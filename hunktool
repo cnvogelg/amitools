@@ -10,7 +10,8 @@ import os, sys
 import argparse
 import pprint
 
-import amitools.Hunk as Hunk
+from amitools import Hunk
+from amitools import ADFScanner
 
 def show_hunks_brief(hunks):
   for hunk in hunks:
@@ -22,27 +23,44 @@ def dump_hunks(hunks):
 
 # ----- handle paths -----
 
-def handle_file(path):
-  global args
-  hf = Hunk.HunkFile()
-  result = hf.read_file(path)
+def check_file(path, hunk_file, result):
   if result == Hunk.RESULT_OK:
     print path,"OK"
     if args.dump:
-      dump_hunks(hf.hunks)
+      dump_hunks(hunk_file.hunks)
   elif result == Hunk.RESULT_NO_HUNK_FILE:
-    #print "No:",path,hf.error_string
+    #print "No:",path,hunk_file.error_string
     pass
   elif result == Hunk.RESULT_INVALID_HUNK_FILE:
-    print path,"Invalid:",hf.error_string
+    print path,"Invalid:",hunk_file.error_string
     if args.dump:
-      dump_hunks(hf.hunks)
+      dump_hunks(hunk_file.hunks)
     sys.exit(1)
   elif result == Hunk.RESULT_UNSUPPORTED_HUNKS:
-    print path,"Unsupported:",hf.error_string
+    print path,"Unsupported:",hunk_file.error_string
     if args.dump:
-      dump_hunks(hf.hunks)
+      dump_hunks(hunk_file.hunks)
     sys.exit(1)
+
+def handle_adf_file(img_path,file_path,data):
+  vpath = img_path + ":" + file_path
+  hf = Hunk.HunkFile()
+  result = hf.read_mem(vpath, data)
+  check_file(vpath, hf, result)
+
+def handle_adf(path):
+  ADFScanner.scan_adf(path, handle_adf_file)
+
+def handle_file(path):
+  global args
+  
+  if path.endswith(".adf"):
+    handle_adf(path)
+    return
+  
+  hf = Hunk.HunkFile()
+  result = hf.read_file(path)
+  check_file(path, hf, result)
 
 def handle_dir(path):
   for root, dirs, files in os.walk(path):
