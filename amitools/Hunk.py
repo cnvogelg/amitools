@@ -198,8 +198,7 @@ class HunkFile:
         return RESULT_INVALID_HUNK_FILE
       
       hunk_info['size'] = hunk_size & ~HUNKF_ALL
-      hunk_info['flags'] = hunk_size & HUNKF_ALL
-      
+      self.set_mem_flags(hunk_info, hunk_size & HUNKF_ALL, 30)      
       hunk_table.append(hunk_info)
     hunk['hunks'] = hunk_table
     return RESULT_OK
@@ -214,7 +213,8 @@ class HunkFile:
     size = num_longs * 4
     
     hunk['size'] = size & ~HUNKF_ALL
-    hunk['flags'] = size & HUNKF_ALL | hunk['flags']
+    flags = size & HUNKF_ALL
+    self.set_mem_flags(hunk, flags, 30)
     hunk['file_offset'] = f.tell()
     data = f.read(hunk['size'])
     #hunk['data'] = data
@@ -230,7 +230,8 @@ class HunkFile:
     size = num_longs * 4
 
     hunk['size'] = size & ~HUNKF_ALL
-    hunk['flags'] = size & HUNKF_ALL | hunk['flags']
+    flags = size & HUNKF_ALL
+    self.set_mem_flags(hunk, flags, 30)
     return RESULT_OK
   
   def parse_reloc(self, f, hunk):
@@ -389,7 +390,7 @@ class HunkFile:
         total_size -= 6
         ihunk['name'] = self.get_index_name(strtab, name_offset)
       
-        # get number of references
+        # get references
         num_refs = self.read_word(f)
         total_size -= 2
         if num_refs > 0:
@@ -401,6 +402,7 @@ class HunkFile:
             name = self.get_index_name(strtab, name_offset)
             refs.append(name)
         
+        # get definitions
         num_defs = self.read_word(f)
         total_size -= 2
         if num_defs > 0:
@@ -409,10 +411,13 @@ class HunkFile:
           for b in xrange(num_defs):
             name_offset = self.read_word(f)
             def_value = self.read_word(f)
-            def_type = self.read_word(f)
+            def_type_flags = self.read_word(f)
+            def_type = def_type_flags & 0x3fff
+            def_flags = def_type_flags & 0xc000
             total_size -= 6
             name = self.get_index_name(strtab, name_offset)
             d = { 'name':name, 'value':def_value,'type':def_type}
+            set_mem_flags(d,def_flags,14)
             defs.append(d)
             
     # align hunk
@@ -426,15 +431,17 @@ class HunkFile:
   def parse_ext(self, f, hunk):
     exts = []
     hunk['exts'] = exts
-    
     ext_type_size = 1
     while ext_type_size > 0:
+      # ext type | size
       ext_type_size = self.read_long(f)
       if ext_type_size < 0:
         self.error_string = "%s has invalid size" % (hunk['type_name'])
         return RESULT_INVALID_HUNK_FILE
       ext_type = ext_type_size >> EXT_TYPE_SHIFT
       ext_size = ext_type_size & EXT_TYPE_SIZE_MASK
+      
+      # ext name
       l,ext_name = self.read_name_size(f, ext_size)
       if l < 0:
         self.error_string = "%s has invalid name" % (hunk['type_name'])
@@ -452,11 +459,13 @@ class HunkFile:
         return RESULT_INVALID_HUNK_FILE
       ext['type_name'] = ext_names[ext_type]
       
-      # read parameters of type
+      # ext common
       if ext_type == EXT_ABSCOMMON or ext_type == EXT_RELCOMMON:
         ext['common_size'] = self.read_long(f)
+      # ext def
       elif ext_type == EXT_DEF or ext_type == EXT_ABS or ext_type == EXT_RES:
-        ext['value'] = self.read_long(f)
+        ext['def'] = self.read_long(f)
+      # ext ref
       else:
         num_refs = self.read_long(f)
         if num_refs == 0:
@@ -466,12 +475,24 @@ class HunkFile:
           ref = self.read_long(f)
           refs.append(ref)
         ext['refs'] = refs
+        
     return RESULT_OK
   
   def parse_unit_or_name(self, f, hunk):
     l,n = self.read_name(f)
-    hunk['name'] = n
+    if l < 0:
+      self.error_string = "%s has invalid name" % (hunk['type_name'])
+      return RESULT_INVALID_HUNK_FILE
+    elif l > 0:
+      hunk['name'] = n
     return RESULT_OK
+    
+  def set_mem_flags(self, hunk, flags, shift):
+    f = flags >> shift
+    if f & 1 == 1:
+      hunk['memf'] = 'chip'
+    elif f & 2 == 2:
+      hunk['memf'] = 'fast'
     
   # ----- public functions -----
   
@@ -533,8 +554,7 @@ class HunkFile:
         hunk = { 'type' : hunk_type }
         self.hunks.append(hunk)
         hunk['type_name'] = hunk_names[hunk_type - HUNK_MIN]
-        # set hunk flags
-        hunk['flags'] = hunk_flags
+        self.set_mem_flags(hunk, hunk_flags, 30)
 
         # V37 fix
         if self.v37_compat and hunk_type == HUNK_DREL32:
