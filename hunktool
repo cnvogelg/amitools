@@ -1,0 +1,68 @@
+#!/usr/bin/env python2.7
+#
+# hunktool
+#
+# the swiss-army knife for Amiga Hunk executable file format
+#
+# written by Christian Vogelgsang (chris@vogelgsang.org)
+
+import os, sys
+import argparse
+import pprint
+
+import amitools.Hunk as Hunk
+
+def show_hunks_brief(hunks):
+  for hunk in hunks:
+    print hunk['name']
+
+def dump_hunks(hunks):
+  pp = pprint.PrettyPrinter(indent=2)
+  pp.pprint(hunks)
+
+# ----- handle paths -----
+
+def handle_file(path):
+  global args
+  hf = Hunk.HunkFile()
+  result = hf.read_file(path)
+  if result == Hunk.RESULT_OK:
+    print path,"OK"
+    if args.dump:
+      dump_hunks(hf.hunks)
+  elif result == Hunk.RESULT_NO_HUNK_FILE:
+    #print "No:",path,hf.error_string
+    pass
+  elif result == Hunk.RESULT_INVALID_HUNK_FILE:
+    print path,"Invalid:",hf.error_string
+    if args.dump:
+      dump_hunks(hf.hunks)
+    sys.exit(1)
+  elif result == Hunk.RESULT_UNSUPPORTED_HUNKS:
+    print path,"Unsupported:",hf.error_string
+    if args.dump:
+      dump_hunks(hf.hunks)
+    sys.exit(1)
+
+def handle_dir(path):
+  for root, dirs, files in os.walk(path):
+    for name in files:
+      handle_file(os.path.join(root,name))
+    for name in dirs:
+      handle_dir(os.path.join(root,name))
+
+def handle_path(path):
+  if os.path.isdir(path):
+    handle_dir(path)
+  elif os.path.isfile(path):
+    handle_file(path)
+  
+# ----- main -----
+parser = argparse.ArgumentParser()
+parser.add_argument('hunkfiles', nargs='+')
+parser.add_argument('-d', '--dump', action='store_true', default=False, help="dump the hunk structure")
+args = parser.parse_args()
+
+for p in args.hunkfiles:
+  handle_path(p)
+print "done"
