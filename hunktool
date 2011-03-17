@@ -10,7 +10,7 @@ import sys
 import argparse
 import pprint
 
-from amitools.HunkScanner import HunkScanner
+from amitools.FileScanner import FileScanner
 from amitools import Hunk
 
 def print_pretty(data):
@@ -28,7 +28,7 @@ class Validator:
     if not self.counts.has_key(error_code):
       self.counts[error_code] = 0
     self.counts[error_code] += 1
-    print path, error_code, hunk_file.error_string
+    print path, Hunk.result_names[error_code], hunk_file.error_string
     if args.dump:
       print_pretty(hunk_file.hunks)
   
@@ -36,7 +36,15 @@ class Validator:
     for code in self.counts.keys():
       print Hunk.result_names[code],":",self.counts[code]
     return 0
-  
+
+# generic hunk reader
+def handle_file(path, fobj, cmd):
+  hunk_file = Hunk.HunkFile()
+  result = hunk_file.read_file_obj(path,fobj,None)
+  if result == Hunk.RESULT_NO_HUNK_FILE:
+    return
+  cmd.handle_file(path, hunk_file, result)
+
 # ----- main -----
 parser = argparse.ArgumentParser()
 #parser.add_argument('command')
@@ -47,7 +55,7 @@ args = parser.parse_args()
 
 # call scanner and process all files with selected command
 cmd = Validator(args)
-scanner = HunkScanner(cmd.handle_file, use_adf=args.adf)
+scanner = FileScanner(lambda path, fobj: handle_file(path, fobj, cmd), use_adf=args.adf)
 for path in args.hunkfiles:
   scanner.handle_path(path)
 res = cmd.result()

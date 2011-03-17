@@ -1,12 +1,11 @@
-# scan a set of hunks
+# scan a set of file
 
 import os
-import Hunk
+import StringIO
 
-class HunkScanner:
+class FileScanner:
   
-  def __init__(self, handler, use_adf = False, ignore_no_hunk = True):
-    self.ignore_no_hunk = ignore_no_hunk
+  def __init__(self, handler, use_adf = False):
     self.handler = handler
     if use_adf:
       import ADFScanner
@@ -14,16 +13,13 @@ class HunkScanner:
     else:
       self.adf_scanner = None
   
-  def call_handler(self, path, hunk_file, return_code):
-    if return_code == Hunk.RESULT_NO_HUNK_FILE and self.ignore_no_hunk:
-      return
-    self.handler(path, hunk_file, return_code)
+  def call_handler(self, path, fobj):
+    self.handler(path, fobj)
 
   def handle_adf_file(self, img_path, file_path, data):
     vpath = img_path + ":" + file_path
-    hf = Hunk.HunkFile()
-    result = hf.read_mem(vpath, data)
-    self.call_handler(vpath, hf, result)
+    fobj = StringIO.StringIO(data)
+    self.call_handler(vpath, fobj)
 
   def handle_adf(self, path):
     if self.adf_scanner != None:
@@ -33,10 +29,8 @@ class HunkScanner:
     if path.lower().endswith(".adf"):
         self.handle_adf(path)
         return
-
-    hf = Hunk.HunkFile()
-    result = hf.read_file(path)
-    self.call_handler(path, hf, result)
+    with open(path) as fobj:
+      self.call_handler(path, fobj)
 
   def handle_dir(self, path):
     for root, dirs, files in os.walk(path):
