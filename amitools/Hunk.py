@@ -1,5 +1,6 @@
 """A class for reading and writing Amiga executables in Hunk format"""
 
+import os
 import struct
 import StringIO
 
@@ -223,7 +224,7 @@ class HunkFile:
     hunk['size'] = size & ~HUNKF_ALL
     flags = size & HUNKF_ALL
     self.set_mem_flags(hunk, flags, 30)
-    hunk['file_offset'] = f.tell()
+    hunk['data_file_offset'] = f.tell()
     data = f.read(hunk['size'])
     #hunk['data'] = data
     return RESULT_OK
@@ -339,13 +340,27 @@ class HunkFile:
     return RESULT_OK
   
   def parse_overlay(self, f, hunk):
-    tab_size = self.read_long(f)
-    if tab_size < 0:
+    ov_size = self.read_long(f)
+    if ov_size < 0:
       self.error_string = "%s has invalid size" % (hunk['type_name'])
       return RESULT_INVALID_HUNK_FILE
-    tab_size += 1
-    size = tab_size * 4
-    data = f.read(size)
+      
+    ov_tree_size = self.read_long(f)
+    if ov_tree_size < 0:
+      self.error_string = "%s has invalid tree_size" % (hunk['type_name'])
+      return RESULT_INVALID_HUNK_FILE
+    
+    hunk['tree_size'] = ov_tree_size
+    
+    # strange overlay usage -> assume a raw overlay until end of file e.g. lha sfx
+    if ov_size == 0 or ov_tree_size <= 1:
+      skip = (ov_size - 1) * 4
+      f.seek(skip, os.SEEK_CUR)
+      hunk['data'] = f.read()
+    else:
+      ov_bytes = ov_size * 4
+      hunk['data'] = f.read(ov_bytes)
+
     return RESULT_OK
   
   def parse_lib(self, f, hunk):
@@ -524,6 +539,8 @@ class HunkFile:
     self.error_string = None
     
     while True:
+      hunk_file_offset = f.tell()
+      
       # read hunk type
       hunk_raw_type = self.read_long(f)
       if hunk_raw_type == -1:
@@ -566,7 +583,7 @@ class HunkFile:
         was_end = False
         was_potentail_v37_hunk = False
         
-        hunk = { 'type' : hunk_type }
+        hunk = { 'type' : hunk_type, 'hunk_file_offset' : hunk_file_offset }
         self.hunks.append(hunk)
         hunk['type_name'] = hunk_names[hunk_type]
         self.set_mem_flags(hunk, hunk_flags, 30)

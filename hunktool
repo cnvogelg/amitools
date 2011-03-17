@@ -33,6 +33,7 @@ class Validator:
     # abort if hunk parser failed!
     if error_code != Hunk.RESULT_OK:
       print Hunk.result_names[error_code], hunk_file.error_string
+      print_pretty(hunk_file.hunks)
       return False
 
     print "[%s]" % (",".join(hunk_file.get_hunk_type_names()).replace("HUNK_",""))
