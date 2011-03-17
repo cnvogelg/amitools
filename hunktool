@@ -28,10 +28,20 @@ class Validator:
     if not self.counts.has_key(error_code):
       self.counts[error_code] = 0
     self.counts[error_code] += 1
-    print path, Hunk.result_names[error_code], hunk_file.error_string
+    print path,
+
+    # abort if hunk parser failed!
+    if error_code != Hunk.RESULT_OK:
+      print Hunk.result_names[error_code], hunk_file.error_string
+      return False
+
+    print "[%s]" % (",".join(hunk_file.get_hunk_type_names()).replace("HUNK_",""))
+    
+    # dump hunk info?
     if args.dump:
       print_pretty(hunk_file.hunks)
-    return error_code == Hunk.RESULT_OK
+
+    return True
   
   def result(self):
     for code in self.counts.keys():

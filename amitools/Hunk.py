@@ -642,3 +642,10 @@ class HunkFile:
 
     return RESULT_OK
 
+  """Return a list with all the hunk type names that were found
+  """
+  def get_hunk_type_names(self):
+    result = []
+    for hunk in self.hunks:
+      result.append(hunk['type_name'])
+    return result
