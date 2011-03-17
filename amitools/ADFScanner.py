@@ -19,14 +19,16 @@ class ADFScanner:
       else:
         path = dir_path + "/" + name
       if entry.ftype == ST_DIR:
-        self.scan_dir(file_name, path, adf)
+        return self.scan_dir(file_name, path, adf)
       elif entry.ftype == ST_FILE:
         try:
           data = adf.get_file(path)
-          self.handler(file_name, path, data)
+          return self.handler(file_name, path, data)
         except AdfIOException, info:
-          pass
+          return False
+      else:
+        return True
 
   def scan_adf(self, file_name):
     adf = Adf(file_name, mode='r')
-    self.scan_dir(file_name, "", adf)
+    return self.scan_dir(file_name, "", adf)

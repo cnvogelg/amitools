@@ -14,34 +14,39 @@ class FileScanner:
       self.adf_scanner = None
   
   def call_handler(self, path, fobj):
-    self.handler(path, fobj)
+    return self.handler(path, fobj)
 
   def handle_adf_file(self, img_path, file_path, data):
     vpath = img_path + ":" + file_path
     fobj = StringIO.StringIO(data)
-    self.call_handler(vpath, fobj)
+    return self.call_handler(vpath, fobj)
 
   def handle_adf(self, path):
     if self.adf_scanner != None:
-      self.adf_scanner.scan_adf(path)
+      return self.adf_scanner.scan_adf(path)
+    else:
+      return True
 
   def handle_file(self, path):
     if path.lower().endswith(".adf"):
-        self.handle_adf(path)
-        return
+        return self.handle_adf(path)
     with open(path) as fobj:
-      self.call_handler(path, fobj)
+      return self.call_handler(path, fobj)
 
   def handle_dir(self, path):
     for root, dirs, files in os.walk(path):
       for name in files:
-        self.handle_file(os.path.join(root,name))
+        if not self.handle_file(os.path.join(root,name)):
+          return False
       for name in dirs:
-        self.handle_dir(os.path.join(root,name))
+        if not self.handle_dir(os.path.join(root,name)):
+          return False
+    return True
 
   def handle_path(self, path):
     if os.path.isdir(path):
-      self.handle_dir(path)
+      return self.handle_dir(path)
     elif os.path.isfile(path):
-      self.handle_file(path)
-  
+      return self.handle_file(path)
+    else:
+      return True

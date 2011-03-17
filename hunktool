@@ -31,6 +31,7 @@ class Validator:
     print path, Hunk.result_names[error_code], hunk_file.error_string
     if args.dump:
       print_pretty(hunk_file.hunks)
+    return error_code == Hunk.RESULT_OK
   
   def result(self):
     for code in self.counts.keys():
@@ -41,9 +42,10 @@ class Validator:
 def handle_file(path, fobj, cmd):
   hunk_file = Hunk.HunkFile()
   result = hunk_file.read_file_obj(path,fobj,None)
+  # ignore non hunk files
   if result == Hunk.RESULT_NO_HUNK_FILE:
-    return
-  cmd.handle_file(path, hunk_file, result)
+    return True
+  return cmd.handle_file(path, hunk_file, result)
 
 # ----- main -----
 parser = argparse.ArgumentParser()
@@ -57,6 +59,8 @@ args = parser.parse_args()
 cmd = Validator(args)
 scanner = FileScanner(lambda path, fobj: handle_file(path, fobj, cmd), use_adf=args.adf)
 for path in args.hunkfiles:
-  scanner.handle_path(path)
+  ok = scanner.handle_path(path)
+  if not ok:
+    print "ABORTED"
 res = cmd.result()
 sys.exit(res)

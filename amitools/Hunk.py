@@ -3,9 +3,6 @@
 import struct
 import StringIO
 
-HUNK_MIN = 999
-HUNK_MAX = 1022
-
 HUNK_UNIT       = 999
 HUNK_NAME       = 1000
 HUNK_CODE       = 1001
@@ -77,6 +74,7 @@ EXT_RELREF32    = 136
 EXT_RELCOMMON   = 137
 EXT_ABSREF16    = 138
 EXT_ABSREF8     = 139
+EXT_RELREF26    = 229
 
 ext_names = {
 EXT_SYMB        : 'EXT_SYMB',
@@ -93,7 +91,8 @@ EXT_DEXT8       : 'EXT_DEXT8',
 EXT_RELREF32    : 'EXT_RELREF32',
 EXT_RELCOMMON   : 'EXT_RELCOMMON',
 EXT_ABSREF16    : 'EXT_ABSREF16',
-EXT_ABSREF8     : 'EXT_ABSREF8'
+EXT_ABSREF8     : 'EXT_ABSREF8',
+EXT_RELREF26    : 'EXT_RELREF26'
 }
 
 EXT_TYPE_SHIFT = 24
@@ -594,7 +593,8 @@ class HunkFile:
         # ----- HUNK_<reloc> -----
         elif hunk_type == HUNK_RELRELOC32 or hunk_type == HUNK_ABSRELOC16 \
           or hunk_type == HUNK_RELRELOC8 or hunk_type == HUNK_RELRELOC16 or hunk_type == HUNK_ABSRELOC32 \
-          or hunk_type ==HUNK_DREL32 or hunk_type == HUNK_DREL16 or hunk_type == HUNK_DREL8:
+          or hunk_type == HUNK_DREL32 or hunk_type == HUNK_DREL16 or hunk_type == HUNK_DREL8 \
+          or hunk_type == HUNK_RELRELOC26:
           result = self.parse_reloc(f,hunk)
           # auto fix v37 bug?
           if hunk_type == HUNK_DREL32 and result != RESULT_OK and v37_compat == None:
