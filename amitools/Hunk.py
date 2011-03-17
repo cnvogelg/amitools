@@ -31,32 +31,36 @@ HUNK_RELOC32SHORT = 1020
 HUNK_RELRELOC32 = 1021
 HUNK_ABSRELOC16 = 1022
 
-hunk_names = [
-"HUNK_UNIT",
-"HUNK_NAME",
-"HUNK_CODE",
-"HUNK_DATA",
-"HUNK_BSS",
-"HUNK_ABSRELOC32",
-"HUNK_RELRELOC16",
-"HUNK_RELRELOC8",
-"HUNK_EXT",
-"HUNK_SYMBOL",
-"HUNK_DEBUG",
-"HUNK_END",
-"HUNK_HEADER",
-"",
-"HUNK_OVERLAY",
-"HUNK_BREAK",
-"HUNK_DREL32",
-"HUNK_DREL16",
-"HUNK_DREL8",
-"HUNK_LIB",
-"HUNK_INDEX",
-"HUNK_RELOC32SHORT",
-"HUNK_RELRELOC32",
-"HUNK_ABSRELOC16"
-]
+HUNK_PPC_CODE   = 1257
+HUNK_RELRELOC26 = 1260
+
+hunk_names = {
+HUNK_UNIT : "HUNK_UNIT",
+HUNK_NAME : "HUNK_NAME",
+HUNK_CODE : "HUNK_CODE",
+HUNK_DATA : "HUNK_DATA",
+HUNK_BSS : "HUNK_BSS",
+HUNK_ABSRELOC32 : "HUNK_ABSRELOC32",
+HUNK_RELRELOC16 : "HUNK_RELRELOC16",
+HUNK_RELRELOC8 : "HUNK_RELRELOC8",
+HUNK_EXT : "HUNK_EXT",
+HUNK_SYMBOL : "HUNK_SYMBOL",
+HUNK_DEBUG : "HUNK_DEBUG",
+HUNK_END : "HUNK_END",
+HUNK_HEADER : "HUNK_HEADER",
+HUNK_OVERLAY : "HUNK_OVERLAY",
+HUNK_BREAK : "HUNK_BREAK",
+HUNK_DREL32 : "HUNK_DREL32",
+HUNK_DREL16 : "HUNK_DREL16",
+HUNK_DREL8 : "HUNK_DREL8",
+HUNK_LIB : "HUNK_LIB",
+HUNK_INDEX : "HUNK_INDEX",
+HUNK_RELOC32SHORT : "HUNK_RELOC32SHORT",
+HUNK_RELRELOC32 : "HUNK_RELRELOC32",
+HUNK_ABSRELOC16 : "HUNK_ABSRELOC16",
+HUNK_PPC_CODE : "HUNK_PPC_CODE",
+HUNK_RELRELOC26 : "HUNK_RELRELOC26"
+}
 
 EXT_SYMB        = 0
 EXT_DEF         = 1
@@ -100,6 +104,13 @@ RESULT_NO_HUNK_FILE = 1
 RESULT_INVALID_HUNK_FILE = 2
 RESULT_UNSUPPORTED_HUNKS = 3
 
+result_names = {
+RESULT_OK : "RESULT_OK",
+RESULT_NO_HUNK_FILE : "RESULT_NO_HUNK_FILE",
+RESULT_INVALID_HUNK_FILE : "RESULT_INVALID_HUNK_FILE",
+RESULT_UNSUPPORTED_HUNKS : "RESULT_UNSUPPORTED_HUNKS"
+}
+
 HUNKF_ADVISORY = 1<<29
 HUNKF_CHIP     = 1<<30
 HUNKF_FAST     = 1<<31
@@ -114,7 +125,6 @@ class HunkFile:
   def __init__(self):
     self.hunks = []
     self.error_string = None
-    self.v37_compat = True
   
   def read_long(self, f):
     data = f.read(4)
@@ -160,8 +170,7 @@ class HunkFile:
       return strtab[offset:end]
   
   def is_valid_first_hunk_type(self, hunk_type):
-    return hunk_type == HUNK_HEADER or hunk_type == HUNK_LIB or hunk_type == HUNK_UNIT \
-          or hunk_type == HUNK_CODE # strange?
+    return hunk_type == HUNK_HEADER or hunk_type == HUNK_LIB or hunk_type == HUNK_UNIT
   
   def parse_header(self, f, hunk):
     names = []
@@ -417,7 +426,7 @@ class HunkFile:
             total_size -= 6
             name = self.get_index_name(strtab, name_offset)
             d = { 'name':name, 'value':def_value,'type':def_type}
-            set_mem_flags(d,def_flags,14)
+            self.set_mem_flags(d,def_flags,14)
             defs.append(d)
             
     # align hunk
@@ -499,19 +508,21 @@ class HunkFile:
   """Read a hunk file and build internal hunk structure
      Return status and set self.error_string on failure
   """
-  def read_file(self, hfile):
+  def read_file(self, hfile, v37_compat=None):
     with open(hfile) as f:
-      return self.read_file_obj(hfile, f)
+      return self.read_file_obj(hfile, f, v37_compat)
 
   """Read a hunk from memory"""
-  def read_mem(self, name, data):
+  def read_mem(self, name, data, v37_compat=None):
     fobj = StringIO.StringIO(data)
-    return self.read_file_obj(name, fobj)
+    return self.read_file_obj(name, fobj, v37_compat)
 
-  def read_file_obj(self, hfile, f):
+  def read_file_obj(self, hfile, f, v37_compat):
     self.hunks = []
     is_first_hunk = True
     was_end = False
+    was_potentail_v37_hunk = False
+    self.error_string = None
     
     while True:
       # read hunk type
@@ -531,40 +542,51 @@ class HunkFile:
       hunk_flags = hunk_raw_type & HUNK_FLAGS_MASK
       
       # check range of hunk type
-      if hunk_type < HUNK_MIN or hunk_type > HUNK_MAX:
+      if not hunk_names.has_key(hunk_type):
         # no hunk file?
         if is_first_hunk:
-          self.error_string = "No valid hunk file: '%s' type was %d" % (hfile, hunk_type) 
+          self.error_string = "No hunk file: '%s' type was %d" % (hfile, hunk_type) 
           return RESULT_NO_HUNK_FILE
         elif was_end:
           # garbage after an end tag is ignored
           return RESULT_OK
+        elif was_potentail_v37_hunk:
+          # auto fix v37 -> reread whole file
+          f.seek(0)
+          return self.read_file_obj(hfile, f, True)
         else:
-          self.error_string = "Invalid hunk type %d found at @%08x" % (hunk_type,f.tell())
+          self.error_string = "Invalid hunk type %d/%x found at @%08x" % (hunk_type,hunk_type,f.tell())
           return RESULT_INVALID_HUNK_FILE
       else:
         # check for valid first hunk type
         if is_first_hunk and not self.is_valid_first_hunk_type(hunk_type):
-          self.error_string = "No valid hunk file: '%s' first hunk type was %d" % (hfile, hunk_type) 
-          return RESULT_INVALID_HUNK_FILE
+          self.error_string = "No hunk file: '%s' first hunk type was %d" % (hfile, hunk_type) 
+          return RESULT_NO_HUNK_FILE
         
         is_first_hunk = False
         was_end = False
+        was_potentail_v37_hunk = False
         
         hunk = { 'type' : hunk_type }
         self.hunks.append(hunk)
-        hunk['type_name'] = hunk_names[hunk_type - HUNK_MIN]
+        hunk['type_name'] = hunk_names[hunk_type]
         self.set_mem_flags(hunk, hunk_flags, 30)
 
-        # V37 fix
-        if self.v37_compat and hunk_type == HUNK_DREL32:
-          hunk_type = HUNK_RELOC32SHORT
+        # V37 fix?
+        if hunk_type == HUNK_DREL32:
+          # try to fix automatically...
+          if v37_compat == None:
+            was_potentail_v37_hunk = True
+          # fix was forced
+          elif v37_compat:
+            hunk_type = HUNK_RELOC32SHORT
+            hunk['fixes'] = 'v37'
 
         # ----- HUNK_HEADER -----
         if hunk_type == HUNK_HEADER:
           result = self.parse_header(f,hunk)
         # ----- HUNK_CODE/HUNK_DATA ------
-        elif hunk_type == HUNK_CODE or hunk_type == HUNK_DATA:
+        elif hunk_type == HUNK_CODE or hunk_type == HUNK_DATA or hunk_type == HUNK_PPC_CODE:
           result = self.parse_code_or_data(f,hunk)
         # ---- HUNK_BSS ----
         elif hunk_type == HUNK_BSS:
@@ -574,6 +596,10 @@ class HunkFile:
           or hunk_type == HUNK_RELRELOC8 or hunk_type == HUNK_RELRELOC16 or hunk_type == HUNK_ABSRELOC32 \
           or hunk_type ==HUNK_DREL32 or hunk_type == HUNK_DREL16 or hunk_type == HUNK_DREL8:
           result = self.parse_reloc(f,hunk)
+          # auto fix v37 bug?
+          if hunk_type == HUNK_DREL32 and result != RESULT_OK and v37_compat == None:
+            f.seek(0)
+            return self.read_file_obj(hfile, f, True)
         # ---- HUNK_<reloc short> -----
         elif hunk_type == HUNK_RELOC32SHORT:
           result = self.parse_reloc_short(f,hunk)
@@ -614,5 +640,5 @@ class HunkFile:
         if result != RESULT_OK:
           return result
 
-      return RESULT_OK
+    return RESULT_OK
 
