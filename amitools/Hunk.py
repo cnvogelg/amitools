@@ -119,12 +119,26 @@ HUNKF_ALL      = (HUNKF_ADVISORY | HUNKF_CHIP | HUNKF_FAST)
 HUNK_TYPE_MASK = 0xffff
 HUNK_FLAGS_MASK = 0xffff0000
 
+TYPE_UNKNOWN    = 0
+TYPE_LOADSEG    = 1
+TYPE_UNIT       = 2
+TYPE_LIB        = 3
+
+type_names = {
+  TYPE_UNKNOWN: 'TYPE_UNKNOWN',
+  TYPE_LOADSEG: 'TYPE_LOADSEG',
+  TYPE_UNIT: 'TYPE_UNIT',
+  TYPE_LIB: 'TYPE_LIB'
+}
+
 class HunkFile:
   """Load and save Amiga executable Hunk structures"""
   
   def __init__(self):
-    self.hunks = []
+    self.hunk_blks = []
     self.error_string = None
+    self.type = None
+    self.hunks = []
   
   def read_long(self, f):
     data = f.read(4)
@@ -354,8 +368,9 @@ class HunkFile:
     
     # strange overlay usage -> assume a raw overlay until end of file e.g. lha sfx
     if ov_size == 0 or ov_tree_size <= 1:
-      skip = (ov_size - 1) * 4
-      f.seek(skip, os.SEEK_CUR)
+      if ov_size > 0:
+        skip = (ov_size - 1) * 4
+        f.seek(skip, os.SEEK_CUR)
       hunk['data'] = f.read()
     else:
       ov_bytes = ov_size * 4
@@ -532,7 +547,7 @@ class HunkFile:
     return self.read_file_obj(name, fobj, v37_compat)
 
   def read_file_obj(self, hfile, f, v37_compat):
-    self.hunks = []
+    self.hunk_blks = []
     is_first_hunk = True
     was_end = False
     was_potentail_v37_hunk = False
@@ -544,8 +559,12 @@ class HunkFile:
       # read hunk type
       hunk_raw_type = self.read_long(f)
       if hunk_raw_type == -1:
-        # eof
-        break
+        if is_first_hunk:
+          self.error_string = "No valid hunk file: '%s' is empty" % (hfile) 
+          return RESULT_NO_HUNK_FILE            
+        else:
+          # eof
+          break
       elif hunk_raw_type < 0:
         if is_first_hunk:
           self.error_string = "No valid hunk file: '%s' is too short" % (hfile) 
@@ -584,7 +603,7 @@ class HunkFile:
         was_potentail_v37_hunk = False
         
         hunk = { 'type' : hunk_type, 'hunk_file_offset' : hunk_file_offset }
-        self.hunks.append(hunk)
+        self.hunk_blks.append(hunk)
         hunk['type_name'] = hunk_names[hunk_type]
         self.set_mem_flags(hunk, hunk_flags, 30)
 
@@ -663,6 +682,129 @@ class HunkFile:
   """
   def get_hunk_type_names(self):
     result = []
-    for hunk in self.hunks:
+    for hunk in self.hunk_blks:
       result.append(hunk['type_name'])
     return result
+
+  # ---------- Build Hunks from Blocks ----------
+
+  def build_loadseg(self):
+    hunk = {}
+    force_header = True
+    for e in self.hunk_blks:
+      hunk_type = e['type']
+      
+      if force_header:
+        if hunk_type == HUNK_HEADER:
+          hunk['header'] = e
+          self.hunks.append(hunk)
+          hunk = {}
+        else:
+          self.error_string = "Expected header in loadseg: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
+          return False          
+        force_header = False
+      else:
+        # a hunk is finished
+        if hunk_type == HUNK_END:
+          # add last and create a new one
+          self.hunks.append(hunk)
+          hunk = {}
+        # add an extra overlay "hunk"
+        elif hunk_type == HUNK_OVERLAY:
+          # assume hunk to be empty
+          if not len(hunk.keys()) == 0:
+            self.error_string = "overlay hunk has to be empty"
+            return False
+          hunk['overlay'] = e
+          self.hunks.append(hunk)
+          hunk = {}
+          force_header = True
+        # break
+        elif hunk_type == HUNK_BREAK:
+          # assume hunk to be empty
+          if not len(hunk.keys()) == 0:
+            self.error_string = "break hunk has to be empty"
+            return False
+          hunk['break'] = e
+          self.hunks.append(hunk)
+          hunk = {}
+          force_header = True
+        # contents of hunk
+        elif hunk_type == HUNK_CODE or hunk_type == HUNK_DATA or hunk_type == HUNK_BSS or hunk_type == HUNK_PPC_CODE:
+          hunk['contents'] = e
+        # relocation
+        elif hunk_type == HUNK_ABSRELOC32:
+          hunk['reloc'] = e
+        # ? found in phxass
+        elif hunk_type == HUNK_DREL32: 
+          hunk['dreloc'] = e
+        # symbol info
+        elif hunk_type == HUNK_SYMBOL:
+          hunk['symbol'] = e
+        # debug info
+        elif hunk_type == HUNK_DEBUG:
+          hunk['debug'] = e
+        # unecpected hunk?!
+        else:
+          self.error_string = "Unexpected hunk in loadseg: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
+          return False
+    
+    # make sure the last one is an end
+    last_hunk = self.hunk_blks[-1]
+    last_type = last_hunk['type']
+    if last_type == HUNK_END:
+      return True
+    elif last_type == HUNK_OVERLAY:
+      # tolerate raw overlays
+      return True
+    elif last_type == HUNK_BREAK:
+      # valid overlay end
+      return True
+    else:
+      self.error_string = "Invalid last hunk in loadseg: %s %d/%x" % (last_hunk['type_name'], last_type, last_type)
+      return False
+    
+  def build_unit(self):
+    return True
+  
+  def build_lib(self):
+    return True
+
+  """From the hunk_blk list build a set of hunks that form the actual binary"""
+  def build_hunks(self):
+    self.hunks = []
+    if len(self.hunk_blks) == 0:
+      self.type = TYPE_UNKNOWN
+      return False
+    
+    # determine type of file from first hunk
+    first_hunk_type = self.hunk_blks[0]['type']
+    if first_hunk_type == HUNK_HEADER:
+      self.type = TYPE_LOADSEG
+      return self.build_loadseg()
+    elif first_hunk_type == HUNK_UNIT:
+      self.type = TYPE_UNIT
+      return self.build_unit()
+    elif first_hunk_type == HUNK_LIB:
+      self.type = TYPE_LIB
+      return self.build_lib()
+    else:
+      self.type = TYPE_UNKNOWN
+      return False
+  
+  def get_hunk_summary(self):
+    result = []
+    for a in self.hunks:
+      l = []
+      for b in a.keys():
+        val = a[b]
+        # if a hunk_block is referenced use its type
+        if val.has_key('type_name'):
+          type_name = val['type_name']
+          tag = type_name.replace('HUNK_','')
+        # else use key
+        else:
+          tag = b
+        l.append(tag)
+      result.append("[%s]" % ",".join(l))
+    return "".join(result)
