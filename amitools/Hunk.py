@@ -3,6 +3,7 @@
 import os
 import struct
 import StringIO
+from types import *
 
 HUNK_UNIT       = 999
 HUNK_NAME       = 1000
@@ -59,6 +60,38 @@ HUNK_ABSRELOC16 : "HUNK_ABSRELOC16",
 HUNK_PPC_CODE : "HUNK_PPC_CODE",
 HUNK_RELRELOC26 : "HUNK_RELRELOC26"
 }
+
+loadseg_valid_hunks = [
+HUNK_CODE,
+HUNK_DATA,
+HUNK_BSS,
+HUNK_PPC_CODE,
+HUNK_ABSRELOC32,
+HUNK_DREL32,
+HUNK_DEBUG,
+HUNK_SYMBOL
+]
+
+unit_valid_hunks = [
+HUNK_CODE,
+HUNK_DATA,
+HUNK_BSS,
+HUNK_PPC_CODE,
+HUNK_DEBUG,
+HUNK_SYMBOL,
+HUNK_NAME,
+HUNK_EXT,
+HUNK_ABSRELOC32,
+HUNK_RELRELOC16,
+HUNK_RELRELOC8,
+HUNK_DREL32,
+HUNK_DREL16,
+HUNK_DREL8,
+HUNK_RELOC32SHORT,
+HUNK_RELRELOC32,
+HUNK_ABSRELOC16,
+HUNK_RELRELOC26,
+]
 
 EXT_SYMB        = 0
 EXT_DEF         = 1
@@ -139,6 +172,16 @@ class HunkFile:
     self.error_string = None
     self.type = None
     self.hunks = []
+  
+  def get_struct_summary(self, obj):
+    if type(obj) == ListType:
+      result = []
+      for a in obj:
+        result.append(self.get_struct_summary(a))
+      return "[" + ",".join(result) + "]"
+    elif type(obj) == DictType:
+      type_name = obj['type_name']
+      return type_name.replace('HUNK_','')
   
   def read_long(self, f):
     data = f.read(4)
@@ -680,25 +723,23 @@ class HunkFile:
 
   """Return a list with all the hunk type names that were found
   """
-  def get_hunk_type_names(self):
-    result = []
-    for hunk in self.hunk_blks:
-      result.append(hunk['type_name'])
-    return result
+  def get_hunk_blk_summary(self):
+    return self.get_struct_summary(self.hunk_blks)
 
   # ---------- Build Hunks from Blocks ----------
 
   def build_loadseg(self):
-    hunk = {}
     force_header = True
+    cur = None
     for e in self.hunk_blks:
       hunk_type = e['type']
       
       if force_header:
         if hunk_type == HUNK_HEADER:
-          hunk['header'] = e
-          self.hunks.append(hunk)
-          hunk = {}
+          cur = []
+          self.hunks.append(cur)
+          cur.append(e)
+          hunk = []
         else:
           self.error_string = "Expected header in loadseg: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
           return False          
@@ -707,64 +748,64 @@ class HunkFile:
         # a hunk is finished
         if hunk_type == HUNK_END:
           # add last and create a new one
-          self.hunks.append(hunk)
-          hunk = {}
+          cur.append(hunk)
+          hunk = []
         # add an extra overlay "hunk"
         elif hunk_type == HUNK_OVERLAY:
           # assume hunk to be empty
-          if not len(hunk.keys()) == 0:
+          if not len(hunk) == 0:
             self.error_string = "overlay hunk has to be empty"
             return False
-          hunk['overlay'] = e
-          self.hunks.append(hunk)
-          hunk = {}
+          cur.append(e)
           force_header = True
         # break
         elif hunk_type == HUNK_BREAK:
           # assume hunk to be empty
-          if not len(hunk.keys()) == 0:
+          if not len(hunk) == 0:
             self.error_string = "break hunk has to be empty"
             return False
-          hunk['break'] = e
-          self.hunks.append(hunk)
-          hunk = {}
           force_header = True
         # contents of hunk
-        elif hunk_type == HUNK_CODE or hunk_type == HUNK_DATA or hunk_type == HUNK_BSS or hunk_type == HUNK_PPC_CODE:
-          hunk['contents'] = e
-        # relocation
-        elif hunk_type == HUNK_ABSRELOC32:
-          hunk['reloc'] = e
-        # ? found in phxass
-        elif hunk_type == HUNK_DREL32: 
-          hunk['dreloc'] = e
-        # symbol info
-        elif hunk_type == HUNK_SYMBOL:
-          hunk['symbol'] = e
-        # debug info
-        elif hunk_type == HUNK_DEBUG:
-          hunk['debug'] = e
+        elif hunk_type in loadseg_valid_hunks:
+          hunk.append(e)
         # unecpected hunk?!
         else:
           self.error_string = "Unexpected hunk in loadseg: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
           return False
-    
-    # make sure the last one is an end
-    last_hunk = self.hunk_blks[-1]
-    last_type = last_hunk['type']
-    if last_type == HUNK_END:
-      return True
-    elif last_type == HUNK_OVERLAY:
-      # tolerate raw overlays
-      return True
-    elif last_type == HUNK_BREAK:
-      # valid overlay end
-      return True
-    else:
-      self.error_string = "Invalid last hunk in loadseg: %s %d/%x" % (last_hunk['type_name'], last_type, last_type)
-      return False
+    return True
     
   def build_unit(self):
+    hunk = []
+    force_unit = True
+    cur = None
+    for e in self.hunk_blks:
+      hunk_type = e['type']
+      
+      # make sure a unit hunk is found
+      if force_unit and hunk_type != HUNK_UNIT:
+        self.error_string = "Expected unit hunk in unit: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
+        return False          
+      force_unit = False
+      
+      # unit
+      if hunk_type == HUNK_UNIT:
+        cur = []
+        self.hunks.append(cur)
+        hunk = []
+        force_unit = False
+      # a hunk is finished
+      elif hunk_type == HUNK_END:
+        # add last and create a new one
+        cur.append(hunk)
+        hunk = []
+      # contents of hunk
+      elif hunk_type in unit_valid_hunks:
+        hunk.append(e)
+      # unecpected hunk?!
+      else:
+        self.error_string = "Unexpected hunk in unit: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
+        return False
+    
     return True
   
   def build_lib(self):
@@ -791,20 +832,6 @@ class HunkFile:
     else:
       self.type = TYPE_UNKNOWN
       return False
-  
+
   def get_hunk_summary(self):
-    result = []
-    for a in self.hunks:
-      l = []
-      for b in a.keys():
-        val = a[b]
-        # if a hunk_block is referenced use its type
-        if val.has_key('type_name'):
-          type_name = val['type_name']
-          tag = type_name.replace('HUNK_','')
-        # else use key
-        else:
-          tag = b
-        l.append(tag)
-      result.append("[%s]" % ",".join(l))
-    return "".join(result)
+    return self.get_struct_summary(self.hunks)
