@@ -184,6 +184,9 @@ class HunkFile:
       type_name = obj['type_name']
       return type_name.replace('HUNK_','')
   
+  def get_long(self, data):
+    return struct.unpack(">I",data)[0]
+  
   def read_long(self, f):
     data = f.read(4)
     if len(data) == 0:
@@ -284,7 +287,7 @@ class HunkFile:
     self.set_mem_flags(hunk, flags, 30)
     hunk['data_file_offset'] = f.tell()
     data = f.read(hunk['size'])
-    #hunk['data'] = data
+    hunk['data'] = data
     return RESULT_OK
   
   def parse_bss(self, f, hunk):
@@ -397,29 +400,50 @@ class HunkFile:
     hunk['data'] = f.read(size)
     return RESULT_OK
   
+  def find_first_code_hunk(self):
+    for hunk in self.hunk_blks:
+      if hunk['type'] == HUNK_CODE:
+        return hunk
+    return None
+  
   def parse_overlay(self, f, hunk):
+    # read size of overlay hunk
     ov_size = self.read_long(f)
     if ov_size < 0:
       self.error_string = "%s has invalid size" % (hunk['type_name'])
       return RESULT_INVALID_HUNK_FILE
+    
+    # read data of overlay
+    byte_size = (ov_size + 1) *4
+    ov_data = f.read(byte_size)
+    hunk['ov_data'] = ov_data
       
-    ov_tree_size = self.read_long(f)
-    if ov_tree_size < 0:
-      self.error_string = "%s has invalid tree_size" % (hunk['type_name'])
+    # check: first get header hunk
+    hdr_hunk = self.hunk_blks[0]
+    if hdr_hunk['type'] != HUNK_HEADER:
+      self.error_string = "%s has no header hunk" % (hunk['type_name'])
       return RESULT_INVALID_HUNK_FILE
     
-    hunk['tree_size'] = ov_tree_size
+    # first find the code segment of the overlay manager
+    overlay_mgr_hunk = self.find_first_code_hunk()
+    if overlay_mgr_hunk == None:
+      self.error_string = "%s has no overlay manager hunk" % (hunk['type_name'])
+      return RESULT_INVALID_HUNK_FILE
     
-    # strange overlay usage -> assume a raw overlay until end of file e.g. lha sfx
-    if ov_size == 0 or ov_tree_size <= 1:
-      if ov_size > 0:
-        skip = (ov_size - 1) * 4
-        f.seek(skip, os.SEEK_CUR)
-      hunk['data'] = f.read()
-    else:
-      ov_bytes = ov_size * 4
-      hunk['data'] = f.read(ov_bytes)
-
+    # check overlay manager
+    overlay_mgr_data = overlay_mgr_hunk['data']
+    magic = self.get_long(overlay_mgr_data[4:8])
+    if magic != 0xabcd:
+      self.error_string = "no valid overlay manager magic found"
+      return RESULT_INVALID_HUNK_FILE
+    
+    # check for standard overlay manager
+    magic2 = self.get_long(overlay_mgr_data[24:28])
+    magic3 = self.get_long(overlay_mgr_data[28:32])
+    magic4 = self.get_long(overlay_mgr_data[32:36])
+    std_overlay = (magic2 == 0x5ba0) and (magic3 == 0x074f7665) and (magic4 == 0x726c6179)
+    hunk['ov_std'] = std_overlay
+    
     return RESULT_OK
   
   def parse_lib(self, f, hunk):
@@ -607,6 +631,7 @@ class HunkFile:
     is_first_hunk = True
     was_end = False
     was_potentail_v37_hunk = False
+    was_overlay = False
     self.error_string = None
     lib_size = 0
     last_file_offset = 0
@@ -626,7 +651,7 @@ class HunkFile:
       elif hunk_raw_type < 0:
         if is_first_hunk:
           self.error_string = "No valid hunk file: '%s' is too short" % (hfile) 
-          return RESULT_NO_HUNK_FILE            
+          return RESULT_NO_HUNK_FILE        
         else:
           self.error_string = "Error reading hunk type @%08x" % (f.tell())
           return RESULT_INVALID_HUNK_FILE
@@ -647,6 +672,11 @@ class HunkFile:
           # auto fix v37 -> reread whole file
           f.seek(0)
           return self.read_file_obj(hfile, f, True)
+        elif was_overlay:
+          # seems to be a custom overlay -> read to end of file
+          ov_custom_data = f.read()
+          self.hunk_blks[-1]['custom_data'] = ov_custom_data
+          return RESULT_OK
         else:
           self.error_string = "Invalid hunk type %d/%x found at @%08x" % (hunk_type,hunk_type,f.tell())
           return RESULT_INVALID_HUNK_FILE
@@ -659,6 +689,7 @@ class HunkFile:
         is_first_hunk = False
         was_end = False
         was_potentail_v37_hunk = False
+        was_overlay = False
         
         hunk = { 'type' : hunk_type, 'hunk_file_offset' : hunk_file_offset }
         self.hunk_blks.append(hunk)
@@ -717,6 +748,7 @@ class HunkFile:
         # ----- HUNK_OVERLAY -----
         elif hunk_type == HUNK_OVERLAY:
           result = self.parse_overlay(f,hunk)
+          was_overlay = True
         # ----- HUNK_BREAK -----
         elif hunk_type == HUNK_BREAK:
           result = RESULT_OK        
