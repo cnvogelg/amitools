@@ -14,21 +14,29 @@ class ADFScanner:
     entries = adf.ls_dir(dir_path)
     for entry in entries:
       name = entry.fname
+      
       if dir_path == "":
         path = name
       else:
         path = dir_path + "/" + name
+      
       if entry.ftype == ST_DIR:
-        return self.scan_dir(file_name, path, adf)
+        ok = self.scan_dir(file_name, path, adf)
+        if not ok:
+          return False
       elif entry.ftype == ST_FILE:
         try:
           data = adf.get_file(path)
-          return self.handler(file_name, path, data)
+          ok = self.handler(file_name, path, data)
+          if not ok:
+            return False
         except AdfIOException, info:
           return False
-      else:
-        return True
+    return True
 
   def scan_adf(self, file_name):
     adf = Adf(file_name, mode='r')
-    return self.scan_dir(file_name, "", adf)
+    if not adf.is_mounted():
+      return True
+    else:
+      return self.scan_dir(file_name, "", adf)

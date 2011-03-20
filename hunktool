@@ -35,7 +35,7 @@ class Validator:
       print Hunk.result_names[error_code], hunk_file.error_string
       if args.dump:
         print_pretty(hunk_file.hunk_blks)        
-      return False
+      return args.stop
 
     # if verbose then print block structure
     if args.verbose:
@@ -49,7 +49,7 @@ class Validator:
     ok = hunk_file.build_hunks()
     if not ok:
       print "BUILD HUNK FAILED: %s" % (hunk_file.error_string)
-      return False
+      return args.stop
     
     # print recognized file type name
     print Hunk.type_names[hunk_file.type],
@@ -85,7 +85,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('hunkfiles', nargs='+')
 parser.add_argument('-d', '--dump', action='store_true', default=False, help="dump the hunk structure")
 parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
-parser.add_argument('-a', '--adf', action='store_true', default=False, help="enable adf scanner (requires adflib)")
+parser.add_argument('-a', '--adf', action='store_true', default=False, help="enable adf scanner (requires adflib shared lib)")
+parser.add_argument('-n', '--no-stop', dest='stop', action='store_false', default=True, help="do not stop on error")
 args = parser.parse_args()
 
 # call scanner and process all files with selected command

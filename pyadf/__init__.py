@@ -196,10 +196,11 @@ class Adf(object):
         while cell:
             tmp_content = cell[0].content
             tmp_content = adflib.cast(tmp_content, Entry_Ptr)
-            fentry = process_entry(vol, tmp_content, "")
-            if fentry:
-                result.append(fentry)
-            cell = cell[0].next
+            if bool(tmp_content):
+              fentry = process_entry(vol, tmp_content, "")
+              if fentry:
+                  result.append(fentry)
+              cell = cell[0].next
         
         adflib.adfFreeDirList(list)
         if dirname:
@@ -338,8 +339,11 @@ class Adf(object):
             _single_internaladfenv.acquire()
         if not self.dev:
             self.dev = adflib.adfMountDev(self.adf_filename, readonly_mode)
-        if not self.vol:
+        if not self.vol and self.dev:
             self.vol = adflib.adfMount(self.dev, self.volnum, readonly_mode)
+    
+    def is_mounted(self):
+      return bool(self.vol)
 
     def close(self):
         ## not sure about name
