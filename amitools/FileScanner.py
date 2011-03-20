@@ -2,18 +2,18 @@
 
 import os
 import StringIO
+import LHAScanner
+import ADFScanner
 
 class FileScanner:
   
-  def __init__(self, handler, use_adf = False, use_lha = None):
+  def __init__(self, handler, use_adf = None, use_lha = None, stop_on_error = True):
     self.handler = handler
     if use_adf:
-      import ADFScanner
-      self.adf_scanner = ADFScanner.ADFScanner(lambda a,b,c: self.handle_ext_file(a,b,c))
+      self.adf_scanner = ADFScanner.ADFScanner(use_adf, lambda a,b,c: self.handle_ext_file(a,b,c), stop_on_error=stop_on_error)
     else:
       self.adf_scanner = None
     if use_lha:
-      import LHAScanner
       self.lha_scanner = LHAScanner.LHAScanner(use_lha, lambda a,b,c: self.handle_ext_file(a,b,c))
     else:
       self.lha_scanner = None
