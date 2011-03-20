@@ -192,7 +192,7 @@ class HunkFile:
     if len(data) == 0:
       return -1
     elif len(data) != 4:
-      return -42
+      return -(len(data)+1)
     return struct.unpack(">I",data)[0]
 
   def read_word(self, f):
@@ -200,7 +200,7 @@ class HunkFile:
     if len(data) == 0:
       return -1
     elif len(data) != 2:
-      return -42
+      return -(len(data)+1)
     return struct.unpack(">H",data)[0]
 
   def read_name(self, f):
@@ -213,8 +213,10 @@ class HunkFile:
       return self.read_name_size(f, num_longs)
 
   def read_name_size(self, f, num_longs):
-    size = num_longs * 4
+    size = (num_longs & 0xffffff) * 4
     data = f.read(size)
+    if len(data) < size:
+      return -1,None
     endpos = data.find('\0')
     if endpos == -1:
       return size,data
@@ -235,6 +237,7 @@ class HunkFile:
   
   def parse_header(self, f, hunk):
     names = []
+    hunk['names'] = names
     while True:
       l,s = self.read_name(f)
       if l < 0:
@@ -243,7 +246,6 @@ class HunkFile:
       elif l == 0:
         break
       names.append(s)
-    hunk['names'] = names
 
     # table size and hunk range
     table_size = self.read_long(f)
@@ -375,9 +377,11 @@ class HunkFile:
   def parse_symbol(self, f, hunk):
     name_len = 1
     symbols = []
+    hunk['symbols'] = symbols
     while name_len > 0:
       (name_len, name) = self.read_name(f)
       if name_len < 0:
+        print "%08x" % f.tell()
         self.error_string = "%s has invalid symbol name" % (hunk['type_name'])
         return RESULT_INVALID_HUNK_FILE
       elif name_len == 0:
@@ -385,10 +389,9 @@ class HunkFile:
         break
       value = self.read_long(f)
       if value < 0:
-        self.error_string = "%s has invalid symbol vlaue" % (hunk['type_name'])
+        self.error_string = "%s has invalid symbol value" % (hunk['type_name'])
         return RESULT_INVALID_HUNK_FILE
       symbols.append( (name,value) )
-    hunk['symbols'] = symbols
     return RESULT_OK
   
   def parse_debug(self, f, hunk):
@@ -641,7 +644,7 @@ class HunkFile:
       
       # read hunk type
       hunk_raw_type = self.read_long(f)
-      if hunk_raw_type == -1:
+      if hunk_raw_type == -1 or hunk_raw_type == -2: # tolerate extra byte at end
         if is_first_hunk:
           self.error_string = "No valid hunk file: '%s' is empty" % (hfile) 
           return RESULT_NO_HUNK_FILE            
