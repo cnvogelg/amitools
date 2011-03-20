@@ -23,6 +23,7 @@ class Validator:
   def __init__(self, args):
     self.counts = {}
     self.args = args
+    self.failed_files = []
 
   def handle_file(self, path, hunk_file, error_code):
     if not self.counts.has_key(error_code):
@@ -34,8 +35,9 @@ class Validator:
     if error_code != Hunk.RESULT_OK:
       print Hunk.result_names[error_code], hunk_file.error_string
       if args.dump:
-        print_pretty(hunk_file.hunk_blks)        
-      return args.stop
+        print_pretty(hunk_file.hunk_blks)
+      self.failed_files.append( (path, "READ: " + hunk_file.error_string) )        
+      return not self.args.stop
 
     # if verbose then print block structure
     if args.verbose:
@@ -49,7 +51,8 @@ class Validator:
     ok = hunk_file.build_hunks()
     if not ok:
       print "BUILD HUNK FAILED: %s" % (hunk_file.error_string)
-      return args.stop
+      self.failed_files.append( (path, "BUILD: " + hunk_file.error_string) )
+      return not self.args.stop
     
     # print recognized file type name
     print Hunk.type_names[hunk_file.type],
@@ -68,6 +71,8 @@ class Validator:
   def result(self):
     for code in self.counts.keys():
       print Hunk.result_names[code],":",self.counts[code]
+    for failed in self.failed_files:
+      print failed[0],failed[1]
     return 0
 
 # generic hunk reader
@@ -86,12 +91,13 @@ parser.add_argument('hunkfiles', nargs='+')
 parser.add_argument('-d', '--dump', action='store_true', default=False, help="dump the hunk structure")
 parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
 parser.add_argument('-a', '--adf', action='store_true', default=False, help="enable adf scanner (requires adflib shared lib)")
-parser.add_argument('-n', '--no-stop', dest='stop', action='store_false', default=True, help="do not stop on error")
+parser.add_argument('-l', '--lha', nargs='?', default='lha', help="enable lha scanner (with given lha executable)")
+parser.add_argument('-s', '--stop', action='store_true', default=False, help="stop on error")
 args = parser.parse_args()
 
 # call scanner and process all files with selected command
 cmd = Validator(args)
-scanner = FileScanner(lambda path, fobj: handle_file(path, fobj, cmd), use_adf=args.adf)
+scanner = FileScanner(lambda path, fobj: handle_file(path, fobj, cmd), use_adf=args.adf, use_lha=args.lha)
 for path in args.hunkfiles:
   ok = scanner.handle_path(path)
   if not ok:

@@ -20,6 +20,7 @@ class ADFScanner:
       else:
         path = dir_path + "/" + name
       
+      print path
       if entry.ftype == ST_DIR:
         ok = self.scan_dir(file_name, path, adf)
         if not ok:
