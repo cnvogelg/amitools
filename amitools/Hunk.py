@@ -381,7 +381,6 @@ class HunkFile:
     while name_len > 0:
       (name_len, name) = self.read_name(f)
       if name_len < 0:
-        print "%08x" % f.tell()
         self.error_string = "%s has invalid symbol name" % (hunk['type_name'])
         return RESULT_INVALID_HUNK_FILE
       elif name_len == 0:
