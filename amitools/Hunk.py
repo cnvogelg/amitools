@@ -69,7 +69,8 @@ HUNK_PPC_CODE,
 HUNK_ABSRELOC32,
 HUNK_DREL32,
 HUNK_DEBUG,
-HUNK_SYMBOL
+HUNK_SYMBOL,
+HUNK_NAME
 ]
 
 unit_valid_hunks = [
@@ -423,16 +424,17 @@ class HunkFile:
   
   def parse_lib(self, f, hunk):
     lib_size = self.read_long(f)
-    # TODO: mark the embedded hunk structure
-    return RESULT_OK
+    hunk['lib_file_offset'] = f.tell()
+    return RESULT_OK,lib_size * 4
   
   def parse_index(self, f, hunk):
     index_size = self.read_long(f)
     total_size = index_size * 4
+
     # first read string table
     strtab_size = self.read_word(f)
     strtab = f.read(strtab_size)
-    total_size -= strtab_size
+    total_size -= strtab_size + 2
     
     # read units
     units = []
@@ -454,8 +456,7 @@ class HunkFile:
       hunk_begin = self.read_word(f)
       num_hunks = self.read_word(f)
       total_size -= 4
-      unit['hunk_begin'] = hunk_begin
-      unit['num_hunks'] = num_hunks
+      unit['hunk_offset'] = hunk_begin
 
       # for all hunks in unit
       ihunks = []
@@ -470,6 +471,10 @@ class HunkFile:
         hunk_type   = self.read_word(f)
         total_size -= 6
         ihunk['name'] = self.get_index_name(strtab, name_offset)
+        ihunk['size'] = hunk_size
+        ihunk['type'] = hunk_type & 0x3fff
+        self.set_mem_flags(ihunk,hunk_type & 0xc000,14)
+        ihunk['type_name'] = hunk_names[hunk_type & 0x3fff]
       
         # get references
         num_refs = self.read_word(f)
@@ -478,10 +483,18 @@ class HunkFile:
           refs = []
           ihunk['refs'] = refs
           for b in xrange(num_refs):
+            ref = {}
             name_offset = self.read_word(f)
             total_size -= 2
             name = self.get_index_name(strtab, name_offset)
-            refs.append(name)
+            if name == '':
+              # 16 bit refs point to the previous zero byte before the string entry...
+              name = self.get_index_name(strtab, name_offset+1)
+              ref['bits'] = 16
+            else:
+              ref['bits'] = 32
+            ref['name'] = name
+            refs.append(ref)
         
         # get definitions
         num_defs = self.read_word(f)
@@ -595,6 +608,8 @@ class HunkFile:
     was_end = False
     was_potentail_v37_hunk = False
     self.error_string = None
+    lib_size = 0
+    last_file_offset = 0
     
     while True:
       hunk_file_offset = f.tell()
@@ -650,6 +665,13 @@ class HunkFile:
         hunk['type_name'] = hunk_names[hunk_type]
         self.set_mem_flags(hunk, hunk_flags, 30)
 
+        # account for lib
+        last_hunk_size = hunk_file_offset - last_file_offset
+        if lib_size > 0:
+          lib_size -= last_hunk_size
+        if lib_size > 0:
+          hunk['in_lib'] = True
+
         # V37 fix?
         if hunk_type == HUNK_DREL32:
           # try to fix automatically...
@@ -700,7 +722,8 @@ class HunkFile:
           result = RESULT_OK        
         # ----- HUNK_LIB -----
         elif hunk_type == HUNK_LIB:
-          result = self.parse_lib(f,hunk)
+          result,lib_size = self.parse_lib(f,hunk)
+          lib_size += 8 # add size of HUNK_LIB itself
         # ----- HUNK_INDEX -----
         elif hunk_type == HUNK_INDEX:
           result = self.parse_index(f,hunk)
@@ -719,6 +742,7 @@ class HunkFile:
         if result != RESULT_OK:
           return result
 
+        last_file_offset = hunk_file_offset
     return RESULT_OK
 
   """Return a list with all the hunk type names that were found
@@ -809,6 +833,47 @@ class HunkFile:
     return True
   
   def build_lib(self):
+    force_lib = True
+    force_index = False
+    cur_lib = []
+    contents_list = None
+    lib_list = []
+    hunk = []
+    self.hunks.append(lib_list)
+    for e in self.hunk_blks:
+      hunk_type = e['type']
+      
+      # make sure a lib hunk is found
+      if force_lib and hunk_type != HUNK_LIB:
+        self.error_string = "Expected lib hunk in lib: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
+        return False          
+      force_lib = False
+      
+      # lib
+      if hunk_type == HUNK_LIB:
+        cur_lib = []
+        lib_list.append(cur_lib)
+        cur_lib.append(e)
+        contents_list = []
+        cur_lib.append(contents_list)
+        hunk = []
+      # index
+      elif hunk_type == HUNK_INDEX:
+        cur_lib.append(e)
+        force_lib = True
+      # other contents
+      elif hunk_type in unit_valid_hunks:
+        if not e.has_key('in_lib'):
+          self.error_string = "Hunk not in lib: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
+          return False
+        hunk.append(e)
+      # end in lib list
+      elif hunk_type == HUNK_END:
+        contents_list.append(hunk)
+        hunk = []        
+      else:
+        self.error_string = "Unexpected hunk in lib: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
+        return False
     return True
 
   """From the hunk_blk list build a set of hunks that form the actual binary"""
