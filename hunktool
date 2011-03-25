@@ -12,12 +12,15 @@ import pprint
 
 from amitools.FileScanner import FileScanner
 from amitools import Hunk
+from amitools import ELF
 
 def print_pretty(data):
   pp = pprint.PrettyPrinter(indent=2)
   pp.pprint(data)
 
-# ----- commands -----
+# ----- commands -------------------------------------------------------------
+
+# ----- Validator -----
 
 class Validator:
   def __init__(self, args):
@@ -74,20 +77,42 @@ class Validator:
     for failed in self.failed_files:
       print failed[0],failed[1]
     return 0
+      
+  def process_file(self, path, fobj, cmd):
+    hunk_file = Hunk.HunkFile()
+    result = hunk_file.read_file_obj(path,fobj,None)
+    # ignore non hunk files
+    if result == Hunk.RESULT_NO_HUNK_FILE:
+      return True
+    return self.handle_file(path, hunk_file, result)
+  
+  def run(self):
+    scanner = FileScanner(lambda path, fobj: self.process_file(path, fobj, cmd), use_adf=args.adf, use_lha=args.lha, stop_on_error=args.stop)
+    for path in args.files:
+      ok = scanner.handle_path(path)
+      if not ok:
+        print "ABORTED"
+    return cmd.result()
 
-# generic hunk reader
-def handle_file(path, fobj, cmd):
-  hunk_file = Hunk.HunkFile()
-  result = hunk_file.read_file_obj(path,fobj,None)
-  # ignore non hunk files
-  if result == Hunk.RESULT_NO_HUNK_FILE:
-    return True
-  return cmd.handle_file(path, hunk_file, result)
+# ----- Elf2Hunk -----
 
+class Elf2Hunk:
+  def __init__(self,args):
+    self.args = args
+  
+  def run(self):
+    for f in args.files:
+      elf = ELF.ELF()
+      if not elf.load(f):
+        print "ERROR loading ELF:",elf.error_string
+        return 1
+      elf.dump_segment_headers()
+    return 0
+  
 # ----- main -----
 parser = argparse.ArgumentParser()
-#parser.add_argument('command')
-parser.add_argument('hunkfiles', nargs='+')
+parser.add_argument('command', help="command: validate, elf2hunk")
+parser.add_argument('files', nargs='+')
 parser.add_argument('-d', '--dump', action='store_true', default=False, help="dump the hunk structure")
 parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
 parser.add_argument('-a', '--adf', nargs='?', default='unadf', help="enable adf scanner (requires unadf tool)")
@@ -96,11 +121,17 @@ parser.add_argument('-s', '--stop', action='store_true', default=False, help="st
 args = parser.parse_args()
 
 # call scanner and process all files with selected command
-cmd = Validator(args)
-scanner = FileScanner(lambda path, fobj: handle_file(path, fobj, cmd), use_adf=args.adf, use_lha=args.lha, stop_on_error=args.stop)
-for path in args.hunkfiles:
-  ok = scanner.handle_path(path)
-  if not ok:
-    print "ABORTED"
-res = cmd.result()
+cmd_map = {
+"validate" : Validator,
+"elf2hunk" : Elf2Hunk
+}
+cmd = args.command
+if not cmd_map.has_key(cmd):
+  print "INVALID COMMAND:",cmd
+  sys.exit(1)
+cmd_cls = cmd_map[cmd]
+
+# execute command
+cmd = cmd_cls(args)
+res = cmd.run()
 sys.exit(res)
