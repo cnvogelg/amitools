@@ -81,6 +81,10 @@ STV_values = {
  3: "PROTECTED"
 }
 
+R_68K_values = {
+0: "68K_NONE",
+1: "68K_32"
+}
 class ELF:
   
   def __init__(self):
@@ -267,7 +271,39 @@ class ELF:
       if not self.parse_data(fmt, entry_data, entry, names):
          self.error_string = "Error parsing rela entry"
          return False
+         
+      # decode sym and type
+      info = entry['info']
+      entry['sym'] = info >> 8
+      entry['type'] = info & 0xff
+      
+      entry['type_str'] = self.decode_value(entry['type'], R_68K_values)
+         
       rela.append(entry)
+      off += entsize
+    return True
+  
+  def resolve_rela_links(self, seg, seghdr):
+    link = seg['link']
+    info = seg['info']
+    num_segs = len(seghdr)
+    if link == 0 or link >= num_segs:
+      self.error_string = "Invalid rela link!"
+      return False
+    if info == 0 or info >= num_segs:  
+      self.error_string = "Invalid rela info!"
+      return False
+    seg['link_seg'] = seghdr[link]
+    seg['info_seg'] = seghdr[info]
+    
+    symtab = seg['link_seg']['symtab']
+    for entry in seg['rela']:
+      entry['sym_ref'] = symtab[entry['sym']]
+      entry['sym_str'] = entry['sym_ref']['name_str']
+      # relative to segment
+      if entry['sym_str'] == "":
+        entry['sym_str'] = seg['info_seg']['name_str']
+    
     return True
   
   def load_segment(self, f, seg):
@@ -347,6 +383,12 @@ class ELF:
           self.elf['symtab'] = seg['symtab']
           if not self.resolve_symtab_names(seg, seghdr):
             return False
+      
+      # resolve rela links
+      for seg in seghdr:  
+        if seg['type'] == SHT_RELA:
+          if not self.resolve_rela_links(seg, seghdr):
+            return False
         
     return True
     
@@ -371,4 +413,14 @@ class ELF:
             (num,sym['value'],sym['size'],sym['type_str'], \
              sym['bind_str'],sym['visibility_str'],sym['name_str']) 
       num += 1
-    
+  
+  def dump_relas(self):
+    for seg in self.elf['seghdr']:
+      if seg['type'] == SHT_RELA:
+        print seg['name_str']
+        print "      offset    type        symbol + addend"
+        num = 0
+        for rel in seg['rela']:
+          print "%4d  %08x  %-10s  %s (%d) + %d" % (num,rel['offset'],rel['type_str'],\
+                rel['sym_str'],rel['sym'],rel['addend'])
+          num += 1

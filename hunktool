@@ -108,6 +108,7 @@ class Elf2Hunk:
         return 1
       elf.dump_segment_headers()
       elf.dump_symbols()
+      elf.dump_relas()
     return 0
   
 # ----- main -----
