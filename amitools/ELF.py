@@ -18,9 +18,10 @@ ET_values = {
 }
 
 SHN_UNDEF = 0
-SHT_NOBITS = 8
-SHT_STRTAB = 3
 SHT_SYMTAB = 2
+SHT_STRTAB = 3
+SHT_RELA = 4
+SHT_NOBITS = 8
 
 SHT_values = {
   0: "NULL",
@@ -252,6 +253,23 @@ class ELF:
     
     return True
   
+  def decode_rela(self, seg, data):
+    entsize = seg['entsize']
+    num = seg['size'] / entsize
+    rela = []
+    seg['rela'] = rela
+    fmt = "IIi"
+    names = ['offset','info','addend']
+    off = 0
+    for n in xrange(num):
+      entry = {}
+      entry_data = data[off:off+entsize]
+      if not self.parse_data(fmt, entry_data, entry, names):
+         self.error_string = "Error parsing rela entry"
+         return False
+      rela.append(entry)
+    return True
+  
   def load_segment(self, f, seg):
     t = seg['type']
     size = seg['size']
@@ -268,6 +286,9 @@ class ELF:
           return False
       elif t == SHT_SYMTAB:
         if not self.decode_symtab(seg, data):
+          return False
+      elif t == SHT_RELA:
+        if not self.decode_rela(seg, data):
           return False
       else:
         # store raw data
