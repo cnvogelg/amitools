@@ -9,7 +9,7 @@ ELFOSABI_SYSV = 0
 
 EM_68K = 4
 
-ET_names = {
+ET_values = {
   0: "NONE",
   1: "REL",
   2: "EXEC",
@@ -20,8 +20,9 @@ ET_names = {
 SHN_UNDEF = 0
 SHT_NOBITS = 8
 SHT_STRTAB = 3
+SHT_SYMTAB = 2
 
-SHT_names = {
+SHT_values = {
   0: "NULL",
   1: "PROGBITS",
   2: "SYMTAB",
@@ -39,6 +40,44 @@ SHT_names = {
   16: "PREINIT_ARRAY",
   17: "GROUP",
   18: "SYMTAB_SHNDX" 
+}
+
+SHT_flags = {
+  1: "WRITE",
+  2: "ALLOC",
+  4: "EXECINSTR",
+  8: "MERGE",
+ 16: "STRINGS",
+ 32: "INFO_LINK",
+ 64: "LINK_ORDER",
+128: "OS_NONCONFORMING",
+256: "GROUP",
+512: "TLS"
+}
+
+STB_values = {
+  0: "LOCAL",
+  1: "GLOBAL",
+  2: "WEAK",
+  3: "NUM"
+}
+
+STT_values = {
+  0: "NOTYPE",
+  1: "OBJECT",
+  2: "FUNC",
+  3: "SECTION",
+  4: "FILE",
+  5: "COMMON",
+  6: "TLS",
+  7: "NUM"
+}
+
+STV_values = {
+ 0: "DEFAULT",
+ 1: "INTERNAL",
+ 2: "HIDDEN",
+ 3: "PROTECTED"
 }
 
 class ELF:
@@ -75,6 +114,19 @@ class ELF:
     for i in xrange(nlen):
       tgt[names[i]] = decoded[i]
     return True
+  
+  def decode_flags(self, value, names):
+    result = []
+    for mask in names:
+      if mask & value == mask:
+        result.append(names[mask])
+    return result
+
+  def decode_value(self, value, names):
+    if names.has_key(value):
+      return names[value]
+    else:
+      return "?UNKNOWN?"
     
   def parse_header(self,data):
     hdr = self.elf['hdr']
@@ -82,10 +134,7 @@ class ELF:
     fmt = "HHIIIIIHHHHHH"
     if not self.parse_data(fmt,data,hdr,names):
       return False
-    if not hdr['type'] in ET_names:
-      self.error_string = "Unknown ELF type: "+hdr['type']
-      return False
-    hdr['type_name'] = ET_names[hdr['type']]
+    hdr['type_str'] = self.decode_value(hdr['type'],ET_values)
     return True
   
   def check_m68k(self):
@@ -97,16 +146,20 @@ class ELF:
            ident['osabi'] == ELFOSABI_SYSV and \
            ident['abiversion'] == 0 and \
            hdr['machine'] == EM_68K
-           
-  def parse_seghdr_entry(self, data, seghdr):
+  
+  def parse_seghdr_entry(self, data):
     fmt = "IIIIIIIIII"
     names = ['name','type','flags','addr','offset','size','link','info','addralign','entsize']
     seg = {}
     if not self.parse_data(fmt, data, seg, names):
       self.error_string = "Error parsing segment header entry"
-      return False
-    seghdr.append(seg)
-    return True
+      return None
+      
+    # decode flags
+    seg['flags_dec'] = self.decode_flags(seg['flags'], SHT_flags)
+    # decode type
+    seg['type_str'] = self.decode_value(seg['type'], SHT_values)
+    return seg
 
   def load_segment_header(self, f):
     hdr = self.elf['hdr']
@@ -118,8 +171,10 @@ class ELF:
     shnum = hdr['shnum']
     for i in xrange(shnum):
       sh_data = f.read(shentsize)
-      if not self.parse_seghdr_entry(sh_data,seghdr):
+      seg = self.parse_seghdr_entry(sh_data)
+      if not seg:
         return False
+      seghdr.append(seg)
     return True
   
   def decode_strtab(self, seg, data):
@@ -151,6 +206,52 @@ class ELF:
     delta = off - strtab[-1][0]
     return strtab[-1][1][delta:]
   
+  def decode_symtab(self, seg, data):
+    entsize = seg['entsize']
+    num = seg['size'] / entsize
+    symtab = []
+    seg['symtab'] = symtab
+    fmt = "IIIBBH"
+    names = ['name','value','size','info','other','shndx']
+    off = 0
+    for n in xrange(num):
+      entry = {}
+      entry_data = data[off:off+entsize]
+      if not self.parse_data(fmt, entry_data, entry, names):
+         self.error_string = "Error parsing symtab entry"
+         return False
+         
+      # decode bind and type from info
+      info = entry['info']
+      entry['bind'] = info >> 4
+      entry['type'] = info & 0xf
+      other = entry['other']
+      entry['visibility'] = other & 0x3
+      
+      entry['bind_str'] = self.decode_value(entry['bind'], STB_values)
+      entry['type_str'] = self.decode_value(entry['type'], STT_values)
+      entry['visibility_str'] = self.decode_value(entry['visibility'], STV_values)
+        
+      symtab.append(entry)
+      off += entsize
+    return True
+  
+  def resolve_symtab_names(self, seg, seghdr):
+    strtab_seg_num = seg['link']
+    if strtab_seg_num < 1 or strtab_seg_num >= len(seghdr):
+      self.error_string = "Invalid strtab for symtab: "+strtab_seg_num
+      return False
+    strtab_seg = seghdr[strtab_seg_num]
+    if not strtab_seg.has_key('strtab'):
+      self.error_string = "Invalid strtab segment for symtab"
+      return False
+    strtab = strtab_seg['strtab']
+    
+    for sym in seg['symtab']:
+      sym['name_str'] = self.decode_string(strtab, sym['name'])
+    
+    return True
+  
   def load_segment(self, f, seg):
     t = seg['type']
     size = seg['size']
@@ -164,6 +265,9 @@ class ELF:
       # decode?
       if t == SHT_STRTAB:
         if not self.decode_strtab(seg, data):
+          return False
+      elif t == SHT_SYMTAB:
+        if not self.decode_symtab(seg, data):
           return False
       else:
         # store raw data
@@ -217,7 +321,12 @@ class ELF:
       for seg in seghdr:
         if not self.name_segment(seg, name_seg['strtab']):
           return False
-      
+        # resolve symtab names
+        if seg['type'] == SHT_SYMTAB:
+          self.elf['symtab'] = seg['symtab']
+          if not self.resolve_symtab_names(seg, seghdr):
+            return False
+        
     return True
     
   def dump_segment_headers(self):
@@ -225,8 +334,20 @@ class ELF:
     seghdr = self.elf['seghdr']
     num = 0
     for seg in seghdr:
-      print "%2d  %-16s %-10s" % (num,seg['name_str'],SHT_names[seg['type']])
+      print "%2d  %-16s %-10s %s" % (num,seg['name_str'],seg['type_str'],",".join(seg['flags_dec']))
       num += 1
       
+  def dump_symbols(self):
+    if not self.elf.has_key('symtab'):
+      print "no symbols"
+      return
     
+    print "      value     size    type        bind        visibility  name"
+    symtab = self.elf['symtab']
+    num = 0
+    for sym in symtab:
+      print "%4d  %08x  %6d  %-10s  %-10s  %-10s  %s" % \
+            (num,sym['value'],sym['size'],sym['type_str'], \
+             sym['bind_str'],sym['visibility_str'],sym['name_str']) 
+      num += 1
     
