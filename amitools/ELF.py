@@ -56,6 +56,11 @@ SHT_flags = {
 512: "TLS"
 }
 
+SHN_values = {
+0: "UND",
+0xfff1: "ABS"
+}
+
 STB_values = {
   0: "LOCAL",
   1: "GLOBAL",
@@ -85,6 +90,7 @@ R_68K_values = {
 0: "68K_NONE",
 1: "68K_32"
 }
+
 class ELF:
   
   def __init__(self):
@@ -131,7 +137,7 @@ class ELF:
     if names.has_key(value):
       return names[value]
     else:
-      return "?UNKNOWN?"
+      return None
     
   def parse_header(self,data):
     hdr = self.elf['hdr']
@@ -236,6 +242,9 @@ class ELF:
       entry['bind_str'] = self.decode_value(entry['bind'], STB_values)
       entry['type_str'] = self.decode_value(entry['type'], STT_values)
       entry['visibility_str'] = self.decode_value(entry['visibility'], STV_values)
+      entry['shndx_str'] = self.decode_value(entry['shndx'], SHN_values)
+      if entry['shndx_str'] == None:
+        entry['shndx_str'] = entry['shndx']
         
       symtab.append(entry)
       off += entsize
@@ -405,13 +414,14 @@ class ELF:
       print "no symbols"
       return
     
-    print "      value     size    type        bind        visibility  name"
+    print "      value     size    type        bind        visibility  ndx  name"
     symtab = self.elf['symtab']
     num = 0
     for sym in symtab:
-      print "%4d  %08x  %6d  %-10s  %-10s  %-10s  %s" % \
+      print "%4d  %08x  %6d  %-10s  %-10s  %-10s  %-3s  %s" % \
             (num,sym['value'],sym['size'],sym['type_str'], \
-             sym['bind_str'],sym['visibility_str'],sym['name_str']) 
+             sym['bind_str'],sym['visibility_str'],
+             sym['shndx_str'],sym['name_str']) 
       num += 1
   
   def dump_relas(self):
