@@ -12,6 +12,7 @@ import pprint
 
 from amitools.FileScanner import FileScanner
 from amitools import Hunk
+from amitools import HunkShow
 from amitools import ELF
 
 def print_pretty(data):
@@ -20,9 +21,7 @@ def print_pretty(data):
 
 # ----- commands -------------------------------------------------------------
 
-# ----- Validator -----
-
-class Validator:
+class HunkCommand:
   def __init__(self, args):
     self.counts = {}
     self.args = args
@@ -32,6 +31,7 @@ class Validator:
     if not self.counts.has_key(error_code):
       self.counts[error_code] = 0
     self.counts[error_code] += 1
+
     print path,
 
     # abort if hunk parser failed!
@@ -68,8 +68,10 @@ class Validator:
         print_pretty(hunk_file.hunks)
     else:
       print
-    
-    return True
+
+    # do special processing on hunk file for command
+    ok = self.handle_hunk_file(hunk_file)
+    return ok
   
   def result(self):
     for code in self.counts.keys():
@@ -79,7 +81,7 @@ class Validator:
     return 0
       
   def process_file(self, path, fobj, cmd):
-    hunk_file = Hunk.HunkFile()
+    hunk_file = Hunk.HunkReader()
     result = hunk_file.read_file_obj(path,fobj,None)
     # ignore non hunk files
     if result == Hunk.RESULT_NO_HUNK_FILE:
@@ -93,6 +95,24 @@ class Validator:
       if not ok:
         print "ABORTED"
     return cmd.result()
+
+# ----- Validator -----
+
+class Validator(HunkCommand):
+  
+  def handle_hunk_file(self, hunk_file):
+    # do nothing extra
+    return True
+
+# ----- Info -----
+
+class Info(HunkCommand):
+
+  def handle_hunk_file(self, hunk_file):
+    # verbose all hunk
+    hs = HunkShow.HunkShow(hunk_file, show_relocs=args.show_relocs, show_debug=args.show_debug)
+    hs.show_hunks()
+    return True
 
 # ----- Elf2Hunk -----
 
@@ -120,16 +140,22 @@ parser.add_argument('-v', '--verbose', action='store_true', default=False, help=
 parser.add_argument('-a', '--adf', nargs='?', default='unadf', help="enable adf scanner (requires unadf tool)")
 parser.add_argument('-l', '--lha', nargs='?', default='lha', help="enable lha scanner (with given lha executable)")
 parser.add_argument('-s', '--stop', action='store_true', default=False, help="stop on error")
+parser.add_argument('-R', '--show-relocs', action='store_true', default=False, help="show relocation entries")
+parser.add_argument('-D', '--show-debug', action='store_true', default=False, help="show debug info entries")
 args = parser.parse_args()
 
 # call scanner and process all files with selected command
 cmd_map = {
 "validate" : Validator,
-"elf2hunk" : Elf2Hunk
+"elf2hunk" : Elf2Hunk,
+"info" : Info
 }
 cmd = args.command
 if not cmd_map.has_key(cmd):
   print "INVALID COMMAND:",cmd
+  print "valid commands are:"
+  for a in cmd_map:
+    print "  ",a
   sys.exit(1)
 cmd_cls = cmd_map[cmd]
 

@@ -61,11 +61,13 @@ HUNK_PPC_CODE : "HUNK_PPC_CODE",
 HUNK_RELRELOC26 : "HUNK_RELRELOC26"
 }
 
-loadseg_valid_hunks = [
+loadseg_valid_begin_hunks = [
 HUNK_CODE,
 HUNK_DATA,
 HUNK_BSS,
-HUNK_PPC_CODE,
+HUNK_PPC_CODE
+]
+loadseg_valid_extra_hunks = [
 HUNK_ABSRELOC32,
 HUNK_DREL32,
 HUNK_DEBUG,
@@ -73,11 +75,13 @@ HUNK_SYMBOL,
 HUNK_NAME
 ]
 
-unit_valid_hunks = [
+unit_valid_main_hunks = [
 HUNK_CODE,
 HUNK_DATA,
 HUNK_BSS,
-HUNK_PPC_CODE,
+HUNK_PPC_CODE
+]
+unit_valid_extra_hunks = [
 HUNK_DEBUG,
 HUNK_SYMBOL,
 HUNK_NAME,
@@ -165,8 +169,8 @@ type_names = {
   TYPE_LIB: 'TYPE_LIB'
 }
 
-class HunkFile:
-  """Load and save Amiga executable Hunk structures"""
+class HunkReader:
+  """Load Amiga executable Hunk structures"""
   
   def __init__(self):
     self.hunk_blks = []
@@ -211,6 +215,14 @@ class HunkFile:
       return 0,""
     else:
       return self.read_name_size(f, num_longs)
+
+  def read_tag(self, f):
+    data = f.read(4)
+    if len(data) == 0:
+      return -1;
+    elif len(data) != 4:
+      return -(len(data)+1)
+    return data
 
   def read_name_size(self, f, num_longs):
     size = (num_longs & 0xffffff) * 4
@@ -399,7 +411,29 @@ class HunkFile:
       self.error_string = "%s has invalid size" % (hunk['type_name'])
       return RESULT_INVALID_HUNK_FILE
     size = num_longs * 4
-    hunk['data'] = f.read(size)
+    
+    offset = self.read_long(f)
+    hunk['debug_offset'] = offset;
+    tag = self.read_tag(f)
+    hunk['debug_type'] = tag;
+    size -= 8
+    
+    if tag == 'LINE':
+      # parse LINE: source line -> code offset mapping
+      l = self.read_long(f)
+      size -= l * 4 + 4;
+      l,n = self.read_name_size(f,l)
+      src_map = []
+      hunk['src_file'] = n
+      hunk['src_map'] = src_map
+      while size > 0:
+        line_no = self.read_long(f)
+        offset = self.read_long(f)
+        size -= 8
+        src_map.append([line_no,offset])
+    else:
+      # read unknown DEBUG hunk
+      hunk['data'] = f.read(size)
     return RESULT_OK
   
   def find_first_code_hunk(self):
@@ -482,7 +516,7 @@ class HunkFile:
       hunk_begin = self.read_word(f)
       num_hunks = self.read_word(f)
       total_size -= 4
-      unit['hunk_offset'] = hunk_begin
+      unit['hunk_begin_offset'] = hunk_begin
 
       # for all hunks in unit
       ihunks = []
@@ -787,27 +821,47 @@ class HunkFile:
   # ---------- Build Hunks from Blocks ----------
 
   def build_loadseg(self):
-    force_header = True
+    in_header = True
     cur = None
+    seek_begin = False
     for e in self.hunk_blks:
       hunk_type = e['type']
+
+      # check for end of header
+      if in_header and hunk_type in loadseg_valid_begin_hunks:
+        in_header = False
+        seek_begin = True
+        hunk_no = 0
       
-      if force_header:
+      if in_header:
         if hunk_type == HUNK_HEADER:
           cur = []
           self.hunks.append(cur)
           cur.append(e)
-          hunk = []
+        # we allow a debug hunk in header for SAS
+        elif hunk_type == HUNK_DEBUG:
+          cur.append(e)
         else:
           self.error_string = "Expected header in loadseg: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
-          return False          
-        force_header = False
+          return False
+                    
+      elif seek_begin:
+        # a new hunk shall begin
+        if hunk_type in loadseg_valid_begin_hunks:
+          cur = [e]
+          self.hunks.append(cur)
+          seek_header = False
+          seek_begin = False
+          e['hunk_no'] = hunk_no
+          hunk_no += 1
+        else:
+          self.error_string = "Expected hunk start in loadseg: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
+          return False     
+               
       else:
-        # a hunk is finished
+        # an extra block in hunk or end is expected
         if hunk_type == HUNK_END:
-          # add last and create a new one
-          cur.append(hunk)
-          hunk = []
+          seek_begin = True
         # add an extra overlay "hunk"
         elif hunk_type == HUNK_OVERLAY:
           # assume hunk to be empty
@@ -815,98 +869,146 @@ class HunkFile:
             self.error_string = "overlay hunk has to be empty"
             return False
           cur.append(e)
-          force_header = True
+          in_header = True
         # break
         elif hunk_type == HUNK_BREAK:
           # assume hunk to be empty
           if not len(hunk) == 0:
             self.error_string = "break hunk has to be empty"
             return False
-          force_header = True
+          in_header = True
         # contents of hunk
-        elif hunk_type in loadseg_valid_hunks:
-          hunk.append(e)
+        elif hunk_type in loadseg_valid_extra_hunks:
+          cur.append(e)
         # unecpected hunk?!
         else:
-          self.error_string = "Unexpected hunk in loadseg: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
+          self.error_string = "Unexpected hunk extra in loadseg: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
           return False
     return True
     
   def build_unit(self):
-    hunk = []
     force_unit = True
+    in_hunk = False
+    name = None
     cur = None
+    unit = None
     for e in self.hunk_blks:
       hunk_type = e['type']
       
-      # make sure a unit hunk is found
-      if force_unit and hunk_type != HUNK_UNIT:
-        self.error_string = "Expected unit hunk in unit: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
-        return False          
-      force_unit = False
-      
-      # unit
+      # optional unit as first entry
       if hunk_type == HUNK_UNIT:
-        cur = []
-        self.hunks.append(cur)
-        hunk = []
+        unit = []
+        self.hunks.append(unit)
         force_unit = False
-      # a hunk is finished
-      elif hunk_type == HUNK_END:
-        # add last and create a new one
-        cur.append(hunk)
-        hunk = []
-      # contents of hunk
-      elif hunk_type in unit_valid_hunks:
-        hunk.append(e)
-      # unecpected hunk?!
+        hunk_no = 0
+      elif force_unit:
+        self.error_string = "Expected name hunk in unit: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
+        return False              
+      elif not in_hunk:
+        # begin a named hunk
+        if hunk_type == HUNK_NAME:
+            name = e['name']
+        # main hunk block
+        elif hunk_type in unit_valid_main_hunks:
+          cur = []
+          unit.append(cur)
+          cur.append(e)
+          # give main block the NAME
+          if name != None:
+            e['name'] = name
+            name = None
+          e['hunk_no'] = hunk_no
+          hunk_no += 1
+          in_hunk = True
+        else:
+          self.error_string = "Expected main hunk in unit: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
+          return False          
       else:
-        self.error_string = "Unexpected hunk in unit: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
-        return False
+        # a hunk is finished
+        if hunk_type == HUNK_END:
+          in_hunk = False
+        # contents of hunk
+        elif hunk_type in unit_valid_extra_hunks:
+          cur.append(e)
+        # unecpected hunk?!
+        else:
+          self.error_string = "Unexpected hunk in unit: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
+          return False
     
     return True
   
   def build_lib(self):
-    force_lib = True
-    force_index = False
-    cur_lib = []
-    contents_list = None
-    lib_list = []
-    hunk = []
-    self.hunks.append(lib_list)
+    cur = None
+    lib = None
+    
+    seek_lib = True
+    seek_main = False
     for e in self.hunk_blks:
       hunk_type = e['type']
-      
-      # make sure a lib hunk is found
-      if force_lib and hunk_type != HUNK_LIB:
-        self.error_string = "Expected lib hunk in lib: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
-        return False          
-      force_lib = False
-      
-      # lib
-      if hunk_type == HUNK_LIB:
-        cur_lib = []
-        lib_list.append(cur_lib)
-        cur_lib.append(e)
-        contents_list = []
-        cur_lib.append(contents_list)
-        hunk = []
-      # index
-      elif hunk_type == HUNK_INDEX:
-        cur_lib.append(e)
-        force_lib = True
-      # other contents
-      elif hunk_type in unit_valid_hunks:
-        if not e.has_key('in_lib'):
-          self.error_string = "Hunk not in lib: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
+
+      # seeking for a LIB hunk
+      if seek_lib:
+        if hunk_type == HUNK_LIB:
+          lib = []
+          self.hunks.append(lib)
+          seek_lib = False
+          seek_main = True
+          hunk_no = 0
+          
+          # get start address of lib hunk in file
+          lib_file_offset = e['lib_file_offset']
+        else:
+          self.error_string = "Expected lib hunk in lib: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
+          return False          
+      elif seek_main:
+        # end of lib? -> index!
+        if hunk_type == HUNK_INDEX:
+          lib.append(e)
+          seek_main = False
+          seek_lib = True
+          if not self.resolve_index_hunks(lib):
+            self.error_string = "Error resolving index hunks!"
+            return False                      
+        # start of a hunk
+        elif hunk_type in unit_valid_main_hunks:
+          cur = [e]
+          e['hunk_no'] = hunk_no
+          hunk_no += 1
+          lib.append(cur)
+          seek_main = False
+          
+          # calc relative lib address
+          hunk_lib_offset = e['hunk_file_offset'] - lib_file_offset
+          e['hunk_lib_offset'] = hunk_lib_offset
+        else:
+          self.error_string = "Expected main hunk in lib: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
           return False
-        hunk.append(e)
-      # end in lib list
-      elif hunk_type == HUNK_END:
-        contents_list.append(hunk)
-        hunk = []        
-      else:
-        self.error_string = "Unexpected hunk in lib: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
+      else:      
+        # end hunk
+        if hunk_type == HUNK_END:
+          seek_main = True
+        # extra contents
+        elif hunk_type in unit_valid_extra_hunks:
+          cur.append(e)
+        else:
+          self.error_string = "Unexpected hunk in lib: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
+          return False
+    
+    return True
+
+  """Resolve hunks referenced in the index"""
+  def resolve_index_hunks(self, lib):
+    index = lib[-1]
+    units = index['units']
+    for unit in units:
+      hunk_offset = unit['hunk_begin_offset']
+      for hunk in lib[0:-1]:
+        hunk_no = hunk[0]['hunk_no']
+        lib_off = hunk[0]['hunk_lib_offset'] / 4 # is in longwords
+        if lib_off == hunk_offset:
+          unit['hunk_begin_no'] = hunk_no
+          unit['hunk_begin'] = hunk
+      if not unit.has_key('hunk_begin'):
         return False
     return True
 
