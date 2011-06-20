@@ -53,7 +53,19 @@ class HunkShow:
   def show_loadseg_hunks(self):
     self.show_header(self.hunks[0])
     for hunk in self.hunks[1:]:
-      self.show_main_hunk(hunk)
+      if hunk[0]['type'] == Hunk.HUNK_OVERLAY:
+        self.show_overlay(hunk)
+      else:
+        self.show_main_hunk(hunk)
+  
+  def show_overlay(self,hunk):
+    print
+    print "Overlay"
+    overlay = hunk[0]
+    for chunk in hunk[1:]:
+      self.show_header(chunk[0])
+      for h in chunk[1:]:
+        self.show_main_hunk(h)
   
   def show_header(self, hunk):
     print "Header"
@@ -86,13 +98,11 @@ class HunkShow:
     print "       %08x / %d bytes" % (size,size)
     for extra in hunk[1:]:
       self.show_extra_hunk(extra)
-      
+  
   def show_extra_hunk(self, hunk):
     hunk_type = hunk['type']
-    if hunk_type == Hunk.HUNK_ABSRELOC32:
-      self.show_reloc_hunk("ABS32",hunk)
-    elif hunk_type == Hunk.HUNK_DREL16:
-      self.show_reloc_hunk("DREL16",hunk)
+    if hunk_type in Hunk.reloc_hunks:
+      self.show_reloc_hunk(hunk)
     elif hunk_type == Hunk.HUNK_DEBUG:
       self.show_debug_hunk(hunk)
     elif hunk_type == Hunk.HUNK_SYMBOL:
@@ -103,8 +113,9 @@ class HunkShow:
       print "  ",hunk['type_name'],"(unknown)"
       print hunk
 
-  def show_reloc_hunk(self, type_name, hunk):
+  def show_reloc_hunk(self, hunk):
     reloc = hunk['reloc']
+    type_name = hunk['type_name'].replace("HUNK_","")
     print "  relocations (%s)" % type_name
     for hunk_num in reloc:
       offsets = reloc[hunk_num]

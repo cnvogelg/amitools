@@ -98,6 +98,19 @@ HUNK_ABSRELOC16,
 HUNK_RELRELOC26,
 ]
 
+reloc_hunks = [
+HUNK_ABSRELOC32,
+HUNK_RELRELOC16,
+HUNK_RELRELOC8,
+HUNK_DREL32,
+HUNK_DREL16,
+HUNK_DREL8,
+HUNK_RELOC32SHORT,
+HUNK_RELRELOC32,
+HUNK_ABSRELOC16,
+HUNK_RELRELOC26,
+]
+
 EXT_SYMB        = 0
 EXT_DEF         = 1
 EXT_ABS         = 2
@@ -639,6 +652,8 @@ class HunkReader:
       return RESULT_INVALID_HUNK_FILE
     elif l > 0:
       hunk['name'] = n
+    else:
+      hunk['name'] = ""
     return RESULT_OK
     
   def set_mem_flags(self, hunk, flags, shift):
@@ -824,6 +839,8 @@ class HunkReader:
     in_header = True
     cur = None
     seek_begin = False
+    base = self.hunks
+    ov_base = None
     for e in self.hunk_blks:
       hunk_type = e['type']
 
@@ -831,13 +848,22 @@ class HunkReader:
       if in_header and hunk_type in loadseg_valid_begin_hunks:
         in_header = False
         seek_begin = True
-        hunk_no = 0
       
       if in_header:
         if hunk_type == HUNK_HEADER:
+          # we are in an overlay!
+          if ov_base != None:
+            hunk_base = []
+            ov_base.append(hunk_base)
+            base = hunk_base
+          
           cur = []
-          self.hunks.append(cur)
+          base.append(cur)
           cur.append(e)
+          
+          # setup hunk counter
+          hunk_no = e['first_hunk']
+          
         # we allow a debug hunk in header for SAS
         elif hunk_type == HUNK_DEBUG:
           cur.append(e)
@@ -849,11 +875,24 @@ class HunkReader:
         # a new hunk shall begin
         if hunk_type in loadseg_valid_begin_hunks:
           cur = [e]
-          self.hunks.append(cur)
+          base.append(cur)
           seek_header = False
           seek_begin = False
           e['hunk_no'] = hunk_no
           hunk_no += 1
+        # add an extra overlay "hunk"
+        elif hunk_type == HUNK_OVERLAY:
+          # assume hunk to be empty
+          ov_base = [e]
+          base.append(ov_base)
+          in_header = True
+        # break
+        elif hunk_type == HUNK_BREAK:
+          # assume hunk to be empty
+          in_header = True
+        # broken hunk: multiple END or other hunks
+        elif hunk_type in [HUNK_END, HUNK_NAME, HUNK_DEBUG]:
+          pass
         else:
           self.error_string = "Expected hunk start in loadseg: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
           return False     
@@ -862,24 +901,17 @@ class HunkReader:
         # an extra block in hunk or end is expected
         if hunk_type == HUNK_END:
           seek_begin = True
-        # add an extra overlay "hunk"
-        elif hunk_type == HUNK_OVERLAY:
-          # assume hunk to be empty
-          if not len(hunk) == 0:
-            self.error_string = "overlay hunk has to be empty"
-            return False
-          cur.append(e)
-          in_header = True
-        # break
-        elif hunk_type == HUNK_BREAK:
-          # assume hunk to be empty
-          if not len(hunk) == 0:
-            self.error_string = "break hunk has to be empty"
-            return False
-          in_header = True
         # contents of hunk
         elif hunk_type in loadseg_valid_extra_hunks:
           cur.append(e)
+        # broken hunk file without END tag
+        elif hunk_type in loadseg_valid_begin_hunks:
+          cur = [e]
+          self.hunks.append(cur)
+          seek_header = False
+          seek_begin = False
+          e['hunk_no'] = hunk_no
+          hunk_no += 1
         # unecpected hunk?!
         else:
           self.error_string = "Unexpected hunk extra in loadseg: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
@@ -920,6 +952,9 @@ class HunkReader:
           e['hunk_no'] = hunk_no
           hunk_no += 1
           in_hunk = True
+        # broken hunk: ignore multi ENDs
+        elif hunk_type == HUNK_END:
+          pass
         else:
           self.error_string = "Expected main hunk in unit: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
           return False          
