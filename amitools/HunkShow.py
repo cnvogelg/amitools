@@ -1,12 +1,17 @@
 from amitools import Hunk
+import subprocess
+import tempfile
+import os
 
 class HunkShow:
   
-  def __init__(self, hunk_file, show_relocs=False, show_debug=False):
+  def __init__(self, hunk_file, show_relocs=False, show_debug=False, disassemble=False, hexdump=False):
     self.hunk_file = hunk_file
     self.hunks = hunk_file.hunks
     self.show_relocs=show_relocs
     self.show_debug=show_debug
+    self.disassemble=disassemble
+    self.hexdump=hexdump
   
   def show_hunks(self):
     type = self.hunk_file.type
@@ -77,28 +82,35 @@ class HunkShow:
   def show_main_hunk(self, hunk):
     hunk_type = hunk[0]['type']
     if hunk_type == Hunk.HUNK_CODE:
-      self.show_generic_main_hunk("Code",hunk)
+      self.show_generic_main_hunk(hunk)
     elif hunk_type == Hunk.HUNK_DATA:
-      self.show_generic_main_hunk("Data",hunk)
+      self.show_generic_main_hunk(hunk)
     elif hunk_type == Hunk.HUNK_BSS:
-      self.show_generic_main_hunk("BSS",hunk)
+      self.show_generic_main_hunk(hunk)
     else:
-      self.show_generic_main_hunk(hunk[0]['type_name'],hunk)
+      self.show_generic_main_hunk(hunk)
       
-  def show_generic_main_hunk(self, type_name, hunk):
+  def show_generic_main_hunk(self, hunk):
+    main = hunk[0]
     # unit hunks are named
     title = ""
     if hunk[0].has_key('name'):
-      title = "'%s'" % hunk[0]['name']
-
+      title = "'%s'" % main['name']
+    type_name = main['type_name'].replace("HUNK_","")
     print
-    print "#%d %s %s" % (hunk[0]['hunk_no'], type_name, title)
-    main = hunk[0]
+    print "#%d %s %s" % (main['hunk_no'], type_name, title)
     size = main['size']
     print "       %08x / %d bytes" % (size,size)
+
+    if self.hexdump:
+      self.show_hex(main['data'])
+
     for extra in hunk[1:]:
       self.show_extra_hunk(extra)
-  
+
+    if main['type'] == Hunk.HUNK_CODE and self.disassemble:
+      self.show_disassembly(hunk)
+
   def show_extra_hunk(self, hunk):
     hunk_type = hunk['type']
     if hunk_type in Hunk.reloc_hunks:
@@ -192,6 +204,71 @@ class HunkShow:
       line = data[o:o+line_size]
       self.show_hex_line(o, line)
       o += line_size
+
+  # ----- disassembler -----
+ 
+  def gen_disassembly(self, data):
+    # write to temp file
+    tmpname = tempfile.mktemp()
+    out = file(tmpname,"wb")
+    out.write(data)
+    out.close()
+    # call external disassembler
+    p = subprocess.Popen(["vda68k",tmpname], stdout=subprocess.PIPE)
+    output = p.communicate()[0]
+    os.remove(tmpname)
+    lines = output.splitlines()
+    # parse output: split addr and code
+    result = []
+    for l in lines:
+      addr = int(l[0:8],16)
+      code = l[10:]
+      result.append((addr,code))
+    return result
+
+  def get_symtab(self, hunk):
+    for h in hunk[1:]:
+      if h['type'] == Hunk.HUNK_SYMBOL:
+        return h['symbols']
+    return None
+
+  def find_src_line(self, hunk, addr):
+    for h in hunk[1:]:
+      if h['type'] == Hunk.HUNK_DEBUG and h['debug_type'] == 'LINE':
+        src_map = h['src_map']
+        for e in src_map:
+          src_line = e[0]
+          src_addr = e[1] + h['debug_offset']
+          if src_addr == addr:
+            return h['src_file'] + ":" + str(src_line)
+    return None
+    
+  def show_disassembly(self, hunk):
+    print "  disassembly"
+    main = hunk[0]
+    lines = self.gen_disassembly(main['data'])
+    # get a symbol table for this hunk
+    symtab = self.get_symtab(hunk)    
+    # show line by line
+    for l in lines:
+      addr = l[0]
+      code = l[1]
+      
+      # try to find a symbol for this addr
+      if symtab != None:
+        for s in symtab:
+          if s[1] == addr:
+            print "%s%s:" % (' ' * 30,s[0])
+      
+      # find source line info
+      line = self.find_src_line(hunk,addr)
+      if line == None:
+        line = ""
+      else:
+        line = "; "+line
+      
+      print "       %08x  %-60s %s" % (addr,code,line)
+
 
 
 
