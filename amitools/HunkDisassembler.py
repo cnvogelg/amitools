@@ -73,7 +73,7 @@ class HunkDisassembler:
           src_line = e[0]
           src_addr = e[1] + h['debug_offset']
           if src_addr == addr:
-            return (h['src_file'],str(src_line))
+            return (h['src_file'],src_line)
     return None
   
   # map reloc type to number of words to be relocated
@@ -100,7 +100,7 @@ class HunkDisassembler:
         for hunk_num in reloc:
           offsets = reloc[hunk_num]
           for off in offsets:
-            if off >= addr and off < end_addr:
+            if off >= addr and off + num_words * 2 <= end_addr:
               word_offset = (off - addr) / 2 # in words
 
               # calc offset
