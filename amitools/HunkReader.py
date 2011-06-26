@@ -343,6 +343,7 @@ class HunkReader:
     # read units
     units = []
     hunk['units'] = units
+    unit_no = 0
     while total_size > 2:
       # read name of unit
       name_offset = self.read_word(f)
@@ -352,6 +353,8 @@ class HunkReader:
     
       unit = {}
       units.append(unit)
+      unit['unit_no'] = unit_no
+      unit_no += 1
 
       # generate unit name
       unit['name'] = self.get_index_name(strtab, name_offset)
@@ -427,8 +430,12 @@ class HunkReader:
     return RESULT_OK
   
   def parse_ext(self, f, hunk):
-    exts = []
-    hunk['exts'] = exts
+    ext_def = []
+    ext_ref = []
+    ext_common = []
+    hunk['ext_def'] = ext_def
+    hunk['ext_ref'] = ext_ref
+    hunk['ext_common'] = ext_common
     ext_type_size = 1
     while ext_type_size > 0:
       # ext type | size
@@ -449,7 +456,6 @@ class HunkReader:
 
       # create local ext object
       ext = { 'type' : ext_type, 'name' : ext_name }
-      exts.append(ext)
       
       # check and setup type name
       if not ext_names.has_key(ext_type):
@@ -460,9 +466,11 @@ class HunkReader:
       # ext common
       if ext_type == EXT_ABSCOMMON or ext_type == EXT_RELCOMMON:
         ext['common_size'] = self.read_long(f)
+        ext_common.append(ext)
       # ext def
       elif ext_type == EXT_DEF or ext_type == EXT_ABS or ext_type == EXT_RES:
         ext['def'] = self.read_long(f)
+        ext_def.append(ext)
       # ext ref
       else:
         num_refs = self.read_long(f)
@@ -473,6 +481,7 @@ class HunkReader:
           ref = self.read_long(f)
           refs.append(ref)
         ext['refs'] = refs
+        ext_ref.append(ext)
         
     return RESULT_OK
   
@@ -761,12 +770,15 @@ class HunkReader:
     segment = None
     unit = None
     self.units = []
+    unit_no = 0
     for e in self.hunks:
       hunk_type = e['type']
       
       # optional unit as first entry
       if hunk_type == HUNK_UNIT:
-        unit = []
+        unit = [e]
+        e['unit_no'] = unit_no
+        unit_no += 1
         self.units.append(unit)
         force_unit = False
         hunk_no = 0
@@ -877,6 +889,10 @@ class HunkReader:
         if lib_off == hunk_offset:
           unit['hunk_begin_no'] = hunk_no
           unit['hunk_begin'] = hunk
+          for h in unit['hunks']:
+            h['hunk_no'] = hunk_no
+            hunk_no += 1
+          
       if not unit.has_key('hunk_begin'):
         return False
     return True

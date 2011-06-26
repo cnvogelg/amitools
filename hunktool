@@ -114,7 +114,10 @@ class Info(HunkCommand):
 
   def handle_hunk_file(self, hunk_file):
     # verbose all hunk
-    hs = HunkShow.HunkShow(hunk_file, show_relocs=args.show_relocs, show_debug=args.show_debug, disassemble=args.disassemble, hexdump=args.hexdump)
+    hs = HunkShow.HunkShow(hunk_file, \
+      show_relocs=args.show_relocs, show_debug=args.show_debug, \
+      disassemble=args.disassemble, hexdump=args.hexdump, \
+      brief=args.brief)
     hs.show_segments()
     return True
 
@@ -148,6 +151,7 @@ parser.add_argument('-R', '--show-relocs', action='store_true', default=False, h
 parser.add_argument('-D', '--show-debug', action='store_true', default=False, help="show debug info entries")
 parser.add_argument('-A', '--disassemble', action='store_true', default=False, help="disassemble code segments")
 parser.add_argument('-x', '--hexdump', action='store_true', default=False, help="dump segments in hex")
+parser.add_argument('-b', '--brief', action='store_true', default=False, help="show only brief information")
 args = parser.parse_args()
 
 # call scanner and process all files with selected command
