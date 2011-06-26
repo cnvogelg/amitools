@@ -38,19 +38,6 @@ class HunkShow:
         self.print_unit(unit['unit_no'], unit['name'])
         for segment in unit['segments']:
           self.show_segment(segment, unit['segments'])
-
-          info = segment[0]['index_hunk']
-          if info.has_key('refs'):
-            self.print_extra("refs","#%d" % len(info['refs']))
-            if not self.brief:
-              for ref in info['refs']:
-                self.print_symbol(-1,ref['name'],"(%d bits)" % ref['bits'])
-          
-          if info.has_key('defs'):
-            self.print_extra("defs","#%d" % len(info['defs']))
-            if not self.brief:
-              for d in info['defs']:
-                self.print_symbol(d['value'],d['name'],"(type %d)" % d['type'])
       
   def show_unit_segments(self):
     for unit in self.units:
@@ -94,12 +81,30 @@ class HunkShow:
     for extra in hunk[1:]:
       self.show_extra_hunk(extra)
 
-    if main['type'] == Hunk.HUNK_CODE and self.disassemble:
+    # index hunk info is embedded if its in a lib
+    if main.has_key('index_hunk'):
+      self.show_index_info(main['index_hunk'])
+
+    if main['type'] == Hunk.HUNK_CODE and self.disassemble and len(main['data'])>0:
       disas = HunkDisassembler.HunkDisassembler()
-      print "\tdisassembly"
+      print
       disas.show_disassembly(hunk, seg_list)
       print
 
+  def show_index_info(self, info):
+    # references from index
+    if info.has_key('refs'):
+      self.print_extra("refs","#%d" % len(info['refs']))
+      if not self.brief:
+        for ref in info['refs']:
+          self.print_symbol(-1,ref['name'],"(%d bits)" % ref['bits'])
+    # defines from index
+    if info.has_key('defs'):
+      self.print_extra("defs","#%d" % len(info['defs']))
+      if not self.brief:
+        for d in info['defs']:
+          self.print_symbol(d['value'],d['name'],"(type %d)" % d['type'])
+ 
   def show_extra_hunk(self, hunk):
     hunk_type = hunk['type']
     if hunk_type in Hunk.reloc_hunks:

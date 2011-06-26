@@ -113,7 +113,9 @@ class HunkDisassembler:
     return None
   
   map_ext_ref_to_num_words = {
-    Hunk.EXT_ABSREF32 : 2
+    Hunk.EXT_ABSREF32 : 2,
+    Hunk.EXT_RELREF16: 1,
+    Hunk.EXT_DEXT16: 1
   }
   
   # find_ext_ref
@@ -138,6 +140,7 @@ class HunkDisassembler:
                 return (word_offset, num_words, ext['name'], type_name)            
     return None
   
+  # search the HUNK_EXT for a defintion
   def find_ext_def(self, hunk, addr):
     for h in hunk[1:]:
       if h['type'] == Hunk.HUNK_EXT:
@@ -146,6 +149,27 @@ class HunkDisassembler:
             return ext['name']
     return None
   
+  # search the index of a lib for a definition
+  def find_index_def(self, hunk, addr):
+    main = hunk[0]
+    if main.has_key('index_hunk'):
+      info = main['index_hunk']
+      if info.has_key('defs'):
+        for d in info['defs']:
+          if d['value'] == addr:
+            return d['name']
+    return None  
+  
+  def find_symbol_or_def(self, hunk, addr, always):
+    symbol = self.find_symbol(hunk, addr, False)
+    if symbol == None:
+      symbol = self.find_ext_def(hunk, addr)
+    if symbol == None:
+      symbol = self.find_index_def(hunk, addr)
+    if symbol == None and always:
+      return "%08x" % addr
+    return symbol
+    
   # ----- show disassembly -----
   
   def show_disassembly(self, hunk, seg_list):
@@ -158,9 +182,7 @@ class HunkDisassembler:
       code = l[2]
       
       # try to find a symbol for this addr
-      symbol = self.find_symbol(hunk, addr, False)
-      if symbol == None:
-        symbol = self.find_ext_def(hunk, addr)      
+      symbol = self.find_symbol_or_def(hunk, addr, False)
       
       # create line info
       info = []
@@ -185,12 +207,12 @@ class HunkDisassembler:
         offset = reloc[3]
         reloc_type_name = reloc[4]
         # a self reference
-        reloc_symbol = self.find_symbol(seg_list[hunk_num],offset,True)
+        reloc_symbol = self.find_symbol_or_def(seg_list[hunk_num],offset,True)
         if hunk_num == main['hunk_no']:
           src = "self"
         else:
           src = "#%03d %s" % (hunk_num, seg_list[hunk_num][0]['type_name'])
-        info.append( "%s: %s + %s" % (reloc_type_name, src, reloc_symbol) )
+        info.append( "%s: %s: %s" % (reloc_type_name, src, reloc_symbol) )
       
       # build comment from all infos
       if len(info) > 0:
