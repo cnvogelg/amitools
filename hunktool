@@ -39,7 +39,7 @@ class HunkCommand:
     if error_code != Hunk.RESULT_OK:
       print Hunk.result_names[error_code], hunk_file.error_string
       if args.dump:
-        print_pretty(hunk_file.hunk_blks)
+        print_pretty(hunk_file.hunks)
       self.failed_files.append( (path, "READ: " + hunk_file.error_string) )        
       return not self.args.stop
 
@@ -48,7 +48,7 @@ class HunkCommand:
       print
       print "  hunks:    ",hunk_file.get_hunk_summary()
       if args.dump:
-        print_pretty(hunk_file.hunk_blks)        
+        print_pretty(hunk_file.hunks)        
       print "  type:     ",
     
     # build segments from hunks
@@ -66,7 +66,7 @@ class HunkCommand:
       print 
       print "  segments: ",hunk_file.get_segment_summary()
       print "  overlays: ",hunk_file.get_overlay_segment_summary()
-      print "  lib_segs: ",hunk_file.get_lib_segment_summary()
+      print "  libs:     ",hunk_file.get_libs_summary()
       print "  units:    ",hunk_file.get_units_summary()
       if args.dump:
         print_pretty(hunk_file.hunks)

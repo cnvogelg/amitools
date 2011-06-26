@@ -18,19 +18,30 @@ class HunkReader:
     self.overlay = None
     self.overlay_headers = None
     self.overlay_segments = None
-    self.lib_indexes = None
-    self.lib_segments = None
+    self.libs = None
     self.units = None
   
   def get_struct_summary(self, obj):
     if type(obj) == ListType:
       result = []
       for a in obj:
-        result.append(self.get_struct_summary(a))
+        v = self.get_struct_summary(a)
+        if v != None:
+          result.append(v)
       return "[" + ",".join(result) + "]"
     elif type(obj) == DictType:
-      type_name = obj['type_name']
-      return type_name.replace('HUNK_','')
+      if obj.has_key('type_name'):
+        type_name = obj['type_name']
+        return type_name.replace('HUNK_','')
+      else:
+        result = []
+        for k in obj.keys():
+          v = self.get_struct_summary(obj[k])
+          if v != None:
+            result.append(k + ":" + v)
+        return '{' + ",".join(result) + '}'
+    else:
+      return None
   
   def get_long(self, data):
     return struct.unpack(">I",data)[0]
@@ -367,7 +378,7 @@ class HunkReader:
 
       # for all hunks in unit
       ihunks = []
-      unit['hunks'] = ihunks
+      unit['hunk_infos'] = ihunks
       for a in xrange(num_hunks):
         ihunk = {}
         ihunks.append(ihunk)
@@ -776,8 +787,11 @@ class HunkReader:
       
       # optional unit as first entry
       if hunk_type == HUNK_UNIT:
-        unit = [e]
-        e['unit_no'] = unit_no
+        unit = {}
+        unit['name'] = e['name']
+        unit['unit_no'] = unit_no
+        unit['segments'] = []
+        unit['unit'] = e
         unit_no += 1
         self.units.append(unit)
         force_unit = False
@@ -792,7 +806,7 @@ class HunkReader:
         # main hunk block
         elif hunk_type in unit_valid_main_hunks:
           segment = [e]
-          unit.append(segment)
+          unit['segments'].append(segment)
           # give main block the NAME
           if name != None:
             e['name'] = name
@@ -821,8 +835,8 @@ class HunkReader:
     return True
   
   def build_lib(self):
-    self.lib_indexes = []
-    self.lib_segments = []
+    self.libs = []
+    lib_segments = []
     seek_lib = True
     seek_main = False
     for e in self.hunks:
@@ -832,7 +846,7 @@ class HunkReader:
       if seek_lib:
         if hunk_type == HUNK_LIB:
           segment_list = []
-          self.lib_segments.append(segment_list)
+          lib_segments.append(segment_list)
           seek_lib = False
           seek_main = True
           hunk_no = 0
@@ -845,12 +859,17 @@ class HunkReader:
       elif seek_main:
         # end of lib? -> index!
         if hunk_type == HUNK_INDEX:
-          self.lib_indexes.append(e)
           seek_main = False
           seek_lib = True
-          if not self.resolve_index_hunks(e,segment_list):
+          lib_units = []
+          if not self.resolve_index_hunks(e, segment_list, lib_units):
             self.error_string = "Error resolving index hunks!"
-            return False                      
+            return False
+          lib = {}
+          lib['units'] = lib_units
+          lib['lib_no'] = len(self.libs)
+          lib['index'] = e
+          self.libs.append(lib)
         # start of a hunk
         elif hunk_type in unit_valid_main_hunks:
           segment = [e]
@@ -879,21 +898,39 @@ class HunkReader:
     return True
 
   """Resolve hunks referenced in the index"""
-  def resolve_index_hunks(self, index, lib):
+  def resolve_index_hunks(self, index, segment_list, lib_units):
     units = index['units']
+    no = 0
     for unit in units:
+      lib_unit = {}
+      unit_segments = []
+      lib_unit['segments'] = unit_segments
+      lib_unit['name'] = unit['name']
+      lib_unit['unit_no'] = no
+      lib_unit['index_unit'] = unit
+      lib_units.append(lib_unit)
+      no += 1
+      
+      # try to find segment with start offset
       hunk_offset = unit['hunk_begin_offset']
-      for hunk in lib[0:-1]:
-        hunk_no = hunk[0]['hunk_no']
-        lib_off = hunk[0]['hunk_lib_offset'] / 4 # is in longwords
+      found = False
+      for segment in segment_list:
+        hunk_no = segment[0]['hunk_no']
+        lib_off = segment[0]['hunk_lib_offset'] / 4 # is in longwords
         if lib_off == hunk_offset:
-          unit['hunk_begin_no'] = hunk_no
-          unit['hunk_begin'] = hunk
-          for h in unit['hunks']:
-            h['hunk_no'] = hunk_no
-            hunk_no += 1
+          # found segment
+          num_segs = len(unit['hunk_infos'])
+          for i in xrange(num_segs):
+            info = unit['hunk_infos'][i]
+            seg = segment_list[hunk_no+i]
+            unit_segments.append(seg)
+            # renumber hunk
+            seg[0]['hunk_no'] = i
+            seg[0]['name'] = info['name']
+            seg[0]['index_hunk'] = info
+          found = True
           
-      if not unit.has_key('hunk_begin'):
+      if not found:
         return False
     return True
 
@@ -929,9 +966,9 @@ class HunkReader:
     else:
       return None
 
-  def get_lib_segment_summary(self):
-    if self.lib_segments != None:
-      return self.get_struct_summary(self.lib_segments)
+  def get_libs_summary(self):
+    if self.libs != None:
+      return self.get_struct_summary(self.libs)
     else:
       return None
 

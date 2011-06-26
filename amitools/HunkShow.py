@@ -13,8 +13,7 @@ class HunkShow:
     self.overlay = hunk_file.overlay
     self.overlay_headers = hunk_file.overlay_headers
     self.overlay_segments = hunk_file.overlay_segments
-    self.lib_indexes = hunk_file.lib_indexes
-    self.lib_segments = hunk_file.lib_segments
+    self.libs = hunk_file.libs
     self.units = hunk_file.units
     
     self.show_relocs=show_relocs
@@ -33,51 +32,31 @@ class HunkShow:
       self.show_lib_segments()
       
   def show_lib_segments(self):
-    num_lib = len(self.lib_indexes)
-    for l in xrange(num_lib):
-      print "Library #%d" % l
+    for lib in self.libs:
+      print "Library #%d" % lib['lib_no']
+      for unit in lib['units']:
+        self.print_unit(unit['unit_no'], unit['name'])
+        for segment in unit['segments']:
+          self.show_segment(segment, unit['segments'])
 
-      # print lib contents only if not in brief mode
-      if not self.brief:
-        # segments of Lib
-        for segment in self.lib_segments[l]:
-          self.show_segment(segment, self.lib_segments[l])
-      
-        # Index
-        print "Index #%d" % l
-      
-      index = self.lib_indexes[l]
-      units = index['units']
-      for unit in units:
-        unit_name = unit['name']
-        hunk_no_begin = unit['hunk_begin_no']        
-        self.print_unit(unit['unit_no'], unit_name)
-        
-        for hunk in unit['hunks']:
-
-          type_name = hunk['type_name'].replace("HUNK_","")
-          name = hunk['name']
-          byte_size = hunk['size'] * 4
-          self.print_segment_header(hunk['hunk_no'], type_name, byte_size, name)
-
-          if hunk.has_key('refs'):
-            self.print_extra("refs","#%d" % len(hunk['refs']))
+          info = segment[0]['index_hunk']
+          if info.has_key('refs'):
+            self.print_extra("refs","#%d" % len(info['refs']))
             if not self.brief:
-              for ref in hunk['refs']:
+              for ref in info['refs']:
                 self.print_symbol(-1,ref['name'],"(%d bits)" % ref['bits'])
           
-          if hunk.has_key('defs'):
-            self.print_extra("defs","#%d" % len(hunk['defs']))
+          if info.has_key('defs'):
+            self.print_extra("defs","#%d" % len(info['defs']))
             if not self.brief:
-              for d in hunk['defs']:
+              for d in info['defs']:
                 self.print_symbol(d['value'],d['name'],"(type %d)" % d['type'])
       
   def show_unit_segments(self):
     for unit in self.units:
-      unit_hunk = unit[0]
-      self.print_unit(unit_hunk['unit_no'], unit_hunk['name'])
-      for hunk in unit[1:]:
-        self.show_segment(hunk, unit[1:])
+      self.print_unit(unit['unit_no'], unit['name'])
+      for segment in unit['segments']:
+        self.show_segment(segment, unit['segments'])
   
   def show_loadseg_segments(self):
     # header + segments
@@ -130,7 +109,7 @@ class HunkShow:
         self.show_reloc_hunk(hunk)
         
     elif hunk_type == Hunk.HUNK_DEBUG:
-      self.print_extra("debug","%s" % (hunk['debug_type']))
+      self.print_extra("debug","%s  offset=%08x" % (hunk['debug_type'], hunk['debug_offset']))
       if not self.brief:
         self.show_debug_hunk(hunk)
     
@@ -160,14 +139,13 @@ class HunkShow:
   def show_debug_hunk(self, hunk):
     debug_type = hunk['debug_type']
     if debug_type == 'LINE':
-      self.print_extra_sub("line for '%s' (offset=@%08x)" % (hunk['src_file'],hunk['debug_offset']))
+      self.print_extra_sub("line for '%s'" % hunk['src_file'])
       if self.show_debug:
         for src_off in hunk['src_map']:
           addr = src_off[1]
           line = src_off[0]
           self.print_symbol(addr,"line %d" % line)
     else:
-      self.print_extra_sub("%s (offset=@%08x,size=%08x)" % (debug_type, hunk['debug_offset'], len(hunk['data'])))
       if self.show_debug:
         self.show_hex(hunk['data'])
     
