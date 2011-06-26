@@ -7,34 +7,44 @@ class HunkShow:
   
   def __init__(self, hunk_file, show_relocs=False, show_debug=False, disassemble=False, hexdump=False):
     self.hunk_file = hunk_file
-    self.hunks = hunk_file.hunks
+    
+    # clone file refs
+    self.header = hunk_file.header
+    self.segments = hunk_file.segments
+    self.overlay = hunk_file.overlay
+    self.overlay_headers = hunk_file.overlay_headers
+    self.overlay_segments = hunk_file.overlay_segments
+    self.lib_indexes = hunk_file.lib_indexes
+    self.lib_segments = hunk_file.lib_segments
+    self.units = hunk_file.units
+    
     self.show_relocs=show_relocs
     self.show_debug=show_debug
     self.disassemble=disassemble
     self.hexdump=hexdump
   
-  def show_hunks(self):
-    type = self.hunk_file.type
-    if type == Hunk.TYPE_LOADSEG:
-      self.show_loadseg_hunks()
-    elif type == Hunk.TYPE_UNIT:
-      self.show_unit_hunks()
-    elif type == Hunk.TYPE_LIB:
-      self.show_lib_hunks()
+  def show_segments(self):
+    hunk_type = self.hunk_file.type
+    if hunk_type == Hunk.TYPE_LOADSEG:
+      self.show_loadseg_segments()
+    elif hunk_type == Hunk.TYPE_UNIT:
+      self.show_unit_segments()
+    elif hunk_type == Hunk.TYPE_LIB:
+      self.show_lib_segments()
     print
       
-  def show_lib_hunks(self):
-    for lib in self.hunks:
-      print "Library"
+  def show_lib_segments(self):
+    num_lib = len(self.lib_indexes)
+    for l in xrange(num_lib):
+      print "Library #%d" % l
       # Main Hunks of Lib
-      hunks = lib[0:-1]
-      for hunk in hunks:
-        self.show_main_hunk(hunk)
+      for segment in self.lib_segments[l]:
+        self.show_segment(segment)
       
       # Index
       print  
       print "Index"
-      index = lib[-1]
+      index = self.lib_indexes[l]
       units = index['units']
       for unit in units:
         print "  Unit '%s' starting at Hunk #%d" % (unit['name'], unit['hunk_begin_no'])
@@ -50,47 +60,36 @@ class HunkShow:
               print "      @%08x  %s (type %d)" % (d['value'],d['name'],d['type'])
           print
       
-  def show_unit_hunks(self):
-    for unit in self.hunks:
+  def show_unit_segments(self):
+    u = 0
+    for unit in self.units:
+      print
+      print "Unit #%d" %  u
+      u += 1
       for hunk in unit:
-        self.show_main_hunk(hunk)
+        self.show_segment(hunk)
   
-  def show_loadseg_hunks(self):
-    self.show_header(self.hunks[0])
-    for hunk in self.hunks[1:]:
-      if hunk[0]['type'] == Hunk.HUNK_OVERLAY:
-        self.show_overlay(hunk)
-      else:
-        self.show_main_hunk(hunk)
-  
-  def show_overlay(self,hunk):
-    print
-    print "Overlay"
-    overlay = hunk[0]
-    for chunk in hunk[1:]:
-      self.show_header(chunk[0])
-      for h in chunk[1:]:
-        self.show_main_hunk(h)
-  
-  def show_header(self, hunk):
-    print "Header"
-    hdr = hunk[0]
-    print "  first hunk:   %d" % hdr['first_hunk']
-    print "  last hunk:    %d" % hdr['last_hunk']
-    print "  table size:   %d" % hdr['table_size']
+  def show_loadseg_segments(self):
+    # header + segments
+    self.show_header(self.header)
+    for segment in self.segments:
+      self.show_segment(segment)
     
-  def show_main_hunk(self, hunk):
-    hunk_type = hunk[0]['type']
-    if hunk_type == Hunk.HUNK_CODE:
-      self.show_generic_main_hunk(hunk)
-    elif hunk_type == Hunk.HUNK_DATA:
-      self.show_generic_main_hunk(hunk)
-    elif hunk_type == Hunk.HUNK_BSS:
-      self.show_generic_main_hunk(hunk)
-    else:
-      self.show_generic_main_hunk(hunk)
-      
-  def show_generic_main_hunk(self, hunk):
+    # overlay
+    if self.overlay != None:
+      print
+      print "Overlay"
+      num_ov = len(self.overlay_headers)
+      for o in xrange(num_ov):
+        print
+        self.show_header(self.overlay_headers[o])
+        for segment in self.overlay_segments[o]:
+          self.show_segment(segment)
+    
+  def show_header(self, hdr):
+    print "Header (first=%d, last=%d, table size=%d)" % (hdr['first_hunk'], hdr['last_hunk'], hdr['table_size'])
+    
+  def show_segment(self, hunk):
     main = hunk[0]
     # unit hunks are named
     title = ""
@@ -98,7 +97,7 @@ class HunkShow:
       title = "'%s'" % main['name']
     type_name = main['type_name'].replace("HUNK_","")
     print
-    print "#%d %s %s" % (main['hunk_no'], type_name, title)
+    print "Segment #%d %s %s" % (main['hunk_no'], type_name, title)
     size = main['size']
     print "       %08x / %d bytes" % (size,size)
 

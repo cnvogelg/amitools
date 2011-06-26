@@ -12,6 +12,7 @@ import pprint
 
 from amitools.FileScanner import FileScanner
 from amitools import Hunk
+from amitools import HunkReader
 from amitools import HunkShow
 from amitools import ELF
 
@@ -45,15 +46,15 @@ class HunkCommand:
     # if verbose then print block structure
     if args.verbose:
       print
-      print "  blocks:",hunk_file.get_hunk_blk_summary()
+      print "  hunks:    ",hunk_file.get_hunk_summary()
       if args.dump:
         print_pretty(hunk_file.hunk_blks)        
-      print "  type:  ",
+      print "  type:     ",
     
-    # build hunk structure
-    ok = hunk_file.build_hunks()
+    # build segments from hunks
+    ok = hunk_file.build_segments()
     if not ok:
-      print "BUILD HUNK FAILED: %s" % (hunk_file.error_string)
+      print "BUILD SEGMENTS FAILED: %s" % (hunk_file.error_string)
       self.failed_files.append( (path, "BUILD: " + hunk_file.error_string) )
       return not self.args.stop
     
@@ -63,7 +64,10 @@ class HunkCommand:
     # if verbose then print hunk structure
     if args.verbose:
       print 
-      print "  hunks: ",hunk_file.get_hunk_summary()
+      print "  segments: ",hunk_file.get_segment_summary()
+      print "  overlays: ",hunk_file.get_overlay_segment_summary()
+      print "  lib_segs: ",hunk_file.get_lib_segment_summary()
+      print "  units:    ",hunk_file.get_units_summary()
       if args.dump:
         print_pretty(hunk_file.hunks)
     else:
@@ -81,7 +85,7 @@ class HunkCommand:
     return 0
       
   def process_file(self, path, fobj, cmd):
-    hunk_file = Hunk.HunkReader()
+    hunk_file = HunkReader.HunkReader()
     result = hunk_file.read_file_obj(path,fobj,None)
     # ignore non hunk files
     if result == Hunk.RESULT_NO_HUNK_FILE:
@@ -111,7 +115,7 @@ class Info(HunkCommand):
   def handle_hunk_file(self, hunk_file):
     # verbose all hunk
     hs = HunkShow.HunkShow(hunk_file, show_relocs=args.show_relocs, show_debug=args.show_debug, disassemble=args.disassemble, hexdump=args.hexdump)
-    hs.show_hunks()
+    hs.show_segments()
     return True
 
 # ----- Elf2Hunk -----
