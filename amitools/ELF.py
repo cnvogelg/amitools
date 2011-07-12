@@ -95,6 +95,7 @@ class ELF:
   
   def __init__(self):
     self.elf = {}
+    self.segments = []
   
   def parse_ident(self, ident_data):
     # magic
@@ -243,8 +244,6 @@ class ELF:
       entry['type_str'] = self.decode_value(entry['type'], STT_values)
       entry['visibility_str'] = self.decode_value(entry['visibility'], STV_values)
       entry['shndx_str'] = self.decode_value(entry['shndx'], SHN_values)
-      if entry['shndx_str'] == None:
-        entry['shndx_str'] = entry['shndx']
         
       symtab.append(entry)
       off += entsize
@@ -264,6 +263,17 @@ class ELF:
     for sym in seg['symtab']:
       sym['name_str'] = self.decode_string(strtab, sym['name'])
     
+    return True
+  
+  def resolve_symtab_indices(self, seg):
+    seghdr = self.elf['seghdr']
+    for sym in seg['symtab']:
+      if sym['shndx_str'] == None:
+        idx = sym['shndx']
+        sym['shndx_hdr'] = seghdr[idx]
+        sym['shndx_str'] = seghdr[idx]['name_str']
+      else:
+        sym['shndx_hdr'] = None
     return True
   
   def decode_rela(self, seg, data):
@@ -307,12 +317,20 @@ class ELF:
     
     symtab = seg['link_seg']['symtab']
     for entry in seg['rela']:
-      entry['sym_ref'] = symtab[entry['sym']]
-      entry['sym_str'] = entry['sym_ref']['name_str']
+      sym_idx = entry['sym']
+      sym = symtab[sym_idx]
+      entry['sym_ref'] = sym
+      entry['sym_str'] = sym['name_str']
       # relative to segment
       if entry['sym_str'] == "":
-        entry['sym_str'] = seg['info_seg']['name_str']
-    
+        entry['sym_str'] = sym['shndx_str']
+      # copy segment info from symbol
+      entry['shndx_hdr'] = sym['shndx_hdr']
+      entry['shndx_str'] = sym['shndx_str']
+      entry['shndx'] = sym['shndx']
+      # calc addend in segment
+      entry['shndx_addend'] = entry['addend'] + sym['value']
+
     return True
   
   def load_segment(self, f, seg):
@@ -392,45 +410,51 @@ class ELF:
           self.elf['symtab'] = seg['symtab']
           if not self.resolve_symtab_names(seg, seghdr):
             return False
+          if not self.resolve_symtab_indices(seg):
+            return False
       
-      # resolve rela links
+      # resolve rela links and symbols
       for seg in seghdr:  
         if seg['type'] == SHT_RELA:
           if not self.resolve_rela_links(seg, seghdr):
             return False
         
     return True
-    
-  def dump_segment_headers(self):
-    print "    name             type       flags"
+  
+  def dump_elf_segment_headers(self):
+    print "    name             size      type       flags"
     seghdr = self.elf['seghdr']
     num = 0
     for seg in seghdr:
-      print "%2d  %-16s %-10s %s" % (num,seg['name_str'],seg['type_str'],",".join(seg['flags_dec']))
+      print "%2d  %-16s %08x  %-10s %s" % (num,seg['name_str'],seg['size'],seg['type_str'],",".join(seg['flags_dec']))
       num += 1
       
-  def dump_symbols(self):
+  def dump_elf_symbols(self):
     if not self.elf.has_key('symtab'):
       print "no symbols"
       return
     
-    print "      value     size    type        bind        visibility  ndx  name"
+    print "      value     size    type      bind      visible   ndx              name"
     symtab = self.elf['symtab']
     num = 0
     for sym in symtab:
-      print "%4d  %08x  %6d  %-10s  %-10s  %-10s  %-3s  %s" % \
+      print "%4d  %08x  %6d  %-8s  %-8s  %-8s  %-16s  %s" % \
             (num,sym['value'],sym['size'],sym['type_str'], \
              sym['bind_str'],sym['visibility_str'],
              sym['shndx_str'],sym['name_str']) 
       num += 1
   
-  def dump_relas(self):
+  def dump_elf_relas(self):
     for seg in self.elf['seghdr']:
       if seg['type'] == SHT_RELA:
-        print seg['name_str']
-        print "      offset    type        symbol + addend"
+        print seg['name_str'],"linked to",seg['info_seg']['name_str']
+        print "      offset    type        segment + addend      symbol + addend"
         num = 0
         for rel in seg['rela']:
-          print "%4d  %08x  %-10s  %s (%d) + %d" % (num,rel['offset'],rel['type_str'],\
-                rel['sym_str'],rel['sym'],rel['addend'])
+          sym_txt = "%s (%d) + %d" % (rel['sym_str'],rel['sym'],rel['addend'])
+          seg_txt = "%s (%d) + %d" % (rel['shndx_str'],rel['shndx'],rel['shndx_addend'])
+          print "%4d  %08x  %-10s  %-20s  %s" % (num,rel['offset'],rel['type_str'],seg_txt,sym_txt)
           num += 1
+  
+  def extract(self):
+    self.text = extract_

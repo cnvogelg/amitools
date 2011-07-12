@@ -133,9 +133,9 @@ class Elf2Hunk:
       if not elf.load(f):
         print "ERROR loading ELF:",elf.error_string
         return 1
-      elf.dump_segment_headers()
-      elf.dump_symbols()
-      elf.dump_relas()
+      elf.dump_elf_segment_headers()
+      elf.dump_elf_symbols()
+      elf.dump_elf_relas()
     return 0
   
 # ----- main -----
