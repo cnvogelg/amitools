@@ -14,7 +14,7 @@ from amitools.FileScanner import FileScanner
 from amitools import Hunk
 from amitools import HunkReader
 from amitools import HunkShow
-from amitools import ELF
+from amitools import ELFReader
 
 def print_pretty(data):
   pp = pprint.PrettyPrinter(indent=2)
@@ -123,24 +123,32 @@ class Info(HunkCommand):
 
 # ----- Elf2Hunk -----
 
-class Elf2Hunk:
+class ElfInfo:
   def __init__(self,args):
     self.args = args
   
   def run(self):
     for f in args.files:
-      elf = ELF.ELF()
+      elf = ELFReader.ELFReader()
       if not elf.load(f):
         print "ERROR loading ELF:",elf.error_string
         return 1
       elf.dump_elf_segment_headers()
       elf.dump_elf_symbols()
       elf.dump_elf_relas()
+      elf.dump_elf_segments(show_relocs=args.show_relocs, show_debug=args.show_debug)
     return 0
   
 # ----- main -----
+# call scanner and process all files with selected command
+cmd_map = {
+"validate" : Validator,
+"info" : Info,
+"elfinfo" : ElfInfo
+}
+
 parser = argparse.ArgumentParser()
-parser.add_argument('command', help="command: validate, elf2hunk")
+parser.add_argument('command', help="command: "+",".join(cmd_map.keys()))
 parser.add_argument('files', nargs='+')
 parser.add_argument('-d', '--dump', action='store_true', default=False, help="dump the hunk structure")
 parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
@@ -154,12 +162,6 @@ parser.add_argument('-x', '--hexdump', action='store_true', default=False, help=
 parser.add_argument('-b', '--brief', action='store_true', default=False, help="show only brief information")
 args = parser.parse_args()
 
-# call scanner and process all files with selected command
-cmd_map = {
-"validate" : Validator,
-"elf2hunk" : Elf2Hunk,
-"info" : Info
-}
 cmd = args.command
 if not cmd_map.has_key(cmd):
   print "INVALID COMMAND:",cmd
