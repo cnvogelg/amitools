@@ -1,0 +1,113 @@
+#!/usr/bin/env python2.7
+#
+# vamos [optoins] <amiga binary> [args ...]
+#
+# run an m68k AmigaOS binary
+#
+# written by Christian Vogelgsang (chris@vogelgsang.org)
+
+import sys
+import argparse
+import pprint
+import struct
+
+from amitools.FileScanner import FileScanner
+from amitools import Hunk
+from amitools import HunkReader
+from amitools import HunkShow
+
+from musashi import m68k
+
+from amitools.vamos import MemoryBlock
+from amitools.vamos import MemoryLayout
+from amitools.vamos import ResetRange
+from amitools.vamos import AmigaLibrary
+from amitools.vamos import AmigaExecBase
+
+import ctypes
+
+# ----- main -----
+
+# --- args ---
+parser = argparse.ArgumentParser()
+parser.add_argument('bin', help="command: AmigaOS binary")
+parser.add_argument('args', nargs='*')
+parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
+args = parser.parse_args()
+
+bin = args.bin
+args = args.args
+print "vamos: %s %s" % (bin, args)
+
+# --- load binary ---
+hunk_file = HunkReader.HunkReader()
+fobj = file(bin,"rb")
+result = hunk_file.read_file_obj(bin,fobj,None)
+if result != Hunk.RESULT_OK:
+  print "Error loading '%s'" % (bin)
+  sys.exit(1)
+# build segments
+ok = hunk_file.build_segments()
+if not ok:
+  print "Error building segments for '%s'" % (bin)
+  sys.exit(2)
+# make sure its a loadseg()
+if hunk_file.type != Hunk.TYPE_LOADSEG:
+  print "File not loadSeg()able: '%s'" % (bin)
+  sys.exit(3)
+
+# --- create memory layout ---
+print "setting up memory layout"
+layout = MemoryLayout.MemoryLayout(verbose=True)
+
+# place prog segments
+print "segments in '%s'" % bin
+prog_base = 0x010000
+off = prog_base
+segment_addr = []
+prog_str = ""
+for segment in hunk_file.segments:
+  data = segment[0]['data'] # main hunk has data/code
+  segment_addr.append(off)
+  end = off + len(data)
+  prog_str += data
+  print "  seg [%06x ... %06x]" % (off,end-1)
+  off = end
+prog_end = off
+prog_size = len(prog_str)
+prog_mem = MemoryBlock.MemoryBlock("prog", prog_base, prog_size)
+prog_mem.write_data(prog_str, 0)
+layout.add_range(prog_mem)
+
+# setup stack
+magic_end = 0xff0000
+stack_base = 0x020000
+stack_size = 0x001000
+stack_end = stack_base + stack_size
+stack_mem = MemoryBlock.MemoryBlock("stack", stack_base, stack_size)
+stack_initial = stack_end - 4
+stack_mem.w32(stack_initial, magic_end)
+layout.add_range(stack_mem)
+
+# setup exec_lib
+exec_base = 0xf08000
+exec_lib = AmigaLibrary.AmigaLibrary("exec",exec_base,100,0)
+layout.add_range(exec_lib)
+exec_base_range = AmigaExecBase.AmigaExecBase(exec_base)
+
+# prepare m68k
+print "setting up m68k"
+m68k.set_read_memory(*layout.get_read_funcs())
+m68k.set_write_memory(*layout.get_write_funcs())
+m68k.set_cpu_type(m68k.M68K_CPU_TYPE_68000)
+
+print "resetting cpu..."
+reset_range = ResetRange.ResetRange(prog_base, stack_initial)
+layout.add_range(reset_range)
+m68k.pulse_reset()
+layout.remove_range(reset_range)
+layout.add_range(exec_base_range)
+
+print "go!"
+print m68k.execute(200)
+
