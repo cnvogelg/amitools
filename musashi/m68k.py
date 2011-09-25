@@ -5,7 +5,9 @@
 # wrapper for musashi m68k CPU emulator
 #
 
+import os
 from ctypes import *
+import ctypes.util
 
 # --- Constants ---
 
@@ -57,7 +59,16 @@ M68K_REG_CPU_TYPE = 31 # Type of CPU being run
 # --- Internal ---
 
 # get lib
-lib = CDLL("libmusashi.dylib")
+def find_lib():
+  path = os.path.dirname(os.path.realpath(__file__))
+  all_files = os.listdir(path)
+  for f in all_files:
+    if f.find('musashi') != -1:
+      return os.path.join(path,f)
+  raise ImportError("Can't find musashi native lib")
+ 
+lib_file = find_lib()
+lib = CDLL(lib_file)
 
 # define function types for callbacks
 read_func_type = CFUNCTYPE(c_uint, c_uint)
