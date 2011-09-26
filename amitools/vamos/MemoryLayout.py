@@ -32,20 +32,49 @@ class MemoryLayout:
              lambda addr,val: self.write_mem(1,addr,val),
              lambda addr,val: self.write_mem(2,addr,val))
   
-  def read_mem(self, width, addr):
+  def get_range(self, addr):
     for r in self.ranges:
       if r.is_inside(addr):
-        val = r.read_mem(width, addr)
-        if self.verbose:
-          print "R(%d): %06x: %x (%s)" % (2**width, addr, val, r.name)
-        return val
-    raise InvalidMemoryAccessError(width, addr)
+        return r
+    return None
+
+  def read_mem(self, width, addr):
+    r = self.get_range(addr)
+    if r != None:
+      val = r.read_mem(width, addr)
+      if self.verbose:
+        print "R(%d): %06x: %x (%s)" % (2**width, addr, val, r.name)
+      return val
+    else:
+      raise InvalidMemoryAccessError(width, addr)
   
   def write_mem(self, width, addr, val):
-    for r in self.ranges:
-      if r.is_inside(addr):
-        r.write_mem(width, addr, val)
-        if self.verbose:
-          print "W(%d): %06x: %x (%s)" % (2**width, addr, val, r.name)
-        return None
-    raise InvalidMemoryAccessError(width, addr)
+    r = self.get_range(addr)
+    if r != None:
+      if self.verbose:
+        print "W(%d): %06x: %x (%s)" % (2**width, addr, val, r.name)
+      r.write_mem(width, addr, val)
+      return None
+    else:
+      raise InvalidMemoryAccessError(width, addr)
+    
+  def write_data(self, addr, data):
+    r = self.get_range(addr)
+    if r != None:
+      r.write_data(addr, data)
+    else:
+      raise InvalidMemoryAccessError(0, addr)
+
+  def read_data(self, addr, size):
+    r = self.get_range(addr)
+    if r != None:
+      return r.read_data(addr, size)
+    else:
+      raise InvalidMemoryAccessError(0, addr)
+
+  def read_cstring(self, addr):
+    r = self.get_range(addr)
+    if r != None:
+      return r.read_cstring(addr)
+    else:
+      raise InvalidMemoryAccessError(0, addr)

@@ -94,7 +94,8 @@
 /* If on, CPU will call the output reset callback when it encounters a reset
  * instruction.
  */
-#define M68K_EMULATE_RESET          OPT_OFF
+/* CV Patch */
+#define M68K_EMULATE_RESET          OPT_ON
 #define M68K_RESET_CALLBACK()       your_reset_handler_function()
 
 
@@ -112,8 +113,7 @@
  * large value.  This allows host programs to be nicer when it comes to
  * fetching immediate data and instructions on a banked memory system.
  */
-/* CV Patch */
-#define M68K_MONITOR_PC             OPT_ON
+#define M68K_MONITOR_PC             OPT_OFF
 #define M68K_SET_PC_CALLBACK(A)     your_pc_changed_handler_function(A)
 
 

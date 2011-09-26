@@ -24,7 +24,7 @@ class MemoryBlock(MemoryRange):
     struct.pack_into("B",self.buffer,addr-self.addr,v)
 
   def w16(self, addr, v):
-    struct.pack_info(">H",self.buffer,addr-self.addr,v)
+    struct.pack_into(">H",self.buffer,addr-self.addr,v)
 
   def w32(self, addr, v):
     struct.pack_into(">I",self.buffer,addr-self.addr,v)
@@ -35,8 +35,27 @@ class MemoryBlock(MemoryRange):
   def write_mem(self, width, addr, val):
     self.wfunc[width](addr, val)
     
-  def write_data(self, data, offset):
-    off = offset
+  def write_data(self, addr, data):
+    off = addr - self.addr
     for d in data:
       self.buffer[off] = d
       off += 1
+  
+  def read_data(self, addr, size):
+    off = addr - self.addr
+    buf = " " * size
+    for i in xrange(size):
+      buf[i] = self.buffer[off]
+      off += 1
+    return buf
+
+  def read_cstring(self, addr):
+    off = addr - self.addr
+    res = ""
+    while self.buffer[off] != '\0':
+      res += self.buffer[off]
+      off += 1
+    return res
+
+    
+    

@@ -73,7 +73,8 @@ lib = CDLL(lib_file)
 # define function types for callbacks
 read_func_type = CFUNCTYPE(c_uint, c_uint)
 write_func_type = CFUNCTYPE(None, c_uint, c_uint)
-monitor_func_type = CFUNCTYPE(None, c_uint)
+pc_changed_callback_func_type = CFUNCTYPE(None, c_uint)
+reset_instr_callback_func_type = CFUNCTYPE(None)
 
 # declare functions
 execute_func = lib.m68k_execute
@@ -104,8 +105,14 @@ def set_write_memory(w8, w16, w32):
   lib.m68k_set_write_memory(w8c, w16c, w32c)
 
 def set_pc_changed_callback(func):
-  f = monitor_func_type(func)
-  lib.m68k_set_pc_changed_callback(f)
+  global pc_changed_callback
+  pc_changed_callback = pc_changed_callbak_func_type(func)
+  lib.m68k_set_pc_changed_callback(pc_changed_callback)
+
+def set_reset_instr_callback(func):
+  global reset_instr_callback
+  reset_instr_callback = reset_instr_callback_func_type(func)
+  lib.m68k_set_reset_instr_callback(reset_instr_callback)
 
 def set_cpu_type(t):
   lib.m68k_set_cpu_type(c_uint(t))
@@ -121,6 +128,9 @@ def get_reg(reg):
 
 def set_reg(reg, value):
   set_reg_func(reg, value)
+
+def end_timeslice():
+  lib.m68k_end_timeslice()
 
 # --- Sample ---
 

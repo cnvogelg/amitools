@@ -19,3 +19,13 @@ class MemoryRange:
   
   def write_mem(self, width, addr, val):
     raise InvalidMemoryAccessError(width, addr)
+    
+  def write_data(self, data, offset):
+    raise InvalidMemoryAccessError(width, addr)
+
+  def read_data(self, offset, size):
+    raise InvalidMemoryAccessError(width, addr)
+
+  def read_cstring(self, offset):
+    raise InvalidMemoryAccessError(width, addr)
+    
