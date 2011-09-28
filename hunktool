@@ -131,7 +131,7 @@ class Relocate(HunkCommand):
       print "ERROR: can only relocate LoadSeg()able files:",path;
       return False
     
-    rel = HunkRelocate.HunkRelocate(hunk_file)
+    rel = HunkRelocate.HunkRelocate(hunk_file,verbose=self.args.verbose)
     # get sizes of all segments
     sizes = rel.get_sizes()
     # calc begin addrs for all segments
@@ -144,10 +144,10 @@ class Relocate(HunkCommand):
       return False
     else:    
       print "Relocate to base address",base_addr
-      print "Bases: ",addrs
-      print "Sizes: ",sizes
-      print "Data:  ",map(lambda x:len(x),datas)
-      print "Total: ",rel.get_total_size()
+      print "Bases: "," ".join(map(lambda x:"%06x"%(x),addrs))
+      print "Sizes: "," ".join(map(lambda x:"%06x"%(x),sizes))
+      print "Data:  "," ".join(map(lambda x:"%06x"%(len(x)),datas))
+      print "Total: ","%06x"%(rel.get_total_size())
       return True
 
 # ----- Elf2Hunk -----

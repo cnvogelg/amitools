@@ -89,10 +89,11 @@ prog_size = len(prog_data)
 prog_mem = MemoryBlock.MemoryBlock("prog", prog_base, prog_size)
 prog_mem.write_data(prog_base, prog_data)
 layout.add_range(prog_mem)
+print prog_mem
 
 # setup stack
 magic_end = 0xff0000
-stack_base = 0x020000
+stack_base = 0x080000
 stack_size = 0x001000
 stack_end = stack_base + stack_size
 stack_mem = MemoryBlock.MemoryBlock("stack", stack_base, stack_size)
