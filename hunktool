@@ -14,6 +14,7 @@ from amitools.FileScanner import FileScanner
 from amitools import Hunk
 from amitools import HunkReader
 from amitools import HunkShow
+from amitools import HunkRelocate
 from amitools import ELFReader
 
 def print_pretty(data):
@@ -74,7 +75,7 @@ class HunkCommand:
       print
 
     # do special processing on hunk file for command
-    ok = self.handle_hunk_file(hunk_file)
+    ok = self.handle_hunk_file(path, hunk_file)
     return ok
   
   def result(self):
@@ -104,7 +105,7 @@ class HunkCommand:
 
 class Validator(HunkCommand):
   
-  def handle_hunk_file(self, hunk_file):
+  def handle_hunk_file(self, path, hunk_file):
     # do nothing extra
     return True
 
@@ -112,7 +113,7 @@ class Validator(HunkCommand):
 
 class Info(HunkCommand):
 
-  def handle_hunk_file(self, hunk_file):
+  def handle_hunk_file(self, path, hunk_file):
     # verbose all hunk
     hs = HunkShow.HunkShow(hunk_file, \
       show_relocs=args.show_relocs, show_debug=args.show_debug, \
@@ -120,6 +121,34 @@ class Info(HunkCommand):
       brief=args.brief)
     hs.show_segments()
     return True
+
+# ----- Relocate -----
+
+class Relocate(HunkCommand):
+  
+  def handle_hunk_file(self, path, hunk_file):
+    if hunk_file.type != Hunk.TYPE_LOADSEG:
+      print "ERROR: can only relocate LoadSeg()able files:",path;
+      return False
+    
+    rel = HunkRelocate.HunkRelocate(hunk_file)
+    # get sizes of all segments
+    sizes = rel.get_sizes()
+    # calc begin addrs for all segments
+    base_addr = self.args.base_address
+    addrs = rel.get_seq_addrs(base_addr)
+    # relocate and return data of segments
+    datas = rel.relocate(addrs)
+    if datas == None:
+      print "ERROR: relocation failed:",path
+      return False
+    else:    
+      print "Relocate to base address",base_addr
+      print "Bases: ",addrs
+      print "Sizes: ",sizes
+      print "Data:  ",map(lambda x:len(x),datas)
+      print "Total: ",rel.get_total_size()
+      return True
 
 # ----- Elf2Hunk -----
 
@@ -144,7 +173,8 @@ class ElfInfo:
 cmd_map = {
 "validate" : Validator,
 "info" : Info,
-"elfinfo" : ElfInfo
+"elfinfo" : ElfInfo,
+"relocate" : Relocate
 }
 
 parser = argparse.ArgumentParser()
@@ -160,6 +190,7 @@ parser.add_argument('-D', '--show-debug', action='store_true', default=False, he
 parser.add_argument('-A', '--disassemble', action='store_true', default=False, help="disassemble code segments")
 parser.add_argument('-x', '--hexdump', action='store_true', default=False, help="dump segments in hex")
 parser.add_argument('-b', '--brief', action='store_true', default=False, help="show only brief information")
+parser.add_argument('-B', '--base-address', action='store', type=int, default=0, help="base address for relocation")
 args = parser.parse_args()
 
 cmd = args.command

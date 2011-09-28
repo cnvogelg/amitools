@@ -14,6 +14,7 @@ import struct
 from amitools.FileScanner import FileScanner
 from amitools import Hunk
 from amitools import HunkReader
+from amitools import HunkRelocate
 from amitools import HunkShow
 
 from musashi import m68k
@@ -82,19 +83,11 @@ context = MachineContext.MachineContext(MusashiCPU(),layout)
 print "segments in '%s'" % bin
 prog_base = 0x010000
 off = prog_base
-segment_addr = []
-prog_str = ""
-for segment in hunk_file.segments:
-  data = segment[0]['data'] # main hunk has data/code
-  segment_addr.append(off)
-  end = off + len(data)
-  prog_str += data
-  print "  seg [%06x ... %06x]" % (off,end-1)
-  off = end
-prog_end = off
-prog_size = len(prog_str)
+relocator = HunkRelocate.HunkRelocate(hunk_file)
+prog_data = relocator.relocate_one_block(prog_base)
+prog_size = len(prog_data)
 prog_mem = MemoryBlock.MemoryBlock("prog", prog_base, prog_size)
-prog_mem.write_data(prog_base, prog_str)
+prog_mem.write_data(prog_base, prog_data)
 layout.add_range(prog_mem)
 
 # setup stack
