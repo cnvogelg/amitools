@@ -1,0 +1,97 @@
+#!/usr/bin/env python2.7
+#
+# fdtool <file.fd> ...
+#
+
+import sys
+import argparse
+import re
+
+def parse_fd(fname):
+  res = {}
+  funcs = []
+  res['funcs'] = funcs
+  
+  func_pat = "([A-Za-z][A-Za-z00-9]+)\((.*)\)\((.*)\)"
+  
+  bias = 0
+  private = True
+  f = open(fname, "r")
+  for line in f:
+    l = line.strip()
+    if len(l) > 0:
+      if l[0] != '*' and len(l) > 1:
+          # a command
+          if l[0] == '#' and l[1] == '#':
+            cmdline = l[2:]
+            cmda = cmdline.split(" ")
+            cmd = cmda[0]
+            if cmd == "base":
+              res['base'] = cmda[1]
+            elif cmd == "bias":
+              bias = int(cmda[1])
+            elif cmd == "private":
+              private = True
+            elif cmd == "public":
+              private = False
+            elif cmd == "end":
+              break
+            else:
+              print "Invalid command:",cmda
+              return None
+          # a function
+          else:
+            func = {}
+            func['bias'] = bias
+            func['private'] = private
+            bias += 6
+            funcs.append(func)
+            m = re.match(func_pat, l)
+            if m == None:
+              print "Failed:",l
+              return None
+            else:
+              name = m.group(1)
+              args = m.group(2)
+              regs = m.group(3)
+              arg = args.replace(',','/').split('/')
+              reg = regs.replace(',','/').split('/')
+              func['name'] = name
+              if len(arg) != len(reg):
+                print "Arg != Reg:",arg,reg
+                return None
+              else:
+                r = []
+                t = []
+                num_args = len(arg)
+                if arg[0] != '':
+                  for i in xrange(num_args):
+                    p = (arg[i],reg[i])
+                    r.append(p)
+                    t.append("[%s,%s]" % p)
+                  func['args'] = r
+                  func['args_str'] = "".join(t)
+                else:
+                  func['args'] = None
+                  func['args_str'] = ""
+                
+  return res
+  
+parser = argparse.ArgumentParser()
+parser.add_argument('files', nargs='+')
+parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
+args = parser.parse_args()
+
+
+files = args.files
+for fname in files:
+  fd = parse_fd(fname)
+  if fd != None:
+    print fname
+    print "  base: %s" % fd['base']
+    funcs = fd['funcs']
+    num = 1
+    for f in funcs:
+      if not f['private']:
+        print "  #%04d  %5d  %20s %s" % (num,f['bias'],f['name'],f['args_str'])
+        num += 1
