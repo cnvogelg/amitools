@@ -1,0 +1,17 @@
+#!/usr/bin/env python2.7
+#
+# vamos [optoins] <amiga binary> [args ...]
+#
+# run an m68k AmigaOS binary
+#
+# written by Christian Vogelgsang (chris@vogelgsang.org)
+
+import sys
+
+from amitools.vamos import AmigaStruct
+from amitools.vamos.structure import ExecStruct
+
+for type_name in sys.argv[1:]:
+  type_def = AmigaStruct.struct_pool[type_name]
+  if type_def != None:
+    type_def.dump()

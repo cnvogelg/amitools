@@ -17,13 +17,13 @@ class HunkRelocate:
       sizes.append(size)
     return sizes
   
-  def get_seq_addrs(self, base_addr):
+  def get_seq_addrs(self, base_addr, padding=0):
     sizes = self.get_sizes()
     addrs = []
     addr = base_addr
     for s in sizes:
       addrs.append(addr)
-      addr += s
+      addr += s + padding
     return addrs
   
   def get_total_size(self):
@@ -33,10 +33,15 @@ class HunkRelocate:
       total += main_hunk['size']
     return total
   
-  def relocate_one_block(self, addr):
-    addrs = self.get_seq_addrs(addr)
+  def relocate_one_block(self, addr, padding=0):
+    addrs = self.get_seq_addrs(addr,padding=padding)
     datas = self.relocate(addrs)
-    return "".join(datas)
+    result = []
+    for d in datas:
+      result.append(d)
+      if padding > 0:
+        result.append('\0' * padding)
+    return "".join(result)
   
   def relocate(self, addr):
     datas = []

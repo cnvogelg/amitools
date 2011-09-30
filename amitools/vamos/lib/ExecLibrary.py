@@ -1,9 +1,10 @@
 from amitools.vamos.AmigaLibrary import *
+from amitools.vamos.structure.ExecStruct import ExecLibraryDef
 
 class ExecLibrary(AmigaLibrary):
   
   def __init__(self, version, context, lib_mgr):
-    AmigaLibrary.__init__(self,"exec.library", version, 30, 100, 10, context)
+    AmigaLibrary.__init__(self,"exec.library", version, 30, 100, ExecLibraryDef, context)
     self.lib_mgr = lib_mgr
     # vector
     self.add_key(-552,self.OpenLibrary,name="OpenLibrary",param=(REG_D0,REG_A1),ret=REG_D0)

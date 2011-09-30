@@ -12,8 +12,11 @@ class InvalidMemoryAccessError(Exception):
 
 class MemoryLayout:
   
+  ranges = []
+  invalid_reads = []
+  invalid_writes = []
+  
   def __init__(self, verbose=False):
-    self.ranges = []
     self.verbose = verbose
     
   def add_range(self, range):
@@ -50,6 +53,7 @@ class MemoryLayout:
         raise InvalidMemoryAccessError(width, addr)
     except InvalidMemoryAccessError as e:
       print "R(%d): %06x !!!" % (e.width,e.addr)
+      self.invalid_reads.append((e.width, e.addr))
       return 0
   
   def write_mem(self, width, addr, val):
@@ -64,6 +68,7 @@ class MemoryLayout:
         raise InvalidMemoryAccessError(width, addr)
     except InvalidMemoryAccessError as e:
       print "W(%d): %06x !!!" % (e.width, e.addr) 
+      self.invalid_writes.append((e.width, e.addr))
       return None
     
   def write_data(self, addr, data):

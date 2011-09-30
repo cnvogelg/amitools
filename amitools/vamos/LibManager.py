@@ -17,7 +17,7 @@ class LibManager:
       if lib[1].name == name and lib[1].version >= ver:
         lib[2] += 1
         if lib[2] == 1:
-          print "  [OpenLibrary: %s @%06x]" % (lib[1].name, lib[0])
+          print "  [OpenLibrary: %s]" % lib[1]
           self.layout.add_range(lib[1])
         return lib[0]
     return 0
@@ -27,6 +27,6 @@ class LibManager:
       if lib[0] == addr:
         lib[2] -= 1
         if lib[2] == 0:
-          print "  [CloseLibrary: %s @%06x]" % (lib[1].name, lib[0])
+          print "  [CloseLibrary: %s]" % lib[1]
         return lib[1]
     return None

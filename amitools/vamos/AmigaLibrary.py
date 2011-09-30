@@ -1,18 +1,18 @@
 
-from MemoryBlock import MemoryBlock
+from MemoryStruct import MemoryStruct
 from MemoryLayout import InvalidMemoryAccessError
 from CPU import *
 
-class AmigaLibrary(MemoryBlock):
+class AmigaLibrary(MemoryStruct):
   
   op_rts = 0x4e75
   
-  def __init__(self, name, version, bias, num_vectors, pos_size, context):
+  def __init__(self, name, version, bias, num_vectors, struct, context):
     self.name = name
     self.version = version
     self.bias = bias
     self.num_vectors = num_vectors
-    self.pos_size = pos_size
+    self.struct = struct
     self.context = context
     # calc neg_size
     self.neg_size = bias + num_vectors * 6
@@ -25,12 +25,17 @@ class AmigaLibrary(MemoryBlock):
     # keep mem and cpu
     self.cpu = self.context.get_cpu()
     self.mem = self.context.get_mem()
-    
+  
+  def __str__(self):
+    return "[AmigaLib:%s V%d bias=%d num_vectors=%d pos_size=%d neg_size=%d [%06x ... %06x ... %06x]]" % \
+      (self.name, self.version, self.bias, self.num_vectors, self.pos_size, self.neg_size, self.begin_addr, self.base_addr, self.end_addr)
+  
   def set_addr(self, addr):
     self.base_addr = addr
     self.begin_addr = addr - self.neg_size
+    self.pos_size = self.struct.get_size()
     self.end_addr = addr + self.pos_size
-    MemoryBlock.__init__(self, self.name, addr, self.pos_size)    
+    MemoryStruct.__init__(self, self.name, addr, self.struct)    
 
   def add_key(self, key, callee, name="none", param=None, ret=REG_D0):
     off = (-key - self.bias) / 6
@@ -45,12 +50,12 @@ class AmigaLibrary(MemoryBlock):
     }
 
   def is_inside(self, addr):
-    return ((addr >= self.begin_addr) and (addr < self.addr))
+    return ((addr >= self.begin_addr) and (addr < self.end_addr))
     
   def read_mem(self, width, addr):
-    # pos range -> redirect to memory
+    # pos range -> redirect to struct
     if addr >= self.addr:
-      return MemoryBlock.read_memory(self, width, addr)
+      return MemoryStruct.read_mem(self, width, addr)
     # trap lib call and return RTS opcode
     elif(width == 1):
       self.call_vector(addr)
@@ -60,9 +65,9 @@ class AmigaLibrary(MemoryBlock):
       raise InvalidMemoryAccessError(width, addr)
 
   def write_mem(self, width, addr, val):
-    # pos range -> redirect to memory
+    # pos range -> redirect to struct
     if addr >= self.addr:
-      return MemoryBlock.write_memory(self, width, addr, val)
+      return MemoryStruct.write_mem(self, width, addr, val)
     # writes to neg area are not allowed for now
     else:
       raise InvalidMemoryAccessError(width, addr)
