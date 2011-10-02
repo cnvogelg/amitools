@@ -7,28 +7,37 @@ class AmigaLibrary(MemoryStruct):
   
   op_rts = 0x4e75
   
-  def __init__(self, name, version, bias, num_vectors, struct, context):
+  def __init__(self, name, version, calls, struct, context):
     self.name = name
     self.version = version
-    self.bias = bias
-    self.num_vectors = num_vectors
+    self.calls = calls
     self.struct = struct
     self.context = context
     # calc neg_size
-    self.neg_size = bias + num_vectors * 6
+    last_call_bias = calls[-1][0]    
+    self.neg_size = last_call_bias + 6
+    self.num_jumps = self.neg_size / 6
     
-    # setup vector table
-    self.vectors = []
-    for i in xrange(num_vectors):
-      self.vectors.append(None)
+    # setup jump_table: [call_tuple|None, PyFunc|None]
+    self.jump_table = []
+    call_id = 0
+    off = 0
+    for i in xrange(self.num_jumps):
+      call = None
+      cur_call = self.calls[call_id]
+      if cur_call[0]==off:
+        call = cur_call
+        call_id += 1
+      off += 6
+      self.jump_table.append([call,None])
 
     # keep mem and cpu
     self.cpu = self.context.get_cpu()
     self.mem = self.context.get_mem()
   
   def __str__(self):
-    return "[AmigaLib:%s V%d bias=%d num_vectors=%d pos_size=%d neg_size=%d [%06x ... %06x ... %06x]]" % \
-      (self.name, self.version, self.bias, self.num_vectors, self.pos_size, self.neg_size, self.begin_addr, self.base_addr, self.end_addr)
+    return "[AmigaLib:%s V%d num_jumps=%d pos_size=%d neg_size=%d [%06x ... %06x ... %06x]]" % \
+      (self.name, self.version, self.num_jumps, self.pos_size, self.neg_size, self.begin_addr, self.base_addr, self.end_addr)
   
   def set_addr(self, addr):
     self.base_addr = addr
@@ -37,17 +46,16 @@ class AmigaLibrary(MemoryStruct):
     self.end_addr = addr + self.pos_size
     MemoryStruct.__init__(self, self.name, addr, self.struct)    
 
-  def add_key(self, key, callee, name="none", param=None, ret=REG_D0):
-    off = (-key - self.bias) / 6
-    self.add_offset(off, callee, name=name, param=param, ret=ret)
+  def set_funcs(self, funcs):
+    for f in funcs:
+      self.set_func(*f)
+
+  def set_func(self, key, callee):
+    off = key / 6
+    self.set_by_offset(off, callee)
     
-  def add_offset(self, off, callee, name="none", param=None, ret=REG_D0):
-    self.vectors[off] = {
-      "callee" : callee,
-      "name" : name,
-      "param" : param,
-      "ret" : ret
-    }
+  def set_by_offset(self, off, callee, name="none", param=None, ret=REG_D0):
+    self.jump_table[off][1] = callee
 
   def is_inside(self, addr):
     return ((addr >= self.begin_addr) and (addr < self.end_addr))
@@ -73,16 +81,41 @@ class AmigaLibrary(MemoryStruct):
       raise InvalidMemoryAccessError(width, addr)
 
   def call_vector(self, addr):
-    off = (self.base_addr - self.bias - addr) / 6
+    off = (self.base_addr - addr) / 6
     key = (addr - self.base_addr)
-    vector = self.vectors[off]
-    if vector != None:
-      callee = vector['callee']
-      print "  [%s] %s" % (self.name, vector['name'])
-      callee()
+    jump_entry = self.jump_table[off]
+
+    # trace call
+    call = jump_entry[0]
+    print "  [lib_call: %s: %4d %s( %s )]" % (self.name, call[0], call[1], self.gen_arg_dump(call[2]))
+
+    callee = jump_entry[1]
+    if callee != None:
+      d0 = callee()
+      if d0 != None:
+        print "  [return d0=%08x]" % (d0)
+        self.cpu.w_reg(REG_D0, d0)
     else:
-      self.default_call(off,key)
+      print "  [default d0=0]"
+      self.cpu.w_reg(REG_D0, 0)
     
-  def default_call(self, off, key):
-    print "  [%s] ignore call: off=%d key=%d" % (self.name,off,key) 
-    self.cpu.w_reg(REG_D0, 0)
+  def get_callee_pc(self):
+    sp = self.cpu.r_reg(REG_A7)
+    return self.context.mem.read_mem(2,sp)
+    
+  def log(self,msg):
+    print "\t[%s]" % msg
+  
+  def gen_arg_dump(self,args):
+    if args == None:
+      return ""
+    result = []
+    for a in args:
+      name = a[0]
+      reg = a[1]
+      reg_num = int(reg[1])
+      if reg[0] == 'a':
+        reg_num += 8
+      val = self.cpu.r_reg(reg_num)
+      result.append("%s[%s]=%x" % (name,reg,val))
+    return ", ".join(result)

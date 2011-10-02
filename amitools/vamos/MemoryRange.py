@@ -1,4 +1,4 @@
-from MemoryLayout import InvalidMemoryAccessError
+from Exceptions import InvalidMemoryAccessError
 
 class MemoryRange:
   

@@ -21,6 +21,7 @@ from musashi import m68k
 
 from amitools.vamos import MemoryBlock
 from amitools.vamos import MemoryLayout
+from amitools.vamos import MemoryAlloc
 from amitools.vamos import ResetRange
 from amitools.vamos import EndRange
 from amitools.vamos import AmigaLibrary
@@ -54,6 +55,7 @@ parser.add_argument('args', nargs='*')
 parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
 parser.add_argument('-c', '--cycles', action='store', type=int, default=0, help="maximum number of cycles to execute")
 parser.add_argument('-b', '--block', action='store', type=int, default=1000, help="cycles per block")
+parser.add_argument('-m', '--memory_trace', action='store_true', default=False, help="trace memory")
 args = parser.parse_args()
 
 bin = args.bin
@@ -79,7 +81,7 @@ if hunk_file.type != Hunk.TYPE_LOADSEG:
 
 # --- create memory layout ---
 print "setting up memory layout"
-layout = MemoryLayout.MemoryLayout(verbose=True)
+layout = MemoryLayout.MemoryLayout("main_memory",0,0x1000000,verbose=args.memory_trace)
 context = MachineContext.MachineContext(MusashiCPU(),layout)
 
 # place prog segments
@@ -106,9 +108,20 @@ stack_base = 0x080000
 stack_size = 0x001000
 stack_end = stack_base + stack_size
 stack_mem = MemoryBlock.MemoryBlock("stack", stack_base, stack_size)
+# prepare stack
+# TOP: size
+# TOP-4: return from program -> magic_ed
 stack_initial = stack_end - 4
+stack_mem.w32(stack_initial, stack_size)
+stack_initial -= 4
 stack_mem.w32(stack_initial, magic_end)
 layout.add_range(stack_mem)
+
+# setup heap
+heap_base = 0x100000
+heap_size = 0x080000
+heap_mem = MemoryAlloc.MemoryAlloc("heap", heap_base, heap_size, verbose=args.memory_trace)
+layout.add_range(heap_mem)
 
 # setup argument
 arg_base = 0x1000
@@ -128,7 +141,7 @@ lib_off  = 0x010000
 lib_mgr  = LibManager.LibManager(lib_base, lib_off, layout)
 
 # setup exec.library
-exec_lib = ExecLibrary.ExecLibrary(0, context, lib_mgr)
+exec_lib = ExecLibrary.ExecLibrary(0, context, lib_mgr, heap_mem)
 lib_mgr.add_lib(exec_lib)
 exec_base = lib_mgr.open_lib("exec.library",0)
 exec_base_range = AmigaExecBase.AmigaExecBase(exec_base)

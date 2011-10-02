@@ -76,22 +76,45 @@ def parse_fd(fname):
                   func['args_str'] = ""
                 
   return res
-  
+
+# ----- dump -----
+
+def dump(fd):
+  print fname
+  print "  base: %s" % fd['base']
+  funcs = fd['funcs']
+  num = 1
+  for f in funcs:
+    if not f['private']:
+      print "  #%04d  %5d  %20s %s" % (num,f['bias'],f['name'],f['args_str'])
+      num += 1
+
+# ----- generate -----
+
+def generate_code(fd):
+  funcs = fd['funcs']
+  for f in funcs:
+    args = f['args']
+    if args != None:
+      args = tuple(args)
+    print "    (%d, '%s', %s)," % (f['bias'],f['name'],args)
+
+
+
+# ----- main -----
+
+# parse args
 parser = argparse.ArgumentParser()
 parser.add_argument('files', nargs='+')
-parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
+parser.add_argument('-g', '--generate', action='store_true', default=False, help="generate code")
 args = parser.parse_args()
 
-
+# main loop
 files = args.files
 for fname in files:
   fd = parse_fd(fname)
   if fd != None:
-    print fname
-    print "  base: %s" % fd['base']
-    funcs = fd['funcs']
-    num = 1
-    for f in funcs:
-      if not f['private']:
-        print "  #%04d  %5d  %20s %s" % (num,f['bias'],f['name'],f['args_str'])
-        num += 1
+    if args.generate:
+      generate_code(fd)
+    else:
+      dump(fd)

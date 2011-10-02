@@ -1,23 +1,18 @@
+from MemoryRange import MemoryRange
+from Exceptions import InvalidMemoryAccessError
 
 MEMORY_WIDTH_BYTE = 0
 MEMORY_WIDTH_WORD = 1
 MEMORY_WIDTH_LONG = 2
 
-class InvalidMemoryAccessError(Exception):
-  def __init__(self, width, addr):
-    self.width = width;
-    self.addr = addr
-  def __str__(self):
-    return "Invalid Memory Access (width=%d, addr=%06x)" % (self.width,self.addr)
-
-class MemoryLayout:
+class MemoryLayout(MemoryRange):
   
-  ranges = []
-  invalid_reads = []
-  invalid_writes = []
-  
-  def __init__(self, verbose=False):
+  def __init__(self, name, addr, size, verbose=False):
+    MemoryRange.__init__(self, name, addr, size)
     self.verbose = verbose
+    self.ranges = []
+    self.invalid_reads = []
+    self.invalid_writes = []
     
   def add_range(self, range):
     self.ranges.append(range)
