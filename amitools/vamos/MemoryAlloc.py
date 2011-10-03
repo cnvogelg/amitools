@@ -40,6 +40,7 @@ class MemoryAlloc(MemoryLayout):
   def alloc_memory(self, name, size, padding=4):
     addr = self.alloc_range(size, padding)
     mb = MemoryBlock(name, addr, size)
+    mb.set_trace_level(self.get_trace_level())
     self.add_range(mb)
     self._reg_range(addr, mb)
     return mb
@@ -52,6 +53,7 @@ class MemoryAlloc(MemoryLayout):
   def alloc_struct(self, name, struct, padding=4):
     addr = self.alloc_range(struct.get_size(), padding)
     ms = MemoryStruct(name, addr, struct)
+    ms.set_trace_level(self.get_trace_level())
     self.add_range(ms)
     self._reg_range(addr, ms)
     return ms

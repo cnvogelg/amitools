@@ -20,9 +20,9 @@ class MemoryLib(MemoryRange):
   def __str__(self):
     return "%s base=%06x %s" %(MemoryRange.__str__(self),self.base_addr,str(self.lib))
 
-  def set_trace(self, on):
-    MemoryRange.set_trace(self, on)
-    self.pos_mem.set_trace(on)
+  def set_trace(self, level):
+    MemoryRange.set_trace(self, level)
+    self.pos_mem.set_trace(level)
 
   def get_base_addr(self):
     return self.base_addr
@@ -40,7 +40,7 @@ class MemoryLib(MemoryRange):
     # trap lib call and return RTS opcode
     elif(width == 1):
       val = self.op_rts
-      self.trace_read(width, addr, val, text="TRAP")
+      self.trace_read(self.TRACE_LEVEL_TRAP,width, addr, val, text="TRAP")
       off = (self.base_addr - addr) / 6
       self.lib.call_vector(off,self,self.ctx)
       return val
@@ -56,26 +56,34 @@ class MemoryLib(MemoryRange):
     else:
       raise InvalidMemoryAccessError(width, addr)
 
-  def set_data(self, data, offset):
+  def w_data(self, data, offset):
     # pos range -> redirect to struct
     if addr >= self.base_addr:
-      return self.pos_mem.set_data(data, offset)
+      return self.pos_mem.w_data(data, offset)
     # writes to neg area are not allowed for now
     else:
       raise InvalidMemoryAccessError(width, addr)
 
-  def get_data(self, offset, size):
+  def r_data(self, offset, size):
     # pos range -> redirect to struct
     if addr >= self.base_addr:
-      return self.pos_mem.get_data(offset, size)
+      return self.pos_mem.r_data(offset, size)
     # writes to neg area are not allowed for now
     else:
       raise InvalidMemoryAccessError(width, addr)
 
-  def get_cstring(self, offset):
+  def r_cstr(self, offset):
     # pos range -> redirect to struct
     if addr >= self.base_addr:
-      return self.pos_mem.get_cstring(offset)
+      return self.pos_mem.r_cstr(offset)
+    # writes to neg area are not allowed for now
+    else:
+      raise InvalidMemoryAccessError(width, addr)
+
+  def w_cstr(self, offset, cstr):
+    # pos range -> redirect to struct
+    if addr >= self.base_addr:
+      self.pos_mem.w_cstr(offset, cstr)
     # writes to neg area are not allowed for now
     else:
       raise InvalidMemoryAccessError(width, addr)

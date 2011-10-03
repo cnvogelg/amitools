@@ -11,10 +11,10 @@ class MemoryLayout(MemoryRange):
     MemoryRange.__init__(self, name, addr, size)
     self.ranges = []
   
-  def set_trace(self, on):
-    MemoryRange.set_trace(self, on)
+  def set_trace(self, level):
+    MemoryRange.set_trace(self, level)
     for r in self.ranges:
-      r.set_trace(on)
+      r.set_trace(level)
   
   def add_range(self, range):
     self.ranges.append(range)
@@ -47,23 +47,30 @@ class MemoryLayout(MemoryRange):
     else:
       raise InvalidMemoryAccessError(width, addr)
     
-  def set_data(self, addr, data):
+  def w_data(self, addr, data):
     r = self.get_range(addr)
     if r != None:
-      r.set_data(addr, data)
+      r.w_data(addr, data)
     else:
       raise InvalidMemoryAccessError(0, addr)
 
-  def get_data(self, addr, size):
+  def r_data(self, addr, size):
     r = self.get_range(addr)
     if r != None:
-      return r.get_data(addr, size)
+      return r.r_data(addr, size)
     else:
       raise InvalidMemoryAccessError(0, addr)
 
-  def get_cstring(self, addr):
+  def r_cstr(self, addr):
     r = self.get_range(addr)
     if r != None:
-      return r.get_cstring(addr)
+      return r.r_cstr(addr)
+    else:
+      raise InvalidMemoryAccessError(0, addr)
+
+  def w_cstr(self, addr, cstr):
+    r = self.get_range(addr)
+    if r != None:
+      r.w_cstr(addr, cstr)
     else:
       raise InvalidMemoryAccessError(0, addr)

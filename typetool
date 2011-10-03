@@ -10,11 +10,17 @@ import sys
 
 from amitools.vamos import AmigaStruct
 from amitools.vamos.structure import ExecStruct
+from amitools.vamos.structure import DosStruct
 
 # --- args ---
 argc = len(sys.argv)
 if argc == 1:
-  print "Usage: typetool <typename> [ offset width | name ]"
+  print """
+Usage: 
+  typetool <typename>                          # Dump given type
+  typetool <typename> <element.path>           # Lookup offset of given element
+  typetool <typename> <offset> <byte_width>    # Lookup element at given offset  
+"""
   sys.exit(1)
 
 type_name = sys.argv[1]
@@ -30,9 +36,9 @@ if argc == 2:
 elif argc == 3:
   name = sys.argv[2]
   res = type_def.get_offset_for_name(name)
-  print "name=%s -> offset=%d width=%s" % (name,res[0],res[1])
+  print "name=%s -> offset=%d width=%s convert=%s" % (name,res[0],res[1],res[2])
 elif argc == 4:
   offset = int(sys.argv[2])
   width = int(sys.argv[3])
   res = type_def.get_name_for_offset(offset,width)
-  print "offset=%d widht=%d -> name=%s delta=%d" % (offset,width,res[0],res[1])
+  print "offset=%d widht=%d -> name=%s delta=%d type_name=%s" % (offset,width,res[0],res[1],res[2])

@@ -80,16 +80,16 @@ class AmigaLibrary:
     jump_entry = self.jump_table[off]
 
     call = jump_entry[0]
-    self.trace_log("call: %4d %s( %s )" % (call[0], call[1], self.gen_arg_dump(call[2], ctx)))
+    self.trace_log("{call: %4d %s( %s )" % (call[0], call[1], self.gen_arg_dump(call[2], ctx)))
 
     callee = jump_entry[1]
     if callee != None:
       d0 = callee(mem_lib, ctx)
       if d0 != None:
-        self.trace_log("return d0=%08x" % (d0))
+        self.trace_log("}return d0=%08x" % (d0))
         ctx.cpu.w_reg(REG_D0, d0)
     else:
-      self.trace_log("default d0=0")
+      self.trace_log("}default d0=0")
       ctx.cpu.w_reg(REG_D0, 0)
     
   def get_callee_pc(self,ctx):

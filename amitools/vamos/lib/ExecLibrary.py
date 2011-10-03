@@ -154,17 +154,22 @@ class ExecLibrary(AmigaLibrary):
     )
     self.set_funcs(exec_funcs)
   
+  def open(self, mem_lib, ctx):
+    # setup exec memory
+    mem_lib.pos_mem.w_s("ThisTask",ctx.this_task.addr)
+    mem_lib.pos_mem.w_s("LibNode.lib_Version", self.version)
+  
   def OpenLibrary(self, mem_lib, ctx):
     ver = ctx.cpu.r_reg(REG_D0)
     name_ptr = ctx.cpu.r_reg(REG_A1)
-    name = ctx.mem.get_cstring(name_ptr)
+    name = ctx.mem.r_cstr(name_ptr)
     lib = self.lib_mgr.open_lib(name, ver, ctx)
     self.trace_log("'%s' V%d -> %s" % (name, ver, lib))
     return lib.get_base_addr()
   
   def OldOpenLibrary(self, mem_lib, ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
-    name = ctx.mem.get_cstring(name_ptr)
+    name = ctx.mem.r_cstr(name_ptr)
     lib = self.lib_mgr.open_lib(name, 0, ctx)
     self.trace_log("'%s' -> %s" % (name, lib))
     return lib.get_base_addr()

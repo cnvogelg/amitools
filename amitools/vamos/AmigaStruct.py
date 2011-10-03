@@ -8,17 +8,27 @@ class InvalidAmigaTypeException(Exception):
 
 class AmigaStruct:
   
-  # name all internal types and map to byte width in 2**n
+  def w_bptr(addr):
+    return addr >> 2
+  
+  def r_bptr(addr):
+    return addr << 2
+  
+  # name all internal types 
+  # and map to (byte width in 2**n, w_convert, r_convert)
   _types = {
-    'UBYTE' : 0,
-    'BYTE' : 0,
-    'char' : 0,
-    'UWORD' : 1,
-    'WORD' : 1,
-    'ULONG' : 2,
-    'LONG' : 2,
-    'APTR' : 2,
-    'VOIDFUNC' : 2
+    'UBYTE' : (0,None),
+    'BYTE' : (0,None),
+    'char' : (0,None),
+    'UWORD' : (1,None),
+    'WORD' : (1,None),
+    'ULONG' : (2,None),
+    'LONG' : (2,None),
+    'APTR' : (2,None),
+    'BPTR' : (2,(w_bptr,r_bptr)),
+    'BSTR' : (2,(w_bptr,r_bptr)),
+    'VOIDFUNC' : (2,None),
+    'void' : (2,None),
   }
   
   def __init__(self):
@@ -68,6 +78,9 @@ class AmigaStruct:
   def get_size(self):
     return self._total_size
     
+  def get_type_name(self):
+    return self._name
+    
   def dump(self, indent=0, num=0, base=0, name=""):
     istr = "  " * indent
     print "     @%04d       %s %s {" % (base, istr, self._name)
@@ -87,7 +100,7 @@ class AmigaStruct:
     print "     @%04d =%04d %s } %s" % (off,total,istr,name)
     return num
   
-  # return (name, delta)
+  # return (name, delta, type_name)
   def get_name_for_offset(self, offset, width, prefix=""):
     num = self.get_index_for_offset(offset)
     if num == None:
@@ -97,20 +110,20 @@ class AmigaStruct:
     sub_type = self._sub_types[num]
     pointer = self._pointers[num]
     format = self._format[num]
-    name = format[1]
+    name = prefix + format[1]
     # a pointer type
     if pointer:
-      return (prefix+name,delta)
+      return (name,delta,format[0])
     # a embedded sub type
     elif sub_type != None:
       return sub_type.get_name_for_offset(delta, width, prefix=name+".")
     # a base type
     else:
       base_type = format[0]
-      type_width = self._types[base_type]
-      return (prefix+name,delta)
+      type_width = self._types[base_type][0]
+      return (name,delta,base_type)
   
-  # return (off, width) or (off, None) if a sub type
+  # return (off, width, convert_func_pair)
   def get_offset_for_name(self, name):
     parts = name.split('.')
     return self._get_offset_loop(parts)
@@ -128,16 +141,18 @@ class AmigaStruct:
 
     # last one
     if len(parts) == 1:
-      # a pointer type
+      # a pointer type -> return pointer itself
       if pointer:
-        return (type_offset, 2)
-      # a embedded sub type
+        return (type_offset, 2, None)
+      # a embedded sub type -> get first elemen of sub type
       elif sub_type != None:
-        return (type_offset, None)
+        first_name = sub_type._format[0][1]
+        return sub_type._get_offset_loop([first_name], base=type_offset)
       # a base type
       else:
         base_type = format[0]
-        return (type_offset, self._types[base_type])
+        base_format = self._types[base_type]
+        return (type_offset, base_format[0], base_format[1])
     # more names:
     else:
       if sub_type != None:
@@ -191,7 +206,7 @@ class AmigaStruct:
       base = 4
     # look for standard type
     elif self._types.has_key(type_name):
-      base = 2 ** self._types[type_name] 
+      base = 2 ** self._types[type_name][0]
     # look for user type
     elif struct_pool.has_key(type_name):
       t = struct_pool[type_name]

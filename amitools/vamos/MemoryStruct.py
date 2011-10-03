@@ -7,21 +7,28 @@ class MemoryStruct(MemoryBlock):
   
   def read_mem(self, width, addr):
     delta = addr - self.addr
-    name,off = self.struct.get_name_for_offset(delta, width)
+    name,off,val_type_name = self.struct.get_name_for_offset(delta, width)
     val = MemoryBlock.read_mem_int(self, width, addr)
-    self.trace_read(width, addr, val, text="Struct %s+%d = %s+%d" % (self.name, delta, name, off))
+    type_name = self.struct.get_type_name()
+    self.trace_read(self.TRACE_LEVEL_STRUCT,width, addr, val, text="Struct  %s+%d = %s(%s)+%d" % (type_name, delta, name, val_type_name, off))
     return val
 
   def write_mem(self, width, addr, val):
     delta = addr - self.addr
-    name,off = self.struct.get_name_for_offset(delta, width)
-    self.trace_write(width, addr, val, text="Struct %s+%d = %s+%d" % (self.name, delta, name, off))
+    name,off,val_type_name = self.struct.get_name_for_offset(delta, width)
+    type_name = self.struct.get_type_name()
+    self.trace_write(self.TRACE_LEVEL_STRUCT,width, addr, val, text="Struct  %s+%d = %s(%s)+%d" % (type_name, delta, name, val_type_name, off))
     return MemoryBlock.write_mem_int(self, width, addr)
     
-  def set_struct_data(self, name, val):
-    off,width = self.struct.get_offset_for_name(name)
+  def w_s(self, name, val):
+    off,width,conv = self.struct.get_offset_for_name(name)
+    if conv != None:
+      val = conv[0](val)
     self.wfunc[width](self.addr + off, val)
-    
-  def get_struct_data(self, name):
-    off,width = self.struct.get_offset_for_name(name)
-    return self.rfunc[width](self.addr + off)
+  
+  def r_s(self, name, val):
+    off,width,conv = self.struct.get_offset_for_name(name)
+    val = self.rfunc[width](self.addr + off)
+    if conv != None:
+      val = conv[1](val)
+    return val

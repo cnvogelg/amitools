@@ -60,6 +60,18 @@ class MinListStruct(AmigaStruct):
   ]
 MinListDef = MinListStruct()
 
+# MsgPort
+class MsgPortStruct(AmigaStruct):
+  _name = "MsgPort"
+  _format = [
+    ('Node','mp_Node'),
+    ('UBYTE','mp_Flags'),
+    ('UBYTE','mp_SigBit'),
+    ('void*','mp_SigTask'),
+    ('List','mp_MsgList')
+  ]
+MsgPortDef = MsgPortStruct()
+
 # IntVector
 class IntVectorStruct(AmigaStruct):
   _name = "IntVector"
@@ -83,7 +95,7 @@ SoftIntListDef = SoftIntListStruct()
 class TaskStruct(AmigaStruct):
   _name = "Task"
   _format = [
-    ('Node*','tc_Node'),
+    ('Node','tc_Node'),
     ('UBYTE','tc_Flags'),
     ('UBYTE','tc_State'),
     ('BYTE','tc_IDNestCnt'),
