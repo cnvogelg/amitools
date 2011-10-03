@@ -37,6 +37,12 @@ class AmigaLibrary:
     return "[Lib %s V%d num_jumps=%d pos_size=%d neg_size=%d]" % \
       (self.name, self.version, self.num_jumps, self.pos_size, self.neg_size)
   
+  def open(self, mem_lib, ctx):
+    pass
+  
+  def close(self, mem_lib, ctx):
+    pass
+  
   def get_pos_struct(self):
     return self.struct
   
@@ -70,7 +76,7 @@ class AmigaLibrary:
     if self.trace:
       print "\t[%s] %s" % (self.name, text)
 
-  def call_vector(self, off, ctx):
+  def call_vector(self, off, mem_lib, ctx):
     jump_entry = self.jump_table[off]
 
     call = jump_entry[0]
@@ -78,7 +84,7 @@ class AmigaLibrary:
 
     callee = jump_entry[1]
     if callee != None:
-      d0 = callee(ctx)
+      d0 = callee(mem_lib, ctx)
       if d0 != None:
         self.trace_log("return d0=%08x" % (d0))
         ctx.cpu.w_reg(REG_D0, d0)

@@ -64,13 +64,15 @@ class LibManager(MemoryLayout):
       base_addr = instance.get_base_addr()
       entry['base_addr'] = base_addr
       self.addr_map[addr] = base_addr
+      # call open on lib
+      lib_class.open(instance,context)
           
     entry['ref_count'] += 1
     self.lib_trace("open_lib","Opened %s V%d ref_count=%d" % (name, lib_ver, entry['ref_count']))
     return instance
 
   # return instance or null
-  def close_lib(self, addr):
+  def close_lib(self, addr, context):
     # find entry by addr
     if not self.addr_map.has_key(addr):
       self.lib_trace("close_lib","No library found at address %06x" % (addr))
@@ -94,6 +96,7 @@ class LibManager(MemoryLayout):
       # remove lib instance
       entry['instance'] = None
       entry['ref_cnt'] = 0
+      lib_class.close(instance,context)
       self.remove_range(instance)
       self.lib_trace("close_lib","Closed %s V%d ref_count=0" % (name, ver))
       return instance

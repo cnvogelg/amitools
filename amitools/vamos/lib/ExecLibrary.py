@@ -1,5 +1,5 @@
 from amitools.vamos.AmigaLibrary import *
-from amitools.vamos.structure.ExecStruct import ExecLibraryDef
+from amitools.vamos.structure.ExecStruct import *
 
 class ExecLibrary(AmigaLibrary):
   name = "exec.library"
@@ -153,23 +153,23 @@ class ExecLibrary(AmigaLibrary):
       (210, self.FreeMem)
     )
     self.set_funcs(exec_funcs)
-    
-  def OpenLibrary(self, ctx):
+  
+  def OpenLibrary(self, mem_lib, ctx):
     ver = ctx.cpu.r_reg(REG_D0)
     name_ptr = ctx.cpu.r_reg(REG_A1)
-    name = ctx.mem.read_cstring(name_ptr)
+    name = ctx.mem.get_cstring(name_ptr)
     lib = self.lib_mgr.open_lib(name, ver, ctx)
     self.trace_log("'%s' V%d -> %s" % (name, ver, lib))
     return lib.get_base_addr()
   
-  def OldOpenLibrary(self, ctx):
+  def OldOpenLibrary(self, mem_lib, ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
-    name = ctx.mem.read_cstring(name_ptr)
+    name = ctx.mem.get_cstring(name_ptr)
     lib = self.lib_mgr.open_lib(name, 0, ctx)
     self.trace_log("'%s' -> %s" % (name, lib))
     return lib.get_base_addr()
   
-  def CloseLibrary(self, ctx):
+  def CloseLibrary(self, mem_lib, ctx):
     lib_addr = ctx.cpu.r_reg(REG_A1)
     lib = self.lib_mgr.close_lib(lib_addr)
     if lib != None:
@@ -177,14 +177,14 @@ class ExecLibrary(AmigaLibrary):
     else:
       self.trace_log("INVALID")
   
-  def AllocMem(self, ctx):
+  def AllocMem(self, mem_lib, ctx):
     size = ctx.cpu.r_reg(REG_D0)
     flags = ctx.cpu.r_reg(REG_D1)
     mb = self.alloc.alloc_memory("AllocMem(@%06x)" % self.get_callee_pc(ctx),size)
     self.trace_log("AllocMem: %s" % mb)
     return mb.addr
   
-  def FreeMem(self, ctx):
+  def FreeMem(self, mem_lib, ctx):
     size = ctx.cpu.r_reg(REG_D0)
     addr = ctx.cpu.r_reg(REG_A1)
     self.alloc.free_memory()

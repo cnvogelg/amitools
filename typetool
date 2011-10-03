@@ -11,7 +11,28 @@ import sys
 from amitools.vamos import AmigaStruct
 from amitools.vamos.structure import ExecStruct
 
-for type_name in sys.argv[1:]:
-  type_def = AmigaStruct.struct_pool[type_name]
-  if type_def != None:
-    type_def.dump()
+# --- args ---
+argc = len(sys.argv)
+if argc == 1:
+  print "Usage: typetool <typename> [ offset width | name ]"
+  sys.exit(1)
+
+type_name = sys.argv[1]
+
+# --- find type ---
+if not AmigaStruct.struct_pool.has_key(type_name):
+  print "Can't find type: %s" % type_name
+  sys.exit(1)
+type_def = AmigaStruct.struct_pool[type_name]
+
+if argc == 2:
+  type_def.dump()
+elif argc == 3:
+  name = sys.argv[2]
+  res = type_def.get_offset_for_name(name)
+  print "name=%s -> offset=%d width=%s" % (name,res[0],res[1])
+elif argc == 4:
+  offset = int(sys.argv[2])
+  width = int(sys.argv[3])
+  res = type_def.get_name_for_offset(offset,width)
+  print "offset=%d widht=%d -> name=%s delta=%d" % (offset,width,res[0],res[1])

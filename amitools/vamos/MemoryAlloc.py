@@ -1,5 +1,6 @@
 from MemoryLayout import MemoryLayout
 from MemoryBlock import MemoryBlock
+from MemoryStruct import MemoryStruct
 from Exceptions import OutOfAmigaMemoryError
 
 class MemoryAlloc(MemoryLayout):
@@ -52,7 +53,7 @@ class MemoryAlloc(MemoryLayout):
     addr = self.alloc_range(struct.get_size(), padding)
     ms = MemoryStruct(name, addr, struct)
     self.add_range(ms)
-    self._reg_range(addr, m)
+    self._reg_range(addr, ms)
     return ms
   
   def free_struct(self, ms):

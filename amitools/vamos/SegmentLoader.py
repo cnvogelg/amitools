@@ -55,6 +55,6 @@ class SegmentLoader:
     for i in xrange(len(sizes)):
       mem = seg_list[i]
       addr = addrs[i]
-      mem.write_data(addr, datas[i])
+      mem.set_data(addr, datas[i])
     
     return seg_list

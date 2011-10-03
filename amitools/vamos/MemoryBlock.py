@@ -45,14 +45,14 @@ class MemoryBlock(MemoryRange):
   # for derived classes without trace
   def write_mem_int(self, width, addr, val):
     self.wfunc[width](addr, val)
-    
-  def write_data(self, addr, data):
+  
+  def set_data(self, addr, data):
     off = addr - self.addr
     for d in data:
       self.buffer[off] = d
       off += 1
   
-  def read_data(self, addr, size):
+  def get_data(self, addr, size):
     off = addr - self.addr
     buf = " " * size
     for i in xrange(size):
@@ -60,7 +60,7 @@ class MemoryBlock(MemoryRange):
       off += 1
     return buf
 
-  def read_cstring(self, addr):
+  def get_cstring(self, addr):
     off = addr - self.addr
     res = ""
     while self.buffer[off] != '\0':

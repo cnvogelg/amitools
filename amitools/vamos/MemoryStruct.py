@@ -16,4 +16,12 @@ class MemoryStruct(MemoryBlock):
     delta = addr - self.addr
     name,off = self.struct.get_name_for_offset(delta, width)
     self.trace_write(width, addr, val, text="Struct %s+%d = %s+%d" % (self.name, delta, name, off))
-    return MemoryBlock.write_mem_int(self, width, addr)  
+    return MemoryBlock.write_mem_int(self, width, addr)
+    
+  def set_struct_data(self, name, val):
+    off,width = self.struct.get_offset_for_name(name)
+    self.wfunc[width](self.addr + off, val)
+    
+  def get_struct_data(self, name):
+    off,width = self.struct.get_offset_for_name(name)
+    return self.rfunc[width](self.addr + off)

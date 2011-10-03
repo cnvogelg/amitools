@@ -62,6 +62,9 @@ class AmigaStruct:
     self._sub_types = sub_types
     self._pointers = pointers
   
+  def __str__(self):
+    return "[Struct: %s size=%d]" % (self._name,self._total_size)
+  
   def get_size(self):
     return self._total_size
     
@@ -84,11 +87,11 @@ class AmigaStruct:
     print "     @%04d =%04d %s } %s" % (off,total,istr,name)
     return num
   
-  # return (name, valid_width)
+  # return (name, delta)
   def get_name_for_offset(self, offset, width, prefix=""):
     num = self.get_index_for_offset(offset)
     if num == None:
-      return (None,false)
+      raise ValueError("Invalid offset %s: %d" % (self, offset))
     type_offset = self._offsets[num]
     delta = offset - type_offset
     sub_type = self._sub_types[num]
@@ -107,7 +110,44 @@ class AmigaStruct:
       type_width = self._types[base_type]
       return (prefix+name,delta)
   
+  # return (off, width) or (off, None) if a sub type
+  def get_offset_for_name(self, name):
+    parts = name.split('.')
+    return self._get_offset_loop(parts)
+  
+  def _get_offset_loop(self, parts, base=0):
+    name = parts[0]
+    if not self._lookup.has_key(name):
+      raise ValueError("Invalid Type key %s: %s %s" %  (self,name,self._lookup))
+    num = self._lookup[name]
+
+    type_offset = base + self._offsets[num]
+    pointer = self._pointers[num]
+    sub_type = self._sub_types[num]
+    format = self._format[num]
+
+    # last one
+    if len(parts) == 1:
+      # a pointer type
+      if pointer:
+        return (type_offset, 2)
+      # a embedded sub type
+      elif sub_type != None:
+        return (type_offset, None)
+      # a base type
+      else:
+        base_type = format[0]
+        return (type_offset, self._types[base_type])
+    # more names:
+    else:
+      if sub_type != None:
+        return sub_type._get_offset_loop(parts[1:], base=type_offset)
+      else:
+        raise ValueError("Type key is no sub type: %s: %s" % (self._name,name))
+  
   def get_index_for_offset(self, offset):
+    if offset < 0:
+      return None
     num = -1
     begin = 0
     for o in self._offsets:
@@ -117,7 +157,7 @@ class AmigaStruct:
     total = self._total_size
     if offset >= total:
       return None
-    return total
+    return num
       
   def get_sub_type(self, full_type_name):
     if self._is_pointer(full_type_name):
