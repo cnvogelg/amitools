@@ -6,7 +6,8 @@ class InvalidMemoryAccessError(Exception):
     return "Invalid Memory Access (width=%d, addr=%06x)" % (self.width,self.addr)
 
 class OutOfAmigaMemoryError(Exception):
-  def __init__(self, alloc):
+  def __init__(self, alloc, size):
     self._alloc = alloc
+    self._size = size
   def __str__(self):
-    return str(self._alloc)
+    return "%s size=%s" % (str(self._alloc), self._size)

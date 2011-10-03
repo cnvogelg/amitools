@@ -2,8 +2,9 @@ from amitools.vamos.AmigaLibrary import *
 from amitools.vamos.structure.ExecStruct import ExecLibraryDef
 
 class ExecLibrary(AmigaLibrary):
-  
-  _exec_calls = (
+  name = "exec.library"
+  version = 39
+  exec_calls = (
     (30, 'Supervisor', (('userFunction', 'a5'),)),
     (36, 'execPrivate1', None),
     (42, 'execPrivate2', None),
@@ -139,53 +140,53 @@ class ExecLibrary(AmigaLibrary):
     (822, 'execPrivate15', None),
   )
 
-  def __init__(self, version, context, lib_mgr, alloc):
-    AmigaLibrary.__init__(self,"exec.library", version, self._exec_calls, ExecLibraryDef, context)
+  def __init__(self, lib_mgr, alloc):
+    AmigaLibrary.__init__(self, self.name, self.version, self.exec_calls, ExecLibraryDef)
     self.lib_mgr = lib_mgr
     self.alloc = alloc
 
-    _exec_funcs = (
+    exec_funcs = (
       (408, self.OldOpenLibrary),
       (414, self.CloseLibrary),
       (552, self.OpenLibrary),
       (198, self.AllocMem),
       (210, self.FreeMem)
     )
-    self.set_funcs(_exec_funcs)
+    self.set_funcs(exec_funcs)
     
-  def OpenLibrary(self):
-    ver = self.cpu.r_reg(REG_D0)
-    name_ptr = self.cpu.r_reg(REG_A1)
-    name = self.mem.read_cstring(name_ptr)
-    addr = self.lib_mgr.open_lib(name, ver)
-    self.log("'%s' V%d -> %06x" % (name, ver, addr))
-    return addr
+  def OpenLibrary(self, ctx):
+    ver = ctx.cpu.r_reg(REG_D0)
+    name_ptr = ctx.cpu.r_reg(REG_A1)
+    name = ctx.mem.read_cstring(name_ptr)
+    lib = self.lib_mgr.open_lib(name, ver, ctx)
+    self.trace_log("'%s' V%d -> %s" % (name, ver, lib))
+    return lib.get_base_addr()
   
-  def OldOpenLibrary(self):
-    name_ptr = self.cpu.r_reg(REG_A1)
-    name = self.mem.read_cstring(name_ptr)
-    addr = self.lib_mgr.open_lib(name, 0)
-    self.log("'%s' -> %06x" % (name, addr))
-    return addr
+  def OldOpenLibrary(self, ctx):
+    name_ptr = ctx.cpu.r_reg(REG_A1)
+    name = ctx.mem.read_cstring(name_ptr)
+    lib = self.lib_mgr.open_lib(name, 0, ctx)
+    self.trace_log("'%s' -> %s" % (name, lib))
+    return lib.get_base_addr()
   
-  def CloseLibrary(self):
-    lib_addr = self.cpu.r_reg(REG_A1)
+  def CloseLibrary(self, ctx):
+    lib_addr = ctx.cpu.r_reg(REG_A1)
     lib = self.lib_mgr.close_lib(lib_addr)
     if lib != None:
-      self.log("'%s' V%d -> %06x" % (lib.name, lib.version, lib_addr))
+      self.trace_log("'%s' V%d -> %06x" % (lib.name, lib.version, lib_addr))
     else:
-      self.log("INVALID")
+      self.trace_log("INVALID")
   
-  def AllocMem(self):
-    size = self.cpu.r_reg(REG_D0)
-    flags = self.cpu.r_reg(REG_D1)
-    mb = self.alloc.allocMemory("AllocMem(@%06x)" % self.get_callee_pc(),size)
-    self.log("flags=%08x" % flags)
+  def AllocMem(self, ctx):
+    size = ctx.cpu.r_reg(REG_D0)
+    flags = ctx.cpu.r_reg(REG_D1)
+    mb = self.alloc.alloc_memory("AllocMem(@%06x)" % self.get_callee_pc(ctx),size)
+    self.trace_log("AllocMem: %s" % mb)
     return mb.addr
   
-  def FreeMem(self):
-    size = self.cpu.r_reg(REG_D0)
-    addr = self.cpu.r_reg(REG_A1)
-    
+  def FreeMem(self, ctx):
+    size = ctx.cpu.r_reg(REG_D0)
+    addr = ctx.cpu.r_reg(REG_A1)
+    self.alloc.free_memory()
 
 

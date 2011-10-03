@@ -18,7 +18,7 @@ REG_A7 = 15
 
 class CPU:
   def __init__(self, name):
-    self.name
+    self.name = name
   
   def get_name(self):
     return self.name

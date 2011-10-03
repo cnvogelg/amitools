@@ -2,8 +2,9 @@ from amitools.vamos.AmigaLibrary import *
 from amitools.vamos.structure.DosStruct import DosLibraryDef
 
 class DosLibrary(AmigaLibrary):
-  
-  _dos_calls = (
+  name = "dos.library"
+  version = 39
+  dos_calls = (
    (30, 'Open', (('name', 'd1'), ('accessMode', 'd2'))),
    (36, 'Close', (('file', 'd1'),)),
    (42, 'Read', (('file', 'd1'), ('buffer', 'd2'), ('length', 'd3'))),
@@ -165,5 +166,5 @@ class DosLibrary(AmigaLibrary):
    (996, 'SetOwner', (('name', 'd1'), ('owner_info', 'd2'))),
   )
   
-  def __init__(self, version, context):
-    AmigaLibrary.__init__(self,"dos.library", version, self._dos_calls, DosLibraryDef, context)
+  def __init__(self):
+    AmigaLibrary.__init__(self, self.name, self.version, self.dos_calls, DosLibraryDef)

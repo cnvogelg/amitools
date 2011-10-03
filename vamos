@@ -8,39 +8,31 @@
 
 import sys
 import argparse
-import pprint
-import struct
-
-from amitools.FileScanner import FileScanner
-from amitools import Hunk
-from amitools import HunkReader
-from amitools import HunkRelocate
-from amitools import HunkShow
 
 from musashi import m68k
 
-from amitools.vamos import MemoryBlock
-from amitools.vamos import MemoryLayout
-from amitools.vamos import MemoryAlloc
-from amitools.vamos import ResetRange
-from amitools.vamos import EndRange
-from amitools.vamos import AmigaLibrary
-from amitools.vamos import AmigaExecBase
-from amitools.vamos import MachineContext
-from amitools.vamos import CPU
-from amitools.vamos import LibManager
+from amitools.vamos.CPU import CPU
+from amitools.vamos.MemoryBlock import MemoryBlock
+from amitools.vamos.MemoryLayout import MemoryLayout
+from amitools.vamos.MemoryAlloc import MemoryAlloc
+from amitools.vamos.MainMemory import MainMemory
+from amitools.vamos.ResetRange import ResetRange
+from amitools.vamos.EndRange import EndRange
+from amitools.vamos.AmigaLibrary import AmigaLibrary
+from amitools.vamos.AmigaExecBase import AmigaExecBase
+from amitools.vamos.LibManager import LibManager
+from amitools.vamos.SegmentLoader import SegmentLoader
+from amitools.vamos.VamosContext import VamosContext
 
 # lib
-from amitools.vamos.lib import ExecLibrary
-from amitools.vamos.lib import DosLibrary
-
-import ctypes
+from amitools.vamos.lib.ExecLibrary import ExecLibrary
+from amitools.vamos.lib.DosLibrary import DosLibrary
 
 # ----- classes -----
 
-class MusashiCPU(CPU.CPU):
+class MusashiCPU(CPU):
   def __init__(self):
-    CPU.__init__("musashi")
+    CPU.__init__(self,"musashi")
   def w_reg(self,reg, val):
     m68k.set_reg(reg,val)
   def r_reg(self,reg):
@@ -57,57 +49,43 @@ parser.add_argument('-c', '--cycles', action='store', type=int, default=0, help=
 parser.add_argument('-b', '--block', action='store', type=int, default=1000, help="cycles per block")
 parser.add_argument('-m', '--memory_trace', action='store_true', default=False, help="trace memory")
 args = parser.parse_args()
+mem_trace = args.memory_trace
 
-bin = args.bin
+# --- amiga binary arguments ---
+bin_file = args.bin
 bin_args = args.args
-print "vamos: %s %s" % (bin, bin_args)
-
-# --- load binary ---
-hunk_file = HunkReader.HunkReader()
-fobj = file(bin,"rb")
-result = hunk_file.read_file_obj(bin,fobj,None)
-if result != Hunk.RESULT_OK:
-  print "Error loading '%s'" % (bin)
-  sys.exit(1)
-# build segments
-ok = hunk_file.build_segments()
-if not ok:
-  print "Error building segments for '%s'" % (bin)
-  sys.exit(2)
-# make sure its a loadseg()
-if hunk_file.type != Hunk.TYPE_LOADSEG:
-  print "File not loadSeg()able: '%s'" % (bin)
-  sys.exit(3)
+print "vamos: %s %s" % (bin_file, bin_args)
 
 # --- create memory layout ---
-print "setting up memory layout"
-layout = MemoryLayout.MemoryLayout("main_memory",0,0x1000000,verbose=args.memory_trace)
-context = MachineContext.MachineContext(MusashiCPU(),layout)
+print "setting up memory"
+mem_size = 0x1000000
+mem = MainMemory(mem_size)
+print mem
 
-# place prog segments
-prog_base = 0x010000
-prog_start = prog_base
-off = prog_base
-relocator = HunkRelocate.HunkRelocate(hunk_file)
-prog_data = relocator.relocate_one_block(prog_base, padding=8)
-prog_size = len(prog_data)
-prog_mem = MemoryBlock.MemoryBlock("prog", prog_base, prog_size)
-prog_mem.write_data(prog_base, prog_data)
-layout.add_range(prog_mem)
-print prog_mem
+# --- load segments of binary ---
+seg_base = 0x010000
+seg_size = 0x070000
+seg_mem = MemoryAlloc("segments", seg_base, seg_size)
+mem.add_range(seg_mem)
+print seg_mem
+seg_loader = SegmentLoader( seg_mem )
 
-# some segment info
-seg_sizes = relocator.get_sizes()
-seg_addrs = relocator.get_seq_addrs(prog_base, padding=8)
-for i in xrange(len(seg_sizes)):
-  print "  seg:  @%06x  +%06x" % (seg_addrs[i], seg_sizes[i])
+# load binary
+seg_list = seg_loader.load_seg(bin_file)
+if seg_list == None:
+  print "ERROR loading binary: '%s' %s" % (bin_file, seg_loader.error)
+  sys.exit(1)
+print "binary:",bin_file
+for s in seg_list:
+  print s
+prog_start = seg_list[0].addr
 
-# setup stack
+# --- setup stack ---
 magic_end = 0xff0000
 stack_base = 0x080000
 stack_size = 0x001000
 stack_end = stack_base + stack_size
-stack_mem = MemoryBlock.MemoryBlock("stack", stack_base, stack_size)
+stack_mem = MemoryBlock("stack", stack_base, stack_size)
 # prepare stack
 # TOP: size
 # TOP-4: return from program -> magic_ed
@@ -115,59 +93,71 @@ stack_initial = stack_end - 4
 stack_mem.w32(stack_initial, stack_size)
 stack_initial -= 4
 stack_mem.w32(stack_initial, magic_end)
-layout.add_range(stack_mem)
+mem.add_range(stack_mem)
+print stack_mem
 
-# setup heap
+# --- setup heap ---
 heap_base = 0x100000
 heap_size = 0x080000
-heap_mem = MemoryAlloc.MemoryAlloc("heap", heap_base, heap_size, verbose=args.memory_trace)
-layout.add_range(heap_mem)
+heap_mem = MemoryAlloc("heap", heap_base, heap_size)
+mem.add_range(heap_mem)
+print heap_mem
 
-# setup argument
-arg_base = 0x1000
+# setup arguments
 arg_text = " ".join(bin_args)
 arg_len  = len(arg_text)
 arg_size = arg_len + 1
-arg_mem  = MemoryBlock.MemoryBlock("args", arg_base, arg_size)
+arg_mem  = heap_mem.alloc_memory("args", arg_size)
+arg_base = arg_mem.addr
 arg_mem.write_data(arg_base, arg_text)
 arg_mem.write_mem(0, arg_base + arg_len, 0)
-layout.add_range(arg_mem)
-print "args: %s (%d)" % (arg_text, arg_len)
+print "args: %s (%d)" % (arg_text, arg_size)
 print arg_mem
 
 # --- libs ---
 lib_base = 0xf08000
-lib_off  = 0x010000
-lib_mgr  = LibManager.LibManager(lib_base, lib_off, layout)
+lib_size = 0x0e0000
+lib_mgr  = LibManager(lib_base, lib_size)
+mem.add_range(lib_mgr)
+print lib_mgr
 
-# setup exec.library
-exec_lib = ExecLibrary.ExecLibrary(0, context, lib_mgr, heap_mem)
-lib_mgr.add_lib(exec_lib)
-exec_base = lib_mgr.open_lib("exec.library",0)
-exec_base_range = AmigaExecBase.AmigaExecBase(exec_base)
+# register libraries
+exec_lib_def = ExecLibrary(lib_mgr, heap_mem)
+lib_mgr.register_lib(exec_lib_def)
+dos_lib_def = DosLibrary()
+lib_mgr.register_lib(dos_lib_def)
 
-# setup dos.library
-dos_lib = DosLibrary.DosLibrary(36, context)
-lib_mgr.add_lib(dos_lib)
+# --- setup context ---
+cpu = MusashiCPU()
+ctx = VamosContext( cpu, mem, lib_mgr, heap_mem )
+
+# --- memory init ---
+# open exec lib
+print "init exec"
+exec_lib = lib_mgr.open_lib(ExecLibrary.name, ExecLibrary.version, ctx)
+print exec_lib
+exec_base_range = AmigaExecBase(exec_lib.base_addr)
+print exec_base_range
 
 # --- start cpu ---
 # prepare m68k
 print "setting up m68k"
-m68k.set_read_memory(*layout.get_read_funcs())
-m68k.set_write_memory(*layout.get_write_funcs())
+m68k.set_read_memory(*mem.get_read_funcs())
+m68k.set_write_memory(*mem.get_write_funcs())
 m68k.set_cpu_type(m68k.M68K_CPU_TYPE_68000)
 
+# reset CPU with a temporary reset range
 print "resetting cpu..."
-reset_range = ResetRange.ResetRange(prog_start, stack_initial)
-layout.add_range(reset_range)
+reset_range = ResetRange(prog_start, stack_initial)
+mem.add_range(reset_range)
 m68k.pulse_reset()
-layout.remove_range(reset_range)
+mem.remove_range(reset_range)
 
-layout.add_range(exec_base_range)
+mem.add_range(exec_base_range)
 
 # setup RESET = end handler
-end_range = EndRange.EndRange(magic_end)
-layout.add_range(end_range)
+end_range = EndRange(magic_end)
+mem.add_range(end_range)
 stay = True
 def end_func():
   global stay
@@ -179,7 +169,11 @@ m68k.set_reset_instr_callback(end_func)
 m68k.set_reg(m68k.M68K_REG_D0, arg_len)
 m68k.set_reg(m68k.M68K_REG_A0, arg_base)
 
-print "go!"
+# enable memory tracing?
+mem.set_trace(mem_trace)
+
+# start main CPU loop
+print "start cpu: %06x" % prog_start
 total_cycles = 0
 cycles_per_run = args.block
 max_cycles = args.cycles 
@@ -189,14 +183,14 @@ while stay:
   if max_cycles > 0 and total_cycles >= max_cycles:
     break
   # if invalid reads or writes then abort
-  if len(layout.invalid_reads)>0:
+  if len(mem.invalid_reads)>0:
     print "ERROR: invalid reads:"
-    for e in layout.invalid_reads:
+    for e in mem.invalid_reads:
       print "R(%d): %06x" % e
     stay = False
-  if len(layout.invalid_writes)>0:
+  if len(mem.invalid_writes)>0:
     print "ERROR: invalid writes:"
-    for e in layout.invalid_writes:
+    for e in mem.invalid_writes:
       print "R(%d): %06x" % e
     stay = False
     

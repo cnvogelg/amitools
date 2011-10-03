@@ -16,6 +16,14 @@ class HunkRelocate:
       size = main_hunk['size']
       sizes.append(size)
     return sizes
+
+  def get_type_names(self):
+    names = []
+    for segment in self.hunk_file.segments:
+      main_hunk = segment[0]
+      name = main_hunk['type_name']
+      names.append(name)
+    return names
   
   def get_seq_addrs(self, base_addr, padding=0):
     sizes = self.get_sizes()

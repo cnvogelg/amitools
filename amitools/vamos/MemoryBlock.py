@@ -30,9 +30,20 @@ class MemoryBlock(MemoryRange):
     struct.pack_into(">I",self.buffer,addr-self.addr,v)
   
   def read_mem(self, width, addr):
-    return self.rfunc[width](addr)
+    val = self.rfunc[width](addr)
+    self.trace_read(width, addr, val);
+    return val
 
   def write_mem(self, width, addr, val):
+    self.wfunc[width](addr, val)
+    self.trace_write(width, addr, val);
+
+  # for derived classes without trace
+  def read_mem_int(self, width, addr):
+    return self.rfunc[width](addr)
+  
+  # for derived classes without trace
+  def write_mem_int(self, width, addr, val):
     self.wfunc[width](addr, val)
     
   def write_data(self, addr, data):
