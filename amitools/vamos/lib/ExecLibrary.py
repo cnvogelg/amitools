@@ -150,7 +150,9 @@ class ExecLibrary(AmigaLibrary):
       (414, self.CloseLibrary),
       (552, self.OpenLibrary),
       (198, self.AllocMem),
-      (210, self.FreeMem)
+      (210, self.FreeMem),
+      (684, self.AllocVec),
+      (690, self.FreeVec),
     )
     self.set_funcs(exec_funcs)
   
@@ -193,6 +195,27 @@ class ExecLibrary(AmigaLibrary):
   def FreeMem(self, mem_lib, ctx):
     size = ctx.cpu.r_reg(REG_D0)
     addr = ctx.cpu.r_reg(REG_A1)
-    self.alloc.free_memory()
+    mb = self.alloc.get_range_by_addr(addr)
+    if mb != None:  
+      self.trace_log("FreeMem: %s" % mb)
+      self.alloc.free_memory(mb)
+    else:
+      self.trace_log("FreeMem: invalid addr %06x" % addr)
 
+  def AllocVec(self, mem_lib, ctx):
+    size = ctx.cpu.r_reg(REG_D0)
+    flags = ctx.cpu.r_reg(REG_D1)
+    mb = self.alloc.alloc_memory("AllocVec(@%06x)" % self.get_callee_pc(ctx),size)
+    self.trace_log("AllocVec: %s" % mb)
+    return mb.addr
+    
+  def FreeVec(self, mem_lib, ctx):
+    addr = ctx.cpu.r_reg(REG_A1)
+    mb = self.alloc.get_range_by_addr(addr)
+    if mb != None:  
+      self.trace_log("FreeMem: %s" % mb)
+      self.alloc.free_memory(mb)
+    else:
+      self.trace_log("FreeMem: invalid addr %06x" % addr)
+    
 

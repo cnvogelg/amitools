@@ -85,9 +85,10 @@ class AmigaLibrary:
     callee = jump_entry[1]
     if callee != None:
       d0 = callee(mem_lib, ctx)
-      if d0 != None:
-        self.trace_log("}return d0=%08x" % (d0))
-        ctx.cpu.w_reg(REG_D0, d0)
+      if d0 == None:
+        d0 = 0
+      self.trace_log("}return d0=%08x" % (d0))
+      ctx.cpu.w_reg(REG_D0, d0)
     else:
       self.trace_log("}default d0=0")
       ctx.cpu.w_reg(REG_D0, 0)

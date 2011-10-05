@@ -175,14 +175,35 @@ class DosLibrary(AmigaLibrary):
     self.alloc = alloc
     
     dos_funcs = (
+      (30, self.Open),
       (60, self.Output),
       (798, self.ReadArgs),
       (858, self.FreeArgs),
+      (822, self.MatchFirst),
+      (954, self.VPrintf),
     )
     self.set_funcs(dos_funcs)
   
   def Output(self, mem_lib, ctx):
     return 0xdeadbeef
+  
+  def Open(self, mem_lib, ctx):
+    name_ptr = ctx.cpu.r_reg(REG_D1)
+    name = ctx.mem.r_cstr(name_ptr)
+    self.trace_log("Open: name='%s'" % name)
+  
+  def VPrintf(self, mem_lib, ctx):
+    format_ptr = ctx.cpu.r_reg(REG_D1)
+    format = ctx.mem.r_cstr(format_ptr)
+    self.trace_log("VPrintf: format='%s'" % format)
+  
+  def MatchFirst(self, mem_lib, ctx):
+    pat_ptr = ctx.cpu.r_reg(REG_D1)
+    pat = ctx.mem.r_cstr(pat_ptr)
+    anchor_path = ctx.cpu.r_reg(REG_D2)
+    self.trace_log("MatchFirst: pat=%s" % pat)
+  
+  # ----- Args -----
   
   def ReadArgs(self, mem_lib, ctx):
     template_ptr = ctx.cpu.r_reg(REG_D1)
