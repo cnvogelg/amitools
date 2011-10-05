@@ -86,7 +86,7 @@ def dump(fd):
   num = 1
   for f in funcs:
     if not f['private']:
-      print "  #%04d  %5d  %20s %s" % (num,f['bias'],f['name'],f['args_str'])
+      print "  #%04d  %5d  0x%04x  %24s %s" % (num,f['bias'],f['bias'],f['name'],f['args_str'])
       num += 1
 
 # ----- generate -----

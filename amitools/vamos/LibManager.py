@@ -44,6 +44,8 @@ class LibManager(MemoryLayout):
     entry = self.libs[name]
     lib_class = entry['lib_class']
     instance = entry['instance']
+    entry['name'] = name
+    entry['version'] = ver # requested version
     lib_ver = lib_class.get_version()
 
     # version correct?
@@ -63,12 +65,13 @@ class LibManager(MemoryLayout):
       # store base_addr
       base_addr = instance.get_base_addr()
       entry['base_addr'] = base_addr
-      self.addr_map[addr] = base_addr
+      self.addr_map[base_addr] = entry
       # call open on lib
       lib_class.open(instance,context)
+      entry['ref_cnt'] = 0
           
-    entry['ref_count'] += 1
-    self.lib_trace("open_lib","Opened %s V%d ref_count=%d" % (name, lib_ver, entry['ref_count']))
+    entry['ref_cnt'] += 1
+    self.lib_trace("open_lib","Opened %s V%d ref_count=%d base=%06x" % (name, lib_ver, entry['ref_count'], entry['base_addr']))
     return instance
 
   # return instance or null
@@ -81,6 +84,8 @@ class LibManager(MemoryLayout):
     instance = entry['instance']
     lib_class = entry['lib_class']
     ver = lib_class.get_version();
+    name = entry['name']
+    ver = entry['version']
       
     # decrement ref_count
     ref_cnt = entry['ref_cnt']

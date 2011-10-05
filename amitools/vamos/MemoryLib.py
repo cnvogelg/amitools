@@ -30,6 +30,9 @@ class MemoryLib(MemoryRange):
   def get_pos_mem(self):
     return self.pos_mem
 
+  def get_lib(self):
+    return self.lib
+
   def is_inside(self, addr):
     return ((addr >= self.begin_addr) and (addr < self.end_addr))
 

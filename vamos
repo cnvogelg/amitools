@@ -120,18 +120,21 @@ print arg_mem
 lib_base = 0xf08000
 lib_size = 0x0e0000
 lib_mgr  = LibManager(lib_base, lib_size)
+lib_mgr.set_lib_trace(True)
 mem.add_range(lib_mgr)
 print lib_mgr
 
 # register libraries
 exec_lib_def = ExecLibrary(lib_mgr, heap_mem)
 lib_mgr.register_lib(exec_lib_def)
-dos_lib_def = DosLibrary()
+dos_lib_def = DosLibrary(heap_mem)
 lib_mgr.register_lib(dos_lib_def)
 
 # --- setup context ---
 cpu = MusashiCPU()
 ctx = VamosContext( cpu, mem, lib_mgr, heap_mem )
+ctx.bin_args = bin_args
+ctx.bin_file = bin_file
 
 # --- memory init ---
 # create CLI

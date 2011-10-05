@@ -74,7 +74,7 @@ class AmigaLibrary:
 
   def trace_log(self, text):
     if self.trace:
-      print "\t[%s] %s" % (self.name, text)
+      print "\t[%24s]  %s" % (self.name, text)
 
   def call_vector(self, off, mem_lib, ctx):
     jump_entry = self.jump_table[off]

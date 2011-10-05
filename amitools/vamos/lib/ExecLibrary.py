@@ -176,9 +176,10 @@ class ExecLibrary(AmigaLibrary):
   
   def CloseLibrary(self, mem_lib, ctx):
     lib_addr = ctx.cpu.r_reg(REG_A1)
-    lib = self.lib_mgr.close_lib(lib_addr)
+    lib = self.lib_mgr.close_lib(lib_addr,ctx)
     if lib != None:
-      self.trace_log("'%s' V%d -> %06x" % (lib.name, lib.version, lib_addr))
+      lib_cls = lib.get_lib()
+      self.trace_log("'%s' V%d -> %06x" % (lib_cls.get_name(), lib_cls.get_version(), lib_addr))
     else:
       self.trace_log("INVALID")
   

@@ -1,5 +1,9 @@
+import types
+
 from amitools.vamos.AmigaLibrary import *
 from amitools.vamos.structure.DosStruct import DosLibraryDef
+
+from dos.Args import *
 
 class DosLibrary(AmigaLibrary):
   name = "dos.library"
@@ -166,5 +170,112 @@ class DosLibrary(AmigaLibrary):
    (996, 'SetOwner', (('name', 'd1'), ('owner_info', 'd2'))),
   )
   
-  def __init__(self):
+  def __init__(self, alloc):
     AmigaLibrary.__init__(self, self.name, self.version, self.dos_calls, DosLibraryDef)
+    self.alloc = alloc
+    
+    dos_funcs = (
+       (798, self.ReadArgs),
+       (858, self.FreeArgs),
+    )
+    self.set_funcs(dos_funcs)
+    
+  def ReadArgs(self, mem_lib, ctx):
+    template_ptr = ctx.cpu.r_reg(REG_D1)
+    template = ctx.mem.r_cstr(template_ptr)
+    array_ptr = ctx.cpu.r_reg(REG_D2)
+    rdargs_ptr = ctx.cpu.r_reg(REG_D3)
+    
+    self.trace_log("ReadArgs: args=%s template=%s" % (ctx.bin_args, template))
+    targs = gen_dos_args(template)
+    
+    # read org values
+    in_val = []
+    ptr = array_ptr
+    for t in targs:
+      raw = ctx.mem.read_mem(2,ptr)
+      # prefill toggle
+      if t['t']:
+        in_val.append(bool(raw))
+      else:
+        in_val.append(None)
+    
+    # parse
+    result = parse_dos_args(targs, ctx.bin_args, in_val)
+    self.trace_log("parse: %s" % result)
+    
+    # calc size of result
+    n = len(result)
+    num_longs = 0
+    num_chars = 0
+    for i in xrange(n):
+      r = result[i]
+      if r == None: # null pointer
+        pass
+      elif type(r) is types.StringType: # string key 'k'
+        num_chars += len(r) + 1
+      elif type(r) is types.IntType: # numerical key 'kn'
+        num_longs += 1
+      elif type(r) is types.ListType: # string list 'm'
+        num_longs += len(r) + 1
+        for s in r:
+          num_chars += len(s) + 1
+    
+    # calc total size
+    size = num_longs * 4 + num_chars
+    self.trace_log("longs=%d chars=%d size=%d" % (num_longs,num_chars,size))
+    
+    # alloc mem
+    mem = self.alloc.alloc_memory("ReadArgs(@%06x)" % self.get_callee_pc(ctx),size)
+    
+    # fill mem
+    addr = mem.addr
+    char_ptr = addr + num_longs * 4
+    long_ptr = addr
+    base_ptr = array_ptr
+    for i in xrange(n):
+      r = result[i]
+      if r == None: # optional value not set ('k')
+        base_val = 0
+      elif type(r) is types.StringType:
+        # pointer to string
+        base_val = char_ptr
+        # append string
+        mem.w_cstr(char_ptr, r)
+        char_ptr += len(r) + 1        
+      elif type(r) is types.IntType:
+        # pointer to long
+        base_val = long_ptr
+        # write long
+        mem.write_mem(2,long_ptr,r)
+        long_ptr += 4
+      elif type(r) is types.ListType:
+        # pointer to array
+        base_val = long_ptr
+        # array with longs + strs
+        for s in r:
+          mem.write_mem(2,long_ptr,char_ptr)
+          mem.w_cstr(char_ptr,s)
+          long_ptr += 4
+          char_ptr += len(s) + 1
+        mem.write_mem(2,long_ptr,0)
+        long_ptr += 4
+      else:
+        # direct value
+        base_val = r
+      
+      ctx.mem.write_mem(2,base_ptr,base_val)
+      base_ptr += 4
+    
+    # TODO: return real RDArgs
+    return mem.addr
+    
+  def FreeArgs(self, mem_lib, ctx):
+    rdargs_ptr = ctx.cpu.r_reg(REG_D1)
+    self.trace_log("FreeArgs: %06x" % rdargs_ptr)
+    mem = self.alloc.get_range_by_addr(rdargs_ptr)
+    if mem == None:
+      self.trace_log("NOT FOUND?!")
+    else:
+      self.alloc.free_memory(mem)
+
