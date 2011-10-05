@@ -175,11 +175,15 @@ class DosLibrary(AmigaLibrary):
     self.alloc = alloc
     
     dos_funcs = (
-       (798, self.ReadArgs),
-       (858, self.FreeArgs),
+      (60, self.Output),
+      (798, self.ReadArgs),
+      (858, self.FreeArgs),
     )
     self.set_funcs(dos_funcs)
-    
+  
+  def Output(self, mem_lib, ctx):
+    return 0xdeadbeef
+  
   def ReadArgs(self, mem_lib, ctx):
     template_ptr = ctx.cpu.r_reg(REG_D1)
     template = ctx.mem.r_cstr(template_ptr)
