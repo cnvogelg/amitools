@@ -92,7 +92,7 @@ class AmigaStruct:
       if sub_type != None:
         num = sub_type.dump(indent=indent+1, num=num, base=off, name=f[1])
       else:
-        print "%04d @%04d +%04d %s   %-10s %-20s  (ptr=%s, sub=%s)" % (num, off, size, istr, f[0], f[1], self._pointers[i], sub_type!=None)
+        print "%04d @%04d/%04x +%04d %s   %-10s %-20s  (ptr=%s, sub=%s)" % (num, off, off, size, istr, f[0], f[1], self._pointers[i], sub_type!=None)
         num += 1
       i += 1
     total = self._total_size

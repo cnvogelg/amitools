@@ -63,6 +63,18 @@ class MemoryAlloc(MemoryLayout):
     self.remove_range(ms)
     self._unreg_range(addr)
   
+  def alloc_cstr(self, name, cstr, padding=4):
+    size = len(cstr) + 1
+    mb = self.alloc_memory(name, size, padding)
+    mb.w_cstr(mb.addr, cstr)
+    return mb
+  
+  def alloc_bstr(self, name, bstr, padding=4):
+    size = len(bstr) + 1
+    mb = self.alloc_memory(name, size, padding)
+    mb.w_bstr(mb.addr, bstr)
+    return mb
+
   
   
   

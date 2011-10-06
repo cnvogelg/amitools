@@ -72,4 +72,9 @@ class MemoryRange:
   def w_cstr(self, offset, cstr):
     raise InvalidMemoryAccessErrro(width, addr)
 
+  def r_bstr(self, offset):
+    raise InvalidMemoryAccessError(width, addr)
+
+  def w_bstr(self, offset, bstr):
+    raise InvalidMemoryAccessErrro(width, addr)
     

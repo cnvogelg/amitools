@@ -90,3 +90,19 @@ class MemoryLib(MemoryRange):
     # writes to neg area are not allowed for now
     else:
       raise InvalidMemoryAccessError(width, addr)
+
+  def r_bstr(self, offset):
+    # pos range -> redirect to struct
+    if addr >= self.base_addr:
+      return self.pos_mem.r_bstr(offset)
+    # writes to neg area are not allowed for now
+    else:
+      raise InvalidMemoryAccessError(width, addr)
+
+  def w_bstr(self, offset, bstr):
+    # pos range -> redirect to struct
+    if addr >= self.base_addr:
+      self.pos_mem.w_bstr(offset, bstr)
+    # writes to neg area are not allowed for now
+    else:
+      raise InvalidMemoryAccessError(width, addr)

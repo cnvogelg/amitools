@@ -54,11 +54,11 @@ class MemoryBlock(MemoryRange):
   
   def r_data(self, addr, size):
     off = addr - self.addr
-    buf = " " * size
+    result = ""
     for i in xrange(size):
-      buf[i] = self.buffer[off]
+      result += self.buffer[off]
       off += 1
-    return buf
+    return result
 
   def r_cstr(self, addr):
     off = addr - self.addr
@@ -74,6 +74,26 @@ class MemoryBlock(MemoryRange):
       self.buffer[off] = c
       off += 1
     self.buffer[off] = '\0'
+
+  def r_bstr(self, addr):
+    off = addr - self.addr
+    res = ""
+    size = ord(self.buffer[off])
+    off += 1
+    for i in xrange(size):
+      res += self.buffer[off]
+      off += 1
+    return res
+
+  def w_bstr(self, addr, bstr):
+    off = addr - self.addr
+    size = len(bstr)
+    self.buffer[off] = chr(size)
+    off += 1
+    for c in bstr:
+      self.buffer[off] = c
+      off += 1
+      
 
     
     

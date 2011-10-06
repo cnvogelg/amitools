@@ -170,13 +170,23 @@ class DosLibrary(AmigaLibrary):
    (996, 'SetOwner', (('name', 'd1'), ('owner_info', 'd2'))),
   )
   
+  DOSFALSE = 0
+  DOSTRUE = 0xffffffff
+  
   def __init__(self, alloc):
     AmigaLibrary.__init__(self, self.name, self.version, self.dos_calls, DosLibraryDef)
     self.alloc = alloc
     
     dos_funcs = (
       (30, self.Open),
+      (36, self.Close),
+      (42, self.Read),
+      (48, self.Write),
+      (54, self.Input),
       (60, self.Output),
+      (84, self.Lock),
+      (90, self.Unlock),
+      (102, self.Examine),
       (798, self.ReadArgs),
       (858, self.FreeArgs),
       (822, self.MatchFirst),
@@ -184,20 +194,75 @@ class DosLibrary(AmigaLibrary):
     )
     self.set_funcs(dos_funcs)
   
-  def Output(self, mem_lib, ctx):
-    return 0xdeadbeef
+  def init(self, lib, ctx):
+    lib.file_id = 0
   
-  def Open(self, mem_lib, ctx):
+  def Input(self, lib, ctx):
+    return 0xdeadbe00
+  
+  def Output(self, lib, ctx):
+    return 0xdeadbe01
+  
+  def Open(self, lib, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name = ctx.mem.r_cstr(name_ptr)
-    self.trace_log("Open: name='%s'" % name)
+    mode = ctx.cpu.r_reg(REG_D2)
+    if mode == 1006:
+      mode_name = "new"
+    elif mode == 1005:
+      mode_name = "old"
+    elif mode == 1004:
+      mode_name = "r/w"
+    else:
+      mode_name = "?"
+    self.trace_log("Open: name='%s' (%s/%d)" % (name, mode_name, mode))
+    
+    if name.upper() == 'NIL:':
+      return 0xdeadbe02
+    elif name == '*':
+      return 0xdeadbe03
+    else:
+      file_id = lib.file_id
+      lib.file_id += 1
+      return 0xdeadbf00 + file_id
   
-  def VPrintf(self, mem_lib, ctx):
+  def Close(self, lib, ctx):
+    return self.DOSTRUE
+  
+  def Read(self, lib, ctx):
+    fh = ctx.cpu.r_reg(REG_D1)
+    buf = ctx.cpu.r_reg(REG_D2)
+    size = ctx.cpu.r_reg(REG_D3)
+    data = ctx.mem.r_data(buf,size)
+    print data
+    return size
+    
+  def Write(self, lib, ctx):
+    fh = ctx.cpu.r_reg(REG_D1)
+    buf = ctx.cpu.r_reg(REG_D2)
+    size = ctx.cpu.r_reg(REG_D3)
+    data = ctx.mem.r_data(buf,size)
+    print data
+    return size
+  
+  def Lock(self, lib, ctx):
+    name_ptr = ctx.cpu.r_reg(REG_D1)
+    name = ctx.mem.r_cstr(name_ptr)
+    self.trace_log("Lock: %s" % (name))
+    return self.DOSFALSE
+  
+  def Unlock(self, lib, ctx):
+    return self.DOSTRUE
+    
+  def Examine(self, lib, ctx):
+    return self.DOSTRUE
+  
+  def VPrintf(self, lib, ctx):
     format_ptr = ctx.cpu.r_reg(REG_D1)
     format = ctx.mem.r_cstr(format_ptr)
     self.trace_log("VPrintf: format='%s'" % format)
   
-  def MatchFirst(self, mem_lib, ctx):
+  def MatchFirst(self, lib, ctx):
     pat_ptr = ctx.cpu.r_reg(REG_D1)
     pat = ctx.mem.r_cstr(pat_ptr)
     anchor_path = ctx.cpu.r_reg(REG_D2)
@@ -205,7 +270,7 @@ class DosLibrary(AmigaLibrary):
   
   # ----- Args -----
   
-  def ReadArgs(self, mem_lib, ctx):
+  def ReadArgs(self, lib, ctx):
     template_ptr = ctx.cpu.r_reg(REG_D1)
     template = ctx.mem.r_cstr(template_ptr)
     array_ptr = ctx.cpu.r_reg(REG_D2)
@@ -295,7 +360,7 @@ class DosLibrary(AmigaLibrary):
     # TODO: return real RDArgs
     return mem.addr
     
-  def FreeArgs(self, mem_lib, ctx):
+  def FreeArgs(self, lib, ctx):
     rdargs_ptr = ctx.cpu.r_reg(REG_D1)
     self.trace_log("FreeArgs: %06x" % rdargs_ptr)
     mem = self.alloc.get_range_by_addr(rdargs_ptr)

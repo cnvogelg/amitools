@@ -107,7 +107,7 @@ mem.add_range(heap_mem)
 print heap_mem
 
 # setup arguments
-arg_text = " ".join(bin_args)
+arg_text = " ".join(bin_args) + "\n" # AmigaDOS appends a new line to the end
 arg_len  = len(arg_text)
 arg_size = arg_len + 1
 arg_mem  = heap_mem.alloc_memory("args", arg_size)
@@ -140,6 +140,8 @@ ctx.bin_file = bin_file
 # create CLI
 cli = heap_mem.alloc_struct("CLI",CLIDef)
 cli.w_s("cli_DefaultStack", stack_size / 4) # in longs
+cmd_mem = heap_mem.alloc_bstr("cmd",bin_file)
+cli.w_s("cli_CommandName", cmd_mem.addr)
 print cli
 
 # create my task structure

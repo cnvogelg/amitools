@@ -74,3 +74,17 @@ class MemoryLayout(MemoryRange):
       r.w_cstr(addr, cstr)
     else:
       raise InvalidMemoryAccessError(0, addr)
+
+  def r_bstr(self, addr):
+    r = self.get_range(addr)
+    if r != None:
+      return r.r_bstr(addr)
+    else:
+      raise InvalidMemoryAccessError(0, addr)
+
+  def w_bstr(self, addr, bstr):
+    r = self.get_range(addr)
+    if r != None:
+      r.w_bstr(addr, bstr)
+    else:
+      raise InvalidMemoryAccessError(0, addr)

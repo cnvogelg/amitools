@@ -156,12 +156,12 @@ class ExecLibrary(AmigaLibrary):
     )
     self.set_funcs(exec_funcs)
   
-  def open(self, mem_lib, ctx):
+  def open(self, lib, ctx):
     # setup exec memory
-    mem_lib.pos_mem.w_s("ThisTask",ctx.this_task.addr)
-    mem_lib.pos_mem.w_s("LibNode.lib_Version", self.version)
+    lib.pos_mem.w_s("ThisTask",ctx.this_task.addr)
+    lib.pos_mem.w_s("LibNode.lib_Version", self.version)
   
-  def OpenLibrary(self, mem_lib, ctx):
+  def OpenLibrary(self, lib, ctx):
     ver = ctx.cpu.r_reg(REG_D0)
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name = ctx.mem.r_cstr(name_ptr)
@@ -169,14 +169,14 @@ class ExecLibrary(AmigaLibrary):
     self.trace_log("'%s' V%d -> %s" % (name, ver, lib))
     return lib.get_base_addr()
   
-  def OldOpenLibrary(self, mem_lib, ctx):
+  def OldOpenLibrary(self, lib, ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name = ctx.mem.r_cstr(name_ptr)
     lib = self.lib_mgr.open_lib(name, 0, ctx)
     self.trace_log("'%s' -> %s" % (name, lib))
     return lib.get_base_addr()
   
-  def CloseLibrary(self, mem_lib, ctx):
+  def CloseLibrary(self, lib, ctx):
     lib_addr = ctx.cpu.r_reg(REG_A1)
     lib = self.lib_mgr.close_lib(lib_addr,ctx)
     if lib != None:
@@ -185,14 +185,14 @@ class ExecLibrary(AmigaLibrary):
     else:
       self.trace_log("INVALID")
   
-  def AllocMem(self, mem_lib, ctx):
+  def AllocMem(self, lib, ctx):
     size = ctx.cpu.r_reg(REG_D0)
     flags = ctx.cpu.r_reg(REG_D1)
     mb = self.alloc.alloc_memory("AllocMem(@%06x)" % self.get_callee_pc(ctx),size)
     self.trace_log("AllocMem: %s" % mb)
     return mb.addr
   
-  def FreeMem(self, mem_lib, ctx):
+  def FreeMem(self, lib, ctx):
     size = ctx.cpu.r_reg(REG_D0)
     addr = ctx.cpu.r_reg(REG_A1)
     mb = self.alloc.get_range_by_addr(addr)
@@ -202,14 +202,14 @@ class ExecLibrary(AmigaLibrary):
     else:
       self.trace_log("FreeMem: invalid addr %06x" % addr)
 
-  def AllocVec(self, mem_lib, ctx):
+  def AllocVec(self, lib, ctx):
     size = ctx.cpu.r_reg(REG_D0)
     flags = ctx.cpu.r_reg(REG_D1)
     mb = self.alloc.alloc_memory("AllocVec(@%06x)" % self.get_callee_pc(ctx),size)
     self.trace_log("AllocVec: %s" % mb)
     return mb.addr
     
-  def FreeVec(self, mem_lib, ctx):
+  def FreeVec(self, lib, ctx):
     addr = ctx.cpu.r_reg(REG_A1)
     mb = self.alloc.get_range_by_addr(addr)
     if mb != None:  
