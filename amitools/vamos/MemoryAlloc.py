@@ -44,6 +44,7 @@ class MemoryAlloc(MemoryLayout):
     mb = MemoryBlock(name, addr, size)
     self.add_range(mb)
     self._reg_range(addr, mb)
+    log_mem_alloc.info(mb)
     return mb
   
   def free_memory(self, mb):
@@ -56,6 +57,7 @@ class MemoryAlloc(MemoryLayout):
     ms = MemoryStruct(name, addr, struct)
     self.add_range(ms)
     self._reg_range(addr, ms)
+    log_mem_alloc.info(ms)
     return ms
   
   def free_struct(self, ms):

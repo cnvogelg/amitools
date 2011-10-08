@@ -28,26 +28,26 @@ class MemoryRange:
     return ((self.addr <= addr) and (addr < self.end))
   
   def read_mem(self, width, addr):
-    raise InvalidMemoryAccessError(width, addr)
+    raise InvalidMemoryAccessError('R', width, addr, self.name)
   
   def write_mem(self, width, addr, val):
-    raise InvalidMemoryAccessError(width, addr)
+    raise InvalidMemoryAccessError('W', width, addr, self.name)
     
-  def w_data(self, data, offset):
-    raise InvalidMemoryAccessError(width, addr)
-
   def r_data(self, offset, size):
-    raise InvalidMemoryAccessError(width, addr)
+    raise InvalidMemoryAccessError('R', 0, addr, self.name)
+
+  def w_data(self, data, offset):
+    raise InvalidMemoryAccessError('W', 0, addr, self.name)
 
   def r_cstr(self, offset):
-    raise InvalidMemoryAccessError(width, addr)
+    raise InvalidMemoryAccessError('R', 0, addr, self.name)
     
   def w_cstr(self, offset, cstr):
-    raise InvalidMemoryAccessErrro(width, addr)
+    raise InvalidMemoryAccessErrro('W', 0, addr, self.name)
 
   def r_bstr(self, offset):
-    raise InvalidMemoryAccessError(width, addr)
+    raise InvalidMemoryAccessError('R', 0, addr, self.name)
 
   def w_bstr(self, offset, bstr):
-    raise InvalidMemoryAccessErrro(width, addr)
+    raise InvalidMemoryAccessErrro('W', 0, addr, self.name)
     

@@ -32,7 +32,7 @@ class MemoryLayout(MemoryRange):
       val = r.read_mem(width, addr)
       return val
     else:
-      raise InvalidMemoryAccessError(width, addr)
+      raise InvalidMemoryAccessError('R', width, addr, self.name)
   
   def write_mem(self, width, addr, val):
     r = self.get_range(addr)
@@ -40,46 +40,46 @@ class MemoryLayout(MemoryRange):
       r.write_mem(width, addr, val)
       return None
     else:
-      raise InvalidMemoryAccessError(width, addr)
+      raise InvalidMemoryAccessError('W', width, addr, self.name)
     
   def w_data(self, addr, data):
     r = self.get_range(addr)
     if r != None:
       r.w_data(addr, data)
     else:
-      raise InvalidMemoryAccessError(0, addr)
+      raise InvalidMemoryAccessError('R', 0, addr, self.name)
 
   def r_data(self, addr, size):
     r = self.get_range(addr)
     if r != None:
       return r.r_data(addr, size)
     else:
-      raise InvalidMemoryAccessError(0, addr)
+      raise InvalidMemoryAccessError('W', 0, addr, self.name)
 
   def r_cstr(self, addr):
     r = self.get_range(addr)
     if r != None:
       return r.r_cstr(addr)
     else:
-      raise InvalidMemoryAccessError(0, addr)
+      raise InvalidMemoryAccessError('R', 0, addr, self.name)
 
   def w_cstr(self, addr, cstr):
     r = self.get_range(addr)
     if r != None:
       r.w_cstr(addr, cstr)
     else:
-      raise InvalidMemoryAccessError(0, addr)
+      raise InvalidMemoryAccessError('W', 0, addr, self.name)
 
   def r_bstr(self, addr):
     r = self.get_range(addr)
     if r != None:
       return r.r_bstr(addr)
     else:
-      raise InvalidMemoryAccessError(0, addr)
+      raise InvalidMemoryAccessError('R', 0, addr, self.name)
 
   def w_bstr(self, addr, bstr):
     r = self.get_range(addr)
     if r != None:
       r.w_bstr(addr, bstr)
     else:
-      raise InvalidMemoryAccessError(0, addr)
+      raise InvalidMemoryAccessError('W', 0, addr, self.name)

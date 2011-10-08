@@ -160,7 +160,13 @@ log_mem_init.info(exec_lib)
 exec_base_range = AmigaExecBase(exec_lib.base_addr)
 log_mem_init.info(exec_base_range)
 
-# --- start cpu ---
+# create a guard memory for tracking invalid old dos access
+guard_base = 0xfe8000
+guard_size = 0x008000
+guard = MemoryRange("old dos",guard_base, guard_size)
+mem.add_range(guard)
+
+# ----- start cpu -----
 # prepare m68k
 log_main.info("setting up m68k")
 m68k.set_read_memory(*mem.get_read_funcs())
@@ -173,8 +179,6 @@ reset_range = ResetRange(prog_start, stack_initial)
 mem.add_range(reset_range)
 m68k.pulse_reset()
 mem.remove_range(reset_range)
-
-# setup tracing
 mem.add_range(exec_base_range)
 
 # setup RESET = end handler
@@ -191,6 +195,11 @@ m68k.set_reset_instr_callback(end_func)
 m68k.set_reg(m68k.M68K_REG_D0, arg_len)
 m68k.set_reg(m68k.M68K_REG_A0, arg_base)
 
+# to track old dos values
+m68k.set_reg(m68k.M68K_REG_A2, guard_base)
+m68k.set_reg(m68k.M68K_REG_A5, guard_base)
+m68k.set_reg(m68k.M68K_REG_A6, guard_base)
+
 # start main CPU loop
 log_main.info("start cpu: %06x", prog_start)
 total_cycles = 0
@@ -202,15 +211,9 @@ while stay:
   if max_cycles > 0 and total_cycles >= max_cycles:
     break
   # if invalid reads or writes then abort
-  if len(mem.invalid_reads)>0:
-    log_main.error("invalid reads:")
-    for e in mem.invalid_reads:
-      log_main.error("R(%d): %06x",*e)
-    stay = False
-  if len(mem.invalid_writes)>0:
-    log_main.error("invalid writes:")
-    for e in mem.invalid_writes:
-      log_main.error("R(%d): %06x",*e)
+  if len(mem.invalid_access)>0:
+    for e in mem.invalid_access:
+      log_main.error(e)
     stay = False
     
 log_main.info("done (%d cycles)", total_cycles)

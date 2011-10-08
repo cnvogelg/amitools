@@ -47,7 +47,7 @@ class MemoryLib(MemoryRange):
       return val
     # invalid access to neg area
     else:
-      raise InvalidMemoryAccessError(width, addr)
+      raise InvalidMemoryAccessError('R', width, addr, self.name)
 
   def write_mem(self, width, addr, val):
     # pos range -> redirect to struct
@@ -55,15 +55,7 @@ class MemoryLib(MemoryRange):
       return self.pos_mem.write_mem(width, addr, val)
     # writes to neg area are not allowed for now
     else:
-      raise InvalidMemoryAccessError(width, addr)
-
-  def w_data(self, data, offset):
-    # pos range -> redirect to struct
-    if addr >= self.base_addr:
-      return self.pos_mem.w_data(data, offset)
-    # writes to neg area are not allowed for now
-    else:
-      raise InvalidMemoryAccessError(width, addr)
+      raise InvalidMemoryAccessError('W', width, addr, self.name)
 
   def r_data(self, offset, size):
     # pos range -> redirect to struct
@@ -71,7 +63,15 @@ class MemoryLib(MemoryRange):
       return self.pos_mem.r_data(offset, size)
     # writes to neg area are not allowed for now
     else:
-      raise InvalidMemoryAccessError(width, addr)
+      raise InvalidMemoryAccessError('R', 0, addr, self.name)
+
+  def w_data(self, data, offset):
+    # pos range -> redirect to struct
+    if addr >= self.base_addr:
+      return self.pos_mem.w_data(data, offset)
+    # writes to neg area are not allowed for now
+    else:
+      raise InvalidMemoryAccessError('W', 0, addr, self.name)
 
   def r_cstr(self, offset):
     # pos range -> redirect to struct
@@ -79,7 +79,7 @@ class MemoryLib(MemoryRange):
       return self.pos_mem.r_cstr(offset)
     # writes to neg area are not allowed for now
     else:
-      raise InvalidMemoryAccessError(width, addr)
+      raise InvalidMemoryAccessError('R', 0, addr, self.name)
 
   def w_cstr(self, offset, cstr):
     # pos range -> redirect to struct
@@ -87,7 +87,7 @@ class MemoryLib(MemoryRange):
       self.pos_mem.w_cstr(offset, cstr)
     # writes to neg area are not allowed for now
     else:
-      raise InvalidMemoryAccessError(width, addr)
+      raise InvalidMemoryAccessError('W', 0, addr, self.name)
 
   def r_bstr(self, offset):
     # pos range -> redirect to struct
@@ -95,7 +95,7 @@ class MemoryLib(MemoryRange):
       return self.pos_mem.r_bstr(offset)
     # writes to neg area are not allowed for now
     else:
-      raise InvalidMemoryAccessError(width, addr)
+      raise InvalidMemoryAccessError('R', 0, addr, self.name)
 
   def w_bstr(self, offset, bstr):
     # pos range -> redirect to struct
@@ -103,4 +103,4 @@ class MemoryLib(MemoryRange):
       self.pos_mem.w_bstr(offset, bstr)
     # writes to neg area are not allowed for now
     else:
-      raise InvalidMemoryAccessError(width, addr)
+      raise InvalidMemoryAccessError('W', 0, addr, self.name)

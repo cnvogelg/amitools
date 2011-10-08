@@ -21,7 +21,7 @@ class MemoryStruct(MemoryBlock):
     name,off,val_type_name = self.struct.get_name_for_offset(delta, width)
     type_name = self.struct.get_type_name()
     self.trace_write(width, addr, val, text="Struct  %s+%d = %s(%s)+%d" % (type_name, delta, name, val_type_name, off), level=logging.INFO)
-    return MemoryBlock.write_mem_int(self, width, addr)
+    MemoryBlock.write_mem_int(self, width, addr, val)
     
   def w_s(self, name, val):
     off,width,conv = self.struct.get_offset_for_name(name)
