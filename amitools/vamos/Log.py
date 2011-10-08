@@ -51,7 +51,7 @@ def log_setup(arg):
       name,level_name = kv.lower().split(':')
       level = log_parse_level(level_name)
       if level == None:
-        raise ValueError("Invalid logging level %s" % level)
+        raise ValueError("Invalid logging level %s" % level_name)
       if name == 'all':
         for l in loggers:
           l.setLevel(level)
@@ -59,4 +59,5 @@ def log_setup(arg):
         for l in loggers:
           if l.name == name:
             l.setLevel(level)
-        
+            return
+        raise ValueError("Invalid logging channel %s" % name)
