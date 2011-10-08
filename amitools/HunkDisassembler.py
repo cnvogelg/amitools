@@ -5,14 +5,14 @@ from amitools import Hunk
 
 class HunkDisassembler:
  
-  def gen_disassembly(self, data):
+  def gen_disassembly(self, data, start):
     # write to temp file
     tmpname = tempfile.mktemp()
     out = file(tmpname,"wb")
     out.write(data)
     out.close()
     # call external disassembler
-    p = subprocess.Popen(["vda68k",tmpname], stdout=subprocess.PIPE)
+    p = subprocess.Popen(["vda68k",tmpname,str(start)], stdout=subprocess.PIPE)
     output = p.communicate()[0]
     os.remove(tmpname)
     lines = output.splitlines()
@@ -172,9 +172,9 @@ class HunkDisassembler:
     
   # ----- show disassembly -----
   
-  def show_disassembly(self, hunk, seg_list):
+  def show_disassembly(self, hunk, seg_list, start):
     main = hunk[0]
-    lines = self.gen_disassembly(main['data'])
+    lines = self.gen_disassembly(main['data'],start)
     # show line by line
     for l in lines:
       addr = l[0]

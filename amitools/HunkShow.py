@@ -4,7 +4,7 @@ from amitools import HunkDisassembler
 class HunkShow:
   
   def __init__(self, hunk_file, show_relocs=False, show_debug=False, \
-                     disassemble=False, hexdump=False, brief=False):
+                     disassemble=False, disassemble_start=0, hexdump=False, brief=False):
     self.hunk_file = hunk_file
     
     # clone file refs
@@ -19,6 +19,7 @@ class HunkShow:
     self.show_relocs=show_relocs
     self.show_debug=show_debug
     self.disassemble=disassemble
+    self.disassemble_start=disassemble_start
     self.hexdump=hexdump
     self.brief=brief
   
@@ -88,7 +89,7 @@ class HunkShow:
     if main['type'] == Hunk.HUNK_CODE and self.disassemble and len(main['data'])>0:
       disas = HunkDisassembler.HunkDisassembler()
       print
-      disas.show_disassembly(hunk, seg_list)
+      disas.show_disassembly(hunk, seg_list, self.disassemble_start)
       print
 
   def show_index_info(self, info):
