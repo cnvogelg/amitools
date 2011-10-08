@@ -151,6 +151,8 @@ class ExecLibrary(AmigaLibrary):
       (552, self.OpenLibrary),
       (198, self.AllocMem),
       (210, self.FreeMem),
+      (294, self.FindTask),
+      (306, self.SetSignals),
       (684, self.AllocVec),
       (690, self.FreeVec),
     )
@@ -160,6 +162,20 @@ class ExecLibrary(AmigaLibrary):
     # setup exec memory
     lib.pos_mem.w_s("ThisTask",ctx.this_task.addr)
     lib.pos_mem.w_s("LibNode.lib_Version", self.version)
+  
+  def FindTask(self, lib, ctx):
+    task_ptr = ctx.cpu.r_reg(REG_A1)
+    if task_ptr == 0:
+      self.log("Find my Task: %06x" % ctx.this_task.addr)
+      return ctx.this_task.addr
+    else:
+      task_name = ctx.mem.r_cstr(task_ptr)
+      self.log("Find Task: %s")
+      return 0
+  
+  def SetSignals(self, lib, ctx):
+    # TODO
+    pass
   
   def OpenLibrary(self, lib, ctx):
     ver = ctx.cpu.r_reg(REG_D0)

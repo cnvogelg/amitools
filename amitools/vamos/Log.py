@@ -11,7 +11,7 @@ log_mem_alloc = logging.getLogger('mem_alloc')
 
 log_lib = logging.getLogger('lib')
 
-loggers = [log_main, log_mem, log_mem_init, log_lib]
+loggers = [log_main, log_mem, log_mem_init, log_mem_alloc, log_lib]
 
 # --- end ---
 
@@ -35,7 +35,7 @@ def log_setup(arg):
   ch = logging.StreamHandler()
   ch.setLevel(logging.DEBUG)
   # and formatter
-  formatter = logging.Formatter('%(asctime)s.%(msecs)03d %(name)10s:%(levelname)7s: %(message)s', datefmt='%H:%M:%S')
+  formatter = logging.Formatter('%(asctime)s.%(msecs)03d %(name)10s:%(levelname)7s:  %(message)s', datefmt='%H:%M:%S')
   ch.setFormatter(formatter)
   for l in loggers:
     l.addHandler(ch)
