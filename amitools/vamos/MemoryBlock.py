@@ -31,12 +31,12 @@ class MemoryBlock(MemoryRange):
   
   def read_mem(self, width, addr):
     val = self.rfunc[width](addr)
-    self.trace_read(self.TRACE_LEVEL_ALL,width, addr, val);
+    self.trace_read(width, addr, val);
     return val
 
   def write_mem(self, width, addr, val):
     self.wfunc[width](addr, val)
-    self.trace_write(self.TRACE_LEVEL_ALL,width, addr, val);
+    self.trace_write(width, addr, val);
 
   # for derived classes without trace
   def read_mem_int(self, width, addr):

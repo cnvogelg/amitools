@@ -3,6 +3,8 @@ from MemoryBlock import MemoryBlock
 from MemoryStruct import MemoryStruct
 from Exceptions import OutOfAmigaMemoryError
 
+from Log import log_mem_alloc
+
 class MemoryAlloc(MemoryLayout):
   
   def __init__(self, name, addr, size):
@@ -16,12 +18,12 @@ class MemoryAlloc(MemoryLayout):
     self._cur = addr + size
     if (self._cur - self.addr) > self.size:
       raise OutOfAmigaMemoryError(self, size)
-    print "\t[alloc @%06x: %06x bytes (padding %x)]" % (addr,size,padding)
+    log_mem_alloc.info("[alloc @%06x: %06x bytes (padding %x)]", addr,size,padding)
     return addr
   
   def free_range(self, addr, size):
     # TODO real free
-    print "\t[free  @%06x: %06x bytes]" % (addr,size)
+    log_mem_alloc.info("[free  @%06x: %06x bytes]", addr, size)
 
   def _reg_range(self, addr, obj):
     self.addrs[addr] = obj
@@ -40,7 +42,6 @@ class MemoryAlloc(MemoryLayout):
   def alloc_memory(self, name, size, padding=4):
     addr = self.alloc_range(size, padding)
     mb = MemoryBlock(name, addr, size)
-    mb.set_trace_level(self.get_trace_level())
     self.add_range(mb)
     self._reg_range(addr, mb)
     return mb
@@ -53,7 +54,6 @@ class MemoryAlloc(MemoryLayout):
   def alloc_struct(self, name, struct, padding=4):
     addr = self.alloc_range(struct.get_size(), padding)
     ms = MemoryStruct(name, addr, struct)
-    ms.set_trace_level(self.get_trace_level())
     self.add_range(ms)
     self._reg_range(addr, ms)
     return ms

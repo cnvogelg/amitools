@@ -215,7 +215,7 @@ class DosLibrary(AmigaLibrary):
       mode_name = "r/w"
     else:
       mode_name = "?"
-    self.trace_log("Open: name='%s' (%s/%d)" % (name, mode_name, mode))
+    self.log("Open: name='%s' (%s/%d)" % (name, mode_name, mode))
     
     if name.upper() == 'NIL:':
       return 0xdeadbe02
@@ -248,7 +248,7 @@ class DosLibrary(AmigaLibrary):
   def Lock(self, lib, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name = ctx.mem.r_cstr(name_ptr)
-    self.trace_log("Lock: %s" % (name))
+    self.log("Lock: %s" % (name))
     return self.DOSFALSE
   
   def Unlock(self, lib, ctx):
@@ -260,13 +260,13 @@ class DosLibrary(AmigaLibrary):
   def VPrintf(self, lib, ctx):
     format_ptr = ctx.cpu.r_reg(REG_D1)
     format = ctx.mem.r_cstr(format_ptr)
-    self.trace_log("VPrintf: format='%s'" % format)
+    self.log("VPrintf: format='%s'" % format)
   
   def MatchFirst(self, lib, ctx):
     pat_ptr = ctx.cpu.r_reg(REG_D1)
     pat = ctx.mem.r_cstr(pat_ptr)
     anchor_path = ctx.cpu.r_reg(REG_D2)
-    self.trace_log("MatchFirst: pat=%s" % pat)
+    self.log("MatchFirst: pat=%s" % pat)
   
   # ----- Args -----
   
@@ -276,7 +276,7 @@ class DosLibrary(AmigaLibrary):
     array_ptr = ctx.cpu.r_reg(REG_D2)
     rdargs_ptr = ctx.cpu.r_reg(REG_D3)
     
-    self.trace_log("ReadArgs: args=%s template=%s" % (ctx.bin_args, template))
+    self.log("ReadArgs: args=%s template=%s" % (ctx.bin_args, template))
     targs = gen_dos_args(template)
     
     # read org values
@@ -292,7 +292,7 @@ class DosLibrary(AmigaLibrary):
     
     # parse
     result = parse_dos_args(targs, ctx.bin_args, in_val)
-    self.trace_log("parse: %s" % result)
+    self.log("parse: %s" % result)
     
     # calc size of result
     n = len(result)
@@ -313,7 +313,7 @@ class DosLibrary(AmigaLibrary):
     
     # calc total size
     size = num_longs * 4 + num_chars
-    self.trace_log("longs=%d chars=%d size=%d" % (num_longs,num_chars,size))
+    self.log("longs=%d chars=%d size=%d" % (num_longs,num_chars,size))
     
     # alloc mem
     mem = self.alloc.alloc_memory("ReadArgs(@%06x)" % self.get_callee_pc(ctx),size)
@@ -362,10 +362,10 @@ class DosLibrary(AmigaLibrary):
     
   def FreeArgs(self, lib, ctx):
     rdargs_ptr = ctx.cpu.r_reg(REG_D1)
-    self.trace_log("FreeArgs: %06x" % rdargs_ptr)
+    self.log("FreeArgs: %06x" % rdargs_ptr)
     mem = self.alloc.get_range_by_addr(rdargs_ptr)
     if mem == None:
-      self.trace_log("NOT FOUND?!")
+      self.log("NOT FOUND?!")
     else:
       self.alloc.free_memory(mem)
 

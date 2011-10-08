@@ -22,7 +22,7 @@ class MainMemory(MemoryLayout):
     try:
       return MemoryLayout.read_mem(self, width, addr)
     except InvalidMemoryAccessError as e:
-      self.trace_read(self.TRACE_LEVEL_OUT,e.width, e.addr, 0, text="OUT!");
+      self.trace_read(e.width, e.addr, 0, text="OUT!");
       self.invalid_reads.append((e.width, e.addr))
       return 0
 
@@ -30,7 +30,7 @@ class MainMemory(MemoryLayout):
     try:
       return MemoryLayout.write_mem(self, width, addr, val)
     except InvalidMemoryAccessError as e:
-      self.trace_write(self.TRACE_LEVEL_OUT,e.width, e.addr, 0, text="OUT!")
+      self.trace_write(e.width, e.addr, 0, text="OUT!")
       self.invalid_writes.append((e.width, e.addr))
       return None
   

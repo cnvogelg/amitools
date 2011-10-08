@@ -1,6 +1,8 @@
 from MemoryRange import MemoryRange
 from MemoryStruct import MemoryStruct
 
+import logging
+
 class MemoryLib(MemoryRange):
   
   op_rts = 0x4e75
@@ -19,10 +21,6 @@ class MemoryLib(MemoryRange):
 
   def __str__(self):
     return "%s base=%06x %s" %(MemoryRange.__str__(self),self.base_addr,str(self.lib))
-
-  def set_trace(self, level):
-    MemoryRange.set_trace(self, level)
-    self.pos_mem.set_trace(level)
 
   def get_base_addr(self):
     return self.base_addr
@@ -43,7 +41,7 @@ class MemoryLib(MemoryRange):
     # trap lib call and return RTS opcode
     elif(width == 1):
       val = self.op_rts
-      self.trace_read(self.TRACE_LEVEL_TRAP,width, addr, val, text="TRAP")
+      self.trace_read(width, addr, val, text="TRAP", level=logging.INFO)
       off = (self.base_addr - addr) / 6
       self.lib.call_vector(off,self,self.ctx)
       return val

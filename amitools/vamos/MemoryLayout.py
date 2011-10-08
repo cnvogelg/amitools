@@ -11,11 +11,6 @@ class MemoryLayout(MemoryRange):
     MemoryRange.__init__(self, name, addr, size)
     self.ranges = []
   
-  def set_trace(self, level):
-    MemoryRange.set_trace(self, level)
-    for r in self.ranges:
-      r.set_trace(level)
-  
   def add_range(self, range):
     self.ranges.append(range)
   

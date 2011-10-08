@@ -1,5 +1,8 @@
 from amitools.vamos.MemoryBlock import MemoryBlock
 
+from Log import log_mem
+import logging
+
 class MemoryStruct(MemoryBlock):
   def __init__(self, name, addr, struct):
     MemoryBlock.__init__(self, name, addr, struct.get_size())
@@ -10,14 +13,14 @@ class MemoryStruct(MemoryBlock):
     name,off,val_type_name = self.struct.get_name_for_offset(delta, width)
     val = MemoryBlock.read_mem_int(self, width, addr)
     type_name = self.struct.get_type_name()
-    self.trace_read(self.TRACE_LEVEL_STRUCT,width, addr, val, text="Struct  %s+%d = %s(%s)+%d" % (type_name, delta, name, val_type_name, off))
+    self.trace_read(width, addr, val, text="Struct  %s+%d = %s(%s)+%d" % (type_name, delta, name, val_type_name, off), level=logging.INFO)
     return val
 
   def write_mem(self, width, addr, val):
     delta = addr - self.addr
     name,off,val_type_name = self.struct.get_name_for_offset(delta, width)
     type_name = self.struct.get_type_name()
-    self.trace_write(self.TRACE_LEVEL_STRUCT,width, addr, val, text="Struct  %s+%d = %s(%s)+%d" % (type_name, delta, name, val_type_name, off))
+    self.trace_write(width, addr, val, text="Struct  %s+%d = %s(%s)+%d" % (type_name, delta, name, val_type_name, off), level=logging.INFO)
     return MemoryBlock.write_mem_int(self, width, addr)
     
   def w_s(self, name, val):

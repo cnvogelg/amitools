@@ -1,5 +1,8 @@
 from CPU import *
 
+from Log import log_lib
+import logging
+
 class AmigaLibrary:
   
   def __init__(self, name, version, calls, struct):
@@ -7,7 +10,6 @@ class AmigaLibrary:
     self.version = version
     self.calls = calls
     self.struct = struct
-    self.trace = False
 
     # get pos_size
     self.pos_size = struct.get_size()
@@ -29,9 +31,6 @@ class AmigaLibrary:
         call_id += 1
       off += 6
       self.jump_table.append([call,None])
-  
-  def set_trace(self, on):
-    self.trace = on
   
   def __str__(self):
     return "[Lib %s V%d num_jumps=%d pos_size=%d neg_size=%d]" % \
@@ -72,25 +71,23 @@ class AmigaLibrary:
   def set_by_offset(self, off, callee, name="none", param=None, ret=REG_D0):
     self.jump_table[off][1] = callee
 
-  def trace_log(self, text):
-    if self.trace:
-      print "\t[%24s]  %s" % (self.name, text)
+  def log(self, text, level=logging.INFO):
+    log_lib.log(level, "[%16s]  %s", self.name, text)
 
   def call_vector(self, off, mem_lib, ctx):
     jump_entry = self.jump_table[off]
-
     call = jump_entry[0]
-    self.trace_log("{call: %4d %s( %s )" % (call[0], call[1], self.gen_arg_dump(call[2], ctx)))
-
     callee = jump_entry[1]
+    call_name = "%4d %s( %s )" % (call[0], call[1], self.gen_arg_dump(call[2], ctx))
     if callee != None:
+      self.log("{ CALL: " + call_name)
       d0 = callee(mem_lib, ctx)
       if d0 == None:
         d0 = 0
-      self.trace_log("}return d0=%08x" % (d0))
+      self.log("} END CALL: d0=%08x" % (d0))
       ctx.cpu.w_reg(REG_D0, d0)
     else:
-      self.trace_log("}default d0=0")
+      self.log("? CALL: %s -> d0=0 (default)" % call_name, level=logging.WARN)
       ctx.cpu.w_reg(REG_D0, 0)
     
   def get_callee_pc(self,ctx):
