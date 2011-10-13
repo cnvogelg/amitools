@@ -77,8 +77,10 @@ class HunkShow:
     type_name = main['type_name'].replace("HUNK_","")
     size = main['size']
     hunk_no = main['hunk_no']
+    data_file_offset = main['data_file_offset']
+    hunk_file_offset = main['hunk_file_offset']
     
-    self.print_segment_header(hunk_no, type_name, size, name)
+    self.print_segment_header(hunk_no, type_name, size, name, data_file_offset, hunk_file_offset)
     if self.hexdump:
       self.show_hex(main['data'])
 
@@ -190,8 +192,8 @@ class HunkShow:
   def print_extra_sub(self, text):
     print "\t\t\t%s" % text
 
-  def print_segment_header(self, hunk_no, type_name, size, name):
-    print "\t#%03d  %-5s %08x  %s" % (hunk_no, type_name, size, name)
+  def print_segment_header(self, hunk_no, type_name, size, name, data_file_offset, hunk_file_offset):
+    print "\t#%03d  %-5s  size %08x  (file pos @%08x, header @%08x)  %s" % (hunk_no, type_name, size, data_file_offset, hunk_file_offset, name)
 
   def print_symbol(self,addr,name,extra):
     if addr == -1:
