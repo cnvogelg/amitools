@@ -13,28 +13,9 @@ import os.path
 
 from musashi import m68k
 
-from amitools.vamos.Log import *
-
 from amitools.vamos.CPU import CPU
-from amitools.vamos.MemoryBlock import MemoryBlock
-from amitools.vamos.MemoryLayout import MemoryLayout
-from amitools.vamos.MemoryRange import MemoryRange
-from amitools.vamos.MemoryAlloc import MemoryAlloc
-from amitools.vamos.MainMemory import MainMemory
-from amitools.vamos.ResetRange import ResetRange
-from amitools.vamos.EndRange import EndRange
-from amitools.vamos.AmigaLibrary import AmigaLibrary
-from amitools.vamos.AmigaExecBase import AmigaExecBase
-from amitools.vamos.LibManager import LibManager
-from amitools.vamos.SegmentLoader import SegmentLoader
-from amitools.vamos.VamosContext import VamosContext
-from amitools.vamos.PathManager import PathManager
-
-# lib
-from amitools.vamos.lib.ExecLibrary import ExecLibrary
-from amitools.vamos.lib.DosLibrary import DosLibrary
-from amitools.vamos.structure.ExecStruct import *
-from amitools.vamos.structure.DosStruct import *
+from amitools.vamos.Log import *
+from amitools.vamos.Vamos import Vamos
 
 # ----- classes -----
 
@@ -64,137 +45,51 @@ args = parser.parse_args()
 vamos_prefix = args.prefix
 
 # --- init logging ---
-
 log_setup(args.logging)
 
-# --- amiga binary arguments ---
-bin_file = args.bin
-bin_args = args.args
-log_main.info("command line for vamos: %s %s", bin_file, bin_args)
+# ----- vamos! ---------------------------------------------------------------
+vamos = Vamos()
 
-# --- create memory layout ---
-log_mem_init.info("setting up memory")
-mem_size = 0x1000000
-mem = MainMemory(mem_size)
-log_mem_init.info(mem)
+# --- setup stack & heap ---
+vamos.init_stack()
+vamos.init_heap()
 
 # --- load segments of binary ---
-seg_base = 0x010000
-seg_size = 0x070000
-seg_mem = MemoryAlloc("segments", seg_base, seg_size)
-mem.add_range(seg_mem)
-log_mem_init.info(seg_mem)
-seg_loader = SegmentLoader( seg_mem )
-
-# load binary
-seg_list = seg_loader.load_seg(bin_file)
-if seg_list == None:
-  log_main.error("failed loading binary: '%s' %s", bin_file, seg_loader.error)
+vamos.init_segments()
+if not vamos.load_main_binary(args.bin):
+  log_main.error("failed loading binary: '%s' %s", args.bin, vamos.seg_loader.error)
   sys.exit(1)
-log_mem_init.info("binary segments: %s",bin_file)
-for s in seg_list:
-  log_mem_init.info(s)
-prog_start = seg_list[0].addr
-
-# --- setup stack ---
-magic_end = 0xff0000
-stack_base = 0x080000
-stack_size = 0x040000
-stack_end = stack_base + stack_size
-stack_mem = MemoryBlock("stack", stack_base, stack_size)
-# prepare stack
-# TOP: size
-# TOP-4: return from program -> magic_ed
-stack_initial = stack_end - 4
-stack_mem.w32(stack_initial, stack_size)
-stack_initial -= 4
-stack_mem.w32(stack_initial, magic_end)
-mem.add_range(stack_mem)
-log_mem_init.info(stack_mem)
-
-# --- setup heap ---
-heap_base = 0x100000
-heap_size = 0x040000
-heap_mem = MemoryAlloc("heap", heap_base, heap_size)
-mem.add_range(heap_mem)
-log_mem_init.info(heap_mem)
-
-# setup arguments
-arg_text = " ".join(bin_args) + "\n" # AmigaDOS appends a new line to the end
-arg_len  = len(arg_text)
-arg_size = arg_len + 1
-arg_mem  = heap_mem.alloc_memory("args", arg_size)
-arg_base = arg_mem.addr
-arg_mem.w_cstr(arg_base, arg_text)
-log_main.info("args: %s (%d)", arg_text, arg_size)
-log_mem_init.info(arg_mem)
+vamos.init_args(args.args)
 
 # --- libs ---
-lib_base = 0xf08000
-lib_size = 0x0e0000
-lib_mgr  = LibManager(lib_base, lib_size)
-mem.add_range(lib_mgr)
-log_mem_init.info(lib_mgr)
+vamos.init_lib_manager()
+vamos.init_path_manager(args.prefix)
+vamos.register_base_libs()
 
-# path manager
-path_mgr = PathManager(vamos_prefix)
-
-# register libraries
-exec_lib_def = ExecLibrary(lib_mgr, heap_mem)
-lib_mgr.register_lib(exec_lib_def)
-dos_lib_def = DosLibrary(heap_mem)
-lib_mgr.register_lib(dos_lib_def)
-
-# --- setup context ---
+# --- vamos context ---
 cpu = MusashiCPU()
-ctx = VamosContext( cpu, mem, lib_mgr, heap_mem )
-ctx.bin_args = bin_args
-ctx.bin_file = bin_file
+ctx = vamos.init_context(cpu)
 
-# --- memory init ---
-# create CLI
-cli = heap_mem.alloc_struct("CLI",CLIDef)
-cli.w_s("cli_DefaultStack", stack_size / 4) # in longs
-cmd_mem = heap_mem.alloc_bstr("cmd",bin_file)
-cli.w_s("cli_CommandName", cmd_mem.addr)
-log_mem_init.info(cli)
+# --- in memory process struct ---
+vamos.setup_process()
+vamos.open_exec_lib()
+vamos.create_old_dos_guard()
 
-# create my task structure
-this_task = heap_mem.alloc_struct("ThisTask",ProcessDef)
-this_task.w_s("pr_CLI", cli.addr)
-ctx.this_task = this_task
-log_mem_init.info(this_task)
-
-# open exec lib
-exec_lib = lib_mgr.open_lib(ExecLibrary.name, ExecLibrary.version, ctx)
-log_mem_init.info(exec_lib)
-exec_base_range = AmigaExecBase(exec_lib.base_addr)
-log_mem_init.info(exec_base_range)
-
-# create a guard memory for tracking invalid old dos access
-guard_base = 0xfe8000
-guard_size = 0x008000
-guard = MemoryRange("old dos",guard_base, guard_size)
-mem.add_range(guard)
-
-# ----- start cpu -----
+# ----- start cpu ------------------------------------------------------------
 # prepare m68k
 log_main.info("setting up m68k")
-m68k.set_read_memory(*mem.get_read_funcs())
-m68k.set_write_memory(*mem.get_write_funcs())
+m68k.set_read_memory(*ctx.mem.get_read_funcs())
+m68k.set_write_memory(*ctx.mem.get_write_funcs())
 m68k.set_cpu_type(m68k.M68K_CPU_TYPE_68000)
 
 # reset CPU with a temporary reset range
 log_main.info("resetting cpu...")
-reset_range = ResetRange(prog_start, stack_initial)
-mem.add_range(reset_range)
+vamos.setup_reset_range()
 m68k.pulse_reset()
-mem.remove_range(reset_range)
-mem.add_range(exec_base_range)
+vamos.setup_execbase_range()
 
 # setup RESET = end handler
-end_range = EndRange(magic_end)
-mem.add_range(end_range)
+vamos.setup_end_range()
 stay = True
 def end_func():
   global stay
@@ -203,16 +98,16 @@ def end_func():
 m68k.set_reset_instr_callback(end_func)
 
 # setup arg in D0/A0
-m68k.set_reg(m68k.M68K_REG_D0, arg_len)
-m68k.set_reg(m68k.M68K_REG_A0, arg_base)
+m68k.set_reg(m68k.M68K_REG_D0, vamos.arg_len)
+m68k.set_reg(m68k.M68K_REG_A0, vamos.arg_base)
 
 # to track old dos values
-m68k.set_reg(m68k.M68K_REG_A2, guard_base)
-m68k.set_reg(m68k.M68K_REG_A5, guard_base)
-m68k.set_reg(m68k.M68K_REG_A6, guard_base)
+m68k.set_reg(m68k.M68K_REG_A2, vamos.dos_guard_base)
+m68k.set_reg(m68k.M68K_REG_A5, vamos.dos_guard_base)
+m68k.set_reg(m68k.M68K_REG_A6, vamos.dos_guard_base)
 
-# start main CPU loop
-log_main.info("start cpu: %06x", prog_start)
+# ----- start main CPU loop --------------------------------------------------
+log_main.info("start cpu: %06x", vamos.prog_start)
 total_cycles = 0
 cycles_per_run = args.block
 max_cycles = args.cycles 
@@ -222,9 +117,8 @@ while stay:
   if max_cycles > 0 and total_cycles >= max_cycles:
     break
   # if invalid reads or writes then abort
-  if len(mem.invalid_access)>0:
-    for e in mem.invalid_access:
+  if len(ctx.mem.invalid_access)>0:
+    for e in ctx.mem.invalid_access:
       log_main.error(e)
     stay = False
-    
 log_main.info("done (%d cycles)", total_cycles)
