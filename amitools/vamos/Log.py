@@ -11,7 +11,9 @@ log_mem_alloc = logging.getLogger('mem_alloc')
 
 log_lib = logging.getLogger('lib')
 
-loggers = [log_main, log_mem, log_mem_init, log_mem_alloc, log_lib]
+log_path = logging.getLogger('path')
+
+loggers = [log_main, log_mem, log_mem_init, log_mem_alloc, log_lib, log_path]
 
 # --- end ---
 

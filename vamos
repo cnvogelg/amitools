@@ -8,6 +8,8 @@
 
 import sys
 import argparse
+import os
+import os.path
 
 from musashi import m68k
 
@@ -26,6 +28,7 @@ from amitools.vamos.AmigaExecBase import AmigaExecBase
 from amitools.vamos.LibManager import LibManager
 from amitools.vamos.SegmentLoader import SegmentLoader
 from amitools.vamos.VamosContext import VamosContext
+from amitools.vamos.PathManager import PathManager
 
 # lib
 from amitools.vamos.lib.ExecLibrary import ExecLibrary
@@ -45,15 +48,20 @@ class MusashiCPU(CPU):
 
 # ----- main -----
 
+# --- preset args ---
+vamos_prefix = os.path.join(os.environ['HOME'],".vamos")
+
 # --- args ---
 parser = argparse.ArgumentParser()
-parser.add_argument('bin', help="command: AmigaOS binary")
-parser.add_argument('args', nargs='*')
+parser.add_argument('bin', help="AmigaOS binary to run")
+parser.add_argument('args', nargs='*', help="AmigaOS binary arguments")
 parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
 parser.add_argument('-c', '--cycles', action='store', type=int, default=0, help="maximum number of cycles to execute")
 parser.add_argument('-b', '--block', action='store', type=int, default=1000, help="cycles per block")
 parser.add_argument('-l', '--logging', action='store', default=None, help="logging settings: <chan>:<level>,*:<level>,...")
+parser.add_argument('-P', '--prefix', action='store', default=vamos_prefix, help="vamos directory prefix (%s)" % vamos_prefix)
 args = parser.parse_args()
+vamos_prefix = args.prefix
 
 # --- init logging ---
 
@@ -127,6 +135,9 @@ lib_size = 0x0e0000
 lib_mgr  = LibManager(lib_base, lib_size)
 mem.add_range(lib_mgr)
 log_mem_init.info(lib_mgr)
+
+# path manager
+path_mgr = PathManager(vamos_prefix)
 
 # register libraries
 exec_lib_def = ExecLibrary(lib_mgr, heap_mem)
