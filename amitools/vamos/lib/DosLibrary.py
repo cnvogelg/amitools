@@ -194,7 +194,8 @@ class DosLibrary(AmigaLibrary):
     )
     self.set_funcs(dos_funcs)
   
-  def init(self, lib, ctx):
+  def open(self, lib, ctx):
+    self.log("open dos.library")
     lib.file_id = 0
   
   def Input(self, lib, ctx):

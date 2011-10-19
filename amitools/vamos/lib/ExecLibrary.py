@@ -183,7 +183,10 @@ class ExecLibrary(AmigaLibrary):
     name = ctx.mem.r_cstr(name_ptr)
     lib = self.lib_mgr.open_lib(name, ver, ctx)
     self.log("'%s' V%d -> %s" % (name, ver, lib))
-    return lib.get_base_addr()
+    if lib == None:
+      return 0
+    else:
+      return lib.get_base_addr()
   
   def OldOpenLibrary(self, lib, ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
@@ -196,8 +199,7 @@ class ExecLibrary(AmigaLibrary):
     lib_addr = ctx.cpu.r_reg(REG_A1)
     lib = self.lib_mgr.close_lib(lib_addr,ctx)
     if lib != None:
-      lib_cls = lib.get_lib()
-      self.log("'%s' V%d -> %06x" % (lib_cls.get_name(), lib_cls.get_version(), lib_addr))
+      self.log("'%s' -> %06x" % (lib, lib.get_base_addr()))
     else:
       self.log("INVALID")
   

@@ -27,6 +27,24 @@ class MemoryRange:
   def is_inside(self, addr):
     return ((self.addr <= addr) and (addr < self.end))
   
+  def r8(self, addr):
+    return self.read_mem(0, addr)
+
+  def r16(self, addr):
+    return self.read_mem(1, addr)
+
+  def r32(self, addr):
+    return self.read_mem(2, addr)
+
+  def w8(self, addr, v):
+    self.write_mem(0, addr, v)
+
+  def w16(self, addr, v):
+    self.write_mem(1, addr, v)
+
+  def w32(self, addr, v):
+    self.write_mem(2, addr, v)
+  
   def read_mem(self, width, addr):
     raise InvalidMemoryAccessError('R', width, addr, self.name)
   

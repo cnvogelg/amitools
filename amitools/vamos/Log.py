@@ -10,10 +10,11 @@ log_mem_init = logging.getLogger('mem_init')
 log_mem_alloc = logging.getLogger('mem_alloc')
 
 log_lib = logging.getLogger('lib')
+log_res = logging.getLogger('res')
 
 log_path = logging.getLogger('path')
 
-loggers = [log_main, log_mem, log_mem_init, log_mem_alloc, log_lib, log_path]
+loggers = [log_main, log_mem, log_mem_init, log_mem_alloc, log_lib, log_path, log_res]
 
 # --- end ---
 
@@ -58,8 +59,11 @@ def log_setup(arg):
         for l in loggers:
           l.setLevel(level)
       else:
+        found = False
         for l in loggers:
           if l.name == name:
             l.setLevel(level)
-            return
-        raise ValueError("Invalid logging channel %s" % name)
+            found = True
+            break
+        if not found:
+          raise ValueError("Invalid logging channel %s" % name)

@@ -118,6 +118,8 @@ class Vamos:
     self.ctx = VamosContext( cpu, self.mem, self.lib_mgr, self.heap_mem )
     self.ctx.bin_args = self.bin_args
     self.ctx.bin_file = self.bin_file
+    self.ctx.seg_loader = self.seg_loader
+    self.ctx.path_mgr = self.path_mgr
     return self.ctx
 
   def setup_process(self):
