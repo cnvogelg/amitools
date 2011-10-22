@@ -42,7 +42,10 @@ class AmigaLibrary:
   def close(self, mem_lib, ctx):
     pass
   
-  def get_pos_struct(self):
+  def get_num_vectors(self):
+    return self.num_jumps
+    
+  def get_struct(self):
     return self.struct
   
   def get_name(self):

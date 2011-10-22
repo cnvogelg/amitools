@@ -1,6 +1,7 @@
 from MemoryLayout import MemoryLayout
 from MemoryLib import MemoryLib
 from AmigaResident import AmigaResident
+from CPU import *
 
 from Log import log_lib
 import logging
@@ -17,20 +18,20 @@ class LibManager(MemoryLayout):
   def register_lib(self, lib_class):
     self.libs[lib_class.get_name()] = {
       'lib_class' : lib_class,
-      'instance' : None,
-      'ref_count' : 0
+      'instance' : None
     }
     
   def unregister_lib(self, lib_class):
     del self.libs[lib_class.get_name()]
   
-  def _get_lib_addr(self, size):
-    addr = self.lib_addr
-    self.lib_addr += size
-    return addr
-  
   def lib_log(self, func, text, level=logging.INFO):
     log_lib.log(level, "LibMgr: [%10s] %s", func, text)
+  
+  def _get_next_lib_addr(self, size):
+    res = self.lib_addr
+    s = (size + 0xffff) & ~0xffff 
+    self.lib_addr += s
+    return res
   
   # ----- common -----
   
@@ -65,70 +66,117 @@ class LibManager(MemoryLayout):
     # check name
     if name.find(':') == -1 and name.find('/') == -1:
       name = "libs:" + name
+      
     # use path manager to find real path
     real_path = context.path_mgr.ami_to_sys_path(name)
     if real_path == None:
       self.lib_log("open_lib","Can't find sys path for '%s'" % name, level=logging.ERROR)
       return None
+    
     # use seg_loader to load lib
     self.lib_log("open_lib","Trying to load native lib: %s -> %s" % (name, real_path))
     seg_list = context.seg_loader.load_seg(real_path)
     if seg_list == None:
       self.lib_log("open_lib","Can't load library file '%s'" % real_path, level=logging.ERROR)
       return None
+    
     # check seg list for resident library struct
     ar = AmigaResident()
     res_list = ar.find_residents(seg_list[0], context.mem)
     if res_list == None or len(res_list) != 1:
       self.lib_log("open_lib","No single resident found!", level=logging.ERROR)
       return None
+    
     # make sure its a library
     res = res_list[0]
     if res['type'] != AmigaResident.NT_LIBRARY:
       self.lib_log("open_lib","Resident is not a library!", level=logging.ERROR)
       return None
+    
     # resident is ok
     lib_name = res['name']
     lib_id = res['id']
     lib_version = res['version']
     auto_init = res['auto_init']
     self.lib_log("open_lib", "found resident: name='%s' id='%s'" % (lib_name, lib_id))
+    
     # read auto init infos
     if not ar.read_auto_init_data(res, context.mem):
       self.lib_log("open_lib","Error reading auto_init!", level=logging.ERROR)
       return None
+    
+    # get library base info
+    vectors  = res['vectors']
+    pos_size = res['dataSize']
+    total_size = pos_size + len(vectors) * 6
+
+    # now create a memory lib instance
+    lib_addr = context.alloc.alloc_range(total_size)
+    instance = MemoryLib(lib_name, lib_addr, len(vectors), pos_size)
+    context.alloc.reg_range(lib_addr, instance)
+    lib_base = instance.get_lib_base()
+  
+    # setup lib instance memory
     hex_vec = map(lambda x:"%06x" % x, res['vectors'])
-    self.lib_log("open_lib", "init_code=%06x dataSize=%06x vectors=%s struct=%s" % (res['init_code_ptr'],res['dataSize'],hex_vec,res['struct']), level=logging.DEBUG)
-    # create lib struct with jump table and pos area
-    lib_mem = ar.create_auto_init_mem(res, context.alloc)
-    lib_base = lib_mem.get_base_addr()
-    self.lib_log("open_lib", "Openend native '%s' V%d: base=%06x mem=%s" % (lib_name, lib_version, lib_base, lib_mem))
+    self.lib_log("open_lib", "setting up vectors=%s" % hex_vec, level=logging.DEBUG)
+    instance.set_all_vectors(vectors)
+    self.lib_log("open_lib", "setting up struct=%s and lib" % res['struct'], level=logging.DEBUG)
+    ar.init_lib(res, instance, lib_base)
+    self.lib_log("open_lib", "init_code=%06x dataSize=%06x" % (res['init_code_ptr'],res['dataSize']), level=logging.DEBUG)
+
+    # now prepare to execute library init code
+    # we will return with RTS from this call
+    # -> new stack return directly jumps into lib init code
+    # -> RTS in init code returns to caller of open lib
+    # function must return lib_base in D0 so everythin is ok
+    init_addr = res['init_code_ptr']
+    if init_addr != 0:
+      # place the init code ptr on stack
+      old_stack = context.cpu.r_reg(REG_A7)
+      old_return = context.mem.read_mem(2,old_stack)
+      new_stack = old_stack - 4
+      context.cpu.w_reg(REG_A7, new_stack)
+      context.mem.write_mem(2,new_stack,init_addr)
+      # D0 = lib_base, A0 = seg_list, A6 = exec base
+      context.cpu.w_reg(REG_D0, lib_base)
+      context.cpu.w_reg(REG_A0, 0xdeadbeef) # FIXME: seg_list
+      self.lib_log("open_lib", "prepare init code jump: old_stack=%06x old_return=%06x -> new_stack=%06x new_return=%06x" \
+        % (old_stack, old_return, new_stack, init_addr), level=logging.DEBUG)
 
     # register lib
     entry = {
       'name' : lib_name,
       'id' : lib_id,
       'version' : res['version'],
-      'mem' : lib_mem,
+      'instance' : instance,
       'seg_list' : seg_list,
-      'base_addr' : lib_base
+      'lib_base' : lib_base
     }
     self.native_libs[entry['name']] = entry
     self.native_addr_map[lib_base] = entry
 
-    # return lib struct memory
-    return lib_mem
+    # return MemoryLib instance
+    self.lib_log("open_lib", "Openend native '%s' V%d: base=%06x mem=%s" % (lib_name, lib_version, lib_base, instance))
+    return instance
 
   def close_native_lib(self, addr, context):
+    # get entry for lib
     entry = self.native_addr_map[addr]
     del self.native_addr_map[addr]
     del self.native_libs[entry['name']]
+
+    # lib param
     name = entry['name']
     version = entry['version']
-    base_addr = entry['base_addr']
-    mem = entry['mem']
-    self.lib_log("close_lib","Closed native '%s' V%d: base=%06x mem=%s]" % (name, version, base_addr, mem))
-    return mem
+    lib_base = entry['lib_base']
+    instance = entry['instance']
+    self.lib_log("close_lib","Closed native '%s' V%d: base=%06x mem=%s]" % (name, version, lib_base, instance))
+
+    # unreg and remove alloc
+    context.alloc.unreg_range(instance.addr)
+    context.alloc.free_range(instance.addr, instance.size)
+
+    return instance
 
   # ----- internal lib -----
 
@@ -149,22 +197,25 @@ class LibManager(MemoryLayout):
     # create an instance
     if instance == None:
       # get memory range for lib
-      lib_size = lib_class.get_total_size()      
-      addr = self._get_lib_addr(lib_size)
+      lib_size = lib_class.get_total_size()     
+      pos_size = lib_class.get_pos_size()
+      num_vecs = lib_class.get_num_vectors()
+      struct   = lib_class.get_struct()
+      lib_addr = self._get_next_lib_addr(lib_size)
       # create lib instance
-      instance = MemoryLib(addr, lib_class, context)
+      instance = MemoryLib(name, lib_addr, num_vecs, pos_size, struct=struct, lib=lib_class, context=context)
       self.add_range(instance)
       entry['instance'] = instance
       # store base_addr
-      base_addr = instance.get_base_addr()
-      entry['base_addr'] = base_addr
-      self.addr_map[base_addr] = entry
+      lib_base = instance.get_lib_base()
+      entry['lib_base'] = lib_base
+      self.addr_map[lib_base] = entry
       # call open on lib
       lib_class.open(instance,context)
       entry['ref_cnt'] = 0
           
     entry['ref_cnt'] += 1
-    self.lib_log("open_lib","Opened %s V%d ref_count=%d base=%06x" % (name, lib_ver, entry['ref_count'], entry['base_addr']))
+    self.lib_log("open_lib","Opened %s V%d ref_count=%d base=%06x" % (name, lib_ver, entry['ref_cnt'], entry['lib_base']))
     return instance
 
   def close_internal_lib(self, addr, context):

@@ -160,8 +160,8 @@ class ExecLibrary(AmigaLibrary):
   
   def open(self, lib, ctx):
     # setup exec memory
-    lib.pos_mem.w_s("ThisTask",ctx.this_task.addr)
-    lib.pos_mem.w_s("LibNode.lib_Version", self.version)
+    lib.w_s("ThisTask",ctx.this_task.addr)
+    lib.w_s("LibNode.lib_Version", self.version)
   
   def FindTask(self, lib, ctx):
     task_ptr = ctx.cpu.r_reg(REG_A1)
@@ -186,20 +186,20 @@ class ExecLibrary(AmigaLibrary):
     if lib == None:
       return 0
     else:
-      return lib.get_base_addr()
+      return lib.get_lib_base()
   
   def OldOpenLibrary(self, lib, ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name = ctx.mem.r_cstr(name_ptr)
     lib = self.lib_mgr.open_lib(name, 0, ctx)
     self.log("'%s' -> %s" % (name, lib))
-    return lib.get_base_addr()
+    return lib.get_lib_base()
   
   def CloseLibrary(self, lib, ctx):
     lib_addr = ctx.cpu.r_reg(REG_A1)
     lib = self.lib_mgr.close_lib(lib_addr,ctx)
     if lib != None:
-      self.log("'%s' -> %06x" % (lib, lib.get_base_addr()))
+      self.log("'%s' -> %06x" % (lib, lib.get_lib_base()))
     else:
       self.log("INVALID")
   

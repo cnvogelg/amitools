@@ -12,7 +12,7 @@ class MemoryAlloc(MemoryLayout):
     self._cur = addr
     self.addrs = {}
   
-  def alloc_range(self, size, padding):
+  def alloc_range(self, size, padding=4):
     addr = self._cur
     addr = (addr + padding - 1) & ~(padding - 1)
     self._cur = addr + size
@@ -25,11 +25,14 @@ class MemoryAlloc(MemoryLayout):
     # TODO real free
     log_mem_alloc.info("[free  @%06x: %06x bytes]", addr, size)
 
-  def _reg_range(self, addr, obj):
+  def reg_range(self, addr, obj):
     self.addrs[addr] = obj
+    self.add_range(obj)
 
-  def _unreg_range(self, addr):
+  def unreg_range(self, addr):
+    obj = self.addrs[addr]
     del self.addrs[addr]
+    self.remove_range(obj)
 
   def get_range_by_addr(self, addr):
     if self.addrs.has_key(addr):
@@ -42,28 +45,24 @@ class MemoryAlloc(MemoryLayout):
   def alloc_memory(self, name, size, padding=4):
     addr = self.alloc_range(size, padding)
     mb = MemoryBlock(name, addr, size)
-    self.add_range(mb)
-    self._reg_range(addr, mb)
+    self.reg_range(addr, mb)
     log_mem_alloc.info(mb)
     return mb
   
   def free_memory(self, mb):
+    self.unreg_range(mb.addr)
     self.free_range(mb.addr, mb.size)
-    self.remove_range(mb)
-    self._unreg_range(mb.addr)
   
   def alloc_struct(self, name, struct, padding=4):
     addr = self.alloc_range(struct.get_size(), padding)
     ms = MemoryStruct(name, addr, struct)
-    self.add_range(ms)
-    self._reg_range(addr, ms)
+    self.reg_range(addr, ms)
     log_mem_alloc.info(ms)
     return ms
   
   def free_struct(self, ms):
+    self.unreg_range(addr)
     self.free_range(ms.addr, ms.size)
-    self.remove_range(ms)
-    self._unreg_range(addr)
   
   def alloc_cstr(self, name, cstr, padding=4):
     size = len(cstr) + 1

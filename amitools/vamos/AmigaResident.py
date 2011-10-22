@@ -139,28 +139,21 @@ class AmigaResident:
 
   # create memory block with jump vectors and pos size
   # store base_addr of library
-  def create_auto_init_mem(self, res, alloc):
-    vectors = res['vectors']
-    neg_size = len(vectors) * 6
-    pos_size = res['dataSize']
-    size = neg_size + pos_size
-    mem = alloc.alloc_memory(res['name'], size)    
-    base_addr = mem.addr + neg_size
-
-    # set base addr to begin of pos region
-    mem.set_base_addr(base_addr)
-    
-    # place vectors
-    addr = base_addr - 6
-    for v in vectors:
-      mem.w16(addr, 0x4ef9) # JMP opcode
-      mem.w32(addr+2, v)
-      addr -= 6
-      
-    # fill struct
+  def setup_struct(self, res, mem, base_addr):
     structure = res['struct']
     for s in structure:
       addr = base_addr + s[0]
       mem.write_mem(s[2], addr, s[1])
-    
-    return mem
+
+  def init_lib(self, res, memlib, base_addr):
+    memlib.w_s("lib_Node.ln_Type", res['type'])
+    memlib.w_s("lib_Node.ln_Pri", res['pri'])
+    memlib.w_s("lib_Node.ln_Name", res['name_ptr'])
+    memlib.w_s("lib_Flags", res['flags'])
+    memlib.w_s("lib_NegSize", memlib.get_neg_size())
+    memlib.w_s("lib_PosSize", memlib.get_pos_size())
+    memlib.w_s("lib_Version", res['version'])
+    memlib.w_s("lib_IdString", res['id_ptr'])
+    self.setup_struct(res, memlib, base_addr)
+
+

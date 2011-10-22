@@ -32,7 +32,7 @@ class LibraryStruct(AmigaStruct):
     ('UWORD','lib_PosSize'),
     ('UWORD','lib_Version'),
     ('UWORD','lib_Revision'),
-    ('APTR','lib_ldString'),
+    ('APTR','lib_IdString'),
     ('ULONG','lib_Sum'),
     ('UWORD','lib_OpenCnt')
   ]

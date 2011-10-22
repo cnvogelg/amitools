@@ -1,106 +1,71 @@
 from MemoryRange import MemoryRange
 from MemoryStruct import MemoryStruct
+from structure.ExecStruct import LibraryDef
 
 import logging
 
-class MemoryLib(MemoryRange):
+class MemoryLib(MemoryStruct):
   
   op_rts = 0x4e75
+  op_jmp = 0x4ef9
   
-  def __init__(self, addr, lib, context):
-    name = lib.get_name()
-    MemoryRange.__init__(self, name, addr, lib.get_total_size())
+  def __init__(self, name, addr, num_vectors, pos_size, struct=LibraryDef, lib=None, context=None):
     self.lib = lib
     self.ctx = context
-    
-    self.begin_addr = addr
-    self.base_addr = addr + lib.get_neg_size()
-    self.end_addr = self.base_addr + lib.get_pos_size()
-    
-    self.pos_mem = MemoryStruct(name, self.base_addr, lib.get_pos_struct())
 
+    self.num_vectors = num_vectors
+    self.pos_size = pos_size
+    self.neg_size = num_vectors * 6
+    
+    self.lib_begin = addr
+    self.lib_base  = addr + self.neg_size
+    self.lib_end   = self.lib_base + self.pos_size
+
+    MemoryStruct.__init__(self, name, addr, struct, size=self.pos_size + self.neg_size, offset=self.neg_size)
+    
   def __str__(self):
-    return "%s base=%06x %s" %(MemoryRange.__str__(self),self.base_addr,str(self.lib))
+    return "%s base=%06x %s" %(MemoryRange.__str__(self),self.lib_base,str(self.lib))
 
-  def get_base_addr(self):
-    return self.base_addr
+  def set_all_vectors(self, vectors):
+    """set all library vectors to valid addresses"""
+    if len(vectors) != self.num_vectors:
+      raise ValueError("Invalid number of library vectors given!")
+    addr = self.lib_base - 6
+    for v in vectors:
+      self.write_mem(1,addr,self.op_jmp)
+      self.write_mem(2,addr+2,v)
+      addr -= 6
 
-  def get_pos_mem(self):
-    return self.pos_mem
+  def get_lib_base(self):
+    return self.lib_base
+    
+  def get_neg_size(self):
+    return self.neg_size
+    
+  def get_pos_size(self):
+    return self.pos_size
 
   def get_lib(self):
     return self.lib
 
-  def is_inside(self, addr):
-    return ((addr >= self.begin_addr) and (addr < self.end_addr))
-
   def read_mem(self, width, addr):
-    # pos range -> redirect to struct
-    if addr >= self.base_addr:
-      return self.pos_mem.read_mem(width, addr)
-    # trap lib call and return RTS opcode
-    elif(width == 1):
-      val = self.op_rts
-      self.trace_read(width, addr, val, text="TRAP", level=logging.INFO)
-      off = (self.base_addr - addr) / 6
-      self.lib.call_vector(off,self,self.ctx)
-      return val
-    # invalid access to neg area
-    else:
-      raise InvalidMemoryAccessError('R', width, addr, self.name)
-
-  def write_mem(self, width, addr, val):
-    # pos range -> redirect to struct
-    if addr >= self.base_addr:
-      return self.pos_mem.write_mem(width, addr, val)
-    # writes to neg area are not allowed for now
-    else:
-      raise InvalidMemoryAccessError('W', width, addr, self.name)
-
-  def r_data(self, offset, size):
-    # pos range -> redirect to struct
-    if addr >= self.base_addr:
-      return self.pos_mem.r_data(offset, size)
-    # writes to neg area are not allowed for now
-    else:
-      raise InvalidMemoryAccessError('R', 0, addr, self.name)
-
-  def w_data(self, data, offset):
-    # pos range -> redirect to struct
-    if addr >= self.base_addr:
-      return self.pos_mem.w_data(data, offset)
-    # writes to neg area are not allowed for now
-    else:
-      raise InvalidMemoryAccessError('W', 0, addr, self.name)
-
-  def r_cstr(self, offset):
-    # pos range -> redirect to struct
-    if addr >= self.base_addr:
-      return self.pos_mem.r_cstr(offset)
-    # writes to neg area are not allowed for now
-    else:
-      raise InvalidMemoryAccessError('R', 0, addr, self.name)
-
-  def w_cstr(self, offset, cstr):
-    # pos range -> redirect to struct
-    if addr >= self.base_addr:
-      self.pos_mem.w_cstr(offset, cstr)
-    # writes to neg area are not allowed for now
-    else:
-      raise InvalidMemoryAccessError('W', 0, addr, self.name)
-
-  def r_bstr(self, offset):
-    # pos range -> redirect to struct
-    if addr >= self.base_addr:
-      return self.pos_mem.r_bstr(offset)
-    # writes to neg area are not allowed for now
-    else:
-      raise InvalidMemoryAccessError('R', 0, addr, self.name)
-
-  def w_bstr(self, offset, bstr):
-    # pos range -> redirect to struct
-    if addr >= self.base_addr:
-      self.pos_mem.w_bstr(offset, bstr)
-    # writes to neg area are not allowed for now
-    else:
-      raise InvalidMemoryAccessError('W', 0, addr, self.name)
+    # a possible trap?
+    if addr < self.lib_base and width == 1:
+      val = self.read_mem_int(1,addr)
+      # is it trapped?
+      if val != self.op_jmp:
+        val = self.op_rts
+        delta = self.lib_base - addr
+        off = delta / 6
+        addon = "-%d [%d]" % (delta,off)
+        self.trace_read(width, addr, val, text="TRAP", level=logging.INFO, addon=addon)
+        self.lib.call_vector(off,self,self.ctx)
+        return val
+      # native lib jump
+      else:
+        delta = self.lib_base - addr
+        addon = "-%d" % delta
+        self.trace_read(width, addr, val, text="JUMP", level=logging.INFO, addon=addon)
+        return val
+    # no use regular access
+    return MemoryStruct.read_mem(self, width, addr)

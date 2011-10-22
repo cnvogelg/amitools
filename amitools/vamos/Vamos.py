@@ -140,7 +140,7 @@ class Vamos:
     # open exec lib
     self.exec_lib = self.lib_mgr.open_lib(ExecLibrary.name, ExecLibrary.version, self.ctx)
     log_mem_init.info(self.exec_lib)
-    self.exec_base_range = AmigaExecBase(self.exec_lib.base_addr)
+    self.exec_base_range = AmigaExecBase(self.exec_lib.get_lib_base())
     log_mem_init.info(self.exec_base_range)
 
   def create_old_dos_guard(self):

@@ -13,13 +13,13 @@ class MemoryRange:
     self.size = size
     self.end = addr + size
   
-  def trace_read(self, width, addr, value, text="", level=logging.DEBUG):
+  def trace_read(self, width, addr, value, text="", level=logging.DEBUG, addon=""):
     val = self.trace_val_str[width] % value
-    log_mem.log(level, "R(%d): %06x: %s  %6s  [@%06x +%06x %s]", 2**width, addr, val, text, self.addr, addr - self.addr, self.name)
+    log_mem.log(level, "R(%d): %06x: %s  %6s  [@%06x +%06x %s] %s", 2**width, addr, val, text, self.addr, addr - self.addr, self.name, addon)
     
-  def trace_write(self, width, addr, value, text="", level=logging.DEBUG):
+  def trace_write(self, width, addr, value, text="", level=logging.DEBUG, addon=""):
     val = self.trace_val_str[width] % value
-    log_mem.log(level, "W(%d): %06x: %s  %6s  [@%06x +%06x %s]", 2**width, addr, val, text, self.addr, addr - self.addr, self.name)
+    log_mem.log(level, "W(%d): %06x: %s  %6s  [@%06x +%06x %s] %s", 2**width, addr, val, text, self.addr, addr - self.addr, self.name, addon)
 
   def __str__(self):
     return "<@%06x +%06x %06x> [%s]" % (self.addr, self.size, self.addr + self.size, self.name)

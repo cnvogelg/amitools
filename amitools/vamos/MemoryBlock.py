@@ -9,16 +9,7 @@ class MemoryBlock(MemoryRange):
     self.buffer = ctypes.create_string_buffer(size)
     self.rfunc = (self.r8, self.r16, self.r32)
     self.wfunc = (self.w8, self.w16, self.w32)
-    self.base_addr = addr
   
-  # set optional base address
-  def set_base_addr(self, addr):
-    self.base_addr = addr
-  
-  # get optional base address
-  def get_base_addr(self):
-    return self.base_addr
-    
   # 'memory access'
   def r8(self, addr):
     return struct.unpack_from("B",self.buffer,offset=addr - self.addr)[0]
