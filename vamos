@@ -26,6 +26,14 @@ class MusashiCPU(CPU):
     m68k.set_reg(reg,val)
   def r_reg(self,reg):
     return m68k.get_reg(reg)
+  def w_pc(self, val):
+    m68k.set_reg(m68k.M68K_REG_PC,val)
+  def r_pc(self):
+    return m68k.get_reg(m68k.M68K_REG_PC)
+  def w_sr(self, val):
+    m68k.set_reg(m68k.M68K_REG_SR,val)
+  def r_sr(sefl):
+    return m68k.get_reg(m68k.M68K_REG_SR)
 
 # ----- main -----
 
@@ -119,6 +127,12 @@ while stay:
   # if invalid reads or writes then abort
   if len(ctx.mem.invalid_access)>0:
     for e in ctx.mem.invalid_access:
+      # show memory access error
       log_main.error(e)
+      # give CPU state dump
+      for d in cpu.dump_state(e.state):
+        log_main.error(d)
+      # PC memory range
+      log_main.error("PC Range: %s  Offset: +%08x" % (e.pc_range_offset[0], e.pc_range_offset[1]))
     stay = False
 log_main.info("done (%d cycles)", total_cycles)

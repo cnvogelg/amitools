@@ -26,6 +26,14 @@ class MemoryLayout(MemoryRange):
         return r
     return None
 
+  def get_range_offset(self, addr):
+    r = self.get_range(addr)
+    if r == None:
+      return (None, 0)
+    else:
+      off = addr - r.addr
+      return (r, off)
+
   def read_mem(self, width, addr):
     r = self.get_range(addr)
     if r != None:

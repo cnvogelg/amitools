@@ -120,6 +120,7 @@ class Vamos:
     self.ctx.bin_file = self.bin_file
     self.ctx.seg_loader = self.seg_loader
     self.ctx.path_mgr = self.path_mgr
+    self.mem.ctx = self.ctx
     return self.ctx
 
   def setup_process(self):
