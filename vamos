@@ -126,6 +126,7 @@ while stay:
     break
   # if invalid reads or writes then abort
   if len(ctx.mem.invalid_access)>0:
+    log_main.error("After %d cycles:", total_cycles)
     for e in ctx.mem.invalid_access:
       # show memory access error
       log_main.error(e)

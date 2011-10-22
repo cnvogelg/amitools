@@ -50,6 +50,22 @@ class MemoryLayout(MemoryRange):
     else:
       raise InvalidMemoryAccessError('W', width, addr, self.name)
     
+  def read_mem_int(self, width, addr):
+    r = self.get_range(addr)
+    if r != None:
+      val = r.read_mem_int(width, addr)
+      return val
+    else:
+      raise InvalidMemoryAccessError('R', width, addr, self.name)
+
+  def write_mem_int(self, width, addr, val):
+    r = self.get_range(addr)
+    if r != None:
+      r.write_mem_int(width, addr, val)
+      return None
+    else:
+      raise InvalidMemoryAccessError('W', width, addr, self.name)
+
   def w_data(self, addr, data):
     r = self.get_range(addr)
     if r != None:
