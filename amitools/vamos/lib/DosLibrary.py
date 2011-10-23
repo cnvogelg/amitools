@@ -2,7 +2,7 @@ import types
 
 from amitools.vamos.AmigaLibrary import *
 from amitools.vamos.structure.DosStruct import DosLibraryDef
-
+from amitools.vamos.Exceptions import *
 from dos.Args import *
 
 class DosLibrary(AmigaLibrary):
@@ -194,63 +194,109 @@ class DosLibrary(AmigaLibrary):
     )
     self.set_funcs(dos_funcs)
   
+  def set_managers(self, lock_mgr, file_mgr):
+    self.lock_mgr = lock_mgr
+    self.file_mgr = file_mgr
+  
   def open(self, lib, ctx):
     self.log("open dos.library")
-    lib.file_id = 0
+    self.io_err = 0
+  
+  # ----- File Ops -----
   
   def Input(self, lib, ctx):
-    return 0xdeadbe00
+    std_input = self.file_mgr.get_input()
+    self.log("Input: %s" % std_input)
+    return std_input.b_addr
   
   def Output(self, lib, ctx):
-    return 0xdeadbe01
+    std_output = self.file_mgr.get_output()
+    self.log("Output: %s" % std_output)
+    return std_output.b_addr
   
   def Open(self, lib, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name = ctx.mem.r_cstr(name_ptr)
     mode = ctx.cpu.r_reg(REG_D2)
+
+    # decode mode
     if mode == 1006:
       mode_name = "new"
+      f_mode = "wb"
     elif mode == 1005:
       mode_name = "old"
+      f_mode = "rb"
     elif mode == 1004:
       mode_name = "r/w"
+      f_mode = "ab"
     else:
       mode_name = "?"
-    self.log("Open: name='%s' (%s/%d)" % (name, mode_name, mode))
     
-    if name.upper() == 'NIL:':
-      return 0xdeadbe02
-    elif name == '*':
-      return 0xdeadbe03
+    # special names
+    uname = name.upper()
+    if uname == 'NIL:':
+      fh = self.file_mgr.get_nil()
+    elif uname in ('*','CONSOLE:'):
+      fh = self.file_mgr.get_output()
     else:
-      file_id = lib.file_id
-      lib.file_id += 1
-      return 0xdeadbf00 + file_id
+      fh = self.file_mgr.open(name, f_mode)
+  
+    self.log("Open: name='%s' (%s/%d/%s) -> %s" % (name, mode_name, mode, f_mode, fh))
+      
+    if fh == None:
+      return 0
+    else:
+      return fh.b_addr
   
   def Close(self, lib, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    self.file_mgr.close(fh)
+    self.log("Close: %s" % fh)
+
     return self.DOSTRUE
   
   def Read(self, lib, ctx):
-    fh = ctx.cpu.r_reg(REG_D1)
-    buf = ctx.cpu.r_reg(REG_D2)
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    buf_ptr = ctx.cpu.r_reg(REG_D2)
     size = ctx.cpu.r_reg(REG_D3)
-    data = ctx.mem.r_data(buf,size)
-    print data
-    return size
+
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    data = self.file_mgr.read(size)
+    ctx.mem.w_data(buf_ptr, data)
+    got = len(data)
+    self.log("Read(%06x, %d) -> %d" % (buf_ptr, size, got))
+    return got
     
   def Write(self, lib, ctx):
-    fh = ctx.cpu.r_reg(REG_D1)
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
     buf = ctx.cpu.r_reg(REG_D2)
     size = ctx.cpu.r_reg(REG_D3)
+    
     data = ctx.mem.r_data(buf,size)
-    print data
+    fh = self.file_mgr.write(data)
     return size
+
+  def VPrintf(self, lib, ctx):
+    format_ptr = ctx.cpu.r_reg(REG_D1)
+    argv_ptr = ctx.cpu.r_reg(REG_D2)
+    format = ctx.mem.r_cstr(format_ptr)
+    # write on output
+    fh = self.file_mgr.get_output()
+    self.log("VPrintf: format='%s' argv=%06x" % (format,argv_ptr))
+    # TODO: expand format :)
+    self.file_mgr.write(fh, format)
+
+  # ----- Locks -----
   
   def Lock(self, lib, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name = ctx.mem.r_cstr(name_ptr)
     self.log("Lock: %s" % (name))
-    return self.DOSFALSE
+    lock_id = lib.lock_id
+    lib.lock_id += 1
+    return 0xe
   
   def Unlock(self, lib, ctx):
     return self.DOSTRUE
@@ -258,16 +304,14 @@ class DosLibrary(AmigaLibrary):
   def Examine(self, lib, ctx):
     return self.DOSTRUE
   
-  def VPrintf(self, lib, ctx):
-    format_ptr = ctx.cpu.r_reg(REG_D1)
-    format = ctx.mem.r_cstr(format_ptr)
-    self.log("VPrintf: format='%s'" % format)
+  # ----- Matcher -----
   
   def MatchFirst(self, lib, ctx):
     pat_ptr = ctx.cpu.r_reg(REG_D1)
     pat = ctx.mem.r_cstr(pat_ptr)
-    anchor_path = ctx.cpu.r_reg(REG_D2)
-    self.log("MatchFirst: pat=%s" % pat)
+    anchor_ptr = ctx.cpu.r_reg(REG_D2)
+    anchor = ctx.mem.r_cstr(anchor_ptr)
+    self.log("MatchFirst: pat=%s anchor=%s" % (pat, anchor))
   
   # ----- Args -----
   

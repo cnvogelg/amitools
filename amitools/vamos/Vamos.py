@@ -11,6 +11,8 @@ from LibManager import LibManager
 from SegmentLoader import SegmentLoader
 from VamosContext import VamosContext
 from PathManager import PathManager
+from FileManager import FileManager
+from LockManager import LockManager
 
 # lib
 from lib.ExecLibrary import ExecLibrary
@@ -97,21 +99,26 @@ class Vamos:
 
   def init_lib_manager(self):
     # --- libs ---
-    self.lib_base = 0xf08000
-    self.lib_size = 0x0e0000
+    self.lib_base = 0xf00000
+    self.lib_size = 0x080000
     self.lib_mgr  = LibManager(self.lib_base, self.lib_size)
     self.mem.add_range(self.lib_mgr)
     log_mem_init.info(self.lib_mgr)
 
-  def init_path_manager(self, prefix):
+  def init_dos_managers(self, prefix):
     self.prefix = prefix
     self.path_mgr = PathManager(prefix)
+    self.lock_base = 0xe00000
+    self.lock_mgr = LockManager(self.path_mgr, self.lock_base)
+    self.file_base = 0xe80000
+    self.file_mgr = FileManager(self.path_mgr, self.file_base)
 
   def register_base_libs(self):
     # register libraries
     self.exec_lib_def = ExecLibrary(self.lib_mgr, self.heap_mem)
     self.lib_mgr.register_lib(self.exec_lib_def)
     self.dos_lib_def = DosLibrary(self.heap_mem)
+    self.dos_lib_def.set_managers(self.lock_mgr, self.file_mgr)
     self.lib_mgr.register_lib(self.dos_lib_def)
 
   def init_context(self, cpu):

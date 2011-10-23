@@ -71,7 +71,7 @@ vamos.init_args(args.args)
 
 # --- libs ---
 vamos.init_lib_manager()
-vamos.init_path_manager(args.prefix)
+vamos.init_dos_managers(args.prefix)
 vamos.register_base_libs()
 
 # --- vamos context ---

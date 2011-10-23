@@ -13,3 +13,9 @@ class OutOfAmigaMemoryError(Exception):
     self._size = size
   def __str__(self):
     return "%s size=%s" % (str(self._alloc), self._size)
+
+class UnsupportedFeatureError(Exception):
+  def __init__(self, what):
+    self._what = what
+  def __str__(self):
+    return "Unupported Feature: %s" % self._what
