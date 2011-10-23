@@ -48,3 +48,7 @@ class MemoryStruct(MemoryBlock):
     if conv != None:
       val = conv[1](val)
     return val
+    
+  def get_addr(self, name):
+    off,width,conv = self.struct.get_offset_for_name(name)
+    return self.struct_begin + off

@@ -35,13 +35,13 @@ class FileManager:
     log_file.info("registered: %s" % fh)
   
   def _unregister_file(self,fh):
-    check = self.files[fh.addr]
+    check = self.files_by_b_addr[fh.b_addr]
     if check != fh:
       raise ValueError("Invalid File to unregister: %s" % fh)
     del self.files_by_b_addr[fh.b_addr]
+    log_file.info("unregistered: %s"% fh)
     fh.addr = 0
     fh.b_addr = 0
-    log_file_info("unregistered: %s"% fh)
     
   def get_input(self):
     return self.std_input

@@ -16,7 +16,10 @@ log_path = logging.getLogger('path')
 log_file = logging.getLogger('file')
 log_lock = logging.getLogger('lock')
 
-loggers = [log_main, log_mem, log_mem_init, log_mem_alloc, log_lib, log_path, log_file, log_lock, log_res]
+log_dos  = logging.getLogger('dos')
+log_exec = logging.getLogger('exec')
+
+loggers = [log_main, log_mem, log_mem_init, log_mem_alloc, log_lib, log_path, log_file, log_lock, log_res, log_dos, log_exec]
 
 # --- end ---
 

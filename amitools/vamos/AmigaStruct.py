@@ -150,7 +150,7 @@ class AmigaStruct:
         return sub_type._get_offset_loop([first_name], base=type_offset)
       # a base type
       else:
-        base_type = format[0]
+        base_type = self._gen_pure_name(format[0])
         base_format = self._types[base_type]
         return (type_offset, base_format[0], base_format[1])
     # more names:
