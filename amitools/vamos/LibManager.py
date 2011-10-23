@@ -1,6 +1,7 @@
 from MemoryLayout import MemoryLayout
 from MemoryLib import MemoryLib
 from AmigaResident import AmigaResident
+from Trampoline import Trampoline
 from CPU import *
 
 from Log import log_lib
@@ -124,24 +125,31 @@ class LibManager(MemoryLayout):
     ar.init_lib(res, instance, lib_base)
     self.lib_log("open_lib", "init_code=%06x dataSize=%06x" % (res['init_code_ptr'],res['dataSize']), level=logging.DEBUG)
 
-    # now prepare to execute library init code
-    # we will return with RTS from this call
-    # -> new stack return directly jumps into lib init code
-    # -> RTS in init code returns to caller of open lib
-    # function must return lib_base in D0 so everythin is ok
+    # do we need to call init code of lib?
     init_addr = res['init_code_ptr']
     if init_addr != 0:
-      # place the init code ptr on stack
+      # now prepare to execute library init code
+      # setup trampoline to call init routine of library
+      # D0 = lib_base, A0 = seg_list, A6 = exec base
+      exec_base = context.mem.read_mem_int(2,4)
+      tr = Trampoline()
+      tr.save_all()
+      tr.set_dx_l(0, lib_base)
+      tr.set_ax_l(0, seg_list[0].addr)
+      tr.set_ax_l(6, exec_base)
+      tr.jsr(init_addr)
+      tr.restore_all()
+      tr.rts()
+      tr_size = tr.get_code_size()
+      tr_mem = context.alloc.alloc_memory("tr_"+lib_name, tr_size)
+      tr.write_code(tr_mem)
+      self.lib_log("open_lib","trampoline: %s" % tr_mem)
+    
+      # place the trampoline code ptr on stack
       old_stack = context.cpu.r_reg(REG_A7)
-      old_return = context.mem.read_mem(2,old_stack)
       new_stack = old_stack - 4
       context.cpu.w_reg(REG_A7, new_stack)
-      context.mem.write_mem(2,new_stack,init_addr)
-      # D0 = lib_base, A0 = seg_list, A6 = exec base
-      context.cpu.w_reg(REG_D0, lib_base)
-      context.cpu.w_reg(REG_A0, 0xdeadbeef) # FIXME: seg_list
-      self.lib_log("open_lib", "prepare init code jump: old_stack=%06x old_return=%06x -> new_stack=%06x new_return=%06x" \
-        % (old_stack, old_return, new_stack, init_addr), level=logging.DEBUG)
+      context.mem.write_mem(2,new_stack, tr_mem.addr)
 
     # register lib
     entry = {
@@ -150,7 +158,8 @@ class LibManager(MemoryLayout):
       'version' : res['version'],
       'instance' : instance,
       'seg_list' : seg_list,
-      'lib_base' : lib_base
+      'lib_base' : lib_base,
+      'trampoline' : tr_mem
     }
     self.native_libs[entry['name']] = entry
     self.native_addr_map[lib_base] = entry
@@ -175,6 +184,7 @@ class LibManager(MemoryLayout):
     # unreg and remove alloc
     context.alloc.unreg_range(instance.addr)
     context.alloc.free_range(instance.addr, instance.size)
+    context.alloc.free_memory(entry['trampoline'])
 
     return instance
 

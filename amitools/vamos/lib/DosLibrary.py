@@ -241,15 +241,7 @@ class DosLibrary(AmigaLibrary):
     else:
       mode_name = "?"
     
-    # special names
-    uname = name.upper()
-    if uname == 'NIL:':
-      fh = self.file_mgr.get_nil()
-    elif uname in ('*','CONSOLE:'):
-      fh = self.file_mgr.get_output()
-    else:
-      fh = self.file_mgr.open(name, f_mode)
-  
+    fh = self.file_mgr.open(name, f_mode)
     log_dos.info("Open: name='%s' (%s/%d/%s) -> %s" % (name, mode_name, mode, f_mode, fh))
       
     if fh == None:

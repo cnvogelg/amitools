@@ -1,15 +1,23 @@
 import sys
+import os.path
 from Log import log_file
 
 class AmiFile:
-  def __init__(self, obj, name):
+  def __init__(self, obj, ami_path, sys_path, need_close=True):
     self.obj = obj
-    self.name = name
+    self.name = os.path.basename(sys_path)
+    self.ami_path = ami_path
+    self.sys_path = sys_path
     self.addr = 0
     self.b_addr = 0
+    self.need_close = need_close
     
   def __str__(self):
-    return "[FH:'%s'@%06x=B@%06x]" % (self.name, self.addr, self.b_addr)
+    return "[FH:'%s'(ami='%s',sys='%s',nc=%s)@%06x=B@%06x]" % (self.name, self.ami_path, self.sys_path, self.need_close, self.addr, self.b_addr)
+
+  def close(self):
+    if self.need_close:
+      self.obj.close()
 
 class FileManager:
   def __init__(self, path_mgr, base_addr):
@@ -19,12 +27,10 @@ class FileManager:
     log_file.info("init manager: base=%06x" % self.base_addr)
     self.files_by_b_addr = {}
     # setup std input/output
-    self.std_input = AmiFile(sys.stdin,'<STDIN>')
-    self.std_output = AmiFile(sys.stdout,'<STDOUT>')
-    self.nil = AmiFile(None,"NIL:")
+    self.std_input = AmiFile(sys.stdin,'<STDIN>','',need_close=False)
+    self.std_output = AmiFile(sys.stdout,'<STDOUT>','',need_close=False)
     self._register_file(self.std_input)
     self._register_file(self.std_output)
-    self._register_file(self.nil)
     
   def _register_file(self, fh):
     addr = self.cur_addr
@@ -49,17 +55,29 @@ class FileManager:
   def get_output(self):
     return self.std_output
     
-  def get_nil(self):
-    return self.nil
+  def open(self, ami_path, f_mode):
+    # special names
+    uname = ami_path.upper()
+    if uname == 'NIL:':
+      sys_name = "/dev/null" 
+      fobj = open(sys_name, f_mode)
+      fh = AmiFile(fobj, ami_name, sys_name)
+    elif uname in ('*','CONSOLE:'):
+      sys_name = ''
+      fh = AmiFile(sys.stdout,'*','',need_close=False)
+    else:
+      sys_path = self.path_mgr.ami_to_sys_path(ami_path)
+      if sys_path == None:
+        log_file.info("file not found: '%s' -> '%s'" % (ami_path, sys_path))
+        return None
+      fobj = open(sys_path, f_mode)
+      fh = AmiFile(fobj, ami_path, sys_path)
     
-  def open(self, name, f_mode):
-    fobj = open(name, f_mode)
-    fh = AmiFile(fobj, name)
     self._register_file(fh)
     return fh
   
   def close(self, fh):
-    fh.obj.close()
+    fh.close()
     self._unregister_file(fh)
   
   def get_by_b_addr(self, b_addr):
