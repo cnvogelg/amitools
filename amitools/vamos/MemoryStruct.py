@@ -21,7 +21,7 @@ class MemoryStruct(MemoryBlock):
       name,off,val_type_name = self.struct.get_name_for_offset(delta, width)
       val = MemoryBlock.read_mem_int(self, width, addr)
       type_name = self.struct.get_type_name()
-      self.trace_read(width, addr, val, text="Struct  %s+%d = %s(%s)+%d" % (type_name, delta, name, val_type_name, off), level=logging.INFO)
+      self.trace_read(width, addr, val, text="Struct", addon="%s+%d = %s(%s)+%d" % (type_name, delta, name, val_type_name, off), level=logging.INFO)
       return val
     else:
       return MemoryBlock.read_mem(self, width, addr)
@@ -31,7 +31,7 @@ class MemoryStruct(MemoryBlock):
     if delta >= 0 and delta < self.struct_size:
       name,off,val_type_name = self.struct.get_name_for_offset(delta, width)
       type_name = self.struct.get_type_name()
-      self.trace_write(width, addr, val, text="Struct  %s+%d = %s(%s)+%d" % (type_name, delta, name, val_type_name, off), level=logging.INFO)
+      self.trace_write(width, addr, val, text="Struct", addon="%s+%d = %s(%s)+%d" % (type_name, delta, name, val_type_name, off), level=logging.INFO)
       MemoryBlock.write_mem_int(self, width, addr, val)
     else:
       return MemoryBlock.write_mem(self, width, addr, val)

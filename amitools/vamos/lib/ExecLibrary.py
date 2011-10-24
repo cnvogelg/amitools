@@ -1,9 +1,9 @@
 from amitools.vamos.AmigaLibrary import *
 from amitools.vamos.structure.ExecStruct import *
+from amitools.vamos.Log import log_exec
 
 class ExecLibrary(AmigaLibrary):
   name = "exec.library"
-  version = 39
   exec_calls = (
     (30, 'Supervisor', (('userFunction', 'a5'),)),
     (36, 'execPrivate1', None),
@@ -140,8 +140,9 @@ class ExecLibrary(AmigaLibrary):
     (822, 'execPrivate15', None),
   )
 
-  def __init__(self, lib_mgr, alloc):
-    AmigaLibrary.__init__(self, self.name, self.version, self.exec_calls, ExecLibraryDef)
+  def __init__(self, lib_mgr, alloc, version=39):
+    AmigaLibrary.__init__(self, self.name, version, self.exec_calls, ExecLibraryDef)
+    log_exec.info("open exec.library V%d", self.version)
     self.lib_mgr = lib_mgr
     self.alloc = alloc
 

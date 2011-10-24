@@ -89,3 +89,32 @@ class FileInfoBlockStruct(AmigaStruct):
     ('char|32','fib_Reserved')
   ]
 FileInfoBlockDef = FileInfoBlockStruct()
+
+class FileHandleStruct(AmigaStruct):
+  _name = "FileHandle"
+  _format = [
+    ('void*','fh_Link'),
+    ('void*','fh_Port'),
+    ('void*','fh_Type'),
+    ('LONG','fh_Buf'),
+    ('LONG','fh_Pos'),
+    ('LONG','fh_End'),
+    ('LONG','fh_Funcs'),
+    ('LONG','fh_Func2'),
+    ('LONG','fh_Func3'),
+    ('LONG','fh_Args'),
+    ('LONG','fh_Arg2')
+  ]
+FileHandleDef = FileHandleStruct()
+
+class FileLockStruct(AmigaStruct):
+  _name = "FileLock"
+  _format = [
+    ('BPTR','fl_Link'),
+    ('LONG','fl_Key'),
+    ('LONG','fl_Access'),
+    ('void*','fl_Task'),
+    ('BPTR','fl_Volume')
+  ]
+FileLockDef = FileLockStruct()
+

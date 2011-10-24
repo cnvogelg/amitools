@@ -10,7 +10,6 @@ from dos.Error import *
 
 class DosLibrary(AmigaLibrary):
   name = "dos.library"
-  version = 39
   dos_calls = (
    (30, 'Open', (('name', 'd1'), ('accessMode', 'd2'))),
    (36, 'Close', (('file', 'd1'),)),
@@ -176,8 +175,8 @@ class DosLibrary(AmigaLibrary):
   DOSFALSE = 0
   DOSTRUE = 0xffffffff
   
-  def __init__(self, alloc):
-    AmigaLibrary.__init__(self, self.name, self.version, self.dos_calls, DosLibraryDef)
+  def __init__(self, alloc,version=39):
+    AmigaLibrary.__init__(self, self.name, version, self.dos_calls, DosLibraryDef)
     self.alloc = alloc
     
     dos_funcs = (
@@ -204,7 +203,7 @@ class DosLibrary(AmigaLibrary):
     self.file_mgr = file_mgr
   
   def open(self, lib, ctx):
-    log_dos.info("open dos.library")
+    log_dos.info("open dos.library V%d", self.version)
     self.io_err = 0
   
   def IoErr(self, lib, ctx):

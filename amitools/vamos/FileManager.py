@@ -1,6 +1,10 @@
 import sys
 import os.path
+import logging
+
 from Log import log_file
+from MemoryRange import MemoryRange
+from structure.DosStruct import FileHandleDef
 
 class AmiFile:
   def __init__(self, obj, ami_path, sys_path, need_close=True):
@@ -19,13 +23,17 @@ class AmiFile:
     if self.need_close:
       self.obj.close()
 
-class FileManager:
-  def __init__(self, path_mgr, base_addr):
+class FileManager(MemoryRange):
+  def __init__(self, path_mgr, base_addr, size):
     self.path_mgr = path_mgr
     self.base_addr = base_addr
     self.cur_addr = base_addr
     log_file.info("init manager: base=%06x" % self.base_addr)
     self.files_by_b_addr = {}
+    MemoryRange.__init__(self, "files", base_addr, size)
+    self.fh_def  = FileHandleDef
+    self.fh_size = FileHandleDef.get_size()
+
     # setup std input/output
     self.std_input = AmiFile(sys.stdin,'<STDIN>','',need_close=False)
     self.std_output = AmiFile(sys.stdout,'<STDOUT>','',need_close=False)
@@ -34,7 +42,7 @@ class FileManager:
     
   def _register_file(self, fh):
     addr = self.cur_addr
-    self.cur_addr += 4
+    self.cur_addr += self.fh_size
     fh.addr = addr
     fh.b_addr = addr >> 2
     self.files_by_b_addr[fh.b_addr] = fh
@@ -48,7 +56,31 @@ class FileManager:
     log_file.info("unregistered: %s"% fh)
     fh.addr = 0
     fh.b_addr = 0
-    
+  
+  # directly read from file handle structure
+  def read_mem(self, width, addr):
+    # find out associated file handle
+    rel = int((addr - self.addr) / self.fh_size)
+    fh_addr = self.addr + rel * self.fh_size
+    b_addr = fh_addr >> 2
+    fh = self.get_by_b_addr(b_addr)
+    if fh != None:
+      # get addon text
+      delta = addr - fh_addr
+      name,off,val_type_name = self.fh_def.get_name_for_offset(delta, width)
+      type_name = self.fh_def.get_type_name()
+      addon="%s+%d = %s(%s)+%d  %s" % (type_name, delta, name, val_type_name, off, fh)
+
+      val = 0
+      self.trace_read(width, addr, val, text="FILE", level=logging.INFO, addon=addon)
+      return val
+    else:
+      raise InvalidMemoryAccessError('R', width, addr, self.name)
+
+  # directly write to file handle structure
+  def write_mem(self, width, addr, val):
+    raise InvalidMemoryAccessError('W', width, addr, self.name)
+  
   def get_input(self):
     return self.std_input
   

@@ -108,16 +108,24 @@ class Vamos:
   def init_dos_managers(self, prefix):
     self.prefix = prefix
     self.path_mgr = PathManager(prefix)
-    self.lock_base = 0xe00000
-    self.lock_mgr = LockManager(self.path_mgr, self.lock_base)
-    self.file_base = 0xe80000
-    self.file_mgr = FileManager(self.path_mgr, self.file_base)
 
-  def register_base_libs(self):
+    self.lock_base = 0xe00000
+    self.lock_size = 0x080000
+    self.lock_mgr = LockManager(self.path_mgr, self.lock_base, self.lock_size)
+    self.mem.add_range(self.lock_mgr)
+
+    self.file_base = 0xe80000
+    self.file_size = 0x080000
+    self.file_mgr = FileManager(self.path_mgr, self.file_base, self.file_size)
+    self.mem.add_range(self.file_mgr)
+
+  def register_base_libs(self, exec_version, dos_version):
     # register libraries
-    self.exec_lib_def = ExecLibrary(self.lib_mgr, self.heap_mem)
+    # exec
+    self.exec_lib_def = ExecLibrary(self.lib_mgr, self.heap_mem, version=exec_version)
     self.lib_mgr.register_lib(self.exec_lib_def)
-    self.dos_lib_def = DosLibrary(self.heap_mem)
+    # dos
+    self.dos_lib_def = DosLibrary(self.heap_mem, version=dos_version)
     self.dos_lib_def.set_managers(self.lock_mgr, self.file_mgr)
     self.lib_mgr.register_lib(self.dos_lib_def)
 
@@ -146,7 +154,7 @@ class Vamos:
 
   def open_exec_lib(self):
     # open exec lib
-    self.exec_lib = self.lib_mgr.open_lib(ExecLibrary.name, ExecLibrary.version, self.ctx)
+    self.exec_lib = self.lib_mgr.open_lib(ExecLibrary.name, 0, self.ctx)
     log_mem_init.info(self.exec_lib)
     self.exec_base_range = AmigaExecBase(self.exec_lib.get_lib_base())
     log_mem_init.info(self.exec_base_range)

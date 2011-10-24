@@ -39,6 +39,10 @@ class MusashiCPU(CPU):
 
 # --- preset args ---
 vamos_prefix = os.path.join(os.environ['HOME'],".vamos")
+lib_versions = {
+  'dos' : 39,
+  'exec' : 39
+}
 
 # --- args ---
 parser = argparse.ArgumentParser()
@@ -49,8 +53,15 @@ parser.add_argument('-c', '--cycles', action='store', type=int, default=0, help=
 parser.add_argument('-b', '--block', action='store', type=int, default=1000, help="cycles per block")
 parser.add_argument('-l', '--logging', action='store', default=None, help="logging settings: <chan>:<level>,*:<level>,...")
 parser.add_argument('-P', '--prefix', action='store', default=vamos_prefix, help="vamos directory prefix (%s)" % vamos_prefix)
+parser.add_argument('-V', '--lib-version', action='store', default=None, help="set lib version: <lib>:<version>,...")
 args = parser.parse_args()
 vamos_prefix = args.prefix
+
+# --- parse args ---
+if args.lib_version != None:
+  for p in args.lib_version.split(','):
+    n,v = p.split(':')
+    lib_versions[n] = int(v)
 
 # --- init logging ---
 log_setup(args.logging)
@@ -72,7 +83,7 @@ vamos.init_args(args.args)
 # --- libs ---
 vamos.init_lib_manager()
 vamos.init_dos_managers(args.prefix)
-vamos.register_base_libs()
+vamos.register_base_libs(lib_versions['exec'], lib_versions['dos'])
 
 # --- vamos context ---
 cpu = MusashiCPU()
