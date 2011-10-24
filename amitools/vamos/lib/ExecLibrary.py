@@ -154,6 +154,7 @@ class ExecLibrary(AmigaLibrary):
       (210, self.FreeMem),
       (294, self.FindTask),
       (306, self.SetSignals),
+      (522, self.RawDoFmt),
       (684, self.AllocVec),
       (690, self.FreeVec),
     )
@@ -237,4 +238,11 @@ class ExecLibrary(AmigaLibrary):
     else:
       self.log("FreeMem: invalid addr %06x" % addr)
     
-
+  def RawDoFmt(self, lib, ctx):
+    format_ptr = ctx.cpu.r_reg(REG_A0)
+    format = ctx.mem.r_cstr(format_ptr)
+    data_ptr   = ctx.cpu.r_reg(REG_A1)
+    putch_ptr  = ctx.cpu.r_reg(REG_A2)
+    pdata_ptr  = ctx.cpu.r_reg(REG_A3)
+    log_exec.info("RawDoFmt: format='%s' data=%06x putch=%06x pdata=%06x" % (format, data_ptr, putch_ptr, pdata_ptr))
+    

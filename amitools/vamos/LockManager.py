@@ -42,7 +42,9 @@ class LockManager(MemoryRange):
   
   def create_lock(self, ami_path, exclusive):
     if ami_path == '':
-      return None
+      ami_path = self.path_mgr.ami_abs_cur_path()
+    else:
+      ami_path = self.path_mgr.ami_abs_path(ami_path)
     sys_path = self.path_mgr.ami_to_sys_path(ami_path)
     if sys_path == None:
       log_lock.info("lock not found: '%s'" % ami_path)
@@ -55,6 +57,17 @@ class LockManager(MemoryRange):
     self._register_lock(lock)
     return lock
   
+  def create_parent_lock(self, lock):
+    # top level
+    if lock.ami_path[-1] == ':':
+      return None
+    ami_path = lock.ami_path
+    ami_parent_path = self.path_mgr.ami_abs_parent_path(ami_path)
+    if ami_parent_path != ami_path:
+      return self.create_lock(ami_parent_path, False)
+    else:
+      return None
+    
   def get_by_b_addr(self, b_addr):
     if self.locks_by_b_addr.has_key(b_addr):
       return self.locks_by_b_addr[b_addr]
@@ -68,7 +81,7 @@ class LockManager(MemoryRange):
     name_addr = fib_mem.get_addr('fib_FileName')
     fib_mem.w_cstr(name_addr, lock.name)
     fib_mem.w_s('fib_DiskKey',0xcafebabe)
-    if os.path.isdir(lock.name):
+    if os.path.isdir(lock.sys_path):
       dirEntryType = 0x01 # pos
     else:
       dirEntryType = 0xffffffff # neg

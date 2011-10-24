@@ -189,6 +189,7 @@ class DosLibrary(AmigaLibrary):
       (84, self.Lock),
       (90, self.UnLock),
       (102, self.Examine),
+      (126, self.CurrentDir),
       (132, self.IoErr),
       (210, self.ParentDir),
       (798, self.ReadArgs),
@@ -198,13 +199,15 @@ class DosLibrary(AmigaLibrary):
     )
     self.set_funcs(dos_funcs)
   
-  def set_managers(self, lock_mgr, file_mgr):
+  def set_managers(self, path_mgr, lock_mgr, file_mgr):
+    self.path_mgr = path_mgr
     self.lock_mgr = lock_mgr
     self.file_mgr = file_mgr
   
   def open(self, lib, ctx):
     log_dos.info("open dos.library V%d", self.version)
     self.io_err = 0
+    self.cur_dir_lock = None
   
   def IoErr(self, lib, ctx):
     log_dos.info("IoErr: %d" % self.io_err)
@@ -305,7 +308,7 @@ class DosLibrary(AmigaLibrary):
       raise UnsupportedFeatureException("Lock: mode=%x" % mode)
     
     lock = self.lock_mgr.create_lock(name, lock_exclusive)
-    log_dos.info("Lock: %s exc=%s -> %s" % (name, lock_exclusive, lock))
+    log_dos.info("Lock: '%s' exc=%s -> %s" % (name, lock_exclusive, lock))
     if lock == None:
       self.io_err = ERROR_OBJECT_NOT_FOUND
       return 0
@@ -331,9 +334,31 @@ class DosLibrary(AmigaLibrary):
   def ParentDir(self, lib, ctx):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-    log_dos.info("ParentDir: %s -> ?" % (lock))
-    # TODO - currently we assume our parent is the root directory
-    return 0
+    parent_lock = self.lock_mgr.create_parent_lock(lock)
+    log_dos.info("ParentDir: %s -> %s" % (lock, parent_lock))
+    if parent_lock != None:
+      return parent_lock.b_addr
+    else:
+      return 0
+
+  def CurrentDir(self, lib, ctx):
+    lock_b_addr = ctx.cpu.r_reg(REG_D1)
+    old_lock = self.cur_dir_lock
+    if lock_b_addr == 0:
+      new_lock = None
+    else:
+      new_lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
+    self.cur_dir_lock = new_lock
+    log_dos.info("CurrentDir: %s -> %s" % (old_lock, new_lock))
+    # set current path in path mgr
+    if new_lock != None:
+      self.path_mgr.set_cur_path(new_lock.ami_path)
+    else:
+      self.path_mgr.set_default_cur_path()
+    if old_lock == None:
+      return 0
+    else:
+      return old_lock.b_addr
 
   # ----- Matcher -----
   

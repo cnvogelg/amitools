@@ -40,7 +40,7 @@ class PathManager:
             if len(result) > 1:
               log_path.error("'sys' assign must be a single one! %s",result)
             else:
-              self.sys = result[0]
+              self.sys = result[0][0]
           else:
             assigns[f] = result        
     self.assigns = assigns
@@ -52,16 +52,33 @@ class PathManager:
     self.read_assigns()
     # ensure to set sys: path
     if not self.assigns.has_key('sys'):
-      self.sys = ['/']
+      self.sys = '/'
       self.assigns['sys'] = self.sys
-    else:
-      self.sys = self.assigns['']
   
     # set current device and path name
     cur_ami = self._find_assign(os.getcwd())
     self.cur_dev  = cur_ami[0]
     self.cur_path = cur_ami[1]
+    self.org_cur_dev = cur_ami[0]
+    self.org_cur_path = cur_ami[1]
     log_path.info("current: dev='%s' path='%s'" % (self.cur_dev, self.cur_path))
+
+  def set_cur_path(self, full_path):
+    col_pos = full_path.find(':')
+    if col_pos == -1:
+      raise ValueError("set_cur_path needs a path with device name!")
+    if full_path[-1] == ':':
+      self.cur_dev = full_path[0:-1]
+      self.cur_path = ''
+    else:
+      self.cur_dev = full_path[0:col_pos]
+      self.cur_path = full_path[col_pos+1:]
+    log_path.info("set current: dev='%s' path='%s'" % (self.cur_dev, self.cur_path))
+  
+  def set_default_cur_path(self):
+    self.cur_dev  = self.org_cur_dev
+    self.cur_path = self.org_cur_path
+    log_path.info("reset current: dev='%s' path='%s'" % (self.cur_dev, self.cur_path))
 
   def _is_path_begin(self, begin, path):
     pl = len(path)
@@ -100,7 +117,7 @@ class PathManager:
     # check for direct match first
     dp = os.path.join(base,d)
     if os.path.exists(dp):
-      return self._follow_path_no_case(dp, dirs[1:])
+      return self._follow_path_no_case(dp, dirs[1:], always=always)
     # read dir and check for no case variant
     dlow = d.lower()
     files = os.listdir(base)
@@ -109,7 +126,7 @@ class PathManager:
         flow = f.lower()
         if flow == dlow:
           res = os.path.join(base, f)
-          return self._follow_path_no_case(res, dirs[1:])
+          return self._follow_path_no_case(res, dirs[1:], always=always)
     # can't find it -> we assume rest of path is new
     if always:
       return os.path.join(base, os.path.join(*dirs))
@@ -119,10 +136,16 @@ class PathManager:
   def ami_to_sys_path(self, name):
     # does it contain a ':' ?
     colon_pos = name.find(':')
-    if colon_pos != -1:
+    if colon_pos > 0:
       dev = name[:colon_pos]
       if len(dev) < len(name)-1:
         path = name[colon_pos+1:]
+      else:
+        path = ""
+    elif colon_pos == 0:
+      dev = self.cur_dev
+      if len(name) > 1:
+        path = name[1:]
       else:
         path = ""
     else:
@@ -145,4 +168,55 @@ class PathManager:
     if path != "" and path[0] == '/':
       path = path[1:]
     return "%s:%s" % (dev, path)
+  
+  def ami_abs_cur_path(self):
+    return self.cur_dev + ":" + self.cur_path
+  
+  def ami_abs_parent_path(self, path):
+    """return absolute parent path of given path or same if already parent"""
+    # can't strip from device prefix
+    if path[-1] == ':':
+      return path
+    # skip trailing slash
+    if path[-1] == '/':
+      return self.ami_strip_name(self, path[:-2])
+    # make absolute first
+    if path.find(':') < 1:
+      path = self.ami_abs_path(path)
+    pos = path.rfind('/')
+    # skip last part
+    if pos != -1:
+      return path[0:pos]
+    # keep only device
+    else:
+      pos = path.find(':')
+      return path[0:pos+1]
+  
+  def ami_abs_path(self, path):
+    """return absolute amiga path from given path"""
+    col_pos = path.find(':')
+    # already with device name
+    if col_pos > 0:
+      return path
+    # relative to cur device
+    elif col_pos == 0:
+      abs_prefix = self.cur_dev + ":"
+      path = path[1:]
+      # invalid parent path of root? -> remove
+      if len(path)>0 and path[0] == '/':
+        path = path[1:]
+    # no path given -> return current path
+    elif path == '':
+      return self.cur_dev + ":" + self.cur_path      
+    # a parent path is given
+    elif path[0] == '/':
+      abs_prefix = self.ami_abs_parent_path(self.cur_dev + ":" + self.cur_path)
+    # cur path
+    else:
+      abs_prefix = self.cur_dev + ":" + self.cur_path
+      if self.cur_path != '':
+        abs_prefix += '/'
+    return abs_prefix + path
+
+
     

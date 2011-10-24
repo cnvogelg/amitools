@@ -88,25 +88,30 @@ class FileManager(MemoryRange):
     return self.std_output
     
   def open(self, ami_path, f_mode):
-    # special names
-    uname = ami_path.upper()
-    if uname == 'NIL:':
-      sys_name = "/dev/null" 
-      fobj = open(sys_name, f_mode)
-      fh = AmiFile(fobj, ami_name, sys_name)
-    elif uname in ('*','CONSOLE:'):
-      sys_name = ''
-      fh = AmiFile(sys.stdout,'*','',need_close=False)
-    else:
-      sys_path = self.path_mgr.ami_to_sys_path(ami_path)
-      if sys_path == None:
-        log_file.info("file not found: '%s' -> '%s'" % (ami_path, sys_path))
-        return None
-      fobj = open(sys_path, f_mode)
-      fh = AmiFile(fobj, ami_path, sys_path)
+    try:
+      # special names
+      uname = ami_path.upper()
+      if uname == 'NIL:':
+        sys_name = "/dev/null" 
+        fobj = open(sys_name, f_mode)
+        fh = AmiFile(fobj, ami_name, sys_name)
+      elif uname in ('*','CONSOLE:'):
+        sys_name = ''
+        fh = AmiFile(sys.stdout,'*','',need_close=False)
+      else:
+        ami_path = self.path_mgr.ami_abs_path(ami_path)
+        sys_path = self.path_mgr.ami_to_sys_path(ami_path)
+        if sys_path == None:
+          log_file.info("file not found: '%s' -> '%s'" % (ami_path, sys_path))
+          return None
+        fobj = open(sys_path, f_mode)
+        fh = AmiFile(fobj, ami_path, sys_path)
     
-    self._register_file(fh)
-    return fh
+      self._register_file(fh)
+      return fh
+    except IOError:
+      log_file.info("error opening: '%s' -> '%s'" % (ami_path, sys_path))
+      return None
   
   def close(self, fh):
     fh.close()

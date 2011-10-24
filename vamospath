@@ -16,12 +16,11 @@ vamos_prefix = os.path.join(os.environ['HOME'],".vamos")
 
 # --- args ---
 parser = argparse.ArgumentParser()
+parser.add_argument('op', help="path operation: a2s s2a abs parent current")
 parser.add_argument('path', help="path to convert")
 parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
 parser.add_argument('-l', '--logging', action='store', default=None, help="logging settings: <chan>:<level>,*:<level>,...")
 parser.add_argument('-P', '--prefix', action='store', default=vamos_prefix, help="vamos directory prefix (%s)" % vamos_prefix)
-parser.add_argument('-a', '--to-amiga', action='store_true', default=False, help="convert to amiga path")
-parser.add_argument('-p', '--to-posix', action='store_true', default=False, help="convert to posix path")
 args = parser.parse_args()
 vamos_prefix = args.prefix
 
@@ -31,7 +30,16 @@ log_setup(args.logging)
 # --- setup path manager ---
 pm = PathManager(vamos_prefix)
 
-if args.to_posix:
+op = args.op
+if op == 'a2s':
   print pm.ami_to_sys_path(args.path)
-if args.to_amiga:
+elif op == 's2a':
   print pm.sys_to_ami_path(args.path)
+elif op == 'abs':
+  print pm.ami_abs_path(args.path)
+elif op == 'parent':
+  print pm.ami_abs_parent_path(args.path)
+elif op == 'current':
+  print pm.ami_abs_cur_path()
+else:
+  print "INVALID OPERATION:",op

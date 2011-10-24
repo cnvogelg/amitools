@@ -126,7 +126,7 @@ class Vamos:
     self.lib_mgr.register_lib(self.exec_lib_def)
     # dos
     self.dos_lib_def = DosLibrary(self.heap_mem, version=dos_version)
-    self.dos_lib_def.set_managers(self.lock_mgr, self.file_mgr)
+    self.dos_lib_def.set_managers(self.path_mgr, self.lock_mgr, self.file_mgr)
     self.lib_mgr.register_lib(self.dos_lib_def)
 
   def init_context(self, cpu):
