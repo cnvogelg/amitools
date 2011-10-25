@@ -1,4 +1,5 @@
 import types
+import time
 
 from amitools.vamos.AmigaLibrary import *
 from amitools.vamos.structure.DosStruct import *
@@ -191,6 +192,7 @@ class DosLibrary(AmigaLibrary):
       (102, self.Examine),
       (126, self.CurrentDir),
       (132, self.IoErr),
+      (192, self.DateStamp),
       (210, self.ParentDir),
       (798, self.ReadArgs),
       (858, self.FreeArgs),
@@ -212,6 +214,25 @@ class DosLibrary(AmigaLibrary):
   def IoErr(self, lib, ctx):
     log_dos.info("IoErr: %d" % self.io_err)
     return self.io_err
+  
+  def DateStamp(self, lib, ctx):
+    ds_ptr = ctx.cpu.r_reg(REG_D1)
+    ds = MemoryStruct("ds",ds_ptr,DateStampDef)
+    t = time.time()
+    ts = int(t)
+    tmil = t - ts
+    tmin = ts / 60
+    ts = ts % 60
+    tday = tmin / (60*24)
+    tmin = tmin % (60*24)
+    ts += tmil
+    tick = int(ts * 200) # 1/50 sec
+    log_dos.info("DateStamp: ptr=%06x tday=%d tmin=%d tick=%d" % (ds_ptr, tday, tmin, tick))
+    ds.w_s("ds_Days",tday)
+    ds.w_s("ds_Minute",tmin)
+    ds.w_s("ds_Tick",tick)
+    ctx.mem.w_data(ds_ptr, ds.buffer)
+    return ds_ptr
   
   # ----- File Ops -----
   

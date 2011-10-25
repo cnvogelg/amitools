@@ -72,7 +72,15 @@ class FileManager(MemoryRange):
       type_name = self.fh_def.get_type_name()
       addon="%s+%d = %s(%s)+%d  %s" % (type_name, delta, name, val_type_name, off, fh)
 
+      # inject some special values to allow PutMsg handler access
       val = 0
+      if name == 'fh_Args':
+        # identifier for File -> use FH itself
+        val = fh_addr
+      elif name == 'fh_Type':
+        # PutMsg port
+        val = self.base_addr
+      
       self.trace_read(width, addr, val, text="FILE", level=logging.INFO, addon=addon)
       return val
     else:
@@ -122,7 +130,8 @@ class FileManager(MemoryRange):
     if self.files_by_b_addr.has_key(b_addr):
       return self.files_by_b_addr[b_addr]
     else:
-      raise ValueError("Invalid File Handle at b@%06x" % b_addr)
+      addr = b_addr << 2
+      raise ValueError("Invalid File Handle at b@%06x = %06x" % (b_addr, addr))
 
   def write(self, fh, data):
     fh.obj.write(data)
