@@ -33,6 +33,7 @@ class FileManager(MemoryRange):
     MemoryRange.__init__(self, "files", base_addr, size)
     self.fh_def  = FileHandleDef
     self.fh_size = FileHandleDef.get_size()
+    self.fh_size = (self.fh_size + 3) & ~3
 
     # setup std input/output
     self.std_input = AmiFile(sys.stdin,'<STDIN>','',need_close=False)

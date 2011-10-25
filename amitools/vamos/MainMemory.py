@@ -7,6 +7,7 @@ class MainMemory(MemoryLayout):
     MemoryLayout.__init__(self, "main", 0, size)
     self.invalid_access = []
     self.force_quit = False
+    self.exit_ex = None
     
   def get_read_funcs(self):
     return ( lambda addr: self.read_mem(0,addr),
@@ -30,6 +31,12 @@ class MainMemory(MemoryLayout):
       self.invalid_access.append(e)
       self.force_quit = True
       return 0
+    except BaseException as e:
+      e.state = self.ctx.cpu.get_state()
+      e.pc_range_offset = self.get_range_offset(e.state['pc'])
+      self.exit_ex = e
+      self.force_quit = True
+      return 0
 
   def write_mem(self, width, addr, val):
     try:
@@ -41,4 +48,10 @@ class MainMemory(MemoryLayout):
       self.invalid_access.append(e)
       self.force_quit = True
       return None
+    except BaseException as e:
+      e.state = self.ctx.cpu.get_state()
+      e.pc_range_offset = self.get_range_offset(e.state['pc'])
+      self.exit_ex = e
+      self.force_quit = True
+      return 0
   

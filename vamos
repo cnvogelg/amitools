@@ -125,6 +125,19 @@ m68k.set_reg(m68k.M68K_REG_A2, vamos.dos_guard_base)
 m68k.set_reg(m68k.M68K_REG_A5, vamos.dos_guard_base)
 m68k.set_reg(m68k.M68K_REG_A6, vamos.dos_guard_base)
 
+# dump an exception
+def dump_ex(e):
+  s = str(e)
+  if s == '':
+    s = type(e)
+  # show memory access error
+  log_main.error(s)
+  # give CPU state dump
+  for d in cpu.dump_state(e.state):
+    log_main.error(d)
+  # PC memory range
+  log_main.error("PC Range: %s  Offset: +%08x" % (e.pc_range_offset[0], e.pc_range_offset[1]))
+
 # ----- start main CPU loop --------------------------------------------------
 log_main.info("start cpu: %06x", vamos.prog_start)
 total_cycles = 0
@@ -137,14 +150,14 @@ while stay:
     break
   # if invalid reads or writes then abort
   if len(ctx.mem.invalid_access)>0:
-    log_main.error("After %d cycles:", total_cycles)
+    log_main.error("Memory Error after %d cycles:", total_cycles)
     for e in ctx.mem.invalid_access:
-      # show memory access error
-      log_main.error(e)
-      # give CPU state dump
-      for d in cpu.dump_state(e.state):
-        log_main.error(d)
-      # PC memory range
-      log_main.error("PC Range: %s  Offset: +%08x" % (e.pc_range_offset[0], e.pc_range_offset[1]))
+      dump_ex(e)
     stay = False
+  # another exception happened during memory access
+  if ctx.mem.exit_ex != None:
+    log_main.error("Abort after %d cycles:", total_cycles)
+    dump_ex(ctx.mem.exit_ex)
+    stay = False
+        
 log_main.info("done (%d cycles)", total_cycles)

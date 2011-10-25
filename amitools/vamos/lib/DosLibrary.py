@@ -326,9 +326,10 @@ class DosLibrary(AmigaLibrary):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     fib_ptr = ctx.cpu.r_reg(REG_D2)
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-    log_dos.info("Examine: %s -> %06x" % (lock, fib_ptr))
+    log_dos.info("Examine: %s fib=%06x" % (lock, fib_ptr))
     fib = MemoryStruct("fib",fib_ptr,FileInfoBlockDef)
     self.lock_mgr.examine_lock(lock, fib)
+    ctx.mem.w_data(fib_ptr, fib.buffer)
     return self.DOSTRUE
   
   def ParentDir(self, lib, ctx):
