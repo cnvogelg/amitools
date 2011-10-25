@@ -218,5 +218,26 @@ class PathManager:
         abs_prefix += '/'
     return abs_prefix + path
 
+  def ami_name_of_path(self, path):
+    l = len(path)
+    # no path given
+    if l == 0:
+      return path
+    # ends with colon
+    if path[-1] == ':':
+      if l == 1:
+        return self.cur_dev
+      else:
+        return path[:-1]
+    # has slash?
+    pos = path.rfind('/')
+    if pos != -1:
+      return path[pos+1:]
+    # has colon?
+    pos = path.rfind(':')
+    if pos != -1:
+      return path[pos+1:]
+    # is relative
+    return path
 
     

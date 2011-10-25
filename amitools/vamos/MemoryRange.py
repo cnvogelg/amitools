@@ -21,6 +21,12 @@ class MemoryRange:
     val = self.trace_val_str[width] % value
     log_mem.log(level, "W(%d): %06x: %s  %6s  [@%06x +%06x %s] %s", 2**width, addr, val, text, self.addr, addr - self.addr, self.name, addon)
 
+  def trace_block_read(self, addr, size, text="", level=logging.DEBUG, addon=""):
+    log_mem.log(level, "R(B): %06x: +%06x   %6s  [@%06x +%06x %s] %s", addr, size, text, self.addr, addr - self.addr, self.name, addon)  
+  
+  def trace_block_write(self, addr, size, text="", level=logging.DEBUG, addon=""):
+    log_mem.log(level, "W(B): %06x: +%06x   %6s  [@%06x +%06x %s] %s", addr, size, text, self.addr, addr - self.addr, self.name, addon)  
+
   def __str__(self):
     return "<@%06x +%06x %06x> [%s]" % (self.addr, self.size, self.addr + self.size, self.name)
   

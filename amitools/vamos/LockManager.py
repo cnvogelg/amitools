@@ -4,10 +4,10 @@ from Log import log_lock
 from MemoryRange import MemoryRange
 
 class AmiLock:
-  def __init__(self, ami_path, sys_path, exclusive):
+  def __init__(self, name, ami_path, sys_path, exclusive):
     self.ami_path = ami_path
     self.sys_path = sys_path
-    self.name = os.path.basename(sys_path)
+    self.name = name
     self.exclusive = exclusive
     self.addr = 0
     self.b_addr = 0
@@ -53,7 +53,8 @@ class LockManager(MemoryRange):
     if not exists:
       log_lock.info("lock not found: '%s' -> '%s'" % (ami_path, sys_path))
       return None      
-    lock = AmiLock(ami_path, sys_path, exclusive)
+    name = self.path_mgr.ami_name_of_path(ami_path)
+    lock = AmiLock(name, ami_path, sys_path, exclusive)
     self._register_lock(lock)
     return lock
   
@@ -82,9 +83,9 @@ class LockManager(MemoryRange):
     fib_mem.w_cstr(name_addr, lock.name)
     fib_mem.w_s('fib_DiskKey',0xcafebabe)
     if os.path.isdir(lock.sys_path):
-      dirEntryType = 0x01 # pos
+      dirEntryType = 0x2 # dir
     else:
-      dirEntryType = 0xffffffff # neg
+      dirEntryType = 0xfffffffd # file
     fib_mem.w_s('fib_DirEntryType', dirEntryType )
     prot = 0xf
     fib_mem.w_s('fib_Protection', prot)
