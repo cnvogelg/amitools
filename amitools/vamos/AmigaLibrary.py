@@ -95,7 +95,7 @@ class AmigaLibrary:
     
   def get_callee_pc(self,ctx):
     sp = ctx.cpu.r_reg(REG_A7)
-    return ctx.mem.read_mem_int(2,sp)
+    return ctx.mem.read_mem(2,sp)
     
   def gen_arg_dump(self,args,ctx):
     if args == None:

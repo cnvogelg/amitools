@@ -10,12 +10,14 @@ import sys
 import argparse
 import os
 import os.path
+import traceback
 
 from musashi import m68k
 
 from amitools.vamos.CPU import CPU
 from amitools.vamos.Log import *
 from amitools.vamos.Vamos import Vamos
+from amitools.vamos.Exceptions import *
 
 # ----- classes -----
 
@@ -97,8 +99,8 @@ vamos.create_old_dos_guard()
 # ----- start cpu ------------------------------------------------------------
 # prepare m68k
 log_main.info("setting up m68k")
-m68k.set_read_memory(*ctx.mem.get_read_funcs())
-m68k.set_write_memory(*ctx.mem.get_write_funcs())
+m68k.set_read_memory(*ctx.raw_mem.get_read_funcs())
+m68k.set_write_memory(*ctx.raw_mem.get_write_funcs())
 m68k.set_cpu_type(m68k.M68K_CPU_TYPE_68000)
 
 # reset CPU with a temporary reset range
@@ -126,17 +128,23 @@ m68k.set_reg(m68k.M68K_REG_A5, vamos.dos_guard_base)
 m68k.set_reg(m68k.M68K_REG_A6, vamos.dos_guard_base)
 
 # dump an exception
-def dump_ex(e):
-  s = str(e)
-  if s == '':
-    s = type(e)
-  # show memory access error
-  log_main.error(s)
+def dump_mem_error(e):
+  # show vamos error
+  log_main.error(e)
   # give CPU state dump
   for d in cpu.dump_state(e.state):
     log_main.error(d)
   # PC memory range
   log_main.error("PC Range: %s  Offset: +%08x" % (e.pc_range_offset[0], e.pc_range_offset[1]))
+
+def dump_exc(exit):
+  if exit['type'] == KeyboardInterrupt:
+    log_main.error("Keyboard Abort")
+  else:
+    tb = exit['tb']
+    log_main.error("*** Python EXCEPTION: %s (%s) ***",exit['value'],exit['type'])
+    for t in tb:
+      log_main.error("%s:%d in %s: %s",*t)
 
 # ----- start main CPU loop --------------------------------------------------
 log_main.info("start cpu: %06x", vamos.prog_start)
@@ -149,15 +157,15 @@ while stay:
   if max_cycles > 0 and total_cycles >= max_cycles:
     break
   # if invalid reads or writes then abort
-  if len(ctx.mem.invalid_access)>0:
+  if len(ctx.raw_mem.invalid_access)>0:
     log_main.error("Memory Error after %d cycles:", total_cycles)
-    for e in ctx.mem.invalid_access:
-      dump_ex(e)
+    for e in ctx.raw_mem.invalid_access:
+      dump_mem_error(e)
     stay = False
   # another exception happened during memory access
-  if ctx.mem.exit_ex != None:
+  if ctx.raw_mem.exit != None:
     log_main.error("Abort after %d cycles:", total_cycles)
-    dump_ex(ctx.mem.exit_ex)
+    dump_exc(ctx.raw_mem.exit)
     stay = False
         
 log_main.info("done (%d cycles)", total_cycles)

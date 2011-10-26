@@ -2,6 +2,7 @@ from MemoryLayout import MemoryLayout
 from MemoryBlock import MemoryBlock
 from MemoryStruct import MemoryStruct
 from Exceptions import OutOfAmigaMemoryError
+from AccessMemory import AccessMemory
 
 from Log import log_mem_alloc
 
@@ -11,6 +12,7 @@ class MemoryAlloc(MemoryLayout):
     MemoryLayout.__init__(self, name, addr, size)
     self._cur = addr
     self.addrs = {}
+    self.access = AccessMemory(self)
   
   def alloc_range(self, size, padding=4):
     addr = self._cur
@@ -67,13 +69,15 @@ class MemoryAlloc(MemoryLayout):
   def alloc_cstr(self, name, cstr, padding=4):
     size = len(cstr) + 1
     mb = self.alloc_memory(name, size, padding)
-    mb.w_cstr(mb.addr, cstr)
+    am = AccessMemory(mb)
+    am.w_cstr(mb.addr, cstr)
     return mb
   
   def alloc_bstr(self, name, bstr, padding=4):
     size = len(bstr) + 1
     mb = self.alloc_memory(name, size, padding)
-    mb.w_bstr(mb.addr, bstr)
+    am = AccessMemory(mb)
+    am.w_bstr(mb.addr, bstr)
     return mb
 
   

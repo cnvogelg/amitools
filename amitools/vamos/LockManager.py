@@ -79,7 +79,7 @@ class LockManager(MemoryRange):
     self._unregister_lock(lock)
 
   def examine_lock(self, lock, fib_mem):
-    name_addr = fib_mem.get_addr('fib_FileName')
+    name_addr = fib_mem.s_get_addr('fib_FileName')
     fib_mem.w_cstr(name_addr, lock.name)
     fib_mem.w_s('fib_DiskKey',0xcafebabe)
     if os.path.isdir(lock.sys_path):

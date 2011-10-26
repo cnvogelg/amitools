@@ -13,6 +13,8 @@ from VamosContext import VamosContext
 from PathManager import PathManager
 from FileManager import FileManager
 from LockManager import LockManager
+from AccessMemory import AccessMemory
+from AccessStruct import AccessStruct
 
 # lib
 from lib.ExecLibrary import ExecLibrary
@@ -93,7 +95,8 @@ class Vamos:
     self.arg_size = self.arg_len + 1
     self.arg_mem  = self.heap_mem.alloc_memory("args", self.arg_size)
     self.arg_base = self.arg_mem.addr
-    self.arg_mem.w_cstr(self.arg_base, self.arg_text)
+    am = AccessMemory(self.arg_mem)
+    am.w_cstr(self.arg_base, self.arg_text)
     log_main.info("args: %s (%d)", self.arg_text, self.arg_size)
     log_mem_init.info(self.arg_mem)
 
@@ -130,25 +133,28 @@ class Vamos:
     self.lib_mgr.register_lib(self.dos_lib_def)
 
   def init_context(self, cpu):
-    self.ctx = VamosContext( cpu, self.mem, self.lib_mgr, self.heap_mem )
+    self.ctx = VamosContext( cpu, self.mem.access, self.lib_mgr, self.heap_mem )
     self.ctx.bin_args = self.bin_args
     self.ctx.bin_file = self.bin_file
     self.ctx.seg_loader = self.seg_loader
     self.ctx.path_mgr = self.path_mgr
+    self.ctx.raw_mem = self.mem
     self.mem.ctx = self.ctx
     return self.ctx
 
   def setup_process(self):
     # create CLI
     self.cli = self.heap_mem.alloc_struct("CLI",CLIDef)
-    self.cli.w_s("cli_DefaultStack", self.stack_size / 4) # in longs
+    am = AccessStruct(self.cli, CLIDef)
+    am.w_s("cli_DefaultStack", self.stack_size / 4) # in longs
     self.cmd_mem = self.heap_mem.alloc_bstr("cmd",self.bin_file)
-    self.cli.w_s("cli_CommandName", self.cmd_mem.addr)
+    am.w_s("cli_CommandName", self.cmd_mem.addr)
     log_mem_init.info(self.cli)
 
     # create my task structure
     self.this_task = self.heap_mem.alloc_struct("ThisTask",ProcessDef)
-    self.this_task.w_s("pr_CLI", self.cli.addr)
+    am = AccessStruct(self.this_task, ProcessDef)
+    am.w_s("pr_CLI", self.cli.addr)
     self.ctx.this_task = self.this_task
     log_mem_init.info(self.this_task)
 

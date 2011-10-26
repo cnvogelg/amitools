@@ -3,6 +3,7 @@ import os.path
 from amitools import Hunk
 from amitools.HunkReader import HunkReader
 from amitools.HunkRelocate import HunkRelocate
+from AccessMemory import AccessMemory
 
 class SegmentLoader:
   
@@ -55,6 +56,7 @@ class SegmentLoader:
     for i in xrange(len(sizes)):
       mem = seg_list[i]
       addr = addrs[i]
-      mem.w_data(addr, datas[i])
+      am = AccessMemory(mem)
+      am.w_data(addr, datas[i])
     
     return seg_list

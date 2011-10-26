@@ -131,7 +131,7 @@ class LibManager(MemoryLayout):
       # now prepare to execute library init code
       # setup trampoline to call init routine of library
       # D0 = lib_base, A0 = seg_list, A6 = exec base
-      exec_base = context.mem.read_mem_int(2,4)
+      exec_base = context.mem.read_mem(2,4)
       tr = Trampoline()
       tr.save_all()
       tr.set_dx_l(0, lib_base)

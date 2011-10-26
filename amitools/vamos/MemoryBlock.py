@@ -39,69 +39,10 @@ class MemoryBlock(MemoryRange):
     self.wfunc[width](addr, val)
     self.trace_write(width, addr, val);
 
-  # for derived classes without trace
+  # for internal memory access without trace
   def read_mem_int(self, width, addr):
     return self.rfunc[width](addr)
   
-  # for derived classes without trace
+  # for internal memory access without trace
   def write_mem_int(self, width, addr, val):
     self.wfunc[width](addr, val)
-  
-  def w_data(self, addr, data):
-    off = addr - self.addr
-    for d in data:
-      self.buffer[off] = d
-      off += 1
-    self.trace_block_write( addr, len(data))
-  
-  def r_data(self, addr, size):
-    off = addr - self.addr
-    result = ""
-    for i in xrange(size):
-      result += self.buffer[off]
-      off += 1
-    self.trace_block_read( addr, size )
-    return result
-
-  def r_cstr(self, addr):
-    off = addr - self.addr
-    res = ""
-    l = 0
-    while self.buffer[off] != '\0':
-      res += self.buffer[off]
-      off += 1
-      l += 1
-    self.trace_block_read( addr, l, text="CSTR", addon="'%s'"%res, level=logging.INFO )
-    return res
-
-  def w_cstr(self, addr, cstr):
-    off = addr - self.addr
-    for c in cstr:
-      self.buffer[off] = c
-      off += 1
-    self.buffer[off] = '\0'
-    self.trace_block_write( addr, len(cstr), text="CSTR", addon="'%s'"%cstr, level=logging.INFO )
-
-  def r_bstr(self, addr):
-    off = addr - self.addr
-    res = ""
-    size = ord(self.buffer[off])
-    off += 1
-    for i in xrange(size):
-      res += self.buffer[off]
-      off += 1
-    self.trace_block_read( addr, size, text='BSTR', addon="'%s'"%res, level=logging.INFO )
-    return res
-
-  def w_bstr(self, addr, bstr):
-    off = addr - self.addr
-    size = len(bstr)
-    self.buffer[off] = chr(size)
-    off += 1
-    for c in bstr:
-      self.buffer[off] = c
-      off += 1
-    self.trace_block_write( addr, size, text='BSTR', addon="'%s'"%bstr, level=logging.INFO )
-
-    
-    

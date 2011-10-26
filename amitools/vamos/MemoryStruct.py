@@ -35,20 +35,3 @@ class MemoryStruct(MemoryBlock):
       MemoryBlock.write_mem_int(self, width, addr, val)
     else:
       return MemoryBlock.write_mem(self, width, addr, val)
-    
-  def w_s(self, name, val):
-    off,width,conv = self.struct.get_offset_for_name(name)
-    if conv != None:
-      val = conv[0](val)
-    self.write_mem(width, self.struct_begin + off, val)
-  
-  def r_s(self, name, val):
-    off,width,conv = self.struct.get_offset_for_name(name)
-    val = self.read_mem(width, self.struct_begin + off)
-    if conv != None:
-      val = conv[1](val)
-    return val
-    
-  def get_addr(self, name):
-    off,width,conv = self.struct.get_offset_for_name(name)
-    return self.struct_begin + off

@@ -154,6 +154,8 @@ class ExecLibrary(AmigaLibrary):
       (210, self.FreeMem),
       (294, self.FindTask),
       (306, self.SetSignals),
+      (366, self.PutMsg),
+      (372, self.GetMsg),
       (522, self.RawDoFmt),
       (684, self.AllocVec),
       (690, self.FreeVec),
@@ -162,8 +164,8 @@ class ExecLibrary(AmigaLibrary):
   
   def open(self, lib, ctx):
     # setup exec memory
-    lib.w_s("ThisTask",ctx.this_task.addr)
-    lib.w_s("LibNode.lib_Version", self.version)
+    lib.access.w_s("ThisTask",ctx.this_task.addr)
+    lib.access.w_s("LibNode.lib_Version", self.version)
   
   def FindTask(self, lib, ctx):
     task_ptr = ctx.cpu.r_reg(REG_A1)
@@ -240,9 +242,18 @@ class ExecLibrary(AmigaLibrary):
     
   def RawDoFmt(self, lib, ctx):
     format_ptr = ctx.cpu.r_reg(REG_A0)
-    format = ctx.mem.r_cstr(format_ptr)
+    format     = ctx.mem.r_cstr(format_ptr)
     data_ptr   = ctx.cpu.r_reg(REG_A1)
     putch_ptr  = ctx.cpu.r_reg(REG_A2)
     pdata_ptr  = ctx.cpu.r_reg(REG_A3)
     log_exec.info("RawDoFmt: format='%s' data=%06x putch=%06x pdata=%06x" % (format, data_ptr, putch_ptr, pdata_ptr))
+    
+  def PutMsg(self, lib, ctx):
+    port = ctx.cpu.r_reg(REG_A0)
+    msg = ctx.cpu.r_reg(REG_A1)
+    log_exec.info("PutMsg: port=%06x msg=%06x" % (port, msg))
+      
+  def GetMsg(self, lib, ctx):
+    port = ctx.cpu.r_reg(REG_A0)
+    log_exec.info("GetMsg: port=%06x" % (port))
     

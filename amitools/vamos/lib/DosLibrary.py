@@ -5,7 +5,7 @@ from amitools.vamos.AmigaLibrary import *
 from amitools.vamos.structure.DosStruct import *
 from amitools.vamos.Exceptions import *
 from amitools.vamos.Log import log_dos
-from amitools.vamos.MemoryStruct import MemoryStruct
+from amitools.vamos.AccessStruct import AccessStruct
 from dos.Args import *
 from dos.Error import *
 
@@ -217,7 +217,7 @@ class DosLibrary(AmigaLibrary):
   
   def DateStamp(self, lib, ctx):
     ds_ptr = ctx.cpu.r_reg(REG_D1)
-    ds = MemoryStruct("ds",ds_ptr,DateStampDef)
+    ds = AccessStruct(ctx.raw_mem,DateStampDef,struct_addr=ds_ptr)
     t = time.time()
     ts = int(t)
     tmil = t - ts
@@ -231,7 +231,6 @@ class DosLibrary(AmigaLibrary):
     ds.w_s("ds_Days",tday)
     ds.w_s("ds_Minute",tmin)
     ds.w_s("ds_Tick",tick)
-    ctx.mem.w_data(ds_ptr, ds.buffer)
     return ds_ptr
   
   # ----- File Ops -----
@@ -348,9 +347,8 @@ class DosLibrary(AmigaLibrary):
     fib_ptr = ctx.cpu.r_reg(REG_D2)
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
     log_dos.info("Examine: %s fib=%06x" % (lock, fib_ptr))
-    fib = MemoryStruct("fib",fib_ptr,FileInfoBlockDef)
+    fib = AccessStruct(ctx.raw_mem,FileInfoBlockDef,struct_addr=fib_ptr)
     self.lock_mgr.examine_lock(lock, fib)
-    ctx.mem.w_data(fib_ptr, fib.buffer)
     return self.DOSTRUE
   
   def ParentDir(self, lib, ctx):

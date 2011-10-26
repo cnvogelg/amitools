@@ -56,22 +56,3 @@ class MemoryRange:
   
   def write_mem(self, width, addr, val):
     raise InvalidMemoryAccessError('W', width, addr, self.name)
-    
-  def r_data(self, offset, size):
-    raise InvalidMemoryAccessError('R', 0, addr, self.name)
-
-  def w_data(self, data, offset):
-    raise InvalidMemoryAccessError('W', 0, addr, self.name)
-
-  def r_cstr(self, offset):
-    raise InvalidMemoryAccessError('R', 0, addr, self.name)
-    
-  def w_cstr(self, offset, cstr):
-    raise InvalidMemoryAccessErrro('W', 0, addr, self.name)
-
-  def r_bstr(self, offset):
-    raise InvalidMemoryAccessError('R', 0, addr, self.name)
-
-  def w_bstr(self, offset, bstr):
-    raise InvalidMemoryAccessErrro('W', 0, addr, self.name)
-    
