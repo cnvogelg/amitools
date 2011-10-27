@@ -13,6 +13,7 @@ from VamosContext import VamosContext
 from PathManager import PathManager
 from FileManager import FileManager
 from LockManager import LockManager
+from PortManager import PortManager
 from AccessMemory import AccessMemory
 from AccessStruct import AccessStruct
 
@@ -108,28 +109,33 @@ class Vamos:
     self.mem.add_range(self.lib_mgr)
     log_mem_init.info(self.lib_mgr)
 
-  def init_dos_managers(self, prefix):
+  def init_managers(self, prefix):
     self.prefix = prefix
     self.path_mgr = PathManager(prefix)
 
     self.lock_base = 0xe00000
-    self.lock_size = 0x080000
+    self.lock_size = 0x040000
     self.lock_mgr = LockManager(self.path_mgr, self.lock_base, self.lock_size)
     self.mem.add_range(self.lock_mgr)
 
-    self.file_base = 0xe80000
-    self.file_size = 0x080000
+    self.file_base = 0xe40000
+    self.file_size = 0x040000
     self.file_mgr = FileManager(self.path_mgr, self.file_base, self.file_size)
     self.mem.add_range(self.file_mgr)
+
+    self.port_base = 0xe80000
+    self.port_size = 0x040000
+    self.port_mgr  = PortManager(self.port_base, self.port_size)
 
   def register_base_libs(self, exec_version, dos_version):
     # register libraries
     # exec
     self.exec_lib_def = ExecLibrary(self.lib_mgr, self.heap_mem, version=exec_version)
+    self.exec_lib_def.set_managers(self.port_mgr)
     self.lib_mgr.register_lib(self.exec_lib_def)
     # dos
     self.dos_lib_def = DosLibrary(self.heap_mem, version=dos_version)
-    self.dos_lib_def.set_managers(self.path_mgr, self.lock_mgr, self.file_mgr)
+    self.dos_lib_def.set_managers(self.path_mgr, self.lock_mgr, self.file_mgr, self.port_mgr)
     self.lib_mgr.register_lib(self.dos_lib_def)
 
   def init_context(self, cpu):

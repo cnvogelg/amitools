@@ -84,7 +84,7 @@ vamos.init_args(args.args)
 
 # --- libs ---
 vamos.init_lib_manager()
-vamos.init_dos_managers(args.prefix)
+vamos.init_managers(args.prefix)
 vamos.register_base_libs(lib_versions['exec'], lib_versions['dos'])
 
 # --- vamos context ---
@@ -128,7 +128,7 @@ m68k.set_reg(m68k.M68K_REG_A5, vamos.dos_guard_base)
 m68k.set_reg(m68k.M68K_REG_A6, vamos.dos_guard_base)
 
 # dump an exception
-def dump_mem_error(e):
+def dump_vamos_error(e):
   # show vamos error
   log_main.error(e)
   # give CPU state dump
@@ -150,22 +150,24 @@ def dump_exc(exit):
 log_main.info("start cpu: %06x", vamos.prog_start)
 total_cycles = 0
 cycles_per_run = args.block
-max_cycles = args.cycles 
+max_cycles = args.cycles
+rm = ctx.raw_mem
 while stay:
   total_cycles += m68k.execute(cycles_per_run)
   # end after enough cycles
   if max_cycles > 0 and total_cycles >= max_cycles:
     break
-  # if invalid reads or writes then abort
-  if len(ctx.raw_mem.invalid_access)>0:
-    log_main.error("Memory Error after %d cycles:", total_cycles)
-    for e in ctx.raw_mem.invalid_access:
-      dump_mem_error(e)
-    stay = False
-  # another exception happened during memory access
-  if ctx.raw_mem.exit != None:
-    log_main.error("Abort after %d cycles:", total_cycles)
-    dump_exc(ctx.raw_mem.exit)
-    stay = False
+  # someone fored a quit?
+  if rm.force_quit:
+    # if invalid reads or writes then abort
+    if rm.vamos_exc != None:
+      log_main.error("Vamos Error after %d cycles:", total_cycles)
+      dump_vamos_error(rm.vamos_exc)
+      stay = False
+    # another exception happened during memory access
+    if rm.exit != None:
+      log_main.error("Abort after %d cycles:", total_cycles)
+      dump_exc(rm.exit)
+      stay = False
         
 log_main.info("done (%d cycles)", total_cycles)

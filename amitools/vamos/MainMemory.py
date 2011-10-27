@@ -1,5 +1,5 @@
 from MemoryLayout import MemoryLayout
-from Exceptions import InvalidMemoryAccessError
+from Exceptions import *
 from AccessMemory import AccessMemory
 import traceback
 import sys
@@ -8,9 +8,9 @@ class MainMemory(MemoryLayout):
   
   def __init__(self, size):
     MemoryLayout.__init__(self, "main", 0, size)
-    self.invalid_access = []
-    self.force_quit = False
+    self.vamos_exc = None
     self.exit = None
+    self.force_quit = False
     self.access = AccessMemory(self)
     
   def get_read_funcs(self):
@@ -29,8 +29,11 @@ class MainMemory(MemoryLayout):
         return 0x4e70 # RESET opcode
       return MemoryLayout.read_mem(self, width, addr)
     except InvalidMemoryAccessError as e:
-      self._handle_mem_error(e)
+      self._handle_vamos_error(e)
       self.trace_read(e.width, e.addr, 0, text="OUT!");
+      return 0
+    except VamosError as e:
+      self._handle_vamos_error(e)
       return 0
     except BaseException as e:
       self._handle_exc(e)
@@ -40,18 +43,20 @@ class MainMemory(MemoryLayout):
     try:
       return MemoryLayout.write_mem(self, width, addr, val)
     except InvalidMemoryAccessError as e:
-      self._handle_mem_error(e)
+      self._handle_vamos_error(e)
       self.trace_write(e.width, e.addr, 0, text="OUT!");
+      return None
+    except VamosError as e:
+      self._handle_vamos_error(e)
       return None
     except BaseException as e:
       self._handle_exc(e)
       return None
   
-  def _handle_mem_error(self, e):
-    self.trace_write(e.width, e.addr, 0, text="OUT!")
+  def _handle_vamos_error(self, e):
     e.state = self.ctx.cpu.get_state()
     e.pc_range_offset = self.get_range_offset(e.state['pc'])
-    self.invalid_access.append(e)
+    self.vamos_exc = e
     self.force_quit = True
   
   def _handle_exc(self, e):

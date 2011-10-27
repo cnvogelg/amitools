@@ -40,7 +40,10 @@ class FileManager(MemoryRange):
     self.std_output = AmiFile(sys.stdout,'<STDOUT>','',need_close=False)
     self._register_file(self.std_input)
     self._register_file(self.std_output)
-    
+  
+  def set_fs_handler_port(self, addr):
+    self.fs_handler_port = addr
+  
   def _register_file(self, fh):
     addr = self.cur_addr
     self.cur_addr += self.fh_size
@@ -79,7 +82,7 @@ class FileManager(MemoryRange):
         val = fh_addr
       elif name == 'fh_Type':
         # PutMsg port
-        val = self.base_addr
+        val = self.fs_handler_port
       
       self.trace_read(width, addr, val, text="FILE", level=logging.INFO, addon=addon)
       return val

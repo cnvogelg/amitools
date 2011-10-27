@@ -1,6 +1,7 @@
 from amitools.vamos.AmigaLibrary import *
 from amitools.vamos.structure.ExecStruct import *
 from amitools.vamos.Log import log_exec
+from amitools.vamos.Exceptions import *
 
 class ExecLibrary(AmigaLibrary):
   name = "exec.library"
@@ -156,11 +157,15 @@ class ExecLibrary(AmigaLibrary):
       (306, self.SetSignals),
       (366, self.PutMsg),
       (372, self.GetMsg),
+      (384, self.WaitPort),
       (522, self.RawDoFmt),
       (684, self.AllocVec),
       (690, self.FreeVec),
     )
     self.set_funcs(exec_funcs)
+  
+  def set_managers(self, port_mgr):
+    self.port_mgr = port_mgr
   
   def open(self, lib, ctx):
     # setup exec memory
@@ -249,11 +254,37 @@ class ExecLibrary(AmigaLibrary):
     log_exec.info("RawDoFmt: format='%s' data=%06x putch=%06x pdata=%06x" % (format, data_ptr, putch_ptr, pdata_ptr))
     
   def PutMsg(self, lib, ctx):
-    port = ctx.cpu.r_reg(REG_A0)
-    msg = ctx.cpu.r_reg(REG_A1)
-    log_exec.info("PutMsg: port=%06x msg=%06x" % (port, msg))
+    port_addr = ctx.cpu.r_reg(REG_A0)
+    msg_addr = ctx.cpu.r_reg(REG_A1)
+    log_exec.info("PutMsg: port=%06x msg=%06x" % (port_addr, msg_addr))
+    has_port = self.port_mgr.has_port(port_addr)
+    if not has_port:
+      raise UnsupportedFeatureError("PutMsg on invalid Port (%06x) called!" % port_addr)
+    self.port_mgr.put_msg(port_addr, msg_addr)
       
   def GetMsg(self, lib, ctx):
-    port = ctx.cpu.r_reg(REG_A0)
-    log_exec.info("GetMsg: port=%06x" % (port))
-    
+    port_addr = ctx.cpu.r_reg(REG_A0)
+    log_exec.info("GetMsg: port=%06x" % (port_addr))
+    has_port = self.port_mgr.has_port(port_addr)
+    if not has_port:
+      raise UnsupportedFeatureError("GetMsg on invalid Port (%06x) called!" % port_addr)
+    msg_addr = self.port_mgr.get_msg(port_addr)
+    if msg_addr != None:
+      log_exec.info("GetMsg: got message %06x" % (msg_addr))
+      return msg_addr
+    else:
+      log_exec.info("GetMsg: no message available!")
+      return 0
+  
+  def WaitPort(self, lib, ctx):
+    port_addr = ctx.cpu.r_reg(REG_A0)
+    log_exec.info("WaitPort: port=%06x" % (port_addr))
+    has_port = self.port_mgr.has_port(port_addr)
+    if not has_port:
+      raise UnsupportedFeatureError("WaitPort on invalid Port (%06x) called!" % port_addr)
+    has_msg = self.port_mgr.has_msg(port_addr)
+    if not has_msg:
+      raise UnsupportedFeatureError("WaitPort on empty message queue called: Port (%06x)" % port_addr)
+    msg_addr = self.port_mgr.get_msg(port_addr)
+    log_exec.info("WaitPort: got message %06x" % (msg_addr))
+    return msg_addr

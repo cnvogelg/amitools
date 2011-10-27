@@ -201,10 +201,14 @@ class DosLibrary(AmigaLibrary):
     )
     self.set_funcs(dos_funcs)
   
-  def set_managers(self, path_mgr, lock_mgr, file_mgr):
+  def set_managers(self, path_mgr, lock_mgr, file_mgr, port_mgr):
     self.path_mgr = path_mgr
     self.lock_mgr = lock_mgr
     self.file_mgr = file_mgr
+    # create fs handler port
+    self.fs_handler_port = port_mgr.add_int_port(self)
+    log_dos.info("dos fs handler port: %06x" % self.fs_handler_port)
+    file_mgr.set_fs_handler_port(self.fs_handler_port)
   
   def open(self, lib, ctx):
     log_dos.info("open dos.library V%d", self.version)
@@ -214,6 +218,12 @@ class DosLibrary(AmigaLibrary):
   def IoErr(self, lib, ctx):
     log_dos.info("IoErr: %d" % self.io_err)
     return self.io_err
+  
+  # callback from port manager for fs handler port
+  def put_msg(self, port_mgr, msg_addr):
+    log_dos.info("DosPacket: %06x", msg_addr)
+  
+  # ----- dos API -----
   
   def DateStamp(self, lib, ctx):
     ds_ptr = ctx.cpu.r_reg(REG_D1)
