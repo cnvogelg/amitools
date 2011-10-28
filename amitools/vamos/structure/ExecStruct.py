@@ -72,6 +72,16 @@ class MsgPortStruct(AmigaStruct):
   ]
 MsgPortDef = MsgPortStruct()
 
+# Message
+class MessageStruct(AmigaStruct):
+  _name = "Message"
+  _format = [
+    ('Node','mn_Node'),
+    ('MsgPort*','mn_ReplyPort'),
+    ('UWORD','mn_Length')
+  ]
+MessageDef = MessageStruct()
+
 # IntVector
 class IntVectorStruct(AmigaStruct):
   _name = "IntVector"

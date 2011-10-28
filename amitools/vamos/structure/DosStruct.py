@@ -118,3 +118,20 @@ class FileLockStruct(AmigaStruct):
   ]
 FileLockDef = FileLockStruct()
 
+class DosPacketStruct(AmigaStruct):
+  _name = "DosPacket"
+  _format = [
+    ('Message*','dp_Link'),
+    ('MsgPort*','dp_Port'),
+    ('LONG','dp_Type'),
+    ('LONG','dp_Res1'),
+    ('LONG','dp_Res2'),
+    ('LONG','dp_Arg1'),
+    ('LONG','dp_Arg2'),
+    ('LONG','dp_Arg3'),
+    ('LONG','dp_Arg4'),
+    ('LONG','dp_Arg5'),
+    ('LONG','dp_Arg6'),
+    ('LONG','dp_Arg7')
+  ]
+DosPacketDef = DosPacketStruct()

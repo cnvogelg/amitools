@@ -175,23 +175,26 @@ class ExecLibrary(AmigaLibrary):
   def FindTask(self, lib, ctx):
     task_ptr = ctx.cpu.r_reg(REG_A1)
     if task_ptr == 0:
-      self.log("Find my Task: %06x" % ctx.this_task.addr)
+      log_exec.info("FindTask: me=%06x" % ctx.this_task.addr)
       return ctx.this_task.addr
     else:
       task_name = ctx.mem.r_cstr(task_ptr)
-      self.log("Find Task: %s")
-      return 0
+      log_exec.info("Find Task: %s" % task_name)
+      raise UnsupportedFeatureError("FindTask: other task!");
   
   def SetSignals(self, lib, ctx):
-    # TODO
-    pass
-  
+    new_signals = ctx.cpu.r_reg(REG_D0)
+    signal_mask = ctx.cpu.r_reg(REG_D1)
+    old_signals = 0
+    log_exec.info("SetSignals: new_signals=%08x signal_mask=%08x old_signals=%08x" % (new_signals, signal_mask, old_signals))
+    return old_signals
+    
   def OpenLibrary(self, lib, ctx):
     ver = ctx.cpu.r_reg(REG_D0)
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name = ctx.mem.r_cstr(name_ptr)
     lib = self.lib_mgr.open_lib(name, ver, ctx)
-    self.log("'%s' V%d -> %s" % (name, ver, lib))
+    log_exec.info("OpenLibrary: '%s' V%d -> %s" % (name, ver, lib))
     if lib == None:
       return 0
     else:
@@ -201,16 +204,16 @@ class ExecLibrary(AmigaLibrary):
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name = ctx.mem.r_cstr(name_ptr)
     lib = self.lib_mgr.open_lib(name, 0, ctx)
-    self.log("'%s' -> %s" % (name, lib))
+    log_exec.info("OldOpenLibrary: '%s' -> %s" % (name, lib))
     return lib.get_lib_base()
   
   def CloseLibrary(self, lib, ctx):
     lib_addr = ctx.cpu.r_reg(REG_A1)
     lib = self.lib_mgr.close_lib(lib_addr,ctx)
     if lib != None:
-      self.log("'%s' -> %06x" % (lib, lib.get_lib_base()))
+      log_exec.info("CloseLibrary: '%s' -> %06x" % (lib, lib.get_lib_base()))
     else:
-      self.log("INVALID")
+      raise VamosInternalError("CloseLibrary: Unknown library to close: ptr=%06x" % lib_addr)
   
   def AllocMem(self, lib, ctx):
     size = ctx.cpu.r_reg(REG_D0)
@@ -227,7 +230,7 @@ class ExecLibrary(AmigaLibrary):
       self.log("FreeMem: %s" % mb)
       self.alloc.free_memory(mb)
     else:
-      self.log("FreeMem: invalid addr %06x" % addr)
+      raise VamosInternalError("FreeMem: Unknown memory to free: ptr=%06x size=%06x" % (addr, size))
 
   def AllocVec(self, lib, ctx):
     size = ctx.cpu.r_reg(REG_D0)
@@ -243,7 +246,7 @@ class ExecLibrary(AmigaLibrary):
       self.log("FreeMem: %s" % mb)
       self.alloc.free_memory(mb)
     else:
-      self.log("FreeMem: invalid addr %06x" % addr)
+      raise VamosInternalError("FreeVec: Unknown memory to free: ptr=%06x" % (addr))
     
   def RawDoFmt(self, lib, ctx):
     format_ptr = ctx.cpu.r_reg(REG_A0)
@@ -259,7 +262,7 @@ class ExecLibrary(AmigaLibrary):
     log_exec.info("PutMsg: port=%06x msg=%06x" % (port_addr, msg_addr))
     has_port = self.port_mgr.has_port(port_addr)
     if not has_port:
-      raise UnsupportedFeatureError("PutMsg on invalid Port (%06x) called!" % port_addr)
+      raise VamosInternalError("PutMsg: on invalid Port (%06x) called!" % port_addr)
     self.port_mgr.put_msg(port_addr, msg_addr)
       
   def GetMsg(self, lib, ctx):
@@ -267,7 +270,7 @@ class ExecLibrary(AmigaLibrary):
     log_exec.info("GetMsg: port=%06x" % (port_addr))
     has_port = self.port_mgr.has_port(port_addr)
     if not has_port:
-      raise UnsupportedFeatureError("GetMsg on invalid Port (%06x) called!" % port_addr)
+      raise VamosInternalError("GetMsg: on invalid Port (%06x) called!" % port_addr)
     msg_addr = self.port_mgr.get_msg(port_addr)
     if msg_addr != None:
       log_exec.info("GetMsg: got message %06x" % (msg_addr))
@@ -281,7 +284,7 @@ class ExecLibrary(AmigaLibrary):
     log_exec.info("WaitPort: port=%06x" % (port_addr))
     has_port = self.port_mgr.has_port(port_addr)
     if not has_port:
-      raise UnsupportedFeatureError("WaitPort on invalid Port (%06x) called!" % port_addr)
+      raise VamosInternalError("WaitPort: on invalid Port (%06x) called!" % port_addr)
     has_msg = self.port_mgr.has_msg(port_addr)
     if not has_msg:
       raise UnsupportedFeatureError("WaitPort on empty message queue called: Port (%06x)" % port_addr)

@@ -23,3 +23,15 @@ class UnsupportedFeatureError(VamosError):
     self._what = what
   def __str__(self):
     return "Unupported vamos Feature: %s" % self._what
+
+class AmigaDeviceNotFoundError(VamosError):
+  def __init__(self, dev):
+    self._dev = dev
+  def __str__(self):
+    return "Amiga volume not found: %s" % self._dev
+
+class VamosInternalError(VamosError):
+  def __init__(self, what):
+    self._what = what
+  def __str__(self):
+    return "Internal Vamos Error: %s" % self._what

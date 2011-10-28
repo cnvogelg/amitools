@@ -3,6 +3,7 @@ import time
 
 from amitools.vamos.AmigaLibrary import *
 from amitools.vamos.structure.DosStruct import *
+from amitools.vamos.structure.ExecStruct import *
 from amitools.vamos.Exceptions import *
 from amitools.vamos.Log import log_dos
 from amitools.vamos.AccessStruct import AccessStruct
@@ -187,6 +188,9 @@ class DosLibrary(AmigaLibrary):
       (48, self.Write),
       (54, self.Input),
       (60, self.Output),
+      (66, self.Seek),
+      (72, self.DeleteFile),
+      (78, self.Rename),
       (84, self.Lock),
       (90, self.UnLock),
       (102, self.Examine),
@@ -205,6 +209,7 @@ class DosLibrary(AmigaLibrary):
     self.path_mgr = path_mgr
     self.lock_mgr = lock_mgr
     self.file_mgr = file_mgr
+    self.port_mgr = port_mgr
     # create fs handler port
     self.fs_handler_port = port_mgr.add_int_port(self)
     log_dos.info("dos fs handler port: %06x" % self.fs_handler_port)
@@ -214,14 +219,46 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("open dos.library V%d", self.version)
     self.io_err = 0
     self.cur_dir_lock = None
+    self.ctx = ctx
   
   def IoErr(self, lib, ctx):
     log_dos.info("IoErr: %d" % self.io_err)
     return self.io_err
   
   # callback from port manager for fs handler port
+  # -> Async I/O
   def put_msg(self, port_mgr, msg_addr):
-    log_dos.info("DosPacket: %06x", msg_addr)
+    msg = AccessStruct(self.ctx.raw_mem,MessageDef,struct_addr=msg_addr)
+    dos_pkt_addr = msg.r_s("mn_Node.ln_Name")
+    dos_pkt = AccessStruct(self.ctx.raw_mem,DosPacketDef,struct_addr=dos_pkt_addr)
+    reply_port_addr = dos_pkt.r_s("dp_Port")
+    pkt_type = dos_pkt.r_s("dp_Type")
+    log_dos.info("DosPacket: msg=%06x -> pkt=%06x: reply_port=%06x type=%06x", msg_addr, dos_pkt_addr, reply_port_addr, pkt_type)
+    # handle packet
+    if pkt_type == ord('R'): # read
+      fh_b_addr = dos_pkt.r_s("dp_Arg1")
+      buf_ptr   = dos_pkt.r_s("dp_Arg2")
+      size      = dos_pkt.r_s("dp_Arg3")
+      # get fh and read
+      fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+      data = self.file_mgr.read(fh, size)
+      self.ctx.mem.w_data(buf_ptr, data)
+      got = len(data)
+      log_dos.info("DosPacket: Read fh_b_addr=%06x buf=%06x len=%06x -> got=%06x fh=%s", fh_b_addr, buf_ptr, size, got, fh)
+      dos_pkt.w_s("dp_Res1", got)
+    elif pkt_type == ord('W'): # write
+      fh_ptr  = dos_pkt.r_s("dp_Arg1")
+      buf_ptr = dos_pkt.r_s("dp_Arg2")
+      size    = dos_pkt.r_s("dp_Arg3")
+      log_dos.info("DosPacket: Write fh=%06x buf=%06x len=%06x", fh_ptr, buf_ptr, size)
+      # TBD
+      raise UnsupportedFeatureException("Unsupported DosPacket: type=%d" % pkt_type)
+    else:
+      raise UnsupportedFeatureException("Unsupported DosPacket: type=%d" % pkt_type)
+    # do reply
+    if not self.port_mgr.has_port(reply_port_addr):
+      self.port_mgr.add_port(reply_port_addr)
+    self.port_mgr.put_msg(reply_port_addr, msg_addr)
   
   # ----- dos API -----
   
@@ -242,7 +279,7 @@ class DosLibrary(AmigaLibrary):
     ds.w_s("ds_Minute",tmin)
     ds.w_s("ds_Tick",tick)
     return ds_ptr
-  
+    
   # ----- File Ops -----
   
   def Input(self, lib, ctx):
@@ -313,6 +350,29 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("Write(%s, %06x, %d)" % (fh, buf_ptr, size))
     return size
 
+  def Seek(self, lib, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    pos = ctx.cpu.r_reg(REG_D2)
+    mode = ctx.cpu.r_reg(REG_D3)
+
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    if mode == 0xffffffff:
+      mode_str = "BEGINNING"
+      whence = 0
+    elif mode == 0:
+      mode_str = "CURRENT"
+      whence = 1
+    elif mode == 1:
+      mode_str = "END"
+      whence = 2
+    else:
+      raise UnsupportedFeatureException("Seek: mode=%d" % mode)
+
+    old_pos = self.file_mgr.tell(fh)
+    self.file_mgr.seek(fh, pos, whence)
+    log_dos.info("Seek(%s, %06x, %s) -> old_pos=%06x" % (fh, pos, mode_str, old_pos))
+    return old_pos
+
   def VPrintf(self, lib, ctx):
     format_ptr = ctx.cpu.r_reg(REG_D1)
     argv_ptr = ctx.cpu.r_reg(REG_D2)
@@ -322,6 +382,28 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("VPrintf: format='%s' argv=%06x" % (format,argv_ptr))
     # TODO: expand format :)
     self.file_mgr.write(fh, format)
+
+  def DeleteFile(self, lib, ctx):
+    name_ptr = ctx.cpu.r_reg(REG_D1)
+    name = ctx.mem.r_cstr(name_ptr)
+    self.io_err = self.file_mgr.delete(name)
+    log_dos.info("DeleteFile: %s -> err=%s" % (name, self.io_err))
+    if self.io_err == 0:
+      return self.DOSTRUE
+    else:
+      return self.DOSFALSE
+
+  def Rename(self, lib, ctx):
+    old_name_ptr = ctx.cpu.r_reg(REG_D1)
+    old_name = ctx.mem.r_cstr(old_name_ptr)
+    new_name_ptr = ctx.cpu.r_reg(REG_D2)
+    new_name = ctx.mem.r_cstr(new_name_ptr)
+    self.io_err = self.file_mgr.rename(old_name, new_name)
+    log_dos.info("Rename: %s %s -> err=%s" % (old_name, new_name, self.io_err))
+    if self.io_err == 0:
+      return self.DOSTRUE
+    else:
+      return self.DOSFALSE
 
   # ----- Locks -----
   

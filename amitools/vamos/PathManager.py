@@ -1,6 +1,7 @@
 import os.path
 import os
 from Log import log_path
+from Exceptions import *
 
 class PathManager:
   
@@ -68,10 +69,10 @@ class PathManager:
     if col_pos == -1:
       raise ValueError("set_cur_path needs a path with device name!")
     if full_path[-1] == ':':
-      self.cur_dev = full_path[0:-1]
+      self.cur_dev = full_path[0:-1].lower()
       self.cur_path = ''
     else:
-      self.cur_dev = full_path[0:col_pos]
+      self.cur_dev = full_path[0:col_pos].lower()
       self.cur_path = full_path[col_pos+1:]
     log_path.info("set current: dev='%s' path='%s'" % (self.cur_dev, self.cur_path))
   
@@ -107,7 +108,7 @@ class PathManager:
     if rem != None:
       return ('sys',rem)
     else:
-      raise ValueError("Invalid Amiga Path: %s" % name)
+      raise AmigaDeviceNoutFoundError(name)
   
   def _follow_path_no_case(self, base, dirs, always=False):
     if len(dirs) == 0:
@@ -137,7 +138,7 @@ class PathManager:
     # does it contain a ':' ?
     colon_pos = name.find(':')
     if colon_pos > 0:
-      dev = name[:colon_pos]
+      dev = name[:colon_pos].lower()
       if len(dev) < len(name)-1:
         path = name[colon_pos+1:]
       else:
@@ -154,7 +155,7 @@ class PathManager:
     pdirs = path.split('/')
     # now search assign
     if not self.assigns.has_key(dev):
-      raise ValueError("Invalid Amiga Device: %s" % dev)
+      raise AmigaDeviceNotFoundError(dev)
     dirs = self.assigns[dev]
     for d in dirs:
       p = self._follow_path_no_case(d, pdirs)

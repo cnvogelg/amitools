@@ -5,6 +5,7 @@ import logging
 from Log import log_file
 from MemoryRange import MemoryRange
 from structure.DosStruct import FileHandleDef
+from lib.dos.Error import *
 
 class AmiFile:
   def __init__(self, obj, ami_path, sys_path, need_close=True):
@@ -79,7 +80,7 @@ class FileManager(MemoryRange):
       val = 0
       if name == 'fh_Args':
         # identifier for File -> use FH itself
-        val = fh_addr
+        val = b_addr
       elif name == 'fh_Type':
         # PutMsg port
         val = self.fs_handler_port
@@ -143,3 +144,41 @@ class FileManager(MemoryRange):
   def read(self, fh, len):
     d = fh.obj.read(len)
     return d
+
+  def tell(self, fh):
+    return fh.obj.tell()
+  
+  def seek(self, fh, pos, whence):
+    fh.obj.seek(pos, whence)
+    
+  def delete(self, ami_path):
+    ami_path = self.path_mgr.ami_abs_path(ami_path)
+    sys_path = self.path_mgr.ami_to_sys_path(ami_path)
+    if sys_path == None or not os.path.exists(sys_path):
+      log_file.info("file to delete not found: '%s'" % (ami_path))
+      return ERROR_OBJECT_NOT_FOUND
+    try:
+      os.remove(sys_path)
+      return 0
+    except OSError as e:
+      log_file.info("can't delete file: '%s' -> %s" % (ami_path, e))
+      return ERROR_OBJECT_IN_USE
+
+  def rename(self, old_ami_path, new_ami_path):
+    old_ami_path = self.path_mgr.ami_abs_path(old_ami_path)
+    old_sys_path = self.path_mgr.ami_to_sys_path(old_ami_path)
+    new_ami_path = self.path_mgr.ami_abs_path(new_ami_path)
+    new_sys_path = self.path_mgr.ami_to_sys_path(new_ami_path)
+    if old_sys_path == None or not os.path.exists(old_sys_path):
+      log_file.info("old file to rename not found: '%s'" % old_ami_path)
+      return ERROR_OBJECT_NOT_FOUND
+    if new_sys_path == None:
+      log_file.info("new file to rename not found: '%s'" % new_ami_path)
+      return ERROR_OBJECT_NOT_FOUND
+    try:
+      os.rename(old_sys_path, new_sys_path)
+      return 0
+    except OSError as e:
+      log_file.info("can't rename file: '%s','%s' -> %s" % (old_ami_path, new_amipath, e))
+      return ERROR_OBJECT_IN_USE
+    
