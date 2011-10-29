@@ -104,12 +104,7 @@ class Vamos:
     log_mem_init.info(self.arg_mem)
 
   def init_lib_manager(self):
-    # --- libs ---
-    self.lib_base = 0xf00000
-    self.lib_size = 0x080000
-    self.lib_mgr  = LibManager(self.lib_base, self.lib_size)
-    self.mem.add_range(self.lib_mgr)
-    log_mem_init.info(self.lib_mgr)
+    self.lib_mgr  = LibManager()
 
   def init_managers(self, prefix):
     self.prefix = prefix

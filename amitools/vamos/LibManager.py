@@ -1,4 +1,3 @@
-from MemoryLayout import MemoryLayout
 from MemoryLib import MemoryLib
 from AmigaResident import AmigaResident
 from Trampoline import Trampoline
@@ -7,15 +6,13 @@ from CPU import *
 from Log import log_lib
 import logging
 
-class LibManager(MemoryLayout):
+class LibManager():
   
   op_rts = 0x4e75
   op_jmp = 0x4ef9
   op_reset = 0x04e70
   
-  def __init__(self, addr, size):
-    MemoryLayout.__init__(self, "lib_mgr", addr, size)
-    self.lib_addr = addr
+  def __init__(self):
     self.libs = {}
     self.addr_map = {}
     self.native_libs = {}
@@ -33,12 +30,6 @@ class LibManager(MemoryLayout):
   
   def lib_log(self, func, text, level=logging.INFO):
     log_lib.log(level, "LibMgr: [%10s] %s", func, text)
-  
-  def _get_next_lib_addr(self, size):
-    res = self.lib_addr
-    s = (size + 0xffff) & ~0xffff 
-    self.lib_addr += s
-    return res
   
   # ----- common -----
   
@@ -225,10 +216,12 @@ class LibManager(MemoryLayout):
       pos_size = lib_class.get_pos_size()
       num_vecs = lib_class.get_num_vectors()
       struct   = lib_class.get_struct()
-      lib_addr = self._get_next_lib_addr(lib_size)
-      # create lib instance
+
+      # allocate and create lib instance
+      lib_addr = context.alloc.alloc_range(lib_size)
       instance = MemoryLib(name, lib_addr, num_vecs, pos_size, struct=struct, lib=lib_class, context=context)
-      self.add_range(instance)
+      context.alloc.reg_range(lib_addr, instance)
+
       entry['instance'] = instance
       # store base_addr
       lib_base = instance.get_lib_base()
@@ -273,7 +266,9 @@ class LibManager(MemoryLayout):
       entry['instance'] = None
       entry['ref_cnt'] = 0
       lib_class.close(instance,context)
-      self.remove_range(instance)
+      # free memory of lib struct
+      context.alloc.unreg_range(instance.addr)
+      context.alloc.free_range(instance.addr, instance.size)
       self.lib_log("close_lib","Closed %s V%d ref_count=0" % (name, ver))
       return instance
       
