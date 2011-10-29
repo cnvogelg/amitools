@@ -8,6 +8,11 @@ from Log import log_lib
 import logging
 
 class LibManager(MemoryLayout):
+  
+  op_rts = 0x4e75
+  op_jmp = 0x4ef9
+  op_reset = 0x04e70
+  
   def __init__(self, addr, size):
     MemoryLayout.__init__(self, "lib_mgr", addr, size)
     self.lib_addr = addr
@@ -74,12 +79,12 @@ class LibManager(MemoryLayout):
     if real_path == None:
       self.lib_log("open_lib","Can't find sys path for '%s'" % name, level=logging.ERROR)
       return None
-    
+      
     # use seg_loader to load lib
     self.lib_log("open_lib","Trying to load native lib: %s -> %s" % (name, real_path))
     seg_list = context.seg_loader.load_seg(real_path)
     if seg_list == None:
-      self.lib_log("open_lib","Can't load library file '%s'" % real_path, level=logging.ERROR)
+      self.lib_log("open_lib","Can't load library file '%s' -> '%s'" % (name, real_path), level=logging.ERROR)
       return None
     
     # check seg list for resident library struct
@@ -121,7 +126,7 @@ class LibManager(MemoryLayout):
     # setup lib instance memory
     hex_vec = map(lambda x:"%06x" % x, res['vectors'])
     self.lib_log("open_lib", "setting up vectors=%s" % hex_vec, level=logging.DEBUG)
-    instance.set_all_vectors(vectors)
+    self.set_all_vectors(context.mem, lib_base, vectors)
     self.lib_log("open_lib", "setting up struct=%s and lib" % res['struct'], level=logging.DEBUG)
     ar.init_lib(res, instance, lib_base)
     self.lib_log("open_lib", "init_code=%06x dataSize=%06x" % (res['init_code_ptr'],res['dataSize']), level=logging.DEBUG)
@@ -189,6 +194,14 @@ class LibManager(MemoryLayout):
 
     return instance
 
+  def set_all_vectors(self, mem, base_addr, vectors):
+    """set all library vectors to valid addresses"""
+    addr = base_addr - 6
+    for v in vectors:
+      mem.write_mem(1,addr,self.op_jmp)
+      mem.write_mem(2,addr+2,v)
+      addr -= 6
+
   # ----- internal lib -----
 
   def open_internal_lib(self, name, ver, context):
@@ -221,14 +234,14 @@ class LibManager(MemoryLayout):
       lib_base = instance.get_lib_base()
       entry['lib_base'] = lib_base
       self.addr_map[lib_base] = entry
-      # call open on lib
-      lib_class.open(instance,context)
       entry['ref_cnt'] = 0
       # setup traps in internal lib
       lib_id = len(self.lib_trap_table)
       self.lib_trap_table.append(instance)
-      instance.trap_all_vectors(lib_id)
+      self.trap_all_vectors(context.mem, lib_base, num_vecs, lib_id)
       entry['lib_id'] = lib_id
+      # call open on lib
+      lib_class.open(instance,context)
           
     entry['ref_cnt'] += 1
     self.lib_log("open_lib","Opened %s V%d ref_count=%d base=%06x" % (name, lib_ver, entry['ref_cnt'], entry['lib_base']))
@@ -276,4 +289,13 @@ class LibManager(MemoryLayout):
     log_lib.debug("Call Lib: %06x lib_id=%d -> offset=%d %s" % (addr, lib_id, offset, instance))
     instance.lib.call_vector(num,instance,ctx)
 
-    
+  def trap_all_vectors(self, mem, base_addr, num_vectors, lib_id):
+    """prepare the entry points for trapping. place RESET, RTS opcode and lib_id"""
+    addr = base_addr - 6
+    for i in xrange(num_vectors):
+      mem.write_mem(1,addr,self.op_reset)
+      mem.write_mem(1,addr+2,self.op_rts)
+      mem.write_mem(1,addr+4,lib_id)
+      addr -= 6
+
+  

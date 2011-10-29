@@ -16,6 +16,11 @@ class SegmentLoader:
     
     hunk_file = HunkReader()
     
+    # does file exist?
+    if not os.path.isfile(name):
+      self.error = "Can't find '%s'" % name
+      return None
+    
     # read hunk file
     fobj = file(name, "rb")
     result = hunk_file.read_file_obj(name,fobj,None)

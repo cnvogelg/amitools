@@ -7,9 +7,7 @@ import logging
 
 class MemoryLib(MemoryStruct):
   
-  op_rts = 0x4e75
   op_jmp = 0x4ef9
-  op_reset = 0x04e70
   
   def __init__(self, name, addr, num_vectors, pos_size, struct=LibraryDef, lib=None, context=None):
     self.lib = lib
@@ -28,25 +26,6 @@ class MemoryLib(MemoryStruct):
     
   def __str__(self):
     return "%s base=%06x %s" %(MemoryRange.__str__(self),self.lib_base,str(self.lib))
-
-  def trap_all_vectors(self, lib_id):
-    """prepare the entry points for trapping. place RESET, RTS opcode and lib_id"""
-    addr = self.lib_base - 6
-    for i in xrange(self.num_vectors):
-      self.write_mem(1,addr,self.op_reset)
-      self.write_mem(1,addr+2,self.op_rts)
-      self.write_mem(1,addr+4,lib_id)
-      addr -= 6
-
-  def set_all_vectors(self, vectors):
-    """set all library vectors to valid addresses"""
-    if len(vectors) != self.num_vectors:
-      raise ValueError("Invalid number of library vectors given!")
-    addr = self.lib_base - 6
-    for v in vectors:
-      self.write_mem(1,addr,self.op_jmp)
-      self.write_mem(2,addr+2,v)
-      addr -= 6
 
   def get_lib_base(self):
     return self.lib_base

@@ -115,11 +115,10 @@ vamos.setup_end_range()
 stay = True
 et = vamos.error_tracker
 def reset_func():
-  global stay
   pc = m68k.get_reg(m68k.M68K_REG_PC) - 2
-  log_main.info("RESET @%06x", pc)  
   # addr == 0 ? -> end reached
   if pc == 0:
+    global stay
     m68k.end_timeslice()
     stay = False
   # a lib trap!
