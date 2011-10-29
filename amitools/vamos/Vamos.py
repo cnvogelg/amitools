@@ -129,11 +129,11 @@ class Vamos:
     # exec
     self.exec_lib_def = ExecLibrary(self.lib_mgr, self.heap_mem, version=exec_version)
     self.exec_lib_def.set_managers(self.port_mgr)
-    self.lib_mgr.register_lib(self.exec_lib_def)
+    self.lib_mgr.register_int_lib(self.exec_lib_def)
     # dos
     self.dos_lib_def = DosLibrary(self.heap_mem, version=dos_version)
     self.dos_lib_def.set_managers(self.path_mgr, self.lock_mgr, self.file_mgr, self.port_mgr)
-    self.lib_mgr.register_lib(self.dos_lib_def)
+    self.lib_mgr.register_int_lib(self.dos_lib_def)
 
   def init_context(self, cpu):
     self.ctx = VamosContext( cpu, self.mem.access, self.lib_mgr, self.heap_mem )
@@ -165,7 +165,7 @@ class Vamos:
     # open exec lib
     self.exec_lib = self.lib_mgr.open_lib(ExecLibrary.name, 0, self.ctx)
     log_mem_init.info(self.exec_lib)
-    self.exec_base_range = AmigaExecBase(self.exec_lib.get_lib_base())
+    self.exec_base_range = AmigaExecBase(self.exec_lib.lib_base)
     log_mem_init.info(self.exec_base_range)
 
   def create_old_dos_guard(self):

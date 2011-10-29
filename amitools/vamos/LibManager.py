@@ -2,9 +2,37 @@ from MemoryLib import MemoryLib
 from AmigaResident import AmigaResident
 from Trampoline import Trampoline
 from CPU import *
-
+from structure.ExecStruct import LibraryDef
+from Exceptions import *
 from Log import log_lib
+from AccessStruct import AccessStruct
 import logging
+
+class LibEntry():
+  def __init__(self, name, version, addr, num_vectors, pos_size, mem, struct=LibraryDef, lib_class=None):
+    self.name = name
+    self.version = version
+    self.lib_class = lib_class
+    self.struct = struct
+
+    self.num_vectors = num_vectors
+    self.pos_size = pos_size
+    self.neg_size = num_vectors * 6
+    self.size = self.pos_size + self.neg_size
+
+    self.lib_begin = addr
+    self.lib_base  = addr + self.neg_size
+    self.lib_end   = self.lib_base + self.pos_size
+
+    self.ref_cnt = 0
+    self.lib_id = None
+    
+    self.access = AccessStruct(mem, struct, self.lib_base)
+    self.label = None
+    
+    # native lib only
+    self.trampoline = None
+    self.seg_list = None
 
 class LibManager():
   
@@ -13,20 +41,18 @@ class LibManager():
   op_reset = 0x04e70
   
   def __init__(self):
-    self.libs = {}
-    self.addr_map = {}
+    self.int_lib_classes = {}
+    self.int_libs = {}
+    self.int_addr_map = {}
     self.native_libs = {}
     self.native_addr_map = {}
     self.lib_trap_table = []
   
-  def register_lib(self, lib_class):
-    self.libs[lib_class.get_name()] = {
-      'lib_class' : lib_class,
-      'instance' : None
-    }
+  def register_int_lib(self, lib_class):
+    self.int_lib_classes[lib_class.get_name()] = lib_class
     
-  def unregister_lib(self, lib_class):
-    del self.libs[lib_class.get_name()]
+  def unregister_int_lib(self, lib_class):
+    del self.int_lib_classes[lib_class.get_name()]
   
   def lib_log(self, func, text, level=logging.INFO):
     log_lib.log(level, "LibMgr: [%10s] %s", func, text)
@@ -36,7 +62,7 @@ class LibManager():
   # return (lib_instance)
   def open_lib(self, name, ver, context):
     # open internal lib
-    if self.libs.has_key(name):
+    if self.int_lib_classes.has_key(name):
       return self.open_internal_lib(name, ver, context)
     # try to open native lib
     instance = self.open_native_lib(name, ver, context)
@@ -49,7 +75,7 @@ class LibManager():
   # return instance or null
   def close_lib(self, addr, context):
     # is an internal lib?
-    if self.addr_map.has_key(addr):
+    if self.int_addr_map.has_key(addr):
       return self.close_internal_lib(addr, context)
     # is a native lib?
     elif self.native_addr_map.has_key(addr):
@@ -110,16 +136,20 @@ class LibManager():
 
     # now create a memory lib instance
     lib_addr = context.alloc.alloc_range(total_size)
-    instance = MemoryLib(lib_name, lib_addr, len(vectors), pos_size)
-    context.alloc.reg_range(lib_addr, instance)
-    lib_base = instance.get_lib_base()
+    entry = LibEntry(lib_name, lib_version, lib_addr, len(vectors), pos_size, context.raw_mem)
+    lib_base = entry.lib_base
+
+    # create a memory label
+    mem_lib = MemoryLib(lib_name, lib_addr, entry.size, lib_base, LibraryDef)
+    entry.label = mem_lib
+    context.alloc.reg_range(lib_addr, mem_lib)
   
     # setup lib instance memory
     hex_vec = map(lambda x:"%06x" % x, res['vectors'])
     self.lib_log("open_lib", "setting up vectors=%s" % hex_vec, level=logging.DEBUG)
     self.set_all_vectors(context.mem, lib_base, vectors)
     self.lib_log("open_lib", "setting up struct=%s and lib" % res['struct'], level=logging.DEBUG)
-    ar.init_lib(res, instance, lib_base)
+    ar.init_lib(res, entry, lib_base)
     self.lib_log("open_lib", "init_code=%06x dataSize=%06x" % (res['init_code_ptr'],res['dataSize']), level=logging.DEBUG)
 
     # do we need to call init code of lib?
@@ -140,7 +170,7 @@ class LibManager():
       tr_size = tr.get_code_size()
       tr_mem = context.alloc.alloc_memory("tr_"+lib_name, tr_size)
       tr.write_code(tr_mem)
-      self.lib_log("open_lib","trampoline: %s" % tr_mem)
+      self.lib_log("open_lib","trampoline: %s" % tr_mem, level=logging.DEBUG)
     
       # place the trampoline code ptr on stack
       old_stack = context.cpu.r_reg(REG_A7)
@@ -148,42 +178,37 @@ class LibManager():
       context.cpu.w_reg(REG_A7, new_stack)
       context.mem.write_mem(2,new_stack, tr_mem.addr)
 
+    # store native components
+    entry.trampoline = tr_mem
+    entry.seg_list = seg_list
+
     # register lib
-    entry = {
-      'name' : lib_name,
-      'id' : lib_id,
-      'version' : res['version'],
-      'instance' : instance,
-      'seg_list' : seg_list,
-      'lib_base' : lib_base,
-      'trampoline' : tr_mem
-    }
-    self.native_libs[entry['name']] = entry
+    self.native_libs[entry.name] = entry
     self.native_addr_map[lib_base] = entry
 
     # return MemoryLib instance
-    self.lib_log("open_lib", "Openend native '%s' V%d: base=%06x mem=%s" % (lib_name, lib_version, lib_base, instance))
-    return instance
+    self.lib_log("open_lib", "Openend native '%s' V%d: base=%06x mem=%s" % (lib_name, lib_version, lib_base, mem_lib))
+    return entry
 
   def close_native_lib(self, addr, context):
     # get entry for lib
     entry = self.native_addr_map[addr]
     del self.native_addr_map[addr]
-    del self.native_libs[entry['name']]
+    del self.native_libs[entry.name]
 
     # lib param
-    name = entry['name']
-    version = entry['version']
-    lib_base = entry['lib_base']
-    instance = entry['instance']
-    self.lib_log("close_lib","Closed native '%s' V%d: base=%06x mem=%s]" % (name, version, lib_base, instance))
+    name = entry.name
+    version = entry.version
+    lib_base = entry.lib_base
+    mem_lib = entry.label
+    self.lib_log("close_lib","Closed native '%s' V%d: base=%06x mem=%s]" % (name, version, lib_base, mem_lib))
 
     # unreg and remove alloc
-    context.alloc.unreg_range(instance.addr)
-    context.alloc.free_range(instance.addr, instance.size)
-    context.alloc.free_memory(entry['trampoline'])
+    context.alloc.unreg_range(entry.lib_begin)
+    context.alloc.free_range(entry.lib_begin, entry.size)
+    context.alloc.free_memory(entry.trampoline)
 
-    return instance
+    return entry
 
   def set_all_vectors(self, mem, base_addr, vectors):
     """set all library vectors to valid addresses"""
@@ -196,21 +221,16 @@ class LibManager():
   # ----- internal lib -----
 
   def open_internal_lib(self, name, ver, context):
-    # get lib entry
-    entry = self.libs[name]
-    lib_class = entry['lib_class']
-    instance = entry['instance']
-    entry['name'] = name
-    entry['version'] = ver # requested version
+    # get lib_class
+    lib_class = self.int_lib_classes[name]
     lib_ver = lib_class.get_version()
-
+    
     # version correct?
     if ver != 0 and lib_ver < ver:
-      self.lib_log("open_lib","Invalid library version: %s has %d, expected %d" % (name, lib_ver, ver))
-      return None
-
-    # create an instance
-    if instance == None:
+      raise VersionMismatchError(name, lib_ver, ver)
+      
+    # do we have a lib entry already?
+    if not self.int_libs.has_key(name):
       # get memory range for lib
       lib_size = lib_class.get_total_size()     
       pos_size = lib_class.get_pos_size()
@@ -219,70 +239,72 @@ class LibManager():
 
       # allocate and create lib instance
       lib_addr = context.alloc.alloc_range(lib_size)
-      instance = MemoryLib(name, lib_addr, num_vecs, pos_size, struct=struct, lib=lib_class, context=context)
-      context.alloc.reg_range(lib_addr, instance)
+      entry = LibEntry(name, ver, lib_addr, num_vecs, pos_size, context.raw_mem, struct, lib_class)
+      lib_base = entry.lib_base
+      
+      # create memory label
+      mem_lib = MemoryLib(name, lib_addr, lib_size, lib_base, struct)
+      entry.label = mem_lib
+      context.alloc.reg_range(lib_addr, mem_lib)
 
-      entry['instance'] = instance
-      # store base_addr
-      lib_base = instance.get_lib_base()
-      entry['lib_base'] = lib_base
-      self.addr_map[lib_base] = entry
-      entry['ref_cnt'] = 0
+      # store entry in address map, too
+      self.int_addr_map[lib_base] = entry
+      self.int_libs[name] = entry
+
       # setup traps in internal lib
       lib_id = len(self.lib_trap_table)
-      self.lib_trap_table.append(instance)
+      self.lib_trap_table.append(entry)
       self.trap_all_vectors(context.mem, lib_base, num_vecs, lib_id)
-      entry['lib_id'] = lib_id
+      entry.lib_id = lib_id
+      
       # call open on lib
-      lib_class.open(instance,context)
+      lib_class.open(entry, context)
+    else:
+      entry = self.int_libs[name]
           
-    entry['ref_cnt'] += 1
-    self.lib_log("open_lib","Opened %s V%d ref_count=%d base=%06x" % (name, lib_ver, entry['ref_cnt'], entry['lib_base']))
-    return instance
+    entry.ref_cnt += 1
+    self.lib_log("open_lib","Opened %s V%d ref_count=%d base=%06x" % (name, lib_ver, entry.ref_cnt, entry.lib_base))
+    return entry
 
   def close_internal_lib(self, addr, context):
-    entry = self.addr_map[addr]
-    instance = entry['instance']
-    lib_class = entry['lib_class']
-    ver = lib_class.get_version();
-    name = entry['name']
-    ver = entry['version']
-      
+    entry = self.int_addr_map[addr]
+    name = entry.name
+    ver = entry.version
+    
     # decrement ref_count
-    ref_cnt = entry['ref_cnt']
+    ref_cnt = entry.ref_cnt
     if ref_cnt < 1:
-      self.lib_log("close_lib","Invalid ref_count ?!")
-      return None
+      raise VamosInternalError("CloseLib: invalid ref count?!")
     elif ref_cnt > 1:
       ref_cnt -= 1;
-      entry['ref_cnt'] = ref_cnt
+      entry.ref_cnt = ref_cnt
       self.lib_log("close_lib","Closed %s V%d ref_count=%d]" % (name, ver, ref_cnt))
-      return instance
+      return entry
     else:
-      # remove in trap table
-      lib_id = entry['lib_id']
+      # call lib to close
+      lib_class = entry.lib_class
+      lib_class.close(entry,context)
+      # remove entry in trap table
+      lib_id = entry.lib_id
       self.lib_trap_table[lib_id] = None
-      # remove lib instance
-      entry['instance'] = None
-      entry['ref_cnt'] = 0
-      lib_class.close(instance,context)
-      # free memory of lib struct
-      context.alloc.unreg_range(instance.addr)
-      context.alloc.free_range(instance.addr, instance.size)
+      # unregister label
+      context.alloc.unreg_range(entry.lib_begin)
+      # free memory
+      context.alloc.free_range(entry.lib_begin, entry.size)
       self.lib_log("close_lib","Closed %s V%d ref_count=0" % (name, ver))
-      return instance
+      return entry
       
   def call_internal_lib(self, addr, ctx):
     lib_id = ctx.raw_mem.read_mem_int(1, addr+4)
     tab = self.lib_trap_table
     if lib_id >= len(tab):
       raise VamosInternalError("Invalid lib trap!")
-    instance = tab[lib_id]
-    base = instance.lib_base
+    entry = tab[lib_id]
+    base = entry.lib_base
     offset = base - addr
     num = offset / 6
-    log_lib.debug("Call Lib: %06x lib_id=%d -> offset=%d %s" % (addr, lib_id, offset, instance))
-    instance.lib.call_vector(num,instance,ctx)
+    log_lib.debug("Call Lib: %06x lib_id=%d -> offset=%d %s" % (addr, lib_id, offset, entry.name))
+    entry.lib_class.call_vector(num,entry,ctx)
 
   def trap_all_vectors(self, mem, base_addr, num_vectors, lib_id):
     """prepare the entry points for trapping. place RESET, RTS opcode and lib_id"""

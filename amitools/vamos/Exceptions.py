@@ -30,6 +30,14 @@ class AmigaDeviceNotFoundError(VamosError):
   def __str__(self):
     return "Amiga volume not found: %s" % self._dev
 
+class VersionMismatchError(VamosError):
+  def __init__(self, what, got, want):
+    self._what = _what
+    self._got = _got
+    self._want = _want
+  def __str__(self):
+    return "Version Mismatch: %s got=%d want=%d" % (self._what, self._got, self._want)
+
 class VamosInternalError(VamosError):
   def __init__(self, what):
     self._what = what
