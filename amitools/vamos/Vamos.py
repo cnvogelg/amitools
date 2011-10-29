@@ -3,10 +3,7 @@ from MemoryLayout import MemoryLayout
 from MemoryRange import MemoryRange
 from MemoryAlloc import MemoryAlloc
 from MainMemory import MainMemory
-from ResetRange import ResetRange
-from EndRange import EndRange
 from AmigaLibrary import AmigaLibrary
-from AmigaExecBase import AmigaExecBase
 from LibManager import LibManager
 from SegmentLoader import SegmentLoader
 from VamosContext import VamosContext
@@ -35,6 +32,9 @@ class Vamos:
     self.mem_size = 0x1000000
     self.mem = MainMemory(self.mem_size, self.error_tracker)
     log_mem_init.info(self.mem)
+    # fake block for 0..8
+    mb = MemoryBlock("zero_page",0,8)
+    self.mem.add_range(mb)
 
   def init_segments(self):
     # --- load segments of binary ---
@@ -165,8 +165,6 @@ class Vamos:
     # open exec lib
     self.exec_lib = self.lib_mgr.open_lib(ExecLibrary.name, 0, self.ctx)
     log_mem_init.info(self.exec_lib)
-    self.exec_base_range = AmigaExecBase(self.exec_lib.lib_base)
-    log_mem_init.info(self.exec_base_range)
 
   def create_old_dos_guard(self):
     # create a guard memory for tracking invalid old dos access
@@ -174,17 +172,3 @@ class Vamos:
     self.dos_guard_size = 0x008000
     self.dos_guard = MemoryRange("old dos",self.dos_guard_base, self.dos_guard_size)
     self.mem.add_range(self.dos_guard)
-
-  # ----- magic ranges for vamos CPU control -----
-  def setup_reset_range(self):
-    self.reset_range = ResetRange(self.prog_start, self.stack_initial)
-    self.mem.add_range(self.reset_range)
-    
-  def setup_execbase_range(self):
-    self.mem.remove_range(self.reset_range)
-    self.mem.add_range(self.exec_base_range)
-    
-  def setup_end_range(self):
-    self.end_range = EndRange(self.magic_end)
-    self.mem.add_range(self.end_range)
-    

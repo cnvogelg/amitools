@@ -106,12 +106,17 @@ m68k.set_cpu_type(m68k.M68K_CPU_TYPE_68000)
 
 # reset CPU with a temporary reset range
 log_main.info("resetting cpu...")
-vamos.setup_reset_range()
+# setup stack & first PC
+ctx.mem.w32(0, vamos.stack_initial)
+ctx.mem.w32(4, vamos.prog_start)
 m68k.pulse_reset()
-vamos.setup_execbase_range()
+
+# set end RESET opcode at 0 and execbase
+op_reset = 0x04e70
+ctx.mem.w16(0, op_reset)
+ctx.mem.w32(4, vamos.exec_lib.lib_base)
 
 # setup RESET: catch end of program and all library traps
-vamos.setup_end_range()
 stay = True
 et = vamos.error_tracker
 def reset_func():

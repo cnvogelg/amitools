@@ -43,13 +43,13 @@ class AccessMemory():
     return self.read_mem(0, addr)
 
   def w32(self, addr, val):
-    self.read_mem(2, addr, val)
+    self.write_mem(2, addr, val)
 
   def w16(self, addr, val):
-    self.read_mem(1, addr, val)
+    self.write_mem(1, addr, val)
 
   def w8(self, addr, val):
-    self.read_mem(0, addr, val)
+    self.write_mem(0, addr, val)
 
   def w_data(self, addr, data):
     off = addr
