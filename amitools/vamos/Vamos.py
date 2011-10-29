@@ -16,6 +16,7 @@ from LockManager import LockManager
 from PortManager import PortManager
 from AccessMemory import AccessMemory
 from AccessStruct import AccessStruct
+from ErrorTracker import ErrorTracker
 
 # lib
 from lib.ExecLibrary import ExecLibrary
@@ -30,8 +31,9 @@ class Vamos:
   def __init__(self):
     # --- create memory layout ---
     log_mem_init.info("setting up memory")
+    self.error_tracker = ErrorTracker()
     self.mem_size = 0x1000000
-    self.mem = MainMemory(self.mem_size)
+    self.mem = MainMemory(self.mem_size, self.error_tracker)
     log_mem_init.info(self.mem)
 
   def init_segments(self):
@@ -65,7 +67,7 @@ class Vamos:
     
   def init_stack(self):
     # --- setup stack ---
-    self.magic_end = 0xff0000
+    self.magic_end = 0x0
     self.stack_base = 0x080000
     self.stack_size = 0x040000
     self.stack_end = self.stack_base + self.stack_size

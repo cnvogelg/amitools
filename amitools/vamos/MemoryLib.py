@@ -9,6 +9,7 @@ class MemoryLib(MemoryStruct):
   
   op_rts = 0x4e75
   op_jmp = 0x4ef9
+  op_reset = 0x04e70
   
   def __init__(self, name, addr, num_vectors, pos_size, struct=LibraryDef, lib=None, context=None):
     self.lib = lib
@@ -27,6 +28,15 @@ class MemoryLib(MemoryStruct):
     
   def __str__(self):
     return "%s base=%06x %s" %(MemoryRange.__str__(self),self.lib_base,str(self.lib))
+
+  def trap_all_vectors(self, lib_id):
+    """prepare the entry points for trapping. place RESET, RTS opcode and lib_id"""
+    addr = self.lib_base - 6
+    for i in xrange(self.num_vectors):
+      self.write_mem(1,addr,self.op_reset)
+      self.write_mem(1,addr+2,self.op_rts)
+      self.write_mem(1,addr+4,lib_id)
+      addr -= 6
 
   def set_all_vectors(self, vectors):
     """set all library vectors to valid addresses"""
@@ -56,18 +66,15 @@ class MemoryLib(MemoryStruct):
       val = self.read_mem_int(1,addr)
       # is it trapped?
       if val != self.op_jmp:
-        val = self.op_rts
         delta = self.lib_base - addr
         off = delta / 6
         addon = "-%d [%d]" % (delta,off)
         self.trace_read(width, addr, val, text="TRAP", level=logging.INFO, addon=addon)
-        self.lib.call_vector(off,self,self.ctx)
-        return val
       # native lib jump
       else:
         delta = self.lib_base - addr
         addon = "-%d" % delta
         self.trace_read(width, addr, val, text="JUMP", level=logging.INFO, addon=addon)
-        return val
+      return val
     # no use regular access
     return MemoryStruct.read_mem(self, width, addr)

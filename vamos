@@ -110,14 +110,29 @@ vamos.setup_reset_range()
 m68k.pulse_reset()
 vamos.setup_execbase_range()
 
-# setup RESET = end handler
+# setup RESET: catch end of program and all library traps
 vamos.setup_end_range()
 stay = True
-def end_func():
+et = vamos.error_tracker
+def reset_func():
   global stay
-  m68k.end_timeslice()
-  stay = False
-m68k.set_reset_instr_callback(end_func)
+  pc = m68k.get_reg(m68k.M68K_REG_PC) - 2
+  log_main.info("RESET @%06x", pc)  
+  # addr == 0 ? -> end reached
+  if pc == 0:
+    m68k.end_timeslice()
+    stay = False
+  # a lib trap!
+  else:
+    global ctx, et
+    try:
+      vamos.lib_mgr.call_internal_lib(pc, ctx)
+    except VamosError as e:
+      et.report_vamos_error(e, ctx.cpu)
+    except BaseException as e:
+      et.report_other_error(e)
+      
+m68k.set_reset_instr_callback(reset_func)
 
 # setup arg in D0/A0
 m68k.set_reg(m68k.M68K_REG_D0, vamos.arg_len)
@@ -127,27 +142,6 @@ m68k.set_reg(m68k.M68K_REG_A0, vamos.arg_base)
 m68k.set_reg(m68k.M68K_REG_A2, vamos.dos_guard_base)
 m68k.set_reg(m68k.M68K_REG_A5, vamos.dos_guard_base)
 m68k.set_reg(m68k.M68K_REG_A6, vamos.dos_guard_base)
-
-# ----- error handling -----
-# show vamos error with machine state
-def dump_vamos_error(e):
-  # show vamos error
-  log_main.error(e)
-  # give CPU state dump
-  for d in cpu.dump_state(e.state):
-    log_main.error(d)
-  # PC memory range
-  log_main.error("PC Range: %s  Offset: +%08x" % (e.pc_range_offset[0], e.pc_range_offset[1]))
-
-# dump a python exception
-def dump_exc(exit):
-  if exit['type'] == KeyboardInterrupt:
-    log_main.error("Keyboard Abort")
-  else:
-    tb = exit['tb']
-    log_main.error("*** Python EXCEPTION: %s (%s) ***",exit['value'],exit['type'])
-    for t in tb:
-      log_main.error("%s:%d in %s: %s",*t)
 
 # ----- start main CPU loop --------------------------------------------------
 log_main.info("start cpu: %06x", vamos.prog_start)
@@ -164,21 +158,16 @@ while stay:
   if max_cycles > 0 and total_cycles >= max_cycles:
     break
   # some error fored a quit?
-  if rm.force_quit:
+  if et.has_errors:
     break
   
-# if invalid reads or writes then abort
-if rm.vamos_exc != None:
-  log_main.error("Vamos Error after %d cycles:", total_cycles)
-  dump_vamos_error(rm.vamos_exc)
-  stay = False
-# another exception happened during memory access
-if rm.exit != None:
-  log_main.error("Abort after %d cycles:", total_cycles)
-  dump_exc(rm.exit)
-  stay = False
-      
 end_time = time.time()
 delta_time = end_time - start_time
 mhz = total_cycles / (1000000.0 * delta_time)
 log_main.info("done (%d cycles in %g s -> %.2g MHz)", total_cycles, delta_time, mhz)
+
+# if errors happened then report them now
+if et.has_errors:
+  log_main.error("After %d cycles:", total_cycles)
+  et.dump(cpu)
+      

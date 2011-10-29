@@ -15,6 +15,7 @@ class LibManager(MemoryLayout):
     self.addr_map = {}
     self.native_libs = {}
     self.native_addr_map = {}
+    self.lib_trap_table = []
   
   def register_lib(self, lib_class):
     self.libs[lib_class.get_name()] = {
@@ -223,6 +224,11 @@ class LibManager(MemoryLayout):
       # call open on lib
       lib_class.open(instance,context)
       entry['ref_cnt'] = 0
+      # setup traps in internal lib
+      lib_id = len(self.lib_trap_table)
+      self.lib_trap_table.append(instance)
+      instance.trap_all_vectors(lib_id)
+      entry['lib_id'] = lib_id
           
     entry['ref_cnt'] += 1
     self.lib_log("open_lib","Opened %s V%d ref_count=%d base=%06x" % (name, lib_ver, entry['ref_cnt'], entry['lib_base']))
@@ -247,6 +253,9 @@ class LibManager(MemoryLayout):
       self.lib_log("close_lib","Closed %s V%d ref_count=%d]" % (name, ver, ref_cnt))
       return instance
     else:
+      # remove in trap table
+      lib_id = entry['lib_id']
+      self.lib_trap_table[lib_id] = None
       # remove lib instance
       entry['instance'] = None
       entry['ref_cnt'] = 0
@@ -255,3 +264,16 @@ class LibManager(MemoryLayout):
       self.lib_log("close_lib","Closed %s V%d ref_count=0" % (name, ver))
       return instance
       
+  def call_internal_lib(self, addr, ctx):
+    lib_id = ctx.raw_mem.read_mem_int(1, addr+4)
+    tab = self.lib_trap_table
+    if lib_id >= len(tab):
+      raise VamosInternalError("Invalid lib trap!")
+    instance = tab[lib_id]
+    base = instance.lib_base
+    offset = base - addr
+    num = offset / 6
+    log_lib.debug("Call Lib: %06x lib_id=%d -> offset=%d %s" % (addr, lib_id, offset, instance))
+    instance.lib.call_vector(num,instance,ctx)
+
+    
