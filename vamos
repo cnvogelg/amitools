@@ -57,6 +57,9 @@ parser.add_argument('-b', '--block', action='store', type=int, default=1000, hel
 parser.add_argument('-l', '--logging', action='store', default=None, help="logging settings: <chan>:<level>,*:<level>,...")
 parser.add_argument('-P', '--prefix', action='store', default=vamos_prefix, help="vamos directory prefix (%s)" % vamos_prefix)
 parser.add_argument('-V', '--lib-version', action='store', default=None, help="set lib version: <lib>:<version>,...")
+parser.add_argument('-m', '--ram-size', action='store', default=1024, help="set RAM size in KiB")
+parser.add_argument('-s', '--stack-size', action='store', default=4, help="set stack size in KiB")
+parser.add_argument('-t', '--memory-trace', action='store_true', default=False, help="enable memory tracing (slow)")
 args = parser.parse_args()
 vamos_prefix = args.prefix
 
@@ -70,27 +73,25 @@ if args.lib_version != None:
 log_setup(args.logging)
 
 # ----- vamos! ---------------------------------------------------------------
-vamos = Vamos()
+cpu = MusashiCPU()
+vamos = Vamos(args.ram_size, cpu)
 
-# --- setup stack & heap ---
-vamos.init_stack()
-vamos.init_heap()
+# --- setup stack ---
+vamos.init_stack(args.stack_size)
 
 # --- load segments of binary ---
-vamos.init_segments()
 if not vamos.load_main_binary(args.bin):
   log_main.error("failed loading binary: '%s' %s", args.bin, vamos.seg_loader.error)
   sys.exit(1)
+# place args in memory
 vamos.init_args(args.args)
 
 # --- libs ---
-vamos.init_lib_manager()
 vamos.init_managers(args.prefix)
 vamos.register_base_libs(lib_versions['exec'], lib_versions['dos'])
 
 # --- vamos context ---
-cpu = MusashiCPU()
-ctx = vamos.init_context(cpu)
+ctx = vamos.init_context()
 
 # --- in memory process struct ---
 vamos.setup_process()
@@ -100,8 +101,8 @@ vamos.create_old_dos_guard()
 # ----- start cpu ------------------------------------------------------------
 # prepare m68k
 log_main.info("setting up m68k")
-m68k.set_read_memory(*ctx.raw_mem.get_read_funcs())
-m68k.set_write_memory(*ctx.raw_mem.get_write_funcs())
+m68k.set_read_memory(*ctx.mem.get_read_funcs(args.memory_trace))
+m68k.set_write_memory(*ctx.mem.get_write_funcs(args.memory_trace))
 m68k.set_cpu_type(m68k.M68K_CPU_TYPE_68000)
 
 # reset CPU with a temporary reset range
@@ -111,7 +112,7 @@ ctx.mem.w32(0, vamos.stack_initial)
 ctx.mem.w32(4, vamos.prog_start)
 m68k.pulse_reset()
 
-# set end RESET opcode at 0 and execbase
+# set end RESET opcode at 0 and execbase at 4
 op_reset = 0x04e70
 ctx.mem.w16(0, op_reset)
 ctx.mem.w32(4, vamos.exec_lib.lib_base)
@@ -131,10 +132,8 @@ def reset_func():
     global ctx, et
     try:
       vamos.lib_mgr.call_internal_lib(pc, ctx)
-    except VamosError as e:
-      et.report_vamos_error(e, ctx.cpu)
     except BaseException as e:
-      et.report_other_error(e)
+      et.report_error(e)
       
 m68k.set_reset_instr_callback(reset_func)
 
@@ -152,7 +151,6 @@ log_main.info("start cpu: %06x", vamos.prog_start)
 total_cycles = 0
 cycles_per_run = args.block
 max_cycles = args.cycles
-rm = ctx.raw_mem
 start_time = time.time()
 
 # main loop
@@ -173,5 +171,5 @@ log_main.info("done (%d cycles in %g s -> %.2g MHz)", total_cycles, delta_time, 
 # if errors happened then report them now
 if et.has_errors:
   log_main.error("After %d cycles:", total_cycles)
-  et.dump(cpu)
+  et.dump()
       

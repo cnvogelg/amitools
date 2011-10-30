@@ -1,4 +1,4 @@
-from MemoryLib import MemoryLib
+from LabelLib import LabelLib
 from AmigaResident import AmigaResident
 from Trampoline import Trampoline
 from CPU import *
@@ -9,7 +9,7 @@ from AccessStruct import AccessStruct
 import logging
 
 class LibEntry():
-  def __init__(self, name, version, addr, num_vectors, pos_size, mem, struct=LibraryDef, lib_class=None):
+  def __init__(self, name, version, addr, num_vectors, pos_size, mem, label_mgr, struct=LibraryDef, lib_class=None):
     self.name = name
     self.version = version
     self.lib_class = lib_class
@@ -27,7 +27,7 @@ class LibEntry():
     self.ref_cnt = 0
     self.lib_id = None
     
-    self.access = AccessStruct(mem, struct, self.lib_base)
+    self.access = AccessStruct(mem, label_mgr, struct, self.lib_base)
     self.label = None
     
     # native lib only
@@ -40,7 +40,8 @@ class LibManager():
   op_jmp = 0x4ef9
   op_reset = 0x04e70
   
-  def __init__(self):
+  def __init__(self, label_mgr):
+    self.label_mgr = label_mgr
     self.int_lib_classes = {}
     self.int_libs = {}
     self.int_addr_map = {}
@@ -135,14 +136,14 @@ class LibManager():
     total_size = pos_size + len(vectors) * 6
 
     # now create a memory lib instance
-    lib_addr = context.alloc.alloc_range(total_size)
-    entry = LibEntry(lib_name, lib_version, lib_addr, len(vectors), pos_size, context.raw_mem)
+    lib_addr = context.alloc.alloc_mem(total_size)
+    entry = LibEntry(lib_name, lib_version, lib_addr, len(vectors), pos_size, context.mem, self.label_mgr)
     lib_base = entry.lib_base
 
     # create a memory label
-    mem_lib = MemoryLib(lib_name, lib_addr, entry.size, lib_base, LibraryDef)
-    entry.label = mem_lib
-    context.alloc.reg_range(lib_addr, mem_lib)
+    label = LabelLib(lib_name, lib_addr, entry.size, lib_base, LibraryDef)
+    entry.label = label
+    self.label_mgr.add_label(label)
   
     # setup lib instance memory
     hex_vec = map(lambda x:"%06x" % x, res['vectors'])
@@ -187,7 +188,7 @@ class LibManager():
     self.native_addr_map[lib_base] = entry
 
     # return MemoryLib instance
-    self.lib_log("open_lib", "Openend native '%s' V%d: base=%06x mem=%s" % (lib_name, lib_version, lib_base, mem_lib))
+    self.lib_log("open_lib", "Openend native '%s' V%d: base=%06x label=%s" % (lib_name, lib_version, lib_base, label))
     return entry
 
   def close_native_lib(self, addr, context):
@@ -200,11 +201,11 @@ class LibManager():
     name = entry.name
     version = entry.version
     lib_base = entry.lib_base
-    mem_lib = entry.label
-    self.lib_log("close_lib","Closed native '%s' V%d: base=%06x mem=%s]" % (name, version, lib_base, mem_lib))
+    label = entry.label
+    self.lib_log("close_lib","Closed native '%s' V%d: base=%06x label=%s]" % (name, version, lib_base, label))
 
     # unreg and remove alloc
-    context.alloc.unreg_range(entry.lib_begin)
+    self.label_mgr.remove_label(label)
     context.alloc.free_range(entry.lib_begin, entry.size)
     context.alloc.free_memory(entry.trampoline)
 
@@ -238,14 +239,14 @@ class LibManager():
       struct   = lib_class.get_struct()
 
       # allocate and create lib instance
-      lib_addr = context.alloc.alloc_range(lib_size)
-      entry = LibEntry(name, ver, lib_addr, num_vecs, pos_size, context.raw_mem, struct, lib_class)
+      lib_addr = context.alloc.alloc_mem(lib_size)
+      entry = LibEntry(name, ver, lib_addr, num_vecs, pos_size, context.mem, self.label_mgr, struct, lib_class)
       lib_base = entry.lib_base
       
       # create memory label
-      mem_lib = MemoryLib(name, lib_addr, lib_size, lib_base, struct)
-      entry.label = mem_lib
-      context.alloc.reg_range(lib_addr, mem_lib)
+      label = LabelLib(name, lib_addr, lib_size, lib_base, struct)
+      entry.label = label
+      self.label_mgr.add_label(label)
 
       # store entry in address map, too
       self.int_addr_map[lib_base] = entry
@@ -288,14 +289,14 @@ class LibManager():
       lib_id = entry.lib_id
       self.lib_trap_table[lib_id] = None
       # unregister label
-      context.alloc.unreg_range(entry.lib_begin)
+      self.label_mgr.remove_label(entry.label)
       # free memory
-      context.alloc.free_range(entry.lib_begin, entry.size)
+      context.alloc.free_mem(entry.lib_begin, entry.size)
       self.lib_log("close_lib","Closed %s V%d ref_count=0" % (name, ver))
       return entry
       
   def call_internal_lib(self, addr, ctx):
-    lib_id = ctx.raw_mem.read_mem_int(1, addr+4)
+    lib_id = ctx.mem.read_mem(1, addr+4)
     tab = self.lib_trap_table
     if lib_id >= len(tab):
       raise VamosInternalError("Invalid lib trap!")

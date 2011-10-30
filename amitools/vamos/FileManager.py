@@ -3,7 +3,7 @@ import os.path
 import logging
 
 from Log import log_file
-from MemoryRange import MemoryRange
+from LabelRange import LabelRange
 from structure.DosStruct import FileHandleDef
 from lib.dos.Error import *
 
@@ -24,14 +24,14 @@ class AmiFile:
     if self.need_close:
       self.obj.close()
 
-class FileManager(MemoryRange):
+class FileManager(LabelRange):
   def __init__(self, path_mgr, base_addr, size):
     self.path_mgr = path_mgr
     self.base_addr = base_addr
     self.cur_addr = base_addr
     log_file.info("init manager: base=%06x" % self.base_addr)
     self.files_by_b_addr = {}
-    MemoryRange.__init__(self, "files", base_addr, size)
+    LabelRange.__init__(self, "files", base_addr, size)
     self.fh_def  = FileHandleDef
     self.fh_size = FileHandleDef.get_size()
     self.fh_size = (self.fh_size + 3) & ~3

@@ -4,16 +4,18 @@ from amitools import Hunk
 from amitools.HunkReader import HunkReader
 from amitools.HunkRelocate import HunkRelocate
 from AccessMemory import AccessMemory
+from LabelRange import LabelRange
 
 class SegmentLoader:
   
-  def __init__(self, alloc):
+  def __init__(self, mem, alloc, label_mgr):
+    self.mem = mem
     self.alloc = alloc
+    self.label_mgr = label_mgr
     self.error = None
     
   def load_seg(self, name):
     base_name = os.path.basename(name)
-    
     hunk_file = HunkReader()
     
     # does file exist?
@@ -50,18 +52,16 @@ class SegmentLoader:
     for i in xrange(len(sizes)):
       size = sizes[i]
       name = "%s:%d:%s" % (base_name,i,names[i].replace("HUNK_","").lower())
-      mem = self.alloc.alloc_memory(name, size)
-      seg_list.append(mem)
-      addrs.append(mem.addr)
+      seg = self.alloc.alloc_memory(name, size)
+      seg_list.append(seg)
+      addrs.append(seg.addr)
     
     # relocate to addresses and return data
     datas = relocator.relocate(addrs)
     
     # write to allocated memory
     for i in xrange(len(sizes)):
-      mem = seg_list[i]
       addr = addrs[i]
-      am = AccessMemory(mem)
-      am.w_data(addr, datas[i])
+      self.mem.access.w_data(addr, datas[i])
     
     return seg_list

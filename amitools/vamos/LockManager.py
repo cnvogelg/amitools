@@ -1,7 +1,7 @@
 import os.path
 
 from Log import log_lock
-from MemoryRange import MemoryRange
+from LabelRange import LabelRange
 
 class AmiLock:
   def __init__(self, name, ami_path, sys_path, exclusive):
@@ -14,14 +14,14 @@ class AmiLock:
   def __str__(self):
     return "[Lock:'%s'(ami='%s',sys='%s',ex=%d)@%06x=b@%06x]" % (self.name, self.ami_path, self.sys_path, self.exclusive, self.addr, self.b_addr)
 
-class LockManager(MemoryRange):
+class LockManager(LabelRange):
   def __init__(self, path_mgr, base_addr, size):
     self.path_mgr = path_mgr
     self.base_addr = base_addr
     self.cur_addr = base_addr
     log_lock.info("init manager: base=%06x" % self.base_addr)
     self.locks_by_b_addr = {}
-    MemoryRange.__init__(self, "locks", base_addr, size)
+    LabelRange.__init__(self, "locks", base_addr, size)
   
   def _register_lock(self, lock):
     addr = self.cur_addr

@@ -2,8 +2,8 @@ import logging
 from AccessMemory import AccessMemory
 
 class AccessStruct(AccessMemory):
-  def __init__(self, mem, struct_def, struct_addr=0):
-    AccessMemory.__init__(self,mem)
+  def __init__(self, mem, label_mgr, struct_def, struct_addr=0):
+    AccessMemory.__init__(self,mem, label_mgr)
     if struct_addr == 0:
       struct_addr = mem.addr
     self.struct_addr = struct_addr
@@ -15,13 +15,13 @@ class AccessStruct(AccessMemory):
     if conv != None:
       val = conv[0](val)
     addr = self.struct_addr + off
-    self.mem.write_mem_int(width, addr, val)
+    self.mem.write_mem(width, addr, val)
     self._trace_write(width, addr, val, text="Struct", addon="%s+%d = %s" % (self.struct_type_name, off, name), level=logging.INFO)
 
   def r_s(self, name):
     off,width,conv = self.struct_def.get_offset_for_name(name)
     addr = self.struct_addr + off
-    val = self.mem.read_mem_int(width, addr)
+    val = self.mem.read_mem(width, addr)
     if conv != None:
       val = conv[1](val)
     self._trace_read(width, addr, val, text="Struct", addon="%s+%d = %s" % (self.struct_type_name, off, name), level=logging.INFO)

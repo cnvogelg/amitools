@@ -177,8 +177,9 @@ class DosLibrary(AmigaLibrary):
   DOSFALSE = 0
   DOSTRUE = 0xffffffff
   
-  def __init__(self, alloc,version=39):
+  def __init__(self, mem, alloc, version=39):
     AmigaLibrary.__init__(self, self.name, version, self.dos_calls, DosLibraryDef)
+    self.mem = mem
     self.alloc = alloc
     
     dos_funcs = (
@@ -220,6 +221,7 @@ class DosLibrary(AmigaLibrary):
     self.io_err = 0
     self.cur_dir_lock = None
     self.ctx = ctx
+    self.mem_allocs = {}
   
   def IoErr(self, lib, ctx):
     log_dos.info("IoErr: %d" % self.io_err)
@@ -228,9 +230,9 @@ class DosLibrary(AmigaLibrary):
   # callback from port manager for fs handler port
   # -> Async I/O
   def put_msg(self, port_mgr, msg_addr):
-    msg = AccessStruct(self.ctx.raw_mem,MessageDef,struct_addr=msg_addr)
+    msg = AccessStruct(self.ctx.mem,MessageDef,struct_addr=msg_addr)
     dos_pkt_addr = msg.r_s("mn_Node.ln_Name")
-    dos_pkt = AccessStruct(self.ctx.raw_mem,DosPacketDef,struct_addr=dos_pkt_addr)
+    dos_pkt = AccessStruct(self.ctx.mem,DosPacketDef,struct_addr=dos_pkt_addr)
     reply_port_addr = dos_pkt.r_s("dp_Port")
     pkt_type = dos_pkt.r_s("dp_Type")
     log_dos.info("DosPacket: msg=%06x -> pkt=%06x: reply_port=%06x type=%06x", msg_addr, dos_pkt_addr, reply_port_addr, pkt_type)
@@ -242,7 +244,7 @@ class DosLibrary(AmigaLibrary):
       # get fh and read
       fh = self.file_mgr.get_by_b_addr(fh_b_addr)
       data = self.file_mgr.read(fh, size)
-      self.ctx.mem.w_data(buf_ptr, data)
+      self.ctx.mem.access.w_data(buf_ptr, data)
       got = len(data)
       log_dos.info("DosPacket: Read fh_b_addr=%06x buf=%06x len=%06x -> got=%06x fh=%s", fh_b_addr, buf_ptr, size, got, fh)
       dos_pkt.w_s("dp_Res1", got)
@@ -264,7 +266,7 @@ class DosLibrary(AmigaLibrary):
   
   def DateStamp(self, lib, ctx):
     ds_ptr = ctx.cpu.r_reg(REG_D1)
-    ds = AccessStruct(ctx.raw_mem,DateStampDef,struct_addr=ds_ptr)
+    ds = AccessStruct(ctx.mem,DateStampDef,struct_addr=ds_ptr)
     t = time.time()
     ts = int(t)
     tmil = t - ts
@@ -294,7 +296,7 @@ class DosLibrary(AmigaLibrary):
   
   def Open(self, lib, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
-    name = ctx.mem.r_cstr(name_ptr)
+    name = ctx.mem.access.r_cstr(name_ptr)
     mode = ctx.cpu.r_reg(REG_D2)
 
     # decode mode
@@ -334,7 +336,7 @@ class DosLibrary(AmigaLibrary):
 
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
     data = self.file_mgr.read(fh, size)
-    ctx.mem.w_data(buf_ptr, data)
+    ctx.mem.access.w_data(buf_ptr, data)
     got = len(data)
     log_dos.info("Read(%s, %06x, %d) -> %d" % (fh, buf_ptr, size, got))
     return got
@@ -345,7 +347,7 @@ class DosLibrary(AmigaLibrary):
     size = ctx.cpu.r_reg(REG_D3)
     
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
-    data = ctx.mem.r_data(buf_ptr,size)
+    data = ctx.mem.access.r_data(buf_ptr,size)
     self.file_mgr.write(fh, data)
     log_dos.info("Write(%s, %06x, %d)" % (fh, buf_ptr, size))
     return size
@@ -376,7 +378,7 @@ class DosLibrary(AmigaLibrary):
   def VPrintf(self, lib, ctx):
     format_ptr = ctx.cpu.r_reg(REG_D1)
     argv_ptr = ctx.cpu.r_reg(REG_D2)
-    format = ctx.mem.r_cstr(format_ptr)
+    format = ctx.mem.access.r_cstr(format_ptr)
     # write on output
     fh = self.file_mgr.get_output()
     log_dos.info("VPrintf: format='%s' argv=%06x" % (format,argv_ptr))
@@ -385,7 +387,7 @@ class DosLibrary(AmigaLibrary):
 
   def DeleteFile(self, lib, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
-    name = ctx.mem.r_cstr(name_ptr)
+    name = ctx.mem.access.r_cstr(name_ptr)
     self.io_err = self.file_mgr.delete(name)
     log_dos.info("DeleteFile: %s -> err=%s" % (name, self.io_err))
     if self.io_err == 0:
@@ -395,9 +397,9 @@ class DosLibrary(AmigaLibrary):
 
   def Rename(self, lib, ctx):
     old_name_ptr = ctx.cpu.r_reg(REG_D1)
-    old_name = ctx.mem.r_cstr(old_name_ptr)
+    old_name = ctx.mem.access.r_cstr(old_name_ptr)
     new_name_ptr = ctx.cpu.r_reg(REG_D2)
-    new_name = ctx.mem.r_cstr(new_name_ptr)
+    new_name = ctx.mem.access.r_cstr(new_name_ptr)
     self.io_err = self.file_mgr.rename(old_name, new_name)
     log_dos.info("Rename: %s %s -> err=%s" % (old_name, new_name, self.io_err))
     if self.io_err == 0:
@@ -409,7 +411,7 @@ class DosLibrary(AmigaLibrary):
   
   def Lock(self, lib, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
-    name = ctx.mem.r_cstr(name_ptr)
+    name = ctx.mem.access.r_cstr(name_ptr)
     mode = ctx.cpu.r_reg(REG_D2)
 
     if mode == 0xffffffff:
@@ -476,16 +478,16 @@ class DosLibrary(AmigaLibrary):
   
   def MatchFirst(self, lib, ctx):
     pat_ptr = ctx.cpu.r_reg(REG_D1)
-    pat = ctx.mem.r_cstr(pat_ptr)
+    pat = ctx.mem.access.r_cstr(pat_ptr)
     anchor_ptr = ctx.cpu.r_reg(REG_D2)
-    anchor = ctx.mem.r_cstr(anchor_ptr)
+    anchor = ctx.mem.access.r_cstr(anchor_ptr)
     log_dos.info("MatchFirst: pat=%s anchor=%s" % (pat, anchor))
   
   # ----- Args -----
   
   def ReadArgs(self, lib, ctx):
     template_ptr = ctx.cpu.r_reg(REG_D1)
-    template = ctx.mem.r_cstr(template_ptr)
+    template = ctx.mem.access.r_cstr(template_ptr)
     array_ptr = ctx.cpu.r_reg(REG_D2)
     rdargs_ptr = ctx.cpu.r_reg(REG_D3)
     
@@ -496,7 +498,7 @@ class DosLibrary(AmigaLibrary):
     in_val = []
     ptr = array_ptr
     for t in targs:
-      raw = ctx.mem.read_mem(2,ptr)
+      raw = ctx.mem.access.read_mem(2,ptr)
       # prefill toggle
       if t['t']:
         in_val.append(bool(raw))
@@ -529,10 +531,9 @@ class DosLibrary(AmigaLibrary):
     log_dos.debug("longs=%d chars=%d size=%d" % (num_longs,num_chars,size))
     
     # alloc mem
-    mem = self.alloc.alloc_memory("ReadArgs(@%06x)" % self.get_callee_pc(ctx),size)
+    addr = self._alloc_mem("ReadArgs(@%06x)" % self.get_callee_pc(ctx),size)
     
     # fill mem
-    addr = mem.addr
     char_ptr = addr + num_longs * 4
     long_ptr = addr
     base_ptr = array_ptr
@@ -544,41 +545,54 @@ class DosLibrary(AmigaLibrary):
         # pointer to string
         base_val = char_ptr
         # append string
-        mem.w_cstr(char_ptr, r)
+        self.mem.access.w_cstr(char_ptr, r)
         char_ptr += len(r) + 1        
       elif type(r) is types.IntType:
         # pointer to long
         base_val = long_ptr
         # write long
-        mem.write_mem(2,long_ptr,r)
+        self.mem.write_mem(2,long_ptr,r)
         long_ptr += 4
       elif type(r) is types.ListType:
         # pointer to array
         base_val = long_ptr
         # array with longs + strs
         for s in r:
-          mem.write_mem(2,long_ptr,char_ptr)
-          mem.w_cstr(char_ptr,s)
+          self.mem.write_mem(2,long_ptr,char_ptr)
+          self.mem.access.w_cstr(char_ptr,s)
           long_ptr += 4
           char_ptr += len(s) + 1
-        mem.write_mem(2,long_ptr,0)
+        self.mem.write_mem(2,long_ptr,0)
         long_ptr += 4
       else:
         # direct value
         base_val = r
       
-      ctx.mem.write_mem(2,base_ptr,base_val)
+      self.mem.write_mem(2,base_ptr,base_val)
       base_ptr += 4
     
     # TODO: return real RDArgs
-    return mem.addr
+    return addr
     
   def FreeArgs(self, lib, ctx):
     rdargs_ptr = ctx.cpu.r_reg(REG_D1)
     log_dos.info("FreeArgs: %06x" % rdargs_ptr)
-    mem = self.alloc.get_range_by_addr(rdargs_ptr)
-    if mem == None:
-      raise ValueError("Invalid FreeArgs mem: %06x" % rdargs_ptr)
-    else:
-      self.alloc.free_memory(mem)
+    self._free_mem(rdargs_ptr)
 
+  # ----- Helpers -----
+
+  def _alloc_mem(self, name, size):
+    mem = self.alloc.alloc_memory(name,size)
+    self.mem_allocs[mem.addr] = mem
+    return mem.addr
+  
+  def _free_mem(self, addr):
+    if self.mem_allocs.has_key(addr):
+      mem = self.mem_allocs[addr]
+      self.alloc.free_memory(mem)
+      del self.mem_allocs[addr]
+    else:  
+      raise ValueError("Invalid DOS free mem: %06x" % addr)
+    
+    
+    
