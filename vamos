@@ -57,6 +57,10 @@ class MusashiMEM(MEM):
     m68k.mem_set_special_range_read_func(page_addr, width, func)
   def set_special_range_write_func(self,page_addr, width, func):
     m68k.mem_set_special_range_write_func(page_addr, width, func)
+  def set_mem_trace_mode(self,on):
+    m68k.mem_set_trace_mode(on)
+  def set_mem_trace_func(self,func):
+    m68k.mem_set_trace_func(func)
 
 # ----- main -----
 
@@ -100,6 +104,11 @@ if not mem.init(args.ram_size):
   log_main.error("can't allocate vamos RAM: %d KiB" % args.ram_size)
   sys.exit(1)
 vamos = Vamos(mem, cpu)
+
+# enable mem trace?
+if args.memory_trace:
+  mem.set_mem_trace_mode(1)
+  mem.set_mem_trace_func(vamos.label_mgr.trace_mem)
 
 # --- setup stack ---
 vamos.init_stack(args.stack_size)
