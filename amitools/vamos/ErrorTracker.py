@@ -14,7 +14,10 @@ class ErrorTracker:
     self.other_tb = None
     self.other_type = None
     self.other_value = None
-    
+  
+  def report_invalid_memory(self, mode, width, addr):
+    self.report_error(InvalidMemoryAccessError(chr(mode), width, addr))
+  
   def report_error(self, e):
     self.has_errors = True
     self.cpu_state = self.cpu.get_state()

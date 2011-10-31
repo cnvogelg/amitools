@@ -119,6 +119,9 @@ if args.memory_trace:
 if args.internal_memory_trace:
   AccessMemory.label_mgr = vamos.label_mgr
 
+# set invalid access handler for memory
+m68k.mem_set_invalid_func(vamos.error_tracker.report_invalid_memory)
+
 # --- setup stack ---
 vamos.init_stack(args.stack_size)
 
