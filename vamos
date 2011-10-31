@@ -81,6 +81,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('bin', help="AmigaOS binary to run")
 parser.add_argument('args', nargs='*', help="AmigaOS binary arguments")
 parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
+parser.add_argument('-q', '--quiet', action='store_true', default=False, help="do not output any logging")
 parser.add_argument('-c', '--cycles', action='store', type=int, default=0, help="maximum number of cycles to execute")
 parser.add_argument('-b', '--block', action='store', type=int, default=1000, help="cycles per block")
 parser.add_argument('-l', '--logging', action='store', default=None, help="logging settings: <chan>:<level>,*:<level>,...")
@@ -100,7 +101,7 @@ if args.lib_version != None:
     lib_versions[n] = int(v)
 
 # --- init logging ---
-log_setup(args.logging)
+log_setup(args.logging, args.verbose, args.quiet)
 
 # ----- vamos! ---------------------------------------------------------------
 cpu = MusashiCPU()

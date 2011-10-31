@@ -24,13 +24,14 @@ loggers = [log_main, log_mem, log_mem_init, log_mem_alloc, log_mem_int, log_lib,
 
 # --- end ---
 
+OFF = 100
 levels = {
   "debug" : logging.DEBUG,
   "info" : logging.INFO,
   "warn" : logging.WARN,
   "error" : logging.ERROR,
   "fatal" : logging.FATAL,
-  "off" : 100
+  "off" : OFF
 }
 
 def log_parse_level(name):
@@ -39,7 +40,7 @@ def log_parse_level(name):
   else:
     return None
 
-def log_setup(arg):
+def log_setup(arg,verbose=False,quiet=False):
   # setup handler
   ch = logging.StreamHandler()
   ch.setLevel(logging.DEBUG)
@@ -50,8 +51,15 @@ def log_setup(arg):
     l.addHandler(ch)
   
   # setup default
+  level = logging.WARN
+  if quiet:
+    level = OFF
   for l in loggers:
-    l.setLevel(logging.WARN)
+    l.setLevel(level)
+  
+  # is verbose enabled?
+  if verbose:
+    log_main.setLevel(logging.INFO)
   
   # parse args
   if arg != None:
