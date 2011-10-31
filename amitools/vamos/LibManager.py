@@ -27,7 +27,7 @@ class LibEntry():
     self.ref_cnt = 0
     self.lib_id = None
     
-    self.access = AccessStruct(mem, label_mgr, struct, self.lib_base)
+    self.access = AccessStruct(mem, struct, self.lib_base)
     self.label = None
     
     # native lib only

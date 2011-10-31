@@ -14,11 +14,10 @@ class MainMemory:
   
   op_reset = 0x04e70
   
-  def __init__(self, raw_mem, label_mgr, error_tracker):
+  def __init__(self, raw_mem, error_tracker):
     self.raw_mem = raw_mem
     self.error_tracker = error_tracker
-    self.label_mgr = label_mgr
-    self.access = AccessMemory(self, label_mgr)
+    self.access = AccessMemory(self)
   
   # reserve special range -> begin_addr
   def reserve_special_range(self, num_pages=1):

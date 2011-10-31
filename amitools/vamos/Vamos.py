@@ -36,7 +36,7 @@ class Vamos:
     
     # create memory and allocate RAM
     self.error_tracker = ErrorTracker(cpu, self.label_mgr)
-    self.mem = MainMemory(self.raw_mem, self.label_mgr, self.error_tracker)
+    self.mem = MainMemory(self.raw_mem, self.error_tracker)
 
     # create memory allocator
     self.mem_begin = 0x1000

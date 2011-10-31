@@ -20,6 +20,7 @@ from amitools.vamos.MEM import MEM
 from amitools.vamos.Log import *
 from amitools.vamos.Vamos import Vamos
 from amitools.vamos.Exceptions import *
+from amitools.vamos.AccessMemory import AccessMemory
 
 # ----- classes -----
 
@@ -87,7 +88,8 @@ parser.add_argument('-P', '--prefix', action='store', default=vamos_prefix, help
 parser.add_argument('-V', '--lib-version', action='store', default=None, help="set lib version: <lib>:<version>,...")
 parser.add_argument('-m', '--ram-size', action='store', default=1024, help="set RAM size in KiB")
 parser.add_argument('-s', '--stack-size', action='store', default=4, help="set stack size in KiB")
-parser.add_argument('-t', '--memory-trace', action='store_true', default=False, help="enable memory tracing (slow)")
+parser.add_argument('-t', '--memory-trace', action='store_true', default=False, help="enable memory tracing (slower)")
+parser.add_argument('-T', '--internal-memory-trace', action='store_true', default=False, help="enable internal memory tracing (slow)")
 args = parser.parse_args()
 vamos_prefix = args.prefix
 
@@ -113,6 +115,8 @@ vamos = Vamos(mem, cpu)
 if args.memory_trace:
   mem.set_mem_trace_mode(1)
   mem.set_mem_trace_func(vamos.label_mgr.trace_mem)
+if args.internal_memory_trace:
+  AccessMemory.label_mgr = vamos.label_mgr
 
 # --- setup stack ---
 vamos.init_stack(args.stack_size)

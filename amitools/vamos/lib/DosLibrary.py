@@ -230,9 +230,9 @@ class DosLibrary(AmigaLibrary):
   # callback from port manager for fs handler port
   # -> Async I/O
   def put_msg(self, port_mgr, msg_addr):
-    msg = AccessStruct(self.ctx.mem,self.ctx.label_mgr,MessageDef,struct_addr=msg_addr)
+    msg = AccessStruct(self.ctx.mem,MessageDef,struct_addr=msg_addr)
     dos_pkt_addr = msg.r_s("mn_Node.ln_Name")
-    dos_pkt = AccessStruct(self.ctx.mem,self.ctx.label_mgr,DosPacketDef,struct_addr=dos_pkt_addr)
+    dos_pkt = AccessStruct(self.ctx.mem,DosPacketDef,struct_addr=dos_pkt_addr)
     reply_port_addr = dos_pkt.r_s("dp_Port")
     pkt_type = dos_pkt.r_s("dp_Type")
     log_dos.info("DosPacket: msg=%06x -> pkt=%06x: reply_port=%06x type=%06x", msg_addr, dos_pkt_addr, reply_port_addr, pkt_type)
@@ -266,7 +266,7 @@ class DosLibrary(AmigaLibrary):
   
   def DateStamp(self, lib, ctx):
     ds_ptr = ctx.cpu.r_reg(REG_D1)
-    ds = AccessStruct(ctx.mem,ctx.label_mgr,DateStampDef,struct_addr=ds_ptr)
+    ds = AccessStruct(ctx.mem,DateStampDef,struct_addr=ds_ptr)
     t = time.time()
     ts = int(t)
     tmil = t - ts
@@ -441,7 +441,7 @@ class DosLibrary(AmigaLibrary):
     fib_ptr = ctx.cpu.r_reg(REG_D2)
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
     log_dos.info("Examine: %s fib=%06x" % (lock, fib_ptr))
-    fib = AccessStruct(ctx.mem,ctx.label_mgr,FileInfoBlockDef,struct_addr=fib_ptr)
+    fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
     self.lock_mgr.examine_lock(lock, fib)
     return self.DOSTRUE
   

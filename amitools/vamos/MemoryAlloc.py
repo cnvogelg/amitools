@@ -14,7 +14,6 @@ class Memory:
     return str(self.label)
 
 class MemoryAlloc:
-  
   def __init__(self, mem, addr, size, begin, label_mgr):
     if begin == 0:
       self._cur = addr
@@ -68,7 +67,7 @@ class MemoryAlloc:
     addr = self.alloc_mem(size, padding)
     label = LabelStruct(name, addr, struct)
     self.label_mgr.add_label(label)
-    access = AccessStruct(self.mem, self.label_mgr, struct, addr)
+    access = AccessStruct(self.mem, struct, addr)
     return Memory(addr,size,label,access)
   
   def free_struct(self, mem):

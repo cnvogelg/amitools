@@ -1,42 +1,22 @@
 import logging
 import ctypes
-from Log import log_mem_int
 
-class AccessMemory():
-  trace_val_str = ( "%02x      ", "%04x    ", "%08x" )
+class AccessMemory:
+  # set this label manager to enable memory tracing!
+  label_mgr = None
   
-  def __init__(self, mem, label_mgr):
+  def __init__(self, mem):
     self.mem = mem
-    self.label_mgr = label_mgr
-
-  def _get_mem_str(self, addr):
-    label = self.label_mgr.get_label(addr)
-    if label != None:
-      return "@%06x +%06x %s" % (label.addr, addr - label.addr, label.name)
-    else:
-      return "N/A"
-
-  def _trace_block_read(self, addr, size, text="", level=logging.DEBUG, addon=""):
-    log_mem_int.log(level, "R(B): %06x: +%06x   %6s  [%s] %s", addr, size, text, self._get_mem_str(addr), addon)  
-
-  def _trace_block_write(self, addr, size, text="", level=logging.DEBUG, addon=""):
-    log_mem_int.log(level, "W(B): %06x: +%06x   %6s  [%s] %s", addr, size, text, self._get_mem_str(addr), addon)  
-
-  def _trace_read(self, width, addr, value, text="", level=logging.DEBUG, addon=""):
-    val = self.trace_val_str[width] % value
-    log_mem_int.log(level, "R(%d): %06x: %s  %6s  [%s] %s", 2**width, addr, val, text, self._get_mem_str(addr), addon)
-
-  def _trace_write(self, width, addr, value, text="", level=logging.DEBUG, addon=""):
-    val = self.trace_val_str[width] % value
-    log_mem_int.log(level, "W(%d): %06x: %s  %6s  [%s] %s", 2**width, addr, val, text, self._get_mem_str(addr), addon)
 
   def write_mem(self, width, addr, val):
     self.mem.write_mem(width, addr, val)
-    self._trace_write(width, addr, val)
+    if self.label_mgr != None:
+      self.label_mgr.trace_int_mem('W',width, addr, val)
 
   def read_mem(self, width, addr):
     val = self.mem.read_mem(width, addr)
-    self._trace_read(width, addr, val)
+    if self.label_mgr != None:
+      self.label_mgr.trace_int_mem('R',width, addr, val)
     return val
 
   def r32(self, addr):
@@ -61,12 +41,14 @@ class AccessMemory():
     size = len(data)
     buf = ctypes.create_string_buffer(data)
     self.mem.write_block(addr,size,buf)
-    self._trace_block_write( addr, size )
+    if self.label_mgr != None:
+      self.label_mgr.trace_int_block( 'W', addr, size )
 
   def r_data(self, addr, size):
     buf = ctypes.create_string_buffer(size)
     self.mem.read_block(addr,size,buf)
-    self._trace_block_read( addr, size )
+    if self.label_mgr != None:
+      self.label_mgr.trace_int_block( 'R', addr, size )
     return buf.value
 
   def r_cstr(self, addr):
@@ -81,7 +63,8 @@ class AccessMemory():
       res += v
       off += 1
       l += 1
-    self._trace_block_read( addr, l, text="CSTR", addon="'%s'"%res, level=logging.INFO )
+    if self.label_mgr != None:
+      self.label_mgr.trace_int_block( 'R', addr, l, text="CSTR", addon="'%s'"%res, level=logging.INFO )
     return res
 
   def w_cstr(self, addr, cstr):
@@ -90,7 +73,8 @@ class AccessMemory():
       self.mem.write_mem(0, off, ord(c))
       off += 1
     self.mem.write_mem(0, off, 0)
-    self._trace_block_write( addr, len(cstr), text="CSTR", addon="'%s'"%cstr, level=logging.INFO )
+    if self.label_mgr != None:
+      self.label_mgr.trace_int_block( 'W', addr, len(cstr), text="CSTR", addon="'%s'"%cstr, level=logging.INFO )
 
   def r_bstr(self, addr):
     off = addr
@@ -100,7 +84,8 @@ class AccessMemory():
     for i in xrange(size):
       res += chr(self.mem.read_mem(0, off))
       off += 1
-    self._trace_block_read( addr, size, text='BSTR', addon="'%s'"%res, level=logging.INFO )
+    if self.label_mgr != None:
+      self.label_mgr.trace_int_block( 'R', addr, size, text='BSTR', addon="'%s'"%res, level=logging.INFO )
     return res
 
   def w_bstr(self, addr, bstr):
@@ -111,7 +96,8 @@ class AccessMemory():
     for c in bstr:
       self.mem.write_mem(0, off, ord(c))
       off += 1
-    self._trace_block_write( addr, size, text='BSTR', addon="'%s'"%bstr, level=logging.INFO )
+    if self.label_mgr != None:
+      self.label_mgr.trace_int_block( 'W', addr, size, text='BSTR', addon="'%s'"%bstr, level=logging.INFO )
 
 
   
