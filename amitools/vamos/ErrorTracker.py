@@ -4,8 +4,9 @@ import sys
 import traceback
 
 class ErrorTracker:
-  def __init__(self, cpu):
+  def __init__(self, cpu, label_mgr):
     self.cpu = cpu
+    self.label_mgr = label_mgr
     self.vamos_error = None
     self.other_error = None
     self.has_errors = False
@@ -31,8 +32,17 @@ class ErrorTracker:
     e = self.vamos_error
     if e == None:
       return
-    # show vamos error
-    log_main.error(e)
+    # memory error?
+    if isinstance(e, InvalidMemoryAccessError):
+      addr = e.addr
+      label = self.label_mgr.get_label(addr)
+      if label != None:
+        delta = addr - label.addr
+        log_main.error("%s -> +%06x %s",e,delta,label)
+      else:
+        log_main.error(e)
+    else:
+      log_main.error(e)
     # give CPU state dump
     for d in self.cpu.dump_state(self.cpu_state):
       log_main.error(d)

@@ -120,7 +120,9 @@ ctx.mem.w32(4, vamos.exec_lib.lib_base)
 # setup RESET: catch end of program and all library traps
 stay = True
 et = vamos.error_tracker
+trap_time = 0.0
 def reset_func():
+  global et
   pc = m68k.get_reg(m68k.M68K_REG_PC) - 2
   # addr == 0 ? -> end reached
   if pc == 0:
@@ -128,10 +130,13 @@ def reset_func():
     m68k.end_timeslice()
     stay = False
   # a lib trap!
-  else:
-    global ctx, et
+  elif not et.has_errors:
+    global ctx, trap_time
     try:
+      begin = time.time()
       vamos.lib_mgr.call_internal_lib(pc, ctx)
+      end = time.time()
+      trap_time += end - begin
     except BaseException as e:
       et.report_error(e)
       
@@ -165,8 +170,9 @@ while stay:
   
 end_time = time.time()
 delta_time = end_time - start_time
+delta_time -= trap_time
 mhz = total_cycles / (1000000.0 * delta_time)
-log_main.info("done (%d cycles in %g s -> %.2g MHz)", total_cycles, delta_time, mhz)
+log_main.info("done (%d cycles in %.4gs -> %.2g MHz, trap time %.4gs)", total_cycles, delta_time, mhz, trap_time)
 
 # if errors happened then report them now
 if et.has_errors:

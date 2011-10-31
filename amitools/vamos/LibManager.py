@@ -206,7 +206,7 @@ class LibManager():
 
     # unreg and remove alloc
     self.label_mgr.remove_label(label)
-    context.alloc.free_range(entry.lib_begin, entry.size)
+    context.alloc.free_mem(entry.lib_begin, entry.size)
     context.alloc.free_memory(entry.trampoline)
 
     return entry

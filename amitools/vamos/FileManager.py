@@ -63,7 +63,7 @@ class FileManager(LabelRange):
     fh.b_addr = 0
   
   # directly read from file handle structure
-  def read_mem(self, width, addr):
+  def r32_fh(self, addr):
     # find out associated file handle
     rel = int((addr - self.addr) / self.fh_size)
     fh_addr = self.addr + rel * self.fh_size
@@ -72,7 +72,7 @@ class FileManager(LabelRange):
     if fh != None:
       # get addon text
       delta = addr - fh_addr
-      name,off,val_type_name = self.fh_def.get_name_for_offset(delta, width)
+      name,off,val_type_name = self.fh_def.get_name_for_offset(delta, 2)
       type_name = self.fh_def.get_type_name()
       addon="%s+%d = %s(%s)+%d  %s" % (type_name, delta, name, val_type_name, off, fh)
 
@@ -85,14 +85,11 @@ class FileManager(LabelRange):
         # PutMsg port
         val = self.fs_handler_port
       
-      self.trace_read(width, addr, val, text="FILE", level=logging.INFO, addon=addon)
+      self.trace_mem_int('R', 2, addr, val, text="FILE", level=logging.INFO, addon=addon)
       return val
     else:
-      raise InvalidMemoryAccessError('R', width, addr, self.name)
-
-  # directly write to file handle structure
-  def write_mem(self, width, addr, val):
-    raise InvalidMemoryAccessError('W', width, addr, self.name)
+      self.trace_mem_int('R', 2, addr, val, text="FILE", level=logging.WARN)
+      return 0
   
   def get_input(self):
     return self.std_input

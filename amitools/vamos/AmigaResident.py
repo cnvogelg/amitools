@@ -15,9 +15,9 @@ class AmigaResident:
   INIT_END = 0
   
   # return array of resident structure addresses
-  def find_residents(self, mem, all_mem):
-    addr = mem.addr
-    end = mem.end
+  def find_residents(self, region, mem):
+    addr = region.addr
+    end = region.addr + region.size
     finds = []
     while addr < end:
       w = mem.r16(addr)
@@ -38,8 +38,8 @@ class AmigaResident:
           }
           # eval values
           res['auto_init'] = res['flags'] & self.RTF_AUTOINIT == self.RTF_AUTOINIT
-          res['name'] = all_mem.r_cstr(res['name_ptr'])
-          res['id'] = all_mem.r_cstr(res['id_ptr'])
+          res['name'] = mem.access.r_cstr(res['name_ptr'])
+          res['id'] = mem.access.r_cstr(res['id_ptr'])
           
           finds.append(res)
           skip = mem.r32(addr+6)

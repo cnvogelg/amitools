@@ -38,5 +38,5 @@ class Trampoline:
     if addr == -1:
       addr = mem.addr
     for w in self.code:
-      mem.write_mem(1, addr, w)
+      mem.access.write_mem(1, addr, w)
       addr += 2

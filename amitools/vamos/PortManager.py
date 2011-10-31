@@ -1,5 +1,8 @@
-class PortManager:
+from LabelRange import LabelRange
+
+class PortManager(LabelRange):
   def __init__(self, addr, size):
+    LabelRange.__init__(self, "ports", addr, size)
     self.ports = {}
     self.base_addr = addr
     self.size = size

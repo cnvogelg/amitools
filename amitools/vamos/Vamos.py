@@ -34,7 +34,7 @@ class Vamos:
     
     # create memory and allocate RAM
     log_mem_init.info("setting up main memory with %s KiB RAM" % ram_size)
-    self.error_tracker = ErrorTracker(cpu)
+    self.error_tracker = ErrorTracker(cpu, self.label_mgr)
     self.mem = MainMemory(self.label_mgr, self.error_tracker)
     self.mem.init_ram(ram_size)
 
@@ -104,23 +104,21 @@ class Vamos:
     self.lock_base = self.mem.reserve_special_range()
     self.lock_size = 0x010000
     self.lock_mgr = LockManager(self.path_mgr, self.lock_base, self.lock_size)
-    label = LabelRange("lock", self.lock_base, self.lock_size)
-    self.label_mgr.add_label(label)
-    log_mem_init.info(label)
+    self.label_mgr.add_label(self.lock_mgr)
+    log_mem_init.info(self.lock_mgr)
     
     self.file_base = self.mem.reserve_special_range()
     self.file_size = 0x010000
     self.file_mgr = FileManager(self.path_mgr, self.file_base, self.file_size)
-    label = LabelRange("file", self.file_base, self.file_size)
-    self.label_mgr.add_label(label)
-    log_mem_init.info(label)
+    self.label_mgr.add_label(self.file_mgr)
+    self.mem.set_special_range_read_funcs(self.file_base, r32=self.file_mgr.r32_fh)
+    log_mem_init.info(self.file_mgr)
 
     self.port_base = self.mem.reserve_special_range()
     self.port_size = 0x010000
     self.port_mgr  = PortManager(self.port_base, self.port_size)
-    label = LabelRange("port", self.port_base, self.port_size)
-    self.label_mgr.add_label(label)
-    log_mem_init.info(label)
+    self.label_mgr.add_label(self.port_mgr)
+    log_mem_init.info(self.port_mgr)
 
   def register_base_libs(self, exec_version, dos_version):
     # register libraries
@@ -139,6 +137,7 @@ class Vamos:
     self.ctx.bin_file = self.bin_file
     self.ctx.seg_loader = self.seg_loader
     self.ctx.path_mgr = self.path_mgr
+    self.ctx.label_mgr = self.label_mgr
     self.ctx.mem = self.mem
     self.mem.ctx = self.ctx
     return self.ctx

@@ -3,13 +3,12 @@ class VamosError(Exception):
     return "VamosError"
 
 class InvalidMemoryAccessError(VamosError):
-  def __init__(self, access_type, width, addr, src):
+  def __init__(self, access_type, width, addr):
     self.access_type = access_type
     self.width = width
     self.addr = addr
-    self.src = src
   def __str__(self):
-    return "Invalid Memory Access %s(%d): %06x [%s]" % (self.access_type,2**self.width,self.addr,self.src)
+    return "Invalid Memory Access %s(%d): %06x" % (self.access_type,2**self.width,self.addr)
 
 class OutOfAmigaMemoryError(VamosError):
   def __init__(self, alloc, size):
