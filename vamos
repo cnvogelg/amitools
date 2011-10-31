@@ -106,7 +106,7 @@ log_setup(args.logging, args.verbose, args.quiet)
 # ----- vamos! ---------------------------------------------------------------
 cpu = MusashiCPU()
 mem = MusashiMEM()
-log_main.info("setting up main memory with %s KiB RAM" % args.ram_size)
+log_main.info("setting up main memory with %s KiB RAM: top=%06x" % (args.ram_size, args.ram_size * 1024))
 if not mem.init(args.ram_size):
   log_main.error("can't allocate vamos RAM: %d KiB" % args.ram_size)
   sys.exit(1)
@@ -165,13 +165,13 @@ trap_time = 0.0
 def reset_func():
   global et
   pc = m68k.get_reg(m68k.M68K_REG_PC) - 2
-  # addr == 0 ? -> end reached
-  if pc == 0:
+  # addr == 0 or an error occurred -> end reached
+  if pc == 0 or et.has_errors:
     global stay
     m68k.end_timeslice()
     stay = False
   # a lib trap!
-  elif not et.has_errors:
+  else:
     global ctx, trap_time
     try:
       begin = time.time()

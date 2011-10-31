@@ -76,7 +76,7 @@ write_func_type = CFUNCTYPE(None, c_uint, c_uint)
 pc_changed_callback_func_type = CFUNCTYPE(None, c_uint)
 reset_instr_callback_func_type = CFUNCTYPE(None)
 invalid_func_type = CFUNCTYPE(None, c_int, c_int, c_uint)
-trace_func_type = CFUNCTYPE(None, c_int, c_int, c_uint, c_uint)
+trace_func_type = CFUNCTYPE(c_int, c_int, c_int, c_uint, c_uint)
 
 # declare cpu functions
 execute_func = lib.m68k_execute
@@ -216,6 +216,7 @@ if __name__ == "__main__":
   
   def trace(mode, width, addr, value):
     print "TRACE: %s(%d): %06x: %x" % (chr(mode), width, addr, value)
+    return 0
   
   mem_set_invalid_func(invalid)
   mem_set_trace_func(trace)

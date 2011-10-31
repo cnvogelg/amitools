@@ -32,9 +32,10 @@ static void default_invalid(int mode, int width, uint addr)
   printf("INVALID: %c(%d): %06x\n",(char)mode,width,addr);
 }
 
-static void default_trace(int mode, int width, uint addr, uint val)
+static int default_trace(int mode, int width, uint addr, uint val)
 {
   printf("%c(%d): %06x: %x\n",(char)mode,width,addr,val);
+  return 0;
 }
 
 /* ----- End Access ----- */
@@ -148,7 +149,9 @@ unsigned int  m68k_read_memory_8(unsigned int address)
   uint page = address >> 16;
   uint val = r_func[page][0](address);
   if(mem_trace) {
-    trace_func('R',0,address,val);
+    if(trace_func('R',0,address,val)) {
+      set_all_to_end();
+    }
   }
   return val;
 }
@@ -158,7 +161,9 @@ unsigned int  m68k_read_memory_16(unsigned int address)
   uint page = address >> 16;
   uint val = r_func[page][1](address);
   if(mem_trace) {
-    trace_func('R',1,address,val);
+    if(trace_func('R',1,address,val)) {
+      set_all_to_end();
+    }
   }
   return val;
 }
@@ -168,7 +173,9 @@ unsigned int  m68k_read_memory_32(unsigned int address)
   uint page = address >> 16;
   uint val = r_func[page][2](address);
   if(mem_trace) {
-    trace_func('R',2,address,val);
+    if(trace_func('R',2,address,val)) {
+      set_all_to_end();
+    }
   }
   return val;
 }
@@ -178,7 +185,9 @@ void m68k_write_memory_8(unsigned int address, unsigned int value)
   uint page = address >> 16;
   w_func[page][0](address, value);
   if(mem_trace) {
-    trace_func('W',0,address,value);
+    if(trace_func('W',0,address,value)) {
+      set_all_to_end();
+    }
   }
 }
 
@@ -187,7 +196,9 @@ void m68k_write_memory_16(unsigned int address, unsigned int value)
   uint page = address >> 16;
   w_func[page][1](address, value);
   if(mem_trace) {
-    trace_func('W',1,address,value);
+    if(trace_func('W',1,address,value)) {
+      set_all_to_end();
+    }
   }
 }
 
@@ -196,7 +207,9 @@ void m68k_write_memory_32(unsigned int address, unsigned int value)
   uint page = address >> 16;
   w_func[page][2](address, value);
   if(mem_trace) {
-    trace_func('W',2,address,value);
+    if(trace_func('W',2,address,value)) {
+      set_all_to_end();
+    }
   }
 }
 

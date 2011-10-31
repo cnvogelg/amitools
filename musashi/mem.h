@@ -17,7 +17,7 @@ typedef uint (*read_func_t)(uint addr);
 typedef void (*write_func_t)(uint addr, uint value);
 
 typedef void (*invalid_func_t)(int mode, int width, uint addr);
-typedef void (*trace_func_t)(int mode, int width, uint addr, uint val);
+typedef int (*trace_func_t)(int mode, int width, uint addr, uint val);
 
 /* ----- API ----- */
 extern int  mem_init(uint ram_size_kib);

@@ -18,9 +18,14 @@ class LabelStruct(LabelRange):
   def trace_mem(self, mode, width, addr, val):
     delta = addr - self.struct_begin
     if delta >= 0 and delta < self.struct_size:
-      name,off,val_type_name = self.struct.get_name_for_offset(delta, width)
-      type_name = self.struct.get_type_name()
-      addon = "%s+%d = %s(%s)+%d" % (type_name, delta, name, val_type_name, off)
-      self.trace_mem_int(mode, width, addr, val, text="Struct", addon=addon, level=logging.INFO)
+      try:
+        name,off,val_type_name = self.struct.get_name_for_offset(delta, width)
+        type_name = self.struct.get_type_name()
+        addon = "%s+%d = %s(%s)+%d" % (type_name, delta, name, val_type_name, off)
+        self.trace_mem_int(mode, width, addr, val, text="Struct", addon=addon, level=logging.INFO)
+        return True
+      except BaseException:
+        return False
     else:
       LabelRange.trace_mem(self, mode, width, addr, val)
+      return True

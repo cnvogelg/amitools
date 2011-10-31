@@ -1,6 +1,6 @@
 import logging
 from Exceptions import InvalidMemoryAccessError
-from Log import log_mem_int
+from Log import *
 
 MEMORY_WIDTH_BYTE = 0
 MEMORY_WIDTH_WORD = 1
@@ -11,6 +11,7 @@ class LabelManager:
   
   def __init__(self):
     self.ranges = []
+    self.error_tracker = None # will be set later
   
   def add_label(self, range):
     self.ranges.append(range)
@@ -42,9 +43,11 @@ class LabelManager:
   def trace_mem(self, mode, width, addr, val):
     r = self.get_label(addr)
     if r != None:
-      r.trace_mem(mode, width, addr, val)
-    else:
-      raise InvalidMemoryAccessError(mode, width, addr, 'main')
+      ok = r.trace_mem(mode, width, addr, val)
+      if ok:
+        return 0
+    self.error_tracker.report_invalid_memory(mode, width, addr)
+    return 1
 
   def _get_mem_str(self, addr):
     label = self.get_label(addr)

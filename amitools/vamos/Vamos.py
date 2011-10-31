@@ -28,14 +28,17 @@ class Vamos:
     self.raw_mem = raw_mem
     self.ram_size = raw_mem.ram_size
     self.cpu = cpu
-    # create a label manager
+
+    # create a label manager and error tracker
     self.label_mgr = LabelManager()
+    self.error_tracker = ErrorTracker(cpu, self.label_mgr)
+    self.label_mgr.error_tracker = self.error_tracker
+
     # set a label for first two dwords
     label = LabelRange("zero_page",0,8)
     self.label_mgr.add_label(label)
     
-    # create memory and allocate RAM
-    self.error_tracker = ErrorTracker(cpu, self.label_mgr)
+    # create memory access
     self.mem = MainMemory(self.raw_mem, self.error_tracker)
 
     # create memory allocator

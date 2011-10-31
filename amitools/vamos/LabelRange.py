@@ -19,6 +19,7 @@ class LabelRange:
 
   def trace_mem(self, mode, width, addr, value):
     self.trace_mem_int(mode, width, addr, value)
+    return True
 
   def trace_block(self, mode, addr, size, text="", level=logging.DEBUG, addon=""):
     log_mem.log(level, "%s(B): %06x: +%06x   %6s  [@%06x +%06x %s] %s", mode, addr, size, text, self.addr, addr - self.addr, self.name, addon)  
