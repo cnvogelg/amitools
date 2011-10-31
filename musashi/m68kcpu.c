@@ -38,35 +38,6 @@ static const char* copyright_notice =
 /* ================================= DATA ================================= */
 /* ======================================================================== */
 
-/* CV patch begin */
-/* don't forget to set these pointers before operation ;) */
-typedef uint (*read_func_t)(uint addr);
-typedef void (*write_func_t)(uint addr, uint value);
-
-read_func_t m68k_read_memory_8;
-read_func_t m68k_read_memory_16;
-read_func_t m68k_read_memory_32;
-
-write_func_t m68k_write_memory_8;
-write_func_t m68k_write_memory_16;
-write_func_t m68k_write_memory_32;
-
-void m68k_set_read_memory(read_func_t r8, read_func_t r16, read_func_t r32)
-{
-  m68k_read_memory_8 = r8;
-  m68k_read_memory_16 = r16;
-  m68k_read_memory_32 = r32;
-}
-
-void m68k_set_write_memory(write_func_t w8, write_func_t w16, write_func_t w32)
-{
-  m68k_write_memory_8 = w8;
-  m68k_write_memory_16 = w16;
-  m68k_write_memory_32 = w32;
-}
-
-/* CV patch end */
-
 int  m68ki_initial_cycles;
 int  m68ki_remaining_cycles = 0;                     /* Number of clocks remaining */
 uint m68ki_tracing = 0;

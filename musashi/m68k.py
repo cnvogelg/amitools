@@ -70,13 +70,15 @@ def find_lib():
 lib_file = find_lib()
 lib = CDLL(lib_file)
 
-# define function types for callbacks
+# define CPU function types for callbacks
 read_func_type = CFUNCTYPE(c_uint, c_uint)
 write_func_type = CFUNCTYPE(None, c_uint, c_uint)
 pc_changed_callback_func_type = CFUNCTYPE(None, c_uint)
 reset_instr_callback_func_type = CFUNCTYPE(None)
+invalid_func_type = CFUNCTYPE(None, c_int, c_int, c_uint)
+trace_func_type = CFUNCTYPE(None, c_int, c_int, c_uint, c_uint)
 
-# declare functions
+# declare cpu functions
 execute_func = lib.m68k_execute
 execute_func.restype = c_int
 execute_func.argtypes = [c_int]
@@ -88,25 +90,41 @@ get_reg_func.argtypes = [c_void_p, c_int]
 set_reg_func = lib.m68k_set_reg
 set_reg_func.argtypes = [c_int, c_uint]
 
-# --- API ---
+# declare mem functions
+mem_init_func = lib.mem_init
+mem_init_func.restype = c_int
+mem_init_func.argtypes = [c_uint]
 
-def set_read_memory(r8, r16, r32):
-  global r8c, r16c, r32c
-  r8c = read_func_type(r8)
-  r16c = read_func_type(r16)
-  r32c = read_func_type(r32)
-  lib.m68k_set_read_memory(r8c, r16c, r32c)
+mem_free_func = lib.mem_free
 
-def set_write_memory(w8, w16, w32):
-  global w8c, w16c, w32c
-  w8c = write_func_type(w8)
-  w16c = write_func_type(w16)
-  w32c = write_func_type(w32)
-  lib.m68k_set_write_memory(w8c, w16c, w32c)
+mem_set_trace_mode_func = lib.mem_set_trace_mode
+mem_set_trace_mode_func.argtypes = [c_int]
+
+mem_is_end_func = lib.mem_is_end
+mem_is_end_func.restype = c_int
+
+mem_reserve_special_range_func = lib.mem_reserve_special_range
+mem_reserve_special_range_func.restype = c_uint
+mem_reserve_special_range_func.argtypes = [c_uint]
+
+mem_set_special_range_read_func_func = lib.mem_set_special_range_read_func
+mem_set_special_range_read_func_func.argtypes = [c_uint, c_uint, read_func_type]
+
+mem_set_special_range_write_func_func = lib.mem_set_special_range_write_func
+mem_set_special_range_write_func_func.argtypes = [c_uint, c_uint, write_func_type]
+
+mem_read_func = lib.mem_read
+mem_read_func.restype = c_uint
+mem_read_func.argtypes = [c_int, c_uint]
+
+mem_write_func = lib.mem_write
+mem_write_func.argtypes = [c_int, c_uint, c_uint]
+
+# --- CPU API ---
 
 def set_pc_changed_callback(func):
   global pc_changed_callback
-  pc_changed_callback = pc_changed_callbak_func_type(func)
+  pc_changed_callback = pc_changed_callback_func_type(func)
   lib.m68k_set_pc_changed_callback(pc_changed_callback)
 
 def set_reset_instr_callback(func):
@@ -132,46 +150,118 @@ def set_reg(reg, value):
 def end_timeslice():
   lib.m68k_end_timeslice()
 
+# --- MEM API ---
+
+def mem_init(ram_size_kib):
+  return mem_init_func(ram_size_kib)
+
+def mem_free():
+  mem_free_func()
+
+def mem_set_invalid_func(func):
+  global invalid_func_callback
+  invalid_func_callback = invalid_func_type(func)
+  lib.mem_set_invalid_func(invalid_func_callback)
+
+def mem_set_trace_mode(on):
+  mem_set_trace_mode_func(on)
+
+def mem_set_trace_func(func):
+  global trace_func_callback
+  trace_func_callback = trace_func_type(func)
+  lib.mem_set_trace_func(trace_func_callback)
+  
+def mem_is_end():
+  return mem_is_end_func()
+  
+def mem_reserve_special_range(num_pages=1):
+  return mem_reserve_special_range_func(num_pages)
+
+w_funcs = {}
+r_funcs = {}
+
+def mem_set_special_range_read_func(page_addr, width, func):
+  global r_funcs
+  key = "%06x_%d" % (page_addr, width)
+  f = read_func_type(func)
+  r_funcs[key] = f
+  mem_set_special_range_read_func_func(page_addr, width, f)
+
+def mem_set_special_range_write_func(page_addr, width, func):
+  global w_funcs
+  key = "%06x_%d" % (page_addr, width)
+  f = write_func_type(func)
+  w_funcs[key] = f
+  mem_set_special_range_write_func_func(page_addr, width, f)
+
+def mem_read(width, addr):
+  return mem_read_func(width, addr)
+
+def mem_write(width, addr, val):
+  mem_write_func(width, addr, val)
+
 # --- Sample ---
 
 if __name__ == "__main__":
-  def read_mem_8(addr):
-    print "read 8 %08x" % (addr)
-    return 0
+  print "init mem"
+  if not mem_init(128):
+    print "ERROR: OUT OF MEMORY"
 
-  def read_mem_16(addr):
-    print "read 16 %08x" % (addr)
-    return 0
+  spec_addr = mem_reserve_special_range()
+  print "special range: %06x" % spec_addr
 
-  def read_mem_32(addr):
-    print "read 32 %08x" % (addr)
-    return 0
-
-  def write_mem_8(addr, value):
-    print "write 8 %08x: %08x" % (addr,value)
-
-  def write_mem_16(addr, value):
-    print "write 16 %08x: %08x" % (addr,value)
-
-  def write_mem_32(addr, value):
-    print "write 32 %08x: %08x" % (addr,value)
+  def invalid(mode, width, addr):
+    print "MY INVALID: %s(%d): %06x" % (chr(mode), width, addr)
+  
+  def trace(mode, width, addr, value):
+    print "TRACE: %s(%d): %06x: %x" % (chr(mode), width, addr, value)
+  
+  mem_set_invalid_func(invalid)
+  mem_set_trace_func(trace)
+  mem_set_trace_mode(1)
   
   def pc_changed(addr):
-    print "pc %08x" % (addr)
+    print "pc %06x" % (addr)
+    
+  def reset_handler():
+    print "RESET"
   
-  set_read_memory(read_mem_8, read_mem_16, read_mem_32)
-  set_write_memory(write_mem_8, write_mem_16, write_mem_32)
   set_cpu_type(M68K_CPU_TYPE_68000)
   set_pc_changed_callback(pc_changed)
+  set_reset_instr_callback(reset_handler)
   
   print "resetting cpu..."
   pulse_reset()
+  
+  # write mem
+  print "write mem..."
+  mem_write(1, 0x1000, 0x4e70) # RESET
+  val = mem_read(1, 0x1000)
+  print "RESET op=%04x" % val
+  
+  # valid range
   print "executing..."
-  set_reg(M68K_REG_PC,0xf80000);
-  print execute(100)
+  set_reg(M68K_REG_PC,0x1000);
+  print execute(2)
+
+  def my_r16(addr):
+    print "MY RANGE: %06x" % addr
+    return 0;
+  mem_set_special_range_read_func(spec_addr, 1, my_r16)
+
+  # invalid range
+  print "executing invalid..."
+  set_reg(M68K_REG_PC,spec_addr);
+  print execute(2)
+  
+  # check if mem is in end mode?
+  is_end = mem_is_end()
+  print "mem is_end:",is_end
   
   print "get/set register"
   print "%08x" % get_reg(M68K_REG_D0)
   set_reg(M68K_REG_D0,0xdeadbeef)
   print "%08x" % get_reg(M68K_REG_D0)
   
+  mem_free()
+  print "done"

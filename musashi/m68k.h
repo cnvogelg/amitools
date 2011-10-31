@@ -142,11 +142,9 @@ typedef enum
  */
 
 /* Read from anywhere */
-/* CV patch begin */
-unsigned int  (*m68k_read_memory_8)(unsigned int address);
-unsigned int  (*m68k_read_memory_16)(unsigned int address);
-unsigned int  (*m68k_read_memory_32)(unsigned int address);
-/* CV patch end */
+unsigned int  m68k_read_memory_8(unsigned int address);
+unsigned int  m68k_read_memory_16(unsigned int address);
+unsigned int  m68k_read_memory_32(unsigned int address);
 
 /* Read data immediately following the PC */
 unsigned int  m68k_read_immediate_16(unsigned int address);
@@ -163,11 +161,9 @@ unsigned int m68k_read_disassembler_16 (unsigned int address);
 unsigned int m68k_read_disassembler_32 (unsigned int address);
 
 /* Write to anywhere */
-/* CV patch begin */
-void (*m68k_write_memory_8)(unsigned int address, unsigned int value);
-void (*m68k_write_memory_16)(unsigned int address, unsigned int value);
-void (*m68k_write_memory_32)(unsigned int address, unsigned int value);
-/* CV patch end */
+void m68k_write_memory_8(unsigned int address, unsigned int value);
+void m68k_write_memory_16(unsigned int address, unsigned int value);
+void m68k_write_memory_32(unsigned int address, unsigned int value);
 
 
 /* ======================================================================== */

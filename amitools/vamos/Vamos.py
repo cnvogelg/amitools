@@ -24,7 +24,9 @@ from Log import *
 
 class Vamos:
   
-  def __init__(self, ram_size, cpu):
+  def __init__(self, raw_mem, cpu):
+    self.raw_mem = raw_mem
+    self.ram_size = raw_mem.ram_size
     self.cpu = cpu
     # create a label manager
     self.label_mgr = LabelManager()
@@ -33,14 +35,12 @@ class Vamos:
     self.label_mgr.add_label(label)
     
     # create memory and allocate RAM
-    log_mem_init.info("setting up main memory with %s KiB RAM" % ram_size)
     self.error_tracker = ErrorTracker(cpu, self.label_mgr)
-    self.mem = MainMemory(self.label_mgr, self.error_tracker)
-    self.mem.init_ram(ram_size)
+    self.mem = MainMemory(self.raw_mem, self.label_mgr, self.error_tracker)
 
     # create memory allocator
     self.mem_begin = 0x1000
-    self.alloc = MemoryAlloc(self.mem, 0, ram_size * 1024, self.mem_begin, self.label_mgr)
+    self.alloc = MemoryAlloc(self.mem, 0, self.ram_size, self.mem_begin, self.label_mgr)
     
     # create segment loader
     self.seg_loader = SegmentLoader( self.mem, self.alloc, self.label_mgr )
@@ -61,7 +61,7 @@ class Vamos:
     # load binary
     seg_list = self.seg_loader.load_seg(bin_file)
     if seg_list == None:
-      log_main.error("failed loading binary: '%s' %s", bin_file, seg_loader.error)
+      log_main.error("failed loading binary: '%s' %s", bin_file, self.seg_loader.error)
       return None
     log_mem_init.info("binary segments: %s",bin_file)
     for s in seg_list:

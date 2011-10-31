@@ -11,8 +11,8 @@ OBJ = $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRC))
 
 GEN_INPUT = m68k_in.c
 
-GEN_SRC = m68kopac.c m68kopdm.c m68kopnz.c m68kops.c
-GEN_HDR = m68kops.h
+GEN_SRC = mem.c m68kopac.c m68kopdm.c m68kopnz.c m68kops.c
+GEN_HDR = mem.h m68kops.h
 GEN_FILES = $(GEN_SRC) $(GEN_HDR)
 GEN_OBJ = $(patsubst %.c,$(BUILD_DIR)/%.o,$(GEN_SRC))
 

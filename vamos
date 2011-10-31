@@ -16,6 +16,7 @@ import time
 from musashi import m68k
 
 from amitools.vamos.CPU import CPU
+from amitools.vamos.MEM import MEM
 from amitools.vamos.Log import *
 from amitools.vamos.Vamos import Vamos
 from amitools.vamos.Exceptions import *
@@ -37,6 +38,25 @@ class MusashiCPU(CPU):
     m68k.set_reg(m68k.M68K_REG_SR,val)
   def r_sr(sefl):
     return m68k.get_reg(m68k.M68K_REG_SR)
+
+class MusashiMEM(MEM):
+  def __init__(self):
+    MEM.__init__(self,"musashi")
+  def init(self,ram_size_kib):
+    self.ram_size = ram_size_kib * 1024
+    return m68k.mem_init(ram_size_kib)
+  def free(self):
+    m68k.mem_free()
+  def read_mem(self,width, addr):
+    return m68k.mem_read(width, addr)
+  def write_mem(self,width, addr, val):
+    m68k.mem_write(width,addr,val)
+  def reserve_special_range(self,num_pages):
+    return m68k.mem_reserve_special_range(num_pages)
+  def set_special_range_read_func(self,page_addr, width, func):
+    m68k.mem_set_special_range_read_func(page_addr, width, func)
+  def set_special_range_write_func(self,page_addr, width, func):
+    m68k.mem_set_special_range_write_func(page_addr, width, func)
 
 # ----- main -----
 
@@ -74,14 +94,18 @@ log_setup(args.logging)
 
 # ----- vamos! ---------------------------------------------------------------
 cpu = MusashiCPU()
-vamos = Vamos(args.ram_size, cpu)
+mem = MusashiMEM()
+log_main.info("setting up main memory with %s KiB RAM" % args.ram_size)
+if not mem.init(args.ram_size):
+  log_main.error("can't allocate vamos RAM: %d KiB" % args.ram_size)
+  sys.exit(1)
+vamos = Vamos(mem, cpu)
 
 # --- setup stack ---
 vamos.init_stack(args.stack_size)
 
 # --- load segments of binary ---
 if not vamos.load_main_binary(args.bin):
-  log_main.error("failed loading binary: '%s' %s", args.bin, vamos.seg_loader.error)
   sys.exit(1)
 # place args in memory
 vamos.init_args(args.args)
@@ -101,21 +125,17 @@ vamos.create_old_dos_guard()
 # ----- start cpu ------------------------------------------------------------
 # prepare m68k
 log_main.info("setting up m68k")
-m68k.set_read_memory(*ctx.mem.get_read_funcs(args.memory_trace))
-m68k.set_write_memory(*ctx.mem.get_write_funcs(args.memory_trace))
 m68k.set_cpu_type(m68k.M68K_CPU_TYPE_68000)
 
-# reset CPU with a temporary reset range
-log_main.info("resetting cpu...")
 # setup stack & first PC
-ctx.mem.w32(0, vamos.stack_initial)
-ctx.mem.w32(4, vamos.prog_start)
+ctx.mem.access.w32(0, vamos.stack_initial)
+ctx.mem.access.w32(4, vamos.prog_start)
 m68k.pulse_reset()
 
 # set end RESET opcode at 0 and execbase at 4
 op_reset = 0x04e70
-ctx.mem.w16(0, op_reset)
-ctx.mem.w32(4, vamos.exec_lib.lib_base)
+ctx.mem.access.w16(0, op_reset)
+ctx.mem.access.w32(4, vamos.exec_lib.lib_base)
 
 # setup RESET: catch end of program and all library traps
 stay = True
@@ -172,10 +192,11 @@ end_time = time.time()
 delta_time = end_time - start_time
 delta_time -= trap_time
 mhz = total_cycles / (1000000.0 * delta_time)
-log_main.info("done (%d cycles in %.4gs -> %.2g MHz, trap time %.4gs)", total_cycles, delta_time, mhz, trap_time)
+log_main.info("done (%d cycles in %.4fs -> %5.2f MHz, trap time %.4fs)", total_cycles, delta_time, mhz, trap_time)
 
 # if errors happened then report them now
 if et.has_errors:
   log_main.error("After %d cycles:", total_cycles)
   et.dump()
       
+mem.free()

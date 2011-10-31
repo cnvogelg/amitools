@@ -19,30 +19,31 @@ class AmigaResident:
     addr = region.addr
     end = region.addr + region.size
     finds = []
+    a = mem.access
     while addr < end:
-      w = mem.r16(addr)
+      w = a.r16(addr)
       if w == self.match_word:
-        ptr = mem.r32(addr+2)
+        ptr = a.r32(addr+2)
         if ptr == addr:
           # found a resident
           res = {
             'addr':addr,
-            'flags':mem.r8(addr+10),
-            'version':mem.r8(addr+11),
-            'type':mem.r8(addr+12),
-            'pri':mem.r8(addr+13),
-            'name_ptr':mem.r32(addr+14),
-            'id_ptr':mem.r32(addr+18),
-            'init_ptr':mem.r32(addr+22),
+            'flags':a.r8(addr+10),
+            'version':a.r8(addr+11),
+            'type':a.r8(addr+12),
+            'pri':a.r8(addr+13),
+            'name_ptr':a.r32(addr+14),
+            'id_ptr':a.r32(addr+18),
+            'init_ptr':a.r32(addr+22),
             'mem':mem
           }
           # eval values
           res['auto_init'] = res['flags'] & self.RTF_AUTOINIT == self.RTF_AUTOINIT
-          res['name'] = mem.access.r_cstr(res['name_ptr'])
-          res['id'] = mem.access.r_cstr(res['id_ptr'])
+          res['name'] = a.r_cstr(res['name_ptr'])
+          res['id'] = a.r_cstr(res['id_ptr'])
           
           finds.append(res)
-          skip = mem.r32(addr+6)
+          skip = a.r32(addr+6)
           addr = skip
         else:
           addr += 2
@@ -58,10 +59,11 @@ class AmigaResident:
     # read auto init params
     addr = res['init_ptr']
     mem = res['mem']
-    res['dataSize'] = all_mem.r32(addr)
-    res['vectors_ptr'] = all_mem.r32(addr+4)
-    res['struct_ptr'] = all_mem.r32(addr+8)
-    res['init_code_ptr'] = all_mem.r32(addr+12)
+    a = all_mem.access
+    res['dataSize'] = a.r32(addr)
+    res['vectors_ptr'] = a.r32(addr+4)
+    res['struct_ptr'] = a.r32(addr+8)
+    res['init_code_ptr'] = a.r32(addr+12)
     
     # parse vectors, structs
     res['vectors'] = self.parse_vectors(res['vectors_ptr'], all_mem)
@@ -73,52 +75,54 @@ class AmigaResident:
     res = []
     if addr == 0:
       return res
+    a = mem.access
     while True:
-      cmd = mem.r8(addr)
+      cmd = a.r8(addr)
       print "%08x: %02x" % (addr,cmd)
       if cmd == self.INIT_END:
         break
       elif cmd == self.INIT_BYTE_B:
-        off = mem.r8(addr+1)
-        val = mem.r8(addr+2)
+        off = a.r8(addr+1)
+        val = a.r8(addr+2)
         addr += 4
         res.append((off,val,0))
       elif cmd == self.INIT_BYTE_W:
-        off = mem.r16(addr+2)
-        val = mem.r8(addr+4)
+        off = a.r16(addr+2)
+        val = a.r8(addr+4)
         addr += 6
         res.append((off,val,0))
       elif cmd == self.INIT_WORD_B:
-        off = mem.r8(addr+1)
-        val = mem.r16(addr+2)
+        off = a.r8(addr+1)
+        val = a.r16(addr+2)
         addr += 4
         res.append((off,val,1))
       elif cmd == self.INIT_WORD_W:
-        off = mem.r16(addr+2)
-        val = mem.r16(addr+4)
+        off = a.r16(addr+2)
+        val = a.r16(addr+4)
         addr += 6
         res.append((off,val,1))
       elif cmd == self.INIT_LONG_B:
-        off = mem.r8(addr+1)
-        val = mem.r32(addr+2)
+        off = a.r8(addr+1)
+        val = a.r32(addr+2)
         addr += 6
         res.append((off,val,2))
       elif cmd == self.INIT_LONG_W:
-        off = mem.r16(addr+2)
-        val = mem.r32(addr+4)
+        off = a.r16(addr+2)
+        val = a.r32(addr+4)
         addr += 8
       else:
         raise ValueError("Invalid parse_struct command: %02x" % cmd)
   
   def parse_vectors(self, addr, all_mem):
-    is_word = (all_mem.r16(addr) == 0xffff)
+    a = all_mem.access
+    is_word = (a.r16(addr) == 0xffff)
     vec = []
     # 16 bit offsets
     if is_word:
       base = addr
       addr += 2
       while True:
-        off = all_mem.r16(addr)
+        off = a.r16(addr)
         addr += 2
         if off == 0xffff:
           break
@@ -130,7 +134,7 @@ class AmigaResident:
     # 32 bit pointers
     else:
       while True:
-        off = all_mem.r32(addr)
+        off = a.r32(addr)
         addr += 4
         if off == 0xffffffff:
           break
