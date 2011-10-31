@@ -47,10 +47,6 @@ class MusashiMEM(MEM):
     return m68k.mem_init(ram_size_kib)
   def free(self):
     m68k.mem_free()
-  def read_mem(self,width, addr):
-    return m68k.mem_read(width, addr)
-  def write_mem(self,width, addr, val):
-    m68k.mem_write(width,addr,val)
   def reserve_special_range(self,num_pages):
     return m68k.mem_reserve_special_range(num_pages)
   def set_special_range_read_func(self,page_addr, width, func):
@@ -61,7 +57,15 @@ class MusashiMEM(MEM):
     m68k.mem_set_trace_mode(on)
   def set_mem_trace_func(self,func):
     m68k.mem_set_trace_func(func)
-
+  def read_ram(self,width, addr):
+    return m68k.mem_ram_read(width, addr)
+  def write_ram(self,width, addr, val):
+    m68k.mem_ram_write(width,addr,val)
+  def read_ram_block(self,addr,size,data):
+    m68k.mem_ram_read_block(addr,size,data)
+  def write_ram_block(self,addr,size,data):
+    m68k.mem_ram_write_block(addr,size,data)
+  
 # ----- main -----
 
 # --- preset args ---

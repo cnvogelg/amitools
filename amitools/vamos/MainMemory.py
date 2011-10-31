@@ -18,7 +18,7 @@ class MainMemory:
     self.raw_mem = raw_mem
     self.error_tracker = error_tracker
     self.label_mgr = label_mgr
-    self.access = AccessMemory(raw_mem, label_mgr)
+    self.access = AccessMemory(self, label_mgr)
   
   # reserve special range -> begin_addr
   def reserve_special_range(self, num_pages=1):
@@ -44,7 +44,13 @@ class MainMemory:
         self.raw_mem.set_special_range_write_func(addr, 2, w32)
 
   def read_mem(self, width, addr):
-    return self.raw_mem.read_mem(width, addr)
+    return self.raw_mem.read_ram(width, addr)
     
   def write_mem(self, width, addr, val):
-    self.raw_mem.write_mem(width, addr, val)
+    self.raw_mem.write_ram(width, addr, val)
+
+  def read_block(self, addr, size, data):
+    self.raw_mem.read_ram_block(addr,size,data)
+  
+  def write_block(self, addr, size, data):
+    self.raw_mem.write_ram_block(addr,size,data)

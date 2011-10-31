@@ -5,9 +5,13 @@ class MEM:
     pass
   def free(self):
     pass
-  def read_mem(self,width, addr):
+  def read_ram(self,width, addr):
     return 0
-  def write_mem(self,width, addr, val):
+  def write_ram(self,width, addr, val):
+    pass
+  def read_ram_block(self,addr,size,data):
+    pass
+  def write_ram_block(self,addr,size,data):
     pass
   def reserve_special_range(num_pages):
     return 0

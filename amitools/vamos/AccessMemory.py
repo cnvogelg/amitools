@@ -1,4 +1,5 @@
 import logging
+import ctypes
 from Log import log_mem_int
 
 class AccessMemory():
@@ -57,20 +58,16 @@ class AccessMemory():
     self.write_mem(0, addr, val)
 
   def w_data(self, addr, data):
-    off = addr
-    for d in data:
-      self.mem.write_mem(0, off, ord(d))
-      off += 1
-    self._trace_block_write( addr, len(data))
+    size = len(data)
+    buf = ctypes.create_string_buffer(data)
+    self.mem.write_block(addr,size,buf)
+    self._trace_block_write( addr, size )
 
   def r_data(self, addr, size):
-    off = addr
-    result = ""
-    for i in xrange(size):
-      result += chr(self.mem.read_mem(0, off))
-      off += 1
+    buf = ctypes.create_string_buffer(size)
+    self.mem.read_block(addr,size,buf)
     self._trace_block_read( addr, size )
-    return result
+    return buf.value
 
   def r_cstr(self, addr):
     off = addr

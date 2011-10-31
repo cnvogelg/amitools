@@ -113,12 +113,19 @@ mem_set_special_range_read_func_func.argtypes = [c_uint, c_uint, read_func_type]
 mem_set_special_range_write_func_func = lib.mem_set_special_range_write_func
 mem_set_special_range_write_func_func.argtypes = [c_uint, c_uint, write_func_type]
 
-mem_read_func = lib.mem_read
-mem_read_func.restype = c_uint
-mem_read_func.argtypes = [c_int, c_uint]
+# public
+mem_ram_read = lib.mem_ram_read
+mem_ram_read.restype = c_uint
+mem_ram_read.argtypes = [c_int, c_uint]
 
-mem_write_func = lib.mem_write
-mem_write_func.argtypes = [c_int, c_uint, c_uint]
+mem_ram_write = lib.mem_ram_write
+mem_ram_write.argtypes = [c_int, c_uint, c_uint]
+
+mem_ram_read_block = lib.mem_ram_read_block
+mem_ram_read_block.argtypes = [c_uint, c_uint, c_char_p]
+
+mem_ram_write_block = lib.mem_ram_write_block
+mem_ram_write_block.argtypes = [c_uint, c_uint, c_char_p]
 
 # --- CPU API ---
 
@@ -194,12 +201,6 @@ def mem_set_special_range_write_func(page_addr, width, func):
   w_funcs[key] = f
   mem_set_special_range_write_func_func(page_addr, width, f)
 
-def mem_read(width, addr):
-  return mem_read_func(width, addr)
-
-def mem_write(width, addr, val):
-  mem_write_func(width, addr, val)
-
 # --- Sample ---
 
 if __name__ == "__main__":
@@ -235,9 +236,14 @@ if __name__ == "__main__":
   
   # write mem
   print "write mem..."
-  mem_write(1, 0x1000, 0x4e70) # RESET
-  val = mem_read(1, 0x1000)
+  mem_ram_write(1, 0x1000, 0x4e70) # RESET
+  val = mem_ram_read(1, 0x1000)
   print "RESET op=%04x" % val
+  
+  # write block
+  p = create_string_buffer(20)
+  mem_ram_write_block(0, 20, p)
+  mem_ram_read_block(0, 20, p)
   
   # valid range
   print "executing..."

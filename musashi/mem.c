@@ -6,6 +6,8 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+
 #include "mem.h"
 
 #define NUM_PAGES   256
@@ -278,40 +280,46 @@ void mem_set_special_range_write_func(uint page_addr, uint width, write_func_t f
   w_func[page][width] = func;
 }
 
-uint mem_read(int mode, uint addr)
+/* ----- RAM Access ----- */
+
+uint mem_ram_read(int mode, uint addr)
 {
-  int save_mem_trace = mem_trace;
-  mem_trace = 0;
   uint val = 0;
   switch(mode) {
     case 0:
-      val = m68k_read_memory_8(addr);
+      val = r8_ram(addr);
       break;
     case 1:
-      val = m68k_read_memory_16(addr);
+      val = r16_ram(addr);
       break;
     case 2:
-      val = m68k_read_memory_32(addr);
+      val = r32_ram(addr);
       break;
   }
-  mem_trace = save_mem_trace;
   return val;
 }
 
-void mem_write(int mode, uint addr, uint value)
+void mem_ram_write(int mode, uint addr, uint value)
 {
-  int save_mem_trace = mem_trace;
-  mem_trace = 0;
   switch(mode) {
     case 0:
-      m68k_write_memory_8(addr, value);
+      w8_ram(addr, value);
       break;
     case 1:
-      m68k_write_memory_16(addr, value);
+      w16_ram(addr, value);
       break;
     case 2:
-      m68k_write_memory_32(addr, value);
+      w32_ram(addr, value);
       break;
   }
-  mem_trace = save_mem_trace;
+}
+
+void mem_ram_read_block(uint addr, uint size, char *data)
+{
+  memcpy(data, ram_data + addr, size);
+}
+
+void mem_ram_write_block(uint addr, uint size, const char *data)
+{
+  memcpy(ram_data + addr, data, size);
 }
