@@ -33,13 +33,13 @@ class MemoryAlloc:
     self._cur = addr + size
     if (self._cur - self.addr) > self.size:
       raise OutOfAmigaMemoryError(self, size)
-    log_mem_alloc.info("[alloc @%06x: %06x bytes (padding %x)]", addr,size,padding)
+    log_mem_alloc.debug("[alloc @%06x: %06x bytes (padding %x)]", addr,size,padding)
     self.addrs[addr] = size
     return addr
   
   def free_mem(self, addr, size):
     # TODO real free
-    log_mem_alloc.info("[free  @%06x: %06x bytes]", addr, size)
+    log_mem_alloc.debug("[free  @%06x: %06x bytes]", addr, size)
     del self.addrs[addr]
 
   def get_range_by_addr(self, addr):
@@ -55,7 +55,9 @@ class MemoryAlloc:
     addr = self.alloc_mem(size, padding)
     label = LabelRange(name, addr, size)
     self.label_mgr.add_label(label)
-    return Memory(addr,size,label,self.mem.access)
+    mem = Memory(addr,size,label,self.mem.access)
+    log_mem_alloc.info(mem)
+    return mem
   
   def free_memory(self, mem):
     self.label_mgr.remove_label(mem.label)
@@ -68,7 +70,9 @@ class MemoryAlloc:
     label = LabelStruct(name, addr, struct)
     self.label_mgr.add_label(label)
     access = AccessStruct(self.mem, struct, addr)
-    return Memory(addr,size,label,access)
+    mem = Memory(addr,size,label,access)
+    log_mem_alloc.info(mem)
+    return mem
   
   def free_struct(self, mem):
     self.label_mgr.remove_label(mem.label)
@@ -81,7 +85,9 @@ class MemoryAlloc:
     label = LabelRange(name, addr, size)
     self.label_mgr.add_label(label)
     self.mem.access.w_cstr(addr, cstr)
-    return Memory(addr,size,label,self.mem.access)
+    mem = Memory(addr,size,label,self.mem.access)
+    log_mem_alloc.info(mem)
+    return mem
   
   def free_cstr(self, mem):
     self.label_mgr.remove_label(mem.label)
@@ -94,7 +100,9 @@ class MemoryAlloc:
     label = LabelRange(name, addr, size)
     self.label_mgr.add_label(label)
     self.mem.access.w_bstr(addr, bstr)
-    return Memory(addr,size,label,self.mem.access)
+    mem = Memory(addr,size,label,self.mem.access)
+    log_mem_alloc.info(mem)
+    return mem
   
   def free_bstr(self, mem):
     self.label_mgr.remove_label(mem.label)

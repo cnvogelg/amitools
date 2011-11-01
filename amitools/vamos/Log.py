@@ -40,9 +40,12 @@ def log_parse_level(name):
   else:
     return None
 
-def log_setup(arg,verbose=False,quiet=False):
+def log_setup(arg,verbose=False,quiet=False,file_name=None):
   # setup handler
-  ch = logging.StreamHandler()
+  if file_name != None:
+    ch = logging.FileHandler(file_name, mode='w')
+  else:
+    ch = logging.StreamHandler()
   ch.setLevel(logging.DEBUG)
   # and formatter
   formatter = logging.Formatter('%(asctime)s.%(msecs)03d %(name)10s:%(levelname)7s:  %(message)s', datefmt='%H:%M:%S')

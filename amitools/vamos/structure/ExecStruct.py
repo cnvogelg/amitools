@@ -201,3 +201,14 @@ class ExecLibraryStruct(AmigaStruct):
     ('APTR','ex_MemHandler')
   ]
 ExecLibraryDef = ExecLibraryStruct()
+
+# StackSwap
+class StackSwapStruct(AmigaStruct):
+  _name = "StackSwap"
+  _format = [
+    ('APTR', 'stk_Lower'),
+    ('ULONG', 'stk_Upper'),
+    ('APTR', 'stk_Pointer')
+  ]
+StackSwapDef = StackSwapStruct()
+  

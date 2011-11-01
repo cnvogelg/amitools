@@ -30,3 +30,4 @@ class LabelLib(LabelStruct):
     else:
       # no use regular access
       LabelStruct.trace_mem(self, mode, width, addr, val)
+    return True

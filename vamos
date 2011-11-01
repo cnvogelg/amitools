@@ -85,6 +85,7 @@ parser.add_argument('-q', '--quiet', action='store_true', default=False, help="d
 parser.add_argument('-c', '--cycles', action='store', type=int, default=0, help="maximum number of cycles to execute")
 parser.add_argument('-b', '--block', action='store', type=int, default=1000, help="cycles per block")
 parser.add_argument('-l', '--logging', action='store', default=None, help="logging settings: <chan>:<level>,*:<level>,...")
+parser.add_argument('-L', '--log-file', action='store', default=None, help="write all log messages to a file")
 parser.add_argument('-P', '--prefix', action='store', default=vamos_prefix, help="vamos directory prefix (%s)" % vamos_prefix)
 parser.add_argument('-V', '--lib-version', action='store', default=None, help="set lib version: <lib>:<version>,...")
 parser.add_argument('-m', '--ram-size', action='store', default=1024, help="set RAM size in KiB")
@@ -101,7 +102,7 @@ if args.lib_version != None:
     lib_versions[n] = int(v)
 
 # --- init logging ---
-log_setup(args.logging, args.verbose, args.quiet)
+log_setup(args.logging, args.verbose, args.quiet, args.log_file)
 
 # ----- vamos! ---------------------------------------------------------------
 cpu = MusashiCPU()

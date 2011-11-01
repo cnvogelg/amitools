@@ -2,6 +2,7 @@ from amitools.vamos.AmigaLibrary import *
 from amitools.vamos.structure.ExecStruct import *
 from amitools.vamos.Log import log_exec
 from amitools.vamos.Exceptions import *
+from amitools.vamos.AccessStruct import AccessStruct
 
 class ExecLibrary(AmigaLibrary):
   name = "exec.library"
@@ -161,8 +162,13 @@ class ExecLibrary(AmigaLibrary):
       (522, self.RawDoFmt),
       (684, self.AllocVec),
       (690, self.FreeVec),
+      (732, self.StackSwap)
     )
     self.set_funcs(exec_funcs)
+  
+  def set_stack(self, lower, upper):
+    self.stk_lower = lower
+    self.stk_upper = upper
   
   def set_managers(self, port_mgr):
     self.port_mgr = port_mgr
@@ -193,6 +199,33 @@ class ExecLibrary(AmigaLibrary):
     log_exec.info("SetSignals: new_signals=%08x signal_mask=%08x old_signals=%08x" % (new_signals, signal_mask, old_signals))
     return old_signals
   
+  def StackSwap(self, lib, ctx):
+    stsw_ptr = ctx.cpu.r_reg(REG_A0)
+    stsw = AccessStruct(ctx.mem,StackSwapDef,struct_addr=stsw_ptr)
+    # get new stack values
+    new_lower = stsw.r_s('stk_Lower')
+    new_upper = stsw.r_s('stk_Upper')
+    new_pointer = stsw.r_s('stk_Pointer')
+    # retrieve current (old) stack
+    old_lower = self.stk_lower
+    old_upper = self.stk_upper
+    old_pointer = ctx.cpu.r_reg(REG_A7) # addr of sys call return
+    # get adress of callee
+    callee = ctx.mem.access.r32(old_pointer)
+    # we report the old stack befor callee
+    old_pointer += 4
+    log_exec.info("StackSwap: old(lower=%06x,upper=%06x,ptr=%06x) new(lower=%06x,upper=%06x,ptr=%06x)" % (old_lower,old_upper,old_pointer,new_lower,new_upper,new_pointer))
+    stsw.w_s('stk_Lower', old_lower)
+    stsw.w_s('stk_Upper', old_upper)
+    stsw.w_s('stk_Pointer', old_pointer)
+    self.stk_lower = new_lower
+    self.stk_upper = new_upper
+    # put callee's address on new stack
+    new_pointer -= 4
+    ctx.mem.access.w32(new_pointer,callee)
+    # activate new stack
+    ctx.cpu.w_reg(REG_A7, new_pointer)
+    
   # ----- Libraries -----
   
   def OpenLibrary(self, lib, ctx):

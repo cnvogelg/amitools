@@ -33,6 +33,8 @@ class LibEntry():
     # native lib only
     self.trampoline = None
     self.seg_list = None
+  def __str__(self):
+    return "[Lib:'%s',V%d]" % (self.name, self.version)
 
 class LibManager():
   

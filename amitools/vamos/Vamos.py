@@ -128,6 +128,7 @@ class Vamos:
     # exec
     self.exec_lib_def = ExecLibrary(self.lib_mgr, self.alloc, version=exec_version)
     self.exec_lib_def.set_managers(self.port_mgr)
+    self.exec_lib_def.set_stack(self.stack_base, self.stack_end)
     self.lib_mgr.register_int_lib(self.exec_lib_def)
     # dos
     self.dos_lib_def = DosLibrary(self.mem, self.alloc, version=dos_version)
