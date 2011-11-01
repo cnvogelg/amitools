@@ -57,7 +57,8 @@ static void wx_end(uint addr, uint val)
 /* ----- Invalid Access ----- */
 static void set_all_to_end(void)
 {
-  for(int i=0;i<NUM_PAGES;i++) {
+  int i;
+  for(i=0;i<NUM_PAGES;i++) {
     r_func[i][0] = rx_end;
     r_func[i][1] = r16_end;
     r_func[i][2] = rx_end;
@@ -220,8 +221,9 @@ int mem_init(uint ram_size_kib)
   ram_size = ram_size_kib * 1024;
   ram_pages = ram_size_kib / 64;
   ram_data = (uint8_t *)malloc(ram_size);
-  
-  for(int i=0;i<NUM_PAGES;i++) {
+
+  int i;
+  for(i=0;i<NUM_PAGES;i++) {
     if(i < ram_pages) {
       r_func[i][0] = r8_ram;
       r_func[i][1] = r16_ram;
