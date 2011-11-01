@@ -135,7 +135,7 @@ class HunkReader:
       if hunk_size < 0:
         self.error_string = "HUNK_HEADER contains invalid hunk_size"
         return RESULT_INVALID_HUNK_FILE
-      
+      hunk_size *= 4 # longs to bytes
       hunk_info['size'] = hunk_size & ~HUNKF_ALL
       self.set_mem_flags(hunk_info, hunk_size & HUNKF_ALL, 30)      
       hunk_table.append(hunk_info)
@@ -731,6 +731,7 @@ class HunkReader:
           seek_header = False
           seek_begin = False
           e['hunk_no'] = hunk_no
+          e['alloc_size'] = self.header['hunks'][hunk_no]['size']
           hunk_no += 1
         # add an extra overlay "hunk"
         elif hunk_type == HUNK_OVERLAY:
@@ -767,6 +768,7 @@ class HunkReader:
           seek_header = False
           seek_begin = False
           e['hunk_no'] = hunk_no
+          e['alloc_size'] = self.header['hunks'][hunk_no]['size']
           hunk_no += 1
         # unecpected hunk?!
         else:

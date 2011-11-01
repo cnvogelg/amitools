@@ -1,4 +1,4 @@
-import array
+import ctypes
 import struct
 
 from amitools import Hunk
@@ -13,9 +13,16 @@ class HunkRelocate:
     sizes = []
     for segment in self.hunk_file.segments:
       main_hunk = segment[0]
-      size = main_hunk['size']
+      size = main_hunk['alloc_size']
       sizes.append(size)
     return sizes
+
+  def get_total_size(self):
+    sizes = self.get_sizes()
+    total = 0
+    for s in sizes:
+      total += s
+    return total
 
   def get_type_names(self):
     names = []
@@ -24,7 +31,9 @@ class HunkRelocate:
       name = main_hunk['type_name']
       names.append(name)
     return names
-  
+
+  # generate a sequence of addresses suitable for relocation
+  # in a single block
   def get_seq_addrs(self, base_addr, padding=0):
     sizes = self.get_sizes()
     addrs = []
@@ -34,33 +43,19 @@ class HunkRelocate:
       addr += s + padding
     return addrs
   
-  def get_total_size(self):
-    total = 0
-    for segment in self.hunk_file.segments:
-      main_hunk = segment[0]
-      total += main_hunk['size']
-    return total
-  
-  def relocate_one_block(self, addr, padding=0):
-    addrs = self.get_seq_addrs(addr,padding=padding)
-    datas = self.relocate(addrs)
-    result = []
-    for d in datas:
-      result.append(d)
-      if padding > 0:
-        result.append('\0' * padding)
-    return "".join(result)
-  
   def relocate(self, addr):
     datas = []
     for segment in self.hunk_file.segments:
       main_hunk = segment[0]
       hunk_no = main_hunk['hunk_no']
-      if main_hunk.has_key('data'):
-        data = array.array('B',main_hunk['data'])
-      else: # bss
-        data = array.array('B','\0' * main_hunk['size'])
+      alloc_size = main_hunk['alloc_size']
+      size = main_hunk['size']
+      data = ctypes.create_string_buffer(alloc_size)      
       
+      # fill in segment data
+      if main_hunk.has_key('data'):
+        data.value = main_hunk['data']
+        
       if self.verbose:
         print "#%02d @ %06x" % (hunk_no, addr[hunk_no])
       
@@ -76,7 +71,7 @@ class HunkRelocate:
             for offset in offsets:
               self.relocate32(hunk_no,data,offset,hunk_addr)
         
-      datas.append(data.tostring())
+      datas.append(data.raw)
     return datas
 
   def relocate32(self, hunk_no, data, offset, hunk_addr):
@@ -92,4 +87,4 @@ class HunkRelocate:
   
   def write_long(self, data, offset, value):
     bytes = struct.pack(">I",value)
-    data[offset:offset+4] = array.array('B',bytes)
+    data[offset:offset+4] = bytes

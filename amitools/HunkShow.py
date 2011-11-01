@@ -1,5 +1,6 @@
 from amitools import Hunk
 from amitools import HunkDisassembler
+import Utils
 
 class HunkShow:
   
@@ -82,10 +83,14 @@ class HunkShow:
     else:
       data_file_offset = None
     hunk_file_offset = main['hunk_file_offset']
+    if main.has_key('alloc_size'):
+      alloc_size = main['alloc_size']
+    else:
+      alloc_size = None
     
-    self.print_segment_header(hunk_no, type_name, size, name, data_file_offset, hunk_file_offset)
+    self.print_segment_header(hunk_no, type_name, size, name, data_file_offset, hunk_file_offset, alloc_size)
     if self.hexdump:
-      self.show_hex(main['data'])
+      Utils.print_hex(main['data'],indent=8)
 
     for extra in hunk[1:]:
       self.show_extra_hunk(extra)
@@ -161,7 +166,7 @@ class HunkShow:
           self.print_symbol(addr,"line %d" % line)
     else:
       if self.show_debug:
-        self.show_hex(hunk['data'])
+        Utils.print_hex(hunk['data'],indent=8)
     
   def show_symbol_hunk(self, hunk):
     for symbol in hunk['symbols']:
@@ -195,11 +200,13 @@ class HunkShow:
   def print_extra_sub(self, text):
     print "\t\t\t%s" % text
 
-  def print_segment_header(self, hunk_no, type_name, size, name, data_file_offset, hunk_file_offset):
-    if data_file_offset == None:
-      extra = "file header @%08x" % hunk_file_offset
-    else:
-      extra = "file header @%08x  data @%08x" % (hunk_file_offset, data_file_offset)
+  def print_segment_header(self, hunk_no, type_name, size, name, data_file_offset, hunk_file_offset, alloc_size):
+    extra = ""
+    if alloc_size != None:
+      extra += "alloc size %08x  " % alloc_size
+    extra += "file header @%08x" % hunk_file_offset
+    if data_file_offset != None:
+      extra += "  data @%08x" % data_file_offset
     print "\t#%03d  %-5s  size %08x  %s  %s" % (hunk_no, type_name, size, extra, name)
 
   def print_symbol(self,addr,name,extra):
@@ -211,37 +218,7 @@ class HunkShow:
 
   def print_unit(self, no, name):
     print "  #%03d  UNIT  %s" % (no, name)
-
-  # ----- hex dump -----
         
-  def show_hex_line(self, addr, line):
-    l = len(line)
-    skip = 16 - l
-    out = "       %08x: " % addr
-    for d in line:
-      out += "%02x " % ord(d)
-    for d in xrange(skip):
-      out += "   "
-    out += " "
-    for d in line:
-      v = ord(d)
-      if v >= 32 and v < 256:
-        out += "%c" % d
-      else:
-        out += "."
-    print out
-
-  def show_hex(self, data):
-    l = len(data)
-    o = 0
-    while o < l:
-      if l < 16:
-        line_size = l
-      else:
-        line_size = 16
-      line = data[o:o+line_size]
-      self.show_hex_line(o, line)
-      o += line_size
 
 
 
