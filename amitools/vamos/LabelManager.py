@@ -40,13 +40,16 @@ class LabelManager:
       off = addr - r.addr
       return (r, off)
 
+  # trace callback from CPU core
+  # mode is an integer with values 'R' and 'W' there
   def trace_mem(self, mode, width, addr, val):
+    mode_char = chr(mode)
     r = self.get_label(addr)
     if r != None:
-      ok = r.trace_mem(mode, width, addr, val)
+      ok = r.trace_mem(mode_char, width, addr, val)
       if ok:
         return 0
-    self.error_tracker.report_invalid_memory(mode, width, addr)
+    self.error_tracker.report_invalid_memory(mode_char, width, addr)
     return 1
 
   def _get_mem_str(self, addr):
