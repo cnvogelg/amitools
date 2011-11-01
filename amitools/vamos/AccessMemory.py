@@ -49,7 +49,7 @@ class AccessMemory:
     self.mem.read_block(addr,size,buf)
     if self.label_mgr != None:
       self.label_mgr.trace_int_block( 'R', addr, size )
-    return buf.value
+    return buf.raw
 
   def r_cstr(self, addr):
     off = addr

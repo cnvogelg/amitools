@@ -6,6 +6,17 @@ from amitools.HunkRelocate import HunkRelocate
 from AccessMemory import AccessMemory
 from LabelRange import LabelRange
 
+class Segment:
+  def __init__(self,name, addr, size, label):
+    self.name = name
+    self.addr = addr
+    self.start = addr + 4
+    self.size = size
+    self.end = addr + size
+    self.label = label
+  def __str__(self):
+    return "[Seg:'%s':%06x-%06x]" % (self.name, self.addr, self.end)
+
 class SegmentLoader:
   
   def __init__(self, mem, alloc, label_mgr):
@@ -51,10 +62,16 @@ class SegmentLoader:
     addrs = []
     for i in xrange(len(sizes)):
       size = sizes[i]
+      seg_addr = self.alloc.alloc_mem(size + 8) # add 4 bytes guard around segment
+      # create label
+      label = None
       name = "%s:%d:%s" % (base_name,i,names[i].replace("HUNK_","").lower())
-      seg = self.alloc.alloc_memory(name, size)
+      if self.alloc.label_mgr != None:
+        label = LabelRange(name, seg_addr + 4, size)
+        self.alloc.label_mgr.add_label(label)
+      seg = Segment(name, seg_addr, size, label)
       seg_list.append(seg)
-      addrs.append(seg.addr)
+      addrs.append(seg.addr + 4)
     
     # relocate to addresses and return data
     datas = relocator.relocate(addrs)

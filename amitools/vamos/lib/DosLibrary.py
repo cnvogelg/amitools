@@ -349,7 +349,8 @@ class DosLibrary(AmigaLibrary):
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
     data = ctx.mem.access.r_data(buf_ptr,size)
     self.file_mgr.write(fh, data)
-    log_dos.info("Write(%s, %06x, %d)" % (fh, buf_ptr, size))
+    got = len(data)
+    log_dos.info("Write(%s, %06x, %d) -> %d" % (fh, buf_ptr, size, got))
     return size
 
   def Seek(self, lib, ctx):

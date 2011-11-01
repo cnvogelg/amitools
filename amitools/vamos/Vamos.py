@@ -57,7 +57,7 @@ class Vamos:
     self.bin_seg_list = self.load_seg(bin_file)
     if self.bin_seg_list == None:
       return False
-    self.prog_start = self.bin_seg_list[0].addr
+    self.prog_start = self.bin_seg_list[0].start
     return True
 
   def load_seg(self, bin_file):
