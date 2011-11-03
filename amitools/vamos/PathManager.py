@@ -76,6 +76,9 @@ class PathManager:
       self.cur_path = full_path[col_pos+1:]
     log_path.info("set current: dev='%s' path='%s'" % (self.cur_dev, self.cur_path))
   
+  def get_cur_path(self):
+    return (self.cur_dev, self.cur_path)
+  
   def set_default_cur_path(self):
     self.cur_dev  = self.org_cur_dev
     self.cur_path = self.org_cur_path

@@ -2,9 +2,10 @@ import os.path
 
 from Log import log_lock
 from LabelRange import LabelRange
+from Exceptions import *
 
 class AmiLock:
-  def __init__(self, name, ami_path, sys_path, exclusive):
+  def __init__(self, name, ami_path, sys_path, exclusive=False):
     self.ami_path = ami_path
     self.sys_path = sys_path
     self.name = name
@@ -34,7 +35,7 @@ class LockManager(LabelRange):
   def _unregister_lock(self, lock):
     check = self.locks_by_b_addr[lock.b_addr]
     if check != lock:
-      raise ValueError("Invalud Lock unregistered: %s" % lock)
+      raise VamosInternalError("Invalud Lock unregistered: %s" % lock)
     del self.locks_by_b_addr[lock.b_addr]
     log_lock.info("unregistered: %s" % lock)
     lock.b_addr = 0
@@ -70,10 +71,17 @@ class LockManager(LabelRange):
       return None
     
   def get_by_b_addr(self, b_addr):
-    if self.locks_by_b_addr.has_key(b_addr):
+    # current dir lock
+    if b_addr == 0:
+      (cur_dev, cur_path) = self.path_mgr.get_cur_path()
+      ami_path = cur_dev + ":" + cur_path
+      sys_path = self.path_mgr.ami_to_sys_path(ami_path)
+      log_lock.info("local lock: ami='%s', sys='%s'" % (ami_path, sys_path))
+      return AmiLock("local",ami_path,sys_path)
+    elif self.locks_by_b_addr.has_key(b_addr):
       return self.locks_by_b_addr[b_addr]
     else:
-      raise ValueError("Invalid File Lock at b@%06x" % b_addr)
+      raise VamosInternalError("Invalid File Lock at b@%06x" % b_addr)
   
   def release_lock(self, lock):
     self._unregister_lock(lock)

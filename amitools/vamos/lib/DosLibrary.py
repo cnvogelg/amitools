@@ -316,6 +316,7 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("Open: name='%s' (%s/%d/%s) -> %s" % (name, mode_name, mode, f_mode, fh))
       
     if fh == None:
+      self.io_err = ERROR_OBJECT_NOT_FOUND
       return 0
     else:
       return fh.b_addr
@@ -593,7 +594,7 @@ class DosLibrary(AmigaLibrary):
       self.alloc.free_memory(mem)
       del self.mem_allocs[addr]
     else:  
-      raise ValueError("Invalid DOS free mem: %06x" % addr)
+      raise VamosInternalError("Invalid DOS free mem: %06x" % addr)
     
     
     
