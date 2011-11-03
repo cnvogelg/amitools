@@ -17,6 +17,7 @@ from ErrorTracker import ErrorTracker
 # lib
 from lib.ExecLibrary import ExecLibrary
 from lib.DosLibrary import DosLibrary
+from lib.IconLibrary import IconLibrary
 from structure.ExecStruct import *
 from structure.DosStruct import *
 
@@ -134,6 +135,9 @@ class Vamos:
     self.dos_lib_def = DosLibrary(self.mem, self.alloc, version=dos_version)
     self.dos_lib_def.set_managers(self.path_mgr, self.lock_mgr, self.file_mgr, self.port_mgr)
     self.lib_mgr.register_int_lib(self.dos_lib_def)
+    # icon
+    self.icon_lib_def = IconLibrary()
+    self.lib_mgr.register_int_lib(self.icon_lib_def)
 
   def init_context(self):
     self.ctx = VamosContext( self.cpu, self.mem, self.lib_mgr, self.alloc )
