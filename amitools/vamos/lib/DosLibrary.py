@@ -9,6 +9,7 @@ from amitools.vamos.Log import log_dos
 from amitools.vamos.AccessStruct import AccessStruct
 from dos.Args import *
 from dos.Error import *
+from dos.AmiTime import *
 
 class DosLibrary(AmigaLibrary):
   name = "dos.library"
@@ -199,6 +200,7 @@ class DosLibrary(AmigaLibrary):
       (132, self.IoErr),
       (192, self.DateStamp),
       (210, self.ParentDir),
+      (606, self.SystemTagList),
       (798, self.ReadArgs),
       (858, self.FreeArgs),
       (822, self.MatchFirst),
@@ -268,18 +270,11 @@ class DosLibrary(AmigaLibrary):
     ds_ptr = ctx.cpu.r_reg(REG_D1)
     ds = AccessStruct(ctx.mem,DateStampDef,struct_addr=ds_ptr)
     t = time.time()
-    ts = int(t)
-    tmil = t - ts
-    tmin = ts / 60
-    ts = ts % 60
-    tday = tmin / (60*24)
-    tmin = tmin % (60*24)
-    ts += tmil
-    tick = int(ts * 200) # 1/50 sec
-    log_dos.info("DateStamp: ptr=%06x tday=%d tmin=%d tick=%d" % (ds_ptr, tday, tmin, tick))
-    ds.w_s("ds_Days",tday)
-    ds.w_s("ds_Minute",tmin)
-    ds.w_s("ds_Tick",tick)
+    at = sys_to_ami_time(t)
+    log_dos.info("DateStamp: ptr=%06x time=%s" % (ds_ptr, at))
+    ds.w_s("ds_Days",at.tday)
+    ds.w_s("ds_Minute",at.tmin)
+    ds.w_s("ds_Tick",at.tick)
     return ds_ptr
     
   # ----- File Ops -----
@@ -580,6 +575,14 @@ class DosLibrary(AmigaLibrary):
     rdargs_ptr = ctx.cpu.r_reg(REG_D1)
     log_dos.info("FreeArgs: %06x" % rdargs_ptr)
     self._free_mem(rdargs_ptr)
+
+  # ----- System/Execute -----
+  
+  def SystemTagList(self, lib, ctx):
+    cmd_ptr = ctx.cpu.r_reg(REG_D1)
+    tagitem_ptr = ctx.cpu.r_reg(REG_D2)
+    cmd = ctx.mem.access.r_cstr(cmd_ptr)
+    log_dos.info("SystemTagList: cmd='%s'" % (cmd))
 
   # ----- Helpers -----
 

@@ -3,6 +3,9 @@ import os.path
 from Log import log_lock
 from LabelRange import LabelRange
 from Exceptions import *
+from lib.dos.AmiTime import *
+from structure.DosStruct import *
+from AccessStruct import AccessStruct
 
 class AmiLock:
   def __init__(self, name, ami_path, sys_path, exclusive=False):
@@ -76,7 +79,6 @@ class LockManager(LabelRange):
       (cur_dev, cur_path) = self.path_mgr.get_cur_path()
       ami_path = cur_dev + ":" + cur_path
       sys_path = self.path_mgr.ami_to_sys_path(ami_path)
-      log_lock.info("local lock: ami='%s', sys='%s'" % (ami_path, sys_path))
       return AmiLock("local",ami_path,sys_path)
     elif self.locks_by_b_addr.has_key(b_addr):
       return self.locks_by_b_addr[b_addr]
@@ -87,18 +89,31 @@ class LockManager(LabelRange):
     self._unregister_lock(lock)
 
   def examine_lock(self, lock, fib_mem):
+    # name
     name_addr = fib_mem.s_get_addr('fib_FileName')
     fib_mem.w_cstr(name_addr, lock.name)
+    # dummy key
     fib_mem.w_s('fib_DiskKey',0xcafebabe)
+    # type
     if os.path.isdir(lock.sys_path):
       dirEntryType = 0x2 # dir
     else:
       dirEntryType = 0xfffffffd # file
     fib_mem.w_s('fib_DirEntryType', dirEntryType )
+    # protection
     prot = 0xf
     fib_mem.w_s('fib_Protection', prot)
+    # size
     if os.path.isfile(lock.sys_path):
       size = os.path.getsize(lock.name)
       fib_mem.w_s('fib_Size', size)
+    # date (use mtime here)
+    date_addr = fib_mem.s_get_addr('fib_Date')
+    date = AccessStruct(fib_mem.mem, DateStampDef, date_addr)
+    t = os.path.getmtime(lock.sys_path)
+    at = sys_to_ami_time(t)
+    date.w_s('ds_Days', at.tday)
+    date.w_s('ds_Minute', at.tmin)
+    date.w_s('ds_Tick', at.tick)
     
     

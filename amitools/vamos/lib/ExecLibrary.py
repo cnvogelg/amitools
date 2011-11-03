@@ -260,7 +260,7 @@ class ExecLibrary(AmigaLibrary):
     size = ctx.cpu.r_reg(REG_D0)
     flags = ctx.cpu.r_reg(REG_D1)
     mb = self.alloc.alloc_memory("AllocMem(@%06x)" % self.get_callee_pc(ctx),size)
-    self.log("AllocMem: %s" % mb)
+    log_exec.info("AllocMem: %s" % mb)
     self.alloc_mems[mb.addr] = mb
     return mb.addr
   
@@ -269,7 +269,7 @@ class ExecLibrary(AmigaLibrary):
     addr = ctx.cpu.r_reg(REG_A1)
     if self.alloc_mems.has_key(addr):
       mb = self.alloc_mems[addr]  
-      self.log("FreeMem: %s" % mb)
+      log_exec.info("FreeMem: %s" % mb)
       self.alloc.free_memory(mb)
     else:
       raise VamosInternalError("FreeMem: Unknown memory to free: ptr=%06x size=%06x" % (addr, size))
@@ -278,7 +278,7 @@ class ExecLibrary(AmigaLibrary):
     size = ctx.cpu.r_reg(REG_D0)
     flags = ctx.cpu.r_reg(REG_D1)
     mb = self.alloc.alloc_memory("AllocVec(@%06x)" % self.get_callee_pc(ctx),size)
-    self.log("AllocVec: %s" % mb)
+    log_exec.info("AllocVec: %s" % mb)
     self.alloc_vecs[mb.addr] = mb
     return mb.addr
     
@@ -286,7 +286,7 @@ class ExecLibrary(AmigaLibrary):
     addr = ctx.cpu.r_reg(REG_A1)
     if self.alloc_vecs.has_key(addr):
       mb = self.alloc_vecs[addr]  
-      self.log("FreeMem: %s" % mb)
+      log_exec.info("FreeVec: %s" % mb)
       self.alloc.free_memory(mb)
     else:
       raise VamosInternalError("FreeVec: Unknown memory to free: ptr=%06x" % (addr))

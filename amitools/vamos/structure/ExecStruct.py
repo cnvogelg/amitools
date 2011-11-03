@@ -211,4 +211,12 @@ class StackSwapStruct(AmigaStruct):
     ('APTR', 'stk_Pointer')
   ]
 StackSwapDef = StackSwapStruct()
-  
+
+# TagItem
+class TagItemStruct(AmigaStruct):
+  _name = "TagItem"
+  _format = [
+    ('ULONG','ti_Tag'),
+    ('ULONG','ti_Data')
+  ]
+TagItemDef = TagItemStruct()
