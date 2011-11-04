@@ -5,6 +5,7 @@ from amitools.HunkReader import HunkReader
 from amitools.HunkRelocate import HunkRelocate
 from AccessMemory import AccessMemory
 from LabelRange import LabelRange
+from Log import *
 
 class Segment:
   def __init__(self,name, addr, size, label):
@@ -19,13 +20,31 @@ class Segment:
 
 class SegmentLoader:
   
-  def __init__(self, mem, alloc, label_mgr):
+  def __init__(self, mem, alloc, label_mgr, path_mgr):
     self.mem = mem
     self.alloc = alloc
     self.label_mgr = label_mgr
+    self.path_mgr = path_mgr
     self.error = None
-    
-  def load_seg(self, name):
+  
+  # load ami_bin_file
+  def load_seg(self, ami_bin_file):
+    # map file name
+    sys_bin_file = self.path_mgr.ami_to_sys_path(ami_bin_file, searchMulti=True)
+    if sys_bin_file == None:
+      log_main.error("failed mapping binary path: '%s'", ami_bin_file)
+      return None
+    seg_list = self._load_seg(sys_bin_file)
+    if seg_list == None:
+      log_main.error("failed loading binary: ami='%s' sys='%s': %s", ami_bin_file, sys_bin_file, self.error)
+      return None
+    log_mem_init.info("binary segments: %s",ami_bin_file)
+    for s in seg_list:
+      log_mem_init.info(s.label)
+    return seg_list
+  
+  # load sys_bin_file
+  def _load_seg(self, name):
     base_name = os.path.basename(name)
     hunk_file = HunkReader()
     

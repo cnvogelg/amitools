@@ -105,7 +105,7 @@ class LockManager(LabelRange):
     fib_mem.w_s('fib_Protection', prot)
     # size
     if os.path.isfile(lock.sys_path):
-      size = os.path.getsize(lock.name)
+      size = os.path.getsize(lock.sys_path)
       fib_mem.w_s('fib_Size', size)
     # date (use mtime here)
     date_addr = fib_mem.s_get_addr('fib_Date')

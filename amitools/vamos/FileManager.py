@@ -109,7 +109,6 @@ class FileManager(LabelRange):
         sys_name = ''
         fh = AmiFile(sys.stdout,'*','',need_close=False)
       else:
-        ami_path = self.path_mgr.ami_abs_path(ami_path)
         sys_path = self.path_mgr.ami_to_sys_path(ami_path)
         if sys_path == None:
           log_file.info("file not found: '%s' -> '%s'" % (ami_path, sys_path))
@@ -149,7 +148,6 @@ class FileManager(LabelRange):
     fh.obj.seek(pos, whence)
     
   def delete(self, ami_path):
-    ami_path = self.path_mgr.ami_abs_path(ami_path)
     sys_path = self.path_mgr.ami_to_sys_path(ami_path)
     if sys_path == None or not os.path.exists(sys_path):
       log_file.info("file to delete not found: '%s'" % (ami_path))
@@ -162,9 +160,7 @@ class FileManager(LabelRange):
       return ERROR_OBJECT_IN_USE
 
   def rename(self, old_ami_path, new_ami_path):
-    old_ami_path = self.path_mgr.ami_abs_path(old_ami_path)
     old_sys_path = self.path_mgr.ami_to_sys_path(old_ami_path)
-    new_ami_path = self.path_mgr.ami_abs_path(new_ami_path)
     new_sys_path = self.path_mgr.ami_to_sys_path(new_ami_path)
     if old_sys_path == None or not os.path.exists(old_sys_path):
       log_file.info("old file to rename not found: '%s'" % old_ami_path)

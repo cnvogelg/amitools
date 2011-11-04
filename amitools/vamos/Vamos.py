@@ -25,10 +25,11 @@ from Log import *
 
 class Vamos:
   
-  def __init__(self, raw_mem, cpu):
+  def __init__(self, raw_mem, cpu, path_mgr):
     self.raw_mem = raw_mem
     self.ram_size = raw_mem.ram_size
     self.cpu = cpu
+    self.path_mgr = path_mgr
 
     # create a label manager and error tracker
     self.label_mgr = LabelManager()
@@ -47,31 +48,20 @@ class Vamos:
     self.alloc = MemoryAlloc(self.mem, 0, self.ram_size, self.mem_begin, self.label_mgr)
     
     # create segment loader
-    self.seg_loader = SegmentLoader( self.mem, self.alloc, self.label_mgr )
+    self.seg_loader = SegmentLoader( self.mem, self.alloc, self.label_mgr, self.path_mgr )
 
     # lib manager
     self.lib_mgr = LibManager( self.label_mgr )
 
-  def load_main_binary(self, bin_file):
-    self.bin_file = bin_file
-    log_main.info("loading binary: %s", bin_file)
-    self.bin_seg_list = self.load_seg(bin_file)
+  def load_main_binary(self, ami_bin_file):
+    self.bin_file = ami_bin_file
+    log_main.info("loading main binary: %s", ami_bin_file)
+    self.bin_seg_list = self.seg_loader.load_seg(ami_bin_file)
     if self.bin_seg_list == None:
       return False
     self.prog_start = self.bin_seg_list[0].start
     return True
 
-  def load_seg(self, bin_file):
-    # load binary
-    seg_list = self.seg_loader.load_seg(bin_file)
-    if seg_list == None:
-      log_main.error("failed loading binary: '%s' %s", bin_file, self.seg_loader.error)
-      return None
-    log_mem_init.info("binary segments: %s",bin_file)
-    for s in seg_list:
-      log_mem_init.info(s.label)
-    return seg_list
-    
   # stack size in KiB
   def init_stack(self, stack_size=4):
     # --- setup stack ---
@@ -101,10 +91,7 @@ class Vamos:
     log_main.info("args: %s (%d)", self.arg_text, self.arg_size)
     log_mem_init.info(self.arg)
 
-  def init_managers(self, prefix):
-    self.prefix = prefix
-    self.path_mgr = PathManager(prefix)
-
+  def init_managers(self):
     self.lock_base = self.mem.reserve_special_range()
     self.lock_size = 0x010000
     self.lock_mgr = LockManager(self.path_mgr, self.lock_base, self.lock_size)

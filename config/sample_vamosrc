@@ -1,0 +1,10 @@
+[volumes]
+shared=~/amiga/chris/shared
+system=~/amiga
+
+[assigns]
+c=system:c
+
+[path]
+# every undefined assign "xy:" will be mapped to "system:xy/"
+auto_assign=system:

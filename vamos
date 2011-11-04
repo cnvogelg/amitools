@@ -21,6 +21,8 @@ from amitools.vamos.Log import *
 from amitools.vamos.Vamos import Vamos
 from amitools.vamos.Exceptions import *
 from amitools.vamos.AccessMemory import AccessMemory
+from amitools.vamos.VamosConfig import VamosConfig
+from amitools.vamos.PathManager import PathManager
 
 # ----- classes -----
 
@@ -70,7 +72,6 @@ class MusashiMEM(MEM):
 # ----- main -----
 
 # --- preset args ---
-vamos_prefix = os.path.join(os.environ['HOME'],".vamos")
 lib_versions = {
   'dos' : 39,
   'exec' : 39
@@ -82,18 +83,20 @@ parser.add_argument('bin', help="AmigaOS binary to run")
 parser.add_argument('args', nargs='*', help="AmigaOS binary arguments")
 parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
 parser.add_argument('-q', '--quiet', action='store_true', default=False, help="do not output any logging")
-parser.add_argument('-c', '--cycles', action='store', type=int, default=0, help="maximum number of cycles to execute")
-parser.add_argument('-b', '--block', action='store', type=int, default=1000, help="cycles per block")
+parser.add_argument('-C', '--cycles', action='store', type=int, default=0, help="maximum number of cycles to execute")
+parser.add_argument('-B', '--block', action='store', type=int, default=1000, help="cycles per block")
 parser.add_argument('-l', '--logging', action='store', default=None, help="logging settings: <chan>:<level>,*:<level>,...")
 parser.add_argument('-L', '--log-file', action='store', default=None, help="write all log messages to a file")
-parser.add_argument('-P', '--prefix', action='store', default=vamos_prefix, help="vamos directory prefix (%s)" % vamos_prefix)
-parser.add_argument('-V', '--lib-version', action='store', default=None, help="set lib version: <lib>:<version>,...")
+parser.add_argument('-i', '--lib-version', action='store', default=None, help="set lib version: <lib>:<version>,...")
 parser.add_argument('-m', '--ram-size', action='store', default=1024, help="set RAM size in KiB")
 parser.add_argument('-s', '--stack-size', action='store', default=4, help="set stack size in KiB")
 parser.add_argument('-t', '--memory-trace', action='store_true', default=False, help="enable memory tracing (slower)")
 parser.add_argument('-T', '--internal-memory-trace', action='store_true', default=False, help="enable internal memory tracing (slow)")
+parser.add_argument('-c', '--config-file', action='store', default=None, help="vamos config file")
+parser.add_argument('-a', '--assign', action='append', default=None, help="add AmigaOS assign: name:[+]/sys/path[,/more/path]")
+parser.add_argument('-V', '--volume', action='append', default=None, help="define AmigaOS volume: name:/abs/sys/path")
+parser.add_argument('-A', '--auto-assign', action='store', default=None, help="define auto assign ami path, e.g. vol:/ami/path")
 args = parser.parse_args()
-vamos_prefix = args.prefix
 
 # --- parse args ---
 if args.lib_version != None:
@@ -104,6 +107,13 @@ if args.lib_version != None:
 # --- init logging ---
 log_setup(args.logging, args.verbose, args.quiet, args.log_file)
 
+# --- init config ---
+cfg = VamosConfig(extra_file=args.config_file)
+
+# --- load config ---
+pm = PathManager()
+pm.parse(cfg, args.volume, args.assign, args.auto_assign)
+
 # ----- vamos! ---------------------------------------------------------------
 cpu = MusashiCPU()
 mem = MusashiMEM()
@@ -111,7 +121,7 @@ log_main.info("setting up main memory with %s KiB RAM: top=%06x" % (args.ram_siz
 if not mem.init(args.ram_size):
   log_main.error("can't allocate vamos RAM: %d KiB" % args.ram_size)
   sys.exit(1)
-vamos = Vamos(mem, cpu)
+vamos = Vamos(mem, cpu, pm)
 
 # enable mem trace?
 if args.memory_trace:
@@ -133,7 +143,7 @@ if not vamos.load_main_binary(args.bin):
 vamos.init_args(args.args)
 
 # --- libs ---
-vamos.init_managers(args.prefix)
+vamos.init_managers()
 vamos.register_base_libs(lib_versions['exec'], lib_versions['dos'])
 
 # --- vamos context ---

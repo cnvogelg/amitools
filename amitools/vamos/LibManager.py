@@ -94,17 +94,11 @@ class LibManager():
     if name.find(':') == -1 and name.find('/') == -1:
       name = "libs:" + name
       
-    # use path manager to find real path
-    real_path = context.path_mgr.ami_to_sys_path(name)
-    if real_path == None:
-      self.lib_log("open_lib","Can't find sys path for '%s'" % name, level=logging.ERROR)
-      return None
-      
     # use seg_loader to load lib
-    self.lib_log("open_lib","Trying to load native lib: %s -> %s" % (name, real_path))
-    seg_list = context.seg_loader.load_seg(real_path)
+    self.lib_log("open_lib","Trying to load native lib: %s" % name)
+    seg_list = context.seg_loader.load_seg(name)
     if seg_list == None:
-      self.lib_log("open_lib","Can't load library file '%s' -> '%s'" % (name, real_path), level=logging.ERROR)
+      self.lib_log("open_lib","Can't load library file '%s'" % name, level=logging.ERROR)
       return None
     
     # check seg list for resident library struct
