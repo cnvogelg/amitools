@@ -110,7 +110,7 @@ def parse_dos_args(targs, in_args, in_result=[]):
       # take from arraay
       if len(args)>0:
         val = args[0]
-        args.remove(0)
+        del args[0]
       # no more value in arg
       else:
         val = None
