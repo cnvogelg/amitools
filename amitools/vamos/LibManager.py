@@ -280,7 +280,7 @@ class LibManager():
     else:
       # call lib to close
       lib_class = entry.lib_class
-      lib_class.close(entry,context)
+      lib_class.finish_lib(entry,context)
       # remove entry in trap table
       lib_id = entry.lib_id
       self.lib_trap_table[lib_id] = None

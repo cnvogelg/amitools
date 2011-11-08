@@ -27,4 +27,3 @@ class IconLibrary(AmigaLibrary):
   
   def __init__(self, version=39):
     AmigaLibrary.__init__(self, self.name, version, self.icon_calls, LibraryDef)
-  

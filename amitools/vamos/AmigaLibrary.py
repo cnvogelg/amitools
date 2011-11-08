@@ -37,10 +37,10 @@ class AmigaLibrary:
     return "[Lib %s V%d num_jumps=%d pos_size=%d neg_size=%d]" % \
       (self.name, self.version, self.num_jumps, self.pos_size, self.neg_size)
   
-  def open(self, mem_lib, ctx):
+  def setup_lib(self, mem_lib, ctx):
     pass
   
-  def close(self, mem_lib, ctx):
+  def finish_lib(self, mem_lib, ctx):
     pass
   
   def get_num_vectors(self):
