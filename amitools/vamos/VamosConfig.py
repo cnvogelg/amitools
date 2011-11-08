@@ -20,6 +20,6 @@ class VamosConfig(ConfigParser.SafeConfigParser):
     # read configs
     self.found_files = self.read(self.files)
     if len(self.found_files) == 0:
-      log_main.warn("no config file found: %s" % ",".join(self.files))
+      log_main.info("no config file found: %s" % ",".join(self.files))
     else:
       log_main.info("read config file: %s" % ",".join(self.found_files))
