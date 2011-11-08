@@ -56,13 +56,6 @@ class CLIStruct(AmigaStruct):
   ]
 CLIDef = CLIStruct()
 
-class DosLibraryStruct(AmigaStruct):
-  _name = "Dos"
-  _format = [
-    ('Library','lib'),
-  ]
-DosLibraryDef = DosLibraryStruct()
-
 class DateStampStruct(AmigaStruct):
   _name = "DateStamp"
   _format = [
@@ -71,6 +64,52 @@ class DateStampStruct(AmigaStruct):
     ('LONG','ds_Tick')
   ]
 DateStampDef = DateStampStruct()
+
+class DosInfoStruct(AmigaStruct):
+  _name = "DosInfo"
+  _format = [
+    ('BPTR','di_McName'),
+    ('BPTR','di_DevInfo'),
+    ('BPTR','di_Devices'),
+    ('BPTR','di_Handlers'),
+    ('BPTR','di_NetHand'),
+    ('SignalSemaphore','di_DevLock'),
+    ('SignalSemaphore','di_EntryLock'),
+    ('SignalSemaphore','di_DeleteLock')
+  ]
+DosInfoDef = DosInfoStruct()
+
+class RootNodeStruct(AmigaStruct):
+  _name = "RootNode"
+  _format = [
+    ('BPTR','rn_TaskArray'),
+    ('BPTR','rn_ConsoleSegment'),
+    ('DateStamp','rn_Time'),
+    ('LONG','rn_RestartSeg'),
+    ('BPTR','rn_Info'),
+    ('BPTR','rn_FileHandlerSegment'),
+    ('MinList','rn_CliList'),
+    ('MsgPort*','rn_BootProc'),
+    ('BPTR','rn_ShellSegment'),
+    ('LONG','rn_Flags')
+  ]
+RootNodeDef = RootNodeStruct()
+
+class DosLibraryStruct(AmigaStruct):
+  _name = "Dos"
+  _format = [
+    ('Library','lib'),
+    ('RootNode*','dl_Root'),
+    ('APTR','dl_GV'),
+    ('LONG','dl_A2'),
+    ('LONG','dl_A5'),
+    ('LONG','dl_A6'),
+    ('APTR','dl_Errors'),
+    ('APTR','dl_TimeReq'),
+    ('APTR','dl_UtilityBase'),
+    ('APTR','dl_IntuitionBase')
+  ]
+DosLibraryDef = DosLibraryStruct()
 
 class FileInfoBlockStruct(AmigaStruct):
   _name = "FileInfoBlock"

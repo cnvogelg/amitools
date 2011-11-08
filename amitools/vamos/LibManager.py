@@ -255,7 +255,7 @@ class LibManager():
       entry.lib_id = lib_id
       
       # call open on lib
-      lib_class.open(entry, context)
+      lib_class.setup_lib(entry, context)
     else:
       entry = self.int_libs[name]
           

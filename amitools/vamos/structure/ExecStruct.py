@@ -220,3 +220,25 @@ class TagItemStruct(AmigaStruct):
     ('ULONG','ti_Data')
   ]
 TagItemDef = TagItemStruct()
+
+# Semaphores
+class SemaphoreRequestStruct(AmigaStruct):
+  _name = "SemaphoreRequest"
+  _format = [
+    ('MinNode','sr_Link'),
+    ('Task*','sr_Waiter')
+  ]
+SemaphoreRequestDef = SemaphoreRequestStruct()
+
+class SignalSemaphoreStruct(AmigaStruct):
+  _name = "SignalSemaphore"
+  _format = [
+    ('Node','ss_Link'),
+    ('WORD','ss_NestCount'),
+    ('MinList','ss_WaitQueue'),
+    ('SemaphoreRequest','ss_MultipleLink'),
+    ('Task*','ss_Owner'),
+    ('WORD','ss_QueueCount')
+  ]
+SignalSemaphoreDef = SignalSemaphoreStruct()
+

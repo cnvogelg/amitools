@@ -173,7 +173,7 @@ class ExecLibrary(AmigaLibrary):
   def set_managers(self, port_mgr):
     self.port_mgr = port_mgr
   
-  def open(self, lib, ctx):
+  def setup_lib(self, lib, ctx):
     # setup exec memory
     lib.access.w_s("ThisTask",ctx.this_task.addr)
     lib.access.w_s("LibNode.lib_Version", self.version)

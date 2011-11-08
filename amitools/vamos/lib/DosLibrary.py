@@ -218,12 +218,18 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("dos fs handler port: %06x" % self.fs_handler_port)
     file_mgr.set_fs_handler_port(self.fs_handler_port)
   
-  def open(self, lib, ctx):
+  def setup_lib(self, lib, ctx):
     log_dos.info("open dos.library V%d", self.version)
     self.io_err = 0
     self.cur_dir_lock = None
     self.ctx = ctx
     self.mem_allocs = {}
+    # setup RootNode
+    self.root_struct = ctx.alloc.alloc_struct("RootNode",RootNodeDef)
+    lib.access.w_s("dl_Root",self.root_struct.addr)
+    # setup DosInfo
+    self.dos_info = ctx.alloc.alloc_struct("DosInfo",DosInfoDef)
+    self.root_struct.access.w_s("rn_Info",self.dos_info.addr)
   
   def IoErr(self, lib, ctx):
     log_dos.info("IoErr: %d" % self.io_err)
