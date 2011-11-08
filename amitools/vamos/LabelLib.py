@@ -26,7 +26,7 @@ class LabelLib(LabelStruct):
         self.trace_mem_int(mode, width, addr, val, text="TRAP", level=logging.INFO, addon=addon)
       # return to caller after trap
       elif val == self.op_rts:
-        self.trace_mem_int(mode, width, addr, val, text="TRETURN")
+        self.trace_mem_int(mode, width, addr, val, text="T_RTS")
       # native lib jump
       elif val == self.op_jmp:
         delta = self.lib_base - addr
