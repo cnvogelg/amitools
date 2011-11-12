@@ -26,9 +26,9 @@ class printf_element:
     result.append('%')
     result.append(self.flags)
     if self.width != None:
-      result.append(self.width + '.')
+      result.append(str(self.width) + '.')
     if self.limit != None:
-      result.append(self.limit)
+      result.append(str(self.limit))
     result.append(t)
     return "".join(result)
 
