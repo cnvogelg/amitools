@@ -1,4 +1,3 @@
-import types
 import time
 
 from amitools.vamos.AmigaLibrary import *
@@ -529,86 +528,23 @@ class DosLibrary(AmigaLibrary):
     rdargs_ptr = ctx.cpu.r_reg(REG_D3)
     
     log_dos.info("ReadArgs: args=%s template=%s" % (ctx.bin_args, template))
-    targs = gen_dos_args(template)
-    
-    # read org values
-    in_val = []
-    ptr = array_ptr
-    for t in targs:
-      raw = ctx.mem.access.read_mem(2,ptr)
-      # prefill toggle
-      if t['t']:
-        in_val.append(bool(raw))
-      else:
-        in_val.append(None)
-    
-    # parse
-    result = parse_dos_args(targs, ctx.bin_args, in_val)
-    log_dos.debug("parse: %s" % result)
-    
+    # try to parse argument string
+    args = Args()
+    args.parse_template(template)
+    args.prepare_input(ctx.mem.access,array_ptr)
+    ok = args.parse_string(ctx.bin_args)
+    if not ok:
+      log_dos.debug("not matched!")
+      return 0
+    log_dos.debug("matched template: %s",args.result)
     # calc size of result
-    n = len(result)
-    num_longs = 0
-    num_chars = 0
-    for i in xrange(n):
-      r = result[i]
-      if r == None: # null pointer
-        pass
-      elif type(r) is types.StringType: # string key 'k'
-        num_chars += len(r) + 1
-      elif type(r) is types.IntType: # numerical key 'kn'
-        num_longs += 1
-      elif type(r) is types.ListType: # string list 'm'
-        num_longs += len(r) + 1
-        for s in r:
-          num_chars += len(s) + 1
-    
-    # calc total size
-    size = num_longs * 4 + num_chars
-    log_dos.debug("longs=%d chars=%d size=%d" % (num_longs,num_chars,size))
-    
-    # alloc mem
+    size = args.calc_result_size()
+    log_dos.debug("longs=%d chars=%d size=%d" % (args.num_longs,args.num_chars,size))
+    # alloc result mem
     addr = self._alloc_mem("ReadArgs(@%06x)" % self.get_callee_pc(ctx),size)
-    
-    # fill mem
-    char_ptr = addr + num_longs * 4
-    long_ptr = addr
-    base_ptr = array_ptr
-    for i in xrange(n):
-      r = result[i]
-      if r == None: # optional value not set ('k')
-        base_val = 0
-      elif type(r) is types.StringType:
-        # pointer to string
-        base_val = char_ptr
-        # append string
-        self.mem.access.w_cstr(char_ptr, r)
-        char_ptr += len(r) + 1        
-      elif type(r) is types.IntType:
-        # pointer to long
-        base_val = long_ptr
-        # write long
-        self.mem.write_mem(2,long_ptr,r)
-        long_ptr += 4
-      elif type(r) is types.ListType:
-        # pointer to array
-        base_val = long_ptr
-        # array with longs + strs
-        for s in r:
-          self.mem.write_mem(2,long_ptr,char_ptr)
-          self.mem.access.w_cstr(char_ptr,s)
-          long_ptr += 4
-          char_ptr += len(s) + 1
-        self.mem.write_mem(2,long_ptr,0)
-        long_ptr += 4
-      else:
-        # direct value
-        base_val = r
-      
-      self.mem.write_mem(2,base_ptr,base_val)
-      base_ptr += 4
-    
-    # TODO: return real RDArgs
+    # fill result memory
+    args.generate_result(ctx.mem.access,addr,array_ptr)
+    # TODO: return real RDArgs struct - for now we simply return our result memory
     return addr
     
   def FreeArgs(self, lib, ctx):
