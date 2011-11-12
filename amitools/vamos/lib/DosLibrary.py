@@ -201,6 +201,7 @@ class DosLibrary(AmigaLibrary):
       (132, self.IoErr),
       (192, self.DateStamp),
       (210, self.ParentDir),
+      (216, self.IsInteractive),
       (606, self.SystemTagList),
       (798, self.ReadArgs),
       (858, self.FreeArgs),
@@ -398,7 +399,7 @@ class DosLibrary(AmigaLibrary):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name = ctx.mem.access.r_cstr(name_ptr)
     self.io_err = self.file_mgr.delete(name)
-    log_dos.info("DeleteFile: %s -> err=%s" % (name, self.io_err))
+    log_dos.info("DeleteFile: '%s': err=%s" % (name, self.io_err))
     if self.io_err == 0:
       return self.DOSTRUE
     else:
@@ -410,12 +411,22 @@ class DosLibrary(AmigaLibrary):
     new_name_ptr = ctx.cpu.r_reg(REG_D2)
     new_name = ctx.mem.access.r_cstr(new_name_ptr)
     self.io_err = self.file_mgr.rename(old_name, new_name)
-    log_dos.info("Rename: %s %s -> err=%s" % (old_name, new_name, self.io_err))
+    log_dos.info("Rename: '%s' -> '%s': err=%s" % (old_name, new_name, self.io_err))
     if self.io_err == 0:
       return self.DOSTRUE
     else:
       return self.DOSFALSE
 
+  def IsInteractive(self, lib, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    res = self.file_mgr.is_interactive(fh)
+    log_dos.info("IsInteractive(%s): %s" % (fh, res))
+    if res:
+      return self.DOSTRUE
+    else:
+      return self.DOSFALSE
+    
   # ----- Locks -----
   
   def Lock(self, lib, ctx):

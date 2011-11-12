@@ -174,4 +174,13 @@ class FileManager(LabelRange):
     except OSError as e:
       log_file.info("can't rename file: '%s','%s' -> %s" % (old_ami_path, new_amipath, e))
       return ERROR_OBJECT_IN_USE
+  
+  def is_interactive(self, fh):
+    fd = fh.obj.fileno()
+    try:
+      os.ttyname(fd)
+      return True
+    except OSError:
+      return False
+
     
