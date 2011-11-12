@@ -10,6 +10,7 @@ from amitools.vamos.AccessStruct import AccessStruct
 from dos.Args import *
 from dos.Error import *
 from dos.AmiTime import *
+import dos.Printf
 
 class DosLibrary(AmigaLibrary):
   name = "dos.library"
@@ -385,8 +386,13 @@ class DosLibrary(AmigaLibrary):
     # write on output
     fh = self.file_mgr.get_output()
     log_dos.info("VPrintf: format='%s' argv=%06x" % (format,argv_ptr))
-    # TODO: expand format :)
-    self.file_mgr.write(fh, format)
+    # now decode printf
+    ps = dos.Printf.printf_parse_string(format)
+    dos.Printf.printf_read_data(ps, ctx.mem.access, argv_ptr)
+    log_dos.debug("VPrintf: parsed format: %s",ps)
+    result = dos.Printf.printf_generate_output(ps)
+    # write result
+    self.file_mgr.write(fh, result)
 
   def DeleteFile(self, lib, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
