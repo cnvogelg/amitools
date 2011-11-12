@@ -174,3 +174,30 @@ class DosPacketStruct(AmigaStruct):
     ('LONG','dp_Arg7')
   ]
 DosPacketDef = DosPacketStruct()
+
+class AChainStruct(AmigaStruct):
+  _name = "AChain"
+  _format = [
+    ('AChain*','an_Child'),
+    ('AChain*','an_Parent'),
+    ('BPTR','an_Lock'),
+    ('FileInfoBlock','an_Info'),
+    ('BYTE','an_Flags'),
+    ('UBYTE','an_String')
+  ]
+AChainDef = AChainStruct()
+
+class AnchorPathStruct(AmigaStruct):
+  _name = "AnchorPath"
+  _format = [
+    ('AChain*','ap_Base'),
+    ('AChain*','ap_Last'),
+    ('LONG','ap_BreakBits'),
+    ('LONG','ap_FoundBreak'),
+    ('BYTE','ap_Flags'),
+    ('BYTE','ap_Reserved'),
+    ('WORD','ap_Strlen'),
+    ('FileInfoBlock','ap_Info'),
+    ('UBYTE','ap_Buf')
+  ]
+AnchorPathDef = AnchorPathStruct()

@@ -206,6 +206,8 @@ class DosLibrary(AmigaLibrary):
       (798, self.ReadArgs),
       (858, self.FreeArgs),
       (822, self.MatchFirst),
+      (828, self.MatchNext),
+      (834, self.MatchEnd),
       (954, self.VPrintf),
     )
     self.set_funcs(dos_funcs)
@@ -500,8 +502,23 @@ class DosLibrary(AmigaLibrary):
     pat_ptr = ctx.cpu.r_reg(REG_D1)
     pat = ctx.mem.access.r_cstr(pat_ptr)
     anchor_ptr = ctx.cpu.r_reg(REG_D2)
-    anchor = ctx.mem.access.r_cstr(anchor_ptr)
-    log_dos.info("MatchFirst: pat=%s anchor=%s" % (pat, anchor))
+    anchor = AccessStruct(self.ctx.mem,AnchorPathDef,struct_addr=anchor_ptr)
+    log_dos.info("TODO MatchFirst: pat='%s' anchor=%06x " % (pat, anchor_ptr))
+    # TODO: do real matching - return no entries for now
+    return ERROR_NO_MORE_ENTRIES
+  
+  def MatchNext(self, lib, ctx):
+    anchor_ptr = ctx.cpu.r_reg(REG_D1)
+    anchor = AccessStruct(self.ctx.mem,AnchorPathDef,struct_addr=anchor_ptr)
+    log_dos.info("TODO MatchNext: anchor=%06x " % (anchor_ptr))
+    # TODO: do real matching - return no entries for now
+    return ERROR_NO_MORE_ENTRIES
+  
+  def MatchEnd(self, lib, ctx):
+    anchor_ptr = ctx.cpu.r_reg(REG_D1)
+    anchor = AccessStruct(self.ctx.mem,AnchorPathDef,struct_addr=anchor_ptr)
+    log_dos.info("TODO MatchEnd: anchor=%06x " % (anchor_ptr))
+    # TODO: do real free
   
   # ----- Args -----
   
