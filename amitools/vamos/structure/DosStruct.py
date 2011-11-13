@@ -65,6 +65,61 @@ class DateStampStruct(AmigaStruct):
   ]
 DateStampDef = DateStampStruct()
 
+# the union in DosList is splitted up into own types
+class DosListDeviceStruct(AmigaStruct):
+  _name = "DosListDevice"
+  _format = [
+    ('BPTR','dol_Next'),
+    ('LONG','dol_Type'),
+    ('APTR','dol_Task'),
+    ('BPTR','dol_Lock'),
+    ('BSTR','dol_Handler'),
+    ('LONG','dol_StackSize'),
+    ('LONG','dol_Priority'),
+    ('LONG','dol_Startup'),
+    ('BPTR','dol_SegList'),
+    ('BPTR','dol_GlobVec'),
+    ('BSTR','dol_Name')
+  ]
+DosListDeviceDef = DosListDeviceStruct()
+
+class DosListVolumeStruct(AmigaStruct):
+  _name = "DosListVolume"
+  _format = [
+    ('BPTR','dol_Next'),
+    ('LONG','dol_Type'),
+    ('APTR','dol_Task'),
+    ('BPTR','dol_Lock'),
+    ('DateStamp','dol_VolumeDate'),
+    ('BPTR','dol_LockList'),
+    ('LONG','dol_DiskType'),
+    ('LONG','dol_Padding0'),
+    ('BSTR','dol_Name')
+  ]
+DosListVolumeDef = DosListVolumeStruct()
+
+class AssignListStruct(AmigaStruct):
+  _name = "AssignList"
+  _format = [
+    ('AssignList*','al_Next'),
+    ('BPTR','al_Lock')
+  ]
+AssignListDef = AssignListStruct()
+
+class DosListAssignStruct(AmigaStruct):
+  _name = "DosListAssign"
+  _format = [
+    ('BPTR','dol_Next'),
+    ('LONG','dol_Type'),
+    ('APTR','dol_Task'),
+    ('BPTR','dol_Lock'),
+    ('UBYTE*','dol_AssignName'),
+    ('AssignList*','dol_List'),
+    ('LONG|4','dol_Padding'),
+    ('BSTR','dol_Name')
+  ]
+DosListAssignDef = DosListAssignStruct()
+
 class DosInfoStruct(AmigaStruct):
   _name = "DosInfo"
   _format = [

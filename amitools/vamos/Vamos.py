@@ -13,6 +13,7 @@ from PortManager import PortManager
 from AccessMemory import AccessMemory
 from AccessStruct import AccessStruct
 from ErrorTracker import ErrorTracker
+from DosListManager import DosListManager
 
 # lib
 from lib.ExecLibrary import ExecLibrary
@@ -92,9 +93,21 @@ class Vamos:
     log_mem_init.info(self.arg)
 
   def init_managers(self):
+    self.doslist_base = self.mem.reserve_special_range()
+    self.doslist_size = 0x010000
+    self.doslist_mgr = DosListManager(self.path_mgr, self.doslist_base, self.doslist_size)
+    self.label_mgr.add_label(self.doslist_mgr)
+    self.mem.set_special_range_read_funcs(self.doslist_base, r32=self.doslist_mgr.r32_doslist)
+    log_mem_init.info(self.doslist_mgr)
+
+    # fill dos list
+    volumes = self.path_mgr.get_all_volume_names()
+    for vol in volumes:
+      self.doslist_mgr.add_volume(vol)
+    
     self.lock_base = self.mem.reserve_special_range()
     self.lock_size = 0x010000
-    self.lock_mgr = LockManager(self.path_mgr, self.lock_base, self.lock_size)
+    self.lock_mgr = LockManager(self.path_mgr, self.doslist_mgr, self.lock_base, self.lock_size)
     self.label_mgr.add_label(self.lock_mgr)
     self.mem.set_special_range_read_funcs(self.lock_base, r32=self.lock_mgr.r32_lock)
     log_mem_init.info(self.lock_mgr)

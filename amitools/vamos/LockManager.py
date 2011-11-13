@@ -20,8 +20,9 @@ class AmiLock:
     return "[Lock:'%s'(ami='%s',sys='%s',ex=%d)@%06x=b@%06x]" % (self.name, self.ami_path, self.sys_path, self.exclusive, self.addr, self.b_addr)
 
 class LockManager(LabelRange):
-  def __init__(self, path_mgr, base_addr, size):
+  def __init__(self, path_mgr, doslist_mgr, base_addr, size):
     self.path_mgr = path_mgr
+    self.doslist_mgr = doslist_mgr
     self.base_addr = base_addr
     self.cur_addr = base_addr
     log_lock.info("init manager: base=%06x" % self.base_addr)
@@ -44,10 +45,20 @@ class LockManager(LabelRange):
       type_name = self.lock_def.get_type_name()
       addon="%s+%d = %s(%s)+%d  %s" % (type_name, delta, name, val_type_name, off, lock)
 
-      # fake some value for now
-      val = 0xc80000
+      # get some special values
+      val = 0
+      # get DosList entry of associated volume
+      if name == 'fl_Volume':
+        ami_path = lock.ami_path
+        volume_name = self.path_mgr.ami_volume_of_abspath(ami_path)
+        log_lock.debug("fl_Volume: looking up volume '%s' of %s",volume_name,lock)
+        volume = self.doslist_mgr.get_entry_by_name(volume_name)
+        if volume == None:
+          raise VamosInternalError("No DosList entry found for volume '%s'" % vol)
+        val = volume.baddr
+  
       self.trace_mem_int('R', 2, addr, val, text="LOCK", level=logging.INFO, addon=addon)
-      return val >> 2 # make bptr
+      return val
     else:
       self.trace_mem_int('R', 2, addr, val, text="NO_LOCK", level=logging.WARN)
       return 0

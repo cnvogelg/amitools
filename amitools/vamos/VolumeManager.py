@@ -171,3 +171,5 @@ class VolumeManager():
     else:
       return os.path.join(base, os.path.join(*dirs))
   
+  def get_all_names(self):
+    return self.volume2sys.keys()

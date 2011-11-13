@@ -58,6 +58,9 @@ class PathManager:
 
   # ----- API -----
 
+  def get_all_volume_names(self):
+    return self.vol_mgr.get_all_names()
+
   def ami_to_sys_path(self, ami_path, searchMulti=False):
     # first get an absolute amiga path
     abs_path = self.ami_abs_path(ami_path)
@@ -156,4 +159,6 @@ class PathManager:
     # is relative
     return path
 
-    
+  def ami_volume_of_abspath(self, path):
+    pos = path.find(':')
+    return path[:pos]
