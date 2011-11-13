@@ -88,7 +88,7 @@ class FileManager(LabelRange):
       self.trace_mem_int('R', 2, addr, val, text="FILE", level=logging.INFO, addon=addon)
       return val
     else:
-      self.trace_mem_int('R', 2, addr, val, text="FILE", level=logging.WARN)
+      self.trace_mem_int('R', 2, addr, val, text="NO_FILE", level=logging.WARN)
       return 0
   
   def get_input(self):

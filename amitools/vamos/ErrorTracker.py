@@ -15,10 +15,15 @@ class ErrorTracker:
     self.other_type = None
     self.other_value = None
   
+  # direct callback from MEM module -> on error
   def report_invalid_memory(self, mode, width, addr):
-    self.report_error(InvalidMemoryAccessError(mode, width, addr))
+    mode_char = chr(mode)
+    self.report_error(InvalidMemoryAccessError(mode_char, width, addr))
   
   def report_error(self, e):
+    # ignore if already an error
+    if self.has_errors:
+      return
     self.has_errors = True
     self.cpu_state = self.cpu.get_state()
     if isinstance(e, VamosError):

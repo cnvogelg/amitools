@@ -34,7 +34,7 @@ extern void mem_set_special_range_read_func(uint page_addr, uint width, read_fun
 extern void mem_set_special_range_write_func(uint page_addr, uint width, write_func_t func);
 
 extern uint mem_ram_read(int mode, uint addr);
-extern void mem_ran_write(int mode, uint addr, uint value);
+extern void mem_ram_write(int mode, uint addr, uint value);
 extern void mem_ram_read_block(uint addr, uint size, char *data);
 extern void mem_ram_write_block(uint addr, uint size, const char *data);
 

@@ -1,4 +1,5 @@
 import os.path
+import logging
 
 from Log import log_lock
 from LabelRange import LabelRange
@@ -26,6 +27,30 @@ class LockManager(LabelRange):
     log_lock.info("init manager: base=%06x" % self.base_addr)
     self.locks_by_b_addr = {}
     LabelRange.__init__(self, "locks", base_addr, size)
+    self.lock_def  = FileLockDef
+    self.lock_size = FileLockDef.get_size()
+  
+  # direct read access to lock structure
+  def r32_lock(self, addr):
+    # find out associated file handle
+    rel = int((addr - self.base_addr) / self.lock_size)
+    lock_addr = self.base_addr + rel * self.lock_size
+    b_addr = lock_addr >> 2
+    lock = self.get_by_b_addr(b_addr)
+    if lock != None:
+      # get addon text
+      delta = addr - lock_addr
+      name,off,val_type_name = self.lock_def.get_name_for_offset(delta, 2)
+      type_name = self.lock_def.get_type_name()
+      addon="%s+%d = %s(%s)+%d  %s" % (type_name, delta, name, val_type_name, off, lock)
+
+      # fake some value for now
+      val = 0xc80000
+      self.trace_mem_int('R', 2, addr, val, text="LOCK", level=logging.INFO, addon=addon)
+      return val >> 2 # make bptr
+    else:
+      self.trace_mem_int('R', 2, addr, val, text="NO_LOCK", level=logging.WARN)
+      return 0
   
   def _register_lock(self, lock):
     addr = self.cur_addr

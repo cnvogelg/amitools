@@ -96,6 +96,7 @@ class Vamos:
     self.lock_size = 0x010000
     self.lock_mgr = LockManager(self.path_mgr, self.lock_base, self.lock_size)
     self.label_mgr.add_label(self.lock_mgr)
+    self.mem.set_special_range_read_funcs(self.lock_base, r32=self.lock_mgr.r32_lock)
     log_mem_init.info(self.lock_mgr)
     
     self.file_base = self.mem.reserve_special_range()

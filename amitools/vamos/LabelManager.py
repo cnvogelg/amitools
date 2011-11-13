@@ -49,7 +49,7 @@ class LabelManager:
       ok = r.trace_mem(mode_char, width, addr, val)
       if ok:
         return 0
-    self.error_tracker.report_invalid_memory(mode_char, width, addr)
+    self.error_tracker.report_invalid_memory(mode, width, addr)
     return 1
 
   def _get_mem_str(self, addr):
