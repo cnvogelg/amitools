@@ -105,7 +105,9 @@ if args.lib_version != None:
     lib_versions[n] = int(v)
 
 # --- init logging ---
-log_setup(args.logging, args.verbose, args.quiet, args.log_file)
+if not log_setup(args.logging, args.verbose, args.quiet, args.log_file):
+  log_help()
+  sys.exit(1)
 
 # --- init config ---
 cfg = VamosConfig(extra_file=args.config_file)

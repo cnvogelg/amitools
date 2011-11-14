@@ -41,6 +41,16 @@ def log_parse_level(name):
   else:
     return None
 
+def log_help():
+  print "logging channels:"
+  names = map(lambda x: x.name, loggers)
+  for n in sorted(names):
+    print "  %s" % n
+  print
+  print "logging levels:"
+  for l in levels:
+    print "  %s" % l
+
 def log_setup(arg,verbose=False,quiet=False,file_name=None):
   # setup handler
   if file_name != None:
@@ -69,19 +79,24 @@ def log_setup(arg,verbose=False,quiet=False,file_name=None):
   if arg != None:
     kvs = arg.split(',')  
     for kv in kvs:
-      name,level_name = kv.lower().split(':')
-      level = log_parse_level(level_name)
-      if level == None:
-        raise ValueError("Invalid logging level %s" % level_name)
-      if name == 'all':
-        for l in loggers:
-          l.setLevel(level)
+      if kv.find(':') == -1:
+        return False
       else:
-        found = False
-        for l in loggers:
-          if l.name == name:
+        name,level_name = kv.lower().split(':')
+        level = log_parse_level(level_name)
+        if level == None:
+          return False
+        if name == 'all':
+          for l in loggers:
             l.setLevel(level)
-            found = True
-            break
-        if not found:
-          raise ValueError("Invalid logging channel %s" % name)
+        else:
+          found = False
+          for l in loggers:
+            if l.name == name:
+              l.setLevel(level)
+              found = True
+              break
+          if not found:
+            return False
+  
+  return True
