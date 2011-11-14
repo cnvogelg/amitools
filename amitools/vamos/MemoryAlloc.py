@@ -95,7 +95,7 @@ class MemoryAlloc:
   
   # bstr
   def alloc_bstr(self, name, bstr, padding=4):
-    size = len(bstr) + 1
+    size = len(bstr) + 2 # front: count, end: extra zero for safety
     addr = self.alloc_mem(size, padding)
     label = LabelRange(name, addr, size)
     self.label_mgr.add_label(label)

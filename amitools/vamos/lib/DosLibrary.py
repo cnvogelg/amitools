@@ -223,6 +223,9 @@ class DosLibrary(AmigaLibrary):
   
   def setup_lib(self, lib, ctx):
     log_dos.info("open dos.library V%d", self.version)
+    # setup lib struct
+    lib.access.w_s("lib.lib_Version", self.version)
+    # init own state
     self.io_err = 0
     self.cur_dir_lock = None
     self.ctx = ctx

@@ -156,6 +156,7 @@ class Vamos:
     self.cli = self.alloc.alloc_struct("CLI",CLIDef)
     self.cli.access.w_s("cli_DefaultStack", self.stack_size / 4) # in longs
     self.cmd = self.alloc.alloc_bstr("cmd",self.bin_file)
+    log_mem_init.info(self.cmd)
     self.cli.access.w_s("cli_CommandName", self.cmd.addr)
     log_mem_init.info(self.cli)
 
