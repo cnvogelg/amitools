@@ -1,5 +1,4 @@
 import logging
-from Exceptions import InvalidMemoryAccessError
 from Log import *
 
 MEMORY_WIDTH_BYTE = 0

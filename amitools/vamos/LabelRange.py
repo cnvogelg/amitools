@@ -1,5 +1,3 @@
-from Exceptions import InvalidMemoryAccessError
-
 from Log import log_mem
 import logging
 
