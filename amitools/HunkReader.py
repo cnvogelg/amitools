@@ -135,8 +135,9 @@ class HunkReader:
       if hunk_size < 0:
         self.error_string = "HUNK_HEADER contains invalid hunk_size"
         return RESULT_INVALID_HUNK_FILE
-      hunk_size *= 4 # longs to bytes
-      hunk_info['size'] = hunk_size & ~HUNKF_ALL
+      hunk_bytes = hunk_size & ~HUNKF_ALL
+      hunk_bytes *= 4 # longs to bytes
+      hunk_info['size'] = hunk_bytes
       self.set_mem_flags(hunk_info, hunk_size & HUNKF_ALL, 30)      
       hunk_table.append(hunk_info)
     hunk['hunks'] = hunk_table
@@ -513,6 +514,8 @@ class HunkReader:
       hunk['memf'] = 'chip'
     elif f & 2 == 2:
       hunk['memf'] = 'fast'
+    else:
+      hunk['memf'] = ''
     
   # ----- public functions -----
   
