@@ -205,27 +205,32 @@ class MemoryAlloc:
       num += 1
       chunk = chunk.next
   
+  def _dump_orphan(self, addr, size):
+    log_mem_alloc.warn("orphan: [@%06x +%06x %06x]" % (addr, size, addr+size))
+    labels = self.label_mgr.get_intersecting_labels(addr,size)
+    for l in labels:
+      log_mem_alloc.warn("-> %s",l)
+  
   def dump_orphans(self):
     last = self.free_first
+    # orphan at begin?
     if last.addr != self.begin:
       addr = self.begin
       size = last.addr - addr
-      log_mem_alloc.warn("orphan: [@%06x +%06x %06x]" % (addr, size, last.addr))
-      labels = self.label_mgr.get_intersecting_lables(addr,size)
-      for l in labels:
-        log_mem_alloc.warn("-> %s",l)
-      
+      self._dump_orphan(addr, size)
+    # walk along free list
     cur = last.next
     while cur != None:
       addr = last.addr + last.size
       size = cur.addr - addr
-      log_mem_alloc.warn("orphan: [@%06x +%06x %06x]" % (addr, size, addr+size))
-      labels = self.label_mgr.get_intersecting_labels(addr,size)
-      for l in labels:
-        log_mem_alloc.warn("-> %s",l)
-        
+      self._dump_orphan(addr, size)        
       last = cur
       cur = cur.next
+    # orphan at end?
+    addr = last.addr + last.size
+    end = self.addr + self.size
+    if addr != end:
+      self._dump_orphan(addr, end-addr)
   
   # ----- convenience functions with label creation -----
   
