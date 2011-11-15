@@ -68,6 +68,8 @@ class MusashiMEM(MEM):
     m68k.mem_ram_read_block(addr,size,data)
   def write_ram_block(self,addr,size,data):
     m68k.mem_ram_write_block(addr,size,data)
+  def clear_ram_block(self,addr,size,value):
+    m68k.mem_ram_clear_block(addr,size,value)
   
 # ----- main -----
 
@@ -230,6 +232,9 @@ mhz = total_cycles / (1000000.0 * delta_time)
 cpu_percent = cpu_time * 100.0 / delta_time
 trap_percent = 100.0 - cpu_percent
 log_main.info("done (%d cycles in cpu time %.4fs -> %5.2f MHz (%.2f %%), trap time %.4fs (%.2f %%), total time %.4fs)", total_cycles, cpu_time, mhz, cpu_percent, trap_time, trap_percent, delta_time)
+
+# shutdown vamos
+vamos.cleanup()
 
 # if errors happened then report them now
 if et.has_errors:

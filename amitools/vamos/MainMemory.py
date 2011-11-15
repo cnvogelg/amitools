@@ -53,3 +53,6 @@ class MainMemory:
   
   def write_block(self, addr, size, data):
     self.raw_mem.write_ram_block(addr,size,data)
+
+  def clear_block(self, addr, size, value):
+    self.raw_mem.clear_ram_block(addr,size,value)

@@ -198,13 +198,16 @@ class LibManager():
     version = entry.version
     lib_base = entry.lib_base
     label = entry.label
-    self.lib_log("close_lib","Closed native '%s' V%d: base=%06x label=%s]" % (name, version, lib_base, label))
 
     # unreg and remove alloc
     self.label_mgr.remove_label(label)
     context.alloc.free_mem(entry.lib_begin, entry.size)
     context.alloc.free_memory(entry.trampoline)
 
+    # unload seg_list
+    context.seg_loader.unload_seg(entry.seg_list)
+
+    self.lib_log("close_lib","Closed native '%s' V%d: base=%06x label=%s]" % (name, version, lib_base, label))
     return entry
 
   def set_all_vectors(self, mem, base_addr, vectors):

@@ -13,6 +13,8 @@ class MEM:
     pass
   def write_ram_block(self,addr,size,data):
     pass
+  def clear_ram_block(self,addr,size,value):
+    pass
   def reserve_special_range(num_pages):
     return 0
   def set_special_range_read_func(page_addr, width, func):

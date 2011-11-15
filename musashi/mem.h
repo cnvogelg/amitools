@@ -37,5 +37,6 @@ extern uint mem_ram_read(int mode, uint addr);
 extern void mem_ram_write(int mode, uint addr, uint value);
 extern void mem_ram_read_block(uint addr, uint size, char *data);
 extern void mem_ram_write_block(uint addr, uint size, const char *data);
+extern void mem_ram_clear_block(uint addr, uint size, int value);
 
 #endif

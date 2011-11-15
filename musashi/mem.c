@@ -338,3 +338,8 @@ void mem_ram_write_block(uint addr, uint size, const char *data)
 {
   memcpy(ram_data + addr, data, size);
 }
+
+void mem_ram_clear_block(uint addr, uint size, int value)
+{
+  memset(ram_data + addr, value, size);
+}

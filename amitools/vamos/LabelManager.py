@@ -31,6 +31,13 @@ class LabelManager:
         return r
     return None
 
+  def get_intersecting_labels(self, addr, size):
+    result = []
+    for r in self.ranges:
+      if r.does_intersect(addr,size):
+        result.append(r)
+    return result
+
   def get_label_offset(self, addr):
     r = self.get_label(addr)
     if r == None:

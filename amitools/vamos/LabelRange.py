@@ -27,3 +27,10 @@ class LabelRange:
   
   def is_inside(self, addr):
     return ((self.addr <= addr) and (addr < self.end))
+
+  def does_intersect(self, addr, size):
+    self_end = self.addr + self.size
+    end = addr + size
+    f1 = (end >= self.addr)
+    f2 = (self_end >= addr)
+    return f1 and f2

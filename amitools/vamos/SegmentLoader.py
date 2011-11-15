@@ -101,3 +101,12 @@ class SegmentLoader:
       self.mem.access.w_data(addr, datas[i])
     
     return seg_list
+    
+  def unload_seg(self, seg_list):
+    for seg in seg_list:
+      # free memory of segment
+      self.alloc.free_mem(seg.addr, seg.size)
+      # remove label of segment
+      if self.alloc.label_mgr != None:
+        self.alloc.label_mgr.remove_label(seg.label)
+      

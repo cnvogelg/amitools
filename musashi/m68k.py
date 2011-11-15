@@ -127,6 +127,9 @@ mem_ram_read_block.argtypes = [c_uint, c_uint, c_char_p]
 mem_ram_write_block = lib.mem_ram_write_block
 mem_ram_write_block.argtypes = [c_uint, c_uint, c_char_p]
 
+mem_ram_clear_block = lib.mem_ram_clear_block
+mem_ram_clear_block.argtypes = [c_uint, c_uint, c_int]
+
 # --- CPU API ---
 
 def set_pc_changed_callback(func):

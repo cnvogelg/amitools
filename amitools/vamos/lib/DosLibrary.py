@@ -237,6 +237,10 @@ class DosLibrary(AmigaLibrary):
     self.dos_info = ctx.alloc.alloc_struct("DosInfo",DosInfoDef)
     self.root_struct.access.w_s("rn_Info",self.dos_info.addr)
   
+  def finish_lib(self, lib, ctx):
+    ctx.alloc.free_struct(self.root_struct)
+    ctx.alloc.free_struct(self.dos_info)
+  
   def IoErr(self, lib, ctx):
     log_dos.info("IoErr: %d" % self.io_err)
     return self.io_err

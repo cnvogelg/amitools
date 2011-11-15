@@ -54,6 +54,15 @@ class Vamos:
     # lib manager
     self.lib_mgr = LibManager( self.label_mgr )
 
+  def cleanup(self):
+    self.close_exec_lib()
+    self.free_process()
+    self.free_args()
+    self.free_stack()
+    self.unload_main_binary()
+    # some diagnostics: orphaned memory
+    self.alloc.dump_orphans()
+
   def load_main_binary(self, ami_bin_file):
     self.bin_file = ami_bin_file
     log_main.info("loading main binary: %s", ami_bin_file)
@@ -62,6 +71,9 @@ class Vamos:
       return False
     self.prog_start = self.bin_seg_list[0].start
     return True
+
+  def unload_main_binary(self):
+    self.seg_loader.unload_seg(self.bin_seg_list)
 
   # stack size in KiB
   def init_stack(self, stack_size=4):
@@ -80,6 +92,9 @@ class Vamos:
     self.stack_initial -= 4
     self.mem.access.w32(self.stack_initial, self.last_addr)
 
+  def free_stack(self):
+    self.alloc.free_memory(self.stack)
+
   def init_args(self, bin_args):
     # setup arguments
     self.bin_args = bin_args
@@ -91,6 +106,9 @@ class Vamos:
     self.mem.access.w_cstr(self.arg_base, self.arg_text)
     log_main.info("args: %s (%d)", self.arg_text, self.arg_size)
     log_mem_init.info(self.arg)
+
+  def free_args(self):
+    self.alloc.free_memory(self.arg)
 
   def init_managers(self):
     self.doslist_base = self.mem.reserve_special_range()
@@ -165,11 +183,19 @@ class Vamos:
     self.this_task.access.w_s("pr_CLI", self.cli.addr)
     self.ctx.this_task = self.this_task
     log_mem_init.info(self.this_task)
+    
+  def free_process(self):
+    self.alloc.free_struct(self.this_task)
+    self.alloc.free_bstr(self.cmd)
+    self.alloc.free_struct(self.cli)
 
   def open_exec_lib(self):
     # open exec lib
     self.exec_lib = self.lib_mgr.open_lib(ExecLibrary.name, 0, self.ctx)
     log_mem_init.info(self.exec_lib)
+
+  def close_exec_lib(self):
+    self.lib_mgr.close_lib(self.exec_lib.lib_base, self.ctx)
 
   def create_old_dos_guard(self):
     # create a guard memory for tracking invalid old dos access
@@ -178,4 +204,3 @@ class Vamos:
     label = LabelRange("old_dos",self.dos_guard_base, self.dos_guard_size)
     self.label_mgr.add_label(label)
     log_mem_init.info(label)
-
