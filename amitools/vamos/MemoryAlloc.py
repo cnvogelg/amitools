@@ -191,8 +191,6 @@ class MemoryAlloc:
     num_allocs = len(self.addrs)
     log_mem_alloc.info("[free  @%06x-%06x: %06x bytes] %s", addr, addr+size, size, self._stat_info())
 
-    self.dump_mem_state()
-
   def get_range_by_addr(self, addr):
     if self.addrs.has_key(addr):
       return self.addrs[addr]
