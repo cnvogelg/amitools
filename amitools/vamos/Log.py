@@ -11,6 +11,7 @@ log_mem_alloc = logging.getLogger('mem_alloc')
 log_mem_int = logging.getLogger('mem_int')
 
 log_lib = logging.getLogger('lib')
+log_libmgr = logging.getLogger('libmgr')
 log_res = logging.getLogger('res')
 
 log_path = logging.getLogger('path')
@@ -21,7 +22,7 @@ log_doslist = logging.getLogger('doslist')
 log_dos  = logging.getLogger('dos')
 log_exec = logging.getLogger('exec')
 
-loggers = [log_main, log_mem, log_mem_init, log_mem_alloc, log_mem_int, log_lib, log_path, log_file, log_lock, log_doslist, log_res, log_dos, log_exec]
+loggers = [log_main, log_mem, log_mem_init, log_mem_alloc, log_mem_int, log_lib, log_libmgr, log_path, log_file, log_lock, log_doslist, log_res, log_dos, log_exec]
 
 # --- end ---
 

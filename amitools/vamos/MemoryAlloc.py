@@ -37,6 +37,7 @@ class MemoryAlloc:
     self.begin = begin
     self.size = size
     self.addrs = {}
+    self.mem_objs = {}
     self.mem = mem
     self.access = mem.access
     self.label_mgr = label_mgr
@@ -234,19 +235,31 @@ class MemoryAlloc:
   
   # ----- convenience functions with label creation -----
   
+  def get_memory(self, addr):
+    if self.mem_objs.has_key(addr):
+      return self.mem_objs[addr]
+    else:
+      return None
+  
   # memory
-  def alloc_memory(self, name, size):
+  def alloc_memory(self, name, size, add_label=True):
     addr = self.alloc_mem(size)
-    label = LabelRange(name, addr, size)
-    self.label_mgr.add_label(label)
+    if add_label:
+      label = LabelRange(name, addr, size)
+      self.label_mgr.add_label(label)
+    else:
+      label = None
     mem = Memory(addr,size,label,self.mem.access)
     log_mem_alloc.info("alloc memory: %s",mem)
+    self.mem_objs[addr] = mem
     return mem
   
   def free_memory(self, mem):
     log_mem_alloc.info("free memory: %s",mem)
-    self.label_mgr.remove_label(mem.label)
+    if mem.label != None:
+      self.label_mgr.remove_label(mem.label)
     self.free_mem(mem.addr, mem.size)
+    del self.mem_objs[mem.addr]
   
   # struct
   def alloc_struct(self, name, struct):
@@ -257,12 +270,14 @@ class MemoryAlloc:
     access = AccessStruct(self.mem, struct, addr)
     mem = Memory(addr,size,label,access)
     log_mem_alloc.info("alloc struct: %s",mem)
+    self.mem_objs[addr] = mem
     return mem
   
   def free_struct(self, mem):
     log_mem_alloc.info("free struct: %s",mem)
     self.label_mgr.remove_label(mem.label)
     self.free_mem(mem.addr, mem.size)
+    del self.mem_objs[mem.addr]
   
   # cstr
   def alloc_cstr(self, name, cstr):
@@ -273,12 +288,14 @@ class MemoryAlloc:
     self.mem.access.w_cstr(addr, cstr)
     mem = Memory(addr,size,label,self.mem.access)
     log_mem_alloc.info("alloc c_str: %s",mem)
+    self.mem_objs[addr] = mem
     return mem
   
   def free_cstr(self, mem):
     log_mem_alloc.info("free c_str: %s",mem)
     self.label_mgr.remove_label(mem.label)
-    self.free_mem(mem.addr, mem.size)    
+    self.free_mem(mem.addr, mem.size)
+    del self.mem_objs[mem.addr]
   
   # bstr
   def alloc_bstr(self, name, bstr):
@@ -289,12 +306,15 @@ class MemoryAlloc:
     self.mem.access.w_bstr(addr, bstr)
     mem = Memory(addr,size,label,self.mem.access)
     log_mem_alloc.info("alloc b_str: %s",mem)
+    self.mem_objs[addr] = mem
     return mem
   
   def free_bstr(self, mem):
     log_mem_alloc.info("free b_str: %s",mem)
     self.label_mgr.remove_label(mem.label)
-    self.free_mem(mem.addr, mem.size)    
+    self.free_mem(mem.addr, mem.size)
+    del self.mem_objs[mem.addr]
+        
 
   
   

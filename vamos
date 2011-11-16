@@ -190,7 +190,12 @@ def reset_func():
     global ctx, trap_time
     try:
       begin = time.time()
-      vamos.lib_mgr.call_internal_lib(pc, ctx)
+      # trampoline trap?
+      if pc == vamos.tr.trap_addr:
+        vamos.tr.trap_func(ctx)
+      # lib trap!
+      else:
+        vamos.lib_mgr.call_internal_lib(pc, ctx)
       end = time.time()
       trap_time += end - begin
     except BaseException as e:

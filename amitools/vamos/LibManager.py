@@ -4,7 +4,7 @@ from Trampoline import Trampoline
 from CPU import *
 from structure.ExecStruct import LibraryDef
 from Exceptions import *
-from Log import log_lib
+from Log import log_libmgr, log_lib
 from AccessStruct import AccessStruct
 import logging
 
@@ -31,8 +31,9 @@ class LibEntry():
     self.label = None
     
     # native lib only
-    self.trampoline = None
     self.seg_list = None
+    self.vectors = None
+    
   def __str__(self):
     return "[Lib:'%s',V%d]" % (self.name, self.version)
 
@@ -58,7 +59,7 @@ class LibManager():
     del self.int_lib_classes[lib_class.get_name()]
   
   def lib_log(self, func, text, level=logging.INFO):
-    log_lib.log(level, "LibMgr: [%10s] %s", func, text)
+    log_libmgr.log(level, "[%10s] %s", func, text)
   
   # ----- common -----
   
@@ -82,7 +83,7 @@ class LibManager():
       return self.close_internal_lib(addr, context)
     # is a native lib?
     elif self.native_addr_map.has_key(addr):
-      return self.close_native_lib(addr, context)
+      return self.expunge_native_lib(addr, context)
     else:
       self.lib_log("close_lib","No library found at address %06x" % (addr))
       return None
@@ -132,8 +133,10 @@ class LibManager():
     total_size = pos_size + len(vectors) * 6
 
     # now create a memory lib instance
-    lib_addr = context.alloc.alloc_mem(total_size)
+    lib_mem = context.alloc.alloc_memory(lib_name, total_size, add_label=False)
+    lib_addr = lib_mem.addr
     entry = LibEntry(lib_name, lib_version, lib_addr, len(vectors), pos_size, context.mem, self.label_mgr)
+    entry.vectors = vectors
     lib_base = entry.lib_base
 
     # create a memory label
@@ -156,27 +159,21 @@ class LibManager():
       # setup trampoline to call init routine of library
       # D0 = lib_base, A0 = seg_list, A6 = exec base
       exec_base = context.mem.read_mem(2,4)
-      tr = Trampoline()
+      seg_list_first = seg_list[0].addr
+      tr = context.tr
+      tr.init()
       tr.save_all()
       tr.set_dx_l(0, lib_base)
-      tr.set_ax_l(0, seg_list[0].addr)
+      tr.set_ax_l(0, seg_list_first)
       tr.set_ax_l(6, exec_base)
       tr.jsr(init_addr)
       tr.restore_all()
       tr.rts()
-      tr_size = tr.get_code_size()
-      tr_mem = context.alloc.alloc_memory("tr_"+lib_name, tr_size)
-      tr.write_code(tr_mem)
-      self.lib_log("open_lib","trampoline: %s" % tr_mem, level=logging.DEBUG)
-    
-      # place the trampoline code ptr on stack
-      old_stack = context.cpu.r_reg(REG_A7)
-      new_stack = old_stack - 4
-      context.cpu.w_reg(REG_A7, new_stack)
-      context.mem.write_mem(2,new_stack, tr_mem.addr)
-
+      tr.done()
+      self.lib_log("open_lib", "trampoline: init @%06x (lib_base/d0=%06x seg_list/a0=%06x exec_base/a6=%06x)" % \
+        (init_addr, lib_base, seg_list_first, exec_base), level=logging.DEBUG)
+      
     # store native components
-    entry.trampoline = tr_mem
     entry.seg_list = seg_list
 
     # register lib
@@ -187,7 +184,31 @@ class LibManager():
     self.lib_log("open_lib", "Openend native '%s' V%d: base=%06x label=%s" % (lib_name, lib_version, lib_base, label))
     return entry
 
-  def close_native_lib(self, addr, context):
+  def expunge_native_lib(self, addr, context):
+    entry = self.native_addr_map[addr]
+    
+    # get expunge func
+    expunge_addr = entry.vectors[2]
+    exec_base = context.mem.read_mem(2,4)
+    seg_list_first = entry.seg_list[0].addr
+    lib_base = entry.lib_base
+    if expunge_addr != 0:
+      tr = context.tr
+      tr.init()
+      tr.save_all()
+      tr.set_ax_l(6, lib_base)
+      tr.jsr(expunge_addr)
+      tr.restore_all()
+      # close lib via trampoline trap after expunge code was run
+      tr.trap(lambda x : self.close_native_lib(addr, context, False))
+      tr.rts()
+      tr.done()
+      self.lib_log("expung_lib","trampoline: expunge @%06x (lib_base/a6=%06x) %s" % (expunge_addr, lib_base, entry.label), level=logging.DEBUG)
+    else:
+      self.close_native_lib(addr, context, True)
+    return entry
+
+  def close_native_lib(self, addr, context, do_free):
     # get entry for lib
     entry = self.native_addr_map[addr]
     del self.native_addr_map[addr]
@@ -201,14 +222,13 @@ class LibManager():
 
     # unreg and remove alloc
     self.label_mgr.remove_label(label)
-    context.alloc.free_mem(entry.lib_begin, entry.size)
-    context.alloc.free_memory(entry.trampoline)
+    if do_free:
+      lib_mem = context.alloc.get_memory(entry.lib_begin)
+      context.alloc.free_memory(lib_mem)
 
     # unload seg_list
     context.seg_loader.unload_seg(entry.seg_list)
-
     self.lib_log("close_lib","Closed native '%s' V%d: base=%06x label=%s]" % (name, version, lib_base, label))
-    return entry
 
   def set_all_vectors(self, mem, base_addr, vectors):
     """set all library vectors to valid addresses"""

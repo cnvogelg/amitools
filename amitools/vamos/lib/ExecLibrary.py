@@ -177,8 +177,6 @@ class ExecLibrary(AmigaLibrary):
     # setup exec memory
     lib.access.w_s("ThisTask",ctx.this_task.addr)
     lib.access.w_s("LibNode.lib_Version", self.version)
-    self.alloc_mems = {}
-    self.alloc_vecs = {}
   
   # ----- System -----
   
@@ -259,16 +257,19 @@ class ExecLibrary(AmigaLibrary):
   def AllocMem(self, lib, ctx):
     size = ctx.cpu.r_reg(REG_D0)
     flags = ctx.cpu.r_reg(REG_D1)
-    mb = self.alloc.alloc_memory("AllocMem(@%06x)" % self.get_callee_pc(ctx),size)
+    # label alloc
+    pc = self.get_callee_pc(ctx)
+    tag = ctx.label_mgr.get_mem_str(pc)
+    name = "AllocMem(%06x = %s)" % (pc,tag)
+    mb = self.alloc.alloc_memory(name,size)
     log_exec.info("AllocMem: %s" % mb)
-    self.alloc_mems[mb.addr] = mb
     return mb.addr
   
   def FreeMem(self, lib, ctx):
     size = ctx.cpu.r_reg(REG_D0)
     addr = ctx.cpu.r_reg(REG_A1)
-    if self.alloc_mems.has_key(addr):
-      mb = self.alloc_mems[addr]  
+    mb = self.alloc.get_memory(addr)
+    if mb != None:
       log_exec.info("FreeMem: %s" % mb)
       self.alloc.free_memory(mb)
     else:
@@ -279,13 +280,12 @@ class ExecLibrary(AmigaLibrary):
     flags = ctx.cpu.r_reg(REG_D1)
     mb = self.alloc.alloc_memory("AllocVec(@%06x)" % self.get_callee_pc(ctx),size)
     log_exec.info("AllocVec: %s" % mb)
-    self.alloc_vecs[mb.addr] = mb
     return mb.addr
     
   def FreeVec(self, lib, ctx):
     addr = ctx.cpu.r_reg(REG_A1)
-    if self.alloc_vecs.has_key(addr):
-      mb = self.alloc_vecs[addr]  
+    mb = self.alloc.get_memory(addr)
+    if mb != None:
       log_exec.info("FreeVec: %s" % mb)
       self.alloc.free_memory(mb)
     else:
