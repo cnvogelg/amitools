@@ -23,6 +23,7 @@ class LibEntry():
     self.lib_begin = addr
     self.lib_base  = addr + self.neg_size
     self.lib_end   = self.lib_base + self.pos_size
+    self.real_lib_base = self.lib_base
 
     self.ref_cnt = 0
     self.lib_id = None
@@ -35,7 +36,7 @@ class LibEntry():
     self.vectors = None
     
   def __str__(self):
-    return "[Lib:'%s',V%d]" % (self.name, self.version)
+    return "[Lib:'%s',V%d,refs=%d]" % (self.name, self.version, self.ref_cnt)
 
 class LibManager():
   
@@ -83,7 +84,7 @@ class LibManager():
       return self.close_internal_lib(addr, context)
     # is a native lib?
     elif self.native_addr_map.has_key(addr):
-      return self.expunge_native_lib(addr, context)
+      return self.close_native_lib(addr, context)
     else:
       self.lib_log("close_lib","No library found at address %06x" % (addr))
       return None
@@ -91,28 +92,107 @@ class LibManager():
   # ----- native lib -----
 
   def open_native_lib(self, name, ver, context):
-    # check name
+    # fix name
     if name.find(':') == -1 and name.find('/') == -1:
       name = "libs:" + name
-      
+  
+    # setup trampoline
+    tr = context.tr
+    tr.init()
+  
+    # alreay have this lib loaded?
+    if self.native_libs.has_key(name):
+      entry = self.native_libs[name]
+    # no -> need to laod it (will add init to trampoline)
+    else:
+      entry = self.load_native_lib(name, ver, context, tr)
+      if entry == None:
+        return None
+    
+    # add Open() call to tramponline 
+    open_addr = entry.vectors[0]
+    lib_base = entry.lib_base
+    self.lib_log("open_lib","trampoline: open @%06x (lib_base/a6=%06x)" % (open_addr,lib_base), level=logging.DEBUG)
+    tr.save_all()
+    tr.set_ax_l(6, lib_base)
+    tr.jsr(open_addr)
+    # fetch the result (the lib base might have been altered)
+    tr.trap(lambda x : self.after_open_native_lib(entry, context))
+    tr.restore_all()
+    
+    # finish trampoline
+    tr.rts()
+    tr.done()
+    
+    # update ref count
+    entry.ref_cnt += 1
+    self.lib_log("open_lib", "Openend native '%s' V%d: %s" % (name, ver, entry))
+    return entry
+    
+  def after_open_native_lib(self, entry, context):
+    real_lib_base = context.cpu.r_reg(REG_D0)
+    lib_base = entry.lib_base
+    self.lib_log("open_lib", "after open: returned lib_base=%06x (was=%06x)" % (real_lib_base, lib_base), level=logging.DEBUG)
+    entry.real_lib_base = real_lib_base
+    
+  def close_native_lib(self, addr, context):
+    # get lib entry
+    if self.native_addr_map.has_key(addr):
+      entry = self.native_addr_map[addr]
+    else:
+      return None
+    
+    # setup trampoline
+    tr = context.tr
+    tr.init()
+    
+    # add Close() call to trampoline
+    close_addr = entry.vectors[1]
+    lib_base = entry.real_lib_base
+    self.lib_log("close_lib","trampoline: close @%06x (lib_base/a6=%06x)" % (close_addr,lib_base), level=logging.DEBUG)
+    tr.save_all()
+    tr.set_ax_l(6, lib_base)
+    tr.jsr(close_addr)
+    # fetch the result of the close call
+    tr.trap(lambda x : self.after_close_native_lib(entry, context))
+    tr.restore_all()
+    
+    # unload?
+    if entry.ref_cnt == 1:
+      self.expunge_native_lib(addr, context, tr)
+    
+    # finish trampoline
+    tr.rts()
+    tr.done()  
+    
+    # update ref count
+    entry.ref_cnt -= 1
+    self.lib_log("close_lib", "Closed native: %s" % entry)
+    return entry
+  
+  def after_close_native_lib(self, entry, context):
+    result = context.cpu.r_reg(REG_D0)
+    self.lib_log("close_lib", "after close: returned seg_list=%06x" % (result), level=logging.DEBUG)
+    
+  def load_native_lib(self, name, ver, context, tr):
     # use seg_loader to load lib
-    self.lib_log("open_lib","Trying to load native lib: %s" % name)
+    self.lib_log("load_lib","Trying to load native lib: %s" % name)
     seg_list = context.seg_loader.load_seg(name)
     if seg_list == None:
-      self.lib_log("open_lib","Can't load library file '%s'" % name, level=logging.ERROR)
+      self.lib_log("load_lib","Can't load library file '%s'" % name, level=logging.ERROR)
       return None
     
     # check seg list for resident library struct
     ar = AmigaResident()
     res_list = ar.find_residents(seg_list[0], context.mem)
     if res_list == None or len(res_list) != 1:
-      self.lib_log("open_lib","No single resident found!", level=logging.ERROR)
+      self.lib_log("load_lib","No single resident found!", level=logging.ERROR)
       return None
     
     # make sure its a library
     res = res_list[0]
     if res['type'] != AmigaResident.NT_LIBRARY:
-      self.lib_log("open_lib","Resident is not a library!", level=logging.ERROR)
+      self.lib_log("load_lib","Resident is not a library!", level=logging.ERROR)
       return None
     
     # resident is ok
@@ -120,11 +200,11 @@ class LibManager():
     lib_id = res['id']
     lib_version = res['version']
     auto_init = res['auto_init']
-    self.lib_log("open_lib", "found resident: name='%s' id='%s'" % (lib_name, lib_id))
+    self.lib_log("load_lib", "found resident: name='%s' id='%s'" % (lib_name, lib_id), level=logging.DEBUG)
     
     # read auto init infos
     if not ar.read_auto_init_data(res, context.mem):
-      self.lib_log("open_lib","Error reading auto_init!", level=logging.ERROR)
+      self.lib_log("load_lib","Error reading auto_init!", level=logging.ERROR)
       return None
     
     # get library base info
@@ -146,11 +226,11 @@ class LibManager():
   
     # setup lib instance memory
     hex_vec = map(lambda x:"%06x" % x, res['vectors'])
-    self.lib_log("open_lib", "setting up vectors=%s" % hex_vec, level=logging.DEBUG)
+    self.lib_log("load_lib", "setting up vectors=%s" % hex_vec, level=logging.DEBUG)
     self.set_all_vectors(context.mem, lib_base, vectors)
-    self.lib_log("open_lib", "setting up struct=%s and lib" % res['struct'], level=logging.DEBUG)
+    self.lib_log("load_lib", "setting up struct=%s and lib" % res['struct'], level=logging.DEBUG)
     ar.init_lib(res, entry, lib_base)
-    self.lib_log("open_lib", "init_code=%06x dataSize=%06x" % (res['init_code_ptr'],res['dataSize']), level=logging.DEBUG)
+    self.lib_log("load_lib", "init_code=%06x dataSize=%06x" % (res['init_code_ptr'],res['dataSize']), level=logging.DEBUG)
 
     # do we need to call init code of lib?
     init_addr = res['init_code_ptr']
@@ -160,17 +240,13 @@ class LibManager():
       # D0 = lib_base, A0 = seg_list, A6 = exec base
       exec_base = context.mem.read_mem(2,4)
       seg_list_first = seg_list[0].addr
-      tr = context.tr
-      tr.init()
       tr.save_all()
       tr.set_dx_l(0, lib_base)
       tr.set_ax_l(0, seg_list_first)
       tr.set_ax_l(6, exec_base)
       tr.jsr(init_addr)
       tr.restore_all()
-      tr.rts()
-      tr.done()
-      self.lib_log("open_lib", "trampoline: init @%06x (lib_base/d0=%06x seg_list/a0=%06x exec_base/a6=%06x)" % \
+      self.lib_log("load_lib", "trampoline: init @%06x (lib_base/d0=%06x seg_list/a0=%06x exec_base/a6=%06x)" % \
         (init_addr, lib_base, seg_list_first, exec_base), level=logging.DEBUG)
       
     # store native components
@@ -181,34 +257,32 @@ class LibManager():
     self.native_addr_map[lib_base] = entry
 
     # return MemoryLib instance
-    self.lib_log("open_lib", "Openend native '%s' V%d: base=%06x label=%s" % (lib_name, lib_version, lib_base, label))
+    self.lib_log("load_lib", "Loaded native '%s' V%d: base=%06x label=%s" % (lib_name, lib_version, lib_base, label))
     return entry
 
-  def expunge_native_lib(self, addr, context):
+  def expunge_native_lib(self, addr, context, tr):
     entry = self.native_addr_map[addr]
     
     # get expunge func
     expunge_addr = entry.vectors[2]
     exec_base = context.mem.read_mem(2,4)
     seg_list_first = entry.seg_list[0].addr
-    lib_base = entry.lib_base
+    lib_base = entry.real_lib_base
     if expunge_addr != 0:
-      tr = context.tr
-      tr.init()
       tr.save_all()
       tr.set_ax_l(6, lib_base)
       tr.jsr(expunge_addr)
       tr.restore_all()
       # close lib via trampoline trap after expunge code was run
-      tr.trap(lambda x : self.close_native_lib(addr, context, False))
-      tr.rts()
-      tr.done()
+      tr.trap(lambda x : self.unload_native_lib(addr, context, False))
       self.lib_log("expung_lib","trampoline: expunge @%06x (lib_base/a6=%06x) %s" % (expunge_addr, lib_base, entry.label), level=logging.DEBUG)
     else:
-      self.close_native_lib(addr, context, True)
-    return entry
+      self.unload_native_lib(addr, context, True)
 
-  def close_native_lib(self, addr, context, do_free):
+  def unload_native_lib(self, addr, context, do_free):
+    result = context.cpu.r_reg(REG_D0)
+    self.lib_log("expung_lib","after expunge: seg_list=%06x" % (result), level=logging.DEBUG)    
+    
     # get entry for lib
     entry = self.native_addr_map[addr]
     del self.native_addr_map[addr]
@@ -228,7 +302,7 @@ class LibManager():
 
     # unload seg_list
     context.seg_loader.unload_seg(entry.seg_list)
-    self.lib_log("close_lib","Closed native '%s' V%d: base=%06x label=%s]" % (name, version, lib_base, label))
+    self.lib_log("unload_lib","Unloaded native '%s' V%d: base=%06x label=%s]" % (name, version, lib_base, label))
 
   def set_all_vectors(self, mem, base_addr, vectors):
     """set all library vectors to valid addresses"""

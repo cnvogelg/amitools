@@ -11,7 +11,10 @@ class Memory:
     self.label = label
     self.access = access
   def __str__(self):
-    return str(self.label)
+    if self.label != None:
+      return str(self.label)
+    else:
+      return "[@%06x +%06x %06x]" % (self.addr, self.size, self.addr+self.size)
 
 # free memory chunk
 class MemoryChunk:
