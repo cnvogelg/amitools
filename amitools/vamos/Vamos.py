@@ -179,10 +179,6 @@ class Vamos:
     self.lib_mgr.register_int_lib(self.icon_lib_def)
 
   def init_context(self):
-    # alloc trampoline
-    self.tr_mem_size = 256
-    self.tr_mem = self.alloc.alloc_memory("Trampoline", self.tr_mem_size)
-    self.tr = Trampoline(self.cpu, self.tr_mem)
     # alloc context
     self.ctx = VamosContext( self.cpu, self.mem, self.lib_mgr, self.alloc )
     self.ctx.bin_args = self.bin_args
@@ -192,6 +188,10 @@ class Vamos:
     self.ctx.label_mgr = self.label_mgr
     self.ctx.mem = self.mem
     self.mem.ctx = self.ctx
+    # alloc trampoline
+    self.tr_mem_size = 256
+    self.tr_mem = self.alloc.alloc_memory("Trampoline", self.tr_mem_size)
+    self.tr = Trampoline(self.ctx, self.tr_mem)
     self.ctx.tr = self.tr
 
   def free_context(self):

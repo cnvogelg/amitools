@@ -3,16 +3,29 @@ import time
 from CPU import *
 from Log import log_main
 
+class Trap:
+  def __init__(self, addr, func, one_shot):
+    self.addr = addr
+    self.func = func
+    self.one_shot = one_shot
+  def __str__(self):
+    return "[@%06x:%s:one_shot=%s]" % (self.addr, self.func, self.one_shot)
+
 class VamosRun:
   def __init__(self, vamos):
     self.vamos = vamos
     self.cpu = vamos.cpu
     self.mem = vamos.mem
     self.ctx = vamos.ctx
+    # store myself in context
+    self.ctx.run = self
     
     self.stay = True
     self.et = vamos.error_tracker
     self.trap_time = 0.0
+    
+    self.traps = {}
+    self.trap_addrs = []
     
   def init_cpu(self):
     # prepare m68k
@@ -37,6 +50,16 @@ class VamosRun:
     self.cpu.w_reg(REG_A5, self.vamos.dos_guard_base)
     self.cpu.w_reg(REG_A6, self.vamos.dos_guard_base)
 
+  def add_trap(self, addr, func, one_shot=False):
+    trap = Trap(addr, func, one_shot)
+    self.traps[addr] = trap
+    self.trap_addrs = self.traps.keys()
+    return trap
+  
+  def remove_trap(self, trap):
+    del self.traps[trap.addr]
+    self.trap_addrs = self.traps.keys()
+
   def reset_func(self):
     """this callback is entered from CPU whenever a RESET opcode is encountered.
        dispatch to end vamos, call trap, or lib call.
@@ -51,9 +74,12 @@ class VamosRun:
       try:
         begin = time.time()
         
-        # trampoline trap?
-        if pc == self.vamos.tr.trap_addr:
-          self.vamos.tr.trap_func(self.ctx)
+        # a registered trap?
+        if pc in self.trap_addrs:
+          trap = self.traps[pc]
+          trap.func(self.ctx)
+          if trap.one_shot:
+            self.remove_trap(trap)          
         # lib trap!
         else:
           self.vamos.lib_mgr.call_internal_lib(pc, self.ctx)

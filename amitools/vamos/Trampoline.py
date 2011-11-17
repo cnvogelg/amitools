@@ -3,19 +3,22 @@ from CPU import *
 
 class Trampoline:
   
-  def __init__(self, cpu, mem):
+  def __init__(self, ctx, mem):
     self.code = []
-    self.cpu = cpu
+    self.ctx = ctx
+    self.cpu = ctx.cpu
     self.mem = mem
-    self.trap_addr = 0
+    self.traps = []
   
   def init(self):
     self.code = []
-    self.trap_addr = 0
+    self.traps = []
   
   def done(self):
-    self.write_code()
-    self.setup_on_stack()
+    self._write_code()
+    self._setup_on_stack()
+  
+  # ----- trampoline commands -----
   
   def save_all(self):
     self.code.extend([0x48e7, 0xfffe]) # movem.l d0-d7/a0-a6,-(sp)
@@ -28,7 +31,7 @@ class Trampoline:
   
   def trap(self, func):
     self.code.append(0x4e70) # reset = trap
-    self.trap_func = func
+    self.traps.append(func)
   
   def set_dx_l(self, num, val):
     op = 0x203c # move.l #LONG, d0
@@ -48,24 +51,27 @@ class Trampoline:
     hi = (addr >> 16) & 0xffff
     lo = addr & 0xffff
     self.code.extend([0x4eb9, hi, lo]) # jsr LONG
+    
+  # ----- internals -----
   
-  def get_code_size(self):
-    return len(self.code) * 2
-  
-  def write_code(self):
+  def _write_code(self):
     size = len(self.code) * 2
     if size > self.mem.size:
       raise VamosInternalError("Trampoline too small: want=%d got=%d" % (size, self.mem.size))
     addr = self.mem.addr
+    trap_pos = 0
     for w in self.code:
-      if w == 0x4e70:
-        self.trap_addr = addr
       self.mem.access.write_mem(1, addr, w)
+      # handle trap -> register one shot at run time
+      if w == 0x4e70:
+        trap_func = self.traps[trap_pos]
+        self.ctx.run.add_trap(addr, trap_func, one_shot=True)
+        trap_pos += 1
       addr += 2
 
-  def setup_on_stack(self):
+  def _setup_on_stack(self):
     old_stack = self.cpu.r_reg(REG_A7)
     new_stack = old_stack - 4
     self.cpu.w_reg(REG_A7, new_stack)
-    self.mem.access.w32(new_stack, self.mem.addr)
+    self.ctx.mem.access.w32(new_stack, self.mem.addr)
 
