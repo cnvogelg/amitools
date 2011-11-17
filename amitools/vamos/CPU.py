@@ -35,6 +35,12 @@ class CPU:
     return 0
   def w_sr(self, val):
     pass
+  def pulse_reset(self):
+    pass
+  def execute(self, num_cycles):
+    return 0
+  def end(self):
+    pass
 
   sr_chars = "CVZNX"
   

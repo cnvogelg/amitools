@@ -8,10 +8,6 @@
 
 import sys
 import argparse
-import os
-import os.path
-import traceback
-import time
 
 from musashi import m68k
 
@@ -23,6 +19,7 @@ from amitools.vamos.Exceptions import *
 from amitools.vamos.AccessMemory import AccessMemory
 from amitools.vamos.VamosConfig import VamosConfig
 from amitools.vamos.PathManager import PathManager
+from amitools.vamos.VamosRun import VamosRun
 
 # ----- classes -----
 
@@ -41,6 +38,12 @@ class MusashiCPU(CPU):
     m68k.set_reg(m68k.M68K_REG_SR,val)
   def r_sr(sefl):
     return m68k.get_reg(m68k.M68K_REG_SR)
+  def pulse_reset(self):
+    m68k.pulse_reset()
+  def execute(self, num_cycles):
+    return m68k.execute(num_cycles)
+  def end(self):
+    m68k.end_timeslice()
 
 class MusashiMEM(MEM):
   def __init__(self):
@@ -158,99 +161,25 @@ vamos.setup_process()
 vamos.open_exec_lib()
 vamos.create_old_dos_guard()
 
-# ----- start cpu ------------------------------------------------------------
-# prepare m68k
-log_main.info("setting up m68k")
+# ------ main loop ------
+# set CPU type
 m68k.set_cpu_type(m68k.M68K_CPU_TYPE_68000)
 
-# setup stack & first PC
-ctx.mem.access.w32(0, vamos.stack_initial)
-ctx.mem.access.w32(4, vamos.prog_start)
-m68k.pulse_reset()
+# init cpu and initial registers
+run = VamosRun(vamos)
+run.init_cpu()
 
-# set end RESET opcode at 0 and execbase at 4
-op_reset = 0x04e70
-ctx.mem.access.w16(0, op_reset)
-ctx.mem.access.w32(4, vamos.exec_lib.lib_base)
-
-# setup RESET: catch end of program and all library traps
-stay = True
-et = vamos.error_tracker
-trap_time = 0.0
-def reset_func():
-  global et
-  pc = m68k.get_reg(m68k.M68K_REG_PC) - 2
-  # addr == 0 or an error occurred -> end reached
-  if pc == 0 or et.has_errors:
-    global stay
-    m68k.end_timeslice()
-    stay = False
-  # a lib trap!
-  else:
-    global ctx, trap_time
-    try:
-      begin = time.time()
-      # trampoline trap?
-      if pc == vamos.tr.trap_addr:
-        vamos.tr.trap_func(ctx)
-      # lib trap!
-      else:
-        vamos.lib_mgr.call_internal_lib(pc, ctx)
-      end = time.time()
-      trap_time += end - begin
-    except BaseException as e:
-      et.report_error(e)
-      
-m68k.set_reset_instr_callback(reset_func)
-
-# setup arg in D0/A0
-m68k.set_reg(m68k.M68K_REG_D0, vamos.arg_len)
-m68k.set_reg(m68k.M68K_REG_A0, vamos.arg_base)
-
-# to track old dos values
-m68k.set_reg(m68k.M68K_REG_A2, vamos.dos_guard_base)
-m68k.set_reg(m68k.M68K_REG_A5, vamos.dos_guard_base)
-m68k.set_reg(m68k.M68K_REG_A6, vamos.dos_guard_base)
-
-# ----- start main CPU loop --------------------------------------------------
-log_main.info("start cpu: %06x", vamos.prog_start)
-total_cycles = 0
-cycles_per_run = args.block
-max_cycles = args.cycles
-start_time = time.time()
+# set reset opcode/trap handler
+m68k.set_reset_instr_callback(run.reset_func)
 
 # main loop
-while stay:
-  total_cycles += m68k.execute(cycles_per_run)
-  # end after enough cycles
-  if max_cycles > 0 and total_cycles >= max_cycles:
-    break
-  # some error fored a quit?
-  if et.has_errors:
-    break
-
-# ----- end of CPU loop ------------------------------------------------------
-end_time = time.time()
-delta_time = end_time - start_time
-cpu_time = delta_time - trap_time
-mhz = total_cycles / (1000000.0 * delta_time)
-cpu_percent = cpu_time * 100.0 / delta_time
-trap_percent = 100.0 - cpu_percent
-log_main.info("done (%d cycles in cpu time %.4fs -> %5.2f MHz (%.2f %%), trap time %.4fs (%.2f %%), total time %.4fs)", total_cycles, cpu_time, mhz, cpu_percent, trap_time, trap_percent, delta_time)
+exit_code = run.run(args.block, args.cycles)
 
 # shutdown vamos
 vamos.cleanup()
 
-# if errors happened then report them now
-if et.has_errors:
-  log_main.error("After %d cycles:", total_cycles)
-  et.dump()
-  exit_code = 1
-else:
-  # get exit code from CPU
-  exit_code = int(m68k.get_reg(m68k.M68K_REG_D0))
-  log_main.info("exit code=%d", exit_code)
-
-# clean up & exit
+# clean up native memory module
 mem.free()
+
+# exit
 sys.exit(exit_code)
