@@ -259,7 +259,7 @@ class LibManager():
 
       # allocate and create lib instance
       lib_addr = context.alloc.alloc_mem(lib_size)
-      entry = LibEntry(name, ver, lib_addr, num_vecs, pos_size, context.mem, self.label_mgr, struct, lib_class)
+      entry = LibEntry(name, lib_ver, lib_addr, num_vecs, pos_size, context.mem, self.label_mgr, struct, lib_class)
       lib_base = entry.lib_base
       
       # create memory label
@@ -283,7 +283,7 @@ class LibManager():
       entry = self.int_libs[name]
           
     entry.ref_cnt += 1
-    self.lib_log("open_lib","Opened %s V%d ref_count=%d base=%06x" % (name, lib_ver, entry.ref_cnt, entry.lib_base))
+    self.lib_log("open_lib","Opened '%s' V%d ref_count=%d base=%06x" % (name, lib_ver, entry.ref_cnt, entry.lib_base))
     return entry
 
   def close_internal_lib(self, addr, context):
@@ -298,7 +298,7 @@ class LibManager():
     elif ref_cnt > 1:
       ref_cnt -= 1;
       entry.ref_cnt = ref_cnt
-      self.lib_log("close_lib","Closed %s V%d ref_count=%d]" % (name, ver, ref_cnt))
+      self.lib_log("close_lib","Closed '%s' V%d ref_count=%d]" % (name, ver, ref_cnt))
       return entry
     else:
       # call lib to close
@@ -311,7 +311,7 @@ class LibManager():
       self.label_mgr.remove_label(entry.label)
       # free memory
       context.alloc.free_mem(entry.lib_begin, entry.size)
-      self.lib_log("close_lib","Closed %s V%d ref_count=0" % (name, ver))
+      self.lib_log("close_lib","Closed '%s' V%d ref_count=0" % (name, ver))
       return entry
       
   def call_internal_lib(self, addr, ctx):
