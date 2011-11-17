@@ -63,8 +63,11 @@ class VamosRun:
         self.trap_time += end - begin
       except BaseException as e:
         self.et.report_error(e)
+        self.cpu.end()
+        self.stay = False
 
   def run(self, cycles_per_run=1000, max_cycles=0):
+    """main run loop of vamos"""
     log_main.info("start cpu: %06x", self.vamos.prog_start)
 
     total_cycles = 0

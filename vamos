@@ -128,6 +128,7 @@ log_main.info("setting up main memory with %s KiB RAM: top=%06x" % (args.ram_siz
 if not mem.init(args.ram_size):
   log_main.error("can't allocate vamos RAM: %d KiB" % args.ram_size)
   sys.exit(1)
+  
 vamos = Vamos(mem, cpu, pm)
 
 # enable mem trace?
@@ -141,25 +142,8 @@ if args.internal_memory_trace:
 m68k.mem_set_invalid_func(vamos.error_tracker.report_invalid_memory)
 
 # --- setup stack ---
-vamos.init_stack(args.stack_size)
-
-# --- load segments of binary ---
-if not vamos.load_main_binary(args.bin):
+if not vamos.init(args.stack_size, args.bin, args.args, lib_versions):
   sys.exit(1)
-# place args in memory
-vamos.init_args(args.args)
-
-# --- libs ---
-vamos.init_managers()
-vamos.register_base_libs(lib_versions['exec'], lib_versions['dos'])
-
-# --- vamos context ---
-ctx = vamos.init_context()
-
-# --- in memory process struct ---
-vamos.setup_process()
-vamos.open_exec_lib()
-vamos.create_old_dos_guard()
 
 # ------ main loop ------
 # set CPU type

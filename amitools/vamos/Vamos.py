@@ -55,6 +55,24 @@ class Vamos:
     # lib manager
     self.lib_mgr = LibManager( self.label_mgr )
 
+  def init(self, stack_size, bin_file, bin_args, lib_versions):
+    self.init_stack(stack_size)
+    # --- load segments of binary ---
+    if not self.load_main_binary(bin_file):
+      return False
+    # place args in memory
+    self.init_args(bin_args)
+    # --- libs ---
+    self.init_managers()
+    self.register_base_libs(lib_versions['exec'], lib_versions['dos'])
+    # --- vamos context ---
+    self.init_context()
+    # --- in memory process struct ---
+    self.setup_process()
+    self.open_exec_lib()
+    self.create_old_dos_guard()
+    return True
+
   def cleanup(self):
     self.close_exec_lib()
     self.free_process()
@@ -175,7 +193,6 @@ class Vamos:
     self.ctx.mem = self.mem
     self.mem.ctx = self.ctx
     self.ctx.tr = self.tr
-    return self.ctx
 
   def free_context(self):
     self.alloc.free_memory(self.tr_mem)
