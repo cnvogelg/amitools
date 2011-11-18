@@ -198,6 +198,8 @@ class DosLibrary(AmigaLibrary):
       (102, self.Examine),
       (126, self.CurrentDir),
       (132, self.IoErr),
+      (150, self.LoadSeg),
+      (156, self.UnLoadSeg),
       (192, self.DateStamp),
       (210, self.ParentDir),
       (216, self.IsInteractive),
@@ -211,11 +213,12 @@ class DosLibrary(AmigaLibrary):
     )
     self.set_funcs(dos_funcs)
   
-  def set_managers(self, path_mgr, lock_mgr, file_mgr, port_mgr):
+  def set_managers(self, path_mgr, lock_mgr, file_mgr, port_mgr, seg_loader):
     self.path_mgr = path_mgr
     self.lock_mgr = lock_mgr
     self.file_mgr = file_mgr
     self.port_mgr = port_mgr
+    self.seg_loader = seg_loader;
     # create fs handler port
     self.fs_handler_port = port_mgr.add_int_port(self)
     log_dos.info("dos fs handler port: %06x" % self.fs_handler_port)
@@ -230,6 +233,7 @@ class DosLibrary(AmigaLibrary):
     self.cur_dir_lock = None
     self.ctx = ctx
     self.mem_allocs = {}
+    self.seg_lists = {}
     # setup RootNode
     self.root_struct = ctx.alloc.alloc_struct("RootNode",RootNodeDef)
     lib.access.w_s("dl_Root",self.root_struct.addr)
@@ -566,6 +570,28 @@ class DosLibrary(AmigaLibrary):
     tagitem_ptr = ctx.cpu.r_reg(REG_D2)
     cmd = ctx.mem.access.r_cstr(cmd_ptr)
     log_dos.info("SystemTagList: cmd='%s'" % (cmd))
+
+  def LoadSeg(self, lib, ctx):
+    name_ptr = ctx.cpu.r_reg(REG_D1)
+    name = ctx.mem.access.r_cstr(name_ptr)
+    seg_list = self.seg_loader.load_seg(name)
+    if seg_list == None:
+      log_dos.warn("LoadSeg: '%s' -> not found!" % (name))
+      return 0
+    else:
+      log_dos.warn("LoadSeg: '%s' -> %s" % (name, seg_list))
+      b_addr = seg_list.b_addr
+      self.seg_lists[b_addr] = seg_list
+      return b_addr
+    
+  def UnLoadSeg(self, lib, ctx):
+    b_addr = ctx.cpu.r_reg(REG_D1)
+    if not self.seg_lists.has_key(b_addr):
+      raise VamosInternalError("Unknown LoadSeg seg_list: b_addr=%06x" % b_addr)
+    else:
+      seg_list = self.seg_lists[b_addr]
+      del self.seg_lists[b_addr]
+      self.seg_loader.unload_seg(seg_list)
 
   # ----- Helpers -----
 

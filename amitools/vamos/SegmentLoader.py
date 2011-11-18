@@ -18,6 +18,26 @@ class Segment:
   def __str__(self):
     return "[Seg:'%s':%06x-%06x]" % (self.name, self.addr, self.end)
 
+class SegList:
+  def __init__(self, ami_bin_file, sys_bin_file):
+    self.ami_bin_file = ami_bin_file
+    self.sys_bin_file = sys_bin_file
+    self.segments = []
+    self.b_addr = 0
+    self.prog_start = 0
+    self.size = 0
+  
+  def add(self, segment):
+    if len(self.segments) == 0:
+      self.b_addr = segment.addr >> 2
+      self.prog_start = segment.addr + 4
+    self.segments.append(segment)
+    self.size += segment.size
+    
+  def __str__(self):
+    return "[SegList:ami='%s':sys='%s':b_addr=%06x,prog=%06x,segs=#%d,size=%d]" % \
+      (self.ami_bin_file, self.sys_bin_file, self.b_addr, self.prog_start, len(self.segments), self.size)
+
 class SegmentLoader:
   
   def __init__(self, mem, alloc, label_mgr, path_mgr):
@@ -32,43 +52,41 @@ class SegmentLoader:
     # map file name
     sys_bin_file = self.path_mgr.ami_to_sys_path(ami_bin_file, searchMulti=True)
     if sys_bin_file == None:
-      log_main.error("failed mapping binary path: '%s'", ami_bin_file)
+      self.error = "failed mapping binary path: '%s'" % ami_bin_file
       return None
-    seg_list = self._load_seg(sys_bin_file)
+      
+    seg_list = self._load_seg(ami_bin_file,sys_bin_file)
     if seg_list == None:
-      log_main.error("failed loading binary: ami='%s' sys='%s': %s", ami_bin_file, sys_bin_file, self.error)
       return None
-    log_mem_init.info("binary segments: %s",ami_bin_file)
-    for s in seg_list:
-      log_mem_init.info(s.label)
+    
     return seg_list
   
   # load sys_bin_file
-  def _load_seg(self, name):
-    base_name = os.path.basename(name)
+  def _load_seg(self, ami_bin_file, sys_bin_file):
+    base_name = os.path.basename(sys_bin_file)
     hunk_file = HunkReader()
     
     # does file exist?
-    if not os.path.isfile(name):
-      self.error = "Can't find '%s'" % name
+    if not os.path.isfile(sys_bin_file):
+      self.error = "Can't find '%s'" % sys_bin_file
       return None
     
     # read hunk file
-    fobj = file(name, "rb")
-    result = hunk_file.read_file_obj(name,fobj,None)
+    fobj = file(sys_bin_file, "rb")
+    result = hunk_file.read_file_obj(sys_bin_file,fobj,None)
     if result != Hunk.RESULT_OK:
-      self.error = "Error loading '%s'" % name
+      self.error = "Error loading '%s'" % sys_bin_file
       return None
       
     # build segments
     ok = hunk_file.build_segments()
     if not ok:
-      self.error = "Error building segments for '%s'" % name
+      self.error = "Error building segments for '%s'" % sys_bin_file
       return None
       
     # make sure its a loadseg()
     if hunk_file.type != Hunk.TYPE_LOADSEG:
-      self.error = "File not loadSeg()able: '%s'" % name
+      self.error = "File not loadSeg()able: '%s'" % sys_bin_file
       return None
 
     # create relocator
@@ -77,33 +95,42 @@ class SegmentLoader:
     # allocate segment memory
     sizes = relocator.get_sizes()
     names = relocator.get_type_names()
-    seg_list = []
+    seg_list = SegList(ami_bin_file,sys_bin_file)
     addrs = []
     for i in xrange(len(sizes)):
       size = sizes[i]
-      seg_addr = self.alloc.alloc_mem(size + 8) # add 4 bytes guard around segment
+      seg_size = size + 4 # add segment pointer
+      seg_addr = self.alloc.alloc_mem(seg_size)
+
       # create label
       label = None
       name = "%s:%d:%s" % (base_name,i,names[i].replace("HUNK_","").lower())
       if self.alloc.label_mgr != None:
-        label = LabelRange(name, seg_addr + 4, size)
+        label = LabelRange(name, seg_addr, seg_size)
         self.alloc.label_mgr.add_label(label)
-      seg = Segment(name, seg_addr, size, label)
-      seg_list.append(seg)
-      addrs.append(seg.addr + 4)
+
+      seg = Segment(name, seg_addr, seg_size, label)
+      seg_list.add(seg)
+      addrs.append(seg.addr + 4) # begin of segment data/code
     
     # relocate to addresses and return data
     datas = relocator.relocate(addrs)
     
     # write to allocated memory
+    last_addr = None
     for i in xrange(len(sizes)):
       addr = addrs[i]
       self.mem.access.w_data(addr, datas[i])
+      # write segment pointers
+      if last_addr != None:
+        b_addr = addr >> 2 # BCPL segment pointers
+        self.mem.access.w32(last_addr - 4, b_addr)
+      last_addr = addr
     
     return seg_list
     
   def unload_seg(self, seg_list):
-    for seg in seg_list:
+    for seg in seg_list.segments:
       # free memory of segment
       self.alloc.free_mem(seg.addr, seg.size)
       # remove label of segment

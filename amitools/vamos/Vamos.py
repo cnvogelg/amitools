@@ -85,11 +85,12 @@ class Vamos:
 
   def load_main_binary(self, ami_bin_file):
     self.bin_file = ami_bin_file
-    log_main.info("loading main binary: %s", ami_bin_file)
     self.bin_seg_list = self.seg_loader.load_seg(ami_bin_file)
     if self.bin_seg_list == None:
+      log_main.error("failed loading main binary: %s", self.seg_loader.error)
       return False
-    self.prog_start = self.bin_seg_list[0].start
+    self.prog_start = self.bin_seg_list.prog_start
+    log_main.info("loaded main binary: %s", self.bin_seg_list)
     return True
 
   def unload_main_binary(self):
@@ -172,7 +173,7 @@ class Vamos:
     self.lib_mgr.register_int_lib(self.exec_lib_def)
     # dos
     self.dos_lib_def = DosLibrary(self.mem, self.alloc, version=dos_version)
-    self.dos_lib_def.set_managers(self.path_mgr, self.lock_mgr, self.file_mgr, self.port_mgr)
+    self.dos_lib_def.set_managers(self.path_mgr, self.lock_mgr, self.file_mgr, self.port_mgr, self.seg_loader)
     self.lib_mgr.register_int_lib(self.dos_lib_def)
     # icon
     self.icon_lib_def = IconLibrary()
@@ -209,6 +210,8 @@ class Vamos:
     # create my task structure
     self.this_task = self.alloc.alloc_struct("ThisTask",ProcessDef)
     self.this_task.access.w_s("pr_CLI", self.cli.addr)
+    self.this_task.access.w_s("pr_CIS", self.file_mgr.get_input().b_addr<<2) # compensate BCPL auto-conversion
+    self.this_task.access.w_s("pr_COS", self.file_mgr.get_output().b_addr<<2) # compensate BCPL auto-conversion
     self.ctx.this_task = self.this_task
     log_mem_init.info(self.this_task)
     
