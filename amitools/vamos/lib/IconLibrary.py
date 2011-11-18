@@ -1,5 +1,5 @@
 from amitools.vamos.AmigaLibrary import AmigaLibrary
-from amitools.vamos.structure.ExecStruct import LibraryDef
+from lexec.ExecStruct import LibraryDef
 
 class IconLibrary(AmigaLibrary):
   name = "icon.library"

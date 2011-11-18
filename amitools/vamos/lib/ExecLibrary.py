@@ -1,5 +1,5 @@
 from amitools.vamos.AmigaLibrary import *
-from amitools.vamos.structure.ExecStruct import *
+from lexec.ExecStruct import *
 from amitools.vamos.Log import log_exec
 from amitools.vamos.Exceptions import *
 from amitools.vamos.AccessStruct import AccessStruct

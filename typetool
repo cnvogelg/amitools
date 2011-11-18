@@ -9,8 +9,9 @@
 import sys
 
 from amitools.vamos import AmigaStruct
-from amitools.vamos.structure import ExecStruct
-from amitools.vamos.structure import DosStruct
+from amitools.vamos.lib.lexec import ExecStruct
+from amitools.vamos.lib.dos import DosStruct
+from amitools.vamos.lib.util import UtilStruct
 
 # --- args ---
 argc = len(sys.argv)

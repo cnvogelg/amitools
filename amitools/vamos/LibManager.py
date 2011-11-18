@@ -2,7 +2,7 @@ from LabelLib import LabelLib
 from AmigaResident import AmigaResident
 from Trampoline import Trampoline
 from CPU import *
-from structure.ExecStruct import LibraryDef
+from lib.lexec.ExecStruct import LibraryDef
 from Exceptions import *
 from Log import log_libmgr, log_lib
 from AccessStruct import AccessStruct

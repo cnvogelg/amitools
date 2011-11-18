@@ -1,4 +1,4 @@
-from amitools.vamos.structure.UtilStruct import *
+from UtilStruct import *
 
 TAG_DONE = 0
 TAG_IGNORE = 1

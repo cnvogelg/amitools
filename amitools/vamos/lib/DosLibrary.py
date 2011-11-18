@@ -1,8 +1,8 @@
 import time
 
 from amitools.vamos.AmigaLibrary import *
-from amitools.vamos.structure.DosStruct import *
-from amitools.vamos.structure.ExecStruct import *
+from dos.DosStruct import *
+from lexec.ExecStruct import *
 from amitools.vamos.Exceptions import *
 from amitools.vamos.Log import log_dos
 from amitools.vamos.AccessStruct import AccessStruct

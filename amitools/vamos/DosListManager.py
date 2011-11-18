@@ -1,7 +1,7 @@
 import logging
 from Log import log_doslist
 from LabelRange import LabelRange
-from structure.DosStruct import *
+from lib.dos.DosStruct import *
 
 class DosListEntry:
   def __init__(self,name):

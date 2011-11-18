@@ -20,8 +20,8 @@ from Trampoline import Trampoline
 from lib.ExecLibrary import ExecLibrary
 from lib.DosLibrary import DosLibrary
 from lib.IconLibrary import IconLibrary
-from structure.ExecStruct import *
-from structure.DosStruct import *
+from lib.lexec.ExecStruct import *
+from lib.dos.DosStruct import *
 
 from Log import *
 

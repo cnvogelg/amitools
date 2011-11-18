@@ -4,7 +4,7 @@ import logging
 
 from Log import log_file
 from LabelRange import LabelRange
-from structure.DosStruct import FileHandleDef
+from lib.dos.DosStruct import FileHandleDef
 from lib.dos.Error import *
 
 class AmiFile:

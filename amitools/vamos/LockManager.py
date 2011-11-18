@@ -5,7 +5,7 @@ from Log import log_lock
 from LabelRange import LabelRange
 from Exceptions import *
 from lib.dos.AmiTime import *
-from structure.DosStruct import *
+from lib.dos.DosStruct import *
 from AccessStruct import AccessStruct
 
 class AmiLock:
