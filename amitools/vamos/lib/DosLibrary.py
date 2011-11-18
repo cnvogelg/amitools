@@ -9,7 +9,9 @@ from amitools.vamos.AccessStruct import AccessStruct
 from dos.Args import *
 from dos.Error import *
 from dos.AmiTime import *
+from util.TagList import *
 import dos.Printf
+from dos.DosTags import DosTags
 
 class DosLibrary(AmigaLibrary):
   name = "dos.library"
@@ -569,7 +571,8 @@ class DosLibrary(AmigaLibrary):
     cmd_ptr = ctx.cpu.r_reg(REG_D1)
     tagitem_ptr = ctx.cpu.r_reg(REG_D2)
     cmd = ctx.mem.access.r_cstr(cmd_ptr)
-    log_dos.info("SystemTagList: cmd='%s'" % (cmd))
+    tag_list = taglist_parse_tagitem_ptr(ctx.mem, tagitem_ptr, DosTags)
+    log_dos.info("SystemTagList: cmd='%s' tags=%s" % (cmd, tag_list))
 
   def LoadSeg(self, lib, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)

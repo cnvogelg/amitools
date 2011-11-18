@@ -212,15 +212,6 @@ class StackSwapStruct(AmigaStruct):
   ]
 StackSwapDef = StackSwapStruct()
 
-# TagItem
-class TagItemStruct(AmigaStruct):
-  _name = "TagItem"
-  _format = [
-    ('ULONG','ti_Tag'),
-    ('ULONG','ti_Data')
-  ]
-TagItemDef = TagItemStruct()
-
 # Semaphores
 class SemaphoreRequestStruct(AmigaStruct):
   _name = "SemaphoreRequest"
