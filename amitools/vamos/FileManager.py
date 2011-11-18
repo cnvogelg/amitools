@@ -104,7 +104,7 @@ class FileManager(LabelRange):
       if uname == 'NIL:':
         sys_name = "/dev/null" 
         fobj = open(sys_name, f_mode)
-        fh = AmiFile(fobj, ami_name, sys_name)
+        fh = AmiFile(fobj, ami_path, sys_name)
       elif uname in ('*','CONSOLE:'):
         sys_name = ''
         fh = AmiFile(sys.stdout,'*','',need_close=False)

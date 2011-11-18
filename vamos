@@ -101,6 +101,7 @@ parser.add_argument('-c', '--config-file', action='store', default=None, help="v
 parser.add_argument('-a', '--assign', action='append', default=None, help="add AmigaOS assign: name:[+]/sys/path[,/more/path]")
 parser.add_argument('-V', '--volume', action='append', default=None, help="define AmigaOS volume: name:/abs/sys/path")
 parser.add_argument('-A', '--auto-assign', action='store', default=None, help="define auto assign ami path, e.g. vol:/ami/path")
+parser.add_argument('-p', '--path', action='append', default=None, help="define command search ami path, e.g. c:")
 args = parser.parse_args()
 
 # --- parse args ---
@@ -119,7 +120,7 @@ cfg = VamosConfig(extra_file=args.config_file)
 
 # --- load config ---
 pm = PathManager()
-pm.parse(cfg, args.volume, args.assign, args.auto_assign)
+pm.parse(cfg, args.volume, args.assign, args.auto_assign, args.path)
 
 # ----- vamos! ---------------------------------------------------------------
 cpu = MusashiCPU()

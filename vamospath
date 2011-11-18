@@ -15,13 +15,14 @@ from amitools.vamos.PathManager import PathManager
 # --- args ---
 parser = argparse.ArgumentParser()
 parser.add_argument('op', help="path operation: a2s s2a abs parent current name")
-parser.add_argument('path', help="path to convert")
+parser.add_argument('arg', help="path to convert")
 parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
 parser.add_argument('-l', '--logging', action='store', default=None, help="logging settings: <chan>:<level>,*:<level>,...")
 parser.add_argument('-c', '--config-file', action='store', default=None, help="vamos config file")
 parser.add_argument('-a', '--assign', action='append', default=None, help="define AmigaOS assign: name:[+]vol:/ami/path[,vol2:/more/path]")
 parser.add_argument('-V', '--volume', action='append', default=None, help="define AmigaOS volume: name:/abs/sys/path")
 parser.add_argument('-A', '--auto-assign', action='store', default=None, help="define auto assign ami path, e.g. vol:/ami/path")
+parser.add_argument('-p', '--path', action='append', default=None, help="define command search ami path, e.g. c:")
 args = parser.parse_args()
 
 # --- setup logging ---
@@ -32,34 +33,36 @@ cfg = VamosConfig(extra_file=args.config_file)
 
 # --- setup path manager ---
 pm = PathManager()
-pm.parse(cfg, args.volume, args.assign, args.auto_assign)
+pm.parse(cfg, args.volume, args.assign, args.auto_assign, args.path)
 
 # --- main ---
 op = args.op
 if op == 'a2s':
-  print pm.ami_to_sys_path(args.path)
+  print pm.ami_to_sys_path(args.arg)
 elif op == 's2a':
-  print pm.sys_to_ami_path(args.path)
+  print pm.sys_to_ami_path(args.arg)
 elif op == 'abs':
-  print pm.ami_abs_path(args.path)
+  print pm.ami_abs_path(args.arg)
 elif op == 'parent':
-  print pm.ami_abs_parent_path(args.path)
+  print pm.ami_abs_parent_path(args.arg)
 elif op == 'current':
   print pm.ami_abs_cur_path()
 elif op == 'name':
-  print pm.ami_name_of_path(args.path)
+  print pm.ami_name_of_path(args.arg)
+elif op == 'cmd':
+  print pm.ami_command_to_sys_path(args.arg)
 # assign manager
 elif op == 'assign':
-  print pm.assign_mgr.ami_path_resolve(args.path)  
+  print pm.assign_mgr.ami_path_resolve(args.arg)  
 elif op == 'resolve':
-  print pm.assign_mgr.ami_path_resolve_assigns(args.path)  
+  print pm.assign_mgr.ami_path_resolve_assigns(args.arg)  
 elif op == 'auto':
-  print pm.assign_mgr.ami_path_resolve_auto_assigns(args.path)
+  print pm.assign_mgr.ami_path_resolve_auto_assigns(args.arg)
 # volume manager ops
 elif op == 'v_s2a':
-  print pm.vol_mgr.sys_to_ami_path(args.path)
+  print pm.vol_mgr.sys_to_ami_path(args.arg)
 elif op == 'v_a2s':
-  print pm.vol_mgr.ami_to_sys_path(args.path)
+  print pm.vol_mgr.ami_to_sys_path(args.arg)
 # unknown operation
 else:
   print "INVALID OPERATION:",op

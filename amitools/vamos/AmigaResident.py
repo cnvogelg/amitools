@@ -15,9 +15,8 @@ class AmigaResident:
   INIT_END = 0
   
   # return array of resident structure addresses
-  def find_residents(self, region, mem):
-    addr = region.addr
-    end = region.addr + region.size
+  def find_residents(self, addr, size, mem):
+    end = addr + size
     finds = []
     a = mem.access
     while addr < end:

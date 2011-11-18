@@ -184,7 +184,8 @@ class LibManager():
     
     # check seg list for resident library struct
     ar = AmigaResident()
-    res_list = ar.find_residents(seg_list[0], context.mem)
+    seg0 = seg_list.segments[0]
+    res_list = ar.find_residents(seg0.addr, seg0.size, context.mem)
     if res_list == None or len(res_list) != 1:
       self.lib_log("load_lib","No single resident found!", level=logging.ERROR)
       return None
@@ -239,15 +240,14 @@ class LibManager():
       # setup trampoline to call init routine of library
       # D0 = lib_base, A0 = seg_list, A6 = exec base
       exec_base = context.mem.read_mem(2,4)
-      seg_list_first = seg_list[0].addr
       tr.save_all()
       tr.set_dx_l(0, lib_base)
-      tr.set_ax_l(0, seg_list_first)
+      tr.set_ax_l(0, seg0.addr)
       tr.set_ax_l(6, exec_base)
       tr.jsr(init_addr)
       tr.restore_all()
       self.lib_log("load_lib", "trampoline: init @%06x (lib_base/d0=%06x seg_list/a0=%06x exec_base/a6=%06x)" % \
-        (init_addr, lib_base, seg_list_first, exec_base), level=logging.DEBUG)
+        (init_addr, lib_base, seg0.addr, exec_base), level=logging.DEBUG)
       
     # store native components
     entry.seg_list = seg_list
@@ -266,7 +266,6 @@ class LibManager():
     # get expunge func
     expunge_addr = entry.vectors[2]
     exec_base = context.mem.read_mem(2,4)
-    seg_list_first = entry.seg_list[0].addr
     lib_base = entry.real_lib_base
     if expunge_addr != 0:
       tr.save_all()
