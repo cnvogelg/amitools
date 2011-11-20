@@ -217,9 +217,11 @@ class DosLibrary(AmigaLibrary):
       (828, self.MatchNext),
       (834, self.MatchEnd),
       (840, self.ParsePattern),
+      (846, self.MatchPattern),
       (948, self.PutStr),
       (954, self.VPrintf),
-      (966, self.ParsePatternNoCase)
+      (966, self.ParsePatternNoCase),
+      (972, self.MatchPatternNoCase)
     )
     self.set_funcs(dos_funcs)
   
@@ -594,7 +596,8 @@ class DosLibrary(AmigaLibrary):
     str_len = anchor.r_s('ap_Strlen')
     log_dos.info("TODO MatchFirst: pat='%s' anchor=%06x strlen=%d" % (pat, anchor_ptr, str_len))
     # TODO: do real matching - return no entries for now
-    return ERROR_OBJECT_NOT_FOUND
+    self.io_err = ERROR_OBJECT_NOT_FOUND
+    return self.io_err
   
   def MatchNext(self, lib, ctx):
     anchor_ptr = ctx.cpu.r_reg(REG_D1)
@@ -608,6 +611,8 @@ class DosLibrary(AmigaLibrary):
     anchor = AccessStruct(self.ctx.mem,AnchorPathDef,struct_addr=anchor_ptr)
     log_dos.info("TODO MatchEnd: anchor=%06x " % (anchor_ptr))
     # TODO: do real free
+  
+  # ----- Pattern Parsing and Matching -----
   
   def ParsePattern(self, lib, ctx, ignore_case=False):
     src_ptr = ctx.cpu.r_reg(REG_D1)
@@ -631,6 +636,21 @@ class DosLibrary(AmigaLibrary):
 
   def ParsePatternNoCase(self, lib, ctx):
     return self.ParsePattern(lib, ctx, ignore_case=True)
+  
+  def MatchPattern(self, lib, ctx, ignore_case=False):
+    pat_ptr = ctx.cpu.r_reg(REG_D1)
+    txt_ptr = ctx.cpu.r_reg(REG_D2)
+    pat = ctx.mem.access.r_cstr(pat_ptr)
+    txt = ctx.mem.access.r_cstr(txt_ptr)
+    match = pattern_match(pat, txt)
+    log_dos.info("MatchPattern: pat=%s txt=%s ignore_case=%s -> match=%s", pat, txt, ignore_case, match)
+    if match:
+      return -1
+    else:
+      return 0
+  
+  def MatchPatternNoCase(self, lib, ctx):
+    return self.MatchPattern(lib, ctx, ignore_case=True)
   
   # ----- Args -----
   
