@@ -256,3 +256,13 @@ class AnchorPathStruct(AmigaStruct):
     ('UBYTE','ap_Buf')
   ]
 AnchorPathDef = AnchorPathStruct()
+
+class DevProcStruct(AmigaStruct):
+  _name = "DosProc"
+  _format = [
+    ('MsgPort*','dvp_Port'),
+    ('BPTR','dvp_Lock'),
+    ('ULONG','dvp_Flags'),
+    ('void*','dvp_DevNode')
+  ]
+DevProcDef = DevProcStruct()

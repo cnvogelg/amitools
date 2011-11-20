@@ -237,3 +237,6 @@ class PathManager:
   def ami_volume_of_abspath(self, path):
     pos = path.find(':')
     return path[:pos]
+    
+  def ami_volume_of_path(self, path):
+    return self.ami_volume_of_abspath(self.ami_abs_path(path))

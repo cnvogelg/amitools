@@ -72,9 +72,11 @@ class LockManager(LabelRange):
     log_lock.info("registered: %s" % lock)
     
   def _unregister_lock(self, lock):
+    if not self.locks_by_b_addr.has_key(lock.b_addr):
+      raise VamosInternalError("Lock %s not registered!" % lock)
     check = self.locks_by_b_addr[lock.b_addr]
     if check != lock:
-      raise VamosInternalError("Invalud Lock unregistered: %s" % lock)
+      raise VamosInternalError("Invalid Lock unregistered: %s" % lock)
     del self.locks_by_b_addr[lock.b_addr]
     log_lock.info("unregistered: %s" % lock)
     lock.b_addr = 0
@@ -122,7 +124,8 @@ class LockManager(LabelRange):
       raise VamosInternalError("Invalid File Lock at b@%06x" % b_addr)
   
   def release_lock(self, lock):
-    self._unregister_lock(lock)
+    if lock.b_addr != 0:
+      self._unregister_lock(lock)
 
   def examine_lock(self, lock, fib_mem):
     # name

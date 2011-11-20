@@ -44,6 +44,9 @@ class FileManager(LabelRange):
   
   def set_fs_handler_port(self, addr):
     self.fs_handler_port = addr
+    
+  def get_fs_handler_port(self):
+    return self.fs_handler_port
   
   def _register_file(self, fh):
     addr = self.cur_addr

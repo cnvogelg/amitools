@@ -209,6 +209,8 @@ class DosLibrary(AmigaLibrary):
       (462, self.SetIoErr),
       (474, self.PrintFault),
       (606, self.SystemTagList),
+      (642, self.GetDeviceProc),
+      (648, self.FreeDeviceProc),
       (798, self.ReadArgs),
       (858, self.FreeArgs),
       (822, self.MatchFirst),
@@ -253,9 +255,7 @@ class DosLibrary(AmigaLibrary):
     ctx.alloc.free_struct(self.root_struct)
     ctx.alloc.free_struct(self.dos_info)
   
-  def IoErr(self, lib, ctx):
-    log_dos.info("IoErr: %d" % self.io_err)
-    return self.io_err
+  # ----- Direct Handler Access -----
   
   # callback from port manager for fs handler port
   # -> Async I/O
@@ -291,8 +291,12 @@ class DosLibrary(AmigaLibrary):
     if not self.port_mgr.has_port(reply_port_addr):
       self.port_mgr.add_port(reply_port_addr)
     self.port_mgr.put_msg(reply_port_addr, msg_addr)
-  
+    
   # ----- IoErr -----
+  
+  def IoErr(self, lib, ctx):
+    log_dos.info("IoErr: %d" % self.io_err)
+    return self.io_err
   
   def SetIoErr(self, lib, ctx):
     old_io_err = self.io_err
@@ -556,6 +560,30 @@ class DosLibrary(AmigaLibrary):
     else:
       return old_lock.b_addr
 
+  # ----- DevProc -----
+
+  def GetDeviceProc(self, lib, ctx):
+    name_ptr = ctx.cpu.r_reg(REG_D1)
+    last_devproc = ctx.cpu.r_reg(REG_D2)
+    name = ctx.mem.access.r_cstr(name_ptr)
+
+    # get volume of path name
+    volume = self.path_mgr.ami_volume_of_path(name)
+    vol_lock = self.lock_mgr.create_lock(volume+":", False)
+    fs_port = self.file_mgr.get_fs_handler_port()
+    addr = self._alloc_mem("DevProc:%s" % name, DevProcDef.get_size())
+    log_dos.info("GetDeviceProc: name='%s' devproc=%06x -> volume=%s devproc=%06x", name, last_devproc, volume, addr)
+    devproc = AccessStruct(self.ctx.mem,DevProcDef,struct_addr=addr)
+    devproc.w_s('dvp_Port', fs_port)
+    devproc.w_s('dvp_Lock', vol_lock.b_addr)
+    self.io_err = NO_ERROR
+    return addr
+
+  def FreeDeviceProc(self, lib, ctx):
+    addr = ctx.cpu.r_reg(REG_D1)
+    self._free_mem(addr)
+    log_dos.info("FreeDeviceProc: devproc=%06x", addr)
+
   # ----- Matcher -----
   
   def MatchFirst(self, lib, ctx):
@@ -563,9 +591,10 @@ class DosLibrary(AmigaLibrary):
     pat = ctx.mem.access.r_cstr(pat_ptr)
     anchor_ptr = ctx.cpu.r_reg(REG_D2)
     anchor = AccessStruct(self.ctx.mem,AnchorPathDef,struct_addr=anchor_ptr)
-    log_dos.info("TODO MatchFirst: pat='%s' anchor=%06x " % (pat, anchor_ptr))
+    str_len = anchor.r_s('ap_Strlen')
+    log_dos.info("TODO MatchFirst: pat='%s' anchor=%06x strlen=%d" % (pat, anchor_ptr, str_len))
     # TODO: do real matching - return no entries for now
-    return ERROR_NO_MORE_ENTRIES
+    return ERROR_OBJECT_NOT_FOUND
   
   def MatchNext(self, lib, ctx):
     anchor_ptr = ctx.cpu.r_reg(REG_D1)
