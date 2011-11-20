@@ -30,7 +30,7 @@ class PathManager:
     if cfg == None:
       return
     sect = 'path'
-    if cfg.has_section(sect):
+    if cfg.has_option(sect, 'path'):
       p = cfg.get(sect, 'path')
       if p != None:
         self.add_path(p)

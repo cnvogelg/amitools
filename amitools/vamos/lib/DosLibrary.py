@@ -12,6 +12,7 @@ from dos.AmiTime import *
 from util.TagList import *
 import dos.Printf
 from dos.DosTags import DosTags
+from dos.PatternMatch import pattern_parse, pattern_match
 
 class DosLibrary(AmigaLibrary):
   name = "dos.library"
@@ -205,13 +206,18 @@ class DosLibrary(AmigaLibrary):
       (192, self.DateStamp),
       (210, self.ParentDir),
       (216, self.IsInteractive),
+      (462, self.SetIoErr),
+      (474, self.PrintFault),
       (606, self.SystemTagList),
       (798, self.ReadArgs),
       (858, self.FreeArgs),
       (822, self.MatchFirst),
       (828, self.MatchNext),
       (834, self.MatchEnd),
+      (840, self.ParsePattern),
+      (948, self.PutStr),
       (954, self.VPrintf),
+      (966, self.ParsePatternNoCase)
     )
     self.set_funcs(dos_funcs)
   
@@ -285,6 +291,34 @@ class DosLibrary(AmigaLibrary):
     if not self.port_mgr.has_port(reply_port_addr):
       self.port_mgr.add_port(reply_port_addr)
     self.port_mgr.put_msg(reply_port_addr, msg_addr)
+  
+  # ----- IoErr -----
+  
+  def SetIoErr(self, lib, ctx):
+    old_io_err = self.io_err
+    self.io_err = ctx.cpu.r_reg(REG_D1)
+    log_dos.info("SetIoErr: IoErr=%d old IoErr=%d", self.io_err, old_io_err)
+    return old_io_err
+  
+  def PrintFault(self, lib, ctx):
+    self.io_err = ctx.cpu.r_reg(REG_D1)
+    hdr_ptr = ctx.cpu.r_reg(REG_D2)
+    # get header string
+    if hdr_ptr != 0:
+      hdr = ctx.mem.access.r_cstr(hdr_ptr)
+    else:
+      hdr = ""
+    # get error string
+    if dos_error_strings.has_key(self.io_err):
+      err_str = dos_error_strings[self.io_err]
+    else:
+      err_str = "??? ERROR"
+    log_dos.info("PrintFault: code=%d header='%s' err_str='%s'", self.io_err, hdr, err_str)
+    # write to stdout
+    txt = "%s%s\n" % (hdr, err_str) 
+    fh = self.file_mgr.get_output()
+    self.file_mgr.write(fh, txt)
+    return self.DOSTRUE
   
   # ----- dos API -----
   
@@ -393,6 +427,17 @@ class DosLibrary(AmigaLibrary):
     self.file_mgr.seek(fh, pos, whence)
     log_dos.info("Seek(%s, %06x, %s) -> old_pos=%06x" % (fh, pos, mode_str, old_pos))
     return old_pos
+    
+  # ----- StdOut -----
+  
+  def PutStr(self, lib, ctx):
+    str_ptr = ctx.cpu.r_reg(REG_D1)
+    str_dat = ctx.mem.access.r_cstr(str_ptr)
+    # write to stdout
+    fh = self.file_mgr.get_output()
+    ok = self.file_mgr.write(fh, str_dat)
+    log_dos.info("PutStr: '%s'", str_dat)
+    return 0 # ok
 
   def VPrintf(self, lib, ctx):
     format_ptr = ctx.cpu.r_reg(REG_D1)
@@ -408,6 +453,9 @@ class DosLibrary(AmigaLibrary):
     result = dos.Printf.printf_generate_output(ps)
     # write result
     self.file_mgr.write(fh, result)
+    return len(result)
+    
+  # ----- File Ops -----
 
   def DeleteFile(self, lib, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
@@ -532,6 +580,29 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("TODO MatchEnd: anchor=%06x " % (anchor_ptr))
     # TODO: do real free
   
+  def ParsePattern(self, lib, ctx, ignore_case=False):
+    src_ptr = ctx.cpu.r_reg(REG_D1)
+    dst_ptr = ctx.cpu.r_reg(REG_D2)
+    dst_len = ctx.cpu.r_reg(REG_D3)
+    src = ctx.mem.access_r_cstr(src_ptr)
+    pat = pattern_parse(src, ignore_case=ignore_case)
+    log_dos.info("ParsePattern: src=%s ignore_case=%s -> pat=%s",src, ignore_case, pat)
+    if pat == None:
+      return -1
+    else:
+      pat_str = pat.pat_str
+      if len(pat_str) >= dst_len:
+        return -1
+      else:
+        ctx.mem.access.w_cstr(dst_ptr, pat_str)
+        if pat.has_wildcard:
+          return 1
+        else:
+          return 0
+
+  def ParsePatternNoCase(self, lib, ctx):
+    return self.ParsePattern(lib, ctx, ignore_case=True)
+  
   # ----- Args -----
   
   def ReadArgs(self, lib, ctx):
@@ -547,7 +618,8 @@ class DosLibrary(AmigaLibrary):
     args.prepare_input(ctx.mem.access,array_ptr)
     ok = args.parse_string(ctx.bin_args)
     if not ok:
-      log_dos.debug("not matched!")
+      self.io_err = args.error
+      log_dos.info("ReadArgs: not matched -> io_err=%d/%s",self.io_err, dos_error_strings[self.io_err])
       return 0
     log_dos.debug("matched template: %s",args.result)
     # calc size of result
@@ -558,6 +630,8 @@ class DosLibrary(AmigaLibrary):
     # fill result memory
     args.generate_result(ctx.mem.access,addr,array_ptr)
     # TODO: return real RDArgs struct - for now we simply return our result memory
+    self.io_err = NO_ERROR
+    log_dos.info("ReadArgs: matched! result_mem=%06x", addr)
     return addr
     
   def FreeArgs(self, lib, ctx):

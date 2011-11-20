@@ -28,12 +28,13 @@ p_txt = {
 }
 
 class Pattern:
-  def __init__(self, src_str, pat_str, ignore_case):
+  def __init__(self, src_str, pat_str, ignore_case, has_wildcard):
     self.src_str = src_str
     self.pat_str = pat_str
     self.ignore_case = ignore_case
+    self.has_wildcard = has_wildcard
   def __str__(self):
-    return "[src='%s'->pat='%s',ignore_case=%s]" % (self.src_str, self.pat_str, self.ignore_case)
+    return "[src='%s'->pat='%s',ignore_case=%s,has_wildcard=%s]" % (self.src_str, self.pat_str, self.ignore_case, self.has_wildcard)
 
 def _pop_non_or(blocks, dst):
   while True:
@@ -192,7 +193,7 @@ def pattern_parse(src_str, ignore_case=True, star_is_wild=True):
   if len(blocks) > 0:
     return None
   
-  return Pattern(src_str, dst, ignore_case)
+  return Pattern(src_str, dst, ignore_case, has_wild)
 
 def _dump(num, level, txt):
   print "%02d" % num," " * level,txt

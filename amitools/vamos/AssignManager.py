@@ -20,7 +20,7 @@ class AssignManager:
     
     # check for [path] -> auto_assign
     sect = 'path'
-    if cfg.has_section(sect):
+    if cfg.has_option(sect, 'auto_assign'):
       aa = cfg.get(sect, 'auto_assign')
       if aa != None:
         self.set_auto_assign(aa)

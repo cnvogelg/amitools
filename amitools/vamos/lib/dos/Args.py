@@ -1,4 +1,5 @@
 import types
+from Error import *
 
 class Args:
 
@@ -67,6 +68,8 @@ class Args:
   """apply an internal template to a given argument array
   """
   def parse_string(self, in_args):
+    self.error = NO_ERROR
+    
     # get args and split = into args, too
     args = []
     for a in in_args:
@@ -83,6 +86,7 @@ class Args:
     pos = 0
     for targ in targs:
       req = targ['a']
+      
       # switch
       if targ['s']:
         val = self._find_remove_key(targ['keys'], args, False)
@@ -91,27 +95,42 @@ class Args:
         else:
           result[pos] = False
           if req:
+            self.error = ERROR_REQUIRED_ARG_MISSING
             return False # sensible? switch with a ??
+      
       # toggle
       elif targ['t']:
         val = self._find_remove_key(targ['keys'], args, False)
         if val:
           result[pos] = not result[pos]
         elif req:
+          self.error = ERROR_REQUIRED_ARG_MISSING
           return False
+          
       # keyword
       elif targ['k']:
         val = self._find_remove_key(targ['keys'], args, True)
+        # keyword at end of line
         if val == None:
+          self.error = ERROR_REQUIRED_ARG_MISSING
           return False
-        if val != False:
-          if targ['n']:
-            val = int(val)
-          result[pos] = val
+        else:
+          # found a real value
+          if val != False:
+            if targ['n']:
+              val = int(val)
+            result[pos] = val
+          # keyword not found
+          else:
+            if req:
+              self.error = ERROR_REQUIRED_ARG_MISSING
+              return False
+            
       # full line
       elif targ['f']:
         result[pos] = args
         args = []
+        
       pos = pos + 1
     
     # scan for multi and non-key args
@@ -125,6 +144,11 @@ class Args:
         multi_targ = targ
         result[pos] = args
         args = []
+        # multi arg required
+        if targ['a'] and len(result[pos])==0:
+          self.error = ERROR_REQUIRED_ARG_MISSING
+          return False
+          
       # normal entry
       elif targ['n']:
         # take from arraay
@@ -140,14 +164,18 @@ class Args:
               result[multi_pos] = result[multi_pos][:-1]
               # oops multi is empty!
               if multi_targ['a'] and len(result[multi_pos]==0):
+                self.error = ERROR_REQUIRED_ARG_MISSING
                 return False
             else: # failed!
+              self.error = ERROR_REQUIRED_ARG_MISSING
               return False
         result[pos] = val
+        
       pos = pos + 1
   
     # something left?
     if len(args)>0:
+      self.error = ERROR_TOO_MANY_ARGS
       return False
   
     self.result = result
