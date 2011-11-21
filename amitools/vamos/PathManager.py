@@ -240,3 +240,27 @@ class PathManager:
     
   def ami_volume_of_path(self, path):
     return self.ami_volume_of_abspath(self.ami_abs_path(path))
+
+  def ami_list_dir(self, ami_path):
+    sys_path = self.ami_to_sys_path(ami_path, mustExist=True)
+    if sys_path == None:
+      return None
+    if not os.path.isdir(sys_path):
+      return None
+    files = os.listdir(sys_path)
+    return files
+    
+  def ami_path_exists(self, ami_path):
+    sys_path = self.ami_to_sys_path(ami_path, mustExist=True)
+    return sys_path != None
+
+  def ami_path_join(self, a, b):
+    if len(a) == 0:
+      return b
+    elif len(b) == 0:
+      return a
+    else:
+      return a + b
+      
+    
+    

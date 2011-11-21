@@ -148,8 +148,19 @@ class VolumeManager():
       return None
   
   def _follow_path_no_case(self, base, dirs, mustExist):
+    # base is the name (no more dirs)
     if len(dirs) == 0:
-      return base
+      if mustExist:
+        if os.path.exists(base):
+          return base
+        else:
+          return None
+      else:
+        return base
+    # make sure base is a dir
+    if not os.path.isdir(base):
+      return None
+    # dir component to search
     d = dirs[0]
     dl = len(d)
     # check for direct match first
