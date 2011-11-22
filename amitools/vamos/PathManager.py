@@ -212,11 +212,13 @@ class PathManager:
         abs_prefix += '/'
     return abs_prefix + path
 
+  # ---- path components -----
+
   def ami_name_of_path(self, path):
     l = len(path)
     # no path given
     if l == 0:
-      return path
+      return ""
     # ends with colon
     if path[-1] == ':':
       if l == 1:
@@ -234,12 +236,47 @@ class PathManager:
     # is relative
     return path
 
-  def ami_volume_of_abspath(self, path):
-    pos = path.find(':')
-    return path[:pos]
-    
+  def ami_dir_of_path(self, path):
+    l = len(path)
+    if l == 0:
+      return ""
+    # ends with volume
+    p = path
+    if p[-1] == ':':
+      return ""
+    # skip volume
+    col_pos = p.find(':')
+    if col_pos :
+      p = p[col_pos+1:]
+      l = len(path)
+      if l > 0 and p[0] == '/':
+        p = p[1:]
+    # find slash
+    slash_pos = p.rfind('/')
+    if slash_pos == -1:
+      return ""
+    else:
+      if slash_pos == 0:
+        return "/"
+      else:
+        return p[:slash_pos]
+        
   def ami_volume_of_path(self, path):
-    return self.ami_volume_of_abspath(self.ami_abs_path(path))
+    pos = path.find(':')
+    if pos == 0:
+      return ""
+    else:
+      return path[:pos]
+
+  def ami_voldir_of_path(self, path):
+    ami_volume = self.ami_volume_of_path(path)
+    ami_dir = self.ami_dir_of_path(path)
+    if ami_volume != "":
+      return ami_volume + ':' + ami_dir
+    else:
+      return ami_dir
+
+  # ----- list dir -----
 
   def ami_list_dir(self, ami_path):
     sys_path = self.ami_to_sys_path(ami_path, mustExist=True)

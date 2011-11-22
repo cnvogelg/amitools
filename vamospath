@@ -42,26 +42,37 @@ if op == 'a2s':
   print pm.ami_to_sys_path(args.arg)
 elif op == 's2a':
   print pm.sys_to_ami_path(args.arg)
+
 elif op == 'abs':
   print pm.ami_abs_path(args.arg)
 elif op == 'parent':
   print pm.ami_abs_parent_path(args.arg)
 elif op == 'current':
   print pm.ami_abs_cur_path()
+# path components
 elif op == 'name':
   print pm.ami_name_of_path(args.arg)
-elif op == 'cmd':
-  print pm.ami_command_to_sys_path(args.arg)
+elif op == 'dir':
+  print pm.ami_dir_of_path(args.arg)
 elif op == 'volume':
   print pm.ami_volume_of_path(args.arg)
-elif op == 'dir':
+elif op == 'voldir':
+  print pm.ami_voldir_of_path(args.arg)
+# path query
+elif op == 'cmd':
+  print pm.ami_command_to_sys_path(args.arg)
+# list
+elif op == 'list':
   print pm.ami_list_dir(args.arg)
+# match path
 elif op == 'match':
-  matcher = PathMatch(pm, args.arg)
-  match = matcher.begin()
-  while match != None:
-    print match
-    match = matcher.next()
+  matcher = PathMatch(pm)
+  ok = matcher.parse(args.arg)
+  if ok:
+    match = matcher.begin()
+    while match != None:
+      print match
+      match = matcher.next()
 # assign manager
 elif op == 'assign':
   print pm.assign_mgr.ami_path_resolve(args.arg)  

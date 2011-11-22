@@ -13,6 +13,8 @@ from util.TagList import *
 import dos.Printf
 from dos.DosTags import DosTags
 from dos.PatternMatch import pattern_parse, pattern_match
+from dos.PathMatch import PathMatch
+from amitools.vamos.LabelStruct import LabelStruct
 
 class DosLibrary(AmigaLibrary):
   name = "dos.library"
@@ -198,6 +200,7 @@ class DosLibrary(AmigaLibrary):
       (78, self.Rename),
       (84, self.Lock),
       (90, self.UnLock),
+      (96, self.DupLock),
       (102, self.Examine),
       (126, self.CurrentDir),
       (132, self.IoErr),
@@ -212,12 +215,13 @@ class DosLibrary(AmigaLibrary):
       (642, self.GetDeviceProc),
       (648, self.FreeDeviceProc),
       (798, self.ReadArgs),
-      (858, self.FreeArgs),
       (822, self.MatchFirst),
       (828, self.MatchNext),
       (834, self.MatchEnd),
       (840, self.ParsePattern),
       (846, self.MatchPattern),
+      (858, self.FreeArgs),
+      (870, self.FilePart),
       (948, self.PutStr),
       (954, self.VPrintf),
       (966, self.ParsePatternNoCase),
@@ -246,6 +250,7 @@ class DosLibrary(AmigaLibrary):
     self.ctx = ctx
     self.mem_allocs = {}
     self.seg_lists = {}
+    self.matches = {}
     # setup RootNode
     self.root_struct = ctx.alloc.alloc_struct("RootNode",RootNodeDef)
     lib.access.w_s("dl_Root",self.root_struct.addr)
@@ -521,9 +526,18 @@ class DosLibrary(AmigaLibrary):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
     log_dos.info("UnLock: %s" % (lock))
-    self.lock_mgr.release_lock(lock)    
+    self.lock_mgr.release_lock(lock)
+    self.io_err = NO_ERROR    
     return self.DOSTRUE
-    
+  
+  def DupLock(self, lib, ctx):
+    lock_b_addr = ctx.cpu.r_reg(REG_D1)
+    lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
+    dup_lock = self.lock_mgr.create_lock(lock.ami_path, False)
+    log_dos.info("DupLock: %s -> %s",lock, dup_lock)
+    self.io_err = NO_ERROR
+    return dup_lock.b_addr
+  
   def Examine(self, lib, ctx):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     fib_ptr = ctx.cpu.r_reg(REG_D2)
@@ -531,6 +545,7 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("Examine: %s fib=%06x" % (lock, fib_ptr))
     fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
     self.lock_mgr.examine_lock(lock, fib)
+    self.io_err = NO_ERROR
     return self.DOSTRUE
   
   def ParentDir(self, lib, ctx):
@@ -569,8 +584,9 @@ class DosLibrary(AmigaLibrary):
     last_devproc = ctx.cpu.r_reg(REG_D2)
     name = ctx.mem.access.r_cstr(name_ptr)
 
-    # get volume of path name
-    volume = self.path_mgr.ami_volume_of_path(name)
+    # get volume of path 
+    abs_name = self.path_mgr.ami_abs_path(name)
+    volume = self.path_mgr.ami_volume_of_path(abs_name)
     vol_lock = self.lock_mgr.create_lock(volume+":", False)
     fs_port = self.file_mgr.get_fs_handler_port()
     addr = self._alloc_mem("DevProc:%s" % name, DevProcDef.get_size())
@@ -592,25 +608,105 @@ class DosLibrary(AmigaLibrary):
     pat_ptr = ctx.cpu.r_reg(REG_D1)
     pat = ctx.mem.access.r_cstr(pat_ptr)
     anchor_ptr = ctx.cpu.r_reg(REG_D2)
+    # get total size of struct
     anchor = AccessStruct(self.ctx.mem,AnchorPathDef,struct_addr=anchor_ptr)
     str_len = anchor.r_s('ap_Strlen')
-    log_dos.info("TODO MatchFirst: pat='%s' anchor=%06x strlen=%d" % (pat, anchor_ptr, str_len))
-    # TODO: do real matching - return no entries for now
-    self.io_err = ERROR_OBJECT_NOT_FOUND
+    total_size = AnchorPathDef.get_size() + str_len
+    # setup matcher
+    matcher = PathMatch(self.path_mgr)
+    ok = matcher.parse(pat)
+    log_dos.info("MatchFirst: pat='%s' anchor=%06x strlen=%d -> ok=%s" % (pat, anchor_ptr, str_len, ok))
+    if not ok:
+      self.io_err = ERROR_BAD_TEMPLATE
+      return self.io_err
+    # get first entry
+    path = matcher.begin()
+    # no entry found
+    if path == None:
+      log_dos.info("MatchFirst: none found!")
+      self.matches[anchor_ptr] = {}
+      self.io_err = ERROR_OBJECT_NOT_FOUND
+    else:
+      # replace label of struct
+      old_label = ctx.label_mgr.get_label(anchor_ptr)
+      if old_label != None:
+        ctx.label_mgr.remove_label(old_label)
+      new_label = LabelStruct("MatchAnchor", anchor_ptr, AnchorPathDef, size=total_size)
+      ctx.label_mgr.add_label(new_label)
+      
+      # get parent dir of first match
+      abs_path = self.path_mgr.ami_abs_path(path)
+      voldir_path = self.path_mgr.ami_voldir_of_path(abs_path)
+      dir_lock = self.lock_mgr.create_lock(voldir_path, False)
+      log_dos.info("MatchFirst: found path='%s' -> dir path=%s -> parent lock %s", path, voldir_path, dir_lock)
+      
+      # create last achain and set dir lock
+      achain_last = ctx.alloc.alloc_struct("AChain_Last", AChainDef)
+      anchor.w_s('ap_Last', achain_last.addr)
+      achain_last.access.w_s('an_Lock', dir_lock.addr)
+      
+      # fill FileInfo of first match in anchor
+      lock = self.lock_mgr.create_lock(abs_path, False)
+      fib_ptr = anchor.s_get_addr('ap_Info')
+      fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
+      self.lock_mgr.examine_lock(lock, fib)
+      self.lock_mgr.release_lock(lock)
+      # store path name of first name at end of structure
+      if str_len > 0:
+        path_ptr = anchor.s_get_addr('ap_Buf')
+        abs_path = self.path_mgr.ami_abs_path(path)
+        anchor.w_cstr(path_ptr, abs_path)
+      
+      # store the match
+      match = {
+        'old_label' : old_label,
+        'new_label' : new_label,
+        'matcher' : matcher,
+        'achain_last' : achain_last
+      }
+      self.matches[anchor_ptr] = match
+      # ok
+      self.io_err = NO_ERROR
     return self.io_err
   
   def MatchNext(self, lib, ctx):
     anchor_ptr = ctx.cpu.r_reg(REG_D1)
     anchor = AccessStruct(self.ctx.mem,AnchorPathDef,struct_addr=anchor_ptr)
-    log_dos.info("TODO MatchNext: anchor=%06x " % (anchor_ptr))
-    # TODO: do real matching - return no entries for now
+    log_dos.info("MatchNext: anchor=%06x " % (anchor_ptr))
+    # retrieve match
+    if not self.matches.has_key(anchor_ptr):
+      raise VamosInternalError("No matcher found for %06x" % anchor_ptr)
+    match = self.matches[anchor_ptr]
+    if match.has_key('matcher'):
+      matcher = match['matcher']
+      # get next match
+    
+    
     return ERROR_NO_MORE_ENTRIES
   
   def MatchEnd(self, lib, ctx):
     anchor_ptr = ctx.cpu.r_reg(REG_D1)
     anchor = AccessStruct(self.ctx.mem,AnchorPathDef,struct_addr=anchor_ptr)
-    log_dos.info("TODO MatchEnd: anchor=%06x " % (anchor_ptr))
-    # TODO: do real free
+    log_dos.info("MatchEnd: anchor=%06x " % (anchor_ptr))
+    # retrieve match
+    if not self.matches.has_key(anchor_ptr):
+      raise VamosInternalError("No matcher found for %06x" % anchor_ptr)
+    match = self.matches[anchor_ptr]
+    del self.matches[anchor_ptr]
+    # valid non empty match
+    if match.has_key('matcher'):
+      # restore label
+      old_label = match['old_label']
+      new_label = match['new_label']
+      ctx.label_mgr.remove_label(new_label)
+      if old_label != None:
+        ctx.label_mgr.add_label(old_label)
+      # free last lock & achain
+      achain_last = match['achain_last']
+      lock_addr = achain_last.access.r_s('an_Lock')
+      lock = self.lock_mgr.get_by_b_addr(lock_addr >> 2)
+      self.lock_mgr.release_lock(lock)
+      ctx.alloc.free_struct(achain_last)
   
   # ----- Pattern Parsing and Matching -----
   
@@ -622,8 +718,10 @@ class DosLibrary(AmigaLibrary):
     pat = pattern_parse(src, ignore_case=ignore_case)
     log_dos.info("ParsePattern: src=%s ignore_case=%s -> pat=%s",src, ignore_case, pat)
     if pat == None:
+      self.io_err = ERROR_BAD_TEMPLATE
       return -1
     else:
+      self.io_err = NO_ERROR
       pat_str = pat.pat_str
       if len(pat_str) >= dst_len:
         return -1
@@ -718,6 +816,23 @@ class DosLibrary(AmigaLibrary):
       seg_list = self.seg_lists[b_addr]
       del self.seg_lists[b_addr]
       self.seg_loader.unload_seg(seg_list)
+
+  # ----- Path Helper -----
+  
+  def FilePart(self, lib, ctx):
+    addr = ctx.cpu.r_reg(REG_D1)
+    path = ctx.mem.access.r_cstr(addr)
+    pos = path.rfind('/')
+    if pos != -1:
+      pos += 1
+    else:
+      pos = path.find(':')
+      if pos == -1:
+        pos = 0
+      else:
+        pos += 1
+    log_dos.info("FilePart: path='%s' -> pos=%d", path, pos)
+    return addr + pos
 
   # ----- Helpers -----
 

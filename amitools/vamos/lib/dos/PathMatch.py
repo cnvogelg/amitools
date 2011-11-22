@@ -78,11 +78,13 @@ class PathMatchChain:
     return txt
 
 class PathMatch:
-  def __init__(self, path_mgr, in_str):
+  def __init__(self, path_mgr):
     self.path_mgr = path_mgr
-    self.in_str = in_str
     self.head_chain = None
 
+  def parse(self, in_str):
+    self.head_chain = None
+    
     # extract volume (if available) 
     pos = in_str.find(':')
     if pos == -1:
@@ -114,12 +116,16 @@ class PathMatch:
             prev_chain = chain
           else:
             last.append(s)
+        else:
+          return False
     
     # postfix
     if len(last)>0:
       self.postfix = "/".join(last)
     else:
       self.postfix = ""
+    
+    return True
     
   def __str__(self):
     return "volume='%s' chain=%s postfix='%s'" % (self.volume, self.head, self.postfix)
@@ -149,4 +155,5 @@ class PathMatch:
 if __name__ == '__main__':
   import sys
   pm = PathMatch(None, sys.argv[1])
+  pm.parse()
   print pm

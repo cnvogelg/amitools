@@ -50,7 +50,7 @@ class LockManager(LabelRange):
       # get DosList entry of associated volume
       if name == 'fl_Volume':
         ami_path = lock.ami_path
-        volume_name = self.path_mgr.ami_volume_of_abspath(ami_path)
+        volume_name = self.path_mgr.ami_volume_of_path(ami_path)
         log_lock.debug("fl_Volume: looking up volume '%s' of %s",volume_name,lock)
         volume = self.doslist_mgr.get_entry_by_name(volume_name)
         if volume == None:
