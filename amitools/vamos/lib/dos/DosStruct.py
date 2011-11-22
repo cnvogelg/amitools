@@ -266,3 +266,24 @@ class DevProcStruct(AmigaStruct):
     ('void*','dvp_DevNode')
   ]
 DevProcDef = DevProcStruct()
+
+class CSourceStruct(AmigaStruct):
+  _name = "CSource"
+  _format = [
+    ('UBYTE*','CS_Buffer'),
+    ('LONG','CS_Length'),
+    ('LONG','CS_CurChr')
+  ]
+CSourceDef = CSourceStruct()
+
+class RDArgsStruct(AmigaStruct):
+  _name = "RDArgs"
+  _format = [
+    ('CSource','RDA_Source'),
+    ('LONG','RDA_DAList'),
+    ('UBYTE*','RDA_Buffer'),
+    ('LONG','RDA_BufSiz'),
+    ('UBYTE*','RDA_ExtHelp'),
+    ('LONG','RDA_Flags')
+  ]
+RDArgsDef = RDArgsStruct()

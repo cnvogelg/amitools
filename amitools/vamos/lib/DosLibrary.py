@@ -209,6 +209,7 @@ class DosLibrary(AmigaLibrary):
       (192, self.DateStamp),
       (210, self.ParentDir),
       (216, self.IsInteractive),
+      (306, self.FGetC),
       (462, self.SetIoErr),
       (474, self.PrintFault),
       (606, self.SystemTagList),
@@ -251,6 +252,7 @@ class DosLibrary(AmigaLibrary):
     self.mem_allocs = {}
     self.seg_lists = {}
     self.matches = {}
+    self.rdargs = {}
     # setup RootNode
     self.root_struct = ctx.alloc.alloc_struct("RootNode",RootNodeDef)
     lib.access.w_s("dl_Root",self.root_struct.addr)
@@ -438,7 +440,18 @@ class DosLibrary(AmigaLibrary):
     self.file_mgr.seek(fh, pos, whence)
     log_dos.info("Seek(%s, %06x, %s) -> old_pos=%06x" % (fh, pos, mode_str, old_pos))
     return old_pos
-    
+  
+  def FGetC(self, lib, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    # TODO: use buffered I/O
+    ch = self.file_mgr.read(fh, 1)
+    log_dos.info("FGetC(%s) -> ch=%s" % (fh, ch))
+    if ch == None or ch == "":
+      return -1
+    else:
+      return ord(ch)
+  
   # ----- StdOut -----
   
   def PutStr(self, lib, ctx):
@@ -465,7 +478,7 @@ class DosLibrary(AmigaLibrary):
     # write result
     self.file_mgr.write(fh, result)
     return len(result)
-    
+  
   # ----- File Ops -----
 
   def DeleteFile(self, lib, ctx):
@@ -758,7 +771,7 @@ class DosLibrary(AmigaLibrary):
     array_ptr = ctx.cpu.r_reg(REG_D2)
     rdargs_ptr = ctx.cpu.r_reg(REG_D3)
     
-    log_dos.info("ReadArgs: args=%s template=%s" % (ctx.bin_args, template))
+    log_dos.info("ReadArgs: args=%s template=%s rdargs_ptr=%06x" % (ctx.bin_args, template, rdargs_ptr))
     # try to parse argument string
     args = Args()
     args.parse_template(template)
@@ -776,15 +789,29 @@ class DosLibrary(AmigaLibrary):
     addr = self._alloc_mem("ReadArgs(@%06x)" % self.get_callee_pc(ctx),size)
     # fill result memory
     args.generate_result(ctx.mem.access,addr,array_ptr)
-    # TODO: return real RDArgs struct - for now we simply return our result memory
+    # alloc RD_Args
+    rdargs = ctx.alloc.alloc_struct("RDArgs", RDArgsDef)
+    rdargs.access.w_s('RDA_Buffer',addr)
+    rdargs.access.w_s('RDA_BufSiz',size)
+    # store rdargs
+    self.rdargs[rdargs.addr] = rdargs
+    # result
     self.io_err = NO_ERROR
-    log_dos.info("ReadArgs: matched! result_mem=%06x", addr)
-    return addr
+    log_dos.info("ReadArgs: matched! result_mem=%06x rdargs=%s", addr, rdargs)
+    return rdargs.addr
     
   def FreeArgs(self, lib, ctx):
     rdargs_ptr = ctx.cpu.r_reg(REG_D1)
     log_dos.info("FreeArgs: %06x" % rdargs_ptr)
-    self._free_mem(rdargs_ptr)
+    # find rdargs
+    if not self.rdargs.has_key(rdargs_ptr):
+      raise VamosInternalError("Can't find RDArgs: %06x" % rdargs_ptr)
+    rdargs = self.rdargs[rdargs_ptr]
+    del self.rdargs[rdargs_ptr]
+    # clean up rdargs
+    addr = rdargs.access.r_s('RDA_Buffer')
+    self._free_mem(addr)
+    self.alloc.free_struct(rdargs)
 
   # ----- System/Execute -----
   
