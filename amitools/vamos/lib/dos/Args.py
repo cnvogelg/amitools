@@ -41,7 +41,7 @@ class Args:
         self.in_val.append(bool(raw))
       else:
         self.in_val.append(None)
-      ptr += 2
+      ptr += 4
 
   def _find_remove_key(self, keys, in_list, extra):
     n = len(in_list)
