@@ -120,7 +120,8 @@
 /* If on, CPU will call the instruction hook callback before every
  * instruction.
  */
-#define M68K_INSTRUCTION_HOOK       OPT_OFF
+/* CV Patch */
+#define M68K_INSTRUCTION_HOOK       OPT_ON
 #define M68K_INSTRUCTION_CALLBACK() your_instruction_hook_function()
 
 

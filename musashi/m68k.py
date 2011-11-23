@@ -77,6 +77,7 @@ pc_changed_callback_func_type = CFUNCTYPE(None, c_uint)
 reset_instr_callback_func_type = CFUNCTYPE(None)
 invalid_func_type = CFUNCTYPE(None, c_int, c_int, c_uint)
 trace_func_type = CFUNCTYPE(c_int, c_int, c_int, c_uint, c_uint)
+instr_hook_callback_func = CFUNCTYPE(None)
 
 # declare cpu functions
 execute_func = lib.m68k_execute
@@ -89,6 +90,10 @@ get_reg_func.argtypes = [c_void_p, c_int]
 
 set_reg_func = lib.m68k_set_reg
 set_reg_func.argtypes = [c_int, c_uint]
+
+disassemble_func = lib.m68k_disassemble
+disassemble_func.restype = c_int
+disassemble_func.argtypes = [c_char_p, c_uint, c_uint]
 
 # declare mem functions
 mem_init_func = lib.mem_init
@@ -142,6 +147,11 @@ def set_reset_instr_callback(func):
   reset_instr_callback = reset_instr_callback_func_type(func)
   lib.m68k_set_reset_instr_callback(reset_instr_callback)
 
+def set_instr_hook_callback(func):
+  global instr_hook_callback
+  instr_hook_callback = instr_hook_callback_func(func)
+  lib.m68k_set_instr_hook_callback(instr_hook_callback)
+
 def set_cpu_type(t):
   lib.m68k_set_cpu_type(c_uint(t))
 
@@ -159,6 +169,11 @@ def set_reg(reg, value):
 
 def end_timeslice():
   lib.m68k_end_timeslice()
+
+def disassemble(pc, cpu_type):
+  p = create_string_buffer(80)
+  n = disassemble_func(p, pc, cpu_type)
+  return p.value
 
 # --- MEM API ---
 

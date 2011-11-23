@@ -12,7 +12,7 @@ CFLAGS = -g -O2
 
 BUILD_DIR = BUILD
 
-SRC = mem.c m68kcpu.c
+SRC = mem.c m68kcpu.c m68kdasm.c
 HDR = mem.h m68k.h m68kcpu.h m68kconf.h
 OBJ = $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRC))
 

@@ -214,6 +214,18 @@ void m68k_write_memory_32(unsigned int address, unsigned int value)
   }
 }
 
+/* Disassemble support */
+
+unsigned int m68k_read_disassembler_16 (unsigned int address)
+{
+  return m68k_read_memory_16(address);
+}
+
+unsigned int m68k_read_disassembler_32 (unsigned int address)
+{
+  return m68k_read_memory_32(address);
+}
+
 /* ----- API ----- */
 
 int mem_init(uint ram_size_kib)

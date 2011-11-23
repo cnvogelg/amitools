@@ -97,6 +97,7 @@ parser.add_argument('-m', '--ram-size', action='store', default=1024, type=int, 
 parser.add_argument('-s', '--stack-size', action='store', default=4, help="set stack size in KiB")
 parser.add_argument('-t', '--memory-trace', action='store_true', default=False, help="enable memory tracing (slower)")
 parser.add_argument('-T', '--internal-memory-trace', action='store_true', default=False, help="enable internal memory tracing (slow)")
+parser.add_argument('-I', '--instr-trace', action='store_true', default=False, help="enable instruction trace")
 parser.add_argument('-c', '--config-file', action='store', default=None, help="vamos config file")
 parser.add_argument('-a', '--assign', action='append', default=None, help="add AmigaOS assign: name:[+]/sys/path[,/more/path]")
 parser.add_argument('-V', '--volume', action='append', default=None, help="define AmigaOS volume: name:/abs/sys/path")
@@ -136,8 +137,13 @@ vamos = Vamos(mem, cpu, pm)
 if args.memory_trace:
   mem.set_mem_trace_mode(1)
   mem.set_mem_trace_func(vamos.label_mgr.trace_mem)
+  if not log_mem.isEnabledFor(logging.INFO):
+    log_mem.setLevel(logging.INFO)
+# enable internal memory trace?
 if args.internal_memory_trace:
   AccessMemory.label_mgr = vamos.label_mgr
+  if not log_mem_int.isEnabledFor(logging.INFO):
+    log_mem_int.setLevel(logging.INFO)
 
 # set invalid access handler for memory
 m68k.mem_set_invalid_func(vamos.error_tracker.report_invalid_memory)
@@ -156,6 +162,18 @@ run.init_cpu()
 
 # set reset opcode/trap handler
 m68k.set_reset_instr_callback(run.reset_func)
+
+# enable instruction trace?
+def instr_hook():
+  pc = m68k.get_reg(m68k.M68K_REG_PC)
+  label = vamos.label_mgr.get_mem_str(pc)
+  txt = m68k.disassemble(pc, m68k.M68K_CPU_TYPE_68000)
+  log_instr.info("%-40s  %06x    %s" % (label, pc, txt))
+
+if args.instr_trace:
+  if not log_instr.isEnabledFor(logging.INFO):
+    log_instr.setLevel(logging.INFO)
+  m68k.set_instr_hook_callback(instr_hook)
 
 # main loop
 exit_code = run.run(args.block, args.cycles)
