@@ -218,12 +218,16 @@ void m68k_write_memory_32(unsigned int address, unsigned int value)
 
 unsigned int m68k_read_disassembler_16 (unsigned int address)
 {
-  return m68k_read_memory_16(address);
+  uint page = address >> 16;
+  uint val = r_func[page][1](address);
+  return val;
 }
 
 unsigned int m68k_read_disassembler_32 (unsigned int address)
 {
-  return m68k_read_memory_32(address);
+  uint page = address >> 16;
+  uint val = r_func[page][2](address);
+  return val;
 }
 
 /* ----- API ----- */
