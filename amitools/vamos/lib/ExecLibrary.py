@@ -268,6 +268,9 @@ class ExecLibrary(AmigaLibrary):
   def FreeMem(self, lib, ctx):
     size = ctx.cpu.r_reg(REG_D0)
     addr = ctx.cpu.r_reg(REG_A1)
+    if addr == 0 or size == 0:
+      log_exec.info("FreeMem: freeing NULL")
+      return
     mb = self.alloc.get_memory(addr)
     if mb != None:
       log_exec.info("FreeMem: %s" % mb)
@@ -284,6 +287,9 @@ class ExecLibrary(AmigaLibrary):
     
   def FreeVec(self, lib, ctx):
     addr = ctx.cpu.r_reg(REG_A1)
+    if addr == 0:
+      log_exec.info("FreeVec: freeing NULL")
+      return
     mb = self.alloc.get_memory(addr)
     if mb != None:
       log_exec.info("FreeVec: %s" % mb)

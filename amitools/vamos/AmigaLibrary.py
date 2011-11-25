@@ -88,12 +88,13 @@ class AmigaLibrary:
       start_time = time.time()
       # call the lib!
       d0 = callee(mem_lib, ctx)
-      if d0 == None:
-        d0 = 0
       end_time = time.time()
       delta = end_time - start_time
-      self.log("} END CALL: d0=%08x (duration: %g ms)" % (d0, (delta * 1000.0)))
-      ctx.cpu.w_reg(REG_D0, d0)
+      if d0 != None:
+        self.log("} END CALL: d0=%08x (duration: %g ms)" % (d0, (delta * 1000.0)))
+        ctx.cpu.w_reg(REG_D0, d0)
+      else:
+        self.log("} END CALL: NO RET (duration: %g ms)" % ((delta * 1000.0)))
     else:
       self.log("? CALL: %s -> d0=0 (default)" % call_name, level=logging.WARN)
       ctx.cpu.w_reg(REG_D0, 0)

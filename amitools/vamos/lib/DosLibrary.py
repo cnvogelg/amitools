@@ -771,7 +771,7 @@ class DosLibrary(AmigaLibrary):
     array_ptr = ctx.cpu.r_reg(REG_D2)
     rdargs_ptr = ctx.cpu.r_reg(REG_D3)
     
-    log_dos.info("ReadArgs: args=%s template=%s rdargs_ptr=%06x" % (ctx.bin_args, template, rdargs_ptr))
+    log_dos.info("ReadArgs: args=%s template='%s' array_ptr=%06x rdargs_ptr=%06x" % (ctx.bin_args, template, array_ptr, rdargs_ptr))
     # try to parse argument string
     args = Args()
     args.parse_template(template)
