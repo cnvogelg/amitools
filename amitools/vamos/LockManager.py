@@ -139,7 +139,7 @@ class LockManager(LabelRange):
     else:
       dirEntryType = 0xfffffffd # file
     fib_mem.w_s('fib_DirEntryType', dirEntryType )
-    # protection
+    # protection: TODO
     prot = 0xf
     fib_mem.w_s('fib_Protection', prot)
     # size

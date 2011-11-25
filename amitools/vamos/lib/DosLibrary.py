@@ -328,7 +328,7 @@ class DosLibrary(AmigaLibrary):
       err_str = "??? ERROR"
     log_dos.info("PrintFault: code=%d header='%s' err_str='%s'", self.io_err, hdr, err_str)
     # write to stdout
-    txt = "%s%s\n" % (hdr, err_str) 
+    txt = "%s: %s\n" % (hdr, err_str) 
     fh = self.file_mgr.get_output()
     self.file_mgr.write(fh, txt)
     return self.DOSTRUE
@@ -537,11 +537,12 @@ class DosLibrary(AmigaLibrary):
   
   def UnLock(self, lib, ctx):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
-    lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-    log_dos.info("UnLock: %s" % (lock))
-    self.lock_mgr.release_lock(lock)
-    self.io_err = NO_ERROR    
-    return self.DOSTRUE
+    if lock_b_addr == 0:
+      log_dos.info("UnLock: NULL")
+    else:
+      lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
+      log_dos.info("UnLock: %s" % (lock))
+      self.lock_mgr.release_lock(lock)
   
   def DupLock(self, lib, ctx):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
@@ -617,6 +618,18 @@ class DosLibrary(AmigaLibrary):
 
   # ----- Matcher -----
   
+  def _fill_fib(self, ctx, abs_path, anchor, str_len):
+    # fill FileInfo of first match in anchor
+    lock = self.lock_mgr.create_lock(abs_path, False)
+    fib_ptr = anchor.s_get_addr('ap_Info')
+    fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
+    self.lock_mgr.examine_lock(lock, fib)
+    self.lock_mgr.release_lock(lock)
+    # store path name of first name at end of structure
+    if str_len > 0:
+      path_ptr = anchor.s_get_addr('ap_Buf')
+      anchor.w_cstr(path_ptr, abs_path)
+    
   def MatchFirst(self, lib, ctx):
     pat_ptr = ctx.cpu.r_reg(REG_D1)
     pat = ctx.mem.access.r_cstr(pat_ptr)
@@ -624,14 +637,16 @@ class DosLibrary(AmigaLibrary):
     # get total size of struct
     anchor = AccessStruct(self.ctx.mem,AnchorPathDef,struct_addr=anchor_ptr)
     str_len = anchor.r_s('ap_Strlen')
+    flags = anchor.r_s('ap_Flags')
     total_size = AnchorPathDef.get_size() + str_len
     # setup matcher
     matcher = PathMatch(self.path_mgr)
     ok = matcher.parse(pat)
-    log_dos.info("MatchFirst: pat='%s' anchor=%06x strlen=%d -> ok=%s" % (pat, anchor_ptr, str_len, ok))
+    log_dos.info("MatchFirst: pat='%s' anchor=%06x strlen=%d flags=%02x-> ok=%s" % (pat, anchor_ptr, str_len, flags, ok))
     if not ok:
       self.io_err = ERROR_BAD_TEMPLATE
       return self.io_err
+    log_dos.debug("MatchFirst: %s" % matcher)
     # get first entry
     path = matcher.begin()
     # no entry found
@@ -658,24 +673,17 @@ class DosLibrary(AmigaLibrary):
       anchor.w_s('ap_Last', achain_last.addr)
       achain_last.access.w_s('an_Lock', dir_lock.addr)
       
-      # fill FileInfo of first match in anchor
-      lock = self.lock_mgr.create_lock(abs_path, False)
-      fib_ptr = anchor.s_get_addr('ap_Info')
-      fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
-      self.lock_mgr.examine_lock(lock, fib)
-      self.lock_mgr.release_lock(lock)
-      # store path name of first name at end of structure
-      if str_len > 0:
-        path_ptr = anchor.s_get_addr('ap_Buf')
-        abs_path = self.path_mgr.ami_abs_path(path)
-        anchor.w_cstr(path_ptr, abs_path)
+      self._fill_fib(ctx, abs_path, anchor, str_len)
       
       # store the match
       match = {
         'old_label' : old_label,
         'new_label' : new_label,
         'matcher' : matcher,
-        'achain_last' : achain_last
+        'achain_last' : achain_last,
+        'voldir_path' : voldir_path,
+        'dir_lock' : dir_lock,
+        'str_len' : str_len
       }
       self.matches[anchor_ptr] = match
       # ok
@@ -693,9 +701,33 @@ class DosLibrary(AmigaLibrary):
     if match.has_key('matcher'):
       matcher = match['matcher']
       # get next match
-    
-    
-    return ERROR_NO_MORE_ENTRIES
+      path = matcher.next()
+      if path == None:
+        log_dos.info("MatchNext: no more entries!")
+        self.io_err = ERROR_NO_MORE_ENTRIES
+      else:
+        # found another path entry
+        
+        # get parent dir of this match
+        abs_path = self.path_mgr.ami_abs_path(path)
+        voldir_path = self.path_mgr.ami_voldir_of_path(abs_path)
+        # need new parent dir lock in achain_last?
+        if volddir_path != match['voldir_path']:
+          dir_lock = match['dir_lock']
+          self.lock_mgr.release_lock(dir_lock)
+          dir_lock = self.lock_mgr.create_lock(voldir_path, False)
+          match['dir_lock'] = dir_lock
+          match['voldir_path'] = voldir_path
+          # update achain_last
+          achain_last = match['achain_last']
+          achain_last.access.w_s('an_Lock', dir_lock.addr)
+          
+        log_dos.info("MatchNext: found path='%s' -> dir path=%s -> parent lock %s", path, voldir_path, dir_lock)
+        
+        self._fill_fib(ctx, abs_path, anchor, match['str_len'])
+        
+        self.io_err = NO_ERRROR
+    return self.io_err
   
   def MatchEnd(self, lib, ctx):
     anchor_ptr = ctx.cpu.r_reg(REG_D1)
@@ -714,7 +746,7 @@ class DosLibrary(AmigaLibrary):
       ctx.label_mgr.remove_label(new_label)
       if old_label != None:
         ctx.label_mgr.add_label(old_label)
-      # free last lock & achain
+      # free last dir lock & achain
       achain_last = match['achain_last']
       lock_addr = achain_last.access.r_s('an_Lock')
       lock = self.lock_mgr.get_by_b_addr(lock_addr >> 2)
@@ -858,7 +890,10 @@ class DosLibrary(AmigaLibrary):
         pos = 0
       else:
         pos += 1
-    log_dos.info("FilePart: path='%s' -> pos=%d", path, pos)
+    if pos < len(path):
+      log_dos.info("FilePart: path='%s' -> result='%s'", path, path[pos:])
+    else:
+      log_dos.info("FilePart: path='%s' -> pos=NULL", path)
     return addr + pos
 
   # ----- Helpers -----

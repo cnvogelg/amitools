@@ -1,6 +1,7 @@
 import sys
 import os.path
 import logging
+import errno
 
 from Log import log_file
 from LabelRange import LabelRange
@@ -156,11 +157,18 @@ class FileManager(LabelRange):
       log_file.info("file to delete not found: '%s'" % (ami_path))
       return ERROR_OBJECT_NOT_FOUND
     try:
-      os.remove(sys_path)
+      if os.path.isdir(sys_path):
+        os.rmdir(sys_path)
+      else:
+        os.remove(sys_path)
       return 0
     except OSError as e:
-      log_file.info("can't delete file: '%s' -> %s" % (ami_path, e))
-      return ERROR_OBJECT_IN_USE
+      if e.errno == errno.ENOTEMPTY: # Directory not empty
+        log_file.info("can't delete directory: '%s' -> not empty!" % (ami_path))
+        return ERROR_DIRECTORY_NOT_EMPTY
+      else:
+        log_file.info("can't delete file: '%s' -> %s" % (ami_path, e))
+        return ERROR_OBJECT_IN_USE
 
   def rename(self, old_ami_path, new_ami_path):
     old_sys_path = self.path_mgr.ami_to_sys_path(old_ami_path)

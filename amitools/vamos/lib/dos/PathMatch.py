@@ -124,12 +124,15 @@ class PathMatch:
       self.postfix = "/".join(last)
     else:
       self.postfix = ""
-    
+      
     return True
     
   def __str__(self):
-    return "volume='%s' chain=%s postfix='%s'" % (self.volume, self.head, self.postfix)
-    
+    return "volume='%s' chain=%s postfix='%s'" % (self.volume, self.head_chain, self.postfix)
+  
+  def has_wildcards(self):
+    return self.head_chain != None
+  
   def begin(self):
     # no wildcard?
     if self.head_chain == None:
