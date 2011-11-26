@@ -149,6 +149,10 @@ class ExecLibrary(AmigaLibrary):
     self.alloc = alloc
 
     exec_funcs = (
+      (120, self.Disable),
+      (126, self.Enable),
+      (132, self.Forbid),
+      (138, self.Permit),
       (408, self.OldOpenLibrary),
       (414, self.CloseLibrary),
       (552, self.OpenLibrary),
@@ -180,6 +184,15 @@ class ExecLibrary(AmigaLibrary):
   
   # ----- System -----
   
+  def Disable(self, lib, ctx):
+    log_exec.info("Disable")
+  def Enable(self, lib, ctx):
+    log_exec.info("Enable")
+  def Forbid(self, lib, ctx):
+    log_exec.info("Forbid")
+  def Permit(self, lib, ctx):
+    log_exec.info("Permit")
+    
   def FindTask(self, lib, ctx):
     task_ptr = ctx.cpu.r_reg(REG_A1)
     if task_ptr == 0:
