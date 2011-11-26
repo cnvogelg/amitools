@@ -32,8 +32,8 @@ class VamosRun:
     log_main.info("setting up m68k")
 
     # setup stack & first PC
-    self.mem.access.w32(0, self.vamos.stack_initial)
-    self.mem.access.w32(4, self.vamos.prog_start)
+    self.mem.access.w32(0, self.ctx.process.stack_initial)
+    self.mem.access.w32(4, self.ctx.process.prog_start)
     self.cpu.pulse_reset()
 
     # set end RESET opcode at 0 and execbase at 4
@@ -42,8 +42,8 @@ class VamosRun:
     self.mem.access.w32(4, self.vamos.exec_lib.lib_base)
 
     # setup arg in D0/A0
-    self.cpu.w_reg(REG_D0, self.vamos.arg_len)
-    self.cpu.w_reg(REG_A0, self.vamos.arg_base)
+    self.cpu.w_reg(REG_D0, self.ctx.process.arg_len)
+    self.cpu.w_reg(REG_A0, self.ctx.process.arg_base)
 
     # to track old dos values
     self.cpu.w_reg(REG_A2, self.vamos.dos_guard_base)
@@ -94,7 +94,7 @@ class VamosRun:
 
   def run(self, cycles_per_run=1000, max_cycles=0):
     """main run loop of vamos"""
-    log_main.info("start cpu: %06x", self.vamos.prog_start)
+    log_main.info("start cpu: %06x", self.ctx.process.prog_start)
 
     total_cycles = 0
     start_time = time.time()

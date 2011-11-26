@@ -737,12 +737,14 @@ class DosLibrary(AmigaLibrary):
     array_ptr = ctx.cpu.r_reg(REG_D2)
     rdargs_ptr = ctx.cpu.r_reg(REG_D3)
     
-    log_dos.info("ReadArgs: args=%s template='%s' array_ptr=%06x rdargs_ptr=%06x" % (ctx.bin_args, template, array_ptr, rdargs_ptr))
+    # get args from process
+    bin_args = ctx.process.bin_args
+    log_dos.info("ReadArgs: args=%s template='%s' array_ptr=%06x rdargs_ptr=%06x" % (bin_args, template, array_ptr, rdargs_ptr))
     # try to parse argument string
     args = Args()
     args.parse_template(template)
     args.prepare_input(ctx.mem.access,array_ptr)
-    ok = args.parse_string(ctx.bin_args)
+    ok = args.parse_string(bin_args)
     if not ok:
       self.io_err = args.error
       log_dos.info("ReadArgs: not matched -> io_err=%d/%s",self.io_err, dos_error_strings[self.io_err])

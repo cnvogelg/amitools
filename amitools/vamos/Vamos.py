@@ -10,8 +10,6 @@ from PathManager import PathManager
 from FileManager import FileManager
 from LockManager import LockManager
 from PortManager import PortManager
-from AccessMemory import AccessMemory
-from AccessStruct import AccessStruct
 from ErrorTracker import ErrorTracker
 from DosListManager import DosListManager
 from Trampoline import Trampoline
@@ -55,82 +53,23 @@ class Vamos:
     # lib manager
     self.lib_mgr = LibManager( self.label_mgr )
 
-  def init(self, stack_size, bin_file, bin_args, lib_versions):
-    self.init_stack(stack_size)
-    # --- load segments of binary ---
-    if not self.load_main_binary(bin_file):
-      return False
-    # place args in memory
-    self.init_args(bin_args)
-    # --- libs ---
+  def init(self, lib_versions):
     self.init_managers()
     self.register_base_libs(lib_versions['exec'], lib_versions['dos'])
-    # --- vamos context ---
-    self.init_context()
-    # --- in memory process struct ---
-    self.setup_process()
-    self.open_exec_lib()
+    self.init_context()  
     self.create_old_dos_guard()
+    self.open_exec_lib()
     return True
 
   def cleanup(self):
     self.close_exec_lib()
-    self.free_process()
     self.free_context()
-    self.free_args()
-    self.free_stack()
-    self.unload_main_binary()
-    # some diagnostics: orphaned memory
     self.alloc.dump_orphans()
-
-  def load_main_binary(self, ami_bin_file):
-    self.bin_file = ami_bin_file
-    self.bin_seg_list = self.seg_loader.load_seg(ami_bin_file)
-    if self.bin_seg_list == None:
-      log_main.error("failed loading main binary: %s", self.seg_loader.error)
-      return False
-    self.prog_start = self.bin_seg_list.prog_start
-    log_main.info("loaded main binary: %s", self.bin_seg_list)
-    return True
-
-  def unload_main_binary(self):
-    self.seg_loader.unload_seg(self.bin_seg_list)
-
-  # stack size in KiB
-  def init_stack(self, stack_size=4):
-    # --- setup stack ---
-    self.last_addr = 0x0
-    self.stack_size = stack_size * 1024
-    self.stack = self.alloc.alloc_memory( "stack", self.stack_size )
-    self.stack_base = self.stack.addr
-    self.stack_end = self.stack_base + self.stack_size
-    log_mem_init.info(self.stack)
-    # prepare stack
-    # TOP: size
-    # TOP-4: return from program -> magic_ed
-    self.stack_initial = self.stack_end - 4
-    self.mem.access.w32(self.stack_initial, self.stack_size)
-    self.stack_initial -= 4
-    self.mem.access.w32(self.stack_initial, self.last_addr)
-
-  def free_stack(self):
-    self.alloc.free_memory(self.stack)
-
-  def init_args(self, bin_args):
-    # setup arguments
-    self.bin_args = bin_args
-    self.arg_text = " ".join(bin_args) + "\n" # AmigaDOS appends a new line to the end
-    self.arg_len  = len(self.arg_text)
-    self.arg_size = self.arg_len + 1
-    self.arg = self.alloc.alloc_memory("args", self.arg_size)
-    self.arg_base = self.arg.addr
-    self.mem.access.w_cstr(self.arg_base, self.arg_text)
-    log_main.info("args: %s (%d)", self.arg_text, self.arg_size)
-    log_mem_init.info(self.arg)
-
-  def free_args(self):
-    self.alloc.free_memory(self.arg)
-
+  
+  def set_this_task(self, process):
+    self.ctx.process = process
+    self.exec_lib.lib_class.set_this_task(self.exec_lib, process)
+  
   def init_managers(self):
     self.doslist_base = self.mem.reserve_special_range()
     self.doslist_size = 0x010000
@@ -168,8 +107,6 @@ class Vamos:
     # register libraries
     # exec
     self.exec_lib_def = ExecLibrary(self.lib_mgr, self.alloc, version=exec_version)
-    self.exec_lib_def.set_managers(self.port_mgr)
-    self.exec_lib_def.set_stack(self.stack_base, self.stack_end)
     self.lib_mgr.register_int_lib(self.exec_lib_def)
     # dos
     self.dos_lib_def = DosLibrary(self.mem, self.alloc, version=dos_version)
@@ -182,11 +119,12 @@ class Vamos:
   def init_context(self):
     # alloc context
     self.ctx = VamosContext( self.cpu, self.mem, self.lib_mgr, self.alloc )
-    self.ctx.bin_args = self.bin_args
-    self.ctx.bin_file = self.bin_file
     self.ctx.seg_loader = self.seg_loader
     self.ctx.path_mgr = self.path_mgr
     self.ctx.label_mgr = self.label_mgr
+    self.ctx.lock_mgr = self.lock_mgr
+    self.ctx.file_mgr = self.file_mgr
+    self.ctx.port_mgr = self.port_mgr
     self.ctx.mem = self.mem
     self.mem.ctx = self.ctx
     # alloc trampoline
@@ -194,31 +132,11 @@ class Vamos:
     self.tr_mem = self.alloc.alloc_memory("Trampoline", self.tr_mem_size)
     self.tr = Trampoline(self.ctx, self.tr_mem)
     self.ctx.tr = self.tr
+    self.process = None
 
   def free_context(self):
+    # free trampoline
     self.alloc.free_memory(self.tr_mem)
-
-  def setup_process(self):
-    # create CLI
-    self.cli = self.alloc.alloc_struct("CLI",CLIDef)
-    self.cli.access.w_s("cli_DefaultStack", self.stack_size / 4) # in longs
-    self.cmd = self.alloc.alloc_bstr("cmd",self.bin_file)
-    log_mem_init.info(self.cmd)
-    self.cli.access.w_s("cli_CommandName", self.cmd.addr)
-    log_mem_init.info(self.cli)
-
-    # create my task structure
-    self.this_task = self.alloc.alloc_struct("ThisTask",ProcessDef)
-    self.this_task.access.w_s("pr_CLI", self.cli.addr)
-    self.this_task.access.w_s("pr_CIS", self.file_mgr.get_input().b_addr<<2) # compensate BCPL auto-conversion
-    self.this_task.access.w_s("pr_COS", self.file_mgr.get_output().b_addr<<2) # compensate BCPL auto-conversion
-    self.ctx.this_task = self.this_task
-    log_mem_init.info(self.this_task)
-    
-  def free_process(self):
-    self.alloc.free_struct(self.this_task)
-    self.alloc.free_bstr(self.cmd)
-    self.alloc.free_struct(self.cli)
 
   def open_exec_lib(self):
     # open exec lib

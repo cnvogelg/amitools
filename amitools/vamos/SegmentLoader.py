@@ -104,7 +104,7 @@ class SegmentLoader:
 
       # create label
       label = None
-      name = "%s:%d:%s" % (base_name,i,names[i].replace("HUNK_","").lower())
+      name = "%s_%d:%s" % (base_name,i,names[i].replace("HUNK_","").lower())
       if self.alloc.label_mgr != None:
         label = LabelRange(name, seg_addr, seg_size)
         self.alloc.label_mgr.add_label(label)

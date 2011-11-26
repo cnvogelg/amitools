@@ -20,6 +20,7 @@ from amitools.vamos.AccessMemory import AccessMemory
 from amitools.vamos.VamosConfig import VamosConfig
 from amitools.vamos.PathManager import PathManager
 from amitools.vamos.VamosRun import VamosRun
+from amitools.vamos.Process import Process
 
 # ----- classes -----
 
@@ -149,8 +150,14 @@ if args.internal_memory_trace:
 m68k.mem_set_invalid_func(vamos.error_tracker.report_invalid_memory)
 
 # --- setup stack ---
-if not vamos.init(args.stack_size, args.bin, args.args, lib_versions):
+if not vamos.init(lib_versions):
   sys.exit(1)
+
+# --- create main process ---
+proc = Process(vamos.ctx, args.bin, args.args, stack_size=args.stack_size*1024)
+if not proc.ok:
+  sys.exit(1)
+vamos.set_this_task(proc)
 
 # ------ main loop ------
 # set CPU type
@@ -177,6 +184,9 @@ if args.instr_trace:
 
 # main loop
 exit_code = run.run(args.block, args.cycles)
+
+# free process
+proc.free()
 
 # shutdown vamos
 vamos.cleanup()

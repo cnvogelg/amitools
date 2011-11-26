@@ -170,18 +170,15 @@ class ExecLibrary(AmigaLibrary):
     )
     self.set_funcs(exec_funcs)
   
-  def set_stack(self, lower, upper):
-    self.stk_lower = lower
-    self.stk_upper = upper
-  
-  def set_managers(self, port_mgr):
-    self.port_mgr = port_mgr
-  
   def setup_lib(self, lib, ctx):
     # setup exec memory
-    lib.access.w_s("ThisTask",ctx.this_task.addr)
     lib.access.w_s("LibNode.lib_Version", self.version)
-  
+
+  def set_this_task(self, lib, process):
+    lib.access.w_s("ThisTask",process.this_task.addr)
+    self.stk_lower = process.stack_base
+    self.stk_upper = process.stack_end
+    
   # ----- System -----
   
   def Disable(self, lib, ctx):
@@ -196,8 +193,9 @@ class ExecLibrary(AmigaLibrary):
   def FindTask(self, lib, ctx):
     task_ptr = ctx.cpu.r_reg(REG_A1)
     if task_ptr == 0:
-      log_exec.info("FindTask: me=%06x" % ctx.this_task.addr)
-      return ctx.this_task.addr
+      addr = lib.access.r_s("ThisTask")
+      log_exec.info("FindTask: me=%06x" % addr)
+      return addr
     else:
       task_name = ctx.mem.access.r_cstr(task_ptr)
       log_exec.info("Find Task: %s" % task_name)
@@ -326,18 +324,18 @@ class ExecLibrary(AmigaLibrary):
     port_addr = ctx.cpu.r_reg(REG_A0)
     msg_addr = ctx.cpu.r_reg(REG_A1)
     log_exec.info("PutMsg: port=%06x msg=%06x" % (port_addr, msg_addr))
-    has_port = self.port_mgr.has_port(port_addr)
+    has_port = ctx.port_mgr.has_port(port_addr)
     if not has_port:
       raise VamosInternalError("PutMsg: on invalid Port (%06x) called!" % port_addr)
-    self.port_mgr.put_msg(port_addr, msg_addr)
+    ctx.port_mgr.put_msg(port_addr, msg_addr)
       
   def GetMsg(self, lib, ctx):
     port_addr = ctx.cpu.r_reg(REG_A0)
     log_exec.info("GetMsg: port=%06x" % (port_addr))
-    has_port = self.port_mgr.has_port(port_addr)
+    has_port = ctx.port_mgr.has_port(port_addr)
     if not has_port:
       raise VamosInternalError("GetMsg: on invalid Port (%06x) called!" % port_addr)
-    msg_addr = self.port_mgr.get_msg(port_addr)
+    msg_addr = ctx.port_mgr.get_msg(port_addr)
     if msg_addr != None:
       log_exec.info("GetMsg: got message %06x" % (msg_addr))
       return msg_addr
@@ -348,12 +346,12 @@ class ExecLibrary(AmigaLibrary):
   def WaitPort(self, lib, ctx):
     port_addr = ctx.cpu.r_reg(REG_A0)
     log_exec.info("WaitPort: port=%06x" % (port_addr))
-    has_port = self.port_mgr.has_port(port_addr)
+    has_port = ctx.port_mgr.has_port(port_addr)
     if not has_port:
       raise VamosInternalError("WaitPort: on invalid Port (%06x) called!" % port_addr)
-    has_msg = self.port_mgr.has_msg(port_addr)
+    has_msg = ctx.port_mgr.has_msg(port_addr)
     if not has_msg:
       raise UnsupportedFeatureError("WaitPort on empty message queue called: Port (%06x)" % port_addr)
-    msg_addr = self.port_mgr.get_msg(port_addr)
+    msg_addr = ctx.port_mgr.get_msg(port_addr)
     log_exec.info("WaitPort: got message %06x" % (msg_addr))
     return msg_addr

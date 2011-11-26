@@ -23,7 +23,13 @@ log_doslist = logging.getLogger('doslist')
 log_dos  = logging.getLogger('dos')
 log_exec = logging.getLogger('exec')
 
-loggers = [log_main, log_mem, log_mem_init, log_mem_alloc, log_mem_int, log_instr, log_lib, log_libmgr, log_path, log_file, log_lock, log_doslist, log_res, log_dos, log_exec]
+log_proc = logging.getLogger('proc')
+
+loggers = [
+  log_main, log_mem, log_mem_init, log_mem_alloc, log_mem_int, 
+  log_instr, log_lib, log_libmgr, log_path, log_file, log_lock, 
+  log_doslist, log_res, log_dos, log_exec, log_proc
+]
 
 # --- end ---
 
