@@ -122,6 +122,8 @@ class PathMatch:
     # postfix
     if len(last)>0:
       self.postfix = "/".join(last)
+      if len(self.postfix) > 0 and self.postfix[-1] == '/':
+        self.postfix = self.postfix[:-1]
     else:
       self.postfix = ""
       
