@@ -2,11 +2,13 @@ import sys
 import os.path
 import logging
 import errno
+import stat
 
 from Log import log_file
 from LabelRange import LabelRange
 from lib.dos.DosStruct import FileHandleDef
 from lib.dos.Error import *
+from lib.dos.DosProtection import DosProtection
 
 class AmiFile:
   def __init__(self, obj, ami_path, sys_path, need_close=True):
@@ -42,6 +44,10 @@ class FileManager(LabelRange):
     self.std_output = AmiFile(sys.stdout,'<STDOUT>','',need_close=False)
     self._register_file(self.std_input)
     self._register_file(self.std_output)
+    
+    # get current umask
+    self.umask = os.umask(0)
+    os.umask(self.umask)
   
   def set_fs_handler_port(self, addr):
     self.fs_handler_port = addr
@@ -194,4 +200,25 @@ class FileManager(LabelRange):
     except OSError:
       return False
 
+  def set_protection(self, ami_path, mask):
+    sys_path = self.path_mgr.ami_to_sys_path(ami_path)
+    if sys_path == None or not os.path.exists(sys_path):
+      log_file.info("file to set proteciton not found: '%s'", ami_path)
+      return ERROR_OBJECT_NOT_FOUND
+    prot = DosProtection(mask)
+    posix_mask = 0
+    if prot.is_e():
+      posix_mask |= stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+    if prot.is_w():
+      posix_mask |= stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH
+    if prot.is_r():
+      posix_mask |= stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
+    posix_mask &= ~self.umask
+    log_file.info("set protection: '%s': %s -> '%s': posix_mask=%03o umask=%03o", ami_path, prot, sys_path, posix_mask, self.umask)
+    try:
+      os.chmod(sys_path, posix_mask)
+      return NO_ERROR
+    except OSError:
+      return ERROR_OBJECT_WRONG_TYPE
+      
     

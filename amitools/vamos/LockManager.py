@@ -1,12 +1,15 @@
 import os.path
 import logging
+import stat
 
 from Log import log_lock
 from LabelRange import LabelRange
 from Exceptions import *
 from lib.dos.AmiTime import *
 from lib.dos.DosStruct import *
+from lib.dos.Error import *
 from AccessStruct import AccessStruct
+from lib.dos.DosProtection import DosProtection
 
 class AmiLock:
   def __init__(self, name, ami_path, sys_path, exclusive=False):
@@ -139,9 +142,21 @@ class LockManager(LabelRange):
     else:
       dirEntryType = 0xfffffffd # file
     fib_mem.w_s('fib_DirEntryType', dirEntryType )
-    # protection: TODO
-    prot = 0xf
-    fib_mem.w_s('fib_Protection', prot)
+    # protection
+    prot = DosProtection(0)
+    try:
+      os_stat = os.stat(lock.sys_path)
+      mode = os_stat.st_mode
+      if mode & stat.S_IXUSR == 0:
+        prot.clr(DosProtection.FIBF_EXECUTE)
+      if mode & stat.S_IRUSR == 0:
+        prot.clr(DosProtection.FIBF_READ)
+      if mode & stat.S_IWUSR == 0:
+        prot.clr(DosProtection.FIBF_WRITE)
+      log_lock.debug("examine lock: '%s' mode=%03o: prot=%s", lock, mode, prot)
+    except OSError:
+      return ERROR_OBJECT_IN_USE
+    fib_mem.w_s('fib_Protection', prot.mask)
     # size
     if os.path.isfile(lock.sys_path):
       size = os.path.getsize(lock.sys_path)
@@ -154,5 +169,7 @@ class LockManager(LabelRange):
     date.w_s('ds_Days', at.tday)
     date.w_s('ds_Minute', at.tmin)
     date.w_s('ds_Tick', at.tick)
+    return NO_ERROR
+
     
     

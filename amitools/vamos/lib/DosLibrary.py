@@ -206,6 +206,7 @@ class DosLibrary(AmigaLibrary):
       (132, self.IoErr),
       (150, self.LoadSeg),
       (156, self.UnLoadSeg),
+      (186, self.SetProtection),
       (192, self.DateStamp),
       (210, self.ParentDir),
       (216, self.IsInteractive),
@@ -486,7 +487,7 @@ class DosLibrary(AmigaLibrary):
     name = ctx.mem.access.r_cstr(name_ptr)
     self.io_err = self.file_mgr.delete(name)
     log_dos.info("DeleteFile: '%s': err=%s" % (name, self.io_err))
-    if self.io_err == 0:
+    if self.io_err == NO_ERROR:
       return self.DOSTRUE
     else:
       return self.DOSFALSE
@@ -498,7 +499,18 @@ class DosLibrary(AmigaLibrary):
     new_name = ctx.mem.access.r_cstr(new_name_ptr)
     self.io_err = self.file_mgr.rename(old_name, new_name)
     log_dos.info("Rename: '%s' -> '%s': err=%s" % (old_name, new_name, self.io_err))
-    if self.io_err == 0:
+    if self.io_err == NO_ERROR:
+      return self.DOSTRUE
+    else:
+      return self.DOSFALSE
+
+  def SetProtection(self, lib, ctx):
+    name_ptr = ctx.cpu.r_reg(REG_D1)
+    name = ctx.mem.access.r_cstr(name_ptr)
+    mask = ctx.cpu.r_reg(REG_D2)
+    self.io_err = self.file_mgr.set_protection(name, mask)
+    log_dos.info("SetProtection: '%s' mask=%04x: err=%s", name, mask, self.io_err)
+    if self.io_err == NO_ERROR:
       return self.DOSTRUE
     else:
       return self.DOSFALSE
@@ -558,9 +570,11 @@ class DosLibrary(AmigaLibrary):
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
     log_dos.info("Examine: %s fib=%06x" % (lock, fib_ptr))
     fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
-    self.lock_mgr.examine_lock(lock, fib)
-    self.io_err = NO_ERROR
-    return self.DOSTRUE
+    self.io_err = self.lock_mgr.examine_lock(lock, fib)
+    if self.io_err == NO_ERROR:
+      return self.DOSTRUE
+    else:
+      return self.DOSFALSE
   
   def ParentDir(self, lib, ctx):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
@@ -640,15 +654,13 @@ class DosLibrary(AmigaLibrary):
       self.io_err = ERROR_OBJECT_NOT_FOUND
     # first match
     else:
-      mfn.first(ctx)
-      log_dos.info("MatchFirst: found path='%s' -> dir path=%s -> parent lock %s", mfn.path, mfn.voldir_path, mfn.dir_lock)
+      self.io_err = mfn.first(ctx)
+      log_dos.info("MatchFirst: found path='%s' -> dir path=%s -> parent lock %s, io_err=%d", mfn.path, mfn.voldir_path, mfn.dir_lock, self.io_err)
       self.matches[anchor_ptr] = mfn
-      self.io_err = NO_ERROR
     return self.io_err
   
   def MatchNext(self, lib, ctx):
     anchor_ptr = ctx.cpu.r_reg(REG_D1)
-    anchor = AccessStruct(self.ctx.mem,AnchorPathDef,struct_addr=anchor_ptr)
     log_dos.info("MatchNext: anchor=%06x" % (anchor_ptr))
     # retrieve match
     if not self.matches.has_key(anchor_ptr):
@@ -656,10 +668,9 @@ class DosLibrary(AmigaLibrary):
     mfn = self.matches[anchor_ptr]
     # has matches?
     if mfn != None:
-      ok = mfn.next(ctx)
-      if ok:
-        log_dos.info("MatchNext: found path='%s' -> dir path=%s -> parent lock %s", mfn.path, mfn.voldir_path, mfn.dir_lock)
-        self.io_err = NO_ERROR
+      self.io_err = mfn.next(ctx)
+      if self.io_err != None:
+        log_dos.info("MatchNext: found path='%s' -> dir path=%s -> parent lock %s, io_err=%d", mfn.path, mfn.voldir_path, mfn.dir_lock, self.io_err)
       else:
         log_dos.info("MatchNext: no more entries!")
         self.io_err = ERROR_NO_MORE_ENTRIES
@@ -667,7 +678,6 @@ class DosLibrary(AmigaLibrary):
     
   def MatchEnd(self, lib, ctx):
     anchor_ptr = ctx.cpu.r_reg(REG_D1)
-    anchor = AccessStruct(self.ctx.mem,AnchorPathDef,struct_addr=anchor_ptr)
     log_dos.info("MatchEnd: anchor=%06x " % (anchor_ptr))
     # retrieve match
     if not self.matches.has_key(anchor_ptr):

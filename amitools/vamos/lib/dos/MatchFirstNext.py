@@ -44,22 +44,24 @@ class MatchFirstNext:
     self.anchor.w_s('ap_Last', self.achain_last.addr)
     self.achain_last.access.w_s('an_Lock', self.dir_lock.addr)
     
-    self._fill_fib(ctx)
+    io_err = self._fill_fib(ctx)
     
     # init stack
     self.dodir_stack = []
+    return io_err
   
   def _fill_fib(self, ctx):
     # fill FileInfo of first match in anchor
     lock = self.lock_mgr.create_lock(self.abs_path, False)
     fib_ptr = self.anchor.s_get_addr('ap_Info')
     fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
-    self.lock_mgr.examine_lock(lock, fib)
+    io_err = self.lock_mgr.examine_lock(lock, fib)
     self.lock_mgr.release_lock(lock)
     # store path name of first name at end of structure
     if self.str_len > 0:
       path_ptr = self.anchor.s_get_addr('ap_Buf')
       self.anchor.w_cstr(path_ptr, self.abs_path)
+    return io_err
   
   def _push_dodir(self):
     dir_entries = self.path_mgr.ami_list_dir(self.abs_path)
@@ -106,7 +108,7 @@ class MatchFirstNext:
     # store path
     self.path = path
     if path == None:
-      return False
+      return None
     else:
       # get parent dir of this match
       self.abs_path = self.path_mgr.ami_abs_path(path)
@@ -119,8 +121,8 @@ class MatchFirstNext:
         # update achain_last
         self.achain_last.access.w_s('an_Lock', self.dir_lock.addr)
       # fill fib
-      self._fill_fib(ctx)
-      return True
+      io_err = self._fill_fib(ctx)
+      return io_err
 
   def end(self, ctx):
     # restore label
