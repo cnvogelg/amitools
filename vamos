@@ -154,7 +154,7 @@ if not vamos.init(lib_versions):
   sys.exit(1)
 
 # --- create main process ---
-proc = Process(vamos.ctx, args.bin, args.args, stack_size=args.stack_size*1024)
+proc = Process(vamos, args.bin, args.args, stack_size=args.stack_size*1024)
 if not proc.ok:
   sys.exit(1)
 vamos.set_this_task(proc)

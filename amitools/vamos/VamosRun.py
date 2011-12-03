@@ -16,7 +16,7 @@ class VamosRun:
     self.vamos = vamos
     self.cpu = vamos.cpu
     self.mem = vamos.mem
-    self.ctx = vamos.ctx
+    self.ctx = vamos
     # store myself in context
     self.ctx.run = self
     
