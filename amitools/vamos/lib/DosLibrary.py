@@ -15,6 +15,8 @@ from dos.DosTags import DosTags
 from dos.PatternMatch import pattern_parse, pattern_match
 from dos.MatchFirstNext import MatchFirstNext
 from amitools.vamos.LabelStruct import LabelStruct
+from dos.CommandLine import CommandLine
+from amitools.vamos.Process import Process
 
 class DosLibrary(AmigaLibrary):
   name = "dos.library"
@@ -788,7 +790,23 @@ class DosLibrary(AmigaLibrary):
     tagitem_ptr = ctx.cpu.r_reg(REG_D2)
     cmd = ctx.mem.access.r_cstr(cmd_ptr)
     tag_list = taglist_parse_tagitem_ptr(ctx.mem, tagitem_ptr, DosTags)
-    log_dos.info("SystemTagList: cmd='%s' tags=%s" % (cmd, tag_list))
+    log_dos.info("SystemTagList: cmd='%s' tags=%s", cmd, tag_list)
+    # parse "command line"
+    cl = CommandLine()
+    if not cl.parse_string(cmd):
+      log_dos.info("SystemTagList: error parsing command: '%s'", cmd)
+      return 10 # RETURN_ERROR
+    args = cl.args
+    if len(args) == 0:
+      log_dos.info("SystemTagList: error parsing command: '%s'", cmd)
+      return 10 # RETURN_ERROR
+    bin = args[0]
+    args = args[1:]
+    # TODO: redirs
+    log_dos.info("SystemTagList: bin='%s' args=%s", bin, args)
+    # create a process and run it...
+    proc = Process(ctx, bin, args)
+    ctx.start_sub_process(proc)
 
   def LoadSeg(self, lib, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)

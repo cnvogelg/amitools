@@ -1,4 +1,4 @@
-from Exceptions import OutOfAmigaMemoryError
+from Exceptions import *
 from Log import log_mem_alloc
 from LabelRange import LabelRange
 from LabelStruct import LabelStruct

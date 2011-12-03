@@ -20,6 +20,9 @@ class Process:
     self.free_stack()
     self.unload_binary()
   
+  def __str__(self):
+    return "[bin='%s']" % self.bin_file
+  
   # ----- stack -----
   # stack size in KiB
   def init_stack(self, stack_size, exit_addr):

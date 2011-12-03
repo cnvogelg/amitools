@@ -13,7 +13,6 @@ class Trap:
 
 class VamosRun:
   def __init__(self, vamos):
-    self.vamos = vamos
     self.cpu = vamos.cpu
     self.mem = vamos.mem
     self.ctx = vamos
@@ -39,16 +38,16 @@ class VamosRun:
     # set end RESET opcode at 0 and execbase at 4
     op_reset = 0x04e70
     self.mem.access.w16(0, op_reset)
-    self.mem.access.w32(4, self.vamos.exec_lib.lib_base)
+    self.mem.access.w32(4, self.ctx.exec_lib.lib_base)
 
     # setup arg in D0/A0
     self.cpu.w_reg(REG_D0, self.ctx.process.arg_len)
     self.cpu.w_reg(REG_A0, self.ctx.process.arg_base)
 
     # to track old dos values
-    self.cpu.w_reg(REG_A2, self.vamos.dos_guard_base)
-    self.cpu.w_reg(REG_A5, self.vamos.dos_guard_base)
-    self.cpu.w_reg(REG_A6, self.vamos.dos_guard_base)
+    self.cpu.w_reg(REG_A2, self.ctx.dos_guard_base)
+    self.cpu.w_reg(REG_A5, self.ctx.dos_guard_base)
+    self.cpu.w_reg(REG_A6, self.ctx.dos_guard_base)
 
   def add_trap(self, addr, func, one_shot=False):
     trap = Trap(addr, func, one_shot)
@@ -82,7 +81,7 @@ class VamosRun:
             self.remove_trap(trap)          
         # lib trap!
         else:
-          self.vamos.lib_mgr.call_internal_lib(pc, self.ctx)
+          self.ctx.lib_mgr.call_internal_lib(pc, self.ctx)
         
         end = time.time()
         # account for trap time
