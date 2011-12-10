@@ -40,7 +40,7 @@ class LockManager(LabelRange):
     rel = int((addr - self.base_addr) / self.lock_size)
     lock_addr = self.base_addr + rel * self.lock_size
     b_addr = lock_addr >> 2
-    lock = self.get_by_b_addr(b_addr)
+    lock = self.get_by_b_addr(b_addr, none_if_missing=True)
     if lock != None:
       # get addon text
       delta = addr - lock_addr
@@ -63,12 +63,14 @@ class LockManager(LabelRange):
       self.trace_mem_int('R', 2, addr, val, text="LOCK", level=logging.INFO, addon=addon)
       return val
     else:
-      self.trace_mem_int('R', 2, addr, val, text="NO_LOCK", level=logging.WARN)
+      # outside of locks
+      addon = "lock=B%06x  cur_lock=B%06x" % (b_addr, self.cur_addr >> 2)
+      self.trace_mem_int('R', 2, addr, 0, text="LOCK??", level=logging.WARN, addon=addon)
       return 0
   
   def _register_lock(self, lock):
     addr = self.cur_addr
-    self.cur_addr += 4
+    self.cur_addr += self.lock_size
     lock.addr = addr
     lock.b_addr = addr >> 2
     self.locks_by_b_addr[lock.b_addr] = lock
@@ -114,7 +116,7 @@ class LockManager(LabelRange):
     else:
       return None
     
-  def get_by_b_addr(self, b_addr):
+  def get_by_b_addr(self, b_addr, none_if_missing=False):
     # current dir lock
     if b_addr == 0:
       (cur_dev, cur_path) = self.path_mgr.get_cur_path()
@@ -124,7 +126,10 @@ class LockManager(LabelRange):
     elif self.locks_by_b_addr.has_key(b_addr):
       return self.locks_by_b_addr[b_addr]
     else:
-      raise VamosInternalError("Invalid File Lock at b@%06x" % b_addr)
+      if none_if_missing:
+        return None
+      else:
+        raise VamosInternalError("Invalid File Lock at b@%06x" % b_addr)
   
   def release_lock(self, lock):
     if lock.b_addr != 0:
