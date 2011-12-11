@@ -372,10 +372,10 @@ class DosLibrary(AmigaLibrary):
       f_mode = "wb"
     elif mode == 1005:
       mode_name = "old"
-      f_mode = "rb"
+      f_mode = "rb+"
     elif mode == 1004:
       mode_name = "r/w"
-      f_mode = "ab"
+      f_mode = "rb+"
     else:
       mode_name = "?"
     
