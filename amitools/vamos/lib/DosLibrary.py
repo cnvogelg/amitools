@@ -806,6 +806,9 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("SystemTagList: bin='%s' args=%s", bin, args)
     # create a process and run it...
     proc = Process(ctx, bin, args)
+    if not proc.ok:
+      log_dos.warn("SystemTagList: can't create process for '%s' args=%s", bin, args)
+      return 0xffffffff
     ctx.start_sub_process(proc)
 
   def LoadSeg(self, lib, ctx):
