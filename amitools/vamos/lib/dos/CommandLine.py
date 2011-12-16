@@ -30,7 +30,7 @@ class CommandLine:
     self._build()
   
   def _split(self, in_str):
-    in_ws = False
+    arg_begin = True
     in_quote = False
     quote_next = False
     is_redir = False
@@ -45,6 +45,7 @@ class CommandLine:
           in_quote = False
           args.append(arg)
           arg = ""
+          arg_begin = True
         # quote next 
         elif c == '*' and not quote_next:
           quote_next = True
@@ -61,26 +62,25 @@ class CommandLine:
           if arg != "":
             args.append(arg)
             arg = ""
-          in_ws = True
+          arg_begin = True
         # quote begin
-        elif c == '"':
+        elif c == '"' and arg_begin:
           # if an arg was begun add that first
           if arg != "":
             args.append(arg)
             arg = ""
           arg = ""
           in_quote = True
-          in_ws = False
+          arg_begin = False
         # start of redir?
         elif c in ('<', '>'):
-          if in_ws:
+          if arg_begin:
             redir_pos.append(len(args))
-            in_ws = False
           arg += c
         # any other char
         else:
           arg += c
-          in_ws = False
+          arg_begin = False
   
     # add last
     if arg != "":
