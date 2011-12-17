@@ -59,10 +59,10 @@ def log_help():
   for l in levels:
     print "  %s" % l
 
-def log_setup(arg,verbose=False,quiet=False,file_name=None):
+def log_setup(arg=None, verbose=False, quiet=False, log_file=None):  
   # setup handler
-  if file_name != None:
-    ch = logging.FileHandler(file_name, mode='w')
+  if log_file != None:
+    ch = logging.FileHandler(log_file, mode='w')
   else:
     ch = logging.StreamHandler()
   ch.setLevel(logging.DEBUG)

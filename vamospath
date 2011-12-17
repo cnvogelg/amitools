@@ -30,7 +30,7 @@ args = parser.parse_args()
 log_setup(args.logging,verbose=args.verbose)
 
 # --- setup config ---
-cfg = VamosConfig(extra_file=args.config_file)
+cfg = VamosConfig(extra_file=args.config_file, args=args)
 
 # --- setup path manager ---
 pm = PathManager()

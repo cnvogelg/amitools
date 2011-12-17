@@ -59,9 +59,9 @@ class Vamos:
     self.proc_list = []
     self.tr_list = []
 
-  def init(self, lib_versions):
+  def init(self, cfg):
     self.init_managers()
-    self.register_base_libs(lib_versions['exec'], lib_versions['dos'])
+    self.register_base_libs(cfg.lib_versions['exec'], cfg.lib_versions['dos'])
     self.init_trampoline()  
     self.create_old_dos_guard()
     self.open_exec_lib()

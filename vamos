@@ -75,13 +75,7 @@ class MusashiMEM(MEM):
   def clear_ram_block(self,addr,size,value):
     m68k.mem_ram_clear_block(addr,size,value)
   
-# ----- main -----
-
-# --- preset args ---
-lib_versions = {
-  'dos' : 39,
-  'exec' : 39
-}
+# ----- main -----------------------------------------------------------------
 
 # --- args ---
 parser = argparse.ArgumentParser()
@@ -89,11 +83,11 @@ parser.add_argument('bin', help="AmigaOS binary to run")
 parser.add_argument('args', nargs='*', help="AmigaOS binary arguments")
 parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
 parser.add_argument('-q', '--quiet', action='store_true', default=False, help="do not output any logging")
-parser.add_argument('-C', '--cycles', action='store', type=int, default=0, help="maximum number of cycles to execute")
-parser.add_argument('-B', '--block', action='store', type=int, default=1000, help="cycles per block")
+parser.add_argument('-C', '--max-cycles', action='store', type=int, default=0, help="maximum number of cycles to execute")
+parser.add_argument('-B', '--cycles-per-block', action='store', type=int, default=1000, help="cycles per block")
 parser.add_argument('-l', '--logging', action='store', default=None, help="logging settings: <chan>:<level>,*:<level>,...")
 parser.add_argument('-L', '--log-file', action='store', default=None, help="write all log messages to a file")
-parser.add_argument('-i', '--lib-version', action='store', default=None, help="set lib version: <lib>:<version>,...")
+parser.add_argument('-i', '--lib-versions', action='store', default=None, help="set lib version: <lib>:<version>,...")
 parser.add_argument('-m', '--ram-size', action='store', default=1024, type=int, help="set RAM size in KiB")
 parser.add_argument('-s', '--stack-size', action='store', default=4, help="set stack size in KiB")
 parser.add_argument('-t', '--memory-trace', action='store_true', default=False, help="enable memory tracing (slower)")
@@ -106,42 +100,37 @@ parser.add_argument('-A', '--auto-assign', action='store', default=None, help="d
 parser.add_argument('-p', '--path', action='append', default=None, help="define command search ami path, e.g. c:")
 args = parser.parse_args()
 
-# --- parse args ---
-if args.lib_version != None:
-  for p in args.lib_version.split(','):
-    n,v = p.split(':')
-    lib_versions[n] = int(v)
+# --- init config ---
+cfg = VamosConfig(extra_file=args.config_file, args=args)
 
 # --- init logging ---
-if not log_setup(args.logging, args.verbose, args.quiet, args.log_file):
+if not log_setup(cfg.logging, cfg.verbose, cfg.quiet, cfg.log_file):
   log_help()
   sys.exit(1)
+cfg.log()
 
-# --- init config ---
-cfg = VamosConfig(extra_file=args.config_file)
-
-# --- load config ---
+# --- setup path manager ---
 pm = PathManager()
 pm.parse(cfg, args.volume, args.assign, args.auto_assign, args.path)
 
 # ----- vamos! ---------------------------------------------------------------
 cpu = MusashiCPU()
 mem = MusashiMEM()
-log_main.info("setting up main memory with %s KiB RAM: top=%06x" % (args.ram_size, args.ram_size * 1024))
-if not mem.init(args.ram_size):
-  log_main.error("can't allocate vamos RAM: %d KiB" % args.ram_size)
+log_main.info("setting up main memory with %s KiB RAM: top=%06x" % (cfg.ram_size, cfg.ram_size * 1024))
+if not mem.init(cfg.ram_size):
+  log_main.error("can't allocate vamos RAM: %d KiB" % cfg.ram_size)
   sys.exit(1)
   
 vamos = Vamos(mem, cpu, pm)
 
 # enable mem trace?
-if args.memory_trace:
+if cfg.memory_trace:
   mem.set_mem_trace_mode(1)
   mem.set_mem_trace_func(vamos.label_mgr.trace_mem)
   if not log_mem.isEnabledFor(logging.INFO):
     log_mem.setLevel(logging.INFO)
 # enable internal memory trace?
-if args.internal_memory_trace:
+if cfg.internal_memory_trace:
   AccessMemory.label_mgr = vamos.label_mgr
   if not log_mem_int.isEnabledFor(logging.INFO):
     log_mem_int.setLevel(logging.INFO)
@@ -149,12 +138,12 @@ if args.internal_memory_trace:
 # set invalid access handler for memory
 m68k.mem_set_invalid_func(vamos.error_tracker.report_invalid_memory)
 
-# --- setup stack ---
-if not vamos.init(lib_versions):
+# --- setup vamos ---
+if not vamos.init(cfg):
   sys.exit(1)
 
 # --- create main process ---
-proc = Process(vamos, args.bin, args.args, stack_size=args.stack_size*1024)
+proc = Process(vamos, args.bin, args.args, stack_size=cfg.stack_size*1024)
 if not proc.ok:
   sys.exit(1)
 vamos.set_main_process(proc)
@@ -177,13 +166,13 @@ def instr_hook():
   txt = m68k.disassemble(pc, m68k.M68K_CPU_TYPE_68000)
   log_instr.info("%-40s  %06x    %s" % (label, pc, txt))
 
-if args.instr_trace:
+if cfg.instr_trace:
   if not log_instr.isEnabledFor(logging.INFO):
     log_instr.setLevel(logging.INFO)
   m68k.set_instr_hook_callback(instr_hook)
 
 # main loop
-exit_code = run.run(args.block, args.cycles)
+exit_code = run.run(cfg.cycles_per_block, cfg.max_cycles)
 
 # free process
 proc.free()
