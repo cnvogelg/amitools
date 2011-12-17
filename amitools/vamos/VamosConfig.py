@@ -32,10 +32,10 @@ class VamosConfig(ConfigParser.SafeConfigParser):
       log_main.info("read config file: %s" % ",".join(self.found_files))
 
   def _reset(self):
-    self.lib_versions = {
-        'dos' : 39,
-        'exec' : 39
-      }
+    self.libs = {
+        'dos' : { 'version':39, 'profile':False },
+        'exec' : { 'version':39, 'profile':False }
+    }
     # define keys that can be set
     self._keys = {
       'logging' : str, 
@@ -65,8 +65,13 @@ class VamosConfig(ConfigParser.SafeConfigParser):
     if hasattr(args, 'lib_versions') and args.lib_versions != None:
       for p in args.lib_version.split(','):
         n,v = p.split(':')
-        if self.lib_versions.has_key(n):
-          self.lib_versions[n] = int(v)
+        if self.libs.has_key(n):
+          self.libs[n]['version'] = int(v)
+    # parse lib profile
+    if hasattr(args, 'lib_profile') and args.lib_profile != None:
+      for p in args.lib_profile.split(','):
+        if self.libs.has_key(p):
+          self.libs[p]['profile'] = True
         
     # get paramters from args
     for key in self._keys:

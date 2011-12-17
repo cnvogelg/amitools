@@ -25,5 +25,5 @@ class IconLibrary(AmigaLibrary):
     (138, 'DeleteDiskObject', (('name', 'a0'),))
   )
   
-  def __init__(self, version=39):
-    AmigaLibrary.__init__(self, self.name, version, self.icon_calls, LibraryDef)
+  def __init__(self, version=39, profile=False):
+    AmigaLibrary.__init__(self, self.name, version, self.icon_calls, LibraryDef, profile)

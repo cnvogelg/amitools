@@ -61,7 +61,7 @@ class Vamos:
 
   def init(self, cfg):
     self.init_managers()
-    self.register_base_libs(cfg.lib_versions['exec'], cfg.lib_versions['dos'])
+    self.register_base_libs(cfg)
     self.init_trampoline()  
     self.create_old_dos_guard()
     self.open_exec_lib()
@@ -172,13 +172,14 @@ class Vamos:
     self.label_mgr.add_label(self.port_mgr)
     log_mem_init.info(self.port_mgr)
 
-  def register_base_libs(self, exec_version, dos_version):
+  def register_base_libs(self, cfg):
+    libs_cfg = cfg.libs
     # register libraries
     # exec
-    self.exec_lib_def = ExecLibrary(self.lib_mgr, self.alloc, version=exec_version)
+    self.exec_lib_def = ExecLibrary(self.lib_mgr, self.alloc, version=libs_cfg['exec']['version'], profile=libs_cfg['exec']['profile'])
     self.lib_mgr.register_int_lib(self.exec_lib_def)
     # dos
-    self.dos_lib_def = DosLibrary(self.mem, self.alloc, version=dos_version)
+    self.dos_lib_def = DosLibrary(self.mem, self.alloc, version=libs_cfg['dos']['version'], profile=libs_cfg['dos']['profile'])
     self.dos_lib_def.set_managers(self.path_mgr, self.lock_mgr, self.file_mgr, self.port_mgr, self.seg_loader)
     self.lib_mgr.register_int_lib(self.dos_lib_def)
     # icon

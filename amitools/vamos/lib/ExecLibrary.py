@@ -142,8 +142,8 @@ class ExecLibrary(AmigaLibrary):
     (822, 'execPrivate15', None),
   )
 
-  def __init__(self, lib_mgr, alloc, version=39):
-    AmigaLibrary.__init__(self, self.name, version, self.exec_calls, ExecLibraryDef)
+  def __init__(self, lib_mgr, alloc, version=39, profile=False):
+    AmigaLibrary.__init__(self, self.name, version, self.exec_calls, ExecLibraryDef, profile)
     log_exec.info("open exec.library V%d", self.version)
     self.lib_mgr = lib_mgr
     self.alloc = alloc
@@ -171,6 +171,7 @@ class ExecLibrary(AmigaLibrary):
     self.set_funcs(exec_funcs)
   
   def setup_lib(self, lib, ctx):
+    AmigaLibrary.setup_lib(self, lib, ctx)
     # setup exec memory
     lib.access.w_s("LibNode.lib_Version", self.version)
 

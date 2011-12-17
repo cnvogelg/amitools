@@ -1,16 +1,17 @@
 from CPU import *
 
-from Log import log_lib
+from Log import *
 import logging
 import time
 
 class AmigaLibrary:
   
-  def __init__(self, name, version, calls, struct):
+  def __init__(self, name, version, calls, struct, profile=False):
     self.name = name
     self.version = version
     self.calls = calls
     self.struct = struct
+    self.profile = profile
 
     # get pos_size
     self.pos_size = struct.get_size()
@@ -32,16 +33,21 @@ class AmigaLibrary:
         call_id += 1
       off += 6
       self.jump_table.append([call,None])
+      
   
   def __str__(self):
     return "[Lib %s V%d num_jumps=%d pos_size=%d neg_size=%d]" % \
       (self.name, self.version, self.num_jumps, self.pos_size, self.neg_size)
   
   def setup_lib(self, mem_lib, ctx):
-    pass
+    # enable profiling
+    if self.profile:
+      self.profile_map = {}
   
   def finish_lib(self, mem_lib, ctx):
-    pass
+    # dump profile
+    if self.profile:
+      self.dump_profile()
   
   def get_num_vectors(self):
     return self.num_jumps
@@ -78,24 +84,50 @@ class AmigaLibrary:
   def log(self, text, level=logging.INFO):
     log_lib.log(level, "[%16s]  %s", self.name, text)
 
+  def dump_profile(self):
+    log_prof.info("'%s' Function Call Profile", self.name)
+    funcs = sorted(self.profile_map.keys())
+    for f in funcs:
+      entry = self.profile_map[f]
+      cnt = entry[1]
+      total = entry[0]
+      per_call = total / cnt
+      log_prof.info("  %20s: #%8d  total=%10.3f  per call=%10.3f", f, cnt, total, per_call)
+
+  def _do_profile(self, func, delta):
+    if self.profile_map.has_key(func):
+      entry = self.profile_map[func]
+      entry[0] += delta
+      entry[1] += 1
+    else:
+      entry = [delta, 1]
+      self.profile_map[func] = entry
+
   def call_vector(self, off, mem_lib, ctx):
     jump_entry = self.jump_table[off]
     call = jump_entry[0]
     callee = jump_entry[1]
-    call_name = "%4d %s( %s ) from PC=%06x" % (call[0], call[1], self.gen_arg_dump(call[2], ctx), self.get_callee_pc(ctx))
+    callee_pc = self.get_callee_pc(ctx)
+    call_name = "%4d %s( %s ) from PC=%06x" % (call[0], call[1], self.gen_arg_dump(call[2], ctx), callee_pc)
     if callee != None:
+      # we have a function
       self.log("{ CALL: " + call_name)
       start_time = time.time()
       # call the lib!
       d0 = callee(mem_lib, ctx)
       end_time = time.time()
       delta = end_time - start_time
+      # do profiling?
+      if self.profile:
+        self._do_profile(call[1], delta)
+      # handle return value
       if d0 != None:
         self.log("} END CALL: d0=%08x (duration: %g ms)" % (d0, (delta * 1000.0)))
         ctx.cpu.w_reg(REG_D0, d0)
       else:
         self.log("} END CALL: NO RET (duration: %g ms)" % ((delta * 1000.0)))
     else:
+      # function not implemented yet
       self.log("? CALL: %s -> d0=0 (default)" % call_name, level=logging.WARN)
       ctx.cpu.w_reg(REG_D0, 0)
     

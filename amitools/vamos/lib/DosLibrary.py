@@ -185,8 +185,8 @@ class DosLibrary(AmigaLibrary):
   DOSFALSE = 0
   DOSTRUE = 0xffffffff
   
-  def __init__(self, mem, alloc, version=39):
-    AmigaLibrary.__init__(self, self.name, version, self.dos_calls, DosLibraryDef)
+  def __init__(self, mem, alloc, version=39, profile=False):
+    AmigaLibrary.__init__(self, self.name, version, self.dos_calls, DosLibraryDef, profile)
     self.mem = mem
     self.alloc = alloc
     
@@ -245,6 +245,7 @@ class DosLibrary(AmigaLibrary):
     file_mgr.set_fs_handler_port(self.fs_handler_port)
   
   def setup_lib(self, lib, ctx):
+    AmigaLibrary.setup_lib(self, lib, ctx)
     log_dos.info("open dos.library V%d", self.version)
     # setup lib struct
     lib.access.w_s("lib.lib_Version", self.version)
@@ -266,6 +267,7 @@ class DosLibrary(AmigaLibrary):
   def finish_lib(self, lib, ctx):
     ctx.alloc.free_struct(self.root_struct)
     ctx.alloc.free_struct(self.dos_info)
+    AmigaLibrary.finish_lib(self, lib, ctx)
   
   # ----- Direct Handler Access -----
   

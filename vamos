@@ -88,6 +88,7 @@ parser.add_argument('-B', '--cycles-per-block', action='store', type=int, defaul
 parser.add_argument('-l', '--logging', action='store', default=None, help="logging settings: <chan>:<level>,*:<level>,...")
 parser.add_argument('-L', '--log-file', action='store', default=None, help="write all log messages to a file")
 parser.add_argument('-i', '--lib-versions', action='store', default=None, help="set lib version: <lib>:<version>,...")
+parser.add_argument('-P', '--lib-profile', action='store', default=None, help="enable lib profiling: <lib>,<lib>,...")
 parser.add_argument('-m', '--ram-size', action='store', default=1024, type=int, help="set RAM size in KiB")
 parser.add_argument('-s', '--stack-size', action='store', default=4, help="set stack size in KiB")
 parser.add_argument('-t', '--memory-trace', action='store_true', default=False, help="enable memory tracing (slower)")
