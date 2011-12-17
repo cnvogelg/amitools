@@ -71,7 +71,7 @@ class VamosRun:
     # a lib trap!
     else:
       try:
-        begin = time.time()
+        begin = time.clock()
         
         # a registered trap?
         if pc in self.trap_addrs:
@@ -83,7 +83,7 @@ class VamosRun:
         else:
           self.ctx.lib_mgr.call_internal_lib(pc, self.ctx)
         
-        end = time.time()
+        end = time.clock()
         # account for trap time
         self.trap_time += end - begin
       except BaseException as e:
@@ -96,7 +96,7 @@ class VamosRun:
     log_main.info("start cpu: %06x", self.ctx.process.prog_start)
 
     total_cycles = 0
-    start_time = time.time()
+    start_time = time.clock()
 
     # main loop
     while self.stay:
@@ -108,7 +108,7 @@ class VamosRun:
       if self.et.has_errors:
         break
 
-    end_time = time.time()
+    end_time = time.clock()
     delta_time = end_time - start_time
     cpu_time = delta_time - self.trap_time
     mhz = total_cycles / (1000000.0 * delta_time)

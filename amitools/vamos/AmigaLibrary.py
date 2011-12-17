@@ -112,10 +112,10 @@ class AmigaLibrary:
     if callee != None:
       # we have a function
       self.log("{ CALL: " + call_name)
-      start_time = time.time()
+      start_time = time.clock()
       # call the lib!
       d0 = callee(mem_lib, ctx)
-      end_time = time.time()
+      end_time = time.clock()
       delta = end_time - start_time
       # do profiling?
       if self.profile:
