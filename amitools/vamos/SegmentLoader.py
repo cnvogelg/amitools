@@ -26,6 +26,7 @@ class SegList:
     self.b_addr = 0
     self.prog_start = 0
     self.size = 0
+    self.usage = 1
   
   def add(self, segment):
     if len(self.segments) == 0:
@@ -35,8 +36,8 @@ class SegList:
     self.size += segment.size
     
   def __str__(self):
-    return "[SegList:ami='%s':sys='%s':b_addr=%06x,prog=%06x,segs=#%d,size=%d]" % \
-      (self.ami_bin_file, self.sys_bin_file, self.b_addr, self.prog_start, len(self.segments), self.size)
+    return "[SegList:ami='%s':sys='%s':b_addr=%06x,prog=%06x,segs=#%d,size=%d,usage=%d]" % \
+      (self.ami_bin_file, self.sys_bin_file, self.b_addr, self.prog_start, len(self.segments), self.size, self.usage)
 
 class SegmentLoader:
   
@@ -46,6 +47,7 @@ class SegmentLoader:
     self.label_mgr = label_mgr
     self.path_mgr = path_mgr
     self.error = None
+    self.loaded_seg_lists = {}
   
   # load ami_bin_file
   def load_seg(self, ami_bin_file):
@@ -54,12 +56,36 @@ class SegmentLoader:
     if sys_bin_file == None:
       self.error = "failed mapping binary path: '%s'" % ami_bin_file
       return None
-      
+
+    # check if seg list already loaded in a parent process
+    if self.loaded_seg_lists.has_key(sys_bin_file):
+      seg_list = self.loaded_seg_lists[sys_bin_file]
+      seg_list.usage += 1
+      return seg_list
+
+    # really load new seg list
     seg_list = self._load_seg(ami_bin_file,sys_bin_file)
     if seg_list == None:
       return None
     
+    # store in cache
+    self.loaded_seg_lists[sys_bin_file] = seg_list
     return seg_list
+  
+  # unload seg list
+  def unload_seg(self, seg_list):
+    sys_bin_file = seg_list.sys_bin_file
+    # check that file is in cache
+    if self.loaded_seg_lists.has_key(sys_bin_file):
+      seg_list.usage -= 1
+      # no more used
+      if seg_list.usage == 0:
+        del self.loaded_seg_lists[sys_bin_file]
+        self._unload_seg(seg_list)
+      return True
+    else:
+      self.error = "seglist not found in loaded seglists!"
+      return False
   
   # load sys_bin_file
   def _load_seg(self, ami_bin_file, sys_bin_file):
@@ -129,7 +155,7 @@ class SegmentLoader:
     
     return seg_list
     
-  def unload_seg(self, seg_list):
+  def _unload_seg(self, seg_list):
     for seg in seg_list.segments:
       # free memory of segment
       self.alloc.free_mem(seg.addr, seg.size)
