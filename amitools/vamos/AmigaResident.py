@@ -1,3 +1,6 @@
+import time
+import struct
+
 class AmigaResident:
   
   match_word = 0x4afc
@@ -14,40 +17,61 @@ class AmigaResident:
   INIT_LONG_W = 0xc0
   INIT_END = 0
   
+  def __init__(self, addr, size, mem):
+    self.addr = addr
+    self.size = size
+    self.mem  = mem
+    self.data = mem.access.r_data(addr, size)
+  
+  def r32(self, off):
+    return struct.unpack_from(">I",self.data,off)[0]
+
+  def r16(self, off):
+    return struct.unpack_from(">H",self.data,off)[0]
+  
+  def r8(self, off):
+    return struct.unpack_from("B",self.data,off)[0]
+  
   # return array of resident structure addresses
-  def find_residents(self, addr, size, mem):
-    end = addr + size
+  def find_residents(self, only_first=True):
+    off = 0
     finds = []
-    a = mem.access
-    while addr < end:
-      w = a.r16(addr)
+    a = self
+    data = self.data
+    while off < self.size:
+      w = a.r16(off)
       if w == self.match_word:
-        ptr = a.r32(addr+2)
-        if ptr == addr:
+        ptr = a.r32(off+2) - self.addr
+        if ptr == off:
           # found a resident
           res = {
-            'addr':addr,
-            'flags':a.r8(addr+10),
-            'version':a.r8(addr+11),
-            'type':a.r8(addr+12),
-            'pri':a.r8(addr+13),
-            'name_ptr':a.r32(addr+14),
-            'id_ptr':a.r32(addr+18),
-            'init_ptr':a.r32(addr+22),
-            'mem':mem
+            'addr':off + self.addr,
+            'flags':a.r8(off+10),
+            'version':a.r8(off+11),
+            'type':a.r8(off+12),
+            'pri':a.r8(off+13),
+            'name_ptr':a.r32(off+14),
+            'id_ptr':a.r32(off+18),
+            'init_ptr':a.r32(off+22),
+            'mem':self.mem
           }
           # eval values
           res['auto_init'] = res['flags'] & self.RTF_AUTOINIT == self.RTF_AUTOINIT
-          res['name'] = a.r_cstr(res['name_ptr'])
-          res['id'] = a.r_cstr(res['id_ptr'])
+          res['name'] = self.mem.access.r_cstr(res['name_ptr'])
+          res['id'] = self.mem.access.r_cstr(res['id_ptr'])
           
           finds.append(res)
-          skip = a.r32(addr+6)
-          addr = skip
+          
+          # only first?
+          if only_first:
+            break
+          
+          skip = a.r32(off+6) - self.addr
+          off = skip
         else:
-          addr += 2
+          off += 2
       else:
-        addr += 2
+        off += 2
     return finds
   
   # create a memory block with the auto init data

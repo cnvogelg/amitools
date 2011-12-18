@@ -114,8 +114,9 @@ class VamosRun:
     mhz = total_cycles / (1000000.0 * delta_time)
     cpu_percent = cpu_time * 100.0 / delta_time
     trap_percent = 100.0 - cpu_percent
-    log_main.info("done (%d cycles in cpu time %.4fs -> %5.2f MHz (%.2f %%), trap time %.4fs (%.2f %%), total time %.4fs)", \
-      total_cycles, cpu_time, mhz, cpu_percent, self.trap_time, trap_percent, delta_time)
+    log_main.info("done %d cycles in host time %.4fs -> %5.2f MHz m68k CPU", total_cycles, cpu_time, mhz)
+    log_main.info("code time %.4fs (%.2f %%), trap time %.4fs (%.2f %%) -> total time %.4fs", \
+      cpu_time, cpu_percent, self.trap_time, trap_percent, delta_time)
 
     # if errors happened then report them now
     if self.et.has_errors:

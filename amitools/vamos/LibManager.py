@@ -7,6 +7,7 @@ from Exceptions import *
 from Log import log_libmgr, log_lib
 from AccessStruct import AccessStruct
 import logging
+import time
 
 class LibEntry():
   def __init__(self, name, version, addr, num_vectors, pos_size, mem, label_mgr, struct=LibraryDef, lib_class=None):
@@ -186,9 +187,12 @@ class LibManager():
       return None
     
     # check seg list for resident library struct
-    ar = AmigaResident()
     seg0 = seg_list.segments[0]
-    res_list = ar.find_residents(seg0.addr, seg0.size, context.mem)
+    ar = AmigaResident(seg0.addr, seg0.size, context.mem)
+    start = time.clock()
+    res_list = ar.find_residents()
+    end = time.clock()
+    delta = end - start;
     if res_list == None or len(res_list) != 1:
       self.lib_log("load_lib","No single resident found!", level=logging.ERROR)
       return None
@@ -204,7 +208,7 @@ class LibManager():
     lib_id = res['id']
     lib_version = res['version']
     auto_init = res['auto_init']
-    self.lib_log("load_lib", "found resident: name='%s' id='%s'" % (lib_name, lib_id), level=logging.DEBUG)
+    self.lib_log("load_lib", "found resident: name='%s' id='%s' in %.4fs" % (lib_name, lib_id, delta), level=logging.DEBUG)
     
     # read auto init infos
     if not ar.read_auto_init_data(res, context.mem):
