@@ -87,12 +87,15 @@ class AmigaLibrary:
   def dump_profile(self):
     log_prof.info("'%s' Function Call Profile", self.name)
     funcs = sorted(self.profile_map.keys())
+    sum_total = 0.0
     for f in funcs:
       entry = self.profile_map[f]
       cnt = entry[1]
       total = entry[0]
       per_call = total / cnt
-      log_prof.info("  %20s: #%8d  total=%10.3f  per call=%10.3f", f, cnt, total, per_call)
+      log_prof.info("  %20s: #%8d  total=%10.4f  per call=%10.4f", f, cnt, total, per_call)
+      sum_total += total
+    log_prof.info("sum total=%.4f",sum_total)
 
   def _do_profile(self, func, delta):
     if self.profile_map.has_key(func):
@@ -129,6 +132,27 @@ class AmigaLibrary:
     else:
       # function not implemented yet
       self.log("? CALL: %s -> d0=0 (default)" % call_name, level=logging.WARN)
+      ctx.cpu.w_reg(REG_D0, 0)
+
+  def call_vector_fast(self, off, mem_lib, ctx):
+    """fast call does no logging"""
+    jump_entry = self.jump_table[off]
+    call = jump_entry[0]
+    callee = jump_entry[1]
+    if callee != None:
+      # we have a function
+      start_time = time.clock()
+      # call the lib!
+      d0 = callee(mem_lib, ctx)
+      end_time = time.clock()
+      delta = end_time - start_time
+      # do profiling?
+      if self.profile:
+        self._do_profile(call[1], delta)
+      # handle return value
+      if d0 != None:
+        ctx.cpu.w_reg(REG_D0, d0)
+    else:
       ctx.cpu.w_reg(REG_D0, 0)
     
   def get_callee_pc(self,ctx):

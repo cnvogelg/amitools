@@ -52,6 +52,9 @@ class LibManager():
     self.native_libs = {}
     self.native_addr_map = {}
     self.lib_trap_table = []
+    
+    # use fast call? -> if lib logging level is ERROR or OFF
+    self.fast_call = not log_lib.isEnabledFor(logging.WARN)
   
   def register_int_lib(self, lib_class):
     self.int_lib_classes[lib_class.get_name()] = lib_class
@@ -396,8 +399,11 @@ class LibManager():
     base = entry.lib_base
     offset = base - addr
     num = offset / 6
-    log_lib.debug("Call Lib: %06x lib_id=%d -> offset=%d %s" % (addr, lib_id, offset, entry.name))
-    entry.lib_class.call_vector(num,entry,ctx)
+    if self.fast_call:
+      entry.lib_class.call_vector_fast(num,entry,ctx)
+    else:
+      log_lib.debug("Call Lib: %06x lib_id=%d -> offset=%d %s" % (addr, lib_id, offset, entry.name))
+      entry.lib_class.call_vector(num,entry,ctx)
 
   def trap_all_vectors(self, mem, base_addr, num_vectors, lib_id):
     """prepare the entry points for trapping. place RESET, RTS opcode and lib_id"""

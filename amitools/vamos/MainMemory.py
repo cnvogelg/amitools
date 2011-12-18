@@ -41,6 +41,7 @@ class MainMemory:
         self.raw_mem.set_special_range_write_func(addr, 1, w16)
       if w32 != None:
         self.raw_mem.set_special_range_write_func(addr, 2, w32)
+      addr += 0x10000
 
   def read_mem(self, width, addr):
     return self.raw_mem.read_ram(width, addr)
