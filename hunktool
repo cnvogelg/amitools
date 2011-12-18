@@ -9,6 +9,7 @@
 import sys
 import argparse
 import pprint
+import time
 
 from amitools.FileScanner import FileScanner
 from amitools import Hunk
@@ -30,12 +31,12 @@ class HunkCommand:
     self.args = args
     self.failed_files = []
 
-  def handle_file(self, path, hunk_file, error_code):
+  def handle_file(self, path, hunk_file, error_code, delta):
     if not self.counts.has_key(error_code):
       self.counts[error_code] = 0
     self.counts[error_code] += 1
 
-    print path,
+    print "%s (%.4fs)" % (path, delta),
 
     # abort if hunk parser failed!
     if error_code != Hunk.RESULT_OK:
@@ -88,11 +89,14 @@ class HunkCommand:
       
   def process_file(self, path, fobj, cmd):
     hunk_file = HunkReader.HunkReader()
+    start = time.clock()
     result = hunk_file.read_file_obj(path,fobj,None)
+    end = time.clock()
+    delta = end - start
     # ignore non hunk files
     if result == Hunk.RESULT_NO_HUNK_FILE:
       return True
-    return self.handle_file(path, hunk_file, result)
+    return self.handle_file(path, hunk_file, result, delta)
   
   def run(self):
     scanner = FileScanner(lambda path, fobj: self.process_file(path, fobj, cmd), use_adf=args.adf, use_lha=args.lha, stop_on_error=args.stop)
