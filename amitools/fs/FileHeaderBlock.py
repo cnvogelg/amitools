@@ -1,4 +1,5 @@
 from Block import Block
+from ProtectFlags import ProtectFlags
 
 class FileHeaderBlock(Block):
   def __init__(self, blkdev, blk_num):
@@ -27,6 +28,7 @@ class FileHeaderBlock(Block):
       self.data_blocks.append(self._get_long(-51-i))
     
     self.protect = self._get_long(-48)
+    self.protect_flags = ProtectFlags(self.protect)
     self.byte_size = self._get_long(-47)
     self.comment = self._get_bstr(-46, 79)
     self.mod_ts = self._get_timestamp(-23)

@@ -1,4 +1,5 @@
 from Block import Block
+from ProtectFlags import ProtectFlags
 
 class UserDirBlock(Block):
   def __init__(self, blkdev, blk_num):
@@ -20,6 +21,7 @@ class UserDirBlock(Block):
     # UserDir fields
     self.own_key = self._get_long(1)
     self.protect = self._get_long(-48)
+    self.protect_flags = ProtectFlags(self.protect)
     self.comment = self._get_bstr(-46, 79)
     self.mod_ts = self._get_timestamp(-23)
     self.name = self._get_bstr(-20, 30)

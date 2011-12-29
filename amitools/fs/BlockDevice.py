@@ -22,14 +22,14 @@ class BlockDevice:
   def _blk_to_offset(self, blk_num):
     return self.block_bytes * blk_num
   
+  # ----- API -----
   def open(self):
     pass
-    
   def close(self):
     pass
-  
+  def flush(self):
+    pass
   def read_block(self, blk_num):
     pass
-  
   def write_block(self, blk_num, data):
     pass

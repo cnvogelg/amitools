@@ -3,16 +3,93 @@
 # swiss army knife for adf and hdf amiga disk images
 
 import sys
+import argparse
+
 from amitools.fs.ADFSVolume import ADFSVolume
 from amitools.fs.ADFBlockDevice import ADFBlockDevice
 from amitools.Utils import *
 
-for a in sys.argv[1:]:
-  adf = ADFBlockDevice(a)
-  vol = ADFSVolume(adf)
-  if not vol.open():
-    print "ERROR opening",a,vol.error
-  else:
-    vol.root_dir.list()
-    vol.bitmap.dump()
-  vol.close()
+# ----- commands -----
+class Command:
+  def __init__(self, args):
+    self.args = args
+  def run(self):
+    img = self.args.image_file
+    ext = img.lower()
+    blkdev = None
+    if ext.endswith('.adf'):
+      blkdev = ADFBlockDevice(img)
+    else:
+      print "INVALID image file:",img
+    blkdev.open()
+    self.handle_blkdev(img, blkdev)
+    blkdev.close()
+
+class FSCommand(Command):
+  def handle_blkdev(self, img, blkdev):
+    vol = ADFSVolume(blkdev)
+    ok = vol.open()
+    if ok:
+      self.handle_vol(img,vol)
+    else:
+      print "ERROR opening volume:",img,vol.error
+    vol.close()
+
+# list: list directory tree
+class ListCmd(FSCommand):
+  def handle_vol(self,img,vol):
+    if len(self.args.paths) == 0:
+      vol.root_dir.list()
+    else:
+      for p in self.args.paths:
+        node = vol.get_path_name(p)
+        if node != None:
+          node.list()
+        else:
+          print "ERROR path not found:",node
+
+class TypeCmd(FSCommand):
+  def handle_vol(self,img,vol):
+    p = self.args.paths
+    if len(p) == 0:
+      print "Nothing to type."
+    else:
+      for f in p:
+        node = vol.get_file_path_name(f)
+        if node != None:
+          data = node.get_file_data()
+          if data != None:
+            print data
+          else:
+            print "ERROR getting file data:",f
+        else:
+          print "ERROR file not found:",f
+
+# ----- main -----
+# call scanner and process all files with selected command
+cmd_map = {
+"list" : ListCmd,
+"type" : TypeCmd
+}
+
+parser = argparse.ArgumentParser()
+parser.add_argument('command', help="command: "+",".join(cmd_map.keys()))
+parser.add_argument('image_file')
+parser.add_argument('paths', nargs='*')
+parser.add_argument('-d', '--dump', action='store_true', default=False, help="dump the disk structure")
+parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
+args = parser.parse_args()
+
+cmd = args.command
+if not cmd_map.has_key(cmd):
+  print "INVALID COMMAND:",cmd
+  print "valid commands are:"
+  for a in cmd_map:
+    print "  ",a
+  sys.exit(1)
+cmd_cls = cmd_map[cmd]
+
+# execute command
+cmd = cmd_cls(args)
+res = cmd.run()
+sys.exit(res)
