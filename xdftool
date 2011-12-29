@@ -1,0 +1,18 @@
+#!/usr/bin/env python2.7
+# xdftool
+# swiss army knife for adf and hdf amiga disk images
+
+import sys
+from amitools.fs.ADFSVolume import ADFSVolume
+from amitools.fs.ADFBlockDevice import ADFBlockDevice
+from amitools.Utils import *
+
+for a in sys.argv[1:]:
+  adf = ADFBlockDevice(a)
+  vol = ADFSVolume(adf)
+  if not vol.open():
+    print "ERROR opening",a,vol.error
+  else:
+    vol.root_dir.list()
+    vol.bitmap.dump()
+  vol.close()
