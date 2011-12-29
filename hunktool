@@ -12,11 +12,11 @@ import pprint
 import time
 
 from amitools.FileScanner import FileScanner
-from amitools import Hunk
-from amitools import HunkReader
-from amitools import HunkShow
-from amitools import HunkRelocate
-from amitools import ELFReader
+from amitools.hunk import Hunk
+from amitools.hunk import HunkReader
+from amitools.hunk import HunkShow
+from amitools.hunk import HunkRelocate
+from amitools.elf import ELFReader
 import amitools.Utils
 
 def print_pretty(data):

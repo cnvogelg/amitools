@@ -1,7 +1,7 @@
 import subprocess
 import tempfile
 import os
-from amitools import Hunk
+import Hunk
 
 class HunkDisassembler:
  

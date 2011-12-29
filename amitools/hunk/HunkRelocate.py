@@ -1,7 +1,6 @@
 import ctypes
 import struct
-
-from amitools import Hunk
+import Hunk
 
 class HunkRelocate:
   

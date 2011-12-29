@@ -1,8 +1,8 @@
 import os.path
 
-from amitools import Hunk
-from amitools.HunkReader import HunkReader
-from amitools.HunkRelocate import HunkRelocate
+from amitools.hunk import Hunk
+from amitools.hunk.HunkReader import HunkReader
+from amitools.hunk.HunkRelocate import HunkRelocate
 from AccessMemory import AccessMemory
 from LabelRange import LabelRange
 from Log import *

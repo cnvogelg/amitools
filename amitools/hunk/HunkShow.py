@@ -1,6 +1,6 @@
-from amitools import Hunk
-from amitools import HunkDisassembler
-import Utils
+import Hunk
+import HunkDisassembler
+from ..Utils import *
 
 class HunkShow:
   
