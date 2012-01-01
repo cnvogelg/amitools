@@ -13,7 +13,7 @@ class Block:
   ST_USERDIR = 2
   ST_FILE = -3 & 0xffffffff
   
-  def __init__(self, blkdev, blk_num, is_type=0, is_sub_type=0):
+  def __init__(self, blkdev, blk_num, is_type=0, is_sub_type=0, chk_loc=5):
     self.valid = False
     self.blkdev = blkdev
     self.blk_num = blk_num
@@ -23,14 +23,19 @@ class Block:
     self.data = None
     self.is_type = is_type
     self.is_sub_type = is_sub_type
+    self.chk_loc = chk_loc
   
-  def read(self, chk_loc=5):
+  def read(self):
     self._read_data()
     self._get_types()
-    self._get_chksum(chk_loc)
+    self._get_chksum()
     self.valid = self.valid_types and self.valid_chksum
     
   def write(self):
+    if self.data == None:
+      self._create_data()
+    self._put_types()
+    self._put_chksum()
     self._write_data()
   
   def _set_data(self, data):
@@ -73,16 +78,28 @@ class Block:
     if self.is_sub_type != 0:
       if self.sub_type != self.is_sub_type:
         self.valid_types = False
-    
-  def _get_chksum(self, loc=5):
-    self.got_chksum = self._get_long(loc)
-    self.calc_chksum = self._calc_chksum(loc)
+  
+  def _put_types(self):
+    if self.is_type != 0:
+      self._put_long(0, self.is_type)
+    if self.is_sub_type != 0:
+      self._put_long(-1, self.is_sub_type)
+  
+  def _get_chksum(self):
+    self.got_chksum = self._get_long(self.chk_loc)
+    self.calc_chksum = self._calc_chksum()
     self.valid_chksum = self.got_chksum == self.calc_chksum
   
-  def _calc_chksum(self, loc=5):
+  def _put_chksum(self):
+    self.calc_chksum = self._calc_chksum()
+    self.got_chksum = self.calc_chksum
+    self.valid_chksum = True
+    self._put_long(self.chk_loc, self.calc_chksum)
+  
+  def _calc_chksum(self):
     chksum = 0
     for i in xrange(self.block_longs):
-      if i != loc:
+      if i != self.chk_loc:
         chksum += self._get_long(i)
     return (-chksum) & 0xffffffff
   
@@ -91,6 +108,11 @@ class Block:
     mins = self._get_long(loc+1)
     ticks = self._get_long(loc+2)
     return TimeStamp(days, mins, ticks)
+  
+  def _put_timestamp(self, loc, ts):
+    self._put_long(loc, ts.days)
+    self._put_long(loc+1, ts.mins)
+    self._put_long(loc+2, ts.ticks)
   
   def _get_bstr(self, loc, max_size):
     if loc < 0:
@@ -103,6 +125,16 @@ class Block:
       return ""
     name = self.data[loc+1:loc+1+size]
     return name
+  
+  def _put_bstr(self, loc, max_size, bstr):
+    n = len(bstr)
+    if n > max_size:
+      bstr = bstr[:max_size]
+    if loc < 0:
+      loc = self.block_longs + loc
+    loc = loc * 4
+    self.data[loc] = chr(len(bstr))
+    self.data[loc+1:loc+1+len(bstr)] = bstr
   
   def dump(self, name):
     print "%sBlock(%d):" % (name, self.blk_num)

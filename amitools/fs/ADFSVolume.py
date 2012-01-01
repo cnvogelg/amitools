@@ -42,7 +42,26 @@ class ADFSVolume:
     else:
       self.error = "Invalid BootBlock"
     return self.valid
+  
+  def create(self, name, create_time=None, dos_type=BootBlock.DOS0, boot_code=None):
+    # create a boot block
+    self.boot = BootBlock(self.blkdev)
+    ok = self.boot.create()
+    if not ok:
+      return False
+    self.boot.write()
+    # create a root block
+    self.root = RootBlock(self.blkdev, self.boot.calc_root_blk)
+    self.root.create(name, create_time)
+    # create bitmap
+    self.bitmap = ADFSBitmap(self.root)
+    self.bitmap.create()
+    self.bitmap.write() # write root block, too
     
+    # all ok
+    self.valid = True
+    return True
+  
   def close(self):
     pass
 

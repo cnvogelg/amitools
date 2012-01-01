@@ -23,6 +23,8 @@ class BlockDevice:
     return self.block_bytes * blk_num
   
   # ----- API -----
+  def create(self):
+    pass
   def open(self):
     pass
   def close(self):

@@ -11,8 +11,9 @@ from amitools.Utils import *
 
 # ----- commands -----
 class Command:
-  def __init__(self, args):
+  def __init__(self, args, create=False):
     self.args = args
+    self.create = create
   def run(self):
     img = self.args.image_file
     ext = img.lower()
@@ -21,11 +22,16 @@ class Command:
       blkdev = ADFBlockDevice(img)
     else:
       print "INVALID image file:",img
-    blkdev.open()
+    if self.create:
+      blkdev.create()
+    else:
+      blkdev.open()
     self.handle_blkdev(img, blkdev)
     blkdev.close()
 
 class FSCommand(Command):
+  def __init__(self, args):
+    Command.__init__(self, args)
   def handle_blkdev(self, img, blkdev):
     vol = ADFSVolume(blkdev)
     ok = vol.open()
@@ -65,11 +71,24 @@ class TypeCmd(FSCommand):
         else:
           print "ERROR file not found:",f
 
+class FormatCmd(Command):
+  def __init__(self, args):
+    Command.__init__(self, args, create=True)
+  def handle_blkdev(self, img, blkdev):
+    vol = ADFSVolume(blkdev)
+    ok = vol.create("Test")
+    if ok:
+      print "ok"
+    else:
+      print "ERROR opening volume:",img,vol.error
+    vol.close()
+
 # ----- main -----
 # call scanner and process all files with selected command
 cmd_map = {
 "list" : ListCmd,
-"type" : TypeCmd
+"type" : TypeCmd,
+"format" : FormatCmd
 }
 
 parser = argparse.ArgumentParser()

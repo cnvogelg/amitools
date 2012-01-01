@@ -25,10 +25,21 @@ class BitmapExtBlock(Block):
     
     self.valid = True
     return True
-    
-  def get_bitmap_data(self):
-    return self.data[4:]
   
+  def create(self):
+    self.bitmap_ptrs = []
+    for i in xrange(self.blkdev.block_longs-1):
+      self.bitmap_ptrs.append(0)
+    self.bitmap_ext_blk = 0
+    self.valid = True
+    return True
+    
+  def write(self):
+    for i in xrange(self.blkdev.block_longs-1):
+      self._put_long(i, self.bitmap_ptrs[i])
+    self._put_long(-1, self.bitmap_ext_blk)
+    Block.write(self)
+    
   def dump(self):
     Block.dump(self,"Bitmap")
     print " bmp ptrs:  %s" % self.bitmap_ptrs

@@ -11,12 +11,17 @@ class BootBlock(Block):
     self.got_chksum = None
     self.boot_code = None
   
-  def create(self, dos_type, root_blk, boot_code=None):
+  def create(self, dos_type=DOS0, root_blk=None, boot_code=None):
     self._create_data()
     self.dos_type = dos_type
-    self.got_root_blk = root_blk
     self.calc_root_blk = int(self.blkdev.num_blocks / 2)
+    if root_blk != None:
+      self.got_root_blk = root_blk
+    else:
+      self.got_root_blk = self.calc_root_blk
     self.boot_code = boot_code
+    self.valid = True
+    return True
   
   def _calc_chksum(self):
     n = self.blkdev.block_longs
@@ -45,13 +50,14 @@ class BootBlock(Block):
   
   def write(self):
     self._create_data()
-    self._put_long(0, dos_type)
-    self._put_long(2, root_blk)
-    if boot_code != None:
-      n = len(boot_code)
+    self._put_long(0, self.dos_type)
+    self._put_long(2, self.got_root_blk)
+    if self.boot_code != None:
+      n = len(self.boot_code)
       self.data[12:12+n] = boot_code
-    self.calc_chksum = self._calc_chksum()
-    self._put_long(1, self.calc_chksum)
+      self.calc_chksum = self._calc_chksum()
+      self._put_long(1, self.calc_chksum)
+    self._write_data()
   
   def dump(self):
     print "BootBlock(%d):" % self.blk_num

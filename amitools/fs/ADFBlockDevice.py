@@ -8,6 +8,10 @@ class ADFBlockDevice(BlockDevice):
     self._set_geometry() # set default geometry
     self.dirty = False
 
+  def create(self):
+    self.read_only=False
+    self.data = ctypes.create_string_buffer(self.num_bytes)
+
   def open(self):
     # open adf file 
     fh = file(self.adf_file, "rb")
