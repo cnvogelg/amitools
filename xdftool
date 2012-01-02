@@ -91,6 +91,7 @@ class MakeDirCmd(FSCommand):
       dir_path = self.args.paths[0]
       ok = vol.create_dir(dir_path)
       print "Creating directory '%s': %s" % (dir_path,ok)
+      vol.root_dir.list()
 
 # ----- Bitmap Tools -----
 

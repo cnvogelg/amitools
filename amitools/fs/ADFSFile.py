@@ -26,8 +26,6 @@ class ADFSFile(ADFSNode):
       self.ext_blks.append(ext_blk)
       self.data_blk_nums += ext_blk.data_blocks
     self.valid = True
-    # get public values
-    self.name = self.block.name
     return self.valid
   
   def read(self):

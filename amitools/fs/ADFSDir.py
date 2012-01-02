@@ -12,6 +12,7 @@ class ADFSDir(ADFSNode):
     self.is_vol = is_vol
     self.blkdev = block.blkdev
     self.block_bytes = self.blkdev.block_bytes
+    # state
     self.entries = None
     self.name_hash = None
     self.valid = False
@@ -48,12 +49,17 @@ class ADFSDir(ADFSNode):
           hash_chain = file_hdr_blk.hash_chain
     return ok,hash_chain,node
   
+  def create_empty(self):
+    self.entries = []
+    self.name_hash = []
+    self.valid = True
+    self.invalid_blocks = []
+  
   def read(self, recursive=True):
     self.entries = []
     self.name_hash = []
     self.valid = False
     self.invalid_blocks = []
-    self.name = self.block.name
 
     # create initial list with blk_num/hash_index for dir scan
     blocks = []
@@ -93,15 +99,15 @@ class ADFSDir(ADFSNode):
       if fn.to_upper() == fn_up:
         return True
     return False
-    
-  def create_dir(self, name, protect=0, comment=None, mod_time=None):
+  
+  def _prepare_create(self, name, num_blks):
     # check file name
     fn = FileName(name)
     if not fn.is_valid():
-      return False
+      return None
     # does already exist with this name?
     if self.has_name(fn):
-      return False  
+      return None  
     # hash index
     fn_hash = fn.hash()
     hash_chain = self.name_hash[fn_hash]
@@ -109,31 +115,50 @@ class ADFSDir(ADFSNode):
       hash_chain_blk = 0
     else:
       hash_chain_blk = hash_chain[0].block.blk_num   
-
-    # find a free block for UserDirBlock
-    bitmap = self.volume.bitmap
-    new_blk = bitmap.find_free()
-    if new_blk == None:
+    # try to find free blocks
+    free_blks = self.volume.bitmap.find_n_free(num_blks)
+    if free_blks == None:
+      return None
+      
+    # update bitmap
+    for b in free_blks:
+      self.volume.bitmap.clr_bit(b)
+    self.volume.bitmap.write()
+      
+    # result: (free_blks, hash_chain_blk)
+    return (free_blks, hash_chain_blk, fn_hash)
+    
+  def _finalize_create(self, new_blk, node, fn_hash):
+    # update my dir
+    self.block.hash_table[fn_hash] = new_blk 
+    self.block.write()
+    
+    # add node
+    self.name_hash[fn_hash].insert(0,node)
+    self.entries.append(node)
+        
+  def create_dir(self, name, protect=0, comment=None, mod_time=None):
+    # check name and free blocks
+    pre = self._prepare_create(name, 1)
+    if pre == None:
       return False
+    (free_blks, hash_chain_blk, fn_hash) = pre
+    new_blk = free_blks[0]
+    
     # create a new user dir block
     ud = UserDirBlock(self.blkdev, new_blk)
     ud.create(self.block.blk_num, name, protect, comment, mod_time, hash_chain_blk)
     ud.write()
 
-    # update my dir
-    self.block.hash_table[fn_hash] = new_blk 
-    self.block.write()
-
-    # finally allocate block and update bitmap
-    bitmap.clr_bit(new_blk)
-    bitmap.write()
-    
     # create dir node
     node = ADFSDir(self.volume, ud, fn_hash)
-    node.read()
-    self.name_hash[fn_hash].insert(0,node)
-    self.entries.append(node)
+    node.create_empty()
+
+    self._finalize_create(new_blk, node, fn_hash)
     return True
+  
+  def create_file(self, name, data=None, protect=0, comment=None, mod_time=None):
+    pass
   
   def get_entries_sorted_by_name(self):
     return sorted(self.entries, key=lambda x : x.name)
