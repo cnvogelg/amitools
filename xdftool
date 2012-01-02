@@ -83,12 +83,51 @@ class FormatCmd(Command):
       print "ERROR opening volume:",img,vol.error
     vol.close()
 
+class MakeDirCmd(FSCommand):
+  def handle_vol(self,img,vol):
+    if len(self.args.paths) != 1:
+      print "ERROR: give name of directory"
+    else:
+      dir_path = self.args.paths[0]
+      ok = vol.create_dir(dir_path)
+      print "Creating directory '%s': %s" % (dir_path,ok)
+
+# ----- Bitmap Tools -----
+
+class BitmapCmd(FSCommand):
+  def handle_vol(self,img,vol):
+    vol.bitmap.dump()
+
+class FindFreeCmd(FSCommand):
+  def handle_vol(self,img,vol):
+    blk_num = vol.bitmap.find_free()
+    if blk_num == None:
+      print "No free block found"
+    else:
+      print "Free block:",blk_num
+
+class FindNFreeCmd(FSCommand):
+  def handle_vol(self,img,vol):
+    if len(self.args.paths) != 1:
+      print "ERROR: give number of free entries to find"
+    else:
+      num = int(self.args.paths[0])
+      blk_nums = vol.bitmap.find_n_free(num)
+      if blk_nums == None:
+        print "No %d free blocks found" % num
+      else:
+        print "Free %d blocks:" % num,blk_nums
+
 # ----- main -----
 # call scanner and process all files with selected command
 cmd_map = {
 "list" : ListCmd,
 "type" : TypeCmd,
-"format" : FormatCmd
+"format" : FormatCmd,
+"bitmap" : BitmapCmd,
+"findfree" : FindFreeCmd,
+"findnfree" : FindNFreeCmd,
+"mkdir" : MakeDirCmd
 }
 
 parser = argparse.ArgumentParser()

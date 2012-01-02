@@ -28,6 +28,8 @@ class ADFSBitmap:
     self.num_blks_in_ext = self.blkdev.block_longs - 1
     # number of ext blocks required
     self.num_ext = (self.bitmap_num_blks - self.num_blks_in_root + self.num_blks_in_ext - 1) / (self.num_blks_in_ext) 
+    # start a root block
+    self.find_start = root_blk.blk_num
   
   def create(self):
     # create data and preset with 0xff
@@ -103,6 +105,8 @@ class ADFSBitmap:
     # get bitmap blocks from root block
     blocks = self.root_blk.bitmap_ptrs
     for blk in blocks:
+      if blk == 0:
+        break
       bm = BitmapBlock(self.blkdev, blk)
       bm.read()
       if not bm.valid:
@@ -134,11 +138,49 @@ class ADFSBitmap:
       return False
     if num_bm_blks != self.bitmap_num_blks:
       return False
-  
+
     # create a modyfiable bitmap
     self.bitmap_data = ctypes.create_string_buffer(bitmap_data)
     self.valid = True
     return self.valid
+
+  def find_free(self, start=None):
+    # give start of search
+    if start == None:
+      pos = self.find_start
+    else:
+      pos = start
+    # at most scan all bits
+    num = self.bitmap_bits
+    while num > 0:
+      # a free bit?
+      found = self.get_bit(pos)
+      old_pos = pos
+      pos += 1
+      if pos == self.bitmap_bits:
+        pos = self.blkdev.reserved
+      if found:
+        # start a next position
+        self.find_start = pos
+        return old_pos
+      num -= 1
+    return None
+
+  def find_n_free(self, num, start=None):
+    first_blk = self.find_free(start)
+    if first_blk == None:
+      return None
+    if num == 1:
+      return [first_blk]
+    result = [first_blk]
+    for i in xrange(num-1):
+      blk_num = self.find_free()
+      if blk_num == None:
+        return None
+      if blk_num in result:
+        return None
+      result.append(blk_num)
+    return result
 
   def get_bit(self, off):
     if off < self.blkdev.reserved or off >= self.blkdev.num_blocks:
@@ -150,6 +192,7 @@ class ADFSBitmap:
     mask = 1 << bit_off
     return (val & mask) == mask
 
+  # mark as free
   def set_bit(self, off):
     if off < self.blkdev.reserved or off >= self.blkdev.num_blocks:
       return False
@@ -161,7 +204,8 @@ class ADFSBitmap:
     val = val | mask
     struct.pack_into(">I", self.bitmap_data, long_off * 4, val)
     return True
-    
+  
+  # mark as used
   def clr_bit(self, off):
     if off < self.blkdev.reserved or off >= self.blkdev.num_blocks:
       return False

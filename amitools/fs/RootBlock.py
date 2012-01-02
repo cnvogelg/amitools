@@ -76,8 +76,6 @@ class RootBlock(Block):
     self.bitmap_ptrs = []
     for i in xrange(25):
       bm_blk = self._get_long(-49+i)
-      if bm_blk == 0:
-        break
       self.bitmap_ptrs.append(bm_blk)
     self.bitmap_ext_blk = self._get_long(-24)
     

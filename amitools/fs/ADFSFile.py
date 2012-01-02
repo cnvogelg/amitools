@@ -1,24 +1,24 @@
 from FileListBlock import FileListBlock
 from FileDataBlock import FileDataBlock
+from ADFSNode import ADFSNode
 
-class ADFSFile:
-  def __init__(self, volume, hdr_blk):
-    self.volume = volume
-    self.hdr_blk = hdr_blk
+class ADFSFile(ADFSNode):
+  def __init__(self, volume, hdr_blk, hash_idx):
+    ADFSNode.__init__(self, volume, hdr_blk, hash_idx)
     self.ext_blks = []
     self.data_blk_nums = []
     self.data_blks = None
     self.valid = False
   
   def __repr__(self):
-    return "[File(%d)'%s':%d]" % (self.hdr_blk.blk_num, self.hdr_blk.name, self.hdr_blk.byte_size)
+    return "[File(%d)'%s':%d]" % (self.block.blk_num, self.block.name, self.block.byte_size)
   
   def scan(self):
     """scan for the data block numbers and look up list blocks"""
-    self.data_blk_nums = self.hdr_blk.data_blocks[:]
-    next_ext = self.hdr_blk.extension
+    self.data_blk_nums = self.block.data_blocks[:]
+    next_ext = self.block.extension
     while next_ext != 0:
-      ext_blk = FileListBlock(self.hdr_blk.blkdev, next_ext)
+      ext_blk = FileListBlock(self.block.blkdev, next_ext)
       ext_blk.read()
       if not ext_blk.valid:
         return False
@@ -27,7 +27,7 @@ class ADFSFile:
       self.data_blk_nums += ext_blk.data_blocks
     self.valid = True
     # get public values
-    self.name = self.hdr_blk.name
+    self.name = self.block.name
     return self.valid
   
   def read(self):
@@ -36,7 +36,7 @@ class ADFSFile:
     want_seq_num = 1
     total_size = 0
     is_ffs = self.volume.is_ffs
-    byte_size = self.hdr_blk.byte_size
+    byte_size = self.block.byte_size
     for blk in self.data_blk_nums:
       if is_ffs:
         # ffs has raw data blocks
@@ -51,7 +51,7 @@ class ADFSFile:
         self.data_blks.append(dat_blk)
       else:
         # ofs
-        dat_blk = FileDataBlock(self.hdr_blk.blkdev, blk)
+        dat_blk = FileDataBlock(self.block.blkdev, blk)
         dat_blk.read()
         if not dat_blk.valid:
           return False
@@ -80,5 +80,5 @@ class ADFSFile:
   
   def list(self, indent=0):
     istr = "  " * indent
-    print "%-40s  %8d  %s  %s" % (istr + self.hdr_blk.name, self.hdr_blk.byte_size, self.hdr_blk.protect_flags, self.hdr_blk.mod_ts)
+    print "%-40s  %8d  %s  %s" % (istr + self.block.name, self.block.byte_size, self.block.protect_flags, self.block.mod_ts)
     

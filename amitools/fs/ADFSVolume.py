@@ -2,14 +2,17 @@ from BootBlock import BootBlock
 from RootBlock import RootBlock
 from ADFSDir import ADFSDir
 from ADFSBitmap import ADFSBitmap
+from FileName import FileName
 
 class ADFSVolume:
   def __init__(self, blkdev):
     self.blkdev = blkdev
+    
     self.boot = None
     self.root = None
     self.root_dir = None
     self.bitmap = None
+    
     self.valid = False
     self.error = None
     self.is_ffs = None
@@ -57,7 +60,9 @@ class ADFSVolume:
     self.bitmap = ADFSBitmap(self.root)
     self.bitmap.create()
     self.bitmap.write() # write root block, too
-    
+    # create empty root dir
+    self.root_dir = ADFSDir(self, self.root, is_vol=True)
+    self.root_dir.read()
     # all ok
     self.valid = True
     return True
@@ -68,8 +73,11 @@ class ADFSVolume:
   def get_path_name(self, path_name, allow_file=True, allow_dir=True):
     if path_name == "" or path_name == "/":
       return self.root_dir
-    pc = path_name.lower().split("/")
-    return self.root_dir.get_path(pc, allow_file, allow_dir)
+    pc = path_name.split("/")
+    fn = []
+    for path in pc:
+      fn.append(FileName(path))
+    return self.root_dir.get_path(fn, allow_file, allow_dir)
 
   def get_dir_path_name(self, path_name):
     return self.get_path_name(path_name, allow_file=False)
@@ -77,4 +85,13 @@ class ADFSVolume:
   def get_file_path_name(self, path_name):
     return self.get_path_name(path_name, allow_dir=False)
   
-    
+  def create_dir(self, path_name):
+    pc = path_name.split("/")
+    # no directory given
+    if len(pc) == 0:
+      return False
+    # no parent dir found
+    node = self.get_dir_path_name("/".join(pc[:-2]))
+    if node == None:
+      return False
+    return node.create_dir(path_name)

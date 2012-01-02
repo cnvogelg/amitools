@@ -45,7 +45,8 @@ class Block:
     data = self.blkdev.read_block(self.blk_num)
     if len(data) != self.blkdev.block_bytes:
       raise ValueError("Invalid Block Data: size=%d but expected %d" % (len(data), self.blkdev.block_bytes))
-    self.data = data
+    self._create_data()
+    self.data[:] = data
   
   def _write_data(self):
     if self.data != None:
@@ -127,6 +128,8 @@ class Block:
     return name
   
   def _put_bstr(self, loc, max_size, bstr):
+    if bstr == None:
+      bstr = ""
     n = len(bstr)
     if n > max_size:
       bstr = bstr[:max_size]
@@ -134,7 +137,8 @@ class Block:
       loc = self.block_longs + loc
     loc = loc * 4
     self.data[loc] = chr(len(bstr))
-    self.data[loc+1:loc+1+len(bstr)] = bstr
+    if len(bstr) > 0:
+      self.data[loc+1:loc+1+len(bstr)] = bstr
   
   def dump(self, name):
     print "%sBlock(%d):" % (name, self.blk_num)

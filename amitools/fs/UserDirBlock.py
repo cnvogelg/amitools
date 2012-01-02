@@ -1,5 +1,7 @@
+import time
 from Block import Block
 from ProtectFlags import ProtectFlags
+from TimeStamp import *
 
 class UserDirBlock(Block):
   def __init__(self, blkdev, blk_num):
@@ -36,6 +38,40 @@ class UserDirBlock(Block):
     
     self.valid = (self.own_key == self.blk_num)
     return self.valid
+
+  def create(self, parent, name, protect=0, comment=None, mod_time=None, hash_chain=0):
+    self.own_key = self.blk_num
+    self.protect = protect
+    self.protect_flags = ProtectFlags(self.protect)
+    self.comment = comment
+    # timestamps
+    if mod_time == None:
+      mod_time = time.mktime(time.localtime())
+    self.mod_ts = ts_create_from_secs(mod_time)
+    self.name = name
+    self.hash_chain = hash_chain
+    self.parent = parent
+    # empty hash table
+    self.hash_table = []
+    self.hash_size = self.blkdev.block_longs - 56
+    for i in xrange(self.hash_size):
+      self.hash_table.append(0)
+    self.valid = True
+    return True
+    
+  def write(self):
+    Block._create_data(self)
+    self._put_long(1, self.own_key)
+    self._put_long(-48, self.protect)
+    self._put_bstr(-46, 79, self.comment)
+    self._put_timestamp(-23, self.mod_ts)
+    self._put_bstr(-20, 30, self.name)
+    self._put_long(-4, self.hash_chain)
+    self._put_long(-3, self.parent)
+    # hash table
+    for i in xrange(self.hash_size):
+      self._put_long(6+i, self.hash_table[i])
+    Block.write(self)
   
   def dump(self):
     Block.dump(self,"UserDir")
