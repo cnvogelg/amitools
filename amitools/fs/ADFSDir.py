@@ -197,16 +197,12 @@ class ADFSDir(ADFSNode):
             return None
     return None
     
-  def draw_bitmap(self, blk_num, recursive=False):
-    if blk_num == self.block.blk_num:
-      if self.is_vol:
-        return 'V'
-      else:
-        return 'D'
+  def draw_on_bitmap(self, bm, show_all=False):
+    blk_num = self.block.blk_num
+    if self.is_vol:
+      bm[blk_num] = 'V'
     else:
-      if recursive:
-        for e in self.entries:
-          c = e.draw_bitmap(blk_num, True)
-          if c != None:
-            return c
-      return None
+      bm[blk_num] = 'D'
+    if show_all:
+      for e in self.entries:
+        e.draw_on_bitmap(bm, True)

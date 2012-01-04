@@ -7,8 +7,8 @@ import argparse
 import os.path
 
 from amitools.fs.ADFSVolume import ADFSVolume
-from amitools.fs.ADFBlockDevice import ADFBlockDevice
-from amitools.fs.HDFBlockDevice import HDFBlockDevice
+from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
+from amitools.fs.blkdev.HDFBlockDevice import HDFBlockDevice
 from amitools.fs.FSError import *
 from amitools.Utils import *
 
@@ -182,18 +182,27 @@ class BitmapCmd(FSCommand):
         else:
           print "Free block:",blk_num
     elif cmd == 'all':
-      vol.bitmap.print_bitmap(lambda x : vol.root_dir.draw_bitmap(x,True) or vol.bitmap.draw_bitmap(x),brief)      
+      bm = vol.bitmap.create_draw_bitmap()
+      vol.bitmap.draw_on_bitmap(bm)
+      vol.root_dir.draw_on_bitmap(bm, True)
+      vol.bitmap.print_draw_bitmap(bm, brief)
     elif cmd == 'data':
-      vol.bitmap.print_bitmap(vol.bitmap.draw_bitmap,brief)
+      bm = vol.bitmap.create_draw_bitmap()
+      vol.bitmap.draw_on_bitmap(bm)
+      vol.bitmap.print_draw_bitmap(bm, brief)
     elif cmd == 'root':
       show_all = 'all' in self.opts
-      vol.bitmap.print_bitmap(lambda x : vol.root_dir.draw_bitmap(x,show_all),brief)
+      bm = vol.bitmap.create_draw_bitmap()
+      vol.root_dir.draw_on_bitmap(bm, show_all)
+      vol.bitmap.print_draw_bitmap(bm, brief)
     elif cmd == 'node':
       if n > 1:
         node = vol.get_path_name(self.opts[1])
         if node != None:
-          recursive = (n > 2)
-          vol.bitmap.print_bitmap(lambda x : node.draw_bitmap(x,recursive),brief)
+          show_all = 'all' in self.opts
+          bm = vol.bitmap.create_draw_bitmap()
+          node.draw_on_bitmap(bm, show_all)
+          vol.bitmap.print_draw_bitmap(bm, brief)
         else:
           print "Node '%s' not found!" % self.opts[1]
       else:

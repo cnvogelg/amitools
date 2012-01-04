@@ -225,12 +225,9 @@ class ADFSFile(ADFSNode):
     istr = "  " * indent
     print "%-40s  %8d  %s  %s" % (istr + self.block.name, self.block.byte_size, self.block.protect_flags, self.block.mod_ts)
 
-  def draw_bitmap(self, blk_num, recursive=False):
-    if blk_num == self.block.blk_num:
-      return 'H'
-    elif blk_num in self.ext_blk_nums:
-      return 'E'
-    elif blk_num in self.data_blk_nums:
-      return 'd'
-    else:
-      return None
+  def draw_on_bitmap(self, bm, show_all=False):
+    bm[self.block.blk_num] = 'H'
+    for b in self.ext_blk_nums:
+      bm[b] = 'E'
+    for b in self.data_blk_nums:
+      bm[b] = 'd'

@@ -221,51 +221,53 @@ class ADFSBitmap:
     print "  blks:",len(self.bitmap_blks)
     print "  bits:",len(self.bitmap_data) * 8,self.blkdev.num_blocks
     
-  def print_free(self, brief=False):  
-    self.print_bitmap(self._draw_free, brief)
+  def create_draw_bitmap(self):
+    bm = ctypes.create_string_buffer(self.blkdev.num_blocks)
+    for i in xrange(self.blkdev.num_blocks):
+      bm[i] = chr(0)
+    return bm
   
-  def print_used(self, brief=False):
-    self.print_bitmap(self._draw_used, brief)
-  
-  def _draw_free(self, blk_num):
-    if self.get_bit(blk_num):
-      return 'F'
-    else:
-      return None
+  def print_free(self, brief=False):
+    bm = self.create_draw_bitmap()
+    res = self.blkdev.reserved
+    for i in xrange(self.blkdev.num_blocks):
+      if i > res and self.get_bit(i):
+        bm[i] = 'F'
+    self.print_draw_bitmap(bm, brief)
       
-  def _draw_used(self, blk_num):
-    if not self.get_bit(blk_num):
-      return '#'
-    else:
-      return None
+  def print_used(self, brief=False):
+    bm = self.create_draw_bitmap()
+    res = self.blkdev.reserved
+    for i in xrange(self.blkdev.num_blocks):
+      if i > res and not self.get_bit(i):
+        bm[i] = '#'
+    self.print_draw_bitmap(bm, brief)
   
-  def draw_bitmap(self, blk_num):
-    if blk_num == self.root_blk.blk_num:
-      return 'R'
-    else:
-      for bm_blk in self.bitmap_blks:
-        if bm_blk.blk_num == blk_num:
-          return 'b'
-      for ext_blk in self.ext_blks:
-        if ext_blk.blk_num == blk_num:
-          return 'B'
-      return None
+  def draw_on_bitmap(self, bm):
+    # show reserved blocks
+    res = self.blkdev.reserved
+    bm[0:res] = "x" * res
+    # root block
+    bm[self.root_blk.blk_num] = 'R'
+    # bitmap blocks
+    for bm_blk in self.bitmap_blks:
+      bm[bm_blk.blk_num] = 'b'
+    # bitmap ext blocks
+    for ext_blk in self.ext_blks:
+      bm[ext_blk.blk_num] = 'B'
 
-  def print_bitmap(self, draw_func, brief=False):
+  def print_draw_bitmap(self, bm, brief=False):
     line = ""
     blk = 0
     blk_cyl = self.blkdev.sectors * self.blkdev.heads
     found = False
     for i in xrange(self.blkdev.num_blocks):
-      if i < self.blkdev.reserved:
-        line += "x"
+      c = bm[i]
+      if ord(c) == 0:
+        c = '.'
       else:
-        c = draw_func(i)
-        if c == None:
-          c = '.'
-        else:
-          found = True
-        line += c
+        found = True
+      line += c
       if i % self.blkdev.sectors == self.blkdev.sectors - 1:
         line += " "
       if i % blk_cyl == blk_cyl - 1:
