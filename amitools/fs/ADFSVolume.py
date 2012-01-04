@@ -3,6 +3,7 @@ from RootBlock import RootBlock
 from ADFSDir import ADFSDir
 from ADFSBitmap import ADFSBitmap
 from FileName import FileName
+from FSError import *
 
 class ADFSVolume:
   def __init__(self, blkdev):
@@ -14,7 +15,6 @@ class ADFSVolume:
     self.bitmap = None
     
     self.valid = False
-    self.error = None
     self.is_ffs = None
     
   def open(self):
@@ -29,29 +29,22 @@ class ADFSVolume:
       self.root.read()
       if self.root.valid:
         # create root dir
-        self.root_dir = ADFSDir(self, self.root, is_vol=True)
-        dir_ok = self.root_dir.read()
-        if not dir_ok:
-          self.error = "Invalid RootDir"
+        self.root_dir = ADFSDir(self)
+        self.root_dir.set_root(self.root)
+        self.root_dir.read()
         # create bitmap
         self.bitmap = ADFSBitmap(self.root)
-        bm_ok = self.bitmap.read()
-        if not bm_ok:
-          self.error = "Invalid Bitmap"
-
-        self.valid = dir_ok and bm_ok
+        self.bitmap.read()
+        self.valid = True
       else:
-        self.error = "Invalid RootBlock"
+        raise FSError(INVALID_ROOT_BLOCK, block=self.root)
     else:
-      self.error = "Invalid BootBlock"
-    return self.valid
+      raise FSError(INVALID_BOOT_BLOCK, block=self.boot)
   
   def create(self, name, create_time=None, dos_type=BootBlock.DOS0, boot_code=None):
     # create a boot block
     self.boot = BootBlock(self.blkdev)
-    ok = self.boot.create()
-    if not ok:
-      return False
+    self.boot.create()
     self.boot.write()
     # create a root block
     self.root = RootBlock(self.blkdev, self.boot.calc_root_blk)
@@ -59,13 +52,13 @@ class ADFSVolume:
     # create bitmap
     self.bitmap = ADFSBitmap(self.root)
     self.bitmap.create()
-    self.bitmap.write() # write root block, too
+    self.bitmap.write() # writes root block, too
     # create empty root dir
-    self.root_dir = ADFSDir(self, self.root, is_vol=True)
+    self.root_dir = ADFSDir(self)
+    self.root_dir.set_root(self.root)
     self.root_dir.read()
     # all ok
     self.valid = True
-    return True
   
   def close(self):
     pass

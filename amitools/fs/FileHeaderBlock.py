@@ -1,5 +1,7 @@
+import time
 from Block import Block
 from ProtectFlags import ProtectFlags
+from TimeStamp import *
 
 class FileHeaderBlock(Block):
   def __init__(self, blkdev, blk_num):
@@ -40,6 +42,48 @@ class FileHeaderBlock(Block):
     self.valid = (self.own_key == self.blk_num)
     return self.valid
   
+  def write(self):
+    Block._create_data(self)
+    self._put_long(1, self.own_key)
+    
+    # data blocks
+    for i in xrange(len(self.data_blocks)):
+      self._put_long(-51-i, self.data_blocks[i])
+    
+    self._put_long(-48, self.protect)
+    self._put_long(-47, self.byte_size)
+    self._put_bstr(-46, 79, self.comment)
+    self._put_timestamp(-23, self.mod_ts)
+    self._put_bstr(-20, 30, self.name)
+    self._put_long(-4, self.hash_chain)
+    self._put_long(-3, self.parent)
+    self._put_long(-2, self.extension)
+    Block.write(self)
+  
+  def create(self, parent, name, byte_size=0, data_blocks=[], protect=0, comment=None, mod_time=None, hash_chain=0, extension=0):
+    self.own_key = self.blk_num
+    n = len(data_blocks)
+    self.block_count = n
+    if n == 0:
+      self.first_data = 0
+    else:
+      self.first_data = data_blocks[0]
+    
+    self.data_blocks = data_blocks
+    self.protect = protect
+    self.protect_flags = ProtectFlags(self.protect)
+    self.byte_size = byte_size
+    self.comment = comment
+    if mod_time == None:
+      mod_time = time.mktime(time.localtime())
+    self.mod_ts = ts_create_from_secs(mod_time)
+    self.name = name
+    self.hash_chain = hash_chain
+    self.parent = parent
+    self.extension = extension
+    self.valid = True
+    return True
+    
   def dump(self):
     Block.dump(self,"FileHeader")
     print " own_key:    %d" % self.own_key

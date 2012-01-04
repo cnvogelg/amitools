@@ -33,8 +33,6 @@ class RootBlock(Block):
     for i in xrange(25):
       self.bitmap_ptrs.append(0)
     self.bitmap_ext_blk = 0
-    
-    return True
   
   def write(self):
     self._create_data()

@@ -1,66 +1,59 @@
 import struct
 from Block import Block
 from UserDirBlock import UserDirBlock
-from FileHeaderBlock import FileHeaderBlock
 from ADFSFile import ADFSFile
 from ADFSNode import ADFSNode
 from FileName import FileName
+from FSError import *
 
 class ADFSDir(ADFSNode):
-  def __init__(self, volume, block, hash_idx=0, is_vol=False):
-    ADFSNode.__init__(self, volume, block, hash_idx)
-    self.is_vol = is_vol
-    self.blkdev = block.blkdev
-    self.block_bytes = self.blkdev.block_bytes
+  def __init__(self, volume, is_vol=False):
+    ADFSNode.__init__(self, volume)
+    self.is_vol = False
     # state
-    self.entries = None
-    self.name_hash = None
+    self.entries = []
+    self.name_hash = []
     self.valid = False
-    self.invalid_blocks = []
     
   def __repr__(self):
-    return "[Dir(%d)'%s':%s,errs=%s]" % (self.block.blk_num, self.block.name, self.entries, self.invalid_blocks)
+    if self.block != None:
+      return "[Dir(%d)'%s':%s]" % (self.block.blk_num, self.block.name, self.entries)
+    else:
+      return "[Dir]"
   
-  def _create_node(self, blk, hash_idx, recursive):
-    ok = False
+  def set_root(self, root_blk):
+    self.is_vol = True
+    self.set_block(root_blk)
+    
+  def blocks_create_old(self, anon_blk):
+    ud = UserDirBlock(self.blkdev, anon_blk.blk_num)
+    ud.set(anon_blk.data)
+    if not ud.valid:
+      raise FSError(INVALID_USER_DIR_BLOCK, block=anon_blk)
+    self.set_block(ud)
+    return ud
+  
+  def _read_add_node(self, blk, recursive):
     hash_chain = None
     node = None
     if blk.valid_chksum and blk.type == Block.T_SHORT:
       # its a userdir
       if blk.sub_type == Block.ST_USERDIR:
-        user_dir_blk = UserDirBlock(self.blkdev, blk.blk_num)
-        user_dir_blk.set(blk.data)
-        if user_dir_blk.valid:
-          user_dir = ADFSDir(self.volume, user_dir_blk, hash_idx)
-          if recursive:
-            ok = user_dir.read()
-          else:
-            ok = True
-          node = user_dir
-          hash_chain = user_dir_blk.hash_chain
+        node = ADFSDir(self.volume)
+        blk = node.blocks_create_old(blk)
+        if recursive:
+          node.read()
       # its a file
       elif blk.sub_type == Block.ST_FILE:
-        file_hdr_blk = FileHeaderBlock(self.blkdev, blk.blk_num)
-        file_hdr_blk.set(blk.data)
-        if file_hdr_blk.valid:
-          afile = ADFSFile(self.volume, file_hdr_blk, hash_idx)
-          ok = afile.scan()
-          node = afile
-          hash_chain = file_hdr_blk.hash_chain
-    return ok,hash_chain,node
-  
-  def create_empty(self):
-    self.entries = []
-    self.name_hash = []
-    self.valid = True
-    self.invalid_blocks = []
+        node = ADFSFile(self.volume)
+        blk = node.blocks_create_old(blk)
+      # unsupported
+      else:
+        raise FSError(UNSUPPORTED_DIR_BLOCK, block=blk)
+    hash_chain = blk.hash_chain
+    return hash_chain,node
   
   def read(self, recursive=True):
-    self.entries = []
-    self.name_hash = []
-    self.valid = False
-    self.invalid_blocks = []
-
     # create initial list with blk_num/hash_index for dir scan
     blocks = []
     for i in xrange(self.block.hash_size):
@@ -74,61 +67,71 @@ class ADFSDir(ADFSNode):
       blk = Block(self.blkdev, blk_num)
       blk.read()
       # create file/dir node
-      ok,hash_chain,node = self._create_node(blk, hash_idx, recursive)
-      if ok:
-        # store node in entries
-        self.entries.append(node)
-        # store node in name_hash
-        self.name_hash[hash_idx].append(node)
-        # follow hash chain
-        if hash_chain != 0:
-          blocks.append((hash_chain,hash_idx))
-      else:
-        # can't parse node
-        self.invalid_blocks.append(blk_num)
-        
-    self.valid = len(self.invalid_blocks) == 0
-    return self.valid
+      hash_chain,node = self._read_add_node(blk, recursive)
+      # store node in entries
+      self.entries.append(node)
+      # store node in name_hash
+      self.name_hash[hash_idx].append(node)
+      # follow hash chain
+      if hash_chain != 0:
+        blocks.append((hash_chain,hash_idx))
   
   def has_name(self, fn):
     fn_hash = fn.hash()
     fn_up = fn.to_upper()
     node_list = self.name_hash[fn_hash]
     for node in node_list:
-      fn = FileName(node.name)
-      if fn.to_upper() == fn_up:
+      if node.name.to_upper() == fn_up:
         return True
     return False
   
-  def _prepare_create(self, name, num_blks):
+  def blocks_create_new(self, free_blks, name, protect, comment, mod_time, hash_chain_blk, parent_blk):
+    blk_num = free_blks[0]
+    blkdev = self.blkdev
+    # create a UserDirBlock
+    ud = UserDirBlock(blkdev, blk_num)
+    ud.create(parent_blk, name, protect, comment, mod_time, hash_chain_blk)
+    ud.write()    
+    self.set_block(ud)
+    return blk_num
+  
+  def blocks_get_create_num(self):
+    # the number of blocks needed for a new (empty) directory
+    # -> only one UserDirBlock
+    return 1
+    
+  def _create_node(self, node, name, protect, comment, mod_time):
     # check file name
     fn = FileName(name)
     if not fn.is_valid():
-      return None
-    # does already exist with this name?
+      raise FSError(INVALID_FILE_NAME, file_name=name, node=self)
+    # does already exist an entry in this dir with this name?
     if self.has_name(fn):
-      return None  
-    # hash index
+      raise FSError(NAME_ALREADY_EXISTS, file_name=name, node=self)
+    # calc hash index of name
     fn_hash = fn.hash()
     hash_chain = self.name_hash[fn_hash]
     if len(hash_chain) == 0:
       hash_chain_blk = 0
     else:
-      hash_chain_blk = hash_chain[0].block.blk_num   
+      hash_chain_blk = hash_chain[0].block.blk_num
+      
+    # return the number of blocks required to create this node
+    num_blks = node.blocks_get_create_num()
+    
     # try to find free blocks
     free_blks = self.volume.bitmap.find_n_free(num_blks)
     if free_blks == None:
-      return None
+      return False
       
     # update bitmap
     for b in free_blks:
       self.volume.bitmap.clr_bit(b)
     self.volume.bitmap.write()
       
-    # result: (free_blks, hash_chain_blk)
-    return (free_blks, hash_chain_blk, fn_hash)
-    
-  def _finalize_create(self, new_blk, node, fn_hash):
+    # now create the blocks for this node
+    new_blk = node.blocks_create_new(free_blks, name, protect, comment, mod_time, hash_chain_blk, self.block.blk_num)
+
     # update my dir
     self.block.hash_table[fn_hash] = new_blk 
     self.block.write()
@@ -138,35 +141,20 @@ class ADFSDir(ADFSNode):
     self.entries.append(node)
         
   def create_dir(self, name, protect=0, comment=None, mod_time=None):
-    # check name and free blocks
-    pre = self._prepare_create(name, 1)
-    if pre == None:
-      return False
-    (free_blks, hash_chain_blk, fn_hash) = pre
-    new_blk = free_blks[0]
-    
-    # create a new user dir block
-    ud = UserDirBlock(self.blkdev, new_blk)
-    ud.create(self.block.blk_num, name, protect, comment, mod_time, hash_chain_blk)
-    ud.write()
-
-    # create dir node
-    node = ADFSDir(self.volume, ud, fn_hash)
-    node.create_empty()
-
-    self._finalize_create(new_blk, node, fn_hash)
-    return True
+    node = ADFSDir(self.volume)
+    self._create_node(node, name, protect, comment, mod_time)
   
-  def create_file(self, name, data=None, protect=0, comment=None, mod_time=None):
-    pass
+  def create_file(self, name, data, protect=0, comment=None, mod_time=None):
+    node = ADFSFile(self.volume) 
+    node.set_file_data(data)
+    self._create_node(node, name, protect, comment, mod_time) 
   
   def get_entries_sorted_by_name(self):
-    return sorted(self.entries, key=lambda x : x.name)
+    return sorted(self.entries, key=lambda x : x.name.to_upper())
   
   def dump(self):
     print "Dir(%d)" % self.block.blk_num
     print " entries: %s" % self.entries
-    print " invalid blocks: %s" % self.invalid_blocks
   
   def list(self, indent=0):
     istr = "  " * indent
@@ -186,8 +174,7 @@ class ADFSDir(ADFSNode):
     if len(pc) == 0:
       return self
     for e in self.entries:
-      fn = FileName(e.name)
-      if fn.to_upper() == pc[0].to_upper():
+      if e.name.to_upper() == pc[0].to_upper():
         if len(pc) > 1:
           if isinstance(e, ADFSDir):
             return e.get_path(pc[1:], allow_file, allow_dir)

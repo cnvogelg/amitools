@@ -4,16 +4,19 @@
 
 import sys
 import argparse
+import os.path
 
 from amitools.fs.ADFSVolume import ADFSVolume
 from amitools.fs.ADFBlockDevice import ADFBlockDevice
+from amitools.fs.FSError import *
 from amitools.Utils import *
 
 # ----- commands -----
 class Command:
-  def __init__(self, args, create=False):
+  def __init__(self, args, opts, create=False):
     self.args = args
     self.create = create
+    self.opts = opts
   def run(self):
     img = self.args.image_file
     ext = img.lower()
@@ -22,32 +25,34 @@ class Command:
       blkdev = ADFBlockDevice(img)
     else:
       print "INVALID image file:",img
-    if self.create:
-      blkdev.create()
-    else:
-      blkdev.open()
-    self.handle_blkdev(img, blkdev)
-    blkdev.close()
+    try:
+      if self.create:
+        blkdev.create()
+      else:
+        blkdev.open()
+      self.handle_blkdev(img, blkdev)
+      blkdev.close()
+    except FSError as e:
+      print "FSError:",str(e)
 
 class FSCommand(Command):
-  def __init__(self, args):
-    Command.__init__(self, args)
+  def __init__(self, args, opts):
+    Command.__init__(self, args, opts)
   def handle_blkdev(self, img, blkdev):
     vol = ADFSVolume(blkdev)
-    ok = vol.open()
-    if ok:
-      self.handle_vol(img,vol)
-    else:
-      print "ERROR opening volume:",img,vol.error
+    vol.open()
+    self.handle_vol(img,vol)
     vol.close()
+
+# ----- Query Image -----
 
 # list: list directory tree
 class ListCmd(FSCommand):
   def handle_vol(self,img,vol):
-    if len(self.args.paths) == 0:
+    if len(self.opts) == 0:
       vol.root_dir.list()
     else:
-      for p in self.args.paths:
+      for p in self.opts:
         node = vol.get_path_name(p)
         if node != None:
           node.list()
@@ -56,7 +61,7 @@ class ListCmd(FSCommand):
 
 class TypeCmd(FSCommand):
   def handle_vol(self,img,vol):
-    p = self.args.paths
+    p = self.opts
     if len(p) == 0:
       print "Nothing to type."
     else:
@@ -64,34 +69,94 @@ class TypeCmd(FSCommand):
         node = vol.get_file_path_name(f)
         if node != None:
           data = node.get_file_data()
-          if data != None:
-            print data
-          else:
-            print "ERROR getting file data:",f
+          print data
         else:
           print "ERROR file not found:",f
 
+class ReadCmd(FSCommand):
+  def handle_vol(self,img,vol):
+    p = self.opts
+    n = len(p)
+    if n == 0 or n > 2:
+      print "Usage: read <ami_file> [sys_file]"
+      return
+    # try to get ami file  
+    node = vol.get_file_path_name(p[0])
+    if node == None:
+      print "ERROR: file not found:",p[0]
+      return
+    # get data of file
+    data = node.get_file_data()
+    # determine output name
+    if n == 1:
+      out_name = node.get_file_name_str()
+    else:
+      out_name = p[1]
+    # write data to file
+    fh = open(out_name,"wb")
+    fh.write(data)
+    fh.close()
+
+# ----- Edit Image -----
+
 class FormatCmd(Command):
-  def __init__(self, args):
-    Command.__init__(self, args, create=True)
+  def __init__(self, args, opts):
+    Command.__init__(self, args, opts, create=True)
   def handle_blkdev(self, img, blkdev):
     vol = ADFSVolume(blkdev)
-    ok = vol.create("Test")
-    if ok:
-      print "ok"
-    else:
-      print "ERROR opening volume:",img,vol.error
+    vol.create("Test")
     vol.close()
 
 class MakeDirCmd(FSCommand):
   def handle_vol(self,img,vol):
-    if len(self.args.paths) != 1:
-      print "ERROR: give name of directory"
+    if len(self.opts) != 1:
+      print "Usage: mkdir <dir_path>"
     else:
-      dir_path = self.args.paths[0]
-      ok = vol.create_dir(dir_path)
-      print "Creating directory '%s': %s" % (dir_path,ok)
-      vol.root_dir.list()
+      dir_path = self.opts[0]
+      vol.create_dir(dir_path)
+
+class WriteCmd(FSCommand):
+  def handle_vol(self,img,vol):
+    n = len(self.opts)
+    if n == 0 or n > 2:
+      print "Usage: write <sys_file> [ami_path]"
+      return
+    
+    # read sys file
+    data = None
+    sys_file = self.opts[0]
+    try:
+      fh = open(sys_file,"rb")
+      data = fh.read()
+      fh.close()
+    except IOError as e:
+      print "ERROR reading:",sys_file
+      return
+    file_name = os.path.basename(sys_file)
+    
+    # get ami dir node
+    if n == 1:
+      node = vol.root_dir
+    else:
+      node = vol.get_dir_path_name(p[1])
+      if node == None:
+        # is a file name appended?
+        pos = p[1].rfind('/')
+        if pos != -1:
+          dir_name = p[1][0:pos]
+          name = p[1][pos+1:]
+          if len(name) != 0:
+            file_name = name
+          node = vol.get_dir_path_name(dir_name)
+          if node == None:
+            print "ERROR: parent directory not found:",dir_name
+        else:
+          file_name = p[1]
+          node = vol.root_dir
+    
+    # create file
+    print node
+    node.create_file(file_name, data)
 
 # ----- Bitmap Tools -----
 
@@ -109,10 +174,10 @@ class FindFreeCmd(FSCommand):
 
 class FindNFreeCmd(FSCommand):
   def handle_vol(self,img,vol):
-    if len(self.args.paths) != 1:
+    if len(self.opts) != 1:
       print "ERROR: give number of free entries to find"
     else:
-      num = int(self.args.paths[0])
+      num = int(self.opts[0])
       blk_nums = vol.bitmap.find_n_free(num)
       if blk_nums == None:
         print "No %d free blocks found" % num
@@ -124,6 +189,8 @@ class FindNFreeCmd(FSCommand):
 cmd_map = {
 "list" : ListCmd,
 "type" : TypeCmd,
+"read" : ReadCmd,
+"write" : WriteCmd,
 "format" : FormatCmd,
 "bitmap" : BitmapCmd,
 "findfree" : FindFreeCmd,
@@ -132,14 +199,14 @@ cmd_map = {
 }
 
 parser = argparse.ArgumentParser()
-parser.add_argument('command', help="command: "+",".join(cmd_map.keys()))
 parser.add_argument('image_file')
-parser.add_argument('paths', nargs='*')
+parser.add_argument('command_list', nargs='+', help="command: "+",".join(cmd_map.keys()))
 parser.add_argument('-d', '--dump', action='store_true', default=False, help="dump the disk structure")
 parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
 args = parser.parse_args()
 
-cmd = args.command
+cmd_list = args.command_list
+cmd = cmd_list[0]
 if not cmd_map.has_key(cmd):
   print "INVALID COMMAND:",cmd
   print "valid commands are:"
@@ -148,7 +215,13 @@ if not cmd_map.has_key(cmd):
   sys.exit(1)
 cmd_cls = cmd_map[cmd]
 
+# get options
+if len(cmd_list) == 1:
+  opts = []
+else:
+  opts = cmd_list[1:]
+
 # execute command
-cmd = cmd_cls(args)
+cmd = cmd_cls(args, opts)
 res = cmd.run()
 sys.exit(res)

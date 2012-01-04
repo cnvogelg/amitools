@@ -21,7 +21,6 @@ class BootBlock(Block):
       self.got_root_blk = self.calc_root_blk
     self.boot_code = boot_code
     self.valid = True
-    return True
   
   def _calc_chksum(self):
     n = self.blkdev.block_longs
