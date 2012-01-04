@@ -12,6 +12,7 @@ class BootBlock(Block):
     self.boot_code = None
   
   def create(self, dos_type=DOS0, root_blk=None, boot_code=None):
+    Block.create(self)
     self._create_data()
     self.dos_type = dos_type
     self.calc_root_blk = int(self.blkdev.num_blocks / 2)

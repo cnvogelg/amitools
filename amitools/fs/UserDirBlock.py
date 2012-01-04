@@ -43,7 +43,10 @@ class UserDirBlock(Block):
     self.own_key = self.blk_num
     self.protect = protect
     self.protect_flags = ProtectFlags(self.protect)
-    self.comment = comment
+    if comment == None:
+      self.comment = ''
+    else:
+      self.comment = comment
     # timestamps
     if mod_time == None:
       mod_time = time.mktime(time.localtime())

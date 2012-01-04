@@ -18,12 +18,16 @@ class Block:
     self.blkdev = blkdev
     self.blk_num = blk_num
     self.block_longs = blkdev.block_longs
-    self.type = None
-    self.sub_type = None
+    self.type = 0
+    self.sub_type = 0
     self.data = None
     self.is_type = is_type
     self.is_sub_type = is_sub_type
     self.chk_loc = chk_loc
+  
+  def create(self):
+    self.type = self.is_type
+    self.sub_type = self.is_sub_type
   
   def read(self):
     self._read_data()
@@ -142,7 +146,7 @@ class Block:
   
   def dump(self, name):
     print "%sBlock(%d):" % (name, self.blk_num)
-    print " types:     %x/%x (valid: %s)" % (self.type, self.sub_type, self.valid_types)
+    print " types:     %x/%x (valid: %x/%x)" % (self.type, self.sub_type, self.is_type, self.is_sub_type)
     print " chksum:    0x%08x (got) 0x%08x (calc)" % (self.got_chksum, self.calc_chksum)
     print " valid:     %s" % self.valid
     

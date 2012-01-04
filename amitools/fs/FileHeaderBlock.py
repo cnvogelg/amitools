@@ -45,6 +45,8 @@ class FileHeaderBlock(Block):
   def write(self):
     Block._create_data(self)
     self._put_long(1, self.own_key)
+    self._put_long(2, self.block_count)
+    self._put_long(4, self.first_data)
     
     # data blocks
     for i in xrange(len(self.data_blocks)):
@@ -60,7 +62,8 @@ class FileHeaderBlock(Block):
     self._put_long(-2, self.extension)
     Block.write(self)
   
-  def create(self, parent, name, byte_size=0, data_blocks=[], protect=0, comment=None, mod_time=None, hash_chain=0, extension=0):
+  def create(self, parent, name, data_blocks, extension, byte_size=0, protect=0, comment=None, mod_time=None, hash_chain=0):
+    Block.create(self)
     self.own_key = self.blk_num
     n = len(data_blocks)
     self.block_count = n
@@ -73,7 +76,10 @@ class FileHeaderBlock(Block):
     self.protect = protect
     self.protect_flags = ProtectFlags(self.protect)
     self.byte_size = byte_size
-    self.comment = comment
+    if comment == None:
+      self.comment = ''
+    else:
+      self.comment = comment
     if mod_time == None:
       mod_time = time.mktime(time.localtime())
     self.mod_ts = ts_create_from_secs(mod_time)

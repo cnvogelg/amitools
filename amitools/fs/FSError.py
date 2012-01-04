@@ -9,6 +9,8 @@ UNSUPPORTED_DIR_BLOCK = 8
 INVALID_FILE_NAME = 9
 NAME_ALREADY_EXISTS = 10
 INVALID_SEQ_NUM = 11
+FILE_LIST_BLOCK_COUNT_MISMATCH = 12
+FILE_DATA_BLOCK_COUNT_MISMATCH = 13
 
 error_names = {
   INVALID_BOOT_BLOCK : "Invalid Boot Block",
@@ -21,7 +23,9 @@ error_names = {
   UNSUPPORTED_DIR_BLOCK : "Unsupported Dir Block",
   INVALID_FILE_NAME : "Invalid File Name",
   NAME_ALREADY_EXISTS : "Name already exists",
-  INVALID_SEQ_NUM : "Invalid Sequence Number"
+  INVALID_SEQ_NUM : "Invalid Sequence Number",
+  FILE_LIST_BLOCK_COUNT_MISMATCH : "FileList Block Count Mismatch",
+  FILE_DATA_BLOCK_COUNT_MISMATCH : "FileData Block Count Mismatch"
 }
 
 class FSError(Exception):
@@ -30,7 +34,7 @@ class FSError(Exception):
     self.node = node
     self.block = block
     self.file_name = file_name
-    self.extra = None
+    self.extra = extra
   def __str__(self):
     if error_names.has_key(self.code):
       code_str = error_names[self.code]
@@ -43,7 +47,7 @@ class FSError(Exception):
       srcs.append("block=" + str(self.block))
     if self.file_name != None:
       srcs.append("file_name='%s'" % self.file_name)
-    if self.exta != None:
+    if self.extra != None:
       srcs.append(self.extra)
     return "%s(%d):%s" % (code_str, self.code, ",".join(srcs))
 

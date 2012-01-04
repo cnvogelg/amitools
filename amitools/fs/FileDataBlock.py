@@ -25,7 +25,25 @@ class FileDataBlock(Block):
     
     self.valid = True
     return self.valid
+
+  def create(self, hdr_key, seq_num, data, next_data):
+    Block.create(self)
+    self.hdr_key = hdr_key
+    self.seq_num = seq_num
+    self.data_size = len(data)
+    self.next_data = next_data
+    self.contents = data
     
+  def write(self):
+    Block._create_data(self)
+    self._put_long(1, self.hdr_key)
+    self._put_long(2, self.seq_num)
+    self._put_long(3, self.data_size)
+    self._put_long(4, self.next_data)
+    if self.contents != None:
+      self.data[24:24+self.data_size] = self.contents
+    Block.write(self)
+
   def get_block_data(self):
     return self.data[24:24+self.data_size]
   

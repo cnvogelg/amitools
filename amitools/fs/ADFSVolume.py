@@ -78,6 +78,30 @@ class ADFSVolume:
   def get_file_path_name(self, path_name):
     return self.get_path_name(path_name, allow_dir=False)
   
+  def get_create_path_name(self, path_name, suggest_name=None):
+    """get a parent node and path name for creation
+       return: parent_node_or_none, file_name_or_none
+    """
+    if path_name == None or path_name == "":
+      return self.root_dir, suggest_name
+    else:
+      # try to get path_name as a directory
+      node = self.get_dir_path_name(path_name)
+      if node != None:
+        return node, suggest_name
+      # is a file name appended?
+      pos = path_name.rfind('/')
+      if pos != -1:
+        dir_name = path_name[0:pos]
+        file_name = path_name[pos+1:]
+        if len(file_name) == 0:
+          file_name = suggest_name
+        node = vol.get_dir_path_name(dir_name)
+        return node, file_name
+      else:
+        # its a file name
+        return self.root_dir, path_name
+  
   def create_dir(self, path_name):
     pc = path_name.split("/")
     # no directory given

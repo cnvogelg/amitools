@@ -122,7 +122,7 @@ class ADFSDir(ADFSNode):
     # try to find free blocks
     free_blks = self.volume.bitmap.find_n_free(num_blks)
     if free_blks == None:
-      return False
+      raise FSError(NO_FREE_BLOCKS, node=self, file_name=name, extra="want %d" % num_blks)
       
     # update bitmap
     for b in free_blks:

@@ -135,27 +135,12 @@ class WriteCmd(FSCommand):
     file_name = os.path.basename(sys_file)
     
     # get ami dir node
-    if n == 1:
-      node = vol.root_dir
+    if n == 2:
+      node, file_name = vol.get_create_path_name(self.opts[1], file_name)
     else:
-      node = vol.get_dir_path_name(p[1])
-      if node == None:
-        # is a file name appended?
-        pos = p[1].rfind('/')
-        if pos != -1:
-          dir_name = p[1][0:pos]
-          name = p[1][pos+1:]
-          if len(name) != 0:
-            file_name = name
-          node = vol.get_dir_path_name(dir_name)
-          if node == None:
-            print "ERROR: parent directory not found:",dir_name
-        else:
-          file_name = p[1]
-          node = vol.root_dir
+      node = vol.root_dir
     
     # create file
-    print node
     node.create_file(file_name, data)
 
 # ----- Bitmap Tools -----
