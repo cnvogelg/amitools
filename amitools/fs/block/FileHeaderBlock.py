@@ -1,7 +1,7 @@
 import time
 from Block import Block
-from ProtectFlags import ProtectFlags
-from TimeStamp import *
+from ..ProtectFlags import ProtectFlags
+from ..TimeStamp import *
 
 class FileHeaderBlock(Block):
   def __init__(self, blkdev, blk_num):

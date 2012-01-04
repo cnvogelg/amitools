@@ -1,6 +1,6 @@
 import time
 from Block import Block
-from TimeStamp import *
+from ..TimeStamp import *
 
 class RootBlock(Block):
   def __init__(self, blkdev, blk_num):

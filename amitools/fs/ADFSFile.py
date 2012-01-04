@@ -1,6 +1,6 @@
-from FileHeaderBlock import FileHeaderBlock
-from FileListBlock import FileListBlock
-from FileDataBlock import FileDataBlock
+from block.FileHeaderBlock import FileHeaderBlock
+from block.FileListBlock import FileListBlock
+from block.FileDataBlock import FileDataBlock
 from ADFSNode import ADFSNode
 from FSError import *
 

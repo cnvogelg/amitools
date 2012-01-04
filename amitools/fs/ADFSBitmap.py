@@ -1,8 +1,8 @@
 import struct
 import ctypes
 
-from BitmapBlock import BitmapBlock
-from BitmapExtBlock import BitmapExtBlock
+from block.BitmapBlock import BitmapBlock
+from block.BitmapExtBlock import BitmapExtBlock
 
 class ADFSBitmap:
   def __init__(self, root_blk):

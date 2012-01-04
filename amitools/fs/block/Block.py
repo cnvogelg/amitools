@@ -1,6 +1,6 @@
 import struct
 import ctypes
-from TimeStamp import TimeStamp
+from ..TimeStamp import TimeStamp
 
 class Block:
   

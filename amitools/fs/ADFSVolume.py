@@ -1,5 +1,5 @@
-from BootBlock import BootBlock
-from RootBlock import RootBlock
+from block.BootBlock import BootBlock
+from block.RootBlock import RootBlock
 from ADFSDir import ADFSDir
 from ADFSBitmap import ADFSBitmap
 from FileName import FileName

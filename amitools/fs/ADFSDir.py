@@ -1,6 +1,6 @@
 import struct
-from Block import Block
-from UserDirBlock import UserDirBlock
+from block.Block import Block
+from block.UserDirBlock import UserDirBlock
 from ADFSFile import ADFSFile
 from ADFSNode import ADFSNode
 from FileName import FileName
