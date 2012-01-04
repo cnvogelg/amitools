@@ -174,9 +174,10 @@ class ADFSFile(ADFSNode):
       flb = FileListBlock(self.blkdev, self.ext_blk_nums[i])
       if i == self.num_ext_blks - 1:
         ext_blk = 0
+        blks = self.data_blk_nums[ext_off:]
       else:
         ext_blk = self.ext_blk_nums[i+1]
-      blks = data_nums[ext_off:ext_off+pbb]
+        blks = self.data_blk_nums[ext_off:ext_off+ppb]
       flb.create(parent_blk, blks, ext_blk)
       flb.write()
       self.ext_blks.append(flb)
