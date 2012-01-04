@@ -221,14 +221,23 @@ class ADFSBitmap:
     print "  blks:",len(self.bitmap_blks)
     print "  bits:",len(self.bitmap_data) * 8,self.blkdev.num_blocks
     
-  def print_free(self):  
-    self.print_bitmap(self._draw_free)
+  def print_free(self, brief=False):  
+    self.print_bitmap(self._draw_free, brief)
+  
+  def print_used(self, brief=False):
+    self.print_bitmap(self._draw_used, brief)
   
   def _draw_free(self, blk_num):
     if self.get_bit(blk_num):
-      return None
+      return 'F'
     else:
+      return None
+      
+  def _draw_used(self, blk_num):
+    if not self.get_bit(blk_num):
       return '#'
+    else:
+      return None
   
   def draw_bitmap(self, blk_num):
     if blk_num == self.root_blk.blk_num:
@@ -242,10 +251,11 @@ class ADFSBitmap:
           return 'B'
       return None
 
-  def print_bitmap(self, draw_func):
+  def print_bitmap(self, draw_func, brief=False):
     line = ""
     blk = 0
     blk_cyl = self.blkdev.sectors * self.blkdev.heads
+    found = False
     for i in xrange(self.blkdev.num_blocks):
       if i < self.blkdev.reserved:
         line += "x"
@@ -253,11 +263,14 @@ class ADFSBitmap:
         c = draw_func(i)
         if c == None:
           c = '.'
+        else:
+          found = True
         line += c
       if i % self.blkdev.sectors == self.blkdev.sectors - 1:
         line += " "
       if i % blk_cyl == blk_cyl - 1:
-        print "%8d: %s" % (blk,line)
+        if not brief or found:
+          print "%8d: %s" % (blk,line)
         blk += blk_cyl
         line = ""
-    
+        found = False

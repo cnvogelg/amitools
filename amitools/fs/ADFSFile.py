@@ -39,10 +39,10 @@ class ADFSFile(ADFSNode):
       ext_blk.read()
       if not ext_blk.valid:
         raise FSError(INVALID_FILE_LIST_BLOCK, block=ext_blk)
-      next_ext = ext_blk.extension
-      self.ext_blks.append(ext_blk)
       self.ext_blk_nums.append(next_ext)
+      self.ext_blks.append(ext_blk)
       self.data_blk_nums += ext_blk.data_blocks
+      next_ext = ext_blk.extension
     
     # now check number of ext blocks
     self.num_ext_blks = self.calc_number_of_list_blks()

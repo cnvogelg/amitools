@@ -5,14 +5,16 @@ class ADFBlockDevice(BlockDevice):
   def __init__(self, adf_file, read_only=False):
     BlockDevice.__init__(self, read_only)
     self.adf_file = adf_file
-    self._set_geometry() # set default geometry
     self.dirty = False
 
   def create(self):
+    self._set_geometry() # set default geometry
     self.read_only=False
+    # allocate image in memory
     self.data = ctypes.create_string_buffer(self.num_bytes)
 
   def open(self):
+    self._set_geometry() # set default geometry
     # open adf file 
     fh = file(self.adf_file, "rb")
     data = fh.read(self.num_bytes)

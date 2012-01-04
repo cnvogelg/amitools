@@ -19,6 +19,14 @@ class BlockDevice:
     self.block_longs = self.block_bytes / 4
     self.num_longs = self.num_blocks * self.block_longs
   
+  def dump(self):
+    print "first_cyl:  ",self.first_cyl
+    print "last_cyl:   ",self.last_cyl
+    print "heads:      ",self.heads
+    print "sectors:    ",self.sectors
+    print "block_nytes:",self.block_bytes
+    print "reserved:   ",self.reserved
+  
   def _blk_to_offset(self, blk_num):
     return self.block_bytes * blk_num
   

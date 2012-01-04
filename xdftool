@@ -8,6 +8,7 @@ import os.path
 
 from amitools.fs.ADFSVolume import ADFSVolume
 from amitools.fs.ADFBlockDevice import ADFBlockDevice
+from amitools.fs.HDFBlockDevice import HDFBlockDevice
 from amitools.fs.FSError import *
 from amitools.Utils import *
 
@@ -23,6 +24,8 @@ class Command:
     blkdev = None
     if ext.endswith('.adf'):
       blkdev = ADFBlockDevice(img)
+    elif ext.endswith(".hdf"):
+      blkdev = HDFBlockDevice(img)
     else:
       print "INVALID image file:",img
     try:
@@ -150,11 +153,20 @@ class BitmapCmd(FSCommand):
   def handle_vol(self,img,vol):
     n = len(self.opts)
     if n == 0:
-      print "Usage: bitmap free | find [n] | all | data | root | node <path>"
+      print "Usage: bitmap ( free | used | find [n] | all | data | root [all] | node <path> ) [brief]"
       return
     cmd = self.opts[0]
+    
+    # brief mode
+    brief = False
+    if self.opts[-1] == 'brief':
+      brief = True
+      self.opts = self.opts[:-1]
+  
     if cmd == 'free':
-      vol.bitmap.print_free()
+      vol.bitmap.print_free(brief)
+    elif cmd == 'used':
+      vol.bitmap.print_used(brief)
     elif cmd == 'find':
       if n == 2:
         num = int(self.opts[1])
@@ -170,24 +182,30 @@ class BitmapCmd(FSCommand):
         else:
           print "Free block:",blk_num
     elif cmd == 'all':
-      vol.bitmap.print_bitmap(lambda x : vol.root_dir.draw_bitmap(x,True) or vol.bitmap.draw_bitmap(x))      
+      vol.bitmap.print_bitmap(lambda x : vol.root_dir.draw_bitmap(x,True) or vol.bitmap.draw_bitmap(x),brief)      
     elif cmd == 'data':
-      vol.bitmap.print_bitmap(vol.bitmap.draw_bitmap)
+      vol.bitmap.print_bitmap(vol.bitmap.draw_bitmap,brief)
     elif cmd == 'root':
-      recursive = (n > 1)
-      vol.bitmap.print_bitmap(lambda x : vol.root_dir.draw_bitmap(x,recursive))
+      show_all = 'all' in self.opts
+      vol.bitmap.print_bitmap(lambda x : vol.root_dir.draw_bitmap(x,show_all),brief)
     elif cmd == 'node':
       if n > 1:
         node = vol.get_path_name(self.opts[1])
         if node != None:
           recursive = (n > 2)
-          vol.bitmap.print_bitmap(lambda x : node.draw_bitmap(x,recursive))
+          vol.bitmap.print_bitmap(lambda x : node.draw_bitmap(x,recursive),brief)
         else:
           print "Node '%s' not found!" % self.opts[1]
       else:
         print "Need node path!"
     else:
       print "Unknown bitmap command!"
+
+# ----- BlkDev Command -----
+
+class BlkDevCmd(Command):
+  def handle_blkdev(self, img, blkdev):
+    blkdev.dump()
 
 # ----- main -----
 # call scanner and process all files with selected command
@@ -199,6 +217,7 @@ cmd_map = {
 "write" : WriteCmd,
 "format" : FormatCmd,
 "bitmap" : BitmapCmd,
+"blkdev" : BlkDevCmd
 }
 
 parser = argparse.ArgumentParser()
