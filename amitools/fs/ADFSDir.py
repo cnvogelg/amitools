@@ -156,7 +156,7 @@ class ADFSDir(ADFSNode):
     print "Dir(%d)" % self.block.blk_num
     print " entries: %s" % self.entries
   
-  def list(self, indent=0):
+  def list(self, indent=0, all=False):
     istr = "  " * indent
     if self.is_vol:
       tstr = "VOL"
@@ -165,10 +165,12 @@ class ADFSDir(ADFSNode):
       tstr = "DIR"
       pstr = str(self.block.protect_flags)
     print "%-40s       %s  %7s  %s" % (istr + self.block.name, tstr, pstr, self.block.mod_ts)
+    if not all and indent > 0:
+      return
     if self.entries:
       es = self.get_entries_sorted_by_name()
       for e in es:
-        e.list(indent=indent+1)
+        e.list(indent=indent+1, all=all)
     
   def get_path(self, pc, allow_file=True, allow_dir=True):
     if len(pc) == 0:
@@ -194,3 +196,17 @@ class ADFSDir(ADFSNode):
           else:
             return None
     return None
+    
+  def draw_bitmap(self, blk_num, recursive=False):
+    if blk_num == self.block.blk_num:
+      if self.is_vol:
+        return 'V'
+      else:
+        return 'D'
+    else:
+      if recursive:
+        for e in self.entries:
+          c = e.draw_bitmap(blk_num, True)
+          if c != None:
+            return c
+      return None

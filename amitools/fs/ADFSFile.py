@@ -8,6 +8,7 @@ class ADFSFile(ADFSNode):
   def __init__(self, volume):
     ADFSNode.__init__(self, volume)
     # state
+    self.ext_blk_nums = []
     self.ext_blks = []
     self.data_blk_nums = []
     self.data_blks = []
@@ -40,6 +41,7 @@ class ADFSFile(ADFSNode):
         raise FSError(INVALID_FILE_LIST_BLOCK, block=ext_blk)
       next_ext = ext_blk.extension
       self.ext_blks.append(ext_blk)
+      self.ext_blk_nums.append(next_ext)
       self.data_blk_nums += ext_blk.data_blocks
     
     # now check number of ext blocks
@@ -141,9 +143,9 @@ class ADFSFile(ADFSNode):
     # assign block numbers
     fhb_num = free_blks[0]
     # ... for ext
-    ext_nums = []
+    self.ext_blk_nums = []
     for i in xrange(self.num_ext_blks):
-      ext_nums.append(free_blks[1+i])
+      self.ext_blk_nums.append(free_blks[1+i])
     # ... for data
     off = 1 + self.num_ext_blks
     self.data_blk_nums = []
@@ -158,7 +160,7 @@ class ADFSFile(ADFSNode):
     byte_size = len(self.data)
     if self.num_data_blks > ppb:
       hdr_blks = self.data_blk_nums[0:ppb]
-      hdr_ext = ext_nums[0]
+      hdr_ext = self.ext_blk_nums[0]
     else:
       hdr_blks = self.data_blk_nums
       hdr_ext = 0
@@ -169,11 +171,11 @@ class ADFSFile(ADFSNode):
     # create file list (=ext) blocks
     ext_off = ppb
     for i in xrange(self.num_ext_blks):
-      flb = FileListBlock(self.blkdev, ext_nums[i])
+      flb = FileListBlock(self.blkdev, self.ext_blk_nums[i])
       if i == self.num_ext_blks - 1:
         ext_blk = 0
       else:
-        ext_blk = ext_nums[i+1]
+        ext_blk = self.ext_blk_nums[i+1]
       blks = data_nums[ext_off:ext_off+pbb]
       flb.create(parent_blk, blks, ext_blk)
       flb.write()
@@ -219,7 +221,16 @@ class ADFSFile(ADFSNode):
       blk_idx += 1
       off += bs
   
-  def list(self, indent=0):
+  def list(self, indent=0, all=False):
     istr = "  " * indent
     print "%-40s  %8d  %s  %s" % (istr + self.block.name, self.block.byte_size, self.block.protect_flags, self.block.mod_ts)
-    
+
+  def draw_bitmap(self, blk_num, recursive=False):
+    if blk_num == self.block.blk_num:
+      return 'H'
+    elif blk_num in self.ext_blk_nums:
+      return 'E'
+    elif blk_num in self.data_blk_nums:
+      return 'd'
+    else:
+      return None

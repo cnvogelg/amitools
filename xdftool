@@ -49,15 +49,16 @@ class FSCommand(Command):
 # list: list directory tree
 class ListCmd(FSCommand):
   def handle_vol(self,img,vol):
-    if len(self.opts) == 0:
-      vol.root_dir.list()
+    n = len(self.opts)
+    if n == 0:
+      vol.root_dir.list(all=True)
     else:
-      for p in self.opts:
-        node = vol.get_path_name(p)
-        if node != None:
-          node.list()
-        else:
-          print "ERROR path not found:",node
+      node = vol.get_path_name(self.opts[0])
+      if node != None:
+        show_all = (n>1)
+        node.list(all=show_all)
+      else:
+        print "ERROR path not found:",node
 
 class TypeCmd(FSCommand):
   def handle_vol(self,img,vol):
@@ -147,27 +148,46 @@ class WriteCmd(FSCommand):
 
 class BitmapCmd(FSCommand):
   def handle_vol(self,img,vol):
-    vol.bitmap.dump()
-
-class FindFreeCmd(FSCommand):
-  def handle_vol(self,img,vol):
-    blk_num = vol.bitmap.find_free()
-    if blk_num == None:
-      print "No free block found"
-    else:
-      print "Free block:",blk_num
-
-class FindNFreeCmd(FSCommand):
-  def handle_vol(self,img,vol):
-    if len(self.opts) != 1:
-      print "ERROR: give number of free entries to find"
-    else:
-      num = int(self.opts[0])
-      blk_nums = vol.bitmap.find_n_free(num)
-      if blk_nums == None:
-        print "No %d free blocks found" % num
+    n = len(self.opts)
+    if n == 0:
+      print "Usage: bitmap free | find [n] | all | data | root | node <path>"
+      return
+    cmd = self.opts[0]
+    if cmd == 'free':
+      vol.bitmap.print_free()
+    elif cmd == 'find':
+      if n == 2:
+        num = int(self.opts[1])
+        blk_nums = vol.bitmap.find_n_free(num)
+        if blk_nums == None:
+          print "No %d free blocks found" % num
+        else:
+          print "Free %d blocks:" % num,blk_nums
       else:
-        print "Free %d blocks:" % num,blk_nums
+        blk_num = vol.bitmap.find_free()
+        if blk_num == None:
+          print "No free block found"
+        else:
+          print "Free block:",blk_num
+    elif cmd == 'all':
+      vol.bitmap.print_bitmap(lambda x : vol.root_dir.draw_bitmap(x,True) or vol.bitmap.draw_bitmap(x))      
+    elif cmd == 'data':
+      vol.bitmap.print_bitmap(vol.bitmap.draw_bitmap)
+    elif cmd == 'root':
+      recursive = (n > 1)
+      vol.bitmap.print_bitmap(lambda x : vol.root_dir.draw_bitmap(x,recursive))
+    elif cmd == 'node':
+      if n > 1:
+        node = vol.get_path_name(self.opts[1])
+        if node != None:
+          recursive = (n > 2)
+          vol.bitmap.print_bitmap(lambda x : node.draw_bitmap(x,recursive))
+        else:
+          print "Node '%s' not found!" % self.opts[1]
+      else:
+        print "Need node path!"
+    else:
+      print "Unknown bitmap command!"
 
 # ----- main -----
 # call scanner and process all files with selected command
@@ -175,12 +195,10 @@ cmd_map = {
 "list" : ListCmd,
 "type" : TypeCmd,
 "read" : ReadCmd,
+"mkdir" : MakeDirCmd,
 "write" : WriteCmd,
 "format" : FormatCmd,
 "bitmap" : BitmapCmd,
-"findfree" : FindFreeCmd,
-"findnfree" : FindNFreeCmd,
-"mkdir" : MakeDirCmd
 }
 
 parser = argparse.ArgumentParser()

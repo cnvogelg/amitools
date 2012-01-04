@@ -3,6 +3,7 @@ import ctypes
 
 from block.BitmapBlock import BitmapBlock
 from block.BitmapExtBlock import BitmapExtBlock
+from FSError import *
 
 class ADFSBitmap:
   def __init__(self, root_blk):
@@ -83,7 +84,6 @@ class ADFSBitmap:
           cur_ext_index += 1
     
     self.valid = True
-    return True
   
   def write(self):
     # write root block
@@ -110,7 +110,7 @@ class ADFSBitmap:
       bm = BitmapBlock(self.blkdev, blk)
       bm.read()
       if not bm.valid:
-        return False
+        raise FSError(INVALID_BITMAP_BLOCK, block=bm)
       self.bitmap_blks.append(bm)
       bitmap_data += bm.get_bitmap_data()
       
@@ -119,15 +119,13 @@ class ADFSBitmap:
     while ext_blk != 0:
       bm_ext = BitmapExtBlock(self.blkdev, ext_blk)
       bm_ext.read()
-      if not bm_ext.valid:
-        return False
       self.ext_blks.append(bm_ext)
       blocks = bm_ext.bitmap_ptrs
       for blk in blocks:
         bm = BitmapBlock(self.blkdev, blk)
         bm.read()
         if not bm.valid:
-          return False
+          raise FSError(INVALID_BITMAP_BLOCK, block=bm)
         bitmap_data += bm.get_bitmap_data()
         self.bitmap_blks.append(bm)
 
@@ -135,14 +133,13 @@ class ADFSBitmap:
     num_bm_blks = len(self.bitmap_blks)
     num_bytes = self.bitmap_blk_bytes * num_bm_blks
     if num_bytes != len(bitmap_data):
-      return False
+      raise FSError(BITMAP_SIZE_MISMATCH, node=self, extra="got=%d want=%d" % (len(bitmap_data), num_bytes))
     if num_bm_blks != self.bitmap_num_blks:
-      return False
+      raise FSError(BITMAP_BLOCK_COUNT_MISMATCH, node=self, extra="got=%d want=%d" % (self.bitmap_num_blks, num_bm_blks))
 
     # create a modyfiable bitmap
     self.bitmap_data = ctypes.create_string_buffer(bitmap_data)
     self.valid = True
-    return self.valid
 
   def find_free(self, start=None):
     # give start of search
@@ -223,18 +220,40 @@ class ADFSBitmap:
     print "  ext: ",self.ext_blks
     print "  blks:",len(self.bitmap_blks)
     print "  bits:",len(self.bitmap_data) * 8,self.blkdev.num_blocks
+    
+  def print_free(self):  
+    self.print_bitmap(self._draw_free)
+  
+  def _draw_free(self, blk_num):
+    if self.get_bit(blk_num):
+      return None
+    else:
+      return '#'
+  
+  def draw_bitmap(self, blk_num):
+    if blk_num == self.root_blk.blk_num:
+      return 'R'
+    else:
+      for bm_blk in self.bitmap_blks:
+        if bm_blk.blk_num == blk_num:
+          return 'b'
+      for ext_blk in self.ext_blks:
+        if ext_blk.blk_num == blk_num:
+          return 'B'
+      return None
+
+  def print_bitmap(self, draw_func):
     line = ""
     blk = 0
     blk_cyl = self.blkdev.sectors * self.blkdev.heads
     for i in xrange(self.blkdev.num_blocks):
       if i < self.blkdev.reserved:
-        line += "."
+        line += "x"
       else:
-        b = self.get_bit(i)
-        if b:
-          line += "1"
-        else:
-          line += "0"
+        c = draw_func(i)
+        if c == None:
+          c = '.'
+        line += c
       if i % self.blkdev.sectors == self.blkdev.sectors - 1:
         line += " "
       if i % blk_cyl == blk_cyl - 1:

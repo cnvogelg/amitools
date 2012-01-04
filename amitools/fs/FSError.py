@@ -11,6 +11,9 @@ NAME_ALREADY_EXISTS = 10
 INVALID_SEQ_NUM = 11
 FILE_LIST_BLOCK_COUNT_MISMATCH = 12
 FILE_DATA_BLOCK_COUNT_MISMATCH = 13
+INVALID_BITMAP_BLOCK = 14,
+BITMAP_BLOCK_COUNT_MISMATCH = 15,
+BITMAP_SIZE_MISMATCH = 16
 
 error_names = {
   INVALID_BOOT_BLOCK : "Invalid Boot Block",
@@ -25,7 +28,10 @@ error_names = {
   NAME_ALREADY_EXISTS : "Name already exists",
   INVALID_SEQ_NUM : "Invalid Sequence Number",
   FILE_LIST_BLOCK_COUNT_MISMATCH : "FileList Block Count Mismatch",
-  FILE_DATA_BLOCK_COUNT_MISMATCH : "FileData Block Count Mismatch"
+  FILE_DATA_BLOCK_COUNT_MISMATCH : "FileData Block Count Mismatch",
+  INVALID_BITMAP_BLOCK : "Invalid Bitmap Block",
+  BITMAP_BLOCK_COUNT_MISMATCH : "Bitmap Block Count Mismatch",
+  BITMAP_SIZE_MISMATCH : "Bitmap Size Mismatch"
 }
 
 class FSError(Exception):
