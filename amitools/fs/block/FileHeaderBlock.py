@@ -94,7 +94,8 @@ class FileHeaderBlock(Block):
     print " blk_cnt:    %d" % self.block_count
     print " first_data: %d" % self.first_data
     print " data blks:  %s" % self.data_blocks
-    print " protect:    0x%x" % self.protect
+    pf = ProtectFlags(self.protect)
+    print " protect:    0x%x 0b%s %s" % (self.protect, pf.bin_str(), pf)
     print " byte_size:  %d" % self.byte_size
     print " comment:    '%s'" % self.comment
     print " mod_ts:     %s" % self.mod_ts

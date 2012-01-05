@@ -24,7 +24,7 @@ class MetaInfo:
     if self.protect_flags != None:
       return str(self.protect_flags)
     else:
-      return pf_empty_string
+      return ProtectFlags.empty_string
       
   def get_comment_str(self):
     if self.comment != None:

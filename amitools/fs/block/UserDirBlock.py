@@ -1,5 +1,6 @@
 import time
 from Block import Block
+from ..ProtectFlags import ProtectFlags
 
 class UserDirBlock(Block):
   def __init__(self, blkdev, blk_num):
@@ -73,7 +74,8 @@ class UserDirBlock(Block):
   def dump(self):
     Block.dump(self,"UserDir")
     print " own_key:    %d" % (self.own_key)
-    print " protect:    0x%x" % self.protect
+    pf = ProtectFlags(self.protect)
+    print " protect:    0x%x 0b%s %s" % (self.protect, pf.bin_str(), pf)
     print " comment:    '%s'" % self.comment
     print " mod_ts:     %s" % self.mod_ts
     print " name:       '%s'" % self.name
