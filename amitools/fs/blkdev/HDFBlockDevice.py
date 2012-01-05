@@ -7,9 +7,11 @@ class HDFBlockDevice(BlockDevice):
     BlockDevice.__init__(self, read_only)
     self.hdf_file = hdf_file   
     self.dirty = False
+    self.fh = None
 
   def create(self, cylinders, heads, sectors, reserved=2):
-    self.read_only=False
+    if self.read_only:
+      raise IOError("HDF creation not allowed in read-only mode!")    
     self.fh = file(self.hdf_file,"wb")
     self._set_geometry(0, cylinders-1, heads, sectors, reserved)
     # create empty file
@@ -72,7 +74,9 @@ class HDFBlockDevice(BlockDevice):
     pass
         
   def close(self):
-    self.fh.close()
+    if self.fh != None:
+      self.fh.close()
+      self.fh = None
 
   def read_block(self, blk_num):
     if blk_num >= self.num_blocks:
@@ -83,7 +87,7 @@ class HDFBlockDevice(BlockDevice):
   
   def write_block(self, blk_num, data):
     if self.read_only:
-      raise IOError("ADF File is read-only!")
+      raise IOError("HDF File is read-only!")
     if blk_num >= self.num_blocks:
       raise ValueError("Invalid ADF block num: got %d but max is %d" % (blk_num, self.num_blocks))
     if len(data) != self.block_bytes:

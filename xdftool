@@ -10,85 +10,172 @@ from amitools.fs.ADFSVolume import ADFSVolume
 from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
 from amitools.fs.blkdev.HDFBlockDevice import HDFBlockDevice
 from amitools.fs.FSError import *
-from amitools.Utils import *
+from amitools.util.CommandQueue import CommandQueue
 
 # ----- commands -----
 class Command:
-  def __init__(self, args, opts, create=False):
+  def __init__(self, args, opts, create=False, edit=False):
     self.args = args
-    self.create = create
     self.opts = opts
-  def run(self):
-    img = self.args.image_file
-    ext = img.lower()
-    blkdev = None
+    self.create = create
+    self.edit = edit
+    
+    self.volume = None
+    self.blkdev = None
+    
+  def run(self, blkdev, vol):
+    self.vol = vol
+    self.blkdev = blkdev
+    if hasattr(self, 'handle_blkdev'):
+      return self.handle_blkdev(blkdev)
+    elif hasattr(self, 'handle_vol'):
+      return self.handle_vol(vol)
+
+class FSCommandQueue(CommandQueue):
+  def __init__(self, args, cmd_list, sep, cmd_map):
+    CommandQueue.__init__(self, cmd_list, sep, cmd_map)
+    self.args = args
+    self.blkdev = None
+    self.volume = None
+  
+  def create_blkdev(self):
+    self.img = self.args.image_file
+    ext = self.img.lower()
+    read_only = self.args.read_only
+    if self.args.verbose and read_only:
+      print "enabling read only mode"
     if ext.endswith('.adf'):
-      blkdev = ADFBlockDevice(img)
+      return ADFBlockDevice(self.img, read_only=read_only)
     elif ext.endswith(".hdf"):
-      blkdev = HDFBlockDevice(img)
+      return HDFBlockDevice(self.img, read_only=read_only)
     else:
-      print "INVALID image file:",img
+      print "INVALID image file:",self.img
+      return None
+  
+  def run(self):
+    # get blkdev for image
+    self.blkdev = self.create_blkdev()
+    if self.blkdev == None:
+      return 2
     try:
-      if self.create:
-        blkdev.create()
-      else:
-        blkdev.open()
-      self.handle_blkdev(img, blkdev)
-      blkdev.close()
+      # main command loop
+       exit_code = CommandQueue.run(self)
     except FSError as e:
-      print "FSError:",str(e)
+      cmd = "'%s'" % " ".join(self.cmd_line)
+      print cmd,"FSError:",str(e)
+      exit_code = 3
+    except IOError as e:
+      cmd = "'%s'" % " ".join(self.cmd_line)
+      print cmd,"IOError:",str(e)
+      exit_code = 4
+    finally:
+      # close volume
+      if self.volume != None:
+        self.volume.close()
+        if self.args.verbose:
+          print "closing volume:",self.img
+      # close blkdev
+      if self.args.verbose:
+        print "closing image:",self.img
+      self.blkdev.close()
+    return exit_code
 
-class FSCommand(Command):
-  def __init__(self, args, opts):
-    Command.__init__(self, args, opts)
-  def handle_blkdev(self, img, blkdev):
-    vol = ADFSVolume(blkdev)
-    vol.open()
-    self.handle_vol(img,vol)
-    vol.close()
+  def create_cmd(self, cclass, name, opts):
+    return cclass(self.args, opts)
 
+  def run_first(self, cmd_line, cmd):
+    self.cmd_line = cmd_line
+    if self.args.verbose:
+      print "command:",self.cmd_line
+    if cmd.edit and self.blkdev.read_only:
+      raise IOError("Edit commands not allowed in read-only mode")
+    # setup blkdev
+    if cmd.create:
+      if self.args.verbose:
+        print "creating image:",self.img
+      cmd.create_blkdev(self.blkdev)
+    else:
+      if self.args.verbose:
+        print "opening image:",self.img
+      self.blkdev.open()
+        
+    # setup volume
+    self.volume = ADFSVolume(self.blkdev)
+    if cmd.create:
+      if self.args.verbose:
+        print "creating volume:",self.img
+      cmd.create_volume(self.volume)
+    else:
+      if self.args.verbose:
+        print "opening volume:",self.img
+      self.volume.open()
+
+    exit_code = cmd.run(self.blkdev, self.volume)
+    if self.args.verbose:
+      print "exit_code:",exit_code
+    return exit_code
+    
+  def run_next(self, cmd_line, cmd):
+    self.cmd_line = cmd_line
+    if self.args.verbose:
+      print "command:",self.cmd_line
+    if cmd.create:
+      raise IOError("Create command is only allowed as first command")
+    if cmd.edit and self.blkdev.read_only:
+      raise IOError("Edit commands not allowed in read-only mode")
+    exit_code = cmd.run(self.blkdev, self.volume)
+    if self.args.verbose:
+      print "exit_code:",exit_code
+    return exit_code
+  
 # ----- Query Image -----
 
 # list: list directory tree
-class ListCmd(FSCommand):
-  def handle_vol(self,img,vol):
+class ListCmd(Command):
+  def handle_vol(self, vol):
     n = len(self.opts)
     if n == 0:
       vol.root_dir.list(all=True)
+      return 0
     else:
       node = vol.get_path_name(self.opts[0])
       if node != None:
         show_all = (n>1)
         node.list(all=show_all)
+        return 0
       else:
         print "ERROR path not found:",node
+        return 2
 
-class TypeCmd(FSCommand):
-  def handle_vol(self,img,vol):
+class TypeCmd(Command):
+  def handle_vol(self, vol):
     p = self.opts
     if len(p) == 0:
-      print "Nothing to type."
+      print "Usage: type <ami_file>"
+      return 1
     else:
-      for f in p:
-        node = vol.get_file_path_name(f)
-        if node != None:
-          data = node.get_file_data()
-          print data
-        else:
-          print "ERROR file not found:",f
+      name = p[0]
+      node = vol.get_file_path_name(name)
+      if node != None:
+        data = node.get_file_data()
+        print data
+        return 0
+      else:
+        print "ERROR file not found:",name
+        return 2
 
-class ReadCmd(FSCommand):
-  def handle_vol(self,img,vol):
+class ReadCmd(Command):
+  def handle_vol(self, vol):
     p = self.opts
     n = len(p)
     if n == 0 or n > 2:
       print "Usage: read <ami_file> [sys_file]"
-      return
+      return 1
     # try to get ami file  
     node = vol.get_file_path_name(p[0])
     if node == None:
       print "ERROR: file not found:",p[0]
-      return
+      return 2
     # get data of file
     data = node.get_file_data()
     # determine output name
@@ -100,31 +187,40 @@ class ReadCmd(FSCommand):
     fh = open(out_name,"wb")
     fh.write(data)
     fh.close()
+    return 0
 
 # ----- Edit Image -----
 
 class FormatCmd(Command):
   def __init__(self, args, opts):
     Command.__init__(self, args, opts, create=True)
-  def handle_blkdev(self, img, blkdev):
-    vol = ADFSVolume(blkdev)
+  def handle_blkdev(self, blkdev):
+    return 0
+  def create_blkdev(self, blkdev):
+    blkdev.create()
+  def create_volume(self, vol):
     vol.create("Test")
-    vol.close()
 
-class MakeDirCmd(FSCommand):
-  def handle_vol(self,img,vol):
+class MakeDirCmd(Command):
+  def __init__(self, args, opts):
+    Command.__init__(self, args, opts, edit=True)
+  def handle_vol(self, vol):
     if len(self.opts) != 1:
       print "Usage: mkdir <dir_path>"
+      return 1
     else:
       dir_path = self.opts[0]
       vol.create_dir(dir_path)
+      return 0
 
-class WriteCmd(FSCommand):
-  def handle_vol(self,img,vol):
+class WriteCmd(Command):
+  def __init__(self, args, opts):
+    Command.__init__(self, args, opts, edit=True)
+  def handle_vol(self, vol):
     n = len(self.opts)
     if n == 0 or n > 2:
       print "Usage: write <sys_file> [ami_path]"
-      return
+      return 1
     
     # read sys file
     data = None
@@ -135,7 +231,7 @@ class WriteCmd(FSCommand):
       fh.close()
     except IOError as e:
       print "ERROR reading:",sys_file
-      return
+      return 2
     file_name = os.path.basename(sys_file)
     
     # get ami dir node
@@ -146,86 +242,107 @@ class WriteCmd(FSCommand):
     
     # create file
     node.create_file(file_name, data)
+    return 0
     
-class DeleteCmd(FSCommand):
-  def handle_vol(self, img, vol):
+class DeleteCmd(Command):
+  def __init__(self, args, opts):
+    Command.__init__(self, args, opts, edit=True)
+  def handle_vol(self, vol):
     n = len(self.opts)
     if n == 0:
       print "Usage: delete <ami_path> [wipe]"
-      return
+      return 1
     
     name = self.opts[0]
     node = vol.get_path_name(name)
     if node != None:
       do_wipe = 'wipe' in self.opts
       node.delete(wipe=do_wipe)
+      return 0
     else:
       print "Can't find node:",name
+      return 2
       
-class ProtectCmd(FSCommand):
-  def handle_vol(self, img, vol):
+class ProtectCmd(Command):
+  def __init__(self, args, opts):
+    Command.__init__(self, args, opts, edit=True)
+  def handle_vol(self, vol):
     n = len(self.opts)
     if n != 2:
       print "Usage: comment <ami_file> <protect>"
-      return
+      return 1
     name = self.opts[0]
     pr_str = self.opts[1]    
     node = vol.get_path_name(name)
     if node != None:
       node.change_protect_by_string(pr_str)
+      return 0
     else:
       print "Can't find node:",name
+      return 2
 
-class CommentCmd(FSCommand):
-  def handle_vol(self, img, vol):
+class CommentCmd(Command):
+  def __init__(self, args, opts):
+    Command.__init__(self, args, opts, edit=True)
+  def handle_vol(self, vol):
     n = len(self.opts)
     if n != 2:
       print "Usage: comment <ami_file> <comment>"
-      return
+      return 1
     name = self.opts[0]
     comment = self.opts[1]
     node = vol.get_path_name(name)
     if node != None:
       node.change_comment(comment)
+      return 0
     else:
       print "Can't find node:",name
+      return 2
     
-class TimeCmd(FSCommand):
-  def handle_vol(self, img, vol):
-    pass
+class TimeCmd(Command):
+  def __init__(self, args, opts):
+    Command.__init__(self, args, opts, edit=True)
+  def handle_vol(self, vol):
+    return 0
 
 # ----- Block Tools -----
 
-class BlockCmd(FSCommand):
-  def handle_vol(self, img, vol):
+class BlockCmd(Command):
+  def handle_vol(self, vol):
     n = len(self.opts)
     if n == 0:
       print "Usage: block ( boot | root | node <ami_file> [data] )"
+      return 1
     cmd = self.opts[0]
     if cmd == 'boot':
       vol.boot.dump()
+      return 0
     elif cmd == 'root':
       vol.root.dump()
+      return 0
     elif cmd == 'node':
       if n == 1:
         print "No node given!"
+        return 1
       else:
         name = self.opts[1]
         node = vol.get_path_name(name)
         if node != None:
           with_data = "data" in self.opts
           node.dump_blocks(with_data)
+          return 0
         else:
           print "Can't find node:",name
+          return 2
 
 # ----- Bitmap Tools -----
 
-class BitmapCmd(FSCommand):
-  def handle_vol(self,img,vol):
+class BitmapCmd(Command):
+  def handle_vol(self, vol):
     n = len(self.opts)
     if n == 0:
-      print "Usage: bitmap ( free | used | find [n] | all | data | root [all] | node <path> ) [brief]"
-      return
+      print "Usage: bitmap ( free | used | find [n] | all | maps | root [all] | node <path> ) [brief]"
+      return 1
     cmd = self.opts[0]
     
     # brief mode
@@ -236,36 +353,45 @@ class BitmapCmd(FSCommand):
   
     if cmd == 'free':
       vol.bitmap.print_free(brief)
+      return 0
     elif cmd == 'used':
       vol.bitmap.print_used(brief)
+      return 0
     elif cmd == 'find':
       if n == 2:
         num = int(self.opts[1])
         blk_nums = vol.bitmap.find_n_free(num)
         if blk_nums == None:
           print "No %d free blocks found" % num
+          return 100
         else:
           print "Free %d blocks:" % num,blk_nums
+          return 0
       else:
         blk_num = vol.bitmap.find_free()
         if blk_num == None:
           print "No free block found"
+          return 100
         else:
           print "Free block:",blk_num
+          return 0
     elif cmd == 'all':
       bm = vol.bitmap.create_draw_bitmap()
       vol.bitmap.draw_on_bitmap(bm)
       vol.root_dir.draw_on_bitmap(bm, True)
       vol.bitmap.print_draw_bitmap(bm, brief)
-    elif cmd == 'data':
+      return 0
+    elif cmd == 'maps':
       bm = vol.bitmap.create_draw_bitmap()
       vol.bitmap.draw_on_bitmap(bm)
       vol.bitmap.print_draw_bitmap(bm, brief)
+      return 0
     elif cmd == 'root':
       show_all = 'all' in self.opts
       bm = vol.bitmap.create_draw_bitmap()
       vol.root_dir.draw_on_bitmap(bm, show_all)
       vol.bitmap.print_draw_bitmap(bm, brief)
+      return 0
     elif cmd == 'node':
       if n > 1:
         node = vol.get_path_name(self.opts[1])
@@ -274,18 +400,23 @@ class BitmapCmd(FSCommand):
           bm = vol.bitmap.create_draw_bitmap()
           node.draw_on_bitmap(bm, show_all)
           vol.bitmap.print_draw_bitmap(bm, brief)
+          return 0
         else:
           print "Node '%s' not found!" % self.opts[1]
+          return 2
       else:
         print "Need node path!"
+        return 1
     else:
       print "Unknown bitmap command!"
+      return 1
 
 # ----- BlkDev Command -----
 
 class BlkDevCmd(Command):
-  def handle_blkdev(self, img, blkdev):
+  def handle_blkdev(self, blkdev):
     blkdev.dump()
+    return 0
 
 # ----- main -----
 # call scanner and process all files with selected command
@@ -310,25 +441,12 @@ parser.add_argument('image_file')
 parser.add_argument('command_list', nargs='+', help="command: "+",".join(cmd_map.keys()))
 parser.add_argument('-d', '--dump', action='store_true', default=False, help="dump the disk structure")
 parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
+parser.add_argument('-s', '--seperator', default='+', help="set the command separator char sequence")
+parser.add_argument('-r', '--read-only', action='store_true', default=False, help="read-only operation")
 args = parser.parse_args()
 
 cmd_list = args.command_list
-cmd = cmd_list[0]
-if not cmd_map.has_key(cmd):
-  print "INVALID COMMAND:",cmd
-  print "valid commands are:"
-  for a in sorted(cmd_map):
-    print "  ",a
-  sys.exit(1)
-cmd_cls = cmd_map[cmd]
-
-# get options
-if len(cmd_list) == 1:
-  opts = []
-else:
-  opts = cmd_list[1:]
-
-# execute command
-cmd = cmd_cls(args, opts)
-res = cmd.run()
-sys.exit(res)
+sep = args.seperator
+queue = FSCommandQueue(args, cmd_list, sep, cmd_map)
+code = queue.run()
+sys.exit(code)

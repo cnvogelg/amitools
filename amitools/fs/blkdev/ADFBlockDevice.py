@@ -8,8 +8,9 @@ class ADFBlockDevice(BlockDevice):
     self.dirty = False
 
   def create(self):
+    if self.read_only:
+      raise IOError("ADF creation not allowed in read-only mode!")    
     self._set_geometry() # set default geometry
-    self.read_only=False
     # allocate image in memory
     self.data = ctypes.create_string_buffer(self.num_bytes)
 
