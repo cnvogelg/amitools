@@ -62,7 +62,7 @@ class FileHeaderBlock(Block):
     self._put_long(-2, self.extension)
     Block.write(self)
   
-  def create(self, parent, name, data_blocks, extension, byte_size=0, protect=0, comment=None, mod_time=None, hash_chain=0):
+  def create(self, parent, name, data_blocks, extension, byte_size=0, protect=0, comment=None, mod_ts=0, hash_chain=0):
     Block.create(self)
     self.own_key = self.blk_num
     n = len(data_blocks)
@@ -80,9 +80,7 @@ class FileHeaderBlock(Block):
       self.comment = ''
     else:
       self.comment = comment
-    if mod_time == None:
-      mod_time = time.mktime(time.localtime())
-    self.mod_ts = ts_create_from_secs(mod_time)
+    self.mod_ts = mod_ts
     self.name = name
     self.hash_chain = hash_chain
     self.parent = parent

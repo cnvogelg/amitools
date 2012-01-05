@@ -139,7 +139,7 @@ class ADFSFile(ADFSNode):
     # determine number of blocks to create
     return 1 + self.num_data_blks + self.num_ext_blks
   
-  def blocks_create_new(self, free_blks, name, protect, comment, mod_time, hash_chain_blk, parent_blk):
+  def blocks_create_new(self, free_blks, name, hash_chain_blk, parent_blk, meta_info):
     # assign block numbers
     fhb_num = free_blks[0]
     # ... for ext
@@ -164,7 +164,7 @@ class ADFSFile(ADFSNode):
     else:
       hdr_blks = self.data_blk_nums
       hdr_ext = 0
-    fhb.create(parent_blk, name, hdr_blks, hdr_ext, byte_size, protect, comment, mod_time, hash_chain_blk)
+    fhb.create(parent_blk, name, hdr_blks, hdr_ext, byte_size, meta_info.get_protect(), meta_info.get_comment(), meta_info.get_mod_ts(), hash_chain_blk)
     fhb.write() 
     self.set_block(fhb)
     
@@ -222,10 +222,6 @@ class ADFSFile(ADFSNode):
       blk_idx += 1
       off += bs
   
-  def list(self, indent=0, all=False):
-    istr = "  " * indent
-    print "%-40s  %8d  %s  %s" % (istr + self.block.name, self.block.byte_size, self.block.protect_flags, self.block.mod_ts)
-
   def draw_on_bitmap(self, bm, show_all=False):
     bm[self.block.blk_num] = 'H'
     for b in self.ext_blk_nums:
@@ -239,5 +235,21 @@ class ADFSFile(ADFSNode):
     result += self.data_blk_nums
     return result
   
+  def get_blocks(self, with_data=True):
+    result = [self.block]
+    result += self.ext_blks
+    if with_data:
+      if self.data == None:
+        self.read()
+      result += self.data_blks
+    return result
+  
   def can_delete(self):
     return True
+  
+  def get_size(self):
+    return self.data_size
+  
+  def get_size_str(self):
+    return "%8d" % self.data_size
+

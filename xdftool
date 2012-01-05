@@ -161,6 +161,62 @@ class DeleteCmd(FSCommand):
       node.delete(wipe=do_wipe)
     else:
       print "Can't find node:",name
+      
+class ProtectCmd(FSCommand):
+  def handle_vol(self, img, vol):
+    n = len(self.opts)
+    if n != 2:
+      print "Usage: comment <ami_file> <protect>"
+      return
+    name = self.opts[0]
+    pr_str = self.opts[1]    
+    node = vol.get_path_name(name)
+    if node != None:
+      node.change_protect_by_string(pr_str)
+    else:
+      print "Can't find node:",name
+
+class CommentCmd(FSCommand):
+  def handle_vol(self, img, vol):
+    n = len(self.opts)
+    if n != 2:
+      print "Usage: comment <ami_file> <comment>"
+      return
+    name = self.opts[0]
+    comment = self.opts[1]
+    node = vol.get_path_name(name)
+    if node != None:
+      node.change_comment(comment)
+    else:
+      print "Can't find node:",name
+    
+class TimeCmd(FSCommand):
+  def handle_vol(self, img, vol):
+    pass
+
+# ----- Block Tools -----
+
+class BlockCmd(FSCommand):
+  def handle_vol(self, img, vol):
+    n = len(self.opts)
+    if n == 0:
+      print "Usage: block ( boot | root | node <ami_file> [data] )"
+    cmd = self.opts[0]
+    if cmd == 'boot':
+      vol.boot.dump()
+    elif cmd == 'root':
+      vol.root.dump()
+    elif cmd == 'node':
+      if n == 1:
+        print "No node given!"
+      else:
+        name = self.opts[1]
+        node = vol.get_path_name(name)
+        if node != None:
+          with_data = "data" in self.opts
+          node.dump_blocks(with_data)
+        else:
+          print "Can't find node:",name
 
 # ----- Bitmap Tools -----
 
@@ -242,7 +298,11 @@ cmd_map = {
 "delete" : DeleteCmd, 
 "format" : FormatCmd,
 "bitmap" : BitmapCmd,
-"blkdev" : BlkDevCmd
+"blkdev" : BlkDevCmd,
+"protect" : ProtectCmd,
+"comment" : CommentCmd,
+"time" : TimeCmd,
+"block" : BlockCmd
 }
 
 parser = argparse.ArgumentParser()
@@ -257,7 +317,7 @@ cmd = cmd_list[0]
 if not cmd_map.has_key(cmd):
   print "INVALID COMMAND:",cmd
   print "valid commands are:"
-  for a in cmd_map:
+  for a in sorted(cmd_map):
     print "  ",a
   sys.exit(1)
 cmd_cls = cmd_map[cmd]

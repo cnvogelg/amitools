@@ -5,6 +5,7 @@ from ADFSFile import ADFSFile
 from ADFSNode import ADFSNode
 from FileName import FileName
 from FSError import *
+from MetaInfo import *
 
 class ADFSDir(ADFSNode):
   def __init__(self, volume, parent, is_vol=False):
@@ -85,12 +86,12 @@ class ADFSDir(ADFSNode):
         return True
     return False
   
-  def blocks_create_new(self, free_blks, name, protect, comment, mod_time, hash_chain_blk, parent_blk):
+  def blocks_create_new(self, free_blks, name, hash_chain_blk, parent_blk, meta_info):
     blk_num = free_blks[0]
     blkdev = self.blkdev
     # create a UserDirBlock
     ud = UserDirBlock(blkdev, blk_num)
-    ud.create(parent_blk, name, protect, comment, mod_time, hash_chain_blk)
+    ud.create(parent_blk, name, meta_info.get_protect(), meta_info.get_comment(), meta_info.get_mod_ts(), hash_chain_blk)
     ud.write()    
     self.set_block(ud)
     return blk_num
@@ -100,7 +101,12 @@ class ADFSDir(ADFSNode):
     # -> only one UserDirBlock
     return 1
     
-  def _create_node(self, node, name, protect, comment, mod_time):
+  def _create_node(self, node, name, meta_info):
+    # make sure a default meta_info is available
+    if meta_info == None:
+      meta_info = MetaInfo()
+      meta_info.set_current_time()
+      meta_info.set_default_protect()
     # check file name
     fn = FileName(name)
     if not fn.is_valid():
@@ -130,7 +136,7 @@ class ADFSDir(ADFSNode):
     self.volume.bitmap.write_only_bits()
       
     # now create the blocks for this node
-    new_blk = node.blocks_create_new(free_blks, name, protect, comment, mod_time, hash_chain_blk, self.block.blk_num)
+    new_blk = node.blocks_create_new(free_blks, name, hash_chain_blk, self.block.blk_num, meta_info)
 
     # update my dir
     self.block.hash_table[fn_hash] = new_blk 
@@ -140,14 +146,14 @@ class ADFSDir(ADFSNode):
     self.name_hash[fn_hash].insert(0,node)
     self.entries.append(node)
         
-  def create_dir(self, name, protect=0, comment=None, mod_time=None):
+  def create_dir(self, name, meta_info=None):
     node = ADFSDir(self.volume, self)
-    self._create_node(node, name, protect, comment, mod_time)
+    self._create_node(node, name, meta_info)
   
-  def create_file(self, name, data, protect=0, comment=None, mod_time=None):
+  def create_file(self, name, data, meta_info=None):
     node = ADFSFile(self.volume, self) 
     node.set_file_data(data)
-    self._create_node(node, name, protect, comment, mod_time) 
+    self._create_node(node, name, meta_info) 
   
   def _delete(self, node, wipe=False):
     # can we delete?
@@ -204,20 +210,9 @@ class ADFSDir(ADFSNode):
   
   def get_entries_sorted_by_name(self):
     return sorted(self.entries, key=lambda x : x.name.to_upper())
-  
-  def dump(self):
-    print "Dir(%d)" % self.block.blk_num
-    print " entries: %s" % self.entries
-  
+    
   def list(self, indent=0, all=False):
-    istr = "  " * indent
-    if self.is_vol:
-      tstr = "VOL"
-      pstr = ""
-    else:
-      tstr = "DIR"
-      pstr = str(self.block.protect_flags)
-    print "%-40s       %s  %7s  %s" % (istr + self.block.name, tstr, pstr, self.block.mod_ts)
+    ADFSNode.list(self, indent, all)
     if not all and indent > 0:
       return
     if self.entries:
@@ -262,3 +257,21 @@ class ADFSDir(ADFSNode):
 
   def get_block_nums(self):
     return [self.block.blk_num]
+
+  def get_blocks(self, with_data=False):
+    return [self.block]
+
+  def get_size(self):
+    return 0
+  
+  def get_size_str(self):
+    if self.is_vol:
+      return "-VOLUME-"
+    else:
+      return "   -DIR-"
+
+  def create_meta_info(self):
+    if self.is_vol:
+      self.meta_info = MetaInfo(mod_ts=self.block.mod_ts)
+    else:
+      ADFSNode.create_meta_info(self)

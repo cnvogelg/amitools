@@ -1,7 +1,5 @@
 import time
 from Block import Block
-from ..ProtectFlags import ProtectFlags
-from ..TimeStamp import *
 
 class UserDirBlock(Block):
   def __init__(self, blkdev, blk_num):
@@ -23,7 +21,6 @@ class UserDirBlock(Block):
     # UserDir fields
     self.own_key = self._get_long(1)
     self.protect = self._get_long(-48)
-    self.protect_flags = ProtectFlags(self.protect)
     self.comment = self._get_bstr(-46, 79)
     self.mod_ts = self._get_timestamp(-23)
     self.name = self._get_bstr(-20, 30)
@@ -39,18 +36,15 @@ class UserDirBlock(Block):
     self.valid = (self.own_key == self.blk_num)
     return self.valid
 
-  def create(self, parent, name, protect=0, comment=None, mod_time=None, hash_chain=0):
+  def create(self, parent, name, protect=0, comment=None, mod_ts=0, hash_chain=0):
     self.own_key = self.blk_num
     self.protect = protect
-    self.protect_flags = ProtectFlags(self.protect)
     if comment == None:
       self.comment = ''
     else:
       self.comment = comment
     # timestamps
-    if mod_time == None:
-      mod_time = time.mktime(time.localtime())
-    self.mod_ts = ts_create_from_secs(mod_time)
+    self.mod_ts = mod_ts
     self.name = name
     self.hash_chain = hash_chain
     self.parent = parent
