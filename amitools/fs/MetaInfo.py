@@ -50,7 +50,8 @@ class MetaInfo:
   def set_mod_time(self, mod_time):
     self.mod_time = mod_time
     if self.mod_time != None:
-      self.mod_ts = ts_create_from_secs(mod_time)
+      self.mod_ts = TimeStamp()
+      self.mod_ts.from_secs(mod_time)
     else:
       self.mod_ts = None
   

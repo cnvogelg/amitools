@@ -42,7 +42,7 @@ class CommandQueue:
       while cmd_line != None:
         cmd = self.create_cmd_instance(cmd_line)
         if cmd == None:
-          self.show_cmd_help(cmd_list[0])
+          self.show_cmd_help(cmd_line[0])
           return 2
   
         # run next command

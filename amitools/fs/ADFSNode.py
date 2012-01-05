@@ -1,6 +1,7 @@
 from FileName import FileName
 from MetaInfo import MetaInfo
 from ProtectFlags import ProtectFlags
+from TimeStamp import TimeStamp
 
 class ADFSNode:
   def __init__(self, volume, parent):
@@ -42,8 +43,8 @@ class ADFSNode:
 
     mod_ts = meta_info.get_mod_ts()
     if mod_ts != None:
-      self.block.mod_ts = mode_ts
-      self.meta_info.set_mode_ts(mod_ts)
+      self.block.mod_ts = mod_ts
+      self.meta_info.set_mod_ts(mod_ts)
       dirty = True
     
     comment = meta_info.get_comment()
@@ -68,6 +69,11 @@ class ADFSNode:
     
   def change_mod_ts(self, mod_ts):
     self.change_meta_info(MetaInfo(mod_ts=mod_ts))
+    
+  def change_mod_ts_by_string(self, tm_str):
+    t = TimeStamp()
+    t.parse(tm_str)
+    self.change_meta_info(MetaInfo(mod_ts=t))
 
   def list(self, indent=0, all=False):
     istr = "  " * indent

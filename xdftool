@@ -303,7 +303,19 @@ class TimeCmd(Command):
   def __init__(self, args, opts):
     Command.__init__(self, args, opts, edit=True)
   def handle_vol(self, vol):
-    return 0
+    n = len(self.opts)
+    if n != 2:
+      print "Usage: time <ami_file> <time>"
+      return 1
+    name = self.opts[0]
+    tstr = self.opts[1]
+    node = vol.get_path_name(name)
+    if node != None:
+      node.change_mod_ts_by_string(tstr)
+      return 0
+    else:
+      print "Can't find node:",name
+      return 2
 
 # ----- Block Tools -----
 

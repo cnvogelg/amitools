@@ -20,9 +20,12 @@ class RootBlock(Block):
       disk_time = create_time
     if mod_time == None:
       mod_time = create_time
-    self.mod_ts = ts_create_from_secs(mod_time)
-    self.disk_ts = ts_create_from_secs(disk_time)
-    self.create_ts = ts_create_from_secs(create_time)
+    self.mod_ts = TimeStamp()
+    self.mod_ts.from_secs(mod_time)
+    self.disk_ts = TimeStamp()
+    self.disk_ts.from_secs(disk_time)
+    self.create_ts = TimeStamp()
+    self.create_ts.from_secs(create_time)
     
     # name
     self.name = name
