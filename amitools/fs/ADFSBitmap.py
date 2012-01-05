@@ -91,6 +91,9 @@ class ADFSBitmap:
     # write ext blocks
     for ext_blk in self.ext_blks:
       ext_blk.write()
+    self.write_only_bits()
+      
+  def write_only_bits(self):
     # write bitmap blocks
     off = 0
     for blk in self.bitmap_blks:

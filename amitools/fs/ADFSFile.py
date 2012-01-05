@@ -5,8 +5,8 @@ from ADFSNode import ADFSNode
 from FSError import *
 
 class ADFSFile(ADFSNode):
-  def __init__(self, volume):
-    ADFSNode.__init__(self, volume)
+  def __init__(self, volume, parent):
+    ADFSNode.__init__(self, volume, parent)
     # state
     self.ext_blk_nums = []
     self.ext_blks = []
@@ -232,3 +232,12 @@ class ADFSFile(ADFSNode):
       bm[b] = 'E'
     for b in self.data_blk_nums:
       bm[b] = 'd'
+
+  def get_block_nums(self):
+    result = [self.block.blk_num]
+    result += self.ext_blk_nums
+    result += self.data_blk_nums
+    return result
+  
+  def can_delete(self):
+    return True

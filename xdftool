@@ -146,6 +146,21 @@ class WriteCmd(FSCommand):
     
     # create file
     node.create_file(file_name, data)
+    
+class DeleteCmd(FSCommand):
+  def handle_vol(self, img, vol):
+    n = len(self.opts)
+    if n == 0:
+      print "Usage: delete <ami_path> [wipe]"
+      return
+    
+    name = self.opts[0]
+    node = vol.get_path_name(name)
+    if node != None:
+      do_wipe = 'wipe' in self.opts
+      node.delete(wipe=do_wipe)
+    else:
+      print "Can't find node:",name
 
 # ----- Bitmap Tools -----
 
@@ -222,8 +237,9 @@ cmd_map = {
 "list" : ListCmd,
 "type" : TypeCmd,
 "read" : ReadCmd,
-"mkdir" : MakeDirCmd,
+"makedir" : MakeDirCmd,
 "write" : WriteCmd,
+"delete" : DeleteCmd, 
 "format" : FormatCmd,
 "bitmap" : BitmapCmd,
 "blkdev" : BlkDevCmd

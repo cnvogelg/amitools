@@ -7,8 +7,8 @@ from FileName import FileName
 from FSError import *
 
 class ADFSDir(ADFSNode):
-  def __init__(self, volume, is_vol=False):
-    ADFSNode.__init__(self, volume)
+  def __init__(self, volume, parent, is_vol=False):
+    ADFSNode.__init__(self, volume, parent)
     self.is_vol = False
     # state
     self.entries = []
@@ -39,13 +39,13 @@ class ADFSDir(ADFSNode):
     if blk.valid_chksum and blk.type == Block.T_SHORT:
       # its a userdir
       if blk.sub_type == Block.ST_USERDIR:
-        node = ADFSDir(self.volume)
+        node = ADFSDir(self.volume, self)
         blk = node.blocks_create_old(blk)
         if recursive:
           node.read()
       # its a file
       elif blk.sub_type == Block.ST_FILE:
-        node = ADFSFile(self.volume)
+        node = ADFSFile(self.volume, self)
         blk = node.blocks_create_old(blk)
       # unsupported
       else:
@@ -127,7 +127,7 @@ class ADFSDir(ADFSNode):
     # update bitmap
     for b in free_blks:
       self.volume.bitmap.clr_bit(b)
-    self.volume.bitmap.write()
+    self.volume.bitmap.write_only_bits()
       
     # now create the blocks for this node
     new_blk = node.blocks_create_new(free_blks, name, protect, comment, mod_time, hash_chain_blk, self.block.blk_num)
@@ -141,13 +141,66 @@ class ADFSDir(ADFSNode):
     self.entries.append(node)
         
   def create_dir(self, name, protect=0, comment=None, mod_time=None):
-    node = ADFSDir(self.volume)
+    node = ADFSDir(self.volume, self)
     self._create_node(node, name, protect, comment, mod_time)
   
   def create_file(self, name, data, protect=0, comment=None, mod_time=None):
-    node = ADFSFile(self.volume) 
+    node = ADFSFile(self.volume, self) 
     node.set_file_data(data)
     self._create_node(node, name, protect, comment, mod_time) 
+  
+  def _delete(self, node, wipe=False):
+    # can we delete?
+    if not node.can_delete():
+      raise FSError(DELETE_NOT_ALLOWED, node=node)
+    # make sure its a node of mine
+    if node.parent != self:
+      raise FSError(INTERNAL_ERROR, node=node)
+    # get hash key
+    hash_key = node.name.hash()
+    names = self.name_hash[hash_key]
+    # find my node
+    pos = None
+    for i in xrange(len(names)):
+      if names[i] == node:
+        pos = i
+        break
+    # hmm not found?!
+    if pos == None:
+      raise FSError(INTERNAL_ERROR, node=node)
+    # find prev and next in hash list
+    if pos > 0:
+      prev = names[pos-1]
+    else:
+      prev = None
+    if pos == len(names)-1:
+      next_blk = 0
+    else:
+      next_blk = names[pos+1].block.blk_num
+    # remove node from the hash chain
+    if prev == None:
+      self.block.hash_table[hash_key] = next_blk
+      self.block.write()
+    else:
+      prev.block.hash_chain = next_blk
+      prev.block.write()
+    # remove from my lists
+    self.entries.remove(node)
+    names.remove(node)
+    # remove blocks of node in bitmap
+    blk_nums = node.get_block_nums()
+    bm = self.volume.bitmap
+    for blk_num in blk_nums:
+      bm.set_bit(blk_num)
+    bm.write_only_bits()
+    # (optional) wipe blocks
+    if wipe:
+      clr_blk = '\0' * self.blkdev.block_bytes
+      for blk_num in blk_nums:
+        self.blkdev.write_block(blk_num, clr_blk)
+    
+  def can_delete(self):
+    return len(self.entries) == 0
   
   def get_entries_sorted_by_name(self):
     return sorted(self.entries, key=lambda x : x.name.to_upper())
@@ -206,3 +259,6 @@ class ADFSDir(ADFSNode):
     if show_all:
       for e in self.entries:
         e.draw_on_bitmap(bm, True)
+
+  def get_block_nums(self):
+    return [self.block.blk_num]

@@ -14,6 +14,8 @@ FILE_DATA_BLOCK_COUNT_MISMATCH = 13
 INVALID_BITMAP_BLOCK = 14,
 BITMAP_BLOCK_COUNT_MISMATCH = 15,
 BITMAP_SIZE_MISMATCH = 16
+DELETE_NOT_ALLOWED = 17
+INTERNAL_ERROR = 18
 
 error_names = {
   INVALID_BOOT_BLOCK : "Invalid Boot Block",
@@ -31,7 +33,9 @@ error_names = {
   FILE_DATA_BLOCK_COUNT_MISMATCH : "FileData Block Count Mismatch",
   INVALID_BITMAP_BLOCK : "Invalid Bitmap Block",
   BITMAP_BLOCK_COUNT_MISMATCH : "Bitmap Block Count Mismatch",
-  BITMAP_SIZE_MISMATCH : "Bitmap Size Mismatch"
+  BITMAP_SIZE_MISMATCH : "Bitmap Size Mismatch",
+  DELETE_NOT_ALLOWED : "Delete Not Allowed",
+  INTERNAL_ERROR : "Internal Error"
 }
 
 class FSError(Exception):

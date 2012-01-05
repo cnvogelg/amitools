@@ -29,7 +29,7 @@ class ADFSVolume:
       self.root.read()
       if self.root.valid:
         # create root dir
-        self.root_dir = ADFSDir(self)
+        self.root_dir = ADFSDir(self, None)
         self.root_dir.set_root(self.root)
         self.root_dir.read()
         # create bitmap
@@ -54,7 +54,7 @@ class ADFSVolume:
     self.bitmap.create()
     self.bitmap.write() # writes root block, too
     # create empty root dir
-    self.root_dir = ADFSDir(self)
+    self.root_dir = ADFSDir(self, None)
     self.root_dir.set_root(self.root)
     self.root_dir.read()
     # all ok
