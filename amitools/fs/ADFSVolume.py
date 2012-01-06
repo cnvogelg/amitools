@@ -16,6 +16,7 @@ class ADFSVolume:
     
     self.valid = False
     self.is_ffs = None
+    self.name = None
     
   def open(self):
     # read boot block
@@ -28,6 +29,7 @@ class ADFSVolume:
       self.root = RootBlock(self.blkdev, self.boot.calc_root_blk)
       self.root.read()
       if self.root.valid:
+        self.name = self.root.name
         # create root dir
         self.root_dir = ADFSDir(self, None)
         self.root_dir.set_root(self.root)
@@ -49,6 +51,7 @@ class ADFSVolume:
     # create a root block
     self.root = RootBlock(self.blkdev, self.boot.calc_root_blk)
     self.root.create(name, create_time)
+    self.name = name
     # create bitmap
     self.bitmap = ADFSBitmap(self.root)
     self.bitmap.create()

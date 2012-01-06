@@ -10,6 +10,7 @@ from amitools.fs.ADFSVolume import ADFSVolume
 from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
 from amitools.fs.blkdev.HDFBlockDevice import HDFBlockDevice
 from amitools.fs.FSError import *
+from amitools.fs.Imager import Imager
 from amitools.util.CommandQueue import CommandQueue
 
 # ----- commands -----
@@ -19,6 +20,7 @@ class Command:
     self.opts = opts
     self.create = create
     self.edit = edit
+    self.exit_code = 0
     
     self.volume = None
     self.blkdev = None
@@ -89,6 +91,9 @@ class FSCommandQueue(CommandQueue):
       print "command:",self.cmd_line
     if cmd.edit and self.blkdev.read_only:
       raise IOError("Edit commands not allowed in read-only mode")
+    # check code of command
+    if cmd.exit_code != 0:
+      return cmd.exit_code  
     # setup blkdev
     if cmd.create:
       if self.args.verbose:
@@ -127,7 +132,39 @@ class FSCommandQueue(CommandQueue):
     if self.args.verbose:
       print "exit_code:",exit_code
     return exit_code
-  
+
+# ----- Pack/Unpack -----
+
+class PackCmd(Command):
+  def __init__(self, args, opts):
+    Command.__init__(self, args, opts, create=True)
+    self.imager = Imager()
+    n = len(self.opts)
+    if n == 0:
+      print "Usage: pack <in_path>"
+      self.exit_code = 1
+    else:
+      self.in_path = self.opts[0]
+  def create_blkdev(self, blkdev):
+    return self.imager.pack_create_blkdev(self.in_path, blkdev)
+  def create_volume(self, volume):
+    self.imager.pack_create_volume(self.in_path, volume)
+  def handle_vol(self, volume):
+    self.imager.pack_root(self.in_path, volume)
+    return 0
+
+class UnpackCmd(Command):
+  def handle_vol(self, vol):
+    n = len(self.opts)
+    if n == 0:
+      print "Usage: unpack <out_path>"
+      return 1
+    else:
+      out_path = self.opts[0]
+      img = Imager()
+      img.unpack(vol, out_path)
+      return 0
+
 # ----- Query Image -----
 
 # list: list directory tree
@@ -194,12 +231,14 @@ class ReadCmd(Command):
 class FormatCmd(Command):
   def __init__(self, args, opts):
     Command.__init__(self, args, opts, create=True)
-  def handle_blkdev(self, blkdev):
-    return 0
   def create_blkdev(self, blkdev):
     blkdev.create()
+    return True
   def create_volume(self, vol):
     vol.create("Test")
+    return True
+  def handle_vol(self, vol):
+    return 0
 
 class MakeDirCmd(Command):
   def __init__(self, args, opts):
@@ -445,7 +484,9 @@ cmd_map = {
 "protect" : ProtectCmd,
 "comment" : CommentCmd,
 "time" : TimeCmd,
-"block" : BlockCmd
+"block" : BlockCmd,
+"pack" : PackCmd,
+"unpack" : UnpackCmd
 }
 
 parser = argparse.ArgumentParser()

@@ -25,6 +25,7 @@ class ADFSDir(ADFSNode):
   def set_root(self, root_blk):
     self.is_vol = True
     self.set_block(root_blk)
+    self._init_name_hash()
     
   def blocks_create_old(self, anon_blk):
     ud = UserDirBlock(self.blkdev, anon_blk.blk_num)
@@ -54,14 +55,19 @@ class ADFSDir(ADFSNode):
     hash_chain = blk.hash_chain
     return hash_chain,node
   
+  def _init_name_hash(self):
+    for i in xrange(self.block.hash_size):
+      self.name_hash.append([])      
+  
   def read(self, recursive=True):
+    self._init_name_hash() 
+     
     # create initial list with blk_num/hash_index for dir scan
     blocks = []
     for i in xrange(self.block.hash_size):
       blk_num = self.block.hash_table[i]
       if blk_num != 0:
         blocks.append((blk_num,i))
-      self.name_hash.append([])
   
     for blk_num,hash_idx in blocks:
       # read anonymous block
@@ -94,6 +100,7 @@ class ADFSDir(ADFSNode):
     ud.create(parent_blk, name, meta_info.get_protect(), meta_info.get_comment(), meta_info.get_mod_ts(), hash_chain_blk)
     ud.write()    
     self.set_block(ud)
+    self._init_name_hash()
     return blk_num
   
   def blocks_get_create_num(self):
@@ -149,11 +156,13 @@ class ADFSDir(ADFSNode):
   def create_dir(self, name, meta_info=None):
     node = ADFSDir(self.volume, self)
     self._create_node(node, name, meta_info)
+    return node
   
   def create_file(self, name, data, meta_info=None):
     node = ADFSFile(self.volume, self) 
     node.set_file_data(data)
     self._create_node(node, name, meta_info) 
+    return node
   
   def _delete(self, node, wipe=False):
     # can we delete?
