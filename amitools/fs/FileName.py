@@ -4,7 +4,7 @@ class FileName:
     self.is_intl = is_intl
   
   def __str__(self):
-    return name
+    return self.name
   
   def to_upper(self):
     result = self.name.upper();

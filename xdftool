@@ -191,15 +191,9 @@ class TypeCmd(Command):
       print "Usage: type <ami_file>"
       return 1
     else:
-      name = p[0]
-      node = vol.get_file_path_name(name)
-      if node != None:
-        data = node.get_file_data()
-        print data
-        return 0
-      else:
-        print "ERROR file not found:",name
-        return 2
+      data = vol.read_file(p[0])
+      print data
+      return 0
 
 class ReadCmd(Command):
   def handle_vol(self, vol):
@@ -209,15 +203,10 @@ class ReadCmd(Command):
       print "Usage: read <ami_file> [sys_file]"
       return 1
     # try to get ami file  
-    node = vol.get_file_path_name(p[0])
-    if node == None:
-      print "ERROR: file not found:",p[0]
-      return 2
-    # get data of file
-    data = node.get_file_data()
+    data = vol.read_file(p[0])
     # determine output name
     if n == 1:
-      out_name = node.get_file_name_str()
+      out_name = os.path.basename(p[0])
     else:
       out_name = p[1]
     # write data to file
@@ -266,7 +255,6 @@ class WriteCmd(Command):
     if n == 0 or n > 2:
       print "Usage: write <sys_file> [ami_path]"
       return 1
-    
     # read sys file
     data = None
     sys_file = self.opts[0]
@@ -277,16 +265,13 @@ class WriteCmd(Command):
     except IOError as e:
       print "ERROR reading:",sys_file
       return 2
+    # get file_name and ami_path
     file_name = os.path.basename(sys_file)
-    
-    # get ami dir node
-    if n == 2:
-      node, file_name = vol.get_create_path_name(self.opts[1], file_name)
+    if n > 1:
+        ami_path = self.opts[1]
     else:
-      node = vol.root_dir
-    
-    # create file
-    node.create_file(file_name, data)
+        ami_path = None
+    vol.write_file(data, ami_path, file_name)
     return 0
     
 class DeleteCmd(Command):
@@ -295,18 +280,13 @@ class DeleteCmd(Command):
   def handle_vol(self, vol):
     n = len(self.opts)
     if n == 0:
-      print "Usage: delete <ami_path> [wipe]"
+      print "Usage: delete <ami_path> [wipe] [all]"
       return 1
-    
-    name = self.opts[0]
-    node = vol.get_path_name(name)
-    if node != None:
-      do_wipe = 'wipe' in self.opts
-      node.delete(wipe=do_wipe)
-      return 0
-    else:
-      print "Can't find node:",name
-      return 2
+    do_wipe = 'wipe' in self.opts
+    do_all = 'all' in self.opts
+    path = self.opts[0]
+    node = vol.delete(path, wipe=do_wipe, all=do_all)
+    return 0
       
 class ProtectCmd(Command):
   def __init__(self, args, opts):

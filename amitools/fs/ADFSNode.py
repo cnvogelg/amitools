@@ -26,8 +26,13 @@ class ADFSNode:
   def get_file_name_str(self):
     return self.name.name
 
-  def delete(self, wipe=False):
+  def delete(self, wipe=False, all=False):
+    if all:
+      self.delete_children(wipe, all)
     self.parent._delete(self, wipe=wipe)
+
+  def delete_children(self, wipe, all):
+    pass
 
   def get_meta_info(self):
     return self.meta_info

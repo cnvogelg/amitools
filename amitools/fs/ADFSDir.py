@@ -11,7 +11,7 @@ class ADFSDir(ADFSNode):
   def __init__(self, volume, parent):
     ADFSNode.__init__(self, volume, parent)
     # state
-    self.entries = []
+    self.entries = None
     self.name_hash = []
     self.valid = False
     
@@ -53,8 +53,9 @@ class ADFSDir(ADFSNode):
     for i in xrange(self.block.hash_size):
       self.name_hash.append([])      
   
-  def read(self, recursive=True):
-    self._init_name_hash() 
+  def read(self, recursive=False):
+    self._init_name_hash()
+    self.entries = [] 
      
     # create initial list with blk_num/hash_index for dir scan
     blocks = []
@@ -76,6 +77,20 @@ class ADFSDir(ADFSNode):
       # follow hash chain
       if hash_chain != 0:
         blocks.append((hash_chain,hash_idx))
+    
+  def flush(self):
+    if self.entries:
+      for e in self.entries:
+        e.flush()
+    self.entries = None
+  
+  def ensure_entries(self):
+    if not self.entries:
+      self.read()
+      
+  def get_entries(self):
+    self.ensure_entries()
+    return self.entries
   
   def has_name(self, fn):
     fn_hash = fn.hash()
@@ -103,6 +118,8 @@ class ADFSDir(ADFSNode):
     return 1
     
   def _create_node(self, node, name, meta_info):
+    self.ensure_entries()
+    
     # make sure a default meta_info is available
     if meta_info == None:
       meta_info = MetaInfo()
@@ -159,6 +176,8 @@ class ADFSDir(ADFSNode):
     return node
   
   def _delete(self, node, wipe=False):
+    self.ensure_entries()
+    
     # can we delete?
     if not node.can_delete():
       raise FSError(DELETE_NOT_ALLOWED, node=node)
@@ -209,23 +228,31 @@ class ADFSDir(ADFSNode):
         self.blkdev.write_block(blk_num, clr_blk)
     
   def can_delete(self):
+    self.ensure_entries()
     return len(self.entries) == 0
   
+  def delete_children(self, wipe, all):
+    self.ensure_entries()
+    for e in self.entries:
+      e.delete(wipe, all)
+
   def get_entries_sorted_by_name(self):
+    self.ensure_entries()
     return sorted(self.entries, key=lambda x : x.name.to_upper())
     
   def list(self, indent=0, all=False):
     ADFSNode.list(self, indent, all)
     if not all and indent > 0:
       return
-    if self.entries:
-      es = self.get_entries_sorted_by_name()
-      for e in es:
-        e.list(indent=indent+1, all=all)
+    self.ensure_entries()
+    es = self.get_entries_sorted_by_name()
+    for e in es:
+      e.list(indent=indent+1, all=all)
     
   def get_path(self, pc, allow_file=True, allow_dir=True):
     if len(pc) == 0:
       return self
+    self.ensure_entries()
     for e in self.entries:
       if e.name.to_upper() == pc[0].to_upper():
         if len(pc) > 1:
@@ -252,6 +279,7 @@ class ADFSDir(ADFSNode):
     blk_num = self.block.blk_num
     bm[blk_num] = 'D'
     if show_all:
+      self.ensure_entries()
       for e in self.entries:
         e.draw_on_bitmap(bm, True)
 

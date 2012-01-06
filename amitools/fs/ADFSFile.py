@@ -103,6 +103,14 @@ class ADFSFile(ADFSNode):
     self.read()
     return self.data
   
+  def flush(self):
+    self.data = None
+    self.data_blks = None
+  
+  def ensure_data(self):
+    if self.data == None:
+      self.read()
+  
   def set_file_data(self, data):
     self.data = data
     self.data_size = len(data)
@@ -190,6 +198,7 @@ class ADFSFile(ADFSNode):
     return fhb_num
   
   def write(self):
+    self.data_blks = []
     off = 0
     left = self.data_size
     blk_idx = 0
@@ -239,8 +248,7 @@ class ADFSFile(ADFSNode):
     result = [self.block]
     result += self.ext_blks
     if with_data:
-      if self.data == None:
-        self.read()
+      self.ensure_data()
       result += self.data_blks
     return result
   

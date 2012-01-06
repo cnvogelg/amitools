@@ -31,11 +31,13 @@ class Imager:
     if isinstance(node, ADFSDir):
       sub_dir = os.path.join(path, name)
       os.mkdir(sub_dir)
-      for sub_node in node.entries:
+      for sub_node in node.get_entries():
         self.unpack_node(sub_node, sub_dir)
+      node.flush()
     # file
     elif isinstance(node, ADFSFile):
       data = node.get_file_data()
+      node.flush()
       file_path = os.path.join(path, name)
       fh = open(file_path, "wb")
       fh.write(data)
@@ -79,4 +81,4 @@ class Imager:
         data = fh.read()
         fh.close()
         node = parent_node.create_file(name, data)
-        
+        node.flush()

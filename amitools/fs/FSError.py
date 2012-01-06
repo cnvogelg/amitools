@@ -17,6 +17,8 @@ BITMAP_SIZE_MISMATCH = 16
 DELETE_NOT_ALLOWED = 17
 INTERNAL_ERROR = 18
 INVALID_PROTECT_FORMAT = 19
+INVALID_PARENT_DIRECTORY = 20
+FILE_NOT_FOUND = 21
 
 error_names = {
   INVALID_BOOT_BLOCK : "Invalid Boot Block",
@@ -37,7 +39,9 @@ error_names = {
   BITMAP_SIZE_MISMATCH : "Bitmap Size Mismatch",
   DELETE_NOT_ALLOWED : "Delete Not Allowed",
   INTERNAL_ERROR : "Internal Error",
-  INVALID_PROTECT_FORMAT : "Invalid Protect Format"
+  INVALID_PROTECT_FORMAT : "Invalid Protect Format",
+  INVALID_PARENT_DIRECTORY : "Invalid Parent Directory",
+  FILE_NOT_FOUND : "File not found"
 }
 
 class FSError(Exception):

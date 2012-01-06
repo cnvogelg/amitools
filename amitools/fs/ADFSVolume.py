@@ -97,19 +97,47 @@ class ADFSVolume:
         file_name = path_name[pos+1:]
         if len(file_name) == 0:
           file_name = suggest_name
-        node = vol.get_dir_path_name(dir_name)
+        node = self.get_dir_path_name(dir_name)
         return node, file_name
       else:
         # its a file name
         return self.root_dir, path_name
   
-  def create_dir(self, path_name):
-    pc = path_name.split("/")
+  # ----- convenience API -----
+  
+  def create_dir(self, ami_path):
+    pc = ami_path.split("/")
     # no directory given
     if len(pc) == 0:
-      return False
+      raise FSError(INVALID_PARENT_DIRECTORY, file_name=ami_path)
     # no parent dir found
-    node = self.get_dir_path_name("/".join(pc[:-2]))
+    node = self.get_dir_path_name("/".join(pc[:-1]))
     if node == None:
-      return False
-    return node.create_dir(path_name)
+      raise FSError(INVALID_PARENT_DIRECTORY, file_name=ami_path)
+    node.create_dir(pc[-1])
+    
+  def write_file(self, data, ami_path=None, file_name=None, cache=False):
+    parent_node, file_name = self.get_create_path_name(ami_path, file_name)
+    if parent_node == None:
+      raise FSError(INVALID_PARENT_DIRECTORY, file_name=ami_path)
+    if file_name == None:
+      raise FSError(INVALID_FILE_NAME, file_name=file_name)
+    # create file
+    node = parent_node.create_file(file_name, data)
+    if not cache:
+      node.flush()
+  
+  def read_file(self, ami_path, cache=False):
+    node = self.get_file_path_name(ami_path)
+    if node == None:
+      raise FSError(FILE_NOT_FOUND, file_name=ami_path)
+    data = node.get_file_data()
+    if not cache:
+      node.flush()
+    return data
+  
+  def delete(self, ami_path, wipe=False, all=False):
+    node = self.get_path_name(ami_path)
+    if node == None:
+      raise FSError(INVALID_FILE_NAME, file_name=ami_path)
+    node.delete(wipe=wipe, all=all)
