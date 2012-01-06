@@ -231,11 +231,17 @@ class ReadCmd(Command):
 class FormatCmd(Command):
   def __init__(self, args, opts):
     Command.__init__(self, args, opts, create=True)
+    n = len(self.opts)
+    if n == 0:
+      print "Usage: format <volume_name>"
+      self.exit_code = 1
+    else:
+      self.vol_name = self.opts[0]
   def create_blkdev(self, blkdev):
     blkdev.create()
     return True
   def create_volume(self, vol):
-    vol.create("Test")
+    vol.create(self.vol_name)
     return True
   def handle_vol(self, vol):
     return 0
