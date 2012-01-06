@@ -157,7 +157,7 @@ class ADFSBitmap:
       found = self.get_bit(pos)
       old_pos = pos
       pos += 1
-      if pos == self.bitmap_bits:
+      if pos == self.bitmap_bits + self.blkdev.reserved:
         pos = self.blkdev.reserved
       if found:
         # start a next position
