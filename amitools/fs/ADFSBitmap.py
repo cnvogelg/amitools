@@ -131,6 +131,7 @@ class ADFSBitmap:
           raise FSError(INVALID_BITMAP_BLOCK, block=bm)
         bitmap_data += bm.get_bitmap_data()
         self.bitmap_blks.append(bm)
+      ext_blk = bm_ext.bitmap_ext_blk
 
     # check bitmap data
     num_bm_blks = len(self.bitmap_blks)
