@@ -8,9 +8,8 @@ from FSError import *
 from MetaInfo import *
 
 class ADFSDir(ADFSNode):
-  def __init__(self, volume, parent, is_vol=False):
+  def __init__(self, volume, parent):
     ADFSNode.__init__(self, volume, parent)
-    self.is_vol = False
     # state
     self.entries = []
     self.name_hash = []
@@ -22,11 +21,6 @@ class ADFSDir(ADFSNode):
     else:
       return "[Dir]"
   
-  def set_root(self, root_blk):
-    self.is_vol = True
-    self.set_block(root_blk)
-    self._init_name_hash()
-    
   def blocks_create_old(self, anon_blk):
     ud = UserDirBlock(self.blkdev, anon_blk.blk_num)
     ud.set(anon_blk.data)
@@ -256,10 +250,7 @@ class ADFSDir(ADFSNode):
     
   def draw_on_bitmap(self, bm, show_all=False):
     blk_num = self.block.blk_num
-    if self.is_vol:
-      bm[blk_num] = 'V'
-    else:
-      bm[blk_num] = 'D'
+    bm[blk_num] = 'D'
     if show_all:
       for e in self.entries:
         e.draw_on_bitmap(bm, True)
@@ -274,13 +265,4 @@ class ADFSDir(ADFSNode):
     return 0
   
   def get_size_str(self):
-    if self.is_vol:
-      return "-VOLUME-"
-    else:
-      return "   -DIR-"
-
-  def create_meta_info(self):
-    if self.is_vol:
-      self.meta_info = MetaInfo(mod_ts=self.block.mod_ts)
-    else:
-      ADFSNode.create_meta_info(self)
+    return "DIR"

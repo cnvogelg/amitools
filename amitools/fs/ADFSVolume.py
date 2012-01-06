@@ -1,6 +1,6 @@
 from block.BootBlock import BootBlock
 from block.RootBlock import RootBlock
-from ADFSDir import ADFSDir
+from ADFSVolDir import ADFSVolDir
 from ADFSBitmap import ADFSBitmap
 from FileName import FileName
 from FSError import *
@@ -31,8 +31,7 @@ class ADFSVolume:
       if self.root.valid:
         self.name = self.root.name
         # create root dir
-        self.root_dir = ADFSDir(self, None)
-        self.root_dir.set_root(self.root)
+        self.root_dir = ADFSVolDir(self, self.root)
         self.root_dir.read()
         # create bitmap
         self.bitmap = ADFSBitmap(self.root)
@@ -57,8 +56,7 @@ class ADFSVolume:
     self.bitmap.create()
     self.bitmap.write() # writes root block, too
     # create empty root dir
-    self.root_dir = ADFSDir(self, None)
-    self.root_dir.set_root(self.root)
+    self.root_dir = ADFSVolDir(self, self.root)
     self.root_dir.read()
     # all ok
     self.valid = True

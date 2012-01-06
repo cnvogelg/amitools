@@ -52,6 +52,11 @@ class Imager:
     blkdev.create()
     
   def pack_create_volume(self, in_path, volume):
+    if in_path == None or in_path == "":
+      raise IOError("Invalid pack input path!")
+    # remove trailing slash
+    if in_path[-1] == '/':
+      in_path = in_path[:-1]
     name = os.path.basename(in_path)
     volume.create(name)
   

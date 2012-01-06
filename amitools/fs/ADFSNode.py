@@ -77,7 +77,7 @@ class ADFSNode:
 
   def list(self, indent=0, all=False):
     istr = "  " * indent
-    print "%-40s       %s  %s" % (istr + self.block.name, self.get_size_str(), str(self.meta_info))
+    print "%-40s       %8s  %s" % (istr + self.block.name, self.get_size_str(), str(self.meta_info))
 
   def dump_blocks(self, with_data=False):
     blks = self.get_blocks(with_data)
