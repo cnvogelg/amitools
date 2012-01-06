@@ -12,7 +12,7 @@ class ADFSDir(ADFSNode):
     ADFSNode.__init__(self, volume, parent)
     # state
     self.entries = None
-    self.name_hash = []
+    self.name_hash = None
     self.valid = False
     
   def __repr__(self):
@@ -50,6 +50,7 @@ class ADFSDir(ADFSNode):
     return hash_chain,node
   
   def _init_name_hash(self):
+    self.name_hash = []
     for i in xrange(self.block.hash_size):
       self.name_hash.append([])      
   
@@ -83,6 +84,7 @@ class ADFSDir(ADFSNode):
       for e in self.entries:
         e.flush()
     self.entries = None
+    self.name_hash = None
   
   def ensure_entries(self):
     if not self.entries:
@@ -184,6 +186,8 @@ class ADFSDir(ADFSNode):
     # make sure its a node of mine
     if node.parent != self:
       raise FSError(INTERNAL_ERROR, node=node)
+    if node not in self.entries:
+      raise FSError(INTERNAL_ERROR, node=node)      
     # get hash key
     hash_key = node.name.hash()
     names = self.name_hash[hash_key]
@@ -233,7 +237,8 @@ class ADFSDir(ADFSNode):
   
   def delete_children(self, wipe, all):
     self.ensure_entries()
-    for e in self.entries:
+    entries = self.entries[:]
+    for e in entries:
       e.delete(wipe, all)
 
   def get_entries_sorted_by_name(self):
