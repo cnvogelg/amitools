@@ -12,7 +12,7 @@ def parse_fd(fname):
   funcs = []
   res['funcs'] = funcs
   
-  func_pat = "([A-Za-z][A-Za-z00-9]+)\((.*)\)\((.*)\)"
+  func_pat = "([A-Za-z][_A-Za-z00-9]+)\((.*)\)\((.*)\)"
   
   bias = 0
   private = True
