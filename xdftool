@@ -12,6 +12,7 @@ from amitools.fs.blkdev.HDFBlockDevice import HDFBlockDevice
 from amitools.fs.FSError import *
 from amitools.fs.Imager import Imager
 from amitools.util.CommandQueue import CommandQueue
+from amitools.util.HexDump import *
 
 # ----- commands -----
 class Command:
@@ -348,7 +349,7 @@ class BlockCmd(Command):
   def handle_vol(self, vol):
     n = len(self.opts)
     if n == 0:
-      print "Usage: block ( boot | root | node <ami_file> [data] )"
+      print "Usage: block ( boot | root | node <ami_file> [data] | dump <block_no> )"
       return 1
     cmd = self.opts[0]
     if cmd == 'boot':
@@ -371,6 +372,14 @@ class BlockCmd(Command):
         else:
           print "Can't find node:",name
           return 2
+    elif cmd == 'dump':
+      if n == 1:
+        print "No block number given!"
+        return 1
+      else:
+        block_no = int(self.opts[1])
+        data = vol.blkdev.read_block(block_no)
+        print_hex(data)
 
 # ----- Bitmap Tools -----
 

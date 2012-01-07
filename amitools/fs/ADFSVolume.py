@@ -16,6 +16,8 @@ class ADFSVolume:
     
     self.valid = False
     self.is_ffs = None
+    self.is_intl = None
+    self.is_dircache = None
     self.name = None
     
   def open(self):
@@ -24,7 +26,10 @@ class ADFSVolume:
     self.boot.read()
     # valid root block?
     if self.boot.valid:
-      self.is_ffs = self.boot.dos_type > BootBlock.DOS0
+      # get fs flags
+      self.is_ffs = self.boot.is_ffs()
+      self.is_intl = self.boot.is_intl()
+      self.is_dircache = self.boot.is_dircache()
       # read root 
       self.root = RootBlock(self.blkdev, self.boot.calc_root_blk)
       self.root.read()

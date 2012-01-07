@@ -6,7 +6,7 @@ class RootBlock(Block):
   def __init__(self, blkdev, blk_num):
     Block.__init__(self, blkdev, blk_num, is_type=Block.T_SHORT, is_sub_type=Block.ST_ROOT)
   
-  def create(self, name, create_time=None, disk_time=None, mod_time=None):
+  def create(self, name, create_time=None, disk_time=None, mod_time=None, extension=0):
     # init fresh hash table
     self.hash_size = self.blkdev.block_longs - 56
     self.hash_table = []
@@ -36,6 +36,8 @@ class RootBlock(Block):
     for i in xrange(25):
       self.bitmap_ptrs.append(0)
     self.bitmap_ext_blk = 0
+    
+    self.extension = extension
   
   def write(self):
     self._create_data()
@@ -58,6 +60,7 @@ class RootBlock(Block):
     
     # name
     self._put_bstr(-20, 30, self.name)
+    self._put_long(-2, self.extension)
     
     Block.write(self)
   
@@ -87,6 +90,7 @@ class RootBlock(Block):
     
     # name
     self.name = self._get_bstr(-20, 30)
+    self.extension = self._get_long(-2)
     
     # check validity
     self.valid = (self.bitmap_flag == 0xffffffff)
@@ -103,4 +107,6 @@ class RootBlock(Block):
     print " disk_ts:   %s" % self.disk_ts
     print " create_ts: %s" % self.create_ts
     print " disk name: %s" % self.name
+    print " extension: %s" % self.extension
+
      

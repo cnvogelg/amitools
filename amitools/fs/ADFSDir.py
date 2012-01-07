@@ -1,6 +1,7 @@
 import struct
 from block.Block import Block
 from block.UserDirBlock import UserDirBlock
+from block.DirCacheBlock import DirCacheBlock 
 from ADFSFile import ADFSFile
 from ADFSNode import ADFSNode
 from FileName import FileName
@@ -12,6 +13,7 @@ class ADFSDir(ADFSNode):
     ADFSNode.__init__(self, volume, parent)
     # state
     self.entries = None
+    self.dcache_blks = None
     self.name_hash = None
     self.valid = False
     
@@ -69,6 +71,9 @@ class ADFSDir(ADFSNode):
       # read anonymous block
       blk = Block(self.blkdev, blk_num)
       blk.read()
+      if not blk.valid:
+        self.valid = False
+        return
       # create file/dir node
       hash_chain,node = self._read_add_node(blk, recursive)
       # store node in entries
@@ -78,6 +83,19 @@ class ADFSDir(ADFSNode):
       # follow hash chain
       if hash_chain != 0:
         blocks.append((hash_chain,hash_idx))
+    
+    # dircaches available?
+    if self.volume.is_dircache:
+      self.dcache_blks = []
+      dcb_num = self.block.extension
+      while dcb_num != 0:
+        dcb = DirCacheBlock(self.blkdev, dcb_num)
+        dcb.read()
+        if not dcb.valid:
+          self.valid = False
+          return
+        self.dcache_blks.append(dcb)
+        dcb_num = dcb.next_cache
     
   def flush(self):
     if self.entries:
@@ -225,6 +243,7 @@ class ADFSDir(ADFSNode):
     for blk_num in blk_nums:
       bm.set_bit(blk_num)
     bm.write_only_bits()
+    
     # (optional) wipe blocks
     if wipe:
       clr_blk = '\0' * self.blkdev.block_bytes
@@ -289,10 +308,19 @@ class ADFSDir(ADFSNode):
         e.draw_on_bitmap(bm, True)
 
   def get_block_nums(self):
-    return [self.block.blk_num]
+    self.ensure_entries()
+    result = [self.block.blk_num]
+    if self.volume.is_dircache:
+      for dcb in self.dcache_blks:
+        result.append(dcb.blk_num)
+    return result
 
   def get_blocks(self, with_data=False):
-    return [self.block]
+    self.ensure_entries()
+    result = [self.block]
+    if self.volume.is_dircache:
+      result += self.dcache_blks
+    return result
 
   def get_size(self):
     return 0

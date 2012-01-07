@@ -1,6 +1,6 @@
 import Hunk
 import HunkDisassembler
-from ..Utils import *
+from amitools.util.HexDump import *
 
 class HunkShow:
   
@@ -90,7 +90,7 @@ class HunkShow:
     
     self.print_segment_header(hunk_no, type_name, size, name, data_file_offset, hunk_file_offset, alloc_size)
     if self.hexdump:
-      Utils.print_hex(main['data'],indent=8)
+      print_hex(main['data'],indent=8)
 
     for extra in hunk[1:]:
       self.show_extra_hunk(extra)
@@ -166,7 +166,7 @@ class HunkShow:
           self.print_symbol(addr,"line %d" % line)
     else:
       if self.show_debug:
-        Utils.print_hex(hunk['data'],indent=8)
+        print_hex(hunk['data'],indent=8)
     
   def show_symbol_hunk(self, hunk):
     for symbol in hunk['symbols']:

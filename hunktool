@@ -17,7 +17,7 @@ from amitools.hunk import HunkReader
 from amitools.hunk import HunkShow
 from amitools.hunk import HunkRelocate
 from amitools.elf import ELFReader
-import amitools.Utils
+from amitools.util.HexDump import *
 
 def print_pretty(data):
   pp = pprint.PrettyPrinter(indent=2)
@@ -157,7 +157,7 @@ class Relocate(HunkCommand):
       print "Total: ","%06x"%(rel.get_total_size())
       if args.hexdump:
         for d in datas:
-          amitools.Utils.print_hex(d)
+          print_hex(d)
       return True
 
 # ----- Elf2Hunk -----

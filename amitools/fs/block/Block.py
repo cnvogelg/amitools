@@ -8,6 +8,7 @@ class Block:
   T_SHORT = 2
   T_DATA = 8
   T_LIST = 16
+  T_DIR_CACHE = 33
   # block sub types
   ST_ROOT = 1
   ST_USERDIR = 2
