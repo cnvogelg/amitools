@@ -2,6 +2,7 @@ from FileName import FileName
 from MetaInfo import MetaInfo
 from ProtectFlags import ProtectFlags
 from TimeStamp import TimeStamp
+from FSError import *
 
 class ADFSNode:
   def __init__(self, volume, parent):
@@ -40,26 +41,47 @@ class ADFSNode:
   def change_meta_info(self, meta_info):
     dirty = False
 
+    # dircache?
+    rebuild_dircache = False
+    if self.volume.is_dircache and self.parent != None:
+      record = self.parent.get_dircache_record(self.get_file_name_str())
+      if record == None:
+        raise FSError(INTERNAL_ERROR, node=self)
+
+    # alter protect flags
     protect = meta_info.get_protect()
     if protect != None and hasattr(self.block, 'protect'):
       self.block.protect = protect
       self.meta_info.set_protect(protect)
       dirty = True
+      if record != None:
+        record.protect = protect
 
+    # alter mod time
     mod_ts = meta_info.get_mod_ts()
     if mod_ts != None:
       self.block.mod_ts = mod_ts
       self.meta_info.set_mod_ts(mod_ts)
       dirty = True
+      if record != None:
+        record.mod_ts = mod_ts
     
+    # alter comment
     comment = meta_info.get_comment()
     if comment != None and hasattr(self.block, "comment"):
       self.block.comment = comment
       self.meta_info.set_comment(comment)
       dirty = True
+      if record != None:
+        rebuild_dircache = len(record.comment) < comment 
+        record.comment = comment
     
+    # really need update?
     if dirty:
       self.block.write()
+      # dirache update
+      if record != None:
+        self.parent.update_dircache_record(record, rebuild_dircache)        
       
   def change_comment(self, comment):
     self.change_meta_info(MetaInfo(comment=comment))

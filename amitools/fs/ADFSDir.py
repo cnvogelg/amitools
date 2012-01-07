@@ -175,7 +175,7 @@ class ADFSDir(ADFSNode):
     if self.volume.is_dircache:
       ok = self._dircache_add_entry(name, meta_info, new_blk, node.get_size(), update_myself=False)
       if not ok:
-        self.delete(wipe)
+        self.delete()
         raise FSError(NO_FREE_BLOCKS, node=self, file_name=name, extra="want dcache")
 
     # update my dir
@@ -348,6 +348,9 @@ class ADFSDir(ADFSNode):
     # create a new dircache record
     r = DirCacheRecord(entry=entry_blk, size=size, protect=meta_info.get_protect(), \
                        mod_ts=meta_info.get_mod_ts(), sub_type=0, name=name, comment=meta_info.get_comment())
+    return self._dircache_add_entry_int(r, update_myself)
+    
+  def _dircache_add_entry_int(self, r, update_myself=True):
     r_bytes = r.get_size()
     # find a dircache block with enough space
     found_blk = None
@@ -430,3 +433,26 @@ class ADFSDir(ADFSNode):
       dcb.write()
       return None
     
+  def get_dircache_record(self, name):
+    if self.dcache_blks != None:
+      for dcb in self.dcache_blks:
+        record = dcb.get_record_by_name(name)
+        if record != None:
+          return record
+    return None
+  
+  def update_dircache_record(self, record, rebuild):
+    if self.dcache_blks == None:
+      return
+    # update record
+    if rebuild:
+      self._dircache_remove_entry(record.name, update_myself=False)
+      self._dircache_add_entry_int(record, update_myself=True)
+    else:
+      # simply re-write the dircache block
+      for dcb in self.dcache_blks:
+        if dcb.has_record(record):
+          dcb.write()
+          break
+
+ 

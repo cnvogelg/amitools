@@ -140,6 +140,9 @@ class DirCacheBlock(Block):
     self.records.remove(record)
     self.num_records = len(self.records)
   
+  def has_record(self, record):
+    return record in self.records
+  
   def is_empty(self):
     return self.num_records == 0
   
