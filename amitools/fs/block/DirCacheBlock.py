@@ -130,6 +130,19 @@ class DirCacheBlock(Block):
     self.records.append(record)
     self.num_records = len(self.records)
   
+  def get_record_by_name(self, name):
+    for r in self.records:
+      if r.name == name:
+        return r
+    return None
+  
+  def remove_record(self, record):
+    self.records.remove(record)
+    self.num_records = len(self.records)
+  
+  def is_empty(self):
+    return self.num_records == 0
+  
   def write(self):
     Block._create_data(self)
     self._put_long(1, self.own_key)

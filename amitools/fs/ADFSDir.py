@@ -164,9 +164,8 @@ class ADFSDir(ADFSNode):
     num_blks = node.blocks_get_create_num()
     
     # try to find free blocks
-    free_blks = self.volume.bitmap.alloc_n_free(num_blks)
+    free_blks = self.volume.bitmap.alloc_n(num_blks)
     if free_blks == None:
-      self._dircache_remove_entry(name)
       raise FSError(NO_FREE_BLOCKS, node=self, file_name=name, extra="want %d" % num_blks)
       
     # now create the blocks for this node
@@ -174,7 +173,7 @@ class ADFSDir(ADFSNode):
 
     # dircache: create record for this node
     if self.volume.is_dircache:
-      ok = self._dircache_add_entry(name, meta_info, new_blk, node.get_size())
+      ok = self._dircache_add_entry(name, meta_info, new_blk, node.get_size(), update_myself=False)
       if not ok:
         self.delete(wipe)
         raise FSError(NO_FREE_BLOCKS, node=self, file_name=name, extra="want dcache")
@@ -230,6 +229,7 @@ class ADFSDir(ADFSNode):
       next_blk = 0
     else:
       next_blk = names[pos+1].block.blk_num
+
     # remove node from the hash chain
     if prev == None:
       self.block.hash_table[hash_key] = next_blk
@@ -237,15 +237,14 @@ class ADFSDir(ADFSNode):
     else:
       prev.block.hash_chain = next_blk
       prev.block.write()
+
     # remove from my lists
     self.entries.remove(node)
     names.remove(node)
+
     # remove blocks of node in bitmap
     blk_nums = node.get_block_nums()
-    bm = self.volume.bitmap
-    for blk_num in blk_nums:
-      bm.set_bit(blk_num)
-    bm.write_only_bits()
+    self.volume.bitmap.dealloc_n(blk_nums)
     
     # dircache?
     if self.volume.is_dircache:
@@ -318,6 +317,9 @@ class ADFSDir(ADFSNode):
       self.ensure_entries()
       for e in self.entries:
         e.draw_on_bitmap(bm, True)
+    if self.dcache_blks != None:
+      for dcb in self.dcache_blks:
+        bm[dcb.blk_num] = 'C'
 
   def get_block_nums(self):
     self.ensure_entries()
@@ -342,7 +344,7 @@ class ADFSDir(ADFSNode):
 
   # ----- dir cache -----
 
-  def _dircache_add_entry(self, name, meta_info, entry_blk, size):
+  def _dircache_add_entry(self, name, meta_info, entry_blk, size, update_myself=True):
     # create a new dircache record
     r = DirCacheRecord(entry=entry_blk, size=size, protect=meta_info.get_protect(), \
                        mod_ts=meta_info.get_mod_ts(), sub_type=0, name=name, comment=meta_info.get_comment())
@@ -356,7 +358,7 @@ class ADFSDir(ADFSNode):
         break
     # need to create a new one?
     if found_blk == None:
-      found_blk = self._dircache_add_block()
+      found_blk = self._dircache_add_block(update_myself)
       if found_blk == None:
         return False
     # add record to block and update it
@@ -364,9 +366,9 @@ class ADFSDir(ADFSNode):
     found_blk.write()
     return True
   
-  def _dircache_add_block(self):
+  def _dircache_add_block(self, update_myself):
     # allocate block
-    blk_nums = self.volume.bitmap.alloc_n_free(1)
+    blk_nums = self.volume.bitmap.alloc_n(1)
     if blk_nums == None:
       return None
     # setup dir cache block
@@ -376,7 +378,8 @@ class ADFSDir(ADFSNode):
     # link new cache block
     if len(self.dcache_blks) == 0:
       self.block.extension = dcb_num
-      # self.block.write() <- we do not need to write here as it is done in _create_above !
+      if update_myself:
+        self.block.write()
     else:
       last_dcb = self.dcache_blks[-1]
       last_dcb.next_cache = dcb_num
@@ -384,6 +387,46 @@ class ADFSDir(ADFSNode):
     self.dcache_blks.append(dcb)
     return dcb
     
-  def _dircache_remove_entry(self, name):
-    pass
+  def _dircache_remove_entry(self, name, update_myself=True):
+    # first find entry
+    pos = None
+    dcb = None
+    record = None
+    n = len(self.dcache_blks)
+    for i in xrange(n):
+      dcb = self.dcache_blks[i]
+      record = dcb.get_record_by_name(name)
+      if record != None:
+        pos = i
+        break
+    if record == None:
+      raise FSError(INTERNAL_ERROR, node=self)
+    # remove entry from this block
+    dcb.remove_record(record)
+    # remove whole block?
+    if dcb.is_empty():
+      # next block following me
+      if pos == n-1:
+        next = 0
+      else:
+        next = self.dcache_blks[pos+1].blk_num
+      # update block links
+      if pos == 0:
+        # adjust extension link in this dir node
+        self.block.extension = next
+        if update_myself:
+          self.block.write()
+      else:
+        # adjust dircache block in front of me
+        prev_blk = self.dcache_blks[pos-1]
+        prev_blk.next_cache = next
+        prev_blk.write()
+      # free cache block in bitmap
+      blk_num = dcb.blk_num
+      self.volume.bitmap.dealloc_n([blk_num])
+      return blk_num # return number of just deleted block
+    else:
+      # update cache block with reduced set of records
+      dcb.write()
+      return None
     
