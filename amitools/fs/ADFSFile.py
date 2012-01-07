@@ -230,6 +230,7 @@ class ADFSFile(ADFSNode):
         self.data_blks.append(fdb)
       blk_idx += 1
       off += bs
+      left -= bs
   
   def draw_on_bitmap(self, bm, show_all=False):
     bm[self.block.blk_num] = 'H'

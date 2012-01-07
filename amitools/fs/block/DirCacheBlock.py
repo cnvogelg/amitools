@@ -13,7 +13,10 @@ class DirCacheRecord:
     self.mod_ts = mod_ts
     self.sub_type = sub_type
     self.name = name
-    self.comment = comment
+    if comment == None:
+      self.comment = ''
+    else:
+      self.comment = comment
     self.offset = None
   
   def get_size(self):
@@ -32,10 +35,12 @@ class DirCacheRecord:
     self.type = ord(data[off + 22])
     # name
     name_len = ord(data[off + 23])
-    self.name = data[off + 24 : off + 24 + name_len]
+    name_off = off + 24
+    self.name = data[name_off : name_off + name_len]
     # comment
     comment_len = ord(data[off + name_len + 24])
-    self.comment = data[off + 25 : off + 25 + comment_len]
+    comment_off = off + 25 + name_len
+    self.comment = data[comment_off : comment_off + comment_len]
     return off + self.get_size()
     
   def put(self, data, off):
@@ -45,12 +50,12 @@ class DirCacheRecord:
     struct.pack_into(">IIIHHHHH",data,off,self.entry,self.size,self.protect,0,0,ts.days,ts.mins,ts.ticks)
     # name
     name_len = len(self.name)
-    data[off + 23] = name_len
-    name_off = 24 + name_len
+    data[off + 23] = chr(name_len)
+    name_off = off + 24
     data[name_off : name_off + name_len] = self.name
     # comment
     comment_len = len(self.comment)
-    data[off + 24 + name_len] = comment_len
+    data[off + 24 + name_len] = chr(comment_len)
     comment_off = off + 25 + name_len
     data[comment_off : comment_off + comment_len] = self.comment
     return off + self.get_size()
@@ -101,8 +106,18 @@ class DirCacheBlock(Block):
     
     self.valid = True
     return True
+    
+  def get_total_record_size(self):
+    size = 0
+    for r in self.records:
+      size += r.get_size()
+    return size
+    
+  def get_free_record_size(self):
+    return self.blkdev.block_bytes - 24 - self.get_total_record_size()
 
-  def create(self, parent, records, next_cache=0):
+  def create(self, parent, records=[], next_cache=0):
+    Block.create(self)
     self.own_key = self.blk_num
     self.parent = parent
     self.num_records = len(records)
@@ -110,7 +125,11 @@ class DirCacheBlock(Block):
     self.records = records
     self.valid = True
     return True
-    
+  
+  def add_record(self, record):
+    self.records.append(record)
+    self.num_records = len(self.records)
+  
   def write(self):
     Block._create_data(self)
     self._put_long(1, self.own_key)

@@ -1,7 +1,7 @@
 import struct
 from block.Block import Block
 from block.UserDirBlock import UserDirBlock
-from block.DirCacheBlock import DirCacheBlock 
+from block.DirCacheBlock import * 
 from ADFSFile import ADFSFile
 from ADFSNode import ADFSNode
 from FileName import FileName
@@ -164,17 +164,20 @@ class ADFSDir(ADFSNode):
     num_blks = node.blocks_get_create_num()
     
     # try to find free blocks
-    free_blks = self.volume.bitmap.find_n_free(num_blks)
+    free_blks = self.volume.bitmap.alloc_n_free(num_blks)
     if free_blks == None:
+      self._dircache_remove_entry(name)
       raise FSError(NO_FREE_BLOCKS, node=self, file_name=name, extra="want %d" % num_blks)
-      
-    # update bitmap
-    for b in free_blks:
-      self.volume.bitmap.clr_bit(b)
-    self.volume.bitmap.write_only_bits()
       
     # now create the blocks for this node
     new_blk = node.blocks_create_new(free_blks, name, hash_chain_blk, self.block.blk_num, meta_info)
+
+    # dircache: create record for this node
+    if self.volume.is_dircache:
+      ok = self._dircache_add_entry(name, meta_info, new_blk, node.get_size())
+      if not ok:
+        self.delete(wipe)
+        raise FSError(NO_FREE_BLOCKS, node=self, file_name=name, extra="want dcache")
 
     # update my dir
     self.block.hash_table[fn_hash] = new_blk 
@@ -182,7 +185,7 @@ class ADFSDir(ADFSNode):
     
     # add node
     self.name_hash[fn_hash].insert(0,node)
-    self.entries.append(node)
+    self.entries.append(node)    
         
   def create_dir(self, name, meta_info=None):
     node = ADFSDir(self.volume, self)
@@ -244,11 +247,20 @@ class ADFSDir(ADFSNode):
       bm.set_bit(blk_num)
     bm.write_only_bits()
     
+    # dircache?
+    if self.volume.is_dircache:
+      free_blk_num = self._dircache_remove_entry(node.name.name)
+    else:
+      free_blk_num = None
+    
     # (optional) wipe blocks
     if wipe:
       clr_blk = '\0' * self.blkdev.block_bytes
       for blk_num in blk_nums:
         self.blkdev.write_block(blk_num, clr_blk)
+      # wipe a potentially free'ed dircache block, too
+      if free_blk != None:
+        self.blkdev.write_block(free_blk_num, clr_blk)
     
   def can_delete(self):
     self.ensure_entries()
@@ -327,3 +339,51 @@ class ADFSDir(ADFSNode):
   
   def get_size_str(self):
     return "DIR"
+
+  # ----- dir cache -----
+
+  def _dircache_add_entry(self, name, meta_info, entry_blk, size):
+    # create a new dircache record
+    r = DirCacheRecord(entry=entry_blk, size=size, protect=meta_info.get_protect(), \
+                       mod_ts=meta_info.get_mod_ts(), sub_type=0, name=name, comment=meta_info.get_comment())
+    r_bytes = r.get_size()
+    # find a dircache block with enough space
+    found_blk = None
+    for dcb in self.dcache_blks:
+      free_bytes = dcb.get_free_record_size()
+      if r_bytes < free_bytes:
+        found_blk = dcb
+        break
+    # need to create a new one?
+    if found_blk == None:
+      found_blk = self._dircache_add_block()
+      if found_blk == None:
+        return False
+    # add record to block and update it
+    found_blk.add_record(r)
+    found_blk.write()
+    return True
+  
+  def _dircache_add_block(self):
+    # allocate block
+    blk_nums = self.volume.bitmap.alloc_n_free(1)
+    if blk_nums == None:
+      return None
+    # setup dir cache block
+    dcb_num = blk_nums[0]
+    dcb = DirCacheBlock(self.blkdev, dcb_num)
+    dcb.create(parent=self.block.blk_num)
+    # link new cache block
+    if len(self.dcache_blks) == 0:
+      self.block.extension = dcb_num
+      # self.block.write() <- we do not need to write here as it is done in _create_above !
+    else:
+      last_dcb = self.dcache_blks[-1]
+      last_dcb.next_cache = dcb_num
+      last_dcb.write()
+    self.dcache_blks.append(dcb)
+    return dcb
+    
+  def _dircache_remove_entry(self, name):
+    pass
+    

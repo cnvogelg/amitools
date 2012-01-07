@@ -35,7 +35,8 @@ class BootBlock(Block):
     Block.__init__(self, blkdev, blk_num)
     self.dos_type = None
     self.got_root_blk = None
-    self.got_chksum = None
+    self.got_chksum = 0
+    self.calc_chksum = 0
     self.boot_code = None
   
   def create(self, dos_type=DOS0, root_blk=None, boot_code=None):
@@ -48,6 +49,7 @@ class BootBlock(Block):
     else:
       self.got_root_blk = self.calc_root_blk
     self.boot_code = boot_code
+    self.valid_dos_type = True
     self.valid = True
   
   def _calc_chksum(self):
@@ -84,6 +86,8 @@ class BootBlock(Block):
       self.data[12:12+n] = boot_code
       self.calc_chksum = self._calc_chksum()
       self._put_long(1, self.calc_chksum)
+    else:
+      self.calc_chksum = 0
     self._write_data()
   
   def get_dos_type_flags(self):

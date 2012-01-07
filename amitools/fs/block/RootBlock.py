@@ -7,6 +7,7 @@ class RootBlock(Block):
     Block.__init__(self, blkdev, blk_num, is_type=Block.T_SHORT, is_sub_type=Block.ST_ROOT)
   
   def create(self, name, create_time=None, disk_time=None, mod_time=None, extension=0):
+    Block.create(self)
     # init fresh hash table
     self.hash_size = self.blkdev.block_longs - 56
     self.hash_table = []

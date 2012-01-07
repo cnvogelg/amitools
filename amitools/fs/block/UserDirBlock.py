@@ -39,6 +39,7 @@ class UserDirBlock(Block):
     return self.valid
 
   def create(self, parent, name, protect=0, comment=None, mod_ts=0, hash_chain=0, extension=0):
+    Block.create(self)
     self.own_key = self.blk_num
     self.protect = protect
     if comment == None:

@@ -183,6 +183,15 @@ class ADFSBitmap:
       result.append(blk_num)
     return result
 
+  def alloc_n_free(self, num, start=None):
+    free_blks = self.find_n_free(num, start)
+    if free_blks == None:
+      return None
+    for b in free_blks:
+      self.clr_bit(b)
+    self.write_only_bits()
+    return free_blks
+
   def get_bit(self, off):
     if off < self.blkdev.reserved or off >= self.blkdev.num_blocks:
       return None

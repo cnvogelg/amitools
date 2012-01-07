@@ -47,10 +47,22 @@ class ADFSVolume:
     else:
       raise FSError(INVALID_BOOT_BLOCK, block=self.boot)
   
-  def create(self, name, create_time=None, dos_type=BootBlock.DOS0, boot_code=None):
+  def create(self, name, create_time=None, dos_type=None, boot_code=None, is_ffs=False, is_intl=False, is_dircache=False):
+    # determine dos_type
+    if dos_type == None:
+      dos_type = BootBlock.DOS0
+      if is_ffs:
+        dos_type |= BootBlock.DOS_MASK_FFS
+      if is_dircache:
+        dos_type |= BootBlock.DOS_MASK_DIRCACHE
+      elif is_intl:
+        dos_type |= BootBlock.DOS_MASK_INTL
     # create a boot block
-    self.boot = BootBlock(self.blkdev)
-    self.boot.create()
+    self.boot = BootBlock(self.blkdev, )
+    self.boot.create(dos_type=dos_type, boot_code=boot_code)
+    self.is_ffs = self.boot.is_ffs()
+    self.is_intl = self.boot.is_intl()
+    self.is_dircache = self.boot.is_dircache()
     self.boot.write()
     # create a root block
     self.root = RootBlock(self.blkdev, self.boot.calc_root_blk)

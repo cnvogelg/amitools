@@ -16,6 +16,8 @@ class FileName:
     return result
   
   def is_valid(self):
+    if len(self.name) > 30:
+      return False
     for c in self.name:
       o = ord(c)
       if o == ':' or o == '/':
