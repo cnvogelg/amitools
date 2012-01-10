@@ -1,60 +1,11 @@
-import subprocess
-import tempfile
-import os
+from amitools.util.DisAsm import DisAsm
 import Hunk
 
 class HunkDisassembler:
  
   def __init__(self, use_objdump = False, cpu = '68000'):
-    self.use_objdump = use_objdump
-    self.cpu = cpu
+    self.disasm = DisAsm(use_objdump, cpu)
  
-  def parse_vda68k(self, lines):
-    # parse output: split addr, raw words, and code
-    result = []
-    for l in lines:
-      addr = int(l[0:8],16)
-      word = map(lambda x: int(x,16),l[10:30].split())      
-      code = l[30:]
-      result.append((addr,word,code))
-    return result
- 
-  def parse_objdump(self, lines):
-    result = []
-    for l in lines[7:]:
-      if not '...' in l:
-        addr_str = l[:8].strip()
-        word_str = l[9:26].split()
-        code = l[26:]
-      
-        addr = int(addr_str,16)
-        word = map(lambda x: int(x,16),word_str)
-        result.append((addr,word,code))
-    return result
- 
-  def gen_disassembly(self, data, start):
-    # write to temp file
-    tmpname = tempfile.mktemp()
-    out = file(tmpname,"wb")
-    out.write(data)
-    out.close()
-    
-    if self.use_objdump:
-      cmd = ["m68k-elf-objdump","-D","-b","binary","-m",self.cpu,tmpname]
-    else:
-      cmd = ["vda68k",tmpname,str(start)]
-    
-    # call external disassembler
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-    output = p.communicate()[0]
-    os.remove(tmpname)
-    lines = output.splitlines()
-    
-    if self.use_objdump:
-      return self.parse_objdump(lines)
-    else:
-      return self.parse_vda68k(lines)
-
   def get_symtab(self, hunk):
     for h in hunk[1:]:
       if h['type'] == Hunk.HUNK_SYMBOL:
@@ -204,7 +155,7 @@ class HunkDisassembler:
   
   def show_disassembly(self, hunk, seg_list, start):
     main = hunk[0]
-    lines = self.gen_disassembly(main['data'],start)
+    lines = self.disasm.disassemble(main['data'],start)
     # show line by line
     for l in lines:
       addr = l[0]

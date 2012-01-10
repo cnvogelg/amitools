@@ -11,8 +11,10 @@ from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
 from amitools.fs.blkdev.HDFBlockDevice import HDFBlockDevice
 from amitools.fs.FSError import *
 from amitools.fs.Imager import Imager
+from amitools.fs.block.BootBlock import BootBlock
 from amitools.util.CommandQueue import CommandQueue
 from amitools.util.HexDump import *
+from amitools.util.DisAsm import DisAsm
 
 # ----- commands -----
 class Command:
@@ -34,6 +36,9 @@ class Command:
     elif hasattr(self, 'handle_vol'):
       return self.handle_vol(vol)
 
+  def need_volume(self):
+    return hasattr(self, 'handle_vol')
+    
 class FSCommandQueue(CommandQueue):
   def __init__(self, args, cmd_list, sep, cmd_map):
     CommandQueue.__init__(self, cmd_list, sep, cmd_map)
@@ -54,6 +59,18 @@ class FSCommandQueue(CommandQueue):
     else:
       print "INVALID image file:",self.img
       return None
+  
+  def setup_volume(self, cmd):
+    # setup volume
+    self.volume = ADFSVolume(self.blkdev)
+    if cmd.create:
+      if self.args.verbose:
+        print "creating volume:",self.img
+      cmd.create_volume(self.volume)
+    else:
+      if self.args.verbose:
+        print "opening volume:",self.img
+      self.volume.open()
   
   def run(self):
     # get blkdev for image
@@ -104,31 +121,29 @@ class FSCommandQueue(CommandQueue):
       if self.args.verbose:
         print "opening image:",self.img
       self.blkdev.open()
-        
-    # setup volume
-    self.volume = ADFSVolume(self.blkdev)
-    if cmd.create:
-      if self.args.verbose:
-        print "creating volume:",self.img
-      cmd.create_volume(self.volume)
-    else:
-      if self.args.verbose:
-        print "opening volume:",self.img
-      self.volume.open()
-
+    # setup volume (if necessary)
+    if cmd.need_volume():
+      self.setup_volume(cmd)
+    # run command
     exit_code = cmd.run(self.blkdev, self.volume)
     if self.args.verbose:
       print "exit_code:",exit_code
+    self.first_cmd = cmd
     return exit_code
     
   def run_next(self, cmd_line, cmd):
     self.cmd_line = cmd_line
     if self.args.verbose:
       print "command:",self.cmd_line
+    # verify command
     if cmd.create:
       raise IOError("Create command is only allowed as first command")
     if cmd.edit and self.blkdev.read_only:
       raise IOError("Edit commands not allowed in read-only mode")
+    # make sure volume is set up
+    if self.volume == None and cmd.need_volume():
+      self.setup_volume(cmd)
+    # run command
     exit_code = cmd.run(self.blkdev, self.volume)
     if self.args.verbose:
       print "exit_code:",exit_code
@@ -461,6 +476,65 @@ class BitmapCmd(Command):
       print "Unknown bitmap command!"
       return 1
 
+# ----- Boot Tools -----
+
+class BootCmd(Command):
+  def handle_blkdev(self, blkdev):
+    n = len(self.opts)
+    if n == 0:
+      print "Usage: boot ( show [hex] [asm] | read <file> )"
+      return 1
+    cmd = self.opts[0]
+    # fetch boot blcok
+    bb = BootBlock(blkdev, 0)
+    bb.read()
+    # boot show [hex] [asm]
+    if cmd == 'show':
+      bb.dump()
+      if bb.valid:
+        if 'hex' in self.opts:
+          print_hex(bb.boot_code)
+        if 'asm' in self.opts:
+          dis = DisAsm()
+          code = dis.disassemble(bb.boot_code)
+          dis.dump(code)
+      return 0
+    # boot read <file>
+    elif cmd == 'read':
+      if n > 1:
+        if bb.valid:
+          if bb.boot_code != None:
+            f = open(self.opts[1], "wb")
+            f.write(bb.boot_code)
+            f.close()
+          else:
+            print "No Boot Code found!"
+            return 2
+        else:
+          print "Invalid Boot Block!"
+          return 1
+      else:
+        print "No file name!"
+        return 1
+    # boot write <file>
+    elif cmd == 'write':
+      if n > 1:
+        f = open(self.opts[1], "rb")
+        data = f.read()
+        f.close()
+        ok = bb.set_boot_code(data)
+        if ok:
+          bb.write()
+        else:
+          print "Boot Code invalid!"
+      else:
+        print "No file name!"
+        return 1
+    # boot ?
+    else:
+      print "Unknown boot command!"
+      return 1
+
 # ----- BlkDev Command -----
 
 class BlkDevCmd(Command):
@@ -485,7 +559,8 @@ cmd_map = {
 "time" : TimeCmd,
 "block" : BlockCmd,
 "pack" : PackCmd,
-"unpack" : UnpackCmd
+"unpack" : UnpackCmd,
+"boot" : BootCmd
 }
 
 parser = argparse.ArgumentParser()

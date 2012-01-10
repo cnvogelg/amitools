@@ -31,9 +31,9 @@ class ADFBlockDevice(BlockDevice):
       
   def flush(self):
     # write dirty adf
-    if self.dirty:
+    if self.dirty and not self.read_only:
       fh = file(self.adf_file, "wb")
-      fh.write(self.data)
+      fh.write(self.data[:self.num_bytes])
       fh.close()
       self.dirty = False
         
