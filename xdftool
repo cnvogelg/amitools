@@ -146,6 +146,7 @@ class PackCmd(Command):
       self.exit_code = 1
     else:
       self.in_path = self.opts[0]
+      self.imager.pack_begin(self.in_path)
   def create_blkdev(self, blkdev):
     return self.imager.pack_create_blkdev(self.in_path, blkdev)
   def create_volume(self, volume):

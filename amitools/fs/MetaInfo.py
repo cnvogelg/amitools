@@ -2,8 +2,11 @@ from ProtectFlags import *
 from TimeStamp import *
 
 class MetaInfo:
-  def __init__(self, protect=None, mod_ts=None, comment=None):
-    self.set_protect(protect)
+  def __init__(self, protect=None, mod_ts=None, comment=None, protect_flags=None):
+    if protect_flags != None:
+      self.set_protect_flags(protect_flags)
+    else:
+      self.set_protect(protect)
     self.set_mod_ts(mod_ts)
     self.set_comment(comment)
   
@@ -26,6 +29,12 @@ class MetaInfo:
     else:
       return ProtectFlags.empty_string
       
+  def get_protect_short_str(self):
+    if self.protect_flags != None:
+      return self.protect_flags.short_str()
+    else:
+      return ""
+      
   def get_comment_str(self):
     if self.comment != None:
       return self.comment
@@ -38,6 +47,10 @@ class MetaInfo:
       self.protect_flags = ProtectFlags(protect)
     else:
       self.protect_flags = None
+  
+  def set_protect_flags(self, pf):
+    self.protect_flags = pf
+    self.protect = pf.mask
   
   def set_default_protect(self):
     self.protect = 0

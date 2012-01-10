@@ -2,24 +2,35 @@ import os
 import os.path
 from ADFSDir import ADFSDir
 from ADFSFile import ADFSFile
+from MetaDB import MetaDB
 
 class Imager:
+  def __init__(self, meta_db=MetaDB()):
+    self.meta_db = meta_db
+
   # ----- unpack -----
   
   def unpack(self, volume, out_path):
-    path = os.path.abspath(out_path)
     # check for volume path
     vol_name = volume.name
-    vol_path = os.path.join(vol_name)
+    if not os.path.exists(out_path):
+      vol_path = out_path
+    else:
+      path = os.path.abspath(out_path)
+      vol_path = os.path.join(path, vol_name)
     if os.path.exists(vol_path):
       raise IOError("Unpack directory already exists: "+vol_path)
     # check for meta file
-    meta_path = vol_path + ".xdfmeta"
-    if os.path.exists(meta_path):
-      raise IOError("Unpack meta file already exists:"+meta_path)
+    if self.meta_db != None:
+      meta_path = vol_path + ".xdfmeta"
+      if os.path.exists(meta_path):
+        raise IOError("Unpack meta file already exists:"+meta_path)
     # create volume path
     os.mkdir(vol_path)
     self.unpack_root(volume, vol_path)
+    # save meta db
+    if self.meta_db != None:
+      self.meta_db.save(meta_path)
     
   def unpack_root(self, volume, vol_path):
     for node in volume.root_dir.entries:
@@ -27,6 +38,10 @@ class Imager:
     
   def unpack_node(self, node, path):
     name = node.name.name
+    # store meta info
+    if self.meta_db != None:
+      node_path = node.get_node_path_name()
+      self.meta_db.set_meta_info(node_path, node.meta_info)
     # sub dir
     if isinstance(node, ADFSDir):
       sub_dir = os.path.join(path, name)
@@ -46,10 +61,19 @@ class Imager:
   # ----- pack -----
   
   def pack(self, in_path, volume):
+    self.pack_begin(in_path)
     blkdev = self.pack_create_blkdev(in_path)
     volume = self.pack_create_volume(in_path)
     self.pack_root(in_path, volume)
-    
+
+  def pack_begin(self, in_path):
+    if self.meta_db != None:
+      # remove trailing slash
+      if in_path[-1] == '/':
+        in_path = in_path[:-1]
+      meta_path = in_path + ".xdfmeta"
+      self.meta_db.load(meta_path)
+      
   def pack_create_blkdev(self, in_path, blkdev):
     blkdev.create()
     
@@ -70,15 +94,26 @@ class Imager:
       
   def pack_dir(self, in_path, parent_node):
     for name in os.listdir(in_path):
-      path = os.path.join(in_path, name)
+      sys_path = os.path.join(in_path, name)
+      # retrieve meta info for path from DB
+      if self.meta_db != None:
+        ami_path = parent_node.get_node_path_name()
+        if ami_path != "":
+          ami_path += "/" + name
+        else:
+          ami_path = name
+        meta_info = self.meta_db.get_meta_info(ami_path)
+      else:
+        meta_info = None    
       # sub dir
-      if os.path.isdir(path):
-        node = parent_node.create_dir(name)
-        self.pack_dir(path, node)
+      if os.path.isdir(sys_path):
+        node = parent_node.create_dir(name, meta_info)
+        self.pack_dir(sys_path, node)
       # file
-      elif os.path.isfile(path):
-        fh = open(path, "rb")
+      elif os.path.isfile(sys_path):
+        fh = open(sys_path, "rb")
         data = fh.read()
         fh.close()
-        node = parent_node.create_file(name, data)
+        node = parent_node.create_file(name, data, meta_info)
         node.flush()
+      

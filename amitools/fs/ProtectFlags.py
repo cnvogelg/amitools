@@ -47,7 +47,10 @@ class ProtectFlags:
         res += "0" 
       m >>= 1
     return res
-      
+
+  def short_str(self):
+    return str(self).replace("-","")
+    
   def parse(self, s):
     if len(s) == 0:
       return

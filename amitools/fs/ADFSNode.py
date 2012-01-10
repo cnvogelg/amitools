@@ -110,3 +110,22 @@ class ADFSNode:
     blks = self.get_blocks(with_data)
     for b in blks:
       b.dump()
+
+  def get_node_path(self, with_vol=False):
+    if self.parent != None:
+      if not with_vol and self.parent.parent == None:
+        r = []
+      else:
+        r = self.parent.get_node_path()
+    else:
+      if not with_vol:
+        return []
+      r = []
+    r.append(self.name.name)
+    return r
+
+  def get_node_path_name(self, with_vol=False):
+    r = self.get_node_path()
+    return "/".join(r)
+
+      
