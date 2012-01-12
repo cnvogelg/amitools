@@ -62,7 +62,7 @@ class ADFSBitmap:
     # set pointers to ext blocks
     if self.num_ext > 0:
       self.root_blk.bitmap_ext_blk = self.ext_blks[0].blk_num
-      for i in xrange(self.num_ext)-1:
+      for i in xrange(self.num_ext-1):
         bm_ext = self.ext_blks[i]
         bm_ext_next = self.ext_blks[i+1]
         bm_ext.bitmap_ext_blk = bm_ext_next.blk_num
@@ -82,7 +82,6 @@ class ADFSBitmap:
         if cur_ext_pos == self.num_blks_in_ext:
           cur_ext_pos = 0
           cur_ext_index += 1
-    
     self.valid = True
   
   def write(self):
@@ -125,6 +124,8 @@ class ADFSBitmap:
       self.ext_blks.append(bm_ext)
       blocks = bm_ext.bitmap_ptrs
       for blk in blocks:
+        if blk == 0:
+          break
         bm = BitmapBlock(self.blkdev, blk)
         bm.read()
         if not bm.valid:

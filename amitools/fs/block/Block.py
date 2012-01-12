@@ -145,9 +145,10 @@ class Block:
     if len(bstr) > 0:
       self.data[loc+1:loc+1+len(bstr)] = bstr
   
-  def dump(self, name):
+  def dump(self, name, details=True):
     print "%sBlock(%d):" % (name, self.blk_num)
-    print " types:     %x/%x (valid: %x/%x)" % (self.type, self.sub_type, self.is_type, self.is_sub_type)
-    print " chksum:    0x%08x (got) 0x%08x (calc)" % (self.got_chksum, self.calc_chksum)
-    print " valid:     %s" % self.valid
+    if details:
+      print " types:     %x/%x (valid: %x/%x)" % (self.type, self.sub_type, self.is_type, self.is_sub_type)
+      print " chksum:    0x%08x (got) 0x%08x (calc)" % (self.got_chksum, self.calc_chksum)
+      print " valid:     %s" % self.valid
     

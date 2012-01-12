@@ -1,4 +1,5 @@
 from Block import Block
+from amitools.util.HexDump import *
 
 class BitmapExtBlock(Block):
   def __init__(self, blkdev, blk_num):
@@ -17,8 +18,6 @@ class BitmapExtBlock(Block):
     self.bitmap_ptrs = []
     for i in xrange(self.blkdev.block_longs-1):
       bm_blk = self._get_long(i)
-      if bm_blk == 0:
-        break
       self.bitmap_ptrs.append(bm_blk)
     
     self.bitmap_ext_blk = self._get_long(-1)
@@ -35,13 +34,14 @@ class BitmapExtBlock(Block):
     return True
     
   def write(self):
+    self._create_data()
     for i in xrange(self.blkdev.block_longs-1):
       self._put_long(i, self.bitmap_ptrs[i])
     self._put_long(-1, self.bitmap_ext_blk)
-    Block.write(self)
+    self._write_data()
     
   def dump(self):
-    Block.dump(self,"Bitmap")
+    Block.dump(self, "BitmapExtBlock", False)
     print " bmp ptrs:  %s" % self.bitmap_ptrs
     print " bmp ext:   %d" % self.bitmap_ext_blk
   

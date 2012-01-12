@@ -25,7 +25,7 @@ class BlockDevice:
     print "last_cyl:   ",self.last_cyl
     print "heads:      ",self.heads
     print "sectors:    ",self.sectors
-    print "block_nytes:",self.block_bytes
+    print "block_bytes:",self.block_bytes
     print "reserved:   ",self.reserved
     print "bootblocks: ",self.bootblocks
   
@@ -33,7 +33,7 @@ class BlockDevice:
     return self.block_bytes * blk_num
   
   # ----- API -----
-  def create(self):
+  def create(self, size=None, chs=None):
     pass
   def open(self):
     pass

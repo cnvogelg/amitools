@@ -247,7 +247,7 @@ class FormatCmd(Command):
       self.is_dircache = "dircache" in self.opts
       self.vol_name = self.opts[0]
   def create_blkdev(self, blkdev):
-    blkdev.create()
+    blkdev.create(self.args.disk_size, self.args.disk_geometry)
     return True
   def create_volume(self, vol):
     vol.create(self.vol_name, is_ffs=self.is_ffs, is_intl=self.is_intl, is_dircache=self.is_dircache)
@@ -570,6 +570,8 @@ parser.add_argument('-d', '--dump', action='store_true', default=False, help="du
 parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
 parser.add_argument('-s', '--seperator', default='+', help="set the command separator char sequence")
 parser.add_argument('-r', '--read-only', action='store_true', default=False, help="read-only operation")
+parser.add_argument('-S', '--disk_size', default=None, help="disk image size (xK xM xG)")
+parser.add_argument('-G', '--disk-geometry', default=None, help="disk geometry: cyls,heads,secs")
 args = parser.parse_args()
 
 cmd_list = args.command_list

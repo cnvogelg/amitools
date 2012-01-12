@@ -7,7 +7,7 @@ class ADFBlockDevice(BlockDevice):
     self.adf_file = adf_file
     self.dirty = False
 
-  def create(self):
+  def create(self, size, chs):
     if self.read_only:
       raise IOError("ADF creation not allowed in read-only mode!")    
     self._set_geometry() # set default geometry
