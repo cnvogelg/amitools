@@ -102,9 +102,13 @@ class ADFSNode:
     t.parse(tm_str)
     self.change_meta_info(MetaInfo(mod_ts=t))
 
-  def list(self, indent=0, all=False):
+  def list(self, indent=0, all=False, detail=False):
     istr = "  " * indent
-    print "%-40s       %8s  %s" % (istr + self.block.name, self.get_size_str(), str(self.meta_info))
+    if detail:
+      extra = self.get_detail_str()
+    else:
+      extra = str(self.meta_info)
+    print "%-40s       %8s  %s" % (istr + self.block.name, self.get_size_str(), extra)
 
   def dump_blocks(self, with_data=False):
     blks = self.get_blocks(with_data)
@@ -128,4 +132,5 @@ class ADFSNode:
     r = self.get_node_path()
     return "/".join(r)
 
-      
+  def get_detail_str(self):
+    return ""

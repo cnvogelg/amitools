@@ -3,6 +3,7 @@ import os.path
 from ADFSDir import ADFSDir
 from ADFSFile import ADFSFile
 from MetaDB import MetaDB
+from amitools.fs.block.BootBlock import BootBlock
 
 class Imager:
   def __init__(self, meta_db=MetaDB()):
@@ -112,6 +113,7 @@ class Imager:
     if self.meta_db != None:
       name = self.meta_db.get_volume_name()
       meta_info = self.meta_db.get_root_meta_info()
+      dos_type = self.meta_db.get_dos_type()
     else:
       # try to derive volume name from image name
       if in_path == None or in_path == "":
@@ -121,7 +123,8 @@ class Imager:
         in_path = in_path[:-1]
       name = os.path.basename(in_path)
       meta_info = None
-    volume.create(name, meta_info)
+      dos_type = BootBlock.DOS0
+    volume.create(name, meta_info, dos_type=dos_type)
   
   def pack_root(self, in_path, volume):
     path = os.path.abspath(in_path)

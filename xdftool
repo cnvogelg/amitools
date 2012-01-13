@@ -200,8 +200,9 @@ class ListCmd(Command):
     else:
       node = vol.get_path_name(self.opts[0])
       if node != None:
-        show_all = (n>1)
-        node.list(all=show_all)
+        show_all = "all" in self.opts
+        show_detail = "detail" in self.opts
+        node.list(all=show_all, detail=show_detail)
         return 0
       else:
         print "ERROR path not found:",node

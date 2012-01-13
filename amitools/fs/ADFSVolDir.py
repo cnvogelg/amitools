@@ -19,9 +19,10 @@ class ADFSVolDir(ADFSDir):
 
   def get_size_str(self):
     return "VOLUME"
-    
+
   def create_meta_info(self):
     self.meta_info = MetaInfo(mod_ts=self.block.mod_ts)
   
   def can_delete(self):
     return False
+

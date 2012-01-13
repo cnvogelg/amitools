@@ -275,14 +275,14 @@ class ADFSDir(ADFSNode):
     self.ensure_entries()
     return sorted(self.entries, key=lambda x : x.name.to_upper())
     
-  def list(self, indent=0, all=False):
-    ADFSNode.list(self, indent, all)
+  def list(self, indent=0, all=False, detail=False):
+    ADFSNode.list(self, indent, all, detail)
     if not all and indent > 0:
       return
     self.ensure_entries()
     es = self.get_entries_sorted_by_name()
     for e in es:
-      e.list(indent=indent+1, all=all)
+      e.list(indent=indent+1, all=all, detail=detail)
     
   def get_path(self, pc, allow_file=True, allow_dir=True):
     if len(pc) == 0:
@@ -341,6 +341,16 @@ class ADFSDir(ADFSNode):
   
   def get_size_str(self):
     return "DIR"
+
+  def get_detail_str(self):
+    self.ensure_entries()
+    if self.entries != None:
+      s = "entries=%d" % len(self.entries)
+    else:
+      s = ""
+    if self.dcache_blks != None:
+      s += " dcache=%d" % len(self.dcache_blks)
+    return s
 
   # ----- dir cache -----
 
@@ -454,5 +464,6 @@ class ADFSDir(ADFSNode):
         if dcb.has_record(record):
           dcb.write()
           break
+    
 
  
