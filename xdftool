@@ -79,7 +79,7 @@ class FSCommandQueue(CommandQueue):
       return 2
     try:
       # main command loop
-       exit_code = CommandQueue.run(self)
+      exit_code = CommandQueue.run(self)
     except FSError as e:
       cmd = "'%s'" % " ".join(self.cmd_line)
       print cmd,"FSError:",str(e)
@@ -168,6 +168,7 @@ class PackCmd(Command):
     self.imager.pack_create_volume(self.in_path, volume)
   def handle_vol(self, volume):
     self.imager.pack_root(self.in_path, volume)
+    self.imager.pack_end(self.in_path, volume)
     return 0
 
 class UnpackCmd(Command):
@@ -494,7 +495,7 @@ class BootCmd(Command):
     # boot show [hex] [asm]
     if cmd == 'show':
       bb.dump()
-      if bb.valid:
+      if bb.valid and bb.boot_code != None:
         if 'hex' in self.opts:
           print_hex(bb.boot_code)
         if 'asm' in self.opts:

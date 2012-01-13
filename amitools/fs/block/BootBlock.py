@@ -58,10 +58,10 @@ class BootBlock(Block):
     self.extra_blks = []
     for i in xrange(self.num_extra):
       b = Block(self.blkdev, self.blk_num + 1 + i)
-      b.create()
+      b._create_data()
       self.extra_blks.append(b)
     # setup boot code
-    self.set_boot_code(boot_code)
+    return self.set_boot_code(boot_code)
   
   def set_boot_code(self, boot_code):
     if boot_code != None:
@@ -118,13 +118,13 @@ class BootBlock(Block):
     for blk in self.extra_blks:
       boot_code += blk.data.raw
     # remove nulls at end
-    pos = len(boot_code) - 1
+    pos = len(boot_code) - 4
     while pos > 0:
-      if ord(boot_code[pos])!=0:
-        pos += 1
+      tag = boot_code[pos:pos+3]
+      if tag != 'DOS' and ord(boot_code[pos])!=0:
+        pos += 4
         break
-      pos -= 1
-    pos = (pos + 1) & ~1 # word align
+      pos -= 4
     # something left
     if pos > 0:
       boot_code = boot_code[:pos]
@@ -171,7 +171,7 @@ class BootBlock(Block):
       # use this for first block
       n = first_size
         
-    # embed boot code and calc correct chksum
+    # embed boot code in boot block
     self.data[12:12+n] = boot_code
     
   def get_dos_type_flags(self):

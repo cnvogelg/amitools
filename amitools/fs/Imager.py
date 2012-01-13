@@ -31,6 +31,12 @@ class Imager:
     # save meta db
     if self.meta_db != None:
       self.meta_db.save(meta_path)
+    # save boot code
+    if volume.boot.boot_code != None:
+      boot_code_path = vol_path + ".bootcode"
+      f = open(boot_code_path,"wb")
+      f.write(volume.boot.boot_code)
+      f.close()
     
   def unpack_root(self, volume, vol_path):
     for node in volume.root_dir.entries:
@@ -65,6 +71,7 @@ class Imager:
     blkdev = self.pack_create_blkdev(in_path)
     volume = self.pack_create_volume(in_path)
     self.pack_root(in_path, volume)
+    self.pack_end(in_path, volume)
 
   def pack_begin(self, in_path):
     if self.meta_db != None:
@@ -72,8 +79,24 @@ class Imager:
       if in_path[-1] == '/':
         in_path = in_path[:-1]
       meta_path = in_path + ".xdfmeta"
-      self.meta_db.load(meta_path)
-      
+      if os.path.exists(meta_path):
+        self.meta_db.load(meta_path)
+  
+  def pack_end(self, in_path, volume):
+    boot_code_path = in_path + ".bootcode"
+    if os.path.exists(boot_code_path):
+      # read boot code
+      f = open(boot_code_path, "rb")
+      data = f.read()
+      f.close()
+      # write boot code
+      bb = volume.boot
+      ok = bb.set_boot_code(data)
+      if ok:
+        bb.write()
+      else:
+        raise IOError("Invalid Boot Code")
+  
   def pack_create_blkdev(self, in_path, blkdev):
     blkdev.create()
     
