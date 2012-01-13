@@ -29,6 +29,7 @@ class CommandQueue:
     cmd_line = self.get_sub_command()
     if cmd_line == None:
       return 1
+    self.cmd_line = cmd_line
     cmd = self.create_cmd_instance(cmd_line)
     if cmd == None:
       self.show_cmd_help(cmd_line[0])

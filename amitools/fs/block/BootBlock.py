@@ -18,12 +18,12 @@ class BootBlock(Block):
   DOS_FFS_INTL_DIRCACHE = DOS5
   # string names for dos types
   dos_type_names = [
-      'ofs',
-      'ffs',
-      'ofs+intl',
-      'ffs+intl',
-      'ofs+intl+dircache',
-      'ffs+intl+dircache',
+      'DOS0:ofs',
+      'DOS1:ffs',
+      'DOS2:ofs+intl',
+      'DOS3:ffs+intl',
+      'DOS4:ofs+intl+dircache',
+      'DOS5:ffs+intl+dircache',
       'N/A',
       'N/A'
   ]

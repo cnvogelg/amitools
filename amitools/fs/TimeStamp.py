@@ -41,9 +41,13 @@ class TimeStamp:
         ticks = int(t[1:])
         s = s[:-4]
     # parse normal time
-    ts = time.strptime(s, ts_format)
-    secs = time.mktime(ts)
-    self.from_secs(secs + ticks / 50.0)
+    try:
+      ts = time.strptime(s, ts_format)
+      secs = time.mktime(ts)
+      self.from_secs(secs + ticks / 50.0)
+      return True
+    except ValueError:
+      return False
   
 if __name__ == '__main__':
   ts = TimeStamp()

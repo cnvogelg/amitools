@@ -13,11 +13,11 @@ class MetaInfo:
   def __str__(self):
     res = []
     res.append(self.get_protect_str())
-    res.append(self.get_time_str())
+    res.append(self.get_mod_time_str())
     res.append(self.get_comment_str())
     return "  ".join(res)
     
-  def get_time_str(self):
+  def get_mod_time_str(self):
     if self.mod_ts != None:
       return str(self.mod_ts)
     else:

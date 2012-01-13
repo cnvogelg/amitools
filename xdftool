@@ -12,6 +12,7 @@ from amitools.fs.blkdev.HDFBlockDevice import HDFBlockDevice
 from amitools.fs.FSError import *
 from amitools.fs.Imager import Imager
 from amitools.fs.block.BootBlock import BootBlock
+from amitools.fs.block.RootBlock import RootBlock
 from amitools.util.CommandQueue import CommandQueue
 from amitools.util.HexDump import *
 from amitools.util.DisAsm import DisAsm
@@ -480,6 +481,48 @@ class BitmapCmd(Command):
       print "Unknown bitmap command!"
       return 1
 
+# ----- Root Tools -----
+
+class RootCmd(Command):
+  def handle_vol(self, volume):
+    n = len(self.opts)
+    if n == 0:
+      print "Usage: root ( show | create_time <time> | disk_time <time> | time <time> )"
+      return 1
+    cmd = self.opts[0]
+    # root show
+    if cmd == 'show':
+      volume.root.dump()
+      return 0
+    # create_time <time>
+    elif cmd == 'create_time':
+      if n != 2:
+        print "create_time <time>"
+        return 1
+      else:
+        volume.change_create_ts_by_string(self.opts[1])
+        return 0
+    # disk_time <time>
+    elif cmd == 'disk_time':
+      if n != 2:
+        print "disk_time <time>"
+        return 1
+      else:
+        volume.change_disk_ts_by_string(self.opts[1])
+        return 0
+    # time <time>
+    elif cmd == 'time':
+      if n != 2:
+        print "time <time>"
+        return 1
+      else:
+        volume.change_mod_ts_by_string(self.opts[1])
+        return 0
+    # boot ?
+    else:
+      print "Unknown root command!"
+      return 1
+
 # ----- Boot Tools -----
 
 class BootCmd(Command):
@@ -593,7 +636,8 @@ cmd_map = {
 "block" : BlockCmd,
 "pack" : PackCmd,
 "unpack" : UnpackCmd,
-"boot" : BootCmd
+"boot" : BootCmd,
+"root" : RootCmd
 }
 
 parser = argparse.ArgumentParser()

@@ -3,7 +3,9 @@ from block.RootBlock import RootBlock
 from ADFSVolDir import ADFSVolDir
 from ADFSBitmap import ADFSBitmap
 from FileName import FileName
+from RootMetaInfo import RootMetaInfo
 from FSError import *
+from TimeStamp import TimeStamp
 
 class ADFSVolume:
   def __init__(self, blkdev):
@@ -19,6 +21,7 @@ class ADFSVolume:
     self.is_intl = None
     self.is_dircache = None
     self.name = None
+    self.meta_info = None
     
   def open(self):
     # read boot block
@@ -35,6 +38,8 @@ class ADFSVolume:
       self.root.read()
       if self.root.valid:
         self.name = self.root.name
+        # build meta info
+        self.meta_info = RootMetaInfo( self.root.create_ts, self.root.disk_ts, self.root.mod_ts )
         # create root dir
         self.root_dir = ADFSVolDir(self, self.root)
         self.root_dir.read()
@@ -47,7 +52,7 @@ class ADFSVolume:
     else:
       raise FSError(INVALID_BOOT_BLOCK, block=self.boot)
   
-  def create(self, name, create_time=None, dos_type=None, boot_code=None, is_ffs=False, is_intl=False, is_dircache=False):
+  def create(self, name, meta_info=None, dos_type=None, boot_code=None, is_ffs=False, is_intl=False, is_dircache=False):
     # determine dos_type
     if dos_type == None:
       dos_type = BootBlock.DOS0
@@ -66,7 +71,17 @@ class ADFSVolume:
     self.boot.write()
     # create a root block
     self.root = RootBlock(self.blkdev, self.boot.calc_root_blk)
-    self.root.create(name, create_time)
+    create_time = None
+    disk_time = None
+    mod_time = None
+    if meta_info != None:
+      create_time = meta_info.get_create_time()
+      disk_time = meta_info.get_disk_time()
+      mod_time = meta_info.get_mod_time()
+      self.meta_info = meta_info
+    else:
+      self.meta_info = None
+    self.root.create(name, create_time, disk_time, mod_time)
     self.name = name
     # create bitmap
     self.bitmap = ADFSBitmap(self.root)
@@ -122,6 +137,59 @@ class ADFSVolume:
   
   # ----- convenience API -----
   
+  def get_meta_info(self):
+    return self.meta_info
+
+  def change_meta_info(self, meta_info):
+    if self.root != None and self.root.valid:
+      dirty = False
+      # update create_ts
+      create_ts = meta_info.get_create_ts()
+      if create_ts != None:
+        self.root.create_ts = meta_info.get_create_ts()
+        dirty = True
+      # update disk_ts
+      disk_ts = meta_info.get_disk_ts()
+      if disk_ts != None:
+        self.root.disk_ts = disk_ts
+        dirty = True
+      # update mod_ts
+      mod_ts = meta_info.get_mod_ts()
+      if mod_ts != None:
+        self.root.mod_ts = mod_ts
+        dirty = True
+      # update if something changed
+      if dirty:
+        self.root.write()
+        self.meta_info = RootMetaInfo( self.root.create_ts, self.root.disk_ts, self.root.mod_ts )
+      return True
+    else:
+      return False
+      
+  def change_create_ts(self, create_ts):
+    return self.change_meta_info(RootMetaInfo(create_ts=create_ts))
+    
+  def change_disk_ts(self, disk_ts):
+    return self.change_meta_info(RootMetaInfo(disk_ts=disk_ts))
+    
+  def change_mod_ts(self, mod_ts):
+    return self.change_meta_info(RootMetaInfo(mod_ts=mod_ts))
+  
+  def change_create_ts_by_string(self, create_ts_str):
+    t = TimeStamp()
+    t.parse(create_ts_str)
+    return self.change_meta_info(RootMetaInfo(create_ts=t))
+
+  def change_disk_ts_by_string(self, disk_ts_str):
+    t = TimeStamp()
+    t.parse(disk_ts_str)
+    return self.change_meta_info(RootMetaInfo(disk_ts=t))
+    
+  def change_mod_ts_by_string(self, mod_ts_str):
+    t = TimeStamp()
+    t.parse(mod_ts_str)
+    return self.change_meta_info(RootMetaInfo(mod_ts=t))    
+    
   def create_dir(self, ami_path):
     pc = ami_path.split("/")
     # no directory given

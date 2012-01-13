@@ -30,6 +30,9 @@ class Imager:
     self.unpack_root(volume, vol_path)
     # save meta db
     if self.meta_db != None:
+      self.meta_db.set_volume_name(volume.name)
+      self.meta_db.set_root_meta_info(volume.get_meta_info())
+      self.meta_db.set_dos_type(volume.boot.dos_type)
       self.meta_db.save(meta_path)
     # save boot code
     if volume.boot.boot_code != None:
@@ -101,13 +104,19 @@ class Imager:
     blkdev.create()
     
   def pack_create_volume(self, in_path, volume):
-    if in_path == None or in_path == "":
-      raise IOError("Invalid pack input path!")
-    # remove trailing slash
-    if in_path[-1] == '/':
-      in_path = in_path[:-1]
-    name = os.path.basename(in_path)
-    volume.create(name)
+    if self.meta_db != None:
+      name = self.meta_db.get_volume_name()
+      meta_info = self.meta_db.get_root_meta_info()
+    else:
+      # try to derive volume name from image name
+      if in_path == None or in_path == "":
+        raise IOError("Invalid pack input path!")
+      # remove trailing slash
+      if in_path[-1] == '/':
+        in_path = in_path[:-1]
+      name = os.path.basename(in_path)
+      meta_info = None
+    volume.create(name, meta_info)
   
   def pack_root(self, in_path, volume):
     path = os.path.abspath(in_path)
