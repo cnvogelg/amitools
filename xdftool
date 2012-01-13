@@ -170,6 +170,8 @@ class PackCmd(Command):
   def handle_vol(self, volume):
     self.imager.pack_root(self.in_path, volume)
     self.imager.pack_end(self.in_path, volume)
+    if self.args.verbose:
+      print "Packed %d bytes" % (self.imager.get_total_bytes())
     return 0
 
 class UnpackCmd(Command):
@@ -182,6 +184,8 @@ class UnpackCmd(Command):
       out_path = self.opts[0]
       img = Imager()
       img.unpack(vol, out_path)
+      if self.args.verbose:
+        print "Unpacked %d bytes" % (img.get_total_bytes())
       return 0
 
 # ----- Query Image -----

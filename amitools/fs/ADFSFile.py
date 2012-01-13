@@ -74,10 +74,10 @@ class ADFSFile(ADFSNode):
         # ffs has raw data blocks
         dat_blk = self.volume.blkdev.read_block(blk)
         total_size += len(dat_blk)
-        # shrink last read id necessary
+        # shrink last read if necessary
         if total_size > byte_size:
           shrink = total_size - byte_size
-          dat_blk = dat_blk[:-shrink-1]
+          dat_blk = dat_blk[:-shrink]
           total_size = byte_size
         data += dat_blk
       else:
@@ -96,6 +96,11 @@ class ADFSFile(ADFSNode):
       want_seq_num += 1
     # store full contents of file
     self.data = data
+    # make sure all went well
+    got_size = len(data)
+    want_size = self.block.byte_size
+    if got_size != want_size:
+      raise FSError(INTERNAL_ERROR, block=self.block, extra="file size mismatch: got=%d want=%d" % (got_size, want_size))
   
   def get_file_data(self):
     if self.data != None:

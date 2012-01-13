@@ -7,6 +7,10 @@ from MetaDB import MetaDB
 class Imager:
   def __init__(self, meta_db=MetaDB()):
     self.meta_db = meta_db
+    self.total_bytes = 0
+
+  def get_total_bytes(self):
+    return self.total_bytes
 
   # ----- unpack -----
   
@@ -66,6 +70,7 @@ class Imager:
       fh = open(file_path, "wb")
       fh.write(data)
       fh.close()
+      self.total_bytes += len(data)
   
   # ----- pack -----
   
@@ -148,4 +153,5 @@ class Imager:
         fh.close()
         node = parent_node.create_file(name, data, meta_info)
         node.flush()
+        self.total_bytes += len(data)
       

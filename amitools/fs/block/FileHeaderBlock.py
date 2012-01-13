@@ -93,7 +93,8 @@ class FileHeaderBlock(Block):
     print " own_key:    %d" % self.own_key
     print " blk_cnt:    %d" % self.block_count
     print " first_data: %d" % self.first_data
-    print " data blks:  %s" % self.data_blocks
+    if self.data_blocks != None:
+      print " data blks:  %s #%d" % (self.data_blocks, len(self.data_blocks))
     pf = ProtectFlags(self.protect)
     print " protect:    0x%x 0b%s %s" % (self.protect, pf.bin_str(), pf)
     print " byte_size:  %d" % self.byte_size

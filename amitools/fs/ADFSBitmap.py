@@ -250,7 +250,7 @@ class ADFSBitmap:
     bm = self.create_draw_bitmap()
     res = self.blkdev.reserved
     for i in xrange(self.blkdev.num_blocks):
-      if i > res and self.get_bit(i):
+      if i >= res and self.get_bit(i):
         bm[i] = 'F'
     self.print_draw_bitmap(bm, brief)
       
@@ -258,7 +258,7 @@ class ADFSBitmap:
     bm = self.create_draw_bitmap()
     res = self.blkdev.reserved
     for i in xrange(self.blkdev.num_blocks):
-      if i > res and not self.get_bit(i):
+      if i >= res and not self.get_bit(i):
         bm[i] = '#'
     self.print_draw_bitmap(bm, brief)
   
