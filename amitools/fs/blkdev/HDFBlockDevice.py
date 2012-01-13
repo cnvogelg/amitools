@@ -10,21 +10,18 @@ class HDFBlockDevice(BlockDevice):
     self.dirty = False
     self.fh = None
 
-  def create(self, size, chs, reserved=2):
+  def create(self, size, reserved=2):
     if self.read_only:
       raise IOError("HDF creation not allowed in read-only mode!")    
-    # determine geometry
+    # determine geometry from size or chs
     geo = DiskGeometry()
-    if size != None:
-      ok = geo.parse_size_str(size)
+    if size == None:
+      raise IOError("No HDF disk geometry or size given!")      
+    ok = geo.parse_size_str(size)
+    if not ok:
+      ok = geo.parse_chs_str(size)
       if not ok:
-        raise IOErrro("Invalid HDF size given: "+size)
-    elif chs != None:
-      ok = geo.parse_chs_str(chs)
-      if not ok:
-        raise IOError("Invalid HDF disk geometry given: "+size)
-    else:
-      raise IOError("No HDF disk size or geometry given!")
+        raise IOError("Invalid HDF disk geometry or size given: "+size)
     self._set_geometry(0, geo.cyls-1, geo.heads, geo.secs, reserved=reserved)
     # create empty file
     self.fh = file(self.hdf_file,"wb")
@@ -61,7 +58,7 @@ class HDFBlockDevice(BlockDevice):
 
   def read_block(self, blk_num):
     if blk_num >= self.num_blocks:
-      raise ValueError("Invalid ADF block num: got %d but max is %d" % (blk_num, self.num_blocks))
+      raise ValueError("Invalid HDF block num: got %d but max is %d" % (blk_num, self.num_blocks))
     off = self._blk_to_offset(blk_num)
     self.fh.seek(off, os.SEEK_SET)
     return self.fh.read(self.block_bytes)
@@ -70,9 +67,9 @@ class HDFBlockDevice(BlockDevice):
     if self.read_only:
       raise IOError("HDF File is read-only!")
     if blk_num >= self.num_blocks:
-      raise ValueError("Invalid ADF block num: got %d but max is %d" % (blk_num, self.num_blocks))
+      raise ValueError("Invalid HDF block num: got %d but max is %d" % (blk_num, self.num_blocks))
     if len(data) != self.block_bytes:
-      raise ValueError("Invalid ADF block size written: got %d but size is %d" % (len(data), self.block_bytes))
+      raise ValueError("Invalid HDF block size written: got %d but size is %d" % (len(data), self.block_bytes))
     off = self._blk_to_offset(blk_num)
     self.fh.seek(off, os.SEEK_SET)
     self.fh.write(data)

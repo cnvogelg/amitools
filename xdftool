@@ -239,7 +239,7 @@ class FormatCmd(Command):
     Command.__init__(self, args, opts, create=True)
     n = len(self.opts)
     if n == 0:
-      print "Usage: format <volume_name> [ffs] [intl] [dircache]"
+      print "Usage: format <volume_name> [<disk_geo|disk_size>] [ffs] [intl] [dircache]"
       self.exit_code = 1
     else:
       self.is_ffs = "ffs" in self.opts
@@ -247,7 +247,10 @@ class FormatCmd(Command):
       self.is_dircache = "dircache" in self.opts
       self.vol_name = self.opts[0]
   def create_blkdev(self, blkdev):
-    blkdev.create(self.args.disk_size, self.args.disk_geometry)
+    size = None
+    if len(self.opts) > 1:
+      size = self.opts[1]    
+    blkdev.create(size)
     return True
   def create_volume(self, vol):
     vol.create(self.vol_name, is_ffs=self.is_ffs, is_intl=self.is_intl, is_dircache=self.is_dircache)
@@ -482,7 +485,7 @@ class BootCmd(Command):
   def handle_blkdev(self, blkdev):
     n = len(self.opts)
     if n == 0:
-      print "Usage: boot ( show [hex] [asm] | read <file> )"
+      print "Usage: boot ( show [hex] [asm] | read <file> | install [boot1x])"
       return 1
     cmd = self.opts[0]
     # fetch boot blcok
@@ -507,6 +510,7 @@ class BootCmd(Command):
             f = open(self.opts[1], "wb")
             f.write(bb.boot_code)
             f.close()
+            return 0
           else:
             print "No Boot Code found!"
             return 2
@@ -525,11 +529,39 @@ class BootCmd(Command):
         ok = bb.set_boot_code(data)
         if ok:
           bb.write()
+          return 0
         else:
           print "Boot Code invalid!"
+          return 2
       else:
         print "No file name!"
         return 1
+    # boot install [<name>]
+    elif cmd == 'install':
+      if n == 1: # default boot code
+        name = "boot2x3x"
+      else: 
+        name = self.opts[1]
+      # boot code directory
+      bc_dir = bb.get_boot_code_dir()
+      if bc_dir == None:
+        print "No boot code directory found!"
+        return 1
+      path = os.path.join(bc_dir, name + ".bin")
+      if not os.path.exists:
+        print "Boot code '%s' not found!" % path
+        return 1
+      # read data
+      f = open(path,"rb")
+      data = f.read()
+      f.close()
+      ok = bb.set_boot_code(data)
+      if ok:
+        bb.write()
+        return 0
+      else:
+        print "Boot Code invalid!"
+        return 2
     # boot ?
     else:
       print "Unknown boot command!"
@@ -570,8 +602,6 @@ parser.add_argument('-d', '--dump', action='store_true', default=False, help="du
 parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
 parser.add_argument('-s', '--seperator', default='+', help="set the command separator char sequence")
 parser.add_argument('-r', '--read-only', action='store_true', default=False, help="read-only operation")
-parser.add_argument('-S', '--disk_size', default=None, help="disk image size (xK xM xG)")
-parser.add_argument('-G', '--disk-geometry', default=None, help="disk geometry: cyls,heads,secs")
 args = parser.parse_args()
 
 cmd_list = args.command_list

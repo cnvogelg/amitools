@@ -1,3 +1,4 @@
+import os.path
 from Block import Block
 
 class BootBlock(Block):
@@ -120,6 +121,7 @@ class BootBlock(Block):
     pos = len(boot_code) - 1
     while pos > 0:
       if ord(boot_code[pos])!=0:
+        pos += 1
         break
       pos -= 1
     pos = (pos + 1) & ~1 # word align
@@ -172,7 +174,6 @@ class BootBlock(Block):
     # embed boot code and calc correct chksum
     self.data[12:12+n] = boot_code
     
-  
   def get_dos_type_flags(self):
     return self.dos_type & 0x7
   
@@ -200,3 +201,13 @@ class BootBlock(Block):
     print " valid:     %s" % self.valid
     if self.boot_code != None:
         print " boot_code: %d bytes" % len(self.boot_code)
+
+  def get_boot_code_dir(self):
+    my_dir = os.path.dirname(__file__)
+    bc_dir = os.path.join(my_dir, "bootcode")
+    if os.path.exists(bc_dir):
+      return bc_dir
+    else:
+      return None
+
+    

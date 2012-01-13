@@ -100,7 +100,7 @@ class DiskGeometry:
     if len(comp) != 3:
       return False
     try:
-      c,h,s = map(comp, lambda x: int(x))
+      c,h,s = map(lambda x: int(x), comp)
       self.cyls = c
       self.heads = h
       self.secs = s
