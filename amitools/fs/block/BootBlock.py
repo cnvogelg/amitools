@@ -197,7 +197,7 @@ class BootBlock(Block):
     print " dos_type:  0x%08x %s (valid: %s) is_ffs=%s is_intl=%s is_dircache=%s" \
       % (self.dos_type, self.get_dos_type_str(), self.valid_dos_type, self.is_ffs(), self.is_intl(), self.is_dircache())
     print " root_blk:  %d (got %d)" % (self.calc_root_blk, self.got_root_blk)
-    print " chksum:    0x%08x (got) 0x%08x (calc)" % (self.got_chksum, self.calc_chksum)
+    print " chksum:    0x%08x (got) 0x%08x (calc) -> bootable: %s" % (self.got_chksum, self.calc_chksum, self.valid_chksum)
     print " valid:     %s" % self.valid
     if self.boot_code != None:
         print " boot_code: %d bytes" % len(self.boot_code)

@@ -237,7 +237,7 @@ class ADFSFile(ADFSNode):
       off += bs
       left -= bs
   
-  def draw_on_bitmap(self, bm, show_all=False):
+  def draw_on_bitmap(self, bm, show_all=False, first=False):
     bm[self.block.blk_num] = 'H'
     for b in self.ext_blk_nums:
       bm[b] = 'E'

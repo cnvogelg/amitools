@@ -253,10 +253,12 @@ class ReadCmd(Command):
       print "Usage: read <ami_file|dir> [sys_file]"
       return 1
     # determine output name
+    out_name = os.path.basename(p[0])
     if n == 1:
-      out_name = os.path.basename(p[0])
-    else:
-      out_name = p[1]
+      if os.path.isdir(p[1]):
+        out_name = os.path.join(p[1],out_name)  
+      else:
+        out_name = p[1]
     # single file operation
     node = vol.get_path_name(p[0])
     if node == None:
@@ -476,7 +478,7 @@ class BitmapCmd(Command):
   def handle_vol(self, vol):
     n = len(self.opts)
     if n == 0:
-      print "Usage: bitmap ( free | used | find [n] | all | maps | root [all] | node <path> ) [brief]"
+      print "Usage: bitmap ( free | used | find [n] | all | maps | root [all] | node <path> [all] [entries]) [brief]"
       return 1
     cmd = self.opts[0]
     
@@ -522,9 +524,9 @@ class BitmapCmd(Command):
       vol.bitmap.print_draw_bitmap(bm, brief)
       return 0
     elif cmd == 'root':
-      show_all = 'all' in self.opts
+      show_entries = 'entries' in self.opts
       bm = vol.bitmap.create_draw_bitmap()
-      vol.root_dir.draw_on_bitmap(bm, show_all)
+      vol.root_dir.draw_on_bitmap(bm, False, show_entries)
       vol.bitmap.print_draw_bitmap(bm, brief)
       return 0
     elif cmd == 'node':
@@ -532,8 +534,9 @@ class BitmapCmd(Command):
         node = vol.get_path_name(self.opts[1])
         if node != None:
           show_all = 'all' in self.opts
+          show_entries = 'entries' in self.opts
           bm = vol.bitmap.create_draw_bitmap()
-          node.draw_on_bitmap(bm, show_all)
+          node.draw_on_bitmap(bm, show_all, show_entries)
           vol.bitmap.print_draw_bitmap(bm, brief)
           return 0
         else:
@@ -594,7 +597,7 @@ class BootCmd(Command):
   def handle_blkdev(self, blkdev):
     n = len(self.opts)
     if n == 0:
-      print "Usage: boot ( show [hex] [asm] | read <file> | install [boot1x])"
+      print "Usage: boot ( show [hex] [asm] | read <file> | write <file> | install [boot1x] | clear )"
       return 1
     cmd = self.opts[0]
     # fetch boot blcok
@@ -671,6 +674,11 @@ class BootCmd(Command):
       else:
         print "Boot Code invalid!"
         return 2
+    # boot clear
+    elif cmd == 'clear':
+      bb.set_boot_code(None)
+      bb.write()
+      return 0
     # boot ?
     else:
       print "Unknown boot command!"
