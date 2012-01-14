@@ -8,6 +8,8 @@ from FSError import *
 from TimeStamp import TimeStamp
 
 class ADFSVolume:
+  root_path_aliases = ("", "/", ":")
+  
   def __init__(self, blkdev):
     self.blkdev = blkdev
     
@@ -97,7 +99,7 @@ class ADFSVolume:
     pass
 
   def get_path_name(self, path_name, allow_file=True, allow_dir=True):
-    if path_name == "" or path_name == "/":
+    if path_name in self.root_path_aliases:
       return self.root_dir
     pc = path_name.split("/")
     fn = []
@@ -115,7 +117,7 @@ class ADFSVolume:
     """get a parent node and path name for creation
        return: parent_node_or_none, file_name_or_none
     """
-    if path_name == None or path_name == "":
+    if path_name in self.root_path_aliases:
       return self.root_dir, suggest_name
     else:
       # try to get path_name as a directory

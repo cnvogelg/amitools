@@ -152,13 +152,17 @@ class PackCmd(Command):
     self.imager = Imager()
     n = len(self.opts)
     if n == 0:
-      print "Usage: pack <in_path>"
+      print "Usage: pack <in_path> [out_size]"
       self.exit_code = 1
     else:
       self.in_path = self.opts[0]
+      if n > 1:
+        self.blkdev_opts = { 'size_str' : self.opts[1] }
+      else:
+        self.blkdev_opts = None
       self.imager.pack_begin(self.in_path)
   def create_blkdev(self, blkdev):
-    return self.imager.pack_create_blkdev(self.in_path, blkdev)
+    return self.imager.pack_create_blkdev(self.in_path, blkdev, self.blkdev_opts)
   def create_volume(self, volume):
     self.imager.pack_create_volume(self.in_path, volume)
   def handle_vol(self, volume):

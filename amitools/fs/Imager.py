@@ -6,6 +6,7 @@ from ADFSVolume import ADFSVolume
 from MetaDB import MetaDB
 from amitools.fs.block.BootBlock import BootBlock
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
+from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 
 class Imager:
   def __init__(self, meta_db=MetaDB()):
@@ -32,6 +33,10 @@ class Imager:
       meta_path = vol_path + ".xdfmeta"
       if os.path.exists(meta_path):
         raise IOError("Unpack meta file already exists:"+meta_path)
+    # check for block dev file
+    blkdev_path = vol_path + ".blkdev"
+    if os.path.exists(blkdev_path):
+      raise IOErrro("Unpack blkdev file aready exists:"+blkdev_path)
     # create volume path
     self.unpack_root(volume, vol_path)
     # save meta db
@@ -46,6 +51,11 @@ class Imager:
       f = open(boot_code_path,"wb")
       f.write(volume.boot.boot_code)
       f.close()
+    # save blkdev
+    geo = volume.blkdev.get_geometry()
+    f = open(blkdev_path,"wb")
+    f.write("%d,%d,%d\n" % (geo.cyls, geo.heads, geo.secs))
+    f.close()
     
   def unpack_root(self, volume, vol_path):
     self.unpack_dir(volume.get_root_dir(), vol_path)
@@ -116,8 +126,23 @@ class Imager:
       else:
         raise IOError("Invalid Boot Code")
   
-  def pack_create_blkdev(self, in_path, blkdev):
-    blkdev.create()
+  def pack_create_blkdev(self, in_path, blkdev, blkdev_opts=None):
+    # try to read options from blkdev file
+    if blkdev_opts == None:
+      blkdev_path = in_path + ".blkdev"
+      if os.path.exists(blkdev_path):
+        f = open(blkdev_path, "rb")
+        data = f.read()
+        f.close()
+        geo = DiskGeometry()
+        if not geo.parse_chs_str(data):
+          raise IOError("Invalid blkdev geometry in '%s'" % blkdev_path)
+        blkdev_opts = { 'geo' : geo }
+
+    if blkdev_opts != None:
+      blkdev.create(**blkdev_opts)
+    else:
+      blkdev.create()
     
   def pack_create_volume(self, in_path, volume):
     if self.meta_db != None:
