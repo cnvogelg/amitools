@@ -146,7 +146,7 @@ class ADFSDir(ADFSNode):
       meta_info.set_current_time()
       meta_info.set_default_protect()
     # check file name
-    fn = FileName(name)
+    fn = FileName(name, is_intl=self.volume.is_intl)
     if not fn.is_valid():
       raise FSError(INVALID_FILE_NAME, file_name=name, node=self)
     # does already exist an entry in this dir with this name?

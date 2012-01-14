@@ -9,11 +9,16 @@ class FileName:
   def to_upper(self):
     result = self.name.upper();
     if self.is_intl:
+      r = ""
       for i in xrange(len(result)):
         o = ord(result[i])
         if o >= 224 and o <= 254 and o != 247:
-          result[i] = chr(o - (ord('a')-ord('A')))
-    return result
+          r += chr(o - (ord('a')-ord('A')))
+        else:
+          r += chr(o)
+      return r
+    else:
+      return result
   
   def is_valid(self):
     if len(self.name) > 30:
