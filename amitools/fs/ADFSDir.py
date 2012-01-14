@@ -464,6 +464,24 @@ class ADFSDir(ADFSNode):
         if dcb.has_record(record):
           dcb.write()
           break
-    
-
- 
+  
+  def get_block_usage(self, all=False, first=True):
+    num_non_data = 1
+    num_data = 0
+    if self.dcache_blks != None:
+      num_non_data += len(self.dcache_blks)
+    if all or first:
+      self.ensure_entries()
+      for e in self.entries:
+        bu = e.get_block_usage(all=all, first=False)
+        num_data += bu[0]
+        num_non_data += bu[1]
+    return (num_data, num_non_data)
+  
+  def get_file_bytes(self, all=False, first=True):
+    size = 0
+    if all or first:
+      self.ensure_entries()
+      for e in self.entries:
+        size += e.get_file_bytes(all=all, first=False)
+    return size

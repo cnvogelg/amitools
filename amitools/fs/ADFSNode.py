@@ -134,3 +134,7 @@ class ADFSNode:
 
   def get_detail_str(self):
     return ""
+    
+  def get_block_usage(self, all=False, first=True):
+    return (0,0)
+

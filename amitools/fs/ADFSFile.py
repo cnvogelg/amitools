@@ -270,3 +270,8 @@ class ADFSFile(ADFSNode):
   def get_detail_str(self):
     return "data=%d ext=%d" % (len(self.data_blk_nums), len(self.ext_blk_nums)) 
 
+  def get_block_usage(self, all=False, first=True):
+    return (len(self.data_blk_nums), len(self.ext_blk_nums) + 1)
+
+  def get_file_bytes(self, all=False, first=True):
+    return self.data_size

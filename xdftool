@@ -196,17 +196,31 @@ class ListCmd(Command):
     n = len(self.opts)
     if n == 0:
       vol.root_dir.list(all=True)
-      return 0
+      show_info = True
+      show_all = True
+      node = vol.get_root_dir()
     else:
       node = vol.get_path_name(self.opts[0])
       if node != None:
         show_all = "all" in self.opts
         show_detail = "detail" in self.opts
+        show_info = "info" in self.opts
         node.list(all=show_all, detail=show_detail)
-        return 0
       else:
         print "ERROR path not found:",node
         return 2
+    if show_info:
+      bu = node.get_block_usage(all=show_all)
+      sum = bu[0] + bu[1]
+      total = vol.get_total_blocks()
+      bb = vol.blkdev.block_bytes
+      ratio = bu[0] * 100.0 / sum
+      file_bytes = node.get_file_bytes(all=show_all)
+      file_ratio = (file_bytes * 100.0) / (bb * bu[0])
+      print "Blocks:    data: %8d, fs: %8d, sum: %8d, ratio=%4.2f, disk total: %8d" % (bu[0], bu[1], sum, ratio, total)
+      print "Bytes:     data: %8d, fs: %8d, sum: %8d, ratio=%4.2f, disk total: %8d" % (bu[0] * bb, bu[1] * bb, sum * bb, ratio, total * bb)
+      print "File:      data: %8d, ratio=%4.2f" % (file_bytes, file_ratio)
+    return 0
 
 class TypeCmd(Command):
   def handle_vol(self, vol):
@@ -238,6 +252,18 @@ class ReadCmd(Command):
     fh.write(data)
     fh.close()
     return 0
+
+class InfoCmd(Command):
+  def handle_vol(self, vol):
+    total = vol.get_total_blocks()
+    free  = vol.get_free_blocks()
+    used  = total - free
+    bb = vol.blkdev.block_bytes
+    btotal = total * bb
+    bfree  = free * bb
+    bused  = used * bb
+    print "Blocks:   total: %8d   used: %8d  free: %8d" % (total, used, free)
+    print "Bytes:    total: %8d   used: %8d  free: %8d" % (btotal, bused, bfree)
 
 # ----- Edit Image -----
 
@@ -642,13 +668,13 @@ cmd_map = {
 "pack" : PackCmd,
 "unpack" : UnpackCmd,
 "boot" : BootCmd,
-"root" : RootCmd
+"root" : RootCmd,
+"info" : InfoCmd
 }
 
 parser = argparse.ArgumentParser()
 parser.add_argument('image_file')
 parser.add_argument('command_list', nargs='+', help="command: "+",".join(cmd_map.keys()))
-parser.add_argument('-d', '--dump', action='store_true', default=False, help="dump the disk structure")
 parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
 parser.add_argument('-s', '--seperator', default='+', help="set the command separator char sequence")
 parser.add_argument('-r', '--read-only', action='store_true', default=False, help="read-only operation")

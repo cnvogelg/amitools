@@ -19,8 +19,8 @@ class ADFSBitmap:
     self.bitmap_blk_longs = root_blk.blkdev.block_longs - 1
     # calc size of bitmap
     self.bitmap_bits = self.blkdev.num_blocks - self.blkdev.reserved
-    self.bitmap_longs = self.bitmap_bits / 32
-    self.bitmap_bytes = self.bitmap_bits / 8
+    self.bitmap_longs = (self.bitmap_bits + 31) / 32
+    self.bitmap_bytes = (self.bitmap_bits + 7) / 8
     # number of blocks required for bitmap (and bytes consumed there)
     self.bitmap_num_blks = (self.bitmap_longs + self.bitmap_blk_longs - 1) / self.bitmap_blk_longs
     self.bitmap_all_blk_bytes = self.bitmap_num_blks * self.bitmap_blk_bytes
@@ -183,6 +183,13 @@ class ADFSBitmap:
         return None
       result.append(blk_num)
     return result
+    
+  def get_num_free(self):
+    num = 0
+    for i in xrange(self.bitmap_bits):
+      if self.get_bit(i):
+        num+=1
+    return num
 
   def alloc_n(self, num, start=None):
     free_blks = self.find_n_free(num, start)

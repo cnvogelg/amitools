@@ -137,6 +137,20 @@ class ADFSVolume:
   
   # ----- convenience API -----
   
+  def get_root_dir(self):
+    return self.root_dir
+  
+  def get_free_blocks(self):
+    return self.bitmap.get_num_free()
+    
+  def get_used_blocks(self):
+    free = self.bitmap.get_num_free()
+    total = self.blkdev.num_blocks
+    return total - free
+    
+  def get_total_blocks(self):
+    return self.blkdev.num_blocks
+  
   def get_meta_info(self):
     return self.meta_info
 
