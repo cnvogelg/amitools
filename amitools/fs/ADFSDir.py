@@ -485,3 +485,6 @@ class ADFSDir(ADFSNode):
       for e in self.entries:
         size += e.get_file_bytes(all=all, first=False)
     return size
+
+  def is_dir(self):
+    return True

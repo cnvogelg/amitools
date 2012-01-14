@@ -70,6 +70,7 @@ class FSCommandQueue(CommandQueue):
     # get blkdev for image
     self.blkdev = self.create_blkdev()
     if self.blkdev == None:
+      print "Error creating block device for '%s'" % self.img
       return 2
     try:
       # main command loop
@@ -245,19 +246,30 @@ class ReadCmd(Command):
     p = self.opts
     n = len(p)
     if n == 0 or n > 2:
-      print "Usage: read <ami_file> [sys_file]"
+      print "Usage: read <ami_file|dir> [sys_file]"
       return 1
-    # try to get ami file  
-    data = vol.read_file(p[0])
     # determine output name
     if n == 1:
       out_name = os.path.basename(p[0])
     else:
       out_name = p[1]
-    # write data to file
-    fh = open(out_name,"wb")
-    fh.write(data)
-    fh.close()
+    # single file operation
+    node = vol.get_path_name(p[0])
+    if node == None:
+      print "Node not found:",p[0]
+      return 2
+    # its a file
+    if node.is_file():
+      data = node.get_file_data()
+      # write data to file
+      fh = open(out_name,"wb")
+      fh.write(data)
+      fh.close()
+    # its a dir
+    elif node.is_dir():
+      img = Imager()
+      img.unpack_dir(node, out_name)
+    node.flush()
     return 0
 
 class InfoCmd(Command):
@@ -287,10 +299,11 @@ class FormatCmd(Command):
       self.is_dircache = "dircache" in self.opts
       self.vol_name = self.opts[0]
   def create_blkdev(self, blkdev):
-    size = None
+    blkdev_opts = {}
     if len(self.opts) > 1:
-      size = self.opts[1]    
-    blkdev.create(size)
+      size_str = self.opts[1]
+      blkdev_opts = { 'size_str' : size_str }    
+    blkdev.create(**blkdev_opts)
     return True
   def create_volume(self, vol):
     vol.create(self.vol_name, is_ffs=self.is_ffs, is_intl=self.is_intl, is_dircache=self.is_dircache)
@@ -316,25 +329,35 @@ class WriteCmd(Command):
   def handle_vol(self, vol):
     n = len(self.opts)
     if n == 0 or n > 2:
-      print "Usage: write <sys_file> [ami_path]"
+      print "Usage: write <sys_file|dir> [ami_path]"
       return 1
-    # read sys file
-    data = None
-    sys_file = self.opts[0]
-    try:
-      fh = open(sys_file,"rb")
-      data = fh.read()
-      fh.close()
-    except IOError as e:
-      print "ERROR reading:",sys_file
-      return 2
     # get file_name and ami_path
+    sys_file = self.opts[0]
     file_name = os.path.basename(sys_file)
     if n > 1:
         ami_path = self.opts[1]
     else:
-        ami_path = None
-    vol.write_file(data, ami_path, file_name)
+        ami_path = os.path.basename(sys_file)
+    # check sys path
+    if not os.path.exists(sys_file):
+      print "File not found:",sys_file
+      return 2
+    # handle file
+    if os.path.isfile(sys_file):
+      fh = open(sys_file,"rb")
+      data = fh.read()
+      fh.close()
+      vol.write_file(data, ami_path, file_name)
+    # handle dir
+    elif os.path.isdir(sys_file):
+      parent_node, dir_name = vol.get_create_path_name(ami_path, file_name)
+      if parent_node == None:
+        print "Invalid path",ami_path
+        return 2
+      node = parent_node.create_dir(dir_name)
+      img = Imager()
+      img.pack_dir(sys_file, node)
+      
     return 0
     
 class DeleteCmd(Command):

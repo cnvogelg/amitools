@@ -5,7 +5,7 @@ class DiskGeometry:
     self.secs = secs
   
   def __str__(self):
-    return "cyl=%d,heads=%d,secs=%d" % (self.cyls, self.heads, self.secs)
+    return "cyls=%d,heads=%d,secs=%d" % (self.cyls, self.heads, self.secs)
   
   def guess_for_size1(self, size, approx=True, block_bytes=512):
     mb = size / 1024

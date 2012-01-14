@@ -275,3 +275,6 @@ class ADFSFile(ADFSNode):
 
   def get_file_bytes(self, all=False, first=True):
     return self.data_size
+
+  def is_file(self):
+    return True

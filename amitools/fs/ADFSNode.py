@@ -140,3 +140,10 @@ class ADFSNode:
 
   def get_file_bytes(self, all=False, first=True):
     return (0,0)
+
+  def is_file(self):
+    return False
+  
+  def is_dir(self):
+    return False
+
