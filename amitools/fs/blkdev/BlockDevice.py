@@ -1,4 +1,5 @@
 # a block device defines a set of blocks used by a file system
+from DiskGeometry import DiskGeometry
 
 class BlockDevice:
   def __init__(self, read_only=False):
@@ -33,7 +34,7 @@ class BlockDevice:
     return self.block_bytes * blk_num
   
   # ----- API -----
-  def create(self, size=None, chs=None):
+  def create(self, **args):
     pass
   def open(self):
     pass
@@ -45,3 +46,6 @@ class BlockDevice:
     pass
   def write_block(self, blk_num, data):
     pass
+  def get_geometry(self):
+    return DiskGeometry(self.last_cyl - self.first_cyl, self.heads, self.sectors)
+

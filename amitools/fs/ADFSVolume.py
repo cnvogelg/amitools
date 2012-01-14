@@ -137,8 +137,17 @@ class ADFSVolume:
   
   # ----- convenience API -----
   
+  def get_volume_name(self):
+    return self.name
+  
   def get_root_dir(self):
     return self.root_dir
+  
+  def get_dos_type(self):
+    return self.boot.dos_type
+    
+  def get_boot_code(self):
+    return self.boot.boot_code
   
   def get_free_blocks(self):
     return self.bitmap.get_num_free()

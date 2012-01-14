@@ -10,18 +10,19 @@ class HDFBlockDevice(BlockDevice):
     self.dirty = False
     self.fh = None
 
-  def create(self, size, reserved=2):
+  def create(self, size_str=None, geo=None, reserved=2):
     if self.read_only:
       raise IOError("HDF creation not allowed in read-only mode!")    
     # determine geometry from size or chs
-    geo = DiskGeometry()
-    if size == None:
-      raise IOError("No HDF disk geometry or size given!")      
-    ok = geo.parse_size_str(size)
-    if not ok:
-      ok = geo.parse_chs_str(size)
+    if geo ==None:
+      geo = DiskGeometry()
+      if size_str == None:
+        raise IOError("No HDF disk geometry or size given!")      
+      ok = geo.parse_size_str(size_str)
       if not ok:
-        raise IOError("Invalid HDF disk geometry or size given: "+size)
+        ok = geo.parse_chs_str(size_str)
+        if not ok:
+          raise IOError("Invalid HDF disk geometry or size given: "+size_str)
     self._set_geometry(0, geo.cyls-1, geo.heads, geo.secs, reserved=reserved)
     # create empty file
     self.fh = file(self.hdf_file,"wb")

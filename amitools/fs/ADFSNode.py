@@ -138,3 +138,5 @@ class ADFSNode:
   def get_block_usage(self, all=False, first=True):
     return (0,0)
 
+  def get_file_bytes(self, all=False, first=True):
+    return (0,0)

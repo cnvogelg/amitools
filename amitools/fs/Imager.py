@@ -2,8 +2,10 @@ import os
 import os.path
 from ADFSDir import ADFSDir
 from ADFSFile import ADFSFile
+from ADFSVolume import ADFSVolume
 from MetaDB import MetaDB
 from amitools.fs.block.BootBlock import BootBlock
+from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 
 class Imager:
   def __init__(self, meta_db=MetaDB()):
@@ -75,10 +77,14 @@ class Imager:
   
   # ----- pack -----
   
-  def pack(self, in_path, volume):
+  def pack(self, in_path):
     self.pack_begin(in_path)
     blkdev = self.pack_create_blkdev(in_path)
+    if blkdev == None:
+      raise IOError("Can't create block device for image: "+in_path)
     volume = self.pack_create_volume(in_path)
+    if not volume.valid:
+      raise IOError("Can't create volume for image: "+in_path)
     self.pack_root(in_path, volume)
     self.pack_end(in_path, volume)
 
@@ -157,4 +163,52 @@ class Imager:
         node = parent_node.create_file(name, data, meta_info)
         node.flush()
         self.total_bytes += len(data)
+  
+  # ----- (re)pack from other volume -----
+  
+  def repack(self, in_volume, out_path, out_blkdev_opts=None):
+    # setup output block device
+    f = BlkDevFactory()
+    blkdev = f.create(out_path)
+    if blkdev == None:
+      raise IOError("Can't create block device for image: "+out_path)
+    if out_blkdev_opts == None:
+      # clone geometry from input block device
+      out_blkdev_opts = {
+        'geo': in_volume.blkdev.get_geometry()
+      }
+    blkdev.create(**out_blkdev_opts)
+    # setup output volume
+    name = in_volume.get_volume_name()
+    dos_type = in_volume.get_dos_type()
+    meta_info = in_volume.get_meta_info()
+    boot_code = in_volume.get_boot_code()
+    volume = ADFSVolume(blkdev)
+    volume.create(name, meta_info=meta_info, dos_type=dos_type, boot_code=boot_code)
+    if not volume.valid:
+      raise IOError("Can't create volume for image: "+out_path)
+    # start repacking from root dir
+    self.repack_node_dir(in_volume.get_root_dir(), volume.get_root_dir())
+  
+  def repack_node_dir(self, in_root, out_root):
+    entries = in_root.get_entries()
+    for e in entries:
+      self.repack_node(e, out_root) 
+  
+  def repack_node(self, in_node, out_dir):
+    name = in_node.get_file_name_str()
+    meta_info = in_node.get_meta_info()
+    # sub dir
+    if isinstance(in_node, ADFSDir):
+      sub_dir = out_dir.create_dir(name, meta_info)
+      for child in in_node.get_entries():
+        self.repack_node(child, sub_dir)
+      sub_dir.flush()
+    # file
+    elif isinstance(in_node, ADFSFile):
+      data = in_node.get_file_data()
+      out_file = out_dir.create_file(name, data, meta_info)
+      out_file.flush()
+    in_node.flush()
+
       

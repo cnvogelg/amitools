@@ -7,8 +7,7 @@ import argparse
 import os.path
 
 from amitools.fs.ADFSVolume import ADFSVolume
-from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
-from amitools.fs.blkdev.HDFBlockDevice import HDFBlockDevice
+from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 from amitools.fs.FSError import *
 from amitools.fs.Imager import Imager
 from amitools.fs.block.BootBlock import BootBlock
@@ -49,17 +48,11 @@ class FSCommandQueue(CommandQueue):
   
   def create_blkdev(self):
     self.img = self.args.image_file
-    ext = self.img.lower()
     read_only = self.args.read_only
     if self.args.verbose and read_only:
       print "enabling read only mode"
-    if ext.endswith('.adf'):
-      return ADFBlockDevice(self.img, read_only=read_only)
-    elif ext.endswith(".hdf"):
-      return HDFBlockDevice(self.img, read_only=read_only)
-    else:
-      print "INVALID image file:",self.img
-      return None
+    f = BlkDevFactory()
+    return f.create(self.img, read_only)
   
   def setup_volume(self, cmd):
     # setup volume
@@ -173,6 +166,20 @@ class PackCmd(Command):
     if self.args.verbose:
       print "Packed %d bytes" % (self.imager.get_total_bytes())
     return 0
+
+class RepackCmd(Command):
+  def handle_vol(self, vol):
+    n = len(self.opts)
+    if n == 0:
+      print "Usage: repack <tgt_img_path> [out_size]"
+      return 1
+    else:
+      if n > 1:
+        blkdev_opts = { 'size_str' : self.opts[1] }
+      else:
+        blkdev_opts = None
+      img = Imager()
+      img.repack(vol, self.opts[0], blkdev_opts)
 
 class UnpackCmd(Command):
   def handle_vol(self, vol):
@@ -667,6 +674,7 @@ cmd_map = {
 "block" : BlockCmd,
 "pack" : PackCmd,
 "unpack" : UnpackCmd,
+"repack" : RepackCmd,
 "boot" : BootCmd,
 "root" : RootCmd,
 "info" : InfoCmd
