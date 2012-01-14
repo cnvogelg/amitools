@@ -116,13 +116,17 @@ class DirCacheBlock(Block):
   def get_free_record_size(self):
     return self.blkdev.block_bytes - 24 - self.get_total_record_size()
 
-  def create(self, parent, records=[], next_cache=0):
+  def create(self, parent, records=None, next_cache=0):
     Block.create(self)
     self.own_key = self.blk_num
     self.parent = parent
-    self.num_records = len(records)
     self.next_cache = next_cache
-    self.records = records
+    if records == None:
+      self.num_records = 0
+      self.records = []
+    else:
+      self.num_records = len(records)
+      self.records = records
     self.valid = True
     return True
   
