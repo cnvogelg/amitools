@@ -44,7 +44,8 @@ class TimeStamp:
     try:
       ts = time.strptime(s, ts_format)
       secs = time.mktime(ts)
-      self.from_secs(secs + ticks / 50.0)
+      self.from_secs(secs)
+      self.sub_secs = ticks
       return True
     except ValueError:
       return False
