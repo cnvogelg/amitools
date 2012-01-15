@@ -23,13 +23,13 @@ class TimeStamp:
     return self.secs
   
   def from_secs(self, secs):
-    ticks = int(secs * 50.0)
+    ticks = secs * 50
     mins = ticks / (50 * 60)
     self.ticks = ticks % (50 * 60)
     self.days = mins / (60 * 24)
     self.mins = mins % (60 * 24)
-    self.secs = int(secs)
-    self.sub_secs = (self.ticks % 50)
+    self.secs = secs
+    self.sub_secs = 0
   
   def parse(self, s):
     # check for ticks
@@ -46,6 +46,7 @@ class TimeStamp:
       secs = time.mktime(ts)
       self.from_secs(secs)
       self.sub_secs = ticks
+      self.ticks += ticks
       return True
     except ValueError:
       return False
