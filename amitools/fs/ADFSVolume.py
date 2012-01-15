@@ -253,5 +253,5 @@ class ADFSVolume:
   def delete(self, ami_path, wipe=False, all=False):
     node = self.get_path_name(ami_path)
     if node == None:
-      raise FSError(INVALID_FILE_NAME, file_name=ami_path)
+      raise FSError(FILE_NOT_FOUND, file_name=ami_path)
     node.delete(wipe=wipe, all=all)
