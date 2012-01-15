@@ -1,3 +1,6 @@
+import time
+from TimeStamp import TimeStamp
+
 class RootMetaInfo:
   def __init__(self, create_ts=None, disk_ts=None, mod_ts=None):
     self.set_create_ts(create_ts)
@@ -39,6 +42,10 @@ class RootMetaInfo:
     else:
       return ts_empty_string
 
+  def set_current_as_create_time(self):
+    create_time = time.mktime(time.localtime())
+    self.set_create_time(create_time)
+
   # disk_ts
   def set_disk_time(self, disk_time):
     self.disk_time = disk_time
@@ -67,6 +74,10 @@ class RootMetaInfo:
     else:
       return ts_empty_string
 
+  def set_current_as_disk_time(self):
+    disk_time = time.mktime(time.localtime())
+    self.set_disk_time(disk_time)
+
   # mod_ts
   def set_mod_time(self, mod_time):
     self.mod_time = mod_time
@@ -94,5 +105,9 @@ class RootMetaInfo:
       return str(self.mod_ts)
     else:
       return ts_empty_string
-  
+ 
+  def set_current_as_mod_time(self):
+    mod_time = time.mktime(time.localtime())
+    self.set_mod_time(mod_time)
+
   

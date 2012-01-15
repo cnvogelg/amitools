@@ -116,6 +116,8 @@ class Block:
     return TimeStamp(days, mins, ticks)
   
   def _put_timestamp(self, loc, ts):
+    if ts == None:
+      ts = TimeStamp()
     self._put_long(loc, ts.days)
     self._put_long(loc+1, ts.mins)
     self._put_long(loc+2, ts.ticks)

@@ -62,7 +62,7 @@ class FileHeaderBlock(Block):
     self._put_long(-2, self.extension)
     Block.write(self)
   
-  def create(self, parent, name, data_blocks, extension, byte_size=0, protect=0, comment=None, mod_ts=0, hash_chain=0):
+  def create(self, parent, name, data_blocks, extension, byte_size=0, protect=0, comment=None, mod_ts=None, hash_chain=0):
     Block.create(self)
     self.own_key = self.blk_num
     n = len(data_blocks)

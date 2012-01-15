@@ -6,7 +6,7 @@ class RootBlock(Block):
   def __init__(self, blkdev, blk_num):
     Block.__init__(self, blkdev, blk_num, is_type=Block.T_SHORT, is_sub_type=Block.ST_ROOT)
   
-  def create(self, name, create_time=None, disk_time=None, mod_time=None, extension=0):
+  def create(self, name, create_ts=None, disk_ts=None, mod_ts=None, extension=0):
     Block.create(self)
     # init fresh hash table
     self.hash_size = self.blkdev.block_longs - 56
@@ -15,18 +15,9 @@ class RootBlock(Block):
       self.hash_table.append(0)
     
     # timestamps
-    if create_time == None:
-      create_time = time.mktime(time.localtime())
-    if disk_time == None:
-      disk_time = create_time
-    if mod_time == None:
-      mod_time = create_time
-    self.mod_ts = TimeStamp()
-    self.mod_ts.from_secs(mod_time)
-    self.disk_ts = TimeStamp()
-    self.disk_ts.from_secs(disk_time)
-    self.create_ts = TimeStamp()
-    self.create_ts.from_secs(create_time)
+    self.mod_ts = mod_ts
+    self.disk_ts = disk_ts
+    self.create_ts = create_ts
     
     # name
     self.name = name

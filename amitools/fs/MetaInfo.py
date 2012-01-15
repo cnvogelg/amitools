@@ -56,7 +56,7 @@ class MetaInfo:
     self.protect = 0
     self.protect_flags = ProtectFlags(self.protect)
   
-  def set_current_time(self):
+  def set_current_as_mod_time(self):
     mod_time = time.mktime(time.localtime())
     self.set_mod_time(mod_time)
     

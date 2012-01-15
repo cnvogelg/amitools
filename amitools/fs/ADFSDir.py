@@ -143,7 +143,7 @@ class ADFSDir(ADFSNode):
     # make sure a default meta_info is available
     if meta_info == None:
       meta_info = MetaInfo()
-      meta_info.set_current_time()
+      meta_info.set_current_as_mod_time()
       meta_info.set_default_protect()
     # check file name
     fn = FileName(name, is_intl=self.volume.is_intl)

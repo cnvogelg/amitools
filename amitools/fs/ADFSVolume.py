@@ -73,17 +73,16 @@ class ADFSVolume:
     self.boot.write()
     # create a root block
     self.root = RootBlock(self.blkdev, self.boot.calc_root_blk)
-    create_time = None
-    disk_time = None
-    mod_time = None
-    if meta_info != None:
-      create_time = meta_info.get_create_time()
-      disk_time = meta_info.get_disk_time()
-      mod_time = meta_info.get_mod_time()
-      self.meta_info = meta_info
-    else:
-      self.meta_info = None
-    self.root.create(name, create_time, disk_time, mod_time)
+    if meta_info == None:
+      meta_info = RootMetaInfo()
+      meta_info.set_current_as_create_time()
+      meta_info.set_current_as_mod_time()
+      meta_info.set_current_as_disk_time()
+    create_ts = meta_info.get_create_ts()
+    disk_ts = meta_info.get_disk_ts()
+    mod_ts = meta_info.get_mod_ts()
+    self.meta_info = meta_info
+    self.root.create(name, create_ts, disk_ts, mod_ts)
     self.name = name
     # create bitmap
     self.bitmap = ADFSBitmap(self.root)
