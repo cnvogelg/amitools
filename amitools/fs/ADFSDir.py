@@ -137,7 +137,7 @@ class ADFSDir(ADFSNode):
     # -> only one UserDirBlock
     return 1
     
-  def _create_node(self, node, name, meta_info):
+  def _create_node(self, node, name, meta_info, update_ts=True):
     self.ensure_entries()
     
     # make sure a default meta_info is available
@@ -187,26 +187,27 @@ class ADFSDir(ADFSNode):
     self.entries.append(node)
     
     # update time stamps
-    self.update_dir_mod_time()
-    self.volume.update_disk_time()
+    if update_ts:
+      self.update_dir_mod_time()
+      self.volume.update_disk_time()
     
   def update_dir_mod_time(self):
     mi = MetaInfo()
     mi.set_current_as_mod_time()
     self.change_meta_info(mi)
         
-  def create_dir(self, name, meta_info=None):
+  def create_dir(self, name, meta_info=None, update_ts=True):
     node = ADFSDir(self.volume, self)
-    self._create_node(node, name, meta_info)
+    self._create_node(node, name, meta_info, update_ts)
     return node
   
-  def create_file(self, name, data, meta_info=None):
+  def create_file(self, name, data, meta_info=None, update_ts=True):
     node = ADFSFile(self.volume, self) 
     node.set_file_data(data)
-    self._create_node(node, name, meta_info) 
+    self._create_node(node, name, meta_info, update_ts) 
     return node
   
-  def _delete(self, node, wipe=False):
+  def _delete(self, node, wipe, update_ts):
     self.ensure_entries()
     
     # can we delete?
@@ -271,18 +272,19 @@ class ADFSDir(ADFSNode):
         self.blkdev.write_block(free_blk_num, clr_blk)
     
     # update time stamps
-    self.update_dir_mod_time()
-    self.volume.update_disk_time()
+    if update_ts:
+      self.update_dir_mod_time()
+      self.volume.update_disk_time()
     
   def can_delete(self):
     self.ensure_entries()
     return len(self.entries) == 0
   
-  def delete_children(self, wipe, all):
+  def delete_children(self, wipe, all, update_ts):
     self.ensure_entries()
     entries = self.entries[:]
     for e in entries:
-      e.delete(wipe, all)
+      e.delete(wipe, all, update_ts)
 
   def get_entries_sorted_by_name(self):
     self.ensure_entries()

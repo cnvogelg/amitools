@@ -9,9 +9,9 @@ class RootMetaInfo:
   
   def __str__(self):
     res = []
-    res.append(self.get_protect_str())
-    res.append(self.get_time_str())
-    res.append(self.get_comment_str())
+    res.append(self.get_create_time_str())
+    res.append(self.get_disk_time_str())
+    res.append(self.get_mod_time_str())
     return "  ".join(res)
       
   # create_ts

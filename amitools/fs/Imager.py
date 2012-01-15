@@ -187,7 +187,7 @@ class Imager:
 
     # pack directory
     if os.path.isdir(in_path):
-      node = parent_node.create_dir(ami_name, meta_info)
+      node = parent_node.create_dir(ami_name, meta_info, False)
       for name in os.listdir(in_path):
         sub_path = os.path.join(in_path, name)
         self.pack_entry(sub_path, node)
@@ -198,7 +198,7 @@ class Imager:
       fh = open(in_path, "rb")
       data = fh.read()
       fh.close()
-      node = parent_node.create_file(ami_name, data, meta_info)
+      node = parent_node.create_file(ami_name, data, meta_info, False)
       node.flush()
       self.total_bytes += len(data)
   
@@ -238,14 +238,14 @@ class Imager:
     meta_info = in_node.get_meta_info()
     # sub dir
     if in_node.is_dir():
-      sub_dir = out_dir.create_dir(name, meta_info)
+      sub_dir = out_dir.create_dir(name, meta_info, False)
       for child in in_node.get_entries():
         self.repack_node(child, sub_dir)
       sub_dir.flush()
     # file
     elif in_node.is_file():
       data = in_node.get_file_data()
-      out_file = out_dir.create_file(name, data, meta_info)
+      out_file = out_dir.create_file(name, data, meta_info, False)
       out_file.flush()
     in_node.flush()
 
