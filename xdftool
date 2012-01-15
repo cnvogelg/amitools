@@ -185,6 +185,7 @@ class RepackCmd(Command):
         blkdev_opts = None
       img = Imager()
       img.repack(vol, self.opts[0], blkdev_opts)
+      return 0
 
 class UnpackCmd(Command):
   def handle_vol(self, vol):
@@ -228,7 +229,10 @@ class ListCmd(Command):
       bb = vol.blkdev.block_bytes
       ratio = bu[0] * 100.0 / sum
       file_bytes = node.get_file_bytes(all=show_all)
-      file_ratio = (file_bytes * 100.0) / (bb * bu[0])
+      if bu[0] != 0:
+        file_ratio = (file_bytes * 100.0) / (bb * bu[0])
+      else:
+        file_ratio = 0
       print "Blocks:    data: %8d, fs: %8d, sum: %8d, ratio=%4.2f, disk total: %8d" % (bu[0], bu[1], sum, ratio, total)
       print "Bytes:     data: %8d, fs: %8d, sum: %8d, ratio=%4.2f, disk total: %8d" % (bu[0] * bb, bu[1] * bb, sum * bb, ratio, total * bb)
       print "File:      data: %8d, ratio=%4.2f" % (file_bytes, file_ratio)

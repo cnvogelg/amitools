@@ -47,7 +47,9 @@ class ADFSNode:
       record = self.parent.get_dircache_record(self.get_file_name_str())
       if record == None:
         raise FSError(INTERNAL_ERROR, node=self)
-
+    else:
+      record = None
+        
     # alter protect flags
     protect = meta_info.get_protect()
     if protect != None and hasattr(self.block, 'protect'):
