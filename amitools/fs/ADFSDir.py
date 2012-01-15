@@ -184,7 +184,16 @@ class ADFSDir(ADFSNode):
     
     # add node
     self.name_hash[fn_hash].insert(0,node)
-    self.entries.append(node)    
+    self.entries.append(node)
+    
+    # update time stamps
+    self.update_dir_mod_time()
+    self.volume.update_disk_time()
+    
+  def update_dir_mod_time(self):
+    mi = MetaInfo()
+    mi.set_current_as_mod_time()
+    self.change_meta_info(mi)
         
   def create_dir(self, name, meta_info=None):
     node = ADFSDir(self.volume, self)
@@ -260,6 +269,10 @@ class ADFSDir(ADFSNode):
       # wipe a potentially free'ed dircache block, too
       if free_blk != None:
         self.blkdev.write_block(free_blk_num, clr_blk)
+    
+    # update time stamps
+    self.update_dir_mod_time()
+    self.volume.update_disk_time()
     
   def can_delete(self):
     self.ensure_entries()

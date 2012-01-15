@@ -164,6 +164,11 @@ class ADFSVolume:
   def get_meta_info(self):
     return self.meta_info
 
+  def update_disk_time(self):
+    mi = RootMetaInfo()
+    mi.set_current_as_disk_time()
+    self.change_meta_info(mi)
+    
   def change_meta_info(self, meta_info):
     if self.root != None and self.root.valid:
       dirty = False
