@@ -9,8 +9,8 @@ from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 
 class Imager:
-  def __init__(self, meta_db=MetaDB()):
-    self.meta_db = meta_db
+  def __init__(self):
+    self.meta_db = None
     self.total_bytes = 0
 
   def get_total_bytes(self):
@@ -29,22 +29,21 @@ class Imager:
     if os.path.exists(vol_path):
       raise IOError("Unpack directory already exists: "+vol_path)
     # check for meta file
-    if self.meta_db != None:
-      meta_path = vol_path + ".xdfmeta"
-      if os.path.exists(meta_path):
-        raise IOError("Unpack meta file already exists:"+meta_path)
+    meta_path = vol_path + ".xdfmeta"
+    if os.path.exists(meta_path):
+      raise IOError("Unpack meta file already exists:"+meta_path)
     # check for block dev file
     blkdev_path = vol_path + ".blkdev"
     if os.path.exists(blkdev_path):
       raise IOErrro("Unpack blkdev file aready exists:"+blkdev_path)
     # create volume path
+    self.meta_db = MetaDB()
     self.unpack_root(volume, vol_path)
     # save meta db
-    if self.meta_db != None:
-      self.meta_db.set_volume_name(volume.name)
-      self.meta_db.set_root_meta_info(volume.get_meta_info())
-      self.meta_db.set_dos_type(volume.boot.dos_type)
-      self.meta_db.save(meta_path)
+    self.meta_db.set_volume_name(volume.name)
+    self.meta_db.set_root_meta_info(volume.get_meta_info())
+    self.meta_db.set_dos_type(volume.boot.dos_type)
+    self.meta_db.save(meta_path)
     # save boot code
     if volume.boot.boot_code != None:
       boot_code_path = vol_path + ".bootcode"
@@ -103,13 +102,13 @@ class Imager:
     self.pack_end(in_path, volume)
 
   def pack_begin(self, in_path):
-    if self.meta_db != None:
-      # remove trailing slash
-      if in_path[-1] == '/':
-        in_path = in_path[:-1]
-      meta_path = in_path + ".xdfmeta"
-      if os.path.exists(meta_path):
-        self.meta_db.load(meta_path)
+    # remove trailing slash
+    if in_path[-1] == '/':
+      in_path = in_path[:-1]
+    meta_path = in_path + ".xdfmeta"
+    if os.path.exists(meta_path):
+      self.meta_db = MetaDB()
+      self.meta_db.load(meta_path)
   
   def pack_end(self, in_path, volume):
     boot_code_path = in_path + ".bootcode"
