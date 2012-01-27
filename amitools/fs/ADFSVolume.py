@@ -218,7 +218,16 @@ class ADFSVolume:
     t = TimeStamp()
     t.parse(mod_ts_str)
     return self.change_meta_info(RootMetaInfo(mod_ts=t))    
-    
+
+  def relabel(self, new_name):
+    fn = FileName(new_name, is_intl=self.is_intl)
+    if not fn.is_valid():
+      raise FSError(INVALID_VOLUME_NAME, file_name=name, node=self)
+    self.root.name = new_name
+    self.root.write()
+    self.name = new_name
+    self.root_dir.name = new_name
+
   def create_dir(self, ami_path):
     pc = ami_path.split("/")
     # no directory given

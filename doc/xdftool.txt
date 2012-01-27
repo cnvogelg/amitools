@@ -283,6 +283,17 @@ EXAMPLE:
   > xdftool mydisk.adf time mydir "06.07.1986 14:38:56"
 
 
+'relabel' - Change the name of the volume
+
+SYNTAX: relable <new_name>
+
+DESCRIPTION: Set a new name for the volume
+
+EXAMPLE:
+
+  > xdftool my.adf relabel "A New Name"
+
+
 'root' - Change parameters of the root block
 
 SYNTAX: root show

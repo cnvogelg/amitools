@@ -19,6 +19,7 @@ INTERNAL_ERROR = 18
 INVALID_PROTECT_FORMAT = 19
 INVALID_PARENT_DIRECTORY = 20
 FILE_NOT_FOUND = 21
+INVALID_VOLUME_NAME = 22
 
 error_names = {
   INVALID_BOOT_BLOCK : "Invalid Boot Block",
@@ -41,7 +42,8 @@ error_names = {
   INTERNAL_ERROR : "Internal Error",
   INVALID_PROTECT_FORMAT : "Invalid Protect Format",
   INVALID_PARENT_DIRECTORY : "Invalid Parent Directory",
-  FILE_NOT_FOUND : "File not found"
+  FILE_NOT_FOUND : "File not found",
+  INVALID_VOLUME_NAME : "Invalid volume name"
 }
 
 class FSError(Exception):

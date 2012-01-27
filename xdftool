@@ -438,6 +438,18 @@ class TimeCmd(Command):
       print "Can't find node:",name
       return 2
 
+class RelabelCmd(Command):
+  def __init__(self, args, opts):
+    Command.__init__(self, args, opts, edit=True)
+  def handle_vol(self, vol):
+    n = len(self.opts)
+    if n != 1:
+      print "Usage: relabel <new_name>"
+      return 1
+    name = self.opts[0]
+    node = vol.relabel(name)
+    return 0
+
 # ----- Block Tools -----
 
 class BlockCmd(Command):
@@ -716,7 +728,8 @@ cmd_map = {
 "repack" : RepackCmd,
 "boot" : BootCmd,
 "root" : RootCmd,
-"info" : InfoCmd
+"info" : InfoCmd,
+"relabel" : RelabelCmd
 }
 
 parser = argparse.ArgumentParser()
