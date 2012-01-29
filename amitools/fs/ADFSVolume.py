@@ -6,6 +6,7 @@ from FileName import FileName
 from RootMetaInfo import RootMetaInfo
 from FSError import *
 from TimeStamp import TimeStamp
+import DosType
 
 class ADFSVolume:
   root_path_aliases = ("", "/", ":")
@@ -32,9 +33,10 @@ class ADFSVolume:
     # valid root block?
     if self.boot.valid:
       # get fs flags
-      self.is_ffs = self.boot.is_ffs()
-      self.is_intl = self.boot.is_intl()
-      self.is_dircache = self.boot.is_dircache()
+      dos_type = self.boot.dos_type
+      self.is_ffs = DosType.is_ffs(dos_type)
+      self.is_intl = DosType.is_intl(dos_type)
+      self.is_dircache = DosType.is_dircache(dos_type)
       # read root 
       self.root = RootBlock(self.blkdev, self.boot.calc_root_blk)
       self.root.read()
@@ -57,19 +59,19 @@ class ADFSVolume:
   def create(self, name, meta_info=None, dos_type=None, boot_code=None, is_ffs=False, is_intl=False, is_dircache=False):
     # determine dos_type
     if dos_type == None:
-      dos_type = BootBlock.DOS0
+      dos_type = DosType.DOS0
       if is_ffs:
-        dos_type |= BootBlock.DOS_MASK_FFS
+        dos_type |= DosType.DOS_MASK_FFS
       if is_dircache:
-        dos_type |= BootBlock.DOS_MASK_DIRCACHE
+        dos_type |= DosType.DOS_MASK_DIRCACHE
       elif is_intl:
-        dos_type |= BootBlock.DOS_MASK_INTL
+        dos_type |= DosType.DOS_MASK_INTL
     # create a boot block
     self.boot = BootBlock(self.blkdev, )
     self.boot.create(dos_type=dos_type, boot_code=boot_code)
-    self.is_ffs = self.boot.is_ffs()
-    self.is_intl = self.boot.is_intl()
-    self.is_dircache = self.boot.is_dircache()
+    self.is_ffs = DosType.is_ffs(dos_type)
+    self.is_intl = DosType.is_intl(dos_type)
+    self.is_dircache = DosType.is_dircache(dos_type)
     self.boot.write()
     # create a root block
     self.root = RootBlock(self.blkdev, self.boot.calc_root_blk)

@@ -2,17 +2,6 @@ import struct
 import ctypes
 from ..TimeStamp import TimeStamp
 
-def dostype_long_to_tag(l):
-  a = chr((l >> 24) & 0xff)
-  b = chr((l >> 16) & 0xff)
-  c = chr((l >> 8) & 0xff)
-  last = (l & 0xff)
-  if last < 32:
-    last = "\\x%02x" % last
-  else:
-    last = chr(d)
-  return a+b+c+last
-  
 class Block:
   # mark end of block list
   no_blk = 0xffffffff

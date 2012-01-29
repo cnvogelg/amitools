@@ -1,4 +1,5 @@
 from ..Block import *
+import amitools.fs.DosType as DosType
 
 class FSHeaderDeviceNode:
   def __init__(self, type=0, task=0, lock=0, handler=0, stack_size=0, priority=0,
@@ -107,7 +108,7 @@ class FSHeaderBlock(Block):
     print " host_id:        %d" % self.host_id
     print " next:           %s" % self._dump_ptr(self.next)
     print " flags:          0x%08x" % self.flags
-    print " dos_type:       0x%08x = %s" % (self.dos_type, dostype_long_to_tag(self.dos_type))
+    print " dos_type:       0x%08x = %s" % (self.dos_type, DosType.num_to_tag_str(self.dos_type))
     print " version:        0x%08x = %d.%d" % (self.version, self.version >> 16, self.version & 0xffff)
     print " patch_flags:    0x%08x" % self.patch_flags
       

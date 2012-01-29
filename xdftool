@@ -723,7 +723,7 @@ class RDiskCmd(Command):
   def handle_blkdev(self, blkdev):
     n = len(self.opts)
     if n == 0:
-      print "Usage: rdisk (dump | info | part <n|dev_name>)"
+      print "Usage: rdisk (show [hex] | info | part <n|dev_name>)"
       return 1
     cmd = self.opts[0]
     # fetch rdisk
@@ -731,9 +731,10 @@ class RDiskCmd(Command):
     if not rdisk.open():
       print "Can't read RDSK!"
       return 1
-    # rdisk dump
-    if cmd == 'dump':
-      rdisk.dump()
+    # rdisk show
+    if cmd == 'show':
+      show_hex = "hex" in self.opts
+      rdisk.dump(show_hex)
       return 0
     # rdisk info
     if cmd == 'info':

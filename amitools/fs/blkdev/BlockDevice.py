@@ -44,5 +44,5 @@ class BlockDevice:
   def write_block(self, blk_num, data):
     pass
   def get_geometry(self):
-    return DiskGeometry(self.last_cyl - self.first_cyl + 1, self.heads, self.sectors)
+    return DiskGeometry(self.cyls, self.heads, self.sectors)
 

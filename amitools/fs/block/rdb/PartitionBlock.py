@@ -1,4 +1,5 @@
 from ..Block import *
+import amitools.fs.DosType as DosType
 
 class PartitionDosEnv:
   def __init__(self, size=0, block_size=0, sec_org=0, surfaces=0, sec_per_blk=0, blk_per_trk=0,
@@ -44,7 +45,7 @@ class PartitionDosEnv:
     print " max_tramsfer:   0x%08x" % self.max_transfer
     print " mask:           0x%08x" % self.mask
     print " boot_pri:       %d" % self.boot_pri
-    print " dos_type:       0x%08x = %s" % (self.dos_type, dostype_long_to_tag(self.dos_type))
+    print " dos_type:       0x%08x = %s" % (self.dos_type, DosType.num_to_tag_str(self.dos_type))
     print " baud:           %d" % self.baud
     print " control:        %d" % self.control
     print " boot_blocks:    %d" % self.boot_blocks
