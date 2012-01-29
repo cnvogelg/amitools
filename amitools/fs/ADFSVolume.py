@@ -7,6 +7,7 @@ from RootMetaInfo import RootMetaInfo
 from FSError import *
 from TimeStamp import TimeStamp
 import DosType
+import amitools.util.ByteSize as ByteSize
 
 class ADFSVolume:
   root_path_aliases = ("", "/", ":")
@@ -98,6 +99,23 @@ class ADFSVolume:
   
   def close(self):
     pass
+
+  def get_info(self):
+    """return an array of strings with information on the volume"""
+    res = []
+    total = self.get_total_blocks()
+    free  = self.get_free_blocks()
+    used  = total - free
+    bb = self.blkdev.block_bytes
+    btotal = total * bb
+    bfree  = free * bb
+    bused  = used * bb
+    prc_free = 10000 * free / total
+    prc_used = 10000 - prc_free
+    res.append("total:  %10d  %s  %12d" % (total, ByteSize.to_bi_str(btotal), btotal))
+    res.append("used:   %10d  %s  %12d  %5.2f%%" % (used, ByteSize.to_bi_str(bused), bused, prc_used / 100.0))
+    res.append("free:   %10d  %s  %12d  %5.2f%%" % (free, ByteSize.to_bi_str(bfree), bfree, prc_free / 100.0))
+    return res
 
   def get_path_name(self, path_name, allow_file=True, allow_dir=True):
     if path_name in self.root_path_aliases:

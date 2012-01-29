@@ -233,19 +233,9 @@ class ListCmd(Command):
         print "ERROR path not found:",node
         return 2
     if show_info:
-      bu = node.get_block_usage(all=show_all)
-      sum = bu[0] + bu[1]
-      total = vol.get_total_blocks()
-      bb = vol.blkdev.block_bytes
-      ratio = bu[0] * 100.0 / sum
-      file_bytes = node.get_file_bytes(all=show_all)
-      if bu[0] != 0:
-        file_ratio = (file_bytes * 100.0) / (bb * bu[0])
-      else:
-        file_ratio = 0
-      print "Blocks:    data: %8d, fs: %8d, sum: %8d, ratio=%4.2f, disk total: %8d" % (bu[0], bu[1], sum, ratio, total)
-      print "Bytes:     data: %8d, fs: %8d, sum: %8d, ratio=%4.2f, disk total: %8d" % (bu[0] * bb, bu[1] * bb, sum * bb, ratio, total * bb)
-      print "File:      data: %8d, ratio=%4.2f" % (file_bytes, file_ratio)
+      info = node.get_info(show_all)
+      for line in info:
+        print line
     return 0
 
 class TypeCmd(Command):
@@ -294,15 +284,10 @@ class ReadCmd(Command):
 
 class InfoCmd(Command):
   def handle_vol(self, vol):
-    total = vol.get_total_blocks()
-    free  = vol.get_free_blocks()
-    used  = total - free
-    bb = vol.blkdev.block_bytes
-    btotal = total * bb
-    bfree  = free * bb
-    bused  = used * bb
-    print "Blocks:   total: %8d   used: %8d  free: %8d" % (total, used, free)
-    print "Bytes:    total: %8d   used: %8d  free: %8d" % (btotal, bused, bfree)
+    info = vol.get_info()
+    for line in info:
+      print line
+    return 0
 
 # ----- Edit Image -----
 

@@ -3,6 +3,7 @@ from MetaInfo import MetaInfo
 from ProtectFlags import ProtectFlags
 from TimeStamp import TimeStamp
 from FSError import *
+import amitools.util.ByteSize as ByteSize
 
 class ADFSNode:
   def __init__(self, volume, parent):
@@ -149,3 +150,18 @@ class ADFSNode:
   def is_dir(self):
     return False
 
+  def get_info(self, all=False):
+    # block usage: data + fs blocks
+    (data,fs) = self.get_block_usage(all=all)
+    total = data + fs
+    bb = self.blkdev.block_bytes
+    btotal = total * bb
+    bdata = data * bb
+    bfs = fs * bb
+    prc_data = 10000 * data / total
+    prc_fs = 10000 - prc_data
+    res = []
+    res.append("sum:    %10d  %s  %12d" % (total, ByteSize.to_bi_str(btotal), btotal))
+    res.append("data:   %10d  %s  %12d  %5.2f%%" % (data, ByteSize.to_bi_str(bdata), bdata, prc_data / 100.0))
+    res.append("fs:     %10d  %s  %12d  %5.2f%%" % (fs, ByteSize.to_bi_str(bfs), bfs, prc_fs / 100.0))
+    return res
