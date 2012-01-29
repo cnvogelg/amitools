@@ -505,4 +505,38 @@ EXAMPLE:
   > xdftool test.adf block node myfile data
   > xdftool test.adf block dump 880
 
+
+3.5 Working with RBD/RDisk Images
+
+xdftool also supports working on partitions on a RDB (Rigid Disk Block) or 
+RDisk disk image or real device. In this case you give xdftool the name of
+the block device or the image and then you must issue the 'rdisk' command
+as the first command in the command list. There you select the partition 
+all other commands will then work on.
+
+'rdisk' - RDB/RDisk query or partition selection.
+
+SYNTAX: rdisk info
+        rdisk show [hex]
+        rdisk part <n|device_name>
+
+DESCRIPTION: The "info" command gives a short overview of the partitions
+available on the RDB image. "show" displays the block structures describing
+the volume. Add the "hex" option to see the contents of the blocks, too.
+
+Both "info" and "show" commands are not allowed in a command list and can
+only be given as the only command.
+
+Use the "part" command to select a partition on the volume. This partition
+is then used for the following xdftool commands. You can either specify the
+partition with a number (see "info" output) or give the device name that
+is associated with it (e.g. "DH0").
+
+EXAMPLE:
+
+  > xdftool disk.rdisk rdisk info
+  > xdftool disk.rdisk rdisk show hex
+  > xdftool disk.rdisk rdisk part 0 + list
+  > xdftool disk.rdisk rdisk part dh0 + info
+
 EOF
