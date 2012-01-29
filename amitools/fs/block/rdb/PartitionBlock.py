@@ -94,6 +94,9 @@ class PartitionDosEnv:
     blk._put_long(51, self.boot_blocks)
 
 class PartitionBlock(Block):
+  FLAG_BOOTABLE = 1
+  FLAG_NO_AUTOMOUNT = 2
+  
   def __init__(self, blkdev, blk_num):
     Block.__init__(self, blkdev, blk_num, chk_loc=2, is_type=Block.PART)
   

@@ -23,7 +23,7 @@ class HDFBlockDevice(BlockDevice):
         ok = geo.parse_chs_str(size_str)
         if not ok:
           raise IOError("Invalid HDF disk geometry or size given: "+size_str)
-    self._set_geometry(0, geo.cyls-1, geo.heads, geo.secs, reserved=reserved)
+    self._set_geometry(geo.cyls, geo.heads, geo.secs, reserved=reserved)
     # create empty file
     self.fh = file(self.hdf_file,"wb")
     blk = '\0' * self.block_bytes
@@ -40,7 +40,7 @@ class HDFBlockDevice(BlockDevice):
     geo = DiskGeometry()
     if geo.guess_for_size(size, approx=False, algo=guess_algo) == None:
       raise IOError("Can't detect HDF disk geometry!")
-    self._set_geometry(0, geo.cyls-1, geo.heads, geo.secs)
+    self._set_geometry(geo.cyls, geo.heads, geo.secs)
     
     # open adf file 
     if self.read_only:

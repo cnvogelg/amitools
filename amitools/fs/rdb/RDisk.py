@@ -1,6 +1,7 @@
 from ..block.rdb.RDBlock import *
 from ..block.rdb.PartitionBlock import *
 from FileSystem import FileSystem
+from ..blkdev.PartBlockDevice import PartBlockDevice
 
 class RDisk:
   def __init__(self, rawblk):
@@ -51,3 +52,45 @@ class RDisk:
     # fs
     for fs in self.fs:
       fs.dump(hex_dump)
+  
+  # ----- query -----
+  
+  def get_info(self):
+    res = []
+    pd = self.rdb.phy_drv
+    res.append("PhysicalDisk: cyls=%d, heads=%d, secs=%d" % (pd.cyls, pd.heads, pd.secs))
+    ld = self.rdb.log_drv
+    res.append("LogicalDisk:  rdb_blks=[%d:%d], cyls=[%d:%d], cyl_blks=%d" % (ld.rdb_blk_lo, ld.rdb_blk_hi, ld.lo_cyl, ld.hi_cyl, ld.cyl_blks))
+    # add partitions
+    num = 0
+    for p in self.parts:
+      de = p.dos_env
+      name = "'%s'" % p.drv_name
+      extra = ""
+      flags = p.flags
+      if flags & PartitionBlock.FLAG_BOOTABLE == PartitionBlock.FLAG_BOOTABLE:
+        extra += " bootable"
+      if flags & PartitionBlock.FLAG_NO_AUTOMOUNT == PartitionBlock.FLAG_NO_AUTOMOUNT:
+        extra += " no_automount"
+      res.append("Partition: #%d %-06s cyls=[%8d:%8d] boot_pri=%d %s" % (num, name, de.low_cyl, de.high_cyl, de.boot_pri, extra))
+      num += 1
+    return res
+
+  def get_num_partitions(self):
+    return len(self.parts)
+  
+  def get_partition_blkdev(self, num):
+    return PartBlockDevice(self.rawblk, self.parts[num])
+
+  def find_partition_by_device_name(self, name):
+    lo_name = name.lower()
+    num = 0
+    for p in self.parts:
+      drv_name = p.drv_name.lower()
+      if drv_name == lo_name:
+        return num
+      num += 1
+    return None
+
+      
+    

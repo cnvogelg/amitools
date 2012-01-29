@@ -47,6 +47,7 @@ class FSCommandQueue(CommandQueue):
     self.args = args
     self.blkdev = None
     self.volume = None
+    self.first_blkdev = None
   
   def create_blkdev(self):
     self.img = self.args.image_file
@@ -95,6 +96,9 @@ class FSCommandQueue(CommandQueue):
       if self.args.verbose:
         print "closing image:",self.img
       self.blkdev.close()
+      # first device was another?
+      if self.first_blkdev != None:
+        self.first_blkdev.close()
     return exit_code
 
   def create_cmd(self, cclass, name, opts):
@@ -127,6 +131,7 @@ class FSCommandQueue(CommandQueue):
       print "exit_code:",exit_code
     # does the command generate a new blk device?
     if cmd.newdev != None:
+      self.first_blkdev = self.blkdev
       self.blkdev = cmd.newdev
     self.first_cmd = cmd
     return exit_code
@@ -716,13 +721,50 @@ class BlkDevCmd(Command):
 
 class RDiskCmd(Command):
   def handle_blkdev(self, blkdev):
+    n = len(self.opts)
+    if n == 0:
+      print "Usage: rdisk (dump | info | part <n|dev_name>)"
+      return 1
+    cmd = self.opts[0]
+    # fetch rdisk
     rdisk = RDisk(blkdev)
-    if rdisk.open():
-      rdisk.dump()
-      return 0
-    else:
+    if not rdisk.open():
       print "Can't read RDSK!"
       return 1
+    # rdisk dump
+    if cmd == 'dump':
+      rdisk.dump()
+      return 0
+    # rdisk info
+    if cmd == 'info':
+      lines = rdisk.get_info()
+      for l in lines:
+        print l
+    # rdisk part - select partition
+    elif cmd == 'part':
+      if n == 1:
+        print "Please give partition number of name"
+        return 1
+      else:
+        # try to find partition by name
+        opt = self.opts[1]
+        num = rdisk.find_partition_by_device_name(opt)
+        if num == None:
+          try:
+            num = int(self.opts[1])
+          except ValueError:
+            print "Invalid partition number given!"
+            return 1
+        if num >= rdisk.get_num_partitions():
+          print "Partition number too high!"
+          return 1
+        # create blockdev for partition
+        blkdev = rdisk.get_partition_blkdev(num)
+        if not blkdev.open():
+          print "Error opening partition block device!"
+          return 1
+        self.newdev = blkdev
+        return 0
 
 # ----- main -----
 # call scanner and process all files with selected command

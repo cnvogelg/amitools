@@ -123,14 +123,12 @@ class RDBDriveID:
 
 
 class RDBlock(Block):
-  no_blk = 0xffffffff
-  
   def __init__(self, blkdev, blk_num=0):
     Block.__init__(self, blkdev, blk_num, chk_loc=2, is_type=Block.RDSK)
   
   def create(self, host_id, block_size, flags, 
              phy_drv, log_drv, drv_id,
-             badblk_list=no_blk, part_list=no_blk, fs_list=no_blk, init_code=no_blk,
+             badblk_list=Block.no_blk, part_list=Block.no_blk, fs_list=Block.no_blk, init_code=Block.no_blk,
              size=64):
     Block.create(self)
     self.size = size
