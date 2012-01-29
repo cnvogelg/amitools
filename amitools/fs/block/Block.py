@@ -2,7 +2,23 @@ import struct
 import ctypes
 from ..TimeStamp import TimeStamp
 
+def dostype_long_to_tag(l):
+  a = chr((l >> 24) & 0xff)
+  b = chr((l >> 16) & 0xff)
+  c = chr((l >> 8) & 0xff)
+  last = (l & 0xff)
+  if last < 32:
+    last = "\\x%02x" % last
+  else:
+    last = chr(d)
+  return a+b+c+last
+  
 class Block:
+  
+  # special blocks
+  RDSK = 0x5244534b
+  BADB = 0x42414442
+  PART = 0x50415254
   
   # block types
   T_SHORT = 2
@@ -146,6 +162,26 @@ class Block:
     self.data[loc] = chr(len(bstr))
     if len(bstr) > 0:
       self.data[loc+1:loc+1+len(bstr)] = bstr
+  
+  def _get_cstr(self, loc, max_size):
+    n = 0
+    s = ""
+    loc = loc * 4
+    while n < max_size:
+      c = self.data[loc+n]
+      if ord(c) == 0:
+        break
+      s += c
+      n += 1
+    return s
+    
+  def _put_cstr_(self, loc, max_size, cstr):
+    if cstr == None:
+      cstr = ""
+    n = min(max_size, len(cstr))
+    loc = loc * 4
+    if n > 0:
+      self.data[loc:loc+n] = cstr
   
   def dump(self, name, details=True):
     print "%sBlock(%d):" % (name, self.blk_num)

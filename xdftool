@@ -15,6 +15,7 @@ from amitools.fs.block.RootBlock import RootBlock
 from amitools.util.CommandQueue import CommandQueue
 from amitools.util.HexDump import *
 from amitools.util.DisAsm import DisAsm
+from amitools.fs.rdb.RDisk import RDisk
 
 # ----- commands -----
 class Command:
@@ -23,6 +24,7 @@ class Command:
     self.opts = opts
     self.create = create
     self.edit = edit
+    self.newdev = None
     self.exit_code = 0
     
     self.volume = None
@@ -123,6 +125,9 @@ class FSCommandQueue(CommandQueue):
     exit_code = cmd.run(self.blkdev, self.volume)
     if self.args.verbose:
       print "exit_code:",exit_code
+    # does the command generate a new blk device?
+    if cmd.newdev != None:
+      self.blkdev = cmd.newdev
     self.first_cmd = cmd
     return exit_code
     
@@ -707,6 +712,18 @@ class BlkDevCmd(Command):
     blkdev.dump()
     return 0
 
+# ----- RDisk Command -----
+
+class RDiskCmd(Command):
+  def handle_blkdev(self, blkdev):
+    rdisk = RDisk(blkdev)
+    if rdisk.open():
+      rdisk.dump()
+      return 0
+    else:
+      print "Can't read RDSK!"
+      return 1
+
 # ----- main -----
 # call scanner and process all files with selected command
 cmd_map = {
@@ -729,7 +746,8 @@ cmd_map = {
 "boot" : BootCmd,
 "root" : RootCmd,
 "info" : InfoCmd,
-"relabel" : RelabelCmd
+"relabel" : RelabelCmd,
+"rdisk" : RDiskCmd
 }
 
 parser = argparse.ArgumentParser()
