@@ -14,11 +14,15 @@ def dostype_long_to_tag(l):
   return a+b+c+last
   
 class Block:
+  # mark end of block list
+  no_blk = 0xffffffff
   
   # special blocks
-  RDSK = 0x5244534b
-  BADB = 0x42414442
-  PART = 0x50415254
+  RDSK = 0x5244534b # Rigid Disk Block
+  BADB = 0x42414442 # Bad Blocks Block
+  PART = 0x50415254 # Partition Block
+  FSHD = 0x46534844 # FileSystem Header Block
+  LSEG = 0x4c534547 # LoadSeg Block
   
   # block types
   T_SHORT = 2
@@ -182,6 +186,12 @@ class Block:
     loc = loc * 4
     if n > 0:
       self.data[loc:loc+n] = cstr
+  
+  def _dump_ptr(self, ptr):
+    if ptr == self.no_blk:
+      return "none"
+    else:
+      return "%d" % ptr
   
   def dump(self, name, details=True):
     print "%sBlock(%d):" % (name, self.blk_num)

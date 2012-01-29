@@ -190,12 +190,6 @@ class RDBlock(Block):
     
     return self.valid
   
-  def _dump_ptr(self, ptr):
-    if ptr == self.no_blk:
-      return "none"
-    else:
-      return "%d" % ptr
-  
   def dump(self):
     Block.dump(self, "RigidDisk")
     

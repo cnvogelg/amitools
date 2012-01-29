@@ -94,8 +94,6 @@ class PartitionDosEnv:
     blk._put_long(51, self.boot_blocks)
 
 class PartitionBlock(Block):
-  no_blk = 0xffffffff
-  
   def __init__(self, blkdev, blk_num):
     Block.__init__(self, blkdev, blk_num, chk_loc=2, is_type=Block.PART)
   
@@ -146,12 +144,6 @@ class PartitionBlock(Block):
     self.dos_env.read(self)
     
     return self.valid
-  
-  def _dump_ptr(self, ptr):
-    if ptr == self.no_blk:
-      return "none"
-    else:
-      return "%d" % ptr
   
   def dump(self):
     Block.dump(self, "Partition")
