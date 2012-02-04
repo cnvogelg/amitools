@@ -171,7 +171,7 @@ class Block:
       n += 1
     return s
     
-  def _put_cstr_(self, loc, max_size, cstr):
+  def _put_cstr(self, loc, max_size, cstr):
     if cstr == None:
       cstr = ""
     n = min(max_size, len(cstr))

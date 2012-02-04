@@ -1,0 +1,230 @@
+#!/usr/bin/env python2.7
+# rdbtool
+# swiss army knife for rdb disk images or devices
+
+import sys
+import argparse
+import os.path
+
+from amitools.util.CommandQueue import CommandQueue
+from amitools.fs.FSError import FSError
+from amitools.fs.rdb.RDisk import RDisk
+from amitools.fs.blkdev.RawBlockDevice import RawBlockDevice
+from amitools.fs.blkdev.DiskGeometry import DiskGeometry
+
+# ----- commands -----
+class Command:
+  def __init__(self, args, opts, provide=False, edit=False):
+    self.args = args
+    self.opts = opts
+    self.provide = provide
+    self.edit = edit
+    self.exit_code = 0
+    
+    self.blkdev = None
+    self.rdisk = None 
+   
+  def run(self, rdisk=None):
+    pass
+    
+class FSCommandQueue(CommandQueue):
+  def __init__(self, args, cmd_list, sep, cmd_map):
+    CommandQueue.__init__(self, cmd_list, sep, cmd_map)
+    self.args = args
+    self.rdisk = None
+    self.blkdev = None
+  
+  def run(self):
+    try:
+      # main command loop
+      exit_code = CommandQueue.run(self)
+    except FSError as e:
+      cmd = "'%s'" % " ".join(self.cmd_line)
+      print cmd,"FSError:",str(e)
+      exit_code = 3
+    except IOError as e:
+      cmd = "'%s'" % " ".join(self.cmd_line)
+      print cmd,"IOError:",str(e)
+      exit_code = 4
+    finally:
+      if self.rdisk != None:
+        self.rdisk.close()
+      if self.blkdev != None:
+        self.blkdev.close()
+    return exit_code
+
+  def create_cmd(self, cclass, name, opts):
+    return cclass(self.args, opts)
+
+  def run_first(self, cmd_line, cmd):
+    self.cmd_line = cmd_line
+    if self.args.verbose:
+      print "command:",self.cmd_line
+    if cmd.edit and self.args.read_only:
+      raise IOError("Edit commands not allowed in read-only mode")
+    # check code of command
+    if cmd.exit_code != 0:
+      return cmd.exit_code
+    # make sure rdisk is here
+    if not cmd.provide:
+      raise IOError("First command must provide a disk object")
+    # run command
+    exit_code = cmd.run()
+    # retrieve rdisk from command
+    self.rdisk = cmd.rdisk    
+    self.blkdev = cmd.blkdev
+    if self.blkdev == None or self.rdisk == None:
+      raise IOError("Error opening disk object")
+    if self.args.verbose:
+      print "exit_code:",exit_code
+    return exit_code
+    
+  def run_next(self, cmd_line, cmd):
+    self.cmd_line = cmd_line
+    if self.args.verbose:
+      print "command:",self.cmd_line
+    # verify command
+    if cmd.provide:
+      raise IOError("Only first command may provide a disk object")
+    if cmd.edit and self.args.read_only:
+      raise IOError("Edit commands not allowed in read-only mode")
+    # run command
+    exit_code = cmd.run(self.rdisk)
+    if self.args.verbose:
+      print "exit_code:",exit_code
+    return exit_code
+
+# ----- Commands -----
+
+# --- Open RDISK device/image ---
+
+class OpenCommand(Command):
+  def __init__(self, args, opts):
+    Command.__init__(self, args, opts, provide=True)
+  def run(self):
+    file_name = self.args.image_file
+    if not os.path.exists(file_name):
+      raise IOError("Image File not found: '%s'" % file_name)
+    self.blkdev = RawBlockDevice(file_name, self.args.read_only)
+    self.blkdev.open()
+    self.rdisk = RDisk(self.blkdev)
+    self.rdisk.open()
+    return 0
+
+# --- Create new RDISK device/image ---
+
+class CreateCommand(Command):
+  def __init__(self, args, opts):
+    Command.__init__(self, args, opts, provide=True, edit=True)
+  def run(self):
+    file_name = self.args.image_file
+    # do not overwrite an existing image file
+    if os.path.exists(file_name) and not self.args.force:
+      raise IOError("Image File already exists: '%s'" % file_name)
+    # determine disk geometry
+    geo = DiskGeometry()
+    if len(self.opts) < 0:
+      print "Usage: create <size|chs>"
+      return 1
+    else:
+      size_str = self.opts[0]
+      if not geo.parse_str(size_str):
+        print "Invalid size given:",size_str
+        return 1
+      else:
+        # create new empty image file for geometry
+        self.blkdev = RawBlockDevice(file_name)
+        self.blkdev.create(geo.get_num_blocks())
+        self.rdisk = RDisk(self.blkdev)
+        self.rdisk.create(geo)
+        return 0
+
+# --- Init existing disk image ---
+
+class InitCommand(Command):
+  def __init__(self, args, opts):
+    Command.__init__(self, args, opts, provide=True, edit=True)
+  def run(self):
+    file_name = self.args.image_file
+    if not os.path.exists(file_name):
+      raise IOError("Image File not found: '%s'" % file_name)
+
+# --- Info about rdisk ----
+
+class InfoCommand(Command):
+  def run(self, rdisk):
+    lines = rdisk.get_info()
+    for l in lines:
+      print l
+    return 0
+
+# --- Show rdisk structures ---
+
+class ShowCommand(Command):
+  def run(self, rdisk):
+      show_hex = "hex" in self.opts
+      rdisk.dump(show_hex)
+      return 0
+
+# --- Add a partition ---
+
+class AddCommand(Command):
+  def __init__(self, args, opts):
+    Command.__init__(self, args, opts, edit=True)
+  
+  def run(self, rdisk):
+    if len(self.opts) < 2:
+      print "Usage: add <drv_name> <cyl_lo,cyl_hi|size>"
+      return 1
+    else:
+      drv_name = self.opts[0]
+      size_str = self.opts[1]
+      lo_hi = self.parse_size(rdisk, size_str)
+      if lo_hi == None:
+        print "ERROR: invalid partition size given: '%s'" % size_str
+        return 1
+      # add partition
+      if rdisk.add_partition(drv_name, lo_hi[0], lo_hi[1]):
+        return 0
+      else:
+        print "ERROR: creating partition: %d %d" % lo_hi
+        return 1
+        
+  def parse_size(self, rdisk, size_str):
+    comp = size_str.split(',')
+    if len(comp) == 2:
+      # lo,hi ?
+      try:
+        lo = int(comp[0])
+        hi = int(comp[1])
+        return (lo,hi)
+      except ValueError:
+        return None
+    else:
+      return None
+
+# ----- main -----
+# call scanner and process all files with selected command
+cmd_map = {
+"open" : OpenCommand,
+"create" : CreateCommand,
+"init" : InitCommand,
+"info" : InfoCommand,
+"show" : ShowCommand,
+"add" : AddCommand
+}
+
+parser = argparse.ArgumentParser()
+parser.add_argument('image_file')
+parser.add_argument('command_list', nargs='+', help="command: "+",".join(cmd_map.keys()))
+parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
+parser.add_argument('-s', '--seperator', default='+', help="set the command separator char sequence")
+parser.add_argument('-r', '--read-only', action='store_true', default=False, help="read-only operation")
+parser.add_argument('-f', '--force', action='store_true', default=False, help="force overwrite existing image")
+args = parser.parse_args()
+
+cmd_list = args.command_list
+sep = args.seperator
+queue = FSCommandQueue(args, cmd_list, sep, cmd_map)
+code = queue.run()
+sys.exit(code)

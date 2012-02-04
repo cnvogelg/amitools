@@ -16,7 +16,14 @@ class FileSystem:
       return self.fshd.next
     else:
       return 0xffffffff
-    
+
+  def get_highest_blk_num(self):
+    hi = self.blk_num
+    for ls in self.lsegs:
+      if ls.blk_num > hi:
+        hi = ls.blk_num
+    return hi
+
   def read(self):
     # read fs header
     self.fshd = FSHeaderBlock(self.blkdev, self.blk_num)

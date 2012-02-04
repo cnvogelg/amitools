@@ -2,7 +2,14 @@ from ..Block import Block
 
 class RDBPhysicalDrive:
   def __init__(self, cyls=0, heads=0, secs=0, 
-               interleave=0, parking_zone=0, write_pre_comp=0, reduced_write=0, step_rate=0):
+               interleave=1, parking_zone=-1, write_pre_comp=-1, reduced_write=-1, step_rate=3):
+    if parking_zone == -1:
+        parking_zone = cyls
+    if write_pre_comp == -1:
+        write_pre_comp = cyls
+    if reduced_write == -1:
+        reduced_write = cyls
+    
     self.cyls = cyls
     self.heads = heads
     self.secs = secs
@@ -126,8 +133,8 @@ class RDBlock(Block):
   def __init__(self, blkdev, blk_num=0):
     Block.__init__(self, blkdev, blk_num, chk_loc=2, is_type=Block.RDSK)
   
-  def create(self, host_id, block_size, flags, 
-             phy_drv, log_drv, drv_id,
+  def create(self, phy_drv, log_drv, drv_id,
+             host_id=7, block_size=512, flags=0x17, 
              badblk_list=Block.no_blk, part_list=Block.no_blk, fs_list=Block.no_blk, init_code=Block.no_blk,
              size=64):
     Block.create(self)
@@ -144,6 +151,7 @@ class RDBlock(Block):
     self.phy_drv = phy_drv
     self.log_drv = log_drv
     self.drv_id = drv_id
+    self.valid = True
       
   def write(self):
     self._create_data()

@@ -2,9 +2,9 @@ from ..Block import *
 import amitools.fs.DosType as DosType
 
 class PartitionDosEnv:
-  def __init__(self, size=0, block_size=0, sec_org=0, surfaces=0, sec_per_blk=0, blk_per_trk=0,
-               reserved=0, pre_alloc=0, interleave=0, low_cyl=0, high_cyl=0, num_buffer=0,
-               buf_mem_type=0, max_transfer=0, mask=0, boot_pri=0, dos_type=0,
+  def __init__(self, size=16, block_size=128, sec_org=0, surfaces=0, sec_per_blk=1, blk_per_trk=0,
+               reserved=2, pre_alloc=0, interleave=0, low_cyl=0, high_cyl=0, num_buffer=30,
+               buf_mem_type=0, max_transfer=0, mask=0x7ffffffe, boot_pri=0, dos_type=DosType.DOS0,
                baud=0, control=0, boot_blocks=0):
     self.size = size
     self.block_size = block_size
@@ -101,8 +101,8 @@ class PartitionBlock(Block):
   def __init__(self, blkdev, blk_num):
     Block.__init__(self, blkdev, blk_num, chk_loc=2, is_type=Block.PART)
   
-  def create(self, host_id=0, next=0, flags=0, dev_flags=0, drv_name="",
-             size=64, dos_env=None):
+  def create(self, drv_name, dos_env, host_id=7, next=0, flags=0, dev_flags=0,
+             size=64):
     Block.create(self)
     self.size = size
     self.host_id = host_id
@@ -115,6 +115,7 @@ class PartitionBlock(Block):
     if dos_env == None:
       dos_env = PartitionDosEnv()
     self.dos_env = dos_env
+    self.valid = True
       
   def write(self):
     self._create_data()

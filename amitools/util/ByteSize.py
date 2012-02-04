@@ -6,13 +6,13 @@ GIB_SIZE = MIB_SIZE * 1024
 
 def to_bi_str(size):
   if size < 1000:
-    return "%3Bi" % size
+    return "%3dBi" % size
   else:
     for unit in "KMGT":
       next = size / KIB_SIZE
       if next < 10:
         rem = size % KIB_SIZE
-        return "%d.%d%si" % (next, rem / 100, unit)
+        return "%d.%d%si" % (next, rem * 10 / KIB_SIZE, unit)
       elif next < 1000:
         return "%3d%si" % (next, unit)
       size = next

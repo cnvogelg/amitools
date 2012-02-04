@@ -28,4 +28,4 @@ class RawBlockDevice(BlockDevice):
     return self.img_file.read_blk(blk_num)
   
   def write_block(self, blk_num, data):
-    self.img_file.write_blk(blk_num)
+    self.img_file.write_blk(blk_num, data)
