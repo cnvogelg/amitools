@@ -16,6 +16,9 @@ class ADFSNode:
     self.valid = False
     self.meta_info = None
   
+  def __str__(self):
+    return "%s:'%s'(@%d)" % (self.__class__.__name__, self.get_node_path_name(), self.block.blk_num)
+  
   def set_block(self, block):  
     self.block = block
     self.name = FileName(self.block.name)

@@ -85,7 +85,8 @@ class RootBlock(Block):
     self.extension = self._get_long(-2)
     
     # check validity
-    self.valid = (self.bitmap_flag == 0xffffffff)
+    self.valid = True
+    #self.valid = (self.bitmap_flag == 0xffffffff)
     return self.valid
   
   def dump(self):

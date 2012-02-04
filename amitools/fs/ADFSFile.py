@@ -85,10 +85,10 @@ class ADFSFile(ADFSNode):
         dat_blk = FileDataBlock(self.block.blkdev, blk)
         dat_blk.read()
         if not dat_blk.valid:
-          raise FSError(INVALID_FILE_DATA_BLOCK, block=dat_blk)
+          raise FSError(INVALID_FILE_DATA_BLOCK, block=dat_blk, node=self)
         # check sequence number
         if dat_blk.seq_num != want_seq_num:
-          raise FSError(INVALID_SEQ_NUM, block=dat_blk, extra="got=%d wanted=%d" % (dat_blk.seq_num, want_seq_num))
+          raise FSError(INVALID_SEQ_NUM, block=dat_blk, node=self, extra="got=%d wanted=%d" % (dat_blk.seq_num, want_seq_num))
         # store data blocks
         self.data_blks.append(dat_blk)
         total_size += dat_blk.data_size
@@ -100,7 +100,7 @@ class ADFSFile(ADFSNode):
     got_size = len(data)
     want_size = self.block.byte_size
     if got_size != want_size:
-      raise FSError(INTERNAL_ERROR, block=self.block, extra="file size mismatch: got=%d want=%d" % (got_size, want_size))
+      raise FSError(INTERNAL_ERROR, block=self.block, node=self, extra="file size mismatch: got=%d want=%d" % (got_size, want_size))
   
   def get_file_data(self):
     if self.data != None:

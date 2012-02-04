@@ -4,6 +4,7 @@ from ADFSDir import ADFSDir
 from ADFSFile import ADFSFile
 from ADFSVolume import ADFSVolume
 from MetaDB import MetaDB
+import DosType
 from amitools.fs.block.BootBlock import BootBlock
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
@@ -157,7 +158,7 @@ class Imager:
         in_path = in_path[:-1]
       name = os.path.basename(in_path)
       meta_info = None
-      dos_type = BootBlock.DOS0
+      dos_type = DosType.DOS0
     volume.create(name, meta_info, dos_type=dos_type)
   
   def pack_root(self, in_path, volume):

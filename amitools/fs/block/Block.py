@@ -35,6 +35,9 @@ class Block:
     self.is_sub_type = is_sub_type
     self.chk_loc = chk_loc
   
+  def __str__(self):
+    return "%s:@%d" % (self.__class__.__name__, self.blk_num)
+  
   def create(self):
     self.type = self.is_type
     self.sub_type = self.is_sub_type

@@ -3,13 +3,14 @@ from RootMetaInfo import RootMetaInfo
 from ProtectFlags import ProtectFlags
 from TimeStamp import TimeStamp
 from amitools.fs.block.BootBlock import BootBlock
+import DosType
 
 class MetaDB:
   def __init__(self):
     self.metas = {}
     self.vol_name = None
     self.vol_meta = None
-    self.dos_type = BootBlock.DOS0
+    self.dos_type = DosType.DOS0
   
   def set_root_meta_info(self, meta):
     self.vol_meta = meta
@@ -68,7 +69,7 @@ class MetaDB:
     num = ord(dos_type_str[3]) - ord('0')
     if num < 0 or num > 5:
       raise IOError("Invalid xdfmeta dostype number")
-    self.dos_type = BootBlock.DOS0 + num
+    self.dos_type = DosType.DOS0 + num
     # then time stamps
     create_ts = TimeStamp()
     ok1 = create_ts.parse(comp[1])
@@ -113,7 +114,7 @@ class MetaDB:
     f = open(file_path, "w")
     # header
     mi = self.vol_meta
-    num = self.dos_type - BootBlock.DOS0 + ord('0')
+    num = self.dos_type - DosType.DOS0 + ord('0')
     dos_type_str = "DOS%c" % num
     line = "%s:%s,%s,%s,%s\n" % (self.vol_name, dos_type_str, mi.get_create_ts(), mi.get_disk_ts(), mi.get_mod_ts())
     f.write(line)
