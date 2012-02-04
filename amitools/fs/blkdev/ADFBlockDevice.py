@@ -3,8 +3,8 @@ import ctypes
 
 class ADFBlockDevice(BlockDevice):
   def __init__(self, adf_file, read_only=False):
-    BlockDevice.__init__(self, read_only)
     self.adf_file = adf_file
+    self.read_only = read_only
     self.dirty = False
 
   def create(self, **args):

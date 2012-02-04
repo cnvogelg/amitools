@@ -2,9 +2,6 @@
 from DiskGeometry import DiskGeometry
 
 class BlockDevice:
-  def __init__(self, read_only=False):
-    self.read_only = read_only
-  
   def _set_geometry(self, cyls=80, heads=2, sectors=11, block_bytes=512, reserved=2, bootblocks=2):
     self.cyls = cyls
     self.heads = heads

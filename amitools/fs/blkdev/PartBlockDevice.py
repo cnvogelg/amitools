@@ -3,8 +3,7 @@ import os.path
 import os
 
 class PartBlockDevice(BlockDevice):
-  def __init__(self, raw_blkdev, part_blk, read_only=False):
-    BlockDevice.__init__(self, read_only)
+  def __init__(self, raw_blkdev, part_blk):
     self.raw_blkdev = raw_blkdev
     self.part_blk = part_blk
     self.blk_off = 0
@@ -39,8 +38,6 @@ class PartBlockDevice(BlockDevice):
     return self.raw_blkdev.read_block(self.blk_off + blk_num)
   
   def write_block(self, blk_num, data):
-    if self.read_only:
-      raise IOError("Part device is read-only!")
     if blk_num >= self.num_blocks:
       raise ValueError("Invalid Part block num: got %d but max is %d" % (blk_num, self.num_blocks))
     if len(data) != self.block_bytes:

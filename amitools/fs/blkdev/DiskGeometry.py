@@ -7,6 +7,9 @@ class DiskGeometry:
   def __str__(self):
     return "cyls=%d,heads=%d,secs=%d" % (self.cyls, self.heads, self.secs)
   
+  def get_num_blocks(self):
+    return self.cyls * self.heads * self.secs
+  
   def guess_for_size1(self, size, approx=True, block_bytes=512):
     mb = size / 1024
     secs = 63
@@ -108,5 +111,14 @@ class DiskGeometry:
     except ValueError:
       return False
 
+  def parse_str(self, format_str):
+    if self.parse_size_str(format_str):
+      return True
+    elif self.parse_chs_str(format_str):
+      return True
+    else:
+      return False
+
+    
     
     
