@@ -42,4 +42,9 @@ class BlockDevice:
     pass
   def get_geometry(self):
     return DiskGeometry(self.cyls, self.heads, self.sectors)
+  def get_chs_str(self):
+    return "chs=%d,%d,%d" % (self.cyls, self.heads, self.sectors)
+  def get_chs_dict(self):
+    return { 'chs' : "%d,%d,%d" % (self.cyls, self.heads, self.sectors) }
+
 

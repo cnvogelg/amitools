@@ -8,6 +8,7 @@ import DosType
 from amitools.fs.block.BootBlock import BootBlock
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
+import amitools.util.KeyValue as KeyValue
 
 class Imager:
   def __init__(self):
@@ -52,9 +53,8 @@ class Imager:
       f.write(volume.boot.boot_code)
       f.close()
     # save blkdev
-    geo = volume.blkdev.get_geometry()
     f = open(blkdev_path,"wb")
-    f.write("%d,%d,%d\n" % (geo.cyls, geo.heads, geo.secs))
+    f.write("%s\n" % volume.blkdev.get_chs_str())
     f.close()
     
   def unpack_root(self, volume, vol_path):
@@ -91,12 +91,12 @@ class Imager:
   
   # ----- pack -----
   
-  def pack(self, in_path):
+  def pack(self, in_path, image_file, force=True, options=None):
     self.pack_begin(in_path)
-    blkdev = self.pack_create_blkdev(in_path)
+    blkdev = self.pack_create_blkdev(in_path, image_file, force, options)
     if blkdev == None:
       raise IOError("Can't create block device for image: "+in_path)
-    volume = self.pack_create_volume(in_path)
+    volume = self.pack_create_volume(in_path, blkdev)
     if not volume.valid:
       raise IOError("Can't create volume for image: "+in_path)
     self.pack_root(in_path, volume)
@@ -126,25 +126,20 @@ class Imager:
       else:
         raise IOError("Invalid Boot Code")
   
-  def pack_create_blkdev(self, in_path, blkdev, blkdev_opts=None):
+  def pack_create_blkdev(self, in_path, image_file, force=True, options=None):
     # try to read options from blkdev file
-    if blkdev_opts == None:
+    if options == None or len(options) == 0:
       blkdev_path = in_path + ".blkdev"
       if os.path.exists(blkdev_path):
         f = open(blkdev_path, "rb")
-        data = f.read()
+        options = {}
+        for line in f:
+          KeyValue.parse_key_value_string(line, options)
         f.close()
-        geo = DiskGeometry()
-        if not geo.parse_chs_str(data):
-          raise IOError("Invalid blkdev geometry in '%s'" % blkdev_path)
-        blkdev_opts = { 'geo' : geo }
-
-    if blkdev_opts != None:
-      blkdev.create(**blkdev_opts)
-    else:
-      blkdev.create()
+    f = BlkDevFactory()
+    return f.create(image_file, force=force, options=options)
     
-  def pack_create_volume(self, in_path, volume):
+  def pack_create_volume(self, in_path, blkdev):
     if self.meta_db != None:
       name = self.meta_db.get_volume_name()
       meta_info = self.meta_db.get_root_meta_info()
@@ -159,7 +154,9 @@ class Imager:
       name = os.path.basename(in_path)
       meta_info = None
       dos_type = DosType.DOS0
+    volume = ADFSVolume(blkdev)
     volume.create(name, meta_info, dos_type=dos_type)
+    return volume
   
   def pack_root(self, in_path, volume):
     self.pack_dir(in_path, volume.get_root_dir())
@@ -201,52 +198,3 @@ class Imager:
       node = parent_node.create_file(ami_name, data, meta_info, False)
       node.flush()
       self.total_bytes += len(data)
-  
-  # ----- (re)pack from other volume -----
-  
-  def repack(self, in_volume, out_path, out_blkdev_opts=None):
-    # setup output block device
-    f = BlkDevFactory()
-    blkdev = f.create(out_path)
-    if blkdev == None:
-      raise IOError("Can't create block device for image: "+out_path)
-    if out_blkdev_opts == None:
-      # clone geometry from input block device
-      out_blkdev_opts = {
-        'geo': in_volume.blkdev.get_geometry()
-      }
-    blkdev.create(**out_blkdev_opts)
-    # setup output volume
-    name = in_volume.get_volume_name()
-    dos_type = in_volume.get_dos_type()
-    meta_info = in_volume.get_meta_info()
-    boot_code = in_volume.get_boot_code()
-    volume = ADFSVolume(blkdev)
-    volume.create(name, meta_info=meta_info, dos_type=dos_type, boot_code=boot_code)
-    if not volume.valid:
-      raise IOError("Can't create volume for image: "+out_path)
-    # start repacking from root dir
-    self.repack_node_dir(in_volume.get_root_dir(), volume.get_root_dir())
-  
-  def repack_node_dir(self, in_root, out_root):
-    entries = in_root.get_entries()
-    for e in entries:
-      self.repack_node(e, out_root) 
-  
-  def repack_node(self, in_node, out_dir):
-    name = in_node.get_file_name_str()
-    meta_info = in_node.get_meta_info()
-    # sub dir
-    if in_node.is_dir():
-      sub_dir = out_dir.create_dir(name, meta_info, False)
-      for child in in_node.get_entries():
-        self.repack_node(child, sub_dir)
-      sub_dir.flush()
-    # file
-    elif in_node.is_file():
-      data = in_node.get_file_data()
-      out_file = out_dir.create_file(name, data, meta_info, False)
-      out_file.flush()
-    in_node.flush()
-
-      

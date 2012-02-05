@@ -4,11 +4,12 @@ import amitools.util.ByteSize as ByteSize
 import amitools.fs.DosType as DosType
 
 class Partition:
-  def __init__(self, blkdev, blk_num, num, cyl_blks):
+  def __init__(self, blkdev, blk_num, num, cyl_blks, rdisk):
     self.blkdev = blkdev
     self.blk_num = blk_num
     self.num = num
     self.cyl_blks = cyl_blks
+    self.rdisk = rdisk
     self.part_blk = None
   
   def get_next_partition_blk(self):
@@ -29,9 +30,12 @@ class Partition:
     self.valid = True
     return True
   
-  def create_blkdev(self):
+  def create_blkdev(self, auto_close_rdisk=False):
     """create a block device for accessing this partition"""
-    return PartBlockDevice(self.blkdev, self.part_blk)
+    rdisk = None
+    if auto_close_rdisk:
+      rdisk = self.rdisk
+    return PartBlockDevice(self.blkdev, self.part_blk, rdisk)
 
   # ----- Query -----
   

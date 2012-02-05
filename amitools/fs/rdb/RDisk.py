@@ -26,7 +26,7 @@ class RDisk:
     self.parts = []
     num = 0
     while part_blk != PartitionBlock.no_blk:
-      p = Partition(self.rawblk, part_blk, num, self.rdb.log_drv.cyl_blks)
+      p = Partition(self.rawblk, part_blk, num, self.rdb.log_drv.cyl_blks, self)
       num += 1
       if not p.read():
         self.valid = False

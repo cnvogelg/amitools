@@ -3,10 +3,11 @@ import os.path
 import os
 
 class PartBlockDevice(BlockDevice):
-  def __init__(self, raw_blkdev, part_blk):
+  def __init__(self, raw_blkdev, part_blk, rdisk=None):
     self.raw_blkdev = raw_blkdev
     self.part_blk = part_blk
     self.blk_off = 0
+    self.rdisk = rdisk
 
   def open(self):
     # extract geometry from partition block
@@ -30,7 +31,9 @@ class PartBlockDevice(BlockDevice):
     self.raw_blkdev.flush()
         
   def close(self):
-    pass
+    # auto close containing rdisk
+    if self.rdisk != None:
+      self.rdisk.close()
 
   def read_block(self, blk_num):
     if blk_num >= self.num_blocks:
