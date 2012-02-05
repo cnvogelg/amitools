@@ -12,20 +12,22 @@ scale_map = {
 
 def to_byte_size_str(size, kibi_units=True):
   """convert a byte value into a 5 letter string"""
-  if size < 1000:
-    return "%3dBi" % size
+  if kibi_units:
+    unit = KIB_UNIT
+    marker = 'i'
   else:
-    if kibi_units:
-      unit = KIB_UNIT
-      marker = 'i'
-    else:
-      unit = 1000
-      marker = ''
+    unit = 1000
+    marker = ''
+  if size < 1000:
+    return "%3dB%s" % (size, marker)
+  else:
     # run through scales
     for scale in "KMGT":
       next = size / unit
       if next < 10:
         frac = float(size) / unit
+        if frac > 9.9:
+          frac = 9.9
         return "%3.1f%s%s" % (frac, scale, marker)
       elif next < 1000:
         return "%3d%s%s" % (next, scale, marker)

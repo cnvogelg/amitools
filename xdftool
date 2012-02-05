@@ -734,18 +734,12 @@ class RDiskCmd(Command):
       else:
         # try to find partition by name
         opt = self.opts[1]
-        num = rdisk.find_partition_by_device_name(opt)
-        if num == None:
-          try:
-            num = int(self.opts[1])
-          except ValueError:
-            print "Invalid partition number given!"
-            return 1
-        if num >= rdisk.get_num_partitions():
-          print "Partition number too high!"
+        part = rdisk.find_partition_by_string(opt)
+        if part == None:
+          print "Invalid partition number given!"
           return 1
         # create blockdev for partition
-        blkdev = rdisk.get_partition_blkdev(num)
+        blkdev = part.create_blkdev()
         if not blkdev.open():
           print "Error opening partition block device!"
           return 1

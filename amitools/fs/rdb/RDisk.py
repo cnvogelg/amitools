@@ -1,9 +1,9 @@
 from ..block.rdb.RDBlock import *
 from ..block.rdb.PartitionBlock import *
-from FileSystem import FileSystem
-from ..blkdev.PartBlockDevice import PartBlockDevice
 import amitools.util.ByteSize as ByteSize
 import amitools.fs.DosType as DosType
+from FileSystem import FileSystem
+from Partition import Partition
 
 class RDisk:
   def __init__(self, rawblk):
@@ -20,24 +20,31 @@ class RDisk:
     if not self.rdb.read():
       self.valid = False
       return False
+      
     # read partitions
     part_blk = self.rdb.part_list
     self.parts = []
+    num = 0
     while part_blk != PartitionBlock.no_blk:
-      pb = PartitionBlock(self.rawblk, part_blk)
-      if not pb.read():
+      p = Partition(self.rawblk, part_blk, num, self.rdb.log_drv.cyl_blks)
+      num += 1
+      if not p.read():
         self.valid = False
         return False
-      self.parts.append(pb)
+      self.parts.append(p)
       # remember highest rdb block
-      if part_blk > self.hi_rdb_blk:
-        self.hi_rdb_blk = part_blk
-      part_blk = pb.next
-    # read fs
+      hi = p.get_highest_blk_num()
+      if hi > self.hi_rdb_blk:
+        self.hi_rdb_blk = hi
+      part_blk = p.get_next_partition_blk()
+    
+    # read filesystems
     fs_blk = self.rdb.fs_list
     self.fs = []
+    num = 0
     while fs_blk != PartitionBlock.no_blk:
-      fs = FileSystem(self.rawblk, fs_blk)
+      fs = FileSystem(self.rawblk, fs_blk, num)
+      num += 1
       if not fs.read():
         self.valid = False
         return False
@@ -47,8 +54,95 @@ class RDisk:
       if hi > self.hi_rdb_blk:
         self.hi_rdb_blk = hi
       fs_blk = fs.get_next_fs_blk()
+      
     # TODO: add bad block blocks
     return True
+
+  def close(self):
+    pass
+    
+  # ----- query -----
+  
+  def dump(self, hex_dump=False):
+    # rdb
+    if self.rdb != None:
+      self.rdb.dump()
+    # partitions
+    for p in self.parts:
+      p.dump()
+    # fs
+    for fs in self.fs:
+      fs.dump(hex_dump)
+  
+  def get_info(self):
+    res = []
+    # physical disk info
+    pd = self.rdb.phy_drv
+    total_blks = self.get_total_blocks()
+    total_bytes = self.get_total_bytes()
+    extra="heads=%d sectors=%d" % (pd.heads, pd.secs)
+    res.append("PhysicalDisk:        %8d %8d  %10d  %s  %s" \
+      % (0, pd.cyls-1, total_blks, ByteSize.to_byte_size_str(total_bytes), extra))
+    # logical disk info
+    ld = self.rdb.log_drv
+    extra="rdb_blks=[%d:%d,%d(%d)] cyl_blks=%d" % (ld.rdb_blk_lo, ld.rdb_blk_hi, ld.high_rdsk_blk, self.hi_rdb_blk, ld.cyl_blks)
+    logic_blks = self.get_logical_blocks()
+    logic_bytes = self.get_logical_bytes()
+    res.append("LogicalDisk:         %8d %8d  %10d  %s  %s" \
+      % (ld.lo_cyl, ld.hi_cyl, logic_blks, ByteSize.to_byte_size_str(logic_bytes), extra))
+    # add partitions
+    for p in self.parts:
+      res.append(p.get_info())
+    # add fileystems
+    for f in self.fs:
+      res.append(f.get_info())
+    return res
+
+  def get_logical_blocks(self):
+    ld = self.rdb.log_drv
+    cyls = ld.hi_cyl - ld.lo_cyl + 1
+    return cyls * ld.cyl_blks
+
+  def get_logical_bytes(self, block_bytes=512):
+    return self.get_logical_blocks() * block_bytes
+
+  def get_total_blocks(self):
+    pd = self.rdb.phy_drv
+    return pd.cyls * pd.heads * pd.secs
+  
+  def get_total_bytes(self, block_bytes=512):
+    return self.get_total_blocks() * block_bytes
+
+  def get_num_partitions(self):
+    return len(self.parts)
+  
+  def get_partition(self, num):
+    if num < len(self.parts):
+      return self.parts[num]
+    else:
+      return None
+  
+  def find_partition_by_drive_name(self, name):
+    lo_name = name.lower()
+    num = 0
+    for p in self.parts:
+      drv_name = p.get_drive_name().lower()
+      if drv_name == lo_name:
+        return p
+    return None
+    
+  def find_partition_by_string(self, s):
+    p = self.find_partition_by_drive_name(s)
+    if p != None:
+      return p
+    # try partition number
+    try:
+      num = int(s)
+      return self.get_partition(num)
+    except ValueError:
+      return None
+
+  # ----- edit -----
   
   def create(self, disk_geo, rdb_cyl=1, hi_rdb_blk=0, disk_names=None, ctrl_names=None):
     cyls = disk_geo.cyls
@@ -88,98 +182,6 @@ class RDisk:
     self.rdb = RDBlock(self.rawblk)
     self.rdb.create(phy_drv, log_drv, drv_id, flags=flags)
     self.rdb.write()
-  
-  def close(self):
-    pass
-    
-  def dump(self, hex_dump=False):
-    # rdb
-    if self.rdb != None:
-      self.rdb.dump()
-    # partitions
-    for p in self.parts:
-      p.dump()
-    # fs
-    for fs in self.fs:
-      fs.dump(hex_dump)
-  
-  # ----- query -----
-  
-  def get_info(self):
-    res = []
-    # physical disk info
-    pd = self.rdb.phy_drv
-    total_blks = self.get_total_blocks()
-    total_bytes = self.get_total_bytes()
-    extra="heads=%d sectors=%d" % (pd.heads, pd.secs)
-    res.append("PhysicalDisk:        %8d %8d  %10d  %s  %s" \
-      % (0, pd.cyls-1, total_blks, ByteSize.to_byte_size_str(total_bytes), extra))
-    # logical disk info
-    ld = self.rdb.log_drv
-    extra="rdb_blks=[%d:%d,%d(%d)] cyl_blks=%d" % (ld.rdb_blk_lo, ld.rdb_blk_hi, ld.high_rdsk_blk, self.hi_rdb_blk, ld.cyl_blks)
-    logic_blks = self.get_logical_blocks()
-    logic_bytes = self.get_logical_bytes()
-    res.append("LogicalDisk:         %8d %8d  %10d  %s  %s" \
-      % (ld.lo_cyl, ld.hi_cyl, logic_blks, ByteSize.to_byte_size_str(logic_bytes), extra))
-    # add partitions
-    num = 0
-    for p in self.parts:
-      de = p.dos_env
-      name = "'%s'" % p.drv_name
-      extra = DosType.num_to_tag_str(p.dos_env.dos_type)
-      flags = p.flags
-      if flags & PartitionBlock.FLAG_BOOTABLE == PartitionBlock.FLAG_BOOTABLE:
-        extra += " bootable pri=%d" % de.boot_pri
-      if flags & PartitionBlock.FLAG_NO_AUTOMOUNT == PartitionBlock.FLAG_NO_AUTOMOUNT:
-        extra += " no_automount"
-      part_blks = self.get_partition_blocks(num)
-      part_bytes = self.get_partition_bytes(num)
-      res.append("Partition: #%d %-06s %8d %8d  %10d  %s  %s" \
-        % (num, name, de.low_cyl, de.high_cyl, part_blks, ByteSize.to_byte_size_str(part_bytes), extra))
-      num += 1
-    return res
-
-  def get_logical_blocks(self):
-    ld = self.rdb.log_drv
-    cyls = ld.hi_cyl - ld.lo_cyl + 1
-    return cyls * ld.cyl_blks
-
-  def get_logical_bytes(self, block_bytes=512):
-    return self.get_logical_blocks() * block_bytes
-
-  def get_total_blocks(self):
-    pd = self.rdb.phy_drv
-    return pd.cyls * pd.heads * pd.secs
-  
-  def get_total_bytes(self, block_bytes=512):
-    return self.get_total_blocks() * block_bytes
-
-  def get_num_partitions(self):
-    return len(self.parts)
-  
-  def get_partition_blkdev(self, num):
-    return PartBlockDevice(self.rawblk, self.parts[num])
-
-  def get_partition_blocks(self, num):
-    p = self.parts[num]
-    cyls = p.dos_env.high_cyl - p.dos_env.low_cyl + 1
-    ld = self.rdb.log_drv
-    return cyls * ld.cyl_blks
-
-  def get_partition_bytes(self, num, block_size=512):
-    return self.get_partition_blocks(num) * block_size
-
-  def find_partition_by_device_name(self, name):
-    lo_name = name.lower()
-    num = 0
-    for p in self.parts:
-      drv_name = p.drv_name.lower()
-      if drv_name == lo_name:
-        return num
-      num += 1
-    return None
-
-  # ----- edit -----
   
   def check_cyl_range(self, lo_cyl, hi_cyl):
     if lo_cyl > hi_cyl:

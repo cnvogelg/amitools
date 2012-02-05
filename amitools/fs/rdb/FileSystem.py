@@ -1,11 +1,13 @@
 from ..block.rdb.FSHeaderBlock import *
 from ..block.rdb.LoadSegBlock import *
 from amitools.util.HexDump import *
+import amitools.fs.DosType as DosType
 
 class FileSystem:
-  def __init__(self, blkdev, blk_num):
+  def __init__(self, blkdev, blk_num, num):
     self.blkdev = blkdev
     self.blk_num = blk_num
+    self.num = num
     self.fshd = None
     self.valid = False
     self.lsegs = []
@@ -48,6 +50,8 @@ class FileSystem:
   def get_data(self):
     return self.data
   
+  # ----- query -----
+  
   def dump(self, hex_dump=False):
     if self.fshd != None:
       self.fshd.dump()
@@ -60,3 +64,7 @@ class FileSystem:
     print " data size:  %d" % len(self.data)
     if hex_dump:
       print_hex(self.data)
+  
+  def get_info(self):
+    tab = " " * 44
+    return "FileSystem #%d %s %s version=%s" % (self.num, tab, DosType.num_to_tag_str(self.fshd.dos_type), self.fshd.get_version_string())

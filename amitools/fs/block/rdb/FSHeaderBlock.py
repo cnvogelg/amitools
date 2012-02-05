@@ -101,6 +101,12 @@ class FSHeaderBlock(Block):
     
     return self.valid
   
+  def get_version_tuple(self):
+    return ((self.version >> 16),(self.version & 0xffff))
+  
+  def get_version_string(self):
+    return "%d.%d" % self.get_version_tuple()
+  
   def dump(self):
     Block.dump(self, "FSHeader")
     
@@ -109,7 +115,7 @@ class FSHeaderBlock(Block):
     print " next:           %s" % self._dump_ptr(self.next)
     print " flags:          0x%08x" % self.flags
     print " dos_type:       0x%08x = %s" % (self.dos_type, DosType.num_to_tag_str(self.dos_type))
-    print " version:        0x%08x = %d.%d" % (self.version, self.version >> 16, self.version & 0xffff)
+    print " version:        0x%08x = %s" % (self.version, self.get_version_string())
     print " patch_flags:    0x%08x" % self.patch_flags
       
     self.dev_node.dump()
