@@ -164,7 +164,7 @@ class ADFSNode:
     prc_data = 10000 * data / total
     prc_fs = 10000 - prc_data
     res = []
-    res.append("sum:    %10d  %s  %12d" % (total, ByteSize.to_bi_str(btotal), btotal))
-    res.append("data:   %10d  %s  %12d  %5.2f%%" % (data, ByteSize.to_bi_str(bdata), bdata, prc_data / 100.0))
-    res.append("fs:     %10d  %s  %12d  %5.2f%%" % (fs, ByteSize.to_bi_str(bfs), bfs, prc_fs / 100.0))
+    res.append("sum:    %10d  %s  %12d" % (total, ByteSize.to_byte_size_str(btotal), btotal))
+    res.append("data:   %10d  %s  %12d  %5.2f%%" % (data, ByteSize.to_byte_size_str(bdata), bdata, prc_data / 100.0))
+    res.append("fs:     %10d  %s  %12d  %5.2f%%" % (fs, ByteSize.to_byte_size_str(bfs), bfs, prc_fs / 100.0))
     return res

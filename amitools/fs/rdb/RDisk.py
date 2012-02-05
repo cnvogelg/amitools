@@ -113,14 +113,14 @@ class RDisk:
     total_bytes = self.get_total_bytes()
     extra="heads=%d sectors=%d" % (pd.heads, pd.secs)
     res.append("PhysicalDisk:        %8d %8d  %10d  %s  %s" \
-      % (0, pd.cyls-1, total_blks, ByteSize.to_bi_str(total_bytes), extra))
+      % (0, pd.cyls-1, total_blks, ByteSize.to_byte_size_str(total_bytes), extra))
     # logical disk info
     ld = self.rdb.log_drv
     extra="rdb_blks=[%d:%d,%d(%d)] cyl_blks=%d" % (ld.rdb_blk_lo, ld.rdb_blk_hi, ld.high_rdsk_blk, self.hi_rdb_blk, ld.cyl_blks)
     logic_blks = self.get_logical_blocks()
     logic_bytes = self.get_logical_bytes()
     res.append("LogicalDisk:         %8d %8d  %10d  %s  %s" \
-      % (ld.lo_cyl, ld.hi_cyl, logic_blks, ByteSize.to_bi_str(logic_bytes), extra))
+      % (ld.lo_cyl, ld.hi_cyl, logic_blks, ByteSize.to_byte_size_str(logic_bytes), extra))
     # add partitions
     num = 0
     for p in self.parts:
@@ -135,7 +135,7 @@ class RDisk:
       part_blks = self.get_partition_blocks(num)
       part_bytes = self.get_partition_bytes(num)
       res.append("Partition: #%d %-06s %8d %8d  %10d  %s  %s" \
-        % (num, name, de.low_cyl, de.high_cyl, part_blks, ByteSize.to_bi_str(part_bytes), extra))
+        % (num, name, de.low_cyl, de.high_cyl, part_blks, ByteSize.to_byte_size_str(part_bytes), extra))
       num += 1
     return res
 
