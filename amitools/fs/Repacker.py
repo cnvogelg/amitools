@@ -2,12 +2,9 @@ from ADFSVolume import ADFSVolume
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 
 class Repacker:
-  def __init__(self, in_image_file, out_image_file, force=True, in_options=None, out_options=None):
+  def __init__(self, in_image_file, in_options=None):
     self.in_image_file = in_image_file
-    self.out_image_file = out_image_file
-    self.force = force
     self.in_options = in_options
-    self.out_options = out_options
     self.in_blkdev = None
     self.out_blkdev = None
     self.in_volume = None
@@ -32,23 +29,24 @@ class Repacker:
       return False
     return True
   
-  def create_out_blkdev(self):
+  def create_out_blkdev(self, image_file, force=True, options=None):
     if self.in_blkdev == None:
       return None
-    if self.out_options == None:
-      opts = self.in_blkdev.get_chs_dict()
-    else:
-      opts = self.out_options
+    # clone geo from input
+    if options == None:
+      options = self.in_blkdev.get_chs_dict()
     f = BlkDevFactory()
-    self.out_blkdev = f.create(self.out_image_file, force=self.force, options=opts)
+    self.out_blkdev = f.create(image_file, force=force, options=options)
     return self.out_blkdev
   
-  def create_out_volume(self):
+  def create_out_volume(self, blkdev=None):
+    if blkdev != None:
+      self.out_blkdev = blkdev
     if self.out_blkdev == None:
       return None
     if self.in_volume == None:
       return None
-    # setup output volume by cloning input volume
+    # clone input volume
     iv = self.in_volume
     name = iv.get_volume_name()
     dos_type = iv.get_dos_type()
