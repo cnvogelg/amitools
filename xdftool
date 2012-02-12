@@ -188,6 +188,11 @@ class CreateCmd(Command):
     return f.create(image_file, options=opts, force=args.force)
 
 class FormatCmd(Command):
+  def init_blkdev(self, image_file):
+    opts = KeyValue.parse_key_value_strings(self.opts[1:])
+    f = BlkDevFactory()
+    return f.create(image_file, options=opts, force=args.force)
+
   def init_vol(self, blkdev):
     vol = ADFSVolume(blkdev)
     n = len(self.opts)
@@ -202,19 +207,6 @@ class FormatCmd(Command):
       vol.create(vol_name, is_ffs=is_ffs, is_intl=is_intl, is_dircache=is_dircache)
       return vol
 
-class InitCommand(Command):
-  def __init__(self, args, opts):
-    Command.__init__(self, args, opts, edit=True)
-  
-  def init_blkdev(self, image_file):
-    opts = KeyValue.parse_key_value_strings(self.opts[1:])
-    f = BlkDevFactory()
-    return f.create(image_file, options=opts, force=args.force)
-  
-  def init_vol(self, blkdev):
-    fc = FormatCmd(self.args, self.opts)
-    return fc.init_vol(blkdev)
-    
 # ----- Pack/Unpack -----
 
 class PackCmd(Command):
@@ -749,56 +741,11 @@ class BlkDevCmd(Command):
     blkdev.dump()
     return 0
 
-# ----- RDisk Command -----
-
-class RDiskCmd(Command):
-  def handle_blkdev(self, blkdev):
-    n = len(self.opts)
-    if n == 0:
-      print "Usage: rdisk (show [hex] | info | part <n|dev_name>)"
-      return 1
-    cmd = self.opts[0]
-    # fetch rdisk
-    rdisk = RDisk(blkdev)
-    if not rdisk.open():
-      print "Can't read RDSK!"
-      return 1
-    # rdisk show
-    if cmd == 'show':
-      show_hex = "hex" in self.opts
-      rdisk.dump(show_hex)
-      return 0
-    # rdisk info
-    if cmd == 'info':
-      lines = rdisk.get_info()
-      for l in lines:
-        print l
-    # rdisk part - select partition
-    elif cmd == 'part':
-      if n == 1:
-        print "Please give partition number of name"
-        return 1
-      else:
-        # try to find partition by name
-        opt = self.opts[1]
-        part = rdisk.find_partition_by_string(opt)
-        if part == None:
-          print "Invalid partition number given!"
-          return 1
-        # create blockdev for partition
-        blkdev = part.create_blkdev()
-        if not blkdev.open():
-          print "Error opening partition block device!"
-          return 1
-        self.newdev = blkdev
-        return 0
-
 # ----- main -----
 # call scanner and process all files with selected command
 cmd_map = {
 "open" : OpenCmd,
 "create" : CreateCmd,
-"init" : InitCommand,
 "list" : ListCmd,
 "type" : TypeCmd,
 "read" : ReadCmd,
@@ -818,8 +765,7 @@ cmd_map = {
 "boot" : BootCmd,
 "root" : RootCmd,
 "info" : InfoCmd,
-"relabel" : RelabelCmd,
-"rdisk" : RDiskCmd
+"relabel" : RelabelCmd
 }
 
 parser = argparse.ArgumentParser()

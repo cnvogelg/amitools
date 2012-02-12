@@ -6,12 +6,15 @@ xdftool - the universal Amiga disk image file tool
 The xdftool is a tool from the amitools tool set that allows to read disk images
 intended for Amiga emulators like ADF or HDF files and display or extract their
 contents. Furthermore, you can create new ADF or HDF images and copy your own 
-files to it, master own images or repack existing images.
+files to it, master own images or repack existing images. It also allows you
+to work on partitions of a RDISK/RDB hdf image.
 
 
 2. Usage
 
-xdftool is a command line utility that is always called with an image file path name as the first argument and with one or more commands working on this image:
+xdftool is a command line utility that is always called with an image file 
+path name as the first argument and with one or more commands working on this 
+image:
 
 > xdftool <image.adf|image.hdf> <command> [option]
 
@@ -53,7 +56,7 @@ EXAMPLE:
 
   > xdftool test.adf list         ; show whole image
   > xdftool test.adf list /       ; same command
-  > xdftool test.adf list devs all   ; show "C" directory on image 
+  > xdftool test.adf list c all   ; show "C" directory on image 
 
 
 'type' - Display the contents of a file
@@ -119,26 +122,94 @@ DESCRIPTION: Displays the number of cylinders, heads, and sectors available
 in the image's block device
 
 
+'open' - Open existing image for processing
+
+SYNTAX: open [part=<name|number>] [chs=<cyls>,<heads>,<secs>] [h=<heads>] [s=<secs>]
+
+DESCRIPTION: This command opens an existing image for further processing.
+This is typically the first command in a command list as it allows all other
+commands to work on the selected file system.
+
+Most often you do not need to specify this command as it will be automatically
+prepended if its missing. In this case all parameters for opening the input
+disk image are determined automatically.
+
+If the parameters can't be detected or you don't want to use the detected values
+then you specify the open command explicetly.
+
+The "part=" option is useful if you access a RDISK or RDB hdf image. In this
+case the image holds a full disk with multiple partitions. xdftool can only work
+on a single partition or file system and thus you must select which partition to
+work on. You can either give a number selecting the n-th partition (startin with
+0, of course!) or give the device name associated with this partition (e.g. dh0)
+without the colon.
+
+The "chs" or "h" "s" options are useful for HDF images without RDB to describe
+the disk geometry. xdftool has an algorithm to determine the disk geometry
+automatically from the byte size, but this approach might fail for some setups.
+In this case you can either fully specify the disk geometry with the "chs="
+option or guide the detection algorithm by giving a sector "s=" and/or heads "h="
+value.
+
+EXAMPLE:
+
+  > xdftool mydisk.rdisk open part=dh1 + list  ; open partition "dh1:" in image
+  > xdftool disk.hdf open chs=10,1,32 + list   ; open image with given geometry
+  > xdftool disk.hdf open h=5 s=16 + list      ; guide auto detection
+
+
 3.2 Edit Image
+
+'create' - Create a new image file
+
+SYNTAX: create [ size=<size> [h=<heads>] [s=<secs>] | chs=<cyls>,<heads>,<secs> ]
+
+DESCRIPTION: With this command you can create a new disk image file. If the disk
+image format has a fixed size (e.g. ADF) then you do not need to specify extra
+paramters to this command.
+
+For a hard disk image (HDF) file you must either give the total size in bytes or
+the disk geometry in cylinders, heads, and sectors. If you specify only the size
+then the disk geometry will be automatically derived. You can use the optional
+paramters "h=" and/or "s=" to fix parts of the disk geometry and guide the
+detection of the disk layout.
+
+Please note that the create command only creates an empty disk image that is
+not formatted yet. You will need the "format" command to create a valid empty
+file system on it.
+
+You can't create a RDB/RDISK image with this command. Use the rdbtool for this
+task.
+
+EXAMPLE:
+
+  > xdftool new.hdf create size=10Mi     ; create an empty HDF image with 10Mi
+  > xdftool new.adf create               ; create an empty floppy disk image
+  > xdftool new.hdf create chs=10,1,32   ; create disk with given geometry
+  > xdftool new.hdf create size=10Mi h=2 ; force 2 heads 
+
 
 'format' - Format an existing or create a new disk image
 
-SYNTAX: format <volume_name> [<disk_size>|<c,h,s>] [ffs] [intl] [dircache]
+SYNTAX: format <volume_name> [ffs] [intl] [dircache] [<create options>]
 
 DESCRIPTION: A new and blank OFS/FFS file system will be created on the given
 image file. All data previously stored there will be lost!!! The <volume_name>
 gives the name of the new file system. The options "ffs", "intl", and or 
 "dircache" allow to select the type of file system you want to create.
 
-If you create a new ADF image then you do not need to specify a disk size. For
-an HDF image the size is required: You can either give a total size, e.g. "10M" or "4G" or give the disk geometry in cylinders, heads and sectors: "650,1,32"
+If the disk image file you specify does not exist on disk yet then an 
+implicit "create" command will be executed first. If the file already
+exists you must use the "create" command in order to create a resized
+image.
 
 EXAMPLE:
 
   > xdftool empty.adf format "My Empty Disk"   ; create a blank OFS disk image
-  > xdftool empty.hdf format Work 10M          ; create a 10M hdf image
-  > xdftool empty.hdf format Work 640,1,32     ; create with given geometry
-  > xdftool empty.hdf format Work 10M ffs      ; create an FFS hdf image
+  > xdftool empty.hdf format Work size=10M     ; create a 10M hdf image
+  > xdftool empty.hdf format Work chs=640,1,32 ; create with given geometry
+  > xdftool empty.hdf format Work size=10M ffs ; create an FFS hdf image
+  > xdftool empty.hdf create size=10M + format Work ffs ; same result
 
 
 'boot' - Alter the boot block
@@ -404,7 +475,7 @@ EXAMPLE:
 
 'repack' - Repack the contents of one image into another one
 
-SYNTAX: repack <new_img.[ah]df> [blkdev_size]
+SYNTAX: repack <src_img.[ah]df> [<open options>]
 
 DESCRIPTION: This command allows you to rebuild an existing disk image by 
 combining the "unpack" and "pack" commands on the fly without creating a
@@ -413,14 +484,20 @@ host file system representation.
 This command is very useful to better "stuff" and "de-fragment" data on a file
 system that already performed lots of delete and create operations.
 
-For a HDF repack you can specify the size of the new disk image with "blkdev_size" (see format command for syntax). This allows you to create 
-a larger target disk. Otherwise a HDF image similar in size of the source image
-will be created.
+You always specify the image from which you want to import. The target image
+is the image you specify on the xdftool command line.
+
+If you are repacking from a HDF image then you can add options like to the
+"open" command to specify the disk geometry or the partition in a RDB image.
+
+You can prepend a "create" command to repack a HDF to another sized HDF.
 
 EXAMPLE:
 
-  > xdftool old.adf repack new.adf       ; repack "old.adf" into "new.adf"
-  > xdftool old.hdf repack new.hdf 10M   ; repack "old.hdf" into a 10M "new.hdf"
+  > xdftool new.adf repack old.adf               ; repack "old.adf" into "new.adf"
+  > xdftool new.hdf repack old.hdf chs=10,2,32   ; repack "old.hdf" with given geo
+  > xdftool new.hdf create size=10M + repack old.hdf ; repack to larger disk
+  > xdftool new.hdf repack old.rdisk part=dh0    ; repack one partition of a disk
 
 
 3.4 Low-Level Commands
@@ -505,38 +582,5 @@ EXAMPLE:
   > xdftool test.adf block node myfile data
   > xdftool test.adf block dump 880
 
-
-3.5 Working with RBD/RDisk Images
-
-xdftool also supports working on partitions on a RDB (Rigid Disk Block) or 
-RDisk disk image or real device. In this case you give xdftool the name of
-the block device or the image and then you must issue the 'rdisk' command
-as the first command in the command list. There you select the partition 
-all other commands will then work on.
-
-'rdisk' - RDB/RDisk query or partition selection.
-
-SYNTAX: rdisk info
-        rdisk show [hex]
-        rdisk part <n|device_name>
-
-DESCRIPTION: The "info" command gives a short overview of the partitions
-available on the RDB image. "show" displays the block structures describing
-the volume. Add the "hex" option to see the contents of the blocks, too.
-
-Both "info" and "show" commands are not allowed in a command list and can
-only be given as the only command.
-
-Use the "part" command to select a partition on the volume. This partition
-is then used for the following xdftool commands. You can either specify the
-partition with a number (see "info" output) or give the device name that
-is associated with it (e.g. "DH0").
-
-EXAMPLE:
-
-  > xdftool disk.rdisk rdisk info
-  > xdftool disk.rdisk rdisk show hex
-  > xdftool disk.rdisk rdisk part 0 + list
-  > xdftool disk.rdisk rdisk part dh0 + info
 
 EOF
