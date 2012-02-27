@@ -21,9 +21,10 @@ class LoadSegBlock(Block):
   
   def set_data(self, data):
     self.data[20:20+len(data)] = data
+    self.size = (20 + len(data)) / 4
   
   def get_data(self):
-    return self.data[20:]
+    return self.data[20:20+(self.size-5)*4]
   
   def read(self):
     Block.read(self)

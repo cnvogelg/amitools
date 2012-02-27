@@ -11,12 +11,14 @@ class RawBlockDevice(BlockDevice):
   def create(self, num_blocks):
     self.img_file.create(num_blocks)
     self.open()
+    self.num_blocks = num_blocks
 
   def open(self):
     self.img_file.open()
     # calc block longs
     self.block_bytes = self.img_file.block_bytes
     self.block_longs = self.block_bytes / 4
+    self.num_blocks = self.img_file.num_blocks
           
   def flush(self):
     pass

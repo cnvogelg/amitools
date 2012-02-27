@@ -37,6 +37,9 @@ class Partition:
       rdisk = self.rdisk
     return PartBlockDevice(self.blkdev, self.part_blk, rdisk)
 
+  def write(self):
+    self.part_blk.write()
+
   # ----- Query -----
   
   def dump(self):
@@ -57,19 +60,30 @@ class Partition:
   def get_index(self):
     return self.num
   
-  def get_info(self):
+  def get_cyl_range(self):
+    de = self.part_blk.dos_env
+    if de == None:
+      return None
+    else:
+      return (de.low_cyl, de.high_cyl)
+  
+  def get_info(self, total_blks=0):
     """return a string line with typical info about this partition"""
     p = self.part_blk
     de = p.dos_env
     name = "'%s'" % p.drv_name
-    extra = DosType.num_to_tag_str(p.dos_env.dos_type)
+    part_blks = self.get_num_blocks()
+    part_bytes = self.get_num_bytes()
+    extra = ""
+    if total_blks != 0:
+      ratio = 100.0 * part_blks / total_blks
+      extra += "%6.2f%%  " % ratio
+    extra += DosType.num_to_tag_str(p.dos_env.dos_type)
     flags = p.flags
     if flags & PartitionBlock.FLAG_BOOTABLE == PartitionBlock.FLAG_BOOTABLE:
       extra += " bootable pri=%d" % de.boot_pri
     if flags & PartitionBlock.FLAG_NO_AUTOMOUNT == PartitionBlock.FLAG_NO_AUTOMOUNT:
       extra += " no_automount"
-    part_blks = self.get_num_blocks()
-    part_bytes = self.get_num_bytes()
     return "Partition: #%d %-06s %8d %8d  %10d  %s  %s" \
       % (self.num, name, de.low_cyl, de.high_cyl, part_blks, ByteSize.to_byte_size_str(part_bytes), extra)
     

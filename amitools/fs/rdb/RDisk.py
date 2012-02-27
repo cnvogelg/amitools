@@ -92,11 +92,15 @@ class RDisk:
       % (ld.lo_cyl, ld.hi_cyl, logic_blks, ByteSize.to_byte_size_str(logic_bytes), extra))
     # add partitions
     for p in self.parts:
-      res.append(p.get_info())
+      res.append(p.get_info(logic_blks))
     # add fileystems
     for f in self.fs:
       res.append(f.get_info())
     return res
+    
+  def get_logical_cylinders(self):
+    ld = self.rdb.log_drv
+    return ld.hi_cyl - ld.lo_cyl + 1
 
   def get_logical_blocks(self):
     ld = self.rdb.log_drv
@@ -112,6 +116,13 @@ class RDisk:
   
   def get_total_bytes(self, block_bytes=512):
     return self.get_total_blocks() * block_bytes
+    
+  def get_cylinder_blocks(self):
+    ld = self.rdb.log_drv
+    return ld.cyl_blks
+    
+  def get_cylinder_bytes(self, block_bytes=512):
+    return self.get_cylinder_blocks() * block_bytes
 
   def get_num_partitions(self):
     return len(self.parts)
@@ -140,6 +151,12 @@ class RDisk:
       num = int(s)
       return self.get_partition(num)
     except ValueError:
+      return None
+      
+  def get_filesystem(self, num):
+    if num < len(self.fs):
+      return self.fs[num]
+    else:
       return None
 
   # ----- edit -----
@@ -183,41 +200,81 @@ class RDisk:
     self.rdb.create(phy_drv, log_drv, drv_id, flags=flags)
     self.rdb.write()
   
+  def get_cyl_range(self):
+    log_drv = self.rdb.log_drv
+    return (log_drv.lo_cyl, log_drv.hi_cyl)
+  
   def check_cyl_range(self, lo_cyl, hi_cyl):
     if lo_cyl > hi_cyl:
       return False
-    log_drv = self.rdb.log_drv
-    if not (lo_cyl >= log_drv.lo_cyl and hi_cyl <= log_drv.hi_cyl):
+    (lo,hi) = self.get_cyl_range()
+    if not (lo_cyl >= lo and hi_cyl <= hi):
       return False
     # check partitions
     for p in self.parts:
-      lo = p.dos_env.low_cyl
-      hi = p.dos_env.high_cyl
+      (lo,hi) = p.get_cyl_range()
       if not ((hi_cyl < lo) or (lo_cyl > hi)):
         return False
     return True
   
-  def has_free_rdb_blocks(self, num):
+  def get_free_cyl_ranges(self):
+    lohi = self.get_cyl_range()
+    free = [lohi] 
+    for p in self.parts:
+      pr = p.get_cyl_range()
+      new_free = []
+      for r in free:
+        # partition completely fills range
+        if pr[0] == r[0] and pr[1] == r[1]:
+          pass
+        # partition starts at range
+        elif pr[0] == r[0]:
+          n = (pr[1]+1, r[1])
+          new_free.append(n)
+        # partition ends at range
+        elif pr[1] == r[1]:
+          n = (r[0], pr[0]-1)
+          new_free.append(n)
+        # partition inside range
+        elif pr[0] > r[0] and pr[1] < r[1]:
+          new_free.append((r[0], pr[0]-1))
+          new_free.append((pr[1]+1,r[1]))
+        else:
+          new_free.append(r)
+      free = new_free
+    return free
+  
+  def find_free_cyl_range_start(self, num_cyls):
+    ranges = self.get_free_cyl_ranges()
+    if ranges == None:
+      return None
+    for r in ranges:
+      size = r[1] - r[0] + 1
+      if num_cyls <= size:
+        return r[0]
+    return None
+  
+  def _has_free_rdb_blocks(self, num):
     return self.hi_rdb_blk + num <= self.rdb.log_drv.rdb_blk_hi
     
-  def alloc_rdb_blocks(self, num):
+  def _alloc_rdb_blocks(self, num):
     blk_num = self.hi_rdb_blk + 1
     self.hi_rdb_blk += num
     return blk_num
     
-  def add_partition(self, drv_name, lo_cyl, hi_cyl, dev_flags=0, flags=0, dostype=DosType.DOS0):
+  def add_partition(self, drv_name, cyl_range, dev_flags=0, flags=0, dostype=DosType.DOS0):
     # cyl range is not free anymore or invalid
-    if not self.check_cyl_range(lo_cyl, hi_cyl):
+    if not self.check_cyl_range(*cyl_range):
       return False
     # no space left for partition block
-    if not self.has_free_rdb_blocks(1):
+    if not self._has_free_rdb_blocks(1):
       return False
     # crete a new parttion block
-    blk_num = self.alloc_rdb_blocks(1)
+    blk_num = self._alloc_rdb_blocks(1)
     pb = PartitionBlock(self.rawblk, blk_num)
     heads = self.rdb.phy_drv.heads
     blk_per_trk = self.rdb.phy_drv.secs
-    dos_env = PartitionDosEnv(low_cyl=lo_cyl, high_cyl=hi_cyl, surfaces=heads, blk_per_trk=blk_per_trk)
+    dos_env = PartitionDosEnv(low_cyl=cyl_range[0], high_cyl=cyl_range[1], surfaces=heads, blk_per_trk=blk_per_trk)
     pb.create(drv_name, dos_env)
     pb.write()
     # link block
@@ -228,10 +285,12 @@ class RDisk:
     else:
       # write into last partition block
       last_pb = self.parts[-1]
-      last_pb.next = blk_num
+      last_pb.part_blk.next = blk_num
       last_pb.write()
-    # add to partition list
-    self.parts.append(pb)
+    # create partition object and add to partition list
+    p = Partition(self.rawblk, blk_num, len(self.parts), blk_per_trk, self)
+    p.read()
+    self.parts.append(p)
     return True
     
     

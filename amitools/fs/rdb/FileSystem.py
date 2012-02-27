@@ -67,4 +67,4 @@ class FileSystem:
   
   def get_info(self):
     tab = " " * 44
-    return "FileSystem #%d %s %s version=%s" % (self.num, tab, DosType.num_to_tag_str(self.fshd.dos_type), self.fshd.get_version_string())
+    return "FileSystem #%d %s %s version=%s size=%d" % (self.num, tab, DosType.num_to_tag_str(self.fshd.dos_type), self.fshd.get_version_string(), len(self.data))
