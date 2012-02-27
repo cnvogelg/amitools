@@ -11,6 +11,7 @@ from amitools.fs.FSError import FSError
 from amitools.fs.rdb.RDisk import RDisk
 from amitools.fs.blkdev.RawBlockDevice import RawBlockDevice
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
+from amitools.fs.DosType import *
 import amitools.util.KeyValue as KeyValue
 import amitools.util.ByteSize as ByteSize
 
@@ -247,43 +248,44 @@ class FreeCommand(Command):
 
 # --- Add a partition ---
 
-class AddCommand(Command):
+class PartEditCommand(Command):
   def __init__(self, args, opts):
     Command.__init__(self, args, opts, edit=True)
   
-  def handle_rdisk(self, rdisk):
-    opts = KeyValue.parse_key_value_strings(self.opts)
-    lo_hi = self._parse_cyl_range(rdisk, opts)
-    if lo_hi == None:
-      print "ERROR: invalid partition range given: %s" % opts
-      return 1
-    # get name
-    if opts.has_key('name'):
-      drv_name = opts['name']
+  def parse_opts(self, rdisk):
+    self.popts = KeyValue.parse_key_value_strings(self.opts)
+    self.rdisk = rdisk
+    
+  def get_dos_type(self):
+    if self.popts.has_key('fs'):
+      fs_str = self.popts['fs']
+    elif self.popts.has_key('dostype'):
+      fs_str = self.popts['dostype']
     else:
-      drv_name = "%s%d" % (self.args.drive_prefix, rdisk.get_num_partitions())
-    print "creating: '%s' %s" % (drv_name, lo_hi)
-    # add partition
-    if rdisk.add_partition(drv_name, lo_hi):
-      return 0
+      fs_str = self.args.dostype
+    return parse_dos_type_str(fs_str)
+    
+  def get_drv_name(self):
+    if self.popts.has_key('name'):
+      drv_name = self.popts['name']
     else:
-      print "ERROR: creating partition: '%s': %s" % (drv_name, lo_hi)
-      return 1
-  
-  def _parse_cyl_range(self, rdisk, opts):
+      drv_name = "%s%d" % (self.args.drive_prefix, self.rdisk.get_num_partitions())
+    return drv_name
+    
+  def get_cyl_range(self):
     start = None
-    if opts.has_key('start'):
-      start = int(opts['start'])
+    if self.popts.has_key('start'):
+      start = int(self.popts['start'])
     # range with start=<n> end=<n>
-    if opts.has_key('end'):
-      end = int(opts['end'])
+    if self.popts.has_key('end'):
+      end = int(self.popts['end'])
       if start == None or end <= start:
         return None
       else:
         return (start, end)
     # expect a size
-    elif opts.has_key('size'):
-      size = opts['size']
+    elif self.popts.has_key('size'):
+      size = self.popts['size']
       cyls = None
       if type(size) == int:
         cyls = size
@@ -292,11 +294,11 @@ class AddCommand(Command):
         bytes = ByteSize.parse_byte_size_str(size[:-1])
         if bytes == None:
           return None
-        cyls = bytes / rdisk.get_cylinder_bytes()
+        cyls = bytes / self.rdisk.get_cylinder_bytes()
       # size in percent
       elif size[-1] == '%':
         prc = float(size[:-1])
-        cyls = int(prc * rdisk.get_logical_cylinders() / 100.0)
+        cyls = int(prc * self.rdisk.get_logical_cylinders() / 100.0)
       # size in cylinders
       else:
         cyls = ByteSize.parse_byte_size_str(size)
@@ -306,33 +308,65 @@ class AddCommand(Command):
         return None
       # find a range if no start is given
       if start == None:
-        start = rdisk.find_free_cyl_range_start(cyls)
+        start = self.rdisk.find_free_cyl_range_start(cyls)
         if start == None:
           return None
       return (start, start + cyls - 1)
     # nothing specified -> get next free range
     else:
-      ranges = rdisk.get_free_cyl_ranges()
+      ranges = self.rdisk.get_free_cyl_ranges()
       if ranges == None:
         return None
       return ranges[0]
 
-# --- Fill empty space with partitions ---
-
-class FillCommand(Command):
+class AddCommand(PartEditCommand):
   def __init__(self, args, opts):
     Command.__init__(self, args, opts, edit=True)
   
   def handle_rdisk(self, rdisk):
+    self.parse_opts(rdisk)
+    lo_hi = self.get_cyl_range()
+    if lo_hi == None:
+      print "ERROR: invalid partition range given!"
+      return 1
+    dostype = self.get_dos_type()
+    if dostype == None:
+      print "ERROR: invalid dos type!"
+      return 1
+    drv_name = self.get_drv_name()
+    if drv_name == None:
+      print "ERROR: invalid drive name!"
+    print "creating: '%s' %s %s" % (drv_name, lo_hi, num_to_tag_str(dostype))
+    # add partition
+    if rdisk.add_partition(drv_name, lo_hi, dos_type=dostype):
+      return 0
+    else:
+      print "ERROR: creating partition: '%s': %s" % (drv_name, lo_hi)
+      return 1
+  
+# --- Fill empty space with partitions ---
+
+class FillCommand(PartEditCommand):
+  def __init__(self, args, opts):
+    Command.__init__(self, args, opts, edit=True)
+  
+  def handle_rdisk(self, rdisk):
+    self.parse_opts(rdisk)
     ranges = rdisk.get_free_cyl_ranges()
     # nothing to do
     if ranges == None:
       return 0
     for lo_hi in ranges:
-      drv_name = "%s%d" % (self.args.drive_prefix, rdisk.get_num_partitions())
-      print "creating: '%s' %s" % (drv_name, lo_hi)
+      drv_name = self.get_drv_name()
+      if drv_name == None:
+        print "ERROR: invalid drive name!"
+      dostype = self.get_dos_type()
+      if dostype == None:
+        print "ERROR: invalid dostype given!"
+        return 1
+      print "creating: '%s' %s %s" % (drv_name, lo_hi, num_to_tag_str(dostype))
       # add partition
-      if not rdisk.add_partition(drv_name, lo_hi):
+      if not rdisk.add_partition(drv_name, lo_hi, dos_type=dostype):
         print "ERROR: creating partition: '%s': %s" % (drv_name, lo_hi)
         return 1
     return 0
@@ -380,6 +414,7 @@ parser.add_argument('-s', '--seperator', default='+', help="set the command sepa
 parser.add_argument('-r', '--read-only', action='store_true', default=False, help="read-only operation")
 parser.add_argument('-f', '--force', action='store_true', default=False, help="force overwrite existing image")
 parser.add_argument('-p', '--drive-prefix', default='DH', help="set default drive name prefix (DH -> DH0, DH1, ...)")
+parser.add_argument('-t', '--dostype', default='ffs+intl', help="set default dos type")
 args = parser.parse_args()
 
 cmd_list = args.command_list

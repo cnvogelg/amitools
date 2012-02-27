@@ -262,7 +262,7 @@ class RDisk:
     self.hi_rdb_blk += num
     return blk_num
     
-  def add_partition(self, drv_name, cyl_range, dev_flags=0, flags=0, dostype=DosType.DOS0):
+  def add_partition(self, drv_name, cyl_range, dev_flags=0, flags=0, dos_type=DosType.DOS0):
     # cyl range is not free anymore or invalid
     if not self.check_cyl_range(*cyl_range):
       return False
@@ -274,7 +274,7 @@ class RDisk:
     pb = PartitionBlock(self.rawblk, blk_num)
     heads = self.rdb.phy_drv.heads
     blk_per_trk = self.rdb.phy_drv.secs
-    dos_env = PartitionDosEnv(low_cyl=cyl_range[0], high_cyl=cyl_range[1], surfaces=heads, blk_per_trk=blk_per_trk)
+    dos_env = PartitionDosEnv(low_cyl=cyl_range[0], high_cyl=cyl_range[1], surfaces=heads, blk_per_trk=blk_per_trk, dos_type=dos_type)
     pb.create(drv_name, dos_env)
     pb.write()
     # link block

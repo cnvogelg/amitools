@@ -33,6 +33,44 @@ DOS_MASK_FFS = 1
 DOS_MASK_INTL = 2
 DOS_MASK_DIRCACHE = 4
 
+def parse_dos_type_str(string):
+  """parse a dos type string
+     return None if its invalid or dostype value
+  """
+  comp = string.split("+")
+  if "ffs" in comp:
+    if "dc" in comp or "dircache" in comp:
+      return DOS_FFS_INTL_DIRCACHE
+    elif "intl" in comp:
+      return DOS_FFS_INTL
+    else:
+      return DOS_FFS
+  elif "ofs" in comp:
+    if "dc" in comp or "dircache" in comp:
+      return DOS_OFS_INTL_DIRCACHE
+    elif "intl" in comp:
+      return DOS_OFS_INTL
+    else:
+      return DOS_OFS
+  else:
+    n = len(string)
+    # use 'DOS0' .. 'DOS5'
+    if n == 4 and string[0:3] == 'DOS':
+      off = ord(string[3]) - ord('0')
+      if off >= 0 and off <= 5:
+        return DOS0 + off
+      else:
+        return None
+    # use '0x01234567' hex value
+    elif n == 10 and string[0:2] == '0x':
+      try:
+        return int(string[2:],16)
+      except ValueError:
+        return None
+    # unknown
+    else:
+      return None
+
 def num_to_tag_str(l):
   """Convert the DosType in a 32 bit value to its 4 letter tag string"""
   a = chr((l >> 24) & 0xff)
@@ -40,9 +78,9 @@ def num_to_tag_str(l):
   c = chr((l >> 8) & 0xff)
   last = (l & 0xff)
   if last < 32:
-    last = "\\x%02x" % last
+    last = chr(last + 48)
   else:
-    last = chr(d)
+    last = chr(last)
   return a+b+c+last
 
 def get_dos_type_str(dos_type):
