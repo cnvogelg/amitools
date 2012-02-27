@@ -12,6 +12,7 @@ from amitools.fs.rdb.RDisk import RDisk
 from amitools.fs.blkdev.RawBlockDevice import RawBlockDevice
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 from amitools.fs.DosType import *
+from amitools.fs.block.rdb.PartitionBlock import PartitionBlock
 import amitools.util.KeyValue as KeyValue
 import amitools.util.ByteSize as ByteSize
 
@@ -271,7 +272,19 @@ class PartEditCommand(Command):
     else:
       drv_name = "%s%d" % (self.args.drive_prefix, self.rdisk.get_num_partitions())
     return drv_name
-    
+  
+  def get_bootable(self):
+    if self.popts.has_key('bootable'):
+      return bool(self.popts['bootable'])
+    else:
+      return False
+      
+  def get_boot_pri(self):
+    if self.popts.has_key('pri'):
+      return self.popts['pri']
+    else:
+      return 0
+  
   def get_cyl_range(self):
     start = None
     if self.popts.has_key('start'):
@@ -336,9 +349,13 @@ class AddCommand(PartEditCommand):
     drv_name = self.get_drv_name()
     if drv_name == None:
       print "ERROR: invalid drive name!"
+    flags = 0
+    if self.get_bootable():
+      flags |= PartitionBlock.FLAG_BOOTABLE
+    boot_pri = self.get_boot_pri();
     print "creating: '%s' %s %s" % (drv_name, lo_hi, num_to_tag_str(dostype))
     # add partition
-    if rdisk.add_partition(drv_name, lo_hi, dos_type=dostype):
+    if rdisk.add_partition(drv_name, lo_hi, dos_type=dostype, flags=flags, boot_pri=boot_pri):
       return 0
     else:
       print "ERROR: creating partition: '%s': %s" % (drv_name, lo_hi)

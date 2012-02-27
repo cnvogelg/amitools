@@ -86,6 +86,16 @@ class Block:
       num = self.block_longs + num
     return struct.unpack_from(">I",self.data,num*4)[0]
 
+  def _put_slong(self, num, val):
+    if num < 0:
+      num = self.block_longs + num
+    struct.pack_into(">i",self.data,num*4,val)
+  
+  def _get_slong(self, num):
+    if num < 0:
+      num = self.block_longs + num
+    return struct.unpack_from(">i",self.data,num*4)[0]
+
   def _get_types(self):
     self.type = self._get_long(0)
     self.sub_type = self._get_long(-1)

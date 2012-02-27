@@ -66,7 +66,7 @@ class PartitionDosEnv:
     self.buf_mem_type = blk._get_long(44)
     self.max_tranfser = blk._get_long(45)
     self.mask = blk._get_long(46)
-    self.boot_pri = blk._get_long(47)
+    self.boot_pri = blk._get_slong(47)
     self.dos_type = blk._get_long(48)
     self.baud = blk._get_long(49)
     self.control = blk._get_long(50)
@@ -88,7 +88,7 @@ class PartitionDosEnv:
     blk._put_long(44, self.buf_mem_type)
     blk._put_long(45, self.max_transfer)
     blk._put_long(46, self.mask)
-    blk._put_long(47, self.boot_pri)
+    blk._put_slong(47, self.boot_pri)
     blk._put_long(48, self.dos_type)
     blk._put_long(49, self.baud)
     blk._put_long(50, self.control)
@@ -101,7 +101,7 @@ class PartitionBlock(Block):
   def __init__(self, blkdev, blk_num):
     Block.__init__(self, blkdev, blk_num, chk_loc=2, is_type=Block.PART)
   
-  def create(self, drv_name, dos_env, host_id=7, next=0, flags=0, dev_flags=0,
+  def create(self, drv_name, dos_env, host_id=7, next=Block.no_blk, flags=0, dev_flags=0,
              size=64):
     Block.create(self)
     self.size = size
