@@ -50,6 +50,48 @@ class FileSystem:
   def get_data(self):
     return self.data
   
+  # ----- create ------
+
+  def get_total_blocks(self, data):
+    size = len(data)
+    lseg_size = self.blkdev.block_bytes - 20
+    num_lseg = int((size + lseg_size - 1)/lseg_size)
+    return num_lseg + 1
+    
+  def create(self, data, version, dos_type):
+    self.data = data
+    # create fs header
+    self.fshd = FSHeaderBlock(self.blkdev, self.blk_num)
+    self.fshd.create(version=version, dos_type=dos_type)
+    # create lseg blocks
+    self.lsegs = []
+    lseg_size = self.blkdev.block_bytes - 20
+    off = 0
+    size = len(data)
+    blk_num = self.blk_num + 1
+    self.fshd.dev_node.seg_list_blk = blk_num
+    while(off < size):
+      blk_len = size - off
+      if blk_len > lseg_size:
+        blk_len = lseg_size
+      blk_data = data[off:off+blk_len]
+      # create new lseg block
+      ls = LoadSegBlock(self.blkdev, blk_num)
+      ls.create(next = blk_num+1)
+      ls.set_data(blk_data)
+      self.lsegs.append(ls)
+      # next round
+      off += blk_len
+      blk_num += 1
+    # remove link in last block
+    ls.next = Block.no_blk
+    
+  def write(self, only_fshd=False):
+    self.fshd.write()
+    if not only_fshd:
+      for lseg in self.lsegs:
+        lseg.write()
+  
   # ----- query -----
   
   def dump(self, hex_dump=False):

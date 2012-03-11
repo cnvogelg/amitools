@@ -266,6 +266,9 @@ class RDisk:
     ld.high_rdsk_blk = self.hi_rdb_blk
     return blk_num
     
+  def _next_rdb_block(self):
+    return self.hi_rdb_blk + 1
+    
   def add_partition(self, drv_name, cyl_range, dev_flags=0, flags=0, dos_type=DosType.DOS0, boot_pri=0):
     # cyl range is not free anymore or invalid
     if not self.check_cyl_range(*cyl_range):
@@ -298,6 +301,33 @@ class RDisk:
     p.read()
     self.parts.append(p)
     return True
-    
-    
-    
+  
+  def add_filesystem(self, data, dos_type=DosType.DOS1, version=0):
+    # create a file system
+    blk_num = self._next_rdb_block()
+    fs_num = len(self.fs)
+    fs = FileSystem(self.rawblk, blk_num, fs_num)
+    # get total number of blocks for fs data
+    num_blks = fs.get_total_blocks(data)
+    # check if RDB has space left
+    if not self._has_free_rdb_blocks(num_blks):
+      return False
+    # allocate blocks
+    self._alloc_rdb_blocks(num_blks)
+    # create file system
+    fs.create(data, version, dos_type)
+    fs.write()
+    # link fs block
+    if len(self.fs) == 0:
+      # write into RDB
+      self.rdb.fs_list = blk_num
+    else:
+      # write into last fs block
+      last_fs = self.fs[-1]
+      last_fs.fshd.next = blk_num
+      last_fs.write(only_fshd=True)
+    # update rdb: allocated blocks and optional link
+    self.rdb.write()
+    # add fs to list
+    self.fs.append(fs)
+    return True

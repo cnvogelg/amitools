@@ -4,14 +4,15 @@ class LoadSegBlock(Block):
   def __init__(self, blkdev, blk_num=0):
     Block.__init__(self, blkdev, blk_num, chk_loc=2, is_type=Block.LSEG)
   
-  def create(self, host_id=0, next=0, size=128):
+  def create(self, host_id=0, next=Block.no_blk, size=128):
     Block.create(self)
     self.size = size
     self.host_id = host_id
     self.next = next
       
   def write(self):
-    self._create_data()
+    if self.data == None:
+      self._create_data()
     
     self._put_long(1, self.size)
     self._put_long(3, self.host_id)
@@ -20,6 +21,8 @@ class LoadSegBlock(Block):
     Block.write(self)
   
   def set_data(self, data):
+    if self.data == None:
+      self._create_data()
     self.data[20:20+len(data)] = data
     self.size = (20 + len(data)) / 4
   

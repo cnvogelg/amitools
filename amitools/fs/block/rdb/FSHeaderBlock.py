@@ -50,7 +50,7 @@ class FSHeaderBlock(Block):
   def __init__(self, blkdev, blk_num):
     Block.__init__(self, blkdev, blk_num, chk_loc=2, is_type=Block.FSHD)
   
-  def create(self, host_id=0, next=0, flags=0, dos_type=0, version=0, patch_flags=0,
+  def create(self, host_id=0, next=Block.no_blk, flags=0, dos_type=0, version=0, patch_flags=0,
              size=64, dev_node=None):
     Block.create(self)
     self.size = size

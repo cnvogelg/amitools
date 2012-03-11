@@ -15,6 +15,7 @@ from amitools.fs.DosType import *
 from amitools.fs.block.rdb.PartitionBlock import PartitionBlock
 import amitools.util.KeyValue as KeyValue
 import amitools.util.ByteSize as ByteSize
+import amitools.util.VerTag as VerTag
 
 # ----- commands -----
 class Command:
@@ -339,9 +340,6 @@ class PartEditCommand(Command):
       return ranges[0]
 
 class AddCommand(PartEditCommand):
-  def __init__(self, args, opts):
-    Command.__init__(self, args, opts, edit=True)
-  
   def handle_rdisk(self, rdisk):
     self.parse_opts(rdisk)
     lo_hi = self.get_cyl_range()
@@ -370,9 +368,6 @@ class AddCommand(PartEditCommand):
 # --- Fill empty space with partitions ---
 
 class FillCommand(PartEditCommand):
-  def __init__(self, args, opts):
-    Command.__init__(self, args, opts, edit=True)
-  
   def handle_rdisk(self, rdisk):
     self.parse_opts(rdisk)
     ranges = rdisk.get_free_cyl_ranges()
@@ -415,6 +410,43 @@ class FSGetCommand(Command):
         f.close()
         return 0
 
+class FSAddCommand(Command):
+  def __init__(self, args, opts):
+    Command.__init__(self, args, opts, edit=True)
+
+  def handle_rdisk(self, rdisk):
+    if len(self.opts) < 1:
+      print "Usage: fsadd <file_name>"
+      return 1
+    else:
+      # parse options
+      opts = KeyValue.parse_key_value_strings(self.opts)
+      # read file data
+      file_name = self.opts[0]
+      f = open(file_name,"rb")
+      data = f.read()
+      f.close()
+      # get version from binary
+      tag = VerTag.find(data)
+      ver = None
+      if tag != None:
+        ver = VerTag.get_version(tag)
+      if ver == None:
+        ver = (0,0)
+      # overwrite version from options
+      if opts.has_key('version'):
+        vstr = opts['version']
+        pos = vstr.find('.')
+        if pos != -1:
+          ver = (int(vstr[:pos]),int(vstr[pos+1:]))
+      # add fs
+      version = ver[0] << 16 | ver[1]
+      if rdisk.add_filesystem(data, version=version):
+        return 0
+      else:
+        print "ERROR adding filesystem! (no space in RDB left)"
+        return 1
+
 # ----- main -----
 # call scanner and process all files with selected command
 cmd_map = {
@@ -426,7 +458,8 @@ cmd_map = {
 "free" : FreeCommand,
 "add" : AddCommand,
 "fill" : FillCommand,
-"fsget" : FSGetCommand
+"fsget" : FSGetCommand,
+"fsadd" : FSAddCommand
 }
 
 parser = argparse.ArgumentParser()
