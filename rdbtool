@@ -217,8 +217,14 @@ class CreateCommand(Command):
 
 class InitCommand(CreateCommand):
   def init_rdisk(self, blkdev):
+    opts = KeyValue.parse_key_value_strings(self.opts)
+    # number of cylinders for RDB
+    if opts.has_key('rdb_cyls'):
+      rdb_cyls = int(opts['rdb_cyls'])
+    else:
+      rdb_cyls = 1
     rdisk = RDisk(blkdev)
-    rdisk.create(blkdev.geo)
+    rdisk.create(blkdev.geo, rdb_cyls=rdb_cyls)
     return rdisk
 
 # --- Info about rdisk ----

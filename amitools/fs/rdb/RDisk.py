@@ -162,12 +162,12 @@ class RDisk:
 
   # ----- edit -----
   
-  def create(self, disk_geo, rdb_cyl=1, hi_rdb_blk=0, disk_names=None, ctrl_names=None):
+  def create(self, disk_geo, rdb_cyls=1, hi_rdb_blk=0, disk_names=None, ctrl_names=None):
     cyls = disk_geo.cyls
     heads = disk_geo.heads
     secs = disk_geo.secs
     cyl_blks = heads * secs
-    rdb_blk_hi = cyl_blks * rdb_cyl - 1
+    rdb_blk_hi = cyl_blks * rdb_cyls - 1
     
     if disk_names != None:
       disk_vendor = disk_names[0]
@@ -195,7 +195,7 @@ class RDisk:
     
     # create RDB
     phy_drv = RDBPhysicalDrive(cyls, heads, secs)
-    log_drv = RDBLogicalDrive(rdb_blk_hi=rdb_blk_hi, lo_cyl=rdb_cyl, hi_cyl=cyls-1, cyl_blks=cyl_blks, high_rdsk_blk=hi_rdb_blk)
+    log_drv = RDBLogicalDrive(rdb_blk_hi=rdb_blk_hi, lo_cyl=rdb_cyls, hi_cyl=cyls-1, cyl_blks=cyl_blks, high_rdsk_blk=hi_rdb_blk)
     drv_id = RDBDriveID(disk_vendor, disk_product, disk_revision, ctrl_vendor, ctrl_product, ctrl_revision)
     self.rdb = RDBlock(self.rawblk)
     self.rdb.create(phy_drv, log_drv, drv_id, flags=flags)
@@ -261,6 +261,9 @@ class RDisk:
   def _alloc_rdb_blocks(self, num):
     blk_num = self.hi_rdb_blk + 1
     self.hi_rdb_blk += num
+    # update rdblock value
+    ld = self.rdb.log_drv
+    ld.high_rdsk_blk = self.hi_rdb_blk
     return blk_num
     
   def add_partition(self, drv_name, cyl_range, dev_flags=0, flags=0, dos_type=DosType.DOS0, boot_pri=0):
@@ -283,12 +286,13 @@ class RDisk:
     if len(self.parts) == 0:
       # write into RDB
       self.rdb.part_list = blk_num
-      self.rdb.write()
     else:
       # write into last partition block
       last_pb = self.parts[-1]
       last_pb.part_blk.next = blk_num
       last_pb.write()
+    # always write RDB as allocated block is stored there, too  
+    self.rdb.write()
     # create partition object and add to partition list
     p = Partition(self.rawblk, blk_num, len(self.parts), blk_per_trk, self)
     p.read()
