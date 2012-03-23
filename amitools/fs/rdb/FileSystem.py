@@ -19,12 +19,11 @@ class FileSystem:
     else:
       return 0xffffffff
 
-  def get_highest_blk_num(self):
-    hi = self.blk_num
+  def get_blk_nums(self):
+    res = [self.blk_num]
     for ls in self.lsegs:
-      if ls.blk_num > hi:
-        hi = ls.blk_num
-    return hi
+      res.append(ls.blk_num)
+    return res
 
   def read(self):
     # read fs header
@@ -58,7 +57,7 @@ class FileSystem:
     num_lseg = int((size + lseg_size - 1)/lseg_size)
     return num_lseg + 1
     
-  def create(self, data, version, dos_type):
+  def create(self, blks, data, version, dos_type):
     self.data = data
     # create fs header
     self.fshd = FSHeaderBlock(self.blkdev, self.blk_num)
@@ -68,23 +67,26 @@ class FileSystem:
     lseg_size = self.blkdev.block_bytes - 20
     off = 0
     size = len(data)
-    blk_num = self.blk_num + 1
-    self.fshd.dev_node.seg_list_blk = blk_num
+    blk_off = 0
+    self.fshd.dev_node.seg_list_blk = blks[blk_off]
     while(off < size):
       blk_len = size - off
       if blk_len > lseg_size:
         blk_len = lseg_size
       blk_data = data[off:off+blk_len]
       # create new lseg block
-      ls = LoadSegBlock(self.blkdev, blk_num)
-      ls.create(next = blk_num+1)
+      ls = LoadSegBlock(self.blkdev, blks[blk_off])
+      # get next block
+      if blk_off == len(blks)-1:
+        next = Block.no_blk
+      else:
+        next = blks[blk_off+1]
+      ls.create(next=next)
       ls.set_data(blk_data)
       self.lsegs.append(ls)
       # next round
       off += blk_len
-      blk_num += 1
-    # remove link in last block
-    ls.next = Block.no_blk
+      blk_off += 1
     
   def write(self, only_fshd=False):
     self.fshd.write()

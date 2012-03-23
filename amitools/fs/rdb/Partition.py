@@ -18,7 +18,8 @@ class Partition:
     else:
       return 0xffffffff
 
-  def get_highest_blk_num(self):
+  def get_blk_num(self):
+    """return the block number of the partition block"""
     return self.blk_num
   
   def read(self):
