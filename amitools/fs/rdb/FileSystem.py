@@ -109,6 +109,30 @@ class FileSystem:
     if hex_dump:
       print_hex(self.data)
   
+  def get_flags_info(self):
+    flags = self.fshd.get_flags()
+    res = []
+    for f in flags:
+      res.append("%s=0x%x" % f)
+    return " ".join(res)
+  
+  def get_valid_flag_names(self):
+    return self.fshd.get_valid_flag_names()
+
   def get_info(self):
-    tab = " " * 44
-    return "FileSystem #%d %s %s version=%s size=%d" % (self.num, tab, DosType.num_to_tag_str(self.fshd.dos_type), self.fshd.get_version_string(), len(self.data))
+    flags = self.get_flags_info()
+    return "FileSystem #%d %s version=%s size=%d %s" % (self.num, DosType.num_to_tag_str(self.fshd.dos_type), self.fshd.get_version_string(), len(self.data), flags)
+
+  # ----- edit -----
+  
+  def clear_flags(self):
+    self.fshd.patch_flags = 0
+    self.fshd.write()
+    return True
+  
+  def set_flags(self, flags, clear=False):
+    if clear:
+      self.fshd.patch_flags = 0
+    self.fshd.set_flags(flags)
+    self.fshd.write()
+  

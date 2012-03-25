@@ -248,6 +248,33 @@ the size of the final partition:
 > rdbtool test.img init + add 10% + add 20% + fill
 
 
+'delete' - Delete an existing partition
+
+SYNTAX:  delete  <id>
+
+This command removes an existing partition and frees all associated resources.
+
+The <id> is the number of the paritition as given in the 'info' command. You
+can also use the device name to select a parition.
+
+> rdbtool mydisk.rdb delete 0
+> rdbtool mydisk.rdb delete dh1
+
+
+'map' - Show the allocation map of the RDB blocks
+
+This command lets you look under the hood of the RDB. It will print all blocks
+associated with the RDB and shows their current contents. A two char code is
+used for each block:
+
+  --    block is empty and not used for RDB
+  RD    the main rigid disk block
+  P?    partition <n>
+  F?    file system <n>
+
+> rdbtool mydisk.rdb map
+
+
 3.4 Working with File Systems
 
 The RDB data structure allows to store file system drivers for classic AmigaOS, so
@@ -286,11 +313,45 @@ the "version" option.
 > rdbtool mydisk.rdb fsadd ffs version=60.32
 
 
- 
+'fsflags' - Change flags of file system
+
+SYNTAX:  fsflags  <id>  [ clear | key=value ... ]
+
+With this command you can alter the device node flags of a file system.
+
+The file system <id> is the number of the file system as listed with the 'info' 
+command.
+
+The following keys are supported:
+
+  type
+  task
+  lock
+  handler
+  stack_size
+  priority
+  startup
+  seg_list_blk
+  global_vec
+  
+The "clear" option will remove all flags first. All other commands add the 
+corresponding flag:
+
+> rdbtool mydisk.rdb fsflags 0 clear stack_size=8192 
+
+Have a look at the output of the 'info' command to see the flags set for a 
+file system.
 
 
+'fsdelete' - Remove a file system
+
+SYNTAX:  fsdelete <id>
+
+The file system with the given number is removed. All associated blocks of the file system
+are free'd.
 
 
+EOF
 
 
 

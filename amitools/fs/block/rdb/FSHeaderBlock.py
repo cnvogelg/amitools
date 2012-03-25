@@ -20,9 +20,70 @@ class FSHeaderDeviceNode:
     print " task:           0x%08x" % self.task
     print " lock:           0x%08x" % self.lock
     print " handler:        0x%08x" % self.handler
-    print " stack_size:     %d" % self.stack_size
-    print " seg_list_blk:   %d" % self.seg_list_blk
+    print " stack_size:     0x%08x" % self.stack_size
+    print " seg_list_blk:   0x%08x" % self.seg_list_blk
     print " global_vec:     0x%08x" % self.global_vec
+  
+  def get_flags(self, patch_flags = 0x1ff):
+    res = []
+    if patch_flags & 0x01 == 0x01:
+      res.append(('type',self.type))
+    if patch_flags & 0x02 == 0x02:
+      res.append(('task',self.task))
+    if patch_flags & 0x04 == 0x04:
+      res.append(('lock',self.lock))
+    if patch_flags & 0x08 == 0x08:
+      res.append(('handler',self.handler))
+    if patch_flags & 0x10 == 0x10:
+      res.append(('stack_size',self.stack_size))
+    if patch_flags & 0x20 == 0x20:
+      res.append(('priority',self.priority))
+    if patch_flags & 0x40 == 0x40:
+      res.append(('startup',self.startup))
+    if patch_flags & 0x80 == 0x80:
+      res.append(('seg_list_blk',self.seg_list_blk))
+    if patch_flags & 0x100 == 0x100:
+      res.append(('global_vec',self.global_vec))
+    return res
+  
+  def set_flags(self, flags):
+    mask = 0
+    for f in flags:
+      key = f[0]
+      val = int(f[1])
+      if key == 'type':
+        self.type = val
+        mask |= 0x01
+      elif key == 'task':
+        self.task = val
+        mask |= 0x02
+      elif key == 'lock':
+        self.lock = val
+        mask |= 0x04
+      elif key == 'handler':
+        self.handler = val
+        mask |= 0x08
+      elif key == 'stack_size':
+        self.stack_size = val
+        mask |= 0x10
+      elif key == 'priority':
+        self.priority = val
+        mask |= 0x20
+      elif key == 'startup':
+        self.startup = val
+        mask |= 0x40
+      elif key == 'seg_list_blk':
+        self.seg_list_blk = val
+        mask |= 0x80
+      elif key == 'global_vec':
+        self.global_vec = val
+        mask |= 0x100
+      else:
+        raise ValueError("Invalid flag: "+key)
+    return mask
+  
+  def get_valid_flag_names(self):
+    return ('type', 'task', 'lock', 'handler', 'stack_size', 'priority', 'startup', 'seg_list_blk', 'global_vec')
   
   def read(self, blk):
     self.type = blk._get_long(11)
@@ -107,6 +168,12 @@ class FSHeaderBlock(Block):
   def get_version_string(self):
     return "%d.%d" % self.get_version_tuple()
   
+  def get_flags(self):
+    return self.dev_node.get_flags(self.patch_flags)
+  
+  def get_valid_flag_names(self):
+    return self.dev_node.get_valid_flag_names()
+  
   def dump(self):
     Block.dump(self, "FSHeader")
     
@@ -119,3 +186,8 @@ class FSHeaderBlock(Block):
     print " patch_flags:    0x%08x" % self.patch_flags
       
     self.dev_node.dump()
+
+  def set_flags(self, flags):
+    mask = self.dev_node.set_flags(flags)
+    self.patch_flags |= mask
+

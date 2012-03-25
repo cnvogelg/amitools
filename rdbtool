@@ -507,6 +507,32 @@ class FSDeleteCommand(Command):
         print "ERROR finding filesystem: '%s'" % self.opts[0]
         return 1
 
+class FSFlagsCommand(Command):
+  def __init__(self, args, opts):
+    Command.__init__(self, args, opts, edit=True)
+
+  def handle_rdisk(self, rdisk):
+    if len(self.opts) < 2:
+      print "Usage: fsflags <fid> [ clear | key=<val> ... ]"
+      return 1
+    else:
+      fs = rdisk.find_filesystem_by_string(self.opts[0])
+      if fs != None:
+        opts = KeyValue.parse_key_value_strings(self.opts[1:])
+        valid_flags = fs.get_valid_flag_names()
+        flags = []
+        clear = False
+        for o in opts:
+          if o in valid_flags:
+            flags.append((o,opts[o]))
+          elif o == 'clear':
+            clear = True
+        fs.set_flags(flags, clear)
+        return 0
+      else:
+        print "ERROR finding filesystem: '%s'" % self.opts[0]
+        return 1    
+
 # ----- main -----
 # call scanner and process all files with selected command
 cmd_map = {
@@ -521,6 +547,7 @@ cmd_map = {
 "fsget" : FSGetCommand,
 "fsadd" : FSAddCommand,
 "fsdelete" : FSDeleteCommand,
+"fsflags" : FSFlagsCommand,
 "map" : MapCommand,
 "delete" : DeleteCommand
 }
