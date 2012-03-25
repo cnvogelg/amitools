@@ -1,4 +1,6 @@
 import os
+import stat
+import amitools.util.BlkDevTools as BlkDevTools
 
 class ImageFile:
   def __init__(self, file_name, read_only=False, block_bytes=512):
@@ -16,8 +18,14 @@ class ImageFile:
     # is writeable?
     if not os.access(self.file_name, os.W_OK):
       self.read_only = True
-    # get size and make sure its not empty
-    self.size = os.path.getsize(self.file_name)
+    # is it a block/char device?
+    st = os.stat(self.file_name)
+    mode = st.st_mode
+    if stat.S_ISBLK(mode) or stat.S_ISCHR(mode):
+      self.size = BlkDevTools.getblkdevsize(self.file_name)
+    else:
+      # get size and make sure its not empty
+      self.size = os.path.getsize(self.file_name)
     if self.size == 0:
       raise IOError("Empty image file detected!")
     self.num_blocks = self.size / self.block_bytes

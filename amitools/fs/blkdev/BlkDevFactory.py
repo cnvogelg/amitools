@@ -1,11 +1,13 @@
 import os
 import os.path
+import stat
 import struct
 from ADFBlockDevice import ADFBlockDevice
 from HDFBlockDevice import HDFBlockDevice
 from RawBlockDevice import RawBlockDevice
 from DiskGeometry import DiskGeometry
 from amitools.fs.rdb.RDisk import RDisk
+import amitools.util.BlkDevTools as BlkDevTools
 
 class BlkDevFactory:
   """the block device factory opens or creates image files suitable as a block device for file system access."""
@@ -77,9 +79,14 @@ class BlkDevFactory:
     if not os.access(img_file, os.W_OK):
       read_only = True
     # check size
-    size = os.path.getsize(img_file)
+    st = os.stat(img_file)
+    mode = st.st_mode
+    if stat.S_ISBLK(mode) or stat.S_ISCHR(mode):
+      size = BlkDevTools.getblkdevsize(img_file)
+    else:
+      size = os.path.getsize(img_file)
     if size == 0:
-      raise IOErrro("image file is empty")
+      raise IOError("image file is empty")
     # detect type
     t = self.detect_type(img_file, options)
     if t == None:
