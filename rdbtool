@@ -310,6 +310,20 @@ class PartEditCommand(Command):
     else:
       return 0
   
+  def get_automount(self):
+    if self.popts.has_key('automount'):
+      return bool(self.popts['automount'])
+    else:
+      return True
+  
+  def get_flags(self):
+    flags = 0
+    if self.get_bootable():
+      flags |= PartitionBlock.FLAG_BOOTABLE
+    if not self.get_automount():
+      flags |= PartitionBlock.FLAG_NO_AUTOMOUNT
+    return flags
+    
   def get_cyl_range(self):
     start = None
     if self.popts.has_key('start'):
@@ -371,9 +385,7 @@ class AddCommand(PartEditCommand):
     drv_name = self.get_drv_name()
     if drv_name == None:
       print "ERROR: invalid drive name!"
-    flags = 0
-    if self.get_bootable():
-      flags |= PartitionBlock.FLAG_BOOTABLE
+    flags = self.get_flags()
     boot_pri = self.get_boot_pri();
     print "creating: '%s' %s %s" % (drv_name, lo_hi, num_to_tag_str(dostype))
     # add partition
@@ -382,6 +394,29 @@ class AddCommand(PartEditCommand):
     else:
       print "ERROR: creating partition: '%s': %s" % (drv_name, lo_hi)
       return 1
+
+class ChangeCommand(PartEditCommand):
+  def handle_rdisk(self, rdisk):
+    if len(self.opts) < 1:
+      print "Usage: change <id>"
+      return 1
+    else:
+      p = rdisk.find_partition_by_string(self.opts[0])
+      if p != None:
+        self.parse_opts(rdisk)
+        dostype = self.get_dos_type()
+        drv_name = self.get_drv_name()
+        flags = self.get_flags()
+        boot_pri = self.get_boot_pri();
+        # change partition
+        if rdisk.change_partition(p.num, drv_name=drv_name, dos_type=dostype, flags=flags, boot_pri=boot_pri):
+          return 0
+        else:
+          print "ERROR: changing partition: '%s'" % (drv_name)
+          return 1    
+      else:
+        print "Can't find partition: '%s'" % self.opts[0]
+        return 1
   
 # --- Fill empty space with partitions ---
 
@@ -549,7 +584,8 @@ cmd_map = {
 "fsdelete" : FSDeleteCommand,
 "fsflags" : FSFlagsCommand,
 "map" : MapCommand,
-"delete" : DeleteCommand
+"delete" : DeleteCommand,
+"change" : ChangeCommand
 }
 
 parser = argparse.ArgumentParser()

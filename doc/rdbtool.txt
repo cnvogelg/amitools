@@ -166,7 +166,8 @@ option to set the number of cylinders to reserve for RDB:
 'add' - Add a new partition
 
 SYNTAX: add  <size> [ name=<name> ] [ dostype|fs=<dostag> ] 
-                    [ bootable ] [ pri=<priority> ]
+                    [ bootable[=true|false] ] [ pri=<priority> ]
+                    [ automount=true|false ]
 
 This command creates a new partition.
 
@@ -216,6 +217,18 @@ select the boot priority with "pri=<n>":
 > rdbtool test.img add size=10% bootable pri=10
 
 
+'change' - Modify parameters of an existing partition
+
+SYNTAX:  change <id>  [ name=<name> ] [ dostype|fs=<dostag> ] 
+                      [ bootable[=true|false] ] [ pri=<priority> ]
+                      [ automount=true|false ]
+
+The <id> is the number of the paritition as given in the 'info' command. You
+can also use the device name to select a parition.
+
+> rdbtool test.img change 0 name=CH0 bootable=true
+
+
 'free' - Show free cylinder range in partition layout
 
 SYNTAX:  free
@@ -230,8 +243,7 @@ command will return nothing.
 
 'fill' - Fill the remaining space in the partition layout with new partition(s)
 
-SYNTAX:  fill [ name=<name> ] [ dostype|fs=<dostag> ] 
-              [ bootable ] [ pri=<priority> ]
+SYNTAX:  fill 
 
 This command takes the free space in a partition layout and creates a new
 partition that fills this space.

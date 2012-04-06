@@ -370,6 +370,37 @@ class RDisk:
     p.read()
     self.parts.append(p)
     return True
+  
+  def change_partition(self, pid, drv_name=None, dev_flags=None, dos_type=None, flags=None, boot_pri=None):
+    # partition not found
+    if pid < 0 or pid >= len(self.parts):
+      return False
+    p = self.parts[pid]
+    pb = p.part_blk
+    if pb == None:
+      return False
+    # set flags
+    dirty = False
+    if flags != None:
+      pb.flags = flags
+      dirty = True
+    if drv_name != None:
+      pb.drv_name = drv_name
+      dirty = True
+    if dev_flags != None:
+      pb.dev_flags = dev_flags
+      dirty = True
+    # set dosenv flags
+    if dos_type != None:
+      pb.dos_env.dos_type = dos_type
+      dirty = True
+    if boot_pri != None:
+      pb.dos_env.boot_pri = boot_pri
+      dirty = True
+    # write change
+    if dirty:
+      pb.write()
+    return True
     
   def delete_partition(self, pid):
     # partition not found
