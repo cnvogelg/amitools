@@ -256,8 +256,8 @@ a new partition for each existing hole.
 With this command you can easily finish paritioning without the need of calculating
 the size of the final partition:
 
-> rdbtool test.img init + add 50% + fill   ; create 2 partitions with 50% size each
-> rdbtool test.img init + add 10% + add 20% + fill
+> rdbtool test.img init + add size=50% + fill   ; create 2 partitions with 50% size each
+> rdbtool test.img init + add size=10% + add size=20% + fill
 
 
 'delete' - Delete an existing partition
@@ -274,6 +274,8 @@ can also use the device name to select a parition.
 
 
 'map' - Show the allocation map of the RDB blocks
+
+SYNTAX:  map
 
 This command lets you look under the hood of the RDB. It will print all blocks
 associated with the RDB and shows their current contents. A two char code is

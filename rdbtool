@@ -216,7 +216,7 @@ class CreateCommand(Command):
 
 # --- Init existing disk image ---
 
-class InitCommand(CreateCommand):
+class InitCommand(OpenCommand):
   def init_rdisk(self, blkdev):
     opts = KeyValue.parse_key_value_strings(self.opts)
     # number of cylinders for RDB
