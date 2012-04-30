@@ -291,9 +291,11 @@ class PartEditCommand(Command):
       fs_str = self.args.dostype
     return parse_dos_type_str(fs_str)
     
-  def get_drv_name(self):
+  def get_drv_name(self, empty=False):
     if self.popts.has_key('name'):
       drv_name = self.popts['name']
+    elif empty:
+      drv_name = None
     else:
       drv_name = "%s%d" % (self.args.drive_prefix, self.rdisk.get_num_partitions())
     return drv_name
@@ -405,7 +407,7 @@ class ChangeCommand(PartEditCommand):
       if p != None:
         self.parse_opts(rdisk)
         dostype = self.get_dos_type()
-        drv_name = self.get_drv_name()
+        drv_name = self.get_drv_name(empty=True)
         flags = self.get_flags()
         boot_pri = self.get_boot_pri();
         # change partition
