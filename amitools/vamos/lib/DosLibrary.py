@@ -214,6 +214,7 @@ class DosLibrary(AmigaLibrary):
       (210, self.ParentDir),
       (216, self.IsInteractive),
       (306, self.FGetC),
+      (402, self.NameFromLock),
       (462, self.SetIoErr),
       (474, self.PrintFault),
       (606, self.SystemTagList),
@@ -622,6 +623,24 @@ class DosLibrary(AmigaLibrary):
       return 0
     else:
       return old_lock.b_addr
+
+  def NameFromLock(self, lib, ctx):
+    lock_b_addr = ctx.cpu.r_reg(REG_D1)
+    buf = ctx.cpu.r_reg(REG_D2)
+    buf_len = ctx.cpu.r_reg(REG_D3)
+    if lock_b_addr == 0:
+      name = "SYS:"
+      lock = None
+    else:
+      lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
+      name = lock.ami_path
+    log_dos.info("NameFromLock(%x,%d): %s -> %s", buf, buf_len, lock, name)
+    if len(name) >= buf_len:
+      self.io_err = ERROR_LINE_TOO_LONG
+      return self.DOSFALSE
+    else:
+      ctx.mem.access.w_cstr(buf, name)
+      return self.DOSTRUE
 
   # ----- DevProc -----
 

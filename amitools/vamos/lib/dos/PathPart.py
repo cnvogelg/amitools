@@ -33,6 +33,8 @@ def path_part(path):
 def add_part(dirname, filename, size):
   if len(dirname) == 0:
     return filename
+  if len(filename) == 0:
+    return dirname
   # does filename have a ':' ?
   pos = filename.find(':')
   if pos > 0:
