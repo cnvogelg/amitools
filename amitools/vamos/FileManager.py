@@ -200,6 +200,10 @@ class FileManager(LabelRange):
     except OSError:
       return False
 
+  def is_file_system(self, name):
+    sys_path = self.path_mgr.ami_to_sys_path(name)
+    return sys_path != None and os.path.exists(sys_path)
+
   def set_protection(self, ami_path, mask):
     sys_path = self.path_mgr.ami_to_sys_path(ami_path)
     if sys_path == None or not os.path.exists(sys_path):

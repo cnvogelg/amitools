@@ -218,6 +218,7 @@ class DosLibrary(AmigaLibrary):
       (606, self.SystemTagList),
       (642, self.GetDeviceProc),
       (648, self.FreeDeviceProc),
+      (708, self.IsFileSystem),
       (798, self.ReadArgs),
       (822, self.MatchFirst),
       (828, self.MatchNext),
@@ -528,7 +529,17 @@ class DosLibrary(AmigaLibrary):
       return self.DOSTRUE
     else:
       return self.DOSFALSE
-    
+  
+  def IsFileSystem(self, lib, ctx):
+    name_ptr = ctx.cpu.r_reg(REG_D1)
+    name = ctx.mem.access.r_cstr(name_ptr)
+    res = self.file_mgr.is_file_system(name)
+    log_dos.info("IsFileSystem(%s): %s" % (name, res))
+    if res:
+      return self.DOSTRUE
+    else:
+      return self.DOSFALSE
+  
   # ----- Locks -----
   
   def Lock(self, lib, ctx):
@@ -757,9 +768,12 @@ class DosLibrary(AmigaLibrary):
     # calc size of result
     size = args.calc_result_size()
     log_dos.debug("longs=%d chars=%d size=%d" % (args.num_longs,args.num_chars,size))
-    # alloc result mem
-    addr = self._alloc_mem("ReadArgs(@%06x)" % self.get_callee_pc(ctx),size)
-    # fill result memory
+    # alloc result mem (extra longs and cstrs)
+    if size > 0:
+      addr = self._alloc_mem("ReadArgs(@%06x)" % self.get_callee_pc(ctx),size)
+    else:
+      addr = 0
+    # fill result array and memory
     args.generate_result(ctx.mem.access,addr,array_ptr)
     # alloc RD_Args
     rdargs = ctx.alloc.alloc_struct("RDArgs", RDArgsDef)
@@ -782,7 +796,8 @@ class DosLibrary(AmigaLibrary):
     del self.rdargs[rdargs_ptr]
     # clean up rdargs
     addr = rdargs.access.r_s('RDA_Buffer')
-    self._free_mem(addr)
+    if addr != 0:
+      self._free_mem(addr)
     self.alloc.free_struct(rdargs)
 
   # ----- System/Execute -----

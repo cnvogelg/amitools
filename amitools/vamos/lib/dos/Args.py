@@ -194,9 +194,11 @@ class Args:
       elif type(r) is types.IntType: # numerical key 'kn'
         num_longs += 1
       elif type(r) is types.ListType: # string list 'm'
-        num_longs += len(r) + 1
-        for s in r:
-          num_chars += len(s) + 1
+        # only if list is not empty
+        if len(r)>0:
+          num_longs += len(r) + 1
+          for s in r:
+            num_chars += len(s) + 1
     
     # calc total size
     size = num_longs * 4 + num_chars
@@ -228,16 +230,20 @@ class Args:
         mem_access.w32(long_ptr,r)
         long_ptr += 4
       elif type(r) is types.ListType:
-        # pointer to array
-        base_val = long_ptr
         # array with longs + strs
-        for s in r:
-          mem_access.w32(long_ptr,char_ptr)
-          mem_access.w_cstr(char_ptr,s)
+        if len(r) == 0:
+          # empty multi array
+          base_val = 0
+        else:
+          # pointer to array
+          base_val = long_ptr
+          for s in r:
+            mem_access.w32(long_ptr,char_ptr)
+            mem_access.w_cstr(char_ptr,s)
+            long_ptr += 4
+            char_ptr += len(s) + 1
+          mem_access.w32(long_ptr,0)
           long_ptr += 4
-          char_ptr += len(s) + 1
-        mem_access.w32(long_ptr,0)
-        long_ptr += 4
       else:
         # direct value
         base_val = r
