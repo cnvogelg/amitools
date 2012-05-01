@@ -17,6 +17,7 @@ from dos.MatchFirstNext import MatchFirstNext
 from amitools.vamos.LabelStruct import LabelStruct
 from dos.CommandLine import CommandLine
 from amitools.vamos.Process import Process
+import dos.PathPart
 
 class DosLibrary(AmigaLibrary):
   name = "dos.library"
@@ -227,6 +228,8 @@ class DosLibrary(AmigaLibrary):
       (846, self.MatchPattern),
       (858, self.FreeArgs),
       (870, self.FilePart),
+      (876, self.PathPart),
+      (882, self.AddPart),
       (948, self.PutStr),
       (954, self.VPrintf),
       (966, self.ParsePatternNoCase),
@@ -534,7 +537,7 @@ class DosLibrary(AmigaLibrary):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name = ctx.mem.access.r_cstr(name_ptr)
     res = self.file_mgr.is_file_system(name)
-    log_dos.info("IsFileSystem(%s): %s" % (name, res))
+    log_dos.info("IsFileSystem('%s'): %s" % (name, res))
     if res:
       return self.DOSTRUE
     else:
@@ -855,20 +858,36 @@ class DosLibrary(AmigaLibrary):
   def FilePart(self, lib, ctx):
     addr = ctx.cpu.r_reg(REG_D1)
     path = ctx.mem.access.r_cstr(addr)
-    pos = path.rfind('/')
-    if pos != -1:
-      pos += 1
-    else:
-      pos = path.find(':')
-      if pos == -1:
-        pos = 0
-      else:
-        pos += 1
+    pos = dos.PathPart.file_part(path)
     if pos < len(path):
       log_dos.info("FilePart: path='%s' -> result='%s'", path, path[pos:])
     else:
       log_dos.info("FilePart: path='%s' -> pos=NULL", path)
     return addr + pos
+
+  def PathPart(self, lib, ctx):
+    addr = ctx.cpu.r_reg(REG_D1)
+    path = ctx.mem.access.r_cstr(addr)
+    pos = dos.PathPart.path_part(path)
+    if pos < len(path):
+      log_dos.info("PathPart: path='%s' -> result='%s'", path, path[pos:])
+    else:
+      log_dos.info("PathPart: path='%s' -> pos=NULL", path)
+    return addr + pos
+
+  def AddPart(self, lib, ctx):
+    dn_addr = ctx.cpu.r_reg(REG_D1)
+    fn_addr = ctx.cpu.r_reg(REG_D2)
+    size = ctx.cpu.r_reg(REG_D3)
+    dn = ctx.mem.access.r_cstr(dn_addr)
+    fn = ctx.mem.access.r_cstr(fn_addr)
+    np = dos.PathPart.add_part(dn,fn,size)
+    log_dos.info("AddPart: dn='%s' fn='%s' size=%d -> np='%s'", dn, fn, size, np)
+    if np != None:
+      ctx.mem.access.w_cstr(dn_addr, np)
+      return NO_ERROR
+    else:
+      return ERROR
 
   # ----- Helpers -----
 
