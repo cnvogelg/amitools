@@ -287,3 +287,15 @@ class RDArgsStruct(AmigaStruct):
     ('LONG','RDA_Flags')
   ]
 RDArgsDef = RDArgsStruct()
+
+class DateTimeStruct(AmigaStruct):
+  _name = "DateTime"
+  _format = [
+    ('DateStamp','dat_Stamp'),
+    ('UBYTE','dat_Format'),
+    ('UBYTE','dat_Flags'),
+    ('UBYTE*','dat_StrDay'),
+    ('UBYTE*','dat_StrDate'),
+    ('UBYTE*','dat_StrTime')
+  ]
+DateTimeDef = DateTimeStruct()

@@ -221,6 +221,7 @@ class DosLibrary(AmigaLibrary):
       (642, self.GetDeviceProc),
       (648, self.FreeDeviceProc),
       (708, self.IsFileSystem),
+      (744, self.DateToStr),
       (798, self.ReadArgs),
       (822, self.MatchFirst),
       (828, self.MatchNext),
@@ -350,11 +351,39 @@ class DosLibrary(AmigaLibrary):
     ds = AccessStruct(ctx.mem,DateStampDef,struct_addr=ds_ptr)
     t = time.time()
     at = sys_to_ami_time(t)
-    log_dos.info("DateStamp: ptr=%06x time=%s" % (ds_ptr, at))
+    log_dos.info("DateStamp: ptr=%06x sys_time=%d time=%s", ds_ptr, t, at)
     ds.w_s("ds_Days",at.tday)
     ds.w_s("ds_Minute",at.tmin)
     ds.w_s("ds_Tick",at.tick)
     return ds_ptr
+    
+  def DateToStr(self, lib, ctx):
+    dt_ptr = ctx.cpu.r_reg(REG_D1)
+    dt = AccessStruct(ctx.mem,DateTimeDef,struct_addr=dt_ptr)
+    ds_day = dt.r_s("dat_Stamp.ds_Days")
+    ds_min = dt.r_s("dat_Stamp.ds_Minute")
+    ds_tick = dt.r_s("dat_Stamp.ds_Tick")
+    format = dt.r_s("dat_Format")
+    flags = dt.r_s("dat_Flags")
+    str_day_ptr = dt.r_s("dat_StrDay")
+    str_date_ptr = dt.r_s("dat_StrDate")
+    str_time_ptr = dt.r_s("dat_StrTime")
+    at = AmiTime(ds_day, ds_min, ds_tick)
+    st = at.to_sys_time()
+    log_dos.info("DateToStr: ptr=%06x format=%x flags=%x day_ptr=%06x date_ptr=%06x time_ptr=%06x %s => sys_time=%d", \
+      dt_ptr, format, flags, str_day_ptr, str_date_ptr, str_time_ptr, at, st)
+    t = time.gmtime(st)
+    day_str = time.strftime("%A", t)
+    date_str = time.strftime("%d-%m-%y", t)
+    time_str = time.strftime("%H:%M:%S", t)
+    log_dos.info("DateToStr: result day='%s' date='%s' time='%s'", day_str, date_str, time_str)
+    if str_day_ptr != 0:
+      ctx.mem.access.w_cstr(str_day_ptr, day_str)
+    if str_date_ptr != 0:
+      ctx.mem.access.w_cstr(str_date_ptr, date_str)
+    if str_time_ptr != 0:
+      ctx.mem.access.w_cstr(str_time_ptr, time_str)
+    return self.DOSTRUE
     
   # ----- File Ops -----
   
