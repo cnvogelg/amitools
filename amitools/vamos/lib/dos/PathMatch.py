@@ -20,6 +20,8 @@ class PathMatchChain:
       return b
     elif b == '':
       return a
+    elif a[-1] in ('/',':'):
+      return a + b
     else:
       return a + "/" + b
   
@@ -42,14 +44,14 @@ class PathMatchChain:
       name = self.candidates[self.pos]
       if pattern_match(self.pattern, name):
         if full_prefix != '': 
-          ami_path = full_prefix + "/" + name
+          ami_path = self._join(full_prefix, name)
         else:
           ami_path = name
       
         # is tail?
         if self.child == None:
           if postfix != "":
-            ami_path += "/" + postfix
+            ami_path = self._join(ami_path, postfix)
           #print "\ttail:",ami_path
           if path_mgr.ami_path_exists(ami_path):
             self.pos += 1
@@ -88,10 +90,19 @@ class PathMatch:
     # extract volume (if available) 
     pos = in_str.find(':')
     if pos == -1:
-      self.volume = ""
+      self.prefix = ""
     else:
-      self.volume = in_str[:pos+1]
+      self.prefix = in_str[:pos+1]
       in_str = in_str[pos+1:]
+      
+    # extrace preceeding slashes
+    prefix_slashes = ""
+    for a in in_str:
+      if a != '/':
+        break
+      prefix_slashes += "/"
+    self.prefix += prefix_slashes
+    in_str = in_str[len(prefix_slashes):]
 
     # split path segments by / and build chain
     segs = in_str.split('/')
@@ -130,7 +141,7 @@ class PathMatch:
     return True
     
   def __str__(self):
-    return "volume='%s' chain=%s postfix='%s'" % (self.volume, self.head_chain, self.postfix)
+    return "prefix='%s' chain=%s postfix='%s'" % (self.prefix, self.head_chain, self.postfix)
   
   def has_wildcards(self):
     return self.head_chain != None
@@ -138,7 +149,7 @@ class PathMatch:
   def begin(self):
     # no wildcard?
     if self.head_chain == None:
-      ami_path = self.volume + self.postfix
+      ami_path = self.prefix + self.postfix
       if self.path_mgr.ami_path_exists(ami_path):
         return ami_path
       else:
@@ -146,7 +157,7 @@ class PathMatch:
     # has wildcards
     else:
       self.head_chain.reset()
-      return self.head_chain.next(self.path_mgr, self.volume, self.postfix)
+      return self.head_chain.next(self.path_mgr, self.prefix, self.postfix)
       
   def next(self):
     # no wildcard?
@@ -154,11 +165,11 @@ class PathMatch:
       return None
     # has wildcards
     else:
-      return self.head_chain.next(self.path_mgr, self.volume, self.postfix)
+      return self.head_chain.next(self.path_mgr, self.prefix, self.postfix)
 
 # ----- test -----
 if __name__ == '__main__':
   import sys
-  pm = PathMatch(None, sys.argv[1])
-  pm.parse()
+  pm = PathMatch(None)
+  pm.parse(sys.argv[1])
   print pm

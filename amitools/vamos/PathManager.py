@@ -204,7 +204,12 @@ class PathManager:
       return self.cur_vol + ":" + self.cur_path      
     # a parent path is given
     elif path[0] == '/':
-      abs_prefix = self.ami_abs_parent_path(self.cur_vol + ":" + self.cur_path)
+      abs_prefix = self.cur_vol + ":" + self.cur_path
+      while len(path)>0 and path[0] == '/':
+        abs_prefix = self.ami_abs_parent_path(abs_prefix)
+        path = path[1:]
+      if path != "":
+        abs_prefix += "/"
     # cur path
     else:
       abs_prefix = self.cur_vol + ":" + self.cur_path
@@ -228,7 +233,10 @@ class PathManager:
     # has slash?
     pos = path.rfind('/')
     if pos != -1:
-      return path[pos+1:]
+      if pos == len(path)-1:
+        return ""
+      else:
+        return path[pos+1:]
     # has colon?
     pos = path.rfind(':')
     if pos != -1:

@@ -713,16 +713,17 @@ class DosLibrary(AmigaLibrary):
       return self.io_err
     log_dos.debug("MatchFirst: %s" % mfn.matcher)
 
-    # no entry found
-    if mfn.path == None:
-      log_dos.info("MatchFirst: none found!")
-      self.matches[anchor_ptr] = None
-      self.io_err = ERROR_OBJECT_NOT_FOUND
-    # first match
+    # try first match
+    self.io_err = mfn.first(ctx)
+    if self.io_err == NO_ERROR:
+      log_dos.info("MatchFirst: found name='%s' path='%s' -> parent lock %s, io_err=%d", mfn.name, mfn.path, mfn.dir_lock, self.io_err)
+      self.matches[anchor_ptr] = mfn    
+    # no entry found or error
+    elif self.io_err == ERROR_OBJECT_NOT_FOUND:
+      log_dos.info("MatchFirst: none found")
+      self.matches[anchor_ptr] = mfn    
     else:
-      self.io_err = mfn.first(ctx)
-      log_dos.info("MatchFirst: found path='%s' -> dir path=%s -> parent lock %s, io_err=%d", mfn.path, mfn.voldir_path, mfn.dir_lock, self.io_err)
-      self.matches[anchor_ptr] = mfn
+      log_dos.info("MatchFirst: error: %d", self.io_err)
     return self.io_err
   
   def MatchNext(self, lib, ctx):
@@ -730,16 +731,17 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("MatchNext: anchor=%06x" % (anchor_ptr))
     # retrieve match
     if not self.matches.has_key(anchor_ptr):
-      raise VamosInternalError("No matcher found for %06x" % anchor_ptr)
+      raise VamosInternalError("MatchNext: No matcher found for %06x" % anchor_ptr)
     mfn = self.matches[anchor_ptr]
     # has matches?
     if mfn != None:
       self.io_err = mfn.next(ctx)
-      if self.io_err != None:
-        log_dos.info("MatchNext: found path='%s' -> dir path=%s -> parent lock %s, io_err=%d", mfn.path, mfn.voldir_path, mfn.dir_lock, self.io_err)
-      else:
+      if self.io_err == NO_ERROR:
+        log_dos.info("MatchNext: found name='%s' path=%s -> parent lock %s, io_err=%d", mfn.name, mfn.path, mfn.dir_lock, self.io_err)
+      elif self.io_err == ERROR_NO_MORE_ENTRIES:
         log_dos.info("MatchNext: no more entries!")
-        self.io_err = ERROR_NO_MORE_ENTRIES
+      else:
+        log_dos.info("MatchNext: error: %d", self.io_err)
       return self.io_err
     
   def MatchEnd(self, lib, ctx):
@@ -747,7 +749,7 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("MatchEnd: anchor=%06x " % (anchor_ptr))
     # retrieve match
     if not self.matches.has_key(anchor_ptr):
-      raise VamosInternalError("No matcher found for %06x" % anchor_ptr)
+      raise VamosInternalError("MatchEnd: No matcher found for %06x" % anchor_ptr)
     mfn = self.matches[anchor_ptr]
     del self.matches[anchor_ptr]
     if mfn != None:

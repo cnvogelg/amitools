@@ -69,6 +69,7 @@ elif op == 'match':
   matcher = PathMatch(pm)
   ok = matcher.parse(args.arg)
   if ok:
+    print matcher
     match = matcher.begin()
     while match != None:
       print match
