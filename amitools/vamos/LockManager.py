@@ -93,6 +93,7 @@ class LockManager(LabelRange):
     else:
       ami_path = self.path_mgr.ami_abs_path(ami_path)
     sys_path = self.path_mgr.ami_to_sys_path(ami_path)
+    name = self.path_mgr.ami_name_of_path(ami_path)
     if sys_path == None:
       log_lock.info("lock '%s' invalid: no sys path found: '%s'", name, ami_path)
       return None
@@ -100,7 +101,6 @@ class LockManager(LabelRange):
     if not exists:
       log_lock.info("lock '%s' invalid: sys path does not exist: '%s' -> '%s'", name, ami_path, sys_path)
       return None      
-    name = self.path_mgr.ami_name_of_path(ami_path)
     lock = AmiLock(name, ami_path, sys_path, exclusive)
     self._register_lock(lock)
     return lock
