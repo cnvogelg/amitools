@@ -322,7 +322,7 @@ class ReadCmd(Command):
       return 1
     # determine output name
     out_name = os.path.basename(p[0])
-    if n == 1:
+    if n == 2:
       if os.path.isdir(p[1]):
         out_name = os.path.join(p[1],out_name)  
       else:
