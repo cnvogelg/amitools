@@ -642,7 +642,7 @@ class DosLibrary(AmigaLibrary):
     else:
       new_lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
     self.cur_dir_lock = new_lock
-    log_dos.info("CurrentDir: %s -> %s" % (old_lock, new_lock))
+    log_dos.info("CurrentDir(b@%x): %s -> %s" % (lock_b_addr, old_lock, new_lock))
     # set current path in path mgr
     if new_lock != None:
       self.path_mgr.set_cur_path(new_lock.ami_path)

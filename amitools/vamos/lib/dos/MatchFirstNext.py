@@ -44,7 +44,8 @@ class MatchFirstNext:
     self.name = self.path_mgr.ami_name_of_path(self.path)
 
     # get parent dir of first match
-    abs_path = self.path_mgr.ami_abs_path(self.path)
+    dir_part = self.path_mgr.ami_dir_of_path(self.path)
+    abs_path = self.path_mgr.ami_abs_path(dir_part)
     self.dir_lock = self.lock_mgr.create_lock(abs_path, False)
     
     # create base/last achain and set dir lock
