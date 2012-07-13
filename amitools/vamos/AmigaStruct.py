@@ -6,13 +6,17 @@ class InvalidAmigaTypeException(Exception):
   def __str__(self):
     return self.type_name
 
+def w_bptr(addr):
+  return addr >> 2
+  
+def r_bptr(addr):
+  return addr << 2
+  
 class AmigaStruct:
   
-  def w_bptr(addr):
-    return addr >> 2
-  
-  def r_bptr(addr):
-    return addr << 2
+  # overwrite these in derived class!
+  _name = None
+  _format = None
   
   # name all internal types 
   # and map to (byte width in 2**n, w_convert, r_convert)

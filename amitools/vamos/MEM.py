@@ -15,9 +15,9 @@ class MEM:
     pass
   def clear_ram_block(self,addr,size,value):
     pass
-  def reserve_special_range(num_pages):
+  def reserve_special_range(self,num_pages):
     return 0
-  def set_special_range_read_func(page_addr, width, func):
+  def set_special_range_read_func(self,page_addr, width, func):
     pass
-  def set_special_range_write_func(page_addr, width, func):
+  def set_special_range_write_func(self,page_addr, width, func):
     pass

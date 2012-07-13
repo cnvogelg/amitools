@@ -304,9 +304,9 @@ class DosLibrary(AmigaLibrary):
       size    = dos_pkt.r_s("dp_Arg3")
       log_dos.info("DosPacket: Write fh=%06x buf=%06x len=%06x", fh_ptr, buf_ptr, size)
       # TBD
-      raise UnsupportedFeatureException("Unsupported DosPacket: type=%d" % pkt_type)
+      raise UnsupportedFeatureError("Unsupported DosPacket: type=%d" % pkt_type)
     else:
-      raise UnsupportedFeatureException("Unsupported DosPacket: type=%d" % pkt_type)
+      raise UnsupportedFeatureError("Unsupported DosPacket: type=%d" % pkt_type)
     # do reply
     if not self.port_mgr.has_port(reply_port_addr):
       self.port_mgr.add_port(reply_port_addr)
@@ -473,7 +473,7 @@ class DosLibrary(AmigaLibrary):
       mode_str = "END"
       whence = 2
     else:
-      raise UnsupportedFeatureException("Seek: mode=%d" % mode)
+      raise UnsupportedFeatureError("Seek: mode=%d" % mode)
 
     old_pos = self.file_mgr.tell(fh)
     self.file_mgr.seek(fh, pos, whence)
@@ -585,7 +585,7 @@ class DosLibrary(AmigaLibrary):
     elif mode == 0xfffffffe:
       lock_exclusive = False
     else:
-      raise UnsupportedFeatureException("Lock: mode=%x" % mode)
+      raise UnsupportedFeatureError("Lock: mode=%x" % mode)
     
     lock = self.lock_mgr.create_lock(name, lock_exclusive)
     log_dos.info("Lock: '%s' exc=%s -> %s" % (name, lock_exclusive, lock))
@@ -935,9 +935,9 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("AddPart: dn='%s' fn='%s' size=%d -> np='%s'", dn, fn, size, np)
     if np != None:
       ctx.mem.access.w_cstr(dn_addr, np)
-      return NO_ERROR
+      return self.DOSTRUE
     else:
-      return ERROR
+      return self.DOSFALSE
 
   # ----- Helpers -----
 

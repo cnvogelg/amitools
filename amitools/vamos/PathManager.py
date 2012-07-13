@@ -50,7 +50,7 @@ class PathManager:
     # split multi assign
     path_list = paths.split(',')
     if path_list == None:
-      raise VamosConfigError("invalid path: %s" % name)
+      raise VamosConfigError("invalid path: %s" % paths)
     # add assign
     if len(path_list) > 0:
       for p in path_list:
@@ -170,7 +170,7 @@ class PathManager:
       return path
     # skip trailing slash
     if path[-1] == '/':
-      return self.ami_strip_name(self, path[:-2])
+      return self.ami_abs_parent_path(path[:-2])
     # make absolute first
     if path.find(':') < 1:
       path = self.ami_abs_path(path)

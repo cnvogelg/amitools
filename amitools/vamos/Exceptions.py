@@ -31,9 +31,9 @@ class AmigaDeviceNotFoundError(VamosError):
 
 class VersionMismatchError(VamosError):
   def __init__(self, what, got, want):
-    self._what = _what
-    self._got = _got
-    self._want = _want
+    self._what = what
+    self._got = got
+    self._want = want
   def __str__(self):
     return "Version Mismatch: %s got=%d want=%d" % (self._what, self._got, self._want)
 

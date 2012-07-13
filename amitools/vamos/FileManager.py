@@ -189,7 +189,7 @@ class FileManager(LabelRange):
       os.rename(old_sys_path, new_sys_path)
       return 0
     except OSError as e:
-      log_file.info("can't rename file: '%s','%s' -> %s" % (old_ami_path, new_amipath, e))
+      log_file.info("can't rename file: '%s','%s' -> %s" % (old_ami_path, new_ami_path, e))
       return ERROR_OBJECT_IN_USE
   
   def is_interactive(self, fh):

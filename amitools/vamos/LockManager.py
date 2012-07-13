@@ -57,7 +57,7 @@ class LockManager(LabelRange):
         log_lock.debug("fl_Volume: looking up volume '%s' of %s",volume_name,lock)
         volume = self.doslist_mgr.get_entry_by_name(volume_name)
         if volume == None:
-          raise VamosInternalError("No DosList entry found for volume '%s'" % vol)
+          raise VamosInternalError("No DosList entry found for volume '%s'" % volume_name)
         val = volume.baddr
   
       self.trace_mem_int('R', 2, addr, val, text="LOCK", level=logging.INFO, addon=addon)
