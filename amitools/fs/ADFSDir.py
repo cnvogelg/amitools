@@ -268,7 +268,7 @@ class ADFSDir(ADFSNode):
       for blk_num in blk_nums:
         self.blkdev.write_block(blk_num, clr_blk)
       # wipe a potentially free'ed dircache block, too
-      if free_blk != None:
+      if free_blk_num != None:
         self.blkdev.write_block(free_blk_num, clr_blk)
     
     # update time stamps

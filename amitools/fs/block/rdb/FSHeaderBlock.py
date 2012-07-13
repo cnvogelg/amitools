@@ -1,4 +1,4 @@
-from ..Block import *
+from amitools.fs.block.Block import *
 import amitools.fs.DosType as DosType
 
 class FSHeaderDeviceNode:

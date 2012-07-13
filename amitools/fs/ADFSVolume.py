@@ -242,7 +242,7 @@ class ADFSVolume:
   def relabel(self, new_name):
     fn = FileName(new_name, is_intl=self.is_intl)
     if not fn.is_valid():
-      raise FSError(INVALID_VOLUME_NAME, file_name=name, node=self)
+      raise FSError(INVALID_VOLUME_NAME, file_name=new_name, node=self)
     self.root.name = new_name
     self.root.write()
     self.name = new_name

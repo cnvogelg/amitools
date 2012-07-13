@@ -37,7 +37,7 @@ class Imager:
     # check for block dev file
     blkdev_path = vol_path + ".blkdev"
     if os.path.exists(blkdev_path):
-      raise IOErrro("Unpack blkdev file aready exists:"+blkdev_path)
+      raise IOError("Unpack blkdev file aready exists:"+blkdev_path)
     # create volume path
     self.meta_db = MetaDB()
     self.unpack_root(volume, vol_path)

@@ -116,6 +116,17 @@ class ADFSNode:
       extra = str(self.meta_info)
     print "%-40s       %8s  %s" % (istr + self.block.name, self.get_size_str(), extra)
 
+  def get_size_str(self):
+    # re-implemented in derived classes!
+    return ""
+    
+  def get_blocks(self, with_data=False):
+    # re-implemented in derived classes!
+    return 0
+
+  def get_file_data(self):
+    return None
+
   def dump_blocks(self, with_data=False):
     blks = self.get_blocks(with_data)
     for b in blks:

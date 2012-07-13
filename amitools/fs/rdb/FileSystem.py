@@ -1,5 +1,5 @@
-from ..block.rdb.FSHeaderBlock import *
-from ..block.rdb.LoadSegBlock import *
+from amitools.fs.block.rdb.FSHeaderBlock import *
+from amitools.fs.block.rdb.LoadSegBlock import *
 from amitools.util.HexDump import *
 import amitools.fs.DosType as DosType
 

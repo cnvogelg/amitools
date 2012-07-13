@@ -1,5 +1,5 @@
 import time
-from TimeStamp import TimeStamp
+from TimeStamp import *
 
 class RootMetaInfo:
   def __init__(self, create_ts=None, disk_ts=None, mod_ts=None):

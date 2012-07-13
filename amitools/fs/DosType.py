@@ -85,7 +85,7 @@ def num_to_tag_str(l):
 
 def get_dos_type_str(dos_type):
   """return description of dos type as a string"""
-  return self.dos_type_names[dos_type & 0x7]
+  return dos_type_names[dos_type & 0x7]
 
 def is_valid(dos_type):
   """check if its a valid dos type"""

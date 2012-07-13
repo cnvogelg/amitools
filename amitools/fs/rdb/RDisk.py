@@ -1,5 +1,5 @@
-from ..block.rdb.RDBlock import *
-from ..block.rdb.PartitionBlock import *
+from amitools.fs.block.rdb.RDBlock import *
+from amitools.fs.block.rdb.PartitionBlock import *
 import amitools.util.ByteSize as ByteSize
 import amitools.fs.DosType as DosType
 from FileSystem import FileSystem

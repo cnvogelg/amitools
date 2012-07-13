@@ -1,5 +1,5 @@
-from ..block.rdb.PartitionBlock import *
-from ..blkdev.PartBlockDevice import PartBlockDevice
+from amitools.fs.block.rdb.PartitionBlock import *
+from amitools.fs.blkdev.PartBlockDevice import PartBlockDevice
 import amitools.util.ByteSize as ByteSize
 import amitools.fs.DosType as DosType
 

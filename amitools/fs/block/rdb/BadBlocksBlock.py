@@ -20,7 +20,7 @@ class BadBlockBlock(Block):
     
     # block_pairs: bad, good, bad, good ...
     off = 6
-    for b in block_pairs:
+    for b in self.block_pairs:
       self._put_long(off, b)
       off += 1
     
@@ -50,7 +50,7 @@ class BadBlockBlock(Block):
     
     print " size:           %d" % self.size
     print " host_id:        %d" % self.host_id
-    print " next:           %s" % self._dump_ptr(self.badblk_list)
+    print " next:           %s" % self._dump_ptr(self.next)
     n = len(self.block_pairs) / 2
     o = 0
     for i in xrange(n):
