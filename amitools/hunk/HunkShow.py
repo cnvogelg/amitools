@@ -163,7 +163,7 @@ class HunkShow:
         for src_off in hunk['src_map']:
           addr = src_off[1]
           line = src_off[0]
-          self.print_symbol(addr,"line %d" % line)
+          self.print_symbol(addr,"line %d" % line,"")
     else:
       if self.show_debug:
         print_hex(hunk['data'],indent=8)

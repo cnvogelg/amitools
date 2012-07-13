@@ -439,7 +439,7 @@ class ELFReader:
     if seg.has_key('rela_by_seg'):
       return seg['rela_by_seg']
     else:
-      return []
+      return {}
 
   def get_segment_symbols(self, seg):
     if seg.has_key('symbols'):
