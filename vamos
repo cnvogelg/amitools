@@ -110,10 +110,6 @@ if not log_setup(cfg.logging, cfg.verbose, cfg.quiet, cfg.log_file):
   sys.exit(1)
 cfg.log()
 
-# --- setup path manager ---
-pm = PathManager()
-pm.parse(cfg, args.volume, args.assign, args.auto_assign, args.path)
-
 # ----- vamos! ---------------------------------------------------------------
 cpu = MusashiCPU()
 mem = MusashiMEM()
@@ -122,7 +118,7 @@ if not mem.init(cfg.ram_size):
   log_main.error("can't allocate vamos RAM: %d KiB" % cfg.ram_size)
   sys.exit(1)
   
-vamos = Vamos(mem, cpu, pm)
+vamos = Vamos(mem, cpu, cfg)
 
 # enable mem trace?
 if cfg.memory_trace:

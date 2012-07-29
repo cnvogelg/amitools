@@ -25,11 +25,11 @@ from CPU import *
 
 class Vamos:
   
-  def __init__(self, raw_mem, cpu, path_mgr):
+  def __init__(self, raw_mem, cpu, cfg):
     self.raw_mem = raw_mem
     self.ram_size = raw_mem.ram_size
     self.cpu = cpu
-    self.path_mgr = path_mgr
+    self.path_mgr = PathManager( cfg )
 
     # create a label manager and error tracker
     self.label_mgr = LabelManager()

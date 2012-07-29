@@ -8,6 +8,7 @@ class VamosConfig(ConfigParser.SafeConfigParser):
   def __init__(self, extra_file=None, args=None):
     ConfigParser.SafeConfigParser.__init__(self)
     self.files = []
+    self.args = args
     
     # prepend extra file
     if extra_file != None:
@@ -24,6 +25,10 @@ class VamosConfig(ConfigParser.SafeConfigParser):
     self._reset()
     self._parse_config()
     self._parse_args(args)
+
+  def get_args(self):
+    """return the command line arguments"""
+    return self.args
 
   def log(self):
     if len(self.found_files) == 0:

@@ -7,11 +7,14 @@ from AssignManager import AssignManager
 
 class PathManager:
   
-  def __init__(self):
+  def __init__(self, cfg):
     self.vol_mgr = VolumeManager()
     self.assign_mgr = AssignManager(self.vol_mgr)
     self.paths = []
   
+    args = cfg.get_args()
+    self.parse(cfg, args.volume, args.assign, args.auto_assign, args.path)
+    
   def parse(self, cfg, volume_strs=None, assign_strs=None, auto_assign=None, path_strs=None):
     # volumes
     self.vol_mgr.parse_config(cfg)
