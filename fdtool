@@ -91,7 +91,7 @@ def dump(fd):
 
 # ----- generate -----
 
-def generate_code(fd):
+def generate_python_code(fd):
   funcs = fd['funcs']
   for f in funcs:
     args = f['args']
@@ -99,14 +99,68 @@ def generate_code(fd):
       args = tuple(args)
     print "    (%d, '%s', %s)," % (f['bias'],f['name'],args)
 
+def generate_c_code(fd, prefix=""):
+  funcs = fd['funcs']
+  for f in funcs:
+    if not f['private']:
+      line = "__asm __saveds int %s%s(" % (prefix,f['name'])
+      args = f['args']
+      if args != None:
+        for a in args:
+          line += "register __%s int %s" % (a[1],a[0])
+          if a != args[-1]:
+            line += ", "
+      else:
+        line += " void "
+      line += " )"
+      print line
+      print "{"
+      
+      print "  return 0;"
+      print "}"
+      print
 
-
+def generate_fd(fd, add_private):
+  print "##base %s" % (fd['base'])
+  last_bias = 0
+  last_mode = None
+  funcs = fd['funcs']
+  for f in funcs:
+    if not f['private'] or add_private:
+      # check new mode
+      if f['private']:
+        new_mode = "private"
+      else:
+        new_mode = "public"
+      if last_mode != new_mode:
+        print "##%s" % new_mode
+        last_mode = new_mode
+      # check new bias
+      new_bias = f['bias']
+      if last_bias + 6 != new_bias:
+        print "##bias %d" % new_bias
+      last_bias = new_bias
+      # build func
+      line = f['name']
+      args = f['args']
+      if args == None:
+        line += "()()"
+      else:
+        line += "(" + ",".join(map(lambda x : x[0], args)) + ")"
+        line += "(" + "/".join(map(lambda x : x[1], args)) + ")"
+      print line
+  print "##end"
+  
 # ----- main -----
 
 # parse args
 parser = argparse.ArgumentParser()
 parser.add_argument('files', nargs='+')
-parser.add_argument('-g', '--generate', action='store_true', default=False, help="generate code")
+parser.add_argument('-p', '--gen-python', action='store_true', default=False, help="generate python code for vamos")
+parser.add_argument('-c', '--gen-c', action='store_true', default=False, help="generate c code")
+parser.add_argument('-f', '--gen-fd', action='store_true', default=False, help="generate compact fd file")
+parser.add_argument('-P', '--add-private', action='store_true', default=False, help="add private functions")
+parser.add_argument('-E', '--prefix', action='store', default='', help="add prefix to functions in C")
 args = parser.parse_args()
 
 # main loop
@@ -114,7 +168,15 @@ files = args.files
 for fname in files:
   fd = parse_fd(fname)
   if fd != None:
-    if args.generate:
-      generate_code(fd)
-    else:
+    code_gen = False
+    if args.gen_python:
+      generate_python_code(fd)
+      code_gen = True
+    if args.gen_c:
+      generate_c_code(fd, args.prefix)
+      code_gen = True
+    if args.gen_fd:
+      generate_fd(fd, args.add_private)
+      code_gen = True
+    if not code_gen:
       dump(fd)
