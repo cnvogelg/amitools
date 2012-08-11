@@ -5,106 +5,42 @@
 
 import sys
 import argparse
-import re
 
-def parse_fd(fname):
-  res = {}
-  funcs = []
-  res['funcs'] = funcs
-  
-  func_pat = "([A-Za-z][_A-Za-z00-9]+)\((.*)\)\((.*)\)"
-  
-  bias = 0
-  private = True
-  f = open(fname, "r")
-  for line in f:
-    l = line.strip()
-    if len(l) > 0:
-      if l[0] != '*' and len(l) > 1:
-          # a command
-          if l[0] == '#' and l[1] == '#':
-            cmdline = l[2:]
-            cmda = cmdline.split(" ")
-            cmd = cmda[0]
-            if cmd == "base":
-              res['base'] = cmda[1]
-            elif cmd == "bias":
-              bias = int(cmda[1])
-            elif cmd == "private":
-              private = True
-            elif cmd == "public":
-              private = False
-            elif cmd == "end":
-              break
-            else:
-              print "Invalid command:",cmda
-              return None
-          # a function
-          else:
-            func = {}
-            func['bias'] = bias
-            func['private'] = private
-            bias += 6
-            funcs.append(func)
-            m = re.match(func_pat, l)
-            if m == None:
-              print "Failed:",l
-              return None
-            else:
-              name = m.group(1)
-              args = m.group(2)
-              regs = m.group(3)
-              arg = args.replace(',','/').split('/')
-              reg = regs.replace(',','/').split('/')
-              func['name'] = name
-              if len(arg) != len(reg):
-                print "Arg != Reg:",arg,reg
-                return None
-              else:
-                r = []
-                t = []
-                num_args = len(arg)
-                if arg[0] != '':
-                  for i in xrange(num_args):
-                    p = (arg[i],reg[i])
-                    r.append(p)
-                    t.append("[%s,%s]" % p)
-                  func['args'] = r
-                  func['args_str'] = "".join(t)
-                else:
-                  func['args'] = None
-                  func['args_str'] = ""
-                
-  return res
+import amitools.fd.FDFormat as FDFormat
 
 # ----- dump -----
 
-def dump(fd):
-  print fname
-  print "  base: %s" % fd['base']
-  funcs = fd['funcs']
+def dump(fd, add_private):
+  print(fname)
+  print("  base: %s" % fd.get_base_name())
+  funcs = fd.get_funcs()
   num = 1
   for f in funcs:
-    if not f['private']:
-      print "  #%04d  %5d  0x%04x  %24s %s" % (num,f['bias'],f['bias'],f['name'],f['args_str'])
+    if add_private or not f.is_private():
+      bias = f.get_bias()
+      print("  #%04d  %5d  0x%04x  %30s %s" % (num,bias,bias,f.get_name(),f.get_arg_str()))
       num += 1
 
 # ----- generate -----
 
-def generate_python_code(fd):
-  funcs = fd['funcs']
+def generate_python_code(fd, add_private):
+  funcs = fd.get_funcs()
   for f in funcs:
-    args = f['args']
-    if args != None:
-      args = tuple(args)
-    print "    (%d, '%s', %s)," % (f['bias'],f['name'],args)
+    if add_private or not f.is_private():
+      args = f.get_args()
+      if len(args)>0:
+        args = tuple(args)
+      else:
+        args = None
+      print "    (%d, '%s', %s)," % (f.get_bias(),f.get_name(),args)
 
-def generate_c_code(fd, prefix=""):
-  funcs = fd['funcs']
+def generate_sasc_code(fname, fd, add_private, prefix=""):
+  funcs = fd.get_funcs()
+  fo = open(fname, "w")
   for f in funcs:
-    if not f['private']:
-      line = "__asm __saveds int %s%s(" % (prefix,f['name'])
-      args = f['args']
+    if add_private or not f.is_private():
+      line = "__asm __saveds int %s%s(" % (prefix, f.get_name())
+      args = f.get_args()
       if args != None:
         for a in args:
           line += "register __%s int %s" % (a[1],a[0])
@@ -113,70 +49,35 @@ def generate_c_code(fd, prefix=""):
       else:
         line += " void "
       line += " )"
-      print line
-      print "{"
-      
-      print "  return 0;"
-      print "}"
-      print
-
-def generate_fd(fd, add_private):
-  print "##base %s" % (fd['base'])
-  last_bias = 0
-  last_mode = None
-  funcs = fd['funcs']
-  for f in funcs:
-    if not f['private'] or add_private:
-      # check new mode
-      if f['private']:
-        new_mode = "private"
-      else:
-        new_mode = "public"
-      if last_mode != new_mode:
-        print "##%s" % new_mode
-        last_mode = new_mode
-      # check new bias
-      new_bias = f['bias']
-      if last_bias + 6 != new_bias:
-        print "##bias %d" % new_bias
-      last_bias = new_bias
-      # build func
-      line = f['name']
-      args = f['args']
-      if args == None:
-        line += "()()"
-      else:
-        line += "(" + ",".join(map(lambda x : x[0], args)) + ")"
-        line += "(" + "/".join(map(lambda x : x[1], args)) + ")"
-      print line
-  print "##end"
+      fo.write(line)
+      fo.write("{\n  return 0;\n}\n\n")
+  fo.close()
   
 # ----- main -----
 
 # parse args
 parser = argparse.ArgumentParser()
 parser.add_argument('files', nargs='+')
-parser.add_argument('-p', '--gen-python', action='store_true', default=False, help="generate python code for vamos")
-parser.add_argument('-c', '--gen-c', action='store_true', default=False, help="generate c code")
-parser.add_argument('-f', '--gen-fd', action='store_true', default=False, help="generate compact fd file")
 parser.add_argument('-P', '--add-private', action='store_true', default=False, help="add private functions")
+parser.add_argument('-p', '--gen-python', action='store_true', default=False, help="generate python code for vamos")
+parser.add_argument('-f', '--gen-fd', action='store', default=None, help="generate a new fd file")
+parser.add_argument('-c', '--gen-sasc', action='store', default=None, help="generate SAS C code file")
 parser.add_argument('-E', '--prefix', action='store', default='', help="add prefix to functions in C")
 args = parser.parse_args()
 
 # main loop
 files = args.files
 for fname in files:
-  fd = parse_fd(fname)
-  if fd != None:
-    code_gen = False
-    if args.gen_python:
-      generate_python_code(fd)
-      code_gen = True
-    if args.gen_c:
-      generate_c_code(fd, args.prefix)
-      code_gen = True
-    if args.gen_fd:
-      generate_fd(fd, args.add_private)
-      code_gen = True
-    if not code_gen:
-      dump(fd)
+  fd = FDFormat.read_fd(fname)
+  code_gen = False
+  if args.gen_python:
+    generate_python_code(fd, args.add_private)
+    code_gen = True
+  if args.gen_sasc:
+    generate_sasc_code(args.gen_sasc, fd, args.add_private, args.prefix)
+    code_gen = True
+  if args.gen_fd != None:
+    FDFormat.write_fd(args.gen_fd, fd, args.add_private)
+    code_gen = True
+  if not code_gen:
+    dump(fd, args.add_private)
