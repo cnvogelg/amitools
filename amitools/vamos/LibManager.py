@@ -6,8 +6,10 @@ from lib.lexec.ExecStruct import LibraryDef
 from Exceptions import *
 from Log import log_libmgr, log_lib
 from AccessStruct import AccessStruct
+import amitools.fd.FDFormat as FDFormat
 import logging
 import time
+import os
 
 class LibEntry():
   def __init__(self, name, version, addr, num_vectors, pos_size, mem, label_mgr, struct=LibraryDef, lib_class=None):
@@ -31,6 +33,7 @@ class LibEntry():
     
     self.access = AccessStruct(mem, struct, self.lib_base)
     self.label = None
+    self.fd = None # optional fd function table description
     
     # native lib only
     self.seg_list = None
@@ -45,7 +48,8 @@ class LibManager():
   op_jmp = 0x4ef9
   op_reset = 0x04e70
   
-  def __init__(self, label_mgr):
+  def __init__(self, label_mgr, data_dir):
+    self.data_dir = data_dir
     self.label_mgr = label_mgr
     self.int_lib_classes = {}
     self.int_libs = {}
@@ -228,7 +232,7 @@ class LibManager():
     lib_base = entry.lib_base
 
     # create a memory label
-    label = LabelLib(lib_name, lib_addr, entry.size, lib_base, LibraryDef)
+    label = LabelLib(lib_name, lib_addr, entry.size, lib_base, LibraryDef, entry)
     entry.label = label
     self.label_mgr.add_label(label)
   
@@ -262,6 +266,10 @@ class LibManager():
     # register lib
     self.native_libs[entry.name] = entry
     self.native_addr_map[lib_base] = entry
+
+    # try to load fd file for library
+    fd = self.load_fd(name)
+    entry.fd = fd
 
     # return MemoryLib instance
     self.lib_log("load_lib", "Loaded native '%s' V%d: base=%06x label=%s" % (lib_name, lib_version, lib_base, label))
@@ -331,6 +339,12 @@ class LibManager():
       
     # do we have a lib entry already?
     if not self.int_libs.has_key(name):
+      
+      # make sure to load fd file
+      fd = self.load_fd(name)
+      if fd == None:
+        raise VamosConfigError("Missing FD file '%s' for internal lib!" % name) 
+      
       # get memory range for lib
       lib_size = lib_class.get_total_size()     
       pos_size = lib_class.get_pos_size()
@@ -341,9 +355,10 @@ class LibManager():
       lib_addr = context.alloc.alloc_mem(lib_size)
       entry = LibEntry(name, lib_ver, lib_addr, num_vecs, pos_size, context.mem, self.label_mgr, struct, lib_class)
       lib_base = entry.lib_base
+      entry.fd = fd
       
       # create memory label
-      label = LabelLib(name, lib_addr, lib_size, lib_base, struct)
+      label = LabelLib(name, lib_addr, lib_size, lib_base, struct, entry)
       entry.label = label
       self.label_mgr.add_label(label)
 
@@ -418,4 +433,26 @@ class LibManager():
       mem.write_mem(1,addr+4,lib_id)
       addr -= 6
 
+  # ----- Helpers -----
   
+  def load_fd(self, lib_name):
+    """try to load a fd file for a library from vamos data dir"""
+    fd_name = lib_name.replace(".library","_lib.fd")
+    pos = fd_name.rfind(":")
+    if pos != -1:
+      fd_name = fd_name[pos+1:]
+    fd_file = os.path.join(self.data_dir,"fd",fd_name)
+    # try to load fd file if it exists
+    if os.path.exists(fd_file):
+      try:
+        begin = time.clock()
+        fd = FDFormat.read_fd(fd_file)
+        end = time.clock()
+        delta = end - begin
+        self.lib_log("load_lib","Loaded fd file '%s' in %fs: base='%s' #funcs=%d" % (fd_file, delta, fd.get_base_name(), len(fd.get_funcs())))
+        return fd
+      except IOError as e:
+        self.lib_log("load_lib","Failed reading fd file '%s'" % fd_file, level=logging.ERROR)
+    else:
+      self.lib_log("load_lib","No fd file found for library '%s'" % fd_file)
+    return None

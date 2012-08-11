@@ -52,7 +52,7 @@ class Vamos:
     self.seg_loader = SegmentLoader( self.mem, self.alloc, self.label_mgr, self.path_mgr )
 
     # lib manager
-    self.lib_mgr = LibManager( self.label_mgr )
+    self.lib_mgr = LibManager( self.label_mgr, cfg.data_dir )
     
     # no current process right now
     self.process = None

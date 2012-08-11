@@ -8,6 +8,7 @@
 
 import sys
 import argparse
+import os
 
 from musashi import m68k
 
@@ -76,8 +77,11 @@ class MusashiMEM(MEM):
     m68k.mem_ram_clear_block(addr,size,value)
   
 # ----- main -----------------------------------------------------------------
+# retrieve vamos home and data dir
+home_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
+data_dir = os.path.join(home_dir, "data")
 
-# --- args ---
+# --- args --
 parser = argparse.ArgumentParser()
 parser.add_argument('bin', help="AmigaOS binary to run")
 parser.add_argument('args', nargs='*', help="AmigaOS binary arguments")
@@ -99,6 +103,7 @@ parser.add_argument('-a', '--assign', action='append', default=None, help="add A
 parser.add_argument('-V', '--volume', action='append', default=None, help="define AmigaOS volume: name:/abs/sys/path")
 parser.add_argument('-A', '--auto-assign', action='store', default=None, help="define auto assign ami path, e.g. vol:/ami/path")
 parser.add_argument('-p', '--path', action='append', default=None, help="define command search ami path, e.g. c:")
+parser.add_argument('-D', '--data-dir', action='store', default=data_dir, help="set vamos data directory (default: %s)" % data_dir)
 args = parser.parse_args()
 
 # --- init config ---

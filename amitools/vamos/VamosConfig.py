@@ -53,7 +53,8 @@ class VamosConfig(ConfigParser.SafeConfigParser):
       'cycles_per_block' : int, 
       'max_cycles' : int,
       'ram_size' : int, 
-      'stack_size' : int
+      'stack_size' : int,
+      'data_dir' : str
     }
     for key in self._keys:
       setattr(self, key, None)
