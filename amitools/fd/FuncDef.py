@@ -5,6 +5,8 @@ class FuncDef:
     self.bias = bias
     self.private = private
     self.args = []
+  def __str__(self):
+    return self.get_str()
   def get_name(self):
     return self.name
   def get_bias(self):

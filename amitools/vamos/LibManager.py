@@ -343,8 +343,11 @@ class LibManager():
       # make sure to load fd file
       fd = self.load_fd(name)
       if fd == None:
-        raise VamosConfigError("Missing FD file '%s' for internal lib!" % name) 
-      
+        raise VamosConfigError("Missing FD file '%s' for internal lib!" % name)
+
+      # setup jump table of lib with fd
+      lib_class.init_jump_table(fd)
+
       # get memory range for lib
       lib_size = lib_class.get_total_size()     
       pos_size = lib_class.get_pos_size()
