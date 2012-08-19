@@ -12,6 +12,8 @@ import amitools.util.BlkDevTools as BlkDevTools
 class BlkDevFactory:
   """the block device factory opens or creates image files suitable as a block device for file system access."""
 
+  valid_extensions = ('.adf','.adz','.adf.gz','.hdf','.rdisk')
+
   TYPE_ADF = 1
   TYPE_HDF = 2
   TYPE_RDISK = 3

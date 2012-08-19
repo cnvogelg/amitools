@@ -1,0 +1,115 @@
+#!/usr/bin/env python2.7
+# xdfscan
+# quickly scan large sets of Amiga disk image files
+
+import sys
+import argparse
+import os.path
+
+from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
+from amitools.fs.Validator import Validator
+
+# ----- logging -----
+
+def pre_log_path(path, msg):
+  print("%20s:  %s  \r" % (msg, path)),
+  sys.stdout.flush()
+
+def log_path(path, msg):
+  print("%20s:  %s  " % (msg, path))
+
+# ----- scanner -----
+
+factory = BlkDevFactory()
+
+def scan(path, args):
+  if not os.path.exists(path):
+    log_path(path, "DOES NOT EXIST")
+    return 1
+  if os.path.isdir(path):
+    return scan_dir(path, args)
+  elif os.path.isfile(path):
+    return scan_file(path, args)
+  
+def scan_dir(path, args):
+  for root, dirs, files in os.walk(path):
+    for name in files:
+      ret = scan_file(os.path.join(root,name), args)
+      if ret != 0:
+        return ret
+    for name in dirs:
+      ret = scan_dir(os.path.join(root,name), args)
+      if ret != 0:
+        return ret
+  return 0
+
+def check_extension(path):
+  for a in BlkDevFactory.valid_extensions:
+    if path.endswith(a):
+      return True
+  return False
+  
+def scan_file(path, args):
+  if not check_extension(path):
+    return 0
+  try:
+    pre_log_path(path,"scan")
+    ret_code = 0
+    ret_str = ""
+    stay = True
+
+    # create a block device for image file 
+    blkdev = factory.open(path, read_only=True)
+
+    # create validator
+    v = Validator(blkdev, debug=args.debug)
+
+    # 1. check boot block
+    if v.scan_boot():
+      # 2. check root block
+      root = v.scan_root()
+      if not root:
+        # invalid root
+        ret_str = "root?"
+        if args.quick:
+          stay = False
+      if stay:
+        # 3. scan blocks: is there any chance for a file/dir?    
+        any_chance = v.scan_blocks()
+        if not any_chance:
+          stay = False
+      if stay:
+        # 4. scan dirs
+        v.scan_dirs()
+      
+    else:
+      # boot block is broken
+      ret_str = "BOOT?"
+    # report result
+    if ret_str == "":
+      ret_str = "ok"
+    log_path(path,ret_str)
+    if args.verbose:
+      v.dump_log()
+    return ret_code
+  except IOError,e:
+    if args.verbose:
+      log_path(path,"BLKDEV?")
+    return 0
+
+# ----- main -----
+parser = argparse.ArgumentParser()
+parser.add_argument('input', nargs='+', help="input image file or directory")
+parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
+parser.add_argument('-d', '--debug', action='store_true', default=False, help="show debug info")
+parser.add_argument('-q', '--quick', action='store_true', default=False, help="quick mode. faster: skip image if root is invalid")
+parser.add_argument('-r', '--repair', action='store_true', default=False, help="try to repair broken images")
+args = parser.parse_args()
+
+# main scan loop
+ret = 0
+for i in args.input:
+  ret = scan(i, args)
+  if ret != 0:
+    break
+sys.exit(ret)

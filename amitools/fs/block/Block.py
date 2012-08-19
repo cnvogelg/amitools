@@ -42,6 +42,21 @@ class Block:
     self.type = self.is_type
     self.sub_type = self.is_sub_type
   
+  def is_root_block(self):
+    return self.type == Block.T_SHORT and self.sub_type == Block.ST_ROOT
+    
+  def is_user_dir_block(self):
+    return self.type == Block.T_SHORT and self.sub_type == Block.ST_USERDIR
+  
+  def is_file_header_block(self):
+    return self.type == Block.T_SHORT and self.sub_type == Block.ST_FILE
+  
+  def is_file_list_block(self):
+    return self.type == Block.T_LIST and self.sub_type == Block.ST_FILE
+  
+  def is_file_data_block(self):
+    return self.type == Block.T_DATA
+  
   def read(self):
     self._read_data()
     self._get_types()
