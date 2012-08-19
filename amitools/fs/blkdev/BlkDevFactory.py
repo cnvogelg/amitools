@@ -33,7 +33,7 @@ class BlkDevFactory:
     if options != None:
       if options.has_key('type'):
         t = options['type'].lower()
-        if t == 'adf':
+        if t in ('adf','adz'):
           return self.TYPE_ADF
         elif t == 'hdf':
           return self.TYPE_HDF
@@ -58,7 +58,7 @@ class BlkDevFactory:
   def type_from_extension(self, img_file):
     """look at file extension for type of image"""
     ext = img_file.lower()
-    if ext.endswith('.adf'):
+    if ext.endswith('.adf') or ext.endswith('.adz') or ext.endswith('.adf.gz'):
       return self.TYPE_ADF
     elif ext.endswith(".hdf"):
       return self.TYPE_HDF

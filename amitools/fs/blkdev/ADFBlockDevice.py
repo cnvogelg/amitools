@@ -1,11 +1,14 @@
 from BlockDevice import BlockDevice
 import ctypes
+import gzip
 
 class ADFBlockDevice(BlockDevice):
   def __init__(self, adf_file, read_only=False):
     self.adf_file = adf_file
     self.read_only = read_only
     self.dirty = False
+    lo = adf_file.lower()
+    self.gzipped = lo.endswith('.adz') or lo.endswith('.adf.gz')
 
   def create(self):
     if self.read_only:
@@ -18,7 +21,10 @@ class ADFBlockDevice(BlockDevice):
   def open(self):
     self._set_geometry() # set default geometry
     # open adf file 
-    fh = file(self.adf_file, "rb")
+    if self.gzipped:
+      fh = gzip.open(self.adf_file,"rb")
+    else:
+      fh = file(self.adf_file, "rb")
     data = fh.read(self.num_bytes)
     fh.close()
     # check size
@@ -33,7 +39,10 @@ class ADFBlockDevice(BlockDevice):
   def flush(self):
     # write dirty adf
     if self.dirty and not self.read_only:
-      fh = file(self.adf_file, "wb")
+      if self.gzipped:
+        fh = gzip.open(self.adf_file,"wb")
+      else:
+        fh = file(self.adf_file, "wb")
       fh.write(self.data[:self.num_bytes])
       fh.close()
       self.dirty = False
