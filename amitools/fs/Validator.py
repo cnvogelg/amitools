@@ -6,6 +6,7 @@ from amitools.fs.block.FileHeaderBlock import FileHeaderBlock
 from amitools.fs.block.FileListBlock import FileListBlock
 from amitools.fs.block.FileDataBlock import FileDataBlock
 from amitools.fs.FSString import FSString
+from amitools.fs.FileName import FileName
 
 class ValidatorRemark:
   """A class to report the validator status"""
@@ -233,4 +234,97 @@ class Validator:
     return self.any_chance
 
   def scan_dirs(self):
-    pass
+    """Stage 4: scan through all found directories"""
+    valid_dirs = []
+    broken_dirs = []
+    # scan root dir(s)
+    for b in self.root_blocks:
+      root = self.root_blocks[b]
+      ok,dir_obj = self.scan_dir(root)
+      if ok:
+        valid_dirs.append(dir_obj)
+      else:
+        broken_dirs.append(dir_obj)
+    # scan user dirs
+    for b in self.dir_blocks:
+      user = self.dir_blocks[b]
+      ok,dir_obj = self.scan_dir(user)
+      if ok:
+        valid_dirs.append(dir_obj)
+      else:
+        broken_dirs.append(dir_obj)
+    # store result
+    self.valid_dirs = valid_dirs
+    self.broken_dirs = broken_dirs
+  
+  def scan_dir(self, dir_blk):    
+    """check a directory by scanning through the hash table entries and follow the chains
+       Returns (all_chains_ok, dir_obj)
+    """
+    # run through hash_table of directory
+    hash_val = 0
+    chains = {}
+    all_chains_ok = True
+    for blk in dir_blk.hash_table:
+      if blk != 0:
+        # build chain
+        chain = []
+        chain_terminated_ok = self.check_dir_chain(hash_val, blk, dir_blk, chain)
+        # validate chain
+        all_parent_ok = True
+        all_hash_ok = True
+        for c in chain:
+          if not c[1]:
+            all_parent_ok = False
+          if not c[2]:
+            all_hash_ok = False
+        chain_ok = chain_terminated_ok and all_parent_ok and all_hash_ok
+        # store chain result in map for hash
+        chains[hash_val] = (chain, chain_terminated_ok, all_parent_ok, all_hash_ok, chain_ok)
+        all_chains_ok = all_chains_ok and chain_ok
+      hash_val += 1
+    # create a dir object
+    dir_obj = { 'chains':chains, 'dir_blk':dir_blk }
+    return (all_chains_ok, dir_obj)
+    
+  def check_dir_chain(self, hash_val, blk_num, dir_blk, chain):
+    """check the blocks along a chain.
+       Return True if the chain is terminated correctly.
+       Store (blk, parent_ok, name_hash_ok) tuples in chain list to show valid parents.
+    """
+    dir_blk_num = dir_blk.blk_num
+    if blk_num in self.dir_blocks:
+      # is a directory block in chain
+      blk = self.dir_blocks[blk_num]
+    elif blk_num in self.file_hdr_blocks:
+      # is a file block in chain
+      blk = self.file_hdr_blocks[blk_num]
+    else:
+      # unknown entry
+      dir_name = FSString(dir_blk.name)
+      self.log(ValidatorRemark.ERROR, "invalid block terminates chain #%d of dir '%s' (%d)" % (hash_val, dir_name, dir_blk_num), blk_num)
+      return False
+    
+    # check parent of block
+    name = FSString(blk.name)
+    parent_blk = blk.parent
+    parent_ok = (parent_blk == dir_blk_num)
+    if not parent_ok:
+      self.log(ValidatorRemark.ERROR, "invalid parent in '%s' chain #%d of dir '%s' (%d)" % (name, hash_val, dir_name, dir_blk_num), blk_num)
+
+    # check name hash
+    fn = FileName(name)
+    fn_hash = fn.hash()
+    fn_hash_ok = (fn_hash == hash_val)
+    if not fn_hash_ok:
+      self.log(ValidatorRemark.ERROR, "invalid name hash in '%s' chain #%d of dir '%s' (%d)" % (name, hash_val, dir_name, dir_blk_num), blk_num)      
+
+    # store in chain: blk and parent_ok
+    chain.append((blk, parent_ok, fn_hash_ok))
+      
+    # check next block in chain
+    next_blk = blk.hash_chain
+    if next_blk != 0:
+      return self.check_dir_chain(hash_val, next_blk, dir_blk, chain)
+    else:  
+      return True
