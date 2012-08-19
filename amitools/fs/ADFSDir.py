@@ -295,14 +295,14 @@ class ADFSDir(ADFSNode):
     self.ensure_entries()
     return sorted(self.entries, key=lambda x : x.name.get_upper_ami_str())
     
-  def list(self, indent=0, all=False, detail=False):
-    ADFSNode.list(self, indent, all, detail)
+  def list(self, indent=0, all=False, detail=False, encoding="UTF-8"):
+    ADFSNode.list(self, indent, all, detail, encoding)
     if not all and indent > 0:
       return
     self.ensure_entries()
     es = self.get_entries_sorted_by_name()
     for e in es:
-      e.list(indent=indent+1, all=all, detail=detail)
+      e.list(indent=indent+1, all=all, detail=detail, encoding=encoding)
     
   def get_path(self, pc, allow_file=True, allow_dir=True):
     if len(pc) == 0:

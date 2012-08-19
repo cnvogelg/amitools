@@ -65,7 +65,7 @@ class Repacker:
       self.repack_node(e, out_root) 
   
   def repack_node(self, in_node, out_dir):
-    name = in_node.get_file_name_str()
+    name = in_node.get_file_name().get_name()
     meta_info = in_node.get_meta_info()
     # sub dir
     if in_node.is_dir():

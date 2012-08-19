@@ -42,7 +42,7 @@ class ADFSVolume:
       self.root = RootBlock(self.blkdev, self.boot.calc_root_blk)
       self.root.read()
       if self.root.valid:
-        self.name = self.root.name
+        self.name = FSString(self.root.name)
         # build meta info
         self.meta_info = RootMetaInfo( self.root.create_ts, self.root.disk_ts, self.root.mod_ts )
         # create root dir
@@ -58,12 +58,6 @@ class ADFSVolume:
       raise FSError(INVALID_BOOT_BLOCK, block=self.boot)
   
   def create(self, name, meta_info=None, dos_type=None, boot_code=None, is_ffs=False, is_intl=False, is_dircache=False):
-    # convert and check volume name
-    if not isinstance(name, FSString):
-      raise ValueError("create's name must be a FSString")
-    fn = FileName(name, is_intl=is_intl)
-    if not fn.is_valid():
-      raise FSError(INVALID_VOLUME_NAME, file_name=name, node=self)
     # determine dos_type
     if dos_type == None:
       dos_type = DosType.DOS0
@@ -73,12 +67,19 @@ class ADFSVolume:
         dos_type |= DosType.DOS_MASK_DIRCACHE
       elif is_intl:
         dos_type |= DosType.DOS_MASK_INTL
-    # create a boot block
-    self.boot = BootBlock(self.blkdev, )
-    self.boot.create(dos_type=dos_type, boot_code=boot_code)
+    # update flags
     self.is_ffs = DosType.is_ffs(dos_type)
     self.is_intl = DosType.is_intl(dos_type)
     self.is_dircache = DosType.is_dircache(dos_type)
+    # convert and check volume name
+    if not isinstance(name, FSString):
+      raise ValueError("create's name must be a FSString")
+    fn = FileName(name, is_intl=self.is_intl)
+    if not fn.is_valid():
+      raise FSError(INVALID_VOLUME_NAME, file_name=name, node=self)
+    # create a boot block
+    self.boot = BootBlock(self.blkdev)
+    self.boot.create(dos_type=dos_type, boot_code=boot_code)
     self.boot.write()
     # create a root block
     self.root = RootBlock(self.blkdev, self.boot.calc_root_blk)
@@ -296,11 +297,11 @@ class ADFSVolume:
     # check file path
     fn = FileName(ami_path, is_intl=self.is_intl)
     if not fn.is_valid():
-      raise FSError(INVALID_FILE_NAME, file_name=file_name)
+      raise FSError(INVALID_FILE_NAME, file_name=ami_path)
     # split into dir and base name
     dir_name, base_name = fn.get_dir_and_base_name()
     if base_name == None:
-      raise FSError(INVALID_FILE_NAME, file_name=file_name)
+      raise FSError(INVALID_FILE_NAME, file_name=ami_path)
     # find parent of dir
     if dir_name == None:
       node = self.root_dir

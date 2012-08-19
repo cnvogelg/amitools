@@ -1,5 +1,6 @@
 from ADFSDir import ADFSDir
 from MetaInfo import MetaInfo
+import DosType
 
 class ADFSVolDir(ADFSDir):
   def __init__(self, volume, root_block):
@@ -26,4 +27,9 @@ class ADFSVolDir(ADFSDir):
   
   def can_delete(self):
     return False
+
+  def get_list_str(self, indent=0, all=False, detail=False):
+    a = ADFSDir.get_list_str(self, indent=indent, all=all, detail=detail)
+    a += DosType.get_dos_type_str(self.volume.get_dos_type())
+    return a
 

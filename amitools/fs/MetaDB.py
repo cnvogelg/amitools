@@ -4,6 +4,7 @@ from ProtectFlags import ProtectFlags
 from TimeStamp import TimeStamp
 from amitools.fs.block.BootBlock import BootBlock
 import DosType
+from FSString import FSString
 
 class MetaDB:
   def __init__(self):
@@ -19,6 +20,8 @@ class MetaDB:
     return self.vol_meta
   
   def set_volume_name(self, name):
+    if type(name) != unicode:
+      raise ValueError("set_volume_name must be unicode")
     self.vol_name = name
   
   def get_volume_name(self):
@@ -31,6 +34,8 @@ class MetaDB:
     return self.dos_type
   
   def set_meta_info(self, path, meta_info):
+    if type(path) != unicode:
+      raise ValueError("set_meta_info: path must be unicode")
     self.metas[path] = meta_info
   
   def get_meta_info(self, path):
@@ -38,6 +43,13 @@ class MetaDB:
       return self.metas[path]
     else:
       return None
+  
+  def dump(self):
+    print self.vol_name, self.vol_meta, self.dos_type
+    for m in self.metas:
+      print m
+  
+  # ----- load -----
     
   def load(self, file_path):
     self.metas = {}
@@ -56,7 +68,8 @@ class MetaDB:
     if pos == -1:
       raise IOError("Invalid xdfmeta header! (no colon in line)")
     # first extract volume name
-    self.vol_name = line[:pos]
+    vol_name = line[:pos]
+    self.vol_name = vol_name.decode("UTF-8")
     line = line[pos+1:]
     # now get parameters
     comp = line.split(',')
@@ -87,7 +100,7 @@ class MetaDB:
     pos = line.find(':')
     if pos == -1:
       raise IOError("Invalid xdfmeta file! (no colon in line)")
-    path = line[:pos]
+    path = line[:pos].decode("UTF-8")
     # prot
     line = line[pos+1:]
     pos = line.find(',')
@@ -105,25 +118,29 @@ class MetaDB:
     time = TimeStamp()
     time.parse(time_str)
     # comment
-    comment = line[pos+1:]
+    comment = FSString(line[pos+1:].decode("UTF-8"))
     # meta info
     mi = MetaInfo(protect_flags=prot, mod_ts=time, comment=comment)
     self.set_meta_info(path, mi)
-    
+  
+  # ----- save -----
+  
   def save(self, file_path):
     f = open(file_path, "w")
     # header
     mi = self.vol_meta
     num = self.dos_type - DosType.DOS0 + ord('0')
     dos_type_str = "DOS%c" % num
-    line = "%s:%s,%s,%s,%s\n" % (self.vol_name, dos_type_str, mi.get_create_ts(), mi.get_disk_ts(), mi.get_mod_ts())
+    vol_name = self.vol_name.encode("UTF-8")
+    line = "%s:%s,%s,%s,%s\n" % (vol_name, dos_type_str, mi.get_create_ts(), mi.get_disk_ts(), mi.get_mod_ts())
     f.write(line)
     # entries
     for path in sorted(self.metas):
       meta_info = self.metas[path]
       protect = meta_info.get_protect_short_str()
       mod_time = meta_info.get_mod_time_str()
-      comment = meta_info.get_comment_str()
-      line = "%s:%s,%s,%s\n" % (path, protect, mod_time, comment)
+      comment = meta_info.get_comment_unicode_str().encode("UTF-8")
+      path_name = path.encode("UTF-8")
+      line = "%s:%s,%s,%s\n" % (path_name, protect, mod_time, comment)
       f.write(line)
     f.close()

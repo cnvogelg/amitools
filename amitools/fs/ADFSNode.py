@@ -29,8 +29,8 @@ class ADFSNode:
   def create_meta_info(self):
     self.meta_info = MetaInfo(self.block.protect, self.block.mod_ts, FSString(self.block.comment))
 
-  def get_file_name_str(self):
-    return self.name.name
+  def get_file_name(self):
+    return self.name
 
   def delete(self, wipe=False, all=False, update_ts=True):
     if all:
@@ -49,7 +49,7 @@ class ADFSNode:
     # dircache?
     rebuild_dircache = False
     if self.volume.is_dircache and self.parent != None:
-      record = self.parent.get_dircache_record(self.get_file_name_str())
+      record = self.parent.get_dircache_record(self.name.get_ami_str_name())
       if record == None:
         raise FSError(INTERNAL_ERROR, node=self)
     else:
@@ -109,13 +109,16 @@ class ADFSNode:
     t.parse(tm_str)
     self.change_meta_info(MetaInfo(mod_ts=t))
 
-  def list(self, indent=0, all=False, detail=False):
+  def get_list_str(self, indent=0, all=False, detail=False):
     istr = u'  ' * indent
     if detail:
       extra = self.get_detail_str()
     else:
       extra = self.meta_info.get_str_line()
-    print(u'%-40s       %8s  %s' % (istr + self.name.get_unicode_name(), self.get_size_str(), extra))
+    return u'%-40s       %8s  %s' % (istr + self.name.get_unicode_name(), self.get_size_str(), extra)
+    
+  def list(self, indent=0, all=False, detail=False, encoding="UTF-8"):
+    print(self.get_list_str(indent=indent, all=all, detail=detail).encode(encoding))
 
   def get_size_str(self):
     # re-implemented in derived classes!
@@ -143,12 +146,12 @@ class ADFSNode:
       if not with_vol:
         return []
       r = []
-    r.append(self.name.name)
+    r.append(self.name.get_unicode_name())
     return r
 
   def get_node_path_name(self, with_vol=False):
     r = self.get_node_path()
-    return "/".join(r)
+    return FSString(u"/".join(r))
 
   def get_detail_str(self):
     return ""

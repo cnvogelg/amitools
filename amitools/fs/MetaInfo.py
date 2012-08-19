@@ -41,10 +41,6 @@ class MetaInfo:
     else:
       return ""
       
-  def get_comment(self):
-    """Return comment string as a FSString""" 
-    return self.comment
-  
   def set_protect(self, protect):
     self.protect = protect
     if self.protect != None:
@@ -105,3 +101,9 @@ class MetaInfo:
       return self.comment.get_ami_str()
     else:
       return ""
+  
+  def get_comment_unicode_str(self):
+    if self.comment != None:
+      return self.comment.get_unicode()
+    else:
+      return u""

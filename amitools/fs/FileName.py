@@ -62,8 +62,6 @@ class FileName:
       o = ord(c)
       if o == ':' or o == '/':
         return False
-      if not self.is_intl and o > 127:
-        return False
     return True
   
   def hash(self, hash_size=72):

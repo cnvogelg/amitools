@@ -1,5 +1,8 @@
 import os
 import os.path
+import sys
+import unicodedata
+
 from ADFSDir import ADFSDir
 from ADFSFile import ADFSFile
 from ADFSVolume import ADFSVolume
@@ -9,25 +12,47 @@ from amitools.fs.block.BootBlock import BootBlock
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 import amitools.util.KeyValue as KeyValue
+from FSString import FSString
 
 class Imager:
-  def __init__(self):
+  def __init__(self, path_encoding=None):
     self.meta_db = None
     self.total_bytes = 0
+    self.path_encoding = path_encoding
+    # get path name encoding for host file system
+    if self.path_encoding == None:
+      self.path_encoding = sys.getfilesystemencoding()
 
   def get_total_bytes(self):
     return self.total_bytes
+
+  def to_path_str(self, u):
+    """convert a unicode string to OS path name encoding"""
+    if type(u) != unicode:
+      raise ValueError("to_path_str: must pass a unicode string")
+    return u.encode(self.path_encoding)
+    
+  def from_path_str(self, s):
+    """convert a OS path name encoded string to unicode"""
+    if type(s) != str:
+      raise ValueError("from_path_str: must pass a string")
+    u = s.decode(self.path_encoding)
+    # on Mac OS X normalize from decomposed form
+    if sys.platform.startswith('darwin'):
+      return unicodedata.normalize('NFC',u)
+    else:
+      return u
 
   # ----- unpack -----
   
   def unpack(self, volume, out_path):
     # check for volume path
-    vol_name = volume.name
+    vol_name = volume.name.get_unicode()
     if not os.path.exists(out_path):
       vol_path = out_path
     else:
       path = os.path.abspath(out_path)
-      vol_path = os.path.join(path, vol_name)
+      vol_path = os.path.join(path, self.to_path_str(vol_name))
     if os.path.exists(vol_path):
       raise IOError("Unpack directory already exists: "+vol_path)
     # check for meta file
@@ -42,7 +67,7 @@ class Imager:
     self.meta_db = MetaDB()
     self.unpack_root(volume, vol_path)
     # save meta db
-    self.meta_db.set_volume_name(volume.name)
+    self.meta_db.set_volume_name(volume.name.get_unicode())
     self.meta_db.set_root_meta_info(volume.get_meta_info())
     self.meta_db.set_dos_type(volume.boot.dos_type)
     self.meta_db.save(meta_path)
@@ -67,14 +92,15 @@ class Imager:
       self.unpack_node(e, path)
   
   def unpack_node(self, node, path):
-    name = node.name.name
+    name = node.name.get_unicode_name()
     # store meta info
     if self.meta_db != None:
+      # get path as FSString
       node_path = node.get_node_path_name()
-      self.meta_db.set_meta_info(node_path, node.meta_info)
+      self.meta_db.set_meta_info(node_path.get_unicode(), node.meta_info)
     # sub dir
     if node.is_dir():
-      sub_dir = os.path.join(path, name)
+      sub_dir = os.path.join(path, self.to_path_str(name))
       os.mkdir(sub_dir)
       for sub_node in node.get_entries():
         self.unpack_node(sub_node, sub_dir)
@@ -83,7 +109,7 @@ class Imager:
     elif node.is_file():
       data = node.get_file_data()
       node.flush()
-      file_path = os.path.join(path, name)
+      file_path = os.path.join(path, self.to_path_str(name))
       fh = open(file_path, "wb")
       fh.write(data)
       fh.close()
@@ -110,7 +136,7 @@ class Imager:
     if os.path.exists(meta_path):
       self.meta_db = MetaDB()
       self.meta_db.load(meta_path)
-  
+      
   def pack_end(self, in_path, volume):
     boot_code_path = in_path + ".bootcode"
     if os.path.exists(boot_code_path):
@@ -151,11 +177,11 @@ class Imager:
       # remove trailing slash
       if in_path[-1] == '/':
         in_path = in_path[:-1]
-      name = os.path.basename(in_path)
+      name = self.from_path_str(os.path.basename(in_path))
       meta_info = None
       dos_type = DosType.DOS0
     volume = ADFSVolume(blkdev)
-    volume.create(name, meta_info, dos_type=dos_type)
+    volume.create(FSString(name), meta_info, dos_type=dos_type)
     return volume
   
   def pack_root(self, in_path, volume):
@@ -170,21 +196,21 @@ class Imager:
       self.pack_entry(sub_path, parent_node)
       
   def pack_entry(self, in_path, parent_node):
-    ami_name = os.path.basename(in_path)
+    ami_name = self.from_path_str(os.path.basename(in_path))
     # retrieve meta info for path from DB
     if self.meta_db != None:
-      ami_path = parent_node.get_node_path_name()
-      if ami_path != "":
-        ami_path += "/" + ami_name
+      ami_path = parent_node.get_node_path_name().get_unicode()
+      if ami_path != u"":
+        ami_path += u"/" + ami_name
       else:
         ami_path = ami_name
       meta_info = self.meta_db.get_meta_info(ami_path)
     else:
-      meta_info = None    
+      meta_info = None
 
     # pack directory
     if os.path.isdir(in_path):
-      node = parent_node.create_dir(ami_name, meta_info, False)
+      node = parent_node.create_dir(FSString(ami_name), meta_info, False)
       for name in os.listdir(in_path):
         sub_path = os.path.join(in_path, name)
         self.pack_entry(sub_path, node)
@@ -195,6 +221,6 @@ class Imager:
       fh = open(in_path, "rb")
       data = fh.read()
       fh.close()
-      node = parent_node.create_file(ami_name, data, meta_info, False)
+      node = parent_node.create_file(FSString(ami_name), data, meta_info, False)
       node.flush()
       self.total_bytes += len(data)
