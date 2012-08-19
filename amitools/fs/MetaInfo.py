@@ -1,5 +1,6 @@
 from ProtectFlags import *
 from TimeStamp import *
+from FSString import FSString
 
 class MetaInfo:
   def __init__(self, protect=None, mod_ts=None, comment=None, protect_flags=None):
@@ -10,12 +11,17 @@ class MetaInfo:
     self.set_mod_ts(mod_ts)
     self.set_comment(comment)
   
-  def __str__(self):
+  def get_str_line(self):
+    """Return a unicode string with protect flags, mod time and (optional) comment"""
     res = []
     res.append(self.get_protect_str())
     res.append(self.get_mod_time_str())
-    res.append(self.get_comment_str())
-    return "  ".join(res)
+    comment = self.get_comment()
+    if comment == None:
+      res.append(u'')
+    else:
+      res.append(self.get_comment().get_unicode())
+    return u'  '.join(res)
     
   def get_mod_time_str(self):
     if self.mod_ts != None:
@@ -35,11 +41,9 @@ class MetaInfo:
     else:
       return ""
       
-  def get_comment_str(self):
-    if self.comment != None:
-      return self.comment
-    else:
-      return ""
+  def get_comment(self):
+    """Return comment string as a FSString""" 
+    return self.comment
   
   def set_protect(self, protect):
     self.protect = protect
@@ -76,6 +80,9 @@ class MetaInfo:
       self.mod_time = None
   
   def set_comment(self, comment):
+    """Set comment as a FSString"""
+    if comment != None and not isinstance(comment, FSString):
+      raise ValueError("Comment must be a FSString")
     self.comment = comment
   
   def get_protect(self):
@@ -89,7 +96,12 @@ class MetaInfo:
 
   def get_mod_ts(self):
     return self.mod_ts
-  
+
   def get_comment(self):
     return self.comment
 
+  def get_comment_ami_str(self):
+    if self.comment != None:
+      return self.comment.get_ami_str()
+    else:
+      return ""

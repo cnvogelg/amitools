@@ -6,6 +6,7 @@ from ADFSFile import ADFSFile
 from ADFSNode import ADFSNode
 from FileName import FileName
 from FSError import *
+from FSString import FSString
 from MetaInfo import *
 
 class ADFSDir(ADFSNode):
@@ -114,10 +115,10 @@ class ADFSDir(ADFSNode):
   
   def has_name(self, fn):
     fn_hash = fn.hash()
-    fn_up = fn.to_upper()
+    fn_up = fn.get_upper_ami_str()
     node_list = self.name_hash[fn_hash]
     for node in node_list:
-      if node.name.to_upper() == fn_up:
+      if node.name.get_upper_ami_str() == fn_up:
         return True
     return False
   
@@ -126,7 +127,7 @@ class ADFSDir(ADFSNode):
     blkdev = self.blkdev
     # create a UserDirBlock
     ud = UserDirBlock(blkdev, blk_num)
-    ud.create(parent_blk, name, meta_info.get_protect(), meta_info.get_comment(), meta_info.get_mod_ts(), hash_chain_blk)
+    ud.create(parent_blk, name.get_ami_str(), meta_info.get_protect(), meta_info.get_comment_ami_str(), meta_info.get_mod_ts(), hash_chain_blk)
     ud.write()    
     self.set_block(ud)
     self._init_name_hash()
@@ -197,11 +198,15 @@ class ADFSDir(ADFSNode):
     self.change_meta_info(mi)
         
   def create_dir(self, name, meta_info=None, update_ts=True):
+    if not isinstance(name, FSString):
+      raise ValueError("create_dir's name must be a FSString")
     node = ADFSDir(self.volume, self)
     self._create_node(node, name, meta_info, update_ts)
     return node
   
   def create_file(self, name, data, meta_info=None, update_ts=True):
+    if not isinstance(name, FSString):
+      raise ValueError("create_file's name must be a FSString")
     node = ADFSFile(self.volume, self) 
     node.set_file_data(data)
     self._create_node(node, name, meta_info, update_ts) 
@@ -215,9 +220,9 @@ class ADFSDir(ADFSNode):
       raise FSError(DELETE_NOT_ALLOWED, node=node)
     # make sure its a node of mine
     if node.parent != self:
-      raise FSError(INTERNAL_ERROR, node=node)
+      raise FSError(INTERNAL_ERROR, node=node, extra="node parent is not me")
     if node not in self.entries:
-      raise FSError(INTERNAL_ERROR, node=node)      
+      raise FSError(INTERNAL_ERROR, node=node, extra="node not in entries")      
     # get hash key
     hash_key = node.name.hash()
     names = self.name_hash[hash_key]
@@ -229,7 +234,7 @@ class ADFSDir(ADFSNode):
         break
     # hmm not found?!
     if pos == None:
-      raise FSError(INTERNAL_ERROR, node=node)
+      raise FSError(INTERNAL_ERROR, node=node, extra="node not found in hash chain")
     # find prev and next in hash list
     if pos > 0:
       prev = names[pos-1]
@@ -288,7 +293,7 @@ class ADFSDir(ADFSNode):
 
   def get_entries_sorted_by_name(self):
     self.ensure_entries()
-    return sorted(self.entries, key=lambda x : x.name.to_upper())
+    return sorted(self.entries, key=lambda x : x.name.get_upper_ami_str())
     
   def list(self, indent=0, all=False, detail=False):
     ADFSNode.list(self, indent, all, detail)
@@ -304,7 +309,9 @@ class ADFSDir(ADFSNode):
       return self
     self.ensure_entries()
     for e in self.entries:
-      if e.name.to_upper() == pc[0].to_upper():
+      if not isinstance(pc[0], FileName):
+        raise ValueError("get_path's pc must be a FileName array")
+      if e.name.get_upper_ami_str() == pc[0].get_upper_ami_str():
         if len(pc) > 1:
           if isinstance(e, ADFSDir):
             return e.get_path(pc[1:], allow_file, allow_dir)

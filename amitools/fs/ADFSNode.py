@@ -3,6 +3,7 @@ from MetaInfo import MetaInfo
 from ProtectFlags import ProtectFlags
 from TimeStamp import TimeStamp
 from FSError import *
+from FSString import FSString
 import amitools.util.ByteSize as ByteSize
 
 class ADFSNode:
@@ -21,12 +22,12 @@ class ADFSNode:
   
   def set_block(self, block):  
     self.block = block
-    self.name = FileName(self.block.name)
+    self.name = FileName(FSString(self.block.name), is_intl=self.volume.is_intl)
     self.valid = True
     self.create_meta_info()
     
   def create_meta_info(self):
-    self.meta_info = MetaInfo(self.block.protect, self.block.mod_ts, self.block.comment)
+    self.meta_info = MetaInfo(self.block.protect, self.block.mod_ts, FSString(self.block.comment))
 
   def get_file_name_str(self):
     return self.name.name
@@ -75,12 +76,12 @@ class ADFSNode:
     # alter comment
     comment = meta_info.get_comment()
     if comment != None and hasattr(self.block, "comment"):
-      self.block.comment = comment
+      self.block.comment = comment.get_ami_str()
       self.meta_info.set_comment(comment)
       dirty = True
       if record != None:
         rebuild_dircache = len(record.comment) < comment 
-        record.comment = comment
+        record.comment = comment.get_ami_str()
     
     # really need update?
     if dirty:
@@ -109,12 +110,12 @@ class ADFSNode:
     self.change_meta_info(MetaInfo(mod_ts=t))
 
   def list(self, indent=0, all=False, detail=False):
-    istr = "  " * indent
+    istr = u'  ' * indent
     if detail:
       extra = self.get_detail_str()
     else:
-      extra = str(self.meta_info)
-    print "%-40s       %8s  %s" % (istr + self.block.name, self.get_size_str(), extra)
+      extra = self.meta_info.get_str_line()
+    print(u'%-40s       %8s  %s' % (istr + self.name.get_unicode_name(), self.get_size_str(), extra))
 
   def get_size_str(self):
     # re-implemented in derived classes!

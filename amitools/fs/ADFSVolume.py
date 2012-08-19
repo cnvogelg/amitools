@@ -5,12 +5,12 @@ from ADFSBitmap import ADFSBitmap
 from FileName import FileName
 from RootMetaInfo import RootMetaInfo
 from FSError import *
+from FSString import FSString
 from TimeStamp import TimeStamp
 import DosType
 import amitools.util.ByteSize as ByteSize
 
 class ADFSVolume:
-  root_path_aliases = ("", "/", ":")
   
   def __init__(self, blkdev):
     self.blkdev = blkdev
@@ -58,6 +58,12 @@ class ADFSVolume:
       raise FSError(INVALID_BOOT_BLOCK, block=self.boot)
   
   def create(self, name, meta_info=None, dos_type=None, boot_code=None, is_ffs=False, is_intl=False, is_dircache=False):
+    # convert and check volume name
+    if not isinstance(name, FSString):
+      raise ValueError("create's name must be a FSString")
+    fn = FileName(name, is_intl=is_intl)
+    if not fn.is_valid():
+      raise FSError(INVALID_VOLUME_NAME, file_name=name, node=self)
     # determine dos_type
     if dos_type == None:
       dos_type = DosType.DOS0
@@ -85,7 +91,7 @@ class ADFSVolume:
     disk_ts = meta_info.get_disk_ts()
     mod_ts = meta_info.get_mod_ts()
     self.meta_info = meta_info
-    self.root.create(name, create_ts, disk_ts, mod_ts)
+    self.root.create(name.get_ami_str(), create_ts, disk_ts, mod_ts)
     self.name = name
     # create bitmap
     self.bitmap = ADFSBitmap(self.root)
@@ -117,45 +123,71 @@ class ADFSVolume:
     res.append("free:   %10d  %s  %12d  %5.2f%%" % (free, ByteSize.to_byte_size_str(bfree), bfree, prc_free / 100.0))
     return res
 
+  # ----- Path Queries -----
+
   def get_path_name(self, path_name, allow_file=True, allow_dir=True):
-    if path_name in self.root_path_aliases:
+    """get node for given path"""
+    # make sure path name is a FSString
+    if not isinstance(path_name, FSString):
+      raise ValueError("get_path_name's path must be a FSString")
+    # create and check file name
+    fn = FileName(path_name, is_intl=self.is_intl)
+    if not fn.is_valid():
+      raise FSError(INVALID_FILE_NAME, file_name=path_name, node=self)      
+    # find node
+    if fn.is_root_path_alias():
+      # its the root node
       return self.root_dir
-    pc = path_name.split("/")
-    fn = []
-    for path in pc:
-      fn.append(FileName(path))
-    return self.root_dir.get_path(fn, allow_file, allow_dir)
+    else:
+      # find a sub node
+      path = fn.split_path()
+      return self.root_dir.get_path(path, allow_file, allow_dir)
 
   def get_dir_path_name(self, path_name):
+    """get node for given path and ensure its a directory"""
     return self.get_path_name(path_name, allow_file=False)
   
   def get_file_path_name(self, path_name):
+    """get node for given path and ensure its a file"""
     return self.get_path_name(path_name, allow_dir=False)
   
   def get_create_path_name(self, path_name, suggest_name=None):
     """get a parent node and path name for creation
        return: parent_node_or_none, file_name_or_none
     """
-    if path_name in self.root_path_aliases:
+    # make sure input is correct
+    if not isinstance(path_name, FSString):
+      raise ValueError("get_create_path_name's path_name must be a FSString")
+    if suggest_name != None and not isinstance(suggest_name, FSString):
+      raise ValueError("get_create_path_name's suggest_name must be a FSString")
+    # is root path?
+    fn = FileName(path_name, is_intl=self.is_intl)
+    if not fn.is_valid():
+      raise FSError(INVALID_FILE_NAME, file_name=path_name, node=self)      
+    # find node
+    if fn.is_root_path_alias():
       return self.root_dir, suggest_name
     else:
       # try to get path_name as a directory
       node = self.get_dir_path_name(path_name)
       if node != None:
         return node, suggest_name
-      # is a file name appended?
-      pos = path_name.rfind('/')
-      if pos != -1:
-        dir_name = path_name[0:pos]
-        file_name = path_name[pos+1:]
-        if len(file_name) == 0:
-          file_name = suggest_name
-        node = self.get_dir_path_name(dir_name)
-        return node, file_name
       else:
-        # its a file name
-        return self.root_dir, path_name
-  
+        # split into dir and file name
+        dn, fn = fn.get_dir_and_base_name()
+        if dn != None:
+          # has a directory -> try to fetch it
+          node = self.get_dir_path_name(dn)
+        else:
+          # no dir -> assume root dir
+          node = self.root_dir
+        if fn != None:
+          # take given name
+          return node, fn
+        else:
+          # use suggested name
+          return node, suggest_name
+    
   # ----- convenience API -----
   
   def get_volume_name(self):
@@ -239,28 +271,50 @@ class ADFSVolume:
     t.parse(mod_ts_str)
     return self.change_meta_info(RootMetaInfo(mod_ts=t))    
 
-  def relabel(self, new_name):
-    fn = FileName(new_name, is_intl=self.is_intl)
+  def relabel(self, name):
+    """Relabel the volume"""
+    # make sure its a FSString
+    if not isinstance(name, FSString):
+      raise ValueError("relabel's name must be a FSString")
+    # validate file name
+    fn = FileName(name, is_intl=self.is_intl)
     if not fn.is_valid():
-      raise FSError(INVALID_VOLUME_NAME, file_name=new_name, node=self)
-    self.root.name = new_name
+      raise FSError(INVALID_VOLUME_NAME, file_name=name, node=self)
+    # update root block
+    ami_name = name.get_ami_str()
+    self.root.name = ami_name
     self.root.write()
-    self.name = new_name
-    self.root_dir.name = new_name
+    # store internally
+    self.name = name
+    self.root_dir.name = name
 
   def create_dir(self, ami_path):
-    pc = ami_path.split("/")
-    # no directory given
-    if len(pc) == 0:
-      raise FSError(INVALID_PARENT_DIRECTORY, file_name=ami_path)
-    # no parent dir found
-    node = self.get_dir_path_name("/".join(pc[:-1]))
-    if node == None:
-      raise FSError(INVALID_PARENT_DIRECTORY, file_name=ami_path)
-    node.create_dir(pc[-1])
+    """Create a new directory"""
+    # make sure its a FSString
+    if not isinstance(ami_path, FSString):
+      raise ValueError("create_dir's ami_path must be a FSString")
+    # check file path
+    fn = FileName(ami_path, is_intl=self.is_intl)
+    if not fn.is_valid():
+      raise FSError(INVALID_FILE_NAME, file_name=file_name)
+    # split into dir and base name
+    dir_name, base_name = fn.get_dir_and_base_name()
+    if base_name == None:
+      raise FSError(INVALID_FILE_NAME, file_name=file_name)
+    # find parent of dir
+    if dir_name == None:
+      node = self.root_dir
+    else:
+      # no parent dir found
+      node = self.get_dir_path_name(dir_name)
+      if node == None:
+        raise FSError(INVALID_PARENT_DIRECTORY, file_name=ami_path, extra="not found: "+dir_name)
+    node.create_dir(base_name)
     
-  def write_file(self, data, ami_path=None, file_name=None, cache=False):
-    parent_node, file_name = self.get_create_path_name(ami_path, file_name)
+  def write_file(self, data, ami_path, suggest_name=None, cache=False):
+    """Write given data as a file"""
+    # get parent node and file_name
+    parent_node, file_name = self.get_create_path_name(ami_path, suggest_name)
     if parent_node == None:
       raise FSError(INVALID_PARENT_DIRECTORY, file_name=ami_path)
     if file_name == None:
@@ -271,6 +325,8 @@ class ADFSVolume:
       node.flush()
   
   def read_file(self, ami_path, cache=False):
+    """Read a file and return data"""
+    # get node of file
     node = self.get_file_path_name(ami_path)
     if node == None:
       raise FSError(FILE_NOT_FOUND, file_name=ami_path)
@@ -280,6 +336,7 @@ class ADFSVolume:
     return data
   
   def delete(self, ami_path, wipe=False, all=False):
+    """Delete a file or directory at given path"""
     node = self.get_path_name(ami_path)
     if node == None:
       raise FSError(FILE_NOT_FOUND, file_name=ami_path)

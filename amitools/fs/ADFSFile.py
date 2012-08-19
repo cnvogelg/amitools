@@ -177,7 +177,8 @@ class ADFSFile(ADFSNode):
     else:
       hdr_blks = self.data_blk_nums
       hdr_ext = 0
-    fhb.create(parent_blk, name, hdr_blks, hdr_ext, byte_size, meta_info.get_protect(), meta_info.get_comment(), meta_info.get_mod_ts(), hash_chain_blk)
+      
+    fhb.create(parent_blk, name.get_ami_str(), hdr_blks, hdr_ext, byte_size, meta_info.get_protect(), meta_info.get_comment_ami_str(), meta_info.get_mod_ts(), hash_chain_blk)
     fhb.write() 
     self.set_block(fhb)
     

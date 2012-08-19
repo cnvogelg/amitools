@@ -18,6 +18,11 @@ from amitools.util.HexDump import *
 from amitools.util.DisAsm import DisAsm
 import amitools.util.KeyValue as KeyValue
 from amitools.fs.rdb.RDisk import RDisk
+from amitools.fs.FSString import FSString
+
+# system encoding
+def make_fsstr(s):
+  return FSString(s.decode(sys.stdout.encoding))
 
 # ----- commands -----
 class Command:
@@ -79,11 +84,11 @@ class FSCommandQueue(CommandQueue):
       exit_code = CommandQueue.run(self)
     except FSError as e:
       cmd = "'%s'" % " ".join(self.cmd_line)
-      print cmd,"FSError:",str(e)
+      print cmd,"FSError:",e
       exit_code = 3
     except IOError as e:
       cmd = "'%s'" % " ".join(self.cmd_line)
-      print cmd,"IOError:",str(e)
+      print cmd,"IOError:",e
       exit_code = 4
     finally:
       # close volume
@@ -203,7 +208,7 @@ class FormatCmd(Command):
       is_ffs = "ffs" in self.opts
       is_intl = "intl" in self.opts
       is_dircache = "dircache" in self.opts
-      vol_name = self.opts[0]
+      vol_name = make_fsstr(self.opts[0])
       vol.create(vol_name, is_ffs=is_ffs, is_intl=is_intl, is_dircache=is_dircache)
       return vol
 
@@ -287,7 +292,8 @@ class ListCmd(Command):
       show_all = True
       node = vol.get_root_dir()
     else:
-      node = vol.get_path_name(self.opts[0])
+      name = make_fsstr(self.opts[0])
+      node = vol.get_path_name(name)
       if node != None:
         show_all = "all" in self.opts
         show_detail = "detail" in self.opts
@@ -309,7 +315,8 @@ class TypeCmd(Command):
       print "Usage: type <ami_file>"
       return 1
     else:
-      data = vol.read_file(p[0])
+      name = make_fsstr(p[0])
+      data = vol.read_file(name)
       print data
       return 0
 
@@ -328,7 +335,8 @@ class ReadCmd(Command):
       else:
         out_name = p[1]
     # single file operation
-    node = vol.get_path_name(p[0])
+    name = make_fsstr(p[0])
+    node = vol.get_path_name(name)
     if node == None:
       print "Node not found:",p[0]
       return 2
@@ -363,7 +371,7 @@ class MakeDirCmd(Command):
       print "Usage: mkdir <dir_path>"
       return 1
     else:
-      dir_path = self.opts[0]
+      dir_path = make_fsstr(self.opts[0])
       vol.create_dir(dir_path)
       return 0
 
@@ -386,6 +394,9 @@ class WriteCmd(Command):
     if not os.path.exists(sys_file):
       print "File not found:",sys_file
       return 2
+      
+    ami_path = make_fsstr(ami_path)
+    file_name = make_fsstr(file_name)
     # handle file
     if os.path.isfile(sys_file):
       fh = open(sys_file,"rb")
@@ -394,7 +405,7 @@ class WriteCmd(Command):
       vol.write_file(data, ami_path, file_name)
     # handle dir
     elif os.path.isdir(sys_file):
-      parent_node, dir_name = vol.get_create_path_name(ami_path, file_name)
+      parent_node, dir_name = vol.get_create_path_name(ami_path,file_name)
       if parent_node == None:
         print "Invalid path",ami_path
         return 2
@@ -414,7 +425,7 @@ class DeleteCmd(Command):
       return 1
     do_wipe = 'wipe' in self.opts
     do_all = 'all' in self.opts
-    path = self.opts[0]
+    path = make_fsstr(self.opts[0])
     node = vol.delete(path, wipe=do_wipe, all=do_all)
     return 0
       
@@ -424,9 +435,9 @@ class ProtectCmd(Command):
   def handle_vol(self, vol):
     n = len(self.opts)
     if n != 2:
-      print "Usage: comment <ami_file> <protect>"
+      print "Usage: protect <ami_file> <protect>"
       return 1
-    name = self.opts[0]
+    name = make_fsstr(self.opts[0])
     pr_str = self.opts[1]    
     node = vol.get_path_name(name)
     if node != None:
@@ -444,8 +455,8 @@ class CommentCmd(Command):
     if n != 2:
       print "Usage: comment <ami_file> <comment>"
       return 1
-    name = self.opts[0]
-    comment = self.opts[1]
+    name = make_fsstr(self.opts[0])
+    comment = make_fsstr(self.opts[1])
     node = vol.get_path_name(name)
     if node != None:
       node.change_comment(comment)
@@ -504,7 +515,7 @@ class BlockCmd(Command):
         print "No node given!"
         return 1
       else:
-        name = self.opts[1]
+        name = make_fsstr(self.opts[1])
         node = vol.get_path_name(name)
         if node != None:
           with_data = "data" in self.opts
@@ -581,7 +592,8 @@ class BitmapCmd(Command):
       return 0
     elif cmd == 'node':
       if n > 1:
-        node = vol.get_path_name(self.opts[1])
+        name = make_fsstr(self.opts[1])
+        node = vol.get_path_name(name)
         if node != None:
           show_all = 'all' in self.opts
           show_entries = 'entries' in self.opts
