@@ -48,7 +48,7 @@ class ADFSDir(ADFSNode):
         blk = node.blocks_create_old(blk)
       # unsupported
       else:
-        raise FSError(UNSUPPORTED_DIR_BLOCK, block=blk)
+        raise FSError(UNSUPPORTED_DIR_BLOCK, block=blk, extra="Sub_Type: %08x" % blk.sub_type)
     hash_chain = blk.hash_chain
     return hash_chain,node
   

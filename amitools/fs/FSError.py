@@ -66,7 +66,7 @@ class FSError(Exception):
     if self.node != None:
       srcs.append(u"node=" + unicode(self.node))
     if self.block != None:
-      srcs.append(u"block=" + self.block)
+      srcs.append(u"block=" + unicode(self.block))
     if self.file_name != None:
       srcs.append(u"file_name=" + self.file_name.get_unicode())
     if self.extra != None:
