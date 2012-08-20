@@ -13,6 +13,9 @@ class FSString:
       self.txt = txt.decode(encoding)
     else:
       raise ValueError("FSString must be str or unicode!")
+      
+  def __repr__(self):
+    return self.__str__()
   
   def __str__(self):
     return self.__unicode__().encode("UTF-8")

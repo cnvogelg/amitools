@@ -7,7 +7,7 @@ import argparse
 import os.path
 
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
-from amitools.fs.Validator import Validator
+from amitools.fs.validate.Validator import Validator
 
 # ----- logging -----
 
@@ -90,7 +90,7 @@ def scan_file(path, args):
       ret_str = "ok"
     log_path(path,ret_str)
     if args.verbose:
-      v.dump_log()
+      v.log.dump()
     return ret_code
   except IOError,e:
     if args.verbose:
