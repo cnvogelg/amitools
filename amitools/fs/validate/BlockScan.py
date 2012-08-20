@@ -47,7 +47,7 @@ class BlockScan:
     self.map_status = None
     self.map_type = None
   
-  def scan(self, debug=True):
+  def scan(self, progress=lambda x : x):
     """Scan blocks of the given block device
        Return True if there is a chance that a file system will be found there
     """
@@ -60,8 +60,16 @@ class BlockScan:
     self.log.msg(Log.DEBUG,"block: checking range: +%d num=%d" % (begin_blk, num_blk))
 
     # scan all blocks
+    last_val = 0
     for n in range(num_blk):
       blk_num = n + begin_blk
+
+      # update progress reporter
+      val = int(n * 1000.0 / num_blk)
+      if val != last_val:
+        progress(val)
+        last_val = val
+
       try:
         # read block from device
         blk = Block(self.blkdev, blk_num)

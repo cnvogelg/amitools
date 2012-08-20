@@ -46,28 +46,28 @@ class Validator:
       # check root block number
       if root_blk_num < self.blkdev.reserved or root_blk_num > self.blkdev.num_blocks:
         root_blk_num = self.blkdev.num_blocks / 2
-        self.log(ValidatorRemark.ERROR,"Invalid root block number: using guess",root_blk_num)
+        self.log.msg(Log.WARN,"Invalid root block number: using guess",root_blk_num)
     else:
       # guess root block number
       root_blk_num = self.blkdev.num_blocks / 2
-      self.log(ValidatorRemark.INFO,"Guessed root block number",root_blk_num)
+      self.log.msg(Log.INFO,"Guessed root block number",root_blk_num)
     # read root block
     root = RootBlock(self.blkdev, root_blk_num)
     root.read()
     if not root.valid:
-      self.log(ValidatorRemark.ERROR,"Root block is not valid",root_blk_num)      
+      self.log.msg(Log.ERROR,"Root block is not valid",root_blk_num)      
       self.root = None # mode without root
       return False
     else:
       self.root = root
       return True
   
-  def scan_blocks(self):
+  def scan_blocks(self, progress=lambda x : x):
     """Stage 3: full block scan.
        Return true if there is a chance of finding a file system on this block device.
     """
     self.block_scan = BlockScan(self.blkdev, self.log)
-    self.block_scan.scan()
+    self.block_scan.scan(progress=progress)
     if self.debug:
       self.block_scan.dump()
     return self.block_scan.any_chance_of_fs()

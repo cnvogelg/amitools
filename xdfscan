@@ -18,6 +18,10 @@ def pre_log_path(path, msg):
 def log_path(path, msg):
   print("%20s:  %s  " % (msg, path))
 
+def print_block(percent):
+  print("%3.1f%%\r" % (percent / 10.0)),
+  sys.stdout.flush()
+
 # ----- scanner -----
 
 factory = BlkDevFactory()
@@ -75,7 +79,7 @@ def scan_file(path, args):
           stay = False
       if stay:
         # 3. scan blocks: is there any chance for a file/dir?    
-        any_chance = v.scan_blocks()
+        any_chance = v.scan_blocks(progress=print_block)
         if not any_chance:
           stay = False
       if stay:
