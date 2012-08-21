@@ -18,6 +18,7 @@ class BlockInfo:
     self.blk_status = BlockScan.BS_UNKNOWN
     self.blk_type = BlockScan.BT_UNKNOWN
     self.used = False
+    self.own_key = None
   
   def __str__(self):
     return str(self.__dict__)
@@ -107,6 +108,7 @@ class BlockScan:
             bi.parent_blk = user.parent
             bi.next_blk = user.hash_chain
             bi.hash_table = user.hash_table
+            bi.own_key = user.own_key
             self.log.msg(Log.INFO, "Found Dir : '%s'" % bi.name, blk_num)
           # --- filter header block ---
           elif blk.is_file_header_block():
@@ -117,6 +119,7 @@ class BlockScan:
             bi.name = FSString(fh.name)
             bi.parent_blk = fh.parent
             bi.next_blk = fh.hash_chain
+            bi.own_key = fh.own_key
             self.log.msg(Log.INFO, "Found File: '%s'" % bi.name, blk_num)
           # --- file list block ---
           elif blk.is_file_list_block():
@@ -126,6 +129,7 @@ class BlockScan:
             bi.blk_status = self.BS_TYPE
             bi.ext_blk = fl.extension
             bi.blk_list = fl.data_blocks
+            bi.own_key = fl.own_key
           # --- file data block (OFS) ---
           elif blk.is_file_data_block():
             bi.blk_type = self.BT_FILE_DATA
@@ -142,6 +146,11 @@ class BlockScan:
       block_infos[blk_num] = bi
       map_status[bi.blk_status].append(bi)
       map_type[bi.blk_type].append(bi)
+      
+      # own key ok?
+      if bi.blk_status == self.BS_TYPE:
+        if bi.own_key != None and bi.own_key != blk_num:
+          self.log.msg(Log.ERROR, "Own key is invalid: %d type: %d" % (bi.own_key, bi.blk_type), blk_num)
         
     # first summary after block scan
     num_error_blocks = len(map_status[self.BS_READ_ERROR])

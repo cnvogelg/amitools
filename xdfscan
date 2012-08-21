@@ -130,4 +130,7 @@ def main():
       break
   sys.exit(ret)
 
-main()
+try:
+  main()
+except KeyboardInterrupt, e:
+  print "aborting..."
