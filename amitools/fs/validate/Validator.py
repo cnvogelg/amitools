@@ -8,8 +8,8 @@ from amitools.fs.validate.DirScan import DirScan
 class Validator:
   """Validate an AmigaDOS file system"""
     
-  def __init__(self, blkdev, debug=True):
-    self.log = Log(debug=debug)
+  def __init__(self, blkdev, min_level, debug=False):
+    self.log = Log(min_level)
     self.debug = debug
     self.blkdev = blkdev
     self.boot = None
@@ -28,11 +28,11 @@ class Validator:
       # dos type is valid
       self.boot = boot
       # give a warning if checksum is not correct
-      if boot.valid_chksum:
-        self.log.msg(Log.WARN,"invalid boot block checksum",0)
+      if not boot.valid_chksum:
+        self.log.msg(Log.INFO,"invalid boot block checksum",0)
       return True
     else:
-      self.log.msg(Log.WARN,"invalid boot block dos type",0)
+      self.log.msg(Log.ERROR,"invalid boot block dos type",0)
       return False
   
   def scan_root(self):
@@ -78,3 +78,9 @@ class Validator:
     self.dir_scan.scan()
     if self.debug:
       self.dir_scan.dump()
+
+  def get_summary(self):
+    """Return (errors, warnings) of log"""
+    num_errors = self.log.get_num_level(Log.ERROR)
+    num_warns = self.log.get_num_level(Log.WARN)
+    return (num_errors, num_warns)

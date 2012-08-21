@@ -66,7 +66,7 @@ def scan_file(path, args):
     blkdev = factory.open(path, read_only=True)
 
     # create validator
-    v = Validator(blkdev, debug=args.debug)
+    v = Validator(blkdev, min_level=args.level, debug=args.debug)
 
     # 1. check boot block
     if v.scan_boot():
@@ -86,12 +86,22 @@ def scan_file(path, args):
         # 4. scan dirs
         v.scan_dirs()
       
+        # summary
+        e, w = v.get_summary()
+        if e > 0:
+          ret_str += "%d ERROR" % e
+        if w > 0:
+          ret_str += " %d warn" % w
+        if e == 0 and w == 0:
+          ret_str = "ok"
+      
     else:
       # boot block is broken
       ret_str = "BOOT?"
+
     # report result
     if ret_str == "":
-      ret_str = "ok"
+      ret_str = "done"
     log_path(path,ret_str)
     if args.verbose:
       v.log.dump()
@@ -108,7 +118,8 @@ def main():
   parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
   parser.add_argument('-d', '--debug', action='store_true', default=False, help="show debug info")
   parser.add_argument('-q', '--quick', action='store_true', default=False, help="quick mode. faster: skip image if root is invalid")
-  parser.add_argument('-r', '--repair', action='store_true', default=False, help="try to repair broken images")
+  parser.add_argument('-l', '--level', default=0, help="show only level or above", type=int)
+  parser.add_argument('-r', '--recover', action='store_true', default=False, help="try to recover data from image")
   args = parser.parse_args()
 
   # main scan loop

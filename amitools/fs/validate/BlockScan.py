@@ -90,63 +90,48 @@ class BlockScan:
           # --- root block ---
           if blk.is_root_block():
             bi.blk_type = self.BT_ROOT
+            bi.blk_status = self.BS_TYPE
             root = RootBlock(self.blkdev, blk_num)
             root.set(data)
-            if root.valid:
-              bi.blk_status = self.BS_TYPE
-              bi.name = FSString(root.name)
-              bi.hash_table = root.hash_table
-              bi.parent_blk = 0
-              self.log.msg(Log.INFO, "Found Root: '%s'" % bi.name, blk_num)
-            else:
-              bi.blk_status = self.BS_INVALID
+            bi.name = FSString(root.name)
+            bi.hash_table = root.hash_table
+            bi.parent_blk = 0
+            self.log.msg(Log.INFO, "Found Root: '%s'" % bi.name, blk_num)
           # --- user dir block ---
           elif blk.is_user_dir_block():
             bi.blk_type = self.BT_DIR
+            bi.blk_status = self.BS_TYPE
             user = UserDirBlock(self.blkdev, blk_num)
             user.set(data)
-            if user.valid:
-              bi.blk_status = self.BS_TYPE
-              bi.name = FSString(user.name)
-              bi.parent_blk = user.parent
-              bi.next_blk = user.hash_chain
-              bi.hash_table = user.hash_table
-              self.log.msg(Log.INFO, "Found Dir : '%s'" % bi.name, blk_num)
-            else:
-              bi.blk_status = self.BS_INVALID
+            bi.name = FSString(user.name)
+            bi.parent_blk = user.parent
+            bi.next_blk = user.hash_chain
+            bi.hash_table = user.hash_table
+            self.log.msg(Log.INFO, "Found Dir : '%s'" % bi.name, blk_num)
           # --- filter header block ---
           elif blk.is_file_header_block():
             bi.blk_type = self.BT_FILE_HDR
+            bi.blk_status = self.BS_TYPE
             fh = FileHeaderBlock(self.blkdev, blk_num)
             fh.set(data)
-            if fh.valid:
-              bi.blk_status = self.BS_TYPE
-              bi.name = FSString(fh.name)
-              bi.parent_blk = fh.parent
-              bi.next_blk = fh.hash_chain
-              self.log.msg(Log.INFO, "Found File: '%s'" % bi.name, blk_num)
-            else:
-              bi.blk_status = self.BS_INVALID
+            bi.name = FSString(fh.name)
+            bi.parent_blk = fh.parent
+            bi.next_blk = fh.hash_chain
+            self.log.msg(Log.INFO, "Found File: '%s'" % bi.name, blk_num)
           # --- file list block ---
           elif blk.is_file_list_block():
             bi.blk_type = self.BT_FILE_LIST
             fl = FileListBlock(self.blkdev, blk_num)
             fl.set(data)
-            if fl.valid:
-              bi.blk_status = self.BS_TYPE
-              bi.ext_blk = fl.extension
-              bi.blk_list = fl.data_blocks
-            else:
-              bi.blk_status = self.BS_INVALID
+            bi.blk_status = self.BS_TYPE
+            bi.ext_blk = fl.extension
+            bi.blk_list = fl.data_blocks
           # --- file data block (OFS) ---
           elif blk.is_file_data_block():
             bi.blk_type = self.BT_FILE_DATA
+            bi.blk_status = self.BS_TYPE
             fd = FileDataBlock(self.blkdev, blk_num)
             fd.set(data)
-            if fd.valid:
-              bi.blk_status = self.BS_TYPE
-            else:
-              bi.blk_status = self.BS_INVALID
               
       except IOError,e:
         self.log.msg(Log.ERROR, "Can't read block", blk_num)

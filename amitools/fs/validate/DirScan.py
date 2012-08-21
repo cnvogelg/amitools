@@ -83,8 +83,9 @@ class DirScan:
     dirs += self.block_scan.get_blocks_of_type(BlockScan.BT_DIR)
     dir_infos = []
     for bi in dirs:
-      di = self.scan_dir(bi)
-      dir_infos.append(di)
+      if bi.blk_type == BlockScan.BT_DIR or bi.blk_type == BlockScan.BT_ROOT:
+        di = self.scan_dir(bi)
+        dir_infos.append(di)
     self.dir_infos = dir_infos
     
     # map dir infos by blk_num

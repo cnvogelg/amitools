@@ -1,6 +1,6 @@
 class LogEntry:
   """A class for a log entry"""
-  names = ('debug','info ','WARN ','ERROR','FATAL')
+  names = ('debug','info ','WARN ','ERROR')
   
   def __init__(self, level, msg, blk_num=-1):
     self.blk_num = blk_num
@@ -19,14 +19,13 @@ class Log:
   INFO = 1
   WARN = 2
   ERROR = 3
-  FATAL = 4
 
-  def __init__(self, debug=False):
+  def __init__(self, min_level):
     self.entries = []
-    self.debug = debug
+    self.min_level = min_level
   
   def msg(self, level, msg, blk_num = -1):
-    if not self.debug and level == self.DEBUG:
+    if level < self.min_level:
       return
     e = LogEntry(level, msg, blk_num)
     self.entries.append(e)
@@ -35,3 +34,9 @@ class Log:
     for e in self.entries:
       print e
   
+  def get_num_level(self, level):
+    num = 0
+    for e in self.entries:
+      if e.level == level:
+        num += 1
+    return num

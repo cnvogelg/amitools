@@ -69,8 +69,11 @@ class RootBlock(Block):
     if not self.valid:
       return False
     
-    # name hash
+    # name hash (limit to max size)
     self.hash_size = self._get_long(3)
+    max_hash_size = self.blkdev.num_longs - 56
+    if self.hash_size > max_hash_size:
+      self.hash_size = max_hash_size
     self.hash_table = []
     for i in xrange(self.hash_size):
       self.hash_table.append(self._get_long(6+i))
