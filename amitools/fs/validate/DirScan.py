@@ -1,6 +1,7 @@
 from BlockScan import BlockScan
 from amitools.fs.FSString import FSString
 from amitools.fs.FileName import FileName
+from amitools.fs.validate.Log import Log
 
 class DirChainEntry:
   def __init__(self, blk_info):
@@ -44,9 +45,13 @@ class DirInfo:
   def __init__(self, blk_info):
     self.blk_info = blk_info
     self.chains = {}
+    self.children = []
 
   def add(self, dc):
     self.chains[dc.hash_val] = dc
+  
+  def add_child(self, c):
+    self.children.append(c)
     
   def get(self, hash_val):
     if hash_val in self.chains:
@@ -58,17 +63,22 @@ class DirInfo:
     return self.chains
   
   def __str__(self):
-    return "<DirInfo @%d '%s' #%d>" % (self.blk_info.blk_num, self.blk_info.name, len(self.chains))
+    bi = self.blk_info
+    blk_num = bi.blk_num
+    name = bi.name
+    parent_blk = bi.parent_blk
+    return "<DirInfo @%d '%s' #%d parent:%d child:#%d>" % (blk_num, name, len(self.chains), parent_blk, len(self.children))
 
 class DirScan:
   def __init__(self, block_scan, log):
     self.log = log
     self.block_scan = block_scan
     self.dir_infos = None
+    self.dir_roots = None
   
   def scan(self):
     """check all directories"""
-    # scan root/user dir(s)
+    # scan root/user dir(s) and build dir info nodes
     dirs = self.block_scan.get_blocks_of_type(BlockScan.BT_ROOT)
     dirs += self.block_scan.get_blocks_of_type(BlockScan.BT_DIR)
     dir_infos = []
@@ -76,6 +86,25 @@ class DirScan:
       di = self.scan_dir(bi)
       dir_infos.append(di)
     self.dir_infos = dir_infos
+    
+    # map dir infos by blk_num
+    map_blk_num = {}
+    for di in dir_infos:
+      map_blk_num[di.blk_info.blk_num] = di
+    
+    # run through all dir infos and add to parents
+    roots = []
+    for di in dir_infos:
+      parent_blk = di.blk_info.parent_blk
+      if parent_blk in map_blk_num:
+        parent_di = map_blk_num[parent_blk]
+        parent_di.add_child(di)
+      else:
+        roots.append(di)
+    self.dir_roots = roots
+    num_roots = len(self.dir_roots)
+    if num_roots > 1:
+      self.log.msg(Log.ERROR, "%d dir roots found" % (num_roots))
   
   def get_dir_infos(self):
     return self.dir_infos
@@ -105,7 +134,7 @@ class DirScan:
     if num_orphaned > 0:  
       self.log.msg(Log.INFO, "%d orphaned children of dir '%s' (%d)" % (num_orphaned, dir_bi.name, dir_bi.blk_num))
     
-    # sort in orphaned entries
+    # sort in orphaned entries that have my dir as parent
     for b in child_blks:
       # calc hash of name
       name = b.name
@@ -128,11 +157,16 @@ class DirScan:
     dir_blk_num = dir_blk_info.blk_num
     dir_name = dir_blk_info.name
     hash_val = chain.hash_val
-    
+
     # remove block from child_blks
     for b in child_blks:
       if b.blk_num == blk_num:
         child_blks.remove(b)
+    
+    # self reference?
+    if blk_num == dir_blk_num:
+      self.log.msg(Log.ERROR, "dir block in its own chain #%d of dir '%s' (%d)" % (hash_val, dir_name, dir_blk_num), blk_num)
+      return
     
     # get entry block
     blk_info = self.block_scan.get_block(blk_num)
@@ -152,7 +186,7 @@ class DirScan:
     if b_type not in (BlockScan.BT_DIR, BlockScan.BT_FILE_HDR):
       self.log.msg(Log.ERROR, "invalid block terminates chain #%d of dir '%s' (%d)" % (hash_val, dir_name, dir_blk_num), blk_num)
       dce.end = True
-      return
+      return 
     
     # all following are ok
     dce.valid = True
@@ -173,10 +207,9 @@ class DirScan:
     # check next block in chain
     next_blk = blk_info.next_blk
     if next_blk != 0:
-      return self.build_chain(chain, dir_blk_info, next_blk, child_blks)
+      self.build_chain(chain, dir_blk_info, next_blk, child_blks)
     else:
       dce.end = True
-      return True
       
   def dump(self):
     for di in self.dir_infos:

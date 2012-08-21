@@ -58,7 +58,8 @@ class Block:
     return self.type == Block.T_DATA
   
   def read(self):
-    self._read_data()
+    if self.data == None:
+      self._read_data()
     self._get_types()
     self._get_chksum()
     self.valid = self.valid_types and self.valid_chksum

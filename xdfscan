@@ -102,18 +102,21 @@ def scan_file(path, args):
     return 0
 
 # ----- main -----
-parser = argparse.ArgumentParser()
-parser.add_argument('input', nargs='+', help="input image file or directory")
-parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
-parser.add_argument('-d', '--debug', action='store_true', default=False, help="show debug info")
-parser.add_argument('-q', '--quick', action='store_true', default=False, help="quick mode. faster: skip image if root is invalid")
-parser.add_argument('-r', '--repair', action='store_true', default=False, help="try to repair broken images")
-args = parser.parse_args()
+def main():
+  parser = argparse.ArgumentParser()
+  parser.add_argument('input', nargs='+', help="input image file or directory")
+  parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
+  parser.add_argument('-d', '--debug', action='store_true', default=False, help="show debug info")
+  parser.add_argument('-q', '--quick', action='store_true', default=False, help="quick mode. faster: skip image if root is invalid")
+  parser.add_argument('-r', '--repair', action='store_true', default=False, help="try to repair broken images")
+  args = parser.parse_args()
 
-# main scan loop
-ret = 0
-for i in args.input:
-  ret = scan(i, args)
-  if ret != 0:
-    break
-sys.exit(ret)
+  # main scan loop
+  ret = 0
+  for i in args.input:
+    ret = scan(i, args)
+    if ret != 0:
+      break
+  sys.exit(ret)
+
+main()

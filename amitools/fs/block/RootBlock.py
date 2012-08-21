@@ -56,7 +56,15 @@ class RootBlock(Block):
     
     Block.write(self)
   
+  def set(self, data):
+    self._set_data(data)
+    self._read()
+  
   def read(self):
+    self._read_data()
+    self._read()
+  
+  def _read(self):
     Block.read(self)
     if not self.valid:
       return False

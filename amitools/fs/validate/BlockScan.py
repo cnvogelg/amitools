@@ -1,3 +1,5 @@
+import time
+
 from amitools.fs.block.Block import Block
 from amitools.fs.block.UserDirBlock import UserDirBlock
 from amitools.fs.block.RootBlock import RootBlock
@@ -61,19 +63,24 @@ class BlockScan:
 
     # scan all blocks
     last_val = 0
+    last_time = int(1000 * time.clock())
     for n in range(num_blk):
       blk_num = n + begin_blk
 
-      # update progress reporter
+      # update progress reporter (every 250 ms)
       val = int(n * 1000.0 / num_blk)
-      if val != last_val:
+      now = int(1000 * time.clock())
+      delta = now - last_time
+      if val != last_val and delta > 250:
         progress(val)
         last_val = val
+        last_time = now
 
       try:
         # read block from device
         blk = Block(self.blkdev, blk_num)
         blk.read()
+        data = blk.data
         # create block info
         bi = BlockInfo(blk_num)
         # --- classify block ---
@@ -84,11 +91,12 @@ class BlockScan:
           if blk.is_root_block():
             bi.blk_type = self.BT_ROOT
             root = RootBlock(self.blkdev, blk_num)
-            root.read()
+            root.set(data)
             if root.valid:
               bi.blk_status = self.BS_TYPE
               bi.name = FSString(root.name)
               bi.hash_table = root.hash_table
+              bi.parent_blk = 0
               self.log.msg(Log.INFO, "Found Root: '%s'" % bi.name, blk_num)
             else:
               bi.blk_status = self.BS_INVALID
@@ -96,7 +104,7 @@ class BlockScan:
           elif blk.is_user_dir_block():
             bi.blk_type = self.BT_DIR
             user = UserDirBlock(self.blkdev, blk_num)
-            user.read()
+            user.set(data)
             if user.valid:
               bi.blk_status = self.BS_TYPE
               bi.name = FSString(user.name)
@@ -110,7 +118,7 @@ class BlockScan:
           elif blk.is_file_header_block():
             bi.blk_type = self.BT_FILE_HDR
             fh = FileHeaderBlock(self.blkdev, blk_num)
-            fh.read()
+            fh.set(data)
             if fh.valid:
               bi.blk_status = self.BS_TYPE
               bi.name = FSString(fh.name)
@@ -123,7 +131,7 @@ class BlockScan:
           elif blk.is_file_list_block():
             bi.blk_type = self.BT_FILE_LIST
             fl = FileListBlock(self.blkdev, blk_num)
-            fl.read()
+            fl.set(data)
             if fl.valid:
               bi.blk_status = self.BS_TYPE
               bi.ext_blk = fl.extension
@@ -134,7 +142,7 @@ class BlockScan:
           elif blk.is_file_data_block():
             bi.blk_type = self.BT_FILE_DATA
             fd = FileDataBlock(self.blkdev, blk_num)
-            fd.read()
+            fd.set(data)
             if fd.valid:
               bi.blk_status = self.BS_TYPE
             else:
