@@ -8,6 +8,7 @@ from amitools.fs.block.FileListBlock import FileListBlock
 from amitools.fs.block.FileDataBlock import FileDataBlock
 from amitools.fs.FSString import FSString
 from amitools.fs.FileName import FileName
+import amitools.fs.DosType as DosType
 
 from amitools.fs.validate.Log import Log
 
@@ -43,12 +44,14 @@ class BlockScan:
   BT_FILE_DATA = 5
   NUM_BT = 6
   
-  def __init__(self, blkdev, log):
+  def __init__(self, blkdev, log, dos_type):
     self.blkdev = blkdev
     self.log = log
+    self.dos_type = dos_type
     self.block_infos = None
     self.map_status = None
     self.map_type = None
+    self.log.msg(Log.INFO,"dos type is '%s'" % DosType.get_dos_type_str(self.dos_type))
   
   def scan(self, progress=lambda x : x):
     """Scan blocks of the given block device
@@ -98,6 +101,13 @@ class BlockScan:
             bi.hash_table = root.hash_table
             bi.parent_blk = 0
             self.log.msg(Log.INFO, "Found Root: '%s'" % bi.name, blk_num)
+            # chech hash size
+            nht = len(root.hash_table)
+            if root.hash_size != nht:
+              self.log.msg(Log.ERROR, "Root block hash table size mismatch", blk_num)
+            eht = self.blkdev.block_longs - 56
+            if nht != eht:
+              self.log.msg(Log.WARN, "Root block does not have normal hash size: %d != %d" % (nht, eht), blk_num)
           # --- user dir block ---
           elif blk.is_user_dir_block():
             bi.blk_type = self.BT_DIR
@@ -109,7 +119,7 @@ class BlockScan:
             bi.next_blk = user.hash_chain
             bi.hash_table = user.hash_table
             bi.own_key = user.own_key
-            self.log.msg(Log.INFO, "Found Dir : '%s'" % bi.name, blk_num)
+            self.log.msg(Log.DEBUG, "Found Dir : '%s'" % bi.name, blk_num)
           # --- filter header block ---
           elif blk.is_file_header_block():
             bi.blk_type = self.BT_FILE_HDR
@@ -120,7 +130,10 @@ class BlockScan:
             bi.parent_blk = fh.parent
             bi.next_blk = fh.hash_chain
             bi.own_key = fh.own_key
-            self.log.msg(Log.INFO, "Found File: '%s'" % bi.name, blk_num)
+            bi.byte_size = fh.byte_size
+            bi.data_blocks = fh.data_blocks
+            bi.extension = fh.extension
+            self.log.msg(Log.DEBUG, "Found File: '%s'" % bi.name, blk_num)
           # --- file list block ---
           elif blk.is_file_list_block():
             bi.blk_type = self.BT_FILE_LIST
@@ -130,12 +143,18 @@ class BlockScan:
             bi.ext_blk = fl.extension
             bi.blk_list = fl.data_blocks
             bi.own_key = fl.own_key
+            bi.data_blocks = fl.data_blocks
+            bi.extension = fl.extension
+            bi.parent_blk = fl.parent
           # --- file data block (OFS) ---
           elif blk.is_file_data_block():
             bi.blk_type = self.BT_FILE_DATA
             bi.blk_status = self.BS_TYPE
             fd = FileDataBlock(self.blkdev, blk_num)
             fd.set(data)
+            bi.data_size = fd.data_size
+            bi.hdr_key = fd.hdr_key
+            bi.seq_num = fd.seq_num
               
       except IOError,e:
         self.log.msg(Log.ERROR, "Can't read block", blk_num)

@@ -71,11 +71,14 @@ class RootBlock(Block):
     
     # name hash (limit to max size)
     self.hash_size = self._get_long(3)
-    max_hash_size = self.blkdev.num_longs - 56
-    if self.hash_size > max_hash_size:
-      self.hash_size = max_hash_size
+    
+    # read (limited) hash
+    hs = self.hash_size
+    mhs = self.blkdev.block_longs - 56
+    if hs > mhs:
+      hs = mhs
     self.hash_table = []
-    for i in xrange(self.hash_size):
+    for i in xrange(hs):
       self.hash_table.append(self._get_long(6+i))
     
     # bitmap

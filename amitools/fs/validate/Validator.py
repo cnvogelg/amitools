@@ -4,6 +4,8 @@ from amitools.fs.block.RootBlock import RootBlock
 from amitools.fs.validate.Log import Log
 from amitools.fs.validate.BlockScan import BlockScan
 from amitools.fs.validate.DirScan import DirScan
+from amitools.fs.validate.FileScan import FileScan
+import amitools.fs.DosType as DosType
 
 class Validator:
   """Validate an AmigaDOS file system"""
@@ -12,13 +14,15 @@ class Validator:
     self.log = Log(min_level)
     self.debug = debug
     self.blkdev = blkdev
+    self.dos_type = None
     self.boot = None
     self.root = None
     self.block_scan = None
 
   def scan_boot(self):
     """Stage 1: scan boot block.
-       Returns True if boot block has a valid dos type.
+       Returns (True, x) if boot block has a valid dos type.
+       Returns (x, True) if boot block is bootable
        Invalid checksum of the block is tolerated but remarked.
     """
     # check boot block
@@ -27,13 +31,14 @@ class Validator:
     if boot.valid:
       # dos type is valid
       self.boot = boot
+      self.dos_type = boot.dos_type
       # give a warning if checksum is not correct
       if not boot.valid_chksum:
         self.log.msg(Log.INFO,"invalid boot block checksum",0)
-      return True
+      return (True, boot.valid_chksum)
     else:
       self.log.msg(Log.ERROR,"invalid boot block dos type",0)
-      return False
+      return (False, False)
   
   def scan_root(self):
     """Stage 2: scan root block.
@@ -66,18 +71,25 @@ class Validator:
     """Stage 3: full block scan.
        Return true if there is a chance of finding a file system on this block device.
     """
-    self.block_scan = BlockScan(self.blkdev, self.log)
+    self.block_scan = BlockScan(self.blkdev, self.log, self.dos_type)
     self.block_scan.scan(progress=progress)
     if self.debug:
       self.block_scan.dump()
     return self.block_scan.any_chance_of_fs()
 
   def scan_dirs(self):
-    """Stage 4: scan through all found directories"""
+    """Stage 4a: scan through all found directories"""
     self.dir_scan = DirScan(self.block_scan, self.log)
     self.dir_scan.scan()
     if self.debug:
       self.dir_scan.dump()
+      
+  def scan_files(self):
+    """Stage 4b: scan through all found files"""
+    self.file_scan = FileScan(self.block_scan, self.log, self.dos_type)
+    self.file_scan.scan()
+    if self.debug:
+      self.file_scan.dump()
 
   def get_summary(self):
     """Return (errors, warnings) of log"""

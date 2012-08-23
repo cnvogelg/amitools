@@ -25,8 +25,13 @@ class FileHeaderBlock(Block):
     self.block_count = self._get_long(2)
     self.first_data = self._get_long(4)
     
+    # read (limited) data blocks table
+    bc = self.block_count
+    mbc = self.blkdev.block_longs - 56
+    if bc > mbc:
+      bc = mbc
     self.data_blocks = []
-    for i in xrange(self.block_count):
+    for i in xrange(bc):
       self.data_blocks.append(self._get_long(-51-i))
     
     self.protect = self._get_long(-48)

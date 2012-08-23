@@ -41,20 +41,21 @@ def scan_dir(path, args):
       ret = scan_file(os.path.join(root,name), args)
       if ret != 0:
         return ret
-    for name in dirs:
-      ret = scan_dir(os.path.join(root,name), args)
-      if ret != 0:
-        return ret
   return 0
 
-def check_extension(path):
-  for a in BlkDevFactory.valid_extensions:
+def check_extension(path, args):
+  ext = []
+  if not args.skip_disks:
+    ext += ['.adf','.adz','.adf.gz']
+  if not args.skip_hds:
+    ext += ['.hdf']
+  for a in ext:
     if path.endswith(a):
       return True
   return False
   
 def scan_file(path, args):
-  if not check_extension(path):
+  if not check_extension(path, args):
     return 0
   try:
     pre_log_path(path,"scan")
@@ -69,12 +70,18 @@ def scan_file(path, args):
     v = Validator(blkdev, min_level=args.level, debug=args.debug)
 
     # 1. check boot block
-    if v.scan_boot():
+    res = []
+    boot_dos, bootable = v.scan_boot()
+    if boot_dos:
+      # disk is bootable
+      if bootable:
+        res.append("boot")
+      
       # 2. check root block
       root = v.scan_root()
       if not root:
         # invalid root
-        ret_str = "root?"
+        res.append("nofs")
         if args.quick:
           stay = False
       if stay:
@@ -83,26 +90,27 @@ def scan_file(path, args):
         if not any_chance:
           stay = False
       if stay:
-        # 4. scan dirs
+        # 4. scan dirs/files
         v.scan_dirs()
+        v.scan_files()
       
         # summary
         e, w = v.get_summary()
         if e > 0:
-          ret_str += "%d ERROR" % e
+          res.append("E=%d" % e)
         if w > 0:
-          ret_str += " %d warn" % w
+          res.append("w=%d" % w)
         if e == 0 and w == 0:
-          ret_str = "ok"
+          res.append("ok")
       
     else:
-      # boot block is broken
-      ret_str = "BOOT?"
+      # boot block is not dos
+      res.append("NDOS")
 
     # report result
-    if ret_str == "":
-      ret_str = "done"
-    log_path(path,ret_str)
+    if len(res) == 0:
+      res.append("done")
+    log_path(path," ".join(res))
     if args.verbose:
       v.log.dump()
     return ret_code
@@ -118,8 +126,10 @@ def main():
   parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
   parser.add_argument('-d', '--debug', action='store_true', default=False, help="show debug info")
   parser.add_argument('-q', '--quick', action='store_true', default=False, help="quick mode. faster: skip image if root is invalid")
-  parser.add_argument('-l', '--level', default=0, help="show only level or above", type=int)
+  parser.add_argument('-l', '--level', default=2, help="show only level or above (0=debug, 1=info, 2=warn, 3=error)", type=int)
   parser.add_argument('-r', '--recover', action='store_true', default=False, help="try to recover data from image")
+  parser.add_argument('-D', '--skip-disks', action='store_true', default=False, help="do not scan disk images")
+  parser.add_argument('-H', '--skip-hds', action='store_true', default=False, help="do not scan hard disk images")
   args = parser.parse_args()
 
   # main scan loop
