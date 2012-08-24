@@ -12,11 +12,11 @@ from amitools.fs.validate.Validator import Validator
 # ----- logging -----
 
 def pre_log_path(path, msg):
-  print("%20s:  %s  \r" % (msg, path)),
+  print("%20s  %s  \r" % (msg, path)),
   sys.stdout.flush()
 
 def log_path(path, msg):
-  print("%20s:  %s  " % (msg, path))
+  print("%20s  %s  " % (msg, path))
 
 def print_block(percent):
   print("%3.1f%%\r" % (percent / 10.0)),
@@ -73,36 +73,37 @@ def scan_file(path, args):
     res = []
     boot_dos, bootable = v.scan_boot()
     if boot_dos:
-      # disk is bootable
-      if bootable:
-        res.append("boot")
-      
       # 2. check root block
       root = v.scan_root()
       if not root:
+        # disk is bootable
+        if bootable:
+          res.append("boot")
+        else:
+          res.append("    ")        
         # invalid root
-        res.append("nofs")
-        if args.quick:
-          stay = False
-      if stay:
-        # 3. scan blocks: is there any chance for a file/dir?    
-        any_chance = v.scan_blocks(progress=print_block)
-        if not any_chance:
-          stay = False
-      if stay:
-        # 4. scan dirs/files
-        v.scan_dirs()
+        res.append("NOFS")
+      else:
+        # 3. scan tree   
+        v.scan_dir_tree()
+        # 4. scan files
         v.scan_files()
-      
+        
         # summary
         e, w = v.get_summary()
         if e > 0:
           res.append("E=%d" % e)
         if w > 0:
           res.append("w=%d" % w)
+        # disk is bootable
+        if bootable:
+          res.append("boot")
+        else:
+          res.append("    ")
         if e == 0 and w == 0:
-          res.append("ok")
-      
+          res.append(" ok ")
+        else:
+          res.append("NOK ")
     else:
       # boot block is not dos
       res.append("NDOS")

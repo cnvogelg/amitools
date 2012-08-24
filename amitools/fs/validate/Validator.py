@@ -20,7 +20,7 @@ class Validator:
     self.block_scan = None
 
   def scan_boot(self):
-    """Stage 1: scan boot block.
+    """Step 1: scan boot block.
        Returns (True, x) if boot block has a valid dos type.
        Returns (x, True) if boot block is bootable
        Invalid checksum of the block is tolerated but remarked.
@@ -35,13 +35,14 @@ class Validator:
       # give a warning if checksum is not correct
       if not boot.valid_chksum:
         self.log.msg(Log.INFO,"invalid boot block checksum",0)
+      self.log.msg(Log.INFO,"dos type is '%s'" % DosType.get_dos_type_str(self.dos_type))
       return (True, boot.valid_chksum)
     else:
       self.log.msg(Log.ERROR,"invalid boot block dos type",0)
       return (False, False)
   
   def scan_root(self):
-    """Stage 2: scan root block.
+    """Step 2: scan root block.
        Try to determine root block from boot block or guess number.
        Returns True if the root block could be decoded.
     """
@@ -49,9 +50,14 @@ class Validator:
       # retrieve root block number from boot block
       root_blk_num = self.boot.got_root_blk
       # check root block number
-      if root_blk_num < self.blkdev.reserved or root_blk_num > self.blkdev.num_blocks:
-        root_blk_num = self.blkdev.num_blocks / 2
-        self.log.msg(Log.WARN,"Invalid root block number: using guess",root_blk_num)
+      if root_blk_num == 0:
+        new_root = self.blkdev.num_blocks / 2
+        self.log.msg(Log.INFO,"Boot contains not Root blk. Using default: %d" % new_root,root_blk_num)
+        root_blk_num = new_root      
+      elif root_blk_num < self.blkdev.reserved or root_blk_num > self.blkdev.num_blocks:
+        new_root = self.blkdev.num_blocks / 2
+        self.log.msg(Log.INFO,"Invalid root block number: given %d using guess %d" % (root_blk_num, new_root),root_blk_num)
+        root_blk_num = new_root
     else:
       # guess root block number
       root_blk_num = self.blkdev.num_blocks / 2
@@ -60,34 +66,29 @@ class Validator:
     root = RootBlock(self.blkdev, root_blk_num)
     root.read()
     if not root.valid:
-      self.log.msg(Log.ERROR,"Root block is not valid",root_blk_num)      
+      self.log.msg(Log.INFO,"Root block is not valid -> No file system",root_blk_num)      
       self.root = None # mode without root
       return False
     else:
       self.root = root
       return True
   
-  def scan_blocks(self, progress=lambda x : x):
-    """Stage 3: full block scan.
-       Return true if there is a chance of finding a file system on this block device.
-    """
+  def scan_dir_tree(self):
+    """Step 3: scan directory structure
+       Return false if structure is not healthy"""
     self.block_scan = BlockScan(self.blkdev, self.log, self.dos_type)
-    self.block_scan.scan(progress=progress)
-    if self.debug:
-      self.block_scan.dump()
-    return self.block_scan.any_chance_of_fs()
-
-  def scan_dirs(self):
-    """Stage 4a: scan through all found directories"""
     self.dir_scan = DirScan(self.block_scan, self.log)
-    self.dir_scan.scan()
+    ok = self.dir_scan.scan_tree(self.root.blk_num)
+    self.log.msg(Log.INFO,"Scanned %d directories" % len(self.dir_scan.get_all_dir_infos()))
     if self.debug:
       self.dir_scan.dump()
-      
+          
   def scan_files(self):
-    """Stage 4b: scan through all found files"""
+    """Step 4: scan through all found files"""
     self.file_scan = FileScan(self.block_scan, self.log, self.dos_type)
-    self.file_scan.scan()
+    all_files = self.dir_scan.get_all_file_hdr_blk_infos()
+    self.log.msg(Log.INFO,"Scanning %d files" % len(all_files))
+    self.file_scan.scan_all_files(all_files)
     if self.debug:
       self.file_scan.dump()
 
