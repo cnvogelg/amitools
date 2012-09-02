@@ -54,11 +54,11 @@ def scan(path, args):
     return scan_file(path, args)
   
 def scan_dir(path, args):
-  for root, dirs, files in os.walk(path):
-    for name in files:
-      ret = scan_file(os.path.join(root,name), args)
-      if ret != 0:
-        return ret
+  for name in sorted(os.listdir(path)):
+    epath = os.path.join(path, name)
+    result = scan(epath, args)
+    if result != 0:
+      return result
   return 0
 
 def check_extension(path, args):

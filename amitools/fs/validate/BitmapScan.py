@@ -72,7 +72,7 @@ class BitmapScan:
     expect = self.calc_lword(blk_num) & self.last_mask
     if got != expect:
       self.log.msg(Log.ERROR,"Invalid bitmap allocation (last) (@%d: #%d+%d) blks [%d...%d] got=%08x expect=%08x" \
-        % (lw, bm_blk, cur_pos/4, blk_num, blk.dev.num_blocks-1, got, expect))
+        % (lw, bm_blk, cur_pos/4, blk_num, blkdev.num_blocks-1, got, expect))
     
   def calc_lword(self, blk_num):
     """calcuate the bitmap lword"""
