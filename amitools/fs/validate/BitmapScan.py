@@ -20,8 +20,15 @@ class BitmapScan:
     block_longs = self.block_scan.blkdev.block_longs - 1 # all longs are available for bitmap
     self.num_bm_lwords = int((num_blks + 31) / 32) # 32 blocks fit in a long word
     self.num_bm_blocks = int((self.num_bm_lwords + block_longs - 1) / block_longs)
-    self.log.msg(Log.DEBUG,"Total Bitmap LWORDs: %d  (block %d)" % (self.num_bm_lwords, block_longs))
+    self.log.msg(Log.DEBUG,"Total Bitmap DWORDs: %d  (block %d)" % (self.num_bm_lwords, block_longs))
     self.log.msg(Log.DEBUG,"Number of Bitmap Blocks: %d" % self.num_bm_blocks)
+    # calc the bitmask in the last word
+    last_filled_bits = self.num_bm_lwords * 32 - num_blks
+    if last_filled_bits == 32:
+      self.last_mask = 0xffffffff
+    else:
+      self.last_mask = (1 << last_filled_bits) - 1
+    self.log.msg(Log.DEBUG,"Last DWORD mask: %08x" % self.last_mask)    
     # now scan bitmap blocks and build list of all bitmap blocks
     self.read_bitmap_ptrs_and_blocks(root)
     found_blocks = len(self.bm_blocks)
@@ -45,7 +52,8 @@ class BitmapScan:
     # loop throug all bitmap longwords
     lw = 0
     blk_num = blkdev.reserved
-    while lw < self.num_bm_lwords:
+    max_lw = self.num_bm_lwords - 1
+    while lw < max_lw:
       got = struct.unpack_from(">I",cur_data,cur_pos)[0]
       expect = self.calc_lword(blk_num)
       if got != expect:
@@ -59,7 +67,13 @@ class BitmapScan:
         bm_blk += 1
         cur_data = self.bm_blocks[bm_blk].bitmap
         cur_pos = 0
-      
+    # the last long word
+    got = struct.unpack_from(">I",cur_data,cur_pos)[0] & self.last_mask
+    expect = self.calc_lword(blk_num) & self.last_mask
+    if got != expect:
+      self.log.msg(Log.ERROR,"Invalid bitmap allocation (last) (@%d: #%d+%d) blks [%d...%d] got=%08x expect=%08x" \
+        % (lw, bm_blk, cur_pos/4, blk_num, blk.dev.num_blocks-1, got, expect))
+    
   def calc_lword(self, blk_num):
     """calcuate the bitmap lword"""
     value = 0
