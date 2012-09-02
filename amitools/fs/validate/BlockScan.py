@@ -6,6 +6,8 @@ from amitools.fs.block.RootBlock import RootBlock
 from amitools.fs.block.FileHeaderBlock import FileHeaderBlock
 from amitools.fs.block.FileListBlock import FileListBlock
 from amitools.fs.block.FileDataBlock import FileDataBlock
+from amitools.fs.block.BitmapBlock import BitmapBlock
+from amitools.fs.block.BitmapExtBlock import BitmapExtBlock
 from amitools.fs.FSString import FSString
 import amitools.fs.DosType as DosType
 
@@ -41,7 +43,9 @@ class BlockScan:
   BT_FILE_HDR = 3
   BT_FILE_LIST = 4
   BT_FILE_DATA = 5
-  NUM_BT = 6
+  BT_BITMAP = 6
+  BT_BITMAP_EXT = 7
+  NUM_BT = 8
   
   def __init__(self, blkdev, log, dos_type):
     self.blkdev = blkdev
@@ -87,11 +91,16 @@ class BlockScan:
       if num_invalid_blocks > 0:
         self.log.msg(Log.INFO, "%d invalid blocks found" % num_invalid_blocks)      
       
-  def read_block(self, blk_num):
+  def read_block(self, blk_num, is_bm=False, is_bm_ext=False):
     """read block from device, decode it, and return block info instance"""
     try:
       # read block from device
-      blk = Block(self.blkdev, blk_num)
+      if is_bm:
+        blk = BitmapBlock(self.blkdev, blk_num)
+      elif is_bm_ext:
+        blk = BitmapExtBlock(self.blkdev, blk_num)
+      else:
+        blk = Block(self.blkdev, blk_num)
       blk.read()
       data = blk.data
       # create block info
@@ -100,8 +109,19 @@ class BlockScan:
       if blk.valid:
         # block is valid AmigaDOS
         bi.blk_status = self.BS_VALID
+        # --- bitmap block ---
+        if is_bm:
+          bi.blk_type = self.BT_BITMAP
+          bi.blk_status = self.BS_TYPE
+          bi.bitmap = blk.get_bitmap_data()
+        # --- bitmap ext block ---
+        elif is_bm_ext:
+          bi.blk_type = self.BT_BITMAP_EXT
+          bi.blk_status = self.BS_TYPE
+          bi.bitmap_ptrs = blk.bitmap_ptrs
+          bi.next_blk = blk.bitmap_ext_blk
         # --- root block ---
-        if blk.is_root_block():
+        elif blk.is_root_block():
           bi.blk_type = self.BT_ROOT
           bi.blk_status = self.BS_TYPE
           root = RootBlock(self.blkdev, blk_num)
@@ -196,7 +216,10 @@ class BlockScan:
     return res
 
   def is_block_available(self, num):
-    return self.block_map[num] != None
+    if num >= 0 and num < len(self.block_map):
+      return self.block_map[num] != None
+    else:
+      return False
 
   def get_block(self, num):
     if num >= 0 and num < len(self.block_map):

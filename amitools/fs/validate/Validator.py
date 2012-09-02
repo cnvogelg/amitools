@@ -5,6 +5,7 @@ from amitools.fs.validate.Log import Log
 from amitools.fs.validate.BlockScan import BlockScan
 from amitools.fs.validate.DirScan import DirScan
 from amitools.fs.validate.FileScan import FileScan
+from amitools.fs.validate.BitmapScan import BitmapScan
 import amitools.fs.DosType as DosType
 
 class Validator:
@@ -91,6 +92,11 @@ class Validator:
     self.file_scan.scan_all_files(all_files)
     if self.debug:
       self.file_scan.dump()
+      
+  def scan_bitmap(self):
+    """Step 5: validate block bitmap"""
+    self.bitmap_scan = BitmapScan(self.block_scan, self.log)
+    self.bitmap_scan.scan_bitmap(self.root)
 
   def get_summary(self):
     """Return (errors, warnings) of log"""

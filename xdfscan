@@ -88,6 +88,8 @@ def scan_file(path, args):
         v.scan_dir_tree()
         # 4. scan files
         v.scan_files()
+        # 5. scan_bitmap
+        v.scan_bitmap()
         
         # summary
         e, w = v.get_summary()
