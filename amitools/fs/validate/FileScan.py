@@ -20,11 +20,18 @@ class FileScan:
     self.ffs = DosType.is_ffs(self.dos_type)
     self.infos = []
   
-  def scan_all_files(self, all_file_hdr_block_infos):
-    """scan through all files"""    
-    for bi in all_file_hdr_block_infos:
-      self.scan_file(bi)
-  
+  def scan_all_files(self, all_file_hdr_block_infos, progress=None):
+    """scan through all files"""
+    if progress != None:
+      progress.begin("file")
+      for bi in all_file_hdr_block_infos:
+        self.scan_file(bi)
+        progress.add()
+      progress.end()
+    else:
+      for bi in all_file_hdr_block_infos:
+        self.scan_file(bi)
+        
   def scan_file(self, bi):
     """scan a file header block info and create a FileInfo instance"""
     fi = FileInfo(bi)

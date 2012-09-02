@@ -11,7 +11,7 @@ import amitools.fs.DosType as DosType
 class Validator:
   """Validate an AmigaDOS file system"""
     
-  def __init__(self, blkdev, min_level, debug=False):
+  def __init__(self, blkdev, min_level, debug=False, progress=None):
     self.log = Log(min_level)
     self.debug = debug
     self.blkdev = blkdev
@@ -19,6 +19,7 @@ class Validator:
     self.boot = None
     self.root = None
     self.block_scan = None
+    self.progress = progress
 
   def scan_boot(self):
     """Step 1: scan boot block.
@@ -79,7 +80,7 @@ class Validator:
        Return false if structure is not healthy"""
     self.block_scan = BlockScan(self.blkdev, self.log, self.dos_type)
     self.dir_scan = DirScan(self.block_scan, self.log)
-    ok = self.dir_scan.scan_tree(self.root.blk_num)
+    ok = self.dir_scan.scan_tree(self.root.blk_num, progress=self.progress)
     self.log.msg(Log.INFO,"Scanned %d directories" % len(self.dir_scan.get_all_dir_infos()))
     if self.debug:
       self.dir_scan.dump()
@@ -89,7 +90,7 @@ class Validator:
     self.file_scan = FileScan(self.block_scan, self.log, self.dos_type)
     all_files = self.dir_scan.get_all_file_hdr_blk_infos()
     self.log.msg(Log.INFO,"Scanning %d files" % len(all_files))
-    self.file_scan.scan_all_files(all_files)
+    self.file_scan.scan_all_files(all_files, progress=self.progress)
     if self.debug:
       self.file_scan.dump()
       

@@ -5,11 +5,29 @@
 import sys
 import argparse
 import os.path
+import time
 
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 from amitools.fs.validate.Validator import Validator
+from amitools.fs.validate.Progress import Progress
 
 # ----- logging -----
+
+class MyProgress(Progress):
+  def __init__(self):
+    Progress.__init__(self)
+    self.clk = int(time.clock() * 1000)
+  def begin(self, msg):
+    Progress.begin(self, msg)
+  def add(self):
+    Progress.add(self)
+    clk = int(time.clock() * 1000)
+    delta = clk - self.clk
+    # update display every 250ms
+    if delta > 250:
+      self.clk = clk
+      print("%s: %d\r" % (self.msg, self.num)),
+      sys.stdout.flush()
 
 def pre_log_path(path, msg):
   print("%20s  %s  \r" % (msg, path)),
@@ -67,7 +85,8 @@ def scan_file(path, args):
     blkdev = factory.open(path, read_only=True)
 
     # create validator
-    v = Validator(blkdev, min_level=args.level, debug=args.debug)
+    progress = MyProgress()
+    v = Validator(blkdev, min_level=args.level, debug=args.debug, progress=progress)
 
     # 1. check boot block
     res = []

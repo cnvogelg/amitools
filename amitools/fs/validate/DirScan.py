@@ -88,18 +88,22 @@ class DirScan:
     self.files = []
     self.dirs = []
   
-  def scan_tree(self, root_blk_num):
+  def scan_tree(self, root_blk_num, progress=None):
     """scan the root tree"""
     # get root block info
     root_bi = self.block_scan.get_block(root_blk_num)
     if root_bi == None:
       self.log.msg(Log.ERROR,"Root block not found?!",root_blk_num)      
       return None
-    # do 
-    self.root_di = self.scan_dir(root_bi)
+    # do tree scan
+    if progress != None:
+      progress.begin("dir")
+    self.root_di = self.scan_dir(root_bi, progress)
+    if progress != None:
+      progress.end()
     return self.root_di
   
-  def scan_dir(self, dir_bi):    
+  def scan_dir(self, dir_bi, progress):    
     """check a directory by scanning through the hash table entries and follow the chains
        Returns (all_chains_ok, dir_obj)
     """
@@ -114,13 +118,13 @@ class DirScan:
       if blk_num != 0:
         # build chain
         chain = DirChain(hash_val)
-        self.build_chain(chain, dir_bi, blk_num)
+        self.build_chain(chain, dir_bi, blk_num, progress)
         di.add(chain)
       hash_val += 1
           
     return di
     
-  def build_chain(self, chain, dir_blk_info, blk_num):
+  def build_chain(self, chain, dir_blk_info, blk_num, progress):
     """build a block chain"""
     dir_blk_num = dir_blk_info.blk_num
     dir_name = dir_blk_info.name
@@ -135,6 +139,10 @@ class DirScan:
     # create dir chain entry
     dce = DirChainEntry(blk_info)
     chain.add(dce)
+
+    # account
+    if progress != None:
+      progress.add()
 
     # block already used?
     if block_used:
@@ -186,14 +194,14 @@ class DirScan:
 
     # recurse into dir?
     if blk_type == BlockScan.BT_DIR:
-      dce.sub = self.scan_dir(blk_info)
+      dce.sub = self.scan_dir(blk_info, progress)
     elif blk_type == BlockScan.BT_FILE_HDR:
       self.files.append(dce)
 
     # check next block in chain
     next_blk = blk_info.next_blk
     if next_blk != 0:
-      self.build_chain(chain, dir_blk_info, next_blk)
+      self.build_chain(chain, dir_blk_info, next_blk, progress)
     else:
       dce.end = True
   
