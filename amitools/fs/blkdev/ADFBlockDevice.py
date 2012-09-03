@@ -29,7 +29,7 @@ class ADFBlockDevice(BlockDevice):
     fh.close()
     # check size
     if len(data) != self.num_bytes:
-      raise IOError("Invalid ADF Size: got %d but expected %d" % (len(self.data), self.num_bytes))
+      raise IOError("Invalid ADF Size: got %d but expected %d" % (len(data), self.num_bytes))
     # create modifyable data
     if self.read_only:
       self.data = data

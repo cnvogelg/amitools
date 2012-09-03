@@ -133,12 +133,14 @@ def scan_file(path, args):
     if len(res) == 0:
       res.append("done")
     log_path(path," ".join(res))
+    # summary
     if args.verbose:
       v.log.dump()
     return ret_code
   except IOError,e:
+    log_path(path,"BLKDEV?")
     if args.verbose:
-      log_path(path,"BLKDEV?")
+      print e
     return 0
 
 # ----- main -----
