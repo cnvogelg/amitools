@@ -1,5 +1,6 @@
 import sys
 import os.path
+import os
 import logging
 import errno
 import stat
@@ -119,17 +120,27 @@ class FileManager(LabelRange):
         sys_name = ''
         fh = AmiFile(sys.stdout,'*','',need_close=False)
       else:
+        # map to system path
         sys_path = self.path_mgr.ami_to_sys_path(ami_path)
         if sys_path == None:
           log_file.info("file not found: '%s' -> '%s'" % (ami_path, sys_path))
           return None
+
+        # make some checks on existing file
+        if os.path.exists(sys_path):
+          # if not writeable -> no append mode
+          if not os.access(sys_path, os.W_OK):
+            if f_mode[-1] == '+':
+              f_mode = f_mode[:-1]
+
+        log_file.debug("opening file: '%s' -> '%s' f_mode=%s" % (ami_path, sys_path, f_mode))
         fobj = open(sys_path, f_mode)
         fh = AmiFile(fobj, ami_path, sys_path)
     
       self._register_file(fh)
       return fh
-    except IOError:
-      log_file.info("error opening: '%s' -> '%s'" % (ami_path, sys_path))
+    except IOError as e:
+      log_file.info("error opening: '%s' -> '%s' f_mode=%s -> %s" % (ami_path, sys_path, f_mode, e))
       return None
   
   def close(self, fh):
