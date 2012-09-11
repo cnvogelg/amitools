@@ -18,7 +18,8 @@ class Args:
       keys = map(lambda x : x.lower(), flags[0].split('='))
       targ = { 'keys' : keys,
                's' : False, 'k' : False, 'n' : False, 't' : False, 
-               'a' : False, 'f' : False, 'm' : False, 'n' : False }
+               'a' : False, 'f' : False, 'm' : False, 'n' : False,
+               'x' : False }
 
       # get keys
       for flag in flags[1:]:
@@ -26,8 +27,8 @@ class Args:
         if targ.has_key(flag):
           targ[flag] = True
 
-      # n = normal switch = not s,t,k,f
-      targ['n'] = not (targ['s'] or targ['t'] or targ['k'] or targ['f'])
+      # x = normal switch = not s,t,k,f
+      targ['x'] = not (targ['s'] or targ['t'] or targ['k'] or targ['f'])
 
       self.targs.append(targ)
 
@@ -44,26 +45,31 @@ class Args:
       ptr += 4
 
   def _find_remove_key(self, keys, in_list, extra):
-    n = len(in_list)
+    pos = self._find_key_pos_and_remove(keys, in_list)
+    if pos != None:
+      # extra arg?
+      if extra:
+        # last one? -> failed to get extra arg
+        n = len(in_list)
+        if pos == n-1:
+          return None
+        val = in_list[pos]
+        in_list.pop(pos)
+        return val
+      else:
+        return True
+    else:
+      return False
+    
+  def _find_key_pos_and_remove(self, keys, in_list):
     for key in keys:
       pos = 0
       for i in in_list:
         if i.lower() == key:
-          break
-        pos = pos + 1
-      if pos != n:
-        in_list.pop(pos)
-        # extra arg?
-        if extra:
-          # last one? -> failed to get extra arg
-          if pos == n-1:
-            return None
-          val = in_list[pos]
           in_list.pop(pos)
-          return val
-        else:
-          return True
-    return False
+          return pos
+        pos = pos + 1
+    return None
 
   """apply an internal template to a given argument array
   """
@@ -125,7 +131,20 @@ class Args:
             if req:
               self.error = ERROR_REQUIRED_ARG_MISSING
               return False
-            
+      
+      # normal key but not multi
+      elif targ['x'] and not targ['m']:
+        val = self._find_remove_key(targ['keys'], args, True)
+        # keyword at end of line
+        if val == None:
+          self.error = ERROR_REQUIRED_ARG_MISSING
+          return False
+        else:
+          # found a real value
+          if val != False:
+            result[pos] = val
+            targ['x'] = False # disable to reject auto fill
+      
       # full line
       elif targ['f']:
         result[pos] = args
@@ -140,9 +159,18 @@ class Args:
     for targ in targs:  
       # multi 
       if targ['m']:
-        multi_pos = pos
-        multi_targ = targ
-        result[pos] = args
+        # try to find multi keys
+        fpos = self._find_key_pos_and_remove(targ['keys'], args)
+        if fpos != None:
+          # use args after found pos
+          multi_pos = fpos
+          multi_targ = targ
+          result[pos] = args[fpos:]
+        else:
+          # use current args
+          multi_pos = pos
+          multi_targ = targ
+          result[pos] = args
         args = []
         # multi arg required
         if targ['a'] and len(result[pos])==0:
@@ -150,7 +178,7 @@ class Args:
           return False
           
       # normal entry
-      elif targ['n']:
+      elif targ['x']:
         # take from arraay
         if len(args)>0:
           val = args[0]
@@ -180,6 +208,14 @@ class Args:
   
     self.result = result
     return True
+
+  def get_result(self):
+    res = []
+    for i in xrange(len(self.result)):
+      k = self.targs[i]['keys']
+      msg = "%s:%s" % (",".join(k),self.result[i])
+      res.append(msg)
+    return "  ".join(res)  
 
   def calc_result_size(self):
     n = len(self.result)

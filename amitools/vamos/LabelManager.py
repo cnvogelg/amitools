@@ -16,7 +16,16 @@ class LabelManager:
     self.ranges.append(range)
   
   def remove_label(self, range):
-    self.ranges.remove(range)
+    if range in self.ranges:
+      self.ranges.remove(range)
+    else:
+      # try to find compatible
+      for r in self.ranges:
+        if r.addr == range.addr and r.size == range.size:
+          self.ranges.remove(r)
+          log_mem_int.log(logging.WARN, "remove_label: got=%s have=%s", range, r)
+          return
+      log_mem_int.log(logging.ERROR, "remove_label: invalid range %s", range)
   
   def get_all_labels(self):
     return self.ranges[:]

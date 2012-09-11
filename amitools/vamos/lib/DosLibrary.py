@@ -608,7 +608,7 @@ class DosLibrary(AmigaLibrary):
       self.io_err = args.error
       log_dos.info("ReadArgs: not matched -> io_err=%d/%s",self.io_err, dos_error_strings[self.io_err])
       return 0
-    log_dos.debug("matched template: %s",args.result)
+    log_dos.debug("matched template: %s",args.get_result())
     # calc size of result
     size = args.calc_result_size()
     log_dos.debug("longs=%d chars=%d size=%d" % (args.num_longs,args.num_chars,size))
