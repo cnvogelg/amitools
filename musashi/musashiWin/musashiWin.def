@@ -1,0 +1,15 @@
+LIBRARY
+EXPORTS
+	mem_init
+	mem_free
+	mem_set_invalid_func
+	mem_set_trace_mode
+	mem_set_trace_func
+	mem_is_end
+	mem_reserve_special_range
+	mem_set_special_range_read_func
+	mem_set_special_range_write_func
+	mem_ram_read
+	mem_ram_write
+	mem_ram_write_block
+	mem_ram_clear_block

@@ -1,0 +1,29 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "musashiWin", "musashiWin.vcxproj", "{6AE3DA9C-EC21-4DAB-81EB-03DC5EECB718}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FEB811BD-18AC-455C-94C5-AF49EC1E7A1F} = {FEB811BD-18AC-455C-94C5-AF49EC1E7A1F}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "m68kmake", "..\m68kmake\m68kmake.vcxproj", "{FEB811BD-18AC-455C-94C5-AF49EC1E7A1F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6AE3DA9C-EC21-4DAB-81EB-03DC5EECB718}.Debug|Win32.ActiveCfg = Debug|Win32
+		{6AE3DA9C-EC21-4DAB-81EB-03DC5EECB718}.Debug|Win32.Build.0 = Debug|Win32
+		{6AE3DA9C-EC21-4DAB-81EB-03DC5EECB718}.Release|Win32.ActiveCfg = Release|Win32
+		{6AE3DA9C-EC21-4DAB-81EB-03DC5EECB718}.Release|Win32.Build.0 = Release|Win32
+		{FEB811BD-18AC-455C-94C5-AF49EC1E7A1F}.Debug|Win32.ActiveCfg = Debug|Win32
+		{FEB811BD-18AC-455C-94C5-AF49EC1E7A1F}.Debug|Win32.Build.0 = Debug|Win32
+		{FEB811BD-18AC-455C-94C5-AF49EC1E7A1F}.Release|Win32.ActiveCfg = Release|Win32
+		{FEB811BD-18AC-455C-94C5-AF49EC1E7A1F}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

@@ -234,11 +234,11 @@ unsigned int m68k_read_disassembler_32 (unsigned int address)
 
 int mem_init(uint ram_size_kib)
 {
+  int i;
   ram_size = ram_size_kib * 1024;
   ram_pages = ram_size_kib / 64;
   ram_data = (uint8_t *)malloc(ram_size);
 
-  int i;
   for(i=0;i<NUM_PAGES;i++) {
     if(i < ram_pages) {
       r_func[i][0] = r8_ram;

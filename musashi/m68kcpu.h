@@ -20,7 +20,7 @@
  * http://kstenerud.cjb.net
  */
 
-
+#define INLINE __inline
 
 
 #ifndef M68KCPU__HEADER
