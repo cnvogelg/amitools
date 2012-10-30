@@ -1,0 +1,41 @@
+LIBRARY
+EXPORTS
+	mem_init
+	mem_free
+	mem_set_invalid_func
+	mem_set_trace_mode
+	mem_set_trace_func
+	mem_is_end
+	mem_reserve_special_range
+	mem_set_special_range_read_func
+	mem_set_special_range_write_func
+	mem_ram_read
+	mem_ram_write
+	mem_ram_read_block
+	mem_ram_write_block
+	mem_ram_clear_block
+	m68k_set_cpu_type
+	m68k_pulse_reset
+	m68k_execute
+	m68k_cycles_run
+	m68k_cycles_remaining
+	m68k_modify_timeslice
+	m68k_end_timeslice
+	m68k_set_irq
+	m68k_pulse_halt
+	m68k_context_size
+	m68k_get_context
+	m68k_set_context
+	m68k_save_context
+	m68k_load_context
+	m68k_get_reg
+	m68k_set_reg
+	m68k_is_valid_instruction
+	m68k_disassemble
+	m68k_set_int_ack_callback
+	m68k_set_bkpt_ack_callback
+	m68k_set_reset_instr_callback
+	m68k_set_pc_changed_callback
+	m68k_set_fc_callback
+	m68k_set_instr_hook_callback
+
