@@ -6,3 +6,4 @@ m68kopdm.c
 m68kopnz.c
 m68kops.c
 m68kops.h
+*.obj
