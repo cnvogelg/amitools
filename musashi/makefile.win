@@ -28,8 +28,8 @@ all: build
 
 build: $(LIB_FILE)
 
-$(LIB_FILE): $(ALL_OBJ) musashi.def
-	$(CC) $(ALL_OBJ) musashi.def /Femusashi.dll /link /dll
+$(LIB_FILE): $(ALL_OBJ) musashi_dll.def
+	$(CC) $(ALL_OBJ) musashi_dll.def /Femusashi.dll /link /dll
 
 #$(SRC): $(GEN_HDR) $(HDR)
 

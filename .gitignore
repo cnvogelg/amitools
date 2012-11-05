@@ -5,3 +5,6 @@ Debug/
 ipch/
 *.sdf
 *.suo
+*.exe
+*.exp
+*.lib
