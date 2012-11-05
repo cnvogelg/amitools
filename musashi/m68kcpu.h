@@ -20,11 +20,16 @@
  * http://kstenerud.cjb.net
  */
 
-#define INLINE __inline
-
 
 #ifndef M68KCPU__HEADER
 #define M68KCPU__HEADER
+
+/* INLINE Definition for Microsoft Visual C++ */
+#ifdef _MSC_VER
+#ifndef INLINE
+#define INLINE __inline
+#endif
+#endif
 
 #include "m68k.h"
 #include <limits.h>
