@@ -1,0 +1,16 @@
+Build instructions for Microsoft Windows
+----------------------------------------
+
+- Install Visual Studio (tested on 2012)
+- Install Python (put it in PATH)
+- Open Visual Studio Developer Command Prompt
+
+- cd amitools\musashi
+- nmake /F makefile.win
+
+- this should result as musashi.dll
+- cd ..
+
+- This should work now:
+- python vamos
+

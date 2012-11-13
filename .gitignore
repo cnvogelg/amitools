@@ -1,1 +1,10 @@
 *.pyc
+*.dll
+Debug/
+*.user
+ipch/
+*.sdf
+*.suo
+*.exe
+*.exp
+*.lib
