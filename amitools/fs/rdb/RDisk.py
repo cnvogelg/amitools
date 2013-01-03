@@ -284,6 +284,8 @@ class RDisk:
         else:
           new_free.append(r)
       free = new_free
+    if len(free) == 0:
+      return None
     return free
   
   def find_free_cyl_range_start(self, num_cyls):

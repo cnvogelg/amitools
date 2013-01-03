@@ -114,7 +114,7 @@ class BlkDevFactory:
       # determine partition
       p = "0"
       if options != None and options.has_key('part'):
-        p = options['part']
+        p = str(options['part'])
       part = rdisk.find_partition_by_string(p)
       if part == None:
         raise IOError("can't find partition in image file")
