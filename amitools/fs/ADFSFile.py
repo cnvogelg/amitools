@@ -192,7 +192,7 @@ class ADFSFile(ADFSNode):
       else:
         ext_blk = self.ext_blk_nums[i+1]
         blks = self.data_blk_nums[ext_off:ext_off+ppb]
-      flb.create(parent_blk, blks, ext_blk)
+      flb.create(fhb_num, blks, ext_blk)
       flb.write()
       self.ext_blks.append(flb)
       ext_off += ppb
