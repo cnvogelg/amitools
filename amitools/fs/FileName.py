@@ -19,6 +19,9 @@ class FileName:
   def is_root_path_alias(self):
     return self.name.get_unicode() in self.root_path_aliases
   
+  def has_dir_prefix(self):
+    return self.name.get_unicode().find("/") != -1
+
   def split_path(self):
     pc = self.name.get_unicode().split("/")
     p = []
@@ -55,13 +58,27 @@ class FileName:
       return result
   
   def is_valid(self):
-    s = self.name.get_ami_str()
-    if len(s) > 30:
-      return False
-    for c in s:
-      o = ord(c)
-      if o == ':' or o == '/':
-        return False
+    # check if path contains dir prefix components
+    if self.has_dir_prefix():
+        e = self.split_path()
+        # empty path?
+        if len(e) == 0:
+            return False
+        for p in e:
+            if not p.is_valid():
+                return False
+        return True
+    else:
+        # single file name
+        s = self.name.get_ami_str()
+        # check for invalid chars
+        for c in s:
+          o = ord(c)
+          if o == ':' or o == '/':
+            return False
+        # check max size
+        if len(s) > 30:
+            return False
     return True
   
   def hash(self, hash_size=72):
