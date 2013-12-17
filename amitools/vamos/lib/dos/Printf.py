@@ -94,7 +94,7 @@ def printf_read_data(state, mem_access, data_ptr):
       data = mem_access.r_bstr(bptr)
     elif t in ('d','u','x'): # number
       l = e.length 
-      if "l" in l:
+      if l is not None and "l" in l:
         data = mem_access.r32(data_ptr)
         data_ptr += 4
       else:
