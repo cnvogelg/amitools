@@ -205,11 +205,15 @@ class FileManager(LabelRange):
   
   def is_interactive(self, fh):
     fd = fh.obj.fileno()
-    try:
-      os.ttyname(fd)
-      return True
-    except OSError:
-      return False
+    if hasattr(os, "ttyname"):
+      try:
+        os.ttyname(fd)
+        return True
+      except OSError:
+        return False
+    else:
+      # Not perfect, but best you can do on non-posix to detect a terminal.
+      return sys.stdin.isatty() or sys.stdout.isatty()
 
   def is_file_system(self, name):
     sys_path = self.path_mgr.ami_to_sys_path(name)
