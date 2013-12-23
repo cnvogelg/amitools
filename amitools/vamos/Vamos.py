@@ -99,6 +99,9 @@ class Vamos:
     # new proc registers: d0=arg_len a0=arg_cptr
     tr.set_dx_l(0, proc.arg_len)
     tr.set_ax_l(0, proc.arg_base)
+    # d2=stack_size.  this value is also in 4(sp) (see Process.init_stack), but
+    # various C programs rely on it being present (1.3-3.1 at least have it).
+    tr.set_dx_l(2, proc.stack_size)
     # to track old dos values
     tr.set_ax_l(2, self.dos_guard_base)
     tr.set_ax_l(5, self.dos_guard_base)

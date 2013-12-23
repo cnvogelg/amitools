@@ -44,6 +44,10 @@ class VamosRun:
     self.cpu.w_reg(REG_D0, self.ctx.process.arg_len)
     self.cpu.w_reg(REG_A0, self.ctx.process.arg_base)
 
+    # d2=stack_size.  this value is also in 4(sp) (see Process.init_stack), but
+    # various C programs rely on it being present (1.3-3.1 at least have it).
+    self.cpu.w_reg(REG_D2, self.ctx.process.stack_size)
+
     # to track old dos values
     self.cpu.w_reg(REG_A2, self.ctx.dos_guard_base)
     self.cpu.w_reg(REG_A5, self.ctx.dos_guard_base)
