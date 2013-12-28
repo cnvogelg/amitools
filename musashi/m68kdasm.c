@@ -3,20 +3,28 @@
 /* ======================================================================== */
 /*
  *                                  MUSASHI
- *                                Version 3.3
+ *                                Version 3.4
  *
  * A portable Motorola M680x0 processor emulation engine.
  * Copyright 1998-2001 Karl Stenerud.  All rights reserved.
  *
- * This code may be freely used for non-commercial purposes as long as this
- * copyright notice remains unaltered in the source code and any binary files
- * containing this code in compiled form.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * All other lisencing terms must be negotiated with the author
- * (Karl Stenerud).
- *
- * The latest version of this code can be obtained at:
- * http://kstenerud.cjb.net
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 
 
@@ -29,6 +37,10 @@
 #include <stdio.h>
 #include <string.h>
 #include "m68k.h"
+
+#ifndef DECL_SPEC
+#define DECL_SPEC
+#endif
 
 /* ======================================================================== */
 /* ============================ GENERAL DEFINES =========================== */
@@ -1300,7 +1312,7 @@ static void d68000_cmpi_8(void)
 static void d68020_cmpi_pcdi_8(void)
 {
 	char* str;
-	LIMIT_CPU_TYPES(M68020_PLUS);
+	LIMIT_CPU_TYPES(M68010_PLUS);
 	str = get_imm_str_s8();
 	sprintf(g_dasm_str, "cmpi.b  %s, %s; (2+)", str, get_ea_mode_str_8(g_cpu_ir));
 }
@@ -1308,7 +1320,7 @@ static void d68020_cmpi_pcdi_8(void)
 static void d68020_cmpi_pcix_8(void)
 {
 	char* str;
-	LIMIT_CPU_TYPES(M68020_PLUS);
+	LIMIT_CPU_TYPES(M68010_PLUS);
 	str = get_imm_str_s8();
 	sprintf(g_dasm_str, "cmpi.b  %s, %s; (2+)", str, get_ea_mode_str_8(g_cpu_ir));
 }
@@ -1316,7 +1328,6 @@ static void d68020_cmpi_pcix_8(void)
 static void d68000_cmpi_16(void)
 {
 	char* str;
-	LIMIT_CPU_TYPES(M68020_PLUS);
 	str = get_imm_str_s16();
 	sprintf(g_dasm_str, "cmpi.w  %s, %s", str, get_ea_mode_str_16(g_cpu_ir));
 }
@@ -1324,7 +1335,7 @@ static void d68000_cmpi_16(void)
 static void d68020_cmpi_pcdi_16(void)
 {
 	char* str;
-	LIMIT_CPU_TYPES(M68020_PLUS);
+	LIMIT_CPU_TYPES(M68010_PLUS);
 	str = get_imm_str_s16();
 	sprintf(g_dasm_str, "cmpi.w  %s, %s; (2+)", str, get_ea_mode_str_16(g_cpu_ir));
 }
@@ -1332,7 +1343,7 @@ static void d68020_cmpi_pcdi_16(void)
 static void d68020_cmpi_pcix_16(void)
 {
 	char* str;
-	LIMIT_CPU_TYPES(M68020_PLUS);
+	LIMIT_CPU_TYPES(M68010_PLUS);
 	str = get_imm_str_s16();
 	sprintf(g_dasm_str, "cmpi.w  %s, %s; (2+)", str, get_ea_mode_str_16(g_cpu_ir));
 }
@@ -1340,7 +1351,6 @@ static void d68020_cmpi_pcix_16(void)
 static void d68000_cmpi_32(void)
 {
 	char* str;
-	LIMIT_CPU_TYPES(M68020_PLUS);
 	str = get_imm_str_s32();
 	sprintf(g_dasm_str, "cmpi.l  %s, %s", str, get_ea_mode_str_32(g_cpu_ir));
 }
@@ -1348,7 +1358,7 @@ static void d68000_cmpi_32(void)
 static void d68020_cmpi_pcdi_32(void)
 {
 	char* str;
-	LIMIT_CPU_TYPES(M68020_PLUS);
+	LIMIT_CPU_TYPES(M68010_PLUS);
 	str = get_imm_str_s32();
 	sprintf(g_dasm_str, "cmpi.l  %s, %s; (2+)", str, get_ea_mode_str_32(g_cpu_ir));
 }
@@ -1356,7 +1366,7 @@ static void d68020_cmpi_pcdi_32(void)
 static void d68020_cmpi_pcix_32(void)
 {
 	char* str;
-	LIMIT_CPU_TYPES(M68020_PLUS);
+	LIMIT_CPU_TYPES(M68010_PLUS);
 	str = get_imm_str_s32();
 	sprintf(g_dasm_str, "cmpi.l  %s, %s; (2+)", str, get_ea_mode_str_32(g_cpu_ir));
 }
@@ -1851,9 +1861,11 @@ static void d68000_movem_pd_16(void)
 		{
 			first = i;
 			run_length = 0;
-			for(i++;i<8;i++)
-				if(data&(1<<(15-i)))
-					run_length++;
+			while(i<7 && (data&(1<<(15-(i+1)))))
+			{
+				i++;
+				run_length++;
+			}
 			if(buffer[0] != 0)
 				strcat(buffer, "/");
 			sprintf(buffer+strlen(buffer), "D%d", first);
@@ -1867,9 +1879,11 @@ static void d68000_movem_pd_16(void)
 		{
 			first = i;
 			run_length = 0;
-			for(i++;i<8;i++)
-				if(data&(1<<(7-i)))
-					run_length++;
+			while(i<7 && (data&(1<<(7-(i+1)))))
+			{
+				i++;
+				run_length++;
+			}
 			if(buffer[0] != 0)
 				strcat(buffer, "/");
 			sprintf(buffer+strlen(buffer), "A%d", first);
@@ -1895,9 +1909,11 @@ static void d68000_movem_pd_32(void)
 		{
 			first = i;
 			run_length = 0;
-			for(i++;i<8;i++)
-				if(data&(1<<(15-i)))
-					run_length++;
+			while(i<7 && (data&(1<<(15-(i+1)))))
+			{
+				i++;
+				run_length++;
+			}
 			if(buffer[0] != 0)
 				strcat(buffer, "/");
 			sprintf(buffer+strlen(buffer), "D%d", first);
@@ -1911,9 +1927,11 @@ static void d68000_movem_pd_32(void)
 		{
 			first = i;
 			run_length = 0;
-			for(i++;i<8;i++)
-				if(data&(1<<(7-i)))
-					run_length++;
+			while(i<7 && (data&(1<<(7-(i+1)))))
+			{
+				i++;
+				run_length++;
+			}
 			if(buffer[0] != 0)
 				strcat(buffer, "/");
 			sprintf(buffer+strlen(buffer), "A%d", first);
@@ -1939,9 +1957,11 @@ static void d68000_movem_er_16(void)
 		{
 			first = i;
 			run_length = 0;
-			for(i++;i<8;i++)
-				if(data&(1<<i))
-					run_length++;
+			while(i<7 && (data&(1<<(i+1))))
+			{
+				i++;
+				run_length++;
+			}
 			if(buffer[0] != 0)
 				strcat(buffer, "/");
 			sprintf(buffer+strlen(buffer), "D%d", first);
@@ -1955,9 +1975,11 @@ static void d68000_movem_er_16(void)
 		{
 			first = i;
 			run_length = 0;
-			for(i++;i<8;i++)
-				if(data&(1<<(i+8)))
-					run_length++;
+			while(i<7 && (data&(1<<(i+8+1))))
+			{
+				i++;
+				run_length++;
+			}
 			if(buffer[0] != 0)
 				strcat(buffer, "/");
 			sprintf(buffer+strlen(buffer), "A%d", first);
@@ -1983,9 +2005,11 @@ static void d68000_movem_er_32(void)
 		{
 			first = i;
 			run_length = 0;
-			for(i++;i<8;i++)
-				if(data&(1<<i))
-					run_length++;
+			while(i<7 && (data&(1<<(i+1))))
+			{
+				i++;
+				run_length++;
+			}
 			if(buffer[0] != 0)
 				strcat(buffer, "/");
 			sprintf(buffer+strlen(buffer), "D%d", first);
@@ -1999,9 +2023,11 @@ static void d68000_movem_er_32(void)
 		{
 			first = i;
 			run_length = 0;
-			for(i++;i<8;i++)
-				if(data&(1<<(i+8)))
-					run_length++;
+			while(i<7 && (data&(1<<(i+8+1))))
+			{
+				i++;
+				run_length++;
+			}
 			if(buffer[0] != 0)
 				strcat(buffer, "/");
 			sprintf(buffer+strlen(buffer), "A%d", first);
@@ -2027,9 +2053,11 @@ static void d68000_movem_re_16(void)
 		{
 			first = i;
 			run_length = 0;
-			for(i++;i<8;i++)
-				if(data&(1<<i))
-					run_length++;
+			while(i<7 && (data&(1<<(i+1))))
+			{
+				i++;
+				run_length++;
+			}
 			if(buffer[0] != 0)
 				strcat(buffer, "/");
 			sprintf(buffer+strlen(buffer), "D%d", first);
@@ -2043,9 +2071,11 @@ static void d68000_movem_re_16(void)
 		{
 			first = i;
 			run_length = 0;
-			for(i++;i<8;i++)
-				if(data&(1<<(i+8)))
-					run_length++;
+			while(i<7 && (data&(1<<(i+8+1))))
+			{
+				i++;
+				run_length++;
+			}
 			if(buffer[0] != 0)
 				strcat(buffer, "/");
 			sprintf(buffer+strlen(buffer), "A%d", first);
@@ -2071,9 +2101,11 @@ static void d68000_movem_re_32(void)
 		{
 			first = i;
 			run_length = 0;
-			for(i++;i<8;i++)
-				if(data&(1<<i))
-					run_length++;
+			while(i<7 && (data&(1<<(i+1))))
+			{
+				i++;
+				run_length++;
+			}
 			if(buffer[0] != 0)
 				strcat(buffer, "/");
 			sprintf(buffer+strlen(buffer), "D%d", first);
@@ -2087,9 +2119,11 @@ static void d68000_movem_re_32(void)
 		{
 			first = i;
 			run_length = 0;
-			for(i++;i<8;i++)
-				if(data&(1<<(i+8)))
-					run_length++;
+			while(i<7 && (data&(1<<(i+8+1))))
+			{
+				i++;
+				run_length++;
+			}
 			if(buffer[0] != 0)
 				strcat(buffer, "/");
 			sprintf(buffer+strlen(buffer), "A%d", first);

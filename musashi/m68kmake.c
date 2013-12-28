@@ -3,20 +3,28 @@
 /* ======================================================================== */
 /*
  *                                  MUSASHI
- *                                Version 3.3
+ *                                Version 3.4
  *
  * A portable Motorola M680x0 processor emulation engine.
  * Copyright 1998-2001 Karl Stenerud.  All rights reserved.
  *
- * This code may be freely used for non-commercial purposes as long as this
- * copyright notice remains unaltered in the source code and any binary files
- * containing this code in compiled form.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * All other lisencing terms must be negotiated with the author
- * (Karl Stenerud).
- *
- * The latest version of this code can be obtained at:
- * http://kstenerud.cjb.net
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 
 
@@ -66,8 +74,8 @@ char* g_version = "3.3";
 /* ============================= CONFIGURATION ============================ */
 /* ======================================================================== */
 
-#define MAX_PATH 1024
-#define MAX_DIR  1024
+#define M68K_MAX_PATH 1024
+#define M68K_MAX_DIR  1024
 
 #define NUM_CPUS                          3	/* 000, 010, 020 */
 #define MAX_LINE_LENGTH                 200	/* length of 1 line */
@@ -168,16 +176,16 @@ enum
 typedef struct
 {
 	char name[MAX_NAME_LENGTH];           /* opcode handler name */
-	unsigned int size;                    /* Size of operation */
+	unsigned char size;                   /* Size of operation */
 	char spec_proc[MAX_SPEC_PROC_LENGTH]; /* Special processing mode */
 	char spec_ea[MAX_SPEC_EA_LENGTH];     /* Specified effective addressing mode */
-	unsigned int bits;                    /* Number of significant bits (used for sorting the table) */
-	unsigned int op_mask;                 /* Mask to apply for matching an opcode to a handler */
-	unsigned int op_match;                /* Value to match after masking */
+	unsigned char bits;                   /* Number of significant bits (used for sorting the table) */
+	unsigned short op_mask;               /* Mask to apply for matching an opcode to a handler */
+	unsigned short op_match;              /* Value to match after masking */
 	char ea_allowed[EA_ALLOWED_LENGTH];   /* Effective addressing modes allowed */
 	char cpu_mode[NUM_CPUS];              /* User or supervisor mode */
 	char cpus[NUM_CPUS+1];                /* Allowed CPUs */
-	unsigned int cycles[NUM_CPUS];        /* cycles for 000, 010, 020 */
+	unsigned char cycles[NUM_CPUS];       /* cycles for 000, 010, 020 */
 } opcode_struct;
 
 
@@ -244,7 +252,7 @@ void read_insert(char* insert);
 /* ======================================================================== */
 
 /* Name of the input file */
-char g_input_filename[MAX_PATH] = FILENAME_INPUT;
+char g_input_filename[M68K_MAX_PATH] = FILENAME_INPUT;
 
 /* File handles */
 FILE* g_input_file = NULL;
@@ -644,7 +652,7 @@ opcode_struct* find_opcode(char* name, int size, char* spec_proc, char* spec_ea)
 	for(op = g_opcode_input_table;op->name != NULL;op++)
 	{
 		if(	strcmp(name, op->name) == 0 &&
-			(size == (int)op->size) &&
+			(size == op->size) &&
 			strcmp(spec_proc, op->spec_proc) == 0 &&
 			strcmp(spec_ea, op->spec_ea) == 0)
 				return op;
@@ -693,6 +701,8 @@ int extract_opcode_info(char* src, char* name, int* size, char* spec_proc, char*
 
 	ptr += check_strcncpy(spec_ea, ptr, ')', MAX_SPEC_EA_LENGTH);
 	if(*ptr != ')') return 0;
+	ptr++;
+	ptr += skip_spaces(ptr);
 
 	return 1;
 }
@@ -791,7 +801,7 @@ void add_opcode_output_table_entry(opcode_struct* op, char* name)
  */
 static int DECL_SPEC compare_nof_true_bits(const void* aptr, const void* bptr)
 {
-	const opcode_struct *a = (const opcode_struct *)aptr, *b = (const opcode_struct *)bptr;
+	const opcode_struct *a = aptr, *b = bptr;
 	if(a->bits != b->bits)
 		return a->bits - b->bits;
 	if(a->op_mask != b->op_mask)
@@ -846,7 +856,7 @@ void set_opcode_struct(opcode_struct* src, opcode_struct* dst, int ea_mode)
 void generate_opcode_handler(FILE* filep, body_struct* body, replace_struct* replace, opcode_struct* opinfo, int ea_mode)
 {
 	char str[MAX_LINE_LENGTH+1];
-	opcode_struct* op = (opcode_struct*)malloc(sizeof(opcode_struct));
+	opcode_struct* op = malloc(sizeof(opcode_struct));
 
 	/* Set the opcode structure and write the tables, prototypes, etc */
 	set_opcode_struct(opinfo, op, ea_mode);
@@ -940,7 +950,7 @@ void generate_opcode_cc_variants(FILE* filep, body_struct* body, replace_struct*
 	char replnot[20];
 	int i;
 	int old_length = replace->length;
-	opcode_struct* op = (opcode_struct*)malloc(sizeof(opcode_struct));
+	opcode_struct* op = malloc(sizeof(opcode_struct));
 
 	*op = *op_in;
 
@@ -980,8 +990,8 @@ void process_opcode_handlers(void)
 	char oper_spec_proc[MAX_LINE_LENGTH+1];
 	char oper_spec_ea[MAX_LINE_LENGTH+1];
 	opcode_struct* opinfo;
-	replace_struct* replace = (replace_struct*)malloc(sizeof(replace_struct));
-	body_struct* body = (body_struct*)malloc(sizeof(body_struct));
+	replace_struct* replace = malloc(sizeof(replace_struct));
+	body_struct* body = malloc(sizeof(body_struct));
 
 
 	output_file = g_ops_ac_file;
@@ -1046,6 +1056,9 @@ void process_opcode_handlers(void)
 		else
 			generate_opcode_ea_variants(output_file, body, replace, opinfo);
 	}
+
+	free(replace);
+	free(body);
 }
 
 
@@ -1125,7 +1138,7 @@ void populate_table(void)
 			}
 			else
 			{
-				op->cpus[i] = (char)('0' + i);
+				op->cpus[i] = '0' + i;
 				ptr += check_atoi(ptr, &temp);
 				op->cycles[i] = (unsigned char)temp;
 			}
@@ -1151,6 +1164,8 @@ void read_insert(char* insert)
 	char* overflow = insert + MAX_INSERT_LENGTH - MAX_LINE_LENGTH;
 	int length;
 	char* first_blank = NULL;
+
+	first_blank = NULL;
 
 	/* Skip any leading blank lines */
 	for(length = 0;length == 0;length = fgetline(ptr, MAX_LINE_LENGTH, g_input_file))
@@ -1193,7 +1208,7 @@ void read_insert(char* insert)
 	/* kill any trailing blank lines */
 	if(first_blank)
 		ptr = first_blank;
-	*ptr = 0;
+	*ptr++ = 0;
 }
 
 
@@ -1205,8 +1220,8 @@ void read_insert(char* insert)
 int main(int argc, char **argv)
 {
 	/* File stuff */
-	char output_path[MAX_DIR] = "";
-	char filename[MAX_PATH];
+	char output_path[M68K_MAX_DIR] = "";
+	char filename[M68K_MAX_PATH];
 	/* Section identifier */
 	char section_id[MAX_LINE_LENGTH+1];
 	/* Inserts */

@@ -80,6 +80,8 @@ trace_func_type = CFUNCTYPE(c_int, c_int, c_int, c_uint, c_uint)
 instr_hook_callback_func = CFUNCTYPE(None)
 
 # declare cpu functions
+cpu_init_func = lib.m68k_init
+
 execute_func = lib.m68k_execute
 execute_func.restype = c_int
 execute_func.argtypes = [c_int]
@@ -136,6 +138,9 @@ mem_ram_clear_block = lib.mem_ram_clear_block
 mem_ram_clear_block.argtypes = [c_uint, c_uint, c_int]
 
 # --- CPU API ---
+
+def cpu_init():
+  cpu_init_func()
 
 def set_pc_changed_callback(func):
   global pc_changed_callback
@@ -222,6 +227,9 @@ def mem_set_special_range_write_func(page_addr, width, func):
 # --- Sample ---
 
 if __name__ == "__main__":
+  print "init cpu"
+  cpu_init()
+  
   print "init mem"
   if not mem_init(128):
     print "ERROR: OUT OF MEMORY"
@@ -266,7 +274,7 @@ if __name__ == "__main__":
   
   # valid range
   print "executing..."
-  set_reg(M68K_REG_PC,0x1000);
+  set_reg(M68K_REG_PC,0x1000)
   print execute(2)
 
   def my_r16(addr):
@@ -276,7 +284,7 @@ if __name__ == "__main__":
 
   # invalid range
   print "executing invalid..."
-  set_reg(M68K_REG_PC,spec_addr);
+  set_reg(M68K_REG_PC,spec_addr)
   print execute(2)
   
   # check if mem is in end mode?

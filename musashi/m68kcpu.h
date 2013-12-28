@@ -1,35 +1,37 @@
-#include <stdio.h>
 /* ======================================================================== */
 /* ========================= LICENSING & COPYRIGHT ======================== */
 /* ======================================================================== */
 /*
  *                                  MUSASHI
- *                                Version 3.3
+ *                                Version 3.4
  *
  * A portable Motorola M680x0 processor emulation engine.
  * Copyright 1998-2001 Karl Stenerud.  All rights reserved.
  *
- * This code may be freely used for non-commercial purposes as long as this
- * copyright notice remains unaltered in the source code and any binary files
- * containing this code in compiled form.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * All other lisencing terms must be negotiated with the author
- * (Karl Stenerud).
- *
- * The latest version of this code can be obtained at:
- * http://kstenerud.cjb.net
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
+
+
 
 
 #ifndef M68KCPU__HEADER
 #define M68KCPU__HEADER
-
-/* INLINE Definition for Microsoft Visual C++ */
-#ifdef _MSC_VER
-#ifndef INLINE
-#define INLINE __inline
-#endif
-#endif
 
 #include "m68k.h"
 #include <limits.h>
@@ -45,6 +47,8 @@
 /* Check for > 32bit sizes */
 #if UINT_MAX > 0xffffffff
 	#define M68K_INT_GT_32_BIT  1
+#else
+	#define M68K_INT_GT_32_BIT  0
 #endif
 
 /* Data types used in this emulation core */
@@ -166,6 +170,15 @@
 #define STOP_LEVEL_STOP 1
 #define STOP_LEVEL_HALT 2
 
+/* Used for 68000 address error processing */
+#define INSTRUCTION_YES 0
+#define INSTRUCTION_NO  0x08
+#define MODE_READ       0x10
+#define MODE_WRITE      0
+
+#define RUN_MODE_NORMAL          0
+#define RUN_MODE_BERR_AERR_RESET 1
+
 #ifndef NULL
 #define NULL ((void*)0)
 #endif
@@ -234,13 +247,13 @@
 #define MASK_OUT_BELOW_16(A) ((A) & ~0xffff)
 
 /* No need to mask if we are 32 bit */
-#if M68K_INT_GT_32BIT || M68K_USE_64_BIT
+#if M68K_INT_GT_32_BIT || M68K_USE_64_BIT
 	#define MASK_OUT_ABOVE_32(A) ((A) & 0xffffffff)
 	#define MASK_OUT_BELOW_32(A) ((A) & ~0xffffffff)
 #else
 	#define MASK_OUT_ABOVE_32(A) (A)
 	#define MASK_OUT_BELOW_32(A) 0
-#endif /* M68K_INT_GT_32BIT || M68K_USE_64_BIT */
+#endif /* M68K_INT_GT_32_BIT || M68K_USE_64_BIT */
 
 /* Simulate address lines of 68k family */
 #define ADDRESS_68K(A) ((A)&CPU_ADDRESS_MASK)
@@ -251,7 +264,7 @@
 #define LSR(A, C) ((A) >> (C))
 
 /* Some > 32-bit optimizations */
-#if M68K_INT_GT_32BIT
+#if M68K_INT_GT_32_BIT
 	/* Shift left and right */
 	#define LSR_32(A, C) ((A) >> (C))
 	#define LSL_32(A, C) ((A) << (C))
@@ -261,7 +274,7 @@
 	 */
 	#define LSR_32(A, C) ((C) < 32 ? (A) >> (C) : 0)
 	#define LSL_32(A, C) ((C) < 32 ? (A) << (C) : 0)
-#endif /* M68K_INT_GT_32BIT */
+#endif /* M68K_INT_GT_32_BIT */
 
 #if M68K_USE_64_BIT
 	#define LSL_32_64(A, C) ((A) << (C))
@@ -326,6 +339,8 @@
 #define CPU_PREF_DATA    m68ki_cpu.pref_data
 #define CPU_ADDRESS_MASK m68ki_cpu.address_mask
 #define CPU_SR_MASK      m68ki_cpu.sr_mask
+#define CPU_INSTR_MODE   m68ki_cpu.instr_mode
+#define CPU_RUN_MODE     m68ki_cpu.run_mode
 
 #define CYC_INSTRUCTION  m68ki_cpu.cyc_instruction
 #define CYC_EXCEPTION    m68ki_cpu.cyc_exception
@@ -495,12 +510,32 @@
 
 /* Address error */
 #if M68K_EMULATE_ADDRESS_ERROR
-	extern jmp_buf m68ki_address_error_trap;
-	#define m68ki_set_address_error_trap() if(setjmp(m68ki_address_error_trap)) m68ki_exception_address_error();
-	#define m68ki_check_address_error(A) if((A)&1) longjmp(m68ki_address_error_jump, 1);
+	#include <setjmp.h>
+	extern jmp_buf m68ki_aerr_trap;
+
+	#define m68ki_set_address_error_trap() \
+		if(setjmp(m68ki_aerr_trap) != 0) \
+		{ \
+			m68ki_exception_address_error(); \
+			if(CPU_STOPPED) \
+			{ \
+				SET_CYCLES(0); \
+				CPU_INT_CYCLES = 0; \
+				return m68ki_initial_cycles; \
+			} \
+		}
+
+	#define m68ki_check_address_error(ADDR, WRITE_MODE, FC) \
+		if((ADDR)&1) \
+		{ \
+			m68ki_aerr_address = ADDR; \
+			m68ki_aerr_write_mode = WRITE_MODE; \
+			m68ki_aerr_fc = FC; \
+			longjmp(m68ki_aerr_trap, 1); \
+		}
 #else
 	#define m68ki_set_address_error_trap()
-	#define m68ki_check_address_error(A)
+	#define m68ki_check_address_error(ADDR, WRITE_MODE, FC)
 #endif /* M68K_ADDRESS_ERROR */
 
 /* Logging */
@@ -726,6 +761,12 @@
 #define m68ki_write_16(A, V) m68ki_write_16_fc(A, FLAG_S | FUNCTION_CODE_USER_DATA, V)
 #define m68ki_write_32(A, V) m68ki_write_32_fc(A, FLAG_S | FUNCTION_CODE_USER_DATA, V)
 
+#if M68K_SIMULATE_PD_WRITES
+#define m68ki_write_32_pd(A, V) m68ki_write_32_pd_fc(A, FLAG_S | FUNCTION_CODE_USER_DATA, V)
+#else
+#define m68ki_write_32_pd(A, V) m68ki_write_32_fc(A, FLAG_S | FUNCTION_CODE_USER_DATA, V)
+#endif
+
 /* map read immediate 8 to read immediate 16 */
 #define m68ki_read_imm_8() MASK_OUT_ABOVE_8(m68ki_read_imm_16())
 
@@ -780,6 +821,8 @@ typedef struct
 	uint pref_data;    /* Data in the prefetch queue */
 	uint address_mask; /* Available address pins */
 	uint sr_mask;      /* Implemented status register bits */
+	uint instr_mode;   /* Stores whether we are in instruction mode or group 0/1 exception mode */
+	uint run_mode;     /* Stores whether we are processing a reset, bus error, address error, or something else */
 
 	/* Clocks required for instructions / exceptions */
 	uint cyc_bcc_notake_b;
@@ -815,6 +858,9 @@ extern uint8          m68ki_exception_cycle_table[][256];
 extern uint           m68ki_address_space;
 extern uint8          m68ki_ea_idx_cycle_table[];
 
+extern uint           m68ki_aerr_address;
+extern uint           m68ki_aerr_write_mode;
+extern uint           m68ki_aerr_fc;
 
 /* Read data immediately after the program counter */
 INLINE uint m68ki_read_imm_16(void);
@@ -829,6 +875,9 @@ INLINE uint m68ki_read_32_fc (uint address, uint fc);
 INLINE void m68ki_write_8_fc (uint address, uint fc, uint value);
 INLINE void m68ki_write_16_fc(uint address, uint fc, uint value);
 INLINE void m68ki_write_32_fc(uint address, uint fc, uint value);
+#if M68K_SIMULATE_PD_WRITES
+INLINE void m68ki_write_32_pd_fc(uint address, uint fc, uint value);
+#endif /* M68K_SIMULATE_PD_WRITES */
 
 /* Indexed and PC-relative ea fetching */
 INLINE uint m68ki_get_ea_pcdi(void);
@@ -908,7 +957,7 @@ INLINE void m68ki_set_sr_noint(uint value);          /* set the status register 
 INLINE uint m68ki_init_exception(void);              /* Initial exception processing */
 
 INLINE void m68ki_stack_frame_3word(uint pc, uint sr); /* Stack various frame types */
-INLINE void m68ki_stack_frame_buserr(uint pc, uint sr, uint address, uint write, uint instruction, uint fc);
+INLINE void m68ki_stack_frame_buserr(uint sr);
 
 INLINE void m68ki_stack_frame_0000(uint pc, uint sr, uint vector);
 INLINE void m68ki_stack_frame_0001(uint pc, uint sr, uint vector);
@@ -946,7 +995,7 @@ char* m68ki_disassemble_quick(unsigned int pc, unsigned int cpu_type);
 INLINE uint m68ki_read_imm_16(void)
 {
 	m68ki_set_fc(FLAG_S | FUNCTION_CODE_USER_PROGRAM); /* auto-disable (see m68kcpu.h) */
-	m68ki_check_address_error(REG_PC); /* auto-disable (see m68kcpu.h) */
+	m68ki_check_address_error(REG_PC, MODE_READ, FLAG_S | FUNCTION_CODE_USER_PROGRAM); /* auto-disable (see m68kcpu.h) */
 #if M68K_EMULATE_PREFETCH
 	if(MASK_OUT_BELOW_2(REG_PC) != CPU_PREF_ADDR)
 	{
@@ -966,7 +1015,7 @@ INLINE uint m68ki_read_imm_32(void)
 	uint temp_val;
 
 	m68ki_set_fc(FLAG_S | FUNCTION_CODE_USER_PROGRAM); /* auto-disable (see m68kcpu.h) */
-	m68ki_check_address_error(REG_PC); /* auto-disable (see m68kcpu.h) */
+	m68ki_check_address_error(REG_PC, MODE_READ, FLAG_S | FUNCTION_CODE_USER_PROGRAM); /* auto-disable (see m68kcpu.h) */
 	if(MASK_OUT_BELOW_2(REG_PC) != CPU_PREF_ADDR)
 	{
 		CPU_PREF_ADDR = MASK_OUT_BELOW_2(REG_PC);
@@ -985,7 +1034,7 @@ INLINE uint m68ki_read_imm_32(void)
 	return temp_val;
 #else
 	m68ki_set_fc(FLAG_S | FUNCTION_CODE_USER_PROGRAM); /* auto-disable (see m68kcpu.h) */
-	m68ki_check_address_error(REG_PC); /* auto-disable (see m68kcpu.h) */
+	m68ki_check_address_error(REG_PC, MODE_READ, FLAG_S | FUNCTION_CODE_USER_PROGRAM); /* auto-disable (see m68kcpu.h) */
 	REG_PC += 4;
 	return m68k_read_immediate_32(ADDRESS_68K(REG_PC-4));
 #endif /* M68K_EMULATE_PREFETCH */
@@ -1009,13 +1058,13 @@ INLINE uint m68ki_read_8_fc(uint address, uint fc)
 INLINE uint m68ki_read_16_fc(uint address, uint fc)
 {
 	m68ki_set_fc(fc); /* auto-disable (see m68kcpu.h) */
-	m68ki_check_address_error(address); /* auto-disable (see m68kcpu.h) */
+	m68ki_check_address_error(address, MODE_READ, fc); /* auto-disable (see m68kcpu.h) */
 	return m68k_read_memory_16(ADDRESS_68K(address));
 }
 INLINE uint m68ki_read_32_fc(uint address, uint fc)
 {
 	m68ki_set_fc(fc); /* auto-disable (see m68kcpu.h) */
-	m68ki_check_address_error(address); /* auto-disable (see m68kcpu.h) */
+	m68ki_check_address_error(address, MODE_READ, fc); /* auto-disable (see m68kcpu.h) */
 	return m68k_read_memory_32(ADDRESS_68K(address));
 }
 
@@ -1027,16 +1076,24 @@ INLINE void m68ki_write_8_fc(uint address, uint fc, uint value)
 INLINE void m68ki_write_16_fc(uint address, uint fc, uint value)
 {
 	m68ki_set_fc(fc); /* auto-disable (see m68kcpu.h) */
-	m68ki_check_address_error(address); /* auto-disable (see m68kcpu.h) */
+	m68ki_check_address_error(address, MODE_WRITE, fc); /* auto-disable (see m68kcpu.h) */
 	m68k_write_memory_16(ADDRESS_68K(address), value);
 }
 INLINE void m68ki_write_32_fc(uint address, uint fc, uint value)
 {
 	m68ki_set_fc(fc); /* auto-disable (see m68kcpu.h) */
-	m68ki_check_address_error(address); /* auto-disable (see m68kcpu.h) */
+	m68ki_check_address_error(address, MODE_WRITE, fc); /* auto-disable (see m68kcpu.h) */
 	m68k_write_memory_32(ADDRESS_68K(address), value);
 }
 
+#if M68K_SIMULATE_PD_WRITES
+INLINE void m68ki_write_32_pd_fc(uint address, uint fc, uint value)
+{
+	m68ki_set_fc(fc); /* auto-disable (see m68kcpu.h) */
+	m68ki_check_address_error(address, MODE_WRITE, fc); /* auto-disable (see m68kcpu.h) */
+	m68k_write_memory_32_pd(ADDRESS_68K(address), value);
+}
+#endif
 
 
 /* --------------------- Effective Address Calculation -------------------- */
@@ -1347,6 +1404,14 @@ INLINE void m68ki_set_sm_flag(uint value)
 	REG_SP = REG_SP_BASE[FLAG_S | ((FLAG_S>>1) & FLAG_M)];
 }
 
+/* Set the S and M flags.  Don't touch the stack pointer. */
+INLINE void m68ki_set_sm_flag_nosp(uint value)
+{
+	/* Set the S and M flags */
+	FLAG_S = value & SFLAG_SET;
+	FLAG_M = value & MFLAG_SET;
+}
+
 
 /* Set the condition code register */
 INLINE void m68ki_set_ccr(uint value)
@@ -1370,6 +1435,22 @@ INLINE void m68ki_set_sr_noint(uint value)
 	FLAG_INT_MASK = value & 0x0700;
 	m68ki_set_ccr(value);
 	m68ki_set_sm_flag((value >> 11) & 6);
+}
+
+/* Set the status register but don't check for interrupts nor
+ * change the stack pointer
+ */
+INLINE void m68ki_set_sr_noint_nosp(uint value)
+{
+	/* Mask out the "unimplemented" bits */
+	value &= CPU_SR_MASK;
+
+	/* Now set the status register */
+	FLAG_T1 = BIT_F(value);
+	FLAG_T0 = BIT_E(value);
+	FLAG_INT_MASK = value & 0x0700;
+	m68ki_set_ccr(value);
+	m68ki_set_sm_flag_nosp((value >> 11) & 6);
 }
 
 /* Set the status register and check for interrupts */
@@ -1444,18 +1525,18 @@ INLINE void m68ki_stack_frame_0010(uint sr, uint vector)
 
 /* Bus error stack frame (68000 only).
  */
-INLINE void m68ki_stack_frame_buserr(uint pc, uint sr, uint address, uint write, uint instruction, uint fc)
+INLINE void m68ki_stack_frame_buserr(uint sr)
 {
-	m68ki_push_32(pc);
+	m68ki_push_32(REG_PC);
 	m68ki_push_16(sr);
 	m68ki_push_16(REG_IR);
-	m68ki_push_32(address);	/* access address */
+	m68ki_push_32(m68ki_aerr_address);	/* access address */
 	/* 0 0 0 0 0 0 0 0 0 0 0 R/W I/N FC
 	 * R/W  0 = write, 1 = read
 	 * I/N  0 = instruction, 1 = not
 	 * FC   3-bit function code
 	 */
-	m68ki_push_16(((!write)<<4) | ((!instruction)<<3) | fc);
+	m68ki_push_16(m68ki_aerr_write_mode | CPU_INSTR_MODE | m68ki_aerr_fc);
 }
 
 /* Format 8 stack frame (68010).
@@ -1665,7 +1746,15 @@ INLINE void m68ki_exception_trace(void)
 	uint sr = m68ki_init_exception();
 
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+	{
+		#if M68K_EMULATE_ADDRESS_ERROR == OPT_ON
+		if(CPU_TYPE_IS_000(CPU_TYPE))
+		{
+			CPU_INSTR_MODE = INSTRUCTION_NO;
+		}
+		#endif /* M68K_EMULATE_ADDRESS_ERROR */
 		m68ki_stack_frame_0000(REG_PC, sr, EXCEPTION_TRACE);
+	}
 	else
 		m68ki_stack_frame_0010(sr, EXCEPTION_TRACE);
 
@@ -1682,7 +1771,15 @@ INLINE void m68ki_exception_trace(void)
 INLINE void m68ki_exception_privilege_violation(void)
 {
 	uint sr = m68ki_init_exception();
-	m68ki_stack_frame_0000(REG_PC, sr, EXCEPTION_PRIVILEGE_VIOLATION);
+
+	#if M68K_EMULATE_ADDRESS_ERROR == OPT_ON
+	if(CPU_TYPE_IS_000(CPU_TYPE))
+	{
+		CPU_INSTR_MODE = INSTRUCTION_NO;
+	}
+	#endif /* M68K_EMULATE_ADDRESS_ERROR */
+
+	m68ki_stack_frame_0000(REG_PPC, sr, EXCEPTION_PRIVILEGE_VIOLATION);
 	m68ki_jump_vector(EXCEPTION_PRIVILEGE_VIOLATION);
 
 	/* Use up some clock cycles and undo the instruction's cycles */
@@ -1700,7 +1797,7 @@ INLINE void m68ki_exception_1010(void)
 #endif
 
 	sr = m68ki_init_exception();
-	m68ki_stack_frame_0000(REG_PC-2, sr, EXCEPTION_1010);
+	m68ki_stack_frame_0000(REG_PPC, sr, EXCEPTION_1010);
 	m68ki_jump_vector(EXCEPTION_1010);
 
 	/* Use up some clock cycles and undo the instruction's cycles */
@@ -1719,7 +1816,7 @@ INLINE void m68ki_exception_1111(void)
 #endif
 
 	sr = m68ki_init_exception();
-	m68ki_stack_frame_0000(REG_PC-2, sr, EXCEPTION_1111);
+	m68ki_stack_frame_0000(REG_PPC, sr, EXCEPTION_1111);
 	m68ki_jump_vector(EXCEPTION_1111);
 
 	/* Use up some clock cycles and undo the instruction's cycles */
@@ -1736,7 +1833,15 @@ INLINE void m68ki_exception_illegal(void)
 				 m68ki_disassemble_quick(ADDRESS_68K(REG_PPC))));
 
 	sr = m68ki_init_exception();
-	m68ki_stack_frame_0000(REG_PC, sr, EXCEPTION_ILLEGAL_INSTRUCTION);
+
+	#if M68K_EMULATE_ADDRESS_ERROR == OPT_ON
+	if(CPU_TYPE_IS_000(CPU_TYPE))
+	{
+		CPU_INSTR_MODE = INSTRUCTION_NO;
+	}
+	#endif /* M68K_EMULATE_ADDRESS_ERROR */
+
+	m68ki_stack_frame_0000(REG_PPC, sr, EXCEPTION_ILLEGAL_INSTRUCTION);
 	m68ki_jump_vector(EXCEPTION_ILLEGAL_INSTRUCTION);
 
 	/* Use up some clock cycles and undo the instruction's cycles */
@@ -1757,7 +1862,27 @@ INLINE void m68ki_exception_format_error(void)
 /* Exception for address error */
 INLINE void m68ki_exception_address_error(void)
 {
-	/* Not emulated yet */
+	uint sr = m68ki_init_exception();
+
+	/* If we were processing a bus error, address error, or reset,
+	 * this is a catastrophic failure.
+	 * Halt the CPU
+	 */
+	if(CPU_RUN_MODE == RUN_MODE_BERR_AERR_RESET)
+	{
+m68k_read_memory_8(0x00ffff01);
+		CPU_STOPPED = STOP_LEVEL_HALT;
+		return;
+	}
+	CPU_RUN_MODE = RUN_MODE_BERR_AERR_RESET;
+
+	/* Note: This is implemented for 68000 only! */
+	m68ki_stack_frame_buserr(sr);
+
+	m68ki_jump_vector(EXCEPTION_ADDRESS_ERROR);
+
+	/* Use up some clock cycles and undo the instruction's cycles */
+	USE_CYCLES(CYC_EXCEPTION[EXCEPTION_ADDRESS_ERROR] - CYC_INSTRUCTION[REG_IR]);
 }
 
 
@@ -1767,6 +1892,13 @@ void m68ki_exception_interrupt(uint int_level)
 	uint vector;
 	uint sr;
 	uint new_pc;
+
+	#if M68K_EMULATE_ADDRESS_ERROR == OPT_ON
+	if(CPU_TYPE_IS_000(CPU_TYPE))
+	{
+		CPU_INSTR_MODE = INSTRUCTION_NO;
+	}
+	#endif /* M68K_EMULATE_ADDRESS_ERROR */
 
 	/* Turn off the stopped state */
 	CPU_STOPPED &= ~STOP_LEVEL_STOP;

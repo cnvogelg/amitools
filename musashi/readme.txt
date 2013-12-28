@@ -1,10 +1,10 @@
                                     MUSASHI
                                     =======
 
-                                  Version 3.3
+                                  Version 3.4
 
              A portable Motorola M680x0 processor emulation engine.
-            Copyright 1998-2001 Karl Stenerud.  All rights reserved.
+            Copyright 1998-2002 Karl Stenerud.  All rights reserved.
 
 
 
@@ -14,40 +14,49 @@ INTRODUCTION:
 Musashi is a Motorola 68000, 68010, 68EC020, and 68020 emulator written in C.
 This emulator was written with two goals in mind: portability and speed.
 
-The emulator is written to ANSI C specifications with the exception that I use
-inline functions.  This is not compliant to the ANSI spec, but will be
-compliant to the ANSI C9X spec.
+The emulator is written to ANSI C89 specifications.  It also uses inline
+functions, which are C9X compliant.
 
-It has been successfully running in the MAME project (www.mame.net) for over 2
-years and so has had time to mature.
+It has been successfully running in the MAME project (www.mame.net) for years
+and so has had time to mature.
 
 
 
 LICENSE AND COPYRIGHT:
 ---------------------
 
-The Musashi M680x0 emulator is copyright 1998-2001 Karl Stenerud.
+Copyright © 1998-2001 Karl Stenerud
 
-The source code included in this archive is provided AS-IS, free for any
-non-commercial purpose.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-If you build a program using this core, please give credit to the author.
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
 
-If you wish to use this core in a commercial environment, please contact
-the author to discuss commercial licensing.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 
 
 
 AVAILABILITY:
 ------------
 The latest version of this code can be obtained at:
-http://kstenerud.cjb.net
+https://github.com/kstenerud/Musashi
 
 
 
 CONTACTING THE AUTHOR:
 ---------------------
-I can be reached at kstenerud@mame.net
+I can be reached at kstenerud@gmail.com
 
 
 
@@ -64,8 +73,9 @@ You will have only one address space, no tracing, and no instruction prefetch.
 
 To implement the basic configuration:
 
-- Open m68kconf.h and verify that the settings for INLINE and DECL_SPEC will
-  work with your compiler. (They are set for gcc)
+- Open m68kconf.h and verify that the settings for INLINE will work with your
+  compiler. (Currently set to "static __inline__", which works in gcc 2.9.
+  For C9X compliance, it should be "inline")
 
 - In your host program, implement the following functions:
     unsigned int  m68k_read_memory_8(unsigned int address);
@@ -122,27 +132,19 @@ To add multiple interrupts:
 
 
 
-SEPARATE IMMEDIATE AND PC-RELATIVE READS:
-----------------------------------------
+SEPARATE IMMEDIATE READS:
+------------------------
 You can write faster memory access functions if you know whether you are
 fetching from ROM or RAM.  Immediate reads are always from the program space
 (Always in ROM unless it is running self-modifying code).
-This will also separate the pc-relative reads, since some systems treat
-PROGRAM mode reads and DATA mode reads differently (for program encryption,
-for instance).  See the section below (ADDRESS SPACE) for an explanation of
-PROGRAM and DATA mode.
 
-To enable separate reads:
+To enable separate immediate reads:
 
-- In m68kconf.h, turn on M68K_SEPARATE_READS.
+- In m68kconf.h, turn on M68K_SEPARATE_READ_IMM.
 
 - In your host program, implement the following functions:
     unsigned int  m68k_read_immediate_16(unsigned int address);
     unsigned int  m68k_read_immediate_32(unsigned int address);
-
-    unsigned int  m68k_read_pcrelative_8(unsigned int address);
-    unsigned int  m68k_read_pcrelative_16(unsigned int address);
-    unsigned int  m68k_read_pcrelative_32(unsigned int address);
 
 - If you need to know the current PC (for banking and such), set
   M68K_MONITOR_PC to OPT_SPECIFY_HANDLER, and set M68K_SET_PC_CALLBACK(A) to
@@ -155,22 +157,16 @@ ADDRESS SPACES:
 Most systems will only implement one address space, placing ROM at the lower
 addresses and RAM at the higher.  However, there is the possibility that a
 system will implement ROM and RAM in the same address range, but in different
-address spaces, or will have different mamory types that require different
-handling for the program and the data.
+address spaces.
 
-The 68k accomodates this by allowing different program spaces, the most
-important to us being PROGRAM and DATA space.  Here is a breakdown of
-how information is fetched:
+In this case, you might get away with assuming that immediate reads are in the
+program space and all other reads are in the data space, if it weren't for the
+fact that the exception vectors are fetched from the data space.  As a result,
+anyone implementing this kind of system will have to copy the vector table
+from ROM to RAM using pc-relative instructions.
 
-- All immediate reads are fetched from PROGRAM space.
-
-- All PC-relative reads are fetched from PROGRAM space.
-
-- The initial stack pointer and program counter are fetched from PROGRAM space.
-
-- All other reads (except for those from the moves instruction for 68020)
-   are fetched from DATA space.
-
+This makes things bad for emulation, because this means that a non-immediate
+read is not necessarily in the data space.
 The m68k deals with this by encoding the requested address space on the
 function code pins:
 
@@ -183,18 +179,6 @@ function code pins:
     SUPERVISOR PROGRAM 110
     CPU SPACE          111 <-- not emulated in this core since we emulate
                                interrupt acknowledge in another way.
-
-Problems arise here if you need to emulate this distinction (if, for example,
-your ROM and RAM are at the same address range, with RAM and ROM enable
-wired to the function code pins).
-
-There are 2 ways to deal with this situation using Musashi:
-
-1. If you only need the distinction between PROGRAM and DATA (the most common),
-   you can just separate the reads (see the preceeding section).  This is the
-   faster solution.
-
-2. You can emulate the function code pins entirely.
 
 To emulate the function code pins:
 
@@ -264,6 +248,12 @@ obscure functions of the m68k:
 
 - M68K_EMULATE_PREFETCH emulates the 4-word instruction prefetch that is part
   of the 68000/68010 (needed for Amiga emulation).
+  NOTE: if the CPU fetches a word or longword at an odd address when this
+  option is on, it will yield unpredictable results, which is why a real
+  68000 will generate an address error exception.
+
+- M68K_EMULATE_ADDRESS_ERROR will cause the CPU to generate address error
+  exceptions if it attempts to read a word or longword at an odd address.
 
 - call m68k_pulse_halt() to emulate the HALT pin.
 
@@ -312,4 +302,4 @@ of the CPU.
 EXAMPLE:
 -------
 
-I have included a file example.zip that contains a full example.
+The subdir example contains a full example (currently DOS only).

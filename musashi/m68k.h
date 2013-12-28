@@ -1,27 +1,42 @@
-#ifndef M68K__HEADER
-#define M68K__HEADER
-
 /* ======================================================================== */
 /* ========================= LICENSING & COPYRIGHT ======================== */
 /* ======================================================================== */
 /*
  *                                  MUSASHI
- *                                Version 3.3
+ *                                Version 3.4
  *
  * A portable Motorola M680x0 processor emulation engine.
  * Copyright 1998-2001 Karl Stenerud.  All rights reserved.
  *
- * This code may be freely used for non-commercial purposes as long as this
- * copyright notice remains unaltered in the source code and any binary files
- * containing this code in compiled form.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * All other lisencing terms must be negotiated with the author
- * (Karl Stenerud).
- *
- * The latest version of this code can be obtained at:
- * http://kstenerud.cjb.net
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 
+#ifndef M68K__HEADER
+#define M68K__HEADER
+
+
+/* ======================================================================== */
+/* ============================= CONFIGURATION ============================ */
+/* ======================================================================== */
+
+/* Import the configuration for this build */
+#include "m68kconf.h"
 
 
 /* ======================================================================== */
@@ -107,7 +122,7 @@ typedef enum
 	/* Assumed registers */
 	/* These are cheat registers which emulate the 1-longword prefetch
 	 * present in the 68000 and 68010.
-	 */ 
+	 */
 	M68K_REG_PREF_ADDR,	/* Last prefetch address */
 	M68K_REG_PREF_DATA,	/* Last prefetch data */
 
@@ -164,6 +179,16 @@ unsigned int m68k_read_disassembler_32 (unsigned int address);
 void m68k_write_memory_8(unsigned int address, unsigned int value);
 void m68k_write_memory_16(unsigned int address, unsigned int value);
 void m68k_write_memory_32(unsigned int address, unsigned int value);
+
+/* Special call to simulate undocumented 68k behavior when move.l with a
+ * predecrement destination mode is executed.
+ * To simulate real 68k behavior, first write the high word to
+ * [address+2], and then write the low word to [address].
+ *
+ * Enable this functionality with M68K_SIMULATE_PD_WRITES in m68kconf.h.
+ */
+void m68k_write_memory_32_pd(unsigned int address, unsigned int value);
+
 
 
 /* ======================================================================== */
@@ -247,6 +272,11 @@ void m68k_set_instr_hook_callback(void  (*callback)(void));
  */
 void m68k_set_cpu_type(unsigned int cpu_type);
 
+/* Do whatever initialisations the core requires.  Should be called
+ * at least once at init time.
+ */
+void m68k_init(void);
+
 /* Pulse the RESET pin on the CPU.
  * You *MUST* reset the CPU at least once to initialize the emulation
  * Note: If you didn't call m68k_set_cpu_type() before resetting
@@ -290,18 +320,8 @@ unsigned int m68k_get_context(void* dst);
 /* set the current cpu context */
 void m68k_set_context(void* dst);
 
-/* Save the current cpu context to disk.
- * You must provide a function pointer of the form:
- * void save_value(char* identifier, unsigned int value)
- */
-void m68k_save_context(	void (*save_value)(char* identifier, unsigned int value));
-
-/* Load a cpu context from disk.
- * You must provide a function pointer of the form:
- * unsigned int load_value(char* identifier)
- */
-void m68k_load_context(unsigned int (*load_value)(char* identifier));
-
+/* Register the CPU state information */
+void m68k_state_register(const char *type);
 
 
 /* Peek at the internals of a CPU context.  This can either be a context
@@ -323,12 +343,12 @@ unsigned int m68k_disassemble(char* str_buff, unsigned int pc, unsigned int cpu_
 
 
 /* ======================================================================== */
-/* ============================= CONFIGURATION ============================ */
+/* ============================== MAME STUFF ============================== */
 /* ======================================================================== */
 
-/* Import the configuration for this build */
-#include "m68kconf.h"
-
+#if M68K_COMPILE_FOR_MAME == OPT_ON
+#include "m68kmame.h"
+#endif /* M68K_COMPILE_FOR_MAME */
 
 
 /* ======================================================================== */

@@ -28,6 +28,7 @@ from amitools.vamos.Process import Process
 class MusashiCPU(CPU):
   def __init__(self):
     CPU.__init__(self,"musashi")
+    m68k.cpu_init()
   def w_reg(self,reg, val):
     m68k.set_reg(reg,val)
   def r_reg(self,reg):
