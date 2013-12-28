@@ -856,7 +856,7 @@ typedef struct
 	void (*pc_changed_callback)(unsigned int new_pc); /* Called when the PC changes by a large amount */
 	void (*set_fc_callback)(unsigned int new_fc);     /* Called when the CPU function code changes */
 	void (*instr_hook_callback)(void);                /* Called every instruction cycle prior to execution */
-  int  (*aline_hook_callback)(unsigned int opcode); /* CV: Called if invalid a-line opcode occurred */
+  int  (*aline_hook_callback)(unsigned int opcode, unsigned int pc); /* CV: Called if invalid a-line opcode occurred */
 
 } m68ki_cpu_core;
 
@@ -1803,7 +1803,7 @@ INLINE void m68ki_exception_privilege_violation(void)
 INLINE void m68ki_exception_1010(void)
 {
 #if M68K_ALINE_HOOK  
-  if(!CALLBACK_ALINE_HOOK(REG_IR)) {
+  if(!CALLBACK_ALINE_HOOK(REG_IR,ADDRESS_68K(REG_PPC))) {
 #endif
 	uint sr;
 #if M68K_LOG_1010_1111 == OPT_ON

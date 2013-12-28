@@ -12,8 +12,8 @@ CFLAGS = -g -O2
 
 BUILD_DIR = BUILD
 
-SRC = mem.c m68kcpu.c m68kdasm.c
-HDR = mem.h m68k.h m68kcpu.h m68kconf.h
+SRC = mem.c traps.c m68kcpu.c m68kdasm.c
+HDR = mem.h traps.h m68k.h m68kcpu.h m68kconf.h
 OBJ = $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRC))
 
 GEN_INPUT = m68k_in.c

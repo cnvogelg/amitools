@@ -78,7 +78,9 @@ reset_instr_callback_func_type = CFUNCTYPE(None)
 invalid_func_type = CFUNCTYPE(None, c_int, c_int, c_uint)
 trace_func_type = CFUNCTYPE(c_int, c_int, c_int, c_uint, c_uint)
 instr_hook_callback_func = CFUNCTYPE(None)
-aline_hook_callback_func = CFUNCTYPE(c_int, c_uint)
+aline_hook_callback_func = CFUNCTYPE(c_int, c_uint, c_uint)
+
+trap_func = CFUNCTYPE(None, c_uint, c_uint)
 
 # declare cpu functions
 cpu_init_func = lib.m68k_init
@@ -137,6 +139,16 @@ mem_ram_write_block.argtypes = [c_uint, c_uint, c_char_p]
 
 mem_ram_clear_block = lib.mem_ram_clear_block
 mem_ram_clear_block.argtypes = [c_uint, c_uint, c_int]
+
+# trap functions
+trap_init_func = lib.trap_init
+
+trap_setup_func = lib.trap_setup
+trap_setup_func.restype = c_uint
+trap_setup_func.argtypes = [trap_func]
+
+trap_free_func = lib.trap_free
+trap_free_func.argtypes = [c_int]
 
 # --- CPU API ---
 
@@ -230,6 +242,25 @@ def mem_set_special_range_write_func(page_addr, width, func):
   w_funcs[key] = f
   mem_set_special_range_write_func_func(page_addr, width, f)
 
+# --- Traps ---
+
+def trap_init():
+  global _traps
+  trap_init_func()
+  _traps = {}
+
+def trap_setup(func):
+  global _traps
+  f = trap_func(func)
+  tid = trap_setup_func(f)
+  _traps[tid] = f
+  return tid
+  
+def trap_free(tid):
+  global _traps
+  del _traps[tid]
+  trap_free_func(tid)
+
 # --- Sample ---
 
 if __name__ == "__main__":
@@ -294,14 +325,32 @@ if __name__ == "__main__":
   print execute(2)
   
   # check invalid a-line opcode hook function
-  def my_aline(op):
-    print "ALINE: %04x" % op
+  def my_aline(op, pc):
+    print "ALINE: %04x @ %08x" % (op, pc)
     return 1
+  print "--- aline ---"
   set_aline_hook_callback(my_aline)
   mem_ram_write(1, 0x2000, 0xa123) # a-line opcode
   set_reg(M68K_REG_PC,0x2000)
   print "testing a-line opcode"
   print execute(2)
+  
+  # test traps
+  print "--- traps ---"
+  trap_init()
+  def my_trap(op, pc):
+    print "MY TRAP: %04x @ %08x" % (op, pc)
+  tid = trap_setup(my_trap)
+  print "trap id=",tid
+  
+  # call trap
+  mem_ram_write(1, 0x2000, 0xa000 + tid)
+  set_reg(M68K_REG_PC,0x2000)
+  print "call trap"
+  print execute(2)
+  
+  # free trap
+  trap_free(tid)
   
   # check if mem is in end mode?
   is_end = mem_is_end()

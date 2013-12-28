@@ -410,7 +410,7 @@ static void default_instr_hook_callback(void)
 }
 
 /* CV */
-static int default_aline_hook_callback(unsigned int opcode)
+static int default_aline_hook_callback(unsigned int opcode, unsigned int pc)
 {
   return 0;
 }
@@ -568,7 +568,7 @@ void m68k_set_instr_hook_callback(void  (*callback)(void))
 }
 
 /* CV */
-void m68k_set_aline_hook_callback(int (*callback)(unsigned int))
+void m68k_set_aline_hook_callback(int (*callback)(unsigned int, unsigned int))
 {
   CALLBACK_ALINE_HOOK = callback ? callback : default_aline_hook_callback;
 }
