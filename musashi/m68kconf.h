@@ -157,6 +157,15 @@
 #define M68K_LOG_1010_1111          OPT_OFF
 #define M68K_LOG_FILEHANDLE         some_file_handle
 
+/* ---------- CV AddOns ---------- */
+
+/* Intercept illegal A-Line opcodes and call hook.
+   Hook prototype is: int hook() 
+   If return == 0 then normal A-Line exception handling is performed.
+   Otherwise nothing is done.
+ */
+#define M68K_ALINE_HOOK             OPT_ON
+#define M68K_ALINE_CALLBACK()       your_aline_hook_function()
 
 /* ----------------------------- COMPATIBILITY ---------------------------- */
 

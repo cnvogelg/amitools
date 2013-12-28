@@ -78,6 +78,7 @@ reset_instr_callback_func_type = CFUNCTYPE(None)
 invalid_func_type = CFUNCTYPE(None, c_int, c_int, c_uint)
 trace_func_type = CFUNCTYPE(c_int, c_int, c_int, c_uint, c_uint)
 instr_hook_callback_func = CFUNCTYPE(None)
+aline_hook_callback_func = CFUNCTYPE(c_int, c_uint)
 
 # declare cpu functions
 cpu_init_func = lib.m68k_init
@@ -156,6 +157,11 @@ def set_instr_hook_callback(func):
   global instr_hook_callback
   instr_hook_callback = instr_hook_callback_func(func)
   lib.m68k_set_instr_hook_callback(instr_hook_callback)
+
+def set_aline_hook_callback(func):
+  global aline_hook_callback
+  aline_hook_callback = aline_hook_callback_func(func)
+  lib.m68k_set_aline_hook_callback(aline_hook_callback)
 
 def set_cpu_type(t):
   lib.m68k_set_cpu_type(c_uint(t))
@@ -285,6 +291,16 @@ if __name__ == "__main__":
   # invalid range
   print "executing invalid..."
   set_reg(M68K_REG_PC,spec_addr)
+  print execute(2)
+  
+  # check invalid a-line opcode hook function
+  def my_aline(op):
+    print "ALINE: %04x" % op
+    return 1
+  set_aline_hook_callback(my_aline)
+  mem_ram_write(1, 0x2000, 0xa123) # a-line opcode
+  set_reg(M68K_REG_PC,0x2000)
+  print "testing a-line opcode"
   print execute(2)
   
   # check if mem is in end mode?
