@@ -7,6 +7,9 @@ import inspect
 
 class AmigaLibrary:
   
+  op_rts = 0x4e75
+  op_reset = 0x4e70
+  
   def __init__(self, name, version, struct, profile=False):
     self.name = name
     self.version = version
@@ -49,6 +52,17 @@ class AmigaLibrary:
         num += 1
     self.log("mapped %d of %d functions" % (num, fd.get_num_funcs()))
 
+  def _trap_all_vectors(self, mem_lib, ctx):
+    """prepare the entry points for trapping. place RESET, RTS opcode and lib_id"""
+    mem = ctx.mem
+    base_addr = mem_lib.lib_base
+    addr = base_addr - 6
+    for i in xrange(mem_lib.num_vectors):
+      mem.write_mem(1,addr,self.op_reset)
+      mem.write_mem(1,addr+2,self.op_rts)
+      mem.write_mem(1,addr+4,mem_lib.lib_id)
+      addr -= 6
+
   def __str__(self):
     return "[Lib %s V%d num_jumps=%d pos_size=%d neg_size=%d]" % \
       (self.name, self.version, self.num_jumps, self.pos_size, self.neg_size)
@@ -57,6 +71,8 @@ class AmigaLibrary:
     # enable profiling
     if self.profile:
       self.profile_map = {}
+    # setup trap vectors
+    self._trap_all_vectors(mem_lib, ctx)
   
   def finish_lib(self, mem_lib, ctx):
     # dump profile

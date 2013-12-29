@@ -44,9 +44,7 @@ class LibEntry():
 
 class LibManager():
   
-  op_rts = 0x4e75
   op_jmp = 0x4ef9
-  op_reset = 0x04e70
   
   def __init__(self, label_mgr, data_dir):
     self.data_dir = data_dir
@@ -369,10 +367,9 @@ class LibManager():
       self.int_addr_map[lib_base] = entry
       self.int_libs[name] = entry
 
-      # setup traps in internal lib
+      # create unique lib id
       lib_id = len(self.lib_trap_table)
       self.lib_trap_table.append(entry)
-      self.trap_all_vectors(context.mem, lib_base, num_vecs, lib_id)
       entry.lib_id = lib_id
       
       # call open on lib
@@ -426,15 +423,6 @@ class LibManager():
     else:
       log_lib.debug("Call Lib: %06x lib_id=%d -> offset=%d %s" % (addr, lib_id, offset, entry.name))
       entry.lib_class.call_vector(num,entry,ctx)
-
-  def trap_all_vectors(self, mem, base_addr, num_vectors, lib_id):
-    """prepare the entry points for trapping. place RESET, RTS opcode and lib_id"""
-    addr = base_addr - 6
-    for i in xrange(num_vectors):
-      mem.write_mem(1,addr,self.op_reset)
-      mem.write_mem(1,addr+2,self.op_rts)
-      mem.write_mem(1,addr+4,lib_id)
-      addr -= 6
 
   # ----- Helpers -----
   

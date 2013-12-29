@@ -41,6 +41,10 @@ class CPU:
     return 0
   def end(self):
     pass
+  def trap_setup(self, func):
+    return -1
+  def trap_free(self, tid):
+    pass
 
   sr_chars = "CVZNX"
   
