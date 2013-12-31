@@ -12,15 +12,14 @@ import time
 import os
 
 class LibEntry():
-  def __init__(self, name, version, addr, num_vectors, pos_size, mem, label_mgr, struct=LibraryDef, lib_class=None):
+  def __init__(self, name, version, addr, neg_size, pos_size, mem, label_mgr, struct=LibraryDef, lib_class=None):
     self.name = name
     self.version = version
     self.lib_class = lib_class
     self.struct = struct
 
-    self.num_vectors = num_vectors
     self.pos_size = pos_size
-    self.neg_size = num_vectors * 6
+    self.neg_size = neg_size
     self.size = self.pos_size + self.neg_size
 
     self.lib_begin = addr
@@ -54,13 +53,14 @@ class LibManager():
     self.int_addr_map = {}
     self.native_libs = {}
     self.native_addr_map = {}
-    self.lib_trap_table = []
+    self.lib_table = []
     
     # use fast call? -> if lib logging level is ERROR or OFF
     self.fast_call = not log_lib.isEnabledFor(logging.WARN)
   
   def register_int_lib(self, lib_class):
     self.int_lib_classes[lib_class.get_name()] = lib_class
+    lib_class.fast_call = self.fast_call
     
   def unregister_int_lib(self, lib_class):
     del self.int_lib_classes[lib_class.get_name()]
@@ -220,12 +220,13 @@ class LibManager():
     # get library base info
     vectors  = res['vectors']
     pos_size = res['dataSize']
-    total_size = pos_size + len(vectors) * 6
+    neg_size = len(vectors) * 6
+    total_size = pos_size + neg_size
 
     # now create a memory lib instance
     lib_mem = context.alloc.alloc_memory(lib_name, total_size, add_label=False)
     lib_addr = lib_mem.addr
-    entry = LibEntry(lib_name, lib_version, lib_addr, len(vectors), pos_size, context.mem, self.label_mgr)
+    entry = LibEntry(lib_name, lib_version, lib_addr, neg_size, pos_size, context.mem, self.label_mgr)
     entry.vectors = vectors
     lib_base = entry.lib_base
 
@@ -344,17 +345,17 @@ class LibManager():
         raise VamosConfigError("Missing FD file '%s' for internal lib!" % name)
 
       # setup jump table of lib with fd
-      lib_class.init_jump_table(fd)
+      lib_class.calc_size(fd)
 
       # get memory range for lib
       lib_size = lib_class.get_total_size()     
       pos_size = lib_class.get_pos_size()
-      num_vecs = lib_class.get_num_vectors()
+      neg_size = lib_class.get_neg_size()
       struct   = lib_class.get_struct()
 
       # allocate and create lib instance
       lib_addr = context.alloc.alloc_mem(lib_size)
-      entry = LibEntry(name, lib_ver, lib_addr, num_vecs, pos_size, context.mem, self.label_mgr, struct, lib_class)
+      entry = LibEntry(name, lib_ver, lib_addr, neg_size, pos_size, context.mem, self.label_mgr, struct, lib_class)
       lib_base = entry.lib_base
       entry.fd = fd
       
@@ -368,9 +369,12 @@ class LibManager():
       self.int_libs[name] = entry
 
       # create unique lib id
-      lib_id = len(self.lib_trap_table)
-      self.lib_trap_table.append(entry)
+      lib_id = len(self.lib_table)
+      self.lib_table.append(entry)
       entry.lib_id = lib_id
+      
+      # trap all members
+      lib_class.trap_class_entries(entry, context, reset_others=True)
       
       # call open on lib
       lib_class.setup_lib(entry, context)
@@ -401,7 +405,7 @@ class LibManager():
       lib_class.finish_lib(entry,context)
       # remove entry in trap table
       lib_id = entry.lib_id
-      self.lib_trap_table[lib_id] = None
+      self.lib_table[lib_id] = None
       # unregister label
       self.label_mgr.remove_label(entry.label)
       # free memory
@@ -409,21 +413,6 @@ class LibManager():
       self.lib_log("close_lib","Closed '%s' V%d ref_count=0" % (name, ver))
       return entry
       
-  def call_internal_lib(self, addr, ctx):
-    lib_id = ctx.mem.read_mem(1, addr+4)
-    tab = self.lib_trap_table
-    if lib_id >= len(tab):
-      raise VamosInternalError("Invalid lib trap!")
-    entry = tab[lib_id]
-    base = entry.lib_base
-    offset = base - addr
-    num = offset / 6
-    if self.fast_call:
-      entry.lib_class.call_vector_fast(num,entry,ctx)
-    else:
-      log_lib.debug("Call Lib: %06x lib_id=%d -> offset=%d %s" % (addr, lib_id, offset, entry.name))
-      entry.lib_class.call_vector(num,entry,ctx)
-
   # ----- Helpers -----
   
   def load_fd(self, lib_name):

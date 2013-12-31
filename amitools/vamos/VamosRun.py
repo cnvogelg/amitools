@@ -83,9 +83,9 @@ class VamosRun:
           trap.func(self.ctx)
           if trap.one_shot:
             self.remove_trap(trap)          
-        # lib trap!
+        # unknown RESET opcode found
         else:
-          self.ctx.lib_mgr.call_internal_lib(pc, self.ctx)
+          raise UnsupportedVamosFeature("Unexpected RESET opcode")
         
         end = time.clock()
         # account for trap time

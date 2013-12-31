@@ -48,8 +48,13 @@ class MusashiCPU(CPU):
     return m68k.execute(num_cycles)
   def end(self):
     m68k.end_timeslice()
-  def trap_setup(self, func):
-    return m68k.trap_setup(func)
+  def trap_setup(self, func, auto_rts=False, one_shot=False):
+    flags = m68k.TRAP_DEFAULT
+    if auto_rts:
+      flags |= m68k.TRAP_AUTO_RTS
+    if one_shot:
+      flags |= m68k.TRAP_ONE_SHOT
+    return m68k.trap_setup(func, flags)
   def trap_free(self, tid):
     m68k.trap_free(tid)
 

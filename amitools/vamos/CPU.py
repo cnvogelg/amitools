@@ -41,7 +41,7 @@ class CPU:
     return 0
   def end(self):
     pass
-  def trap_setup(self, func):
+  def trap_setup(self, func, auto_rts=False, one_shot=False):
     return -1
   def trap_free(self, tid):
     pass
