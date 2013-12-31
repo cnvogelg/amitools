@@ -56,6 +56,16 @@ M68K_REG_PPC = 29 # Previous value in the program counter
 M68K_REG_IR = 30 # Instruction register
 M68K_REG_CPU_TYPE = 31 # Type of CPU being run
 
+# aline callback
+M68K_ALINE_NONE   = 0
+M68K_ALINE_EXCEPT = 1
+M68K_ALINE_RTS    = 2
+
+# traps
+TRAP_DEFAULT  = 0
+TRAP_ONE_SHOT = 1
+TRAP_AUTO_RTS = 2
+
 # --- Internal ---
 
 # get lib
@@ -145,7 +155,7 @@ trap_init_func = lib.trap_init
 
 trap_setup_func = lib.trap_setup
 trap_setup_func.restype = c_uint
-trap_setup_func.argtypes = [trap_func]
+trap_setup_func.argtypes = [trap_func, c_int]
 
 trap_free_func = lib.trap_free
 trap_free_func.argtypes = [c_int]
@@ -249,10 +259,10 @@ def trap_init():
   trap_init_func()
   _traps = {}
 
-def trap_setup(func):
+def trap_setup(func, flags):
   global _traps
   f = trap_func(func)
-  tid = trap_setup_func(f)
+  tid = trap_setup_func(f, flags)
   _traps[tid] = f
   return tid
   
@@ -327,7 +337,7 @@ if __name__ == "__main__":
   # check invalid a-line opcode hook function
   def my_aline(op, pc):
     print "ALINE: %04x @ %08x" % (op, pc)
-    return 1
+    return M68K_ALINE_NONE
   print "--- aline ---"
   set_aline_hook_callback(my_aline)
   mem_ram_write(1, 0x2000, 0xa123) # a-line opcode
@@ -340,14 +350,14 @@ if __name__ == "__main__":
   trap_init()
   def my_trap(op, pc):
     print "MY TRAP: %04x @ %08x" % (op, pc)
-  tid = trap_setup(my_trap)
+  tid = trap_setup(my_trap, TRAP_AUTO_RTS)
   print "trap id=",tid
   
   # call trap
   mem_ram_write(1, 0x2000, 0xa000 + tid)
   set_reg(M68K_REG_PC,0x2000)
   print "call trap"
-  print execute(2)
+  print execute(4)
   
   # free trap
   trap_free(tid)

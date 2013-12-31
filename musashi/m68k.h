@@ -260,6 +260,11 @@ void m68k_set_fc_callback(void  (*callback)(unsigned int new_fc));
  */
 void m68k_set_instr_hook_callback(void  (*callback)(void));
 
+/* CV: operation done after aline callback */
+#define M68K_ALINE_NONE   0
+#define M68K_ALINE_EXCEPT 1
+#define M68K_ALINE_RTS    2
+
 /* CV: call callback with (opcode, pc) */
 void m68k_set_aline_hook_callback(int (*callback)(unsigned int, unsigned int));
 

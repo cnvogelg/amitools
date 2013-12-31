@@ -412,7 +412,7 @@ static void default_instr_hook_callback(void)
 /* CV */
 static int default_aline_hook_callback(unsigned int opcode, unsigned int pc)
 {
-  return 0;
+  return M68K_ALINE_EXCEPT;
 }
 
 #if M68K_EMULATE_ADDRESS_ERROR

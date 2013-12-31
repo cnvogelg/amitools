@@ -564,7 +564,7 @@
 		#define m68ki_aline_hook() CALLBACK_ALINE_HOOK()
 	#endif
 #else
-	#define m68ki_aline_hook()  0
+	#define m68ki_aline_hook()  M68K_ALINE_EXCEPT
 #endif /* M68K_ALINE_HOOK */
 
 
@@ -1802,8 +1802,9 @@ INLINE void m68ki_exception_privilege_violation(void)
 /* Exception for A-Line instructions */
 INLINE void m68ki_exception_1010(void)
 {
-#if M68K_ALINE_HOOK  
-  if(!CALLBACK_ALINE_HOOK(REG_IR,ADDRESS_68K(REG_PPC))) {
+#if M68K_ALINE_HOOK
+  int res = CALLBACK_ALINE_HOOK(REG_IR,ADDRESS_68K(REG_PPC));
+  if(res == M68K_ALINE_EXCEPT) {
 #endif
 	uint sr;
 #if M68K_LOG_1010_1111 == OPT_ON
@@ -1819,6 +1820,9 @@ INLINE void m68ki_exception_1010(void)
 	/* Use up some clock cycles and undo the instruction's cycles */
 	USE_CYCLES(CYC_EXCEPTION[EXCEPTION_1010] - CYC_INSTRUCTION[REG_IR]);
 #if M68K_ALINE_HOOK
+  } else if(res == M68K_ALINE_RTS) {
+    m68ki_trace_t0();				   /* auto-disable (see m68kcpu.h) */
+    m68ki_jump(m68ki_pull_32());
   }
 #endif
 }

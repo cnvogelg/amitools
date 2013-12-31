@@ -10,6 +10,10 @@
 #include "m68k.h"
 #include <stdint.h>
 
+#define TRAP_DEFAULT    0
+#define TRAP_ONE_SHOT   1
+#define TRAP_AUTO_RTS   2
+
 /* ------ Types ----- */
 typedef unsigned int uint;
 
@@ -18,7 +22,7 @@ typedef void (*trap_func_t)(uint opcode, uint pc);
 /* ----- API ----- */
 extern void trap_init(void);
 
-extern int  trap_setup(trap_func_t func);
+extern int  trap_setup(trap_func_t func, int flags);
 extern void trap_free(int id);
 
 #endif

@@ -11,11 +11,14 @@
 #define NUM_TRAPS  0x1000
 #define TRAP_MASK  0x0fff
 
-union entry {
-  trap_func_t trap;
-  union entry *next;
+struct entry {
+  union {
+    trap_func_t trap;
+    struct entry *next;
+  };
+  int flags;
 };
-typedef union entry entry_t; 
+typedef struct entry entry_t; 
 
 static entry_t traps[NUM_TRAPS];
 static entry_t *first_free;
@@ -25,7 +28,19 @@ static int trap_aline(uint opcode, uint pc)
   uint off = opcode & TRAP_MASK;
   trap_func_t f = traps[off].trap;
   f(opcode, pc);
-  return 1; /* do not handle illegal opcode anymore */
+  
+  int flags = traps[off].flags;
+
+  /* a one shot trap is removed after it is triggered */
+  if(flags & TRAP_ONE_SHOT) {
+    trap_free(off);
+  }
+  
+  if(flags & TRAP_AUTO_RTS) {
+    return M68K_ALINE_RTS;
+  } else {
+    return M68K_ALINE_NONE;
+  }
 }
 
 void trap_init(void)
@@ -41,7 +56,7 @@ void trap_init(void)
   m68k_set_aline_hook_callback(trap_aline);
 }
 
-int trap_setup(trap_func_t func)
+int trap_setup(trap_func_t func, int flags)
 {
   /* no more traps available? */
   if(first_free == NULL) {
@@ -55,6 +70,7 @@ int trap_setup(trap_func_t func)
   
   /* store trap function */
   traps[off].trap = func;
+  traps[off].flags = flags;
 
   return off;
 }
