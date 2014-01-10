@@ -98,7 +98,7 @@ parser.add_argument('bin', help="AmigaOS binary to run")
 parser.add_argument('args', nargs='*', help="AmigaOS binary arguments")
 parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
 parser.add_argument('-q', '--quiet', action='store_true', default=False, help="do not output any logging")
-parser.add_argument('-C', '--max-cycles', action='store', type=int, default=0, help="maximum number of cycles to execute")
+parser.add_argument('-y', '--max-cycles', action='store', type=int, default=0, help="maximum number of cycles to execute")
 parser.add_argument('-B', '--cycles-per-block', action='store', type=int, default=1000, help="cycles per block")
 parser.add_argument('-l', '--logging', action='store', default=None, help="logging settings: <chan>:<level>,*:<level>,...")
 parser.add_argument('-L', '--log-file', action='store', default=None, help="write all log messages to a file")
@@ -116,6 +116,7 @@ parser.add_argument('-A', '--auto-assign', action='store', default=None, help="d
 parser.add_argument('-p', '--path', action='append', default=None, help="define command search ami path, e.g. c:")
 parser.add_argument('-D', '--data-dir', action='store', default=data_dir, help="set vamos data directory (default: %s)" % data_dir)
 parser.add_argument('-b', '--benchmark', action='store_true', default=False, help="enable benchmarking")
+parser.add_argument('-C', '--cpu', action='store', default="68000", help="Set type of CPU to emulate (68000 or 68020)")
 args = parser.parse_args()
 
 # --- init config ---
@@ -164,7 +165,13 @@ vamos.set_main_process(proc)
 
 # ------ main loop ------
 # set CPU type
-m68k.set_cpu_type(m68k.M68K_CPU_TYPE_68000)
+if cfg.cpu == '68000':
+  m68k.set_cpu_type(m68k.M68K_CPU_TYPE_68000)
+elif cfg.cpu == '68020':
+  m68k.set_cpu_type(m68k.M68K_CPU_TYPE_68020)
+else:
+  log_main.error("Invalid CPU type: %s" % cfg.cpu)
+  sys.exit(1)
 
 # init cpu and initial registers
 run = VamosRun(vamos, args.benchmark)
