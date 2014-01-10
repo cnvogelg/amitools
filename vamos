@@ -115,6 +115,7 @@ parser.add_argument('-V', '--volume', action='append', default=None, help="defin
 parser.add_argument('-A', '--auto-assign', action='store', default=None, help="define auto assign ami path, e.g. vol:/ami/path")
 parser.add_argument('-p', '--path', action='append', default=None, help="define command search ami path, e.g. c:")
 parser.add_argument('-D', '--data-dir', action='store', default=data_dir, help="set vamos data directory (default: %s)" % data_dir)
+parser.add_argument('-b', '--benchmark', action='store_true', default=False, help="enable benchmarking")
 args = parser.parse_args()
 
 # --- init config ---
@@ -166,7 +167,7 @@ vamos.set_main_process(proc)
 m68k.set_cpu_type(m68k.M68K_CPU_TYPE_68000)
 
 # init cpu and initial registers
-run = VamosRun(vamos)
+run = VamosRun(vamos, args.benchmark)
 run.init_cpu()
 
 # set reset opcode/trap handler

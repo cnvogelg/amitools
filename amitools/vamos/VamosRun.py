@@ -12,7 +12,7 @@ class Trap:
     return "[@%06x:%s:one_shot=%s]" % (self.addr, self.func, self.one_shot)
 
 class VamosRun:
-  def __init__(self, vamos):
+  def __init__(self, vamos, benchmark=False):
     self.cpu = vamos.cpu
     self.mem = vamos.mem
     self.ctx = vamos
@@ -25,6 +25,8 @@ class VamosRun:
     
     self.traps = {}
     self.trap_addrs = []
+    
+    self.benchmark = benchmark
     
   def init_cpu(self):
     # prepare m68k
@@ -65,7 +67,7 @@ class VamosRun:
 
   def reset_func(self):
     """this callback is entered from CPU whenever a RESET opcode is encountered.
-       dispatch to end vamos, call trap, or lib call.
+       dispatch to end vamos or call a trap.
     """
     pc = self.cpu.r_pc() - 2
     # addr == 0 or an error occurred -> end reached
@@ -95,6 +97,16 @@ class VamosRun:
         self.cpu.end()
         self.stay = False
 
+  def _calc_benchmark(self, total_cycles, delta_time):
+    python_time = self.trap_time + self.ctx.lib_mgr.bench_total    
+    cpu_time = delta_time - python_time
+    mhz = total_cycles / (1000000.0 * delta_time)
+    cpu_percent = cpu_time * 100.0 / delta_time
+    python_percent = 100.0 - cpu_percent
+    log_main.info("done %d cycles in host time %.4fs -> %5.2f MHz m68k CPU", total_cycles, cpu_time, mhz)
+    log_main.info("code time %.4fs (%.2f %%), python time %.4fs (%.2f %%) -> total time %.4fs", \
+      cpu_time, cpu_percent, python_time, python_percent, delta_time)
+
   def run(self, cycles_per_run=1000, max_cycles=0):
     """main run loop of vamos"""
     log_main.info("start cpu: %06x", self.ctx.process.prog_start)
@@ -113,14 +125,10 @@ class VamosRun:
         break
 
     end_time = time.clock()
-    delta_time = end_time - start_time
-    cpu_time = delta_time - self.trap_time
-    mhz = total_cycles / (1000000.0 * delta_time)
-    cpu_percent = cpu_time * 100.0 / delta_time
-    trap_percent = 100.0 - cpu_percent
-    log_main.info("done %d cycles in host time %.4fs -> %5.2f MHz m68k CPU", total_cycles, cpu_time, mhz)
-    log_main.info("code time %.4fs (%.2f %%), trap time %.4fs (%.2f %%) -> total time %.4fs", \
-      cpu_time, cpu_percent, self.trap_time, trap_percent, delta_time)
+    
+    # calc benchmark values
+    if self.benchmark:
+      self._calc_benchmark( total_cycles, end_time - start_time )
 
     # if errors happened then report them now
     if self.et.has_errors:

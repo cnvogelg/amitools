@@ -45,7 +45,7 @@ class LibManager():
   
   op_jmp = 0x4ef9
   
-  def __init__(self, label_mgr, data_dir):
+  def __init__(self, label_mgr, data_dir, benchmark):
     self.data_dir = data_dir
     self.label_mgr = label_mgr
     self.int_lib_classes = {}
@@ -56,11 +56,17 @@ class LibManager():
     self.lib_table = []
     
     # use fast call? -> if lib logging level is ERROR or OFF
-    self.fast_call = not log_lib.isEnabledFor(logging.WARN)
+    self.log_call = log_lib.isEnabledFor(logging.WARN)
+    self.benchmark = benchmark
+
+    # libs will accumulate this if benchmarking is enabled
+    self.bench_total = 0.0
   
   def register_int_lib(self, lib_class):
     self.int_lib_classes[lib_class.get_name()] = lib_class
-    lib_class.fast_call = self.fast_call
+    lib_class.log_call = self.log_call
+    lib_class.benchmark = self.benchmark
+    lib_class.lib_mgr = self
     
   def unregister_int_lib(self, lib_class):
     del self.int_lib_classes[lib_class.get_name()]

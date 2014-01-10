@@ -15,9 +15,14 @@ class AmigaLibrary:
     self.version = version
     self.struct = struct
 
-    # flags
+    # will be set by lib manager
+    self.lib_mgr = None
+
+    # stub generation flags
     self.profile = profile
-    self.fast_call = False
+    self.log_call = False
+    self.benchmark = False
+    self.catch_ex = False
 
     # needs calc size
     self.pos_size = None
@@ -66,73 +71,94 @@ class AmigaLibrary:
       result.append("%s[%s]=%08x" % (name,reg,val))
     return ", ".join(result)
 
+  def _generate_dummy_call_stub(self, ctx, bias, name, args=None):
+    """a call stub for unsupported/empty functions.
+       only trace the call and return D0=0
+    """
+    if self.log_call:
+      def call_stub(op, pc):
+        callee_pc = self.get_callee_pc(ctx)
+        call_name = "%4d %s( %s ) from PC=%06x" % (bias, name, self._gen_arg_dump(args, ctx), callee_pc)
+        self.log("? CALL: %s -> d0=0 (default)" % call_name, level=logging.WARN)
+        ctx.cpu.w_reg(REG_D0, 0)
+    else:
+      def call_stub(op, pc):
+        ctx.cpu.w_reg(REG_D0, 0)
+    return call_stub
+
+  def _generate_fast_call_stub(self, mem_lib, ctx, method):
+    """generate a fast call stub without any processing"""
+    def call_stub(op, pc):
+      """the generic call stub: call python bound method and 
+         if return value exists then set it in CPU's D0 register"""
+      d0 = method(mem_lib, ctx)
+      if d0 != None:
+        ctx.cpu.w_reg(REG_D0, d0)
+    return call_stub
+
   def _generate_call_stub(self, mem_lib, ctx, bias, name, method=None, args=None):
     """generate a call stub for this given bound method
        this will construct a small wrapper around the library call to be set as a trap
        function.
        For unknown methods it can generate a default/dummy stub that only set d0=0
-    """    
-    # method is available
-    if method != None:
-      # fast call a method
-      if self.fast_call:
-        # is profiling enabled?
-        if self.profile:
-          def call_stub(op, pc):
-            start = time.clock()
-            d0 = method(mem_lib, ctx)
-            end = time.clock()
-            delta = end - start
-            self._account_profile_data(name, delta)
-            if d0 != None:
-              ctx.cpu.w_reg(REG_D0, d0)
-        # no profiling, really fast call :)
-        else:
-          def call_stub(op, pc):
-            d0 = method(mem_lib, ctx)
-            if d0 != None:
-              ctx.cpu.w_reg(REG_D0, d0)
-      # call method with optional trace
-      else:
-        # is profiling enabled?
-        if self.profile:
-          # with profiling
-          def call_stub(op, pc):
-            callee_pc = self.get_callee_pc(ctx)
-            call_name = "%4d %s( %s ) from PC=%06x" % (bias, name, self._gen_arg_dump(args, ctx), callee_pc)
-            self.log("{ CALL: %s" % call_name, level=logging.WARN)
-            start = time.clock()
-            d0 = method(mem_lib, ctx)
-            end = time.clock()
-            delta = end - start
-            self._account_profile_data(name, delta)
-            self.log("} END CALL: d0=%s (default)" % (d0), level=logging.WARN)
-            if d0 != None:
-              ctx.cpu.w_reg(REG_D0, d0)
-        else:
-          # no profiling
-          def call_stub(op, pc):
-            callee_pc = self.get_callee_pc(ctx)
-            call_name = "%4d %s( %s ) from PC=%06x" % (bias, name, self._gen_arg_dump(args, ctx), callee_pc)
-            self.log("{ CALL: %s" % call_name, level=logging.WARN)
-            d0 = method(mem_lib, ctx)
-            self.log("} END CALL: d0=%s (default)" % (d0), level=logging.WARN)
-            if d0 != None:
-              ctx.cpu.w_reg(REG_D0, d0)
+    """
+    # if no method is available then generate a dummy stub
+    if method == None:
+      return self._generate_dummy_call_stub(ctx, bias, name, args)
 
-    # dummy method:
-    else:
-      if self.fast_call:
-        def call_stub(op, pc):
-          ctx.cpu.w_reg(REG_D0, 0)
-      else:
-        def call_stub(op, pc):
-          callee_pc = self.get_callee_pc(ctx)
-          call_name = "%4d %s( %s ) from PC=%06x" % (bias, name, self._gen_arg_dump(args, ctx), callee_pc)
-          self.log("? CALL: %s -> d0=0 (default)" % call_name, level=logging.WARN)
-          ctx.cpu.w_reg(REG_D0, 0)
-        
-    return call_stub
+    # if extra processing is disabled then create a compact call stub
+    if not self.log_call and not self.benchmark and not self.profile and not self.catch_ex:
+      return self._generate_fast_call_stub(mem_lib, ctx, method)
+    
+    # ... otherwise processing is enabled and we need to synthesise a
+    # suitable call stub
+    need_timing = self.benchmark or self.profile
+    code = ["def call_stub(op, pc):"]
+    
+    # logging (begin)
+    if self.log_call:
+      code.append('  callee_pc = self.get_callee_pc(ctx)')
+      code.append('  call_name = "%4d %s( %s ) from PC=%06x" % (bias, name, self._gen_arg_dump(args, ctx), callee_pc)')
+      code.append('  self.log("{ CALL: %s" % call_name, level=logging.WARN)')
+    
+    # timing code
+    if need_timing:
+      code.append('  start = time.clock()')
+      
+    # main call: call method and evaluate result
+    code.append('  d0 = method(mem_lib, ctx)')
+    code.append('  if d0 != None:')
+    code.append('    ctx.cpu.w_reg(REG_D0, d0)')
+    
+    # timing code
+    if need_timing:
+      code.append('  end = time.clock()')
+      code.append('  delta = end - start')
+    if self.profile:
+      code.append('  self._account_profile_data(name, delta)')
+    if self.benchmark:
+      code.append('  self._account_benchmark_data(delta)')
+
+    # logging (end)
+    if self.log_call:
+      code.append('  self.log("} END CALL: d0=%s (default)" % (d0), level=logging.WARN)')
+
+    # wrap exception handler
+    if self.catch_ex:
+      c = [code[0]]
+      c.append("  try:")
+      for l in code[1:]:
+        c.append("  " + l)
+      c.append("  except:")
+      c.append("    self._handle_exc()")
+      code = c
+      
+    # generate code
+    l = {}
+    l.update(globals())
+    l.update(locals())
+    exec "\n".join(code) in l
+    return l['call_stub']
     
   def trap_lib_entry(self, mem_lib, ctx, bias, name, method=None, args=None):
     """generate a trap in the library's jump table.
@@ -150,7 +176,7 @@ class AmigaLibrary:
     # patch the lib in memory
     addr = mem_lib.lib_base - bias
     ctx.mem.write_mem(1,addr,op)
-    self.log("patch $%04x: '%s' [%s]" % (bias, name, method), level=logging.DEBUG)
+    self.log("patch $%04x: op=$%04x '%s' [%s]" % (bias, op, name, method), level=logging.DEBUG)
     return True  
 
   def trap_class_entries(self, mem_lib, ctx, reset_others=False, add_private=False):
@@ -258,3 +284,12 @@ class AmigaLibrary:
     else:
       entry = [delta, 1]
       self.profile_map[func] = entry
+  
+  def _account_benchmark_data(self, delta):
+    self.lib_mgr.bench_total += delta
+    
+  def _handle_exc(self):
+    """handle an exception that occurred inside the call stub's python code"""
+    # TBD
+    print "ARGH"
+

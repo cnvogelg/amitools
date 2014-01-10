@@ -45,7 +45,8 @@ class VamosConfig(ConfigParser.SafeConfigParser):
     self._keys = {
       'logging' : str, 
       'verbose' : int, 
-      'quiet' : bool, 
+      'quiet' : bool,
+      'benchmark' : bool, 
       'log_file' : str,
       'instr_trace' : bool, 
       'memory_trace' : bool, 
