@@ -8,17 +8,17 @@ class LabelLib(LabelStruct):
   op_reset = 0x04e70
   op_rts = 0x4e75
   
-  def __init__(self, name, addr, size, lib_base, struct, lib_entry):
+  def __init__(self, name, addr, size, lib_base, struct, lib):
     LabelStruct.__init__(self, name, addr, struct, size=size, offset=lib_base - addr)
     self.lib_base = lib_base
-    self.lib_entry = lib_entry
+    self.lib = lib
     
   def __str__(self):
     return "%s base=%06x" %(LabelStruct.__str__(self),self.lib_base)
 
   def _get_fd_str(self, bias):
-    if self.lib_entry.fd != None:
-      f = self.lib_entry.fd.get_func_by_bias(bias)
+    if self.lib.fd != None:
+      f = self.lib.fd.get_func_by_bias(bias)
       if f != None:
         return f.get_str()
     return ""

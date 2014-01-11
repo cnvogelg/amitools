@@ -13,11 +13,6 @@ class ExecLibrary(AmigaLibrary):
     self.lib_mgr = lib_mgr
     self.alloc = alloc
     
-  def setup_lib(self, lib, ctx):
-    AmigaLibrary.setup_lib(self, lib, ctx)
-    # setup exec memory
-    lib.access.w_s("LibNode.lib_Version", self.version)
-
   def set_this_task(self, lib, process):
     lib.access.w_s("ThisTask",process.this_task.addr)
     self.stk_lower = process.stack_base
@@ -90,20 +85,20 @@ class ExecLibrary(AmigaLibrary):
     if lib == None:
       return 0
     else:
-      return lib.lib_base
+      return lib.addr_base_open
   
   def OldOpenLibrary(self, lib, ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name = ctx.mem.access.r_cstr(name_ptr)
     lib = self.lib_mgr.open_lib(name, 0, ctx)
     log_exec.info("OldOpenLibrary: '%s' -> %s" % (name, lib))
-    return lib.lib_base
+    return lib.addr_base_open
   
   def CloseLibrary(self, lib, ctx):
     lib_addr = ctx.cpu.r_reg(REG_A1)
     lib = self.lib_mgr.close_lib(lib_addr,ctx)
     if lib != None:
-      log_exec.info("CloseLibrary: '%s' -> %06x" % (lib, lib.lib_base))
+      log_exec.info("CloseLibrary: '%s' -> %06x" % (lib, lib.addr_base))
     else:
       raise VamosInternalError("CloseLibrary: Unknown library to close: ptr=%06x" % lib_addr)
   

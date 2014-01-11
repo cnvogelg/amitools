@@ -1,9 +1,13 @@
 from CPU import *
-
 from Log import *
+
 import logging
 import time
 import inspect
+
+from LabelLib import LabelLib
+from AccessStruct import AccessStruct
+from lib.lexec.ExecStruct import LibraryDef
 
 class AmigaLibrary:
   
@@ -18,28 +22,54 @@ class AmigaLibrary:
     # will be set by lib manager
     self.lib_mgr = None
 
+    # lib flags
+    self.is_native = False
+    self.is_auto_created = False
+
     # stub generation flags
     self.profile = profile
     self.log_call = False
     self.benchmark = False
     self.catch_ex = False
 
-    # needs calc size
-    self.pos_size = None
-    self.neg_size = None
-    self.fd = None
-
-  def calc_size(self, fd):
-    """pass the fd describing the lib 
-       and setup the jump table (neg size) and library struct (pos size)
-    """
-    # keep function description
-    self.fd = fd
-    # get pos_size
+    # proposal of size
     self.pos_size = self.struct.get_size()
-    # calc neg_size
-    max_bias = fd.get_max_bias()
+    self.neg_size = 0
+    
+    # (optional) fd describing lib functions
+    self.fd = None
+    # (optional) native segment list loaded for lib
+    self.seg_list = None
+
+    # --- setup state in memory ---
+    # set memory version
+    self.mem_version = 0
+    # memory pos size and neg size
+    # (might differ if native lib was loaded)
+    self.mem_pos_size = 0
+    self.mem_neg_size = 0
+    # if lib is setup then a base address is assigned
+    self.addr_base = 0
+    self.addr_begin = 0
+    self.addr_end = 0
+    self.addr_base_open = 0 # address returned by open as lib base
+    self.label = None
+    self.access = None
+    self.lib_access = None
+    # number of users opening the lib
+    self.ref_cnt = 0
+    # also an access object for the lib struct members are allocated
+
+  def calc_neg_size_from_fd(self):
+    """calc the neg size from the fd bias"""
+    if self.fd == None:
+      return
+    max_bias = self.fd.get_max_bias()
     self.neg_size = max_bias + 6
+  
+  def use_sizes(self):
+    self.mem_pos_size = self.pos_size
+    self.mem_neg_size = self.neg_size
   
   def _get_class_methods(self):
     """return a map with method name to bound method mapping of this class"""    
@@ -86,17 +116,17 @@ class AmigaLibrary:
         ctx.cpu.w_reg(REG_D0, 0)
     return call_stub
 
-  def _generate_fast_call_stub(self, mem_lib, ctx, method):
+  def _generate_fast_call_stub(self, ctx, method):
     """generate a fast call stub without any processing"""
     def call_stub(op, pc):
       """the generic call stub: call python bound method and 
          if return value exists then set it in CPU's D0 register"""
-      d0 = method(mem_lib, ctx)
+      d0 = method(self, ctx)
       if d0 != None:
         ctx.cpu.w_reg(REG_D0, d0)
     return call_stub
 
-  def _generate_call_stub(self, mem_lib, ctx, bias, name, method=None, args=None):
+  def _generate_call_stub(self, ctx, bias, name, method=None, args=None):
     """generate a call stub for this given bound method
        this will construct a small wrapper around the library call to be set as a trap
        function.
@@ -108,7 +138,7 @@ class AmigaLibrary:
 
     # if extra processing is disabled then create a compact call stub
     if not self.log_call and not self.benchmark and not self.profile and not self.catch_ex:
-      return self._generate_fast_call_stub(mem_lib, ctx, method)
+      return self._generate_fast_call_stub(ctx, method)
     
     # ... otherwise processing is enabled and we need to synthesise a
     # suitable call stub
@@ -126,7 +156,7 @@ class AmigaLibrary:
       code.append('  start = time.clock()')
       
     # main call: call method and evaluate result
-    code.append('  d0 = method(mem_lib, ctx)')
+    code.append('  d0 = method(self, ctx)')
     code.append('  if d0 != None:')
     code.append('    ctx.cpu.w_reg(REG_D0, d0)')
     
@@ -160,12 +190,12 @@ class AmigaLibrary:
     exec "\n".join(code) in l
     return l['call_stub']
     
-  def trap_lib_entry(self, mem_lib, ctx, bias, name, method=None, args=None):
+  def trap_lib_entry(self, ctx, bias, name, method=None, args=None):
     """generate a trap in the library's jump table.
        returns True if trap was applied or False if no trap could be setup
     """
     # get call stub
-    call_stub = self._generate_call_stub(mem_lib, ctx, bias, name, method, args)
+    call_stub = self._generate_call_stub(ctx, bias, name, method, args)
     # allocate a trap
     tid = ctx.cpu.trap_setup(call_stub, auto_rts=True)
     if tid < 0:
@@ -174,18 +204,19 @@ class AmigaLibrary:
     # generate opcode
     op = 0xa000 | tid
     # patch the lib in memory
-    addr = mem_lib.lib_base - bias
+    addr = self.addr_base - bias
     ctx.mem.write_mem(1,addr,op)
     self.log("patch $%04x: op=$%04x '%s' [%s]" % (bias, op, name, method), level=logging.DEBUG)
     return True  
 
-  def trap_class_entries(self, mem_lib, ctx, reset_others=False, add_private=False):
+  def trap_class_entries(self, ctx, add_private=False):
     """look up all names (from fd) and if members of this class match then trap the function.
-       optionally you can place a RESET opcode on all other entry points
+    
+       return (number of methods patched, number of dummies patched)
     """
     # this works only with fd file!
     if self.fd == None:
-      return False
+      return None
     
     # build a map: bias -> func name
     bias_map = {}
@@ -199,7 +230,9 @@ class AmigaLibrary:
       
     # loop over all biases
     bias = 6
-    addr = mem_lib.lib_base - bias
+    addr = self.addr_base - bias
+    num_dummy = 0
+    num_method = 0
     while bias < self.neg_size:
       # bias is found in FD
       if bias in bias_map:
@@ -210,33 +243,99 @@ class AmigaLibrary:
         # is a method implemented in this class?
         if name in method_map:
           method = method_map[name]
+          num_method += 1
         else:
           method = None
+          num_dummy += 1
         
         # now trap entry
-        self.trap_lib_entry(mem_lib, ctx, bias, name, method, args)
-
-      # place a RESET in untrapped lib entries
-      elif reset_others:
-        self.log("patch $%04x: <RESET>" % bias, level=logging.DEBUG)
-        ctx.mem.write_mem(1,addr,self.op_reset)
+        self.trap_lib_entry(ctx, bias, name, method, args)
         
       addr -= 6
       bias += 6
 
+    return (num_method, num_dummy)
+
+  def create_empty_jump_table(self, ctx):
+    """create a table full of RESET opcodes for all function entries"""
+    bias = 6
+    addr = self.addr_base
+    while bias < self.neg_size:
+      ctx.mem.write_mem(1,addr,self.op_reset)
+      bias += 6
+      addr -= 6
+
   def __str__(self):
-    return "[Lib %s V%d pos_size=%d neg_size=%d]" % \
-      (self.name, self.version, self.pos_size, self.neg_size)
+    return "[Lib %s V%d {+%d -%d} mem: V%d {+%d -%d} <%08x, %08x, %08x> @%08x]" % \
+      (self.name, self.version, 
+       self.pos_size, self.neg_size,
+       self.mem_version,
+       self.mem_pos_size, self.mem_neg_size,
+       self.addr_begin, self.addr_base, self.addr_end,
+       self.addr_base_open)
+
+  def alloc_lib_base(self, ctx):
+    """alloc memory for the library base"""
+    # alloc memory
+    lib_size = self.mem_neg_size + self.mem_pos_size
+    self.addr_begin = ctx.alloc.alloc_mem(lib_size)
+    self.addr_base = self.addr_begin + self.mem_neg_size
+    self.addr_end = self.addr_base + self.mem_pos_size
+    self.addr_base_open = self.addr_base
+    # create memory label
+    self.label = LabelLib(self.name, self.addr_begin, lib_size, self.mem_neg_size, self.struct, self)
+    ctx.label_mgr.add_label(self.label)
+    # create access
+    self.access = AccessStruct(ctx.mem, self.struct, self.addr_base)
+    self.lib_access = AccessStruct(ctx.mem, LibraryDef, self.addr_base)
   
-  def setup_lib(self, mem_lib, ctx):
+  def free_lib_base(self, ctx, free_alloc=True):
+    """free memory for the library base"""
+    # free memory
+    if free_alloc:
+      ctx.alloc.free_mem(self.addr_begin, self.mem_neg_size + self.mem_pos_size)
+    ctx.label_mgr.remove_label(self.label)
+    # clean up
+    self.addr_begin = 0
+    self.addr_base = 0
+    self.addr_end = 0
+    self.addr_base_open = 0
+    self.label = None
+    self.access = None
+    self.lib_access = None
+  
+  def fill_lib_struct(self):
+    # now we can fill the library structure with some sane values
+    self.lib_access.w_s("lib_Version", self.mem_version)
+    self.lib_access.w_s("lib_PosSize", self.mem_pos_size)
+    self.lib_access.w_s("lib_NegSize", self.mem_neg_size)
+    self.lib_access.w_s("lib_OpenCnt", 0)
+  
+  def setup_lib(self, ctx):
+    """the lib is now used in memory at the given base address"""
+    self.ref_cnt = 0
     # enable profiling
     if self.profile:
       self.profile_map = {}
   
-  def finish_lib(self, mem_lib, ctx):
+  def finish_lib(self, ctx):
+    """the lib is no longer used in memory"""
+    if self.ref_cnt != 0:
+      self.log("lib ref count != 0: %d" % self.ref_cnt, level=logging.ERROR)
+    
     # dump profile
     if self.profile:
       self.dump_profile()
+  
+  def inc_usage(self):
+    """increment usage counter"""
+    self.ref_cnt += 1
+    self.lib_access.w_s("lib_OpenCnt", self.ref_cnt)
+    
+  def dec_usage(self):
+    """decrement usage counter"""
+    self.ref_cnt -= 1
+    self.lib_access.w_s("lib_OpenCnt", self.ref_cnt)
   
   def get_num_vectors(self):
     return self.num_jumps

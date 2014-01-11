@@ -172,16 +172,16 @@ class AmigaResident:
       addr = base_addr + s[0]
       mem.access.write_mem(s[2], addr, s[1])
 
-  def init_lib(self, res, memlib, base_addr):
-    a = memlib.access
+  def init_lib(self, res, lib, base_addr):
+    a = lib.access
     a.w_s("lib_Node.ln_Type", res['type'])
     a.w_s("lib_Node.ln_Pri", res['pri'])
     a.w_s("lib_Node.ln_Name", res['name_ptr'])
     a.w_s("lib_Flags", res['flags'])
-    a.w_s("lib_NegSize", memlib.neg_size)
-    a.w_s("lib_PosSize", memlib.pos_size)
+    a.w_s("lib_NegSize", lib.mem_neg_size)
+    a.w_s("lib_PosSize", lib.mem_pos_size)
     a.w_s("lib_Version", res['version'])
     a.w_s("lib_IdString", res['id_ptr'])
-    self.setup_struct(res, memlib, base_addr)
+    self.setup_struct(res, lib, base_addr)
 
 

@@ -16,8 +16,6 @@ from Trampoline import Trampoline
 # lib
 from lib.ExecLibrary import ExecLibrary
 from lib.DosLibrary import DosLibrary
-from lib.IconLibrary import IconLibrary
-from lib.IFFParseLibrary import IFFParseLibrary
 from lib.lexec.ExecStruct import *
 from lib.dos.DosStruct import *
 
@@ -78,7 +76,7 @@ class Vamos:
   def _set_this_task(self, proc):
     """tell exec about this process and all others referencing process from here"""
     self.process = proc
-    self.exec_lib.lib_class.set_this_task(self.exec_lib, proc)
+    self.exec_lib.set_this_task(self.exec_lib, proc)
   
   def set_main_process(self, proc):
     log_proc.info("set main process: %s", proc)
@@ -186,12 +184,6 @@ class Vamos:
     self.dos_lib_def = DosLibrary(self.mem, self.alloc, version=libs_cfg['dos']['version'], profile=libs_cfg['dos']['profile'])
     self.dos_lib_def.set_managers(self.path_mgr, self.lock_mgr, self.file_mgr, self.port_mgr, self.seg_loader)
     self.lib_mgr.register_int_lib(self.dos_lib_def)
-    # icon
-    self.icon_lib_def = IconLibrary()
-    self.lib_mgr.register_int_lib(self.icon_lib_def)
-    # iffparse
-    self.iffparse_lib_def = IFFParseLibrary()
-    self.lib_mgr.register_int_lib(self.iffparse_lib_def)
 
   def init_trampoline(self):
     self.tr_mem_size = 256
@@ -207,7 +199,7 @@ class Vamos:
     log_mem_init.info(self.exec_lib)
 
   def close_exec_lib(self):
-    self.lib_mgr.close_lib(self.exec_lib.lib_base, self)
+    self.lib_mgr.close_lib(self.exec_lib.addr_base, self)
 
   def create_old_dos_guard(self):
     # create a guard memory for tracking invalid old dos access

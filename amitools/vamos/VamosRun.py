@@ -40,7 +40,7 @@ class VamosRun:
     # set end RESET opcode at 0 and execbase at 4
     op_reset = 0x04e70
     self.mem.access.w16(0, op_reset)
-    self.mem.access.w32(4, self.ctx.exec_lib.lib_base)
+    self.mem.access.w32(4, self.ctx.exec_lib.addr_base)
 
     # setup arg in D0/A0
     self.cpu.w_reg(REG_D0, self.ctx.process.arg_len)

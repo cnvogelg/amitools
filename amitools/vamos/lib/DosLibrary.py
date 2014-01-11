@@ -41,11 +41,9 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("dos fs handler port: %06x" % self.fs_handler_port)
     file_mgr.set_fs_handler_port(self.fs_handler_port)
   
-  def setup_lib(self, lib, ctx):
-    AmigaLibrary.setup_lib(self, lib, ctx)
+  def setup_lib(self, ctx):
+    AmigaLibrary.setup_lib(self, ctx)
     log_dos.info("open dos.library V%d", self.version)
-    # setup lib struct
-    lib.access.w_s("lib.lib_Version", self.version)
     # init own state
     self.io_err = 0
     self.cur_dir_lock = None
@@ -56,15 +54,15 @@ class DosLibrary(AmigaLibrary):
     self.rdargs = {}
     # setup RootNode
     self.root_struct = ctx.alloc.alloc_struct("RootNode",RootNodeDef)
-    lib.access.w_s("dl_Root",self.root_struct.addr)
+    self.access.w_s("dl_Root",self.root_struct.addr)
     # setup DosInfo
     self.dos_info = ctx.alloc.alloc_struct("DosInfo",DosInfoDef)
     self.root_struct.access.w_s("rn_Info",self.dos_info.addr)
   
-  def finish_lib(self, lib, ctx):
+  def finish_lib(self, ctx):
     ctx.alloc.free_struct(self.root_struct)
     ctx.alloc.free_struct(self.dos_info)
-    AmigaLibrary.finish_lib(self, lib, ctx)
+    AmigaLibrary.finish_lib(self, ctx)
   
   # ----- Direct Handler Access -----
   

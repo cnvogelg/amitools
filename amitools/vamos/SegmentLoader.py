@@ -49,6 +49,9 @@ class SegmentLoader:
     self.error = None
     self.loaded_seg_lists = {}
   
+  def can_load_seg(self, ami_bin_file):
+    return self.path_mgr.ami_command_to_sys_path(ami_bin_file) != None
+  
   # load ami_bin_file
   def load_seg(self, ami_bin_file):
     # map file name
