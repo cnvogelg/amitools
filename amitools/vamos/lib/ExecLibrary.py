@@ -17,6 +17,12 @@ class ExecLibrary(AmigaLibrary):
     self.access.w_s("ThisTask",process.this_task.addr)
     self.stk_lower = process.stack_base
     self.stk_upper = process.stack_end
+  
+  def set_cpu(self, cpu):
+    if cpu == '68020':
+      self.access.w_s("AttnFlags",2)
+    else:
+      self.access.w_s("AttnFlags",0)
     
   # ----- System -----
   

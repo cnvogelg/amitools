@@ -28,6 +28,7 @@ class Vamos:
     self.raw_mem = raw_mem
     self.ram_size = raw_mem.ram_size
     self.cpu = cpu
+    self.cpu_type = cfg.cpu
     self.path_mgr = PathManager( cfg )
 
     # create a label manager and error tracker
@@ -196,6 +197,7 @@ class Vamos:
   def open_exec_lib(self):
     # open exec lib
     self.exec_lib = self.lib_mgr.open_lib(ExecLibrary.name, 0, self)
+    self.exec_lib_def.set_cpu(self.cpu_type)
     log_mem_init.info(self.exec_lib)
 
   def close_exec_lib(self):
