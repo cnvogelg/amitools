@@ -49,6 +49,7 @@ class AmigaLibrary:
     self.mem_pos_size = 0
     self.mem_neg_size = 0
     # if lib is setup then a base address is assigned
+    self.mem_obj = None
     self.addr_base = 0
     self.addr_begin = 0
     self.addr_end = 0
@@ -266,19 +267,22 @@ class AmigaLibrary:
       addr -= 6
 
   def __str__(self):
-    return "[Lib %s V%d {+%d -%d} mem: V%d {+%d -%d} <%08x, %08x, %08x> @%08x]" % \
+    return "[Lib %s V%d {+%d -%d} mem: V%d {+%d -%d} <%08x, %08x, %08x> open_base=%08x ref_cnt=%d]" % \
       (self.name, self.version, 
        self.pos_size, self.neg_size,
        self.mem_version,
        self.mem_pos_size, self.mem_neg_size,
        self.addr_begin, self.addr_base, self.addr_end,
-       self.addr_base_open)
+       self.addr_base_open, self.ref_cnt)
 
   def alloc_lib_base(self, ctx):
     """alloc memory for the library base"""
-    # alloc memory
+    # alloc memory - use an Exec AllocMemory() compatible scheme here
+    # as the lib might get free'd by library code and calling FreeMem()
     lib_size = self.mem_neg_size + self.mem_pos_size
-    self.addr_begin = ctx.alloc.alloc_mem(lib_size)
+    tag = "LibBase(%s)" % self.name
+    self.mem_obj = ctx.alloc.alloc_memory(tag, lib_size, add_label=False)
+    self.addr_begin = self.mem_obj.addr
     self.addr_base = self.addr_begin + self.mem_neg_size
     self.addr_end = self.addr_base + self.mem_pos_size
     self.addr_base_open = self.addr_base
@@ -293,9 +297,10 @@ class AmigaLibrary:
     """free memory for the library base"""
     # free memory
     if free_alloc:
-      ctx.alloc.free_mem(self.addr_begin, self.mem_neg_size + self.mem_pos_size)
+      ctx.alloc.free_memory(self.mem_obj)
     ctx.label_mgr.remove_label(self.label)
     # clean up
+    self.mem_obj = None
     self.addr_begin = 0
     self.addr_base = 0
     self.addr_end = 0
