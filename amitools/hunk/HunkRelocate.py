@@ -82,8 +82,8 @@ class HunkRelocate:
     
   def read_long(self, data, offset):
     bytes = data[offset:offset+4]
-    return struct.unpack(">I",bytes)[0]
+    return struct.unpack(">i",bytes)[0]
   
   def write_long(self, data, offset, value):
-    bytes = struct.pack(">I",value)
+    bytes = struct.pack(">i",value)
     data[offset:offset+4] = bytes
