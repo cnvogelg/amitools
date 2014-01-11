@@ -101,7 +101,6 @@ class AmigaResident:
     a = mem.access
     while True:
       cmd = a.r8(addr)
-      print "%08x: %02x" % (addr,cmd)
       if cmd == self.INIT_END:
         break
       elif cmd == self.INIT_BYTE_B:
@@ -135,6 +134,7 @@ class AmigaResident:
         addr += 8
       else:
         raise ValueError("Invalid parse_struct command: %02x" % cmd)
+    return res
   
   def parse_vectors(self, addr, all_mem):
     a = all_mem.access

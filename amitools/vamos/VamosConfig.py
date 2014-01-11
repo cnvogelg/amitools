@@ -84,4 +84,7 @@ class VamosConfig(ConfigParser.SafeConfigParser):
     # get paramters from args
     for key in self._keys:
       if hasattr(args, key) and getattr(self, key) == None:
-        setattr(self, key, getattr(args, key))
+        arg_value = getattr(args, key)
+        if arg_value != None:
+          key_type = self._keys[key]
+          setattr(self, key, key_type(arg_value))
