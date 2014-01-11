@@ -122,7 +122,7 @@ class AmigaLibrary:
     def call_stub(op, pc):
       """the generic call stub: call python bound method and 
          if return value exists then set it in CPU's D0 register"""
-      d0 = method(self, ctx)
+      d0 = method(ctx)
       if d0 != None:
         ctx.cpu.w_reg(REG_D0, d0)
     return call_stub
@@ -157,7 +157,7 @@ class AmigaLibrary:
       code.append('  start = time.clock()')
       
     # main call: call method and evaluate result
-    code.append('  d0 = method(self, ctx)')
+    code.append('  d0 = method(ctx)')
     code.append('  if d0 != None:')
     code.append('    ctx.cpu.w_reg(REG_D0, d0)')
     

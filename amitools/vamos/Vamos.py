@@ -76,7 +76,7 @@ class Vamos:
   def _set_this_task(self, proc):
     """tell exec about this process and all others referencing process from here"""
     self.process = proc
-    self.exec_lib.set_this_task(self.exec_lib, proc)
+    self.exec_lib.set_this_task(proc)
   
   def set_main_process(self, proc):
     log_proc.info("set main process: %s", proc)

@@ -13,26 +13,26 @@ class ExecLibrary(AmigaLibrary):
     self.lib_mgr = lib_mgr
     self.alloc = alloc
     
-  def set_this_task(self, lib, process):
-    lib.access.w_s("ThisTask",process.this_task.addr)
+  def set_this_task(self, process):
+    self.access.w_s("ThisTask",process.this_task.addr)
     self.stk_lower = process.stack_base
     self.stk_upper = process.stack_end
     
   # ----- System -----
   
-  def Disable(self, lib, ctx):
+  def Disable(self, ctx):
     log_exec.info("Disable")
-  def Enable(self, lib, ctx):
+  def Enable(self, ctx):
     log_exec.info("Enable")
-  def Forbid(self, lib, ctx):
+  def Forbid(self, ctx):
     log_exec.info("Forbid")
-  def Permit(self, lib, ctx):
+  def Permit(self, ctx):
     log_exec.info("Permit")
     
-  def FindTask(self, lib, ctx):
+  def FindTask(self, ctx):
     task_ptr = ctx.cpu.r_reg(REG_A1)
     if task_ptr == 0:
-      addr = lib.access.r_s("ThisTask")
+      addr = self.access.r_s("ThisTask")
       log_exec.info("FindTask: me=%06x" % addr)
       return addr
     else:
@@ -40,14 +40,14 @@ class ExecLibrary(AmigaLibrary):
       log_exec.info("Find Task: %s" % task_name)
       raise UnsupportedFeatureError("FindTask: other task!");
   
-  def SetSignals(self, lib, ctx):
+  def SetSignals(self, ctx):
     new_signals = ctx.cpu.r_reg(REG_D0)
     signal_mask = ctx.cpu.r_reg(REG_D1)
     old_signals = 0
     log_exec.info("SetSignals: new_signals=%08x signal_mask=%08x old_signals=%08x" % (new_signals, signal_mask, old_signals))
     return old_signals
   
-  def StackSwap(self, lib, ctx):
+  def StackSwap(self, ctx):
     stsw_ptr = ctx.cpu.r_reg(REG_A0)
     stsw = AccessStruct(ctx.mem,StackSwapDef,struct_addr=stsw_ptr)
     # get new stack values
@@ -76,7 +76,7 @@ class ExecLibrary(AmigaLibrary):
     
   # ----- Libraries -----
   
-  def OpenLibrary(self, lib, ctx):
+  def OpenLibrary(self, ctx):
     ver = ctx.cpu.r_reg(REG_D0)
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name = ctx.mem.access.r_cstr(name_ptr)
@@ -87,14 +87,14 @@ class ExecLibrary(AmigaLibrary):
     else:
       return lib.addr_base_open
   
-  def OldOpenLibrary(self, lib, ctx):
+  def OldOpenLibrary(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name = ctx.mem.access.r_cstr(name_ptr)
     lib = self.lib_mgr.open_lib(name, 0, ctx)
     log_exec.info("OldOpenLibrary: '%s' -> %s" % (name, lib))
     return lib.addr_base_open
   
-  def CloseLibrary(self, lib, ctx):
+  def CloseLibrary(self, ctx):
     lib_addr = ctx.cpu.r_reg(REG_A1)
     lib = self.lib_mgr.close_lib(lib_addr,ctx)
     if lib != None:
@@ -104,7 +104,7 @@ class ExecLibrary(AmigaLibrary):
   
   # ----- Memory Handling -----
   
-  def AllocMem(self, lib, ctx):
+  def AllocMem(self, ctx):
     size = ctx.cpu.r_reg(REG_D0)
     flags = ctx.cpu.r_reg(REG_D1)
     # label alloc
@@ -115,7 +115,7 @@ class ExecLibrary(AmigaLibrary):
     log_exec.info("AllocMem: %s" % mb)
     return mb.addr
   
-  def FreeMem(self, lib, ctx):
+  def FreeMem(self, ctx):
     size = ctx.cpu.r_reg(REG_D0)
     addr = ctx.cpu.r_reg(REG_A1)
     if addr == 0 or size == 0:
@@ -128,14 +128,14 @@ class ExecLibrary(AmigaLibrary):
     else:
       raise VamosInternalError("FreeMem: Unknown memory to free: ptr=%06x size=%06x" % (addr, size))
 
-  def AllocVec(self, lib, ctx):
+  def AllocVec(self, ctx):
     size = ctx.cpu.r_reg(REG_D0)
     flags = ctx.cpu.r_reg(REG_D1)
     mb = self.alloc.alloc_memory("AllocVec(@%06x)" % self.get_callee_pc(ctx),size)
     log_exec.info("AllocVec: %s" % mb)
     return mb.addr
     
-  def FreeVec(self, lib, ctx):
+  def FreeVec(self, ctx):
     addr = ctx.cpu.r_reg(REG_A1)
     if addr == 0:
       log_exec.info("FreeVec: freeing NULL")
@@ -149,7 +149,7 @@ class ExecLibrary(AmigaLibrary):
   
   # ----- Misc -----
   
-  def RawDoFmt(self, lib, ctx):
+  def RawDoFmt(self, ctx):
     format_ptr = ctx.cpu.r_reg(REG_A0)
     format     = ctx.mem.access.r_cstr(format_ptr)
     data_ptr   = ctx.cpu.r_reg(REG_A1)
@@ -159,7 +159,7 @@ class ExecLibrary(AmigaLibrary):
   
   # ----- Message Passing -----
   
-  def PutMsg(self, lib, ctx):
+  def PutMsg(self, ctx):
     port_addr = ctx.cpu.r_reg(REG_A0)
     msg_addr = ctx.cpu.r_reg(REG_A1)
     log_exec.info("PutMsg: port=%06x msg=%06x" % (port_addr, msg_addr))
@@ -168,7 +168,7 @@ class ExecLibrary(AmigaLibrary):
       raise VamosInternalError("PutMsg: on invalid Port (%06x) called!" % port_addr)
     ctx.port_mgr.put_msg(port_addr, msg_addr)
       
-  def GetMsg(self, lib, ctx):
+  def GetMsg(self, ctx):
     port_addr = ctx.cpu.r_reg(REG_A0)
     log_exec.info("GetMsg: port=%06x" % (port_addr))
     has_port = ctx.port_mgr.has_port(port_addr)
@@ -182,7 +182,7 @@ class ExecLibrary(AmigaLibrary):
       log_exec.info("GetMsg: no message available!")
       return 0
   
-  def WaitPort(self, lib, ctx):
+  def WaitPort(self, ctx):
     port_addr = ctx.cpu.r_reg(REG_A0)
     log_exec.info("WaitPort: port=%06x" % (port_addr))
     has_port = ctx.port_mgr.has_port(port_addr)
