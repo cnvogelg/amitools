@@ -11,7 +11,7 @@ class Segment:
   def __init__(self,name, addr, size, label):
     self.name = name
     self.addr = addr
-    self.start = addr + 4
+    self.start = addr + 8
     self.size = size
     self.end = addr + size
     self.label = label
@@ -30,8 +30,8 @@ class SegList:
   
   def add(self, segment):
     if len(self.segments) == 0:
-      self.b_addr = segment.addr >> 2
-      self.prog_start = segment.addr + 4
+      self.b_addr = (segment.addr+4) >> 2 # baddr of 'next' ptr
+      self.prog_start = segment.addr + 8 # begin of first code segment
     self.segments.append(segment)
     self.size += segment.size
     
@@ -128,7 +128,7 @@ class SegmentLoader:
     addrs = []
     for i in xrange(len(sizes)):
       size = sizes[i]
-      seg_size = size + 4 # add segment pointer
+      seg_size = size + 8 # add segment pointer and size of segment
       seg_addr = self.alloc.alloc_mem(seg_size)
 
       # create label
@@ -140,7 +140,7 @@ class SegmentLoader:
 
       seg = Segment(name, seg_addr, seg_size, label)
       seg_list.add(seg)
-      addrs.append(seg.addr + 4) # begin of segment data/code
+      addrs.append(seg.addr + 8) # begin of segment data/code
     
     # relocate to addresses and return data
     datas = relocator.relocate(addrs)
@@ -148,13 +148,20 @@ class SegmentLoader:
     # write to allocated memory
     last_addr = None
     for i in xrange(len(sizes)):
+      # write data to segments
       addr = addrs[i]
       self.mem.access.w_data(addr, datas[i])
-      # write segment pointers
+      # link segment pointers
       if last_addr != None:
-        b_addr = addr >> 2 # BCPL segment pointers
+        b_addr = (addr-4) >> 2 # BCPL segment 'next' pointer
         self.mem.access.w32(last_addr - 4, b_addr)
+      # write size before segment pointer
+      size_longs = (sizes[i] + 8) / 4
+      self.mem.access.w32(addr - 8, size_longs)
       last_addr = addr
+
+    # clear final 'next' pointer
+    self.mem.access.w32(addr - 4, 0)
     
     return seg_list
     
