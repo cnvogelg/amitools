@@ -142,8 +142,8 @@ vamos = Vamos(mem, cpu, cfg)
 if cfg.memory_trace:
   mem.set_mem_trace_mode(1)
   mem.set_mem_trace_func(vamos.label_mgr.trace_mem)
-  if not log_mem.isEnabledFor(logging.INFO):
-    log_mem.setLevel(logging.INFO)
+  if not log_mem.isEnabledFor(logging.DEBUG):
+    log_mem.setLevel(logging.DEBUG)
 # enable internal memory trace?
 if cfg.internal_memory_trace:
   AccessMemory.label_mgr = vamos.label_mgr
