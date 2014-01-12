@@ -279,7 +279,7 @@ class LibManager():
       exec_base = ctx.mem.read_mem(2,4)
       tr.save_all()
       tr.set_dx_l(0, lib.addr_base)
-      tr.set_ax_l(0, seg0.addr)
+      tr.set_ax_l(0, lib.seg_list.b_addr) # baddr!
       tr.set_ax_l(6, exec_base)
       tr.jsr(init_addr)
       tr.restore_all()
