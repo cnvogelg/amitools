@@ -56,7 +56,8 @@ class VamosConfig(ConfigParser.SafeConfigParser):
       'ram_size' : int, 
       'stack_size' : int,
       'data_dir' : str,
-      'cpu' : str
+      'cpu' : str,
+      'reg_dump' : bool
     }
     for key in self._keys:
       setattr(self, key, None)
