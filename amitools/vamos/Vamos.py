@@ -118,7 +118,9 @@ class Vamos:
     # restore regs
     tr.restore_all_but_d0()
     # trap to clean up sub process resources
-    tr.trap(lambda x : self.stop_sub_process())
+    def trap_stop_sub_process():
+      self.stop_sub_process()
+    tr.trap(trap_stop_sub_process)
     tr.rts()
     tr.done()
     # get label addr -> set as return value of new stack

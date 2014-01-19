@@ -177,7 +177,9 @@ class LibManager():
     tr.set_ax_l(6, lib_base)
     tr.jsr(open_addr)
     # fetch the result (the lib base might have been altered)
-    tr.trap(lambda x : self._open_native_lib_part2(lib, ctx))
+    def trap_open_native_lib():
+      self._open_native_lib_part2(lib, ctx)
+    tr.trap(trap_open_native_lib)
     tr.restore_all()
 
     # update ref count
@@ -199,7 +201,9 @@ class LibManager():
     tr.set_ax_l(6, lib_base)
     tr.jsr(close_addr)
     # fetch the result of the close call
-    tr.trap(lambda x : self._close_native_lib_part2(lib, ctx))
+    def trap_close_native_lib():
+      self._close_native_lib_part2(lib, ctx)
+    tr.trap(trap_close_native_lib)
     tr.restore_all()
     
     # update ref count
@@ -283,7 +287,9 @@ class LibManager():
       tr.set_ax_l(6, exec_base)
       tr.jsr(init_addr)
       tr.restore_all()
-      tr.trap(lambda x : self._create_native_lib_part2(lib, ctx))
+      def trap_create_native_lib():
+        self._create_native_lib_part2(lib, ctx)
+      tr.trap(trap_create_native_lib)
       self.lib_log("load_lib", "trampoline: init @%06x (lib_base/d0=%06x seg_list/a0=%06x exec_base/a6=%06x)" % \
         (init_addr, lib.addr_base, seg0.addr, exec_base), level=logging.DEBUG)
     else:
@@ -314,7 +320,9 @@ class LibManager():
       tr.jsr(expunge_addr)
       tr.restore_all()
       # close lib via trampoline trap after expunge code was run
-      tr.trap(lambda x : self._free_native_lib_part2(lib, ctx, False))
+      def trap_free_native_lib():
+        self._free_native_lib_part2(lib, ctx, False)
+      tr.trap(trap_free_native_lib)
       self.lib_log("free_lib","trampoline: expunge @%06x (lib_base/a6=%06x)" % (expunge_addr, lib_base), level=logging.DEBUG)
     else:
       self._free_native_lib_part2(lib, ctx, True)

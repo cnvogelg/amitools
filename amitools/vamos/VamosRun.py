@@ -21,10 +21,6 @@ class VamosRun:
     
     self.stay = True
     self.et = vamos.error_tracker
-    self.trap_time = 0.0
-    
-    self.traps = {}
-    self.trap_addrs = []
     
     self.benchmark = benchmark
     
@@ -55,50 +51,21 @@ class VamosRun:
     self.cpu.w_reg(REG_A5, self.ctx.dos_guard_base)
     self.cpu.w_reg(REG_A6, self.ctx.dos_guard_base)
 
-  def add_trap(self, addr, func, one_shot=False):
-    trap = Trap(addr, func, one_shot)
-    self.traps[addr] = trap
-    self.trap_addrs = self.traps.keys()
-    return trap
-  
-  def remove_trap(self, trap):
-    del self.traps[trap.addr]
-    self.trap_addrs = self.traps.keys()
-
   def reset_func(self):
     """this callback is entered from CPU whenever a RESET opcode is encountered.
-       dispatch to end vamos or call a trap.
+       dispatch to end vamos.
     """
     pc = self.cpu.r_pc() - 2
     # addr == 0 or an error occurred -> end reached
     if pc == 0 or self.et.has_errors:
       self.cpu.end()
       self.stay = False
-    # a lib trap!
+    # unknown RESET opcode found
     else:
-      try:
-        begin = time.clock()
-        
-        # a registered trap?
-        if pc in self.trap_addrs:
-          trap = self.traps[pc]
-          trap.func(self.ctx)
-          if trap.one_shot:
-            self.remove_trap(trap)          
-        # unknown RESET opcode found
-        else:
-          raise UnsupportedVamosFeature("Unexpected RESET opcode")
-        
-        end = time.clock()
-        # account for trap time
-        self.trap_time += end - begin
-      except BaseException as e:
-        self.et.report_error(e)
-        self.cpu.end()
-        self.stay = False
+      raise UnsupportedVamosFeature("Unexpected RESET opcode")
 
   def _calc_benchmark(self, total_cycles, delta_time):
-    python_time = self.trap_time + self.ctx.lib_mgr.bench_total    
+    python_time = self.ctx.lib_mgr.bench_total    
     cpu_time = delta_time - python_time
     mhz = total_cycles / (1000000.0 * delta_time)
     cpu_percent = cpu_time * 100.0 / delta_time

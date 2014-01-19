@@ -1,6 +1,8 @@
 from Exceptions import *
 from CPU import *
 
+from Log import log_tp
+
 class Trampoline:
   
   def __init__(self, ctx, mem):
@@ -91,6 +93,13 @@ class Trampoline:
     
   # ----- internals -----
   
+  def _gen_trap_func(self, trap_func):
+    def tf(op,pc):
+      log_tp.debug("{ trap: %s",trap_func.__name__)
+      trap_func()
+      log_tp.debug("} trap: %s",trap_func.__name__)
+    return tf
+  
   def _write_code(self):
     size = len(self.code) * 2
     if size > self.mem.size:
@@ -103,7 +112,11 @@ class Trampoline:
       # handle trap -> register one shot at run time
       if w == 0x4e70:
         trap_func = self.traps[trap_pos]
-        self.ctx.run.add_trap(addr, trap_func, one_shot=True)
+        tf = self._gen_trap_func(trap_func)
+        code = self.ctx.cpu.trap_setup(tf, one_shot=True)
+        if code == -1:
+          raise VamosInternalError("No more traps for trampoline left!")
+        self.mem.access.write_mem(1, addr, 0xa000 | code)
         trap_pos += 1
       # check for label
       if code_pos in self.label_pos:
