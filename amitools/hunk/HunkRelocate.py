@@ -60,8 +60,9 @@ class HunkRelocate:
       
       # find relocation hunks
       for hunk in segment[1:]:
-        # abs reloc 32
-        if hunk['type'] == Hunk.HUNK_ABSRELOC32:
+        # abs reloc 32 or
+        # HUNK_DREL32 is a buggy V37 HUNK_RELOC32SHORT...
+        if hunk['type'] == Hunk.HUNK_ABSRELOC32 or hunk['type'] == Hunk.HUNK_DREL32:
           reloc = hunk['reloc']
           for hunk_num in reloc:
             # get address of other hunk
