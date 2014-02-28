@@ -57,19 +57,16 @@ class Vamos:
     # no current process right now
     self.process = None
     self.proc_list = []
-    self.tr_list = []
 
   def init(self, cfg):
     self.init_managers()
     self.register_base_libs(cfg)
-    self.init_trampoline()  
     self.create_old_dos_guard()
     self.open_exec_lib()
     return True
 
   def cleanup(self):
     self.close_exec_lib()
-    self.free_trampoline()
     self.alloc.dump_orphans()
   
   # ----- process handling -----
@@ -90,10 +87,7 @@ class Vamos:
     self._set_this_task(proc)
     
     # setup trampoline to enter sub process
-    tr_mem_size = 128
-    tr_mem = self.alloc.alloc_memory("SubProcJump", tr_mem_size)
-    tr = Trampoline(self, tr_mem)
-    tr.init()
+    tr = Trampoline(self, "SubProcJump")
     tr.save_all_but_d0()
     # new proc registers: d0=arg_len a0=arg_cptr
     tr.set_dx_l(0, proc.arg_len)
@@ -105,31 +99,34 @@ class Vamos:
     tr.set_ax_l(2, self.dos_guard_base)
     tr.set_ax_l(5, self.dos_guard_base)
     tr.set_ax_l(6, self.dos_guard_base)
-    # setup new stack
-    stack_save_addr = tr_mem.addr + tr_mem_size - 4
-    tr.write_ax_l(7, stack_save_addr)
+    # save old stack and set new stack
+    old_stack_label = tr.set_label()
+    tr.write_ax_l(7, 0) # addr will be patched below
     new_stack = proc.stack_initial
     tr.set_ax_l(7, new_stack)
     # call code! (jmp - return value is on stack)
     tr.jmp(proc.prog_start)
     # restore stack (set a label to return from new stack - see below)
     lab = tr.set_label()
-    tr.read_ax_l(7, stack_save_addr)
+    tr.read_ax_l(7, 0) # addr will be patched below
     # restore regs
     tr.restore_all_but_d0()
     # trap to clean up sub process resources
     def trap_stop_sub_process():
       self.stop_sub_process()
-    tr.trap(trap_stop_sub_process)
-    tr.rts()
+    tr.final_rts(trap_stop_sub_process)
+    # allocate a long for old stack
+    old_stack_pos = tr.dc_l(0)
+    # realize trampoline in memory
     tr.done()
     # get label addr -> set as return value of new stack
     lab_addr = tr.get_label(lab)
     log_proc.debug("new_stack=%06x trampoline_return=%06x", new_stack, lab_addr)
     self.mem.access.w32(new_stack, lab_addr)
-    
-    # push trampoline
-    self.tr_list.append(tr)
+    # now patch addr for old stack
+    old_stack_addr = tr.data_addr + old_stack_pos
+    tr.patch_at_label_l(old_stack_label, 2, old_stack_addr)
+    tr.patch_at_label_l(lab, 2, old_stack_addr)
   
   def stop_sub_process(self):
     # get return value
@@ -138,9 +135,6 @@ class Vamos:
     proc = self.proc_list.pop()
     log_proc.info("stop sub process: %s ret_code=%d", proc, ret_code)
     proc.free()
-    # pop trampoline
-    tr = self.tr_list.pop()
-    self.alloc.free_memory(tr.mem)
     
   # ----- init environment -----
   
@@ -187,14 +181,6 @@ class Vamos:
     self.dos_lib_def = DosLibrary(self.mem, self.alloc, version=libs_cfg['dos']['version'], profile=libs_cfg['dos']['profile'])
     self.dos_lib_def.set_managers(self.path_mgr, self.lock_mgr, self.file_mgr, self.port_mgr, self.seg_loader)
     self.lib_mgr.register_int_lib(self.dos_lib_def)
-
-  def init_trampoline(self):
-    self.tr_mem_size = 256
-    self.tr_mem = self.alloc.alloc_memory("Trampoline", self.tr_mem_size)
-    self.tr = Trampoline(self, self.tr_mem)
-
-  def free_trampoline(self):
-    self.alloc.free_memory(self.tr_mem)
 
   def open_exec_lib(self):
     # open exec lib

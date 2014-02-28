@@ -67,10 +67,9 @@ class LibManager():
       lib = self.open_libs_name[sane_name]
       if lib.is_native:
         # call Open()
-        tr = ctx.tr
-        tr.init()
+        tr = Trampoline(ctx,"open_lib[%s]" % sane_name)
         self._open_native_lib(lib, ctx, tr)
-        tr.rts()
+        tr.final_rts()
         tr.done()
       else:
         # handle usage count
@@ -100,11 +99,10 @@ class LibManager():
       load_name = self._get_load_lib_name(name)
       if ctx.seg_loader.can_load_seg(load_name):
         # setup trampoline
-        tr = ctx.tr
-        tr.init()
+        tr = Trampoline(ctx,"create_lib[%s]" % sane_name)
         self._create_native_lib(lib, load_name, ctx, tr)
         self._open_native_lib(lib, ctx, tr)
-        tr.rts()
+        tr.final_rts()
         tr.done()
       else:
         # own memory lib
@@ -124,14 +122,13 @@ class LibManager():
     
     # native lib handling
     if lib.is_native:
-      tr = ctx.tr
-      tr.init()
+      tr = Trampoline(ctx,"close_lib[%s]" % lib.name)
       self._close_native_lib(lib, ctx, tr)
       if lib.ref_cnt == 0:
         self._free_native_lib(lib, ctx, tr)
       elif lib.ref_cnt < 0:
         raise VamosInternalError("CloseLib: invalid ref count?!")      
-      tr.rts()
+      tr.final_rts()
       tr.done()
       
     # own lib handling
