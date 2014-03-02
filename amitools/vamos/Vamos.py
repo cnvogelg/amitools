@@ -175,11 +175,11 @@ class Vamos:
     # register libraries
     # exec
     self.exec_lib_def = ExecLibrary(self.lib_mgr, self.alloc, version=libs_cfg['exec']['version'], profile=libs_cfg['exec']['profile'])
-    self.lib_mgr.register_int_lib(self.exec_lib_def)
+    self.lib_mgr.register_vamos_lib(self.exec_lib_def)
     # dos
     self.dos_lib_def = DosLibrary(self.mem, self.alloc, version=libs_cfg['dos']['version'], profile=libs_cfg['dos']['profile'])
     self.dos_lib_def.set_managers(self.path_mgr, self.lock_mgr, self.file_mgr, self.port_mgr, self.seg_loader)
-    self.lib_mgr.register_int_lib(self.dos_lib_def)
+    self.lib_mgr.register_vamos_lib(self.dos_lib_def)
 
   def open_exec_lib(self):
     # open exec lib

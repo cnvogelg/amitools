@@ -24,7 +24,6 @@ class AmigaLibrary:
 
     # lib flags
     self.is_native = False
-    self.is_auto_created = False
 
     # stub generation flags
     self.profile = profile

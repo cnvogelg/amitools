@@ -15,14 +15,12 @@ class LibManager():
   
   op_jmp = 0x4ef9
   
-  def __init__(self, label_mgr, data_dir, benchmark=False, auto_create=True):
+  def __init__(self, label_mgr, data_dir, benchmark=False):
     self.data_dir = data_dir
     self.label_mgr = label_mgr
     
-    # auto create missing libs
-    self.auto_create = auto_create
     # map of registered libs: name -> AmigaLibrary
-    self.reg_libs = {}
+    self.vamos_libs = {}
     # map of opened libs: base_addr -> AmigaLibrary
     self.open_libs_addr = {}
     self.open_libs_name = {}
@@ -33,18 +31,25 @@ class LibManager():
 
     # libs will accumulate this if benchmarking is enabled
     self.bench_total = 0.0
+
+    # --- config for auto lib ---
+    # black and white list for auto creation of libs
+    # (use sane or normal name)
+    self.black_list = []
+    self.white_list = ['icon.library']
+    self.auto_create = False
   
-  def register_int_lib(self, lib):
-    """register an own library class"""
-    self.reg_libs[lib.get_name()] = lib
+  def register_vamos_lib(self, lib):
+    """register an vamos library class"""
+    self.vamos_libs[lib.get_name()] = lib
     # init lib class instance
     lib.log_call = self.log_call
     lib.benchmark = self.benchmark
     lib.lib_mgr = self
     
-  def unregister_int_lib(self, lib):
-    """unregister your own library class"""
-    del self.reg_libs[lib.get_name()]
+  def unregister_vamos_lib(self, lib):
+    """unregister your vamos library class"""
+    del self.vamos_libs[lib.get_name()]
   
   def lib_log(self, func, text, level=logging.INFO):
     """helper to create lib log messages"""
@@ -77,19 +82,16 @@ class LibManager():
 
     # lib has to be openend
     else:
-      # otherwise try to find a lib instance in registered libs
-      if sane_name in self.reg_libs:
-        self.lib_log("open_lib","opening registered lib: %s" % sane_name)
-        lib = self.reg_libs[sane_name]
-      # auto create lib?
-      elif self.auto_create:
-        self.lib_log("open_lib","auto create lib: %s" % sane_name)
-        lib = AmigaLibrary(sane_name, 0, LibraryDef)
-        lib.is_auto_created = True
-      # no chance to open lib
+      # first check if its an internal vamos library
+      if sane_name in self.vamos_libs:
+        self.lib_log("open_lib","opening vamos lib: %s" % sane_name)
+        lib = self.vamos_libs[sane_name]
+        is_vamos_lib = True
+      # otherwise create a new and empty AmigaLibrary
       else:
-        self.lib_log("open_lib","opening failed: %s" % sane_name, level=logging.ERROR)
-        return None
+        self.lib_log("open_lib","create default lib: %s" % sane_name)
+        lib = AmigaLibrary(sane_name, 0, LibraryDef)
+        is_vamos_lib = False
 
       # try to load an fd file for this lib
       lib.fd = self._load_fd(sane_name)
@@ -104,9 +106,23 @@ class LibManager():
         self._open_native_lib(lib, ctx, tr)
         tr.final_rts()
         tr.done()
+
+      # no native lib available...
+      # either its a vamos lib or we auto create one from an FD file
       else:
-        # own memory lib
-        self._create_own_lib(lib, ctx)
+        # we need to have an FD file otherwise we can't create lib
+        if lib.fd == None:
+          self.lib_log("create_lib","can't create auto lib without FD file: %s" % sane_name, level=logging.ERROR)
+          return None
+
+        # check if we can auto create the lib
+        if not is_vamos_lib:
+          if not self._allow_auto_create(name, sane_name):
+            self.lib_log("open_lib","can't open lib (no auto create): %s" % sane_name, level=logging.ERROR)
+            return None
+
+        # create a (opt. fake/empty) vamos library
+        self._create_vamos_lib(lib, ctx)
         self._register_open_lib(lib)
         lib.inc_usage()
       
@@ -139,7 +155,7 @@ class LibManager():
       if lib.ref_cnt == 0:
         # finally close lib
         self._unregister_open_lib(lib)
-        self._free_own_lib(lib, ctx)
+        self._free_vamos_lib(lib, ctx)
       elif lib.ref_cnt < 0:
         raise VamosInternalError("CloseLib: invalid ref count?!")
 
@@ -339,11 +355,11 @@ class LibManager():
 
     self.lib_log("free_lib","done freeing native lib: %s" % lib)
 
-  # ----- own memory lib creation without loading a binary lib first -----
+  # ----- vamos memory lib creation without loading a binary lib first -----
 
-  def _create_own_lib(self, lib, ctx):
-    """create an own library structure in memory for the given lib"""          
-    self.lib_log("create_lib","creating own mem lib for %s" % lib.name)
+  def _create_vamos_lib(self, lib, ctx):
+    """create an vamos library structure in memory for the given lib"""          
+    self.lib_log("create_lib","creating vamos mem lib for %s" % lib.name)
     # we need a FD description for the library otherwise we don't know neg size
     # (TBD: later on we might force a (neg) size)
     if lib.fd == None:
@@ -371,19 +387,34 @@ class LibManager():
     lib.setup_lib(ctx)
     self.lib_log("create_lib","library %s is setup" % lib.name)
 
-  def _free_own_lib(self, lib, ctx):
-    """free memory foot print of own allocated library"""
-    self.lib_log("free_lib","own mem library %s is finishing" % lib.name)
+  def _free_vamos_lib(self, lib, ctx):
+    """free memory foot print of vamos allocated library"""
+    self.lib_log("free_lib","vamos mem library %s is finishing" % lib.name)
 
     # first call finish lib
     lib.finish_lib(ctx)
     # free memory allocation
     lib.free_lib_base(ctx)
     
-    self.lib_log("free_lib","own mem library %s is freed" % lib.name)
+    self.lib_log("free_lib","vamos mem library %s is free()ed" % lib.name)
       
   # ----- Helpers -----
   
+  def _allow_auto_create(self, name, sane_name):
+    # check black list
+    for l in self.black_list:
+      if name == l or sane_name == l:
+        self.lib_log("open_lib","'%s' is in black list -> deny" % name, level=logging.WARN)
+        return False
+    # check white list
+    for l in self.white_list:
+      if name == l or sane_name == l:
+        self.lib_log("open_lib","'%s' is in white list -> accept" % name, level=logging.DEBUG)
+        return True
+    # default
+    self.lib_log("open_lib","'%s' uses default: auto_create=%s" % (name, self.auto_create), level=logging.DEBUG)
+    return self.auto_create
+
   def _load_fd(self, lib_name):
     """try to load a fd file for a library from vamos data dir"""
     fd_name = lib_name.replace(".library","_lib.fd")
