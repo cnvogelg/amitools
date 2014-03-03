@@ -102,8 +102,7 @@ parser.add_argument('-y', '--max-cycles', action='store', type=int, default=0, h
 parser.add_argument('-B', '--cycles-per-block', action='store', type=int, default=1000, help="cycles per block")
 parser.add_argument('-l', '--logging', action='store', default=None, help="logging settings: <chan>:<level>,*:<level>,...")
 parser.add_argument('-L', '--log-file', action='store', default=None, help="write all log messages to a file")
-parser.add_argument('-i', '--lib-versions', action='store', default=None, help="set lib version: <lib>:<version>,...")
-parser.add_argument('-P', '--lib-profile', action='store', default=None, help="enable lib profiling: <lib>,<lib>,...")
+parser.add_argument('-O', '--lib-options', action='append', default=None, help="set lib options: <lib>:<key>=<value>,...")
 parser.add_argument('-m', '--ram-size', action='store', default=1024, type=int, help="set RAM size in KiB")
 parser.add_argument('-s', '--stack-size', action='store', default=4, help="set stack size in KiB")
 parser.add_argument('-t', '--memory-trace', action='store_true', default=False, help="enable memory tracing (slower)")
@@ -166,9 +165,9 @@ vamos.set_main_process(proc)
 
 # ------ main loop ------
 # set CPU type
-if cfg.cpu == '68000':
+if cfg.cpu in ('68000', '000', '00'):
   m68k.set_cpu_type(m68k.M68K_CPU_TYPE_68000)
-elif cfg.cpu == '68020':
+elif cfg.cpu in ('68020', '020', '20'):
   m68k.set_cpu_type(m68k.M68K_CPU_TYPE_68020)
 else:
   log_main.error("Invalid CPU type: %s" % cfg.cpu)

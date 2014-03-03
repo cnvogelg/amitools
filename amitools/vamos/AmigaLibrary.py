@@ -14,10 +14,11 @@ class AmigaLibrary:
   op_rts = 0x4e75
   op_reset = 0x4e70
   
-  def __init__(self, name, version, struct, profile=False):
+  def __init__(self, name, struct, config):
     self.name = name
-    self.version = version
     self.struct = struct
+    self.config = config
+    self.version = config.version
 
     # will be set by lib manager
     self.lib_mgr = None
@@ -26,7 +27,7 @@ class AmigaLibrary:
     self.is_native = False
 
     # stub generation flags
-    self.profile = profile
+    self.profile = config.profile
     self.log_call = False
     self.benchmark = False
     self.catch_ex = False

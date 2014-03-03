@@ -25,8 +25,8 @@ class DosLibrary(AmigaLibrary):
   DOSFALSE = 0
   DOSTRUE = 0xffffffff
   
-  def __init__(self, mem, alloc, version=39, profile=False):
-    AmigaLibrary.__init__(self, self.name, version, DosLibraryDef, profile)
+  def __init__(self, mem, alloc, config):
+    AmigaLibrary.__init__(self, self.name, DosLibraryDef, config)
     self.mem = mem
     self.alloc = alloc
   

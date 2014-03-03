@@ -7,8 +7,8 @@ from amitools.vamos.AccessStruct import AccessStruct
 class ExecLibrary(AmigaLibrary):
   name = "exec.library"
 
-  def __init__(self, lib_mgr, alloc, version=39, profile=False):
-    AmigaLibrary.__init__(self, self.name, version, ExecLibraryDef, profile)
+  def __init__(self, lib_mgr, alloc, config):
+    AmigaLibrary.__init__(self, self.name, ExecLibraryDef, config)
     log_exec.info("open exec.library V%d", self.version)
     self.lib_mgr = lib_mgr
     self.alloc = alloc

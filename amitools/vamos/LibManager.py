@@ -15,9 +15,10 @@ class LibManager():
   
   op_jmp = 0x4ef9
   
-  def __init__(self, label_mgr, data_dir, benchmark=False):
-    self.data_dir = data_dir
+  def __init__(self, label_mgr, cfg):
     self.label_mgr = label_mgr
+    self.cfg = cfg
+    self.data_dir = cfg.data_dir
     
     # map of registered libs: name -> AmigaLibrary
     self.vamos_libs = {}
@@ -27,7 +28,7 @@ class LibManager():
     
     # use fast call? -> if lib logging level is ERROR or OFF
     self.log_call = log_lib.isEnabledFor(logging.WARN)
-    self.benchmark = benchmark
+    self.benchmark = cfg.benchmark
 
     # libs will accumulate this if benchmarking is enabled
     self.bench_total = 0.0
@@ -82,6 +83,7 @@ class LibManager():
 
     # lib has to be openend
     else:
+
       # first check if its an internal vamos library
       if sane_name in self.vamos_libs:
         self.lib_log("open_lib","opening vamos lib: %s" % sane_name)
@@ -90,36 +92,50 @@ class LibManager():
       # otherwise create a new and empty AmigaLibrary
       else:
         self.lib_log("open_lib","create default lib: %s" % sane_name)
-        lib = AmigaLibrary(sane_name, 0, LibraryDef)
+        lib_cfg = self.cfg.get_lib_config(sane_name)
+        lib = AmigaLibrary(sane_name, LibraryDef, lib_cfg)
         is_vamos_lib = False
+
+      # dump config of lib
+      self._dump_lib_cfg(lib.config)
+
+      # is lib mode = 'off' then reject open
+      mode = lib.config.mode
+      if mode == 'off':
+        self.lib_log("open_lib","reject open: mode='off': %s" % sane_name, level=logging.WARN)
+        return None
 
       # try to load an fd file for this lib
       lib.fd = self._load_fd(sane_name)
 
-      # now check if the library has a native counterpart
-      # if yes then create memory layout with it
-      load_name = self._get_load_lib_name(name)
-      if ctx.seg_loader.can_load_seg(load_name):
-        # setup trampoline
-        tr = Trampoline(ctx,"create_lib[%s]" % sane_name)
-        self._create_native_lib(lib, load_name, ctx, tr)
-        self._open_native_lib(lib, ctx, tr)
-        tr.final_rts()
-        tr.done()
+      # is native loading allowed?
+      native_loaded = False
+      native_allowed = mode in ('auto','amiga')
+      if native_allowed:
+        # now check if the library has a native counterpart
+        # if yes then create memory layout with it
+        load_name = self._get_load_lib_name(name)
+        if ctx.seg_loader.can_load_seg(load_name):
+          # setup trampoline
+          tr = Trampoline(ctx,"create_lib[%s]" % sane_name)
+          self._create_native_lib(lib, load_name, ctx, tr)
+          self._open_native_lib(lib, ctx, tr)
+          tr.final_rts()
+          tr.done()
+          native_loaded = True
 
       # no native lib available...
       # either its a vamos lib or we auto create one from an FD file
-      else:
+      if not native_loaded:
         # we need to have an FD file otherwise we can't create lib
         if lib.fd == None:
           self.lib_log("create_lib","can't create auto lib without FD file: %s" % sane_name, level=logging.ERROR)
           return None
 
-        # check if we can auto create the lib
-        if not is_vamos_lib:
-          if not self._allow_auto_create(name, sane_name):
-            self.lib_log("open_lib","can't open lib (no auto create): %s" % sane_name, level=logging.ERROR)
-            return None
+        # if not 'auto' or 'vamos' then fail now
+        if mode == 'amiga':
+          self.lib_log("open_lib","can't open amiga lib: %s" % sane_name, level=logging.WARN)
+          return None
 
         # create a (opt. fake/empty) vamos library
         self._create_vamos_lib(lib, ctx)
@@ -400,21 +416,6 @@ class LibManager():
       
   # ----- Helpers -----
   
-  def _allow_auto_create(self, name, sane_name):
-    # check black list
-    for l in self.black_list:
-      if name == l or sane_name == l:
-        self.lib_log("open_lib","'%s' is in black list -> deny" % name, level=logging.WARN)
-        return False
-    # check white list
-    for l in self.white_list:
-      if name == l or sane_name == l:
-        self.lib_log("open_lib","'%s' is in white list -> accept" % name, level=logging.DEBUG)
-        return True
-    # default
-    self.lib_log("open_lib","'%s' uses default: auto_create=%s" % (name, self.auto_create), level=logging.DEBUG)
-    return self.auto_create
-
   def _load_fd(self, lib_name):
     """try to load a fd file for a library from vamos data dir"""
     fd_name = lib_name.replace(".library","_lib.fd")
@@ -453,3 +454,7 @@ class LibManager():
     if name.find(':') == -1 and name.find('/') == -1:
       name = "libs:" + name
     return name
+
+  def _dump_lib_cfg(self, lib_cfg):
+    for key in lib_cfg._keys:
+      self.lib_log("config","%s = %s" % (key, getattr(lib_cfg, key)))

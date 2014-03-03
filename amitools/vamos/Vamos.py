@@ -52,7 +52,7 @@ class Vamos:
     self.seg_loader = SegmentLoader( self.mem, self.alloc, self.label_mgr, self.path_mgr )
 
     # lib manager
-    self.lib_mgr = LibManager( self.label_mgr, cfg.data_dir, cfg.benchmark)
+    self.lib_mgr = LibManager( self.label_mgr, cfg)
     
     # no current process right now
     self.process = None
@@ -171,13 +171,14 @@ class Vamos:
     log_mem_init.info(self.port_mgr)
 
   def register_base_libs(self, cfg):
-    libs_cfg = cfg.libs
     # register libraries
     # exec
-    self.exec_lib_def = ExecLibrary(self.lib_mgr, self.alloc, version=libs_cfg['exec']['version'], profile=libs_cfg['exec']['profile'])
+    exec_cfg = cfg.get_lib_config('exec.library')
+    self.exec_lib_def = ExecLibrary(self.lib_mgr, self.alloc, exec_cfg)
     self.lib_mgr.register_vamos_lib(self.exec_lib_def)
     # dos
-    self.dos_lib_def = DosLibrary(self.mem, self.alloc, version=libs_cfg['dos']['version'], profile=libs_cfg['dos']['profile'])
+    dos_cfg = cfg.get_lib_config('dos.library')
+    self.dos_lib_def = DosLibrary(self.mem, self.alloc, dos_cfg)
     self.dos_lib_def.set_managers(self.path_mgr, self.lock_mgr, self.file_mgr, self.port_mgr, self.seg_loader)
     self.lib_mgr.register_vamos_lib(self.dos_lib_def)
 
