@@ -60,11 +60,11 @@ access. This is done by specifying a volume to system path mapping.
 
 In the config file the section volumes contains this mapping:
 
-  [volumes]
-  system=~/amiga/wb310
-  home=~
-  work=~/amiga/work
-  shared=$HOME/amiga/shared
+    [volumes]
+    system=~/amiga/wb310
+    home=~
+    work=~/amiga/work
+    shared=$HOME/amiga/shared
 
 This example defines the volume names system:. home:, work:, and shared: and
 assigns them native paths on the host computer.
