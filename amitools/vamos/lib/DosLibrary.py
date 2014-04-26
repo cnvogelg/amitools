@@ -104,7 +104,7 @@ class DosLibrary(AmigaLibrary):
   # ----- IoErr -----
   
   def IoErr(self, ctx):
-    log_dos.info("IoErr: %d" % self.io_err)
+    log_dos.info("IoErr: %d (%s)" % (self.io_err, dos_error_strings[self.io_err]))
     return self.io_err
   
   def SetIoErr(self, ctx):
@@ -459,6 +459,22 @@ class DosLibrary(AmigaLibrary):
     else:
       ctx.mem.access.w_cstr(buf, name)
       return self.DOSTRUE
+
+  def CreateDir(self, ctx):
+    name_ptr = ctx.cpu.r_reg(REG_D1)
+    name = ctx.mem.access.r_cstr(name_ptr)
+    err = self.file_mgr.create_dir(name)
+    if err != NO_ERROR:
+      self.io_err = err
+      return 0
+    else:
+      lock = self.lock_mgr.create_lock(name, True)
+      log_dos.info("CreateDir: '%s' -> %s" % (name, lock))
+    if lock == None:
+      self.io_err = ERROR_OBJECT_NOT_FOUND
+      return 0
+    else:
+      return lock.b_addr
 
   # ----- DevProc -----
 

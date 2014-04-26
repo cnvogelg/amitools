@@ -239,5 +239,11 @@ class FileManager(LabelRange):
       return NO_ERROR
     except OSError:
       return ERROR_OBJECT_WRONG_TYPE
-      
-    
+  
+  def  create_dir(self, ami_path):
+    sys_path = self.path_mgr.ami_to_sys_path(ami_path)
+    try:
+      os.mkdir(sys_path)
+      return NO_ERROR
+    except OSError:
+      return ERROR_OBJECT_EXISTS
