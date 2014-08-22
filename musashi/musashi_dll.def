@@ -26,8 +26,6 @@ EXPORTS
 	m68k_context_size
 	m68k_get_context
 	m68k_set_context
-	m68k_save_context
-	m68k_load_context
 	m68k_get_reg
 	m68k_set_reg
 	m68k_is_valid_instruction
