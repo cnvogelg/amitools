@@ -10,6 +10,13 @@ SO_EXT = so
 endif
 CFLAGS = -g -O2 --std=c99
 
+# 64 Bits?
+PROCESSOR = $(shell uname -p)
+ifeq "$(PROCESSOR)" "x86_64"
+CFLAGS += -fPIC
+LDFLAGS += -fPIC
+endif
+
 BUILD_DIR = BUILD
 
 SRC = mem.c traps.c m68kcpu.c m68kdasm.c
@@ -62,3 +69,4 @@ clean_gen:
 
 $(BUILD_DIR)/%.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
+
