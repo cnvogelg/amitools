@@ -635,11 +635,16 @@ class DosLibrary(AmigaLibrary):
     # fill result array and memory
     args.generate_result(ctx.mem.access,addr,array_ptr)
     # alloc RD_Args
-    rdargs = ctx.alloc.alloc_struct("RDArgs", RDArgsDef)
+    if rdargs_ptr == 0:
+      rdargs = ctx.alloc.alloc_struct("RDArgs", RDArgsDef)
+      own = True
+    else:
+      rdargs = ctx.alloc.map_struct("RDArgs", rdargs_ptr, RDArgsDef)
+      own = False
     rdargs.access.w_s('RDA_Buffer',addr)
     rdargs.access.w_s('RDA_BufSiz',size)
     # store rdargs
-    self.rdargs[rdargs.addr] = rdargs
+    self.rdargs[rdargs.addr] = (rdargs, own)
     # result
     self.io_err = NO_ERROR
     log_dos.info("ReadArgs: matched! result_mem=%06x rdargs=%s", addr, rdargs)
@@ -651,13 +656,15 @@ class DosLibrary(AmigaLibrary):
     # find rdargs
     if not self.rdargs.has_key(rdargs_ptr):
       raise VamosInternalError("Can't find RDArgs: %06x" % rdargs_ptr)
-    rdargs = self.rdargs[rdargs_ptr]
+    rdargs, own = self.rdargs[rdargs_ptr]
     del self.rdargs[rdargs_ptr]
     # clean up rdargs
     addr = rdargs.access.r_s('RDA_Buffer')
     if addr != 0:
       self._free_mem(addr)
-    self.alloc.free_struct(rdargs)
+    # free our memory
+    if own:
+      self.alloc.free_struct(rdargs)
 
   # ----- System/Execute -----
   

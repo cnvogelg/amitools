@@ -276,6 +276,14 @@ class MemoryAlloc:
     self.mem_objs[addr] = mem
     return mem
   
+  def map_struct(self, name, addr, struct):
+    size = struct.get_size()
+    access = AccessStruct(self.mem, struct, addr)
+    label = self.label_mgr.get_label(addr)
+    mem = Memory(addr,size,label,access)
+    log_mem_alloc.info("map struct: %s",mem)
+    return mem
+
   def free_struct(self, mem):
     log_mem_alloc.info("free struct: %s",mem)
     self.label_mgr.remove_label(mem.label)
