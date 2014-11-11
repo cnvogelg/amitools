@@ -52,6 +52,7 @@ class DosLibrary(AmigaLibrary):
     self.seg_lists = {}
     self.matches = {}
     self.rdargs = {}
+    self.dos_objs = {}
     # setup RootNode
     self.root_struct = ctx.alloc.alloc_struct("RootNode",RootNodeDef)
     self.access.w_s("dl_Root",self.root_struct.addr)
@@ -743,6 +744,65 @@ class DosLibrary(AmigaLibrary):
       return self.DOSTRUE
     else:
       return self.DOSFALSE
+
+  # ----- DosObjects -----
+
+  def AllocDosObject(self, ctx):
+    obj_type = ctx.cpu.r_reg(REG_D1)
+    tags_ptr = ctx.cpu.r_reg(REG_D2)
+    if obj_type == 0: # DOS_FILEHANDLE
+      name = "DOS_FILEHANDLE"
+      struct_def = FileHandleDef
+    elif obj_type == 1: # DOS_EXALLCONTROL
+      name = "DOS_EXALLCONTROL"
+      struct_def = None
+    elif obj_type == 2: # DOS_FIB
+      name = "DOS_FIB"
+      struct_def = FileInfoBlockDef
+    elif obj_type == 3: # DOS_STDPKT
+      name = "DOS_STDPKT"
+      struct_def = DosPacketDef
+    elif obj_type == 4: # DOS_CLI
+      name = "DOS_CLI"
+      struct_def = CLIDef
+    elif obj_type == 5: # DOS_RDARGS
+      name = "DOS_RDARGS"
+      struct_def = RDArgsDef
+    else:
+      log_dos.error("AllocDosObject: invalid type=%d", obj_type)
+      return 0
+    if struct_def is None:
+      log_dos.warn("AllocDosObject: unsupported type=%d/%s", obj_type, name)
+      return 0
+    # allocate struct
+    dos_obj = ctx.alloc.alloc_struct(name, struct_def)
+    log_dos.info("AllocDosObject: type=%d/%s tags_ptr=%08x -> dos_obj=%s",
+      obj_type, name, tags_ptr, dos_obj)
+    # store struct
+    ptr = dos_obj.addr
+    self.dos_objs[ptr] = (dos_obj, obj_type)
+    # pre fill struct
+    if obj_type == 0:
+      dos_obj.access.w_s('fh_Pos',0xffffffff)
+      dos_obj.access.w_s('fh_End',0xffffffff)
+    elif obj_type == 4:
+      raise UnsupportedFeatureError("AllocDosObject: DOS_CLI fill TBD")
+    return ptr
+
+  def FreeDosObject(self, ctx):
+    obj_type = ctx.cpu.r_reg(REG_D1)
+    ptr = ctx.cpu.r_reg(REG_D2)
+    # retrieve struct
+    if ptr in self.dos_objs:
+      entry = self.dos_objs[ptr]
+      del self.dos_objs[ptr]
+      # check type
+      if obj_type != entry[1]:
+        log_dos.warn("FreeDosObject: type mismatch %d != %d", obj_type, entry[1])
+      # free struct
+      ctx.alloc.free_struct(entry[0])
+    else:
+      log_dos.error("FreeDosObject: type=%d ptr=%08x -> NOT FOUND!", obj_type, ptr)
 
   # ----- Helpers -----
 
