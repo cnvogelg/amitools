@@ -29,6 +29,7 @@ class AmigaLibrary:
     # stub generation flags
     self.profile = config.profile
     self.log_call = False
+    self.log_dummy_call = False
     self.benchmark = False
     self.catch_ex = False
 
@@ -106,7 +107,7 @@ class AmigaLibrary:
     """a call stub for unsupported/empty functions.
        only trace the call and return D0=0
     """
-    if self.log_call:
+    if self.log_dummy_call:
       def call_stub(op, pc):
         callee_pc = self.get_callee_pc(ctx)
         call_name = "%4d %s( %s ) from PC=%06x" % (bias, name, self._gen_arg_dump(args, ctx), callee_pc)
@@ -150,7 +151,7 @@ class AmigaLibrary:
     if self.log_call:
       code.append('  callee_pc = self.get_callee_pc(ctx)')
       code.append('  call_name = "%4d %s( %s ) from PC=%06x" % (bias, name, self._gen_arg_dump(args, ctx), callee_pc)')
-      code.append('  self.log("{ CALL: %s" % call_name, level=logging.WARN)')
+      code.append('  self.log("{ CALL: %s" % call_name, level=logging.INFO)')
     
     # timing code
     if need_timing:
@@ -172,7 +173,7 @@ class AmigaLibrary:
 
     # logging (end)
     if self.log_call:
-      code.append('  self.log("} END CALL: d0=%s (default)" % (d0), level=logging.WARN)')
+      code.append('  self.log("} END CALL: d0=%s (default)" % (d0), level=logging.INFO)')
 
     # wrap exception handler
     if self.catch_ex:

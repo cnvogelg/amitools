@@ -27,7 +27,8 @@ class LibManager():
     self.open_libs_name = {}
     
     # use fast call? -> if lib logging level is ERROR or OFF
-    self.log_call = log_lib.isEnabledFor(logging.WARN)
+    self.log_call = log_lib.isEnabledFor(logging.INFO)
+    self.log_dummy_call = log_lib.isEnabledFor(logging.WARN)
     self.benchmark = cfg.benchmark
 
     # libs will accumulate this if benchmarking is enabled
@@ -45,6 +46,7 @@ class LibManager():
     self.vamos_libs[lib.get_name()] = lib
     # init lib class instance
     lib.log_call = self.log_call
+    lib.log_dummy_call = self.log_dummy_call
     lib.benchmark = self.benchmark
     lib.lib_mgr = self
     
