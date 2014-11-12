@@ -27,22 +27,19 @@ class LabelLib(LabelStruct):
     # a possible trap?
     if mode == 'R' and addr < self.lib_base and width == 1:
       # is it trapped?
-      if val == self.op_reset:
+      if val & 0xa000 == 0xa000:
         delta = self.lib_base - addr
         off = delta / 6
         addon = "-%d [%d]  " % (delta,off)
         addon += self._get_fd_str(delta)
         self.trace_mem_int(mode, width, addr, val, text="TRAP", level=logging.INFO, addon=addon)
-      # return to caller after trap
-      elif val == self.op_rts:
-        self.trace_mem_int(mode, width, addr, val, text="T_RTS")
       # native lib jump
       elif val == self.op_jmp:
         delta = self.lib_base - addr
         addon = "-%d  " % delta
         addon += self._get_fd_str(delta)
         self.trace_mem_int(mode, width, addr, val, text="JUMP", level=logging.INFO, addon=addon)
-      # something strange
+      # something inside jump table
       else:
         self.trace_mem_int(mode, width, addr, val, text="LIB?!", level=logging.WARN)      
     else:

@@ -288,7 +288,7 @@ class AmigaLibrary:
     self.addr_end = self.addr_base + self.mem_pos_size
     self.addr_base_open = self.addr_base
     # create memory label
-    self.label = LabelLib(self.name, self.addr_begin, lib_size, self.mem_neg_size, self.struct, self)
+    self.label = LabelLib(self.name, self.addr_begin, lib_size, self.addr_base, self.struct, self)
     ctx.label_mgr.add_label(self.label)
     # create access
     self.access = AccessStruct(ctx.mem, self.struct, self.addr_base)
