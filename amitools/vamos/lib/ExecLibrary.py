@@ -23,7 +23,10 @@ class ExecLibrary(AmigaLibrary):
       self.access.w_s("AttnFlags",2)
     else:
       self.access.w_s("AttnFlags",0)
-    
+  
+  def set_ram_size(self, mem_size):
+    self.access.w_s("MaxLocMem", mem_size)
+
   # ----- System -----
   
   def Disable(self, ctx):

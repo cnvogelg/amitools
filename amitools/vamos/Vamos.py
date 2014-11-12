@@ -191,6 +191,7 @@ class Vamos:
     # open exec lib
     self.exec_lib = self.lib_mgr.open_lib(ExecLibrary.name, 0, self)
     self.exec_lib_def.set_cpu(self.cpu_type)
+    self.exec_lib_def.set_ram_size(self.ram_size)
     log_mem_init.info(self.exec_lib)
 
   def close_exec_lib(self):
