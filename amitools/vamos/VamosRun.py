@@ -2,6 +2,7 @@ import time
 
 from CPU import *
 from Log import log_main
+from Exceptions import *
 
 class Trap:
   def __init__(self, addr, func, one_shot):
@@ -57,12 +58,11 @@ class VamosRun:
     """
     pc = self.cpu.r_pc() - 2
     # addr == 0 or an error occurred -> end reached
-    if pc == 0 or self.et.has_errors:
-      self.cpu.end()
-      self.stay = False
-    # unknown RESET opcode found
-    else:
-      raise UnsupportedVamosFeature("Unexpected RESET opcode")
+    if pc != 0 and not self.et.has_errors:
+      log_main.error("RESET encountered - abort")
+    # stop all
+    self.cpu.end()
+    self.stay = False
 
   def _calc_benchmark(self, total_cycles, delta_time):
     python_time = self.ctx.lib_mgr.bench_total    
@@ -82,14 +82,17 @@ class VamosRun:
     start_time = time.clock()
 
     # main loop
-    while self.stay:
-      total_cycles += self.cpu.execute(cycles_per_run)
-      # end after enough cycles
-      if max_cycles > 0 and total_cycles >= max_cycles:
-        break
-      # some error fored a quit?
-      if self.et.has_errors:
-        break
+    try:
+      while self.stay:
+        total_cycles += self.cpu.execute(cycles_per_run)
+        # end after enough cycles
+        if max_cycles > 0 and total_cycles >= max_cycles:
+          break
+        # some error fored a quit?
+        if self.et.has_errors:
+          break
+    except Exception as e:
+      self.et.report_error(e)
 
     end_time = time.clock()
     
