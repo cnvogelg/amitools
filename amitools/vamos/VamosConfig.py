@@ -99,7 +99,7 @@ class VamosConfig(ConfigParser.SafeConfigParser):
       return self.libs[default_lib]
     # create default config
     else:
-      return VamosLibConfig()
+      return VamosLibConfig(version=39)
 
   def get_args(self):
     """return the command line arguments"""
