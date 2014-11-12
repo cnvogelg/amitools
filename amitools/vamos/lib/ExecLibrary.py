@@ -108,6 +108,12 @@ class ExecLibrary(AmigaLibrary):
     else:
       raise VamosInternalError("CloseLibrary: Unknown library to close: ptr=%06x" % lib_addr)
   
+  def FindResident(self, ctx):
+    name_ptr = ctx.cpu.r_reg(REG_A1)
+    name = ctx.mem.access.r_cstr(name_ptr)
+    log_exec.info("FindResident: '%s'" % (name))
+    return 0
+
   # ----- Memory Handling -----
   
   def AllocMem(self, ctx):
