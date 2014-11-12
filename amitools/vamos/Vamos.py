@@ -18,6 +18,7 @@ from lib.ExecLibrary import ExecLibrary
 from lib.DosLibrary import DosLibrary
 from lib.lexec.ExecStruct import *
 from lib.dos.DosStruct import *
+from lib.IntuitionLibrary import IntuitionLibrary
 
 from Log import *
 from CPU import *
@@ -181,6 +182,10 @@ class Vamos:
     self.dos_lib_def = DosLibrary(self.mem, self.alloc, dos_cfg)
     self.dos_lib_def.set_managers(self.path_mgr, self.lock_mgr, self.file_mgr, self.port_mgr, self.seg_loader)
     self.lib_mgr.register_vamos_lib(self.dos_lib_def)
+    # intuition
+    int_cfg = cfg.get_lib_config('intuition.library')
+    self.int_lib_def = IntuitionLibrary(int_cfg)
+    self.lib_mgr.register_vamos_lib(self.int_lib_def)
 
   def open_exec_lib(self):
     # open exec lib
