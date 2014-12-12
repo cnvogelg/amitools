@@ -156,8 +156,8 @@ class SegmentLoader:
         b_addr = (addr-4) >> 2 # BCPL segment 'next' pointer
         self.mem.access.w32(last_addr - 4, b_addr)
       # write size before segment pointer
-      size_longs = (sizes[i] + 8) / 4
-      self.mem.access.w32(addr - 8, size_longs)
+      total_size = (sizes[i] + 8)
+      self.mem.access.w32(addr - 8, total_size)
       last_addr = addr
 
     # clear final 'next' pointer
