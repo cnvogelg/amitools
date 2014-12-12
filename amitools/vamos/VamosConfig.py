@@ -99,7 +99,7 @@ class VamosConfig(ConfigParser.SafeConfigParser):
       return self.libs[default_lib]
     # create default config
     else:
-      return VamosLibConfig(version=39)
+      return VamosLibConfig(version=40)
 
   def get_args(self):
     """return the command line arguments"""
@@ -131,8 +131,8 @@ class VamosConfig(ConfigParser.SafeConfigParser):
   def _reset(self):
     # library config
     self.libs = {
-      'dos.library' : VamosLibConfig('vamos', 39, False),
-      'exec.library' : VamosLibConfig('vamos', 39, False),
+      'dos.library' : VamosLibConfig('vamos', 40, False),
+      'exec.library' : VamosLibConfig('vamos', 40, False),
       'icon.library' : VamosLibConfig('auto', 0, False)
     }
     # define keys that can be set
