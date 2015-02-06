@@ -523,7 +523,7 @@ class HunkReader:
      Return status and set self.error_string on failure
   """
   def read_file(self, hfile, v37_compat=None):
-    with open(hfile) as f:
+    with open(hfile, "rb") as f:
       return self.read_file_obj(hfile, f, v37_compat)
 
   """Read a hunk from memory"""

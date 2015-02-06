@@ -45,7 +45,7 @@ class FileScanner:
     elif lpath.endswith(".lha"):
       return self.handle_lha(path)
     else:
-      with open(path) as fobj:
+      with open(path, "rb") as fobj:
         return self.call_handler(path, fobj)
 
   def handle_dir(self, path):
