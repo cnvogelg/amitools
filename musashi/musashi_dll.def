@@ -14,6 +14,7 @@ EXPORTS
 	mem_ram_read_block
 	mem_ram_write_block
 	mem_ram_clear_block
+	m68k_init
 	m68k_set_cpu_type
 	m68k_pulse_reset
 	m68k_execute
@@ -36,4 +37,7 @@ EXPORTS
 	m68k_set_pc_changed_callback
 	m68k_set_fc_callback
 	m68k_set_instr_hook_callback
-
+	m68k_set_aline_hook_callback
+	trap_init
+	trap_setup
+	trap_free

@@ -26,10 +26,10 @@ static entry_t *first_free;
 static int trap_aline(uint opcode, uint pc)
 {
   uint off = opcode & TRAP_MASK;
-  trap_func_t f = traps[off].trap;
-  f(opcode, pc);
-  
+  trap_func_t func = traps[off].trap;
   int flags = traps[off].flags;
+
+  func(opcode, pc);
 
   /* a one shot trap is removed after it is triggered */
   if(flags & TRAP_ONE_SHOT) {
@@ -45,9 +45,11 @@ static int trap_aline(uint opcode, uint pc)
 
 void trap_init(void)
 {
+  int i;
+
   /* setup free list */
   first_free = &traps[0];
-  for(int i=0;i<(NUM_TRAPS-1);i++) {
+  for(i=0;i<(NUM_TRAPS-1);i++) {
     traps[i].next = &traps[i+1];
   }
   traps[NUM_TRAPS-1].next = NULL;
@@ -58,12 +60,14 @@ void trap_init(void)
 
 int trap_setup(trap_func_t func, int flags)
 {
+  int off;
+
   /* no more traps available? */
   if(first_free == NULL) {
     return -1;
   }
   
-  int off = (int)(first_free - traps);
+  off = (int)(first_free - traps);
   
   /* new first free */
   first_free = traps[off].next;

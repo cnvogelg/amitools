@@ -4,9 +4,9 @@ CC = cl
 SO_EXT = dll
 CFLAGS =
 
-SRC = mem.c m68kcpu.c m68kdasm.c
-HDR = mem.h m68k.h m68kcpu.h m68kconf.h
-OBJ = mem.obj m68kcpu.obj m68kdasm.obj
+SRC = traps.c mem.c m68kcpu.c m68kdasm.c
+HDR = traps.h mem.h m68k.h m68kcpu.h m68kconf.h
+OBJ = traps.obj mem.obj m68kcpu.obj m68kdasm.obj
 
 GEN_INPUT = m68k_in.c
 
