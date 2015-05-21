@@ -519,6 +519,18 @@ class DosLibrary(AmigaLibrary):
       return self.DOSTRUE
     else:
       return self.DOSFALSE
+
+  def ExNext(self, ctx):
+    lock_b_addr = ctx.cpu.r_reg(REG_D1)
+    fib_ptr = ctx.cpu.r_reg(REG_D2)
+    lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
+    log_dos.info("ExNext: %s fib=%06x" % (lock, fib_ptr))
+    fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
+    self.io_err = self.lock_mgr.examine_next(lock, fib)
+    if self.io_err == NO_ERROR:
+      return self.DOSTRUE
+    else:
+      return self.DOSFALSE
   
   def ParentDir(self, ctx):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
