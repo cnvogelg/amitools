@@ -184,14 +184,26 @@ class DosLibrary(AmigaLibrary):
     return cli_addr
   
   def Input(self, ctx):
-    std_input = self.file_mgr.get_input()
-    log_dos.info("Input: %s" % std_input)
-    return std_input.b_addr
+    fh = ctx.process.get_input()
+    log_dos.info("Input() -> %s" % fh)
+    return fh.b_addr
   
   def Output(self, ctx):
-    std_output = self.file_mgr.get_output()
-    log_dos.info("Output: %s" % std_output)
-    return std_output.b_addr
+    fh = ctx.process.get_output()
+    log_dos.info("Output() -> %s" % fh)
+    return fh.b_addr
+
+  def SelectInput(self, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    log_dos.info("SelectInput(fh=%s)" % fh)
+    ctx.process.set_input(fh)
+
+  def SelectOutput(self, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    log_dos.info("SelectOutput(fh=%s)" % fh)
+    ctx.process.set_output(fh)
   
   def Open(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)

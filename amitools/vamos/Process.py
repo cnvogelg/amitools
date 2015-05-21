@@ -101,8 +101,6 @@ class Process:
       input_fh = self.ctx.file_mgr.get_input()
     if output_fh == None:
       output_fh = self.ctx.file_mgr.get_output()
-    self.input_fh = input_fh
-    self.output_fh = output_fh
     self.this_task = self.ctx.alloc.alloc_struct(self.bin_basename + "_ThisTask",ProcessDef)
     self.this_task.access.w_s("pr_Task.tc_Node.ln_Type", NT_PROCESS)
     self.this_task.access.w_s("pr_CLI", self.cli.addr)
@@ -112,5 +110,18 @@ class Process:
     
   def free_task_struct(self):
     self.ctx.alloc.free_struct(self.this_task)
-  
-  
+
+  def get_input(self):
+    fh_b = self.this_task.access.r_s("pr_CIS") >> 2
+    return self.ctx.file_mgr.get_by_b_addr(fh_b)
+ 
+  def set_input(self, input_fh):
+    self.this_task.access.w_s("pr_CIS", input_fh.b_addr<<2) # compensate BCPL auto-conversion
+
+  def get_output(self):
+    fh_b = self.this_task.access.r_s("pr_COS") >> 2
+    return self.ctx.file_mgr.get_by_b_addr(fh_b)
+
+  def set_output(self, output_fh):
+    self.this_task.access.w_s("pr_COS", output_fh.b_addr<<2) # compensate BCPL auto-conversion
+
