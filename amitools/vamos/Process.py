@@ -2,6 +2,8 @@ from Log import log_proc
 from lib.lexec.ExecStruct import *
 from lib.dos.DosStruct import *
 
+NT_PROCESS = 13
+
 class Process:
   def __init__(self, ctx, bin_file, bin_args, input_fh=None, output_fh=None, stack_size=4096, exit_addr=0):
     self.ctx = ctx
@@ -99,6 +101,7 @@ class Process:
     self.input_fh = input_fh
     self.output_fh = output_fh
     self.this_task = self.ctx.alloc.alloc_struct(self.bin_basename + "_ThisTask",ProcessDef)
+    self.this_task.access.w_s("pr_Task.tc_Node.ln_Type", NT_PROCESS)
     self.this_task.access.w_s("pr_CLI", self.cli.addr)
     self.this_task.access.w_s("pr_CIS", input_fh.b_addr<<2) # compensate BCPL auto-conversion
     self.this_task.access.w_s("pr_COS", output_fh.b_addr<<2) # compensate BCPL auto-conversion
