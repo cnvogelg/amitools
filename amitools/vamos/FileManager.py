@@ -39,6 +39,8 @@ class FileManager(LabelRange):
     self.fh_def  = FileHandleDef
     self.fh_size = FileHandleDef.get_size()
     self.fh_size = (self.fh_size + 3) & ~3
+    self.unch = ''
+    self.ch = -1
 
     # setup std input/output
     self.std_input = AmiFile(sys.stdin,'<STDIN>','',need_close=False)
@@ -161,6 +163,28 @@ class FileManager(LabelRange):
   def read(self, fh, len):
     d = fh.obj.read(len)
     return d
+
+  def getc(self, fh):
+    if len(self.unch) > 0:
+      d = self.unch[0]
+      self.unch = self.unch[1:len(self.unch)]
+    else:
+      d = fh.obj.read(1)
+    self.ch = ord(d)
+    return self.ch
+
+  def ungetc(self, fh, var):
+    if var == 0xffffffff:
+        var = -1
+    if var < 0 and self.ch >= 0:
+      var = self.ch
+      self.ch = -1
+    if var >= 0:
+        self.unch = self.unch + chr(var)
+    return var
+
+  def ungets(self, fh, s):
+    self.unch = self.unch + s
 
   def tell(self, fh):
     return fh.obj.tell()

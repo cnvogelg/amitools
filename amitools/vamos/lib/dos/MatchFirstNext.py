@@ -47,6 +47,8 @@ class MatchFirstNext:
     dir_part = self.path_mgr.ami_dir_of_path(self.path)
     abs_path = self.path_mgr.ami_abs_path(dir_part)
     self.dir_lock = self.lock_mgr.create_lock(abs_path, False)
+    if self.dir_lock == None:
+      return ERROR_OBJECT_NOT_FOUND
     
     # create base/last achain and set dir lock
     self.achain_dummy = ctx.alloc.alloc_struct("AChain_Dummy", AChainDef)

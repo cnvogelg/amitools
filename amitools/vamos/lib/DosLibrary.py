@@ -1,4 +1,5 @@
 import time
+import ctypes
 
 from amitools.vamos.AmigaLibrary import *
 from dos.DosStruct import *
@@ -174,18 +175,52 @@ class DosLibrary(AmigaLibrary):
     if str_time_ptr != 0:
       ctx.mem.access.w_cstr(str_time_ptr, time_str)
     return self.DOSTRUE
+
+  # ----- ENV: Vars -----
+  def GetVar(self, ctx):
+    name_ptr = ctx.cpu.r_reg(REG_D1)
+    buff_ptr = ctx.cpu.r_reg(REG_D2)
+    size = ctx.cpu.r_reg(REG_D3)
+    flags = ctx.cpu.r_reg(REG_D4)
+    if size == 0:
+      self.io_err = ERROR_BAD_NUMBER
+      return -1
+
+    name = ctx.mem.access.r_cstr(name_ptr)
+    ctx.mem.access.w_cstr(buff_ptr, '')
+    log_dos.info('GetVar("%s", 0x%x, %d, 0x%x) -> -1' % (name, buff_ptr, size, flags))
+
+    self.io_err = ERROR_OBJECT_NOT_FOUND
+    return -1
     
   # ----- File Ops -----
+
+  def Cli(self, ctx):
+    cli_addr = ctx.process.get_cli_struct()
+    log_dos.info("Cli() -> %06x" % cli_addr)
+    return cli_addr
   
   def Input(self, ctx):
-    std_input = self.file_mgr.get_input()
-    log_dos.info("Input: %s" % std_input)
-    return std_input.b_addr
+    fh = ctx.process.get_input()
+    log_dos.info("Input() -> %s" % fh)
+    return fh.b_addr
   
   def Output(self, ctx):
-    std_output = self.file_mgr.get_output()
-    log_dos.info("Output: %s" % std_output)
-    return std_output.b_addr
+    fh = ctx.process.get_output()
+    log_dos.info("Output() -> %s" % fh)
+    return fh.b_addr
+
+  def SelectInput(self, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    log_dos.info("SelectInput(fh=%s)" % fh)
+    ctx.process.set_input(fh)
+
+  def SelectOutput(self, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    log_dos.info("SelectOutput(fh=%s)" % fh)
+    ctx.process.set_output(fh)
   
   def Open(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
@@ -273,14 +308,26 @@ class DosLibrary(AmigaLibrary):
   def FGetC(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
-    # TODO: use buffered I/O
-    ch = self.file_mgr.read(fh, 1)
-    log_dos.info("FGetC(%s) -> ch=%s" % (fh, ch))
-    if ch == None or ch == "":
-      return -1
-    else:
-      return ord(ch)
-  
+    ch = self.file_mgr.getc(fh)
+    log_dos.info("FGetC(%s) -> '%c' (%d)" % (fh, ch, ch))
+    return ch
+
+  def FPutC(self, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    val = ctx.cpu.r_reg(REG_D2)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    log_dos.info("FPutC(%s, '%c' (%d))" % (fh, val, val))
+    self.file_mgr.write(fh, chr(val))
+    return val
+
+  def UnGetC(self, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    val = ctx.cpu.r_reg(REG_D2)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    ch = self.file_mgr.ungetc(fh, val)
+    log_dos.info("UnGetC(%s, %d) -> ch=%c (%d)" % (fh, val, ch, ch))
+    return ch
+
   # ----- StdOut -----
   
   def PutStr(self, ctx):
@@ -295,12 +342,12 @@ class DosLibrary(AmigaLibrary):
   def VPrintf(self, ctx):
     format_ptr = ctx.cpu.r_reg(REG_D1)
     argv_ptr = ctx.cpu.r_reg(REG_D2)
-    format = ctx.mem.access.r_cstr(format_ptr)
+    fmt = ctx.mem.access.r_cstr(format_ptr)
     # write on output
     fh = self.file_mgr.get_output()
-    log_dos.info("VPrintf: format='%s' argv=%06x" % (format,argv_ptr))
+    log_dos.info("VPrintf: format='%s' argv=%06x" % (fmt,argv_ptr))
     # now decode printf
-    ps = dos.Printf.printf_parse_string(format)
+    ps = dos.Printf.printf_parse_string(fmt)
     dos.Printf.printf_read_data(ps, ctx.mem.access, argv_ptr)
     log_dos.debug("VPrintf: parsed format: %s",ps)
     result = dos.Printf.printf_generate_output(ps)
@@ -308,6 +355,65 @@ class DosLibrary(AmigaLibrary):
     self.file_mgr.write(fh, result)
     return len(result)
   
+  def VFWritef(self, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    fmt_ptr = ctx.cpu.r_reg(REG_D2)
+    args_ptr = ctx.cpu.r_reg(REG_D3)
+    fmt = ctx.mem.access.r_cstr(fmt_ptr)
+    log_dos.info("VFWritef: fh=%s format='%s' args_ptr=%06x" % (fh, fmt, args_ptr))
+    out = ''
+    pos = 0
+    state = ''
+    while pos < len(fmt):
+      ch = fmt[pos]
+      pos = pos + 1
+      if state[0:0] == 'x':
+        n = ord(ch.ascii_uppercase)
+        if n >= ord('0') and n <= ord('9'):
+          n = n - ord('0')
+        elif n >= ord('A') and n <= ord('Z'):
+          n = (n - ord('A')) + 10
+        else:
+          n = 0
+        ch = state[1]
+        if ch == 'T':
+          out = out + ("%*s" % (n, ctx.mem.access.r_cstr(val)))
+        elif ch == 'O':
+          out = out + ("%*O" % (n, val))
+        elif ch == 'X':
+          out = out + ("%*X" % (n, val))
+        elif ch == 'I':
+          out = out + ("%*ld" % (n, ctypes.c_long(val).value))
+        elif ch == 'U':
+          out = out + ("%*lu" % (n, ctypes.c_ulong(val).value))
+        else:
+          out = out + '%' + state[1] + state[0]
+        state = ''
+      elif state == '%':
+        if ch == 'S':
+          out = out + ctx.mem.access.r_cstr(val)
+        elif ch == 'C':
+          out = out + chr(val & 0xff)
+        elif ch == 'N':
+          out = out + ("%ld", ctypes.c_long(val).value)
+        elif ch == '$':
+          pass
+        elif ch == 'T' or ch == 'O' or ch == 'X' or ch == 'I' or ch == 'U':
+          state = 'x' + ch
+        else:
+          state = ''
+          out = out + '%' + ch
+      else:
+        if ch == '%':
+          state = '%'
+          val = ctx.mem.access.r32(args_ptr)
+          args_ptr = args_ptr + 4
+        else:
+          out = out + ch
+    self.file_mgr.write(fh, out)
+    return len(out)
+
   # ----- File Ops -----
 
   def DeleteFile(self, ctx):
@@ -409,6 +515,18 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("Examine: %s fib=%06x" % (lock, fib_ptr))
     fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
     self.io_err = self.lock_mgr.examine_lock(lock, fib)
+    if self.io_err == NO_ERROR:
+      return self.DOSTRUE
+    else:
+      return self.DOSFALSE
+
+  def ExNext(self, ctx):
+    lock_b_addr = ctx.cpu.r_reg(REG_D1)
+    fib_ptr = ctx.cpu.r_reg(REG_D2)
+    lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
+    log_dos.info("ExNext: %s fib=%06x" % (lock, fib_ptr))
+    fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
+    self.io_err = self.lock_mgr.examine_next(lock, fib)
     if self.io_err == NO_ERROR:
       return self.DOSTRUE
     else:
@@ -665,6 +783,106 @@ class DosLibrary(AmigaLibrary):
     # free our memory
     if own:
       self.alloc.free_struct(rdargs)
+   
+  def cs_get(self, ctx):
+    if self.cs_input:
+      ch = self.file_mgr.getc(self.cs_input)
+    else:
+      if self.cs_curchr < self.cs_length:
+        ch = ctx.mem.access.r8(self.cs_buffer + self.cs_curchr)
+        self.cs_curchr = self.cs_curchr + 1
+      else:
+        ch = -1
+    return ch
+
+  def cs_unget(self, ctx):
+    if self.cs_input:
+      self.file_mgr.ungetc(self.cs_input, -1)
+    else:
+      self.cs_curchr = self.cs_curchr - 1
+
+  def ReadItem(self, ctx):
+    buff_ptr = ctx.cpu.r_reg(REG_D1)
+    maxchars = ctx.cpu.r_reg(REG_D2)
+    csource_ptr = ctx.cpu.r_reg(REG_D3)
+    log_dos.info("ReadItem: buff_ptr=%06x maxchars=%d csource_ptr=%06x" % (buff_ptr, maxchars, csource_ptr))
+    if (csource_ptr):
+      csource = ctx.alloc.map_struct("CSource", csource_ptr, CSourceDef)
+      self.cs_input = None
+      self.cs_buffer = csource.access.r_s('CS_Buffer')
+      self.cs_length = csource.access.r_s('CS_Length')
+      self.cs_curchr = csource.access.r_s('CS_CurChr')
+    else:
+      self.cs_input = ctx.process.get_input()
+
+    if buff_ptr == 0:
+        return 0 # ITEM_NOTHING
+
+    # Well Known Bug: buff[0] = 0, even if maxchars == 0
+    ctx.mem.access.w8(buff_ptr, 0)
+
+    # Skip leading whitespace
+    while True:
+      ch = self.cs_get(ctx)
+      if ch != ord(" ") and ch != ord("\t"):
+        break
+
+    if ch == 0 or ch == ord("\n") or ch < 0 or ch == ord(";"):
+      if ch >= 0:
+        self.cs_unget(ctx)
+      return 0 # ITEM_NOTHING
+
+    if ch == ord("="):
+      return -2 # ITEM_EQUAL
+
+    if ch == ord("\""):
+      while True:
+        if maxchars <= 0:
+          ctx.mem.access.w8(buff_ptr - 1, 0)
+          return 0 # ITEM_NOTHING
+        maxchars = maxchars - 1
+        ch = self.cs_get(ctx)
+        if ch == ord("*"):
+          ch = self.cs_get(ctx)
+          if ch == 0 or ch == ord("\n") or ch < 0:
+            self.cs_unget(ctx)
+            ctx.mem.access.w8(buff_ptr, 0)
+            return -1 # ITEM_ERROR
+          elif ch == ord("n") or ch == ord("N"):
+            ch = ord("\n")
+          elif ch == ord("e") or ch == ord("E"):
+            ch = 0x1b
+        elif ch == 0 or ch == ord("\n") or ch < 0:
+          self.cs_ungetc(ctx)
+          ctx.mem.access.w8(buff_ptr, 0)
+          return -1 # ITEM_ERROR
+        elif ch == ord("\""):
+          ctx.mem.access.w8(buff_ptr, 0)
+          return 2 # ITEM_QUOTED
+        ctx.mem.access.w8(buff_ptr, ch)
+        buff_ptr = buff_ptr + 1
+      pass
+    else:
+      if maxchars <= 0:
+        ctx.mem.access.w8(buff_ptr - 1, 0)
+        return -1 # ITEM_ERROR
+      maxchars = maxchars - 1
+      ctx.mem.access.w8(buff_ptr, ch)
+      buff_ptr = buff_ptr + 1
+      while True:
+        if maxchars <= 0:
+          ctx.mem.access.w8(buff_ptr - 1, 0)
+          return -1 # ITEM_ERROR
+        maxchar = maxchars - 1
+        ch = self.cs_get(ctx)
+        if ch == 0 or ch == ord("\n") or ch == ord(" ") or ch == ord("\t") or ch == ord("=") or ch < 0:
+          # Know Bug: Don't UNGET for a space or equals sign
+          if ch != ord("=") and ch != ord(" ") and ch != ord("\t"):
+            self.cs_unget(ctx)
+          ctx.mem.access.w8(buff_ptr, 0)
+          return 1 # ITEM_UNQUOTED
+        ctx.mem.access.w8(buff_ptr, ch)
+        buff_ptr = buff_ptr + 1
 
   # ----- System/Execute -----
   

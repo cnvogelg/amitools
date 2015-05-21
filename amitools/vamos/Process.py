@@ -2,6 +2,8 @@ from Log import log_proc
 from lib.lexec.ExecStruct import *
 from lib.dos.DosStruct import *
 
+NT_PROCESS = 13
+
 class Process:
   def __init__(self, ctx, bin_file, bin_args, input_fh=None, output_fh=None, stack_size=4096, exit_addr=0):
     self.ctx = ctx
@@ -90,15 +92,19 @@ class Process:
     self.ctx.alloc.free_bstr(self.cmd)
     self.ctx.alloc.free_struct(self.cli)
 
+  def get_cli_struct(self):
+    return self.cli.addr
+
   # ----- task struct -----
   def init_task_struct(self, input_fh, output_fh):
     if input_fh == None:
       input_fh = self.ctx.file_mgr.get_input()
     if output_fh == None:
       output_fh = self.ctx.file_mgr.get_output()
-    self.input_fh = input_fh
-    self.output_fh = output_fh
+    # Inject arguments into input stream (Needed for C:Execute)
+    self.ctx.file_mgr.ungets(input_fh, self.arg_text)
     self.this_task = self.ctx.alloc.alloc_struct(self.bin_basename + "_ThisTask",ProcessDef)
+    self.this_task.access.w_s("pr_Task.tc_Node.ln_Type", NT_PROCESS)
     self.this_task.access.w_s("pr_CLI", self.cli.addr)
     self.this_task.access.w_s("pr_CIS", input_fh.b_addr<<2) # compensate BCPL auto-conversion
     self.this_task.access.w_s("pr_COS", output_fh.b_addr<<2) # compensate BCPL auto-conversion
@@ -106,5 +112,18 @@ class Process:
     
   def free_task_struct(self):
     self.ctx.alloc.free_struct(self.this_task)
-  
-  
+
+  def get_input(self):
+    fh_b = self.this_task.access.r_s("pr_CIS") >> 2
+    return self.ctx.file_mgr.get_by_b_addr(fh_b)
+ 
+  def set_input(self, input_fh):
+    self.this_task.access.w_s("pr_CIS", input_fh.b_addr<<2) # compensate BCPL auto-conversion
+
+  def get_output(self):
+    fh_b = self.this_task.access.r_s("pr_COS") >> 2
+    return self.ctx.file_mgr.get_by_b_addr(fh_b)
+
+  def set_output(self, output_fh):
+    self.this_task.access.w_s("pr_COS", output_fh.b_addr<<2) # compensate BCPL auto-conversion
+
