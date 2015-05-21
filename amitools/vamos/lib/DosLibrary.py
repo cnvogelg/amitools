@@ -273,14 +273,26 @@ class DosLibrary(AmigaLibrary):
   def FGetC(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
-    # TODO: use buffered I/O
-    ch = self.file_mgr.read(fh, 1)
-    log_dos.info("FGetC(%s) -> ch=%s" % (fh, ch))
-    if ch == None or ch == "":
-      return -1
-    else:
-      return ord(ch)
-  
+    ch = self.file_mgr.getc(fh)
+    log_dos.info("FGetC(%s) -> '%c' (%d)" % (fh, ch, ch))
+    return ch
+
+  def FPutC(self, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    val = ctx.cpu.r_reg(REG_D2)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    log_dos.info("FPutC(%s, '%c' (%d))" % (fh, val, val))
+    self.file_mgr.write(fh, chr(val))
+    return val
+
+  def UnGetC(self, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    val = ctx.cpu.r_reg(REG_D2)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    ch = self.file_mgr.ungetc(fh, val)
+    log_dos.info("UnGetC(%s, %d) -> ch=%c (%d)" % (fh, val, ch, ch))
+    return ch
+
   # ----- StdOut -----
   
   def PutStr(self, ctx):
