@@ -44,7 +44,7 @@ class ListStruct(AmigaStruct):
   _format = [
     ('Node*','lh_Head'),
     ('Node*','lh_Tail'),
-    ('Node*','lh_TailPref'),
+    ('Node*','lh_TailPred'),
     ('UBYTE','lh_Type'),
     ('UBYTE','l_pad')
   ]
