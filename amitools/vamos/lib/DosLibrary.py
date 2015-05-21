@@ -1,4 +1,5 @@
 import time
+import ctypes
 
 from amitools.vamos.AmigaLibrary import *
 from dos.DosStruct import *
@@ -312,12 +313,12 @@ class DosLibrary(AmigaLibrary):
   def VPrintf(self, ctx):
     format_ptr = ctx.cpu.r_reg(REG_D1)
     argv_ptr = ctx.cpu.r_reg(REG_D2)
-    format = ctx.mem.access.r_cstr(format_ptr)
+    fmt = ctx.mem.access.r_cstr(format_ptr)
     # write on output
     fh = self.file_mgr.get_output()
-    log_dos.info("VPrintf: format='%s' argv=%06x" % (format,argv_ptr))
+    log_dos.info("VPrintf: format='%s' argv=%06x" % (fmt,argv_ptr))
     # now decode printf
-    ps = dos.Printf.printf_parse_string(format)
+    ps = dos.Printf.printf_parse_string(fmt)
     dos.Printf.printf_read_data(ps, ctx.mem.access, argv_ptr)
     log_dos.debug("VPrintf: parsed format: %s",ps)
     result = dos.Printf.printf_generate_output(ps)
@@ -325,6 +326,65 @@ class DosLibrary(AmigaLibrary):
     self.file_mgr.write(fh, result)
     return len(result)
   
+  def VFWritef(self, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    fmt_ptr = ctx.cpu.r_reg(REG_D2)
+    args_ptr = ctx.cpu.r_reg(REG_D3)
+    fmt = ctx.mem.access.r_cstr(fmt_ptr)
+    log_dos.info("VFWritef: fh=%s format='%s' args_ptr=%06x" % (fh, fmt, args_ptr))
+    out = ''
+    pos = 0
+    state = ''
+    while pos < len(fmt):
+      ch = fmt[pos]
+      pos = pos + 1
+      if state[0:0] == 'x':
+        n = ord(ch.ascii_uppercase)
+        if n >= ord('0') and n <= ord('9'):
+          n = n - ord('0')
+        elif n >= ord('A') and n <= ord('Z'):
+          n = (n - ord('A')) + 10
+        else:
+          n = 0
+        ch = state[1]
+        if ch == 'T':
+          out = out + ("%*s" % (n, ctx.mem.access.r_cstr(val)))
+        elif ch == 'O':
+          out = out + ("%*O" % (n, val))
+        elif ch == 'X':
+          out = out + ("%*X" % (n, val))
+        elif ch == 'I':
+          out = out + ("%*ld" % (n, ctypes.c_long(val).value))
+        elif ch == 'U':
+          out = out + ("%*lu" % (n, ctypes.c_ulong(val).value))
+        else:
+          out = out + '%' + state[1] + state[0]
+        state = ''
+      elif state == '%':
+        if ch == 'S':
+          out = out + ctx.mem.access.r_cstr(val)
+        elif ch == 'C':
+          out = out + chr(val & 0xff)
+        elif ch == 'N':
+          out = out + ("%ld", ctypes.c_long(val).value)
+        elif ch == '$':
+          pass
+        elif ch == 'T' or ch == 'O' or ch == 'X' or ch == 'I' or ch == 'U':
+          state = 'x' + ch
+        else:
+          state = ''
+          out = out + '%' + ch
+      else:
+        if ch == '%':
+          state = '%'
+          val = ctx.mem.access.r32(args_ptr)
+          args_ptr = args_ptr + 4
+        else:
+          out = out + ch
+    self.file_mgr.write(fh, out)
+    return len(out)
+
   # ----- File Ops -----
 
   def DeleteFile(self, ctx):
