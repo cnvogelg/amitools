@@ -230,7 +230,7 @@ class DosLibrary(AmigaLibrary):
     # decode mode
     if mode == 1006:
       mode_name = "new"
-      f_mode = "wb"
+      f_mode = "wb+"
     elif mode == 1005:
       mode_name = "old"
       f_mode = "rb+"
