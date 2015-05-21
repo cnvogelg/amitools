@@ -176,6 +176,11 @@ class DosLibrary(AmigaLibrary):
     return self.DOSTRUE
     
   # ----- File Ops -----
+
+  def Cli(self, ctx):
+    cli_addr = ctx.process.get_cli_struct()
+    log_dos.info("Cli() -> %06x" % cli_addr)
+    return cli_addr
   
   def Input(self, ctx):
     std_input = self.file_mgr.get_input()

@@ -92,6 +92,9 @@ class Process:
     self.ctx.alloc.free_bstr(self.cmd)
     self.ctx.alloc.free_struct(self.cli)
 
+  def get_cli_struct(self):
+    return self.cli.addr
+
   # ----- task struct -----
   def init_task_struct(self, input_fh, output_fh):
     if input_fh == None:
