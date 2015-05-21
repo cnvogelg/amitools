@@ -49,7 +49,7 @@ class ExecLibrary(AmigaLibrary):
       log_exec.info("Find Task: %s" % task_name)
       raise UnsupportedFeatureError("FindTask: other task!");
   
-  def SetSignals(self, ctx):
+  def SetSignal(self, ctx):
     new_signals = ctx.cpu.r_reg(REG_D0)
     signal_mask = ctx.cpu.r_reg(REG_D1)
     old_signals = 0
