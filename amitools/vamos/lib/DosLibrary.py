@@ -771,6 +771,106 @@ class DosLibrary(AmigaLibrary):
     # free our memory
     if own:
       self.alloc.free_struct(rdargs)
+   
+  def cs_get(self, ctx):
+    if self.cs_input:
+      ch = self.file_mgr.getc(self.cs_input)
+    else:
+      if self.cs_curchr < self.cs_length:
+        ch = ctx.mem.access.r8(self.cs_buffer + self.cs_curchr)
+        self.cs_curchr = self.cs_curchr + 1
+      else:
+        ch = -1
+    return ch
+
+  def cs_unget(self, ctx):
+    if self.cs_input:
+      self.file_mgr.ungetc(self.cs_input, -1)
+    else:
+      self.cs_curchr = self.cs_curchr - 1
+
+  def ReadItem(self, ctx):
+    buff_ptr = ctx.cpu.r_reg(REG_D1)
+    maxchars = ctx.cpu.r_reg(REG_D2)
+    csource_ptr = ctx.cpu.r_reg(REG_D3)
+    log_dos.info("ReadItem: buff_ptr=%06x maxchars=%d csource_ptr=%06x" % (buff_ptr, maxchars, csource_ptr))
+    if (csource_ptr):
+      csource = ctx.alloc.map_struct("CSource", csource_ptr, CSourceDef)
+      self.cs_input = None
+      self.cs_buffer = csource.access.r_s('CS_Buffer')
+      self.cs_length = csource.access.r_s('CS_Length')
+      self.cs_curchr = csource.access.r_s('CS_CurChr')
+    else:
+      self.cs_input = ctx.process.get_input()
+
+    if buff_ptr == 0:
+        return 0 # ITEM_NOTHING
+
+    # Well Known Bug: buff[0] = 0, even if maxchars == 0
+    ctx.mem.access.w8(buff_ptr, 0)
+
+    # Skip leading whitespace
+    while True:
+      ch = self.cs_get(ctx)
+      if ch != ord(" ") and ch != ord("\t"):
+        break
+
+    if ch == 0 or ch == ord("\n") or ch < 0 or ch == ord(";"):
+      if ch >= 0:
+        self.cs_unget(ctx)
+      return 0 # ITEM_NOTHING
+
+    if ch == ord("="):
+      return -2 # ITEM_EQUAL
+
+    if ch == ord("\""):
+      while True:
+        if maxchars <= 0:
+          ctx.mem.access.w8(buff_ptr - 1, 0)
+          return 0 # ITEM_NOTHING
+        maxchars = maxchars - 1
+        ch = self.cs_get(ctx)
+        if ch == ord("*"):
+          ch = self.cs_get(ctx)
+          if ch == 0 or ch == ord("\n") or ch < 0:
+            self.cs_unget(ctx)
+            ctx.mem.access.w8(buff_ptr, 0)
+            return -1 # ITEM_ERROR
+          elif ch == ord("n") or ch == ord("N"):
+            ch = ord("\n")
+          elif ch == ord("e") or ch == ord("E"):
+            ch = 0x1b
+        elif ch == 0 or ch == ord("\n") or ch < 0:
+          self.cs_ungetc(ctx)
+          ctx.mem.access.w8(buff_ptr, 0)
+          return -1 # ITEM_ERROR
+        elif ch == ord("\""):
+          ctx.mem.access.w8(buff_ptr, 0)
+          return 2 # ITEM_QUOTED
+        ctx.mem.access.w8(buff_ptr, ch)
+        buff_ptr = buff_ptr + 1
+      pass
+    else:
+      if maxchars <= 0:
+        ctx.mem.access.w8(buff_ptr - 1, 0)
+        return -1 # ITEM_ERROR
+      maxchars = maxchars - 1
+      ctx.mem.access.w8(buff_ptr, ch)
+      buff_ptr = buff_ptr + 1
+      while True:
+        if maxchars <= 0:
+          ctx.mem.access.w8(buff_ptr - 1, 0)
+          return -1 # ITEM_ERROR
+        maxchar = maxchars - 1
+        ch = self.cs_get(ctx)
+        if ch == 0 or ch == ord("\n") or ch == ord(" ") or ch == ord("\t") or ch == ord("=") or ch < 0:
+          # Know Bug: Don't UNGET for a space or equals sign
+          if ch != ord("=") and ch != ord(" ") and ch != ord("\t"):
+            self.cs_unget(ctx)
+          ctx.mem.access.w8(buff_ptr, 0)
+          return 1 # ITEM_UNQUOTED
+        ctx.mem.access.w8(buff_ptr, ch)
+        buff_ptr = buff_ptr + 1
 
   # ----- System/Execute -----
   
