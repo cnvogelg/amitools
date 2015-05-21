@@ -101,6 +101,8 @@ class Process:
       input_fh = self.ctx.file_mgr.get_input()
     if output_fh == None:
       output_fh = self.ctx.file_mgr.get_output()
+    # Inject arguments into input stream (Needed for C:Execute)
+    self.ctx.file_mgr.ungets(input_fh, self.arg_text)
     self.this_task = self.ctx.alloc.alloc_struct(self.bin_basename + "_ThisTask",ProcessDef)
     self.this_task.access.w_s("pr_Task.tc_Node.ln_Type", NT_PROCESS)
     self.this_task.access.w_s("pr_CLI", self.cli.addr)
