@@ -49,7 +49,7 @@ class ExecLibrary(AmigaLibrary):
       log_exec.info("Find Task: %s" % task_name)
       raise UnsupportedFeatureError("FindTask: other task!");
   
-  def SetSignals(self, ctx):
+  def SetSignal(self, ctx):
     new_signals = ctx.cpu.r_reg(REG_D0)
     signal_mask = ctx.cpu.r_reg(REG_D1)
     old_signals = 0
@@ -213,3 +213,16 @@ class ExecLibrary(AmigaLibrary):
     msg_addr = ctx.port_mgr.get_msg(port_addr)
     log_exec.info("WaitPort: got message %06x" % (msg_addr))
     return msg_addr
+
+  def AddTail(self, ctx):
+    list_addr = ctx.cpu.r_reg(REG_A0)
+    node_addr = ctx.cpu.r_reg(REG_A1)
+    l = AccessStruct(ctx.mem, ListDef, list_addr)
+    n = AccessStruct(ctx.mem, NodeDef, node_addr)
+    n.w_s("ln_Succ", l.s_get_addr("lh_Tail"))
+    tp = l.r_s("lh_TailPred")
+    n.w_s("ln_Pred", tp)
+    AccessStruct(ctx.mem, NodeDef, tp).w_s("ln_Succ", node_addr)
+    l.w_s("lh_TailPred", node_addr)
+
+
