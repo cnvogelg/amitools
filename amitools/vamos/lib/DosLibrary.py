@@ -175,6 +175,23 @@ class DosLibrary(AmigaLibrary):
     if str_time_ptr != 0:
       ctx.mem.access.w_cstr(str_time_ptr, time_str)
     return self.DOSTRUE
+
+  # ----- ENV: Vars -----
+  def GetVar(self, ctx):
+    name_ptr = ctx.cpu.r_reg(REG_D1)
+    buff_ptr = ctx.cpu.r_reg(REG_D2)
+    size = ctx.cpu.r_reg(REG_D3)
+    flags = ctx.cpu.r_reg(REG_D4)
+    if size == 0:
+      self.io_err = ERROR_BAD_NUMBER
+      return -1
+
+    name = ctx.mem.access.r_cstr(name_ptr)
+    ctx.mem.access.w_cstr(buff_ptr, '')
+    log_dos.info('GetVar("%s", 0x%x, %d, 0x%x) -> -1' % (name, buff_ptr, size, flags))
+
+    self.io_err = ERROR_OBJECT_NOT_FOUND
+    return -1
     
   # ----- File Ops -----
 
