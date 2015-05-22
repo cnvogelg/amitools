@@ -50,8 +50,6 @@ def pattern_parse(src_str, ignore_case=True, star_is_wild=True):
   """tokenize pattern. return tokenized pattern or None if an error occurred"""
   dst = ""
   n_src = len(src_str)
-  if n_src == 0:
-    return dst
   
   has_wild = False
   blocks = []
