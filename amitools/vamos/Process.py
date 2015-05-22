@@ -12,7 +12,7 @@ class Process:
       return
     self.init_stack(stack_size, exit_addr)
     self.init_args(bin_args)
-    self.init_cli_struct()
+    self.init_cli_struct(input_fh, output_fh)
     self.init_task_struct(input_fh, output_fh)
   
   def free(self):
@@ -80,12 +80,20 @@ class Process:
     self.ctx.alloc.free_memory(self.arg)
   
   # ----- cli struct -----
-  def init_cli_struct(self):
+  def init_cli_struct(self, input_fh, output_fh):
+    if input_fh == None:
+      input_fh = self.ctx.file_mgr.get_input()
+    if output_fh == None:
+      output_fh = self.ctx.file_mgr.get_output()
     self.cli = self.ctx.alloc.alloc_struct(self.bin_basename + "_CLI",CLIDef)
     self.cli.access.w_s("cli_DefaultStack", self.stack_size / 4) # in longs
     self.cmd = self.ctx.alloc.alloc_bstr(self.bin_basename + "_cmd",self.bin_file)
     log_proc.info(self.cmd)
     self.cli.access.w_s("cli_CommandName", self.cmd.addr)
+    self.cli.access.w_s("cli_StandardInput", input_fh.b_addr)
+    self.cli.access.w_s("cli_CurrentInput", input_fh.b_addr)
+    self.cli.access.w_s("cli_StandardOutput", output_fh.b_addr)
+    self.cli.access.w_s("cli_CurrentOutput", output_fh.b_addr)
     log_proc.info(self.cli)
 
   def free_cli_struct(self):
