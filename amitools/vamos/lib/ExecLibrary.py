@@ -217,6 +217,7 @@ class ExecLibrary(AmigaLibrary):
   def AddTail(self, ctx):
     list_addr = ctx.cpu.r_reg(REG_A0)
     node_addr = ctx.cpu.r_reg(REG_A1)
+    log_exec.info("AddTail(%06x, %06x)" % (list_addr, node_addr))
     l = AccessStruct(ctx.mem, ListDef, list_addr)
     n = AccessStruct(ctx.mem, NodeDef, node_addr)
     n.w_s("ln_Succ", l.s_get_addr("lh_Tail"))
@@ -225,4 +226,13 @@ class ExecLibrary(AmigaLibrary):
     AccessStruct(ctx.mem, NodeDef, tp).w_s("ln_Succ", node_addr)
     l.w_s("lh_TailPred", node_addr)
 
+  def Remove(self, ctx):
+    node_addr = ctx.cpu.r_reg(REG_A1)
+    n = AccessStruct(ctx.mem, NodeDef, node_addr)
+    succ = n.r_s("ln_Succ")
+    pred = n.r_s("ln_Pred")
+    log_exec.info("Remove(%06x): ln_Pred=%06x ln_Succ=%06x" % (node_addr, pred, succ))
+    AccessStruct(ctx.mem, NodeDef, pred).w_s("ln_Succ", succ)
+    AccessStruct(ctx.mem, NodeDef, succ).w_s("ln_Pred", pred)
+    return node_addr
 
