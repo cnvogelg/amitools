@@ -16,6 +16,7 @@ from Trampoline import Trampoline
 # lib
 from lib.ExecLibrary import ExecLibrary
 from lib.DosLibrary import DosLibrary
+from lib.UtilityLibrary import UtilityLibrary
 from lib.lexec.ExecStruct import *
 from lib.dos.DosStruct import *
 from lib.IntuitionLibrary import IntuitionLibrary
@@ -186,6 +187,10 @@ class Vamos:
     int_cfg = cfg.get_lib_config('intuition.library')
     self.int_lib_def = IntuitionLibrary(int_cfg)
     self.lib_mgr.register_vamos_lib(self.int_lib_def)
+    # utility
+    utility_cfg = cfg.get_lib_config('utility.library')
+    self.utility_lib_def = UtilityLibrary(utility_cfg)
+    self.lib_mgr.register_vamos_lib(self.utility_lib_def)
 
   def open_exec_lib(self):
     # open exec lib
