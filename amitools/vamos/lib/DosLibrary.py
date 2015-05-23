@@ -90,12 +90,15 @@ class DosLibrary(AmigaLibrary):
       log_dos.info("DosPacket: Read fh_b_addr=%06x buf=%06x len=%06x -> got=%06x fh=%s", fh_b_addr, buf_ptr, size, got, fh)
       dos_pkt.w_s("dp_Res1", got)
     elif pkt_type == ord('W'): # write
-      fh_ptr  = dos_pkt.r_s("dp_Arg1")
-      buf_ptr = dos_pkt.r_s("dp_Arg2")
-      size    = dos_pkt.r_s("dp_Arg3")
-      log_dos.info("DosPacket: Write fh=%06x buf=%06x len=%06x", fh_ptr, buf_ptr, size)
-      # TBD
-      raise UnsupportedFeatureError("Unsupported DosPacket: type=%d" % pkt_type)
+      fh_b_addr = dos_pkt.r_s("dp_Arg1")
+      buf_ptr   = dos_pkt.r_s("dp_Arg2")
+      size      = dos_pkt.r_s("dp_Arg3")
+      fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+      data = self.ctx.mem.access.r_data(buf_ptr, size)
+      self.file_mgr.write(fh, data)
+      put = len(data)
+      log_dos.info("DosPacket: Write fh=%06x buf=%06x len=%06x -> put=%06x fh=%s", fh_b_addr, buf_ptr, size, put, fh)
+      dos_pkt.w_s("dp_Res1", put)
     else:
       raise UnsupportedFeatureError("Unsupported DosPacket: type=%d" % pkt_type)
     # do reply

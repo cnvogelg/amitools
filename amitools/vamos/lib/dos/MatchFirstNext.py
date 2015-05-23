@@ -30,13 +30,6 @@ class MatchFirstNext:
     self.path = None
   
   def first(self, ctx):
-    # replace label of struct
-    self.old_label = ctx.label_mgr.get_label(self.anchor.struct_addr)
-    if self.old_label != None:
-      ctx.label_mgr.remove_label(self.old_label)
-    self.new_label = LabelStruct("MatchAnchor", self.anchor.struct_addr, AnchorPathDef, size=self.total_size)
-    ctx.label_mgr.add_label(self.new_label)
-
     # match first entry
     self.path = self.matcher.begin()
     if self.path == None:
@@ -103,6 +96,7 @@ class MatchFirstNext:
         self.dodir_stack.pop()
         return name, path, flags
     else:
+      flags &= ~self.DODIR
       return None, None, flags
 
   def next(self, ctx):

@@ -178,21 +178,23 @@ class LockManager(LabelRange):
     return NO_ERROR
 
   def examine_lock(self, lock, fib_mem):
-    rc = self.examine_file(fib_mem, lock.name, lock.sys_path)
-    if rc == NO_ERROR:
+    return self.examine_file(fib_mem, lock.name, lock.sys_path)
+
+  def examine_next(self, lock, fib_mem):
+    if lock.dirent == None:
       dirEntryType = fib_mem.r_s('fib_DirEntryType')
-      if dirEntryType == 2:
+      if os.path.isdir(lock.sys_path):
         lock.dirent = os.listdir(lock.sys_path)
       else:
         lock.dirent = []
-    return rc
 
-  def examine_next(self, lock, fib_mem):
     if len(lock.dirent) > 0:
-      aname = lock.name + "/" + lock.dirent[0]
+      aname = lock.dirent[0]
       apath = lock.sys_path + "/" + lock.dirent[0]
       lock.dirent = lock.dirent[1:len(lock.dirent)]
       return self.examine_file(fib_mem, aname, apath)
+
+    lock.dirent = None
     return ERROR_NO_MORE_ENTRIES
     
     

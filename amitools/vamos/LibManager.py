@@ -330,6 +330,9 @@ class LibManager():
 
   def _create_native_lib_part2(self, lib, ctx):
     self.lib_log("load_lib", "done loading native lib: %s" % lib)
+    # Set up lib_Node
+    lib.lib_access.w_s("lib_Node.ln_Succ", lib.addr_base)
+    lib.lib_access.w_s("lib_Node.ln_Pred", lib.addr_base)
 
   def _set_all_vectors(self, mem, base_addr, vectors):
     """set all library vectors to valid addresses"""

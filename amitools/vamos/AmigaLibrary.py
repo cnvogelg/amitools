@@ -125,7 +125,11 @@ class AmigaLibrary:
          if return value exists then set it in CPU's D0 register"""
       d0 = method(ctx)
       if d0 != None:
-        ctx.cpu.w_reg(REG_D0, d0)
+        if d0.__class__.__name__ == 'list':
+          ctx.cpu.w_reg(REG_D0, d0[0] & 0xffffffff)
+          ctx.cpu.w_reg(REG_D1, d0[1] & 0xffffffff)
+        else:
+          ctx.cpu.w_reg(REG_D0, d0 & 0xffffffff)
     return call_stub
 
   def _generate_call_stub(self, ctx, bias, name, method=None, args=None):

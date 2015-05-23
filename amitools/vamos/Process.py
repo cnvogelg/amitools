@@ -7,12 +7,16 @@ NT_PROCESS = 13
 class Process:
   def __init__(self, ctx, bin_file, bin_args, input_fh=None, output_fh=None, stack_size=4096, exit_addr=0):
     self.ctx = ctx
+    if input_fh == None:
+      input_fh = self.ctx.file_mgr.get_input()
+    if output_fh == None:
+      output_fh = self.ctx.file_mgr.get_output()
     self.ok = self.load_binary(bin_file)
     if not self.ok:
       return
     self.init_stack(stack_size, exit_addr)
     self.init_args(bin_args)
-    self.init_cli_struct()
+    self.init_cli_struct(input_fh, output_fh)
     self.init_task_struct(input_fh, output_fh)
   
   def free(self):
@@ -80,12 +84,16 @@ class Process:
     self.ctx.alloc.free_memory(self.arg)
   
   # ----- cli struct -----
-  def init_cli_struct(self):
+  def init_cli_struct(self, input_fh, output_fh):
     self.cli = self.ctx.alloc.alloc_struct(self.bin_basename + "_CLI",CLIDef)
     self.cli.access.w_s("cli_DefaultStack", self.stack_size / 4) # in longs
     self.cmd = self.ctx.alloc.alloc_bstr(self.bin_basename + "_cmd",self.bin_file)
     log_proc.info(self.cmd)
     self.cli.access.w_s("cli_CommandName", self.cmd.addr)
+    self.cli.access.w_s("cli_StandardInput", input_fh.b_addr)
+    self.cli.access.w_s("cli_CurrentInput", input_fh.b_addr)
+    self.cli.access.w_s("cli_StandardOutput", output_fh.b_addr)
+    self.cli.access.w_s("cli_CurrentOutput", output_fh.b_addr)
     log_proc.info(self.cli)
 
   def free_cli_struct(self):
@@ -97,10 +105,6 @@ class Process:
 
   # ----- task struct -----
   def init_task_struct(self, input_fh, output_fh):
-    if input_fh == None:
-      input_fh = self.ctx.file_mgr.get_input()
-    if output_fh == None:
-      output_fh = self.ctx.file_mgr.get_output()
     # Inject arguments into input stream (Needed for C:Execute)
     self.ctx.file_mgr.ungets(input_fh, self.arg_text)
     self.this_task = self.ctx.alloc.alloc_struct(self.bin_basename + "_ThisTask",ProcessDef)
