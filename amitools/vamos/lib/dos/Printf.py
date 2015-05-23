@@ -105,7 +105,10 @@ def printf_read_data(state, mem_access, data_ptr):
     elif t == 's': # STR
       cptr = mem_access.r32(data_ptr)
       data_ptr += 4
-      data = mem_access.r_cstr(cptr)
+      if cptr > 0:
+        data = mem_access.r_cstr(cptr)
+      else:
+        data = '(null)'
     elif t == 'c': # char
       data = mem_access.r16(data_ptr)
       data_ptr += 2
