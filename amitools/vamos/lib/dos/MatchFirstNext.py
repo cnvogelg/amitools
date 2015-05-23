@@ -96,6 +96,7 @@ class MatchFirstNext:
         self.dodir_stack.pop()
         return name, path, flags
     else:
+      flags &= ~self.DODIR
       return None, None, flags
 
   def next(self, ctx):
