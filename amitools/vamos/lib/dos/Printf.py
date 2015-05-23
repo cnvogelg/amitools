@@ -21,7 +21,9 @@ class printf_element:
   def gen_sys_printf_format(self):
     t = self.etype
     if t == 'b':
-      t == 's'
+      t = 's'
+    if t == '%':
+      t = 'c'
     result = []
     result.append('%')
     result.append(self.flags)
@@ -40,7 +42,7 @@ class printf_state:
   def __str__(self):
     return "[elements:%s, fragments:%s]" % (map(str, self.elements), self.fragments)
 
-printf_re_format = "%([-]?)([0-9]+\.)?([0-9]+)?([l])?([bduxsc])"
+printf_re_format = "%([-]?)([0-9]+\.)?([0-9]+)?([l])?([bduxsc%])"
 
 def printf_parse_string(string):
   # groups in pattern:
@@ -108,6 +110,8 @@ def printf_read_data(state, mem_access, data_ptr):
       data = mem_access.r16(data_ptr)
       data_ptr += 2
       data = chr(data)
+    elif t == '%':
+      data = ord('%')
     e.data = data
 
 def printf_generate_output(state):
