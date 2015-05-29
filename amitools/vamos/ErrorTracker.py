@@ -2,6 +2,7 @@ from Log import log_main
 from Exceptions import *
 import sys
 import traceback
+import CPU
 
 class ErrorTracker:
   def __init__(self, cpu, label_mgr):
@@ -14,18 +15,19 @@ class ErrorTracker:
     self.other_tb = None
     self.other_type = None
     self.other_value = None
-  
+
   # direct callback from MEM module -> on error
   def report_invalid_memory(self, mode, width, addr):
     mode_char = chr(mode)
     self.report_error(InvalidMemoryAccessError(mode_char, width, addr))
-  
+
   def report_error(self, e):
     # ignore if already an error
     if self.has_errors:
       return
     self.has_errors = True
-    self.cpu_state = self.cpu.get_state()
+    self.cpu_state = CPU.CPUState()
+    self.cpu_state.get(self.cpu)
     if isinstance(e, VamosError):
       self.vamos_error = e
     else:
@@ -34,7 +36,7 @@ class ErrorTracker:
       self.other_tb = traceback.extract_tb(exc_traceback)
       self.other_type = exc_type
       self.other_value = exc_value
-  
+
   # show vamos error with machine state
   def dump_vamos_error(self):
     e = self.vamos_error
@@ -51,11 +53,11 @@ class ErrorTracker:
     else:
       log_main.error(e)
     # give CPU state dump
-    pc = self.cpu_state['pc']
+    pc = self.cpu_state.pc
     label,offset = self.label_mgr.get_label_offset(pc)
     if label != None:
       log_main.error("PC=%08x -> +%06x %s",pc,offset,label)
-    for d in self.cpu.dump_state(self.cpu_state):
+    for d in self.cpu_state.dump():
       log_main.error(d)
 
   # dump a python exception
@@ -69,7 +71,7 @@ class ErrorTracker:
       log_main.error("*** Python EXCEPTION: %s (%s) ***",self.other_value,self.other_type)
       for t in self.other_tb:
         log_main.error("%s:%d in %s: %s",*t)
-  
+
   def dump(self):
     self.dump_vamos_error()
     self.dump_other_error()

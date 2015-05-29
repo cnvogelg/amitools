@@ -1,103 +1,99 @@
 import logging
-import ctypes
 
 class AccessMemory:
   # set this label manager to enable memory tracing!
   label_mgr = None
-  
+
   def __init__(self, mem):
     self.mem = mem
+    self.raw_mem = mem.raw_mem
 
-  def write_mem(self, width, addr, val):
-    self.mem.write_mem(width, addr, val)
-    if self.label_mgr != None:
-      self.label_mgr.trace_int_mem('W',width, addr, val)
-
-  def read_mem(self, width, addr):
-    val = self.mem.read_mem(width, addr)
-    if self.label_mgr != None:
-      self.label_mgr.trace_int_mem('R',width, addr, val)
-    return val
+  # memory access
+  def rx(self, addr, width):
+    if width == 0:
+      return r8(addr)
+    elif width == 1:
+      return r16(addr)
 
   def r32(self, addr):
-    return self.read_mem(2, addr)
-  
+    val = self.raw_mem.r32(addr)
+    if self.label_mgr != None:
+      self.label_mgr.trace_int_mem('R', 2, addr, val)
+    return val
+
   def r16(self, addr):
-    return self.read_mem(1, addr)
-  
+    val = self.raw_mem.r16(addr)
+    if self.label_mgr != None:
+      self.label_mgr.trace_int_mem('R', 1, addr, val)
+    return val
+
   def r8(self, addr):
+    val = self.raw_mem.r8(addr)
+    if self.label_mgr != None:
+      self.label_mgr.trace_int_mem('R', 0, addr, val)
     return self.read_mem(0, addr)
 
   def w32(self, addr, val):
-    self.write_mem(2, addr, val)
+    self.raw_mem.w32(addr, val)
+    if self.label_mgr != None:
+      self.label_mgr.trace_int_mem('W', 2, addr, val)
 
   def w16(self, addr, val):
-    self.write_mem(1, addr, val)
+    self.raw_mem.w16(addr, val)
+    if self.label_mgr != None:
+      self.label_mgr.trace_int_mem('W', 1, addr, val)
 
   def w8(self, addr, val):
-    self.write_mem(0, addr, val)
-
-  def w_data(self, addr, data):
-    size = len(data)
-    buf = ctypes.create_string_buffer(data)
-    self.mem.write_block(addr,size,buf)
+    self.raw_mem.w8(addr, val)
     if self.label_mgr != None:
-      self.label_mgr.trace_int_block( 'W', addr, size )
+      self.label_mgr.trace_int_mem('W', 0, addr, val)
+
+  # arbitrary width
+  def read_mem(self, width, addr):
+    val = self.raw_mem.read(width, addr)
+    if self.label_mgr != None:
+      self.label_mgr.trace_int_mem('R', width, addr, val)
+    return val
+
+  def write_mem(self, width, addr, value):
+    self.raw_mem.write(width, addr, value)
+    if self.label_mgr != None:
+      self.label_mgr.trace_int_mem('W', width, addr, val)
+
+  # block access
+  def w_data(self, addr, data):
+    self.raw_mem.w_block(addr, data)
+    if self.label_mgr != None:
+      self.label_mgr.trace_int_block( 'W', addr, len(data) )
 
   def r_data(self, addr, size):
-    buf = ctypes.create_string_buffer(size)
-    self.mem.read_block(addr,size,buf)
+    data = self.raw_mem.r_block(addr, size)
     if self.label_mgr != None:
       self.label_mgr.trace_int_block( 'R', addr, size )
-    return buf.raw
+    return data
 
+  def clear_data(self, addr, size, value):
+    self.raw_mem.clear_block(addr, size, value)
+
+  # c string
   def r_cstr(self, addr):
-    off = addr
-    res = ""
-    l = 0
-    v = None
-    while True:
-      v = chr(self.mem.read_mem(0, off))
-      if v == '\0':
-        break
-      res += v
-      off += 1
-      l += 1
+    cstr = self.raw_mem.r_cstr(addr)
     if self.label_mgr != None:
-      self.label_mgr.trace_int_block( 'R', addr, l, text="CSTR", addon="'%s'"%res, level=logging.INFO )
-    return res
+      self.label_mgr.trace_int_block( 'R', addr, len(cstr), text="CSTR", addon="'%s'"%cstr, level=logging.INFO )
+    return cstr
 
   def w_cstr(self, addr, cstr):
-    off = addr
-    for c in cstr:
-      self.mem.write_mem(0, off, ord(c))
-      off += 1
-    self.mem.write_mem(0, off, 0)
+    self.raw_mem.w_cstr(addr, cstr)
     if self.label_mgr != None:
       self.label_mgr.trace_int_block( 'W', addr, len(cstr), text="CSTR", addon="'%s'"%cstr, level=logging.INFO )
 
   def r_bstr(self, addr):
-    off = addr
-    res = ""
-    size = self.mem.read_mem(0, off)
-    off += 1
-    for i in xrange(size):
-      res += chr(self.mem.read_mem(0, off))
-      off += 1
+    bstr = self.raw_mem.r_bstr(addr)
     if self.label_mgr != None:
-      self.label_mgr.trace_int_block( 'R', addr, size, text='BSTR', addon="'%s'"%res, level=logging.INFO )
-    return res
+      self.label_mgr.trace_int_block( 'R', addr, len(bstr), text='BSTR', addon="'%s'"%bstr, level=logging.INFO )
+    return bstr
 
   def w_bstr(self, addr, bstr):
-    off = addr
-    size = len(bstr)
-    self.mem.write_mem(0, off, size)
-    off += 1
-    for c in bstr:
-      self.mem.write_mem(0, off, ord(c))
-      off += 1
+    self.raw_mem.w_bstr(addr, bstr)
     if self.label_mgr != None:
-      self.label_mgr.trace_int_block( 'W', addr, size, text='BSTR', addon="'%s'"%bstr, level=logging.INFO )
-
-
-  
+      self.label_mgr.trace_int_block( 'W', addr, len(bstr), text='BSTR', addon="'%s'"%bstr, level=logging.INFO )

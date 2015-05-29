@@ -10,10 +10,10 @@ from AccessStruct import AccessStruct
 from lib.lexec.ExecStruct import LibraryDef
 
 class AmigaLibrary:
-  
+
   op_rts = 0x4e75
   op_reset = 0x4e70
-  
+
   def __init__(self, name, struct, config):
     self.name = name
     self.struct = struct
@@ -36,7 +36,7 @@ class AmigaLibrary:
     # proposal of size
     self.pos_size = self.struct.get_size()
     self.neg_size = 0
-    
+
     # (optional) fd describing lib functions
     self.fd = None
     # (optional) native segment list loaded for lib
@@ -68,13 +68,13 @@ class AmigaLibrary:
       return
     max_bias = self.fd.get_max_bias()
     self.neg_size = max_bias + 6
-  
+
   def use_sizes(self):
     self.mem_pos_size = self.pos_size
     self.mem_neg_size = self.neg_size
-  
+
   def _get_class_methods(self):
-    """return a map with method name to bound method mapping of this class"""    
+    """return a map with method name to bound method mapping of this class"""
     members = inspect.getmembers(self, predicate=inspect.ismethod)
     result = {}
     for member in members:
@@ -86,8 +86,8 @@ class AmigaLibrary:
   def get_callee_pc(self,ctx):
     """a call stub log helper to extract the callee's pc"""
     sp = ctx.cpu.r_reg(REG_A7)
-    return ctx.mem.read_mem(2,sp)
-    
+    return ctx.mem.access.r32(sp)
+
   def _gen_arg_dump(self,args,ctx):
     """a call stub helper to dump the registers of a call"""
     if args == None or len(args) == 0:
@@ -121,7 +121,7 @@ class AmigaLibrary:
   def _generate_fast_call_stub(self, ctx, method):
     """generate a fast call stub without any processing"""
     def call_stub(op, pc):
-      """the generic call stub: call python bound method and 
+      """the generic call stub: call python bound method and
          if return value exists then set it in CPU's D0 register"""
       d0 = method(ctx)
       if d0 != None:
@@ -145,27 +145,27 @@ class AmigaLibrary:
     # if extra processing is disabled then create a compact call stub
     if not self.log_call and not self.benchmark and not self.profile and not self.catch_ex:
       return self._generate_fast_call_stub(ctx, method)
-    
+
     # ... otherwise processing is enabled and we need to synthesise a
     # suitable call stub
     need_timing = self.benchmark or self.profile
     code = ["def call_stub(op, pc):"]
-    
+
     # logging (begin)
     if self.log_call:
       code.append('  callee_pc = self.get_callee_pc(ctx)')
       code.append('  call_name = "%4d %s( %s ) from PC=%06x" % (bias, name, self._gen_arg_dump(args, ctx), callee_pc)')
       code.append('  self.log("{ CALL: %s" % call_name, level=logging.INFO)')
-    
+
     # timing code
     if need_timing:
       code.append('  start = time.clock()')
-      
+
     # main call: call method and evaluate result
     code.append('  d0 = method(ctx)')
     code.append('  if d0 != None:')
     code.append('    ctx.cpu.w_reg(REG_D0, d0)')
-    
+
     # timing code
     if need_timing:
       code.append('  end = time.clock()')
@@ -188,14 +188,14 @@ class AmigaLibrary:
       c.append("  except:")
       c.append("    self._handle_exc()")
       code = c
-      
+
     # generate code
     l = {}
     l.update(globals())
     l.update(locals())
     exec "\n".join(code) in l
     return l['call_stub']
-    
+
   def trap_lib_entry(self, ctx, bias, name, method=None, args=None):
     """generate a trap in the library's jump table.
        returns True if trap was applied or False if no trap could be setup
@@ -203,7 +203,7 @@ class AmigaLibrary:
     # get call stub
     call_stub = self._generate_call_stub(ctx, bias, name, method, args)
     # allocate a trap
-    tid = ctx.cpu.trap_setup(call_stub, auto_rts=True)
+    tid = ctx.traps.setup(call_stub, auto_rts=True)
     if tid < 0:
       self.log("patch $%04x: '%s' -> NO TRAP AVAILABLE" % (bias, name), level=logging.ERROR)
       return False
@@ -211,29 +211,29 @@ class AmigaLibrary:
     op = 0xa000 | tid
     # patch the lib in memory
     addr = self.addr_base - bias
-    ctx.mem.write_mem(1,addr,op)
+    ctx.mem.access.w16(addr,op)
     self.log("patch $%04x: op=$%04x '%s' [%s]" % (bias, op, name, method), level=logging.DEBUG)
-    return True  
+    return True
 
   def trap_class_entries(self, ctx, add_private=False):
     """look up all names (from fd) and if members of this class match then trap the function.
-    
+
        return (number of methods patched, number of dummies patched)
     """
     # this works only with fd file!
     if self.fd == None:
       return None
-    
+
     # build a map: bias -> func name
     bias_map = {}
     for f in self.fd.get_funcs():
       # add public and optionally private API calls
       if add_private or not f.is_private():
         bias_map[f.get_bias()] = (f.get_name(), f.get_args())
-    
+
     # get all implemented class methods
     method_map = self._get_class_methods()
-      
+
     # loop over all biases
     bias = 6
     addr = self.addr_base - bias
@@ -253,10 +253,10 @@ class AmigaLibrary:
         else:
           method = None
           num_dummy += 1
-        
+
         # now trap entry
         self.trap_lib_entry(ctx, bias, name, method, args)
-        
+
       addr -= 6
       bias += 6
 
@@ -267,13 +267,13 @@ class AmigaLibrary:
     bias = 6
     addr = self.addr_base
     while bias < self.neg_size:
-      ctx.mem.write_mem(1,addr,self.op_reset)
+      ctx.mem.access.w16(addr,self.op_reset)
       bias += 6
       addr -= 6
 
   def __str__(self):
     return "[Lib %s V%d {+%d -%d} mem: V%d {+%d -%d} <%08x, %08x, %08x> open_base=%08x ref_cnt=%d]" % \
-      (self.name, self.version, 
+      (self.name, self.version,
        self.pos_size, self.neg_size,
        self.mem_version,
        self.mem_pos_size, self.mem_neg_size,
@@ -297,7 +297,7 @@ class AmigaLibrary:
     # create access
     self.access = AccessStruct(ctx.mem, self.struct, self.addr_base)
     self.lib_access = AccessStruct(ctx.mem, LibraryDef, self.addr_base)
-  
+
   def free_lib_base(self, ctx, free_alloc=True):
     """free memory for the library base"""
     # free memory
@@ -313,61 +313,61 @@ class AmigaLibrary:
     self.label = None
     self.access = None
     self.lib_access = None
-  
+
   def fill_lib_struct(self):
     # now we can fill the library structure with some sane values
     self.lib_access.w_s("lib_Version", self.mem_version)
     self.lib_access.w_s("lib_PosSize", self.mem_pos_size)
     self.lib_access.w_s("lib_NegSize", self.mem_neg_size)
     self.lib_access.w_s("lib_OpenCnt", 0)
-  
+
   def setup_lib(self, ctx):
     """the lib is now used in memory at the given base address"""
     self.ref_cnt = 0
     # enable profiling
     if self.profile:
       self.profile_map = {}
-  
+
   def finish_lib(self, ctx):
     """the lib is no longer used in memory"""
     if self.ref_cnt != 0:
       self.log("lib ref count != 0: %d" % self.ref_cnt, level=logging.ERROR)
-    
+
     # dump profile
     if self.profile:
       self.dump_profile()
-  
+
   def inc_usage(self):
     """increment usage counter"""
     self.ref_cnt += 1
     self.lib_access.w_s("lib_OpenCnt", self.ref_cnt)
-    
+
   def dec_usage(self):
     """decrement usage counter"""
     self.ref_cnt -= 1
     self.lib_access.w_s("lib_OpenCnt", self.ref_cnt)
-  
+
   def get_num_vectors(self):
     return self.num_jumps
-    
+
   def get_struct(self):
     return self.struct
-  
+
   def get_name(self):
     return self.name
-    
+
   def get_version(self):
     return self.version
-  
+
   def get_total_size(self):
     return self.neg_size + self.pos_size
-  
+
   def get_neg_size(self):
     return self.neg_size
-    
+
   def get_pos_size(self):
     return self.pos_size
-  
+
   def log(self, text, level=logging.INFO):
     log_lib.log(level, "[%16s]  %s", self.name, text)
 
@@ -393,10 +393,10 @@ class AmigaLibrary:
     else:
       entry = [delta, 1]
       self.profile_map[func] = entry
-  
+
   def _account_benchmark_data(self, delta):
     self.lib_mgr.bench_total += delta
-    
+
   def _handle_exc(self):
     """handle an exception that occurred inside the call stub's python code"""
     # TBD

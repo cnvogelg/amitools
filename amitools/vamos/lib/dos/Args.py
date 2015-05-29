@@ -17,7 +17,7 @@ class Args:
       flags = p.split('/')
       keys = map(lambda x : x.lower(), flags[0].split('='))
       targ = { 'keys' : keys,
-               's' : False, 'k' : False, 'n' : False, 't' : False, 
+               's' : False, 'k' : False, 'n' : False, 't' : False,
                'a' : False, 'f' : False, 'm' : False, 'n' : False,
                'x' : False }
 
@@ -36,7 +36,7 @@ class Args:
     # read org values
     self.in_val = []
     for t in self.targs:
-      raw = mem_access.read_mem(2,ptr)
+      raw = mem_access.read32(ptr)
       # prefill toggle
       if t['t']:
         self.in_val.append(bool(raw))
@@ -60,7 +60,7 @@ class Args:
         return True
     else:
       return False
-    
+
   def _find_key_pos_and_remove(self, keys, in_list):
     for key in keys:
       pos = 0
@@ -75,24 +75,24 @@ class Args:
   """
   def parse_string(self, in_args):
     self.error = NO_ERROR
-    
+
     # get args and split = into args, too
     args = []
     for a in in_args:
       b = a.split('=')
       args += b
-  
+
     # prepare result array
     result = []
     targs = self.targs
     while len(result) < len(targs):
       result.append(None)
-  
+
     # scan through args and look for keyword named entries
     pos = 0
     for targ in targs:
       req = targ['a']
-      
+
       # switch
       if targ['s']:
         val = self._find_remove_key(targ['keys'], args, False)
@@ -103,7 +103,7 @@ class Args:
           if req:
             self.error = ERROR_REQUIRED_ARG_MISSING
             return False # sensible? switch with a ??
-      
+
       # toggle
       elif targ['t']:
         val = self._find_remove_key(targ['keys'], args, False)
@@ -112,7 +112,7 @@ class Args:
         elif req:
           self.error = ERROR_REQUIRED_ARG_MISSING
           return False
-          
+
       # keyword
       elif targ['k']:
         val = self._find_remove_key(targ['keys'], args, True)
@@ -131,7 +131,7 @@ class Args:
             if req:
               self.error = ERROR_REQUIRED_ARG_MISSING
               return False
-      
+
       # normal key but not multi
       elif targ['x'] and not targ['m']:
         val = self._find_remove_key(targ['keys'], args, True)
@@ -144,20 +144,20 @@ class Args:
           if val != False:
             result[pos] = val
             targ['x'] = False # disable to reject auto fill
-      
+
       # full line
       elif targ['f']:
         result[pos] = args
         args = []
-        
+
       pos = pos + 1
-    
+
     # scan for multi and non-key args
     multi_pos = None
     multi_targ = None
     pos = 0
-    for targ in targs:  
-      # multi 
+    for targ in targs:
+      # multi
       if targ['m']:
         # try to find multi keys
         fpos = self._find_key_pos_and_remove(targ['keys'], args)
@@ -176,7 +176,7 @@ class Args:
         if targ['a'] and len(result[pos])==0:
           self.error = ERROR_REQUIRED_ARG_MISSING
           return False
-          
+
       # normal entry
       elif targ['x']:
         # take from arraay
@@ -198,14 +198,14 @@ class Args:
               self.error = ERROR_REQUIRED_ARG_MISSING
               return False
         result[pos] = val
-        
+
       pos = pos + 1
-  
+
     # something left?
     if len(args)>0:
       self.error = ERROR_TOO_MANY_ARGS
       return False
-  
+
     self.result = result
     return True
 
@@ -215,7 +215,7 @@ class Args:
       k = self.targs[i]['keys']
       msg = "%s:%s" % (",".join(k),self.result[i])
       res.append(msg)
-    return "  ".join(res)  
+    return "  ".join(res)
 
   def calc_result_size(self):
     n = len(self.result)
@@ -235,7 +235,7 @@ class Args:
           num_longs += len(r) + 1
           for s in r:
             num_chars += len(s) + 1
-    
+
     # calc total size
     size = num_longs * 4 + num_chars
 
@@ -258,7 +258,7 @@ class Args:
         base_val = char_ptr
         # append string
         mem_access.w_cstr(char_ptr, r)
-        char_ptr += len(r) + 1        
+        char_ptr += len(r) + 1
       elif type(r) is types.IntType:
         # pointer to long
         base_val = long_ptr
@@ -283,7 +283,7 @@ class Args:
       else:
         # direct value
         base_val = r
-      
+
       mem_access.w32(base_ptr,base_val)
       base_ptr += 4
-    
+

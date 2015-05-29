@@ -32,7 +32,7 @@ class MemoryChunk:
     """check if new size would fit into chunk
        return < 0 if it does not fit, 0 for exact fit, > 0 n wasted bytes
     """
-    return self.size - size      
+    return self.size - size
 
 class MemoryAlloc:
   def __init__(self, mem, addr, size, begin, label_mgr):
@@ -44,12 +44,12 @@ class MemoryAlloc:
     self.mem = mem
     self.access = mem.access
     self.label_mgr = label_mgr
-    
+
     # init free list
     self.free_bytes = size - (begin - addr)
     self.free_first = MemoryChunk(addr + begin, self.free_bytes)
     self.free_entries = 1
-  
+
   def _find_best_chunk(self, size):
     """find best chunk that could take the given alloc
        return: index of chunk in free list or -1 if none found + bytes left in chunk
@@ -72,7 +72,7 @@ class MemoryAlloc:
     keys = sorted(potentials.keys())
     best = keys[0]
     return (potentials[best], best)
-    
+
   def _remove_chunk(self, chunk):
     next = chunk.next
     prev = chunk.prev
@@ -83,7 +83,7 @@ class MemoryAlloc:
     if prev != None:
       prev.next = next
     self.free_entries -= 1
-  
+
   def _replace_chunk(self, old_chunk, new_chunk):
     next = old_chunk.next
     prev = old_chunk.prev
@@ -95,7 +95,7 @@ class MemoryAlloc:
       prev.next = new_chunk
     new_chunk.next = next
     new_chunk.prev = prev
-  
+
   def _insert_chunk(self, chunk):
     cur = self.free_first
     last = None
@@ -105,8 +105,8 @@ class MemoryAlloc:
       if addr < cur.addr:
         break
       last = cur
-      cur = cur.next  
-    # inster after last but before cur 
+      cur = cur.next
+    # inster after last but before cur
     if last == None:
       self.free_first = chunk
     else:
@@ -116,7 +116,7 @@ class MemoryAlloc:
       chunk.next = cur
       cur.prev = chunk
     self.free_entries += 1
-  
+
   def _merge_chunk(self, a, b):
     # can we merge?
     if a.addr + a.size == b.addr:
@@ -135,11 +135,11 @@ class MemoryAlloc:
       return chunk
     else:
       return None
-  
+
   def _stat_info(self):
     num_allocs = len(self.addrs)
     return "(free %06x #%d) (allocs #%d)" % (self.free_bytes, self.free_entries, num_allocs)
-  
+
   def alloc_mem(self, size):
     """allocate memory and return addr or 0 if no more memory"""
     # align size to 4 bytes
@@ -148,7 +148,7 @@ class MemoryAlloc:
     chunk, left = self._find_best_chunk(size)
     # out of memory?
     if chunk == None:
-      log_mem_alloc.warn("[alloc: NO MEMORY for %06x bytes]", size)
+      log_mem_alloc.error("[alloc: NO MEMORY for %06x bytes]", size)
       return 0
     # remove chunk from free list
     # is something left?
@@ -162,10 +162,10 @@ class MemoryAlloc:
     self.addrs[addr] = size
     self.free_bytes -= size
     # erase memory
-    self.mem.clear_block(addr, size, 0)
+    self.mem.access.clear_data(addr, size, 0)
     log_mem_alloc.info("[alloc @%06x-%06x: %06x bytes] %s", addr, addr+size, size, self._stat_info())
     return addr
-  
+
   def free_mem(self, addr, size):
     # first check if its a right alloc
     if not self.addrs.has_key(addr):
@@ -176,7 +176,7 @@ class MemoryAlloc:
     # create a new free chunk
     chunk = MemoryChunk(addr, real_size)
     self._insert_chunk(chunk)
-    
+
     # try to merge with prev/next
     prev = chunk.prev
     if prev != None:
@@ -189,7 +189,7 @@ class MemoryAlloc:
       new_chunk = self._merge_chunk(chunk, next)
       if new_chunk != None:
         log_mem_alloc.debug("merged: this=%s + %s -> %s", chunk, next, new_chunk)
-      
+
     # correct free bytes
     self.free_bytes += size
     num_allocs = len(self.addrs)
@@ -200,7 +200,7 @@ class MemoryAlloc:
       return self.addrs[addr]
     else:
       return None
-      
+
   def dump_mem_state(self):
     chunk = self.free_first
     num = 0
@@ -208,13 +208,13 @@ class MemoryAlloc:
       log_mem_alloc.debug("dump #%02d: %s" % (num, chunk))
       num += 1
       chunk = chunk.next
-  
+
   def _dump_orphan(self, addr, size):
     log_mem_alloc.warn("orphan: [@%06x +%06x %06x]" % (addr, size, addr+size))
     labels = self.label_mgr.get_intersecting_labels(addr,size)
     for l in labels:
       log_mem_alloc.warn("-> %s",l)
-  
+
   def dump_orphans(self):
     last = self.free_first
     # orphan at begin?
@@ -227,7 +227,7 @@ class MemoryAlloc:
     while cur != None:
       addr = last.addr + last.size
       size = cur.addr - addr
-      self._dump_orphan(addr, size)        
+      self._dump_orphan(addr, size)
       last = cur
       cur = cur.next
     # orphan at end?
@@ -235,15 +235,15 @@ class MemoryAlloc:
     end = self.addr + self.size
     if addr != end:
       self._dump_orphan(addr, end-addr)
-  
+
   # ----- convenience functions with label creation -----
-  
+
   def get_memory(self, addr):
     if self.mem_objs.has_key(addr):
       return self.mem_objs[addr]
     else:
       return None
-  
+
   # memory
   def alloc_memory(self, name, size, add_label=True):
     addr = self.alloc_mem(size)
@@ -256,14 +256,14 @@ class MemoryAlloc:
     log_mem_alloc.info("alloc memory: %s",mem)
     self.mem_objs[addr] = mem
     return mem
-  
+
   def free_memory(self, mem):
     log_mem_alloc.info("free memory: %s",mem)
     if mem.label != None:
       self.label_mgr.remove_label(mem.label)
     self.free_mem(mem.addr, mem.size)
     del self.mem_objs[mem.addr]
-  
+
   # struct
   def alloc_struct(self, name, struct):
     size = struct.get_size()
@@ -275,7 +275,7 @@ class MemoryAlloc:
     log_mem_alloc.info("alloc struct: %s",mem)
     self.mem_objs[addr] = mem
     return mem
-  
+
   def map_struct(self, name, addr, struct):
     size = struct.get_size()
     access = AccessStruct(self.mem, struct, addr)
@@ -289,7 +289,7 @@ class MemoryAlloc:
     self.label_mgr.remove_label(mem.label)
     self.free_mem(mem.addr, mem.size)
     del self.mem_objs[mem.addr]
-  
+
   # cstr
   def alloc_cstr(self, name, cstr):
     size = len(cstr) + 1
@@ -301,13 +301,13 @@ class MemoryAlloc:
     log_mem_alloc.info("alloc c_str: %s",mem)
     self.mem_objs[addr] = mem
     return mem
-  
+
   def free_cstr(self, mem):
     log_mem_alloc.info("free c_str: %s",mem)
     self.label_mgr.remove_label(mem.label)
     self.free_mem(mem.addr, mem.size)
     del self.mem_objs[mem.addr]
-  
+
   # bstr
   def alloc_bstr(self, name, bstr):
     size = len(bstr) + 2 # front: count, end: extra zero for safety
@@ -319,14 +319,14 @@ class MemoryAlloc:
     log_mem_alloc.info("alloc b_str: %s",mem)
     self.mem_objs[addr] = mem
     return mem
-  
+
   def free_bstr(self, mem):
     log_mem_alloc.info("free b_str: %s",mem)
     self.label_mgr.remove_label(mem.label)
     self.free_mem(mem.addr, mem.size)
     del self.mem_objs[mem.addr]
-        
 
-  
-  
-  
+
+
+
+

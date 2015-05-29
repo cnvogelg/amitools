@@ -7,14 +7,14 @@ MEMORY_WIDTH_LONG = 2
 
 class LabelManager:
   trace_val_str = ( "%02x      ", "%04x    ", "%08x" )
-  
+
   def __init__(self):
     self.ranges = []
     self.error_tracker = None # will be set later
-  
+
   def add_label(self, range):
     self.ranges.append(range)
-  
+
   def remove_label(self, range):
     if range in self.ranges:
       self.ranges.remove(range)
@@ -26,14 +26,14 @@ class LabelManager:
           log_mem_int.log(logging.WARN, "remove_label: got=%s have=%s", range, r)
           return
       log_mem_int.log(logging.ERROR, "remove_label: invalid range %s", range)
-  
+
   def get_all_labels(self):
     return self.ranges[:]
-  
+
   def dump(self):
     for r in self.ranges:
       print r
-  
+
   def get_label(self, addr):
     for r in self.ranges:
       if r.is_inside(addr):
@@ -75,7 +75,7 @@ class LabelManager:
       return "N/A"
 
   def trace_int_block(self, mode, addr, size, text="", level=logging.DEBUG, addon=""):
-    log_mem_int.log(level, "%s(B): %06x: +%06x   %6s  [%s] %s", mode, addr, size, text, self.get_mem_str(addr), addon)  
+    log_mem_int.log(level, "%s(B): %06x: +%06x   %6s  [%s] %s", mode, addr, size, text, self.get_mem_str(addr), addon)
 
   def trace_int_mem(self, mode, width, addr, value, text="", level=logging.DEBUG, addon=""):
     val = self.trace_val_str[width] % value

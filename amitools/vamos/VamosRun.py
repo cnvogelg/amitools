@@ -19,12 +19,12 @@ class VamosRun:
     self.ctx = vamos
     # store myself in context
     self.ctx.run = self
-    
+
     self.stay = True
     self.et = vamos.error_tracker
-    
+
     self.benchmark = benchmark
-    
+
   def init_cpu(self):
     # prepare m68k
     log_main.info("setting up m68k")
@@ -65,7 +65,7 @@ class VamosRun:
     self.stay = False
 
   def _calc_benchmark(self, total_cycles, delta_time):
-    python_time = self.ctx.lib_mgr.bench_total    
+    python_time = self.ctx.lib_mgr.bench_total
     cpu_time = delta_time - python_time
     mhz = total_cycles / (1000000.0 * delta_time)
     cpu_percent = cpu_time * 100.0 / delta_time
@@ -95,7 +95,7 @@ class VamosRun:
       self.et.report_error(e)
 
     end_time = time.clock()
-    
+
     # calc benchmark values
     if self.benchmark:
       self._calc_benchmark( total_cycles, end_time - start_time )
@@ -111,4 +111,4 @@ class VamosRun:
       log_main.info("exit code=%d", exit_code)
 
     return exit_code
-    
+

@@ -16,39 +16,16 @@ REG_A5 = 13
 REG_A6 = 14
 REG_A7 = 15
 
-class CPU:
-  def __init__(self, name):
-    self.name = name
-  
-  def get_name(self):
-    return self.name
-  
-  def r_reg(self, reg):
-    return 0
-  def w_reg(self, reg, val):
-    pass
-  def r_pc(self):
-    return 0
-  def w_pc(self, val):
-    pass
-  def r_sr(self):
-    return 0
-  def w_sr(self, val):
-    pass
-  def pulse_reset(self):
-    pass
-  def execute(self, num_cycles):
-    return 0
-  def end(self):
-    pass
-  def trap_setup(self, func, auto_rts=False, one_shot=False):
-    return -1
-  def trap_free(self, tid):
-    pass
+class CPUState:
+  def __init__(self):
+    self.pc = None
+    self.sr = None
+    self.dx = None
+    self.ax = None
 
   sr_chars = "CVZNX"
-  
-  def sr_str(self, val):
+
+  def _sr_str(self, val):
     mask = 1
     res = []
     for c in self.sr_chars:
@@ -58,42 +35,35 @@ class CPU:
         res.append('-')
       mask *= 2
     return "".join(res)
-  
-  def get_state(self):
-    state = {
-      'pc' : self.r_pc(),
-      'sr' : self.r_sr(),
-      'sr_str' : self.sr_str(self.r_sr()),
-    }
+
+  def get(self, cpu):
+    self.pc = cpu.r_pc()
+    self.sr = cpu.r_sr()
     # data register
     dx = []
-    state['dx'] = dx
+    self.dx = dx
     for i in xrange(8):
-      dx.append(self.r_reg(i))
+      dx.append(cpu.r_reg(i))
     # addr register
     ax = []
-    state['ax'] = ax
+    self.ax = ax
     for i in xrange(8):
-      ax.append(self.r_reg(8+i))
-    return state
-    
-  def dump_state(self, state=None):
-    if state == None:
-      state = self.get_state()
-    
+      ax.append(cpu.r_reg(8+i))
+
+  def dump(self):
     res = []
-    res.append( "PC=%08x  SR=%s" % (state['pc'],state['sr_str']))
+    res.append( "PC=%08x  SR=%s" % (self.pc, self._sr_str(self.sr)))
     # data register
     dx = []
     pos = 0
-    for d in state['dx']:
+    for d in self.dx:
       dx.append("D%d=%08x" % (pos, d))
       pos += 1
     res.append( "  ".join(dx) )
     # addr register
     ax = []
     pos = 0
-    for a in state['ax']:
+    for a in self.ax:
       ax.append("A%d=%08x" % (pos, a))
       pos += 1
     res.append( "  ".join(ax))

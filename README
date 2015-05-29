@@ -3,7 +3,7 @@ amitools - various AmigaOS tools for other platforms
 
   written by Christian Vogelgsang <chris@vogelgsang.org>
   under the GNU Public License V2
-  
+
 Introduction
 ------------
 
@@ -17,6 +17,34 @@ provide other Amiga support, too.
 
 The tools are mostly developer-oriented, so a background in Amiga programming
 will be very helpful.
+
+Installation
+------------
+
+ - You can run all tools right where you checked out the source tree.
+   No installation is required. On Mac OS X or other Unixes simply run the
+   tool directly, on Windows you need to prefix the python binary.
+
+ - vamos m68k emulator using musashi needs a native library to be compiled
+   first. You need Cython version 0.21 or greater to build it:
+
+   On Mac OS X:
+
+     > sudo port install py27-cython
+     > cd musashi && make
+
+   On Ubuntu:
+
+     > sudo apt-get install python-pip
+     > sudo pip install cython
+     # do not install Ubuntu's cython as its too old (0.20)!
+     > cd musashi && make
+
+   On Windows with MSYS2:
+
+     > pacman -S mingw-w64-i686-cython2 # 32 bit
+     > pacman -S mingw-w64-x86_64-cython2 # 64 bit
+     > cd musashi && make CYTHON=cython2
 
 Tools
 -----
@@ -37,7 +65,7 @@ Tools
 
     It uses the Hunk library of amitools to load and relocate the binary. A
     m68k CPU emulator is used to execute the code (here: Musashi emulator
-    in native C with Python binding via ctypes).
+    in native C with Python binding via cython (>= 0.21)).
 
     Every call to a library is trapped during execution and realized with own
     Python code or simply ignored if no trap is defined.
@@ -50,7 +78,7 @@ Tools
     is very instructive but not too fast. Later on, a native C implementation
     may be derived from these concepts to create a very fast and efficient
     vamos.
-    
+
     For now its a playground for me to learn lots about Amiga OS, its binaries,
     its libraries and how they work together...
 
@@ -73,7 +101,7 @@ Tools
     This tool reads the fd (function description) files Commodore supplied for
     all of their libraries and dumps their contents in different formats
     including a code structure used in vamos.
-    
+
     You can query functions and find their jump table offset.
 
 
@@ -98,4 +126,4 @@ Libraries
     file data for further processing. I support file trees on the file system,
     in lha archives or in adf disk images
 
-    
+

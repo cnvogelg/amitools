@@ -2,13 +2,13 @@ import time
 import struct
 
 class AmigaResident:
-  
+
   match_word = 0x4afc
-  
+
   RTF_AUTOINIT = 1<<7
-  
+
   NT_LIBRARY = 9
-  
+
   INIT_BYTE_B = 0xa0
   INIT_BYTE_W = 0xe0
   INIT_WORD_B = 0x90
@@ -16,22 +16,22 @@ class AmigaResident:
   INIT_LONG_B = 0x80
   INIT_LONG_W = 0xc0
   INIT_END = 0
-  
+
   def __init__(self, addr, size, mem):
     self.addr = addr
     self.size = size
     self.mem  = mem
     self.data = mem.access.r_data(addr, size)
-  
+
   def r32(self, off):
     return struct.unpack_from(">I",self.data,off)[0]
 
   def r16(self, off):
     return struct.unpack_from(">H",self.data,off)[0]
-  
+
   def r8(self, off):
     return struct.unpack_from("B",self.data,off)[0]
-  
+
   # return array of resident structure addresses
   def find_residents(self, only_first=True):
     off = 0
@@ -59,13 +59,13 @@ class AmigaResident:
           res['auto_init'] = res['flags'] & self.RTF_AUTOINIT == self.RTF_AUTOINIT
           res['name'] = self.mem.access.r_cstr(res['name_ptr'])
           res['id'] = self.mem.access.r_cstr(res['id_ptr'])
-          
+
           finds.append(res)
-          
+
           # only first?
           if only_first:
             break
-          
+
           skip = a.r32(off+6) - self.addr
           off = skip
         else:
@@ -73,7 +73,7 @@ class AmigaResident:
       else:
         off += 2
     return finds
-  
+
   # create a memory block with the auto init data
   def read_auto_init_data(self, res, all_mem):
     # make sure its auto init
@@ -87,13 +87,13 @@ class AmigaResident:
     res['vectors_ptr'] = a.r32(addr+4)
     res['struct_ptr'] = a.r32(addr+8)
     res['init_code_ptr'] = a.r32(addr+12)
-    
+
     # parse vectors, structs
     res['vectors'] = self.parse_vectors(res['vectors_ptr'], all_mem)
     res['struct'] = self.parse_struct(res['struct_ptr'], all_mem)
-    
+
     return True
-  
+
   def parse_struct(self, addr, mem):
     res = []
     if addr == 0:
@@ -135,7 +135,7 @@ class AmigaResident:
       else:
         raise ValueError("Invalid parse_struct command: %02x" % cmd)
     return res
-  
+
   def parse_vectors(self, addr, all_mem):
     a = all_mem.access
     is_word = (a.r16(addr) == 0xffff)

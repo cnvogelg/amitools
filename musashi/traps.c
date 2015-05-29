@@ -11,14 +11,17 @@
 #define NUM_TRAPS  0x1000
 #define TRAP_MASK  0x0fff
 
+
+
 struct entry {
   union {
     trap_func_t trap;
     struct entry *next;
   };
+  void *data;
   int flags;
 };
-typedef struct entry entry_t; 
+typedef struct entry entry_t;
 
 static entry_t traps[NUM_TRAPS];
 static entry_t *first_free;
@@ -27,15 +30,16 @@ static int trap_aline(uint opcode, uint pc)
 {
   uint off = opcode & TRAP_MASK;
   trap_func_t func = traps[off].trap;
+  void *data = traps[off].data;
   int flags = traps[off].flags;
 
-  func(opcode, pc);
+  func(opcode, pc, data);
 
   /* a one shot trap is removed after it is triggered */
   if(flags & TRAP_ONE_SHOT) {
     trap_free(off);
   }
-  
+
   if(flags & TRAP_AUTO_RTS) {
     return M68K_ALINE_RTS;
   } else {
@@ -53,12 +57,12 @@ void trap_init(void)
     traps[i].next = &traps[i+1];
   }
   traps[NUM_TRAPS-1].next = NULL;
-  
+
   /* setup my trap handler */
   m68k_set_aline_hook_callback(trap_aline);
 }
 
-int trap_setup(trap_func_t func, int flags)
+int trap_setup(trap_func_t func, int flags, void *data)
 {
   int off;
 
@@ -66,14 +70,15 @@ int trap_setup(trap_func_t func, int flags)
   if(first_free == NULL) {
     return -1;
   }
-  
+
   off = (int)(first_free - traps);
-  
+
   /* new first free */
   first_free = traps[off].next;
-  
+
   /* store trap function */
   traps[off].trap = func;
+  traps[off].data = data;
   traps[off].flags = flags;
 
   return off;

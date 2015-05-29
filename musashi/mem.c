@@ -19,37 +19,52 @@ static uint     ram_pages;
 
 static read_func_t    r_func[NUM_PAGES][3];
 static write_func_t   w_func[NUM_PAGES][3];
+static void *         r_ctx[NUM_PAGES][3];
+static void *         w_ctx[NUM_PAGES][3];
 
 static invalid_func_t invalid_func;
+static void *invalid_ctx;
 static int mem_trace = 0;
 static trace_func_t trace_func;
+static void *trace_ctx;
 static int is_end = 0;
 static uint special_page = NUM_PAGES;
 
+/* ----- RAW Access ----- */
+extern uint8_t *mem_raw_ptr(void)
+{
+  return ram_data;
+}
+
+extern uint mem_raw_size(void)
+{
+  return ram_size;
+}
+
 /* ----- Default Funcs ----- */
-static void default_invalid(int mode, int width, uint addr)
+static void default_invalid(int mode, int width, uint addr, void *ctx)
 {
   printf("INVALID: %c(%d): %06x\n",(char)mode,width,addr);
 }
 
-static int default_trace(int mode, int width, uint addr, uint val)
+static int default_trace(int mode, int width, uint addr, uint val, void *ctx)
 {
   printf("%c(%d): %06x: %x\n",(char)mode,width,addr,val);
   return 0;
 }
 
 /* ----- End Access ----- */
-static uint rx_end(uint addr)
+static uint rx_end(uint addr, void *ctx)
 {
   return 0;
 }
 
-static uint r16_end(uint addr)
+static uint r16_end(uint addr, void *ctx)
 {
   return 0x4e70; // RESET opcode
 }
 
-static void wx_end(uint addr, uint val)
+static void wx_end(uint addr, uint val, void *ctx)
 {
   // do nothing
 }
@@ -69,73 +84,73 @@ static void set_all_to_end(void)
   is_end = 1;
 }
 
-static uint r8_fail(uint addr)
+static uint r8_fail(uint addr, void *ctx)
 {
-  invalid_func('R', 0, addr);
+  invalid_func('R', 0, addr, invalid_ctx);
   set_all_to_end();
   return 0;
 }
 
-static uint r16_fail(uint addr)
+static uint r16_fail(uint addr, void *ctx)
 {
-  invalid_func('R', 1, addr);
+  invalid_func('R', 1, addr, invalid_ctx);
   set_all_to_end();
   return 0;
 }
 
-static uint r32_fail(uint addr)
+static uint r32_fail(uint addr, void *ctx)
 {
-  invalid_func('R', 2, addr);
+  invalid_func('R', 2, addr, invalid_ctx);
   set_all_to_end();
   return 0;
 }
 
-static void w8_fail(uint addr, uint val)
+static void w8_fail(uint addr, uint val, void *ctx)
 {
-  invalid_func('W', 0, addr);
+  invalid_func('W', 0, addr, invalid_ctx);
   set_all_to_end();
 }
 
-static void w16_fail(uint addr, uint val)
+static void w16_fail(uint addr, uint val, void *ctx)
 {
-  invalid_func('W', 1, addr);
+  invalid_func('W', 1, addr, invalid_ctx);
   set_all_to_end();
 }
 
-static void w32_fail(uint addr, uint val)
+static void w32_fail(uint addr, uint val, void *ctx)
 {
-  invalid_func('W', 2, addr);
+  invalid_func('W', 2, addr, invalid_ctx);
   set_all_to_end();
 }
 
 /* ----- RAM access ----- */
-static uint r8_ram(uint addr)
+static uint mem_r8_ram(uint addr, void *ctx)
 {
   return ram_data[addr];
 }
 
-static uint r16_ram(uint addr)
+static uint mem_r16_ram(uint addr, void *ctx)
 {
   return (ram_data[addr] << 8) | ram_data[addr+1];
 }
 
-static uint r32_ram(uint addr)
+static uint mem_r32_ram(uint addr, void *ctx)
 {
   return (ram_data[addr] << 24) | (ram_data[addr+1] << 16) | (ram_data[addr+2] << 8) | (ram_data[addr+3]);
 }
 
-static void w8_ram(uint addr, uint val)
+static void mem_w8_ram(uint addr, uint val, void *ctx)
 {
   ram_data[addr] = val;
 }
 
-static void w16_ram(uint addr, uint val)
+static void mem_w16_ram(uint addr, uint val, void *ctx)
 {
   ram_data[addr] = val >> 8;
   ram_data[addr+1] = val & 0xff;
 }
 
-static void w32_ram(uint addr, uint val)
+static void mem_w32_ram(uint addr, uint val, void *ctx)
 {
   ram_data[addr]   = val >> 24;
   ram_data[addr+1] = (val >> 16) & 0xff;
@@ -148,9 +163,9 @@ static void w32_ram(uint addr, uint val)
 unsigned int  m68k_read_memory_8(unsigned int address)
 {
   uint page = address >> 16;
-  uint val = r_func[page][0](address);
+  uint val = r_func[page][0](address, r_ctx[page][0]);
   if(mem_trace) {
-    if(trace_func('R',0,address,val)) {
+    if(trace_func('R',0,address,val,trace_ctx)) {
       set_all_to_end();
     }
   }
@@ -160,9 +175,9 @@ unsigned int  m68k_read_memory_8(unsigned int address)
 unsigned int  m68k_read_memory_16(unsigned int address)
 {
   uint page = address >> 16;
-  uint val = r_func[page][1](address);
+  uint val = r_func[page][1](address, r_ctx[page][1]);
   if(mem_trace) {
-    if(trace_func('R',1,address,val)) {
+    if(trace_func('R',1,address,val,trace_ctx)) {
       set_all_to_end();
     }
   }
@@ -172,9 +187,9 @@ unsigned int  m68k_read_memory_16(unsigned int address)
 unsigned int  m68k_read_memory_32(unsigned int address)
 {
   uint page = address >> 16;
-  uint val = r_func[page][2](address);
+  uint val = r_func[page][2](address, r_ctx[page][2]);
   if(mem_trace) {
-    if(trace_func('R',2,address,val)) {
+    if(trace_func('R',2,address,val,trace_ctx)) {
       set_all_to_end();
     }
   }
@@ -184,9 +199,9 @@ unsigned int  m68k_read_memory_32(unsigned int address)
 void m68k_write_memory_8(unsigned int address, unsigned int value)
 {
   uint page = address >> 16;
-  w_func[page][0](address, value);
+  w_func[page][0](address, value, w_ctx[page][0]);
   if(mem_trace) {
-    if(trace_func('W',0,address,value)) {
+    if(trace_func('W',0,address,value,trace_ctx)) {
       set_all_to_end();
     }
   }
@@ -195,9 +210,9 @@ void m68k_write_memory_8(unsigned int address, unsigned int value)
 void m68k_write_memory_16(unsigned int address, unsigned int value)
 {
   uint page = address >> 16;
-  w_func[page][1](address, value);
+  w_func[page][1](address, value, w_ctx[page][1]);
   if(mem_trace) {
-    if(trace_func('W',1,address,value)) {
+    if(trace_func('W',1,address,value,trace_ctx)) {
       set_all_to_end();
     }
   }
@@ -206,9 +221,9 @@ void m68k_write_memory_16(unsigned int address, unsigned int value)
 void m68k_write_memory_32(unsigned int address, unsigned int value)
 {
   uint page = address >> 16;
-  w_func[page][2](address, value);
+  w_func[page][2](address, value, w_ctx[page][2]);
   if(mem_trace) {
-    if(trace_func('W',2,address,value)) {
+    if(trace_func('W',2,address,value,trace_ctx)) {
       set_all_to_end();
     }
   }
@@ -219,14 +234,14 @@ void m68k_write_memory_32(unsigned int address, unsigned int value)
 unsigned int m68k_read_disassembler_16 (unsigned int address)
 {
   uint page = address >> 16;
-  uint val = r_func[page][1](address);
+  uint val = r_func[page][1](address, r_ctx[page][1]);
   return val;
 }
 
 unsigned int m68k_read_disassembler_32 (unsigned int address)
 {
   uint page = address >> 16;
-  uint val = r_func[page][2](address);
+  uint val = r_func[page][2](address, r_ctx[page][1]);
   return val;
 }
 
@@ -241,12 +256,12 @@ int mem_init(uint ram_size_kib)
 
   for(i=0;i<NUM_PAGES;i++) {
     if(i < ram_pages) {
-      r_func[i][0] = r8_ram;
-      r_func[i][1] = r16_ram;
-      r_func[i][2] = r32_ram;
-      w_func[i][0] = w8_ram;
-      w_func[i][1] = w16_ram;
-      w_func[i][2] = w32_ram;
+      r_func[i][0] = mem_r8_ram;
+      r_func[i][1] = mem_r16_ram;
+      r_func[i][2] = mem_r32_ram;
+      w_func[i][0] = mem_w8_ram;
+      w_func[i][1] = mem_w16_ram;
+      w_func[i][2] = mem_w32_ram;
     } else {
       r_func[i][0] = r8_fail;
       r_func[i][1] = r16_fail;
@@ -256,7 +271,7 @@ int mem_init(uint ram_size_kib)
       w_func[i][2] = w32_fail;
     }
   }
-  
+
   trace_func = default_trace;
   invalid_func = default_invalid;
 
@@ -269,9 +284,10 @@ void mem_free(void)
   ram_data = NULL;
 }
 
-void mem_set_invalid_func(invalid_func_t func)
+void mem_set_invalid_func(invalid_func_t func, void *ctx)
 {
   invalid_func = func;
+  invalid_ctx = ctx;
 }
 
 void mem_set_trace_mode(int on)
@@ -279,9 +295,10 @@ void mem_set_trace_mode(int on)
   mem_trace = on;
 }
 
-void mem_set_trace_func(trace_func_t func)
+void mem_set_trace_func(trace_func_t func, void *ctx)
 {
   trace_func = func;
+  trace_ctx = ctx;
 }
 
 int mem_is_end(void)
@@ -299,63 +316,16 @@ uint mem_reserve_special_range(uint num_pages)
   return begin_page << 16;
 }
 
-void mem_set_special_range_read_func(uint page_addr, uint width, read_func_t func)
+void mem_set_special_range_read_func(uint page_addr, uint width, read_func_t func, void *ctx)
 {
   uint page = page_addr >> 16;
   r_func[page][width] = func;
+  r_ctx[page][width] = ctx;
 }
 
-void mem_set_special_range_write_func(uint page_addr, uint width, write_func_t func)
+void mem_set_special_range_write_func(uint page_addr, uint width, write_func_t func, void *ctx)
 {
   uint page = page_addr >> 16;
   w_func[page][width] = func;
-}
-
-/* ----- RAM Access ----- */
-
-uint mem_ram_read(int mode, uint addr)
-{
-  uint val = 0;
-  switch(mode) {
-    case 0:
-      val = r8_ram(addr);
-      break;
-    case 1:
-      val = r16_ram(addr);
-      break;
-    case 2:
-      val = r32_ram(addr);
-      break;
-  }
-  return val;
-}
-
-void mem_ram_write(int mode, uint addr, uint value)
-{
-  switch(mode) {
-    case 0:
-      w8_ram(addr, value);
-      break;
-    case 1:
-      w16_ram(addr, value);
-      break;
-    case 2:
-      w32_ram(addr, value);
-      break;
-  }
-}
-
-void mem_ram_read_block(uint addr, uint size, char *data)
-{
-  memcpy(data, ram_data + addr, size);
-}
-
-void mem_ram_write_block(uint addr, uint size, const char *data)
-{
-  memcpy(ram_data + addr, data, size);
-}
-
-void mem_ram_clear_block(uint addr, uint size, int value)
-{
-  memset(ram_data + addr, value, size);
+  w_ctx[page][width] = ctx;
 }

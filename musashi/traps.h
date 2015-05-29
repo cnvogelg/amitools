@@ -15,14 +15,17 @@
 #define TRAP_AUTO_RTS   2
 
 /* ------ Types ----- */
+#ifndef UINT_TYPE
+#define UINT_TYPE
 typedef unsigned int uint;
+#endif
 
-typedef void (*trap_func_t)(uint opcode, uint pc);
+typedef void (*trap_func_t)(uint opcode, uint pc, void *data);
 
 /* ----- API ----- */
 extern void trap_init(void);
 
-extern int  trap_setup(trap_func_t func, int flags);
+extern int  trap_setup(trap_func_t func, int flags, void *data);
 extern void trap_free(int id);
 
 #endif

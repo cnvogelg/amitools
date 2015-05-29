@@ -1,9 +1,8 @@
-BUILD
-libmusashi.*
-m68kmake
 m68kopac.c
 m68kopdm.c
 m68kopnz.c
 m68kops.c
 m68kops.h
-*.obj
+emu.c
+emu.so
+build

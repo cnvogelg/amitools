@@ -11,9 +11,8 @@ import argparse
 import os
 
 from musashi import m68k
+from musashi import emu
 
-from amitools.vamos.CPU import CPU
-from amitools.vamos.MEM import MEM
 from amitools.vamos.Log import *
 from amitools.vamos.Vamos import Vamos
 from amitools.vamos.Exceptions import *
@@ -23,70 +22,6 @@ from amitools.vamos.PathManager import PathManager
 from amitools.vamos.VamosRun import VamosRun
 from amitools.vamos.Process import Process
 
-# ----- classes -----
-
-class MusashiCPU(CPU):
-  def __init__(self):
-    CPU.__init__(self,"musashi")
-    m68k.cpu_init()
-    m68k.trap_init()
-  def w_reg(self,reg, val):
-    m68k.set_reg(reg,val)
-  def r_reg(self,reg):
-    return m68k.get_reg(reg)
-  def w_pc(self, val):
-    m68k.set_reg(m68k.M68K_REG_PC,val)
-  def r_pc(self):
-    return m68k.get_reg(m68k.M68K_REG_PC)
-  def w_sr(self, val):
-    m68k.set_reg(m68k.M68K_REG_SR,val)
-  def r_sr(sefl):
-    return m68k.get_reg(m68k.M68K_REG_SR)
-  def pulse_reset(self):
-    m68k.pulse_reset()
-  def execute(self, num_cycles):
-    return m68k.execute(num_cycles)
-  def end(self):
-    m68k.end_timeslice()
-  def trap_setup(self, func, auto_rts=False, one_shot=False):
-    flags = m68k.TRAP_DEFAULT
-    if auto_rts:
-      flags |= m68k.TRAP_AUTO_RTS
-    if one_shot:
-      flags |= m68k.TRAP_ONE_SHOT
-    return m68k.trap_setup(func, flags)
-  def trap_free(self, tid):
-    m68k.trap_free(tid)
-
-class MusashiMEM(MEM):
-  def __init__(self):
-    MEM.__init__(self,"musashi")
-  def init(self,ram_size_kib):
-    self.ram_size = ram_size_kib * 1024
-    return m68k.mem_init(ram_size_kib)
-  def free(self):
-    m68k.mem_free()
-  def reserve_special_range(self,num_pages):
-    return m68k.mem_reserve_special_range(num_pages)
-  def set_special_range_read_func(self,page_addr, width, func):
-    m68k.mem_set_special_range_read_func(page_addr, width, func)
-  def set_special_range_write_func(self,page_addr, width, func):
-    m68k.mem_set_special_range_write_func(page_addr, width, func)
-  def set_mem_trace_mode(self,on):
-    m68k.mem_set_trace_mode(on)
-  def set_mem_trace_func(self,func):
-    m68k.mem_set_trace_func(func)
-  def read_ram(self,width, addr):
-    return m68k.mem_ram_read(width, addr)
-  def write_ram(self,width, addr, val):
-    m68k.mem_ram_write(width,addr,val)
-  def read_ram_block(self,addr,size,data):
-    m68k.mem_ram_read_block(addr,size,data)
-  def write_ram_block(self,addr,size,data):
-    m68k.mem_ram_write_block(addr,size,data)
-  def clear_ram_block(self,addr,size,value):
-    m68k.mem_ram_clear_block(addr,size,value)
-  
 # ----- main -----------------------------------------------------------------
 # retrieve vamos home and data dir
 home_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
@@ -129,19 +64,31 @@ if not log_setup(cfg.logging, cfg.verbose, cfg.quiet, cfg.log_file):
 cfg.log()
 
 # ----- vamos! ---------------------------------------------------------------
-cpu = MusashiCPU()
-mem = MusashiMEM()
-log_main.info("setting up main memory with %s KiB RAM: top=%06x" % (cfg.ram_size, cfg.ram_size * 1024))
-if not mem.init(cfg.ram_size):
-  log_main.error("can't allocate vamos RAM: %d KiB" % cfg.ram_size)
+# setup CPU
+if cfg.cpu in ('68000', '000', '00'):
+  cpu_type = m68k.M68K_CPU_TYPE_68000
+elif cfg.cpu in ('68020', '020', '20'):
+  cpu_type = m68k.M68K_CPU_TYPE_68020
+else:
+  log_main.error("Invalid CPU type: %s" % cfg.cpu)
   sys.exit(1)
-  
-vamos = Vamos(mem, cpu, cfg)
+log_main.info("setting up CPU: %s = %d" % (cfg.cpu, cpu_type))
+cpu = emu.CPU(cpu_type)
+
+# setup memory
+mem = emu.Memory(cfg.ram_size)
+log_main.info("setting up main memory with %s KiB RAM: top=%06x" % (cfg.ram_size, cfg.ram_size * 1024))
+
+# setup traps
+traps = emu.Traps()
+
+# combine to vamos instance
+vamos = Vamos(mem, cpu, traps, cfg)
 
 # enable mem trace?
 if cfg.memory_trace:
-  mem.set_mem_trace_mode(1)
-  mem.set_mem_trace_func(vamos.label_mgr.trace_mem)
+  mem.set_trace_mode(1)
+  mem.set_trace_func(vamos.label_mgr.trace_mem)
   if not log_mem.isEnabledFor(logging.DEBUG):
     log_mem.setLevel(logging.DEBUG)
 # enable internal memory trace?
@@ -151,7 +98,7 @@ if cfg.internal_memory_trace:
     log_mem_int.setLevel(logging.INFO)
 
 # set invalid access handler for memory
-m68k.mem_set_invalid_func(vamos.error_tracker.report_invalid_memory)
+mem.set_invalid_func(vamos.error_tracker.report_invalid_memory)
 
 # --- setup vamos ---
 if not vamos.init(cfg):
@@ -164,21 +111,13 @@ if not proc.ok:
 vamos.set_main_process(proc)
 
 # ------ main loop ------
-# set CPU type
-if cfg.cpu in ('68000', '000', '00'):
-  m68k.set_cpu_type(m68k.M68K_CPU_TYPE_68000)
-elif cfg.cpu in ('68020', '020', '20'):
-  m68k.set_cpu_type(m68k.M68K_CPU_TYPE_68020)
-else:
-  log_main.error("Invalid CPU type: %s" % cfg.cpu)
-  sys.exit(1)
 
 # init cpu and initial registers
 run = VamosRun(vamos, args.benchmark)
 run.init_cpu()
 
 # set reset opcode/trap handler
-m68k.set_reset_instr_callback(run.reset_func)
+cpu.set_reset_instr_callback(run.reset_func)
 
 # enable instruction trace?
 def instr_hook():
@@ -188,15 +127,15 @@ def instr_hook():
     for r in res:
       log_instr.info(r)
   # disassemble line
-  pc = m68k.get_reg(m68k.M68K_REG_PC)
+  pc = cpu.r_reg(m68k.M68K_REG_PC)
   label = vamos.label_mgr.get_mem_str(pc)
-  txt = m68k.disassemble(pc, m68k.M68K_CPU_TYPE_68000)
+  _,txt = cpu.disassemble(pc)
   log_instr.info("%-40s  %06x    %s" % (label, pc, txt))
 
 if cfg.instr_trace:
   if not log_instr.isEnabledFor(logging.INFO):
     log_instr.setLevel(logging.INFO)
-  m68k.set_instr_hook_callback(instr_hook)
+  cpu.set_instr_hook_callback(instr_hook)
 
 # main loop
 exit_code = run.run(cfg.cycles_per_block, cfg.max_cycles)
@@ -207,8 +146,6 @@ proc.free()
 # shutdown vamos
 vamos.cleanup()
 
-# clean up native memory module
-mem.free()
-
 # exit
+log_main.info("vamos is exiting")
 sys.exit(exit_code)

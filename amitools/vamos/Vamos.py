@@ -25,12 +25,13 @@ from Log import *
 from CPU import *
 
 class Vamos:
-  
-  def __init__(self, raw_mem, cpu, cfg):
+
+  def __init__(self, raw_mem, cpu, traps, cfg):
     self.raw_mem = raw_mem
-    self.ram_size = raw_mem.ram_size
+    self.ram_size = raw_mem.get_ram_size() * 1024 # in bytes
     self.cpu = cpu
     self.cpu_type = cfg.cpu
+    self.traps = traps
     self.path_mgr = PathManager( cfg )
 
     # create a label manager and error tracker
@@ -41,7 +42,7 @@ class Vamos:
     # set a label for first two dwords
     label = LabelRange("zero_page",0,8)
     self.label_mgr.add_label(label)
-    
+
     # create memory access
     self.mem = MainMemory(self.raw_mem, self.error_tracker)
     self.mem.ctx = self
@@ -49,13 +50,13 @@ class Vamos:
     # create memory allocator
     self.mem_begin = 0x1000
     self.alloc = MemoryAlloc(self.mem, 0, self.ram_size, self.mem_begin, self.label_mgr)
-    
+
     # create segment loader
     self.seg_loader = SegmentLoader( self.mem, self.alloc, self.label_mgr, self.path_mgr )
 
     # lib manager
     self.lib_mgr = LibManager( self.label_mgr, cfg)
-    
+
     # no current process right now
     self.process = None
     self.proc_list = []
@@ -70,24 +71,24 @@ class Vamos:
   def cleanup(self):
     self.close_exec_lib()
     self.alloc.dump_orphans()
-  
+
   # ----- process handling -----
-  
+
   def _set_this_task(self, proc):
     """tell exec about this process and all others referencing process from here"""
     self.process = proc
     self.exec_lib.set_this_task(proc)
-  
+
   def set_main_process(self, proc):
     log_proc.info("set main process: %s", proc)
     self.proc_list.append(proc)
     self._set_this_task(proc)
-  
+
   def start_sub_process(self, proc):
     log_proc.info("start sub process: %s", proc)
     self.proc_list.append(proc)
     self._set_this_task(proc)
-    
+
     # setup trampoline to enter sub process
     tr = Trampoline(self, "SubProcJump")
 
@@ -136,9 +137,9 @@ class Vamos:
     proc = self.proc_list.pop()
     log_proc.info("stop sub process: %s ret_code=%d", proc, ret_code)
     proc.free()
-    
+
   # ----- init environment -----
-  
+
   def init_managers(self):
     self.doslist_base = self.mem.reserve_special_range()
     self.doslist_size = 0x010000
@@ -151,14 +152,14 @@ class Vamos:
     volumes = self.path_mgr.get_all_volume_names()
     for vol in volumes:
       self.doslist_mgr.add_volume(vol)
-    
+
     self.lock_base = self.mem.reserve_special_range()
     self.lock_size = 0x010000
     self.lock_mgr = LockManager(self.path_mgr, self.doslist_mgr, self.lock_base, self.lock_size)
     self.label_mgr.add_label(self.lock_mgr)
     self.mem.set_special_range_read_funcs(self.lock_base, r32=self.lock_mgr.r32_lock)
     log_mem_init.info(self.lock_mgr)
-    
+
     self.file_base = self.mem.reserve_special_range()
     self.file_size = 0x010000
     self.file_mgr = FileManager(self.path_mgr, self.file_base, self.file_size)

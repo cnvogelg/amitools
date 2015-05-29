@@ -4,7 +4,7 @@ from CPU import *
 from Log import log_tp
 
 class Trampoline:
-  
+
   def __init__(self, ctx, name):
     self.ctx = ctx
     self.cpu = ctx.cpu
@@ -12,7 +12,7 @@ class Trampoline:
     self.mem = None
 
     self.code = [] # words for code
-    self.data = [] # 
+    self.data = [] #
     self.code_size = 0
     self.data_size = 0
     self.code_addr = None
@@ -26,21 +26,21 @@ class Trampoline:
   def get_code_offset(self):
     """before done() you can get the current code offset"""
     return self.code_size
-  
+
   def get_code_addr(self, offset):
     """after done() you can query the absolute address of an offset"""
     return self.code_addr + offset
 
   # ----- trampoline commands -----
-  
+
   def save_all(self):
     self.code.extend([0x48e7, 0xfffe]) # movem.l d0-d7/a0-a6,-(sp)
     self.code_size += 4
-  
+
   def restore_all(self):
     self.code.extend([0x4cdf, 0x7fff]) # movem.l (sp)+,d0-d7/a0-a6
     self.code_size += 4
-    
+
   def save_all_but_d0(self):
     self.code.extend([0x48e7, 0x7ffe]) # movem.l d1-d7/a0-a6,-(sp)
     self.code_size += 4
@@ -52,7 +52,7 @@ class Trampoline:
   def rts(self):
     self.code.append(0x4e75) # rts
     self.code_size += 2
-  
+
   def final_rts(self, final_func=None):
     self.code.append(('trap',final_func,True,True))
     self.code_size += 2 # a-line opcode
@@ -60,7 +60,7 @@ class Trampoline:
   def trap(self, func, auto_rts=False):
     self.code.append(('trap',func,auto_rts,False))
     self.code_size += 2 # a-line opcode
-  
+
   def set_dx_l(self, num, val):
     op = 0x203c # move.l #LONG, d0
     op += num * 0x200
@@ -68,7 +68,7 @@ class Trampoline:
     lo = val & 0xffff
     self.code.extend([op, hi, lo])
     self.code_size += 6
-  
+
   def set_ax_l(self, num, val):
     op = 0x41f9 # lea.l LONG, a0
     op += num * 0x200
@@ -76,7 +76,7 @@ class Trampoline:
     lo = val & 0xffff
     self.code.extend([op, hi, lo])
     self.code_size += 6
-  
+
   def jsr(self, addr):
     hi = (addr >> 16) & 0xffff
     lo = addr & 0xffff
@@ -88,7 +88,7 @@ class Trampoline:
     lo = addr & 0xffff
     self.code.extend([0x4ef9, hi, lo]) # jmp LONG
     self.code_size += 6
-  
+
   def write_ax_l(self, num, addr, is_data_offset=False):
     op = 0x23c8 # move.l ax, addr.l
     op += num
@@ -99,7 +99,7 @@ class Trampoline:
     else:
       self.code.extend([op, hi, lo])
     self.code_size += 6
-    
+
   def read_ax_l(self, num, addr, is_data_offset=False):
     op = 0x2079 # movea.l addr.l, ax
     op += num * 0x200
@@ -110,7 +110,7 @@ class Trampoline:
     else:
       self.code.extend([op, hi, lo])
     self.code_size += 6
-  
+
   # ----- data commands (return offset) -----
 
   def dc_b(self, b):
@@ -135,7 +135,7 @@ class Trampoline:
     return pos
 
   # ----- internals -----
-  
+
   def _gen_trap_func(self, trap_func):
     """add a user defined trap function and surround it with logging"""
     def tf(op,pc):
@@ -143,7 +143,7 @@ class Trampoline:
       trap_func()
       log_tp.debug("#%s } trap: %s",self.name, trap_func.__name__)
     return tf
-  
+
   def _gen_trap_cleanup(self, mem, trap_func):
     """clean up function that removes trap memory on final_rts"""
     def tf(op,pc):
@@ -163,12 +163,12 @@ class Trampoline:
     else:
       tf = self._gen_trap_func(func)
     # create a trap
-    code = self.ctx.cpu.trap_setup(tf, one_shot=True, auto_rts=auto_rts)
+    code = self.ctx.traps.setup(tf, one_shot=True, auto_rts=auto_rts)
     if code == -1:
       raise VamosInternalError("No more traps for trampoline left!")
     # place trap opcode
     opcode = 0xa000 | code
-    self.mem.access.write_mem(1, addr, opcode)
+    self.mem.access.w16(addr, opcode)
     if final:
       log_tp.debug("#%s: final trap: opcode=%04x @%08x", self.name, opcode, addr)
 
@@ -177,7 +177,7 @@ class Trampoline:
     size = self.code_size + self.data_size
     self.mem = self.ctx.alloc.alloc_memory(self.name, size)
     addr = self.mem.addr
-    log_tp.debug("#%s: @%06x: allocating %d bytes (code=%d, data=%d)", 
+    log_tp.debug("#%s: @%06x: allocating %d bytes (code=%d, data=%d)",
       self.name, addr, size, self.code_size, self.data_size)
 
     # abs addresses of code and data
@@ -197,14 +197,14 @@ class Trampoline:
         elif special == 'data_offset':
           offset = w[1]
           data_addr = self.data_addr + offset
-          self.mem.access.write_mem(2, addr, data_addr)
+          self.mem.access.w32(addr, data_addr)
           addr += 4
         # --- unknown special ---
         else:
           raise VamosInternalError("Invalid special: %s" % special)
       # === normal code word ===
       else:
-        self.mem.access.write_mem(1, addr, w)
+        self.mem.access.w16(addr, w)
         addr += 2
 
     # now write data
