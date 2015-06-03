@@ -144,6 +144,7 @@ class LibManager():
         self._register_open_lib(lib)
         lib.inc_usage()
 
+    self.lib_log("open_lib","leaving open_lib(): %s" % lib, level=logging.DEBUG)
     return lib
 
   # return instance or null
@@ -201,10 +202,18 @@ class LibManager():
 
   def _open_native_lib(self, lib, ctx, tr):
     """call Open() on native lib"""
-    open_addr = lib.vectors[0]
     lib_base = lib.addr_base
-    self.lib_log("open_lib","trampoline: open @%06x (lib_base/a6=%06x)" % (open_addr,lib_base), level=logging.DEBUG)
+    if lib_base != 0:
+      # RTF_AUTOINIT lib already knows the lib_base and the open vector
+      open_addr = lib.vectors[0]
+      self.lib_log("open_lib","trampoline: open @%06x (lib_base/a6=%06x)" % (open_addr,lib_base), level=logging.DEBUG)
+    else:
+      # RT_INIT lib does not know address yet - will be patched later
+      open_addr = 0
+      self.lib_log("open_lib","trampoline: open - needs patch", level=logging.DEBUG)
     tr.save_all()
+    # we save an offset to lib_base patching later on
+    lib.patch_off_open = tr.get_code_offset()
     tr.set_ax_l(6, lib_base)
     tr.jsr(open_addr)
     # fetch the result (the lib base might have been altered)
@@ -225,8 +234,8 @@ class LibManager():
   def _close_native_lib(self, lib, ctx, tr):
     """call Close() on native lib"""
     # add Close() call to trampoline
-    close_addr = lib.vectors[1]
     lib_base = lib.addr_base_open
+    close_addr = ctx.mem.access.r32(lib_base - 10) # LVO_Close
     self.lib_log("close_lib","trampoline: close @%06x (lib_base/a6=%06x)" % (close_addr,lib_base), level=logging.DEBUG)
     tr.save_all()
     tr.set_ax_l(6, lib_base)
@@ -279,13 +288,57 @@ class LibManager():
     lib_name = res['name']
     lib_id = res['id']
     lib.mem_version = res['version']
-    auto_init = res['auto_init']
-    self.lib_log("load_lib", "found resident: name='%s' id='%s' in %.4fs" % (lib_name, lib_id, delta), level=logging.DEBUG)
+    lib.auto_init = res['auto_init']
+    init_ptr = res['init_ptr']
+    self.lib_log("load_lib", "found resident: name='%s' id='%s' auto_init=%s init_ptr=%08x in %.4fs"
+      % (lib_name, lib_id, lib.auto_init, init_ptr, delta), level=logging.DEBUG)
 
+    # has RTF_AUTOINIT?
+    if lib.auto_init:
+      if not self._auto_init_native_lib(lib, ar, res, ctx, tr):
+        return None
+    # or has RT_INIT?
+    elif init_ptr != 0:
+      self._rtinit_native_lib(lib, ctx, tr, init_ptr)
+    # hmm, no RTF_AUTOINIT and no RT_INIT?
+    else:
+      self.lib_log("load_lib", "neither RTF_AUTOINIT nor RT_INIT found!", level=logging.ERROR)
+      return None
+
+    return lib
+
+  def _rtinit_native_lib(self, lib, ctx, tr, init_ptr):
+    """library init done for RT_INIT style lib"""
+    exec_base = ctx.mem.access.r32(4)
+    seg_list = lib.seg_list.b_addr
+    tr.save_all()
+    tr.set_dx_l(0, 0) # D0=0
+    tr.set_ax_l(0, seg_list) # A0 = SegList
+    tr.set_ax_l(6, exec_base) # A6 = ExecBase
+    tr.jsr(init_ptr)
+    def trap_init_done():
+      self._rtinit_done_native_lib(lib, ctx)
+    tr.trap(trap_init_done)
+    tr.restore_all()
+    self.lib_log("load_lib", "trampoline: RT_INIT @%06x (d0=0 seg_list/a0=%06x exec_base/a6=%06x)" % \
+      (init_ptr, seg_list, exec_base), level=logging.DEBUG)
+    # DEBUG
+    addr = seg_list << 2
+    sl_len = ctx.mem.access.r32(addr-4)
+    sl_next = ctx.mem.access.r32(addr)
+    self.lib_log("load_lib", "seglist: len=%d next=%4x" % (sl_len, sl_next))
+    self.lib_log("load_lib", "seglist: %s" % lib.seg_list)
+
+  def _rtinit_done_native_lib(self, lib, ctx):
+    lib_base = ctx.cpu.r_reg(REG_D0)
+    self.lib_log("load_lib", "RT_INIT done: d0=%08x" % lib_base, level=logging.DEBUG)
+    sys.exit(1)
+
+  def _auto_init_native_lib(self, lib, ar, res, ctx, tr):
     # read auto init infos
     if not ar.read_auto_init_data(res, ctx.mem):
       self.lib_log("load_lib","Error reading auto_init!", level=logging.ERROR)
-      return None
+      return False
 
     # get library base info
     lib.vectors = res['vectors']
@@ -311,24 +364,26 @@ class LibManager():
       # now prepare to execute library init code
       # setup trampoline to call init routine of library
       # D0 = lib_base, A0 = seg_list, A6 = exec base
+      seg_list = lib.seg_list.b_addr
       exec_base = ctx.mem.access.r32(4)
+      lib_base = lib.addr_base
       tr.save_all()
-      tr.set_dx_l(0, lib.addr_base)
-      tr.set_ax_l(0, lib.seg_list.b_addr) # baddr!
+      tr.set_dx_l(0, lib_base)
+      tr.set_ax_l(0, seg_list) # baddr!
       tr.set_ax_l(6, exec_base)
       tr.jsr(init_addr)
       tr.restore_all()
       def trap_create_native_lib():
-        self._create_native_lib_part2(lib, ctx)
+        self._auto_init_done_native_lib(lib, ctx)
       tr.trap(trap_create_native_lib)
       self.lib_log("load_lib", "trampoline: init @%06x (lib_base/d0=%06x seg_list/a0=%06x exec_base/a6=%06x)" % \
-        (init_addr, lib.addr_base, seg0.addr, exec_base), level=logging.DEBUG)
+        (init_addr, lib_base, seg_list, exec_base), level=logging.DEBUG)
     else:
       self._create_native_lib_part2(lib, ctx)
 
-    return lib
+    return True
 
-  def _create_native_lib_part2(self, lib, ctx):
+  def _auto_init_done_native_lib(self, lib, ctx):
     self.lib_log("load_lib", "done loading native lib: %s" % lib)
     # Set up lib_Node
     lib.lib_access.w_s("lib_Node.ln_Succ", lib.addr_base)
@@ -344,9 +399,9 @@ class LibManager():
 
   def _free_native_lib(self, lib, ctx, tr):
     # get expunge func
-    expunge_addr = lib.vectors[2]
     exec_base = ctx.mem.access.r32(4)
     lib_base = lib.addr_base
+    expunge_addr = ctx.mem.access.r32(lib_base - 16) # LVO_Expunge
     if expunge_addr != 0:
       # setup trampoline to call expunge and then part2 of unload
       tr.save_all()
