@@ -1,7 +1,7 @@
 from Exceptions import *
 from Log import log_mem_alloc
-from LabelRange import LabelRange
-from LabelStruct import LabelStruct
+from label.LabelRange import LabelRange
+from label.LabelStruct import LabelStruct
 from AccessStruct import AccessStruct
 
 class Memory:

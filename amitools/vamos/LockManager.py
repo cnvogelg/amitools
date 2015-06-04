@@ -3,7 +3,7 @@ import logging
 import stat
 
 from Log import log_lock
-from LabelRange import LabelRange
+from label.LabelRange import LabelRange
 from Exceptions import *
 from lib.dos.AmiTime import *
 from lib.dos.DosStruct import *
@@ -34,7 +34,7 @@ class LockManager(LabelRange):
     LabelRange.__init__(self, "locks", base_addr, size)
     self.lock_def  = FileLockDef
     self.lock_size = FileLockDef.get_size()
-  
+
   # direct read access to lock structure
   def r32_lock(self, addr):
     # find out associated file handle
@@ -60,7 +60,7 @@ class LockManager(LabelRange):
         if volume == None:
           raise VamosInternalError("No DosList entry found for volume '%s'" % volume_name)
         val = volume.baddr
-  
+
       self.trace_mem_int('R', 2, addr, val, text="LOCK", level=logging.INFO, addon=addon)
       return val
     else:
@@ -68,7 +68,7 @@ class LockManager(LabelRange):
       addon = "lock=B%06x  cur_lock=B%06x" % (b_addr, self.cur_addr >> 2)
       self.trace_mem_int('R', 2, addr, 0, text="LOCK??", level=logging.WARN, addon=addon)
       return 0
-  
+
   def _register_lock(self, lock):
     addr = self.cur_addr
     self.cur_addr += self.lock_size
@@ -76,7 +76,7 @@ class LockManager(LabelRange):
     lock.b_addr = addr >> 2
     self.locks_by_b_addr[lock.b_addr] = lock
     log_lock.info("registered: %s" % lock)
-    
+
   def _unregister_lock(self, lock):
     if not self.locks_by_b_addr.has_key(lock.b_addr):
       raise VamosInternalError("Lock %s not registered!" % lock)
@@ -87,7 +87,7 @@ class LockManager(LabelRange):
     log_lock.info("unregistered: %s" % lock)
     lock.b_addr = 0
     lock.addr = 0
-  
+
   def create_lock(self, ami_path, exclusive):
     if ami_path == '':
       ami_path = self.path_mgr.ami_abs_cur_path()
@@ -101,11 +101,11 @@ class LockManager(LabelRange):
     exists = os.path.exists(sys_path)
     if not exists:
       log_lock.info("lock '%s' invalid: sys path does not exist: '%s' -> '%s'", name, ami_path, sys_path)
-      return None      
+      return None
     lock = AmiLock(name, ami_path, sys_path, exclusive)
     self._register_lock(lock)
     return lock
-  
+
   def create_parent_lock(self, lock):
     # top level
     if lock.ami_path[-1] == ':':
@@ -116,7 +116,7 @@ class LockManager(LabelRange):
       return self.create_lock(ami_parent_path, False)
     else:
       return None
-    
+
   def get_by_b_addr(self, b_addr, none_if_missing=False):
     # current dir lock
     if b_addr == 0:
@@ -131,7 +131,7 @@ class LockManager(LabelRange):
         return None
       else:
         raise VamosInternalError("Invalid File Lock at b@%06x" % b_addr)
-  
+
   def release_lock(self, lock):
     if lock.b_addr != 0:
       self._unregister_lock(lock)
@@ -196,5 +196,5 @@ class LockManager(LabelRange):
 
     lock.dirent = None
     return ERROR_NO_MORE_ENTRIES
-    
-    
+
+

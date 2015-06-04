@@ -4,7 +4,7 @@ from amitools.hunk import Hunk
 from amitools.hunk.HunkReader import HunkReader
 from amitools.hunk.HunkRelocate import HunkRelocate
 from AccessMemory import AccessMemory
-from LabelRange import LabelRange
+from label.LabelRange import LabelRange
 from Log import *
 
 class Segment:
@@ -27,20 +27,20 @@ class SegList:
     self.prog_start = 0
     self.size = 0
     self.usage = 1
-  
+
   def add(self, segment):
     if len(self.segments) == 0:
       self.b_addr = (segment.addr+4) >> 2 # baddr of 'next' ptr
       self.prog_start = segment.addr + 8 # begin of first code segment
     self.segments.append(segment)
     self.size += segment.size
-    
+
   def __str__(self):
     return "[SegList:ami='%s':sys='%s':b_addr=%06x,prog=%06x,segs=#%d,size=%d,usage=%d]" % \
       (self.ami_bin_file, self.sys_bin_file, self.b_addr, self.prog_start, len(self.segments), self.size, self.usage)
 
 class SegmentLoader:
-  
+
   def __init__(self, mem, alloc, label_mgr, path_mgr):
     self.mem = mem
     self.alloc = alloc
@@ -48,10 +48,10 @@ class SegmentLoader:
     self.path_mgr = path_mgr
     self.error = None
     self.loaded_seg_lists = {}
-  
+
   def can_load_seg(self, ami_bin_file):
     return self.path_mgr.ami_command_to_sys_path(ami_bin_file) != None
-  
+
   # load ami_bin_file
   def load_seg(self, ami_bin_file):
     # map file name
@@ -70,11 +70,11 @@ class SegmentLoader:
     seg_list = self._load_seg(ami_bin_file,sys_bin_file)
     if seg_list == None:
       return None
-    
+
     # store in cache
     self.loaded_seg_lists[sys_bin_file] = seg_list
     return seg_list
-  
+
   # unload seg list
   def unload_seg(self, seg_list):
     sys_bin_file = seg_list.sys_bin_file
@@ -89,30 +89,30 @@ class SegmentLoader:
     else:
       self.error = "seglist not found in loaded seglists!"
       return False
-  
+
   # load sys_bin_file
   def _load_seg(self, ami_bin_file, sys_bin_file):
     base_name = os.path.basename(sys_bin_file)
     hunk_file = HunkReader()
-    
+
     # does file exist?
     if not os.path.isfile(sys_bin_file):
       self.error = "Can't find '%s'" % sys_bin_file
       return None
-    
+
     # read hunk file
     fobj = file(sys_bin_file, "rb")
     result = hunk_file.read_file_obj(sys_bin_file,fobj,None)
     if result != Hunk.RESULT_OK:
       self.error = "Error loading '%s'" % sys_bin_file
       return None
-      
+
     # build segments
     ok = hunk_file.build_segments()
     if not ok:
       self.error = "Error building segments for '%s'" % sys_bin_file
       return None
-      
+
     # make sure its a loadseg()
     if hunk_file.type != Hunk.TYPE_LOADSEG:
       self.error = "File not loadSeg()able: '%s'" % sys_bin_file
@@ -120,7 +120,7 @@ class SegmentLoader:
 
     # create relocator
     relocator = HunkRelocate(hunk_file)
-    
+
     # allocate segment memory
     sizes = relocator.get_sizes()
     names = relocator.get_type_names()
@@ -141,10 +141,10 @@ class SegmentLoader:
       seg = Segment(name, seg_addr, seg_size, label)
       seg_list.add(seg)
       addrs.append(seg.addr + 8) # begin of segment data/code
-    
+
     # relocate to addresses and return data
     datas = relocator.relocate(addrs)
-    
+
     # write to allocated memory
     last_addr = None
     for i in xrange(len(sizes)):
@@ -162,9 +162,9 @@ class SegmentLoader:
 
     # clear final 'next' pointer
     self.mem.access.w32(addr - 4, 0)
-    
+
     return seg_list
-    
+
   def _unload_seg(self, seg_list):
     for seg in seg_list.segments:
       # free memory of segment
@@ -172,4 +172,4 @@ class SegmentLoader:
       # remove label of segment
       if self.alloc.label_mgr != None:
         self.alloc.label_mgr.remove_label(seg.label)
-      
+

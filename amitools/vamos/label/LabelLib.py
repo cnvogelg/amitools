@@ -1,18 +1,17 @@
 from LabelStruct import LabelStruct
-from AccessStruct import AccessStruct
 import logging
 
 class LabelLib(LabelStruct):
-  
+
   op_jmp = 0x4ef9
   op_reset = 0x04e70
   op_rts = 0x4e75
-  
+
   def __init__(self, name, addr, size, lib_base, struct, lib):
     LabelStruct.__init__(self, name, addr, struct, size=size, offset=lib_base - addr)
     self.lib_base = lib_base
     self.lib = lib
-    
+
   def __str__(self):
     return "%s base=%06x" %(LabelStruct.__str__(self),self.lib_base)
 
@@ -41,7 +40,7 @@ class LabelLib(LabelStruct):
         self.trace_mem_int(mode, width, addr, val, text="JUMP", level=logging.INFO, addon=addon)
       # something inside jump table
       else:
-        self.trace_mem_int(mode, width, addr, val, text="LIB?!", level=logging.WARN)      
+        self.trace_mem_int(mode, width, addr, val, text="LIB?!", level=logging.WARN)
     else:
       # no use regular access
       LabelStruct.trace_mem(self, mode, width, addr, val)

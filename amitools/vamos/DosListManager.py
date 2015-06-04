@@ -1,6 +1,6 @@
 import logging
 from Log import log_doslist
-from LabelRange import LabelRange
+from label.LabelRange import LabelRange
 from lib.dos.DosStruct import *
 
 class DosListEntry:
@@ -18,10 +18,10 @@ class DosListManager(LabelRange):
     self.base_addr = base_addr
     self.cur_addr = base_addr
     log_doslist.info("init manager: base=%06x" % self.base_addr)
-    
+
     self.entries_by_b_addr = {}
     self.entries_by_name = {}
-    
+
     LabelRange.__init__(self, "doslist", base_addr, size)
     self.entry_device_def = DosListDeviceDef
     self.entry_volume_def = DosListVolumeDef
@@ -58,7 +58,7 @@ class DosListManager(LabelRange):
     self.entries_by_b_addr[entry.baddr] = entry
     self.entries_by_name[entry.name] = entry
     log_doslist.info("add entry: %s", entry)
-    
+
   def add_volume(self, name):
     entry = DosListEntry(name)
     self._add_entry(entry)

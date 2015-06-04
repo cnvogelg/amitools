@@ -1,14 +1,14 @@
 from DosStruct import *
 from PathMatch import PathMatch
-from amitools.vamos.LabelStruct import LabelStruct
+from amitools.vamos.label.LabelStruct import LabelStruct
 from amitools.vamos.AccessStruct import AccessStruct
 from Error import *
 
 class MatchFirstNext:
-  
+
   DODIR = 4
   DIDDIR = 8
-  
+
   def __init__(self, path_mgr, lock_mgr, pattern, anchor):
     self.path_mgr = path_mgr
     self.lock_mgr = lock_mgr
@@ -28,7 +28,7 @@ class MatchFirstNext:
     self.dir_lock = None
     self.name = None
     self.path = None
-  
+
   def first(self, ctx):
     # match first entry
     self.path = self.matcher.begin()
@@ -42,20 +42,20 @@ class MatchFirstNext:
     self.dir_lock = self.lock_mgr.create_lock(abs_path, False)
     if self.dir_lock == None:
       return ERROR_OBJECT_NOT_FOUND
-    
+
     # create base/last achain and set dir lock
     self.achain_dummy = ctx.alloc.alloc_struct("AChain_Dummy", AChainDef)
     self.anchor.w_s('ap_Last', self.achain_dummy.addr)
     self.anchor.w_s('ap_Base', self.achain_dummy.addr)
     self.achain_dummy.access.w_s('an_Lock', self.dir_lock.addr)
-    
+
     # fill first entry
     io_err = self._fill_fib(ctx, self.path)
-    
+
     # init stack
     self.dodir_stack = []
     return io_err
-  
+
   def _fill_fib(self, ctx, path):
     # fill FileInfo of first match in anchor
     lock = self.lock_mgr.create_lock(path, False)
@@ -68,7 +68,7 @@ class MatchFirstNext:
       path_ptr = self.anchor.s_get_addr('ap_Buf')
       self.anchor.w_cstr(path_ptr, path)
     return io_err
-  
+
   def _push_dodir(self, name, path):
     abs_path = self.path_mgr.ami_abs_path(path)
     dir_entries = self.path_mgr.ami_list_dir(path)
@@ -87,9 +87,9 @@ class MatchFirstNext:
         elif path[-1] in (':','/'):
           sub_path = path + sub_name
         else:
-          sub_path = path + "/" + sub_name        
+          sub_path = path + "/" + sub_name
         return sub_name, sub_path, flags
-      else:  
+      else:
         # top stack is finished
         flags |= self.DIDDIR
         flags &= ~self.DODIR
@@ -102,16 +102,16 @@ class MatchFirstNext:
   def next(self, ctx):
     flags = self.anchor.r_s('ap_Flags')
     org_flags = flags
-    
+
     # check DODIR flag and add first level of dir entries
     if flags & self.DODIR == self.DODIR:
       self._push_dodir(self.name, self.path)
-    
+
     # are there dirs to do?
     name, path, flags = self._get_dodir(flags)
     if flags != org_flags:
       self.anchor.w_s('ap_Flags',flags)
-    
+
     # no dodir -> use matcher
     if path == None:
       path = self.matcher.next()
@@ -120,11 +120,11 @@ class MatchFirstNext:
         return ERROR_NO_MORE_ENTRIES
       # extract name
       name = self.path_mgr.ami_name_of_path(path)
-    
+
     # update current
     self.path = path
     self.name = name
-    
+
     # fill fib
     io_err = self._fill_fib(ctx, path)
     return io_err

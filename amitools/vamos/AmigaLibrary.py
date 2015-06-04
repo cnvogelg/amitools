@@ -5,7 +5,7 @@ import logging
 import time
 import inspect
 
-from LabelLib import LabelLib
+from label.LabelLib import LabelLib
 from AccessStruct import AccessStruct
 from lib.lexec.ExecStruct import LibraryDef
 

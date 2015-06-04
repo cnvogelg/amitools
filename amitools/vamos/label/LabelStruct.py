@@ -1,6 +1,6 @@
 from LabelRange import LabelRange
 
-from Log import log_mem
+from amitools.vamos.Log import log_mem
 import logging
 
 class LabelStruct(LabelRange):
@@ -14,7 +14,7 @@ class LabelStruct(LabelRange):
     self.struct_begin = addr + offset
     self.struct_end   = self.struct_begin + str_size
     self.struct_size  = str_size
-  
+
   def trace_mem(self, mode, width, addr, val):
     delta = addr - self.struct_begin
     if delta >= 0 and delta < self.struct_size:

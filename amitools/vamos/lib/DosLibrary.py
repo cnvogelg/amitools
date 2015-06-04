@@ -15,7 +15,7 @@ import dos.Printf
 from dos.DosTags import DosTags
 from dos.PatternMatch import pattern_parse, pattern_match
 from dos.MatchFirstNext import MatchFirstNext
-from amitools.vamos.LabelStruct import LabelStruct
+from amitools.vamos.label.LabelStruct import LabelStruct
 from dos.CommandLine import CommandLine
 from amitools.vamos.Process import Process
 import dos.PathPart
@@ -25,12 +25,12 @@ class DosLibrary(AmigaLibrary):
 
   DOSFALSE = 0
   DOSTRUE = 0xffffffff
-  
+
   def __init__(self, mem, alloc, config):
     AmigaLibrary.__init__(self, self.name, DosLibraryDef, config)
     self.mem = mem
     self.alloc = alloc
-  
+
   def set_managers(self, path_mgr, lock_mgr, file_mgr, port_mgr, seg_loader):
     self.path_mgr = path_mgr
     self.lock_mgr = lock_mgr
@@ -41,7 +41,7 @@ class DosLibrary(AmigaLibrary):
     self.fs_handler_port = port_mgr.add_int_port(self)
     log_dos.info("dos fs handler port: %06x" % self.fs_handler_port)
     file_mgr.set_fs_handler_port(self.fs_handler_port)
-  
+
   def setup_lib(self, ctx):
     AmigaLibrary.setup_lib(self, ctx)
     log_dos.info("open dos.library V%d", self.version)
@@ -60,14 +60,14 @@ class DosLibrary(AmigaLibrary):
     # setup DosInfo
     self.dos_info = ctx.alloc.alloc_struct("DosInfo",DosInfoDef)
     self.root_struct.access.w_s("rn_Info",self.dos_info.addr)
-  
+
   def finish_lib(self, ctx):
     ctx.alloc.free_struct(self.root_struct)
     ctx.alloc.free_struct(self.dos_info)
     AmigaLibrary.finish_lib(self, ctx)
-  
+
   # ----- Direct Handler Access -----
-  
+
   # callback from port manager for fs handler port
   # -> Async I/O
   def put_msg(self, port_mgr, msg_addr):
@@ -105,19 +105,19 @@ class DosLibrary(AmigaLibrary):
     if not self.port_mgr.has_port(reply_port_addr):
       self.port_mgr.add_port(reply_port_addr)
     self.port_mgr.put_msg(reply_port_addr, msg_addr)
-    
+
   # ----- IoErr -----
-  
+
   def IoErr(self, ctx):
     log_dos.info("IoErr: %d (%s)" % (self.io_err, dos_error_strings[self.io_err]))
     return self.io_err
-  
+
   def SetIoErr(self, ctx):
     old_io_err = self.io_err
     self.io_err = ctx.cpu.r_reg(REG_D1)
     log_dos.info("SetIoErr: IoErr=%d old IoErr=%d", self.io_err, old_io_err)
     return old_io_err
-  
+
   def PrintFault(self, ctx):
     self.io_err = ctx.cpu.r_reg(REG_D1)
     hdr_ptr = ctx.cpu.r_reg(REG_D2)
@@ -133,13 +133,13 @@ class DosLibrary(AmigaLibrary):
       err_str = "??? ERROR"
     log_dos.info("PrintFault: code=%d header='%s' err_str='%s'", self.io_err, hdr, err_str)
     # write to stdout
-    txt = "%s: %s\n" % (hdr, err_str) 
+    txt = "%s: %s\n" % (hdr, err_str)
     fh = self.file_mgr.get_output()
     self.file_mgr.write(fh, txt)
     return self.DOSTRUE
-  
+
   # ----- dos API -----
-  
+
   def DateStamp(self, ctx):
     ds_ptr = ctx.cpu.r_reg(REG_D1)
     ds = AccessStruct(ctx.mem,DateStampDef,struct_addr=ds_ptr)
@@ -150,7 +150,7 @@ class DosLibrary(AmigaLibrary):
     ds.w_s("ds_Minute",at.tmin)
     ds.w_s("ds_Tick",at.tick)
     return ds_ptr
-    
+
   def DateToStr(self, ctx):
     dt_ptr = ctx.cpu.r_reg(REG_D1)
     dt = AccessStruct(ctx.mem,DateTimeDef,struct_addr=dt_ptr)
@@ -195,19 +195,19 @@ class DosLibrary(AmigaLibrary):
 
     self.io_err = ERROR_OBJECT_NOT_FOUND
     return -1
-    
+
   # ----- File Ops -----
 
   def Cli(self, ctx):
     cli_addr = ctx.process.get_cli_struct()
     log_dos.info("Cli() -> %06x" % cli_addr)
     return cli_addr
-  
+
   def Input(self, ctx):
     fh = ctx.process.get_input()
     log_dos.info("Input() -> %s" % fh)
     return fh.b_addr
-  
+
   def Output(self, ctx):
     fh = ctx.process.get_output()
     log_dos.info("Output() -> %s" % fh)
@@ -224,7 +224,7 @@ class DosLibrary(AmigaLibrary):
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
     log_dos.info("SelectOutput(fh=%s)" % fh)
     ctx.process.set_output(fh)
-  
+
   def Open(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name = ctx.mem.access.r_cstr(name_ptr)
@@ -242,16 +242,16 @@ class DosLibrary(AmigaLibrary):
       f_mode = "rb+"
     else:
       mode_name = "?"
-    
+
     fh = self.file_mgr.open(name, f_mode)
     log_dos.info("Open: name='%s' (%s/%d/%s) -> %s" % (name, mode_name, mode, f_mode, fh))
-      
+
     if fh == None:
       self.io_err = ERROR_OBJECT_NOT_FOUND
       return 0
     else:
       return fh.b_addr
-  
+
   def Close(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
 
@@ -260,7 +260,7 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("Close: %s" % fh)
 
     return self.DOSTRUE
-  
+
   def Read(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     buf_ptr = ctx.cpu.r_reg(REG_D2)
@@ -272,12 +272,12 @@ class DosLibrary(AmigaLibrary):
     got = len(data)
     log_dos.info("Read(%s, %06x, %d) -> %d" % (fh, buf_ptr, size, got))
     return got
-    
+
   def Write(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     buf_ptr = ctx.cpu.r_reg(REG_D2)
     size = ctx.cpu.r_reg(REG_D3)
-    
+
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
     data = ctx.mem.access.r_data(buf_ptr,size)
     self.file_mgr.write(fh, data)
@@ -307,7 +307,7 @@ class DosLibrary(AmigaLibrary):
     self.file_mgr.seek(fh, pos, whence)
     log_dos.info("Seek(%s, %06x, %s) -> old_pos=%06x" % (fh, pos, mode_str, old_pos))
     return old_pos
-  
+
   def FGetC(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
@@ -332,7 +332,7 @@ class DosLibrary(AmigaLibrary):
     return ch
 
   # ----- StdOut -----
-  
+
   def PutStr(self, ctx):
     str_ptr = ctx.cpu.r_reg(REG_D1)
     str_dat = ctx.mem.access.r_cstr(str_ptr)
@@ -357,7 +357,7 @@ class DosLibrary(AmigaLibrary):
     # write result
     self.file_mgr.write(fh, result)
     return len(result)
-  
+
   def VFWritef(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
@@ -461,7 +461,7 @@ class DosLibrary(AmigaLibrary):
       return self.DOSTRUE
     else:
       return self.DOSFALSE
-  
+
   def IsFileSystem(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name = ctx.mem.access.r_cstr(name_ptr)
@@ -471,9 +471,9 @@ class DosLibrary(AmigaLibrary):
       return self.DOSTRUE
     else:
       return self.DOSFALSE
-  
+
   # ----- Locks -----
-  
+
   def Lock(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name = ctx.mem.access.r_cstr(name_ptr)
@@ -485,7 +485,7 @@ class DosLibrary(AmigaLibrary):
       lock_exclusive = False
     else:
       raise UnsupportedFeatureError("Lock: mode=%x" % mode)
-    
+
     lock = self.lock_mgr.create_lock(name, lock_exclusive)
     log_dos.info("Lock: '%s' exc=%s -> %s" % (name, lock_exclusive, lock))
     if lock == None:
@@ -493,7 +493,7 @@ class DosLibrary(AmigaLibrary):
       return 0
     else:
       return lock.b_addr
-  
+
   def UnLock(self, ctx):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     if lock_b_addr == 0:
@@ -502,7 +502,7 @@ class DosLibrary(AmigaLibrary):
       lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
       log_dos.info("UnLock: %s" % (lock))
       self.lock_mgr.release_lock(lock)
-  
+
   def DupLock(self, ctx):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
@@ -510,7 +510,7 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("DupLock: %s -> %s",lock, dup_lock)
     self.io_err = NO_ERROR
     return dup_lock.b_addr
-  
+
   def Examine(self, ctx):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     fib_ptr = ctx.cpu.r_reg(REG_D2)
@@ -534,7 +534,7 @@ class DosLibrary(AmigaLibrary):
       return self.DOSTRUE
     else:
       return self.DOSFALSE
-  
+
   def ParentDir(self, ctx):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
@@ -605,7 +605,7 @@ class DosLibrary(AmigaLibrary):
     last_devproc = ctx.cpu.r_reg(REG_D2)
     name = ctx.mem.access.r_cstr(name_ptr)
 
-    # get volume of path 
+    # get volume of path
     abs_name = self.path_mgr.ami_abs_path(name)
     volume = self.path_mgr.ami_volume_of_path(abs_name)
     vol_lock = self.lock_mgr.create_lock(volume+":", False)
@@ -624,13 +624,13 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("FreeDeviceProc: devproc=%06x", addr)
 
   # ----- Matcher -----
-  
+
   def MatchFirst(self, ctx):
     pat_ptr = ctx.cpu.r_reg(REG_D1)
     pat = ctx.mem.access.r_cstr(pat_ptr)
     anchor_ptr = ctx.cpu.r_reg(REG_D2)
     anchor = AccessStruct(self.ctx.mem,AnchorPathDef,struct_addr=anchor_ptr)
-    
+
     # create MatchFirstNext instance
     mfn = MatchFirstNext(self.path_mgr, self.lock_mgr, pat, anchor)
     log_dos.info("MatchFirst: pat='%s' anchor=%06x strlen=%d flags=%02x-> ok=%s" \
@@ -644,15 +644,15 @@ class DosLibrary(AmigaLibrary):
     self.io_err = mfn.first(ctx)
     if self.io_err == NO_ERROR:
       log_dos.info("MatchFirst: found name='%s' path='%s' -> parent lock %s, io_err=%d", mfn.name, mfn.path, mfn.dir_lock, self.io_err)
-      self.matches[anchor_ptr] = mfn    
+      self.matches[anchor_ptr] = mfn
     # no entry found or error
     elif self.io_err == ERROR_OBJECT_NOT_FOUND:
       log_dos.info("MatchFirst: none found")
-      self.matches[anchor_ptr] = mfn    
+      self.matches[anchor_ptr] = mfn
     else:
       log_dos.info("MatchFirst: error: %d", self.io_err)
     return self.io_err
-  
+
   def MatchNext(self, ctx):
     anchor_ptr = ctx.cpu.r_reg(REG_D1)
     log_dos.info("MatchNext: anchor=%06x" % (anchor_ptr))
@@ -670,7 +670,7 @@ class DosLibrary(AmigaLibrary):
       else:
         log_dos.info("MatchNext: error: %d", self.io_err)
       return self.io_err
-    
+
   def MatchEnd(self, ctx):
     anchor_ptr = ctx.cpu.r_reg(REG_D1)
     log_dos.info("MatchEnd: anchor=%06x " % (anchor_ptr))
@@ -681,9 +681,9 @@ class DosLibrary(AmigaLibrary):
     del self.matches[anchor_ptr]
     if mfn != None:
       mfn.end(ctx)
-  
+
   # ----- Pattern Parsing and Matching -----
-  
+
   def ParsePattern(self, ctx, ignore_case=False):
     src_ptr = ctx.cpu.r_reg(REG_D1)
     dst_ptr = ctx.cpu.r_reg(REG_D2)
@@ -708,7 +708,7 @@ class DosLibrary(AmigaLibrary):
 
   def ParsePatternNoCase(self, ctx):
     return self.ParsePattern(ctx, ignore_case=True)
-  
+
   def MatchPattern(self, ctx, ignore_case=False):
     pat_ptr = ctx.cpu.r_reg(REG_D1)
     txt_ptr = ctx.cpu.r_reg(REG_D2)
@@ -720,18 +720,18 @@ class DosLibrary(AmigaLibrary):
       return -1
     else:
       return 0
-  
+
   def MatchPatternNoCase(self, ctx):
     return self.MatchPattern(ctx, ignore_case=True)
-  
+
   # ----- Args -----
-  
+
   def ReadArgs(self, ctx):
     template_ptr = ctx.cpu.r_reg(REG_D1)
     template = ctx.mem.access.r_cstr(template_ptr)
     array_ptr = ctx.cpu.r_reg(REG_D2)
     rdargs_ptr = ctx.cpu.r_reg(REG_D3)
-    
+
     # get args from process
     bin_args = ctx.process.bin_args
     log_dos.info("ReadArgs: args=%s template='%s' array_ptr=%06x rdargs_ptr=%06x" % (bin_args, template, array_ptr, rdargs_ptr))
@@ -770,7 +770,7 @@ class DosLibrary(AmigaLibrary):
     self.io_err = NO_ERROR
     log_dos.info("ReadArgs: matched! result_mem=%06x rdargs=%s", addr, rdargs)
     return rdargs.addr
-    
+
   def FreeArgs(self, ctx):
     rdargs_ptr = ctx.cpu.r_reg(REG_D1)
     log_dos.info("FreeArgs: %06x" % rdargs_ptr)
@@ -786,7 +786,7 @@ class DosLibrary(AmigaLibrary):
     # free our memory
     if own:
       self.alloc.free_struct(rdargs)
-   
+
   def cs_get(self, ctx):
     if self.cs_input:
       ch = self.file_mgr.getc(self.cs_input)
@@ -888,7 +888,7 @@ class DosLibrary(AmigaLibrary):
         buff_ptr = buff_ptr + 1
 
   # ----- System/Execute -----
-  
+
   def SystemTagList(self, ctx):
     cmd_ptr = ctx.cpu.r_reg(REG_D1)
     tagitem_ptr = ctx.cpu.r_reg(REG_D2)
@@ -927,7 +927,7 @@ class DosLibrary(AmigaLibrary):
       b_addr = seg_list.b_addr
       self.seg_lists[b_addr] = seg_list
       return b_addr
-    
+
   def UnLoadSeg(self, ctx):
     b_addr = ctx.cpu.r_reg(REG_D1)
     if not self.seg_lists.has_key(b_addr):
@@ -938,7 +938,7 @@ class DosLibrary(AmigaLibrary):
       self.seg_loader.unload_seg(seg_list)
 
   # ----- Path Helper -----
-  
+
   def FilePart(self, ctx):
     addr = ctx.cpu.r_reg(REG_D1)
     path = ctx.mem.access.r_cstr(addr)
@@ -1038,14 +1038,14 @@ class DosLibrary(AmigaLibrary):
     mem = self.alloc.alloc_memory(name,size)
     self.mem_allocs[mem.addr] = mem
     return mem.addr
-  
+
   def _free_mem(self, addr):
     if self.mem_allocs.has_key(addr):
       mem = self.mem_allocs[addr]
       self.alloc.free_memory(mem)
       del self.mem_allocs[addr]
-    else:  
+    else:
       raise VamosInternalError("Invalid DOS free mem: %06x" % addr)
-    
-    
-    
+
+
+

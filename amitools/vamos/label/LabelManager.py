@@ -1,5 +1,5 @@
 import logging
-from Log import *
+from amitools.vamos.Log import *
 
 MEMORY_WIDTH_BYTE = 0
 MEMORY_WIDTH_WORD = 1

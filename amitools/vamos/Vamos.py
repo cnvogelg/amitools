@@ -1,5 +1,5 @@
-from LabelManager import LabelManager
-from LabelRange import LabelRange
+from label.LabelManager import LabelManager
+from label.LabelRange import LabelRange
 from MemoryAlloc import MemoryAlloc
 from MainMemory import MainMemory
 from AmigaLibrary import AmigaLibrary

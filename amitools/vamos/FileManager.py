@@ -6,7 +6,7 @@ import errno
 import stat
 
 from Log import log_file
-from LabelRange import LabelRange
+from label.LabelRange import LabelRange
 from lib.dos.DosStruct import FileHandleDef
 from lib.dos.Error import *
 from lib.dos.DosProtection import DosProtection
@@ -20,7 +20,7 @@ class AmiFile:
     self.addr = 0
     self.b_addr = 0
     self.need_close = need_close
-    
+
   def __str__(self):
     return "[FH:'%s'(ami='%s',sys='%s',nc=%s)@%06x=B@%06x]" % (self.name, self.ami_path, self.sys_path, self.need_close, self.addr, self.b_addr)
 
@@ -47,17 +47,17 @@ class FileManager(LabelRange):
     self.std_output = AmiFile(sys.stdout,'<STDOUT>','',need_close=False)
     self._register_file(self.std_input)
     self._register_file(self.std_output)
-    
+
     # get current umask
     self.umask = os.umask(0)
     os.umask(self.umask)
-  
+
   def set_fs_handler_port(self, addr):
     self.fs_handler_port = addr
-    
+
   def get_fs_handler_port(self):
     return self.fs_handler_port
-  
+
   def _register_file(self, fh):
     addr = self.cur_addr
     self.cur_addr += self.fh_size
@@ -65,7 +65,7 @@ class FileManager(LabelRange):
     fh.b_addr = addr >> 2
     self.files_by_b_addr[fh.b_addr] = fh
     log_file.info("registered: %s" % fh)
-  
+
   def _unregister_file(self,fh):
     check = self.files_by_b_addr[fh.b_addr]
     if check != fh:
@@ -74,7 +74,7 @@ class FileManager(LabelRange):
     log_file.info("unregistered: %s"% fh)
     fh.addr = 0
     fh.b_addr = 0
-  
+
   # directly read from file handle structure
   def r32_fh(self, addr):
     # find out associated file handle
@@ -97,25 +97,25 @@ class FileManager(LabelRange):
       elif name == 'fh_Type':
         # PutMsg port
         val = self.fs_handler_port
-      
+
       self.trace_mem_int('R', 2, addr, val, text="FILE", level=logging.INFO, addon=addon)
       return val
     else:
       self.trace_mem_int('R', 2, addr, val, text="NO_FILE", level=logging.WARN)
       return 0
-  
+
   def get_input(self):
     return self.std_input
-  
+
   def get_output(self):
     return self.std_output
-    
+
   def open(self, ami_path, f_mode):
     try:
       # special names
       uname = ami_path.upper()
       if uname == 'NIL:':
-        sys_name = "/dev/null" 
+        sys_name = "/dev/null"
         fobj = open(sys_name, f_mode)
         fh = AmiFile(fobj, ami_path, sys_name)
       elif uname in ('*','CONSOLE:'):
@@ -138,17 +138,17 @@ class FileManager(LabelRange):
         log_file.debug("opening file: '%s' -> '%s' f_mode=%s" % (ami_path, sys_path, f_mode))
         fobj = open(sys_path, f_mode)
         fh = AmiFile(fobj, ami_path, sys_path)
-    
+
       self._register_file(fh)
       return fh
     except IOError as e:
       log_file.info("error opening: '%s' -> '%s' f_mode=%s -> %s" % (ami_path, sys_path, f_mode, e))
       return None
-  
+
   def close(self, fh):
     fh.close()
     self._unregister_file(fh)
-  
+
   def get_by_b_addr(self, b_addr):
     if self.files_by_b_addr.has_key(b_addr):
       return self.files_by_b_addr[b_addr]
@@ -188,10 +188,10 @@ class FileManager(LabelRange):
 
   def tell(self, fh):
     return fh.obj.tell()
-  
+
   def seek(self, fh, pos, whence):
     fh.obj.seek(pos, whence)
-    
+
   def delete(self, ami_path):
     sys_path = self.path_mgr.ami_to_sys_path(ami_path)
     if sys_path == None or not os.path.exists(sys_path):
@@ -226,7 +226,7 @@ class FileManager(LabelRange):
     except OSError as e:
       log_file.info("can't rename file: '%s','%s' -> %s" % (old_ami_path, new_ami_path, e))
       return ERROR_OBJECT_IN_USE
-  
+
   def is_interactive(self, fh):
     fd = fh.obj.fileno()
     if hasattr(os, "ttyname"):
@@ -263,7 +263,7 @@ class FileManager(LabelRange):
       return NO_ERROR
     except OSError:
       return ERROR_OBJECT_WRONG_TYPE
-  
+
   def  create_dir(self, ami_path):
     sys_path = self.path_mgr.ami_to_sys_path(ami_path)
     try:
