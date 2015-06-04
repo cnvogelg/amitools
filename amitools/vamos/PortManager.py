@@ -1,59 +1,87 @@
-from label.LabelRange import LabelRange
+from amitools.vamos.lib.lexec.ExecStruct import MsgPortDef
+from Exceptions import *
 
-class PortManager(LabelRange):
-  def __init__(self, addr, size):
-    LabelRange.__init__(self, "ports", addr, size)
+class Port:
+  def __init__(self, name, addr=None, mem=None, handler=None):
+    # either use callback via handler or queue messages
+    self.name = name
+    if mem is None:
+      self.addr = addr
+    else:
+      self.addr = mem.addr
+    self.mem = mem
+    self.handler = handler
+    if handler is None:
+      self.queue = []
+    else:
+      self.queue = None
+
+  def __str__(self):
+    return "<Port:name=%s,addr=%06x>" % (self.name, self.addr)
+
+  def put_msg(self, msg_addr):
+    if self.handler is not None:
+      self.handler.put_msg(self, msg_addr)
+    else:
+      self.queue.append(msg_addr)
+
+  def has_msg(self):
+    if self.queue is not None:
+      return len(self.queue) > 0
+    else:
+      return False
+
+  def get_msg(self):
+    if self.queue is not None and len(self.queue) > 0:
+      return self.queue.pop(0)
+    else:
+      return None
+
+class PortManager:
+  def __init__(self, alloc):
+    self.alloc = alloc
     self.ports = {}
-    self.base_addr = addr
-    self.size = size
-    self.cur_addr = addr
 
-  def add_int_port(self, handler):
-    addr = self.cur_addr
-    self.cur_addr += 4
-    port = {
-      'addr' : addr,
-      'handler' : handler,
-      'queue' : None
-    }
+  def create_port(self, name, py_msg_handler):
+    mem = self.alloc.alloc_struct(name,MsgPortDef)
+    port = Port(name, mem=mem, handler=py_msg_handler)
+    addr = mem.addr
     self.ports[addr] = port
     return addr
 
-  def add_port(self, addr):
-    port = {
-      'addr' : addr,
-      'handler' : None,
-      'queue' : []
-    }
+  def free_port(self, addr):
+    if addr in self.ports:
+      port = self.ports[addr]
+      mem = port.mem
+      if mem is not None:
+        self.alloc.free_struct(mem)
+      else:
+        raise VamosInternalError("Free non created port: %06x" % addr)
+    else:
+     raise VamosInternalError("Invalid Port free mem: %06x" % addr)
+
+  def register_port(self, addr):
+    name = "IntPort@%06x" % addr
+    port = Port(name,addr=addr)
     self.ports[addr] = port
 
   def has_port(self, addr):
-    return self.ports.has_key(addr)
+    return addr in self.ports
 
-  def rem_port(self, addr):
-    del self.ports[addr]
+  def unregister_port(self, addr):
+    if addr in self.ports:
+      del self.ports[addr]
+    else:
+      raise VamosInternalError("Invalid Port remove: %06x" % addr)
 
   def put_msg(self, port_addr, msg_addr):
     port = self.ports[port_addr]
-    handler = port['handler']
-    # directly call handler to process message
-    if handler != None:
-      handler.put_msg(self, msg_addr)
-    # enqueue message for later get_msg from code
-    else:
-      port['queue'].append(msg_addr)
+    port.put_msg(msg_addr)
 
   def has_msg(self, port_addr):
     port = self.ports[port_addr]
-    queue = port['queue']
-    return len(queue) > 0
+    return port.has_msg()
 
   def get_msg(self, port_addr):
     port = self.ports[port_addr]
-    queue = port['queue']
-    if len(queue) == 0:
-      return None
-    else:
-      return queue.pop(0)
-
-
+    return port.get_msg()

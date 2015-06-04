@@ -37,10 +37,6 @@ class DosLibrary(AmigaLibrary):
     self.file_mgr = file_mgr
     self.port_mgr = port_mgr
     self.seg_loader = seg_loader;
-    # create fs handler port
-    self.fs_handler_port = port_mgr.add_int_port(self)
-    log_dos.info("dos fs handler port: %06x" % self.fs_handler_port)
-    file_mgr.set_fs_handler_port(self.fs_handler_port)
 
   def setup_lib(self, ctx):
     AmigaLibrary.setup_lib(self, ctx)
@@ -60,9 +56,17 @@ class DosLibrary(AmigaLibrary):
     # setup DosInfo
     self.dos_info = ctx.alloc.alloc_struct("DosInfo",DosInfoDef)
     self.root_struct.access.w_s("rn_Info",self.dos_info.addr)
+    # currently we use a single fake port for all devices
+    self.fs_handler_port = self.port_mgr.create_port("FakeFSPort",self)
+    log_dos.info("dos fs handler port: %06x" % self.fs_handler_port)
+    self.file_mgr.set_fs_handler_port(self.fs_handler_port)
 
   def finish_lib(self, ctx):
+    # free port
+    self.port_mgr.free_port(self.fs_handler_port)
+    # free RootNode
     ctx.alloc.free_struct(self.root_struct)
+    # free DosInfo
     ctx.alloc.free_struct(self.dos_info)
     AmigaLibrary.finish_lib(self, ctx)
 
@@ -103,7 +107,7 @@ class DosLibrary(AmigaLibrary):
       raise UnsupportedFeatureError("Unsupported DosPacket: type=%d" % pkt_type)
     # do reply
     if not self.port_mgr.has_port(reply_port_addr):
-      self.port_mgr.add_port(reply_port_addr)
+      self.port_mgr.register_port(reply_port_addr)
     self.port_mgr.put_msg(reply_port_addr, msg_addr)
 
   # ----- IoErr -----

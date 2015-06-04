@@ -57,6 +57,9 @@ class Vamos:
     # lib manager
     self.lib_mgr = LibManager( self.label_mgr, cfg)
 
+    # port manager
+    self.port_mgr = PortManager(self.alloc)
+
     # no current process right now
     self.process = None
     self.proc_list = []
@@ -166,12 +169,6 @@ class Vamos:
     self.label_mgr.add_label(self.file_mgr)
     self.mem.set_special_range_read_funcs(self.file_base, r32=self.file_mgr.r32_fh)
     log_mem_init.info(self.file_mgr)
-
-    self.port_base = self.mem.reserve_special_range()
-    self.port_size = 0x010000
-    self.port_mgr  = PortManager(self.port_base, self.port_size)
-    self.label_mgr.add_label(self.port_mgr)
-    log_mem_init.info(self.port_mgr)
 
   def register_base_libs(self, cfg):
     # register libraries
