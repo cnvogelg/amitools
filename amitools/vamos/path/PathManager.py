@@ -1,20 +1,20 @@
 import os.path
 import os
-from Log import log_path
-from Exceptions import *
+from amitools.vamos.Log import log_path
+from amitools.vamos.Exceptions import *
 from VolumeManager import VolumeManager
 from AssignManager import AssignManager
 
 class PathManager:
-  
+
   def __init__(self, cfg):
     self.vol_mgr = VolumeManager()
     self.assign_mgr = AssignManager(self.vol_mgr)
     self.paths = []
-  
+
     args = cfg.get_args()
     self.parse(cfg, args.volume, args.assign, args.auto_assign, args.path)
-    
+
   def parse(self, cfg, volume_strs=None, assign_strs=None, auto_assign=None, path_strs=None):
     # volumes
     self.vol_mgr.parse_config(cfg)
@@ -28,7 +28,7 @@ class PathManager:
     self._parse_config(cfg)
     self._parse_strings(path_strs)
     self._config_done()
-  
+
   def _parse_config(self, cfg):
     if cfg == None:
       return
@@ -37,13 +37,13 @@ class PathManager:
       p = cfg.get(sect, 'path')
       if p != None:
         self.add_path(p)
-    
+
   def _parse_strings(self, path_strs):
     if path_strs == None:
       return
     for p in path_strs:
       self.add_path(p)
-  
+
   def add_path(self, paths):
     # append assign or clear first?
     if len(paths)>0 and paths[0] == '+':
@@ -61,8 +61,8 @@ class PathManager:
         if p[-1] != ':' and p[-1] != '/' and p != '.':
           p += '/'
         self.paths.append(p)
-  
-  def _config_done(self):    
+
+  def _config_done(self):
     # set current device and path name
     cur_sys = os.getcwd()
     cur_ami = self.vol_mgr.sys_to_ami_path_pair(cur_sys)
@@ -77,9 +77,9 @@ class PathManager:
     if len(self.paths)==0:
       self.paths = ['.','c:']
     log_path.info("path: %s" % map(str, self.paths))
-  
+
   # current path handling
-  
+
   def set_cur_path(self, full_path):
     split = self.assign_mgr.ami_path_split_volume(full_path)
     if split == None:
@@ -87,10 +87,10 @@ class PathManager:
     self.cur_vol = split[0]
     self.cur_path = split[1]
     log_path.info("set current: dev='%s' path='%s'" % (self.cur_vol, self.cur_path))
-  
+
   def get_cur_path(self):
     return (self.cur_vol, self.cur_path)
-  
+
   def set_default_cur_path(self):
     self.cur_vol  = self.org_cur_vol
     self.cur_path = self.org_cur_path
@@ -128,7 +128,7 @@ class PathManager:
         if check_path != None and os.path.isfile(check_path):
           sys_path = check_path
           break
-        
+
     if sys_path != None:
       log_path.info("ami_command_to_sys_path: ami_path=%s -> sys_path=%s" % (ami_path, sys_path))
       return sys_path
@@ -165,7 +165,7 @@ class PathManager:
     ami_path = self.vol_mgr.sys_to_ami_path(abs_path)
     log_path.info("sys_to_ami_path: sys_path='%s' -> abs_path='%s' -> ami_path='%s'" % (sys_path, abs_path, ami_path))
     return ami_path
-  
+
   def ami_abs_parent_path(self, path):
     """return absolute parent path of given path or same if already parent"""
     # can't strip from device prefix
@@ -185,7 +185,7 @@ class PathManager:
     else:
       pos = path.find(':')
       return path[0:pos+1]
-  
+
   def ami_abs_path(self, path):
     """return absolute amiga path from given path"""
     # current dir
@@ -204,7 +204,7 @@ class PathManager:
         path = path[1:]
     # no path given -> return current path
     elif path == '':
-      return self.cur_vol + ":" + self.cur_path      
+      return self.cur_vol + ":" + self.cur_path
     # a parent path is given
     elif path[0] == '/':
       abs_prefix = self.cur_vol + ":" + self.cur_path
@@ -271,7 +271,7 @@ class PathManager:
         return "/"
       else:
         return p[:slash_pos]
-        
+
   def ami_volume_of_path(self, path):
     pos = path.find(':')
     if pos == 0:
@@ -297,7 +297,7 @@ class PathManager:
       return None
     files = os.listdir(sys_path)
     return files
-    
+
   def ami_path_exists(self, ami_path):
     sys_path = self.ami_to_sys_path(ami_path, mustExist=True)
     return sys_path != None
@@ -309,6 +309,6 @@ class PathManager:
       return a
     else:
       return a + b
-      
-    
-    
+
+
+

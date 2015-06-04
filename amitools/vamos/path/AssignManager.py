@@ -1,5 +1,5 @@
-from Log import *
-from Exceptions import *
+from amitools.vamos.Log import *
+from amitools.vamos.Exceptions import *
 import os
 
 class AssignManager:
@@ -7,7 +7,7 @@ class AssignManager:
     self.vol_mgr = vol_mgr
     self.assigns = {}
     self.auto_assign = None
-  
+
   def parse_config(self, cfg):
     if cfg == None:
       return
@@ -17,7 +17,7 @@ class AssignManager:
       for name in opts:
         paths = cfg.get(sect, name)
         self.set_assign(name, paths)
-    
+
     # check for [path] -> auto_assign
     sect = 'path'
     if cfg.has_option(sect, 'auto_assign'):
@@ -59,7 +59,7 @@ class AssignManager:
     # add assign
     if len(path_list) > 0:
       self.add_assign(name, path_list)
-      
+
   def _ensure_volume_or_assign(self, path_name):
     if len(path_name) == 0:
       raise VamosConfigError("invalid empty assign: %s",path_name)
@@ -82,14 +82,14 @@ class AssignManager:
       self.assigns[name] = alist
     # check path_list
     for p in path_list:
-      p,is_vol = self._ensure_volume_or_assign(p)  
+      p,is_vol = self._ensure_volume_or_assign(p)
       alist.append(p)
     log_path.info("add_assign: name='%s' -> paths=%s", name, alist)
 
   def clear_assign(self, name):
     if self.assigns.has_key(name):
       del self.assigns[name]
-  
+
   # return (volume,remainder) or none if no volume found
   def ami_path_split_volume(self, ami_path):
     pos = ami_path.find(':')
@@ -108,7 +108,7 @@ class AssignManager:
   # returns: list of reachable paths
   # Note: this follows recursive assigns, too
   def ami_path_resolve_assigns(self, ami_path):
-    result = []  
+    result = []
     split = self.ami_path_split_volume(ami_path)
     if split == None:
       return ami_path
@@ -122,7 +122,7 @@ class AssignManager:
       # no assign
       else:
         result.append(ami_path)
-    
+
     log_path.debug("resolve_assign: ami_path='%s' -> paths=%s", ami_path, result)
     return result
 
@@ -144,7 +144,7 @@ class AssignManager:
     new_path = self.auto_assign + split[0] + '/' + split[1]
     log_path.debug("resolve_auto_assign: ami_path='%s' -> new_path='%s'", ami_path, new_path)
     return new_path
-  
+
   # full resolve: assigns + auto assigns
   def ami_path_resolve(self, ami_path):
     ami_path = self.ami_path_resolve_assigns(ami_path)
@@ -156,4 +156,4 @@ class AssignManager:
     return result
 
 
-    
+

@@ -1,7 +1,7 @@
 import os
 import os.path
-from Log import *
-from Exceptions import *
+from amitools.vamos.Log import *
+from amitools.vamos.Exceptions import *
 
 class VolumeManager():
   def __init__(self):
@@ -10,7 +10,7 @@ class VolumeManager():
     self.sys2volume = {}
     # ensure to define sys: volume
     self.set_volume('root','/')
-  
+
   def parse_config(self, cfg):
     if cfg == None:
       return
@@ -54,20 +54,20 @@ class VolumeManager():
       log_path.info("set_volume: '%s:' -> %s" % (name, abs_path))
       self.volume2sys[name] = abs_path
       self.sys2volume[abs_path] = name
-      
+
   def del_volume(self, name):
     if not self.volume2sys.has_key(name):
       return
     sys_path = self.volume2sys[name]
     del self.volume2sys[name]
     del self.sys2volume[sys_path]
-    
+
   def config_done(self):
     # sort volume list by length
     self.vol_list = self.sys2volume.keys()
     self.vol_list.sort(reverse=True)
     log_path.debug("vol_list=%s",self.vol_list)
-  
+
   def _is_path_begin(self, begin, path):
     pl = len(path)
     bl = len(begin)
@@ -80,11 +80,11 @@ class VolumeManager():
       if part == begin:
         return remainder
     return None
-  
+
   def is_ami_volume(self, vol_name):
     name = vol_name.lower()
     return self.volume2sys.has_key(name)
-  
+
   # in: ami path
   # out: sys_path if it exists and None if not
   def valid_volume_ami_to_sys_path(self, ami_path):
@@ -146,7 +146,7 @@ class VolumeManager():
     else:
       log_path.error("vol: ami_to_sys_path: volume='%s' not found!", vol_name )
       return None
-  
+
   def _follow_path_no_case(self, base, dirs, mustExist):
     # base is the name (no more dirs)
     if len(dirs) == 0:
@@ -181,6 +181,6 @@ class VolumeManager():
       return None
     else:
       return os.path.join(base, os.path.join(*dirs))
-  
+
   def get_all_names(self):
     return self.volume2sys.keys()

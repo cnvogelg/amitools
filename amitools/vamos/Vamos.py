@@ -5,7 +5,7 @@ from MainMemory import MainMemory
 from AmigaLibrary import AmigaLibrary
 from LibManager import LibManager
 from SegmentLoader import SegmentLoader
-from PathManager import PathManager
+from path.PathManager import PathManager
 from FileManager import FileManager
 from LockManager import LockManager
 from PortManager import PortManager
