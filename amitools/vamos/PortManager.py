@@ -2,9 +2,10 @@ from amitools.vamos.lib.lexec.ExecStruct import MsgPortDef
 from Exceptions import *
 
 class Port:
-  def __init__(self, name, addr=None, mem=None, handler=None):
+  def __init__(self, name, port_mgr, addr=None, mem=None, handler=None):
     # either use callback via handler or queue messages
     self.name = name
+    self.port_mgr = port_mgr
     if mem is None:
       self.addr = addr
     else:
@@ -21,7 +22,7 @@ class Port:
 
   def put_msg(self, msg_addr):
     if self.handler is not None:
-      self.handler.put_msg(self, msg_addr)
+      self.handler.put_msg(self.port_mgr, msg_addr)
     else:
       self.queue.append(msg_addr)
 
@@ -44,7 +45,7 @@ class PortManager:
 
   def create_port(self, name, py_msg_handler):
     mem = self.alloc.alloc_struct(name,MsgPortDef)
-    port = Port(name, mem=mem, handler=py_msg_handler)
+    port = Port(name, self, mem=mem, handler=py_msg_handler)
     addr = mem.addr
     self.ports[addr] = port
     return addr
@@ -62,7 +63,7 @@ class PortManager:
 
   def register_port(self, addr):
     name = "IntPort@%06x" % addr
-    port = Port(name,addr=addr)
+    port = Port(name,self,addr=addr)
     self.ports[addr] = port
 
   def has_port(self, addr):

@@ -5,11 +5,11 @@ import logging
 import errno
 import stat
 
-from Log import log_file
-from label.LabelRange import LabelRange
-from lib.dos.DosStruct import FileHandleDef
-from lib.dos.Error import *
-from lib.dos.DosProtection import DosProtection
+from amitools.vamos.Log import log_file
+from amitools.vamos.label.LabelRange import LabelRange
+from DosStruct import FileHandleDef
+from Error import *
+from DosProtection import DosProtection
 
 class AmiFile:
   def __init__(self, obj, ami_path, sys_path, need_close=True):

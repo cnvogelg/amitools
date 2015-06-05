@@ -8,9 +8,9 @@ class Process:
   def __init__(self, ctx, bin_file, bin_args, input_fh=None, output_fh=None, stack_size=4096, exit_addr=0):
     self.ctx = ctx
     if input_fh == None:
-      input_fh = self.ctx.file_mgr.get_input()
+      input_fh = self.ctx.dos_lib.file_mgr.get_input()
     if output_fh == None:
-      output_fh = self.ctx.file_mgr.get_output()
+      output_fh = self.ctx.dos_lib.file_mgr.get_output()
     self.ok = self.load_binary(bin_file)
     if not self.ok:
       return
@@ -18,17 +18,17 @@ class Process:
     self.init_args(bin_args)
     self.init_cli_struct(input_fh, output_fh)
     self.init_task_struct(input_fh, output_fh)
-  
+
   def free(self):
     self.free_task_struct()
     self.free_cli_struct()
     self.free_args()
     self.free_stack()
     self.unload_binary()
-  
+
   def __str__(self):
     return "[bin='%s']" % self.bin_file
-  
+
   # ----- stack -----
   # stack size in KiB
   def init_stack(self, stack_size, exit_addr):
@@ -49,7 +49,7 @@ class Process:
 
   def free_stack(self):
     self.ctx.alloc.free_memory(self.stack)
-  
+
   # ----- binary -----
   def load_binary(self, ami_bin_file):
     self.bin_basename = self.ctx.path_mgr.ami_name_of_path(ami_bin_file)
@@ -66,7 +66,7 @@ class Process:
 
   def unload_binary(self):
     self.ctx.seg_loader.unload_seg(self.bin_seg_list)
-  
+
   # ----- args -----
   def init_args(self, bin_args):
     # setup arguments
@@ -82,7 +82,7 @@ class Process:
 
   def free_args(self):
     self.ctx.alloc.free_memory(self.arg)
-  
+
   # ----- cli struct -----
   def init_cli_struct(self, input_fh, output_fh):
     self.cli = self.ctx.alloc.alloc_struct(self.bin_basename + "_CLI",CLIDef)
@@ -106,27 +106,27 @@ class Process:
   # ----- task struct -----
   def init_task_struct(self, input_fh, output_fh):
     # Inject arguments into input stream (Needed for C:Execute)
-    self.ctx.file_mgr.ungets(input_fh, self.arg_text)
+    self.ctx.dos_lib.file_mgr.ungets(input_fh, self.arg_text)
     self.this_task = self.ctx.alloc.alloc_struct(self.bin_basename + "_ThisTask",ProcessDef)
     self.this_task.access.w_s("pr_Task.tc_Node.ln_Type", NT_PROCESS)
     self.this_task.access.w_s("pr_CLI", self.cli.addr)
     self.this_task.access.w_s("pr_CIS", input_fh.b_addr<<2) # compensate BCPL auto-conversion
     self.this_task.access.w_s("pr_COS", output_fh.b_addr<<2) # compensate BCPL auto-conversion
     log_proc.info(self.this_task)
-    
+
   def free_task_struct(self):
     self.ctx.alloc.free_struct(self.this_task)
 
   def get_input(self):
     fh_b = self.this_task.access.r_s("pr_CIS") >> 2
-    return self.ctx.file_mgr.get_by_b_addr(fh_b)
- 
+    return self.ctx.dos_lib.file_mgr.get_by_b_addr(fh_b)
+
   def set_input(self, input_fh):
     self.this_task.access.w_s("pr_CIS", input_fh.b_addr<<2) # compensate BCPL auto-conversion
 
   def get_output(self):
     fh_b = self.this_task.access.r_s("pr_COS") >> 2
-    return self.ctx.file_mgr.get_by_b_addr(fh_b)
+    return self.ctx.dos_lib.file_mgr.get_by_b_addr(fh_b)
 
   def set_output(self, output_fh):
     self.this_task.access.w_s("pr_COS", output_fh.b_addr<<2) # compensate BCPL auto-conversion

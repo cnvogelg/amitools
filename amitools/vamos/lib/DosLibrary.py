@@ -19,6 +19,9 @@ from amitools.vamos.label.LabelStruct import LabelStruct
 from dos.CommandLine import CommandLine
 from amitools.vamos.Process import Process
 import dos.PathPart
+from dos.DosList import DosList
+from dos.LockManager import LockManager
+from dos.FileManager import FileManager
 
 class DosLibrary(AmigaLibrary):
   name = "dos.library"
@@ -30,13 +33,6 @@ class DosLibrary(AmigaLibrary):
     AmigaLibrary.__init__(self, self.name, DosLibraryDef, config)
     self.mem = mem
     self.alloc = alloc
-
-  def set_managers(self, path_mgr, lock_mgr, file_mgr, port_mgr, seg_loader):
-    self.path_mgr = path_mgr
-    self.lock_mgr = lock_mgr
-    self.file_mgr = file_mgr
-    self.port_mgr = port_mgr
-    self.seg_loader = seg_loader;
 
   def setup_lib(self, ctx):
     AmigaLibrary.setup_lib(self, ctx)
@@ -57,13 +53,32 @@ class DosLibrary(AmigaLibrary):
     self.dos_info = ctx.alloc.alloc_struct("DosInfo",DosInfoDef)
     self.root_struct.access.w_s("rn_Info",self.dos_info.addr)
     # currently we use a single fake port for all devices
-    self.fs_handler_port = self.port_mgr.create_port("FakeFSPort",self)
+    self.fs_handler_port = ctx.port_mgr.create_port("FakeFSPort",self)
     log_dos.info("dos fs handler port: %06x" % self.fs_handler_port)
+    # setup dos list
+    self.dos_list = DosList(ctx.alloc)
+    baddr = self.dos_list.build_list(ctx.path_mgr)
+    # create lock manager
+    self.lock_base = self.ctx.mem.reserve_special_range()
+    self.lock_size = 0x010000
+    self.lock_mgr = LockManager(ctx.path_mgr, self.dos_list, self.lock_base, self.lock_size)
+    ctx.label_mgr.add_label(self.lock_mgr)
+    self.mem.set_special_range_read_funcs(self.lock_base, r32=self.lock_mgr.r32_lock)
+    log_mem_init.info(self.lock_mgr)
+    # create file manager
+    self.file_base = self.ctx.mem.reserve_special_range()
+    self.file_size = 0x010000
+    self.file_mgr = FileManager(ctx.path_mgr, self.file_base, self.file_size)
     self.file_mgr.set_fs_handler_port(self.fs_handler_port)
+    ctx.label_mgr.add_label(self.file_mgr)
+    self.mem.set_special_range_read_funcs(self.file_base, r32=self.file_mgr.r32_fh)
+    log_mem_init.info(self.file_mgr)
 
   def finish_lib(self, ctx):
+    # free dos list
+    self.dos_list.free_list()
     # free port
-    self.port_mgr.free_port(self.fs_handler_port)
+    ctx.port_mgr.free_port(self.fs_handler_port)
     # free RootNode
     ctx.alloc.free_struct(self.root_struct)
     # free DosInfo
@@ -106,9 +121,9 @@ class DosLibrary(AmigaLibrary):
     else:
       raise UnsupportedFeatureError("Unsupported DosPacket: type=%d" % pkt_type)
     # do reply
-    if not self.port_mgr.has_port(reply_port_addr):
-      self.port_mgr.register_port(reply_port_addr)
-    self.port_mgr.put_msg(reply_port_addr, msg_addr)
+    if not port_mgr.has_port(reply_port_addr):
+      port_mgr.register_port(reply_port_addr)
+    port_mgr.put_msg(reply_port_addr, msg_addr)
 
   # ----- IoErr -----
 
@@ -922,7 +937,7 @@ class DosLibrary(AmigaLibrary):
   def LoadSeg(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name = ctx.mem.access.r_cstr(name_ptr)
-    seg_list = self.seg_loader.load_seg(name)
+    seg_list = self.ctx.seg_loader.load_seg(name)
     if seg_list == None:
       log_dos.warn("LoadSeg: '%s' -> not found!" % (name))
       return 0
@@ -939,7 +954,7 @@ class DosLibrary(AmigaLibrary):
     else:
       seg_list = self.seg_lists[b_addr]
       del self.seg_lists[b_addr]
-      self.seg_loader.unload_seg(seg_list)
+      self.ctx.seg_loader.unload_seg(seg_list)
 
   # ----- Path Helper -----
 

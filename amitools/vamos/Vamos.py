@@ -10,7 +10,6 @@ from FileManager import FileManager
 from LockManager import LockManager
 from PortManager import PortManager
 from ErrorTracker import ErrorTracker
-from DosListManager import DosListManager
 from Trampoline import Trampoline
 
 # lib
@@ -65,14 +64,13 @@ class Vamos:
     self.proc_list = []
 
   def init(self, cfg):
-    self.init_managers()
     self.register_base_libs(cfg)
     self.create_old_dos_guard()
-    self.open_exec_lib()
+    self.open_base_libs()
     return True
 
   def cleanup(self):
-    self.close_exec_lib()
+    self.close_base_libs()
     self.alloc.dump_orphans()
 
   # ----- process handling -----
@@ -143,33 +141,6 @@ class Vamos:
 
   # ----- init environment -----
 
-  def init_managers(self):
-    self.doslist_base = self.mem.reserve_special_range()
-    self.doslist_size = 0x010000
-    self.doslist_mgr = DosListManager(self.path_mgr, self.doslist_base, self.doslist_size)
-    self.label_mgr.add_label(self.doslist_mgr)
-    self.mem.set_special_range_read_funcs(self.doslist_base, r32=self.doslist_mgr.r32_doslist)
-    log_mem_init.info(self.doslist_mgr)
-
-    # fill dos list
-    volumes = self.path_mgr.get_all_volume_names()
-    for vol in volumes:
-      self.doslist_mgr.add_volume(vol)
-
-    self.lock_base = self.mem.reserve_special_range()
-    self.lock_size = 0x010000
-    self.lock_mgr = LockManager(self.path_mgr, self.doslist_mgr, self.lock_base, self.lock_size)
-    self.label_mgr.add_label(self.lock_mgr)
-    self.mem.set_special_range_read_funcs(self.lock_base, r32=self.lock_mgr.r32_lock)
-    log_mem_init.info(self.lock_mgr)
-
-    self.file_base = self.mem.reserve_special_range()
-    self.file_size = 0x010000
-    self.file_mgr = FileManager(self.path_mgr, self.file_base, self.file_size)
-    self.label_mgr.add_label(self.file_mgr)
-    self.mem.set_special_range_read_funcs(self.file_base, r32=self.file_mgr.r32_fh)
-    log_mem_init.info(self.file_mgr)
-
   def register_base_libs(self, cfg):
     # register libraries
     # exec
@@ -179,7 +150,6 @@ class Vamos:
     # dos
     dos_cfg = cfg.get_lib_config('dos.library')
     self.dos_lib_def = DosLibrary(self.mem, self.alloc, dos_cfg)
-    self.dos_lib_def.set_managers(self.path_mgr, self.lock_mgr, self.file_mgr, self.port_mgr, self.seg_loader)
     self.lib_mgr.register_vamos_lib(self.dos_lib_def)
     # intuition
     int_cfg = cfg.get_lib_config('intuition.library')
@@ -190,14 +160,20 @@ class Vamos:
     self.utility_lib_def = UtilityLibrary(utility_cfg)
     self.lib_mgr.register_vamos_lib(self.utility_lib_def)
 
-  def open_exec_lib(self):
+  def open_base_libs(self):
     # open exec lib
     self.exec_lib = self.lib_mgr.open_lib(ExecLibrary.name, 0, self)
-    self.exec_lib_def.set_cpu(self.cpu_type)
-    self.exec_lib_def.set_ram_size(self.ram_size)
+    self.exec_lib.set_cpu(self.cpu_type)
+    self.exec_lib.set_ram_size(self.ram_size)
     log_mem_init.info(self.exec_lib)
+    # open dos lib
+    self.dos_lib = self.lib_mgr.open_lib(DosLibrary.name, 0, self)
+    log_mem_init.info(self.dos_lib)
 
-  def close_exec_lib(self):
+  def close_base_libs(self):
+    # close dos
+    self.lib_mgr.close_lib(self.dos_lib.addr_base, self)
+    # close exec
     self.lib_mgr.close_lib(self.exec_lib.addr_base, self)
 
   def create_old_dos_guard(self):

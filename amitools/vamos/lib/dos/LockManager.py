@@ -2,14 +2,14 @@ import os.path
 import logging
 import stat
 
-from Log import log_lock
-from label.LabelRange import LabelRange
-from Exceptions import *
-from lib.dos.AmiTime import *
-from lib.dos.DosStruct import *
-from lib.dos.Error import *
-from AccessStruct import AccessStruct
-from lib.dos.DosProtection import DosProtection
+from amitools.vamos.Log import log_lock
+from amitools.vamos.label.LabelRange import LabelRange
+from amitools.vamos.Exceptions import *
+from amitools.vamos.AccessStruct import AccessStruct
+from AmiTime import *
+from DosStruct import *
+from Error import *
+from DosProtection import DosProtection
 
 class AmiLock:
   def __init__(self, name, ami_path, sys_path, exclusive=False):
