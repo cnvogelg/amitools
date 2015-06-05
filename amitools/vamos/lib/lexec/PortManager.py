@@ -1,5 +1,5 @@
-from amitools.vamos.lib.lexec.ExecStruct import MsgPortDef
-from Exceptions import *
+from ExecStruct import MsgPortDef
+from amitools.vamos.Exceptions import *
 
 class Port:
   def __init__(self, name, port_mgr, addr=None, mem=None, handler=None):

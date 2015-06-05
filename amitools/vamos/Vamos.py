@@ -6,9 +6,6 @@ from AmigaLibrary import AmigaLibrary
 from LibManager import LibManager
 from SegmentLoader import SegmentLoader
 from path.PathManager import PathManager
-from FileManager import FileManager
-from LockManager import LockManager
-from PortManager import PortManager
 from ErrorTracker import ErrorTracker
 from Trampoline import Trampoline
 
@@ -16,8 +13,6 @@ from Trampoline import Trampoline
 from lib.ExecLibrary import ExecLibrary
 from lib.DosLibrary import DosLibrary
 from lib.UtilityLibrary import UtilityLibrary
-from lib.lexec.ExecStruct import *
-from lib.dos.DosStruct import *
 from lib.IntuitionLibrary import IntuitionLibrary
 
 from Log import *
@@ -31,6 +26,9 @@ class Vamos:
     self.cpu = cpu
     self.cpu_type = cfg.cpu
     self.traps = traps
+    self.cfg = cfg
+
+    # path manager
     self.path_mgr = PathManager( cfg )
 
     # create a label manager and error tracker
@@ -55,9 +53,6 @@ class Vamos:
 
     # lib manager
     self.lib_mgr = LibManager( self.label_mgr, cfg)
-
-    # port manager
-    self.port_mgr = PortManager(self.alloc)
 
     # no current process right now
     self.process = None
@@ -163,8 +158,6 @@ class Vamos:
   def open_base_libs(self):
     # open exec lib
     self.exec_lib = self.lib_mgr.open_lib(ExecLibrary.name, 0, self)
-    self.exec_lib.set_cpu(self.cpu_type)
-    self.exec_lib.set_ram_size(self.ram_size)
     log_mem_init.info(self.exec_lib)
     # open dos lib
     self.dos_lib = self.lib_mgr.open_lib(DosLibrary.name, 0, self)

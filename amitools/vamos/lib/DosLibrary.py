@@ -53,7 +53,7 @@ class DosLibrary(AmigaLibrary):
     self.dos_info = ctx.alloc.alloc_struct("DosInfo",DosInfoDef)
     self.root_struct.access.w_s("rn_Info",self.dos_info.addr)
     # currently we use a single fake port for all devices
-    self.fs_handler_port = ctx.port_mgr.create_port("FakeFSPort",self)
+    self.fs_handler_port = ctx.exec_lib.port_mgr.create_port("FakeFSPort",self)
     log_dos.info("dos fs handler port: %06x" % self.fs_handler_port)
     # setup dos list
     self.dos_list = DosList(ctx.alloc)
@@ -78,7 +78,7 @@ class DosLibrary(AmigaLibrary):
     # free dos list
     self.dos_list.free_list()
     # free port
-    ctx.port_mgr.free_port(self.fs_handler_port)
+    ctx.exec_lib.port_mgr.free_port(self.fs_handler_port)
     # free RootNode
     ctx.alloc.free_struct(self.root_struct)
     # free DosInfo
