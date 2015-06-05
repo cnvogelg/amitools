@@ -3,7 +3,6 @@ import ctypes
 
 from amitools.vamos.AmigaLibrary import *
 from dos.DosStruct import *
-from lexec.ExecStruct import *
 from amitools.vamos.Exceptions import *
 from amitools.vamos.Log import log_dos
 from amitools.vamos.AccessStruct import AccessStruct
@@ -52,9 +51,6 @@ class DosLibrary(AmigaLibrary):
     # setup DosInfo
     self.dos_info = ctx.alloc.alloc_struct("DosInfo",DosInfoDef)
     self.root_struct.access.w_s("rn_Info",self.dos_info.addr)
-    # currently we use a single fake port for all devices
-    self.fs_handler_port = ctx.exec_lib.port_mgr.create_port("FakeFSPort",self)
-    log_dos.info("dos fs handler port: %06x" % self.fs_handler_port)
     # setup dos list
     self.dos_list = DosList(ctx.alloc)
     baddr = self.dos_list.build_list(ctx.path_mgr)
@@ -66,61 +62,24 @@ class DosLibrary(AmigaLibrary):
     self.mem.set_special_range_read_funcs(self.lock_base, r32=self.lock_mgr.r32_lock)
     log_mem_init.info(self.lock_mgr)
     # create file manager
-    self.file_mgr = FileManager(ctx.path_mgr, ctx.alloc)
+    self.file_mgr = FileManager(ctx.path_mgr, ctx.alloc, ctx.mem)
+    # currently we use a single fake port for all devices
+    self.fs_handler_port = ctx.exec_lib.port_mgr.create_port("FakeFSPort",self.file_mgr)
+    log_dos.info("dos fs handler port: %06x" % self.fs_handler_port)
     self.file_mgr.setup(self.fs_handler_port)
 
   def finish_lib(self, ctx):
+    # free port
+    ctx.exec_lib.port_mgr.free_port(self.fs_handler_port)
     # finish file manager
     self.file_mgr.finish()
     # free dos list
     self.dos_list.free_list()
-    # free port
-    ctx.exec_lib.port_mgr.free_port(self.fs_handler_port)
     # free RootNode
     ctx.alloc.free_struct(self.root_struct)
     # free DosInfo
     ctx.alloc.free_struct(self.dos_info)
     AmigaLibrary.finish_lib(self, ctx)
-
-  # ----- Direct Handler Access -----
-
-  # callback from port manager for fs handler port
-  # -> Async I/O
-  def put_msg(self, port_mgr, msg_addr):
-    msg = AccessStruct(self.ctx.mem,MessageDef,struct_addr=msg_addr)
-    dos_pkt_addr = msg.r_s("mn_Node.ln_Name")
-    dos_pkt = AccessStruct(self.ctx.mem,DosPacketDef,struct_addr=dos_pkt_addr)
-    reply_port_addr = dos_pkt.r_s("dp_Port")
-    pkt_type = dos_pkt.r_s("dp_Type")
-    log_dos.info("DosPacket: msg=%06x -> pkt=%06x: reply_port=%06x type=%06x", msg_addr, dos_pkt_addr, reply_port_addr, pkt_type)
-    # handle packet
-    if pkt_type == ord('R'): # read
-      fh_b_addr = dos_pkt.r_s("dp_Arg1")
-      buf_ptr   = dos_pkt.r_s("dp_Arg2")
-      size      = dos_pkt.r_s("dp_Arg3")
-      # get fh and read
-      fh = self.file_mgr.get_by_b_addr(fh_b_addr)
-      data = self.file_mgr.read(fh, size)
-      self.ctx.mem.access.w_data(buf_ptr, data)
-      got = len(data)
-      log_dos.info("DosPacket: Read fh_b_addr=%06x buf=%06x len=%06x -> got=%06x fh=%s", fh_b_addr, buf_ptr, size, got, fh)
-      dos_pkt.w_s("dp_Res1", got)
-    elif pkt_type == ord('W'): # write
-      fh_b_addr = dos_pkt.r_s("dp_Arg1")
-      buf_ptr   = dos_pkt.r_s("dp_Arg2")
-      size      = dos_pkt.r_s("dp_Arg3")
-      fh = self.file_mgr.get_by_b_addr(fh_b_addr)
-      data = self.ctx.mem.access.r_data(buf_ptr, size)
-      self.file_mgr.write(fh, data)
-      put = len(data)
-      log_dos.info("DosPacket: Write fh=%06x buf=%06x len=%06x -> put=%06x fh=%s", fh_b_addr, buf_ptr, size, put, fh)
-      dos_pkt.w_s("dp_Res1", put)
-    else:
-      raise UnsupportedFeatureError("Unsupported DosPacket: type=%d" % pkt_type)
-    # do reply
-    if not port_mgr.has_port(reply_port_addr):
-      port_mgr.register_port(reply_port_addr)
-    port_mgr.put_msg(reply_port_addr, msg_addr)
 
   # ----- IoErr -----
 

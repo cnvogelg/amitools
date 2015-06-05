@@ -6,7 +6,9 @@ import errno
 import stat
 
 from amitools.vamos.Log import log_file
-from DosStruct import FileHandleDef
+from amitools.vamos.AccessStruct import AccessStruct
+from DosStruct import FileHandleDef, DosPacketDef
+from amitools.vamos.lib.lexec.ExecStruct import MessageDef
 from Error import *
 from DosProtection import DosProtection
 
@@ -42,9 +44,10 @@ class AmiFile:
 
 
 class FileManager:
-  def __init__(self, path_mgr, alloc):
+  def __init__(self, path_mgr, alloc, mem):
     self.path_mgr = path_mgr
     self.alloc = alloc
+    self.mem = mem
 
     self.files_by_b_addr = {}
 
@@ -250,3 +253,45 @@ class FileManager:
       return NO_ERROR
     except OSError:
       return ERROR_OBJECT_EXISTS
+
+  # ----- Direct Handler Access -----
+
+  # callback from port manager for fs handler port
+  # -> Async I/O
+  def put_msg(self, port_mgr, msg_addr):
+    msg = AccessStruct(self.mem,MessageDef,struct_addr=msg_addr)
+    dos_pkt_addr = msg.r_s("mn_Node.ln_Name")
+    dos_pkt = AccessStruct(self.mem,DosPacketDef,struct_addr=dos_pkt_addr)
+    reply_port_addr = dos_pkt.r_s("dp_Port")
+    pkt_type = dos_pkt.r_s("dp_Type")
+    log_file.info("DosPacket: msg=%06x -> pkt=%06x: reply_port=%06x type=%06x", msg_addr, dos_pkt_addr, reply_port_addr, pkt_type)
+    # handle packet
+    if pkt_type == ord('R'): # read
+      fh_b_addr = dos_pkt.r_s("dp_Arg1")
+      buf_ptr   = dos_pkt.r_s("dp_Arg2")
+      size      = dos_pkt.r_s("dp_Arg3")
+      # get fh and read
+      fh = self.get_by_b_addr(fh_b_addr)
+      data = self.read(fh, size)
+      self.mem.access.w_data(buf_ptr, data)
+      got = len(data)
+      log_file.info("DosPacket: Read fh_b_addr=%06x buf=%06x len=%06x -> got=%06x fh=%s", fh_b_addr, buf_ptr, size, got, fh)
+      dos_pkt.w_s("dp_Res1", got)
+    elif pkt_type == ord('W'): # write
+      fh_b_addr = dos_pkt.r_s("dp_Arg1")
+      buf_ptr   = dos_pkt.r_s("dp_Arg2")
+      size      = dos_pkt.r_s("dp_Arg3")
+      fh = self.get_by_b_addr(fh_b_addr)
+      data = self.mem.access.r_data(buf_ptr, size)
+      self.file_mgr.write(fh, data)
+      put = len(data)
+      log_file.info("DosPacket: Write fh=%06x buf=%06x len=%06x -> put=%06x fh=%s", fh_b_addr, buf_ptr, size, put, fh)
+      dos_pkt.w_s("dp_Res1", put)
+    else:
+      raise UnsupportedFeatureError("Unsupported DosPacket: type=%d" % pkt_type)
+    # do reply
+    if not port_mgr.has_port(reply_port_addr):
+      port_mgr.register_port(reply_port_addr)
+    port_mgr.put_msg(reply_port_addr, msg_addr)
+
+
