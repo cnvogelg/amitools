@@ -17,64 +17,45 @@ class AmiLock:
     self.sys_path = sys_path
     self.name = name
     self.exclusive = exclusive
-    self.addr = 0
+    self.mem = None
     self.b_addr = 0
     self.dirent = []
+
   def __str__(self):
-    return "[Lock:'%s'(ami='%s',sys='%s',ex=%d)@%06x=b@%06x]" % (self.name, self.ami_path, self.sys_path, self.exclusive, self.addr, self.b_addr)
+    return "[Lock:'%s'(ami='%s',sys='%s',ex=%d)@%06x=b@%06x]" % (self.name, self.ami_path, self.sys_path, self.exclusive, self.mem.addr, self.b_addr)
 
-class LockManager(LabelRange):
-  def __init__(self, path_mgr, doslist_mgr, base_addr, size):
+  def alloc(self, alloc, vol_baddr):
+    name = "Lock:" + self.name
+    self.mem = alloc.alloc_struct(name, FileLockDef)
+    self.mem.access.w_s("fl_Volume", vol_baddr)
+    self.b_addr = self.mem.addr >> 2
+    return self.b_addr
+
+  def free(self, alloc):
+    alloc.free_struct(self.mem)
+
+
+class LockManager:
+  def __init__(self, path_mgr, dos_list, alloc):
     self.path_mgr = path_mgr
-    self.doslist_mgr = doslist_mgr
-    self.base_addr = base_addr
-    self.cur_addr = base_addr
-    log_lock.info("init manager: base=%06x" % self.base_addr)
+    self.dos_list = dos_list
+    self.alloc = alloc
+
     self.locks_by_b_addr = {}
-    LabelRange.__init__(self, "locks", base_addr, size)
-    self.lock_def  = FileLockDef
-    self.lock_size = FileLockDef.get_size()
-
-  # direct read access to lock structure
-  def r32_lock(self, addr):
-    # find out associated file handle
-    rel = int((addr - self.base_addr) / self.lock_size)
-    lock_addr = self.base_addr + rel * self.lock_size
-    b_addr = lock_addr >> 2
-    lock = self.get_by_b_addr(b_addr, none_if_missing=True)
-    if lock != None:
-      # get addon text
-      delta = addr - lock_addr
-      name,off,val_type_name = self.lock_def.get_name_for_offset(delta, 2)
-      type_name = self.lock_def.get_type_name()
-      addon="%s+%d = %s(%s)+%d  %s" % (type_name, delta, name, val_type_name, off, lock)
-
-      # get some special values
-      val = 0
-      # get DosList entry of associated volume
-      if name == 'fl_Volume':
-        ami_path = lock.ami_path
-        volume_name = self.path_mgr.ami_volume_of_path(ami_path)
-        log_lock.debug("fl_Volume: looking up volume '%s' of %s",volume_name,lock)
-        volume = self.doslist_mgr.get_entry_by_name(volume_name)
-        if volume == None:
-          raise VamosInternalError("No DosList entry found for volume '%s'" % volume_name)
-        val = volume.baddr
-
-      self.trace_mem_int('R', 2, addr, val, text="LOCK", level=logging.INFO, addon=addon)
-      return val
-    else:
-      # outside of locks
-      addon = "lock=B%06x  cur_lock=B%06x" % (b_addr, self.cur_addr >> 2)
-      self.trace_mem_int('R', 2, addr, 0, text="LOCK??", level=logging.WARN, addon=addon)
-      return 0
 
   def _register_lock(self, lock):
-    addr = self.cur_addr
-    self.cur_addr += self.lock_size
-    lock.addr = addr
-    lock.b_addr = addr >> 2
-    self.locks_by_b_addr[lock.b_addr] = lock
+    # look up volume
+    volume_name = self.path_mgr.ami_volume_of_path(lock.ami_path)
+    log_lock.debug("fl_Volume: looking up volume '%s' of %s",volume_name,lock)
+    volume = self.dos_list.get_entry_by_name(volume_name)
+    if volume is None:
+      vol_baddr = 0
+      log_lock.warn("lock volume? volume=%s lock=%s",volume,lock)
+    else:
+      vol_baddr = volume.baddr
+    # allocate lock struct
+    b_addr = lock.alloc(self.alloc, vol_baddr)
+    self.locks_by_b_addr[b_addr] = lock
     log_lock.info("registered: %s" % lock)
 
   def _unregister_lock(self, lock):
@@ -87,6 +68,7 @@ class LockManager(LabelRange):
     log_lock.info("unregistered: %s" % lock)
     lock.b_addr = 0
     lock.addr = 0
+    lock.free(self.alloc)
 
   def create_lock(self, ami_path, exclusive):
     if ami_path == '':
