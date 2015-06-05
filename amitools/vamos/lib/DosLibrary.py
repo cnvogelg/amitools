@@ -66,15 +66,12 @@ class DosLibrary(AmigaLibrary):
     self.mem.set_special_range_read_funcs(self.lock_base, r32=self.lock_mgr.r32_lock)
     log_mem_init.info(self.lock_mgr)
     # create file manager
-    self.file_base = self.ctx.mem.reserve_special_range()
-    self.file_size = 0x010000
-    self.file_mgr = FileManager(ctx.path_mgr, self.file_base, self.file_size)
-    self.file_mgr.set_fs_handler_port(self.fs_handler_port)
-    ctx.label_mgr.add_label(self.file_mgr)
-    self.mem.set_special_range_read_funcs(self.file_base, r32=self.file_mgr.r32_fh)
-    log_mem_init.info(self.file_mgr)
+    self.file_mgr = FileManager(ctx.path_mgr, ctx.alloc)
+    self.file_mgr.setup(self.fs_handler_port)
 
   def finish_lib(self, ctx):
+    # finish file manager
+    self.file_mgr.finish()
     # free dos list
     self.dos_list.free_list()
     # free port

@@ -6,7 +6,6 @@ import errno
 import stat
 
 from amitools.vamos.Log import log_file
-from amitools.vamos.label.LabelRange import LabelRange
 from DosStruct import FileHandleDef
 from Error import *
 from DosProtection import DosProtection
@@ -17,53 +16,63 @@ class AmiFile:
     self.name = os.path.basename(sys_path)
     self.ami_path = ami_path
     self.sys_path = sys_path
-    self.addr = 0
     self.b_addr = 0
     self.need_close = need_close
 
   def __str__(self):
-    return "[FH:'%s'(ami='%s',sys='%s',nc=%s)@%06x=B@%06x]" % (self.name, self.ami_path, self.sys_path, self.need_close, self.addr, self.b_addr)
+    return "[FH:'%s'(ami='%s',sys='%s',nc=%s)@%06x=B@%06x]" % (self.name, self.ami_path, self.sys_path, self.need_close, self.mem.addr, self.b_addr)
 
   def close(self):
     if self.need_close:
       self.obj.close()
 
-class FileManager(LabelRange):
-  def __init__(self, path_mgr, base_addr, size):
+  def alloc_fh(self, alloc, fs_handler_port):
+    name = "File:" + self.name
+    self.mem = alloc.alloc_struct(name, FileHandleDef)
+    self.b_addr = self.mem.addr >> 2
+    # -- fill filehandle
+    # use baddr of FH itself as identifier
+    self.mem.access.w_s("fh_Args", self.b_addr)
+    # set port
+    self.mem.access.w_s("fh_Type", fs_handler_port)
+    return self.b_addr
+
+  def free_fh(self, alloc):
+    alloc.free_struct(self.mem)
+
+
+class FileManager:
+  def __init__(self, path_mgr, alloc):
     self.path_mgr = path_mgr
-    self.base_addr = base_addr
-    self.cur_addr = base_addr
-    log_file.info("init manager: base=%06x" % self.base_addr)
+    self.alloc = alloc
+
     self.files_by_b_addr = {}
-    LabelRange.__init__(self, "files", base_addr, size)
-    self.fh_def  = FileHandleDef
-    self.fh_size = FileHandleDef.get_size()
-    self.fh_size = (self.fh_size + 3) & ~3
+
+    # buffering
     self.unch = ''
     self.ch = -1
+    # get current umask
+    self.umask = os.umask(0)
+    os.umask(self.umask)
 
+  def setup(self, fs_handler_port):
+    self.fs_handler_port = fs_handler_port
     # setup std input/output
     self.std_input = AmiFile(sys.stdin,'<STDIN>','',need_close=False)
     self.std_output = AmiFile(sys.stdout,'<STDOUT>','',need_close=False)
     self._register_file(self.std_input)
     self._register_file(self.std_output)
 
-    # get current umask
-    self.umask = os.umask(0)
-    os.umask(self.umask)
-
-  def set_fs_handler_port(self, addr):
-    self.fs_handler_port = addr
+  def finish(self):
+    self._unregister_file(self.std_input)
+    self._unregister_file(self.std_output)
 
   def get_fs_handler_port(self):
     return self.fs_handler_port
 
   def _register_file(self, fh):
-    addr = self.cur_addr
-    self.cur_addr += self.fh_size
-    fh.addr = addr
-    fh.b_addr = addr >> 2
-    self.files_by_b_addr[fh.b_addr] = fh
+    baddr = fh.alloc_fh(self.alloc, self.fs_handler_port)
+    self.files_by_b_addr[baddr] = fh
     log_file.info("registered: %s" % fh)
 
   def _unregister_file(self,fh):
@@ -72,37 +81,7 @@ class FileManager(LabelRange):
       raise ValueError("Invalid File to unregister: %s" % fh)
     del self.files_by_b_addr[fh.b_addr]
     log_file.info("unregistered: %s"% fh)
-    fh.addr = 0
-    fh.b_addr = 0
-
-  # directly read from file handle structure
-  def r32_fh(self, addr):
-    # find out associated file handle
-    rel = int((addr - self.addr) / self.fh_size)
-    fh_addr = self.addr + rel * self.fh_size
-    b_addr = fh_addr >> 2
-    fh = self.get_by_b_addr(b_addr)
-    if fh != None:
-      # get addon text
-      delta = addr - fh_addr
-      name,off,val_type_name = self.fh_def.get_name_for_offset(delta, 2)
-      type_name = self.fh_def.get_type_name()
-      addon="%s+%d = %s(%s)+%d  %s" % (type_name, delta, name, val_type_name, off, fh)
-
-      # inject some special values to allow PutMsg handler access
-      val = 0
-      if name == 'fh_Args':
-        # identifier for File -> use FH itself
-        val = b_addr
-      elif name == 'fh_Type':
-        # PutMsg port
-        val = self.fs_handler_port
-
-      self.trace_mem_int('R', 2, addr, val, text="FILE", level=logging.INFO, addon=addon)
-      return val
-    else:
-      self.trace_mem_int('R', 2, addr, val, text="NO_FILE", level=logging.WARN)
-      return 0
+    fh.free_fh(self.alloc)
 
   def get_input(self):
     return self.std_input
