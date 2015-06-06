@@ -10,7 +10,7 @@ class DosListEntry:
     self.baddr = 0
 
   def __str__(self):
-    return "[%s@%06x=b@%06x]" % (self.name, self.addr, self.baddr)
+    return "[%s@%06x=b@%06x]" % (self.name, self.mem.addr, self.baddr)
 
 class DosList:
   def __init__(self, alloc):

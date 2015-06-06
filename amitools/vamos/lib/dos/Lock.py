@@ -22,7 +22,10 @@ class Lock:
     self.dirent = []
 
   def __str__(self):
-    return "[Lock:'%s'(ami='%s',sys='%s',ex=%d)@%06x=b@%06x]" % (self.name, self.ami_path, self.sys_path, self.exclusive, self.mem.addr, self.b_addr)
+    addr = 0
+    if self.mem is not None:
+      addr = self.mem.addr
+    return "[Lock:'%s'(ami='%s',sys='%s',ex=%d)@%06x=b@%06x]" % (self.name, self.ami_path, self.sys_path, self.exclusive, addr, self.b_addr)
 
   def alloc(self, alloc, vol_baddr):
     name = "Lock:" + self.name
