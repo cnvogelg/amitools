@@ -27,13 +27,14 @@ log_utility = logging.getLogger('utility')
 log_proc = logging.getLogger('proc')
 log_prof = logging.getLogger('prof')
 
-log_tp = logging.getLogger('tp') 
+log_tp = logging.getLogger('tp')
+log_hw = logging.getLogger('hw')
 
 loggers = [
-  log_main, log_mem, log_mem_init, log_mem_alloc, log_mem_int, 
-  log_instr, log_lib, log_libmgr, log_path, log_file, log_lock, 
+  log_main, log_mem, log_mem_init, log_mem_alloc, log_mem_int,
+  log_instr, log_lib, log_libmgr, log_path, log_file, log_lock,
   log_doslist, log_res, log_dos, log_exec, log_proc, log_prof,
-  log_tp, log_utility
+  log_tp, log_utility, log_hw
 ]
 
 # --- end ---
@@ -64,7 +65,7 @@ def log_help():
   for l in levels:
     print "  %s" % l
 
-def log_setup(arg=None, verbose=False, quiet=False, log_file=None):  
+def log_setup(arg=None, verbose=False, quiet=False, log_file=None):
   # setup handler
   if log_file != None:
     ch = logging.FileHandler(log_file, mode='w')
@@ -76,24 +77,24 @@ def log_setup(arg=None, verbose=False, quiet=False, log_file=None):
   ch.setFormatter(formatter)
   for l in loggers:
     l.addHandler(ch)
-  
+
   # setup default
   level = logging.WARN
   if quiet:
     level = logging.ERROR
   for l in loggers:
     l.setLevel(level)
-    
+
   # special default for profiling
   log_prof.setLevel(logging.INFO)
-  
+
   # is verbose enabled?
   if verbose:
     log_main.setLevel(logging.INFO)
-  
+
   # parse args
   if arg != None:
-    kvs = arg.split(',')  
+    kvs = arg.split(',')
     for kv in kvs:
       if kv.find(':') == -1:
         return False
@@ -114,5 +115,5 @@ def log_setup(arg=None, verbose=False, quiet=False, log_file=None):
               break
           if not found:
             return False
-  
+
   return True

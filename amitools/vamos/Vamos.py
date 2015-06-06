@@ -8,6 +8,7 @@ from SegmentLoader import SegmentLoader
 from path.PathManager import PathManager
 from ErrorTracker import ErrorTracker
 from Trampoline import Trampoline
+from HardwareAccess import HardwareAccess
 
 # lib
 from lib.ExecLibrary import ExecLibrary
@@ -17,6 +18,7 @@ from lib.IntuitionLibrary import IntuitionLibrary
 
 from Log import *
 from CPU import *
+from Exceptions import *
 
 class Vamos:
 
@@ -27,6 +29,14 @@ class Vamos:
     self.cpu_type = cfg.cpu
     self.traps = traps
     self.cfg = cfg
+
+    # too much RAM requested?
+    # our "custom chips" start at $BFxxxx so we allow RAM only to be below
+    if self.ram_size >= 0xbf0000:
+      raise VamosConfigError("Too much RAM configured! Only up to $BF0000 allowed.")
+
+    # setup custom chips
+    self.hw_access = HardwareAccess(raw_mem)
 
     # path manager
     self.path_mgr = PathManager( cfg )

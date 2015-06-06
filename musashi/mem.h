@@ -27,6 +27,7 @@ extern int  mem_init(uint ram_size_kib);
 extern void mem_free(void);
 
 extern void mem_set_invalid_func(invalid_func_t func, void *ctx);
+extern void mem_set_all_to_end(void);
 extern int  mem_is_end(void);
 
 extern void mem_set_trace_mode(int on);

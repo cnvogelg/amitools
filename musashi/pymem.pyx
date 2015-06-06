@@ -10,6 +10,7 @@ cdef extern from "mem.h":
   void mem_free()
 
   void mem_set_invalid_func(invalid_func_t func, void *ctx)
+  void mem_set_all_to_end()
   int  mem_is_end()
 
   void mem_set_trace_mode(int on)
@@ -49,7 +50,6 @@ cdef uint special_read_func_wrapper(uint addr, void *ctx) except *:
 
 cdef void special_write_func_wrapper(uint addr, uint value, void *ctx) except *:
   cdef object py_func = <object>ctx
-  print("WRITE: addr=%06x func=%s" % (addr,py_func))
   py_func(addr, value)
 
 # public Memory class
@@ -74,6 +74,9 @@ cdef class Memory:
 
   def get_ram_size(self):
     return self.ram_size
+
+  def set_all_to_end(self):
+    mem_set_all_to_end()
 
   def is_end(self):
     return mem_is_end()

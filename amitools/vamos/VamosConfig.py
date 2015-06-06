@@ -67,18 +67,18 @@ class VamosConfig(ConfigParser.SafeConfigParser):
     ConfigParser.SafeConfigParser.__init__(self)
     self.files = []
     self.args = args
-    
+
     # keep errors until logging is available
     self.errors = []
 
     # prepend extra file
     if extra_file != None:
-      self.files.append(extra_file)    
+      self.files.append(extra_file)
     # add config in current working dir
     self.files.append(os.path.join(os.getcwd(),".vamosrc"))
     # add config in home directory
     self.files.append(os.path.expanduser("~/.vamosrc"))
-    
+
     # read configs
     self.found_files = self.read(self.files)
 
@@ -137,26 +137,27 @@ class VamosConfig(ConfigParser.SafeConfigParser):
     }
     # define keys that can be set
     self._keys = {
-      'logging' : str, 
-      'verbose' : int, 
+      'logging' : str,
+      'verbose' : int,
       'quiet' : bool,
-      'benchmark' : bool, 
+      'benchmark' : bool,
       'log_file' : str,
-      'instr_trace' : bool, 
-      'memory_trace' : bool, 
+      'instr_trace' : bool,
+      'memory_trace' : bool,
       'internal_memory_trace' : bool,
-      'cycles_per_block' : int, 
+      'cycles_per_block' : int,
       'max_cycles' : int,
-      'ram_size' : int, 
+      'ram_size' : int,
       'stack_size' : int,
       'data_dir' : str,
       'cpu' : str,
-      'reg_dump' : bool
+      'reg_dump' : bool,
+      'hw_access' : str
     }
     # prefill keys with None
     for key in self._keys:
       setattr(self, key, None)
-  
+
   def _check_cpu(self, val):
     return val in ('68000','68020','000','020','00','20')
 
@@ -187,11 +188,11 @@ class VamosConfig(ConfigParser.SafeConfigParser):
       if self.has_option(sect, key) and getattr(self, key) == None:
         value = self.get(sect, key)
         self._set_value(key, value)
-  
+
   def _parse_args(self, args):
-    # get paramters from args
+    # get paramters from args (allow to overwrite existing settings)
     for key in self._keys:
-      if hasattr(args, key) and getattr(self, key) == None:
+      if hasattr(args, key):
         arg_value = getattr(args, key)
         if arg_value != None:
           self._set_value(key, arg_value)

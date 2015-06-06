@@ -21,6 +21,7 @@ from amitools.vamos.VamosConfig import VamosConfig
 from amitools.vamos.path.PathManager import PathManager
 from amitools.vamos.VamosRun import VamosRun
 from amitools.vamos.Process import Process
+from amitools.vamos.HardwareAccess import HardwareAccess
 
 # ----- main -----------------------------------------------------------------
 # retrieve vamos home and data dir
@@ -52,6 +53,7 @@ parser.add_argument('-p', '--path', action='append', default=None, help="define 
 parser.add_argument('-D', '--data-dir', action='store', default=data_dir, help="set vamos data directory (default: %s)" % data_dir)
 parser.add_argument('-b', '--benchmark', action='store_true', default=False, help="enable benchmarking")
 parser.add_argument('-C', '--cpu', action='store', default="68000", help="Set type of CPU to emulate (68000 or 68020)")
+parser.add_argument('-H', '--hw-access', action='store', default='emu', help="What to do on direct HW access? (emu,ignore,abort)")
 args = parser.parse_args()
 
 # --- init config ---
@@ -76,6 +78,10 @@ log_main.info("setting up CPU: %s = %d" % (cfg.cpu, cpu_type))
 cpu = emu.CPU(cpu_type)
 
 # setup memory
+max_mem = 0xbf0000 / 1024
+if cfg.ram_size >= max_mem:
+  log_main.error("too much RAM requested. max allowed KiB: %d", max_mem)
+  sys.exit(1)
 mem = emu.Memory(cfg.ram_size)
 log_main.info("setting up main memory with %s KiB RAM: top=%06x" % (cfg.ram_size, cfg.ram_size * 1024))
 
@@ -84,6 +90,18 @@ traps = emu.Traps()
 
 # combine to vamos instance
 vamos = Vamos(mem, cpu, traps, cfg)
+
+# direct hw access
+if cfg.hw_access == "emu":
+  vamos.hw_access.set_mode(HardwareAccess.MODE_EMU)
+elif cfg.hw_access == "ignore":
+  vamos.hw_access.set_mode(HardwareAccess.MODE_IGNORE)
+elif cfg.hw_access == "abort":
+  vamos.hw_access.set_mode(HardwareAccess.MODE_ABORT)
+else:
+  log_main.error("Invalid HW Access mode: %s",cfg.hw_access)
+  sys.exit(1)
+log_main.info("setting up HW Access mode: %s",cfg.hw_access)
 
 # enable mem trace?
 if cfg.memory_trace:
