@@ -10,7 +10,7 @@ import os
 
 from amitools.vamos.Log import *
 from amitools.vamos.VamosConfig import *
-from amitools.vamos.PathManager import PathManager
+from amitools.vamos.path.PathManager import PathManager
 from amitools.vamos.lib.dos.PathMatch import PathMatch
 
 # --- args ---
@@ -33,8 +33,7 @@ log_setup(args.logging,verbose=args.verbose)
 cfg = VamosConfig(extra_file=args.config_file, args=args)
 
 # --- setup path manager ---
-pm = PathManager()
-pm.parse(cfg, args.volume, args.assign, args.auto_assign, args.path)
+pm = PathManager(cfg)
 
 # --- main ---
 op = args.op
@@ -76,9 +75,9 @@ elif op == 'match':
       match = matcher.next()
 # assign manager
 elif op == 'assign':
-  print pm.assign_mgr.ami_path_resolve(args.arg)  
+  print pm.assign_mgr.ami_path_resolve(args.arg)
 elif op == 'resolve':
-  print pm.assign_mgr.ami_path_resolve_assigns(args.arg)  
+  print pm.assign_mgr.ami_path_resolve_assigns(args.arg)
 elif op == 'auto':
   print pm.assign_mgr.ami_path_resolve_auto_assigns(args.arg)
 # volume manager ops
