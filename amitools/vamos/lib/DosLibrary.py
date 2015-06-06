@@ -487,7 +487,7 @@ class DosLibrary(AmigaLibrary):
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
     log_dos.info("Examine: %s fib=%06x" % (lock, fib_ptr))
     fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
-    self.io_err = self.lock_mgr.examine_lock(lock, fib)
+    self.io_err = lock.examine_lock(fib)
     if self.io_err == NO_ERROR:
       return self.DOSTRUE
     else:
@@ -499,7 +499,7 @@ class DosLibrary(AmigaLibrary):
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
     log_dos.info("ExNext: %s fib=%06x" % (lock, fib_ptr))
     fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
-    self.io_err = self.lock_mgr.examine_next(lock, fib)
+    self.io_err = lock.examine_next(fib)
     if self.io_err == NO_ERROR:
       return self.DOSTRUE
     else:

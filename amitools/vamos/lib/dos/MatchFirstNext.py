@@ -61,7 +61,7 @@ class MatchFirstNext:
     lock = self.lock_mgr.create_lock(path, False)
     fib_ptr = self.anchor.s_get_addr('ap_Info')
     fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
-    io_err = self.lock_mgr.examine_lock(lock, fib)
+    io_err = lock.examine_lock(fib)
     self.lock_mgr.release_lock(lock)
     # store path name of first name at end of structure
     if self.str_len > 0:
