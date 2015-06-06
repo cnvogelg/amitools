@@ -157,14 +157,14 @@ class DosLibrary(AmigaLibrary):
     flags = ctx.cpu.r_reg(REG_D4)
     if size == 0:
       self.io_err = ERROR_BAD_NUMBER
-      return -1
+      return self.DOSFALSE
 
     name = ctx.mem.access.r_cstr(name_ptr)
     ctx.mem.access.w_cstr(buff_ptr, '')
     log_dos.info('GetVar("%s", 0x%x, %d, 0x%x) -> -1' % (name, buff_ptr, size, flags))
 
     self.io_err = ERROR_OBJECT_NOT_FOUND
-    return -1
+    return self.DOSFALSE
 
   # ----- File Ops -----
 
