@@ -10,30 +10,7 @@ from AmiTime import *
 from DosStruct import *
 from Error import *
 from DosProtection import DosProtection
-
-class AmiLock:
-  def __init__(self, name, ami_path, sys_path, exclusive=False):
-    self.ami_path = ami_path
-    self.sys_path = sys_path
-    self.name = name
-    self.exclusive = exclusive
-    self.mem = None
-    self.b_addr = 0
-    self.dirent = []
-
-  def __str__(self):
-    return "[Lock:'%s'(ami='%s',sys='%s',ex=%d)@%06x=b@%06x]" % (self.name, self.ami_path, self.sys_path, self.exclusive, self.mem.addr, self.b_addr)
-
-  def alloc(self, alloc, vol_baddr):
-    name = "Lock:" + self.name
-    self.mem = alloc.alloc_struct(name, FileLockDef)
-    self.mem.access.w_s("fl_Volume", vol_baddr)
-    self.b_addr = self.mem.addr >> 2
-    return self.b_addr
-
-  def free(self, alloc):
-    alloc.free_struct(self.mem)
-
+from Lock import Lock
 
 class LockManager:
   def __init__(self, path_mgr, dos_list, alloc):
@@ -84,7 +61,7 @@ class LockManager:
     if not exists:
       log_lock.info("lock '%s' invalid: sys path does not exist: '%s' -> '%s'", name, ami_path, sys_path)
       return None
-    lock = AmiLock(name, ami_path, sys_path, exclusive)
+    lock = Lock(name, ami_path, sys_path, exclusive)
     self._register_lock(lock)
     return lock
 
@@ -105,7 +82,7 @@ class LockManager:
       (cur_dev, cur_path) = self.path_mgr.get_cur_path()
       ami_path = cur_dev + ":" + cur_path
       sys_path = self.path_mgr.ami_to_sys_path(ami_path)
-      return AmiLock("local",ami_path,sys_path)
+      return Lock("local",ami_path,sys_path)
     elif self.locks_by_b_addr.has_key(b_addr):
       return self.locks_by_b_addr[b_addr]
     else:

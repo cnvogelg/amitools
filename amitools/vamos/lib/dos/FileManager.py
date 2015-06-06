@@ -7,41 +7,11 @@ import stat
 
 from amitools.vamos.Log import log_file
 from amitools.vamos.AccessStruct import AccessStruct
-from DosStruct import FileHandleDef, DosPacketDef
+from DosStruct import DosPacketDef
 from amitools.vamos.lib.lexec.ExecStruct import MessageDef
 from Error import *
 from DosProtection import DosProtection
-
-class AmiFile:
-  def __init__(self, obj, ami_path, sys_path, need_close=True):
-    self.obj = obj
-    self.name = os.path.basename(sys_path)
-    self.ami_path = ami_path
-    self.sys_path = sys_path
-    self.b_addr = 0
-    self.need_close = need_close
-
-  def __str__(self):
-    return "[FH:'%s'(ami='%s',sys='%s',nc=%s)@%06x=B@%06x]" % (self.name, self.ami_path, self.sys_path, self.need_close, self.mem.addr, self.b_addr)
-
-  def close(self):
-    if self.need_close:
-      self.obj.close()
-
-  def alloc_fh(self, alloc, fs_handler_port):
-    name = "File:" + self.name
-    self.mem = alloc.alloc_struct(name, FileHandleDef)
-    self.b_addr = self.mem.addr >> 2
-    # -- fill filehandle
-    # use baddr of FH itself as identifier
-    self.mem.access.w_s("fh_Args", self.b_addr)
-    # set port
-    self.mem.access.w_s("fh_Type", fs_handler_port)
-    return self.b_addr
-
-  def free_fh(self, alloc):
-    alloc.free_struct(self.mem)
-
+from FileHandle import FileHandle
 
 class FileManager:
   def __init__(self, path_mgr, alloc, mem):
@@ -61,8 +31,8 @@ class FileManager:
   def setup(self, fs_handler_port):
     self.fs_handler_port = fs_handler_port
     # setup std input/output
-    self.std_input = AmiFile(sys.stdin,'<STDIN>','',need_close=False)
-    self.std_output = AmiFile(sys.stdout,'<STDOUT>','',need_close=False)
+    self.std_input = FileHandle(sys.stdin,'<STDIN>','',need_close=False)
+    self.std_output = FileHandle(sys.stdout,'<STDOUT>','',need_close=False)
     self._register_file(self.std_input)
     self._register_file(self.std_output)
 
@@ -99,10 +69,10 @@ class FileManager:
       if uname == 'NIL:':
         sys_name = "/dev/null"
         fobj = open(sys_name, f_mode)
-        fh = AmiFile(fobj, ami_path, sys_name)
+        fh = FileHandle(fobj, ami_path, sys_name)
       elif uname in ('*','CONSOLE:'):
         sys_name = ''
-        fh = AmiFile(sys.stdout,'*','',need_close=False)
+        fh = FileHandle(sys.stdout,'*','',need_close=False)
       else:
         # map to system path
         sys_path = self.path_mgr.ami_to_sys_path(ami_path)
@@ -119,7 +89,7 @@ class FileManager:
 
         log_file.debug("opening file: '%s' -> '%s' f_mode=%s" % (ami_path, sys_path, f_mode))
         fobj = open(sys_path, f_mode)
-        fh = AmiFile(fobj, ami_path, sys_path)
+        fh = FileHandle(fobj, ami_path, sys_path)
 
       self._register_file(fh)
       return fh
@@ -246,7 +216,7 @@ class FileManager:
     except OSError:
       return ERROR_OBJECT_WRONG_TYPE
 
-  def  create_dir(self, ami_path):
+  def create_dir(self, ami_path):
     sys_path = self.path_mgr.ami_to_sys_path(ami_path)
     try:
       os.mkdir(sys_path)
