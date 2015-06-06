@@ -21,9 +21,6 @@ class FileManager:
 
     self.files_by_b_addr = {}
 
-    # buffering
-    self.unch = ''
-    self.ch = -1
     # get current umask
     self.umask = os.umask(0)
     os.umask(self.umask)
@@ -108,42 +105,6 @@ class FileManager:
       addr = b_addr << 2
       raise ValueError("Invalid File Handle at b@%06x = %06x" % (b_addr, addr))
 
-  def write(self, fh, data):
-    fh.obj.write(data)
-    return len(data)
-
-  def read(self, fh, len):
-    d = fh.obj.read(len)
-    return d
-
-  def getc(self, fh):
-    if len(self.unch) > 0:
-      d = self.unch[0]
-      self.unch = self.unch[1:len(self.unch)]
-    else:
-      d = fh.obj.read(1)
-    self.ch = ord(d)
-    return self.ch
-
-  def ungetc(self, fh, var):
-    if var == 0xffffffff:
-        var = -1
-    if var < 0 and self.ch >= 0:
-      var = self.ch
-      self.ch = -1
-    if var >= 0:
-        self.unch = self.unch + chr(var)
-    return var
-
-  def ungets(self, fh, s):
-    self.unch = self.unch + s
-
-  def tell(self, fh):
-    return fh.obj.tell()
-
-  def seek(self, fh, pos, whence):
-    fh.obj.seek(pos, whence)
-
   def delete(self, ami_path):
     sys_path = self.path_mgr.ami_to_sys_path(ami_path)
     if sys_path == None or not os.path.exists(sys_path):
@@ -178,18 +139,6 @@ class FileManager:
     except OSError as e:
       log_file.info("can't rename file: '%s','%s' -> %s" % (old_ami_path, new_ami_path, e))
       return ERROR_OBJECT_IN_USE
-
-  def is_interactive(self, fh):
-    fd = fh.obj.fileno()
-    if hasattr(os, "ttyname"):
-      try:
-        os.ttyname(fd)
-        return True
-      except OSError:
-        return False
-    else:
-      # Not perfect, but best you can do on non-posix to detect a terminal.
-      return sys.stdin.isatty() or sys.stdout.isatty()
 
   def is_file_system(self, name):
     sys_path = self.path_mgr.ami_to_sys_path(name)
@@ -242,7 +191,7 @@ class FileManager:
       size      = dos_pkt.r_s("dp_Arg3")
       # get fh and read
       fh = self.get_by_b_addr(fh_b_addr)
-      data = self.read(fh, size)
+      data = fh.read(size)
       self.mem.access.w_data(buf_ptr, data)
       got = len(data)
       log_file.info("DosPacket: Read fh_b_addr=%06x buf=%06x len=%06x -> got=%06x fh=%s", fh_b_addr, buf_ptr, size, got, fh)
@@ -253,7 +202,7 @@ class FileManager:
       size      = dos_pkt.r_s("dp_Arg3")
       fh = self.get_by_b_addr(fh_b_addr)
       data = self.mem.access.r_data(buf_ptr, size)
-      self.file_mgr.write(fh, data)
+      fh.write(data)
       put = len(data)
       log_file.info("DosPacket: Write fh=%06x buf=%06x len=%06x -> put=%06x fh=%s", fh_b_addr, buf_ptr, size, put, fh)
       dos_pkt.w_s("dp_Res1", put)

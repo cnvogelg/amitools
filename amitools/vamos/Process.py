@@ -106,7 +106,7 @@ class Process:
   # ----- task struct -----
   def init_task_struct(self, input_fh, output_fh):
     # Inject arguments into input stream (Needed for C:Execute)
-    self.ctx.dos_lib.file_mgr.ungets(input_fh, self.arg_text)
+    input_fh.ungets(self.arg_text)
     self.this_task = self.ctx.alloc.alloc_struct(self.bin_basename + "_ThisTask",ProcessDef)
     self.this_task.access.w_s("pr_Task.tc_Node.ln_Type", NT_PROCESS)
     self.this_task.access.w_s("pr_CLI", self.cli.addr)

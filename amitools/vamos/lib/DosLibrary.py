@@ -105,7 +105,7 @@ class DosLibrary(AmigaLibrary):
     # write to stdout
     txt = "%s: %s\n" % (hdr, err_str)
     fh = self.file_mgr.get_output()
-    self.file_mgr.write(fh, txt)
+    fh.write(txt)
     return self.DOSTRUE
 
   # ----- dos API -----
@@ -237,7 +237,7 @@ class DosLibrary(AmigaLibrary):
     size = ctx.cpu.r_reg(REG_D3)
 
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
-    data = self.file_mgr.read(fh, size)
+    data = fh.read(size)
     ctx.mem.access.w_data(buf_ptr, data)
     got = len(data)
     log_dos.info("Read(%s, %06x, %d) -> %d" % (fh, buf_ptr, size, got))
@@ -250,7 +250,7 @@ class DosLibrary(AmigaLibrary):
 
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
     data = ctx.mem.access.r_data(buf_ptr,size)
-    self.file_mgr.write(fh, data)
+    fh.write(data)
     got = len(data)
     log_dos.info("Write(%s, %06x, %d) -> %d" % (fh, buf_ptr, size, got))
     return size
@@ -273,15 +273,15 @@ class DosLibrary(AmigaLibrary):
     else:
       raise UnsupportedFeatureError("Seek: mode=%d" % mode)
 
-    old_pos = self.file_mgr.tell(fh)
-    self.file_mgr.seek(fh, pos, whence)
+    old_pos = fh.tell()
+    fh.seek(pos, whence)
     log_dos.info("Seek(%s, %06x, %s) -> old_pos=%06x" % (fh, pos, mode_str, old_pos))
     return old_pos
 
   def FGetC(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
-    ch = self.file_mgr.getc(fh)
+    ch = fh.getc()
     log_dos.info("FGetC(%s) -> '%c' (%d)" % (fh, ch, ch))
     return ch
 
@@ -290,14 +290,14 @@ class DosLibrary(AmigaLibrary):
     val = ctx.cpu.r_reg(REG_D2)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
     log_dos.info("FPutC(%s, '%c' (%d))" % (fh, val, val))
-    self.file_mgr.write(fh, chr(val))
+    fh.write(chr(val))
     return val
 
   def UnGetC(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     val = ctx.cpu.r_reg(REG_D2)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
-    ch = self.file_mgr.ungetc(fh, val)
+    ch = fh.ungetc(val)
     log_dos.info("UnGetC(%s, %d) -> ch=%c (%d)" % (fh, val, ch, ch))
     return ch
 
@@ -308,7 +308,7 @@ class DosLibrary(AmigaLibrary):
     str_dat = ctx.mem.access.r_cstr(str_ptr)
     # write to stdout
     fh = self.file_mgr.get_output()
-    ok = self.file_mgr.write(fh, str_dat)
+    ok = fh.write(str_dat)
     log_dos.info("PutStr: '%s'", str_dat)
     return 0 # ok
 
@@ -325,7 +325,7 @@ class DosLibrary(AmigaLibrary):
     log_dos.debug("VPrintf: parsed format: %s",ps)
     result = dos.Printf.printf_generate_output(ps)
     # write result
-    self.file_mgr.write(fh, result)
+    fh.write(result)
     return len(result)
 
   def VFWritef(self, ctx):
@@ -384,7 +384,7 @@ class DosLibrary(AmigaLibrary):
           args_ptr = args_ptr + 4
         else:
           out = out + ch
-    self.file_mgr.write(fh, out)
+    fh.write(out)
     return len(out)
 
   # ----- File Ops -----
@@ -425,7 +425,7 @@ class DosLibrary(AmigaLibrary):
   def IsInteractive(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
-    res = self.file_mgr.is_interactive(fh)
+    res = fh.is_interactive()
     log_dos.info("IsInteractive(%s): %s" % (fh, res))
     if res:
       return self.DOSTRUE
@@ -759,7 +759,7 @@ class DosLibrary(AmigaLibrary):
 
   def cs_get(self, ctx):
     if self.cs_input:
-      ch = self.file_mgr.getc(self.cs_input)
+      ch = self.cs_input.getc()
     else:
       if self.cs_curchr < self.cs_length:
         ch = ctx.mem.access.r8(self.cs_buffer + self.cs_curchr)
@@ -770,7 +770,7 @@ class DosLibrary(AmigaLibrary):
 
   def cs_unget(self, ctx):
     if self.cs_input:
-      self.file_mgr.ungetc(self.cs_input, -1)
+      self.cs_input.ungetc(-1)
     else:
       self.cs_curchr = self.cs_curchr - 1
 
