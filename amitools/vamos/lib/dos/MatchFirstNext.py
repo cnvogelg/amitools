@@ -47,7 +47,7 @@ class MatchFirstNext:
     self.achain_dummy = ctx.alloc.alloc_struct("AChain_Dummy", AChainDef)
     self.anchor.w_s('ap_Last', self.achain_dummy.addr)
     self.anchor.w_s('ap_Base', self.achain_dummy.addr)
-    self.achain_dummy.access.w_s('an_Lock', self.dir_lock.addr)
+    self.achain_dummy.access.w_s('an_Lock', self.dir_lock.mem.addr)
 
     # fill first entry
     io_err = self._fill_fib(ctx, self.path)

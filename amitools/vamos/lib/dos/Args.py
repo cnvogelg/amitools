@@ -36,7 +36,7 @@ class Args:
     # read org values
     self.in_val = []
     for t in self.targs:
-      raw = mem_access.read32(ptr)
+      raw = mem_access.r32(ptr)
       # prefill toggle
       if t['t']:
         self.in_val.append(bool(raw))

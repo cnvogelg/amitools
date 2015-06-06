@@ -526,9 +526,9 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("CurrentDir(b@%x): %s -> %s" % (lock_b_addr, old_lock, new_lock))
     # set current path in path mgr
     if new_lock != None:
-      self.path_mgr.set_cur_path(new_lock.ami_path)
+      ctx.path_mgr.set_cur_path(new_lock.ami_path)
     else:
-      self.path_mgr.set_default_cur_path()
+      ctx.path_mgr.set_default_cur_path()
     if old_lock == None:
       return 0
     else:
@@ -576,8 +576,8 @@ class DosLibrary(AmigaLibrary):
     name = ctx.mem.access.r_cstr(name_ptr)
 
     # get volume of path
-    abs_name = self.path_mgr.ami_abs_path(name)
-    volume = self.path_mgr.ami_volume_of_path(abs_name)
+    abs_name = ctx.path_mgr.ami_abs_path(name)
+    volume = ctx.path_mgr.ami_volume_of_path(abs_name)
     vol_lock = self.lock_mgr.create_lock(volume+":", False)
     fs_port = self.file_mgr.get_fs_handler_port()
     addr = self._alloc_mem("DevProc:%s" % name, DevProcDef.get_size())
@@ -602,7 +602,7 @@ class DosLibrary(AmigaLibrary):
     anchor = AccessStruct(self.ctx.mem,AnchorPathDef,struct_addr=anchor_ptr)
 
     # create MatchFirstNext instance
-    mfn = MatchFirstNext(self.path_mgr, self.lock_mgr, pat, anchor)
+    mfn = MatchFirstNext(ctx.path_mgr, self.lock_mgr, pat, anchor)
     log_dos.info("MatchFirst: pat='%s' anchor=%06x strlen=%d flags=%02x-> ok=%s" \
       % (pat, anchor_ptr, mfn.str_len, mfn.flags, mfn.ok))
     if not mfn.ok:
