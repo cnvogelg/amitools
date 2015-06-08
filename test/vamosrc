@@ -1,0 +1,16 @@
+[volumes]
+sc=${SASC_INSTALL_DIR}/sc
+base=.
+
+[assigns]
+include=sc:include
+includeasm=sc:include
+lib=sc:lib
+t=root:tmp
+
+[path]
+path=sc:c
+
+[vamos]
+quiet=True
+ram_size=2048
