@@ -12,7 +12,7 @@ def update_suite(suite, flavor, vamos_args):
     if isinstance(e, unittest.TestSuite):
       update_suite(e, flavor, vamos_args)
     elif isinstance(e, unittest.TestCase):
-      e.variant = flavor
+      e.flavor = flavor
       e.vamos_args = vamos_args
 
 def load_suite(flavors, vamos_args):
