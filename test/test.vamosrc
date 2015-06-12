@@ -1,0 +1,12 @@
+[volumes]
+curdir=.
+
+[assigns]
+bin=curdir:bin
+
+[path]
+path=curdir:bin
+
+[vamos]
+quiet=True
+ram_size=2048

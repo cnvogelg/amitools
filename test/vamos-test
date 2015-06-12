@@ -1,0 +1,79 @@
+#!/usr/bin/env python2.7
+
+from __future__ import print_function
+import unittest
+import vtest
+import argparse
+import shlex
+
+def update_suite(suite, flavor, vamos_args):
+  """set binary flavor in all test suites"""
+  for e in suite:
+    if isinstance(e, unittest.TestSuite):
+      update_suite(e, flavor, vamos_args)
+    elif isinstance(e, unittest.TestCase):
+      e.variant = flavor
+      e.vamos_args = vamos_args
+
+def load_suite(flavors, vamos_args):
+  """load the suite from the sub dir of tests and replicate for flavors"""
+  main_suite = unittest.TestSuite()
+  # load test suite
+  for f in flavors:
+    load_suite = unittest.TestLoader().discover("suite",pattern="*.py")
+    for suite in load_suite:
+      update_suite(suite, f, vamos_args)
+      main_suite.addTest(suite)
+  return main_suite
+
+def filter_suite(suite, new_suite, suite_name, test_name=None):
+  """keep only those test cases matching suite and test name"""
+  for e in suite:
+    if isinstance(e, unittest.TestSuite):
+      filter_suite(e, new_suite, suite_name, test_name)
+    elif isinstance(e, unittest.TestCase):
+      this_test_name, this_suite_name = str(e).split(' ')
+      if this_suite_name.find(suite_name) != -1:
+        if test_name is None or this_test_name.find(test_name) != -1:
+          new_suite.addTest(e)
+
+def run():
+  parser = argparse.ArgumentParser()
+  parser.add_argument('-v', '--verbose', action='count', default=0,
+                      help="be more verbose")
+  parser.add_argument('-f', '--fail-fast', action='store_true', default=False,
+                      help="abort after first failed test")
+  parser.add_argument('-F', '--flavors', nargs='*', default=['vc'],
+                      help="select compiler flavors to test: " + str(vtest.PROG_FLAVORS))
+  parser.add_argument('-t', '--test',
+                      help="pick a 'suite.test' or 'suite' to test")
+  parser.add_argument('vamos_args', nargs='*', default=None,
+                      help="add extra vamos options after --")
+  args = parser.parse_args()
+
+  # parse flavors
+  flavors = args.flavors
+  if 'all' in flavors:
+    flavors = vtest.PROG_FLAVORS
+
+  # parse vamos args
+  vamos_args = []
+  if args.vamos_args is not None:
+    vamos_args = args.vamos_args
+
+  # create suite
+  suite = load_suite(flavors, vamos_args)
+  if args.test is not None:
+    new_suite = unittest.TestSuite()
+    test = args.test.split('.')
+    filter_suite(suite, new_suite, *test)
+    suite = new_suite
+
+  # sane ctrl-c
+  unittest.installHandler()
+
+  # run suite
+  unittest.TextTestRunner(verbosity=args.verbose, failfast=args.fail_fast).run(suite)
+
+if __name__ == '__main__':
+  run()
