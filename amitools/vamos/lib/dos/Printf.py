@@ -3,20 +3,19 @@
 import re
 
 class printf_element:
-  def __init__(self, txt, begin, end, etype, flags=None, width=None, limit=None, length=None):
+  def __init__(self, txt, begin, end, etype, flags=None, width_limit=None, length=None):
     self.txt = txt
     self.begin = begin
     self.end = end
     self.etype = etype
     self.flags = flags
-    self.width = width
-    self.limit = limit
+    self.width_limit = width_limit
     self.length = length
     self.data = None
 
   def __str__(self):
     sf = self.gen_sys_printf_format()
-    return "[%d:%d:'%s'=%s (%s)(type=%s,flags=%s,width=%s,limit=%s,length=%s)]" % (self.begin, self.end, self.txt, self.data, sf, self.etype,self.flags,self.width,self.limit,self.length)
+    return "[%d:%d:'%s'=%s (%s)(type=%s,flags=%s,width_limit=%s,length=%s)]" % (self.begin, self.end, self.txt, self.data, sf, self.etype,self.flags,self.width_limit,self.length)
 
   def gen_sys_printf_format(self):
     t = self.etype
@@ -29,10 +28,14 @@ class printf_element:
     result = []
     result.append('%')
     result.append(self.flags)
-    if self.width != None:
-      result.append(str(self.width) + '.')
-    if self.limit != None:
-      result.append(str(self.limit))
+
+    wl = self.width_limit
+    if wl is not None and len(wl)>0:
+      if t == 's' and wl[-1] == '.':
+        # trailing dot seems to fail on python: e.g. %10.s -> %10s
+        wl = wl[:-1]
+      result.append(wl)
+
     result.append(t)
     return "".join(result)
 
@@ -61,15 +64,14 @@ class printf_state:
   def __str__(self):
     return "[elements:%s, fragments:%s]" % (map(str, self.elements), self.fragments)
 
-printf_re_format = "%([-]?)([0-9]+\.)?([0-9]+)?([l])?([bduxsc%])"
+printf_re_format = "%([-]?)([0-9]*\.?[0-9]*)?([l])?([bduxsc%])"
 
 def printf_parse_string(string):
   # groups in pattern:
   # 1 flags (opt)
-  # 2 width (opt)
-  # 3 limit (opt)
-  # 4 length (opt)
-  # 5 type (req)
+  # 2 width_limit (opt)
+  # 3 length (opt)
+  # 4 type (req)
   matches = re.finditer(printf_re_format, string)
   pos = 0
   end = len(string)
@@ -85,17 +87,12 @@ def printf_parse_string(string):
 
     # fetch options
     flags = m.group(1)
-    width = m.group(2)
-    if width != None:
-      width = int(width[:-1])
-    limit = m.group(3)
-    if limit != None:
-      limit = int(limit)
-    length = m.group(4)
-    etype = m.group(5)
+    width_limit = m.group(2)
+    length = m.group(3)
+    etype = m.group(4)
     txt = string[m_s:m_e]
     # create element
-    e = printf_element(txt,m_s,m_e,etype,flags,width,limit,length)
+    e = printf_element(txt,m_s,m_e,etype,flags,width_limit,length)
     elements.append(e)
     pos = m_e
 

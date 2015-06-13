@@ -99,6 +99,7 @@ class VamosTestCase(unittest.TestCase):
   def _compare(self, got, ok):
     for i in xrange(len(ok)):
       self.assertEquals(got[i], ok[i])
+    self.assertEquals(len(got), len(ok), msg="stdout line count differs")
 
   def run_prog_check_data(self, *prog_args, **kw_args):
     """like run_prog_checked() but also verify the stdout
