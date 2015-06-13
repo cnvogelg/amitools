@@ -1,0 +1,8 @@
+int 65001 DEAD -1 4294967295 FFFFFFFF
+int '     65001' '      DEAD'
+int '65001     ' 'DEAD      '
+str 'hello'
+str '     hello'
+str 'hello     '
+str 'hello'
+str 'hello'

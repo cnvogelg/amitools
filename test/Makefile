@@ -3,7 +3,7 @@
 # build programs with the following compilers:
 # VBCC, GCC, AROS_GCC, SASC
 
-SOURCES_C = hello.c locks.c
+SOURCES_C = vprintf.c
 
 VPATH = src
 

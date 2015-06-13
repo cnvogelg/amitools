@@ -13,17 +13,19 @@ class printf_element:
     self.limit = limit
     self.length = length
     self.data = None
-    
+
   def __str__(self):
     sf = self.gen_sys_printf_format()
     return "[%d:%d:'%s'=%s (%s)(type=%s,flags=%s,width=%s,limit=%s,length=%s)]" % (self.begin, self.end, self.txt, self.data, sf, self.etype,self.flags,self.width,self.limit,self.length)
-  
+
   def gen_sys_printf_format(self):
     t = self.etype
     if t == 'b':
       t = 's'
     if t == '%':
       t = 'c'
+    if t == 'x':
+      t = 'X'
     result = []
     result.append('%')
     result.append(self.flags)
@@ -33,6 +35,23 @@ class printf_element:
       result.append(str(self.limit))
     result.append(t)
     return "".join(result)
+
+  def gen_value(self):
+    fmt = self.gen_sys_printf_format()
+    val = self.data
+
+    # handle negative values in '%d'
+    if self.etype == 'd':
+      # 32 bit
+      if self.length and 'l' in self.length:
+        if val >= 0x80000000:
+          val = 0xfffffffe - val
+      # 16 bit
+      else:
+        if val >= 0x8000:
+          val = 0xfffe - val
+
+    return fmt % val
 
 class printf_state:
   def __init__(self, elements, fragments):
@@ -63,7 +82,7 @@ def printf_parse_string(string):
       # create new string fragment
       fs = string[pos:m_s]
       fragments.append(fs)
-    
+
     # fetch options
     flags = m.group(1)
     width = m.group(2)
@@ -95,7 +114,7 @@ def printf_read_data(state, mem_access, data_ptr):
       bptr *= 4
       data = mem_access.r_bstr(bptr)
     elif t in ('d','u','x'): # number
-      l = e.length 
+      l = e.length
       if l is not None and "l" in l:
         data = mem_access.r32(data_ptr)
         data_ptr += 4
@@ -125,8 +144,7 @@ def printf_generate_output(state):
     begin = e.begin
     if pos < begin:
       result.append(f.pop(0))
-    fmt = e.gen_sys_printf_format()
-    val = fmt % e.data
+    val = e.gen_value()
     result.append(val)
     pos = e.end
   if len(f) > 0:
@@ -146,11 +164,11 @@ if __name__ == '__main__':
   for e in elements:
     print e
   print fragments
-  
+
   txt = "%s begin and last %d"
   print txt
   elements, fragments = printf_parse_string(txt)
   for e in elements:
     print e
   print fragments
-  
+

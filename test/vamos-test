@@ -6,23 +6,23 @@ import vtest
 import argparse
 import shlex
 
-def update_suite(suite, flavor, vamos_args):
+def update_suite(suite, flavor, opts):
   """set binary flavor in all test suites"""
   for e in suite:
     if isinstance(e, unittest.TestSuite):
-      update_suite(e, flavor, vamos_args)
+      update_suite(e, flavor, opts)
     elif isinstance(e, unittest.TestCase):
       e.flavor = flavor
-      e.vamos_args = vamos_args
+      e.opts = opts
 
-def load_suite(flavors, vamos_args):
+def load_suite(flavors, opts):
   """load the suite from the sub dir of tests and replicate for flavors"""
   main_suite = unittest.TestSuite()
   # load test suite
   for f in flavors:
     load_suite = unittest.TestLoader().discover("suite",pattern="*.py")
     for suite in load_suite:
-      update_suite(suite, f, vamos_args)
+      update_suite(suite, f, opts)
       main_suite.addTest(suite)
   return main_suite
 
@@ -41,6 +41,10 @@ def run():
   parser = argparse.ArgumentParser()
   parser.add_argument('-v', '--verbose', action='count', default=0,
                       help="be more verbose")
+  parser.add_argument('-s', '--show-output', action='store_true', default=False,
+                      help="show stdout of test binaries")
+  parser.add_argument('-g', '--generate-data', action='store_true', default=False,
+                      help="generate test data file from stdout of binary")
   parser.add_argument('-f', '--fail-fast', action='store_true', default=False,
                       help="abort after first failed test")
   parser.add_argument('-F', '--flavors', nargs='*', default=['vc'],
@@ -61,8 +65,14 @@ def run():
   if args.vamos_args is not None:
     vamos_args = args.vamos_args
 
+  # set test options
+  opts = vtest.VamosTestOptions()
+  opts.vamos_args = vamos_args
+  opts.show_output = args.show_output
+  opts.generate_data = args.generate_data
+
   # create suite
-  suite = load_suite(flavors, vamos_args)
+  suite = load_suite(flavors, opts)
   if args.test is not None:
     new_suite = unittest.TestSuite()
     test = args.test.split('.')
