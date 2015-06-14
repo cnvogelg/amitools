@@ -51,6 +51,8 @@ def run():
                       help="select compiler flavors to test: " + str(vtest.PROG_FLAVORS))
   parser.add_argument('-t', '--test',
                       help="pick a 'suite.test' or 'suite' to test")
+  parser.add_argument('-d', '--debug-bins', action='store_true', default=False,
+                      help="use debug binaries")
   parser.add_argument('vamos_args', nargs='*', default=None,
                       help="add extra vamos options after --")
   args = parser.parse_args()
@@ -70,6 +72,7 @@ def run():
   opts.vamos_args = vamos_args
   opts.show_output = args.show_output
   opts.generate_data = args.generate_data
+  opts.debug_bins = args.debug_bins
 
   # create suite
   suite = load_suite(flavors, opts)

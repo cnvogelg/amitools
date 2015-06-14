@@ -21,16 +21,30 @@ AROS_ELF2HUNK = elf2hunk
 SASC = ../vamos -c sasc.vamosrc sc
 
 # options
-VBCC_OPTS = -O2
-GCC_OPTS  = -O2 -noixemul
-AROS_GCC_OPTS = -O2
+VBCC_OPTS =
+GCC_OPTS  = -noixemul
+AROS_GCC_OPTS =
 SASC_OPTS = SMALLDATA SMALLCODE NOSTKCHK NOCHKABORT NOICONS STRICT ANSI
+
+# optimize options
+VBCC_OPTI = -O2
+GCC_OPTI = -O2
+AROS_GCC_OPTI = -O2
+SASC_OPTI = PARAMETERS=REGISTERS OPT OPTTIME OPTINLINE\
+            OPTSCHEDULE STRINGMERGE STRUCTUREEQUIVALENCE NODEBUG
+
+# debug options
+VBCC_DEBUG = -g
+GCC_DEBUG = -g
+AROS_GCC_DEBUG = -g
+SASC_DEBUG = DEBUG=F
 
 # binary extensions
 VBCC_EXT = _vc
 GCC_EXT = _gcc
 AROS_GCC_EXT = _agcc
 SASC_EXT = _sc
+DBG_EXT = _dbg
 
 # source to program mapping
 PROGS_VBCC = $(patsubst %.c,$(BUILD_DIR)/%$(VBCC_EXT),$(SOURCES_C))
@@ -40,9 +54,19 @@ PROGS_SASC = $(patsubst %.c,$(BUILD_DIR)/%$(SASC_EXT),$(SOURCES_C))
 
 PROGS = $(PROGS_VBCC) $(PROGS_GCC) $(PROGS_AROS) $(PROGS_SASC)
 
+PROGS_VBCC_DBG = $(patsubst %.c,$(BUILD_DIR)/%$(VBCC_EXT)$(DBG_EXT),$(SOURCES_C))
+PROGS_GCC_DBG  = $(patsubst %.c,$(BUILD_DIR)/%$(GCC_EXT)$(DBG_EXT),$(SOURCES_C))
+PROGS_AROS_DBG = $(patsubst %.c,$(BUILD_DIR)/%$(AROS_GCC_EXT)$(DBG_EXT),$(SOURCES_C))
+PROGS_SASC_DBG = $(patsubst %.c,$(BUILD_DIR)/%$(SASC_EXT)$(DBG_EXT),$(SOURCES_C))
+
+PROGS_DBG = $(PROGS_VBCC_DBG) $(PROGS_GCC_DBG) $(PROGS_AROS_DBG) $(PROGS_SASC_DBG)
+
 # --- rules ---
 
-all: $(PROGS)
+all: $(PROGS) $(PROGS_DBG)
+
+opt: $(PROGS)
+debug: $(PROGS_DBG)
 
 $(PROGS): $(BUILD_DIR)
 
@@ -53,18 +77,34 @@ clean:
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-# rules
+# rules for opt
 $(BUILD_DIR)/%$(VBCC_EXT) : %.c
-	$(VBCC) $(VBCC_OPTS) -o $@ $<
+	$(VBCC) $(VBCC_OPTS) $(VBCC_OPTI) -o $@ $<
 
 $(BUILD_DIR)/%$(GCC_EXT) : %.c
-	$(GCC) $(GCC_OPTS) -o $@ $<
+	$(GCC) $(GCC_OPTS) $(GCC_OPTI) -o $@ $<
 
 $(BUILD_DIR)/%$(AROS_GCC_EXT).elf : %.c
-	$(AROS_GCC) $(AROS_GCC_OPTS) -o $@ $<
+	$(AROS_GCC) $(AROS_GCC_OPTS) $(AROS_GCC_OPTI) -o $@ $<
 
 $(BUILD_DIR)/%$(AROS_GCC_EXT) : $(BUILD_DIR)/%$(AROS_GCC_EXT).elf
 	$(AROS_ELF2HUNK) $< $@
 
 $(BUILD_DIR)/%$(SASC_EXT) : %.c
-	$(SASC) $(SASC_OPTS) LINK TO $@ $<
+	$(SASC) $(SASC_OPTS) $(SASC_OPTI) LINK TO $@ $<
+
+# rules for dbg
+$(BUILD_DIR)/%$(VBCC_EXT)$(DBG_EXT) : %.c
+	$(VBCC) $(VBCC_OPTS) $(VBCC_DEBUG) -o $@ $<
+
+$(BUILD_DIR)/%$(GCC_EXT)$(DBG_EXT) : %.c
+	$(GCC) $(GCC_OPTS) $(GCC_DEBUG) -o $@ $<
+
+$(BUILD_DIR)/%$(AROS_GCC_EXT)$(DBG_EXT).elf : %.c
+	$(AROS_GCC) $(AROS_GCC_OPTS) $(AROS_GCC_DEBUG) -o $@ $<
+
+$(BUILD_DIR)/%$(AROS_GCC_EXT)$(DBG_EXT) : $(BUILD_DIR)/%$(AROS_GCC_EXT)$(DBG_EXT).elf
+	$(AROS_ELF2HUNK) $< $@
+
+$(BUILD_DIR)/%$(SASC_EXT)$(DBG_EXT) : %.c
+	$(SASC) $(SASC_OPTS) $(SASC_DEBUG) LINK TO $@ $<

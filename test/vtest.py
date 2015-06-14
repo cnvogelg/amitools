@@ -13,6 +13,7 @@ class VamosTestOptions:
   vamos_args = []
   show_output = False
   generate_data = False
+  debug_bins = False
 
 class VamosTestCase(unittest.TestCase):
 
@@ -24,7 +25,10 @@ class VamosTestCase(unittest.TestCase):
     # call make with all program paths to ensure they are built
     args = ['make']
     for p in prog_names:
-      args.append(os.path.join(PROG_BIN_DIR, p + '_' + self.flavor))
+      path = os.path.join(PROG_BIN_DIR, p + '_' + self.flavor)
+      if self.opts.debug_bins:
+        path = path + "_dbg"
+      args.append(path)
     _ = subprocess.check_call(args, stdout=subprocess.PIPE)
 
   def _get_data_path(self, prog_name, kw_args):
@@ -51,6 +55,8 @@ class VamosTestCase(unittest.TestCase):
     if len(self.opts.vamos_args) > 0:
       args = args + self.opts.vamos_args
     prog_name = "curdir:bin/" + prog_args[0] + '_' + self.flavor
+    if self.opts.debug_bins:
+      prog_name = prog_name + "_dbg"
     args.append(prog_name)
     if len(prog_args) > 1:
       args = args + prog_args[1:]
