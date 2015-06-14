@@ -328,6 +328,23 @@ class DosLibrary(AmigaLibrary):
     fh.write(result)
     return len(result)
 
+  def VFPrintf(self, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    format_ptr = ctx.cpu.r_reg(REG_D2)
+    argv_ptr = ctx.cpu.r_reg(REG_D3)
+    fmt = ctx.mem.access.r_cstr(format_ptr)
+    # write on output
+    log_dos.info("VFPrintf: format='%s' argv=%06x" % (fmt,argv_ptr))
+    # now decode printf
+    ps = dos.Printf.printf_parse_string(fmt)
+    dos.Printf.printf_read_data(ps, ctx.mem.access, argv_ptr)
+    log_dos.debug("VFPrintf: parsed format: %s",ps)
+    result = dos.Printf.printf_generate_output(ps)
+    # write result
+    fh.write(result)
+    return len(result)
+
   def VFWritef(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
