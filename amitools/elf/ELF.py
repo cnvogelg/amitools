@@ -3,6 +3,7 @@
 ELFCLASS32 = 1
 ELFDATA2MSB = 2
 ELFOSABI_SYSV = 0
+ELFOSABI_AROS = 15
 
 EM_68K = 4
 
@@ -37,7 +38,7 @@ SHT_values = {
   15: "FINI_ARRAY",
   16: "PREINIT_ARRAY",
   17: "GROUP",
-  18: "SYMTAB_SHNDX" 
+  18: "SYMTAB_SHNDX"
 }
 
 SHT_flags = {

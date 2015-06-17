@@ -16,7 +16,7 @@ from amitools.hunk import Hunk
 from amitools.hunk import HunkReader
 from amitools.hunk import HunkShow
 from amitools.hunk import HunkRelocate
-from amitools.elf import ELFReader
+import amitools.elf
 from amitools.util.HexDump import *
 
 def print_pretty(data):
@@ -43,7 +43,7 @@ class HunkCommand:
       print Hunk.result_names[error_code], hunk_file.error_string
       if args.dump:
         print_pretty(hunk_file.hunks)
-      self.failed_files.append( (path, "READ: " + hunk_file.error_string) )        
+      self.failed_files.append( (path, "READ: " + hunk_file.error_string) )
       return not self.args.stop
 
     # if verbose then print block structure
@@ -51,22 +51,22 @@ class HunkCommand:
       print
       print "  hunks:    ",hunk_file.get_hunk_summary()
       if args.dump:
-        print_pretty(hunk_file.hunks)        
+        print_pretty(hunk_file.hunks)
       print "  type:     ",
-    
+
     # build segments from hunks
     ok = hunk_file.build_segments()
     if not ok:
       print "BUILD SEGMENTS FAILED: %s" % (hunk_file.error_string)
       self.failed_files.append( (path, "BUILD: " + hunk_file.error_string) )
       return not self.args.stop
-    
+
     # print recognized file type name
     print Hunk.type_names[hunk_file.type],
-    
+
     # if verbose then print hunk structure
     if args.verbose:
-      print 
+      print
       print "  segments: ",hunk_file.get_segment_summary()
       print "  overlays: ",hunk_file.get_overlay_segment_summary()
       print "  libs:     ",hunk_file.get_libs_summary()
@@ -79,14 +79,14 @@ class HunkCommand:
     # do special processing on hunk file for command
     ok = self.handle_hunk_file(path, hunk_file)
     return ok
-  
+
   def result(self):
     for code in self.counts.keys():
       print Hunk.result_names[code],":",self.counts[code]
     for failed in self.failed_files:
       print failed[0],failed[1]
     return 0
-      
+
   def process_file(self, path, fobj, cmd):
     hunk_file = HunkReader.HunkReader()
     start = time.clock()
@@ -97,7 +97,7 @@ class HunkCommand:
     if result == Hunk.RESULT_NO_HUNK_FILE:
       return True
     return self.handle_file(path, hunk_file, result, delta)
-  
+
   def run(self):
     scanner = FileScanner(lambda path, fobj: self.process_file(path, fobj, cmd), use_adf=args.adf, use_lha=args.lha, stop_on_error=args.stop)
     for path in args.files:
@@ -109,7 +109,7 @@ class HunkCommand:
 # ----- Validator -----
 
 class Validator(HunkCommand):
-  
+
   def handle_hunk_file(self, path, hunk_file):
     # do nothing extra
     return True
@@ -132,12 +132,12 @@ class Info(HunkCommand):
 # ----- Relocate -----
 
 class Relocate(HunkCommand):
-  
+
   def handle_hunk_file(self, path, hunk_file):
     if hunk_file.type != Hunk.TYPE_LOADSEG:
       print "ERROR: can only relocate LoadSeg()able files:",path;
       return False
-    
+
     rel = HunkRelocate.HunkRelocate(hunk_file,verbose=self.args.verbose)
     # get sizes of all segments
     sizes = rel.get_sizes()
@@ -149,7 +149,7 @@ class Relocate(HunkCommand):
     if datas == None:
       print "ERROR: relocation failed:",path
       return False
-    else:    
+    else:
       print "Relocate to base address",base_addr
       print "Bases: "," ".join(map(lambda x:"%06x"%(x),addrs))
       print "Sizes: "," ".join(map(lambda x:"%06x"%(x),sizes))
@@ -165,19 +165,20 @@ class Relocate(HunkCommand):
 class ElfInfo:
   def __init__(self,args):
     self.args = args
-  
+
   def run(self):
     for f in args.files:
-      elf = ELFReader.ELFReader()
-      if not elf.load(f):
+      reader = amitools.elf.ELFReader()
+      elf = reader.load(open(f, "rb"))
+      if elf is None:
         print "ERROR loading ELF:",elf.error_string
         return 1
-      elf.dump_elf_segment_headers()
-      elf.dump_elf_symbols()
-      elf.dump_elf_relas()
-      elf.dump_elf_segments(show_relocs=args.show_relocs, show_debug=args.show_debug)
+      dumper = amitools.elf.ELFDumper(elf)
+      dumper.dump_sections(show_relocs=args.show_relocs, show_debug=args.show_debug)
+      dumper.dump_symbols()
+      dumper.dump_relas()
     return 0
-  
+
 # ----- main -----
 # call scanner and process all files with selected command
 cmd_map = {
