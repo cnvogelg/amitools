@@ -11,7 +11,9 @@ import argparse
 import pprint
 import time
 
-from amitools.FileScanner import FileScanner
+from amitools.scan.FileScanner import FileScanner
+from amitools.scan.ADFSScanner import ADFSScanner
+from amitools.scan.ArchiveScanner import ZipScanner, LhaScanner
 from amitools.hunk import Hunk
 from amitools.hunk import HunkReader
 from amitools.hunk import HunkShow
@@ -87,7 +89,9 @@ class HunkCommand:
       print failed[0],failed[1]
     return 0
 
-  def process_file(self, path, fobj, cmd):
+  def process_file(self, scan_file):
+    path = scan_file.get_path()
+    fobj = scan_file.get_fobj()
     hunk_file = HunkReader.HunkReader()
     start = time.clock()
     result = hunk_file.read_file_obj(path,fobj,None)
@@ -99,9 +103,17 @@ class HunkCommand:
     return self.handle_file(path, hunk_file, result, delta)
 
   def run(self):
-    scanner = FileScanner(lambda path, fobj: self.process_file(path, fobj, cmd), use_adf=args.adf, use_lha=args.lha, stop_on_error=args.stop)
+    # setup error handler
+    def error_handler(sf, e):
+      print "FAILED", sf.get_path(), e
+      return not args.stop
+    # setup scanners
+    scanners = [ADFSScanner(), ZipScanner(), LhaScanner()]
+    scanner = FileScanner(self.process_file,
+                          error_handler=error_handler,
+                          scanners=scanners)
     for path in args.files:
-      ok = scanner.handle_path(path)
+      ok = scanner.scan(path)
       if not ok:
         print "ABORTED"
     return cmd.result()
@@ -193,8 +205,6 @@ parser.add_argument('command', help="command: "+",".join(cmd_map.keys()))
 parser.add_argument('files', nargs='+')
 parser.add_argument('-d', '--dump', action='store_true', default=False, help="dump the hunk structure")
 parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
-parser.add_argument('-a', '--adf', nargs='?', default='unadf', help="enable adf scanner (requires unadf tool)")
-parser.add_argument('-l', '--lha', nargs='?', default='lha', help="enable lha scanner (with given lha executable)")
 parser.add_argument('-s', '--stop', action='store_true', default=False, help="stop on error")
 parser.add_argument('-R', '--show-relocs', action='store_true', default=False, help="show relocation entries")
 parser.add_argument('-D', '--show-debug', action='store_true', default=False, help="show debug info entries")
