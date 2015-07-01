@@ -1,5 +1,7 @@
 """The hunk block types defined as data classes"""
 
+from __future__ import print_function
+
 import struct
 from Hunk import *
 
@@ -55,9 +57,31 @@ class HunkBlock:
     else:
       return size,data[:endpos]
 
+  def _write_long(self, f, v):
+    data = struct.pack(">I",v)
+    f.write(data)
+
+  def _write_word(self, f, v):
+    data = struct.pack(">H",v)
+    f.write(data)
+
+  def _write_name(self, f, s, tag=None):
+    n = len(s)
+    num_longs = int((n+3)/4)
+    b = bytearray(num_longs * 4)
+    if n > 0:
+      b[0:n] = s
+    if tag is not None:
+      num_longs |= tag << 24
+    self._write_long(f, num_longs)
+    f.write(b)
+
 
 class HunkHeaderBlock(HunkBlock):
   """HUNK_HEADER - header block of Load Modules"""
+
+  blk_id = HUNK_HEADER
+
   def __init__(self):
     self.reslib_names = []
     self.table_size = 0
@@ -90,6 +114,19 @@ class HunkHeaderBlock(HunkBlock):
         raise HunkParseError("HUNK_HEADER contains invalid hunk_size")
       self.hunk_table.append(hunk_size)
 
+  def write(self, f):
+    # write residents
+    for reslib in self.reslib_names:
+      self._write_name(f, reslib)
+    self._write_long(f, 0)
+    # table size and hunk range
+    self._write_long(f, self.table_size)
+    self._write_long(f, self.first_hunk)
+    self._write_long(f, self.last_hunk)
+    # sizes
+    for hunk_size in self.hunk_table:
+      self._write_long(f, hunk_size)
+
 
 class HunkSegmentBlock(HunkBlock):
   """HUNK_CODE, HUNK_DATA, HUNK_BSS"""
@@ -104,12 +141,16 @@ class HunkSegmentBlock(HunkBlock):
       size *= 4
       self.data = f.read(size)
 
+  def write(self, f):
+    self._write_long(f, self.size_longs)
+    f.write(self.data)
+
 
 class HunkRelocLongBlock(HunkBlock):
   """HUNK_ABSRELOC32 - relocations stored in longs"""
   def __init__(self):
     # map hunk number to list of relocations (i.e. byte offsets in long)
-    self.relocs = {}
+    self.relocs = []
 
   def parse(self, f):
     while True:
@@ -121,7 +162,16 @@ class HunkRelocLongBlock(HunkBlock):
       for i in xrange(num):
         off = self._read_long(f)
         offsets.append(off)
-      self.relocs[hunk_num] = offsets
+      self.relocs.append((hunk_num, offsets))
+
+  def write(self,f):
+    for reloc in self.relocs:
+      hunk_num, offsets = reloc
+      self._write_long(f, len(offsets))
+      self._write_long(f, hunk_num)
+      for off in offsets:
+        self._write_long(f, off)
+    self._write_long(f, 0)
 
 
 class HunkRelocWordBlock(HunkBlock):
@@ -153,19 +203,8 @@ class HunkEndBlock(HunkBlock):
   """HUNK_END"""
   def parse(self, f):
     pass
-
-
-class HunkOverlayEntry:
-  def __init__(self, seek_offset, dummy1, dummy2, level, ordinate,
-               initial_hunk, symbol_hunk, symbol_offset):
-    self.seek_offset = seek_offset
-    self.dummy1 = dummy1
-    self.dummy2 = dummy2
-    self.level = level
-    self.ordinate = ordinate
-    self.initial_hunk = initial_hunk
-    self.symbol_hunk = symbol_hunk
-    self.symbol_offset = symbol_offset
+  def write(self, f):
+    pass
 
 
 class HunkOverlayBlock(HunkBlock):
@@ -177,10 +216,16 @@ class HunkOverlayBlock(HunkBlock):
     num_longs = self._read_long(f)
     self.data = f.read(num_longs * 4)
 
+  def write(self, f):
+    self._write_long(f, int(self.data/4))
+    f.write(self.data)
+
 
 class HunkBreakBlock(HunkBlock):
   """HUNK_BREAK"""
   def parse(self, f):
+    pass
+  def write(self, f):
     pass
 
 
@@ -193,6 +238,11 @@ class HunkDebugBlock(HunkBlock):
     num_longs = self._read_long(f)
     num_bytes = num_longs * 4
     self.debug_data = f.read(num_bytes)
+
+  def write(self, f):
+    num_longs = int(len(self.debug_data)/4)
+    self._write_long(f, num_longs)
+    f.write(self.debug_data)
 
 
 class HunkSymbolBlock(HunkBlock):
@@ -208,6 +258,12 @@ class HunkSymbolBlock(HunkBlock):
       off = self._read_long(f)
       self.symbols.append((n, off))
 
+  def write(self, f):
+    for sym, off in self.symbols:
+      self._write_name(f, sym)
+      self._write_long(f, off)
+    self._write_long(f, 0)
+
 
 class HunkUnitBlock(HunkBlock):
   """HUNK_UNIT"""
@@ -217,6 +273,9 @@ class HunkUnitBlock(HunkBlock):
   def parse(self, f):
     _,self.name = self._read_name(f)
 
+  def write(self, f):
+    self._write_name(f, self.name)
+
 
 class HunkNameBlock(HunkBlock):
   """HUNK_NAME"""
@@ -225,6 +284,9 @@ class HunkNameBlock(HunkBlock):
 
   def parse(self, f):
     _,self.name = self._read_name(f)
+
+  def write(self, f):
+    self._write_name(f, self.name)
 
 
 class HunkExtEntry:
@@ -249,7 +311,7 @@ class HunkExtBlock(HunkBlock):
         break
       ext_type = tag >> 24
       name_len = tag & 0xffffff
-      name = self._read_name_size(f, name_len)
+      _,name = self._read_name_size(f, name_len)
       # add on for type
       bss_size = None
       offsets = None
@@ -270,11 +332,30 @@ class HunkExtBlock(HunkBlock):
       e = HunkExtEntry(name, ext_type, value, bss_size, offsets)
       self.entries.append(e)
 
+  def write(self, f):
+    for entry in self.entries:
+      ext_type = entry.ext_type
+      self._write_name(f, entry.name, tag=ext_type)
+      # ABSCOMMON
+      if ext_type == EXT_ABSCOMMON:
+        self._write_long(f, entry.bss_size)
+      # is a reference
+      elif ext_type >= 0x80:
+        num_offsets = len(entry.ref_offsets)
+        self._write_long(f, num_offsets)
+        for off in entry.ref_offsets:
+          self._write_long(f, off)
+      # is a definition
+      else:
+        self._write_long(f, entry.def_value)
+    self._write_long(f,0)
+
 
 class HunkLibBlock(HunkBlock):
   """HUNK_LIB"""
   def __init__(self):
     self.blocks = []
+    self.offsets = []
 
   def parse(self, f):
     num_longs = self._read_long(f)
@@ -297,12 +378,36 @@ class HunkLibBlock(HunkBlock):
         # create block and parse
         block = blk_type()
         block.blk_id = blk_id
-        block.sub_offset = pos
         block.parse(f)
+        self.offsets.append(pos)
         self.blocks.append(block)
       else:
         raise HunkParseError("Unsupported hunk type: %04d" % blk_id)
       pos = f.tell()
+
+  def write(self, f):
+    # write dummy length (fill in later)
+    pos = f.tell()
+    start = pos
+    self._write_long(f, 0)
+    self.offsets = []
+    # write blocks
+    for block in self.blocks:
+      block_id = block.blk_id
+      block_id_raw = struct.pack(">I",block_id)
+      f.write(block_id_raw)
+      # write block itself
+      block.write(f)
+      # update offsets
+      self.offsets.append(pos)
+      pos = f.tell()
+    # fill in size
+    end = f.tell()
+    size = end - start - 4
+    num_longs = size / 4
+    f.seek(start, 0)
+    self._write_long(f, num_longs)
+    f.seek(end, 0)
 
 
 class HunkIndexUnitEntry:
@@ -352,7 +457,7 @@ class HunkIndexBlock(HunkBlock):
       name_off = self._read_word(f)
       first_hunk_long_off = self._read_word(f)
       num_hunks = self._read_word(f)
-      num_words = num_words - 3
+      num_words -= 3
       unit_entry = HunkIndexUnitEntry(name_off, first_hunk_long_off)
       self.units.append(unit_entry)
       for i in xrange(num_hunks):
@@ -379,6 +484,50 @@ class HunkIndexBlock(HunkBlock):
     # alignment word?
     if num_words == 1:
       self._read_word(f)
+
+  def write(self, f):
+    # write dummy size
+    num_longs_pos = f.tell()
+    self._write_long(f, 0)
+    num_words = 0
+    # write string table
+    size_strtab = len(self.strtab)
+    self._write_word(f, size_strtab)
+    f.write(self.strtab)
+    num_words += size_strtab / 2 + 1
+    # write unit blocks
+    for unit in self.units:
+      self._write_word(f, unit.name_off)
+      self._write_word(f, unit.first_hunk_long_off)
+      self._write_word(f, len(unit.index_hunks))
+      num_words += 3
+      for index in unit.index_hunks:
+        self._write_word(f, index.name_off)
+        self._write_word(f, index.hunk_longs)
+        self._write_word(f, index.hunk_ctype)
+        # refs
+        num_refs = len(index.sym_refs)
+        self._write_word(f, num_refs)
+        for sym_ref in index.sym_refs:
+          self._write_word(f, sym_ref.name_off)
+        # defs
+        num_defs = len(index.sym_defs)
+        self._write_word(f, num_defs)
+        for sym_def in index.sym_defs:
+          self._write_word(f, sym_def.name_off)
+          self._write_word(f, sym_def.value)
+          self._write_word(f, sym_def.sym_ctype)
+        # count words
+        num_words += 5 + num_refs + num_defs * 3
+    # alignment word?
+    if num_words % 2 == 1:
+      num_words += 1
+      self._write_word(f, 0)
+    # fill in real size
+    pos = f.tell()
+    f.seek(num_longs_pos, 0)
+    self._write_long(f, num_words/2)
+    f.seek(pos, 0)
 
 
 # map the hunk types to the block classes
@@ -440,12 +589,63 @@ class HunkBlockFile:
       else:
         raise HunkParseError("Unsupported hunk type: %04d" % blk_id)
 
+  def write(self, f):
+    """write a hunk file back to file object"""
+    for block in self.blocks:
+      # write block id
+      block_id = block.blk_id
+      block_id_raw = struct.pack(">I",block_id)
+      f.write(block_id_raw)
+      # write block itself
+      block.write(f)
+
+  def detect_type(self):
+    """look at blocks and try to deduce the type of hunk file"""
+    if len(self.blocks) == 0:
+      return TYPE_UNKNOWN
+    first_block = self.blocks[0]
+    blk_id = first_block.blk_id
+    if blk_id == HUNK_HEADER:
+      return TYPE_LOADSEG
+    elif blk_id == HUNK_UNIT:
+      return TYPE_UNIT
+    elif blk_id == HUNK_LIB:
+      return TYPE_LIB
+    else:
+      return TYPE_UNKNOWN
+
 
 # mini test
 if __name__ == '__main__':
   import sys
+  import StringIO
   for a in sys.argv[1:]:
+    # read data
     f = open(a, "rb")
-    hbf = HunkBlockFile()
-    hbf.read(f)
+    data = f.read()
     f.close()
+    # parse from string stream
+    fobj = StringIO.StringIO(data)
+    hbf = HunkBlockFile()
+    hbf.read(fobj)
+    fobj.close()
+    # write to new string stream
+    nobj = StringIO.StringIO()
+    hbf.write(nobj)
+    new_data = nobj.getvalue()
+    nobj.close()
+    # dump debug data
+    f = open("debug.hunk", "wb")
+    f.write(new_data)
+    f.close()
+    # compare read and written stream
+    if len(data) != len(new_data):
+      print("MISMATCH", len(data), len(new_data))
+    else:
+      for i in xrange(len(data)):
+        if data[i] != new_data[i]:
+          print("MISMATCH @", i)
+      print("OK")
+    # detect type of file
+    t = hbf.detect_type()
+    print("type=", t, type_names[t])
