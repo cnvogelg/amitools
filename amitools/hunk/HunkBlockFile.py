@@ -565,6 +565,17 @@ class HunkBlockFile:
   def __init__(self):
     self.blocks = []
 
+  def get_blocks(self):
+    return self.blocks
+
+  def set_blocks(self, blocks):
+    self.blocks = blocks
+
+  def read_path(self, path_name):
+    f = open(path_name, "rb")
+    self.read(f)
+    f.close()
+
   def read(self, f):
     """read a hunk file and fill block list"""
     while True:
@@ -589,6 +600,11 @@ class HunkBlockFile:
       else:
         raise HunkParseError("Unsupported hunk type: %04d" % blk_id)
 
+  def write_path(self, path_name):
+    f = open(path_name, "wb")
+    self.write(f)
+    f.close()
+
   def write(self, f):
     """write a hunk file back to file object"""
     for block in self.blocks:
@@ -605,6 +621,25 @@ class HunkBlockFile:
       return TYPE_UNKNOWN
     first_block = self.blocks[0]
     blk_id = first_block.blk_id
+    return self._map_blkid_to_type(blk_id)
+
+  def peek_type(self, f):
+    """look into given file obj stream to determine file format.
+       stream is read and later on seek'ed back."""
+    pos = f.tell()
+    tag = f.read(4)
+    # EOF
+    if len(tag) == 0:
+      return TYPE_UNKNOWN
+    elif len(tag) != 4:
+      f.seek(pos,0)
+      return TYPE_UNKNOWN
+    else:
+      blk_id = struct.unpack(">I",tag)[0]
+      f.seek(pos,0)
+      return self._map_blkid_to_type(blk_id)
+
+  def _map_blkid_to_type(self, blk_id):
     if blk_id == HUNK_HEADER:
       return TYPE_LOADSEG
     elif blk_id == HUNK_UNIT:
@@ -613,6 +648,15 @@ class HunkBlockFile:
       return TYPE_LIB
     else:
       return TYPE_UNKNOWN
+
+  def get_block_type_names(self):
+    """return a string array with the names of all block types"""
+    res = []
+    for blk in self.blocks:
+      blk_id = blk.blk_id
+      name = hunk_names[blk_id]
+      res.append(name)
+    return res
 
 
 # mini test
