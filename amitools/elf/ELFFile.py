@@ -50,7 +50,7 @@ class ELFIdentifier(ELFPart):
     # magic
     magic = ident_data[0:4]
     if magic != "\177ELF":
-      raise ELFParserError("No ELF Magic found!")
+      raise ELFParseError("No ELF Magic found!")
     self.class_ = ord(ident_data[4])
     self.data = ord(ident_data[5])
     self.version = ord(ident_data[6])
