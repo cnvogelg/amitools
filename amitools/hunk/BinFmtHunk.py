@@ -43,7 +43,7 @@ class BinFmtHunk:
     for seg in segs:
       # what type of segment to we have?
       blk_id = seg.seg_blk.blk_id
-      size = seg.seg_blk.size_longs * 4
+      size = seg.size_longs * 4
       data = seg.seg_blk.data
       if blk_id == Hunk.HUNK_CODE:
         seg_type = SEGMENT_TYPE_CODE

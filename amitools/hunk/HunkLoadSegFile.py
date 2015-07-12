@@ -11,13 +11,15 @@ class HunkSegment:
     self.symbol_blk = None
     self.reloc_blk = None
     self.debug_blks = None
+    self.size_longs = 0
 
   def __repr__(self):
-    return "[seg=%s,symbol=%s,reloc=%s,debug=%s]" % \
+    return "[seg=%s,symbol=%s,reloc=%s,debug=%s,size=%d]" % \
       (self._blk_str(self.seg_blk),
        self._blk_str(self.symbol_blk),
        self._blk_str(self.reloc_blk),
-       self._blk_str_list(self.debug_blks))
+       self._blk_str_list(self.debug_blks),
+       self.size)
 
   def _blk_str(self, blk):
     if blk is None:
@@ -121,11 +123,18 @@ class HunkLoadSegFile:
             new_list.append(blk)
           else:
             raise HunkParseError("can't split block list")
+    # check size of hunk table
+    if len(hdr_blk.hunk_table) != len(second):
+      raise HunkParseError("can't match hunks to header")
     # convert block lists into segments
     for l in second:
       seg = HunkSegment()
       seg.parse(l)
       self.segments.append(seg)
+    # set size in segments
+    n = len(second)
+    for i in xrange(n):
+      self.segments[i].size_longs = hdr_blk.hunk_table[i]
 
 
 # mini test

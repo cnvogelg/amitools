@@ -103,6 +103,13 @@ class Segment:
   def add_reloc(self, to_seg, relocs):
     self.relocs[to_seg] = relocs
 
+  def get_reloc_to_segs(self):
+    keys = self.relocs.keys()
+    return sorted(keys, key=lambda x: x.id)
+
+  def get_reloc(self, to_seg):
+    return self.relocs[to_seg]
+
   def set_symtab(self, symtab):
     self.symtab = symtab
 
