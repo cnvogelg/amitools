@@ -55,7 +55,7 @@ class BinFmtELF:
     reader = ELFReader()
     elf = reader.load(fobj)
     # create bin image and assign elf file
-    bi = BinImage()
+    bi = BinImage(BIN_IMAGE_TYPE_ELF)
     bi.set_file_data(elf)
     # walk through elf sections
     sect_to_seg = {}
@@ -112,7 +112,8 @@ class BinFmtELF:
         seg.add_reloc(to_seg, rl)
         # add relocations
         for rel in sect.get_rela_by_section(tgt_sect):
-          rl.add_reloc(rel.section_addend)
+          r = Reloc(rel.section_addend)
+          rl.add_reloc(r)
 
   def add_elf_symbols(self, symbols, seg):
     symtab = SymbolTable()
@@ -121,7 +122,13 @@ class BinFmtELF:
       # add entry
       off = sym.value
       name = sym.name_str
-      symtab.add_symbol(off, name)
+      file_sym = sym.file_sym
+      if file_sym is not None:
+        file_name = file_sym.name_str
+      else:
+        file_name = None
+      symbol = Symbol(off, name, file_name)
+      symtab.add_symbol(symbol)
 
 
 # mini test

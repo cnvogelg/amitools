@@ -9,29 +9,66 @@ segment_type_names = [
   "CODE", "DATA", "BSS"
 ]
 
+BIN_IMAGE_TYPE_HUNK = 0
+BIN_IMAGE_TYPE_ELF = 1
+
+bin_image_type_names = [
+  "hunk", "elf"
+]
+
+class Reloc:
+  def __init__(self, offset, width=2):
+    self.offset = offset
+    self.width = width
+
+  def get_offset(self):
+    return self.offset
+
+  def get_width(self):
+    return self.width
+
 
 class Relocations:
   def __init__(self, to_seg):
     self.to_seg = to_seg
     self.entries = []
 
-  def add_reloc(self, offset, width=2):
-    self.entries.append((offset, width))
+  def add_reloc(self, reloc):
+    self.entries.append(reloc)
 
   def get_relocs(self):
     return self.entries
+
+
+class Symbol:
+  def __init__(self, offset, name, file_name=None):
+    self.offset = offset
+    self.name = name
+    self.file_name = file_name
+
+  def get_offset(self):
+    return self.offset
+
+  def get_name(self):
+    return self.name
+
+  def get_file_name(self):
+    return self.file_name
 
 
 class SymbolTable:
   def __init__(self):
     self.symbols = []
 
-  def add_symbol(self, offset, name):
-    self.symbols.append((offset, name))
+  def add_symbol(self, symbol):
+    self.symbols.append(symbol)
+
+  def get_symbols(self):
+    return self.symbols
 
 
 class Segment:
-  def __init__(self, seg_type, size, data=None, flags=None):
+  def __init__(self, seg_type, size, data=None, flags=0):
     self.seg_type = seg_type
     self.size = size
     self.data = data
@@ -84,9 +121,10 @@ class Segment:
 class BinImage:
   """A binary image contains all the segments of a program's binary image.
   """
-  def __init__(self):
+  def __init__(self, file_type):
     self.segments = []
     self.file_data = None
+    self.file_type = file_type
 
   def __str__(self):
     return "<%s>" % ",".join(map(str,self.segments))

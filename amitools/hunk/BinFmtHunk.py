@@ -37,7 +37,7 @@ class BinFmtHunk:
 
   def create_image_from_load_seg_file(self, lsf):
     """create a BinImage from a HunkLoadSegFile object"""
-    bi = BinImage()
+    bi = BinImage(BIN_IMAGE_TYPE_HUNK)
     bi.set_file_data(lsf)
     segs = lsf.get_segments()
     for seg in segs:
@@ -84,7 +84,8 @@ class BinFmtHunk:
       rl = Relocations(to_seg)
       # add offsets
       for o in offsets:
-        rl.add_reloc(o)
+        r = Reloc(o)
+        rl.add_reloc(r)
       seg.add_reloc(to_seg, rl)
 
   def add_hunk_symbols(self, blk, seg):
@@ -97,7 +98,8 @@ class BinFmtHunk:
     for sym in syms:
       name = sym[0]
       offset = sym[1]
-      st.add_symbol(offset, name)
+      symbol = Symbol(offset, name)
+      st.add_symbol(symbol)
 
 
 # mini test
