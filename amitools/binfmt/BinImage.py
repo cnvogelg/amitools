@@ -17,15 +17,19 @@ bin_image_type_names = [
 ]
 
 class Reloc:
-  def __init__(self, offset, width=2):
+  def __init__(self, offset, width=2, addend=0):
     self.offset = offset
     self.width = width
+    self.addend = addend
 
   def get_offset(self):
     return self.offset
 
   def get_width(self):
     return self.width
+
+  def get_addend(self):
+    return self.addend
 
 
 class Relocations:

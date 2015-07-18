@@ -67,7 +67,7 @@ class Relocate:
   def _reloc(self, my_id, data, reloc, to_addr, to_id):
     """relocate one entry"""
     offset = reloc.get_offset()
-    delta = self._read_long(data, offset)
+    delta = self._read_long(data, offset) + reloc.addend
     addr = to_addr + delta
     self._write_long(data, offset, addr)
     if self.verbose:

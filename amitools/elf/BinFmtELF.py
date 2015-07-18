@@ -112,7 +112,7 @@ class BinFmtELF:
         seg.add_reloc(to_seg, rl)
         # add relocations
         for rel in sect.get_rela_by_section(tgt_sect):
-          r = Reloc(rel.section_addend)
+          r = Reloc(rel.offset, addend=rel.section_addend)
           rl.add_reloc(r)
 
   def add_elf_symbols(self, symbols, seg):

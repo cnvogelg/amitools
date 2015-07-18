@@ -24,7 +24,8 @@ class Dumper:
           reloc = seg.get_reloc(to_seg)
           for r in reloc.get_relocs():
             off = r.get_offset()
-            print("    %08x/%10d" % (off, off))
+            add = r.get_addend()
+            print("    %08x/%10d    +%08x/%10d" % (off, off, add, add))
       # show symbols
       if show_symbols:
         symtab = seg.get_symtab()

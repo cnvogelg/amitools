@@ -86,6 +86,19 @@ class ELFDumper:
         self._dump_rela_entry(rela, prefix="%4d  " % num)
         num += 1
 
+  def dump_relas_by_sect(self):
+    print "ELF Relocations (by sections)"
+    for sect in self.elf.sections:
+      to_sects = sect.get_rela_sections()
+      if len(to_sects) > 0:
+        print "  section", sect.idx
+        for to_sect in to_sects:
+          print "    -> section", to_sect.idx
+          num = 0
+          for rela in sect.get_rela_by_section(to_sect):
+            self._dump_rela_entry(rela, prefix="      %4d  " % num)
+            num += 1
+
 
 if __name__ == '__main__':
   from ELFReader import ELFReader
@@ -98,4 +111,4 @@ if __name__ == '__main__':
     dumper.dump_sections(True, True)
     dumper.dump_symbols()
     dumper.dump_relas()
-
+    dumper.dump_relas_by_sect()
