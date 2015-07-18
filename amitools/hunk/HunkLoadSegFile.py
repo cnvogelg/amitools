@@ -50,7 +50,7 @@ class HunkSegment:
         if self.debug_blks is None:
           self.debug_blks = []
         self.debug_blks.append(blk)
-      elif blk_id in (HUNK_ABSRELOC32, HUNK_DREL32):
+      elif blk_id in (HUNK_ABSRELOC32, HUNK_RELOC32SHORT):
         if self.reloc_blk is None:
           self.reloc_blk = blk
         else:
@@ -141,7 +141,7 @@ class HunkLoadSegFile:
 if __name__ == '__main__':
   import sys
   for a in sys.argv[1:]:
-    bf = HunkBlockFile()
+    bf = HunkBlockFile(isLoadSeg=True)
     bf.read_path(a)
     print(bf.get_block_type_names())
     lsf = HunkLoadSegFile()

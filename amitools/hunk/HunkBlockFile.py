@@ -357,7 +357,7 @@ class HunkLibBlock(HunkBlock):
     self.blocks = []
     self.offsets = []
 
-  def parse(self, f):
+  def parse(self, f, isLoadSeg=False):
     num_longs = self._read_long(f)
     pos = f.tell()
     end_pos = pos + num_longs * 4
@@ -576,7 +576,7 @@ class HunkBlockFile:
     self.read(f)
     f.close()
 
-  def read(self, f):
+  def read(self, f, isLoadSeg=False, verbose=False):
     """read a hunk file and fill block list"""
     while True:
       # first read block id
@@ -591,6 +591,10 @@ class HunkBlockFile:
       blk_id = blk_id & HUNK_TYPE_MASK
       # look up block type
       if blk_id in hunk_block_type_map:
+        # v37 special case: 1015 is 1020 (HUNK_RELOC32SHORT)
+        # we do this only in LoadSeg() files
+        if isLoadSeg and blk_id == 1015:
+          blk_id = 1020
         blk_type = hunk_block_type_map[blk_id]
         # create block and parse
         block = blk_type()
@@ -671,7 +675,7 @@ if __name__ == '__main__':
     # parse from string stream
     fobj = StringIO.StringIO(data)
     hbf = HunkBlockFile()
-    hbf.read(fobj)
+    hbf.read(fobj, True)
     fobj.close()
     # write to new string stream
     nobj = StringIO.StringIO()

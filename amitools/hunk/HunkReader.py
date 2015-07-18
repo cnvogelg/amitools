@@ -8,7 +8,7 @@ from Hunk import *
 
 class HunkReader:
   """Load Amiga executable Hunk structures"""
-  
+
   def __init__(self):
     self.hunks = []
     self.error_string = None
@@ -20,7 +20,7 @@ class HunkReader:
     self.overlay_segments = None
     self.libs = None
     self.units = None
-  
+
   def get_struct_summary(self, obj):
     if type(obj) == ListType:
       result = []
@@ -42,10 +42,10 @@ class HunkReader:
         return '{' + ",".join(result) + '}'
     else:
       return None
-  
+
   def get_long(self, data):
     return struct.unpack(">I",data)[0]
-  
+
   def read_long(self, f):
     data = f.read(4)
     if len(data) == 0:
@@ -91,17 +91,17 @@ class HunkReader:
       return 0,""
     else:
       return size,data[:endpos]
-  
+
   def get_index_name(self, strtab, offset):
     end = strtab.find('\0',offset)
     if end == -1:
       return strtab[offset:]
     else:
       return strtab[offset:end]
-  
+
   def is_valid_first_hunk_type(self, hunk_type):
     return hunk_type == HUNK_HEADER or hunk_type == HUNK_LIB or hunk_type == HUNK_UNIT
-  
+
   def parse_header(self, f, hunk):
     names = []
     hunk['names'] = names
@@ -121,7 +121,7 @@ class HunkReader:
     if table_size < 0 or first_hunk < 0 or last_hunk < 0:
       self.error_string = "HUNK_HEADER invalid table_size or first_hunk or last_hunk"
       return RESULT_INVALID_HUNK_FILE
-    
+
     hunk['table_size'] = table_size
     hunk['first_hunk'] = first_hunk
     hunk['last_hunk'] = last_hunk
@@ -138,20 +138,20 @@ class HunkReader:
       hunk_bytes = hunk_size & ~HUNKF_ALL
       hunk_bytes *= 4 # longs to bytes
       hunk_info['size'] = hunk_bytes
-      self.set_mem_flags(hunk_info, hunk_size & HUNKF_ALL, 30)      
+      self.set_mem_flags(hunk_info, hunk_size & HUNKF_ALL, 30)
       hunk_table.append(hunk_info)
     hunk['hunks'] = hunk_table
     return RESULT_OK
-  
+
   def parse_code_or_data(self, f, hunk):
     num_longs = self.read_long(f)
     if num_longs < 0:
       self.error_string = "%s has invalid size" % (hunk['type_name'])
       return RESULT_INVALID_HUNK_FILE
-    
+
     # read in hunk data
     size = num_longs * 4
-    
+
     hunk['size'] = size & ~HUNKF_ALL
     flags = size & HUNKF_ALL
     self.set_mem_flags(hunk, flags, 30)
@@ -159,7 +159,7 @@ class HunkReader:
     data = f.read(hunk['size'])
     hunk['data'] = data
     return RESULT_OK
-  
+
   def parse_bss(self, f, hunk):
     num_longs = self.read_long(f)
     if num_longs < 0:
@@ -173,7 +173,7 @@ class HunkReader:
     flags = size & HUNKF_ALL
     self.set_mem_flags(hunk, flags, 30)
     return RESULT_OK
-  
+
   def parse_reloc(self, f, hunk):
     num_relocs = 1
     reloc = {}
@@ -186,7 +186,7 @@ class HunkReader:
       elif num_relocs == 0:
         # last relocation found
         break
-      
+
       # build reloc map
       hunk_num = self.read_long(f)
       if hunk_num < 0:
@@ -203,7 +203,7 @@ class HunkReader:
         offsets.append(offset)
       reloc[hunk_num] = offsets
     return RESULT_OK
-  
+
   def parse_reloc_short(self, f, hunk):
     num_relocs = 1
     reloc = {}
@@ -218,7 +218,7 @@ class HunkReader:
         # last relocation found
         total_words += 1
         break
-      
+
       # build reloc map
       hunk_num = self.read_word(f)
       if hunk_num < 0:
@@ -241,7 +241,7 @@ class HunkReader:
     if total_words & 1 == 1:
       self.read_word(f)
     return RESULT_OK
-  
+
   def parse_symbol(self, f, hunk):
     name_len = 1
     symbols = []
@@ -260,20 +260,20 @@ class HunkReader:
         return RESULT_INVALID_HUNK_FILE
       symbols.append( (name,value) )
     return RESULT_OK
-  
+
   def parse_debug(self, f, hunk):
     num_longs = self.read_long(f)
     if num_longs < 0:
       self.error_string = "%s has invalid size" % (hunk['type_name'])
       return RESULT_INVALID_HUNK_FILE
     size = num_longs * 4
-    
+
     offset = self.read_long(f)
     hunk['debug_offset'] = offset;
     tag = self.read_tag(f)
     hunk['debug_type'] = tag;
     size -= 8
-    
+
     if tag == 'LINE':
       # parse LINE: source line -> code offset mapping
       l = self.read_long(f)
@@ -291,58 +291,58 @@ class HunkReader:
       # read unknown DEBUG hunk
       hunk['data'] = f.read(size)
     return RESULT_OK
-  
+
   def find_first_code_hunk(self):
     for hunk in self.hunks:
       if hunk['type'] == HUNK_CODE:
         return hunk
     return None
-  
+
   def parse_overlay(self, f, hunk):
     # read size of overlay hunk
     ov_size = self.read_long(f)
     if ov_size < 0:
       self.error_string = "%s has invalid size" % (hunk['type_name'])
       return RESULT_INVALID_HUNK_FILE
-    
+
     # read data of overlay
     byte_size = (ov_size + 1) *4
     ov_data = f.read(byte_size)
     hunk['ov_data'] = ov_data
-      
+
     # check: first get header hunk
     hdr_hunk = self.hunks[0]
     if hdr_hunk['type'] != HUNK_HEADER:
       self.error_string = "%s has no header hunk" % (hunk['type_name'])
       return RESULT_INVALID_HUNK_FILE
-    
+
     # first find the code segment of the overlay manager
     overlay_mgr_hunk = self.find_first_code_hunk()
     if overlay_mgr_hunk == None:
       self.error_string = "%s has no overlay manager hunk" % (hunk['type_name'])
       return RESULT_INVALID_HUNK_FILE
-    
+
     # check overlay manager
     overlay_mgr_data = overlay_mgr_hunk['data']
     magic = self.get_long(overlay_mgr_data[4:8])
     if magic != 0xabcd:
       self.error_string = "no valid overlay manager magic found"
       return RESULT_INVALID_HUNK_FILE
-    
+
     # check for standard overlay manager
     magic2 = self.get_long(overlay_mgr_data[24:28])
     magic3 = self.get_long(overlay_mgr_data[28:32])
     magic4 = self.get_long(overlay_mgr_data[32:36])
     std_overlay = (magic2 == 0x5ba0) and (magic3 == 0x074f7665) and (magic4 == 0x726c6179)
     hunk['ov_std'] = std_overlay
-    
+
     return RESULT_OK
-  
+
   def parse_lib(self, f, hunk):
     lib_size = self.read_long(f)
     hunk['lib_file_offset'] = f.tell()
     return RESULT_OK,lib_size * 4
-  
+
   def parse_index(self, f, hunk):
     index_size = self.read_long(f)
     total_size = index_size * 4
@@ -351,7 +351,7 @@ class HunkReader:
     strtab_size = self.read_word(f)
     strtab = f.read(strtab_size)
     total_size -= strtab_size + 2
-    
+
     # read units
     units = []
     hunk['units'] = units
@@ -362,7 +362,7 @@ class HunkReader:
       total_size -= 2
       if name_offset == 0:
         break
-    
+
       unit = {}
       units.append(unit)
       unit['unit_no'] = unit_no
@@ -370,7 +370,7 @@ class HunkReader:
 
       # generate unit name
       unit['name'] = self.get_index_name(strtab, name_offset)
-      
+
       # hunks in unit
       hunk_begin = self.read_word(f)
       num_hunks = self.read_word(f)
@@ -383,7 +383,7 @@ class HunkReader:
       for a in xrange(num_hunks):
         ihunk = {}
         ihunks.append(ihunk)
-        
+
         # get hunk info
         name_offset = self.read_word(f)
         hunk_size   = self.read_word(f)
@@ -394,7 +394,7 @@ class HunkReader:
         ihunk['type'] = hunk_type & 0x3fff
         self.set_mem_flags(ihunk,hunk_type & 0xc000,14)
         ihunk['type_name'] = hunk_names[hunk_type & 0x3fff]
-      
+
         # get references
         num_refs = self.read_word(f)
         total_size -= 2
@@ -414,7 +414,7 @@ class HunkReader:
               ref['bits'] = 32
             ref['name'] = name
             refs.append(ref)
-        
+
         # get definitions
         num_defs = self.read_word(f)
         total_size -= 2
@@ -432,15 +432,15 @@ class HunkReader:
             d = { 'name':name, 'value':def_value,'type':def_type}
             self.set_mem_flags(d,def_flags,14)
             defs.append(d)
-            
+
     # align hunk
     if total_size == 2:
-      self.read_word(f) 
+      self.read_word(f)
     elif total_size != 0:
       self.error_string = "%s has invalid padding" % (hunk['type_name'])
       return RESULT_INVALID_HUNK_FILE
     return RESULT_OK
-  
+
   def parse_ext(self, f, hunk):
     ext_def = []
     ext_ref = []
@@ -457,7 +457,7 @@ class HunkReader:
         return RESULT_INVALID_HUNK_FILE
       ext_type = ext_type_size >> EXT_TYPE_SHIFT
       ext_size = ext_type_size & EXT_TYPE_SIZE_MASK
-      
+
       # ext name
       l,ext_name = self.read_name_size(f, ext_size)
       if l < 0:
@@ -468,13 +468,13 @@ class HunkReader:
 
       # create local ext object
       ext = { 'type' : ext_type, 'name' : ext_name }
-      
+
       # check and setup type name
       if not ext_names.has_key(ext_type):
         self.error_string = "%s has unspported ext entry %d" % (hunk['type_name'],ext_type)
         return RESULT_INVALID_HUNK_FILE
       ext['type_name'] = ext_names[ext_type]
-      
+
       # ext common
       if ext_type == EXT_ABSCOMMON or ext_type == EXT_RELCOMMON:
         ext['common_size'] = self.read_long(f)
@@ -494,9 +494,9 @@ class HunkReader:
           refs.append(ref)
         ext['refs'] = refs
         ext_ref.append(ext)
-        
+
     return RESULT_OK
-  
+
   def parse_unit_or_name(self, f, hunk):
     l,n = self.read_name(f)
     if l < 0:
@@ -507,7 +507,7 @@ class HunkReader:
     else:
       hunk['name'] = ""
     return RESULT_OK
-    
+
   def set_mem_flags(self, hunk, flags, shift):
     f = flags >> shift
     if f & 1 == 1:
@@ -516,9 +516,9 @@ class HunkReader:
       hunk['memf'] = 'fast'
     else:
       hunk['memf'] = ''
-    
+
   # ----- public functions -----
-  
+
   """Read a hunk file and build internal hunk structure
      Return status and set self.error_string on failure
   """
@@ -540,35 +540,35 @@ class HunkReader:
     self.error_string = None
     lib_size = 0
     last_file_offset = 0
-    
+
     while True:
       hunk_file_offset = f.tell()
-      
+
       # read hunk type
       hunk_raw_type = self.read_long(f)
       if hunk_raw_type == -1 or hunk_raw_type == -2: # tolerate extra byte at end
         if is_first_hunk:
-          self.error_string = "No valid hunk file: '%s' is empty" % (hfile) 
-          return RESULT_NO_HUNK_FILE            
+          self.error_string = "No valid hunk file: '%s' is empty" % (hfile)
+          return RESULT_NO_HUNK_FILE
         else:
           # eof
           break
       elif hunk_raw_type < 0:
         if is_first_hunk:
-          self.error_string = "No valid hunk file: '%s' is too short" % (hfile) 
-          return RESULT_NO_HUNK_FILE        
+          self.error_string = "No valid hunk file: '%s' is too short" % (hfile)
+          return RESULT_NO_HUNK_FILE
         else:
           self.error_string = "Error reading hunk type @%08x" % (f.tell())
           return RESULT_INVALID_HUNK_FILE
-      
+
       hunk_type = hunk_raw_type & HUNK_TYPE_MASK
       hunk_flags = hunk_raw_type & HUNK_FLAGS_MASK
-      
+
       # check range of hunk type
       if not hunk_names.has_key(hunk_type):
         # no hunk file?
         if is_first_hunk:
-          self.error_string = "No hunk file: '%s' type was %d" % (hfile, hunk_type) 
+          self.error_string = "No hunk file: '%s' type was %d" % (hfile, hunk_type)
           return RESULT_NO_HUNK_FILE
         elif was_end:
           # garbage after an end tag is ignored
@@ -588,14 +588,14 @@ class HunkReader:
       else:
         # check for valid first hunk type
         if is_first_hunk and not self.is_valid_first_hunk_type(hunk_type):
-          self.error_string = "No hunk file: '%s' first hunk type was %d" % (hfile, hunk_type) 
+          self.error_string = "No hunk file: '%s' first hunk type was %d" % (hfile, hunk_type)
           return RESULT_NO_HUNK_FILE
-        
+
         is_first_hunk = False
         was_end = False
         was_potentail_v37_hunk = False
         was_overlay = False
-        
+
         hunk = { 'type' : hunk_type, 'hunk_file_offset' : hunk_file_offset }
         self.hunks.append(hunk)
         hunk['type_name'] = hunk_names[hunk_type]
@@ -656,7 +656,7 @@ class HunkReader:
           was_overlay = True
         # ----- HUNK_BREAK -----
         elif hunk_type == HUNK_BREAK:
-          result = RESULT_OK        
+          result = RESULT_OK
         # ----- HUNK_LIB -----
         elif hunk_type == HUNK_LIB:
           result,lib_size = self.parse_lib(f,hunk)
@@ -701,7 +701,7 @@ class HunkReader:
       if in_header and hunk_type in loadseg_valid_begin_hunks:
         in_header = False
         seek_begin = True
-      
+
       if in_header:
         if hunk_type == HUNK_HEADER:
           # we are in an overlay!
@@ -715,17 +715,17 @@ class HunkReader:
 
           # start a new segment
           segment = []
-          
+
           # setup hunk counter
           hunk_no = e['first_hunk']
-          
+
         # we allow a debug hunk in header for SAS compatibility
         elif hunk_type == HUNK_DEBUG:
           segment.append(e)
         else:
           self.error_string = "Expected header in loadseg: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
           return False
-                    
+
       elif seek_begin:
         # a new hunk shall begin
         if hunk_type in loadseg_valid_begin_hunks:
@@ -755,14 +755,14 @@ class HunkReader:
           pass
         else:
           self.error_string = "Expected hunk start in loadseg: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
-          return False     
-               
+          return False
+
       else:
         # an extra block in hunk or end is expected
         if hunk_type == HUNK_END:
           seek_begin = True
         # contents of hunk
-        elif hunk_type in loadseg_valid_extra_hunks:
+        elif hunk_type in loadseg_valid_extra_hunks or hunk_type == HUNK_DREL32:
           segment.append(e)
         # broken hunk file without END tag
         elif hunk_type in loadseg_valid_begin_hunks:
@@ -778,7 +778,7 @@ class HunkReader:
           self.error_string = "Unexpected hunk extra in loadseg: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
           return False
     return True
-    
+
   def build_unit(self):
     force_unit = True
     in_hunk = False
@@ -789,7 +789,7 @@ class HunkReader:
     unit_no = 0
     for e in self.hunks:
       hunk_type = e['type']
-      
+
       # optional unit as first entry
       if hunk_type == HUNK_UNIT:
         unit = {}
@@ -803,7 +803,7 @@ class HunkReader:
         hunk_no = 0
       elif force_unit:
         self.error_string = "Expected name hunk in unit: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
-        return False              
+        return False
       elif not in_hunk:
         # begin a named hunk
         if hunk_type == HUNK_NAME:
@@ -824,7 +824,7 @@ class HunkReader:
           pass
         else:
           self.error_string = "Expected main hunk in unit: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
-          return False          
+          return False
       else:
         # a hunk is finished
         if hunk_type == HUNK_END:
@@ -836,9 +836,9 @@ class HunkReader:
         else:
           self.error_string = "Unexpected hunk in unit: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
           return False
-    
+
     return True
-  
+
   def build_lib(self):
     self.libs = []
     lib_segments = []
@@ -855,12 +855,12 @@ class HunkReader:
           seek_lib = False
           seek_main = True
           hunk_no = 0
-          
+
           # get start address of lib hunk in file
           lib_file_offset = e['lib_file_offset']
         else:
           self.error_string = "Expected lib hunk in lib: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
-          return False          
+          return False
       elif seek_main:
         # end of lib? -> index!
         if hunk_type == HUNK_INDEX:
@@ -882,14 +882,14 @@ class HunkReader:
           hunk_no += 1
           segment_list.append(segment)
           seek_main = False
-          
+
           # calc relative lib address
           hunk_lib_offset = e['hunk_file_offset'] - lib_file_offset
           e['hunk_lib_offset'] = hunk_lib_offset
         else:
           self.error_string = "Expected main hunk in lib: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
           return False
-      else:      
+      else:
         # end hunk
         if hunk_type == HUNK_END:
           seek_main = True
@@ -899,7 +899,7 @@ class HunkReader:
         else:
           self.error_string = "Unexpected hunk in lib: %s %d/%x" % (e['type_name'], hunk_type, hunk_type)
           return False
-    
+
     return True
 
   """Resolve hunks referenced in the index"""
@@ -915,7 +915,7 @@ class HunkReader:
       lib_unit['index_unit'] = unit
       lib_units.append(lib_unit)
       no += 1
-      
+
       # try to find segment with start offset
       hunk_offset = unit['hunk_begin_offset']
       found = False
@@ -934,7 +934,7 @@ class HunkReader:
             seg[0]['name'] = info['name']
             seg[0]['index_hunk'] = info
           found = True
-          
+
       if not found:
         return False
     return True
@@ -945,7 +945,7 @@ class HunkReader:
     if len(self.hunks) == 0:
       self.type = TYPE_UNKNOWN
       return False
-    
+
     # determine type of file from first hunk
     first_hunk_type = self.hunks[0]['type']
     if first_hunk_type == HUNK_HEADER:

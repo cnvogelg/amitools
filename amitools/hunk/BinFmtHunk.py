@@ -28,7 +28,7 @@ class BinFmtHunk:
     """load a BinImage from a hunk file given via file obj"""
     # read the hunk blocks
     bf = HunkBlockFile()
-    bf.read(fobj)
+    bf.read(fobj, isLoadSeg=True)
     # derive load seg file
     lsf = HunkLoadSegFile()
     lsf.parse_block_file(bf)
@@ -73,7 +73,7 @@ class BinFmtHunk:
 
   def add_hunk_relocs(self, blk, seg, all_segs):
     """add relocations to a segment"""
-    if blk.blk_id != Hunk.HUNK_ABSRELOC32:
+    if blk.blk_id not in (Hunk.HUNK_ABSRELOC32, Hunk.HUNK_RELOC32SHORT):
       raise HunkParseError("Invalid Relocations for BinImage: %d" % blk_id)
     relocs = blk.relocs
     for r in relocs:
