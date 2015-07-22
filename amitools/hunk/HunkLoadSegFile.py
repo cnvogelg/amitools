@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 from HunkBlockFile import *
+from HunkDebug import HunkDebug
 
 
 class HunkSegment:
@@ -11,15 +12,24 @@ class HunkSegment:
     self.symbol_blk = None
     self.reloc_blk = None
     self.debug_blks = None
+    self.debug_infos = None
     self.size_longs = 0
+    self.size = 0
 
   def __repr__(self):
-    return "[seg=%s,symbol=%s,reloc=%s,debug=%s,size=%d]" % \
+    return "[seg=%s,symbol=%s,reloc=%s,debug=%s,debug_info=%s,size=%d]" % \
       (self._blk_str(self.seg_blk),
        self._blk_str(self.symbol_blk),
        self._blk_str(self.reloc_blk),
        self._blk_str_list(self.debug_blks),
+       self._debug_infos_str(),
        self.size)
+
+  def _debug_infos_str(self):
+    if self.debug_infos is None:
+      return "n/a"
+    else:
+      return ",".join(map(str, self.debug_infos))
 
   def _blk_str(self, blk):
     if blk is None:
@@ -36,6 +46,7 @@ class HunkSegment:
     return ",".join(res)
 
   def parse(self, blocks):
+    hd = HunkDebug()
     self.blocks = blocks
     for blk in blocks:
       blk_id = blk.blk_id
@@ -50,6 +61,12 @@ class HunkSegment:
         if self.debug_blks is None:
           self.debug_blks = []
         self.debug_blks.append(blk)
+        # decode hunk debug info
+        debug_info = hd.decode(blk.debug_data)
+        if debug_info is not None:
+          if self.debug_infos is None:
+            self.debug_infos = []
+          self.debug_infos.append(debug_info)
       elif blk_id in (HUNK_ABSRELOC32, HUNK_RELOC32SHORT):
         if self.reloc_blk is None:
           self.reloc_blk = blk
@@ -135,14 +152,15 @@ class HunkLoadSegFile:
     n = len(second)
     for i in xrange(n):
       self.segments[i].size_longs = hdr_blk.hunk_table[i]
+      self.segments[i].size = self.segments[i].size_longs * 4
 
 
 # mini test
 if __name__ == '__main__':
   import sys
   for a in sys.argv[1:]:
-    bf = HunkBlockFile(isLoadSeg=True)
-    bf.read_path(a)
+    bf = HunkBlockFile()
+    bf.read_path(a, isLoadSeg=True)
     print(bf.get_block_type_names())
     lsf = HunkLoadSegFile()
     lsf.parse_block_file(bf)

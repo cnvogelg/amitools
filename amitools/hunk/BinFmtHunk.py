@@ -3,6 +3,7 @@ from __future__ import print_function
 from amitools.binfmt.BinImage import *
 from HunkBlockFile import HunkBlockFile, HunkParseError
 from HunkLoadSegFile import HunkLoadSegFile
+from HunkDebug import HunkDebugLine
 import Hunk
 
 class BinFmtHunk:
@@ -69,6 +70,11 @@ class BinFmtHunk:
       symbol_blk = hseg.symbol_blk
       if symbol_blk is not None:
         self.add_hunk_symbols(symbol_blk, seg)
+      # add debug infos
+      debug_infos = hseg.debug_infos
+      if debug_infos is not None:
+        self.add_debug_infos(debug_infos, seg)
+
     return bi
 
   def add_hunk_relocs(self, blk, seg, all_segs):
@@ -100,6 +106,20 @@ class BinFmtHunk:
       offset = sym[1]
       symbol = Symbol(offset, name)
       st.add_symbol(symbol)
+
+  def add_debug_infos(self, debug_infos, seg):
+    dl = DebugLine()
+    seg.set_debug_line(dl)
+    for debug_info in debug_infos:
+      # add source line infos
+      if isinstance(debug_info, HunkDebugLine):
+        src_file = debug_info.src_file
+        base_offset = debug_info.base_offset
+        dl.add_file(src_file)
+        for entry in debug_info.get_entries():
+          off = base_offset + entry.offset
+          src_line = entry.src_line
+          dl.add_entry(src_file, off, src_line)
 
 
 # mini test

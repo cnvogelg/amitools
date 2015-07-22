@@ -42,11 +42,11 @@ class Relocate:
     for segment in segs:
       # allocate segment data
       size = segment.size
+      data = bytearray(size)
       src_data = segment.data
-      if src_data is None:
-        data = bytearray(size)
-      else:
-        data = bytearray(src_data)
+      if src_data is not None:
+        src_len = len(src_data)
+        data[0:src_len] = src_data
 
       if self.verbose:
         print("#%02d @%06x +%06x" % (segment.id, addrs[segment.id], size))

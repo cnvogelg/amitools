@@ -571,9 +571,9 @@ class HunkBlockFile:
   def set_blocks(self, blocks):
     self.blocks = blocks
 
-  def read_path(self, path_name):
+  def read_path(self, path_name, isLoadSeg=False, verbose=False):
     f = open(path_name, "rb")
-    self.read(f)
+    self.read(f, isLoadSeg, verbose)
     f.close()
 
   def read(self, f, isLoadSeg=False, verbose=False):

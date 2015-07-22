@@ -71,6 +71,35 @@ class SymbolTable:
     return self.symbols
 
 
+class DebugLineEntry:
+  def __init__(self, offset, src_line):
+    self.offset = offset
+    self.src_line = src_line
+
+  def get_offset(self):
+    return self.offset
+
+  def get_src_line(self):
+    return self.src_line
+
+
+class DebugLine:
+  def __init__(self):
+    self.file_map = {}
+
+  def add_file(self, src_file):
+    self.file_map[src_file] = []
+
+  def add_entry(self, src_file, offset, src_line):
+    self.file_map[src_file].append(DebugLineEntry(offset, src_line))
+
+  def get_src_files(self):
+    return self.file_map.keys()
+
+  def get_entries(self, src_file):
+    return self.file_map[src_file]
+
+
 class Segment:
   def __init__(self, seg_type, size, data=None, flags=0):
     self.seg_type = seg_type
@@ -81,19 +110,33 @@ class Segment:
     self.symtab = None
     self.id = None
     self.file_data = None
+    self.debug_line = None
 
   def __str__(self):
+    # relocs
     relocs = []
     for to_seg in self.relocs:
       r = self.relocs[to_seg]
       relocs.append("(#%d:size=%d)" % (to_seg.id, len(r.entries)))
+    # symtab
     if self.symtab is not None:
       symtab = "symtab=#%d" % len(self.symtab.symbols)
     else:
       symtab = ""
-    return "[#%d:%s:size=%d,flags=%d,%s,%s]" % (self.id,
+    # debug_line
+    if self.debug_line is not None:
+      src_files = self.debug_line.get_src_files()
+      file_info = []
+      for src_file in src_files:
+        n = len(self.debug_line.get_entries(src_file))
+        file_info.append("(%s:#%d)" % (src_file, n))
+      debug_line = "debug_line=" + ",".join(file_info)
+    else:
+      debug_line = ""
+    # summary
+    return "[#%d:%s:size=%d,flags=%d,%s,%s,%s]" % (self.id,
       segment_type_names[self.seg_type], self.size, self.flags,
-      ",".join(relocs), symtab)
+      ",".join(relocs), symtab, debug_line)
 
   def get_type(self):
     return self.seg_type
@@ -119,6 +162,12 @@ class Segment:
 
   def get_symtab(self):
     return self.symtab
+
+  def set_debug_line(self, debug_line):
+    self.debug_line = debug_line
+
+  def get_debug_line(self):
+    return self.debug_line
 
   def set_file_data(self, file_data):
     """set associated loaded binary file"""
