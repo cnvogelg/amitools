@@ -261,3 +261,8 @@ class ELFFile:
     self.symtabs = []
     self.relas = []
 
+  def get_section_by_name(self, name):
+    for sect in self.sections:
+      if sect.name_str == name:
+        return sect
+    return None
