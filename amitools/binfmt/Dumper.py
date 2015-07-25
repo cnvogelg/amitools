@@ -43,7 +43,7 @@ class Dumper:
           for f in debug_line.get_files():
             print("    FILE: [%s] %s" % (f.get_dir_name(), f.get_src_file()))
             for e in f.get_entries():
-              print("      %08x  %d" % (e.offset, e.src_line))
+              print("      %08x  %d" % (e.get_offset(), e.get_src_line()))
 
 
 # mini test

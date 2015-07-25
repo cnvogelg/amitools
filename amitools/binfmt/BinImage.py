@@ -75,12 +75,16 @@ class DebugLineEntry:
   def __init__(self, offset, src_line):
     self.offset = offset
     self.src_line = src_line
+    self.file_ = None
 
   def get_offset(self):
     return self.offset
 
   def get_src_line(self):
     return self.src_line
+
+  def get_file(self):
+    return self.file_
 
 
 class DebugLineFile:
@@ -100,6 +104,7 @@ class DebugLineFile:
 
   def add_entry(self, e):
     self.entries.append(e)
+    e.file_ = self
 
 
 class DebugLine:
@@ -189,6 +194,36 @@ class Segment:
   def get_file_data(self):
     """get associated loaded binary file"""
     return self.file_data
+
+  def find_symbol(self, offset):
+    symtab = self.get_symtab()
+    if symtab is None:
+      return None
+    for symbol in symtab.get_symbols():
+      off = symbol.get_offset()
+      if off == offset:
+        return symbol.get_name()
+    return None
+
+  def find_reloc(self, offset, size):
+    to_segs = self.get_reloc_to_segs()
+    for to_seg in to_segs:
+      reloc = self.get_reloc(to_seg)
+      for r in reloc.get_relocs():
+        off = r.get_offset()
+        if off >= offset and off <= (offset + size):
+          return r,to_seg,off
+    return None
+
+  def find_debug_line(self, offset):
+    debug_line = self.debug_line
+    if debug_line is None:
+      return None
+    for df in debug_line.get_files():
+      for e in df.get_entries():
+        if e.get_offset() == offset:
+          return e
+    return None
 
 
 class BinImage:
