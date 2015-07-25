@@ -114,12 +114,21 @@ class BinFmtHunk:
       # add source line infos
       if isinstance(debug_info, HunkDebugLine):
         src_file = debug_info.src_file
+        # abs path?
+        pos = src_file.rfind('/')
+        if pos != -1:
+          dir_name = src_file[:pos]
+          src_file = src_file[pos+1:]
+        else:
+          dir_name = ""
         base_offset = debug_info.base_offset
-        dl.add_file(src_file)
+        df = DebugLineFile(src_file, dir_name)
+        dl.add_file(df)
         for entry in debug_info.get_entries():
           off = base_offset + entry.offset
           src_line = entry.src_line
-          dl.add_entry(src_file, off, src_line)
+          e = DebugLineEntry(off, src_line)
+          df.add_entry(e)
 
 
 # mini test

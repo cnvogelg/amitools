@@ -11,6 +11,7 @@ class LineState:
     self.is_stmt = is_stmt
     self.basic_block = False
     self.end_sequence = False
+    self.section = None
 
   def clone(self):
     state = LineState()
@@ -21,6 +22,7 @@ class LineState:
     state.is_stmt = self.is_stmt
     state.basic_block = self.basic_block
     state.end_sequence = self.end_sequence
+    state.section = self.section
     return state
 
   def __str__(self):
@@ -31,7 +33,7 @@ class LineState:
 
 class DwarfDebugLine:
   """decode .debug_line Dwarf line debug sections"""
-  def __init__(self, verbose):
+  def __init__(self, verbose=False):
     self.input = None
     self.error = None
     self.verbose = verbose
@@ -83,9 +85,10 @@ class DwarfDebugLine:
         elif sub_opc == 2:
           pos = self.input.tell()
           addr = self.read_long()
-          addend = self.find_rela(rela, pos)
+          addend, sect = self.find_rela(rela, pos)
           state.address = addr + addend
-          log("DW_LNE_set_address: %08x" % state.address)
+          state.section = sect
+          log("DW_LNE_set_address: %08x  sect=%s" % (state.address, sect))
         # 3: DW_LNE_set_file
         elif sub_opc == 3:
           tup = self.decode_file()
@@ -161,22 +164,24 @@ class DwarfDebugLine:
   def get_matrix(self):
     return self.matrix
 
-  def get_file_path(self, idx):
+  def get_file_dir(self, idx):
     f = self.files[idx-1]
-    name = f[0]
     dir_idx = f[1]
     if dir_idx > 0:
-      dir_name = self.inc_dirs[dir_idx-1] + "/"
+      dir_name = self.inc_dirs[dir_idx-1]
     else:
       dir_name = ""
-    return dir_name + name
+    return dir_name
+
+  def get_file_name(self, idx):
+    return self.files[idx-1][0]
 
   def find_rela(self, rela_section, pos):
     if rela_section is not None:
       for rela in rela_section.rela:
         if rela.offset == pos:
-          return rela.addend
-    return 0
+          return rela.addend, rela.section
+    return 0,None
 
   def decode_special_opcode(self, opc):
     adj_opc = opc - self.opc_base
@@ -313,4 +318,7 @@ if __name__ == '__main__':
     if ok:
       print("--- line matrix ---")
       for row in ddl.get_matrix():
-        print("%08x: %s:%d" % (row.address, ddl.get_file_path(row.file), row.line))
+        name = ddl.get_file_name(row.file)
+        fdir = ddl.get_file_dir(row.file)
+        sect_name = row.section.name_str
+        print("%08x: %s [%s] %s:%d" % (row.address, sect_name, fdir, name, row.line))

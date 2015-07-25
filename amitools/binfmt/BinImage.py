@@ -83,21 +83,34 @@ class DebugLineEntry:
     return self.src_line
 
 
+class DebugLineFile:
+  def __init__(self, src_file, dir_name=None):
+    self.src_file = src_file
+    self.dir_name = dir_name
+    self.entries = []
+
+  def get_src_file(self):
+    return self.src_file
+
+  def get_dir_name(self):
+    return self.dir_name
+
+  def get_entries(self):
+    return self.entries
+
+  def add_entry(self, e):
+    self.entries.append(e)
+
+
 class DebugLine:
   def __init__(self):
-    self.file_map = {}
+    self.files = []
 
   def add_file(self, src_file):
-    self.file_map[src_file] = []
+    self.files.append(src_file)
 
-  def add_entry(self, src_file, offset, src_line):
-    self.file_map[src_file].append(DebugLineEntry(offset, src_line))
-
-  def get_src_files(self):
-    return self.file_map.keys()
-
-  def get_entries(self, src_file):
-    return self.file_map[src_file]
+  def get_files(self):
+    return self.files
 
 
 class Segment:

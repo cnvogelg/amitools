@@ -6,7 +6,7 @@ class Dumper:
   def __init__(self, bin_img):
     self.bin_img = bin_img
 
-  def dump(self, hex_dump=False, show_reloc=False, show_symbols=False):
+  def dump(self, hex_dump=False, show_reloc=False, show_symbols=False, show_debug_line=False):
     for seg in self.bin_img.get_segments():
       seg_type = seg.seg_type
       seg_type_name = segment_type_names[seg_type]
@@ -35,6 +35,16 @@ class Dumper:
             off = sym.get_offset()
             name = sym.get_name()
             print("    %08x/%10d    %s" % (off, off, name))
+      # show debug info
+      if show_debug_line:
+        debug_line = seg.get_debug_line()
+        if debug_line is not None:
+          print("  DEBUG LINE")
+          for f in debug_line.get_files():
+            print("    FILE: [%s] %s" % (f.get_dir_name(), f.get_src_file()))
+            for e in f.get_entries():
+              print("      %08x  %d" % (e.offset, e.src_line))
+
 
 # mini test
 if __name__ == '__main__':
@@ -46,4 +56,4 @@ if __name__ == '__main__':
     if bi is not None:
       print(a)
       d = Dumper(bi)
-      d.dump(True, True, True)
+      d.dump(True, True, True, True)

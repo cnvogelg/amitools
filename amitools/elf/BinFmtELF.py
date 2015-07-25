@@ -4,6 +4,8 @@ from amitools.binfmt.BinImage import *
 from ELFFile import *
 from ELF import *
 from ELFReader import ELFReader
+from DwarfDebugLine import DwarfDebugLine
+
 
 class BinFmtELF:
   """Handle Amiga m68k binaries in ELF format (usually from AROS)"""
@@ -101,6 +103,12 @@ class BinFmtELF:
       if num_syms > 0:
         self.add_elf_symbols(symbols, seg)
 
+    # try to add debug info
+    ddl = DwarfDebugLine()
+    got = ddl.decode(elf)
+    if got:
+      self.add_debug_line(ddl, bi, sect_to_seg)
+
     return bi
 
   def add_elf_rela(self, sect, seg, sect_to_seg):
@@ -129,6 +137,37 @@ class BinFmtELF:
         file_name = None
       symbol = Symbol(off, name, file_name)
       symtab.add_symbol(symbol)
+
+  def add_debug_line(self, ddl, bi, sect_to_seg):
+    seg_to_dl = {}
+    matrix = ddl.get_matrix()
+    for row in matrix:
+      sect = row.section
+      if sect in sect_to_seg:
+        segment = sect_to_seg[sect]
+
+        # fetch debug info
+        if segment in seg_to_dl:
+          dl, file_to_df = seg_to_dl[segment]
+        else:
+          dl = DebugLine()
+          file_to_df = {}
+          segment.set_debug_line(dl)
+          seg_to_dl[segment] = (dl, file_to_df)
+
+        # fetch file instance
+        fid = row.file
+        if fid in file_to_df:
+          df = file_to_df[fid]
+        else:
+          df = DebugLineFile(ddl.get_file_name(fid),
+                             ddl.get_file_dir(fid))
+          dl.add_file(df)
+          file_to_df[fid] = df
+
+        # add entry
+        e = DebugLineEntry(row.address, row.line)
+        df.add_entry(e)
 
 
 # mini test
