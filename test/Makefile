@@ -103,8 +103,4 @@ $(BUILD_DIR)/%$(AROS_GCC_EXT)$(DBG_EXT) : %.c
 $(BUILD_DIR)/%$(SASC_EXT)$(DBG_EXT) : %.c
 	$(SASC) $(SASC_OPTS) $(SASC_DEBUG) LINK TO $@ $<
 
-# keep elf files
-.PRECIOUS: $(BUILD_DIR)/%$(AROS_GCC_EXT)$(DBG_EXT).elf \
-	$(BUILD_DIR)/%$(AROS_GCC_EXT).elf
-
 

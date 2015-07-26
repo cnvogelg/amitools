@@ -1,7 +1,7 @@
 from __future__ import print_function
 
-from amitools.elf.BinFmtELF import BinFmtELF
-from amitools.hunk.BinFmtHunk import BinFmtHunk
+from elf.BinFmtELF import BinFmtELF
+from hunk.BinFmtHunk import BinFmtHunk
 
 class BinFmt:
   def __init__(self):

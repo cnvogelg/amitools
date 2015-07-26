@@ -14,11 +14,11 @@ import time
 from amitools.scan.FileScanner import FileScanner
 from amitools.scan.ADFSScanner import ADFSScanner
 from amitools.scan.ArchiveScanner import ZipScanner, LhaScanner
-from amitools.hunk import Hunk
-from amitools.hunk import HunkReader
-from amitools.hunk import HunkShow
-from amitools.hunk import HunkRelocate
-import amitools.elf
+from amitools.binfmt.hunk import Hunk
+from amitools.binfmt.hunk import HunkReader
+from amitools.binfmt.hunk import HunkShow
+from amitools.binfmt.hunk import HunkRelocate
+import amitools.binfmt.elf
 from amitools.util.HexDump import *
 
 def print_pretty(data):
@@ -180,12 +180,12 @@ class ElfInfo:
 
   def run(self):
     for f in args.files:
-      reader = amitools.elf.ELFReader()
+      reader = amitools.binfmt.elf.ELFReader()
       elf = reader.load(open(f, "rb"))
       if elf is None:
         print "ERROR loading ELF:",elf.error_string
         return 1
-      dumper = amitools.elf.ELFDumper(elf)
+      dumper = amitools.binfmt.elf.ELFDumper(elf)
       dumper.dump_sections(show_relocs=args.show_relocs, show_debug=args.show_debug)
       dumper.dump_symbols()
       dumper.dump_relas()
