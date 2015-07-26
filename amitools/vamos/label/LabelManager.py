@@ -83,7 +83,7 @@ class LabelManager:
     else:
       mem = "N/A"
       sym = None
-      src = ""
+      src = None
     return (mem, sym, src)
 
   def trace_int_block(self, mode, addr, size, text="", level=logging.DEBUG, addon=""):

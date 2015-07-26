@@ -14,8 +14,8 @@ class LabelSegment(LabelRange):
   def get_src_info(self, addr):
     info = self.get_src_line(addr)
     if info is None:
-      return ""
+      return None
     f = info.get_file()
     src_file = f.get_src_file()
     src_line = info.get_src_line()
-    return ";  %s:%d" % (src_file, src_line)
+    return "[%s:%d]" % (src_file, src_line)

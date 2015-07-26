@@ -39,4 +39,4 @@ class LabelRange:
     return None
 
   def get_src_info(self, addr):
-    return ""
+    return None

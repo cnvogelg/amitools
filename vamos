@@ -150,7 +150,9 @@ def instr_hook():
   _,txt = cpu.disassemble(pc)
   if sym is not None:
     log_instr.info("%s%s:", " "*40, sym)
-  log_instr.info("%-40s  %06x    %-20s  %s" % (label, pc, txt, src))
+  if src is not None:
+    log_instr.info("%s%s", " "*50, src)
+  log_instr.info("%-40s  %06x    %-20s" % (label, pc, txt))
 
 if cfg.instr_trace:
   if not log_instr.isEnabledFor(logging.INFO):
