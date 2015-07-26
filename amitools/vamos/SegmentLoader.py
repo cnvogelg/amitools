@@ -1,27 +1,29 @@
 import os.path
 
-from amitools.hunk import Hunk
-from amitools.hunk.HunkReader import HunkReader
-from amitools.hunk.HunkRelocate import HunkRelocate
+from amitools.binfmt.BinFmt import BinFmt
+from amitools.binfmt.Relocate import Relocate
 from AccessMemory import AccessMemory
 from label.LabelRange import LabelRange
 from Log import *
 
 class Segment:
-  def __init__(self,name, addr, size, label):
+  def __init__(self, name, addr, size, label, bin_img_seg):
     self.name = name
     self.addr = addr
     self.start = addr + 8
     self.size = size
     self.end = addr + size
     self.label = label
+    self.bin_img_seg = bin_img_seg
+
   def __str__(self):
     return "[Seg:'%s':%06x-%06x]" % (self.name, self.addr, self.end)
 
 class SegList:
-  def __init__(self, ami_bin_file, sys_bin_file):
+  def __init__(self, ami_bin_file, sys_bin_file, bin_img):
     self.ami_bin_file = ami_bin_file
     self.sys_bin_file = sys_bin_file
+    self.bin_img = bin_img
     self.segments = []
     self.b_addr = 0
     self.prog_start = 0
@@ -48,6 +50,7 @@ class SegmentLoader:
     self.path_mgr = path_mgr
     self.error = None
     self.loaded_seg_lists = {}
+    self.binfmt = BinFmt()
 
   def can_load_seg(self, ami_bin_file):
     return self.path_mgr.ami_command_to_sys_path(ami_bin_file) != None
@@ -93,38 +96,30 @@ class SegmentLoader:
   # load sys_bin_file
   def _load_seg(self, ami_bin_file, sys_bin_file):
     base_name = os.path.basename(sys_bin_file)
-    hunk_file = HunkReader()
 
     # does file exist?
     if not os.path.isfile(sys_bin_file):
       self.error = "Can't find '%s'" % sys_bin_file
       return None
 
-    # read hunk file
-    fobj = file(sys_bin_file, "rb")
-    result = hunk_file.read_file_obj(sys_bin_file,fobj,None)
-    if result != Hunk.RESULT_OK:
-      self.error = "Error loading '%s'" % sys_bin_file
-      return None
-
-    # build segments
-    ok = hunk_file.build_segments()
-    if not ok:
-      self.error = "Error building segments for '%s'" % sys_bin_file
-      return None
-
-    # make sure its a loadseg()
-    if hunk_file.type != Hunk.TYPE_LOADSEG:
-      self.error = "File not loadSeg()able: '%s'" % sys_bin_file
+    # try to load bin image in supported format (e.g. HUNK or ELF)
+    try:
+      bin_img = self.binfmt.load_image(sys_bin_file)
+      if bin_img is None:
+        self.error = "Error loading '%s': unsupported format" % sys_bin_file
+        return None
+    except Exception as e:
+      self.error = "Error loading '%s': %s" % (sys_bin_file, e)
       return None
 
     # create relocator
-    relocator = HunkRelocate(hunk_file)
+    relocator = Relocate(bin_img)
 
     # allocate segment memory
     sizes = relocator.get_sizes()
-    names = relocator.get_type_names()
-    seg_list = SegList(ami_bin_file,sys_bin_file)
+    names = bin_img.get_segment_names()
+    bin_img_segs = bin_img.get_segments()
+    seg_list = SegList(ami_bin_file, sys_bin_file, bin_img)
     addrs = []
     for i in xrange(len(sizes)):
       size = sizes[i]
@@ -133,12 +128,12 @@ class SegmentLoader:
 
       # create label
       label = None
-      name = "%s_%d:%s" % (base_name,i,names[i].replace("HUNK_","").lower())
+      name = "%s_%d:%s" % (base_name,i,names[i].lower())
       if self.alloc.label_mgr != None:
         label = LabelRange(name, seg_addr, seg_size)
         self.alloc.label_mgr.add_label(label)
 
-      seg = Segment(name, seg_addr, seg_size, label)
+      seg = Segment(name, seg_addr, seg_size, label, bin_img_segs[i])
       seg_list.add(seg)
       addrs.append(seg.addr + 8) # begin of segment data/code
 

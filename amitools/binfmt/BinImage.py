@@ -159,6 +159,9 @@ class Segment:
   def get_type(self):
     return self.seg_type
 
+  def get_type_name(self):
+    return segment_type_names[self.seg_type]
+
   def get_size(self):
     return self.size
 
@@ -252,3 +255,8 @@ class BinImage:
     """get associated loaded binary file"""
     return self.file_data
 
+  def get_segment_names(self):
+    names = []
+    for seg in self.segments:
+      names.append(seg.get_type_name())
+    return names

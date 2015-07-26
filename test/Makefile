@@ -100,11 +100,8 @@ $(BUILD_DIR)/%$(VBCC_EXT)$(DBG_EXT) : %.c
 $(BUILD_DIR)/%$(GCC_EXT)$(DBG_EXT) : %.c
 	$(GCC) $(GCC_OPTS) $(GCC_DEBUG) -o $@ $<
 
-$(BUILD_DIR)/%$(AROS_GCC_EXT)$(DBG_EXT).elf : %.c
+$(BUILD_DIR)/%$(AROS_GCC_EXT)$(DBG_EXT) : %.c
 	$(AROS_GCC) $(AROS_GCC_OPTS) $(AROS_GCC_DEBUG) -o $@ $<
-
-$(BUILD_DIR)/%$(AROS_GCC_EXT)$(DBG_EXT) : $(BUILD_DIR)/%$(AROS_GCC_EXT)$(DBG_EXT).elf
-	$(AROS_ELF2HUNK) $< $@
 
 $(BUILD_DIR)/%$(SASC_EXT)$(DBG_EXT) : %.c
 	$(SASC) $(SASC_OPTS) $(SASC_DEBUG) LINK TO $@ $<
