@@ -146,9 +146,11 @@ def instr_hook():
       log_instr.info(r)
   # disassemble line
   pc = cpu.r_reg(m68k.M68K_REG_PC)
-  label = vamos.label_mgr.get_mem_str(pc)
+  label, sym, src = vamos.label_mgr.get_disasm_info(pc)
   _,txt = cpu.disassemble(pc)
-  log_instr.info("%-40s  %06x    %s" % (label, pc, txt))
+  if sym is not None:
+    log_instr.info("%s%s:", " "*40, sym)
+  log_instr.info("%-40s  %06x    %-20s  %s" % (label, pc, txt, src))
 
 if cfg.instr_trace:
   if not log_instr.isEnabledFor(logging.INFO):

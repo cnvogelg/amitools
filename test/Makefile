@@ -84,11 +84,8 @@ $(BUILD_DIR)/%$(VBCC_EXT) : %.c
 $(BUILD_DIR)/%$(GCC_EXT) : %.c
 	$(GCC) $(GCC_OPTS) $(GCC_OPTI) -o $@ $<
 
-$(BUILD_DIR)/%$(AROS_GCC_EXT).elf : %.c
+$(BUILD_DIR)/%$(AROS_GCC_EXT) : %.c
 	$(AROS_GCC) $(AROS_GCC_OPTS) $(AROS_GCC_OPTI) -o $@ $<
-
-$(BUILD_DIR)/%$(AROS_GCC_EXT) : $(BUILD_DIR)/%$(AROS_GCC_EXT).elf
-	$(AROS_ELF2HUNK) $< $@
 
 $(BUILD_DIR)/%$(SASC_EXT) : %.c
 	$(SASC) $(SASC_OPTS) $(SASC_OPTI) LINK TO $@ $<

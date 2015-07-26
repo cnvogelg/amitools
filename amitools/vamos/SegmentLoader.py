@@ -3,7 +3,7 @@ import os.path
 from amitools.binfmt.BinFmt import BinFmt
 from amitools.binfmt.Relocate import Relocate
 from AccessMemory import AccessMemory
-from label.LabelRange import LabelRange
+from label.LabelSegment import LabelSegment
 from Log import *
 
 class Segment:
@@ -129,11 +129,12 @@ class SegmentLoader:
       # create label
       label = None
       name = "%s_%d:%s" % (base_name,i,names[i].lower())
+      bin_img_seg = bin_img_segs[i]
       if self.alloc.label_mgr != None:
-        label = LabelRange(name, seg_addr, seg_size)
+        label = LabelSegment(name, seg_addr, seg_size, bin_img_seg)
         self.alloc.label_mgr.add_label(label)
 
-      seg = Segment(name, seg_addr, seg_size, label, bin_img_segs[i])
+      seg = Segment(name, seg_addr, seg_size, label, bin_img_seg)
       seg_list.add(seg)
       addrs.append(seg.addr + 8) # begin of segment data/code
 

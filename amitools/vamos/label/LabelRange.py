@@ -34,3 +34,9 @@ class LabelRange:
     f1 = (end >= self.addr)
     f2 = (self_end >= addr)
     return f1 and f2
+
+  def get_symbol(self, addr):
+    return None
+
+  def get_src_info(self, addr):
+    return ""

@@ -74,6 +74,18 @@ class LabelManager:
     else:
       return "N/A"
 
+  def get_disasm_info(self, addr):
+    label = self.get_label(addr)
+    if label != None:
+      mem = "@%06x +%06x %s" % (label.addr, addr - label.addr, label.name)
+      sym = label.get_symbol(addr)
+      src = label.get_src_info(addr)
+    else:
+      mem = "N/A"
+      sym = None
+      src = ""
+    return (mem, sym, src)
+
   def trace_int_block(self, mode, addr, size, text="", level=logging.DEBUG, addon=""):
     log_mem_int.log(level, "%s(B): %06x: +%06x   %6s  [%s] %s", mode, addr, size, text, self.get_mem_str(addr), addon)
 
