@@ -1,8 +1,4 @@
-import vtest
 
-class VPrintfTests(vtest.VamosTestCase):
-
-  programs = ["vprintf"]
-
-  def runTest(self):
-    self.run_prog_check_data("vprintf")
+def run_test(vamos):
+  vamos.make_prog("vprintf")
+  vamos.run_prog_check_data("vprintf")

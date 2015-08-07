@@ -1,13 +1,12 @@
-from __future__ import print_function
+# pytest fixture for vamos tests
 
-import unittest
+import pytest
 import subprocess
 import os
 
 VAMOS_BIN="../vamos"
 VAMOS_ARGS=['-c', 'test.vamosrc']
 PROG_BIN_DIR="bin"
-PROG_FLAVORS=('vc', 'gcc', 'agcc', 'sc')
 
 class VamosTestOptions:
   vamos_args = []
@@ -15,11 +14,15 @@ class VamosTestOptions:
   generate_data = False
   debug_bins = False
 
-class VamosTestCase(unittest.TestCase):
-
+class VamosTestRunner:
   flavor = 'vc'
-  programs = []
   opts = VamosTestOptions()
+
+  def __init__(self, flavor):
+    self.flavor = flavor
+
+  def make_prog(self, prog_name):
+    self.make_progs([prog_name])
 
   def make_progs(self, prog_names):
     # call make with all program paths to ensure they are built
@@ -104,8 +107,8 @@ class VamosTestCase(unittest.TestCase):
 
   def _compare(self, got, ok):
     for i in xrange(len(ok)):
-      self.assertEquals(got[i], ok[i])
-    self.assertEquals(len(got), len(ok), msg="stdout line count differs")
+      assert (got[i] == ok[i])
+    assert (len(got)==len(ok)), "stdout line count differs"
 
   def run_prog_check_data(self, *prog_args, **kw_args):
     """like run_prog_checked() but also verify the stdout
@@ -120,7 +123,21 @@ class VamosTestCase(unittest.TestCase):
     f.close()
     self._compare(stdout, ok_stdout)
 
-  def setUp(self):
-    # ensure that all required programs are built
-    if len(self.programs) > 0:
-      self.make_progs(self.programs)
+# ----- pytest integration -----
+
+def pytest_addoption(parser):
+    parser.addoption("--flavor", "-F", action="store", default=None,
+        help="select an Amiga compiler flavor to test")
+
+def pytest_runtest_setup(item):
+  flv = item.config.getoption("--flavor")
+  if flv is not None:
+    kw = item.keywords
+    if flv not in kw:
+      pytest.skip("disabled flavor")
+
+@pytest.fixture(scope="module",
+                params=['vc', 'gcc', 'agcc', 'sc'])
+def vamos(request):
+  """Run vamos with test programs"""
+  return VamosTestRunner(request.param)
