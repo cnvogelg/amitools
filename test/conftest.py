@@ -8,18 +8,17 @@ VAMOS_BIN="../vamos"
 VAMOS_ARGS=['-c', 'test.vamosrc']
 PROG_BIN_DIR="bin"
 
-class VamosTestOptions:
-  vamos_args = []
-  show_output = False
-  generate_data = False
-  debug_bins = False
-
 class VamosTestRunner:
-  flavor = 'vc'
-  opts = VamosTestOptions()
-
-  def __init__(self, flavor):
+  def __init__(self, flavor,
+               vopts=None,
+               use_debug_bins=False,
+               dump_output=False,
+               generate_data=False):
     self.flavor = flavor
+    self.vopts = vopts
+    self.use_debug_bins = use_debug_bins
+    self.dump_output = dump_output
+    self.generate_data = generate_data
 
   def make_prog(self, prog_name):
     self.make_progs([prog_name])
@@ -29,7 +28,7 @@ class VamosTestRunner:
     args = ['make']
     for p in prog_names:
       path = os.path.join(PROG_BIN_DIR, p + '_' + self.flavor)
-      if self.opts.debug_bins:
+      if self.use_debug_bins:
         path = path + "_dbg"
       args.append(path)
     _ = subprocess.check_call(args, stdout=subprocess.PIPE)
@@ -55,10 +54,10 @@ class VamosTestRunner:
     """
     # run vamos with prog
     args = [VAMOS_BIN] + VAMOS_ARGS
-    if len(self.opts.vamos_args) > 0:
-      args = args + self.opts.vamos_args
+    if self.vopts is not None:
+      args = args + self.vopts
     prog_name = "curdir:bin/" + prog_args[0] + '_' + self.flavor
-    if self.opts.debug_bins:
+    if self.use_debug_bins:
       prog_name = prog_name + "_dbg"
     args.append(prog_name)
     if len(prog_args) > 1:
@@ -79,12 +78,16 @@ class VamosTestRunner:
     stdout = stdout.splitlines()
 
     # show?
-    if self.opts.show_output:
+    if self.dump_output:
+      fh = open("vamos.log", "w+")
+      fh.write(" ".join(args)+"\n")
       for line in stdout:
-        print(line)
+        fh.write(line)
+        fh.write("\n")
+      fh.close()
 
     # generate data?
-    if self.opts.generate_data:
+    if self.generate_data:
       dat_path = self._get_data_path(prog_args[0], kw_args)
       print("wrote output to '%s'" % dat_path)
       f = open(dat_path, "w")
@@ -128,6 +131,12 @@ class VamosTestRunner:
 def pytest_addoption(parser):
     parser.addoption("--flavor", "-F", action="store", default=None,
         help="select an Amiga compiler flavor to test")
+    parser.addoption("--use-debug-bins", "-D", action="store_true", default=False,
+        help="run the debug versions of the Amiga binaries")
+    parser.addoption("--dump-output", "-O", action="store_true", default=False,
+        help="write all vamos output to 'vamos.log'")
+    parser.addoption("--gen-data", "-G", action="store_true", default=False,
+        help="generate data files by using the output of the test program")
 
 def pytest_runtest_setup(item):
   flv = item.config.getoption("--flavor")
@@ -140,4 +149,10 @@ def pytest_runtest_setup(item):
                 params=['vc', 'gcc', 'agcc', 'sc'])
 def vamos(request):
   """Run vamos with test programs"""
-  return VamosTestRunner(request.param)
+  dbg = request.config.getoption("--use-debug-bins")
+  dump = request.config.getoption("--dump-output")
+  gen = request.config.getoption("--gen-data")
+  return VamosTestRunner(request.param,
+    use_debug_bins=dbg,
+    dump_output=dump,
+    generate_data=gen)
