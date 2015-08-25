@@ -2,6 +2,7 @@ from label.LabelManager import LabelManager
 from label.LabelRange import LabelRange
 from MemoryAlloc import MemoryAlloc
 from MainMemory import MainMemory
+from AccessMemory import AccessMemory
 from AmigaLibrary import AmigaLibrary
 from LibManager import LibManager
 from SegmentLoader import SegmentLoader
@@ -37,6 +38,7 @@ class Vamos:
 
     # setup custom chips
     self.hw_access = HardwareAccess(raw_mem)
+    self._setup_hw_access()
 
     # path manager
     self.path_mgr = PathManager( cfg )
@@ -51,8 +53,9 @@ class Vamos:
     self.label_mgr.add_label(label)
 
     # create memory access
-    self.mem = MainMemory(self.raw_mem, self.error_tracker)
+    self.mem = MainMemory(raw_mem, self.error_tracker)
     self.mem.ctx = self
+    self._setup_memory(raw_mem)
 
     # create memory allocator
     self.mem_begin = 0x1000
@@ -68,8 +71,8 @@ class Vamos:
     self.process = None
     self.proc_list = []
 
-  def init(self, cfg):
-    self.register_base_libs(cfg)
+  def init(self):
+    self.register_base_libs(self.cfg)
     self.create_old_dos_guard()
     self.open_base_libs()
     return True
@@ -77,6 +80,36 @@ class Vamos:
   def cleanup(self):
     self.close_base_libs()
     self.alloc.dump_orphans()
+
+  # ----- system setup -----
+
+  def _setup_hw_access(self):
+    # direct hw access
+    cfg = self.cfg
+    if cfg.hw_access == "emu":
+      self.hw_access.set_mode(HardwareAccess.MODE_EMU)
+    elif cfg.hw_access == "ignore":
+      self.hw_access.set_mode(HardwareAccess.MODE_IGNORE)
+    elif cfg.hw_access == "abort":
+      self.hw_access.set_mode(HardwareAccess.MODE_ABORT)
+    else:
+      raise VamosConfigError("Invalid HW Access mode: %s" % cfg.hw_access)
+
+  def _setup_memory(self, mem):
+    cfg = self.cfg
+    # enable mem trace?
+    if cfg.memory_trace:
+      mem.set_trace_mode(1)
+      mem.set_trace_func(self.label_mgr.trace_mem)
+      if not log_mem.isEnabledFor(logging.DEBUG):
+        log_mem.setLevel(logging.DEBUG)
+    # enable internal memory trace?
+    if cfg.internal_memory_trace:
+      AccessMemory.label_mgr = self.label_mgr
+      if not log_mem_int.isEnabledFor(logging.INFO):
+        log_mem_int.setLevel(logging.INFO)
+    # set invalid access handler for memory
+    mem.set_invalid_func(self.error_tracker.report_invalid_memory)
 
   # ----- process handling -----
 

@@ -15,6 +15,7 @@ REG_A4 = 12
 REG_A5 = 13
 REG_A6 = 14
 REG_A7 = 15
+REG_PC = 16
 
 class CPUState:
   def __init__(self):

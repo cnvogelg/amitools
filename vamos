@@ -16,7 +16,6 @@ from musashi import emu
 from amitools.vamos.Log import *
 from amitools.vamos.Vamos import Vamos
 from amitools.vamos.Exceptions import *
-from amitools.vamos.AccessMemory import AccessMemory
 from amitools.vamos.VamosConfig import VamosConfig
 from amitools.vamos.path.PathManager import PathManager
 from amitools.vamos.VamosRun import VamosRun
@@ -99,37 +98,7 @@ traps = emu.Traps()
 
 # combine to vamos instance
 vamos = Vamos(mem, cpu, traps, cfg)
-
-# direct hw access
-if cfg.hw_access == "emu":
-  vamos.hw_access.set_mode(HardwareAccess.MODE_EMU)
-elif cfg.hw_access == "ignore":
-  vamos.hw_access.set_mode(HardwareAccess.MODE_IGNORE)
-elif cfg.hw_access == "abort":
-  vamos.hw_access.set_mode(HardwareAccess.MODE_ABORT)
-else:
-  log_main.error("Invalid HW Access mode: %s",cfg.hw_access)
-  sys.exit(1)
-log_main.info("setting up HW Access mode: %s",cfg.hw_access)
-
-# enable mem trace?
-if cfg.memory_trace:
-  mem.set_trace_mode(1)
-  mem.set_trace_func(vamos.label_mgr.trace_mem)
-  if not log_mem.isEnabledFor(logging.DEBUG):
-    log_mem.setLevel(logging.DEBUG)
-# enable internal memory trace?
-if cfg.internal_memory_trace:
-  AccessMemory.label_mgr = vamos.label_mgr
-  if not log_mem_int.isEnabledFor(logging.INFO):
-    log_mem_int.setLevel(logging.INFO)
-
-# set invalid access handler for memory
-mem.set_invalid_func(vamos.error_tracker.report_invalid_memory)
-
-# --- setup vamos ---
-if not vamos.init(cfg):
-  sys.exit(1)
+vamos.init()
 
 # --- create main process ---
 proc = Process(vamos, args.bin, args.args, stack_size=cfg.stack_size*1024)
@@ -141,32 +110,7 @@ vamos.set_main_process(proc)
 
 # init cpu and initial registers
 run = VamosRun(vamos, args.benchmark)
-run.init_cpu()
-
-# set reset opcode/trap handler
-cpu.set_reset_instr_callback(run.reset_func)
-
-# enable instruction trace?
-def instr_hook():
-  # add register dump
-  if cfg.reg_dump:
-    res = cpu.dump_state()
-    for r in res:
-      log_instr.info(r)
-  # disassemble line
-  pc = cpu.r_reg(m68k.M68K_REG_PC)
-  label, sym, src = vamos.label_mgr.get_disasm_info(pc)
-  _,txt = cpu.disassemble(pc)
-  if sym is not None:
-    log_instr.info("%s%s:", " "*40, sym)
-  if src is not None:
-    log_instr.info("%s%s", " "*50, src)
-  log_instr.info("%-40s  %06x    %-20s" % (label, pc, txt))
-
-if cfg.instr_trace:
-  if not log_instr.isEnabledFor(logging.INFO):
-    log_instr.setLevel(logging.INFO)
-  cpu.set_instr_hook_callback(instr_hook)
+run.init()
 
 # main loop
 exit_code = run.run(cfg.cycles_per_block, cfg.max_cycles)

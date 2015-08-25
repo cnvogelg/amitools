@@ -1,7 +1,8 @@
 import time
+import logging
 
 from CPU import *
-from Log import log_main
+from Log import log_main, log_instr
 from Exceptions import *
 
 class Trap:
@@ -24,8 +25,19 @@ class VamosRun:
     self.et = vamos.error_tracker
 
     self.benchmark = benchmark
+    self.reg_dump = vamos.cfg.reg_dump
 
-  def init_cpu(self):
+  def init(self):
+    self._init_cpu()
+    # set reset opcode/trap handler
+    self.cpu.set_reset_instr_callback(self.reset_func)
+    # enable instruction tracing?
+    if self.ctx.cfg.instr_trace:
+      if not log_instr.isEnabledFor(logging.INFO):
+        log_instr.setLevel(logging.INFO)
+      self.cpu.set_instr_hook_callback(self.instr_hook)
+
+  def _init_cpu(self):
     # prepare m68k
     log_main.info("setting up m68k")
 
@@ -63,6 +75,23 @@ class VamosRun:
     # stop all
     self.cpu.end()
     self.stay = False
+
+  # enable instruction trace?
+  def instr_hook(self):
+    # add register dump
+    if self.reg_dump:
+      res = cpu.dump_state()
+      for r in res:
+        log_instr.info(r)
+    # disassemble line
+    pc = self.cpu.r_reg(REG_PC)
+    label, sym, src = self.ctx.label_mgr.get_disasm_info(pc)
+    _,txt = self.cpu.disassemble(pc)
+    if sym is not None:
+      log_instr.info("%s%s:", " "*40, sym)
+    if src is not None:
+      log_instr.info("%s%s", " "*50, src)
+    log_instr.info("%-40s  %06x    %-20s" % (label, pc, txt))
 
   def _calc_benchmark(self, total_cycles, delta_time):
     python_time = self.ctx.lib_mgr.bench_total
