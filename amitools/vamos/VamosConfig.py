@@ -63,8 +63,9 @@ class VamosConfig(ConfigParser.SafeConfigParser):
 
   default_lib = '*.library'
 
-  def __init__(self, extra_file=None, args=None):
+  def __init__(self, extra_file=None, skip_defaults=False, args=None, def_data_dir=None):
     ConfigParser.SafeConfigParser.__init__(self)
+    self.def_data_dir = def_data_dir
     self.files = []
     self.args = args
 
@@ -74,10 +75,12 @@ class VamosConfig(ConfigParser.SafeConfigParser):
     # prepend extra file
     if extra_file != None:
       self.files.append(extra_file)
-    # add config in current working dir
-    self.files.append(os.path.join(os.getcwd(),".vamosrc"))
-    # add config in home directory
-    self.files.append(os.path.expanduser("~/.vamosrc"))
+    # read default config files (if they exist)
+    if not skip_defaults:
+      # add config in current working dir
+      self.files.append(os.path.join(os.getcwd(),".vamosrc"))
+      # add config in home directory
+      self.files.append(os.path.expanduser("~/.vamosrc"))
 
     # read configs
     self.found_files = self.read(self.files)
@@ -88,6 +91,7 @@ class VamosConfig(ConfigParser.SafeConfigParser):
     self._parse_lib_config()
     self._parse_args(args)
     self._parse_lib_args(args)
+    self._set_defaults()
 
   def get_lib_config(self, lib_name):
     """get a configuration object for the given lib"""
@@ -137,33 +141,45 @@ class VamosConfig(ConfigParser.SafeConfigParser):
     }
     # define keys that can be set
     self._keys = {
-      'logging' : str,
-      'verbose' : int,
-      'quiet' : bool,
-      'benchmark' : bool,
-      'log_file' : str,
-      'instr_trace' : bool,
-      'memory_trace' : bool,
-      'internal_memory_trace' : bool,
-      'cycles_per_block' : int,
-      'max_cycles' : int,
-      'ram_size' : int,
-      'stack_size' : int,
-      'data_dir' : str,
-      'cpu' : str,
-      'reg_dump' : bool,
-      'hw_access' : str
+      # logging
+      'logging' : (str, None),
+      'verbose' : (int, 0),
+      'quiet' : (bool, False),
+      'benchmark' : (bool, False),
+      'log_file' : (str, None),
+      # low-level tracing
+      'instr_trace' : (bool, False),
+      'memory_trace' : (bool, False),
+      'internal_memory_trace' : (bool, False),
+      'reg_dump' : (bool, False),
+      # cpu emu
+      'cpu' : (str, "68000"),
+      'max_cycles' : (int, 0),
+      'cycles_per_block' : (int, 1000),
+      # system
+      'ram_size' : (int, 1024),
+      'stack_size' : (int, 4),
+      'hw_access' : (str, "emu"),
+      # dirs
+      'data_dir' : (str, self.def_data_dir),
     }
     # prefill keys with None
     for key in self._keys:
       setattr(self, key, None)
+
+  def _set_defaults(self):
+    for key in self._keys:
+      val = getattr(self, key)
+      if val is None:
+        def_val = self._keys[key][1]
+        setattr(self, key, def_val)
 
   def _check_cpu(self, val):
     return val in ('68000','68020','000','020','00','20')
 
   def _set_value(self, key, value):
     if key in self._keys:
-      val_type = self._keys[key]
+      val_type = self._keys[key][0]
       try:
         rv = val_type(value)
         # check value
@@ -185,7 +201,7 @@ class VamosConfig(ConfigParser.SafeConfigParser):
     # parse [vamos] section
     sect = 'vamos'
     for key in self._keys:
-      if self.has_option(sect, key) and getattr(self, key) == None:
+      if self.has_option(sect, key) and getattr(self, key) is None:
         value = self.get(sect, key)
         self._set_value(key, value)
 
@@ -194,7 +210,7 @@ class VamosConfig(ConfigParser.SafeConfigParser):
     for key in self._keys:
       if hasattr(args, key):
         arg_value = getattr(args, key)
-        if arg_value != None:
+        if arg_value is not None:
           self._set_value(key, arg_value)
 
   def _parse_lib_config(self):

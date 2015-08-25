@@ -29,6 +29,7 @@ class HardwareAccess:
     log_hw.warn("CIA read byte @%06x",addr)
     if self.mode == self.MODE_ABORT:
       self.raw_mem.set_all_to_end()
+    return 0
 
   def cia_w8(self, addr, val):
     log_hw.warn("CIA write byte @%06x: %02x",addr,val)
@@ -39,6 +40,7 @@ class HardwareAccess:
     log_hw.warn("Custom Chip read word @%06x",addr)
     if self.mode == self.MODE_ABORT:
       self.raw_mem.set_all_to_end()
+    return 0
 
   def cc_w16(self, addr, val):
     log_hw.warn("Custom Chip write word @%06x: %04x",addr,val)
