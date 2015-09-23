@@ -1,6 +1,7 @@
 from BlockDevice import BlockDevice
 import ctypes
 import gzip
+import io
 
 class ADFBlockDevice(BlockDevice):
   def __init__(self, adf_file, read_only=False, fobj=None):
@@ -34,7 +35,7 @@ class ADFBlockDevice(BlockDevice):
       if self.gzipped:
         fh = gzip.open(self.adf_file,"rb")
       else:
-        fh = file(self.adf_file, "rb")
+        fh = io.open(self.adf_file, "rb")
     # read image
     data = fh.read(self.num_bytes)
     # close input file
@@ -65,7 +66,7 @@ class ADFBlockDevice(BlockDevice):
         if self.gzipped:
           fh = gzip.open(self.adf_file,"wb")
         else:
-          fh = file(self.adf_file, "wb")
+          fh = io.open(self.adf_file, "wb")
       # write image
       fh.write(self.data)
       # close file

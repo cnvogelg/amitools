@@ -21,7 +21,7 @@ class RawBlockDevice(BlockDevice):
     self.num_blocks = self.img_file.num_blocks
 
   def flush(self):
-    pass
+    self.img_file.flush()
 
   def close(self):
     self.img_file.close()

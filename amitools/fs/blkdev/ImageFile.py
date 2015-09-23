@@ -1,6 +1,8 @@
 import os
 import stat
 import amitools.util.BlkDevTools as BlkDevTools
+import zlib
+import io
 
 class ImageFile:
   def __init__(self, file_name, read_only=False, block_bytes=512, fobj=None):
@@ -11,7 +13,6 @@ class ImageFile:
     self.fh = None
     self.size = 0
     self.num_blocks = 0
-    self.pos = 0
 
   def open(self):
     # file obj?
@@ -46,17 +47,16 @@ class ImageFile:
         flags = "rb"
       else:
         flags = "r+b"
-      self.fh = file(self.file_name, flags)
+      self.fh = io.open(self.file_name, flags)
 
   def read_blk(self, blk_num):
     if blk_num >= self.num_blocks:
       raise IOError("Invalid image file block num: got %d but max is %d" % (blk_num, self.num_blocks))
     off = blk_num * self.block_bytes
-    if off != self.pos:
+    if off != self.fh.tell():
       self.fh.seek(off, os.SEEK_SET)
     num = self.block_bytes
     data = self.fh.read(self.block_bytes)
-    self.pos = off + num
     return data
 
   def write_blk(self, blk_num, data):
@@ -67,10 +67,12 @@ class ImageFile:
     if len(data) != self.block_bytes:
       raise IOError("Invalid block size written: got %d but size is %d" % (len(data), self.block_bytes))
     off = blk_num * self.block_bytes
-    if off != self.pos:
+    if off != self.fh.tell():
       self.fh.seek(off, os.SEEK_SET)
     self.fh.write(data)
-    self.pos = off + len(data)
+
+  def flush(self):
+    self.fh.flush()
 
   def close(self):
     if self.fh != None:

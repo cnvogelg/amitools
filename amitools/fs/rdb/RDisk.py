@@ -23,7 +23,7 @@ class RDisk:
       return False
     # create used block list
     self.used_blks = [self.rdb.blk_num]
-      
+
     # read partitions
     part_blk = self.rdb.part_list
     self.parts = []
@@ -39,7 +39,7 @@ class RDisk:
       self.used_blks.append(p.get_blk_num())
       # next partition
       part_blk = p.get_next_partition_blk()
-    
+
     # read filesystems
     fs_blk = self.rdb.fs_list
     self.fs = []
@@ -55,18 +55,18 @@ class RDisk:
       self.used_blks += fs.get_blk_nums()
       # next partition
       fs_blk = fs.get_next_fs_blk()
-      
+
     # TODO: add bad block blocks
-    
+
     self.valid = True
     self.max_blks = self.rdb.log_drv.rdb_blk_hi + 1
     return True
 
   def close(self):
     pass
-    
+
   # ----- query -----
-  
+
   def dump(self, hex_dump=False):
     # rdb
     if self.rdb != None:
@@ -77,7 +77,7 @@ class RDisk:
     # fs
     for fs in self.fs:
       fs.dump(hex_dump)
-  
+
   def get_info(self):
     res = []
     # physical disk info
@@ -101,7 +101,7 @@ class RDisk:
     for f in self.fs:
       res.append(f.get_info())
     return res
-    
+
   def get_block_map(self):
     res = []
     for i in xrange(self.max_blks):
@@ -124,7 +124,7 @@ class RDisk:
           blk = '--'
       res.append(blk)
     return res
-    
+
   def get_logical_cylinders(self):
     ld = self.rdb.log_drv
     return ld.hi_cyl - ld.lo_cyl + 1
@@ -140,26 +140,26 @@ class RDisk:
   def get_total_blocks(self):
     pd = self.rdb.phy_drv
     return pd.cyls * pd.heads * pd.secs
-  
+
   def get_total_bytes(self, block_bytes=512):
     return self.get_total_blocks() * block_bytes
-    
+
   def get_cylinder_blocks(self):
     ld = self.rdb.log_drv
     return ld.cyl_blks
-    
+
   def get_cylinder_bytes(self, block_bytes=512):
     return self.get_cylinder_blocks() * block_bytes
 
   def get_num_partitions(self):
     return len(self.parts)
-  
+
   def get_partition(self, num):
     if num < len(self.parts):
       return self.parts[num]
     else:
       return None
-  
+
   def find_partition_by_drive_name(self, name):
     lo_name = name.lower()
     num = 0
@@ -168,7 +168,7 @@ class RDisk:
       if drv_name == lo_name:
         return p
     return None
-    
+
   def find_partition_by_string(self, s):
     p = self.find_partition_by_drive_name(s)
     if p != None:
@@ -179,13 +179,13 @@ class RDisk:
       return self.get_partition(num)
     except ValueError:
       return None
-      
+
   def get_filesystem(self, num):
     if num < len(self.fs):
       return self.fs[num]
     else:
       return None
-      
+
   def get_used_blocks(self):
     return self.used_blks
 
@@ -195,17 +195,17 @@ class RDisk:
       num = int(s)
       return self.get_filesystem(num)
     except ValueError:
-      return None    
-      
+      return None
+
   # ----- edit -----
-  
+
   def create(self, disk_geo, rdb_cyls=1, hi_rdb_blk=0, disk_names=None, ctrl_names=None):
     cyls = disk_geo.cyls
     heads = disk_geo.heads
     secs = disk_geo.secs
     cyl_blks = heads * secs
     rdb_blk_hi = cyl_blks * rdb_cyls - 1
-    
+
     if disk_names != None:
       disk_vendor = disk_names[0]
       disk_product = disk_names[1]
@@ -214,7 +214,7 @@ class RDisk:
       disk_vendor = 'RDBTOOL'
       disk_product = 'IMAGE'
       disk_revision = '2012'
-      
+
     if ctrl_names != None:
       ctrl_vendor = ctrl_names[0]
       ctrl_product = ctrl_names[1]
@@ -223,13 +223,13 @@ class RDisk:
       ctrl_vendor = ''
       ctrl_product = ''
       ctrl_revision = ''
-    
+
     flags = 0x7
     if disk_names != None:
       flags |= 0x10
     if ctrl_names != None:
       flags |= 0x20
-    
+
     # create RDB
     phy_drv = RDBPhysicalDrive(cyls, heads, secs)
     log_drv = RDBLogicalDrive(rdb_blk_hi=rdb_blk_hi, lo_cyl=rdb_cyls, hi_cyl=cyls-1, cyl_blks=cyl_blks, high_rdsk_blk=hi_rdb_blk)
@@ -237,15 +237,15 @@ class RDisk:
     self.rdb = RDBlock(self.rawblk)
     self.rdb.create(phy_drv, log_drv, drv_id, flags=flags)
     self.rdb.write()
-    
+
     self.used_blks = [self.rdb.blk_num]
     self.max_blks = self.rdb.log_drv.rdb_blk_hi + 1
     self.valid = True
-  
+
   def get_cyl_range(self):
     log_drv = self.rdb.log_drv
     return (log_drv.lo_cyl, log_drv.hi_cyl)
-  
+
   def check_cyl_range(self, lo_cyl, hi_cyl):
     if lo_cyl > hi_cyl:
       return False
@@ -258,10 +258,10 @@ class RDisk:
       if not ((hi_cyl < lo) or (lo_cyl > hi)):
         return False
     return True
-  
+
   def get_free_cyl_ranges(self):
     lohi = self.get_cyl_range()
-    free = [lohi] 
+    free = [lohi]
     for p in self.parts:
       pr = p.get_cyl_range()
       new_free = []
@@ -287,7 +287,7 @@ class RDisk:
     if len(free) == 0:
       return None
     return free
-  
+
   def find_free_cyl_range_start(self, num_cyls):
     ranges = self.get_free_cyl_ranges()
     if ranges == None:
@@ -297,36 +297,36 @@ class RDisk:
       if num_cyls <= size:
         return r[0]
     return None
-  
+
   # ----- manage rdb blocks -----
-  
+
   def _has_free_rdb_blocks(self, num):
     return (len(self.used_blks) + num) <= self.max_blks
-  
+
   def get_free_blocks(self):
     res = []
     for i in xrange(self.max_blks):
       if i not in self.used_blks:
         res.append(i)
     return res
-      
+
   def _alloc_rdb_blocks(self, num):
     free = self.get_free_blocks()
-    n = len(free) 
+    n = len(free)
     if n == num:
       return free
     elif n > num:
       return free[:num]
     else:
       return None
-    
+
   def _next_rdb_block(self):
     free = self.get_free_blocks()
     if len(free) > 0:
       return free[0]
     else:
       return None
-  
+
   def _update_hi_blk(self):
     hi = 0
     for blk_num in self.used_blks:
@@ -334,9 +334,9 @@ class RDisk:
         hi = blk_num
     ld = self.rdb.log_drv
     ld.high_rdsk_blk = hi
-  
+
   # ----- partition handling -----
-  
+
   def add_partition(self, drv_name, cyl_range, dev_flags=0, flags=0, dos_type=DosType.DOS0, boot_pri=0):
     # cyl range is not free anymore or invalid
     if not self.check_cyl_range(*cyl_range):
@@ -365,14 +365,16 @@ class RDisk:
       last_pb = self.parts[-1]
       last_pb.part_blk.next = blk_num
       last_pb.write()
-    # always write RDB as allocated block is stored there, too  
+    # always write RDB as allocated block is stored there, too
     self.rdb.write()
+    # flush out all changes before we read again
+    self.rawblk.flush()
     # create partition object and add to partition list
     p = Partition(self.rawblk, blk_num, len(self.parts), blk_per_trk, self)
     p.read()
     self.parts.append(p)
     return True
-  
+
   def change_partition(self, pid, drv_name=None, dev_flags=None, dos_type=None, flags=None, boot_pri=None):
     # partition not found
     if pid < 0 or pid >= len(self.parts):
@@ -403,7 +405,7 @@ class RDisk:
     if dirty:
       pb.write()
     return True
-    
+
   def delete_partition(self, pid):
     # partition not found
     if pid < 0 or pid >= len(self.parts):
@@ -422,7 +424,7 @@ class RDisk:
     p = self.parts[pid]
     blk_num = p.get_blk_num()
     self.used_blks.remove(blk_num)
-    self._update_hi_blk()    
+    self._update_hi_blk()
     # write RDB
     self.rdb.write()
     # remove partition instance
@@ -434,9 +436,9 @@ class RDisk:
       num += 1
     # done!
     return True
-  
+
   # ----- file system handling ------
-  
+
   def add_filesystem(self, data, dos_type=DosType.DOS1, version=0):
     # create a file system
     blk_num = self._next_rdb_block()
@@ -488,7 +490,7 @@ class RDisk:
     blks = f.get_blk_nums()
     for b in blks:
       self.used_blks.remove(b)
-    self._update_hi_blk()    
+    self._update_hi_blk()
     # write RDB
     self.rdb.write()
     # remove partition instance
