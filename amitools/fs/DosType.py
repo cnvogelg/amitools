@@ -28,7 +28,7 @@ dos_type_names = [
     'N/A'
 ]
 
-# masks for modes  
+# masks for modes
 DOS_MASK_FFS = 1
 DOS_MASK_INTL = 2
 DOS_MASK_DIRCACHE = 4
@@ -61,15 +61,31 @@ def parse_dos_type_str(string):
         return DOS0 + off
       else:
         return None
+    # other tag?
+    elif string[0].isalpha() and n==4:
+      return tag_str_to_num(string)
     # use '0x01234567' hex value
-    elif n == 10 and string[0:2] == '0x':
+    elif string[0:2] == '0x':
       try:
         return int(string[2:],16)
       except ValueError:
         return None
-    # unknown
+    # try number
     else:
-      return None
+      try:
+        return int(string)
+      except ValueError:
+        return None
+
+def tag_str_to_num(s):
+  """Convert the DosType in a 4 letter tag string to 32 bit value"""
+  if len(s) != 4:
+    return 0
+  a = ord(s[0]) << 24
+  b = ord(s[1]) << 16
+  c = ord(s[2]) << 8
+  d = ord(s[3])
+  return a+b+c+d
 
 def num_to_tag_str(l):
   """Convert the DosType in a 32 bit value to its 4 letter tag string"""
@@ -94,11 +110,11 @@ def is_valid(dos_type):
 def is_ffs(dos_type):
   """check if its a fast file system dostype"""
   return (dos_type & DOS_MASK_FFS) == DOS_MASK_FFS
-  
+
 def is_intl(dos_type):
   """check if international mode is enabled in dostype"""
   return is_dircache(dos_type) or (dos_type & DOS_MASK_INTL) == DOS_MASK_INTL
-  
+
 def is_dircache(dos_type):
   """check if dir cache mode is enabled in dostype"""
   return (dos_type & DOS_MASK_DIRCACHE) == DOS_MASK_DIRCACHE

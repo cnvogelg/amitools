@@ -35,7 +35,7 @@ class Command:
         if self.blkdev == None:
           return 5
         blkdev = self.blkdev
-        
+
     # optional init rdisk function
     if hasattr(self, "init_rdisk"):
       # close old
@@ -54,20 +54,20 @@ class Command:
       return self.handle_rdisk(rdisk)
     else:
       return 0
-  
+
   def has_init_blkdev(self):
     return hasattr(self, 'init_blkdev')
-    
+
   def need_rdisk(self):
     return hasattr(self, 'handle_rdisk') and not hasattr(self, 'init_rdisk')
-    
+
 class FSCommandQueue(CommandQueue):
   def __init__(self, args, cmd_list, sep, cmd_map):
     CommandQueue.__init__(self, cmd_list, sep, cmd_map)
     self.args = args
     self.blkdev = None
     self.rdisk = None
-  
+
   def run(self):
     self.img = self.args.image_file
     try:
@@ -103,10 +103,10 @@ class FSCommandQueue(CommandQueue):
       if self.args.verbose:
         print "opening rdisk:",self.img
       self.rdisk.open()
-  
+
   def run_first(self, cmd_line, cmd):
     self.cmd_line = cmd_line
-    
+
     # check if first command is an init command
     if not cmd.has_init_blkdev():
       # auto add 'open' command
@@ -122,8 +122,8 @@ class FSCommandQueue(CommandQueue):
       # setup rdisk (if necessary)
       if cmd.need_rdisk():
         self._open_rdisk()
-        
-    # run first command    
+
+    # run first command
     if self.args.verbose:
       print "command:",self.cmd_line
     if cmd.edit and self.args.read_only:
@@ -131,8 +131,8 @@ class FSCommandQueue(CommandQueue):
 
     # check code of command after __init__ parsing
     if cmd.exit_code != 0:
-      return cmd.exit_code  
-    
+      return cmd.exit_code
+
     # perform command
     exit_code = cmd.run(self.blkdev, self.rdisk)
     if cmd.blkdev != None:
@@ -144,7 +144,7 @@ class FSCommandQueue(CommandQueue):
     if self.args.verbose:
       print "exit_code:",exit_code
     return exit_code
-    
+
   def run_next(self, cmd_line, cmd):
     self.cmd_line = cmd_line
     if self.args.verbose:
@@ -277,11 +277,11 @@ class FreeCommand(Command):
 class PartEditCommand(Command):
   def __init__(self, args, opts):
     Command.__init__(self, args, opts, edit=True)
-  
+
   def parse_opts(self, rdisk):
     self.popts = KeyValue.parse_key_value_strings(self.opts)
     self.rdisk = rdisk
-    
+
   def get_dos_type(self):
     if self.popts.has_key('fs'):
       fs_str = self.popts['fs']
@@ -289,8 +289,8 @@ class PartEditCommand(Command):
       fs_str = self.popts['dostype']
     else:
       fs_str = self.args.dostype
-    return parse_dos_type_str(fs_str)
-    
+    return parse_dos_type_str(str(fs_str))
+
   def get_drv_name(self, empty=False):
     if self.popts.has_key('name'):
       drv_name = self.popts['name']
@@ -299,25 +299,25 @@ class PartEditCommand(Command):
     else:
       drv_name = "%s%d" % (self.args.drive_prefix, self.rdisk.get_num_partitions())
     return drv_name
-  
+
   def get_bootable(self):
     if self.popts.has_key('bootable'):
       return bool(self.popts['bootable'])
     else:
       return False
-      
+
   def get_boot_pri(self):
     if self.popts.has_key('pri'):
       return self.popts['pri']
     else:
       return 0
-  
+
   def get_automount(self):
     if self.popts.has_key('automount'):
       return bool(self.popts['automount'])
     else:
       return True
-  
+
   def get_flags(self):
     flags = 0
     if self.get_bootable():
@@ -325,7 +325,7 @@ class PartEditCommand(Command):
     if not self.get_automount():
       flags |= PartitionBlock.FLAG_NO_AUTOMOUNT
     return flags
-    
+
   def get_cyl_range(self):
     start = None
     if self.popts.has_key('start'):
@@ -356,7 +356,7 @@ class PartEditCommand(Command):
       # size in cylinders
       else:
         cyls = ByteSize.parse_byte_size_str(size)
-      
+
       # check cyls
       if cyls == None or cyls < 1:
         return None
@@ -415,11 +415,11 @@ class ChangeCommand(PartEditCommand):
           return 0
         else:
           print "ERROR: changing partition: '%s'" % (drv_name)
-          return 1    
+          return 1
       else:
         print "Can't find partition: '%s'" % self.opts[0]
         return 1
-  
+
 # --- Fill empty space with partitions ---
 
 class FillCommand(PartEditCommand):
@@ -568,7 +568,7 @@ class FSFlagsCommand(Command):
         return 0
       else:
         print "ERROR finding filesystem: '%s'" % self.opts[0]
-        return 1    
+        return 1
 
 # ----- main -----
 # call scanner and process all files with selected command
