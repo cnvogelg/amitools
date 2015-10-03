@@ -13,8 +13,6 @@ def parse_key_value_string(s, d):
       value = True
     elif v in ("false","off"):
       value = False
-    elif v.startswith("0x"):
-      value = int(v[2:],16)
     else:
       # try a value
       try:
@@ -29,4 +27,4 @@ def parse_key_value_strings(strs):
   for s in strs:
     parse_key_value_string(s, result)
   return result
-  
+
