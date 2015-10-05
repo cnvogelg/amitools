@@ -11,7 +11,7 @@ class Partition:
     self.cyl_blks = cyl_blks
     self.rdisk = rdisk
     self.part_blk = None
-  
+
   def get_next_partition_blk(self):
     if self.part_blk != None:
       return self.part_blk.next
@@ -21,7 +21,7 @@ class Partition:
   def get_blk_num(self):
     """return the block number of the partition block"""
     return self.blk_num
-  
+
   def read(self):
     # read fs header
     self.part_blk = PartitionBlock(self.blkdev, self.blk_num)
@@ -30,7 +30,7 @@ class Partition:
       return False
     self.valid = True
     return True
-  
+
   def create_blkdev(self, auto_close_rdisk=False):
     """create a block device for accessing this partition"""
     rdisk = None
@@ -42,10 +42,10 @@ class Partition:
     self.part_blk.write()
 
   # ----- Query -----
-  
+
   def dump(self):
     self.part_blk.dump()
-  
+
   def get_num_blocks(self):
     """return total number of blocks in this partition"""
     p = self.part_blk
@@ -54,20 +54,20 @@ class Partition:
 
   def get_num_bytes(self, block_size=512):
     return self.get_num_blocks() * block_size
-  
+
   def get_drive_name(self):
     return self.part_blk.drv_name
-    
+
   def get_index(self):
     return self.num
-  
+
   def get_cyl_range(self):
     de = self.part_blk.dos_env
     if de == None:
       return None
     else:
       return (de.low_cyl, de.high_cyl)
-  
+
   def get_info(self, total_blks=0):
     """return a string line with typical info about this partition"""
     p = self.part_blk
@@ -79,7 +79,10 @@ class Partition:
     if total_blks != 0:
       ratio = 100.0 * part_blks / total_blks
       extra += "%6.2f%%  " % ratio
-    extra += DosType.num_to_tag_str(p.dos_env.dos_type)
+    # add dos type
+    dos_type = p.dos_env.dos_type
+    extra += DosType.num_to_tag_str(dos_type)
+    extra += "/0x%04x" % dos_type
     flags = p.flags
     if flags & PartitionBlock.FLAG_BOOTABLE == PartitionBlock.FLAG_BOOTABLE:
       extra += " bootable pri=%d" % de.boot_pri
@@ -87,5 +90,5 @@ class Partition:
       extra += " no_automount"
     return "Partition: #%d %-06s %8d %8d  %10d  %s  %s" \
       % (self.num, name, de.low_cyl, de.high_cyl, part_blks, ByteSize.to_byte_size_str(part_bytes), extra)
-    
-  
+
+
