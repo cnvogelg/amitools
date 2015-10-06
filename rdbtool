@@ -493,7 +493,7 @@ class FSAddCommand(Command):
 
   def handle_rdisk(self, rdisk):
     if len(self.opts) < 1:
-      print "Usage: fsadd <file_name>"
+      print "Usage: fsadd <file_name> [ dostype=<val> | version=<val> ]"
       return 1
     else:
       # parse options
@@ -516,9 +516,17 @@ class FSAddCommand(Command):
         pos = vstr.find('.')
         if pos != -1:
           ver = (int(vstr[:pos]),int(vstr[pos+1:]))
+      # get dostype from options
+      if opts.has_key('dostype'):
+        dostype = parse_dos_type_str(str(opts['dostype']))
+        if dostype == None:
+          print "ERROR: invalid dos type!"
+          return 1
+      else:
+          dostype = DOS1
       # add fs
       version = ver[0] << 16 | ver[1]
-      if rdisk.add_filesystem(data, version=version):
+      if rdisk.add_filesystem(data, dos_type=dostype, version=version):
         return 0
       else:
         print "ERROR adding filesystem! (no space in RDB left)"
