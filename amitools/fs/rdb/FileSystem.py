@@ -57,18 +57,24 @@ class FileSystem:
     num_lseg = int((size + lseg_size - 1)/lseg_size)
     return num_lseg + 1
 
-  def create(self, blks, data, version, dos_type):
+  def create(self, blks, data, version, dos_type, dev_flags=None):
     self.data = data
     # create fs header
     self.fshd = FSHeaderBlock(self.blkdev, self.blk_num)
     self.fshd.create(version=version, dos_type=dos_type)
+    # store begin of seg list
+    self.fshd.set_flag('seg_list_blk',blks[0])
+    self.fshd.set_flag('global_vec', 0xffffffff)
+    # add custom flags
+    if dev_flags is not None:
+      for p in dev_flags:
+        self.fshd.set_flag(p[0], p[1])
     # create lseg blocks
     self.lsegs = []
     lseg_size = self.blkdev.block_bytes - 20
     off = 0
     size = len(data)
     blk_off = 0
-    self.fshd.dev_node.seg_list_blk = blks[blk_off]
     while(off < size):
       blk_len = size - off
       if blk_len > lseg_size:

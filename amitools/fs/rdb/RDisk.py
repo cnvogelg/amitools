@@ -439,7 +439,7 @@ class RDisk:
 
   # ----- file system handling ------
 
-  def add_filesystem(self, data, dos_type=DosType.DOS1, version=0):
+  def add_filesystem(self, data, dos_type=DosType.DOS1, version=0, dev_flags=None):
     # create a file system
     blk_num = self._next_rdb_block()
     fs_num = len(self.fs)
@@ -454,7 +454,7 @@ class RDisk:
     self.used_blks += blks
     self._update_hi_blk()
     # create file system
-    fs.create(blks[1:], data, version, dos_type)
+    fs.create(blks[1:], data, version, dos_type, dev_flags)
     fs.write()
     # link fs block
     if len(self.fs) == 0:
