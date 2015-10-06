@@ -12,7 +12,7 @@ from amitools.fs.rdb.RDisk import RDisk
 from amitools.fs.blkdev.RawBlockDevice import RawBlockDevice
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 from amitools.fs.DosType import *
-from amitools.fs.block.rdb.PartitionBlock import PartitionBlock
+from amitools.fs.block.rdb.PartitionBlock import PartitionBlock, PartitionDosEnv
 from amitools.fs.block.rdb.FSHeaderBlock import FSHeaderDeviceNode
 import amitools.util.KeyValue as KeyValue
 import amitools.util.ByteSize as ByteSize
@@ -327,6 +327,22 @@ class PartEditCommand(Command):
       flags |= PartitionBlock.FLAG_NO_AUTOMOUNT
     return flags
 
+  def get_more_dos_env(self):
+    more_dos_env = []
+    valid_keys = PartitionDosEnv.valid_keys
+    for key in self.popts:
+      if key in valid_keys:
+        more_dos_env.append((key, self.popts[key]))
+    if len(more_dos_env) > 0:
+      return more_dos_env
+    else:
+      return None
+
+  def get_more_dos_env_info(self):
+    valid_keys = PartitionDosEnv.valid_keys
+    info = map(lambda x : "[%s=<n>]" % x, valid_keys)
+    return " ".join(info)
+
   def get_cyl_range(self):
     start = None
     if self.popts.has_key('start'):
@@ -389,10 +405,11 @@ class AddCommand(PartEditCommand):
     if drv_name == None:
       print "ERROR: invalid drive name!"
     flags = self.get_flags()
-    boot_pri = self.get_boot_pri();
+    boot_pri = self.get_boot_pri()
+    more_dos_env = self.get_more_dos_env()
     print "creating: '%s' %s %s" % (drv_name, lo_hi, num_to_tag_str(dostype))
     # add partition
-    if rdisk.add_partition(drv_name, lo_hi, dos_type=dostype, flags=flags, boot_pri=boot_pri):
+    if rdisk.add_partition(drv_name, lo_hi, dos_type=dostype, flags=flags, boot_pri=boot_pri, more_dos_env=more_dos_env):
       return 0
     else:
       print "ERROR: creating partition: '%s': %s" % (drv_name, lo_hi)
@@ -401,7 +418,7 @@ class AddCommand(PartEditCommand):
 class ChangeCommand(PartEditCommand):
   def handle_rdisk(self, rdisk):
     if len(self.opts) < 1:
-      print "Usage: change <id>"
+      print "Usage: change <id> [name=<s>] [dostype=<n|tag>] [automount=<b>] [bootable=<b>] [pri=<n>] " + self.get_more_dos_env_info()
       return 1
     else:
       p = rdisk.find_partition_by_string(self.opts[0])
@@ -410,9 +427,10 @@ class ChangeCommand(PartEditCommand):
         dostype = self.get_dos_type()
         drv_name = self.get_drv_name(empty=True)
         flags = self.get_flags()
-        boot_pri = self.get_boot_pri();
+        boot_pri = self.get_boot_pri()
+        more_dos_env = self.get_more_dos_env()
         # change partition
-        if rdisk.change_partition(p.num, drv_name=drv_name, dos_type=dostype, flags=flags, boot_pri=boot_pri):
+        if rdisk.change_partition(p.num, drv_name=drv_name, dos_type=dostype, flags=flags, boot_pri=boot_pri, more_dos_env=more_dos_env):
           return 0
         else:
           print "ERROR: changing partition: '%s'" % (drv_name)

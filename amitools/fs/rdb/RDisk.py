@@ -337,7 +337,15 @@ class RDisk:
 
   # ----- partition handling -----
 
-  def add_partition(self, drv_name, cyl_range, dev_flags=0, flags=0, dos_type=DosType.DOS0, boot_pri=0):
+  def _adjust_dos_env(self, dos_env, more_dos_env):
+    if more_dos_env is None:
+      return
+    for p in more_dos_env:
+      key = p[0]
+      if hasattr(dos_env, key):
+        setattr(dos_env, key, int(p[1]))
+
+  def add_partition(self, drv_name, cyl_range, dev_flags=0, flags=0, dos_type=DosType.DOS0, boot_pri=0, more_dos_env=None):
     # cyl range is not free anymore or invalid
     if not self.check_cyl_range(*cyl_range):
       return False
@@ -350,10 +358,12 @@ class RDisk:
     self._update_hi_blk()
     # crete a new parttion block
     pb = PartitionBlock(self.rawblk, blk_num)
+    # setup dos env
     heads = self.rdb.phy_drv.heads
     blk_per_trk = self.rdb.phy_drv.secs
     dos_env = PartitionDosEnv(low_cyl=cyl_range[0], high_cyl=cyl_range[1], surfaces=heads, \
                               blk_per_trk=blk_per_trk, dos_type=dos_type, boot_pri=boot_pri)
+    self._adjust_dos_env(dos_env, more_dos_env)
     pb.create(drv_name, dos_env, flags=flags)
     pb.write()
     # link block
@@ -375,7 +385,7 @@ class RDisk:
     self.parts.append(p)
     return True
 
-  def change_partition(self, pid, drv_name=None, dev_flags=None, dos_type=None, flags=None, boot_pri=None):
+  def change_partition(self, pid, drv_name=None, dev_flags=None, dos_type=None, flags=None, boot_pri=None, more_dos_env=None):
     # partition not found
     if pid < 0 or pid >= len(self.parts):
       return False
@@ -401,6 +411,9 @@ class RDisk:
     if boot_pri != None:
       pb.dos_env.boot_pri = boot_pri
       dirty = True
+    # update dos env
+    if more_dos_env is not None:
+      self._adjust_dos_env(pb.dos_env, more_dos_env)
     # write change
     if dirty:
       pb.write()

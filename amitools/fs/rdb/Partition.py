@@ -80,9 +80,14 @@ class Partition:
       ratio = 100.0 * part_blks / total_blks
       extra += "%6.2f%%  " % ratio
     # add dos type
-    dos_type = p.dos_env.dos_type
+    dos_type = de.dos_type
     extra += DosType.num_to_tag_str(dos_type)
     extra += "/0x%04x" % dos_type
+    # max transfer
+    extra += " max_transfer=0x%x" % de.max_transfer
+    extra += " mask=0x%x" % de.mask
+    extra += " num_buffer=%d" % de.num_buffer
+    # add flags
     flags = p.flags
     if flags & PartitionBlock.FLAG_BOOTABLE == PartitionBlock.FLAG_BOOTABLE:
       extra += " bootable pri=%d" % de.boot_pri
