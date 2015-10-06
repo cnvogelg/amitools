@@ -491,7 +491,20 @@ class FSAddCommand(Command):
   def __init__(self, args, opts):
     Command.__init__(self, args, opts, edit=True)
 
+  def parse_opts(self):
+    self.popts = KeyValue.parse_key_value_strings(self.opts)
+
+  def get_dos_type(self):
+    if self.popts.has_key('fs'):
+      fs_str = self.popts['fs']
+    elif self.popts.has_key('dostype'):
+      fs_str = self.popts['dostype']
+    else:
+      fs_str = self.args.dostype
+    return parse_dos_type_str(str(fs_str))
+
   def handle_rdisk(self, rdisk):
+    self.parse_opts()
     if len(self.opts) < 1:
       print "Usage: fsadd <file_name>"
       return 1
@@ -518,7 +531,9 @@ class FSAddCommand(Command):
           ver = (int(vstr[:pos]),int(vstr[pos+1:]))
       # add fs
       version = ver[0] << 16 | ver[1]
-      if rdisk.add_filesystem(data, version=version):
+      # get dostype
+      dostype = self.get_dos_type()
+      if rdisk.add_filesystem(data, dos_type=dostype, version=version):
         return 0
       else:
         print "ERROR adding filesystem! (no space in RDB left)"
