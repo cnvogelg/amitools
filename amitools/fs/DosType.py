@@ -84,10 +84,17 @@ def tag_str_to_num(s):
   a = ord(s[0]) << 24
   b = ord(s[1]) << 16
   c = ord(s[2]) << 8
+<<<<<<< HEAD
+  try:
+    d = int(s[3])
+  except TypeError:
+    return 0
+=======
   l = s[3]
   d = ord(l)
   if l.isdigit():
     d = d - ord('0')
+>>>>>>> upstream
   return a+b+c+d
 
 def num_to_tag_str(l):
