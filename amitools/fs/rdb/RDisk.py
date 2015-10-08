@@ -414,6 +414,7 @@ class RDisk:
     # update dos env
     if more_dos_env is not None:
       self._adjust_dos_env(pb.dos_env, more_dos_env)
+      dirty = True
     # write change
     if dirty:
       pb.write()

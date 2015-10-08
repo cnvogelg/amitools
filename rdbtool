@@ -283,13 +283,15 @@ class PartEditCommand(Command):
     self.popts = KeyValue.parse_key_value_strings(self.opts)
     self.rdisk = rdisk
 
-  def get_dos_type(self):
+  def get_dos_type(self, empty=False):
     if self.popts.has_key('fs'):
       fs_str = self.popts['fs']
     elif self.popts.has_key('dostype'):
       fs_str = self.popts['dostype']
-    else:
+    elif not empty:
       fs_str = self.args.dostype
+    else:
+      return None
     return parse_dos_type_str(str(fs_str))
 
   def get_drv_name(self, empty=False):
@@ -301,30 +303,44 @@ class PartEditCommand(Command):
       drv_name = "%s%d" % (self.args.drive_prefix, self.rdisk.get_num_partitions())
     return drv_name
 
-  def get_bootable(self):
+  def get_bootable(self, empty=False):
     if self.popts.has_key('bootable'):
       return bool(self.popts['bootable'])
-    else:
+    elif not empty:
       return False
+    else:
+      return None
 
-  def get_boot_pri(self):
+  def get_boot_pri(self, empty=False):
     if self.popts.has_key('pri'):
       return self.popts['pri']
-    else:
+    elif not empty:
       return 0
+    else:
+      return None
 
-  def get_automount(self):
+  def get_automount(self, empty=False):
     if self.popts.has_key('automount'):
       return bool(self.popts['automount'])
-    else:
+    elif not empty:
       return True
+    else:
+      return None
 
-  def get_flags(self):
+  def get_flags(self, empty=False, old_flags=0):
     flags = 0
-    if self.get_bootable():
-      flags |= PartitionBlock.FLAG_BOOTABLE
-    if not self.get_automount():
-      flags |= PartitionBlock.FLAG_NO_AUTOMOUNT
+    bootable = self.get_bootable(empty=empty)
+    if bootable is not None:
+      if bootable:
+        flags |= PartitionBlock.FLAG_BOOTABLE
+    else:
+      flags |= (old_flags) & PartitionBlock.FLAG_BOOTABLE
+    automount = self.get_automount(empty=empty)
+    if automount is not None:
+      if not automount:
+        flags |= PartitionBlock.FLAG_NO_AUTOMOUNT
+    else:
+      flags |= (old_flags) & PartitionBlock.FLAG_NO_AUTOMOUNT
     return flags
 
   def get_more_dos_env(self):
@@ -424,10 +440,10 @@ class ChangeCommand(PartEditCommand):
       p = rdisk.find_partition_by_string(self.opts[0])
       if p != None:
         self.parse_opts(rdisk)
-        dostype = self.get_dos_type()
+        dostype = self.get_dos_type(empty=True)
         drv_name = self.get_drv_name(empty=True)
-        flags = self.get_flags()
-        boot_pri = self.get_boot_pri()
+        flags = self.get_flags(empty=True, old_flags=p.get_flags())
+        boot_pri = self.get_boot_pri(empty=True)
         more_dos_env = self.get_more_dos_env()
         # change partition
         if rdisk.change_partition(p.num, drv_name=drv_name, dos_type=dostype, flags=flags, boot_pri=boot_pri, more_dos_env=more_dos_env):

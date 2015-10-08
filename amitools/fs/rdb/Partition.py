@@ -58,6 +58,9 @@ class Partition:
   def get_drive_name(self):
     return self.part_blk.drv_name
 
+  def get_flags(self):
+    return self.part_blk.flags
+
   def get_index(self):
     return self.num
 
