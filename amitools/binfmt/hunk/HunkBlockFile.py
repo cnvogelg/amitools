@@ -195,7 +195,7 @@ class HunkRelocWordBlock(HunkBlock):
         offsets.append(off)
       self.relocs.append((hunk_num, offsets))
     # pad to long
-    if num_words % 1 == 1:
+    if num_words % 2 == 1:
       self._read_word(f)
 
 
