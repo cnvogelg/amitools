@@ -75,8 +75,8 @@ class FileHandle:
   def seek(self, pos, whence):
     self.obj.seek(pos, whence)
 
-  def is_interactive(self, fh):
-    fd = fh.obj.fileno()
+  def is_interactive(self):
+    fd = self.obj.fileno()
     if hasattr(os, "ttyname"):
       try:
         os.ttyname(fd)
