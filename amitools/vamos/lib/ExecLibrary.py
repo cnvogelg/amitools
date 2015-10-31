@@ -4,15 +4,20 @@ from amitools.vamos.Log import log_exec
 from amitools.vamos.Exceptions import *
 from amitools.vamos.AccessStruct import AccessStruct
 from lexec.PortManager import PortManager
+from lexec.Pool import Pool
 
 class ExecLibrary(AmigaLibrary):
   name = "exec.library"
+  _pools = {}
+  _poolid = 0x1000
 
   def __init__(self, lib_mgr, alloc, config):
     AmigaLibrary.__init__(self, self.name, ExecLibraryDef, config)
     log_exec.info("open exec.library V%d", self.version)
     self.lib_mgr = lib_mgr
     self.alloc = alloc
+    self._pools = {}
+    self._poolid = 0x1000
 
   def setup_lib(self, ctx):
     # set some system contants
@@ -125,6 +130,38 @@ class ExecLibrary(AmigaLibrary):
     name = ctx.mem.access.r_cstr(name_ptr)
     log_exec.info("FindResident: '%s'" % (name))
     return 0
+
+  def CreatePool(self, ctx):
+    # need some sort of uniq id. 
+    # HACK: this is a hack to produce private uniq ids
+    poolid = self._poolid
+    self._poolid += 4;
+    flags = ctx.cpu.r_reg(REG_D0);
+    size = ctx.cpu.r_reg(REG_D1);
+    thresh = ctx.cpu.r_reg(REG_D2)
+    pool = Pool(self.alloc, flags, size, thresh)
+    self._pools[poolid] = pool
+    return poolid
+
+  def AllocPooled(self, ctx):
+    poolid = ctx.cpu.r_reg(REG_A0)
+    size = ctx.cpu.r_reg(REG_D0)
+    pc = self.get_callee_pc(ctx)
+    tag = ctx.label_mgr.get_mem_str(pc)
+    name = "AllocPooled(%06x = %s)" % (pc,tag)
+    pool = self._pools[poolid]
+    if pool is not None:
+      return pool.AllocPooled(name, size)
+    else:
+      return 0
+
+  def DeletePool(self, ctx):
+    log_exec.info("DeletePool")    
+    poolid = ctx.cpu.r_reg(REG_A0)
+    pool = self._pools[poolid]
+    del self._pools[poolid]
+    if pool is not None:
+      del pool
 
   # ----- Memory Handling -----
 
