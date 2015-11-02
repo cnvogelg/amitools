@@ -51,7 +51,7 @@ class Args:
       if extra:
         # last one? -> failed to get extra arg
         n = len(in_list)
-        if pos == n-1:
+        if pos == n: # THOR: off-by-one error, note that in_list is now one element shorter
           return None
         val = in_list[pos]
         in_list.pop(pos)
