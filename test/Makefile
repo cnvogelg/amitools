@@ -3,7 +3,7 @@
 # build programs with the following compilers:
 # VBCC, GCC, AROS_GCC, SASC
 
-SOURCES_C = vprintf.c
+SOURCES_C = vprintf.c mem.c
 
 VPATH = src
 
@@ -38,6 +38,9 @@ VBCC_DEBUG = -g
 GCC_DEBUG = -g
 AROS_GCC_DEBUG = -g
 SASC_DEBUG = DEBUG=F
+
+# libs
+VBCC_LIBS = -lamiga
 
 # binary extensions
 VBCC_EXT = _vc
@@ -79,7 +82,7 @@ $(BUILD_DIR):
 
 # rules for opt
 $(BUILD_DIR)/%$(VBCC_EXT) : %.c
-	$(VBCC) $(VBCC_OPTS) $(VBCC_OPTI) -o $@ $<
+	$(VBCC) $(VBCC_OPTS) $(VBCC_OPTI) -o $@ $< $(VBCC_LIBS)
 
 $(BUILD_DIR)/%$(GCC_EXT) : %.c
 	$(GCC) $(GCC_OPTS) $(GCC_OPTI) -o $@ $<
@@ -92,7 +95,7 @@ $(BUILD_DIR)/%$(SASC_EXT) : %.c
 
 # rules for dbg
 $(BUILD_DIR)/%$(VBCC_EXT)$(DBG_EXT) : %.c
-	$(VBCC) $(VBCC_OPTS) $(VBCC_DEBUG) -o $@ $<
+	$(VBCC) $(VBCC_OPTS) $(VBCC_DEBUG) -o $@ $< $(VBCC_LIBS)
 
 $(BUILD_DIR)/%$(GCC_EXT)$(DBG_EXT) : %.c
 	$(GCC) $(GCC_OPTS) $(GCC_DEBUG) -o $@ $<

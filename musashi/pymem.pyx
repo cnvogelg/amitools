@@ -172,11 +172,19 @@ cdef class Memory:
     cdef const unsigned char *ptr = data
     cdef unsigned char *ram = self.ram_ptr + addr
     memcpy(ram, ptr, size)
+
   def clear_block(self,uint addr,uint size,unsigned char value):
     if (addr+size) > self.ram_bytes:
       raise ValueError("no RAM")
     cdef unsigned char *ram = self.ram_ptr + addr
     memset(ram,value,size)
+
+  def copy_block(self,uint from_addr, uint to_addr, uint size):
+    if (from_addr+size) > self.ram_bytes or (to_addr+size) > self.ram_bytes:
+      raise ValueError("no RAM")
+    cdef unsigned char *from_ptr = self.ram_ptr + from_addr
+    cdef unsigned char *to_ptr = self.ram_ptr + to_addr
+    memcpy(to_ptr, from_ptr, size)
 
   # helpers for c-strings (only RAM)
   def r_cstr(self,uint addr):

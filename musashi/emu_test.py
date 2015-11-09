@@ -65,6 +65,12 @@ def run():
   s = memory.r_bstr(0)
   print s,type(s)
 
+  # copy block
+  memory.w_bstr(0,"hello, world!")
+  memory.copy_block(0, 100, 100)
+  txt = memory.r_bstr(100)
+  print txt
+
   # valid range
   print "executing..."
   cpu.w_reg(m68k.M68K_REG_PC,0x1000)
