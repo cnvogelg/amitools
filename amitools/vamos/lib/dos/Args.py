@@ -155,6 +155,7 @@ class Args:
     # scan for multi and non-key args
     multi_pos = None
     multi_targ = None
+    
     pos = 0
     for targ in targs:
       # multi

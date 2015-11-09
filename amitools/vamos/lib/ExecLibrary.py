@@ -278,3 +278,27 @@ class ExecLibrary(AmigaLibrary):
     AccessStruct(ctx.mem, NodeDef, succ).w_s("ln_Pred", pred)
     return node_addr
 
+  def CopyMem(self, ctx):
+    source = ctx.cpu.r_reg(REG_A0)
+    dest   = ctx.cpu.r_reg(REG_A1)
+    len    = ctx.cpu.r_reg(REG_D0)
+    log_exec.info("CopyMem: source=%06x dest=%06x len=%06x" % (source,dest,len))
+    while len > 0:
+      ctx.mem.access.w8(dest,ctx.mem.access.r8(source))
+      dest   = dest   + 1
+      source = source + 1
+      len    = len    - 1
+
+  def CopyMemQuick(self, ctx):
+    source = ctx.cpu.r_reg(REG_A0)
+    dest   = ctx.cpu.r_reg(REG_A1)
+    len    = ctx.cpu.r_reg(REG_D0)
+    log_exec.info("CopyMemQuick: source=%06x dest=%06x len=%06x" % (source,dest,len))
+    while len > 0:
+      ctx.mem.access.w32(dest,ctx.mem.access.r32(source))
+      dest   = dest   + 4
+      source = source + 4
+      len    = len    - 4
+
+
+

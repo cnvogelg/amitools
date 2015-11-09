@@ -1,5 +1,6 @@
 import os
 import stat
+import uuid
 
 from amitools.vamos.Log import log_lock
 from amitools.vamos.AccessStruct import AccessStruct
@@ -19,7 +20,8 @@ class Lock:
     self.exclusive = exclusive
     self.mem = None
     self.b_addr = 0
-    self.dirent = []
+    self.key    = 0
+    self.dirent = None
 
   def __str__(self):
     addr = 0
@@ -31,6 +33,8 @@ class Lock:
     name = "Lock:" + self.name
     self.mem = alloc.alloc_struct(name, FileLockDef)
     self.mem.access.w_s("fl_Volume", vol_baddr)
+    self.key = uuid.uuid4().time_low
+    self.mem.access.w_s("fl_Key",self.key)
     self.b_addr = self.mem.addr >> 2
     return self.b_addr
 
@@ -44,7 +48,7 @@ class Lock:
     name_addr = fib_mem.s_get_addr('fib_FileName')
     fib_mem.w_cstr(name_addr, name)
     # dummy key
-    fib_mem.w_s('fib_DiskKey',0xcafebabe)
+    fib_mem.w_s('fib_DiskKey',self.key)
     # type
     if os.path.isdir(sys_path):
       dirEntryType = 0x2 # dir
@@ -99,3 +103,8 @@ class Lock:
 
     self.dirent = None
     return ERROR_NO_MORE_ENTRIES
+
+  def find_volume_node(self,dos_list):
+    return self.mem.access.r_s("fl_Volume")
+
+

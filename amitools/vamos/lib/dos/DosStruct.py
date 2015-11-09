@@ -299,3 +299,21 @@ class DateTimeStruct(AmigaStruct):
     ('UBYTE*','dat_StrTime')
   ]
 DateTimeDef = DateTimeStruct()
+
+class InfoDataStruct(AmigaStruct):
+  _name = "InfoData"
+  _format = [
+    ('LONG','id_NumSoftErrors'),
+    ('LONG','id_UnitNumber'),
+    ('LONG','id_DiskState'),
+    ('LONG','id_NumBlocks'),
+    ('LONG','id_NumBlocksUsed'),
+    ('LONG','id_BytesPerBlock'),
+    ('LONG','id_DiskType'),
+    ('BPTR','id_VolumeNode'),
+    ('LONG','id_InUse')
+    ]
+InfoDataDef = InfoDataStruct()
+
+
+    

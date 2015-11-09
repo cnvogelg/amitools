@@ -13,7 +13,7 @@ class FileHandle:
     self.b_addr = 0
     self.need_close = need_close
     # buffering
-    self.unch = ''
+    self.unch = ""
     self.ch = -1
 
   def __str__(self):
@@ -69,6 +69,9 @@ class FileHandle:
   def ungets(self, s):
     self.unch = self.unch + s
 
+  def setbuf(self,s):
+    self.unch = s
+    
   def tell(self):
     return self.obj.tell()
 

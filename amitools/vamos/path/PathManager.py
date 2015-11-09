@@ -192,6 +192,7 @@ class PathManager:
     if path == "":
       return self.cur_vol + ":" + self.cur_path
     col_pos = path.find(':')
+    #print path,col_pos
     # already with device name
     if col_pos > 0:
       return path
@@ -253,24 +254,27 @@ class PathManager:
       return ""
     # ends with volume
     p = path
+    vol = ""
     if p[-1] == ':':
       return ""
     # skip volume
     col_pos = p.find(':')
     if col_pos :
+      vol = p[:col_pos+1]
       p = p[col_pos+1:]
       l = len(path)
       if l > 0 and p[0] == '/':
         p = p[1:]
-    # find slash
+    # find slash, also add
+    # the volume again.
     slash_pos = p.rfind('/')
     if slash_pos == -1:
-      return ""
+      return vol+""
     else:
       if slash_pos == 0:
-        return "/"
+        return vol+"/"
       else:
-        return p[:slash_pos]
+        return vol+p[:slash_pos]
 
   def ami_volume_of_path(self, path):
     pos = path.find(':')

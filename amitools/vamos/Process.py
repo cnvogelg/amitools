@@ -15,7 +15,7 @@ class Process:
     if not self.ok:
       return
     self.init_stack(stack_size, exit_addr)
-    self.init_args(bin_args)
+    self.init_args(bin_args,input_fh)
     self.init_cli_struct(input_fh, output_fh)
     self.init_task_struct(input_fh, output_fh)
 
@@ -67,12 +67,30 @@ class Process:
   def unload_binary(self):
     self.ctx.seg_loader.unload_seg(self.bin_seg_list)
 
+  def quote_arg(self,arg):
+    if " " in arg or arg == "":
+      out=arg.replace("*","**")
+      out=out.replace("\e","*e")
+      out=out.replace("\n","*n")
+      out=out.replace("\"","*\"")
+      return "\""+out+"\""
+    else:
+      return arg
+    
   # ----- args -----
-  def init_args(self, bin_args):
+  def init_args(self, bin_args, fh):
     # setup arguments
     self.bin_args = bin_args
-    self.arg_text = " ".join(bin_args) + "\n" # AmigaDOS appends a new line to the end
+    text_args = ""
+    gap = False
+    for arg in bin_args:
+      if gap:
+        text_args = text_args + " "
+      text_args = text_args + self.quote_arg(arg)
+      gap = True
+    self.arg_text = text_args + "\n" # AmigaDOS appends a new line to the end
     self.arg_len  = len(self.arg_text)
+    fh.setbuf(self.arg_text) # Tripos makes the input line available as buffered input for ReadItem()
     self.arg_size = self.arg_len + 1
     self.arg = self.ctx.alloc.alloc_memory(self.bin_basename + "_args", self.arg_size)
     self.arg_base = self.arg.addr
@@ -106,7 +124,7 @@ class Process:
   # ----- task struct -----
   def init_task_struct(self, input_fh, output_fh):
     # Inject arguments into input stream (Needed for C:Execute)
-    input_fh.ungets(self.arg_text)
+    #input_fh.ungets(self.arg_text)
     self.this_task = self.ctx.alloc.alloc_struct(self.bin_basename + "_ThisTask",ProcessDef)
     self.this_task.access.w_s("pr_Task.tc_Node.ln_Type", NT_PROCESS)
     self.this_task.access.w_s("pr_CLI", self.cli.addr)

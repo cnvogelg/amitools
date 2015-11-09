@@ -10,12 +10,13 @@ from Error import *
 from Lock import Lock
 
 class LockManager:
-  def __init__(self, path_mgr, dos_list, alloc):
+  def __init__(self, path_mgr, dos_list, alloc, mem):
     self.path_mgr = path_mgr
     self.dos_list = dos_list
-    self.alloc = alloc
+    self.alloc    = alloc
+    self.mem      = mem
 
-    self.locks_by_b_addr = {}
+    self.locks_by_key = {}
 
   def _register_lock(self, lock):
     # look up volume
@@ -29,16 +30,16 @@ class LockManager:
       vol_baddr = volume.baddr
     # allocate lock struct
     b_addr = lock.alloc(self.alloc, vol_baddr)
-    self.locks_by_b_addr[b_addr] = lock
+    self.locks_by_key[lock.key] = lock
     log_lock.info("registered: %s" % lock)
 
   def _unregister_lock(self, lock):
-    if not self.locks_by_b_addr.has_key(lock.b_addr):
+    if not self.locks_by_key.has_key(lock.key):
       raise VamosInternalError("Lock %s not registered!" % lock)
-    check = self.locks_by_b_addr[lock.b_addr]
+    check = self.locks_by_key[lock.key]
     if check != lock:
       raise VamosInternalError("Invalid Lock unregistered: %s" % lock)
-    del self.locks_by_b_addr[lock.b_addr]
+    del self.locks_by_key[lock.key]
     log_lock.info("unregistered: %s" % lock)
     lock.b_addr = 0
     lock.addr = 0
@@ -49,7 +50,7 @@ class LockManager:
       ami_path = self.path_mgr.ami_abs_cur_path()
     else:
       ami_path = self.path_mgr.ami_abs_path(ami_path)
-    sys_path = self.path_mgr.ami_to_sys_path(ami_path)
+    sys_path = self.path_mgr.ami_to_sys_path(ami_path,searchMulti=True)
     name = self.path_mgr.ami_name_of_path(ami_path)
     if sys_path == None:
       log_lock.info("lock '%s' invalid: no sys path found: '%s'", name, ami_path)
@@ -73,6 +74,10 @@ class LockManager:
     else:
       return None
 
+  def _get_key_from_baddr(self, b_addr):
+    addr = b_addr << 2
+    return self.mem.access.r32(addr + 4)
+
   def get_by_b_addr(self, b_addr, none_if_missing=False):
     # current dir lock
     if b_addr == 0:
@@ -80,8 +85,9 @@ class LockManager:
       ami_path = cur_dev + ":" + cur_path
       sys_path = self.path_mgr.ami_to_sys_path(ami_path)
       return Lock("local",ami_path,sys_path)
-    elif self.locks_by_b_addr.has_key(b_addr):
-      return self.locks_by_b_addr[b_addr]
+    elif self.locks_by_key.has_key(self._get_key_from_baddr(b_addr)):
+      lock = self.locks_by_key[self._get_key_from_baddr(b_addr)]
+      return lock
     else:
       if none_if_missing:
         return None
