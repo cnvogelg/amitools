@@ -67,11 +67,29 @@ class Process:
   def unload_binary(self):
     self.ctx.seg_loader.unload_seg(self.bin_seg_list)
 
+  def quote_arg(self,arg):
+    if " " in arg or arg == "":
+      out=arg.replace("*","**")
+      out=out.replace("\e","*e")
+      out=out.replace("\n","*n")
+      out=out.replace("\"","*\"")
+      return "\""+out+"\""
+    else:
+      return arg
+    
   # ----- args -----
   def init_args(self, bin_args):
     # setup arguments
     self.bin_args = bin_args
-    self.arg_text = " ".join(bin_args) + "\n" # AmigaDOS appends a new line to the end
+    text_args = ""
+    gap = False
+    for arg in bin_args:
+      if gap:
+        text_args = text_args + " "
+      text_args = text_args + self.quote_arg(arg)
+      gap = True
+    print "Text args are "+text_args
+    self.arg_text = text_args + "\n" # AmigaDOS appends a new line to the end
     self.arg_len  = len(self.arg_text)
     self.arg_size = self.arg_len + 1
     self.arg = self.ctx.alloc.alloc_memory(self.bin_basename + "_args", self.arg_size)

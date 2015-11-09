@@ -46,6 +46,7 @@ class LockManager:
 
   def create_lock(self, ami_path, exclusive):
     if ami_path == '':
+      #ami_path = self.path_mgr.ami_abs_path('.')
       ami_path = self.path_mgr.ami_abs_cur_path()
     else:
       ami_path = self.path_mgr.ami_abs_path(ami_path)
