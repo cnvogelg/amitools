@@ -19,6 +19,13 @@ class DosList:
     self.entries_by_name = {}
     self.entries = []
 
+  def __str__(self):
+    res = "["
+    for en in self.entries:
+      res = res + en.__str__()
+    res = res + "]"
+    return res
+
   def build_list(self, path_mgr):
     """build the dos list and return a bptr of the first entry"""
     # fill dos list

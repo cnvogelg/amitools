@@ -35,7 +35,6 @@ class MatchFirstNext:
     if self.path == None:
       return ERROR_OBJECT_NOT_FOUND
     self.name = self.path_mgr.ami_name_of_path(self.path)
-
     # get parent dir of first match
     dir_part = self.path_mgr.ami_dir_of_path(self.path)
     abs_path = self.path_mgr.ami_abs_path(dir_part)

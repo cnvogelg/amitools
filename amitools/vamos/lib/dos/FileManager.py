@@ -74,7 +74,7 @@ class FileManager:
         fh = FileHandle(sys.stdout,'*','',need_close=False)
       else:
         # map to system path
-        sys_path = self.path_mgr.ami_to_sys_path(ami_path)
+        sys_path = self.path_mgr.ami_to_sys_path(ami_path,searchMulti=True)
         if sys_path == None:
           log_file.info("file not found: '%s' -> '%s'" % (ami_path, sys_path))
           return None

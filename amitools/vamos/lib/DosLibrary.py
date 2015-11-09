@@ -55,7 +55,7 @@ class DosLibrary(AmigaLibrary):
     self.dos_list = DosList(ctx.alloc)
     baddr = self.dos_list.build_list(ctx.path_mgr)
     # create lock manager
-    self.lock_mgr = LockManager(ctx.path_mgr, self.dos_list, ctx.alloc)
+    self.lock_mgr = LockManager(ctx.path_mgr, self.dos_list, ctx.alloc, ctx.mem)
     # create file manager
     self.file_mgr = FileManager(ctx.path_mgr, ctx.alloc, ctx.mem)
     # currently we use a single fake port for all devices
@@ -508,6 +508,28 @@ class DosLibrary(AmigaLibrary):
     if self.io_err == NO_ERROR:
       return self.DOSTRUE
     else:
+      return self.DOSFALSE
+
+  def Info(self, ctx):
+    lock_b_addr = ctx.cpu.r_reg(REG_D1)
+    info_ptr = ctx.cpu.r_reg(REG_D2)
+    lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
+    info = AccessStruct(ctx.mem,InfoDataDef,struct_addr=info_ptr)
+    vol  = lock.find_volume_node(self.dos_list)
+    if vol != None:
+      info.w_s('id_NumSoftErrors',0)
+      info.w_s('id_UnitNumber',0) #not that we really care...
+      info.w_s('id_DiskState',0)  #disk is not write protected
+      info.w_s('id_NumBlocks',0x7fffffff) #a really really big disk....
+      info.w_s('id_NumBlocksUsed',0x0fffffff) #some...
+      info.w_s('id_BytesPerBlock',512) #let's take regular FFS blocks
+      info.w_s('id_DiskType',0x444F5303) #international FFS
+      info.w_s('id_VolumeNode',vol)
+      info.w_s('id_InUse',0)
+      log_dos.info("Info: %s info=%06x -> true" % (lock, info_ptr))
+      return self.DOSTRUE
+    else:
+      log_dos.info("Info: %s info=%06x -> false" % (lock, info_ptr))
       return self.DOSFALSE
 
   def ExNext(self, ctx):
