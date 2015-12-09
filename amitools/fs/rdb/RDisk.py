@@ -360,7 +360,7 @@ class RDisk:
     pb = PartitionBlock(self.rawblk, blk_num)
     # setup dos env
     heads = self.rdb.phy_drv.heads
-    blk_per_trk = self.rdb.phy_drv.secs
+    blk_per_trk = self.rdb.phy_drv.secs * heads
     dos_env = PartitionDosEnv(low_cyl=cyl_range[0], high_cyl=cyl_range[1], surfaces=heads, \
                               blk_per_trk=blk_per_trk, dos_type=dos_type, boot_pri=boot_pri)
     self._adjust_dos_env(dos_env, more_dos_env)
