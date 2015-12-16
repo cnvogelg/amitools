@@ -15,12 +15,9 @@ from musashi import emu
 
 from amitools.vamos.Log import *
 from amitools.vamos.Vamos import Vamos
-from amitools.vamos.Exceptions import *
 from amitools.vamos.VamosConfig import VamosConfig
-from amitools.vamos.path.PathManager import PathManager
 from amitools.vamos.VamosRun import VamosRun
 from amitools.vamos.Process import Process
-from amitools.vamos.HardwareAccess import HardwareAccess
 
 # ----- main -----------------------------------------------------------------
 # retrieve vamos home and data dir

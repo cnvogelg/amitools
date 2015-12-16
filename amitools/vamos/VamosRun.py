@@ -80,7 +80,7 @@ class VamosRun:
   def instr_hook(self):
     # add register dump
     if self.reg_dump:
-      res = cpu.dump_state()
+      res = self.cpu.dump_state()
       for r in res:
         log_instr.info(r)
     # disassemble line
