@@ -177,6 +177,66 @@ class Vamos:
     log_proc.info("stop sub process: %s ret_code=%d", proc, ret_code)
     proc.free()
 
+  # ----- overload a process for RunCommand -----
+  
+  def run_command(self,start_pc,argsptr,arglen,stacksize):
+    newstack     = self.alloc.alloc_memory("shell command stack",stacksize)
+    newstackbase = newstack.addr
+    newstacktop  = newstackbase + stacksize
+    oldstackbase = self.process.this_task.access.r_s("pr_Task.tc_SPLower");
+    oldstacktop  = self.process.this_task.access.r_s("pr_Task.tc_SPUpper");
+    old_stackptr = self.cpu.r_reg(REG_A7) # addr of sys call return
+    # put stack size on top of stack
+    self.mem.access.w32(newstacktop - 4,stacksize)
+    # activate new stack
+    new_stackptr = newstacktop - 4
+    self.process.this_task.access.w_s("pr_Task.tc_SPLower",newstackbase)
+    self.process.this_task.access.w_s("pr_Task.tc_SPUpper",newstacktop)
+    # NOTE: the Manx fexec and BPCL mess is not (yet) setup here.
+    # setup trampoline to enter sub process
+    tr = Trampoline(self, "RunCommand")
+    # reserve a long for old stack
+    old_stack_off = tr.dc_l(0)
+    # code starts
+    tr.save_all_but_d0()
+    # new proc registers: d0=arg_len a0=arg_cptr
+    tr.set_dx_l(0, arglen)
+    tr.set_ax_l(0, argsptr)
+    # d2=stack_size.  this value is also in 4(sp) (see Process.init_stack), but
+    # various C programs rely on it being present (1.3-3.1 at least have it).
+    tr.set_dx_l(2, stacksize)
+    # to track old dos values
+    tr.set_ax_l(2, self.dos_guard_base)
+    tr.set_ax_l(5, self.dos_guard_base)
+    tr.set_ax_l(6, self.dos_guard_base)
+    # save old stack and set new stack
+    tr.write_ax_l(7, old_stack_off, True) # write to data offset (dc.l above)
+    tr.set_ax_l(7, new_stackptr)
+    # call code! (jmp - return value is on stack)
+    tr.jmp(start_pc)
+    # restore stack (set a label to return from new stack - see below)
+    return_off = tr.get_code_offset()
+    tr.read_ax_l(7, old_stack_off, True) # read from data offset (dc.l above)
+    # restore regs
+    tr.restore_all_but_d0()
+    # trap to clean up sub process resources
+    def trap_stop_run_command():
+      ret_code = self.cpu.r_reg(REG_D0)
+      log_proc.info("return from RunCommand: ret_code=%d", ret_code)
+      self.cpu.w_reg(REG_A7,old_stackptr)
+      self.process.this_task.access.w_s("pr_Task.tc_SPLower",oldstackbase)
+      self.process.this_task.access.w_s("pr_Task.tc_SPUpper",oldstacktop)
+      self.alloc.free_memory(newstack)
+      # The return code remains in d0 as is
+    tr.final_rts(trap_stop_run_command)
+    # realize trampoline in memory (data+code)
+    tr.done()
+    # get label addr -> set as return value of new stack
+    return_addr = tr.get_code_addr(return_off)
+    log_proc.debug("new_stack=%06x return_addr=%06x", new_stackptr, return_addr)
+    # place return address for new process
+    self.mem.access.w32(new_stackptr, return_addr)
+
   # ----- init environment -----
 
   def register_base_libs(self, cfg):

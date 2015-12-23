@@ -762,8 +762,13 @@ class DosLibrary(AmigaLibrary):
     array_ptr = ctx.cpu.r_reg(REG_D2)
     rdargs_ptr = ctx.cpu.r_reg(REG_D3)
 
-    # get args from process
-    bin_args = ctx.process.bin_args
+    # get args from process, unless we're running a native
+    # shell. The shell leaves the arguments in the buffer
+    # of the input file handle.
+    if ctx.process.bin_args is not None:
+      bin_args = ctx.process.bin_args
+    else:
+      bin_args = ctx.process.get_input().getbuf()
     log_dos.info("ReadArgs: args=%s template='%s' array_ptr=%06x rdargs_ptr=%06x" % (bin_args, template, array_ptr, rdargs_ptr))
     # try to parse argument string
     args = Args()
@@ -966,6 +971,15 @@ class DosLibrary(AmigaLibrary):
       seg_list = self.seg_lists[b_addr]
       del self.seg_lists[b_addr]
       self.ctx.seg_loader.unload_seg(seg_list)
+
+  def RunCommand(self, ctx):
+    seglist  = ctx.cpu.r_reg(REG_D1)
+    stack    = ctx.cpu.r_reg(REG_D2)
+    args     = ctx.cpu.r_reg(REG_D3)
+    length   = ctx.cpu.r_reg(REG_D4)
+    # round up the stack
+    stack    = (stack + 3) & -4
+    ctx.run_command((seglist << 2) + 4,args,length,stack)
 
   # ----- Path Helper -----
 

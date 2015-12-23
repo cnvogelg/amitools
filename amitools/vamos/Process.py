@@ -25,6 +25,7 @@ class Process:
       self.cli = self.ctx.alloc.alloc_struct(self.bin_basename + "_CLI",CLIDef)
       self.cmd = None
       self.arg = None
+      self.bin_args = None
     self.init_task_struct(input_fh, output_fh)
 
   def free(self):

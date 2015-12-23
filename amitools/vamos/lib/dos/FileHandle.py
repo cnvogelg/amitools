@@ -95,6 +95,9 @@ class FileHandle:
 
   def setbuf(self,s):
     self.unch = s
+
+  def getbuf(self):
+    return self.unch
     
   def tell(self):
     return self.obj.tell()
