@@ -765,13 +765,13 @@ class DosLibrary(AmigaLibrary):
     # get args from process, unless we're running a native
     # shell. The shell leaves the arguments in the buffer
     # of the input file handle.
+    args = Args()
     if ctx.process.bin_args is not None:
       bin_args = ctx.process.bin_args
     else:
-      bin_args = ctx.process.get_input().getbuf()
+      bin_args = args.split(ctx.process.get_input().getbuf())
     log_dos.info("ReadArgs: args=%s template='%s' array_ptr=%06x rdargs_ptr=%06x" % (bin_args, template, array_ptr, rdargs_ptr))
     # try to parse argument string
-    args = Args()
     args.parse_template(template)
     args.prepare_input(ctx.mem.access,array_ptr)
     ok = args.parse_string(bin_args)
@@ -858,7 +858,13 @@ class DosLibrary(AmigaLibrary):
 
     # Well Known Bug: buff[0] = 0, even if maxchars == 0
     ctx.mem.access.w8(buff_ptr, 0)
+    res = self._readItem(ctx,buff_ptr,maxchars)
+    # Write back the updated csource ptr if we have one
+    if (csource_ptr):
+      csource.access.w_s('CS_CurChr',self.cs_curchr)
+    return res
 
+  def _readItem(self, ctx, buff_ptr, maxchars):
     # Skip leading whitespace
     while True:
       ch = self.cs_get(ctx)
@@ -977,6 +983,10 @@ class DosLibrary(AmigaLibrary):
     stack    = ctx.cpu.r_reg(REG_D2)
     args     = ctx.cpu.r_reg(REG_D3)
     length   = ctx.cpu.r_reg(REG_D4)
+    fh       = ctx.process.get_input()
+    cmdline  = ctx.mem.access.r_cstr(args)
+    ctx.process.get_input().setbuf(cmdline)
+    log_dos.info("RunCommand: seglist=%06x stack=%d args=%s" % (seglist, stack, cmdline))
     # round up the stack
     stack    = (stack + 3) & -4
     ctx.run_command((seglist << 2) + 4,args,length,stack)

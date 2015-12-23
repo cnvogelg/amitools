@@ -227,6 +227,7 @@ class Vamos:
       self.process.this_task.access.w_s("pr_Task.tc_SPLower",oldstackbase)
       self.process.this_task.access.w_s("pr_Task.tc_SPUpper",oldstacktop)
       self.alloc.free_memory(newstack)
+      self.process.get_input().setbuf("")
       # The return code remains in d0 as is
     tr.final_rts(trap_stop_run_command)
     # realize trampoline in memory (data+code)

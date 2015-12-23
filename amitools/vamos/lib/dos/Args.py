@@ -44,6 +44,53 @@ class Args:
         self.in_val.append(None)
       ptr += 4
 
+  def split(self,argstring):
+    args=[]
+    # AmigaOs quoting rules are weird!
+    # This is a simplified version of the shell
+    # argument parsing.
+    arg      = ""
+    inquote  = False
+    inspace  = True
+    asterisk = False
+    for b in argstring:
+      if asterisk:
+        if b == 'E' or b ==' e':
+          arg += chr(27)
+        elif b == 'N' or b == 'n':
+          arg += chr(10)
+        else:
+          arg += b
+        asterisk = False
+      elif inspace:
+        if not (b == ' ' or b == '\t' or b == '\n'):
+          inspace = False
+          arg     = ""
+          if b == '"':
+            inquote = True
+          else:
+            arg    += b
+      elif inquote:
+        if b == '*':
+          asterisk = True
+        elif b == '"':
+          inquote = False
+          inspace = True
+          args   += [arg]
+          arg     = ""
+        else:
+          arg += b
+      else:
+        if b == ' ' or b == '\t' or b == '\n':
+          args += [arg]
+          arg   = ""
+          inspace = True
+        else:
+          arg  += b
+    if arg != "":
+      args += [arg]
+    return args
+  
   def _find_remove_key(self, keys, in_list, extra):
     pos = self._find_key_pos_and_remove(keys, in_list)
     if pos != None:
@@ -71,7 +118,7 @@ class Args:
         pos = pos + 1
     return None
 
-  """apply an internal template to a given argument array
+  """apply an internal template to a given argument array, this already expects an array of strings.
   """
   def parse_string(self, in_args):
     self.error = NO_ERROR
@@ -81,7 +128,7 @@ class Args:
     for a in in_args:
       b = a.split('=')
       args += b
-
+      
     # prepare result array
     result = []
     targs = self.targs
