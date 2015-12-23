@@ -153,7 +153,7 @@ class ExecLibrary(AmigaLibrary):
     if pool is not None:
       return pool.AllocPooled(name, size)
     else:
-      return 0
+      raise VamosInternalError("AllocPooled: invalid memory pool: ptr=%06x" % poolid)
 
   def DeletePool(self, ctx):
     log_exec.info("DeletePool")

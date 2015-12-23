@@ -164,6 +164,8 @@ class MemoryAlloc:
     # erase memory
     self.mem.access.clear_data(addr, size, 0)
     log_mem_alloc.info("[alloc @%06x-%06x: %06x bytes] %s", addr, addr+size, size, self._stat_info())
+    if addr % 4:
+      raise VamosInternalError("Memory pool is invalid, return address not aligned by a long word");
     return addr
 
   def free_mem(self, addr, size):

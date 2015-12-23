@@ -171,9 +171,8 @@ SetVar(name,buffer,size,flags)(d1/d2/d3/d4)
 GetVar(name,buffer,size,flags)(d1/d2/d3/d4)
 DeleteVar(name,flags)(d1/d2)
 FindVar(name,type)(d1/d2)
-##private
-dosPrivate4()()
-##public
+* THOR: This is marked private, but required for the shell
+CliInit(dp)(a0)
 CliInitNewcli(dp)(a0)
 CliInitRun(dp)(a0)
 WriteChars(buf,buflen)(d1/d2)

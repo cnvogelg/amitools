@@ -5,18 +5,26 @@ from lib.dos.DosStruct import *
 NT_PROCESS = 13
 
 class Process:
-  def __init__(self, ctx, bin_file, bin_args, input_fh=None, output_fh=None, stack_size=4096, exit_addr=0):
+  def __init__(self, ctx, bin_file, bin_args, input_fh=None, output_fh=None, stack_size=4096, exit_addr=0, shell=False):
     self.ctx = ctx
     if input_fh == None:
       input_fh = self.ctx.dos_lib.file_mgr.get_input()
     if output_fh == None:
       output_fh = self.ctx.dos_lib.file_mgr.get_output()
-    self.ok = self.load_binary(bin_file)
+    self.ok = self.load_binary(bin_file,shell)
     if not self.ok:
       return
     self.init_stack(stack_size, exit_addr)
-    self.init_args(bin_args,input_fh)
-    self.init_cli_struct(input_fh, output_fh)
+    # thor: the boot shell creates its own CLI if it is not there.
+    # but for now, supply it with the Vamos CLI and let it initialize
+    # it through the private CliInit() call of the dos.library
+    if not shell:
+      self.init_args(bin_args,input_fh)
+      self.init_cli_struct(input_fh, output_fh)
+    else:
+      self.cli = self.ctx.alloc.alloc_struct(self.bin_basename + "_CLI",CLIDef)
+      self.cmd = None
+      self.arg = None
     self.init_task_struct(input_fh, output_fh)
 
   def free(self):
@@ -51,14 +59,20 @@ class Process:
     self.ctx.alloc.free_memory(self.stack)
 
   # ----- binary -----
-  def load_binary(self, ami_bin_file):
+  def load_binary(self, ami_bin_file, shell=False):
     self.bin_basename = self.ctx.path_mgr.ami_name_of_path(ami_bin_file)
-    self.bin_file = ami_bin_file
+    self.bin_file     = ami_bin_file
     self.bin_seg_list = self.ctx.seg_loader.load_seg(ami_bin_file)
     if self.bin_seg_list == None:
       log_proc.error("failed loading binary: %s", self.ctx.seg_loader.error)
       return False
     self.prog_start = self.bin_seg_list.prog_start
+    # THOR: If this is a shell, then the seglist requires BCPL linkage and
+    # initialization of the GlobVec. Fortunately, for the 3.9 shell all this
+    # magic is not really required, and the BCPL call-in (we use) is at
+    # offset +8
+    if shell:
+      self.prog_start += 8
     log_proc.info("loaded binary: %s", self.bin_seg_list)
     for seg in self.bin_seg_list.segments:
       log_proc.info(seg)
@@ -99,7 +113,8 @@ class Process:
     log_proc.info(self.arg)
 
   def free_args(self):
-    self.ctx.alloc.free_memory(self.arg)
+    if self.arg != None:
+      self.ctx.alloc.free_memory(self.arg)
 
   # ----- cli struct -----
   def init_cli_struct(self, input_fh, output_fh):
@@ -115,7 +130,8 @@ class Process:
     log_proc.info(self.cli)
 
   def free_cli_struct(self):
-    self.ctx.alloc.free_bstr(self.cmd)
+    if self.cmd != None:
+      self.ctx.alloc.free_bstr(self.cmd)
     self.ctx.alloc.free_struct(self.cli)
 
   def get_cli_struct(self):

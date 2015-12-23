@@ -312,6 +312,12 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("PutStr: '%s'", str_dat)
     return 0 # ok
 
+  def Flush(self, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    fh.flush()
+    return -1
+
   def VPrintf(self, ctx):
     format_ptr = ctx.cpu.r_reg(REG_D1)
     argv_ptr = ctx.cpu.r_reg(REG_D2)
@@ -386,14 +392,14 @@ class DosLibrary(AmigaLibrary):
         elif ch == 'C':
           out = out + chr(val & 0xff)
         elif ch == 'N':
-          out = out + ("%ld", ctypes.c_long(val).value)
+          out = out + ("%ld" % ctypes.c_long(val).value)
         elif ch == '$':
           pass
         elif ch == 'T' or ch == 'O' or ch == 'X' or ch == 'I' or ch == 'U':
           state = 'x' + ch
         else:
-          state = ''
           out = out + '%' + ch
+        state = ''
       else:
         if ch == '%':
           state = '%'
@@ -403,6 +409,20 @@ class DosLibrary(AmigaLibrary):
           out = out + ch
     fh.write(out)
     return len(out)
+
+  # ----- Stdin --------
+
+  def FGets(self,ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    bufaddr   = ctx.cpu.r_reg(REG_D2)
+    buflen    = ctx.cpu.r_reg(REG_D3)
+    fh   = self.file_mgr.get_by_b_addr(fh_b_addr)
+    line = fh.gets(buflen)
+    log_dos.info("FGetC(%s) -> '%s'" % (fh, line))
+    ctx.mem.access.w_cstr(bufaddr,line)
+    if line == "":
+      return 0
+    return bufaddr
 
   # ----- File Ops -----
 
@@ -620,10 +640,11 @@ class DosLibrary(AmigaLibrary):
     vol_lock = self.lock_mgr.create_lock(volume+":", False)
     fs_port = self.file_mgr.get_fs_handler_port()
     addr = self._alloc_mem("DevProc:%s" % name, DevProcDef.get_size())
-    log_dos.info("GetDeviceProc: name='%s' devproc=%06x -> volume=%s devproc=%06x", name, last_devproc, volume, addr)
+    log_dos.info("GetDeviceProc: name='%s' devproc=%06x -> volume=%s devproc=%06x lock=%06x",
+                 name, last_devproc, volume, addr, vol_lock.b_addr)
     devproc = AccessStruct(self.ctx.mem,DevProcDef,struct_addr=addr)
     devproc.w_s('dvp_Port', fs_port)
-    devproc.w_s('dvp_Lock', vol_lock.b_addr)
+    devproc.w_s('dvp_Lock', vol_lock.b_addr << 2) #THOR: Compensate for BADDR adjustment.
     self.io_err = NO_ERROR
     return addr
 
@@ -1040,6 +1061,44 @@ class DosLibrary(AmigaLibrary):
       ctx.alloc.free_struct(entry[0])
     else:
       log_dos.error("FreeDosObject: type=%d ptr=%08x -> NOT FOUND!", obj_type, ptr)
+
+  # ----- Cli support ---
+  
+  def CliInit(self,ctx):
+    log_dos.info("CliInit")
+    clip_addr = self.Cli(ctx)
+    clip      = AccessStruct(ctx.mem,CLIDef,struct_addr=clip_addr)
+    clip.w_s("cli_FailLevel",10)
+    clip.w_s("cli_DefaultStack",1024)
+    # Typically, the creator of the CLI would also initialize
+    # the prompt and command name arguments. Unfortunately,
+    # vamos does not necessarily do that, so cover this here.
+    if clip.r_s("cli_Prompt") == 0:
+      prompt_ptr = self.ctx.alloc.alloc_memory("cli_Prompt",60).addr
+      clip.w_s("cli_Prompt",prompt_ptr)
+    else:
+      prompt_ptr = clip.r_s("cli_Prompt")
+    ctx.mem.access.w_bstr(prompt_ptr,"%N>")
+    if clip.r_s("cli_CommandName") == 0:
+      cmdname = self.ctx.alloc.alloc_memory("cli_CommandName",104).addr
+      clip.w_s("cli_CommandName",cmdname)
+    if clip.r_s("cli_CommandFile") == 0:
+      cmdfile = self.ctx.alloc.alloc_memory("cli_CommandFile",40).addr
+      clip.w_s("cli_CommandFile",cmdfile)
+    if clip.r_s("cli_SetName") == 0:
+      setname = self.ctx.alloc.alloc_memory("cli_SetName",80).addr
+      clip.w_s("cli_SetName",setname)
+    # The native CliInit opens the CON window here. Don't do that
+    # instead use Input and Output.
+    # cli_CurrentInput would also be set to the input handle of
+    # the S:Startup-Sequence
+    infh  = self.Input(ctx)  << 2
+    outfh = self.Output(ctx) << 2
+    clip.w_s("cli_StandardInput",infh)
+    clip.w_s("cli_CurrentInput",infh)
+    clip.w_s("cli_StandardOutput",outfh)
+    clip.w_s("cli_CurrentOutput",outfh)
+    return 0
 
   # ----- Helpers -----
 

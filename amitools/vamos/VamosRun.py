@@ -14,10 +14,11 @@ class Trap:
     return "[@%06x:%s:one_shot=%s]" % (self.addr, self.func, self.one_shot)
 
 class VamosRun:
-  def __init__(self, vamos, benchmark=False):
-    self.cpu = vamos.cpu
-    self.mem = vamos.mem
-    self.ctx = vamos
+  def __init__(self, vamos, benchmark=False, shell=False):
+    self.cpu   = vamos.cpu
+    self.mem   = vamos.mem
+    self.ctx   = vamos
+    self.shell = shell
     # store myself in context
     self.ctx.run = self
 
@@ -52,8 +53,15 @@ class VamosRun:
     self.mem.access.w32(4, self.ctx.exec_lib.addr_base)
 
     # setup arg in D0/A0
-    self.cpu.w_reg(REG_D0, self.ctx.process.arg_len)
-    self.cpu.w_reg(REG_A0, self.ctx.process.arg_base)
+    if self.shell:
+      # thor: If we run a shell through vamos, then
+      # BPCL places the BPTR to the parameter packet into
+      # d1. The default shell can work without ParmPkt
+      # thus leave this at zero for this time.
+      self.cpu.w_reg(REG_D1, 0)
+    else:
+      self.cpu.w_reg(REG_D0, self.ctx.process.arg_len)
+      self.cpu.w_reg(REG_A0, self.ctx.process.arg_base)
 
     # d2=stack_size.  this value is also in 4(sp) (see Process.init_stack), but
     # various C programs rely on it being present (1.3-3.1 at least have it).
