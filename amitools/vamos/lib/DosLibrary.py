@@ -166,6 +166,47 @@ class DosLibrary(AmigaLibrary):
     self.io_err = ERROR_OBJECT_NOT_FOUND
     return self.DOSFALSE
 
+  # ----- Resident commands support ----
+
+  def FindSegment(self, ctx):
+    name_ptr = ctx.cpu.r_reg(REG_D1)
+    needle   = ctx.mem.access.r_cstr(name_ptr)
+    start    = ctx.cpu.r_reg(REG_D2)
+    system   = ctx.cpu.r_reg(REG_D3)
+    if start == 0:
+      seg_addr = self.dos_info.access.r_s("di_NetHand")
+    else:
+      seg_addr = AccessStruct(ctx.mem, SegmentDef, start).r_s("seg_Next")
+    log_dos.info("FindSegment(%s)" % needle)
+    while seg_addr != 0:
+      segment  = AccessStruct(ctx.mem, SegmentDef, seg_addr)
+      name_addr= seg_addr + SegmentDef.get_offset_for_name("seg_Name")[0]
+      name     = ctx.mem.access.r_bstr(name_addr)
+      if name.lower() == needle.lower():
+        if (system and segment.r_s("seg_UC") < 0) or (not system and segment.r_s("seg_UC") > 0):
+          seg  = segment.r_s("seg_Seg")
+          log_dos.info("FindSegment(%s) -> %06x" % (name,seg))
+          return seg_addr
+      seg_addr = segment.r_s("seg_Next")
+    return 0
+
+  def AddSegment(self,ctx):
+    name_ptr  = ctx.cpu.r_reg(REG_D1)
+    seglist   = ctx.cpu.r_reg(REG_D2) << 2
+    system    = ctx.cpu.r_reg(REG_D3)
+    name      = ctx.mem.access.r_cstr(name_ptr)
+    seg_addr  = ctx.alloc.alloc_memory("Segment",SegmentDef.get_size() + len(name) + 1).addr
+    name_addr = seg_addr + SegmentDef.get_offset_for_name("seg_Name")[0]
+    segment   = ctx.alloc.map_struct("Segment", seg_addr, SegmentDef)
+    head_addr = self.dos_info.access.r_s("di_NetHand")
+    segment.access.w_s("seg_Next",head_addr)
+    segment.access.w_s("seg_UC",system)
+    segment.access.w_s("seg_Seg",seglist)
+    ctx.mem.access.w_bstr(name_addr,name)
+    self.dos_info.access.w_s("di_NetHand",seg_addr)
+    log_dos.info("AddSegment(%s,%06x) -> %06x" % (name,seglist,seg_addr))
+    return -1
+
   # ----- File Ops -----
 
   def Cli(self, ctx):
@@ -253,6 +294,20 @@ class DosLibrary(AmigaLibrary):
     fh.write(data)
     got = len(data)
     log_dos.info("Write(%s, %06x, %d) -> %d" % (fh, buf_ptr, size, got))
+    return size
+
+  def FWrite(self, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    buf_ptr = ctx.cpu.r_reg(REG_D2)
+    size = ctx.cpu.r_reg(REG_D3)
+    number = ctx.cpu.r_reg(REG_D4)
+    # Actually, this is buffered I/O, not unbuffered IO. For the
+    # time being, keep it unbuffered.
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    data = ctx.mem.access.r_data(buf_ptr,size * number)
+    fh.write(data)
+    got = len(data) / size
+    log_dos.info("FWrite(%s, %06x, %d, %d) -> %d" % (fh, buf_ptr, size, number, got))
     return size
 
   def Seek(self, ctx):
