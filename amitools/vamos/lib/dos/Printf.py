@@ -132,6 +132,7 @@ def printf_read_data(state, mem_access, data_ptr):
     elif t == '%':
       data = ord('%')
     e.data = data
+  return data_ptr
 
 def printf_generate_output(state):
   result = []

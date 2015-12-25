@@ -104,6 +104,8 @@ class MatchFirstNext:
 
     # check DODIR flag and add first level of dir entries
     if flags & self.DODIR == self.DODIR:
+      # Note that FindNext *CLEARS* DODIR after testing!
+      self.anchor.w_s('ap_Flags',flags & ~self.DODIR)
       self._push_dodir(self.name, self.path)
 
     # are there dirs to do?
