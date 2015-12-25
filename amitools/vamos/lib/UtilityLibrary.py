@@ -22,3 +22,8 @@ class UtilityLibrary(AmigaLibrary):
     c = (a * b) & 0xffffffff
     log_utility.info("UMult32(a=%u, b=%u) => %u", a, b, c)
     return c
+
+  def ToUpper(self, ctx):
+    a = ctx.cpu.r_reg(REG_D0)
+    return ord(chr(a).upper())
+  

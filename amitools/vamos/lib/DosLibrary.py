@@ -166,6 +166,14 @@ class DosLibrary(AmigaLibrary):
     self.io_err = ERROR_OBJECT_NOT_FOUND
     return self.DOSFALSE
 
+  # ----- Signals ----------------------
+
+  def CheckSignal(self, ctx):
+    sigmask = ctx.cpu.r_reg(REG_D1)
+    # THOR: Fixme. We really need to get the signal
+    # mask from the tty here.
+    return 0
+
   # ----- Resident commands support ----
 
   def FindSegment(self, ctx):
@@ -337,7 +345,10 @@ class DosLibrary(AmigaLibrary):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
     ch = fh.getc()
-    log_dos.info("FGetC(%s) -> '%c' (%d)" % (fh, ch, ch))
+    if ch == -1:
+      log_dos.info("FGetC(%s) -> EOF (%d)" % (fh, ch))
+    else:
+      log_dos.info("FGetC(%s) -> '%c' (%d)" % (fh, ch, ch))
     return ch
 
   def FPutC(self, ctx):

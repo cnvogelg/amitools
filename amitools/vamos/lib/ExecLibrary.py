@@ -278,6 +278,21 @@ class ExecLibrary(AmigaLibrary):
     AccessStruct(ctx.mem, NodeDef, succ).w_s("ln_Pred", pred)
     return node_addr
 
+  def RemHead(self, ctx):
+    list_addr = ctx.cpu.r_reg(REG_A0)
+    l = AccessStruct(ctx.mem, ListDef, list_addr)
+    node_addr = l.r_s("lh_Head")
+    n = AccessStruct(ctx.mem, NodeDef, node_addr)
+    succ = n.r_s("ln_Succ")
+    pred = n.r_s("ln_Pred")
+    if succ == 0:
+      log_exec.info("RemHead(%06x): null" % list_addr)
+      return 0
+    AccessStruct(ctx.mem, NodeDef, pred).w_s("ln_Succ", succ)
+    AccessStruct(ctx.mem, NodeDef, succ).w_s("ln_Pred", pred)
+    log_exec.info("RemHead(%06x): %06x" % (list_addr, node_addr))
+    return node_addr
+
   def CopyMem(self, ctx):
     source = ctx.cpu.r_reg(REG_A0)
     dest   = ctx.cpu.r_reg(REG_A1)
