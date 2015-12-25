@@ -22,3 +22,4 @@ class MainMemory:
 
   def set_special_range_write_funcs(self, addr, num_pages=1, w8=None, w16=None, w32=None):
     self.raw_mem.set_special_range_write_funcs(addr, num_pages, r8, r16, r32)
+

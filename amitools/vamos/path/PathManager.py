@@ -104,6 +104,9 @@ class PathManager:
   def get_all_volume_names(self):
     return self.vol_mgr.get_all_names()
 
+  def get_all_assigns(self):
+    return self.assign_mgr.get_all_assigns()
+
   def ami_command_to_sys_path(self, ami_path):
     """lookup a command on path if it does not contain a relative or absolute path
        otherwise perform normal 'ami_to_sys_path' conversion"""

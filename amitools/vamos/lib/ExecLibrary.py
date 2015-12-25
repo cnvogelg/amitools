@@ -292,6 +292,21 @@ class ExecLibrary(AmigaLibrary):
     AccessStruct(ctx.mem, NodeDef, succ).w_s("ln_Pred", pred)
     log_exec.info("RemHead(%06x): %06x" % (list_addr, node_addr))
     return node_addr
+  
+  def RemTail(self, ctx):
+    list_addr = ctx.cpu.r_reg(REG_A0)
+    l = AccessStruct(ctx.mem, ListDef, list_addr)
+    node_addr = l.r_s("lh_TailPred")
+    n = AccessStruct(ctx.mem, NodeDef, node_addr)
+    succ = n.r_s("ln_Succ")
+    pred = n.r_s("ln_Pred")
+    if pred == 0:
+      log_exec.info("RemTail(%06x): null" % list_addr)
+      return 0
+    AccessStruct(ctx.mem, NodeDef, pred).w_s("ln_Succ", succ)
+    AccessStruct(ctx.mem, NodeDef, succ).w_s("ln_Pred", pred)
+    log_exec.info("RemTail(%06x): %06x" % (list_addr, node_addr))
+    return node_addr
 
   def CopyMem(self, ctx):
     source = ctx.cpu.r_reg(REG_A0)
@@ -307,5 +322,9 @@ class ExecLibrary(AmigaLibrary):
     log_exec.info("CopyMemQuick: source=%06x dest=%06x len=%06x" % (source,dest,length))
     ctx.mem.raw_mem.copy_block(source, dest, length)
 
-
+  def TypeOfMem(self, ctx):
+    addr = ctx.cpu.r_reg(REG_A1)
+    if self.alloc.is_valid_address(addr):
+      return 1 #MEMF_PUBLIC
+    return 0
 

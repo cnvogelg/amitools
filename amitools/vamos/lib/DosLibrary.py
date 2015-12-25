@@ -52,10 +52,12 @@ class DosLibrary(AmigaLibrary):
     self.dos_info = ctx.alloc.alloc_struct("DosInfo",DosInfoDef)
     self.root_struct.access.w_s("rn_Info",self.dos_info.addr)
     # setup dos list
-    self.dos_list = DosList(ctx.alloc)
+    self.dos_list = DosList(ctx.mem, ctx.alloc)
     baddr = self.dos_list.build_list(ctx.path_mgr)
     # create lock manager
     self.lock_mgr = LockManager(ctx.path_mgr, self.dos_list, ctx.alloc, ctx.mem)
+    # equip the DosList with all the locks
+    self.dos_list.add_locks(self.lock_mgr)
     # create file manager
     self.file_mgr = FileManager(ctx.path_mgr, ctx.alloc, ctx.mem)
     # currently we use a single fake port for all devices

@@ -155,5 +155,6 @@ class AssignManager:
         result.append(p)
     return result
 
-
+  def get_all_assigns(self):
+    return (self.assigns,self.auto_assign)
 

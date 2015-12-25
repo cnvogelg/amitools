@@ -328,7 +328,10 @@ class MemoryAlloc:
     self.free_mem(mem.addr, mem.size)
     del self.mem_objs[mem.addr]
 
-
+  def is_valid_address(self, addr):
+    if addr >= self.begin and addr < self.begin + self.size:
+      return True
+    return False
 
 
 
