@@ -21,11 +21,13 @@ class Process:
     if not shell:
       self.init_args(bin_args,input_fh)
       self.init_cli_struct(input_fh, output_fh)
+      self.shell = False
     else:
       self.cli = self.ctx.alloc.alloc_struct(self.bin_basename + "_CLI",CLIDef)
       self.cmd = None
       self.arg = None
       self.bin_args = None
+      self.shell = True
     self.init_task_struct(input_fh, output_fh)
 
   def free(self):
@@ -174,3 +176,5 @@ class Process:
   def set_output(self, output_fh):
     self.this_task.access.w_s("pr_COS", output_fh.b_addr<<2) # compensate BCPL auto-conversion
 
+  def is_native_shell(self):
+    return self.shell

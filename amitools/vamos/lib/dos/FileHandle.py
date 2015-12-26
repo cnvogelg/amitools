@@ -77,7 +77,7 @@ class FileHandle:
     while ch != 10:
       ch = self.getc()
       remains = remains + chr(ch)
-    self.unch = self.unch + remains
+    self.unch = remains + self.unch
     return res
 
   def ungetc(self, var):

@@ -620,7 +620,7 @@ class DosLibrary(AmigaLibrary):
     buflen    = ctx.cpu.r_reg(REG_D3)
     fh   = self.file_mgr.get_by_b_addr(fh_b_addr)
     line = fh.gets(buflen)
-    log_dos.info("FGetC(%s) -> '%s'" % (fh, line))
+    log_dos.info("FGetS(%s,%d) -> '%s'" % (fh, buflen, line))
     ctx.mem.access.w_cstr(bufaddr,line)
     if line == "":
       return 0
@@ -1138,25 +1138,47 @@ class DosLibrary(AmigaLibrary):
     cmd = ctx.mem.access.r_cstr(cmd_ptr)
     tag_list = taglist_parse_tagitem_ptr(ctx.mem, tagitem_ptr, DosTags)
     log_dos.info("SystemTagList: cmd='%s' tags=%s", cmd, tag_list)
-    # parse "command line"
-    cl = CommandLine()
-    if not cl.parse_string(cmd):
-      log_dos.info("SystemTagList: error parsing command: '%s'", cmd)
-      return 10 # RETURN_ERROR
-    args = cl.args
-    if len(args) == 0:
-      log_dos.info("SystemTagList: error parsing command: '%s'", cmd)
-      return 10 # RETURN_ERROR
-    bin = args[0]
-    args = args[1:]
-    # TODO: redirs
-    log_dos.info("SystemTagList: bin='%s' args=%s", bin, args)
-    # create a process and run it...
-    proc = Process(ctx, bin, args)
-    if not proc.ok:
-      log_dos.warn("SystemTagList: can't create process for '%s' args=%s", bin, args)
-      return 0xffffffff
-    ctx.start_sub_process(proc)
+    # cmd is at this point a full string of commands to execute.
+    # If we're running from the Amiga shell, forward this to the shell
+    # anyhow.
+    if ctx.process.is_native_shell():
+      cli_addr = ctx.process.get_cli_struct()
+      cli      = AccessStruct(ctx.mem,CLIDef,struct_addr=cli_addr)
+      if cli.r_s("cli_CurrentInput") == cli.r_s("cli_StandardInput"):
+        new_input = self.file_mgr.open("NIL:","r")
+        if new_input == None:
+          log_dos.warn("SystemTagList: can't create new input file handle for SystemTagList('%s')", cmd)
+        return 0xffffffff
+        #Push-back the commands into the input buffer.
+        new_input.setbuf(cmd)
+      else:
+        inputfh   = cli.r_s("cli_CurrentInput")
+        new_input = self.file_mgr.get_by_b_addr(self, inputfh >> 2)
+        new_input.setbuf(cmd + "\n" + new_input.getbuf())
+      # and install this as current input. The shell will read from that
+      # instead until it hits the EOF
+      cli.w_s("cli_CurrentInput",new_input.mem.addr)
+      return self.DOSTRUE
+    else:
+      # parse "command line"
+      cl = CommandLine()
+      if not cl.parse_string(cmd):
+        log_dos.info("SystemTagList: error parsing command: '%s'", cmd)
+        return 10 # RETURN_ERROR
+      args = cl.args
+      if len(args) == 0:
+        log_dos.info("SystemTagList: error parsing command: '%s'", cmd)
+        return 10 # RETURN_ERROR
+      bin = args[0]
+      args = args[1:]
+      # TODO: redirs
+      log_dos.info("SystemTagList: bin='%s' args=%s", bin, args)
+      # create a process and run it...
+      proc = Process(ctx, bin, args)
+      if not proc.ok:
+        log_dos.warn("SystemTagList: can't create process for '%s' args=%s", bin, args)
+        return self.DOSTRUE
+      ctx.start_sub_process(proc)
 
   def LoadSeg(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
@@ -1349,6 +1371,24 @@ class DosLibrary(AmigaLibrary):
       return len(match.group(0))
     else:
       return 0
+
+  def SetCurrentDirName(self,ctx):
+    str_addr = ctx.cpu.r_reg(REG_D1)
+    string   = ctx.mem.access.r_cstr(str_addr)[:79]
+    cli_addr = self.Cli(ctx)
+    cli      = AccessStruct(ctx.mem,CLIDef,struct_addr=cli_addr)
+    setaddr  = cli.r_s("cli_SetName")
+    ctx.mem.access.w_bstr(setaddr,string)
+    return self.DOSTRUE
+
+  def SetPrompt(self,ctx):
+    str_addr = ctx.cpu.r_reg(REG_D1)
+    string   = ctx.mem.access.r_cstr(str_addr)[:59]
+    cli_addr = self.Cli(ctx)
+    cli      = AccessStruct(ctx.mem,CLIDef,struct_addr=cli_addr)
+    setaddr  = cli.r_s("cli_Prompt")
+    ctx.mem.access.w_bstr(setaddr,string)
+    return self.DOSTRUE
 
   # ----- Helpers -----
 
