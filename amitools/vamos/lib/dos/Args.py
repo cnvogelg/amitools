@@ -194,6 +194,8 @@ class Args:
         else:
           # found a real value
           if val != False:
+            if targ['n']:
+              val = int(val)
             result[pos] = val
             targ['x'] = False # disable to reject auto fill
       elif targ['f']:
@@ -246,6 +248,8 @@ class Args:
             else: # failed!
               self.error = ERROR_REQUIRED_ARG_MISSING
               return False
+        if targ['n']:
+          val = int(val)
         result[pos] = val
       elif targ['f']:
         res = None
