@@ -180,7 +180,7 @@ class DosLibrary(AmigaLibrary):
 
   def create_var(self, ctx, name, flags):
     varlist   = ctx.process.get_local_vars()
-    node_addr = ctx.alloc.alloc_memory("ShellVar(%s)" % name,LocalVarDef.get_size() + len(name) + 1).addr
+    node_addr = self._alloc_mem("ShellVar(%s)" % name,LocalVarDef.get_size() + len(name) + 1)
     name_addr = node_addr + LocalVarDef.get_size()
     node      = ctx.alloc.map_struct("ShellVar(%s) % name", node_addr, LocalVarDef)
     ctx.mem.access.w_cstr(name_addr,name)
@@ -189,23 +189,37 @@ class DosLibrary(AmigaLibrary):
     node.access.w_s("lv_Value",0)
     head_addr = varlist.access.r_s("mlh_Head")
     head      = AccessStruct(ctx.mem, NodeDef, head_addr)
-    node.access.w_s("lv_Node.ln_Succ",head_addr)
-    node.access.w_s("lv_Node.ln_Pred",varlist.access.s_get_addr("mlh_Tail"))
     head.w_s("ln_Pred",node_addr)
     varlist.access.w_s("mlh_Head",node_addr)
+    node.access.w_s("lv_Node.ln_Succ",head_addr)
+    node.access.w_s("lv_Node.ln_Pred",varlist.access.s_get_addr("mlh_Head"))
     return node.access
 
   def set_var(self,ctx,node,buff_ptr,size,value,flags):
     if node.r_s("lv_Value") != 0:
-      ctx.alloc.free_mem(node.r_s("lv_Value"),node.r_s("lv_Len"))
+      self._free_mem(node.r_s("lv_Value"))
       node.w_s("lv_Value",0)
-    buf_addr = ctx.alloc.alloc_memory("ShellVarBuffer",size)
-    node.w_s("lv_Value",buf_addr.addr)
+    buf_addr = self._alloc_mem("ShellVarBuffer",size)
+    node.w_s("lv_Value",buf_addr)
     node.w_s("lv_Len",size)
     if flags & self.GVF_BINARY_VAR:
-      ctx.mem.raw_mem.copy_block(buff_ptr,buf_addr.addr,size)
+      ctx.mem.raw_mem.copy_block(buff_ptr,buf_addr,size)
     else:
-      ctx.mem.access.w_cstr(buf_addr.addr,value)
+      ctx.mem.access.w_cstr(buf_addr,value)
+
+  def delete_var(self,ctx,node):
+    buf_addr  = node.r_s("lv_Value")
+    buf_len   = node.r_s("lv_Len")
+    name_addr = node.r_s("lv_Node.ln_Name")
+    name      = ctx.mem.access.r_cstr(name_addr)
+    if buf_addr != 0:
+      self._free_mem(buf_addr)
+    node.w_s("lv_Value",0)
+    succ = node.r_s("lv_Node.ln_Succ")
+    pred = node.r_s("lv_Node.ln_Pred")
+    AccessStruct(ctx.mem, NodeDef, pred).w_s("ln_Succ", succ)
+    AccessStruct(ctx.mem, NodeDef, succ).w_s("ln_Pred", pred)
+    self._free_mem(node.struct_addr)
 
   def GetVar(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
@@ -266,7 +280,7 @@ class DosLibrary(AmigaLibrary):
       else:
         value = ctx.mem.access.r_cstr(buff_ptr)
         log_dos.info('SetVar("%s") to %s' % (name, value))
-        size  = len(value)
+        size  = len(value) + 1
       if not flags & self.GVF_GLOBAL_ONLY:
         node = self.find_var(ctx,name,flags)
         if node == None and buff_ptr != 0:
@@ -275,8 +289,18 @@ class DosLibrary(AmigaLibrary):
           self.set_var(ctx,node,buff_ptr,size,value,flags)
         return self.DOSTRUE
     return 0
-  
 
+  def DeleteVar(self, ctx):
+    name_ptr  = ctx.cpu.r_reg(REG_D1)
+    flags     = ctx.cpu.r_reg(REG_D4)
+    name      = ctx.mem.access.r_cstr(name_ptr)
+    if not flags & self.GVF_GLOBAL_ONLY:
+      node = self.find_var(ctx,name,flags)
+      log_dos.info('DeleteVar("%s")' % name)
+      if node != None:
+        self.delete_var(ctx,node)
+      return self.DOSTRUE
+      
   # ----- Signals ----------------------
 
   def CheckSignal(self, ctx):
@@ -314,7 +338,7 @@ class DosLibrary(AmigaLibrary):
     seglist   = ctx.cpu.r_reg(REG_D2) << 2
     system    = ctx.cpu.r_reg(REG_D3)
     name      = ctx.mem.access.r_cstr(name_ptr)
-    seg_addr  = ctx.alloc.alloc_memory("Segment",SegmentDef.get_size() + len(name) + 1).addr
+    seg_addr  = self._alloc_mem("Segment",SegmentDef.get_size() + len(name) + 1)
     name_addr = seg_addr + SegmentDef.get_offset_for_name("seg_Name")[0]
     segment   = ctx.alloc.map_struct("Segment", seg_addr, SegmentDef)
     head_addr = self.dos_info.access.r_s("di_NetHand")
@@ -1275,19 +1299,19 @@ class DosLibrary(AmigaLibrary):
     # the prompt and command name arguments. Unfortunately,
     # vamos does not necessarily do that, so cover this here.
     if clip.r_s("cli_Prompt") == 0:
-      prompt_ptr = self.ctx.alloc.alloc_memory("cli_Prompt",60).addr
+      prompt_ptr = self._alloc_mem("cli_Prompt",60)
       clip.w_s("cli_Prompt",prompt_ptr)
     else:
       prompt_ptr = clip.r_s("cli_Prompt")
     ctx.mem.access.w_bstr(prompt_ptr,"%N>")
     if clip.r_s("cli_CommandName") == 0:
-      cmdname = self.ctx.alloc.alloc_memory("cli_CommandName",104).addr
+      cmdname = self._alloc_mem("cli_CommandName",104)
       clip.w_s("cli_CommandName",cmdname)
     if clip.r_s("cli_CommandFile") == 0:
-      cmdfile = self.ctx.alloc.alloc_memory("cli_CommandFile",40).addr
+      cmdfile = self._alloc_mem("cli_CommandFile",40)
       clip.w_s("cli_CommandFile",cmdfile)
     if clip.r_s("cli_SetName") == 0:
-      setname = self.ctx.alloc.alloc_memory("cli_SetName",80).addr
+      setname = self._alloc_mem("cli_SetName",80)
       clip.w_s("cli_SetName",setname)
     # The native CliInit opens the CON window here. Don't do that
     # instead use Input and Output.
@@ -1299,6 +1323,17 @@ class DosLibrary(AmigaLibrary):
     clip.w_s("cli_CurrentInput",infh)
     clip.w_s("cli_StandardOutput",outfh)
     clip.w_s("cli_CurrentOutput",outfh)
+    #
+    # Create the path
+    cmd_dir_addr = clip.r_s("cli_CommandDir")
+    for p in ctx.path_mgr.get_paths():
+      if p != "C:" and p != "c:":
+        path = ctx.alloc.alloc_struct("Path(%s)" % p,PathDef)
+        lock = self.lock_mgr.create_lock(p, False)
+        path.access.w_s("path_Lock",lock.mem.addr)
+        path.access.w_s("path_Next",cmd_dir_addr)
+        cmd_dir_addr = path.addr
+        clip.w_s("cli_CommandDir",cmd_dir_addr)
     return 0
 
   # ----- Helpers -----

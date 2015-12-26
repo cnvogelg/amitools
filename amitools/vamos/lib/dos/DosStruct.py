@@ -335,3 +335,10 @@ class LocalVarStruct(AmigaStruct):
   ]
 LocalVarDef = LocalVarStruct()
 
+class PathStruct(AmigaStruct):
+  _name = "Path"
+  _format = [
+    ('BPTR','path_Next'),
+    ('BPTR','path_Lock')
+  ]
+PathDef = PathStruct()

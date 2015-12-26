@@ -11,7 +11,6 @@ class PathManager:
     self.vol_mgr = VolumeManager()
     self.assign_mgr = AssignManager(self.vol_mgr)
     self.paths = []
-
     args = cfg.get_args()
     self.parse(cfg, args.volume, args.assign, args.auto_assign, args.path)
 
@@ -106,6 +105,9 @@ class PathManager:
 
   def get_all_assigns(self):
     return self.assign_mgr.get_all_assigns()
+
+  def get_paths(self):
+    return self.paths
 
   def ami_command_to_sys_path(self, ami_path):
     """lookup a command on path if it does not contain a relative or absolute path
