@@ -5,7 +5,7 @@ from DosStruct import FileHandleDef
 class FileHandle:
   """represent an AmigaOS file handle (FH) in vamos"""
 
-  def __init__(self, obj, ami_path, sys_path, need_close=True):
+  def __init__(self, obj, ami_path, sys_path, need_close=True, is_nil=False):
     self.obj = obj
     self.name = os.path.basename(sys_path)
     self.ami_path = ami_path
@@ -15,6 +15,7 @@ class FileHandle:
     # buffering
     self.unch = ""
     self.ch = -1
+    self.is_nil = is_nil
 
   def __str__(self):
     return "[FH:'%s'(ami='%s',sys='%s',nc=%s)@%06x=B@%06x]" % (self.name, self.ami_path, self.sys_path, self.need_close, self.mem.addr, self.b_addr)
@@ -52,6 +53,8 @@ class FileHandle:
       d = self.unch[0]
       self.unch = self.unch[1:len(self.unch)]
     else:
+      if self.is_nil:
+        return -1
       d = self.obj.read(1)
       if d == "":
         return -1
@@ -61,6 +64,7 @@ class FileHandle:
   def gets(self,len):
     res = ""
     ch = -1
+    #print "fgets from %s" % self
     while len>0:
       len -= 1
       ch   = self.getc()
@@ -76,6 +80,8 @@ class FileHandle:
     remains = ""
     while ch != 10:
       ch = self.getc()
+      if ch == -1:
+        break
       remains = remains + chr(ch)
     self.unch = remains + self.unch
     return res

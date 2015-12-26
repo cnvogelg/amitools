@@ -32,6 +32,7 @@ class LockManager:
     b_addr = lock.alloc(self.alloc, vol_baddr)
     self.locks_by_key[lock.key] = lock
     log_lock.info("registered: %s" % lock)
+    #print "*** registered lock %s" % lock
 
   def _unregister_lock(self, lock):
     if not self.locks_by_key.has_key(lock.key):
@@ -41,6 +42,7 @@ class LockManager:
       raise VamosInternalError("Invalid Lock unregistered: %s" % lock)
     del self.locks_by_key[lock.key]
     log_lock.info("unregistered: %s" % lock)
+    #print "*** unregistered lock %s" % lock
     lock.b_addr = 0
     lock.addr = 0
     lock.free(self.alloc)

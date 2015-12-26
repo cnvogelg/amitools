@@ -1,6 +1,7 @@
 from Log import log_proc
 from lib.lexec.ExecStruct import *
 from lib.dos.DosStruct import *
+from lib.lexec.PortManager import *
 
 NT_PROCESS = 13
 
@@ -28,6 +29,9 @@ class Process:
       self.arg = None
       self.bin_args = None
       self.shell = True
+    self.shell_message = None
+    self.shell_packet  = None
+    self.shell_port    = None
     self.init_task_struct(input_fh, output_fh)
 
   def free(self):
@@ -76,6 +80,7 @@ class Process:
     # offset +8
     if shell:
       self.prog_start += 8
+      self.shell_start = self.prog_start
     log_proc.info("loaded binary: %s", self.bin_seg_list)
     for seg in self.bin_seg_list.segments:
       log_proc.info(seg)
@@ -139,6 +144,32 @@ class Process:
 
   def get_cli_struct(self):
     return self.cli.addr
+
+  # ----- initialize for running a command in a shell -----
+  def run_system(self):
+    if self.shell_packet == None:
+      # Ok, here we have to create a DosPacket for the shell startup
+      self.shell_message = self.ctx.alloc.alloc_struct("Shell Startup Message",MessageDef)
+      self.shell_packet  = self.ctx.alloc.alloc_struct("Shell Startup Packet",DosPacketDef)
+      self.shell_port    = self.ctx.exec_lib.port_mgr.create_port("Shell Startup Port",None)
+    self.shell_packet.access.w_s("dp_Type",1) # indicate RUN
+    self.shell_packet.access.w_s("dp_Res2",0) # indicate correct startup
+    self.shell_packet.access.w_s("dp_Res1",0) # indicate RUN
+    self.shell_packet.access.w_s("dp_Link",self.shell_message.addr)
+    self.shell_packet.access.w_s("dp_Port",self.shell_port)
+    self.shell_message.access.w_s("mn_Node.ln_Name",self.shell_packet.addr)
+    while self.ctx.exec_lib.port_mgr.has_msg(self.shell_port):
+      self.ctx.exec_lib.port_mgr.get_msg(self.shell_port)
+    return self.shell_packet.addr
+
+  def create_port(self, name, py_msg_handler):
+    mem = self.alloc.alloc_struct(name,MsgPortDef)
+    port = Port(name, self, mem=mem, handler=py_msg_handler)
+    addr = mem.addr
+    self.ports[addr] = port
+    return addr
+
+      
 
   # ----- task struct -----
   def init_task_struct(self, input_fh, output_fh):

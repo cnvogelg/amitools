@@ -68,7 +68,7 @@ class FileManager:
       if uname.startswith('NIL:'):
         sys_name = "/dev/null"
         fobj = open(sys_name, f_mode)
-        fh = FileHandle(fobj, ami_path, sys_name)
+        fh = FileHandle(fobj, ami_path, sys_name, is_nil = True)
       elif uname == '*' or uname.startswith('CONSOLE:'):
         sys_name = ''
         fh = FileHandle(sys.stdout,'*','',need_close=False)

@@ -92,7 +92,11 @@ class DosLibrary(AmigaLibrary):
   # ----- IoErr -----
 
   def IoErr(self, ctx):
-    log_dos.info("IoErr: %d (%s)" % (self.io_err, dos_error_strings[self.io_err]))
+    if self.io_err in dos_error_strings:
+      errstring = dos_error_strings[self.io_err]
+    else:
+      errstring = "???"
+    log_dos.info("IoErr: %d (%s)" % (self.io_err, errstring))
     return self.io_err
 
   def setioerr(self, ctx, err):
@@ -361,14 +365,10 @@ class DosLibrary(AmigaLibrary):
     return cli_addr
 
   def Input(self, ctx):
-    fh = ctx.process.get_input()
-    log_dos.info("Input() -> %s" % fh)
-    return fh.b_addr
+    return ctx.process.this_task.access.r_s("pr_CIS") >> 2
 
   def Output(self, ctx):
-    fh = ctx.process.get_output()
-    log_dos.info("Output() -> %s" % fh)
-    return fh.b_addr
+    return ctx.process.this_task.access.r_s("pr_COS") >> 2
 
   def SelectInput(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
@@ -411,9 +411,9 @@ class DosLibrary(AmigaLibrary):
 
   def Close(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
-
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
     self.file_mgr.close(fh)
+    #print "*** Closing input %s" % fh
     log_dos.info("Close: %s" % fh)
 
     return self.DOSTRUE
@@ -1142,29 +1142,54 @@ class DosLibrary(AmigaLibrary):
     # If we're running from the Amiga shell, forward this to the shell
     # anyhow.
     if ctx.process.is_native_shell():
-      print "*** native shell SystemTagList"
       cli_addr = ctx.process.get_cli_struct()
       cli      = AccessStruct(ctx.mem,CLIDef,struct_addr=cli_addr)
       if cli.r_s("cli_CurrentInput") == cli.r_s("cli_StandardInput"):
-        print "*** creating a new dummy input"
         new_input = self.file_mgr.open("NIL:","r")
-        print "*** new input is %s" % new_input
         if new_input == None:
           log_dos.warn("SystemTagList: can't create new input file handle for SystemTagList('%s')", cmd)
           return 0xffffffff
         #Push-back the commands into the input buffer.
-        print "*** setting the input buffer to %s" % cmd
         new_input.setbuf(cmd)
       else:
-        print "*** updating an existing input buffer"
         inputfh   = cli.r_s("cli_CurrentInput")
         new_input = self.file_mgr.get_by_b_addr(inputfh >> 2)
         cmd       = cmd + "\n" + new_input.getbuf()
-        print "*** setting the input buffer to %s" % cmd
         new_input.setbuf(cmd)
+      # print "setting new input to %s" % new_input
       # and install this as current input. The shell will read from that
       # instead until it hits the EOF
       cli.w_s("cli_CurrentInput",new_input.mem.addr)
+      cli.w_s("cli_StandardInput",new_input.mem.addr)
+      cli.w_s("cli_Background",self.DOSTRUE)
+      # Create the Packet for the background process.
+      packet      = self.ctx.process.run_system()
+      stacksize   = cli.r_s("cli_DefaultStack") << 2
+      input_fh    = self.ctx.process.get_input()
+      current_dir = self.ctx.process.get_current_dir()
+      #print "*** Current dir is %x" % (current_dir >> 2)
+      cur_lock    = self.lock_mgr.get_by_b_addr(current_dir >> 2)
+      dup_lock    = self.lock_mgr.create_lock(cur_lock.ami_path, False)
+      #print "*** Duplicate current dir is %x" % dup_lock.b_addr
+      self.ctx.process.set_current_dir(dup_lock.mem.addr)
+      self.cur_dir_lock = dup_lock
+      # print "*** Current input is %s" % input_fh
+      # trap to clean up sub process resources
+      def trap_stop_run_command(ret_code):
+        # print "**** Returned from SystemTagList()"
+        cli.w_s("cli_CurrentInput",input_fh.mem.addr)
+        cli.w_s("cli_StandardInput",input_fh.mem.addr)
+        cli.w_s("cli_Background",self.DOSFALSE)
+        # print "*** Restoring input to %s" % input_fh
+        self.ctx.process.set_input(input_fh)
+        #print "restoring current dir to %x " % (current_dir >> 2)
+        self.ctx.process.set_current_dir(current_dir)
+        self.cur_dir_lock = self.lock_mgr.get_by_b_addr(current_dir >> 2)
+        ctx.cpu.w_reg(REG_D0,self.DOSTRUE)
+        self.setioerr(ctx, ret_code)
+        return self.DOSTRUE
+      # The return code remains in d0 as is
+      ctx.run_shell(ctx.process.shell_start,packet,stacksize,trap_stop_run_command)
       return self.DOSTRUE
     else:
       # parse "command line"
@@ -1344,6 +1369,7 @@ class DosLibrary(AmigaLibrary):
       setname = self._alloc_mem("cli_SetName",80)
       clip.w_s("cli_SetName",setname)
     # Get the current dir and install it.
+    setname = clip.r_s("cli_SetName")
     ctx.mem.access.w_bstr(setname,"SYS:")
     # The native CliInit opens the CON window here. Don't do that
     # instead use Input and Output.
@@ -1367,6 +1393,15 @@ class DosLibrary(AmigaLibrary):
         cmd_dir_addr = path.addr
         clip.w_s("cli_CommandDir",cmd_dir_addr)
     return 0
+
+  def CliInitRun(self, ctx):
+    clip_addr = self.Cli(ctx)
+    clip      = AccessStruct(ctx.mem,CLIDef,struct_addr=clip_addr)
+    pkt       = ctx.cpu.r_reg(REG_A0)
+    log_dos.info("CliInitRun (0x%06x)" % pkt)
+    # This would typically initialize the CLI for running a command
+    # from the packet. Anyhow, this is already done, so do nothing here
+    return 0x80000004 #valid, and a System() call.
 
   # ----- misc --------
 

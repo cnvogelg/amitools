@@ -209,16 +209,6 @@ class ExecLibrary(AmigaLibrary):
     else:
       raise VamosInternalError("FreeVec: Unknown memory to free: ptr=%06x" % (addr))
 
-  # ----- Misc -----
-
-  def RawDoFmt(self, ctx):
-    format_ptr = ctx.cpu.r_reg(REG_A0)
-    format     = ctx.mem.access.r_cstr(format_ptr)
-    data_ptr   = ctx.cpu.r_reg(REG_A1)
-    putch_ptr  = ctx.cpu.r_reg(REG_A2)
-    pdata_ptr  = ctx.cpu.r_reg(REG_A3)
-    log_exec.info("RawDoFmt: format='%s' data=%06x putch=%06x pdata=%06x" % (format, data_ptr, putch_ptr, pdata_ptr))
-
   # ----- Message Passing -----
 
   def PutMsg(self, ctx):
@@ -340,6 +330,9 @@ class ExecLibrary(AmigaLibrary):
     log_exec.info("TypeOfMem: source=%06x -> %s" % (addr,self.alloc.is_valid_address(addr)))
     if self.alloc.is_valid_address(addr):
       return 1 #MEMF_PUBLIC
+    return 0
+
+  def CacheClearU(self, ctx):
     return 0
 
   def RawDoFmt(self, ctx):
