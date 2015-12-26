@@ -1185,9 +1185,9 @@ class DosLibrary(AmigaLibrary):
         #print "restoring current dir to %x " % (current_dir >> 2)
         self.ctx.process.set_current_dir(current_dir)
         self.cur_dir_lock = self.lock_mgr.get_by_b_addr(current_dir >> 2)
-        ctx.cpu.w_reg(REG_D0,self.DOSTRUE)
+        ctx.cpu.w_reg(REG_D0,0)
         self.setioerr(ctx, ret_code)
-        return self.DOSTRUE
+        return 0
       # The return code remains in d0 as is
       ctx.run_shell(ctx.process.shell_start,packet,stacksize,trap_stop_run_command)
       return self.DOSTRUE
