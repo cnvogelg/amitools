@@ -778,18 +778,16 @@ class DosLibrary(AmigaLibrary):
 
   def CurrentDir(self, ctx):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
-    old_lock = self.cur_dir_lock
-    if lock_b_addr == 0:
-      new_lock = None
-    else:
-      new_lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
+    old_lock    = self.cur_dir_lock
+    new_lock    = self.lock_mgr.get_by_b_addr(lock_b_addr)
     self.cur_dir_lock = new_lock
     log_dos.info("CurrentDir(b@%x): %s -> %s" % (lock_b_addr, old_lock, new_lock))
     # set current path in path mgr
     if new_lock != None:
       ctx.path_mgr.set_cur_path(new_lock.ami_path)
     else:
-      ctx.path_mgr.set_default_cur_path()
+      ctx.path_mgr.set_cur_path("SYS:")
+    ctx.process.set_current_dir(new_lock.b_addr << 2)
     if old_lock == None:
       return 0
     else:
@@ -1188,7 +1186,7 @@ class DosLibrary(AmigaLibrary):
       log_dos.warn("LoadSeg: '%s' -> not found!" % (name))
       return 0
     else:
-      log_dos.warn("LoadSeg: '%s' -> %s" % (name, seg_list))
+      log_dos.info("LoadSeg: '%s' -> %s" % (name, seg_list))
       b_addr = seg_list.b_addr
       self.seg_lists[b_addr] = seg_list
       return b_addr
@@ -1326,7 +1324,7 @@ class DosLibrary(AmigaLibrary):
       clip.w_s("cli_Prompt",prompt_ptr)
     else:
       prompt_ptr = clip.r_s("cli_Prompt")
-    ctx.mem.access.w_bstr(prompt_ptr,"%N>")
+    ctx.mem.access.w_bstr(prompt_ptr,"%N.%S> ")
     if clip.r_s("cli_CommandName") == 0:
       cmdname = self._alloc_mem("cli_CommandName",104)
       clip.w_s("cli_CommandName",cmdname)
@@ -1336,6 +1334,8 @@ class DosLibrary(AmigaLibrary):
     if clip.r_s("cli_SetName") == 0:
       setname = self._alloc_mem("cli_SetName",80)
       clip.w_s("cli_SetName",setname)
+    # Get the current dir and install it.
+    ctx.mem.access.w_bstr(setname,"SYS:")
     # The native CliInit opens the CON window here. Don't do that
     # instead use Input and Output.
     # cli_CurrentInput would also be set to the input handle of

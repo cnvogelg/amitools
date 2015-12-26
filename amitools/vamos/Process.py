@@ -176,5 +176,11 @@ class Process:
   def set_output(self, output_fh):
     self.this_task.access.w_s("pr_COS", output_fh.b_addr<<2) # compensate BCPL auto-conversion
 
+  def get_current_dir(self):
+    return self.this_task.access.r_s("pr_CurrentDir")
+
+  def set_current_dir(self,lock):
+    self.this_task.access.w_s("pr_CurrentDir",lock)
+
   def is_native_shell(self):
     return self.shell
