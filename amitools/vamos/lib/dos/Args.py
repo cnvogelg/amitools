@@ -196,12 +196,8 @@ class Args:
           if val != False:
             result[pos] = val
             targ['x'] = False # disable to reject auto fill
-
-      # full line
       elif targ['f']:
-        result[pos] = args
-        args = []
-
+        fullPos = pos
       pos = pos + 1
 
     # scan for multi and non-key args
@@ -251,6 +247,21 @@ class Args:
               self.error = ERROR_REQUIRED_ARG_MISSING
               return False
         result[pos] = val
+      elif targ['f']:
+        res = None
+        for arg in args:
+          if res == None:
+            res = ""
+          else:
+            res = res + " "
+          if arg == "":
+            res = res + '""'
+          else:
+            res = res + arg
+        if res == None:
+          res = ""
+        result[fullPos] = res
+        args = []
 
       pos = pos + 1
 

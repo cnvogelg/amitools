@@ -92,9 +92,13 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("IoErr: %d (%s)" % (self.io_err, dos_error_strings[self.io_err]))
     return self.io_err
 
+  def setioerr(self, ctx, err):
+    self.io_err = err
+    ctx.process.this_task.access.w_s("pr_Result2",err)
+
   def SetIoErr(self, ctx):
     old_io_err = self.io_err
-    self.io_err = ctx.cpu.r_reg(REG_D1)
+    self.setioerr(ctx,ctx.cpu.r_reg(REG_D1))
     log_dos.info("SetIoErr: IoErr=%d old IoErr=%d", self.io_err, old_io_err)
     return old_io_err
 
@@ -209,21 +213,23 @@ class DosLibrary(AmigaLibrary):
     size     = ctx.cpu.r_reg(REG_D3)
     flags    = ctx.cpu.r_reg(REG_D4)
     if size == 0:
-      self.io_err = ERROR_BAD_NUMBER
+      self.setioerr(ctx, ERROR_BAD_NUMBER)
       return self.DOSFALSE
     name = ctx.mem.access.r_cstr(name_ptr)
-    ctx.mem.access.w_cstr(buff_ptr, '')
     if not flags & self.GVF_GLOBAL_ONLY:
       node = self.find_var(ctx,name,flags & 0xff)
       if node != None:
         nodelen = node.r_s("lv_Len")
         if flags & self.GVF_BINARY_VAR:
           ctx.mem.raw_mem.copy_block(node.r_s("lv_Value"),buff_ptr,min(nodelen,size))
-          self.io_err = nodelen
+          log_dos.info('GetVar("%s", 0x%x) -> %0x06x' % (name, flags, node.r_s("lv_Value")))
+          self.setioerr(ctx,nodelen)
           return min(nodelen,size)
         else:
-          value = ctx.mem.access.r_cstr(node.r_s("lv_Value"))[:size-1]
-          ctx.mem.access.w_cstr(buff_ptr,value)
+          value = ctx.mem.access.r_cstr(node.r_s("lv_Value"))
+          ctx.mem.access.w_cstr(buff_ptr,value[:size-1])
+          log_dos.info('GetVar("%s", 0x%x) -> %s' % (name, flags, value))
+          self.setioerr(ctx,len(value))
           return min(nodelen-1,size-1)
     return self.DOSFALSE
 
@@ -233,13 +239,13 @@ class DosLibrary(AmigaLibrary):
     name      = ctx.mem.access.r_cstr(name_ptr)
     node      = self.find_var(ctx,name,vtype)
     if node == None:
-      self.io_err = ERROR_OBJECT_NOT_FOUND
+      self.setioerr(ctx,ERROR_OBJECT_NOT_FOUND)
       log_dos.info('FindVar("%s", 0x%x) -> NULL' % (name, vtype))
       return 0
     else:
       log_dos.info('FindVar("%s", 0x%x) -> %06lx' % (name, vtype, node.struct_addr))
       return node.struct_addr
-    return 0
+
 
   def SetVar(self, ctx):
     name_ptr  = ctx.cpu.r_reg(REG_D1)
@@ -256,8 +262,10 @@ class DosLibrary(AmigaLibrary):
     else:
       if flags & self.GVF_BINARY_VAR:
         value = None
+        log_dos.info('SetVar("%s") to %0x6x' % (name, buff_ptr))
       else:
         value = ctx.mem.access.r_cstr(buff_ptr)
+        log_dos.info('SetVar("%s") to %s' % (name, value))
         size  = len(value)
       if not flags & self.GVF_GLOBAL_ONLY:
         node = self.find_var(ctx,name,flags)
@@ -369,7 +377,7 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("Open: name='%s' (%s/%d/%s) -> %s" % (name, mode_name, mode, f_mode, fh))
 
     if fh == None:
-      self.io_err = ERROR_OBJECT_NOT_FOUND
+      self.setioerr(ctx,ERROR_OBJECT_NOT_FOUND)
       return 0
     else:
       return fh.b_addr
@@ -598,7 +606,7 @@ class DosLibrary(AmigaLibrary):
   def DeleteFile(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name = ctx.mem.access.r_cstr(name_ptr)
-    self.io_err = self.file_mgr.delete(name)
+    self.setioerr(ctx,self.file_mgr.delete(name))
     log_dos.info("DeleteFile: '%s': err=%s" % (name, self.io_err))
     if self.io_err == NO_ERROR:
       return self.DOSTRUE
@@ -610,7 +618,7 @@ class DosLibrary(AmigaLibrary):
     old_name = ctx.mem.access.r_cstr(old_name_ptr)
     new_name_ptr = ctx.cpu.r_reg(REG_D2)
     new_name = ctx.mem.access.r_cstr(new_name_ptr)
-    self.io_err = self.file_mgr.rename(old_name, new_name)
+    self.setioerr(ctx,self.file_mgr.rename(old_name, new_name))
     log_dos.info("Rename: '%s' -> '%s': err=%s" % (old_name, new_name, self.io_err))
     if self.io_err == NO_ERROR:
       return self.DOSTRUE
@@ -621,7 +629,7 @@ class DosLibrary(AmigaLibrary):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name = ctx.mem.access.r_cstr(name_ptr)
     mask = ctx.cpu.r_reg(REG_D2)
-    self.io_err = self.file_mgr.set_protection(name, mask)
+    self.setioerr(ctx,self.file_mgr.set_protection(name, mask))
     log_dos.info("SetProtection: '%s' mask=%04x: err=%s", name, mask, self.io_err)
     if self.io_err == NO_ERROR:
       return self.DOSTRUE
@@ -665,7 +673,7 @@ class DosLibrary(AmigaLibrary):
     lock = self.lock_mgr.create_lock(name, lock_exclusive)
     log_dos.info("Lock: '%s' exc=%s -> %s" % (name, lock_exclusive, lock))
     if lock == None:
-      self.io_err = ERROR_OBJECT_NOT_FOUND
+      self.setioerr(ctx,ERROR_OBJECT_NOT_FOUND)
       return 0
     else:
       return lock.b_addr
@@ -684,7 +692,7 @@ class DosLibrary(AmigaLibrary):
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
     dup_lock = self.lock_mgr.create_lock(lock.ami_path, False)
     log_dos.info("DupLock: %s -> %s",lock, dup_lock)
-    self.io_err = NO_ERROR
+    self.setioerr(ctx,NO_ERROR)
     return dup_lock.b_addr
 
   def Examine(self, ctx):
@@ -693,7 +701,7 @@ class DosLibrary(AmigaLibrary):
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
     log_dos.info("Examine: %s fib=%06x" % (lock, fib_ptr))
     fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
-    self.io_err = lock.examine_lock(fib)
+    self.setioerr(ctx,lock.examine_lock(fib))
     if self.io_err == NO_ERROR:
       return self.DOSTRUE
     else:
@@ -727,7 +735,7 @@ class DosLibrary(AmigaLibrary):
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
     log_dos.info("ExNext: %s fib=%06x" % (lock, fib_ptr))
     fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
-    self.io_err = lock.examine_next(fib)
+    self.setioerr(ctx,lock.examine_next(fib))
     if self.io_err == NO_ERROR:
       return self.DOSTRUE
     else:
@@ -774,7 +782,7 @@ class DosLibrary(AmigaLibrary):
       name = lock.ami_path
     log_dos.info("NameFromLock(%x,%d): %s -> %s", buf, buf_len, lock, name)
     if len(name) >= buf_len:
-      self.io_err = ERROR_LINE_TOO_LONG
+      self.setioerr(ctx,ERROR_LINE_TOO_LONG)
       return self.DOSFALSE
     else:
       ctx.mem.access.w_cstr(buf, name)
@@ -785,13 +793,13 @@ class DosLibrary(AmigaLibrary):
     name = ctx.mem.access.r_cstr(name_ptr)
     err = self.file_mgr.create_dir(name)
     if err != NO_ERROR:
-      self.io_err = err
+      self.setioerr(ctx,err)
       return 0
     else:
       lock = self.lock_mgr.create_lock(name, True)
       log_dos.info("CreateDir: '%s' -> %s" % (name, lock))
     if lock == None:
-      self.io_err = ERROR_OBJECT_NOT_FOUND
+      self.setioerr(ctx,ERROR_OBJECT_NOT_FOUND)
       return 0
     else:
       return lock.b_addr
@@ -814,7 +822,7 @@ class DosLibrary(AmigaLibrary):
     devproc = AccessStruct(self.ctx.mem,DevProcDef,struct_addr=addr)
     devproc.w_s('dvp_Port', fs_port)
     devproc.w_s('dvp_Lock', vol_lock.b_addr << 2) #THOR: Compensate for BADDR adjustment.
-    self.io_err = NO_ERROR
+    self.setioerr(ctx,NO_ERROR)
     return addr
 
   def FreeDeviceProc(self, ctx):
@@ -835,12 +843,12 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("MatchFirst: pat='%s' anchor=%06x strlen=%d flags=%02x-> ok=%s" \
       % (pat, anchor_ptr, mfn.str_len, mfn.flags, mfn.ok))
     if not mfn.ok:
-      self.io_err = ERROR_BAD_TEMPLATE
+      self.setioerr(ctx,ERROR_BAD_TEMPLATE)
       return self.io_err
     log_dos.debug("MatchFirst: %s" % mfn.matcher)
 
     # try first match
-    self.io_err = mfn.first(ctx)
+    self.setioerr(ctx,mfn.first(ctx))
     if self.io_err == NO_ERROR:
       log_dos.info("MatchFirst: found name='%s' path='%s' -> parent lock %s, io_err=%d", mfn.name, mfn.path, mfn.dir_lock, self.io_err)
       self.matches[anchor_ptr] = mfn
@@ -861,7 +869,7 @@ class DosLibrary(AmigaLibrary):
     mfn = self.matches[anchor_ptr]
     # has matches?
     if mfn != None:
-      self.io_err = mfn.next(ctx)
+      self.setioerr(ctx,mfn.next(ctx))
       if self.io_err == NO_ERROR:
         log_dos.info("MatchNext: found name='%s' path=%s -> parent lock %s, io_err=%d", mfn.name, mfn.path, mfn.dir_lock, self.io_err)
       elif self.io_err == ERROR_NO_MORE_ENTRIES:
@@ -891,10 +899,10 @@ class DosLibrary(AmigaLibrary):
     pat = pattern_parse(src, ignore_case=ignore_case)
     log_dos.info("ParsePattern: src=%s ignore_case=%s -> pat=%s",src, ignore_case, pat)
     if pat == None:
-      self.io_err = ERROR_BAD_TEMPLATE
+      self.setioerr(ctx,ERROR_BAD_TEMPLATE)
       return -1
     else:
-      self.io_err = NO_ERROR
+      self.setioerr(ctx,NO_ERROR)
       pat_str = pat.pat_str
       if len(pat_str) >= dst_len:
         return -1
@@ -945,7 +953,7 @@ class DosLibrary(AmigaLibrary):
     args.prepare_input(ctx.mem.access,array_ptr)
     ok = args.parse_string(bin_args)
     if not ok:
-      self.io_err = args.error
+      self.setioerr(ctx,args.error)
       log_dos.info("ReadArgs: not matched -> io_err=%d/%s",self.io_err, dos_error_strings[self.io_err])
       return 0
     log_dos.debug("matched template: %s",args.get_result())
@@ -971,7 +979,7 @@ class DosLibrary(AmigaLibrary):
     # store rdargs
     self.rdargs[rdargs.addr] = (rdargs, own)
     # result
-    self.io_err = NO_ERROR
+    self.setioerr(ctx,NO_ERROR)
     log_dos.info("ReadArgs: matched! result_mem=%06x rdargs=%s", addr, rdargs)
     return rdargs.addr
 
