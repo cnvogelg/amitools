@@ -1401,11 +1401,11 @@ class DosLibrary(AmigaLibrary):
 
   def DosGetString(self,ctx):
     errno = ctx.cpu.r_reg(REG_D1)
-    if errno in DosErrors:
+    if errno in dos_error_strings:
       if errno in errstrings:
         return errstrings[errno]
-      errstrings[errno] = self._alloc_mem("Error %d" % errno,len(DosErrors[errno]) + 1)
-      ctx.mem.access.w_cstr(errstrings[errno],DosErrors[errno])
+      errstrings[errno] = self._alloc_mem("Error %d" % errno,len(dos_error_strings[errno]) + 1)
+      ctx.mem.access.w_cstr(errstrings[errno],dos_error_strings[errno])
       return errstrings[errno]
     else:
       return 0
