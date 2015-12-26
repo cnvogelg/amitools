@@ -1,5 +1,6 @@
 import time
 import ctypes
+import re
 
 from amitools.vamos.AmigaLibrary import *
 from dos.DosStruct import *
@@ -1335,6 +1336,19 @@ class DosLibrary(AmigaLibrary):
         cmd_dir_addr = path.addr
         clip.w_s("cli_CommandDir",cmd_dir_addr)
     return 0
+
+  # ----- misc --------
+
+  def StrToLong(self, ctx):
+    str_addr = ctx.cpu.r_reg(REG_D1)
+    val_addr = ctx.cpu.r_reg(REG_D2)
+    string   = ctx.mem.access.r_cstr(str_addr)
+    match    = re.search("(\+|\-|)[0-9]*",string)
+    if len(match.group(0)) > 0:
+      ctx.mem.access.w32(val_addr,int(match.group(0)))
+      return len(match.group(0))
+    else:
+      return 0
 
   # ----- Helpers -----
 
