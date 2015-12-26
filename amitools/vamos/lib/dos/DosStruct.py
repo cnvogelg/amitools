@@ -325,4 +325,13 @@ class SegmentStruct(AmigaStruct):
     ]
 SegmentDef = SegmentStruct()
 
-    
+class LocalVarStruct(AmigaStruct):
+  _name = "LocalVar"
+  _format = [
+    ('Node','lv_Node'),
+    ('UWORD','lv_Flags'),
+    ('UBYTE*','lv_Value'),
+    ('ULONG','lv_Len')
+  ]
+LocalVarDef = LocalVarStruct()
+

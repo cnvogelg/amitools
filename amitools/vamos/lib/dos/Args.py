@@ -1,6 +1,11 @@
 import types
 from Error import *
 
+#
+# THOR: FIXME: /F arguments eat *all* arguments, not just
+# the rest of the line. "set echo on" does not work due to
+# this problem.
+#
 class Args:
 
   def __init__(self):

@@ -147,10 +147,18 @@ class Process:
     self.this_task.access.w_s("pr_CLI", self.cli.addr)
     self.this_task.access.w_s("pr_CIS", input_fh.b_addr<<2) # compensate BCPL auto-conversion
     self.this_task.access.w_s("pr_COS", output_fh.b_addr<<2) # compensate BCPL auto-conversion
-    log_proc.info(self.this_task)
+    varlist = self.get_local_vars()
+    # Initialize the list of local shell variables
+    varlist.access.w_s("mlh_Head",varlist.addr + 4)
+    varlist.access.w_s("mlh_Tail",0)
+    varlist.access.w_s("mlh_TailPred",varlist.addr)
 
   def free_task_struct(self):
     self.ctx.alloc.free_struct(self.this_task)
+
+  def get_local_vars(self):
+    localvars_addr = self.this_task.access.s_get_addr("pr_LocalVars")
+    return self.ctx.alloc.map_struct("MinList", localvars_addr, MinListDef)
 
   def get_input(self):
     fh_b = self.this_task.access.r_s("pr_CIS") >> 2

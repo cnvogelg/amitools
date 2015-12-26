@@ -148,7 +148,8 @@ class MemoryAlloc:
     chunk, left = self._find_best_chunk(size)
     # out of memory?
     if chunk == None:
-      log_mem_alloc.error("[alloc: NO MEMORY for %06x bytes]", size)
+      raise VamosInternalError("[alloc: NO MEMORY for %06x bytes]" % size)
+      log_mem_alloc.error("[alloc: NO MEMORY for %06x bytes]" % size)
       return 0
     # remove chunk from free list
     # is something left?

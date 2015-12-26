@@ -3,6 +3,7 @@ import ctypes
 
 from amitools.vamos.AmigaLibrary import *
 from dos.DosStruct import *
+from lexec.ExecStruct import ListDef, MinListDef, NodeDef
 from amitools.vamos.Exceptions import *
 from amitools.vamos.Log import log_dos
 from amitools.vamos.AccessStruct import AccessStruct
@@ -27,6 +28,13 @@ class DosLibrary(AmigaLibrary):
 
   DOSFALSE = 0
   DOSTRUE = 0xffffffff
+  
+  LV_VAR   = 0	# an variable 
+  LV_ALIAS = 1	# an alias
+  LVF_IGNORE            =       0x80
+  GVF_GLOBAL_ONLY	=       0x100
+  GVF_LOCAL_ONLY        =	0x200
+  GVF_BINARY_VAR	=	0x400
 
   def __init__(self, mem, alloc, config):
     AmigaLibrary.__init__(self, self.name, DosLibraryDef, config)
@@ -152,21 +160,114 @@ class DosLibrary(AmigaLibrary):
     return self.DOSTRUE
 
   # ----- ENV: Vars -----
+  def find_var(self, ctx, name, flags):
+    varlist   = ctx.process.get_local_vars()
+    node_addr = varlist.access.r_s("mlh_Head")
+    node      = AccessStruct(ctx.mem,LocalVarDef,node_addr)
+    while node.r_s("lv_Node.ln_Succ") != 0:
+      naddr   = node.r_s("lv_Node.ln_Name")
+      mname   = ctx.mem.access.r_cstr(naddr)
+      mtype   = node.r_s("lv_Node.ln_Type")
+      if mtype == flags & 0xff and name.lower() == mname.lower():
+        return node
+      node_addr = node.r_s("lv_Node.ln_Succ")
+      node      = AccessStruct(ctx.mem,LocalVarDef,node_addr)
+    return None
+
+  def create_var(self, ctx, name, flags):
+    varlist   = ctx.process.get_local_vars()
+    node_addr = ctx.alloc.alloc_memory("ShellVar(%s)" % name,LocalVarDef.get_size() + len(name) + 1).addr
+    name_addr = node_addr + LocalVarDef.get_size()
+    node      = ctx.alloc.map_struct("ShellVar(%s) % name", node_addr, LocalVarDef)
+    ctx.mem.access.w_cstr(name_addr,name)
+    node.access.w_s("lv_Node.ln_Name",name_addr)
+    node.access.w_s("lv_Node.ln_Type",flags & 0xff)
+    node.access.w_s("lv_Value",0)
+    head_addr = varlist.access.r_s("mlh_Head")
+    head      = AccessStruct(ctx.mem, NodeDef, head_addr)
+    node.access.w_s("lv_Node.ln_Succ",head_addr)
+    node.access.w_s("lv_Node.ln_Pred",varlist.access.s_get_addr("mlh_Tail"))
+    head.w_s("ln_Pred",node_addr)
+    varlist.access.w_s("mlh_Head",node_addr)
+    return node.access
+
+  def set_var(self,ctx,node,buff_ptr,size,value,flags):
+    if node.r_s("lv_Value") != 0:
+      ctx.alloc.free_mem(node.r_s("lv_Value"),node.r_s("lv_Len"))
+      node.w_s("lv_Value",0)
+    buf_addr = ctx.alloc.alloc_memory("ShellVarBuffer",size)
+    node.w_s("lv_Value",buf_addr.addr)
+    node.w_s("lv_Len",size)
+    if flags & self.GVF_BINARY_VAR:
+      ctx.mem.raw_mem.copy_block(buff_ptr,buf_addr.addr,size)
+    else:
+      ctx.mem.access.w_cstr(buf_addr.addr,value)
+
   def GetVar(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     buff_ptr = ctx.cpu.r_reg(REG_D2)
-    size = ctx.cpu.r_reg(REG_D3)
-    flags = ctx.cpu.r_reg(REG_D4)
+    size     = ctx.cpu.r_reg(REG_D3)
+    flags    = ctx.cpu.r_reg(REG_D4)
     if size == 0:
       self.io_err = ERROR_BAD_NUMBER
       return self.DOSFALSE
-
     name = ctx.mem.access.r_cstr(name_ptr)
     ctx.mem.access.w_cstr(buff_ptr, '')
-    log_dos.info('GetVar("%s", 0x%x, %d, 0x%x) -> -1' % (name, buff_ptr, size, flags))
-
-    self.io_err = ERROR_OBJECT_NOT_FOUND
+    if not flags & self.GVF_GLOBAL_ONLY:
+      node = self.find_var(ctx,name,flags & 0xff)
+      if node != None:
+        nodelen = node.r_s("lv_Len")
+        if flags & self.GVF_BINARY_VAR:
+          ctx.mem.raw_mem.copy_block(node.r_s("lv_Value"),buff_ptr,min(nodelen,size))
+          self.io_err = nodelen
+          return min(nodelen,size)
+        else:
+          value = ctx.mem.access.r_cstr(node.r_s("lv_Value"))[:size-1]
+          ctx.mem.access.w_cstr(buff_ptr,value)
+          return min(nodelen-1,size-1)
     return self.DOSFALSE
+
+  def FindVar(self, ctx):
+    name_ptr  = ctx.cpu.r_reg(REG_D1)
+    vtype     = ctx.cpu.r_reg(REG_D2)
+    name      = ctx.mem.access.r_cstr(name_ptr)
+    node      = self.find_var(ctx,name,vtype)
+    if node == None:
+      self.io_err = ERROR_OBJECT_NOT_FOUND
+      log_dos.info('FindVar("%s", 0x%x) -> NULL' % (name, vtype))
+      return 0
+    else:
+      log_dos.info('FindVar("%s", 0x%x) -> %06lx' % (name, vtype, node.struct_addr))
+      return node.struct_addr
+    return 0
+
+  def SetVar(self, ctx):
+    name_ptr  = ctx.cpu.r_reg(REG_D1)
+    buff_ptr  = ctx.cpu.r_reg(REG_D2)
+    size      = ctx.cpu.r_reg(REG_D3)
+    flags     = ctx.cpu.r_reg(REG_D4)
+    name      = ctx.mem.access.r_cstr(name_ptr)
+    if buff_ptr == 0:
+      if not flags & self.GVF_GLOBAL_ONLY:
+        node = self.find_var(ctx,name,vtype)
+        if node != None:
+          self.delete_var(ctx,node)
+        return self.DOSTRUE
+    else:
+      if flags & self.GVF_BINARY_VAR:
+        value = None
+      else:
+        value = ctx.mem.access.r_cstr(buff_ptr)
+        size  = len(value)
+      if not flags & self.GVF_GLOBAL_ONLY:
+        node = self.find_var(ctx,name,flags)
+        if node == None and buff_ptr != 0:
+          node = self.create_var(ctx,name,flags)
+        if node != None:
+          self.set_var(ctx,node,buff_ptr,size,value,flags)
+        return self.DOSTRUE
+    return 0
+  
 
   # ----- Signals ----------------------
 

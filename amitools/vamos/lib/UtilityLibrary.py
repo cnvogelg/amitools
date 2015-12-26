@@ -26,4 +26,30 @@ class UtilityLibrary(AmigaLibrary):
   def ToUpper(self, ctx):
     a = ctx.cpu.r_reg(REG_D0)
     return ord(chr(a).upper())
+
+  def Stricmp(self, ctx):
+    str1_addr = ctx.cpu.r_reg(REG_A0)
+    str2_addr = ctx.cpu.r_reg(REG_A1)
+    str1 = ctx.mem.access.r_cstr(str1_addr)
+    str2 = ctx.mem.access.r_cstr(str2_addr)
+    if str1.lower() < str2.lower():
+      return -1
+    elif str2.lower() > str2.lower():
+      return +1
+    else:
+      return 0
+    
+  def Strnicmp(self, ctx):
+    str1_addr = ctx.cpu.r_reg(REG_A0)
+    str2_addr = ctx.cpu.r_reg(REG_A1)
+    length    = ctx.cpu.r_reg(REG_D0)
+    str1 = ctx.mem.access.r_cstr(str1_addr)[:length]
+    str2 = ctx.mem.access.r_cstr(str2_addr)[:length]
+    if str1.lower() < str2.lower():
+      return -1
+    elif str2.lower() > str2.lower():
+      return +1
+    else:
+      return 0
+    
   

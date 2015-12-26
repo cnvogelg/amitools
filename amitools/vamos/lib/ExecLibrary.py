@@ -269,6 +269,18 @@ class ExecLibrary(AmigaLibrary):
     AccessStruct(ctx.mem, NodeDef, tp).w_s("ln_Succ", node_addr)
     l.w_s("lh_TailPred", node_addr)
 
+  def AddHead(self, ctx):
+    list_addr = ctx.cpu.r_reg(REG_A0)
+    node_addr = ctx.cpu.r_reg(REG_A1)
+    log_exec.info("AddHead(%06x, %06x)" % (list_addr, node_addr))
+    l = AccessStruct(ctx.mem, ListDef, list_addr)
+    n = AccessStruct(ctx.mem, NodeDef, node_addr)
+    n.w_s("ln_Pred", l.s_get_addr("lh_TailPred"))
+    h = l.r_s("lh_Head")
+    n.w_s("ln_Succ", h)
+    AccessStruct(ctx.mem, NodeDef, h).w_s("ln_Pred", node_addr)
+    l.w_s("lh_Head", node_addr)
+
   def Remove(self, ctx):
     node_addr = ctx.cpu.r_reg(REG_A1)
     n = AccessStruct(ctx.mem, NodeDef, node_addr)
@@ -325,6 +337,7 @@ class ExecLibrary(AmigaLibrary):
 
   def TypeOfMem(self, ctx):
     addr = ctx.cpu.r_reg(REG_A1)
+    log_exec.info("TypeOfMem: source=%06x -> %s" % (addr,self.alloc.is_valid_address(addr)))
     if self.alloc.is_valid_address(addr):
       return 1 #MEMF_PUBLIC
     return 0
@@ -355,4 +368,5 @@ class ExecLibrary(AmigaLibrary):
     dataStream = dos.Printf.printf_read_data(ps, ctx.mem.access, dataStream)
     result = dos.Printf.printf_generate_output(ps)
     ctx.mem.access.w_cstr(putData,result)
+    log_exec.info("RawDoFmt: fmtString=%s -> %s" % (fmt,result))
     return dataStream
