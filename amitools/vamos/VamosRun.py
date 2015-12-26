@@ -79,7 +79,7 @@ class VamosRun:
     pc = self.cpu.r_pc() - 2
     # addr == 0 or an error occurred -> end reached
     if pc != 0 and not self.et.has_errors:
-      log_main.error("RESET encountered - abort")
+      log_main.error("RESET encountered at pc 0x%06x- abort",pc)
     # stop all
     self.cpu.end()
     self.stay = False

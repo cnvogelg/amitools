@@ -19,6 +19,7 @@ from dos.MatchFirstNext import MatchFirstNext
 from amitools.vamos.label.LabelStruct import LabelStruct
 from dos.CommandLine import CommandLine
 from amitools.vamos.Process import Process
+from dos.DosErrors import DosErrors
 import dos.PathPart
 from dos.DosList import DosList
 from dos.LockManager import LockManager
@@ -54,6 +55,7 @@ class DosLibrary(AmigaLibrary):
     self.matches = {}
     self.rdargs = {}
     self.dos_objs = {}
+    self.errstrings = {}
     # setup RootNode
     self.root_struct = ctx.alloc.alloc_struct("RootNode",RootNodeDef)
     self.access.w_s("dl_Root",self.root_struct.addr)
@@ -1140,19 +1142,26 @@ class DosLibrary(AmigaLibrary):
     # If we're running from the Amiga shell, forward this to the shell
     # anyhow.
     if ctx.process.is_native_shell():
+      print "*** native shell SystemTagList"
       cli_addr = ctx.process.get_cli_struct()
       cli      = AccessStruct(ctx.mem,CLIDef,struct_addr=cli_addr)
       if cli.r_s("cli_CurrentInput") == cli.r_s("cli_StandardInput"):
+        print "*** creating a new dummy input"
         new_input = self.file_mgr.open("NIL:","r")
+        print "*** new input is %s" % new_input
         if new_input == None:
           log_dos.warn("SystemTagList: can't create new input file handle for SystemTagList('%s')", cmd)
-        return 0xffffffff
+          return 0xffffffff
         #Push-back the commands into the input buffer.
+        print "*** setting the input buffer to %s" % cmd
         new_input.setbuf(cmd)
       else:
+        print "*** updating an existing input buffer"
         inputfh   = cli.r_s("cli_CurrentInput")
-        new_input = self.file_mgr.get_by_b_addr(self, inputfh >> 2)
-        new_input.setbuf(cmd + "\n" + new_input.getbuf())
+        new_input = self.file_mgr.get_by_b_addr(inputfh >> 2)
+        cmd       = cmd + "\n" + new_input.getbuf()
+        print "*** setting the input buffer to %s" % cmd
+        new_input.setbuf(cmd)
       # and install this as current input. The shell will read from that
       # instead until it hits the EOF
       cli.w_s("cli_CurrentInput",new_input.mem.addr)
@@ -1389,6 +1398,17 @@ class DosLibrary(AmigaLibrary):
     setaddr  = cli.r_s("cli_Prompt")
     ctx.mem.access.w_bstr(setaddr,string)
     return self.DOSTRUE
+
+  def DosGetString(self,ctx):
+    errno = ctx.cpu.r_reg(REG_D1)
+    if errno in DosErrors:
+      if errno in errstrings:
+        return errstrings[errno]
+      errstrings[errno] = self._alloc_mem("Error %d" % errno,len(DosErrors[errno]) + 1)
+      ctx.mem.access.w_cstr(errstrings[errno],DosErrors[errno])
+      return errstrings[errno]
+    else:
+      return 0
 
   # ----- Helpers -----
 

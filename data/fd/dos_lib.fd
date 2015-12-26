@@ -183,9 +183,8 @@ VPrintf(format,argarray)(d1/d2)
 * these were unimplemented until dos 36.147
 ParsePatternNoCase(pat,buf,buflen)(d1/d2/d3)
 MatchPatternNoCase(pat,str)(d1/d2)
-##private
-dosPrivate5()()
-##public
+* THOR: This is marked private, but required for Fault.
+DosGetString(errno)(d1)
 * this was added for V37 dos, returned 0 before then.
 SameDevice(lock1,lock2)(d1/d2)
 *
