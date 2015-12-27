@@ -105,10 +105,11 @@ class ExecLibrary(AmigaLibrary):
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name = ctx.mem.access.r_cstr(name_ptr)
     lib = self.lib_mgr.open_lib(name, ver, ctx)
-    log_exec.info("OpenLibrary: '%s' V%d -> %s" % (name, ver, lib))
     if lib == None:
+      log_exec.info("OpenLibrary: '%s' V%d -> NULL" % (name, ver))
       return 0
     else:
+      log_exec.info("OpenLibrary: '%s' V%d -> %s@0x%06x" % (name, ver, lib, lib.addr_base_open))
       return lib.addr_base_open
 
   def OldOpenLibrary(self, ctx):

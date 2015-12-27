@@ -676,6 +676,16 @@ int m68k_execute(int num_cycles)
 			/* Call external hook to peek at CPU */
 			m68ki_instr_hook(); /* auto-disable (see m68kcpu.h) */
 
+#if 0			
+			/* THOR: stupid tracing */
+			printf("PC = 0x%08x "
+			       "Dx:%08x,%08x,%08x,%08x,%08x,%08x,%08x,%08x "
+			       "Ax:%08x,%08x,%08x,%08x,%08x,%08x,%08x,%08x\n",
+			       REG_PC,
+			       REG_D[0],REG_D[1],REG_D[2],REG_D[3],REG_D[4],REG_D[5],REG_D[6],REG_D[7],
+			       REG_A[0],REG_A[1],REG_A[2],REG_A[3],REG_A[4],REG_A[5],REG_A[6],REG_A[7]);
+#endif
+			
 			/* Record previous program counter */
 			REG_PPC = REG_PC;
 

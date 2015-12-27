@@ -413,7 +413,7 @@ class DosLibrary(AmigaLibrary):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
     self.file_mgr.close(fh)
-    #print "*** Closing input %s" % fh
+    #print "*** Closing input %s" % fh.mem.addr
     log_dos.info("Close: %s" % fh)
 
     return self.DOSTRUE
@@ -621,6 +621,7 @@ class DosLibrary(AmigaLibrary):
     bufaddr   = ctx.cpu.r_reg(REG_D2)
     buflen    = ctx.cpu.r_reg(REG_D3)
     fh   = self.file_mgr.get_by_b_addr(fh_b_addr)
+    #print "*** Reading from %s" % fh.mem.addr
     line = fh.gets(buflen)
     log_dos.info("FGetS(%s,%d) -> '%s'" % (fh, buflen, line))
     ctx.mem.access.w_cstr(bufaddr,line)
@@ -1156,17 +1157,20 @@ class DosLibrary(AmigaLibrary):
         new_input = self.file_mgr.get_by_b_addr(inputfh >> 2)
         cmd       = cmd + "\n" + new_input.getbuf()
         new_input.setbuf(cmd)
+      new_stdin = self.file_mgr.open("*","rw")
       # print "setting new input to %s" % new_input
       # and install this as current input. The shell will read from that
       # instead until it hits the EOF
+      input_fh    = cli.r_s("cli_StandardInput")
       cli.w_s("cli_CurrentInput",new_input.mem.addr)
-      cli.w_s("cli_StandardInput",new_input.mem.addr)
+      cli.w_s("cli_StandardInput",new_stdin.mem.addr)
       cli.w_s("cli_Background",self.DOSTRUE)
       # Create the Packet for the background process.
       packet      = self.ctx.process.run_system()
       stacksize   = cli.r_s("cli_DefaultStack") << 2
-      input_fh    = self.ctx.process.get_input()
       current_dir = self.ctx.process.get_current_dir()
+      #print "*** standard input is %s" % input_fh
+      #print "*** current input is %s" % new_input.mem.addr
       #print "*** Current dir is %x" % (current_dir >> 2)
       cur_lock    = self.lock_mgr.get_by_b_addr(current_dir >> 2)
       dup_lock    = self.lock_mgr.create_lock(cur_lock.ami_path, False)
@@ -1176,12 +1180,13 @@ class DosLibrary(AmigaLibrary):
       # print "*** Current input is %s" % input_fh
       # trap to clean up sub process resources
       def trap_stop_run_command(ret_code):
-        # print "**** Returned from SystemTagList()"
-        cli.w_s("cli_CurrentInput",input_fh.mem.addr)
-        cli.w_s("cli_StandardInput",input_fh.mem.addr)
+        #print "**** Returned from SystemTagList()"
+        #print "**** restoring standard input to %s" % input_fh
+        cli.w_s("cli_CurrentInput",input_fh)
+        cli.w_s("cli_StandardInput",input_fh)
         cli.w_s("cli_Background",self.DOSFALSE)
         # print "*** Restoring input to %s" % input_fh
-        self.ctx.process.set_input(input_fh)
+        ctx.process.this_task.access.w_s("pr_CIS",input_fh)
         #print "restoring current dir to %x " % (current_dir >> 2)
         self.ctx.process.set_current_dir(current_dir)
         self.cur_dir_lock = self.lock_mgr.get_by_b_addr(current_dir >> 2)

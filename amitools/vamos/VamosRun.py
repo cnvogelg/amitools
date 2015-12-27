@@ -66,7 +66,6 @@ class VamosRun:
     # d2=stack_size.  this value is also in 4(sp) (see Process.init_stack), but
     # various C programs rely on it being present (1.3-3.1 at least have it).
     self.cpu.w_reg(REG_D2, self.ctx.process.stack_size)
-
     # to track old dos values
     self.cpu.w_reg(REG_A2, self.ctx.dos_guard_base)
     self.cpu.w_reg(REG_A5, self.ctx.dos_guard_base)
@@ -77,9 +76,14 @@ class VamosRun:
        dispatch to end vamos.
     """
     pc = self.cpu.r_pc() - 2
+    sp = self.cpu.r_reg(REG_A7)
+    a6 = self.cpu.r_reg(REG_A6)
     # addr == 0 or an error occurred -> end reached
-    if pc != 0 and not self.et.has_errors:
-      log_main.error("RESET encountered at pc 0x%06x- abort",pc)
+    #if pc != 0 and not self.et.has_errors:
+    log_main.error("RESET encountered at pc 0x%06x sp 0x%06x a6 0x%06x - abort",pc,sp,a6)
+    for x in range(-32,32,2):
+      w = self.mem.access.r32(sp+x)
+      log_main.error("sp+%d : 0x%02x",x,w)
     # stop all
     self.cpu.end()
     self.stay = False
