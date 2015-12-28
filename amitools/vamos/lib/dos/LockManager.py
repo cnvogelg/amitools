@@ -27,12 +27,11 @@ class LockManager:
       vol_baddr = 0
       log_lock.warn("lock volume? volume=%s lock=%s",volume,lock)
     else:
-      vol_baddr = volume.baddr
+      vol_baddr = volume.mem.addr
     # allocate lock struct
     b_addr = lock.alloc(self.alloc, vol_baddr)
     self.locks_by_key[lock.key] = lock
     log_lock.info("registered: %s" % lock)
-    #print "*** registered lock %s" % lock
 
   def _unregister_lock(self, lock):
     if not self.locks_by_key.has_key(lock.key):
@@ -42,18 +41,20 @@ class LockManager:
       raise VamosInternalError("Invalid Lock unregistered: %s" % lock)
     del self.locks_by_key[lock.key]
     log_lock.info("unregistered: %s" % lock)
-    #print "*** unregistered lock %s" % lock
     lock.b_addr = 0
     lock.addr = 0
     lock.free(self.alloc)
 
-  def create_lock(self, ami_path, exclusive):
+  def create_lock(self, cur_dir, ami_path, exclusive):
     if ami_path == '':
-      ami_path = self.path_mgr.ami_abs_cur_path()
+      if cur_dir == None:
+        ami_path = "SYS:"
+      else:
+        ami_path = cur_dir.ami_path
     else:
-      ami_path = self.path_mgr.ami_abs_path(ami_path)
-    sys_path = self.path_mgr.ami_to_sys_path(ami_path,searchMulti=True)
-    name = self.path_mgr.ami_name_of_path(ami_path)
+      ami_path = self.path_mgr.ami_abs_path(cur_dir,ami_path)
+    sys_path = self.path_mgr.ami_to_sys_path(cur_dir,ami_path,searchMulti=True)
+    name     = self.path_mgr.ami_name_of_path(cur_dir,ami_path)
     if sys_path == None:
       log_lock.info("lock '%s' invalid: no sys path found: '%s'", name, ami_path)
       return None
@@ -65,6 +66,9 @@ class LockManager:
     self._register_lock(lock)
     return lock
 
+  def dup_lock(self, lock):
+    return self.create_lock(lock,"",False)
+
   def create_parent_lock(self, lock):
     # top level
     if lock.ami_path[-1] == ':':
@@ -72,7 +76,7 @@ class LockManager:
     ami_path = lock.ami_path
     ami_parent_path = self.path_mgr.ami_abs_parent_path(ami_path)
     if ami_parent_path != ami_path:
-      return self.create_lock(ami_parent_path, False)
+      return self.create_lock(None,ami_parent_path, False)
     else:
       return None
 
@@ -81,12 +85,8 @@ class LockManager:
     return self.mem.access.r32(addr + 4)
 
   def get_by_b_addr(self, b_addr, none_if_missing=False):
-    # current dir lock
     if b_addr == 0:
-      (cur_dev, cur_path) = self.path_mgr.get_cur_path()
-      ami_path = cur_dev + ":" + cur_path
-      sys_path = self.path_mgr.ami_to_sys_path(ami_path)
-      return Lock("local",ami_path,sys_path)
+      return None
     elif self.locks_by_key.has_key(self._get_key_from_baddr(b_addr)):
       lock = self.locks_by_key[self._get_key_from_baddr(b_addr)]
       return lock
@@ -99,3 +99,13 @@ class LockManager:
   def release_lock(self, lock):
     if lock.b_addr != 0:
       self._unregister_lock(lock)
+
+  def volume_name_of_lock(self, lock):
+    if lock == None:
+      return "SYS:"
+    else:
+      vol_addr  = lock.mem.access.r_s("fl_Volume")
+      volnode   = AccessStruct(self.mem,DosListVolumeDef,vol_addr)
+      name_addr = volnode.r_s("dol_Name")
+      name = self.mem.access.r_bstr(name_addr) + ":"
+      return name

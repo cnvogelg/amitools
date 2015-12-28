@@ -19,9 +19,10 @@ class Lock:
     self.name = name
     self.exclusive = exclusive
     self.mem = None
-    self.b_addr = 0
-    self.key    = 0
-    self.dirent = None
+    self.b_addr  = 0
+    self.key     = 0
+    self.dirent  = None
+    self.key_cnt = 256
 
   def __str__(self):
     addr = 0
@@ -29,10 +30,10 @@ class Lock:
       addr = self.mem.addr
     return "[Lock:'%s'(ami='%s',sys='%s',ex=%d)@%06x=b@%06x]" % (self.name, self.ami_path, self.sys_path, self.exclusive, addr, self.b_addr)
 
-  def alloc(self, alloc, vol_baddr):
+  def alloc(self, alloc, vol_addr):
     name = "Lock:" + self.name
     self.mem = alloc.alloc_struct(name, FileLockDef)
-    self.mem.access.w_s("fl_Volume", vol_baddr)
+    self.mem.access.w_s("fl_Volume", vol_addr)
     self.key = uuid.uuid4().time_low
     self.mem.access.w_s("fl_Key",self.key)
     self.b_addr = self.mem.addr >> 2
@@ -51,9 +52,9 @@ class Lock:
     fib_mem.w_s('fib_DiskKey',self.key)
     # type
     if os.path.isdir(sys_path):
-      dirEntryType = 0x2 # dir
+      dirEntryType = self.key_cnt
     else:
-      dirEntryType = 0xfffffffd # file
+      dirEntryType = (-self.key_cnt) & 0xffffffff
     fib_mem.w_s('fib_DirEntryType', dirEntryType )
     # protection
     prot = DosProtection(0)
@@ -95,6 +96,7 @@ class Lock:
       else:
         self.dirent = []
 
+    self.key_cnt += 1
     if len(self.dirent) > 0:
       aname = self.dirent[0]
       apath = self.sys_path + "/" + self.dirent[0]
@@ -106,5 +108,3 @@ class Lock:
 
   def find_volume_node(self,dos_list):
     return self.mem.access.r_s("fl_Volume")
-
-

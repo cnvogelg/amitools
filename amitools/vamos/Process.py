@@ -12,7 +12,7 @@ class Process:
       input_fh = self.ctx.dos_lib.file_mgr.get_input()
     if output_fh == None:
       output_fh = self.ctx.dos_lib.file_mgr.get_output()
-    self.ok = self.load_binary(bin_file,shell)
+    self.ok = self.load_binary(None,bin_file,shell)
     if not self.ok:
       return
     self.init_stack(stack_size, exit_addr)
@@ -66,10 +66,10 @@ class Process:
     self.ctx.alloc.free_memory(self.stack)
 
   # ----- binary -----
-  def load_binary(self, ami_bin_file, shell=False):
-    self.bin_basename = self.ctx.path_mgr.ami_name_of_path(ami_bin_file)
+  def load_binary(self, lock, ami_bin_file, shell=False):
+    self.bin_basename = self.ctx.path_mgr.ami_name_of_path(lock,ami_bin_file)
     self.bin_file     = ami_bin_file
-    self.bin_seg_list = self.ctx.seg_loader.load_seg(ami_bin_file)
+    self.bin_seg_list = self.ctx.seg_loader.load_seg(lock,ami_bin_file)
     if self.bin_seg_list == None:
       log_proc.error("failed loading binary: %s", self.ctx.seg_loader.error)
       return False
@@ -208,7 +208,7 @@ class Process:
     self.this_task.access.w_s("pr_COS", output_fh.b_addr<<2) # compensate BCPL auto-conversion
 
   def get_current_dir(self):
-    return self.this_task.access.r_s("pr_CurrentDir")
+    return self.this_task.access.r_s("pr_CurrentDir")    
 
   def set_current_dir(self,lock):
     self.this_task.access.w_s("pr_CurrentDir",lock)

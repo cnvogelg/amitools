@@ -48,7 +48,6 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("open dos.library V%d", self.version)
     # init own state
     self.io_err = 0
-    self.cur_dir_lock = None
     self.ctx = ctx
     self.mem_allocs = {}
     self.seg_lists = {}
@@ -67,6 +66,7 @@ class DosLibrary(AmigaLibrary):
     baddr = self.dos_list.build_list(ctx.path_mgr)
     # create lock manager
     self.lock_mgr = LockManager(ctx.path_mgr, self.dos_list, ctx.alloc, ctx.mem)
+    ctx.path_mgr.setup(self.lock_mgr)
     # equip the DosList with all the locks
     self.dos_list.add_locks(self.lock_mgr)
     # create file manager
@@ -129,6 +129,13 @@ class DosLibrary(AmigaLibrary):
     fh.write(txt)
     return self.DOSTRUE
 
+
+  # ----- current dir
+
+  def get_current_dir(self):
+    cur_dir = self.ctx.process.get_current_dir()
+    return self.lock_mgr.get_by_b_addr(cur_dir >> 2)
+
   # ----- dos API -----
 
   def DateStamp(self, ctx):
@@ -170,7 +177,8 @@ class DosLibrary(AmigaLibrary):
       ctx.mem.access.w_cstr(str_time_ptr, time_str)
     return self.DOSTRUE
 
-  # ----- ENV: Vars -----
+  # ----- Variables -----
+  
   def find_var(self, ctx, name, flags):
     varlist   = ctx.process.get_local_vars()
     node_addr = varlist.access.r_s("mlh_Head")
@@ -266,7 +274,6 @@ class DosLibrary(AmigaLibrary):
     else:
       log_dos.info('FindVar("%s", 0x%x) -> %06lx' % (name, vtype, node.struct_addr))
       return node.struct_addr
-
 
   def SetVar(self, ctx):
     name_ptr  = ctx.cpu.r_reg(REG_D1)
@@ -400,7 +407,7 @@ class DosLibrary(AmigaLibrary):
     else:
       mode_name = "?"
 
-    fh = self.file_mgr.open(name, f_mode)
+    fh = self.file_mgr.open(self.get_current_dir(), name, f_mode)
     log_dos.info("Open: name='%s' (%s/%d/%s) -> %s" % (name, mode_name, mode, f_mode, fh))
 
     if fh == None:
@@ -413,7 +420,6 @@ class DosLibrary(AmigaLibrary):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr)
     self.file_mgr.close(fh)
-    #print "*** Closing input %s" % fh.mem.addr
     log_dos.info("Close: %s" % fh)
 
     return self.DOSTRUE
@@ -591,7 +597,7 @@ class DosLibrary(AmigaLibrary):
           out = out + '%' + state[1] + state[0]
         state = ''
       elif state == '%':
-        if ch == 'S':
+        if ch == 'S' or ch == 's':
           out = out + ctx.mem.access.r_cstr(val)
         elif ch == 'C':
           out = out + chr(val & 0xff)
@@ -621,7 +627,6 @@ class DosLibrary(AmigaLibrary):
     bufaddr   = ctx.cpu.r_reg(REG_D2)
     buflen    = ctx.cpu.r_reg(REG_D3)
     fh   = self.file_mgr.get_by_b_addr(fh_b_addr)
-    #print "*** Reading from %s" % fh.mem.addr
     line = fh.gets(buflen)
     log_dos.info("FGetS(%s,%d) -> '%s'" % (fh, buflen, line))
     ctx.mem.access.w_cstr(bufaddr,line)
@@ -634,7 +639,7 @@ class DosLibrary(AmigaLibrary):
   def DeleteFile(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name = ctx.mem.access.r_cstr(name_ptr)
-    self.setioerr(ctx,self.file_mgr.delete(name))
+    self.setioerr(ctx,self.file_mgr.delete(self.get_current_dir(),name))
     log_dos.info("DeleteFile: '%s': err=%s" % (name, self.io_err))
     if self.io_err == NO_ERROR:
       return self.DOSTRUE
@@ -646,7 +651,8 @@ class DosLibrary(AmigaLibrary):
     old_name = ctx.mem.access.r_cstr(old_name_ptr)
     new_name_ptr = ctx.cpu.r_reg(REG_D2)
     new_name = ctx.mem.access.r_cstr(new_name_ptr)
-    self.setioerr(ctx,self.file_mgr.rename(old_name, new_name))
+    lock = self.get_current_dir()
+    self.setioerr(ctx,self.file_mgr.rename(lock, old_name, new_name))
     log_dos.info("Rename: '%s' -> '%s': err=%s" % (old_name, new_name, self.io_err))
     if self.io_err == NO_ERROR:
       return self.DOSTRUE
@@ -657,7 +663,8 @@ class DosLibrary(AmigaLibrary):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name = ctx.mem.access.r_cstr(name_ptr)
     mask = ctx.cpu.r_reg(REG_D2)
-    self.setioerr(ctx,self.file_mgr.set_protection(name, mask))
+    lock = self.get_current_dir()
+    self.setioerr(ctx,self.file_mgr.set_protection(lock, name, mask))
     log_dos.info("SetProtection: '%s' mask=%04x: err=%s", name, mask, self.io_err)
     if self.io_err == NO_ERROR:
       return self.DOSTRUE
@@ -677,7 +684,9 @@ class DosLibrary(AmigaLibrary):
   def IsFileSystem(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name = ctx.mem.access.r_cstr(name_ptr)
-    res = self.file_mgr.is_file_system(name)
+    log_dos.info("IsFileSystem('%s'):" % name)
+    lock = self.get_current_dir()
+    res  = self.file_mgr.is_file_system(lock,name)
     log_dos.info("IsFileSystem('%s'): %s" % (name, res))
     if res:
       return self.DOSTRUE
@@ -698,7 +707,7 @@ class DosLibrary(AmigaLibrary):
     else:
       raise UnsupportedFeatureError("Lock: mode=%x" % mode)
 
-    lock = self.lock_mgr.create_lock(name, lock_exclusive)
+    lock = self.lock_mgr.create_lock(self.get_current_dir(), name, lock_exclusive)
     log_dos.info("Lock: '%s' exc=%s -> %s" % (name, lock_exclusive, lock))
     if lock == None:
       self.setioerr(ctx,ERROR_OBJECT_NOT_FOUND)
@@ -718,7 +727,7 @@ class DosLibrary(AmigaLibrary):
   def DupLock(self, ctx):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-    dup_lock = self.lock_mgr.create_lock(lock.ami_path, False)
+    dup_lock = self.lock_mgr.dup_lock(lock)
     log_dos.info("DupLock: %s -> %s",lock, dup_lock)
     self.setioerr(ctx,NO_ERROR)
     return dup_lock.b_addr
@@ -771,7 +780,7 @@ class DosLibrary(AmigaLibrary):
 
   def ParentDir(self, ctx):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
-    lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
+    lock        = self.lock_mgr.get_by_b_addr(lock_b_addr)
     parent_lock = self.lock_mgr.create_parent_lock(lock)
     log_dos.info("ParentDir: %s -> %s" % (lock, parent_lock))
     if parent_lock != None:
@@ -781,16 +790,13 @@ class DosLibrary(AmigaLibrary):
 
   def CurrentDir(self, ctx):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
-    old_lock    = self.cur_dir_lock
+    old_lock    = self.get_current_dir()
     new_lock    = self.lock_mgr.get_by_b_addr(lock_b_addr)
-    self.cur_dir_lock = new_lock
     log_dos.info("CurrentDir(b@%x): %s -> %s" % (lock_b_addr, old_lock, new_lock))
-    # set current path in path mgr
-    if new_lock != None:
-      ctx.path_mgr.set_cur_path(new_lock.ami_path)
+    if new_lock == None:
+      ctx.process.set_current_dir(0)
     else:
-      ctx.path_mgr.set_cur_path("SYS:")
-    ctx.process.set_current_dir(new_lock.b_addr << 2)
+      ctx.process.set_current_dir(new_lock.b_addr << 2)
     if old_lock == None:
       return 0
     else:
@@ -817,12 +823,13 @@ class DosLibrary(AmigaLibrary):
   def CreateDir(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name = ctx.mem.access.r_cstr(name_ptr)
-    err = self.file_mgr.create_dir(name)
+    lock = self.get_current_dir()
+    err  = self.file_mgr.create_dir(lock,name)
     if err != NO_ERROR:
       self.setioerr(ctx,err)
       return 0
     else:
-      lock = self.lock_mgr.create_lock(name, True)
+      lock = self.lock_mgr.create_lock(lock, name, True)
       log_dos.info("CreateDir: '%s' -> %s" % (name, lock))
     if lock == None:
       self.setioerr(ctx,ERROR_OBJECT_NOT_FOUND)
@@ -836,23 +843,37 @@ class DosLibrary(AmigaLibrary):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     last_devproc = ctx.cpu.r_reg(REG_D2)
     name = ctx.mem.access.r_cstr(name_ptr)
-
-    # get volume of path
-    abs_name = ctx.path_mgr.ami_abs_path(name)
-    volume = ctx.path_mgr.ami_volume_of_path(abs_name)
-    vol_lock = self.lock_mgr.create_lock(volume+":", False)
-    fs_port = self.file_mgr.get_fs_handler_port()
-    addr = self._alloc_mem("DevProc:%s" % name, DevProcDef.get_size())
+    uname = name.upper()
+    #
+    # First filter out "real" devices.
+    if uname.startswith('NIL:') or uname == '*' or uname.startswith('CONSOLE:'):
+      log_dos.info("GetDeviceProc: %s -> None" % name)
+      vol_lock = 0
+    else:
+      # Otherwise, create a lock for the path
+      abs_name = ctx.path_mgr.ami_abs_path(self.get_current_dir(),name)
+      volume   = ctx.path_mgr.ami_volume_of_path(abs_name)
+      vol_lock = self.lock_mgr.create_lock(None,volume+":", False)
+    fs_port  = self.file_mgr.get_fs_handler_port()
+    addr     = self._alloc_mem("DevProc:%s" % name, DevProcDef.get_size())
     log_dos.info("GetDeviceProc: name='%s' devproc=%06x -> volume=%s devproc=%06x lock=%06x",
                  name, last_devproc, volume, addr, vol_lock.b_addr)
     devproc = AccessStruct(self.ctx.mem,DevProcDef,struct_addr=addr)
     devproc.w_s('dvp_Port', fs_port)
-    devproc.w_s('dvp_Lock', vol_lock.b_addr << 2) #THOR: Compensate for BADDR adjustment.
+    if vol_lock == None:
+      devproc.w_s('dvp_Lock', 0)
+    else:
+      devproc.w_s('dvp_Lock', vol_lock.b_addr << 2) #THOR: Compensate for BADDR adjustment.
     self.setioerr(ctx,NO_ERROR)
     return addr
 
   def FreeDeviceProc(self, ctx):
-    addr = ctx.cpu.r_reg(REG_D1)
+    addr     = ctx.cpu.r_reg(REG_D1)
+    devproc  = AccessStruct(self.ctx.mem,DevProcDef,struct_addr=addr)
+    vol_lock = devproc.r_s('dvp_Lock')
+    if vol_lock != 0:
+      lock = self.lock_mgr.get_by_b_addr(vol_lock >> 2)
+      self.lock_mgr.release_lock(lock)
     self._free_mem(addr)
     log_dos.info("FreeDeviceProc: devproc=%06x", addr)
 
@@ -860,12 +881,12 @@ class DosLibrary(AmigaLibrary):
 
   def MatchFirst(self, ctx):
     pat_ptr = ctx.cpu.r_reg(REG_D1)
-    pat = ctx.mem.access.r_cstr(pat_ptr)
+    pat     = ctx.mem.access.r_cstr(pat_ptr)
     anchor_ptr = ctx.cpu.r_reg(REG_D2)
     anchor = AccessStruct(self.ctx.mem,AnchorPathDef,struct_addr=anchor_ptr)
 
     # create MatchFirstNext instance
-    mfn = MatchFirstNext(ctx.path_mgr, self.lock_mgr, pat, anchor)
+    mfn = MatchFirstNext(ctx.path_mgr, self.lock_mgr, self.get_current_dir(), pat, anchor)
     log_dos.info("MatchFirst: pat='%s' anchor=%06x strlen=%d flags=%02x-> ok=%s" \
       % (pat, anchor_ptr, mfn.str_len, mfn.flags, mfn.ok))
     if not mfn.ok:
@@ -874,7 +895,8 @@ class DosLibrary(AmigaLibrary):
     log_dos.debug("MatchFirst: %s" % mfn.matcher)
 
     # try first match
-    self.setioerr(ctx,mfn.first(ctx))
+    err = mfn.first(ctx)
+    self.setioerr(ctx,err)
     if self.io_err == NO_ERROR:
       log_dos.info("MatchFirst: found name='%s' path='%s' -> parent lock %s, io_err=%d", mfn.name, mfn.path, mfn.dir_lock, self.io_err)
       self.matches[anchor_ptr] = mfn
@@ -947,7 +969,8 @@ class DosLibrary(AmigaLibrary):
     txt_ptr = ctx.cpu.r_reg(REG_D2)
     pat = ctx.mem.access.r_cstr(pat_ptr)
     txt = ctx.mem.access.r_cstr(txt_ptr)
-    match = pattern_match(pat, txt)
+    pattern = pattern_parse(pat,ignore_case,False)
+    match = pattern_match(pattern, txt)
     log_dos.info("MatchPattern: pat=%s txt=%s ignore_case=%s -> match=%s", pat, txt, ignore_case, match)
     if match:
       return -1
@@ -961,9 +984,9 @@ class DosLibrary(AmigaLibrary):
 
   def ReadArgs(self, ctx):
     template_ptr = ctx.cpu.r_reg(REG_D1)
-    template = ctx.mem.access.r_cstr(template_ptr)
-    array_ptr = ctx.cpu.r_reg(REG_D2)
-    rdargs_ptr = ctx.cpu.r_reg(REG_D3)
+    template     = ctx.mem.access.r_cstr(template_ptr)
+    array_ptr    = ctx.cpu.r_reg(REG_D2)
+    rdargs_ptr   = ctx.cpu.r_reg(REG_D3)
 
     # get args from process, unless we're running a native
     # shell. The shell leaves the arguments in the buffer
@@ -1146,7 +1169,7 @@ class DosLibrary(AmigaLibrary):
       cli_addr = ctx.process.get_cli_struct()
       cli      = AccessStruct(ctx.mem,CLIDef,struct_addr=cli_addr)
       if cli.r_s("cli_CurrentInput") == cli.r_s("cli_StandardInput"):
-        new_input = self.file_mgr.open("NIL:","r")
+        new_input = self.file_mgr.open(None,"NIL:","r")
         if new_input == None:
           log_dos.warn("SystemTagList: can't create new input file handle for SystemTagList('%s')", cmd)
           return 0xffffffff
@@ -1157,7 +1180,7 @@ class DosLibrary(AmigaLibrary):
         new_input = self.file_mgr.get_by_b_addr(inputfh >> 2)
         cmd       = cmd + "\n" + new_input.getbuf()
         new_input.setbuf(cmd)
-      new_stdin = self.file_mgr.open("*","rw")
+      new_stdin = self.file_mgr.open(None,"*","rw")
       # print "setting new input to %s" % new_input
       # and install this as current input. The shell will read from that
       # instead until it hits the EOF
@@ -1169,25 +1192,17 @@ class DosLibrary(AmigaLibrary):
       packet      = self.ctx.process.run_system()
       stacksize   = cli.r_s("cli_DefaultStack") << 2
       current_dir = self.ctx.process.get_current_dir()
-      #print "*** standard input is %s" % input_fh
-      #print "*** current input is %s" % new_input.mem.addr
-      #print "*** Current dir is %x" % (current_dir >> 2)
       cur_lock    = self.lock_mgr.get_by_b_addr(current_dir >> 2)
-      dup_lock    = self.lock_mgr.create_lock(cur_lock.ami_path, False)
-      #print "*** Duplicate current dir is %x" % dup_lock.b_addr
+      dup_lock    = self.lock_mgr.dup_lock(self.get_current_dir())
       self.ctx.process.set_current_dir(dup_lock.mem.addr)
       self.cur_dir_lock = dup_lock
       # print "*** Current input is %s" % input_fh
       # trap to clean up sub process resources
       def trap_stop_run_command(ret_code):
-        #print "**** Returned from SystemTagList()"
-        #print "**** restoring standard input to %s" % input_fh
         cli.w_s("cli_CurrentInput",input_fh)
         cli.w_s("cli_StandardInput",input_fh)
         cli.w_s("cli_Background",self.DOSFALSE)
-        # print "*** Restoring input to %s" % input_fh
         ctx.process.this_task.access.w_s("pr_CIS",input_fh)
-        #print "restoring current dir to %x " % (current_dir >> 2)
         self.ctx.process.set_current_dir(current_dir)
         self.cur_dir_lock = self.lock_mgr.get_by_b_addr(current_dir >> 2)
         ctx.cpu.w_reg(REG_D0,0)
@@ -1219,8 +1234,9 @@ class DosLibrary(AmigaLibrary):
 
   def LoadSeg(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
-    name = ctx.mem.access.r_cstr(name_ptr)
-    seg_list = self.ctx.seg_loader.load_seg(name)
+    name     = ctx.mem.access.r_cstr(name_ptr)
+    lock     = self.get_current_dir()
+    seg_list = self.ctx.seg_loader.load_seg(lock,name)
     if seg_list == None:
       log_dos.warn("LoadSeg: '%s' -> not found!" % (name))
       return 0
@@ -1257,7 +1273,7 @@ class DosLibrary(AmigaLibrary):
   def FilePart(self, ctx):
     addr = ctx.cpu.r_reg(REG_D1)
     path = ctx.mem.access.r_cstr(addr)
-    pos = dos.PathPart.file_part(path)
+    pos  = dos.PathPart.file_part(path)
     if pos < len(path):
       log_dos.info("FilePart: path='%s' -> result='%s'", path, path[pos:])
     else:
@@ -1267,7 +1283,7 @@ class DosLibrary(AmigaLibrary):
   def PathPart(self, ctx):
     addr = ctx.cpu.r_reg(REG_D1)
     path = ctx.mem.access.r_cstr(addr)
-    pos = dos.PathPart.path_part(path)
+    pos  = dos.PathPart.path_part(path)
     if pos < len(path):
       log_dos.info("PathPart: path='%s' -> result='%s'", path, path[pos:])
     else:
@@ -1277,10 +1293,10 @@ class DosLibrary(AmigaLibrary):
   def AddPart(self, ctx):
     dn_addr = ctx.cpu.r_reg(REG_D1)
     fn_addr = ctx.cpu.r_reg(REG_D2)
-    size = ctx.cpu.r_reg(REG_D3)
-    dn = ctx.mem.access.r_cstr(dn_addr)
-    fn = ctx.mem.access.r_cstr(fn_addr)
-    np = dos.PathPart.add_part(dn,fn,size)
+    size    = ctx.cpu.r_reg(REG_D3)
+    dn      = ctx.mem.access.r_cstr(dn_addr)
+    fn      = ctx.mem.access.r_cstr(fn_addr)
+    np      = dos.PathPart.add_part(dn,fn,size)
     log_dos.info("AddPart: dn='%s' fn='%s' size=%d -> np='%s'", dn, fn, size, np)
     if np != None:
       ctx.mem.access.w_cstr(dn_addr, np)
@@ -1392,7 +1408,7 @@ class DosLibrary(AmigaLibrary):
     for p in ctx.path_mgr.get_paths():
       if p != "C:" and p != "c:":
         path = ctx.alloc.alloc_struct("Path(%s)" % p,PathDef)
-        lock = self.lock_mgr.create_lock(p, False)
+        lock = self.lock_mgr.create_lock(None, p, False)
         path.access.w_s("path_Lock",lock.mem.addr)
         path.access.w_s("path_Next",cmd_dir_addr)
         cmd_dir_addr = path.addr
@@ -1464,6 +1480,3 @@ class DosLibrary(AmigaLibrary):
       del self.mem_allocs[addr]
     else:
       raise VamosInternalError("Invalid DOS free mem: %06x" % addr)
-
-
-

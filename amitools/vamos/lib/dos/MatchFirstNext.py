@@ -9,17 +9,18 @@ class MatchFirstNext:
   DODIR = 4
   DIDDIR = 8
 
-  def __init__(self, path_mgr, lock_mgr, pattern, anchor):
+  def __init__(self, path_mgr, lock_mgr, lock, pattern, anchor):
     self.path_mgr = path_mgr
     self.lock_mgr = lock_mgr
     self.pattern = pattern
+    self.lock    = lock
     self.anchor = anchor
     # get total size of struct
     self.str_len = anchor.r_s('ap_Strlen')
     self.total_size = AnchorPathDef.get_size() + self.str_len
     self.flags = anchor.r_s('ap_Flags')
     # setup matcher
-    self.matcher = PathMatch(self.path_mgr)
+    self.matcher = PathMatch(self.path_mgr,self.lock)
     self.ok = self.matcher.parse(self.pattern)
     # init state
     self.old_label = None
@@ -34,11 +35,11 @@ class MatchFirstNext:
     self.path = self.matcher.begin()
     if self.path == None:
       return ERROR_OBJECT_NOT_FOUND
-    self.name = self.path_mgr.ami_name_of_path(self.path)
+    self.name = self.path_mgr.ami_name_of_path(self.lock,self.path)
     # get parent dir of first match
-    dir_part = self.path_mgr.ami_dir_of_path(self.path)
-    abs_path = self.path_mgr.ami_abs_path(dir_part)
-    self.dir_lock = self.lock_mgr.create_lock(abs_path, False)
+    dir_part = self.path_mgr.ami_dir_of_path(self.lock,self.path)
+    abs_path = self.path_mgr.ami_abs_path(self.lock,dir_part)
+    self.dir_lock = self.lock_mgr.create_lock(self.lock,abs_path, False)
     if self.dir_lock == None:
       return ERROR_OBJECT_NOT_FOUND
 
@@ -57,7 +58,9 @@ class MatchFirstNext:
 
   def _fill_fib(self, ctx, path):
     # fill FileInfo of first match in anchor
-    lock = self.lock_mgr.create_lock(path, False)
+    lock = self.lock_mgr.create_lock(self.lock, path, False)
+    if lock == None:
+      return ERROR_OBJECT_NOT_FOUND
     fib_ptr = self.anchor.s_get_addr('ap_Info')
     fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
     io_err = lock.examine_lock(fib)
@@ -69,8 +72,8 @@ class MatchFirstNext:
     return io_err
 
   def _push_dodir(self, name, path):
-    abs_path = self.path_mgr.ami_abs_path(path)
-    dir_entries = self.path_mgr.ami_list_dir(path)
+    abs_path = self.path_mgr.ami_abs_path(self.lock,path)
+    dir_entries = self.path_mgr.ami_list_dir(self.lock,path)
     # its really a dir
     if dir_entries != None:
       self.dodir_stack.append((name, path, dir_entries))
@@ -120,7 +123,7 @@ class MatchFirstNext:
       if path == None:
         return ERROR_NO_MORE_ENTRIES
       # extract name
-      name = self.path_mgr.ami_name_of_path(path)
+      name = self.path_mgr.ami_name_of_path(self.lock,path)
 
     # update current
     self.path = path

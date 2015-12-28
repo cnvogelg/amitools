@@ -266,7 +266,7 @@ class ExecLibrary(AmigaLibrary):
     log_exec.info("AddHead(%06x, %06x)" % (list_addr, node_addr))
     l = AccessStruct(ctx.mem, ListDef, list_addr)
     n = AccessStruct(ctx.mem, NodeDef, node_addr)
-    n.w_s("ln_Pred", l.s_get_addr("lh_TailPred"))
+    n.w_s("ln_Pred", l.s_get_addr("lh_Head"))
     h = l.r_s("lh_Head")
     n.w_s("ln_Succ", h)
     AccessStruct(ctx.mem, NodeDef, h).w_s("ln_Pred", node_addr)

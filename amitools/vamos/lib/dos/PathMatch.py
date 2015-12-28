@@ -1,7 +1,8 @@
 from PatternMatch import pattern_parse, pattern_match
 
 class PathMatchChain:
-  def __init__(self, pattern, prefix="", parent=None):
+  def __init__(self, lock, pattern, prefix="", parent=None):
+    self.lock    = lock
     self.pattern = pattern
     self.prefix = prefix
     self.parent = parent
@@ -30,8 +31,7 @@ class PathMatchChain:
     
     # need candidates?
     if self.pos == -1:
-      self.candidates = path_mgr.ami_list_dir(full_prefix)
-      #print "\tlist:",full_prefix,"->",self.candidates
+      self.candidates = path_mgr.ami_list_dir(self.lock,full_prefix)
       # no dir?
       if self.candidates == None:
         return None
@@ -52,14 +52,12 @@ class PathMatchChain:
         if self.child == None:
           if postfix != "":
             ami_path = self._join(ami_path, postfix)
-          #print "\ttail:",ami_path
-          if path_mgr.ami_path_exists(ami_path):
+          if path_mgr.ami_path_exists(self.lock,ami_path):
             self.pos += 1
             return ami_path
           else:
             return None
         else:
-          #print "\tsub:",ami_path
           # sub paths
           match = self.child.next(path_mgr, ami_path, postfix)
           if match != None:
@@ -80,8 +78,9 @@ class PathMatchChain:
     return txt
 
 class PathMatch:
-  def __init__(self, path_mgr):
-    self.path_mgr = path_mgr
+  def __init__(self, path_mgr, lock):
+    self.path_mgr   = path_mgr
+    self.lock       = lock
     self.head_chain = None
 
   def parse(self, in_str):
@@ -121,7 +120,7 @@ class PathMatch:
               last = []
             else:
               prefix = ""
-            chain = PathMatchChain(pat, prefix=prefix, parent=prev_chain)
+            chain = PathMatchChain(self.lock, pat, prefix=prefix, parent=prev_chain)
             if prev_chain == None:
               self.head_chain = chain
             prev_chain = chain
@@ -150,7 +149,7 @@ class PathMatch:
     # no wildcard?
     if self.head_chain == None:
       ami_path = self.prefix + self.postfix
-      if self.path_mgr.ami_path_exists(ami_path):
+      if self.path_mgr.ami_path_exists(self.lock,ami_path):
         return ami_path
       else:
         return None
