@@ -33,9 +33,10 @@ class FileManager:
     self._register_file(self.std_input)
     self._register_file(self.std_output)
 
-  def finish(self):
-    self._unregister_file(self.std_input)
-    self._unregister_file(self.std_output)
+  def finish(self,have_native_shell):
+    if not have_native_shell: #the Shell otherwise closes the streams for us
+      self._unregister_file(self.std_input)
+      self._unregister_file(self.std_output)
 
   def get_fs_handler_port(self):
     return self.fs_handler_port
@@ -46,9 +47,12 @@ class FileManager:
     log_file.info("registered: %s" % fh)
 
   def _unregister_file(self,fh):
-    check = self.files_by_b_addr[fh.b_addr]
-    if check != fh:
-      raise ValueError("Invalid File to unregister: %s" % fh)
+    if fh.b_addr in self.files_by_b_addr:
+      check = self.files_by_b_addr[fh.b_addr]
+      if check != fh:
+        raise ValueError("Invalid File to unregister: %s" % fh)
+    else:
+      raise ValueError("Invalid File to unregister: %s" % fh)       
     del self.files_by_b_addr[fh.b_addr]
     log_file.info("unregistered: %s"% fh)
     fh.free_fh(self.alloc)

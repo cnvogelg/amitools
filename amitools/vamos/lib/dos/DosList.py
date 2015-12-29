@@ -48,15 +48,22 @@ class DosList:
 
   def free_list(self):
     for entry in self.entries:
+      self.alloc.free_bstr(entry.name_addr)
       self.alloc.free_struct(entry.mem)
+      for lock in entry.locks:
+        self.lock_mgr.release_lock(lock)
+      for alist in entry.alist:
+        self.alloc.free_struct(alist)
 
   def _add_entry(self, entry):
     # allocate amiga entry
+    entry.locks  = []
+    entry.alist  = []
     entry.mem    = self.alloc.alloc_struct(entry.name,entry.struct_def)
     entry.baddr  = entry.mem.addr >> 2
     entry.access = AccessStruct(self.mem,entry.struct_def,entry.mem.addr)
-    name_addr    = self.alloc.alloc_bstr("DosListName",entry.name)
-    entry.access.w_s("dol_Name",name_addr.addr)
+    entry.name_addr = self.alloc.alloc_bstr("DosListName",entry.name)
+    entry.access.w_s("dol_Name",entry.name_addr.addr)
     # register in lists
     self.entries_by_b_addr[entry.baddr] = entry
     self.entries_by_name[entry.name.lower()] = entry
@@ -82,6 +89,7 @@ class DosList:
   # after creating the device list, the volume and assign
   # locks have to be added.
   def add_locks(self, lock_mgr):
+    self.lock_mgr = lock_mgr
     for entry in self.entries:
       first       = True
       assign_last = None
@@ -89,19 +97,20 @@ class DosList:
       #print "*** Entry %s, Name address is %s,%s" % (entry.mem,name_addr,self.mem.access.r_bstr(name_addr))
       for dirs in entry.assigns:
         lock = lock_mgr.create_lock(None,dirs,False)
+        entry.locks.append(lock)
         if first:
           entry.access.w_s("dol_Lock",lock.mem.addr)
           first = False
         else:
           assign_entry = self.alloc.alloc_struct("AssignList",AssignListDef)
-          access       = AccessStruct(self.mem,AssignListDef,assign_entry.addr)
-          access.w_s("al_Next",0)
-          access.w_s("al_Lock",lock.mem.addr)
+          entry.alist.append(assign_entry)
+          assign_entry.access.w_s("al_Next",0)
+          assign_entry.access.w_s("al_Lock",lock.mem.addr)
           if assign_last != None:
             assign_last.w_s("al_Next",assign_entry.addr)
           else:
             entry.access.w_s("dol_List",assign_entry.addr)
-          assign_last = access
+          assign_last = assign_entry.access
 
   def get_entry_by_b_addr(self, baddr):
     if not self.entries_by_b_addr.has_key(baddr):

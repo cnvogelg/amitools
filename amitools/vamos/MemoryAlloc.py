@@ -235,7 +235,7 @@ class MemoryAlloc:
       cur = cur.next
     # orphan at end?
     addr = last.addr + last.size
-    end = self.addr + self.size
+    end  = self.addr + self.size
     if addr != end:
       self._dump_orphan(addr, end-addr)
 

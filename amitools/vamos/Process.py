@@ -20,15 +20,14 @@ class Process:
     # but for now, supply it with the Vamos CLI and let it initialize
     # it through the private CliInit() call of the dos.library
     if not shell:
-      self.init_args(bin_args,input_fh)
-      self.init_cli_struct(input_fh, output_fh)
       self.shell = False
+      self.init_args(bin_args,input_fh)
+      self.init_cli_struct(input_fh, output_fh,self.bin_basename)
     else:
-      self.cli = self.ctx.alloc.alloc_struct(self.bin_basename + "_CLI",CLIDef)
-      self.cmd = None
       self.arg = None
       self.bin_args = None
       self.shell = True
+      self.init_cli_struct(None,None,None)
     self.shell_message = None
     self.shell_packet  = None
     self.shell_port    = None
@@ -125,21 +124,32 @@ class Process:
       self.ctx.alloc.free_memory(self.arg)
 
   # ----- cli struct -----
-  def init_cli_struct(self, input_fh, output_fh):
+  def init_cli_struct(self, input_fh, output_fh, name):
     self.cli = self.ctx.alloc.alloc_struct(self.bin_basename + "_CLI",CLIDef)
     self.cli.access.w_s("cli_DefaultStack", self.stack_size / 4) # in longs
-    self.cmd = self.ctx.alloc.alloc_bstr(self.bin_basename + "_cmd",self.bin_file)
-    log_proc.info(self.cmd)
-    self.cli.access.w_s("cli_CommandName", self.cmd.addr)
-    self.cli.access.w_s("cli_StandardInput", input_fh.b_addr)
-    self.cli.access.w_s("cli_CurrentInput", input_fh.b_addr)
-    self.cli.access.w_s("cli_StandardOutput", output_fh.b_addr)
-    self.cli.access.w_s("cli_CurrentOutput", output_fh.b_addr)
+    if input_fh != None:
+      self.cli.access.w_s("cli_StandardInput", input_fh.b_addr)
+      self.cli.access.w_s("cli_CurrentInput", input_fh.b_addr)
+    if output_fh != None:
+      self.cli.access.w_s("cli_StandardOutput", output_fh.b_addr)
+      self.cli.access.w_s("cli_CurrentOutput", output_fh.b_addr)
+    self.prompt  = self.ctx.alloc.alloc_memory("cli_Prompt",60)
+    self.cmdname = self.ctx.alloc.alloc_memory("cli_CommandName",104)
+    self.cmdfile = self.ctx.alloc.alloc_memory("cli_CommandFile",40)
+    self.setname = self.ctx.alloc.alloc_memory("cli_SetName",80)
+    self.cli.access.w_s("cli_Prompt",self.prompt.addr)
+    self.cli.access.w_s("cli_CommandName",self.cmdname.addr)
+    self.cli.access.w_s("cli_CommandFile",self.cmdfile.addr)
+    self.cli.access.w_s("cli_SetName",self.setname.addr)
+    if name != None:
+      self.ctx.mem.access.w_bstr(cmdname.addr,name)
     log_proc.info(self.cli)
 
   def free_cli_struct(self):
-    if self.cmd != None:
-      self.ctx.alloc.free_bstr(self.cmd)
+    self.ctx.alloc.free_memory(self.prompt)
+    self.ctx.alloc.free_memory(self.cmdname)
+    self.ctx.alloc.free_memory(self.setname)
+    self.ctx.alloc.free_memory(self.cmdfile)
     self.ctx.alloc.free_struct(self.cli)
 
   def get_cli_struct(self):
@@ -176,7 +186,9 @@ class Process:
     # Inject arguments into input stream (Needed for C:Execute)
     #input_fh.ungets(self.arg_text)
     self.this_task = self.ctx.alloc.alloc_struct(self.bin_basename + "_ThisTask",ProcessDef)
+    self.seglist   = self.ctx.alloc.alloc_memory("Process Seglist",24)
     self.this_task.access.w_s("pr_Task.tc_Node.ln_Type", NT_PROCESS)
+    self.this_task.access.w_s("pr_SegList",self.seglist.addr)
     self.this_task.access.w_s("pr_CLI", self.cli.addr)
     self.this_task.access.w_s("pr_CIS", input_fh.b_addr<<2) # compensate BCPL auto-conversion
     self.this_task.access.w_s("pr_COS", output_fh.b_addr<<2) # compensate BCPL auto-conversion
@@ -188,6 +200,7 @@ class Process:
 
   def free_task_struct(self):
     self.ctx.alloc.free_struct(self.this_task)
+    self.ctx.alloc.free_memory(self.seglist)
 
   def get_local_vars(self):
     localvars_addr = self.this_task.access.s_get_addr("pr_LocalVars")

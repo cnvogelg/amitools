@@ -55,6 +55,9 @@ class DosLibrary(AmigaLibrary):
     self.rdargs = {}
     self.dos_objs = {}
     self.errstrings = {}
+    self.path = []
+    self.resident = []
+    self.local_vars = []
     # setup RootNode
     self.root_struct = ctx.alloc.alloc_struct("RootNode",RootNodeDef)
     self.access.w_s("dl_Root",self.root_struct.addr)
@@ -80,9 +83,21 @@ class DosLibrary(AmigaLibrary):
     # free port
     ctx.exec_lib.port_mgr.free_port(self.fs_handler_port)
     # finish file manager
-    self.file_mgr.finish()
+    self.file_mgr.finish(ctx.process.is_native_shell())
     # free dos list
     self.dos_list.free_list()
+    # free path
+    for path,lock in self.path:
+      ctx.alloc.free_struct(path)
+      self.lock_mgr.release_lock(lock)
+    # free resident nodes
+    for res in self.resident:
+      self._free_mem(res)
+    # free shell variables
+    while len(self.local_vars) > 0:
+      var = self.local_vars[0]
+      self.delete_var(ctx,var)
+    # self.delete_var(ctx,var)
     # free RootNode
     ctx.alloc.free_struct(self.root_struct)
     # free DosInfo
@@ -109,6 +124,32 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("SetIoErr: IoErr=%d old IoErr=%d", self.io_err, old_io_err)
     return old_io_err
 
+  def Fault(self, ctx):
+    errcode = ctx.cpu.r_reg(REG_D1)
+    hdr_ptr = ctx.cpu.r_reg(REG_D2)
+    buf_ptr = ctx.cpu.r_reg(REG_D3)
+    buf_len = ctx.cpu.r_reg(REG_D4)
+    if errcode >= 0x80000000:
+      idx = errcode - 0x100000000
+    else:
+      idx = errcode
+    if hdr_ptr != 0:
+      hdr = ctx.mem.access.r_cstr(hdr_ptr)
+    else:
+      hdr = ""
+    if dos_error_strings.has_key(idx):
+      err_str = dos_error_strings[idx]
+    else:
+      err_str = "%d ERROR" % self.io_err
+    log_dos.info("Fault: code=%d header='%s' err_str='%s'", self.io_err, hdr, err_str)
+    # write to stdout
+    if hdr_ptr != 0:
+      txt = "%s: %s\n" % (hdr, err_str)
+    else:
+      txt = "%s\n" % err_str
+    ctx.mem.access.w_cstr(buf_ptr,txt[:buf_len-1])
+    return self.DOSTRUE
+      
   def PrintFault(self, ctx):
     self.io_err = ctx.cpu.r_reg(REG_D1)
     hdr_ptr = ctx.cpu.r_reg(REG_D2)
@@ -215,6 +256,7 @@ class DosLibrary(AmigaLibrary):
     varlist.access.w_s("mlh_Head",node_addr)
     node.access.w_s("lv_Node.ln_Succ",head_addr)
     node.access.w_s("lv_Node.ln_Pred",varlist.access.s_get_addr("mlh_Head"))
+    self.local_vars.append(node.access)
     return node.access
 
   def set_var(self,ctx,node,buff_ptr,size,value,flags):
@@ -242,6 +284,7 @@ class DosLibrary(AmigaLibrary):
     AccessStruct(ctx.mem, NodeDef, pred).w_s("ln_Succ", succ)
     AccessStruct(ctx.mem, NodeDef, succ).w_s("ln_Pred", pred)
     self._free_mem(node.struct_addr)
+    self.local_vars.remove(node)
 
   def GetVar(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
@@ -369,6 +412,7 @@ class DosLibrary(AmigaLibrary):
     ctx.mem.access.w_bstr(name_addr,name)
     self.dos_info.access.w_s("di_NetHand",seg_addr)
     log_dos.info("AddSegment(%s,%06x) -> %06x" % (name,seglist,seg_addr))
+    self.resident.append(seg_addr)
     return -1
 
   # ----- File Ops -----
@@ -1397,27 +1441,14 @@ class DosLibrary(AmigaLibrary):
   def CliInit(self,ctx):
     log_dos.info("CliInit")
     clip_addr = self.Cli(ctx)
-    clip      = AccessStruct(ctx.mem,CLIDef,struct_addr=clip_addr)
+    clip      = AccessStruct(ctx.mem,CLIDef,clip_addr)
     clip.w_s("cli_FailLevel",10)
     clip.w_s("cli_DefaultStack",1024)
     # Typically, the creator of the CLI would also initialize
     # the prompt and command name arguments. Unfortunately,
     # vamos does not necessarily do that, so cover this here.
-    if clip.r_s("cli_Prompt") == 0:
-      prompt_ptr = self._alloc_mem("cli_Prompt",60)
-      clip.w_s("cli_Prompt",prompt_ptr)
-    else:
-      prompt_ptr = clip.r_s("cli_Prompt")
+    prompt_ptr = clip.r_s("cli_Prompt")
     ctx.mem.access.w_bstr(prompt_ptr,"%N.%S> ")
-    if clip.r_s("cli_CommandName") == 0:
-      cmdname = self._alloc_mem("cli_CommandName",104)
-      clip.w_s("cli_CommandName",cmdname)
-    if clip.r_s("cli_CommandFile") == 0:
-      cmdfile = self._alloc_mem("cli_CommandFile",40)
-      clip.w_s("cli_CommandFile",cmdfile)
-    if clip.r_s("cli_SetName") == 0:
-      setname = self._alloc_mem("cli_SetName",80)
-      clip.w_s("cli_SetName",setname)
     # Get the current dir and install it.
     setname = clip.r_s("cli_SetName")
     ctx.mem.access.w_bstr(setname,"SYS:")
@@ -1442,6 +1473,7 @@ class DosLibrary(AmigaLibrary):
         path.access.w_s("path_Next",cmd_dir_addr)
         cmd_dir_addr = path.addr
         clip.w_s("cli_CommandDir",cmd_dir_addr)
+        self.path.append((path,lock))
     return 0
 
   def CliInitRun(self, ctx):

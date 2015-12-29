@@ -79,11 +79,11 @@ class VamosRun:
     sp = self.cpu.r_reg(REG_A7)
     a6 = self.cpu.r_reg(REG_A6)
     # addr == 0 or an error occurred -> end reached
-    #if pc != 0 and not self.et.has_errors:
-    log_main.error("RESET encountered at pc 0x%06x sp 0x%06x a6 0x%06x - abort",pc,sp,a6)
-    for x in range(-32,32,2):
-      w = self.mem.access.r32(sp+x)
-      log_main.error("sp+%d : 0x%02x",x,w)
+    if pc != 0 and not self.et.has_errors:
+      log_main.error("RESET encountered at pc 0x%06x sp 0x%06x a6 0x%06x - abort",pc,sp,a6)
+      for x in range(-32,32,2):
+        w = self.mem.access.r32(sp+x)
+        log_main.error("sp+%d : 0x%02x",x,w)
     # stop all
     self.cpu.end()
     self.stay = False

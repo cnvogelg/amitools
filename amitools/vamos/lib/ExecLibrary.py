@@ -7,6 +7,7 @@ from amitools.vamos.Trampoline import Trampoline
 from lexec.PortManager import PortManager
 from lexec.Pool import Pool
 import dos.Printf
+import sys
 
 class ExecLibrary(AmigaLibrary):
   name = "exec.library"
@@ -30,6 +31,7 @@ class ExecLibrary(AmigaLibrary):
     self.access.w_s("MaxLocMem", ctx.ram_size)
     # create the port manager
     self.port_mgr = PortManager(ctx.alloc)
+    self.mem      = ctx.mem
 
   def finish_lib(self, ctx):
     pass
@@ -139,32 +141,50 @@ class ExecLibrary(AmigaLibrary):
     # HACK: this is a hack to produce private uniq ids
     poolid = self._poolid
     self._poolid += 4;
-    flags = ctx.cpu.r_reg(REG_D0);
-    size = ctx.cpu.r_reg(REG_D1);
+    flags  = ctx.cpu.r_reg(REG_D0);
+    size   = ctx.cpu.r_reg(REG_D1);
     thresh = ctx.cpu.r_reg(REG_D2)
-    pool = Pool(self.alloc, flags, size, thresh)
+    pool   = Pool(self.mem, self.alloc, flags, size, thresh)
     self._pools[poolid] = pool
+    log_exec.info("CreatePool: pool 0x%x" % poolid)
     return poolid
 
   def AllocPooled(self, ctx):
     poolid = ctx.cpu.r_reg(REG_A0)
-    size = ctx.cpu.r_reg(REG_D0)
-    pc = self.get_callee_pc(ctx)
-    tag = ctx.label_mgr.get_mem_str(pc)
-    name = "AllocPooled(%06x = %s)" % (pc,tag)
-    pool = self._pools[poolid]
-    if pool is not None:
-      return pool.AllocPooled(name, size)
+    size   = ctx.cpu.r_reg(REG_D0)
+    pc     = self.get_callee_pc(ctx)
+    tag    = ctx.label_mgr.get_mem_str(pc)
+    name   = "AllocPooled(%06x = %s)" % (pc,tag)
+    if poolid in self._pools:
+      pool = self._pools[poolid]
+      mem = pool.AllocPooled(ctx.label_mgr ,name, size)
+      log_exec.info("AllocPooled: from pool 0x%x size %d -> 0x%06x" % (poolid,size,mem))
+      return mem
     else:
       raise VamosInternalError("AllocPooled: invalid memory pool: ptr=%06x" % poolid)
+
+  def FreePooled(self, ctx):
+    poolid = ctx.cpu.r_reg(REG_A0)
+    size   = ctx.cpu.r_reg(REG_D0)
+    mem_ptr= ctx.cpu.r_reg(REG_A1)
+    if poolid in self._pools:
+      pool   = self._pools[poolid]
+      pool.FreePooled(mem_ptr,size)
+      log_exec.info("FreePooled: to pool 0x%x mem 0x%06x size %d" % (poolid,mem_ptr,size))
+    else:
+      raise VamosInternalError("FreePooled: invalid memory pool: ptr=%06x" % poolid)
 
   def DeletePool(self, ctx):
     log_exec.info("DeletePool")
     poolid = ctx.cpu.r_reg(REG_A0)
-    pool = self._pools[poolid]
-    del self._pools[poolid]
-    if pool is not None:
+    if poolid in self._pools:
+      pool = self._pools[poolid]
+      del self._pools[poolid]
       del pool
+      log_exec.info("DeletePooled: pool 0x%x" % poolid)
+    else:
+      raise VamosInternalError("DeletePooled: invalid memory pool: ptr=%06x" % poolid)
+
 
   # ----- Memory Handling -----
 
