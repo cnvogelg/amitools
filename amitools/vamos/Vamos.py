@@ -132,10 +132,8 @@ class Vamos:
 
     # setup trampoline to enter sub process
     tr = Trampoline(self, "SubProcJump")
-
     # reserve a long for old stack
     old_stack_off = tr.dc_l(0)
-
     # code starts
     tr.save_all_but_d0()
     # new proc registers: d0=arg_len a0=arg_cptr

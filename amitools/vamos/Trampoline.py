@@ -134,6 +134,12 @@ class Trampoline:
     self.data_size += 4
     return pos
 
+  # ----- modify an existing trampoline at an offset
+
+  def modify_long(self,offset,data):
+    self.mem.access.w16(self.code_addr + offset + 2,(data >> 16) & 0xffff)
+    self.mem.access.w16(self.code_addr + offset + 4,data         & 0xffff)
+  
   # ----- internals -----
 
   def _gen_trap_func(self, trap_func):

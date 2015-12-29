@@ -1466,6 +1466,15 @@ class DosLibrary(AmigaLibrary):
     else:
       return 0
 
+  # As we only have one file system (though with multiple assigns)
+  # it does not really matter what we do here...
+  def GetFileSysTask(self,ctx):
+    return ctx.process.this_task.access.r_s("pr_FileSystemTask")
+
+  def SetFileSysTask(self,ctx):
+    port = ctx.cpu.r_reg(REG_D1)
+    ctx.process.this_task.access.w_s("pr_FileSystemTask",port)
+  
   # ----- Helpers -----
 
   def _alloc_mem(self, name, size):

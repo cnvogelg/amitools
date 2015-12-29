@@ -3,6 +3,7 @@ from lexec.ExecStruct import *
 from amitools.vamos.Log import log_exec
 from amitools.vamos.Exceptions import *
 from amitools.vamos.AccessStruct import AccessStruct
+from amitools.vamos.Trampoline import Trampoline
 from lexec.PortManager import PortManager
 from lexec.Pool import Pool
 import dos.Printf
@@ -342,25 +343,28 @@ class ExecLibrary(AmigaLibrary):
     putProc    = ctx.cpu.r_reg(REG_A2)
     putData    = ctx.cpu.r_reg(REG_A3)
     fmt        = ctx.mem.access.r_cstr(fmtString)
-    # If the putProc is the typical move.b d0,(a3)+:rts, then place the data formatted in the output
-    # buffer. Otherwise, we would need to run a Trampoline.
-    putproc    = ctx.mem.access.r32(putProc)
-    valid      = False
-    if putproc == 0x16c04e75:
-      valid    = True
-    elif putproc == 0x4e55fffc: #link #-4,a5
-      putproc2 = ctx.mem.access.r32(putProc+4)
-      putproc3 = ctx.mem.access.r32(putProc+8)
-      putproc4 = ctx.mem.access.r16(putProc+12)
-      if putproc2 == 0x2b40fffc and putproc3 == 0x16c04e5d and putproc4 == 0x4e75:
-        valid = True
-    if not valid:
-      log_exec.warn("RawDoFmt: unsupported PutProc: fmtString=%s putProc=%06x(%08lx)" % (fmt,putProc,putproc))
-      # This should really run a trampoline instead.
-      return dataStream
-    ps = dos.Printf.printf_parse_string(fmt)
+    ps         = dos.Printf.printf_parse_string(fmt)
     dataStream = dos.Printf.printf_read_data(ps, ctx.mem.access, dataStream)
-    result = dos.Printf.printf_generate_output(ps)
-    ctx.mem.access.w_cstr(putData,result)
-    log_exec.info("RawDoFmt: fmtString=%s -> %s" % (fmt,result))
+    resultstr  = dos.Printf.printf_generate_output(ps)
+    fmtstr     = resultstr+"\0"
+    # This is a recursive trampoline that writes the formatted data through
+    # the put-proc. Unfortunately, this is pretty convoluted.
+    def _make_trampoline(fmtstr,olda3,newa3,ctx):
+      if len(fmtstr) > 0:
+        tr = Trampoline(ctx,"RawDoFmt")
+        tr.set_dx_l(0,ord(fmtstr[0:1]))
+        tr.set_ax_l(2,putProc)
+        tr.set_ax_l(3,newa3)
+        tr.jsr(putProc)
+        def _done_func():
+          a3 = ctx.cpu.r_reg(REG_A3)
+          _make_trampoline(fmtstr[1:],olda3,a3,ctx)
+        tr.final_rts(_done_func)
+        tr.done()
+      else:
+        ctx.cpu.w_reg(REG_A3,olda3)
+    _make_trampoline(fmtstr,putData,putData,ctx)
+    log_exec.info("RawDoFmt: fmtString=%s -> %s" % (fmt,resultstr))
     return dataStream
+
+    
