@@ -3,8 +3,10 @@ from lexec.ExecStruct import *
 from amitools.vamos.Log import log_exec
 from amitools.vamos.Exceptions import *
 from amitools.vamos.AccessStruct import AccessStruct
+from amitools.vamos.Trampoline import Trampoline
 from lexec.PortManager import PortManager
 from lexec.Pool import Pool
+import dos.Printf
 
 class ExecLibrary(AmigaLibrary):
   name = "exec.library"
@@ -104,10 +106,11 @@ class ExecLibrary(AmigaLibrary):
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name = ctx.mem.access.r_cstr(name_ptr)
     lib = self.lib_mgr.open_lib(name, ver, ctx)
-    log_exec.info("OpenLibrary: '%s' V%d -> %s" % (name, ver, lib))
     if lib == None:
+      log_exec.info("OpenLibrary: '%s' V%d -> NULL" % (name, ver))
       return 0
     else:
+      log_exec.info("OpenLibrary: '%s' V%d -> %s@0x%06x" % (name, ver, lib, lib.addr_base_open))
       return lib.addr_base_open
 
   def OldOpenLibrary(self, ctx):
@@ -153,7 +156,7 @@ class ExecLibrary(AmigaLibrary):
     if pool is not None:
       return pool.AllocPooled(name, size)
     else:
-      return 0
+      raise VamosInternalError("AllocPooled: invalid memory pool: ptr=%06x" % poolid)
 
   def DeletePool(self, ctx):
     log_exec.info("DeletePool")
@@ -208,16 +211,6 @@ class ExecLibrary(AmigaLibrary):
     else:
       raise VamosInternalError("FreeVec: Unknown memory to free: ptr=%06x" % (addr))
 
-  # ----- Misc -----
-
-  def RawDoFmt(self, ctx):
-    format_ptr = ctx.cpu.r_reg(REG_A0)
-    format     = ctx.mem.access.r_cstr(format_ptr)
-    data_ptr   = ctx.cpu.r_reg(REG_A1)
-    putch_ptr  = ctx.cpu.r_reg(REG_A2)
-    pdata_ptr  = ctx.cpu.r_reg(REG_A3)
-    log_exec.info("RawDoFmt: format='%s' data=%06x putch=%06x pdata=%06x" % (format, data_ptr, putch_ptr, pdata_ptr))
-
   # ----- Message Passing -----
 
   def PutMsg(self, ctx):
@@ -268,6 +261,18 @@ class ExecLibrary(AmigaLibrary):
     AccessStruct(ctx.mem, NodeDef, tp).w_s("ln_Succ", node_addr)
     l.w_s("lh_TailPred", node_addr)
 
+  def AddHead(self, ctx):
+    list_addr = ctx.cpu.r_reg(REG_A0)
+    node_addr = ctx.cpu.r_reg(REG_A1)
+    log_exec.info("AddHead(%06x, %06x)" % (list_addr, node_addr))
+    l = AccessStruct(ctx.mem, ListDef, list_addr)
+    n = AccessStruct(ctx.mem, NodeDef, node_addr)
+    n.w_s("ln_Pred", l.s_get_addr("lh_Head"))
+    h = l.r_s("lh_Head")
+    n.w_s("ln_Succ", h)
+    AccessStruct(ctx.mem, NodeDef, h).w_s("ln_Pred", node_addr)
+    l.w_s("lh_Head", node_addr)
+
   def Remove(self, ctx):
     node_addr = ctx.cpu.r_reg(REG_A1)
     n = AccessStruct(ctx.mem, NodeDef, node_addr)
@@ -276,6 +281,36 @@ class ExecLibrary(AmigaLibrary):
     log_exec.info("Remove(%06x): ln_Pred=%06x ln_Succ=%06x" % (node_addr, pred, succ))
     AccessStruct(ctx.mem, NodeDef, pred).w_s("ln_Succ", succ)
     AccessStruct(ctx.mem, NodeDef, succ).w_s("ln_Pred", pred)
+    return node_addr
+
+  def RemHead(self, ctx):
+    list_addr = ctx.cpu.r_reg(REG_A0)
+    l = AccessStruct(ctx.mem, ListDef, list_addr)
+    node_addr = l.r_s("lh_Head")
+    n = AccessStruct(ctx.mem, NodeDef, node_addr)
+    succ = n.r_s("ln_Succ")
+    pred = n.r_s("ln_Pred")
+    if succ == 0:
+      log_exec.info("RemHead(%06x): null" % list_addr)
+      return 0
+    AccessStruct(ctx.mem, NodeDef, pred).w_s("ln_Succ", succ)
+    AccessStruct(ctx.mem, NodeDef, succ).w_s("ln_Pred", pred)
+    log_exec.info("RemHead(%06x): %06x" % (list_addr, node_addr))
+    return node_addr
+  
+  def RemTail(self, ctx):
+    list_addr = ctx.cpu.r_reg(REG_A0)
+    l = AccessStruct(ctx.mem, ListDef, list_addr)
+    node_addr = l.r_s("lh_TailPred")
+    n = AccessStruct(ctx.mem, NodeDef, node_addr)
+    succ = n.r_s("ln_Succ")
+    pred = n.r_s("ln_Pred")
+    if pred == 0:
+      log_exec.info("RemTail(%06x): null" % list_addr)
+      return 0
+    AccessStruct(ctx.mem, NodeDef, pred).w_s("ln_Succ", succ)
+    AccessStruct(ctx.mem, NodeDef, succ).w_s("ln_Pred", pred)
+    log_exec.info("RemTail(%06x): %06x" % (list_addr, node_addr))
     return node_addr
 
   def CopyMem(self, ctx):
@@ -292,5 +327,44 @@ class ExecLibrary(AmigaLibrary):
     log_exec.info("CopyMemQuick: source=%06x dest=%06x len=%06x" % (source,dest,length))
     ctx.mem.raw_mem.copy_block(source, dest, length)
 
+  def TypeOfMem(self, ctx):
+    addr = ctx.cpu.r_reg(REG_A1)
+    log_exec.info("TypeOfMem: source=%06x -> %s" % (addr,self.alloc.is_valid_address(addr)))
+    if self.alloc.is_valid_address(addr):
+      return 1 #MEMF_PUBLIC
+    return 0
 
+  def CacheClearU(self, ctx):
+    return 0
 
+  def RawDoFmt(self, ctx):
+    fmtString  = ctx.cpu.r_reg(REG_A0)
+    dataStream = ctx.cpu.r_reg(REG_A1)
+    putProc    = ctx.cpu.r_reg(REG_A2)
+    putData    = ctx.cpu.r_reg(REG_A3)
+    fmt        = ctx.mem.access.r_cstr(fmtString)
+    ps         = dos.Printf.printf_parse_string(fmt)
+    dataStream = dos.Printf.printf_read_data(ps, ctx.mem.access, dataStream)
+    resultstr  = dos.Printf.printf_generate_output(ps)
+    fmtstr     = resultstr+"\0"
+    # This is a recursive trampoline that writes the formatted data through
+    # the put-proc. Unfortunately, this is pretty convoluted.
+    def _make_trampoline(fmtstr,olda3,newa3,ctx):
+      if len(fmtstr) > 0:
+        tr = Trampoline(ctx,"RawDoFmt")
+        tr.set_dx_l(0,ord(fmtstr[0:1]))
+        tr.set_ax_l(2,putProc)
+        tr.set_ax_l(3,newa3)
+        tr.jsr(putProc)
+        def _done_func():
+          a3 = ctx.cpu.r_reg(REG_A3)
+          _make_trampoline(fmtstr[1:],olda3,a3,ctx)
+        tr.final_rts(_done_func)
+        tr.done()
+      else:
+        ctx.cpu.w_reg(REG_A3,olda3)
+    _make_trampoline(fmtstr,putData,putData,ctx)
+    log_exec.info("RawDoFmt: fmtString=%s -> %s" % (fmt,resultstr))
+    return dataStream
+
+    

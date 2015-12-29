@@ -4,6 +4,8 @@ from amitools.vamos.Log import log_path
 from amitools.vamos.Exceptions import *
 from VolumeManager import VolumeManager
 from AssignManager import AssignManager
+from amitools.vamos.lib.dos.LockManager import LockManager
+from amitools.vamos.lib.dos.Lock import Lock
 
 class PathManager:
 
@@ -11,7 +13,7 @@ class PathManager:
     self.vol_mgr = VolumeManager()
     self.assign_mgr = AssignManager(self.vol_mgr)
     self.paths = []
-
+    self.lock_mgr = None
     args = cfg.get_args()
     self.parse(cfg, args.volume, args.assign, args.auto_assign, args.path)
 
@@ -28,6 +30,9 @@ class PathManager:
     self._parse_config(cfg)
     self._parse_strings(path_strs)
     self._config_done()
+
+  def setup(self, lock_mgr):
+    self.lock_mgr = lock_mgr
 
   def _parse_config(self, cfg):
     if cfg == None:
@@ -68,49 +73,29 @@ class PathManager:
     cur_ami = self.vol_mgr.sys_to_ami_path_pair(cur_sys)
     if cur_ami == None:
       raise VamosConfigError("Can't map current directory to amiga path: '%s'" % cur_sys)
-    self.cur_vol  = cur_ami[0]
-    self.cur_path = cur_ami[1]
-    self.org_cur_vol = cur_ami[0]
-    self.org_cur_path = cur_ami[1]
-    log_path.info("current amiga dir: '%s:%s'" % (self.cur_vol, self.cur_path))
     # ensure path
     if len(self.paths)==0:
       self.paths = ['.','c:']
     log_path.info("path: %s" % map(str, self.paths))
-
-  # current path handling
-
-  def set_cur_path(self, full_path):
-    split = self.assign_mgr.ami_path_split_volume(full_path)
-    if split == None:
-      raise ValueError("set_cur_path needs a path with device name!")
-    self.cur_vol = split[0]
-    self.cur_path = split[1]
-    log_path.info("set current: dev='%s' path='%s'" % (self.cur_vol, self.cur_path))
-
-  def get_cur_path(self):
-    return (self.cur_vol, self.cur_path)
-
-  def set_default_cur_path(self):
-    self.cur_vol  = self.org_cur_vol
-    self.cur_path = self.org_cur_path
-    log_path.info("reset current: dev='%s' path='%s'" % (self.cur_vol, self.cur_path))
-
-  def ami_abs_cur_path(self):
-    return self.cur_vol + ":" + self.cur_path
 
   # ----- API -----
 
   def get_all_volume_names(self):
     return self.vol_mgr.get_all_names()
 
-  def ami_command_to_sys_path(self, ami_path):
+  def get_all_assigns(self):
+    return self.assign_mgr.get_all_assigns()
+
+  def get_paths(self):
+    return self.paths
+
+  def ami_command_to_sys_path(self, lock, ami_path):
     """lookup a command on path if it does not contain a relative or absolute path
        otherwise perform normal 'ami_to_sys_path' conversion"""
     sys_path = None
     # is not a command only
     if ami_path.find(':') != -1 or ami_path.find('/') != -1:
-      check_path = self.ami_to_sys_path(ami_path)
+      check_path = self.ami_to_sys_path(lock, ami_path)
       # make sure its a file
       if check_path != None and os.path.isfile(check_path):
         sys_path = check_path
@@ -122,7 +107,7 @@ class PathManager:
           try_ami_path = ami_path
         else:
           try_ami_path = path + ami_path
-        check_path = self.ami_to_sys_path(try_ami_path, mustExist=True)
+        check_path = self.ami_to_sys_path(None, try_ami_path, mustExist=True)
         log_path.info("ami_command_to_sys_path: try_ami_path='%s' -> sys_path='%s'" % (try_ami_path, check_path))
         # make sure its a file
         if check_path != None and os.path.isfile(check_path):
@@ -136,9 +121,9 @@ class PathManager:
       log_path.warn("ami_command_to_sys_path: ami_path='%s' not found!" % (ami_path))
       return None
 
-  def ami_to_sys_path(self, ami_path, searchMulti=False, mustExist=False):
+  def ami_to_sys_path(self, lock, ami_path, searchMulti=False, mustExist=False):
     # first get an absolute amiga path
-    abs_path = self.ami_abs_path(ami_path)
+    abs_path = self.ami_abs_path(lock, ami_path)
     # replace assigns
     norm_paths = self.assign_mgr.ami_path_resolve(abs_path)
     if len(norm_paths) == 0:
@@ -171,44 +156,45 @@ class PathManager:
     # can't strip from device prefix
     if path[-1] == ':':
       return path
-    # skip trailing slash
+    # skip trailing slash, then recursively call self
     if path[-1] == '/':
-      return self.ami_abs_parent_path(path[:-2])
-    # make absolute first
-    if path.find(':') < 1:
-      path = self.ami_abs_path(path)
+      return self.ami_abs_parent_path(path[:-1])
     pos = path.rfind('/')
-    # skip last part
-    if pos != -1:
+    # skip last part if we have parts
+    if pos > -1:
       return path[0:pos]
-    # keep only device
+    # keep only device if we have it
     else:
       pos = path.find(':')
-      return path[0:pos+1]
+      if pos > 0:
+        return path[0:pos+1]
+      else:
+        return path+"//"
+      
 
-  def ami_abs_path(self, path):
+  def ami_abs_path(self, lock, path):
     """return absolute amiga path from given path"""
     # current dir
     if path == "":
-      return self.cur_vol + ":" + self.cur_path
+      if lock == None:
+        return "SYS:"
+      else:
+        return lock.ami_path
     col_pos = path.find(':')
-    #print path,col_pos
-    # already with device name
+    # already with device name, path is already
+    # absolute
     if col_pos > 0:
       return path
-    # relative to cur device
+    # relative to root of current lock
     elif col_pos == 0:
-      abs_prefix = self.cur_vol + ":"
+      abs_prefix = self.lock_mgr.volume_name_of_lock(lock)
       path = path[1:]
-      # invalid parent path of root? -> remove
-      if len(path)>0 and path[0] == '/':
+      # parent path of root? -> remove
+      while len(path)>0 and path[0] == '/':
         path = path[1:]
-    # no path given -> return current path
-    elif path == '':
-      return self.cur_vol + ":" + self.cur_path
     # a parent path is given
     elif path[0] == '/':
-      abs_prefix = self.cur_vol + ":" + self.cur_path
+      abs_prefix = self.lock_mgr.volume_name_of_lock(lock)
       while len(path)>0 and path[0] == '/':
         abs_prefix = self.ami_abs_parent_path(abs_prefix)
         path = path[1:]
@@ -216,14 +202,17 @@ class PathManager:
         abs_prefix += "/"
     # cur path
     else:
-      abs_prefix = self.cur_vol + ":" + self.cur_path
-      if self.cur_path != '':
+      if lock == None:
+        abs_prefix = "SYS:"
+      else:
+        abs_prefix = lock.ami_path
+      if abs_prefix[-1] != ':' and abs_prefix[-1] != '/':
         abs_prefix += '/'
     return abs_prefix + path
 
   # ---- path components -----
 
-  def ami_name_of_path(self, path):
+  def ami_name_of_path(self, lock, path):
     l = len(path)
     # no path given
     if l == 0:
@@ -231,7 +220,7 @@ class PathManager:
     # ends with colon
     if path[-1] == ':':
       if l == 1:
-        return self.cur_vol
+        return self.lock_mgr.volume_name_of_lock(lock)
       else:
         return path[:-1]
     # has slash?
@@ -248,7 +237,7 @@ class PathManager:
     # is relative
     return path
 
-  def ami_dir_of_path(self, path):
+  def ami_dir_of_path(self, lock, path):
     l = len(path)
     if l == 0:
       return ""
@@ -279,13 +268,13 @@ class PathManager:
   def ami_volume_of_path(self, path):
     pos = path.find(':')
     if pos == 0:
-      return ""
+      raise VamosConfigError("ami volume path is not absolute: %s" % paths)
     else:
       return path[:pos]
 
-  def ami_voldir_of_path(self, path):
-    ami_volume = self.ami_volume_of_path(path)
-    ami_dir = self.ami_dir_of_path(path)
+  def ami_voldir_of_path(self, lock, path):
+    ami_volume = self.ami_volume_of_path(lock,path)
+    ami_dir = self.ami_dir_of_path(lock,path)
     if ami_volume != "":
       return ami_volume + ':' + ami_dir
     else:
@@ -293,8 +282,8 @@ class PathManager:
 
   # ----- list dir -----
 
-  def ami_list_dir(self, ami_path):
-    sys_path = self.ami_to_sys_path(ami_path, mustExist=True)
+  def ami_list_dir(self, lock, ami_path):
+    sys_path = self.ami_to_sys_path(lock, ami_path, mustExist=True)
     if sys_path == None:
       return None
     if not os.path.isdir(sys_path):
@@ -302,8 +291,8 @@ class PathManager:
     files = os.listdir(sys_path)
     return files
 
-  def ami_path_exists(self, ami_path):
-    sys_path = self.ami_to_sys_path(ami_path, mustExist=True)
+  def ami_path_exists(self, lock, ami_path):
+    sys_path = self.ami_to_sys_path(lock, ami_path, mustExist=True)
     return sys_path != None
 
   def ami_path_join(self, a, b):

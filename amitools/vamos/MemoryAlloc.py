@@ -148,7 +148,8 @@ class MemoryAlloc:
     chunk, left = self._find_best_chunk(size)
     # out of memory?
     if chunk == None:
-      log_mem_alloc.error("[alloc: NO MEMORY for %06x bytes]", size)
+      raise VamosInternalError("[alloc: NO MEMORY for %06x bytes]" % size)
+      log_mem_alloc.error("[alloc: NO MEMORY for %06x bytes]" % size)
       return 0
     # remove chunk from free list
     # is something left?
@@ -164,6 +165,8 @@ class MemoryAlloc:
     # erase memory
     self.mem.access.clear_data(addr, size, 0)
     log_mem_alloc.info("[alloc @%06x-%06x: %06x bytes] %s", addr, addr+size, size, self._stat_info())
+    if addr % 4:
+      raise VamosInternalError("Memory pool is invalid, return address not aligned by a long word");
     return addr
 
   def free_mem(self, addr, size):
@@ -326,7 +329,10 @@ class MemoryAlloc:
     self.free_mem(mem.addr, mem.size)
     del self.mem_objs[mem.addr]
 
-
+  def is_valid_address(self, addr):
+    if addr >= self.begin and addr < self.begin + self.size:
+      return True
+    return False
 
 
 

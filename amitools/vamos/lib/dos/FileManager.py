@@ -59,7 +59,7 @@ class FileManager:
   def get_output(self):
     return self.std_output
 
-  def open(self, ami_path, f_mode):
+  def open(self, lock, ami_path, f_mode):
     try:
       # special names
       uname = ami_path.upper()
@@ -68,13 +68,13 @@ class FileManager:
       if uname.startswith('NIL:'):
         sys_name = "/dev/null"
         fobj = open(sys_name, f_mode)
-        fh = FileHandle(fobj, ami_path, sys_name)
+        fh   = FileHandle(fobj, ami_path, sys_name, is_nil = True)
       elif uname == '*' or uname.startswith('CONSOLE:'):
         sys_name = ''
         fh = FileHandle(sys.stdout,'*','',need_close=False)
       else:
         # map to system path
-        sys_path = self.path_mgr.ami_to_sys_path(ami_path,searchMulti=True)
+        sys_path = self.path_mgr.ami_to_sys_path(lock,ami_path,searchMulti=True)
         if sys_path == None:
           log_file.info("file not found: '%s' -> '%s'" % (ami_path, sys_path))
           return None
@@ -107,8 +107,8 @@ class FileManager:
       addr = b_addr << 2
       raise ValueError("Invalid File Handle at b@%06x = %06x" % (b_addr, addr))
 
-  def delete(self, ami_path):
-    sys_path = self.path_mgr.ami_to_sys_path(ami_path)
+  def delete(self, lock, ami_path):
+    sys_path = self.path_mgr.ami_to_sys_path(lock,ami_path)
     if sys_path == None or not os.path.exists(sys_path):
       log_file.info("file to delete not found: '%s'" % (ami_path))
       return ERROR_OBJECT_NOT_FOUND
@@ -126,9 +126,9 @@ class FileManager:
         log_file.info("can't delete file: '%s' -> %s" % (ami_path, e))
         return ERROR_OBJECT_IN_USE
 
-  def rename(self, old_ami_path, new_ami_path):
-    old_sys_path = self.path_mgr.ami_to_sys_path(old_ami_path)
-    new_sys_path = self.path_mgr.ami_to_sys_path(new_ami_path)
+  def rename(self, lock, old_ami_path, new_ami_path):
+    old_sys_path = self.path_mgr.ami_to_sys_path(lock,old_ami_path)
+    new_sys_path = self.path_mgr.ami_to_sys_path(lock,new_ami_path)
     if old_sys_path == None or not os.path.exists(old_sys_path):
       log_file.info("old file to rename not found: '%s'" % old_ami_path)
       return ERROR_OBJECT_NOT_FOUND
@@ -142,12 +142,18 @@ class FileManager:
       log_file.info("can't rename file: '%s','%s' -> %s" % (old_ami_path, new_ami_path, e))
       return ERROR_OBJECT_IN_USE
 
-  def is_file_system(self, name):
-    sys_path = self.path_mgr.ami_to_sys_path(name)
-    return sys_path != None and os.path.exists(sys_path)
+  def is_file_system(self, lock, name):
+    uname    = name.upper()
+    if uname.startswith('NIL:'):
+      return False
+    elif uname == '*' or uname.startswith('CONSOLE:'):
+      return False
+    # Everything else is a file system here, we don't support any
+    # other devices.
+    return True
 
-  def set_protection(self, ami_path, mask):
-    sys_path = self.path_mgr.ami_to_sys_path(ami_path)
+  def set_protection(self, lock, ami_path, mask):
+    sys_path = self.path_mgr.ami_to_sys_path(lock, ami_path)
     if sys_path == None or not os.path.exists(sys_path):
       log_file.info("file to set proteciton not found: '%s'", ami_path)
       return ERROR_OBJECT_NOT_FOUND
@@ -167,8 +173,8 @@ class FileManager:
     except OSError:
       return ERROR_OBJECT_WRONG_TYPE
 
-  def create_dir(self, ami_path):
-    sys_path = self.path_mgr.ami_to_sys_path(ami_path)
+  def create_dir(self, lock, ami_path):
+    sys_path = self.path_mgr.ami_to_sys_path(lock, ami_path)
     try:
       os.mkdir(sys_path)
       return NO_ERROR

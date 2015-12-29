@@ -1,22 +1,37 @@
 from Log import log_proc
 from lib.lexec.ExecStruct import *
 from lib.dos.DosStruct import *
+from lib.lexec.PortManager import *
 
 NT_PROCESS = 13
 
 class Process:
-  def __init__(self, ctx, bin_file, bin_args, input_fh=None, output_fh=None, stack_size=4096, exit_addr=0):
+  def __init__(self, ctx, bin_file, bin_args, input_fh=None, output_fh=None, stack_size=4096, exit_addr=0, shell=False):
     self.ctx = ctx
     if input_fh == None:
       input_fh = self.ctx.dos_lib.file_mgr.get_input()
     if output_fh == None:
       output_fh = self.ctx.dos_lib.file_mgr.get_output()
-    self.ok = self.load_binary(bin_file)
+    self.ok = self.load_binary(None,bin_file,shell)
     if not self.ok:
       return
     self.init_stack(stack_size, exit_addr)
-    self.init_args(bin_args,input_fh)
-    self.init_cli_struct(input_fh, output_fh)
+    # thor: the boot shell creates its own CLI if it is not there.
+    # but for now, supply it with the Vamos CLI and let it initialize
+    # it through the private CliInit() call of the dos.library
+    if not shell:
+      self.init_args(bin_args,input_fh)
+      self.init_cli_struct(input_fh, output_fh)
+      self.shell = False
+    else:
+      self.cli = self.ctx.alloc.alloc_struct(self.bin_basename + "_CLI",CLIDef)
+      self.cmd = None
+      self.arg = None
+      self.bin_args = None
+      self.shell = True
+    self.shell_message = None
+    self.shell_packet  = None
+    self.shell_port    = None
     self.init_task_struct(input_fh, output_fh)
 
   def free(self):
@@ -51,14 +66,21 @@ class Process:
     self.ctx.alloc.free_memory(self.stack)
 
   # ----- binary -----
-  def load_binary(self, ami_bin_file):
-    self.bin_basename = self.ctx.path_mgr.ami_name_of_path(ami_bin_file)
-    self.bin_file = ami_bin_file
-    self.bin_seg_list = self.ctx.seg_loader.load_seg(ami_bin_file)
+  def load_binary(self, lock, ami_bin_file, shell=False):
+    self.bin_basename = self.ctx.path_mgr.ami_name_of_path(lock,ami_bin_file)
+    self.bin_file     = ami_bin_file
+    self.bin_seg_list = self.ctx.seg_loader.load_seg(lock,ami_bin_file)
     if self.bin_seg_list == None:
       log_proc.error("failed loading binary: %s", self.ctx.seg_loader.error)
       return False
     self.prog_start = self.bin_seg_list.prog_start
+    # THOR: If this is a shell, then the seglist requires BCPL linkage and
+    # initialization of the GlobVec. Fortunately, for the 3.9 shell all this
+    # magic is not really required, and the BCPL call-in (we use) is at
+    # offset +8
+    if shell:
+      self.prog_start += 8
+      self.shell_start = self.prog_start
     log_proc.info("loaded binary: %s", self.bin_seg_list)
     for seg in self.bin_seg_list.segments:
       log_proc.info(seg)
@@ -99,7 +121,8 @@ class Process:
     log_proc.info(self.arg)
 
   def free_args(self):
-    self.ctx.alloc.free_memory(self.arg)
+    if self.arg != None:
+      self.ctx.alloc.free_memory(self.arg)
 
   # ----- cli struct -----
   def init_cli_struct(self, input_fh, output_fh):
@@ -115,11 +138,38 @@ class Process:
     log_proc.info(self.cli)
 
   def free_cli_struct(self):
-    self.ctx.alloc.free_bstr(self.cmd)
+    if self.cmd != None:
+      self.ctx.alloc.free_bstr(self.cmd)
     self.ctx.alloc.free_struct(self.cli)
 
   def get_cli_struct(self):
     return self.cli.addr
+
+  # ----- initialize for running a command in a shell -----
+  def run_system(self):
+    if self.shell_packet == None:
+      # Ok, here we have to create a DosPacket for the shell startup
+      self.shell_message = self.ctx.alloc.alloc_struct("Shell Startup Message",MessageDef)
+      self.shell_packet  = self.ctx.alloc.alloc_struct("Shell Startup Packet",DosPacketDef)
+      self.shell_port    = self.ctx.exec_lib.port_mgr.create_port("Shell Startup Port",None)
+    self.shell_packet.access.w_s("dp_Type",1) # indicate RUN
+    self.shell_packet.access.w_s("dp_Res2",0) # indicate correct startup
+    self.shell_packet.access.w_s("dp_Res1",0) # indicate RUN
+    self.shell_packet.access.w_s("dp_Link",self.shell_message.addr)
+    self.shell_packet.access.w_s("dp_Port",self.shell_port)
+    self.shell_message.access.w_s("mn_Node.ln_Name",self.shell_packet.addr)
+    while self.ctx.exec_lib.port_mgr.has_msg(self.shell_port):
+      self.ctx.exec_lib.port_mgr.get_msg(self.shell_port)
+    return self.shell_packet.addr
+
+  def create_port(self, name, py_msg_handler):
+    mem = self.alloc.alloc_struct(name,MsgPortDef)
+    port = Port(name, self, mem=mem, handler=py_msg_handler)
+    addr = mem.addr
+    self.ports[addr] = port
+    return addr
+
+      
 
   # ----- task struct -----
   def init_task_struct(self, input_fh, output_fh):
@@ -130,10 +180,18 @@ class Process:
     self.this_task.access.w_s("pr_CLI", self.cli.addr)
     self.this_task.access.w_s("pr_CIS", input_fh.b_addr<<2) # compensate BCPL auto-conversion
     self.this_task.access.w_s("pr_COS", output_fh.b_addr<<2) # compensate BCPL auto-conversion
-    log_proc.info(self.this_task)
+    varlist = self.get_local_vars()
+    # Initialize the list of local shell variables
+    varlist.access.w_s("mlh_Head",varlist.addr + 4)
+    varlist.access.w_s("mlh_Tail",0)
+    varlist.access.w_s("mlh_TailPred",varlist.addr)
 
   def free_task_struct(self):
     self.ctx.alloc.free_struct(self.this_task)
+
+  def get_local_vars(self):
+    localvars_addr = self.this_task.access.s_get_addr("pr_LocalVars")
+    return self.ctx.alloc.map_struct("MinList", localvars_addr, MinListDef)
 
   def get_input(self):
     fh_b = self.this_task.access.r_s("pr_CIS") >> 2
@@ -149,3 +207,11 @@ class Process:
   def set_output(self, output_fh):
     self.this_task.access.w_s("pr_COS", output_fh.b_addr<<2) # compensate BCPL auto-conversion
 
+  def get_current_dir(self):
+    return self.this_task.access.r_s("pr_CurrentDir")    
+
+  def set_current_dir(self,lock):
+    self.this_task.access.w_s("pr_CurrentDir",lock)
+
+  def is_native_shell(self):
+    return self.shell

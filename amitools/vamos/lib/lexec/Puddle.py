@@ -24,7 +24,7 @@ class Puddle:
     result = 0;
     if (size <= self.bytesleft):
       result = self.current
-      self.current+=size;
+      self.current   += size;
       self.bytesleft -= size;
     if (result != 0):
       log_exec.info("%s: %06x from pool at base %06x" % (name, result, self.mem.addr))

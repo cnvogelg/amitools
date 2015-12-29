@@ -315,5 +315,30 @@ class InfoDataStruct(AmigaStruct):
     ]
 InfoDataDef = InfoDataStruct()
 
+class SegmentStruct(AmigaStruct):
+  _name = "Segment"
+  _format = [
+    ('BPTR','seg_Next'),
+    ('LONG','seg_UC'),
+    ('BPTR','seg_Seg'),
+    ('UBYTE','seg_Name')
+    ]
+SegmentDef = SegmentStruct()
 
-    
+class LocalVarStruct(AmigaStruct):
+  _name = "LocalVar"
+  _format = [
+    ('Node','lv_Node'),
+    ('UWORD','lv_Flags'),
+    ('UBYTE*','lv_Value'),
+    ('ULONG','lv_Len')
+  ]
+LocalVarDef = LocalVarStruct()
+
+class PathStruct(AmigaStruct):
+  _name = "Path"
+  _format = [
+    ('BPTR','path_Next'),
+    ('BPTR','path_Lock')
+  ]
+PathDef = PathStruct()

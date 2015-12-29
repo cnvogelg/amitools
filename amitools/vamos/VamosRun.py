@@ -14,10 +14,11 @@ class Trap:
     return "[@%06x:%s:one_shot=%s]" % (self.addr, self.func, self.one_shot)
 
 class VamosRun:
-  def __init__(self, vamos, benchmark=False):
-    self.cpu = vamos.cpu
-    self.mem = vamos.mem
-    self.ctx = vamos
+  def __init__(self, vamos, benchmark=False, shell=False):
+    self.cpu   = vamos.cpu
+    self.mem   = vamos.mem
+    self.ctx   = vamos
+    self.shell = shell
     # store myself in context
     self.ctx.run = self
 
@@ -52,13 +53,19 @@ class VamosRun:
     self.mem.access.w32(4, self.ctx.exec_lib.addr_base)
 
     # setup arg in D0/A0
-    self.cpu.w_reg(REG_D0, self.ctx.process.arg_len)
-    self.cpu.w_reg(REG_A0, self.ctx.process.arg_base)
+    if self.shell:
+      # thor: If we run a shell through vamos, then
+      # BPCL places the BPTR to the parameter packet into
+      # d1. The default shell can work without ParmPkt
+      # thus leave this at zero for this time.
+      self.cpu.w_reg(REG_D1, 0)
+    else:
+      self.cpu.w_reg(REG_D0, self.ctx.process.arg_len)
+      self.cpu.w_reg(REG_A0, self.ctx.process.arg_base)
 
     # d2=stack_size.  this value is also in 4(sp) (see Process.init_stack), but
     # various C programs rely on it being present (1.3-3.1 at least have it).
     self.cpu.w_reg(REG_D2, self.ctx.process.stack_size)
-
     # to track old dos values
     self.cpu.w_reg(REG_A2, self.ctx.dos_guard_base)
     self.cpu.w_reg(REG_A5, self.ctx.dos_guard_base)
@@ -69,9 +76,14 @@ class VamosRun:
        dispatch to end vamos.
     """
     pc = self.cpu.r_pc() - 2
+    sp = self.cpu.r_reg(REG_A7)
+    a6 = self.cpu.r_reg(REG_A6)
     # addr == 0 or an error occurred -> end reached
-    if pc != 0 and not self.et.has_errors:
-      log_main.error("RESET encountered - abort")
+    #if pc != 0 and not self.et.has_errors:
+    log_main.error("RESET encountered at pc 0x%06x sp 0x%06x a6 0x%06x - abort",pc,sp,a6)
+    for x in range(-32,32,2):
+      w = self.mem.access.r32(sp+x)
+      log_main.error("sp+%d : 0x%02x",x,w)
     # stop all
     self.cpu.end()
     self.stay = False

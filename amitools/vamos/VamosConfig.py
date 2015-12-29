@@ -160,6 +160,7 @@ class VamosConfig(ConfigParser.SafeConfigParser):
       'ram_size' : (int, 1024),
       'stack_size' : (int, 4),
       'hw_access' : (str, "emu"),
+      'shell' : (bool, False),
       # dirs
       'data_dir' : (str, self.def_data_dir),
     }
