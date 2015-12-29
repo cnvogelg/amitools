@@ -128,7 +128,10 @@ class DosLibrary(AmigaLibrary):
       err_str = "%d ERROR" % self.io_err
     log_dos.info("PrintFault: code=%d header='%s' err_str='%s'", self.io_err, hdr, err_str)
     # write to stdout
-    txt = "%s: %s\n" % (hdr, err_str)
+    if hdr_ptr != 0:
+      txt = "%s: %s\n" % (hdr, err_str)
+    else:
+      txt = "%s\n" % err_str
     fh = self.file_mgr.get_output()
     fh.write(txt)
     return self.DOSTRUE

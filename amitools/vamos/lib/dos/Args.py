@@ -113,12 +113,13 @@ class Args:
     else:
       return False
 
-  def _find_key_pos_and_remove(self, keys, in_list):
+  def _find_key_pos_and_remove(self, keys, in_list, remove=True):
     for key in keys:
       pos = 0
       for i in in_list:
         if i.lower() == key and key != "":
-          in_list.pop(pos)
+          if remove:
+            in_list.pop(pos)
           return pos
         pos = pos + 1
     return None
@@ -195,18 +196,23 @@ class Args:
 
       # normal key but not multi
       elif targ['x'] and not targ['m']:
-        val = self._find_remove_key(targ['keys'], args, True)
-        # keyword at end of line
-        if val == None:
-          self.error = ERROR_REQUIRED_ARG_MISSING
-          return False
-        else:
-          # found a real value
-          if val != False:
-            if targ['n']:
-              val = int(val)
-            result[pos] = val
-            targ['x'] = False # disable to reject auto fill
+        # Check whether this is the last keypos. If so, do not
+        # match by key, but rather take this as a literal
+        # argument.
+        found = self._find_key_pos_and_remove(targ['keys'], args, False)
+        if found != None and found < len(args)-1:
+          val = self._find_remove_key(targ['keys'], args, True)
+          # keyword at end of line does not match standard keywords.
+          if val == None:
+            self.error = ERROR_REQUIRED_ARG_MISSING
+            return False
+          else:
+            # found a real value
+            if val != False:
+              if targ['n']:
+                val = int(val)
+              result[pos] = val
+              targ['x'] = False # disable to reject auto fill
       elif targ['f']:
         fullPos = pos
       pos = pos + 1
@@ -262,13 +268,19 @@ class Args:
         result[pos] = val
       elif targ['f']:
         res = None
+        # THOR: Reconstruct the rest of the line. Actually
+        # this is not a good algorithm - separation into
+        # arguments should not happen before ReadArgs, but
+        # within ReadArgs. The following algorithm may
+        # add quotes where none are needed, and also forgets
+        # to re-escape special characters.
         for arg in args:
           if res == None:
             res = ""
           else:
             res = res + " "
-          if arg == "":
-            res = res + '""'
+          if arg == "" or arg.find(" ") >= 0:
+            res = res + '"'+arg+'"'
           else:
             res = res + arg
         if res == None:
