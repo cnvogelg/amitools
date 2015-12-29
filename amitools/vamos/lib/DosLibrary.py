@@ -576,44 +576,47 @@ class DosLibrary(AmigaLibrary):
     pos = 0
     state = ''
     while pos < len(fmt):
-      ch = fmt[pos]
+      ch = fmt[pos].upper()
       pos = pos + 1
-      if state[0:0] == 'x':
-        n = ord(ch.ascii_uppercase)
+      if state[0:1] == 'x':
+        n = ord(ch)
         if n >= ord('0') and n <= ord('9'):
           n = n - ord('0')
         elif n >= ord('A') and n <= ord('Z'):
           n = (n - ord('A')) + 10
         else:
           n = 0
-        ch = state[1]
+        ch = state[1:2]
         if ch == 'T':
-          out = out + ("%*s" % (n, ctx.mem.access.r_cstr(val)))
+          out = out + ("%*s" % (-n, ctx.mem.access.r_cstr(val)))
         elif ch == 'O':
-          out = out + ("%*O" % (n, val))
+          out = out + ("%*O" % (-n, val))
         elif ch == 'X':
-          out = out + ("%*X" % (n, val))
+          out = out + ("%*X" % (-n, val))
         elif ch == 'I':
-          out = out + ("%*ld" % (n, ctypes.c_long(val).value))
+          out = out + ("%*ld" % (-n, ctypes.c_long(val).value))
         elif ch == 'U':
-          out = out + ("%*lu" % (n, ctypes.c_ulong(val).value))
+          out = out + ("%*lu" % (-n, ctypes.c_ulong(val).value))
         else:
           out = out + '%' + state[1] + state[0]
         state = ''
       elif state == '%':
-        if ch == 'S' or ch == 's':
+        if ch == 'S':
           out = out + ctx.mem.access.r_cstr(val)
+          state = ''
         elif ch == 'C':
           out = out + chr(val & 0xff)
+          state = ''
         elif ch == 'N':
           out = out + ("%ld" % ctypes.c_long(val).value)
+          state = ''
         elif ch == '$':
-          pass
+          state = ''
         elif ch == 'T' or ch == 'O' or ch == 'X' or ch == 'I' or ch == 'U':
           state = 'x' + ch
         else:
           out = out + '%' + ch
-        state = ''
+          state = ''
       else:
         if ch == '%':
           state = '%'
