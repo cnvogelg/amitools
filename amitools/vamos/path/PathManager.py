@@ -194,7 +194,7 @@ class PathManager:
         path = path[1:]
     # a parent path is given
     elif path[0] == '/':
-      abs_prefix = self.lock_mgr.volume_name_of_lock(lock)
+      abs_prefix = lock.ami_path
       while len(path)>0 and path[0] == '/':
         abs_prefix = self.ami_abs_parent_path(abs_prefix)
         path = path[1:]

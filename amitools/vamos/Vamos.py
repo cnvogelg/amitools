@@ -219,6 +219,8 @@ class Vamos:
     tr.read_ax_l(7, old_stack_off, True) # read from data offset (dc.l above)
     # restore regs
     tr.restore_all_but_d0()
+    # keep the old input file handle
+    input_fh = self.process.get_input()
     # trap to clean up sub process resources
     def trap_stop_run_command():
       ret_code = self.cpu.r_reg(REG_D0)
@@ -227,7 +229,7 @@ class Vamos:
       self.process.this_task.access.w_s("pr_Task.tc_SPLower",oldstackbase)
       self.process.this_task.access.w_s("pr_Task.tc_SPUpper",oldstacktop)
       self.alloc.free_memory(newstack)
-      self.process.get_input().setbuf("")
+      input_fh.setbuf("")
       # The return code remains in d0 as is
     tr.final_rts(trap_stop_run_command)
     # realize trampoline in memory (data+code)

@@ -95,7 +95,7 @@ class DosLibrary(AmigaLibrary):
     if self.io_err in dos_error_strings:
       errstring = dos_error_strings[self.io_err]
     else:
-      errstring = "???"
+      errstring = "%d" % self.io_err
     log_dos.info("IoErr: %d (%s)" % (self.io_err, errstring))
     return self.io_err
 
@@ -112,16 +112,20 @@ class DosLibrary(AmigaLibrary):
   def PrintFault(self, ctx):
     self.io_err = ctx.cpu.r_reg(REG_D1)
     hdr_ptr = ctx.cpu.r_reg(REG_D2)
+    if self.io_err >= 0x80000000:
+      idx = self.io_err - 0x100000000
+    else:
+      idx = self.io_err
     # get header string
     if hdr_ptr != 0:
       hdr = ctx.mem.access.r_cstr(hdr_ptr)
     else:
       hdr = ""
     # get error string
-    if dos_error_strings.has_key(self.io_err):
-      err_str = dos_error_strings[self.io_err]
+    if dos_error_strings.has_key(idx):
+      err_str = dos_error_strings[idx]
     else:
-      err_str = "??? ERROR"
+      err_str = "%d ERROR" % self.io_err
     log_dos.info("PrintFault: code=%d header='%s' err_str='%s'", self.io_err, hdr, err_str)
     # write to stdout
     txt = "%s: %s\n" % (hdr, err_str)
@@ -982,6 +986,17 @@ class DosLibrary(AmigaLibrary):
 
   # ----- Args -----
 
+  def FindArg(self, ctx):
+    template_ptr = ctx.cpu.r_reg(REG_D1)
+    keyword_ptr  = ctx.cpu.r_reg(REG_D2)
+    template     = ctx.mem.access.r_cstr(template_ptr)
+    keyword      = ctx.mem.access.r_cstr(keyword_ptr)
+    args         = Args()
+    args.parse_template(template)
+    pos          = args.find_arg(keyword)
+    log_dos.info("FindArgs: template=%s keyword=%s -> %d" % (template,keyword,pos))
+    return pos
+    
   def ReadArgs(self, ctx):
     template_ptr = ctx.cpu.r_reg(REG_D1)
     template     = ctx.mem.access.r_cstr(template_ptr)
@@ -995,7 +1010,12 @@ class DosLibrary(AmigaLibrary):
     if ctx.process.bin_args is not None:
       bin_args = ctx.process.bin_args
     else:
-      bin_args = args.split(ctx.process.get_input().getbuf())
+      raw_args = ctx.process.get_input().getbuf()
+      if raw_args == "?\n":
+        ctx.process.get_output().write(template+": ")
+        ctx.process.get_input().setbuf("")
+        raw_args = ctx.process.get_input().gets(512)
+      bin_args = args.split(raw_args)
     log_dos.info("ReadArgs: args=%s template='%s' array_ptr=%06x rdargs_ptr=%06x" % (bin_args, template, array_ptr, rdargs_ptr))
     # try to parse argument string
     args.parse_template(template)
@@ -1088,6 +1108,7 @@ class DosLibrary(AmigaLibrary):
     # Write back the updated csource ptr if we have one
     if (csource_ptr):
       csource.access.w_s('CS_CurChr',self.cs_curchr)
+    result = ctx.mem.access.r_cstr(buff_ptr)
     return res
 
   def _readItem(self, ctx, buff_ptr, maxchars):
@@ -1203,6 +1224,8 @@ class DosLibrary(AmigaLibrary):
         cli.w_s("cli_StandardInput",input_fh)
         cli.w_s("cli_Background",self.DOSFALSE)
         ctx.process.this_task.access.w_s("pr_CIS",input_fh)
+        infile = self.file_mgr.get_by_b_addr(input_fh >> 2)
+        infile.setbuf("")
         self.ctx.process.set_current_dir(current_dir)
         self.cur_dir_lock = self.lock_mgr.get_by_b_addr(current_dir >> 2)
         ctx.cpu.w_reg(REG_D0,0)
@@ -1457,12 +1480,14 @@ class DosLibrary(AmigaLibrary):
 
   def DosGetString(self,ctx):
     errno = ctx.cpu.r_reg(REG_D1)
+    if errno >= 0x80000000:
+      errno = errno - 0x100000000
     if errno in dos_error_strings:
-      if errno in errstrings:
-        return errstrings[errno]
-      errstrings[errno] = self._alloc_mem("Error %d" % errno,len(dos_error_strings[errno]) + 1)
-      ctx.mem.access.w_cstr(errstrings[errno],dos_error_strings[errno])
-      return errstrings[errno]
+      if errno in self.errstrings:
+        return self.errstrings[errno]
+      self.errstrings[errno] = self._alloc_mem("Error %d" % errno,len(dos_error_strings[errno]) + 1)
+      ctx.mem.access.w_cstr(self.errstrings[errno],dos_error_strings[errno])
+      return self.errstrings[errno]
     else:
       return 0
 

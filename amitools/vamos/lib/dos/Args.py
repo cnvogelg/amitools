@@ -117,12 +117,21 @@ class Args:
     for key in keys:
       pos = 0
       for i in in_list:
-        if i.lower() == key:
+        if i.lower() == key and key != "":
           in_list.pop(pos)
           return pos
         pos = pos + 1
     return None
 
+  def find_arg(self,keyword):
+    pos = 0
+    for targ in self.targs:
+      for key in targ['keys']:
+        if key != "" and keyword.lower() == key:
+          return pos
+      pos = pos + 1
+    return -1
+    
   """apply an internal template to a given argument array, this already expects an array of strings.
   """
   def parse_string(self, in_args):
