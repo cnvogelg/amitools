@@ -57,7 +57,7 @@ class DosLibrary(AmigaLibrary):
     self.errstrings = {}
     self.path = []
     self.resident = []
-    self.local_vars = []
+    self.local_vars = {}
     # setup RootNode
     self.root_struct = ctx.alloc.alloc_struct("RootNode",RootNodeDef)
     self.access.w_s("dl_Root",self.root_struct.addr)
@@ -228,18 +228,10 @@ class DosLibrary(AmigaLibrary):
   # ----- Variables -----
   
   def find_var(self, ctx, name, flags):
-    varlist   = ctx.process.get_local_vars()
-    node_addr = varlist.access.r_s("mlh_Head")
-    node      = AccessStruct(ctx.mem,LocalVarDef,node_addr)
-    while node.r_s("lv_Node.ln_Succ") != 0:
-      naddr   = node.r_s("lv_Node.ln_Name")
-      mname   = ctx.mem.access.r_cstr(naddr)
-      mtype   = node.r_s("lv_Node.ln_Type")
-      if mtype == flags & 0xff and name.lower() == mname.lower():
-        return node
-      node_addr = node.r_s("lv_Node.ln_Succ")
-      node      = AccessStruct(ctx.mem,LocalVarDef,node_addr)
-    return None
+    if (name.lower(),flags & 0xff) in self.local_vars:
+      return self.local_vars[(name.lower(),flags & 0xff)]
+    else:
+      return None
 
   def create_var(self, ctx, name, flags):
     varlist   = ctx.process.get_local_vars()
@@ -256,7 +248,7 @@ class DosLibrary(AmigaLibrary):
     varlist.access.w_s("mlh_Head",node_addr)
     node.access.w_s("lv_Node.ln_Succ",head_addr)
     node.access.w_s("lv_Node.ln_Pred",varlist.access.s_get_addr("mlh_Head"))
-    self.local_vars.append(node.access)
+    self.local_vars[(name.lower(),flags & 0xff)] = node.access
     return node.access
 
   def set_var(self,ctx,node,buff_ptr,size,value,flags):
@@ -284,7 +276,9 @@ class DosLibrary(AmigaLibrary):
     AccessStruct(ctx.mem, NodeDef, pred).w_s("ln_Succ", succ)
     AccessStruct(ctx.mem, NodeDef, succ).w_s("ln_Pred", pred)
     self._free_mem(node.struct_addr)
-    self.local_vars.remove(node)
+    for k in self.local_vars.keys():
+      if self.local_vars[k] == node:
+        del self.local_vars[k]
 
   def GetVar(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
