@@ -142,7 +142,7 @@ class ExecLibrary(AmigaLibrary):
     poolid = self._poolid
     self._poolid += 4;
     flags  = ctx.cpu.r_reg(REG_D0);
-    size   = ctx.cpu.r_reg(REG_D1);
+    size   = (ctx.cpu.r_reg(REG_D1) + 7) & -8;
     thresh = ctx.cpu.r_reg(REG_D2)
     pool   = Pool(self.mem, self.alloc, flags, size, thresh)
     self._pools[poolid] = pool
@@ -151,7 +151,7 @@ class ExecLibrary(AmigaLibrary):
 
   def AllocPooled(self, ctx):
     poolid = ctx.cpu.r_reg(REG_A0)
-    size   = ctx.cpu.r_reg(REG_D0)
+    size   = (ctx.cpu.r_reg(REG_D0) + 7) & -8
     pc     = self.get_callee_pc(ctx)
     tag    = ctx.label_mgr.get_mem_str(pc)
     name   = "AllocPooled(%06x = %s)" % (pc,tag)
@@ -165,7 +165,7 @@ class ExecLibrary(AmigaLibrary):
 
   def FreePooled(self, ctx):
     poolid = ctx.cpu.r_reg(REG_A0)
-    size   = ctx.cpu.r_reg(REG_D0)
+    size   = (ctx.cpu.r_reg(REG_D0) + 7) & -8
     mem_ptr= ctx.cpu.r_reg(REG_A1)
     if poolid in self._pools:
       pool   = self._pools[poolid]
@@ -230,6 +230,18 @@ class ExecLibrary(AmigaLibrary):
       self.alloc.free_memory(mb)
     else:
       raise VamosInternalError("FreeVec: Unknown memory to free: ptr=%06x" % (addr))
+
+  def AvailMem(self, ctx):
+    reqments = ctx.cpu.r_reg(REG_D1)
+    if reqments & 2:
+      return 0 # no chip memory
+    if reqments & (1<<17):
+      return self.alloc.largest_chunk()
+    elif reqments & (1<<19):
+      return self.alloc.total()
+    else:
+      return self.alloc.available()
+      
 
   # ----- Message Passing -----
 

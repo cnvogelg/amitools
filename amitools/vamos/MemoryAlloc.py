@@ -334,5 +334,24 @@ class MemoryAlloc:
       return True
     return False
 
+  def total(self):
+    return self.size
+
+  def available(self):
+    free  = 0
+    chunk = self.free_first
+    while chunk != None:
+      free += chunk.size
+      chunk = chunk.next
+    return free
+
+  def largest_chunk(self):
+    largest = 0
+    chunk = self.free_first
+    while chunk != None:
+      if chunk.size > largest:
+        largest = chunk.size
+      chunk = chunk.next
+    return largest
 
 

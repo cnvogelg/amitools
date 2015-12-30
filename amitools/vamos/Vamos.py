@@ -35,12 +35,13 @@ class Vamos:
 
     # too much RAM requested?
     # our "custom chips" start at $BFxxxx so we allow RAM only to be below
-    if self.ram_size >= 0xbf0000:
+    if self.ram_size >= 0xbf0000 and self.cfg.hw_access != "disable":
       raise VamosConfigError("Too much RAM configured! Only up to $BF0000 allowed.")
 
     # setup custom chips
-    self.hw_access = HardwareAccess(raw_mem)
-    self._setup_hw_access()
+    if self.cfg.hw_access != "disable":
+      self.hw_access = HardwareAccess(raw_mem)
+      self._setup_hw_access()
 
     # path manager
     self.path_mgr = PathManager( cfg )
@@ -94,6 +95,8 @@ class Vamos:
       self.hw_access.set_mode(HardwareAccess.MODE_IGNORE)
     elif cfg.hw_access == "abort":
       self.hw_access.set_mode(HardwareAccess.MODE_ABORT)
+    elif cfg.hw_access == "disable":
+      pass
     else:
       raise VamosConfigError("Invalid HW Access mode: %s" % cfg.hw_access)
 
