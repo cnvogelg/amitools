@@ -151,8 +151,9 @@ class MemoryAlloc:
     # out of memory?
     if chunk == None:
       if except_on_fail:
-        raise VamosInternalError("[alloc: NO MEMORY for %06x bytes]" % size)
+        self.dump_orphans()
         log_mem_alloc.error("[alloc: NO MEMORY for %06x bytes]" % size)
+        raise VamosInternalError("[alloc: NO MEMORY for %06x bytes]" % size)
       return 0
     # remove chunk from free list
     # is something left?
