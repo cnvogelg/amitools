@@ -195,7 +195,7 @@ class ExecLibrary(AmigaLibrary):
     tag = ctx.label_mgr.get_mem_str(pc)
     name = "AllocMem(%06x = %s)" % (pc,tag)
     mb = self.alloc.alloc_memory(name,size)
-    log_exec.info("AllocMem: %s" % mb)
+    log_exec.info("AllocMem: %s -> 0x%06x %d bytes" % (mb,mb.addr,size))
     return mb.addr
 
   def FreeMem(self, ctx):
@@ -206,7 +206,7 @@ class ExecLibrary(AmigaLibrary):
       return
     mb = self.alloc.get_memory(addr)
     if mb != None:
-      log_exec.info("FreeMem: %s" % mb)
+      log_exec.info("FreeMem: 0x%06x %d bytes -> %s" % (addr,size,mb))
       self.alloc.free_memory(mb)
     else:
       raise VamosInternalError("FreeMem: Unknown memory to free: ptr=%06x size=%06x" % (addr, size))

@@ -56,7 +56,7 @@ class SegmentLoader:
     return self.path_mgr.ami_command_to_sys_path(lock, ami_bin_file) != None
 
   # load ami_bin_file
-  def load_seg(self, lock, ami_bin_file):
+  def load_seg(self, lock, ami_bin_file, allow_reuse = True):
     # map file name
     sys_bin_file = self.path_mgr.ami_command_to_sys_path(lock, ami_bin_file)
     if sys_bin_file == None:
@@ -64,7 +64,8 @@ class SegmentLoader:
       return None
 
     # check if seg list already loaded in a parent process
-    if self.loaded_seg_lists.has_key(sys_bin_file):
+    # Bummer! This cannot work unless commands are resident!
+    if allow_reuse and self.loaded_seg_lists.has_key(sys_bin_file):
       seg_list = self.loaded_seg_lists[sys_bin_file]
       seg_list.usage += 1
       return seg_list
@@ -74,19 +75,21 @@ class SegmentLoader:
     if seg_list == None:
       return None
 
-    # store in cache
-    self.loaded_seg_lists[sys_bin_file] = seg_list
+    # store in cache if allowed by caller
+    if allow_reuse:
+      self.loaded_seg_lists[sys_bin_file] = seg_list
     return seg_list
 
   # unload seg list
-  def unload_seg(self, seg_list):
+  def unload_seg(self, seg_list, allow_reuse = True):
     sys_bin_file = seg_list.sys_bin_file
     # check that file is in cache
-    if self.loaded_seg_lists.has_key(sys_bin_file):
+    if not allow_reuse or sys_bin_file in self.loaded_seg_lists:
       seg_list.usage -= 1
       # no more used
       if seg_list.usage == 0:
-        del self.loaded_seg_lists[sys_bin_file]
+        if sys_bin_file in self.loaded_seg_lists:
+          del self.loaded_seg_lists[sys_bin_file]
         self._unload_seg(seg_list)
       return True
     else:

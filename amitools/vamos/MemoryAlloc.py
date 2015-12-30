@@ -3,6 +3,7 @@ from Log import log_mem_alloc
 from label.LabelRange import LabelRange
 from label.LabelStruct import LabelStruct
 from AccessStruct import AccessStruct
+import sys
 
 class Memory:
   def __init__(self, addr, size, label, access):
@@ -49,6 +50,7 @@ class MemoryAlloc:
     self.free_bytes = size - (begin - addr)
     self.free_first = MemoryChunk(begin, self.free_bytes)
     self.free_entries = 1
+    #self.next_dump  = self.free_bytes - 0x10000
 
   def _find_best_chunk(self, size):
     """find best chunk that could take the given alloc
@@ -168,6 +170,10 @@ class MemoryAlloc:
     log_mem_alloc.info("[alloc @%06x-%06x: %06x bytes] %s", addr, addr+size, size, self._stat_info())
     if addr % 4:
       raise VamosInternalError("Memory pool is invalid, return address not aligned by a long word");
+    #if self.free_bytes < self.next_dump:
+    #  self.next_dump -= 0x10000
+    #  sys.stderr.write("\n\n**** Memory allocation dump ****\n");
+    #  self.dump_orphans()
     return addr
 
   def free_mem(self, addr, size):

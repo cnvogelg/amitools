@@ -22,20 +22,19 @@ class Lock:
     self.b_addr  = 0
     self.key     = 0
     self.dirent  = None
-    self.key_cnt = 256
 
   def __str__(self):
     addr = 0
     if self.mem is not None:
       addr = self.mem.addr
-    return "[Lock:'%s'(ami='%s',sys='%s',ex=%d)@%06x=b@%06x]" % (self.name, self.ami_path, self.sys_path, self.exclusive, addr, self.b_addr)
+    return "[Lock:'%s'(ami='%s',sys='%s',key='%s',ex=%d)@%06x=b@%06x]" % (self.name, self.ami_path, self.sys_path, self.key, self.exclusive, addr, self.b_addr)
 
-  def alloc(self, alloc, vol_addr):
-    name = "Lock:" + self.name
-    self.mem = alloc.alloc_struct(name, FileLockDef)
-    self.mem.access.w_s("fl_Volume", vol_addr)
-    self.key = uuid.uuid4().time_low
-    self.mem.access.w_s("fl_Key",self.key)
+  def alloc(self, alloc, vol_addr,generate_key):
+    self.keygen = generate_key
+    self.key    = self.keygen(self.sys_path)
+    name        = "Lock: %s" % self
+    self.mem    = alloc.alloc_struct(name, FileLockDef)
+    self.mem.access.w_s("fl_Key" ,self.key)
     self.b_addr = self.mem.addr >> 2
     return self.b_addr
 
@@ -48,14 +47,16 @@ class Lock:
     # name
     name_addr = fib_mem.s_get_addr('fib_FileName')
     fib_mem.w_cstr(name_addr, name)
-    # dummy key
-    fib_mem.w_s('fib_DiskKey',self.key)
+    # create the "inode" information
+    key = self.keygen(sys_path)
+    fib_mem.w_s('fib_DiskKey',key)
     # type
     if os.path.isdir(sys_path):
-      dirEntryType = self.key_cnt
+      dirEntryType = 2
     else:
-      dirEntryType = (-self.key_cnt) & 0xffffffff
+      dirEntryType = (-3) & 0xffffffff
     fib_mem.w_s('fib_DirEntryType', dirEntryType )
+    fib_mem.w_s('fib_EntryType',    dirEntryType )
     # protection
     prot = DosProtection(0)
     try:
@@ -96,11 +97,10 @@ class Lock:
       else:
         self.dirent = []
 
-    self.key_cnt += 1
     if len(self.dirent) > 0:
       aname = self.dirent[0]
       apath = self.sys_path + "/" + self.dirent[0]
-      self.dirent = self.dirent[1:len(self.dirent)]
+      self.dirent = self.dirent[1:]
       return self.examine_file(fib_mem, aname, apath)
 
     self.dirent = None

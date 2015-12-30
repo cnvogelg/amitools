@@ -15,8 +15,17 @@ class LockManager:
     self.dos_list = dos_list
     self.alloc    = alloc
     self.mem      = mem
+    self.keys     = {}
+    self.next_key = 256
+    self.locks_by_baddr = {}
 
-    self.locks_by_key = {}
+  def generate_key(self, system_path):
+    if system_path in self.keys:
+      return self.keys[system_path]
+    self.next_key += 1
+    self.keys[system_path] = self.next_key
+    log_lock.info("generated key %d for path %s" % (self.next_key,system_path))
+    return self.next_key
 
   def _register_lock(self, lock):
     # look up volume
@@ -29,21 +38,15 @@ class LockManager:
     else:
       vol_baddr = volume.mem.addr
     # allocate lock struct
-    b_addr = lock.alloc(self.alloc, vol_baddr)
-    self.locks_by_key[lock.key] = lock
+    b_addr = lock.alloc(self.alloc, vol_baddr, self.generate_key)
+    self.locks_by_baddr[b_addr] = lock
     log_lock.info("registered: %s" % lock)
 
   def _unregister_lock(self, lock):
-    if not self.locks_by_key.has_key(lock.key):
-      raise VamosInternalError("Lock %s not registered!" % lock)
-    check = self.locks_by_key[lock.key]
-    if check != lock:
-      raise VamosInternalError("Invalid Lock unregistered: %s" % lock)
-    del self.locks_by_key[lock.key]
+    del self.locks_by_baddr[lock.b_addr]
     log_lock.info("unregistered: %s" % lock)
-    lock.b_addr = 0
-    lock.addr = 0
     lock.free(self.alloc)
+    del lock
 
   def create_lock(self, cur_dir, ami_path, exclusive):
     if ami_path == '':
@@ -80,15 +83,11 @@ class LockManager:
     else:
       return None
 
-  def _get_key_from_baddr(self, b_addr):
-    addr = b_addr << 2
-    return self.mem.access.r32(addr + 4)
-
   def get_by_b_addr(self, b_addr, none_if_missing=False):
     if b_addr == 0:
       return None
-    elif self.locks_by_key.has_key(self._get_key_from_baddr(b_addr)):
-      lock = self.locks_by_key[self._get_key_from_baddr(b_addr)]
+    elif b_addr in self.locks_by_baddr:
+      lock = self.locks_by_baddr[b_addr]
       return lock
     else:
       if none_if_missing:

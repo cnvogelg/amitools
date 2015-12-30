@@ -407,6 +407,10 @@ class DosLibrary(AmigaLibrary):
     self.dos_info.access.w_s("di_NetHand",seg_addr)
     log_dos.info("AddSegment(%s,%06x) -> %06x" % (name,seglist,seg_addr))
     self.resident.append(seg_addr)
+    # Adding a resident command to the registered seglists.
+    b_addr = seglist >> 2
+    if b_addr not in self.seg_lists:
+      self.seg_lists[b_addr] = (None,name)
     return -1
 
   # ----- File Ops -----
@@ -784,10 +788,13 @@ class DosLibrary(AmigaLibrary):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     fib_ptr = ctx.cpu.r_reg(REG_D2)
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-    log_dos.info("Examine: %s fib=%06x" % (lock, fib_ptr))
     fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
-    self.setioerr(ctx,lock.examine_lock(fib))
-    if self.io_err == NO_ERROR:
+    err = lock.examine_lock(fib)
+    name_addr = fib.s_get_addr('fib_FileName')
+    name      = fib.r_cstr(name_addr)
+    log_dos.info("Examine: %s fib=%06x(%s) -> %s" % (lock, fib_ptr, name, err))
+    self.setioerr(ctx,err)
+    if err == NO_ERROR:
       return self.DOSTRUE
     else:
       return self.DOSFALSE
@@ -818,10 +825,13 @@ class DosLibrary(AmigaLibrary):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     fib_ptr = ctx.cpu.r_reg(REG_D2)
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-    log_dos.info("ExNext: %s fib=%06x" % (lock, fib_ptr))
     fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
-    self.setioerr(ctx,lock.examine_next(fib))
-    if self.io_err == NO_ERROR:
+    err = lock.examine_next(fib)
+    name_addr = fib.s_get_addr('fib_FileName')
+    name      = fib.r_cstr(name_addr)
+    log_dos.info("ExNext: %s fib=%06x (%s) -> %s" % (lock, fib_ptr, name, err))
+    self.setioerr(ctx,err)
+    if err == NO_ERROR:
       return self.DOSTRUE
     else:
       return self.DOSFALSE
@@ -1277,6 +1287,7 @@ class DosLibrary(AmigaLibrary):
         self.cur_dir_lock = self.lock_mgr.get_by_b_addr(current_dir >> 2)
         ctx.cpu.w_reg(REG_D0,0)
         self.setioerr(ctx, ret_code)
+        log_dos.info("SystemTagList returned: cmd='%s' tags=%s", cmd, tag_list)
         return 0
       # The return code remains in d0 as is
       ctx.run_shell(ctx.process.shell_start,packet,stacksize,trap_stop_run_command)
@@ -1306,41 +1317,45 @@ class DosLibrary(AmigaLibrary):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name     = ctx.mem.access.r_cstr(name_ptr)
     lock     = self.get_current_dir()
-    seg_list = self.ctx.seg_loader.load_seg(lock,name)
+    seg_list = self.ctx.seg_loader.load_seg(lock,name,False)
     if seg_list == None:
       log_dos.warn("LoadSeg: '%s' -> not found!" % (name))
       return 0
     else:
       log_dos.info("LoadSeg: '%s' -> %s" % (name, seg_list))
       b_addr = seg_list.b_addr
-      self.seg_lists[b_addr] = seg_list
+      self.seg_lists[b_addr] = (seg_list,name)
       return b_addr
 
   def UnLoadSeg(self, ctx):
     b_addr = ctx.cpu.r_reg(REG_D1)
     if b_addr != 0:
       if not self.seg_lists.has_key(b_addr):
-        raise VamosInternalError("Unknown LoadSeg seg_list: b_addr=%06x" % b_addr)
+        raise VamosInternalError("Trying to unload unknown LoadSeg seg_list: b_addr=%06x" % b_addr)
       else:
-        seg_list = self.seg_lists[b_addr]
+        seg_list = self.seg_lists[b_addr][0]
         del self.seg_lists[b_addr]
-        self.ctx.seg_loader.unload_seg(seg_list)
+        self.ctx.seg_loader.unload_seg(seg_list,False)
         log_dos.info("UnLoadSeg:  %s" % seg_list)
     else:
       log_dos.info("UnLoadSeg:  NULL")
 
   def RunCommand(self, ctx):
-    seglist  = ctx.cpu.r_reg(REG_D1)
+    b_addr   = ctx.cpu.r_reg(REG_D1)
+    if not b_addr in self.seg_lists:
+      raise VamosInternalError("Trying to run unknown LoadSeg seg_list: b_addr=%06x" % b_addr)
+    else:
+      name = self.seg_lists[b_addr][1]
     stack    = ctx.cpu.r_reg(REG_D2)
     args     = ctx.cpu.r_reg(REG_D3)
     length   = ctx.cpu.r_reg(REG_D4)
     fh       = ctx.process.get_input()
     cmdline  = ctx.mem.access.r_cstr(args)
     ctx.process.get_input().setbuf(cmdline)
-    log_dos.info("RunCommand: seglist=%06x stack=%d args=%s" % (seglist, stack, cmdline))
+    log_dos.info("RunCommand: seglist=%06x(%s) stack=%d args=%s" % (b_addr, name, stack, cmdline))
     # round up the stack
     stack    = (stack + 3) & -4
-    ctx.run_command((seglist << 2) + 4,args,length,stack)
+    ctx.run_command((b_addr << 2) + 4,args,length,stack)
 
   # ----- Path Helper -----
 
@@ -1349,7 +1364,7 @@ class DosLibrary(AmigaLibrary):
     path = ctx.mem.access.r_cstr(addr)
     pos  = dos.PathPart.file_part(path)
     if pos < len(path):
-      log_dos.info("FilePart: path='%s' -> result='%s'", path, path[:pos])
+      log_dos.info("FilePart: path='%s' -> result='%s'", path, path[pos:])
     else:
       log_dos.info("FilePart: path='%s' -> pos=NULL", path)
     return addr + pos
@@ -1359,7 +1374,7 @@ class DosLibrary(AmigaLibrary):
     path = ctx.mem.access.r_cstr(addr)
     pos  = dos.PathPart.path_part(path)
     if pos < len(path):
-      log_dos.info("PathPart: path='%s' -> result='%s'", path, path[pos:])
+      log_dos.info("PathPart: path='%s' -> result='%s'", path, path[:pos])
     else:
       log_dos.info("PathPart: path='%s' -> pos=NULL", path)
     return addr + pos
