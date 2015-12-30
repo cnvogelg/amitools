@@ -47,7 +47,7 @@ class MemoryAlloc:
 
     # init free list
     self.free_bytes = size - (begin - addr)
-    self.free_first = MemoryChunk(addr + begin, self.free_bytes)
+    self.free_first = MemoryChunk(begin, self.free_bytes)
     self.free_entries = 1
 
   def _find_best_chunk(self, size):

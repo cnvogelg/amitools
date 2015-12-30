@@ -4,6 +4,7 @@ from Log import *
 import logging
 import time
 import inspect
+import sys, traceback
 
 from label.LabelLib import LabelLib
 from AccessStruct import AccessStruct
@@ -31,7 +32,7 @@ class AmigaLibrary:
     self.log_call = False
     self.log_dummy_call = False
     self.benchmark = False
-    self.catch_ex = False
+    self.catch_ex = True
 
     # proposal of size
     self.pos_size = self.struct.get_size()
@@ -399,6 +400,8 @@ class AmigaLibrary:
 
   def _handle_exc(self):
     """handle an exception that occurred inside the call stub's python code"""
-    # TBD
-    print "ARGH"
+    sys.stderr.write("\n**** Unexpected exception in library stub: %s " % sys.exc_info()[1])
+    traceback.print_tb(sys.exc_info()[2],file=sys.stderr)
+    sys.stderr.write("\n")
+    raise
 

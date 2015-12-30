@@ -46,7 +46,6 @@ class Pool:
           result = puddle.AllocPooled(name, size)
     if result == 0: 
       log_exec.info("AllocPooled: Unable to allocate memory (%x)", size)
-    #print "%s allocated -> %s" % (size,self)
     return result
 
   def FreePooled(self, mem, size):
@@ -54,4 +53,6 @@ class Pool:
       for puddle in self.puddles:
         if puddle.contains(mem,size):
           puddle.FreePooled(mem,size)
-    #print "%s released -> %s" % (size,self)
+          return
+      raise VamosInternalError("FreePooled: invalid memory, not in any puddle : ptr=%06x" % mem)
+

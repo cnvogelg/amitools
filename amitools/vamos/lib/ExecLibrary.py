@@ -7,7 +7,6 @@ from amitools.vamos.Trampoline import Trampoline
 from lexec.PortManager import PortManager
 from lexec.Pool import Pool
 import dos.Printf
-import sys
 
 class ExecLibrary(AmigaLibrary):
   name = "exec.library"
@@ -158,8 +157,8 @@ class ExecLibrary(AmigaLibrary):
     if poolid in self._pools:
       pool = self._pools[poolid]
       mem = pool.AllocPooled(ctx.label_mgr ,name, size)
-      log_exec.info("AllocPooled: from pool 0x%x size %d -> 0x%06x" % (poolid,size,mem))
-      return mem
+      log_exec.info("AllocPooled: from pool 0x%x size %d -> 0x%06x" % (poolid,size,mem.addr))
+      return mem.addr
     else:
       raise VamosInternalError("AllocPooled: invalid memory pool: ptr=%06x" % poolid)
 
