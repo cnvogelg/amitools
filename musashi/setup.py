@@ -15,5 +15,5 @@ depends = [
 extensions = [Extension("emu", sourcefiles, depends=depends)]
 
 setup(
-    ext_modules = cythonize(extensions)
+    ext_modules = cythonize(extensions) #, output_dir=".", gdb_debug=True)
 )

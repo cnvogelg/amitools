@@ -140,7 +140,7 @@ class MemoryAlloc:
     num_allocs = len(self.addrs)
     return "(free %06x #%d) (allocs #%d)" % (self.free_bytes, self.free_entries, num_allocs)
 
-  def alloc_mem(self, size):
+  def alloc_mem(self, size, except_on_fail = True):
     """allocate memory and return addr or 0 if no more memory"""
     # align size to 4 bytes
     size = (size + 3) & ~3
@@ -148,8 +148,9 @@ class MemoryAlloc:
     chunk, left = self._find_best_chunk(size)
     # out of memory?
     if chunk == None:
-      raise VamosInternalError("[alloc: NO MEMORY for %06x bytes]" % size)
-      log_mem_alloc.error("[alloc: NO MEMORY for %06x bytes]" % size)
+      if except_on_fail:
+        raise VamosInternalError("[alloc: NO MEMORY for %06x bytes]" % size)
+        log_mem_alloc.error("[alloc: NO MEMORY for %06x bytes]" % size)
       return 0
     # remove chunk from free list
     # is something left?
@@ -248,8 +249,10 @@ class MemoryAlloc:
       return None
 
   # memory
-  def alloc_memory(self, name, size, add_label=True):
-    addr = self.alloc_mem(size)
+  def alloc_memory(self, name, size, add_label=True, except_on_failure = True):
+    addr = self.alloc_mem(size, except_on_failure)
+    if addr == 0:
+      return None
     if add_label:
       label = LabelRange(name, addr, size)
       self.label_mgr.add_label(label)

@@ -143,7 +143,7 @@ class ExecLibrary(AmigaLibrary):
     flags  = ctx.cpu.r_reg(REG_D0);
     size   = (ctx.cpu.r_reg(REG_D1) + 7) & -8;
     thresh = ctx.cpu.r_reg(REG_D2)
-    pool   = Pool(self.mem, self.alloc, flags, size, thresh)
+    pool   = Pool(self.mem, self.alloc, flags, size, thresh, poolid)
     self._pools[poolid] = pool
     log_exec.info("CreatePool: pool 0x%x" % poolid)
     return poolid

@@ -126,7 +126,7 @@ class PathManager:
     abs_path = self.ami_abs_path(lock, ami_path)
     # replace assigns
     norm_paths = self.assign_mgr.ami_path_resolve(abs_path)
-    if len(norm_paths) == 0:
+    if len(norm_paths) == 0 or ami_path=="*":
       log_path.warn("ami_to_sys_path: ami_path='%s' -> abs_path='%s' -> no resolved paths!" % (ami_path, abs_path))
       return None
     # now we have paths with volume:abs/path

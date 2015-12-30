@@ -1259,6 +1259,8 @@ class DosLibrary(AmigaLibrary):
       current_dir = self.ctx.process.get_current_dir()
       cur_lock    = self.lock_mgr.get_by_b_addr(current_dir >> 2)
       dup_lock    = self.lock_mgr.dup_lock(self.get_current_dir())
+      cur_module  = cli.r_s("cli_Module")
+      cli.w_s("cli_Module",0)
       self.ctx.process.set_current_dir(dup_lock.mem.addr)
       self.cur_dir_lock = dup_lock
       # print "*** Current input is %s" % input_fh
@@ -1267,6 +1269,7 @@ class DosLibrary(AmigaLibrary):
         cli.w_s("cli_CurrentInput",input_fh)
         cli.w_s("cli_StandardInput",input_fh)
         cli.w_s("cli_Background",self.DOSFALSE)
+        cli.w_s("cli_Module",cur_module)
         ctx.process.this_task.access.w_s("pr_CIS",input_fh)
         infile = self.file_mgr.get_by_b_addr(input_fh >> 2)
         infile.setbuf("")
@@ -1315,12 +1318,16 @@ class DosLibrary(AmigaLibrary):
 
   def UnLoadSeg(self, ctx):
     b_addr = ctx.cpu.r_reg(REG_D1)
-    if not self.seg_lists.has_key(b_addr):
-      raise VamosInternalError("Unknown LoadSeg seg_list: b_addr=%06x" % b_addr)
+    if b_addr != 0:
+      if not self.seg_lists.has_key(b_addr):
+        raise VamosInternalError("Unknown LoadSeg seg_list: b_addr=%06x" % b_addr)
+      else:
+        seg_list = self.seg_lists[b_addr]
+        del self.seg_lists[b_addr]
+        self.ctx.seg_loader.unload_seg(seg_list)
+        log_dos.info("UnLoadSeg:  %s" % seg_list)
     else:
-      seg_list = self.seg_lists[b_addr]
-      del self.seg_lists[b_addr]
-      self.ctx.seg_loader.unload_seg(seg_list)
+      log_dos.info("UnLoadSeg:  NULL")
 
   def RunCommand(self, ctx):
     seglist  = ctx.cpu.r_reg(REG_D1)
@@ -1342,7 +1349,7 @@ class DosLibrary(AmigaLibrary):
     path = ctx.mem.access.r_cstr(addr)
     pos  = dos.PathPart.file_part(path)
     if pos < len(path):
-      log_dos.info("FilePart: path='%s' -> result='%s'", path, path[pos:])
+      log_dos.info("FilePart: path='%s' -> result='%s'", path, path[:pos])
     else:
       log_dos.info("FilePart: path='%s' -> pos=NULL", path)
     return addr + pos

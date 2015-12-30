@@ -4,12 +4,13 @@ from Puddle import Puddle
 
 class Pool:
 
-  def __init__(self, mem, alloc, flags, size, thresh):
+  def __init__(self, mem, alloc, flags, size, thresh, poolid):
     self.alloc   = alloc
     self.mem     = mem
     self.minsize = size
     self.flags   = flags
-    self.thresh  = thresh    
+    self.thresh  = thresh
+    self.name    = " in Pool %x" % poolid
     self.puddles = []
 
   def __del__(self):
@@ -27,24 +28,24 @@ class Pool:
     return poolstr
         
   def AllocPooled(self, label_mgr, name, size):
-    result = 0
+    result = None
     if size >= self.thresh:
       puddle = Puddle(self.mem, self.alloc, label_mgr, name, size)
       if puddle != None:
         self.puddles.append(puddle)
-        result = puddle.AllocPooled(name, size)
+        result = puddle.AllocPooled(name + self.name, size)
     else: 
       for puddle in self.puddles:
-        result = puddle.AllocPooled(name,size)
-        if result > 0:
+        result = puddle.AllocPooled(name + self.name, size)
+        if result != None:
           break
         # none of the puddles had enough memory
-      if result == 0:
+      if result == None:
         puddle = Puddle(self.mem, self.alloc, label_mgr, name, self.minsize)
         if puddle != None:
           self.puddles.append(puddle)
-          result = puddle.AllocPooled(name, size)
-    if result == 0: 
+          result = puddle.AllocPooled(name + self.name, size)
+    if result == None: 
       log_exec.info("AllocPooled: Unable to allocate memory (%x)", size)
     return result
 

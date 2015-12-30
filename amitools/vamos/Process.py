@@ -35,6 +35,7 @@ class Process:
 
   def free(self):
     self.free_task_struct()
+    self.free_shell_packet()
     self.free_cli_struct()
     self.free_args()
     self.free_stack()
@@ -156,6 +157,18 @@ class Process:
     return self.cli.addr
 
   # ----- initialize for running a command in a shell -----
+
+  def free_shell_packet(self):
+    if self.shell_message != None:
+      self.ctx.alloc.free_struct(self.shell_message)
+      self.shell_message = None
+    if self.shell_packet != None:
+      self.ctx.alloc.free_struct(self.shell_packet)
+      self.shell_packet = None
+    if self.shell_port != None:
+      self.ctx.exec_lib.port_mgr.free_port(self.shell_port)
+      self.shell_port = None
+
   def run_system(self):
     if self.shell_packet == None:
       # Ok, here we have to create a DosPacket for the shell startup

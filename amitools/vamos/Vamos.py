@@ -338,6 +338,6 @@ class Vamos:
     # create a guard memory for tracking invalid old dos access
     self.dos_guard_base = self.mem.reserve_special_range()
     self.dos_guard_size = 0x010000
-    label = LabelRange("old_dos",self.dos_guard_base, self.dos_guard_size)
+    label = LabelRange("old_dos guard",self.dos_guard_base, self.dos_guard_size)
     self.label_mgr.add_label(label)
     log_mem_init.info(label)

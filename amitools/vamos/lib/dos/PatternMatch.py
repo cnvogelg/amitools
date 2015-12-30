@@ -46,7 +46,7 @@ def _pop_non_or(blocks, dst):
     else:
       return dst
 
-def pattern_parse(src_str, ignore_case=True, star_is_wild=True):
+def pattern_parse(src_str, ignore_case=True, star_is_wild=False):
   """tokenize pattern. return tokenized pattern or None if an error occurred"""
   dst = ""
   n_src = len(src_str)

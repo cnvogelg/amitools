@@ -17,6 +17,7 @@ GEN_C = $(patsubst %.pyx,%.c,$(PYX))
 
 DEPS = $(PYX) mem.c mem.h traps.c traps.h
 PYTHON = python
+#PYTHON = python-dbg
 
 BUILD_DIR = build
 
