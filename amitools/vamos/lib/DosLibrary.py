@@ -95,7 +95,7 @@ class DosLibrary(AmigaLibrary):
       self._free_mem(res)
     # free shell variables
     while len(self.local_vars) > 0:
-      var = self.local_vars[0]
+      var = self.local_vars.values()[0]
       self.delete_var(ctx,var)
     # self.delete_var(ctx,var)
     # free RootNode
