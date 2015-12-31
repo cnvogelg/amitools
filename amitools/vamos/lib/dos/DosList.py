@@ -8,8 +8,9 @@ class DosListEntry:
   def __init__(self,name,struct_def):
     self.name = name
     self.struct_def = struct_def
-    self.mem = None
+    self.mem   = None
     self.baddr = 0
+    self.next  = None
 
   def __str__(self):
     return "[%s@%06x=b@%06x]" % (self.name, self.mem.addr, self.baddr)
@@ -21,6 +22,9 @@ class DosList:
     self.entries_by_b_addr = {}
     self.entries_by_name = {}
     self.entries = []
+    self.first_entry = None
+    self.LDF_ASSIGNS = 1 << 4
+    self.LDF_VOLUMES = 1 << 3
 
   def __str__(self):
     res = "["
@@ -36,13 +40,19 @@ class DosList:
     volumes = path_mgr.get_all_volume_names()
     for vol in volumes:
       entry = self.add_volume(vol)
-      if last_entry is not None:
+      if last_entry is None:
+        self.first_entry = entry
+      else:
+        last_entry.next = entry
         last_entry.access.w_s('dol_Next', entry.baddr)
       last_entry = entry
     assigns,auto_assigns = path_mgr.get_all_assigns()
     for assign in assigns:
       entry = self.add_assign(assign,assigns[assign])
-      if last_entry is not None:
+      if last_entry is None:
+        self.first_entry = entry
+      else:
+        last_entry.next = entry
         last_entry.access.w_s('dol_Next', entry.baddr)
       last_entry = entry
 
@@ -123,3 +133,38 @@ class DosList:
       return None
     else:
       return self.entries_by_name[name.lower()]
+
+  def _next_dos_entry(self,entry,flags):
+    while entry != None:
+      t = entry.access.r_s("dol_Type")
+      if t == 1 and flags & self.LDF_ASSIGNS:
+        return entry
+      elif t == 2 and flags & self.LDF_VOLUMES:
+        return entry
+      entry = entry.next
+    return None  
+
+  def lock_dos_list(self,flags):
+    # Yes, this algorithm is really the one in the
+    # dos.library.
+    entry = self._next_dos_entry(self.first_entry,flags)
+    if entry == None:
+      return 0
+    else:
+      return entry.mem.addr + 1
+
+  def unlock_dos_list(self,flags):
+    pass
+
+  def next_dos_entry(self,flags,node):
+    if node == 0:
+      return 0
+    if node & 1:
+      entry = self.entries_by_b_addr[(node - 1) >> 2]
+    else:
+      entry = self.entries_by_b_addr[node >> 2].next
+      entry = self._next_dos_entry(entry,flags)
+    if entry == None:
+      return 0
+    else:
+      return entry.mem.addr

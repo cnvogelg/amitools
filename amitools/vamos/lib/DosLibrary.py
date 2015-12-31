@@ -173,7 +173,7 @@ class DosLibrary(AmigaLibrary):
       txt = "%s: %s\n" % (hdr, err_str)
     else:
       txt = "%s\n" % err_str
-    fh = self.file_mgr.get_output()
+    fh = ctx.process.get_output()
     fh.write(txt)
     return self.DOSTRUE
 
@@ -566,7 +566,7 @@ class DosLibrary(AmigaLibrary):
     str_ptr = ctx.cpu.r_reg(REG_D1)
     str_dat = ctx.mem.access.r_cstr(str_ptr)
     # write to stdout
-    fh = self.file_mgr.get_output()
+    fh = ctx.process.get_output()
     ok = fh.write(str_dat)
     log_dos.info("PutStr: '%s'", str_dat)
     return 0 # ok
@@ -582,7 +582,7 @@ class DosLibrary(AmigaLibrary):
     argv_ptr = ctx.cpu.r_reg(REG_D2)
     fmt = ctx.mem.access.r_cstr(format_ptr)
     # write on output
-    fh = self.file_mgr.get_output()
+    fh = ctx.process.get_output()
     log_dos.info("VPrintf: format='%s' argv=%06x" % (fmt,argv_ptr))
     # now decode printf
     ps = dos.Printf.printf_parse_string(fmt)
@@ -609,6 +609,14 @@ class DosLibrary(AmigaLibrary):
     # write result
     fh.write(result)
     return len(result)
+
+  def WriteChars(self, ctx):
+    fh       = ctx.process.get_output()
+    buf_addr = ctx.cpu.r_reg(REG_D1)
+    siz      = ctx.cpu.r_reg(REG_D2)
+    buf      = ctx.mem.access.r_cstr(buf_addr)[:siz]
+    fh.write(buf)
+    return len(buf)
 
   def VFWritef(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
@@ -1501,6 +1509,22 @@ class DosLibrary(AmigaLibrary):
     # from the packet. Anyhow, this is already done, so do nothing here
     return 0x80000004 #valid, and a System() call.
 
+  # ----- DosList -------------
+
+  def LockDosList(self, ctx):
+    flags = ctx.cpu.r_reg(REG_D1)
+    node  = self.dos_list.lock_dos_list(flags)
+    return node
+
+  def UnLockDosList(self, ctx):
+    flags = ctx.cpu.r_reg(REG_D1)
+    self.dos_list.unlock_dos_list(flags)
+
+  def NextDosEntry(self, ctx):
+    flags = ctx.cpu.r_reg(REG_D2)
+    node  = ctx.cpu.r_reg(REG_D1)
+    return self.dos_list.next_dos_entry(flags,node)
+  
   # ----- misc --------
 
   def StrToLong(self, ctx):
