@@ -88,12 +88,12 @@ class FileHandle:
 
   def ungetc(self, var):
     if var == 0xffffffff:
-        var = -1
+      var = -1
     if var < 0 and self.ch >= 0:
       var = self.ch
       self.ch = -1
     if var >= 0:
-        self.unch = self.unch + chr(var)
+      self.unch = chr(var) + self.unch
     return var
 
   def ungets(self, s):

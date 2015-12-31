@@ -35,12 +35,13 @@ class Vamos:
 
     # too much RAM requested?
     # our "custom chips" start at $BFxxxx so we allow RAM only to be below
-    if self.ram_size >= 0xbf0000:
+    if self.ram_size >= 0xbf0000 and self.cfg.hw_access != "disable":
       raise VamosConfigError("Too much RAM configured! Only up to $BF0000 allowed.")
 
     # setup custom chips
-    self.hw_access = HardwareAccess(raw_mem)
-    self._setup_hw_access()
+    if self.cfg.hw_access != "disable":
+      self.hw_access = HardwareAccess(raw_mem)
+      self._setup_hw_access()
 
     # path manager
     self.path_mgr = PathManager( cfg )
@@ -94,6 +95,8 @@ class Vamos:
       self.hw_access.set_mode(HardwareAccess.MODE_IGNORE)
     elif cfg.hw_access == "abort":
       self.hw_access.set_mode(HardwareAccess.MODE_ABORT)
+    elif cfg.hw_access == "disable":
+      pass
     else:
       raise VamosConfigError("Invalid HW Access mode: %s" % cfg.hw_access)
 
@@ -219,6 +222,8 @@ class Vamos:
     tr.read_ax_l(7, old_stack_off, True) # read from data offset (dc.l above)
     # restore regs
     tr.restore_all_but_d0()
+    # keep the old input file handle
+    input_fh = self.process.get_input()
     # trap to clean up sub process resources
     def trap_stop_run_command():
       ret_code = self.cpu.r_reg(REG_D0)
@@ -227,7 +232,7 @@ class Vamos:
       self.process.this_task.access.w_s("pr_Task.tc_SPLower",oldstackbase)
       self.process.this_task.access.w_s("pr_Task.tc_SPUpper",oldstacktop)
       self.alloc.free_memory(newstack)
-      self.process.get_input().setbuf("")
+      input_fh.setbuf("")
       # The return code remains in d0 as is
     tr.final_rts(trap_stop_run_command)
     # realize trampoline in memory (data+code)
@@ -333,6 +338,6 @@ class Vamos:
     # create a guard memory for tracking invalid old dos access
     self.dos_guard_base = self.mem.reserve_special_range()
     self.dos_guard_size = 0x010000
-    label = LabelRange("old_dos",self.dos_guard_base, self.dos_guard_size)
+    label = LabelRange("old_dos guard",self.dos_guard_base, self.dos_guard_size)
     self.label_mgr.add_label(label)
     log_mem_init.info(label)

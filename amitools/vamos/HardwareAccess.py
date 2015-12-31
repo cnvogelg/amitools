@@ -10,6 +10,7 @@ class HardwareAccess:
   MODE_IGNORE = 0
   MODE_EMU = 1
   MODE_ABORT = 2
+  MODE_DISABLE = 3
 
   def __init__(self, raw_mem):
     # setup $BFxxxx CIA range

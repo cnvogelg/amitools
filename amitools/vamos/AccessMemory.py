@@ -77,23 +77,33 @@ class AccessMemory:
 
   # c string
   def r_cstr(self, addr):
-    cstr = self.raw_mem.r_cstr(addr)
+    if addr == 0:
+      # THOR: Some buggy programs pass a NULL pointer and expect that
+      # location zero reads zero (which it does by default)
+      cstr = ""
+    else:
+      cstr = self.raw_mem.r_cstr(addr)
     if self.label_mgr != None:
       self.label_mgr.trace_int_block( 'R', addr, len(cstr), text="CSTR", addon="'%s'"%cstr, level=logging.INFO )
     return cstr
 
   def w_cstr(self, addr, cstr):
-    self.raw_mem.w_cstr(addr, cstr)
-    if self.label_mgr != None:
-      self.label_mgr.trace_int_block( 'W', addr, len(cstr), text="CSTR", addon="'%s'"%cstr, level=logging.INFO )
+    if addr != 0:
+      self.raw_mem.w_cstr(addr, cstr)
+      if self.label_mgr != None:
+        self.label_mgr.trace_int_block( 'W', addr, len(cstr), text="CSTR", addon="'%s'"%cstr, level=logging.INFO )
 
   def r_bstr(self, addr):
-    bstr = self.raw_mem.r_bstr(addr)
+    if addr == 0:
+      bstr = ""
+    else:
+      bstr = self.raw_mem.r_bstr(addr)
     if self.label_mgr != None:
       self.label_mgr.trace_int_block( 'R', addr, len(bstr), text='BSTR', addon="'%s'"%bstr, level=logging.INFO )
     return bstr
 
   def w_bstr(self, addr, bstr):
-    self.raw_mem.w_bstr(addr, bstr)
-    if self.label_mgr != None:
-      self.label_mgr.trace_int_block( 'W', addr, len(bstr), text='BSTR', addon="'%s'"%bstr, level=logging.INFO )
+    if addr != 0:
+      self.raw_mem.w_bstr(addr, bstr)
+      if self.label_mgr != None:
+        self.label_mgr.trace_int_block( 'W', addr, len(bstr), text='BSTR', addon="'%s'"%bstr, level=logging.INFO )

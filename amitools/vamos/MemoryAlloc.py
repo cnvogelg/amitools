@@ -3,6 +3,7 @@ from Log import log_mem_alloc
 from label.LabelRange import LabelRange
 from label.LabelStruct import LabelStruct
 from AccessStruct import AccessStruct
+import sys
 
 class Memory:
   def __init__(self, addr, size, label, access):
@@ -47,8 +48,9 @@ class MemoryAlloc:
 
     # init free list
     self.free_bytes = size - (begin - addr)
-    self.free_first = MemoryChunk(addr + begin, self.free_bytes)
+    self.free_first = MemoryChunk(begin, self.free_bytes)
     self.free_entries = 1
+    #self.next_dump  = self.free_bytes - 0x10000
 
   def _find_best_chunk(self, size):
     """find best chunk that could take the given alloc
@@ -140,7 +142,7 @@ class MemoryAlloc:
     num_allocs = len(self.addrs)
     return "(free %06x #%d) (allocs #%d)" % (self.free_bytes, self.free_entries, num_allocs)
 
-  def alloc_mem(self, size):
+  def alloc_mem(self, size, except_on_fail = True):
     """allocate memory and return addr or 0 if no more memory"""
     # align size to 4 bytes
     size = (size + 3) & ~3
@@ -148,8 +150,10 @@ class MemoryAlloc:
     chunk, left = self._find_best_chunk(size)
     # out of memory?
     if chunk == None:
-      raise VamosInternalError("[alloc: NO MEMORY for %06x bytes]" % size)
-      log_mem_alloc.error("[alloc: NO MEMORY for %06x bytes]" % size)
+      if except_on_fail:
+        self.dump_orphans()
+        log_mem_alloc.error("[alloc: NO MEMORY for %06x bytes]" % size)
+        raise VamosInternalError("[alloc: NO MEMORY for %06x bytes]" % size)
       return 0
     # remove chunk from free list
     # is something left?
@@ -167,6 +171,10 @@ class MemoryAlloc:
     log_mem_alloc.info("[alloc @%06x-%06x: %06x bytes] %s", addr, addr+size, size, self._stat_info())
     if addr % 4:
       raise VamosInternalError("Memory pool is invalid, return address not aligned by a long word");
+    #if self.free_bytes < self.next_dump:
+    #  self.next_dump -= 0x10000
+    #  sys.stderr.write("\n\n**** Memory allocation dump ****\n");
+    #  self.dump_orphans()
     return addr
 
   def free_mem(self, addr, size):
@@ -235,7 +243,7 @@ class MemoryAlloc:
       cur = cur.next
     # orphan at end?
     addr = last.addr + last.size
-    end = self.addr + self.size
+    end  = self.addr + self.size
     if addr != end:
       self._dump_orphan(addr, end-addr)
 
@@ -248,8 +256,10 @@ class MemoryAlloc:
       return None
 
   # memory
-  def alloc_memory(self, name, size, add_label=True):
-    addr = self.alloc_mem(size)
+  def alloc_memory(self, name, size, add_label=True, except_on_failure = True):
+    addr = self.alloc_mem(size, except_on_failure)
+    if addr == 0:
+      return None
     if add_label:
       label = LabelRange(name, addr, size)
       self.label_mgr.add_label(label)
@@ -334,5 +344,24 @@ class MemoryAlloc:
       return True
     return False
 
+  def total(self):
+    return self.size
+
+  def available(self):
+    free  = 0
+    chunk = self.free_first
+    while chunk != None:
+      free += chunk.size
+      chunk = chunk.next
+    return free
+
+  def largest_chunk(self):
+    largest = 0
+    chunk = self.free_first
+    while chunk != None:
+      if chunk.size > largest:
+        largest = chunk.size
+      chunk = chunk.next
+    return largest
 
 

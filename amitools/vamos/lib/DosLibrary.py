@@ -54,6 +54,9 @@ class DosLibrary(AmigaLibrary):
     self.rdargs = {}
     self.dos_objs = {}
     self.errstrings = {}
+    self.path = []
+    self.resident = []
+    self.local_vars = {}
     # setup RootNode
     self.root_struct = ctx.alloc.alloc_struct("RootNode",RootNodeDef)
     self.access.w_s("dl_Root",self.root_struct.addr)
@@ -79,9 +82,21 @@ class DosLibrary(AmigaLibrary):
     # free port
     ctx.exec_lib.port_mgr.free_port(self.fs_handler_port)
     # finish file manager
-    self.file_mgr.finish()
+    self.file_mgr.finish(ctx.process.is_native_shell())
     # free dos list
     self.dos_list.free_list()
+    # free path
+    for path,lock in self.path:
+      ctx.alloc.free_struct(path)
+      self.lock_mgr.release_lock(lock)
+    # free resident nodes
+    for res in self.resident:
+      self._free_mem(res)
+    # free shell variables
+    while len(self.local_vars) > 0:
+      var = self.local_vars.values()[0]
+      self.delete_var(ctx,var)
+    # self.delete_var(ctx,var)
     # free RootNode
     ctx.alloc.free_struct(self.root_struct)
     # free DosInfo
@@ -94,7 +109,7 @@ class DosLibrary(AmigaLibrary):
     if self.io_err in dos_error_strings:
       errstring = dos_error_strings[self.io_err]
     else:
-      errstring = "???"
+      errstring = "%d" % self.io_err
     log_dos.info("IoErr: %d (%s)" % (self.io_err, errstring))
     return self.io_err
 
@@ -108,22 +123,55 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("SetIoErr: IoErr=%d old IoErr=%d", self.io_err, old_io_err)
     return old_io_err
 
+  def Fault(self, ctx):
+    errcode = ctx.cpu.r_reg(REG_D1)
+    hdr_ptr = ctx.cpu.r_reg(REG_D2)
+    buf_ptr = ctx.cpu.r_reg(REG_D3)
+    buf_len = ctx.cpu.r_reg(REG_D4)
+    if errcode >= 0x80000000:
+      idx = errcode - 0x100000000
+    else:
+      idx = errcode
+    if hdr_ptr != 0:
+      hdr = ctx.mem.access.r_cstr(hdr_ptr)
+    else:
+      hdr = ""
+    if dos_error_strings.has_key(idx):
+      err_str = dos_error_strings[idx]
+    else:
+      err_str = "%d ERROR" % self.io_err
+    log_dos.info("Fault: code=%d header='%s' err_str='%s'", self.io_err, hdr, err_str)
+    # write to stdout
+    if hdr_ptr != 0:
+      txt = "%s: %s\n" % (hdr, err_str)
+    else:
+      txt = "%s\n" % err_str
+    ctx.mem.access.w_cstr(buf_ptr,txt[:buf_len-1])
+    return self.DOSTRUE
+      
   def PrintFault(self, ctx):
     self.io_err = ctx.cpu.r_reg(REG_D1)
     hdr_ptr = ctx.cpu.r_reg(REG_D2)
+    if self.io_err >= 0x80000000:
+      idx = self.io_err - 0x100000000
+    else:
+      idx = self.io_err
     # get header string
     if hdr_ptr != 0:
       hdr = ctx.mem.access.r_cstr(hdr_ptr)
     else:
       hdr = ""
     # get error string
-    if dos_error_strings.has_key(self.io_err):
-      err_str = dos_error_strings[self.io_err]
+    if dos_error_strings.has_key(idx):
+      err_str = dos_error_strings[idx]
     else:
-      err_str = "??? ERROR"
+      err_str = "%d ERROR" % self.io_err
     log_dos.info("PrintFault: code=%d header='%s' err_str='%s'", self.io_err, hdr, err_str)
     # write to stdout
-    txt = "%s: %s\n" % (hdr, err_str)
+    if hdr_ptr != 0:
+      txt = "%s: %s\n" % (hdr, err_str)
+    else:
+      txt = "%s\n" % err_str
     fh = self.file_mgr.get_output()
     fh.write(txt)
     return self.DOSTRUE
@@ -179,18 +227,10 @@ class DosLibrary(AmigaLibrary):
   # ----- Variables -----
 
   def find_var(self, ctx, name, flags):
-    varlist   = ctx.process.get_local_vars()
-    node_addr = varlist.access.r_s("mlh_Head")
-    node      = AccessStruct(ctx.mem,LocalVarDef,node_addr)
-    while node.r_s("lv_Node.ln_Succ") != 0:
-      naddr   = node.r_s("lv_Node.ln_Name")
-      mname   = ctx.mem.access.r_cstr(naddr)
-      mtype   = node.r_s("lv_Node.ln_Type")
-      if mtype == flags & 0xff and name.lower() == mname.lower():
-        return node
-      node_addr = node.r_s("lv_Node.ln_Succ")
-      node      = AccessStruct(ctx.mem,LocalVarDef,node_addr)
-    return None
+    if (name.lower(),flags & 0xff) in self.local_vars:
+      return self.local_vars[(name.lower(),flags & 0xff)]
+    else:
+      return None
 
   def create_var(self, ctx, name, flags):
     varlist   = ctx.process.get_local_vars()
@@ -207,6 +247,7 @@ class DosLibrary(AmigaLibrary):
     varlist.access.w_s("mlh_Head",node_addr)
     node.access.w_s("lv_Node.ln_Succ",head_addr)
     node.access.w_s("lv_Node.ln_Pred",varlist.access.s_get_addr("mlh_Head"))
+    self.local_vars[(name.lower(),flags & 0xff)] = node.access
     return node.access
 
   def set_var(self,ctx,node,buff_ptr,size,value,flags):
@@ -234,6 +275,9 @@ class DosLibrary(AmigaLibrary):
     AccessStruct(ctx.mem, NodeDef, pred).w_s("ln_Succ", succ)
     AccessStruct(ctx.mem, NodeDef, succ).w_s("ln_Pred", pred)
     self._free_mem(node.struct_addr)
+    for k in self.local_vars.keys():
+      if self.local_vars[k] == node:
+        del self.local_vars[k]
 
   def GetVar(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
@@ -361,6 +405,11 @@ class DosLibrary(AmigaLibrary):
     ctx.mem.access.w_bstr(name_addr,name)
     self.dos_info.access.w_s("di_NetHand",seg_addr)
     log_dos.info("AddSegment(%s,%06x) -> %06x" % (name,seglist,seg_addr))
+    self.resident.append(seg_addr)
+    # Adding a resident command to the registered seglists.
+    b_addr = seglist >> 2
+    if b_addr not in self.seg_lists:
+      self.seg_lists[b_addr] = (None,name)
     return -1
 
   # ----- File Ops -----
@@ -571,44 +620,47 @@ class DosLibrary(AmigaLibrary):
     pos = 0
     state = ''
     while pos < len(fmt):
-      ch = fmt[pos]
+      ch = fmt[pos].upper()
       pos = pos + 1
-      if state[0:0] == 'x':
-        n = ord(ch.ascii_uppercase)
+      if state[0:1] == 'x':
+        n = ord(ch)
         if n >= ord('0') and n <= ord('9'):
           n = n - ord('0')
         elif n >= ord('A') and n <= ord('Z'):
           n = (n - ord('A')) + 10
         else:
           n = 0
-        ch = state[1]
+        ch = state[1:2]
         if ch == 'T':
-          out = out + ("%*s" % (n, ctx.mem.access.r_cstr(val)))
+          out = out + ("%*s" % (-n, ctx.mem.access.r_cstr(val)))
         elif ch == 'O':
-          out = out + ("%*O" % (n, val))
+          out = out + ("%*O" % (-n, val))
         elif ch == 'X':
-          out = out + ("%*X" % (n, val))
+          out = out + ("%*X" % (-n, val))
         elif ch == 'I':
-          out = out + ("%*ld" % (n, ctypes.c_long(val).value))
+          out = out + ("%*ld" % (-n, ctypes.c_long(val).value))
         elif ch == 'U':
-          out = out + ("%*lu" % (n, ctypes.c_ulong(val).value))
+          out = out + ("%*lu" % (-n, ctypes.c_ulong(val).value))
         else:
           out = out + '%' + state[1] + state[0]
         state = ''
       elif state == '%':
-        if ch == 'S' or ch == 's':
+        if ch == 'S':
           out = out + ctx.mem.access.r_cstr(val)
+          state = ''
         elif ch == 'C':
           out = out + chr(val & 0xff)
+          state = ''
         elif ch == 'N':
           out = out + ("%ld" % ctypes.c_long(val).value)
+          state = ''
         elif ch == '$':
-          pass
+          state = ''
         elif ch == 'T' or ch == 'O' or ch == 'X' or ch == 'I' or ch == 'U':
           state = 'x' + ch
         else:
           out = out + '%' + ch
-        state = ''
+          state = ''
       else:
         if ch == '%':
           state = '%'
@@ -735,10 +787,13 @@ class DosLibrary(AmigaLibrary):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     fib_ptr = ctx.cpu.r_reg(REG_D2)
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-    log_dos.info("Examine: %s fib=%06x" % (lock, fib_ptr))
     fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
-    self.setioerr(ctx,lock.examine_lock(fib))
-    if self.io_err == NO_ERROR:
+    err = lock.examine_lock(fib)
+    name_addr = fib.s_get_addr('fib_FileName')
+    name      = fib.r_cstr(name_addr)
+    log_dos.info("Examine: %s fib=%06x(%s) -> %s" % (lock, fib_ptr, name, err))
+    self.setioerr(ctx,err)
+    if err == NO_ERROR:
       return self.DOSTRUE
     else:
       return self.DOSFALSE
@@ -769,10 +824,13 @@ class DosLibrary(AmigaLibrary):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     fib_ptr = ctx.cpu.r_reg(REG_D2)
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-    log_dos.info("ExNext: %s fib=%06x" % (lock, fib_ptr))
     fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
-    self.setioerr(ctx,lock.examine_next(fib))
-    if self.io_err == NO_ERROR:
+    err = lock.examine_next(fib)
+    name_addr = fib.s_get_addr('fib_FileName')
+    name      = fib.r_cstr(name_addr)
+    log_dos.info("ExNext: %s fib=%06x (%s) -> %s" % (lock, fib_ptr, name, err))
+    self.setioerr(ctx,err)
+    if err == NO_ERROR:
       return self.DOSTRUE
     else:
       return self.DOSFALSE
@@ -981,6 +1039,17 @@ class DosLibrary(AmigaLibrary):
 
   # ----- Args -----
 
+  def FindArg(self, ctx):
+    template_ptr = ctx.cpu.r_reg(REG_D1)
+    keyword_ptr  = ctx.cpu.r_reg(REG_D2)
+    template     = ctx.mem.access.r_cstr(template_ptr)
+    keyword      = ctx.mem.access.r_cstr(keyword_ptr)
+    args         = Args()
+    args.parse_template(template)
+    pos          = args.find_arg(keyword)
+    log_dos.info("FindArgs: template=%s keyword=%s -> %d" % (template,keyword,pos))
+    return pos
+    
   def ReadArgs(self, ctx):
     template_ptr = ctx.cpu.r_reg(REG_D1)
     template     = ctx.mem.access.r_cstr(template_ptr)
@@ -994,7 +1063,12 @@ class DosLibrary(AmigaLibrary):
     if ctx.process.bin_args is not None:
       bin_args = ctx.process.bin_args
     else:
-      bin_args = args.split(ctx.process.get_input().getbuf())
+      raw_args = ctx.process.get_input().getbuf()
+      if raw_args == "?\n":
+        ctx.process.get_output().write(template+": ")
+        ctx.process.get_input().setbuf("")
+        raw_args = ctx.process.get_input().gets(512)
+      bin_args = args.split(raw_args)
     log_dos.info("ReadArgs: args=%s template='%s' array_ptr=%06x rdargs_ptr=%06x" % (bin_args, template, array_ptr, rdargs_ptr))
     # try to parse argument string
     args.parse_template(template)
@@ -1087,6 +1161,7 @@ class DosLibrary(AmigaLibrary):
     # Write back the updated csource ptr if we have one
     if (csource_ptr):
       csource.access.w_s('CS_CurChr',self.cs_curchr)
+    result = ctx.mem.access.r_cstr(buff_ptr)
     return res
 
   def _readItem(self, ctx, buff_ptr, maxchars):
@@ -1193,6 +1268,8 @@ class DosLibrary(AmigaLibrary):
       current_dir = self.ctx.process.get_current_dir()
       cur_lock    = self.lock_mgr.get_by_b_addr(current_dir >> 2)
       dup_lock    = self.lock_mgr.dup_lock(self.get_current_dir())
+      cur_module  = cli.r_s("cli_Module")
+      cli.w_s("cli_Module",0)
       self.ctx.process.set_current_dir(dup_lock.mem.addr)
       self.cur_dir_lock = dup_lock
       # print "*** Current input is %s" % input_fh
@@ -1201,11 +1278,15 @@ class DosLibrary(AmigaLibrary):
         cli.w_s("cli_CurrentInput",input_fh)
         cli.w_s("cli_StandardInput",input_fh)
         cli.w_s("cli_Background",self.DOSFALSE)
+        cli.w_s("cli_Module",cur_module)
         ctx.process.this_task.access.w_s("pr_CIS",input_fh)
+        infile = self.file_mgr.get_by_b_addr(input_fh >> 2)
+        infile.setbuf("")
         self.ctx.process.set_current_dir(current_dir)
         self.cur_dir_lock = self.lock_mgr.get_by_b_addr(current_dir >> 2)
         ctx.cpu.w_reg(REG_D0,0)
         self.setioerr(ctx, ret_code)
+        log_dos.info("SystemTagList returned: cmd='%s' tags=%s", cmd, tag_list)
         return 0
       # The return code remains in d0 as is
       ctx.run_shell(ctx.process.shell_start,packet,stacksize,trap_stop_run_command)
@@ -1235,37 +1316,45 @@ class DosLibrary(AmigaLibrary):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name     = ctx.mem.access.r_cstr(name_ptr)
     lock     = self.get_current_dir()
-    seg_list = self.ctx.seg_loader.load_seg(lock,name)
+    seg_list = self.ctx.seg_loader.load_seg(lock,name,False)
     if seg_list == None:
       log_dos.warn("LoadSeg: '%s' -> not found!" % (name))
       return 0
     else:
       log_dos.info("LoadSeg: '%s' -> %s" % (name, seg_list))
       b_addr = seg_list.b_addr
-      self.seg_lists[b_addr] = seg_list
+      self.seg_lists[b_addr] = (seg_list,name)
       return b_addr
 
   def UnLoadSeg(self, ctx):
     b_addr = ctx.cpu.r_reg(REG_D1)
-    if not self.seg_lists.has_key(b_addr):
-      raise VamosInternalError("Unknown LoadSeg seg_list: b_addr=%06x" % b_addr)
+    if b_addr != 0:
+      if not self.seg_lists.has_key(b_addr):
+        raise VamosInternalError("Trying to unload unknown LoadSeg seg_list: b_addr=%06x" % b_addr)
+      else:
+        seg_list = self.seg_lists[b_addr][0]
+        del self.seg_lists[b_addr]
+        self.ctx.seg_loader.unload_seg(seg_list,False)
+        log_dos.info("UnLoadSeg:  %s" % seg_list)
     else:
-      seg_list = self.seg_lists[b_addr]
-      del self.seg_lists[b_addr]
-      self.ctx.seg_loader.unload_seg(seg_list)
+      log_dos.info("UnLoadSeg:  NULL")
 
   def RunCommand(self, ctx):
-    seglist  = ctx.cpu.r_reg(REG_D1)
+    b_addr   = ctx.cpu.r_reg(REG_D1)
+    if not b_addr in self.seg_lists:
+      raise VamosInternalError("Trying to run unknown LoadSeg seg_list: b_addr=%06x" % b_addr)
+    else:
+      name = self.seg_lists[b_addr][1]
     stack    = ctx.cpu.r_reg(REG_D2)
     args     = ctx.cpu.r_reg(REG_D3)
     length   = ctx.cpu.r_reg(REG_D4)
     fh       = ctx.process.get_input()
     cmdline  = ctx.mem.access.r_cstr(args)
     ctx.process.get_input().setbuf(cmdline)
-    log_dos.info("RunCommand: seglist=%06x stack=%d args=%s" % (seglist, stack, cmdline))
+    log_dos.info("RunCommand: seglist=%06x(%s) stack=%d args=%s" % (b_addr, name, stack, cmdline))
     # round up the stack
     stack    = (stack + 3) & -4
-    ctx.run_command((seglist << 2) + 4,args,length,stack)
+    ctx.run_command((b_addr << 2) + 4,args,length,stack)
 
   # ----- Path Helper -----
 
@@ -1284,7 +1373,7 @@ class DosLibrary(AmigaLibrary):
     path = ctx.mem.access.r_cstr(addr)
     pos  = dos.PathPart.path_part(path)
     if pos < len(path):
-      log_dos.info("PathPart: path='%s' -> result='%s'", path, path[pos:])
+      log_dos.info("PathPart: path='%s' -> result='%s'", path, path[:pos])
     else:
       log_dos.info("PathPart: path='%s' -> pos=NULL", path)
     return addr + pos
@@ -1367,27 +1456,14 @@ class DosLibrary(AmigaLibrary):
   def CliInit(self,ctx):
     log_dos.info("CliInit")
     clip_addr = self.Cli(ctx)
-    clip      = AccessStruct(ctx.mem,CLIDef,struct_addr=clip_addr)
+    clip      = AccessStruct(ctx.mem,CLIDef,clip_addr)
     clip.w_s("cli_FailLevel",10)
     clip.w_s("cli_DefaultStack",1024)
     # Typically, the creator of the CLI would also initialize
     # the prompt and command name arguments. Unfortunately,
     # vamos does not necessarily do that, so cover this here.
-    if clip.r_s("cli_Prompt") == 0:
-      prompt_ptr = self._alloc_mem("cli_Prompt",60)
-      clip.w_s("cli_Prompt",prompt_ptr)
-    else:
-      prompt_ptr = clip.r_s("cli_Prompt")
+    prompt_ptr = clip.r_s("cli_Prompt")
     ctx.mem.access.w_bstr(prompt_ptr,"%N.%S> ")
-    if clip.r_s("cli_CommandName") == 0:
-      cmdname = self._alloc_mem("cli_CommandName",104)
-      clip.w_s("cli_CommandName",cmdname)
-    if clip.r_s("cli_CommandFile") == 0:
-      cmdfile = self._alloc_mem("cli_CommandFile",40)
-      clip.w_s("cli_CommandFile",cmdfile)
-    if clip.r_s("cli_SetName") == 0:
-      setname = self._alloc_mem("cli_SetName",80)
-      clip.w_s("cli_SetName",setname)
     # Get the current dir and install it.
     setname = clip.r_s("cli_SetName")
     ctx.mem.access.w_bstr(setname,"SYS:")
@@ -1412,6 +1488,7 @@ class DosLibrary(AmigaLibrary):
         path.access.w_s("path_Next",cmd_dir_addr)
         cmd_dir_addr = path.addr
         clip.w_s("cli_CommandDir",cmd_dir_addr)
+        self.path.append((path,lock))
     return 0
 
   def CliInitRun(self, ctx):
@@ -1456,12 +1533,14 @@ class DosLibrary(AmigaLibrary):
 
   def DosGetString(self,ctx):
     errno = ctx.cpu.r_reg(REG_D1)
+    if errno >= 0x80000000:
+      errno = errno - 0x100000000
     if errno in dos_error_strings:
-      if errno in errstrings:
-        return errstrings[errno]
-      errstrings[errno] = self._alloc_mem("Error %d" % errno,len(dos_error_strings[errno]) + 1)
-      ctx.mem.access.w_cstr(errstrings[errno],dos_error_strings[errno])
-      return errstrings[errno]
+      if errno in self.errstrings:
+        return self.errstrings[errno]
+      self.errstrings[errno] = self._alloc_mem("Error %d" % errno,len(dos_error_strings[errno]) + 1)
+      ctx.mem.access.w_cstr(self.errstrings[errno],dos_error_strings[errno])
+      return self.errstrings[errno]
     else:
       return 0
 

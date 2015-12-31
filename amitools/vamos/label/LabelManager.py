@@ -19,9 +19,11 @@ class LabelManager:
     if range in self.ranges:
       self.ranges.remove(range)
     else:
-      # try to find compatible
+      # try to find compatible: release all labels within the given range
+      # this is necessary because the label could be part of a puddle
+      # that is released in one go.
       for r in self.ranges:
-        if r.addr == range.addr and r.size == range.size:
+        if r.addr >= range.addr and r.addr + r.size <= range.addr + range.size:
           self.ranges.remove(r)
           log_mem_int.log(logging.WARN, "remove_label: got=%s have=%s", range, r)
           return

@@ -117,7 +117,7 @@ class LibManager():
         # now check if the library has a native counterpart
         # if yes then create memory layout with it
         load_name = self._get_load_lib_name(name)
-        if ctx.seg_loader.can_load_seg(load_name):
+        if ctx.seg_loader.can_load_seg(None,load_name):
           # setup trampoline
           tr = Trampoline(ctx,"create_lib[%s]" % sane_name)
           self._create_native_lib(lib, load_name, ctx, tr)
@@ -262,7 +262,7 @@ class LibManager():
 
     # use seg_loader to load lib
     self.lib_log("load_lib","loading native lib: %s" % load_name)
-    lib.seg_list = ctx.seg_loader.load_seg(load_name)
+    lib.seg_list = ctx.seg_loader.load_seg(None,load_name)
     if lib.seg_list == None:
       self.lib_log("load_lib","Can't load library file '%s'" % load_name, level=logging.ERROR)
       return None
