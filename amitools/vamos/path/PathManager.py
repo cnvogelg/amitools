@@ -107,7 +107,7 @@ class PathManager:
           try_ami_path = ami_path
         else:
           try_ami_path = path + ami_path
-        check_path = self.ami_to_sys_path(None, try_ami_path, mustExist=True)
+        check_path = self.ami_to_sys_path(lock, try_ami_path, mustExist=True)
         log_path.info("ami_command_to_sys_path: try_ami_path='%s' -> sys_path='%s'" % (try_ami_path, check_path))
         # make sure its a file
         if check_path != None and os.path.isfile(check_path):
