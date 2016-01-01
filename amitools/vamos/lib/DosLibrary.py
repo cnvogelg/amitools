@@ -44,7 +44,7 @@ class DosLibrary(AmigaLibrary):
     self.alloc = alloc
 
   def setup_lib(self, ctx):
-    AmigaLibrary.setup_lib(self, ctx)
+    AmigaLibrary.setup_lib(self, ctx, lock_in_memory = True)
     log_dos.info("open dos.library V%d", self.version)
     # init own state
     self.io_err = 0

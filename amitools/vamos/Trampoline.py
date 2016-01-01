@@ -10,13 +10,13 @@ class Trampoline:
     self.cpu = ctx.cpu
     self.name = name
     self.mem = None
-
     self.code = [] # words for code
     self.data = [] #
     self.code_size = 0
     self.data_size = 0
     self.code_addr = None
     self.data_addr = None
+    self.trapcode  = None
 
   def done(self):
     """add final rts and generate trampoline in memory"""
@@ -173,6 +173,7 @@ class Trampoline:
     if code == -1:
       raise VamosInternalError("No more traps for trampoline left!")
     # place trap opcode
+    self.trapcode = code
     opcode = 0xa000 | code
     self.mem.access.w16(addr, opcode)
     if final:

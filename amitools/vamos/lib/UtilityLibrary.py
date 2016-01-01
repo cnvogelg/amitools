@@ -8,6 +8,9 @@ class UtilityLibrary(AmigaLibrary):
   def __init__(self, config):
     AmigaLibrary.__init__(self, self.name, LibraryDef, config)
 
+  def setup_lib(self, ctx):
+    AmigaLibrary.setup_lib(self, ctx, lock_in_memory = True)
+
   def UDivMod32(self, ctx):
     dividend = ctx.cpu.r_reg(REG_D0)
     divisor = ctx.cpu.r_reg(REG_D1)
