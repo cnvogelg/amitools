@@ -467,10 +467,10 @@ class DosLibrary(AmigaLibrary):
 
   def Close(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
-    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
-    self.file_mgr.close(fh)
-    log_dos.info("Close: %s" % fh)
-
+    if fh_b_addr != 0:
+      fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+      self.file_mgr.close(fh)
+      log_dos.info("Close: %s" % fh)
     return self.DOSTRUE
 
   def Read(self, ctx):
