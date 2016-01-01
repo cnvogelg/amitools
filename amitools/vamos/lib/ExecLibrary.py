@@ -22,7 +22,7 @@ class ExecLibrary(AmigaLibrary):
     self._poolid = 0x1000
 
   def setup_lib(self, ctx):
-    AmigaLibrary.setup_lib(self, ctx, lock_in_memory = True)
+    AmigaLibrary.setup_lib(self, ctx)
     # set some system contants
     if ctx.cpu_type == '68020':
       self.access.w_s("AttnFlags",2)

@@ -44,7 +44,7 @@ class DosLibrary(AmigaLibrary):
     self.alloc = alloc
 
   def setup_lib(self, ctx):
-    AmigaLibrary.setup_lib(self, ctx, lock_in_memory = True)
+    AmigaLibrary.setup_lib(self, ctx)
     log_dos.info("open dos.library V%d", self.version)
     # init own state
     self.io_err = 0
@@ -1467,7 +1467,7 @@ class DosLibrary(AmigaLibrary):
     clip_addr = self.Cli(ctx)
     clip      = AccessStruct(ctx.mem,CLIDef,clip_addr)
     clip.w_s("cli_FailLevel",10)
-    clip.w_s("cli_DefaultStack",1024)
+    clip.w_s("cli_DefaultStack", ctx.process.stack_size >> 2) # in longs
     # Typically, the creator of the CLI would also initialize
     # the prompt and command name arguments. Unfortunately,
     # vamos does not necessarily do that, so cover this here.
