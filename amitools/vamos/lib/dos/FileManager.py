@@ -105,7 +105,7 @@ class FileManager:
     self._unregister_file(fh)
 
   def get_by_b_addr(self, b_addr):
-    if self.files_by_b_addr.has_key(b_addr):
+    if b_addr in self.files_by_b_addr:
       return self.files_by_b_addr[b_addr]
     else:
       addr = b_addr << 2

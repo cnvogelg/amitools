@@ -14,7 +14,7 @@ from dos.AmiTime import *
 from util.TagList import *
 import dos.Printf
 from dos.DosTags import DosTags
-from dos.PatternMatch import pattern_parse, pattern_match
+from dos.PatternMatch import Pattern, pattern_parse, pattern_match
 from dos.MatchFirstNext import MatchFirstNext
 from amitools.vamos.label.LabelStruct import LabelStruct
 from dos.CommandLine import CommandLine
@@ -1035,8 +1035,8 @@ class DosLibrary(AmigaLibrary):
     txt_ptr = ctx.cpu.r_reg(REG_D2)
     pat = ctx.mem.access.r_cstr(pat_ptr)
     txt = ctx.mem.access.r_cstr(txt_ptr)
-    pattern = pattern_parse(pat,ignore_case,False)
-    match = pattern_match(pattern, txt)
+    pattern = Pattern(None,pat,ignore_case,True)
+    match   = pattern_match(pattern, txt, ignore_case)
     log_dos.info("MatchPattern: pat=%s txt=%s ignore_case=%s -> match=%s", pat, txt, ignore_case, match)
     if match:
       return -1
