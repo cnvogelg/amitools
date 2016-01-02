@@ -98,7 +98,7 @@ class Process:
       return "\""+out+"\""
     else:
       return arg
-    
+
   # ----- args -----
   def init_args(self, bin_args, fh):
     # setup arguments
@@ -143,7 +143,7 @@ class Process:
     self.cli.access.w_s("cli_CommandFile",self.cmdfile.addr)
     self.cli.access.w_s("cli_SetName",self.setname.addr)
     if name != None:
-      self.ctx.mem.access.w_bstr(cmdname.addr,name)
+      self.ctx.mem.access.w_bstr(self.cmdname.addr,name)
     log_proc.info(self.cli)
 
   def free_cli_struct(self):
@@ -192,7 +192,7 @@ class Process:
     self.ports[addr] = port
     return addr
 
-      
+
 
   # ----- task struct -----
   def init_task_struct(self, input_fh, output_fh):
@@ -234,7 +234,7 @@ class Process:
     self.this_task.access.w_s("pr_COS", output_fh.b_addr<<2) # compensate BCPL auto-conversion
 
   def get_current_dir(self):
-    return self.this_task.access.r_s("pr_CurrentDir")    
+    return self.this_task.access.r_s("pr_CurrentDir")
 
   def set_current_dir(self,lock):
     self.this_task.access.w_s("pr_CurrentDir",lock)
