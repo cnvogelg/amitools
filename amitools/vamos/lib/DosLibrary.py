@@ -1277,6 +1277,7 @@ class DosLibrary(AmigaLibrary):
       cur_lock    = self.lock_mgr.get_by_b_addr(current_dir >> 2)
       dup_lock    = self.lock_mgr.dup_lock(self.get_current_dir())
       cur_module  = cli.r_s("cli_Module")
+      cur_setname = ctx.mem.access.r_bstr(cli.r_s("cli_SetName"))
       cli.w_s("cli_Module",0)
       self.ctx.process.set_current_dir(dup_lock.mem.addr)
       self.cur_dir_lock = dup_lock
@@ -1287,6 +1288,7 @@ class DosLibrary(AmigaLibrary):
         cli.w_s("cli_StandardInput",input_fh)
         cli.w_s("cli_Background",self.DOSFALSE)
         cli.w_s("cli_Module",cur_module)
+        ctx.mem.access.w_bstr(cli.r_s("cli_SetName"),cur_setname)
         ctx.process.this_task.access.w_s("pr_CIS",input_fh)
         infile = self.file_mgr.get_by_b_addr(input_fh >> 2)
         infile.setbuf("")
