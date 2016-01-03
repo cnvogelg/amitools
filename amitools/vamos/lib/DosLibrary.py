@@ -19,7 +19,6 @@ from dos.MatchFirstNext import MatchFirstNext
 from amitools.vamos.label.LabelStruct import LabelStruct
 from dos.CommandLine import CommandLine
 from amitools.vamos.Process import Process
-from dos.DosErrors import DosErrors
 import dos.PathPart
 from dos.DosList import DosList
 from dos.LockManager import LockManager
