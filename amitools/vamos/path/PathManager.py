@@ -248,7 +248,7 @@ class PathManager:
       return ""
     # skip volume
     col_pos = p.find(':')
-    if col_pos :
+    if col_pos >= 0:
       vol = p[:col_pos+1]
       p = p[col_pos+1:]
       l = len(path)
