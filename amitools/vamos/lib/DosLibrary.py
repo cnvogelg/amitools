@@ -791,6 +791,17 @@ class DosLibrary(AmigaLibrary):
     self.setioerr(ctx,NO_ERROR)
     return dup_lock.b_addr
 
+  def SameLock(self, ctx):
+    lock1_b_addr = ctx.cpu.r_reg(REG_D1)
+    lock2_b_addr = ctx.cpu.r_reg(REG_D1)
+    lock1 = self.lock_mgr.get_by_b_addr(lock1_b_addr)
+    lock2 = self.lock_mgr.get_by_b_addr(lock2_b_addr)
+    if lock1 == lock2:
+      return self.DOSTRUE
+    if lock1 != None and lock2 != None:
+      return lock1.key == lock2.key
+    return self.DOSFALSE
+    
   def Examine(self, ctx):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     fib_ptr = ctx.cpu.r_reg(REG_D2)

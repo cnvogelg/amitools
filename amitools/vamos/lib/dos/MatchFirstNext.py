@@ -26,10 +26,10 @@ class MatchFirstNext:
     self.old_label = None
     self.new_label = None
     self.achain_dummy = None
-    self.dir_lock = None
     self.name = None
     self.path = None
-
+    self.dir_lock = None
+    
   def first(self, ctx):
     # match first entry
     self.path = self.matcher.begin()
@@ -39,19 +39,21 @@ class MatchFirstNext:
     # get parent dir of first match
     dir_part = self.path_mgr.ami_dir_of_path(self.lock,self.path)
     abs_path = self.path_mgr.ami_abs_path(self.lock,dir_part)
-    self.dir_lock = self.lock_mgr.create_lock(self.lock,abs_path, False)
-    if self.dir_lock == None:
-      return ERROR_OBJECT_NOT_FOUND
 
     # create base/last achain and set dir lock
+    # THOR: this is still screwed up. Some utililties
+    # most notably "dir" depend on a correctly setup
+    # anchor chain...
     self.achain_dummy = ctx.alloc.alloc_struct("AChain_Dummy", AChainDef)
     self.anchor.w_s('ap_Last', self.achain_dummy.addr)
     self.anchor.w_s('ap_Base', self.achain_dummy.addr)
-    self.achain_dummy.access.w_s('an_Lock', self.dir_lock.mem.addr)
-
+    if not self._fill_lock(abs_path):
+      return ERROR_OBJECT_NOT_FOUND
+    
     # fill first entry
     io_err = self._fill_fib(ctx, self.path)
-
+    self._fill_parent_lock(self.path)
+    
     # init stack
     self.dodir_stack = []
     return io_err
@@ -71,12 +73,33 @@ class MatchFirstNext:
       self.anchor.w_cstr(path_ptr, path)
     return io_err
 
+  def _fill_lock(self, path):
+    lock = self.lock_mgr.create_lock(self.lock,path,False)
+    if lock == None:
+      return False
+    self.dir_lock = lock
+    oldlock = self.lock_mgr.get_by_b_addr(self.achain_dummy.access.r_s("an_Lock") >> 2)
+    self.lock_mgr.release_lock(oldlock)
+    self.achain_dummy.access.w_s("an_Lock",lock.mem.addr)
+    return True
+
+  def _fill_parent_lock(self, path):
+    slash  = path.rfind('/')
+    if slash > 0:
+      parent = path[0:slash]
+    elif slash == 0:
+      parent = "/"
+    else:
+      parent = ""
+    return self._fill_lock(parent)
+
   def _push_dodir(self, name, path):
-    abs_path = self.path_mgr.ami_abs_path(self.lock,path)
+    abs_path    = self.path_mgr.ami_abs_path(self.lock,path)
     dir_entries = self.path_mgr.ami_list_dir(self.lock,path)
     # its really a dir
     if dir_entries != None:
       self.dodir_stack.append((name, path, dir_entries))
+      self._fill_lock(path)
 
   def _get_dodir(self, flags):
     if len(self.dodir_stack) > 0:
@@ -90,15 +113,18 @@ class MatchFirstNext:
           sub_path = path + sub_name
         else:
           sub_path = path + "/" + sub_name
+        self._fill_lock(path)
         return sub_name, sub_path, flags
       else:
         # top stack is finished
         flags |= self.DIDDIR
         flags &= ~self.DODIR
         self.dodir_stack.pop()
+        self._fill_parent_lock(path)
         return name, path, flags
     else:
       flags &= ~self.DODIR
+      self._fill_lock("")
       return None, None, flags
 
   def next(self, ctx):
@@ -109,6 +135,7 @@ class MatchFirstNext:
     if flags & self.DODIR == self.DODIR:
       # Note that FindNext *CLEARS* DODIR after testing!
       self.anchor.w_s('ap_Flags',flags & ~self.DODIR)
+      print "entering directory %s %s" % (self.name, self.path)
       self._push_dodir(self.name, self.path)
 
     # are there dirs to do?
@@ -128,6 +155,7 @@ class MatchFirstNext:
     # update current
     self.path = path
     self.name = name
+    self._fill_parent_lock(path)
 
     # fill fib
     io_err = self._fill_fib(ctx, path)
@@ -140,8 +168,8 @@ class MatchFirstNext:
     if self.old_label != None:
       ctx.label_mgr.add_label(self.old_label)
     # free last dir lock & achain
-    if self.dir_lock != None:
-      self.lock_mgr.release_lock(self.dir_lock)
     if self.achain_dummy != None:
+      oldlock = self.lock_mgr.get_by_b_addr(self.achain_dummy.access.r_s("an_Lock") >> 2)
+      self.lock_mgr.release_lock(oldlock)
       ctx.alloc.free_struct(self.achain_dummy)
 

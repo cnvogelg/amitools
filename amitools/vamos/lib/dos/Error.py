@@ -53,7 +53,7 @@ ERROR_NOT_EXECUTABLE              = 305     # A file has E bit cleared
 
 dos_error_strings = {
 NO_ERROR                         :'NO ERROR',
-    -161:'%s failed returncode %ld',
+    -161:'%s failed returncode %ld\n',
     -155:'Fault %3ld',
     -154:'Fail limit: %ld',
     -153:'Bad return code specified',

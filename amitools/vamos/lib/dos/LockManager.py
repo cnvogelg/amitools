@@ -89,7 +89,7 @@ class LockManager:
         raise VamosInternalError("Invalid File Lock at b@%06x" % b_addr)
 
   def release_lock(self, lock):
-    if lock.b_addr != 0:
+    if lock != None and lock.b_addr != 0:
       self._unregister_lock(lock)
 
   def volume_name_of_lock(self, lock):
