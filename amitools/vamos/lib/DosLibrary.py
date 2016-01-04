@@ -1498,6 +1498,9 @@ class DosLibrary(AmigaLibrary):
     clip.w_s("cli_CurrentInput",infh)
     clip.w_s("cli_StandardOutput",outfh)
     clip.w_s("cli_CurrentOutput",outfh)
+    fh = self.file_mgr.open(self.get_current_dir(), "S:Vamos-Startup", "rb+")
+    if fh != None:
+      clip.w_s("cli_CurrentInput",fh.mem.addr)
     #
     # Create the path
     cmd_dir_addr = clip.r_s("cli_CommandDir")
