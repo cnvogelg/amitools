@@ -52,7 +52,12 @@ ERROR_BREAK                       = 304     # A break character was received
 ERROR_NOT_EXECUTABLE              = 305     # A file has E bit cleared
 
 dos_error_strings = {
-NO_ERROR                         :'NO ERROR',
+    NO_ERROR                         :'NO ERROR',
+    -160:'%TH USE COUNT\n\n',
+    -159:'NAME',
+    -158:'%TH DISABLED\n',
+    -157:'%TH INTERNAL\n',
+    -156:'%TH SYSTEM\n',
     -161:'%s failed returncode %ld\n',
     -155:'Fault %3ld',
     -154:'Fail limit: %ld',
@@ -60,7 +65,7 @@ NO_ERROR                         :'NO ERROR',
     -152:'Current_directory',
     -151:'The last command did not set a return code',
     -150:'Last command failed because ',
-    -149:'Process %N ending',
+    -149:'Process %N ending\n',
     -148:'Requested size too small',
     -147:'Requested size too large',
     -146:'Current stack size is %ld bytes',

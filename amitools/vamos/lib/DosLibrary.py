@@ -143,9 +143,9 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("Fault: code=%d header='%s' err_str='%s'", self.io_err, hdr, err_str)
     # write to stdout
     if hdr_ptr != 0:
-      txt = "%s: %s\n" % (hdr, err_str)
+      txt = "%s: %s" % (hdr, err_str)
     else:
-      txt = "%s\n" % err_str
+      txt = "%s" % err_str
     ctx.mem.access.w_cstr(buf_ptr,txt[:buf_len-1])
     return self.DOSTRUE
       

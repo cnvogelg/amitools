@@ -37,7 +37,7 @@ class UtilityLibrary(AmigaLibrary):
     str2 = ctx.mem.access.r_cstr(str2_addr)
     if str1.lower() < str2.lower():
       return -1
-    elif str2.lower() > str2.lower():
+    elif str1.lower() > str2.lower():
       return +1
     else:
       return 0
@@ -50,7 +50,7 @@ class UtilityLibrary(AmigaLibrary):
     str2 = ctx.mem.access.r_cstr(str2_addr)[:length]
     if str1.lower() < str2.lower():
       return -1
-    elif str2.lower() > str2.lower():
+    elif str1.lower() > str2.lower():
       return +1
     else:
       return 0
