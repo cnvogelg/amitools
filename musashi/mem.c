@@ -10,7 +10,10 @@
 
 #include "mem.h"
 
-#define NUM_PAGES   256
+/* THOR: I need a *little* more memory than 16MB.
+** This gives 256MB max.
+*/
+#define NUM_PAGES   4096
 
 /* ----- Data ----- */
 static uint8_t *ram_data;
