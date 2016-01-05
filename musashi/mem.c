@@ -163,47 +163,123 @@ static void mem_w32_ram(uint addr, uint val, void *ctx)
 
 /* ----- Musashi Interface ----- */
 
+#include "m68kcpu.h"
+
+void print_cpu_state(m68ki_cpu_core *cpu)
+{
+  int i;
+  volatile int *p = 0;
+  unsigned int a7 = cpu->dar[8 + 7];
+  
+  fprintf(stderr,"CPU crashed - detailed information:\n");
+  fprintf(stderr,"PC          : 0x%08x\n",cpu->pc);
+  fprintf(stderr,"Previous PC : 0x%08x\n",cpu->ppc);
+
+  fprintf(stderr,"D0-7 : ");
+  for(i = 0;i < 8;i++) {
+    fprintf(stderr,"0x%08x ",cpu->dar[i]);
+  }
+  fprintf(stderr,"\nA0-7 : ");
+  for(i = 0;i < 8;i++) {
+    fprintf(stderr,"0x%08x ",cpu->dar[i + 8]);
+  }
+  fprintf(stderr,"\n Stack:");
+  for(i = -32;i <= 32;i += 4) {
+    unsigned int adr = a7 + i;
+    uint page        = adr >> 16;
+    if (page < NUM_PAGES) {
+      unsigned int val = m68k_read_memory_32(adr);
+      fprintf(stderr,"0x%08x ",val);
+    }
+    if ((i & 0x10) == 0x0c)
+      fprintf(stderr,"\n");
+  }
+  fprintf(stderr,"\n");
+#if 0  
+  *p++;
+#endif
+}
+			    
+void crash_me(void)
+{
+  print_cpu_state(&m68ki_cpu);
+}
+
 unsigned int  m68k_read_memory_8(unsigned int address)
 {
   uint page = address >> 16;
-  uint val = r_func[page][0](address, r_ctx[page][0]);
-  if(mem_trace) {
+  if (page < NUM_PAGES) {
+    uint val = r_func[page][0](address, r_ctx[page][0]);
+    if(mem_trace) {
+      if(trace_func('R',0,address,val,trace_ctx)) {
+	mem_set_all_to_end();
+      }
+    }
+    return val;
+  } else {
+    uint val = 0x00; /* CPU goes bezerk */
+    crash_me();
     if(trace_func('R',0,address,val,trace_ctx)) {
       mem_set_all_to_end();
     }
+    return val;
   }
-  return val;
 }
 
 unsigned int  m68k_read_memory_16(unsigned int address)
 {
   uint page = address >> 16;
-  uint val = r_func[page][1](address, r_ctx[page][1]);
-  if(mem_trace) {
+  if (page < NUM_PAGES) {
+    uint val = r_func[page][1](address, r_ctx[page][1]);
+    if(mem_trace) {
+      if(trace_func('R',1,address,val,trace_ctx)) {
+      mem_set_all_to_end();
+      }
+    }
+    return val;
+  } else {
+    uint val = 0x4e70; /* CPU goes bezerk */
+    crash_me();
     if(trace_func('R',1,address,val,trace_ctx)) {
       mem_set_all_to_end();
     }
+    return val;
   }
-  return val;
 }
 
 unsigned int  m68k_read_memory_32(unsigned int address)
 {
   uint page = address >> 16;
-  uint val = r_func[page][2](address, r_ctx[page][2]);
-  if(mem_trace) {
+  if (page < NUM_PAGES) {
+    uint val = r_func[page][2](address, r_ctx[page][2]);
+    if(mem_trace) {
+      if(trace_func('R',2,address,val,trace_ctx)) {
+	mem_set_all_to_end();
+      }
+    }
+    return val;
+  } else {
+    uint val = 0x0; /* CPU goes bezerk */
+    crash_me();
     if(trace_func('R',2,address,val,trace_ctx)) {
       mem_set_all_to_end();
     }
+    return val;
   }
-  return val;
 }
 
 void m68k_write_memory_8(unsigned int address, unsigned int value)
 {
   uint page = address >> 16;
-  w_func[page][0](address, value, w_ctx[page][0]);
-  if(mem_trace) {
+  if (page < NUM_PAGES) {
+    w_func[page][0](address, value, w_ctx[page][0]);
+    if(mem_trace) {
+      if(trace_func('W',0,address,value,trace_ctx)) {
+	mem_set_all_to_end();
+      }
+    }
+  } else {
+    crash_me();
     if(trace_func('W',0,address,value,trace_ctx)) {
       mem_set_all_to_end();
     }
@@ -213,8 +289,15 @@ void m68k_write_memory_8(unsigned int address, unsigned int value)
 void m68k_write_memory_16(unsigned int address, unsigned int value)
 {
   uint page = address >> 16;
-  w_func[page][1](address, value, w_ctx[page][1]);
-  if(mem_trace) {
+  if (page < NUM_PAGES) {
+    w_func[page][1](address, value, w_ctx[page][1]);
+    if(mem_trace) {
+      if(trace_func('W',1,address,value,trace_ctx)) {
+	mem_set_all_to_end();
+      }
+    }
+  } else {
+    crash_me();
     if(trace_func('W',1,address,value,trace_ctx)) {
       mem_set_all_to_end();
     }
@@ -224,8 +307,15 @@ void m68k_write_memory_16(unsigned int address, unsigned int value)
 void m68k_write_memory_32(unsigned int address, unsigned int value)
 {
   uint page = address >> 16;
-  w_func[page][2](address, value, w_ctx[page][2]);
-  if(mem_trace) {
+  if (page < NUM_PAGES) {
+    w_func[page][2](address, value, w_ctx[page][2]);
+    if(mem_trace) {
+      if(trace_func('W',2,address,value,trace_ctx)) {
+	mem_set_all_to_end();
+      }
+    }
+  } else {
+    crash_me();
     if(trace_func('W',2,address,value,trace_ctx)) {
       mem_set_all_to_end();
     }
@@ -237,15 +327,24 @@ void m68k_write_memory_32(unsigned int address, unsigned int value)
 unsigned int m68k_read_disassembler_16 (unsigned int address)
 {
   uint page = address >> 16;
-  uint val = r_func[page][1](address, r_ctx[page][1]);
-  return val;
+  
+  if (page < NUM_PAGES) {
+    uint val = r_func[page][1](address, r_ctx[page][1]);
+    return val;
+  } else {
+    return 0x4afc; /* illegal */
+  }
 }
 
 unsigned int m68k_read_disassembler_32 (unsigned int address)
 {
   uint page = address >> 16;
-  uint val = r_func[page][2](address, r_ctx[page][1]);
-  return val;
+  if (page < NUM_PAGES) {
+    uint val = r_func[page][2](address, r_ctx[page][1]);
+    return val;
+  } else {
+    return 0x0;
+  }
 }
 
 /* ----- API ----- */

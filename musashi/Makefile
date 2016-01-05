@@ -1,5 +1,8 @@
 # Makefile for musashi
 
+#CFLAGS    = -O0 -ggdb3
+CFLAGS    = -O3
+
 GEN_INPUT = m68k_in.c
 
 GEN_SRC = m68kopac.c m68kopdm.c m68kopnz.c m68kops.c
