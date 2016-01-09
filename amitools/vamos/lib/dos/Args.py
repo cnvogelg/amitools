@@ -263,7 +263,7 @@ class Args:
             else: # failed!
               self.error = ERROR_REQUIRED_ARG_MISSING
               return False
-        if targ['n']:
+        if targ['n'] and val != None:
           val = int(val)
         result[pos] = val
       elif targ['f']:

@@ -8,6 +8,9 @@ class IntuitionLibrary(AmigaLibrary):
   def __init__(self, config):
     AmigaLibrary.__init__(self, self.name, LibraryDef, config)
 
+  def setup_lib(self, ctx):
+    AmigaLibrary.setup_lib(self, ctx)
+
   def DisplayAlert(self, ctx):
     alert_num = ctx.cpu.r_reg(REG_D0)
     msg_ptr = ctx.cpu.r_reg(REG_A0)

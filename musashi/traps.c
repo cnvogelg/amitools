@@ -32,13 +32,16 @@ static int trap_aline(uint opcode, uint pc)
   trap_func_t func = traps[off].trap;
   void *data = traps[off].data;
   int flags = traps[off].flags;
-
-  func(opcode, pc, data);
-
-  /* a one shot trap is removed after it is triggered */
+  
+  /* a one shot trap is removed before it is triggered
+  ** otherwise, trap-functions used to capture "end-of-call"s
+  ** of shell processes would never be released.
+  */
   if(flags & TRAP_ONE_SHOT) {
     trap_free(off);
   }
+
+  func(opcode, pc, data);
 
   if(flags & TRAP_AUTO_RTS) {
     return M68K_ALINE_RTS;

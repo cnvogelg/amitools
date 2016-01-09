@@ -192,7 +192,7 @@ class Vamos:
     # put stack size on top of stack
     self.mem.access.w32(newstacktop - 4,stacksize)
     # activate new stack
-    new_stackptr = newstacktop - 4
+    new_stackptr = newstacktop - 8
     self.process.this_task.access.w_s("pr_Task.tc_SPLower",newstackbase)
     self.process.this_task.access.w_s("pr_Task.tc_SPUpper",newstacktop)
     # NOTE: the Manx fexec and BPCL mess is not (yet) setup here.
@@ -253,7 +253,7 @@ class Vamos:
     # put stack size on top of stack
     self.mem.access.w32(newstacktop - 4,stacksize)
     # activate new stack
-    new_stackptr = newstacktop - 4
+    new_stackptr = newstacktop - 8
     self.process.this_task.access.w_s("pr_Task.tc_SPLower",newstackbase)
     self.process.this_task.access.w_s("pr_Task.tc_SPUpper",newstacktop)
     # NOTE: the Manx fexec and BPCL mess is not (yet) setup here.

@@ -15,17 +15,10 @@ class LockManager:
     self.dos_list = dos_list
     self.alloc    = alloc
     self.mem      = mem
-    self.keys     = {}
-    self.next_key = 256
     self.locks_by_baddr = {}
 
   def generate_key(self, system_path):
-    if system_path in self.keys:
-      return self.keys[system_path]
-    self.next_key += 1
-    self.keys[system_path] = self.next_key
-    log_lock.info("generated key %d for path %s" % (self.next_key,system_path))
-    return self.next_key
+    return os.lstat(system_path).st_ino
 
   def _register_lock(self, lock):
     # look up volume
@@ -96,7 +89,7 @@ class LockManager:
         raise VamosInternalError("Invalid File Lock at b@%06x" % b_addr)
 
   def release_lock(self, lock):
-    if lock.b_addr != 0:
+    if lock != None and lock.b_addr != 0:
       self._unregister_lock(lock)
 
   def volume_name_of_lock(self, lock):

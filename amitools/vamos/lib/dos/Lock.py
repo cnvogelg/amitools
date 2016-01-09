@@ -34,7 +34,8 @@ class Lock:
     self.key    = self.keygen(self.sys_path)
     name        = "Lock: %s" % self
     self.mem    = alloc.alloc_struct(name, FileLockDef)
-    self.mem.access.w_s("fl_Key" ,self.key)
+    self.mem.access.w_s("fl_Key"   ,self.key)
+    self.mem.access.w_s("fl_Volume",vol_addr)
     self.b_addr = self.mem.addr >> 2
     return self.b_addr
 

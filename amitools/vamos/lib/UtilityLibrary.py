@@ -8,6 +8,9 @@ class UtilityLibrary(AmigaLibrary):
   def __init__(self, config):
     AmigaLibrary.__init__(self, self.name, LibraryDef, config)
 
+  def setup_lib(self, ctx):
+    AmigaLibrary.setup_lib(self, ctx)
+
   def UDivMod32(self, ctx):
     dividend = ctx.cpu.r_reg(REG_D0)
     divisor = ctx.cpu.r_reg(REG_D1)
@@ -34,7 +37,7 @@ class UtilityLibrary(AmigaLibrary):
     str2 = ctx.mem.access.r_cstr(str2_addr)
     if str1.lower() < str2.lower():
       return -1
-    elif str2.lower() > str2.lower():
+    elif str1.lower() > str2.lower():
       return +1
     else:
       return 0
@@ -47,7 +50,7 @@ class UtilityLibrary(AmigaLibrary):
     str2 = ctx.mem.access.r_cstr(str2_addr)[:length]
     if str1.lower() < str2.lower():
       return -1
-    elif str2.lower() > str2.lower():
+    elif str1.lower() > str2.lower():
       return +1
     else:
       return 0

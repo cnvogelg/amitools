@@ -61,6 +61,8 @@ class AmigaLibrary:
     self.lib_access = None
     # number of users opening the lib
     self.ref_cnt = 0
+    self.lock_in_memory = False
+    self.traps = []
     # also an access object for the lib struct members are allocated
 
   def calc_neg_size_from_fd(self):
@@ -212,6 +214,7 @@ class AmigaLibrary:
     op = 0xa000 | tid
     # patch the lib in memory
     addr = self.addr_base - bias
+    self.traps.append(tid)
     ctx.mem.access.w16(addr,op)
     self.log("patch $%04x: op=$%04x '%s' [%s]" % (bias, op, name, method), level=logging.DEBUG)
     return True
@@ -314,6 +317,10 @@ class AmigaLibrary:
     self.label = None
     self.access = None
     self.lib_access = None
+    # release all the traps so they can be recycled
+    for tid in self.traps:
+      ctx.traps.free(tid)
+    self.traps = []
 
   def fill_lib_struct(self):
     # now we can fill the library structure with some sane values
@@ -322,12 +329,15 @@ class AmigaLibrary:
     self.lib_access.w_s("lib_NegSize", self.mem_neg_size)
     self.lib_access.w_s("lib_OpenCnt", 0)
 
-  def setup_lib(self, ctx):
+  def setup_lib(self, ctx, lock_in_memory = False):
     """the lib is now used in memory at the given base address"""
     self.ref_cnt = 0
     # enable profiling
     if self.profile:
       self.profile_map = {}
+    # If the library is a system library, better lock it in memory
+    # to ensure that the traps are kept.
+    self.lock_in_memory = lock_in_memory
 
   def finish_lib(self, ctx):
     """the lib is no longer used in memory"""
@@ -345,8 +355,9 @@ class AmigaLibrary:
 
   def dec_usage(self):
     """decrement usage counter"""
-    self.ref_cnt -= 1
-    self.lib_access.w_s("lib_OpenCnt", self.ref_cnt)
+    if not self.lock_in_memory:
+      self.ref_cnt -= 1
+      self.lib_access.w_s("lib_OpenCnt", self.ref_cnt)
 
   def get_num_vectors(self):
     return self.num_jumps

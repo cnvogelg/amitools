@@ -14,7 +14,7 @@ from dos.AmiTime import *
 from util.TagList import *
 import dos.Printf
 from dos.DosTags import DosTags
-from dos.PatternMatch import pattern_parse, pattern_match
+from dos.PatternMatch import Pattern, pattern_parse, pattern_match
 from dos.MatchFirstNext import MatchFirstNext
 from amitools.vamos.label.LabelStruct import LabelStruct
 from dos.CommandLine import CommandLine
@@ -143,9 +143,9 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("Fault: code=%d header='%s' err_str='%s'", self.io_err, hdr, err_str)
     # write to stdout
     if hdr_ptr != 0:
-      txt = "%s: %s\n" % (hdr, err_str)
+      txt = "%s: %s" % (hdr, err_str)
     else:
-      txt = "%s\n" % err_str
+      txt = "%s" % err_str
     ctx.mem.access.w_cstr(buf_ptr,txt[:buf_len-1])
     return self.DOSTRUE
       
@@ -172,7 +172,7 @@ class DosLibrary(AmigaLibrary):
       txt = "%s: %s\n" % (hdr, err_str)
     else:
       txt = "%s\n" % err_str
-    fh = self.file_mgr.get_output()
+    fh = ctx.process.get_output()
     fh.write(txt)
     return self.DOSTRUE
 
@@ -466,10 +466,10 @@ class DosLibrary(AmigaLibrary):
 
   def Close(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
-    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
-    self.file_mgr.close(fh)
-    log_dos.info("Close: %s" % fh)
-
+    if fh_b_addr != 0:
+      fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+      self.file_mgr.close(fh)
+      log_dos.info("Close: %s" % fh)
     return self.DOSTRUE
 
   def Read(self, ctx):
@@ -565,7 +565,7 @@ class DosLibrary(AmigaLibrary):
     str_ptr = ctx.cpu.r_reg(REG_D1)
     str_dat = ctx.mem.access.r_cstr(str_ptr)
     # write to stdout
-    fh = self.file_mgr.get_output()
+    fh = ctx.process.get_output()
     ok = fh.write(str_dat)
     log_dos.info("PutStr: '%s'", str_dat)
     return 0 # ok
@@ -581,7 +581,7 @@ class DosLibrary(AmigaLibrary):
     argv_ptr = ctx.cpu.r_reg(REG_D2)
     fmt = ctx.mem.access.r_cstr(format_ptr)
     # write on output
-    fh = self.file_mgr.get_output()
+    fh = ctx.process.get_output()
     log_dos.info("VPrintf: format='%s' argv=%06x" % (fmt,argv_ptr))
     # now decode printf
     ps = dos.Printf.printf_parse_string(fmt)
@@ -608,6 +608,14 @@ class DosLibrary(AmigaLibrary):
     # write result
     fh.write(result)
     return len(result)
+
+  def WriteChars(self, ctx):
+    fh       = ctx.process.get_output()
+    buf_addr = ctx.cpu.r_reg(REG_D1)
+    siz      = ctx.cpu.r_reg(REG_D2)
+    buf      = ctx.mem.access.r_cstr(buf_addr)[:siz]
+    fh.write(buf)
+    return len(buf)
 
   def VFWritef(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
@@ -783,6 +791,17 @@ class DosLibrary(AmigaLibrary):
     self.setioerr(ctx,NO_ERROR)
     return dup_lock.b_addr
 
+  def SameLock(self, ctx):
+    lock1_b_addr = ctx.cpu.r_reg(REG_D1)
+    lock2_b_addr = ctx.cpu.r_reg(REG_D1)
+    lock1 = self.lock_mgr.get_by_b_addr(lock1_b_addr)
+    lock2 = self.lock_mgr.get_by_b_addr(lock2_b_addr)
+    if lock1 == lock2:
+      return self.DOSTRUE
+    if lock1 != None and lock2 != None:
+      return lock1.key == lock2.key
+    return self.DOSFALSE
+    
   def Examine(self, ctx):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     fib_ptr = ctx.cpu.r_reg(REG_D2)
@@ -1026,8 +1045,8 @@ class DosLibrary(AmigaLibrary):
     txt_ptr = ctx.cpu.r_reg(REG_D2)
     pat = ctx.mem.access.r_cstr(pat_ptr)
     txt = ctx.mem.access.r_cstr(txt_ptr)
-    pattern = pattern_parse(pat,ignore_case,False)
-    match = pattern_match(pattern, txt)
+    pattern = Pattern(None,pat,ignore_case,True)
+    match   = pattern_match(pattern, txt, ignore_case)
     log_dos.info("MatchPattern: pat=%s txt=%s ignore_case=%s -> match=%s", pat, txt, ignore_case, match)
     if match:
       return -1
@@ -1269,6 +1288,7 @@ class DosLibrary(AmigaLibrary):
       cur_lock    = self.lock_mgr.get_by_b_addr(current_dir >> 2)
       dup_lock    = self.lock_mgr.dup_lock(self.get_current_dir())
       cur_module  = cli.r_s("cli_Module")
+      cur_setname = ctx.mem.access.r_bstr(cli.r_s("cli_SetName"))
       cli.w_s("cli_Module",0)
       self.ctx.process.set_current_dir(dup_lock.mem.addr)
       self.cur_dir_lock = dup_lock
@@ -1279,6 +1299,7 @@ class DosLibrary(AmigaLibrary):
         cli.w_s("cli_StandardInput",input_fh)
         cli.w_s("cli_Background",self.DOSFALSE)
         cli.w_s("cli_Module",cur_module)
+        ctx.mem.access.w_bstr(cli.r_s("cli_SetName"),cur_setname)
         ctx.process.this_task.access.w_s("pr_CIS",input_fh)
         infile = self.file_mgr.get_by_b_addr(input_fh >> 2)
         infile.setbuf("")
@@ -1458,7 +1479,7 @@ class DosLibrary(AmigaLibrary):
     clip_addr = self.Cli(ctx)
     clip      = AccessStruct(ctx.mem,CLIDef,clip_addr)
     clip.w_s("cli_FailLevel",10)
-    clip.w_s("cli_DefaultStack",1024)
+    clip.w_s("cli_DefaultStack", ctx.process.stack_size >> 2) # in longs
     # Typically, the creator of the CLI would also initialize
     # the prompt and command name arguments. Unfortunately,
     # vamos does not necessarily do that, so cover this here.
@@ -1477,6 +1498,9 @@ class DosLibrary(AmigaLibrary):
     clip.w_s("cli_CurrentInput",infh)
     clip.w_s("cli_StandardOutput",outfh)
     clip.w_s("cli_CurrentOutput",outfh)
+    fh = self.file_mgr.open(self.get_current_dir(), "S:Vamos-Startup", "rb+")
+    if fh != None:
+      clip.w_s("cli_CurrentInput",fh.mem.addr)
     #
     # Create the path
     cmd_dir_addr = clip.r_s("cli_CommandDir")
@@ -1500,6 +1524,22 @@ class DosLibrary(AmigaLibrary):
     # from the packet. Anyhow, this is already done, so do nothing here
     return 0x80000004 #valid, and a System() call.
 
+  # ----- DosList -------------
+
+  def LockDosList(self, ctx):
+    flags = ctx.cpu.r_reg(REG_D1)
+    node  = self.dos_list.lock_dos_list(flags)
+    return node
+
+  def UnLockDosList(self, ctx):
+    flags = ctx.cpu.r_reg(REG_D1)
+    self.dos_list.unlock_dos_list(flags)
+
+  def NextDosEntry(self, ctx):
+    flags = ctx.cpu.r_reg(REG_D2)
+    node  = ctx.cpu.r_reg(REG_D1)
+    return self.dos_list.next_dos_entry(flags,node)
+  
   # ----- misc --------
 
   def StrToLong(self, ctx):
