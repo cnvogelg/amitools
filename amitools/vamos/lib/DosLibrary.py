@@ -1337,7 +1337,7 @@ class DosLibrary(AmigaLibrary):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name     = ctx.mem.access.r_cstr(name_ptr)
     lock     = self.get_current_dir()
-    seg_list = self.ctx.seg_loader.load_seg(lock,name,False)
+    seg_list = self.ctx.seg_loader.load_seg(lock,name,False,True)
     if seg_list == None:
       log_dos.warn("LoadSeg: '%s' -> not found!" % (name))
       return 0
