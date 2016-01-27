@@ -427,13 +427,13 @@ class DosLibrary(AmigaLibrary):
 
   def SelectInput(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
-    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr,False)
     log_dos.info("SelectInput(fh=%s)" % fh)
     ctx.process.set_input(fh)
 
   def SelectOutput(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
-    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
     log_dos.info("SelectOutput(fh=%s)" % fh)
     ctx.process.set_output(fh)
 
@@ -477,7 +477,7 @@ class DosLibrary(AmigaLibrary):
     buf_ptr = ctx.cpu.r_reg(REG_D2)
     size = ctx.cpu.r_reg(REG_D3)
 
-    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr,False)
     data = fh.read(size)
     ctx.mem.access.w_data(buf_ptr, data)
     got = len(data)
@@ -489,7 +489,7 @@ class DosLibrary(AmigaLibrary):
     buf_ptr = ctx.cpu.r_reg(REG_D2)
     size = ctx.cpu.r_reg(REG_D3)
 
-    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
     data = ctx.mem.access.r_data(buf_ptr,size)
     fh.write(data)
     got = len(data)
@@ -503,7 +503,7 @@ class DosLibrary(AmigaLibrary):
     number = ctx.cpu.r_reg(REG_D4)
     # Actually, this is buffered I/O, not unbuffered IO. For the
     # time being, keep it unbuffered.
-    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
     data = ctx.mem.access.r_data(buf_ptr,size * number)
     fh.write(data)
     got = len(data) / size
@@ -535,7 +535,7 @@ class DosLibrary(AmigaLibrary):
 
   def FGetC(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
-    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr,False)
     ch = fh.getc()
     if ch == -1:
       log_dos.info("FGetC(%s) -> EOF (%d)" % (fh, ch))
@@ -546,7 +546,7 @@ class DosLibrary(AmigaLibrary):
   def FPutC(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     val = ctx.cpu.r_reg(REG_D2)
-    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
     log_dos.info("FPutC(%s, '%c' (%d))" % (fh, val, val))
     fh.write(chr(val))
     return val
@@ -554,7 +554,7 @@ class DosLibrary(AmigaLibrary):
   def UnGetC(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     val = ctx.cpu.r_reg(REG_D2)
-    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr,False)
     ch = fh.ungetc(val)
     log_dos.info("UnGetC(%s, %d) -> ch=%c (%d)" % (fh, val, ch, ch))
     return ch
@@ -572,7 +572,7 @@ class DosLibrary(AmigaLibrary):
 
   def Flush(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
-    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
     fh.flush()
     return -1
 
@@ -594,7 +594,7 @@ class DosLibrary(AmigaLibrary):
 
   def VFPrintf(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
-    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
     format_ptr = ctx.cpu.r_reg(REG_D2)
     argv_ptr = ctx.cpu.r_reg(REG_D3)
     fmt = ctx.mem.access.r_cstr(format_ptr)
@@ -619,7 +619,7 @@ class DosLibrary(AmigaLibrary):
 
   def VFWritef(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
-    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
     fmt_ptr = ctx.cpu.r_reg(REG_D2)
     args_ptr = ctx.cpu.r_reg(REG_D3)
     fmt = ctx.mem.access.r_cstr(fmt_ptr)
@@ -685,7 +685,7 @@ class DosLibrary(AmigaLibrary):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     bufaddr   = ctx.cpu.r_reg(REG_D2)
     buflen    = ctx.cpu.r_reg(REG_D3)
-    fh   = self.file_mgr.get_by_b_addr(fh_b_addr)
+    fh   = self.file_mgr.get_by_b_addr(fh_b_addr,False)
     line = fh.gets(buflen)
     log_dos.info("FGetS(%s,%d) -> '%s'" % (fh, buflen, line))
     ctx.mem.access.w_cstr(bufaddr,line)
@@ -732,7 +732,7 @@ class DosLibrary(AmigaLibrary):
 
   def IsInteractive(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
-    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr,False)
     res = fh.is_interactive()
     log_dos.info("IsInteractive(%s): %s" % (fh, res))
     if res:
@@ -1270,7 +1270,7 @@ class DosLibrary(AmigaLibrary):
         new_input.setbuf(cmd)
       else:
         inputfh   = cli.r_s("cli_CurrentInput")
-        new_input = self.file_mgr.get_by_b_addr(inputfh >> 2)
+        new_input = self.file_mgr.get_by_b_addr(inputfh >> 2,False)
         cmd       = cmd + "\n" + new_input.getbuf()
         new_input.setbuf(cmd)
       new_stdin = self.file_mgr.open(None,"*","rw")
@@ -1301,7 +1301,7 @@ class DosLibrary(AmigaLibrary):
         cli.w_s("cli_Module",cur_module)
         ctx.mem.access.w_bstr(cli.r_s("cli_SetName"),cur_setname)
         ctx.process.this_task.access.w_s("pr_CIS",input_fh)
-        infile = self.file_mgr.get_by_b_addr(input_fh >> 2)
+        infile = self.file_mgr.get_by_b_addr(input_fh >> 2,False)
         infile.setbuf("")
         self.ctx.process.set_current_dir(current_dir)
         self.cur_dir_lock = self.lock_mgr.get_by_b_addr(current_dir >> 2)
