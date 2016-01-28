@@ -1261,23 +1261,18 @@ class DosLibrary(AmigaLibrary):
     if ctx.process.is_native_shell():
       cli_addr = ctx.process.get_cli_struct()
       cli      = AccessStruct(ctx.mem,CLIDef,struct_addr=cli_addr)
-      if cli.r_s("cli_CurrentInput") == cli.r_s("cli_StandardInput"):
-        new_input = self.file_mgr.open(None,"NIL:","r")
-        if new_input == None:
-          log_dos.warn("SystemTagList: can't create new input file handle for SystemTagList('%s')", cmd)
-          return 0xffffffff
-        #Push-back the commands into the input buffer.
-        new_input.setbuf(cmd)
-      else:
-        inputfh   = cli.r_s("cli_CurrentInput")
-        new_input = self.file_mgr.get_by_b_addr(inputfh >> 2,False)
-        cmd       = cmd + "\n" + new_input.getbuf()
-        new_input.setbuf(cmd)
+      new_input = self.file_mgr.open(None,"NIL:","r")
+      if new_input == None:
+        log_dos.warn("SystemTagList: can't create new input file handle for SystemTagList('%s')", cmd)
+        return 0xffffffff
+      #Push-back the commands into the input buffer.
+      new_input.setbuf(cmd)
       new_stdin = self.file_mgr.open(None,"*","rw")
       # print "setting new input to %s" % new_input
       # and install this as current input. The shell will read from that
       # instead until it hits the EOF
-      input_fh    = cli.r_s("cli_StandardInput")
+      input_fhsi  = cli.r_s("cli_StandardInput")
+      input_fhci  = cli.r_s("cli_CurrentInput")
       cli.w_s("cli_CurrentInput",new_input.mem.addr)
       cli.w_s("cli_StandardInput",new_stdin.mem.addr)
       cli.w_s("cli_Background",self.DOSTRUE)
@@ -1295,14 +1290,15 @@ class DosLibrary(AmigaLibrary):
       # print "*** Current input is %s" % input_fh
       # trap to clean up sub process resources
       def trap_stop_run_command(ret_code):
-        cli.w_s("cli_CurrentInput",input_fh)
-        cli.w_s("cli_StandardInput",input_fh)
+        cli.w_s("cli_CurrentInput",input_fhci)
+        cli.w_s("cli_StandardInput",input_fhsi)
         cli.w_s("cli_Background",self.DOSFALSE)
         cli.w_s("cli_Module",cur_module)
+        # Channels are closed by the dying shell
         ctx.mem.access.w_bstr(cli.r_s("cli_SetName"),cur_setname)
-        ctx.process.this_task.access.w_s("pr_CIS",input_fh)
-        infile = self.file_mgr.get_by_b_addr(input_fh >> 2,False)
-        infile.setbuf("")
+        ctx.process.this_task.access.w_s("pr_CIS",input_fhci)
+        #infile = self.file_mgr.get_by_b_addr(input_fhci >> 2,False)
+        #infile.setbuf("")
         self.ctx.process.set_current_dir(current_dir)
         self.cur_dir_lock = self.lock_mgr.get_by_b_addr(current_dir >> 2)
         ctx.cpu.w_reg(REG_D0,0)
