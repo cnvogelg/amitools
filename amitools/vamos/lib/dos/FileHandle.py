@@ -41,12 +41,18 @@ class FileHandle:
   # --- file ops ---
 
   def write(self, data):
-    self.obj.write(data)
-    return len(data)
+    try:
+      self.obj.write(data)
+      return len(data)
+    except IOError:
+      return -1
 
   def read(self, len):
-    d = self.obj.read(len)
-    return d
+    try:
+      d = self.obj.read(len)
+      return d
+    except IOError:
+      return -1
 
   def getc(self):
     if len(self.unch) > 0:
@@ -55,8 +61,11 @@ class FileHandle:
     else:
       if self.is_nil:
         return -1
-      d = self.obj.read(1)
-      if d == "":
+      try:
+        d = self.obj.read(1)
+        if d == "":
+          return -1
+      except IOError:
         return -1
     self.ch = ord(d)
     return self.ch
@@ -109,7 +118,10 @@ class FileHandle:
     return self.obj.tell()
 
   def seek(self, pos, whence):
-    self.obj.seek(pos, whence)
+    try:
+      self.obj.seek(pos, whence)
+    except IOError:
+      return -1
 
   def flush(self):
     self.obj.flush()

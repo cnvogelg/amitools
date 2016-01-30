@@ -275,7 +275,7 @@ class LibManager():
     end = time.clock()
     delta = end - start;
     if res_list == None or len(res_list) != 1:
-      self.lib_log("load_lib","No single resident found!", level=logging.ERROR)
+      self.lib_log("load_lib","No single resident in %s found found!" % load_name, level=logging.ERROR)
       return None
 
     # make sure its a library

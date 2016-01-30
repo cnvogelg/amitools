@@ -104,11 +104,18 @@ class FileManager:
     fh.close()
     self._unregister_file(fh)
 
-  def get_by_b_addr(self, b_addr):
+  def get_by_b_addr(self, b_addr, for_writing = None):
     if b_addr == 0:
       return None
     if b_addr in self.files_by_b_addr:
-      return self.files_by_b_addr[b_addr]
+      fh = self.files_by_b_addr[b_addr]
+      # AmigaDos has no problem reading from an output console handle
+      # or writing to the input handle for the console.
+      if for_writing == True and fh.obj == sys.stdin:
+        return self.std_output
+      elif for_writing == False and fh.obj == sys.stdout:
+        return self.std_input
+      return fh
     else:
       addr = b_addr << 2
       raise ValueError("Invalid File Handle at b@%06x = %06x" % (b_addr, addr))

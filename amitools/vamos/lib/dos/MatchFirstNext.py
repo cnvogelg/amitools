@@ -39,7 +39,7 @@ class MatchFirstNext:
     # get parent dir of first match
     dir_part = self.path_mgr.ami_dir_of_path(self.lock,self.path)
     abs_path = self.path_mgr.ami_abs_path(self.lock,dir_part)
-
+    
     # create base/last achain and set dir lock
     # THOR: this is still screwed up. Some utililties
     # most notably "dir" depend on a correctly setup
@@ -84,13 +84,7 @@ class MatchFirstNext:
     return True
 
   def _fill_parent_lock(self, path):
-    slash  = path.rfind('/')
-    if slash > 0:
-      parent = path[0:slash]
-    elif slash == 0:
-      parent = "/"
-    else:
-      parent = ""
+    parent = self.path_mgr.ami_abs_parent_path(path)
     return self._fill_lock(parent)
 
   def _push_dodir(self, name, path):

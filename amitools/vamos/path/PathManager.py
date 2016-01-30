@@ -154,10 +154,10 @@ class PathManager:
   def ami_abs_parent_path(self, path):
     """return absolute parent path of given path or same if already parent"""
     # can't strip from device prefix
-    if path[-1] == ':':
+    if len(path) > 0 and path[-1] == ':':
       return path
     # skip trailing slash, then recursively call self
-    if path[-1] == '/':
+    if len(path) > 0 and path[-1] == '/':
       return self.ami_abs_parent_path(path[:-1])
     pos = path.rfind('/')
     # skip last part if we have parts
@@ -168,9 +168,10 @@ class PathManager:
       pos = path.find(':')
       if pos > 0:
         return path[0:pos+1]
+      elif len(path) > 0:
+        return ""
       else:
-        return path+"//"
-      
+        return "/"
 
   def ami_abs_path(self, lock, path):
     """return absolute amiga path from given path"""

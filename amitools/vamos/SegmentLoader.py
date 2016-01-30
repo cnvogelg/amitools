@@ -56,9 +56,12 @@ class SegmentLoader:
     return self.path_mgr.ami_command_to_sys_path(lock, ami_bin_file) != None
 
   # load ami_bin_file
-  def load_seg(self, lock, ami_bin_file, allow_reuse = True):
+  def load_seg(self, lock, ami_bin_file, allow_reuse = True, local_path = False):
     # map file name
-    sys_bin_file = self.path_mgr.ami_command_to_sys_path(lock, ami_bin_file)
+    if local_path:
+      sys_bin_file = self.path_mgr.ami_to_sys_path(lock,ami_bin_file,searchMulti=True)
+    else:
+      sys_bin_file = self.path_mgr.ami_command_to_sys_path(lock, ami_bin_file)
     if sys_bin_file == None:
       self.error = "failed mapping binary path: '%s'" % ami_bin_file
       return None
