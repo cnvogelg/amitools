@@ -72,7 +72,11 @@
 
 /* signed and unsigned int must be at least 32 bits wide */
 #define sint   signed   int
+#ifdef __CYGWIN__
+typedef unsigned int uint;
+#else
 #define uint   unsigned int
+#endif
 
 
 #if M68K_USE_64_BIT
