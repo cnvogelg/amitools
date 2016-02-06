@@ -18,7 +18,7 @@ class LockManager:
     self.locks_by_baddr = {}
 
   def generate_key(self, system_path):
-    return os.lstat(system_path).st_ino
+    return 0xffffffff & os.lstat(system_path).st_ino
 
   def _register_lock(self, lock):
     # look up volume
