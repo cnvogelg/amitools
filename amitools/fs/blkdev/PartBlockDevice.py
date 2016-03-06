@@ -3,11 +3,11 @@ import os.path
 import os
 
 class PartBlockDevice(BlockDevice):
-  def __init__(self, raw_blkdev, part_blk, rdisk=None):
+  def __init__(self, raw_blkdev, part_blk, auto_close=False):
     self.raw_blkdev = raw_blkdev
     self.part_blk = part_blk
     self.blk_off = 0
-    self.rdisk = rdisk
+    self.auto_close = auto_close
 
   def open(self):
     # extract geometry from partition block
@@ -26,20 +26,20 @@ class PartBlockDevice(BlockDevice):
     # calc block offset of partition
     self.blk_off = heads * secs * lo_cyl
     return True
-      
+
   def flush(self):
     self.raw_blkdev.flush()
-        
+
   def close(self):
     # auto close containing rdisk
-    if self.rdisk != None:
-      self.rdisk.close()
+    if self.auto_close:
+      self.raw_blkdev.close()
 
   def read_block(self, blk_num):
     if blk_num >= self.num_blocks:
       raise ValueError("Invalid Part block num: got %d but max is %d" % (blk_num, self.num_blocks))
     return self.raw_blkdev.read_block(self.blk_off + blk_num)
-  
+
   def write_block(self, blk_num, data):
     if blk_num >= self.num_blocks:
       raise ValueError("Invalid Part block num: got %d but max is %d" % (blk_num, self.num_blocks))
