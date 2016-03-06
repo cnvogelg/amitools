@@ -103,7 +103,9 @@ class FSCommandQueue(CommandQueue):
       self.rdisk = RDisk(self.blkdev)
       if self.args.verbose:
         print "opening rdisk:",self.img
-      self.rdisk.open()
+      return self.rdisk.open()
+    else:
+      return True
 
   def run_first(self, cmd_line, cmd):
     self.cmd_line = cmd_line
@@ -122,7 +124,8 @@ class FSCommandQueue(CommandQueue):
       self.blkdev = pre_cmd.blkdev
       # setup rdisk (if necessary)
       if cmd.need_rdisk():
-        self._open_rdisk()
+        if not self._open_rdisk():
+          raise IOError("No RDB Disk?")
 
     # run first command
     if self.args.verbose:
@@ -155,7 +158,8 @@ class FSCommandQueue(CommandQueue):
       raise IOError("Edit commands not allowed in read-only mode")
     # make sure rdisk is set up
     if self.rdisk == None and cmd.need_rdisk():
-      self._open_rdisk()
+      if not self._open_rdisk():
+        raise IOError("No RDB Disk?")
     # run command
     exit_code = cmd.run(self.blkdev, self.rdisk)
     if cmd.blkdev != None:
