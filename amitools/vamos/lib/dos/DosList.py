@@ -87,7 +87,7 @@ class DosList:
     entry.name    = name
     entry.assigns = [name+":"]
     return entry
-  
+
   def add_assign(self, name, assign_names):
     entry = DosListEntry(name,DosListAssignDef)
     self._add_entry(entry)
@@ -107,20 +107,21 @@ class DosList:
       #print "*** Entry %s, Name address is %s,%s" % (entry.mem,name_addr,self.mem.access.r_bstr(name_addr))
       for dirs in entry.assigns:
         lock = lock_mgr.create_lock(None,dirs,False)
-        entry.locks.append(lock)
-        if first:
-          entry.access.w_s("dol_Lock",lock.mem.addr)
-          first = False
-        else:
-          assign_entry = self.alloc.alloc_struct("AssignList",AssignListDef)
-          entry.alist.append(assign_entry)
-          assign_entry.access.w_s("al_Next",0)
-          assign_entry.access.w_s("al_Lock",lock.mem.addr)
-          if assign_last != None:
-            assign_last.w_s("al_Next",assign_entry.addr)
+        if lock is not None:
+          entry.locks.append(lock)
+          if first:
+            entry.access.w_s("dol_Lock",lock.mem.addr)
+            first = False
           else:
-            entry.access.w_s("dol_List",assign_entry.addr)
-          assign_last = assign_entry.access
+            assign_entry = self.alloc.alloc_struct("AssignList",AssignListDef)
+            entry.alist.append(assign_entry)
+            assign_entry.access.w_s("al_Next",0)
+            assign_entry.access.w_s("al_Lock",lock.mem.addr)
+            if assign_last != None:
+              assign_last.w_s("al_Next",assign_entry.addr)
+            else:
+              entry.access.w_s("dol_List",assign_entry.addr)
+            assign_last = assign_entry.access
 
   def get_entry_by_b_addr(self, baddr):
     if not self.entries_by_b_addr.has_key(baddr):
@@ -142,7 +143,7 @@ class DosList:
       elif t == 2 and flags & self.LDF_VOLUMES:
         return entry
       entry = entry.next
-    return None  
+    return None
 
   def lock_dos_list(self,flags):
     # Yes, this algorithm is really the one in the
