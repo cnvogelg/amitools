@@ -123,6 +123,9 @@ class Vamos:
     self.process = proc
     self.exec_lib.set_this_task(proc)
 
+  def get_current_process(self):
+    return self.process
+
   def set_main_process(self, proc):
     log_proc.info("set main process: %s", proc)
     self.proc_list.append(proc)
@@ -181,7 +184,7 @@ class Vamos:
     proc.free()
 
   # ----- overload a process for RunCommand -----
-  
+
   def run_command(self,start_pc,argsptr,arglen,stacksize):
     newstack     = self.alloc.alloc_memory("shell command stack",stacksize)
     newstackbase = newstack.addr

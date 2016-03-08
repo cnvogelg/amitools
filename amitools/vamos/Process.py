@@ -6,13 +6,16 @@ from lib.lexec.PortManager import *
 NT_PROCESS = 13
 
 class Process:
-  def __init__(self, ctx, bin_file, bin_args, input_fh=None, output_fh=None, stack_size=4096, exit_addr=0, shell=False):
+  def __init__(self, ctx, bin_file, bin_args,
+               input_fh=None, output_fh=None, stack_size=4096,
+               exit_addr=0, shell=False, cwd=None, cwd_lock=None):
     self.ctx = ctx
     if input_fh == None:
       input_fh = self.ctx.dos_lib.file_mgr.get_input()
     if output_fh == None:
       output_fh = self.ctx.dos_lib.file_mgr.get_output()
-    self.ok = self.load_binary(None,bin_file,shell)
+    self.init_cwd(cwd, cwd_lock)
+    self.ok = self.load_binary(self.cwd_lock,bin_file,shell)
     if not self.ok:
       return
     self.init_stack(stack_size, exit_addr)
@@ -32,8 +35,10 @@ class Process:
     self.shell_packet  = None
     self.shell_port    = None
     self.init_task_struct(input_fh, output_fh)
+    self.set_cwd()
 
   def free(self):
+    self.free_cwd()
     self.free_task_struct()
     self.free_shell_packet()
     self.free_cli_struct()
@@ -43,6 +48,32 @@ class Process:
 
   def __str__(self):
     return "[bin='%s']" % self.bin_file
+
+  # ----- current working dir -----
+  def init_cwd(self, cwd, cwd_lock):
+    self.cwd = cwd
+    if cwd is not None and cwd_lock is None:
+      lock_mgr = self.ctx.dos_lib.lock_mgr
+      dos_list = self.ctx.dos_lib.dos_list
+      entry = dos_list.get_entry_by_name('root')
+      lock = entry.locks[0]
+      self.cwd_lock = lock_mgr.create_lock(lock, cwd, False)
+      log_proc.info("current dir: cwd=%s create lock=%s", cwd, self.cwd_lock)
+      self.cwd_shared = False
+    else:
+      self.cwd_lock = cwd_lock
+      self.cwd_shared = True
+      log_proc.info("current dir: cwd=%s shared lock=%s", cwd, self.cwd_lock)
+
+  def set_cwd(self):
+    if self.cwd_lock is not None:
+      self.set_current_dir(self.cwd_lock.b_addr << 2)
+
+  def free_cwd(self):
+    if self.cwd_lock is not None and not self.cwd_shared:
+      log_proc.info("current_dir: free lock=%s", self.cwd_lock)
+      lock_mgr = self.ctx.dos_lib.lock_mgr
+      lock_mgr.release_lock(self.cwd_lock)
 
   # ----- stack -----
   # stack size in KiB

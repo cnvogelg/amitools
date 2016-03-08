@@ -148,7 +148,7 @@ class DosLibrary(AmigaLibrary):
       txt = "%s" % err_str
     ctx.mem.access.w_cstr(buf_ptr,txt[:buf_len-1])
     return self.DOSTRUE
-      
+
   def PrintFault(self, ctx):
     self.io_err = ctx.cpu.r_reg(REG_D1)
     hdr_ptr = ctx.cpu.r_reg(REG_D2)
@@ -801,7 +801,7 @@ class DosLibrary(AmigaLibrary):
     if lock1 != None and lock2 != None:
       return lock1.key == lock2.key
     return self.DOSFALSE
-    
+
   def Examine(self, ctx):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     fib_ptr = ctx.cpu.r_reg(REG_D2)
@@ -1068,7 +1068,7 @@ class DosLibrary(AmigaLibrary):
     pos          = args.find_arg(keyword)
     log_dos.info("FindArgs: template=%s keyword=%s -> %d" % (template,keyword,pos))
     return pos
-    
+
   def ReadArgs(self, ctx):
     template_ptr = ctx.cpu.r_reg(REG_D1)
     template     = ctx.mem.access.r_cstr(template_ptr)
@@ -1322,8 +1322,12 @@ class DosLibrary(AmigaLibrary):
       args = args[1:]
       # TODO: redirs
       log_dos.info("SystemTagList: bin='%s' args=%s", bin, args)
+      # fetch current dir for current process
+      cur_proc = ctx.get_current_process()
+      cwd_lock = cur_proc.cwd_lock
+      cwd = cur_proc.cwd
       # create a process and run it...
-      proc = Process(ctx, bin, args)
+      proc = Process(ctx, bin, args, cwd=cwd, cwd_lock=cwd_lock)
       if not proc.ok:
         log_dos.warn("SystemTagList: can't create process for '%s' args=%s", bin, args)
         return self.DOSTRUE
@@ -1535,7 +1539,7 @@ class DosLibrary(AmigaLibrary):
     flags = ctx.cpu.r_reg(REG_D2)
     node  = ctx.cpu.r_reg(REG_D1)
     return self.dos_list.next_dos_entry(flags,node)
-  
+
   # ----- misc --------
 
   def StrToLong(self, ctx):
