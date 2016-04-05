@@ -128,7 +128,7 @@ class AmigaLibrary:
          if return value exists then set it in CPU's D0 register"""
       d0 = method(ctx)
       if d0 != None:
-        if d0.__class__.__name__ == 'list':
+        if type(d0) is list:
           ctx.cpu.w_reg(REG_D0, d0[0] & 0xffffffff)
           ctx.cpu.w_reg(REG_D1, d0[1] & 0xffffffff)
         else:
@@ -167,7 +167,11 @@ class AmigaLibrary:
     # main call: call method and evaluate result
     code.append('  d0 = method(ctx)')
     code.append('  if d0 != None:')
-    code.append('    ctx.cpu.w_reg(REG_D0, d0)')
+    code.append('    if type(d0) is list:')
+    code.append('      ctx.cpu.w_reg(REG_D0, d0[0] & 0xffffffff)')
+    code.append('      ctx.cpu.w_reg(REG_D1, d0[1] & 0xffffffff)')
+    code.append('    else:')
+    code.append('      ctx.cpu.w_reg(REG_D0, d0 & 0xffffffff)')
 
     # timing code
     if need_timing:
