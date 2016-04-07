@@ -31,10 +31,10 @@ class Command:
     self.opts = opts
     self.edit = edit
     self.exit_code = 0
-    
+
     self.volume = None
     self.blkdev = None
-    
+
   def run(self, blkdev, vol):
     # optional init blkdev function
     if hasattr(self, "init_blkdev"):
@@ -43,7 +43,7 @@ class Command:
         if self.blkdev == None:
           return 5
         blkdev = self.blkdev
-        
+
     # optional init volume function
     if hasattr(self, "init_vol"):
       # close old
@@ -62,10 +62,10 @@ class Command:
       return self.handle_vol(vol)
     else:
       return 0
-  
+
   def has_init_blkdev(self):
     return hasattr(self, 'init_blkdev')
-    
+
   def need_volume(self):
     return hasattr(self, 'handle_vol') and not hasattr(self, 'init_vol')
 
@@ -76,7 +76,7 @@ class FSCommandQueue(CommandQueue):
     self.args = args
     self.blkdev = None
     self.volume = None
-  
+
   def run(self):
     self.img = self.args.image_file
     try:
@@ -113,10 +113,10 @@ class FSCommandQueue(CommandQueue):
       if self.args.verbose:
         print "opening volume:",self.img
       self.volume.open()
-  
+
   def run_first(self, cmd_line, cmd):
     self.cmd_line = cmd_line
-    
+
     # check if first command is an init command
     if not cmd.has_init_blkdev():
       # auto add 'open' command
@@ -132,8 +132,8 @@ class FSCommandQueue(CommandQueue):
       # setup volume (if necessary)
       if cmd.need_volume():
         self._open_volume()
-        
-    # run first command    
+
+    # run first command
     if self.args.verbose:
       print "command:",self.cmd_line
     if cmd.edit and self.args.read_only:
@@ -141,8 +141,8 @@ class FSCommandQueue(CommandQueue):
 
     # check code of command after __init__ parsing
     if cmd.exit_code != 0:
-      return cmd.exit_code  
-    
+      return cmd.exit_code
+
     # perform command
     exit_code = cmd.run(self.blkdev, self.volume)
     if cmd.blkdev != None:
@@ -154,7 +154,7 @@ class FSCommandQueue(CommandQueue):
     if self.args.verbose:
       print "exit_code:",exit_code
     return exit_code
-    
+
   def run_next(self, cmd_line, cmd):
     self.cmd_line = cmd_line
     if self.args.verbose:
@@ -181,22 +181,22 @@ class OpenCmd(Command):
   def init_blkdev(self, image_file):
     opts = KeyValue.parse_key_value_strings(self.opts)
     f = BlkDevFactory()
-    return f.open(image_file, options=opts, read_only=args.read_only)
-    
+    return f.open(image_file, options=opts, read_only=self.args.read_only)
+
 class CreateCmd(Command):
   def __init__(self, args, opts):
     Command.__init__(self, args, opts, edit=True)
-    
+
   def init_blkdev(self, image_file):
     opts = KeyValue.parse_key_value_strings(self.opts)
     f = BlkDevFactory()
-    return f.create(image_file, options=opts, force=args.force)
+    return f.create(image_file, options=opts, force=self.args.force)
 
 class FormatCmd(Command):
   def init_blkdev(self, image_file):
     opts = KeyValue.parse_key_value_strings(self.opts[1:])
     f = BlkDevFactory()
-    return f.create(image_file, options=opts, force=args.force)
+    return f.create(image_file, options=opts, force=self.args.force)
 
   def init_vol(self, blkdev):
     vol = ADFSVolume(blkdev)
@@ -229,13 +229,13 @@ class PackCmd(Command):
       else:
         self.blkdev_opts = None
       self.imager.pack_begin(self.in_path)
-      
+
   def init_blkdev(self, image_file):
     return self.imager.pack_create_blkdev(self.in_path, image_file, force=self.args.force, options=self.blkdev_opts)
-  
+
   def init_vol(self, blkdev):
     return self.imager.pack_create_volume(self.in_path, blkdev)
-  
+
   def handle_vol(self, volume):
     self.imager.pack_root(self.in_path, volume)
     self.imager.pack_end(self.in_path, volume)
@@ -272,10 +272,10 @@ class RepackCmd(Command):
 
   def init_blkdev(self, image_file):
     return self.repacker.create_out_blkdev(image_file)
-    
+
   def init_vol(self, blkdev):
     return self.repacker.create_out_volume(blkdev)
-  
+
   def handle_vol(self, vol):
     self.repacker.repack()
     return 0
@@ -331,7 +331,7 @@ class ReadCmd(Command):
     out_name = os.path.basename(p[0])
     if n == 2:
       if os.path.isdir(p[1]):
-        out_name = os.path.join(p[1],out_name)  
+        out_name = os.path.join(p[1],out_name)
       else:
         out_name = p[1]
     # single file operation
@@ -394,7 +394,7 @@ class WriteCmd(Command):
     if not os.path.exists(sys_file):
       print "File not found:",sys_file
       return 2
-      
+
     ami_path = make_fsstr(ami_path)
     file_name = make_fsstr(file_name)
     # handle file
@@ -412,9 +412,9 @@ class WriteCmd(Command):
       node = parent_node.create_dir(dir_name)
       img = Imager()
       img.pack_dir(sys_file, node)
-      
+
     return 0
-    
+
 class DeleteCmd(Command):
   def __init__(self, args, opts):
     Command.__init__(self, args, opts, edit=True)
@@ -428,7 +428,7 @@ class DeleteCmd(Command):
     path = make_fsstr(self.opts[0])
     node = vol.delete(path, wipe=do_wipe, all=do_all)
     return 0
-      
+
 class ProtectCmd(Command):
   def __init__(self, args, opts):
     Command.__init__(self, args, opts, edit=True)
@@ -438,7 +438,7 @@ class ProtectCmd(Command):
       print "Usage: protect <ami_file> <protect>"
       return 1
     name = make_fsstr(self.opts[0])
-    pr_str = self.opts[1]    
+    pr_str = self.opts[1]
     node = vol.get_path_name(name)
     if node != None:
       node.change_protect_by_string(pr_str)
@@ -464,7 +464,7 @@ class CommentCmd(Command):
     else:
       print "Can't find node:",name
       return 2
-    
+
 class TimeCmd(Command):
   def __init__(self, args, opts):
     Command.__init__(self, args, opts, edit=True)
@@ -542,13 +542,13 @@ class BitmapCmd(Command):
       print "Usage: bitmap ( free | used | find [n] | all | maps | root [all] | node <path> [all] [entries]) [brief]"
       return 1
     cmd = self.opts[0]
-    
+
     # brief mode
     brief = False
     if self.opts[-1] == 'brief':
       brief = True
       self.opts = self.opts[:-1]
-  
+
     if cmd == 'free':
       vol.bitmap.print_free(brief)
       return 0
@@ -714,7 +714,7 @@ class BootCmd(Command):
     elif cmd == 'install':
       if n == 1: # default boot code
         name = "boot2x3x"
-      else: 
+      else:
         name = self.opts[1]
       # boot code directory
       bc_dir = bb.get_boot_code_dir()
@@ -754,43 +754,48 @@ class BlkDevCmd(Command):
     return 0
 
 # ----- main -----
-# call scanner and process all files with selected command
-cmd_map = {
-"open" : OpenCmd,
-"create" : CreateCmd,
-"list" : ListCmd,
-"type" : TypeCmd,
-"read" : ReadCmd,
-"makedir" : MakeDirCmd,
-"write" : WriteCmd,
-"delete" : DeleteCmd, 
-"format" : FormatCmd,
-"bitmap" : BitmapCmd,
-"blkdev" : BlkDevCmd,
-"protect" : ProtectCmd,
-"comment" : CommentCmd,
-"time" : TimeCmd,
-"block" : BlockCmd,
-"pack" : PackCmd,
-"unpack" : UnpackCmd,
-"repack" : RepackCmd,
-"boot" : BootCmd,
-"root" : RootCmd,
-"info" : InfoCmd,
-"relabel" : RelabelCmd
-}
+def main():
+  # call scanner and process all files with selected command
+  cmd_map = {
+  "open" : OpenCmd,
+  "create" : CreateCmd,
+  "list" : ListCmd,
+  "type" : TypeCmd,
+  "read" : ReadCmd,
+  "makedir" : MakeDirCmd,
+  "write" : WriteCmd,
+  "delete" : DeleteCmd,
+  "format" : FormatCmd,
+  "bitmap" : BitmapCmd,
+  "blkdev" : BlkDevCmd,
+  "protect" : ProtectCmd,
+  "comment" : CommentCmd,
+  "time" : TimeCmd,
+  "block" : BlockCmd,
+  "pack" : PackCmd,
+  "unpack" : UnpackCmd,
+  "repack" : RepackCmd,
+  "boot" : BootCmd,
+  "root" : RootCmd,
+  "info" : InfoCmd,
+  "relabel" : RelabelCmd
+  }
 
-parser = argparse.ArgumentParser()
-parser.add_argument('image_file')
-parser.add_argument('command_list', nargs='+', help="command: "+",".join(cmd_map.keys()))
-parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
-parser.add_argument('-s', '--seperator', default='+', help="set the command separator char sequence")
-parser.add_argument('-r', '--read-only', action='store_true', default=False, help="read-only operation")
-parser.add_argument('-f', '--force', action='store_true', default=False, help="force overwrite existing image")
-args = parser.parse_args()
+  parser = argparse.ArgumentParser()
+  parser.add_argument('image_file')
+  parser.add_argument('command_list', nargs='+', help="command: "+",".join(cmd_map.keys()))
+  parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
+  parser.add_argument('-s', '--seperator', default='+', help="set the command separator char sequence")
+  parser.add_argument('-r', '--read-only', action='store_true', default=False, help="read-only operation")
+  parser.add_argument('-f', '--force', action='store_true', default=False, help="force overwrite existing image")
+  args = parser.parse_args()
 
-cmd_list = args.command_list
-sep = args.seperator
-queue = FSCommandQueue(args, cmd_list, sep, cmd_map)
-code = queue.run()
-sys.exit(code)
+  cmd_list = args.command_list
+  sep = args.seperator
+  queue = FSCommandQueue(args, cmd_list, sep, cmd_map)
+  code = queue.run()
+  return code
+
+
+if __name__ == '__main__':
+  sys.exit(main())

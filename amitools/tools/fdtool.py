@@ -10,7 +10,7 @@ import amitools.fd.FDFormat as FDFormat
 
 # ----- dump -----
 
-def dump(fd, add_private):
+def dump(fname, fd, add_private):
   print(fname)
   print("  base: %s" % fd.get_base_name())
   funcs = fd.get_funcs()
@@ -52,32 +52,36 @@ def generate_sasc_code(fname, fd, add_private, prefix=""):
       fo.write(line)
       fo.write("{\n  return 0;\n}\n\n")
   fo.close()
-  
+
 # ----- main -----
+def main():
+  # parse args
+  parser = argparse.ArgumentParser()
+  parser.add_argument('files', nargs='+')
+  parser.add_argument('-P', '--add-private', action='store_true', default=False, help="add private functions")
+  parser.add_argument('-p', '--gen-python', action='store_true', default=False, help="generate python code for vamos")
+  parser.add_argument('-f', '--gen-fd', action='store', default=None, help="generate a new fd file")
+  parser.add_argument('-c', '--gen-sasc', action='store', default=None, help="generate SAS C code file")
+  parser.add_argument('-E', '--prefix', action='store', default='', help="add prefix to functions in C")
+  args = parser.parse_args()
 
-# parse args
-parser = argparse.ArgumentParser()
-parser.add_argument('files', nargs='+')
-parser.add_argument('-P', '--add-private', action='store_true', default=False, help="add private functions")
-parser.add_argument('-p', '--gen-python', action='store_true', default=False, help="generate python code for vamos")
-parser.add_argument('-f', '--gen-fd', action='store', default=None, help="generate a new fd file")
-parser.add_argument('-c', '--gen-sasc', action='store', default=None, help="generate SAS C code file")
-parser.add_argument('-E', '--prefix', action='store', default='', help="add prefix to functions in C")
-args = parser.parse_args()
+  # main loop
+  files = args.files
+  for fname in files:
+    fd = FDFormat.read_fd(fname)
+    code_gen = False
+    if args.gen_python:
+      generate_python_code(fd, args.add_private)
+      code_gen = True
+    if args.gen_sasc:
+      generate_sasc_code(args.gen_sasc, fd, args.add_private, args.prefix)
+      code_gen = True
+    if args.gen_fd != None:
+      FDFormat.write_fd(args.gen_fd, fd, args.add_private)
+      code_gen = True
+    if not code_gen:
+      dump(fname, fd, args.add_private)
 
-# main loop
-files = args.files
-for fname in files:
-  fd = FDFormat.read_fd(fname)
-  code_gen = False
-  if args.gen_python:
-    generate_python_code(fd, args.add_private)
-    code_gen = True
-  if args.gen_sasc:
-    generate_sasc_code(args.gen_sasc, fd, args.add_private, args.prefix)
-    code_gen = True
-  if args.gen_fd != None:
-    FDFormat.write_fd(args.gen_fd, fd, args.add_private)
-    code_gen = True
-  if not code_gen:
-    dump(fd, args.add_private)
+
+if __name__ == '__main__':
+  main()

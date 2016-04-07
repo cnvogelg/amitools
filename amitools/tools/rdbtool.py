@@ -633,38 +633,43 @@ class FSFlagsCommand(Command):
         return 1
 
 # ----- main -----
-# call scanner and process all files with selected command
-cmd_map = {
-"open" : OpenCommand,
-"create" : CreateCommand,
-"init" : InitCommand,
-"info" : InfoCommand,
-"show" : ShowCommand,
-"free" : FreeCommand,
-"add" : AddCommand,
-"fill" : FillCommand,
-"fsget" : FSGetCommand,
-"fsadd" : FSAddCommand,
-"fsdelete" : FSDeleteCommand,
-"fsflags" : FSFlagsCommand,
-"map" : MapCommand,
-"delete" : DeleteCommand,
-"change" : ChangeCommand
-}
+def main():
+  # call scanner and process all files with selected command
+  cmd_map = {
+  "open" : OpenCommand,
+  "create" : CreateCommand,
+  "init" : InitCommand,
+  "info" : InfoCommand,
+  "show" : ShowCommand,
+  "free" : FreeCommand,
+  "add" : AddCommand,
+  "fill" : FillCommand,
+  "fsget" : FSGetCommand,
+  "fsadd" : FSAddCommand,
+  "fsdelete" : FSDeleteCommand,
+  "fsflags" : FSFlagsCommand,
+  "map" : MapCommand,
+  "delete" : DeleteCommand,
+  "change" : ChangeCommand
+  }
 
-parser = argparse.ArgumentParser()
-parser.add_argument('image_file')
-parser.add_argument('command_list', nargs='+', help="command: "+",".join(cmd_map.keys()))
-parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
-parser.add_argument('-s', '--seperator', default='+', help="set the command separator char sequence")
-parser.add_argument('-r', '--read-only', action='store_true', default=False, help="read-only operation")
-parser.add_argument('-f', '--force', action='store_true', default=False, help="force overwrite existing image")
-parser.add_argument('-p', '--drive-prefix', default='DH', help="set default drive name prefix (DH -> DH0, DH1, ...)")
-parser.add_argument('-t', '--dostype', default='ffs+intl', help="set default dos type")
-args = parser.parse_args()
+  parser = argparse.ArgumentParser()
+  parser.add_argument('image_file')
+  parser.add_argument('command_list', nargs='+', help="command: "+",".join(cmd_map.keys()))
+  parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
+  parser.add_argument('-s', '--seperator', default='+', help="set the command separator char sequence")
+  parser.add_argument('-r', '--read-only', action='store_true', default=False, help="read-only operation")
+  parser.add_argument('-f', '--force', action='store_true', default=False, help="force overwrite existing image")
+  parser.add_argument('-p', '--drive-prefix', default='DH', help="set default drive name prefix (DH -> DH0, DH1, ...)")
+  parser.add_argument('-t', '--dostype', default='ffs+intl', help="set default dos type")
+  args = parser.parse_args()
 
-cmd_list = args.command_list
-sep = args.seperator
-queue = FSCommandQueue(args, cmd_list, sep, cmd_map)
-code = queue.run()
-sys.exit(code)
+  cmd_list = args.command_list
+  sep = args.seperator
+  queue = FSCommandQueue(args, cmd_list, sep, cmd_map)
+  code = queue.run()
+  return code
+
+
+if __name__ == '__main__':
+  sys.exit(main())
