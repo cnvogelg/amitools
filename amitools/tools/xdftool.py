@@ -19,6 +19,7 @@ from amitools.util.DisAsm import DisAsm
 import amitools.util.KeyValue as KeyValue
 from amitools.fs.rdb.RDisk import RDisk
 from amitools.fs.FSString import FSString
+import amitools.fs.DosType as DosType
 
 # system encoding
 def make_fsstr(s):
@@ -30,7 +31,7 @@ def make_fsstr(s):
       encoding = "cp1252"
     else:
       encoding = "utf-8"
-  u = s.deocde(encoding)
+  u = s.decode(encoding)
   return FSString(u)
 
 # ----- commands -----
@@ -210,15 +211,20 @@ class FormatCmd(Command):
   def init_vol(self, blkdev):
     vol = ADFSVolume(blkdev)
     n = len(self.opts)
-    if n == 0:
-      print "Usage: format <volume_name> [ffs] [intl] [dircache]"
+    if n < 1 or n > 2:
+      print "Usage: format <volume_name> [dos_type]"
       return None
     else:
-      is_ffs = "ffs" in self.opts
-      is_intl = "intl" in self.opts
-      is_dircache = "dircache" in self.opts
+      if n > 1:
+        dos_str = self.opts[1]
+        dos_type = DosType.parse_dos_type_str(dos_str)
+        if dos_type is None:
+          print "ERROR invalid dos_tpye:", dos_str
+          return None
+      else:
+        dos_type = None
       vol_name = make_fsstr(self.opts[0])
-      vol.create(vol_name, is_ffs=is_ffs, is_intl=is_intl, is_dircache=is_dircache)
+      vol.create(vol_name, dos_type=dos_type)
       return vol
 
 # ----- Pack/Unpack -----
@@ -229,21 +235,31 @@ class PackCmd(Command):
     self.imager = Imager()
     n = len(self.opts)
     if n == 0:
-      print "Usage: pack <in_path> [out_size]"
+      print "Usage: pack <in_path> [dos_type] [out_size]"
       self.exit_code = 1
     else:
       self.in_path = self.opts[0]
+      blkdev_opts = None
+      dos_type = None
       if n > 1:
-        self.blkdev_opts = KeyValue.parse_key_value_strings(opts[1:])
-      else:
-        self.blkdev_opts = None
+        # is a dostype given?
+        dos_str = opts[1]
+        dos_type = DosType.parse_dos_type_str(dos_str)
+        if dos_type is not None:
+          begin = 2
+        else:
+          begin = 1
+        # take remainder as blkdev opts
+        blkdev_opts = KeyValue.parse_key_value_strings(opts[begin:])
+      self.blkdev_opts = blkdev_opts
+      self.dos_type = dos_type
       self.imager.pack_begin(self.in_path)
 
   def init_blkdev(self, image_file):
     return self.imager.pack_create_blkdev(self.in_path, image_file, force=self.args.force, options=self.blkdev_opts)
 
   def init_vol(self, blkdev):
-    return self.imager.pack_create_volume(self.in_path, blkdev)
+    return self.imager.pack_create_volume(self.in_path, blkdev, dos_type=self.dos_type)
 
   def handle_vol(self, volume):
     self.imager.pack_root(self.in_path, volume)
