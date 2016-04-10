@@ -22,7 +22,16 @@ from amitools.fs.FSString import FSString
 
 # system encoding
 def make_fsstr(s):
-  return FSString(s.decode(sys.stdout.encoding))
+  # fetch default encoding (if available)
+  encoding = sys.stdin.encoding
+  if encoding is None:
+    # assume win default encoding
+    if os.platform == "win32":
+      encoding = "cp1252"
+    else:
+      encoding = "utf-8"
+  u = s.deocde(encoding)
+  return FSString(u)
 
 # ----- commands -----
 class Command:
