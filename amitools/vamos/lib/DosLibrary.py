@@ -522,8 +522,11 @@ class DosLibrary(AmigaLibrary):
     elif mode == 0:
       mode_str = "CURRENT"
       whence = 1
+      if pos >= 0x80000000:
+        pos = pos - 0x100000000
     elif mode == 1:
       mode_str = "END"
+      pos = pos - 0x100000000
       whence = 2
     else:
       raise UnsupportedFeatureError("Seek: mode=%d" % mode)

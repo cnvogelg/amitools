@@ -1,7 +1,7 @@
 # Makefile for musashi
 
-CFLAGS    = -O0 -ggdb3
-#CFLAGS    = -O3
+#CFLAGS    = -O0 -ggdb3
+CFLAGS    = -O3
 
 GEN_INPUT = m68k_in.c
 
