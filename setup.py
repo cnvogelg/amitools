@@ -32,6 +32,7 @@ scripts = {
     'geotool = amitools.tools.geotool:main',
     'hunktool = amitools.tools.hunktool:main',
     'rdbtool = amitools.tools.rdbtool:main',
+    'romtool = amitools.tools.romtool:main',
     'typetool = amitools.tools.typetool:main',
     'vamos = amitools.tools.vamos:main',
     'vamospath = amitools.tools.vamospath:main',
