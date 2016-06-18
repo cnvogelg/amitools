@@ -31,7 +31,7 @@ class KickRomHelper(object):
       return False
     return True
 
-  def _do_calc_check_sum(self, skip_off=None):
+  def calc_check_sum(self, skip_off=None):
     """Check internal kickstart checksum and return True if is correct"""
     chk_sum = 0
     num_longs = self.size / 4
@@ -47,22 +47,21 @@ class KickRomHelper(object):
         chk_sum += 1
     return max_u32 - chk_sum
 
-  def calc_check_sum(self, sum_off=None):
-    if sum_off is None:
-      sum_off = self.size - 0x18
-    return self._do_calc_check_sum(sum_off)
-
   def verify_check_sum(self):
-    chk_sum = self._do_calc_check_sum()
+    chk_sum = self.calc_check_sum()
     return chk_sum == 0
 
   def read_check_sum(self):
     sum_off = self.size - 0x18
-    return struct.unpack_from(">I", self.data, sum_off)[0]
+    return self._read_long(sum_off)
+
+  def recalc_check_sum(self):
+    sum_off = self.size - 0x18
+    return self.calc_check_sum(sum_off)
 
   def get_boot_pc(self):
     """return PC for booting the ROM"""
-    return struct.unpack_from(">I", self.data, 4)[0]
+    return self._read_long(4)
 
   def get_rom_ver_rev(self):
     """get (ver, rev) version info from ROM"""
@@ -71,14 +70,13 @@ class KickRomHelper(object):
   def get_rom_size_field(self):
     """return size of ROM stored in ROM itself"""
     off = self.size - 0x14
-    return struct.unpack_from(">I", self.data, off)[0]
+    return self._read_long(off)
 
   def get_base_addr(self):
-    kib = self.size / 1024
-    if kib == 256:
-      return 0xfc0000
-    else:
-      return 0xf80000
+    return self.get_boot_pc() & ~0xffff
+
+  def _read_long(self, off):
+    return struct.unpack_from(">I", self.data, off)[0]
 
 
 class KickRomLoader(object):
@@ -114,7 +112,10 @@ class KickRomLoader(object):
     if kh.validate():
       rom.addr = kh.get_base_addr()
       rom.chk_sum_off = len(rom_img) - 0x18
+      rom.chk_sum = struct.unpack_from(">I", rom.data, rom.chk_sum_off)[0]
       rom.is_kick = True
+    else:
+      rom.chk_sum = kh.calc_check_sum()
     return rom
 
   @classmethod
@@ -143,8 +144,9 @@ if __name__ == '__main__':
   print("pc=%08x" % kh.get_boot_pc())
   print("ver,rev=", kh.get_rom_ver_rev())
   print("size %08x == %08x" % (kh.get_rom_size_field(), ks.get_size()))
+  print("base %08x" % kh.get_base_addr())
   print("get chk_sum=%08x" % kh.read_check_sum())
-  print("calc chk_sum=%08x" % kh.calc_check_sum())
+  print("calc chk_sum=%08x" % kh.recalc_check_sum())
 #  with open("out.rom", "wb") as fh:
 #    fh.write(ks.get_data())
 

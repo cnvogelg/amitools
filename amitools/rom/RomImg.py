@@ -7,17 +7,18 @@ class RomImg(object):
     self.is_writeable = type(data_bytes) is bytearray
     self.name = None
     self.short_name = None
-    self.chk_sum_off = None
+    self.chk_sum = 0
+    self.chk_sum_off = 0xffffffff
     self.is_kick = False
 
   def __repr__(self):
     return "RomImg(addr=%08x,size=%08x," \
            "is_writeable=%s,name=%s,short_name=%s," \
-           "chk_sum_off=%s,is_kick=%s)" % \
+           "chk_sum=%08x,chk_sum_off=%08x,is_kick=%s)" % \
       (self.addr, self.size,
        self.is_writeable,
        self.name, self.short_name,
-       self.chk_sum_off, self.is_kick)
+       self.chk_sum, self.chk_sum_off, self.is_kick)
 
   def get_data(self):
     return self.data

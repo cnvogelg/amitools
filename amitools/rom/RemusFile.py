@@ -3,8 +3,6 @@ from __future__ import print_function
 import os
 import struct
 
-from KickRom import *
-
 
 class RemusRom(object):
   def __init__(self, sum_off, chk_sum, size, base_addr, name, short_name):
@@ -131,21 +129,11 @@ class RemusSplitFile(RemusFile):
              rom.sum_off, rom.chk_sum,
              rom.short_name, rom.name))
 
-  def find_rom(self, rom_data, chk_sum_cache):
-    size = len(rom_data)
-    helper = KickRomHelper(rom_data)
+  def find_rom(self, rom_img):
     for rom in self.roms:
       # ok. size does match!
-      if size == rom.size:
-        # do we have a chk sum for the offset?
-        sum_off = rom.sum_off
-        if sum_off in chk_sum_cache:
-          chk_sum = chk_sum_cache[sum_off]
-        else:
-          chk_sum = helper.calc_check_sum(sum_off)
-          chk_sum_cache[sum_off] = chk_sum
-        # does check sum match?
-        if rom.chk_sum == chk_sum:
+      if rom_img.size == rom.size:
+        if rom_img.chk_sum == rom.chk_sum:
           return rom
 
 
@@ -213,22 +201,22 @@ class RemusFileSet(object):
     if self.id_file is not None:
       self.id_file.dump()
 
-  def find_rom(self, rom_data):
-    chk_sum_cache = {}
+  def find_rom(self, rom_img):
     for f in self.split_files:
-      rom = f.find_rom(rom_data, chk_sum_cache)
+      rom = f.find_rom(rom_img)
       if rom is not None:
         return rom
 
 
 if __name__ == '__main__':
   import sys
+  import KickRom
   rfs = RemusFileSet()
   rfs.load("../data/splitdata")
   rfs.dump()
   if len(sys.argv) > 0:
     for rom_path in sys.argv[1:]:
-      rom_img = KickRomLoader.load(rom_path)
+      rom_img = KickRom.KickRomLoader.load(rom_path)
       print(rom_img)
-      found_rom = rfs.find_rom(rom_img.get_data())
+      found_rom = rfs.find_rom(rom_img)
       print(found_rom)
