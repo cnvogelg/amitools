@@ -3,27 +3,26 @@ from __future__ import print_function
 import os
 import struct
 
-from RomImg import RomImg
 
-
-class KickRomError(Exception):
-  def __init__(self, msg):
-    self.msg = msg
-  def __str__(self):
-    return repr(self.msg)
-
-
-class KickRomHelper(object):
+class Helper(object):
   def __init__(self, rom_data):
     self.data = rom_data
     self.size = len(rom_data)
 
-  def validate(self):
+  def is_kick_rom(self):
     if not self.check_size():
+      return False
+    if not self.check_header():
       return False
     return self.verify_check_sum()
 
+  def check_header(self):
+    # expect 0x1114 0x4ef9
+    val = self._read_long(0)
+    return val == 0x11144ef9
+
   def check_size(self):
+    # expect 256k or 512k ROM
     if self.size % 1024 != 0:
       return False
     kib = self.size / 1024
@@ -79,7 +78,7 @@ class KickRomHelper(object):
     return struct.unpack_from(">I", self.data, off)[0]
 
 
-class KickRomLoader(object):
+class Loader(object):
   """Load kick rom images in different formats"""
   @classmethod
   def load(cls, kick_file, rom_key_file=None):
@@ -104,19 +103,7 @@ class KickRomLoader(object):
       with open(rom_key_file, "rb") as fh:
         rom_key = fh.read()
       rom_img = cls._decode(rom_img, rom_key)
-    # build rom image
-    rom = RomImg(rom_img)
-    rom.name = os.path.basename(kick_file)
-    # check if its really a kickstart rom
-    kh = KickRomHelper(rom_img)
-    if kh.validate():
-      rom.addr = kh.get_base_addr()
-      rom.chk_sum_off = len(rom_img) - 0x18
-      rom.chk_sum = struct.unpack_from(">I", rom.data, rom.chk_sum_off)[0]
-      rom.is_kick = True
-    else:
-      rom.chk_sum = kh.calc_check_sum()
-    return rom
+    return rom_img
 
   @classmethod
   def _decode(cls, img, rom_key):
@@ -138,12 +125,12 @@ if __name__ == '__main__':
   else:
     ks_file = 'amiga-os-310-a500.rom'
   print(ks_file)
-  ks = KickRomLoader.load(ks_file,'rom.key')
-  print(ks)
-  kh = KickRomHelper(ks.get_data())
+  ks = Loader.load(ks_file,'rom.key')
+  kh = Helper(ks)
+  print("is_kick_rom", kh.is_kick_rom())
   print("pc=%08x" % kh.get_boot_pc())
   print("ver,rev=", kh.get_rom_ver_rev())
-  print("size %08x == %08x" % (kh.get_rom_size_field(), ks.get_size()))
+  print("size %08x == %08x" % (kh.get_rom_size_field(), len(ks)))
   print("base %08x" % kh.get_base_addr())
   print("get chk_sum=%08x" % kh.read_check_sum())
   print("calc chk_sum=%08x" % kh.recalc_check_sum())

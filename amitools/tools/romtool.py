@@ -7,88 +7,80 @@ from __future__ import print_function
 
 import sys
 import argparse
-import os.path
+import os
 import logging
 
 from amitools.util.Logging import *
-from amitools.util.DataDir import *
-from amitools.rom.KickRom import *
-from amitools.rom.RemusFile import *
-
+from amitools.rom.RomSplitter import *
 
 desc="""romtool allows you to dissect, inspect, or create Amiga ROM files"""
 
 
-def load_rom(rom_image, rom_key_file):
-  logging.info("loading ROM image from '%s'", rom_image)
-  try:
-    return KickRomLoader.load(rom_image, rom_key_file)
-  except IOError as e:
-    logging.error("Error loading ROM image '%s': %s", rom_image, e)
-    return None
-
-
-def show_remus_rom(rom):
-  print("@%08x  +%08x  sum=%08x  off=%08x  %s" % \
-        (rom.base_addr, rom.size, rom.chk_sum, rom.sum_off, rom.name))
-  print()
-  for e in rom.entries:
-    print("@%08x  +%08x  relocs=#%5d  %s" % \
-          (e.offset, e.size, len(e.relocs), e.name))
-
-
-def load_remus_file_set():
-  remus_set = RemusFileSet()
-  try:
-    data_dir = ensure_data_sub_dir("splitdata")
-    remus_set.load(data_dir)
-    return remus_set
-  except IOError as e:
-    logging.error("Error loading Remus file set: %s", e)
-    return None
-
-
 def do_query_cmd(args):
-  # first load ROM
-  rom_img = load_rom(args.rom_image, args.rom_key)
-  if rom_img is None:
+  try:
+    ri = args.rom_image
+    rs = RomSplitter()
+    if not rs.find_rom(ri):
+      print(ri, "not found in split database!")
+      return 100
+    else:
+      rs.print_rom(print)
+      if args.query is None:
+        e = rs.get_all_entries()
+      else:
+        e = rs.query_entries(args.query)
+      rs.print_entries(print,e)
+      return 0
+  except IOError as e:
+    logging.error("IO Error: %s", e)
     return 1
-  logging.debug("got ROM: %r", rom_img)
-  # load Remus split data
-  remus_file_set = load_remus_file_set()
-  if remus_file_set is None:
-    return 2
-  # find ROM
-  rom = remus_file_set.find_rom(rom_img)
-  if rom is not None:
-    show_remus_rom(rom)
-    return 0
-  else:
-    print("ROM not found in split data.")
-    return 100
 
 
 def do_split_cmd(args):
-  # first load ROM
-  rom_img = load_rom(args.rom_image, args.rom_key)
-  if rom_img is None:
+  try:
+    ri = args.rom_image
+    rs = RomSplitter()
+    rom = rs.find_rom(ri)
+    if rom is None:
+      logging.error(ri, "not found in split database!")
+      return 100
+    else:
+      rs.print_rom(logging.info)
+      entries = rs.get_all_entries()
+      # setup output dir
+      out_path = os.path.join(args.output_dir, rom.short_name)
+      # make dirs
+      if not os.path.isdir(out_path):
+        logging.info("creating directory '%s'", out_path)
+        os.makedirs(out_path)
+      # create index file
+      if not args.no_index:
+        idx_path = os.path.join(out_path, "index.txt")
+        with open(idx_path, "w") as fh:
+          logging.info("writing index to '%s'", idx_path)
+          for e in entries:
+            fh.write(e.name + "\n")
+      # extract entries
+      for e in entries:
+        rs.print_entry(logging.info, e)
+        bin_img = rs.extract_bin_img(e)
+      return 0
+  except IOError as e:
+    logging.error("IO Error: %s", e)
     return 1
-  logging.debug("got ROM: %r", rom_img)
-  # load Remus split data
-  remus_file_set = load_remus_file_set()
-  if remus_file_set is None:
-    return 2
-  return 0
 
 
 def setup_query_parser(parser):
   parser.add_argument('rom_image', help='rom image file to be split')
+  parser.add_argument('query', default=None, help='query module name', nargs='?')
   parser.set_defaults(cmd=do_query_cmd)
 
 
 def setup_split_parser(parser):
   parser.add_argument('rom_image', help='rom image file to be split')
-  parser.add_argument('output_dir', help='store modules in this base dir', nargs='?')
+  parser.add_argument('output_dir', help='store modules in this base dir')
+  parser.add_argument('--no-index', default=False, action='store_true',
+                      help="do not create an 'index.txt' in output path")
   parser.set_defaults(cmd=do_split_cmd)
 
 
