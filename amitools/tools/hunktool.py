@@ -43,7 +43,7 @@ class HunkCommand:
     # abort if hunk parser failed!
     if error_code != Hunk.RESULT_OK:
       print Hunk.result_names[error_code], hunk_file.error_string
-      if args.dump:
+      if self.args.dump:
         print_pretty(hunk_file.hunks)
       self.failed_files.append( (path, "READ: " + hunk_file.error_string) )
       return not self.args.stop
@@ -52,7 +52,7 @@ class HunkCommand:
     if self.args.verbose:
       print
       print "  hunks:    ",hunk_file.get_hunk_summary()
-      if args.dump:
+      if self.args.dump:
         print_pretty(hunk_file.hunks)
       print "  type:     ",
 
@@ -73,7 +73,7 @@ class HunkCommand:
       print "  overlays: ",hunk_file.get_overlay_segment_summary()
       print "  libs:     ",hunk_file.get_libs_summary()
       print "  units:    ",hunk_file.get_units_summary()
-      if args.dump:
+      if self.args.dump:
         print_pretty(hunk_file.hunks)
     else:
       print

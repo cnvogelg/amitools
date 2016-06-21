@@ -143,11 +143,11 @@ class Segment:
       symtab = ""
     # debug_line
     if self.debug_line is not None:
-      src_files = self.debug_line.get_src_files()
+      dl_files = self.debug_line.get_files()
       file_info = []
-      for src_file in src_files:
-        n = len(self.debug_line.get_entries(src_file))
-        file_info.append("(%s:#%d)" % (src_file, n))
+      for dl_file in dl_files:
+        n = len(dl_file.entries)
+        file_info.append("(%s:#%d)" % (dl_file.src_file, n))
       debug_line = "debug_line=" + ",".join(file_info)
     else:
       debug_line = ""

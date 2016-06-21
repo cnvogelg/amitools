@@ -2,7 +2,7 @@ from __future__ import print_function
 
 from amitools.binfmt.BinImage import *
 from HunkBlockFile import HunkBlockFile, HunkParseError
-from HunkLoadSegFile import HunkLoadSegFile
+from HunkLoadSegFile import HunkLoadSegFile, HunkSegment
 from HunkDebug import HunkDebugLine
 import Hunk
 
@@ -36,6 +36,41 @@ class BinFmtHunk:
     # convert load seg file
     return self.create_image_from_load_seg_file(lsf)
 
+  def save_image(self, path, bin_img):
+    """save a BinImage to a hunk file given via path"""
+    with open(path, "wb") as f:
+      self.save_image_fobj(f, bin_img)
+
+  def save_image_fobj(self, fobj, bin_img):
+    """save a BinImage to a hunk file given via file obj"""
+    lsf = self.create_load_seg_file_from_image(bin_img)
+    bf = lsf.create_block_file()
+    bf.write(fobj, isLoadSeg=True)
+
+  def create_load_seg_file_from_image(self, bin_img):
+    """create a HunkLodSegFile from a BinImage"""
+    lsf = HunkLoadSegFile()
+    for seg in bin_img.segments:
+      seg_type = seg.get_type()
+      # create HunkSegment
+      lseg = HunkSegment()
+      lsf.add_segment(lseg)
+      if seg_type == SEGMENT_TYPE_CODE:
+        lseg.setup_code(seg.data)
+      elif seg_type == SEGMENT_TYPE_DATA:
+        lseg.setup_data(seg.data)
+      elif seg_type == SEGMENT_TYPE_BSS:
+        lseg.setup_bss(seg.size)
+      else:
+        raise HunkParseError("Unknown Segment Type in BinImage: %d" % seg_type)
+      # add relocs
+
+      # add symbols
+
+      # add debug info
+
+    return lsf
+
   def create_image_from_load_seg_file(self, lsf):
     """create a BinImage from a HunkLoadSegFile object"""
     bi = BinImage(BIN_IMAGE_TYPE_HUNK)
@@ -65,19 +100,19 @@ class BinFmtHunk:
       hseg = seg.file_data
       reloc_blk = hseg.reloc_blk
       if reloc_blk is not None:
-        self.add_hunk_relocs(reloc_blk, seg, bi_segs)
+        self._add_hunk_relocs(reloc_blk, seg, bi_segs)
       # add symbol table
       symbol_blk = hseg.symbol_blk
       if symbol_blk is not None:
-        self.add_hunk_symbols(symbol_blk, seg)
+        self._add_hunk_symbols(symbol_blk, seg)
       # add debug infos
       debug_infos = hseg.debug_infos
       if debug_infos is not None:
-        self.add_debug_infos(debug_infos, seg)
+        self._add_debug_infos(debug_infos, seg)
 
     return bi
 
-  def add_hunk_relocs(self, blk, seg, all_segs):
+  def _add_hunk_relocs(self, blk, seg, all_segs):
     """add relocations to a segment"""
     if blk.blk_id not in (Hunk.HUNK_ABSRELOC32, Hunk.HUNK_RELOC32SHORT):
       raise HunkParseError("Invalid Relocations for BinImage: %d" % blk_id)
@@ -94,7 +129,7 @@ class BinFmtHunk:
         rl.add_reloc(r)
       seg.add_reloc(to_seg, rl)
 
-  def add_hunk_symbols(self, blk, seg):
+  def _add_hunk_symbols(self, blk, seg):
     """add symbols to segment"""
     syms = blk.symbols
     if len(syms) == 0:
@@ -107,7 +142,7 @@ class BinFmtHunk:
       symbol = Symbol(offset, name)
       st.add_symbol(symbol)
 
-  def add_debug_infos(self, debug_infos, seg):
+  def _add_debug_infos(self, debug_infos, seg):
     dl = DebugLine()
     seg.set_debug_line(dl)
     for debug_info in debug_infos:
@@ -140,5 +175,6 @@ if __name__ == '__main__':
       print("loading", a)
       bi = bf.load_image(a)
       print(bi)
+      bf.save_image("a.out", bi)
     else:
       print("NO HUNK:", a)
