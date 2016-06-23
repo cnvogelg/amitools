@@ -45,18 +45,18 @@ class HunkSegment:
 
   def setup_relocs(self, relocs, force_long=False):
     """relocs: ((hunk_num, (off1, off2, ...)), ...)"""
-    if force_longs:
+    if force_long:
       use_short = False
     else:
       use_short = self._are_relocs_short(relocs)
     if use_short:
-      self.reloc_blk = HunkRelocShortBlock(HUNK_RELOC32SHORT, relocs)
+      self.reloc_blk = HunkRelocWordBlock(HUNK_RELOC32SHORT, relocs)
     else:
       self.reloc_blk = HunkRelocLongBlock(HUNK_ABSRELOC32, relocs)
 
   def setup_symbols(self, symbols):
     """symbols: ((name, off), ...)"""
-    self.symbol_blk = HunkSymbol(symbols)
+    self.symbol_blk = HunkSymbolBlock(symbols)
 
   def setup_debug(self, debug_info):
     if self.debug_infos is None:

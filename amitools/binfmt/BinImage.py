@@ -72,9 +72,10 @@ class SymbolTable:
 
 
 class DebugLineEntry:
-  def __init__(self, offset, src_line):
+  def __init__(self, offset, src_line, flags=0):
     self.offset = offset
     self.src_line = src_line
+    self.flags = flags
     self.file_ = None
 
   def get_offset(self):
@@ -83,14 +84,18 @@ class DebugLineEntry:
   def get_src_line(self):
     return self.src_line
 
+  def get_flags(self):
+    return self.flags
+
   def get_file(self):
     return self.file_
 
 
 class DebugLineFile:
-  def __init__(self, src_file, dir_name=None):
+  def __init__(self, src_file, dir_name=None, base_offset=0):
     self.src_file = src_file
     self.dir_name = dir_name
+    self.base_offset = base_offset
     self.entries = []
 
   def get_src_file(self):
@@ -101,6 +106,9 @@ class DebugLineFile:
 
   def get_entries(self):
     return self.entries
+
+  def get_base_offset(self):
+    return self.base_offset
 
   def add_entry(self, e):
     self.entries.append(e)

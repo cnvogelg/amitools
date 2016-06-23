@@ -3,7 +3,7 @@ from __future__ import print_function
 from amitools.binfmt.BinImage import *
 from HunkBlockFile import HunkBlockFile, HunkParseError
 from HunkLoadSegFile import HunkLoadSegFile, HunkSegment
-from HunkDebug import HunkDebugLine
+from HunkDebug import *
 import Hunk
 
 class BinFmtHunk:
@@ -64,12 +64,51 @@ class BinFmtHunk:
       else:
         raise HunkParseError("Unknown Segment Type in BinImage: %d" % seg_type)
       # add relocs
-
+      self._add_bin_img_relocs(lseg, seg)
       # add symbols
-
+      self._add_bin_img_symbols(lseg, seg)
       # add debug info
-
+      self._add_bin_img_debug_info(lseg, seg)
     return lsf
+
+  def _add_bin_img_relocs(self, hunk_seg, seg):
+    reloc_segs = seg.get_reloc_to_segs()
+    hunk_relocs = []
+    for reloc_seg in reloc_segs:
+      seg_id = reloc_seg.id
+      reloc = seg.get_reloc(reloc_seg)
+      relocs = reloc.get_relocs()
+      offsets = []
+      for r in relocs:
+        if r.get_width() != 2 or r.get_addend() != 0:
+          raise HunkParseError("Invalid reloc: " + r)
+        offsets.append(r.get_offset())
+      hunk_relocs.append((seg_id, offsets))
+    if len(hunk_relocs) > 0:
+      hunk_seg.setup_relocs(hunk_relocs)
+
+  def _add_bin_img_symbols(self, hunk_seg, seg):
+    sym_tab = seg.get_symtab()
+    if sym_tab is not None:
+      hunk_sym_list = []
+      for sym in sym_tab.get_symbols():
+        hunk_sym_list.append((sym.get_name(), sym.get_offset()))
+      hunk_seg.setup_symbols(hunk_sym_list)
+
+  def _add_bin_img_debug_info(self, hunk_seg, seg):
+    debug_line = seg.get_debug_line()
+    if debug_line is not None:
+      for file in debug_line.get_files():
+        src_file = file.get_src_file()
+        base_offset = file.get_base_offset()
+        dl = HunkDebugLine(src_file, base_offset)
+        for e in file.get_entries():
+          offset = e.get_offset()
+          src_line = e.get_src_line()
+          flags = e.get_flags()
+          hunk_src_line = src_line | (flags << 24)
+          dl.add_entry(offset, hunk_src_line)
+        hunk_seg.setup_debug(dl)
 
   def create_image_from_load_seg_file(self, lsf):
     """create a BinImage from a HunkLoadSegFile object"""
@@ -157,12 +196,13 @@ class BinFmtHunk:
         else:
           dir_name = ""
         base_offset = debug_info.base_offset
-        df = DebugLineFile(src_file, dir_name)
+        df = DebugLineFile(src_file, dir_name, base_offset)
         dl.add_file(df)
         for entry in debug_info.get_entries():
-          off = base_offset + entry.offset
-          src_line = entry.src_line
-          e = DebugLineEntry(off, src_line)
+          off = entry.offset
+          src_line = entry.src_line & 0xffffff
+          flags = (entry.src_line & 0xff000000) >> 24
+          e = DebugLineEntry(off, src_line, flags)
           df.add_entry(e)
 
 

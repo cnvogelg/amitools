@@ -20,8 +20,8 @@ class HunkDebugLineEntry:
 
 class HunkDebugLine:
   """structure to hold source line info"""
-  def __init__(self, tag, src_file, base_offset):
-    self.tag = tag
+  def __init__(self, src_file, base_offset):
+    self.tag = 'LINE'
     self.src_file = src_file
     self.base_offset = base_offset
     self.entries = []
@@ -90,7 +90,7 @@ class HunkDebug:
     if tag == 'LINE': # SAS/C source line info
       # +8: string file name
       src_file, src_size = self._read_string(debug_data, 8)
-      dl = HunkDebugLine(tag, src_file, base_offset)
+      dl = HunkDebugLine(src_file, base_offset)
       off = 12 + src_size
       num = (len(debug_data) - off) / 8
       for i in range(num):
