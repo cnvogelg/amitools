@@ -12,6 +12,7 @@ import logging
 
 from amitools.util.Logging import *
 from amitools.rom.RomSplitter import *
+from amitools.binfmt.hunk.BinFmtHunk import BinFmtHunk
 
 desc="""romtool allows you to dissect, inspect, or create Amiga ROM files"""
 
@@ -61,9 +62,13 @@ def do_split_cmd(args):
           for e in entries:
             fh.write(e.name + "\n")
       # extract entries
+      bfh = BinFmtHunk()
       for e in entries:
         rs.print_entry(logging.info, e)
         bin_img = rs.extract_bin_img(e)
+        out_file = os.path.join(out_path, e.name)
+        logging.info("writing file '%s'", out_file)
+        bfh.save_image(out_file, bin_img)
       return 0
   except IOError as e:
     logging.error("IO Error: %s", e)

@@ -73,11 +73,11 @@ class RomSplitter:
     seg = Segment(SEGMENT_TYPE_CODE, len(data), data)
     bi.add_segment(seg)
     # create reloc for target segment
-    rl = Relocations(seg.id)
+    rl = Relocations(seg)
     # add offsets
     for o in relocs:
       r = Reloc(o)
       rl.add_reloc(r)
-    seg.add_reloc(seg.id, rl)
+    seg.add_reloc(seg, rl)
     # return final binary image
     return bi
