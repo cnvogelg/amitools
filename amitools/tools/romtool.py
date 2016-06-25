@@ -11,68 +11,122 @@ import os
 import logging
 
 from amitools.util.Logging import *
+from amitools.util.HexDump import *
 from amitools.rom.RomSplitter import *
+from amitools.rom.RomBuilder import *
+from amitools.rom.KickRom import *
 from amitools.binfmt.hunk.BinFmtHunk import BinFmtHunk
+from amitools.binfmt.BinFmt import BinFmt
 
 desc="""romtool allows you to dissect, inspect, or create Amiga ROM files"""
 
 
 def do_query_cmd(args):
-  try:
-    ri = args.rom_image
-    rs = RomSplitter()
-    if not rs.find_rom(ri):
-      print(ri, "not found in split database!")
-      return 100
+  ri = args.rom_image
+  rs = RomSplitter()
+  if not rs.find_rom(ri):
+    print(ri, "not found in split database!")
+    return 100
+  else:
+    rs.print_rom(print)
+    if args.query is None:
+      e = rs.get_all_entries()
     else:
-      rs.print_rom(print)
-      if args.query is None:
-        e = rs.get_all_entries()
-      else:
-        e = rs.query_entries(args.query)
-      rs.print_entries(print,e)
-      return 0
-  except IOError as e:
-    logging.error("IO Error: %s", e)
-    return 1
+      e = rs.query_entries(args.query)
+    rs.print_entries(print,e)
+    return 0
 
 
 def do_split_cmd(args):
-  try:
-    ri = args.rom_image
-    rs = RomSplitter()
-    rom = rs.find_rom(ri)
-    if rom is None:
-      logging.error(ri, "not found in split database!")
-      return 100
+  ri = args.rom_image
+  rs = RomSplitter()
+  rom = rs.find_rom(ri)
+  if rom is None:
+    logging.error(ri, "not found in split database!")
+    return 100
+  else:
+    rs.print_rom(logging.info)
+    entries = rs.get_all_entries()
+    # setup output dir
+    out_path = os.path.join(args.output_dir, rom.short_name)
+    # make dirs
+    if not os.path.isdir(out_path):
+      logging.info("creating directory '%s'", out_path)
+      os.makedirs(out_path)
+    # create index file
+    if not args.no_index:
+      idx_path = os.path.join(out_path, "index.txt")
+      with open(idx_path, "w") as fh:
+        logging.info("writing index to '%s'", idx_path)
+        for e in entries:
+          fh.write(e.name + "\n")
+    # extract entries
+    bfh = BinFmtHunk()
+    for e in entries:
+      rs.print_entry(logging.info, e)
+      bin_img = rs.extract_bin_img(e)
+      out_file = os.path.join(out_path, e.name)
+      logging.info("writing file '%s'", out_file)
+      bfh.save_image(out_file, bin_img)
+    return 0
+
+
+def do_build_cmd(args):
+  rom_addr = int(args.rom_addr, 16)
+  rb = RomBuilder(args.rom_size, rom_addr, args.fill_byte)
+  # build file list
+  files = []
+  for mod in args.modules:
+    # is an index file?
+    if mod.endswith('.txt'):
+      base_path = os.path.dirname(mod)
+      with open(mod, "r") as fh:
+        for line in fh:
+          name = line.strip()
+          if len(name) > 0:
+            f = os.path.join(base_path, name)
+            files.append(f)
     else:
-      rs.print_rom(logging.info)
-      entries = rs.get_all_entries()
-      # setup output dir
-      out_path = os.path.join(args.output_dir, rom.short_name)
-      # make dirs
-      if not os.path.isdir(out_path):
-        logging.info("creating directory '%s'", out_path)
-        os.makedirs(out_path)
-      # create index file
-      if not args.no_index:
-        idx_path = os.path.join(out_path, "index.txt")
-        with open(idx_path, "w") as fh:
-          logging.info("writing index to '%s'", idx_path)
-          for e in entries:
-            fh.write(e.name + "\n")
-      # extract entries
-      bfh = BinFmtHunk()
-      for e in entries:
-        rs.print_entry(logging.info, e)
-        bin_img = rs.extract_bin_img(e)
-        out_file = os.path.join(out_path, e.name)
-        logging.info("writing file '%s'", out_file)
-        bfh.save_image(out_file, bin_img)
-      return 0
-  except IOError as e:
-    logging.error("IO Error: %s", e)
-    return 1
+      files.append(mod)
+  # load modules
+  bf = BinFmt()
+  for f in files:
+    if not bf.is_image(f):
+      logging.error("Can't load module '%s'", f)
+      return 2
+    name = os.path.basename(f)
+    logging.info("@%08x: loading '%s'", rb.get_current_offset(), f)
+    bin_img = bf.load_image(f)
+    e = rb.add_bin_img(name, bin_img)
+    if e is None:
+      logging.error("Can't add module '%s' to ROM", f)
+      return 3
+  # build rom
+  rom_data = rb.build_rom()
+  # save rom
+  rom_image = args.rom_image
+  logging.info("saving ROM to '%s'", rom_image)
+  with open(rom_image, "wb") as fh:
+    fh.write(rom_data)
+  return 0
+
+
+def do_diff_cmd(args):
+  # load ROMs
+  img_a = args.image_a
+  logging.info("loading ROM A from '%s'", img_a)
+  rom_a = KickRom.Loader.load(img_a)
+  img_b = args.image_b
+  logging.info("loading ROM B from '%s'", img_b)
+  rom_b = KickRom.Loader.load(img_b)
+  # check sizes
+  size_a = len(rom_a)
+  size_b = len(rom_b)
+  if not args.force and size_a != size_b:
+    logging.error("ROM differ in size (%08x != %08x). Aborting", size_a, size_b)
+    return 2
+  # do diff
+  print_hex_diff(rom_a, rom_b, num=args.columns, show_same=args.same)
 
 
 def setup_query_parser(parser):
@@ -87,6 +141,31 @@ def setup_split_parser(parser):
   parser.add_argument('--no-index', default=False, action='store_true',
                       help="do not create an 'index.txt' in output path")
   parser.set_defaults(cmd=do_split_cmd)
+
+
+def setup_build_parser(parser):
+  parser.add_argument('rom_image', help='rom image file to be built')
+  parser.add_argument('modules', default=[], action='append',
+                      help='modules or index.txt files to be added')
+  parser.add_argument('-s', '--rom-size', default=512, type=int,
+                      help="size of ROM in KiB")
+  parser.add_argument('-a', '--rom-addr', default="f80000",
+                      help="base address of ROM in hex")
+  parser.add_argument('--fill-byte', default=255, type=int,
+                      help="fill byte for empty ranges")
+  parser.set_defaults(cmd=do_build_cmd)
+
+
+def setup_diff_parser(parser):
+  parser.add_argument('image_a', help='rom image a')
+  parser.add_argument('image_b', help='rom image b')
+  parser.add_argument('-s', '--same', default=False, action='store_true',
+                      help="show same lines of ROMs")
+  parser.add_argument('-f', '--force', default=False, action='store_true',
+                      help="diff ROMs even if size differs")
+  parser.add_argument('-c', '--columns', default=8, type=int,
+                      help="number of bytes shown per line")
+  parser.set_defaults(cmd=do_diff_cmd)
 
 
 def parse_args():
@@ -107,6 +186,12 @@ def parse_args():
   # split
   split_parser = sub_parsers.add_parser('split', help='split a ROM into modules')
   setup_split_parser(split_parser)
+  # build
+  build_parser = sub_parsers.add_parser('build', help='build a ROM from modules')
+  setup_build_parser(build_parser)
+  # diff
+  diff_parser = sub_parsers.add_parser('diff', help='show differences in two ROM images')
+  setup_diff_parser(diff_parser)
 
   # parse
   return parser.parse_args()
@@ -120,7 +205,11 @@ def main():
   # say hello
   logging.info("Welcom to romtool")
   # run command
-  return args.cmd(args)
+  try:
+    return args.cmd(args)
+  except IOError as e:
+    logging.error("IO Error: %s", e)
+    return 1
 
 
 # ----- entry point -----
