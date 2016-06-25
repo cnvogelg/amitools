@@ -126,7 +126,35 @@ def do_diff_cmd(args):
     logging.error("ROM differ in size (%08x != %08x). Aborting", size_a, size_b)
     return 2
   # do diff
-  print_hex_diff(rom_a, rom_b, num=args.columns, show_same=args.same)
+  base_addr = 0
+  if args.rom_addr:
+    base_addr = int(args.rom_addr, 16)
+  elif args.show_address:
+    kh = KickRom.Helper(rom_a)
+    if kh.is_kick_rom():
+      base_addr = kh.get_base_addr()
+    else:
+      logging.error("Not a KickROM! Can't detect base address.")
+      return 3
+  print_hex_diff(rom_a, rom_b, num=args.columns, show_same=args.same,
+                 base_addr=base_addr)
+
+
+def do_dump_cmd(args):
+  img = args.image
+  logging.info("loading ROM from '%s'", img)
+  rom = KickRom.Loader.load(img)
+  base_addr = 0
+  if args.rom_addr:
+    base_addr = int(args.rom_addr, 16)
+  elif args.show_address:
+    kh = KickRom.Helper(rom)
+    if kh.is_kick_rom():
+      base_addr = kh.get_base_addr()
+    else:
+      logging.error("Not a KickROM! Can't detect base address.")
+      return 3
+  print_hex(rom, num=args.columns, base_addr=base_addr)
 
 
 def setup_query_parser(parser):
@@ -161,11 +189,26 @@ def setup_diff_parser(parser):
   parser.add_argument('image_b', help='rom image b')
   parser.add_argument('-s', '--same', default=False, action='store_true',
                       help="show same lines of ROMs")
+  parser.add_argument('-a', '--show-address', default=False, action='store_true',
+                      help="show KickROM address (otherwise image offset)")
+  parser.add_argument('-b', '--rom-addr', default=None,
+                      help="use hex base address for output")
   parser.add_argument('-f', '--force', default=False, action='store_true',
                       help="diff ROMs even if size differs")
   parser.add_argument('-c', '--columns', default=8, type=int,
                       help="number of bytes shown per line")
   parser.set_defaults(cmd=do_diff_cmd)
+
+
+def setup_dump_parser(parser):
+  parser.add_argument('image', help='rom image to be dumped')
+  parser.add_argument('-a', '--show-address', default=False, action='store_true',
+                      help="show KickROM address (otherwise image offset)")
+  parser.add_argument('-b', '--rom-addr', default=None,
+                      help="use hex base address for output")
+  parser.add_argument('-c', '--columns', default=16, type=int,
+                      help="number of bytes shown per line")
+  parser.set_defaults(cmd=do_dump_cmd)
 
 
 def parse_args():
@@ -192,6 +235,9 @@ def parse_args():
   # diff
   diff_parser = sub_parsers.add_parser('diff', help='show differences in two ROM images')
   setup_diff_parser(diff_parser)
+  # dump
+  dump_parser = sub_parsers.add_parser('dump', help='dump a ROM image')
+  setup_dump_parser(dump_parser)
 
   # parse
   return parser.parse_args()

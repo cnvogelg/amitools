@@ -8,6 +8,7 @@ class Helper(object):
   def __init__(self, rom_data):
     self.data = rom_data
     self.size = len(rom_data)
+    self.kib = self.size / 1024
 
   def is_kick_rom(self):
     if not self.check_size():
@@ -19,14 +20,18 @@ class Helper(object):
   def check_header(self):
     # expect 0x1114 0x4ef9
     val = self._read_long(0)
-    return val == 0x11144ef9
+    if self.kib == 512:
+      return val == 0x11144ef9
+    elif self.kib == 256:
+      return val == 0x11114ef9
+    else:
+      return False
 
   def check_size(self):
     # expect 256k or 512k ROM
     if self.size % 1024 != 0:
       return False
-    kib = self.size / 1024
-    if kib not in (256, 512):
+    if self.kib not in (256, 512):
       return False
     return True
 

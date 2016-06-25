@@ -1,4 +1,5 @@
 import fnmatch
+import struct
 
 import KickRom
 import RemusFile
@@ -64,7 +65,20 @@ class RomSplitter:
     """return data, relocs"""
     data = self.rom_data[entry.offset:entry.offset+entry.size]
     relocs = entry.relocs
+    entry_addr = self.remus_rom.base_addr + entry.offset
+    data = self._clean_relocs(data, relocs, entry_addr)
     return data, relocs
+
+  def _clean_relocs(self, data, relocs, base_addr):
+    if type(data) is not bytearray:
+      data = bytearray(data)
+    for off in relocs:
+      addr = struct.unpack_from(">I", data, off)[0]
+      if addr < base_addr:
+        raise ValueError("Invalid relocatable address: %08x" % addr)
+      addr -= base_addr
+      struct.pack_into(">I", data, off, addr)
+    return data
 
   def extract_bin_img(self, entry):
     data, relocs = self.extract_entry(entry)

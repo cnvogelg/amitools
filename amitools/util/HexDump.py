@@ -5,7 +5,7 @@ from __future__ import print_function
 
 def _get_vis_char(d):
   v = ord(d)
-  if v >= 32 and v < 128:
+  if v >= 32 and v < 127:
     return "%c" % d
   else:
     return "."
@@ -24,13 +24,15 @@ def get_hex_line(addr, line, indent=0, num=16):
     out += _get_vis_char(d)
   return out
 
-def print_hex(data, indent=0, num=16, out=print):
+def print_hex(data, indent=0, num=16, out=print, base_addr=0):
   l = len(data)
   o = 0
+  addr = base_addr
   while o < l:
     line = data[o:o+num]
-    out(get_hex_line(o, line, indent, num))
+    out(get_hex_line(addr, line, indent, num))
     o += num
+    addr += num
 
 def get_hex_diff_line(addr, a_line, b_line, indent=0, num=16):
   na = len(a_line)
@@ -65,20 +67,23 @@ def get_hex_diff_line(addr, a_line, b_line, indent=0, num=16):
   out += " ".join(bh) + "  " + "".join(bc)
   return out
 
-def print_hex_diff(a_data, b_data, indent=0, num=16, out=print, show_same=False):
+def print_hex_diff(a_data, b_data, indent=0, num=16, out=print,
+                   show_same=False, base_addr=0):
   na = len(a_data)
   nb = len(b_data)
   n = max(na, nb)
   o = 0
+  addr = base_addr
   while o < n:
     a_line = a_data[o:o+num]
     b_line = b_data[o:o+num]
     if show_same or a_line != b_line:
-      out(get_hex_diff_line(o, a_line, b_line, indent, num))
+      out(get_hex_diff_line(addr, a_line, b_line, indent, num))
     o += num
+    addr += num
 
 
 # mini test
 if __name__ == '__main__':
-  print_hex("hello, world!", num=8)
-  print_hex_diff("hello, world!", "hello. WOrld!", num=8)
+  print_hex("hello, world!", num=8, base_addr=0xf80000)
+  print_hex_diff("hello, world!", "hello. WOrld!", num=8, base_addr=0xf80000)

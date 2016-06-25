@@ -42,7 +42,7 @@ class Relocate:
     for segment in segs:
       self._copy_data(data, segment, offset)
       self._reloc_data(data, segment, addrs, offset)
-      offset += segment.size
+      offset += segment.size + padding
     return data
 
   def relocate(self, addrs, in_data=None):
