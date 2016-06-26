@@ -21,6 +21,12 @@ from amitools.binfmt.BinFmt import BinFmt
 desc="""romtool allows you to dissect, inspect, or create Amiga ROM files"""
 
 
+def do_list_cmd(args):
+  rs = RomSplitter()
+  rs.list_roms(print, args.query, show_entries=args.entries)
+  return 0
+
+
 def do_query_cmd(args):
   ri = args.rom_image
   rs = RomSplitter()
@@ -95,11 +101,12 @@ def do_build_cmd(args):
       logging.error("Can't load module '%s'", f)
       return 2
     name = os.path.basename(f)
-    logging.info("@%08x: loading '%s'", rb.get_current_offset(), f)
+    off = rb.get_current_offset()
+    logging.info("@%08x: loading '%s'", off, f)
     bin_img = bf.load_image(f)
     e = rb.add_bin_img(name, bin_img)
     if e is None:
-      logging.error("Can't add module '%s' to ROM", f)
+      logging.error("@%08x: can't add module '%s'", off, f)
       return 3
   # build rom
   rom_data = rb.build_rom()
@@ -155,6 +162,13 @@ def do_dump_cmd(args):
       logging.error("Not a KickROM! Can't detect base address.")
       return 3
   print_hex(rom, num=args.columns, base_addr=base_addr)
+
+
+def setup_list_parser(parser):
+  parser.add_argument('query', default=None, help='query rom name', nargs='?')
+  parser.add_argument('-e', '--entries', default=False, action='store_true',
+                      help="show entries of ROMs")
+  parser.set_defaults(cmd=do_list_cmd)
 
 
 def setup_query_parser(parser):
@@ -223,6 +237,9 @@ def parse_args():
 
   # sub parsers
   sub_parsers = parser.add_subparsers(help="sub commands")
+  # list
+  list_parser = sub_parsers.add_parser('list', help='list ROMs in split data')
+  setup_list_parser(list_parser)
   # query
   query_parser = sub_parsers.add_parser('query', help='query if ROM is in split data')
   setup_query_parser(query_parser)

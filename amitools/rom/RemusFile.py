@@ -138,6 +138,9 @@ class RemusSplitFile(RemusFile):
       if rom_size == rom.size and chk_sum == rom.chk_sum:
         return rom
 
+  def get_roms(self, roms):
+    roms += self.roms
+
 
 class RemusIdEntry(object):
   def __init__(self, count, bogus, chk_sum, name):
@@ -208,6 +211,13 @@ class RemusFileSet(object):
       rom = f.find_rom(rom_data, chk_sum)
       if rom is not None:
         return rom
+
+  def get_roms(self):
+    roms = []
+    for f in self.split_files:
+      f.get_roms(roms)
+    roms = sorted(roms, key=lambda x:x.name)
+    return roms
 
 
 if __name__ == '__main__':

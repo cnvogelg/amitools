@@ -10,12 +10,19 @@ class Helper(object):
     self.size = len(rom_data)
     self.kib = self.size / 1024
 
-  def is_kick_rom(self):
+  def is_kick_rom(self, verify=True):
     if not self.check_size():
       return False
     if not self.check_header():
       return False
-    return self.verify_check_sum()
+    if not self.check_footer():
+      return False
+    if self.get_rom_size_field() != self.kib:
+      return False
+    if verify:
+      return self.verify_check_sum()
+    else:
+      return True
 
   def check_header(self):
     # expect 0x1114 0x4ef9
@@ -26,6 +33,18 @@ class Helper(object):
       return val == 0x11114ef9
     else:
       return False
+
+  def check_footer(self):
+    # expect 0x0019 ... 0x001f
+    off = self.size - 14
+    num = 0x19
+    for i in xrange(7):
+      val = self._read_word(off)
+      if val != num:
+        return False
+      val += 1
+      off += 2
+    return True
 
   def check_size(self):
     # expect 256k or 512k ROM
@@ -63,6 +82,28 @@ class Helper(object):
     sum_off = self.size - 0x18
     return self.calc_check_sum(sum_off)
 
+  def write_check_sum(self):
+    cs = self.recalc_check_sum()
+    sum_off = self.size - 0x18
+    self._write_long(sum_off, cs)
+
+  def write_rom_size_field(self):
+    off = self.size - 0x14
+    self._write_long(off, self.size)
+
+  def write_header(self, jump_addr):
+    val = 0x11114ef9 if self.kib == 256 else 0x11144ef9
+    self._write_long(0, val)
+    self._write_long(4, jump_addr)
+
+  def write_footer(self):
+    off = self.size - 0x10
+    num = 0x18
+    for i in xrange(8):
+      self._write_word(off, num)
+      num += 1
+      off += 2
+
   def get_boot_pc(self):
     """return PC for booting the ROM"""
     return self._read_long(4)
@@ -81,6 +122,15 @@ class Helper(object):
 
   def _read_long(self, off):
     return struct.unpack_from(">I", self.data, off)[0]
+
+  def _write_long(self, off, val):
+    return struct.pack_into(">I", self.data, off, val)
+
+  def _read_word(self, off):
+    return struct.unpack_from(">H", self.data, off)[0]
+
+  def _write_word(self, off, val):
+    return struct.pack_into(">H", self.data, off, val)
 
 
 class Loader(object):

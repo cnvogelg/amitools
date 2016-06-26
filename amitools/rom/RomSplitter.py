@@ -20,6 +20,13 @@ class RomSplitter:
     self.rom_data = None
     self.remus_rom = None
 
+  def list_roms(self, out, query=None, show_entries=False):
+    roms = self.rfs.get_roms()
+    for rom in roms:
+      if query is None or fnmatch.fnmatch(rom.name, query):
+        self.remus_rom = rom
+        self.print_rom(out, show_entries)
+
   def find_rom(self, rom_path):
     """load ROM and try to find a matching dat file.
        Returns True if ROM was matched"""
