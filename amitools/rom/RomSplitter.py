@@ -32,7 +32,7 @@ class RomSplitter:
        Returns True if ROM was matched"""
     self.rom_data = KickRom.Loader.load(rom_path)
     # get check sum
-    kh = KickRom.Helper(self.rom_data)
+    kh = KickRom.KickRomAccess(self.rom_data)
     if kh.is_kick_rom():
       self.chk_sum = kh.read_check_sum()
     else:
@@ -102,3 +102,8 @@ class RomSplitter:
     seg.add_reloc(seg, rl)
     # return final binary image
     return bi
+
+  def write_index_file(self, idx_path):
+    with open(idx_path, "w") as fh:
+      for e in self.remus_rom.entries:
+        fh.write(e.name + "\n")

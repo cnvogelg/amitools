@@ -3,34 +3,49 @@ from __future__ import print_function
 import os
 import struct
 
+from RomAccess import RomAccess
 
-class Helper(object):
+class KickRomAccess(RomAccess):
+
+  FOOTER_SIZE = 0x18
+  ROMHDR_SIZE = 8
+  ROMHDR_256K = 0x11114ef9
+  ROMHDR_512K = 0x11144ef9
+
   def __init__(self, rom_data):
-    self.data = rom_data
-    self.size = len(rom_data)
-    self.kib = self.size / 1024
+    RomAccess.__init__(self, rom_data)
 
-  def is_kick_rom(self, verify=True):
+  def is_kick_rom(self):
+    return self.detect_kick_rom() == "ok"
+
+  def detect_kick_rom(self):
     if not self.check_size():
-      return False
+      return "size check failed"
     if not self.check_header():
-      return False
+      return "header check failed"
     if not self.check_footer():
-      return False
-    if self.get_rom_size_field() != self.kib:
-      return False
-    if verify:
-      return self.verify_check_sum()
-    else:
-      return True
+      return "footer check failed"
+    if not self.check_rom_size_field():
+      return "rom size field mismatch"
+    if not self.verify_check_sum():
+      return "check sum mismatch"
+    return "ok"
 
   def check_header(self):
     # expect 0x1114 0x4ef9
-    val = self._read_long(0)
+    val = self.read_long(0)
     if self.kib == 512:
-      return val == 0x11144ef9
+      return val == self.ROMHDR_512K
     elif self.kib == 256:
-      return val == 0x11114ef9
+      return val == self.ROMHDR_256K
+    else:
+      return False
+
+  def check_kickety_split(self):
+    # expect 0x1111 0x4ef9
+    if self.kib == 512:
+      val = self.read_long(0x40000)
+      return val == self.ROMHDR_256K
     else:
       return False
 
@@ -39,10 +54,10 @@ class Helper(object):
     off = self.size - 14
     num = 0x19
     for i in xrange(7):
-      val = self._read_word(off)
+      val = self.read_word(off)
       if val != num:
         return False
-      val += 1
+      num += 1
       off += 2
     return True
 
@@ -54,6 +69,9 @@ class Helper(object):
       return False
     return True
 
+  def check_rom_size_field(self):
+    return self.read_rom_size_field() == self.size
+
   def calc_check_sum(self, skip_off=None):
     """Check internal kickstart checksum and return True if is correct"""
     chk_sum = 0
@@ -61,7 +79,7 @@ class Helper(object):
     off = 0
     max_u32 = 0xffffffff
     for i in xrange(num_longs):
-      val = struct.unpack_from(">I", self.data, off)[0]
+      val = struct.unpack_from(">I", self.rom_data, off)[0]
       if off != skip_off:
         chk_sum += val
       off += 4
@@ -76,7 +94,7 @@ class Helper(object):
 
   def read_check_sum(self):
     sum_off = self.size - 0x18
-    return self._read_long(sum_off)
+    return self.read_long(sum_off)
 
   def recalc_check_sum(self):
     sum_off = self.size - 0x18
@@ -85,52 +103,52 @@ class Helper(object):
   def write_check_sum(self):
     cs = self.recalc_check_sum()
     sum_off = self.size - 0x18
-    self._write_long(sum_off, cs)
+    self.write_long(sum_off, cs)
 
   def write_rom_size_field(self):
     off = self.size - 0x14
-    self._write_long(off, self.size)
+    self.write_long(off, self.size)
 
-  def write_header(self, jump_addr):
-    val = 0x11114ef9 if self.kib == 256 else 0x11144ef9
-    self._write_long(0, val)
-    self._write_long(4, jump_addr)
+  def write_header(self, jump_addr, kickety_split=False):
+    if kickety_split:
+      offset = 0x40000
+      hdr = self.ROMHDR_256K
+    elif self.kib == 256:
+      offset = 0
+      hdr = self.ROMHDR_256K
+    else:
+      offset = 0
+      hdr = self.ROMHDR_512K
+    self.write_long(offset, hdr)
+    self.write_long(offset+4, jump_addr)
 
   def write_footer(self):
     off = self.size - 0x10
     num = 0x18
     for i in xrange(8):
-      self._write_word(off, num)
+      self.write_word(off, num)
       num += 1
       off += 2
 
-  def get_boot_pc(self):
+  def read_boot_pc(self):
     """return PC for booting the ROM"""
-    return self._read_long(4)
+    return self.read_long(4)
 
-  def get_rom_ver_rev(self):
+  def read_rom_ver_rev(self):
     """get (ver, rev) version info from ROM"""
-    return struct.unpack_from(">HH", self.data, 12)
+    return struct.unpack_from(">HH", self.rom_data, 12)
 
-  def get_rom_size_field(self):
+  def read_exec_ver_rev(self):
+    """get (ver, rev) version info from ROM"""
+    return struct.unpack_from(">HH", self.rom_data, 16)
+
+  def read_rom_size_field(self):
     """return size of ROM stored in ROM itself"""
     off = self.size - 0x14
-    return self._read_long(off)
+    return self.read_long(off)
 
   def get_base_addr(self):
-    return self.get_boot_pc() & ~0xffff
-
-  def _read_long(self, off):
-    return struct.unpack_from(">I", self.data, off)[0]
-
-  def _write_long(self, off, val):
-    return struct.pack_into(">I", self.data, off, val)
-
-  def _read_word(self, off):
-    return struct.unpack_from(">H", self.data, off)[0]
-
-  def _write_word(self, off, val):
-    return struct.pack_into(">H", self.data, off, val)
+    return self.read_boot_pc() & ~0xffff
 
 
 class Loader(object):
@@ -181,11 +199,13 @@ if __name__ == '__main__':
     ks_file = 'amiga-os-310-a500.rom'
   print(ks_file)
   ks = Loader.load(ks_file,'rom.key')
-  kh = Helper(ks)
+  kh = KickRomAccess(ks)
   print("is_kick_rom", kh.is_kick_rom())
-  print("pc=%08x" % kh.get_boot_pc())
-  print("ver,rev=", kh.get_rom_ver_rev())
-  print("size %08x == %08x" % (kh.get_rom_size_field(), len(ks)))
+  print("detect_kick_rom", kh.detect_kick_rom())
+  print("pc=%08x" % kh.read_boot_pc())
+  print("ver,rev=", kh.read_rom_ver_rev())
+  print("ver,rev=", kh.read_exec_ver_rev())
+  print("size %08x == %08x" % (kh.read_rom_size_field(), len(ks)))
   print("base %08x" % kh.get_base_addr())
   print("get chk_sum=%08x" % kh.read_check_sum())
   print("calc chk_sum=%08x" % kh.recalc_check_sum())

@@ -1,8 +1,9 @@
+import os
 import struct
 
 from amitools.binfmt.BinImage import *
 from amitools.binfmt.Relocate import *
-import KickRom
+from KickRom import KickRomAccess
 
 
 class RomEntryRaw:
@@ -58,37 +59,29 @@ class RomEntryRomHdr:
 
 
 class RomBuilder:
-  def __init__(self, size=512, base_addr=0xf8000, fill_byte=0xff,
-               chunk_size=256, kick_sum=True):
-    if chunk_size == 0:
-      chunk_size = size
+  def __init__(self, size=512, base_addr=0xf80000, fill_byte=0xff):
     self.size = size # in KiB
     self.base_addr = base_addr
     self.fill_byte = fill_byte
-    self.chunk_size = chunk_size
-    self.kick_sum = kick_sum
     self.size_bytes = size * 1024
-    self.chunk_size_bytes = chunk_size * 1024
     # state
     self.modules = []
+    self.build_offset = 0
+    self.left_bytes = self.size_bytes
     self.cur_off = 0
-    self.cur_chunk = 0
     self.error = None
+
+  def get_error(self):
+    return self.error
 
   def get_current_offset(self):
     return self.cur_off
 
   def get_bytes_left(self):
-    return self.size_bytes - self.cur_off
+    return self.left_bytes
 
   def does_fit(self, num_bytes):
-    off = self.cur_off % self.chunk_size_bytes
-    # fits into current chunk
-    if num_bytes + off <= self.chunk_size_bytes:
-      return True
-    # move to next chunk
-    off += self.chunk_size_bytes - self.cur_chunk + 8
-    if num_bytes + off <= self.size_bytes:
+    if num_bytes <= self.left_bytes:
       return True
     return False
 
@@ -97,17 +90,27 @@ class RomBuilder:
     if not self.does_fit(n):
       self.error = "module '%s' does not fit into ROM!" % (entry.name)
       return None
-    # add rom header
-    if (self.cur_chunk + n) > self.chunk_size_bytes:
-      skip = self.chunk_size_bytes - self.cur_chunk
-      self.cur_off += skip + 8
-      self.cur_chunk = 8
-      self.modules.append(RomEntryRomHdr("Skip", skip, self.base_addr+2))
     # add entry
     self.modules.append(entry)
     self.cur_off += n
-    self.cur_chunk += n
+    self.left_bytes -= n
     return entry
+
+  def build_file_list(self, names):
+    files = []
+    for mod in names:
+      # is an index file?
+      if mod.endswith('.txt'):
+        base_path = os.path.dirname(mod)
+        with open(mod, "r") as fh:
+          for line in fh:
+            name = line.strip()
+            if len(name) > 0:
+              f = os.path.join(base_path, name)
+              files.append(f)
+      else:
+        files.append(mod)
+    return files
 
   def add_module(self, name, data, relocs):
     e = RomEntryRaw(name, data, relocs)
@@ -120,22 +123,64 @@ class RomBuilder:
   def build_rom(self):
     rom_data = bytearray(self.size_bytes)
     # fill in modules
-    addr = self.base_addr
-    off = 0
+    addr = self.base_addr + self.build_offset
+    off = self.build_offset
     for mod in self.modules:
       n = mod.get_size()
       rom_data[off: off+n] = mod.get_data(addr)
       off += n
       addr += n
-    # fill space
+    # fill empty space
     fill = chr(self.fill_byte)
     while off < self.size_bytes:
       rom_data[off] = fill
       off += 1
+    return rom_data
+
+
+class KickRomBuilder(RomBuilder):
+  def __init__(self, size, kickety_split=True, **kw_args):
+    RomBuilder.__init__(self, size, **kw_args)
+    # do we need a rom header at 256k border? (the original ROMs do this)
+    if size == 512:
+      self.kickety_split = kickety_split
+      self.split_offset = 0x40000
+    else:
+      self.kickety_split = False
+      self.split_offset = None
+    # check size
+    if size not in (256,512):
+      raise ValueError("KickROM size must be 256 or 512 KiB!")
+    # we need a footer
+    self.left_bytes -= KickRomAccess.FOOTER_SIZE
+    # extra rom header takes 8
+    if self.kickety_split:
+      self.left_bytes -= KickRomAccess.ROMHDR_SIZE
+
+  def cross_kickety_split(self, num_bytes):
+    if self.kickety_split:
+      new_off = self.cur_off + num_bytes
+      return self.cur_off < self.split_offset and new_off > self.split_offset
+    else:
+      return False
+
+  def add_kickety_split(self):
+    jump_addr = self.base_addr + 2
+    skip = self.split_offset - self.cur_off
+    e = RomEntryRomHdr("KicketySplit", skip, jump_addr)
+    return self._add_entry(e)
+
+  def build_rom(self):
+    rom_data = RomBuilder.build_rom(self)
     # add kick sum
-    if self.kick_sum:
-      kh = KickRom.Helper(rom_data)
-      kh.write_rom_size_field()
-      kh.write_footer()
-      kh.write_check_sum()
+    kh = KickRomAccess(rom_data)
+    # ensure that first module brought the header
+    if not kh.check_header():
+      error = "First KickROM module does not contain RomHdr!"
+      return None
+    # write missing entries in footer
+    kh.write_rom_size_field()
+    kh.write_footer()
+    # finally calc checksum
+    kh.write_check_sum()
     return rom_data

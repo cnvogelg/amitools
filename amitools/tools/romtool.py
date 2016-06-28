@@ -23,7 +23,7 @@ desc="""romtool allows you to dissect, inspect, or create Amiga ROM files"""
 
 def do_list_cmd(args):
   rs = RomSplitter()
-  rs.list_roms(print, args.query, show_entries=args.entries)
+  rs.list_roms(print, args.rom, show_entries=args.entries)
   return 0
 
 
@@ -35,10 +35,10 @@ def do_query_cmd(args):
     return 100
   else:
     rs.print_rom(print)
-    if args.query is None:
+    if args.module is None:
       e = rs.get_all_entries()
     else:
-      e = rs.query_entries(args.query)
+      e = rs.query_entries(args.module)
     rs.print_entries(print,e)
     return 0
 
@@ -52,9 +52,18 @@ def do_split_cmd(args):
     return 100
   else:
     rs.print_rom(logging.info)
-    entries = rs.get_all_entries()
+    # no output dir? end now
+    out_path = args.output_dir
+    if out_path is None:
+      return 0
+    # get modules to export
+    if args.module is None:
+      entries = rs.get_all_entries()
+    else:
+      entries = rs.query_entries(args.module)
     # setup output dir
-    out_path = os.path.join(args.output_dir, rom.short_name)
+    if not args.no_version_dir:
+      out_path = os.path.join(out_path, rom.short_name)
     # make dirs
     if not os.path.isdir(out_path):
       logging.info("creating directory '%s'", out_path)
@@ -62,10 +71,8 @@ def do_split_cmd(args):
     # create index file
     if not args.no_index:
       idx_path = os.path.join(out_path, "index.txt")
-      with open(idx_path, "w") as fh:
-        logging.info("writing index to '%s'", idx_path)
-        for e in entries:
-          fh.write(e.name + "\n")
+      logging.info("writing index to '%s'", idx_path)
+      rs.write_index_file(idx_path)
     # extract entries
     bfh = BinFmtHunk()
     for e in entries:
@@ -78,43 +85,60 @@ def do_split_cmd(args):
 
 
 def do_build_cmd(args):
+  # get options
+  rom_size = args.rom_size
   rom_addr = int(args.rom_addr, 16)
-  rb = RomBuilder(args.rom_size, rom_addr, args.fill_byte)
+  kickety_split = args.kickety_split
+  rom_type = args.rom_type
+  fill_byte = int(args.fill_byte, 16)
+  logging.info("building %d KiB '%s' ROM @%08x", rom_size, rom_type, rom_addr)
+  # select rom builder
+  if rom_type == 'kick':
+    rb = KickRomBuilder(rom_size,
+                        base_addr=rom_addr, fill_byte=fill_byte,
+                        kickety_split=kickety_split)
+  else:
+    logging.error("Unknown rom_type=%s", rom_type)
+    return 1
   # build file list
-  files = []
-  for mod in args.modules:
-    # is an index file?
-    if mod.endswith('.txt'):
-      base_path = os.path.dirname(mod)
-      with open(mod, "r") as fh:
-        for line in fh:
-          name = line.strip()
-          if len(name) > 0:
-            f = os.path.join(base_path, name)
-            files.append(f)
-    else:
-      files.append(mod)
+  file_list = rb.build_file_list(args.modules)
   # load modules
   bf = BinFmt()
-  for f in files:
+  for f in file_list:
+    # load image
     if not bf.is_image(f):
       logging.error("Can't load module '%s'", f)
       return 2
     name = os.path.basename(f)
-    off = rb.get_current_offset()
-    logging.info("@%08x: loading '%s'", off, f)
     bin_img = bf.load_image(f)
+
+    # handle kickety split
+    if kickety_split and rb.cross_kickety_split(bin_img.get_size()):
+      off = rb.get_current_offset()
+      logging.info("@%08x: adding kickety split", off)
+      rb.add_kickety_split()
+
+    # add image
+    off = rb.get_current_offset()
+    logging.info("@%08x: adding module '%s'", off, f)
     e = rb.add_bin_img(name, bin_img)
     if e is None:
-      logging.error("@%08x: can't add module '%s'", off, f)
+      logging.error("@%08x: can't add module '%s': %s", off, f, rb.get_error())
       return 3
+
   # build rom
+  off = rb.get_current_offset()
+  logging.info("@%08x: padding %d bytes with %02x", off, rb.get_bytes_left(), fill_byte)
   rom_data = rb.build_rom()
+  if rom_data is None:
+    logging.error("building ROM failed: %s", rb.get_error())
+
   # save rom
-  rom_image = args.rom_image
-  logging.info("saving ROM to '%s'", rom_image)
-  with open(rom_image, "wb") as fh:
-    fh.write(rom_data)
+  output = args.output
+  if output is not None:
+    logging.info("saving ROM to '%s'", output)
+    with open(output, "wb") as fh:
+      fh.write(rom_data)
   return 0
 
 
@@ -165,36 +189,50 @@ def do_dump_cmd(args):
 
 
 def setup_list_parser(parser):
-  parser.add_argument('query', default=None, help='query rom name', nargs='?')
+  parser.add_argument('-r', '--rom', default=None,
+                      help='query rom name by wildcard')
   parser.add_argument('-e', '--entries', default=False, action='store_true',
                       help="show entries of ROMs")
   parser.set_defaults(cmd=do_list_cmd)
 
 
 def setup_query_parser(parser):
-  parser.add_argument('rom_image', help='rom image file to be split')
-  parser.add_argument('query', default=None, help='query module name', nargs='?')
+  parser.add_argument('rom_image',
+                      help='rom image to be checked')
+  parser.add_argument('-m', '--module', default=None,
+                      help='query module by wildcard')
   parser.set_defaults(cmd=do_query_cmd)
 
 
 def setup_split_parser(parser):
-  parser.add_argument('rom_image', help='rom image file to be split')
-  parser.add_argument('output_dir', help='store modules in this base dir')
+  parser.add_argument('rom_image',
+                      help='rom image file to be split')
+  parser.add_argument('-o', '--output-dir',
+                      help='store modules in this base dir')
+  parser.add_argument('-m', '--module', default=None,
+                      help='query module by wildcard')
+  parser.add_argument('--no-version-dir', default=False, action='store_true',
+                      help="do not create sub directory with version name")
   parser.add_argument('--no-index', default=False, action='store_true',
                       help="do not create an 'index.txt' in output path")
   parser.set_defaults(cmd=do_split_cmd)
 
 
 def setup_build_parser(parser):
-  parser.add_argument('rom_image', help='rom image file to be built')
   parser.add_argument('modules', default=[], action='append',
                       help='modules or index.txt files to be added')
+  parser.add_argument('-o', '--output',
+                      help='rom image file to be built')
+  parser.add_argument('-t', '--rom-type', default='kick',
+                      help="what type of ROM to build (kick, ext)")
   parser.add_argument('-s', '--rom-size', default=512, type=int,
                       help="size of ROM in KiB")
   parser.add_argument('-a', '--rom-addr', default="f80000",
                       help="base address of ROM in hex")
-  parser.add_argument('--fill-byte', default=255, type=int,
-                      help="fill byte for empty ranges")
+  parser.add_argument('-k', '--kickety_split', default=False, action='store_true',
+                      help="add 'kickety split' romhdr at center of 512k ROM")
+  parser.add_argument('--fill-byte', default='ff',
+                      help="fill byte in hex for empty ranges")
   parser.set_defaults(cmd=do_build_cmd)
 
 

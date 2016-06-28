@@ -248,6 +248,12 @@ class BinImage:
   def __str__(self):
     return "<%s>" % ",".join(map(str,self.segments))
 
+  def get_size(self):
+    total_size = 0
+    for seg in self.segments:
+      total_size += seg.get_size()
+    return total_size
+
   def add_segment(self, seg):
     seg.id = len(self.segments)
     self.segments.append(seg)
