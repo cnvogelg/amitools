@@ -73,6 +73,9 @@ class KickRomAccess(RomAccess):
   def check_rom_size_field(self):
     return self.read_rom_size_field() == self.size
 
+  def check_magic_reset(self):
+    return self.read_word(0xd0) == 0x4e70
+
   def calc_check_sum(self, skip_off=None):
     """Check internal kickstart checksum and return True if is correct"""
     chk_sum = 0
@@ -143,6 +146,10 @@ class KickRomAccess(RomAccess):
       num += 1
       off += 2
 
+  def write_rom_ver_rev(self, rom_rev):
+    """get (ver, rev) version info from ROM"""
+    return struct.pack_into(">HH", self.rom_data, 12, rom_rev[0], rom_rev[1])
+
   def read_boot_pc(self):
     """return PC for booting the ROM"""
     return self.read_long(4)
@@ -150,10 +157,6 @@ class KickRomAccess(RomAccess):
   def read_rom_ver_rev(self):
     """get (ver, rev) version info from ROM"""
     return struct.unpack_from(">HH", self.rom_data, 12)
-
-  def write_rom_ver_rev(self, rom_rev):
-    """get (ver, rev) version info from ROM"""
-    return struct.pack_into(">HH", self.rom_data, 12, rom_rev[0], rom_rev[1])
 
   def read_exec_ver_rev(self):
     """get (ver, rev) version info from ROM"""

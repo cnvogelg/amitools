@@ -200,6 +200,35 @@ def do_dump_cmd(args):
   print_hex(rom, num=args.columns, base_addr=base_addr)
 
 
+def do_info_cmd(args):
+  img = args.image
+  rom = KickRom.Loader.load(img)
+  kh = KickRom.KickRomAccess(rom)
+  checks = [
+    ('size', kh.check_size()),
+    ('header', kh.check_header()),
+    ('footer', kh.check_footer()),
+    ('size_field', kh.check_size()),
+    ('chk_sum', kh.verify_check_sum()),
+    ('kickety_split', kh.check_kickety_split()),
+    ('magic_reset', kh.check_magic_reset()),
+    ('is_kick', kh.is_kick_rom())
+  ]
+  c = map(lambda x:"%-20s  %s" % (x[0], "ok" if x[1] else "NOK"), checks)
+  for i in c:
+    print(i)
+  values = [
+    ('check_sum', '%08x', kh.read_check_sum()),
+    ('base_addr', '%08x', kh.get_base_addr()),
+    ('boot_pc', '%08x', kh.read_boot_pc()),
+    ('rom_rev', '%d.%d', kh.read_rom_ver_rev()),
+    ('exec_rev', '%d.%d', kh.read_exec_ver_rev())
+  ]
+  v = map(lambda x:"%-20s  %s" % (x[0], x[1] % x[2]), values)
+  for i in v:
+    print(i)
+
+
 def setup_list_parser(parser):
   parser.add_argument('-r', '--rom', default=None,
                       help='query rom name by wildcard')
@@ -281,6 +310,11 @@ def setup_dump_parser(parser):
   parser.set_defaults(cmd=do_dump_cmd)
 
 
+def setup_info_parser(parser):
+  parser.add_argument('image', help='rom image to be analyzed')
+  parser.set_defaults(cmd=do_info_cmd)
+
+
 def parse_args():
   """parse args and return (args, opts)"""
   parser = argparse.ArgumentParser(description=desc)
@@ -311,6 +345,9 @@ def parse_args():
   # dump
   dump_parser = sub_parsers.add_parser('dump', help='dump a ROM image')
   setup_dump_parser(dump_parser)
+  # info
+  info_parser = sub_parsers.add_parser('info', help='print infos on a ROM image')
+  setup_info_parser(info_parser)
 
   # parse
   return parser.parse_args()
