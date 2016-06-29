@@ -87,16 +87,28 @@ def do_split_cmd(args):
 def do_build_cmd(args):
   # get options
   rom_size = args.rom_size
-  rom_addr = int(args.rom_addr, 16)
+  kick_addr = int(args.kick_addr, 16)
+  ext_addr = int(args.ext_addr, 16)
   kickety_split = args.kickety_split
   rom_type = args.rom_type
   fill_byte = int(args.fill_byte, 16)
-  logging.info("building %d KiB '%s' ROM @%08x", rom_size, rom_type, rom_addr)
+  rom_rev = args.rom_rev
+  if rom_rev is not None:
+    rom_rev = map(int, rom_rev.split("."))
+  add_footer = args.add_footer
   # select rom builder
   if rom_type == 'kick':
+    logging.info("building %d KiB Kick ROM @%08x", rom_size, kick_addr)
     rb = KickRomBuilder(rom_size,
-                        base_addr=rom_addr, fill_byte=fill_byte,
-                        kickety_split=kickety_split)
+                        base_addr=kick_addr, fill_byte=fill_byte,
+                        kickety_split=kickety_split, rom_ver=rom_rev)
+  elif rom_type == 'ext':
+    logging.info("building %d KiB Ext ROM @%08x Rev %r for Kick @%08x",
+                 rom_size, ext_addr, rom_rev, kick_addr)
+    rb = ExtRomBuilder(rom_size,
+                       base_addr=ext_addr, fill_byte=fill_byte,
+                       add_footer=add_footer, rom_ver=rom_rev,
+                       kick_addr=kick_addr)
   else:
     logging.error("Unknown rom_type=%s", rom_type)
     return 1
@@ -227,11 +239,17 @@ def setup_build_parser(parser):
                       help="what type of ROM to build (kick, ext)")
   parser.add_argument('-s', '--rom-size', default=512, type=int,
                       help="size of ROM in KiB")
-  parser.add_argument('-a', '--rom-addr', default="f80000",
-                      help="base address of ROM in hex")
+  parser.add_argument('-a', '--kick-addr', default="f80000",
+                      help="base address of Kick ROM in hex")
+  parser.add_argument('-e', '--ext-addr', default="e00000",
+                      help="base address of Ext ROM in hex")
+  parser.add_argument('-f', '--add-footer', default=False, action='store_true',
+                      help="add footer with check sum to Ext ROM")
+  parser.add_argument('-r', '--rom-rev', default=None,
+                      help="set ROM revision, e.g. 45.10")
   parser.add_argument('-k', '--kickety_split', default=False, action='store_true',
                       help="add 'kickety split' romhdr at center of 512k ROM")
-  parser.add_argument('--fill-byte', default='ff',
+  parser.add_argument('-b', '--fill-byte', default='ff',
                       help="fill byte in hex for empty ranges")
   parser.set_defaults(cmd=do_build_cmd)
 

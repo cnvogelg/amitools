@@ -7,6 +7,7 @@ from RomAccess import RomAccess
 
 class KickRomAccess(RomAccess):
 
+  EXT_HEADER_SIZE = 0x10
   FOOTER_SIZE = 0x18
   ROMHDR_SIZE = 8
   ROMHDR_256K = 0x11114ef9
@@ -122,6 +123,18 @@ class KickRomAccess(RomAccess):
     self.write_long(offset, hdr)
     self.write_long(offset+4, jump_addr)
 
+  def write_ext_header(self, jump_addr, rom_rev):
+    self.write_header(jump_addr)
+    self.write_word(8,0)
+    self.write_word(10,0xffff)
+    self.write_word(12,rom_rev[0])
+    self.write_word(14,rom_rev[1])
+
+  def write_ext_footer(self):
+    self.write_footer()
+    self.write_rom_size_field()
+    self.write_check_sum()
+
   def write_footer(self):
     off = self.size - 0x10
     num = 0x18
@@ -137,6 +150,10 @@ class KickRomAccess(RomAccess):
   def read_rom_ver_rev(self):
     """get (ver, rev) version info from ROM"""
     return struct.unpack_from(">HH", self.rom_data, 12)
+
+  def write_rom_ver_rev(self, rom_rev):
+    """get (ver, rev) version info from ROM"""
+    return struct.pack_into(">HH", self.rom_data, 12, rom_rev[0], rom_rev[1])
 
   def read_exec_ver_rev(self):
     """get (ver, rev) version info from ROM"""

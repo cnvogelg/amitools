@@ -139,8 +139,10 @@ class RomBuilder:
 
 
 class KickRomBuilder(RomBuilder):
-  def __init__(self, size, kickety_split=True, **kw_args):
+  def __init__(self, size, kickety_split=True, rom_ver=None,
+               **kw_args):
     RomBuilder.__init__(self, size, **kw_args)
+    self.rom_ver = rom_ver
     # do we need a rom header at 256k border? (the original ROMs do this)
     if size == 512:
       self.kickety_split = kickety_split
@@ -178,9 +180,39 @@ class KickRomBuilder(RomBuilder):
     if not kh.check_header():
       error = "First KickROM module does not contain RomHdr!"
       return None
+    # write custom rev?
+    if self.rom_ver is not None:
+      kh.write_rom_ver_rev(self.rom_ver)
     # write missing entries in footer
-    kh.write_rom_size_field()
-    kh.write_footer()
-    # finally calc checksum
-    kh.write_check_sum()
+    kh.write_ext_footer()
+    return rom_data
+
+
+class ExtRomBuilder(RomBuilder):
+  def __init__(self, size, rom_ver=None, add_footer=False,
+               kick_addr=0xf80000, **kw_args):
+    RomBuilder.__init__(self, size, **kw_args)
+    # kick addr for jump
+    self.kick_addr = kick_addr
+    # set ROM version
+    if rom_ver is None:
+      self.rom_ver = (45,10)
+    else:
+      self.rom_ver = rom_ver
+    # add footer
+    self.add_footer = add_footer
+    if add_footer:
+      self.left_bytes -= KickRomAccess.FOOTER_SIZE
+    # account for header
+    self.left_bytes -= KickRomAccess.EXT_HEADER_SIZE
+    self.build_offset = KickRomAccess.EXT_HEADER_SIZE
+
+  def build_rom(self):
+    rom_data = RomBuilder.build_rom(self)
+    # write a header
+    kh = KickRomAccess(rom_data)
+    kh.write_ext_header(self.kick_addr+2, self.rom_ver)
+    # write footer
+    if self.add_footer:
+      kh.write_ext_footer()
     return rom_data
