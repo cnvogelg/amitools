@@ -14,6 +14,7 @@ from amitools.util.Logging import *
 from amitools.util.HexDump import *
 from amitools.rom.RomSplitter import *
 from amitools.rom.RomBuilder import *
+from amitools.rom.RomPatcher import *
 from amitools.rom.KickRom import *
 from amitools.binfmt.hunk.BinFmtHunk import BinFmtHunk
 from amitools.binfmt.BinFmt import BinFmt
@@ -229,6 +230,38 @@ def do_info_cmd(args):
     print(i)
 
 
+def do_patch_cmd(args):
+  img = args.image
+  logging.info("loading ROM from '%s'", img)
+  rom = KickRom.Loader.load(img)
+  # apply patches
+  rp = RomPatcher(rom)
+  for patch in args.patches:
+    logging.info("searching patch '%s'", patch)
+    p = rp.find_patch(patch)
+    if p is None:
+      logging.error("can't find patch '%s'", patch)
+      return 1
+    ok, msg = rp.apply_patch(p)
+    if ok:
+      logging.info("applied patch '%s': %s", patch, msg)
+    else:
+      logging.error("error applying patch '%s': %s", patch, msg)
+      return 2
+  # save rom
+  output = args.output
+  if output is not None:
+    logging.info("saving ROM to '%s'", output)
+    with open(output, "wb") as fh:
+      fh.write(rp.get_patched_rom())
+  return 0
+
+
+def do_patches_cmd(args):
+  for p in patches:
+    print("%-10s  %s" % (p.name, p.desc))
+
+
 def setup_list_parser(parser):
   parser.add_argument('-r', '--rom', default=None,
                       help='query rom name by wildcard')
@@ -315,6 +348,20 @@ def setup_info_parser(parser):
   parser.set_defaults(cmd=do_info_cmd)
 
 
+def setup_patch_parser(parser):
+  parser.add_argument('image',
+                      help='rom image to be patched')
+  parser.add_argument('patches', default=[], action='append',
+                      help='patches to be applied')
+  parser.add_argument('-o', '--output',
+                      help='rom image file to be built')
+  parser.set_defaults(cmd=do_patch_cmd)
+
+
+def setup_patches_parser(parser):
+  parser.set_defaults(cmd=do_patches_cmd)
+
+
 def parse_args():
   """parse args and return (args, opts)"""
   parser = argparse.ArgumentParser(description=desc)
@@ -348,6 +395,12 @@ def parse_args():
   # info
   info_parser = sub_parsers.add_parser('info', help='print infos on a ROM image')
   setup_info_parser(info_parser)
+  # patch
+  patch_parser = sub_parsers.add_parser('patch', help='patch a ROM image')
+  setup_patch_parser(patch_parser)
+  # patches
+  patches_parser = sub_parsers.add_parser('patches', help='show available patches')
+  setup_patches_parser(patches_parser)
 
   # parse
   return parser.parse_args()

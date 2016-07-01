@@ -23,7 +23,7 @@ class RomAccess:
     return self.writable
 
   def get_data(self):
-    return rom_data
+    return self.rom_data
 
   def make_writable(self):
     if not self.writable:
