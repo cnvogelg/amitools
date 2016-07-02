@@ -263,6 +263,44 @@ def do_patches_cmd(args):
     print("%-10s  %s" % (p.name, p.desc))
 
 
+def do_combine_cmd(args):
+  # load kick rom
+  kick_img = args.kick_rom
+  logging.info("loading Kick ROM from '%s'", kick_img)
+  kick_rom = KickRom.Loader.load(kick_img)
+  # load ext rom
+  ext_img = args.ext_rom
+  logging.info("loading Ext ROM from '%s'", ext_img)
+  ext_rom = KickRom.Loader.load(ext_img)
+  # check kick
+  logging.info("validating Kick ROM")
+  ka = KickRom.KickRomAccess(kick_rom)
+  if not ka.is_kick_rom():
+    logging.error("Not a Kick ROM image!")
+    return 1
+  if ka.get_size_kib() != 512:
+    logging.error("Not a 512 MiB Kick ROM image!")
+    return 2
+  if ka.get_base_addr() != 0xf80000:
+    logging.error("Kick ROM base address is not 0xf80000!")
+    return 3
+  # check ext
+  logging.info("validating Ext ROM")
+  ka = KickRom.KickRomAccess(ext_rom)
+  if not ka.check_header():
+    logging.error("No ROM Header in Ext ROM image found!")
+  if ka.get_size_kib() != 512:
+    logging.error("Not a 512 MiB Ext ROM image!")
+  # write rom
+  rom = ext_rom + kick_rom
+  output = args.output
+  if output is not None:
+    logging.info("saving ROM to '%s'", output)
+    with open(output, "wb") as fh:
+      fh.write(rom)
+  return 0
+
+
 def setup_list_parser(parser):
   parser.add_argument('-r', '--rom', default=None,
                       help='query rom name by wildcard')
@@ -363,6 +401,14 @@ def setup_patches_parser(parser):
   parser.set_defaults(cmd=do_patches_cmd)
 
 
+def setup_combine_parser(parser):
+  parser.add_argument('kick_rom', help='kick rom to be combined')
+  parser.add_argument('ext_rom', help='ext rom to be combined')
+  parser.set_defaults(cmd=do_combine_cmd)
+  parser.add_argument('-o', '--output',
+                      help='rom image file to be built')
+
+
 def parse_args():
   """parse args and return (args, opts)"""
   parser = argparse.ArgumentParser(description=desc)
@@ -402,6 +448,9 @@ def parse_args():
   # patches
   patches_parser = sub_parsers.add_parser('patches', help='show available patches')
   setup_patches_parser(patches_parser)
+  # combine
+  combine_parser = sub_parsers.add_parser('combine', help='combine a kick and an ext ROM to a 1 MiB ROM')
+  setup_combine_parser(combine_parser)
 
   # parse
   return parser.parse_args()
