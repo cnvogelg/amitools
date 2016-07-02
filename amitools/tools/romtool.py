@@ -16,6 +16,7 @@ from amitools.rom.RomSplitter import *
 from amitools.rom.RomBuilder import *
 from amitools.rom.RomPatcher import *
 from amitools.rom.KickRom import *
+from amitools.rom.ResidentScan import *
 from amitools.binfmt.hunk.BinFmtHunk import BinFmtHunk
 from amitools.binfmt.BinFmt import BinFmt
 
@@ -301,6 +302,52 @@ def do_combine_cmd(args):
   return 0
 
 
+def do_scan_cmd(args):
+  # load rom
+  img = args.image
+  logging.info("loading ROM from '%s'", img)
+  rom = KickRom.Loader.load(img)
+  # scan
+  base_addr = args.rom_addr
+  if base_addr is not None:
+    base_addr = int(base_addr, 16)
+    logging.info("set base address: %08x", base_addr)
+  else:
+    # guess address
+    rs = ResidentScan(rom)
+    base_addr = rs.guess_base_addr()
+    if base_addr is None:
+      logging.error("can't guess base address of ROM!")
+      return 1
+    elif type(base_addr) is list:
+      addrs = map(hex, base_addr)
+      logging.error("multiple addresses guessed: %s", ",".join(addrs))
+      return 2
+    else:
+      logging.info("guessed base address: %08x", base_addr)
+  # setup scanner
+  rs = ResidentScan(rom, base_addr)
+  offs = rs.get_all_resident_pos()
+  info = args.show_info
+  for off in offs:
+    r = rs.get_resident(off)
+    nt = r.get_node_type_str()
+    name = r.name.strip()
+    id_string = r.id_string.strip()
+    if info:
+      print("@%08x  name:       %s" % (off, name))
+      spc = " " * 10
+      print(spc, "id_string:  %s" % id_string)
+      print(spc, "node_type:  %s" % nt)
+      print(spc, "flags:      %s" % (" | ".join(r.get_flags_strings())))
+      print(spc, "version:    %u" % r.version)
+      print(spc, "priority:   %d" % r.pri)
+      print(spc, "init off:   %08x" % r.init_off)
+      print(spc, "skip off:   %08x" % r.skip_off)
+    else:
+      print("@%08x  +%08x  %-12s  %+4d  %s  %s" % (off, r.skip_off, nt, r.pri, name, id_string))
+
+
 def setup_list_parser(parser):
   parser.add_argument('-r', '--rom', default=None,
                       help='query rom name by wildcard')
@@ -409,6 +456,15 @@ def setup_combine_parser(parser):
                       help='rom image file to be built')
 
 
+def setup_scan_parser(parser):
+  parser.add_argument('image', help='rom image to be scanned')
+  parser.add_argument('-b', '--rom-addr', default=None,
+                      help="use this base address for ROM. otherwise guess.")
+  parser.add_argument('-i', '--show-info', default=False, action='store_true',
+                      help="show more details on resident")
+  parser.set_defaults(cmd=do_scan_cmd)
+
+
 def parse_args():
   """parse args and return (args, opts)"""
   parser = argparse.ArgumentParser(description=desc)
@@ -451,6 +507,9 @@ def parse_args():
   # combine
   combine_parser = sub_parsers.add_parser('combine', help='combine a kick and an ext ROM to a 1 MiB ROM')
   setup_combine_parser(combine_parser)
+  # scan
+  scan_parser = sub_parsers.add_parser('scan', help='scan ROM for residents')
+  setup_scan_parser(scan_parser)
 
   # parse
   return parser.parse_args()

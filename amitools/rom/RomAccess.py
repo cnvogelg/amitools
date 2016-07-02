@@ -46,3 +46,9 @@ class RomAccess:
     if not self.writable:
       raise ValueError("can't write to ROM")
     return struct.pack_into(">H", self.rom_data, off, val)
+
+  def read_byte(self, off):
+    return struct.unpack_from("B", self.rom_data, off)[0]
+
+  def read_sbyte(self, off):
+    return struct.unpack_from("b", self.rom_data, off)[0]
