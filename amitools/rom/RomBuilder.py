@@ -178,7 +178,7 @@ class KickRomBuilder(RomBuilder):
     kh = KickRomAccess(rom_data)
     # ensure that first module brought the header
     if not kh.check_header():
-      error = "First KickROM module does not contain RomHdr!"
+      self.error = "First KickROM module does not contain RomHdr!"
       return None
     # write custom rev?
     if self.rom_ver is not None:

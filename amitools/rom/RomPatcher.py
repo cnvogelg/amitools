@@ -1,3 +1,4 @@
+import logging
 from RomAccess import RomAccess
 
 
@@ -7,7 +8,7 @@ class RomPatch:
     self.desc = desc
 
   def apply_patch(self, access):
-    return "N/A"
+    return False
 
 
 class OneMegRomPatch(RomPatch):
@@ -30,14 +31,17 @@ class OneMegRomPatch(RomPatch):
             access.write_long(off-4, 0x1000000)
             access.write_long(off, 0xe00000)
             access.write_long(off+4, 0xe80000)
-            return True, "@%08x Variant A" % off
+            logging.info("@%08x Variant A", off)
+            return True
           else:
             access.write_long(off, 0xf00000)
             access.write_long(off+8, 0xe00000)
             access.write_long(off+0xc, 0xe80000)
-            return True, "@%08x Variant B" % off
+            logging.info("@%08x Variant B", off)
+            return True
       off += 2
-    return False, "Exec Table not found!"
+    logging.error("Exec Table not found!")
+    return False
 
 
 # list of all available patch classes

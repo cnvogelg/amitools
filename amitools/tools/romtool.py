@@ -145,6 +145,7 @@ def do_build_cmd(args):
   rom_data = rb.build_rom()
   if rom_data is None:
     logging.error("building ROM failed: %s", rb.get_error())
+    return 4
 
   # save rom
   output = args.output
@@ -242,11 +243,11 @@ def do_patch_cmd(args):
     if p is None:
       logging.error("can't find patch '%s'", patch)
       return 1
-    ok, msg = rp.apply_patch(p)
+    ok = rp.apply_patch(p)
     if ok:
-      logging.info("applied patch '%s': %s", patch, msg)
+      logging.info("applied patch '%s'", patch)
     else:
-      logging.error("error applying patch '%s': %s", patch, msg)
+      logging.error("error applying patch '%s'", patch)
       return 2
   # save rom
   output = args.output
