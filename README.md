@@ -122,6 +122,11 @@ python setup.py develop --user
 
     Create or modify disk images with Rigid Disk Block (RDB)
 
+  - [romtool](doc/romtool.md)
+
+    A tool to inspect, dissect, and build Amiga Kickstart ROM images to be
+    used with emulators, run with soft kickers or burned into flash ROMs.
+
   - hunktool
 
     The hunktool uses amitools' hunk library to load a hunk-based amiga

@@ -25,7 +25,7 @@ desc="""romtool allows you to dissect, inspect, or create Amiga ROM files"""
 
 def do_list_cmd(args):
   rs = RomSplitter()
-  rs.list_roms(print, args.rom, show_entries=args.entries)
+  rs.list_roms(print, args.rom, show_entries=args.modules)
   return 0
 
 
@@ -37,10 +37,10 @@ def do_query_cmd(args):
     return 100
   else:
     rs.print_rom(print)
-    if args.module is None:
+    if args.modules is None:
       e = rs.get_all_entries()
     else:
-      e = rs.query_entries(args.module)
+      e = rs.query_entries(args.modules)
     rs.print_entries(print,e)
     return 0
 
@@ -59,10 +59,10 @@ def do_split_cmd(args):
     if out_path is None:
       return 0
     # get modules to export
-    if args.module is None:
+    if args.modules is None:
       entries = rs.get_all_entries()
     else:
-      entries = rs.query_entries(args.module)
+      entries = rs.query_entries(args.modules)
     # setup output dir
     if not args.no_version_dir:
       out_path = os.path.join(out_path, rom.short_name)
@@ -351,7 +351,7 @@ def do_scan_cmd(args):
 def setup_list_parser(parser):
   parser.add_argument('-r', '--rom', default=None,
                       help='query rom name by wildcard')
-  parser.add_argument('-e', '--entries', default=False, action='store_true',
+  parser.add_argument('-m', '--modules', default=False, action='store_true',
                       help="show entries of ROMs")
   parser.set_defaults(cmd=do_list_cmd)
 
@@ -359,7 +359,7 @@ def setup_list_parser(parser):
 def setup_query_parser(parser):
   parser.add_argument('rom_image',
                       help='rom image to be checked')
-  parser.add_argument('-m', '--module', default=None,
+  parser.add_argument('-m', '--modules', default=None,
                       help='query module by wildcard')
   parser.set_defaults(cmd=do_query_cmd)
 
@@ -369,7 +369,7 @@ def setup_split_parser(parser):
                       help='rom image file to be split')
   parser.add_argument('-o', '--output-dir',
                       help='store modules in this base dir')
-  parser.add_argument('-m', '--module', default=None,
+  parser.add_argument('-m', '--modules', default=None,
                       help='query module by wildcard')
   parser.add_argument('--no-version-dir', default=False, action='store_true',
                       help="do not create sub directory with version name")
@@ -477,18 +477,13 @@ def parse_args():
 
   # sub parsers
   sub_parsers = parser.add_subparsers(help="sub commands")
-  # list
-  list_parser = sub_parsers.add_parser('list', help='list ROMs in split data')
-  setup_list_parser(list_parser)
-  # query
-  query_parser = sub_parsers.add_parser('query', help='query if ROM is in split data')
-  setup_query_parser(query_parser)
-  # split
-  split_parser = sub_parsers.add_parser('split', help='split a ROM into modules')
-  setup_split_parser(split_parser)
+
   # build
   build_parser = sub_parsers.add_parser('build', help='build a ROM from modules')
   setup_build_parser(build_parser)
+  # combine
+  combine_parser = sub_parsers.add_parser('combine', help='combine a kick and an ext ROM to a 1 MiB ROM')
+  setup_combine_parser(combine_parser)
   # diff
   diff_parser = sub_parsers.add_parser('diff', help='show differences in two ROM images')
   setup_diff_parser(diff_parser)
@@ -498,18 +493,24 @@ def parse_args():
   # info
   info_parser = sub_parsers.add_parser('info', help='print infos on a ROM image')
   setup_info_parser(info_parser)
+  # list
+  list_parser = sub_parsers.add_parser('list', help='list ROMs in split data')
+  setup_list_parser(list_parser)
   # patch
   patch_parser = sub_parsers.add_parser('patch', help='patch a ROM image')
   setup_patch_parser(patch_parser)
   # patches
   patches_parser = sub_parsers.add_parser('patches', help='show available patches')
   setup_patches_parser(patches_parser)
-  # combine
-  combine_parser = sub_parsers.add_parser('combine', help='combine a kick and an ext ROM to a 1 MiB ROM')
-  setup_combine_parser(combine_parser)
+  # query
+  query_parser = sub_parsers.add_parser('query', help='query if ROM is in split data')
+  setup_query_parser(query_parser)
   # scan
   scan_parser = sub_parsers.add_parser('scan', help='scan ROM for residents')
   setup_scan_parser(scan_parser)
+  # split
+  split_parser = sub_parsers.add_parser('split', help='split a ROM into modules')
+  setup_split_parser(split_parser)
 
   # parse
   return parser.parse_args()
