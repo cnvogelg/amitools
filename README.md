@@ -24,6 +24,8 @@ will be very helpful.
  - All other packages are installed automatically, if missing:
    - [pytest][2]
    - [lhafile - FS Edition][3]
+   - setuptools_scm
+   - pytest-runner
  - First make sure to have the Python package installer ```pip```:
   - On Mac OS X using [MacPorts][4] (Tool is called ```pip-2.7``` here):
   ```
