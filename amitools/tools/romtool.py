@@ -236,6 +236,9 @@ def do_patch_cmd(args):
   img = args.image
   logging.info("loading ROM from '%s'", img)
   rom = KickRom.Loader.load(img)
+  # is kick?
+  kh = KickRom.KickRomAccess(rom)
+  is_kick = kh.is_kick_rom()
   # apply patches
   rp = RomPatcher(rom)
   for patch in args.patches:
@@ -250,12 +253,18 @@ def do_patch_cmd(args):
     else:
       logging.error("error applying patch '%s'", patch)
       return 2
+  # update kick sum
+  rom_data = rp.get_patched_rom()
+  if is_kick:
+    kh = KickRom.KickRomAccess(rom_data)
+    cs = kh.write_check_sum()
+    logging.info("updated kicksum=%08x", cs)
   # save rom
   output = args.output
   if output is not None:
     logging.info("saving ROM to '%s'", output)
     with open(output, "wb") as fh:
-      fh.write(rp.get_patched_rom())
+      fh.write(rom_data)
   return 0
 
 

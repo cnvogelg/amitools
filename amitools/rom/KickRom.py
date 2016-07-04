@@ -108,6 +108,7 @@ class KickRomAccess(RomAccess):
     cs = self.recalc_check_sum()
     sum_off = self.size - 0x18
     self.write_long(sum_off, cs)
+    return cs
 
   def write_rom_size_field(self):
     off = self.size - 0x14
