@@ -86,8 +86,10 @@ class BinFmtHunk:
       hunk_num = r[0]
       offsets = r[1]
       to_seg = all_segs[hunk_num]
-      # create reloc for target segment
-      rl = Relocations(to_seg)
+      # create reloc for target segment or reuse one.
+      rl = seg.get_reloc(to_seg)
+      if rl == None:
+        rl = Relocations(to_seg)
       # add offsets
       for o in offsets:
         r = Reloc(o)

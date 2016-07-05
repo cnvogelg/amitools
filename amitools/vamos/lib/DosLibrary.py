@@ -1506,13 +1506,16 @@ class DosLibrary(AmigaLibrary):
     cmd_dir_addr = clip.r_s("cli_CommandDir")
     for p in ctx.path_mgr.get_paths():
       if p != "C:" and p != "c:":
-        path = ctx.alloc.alloc_struct("Path(%s)" % p,PathDef)
         lock = self.lock_mgr.create_lock(None, p, False)
-        path.access.w_s("path_Lock",lock.mem.addr)
-        path.access.w_s("path_Next",cmd_dir_addr)
-        cmd_dir_addr = path.addr
-        clip.w_s("cli_CommandDir",cmd_dir_addr)
-        self.path.append((path,lock))
+        if lock != None:
+          path = ctx.alloc.alloc_struct("Path(%s)" % p,PathDef)
+          path.access.w_s("path_Lock",lock.mem.addr)
+          path.access.w_s("path_Next",cmd_dir_addr)
+          cmd_dir_addr = path.addr
+          clip.w_s("cli_CommandDir",cmd_dir_addr)
+          self.path.append((path,lock))
+        else:
+          print "Path %s does not exist, expect problems!" % p
     return 0
 
   def CliInitRun(self, ctx):

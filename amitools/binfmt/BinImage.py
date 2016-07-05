@@ -176,7 +176,10 @@ class Segment:
     return sorted(keys, key=lambda x: x.id)
 
   def get_reloc(self, to_seg):
-    return self.relocs[to_seg]
+    if to_seg in self.relocs:
+      return self.relocs[to_seg]
+    else:
+      return None
 
   def set_symtab(self, symtab):
     self.symtab = symtab

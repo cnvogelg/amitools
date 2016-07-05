@@ -275,7 +275,7 @@ class LibManager():
     end = time.clock()
     delta = end - start;
     if res_list == None or len(res_list) != 1:
-      self.lib_log("load_lib","No single resident in %s found found!" % load_name, level=logging.ERROR)
+      self.lib_log("load_lib","No single resident in %s found!" % load_name, level=logging.ERROR)
       return None
 
     # make sure its a library
@@ -332,7 +332,7 @@ class LibManager():
   def _rtinit_done_native_lib(self, lib, ctx):
     lib_base = ctx.cpu.r_reg(REG_D0)
     self.lib_log("load_lib", "RT_INIT done: d0=%08x" % lib_base, level=logging.DEBUG)
-    sys.exit(1)
+    #sys.exit(1)
 
   def _auto_init_native_lib(self, lib, ar, res, ctx, tr):
     # read auto init infos
