@@ -25,6 +25,14 @@ class UtilityLibrary(AmigaLibrary):
     c = (a * b) & 0xffffffff
     log_utility.info("UMult32(a=%u, b=%u) => %u", a, b, c)
     return c
+  
+  def SMult32(self, ctx):
+    # Z_{2^32} is a ring. It does not matter whether we multiply signed or unsigned
+    a = ctx.cpu.r_reg(REG_D0)
+    b = ctx.cpu.r_reg(REG_D1)
+    c = (a * b) & 0xffffffff
+    log_utility.info("SMult32(a=%d, b=%d) => %d", a, b, c)
+    return c
 
   def ToUpper(self, ctx):
     a = ctx.cpu.r_reg(REG_D0)

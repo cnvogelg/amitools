@@ -1272,11 +1272,17 @@ class DosLibrary(AmigaLibrary):
       #Push-back the commands into the input buffer.
       new_input.setbuf(cmd)
       new_stdin = self.file_mgr.open(None,"*","rw")
+      outtag    = tag_list.find_tag('SYS_Output')
       # print "setting new input to %s" % new_input
       # and install this as current input. The shell will read from that
       # instead until it hits the EOF
       input_fhsi  = cli.r_s("cli_StandardInput")
       input_fhci  = cli.r_s("cli_CurrentInput")
+      if outtag != None and outtag.data != 0:
+        output_fhci = cli.r_s("cli_StandardOutput")
+        cli.w_s("cli_StandardOutput",outtag.data << 2)
+      else:
+        output_fhci = None
       cli.w_s("cli_CurrentInput",new_input.mem.addr)
       cli.w_s("cli_StandardInput",new_stdin.mem.addr)
       cli.w_s("cli_Background",self.DOSTRUE)
@@ -1298,6 +1304,8 @@ class DosLibrary(AmigaLibrary):
         cli.w_s("cli_StandardInput",input_fhsi)
         cli.w_s("cli_Background",self.DOSFALSE)
         cli.w_s("cli_Module",cur_module)
+        if output_fhci != None:
+          cli.w_s("cli_StandardOutput",output_fhci)
         # Channels are closed by the dying shell
         ctx.mem.access.w_bstr(cli.r_s("cli_SetName"),cur_setname)
         ctx.process.this_task.access.w_s("pr_CIS",input_fhci)

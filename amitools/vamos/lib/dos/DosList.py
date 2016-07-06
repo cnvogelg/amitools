@@ -107,20 +107,23 @@ class DosList:
       #print "*** Entry %s, Name address is %s,%s" % (entry.mem,name_addr,self.mem.access.r_bstr(name_addr))
       for dirs in entry.assigns:
         lock = lock_mgr.create_lock(None,dirs,False)
-        entry.locks.append(lock)
-        if first:
-          entry.access.w_s("dol_Lock",lock.mem.addr)
-          first = False
+        if lock == None:
+          print "%s does not exist" % dirs
         else:
-          assign_entry = self.alloc.alloc_struct("AssignList",AssignListDef)
-          entry.alist.append(assign_entry)
-          assign_entry.access.w_s("al_Next",0)
-          assign_entry.access.w_s("al_Lock",lock.mem.addr)
-          if assign_last != None:
-            assign_last.w_s("al_Next",assign_entry.addr)
+          entry.locks.append(lock)
+          if first:
+            entry.access.w_s("dol_Lock",lock.mem.addr)
+            first = False
           else:
-            entry.access.w_s("dol_List",assign_entry.addr)
-          assign_last = assign_entry.access
+            assign_entry = self.alloc.alloc_struct("AssignList",AssignListDef)
+            entry.alist.append(assign_entry)
+            assign_entry.access.w_s("al_Next",0)
+            assign_entry.access.w_s("al_Lock",lock.mem.addr)
+            if assign_last != None:
+              assign_last.w_s("al_Next",assign_entry.addr)
+            else:
+              entry.access.w_s("dol_List",assign_entry.addr)
+            assign_last = assign_entry.access
 
   def get_entry_by_b_addr(self, baddr):
     if not self.entries_by_b_addr.has_key(baddr):

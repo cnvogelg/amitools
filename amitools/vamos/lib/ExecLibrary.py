@@ -268,6 +268,37 @@ class ExecLibrary(AmigaLibrary):
       log_exec.info("GetMsg: no message available!")
       return 0
 
+  def CreateMsgPort(self, ctx):
+    port = self.port_mgr.create_port("exec_port",None)
+    log_exec.info("CreateMsgPort: -> port=%06x" % (port))
+    return port
+
+  def DeleteMsgPort(self, ctx):
+    port = ctx.cpu.r_reg(REG_A0)
+    log_exec.info("DeleteMsgPort(%06x)" % port)
+    self.port_mgr.free_port(port)
+    return 0
+
+  def CreateIORequest(self,ctx):
+    port = ctx.cpu.r_reg(REG_A0)
+    size = ctx.cpu.r_reg(REG_D0)
+    # label alloc
+    pc   = self.get_callee_pc(ctx)
+    tag  = ctx.label_mgr.get_mem_str(pc)
+    name = "CreateIORequest(%06x = %s)" % (pc,tag)
+    mb   = self.alloc.alloc_memory(name,size)
+    log_exec.info("CreateIORequest: (%s,%s,%s) -> 0x%06x %d bytes" % (mb,port,size,mb.addr,size))
+    return mb.addr
+
+  def DeleteIORequest(self,ctx):
+    req = ctx.cpu.r_reg(REG_A0)
+    mb  = self.alloc.get_memory(req)
+    if mb != None:
+      log_exec.info("DeleteIOREquest: 0x%06x -> %s" % (req,mb))
+      self.alloc.free_memory(mb)
+    else:
+      raise VamosInternalError("DeleteIORequest: Unknown IORequest to delete: ptr=%06x" % addr)
+
   def WaitPort(self, ctx):
     port_addr = ctx.cpu.r_reg(REG_A0)
     log_exec.info("WaitPort: port=%06x" % (port_addr))
