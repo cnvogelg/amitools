@@ -771,7 +771,7 @@ class DosLibrary(AmigaLibrary):
       raise UnsupportedFeatureError("Lock: mode=%x" % mode)
 
     lock = self.lock_mgr.create_lock(self.get_current_dir(), name, lock_exclusive)
-    log_dos.info("Lock: '%s' exc=%s -> %s" % (name, lock_exclusive, lock))
+    log_dos.info("Lock: (%s) '%s' exc=%s -> %s" % (self.get_current_dir(), name, lock_exclusive, lock))
     if lock == None:
       self.setioerr(ctx,ERROR_OBJECT_NOT_FOUND)
       return 0
@@ -1111,7 +1111,7 @@ class DosLibrary(AmigaLibrary):
     else:
       addr = 0
     # fill result array and memory
-    args.generate_result(ctx.mem.access,addr,array_ptr)
+    resarray = args.generate_result(ctx.mem.access,addr,array_ptr)
     # alloc RD_Args
     if rdargs_ptr == 0:
       rdargs = ctx.alloc.alloc_struct("RDArgs", RDArgsDef)
@@ -1125,7 +1125,7 @@ class DosLibrary(AmigaLibrary):
     self.rdargs[rdargs.addr] = (rdargs, own)
     # result
     self.setioerr(ctx,NO_ERROR)
-    log_dos.info("ReadArgs: matched! result_mem=%06x rdargs=%s", addr, rdargs)
+    log_dos.info("ReadArgs: matched! result_mem=%06x rdargs=%s", addr, resarray)
     return rdargs.addr
 
   def FreeArgs(self, ctx):
