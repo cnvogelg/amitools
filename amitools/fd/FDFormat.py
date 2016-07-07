@@ -57,7 +57,7 @@ def read_fd(fname):
           bias += 6
   f.close()
   return func_table
-
+  
 def write_fd(fname, fd, add_private):
   fo = open(fname, "w")
   fo.write("##base %s\n" % (fd.get_base_name()))

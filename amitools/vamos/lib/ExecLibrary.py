@@ -299,6 +299,34 @@ class ExecLibrary(AmigaLibrary):
     else:
       raise VamosInternalError("DeleteIORequest: Unknown IORequest to delete: ptr=%06x" % addr)
 
+  def OpenDevice(self,ctx):
+    name_ptr = ctx.cpu.r_reg(REG_A0)
+    unit     = ctx.cpu.r_reg(REG_D0)
+    io_addr  = ctx.cpu.r_reg(REG_A1)
+    io       = AccessStruct(ctx.mem, IORequestDef, io_addr)
+    flags    = ctx.cpu.r_reg(REG_D1)
+    name     = ctx.mem.access.r_cstr(name_ptr)
+    lib      = self.lib_mgr.open_dev(name, unit, flags, io, ctx)
+    if lib == None:
+      log_exec.info("OpenDevice: '%s' unit %d flags %d -> NULL" % (name, unit, flags))
+      return -1
+    else:
+      log_exec.info("OpenDevice: '%s' unit %d flags %d -> %s@0x%06x" % (name, unit, flags, lib, lib.addr_base_open))
+      return 0
+
+  def CloseDevice(self,ctx):
+    io_addr  = ctx.cpu.r_reg(REG_A1)
+    if io_addr != 0:
+      io       = AccessStruct(ctx.mem, IORequestDef, io_addr)
+      dev_addr = io.r_s("io_Device")
+      if dev_addr != 0:
+        dev = self.lib_mgr.close_dev(dev_addr,ctx)
+        io.w_s("io_Device",0)
+        if dev != None:
+          log_exec.info("CloseDevice: '%s' -> %06x" % (dev, dev.addr_base))
+        else:
+          raise VamosInternalError("CloseDevice: Unknown library to close: ptr=%06x" % dev_addr)
+
   def WaitPort(self, ctx):
     port_addr = ctx.cpu.r_reg(REG_A0)
     log_exec.info("WaitPort: port=%06x" % (port_addr))

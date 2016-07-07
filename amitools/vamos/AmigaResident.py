@@ -7,6 +7,7 @@ class AmigaResident:
 
   RTF_AUTOINIT = 1<<7
 
+  NT_DEVICE  = 3
   NT_LIBRARY = 9
 
   INIT_BYTE_B = 0xa0

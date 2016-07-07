@@ -233,3 +233,38 @@ class SignalSemaphoreStruct(AmigaStruct):
   ]
 SignalSemaphoreDef = SignalSemaphoreStruct()
 
+# Device
+class DeviceStruct(AmigaStruct):
+  _name = "Device"
+  _format = [
+    ('Library','dd_Library')
+  ]
+DeviceDef = DeviceStruct()
+
+# Unit
+class UnitStruct(AmigaStruct):
+  _name = "Unit"
+  _format = [
+    ('MsgPort','unit_MsgPort'),
+    ('UBYTE','unit_flags'),
+    ('UBYTE','unit_pad'),
+    ('UWORD','unit_OpenCnt')
+  ]
+UnitDef = UnitStruct()
+
+# IORequests
+class IORequestStruct(AmigaStruct):
+  _name = "IORequest"
+  _format = [
+    ('Message','io_Message'),
+    ('Device','io_Device'),
+    ('Unit','io_Unit'),
+    ('UWORD','io_Command'),
+    ('UBYTE','io_Flags'),
+    ('BYTE','io_Error'),
+    ('ULONG','io_Actual'),
+    ('ULONG','io_Length'),
+    ('ULONG','io_Data'),
+    ('ULONG','io_Offset')
+  ]
+IORequestDef = IORequestStruct()

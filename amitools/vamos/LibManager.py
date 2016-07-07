@@ -59,7 +59,20 @@ class LibManager():
     log_libmgr.log(level, "[%10s] %s", func, text)
 
   # ----- common -----
+ 
+  def open_dev(self, name, unit, flags, io, ctx):
+    """ Open a device by name, unit and flags"""
+    lib = self.open_lib(name,0,ctx)
+    if lib != None:
+      io.w_s("io_Device",lib.addr_base_open)
+      return lib
+    else:
+      return None
 
+  def close_dev(self, dev_addr, ctx):
+    lib = self.close_lib(dev_addr, ctx)
+    return lib
+  
   def open_lib(self, name, ver, ctx):
     """open a new library in memory
        return new AmigaLibrary instance that is setup or None if lib was not found
@@ -280,8 +293,8 @@ class LibManager():
 
     # make sure its a library
     res = res_list[0]
-    if res['type'] != AmigaResident.NT_LIBRARY:
-      self.lib_log("load_lib","Resident is not a library!", level=logging.ERROR)
+    if res['type'] != AmigaResident.NT_DEVICE and res['type'] != AmigaResident.NT_LIBRARY:
+      self.lib_log("load_lib","Resident is not a library nor a device!", level=logging.ERROR)
       return None
 
     # resident is ok
@@ -478,7 +491,12 @@ class LibManager():
 
   def _load_fd(self, lib_name):
     """try to load a fd file for a library from vamos data dir"""
-    fd_name = lib_name.replace(".library","_lib.fd")
+    if lib_name.endswith(".device"):
+      is_dev  = True
+      fd_name = lib_name.replace(".device","_lib.fd")
+    else:
+      is_dev  = False
+      fd_name = lib_name.replace(".library","_lib.fd")
     pos = fd_name.rfind(":")
     if pos != -1:
       fd_name = fd_name[pos+1:]
@@ -488,6 +506,9 @@ class LibManager():
       try:
         begin = time.clock()
         fd = FDFormat.read_fd(fd_file)
+        if is_dev:
+          fd.add_call("BeginIO",30,["IORequest"],["a1"])
+          fd.add_call("AbortIO",36,["IORequest"],["a1"])
         end = time.clock()
         delta = end - begin
         self.lib_log("load_fd","loaded fd file '%s' in %fs: base='%s' #funcs=%d" % (fd_file, delta, fd.get_base_name(), len(fd.get_funcs())))
