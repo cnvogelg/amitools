@@ -68,7 +68,7 @@ dos_error_strings = {
     -149:'Process %N ending\n',
     -148:'Requested size too small',
     -147:'Requested size too large',
-    -146:'Current stack size is %ld bytes',
+    -146:'Current stack size is %ld bytes\n',
     -145:'NewShell failed',
     -144:'Missing ELSE or ENDIF',
     -143:'Must be in a command file',
