@@ -115,33 +115,50 @@ def do_build_cmd(args):
     logging.error("Unknown rom_type=%s", rom_type)
     return 1
   # build file list
+  if args.modules is None:
+    logging.error("No modules given!")
+    return 1
   file_list = rb.build_file_list(args.modules)
   # load modules
   bf = BinFmt()
   for f in file_list:
-    # load image
-    if not bf.is_image(f):
-      logging.error("Can't load module '%s'", f)
-      return 2
     name = os.path.basename(f)
-    bin_img = bf.load_image(f)
+    # load image
+    if bf.is_image(f):
+      bin_img = bf.load_image(f)
+      size = bin_img.get_size()
+      data = None
+    else:
+      # load raw data
+      bin_img = None
+      with open(f, "rb") as fh:
+        data = fh.read()
+      size = len(data)
 
     # handle kickety split
-    if kickety_split and rb.cross_kickety_split(bin_img.get_size()):
-      off = rb.get_current_offset()
+    if kickety_split and rb.cross_kickety_split(size):
+      off = rb.get_rom_offset()
       logging.info("@%08x: adding kickety split", off)
       rb.add_kickety_split()
 
+    off = rb.get_rom_offset()
     # add image
-    off = rb.get_current_offset()
-    logging.info("@%08x: adding module '%s'", off, f)
-    e = rb.add_bin_img(name, bin_img)
-    if e is None:
-      logging.error("@%08x: can't add module '%s': %s", off, f, rb.get_error())
-      return 3
+    if bin_img is not None:
+      logging.info("@%08x: adding module '%s'", off, f)
+      e = rb.add_bin_img(name, bin_img)
+      if e is None:
+        logging.error("@%08x: can't add module '%s': %s", off, f, rb.get_error())
+        return 3
+    # add data
+    else:
+      logging.info("@%08x: adding raw data '%s'", off, f)
+      e = rb.add_module(name, data)
+      if e is None:
+        logging.error("@%08x: can't add raw data '%s': %s", off, f, rb.get_error())
+        return 3
 
   # build rom
-  off = rb.get_current_offset()
+  off = rb.get_rom_offset()
   logging.info("@%08x: padding %d bytes with %02x", off, rb.get_bytes_left(), fill_byte)
   rom_data = rb.build_rom()
   if rom_data is None:
@@ -388,7 +405,7 @@ def setup_split_parser(parser):
 
 
 def setup_build_parser(parser):
-  parser.add_argument('modules', default=[], action='append',
+  parser.add_argument('modules', default=None, nargs='+',
                       help='modules or index.txt files to be added')
   parser.add_argument('-o', '--output',
                       help='rom image file to be built')
@@ -446,7 +463,7 @@ def setup_info_parser(parser):
 def setup_patch_parser(parser):
   parser.add_argument('image',
                       help='rom image to be patched')
-  parser.add_argument('patches', default=[], action='append',
+  parser.add_argument('patches', default=None, nargs='+',
                       help='patches to be applied')
   parser.add_argument('-o', '--output',
                       help='rom image file to be built')

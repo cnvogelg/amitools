@@ -7,7 +7,7 @@ from KickRom import KickRomAccess
 
 
 class RomEntryRaw:
-  def __init__(self, name, data, relocs):
+  def __init__(self, name, data, relocs=None):
     self.name = name
     self.data = data
     self.relocs = relocs
@@ -66,16 +66,19 @@ class RomBuilder:
     self.size_bytes = size * 1024
     # state
     self.modules = []
-    self.build_offset = 0
+    self.rom_off = 0
     self.left_bytes = self.size_bytes
-    self.cur_off = 0
+    self.data_off = 0
     self.error = None
 
   def get_error(self):
     return self.error
 
-  def get_current_offset(self):
-    return self.cur_off
+  def get_data_offset(self):
+    return self.data_off
+
+  def get_rom_offset(self):
+    return self.rom_off + self.data_off
 
   def get_bytes_left(self):
     return self.left_bytes
@@ -92,7 +95,7 @@ class RomBuilder:
       return None
     # add entry
     self.modules.append(entry)
-    self.cur_off += n
+    self.data_off += n
     self.left_bytes -= n
     return entry
 
@@ -112,7 +115,7 @@ class RomBuilder:
         files.append(mod)
     return files
 
-  def add_module(self, name, data, relocs):
+  def add_module(self, name, data, relocs=None):
     e = RomEntryRaw(name, data, relocs)
     return self._add_entry(e)
 
@@ -123,8 +126,8 @@ class RomBuilder:
   def build_rom(self):
     rom_data = bytearray(self.size_bytes)
     # fill in modules
-    addr = self.base_addr + self.build_offset
-    off = self.build_offset
+    addr = self.base_addr + self.rom_off
+    off = self.rom_off
     for mod in self.modules:
       n = mod.get_size()
       rom_data[off: off+n] = mod.get_data(addr)
@@ -161,14 +164,14 @@ class KickRomBuilder(RomBuilder):
 
   def cross_kickety_split(self, num_bytes):
     if self.kickety_split:
-      new_off = self.cur_off + num_bytes
-      return self.cur_off < self.split_offset and new_off > self.split_offset
+      new_off = self.data_off + num_bytes
+      return self.data_off < self.split_offset and new_off > self.split_offset
     else:
       return False
 
   def add_kickety_split(self):
     jump_addr = self.base_addr + 2
-    skip = self.split_offset - self.cur_off
+    skip = self.split_offset - self.data_off
     e = RomEntryRomHdr("KicketySplit", skip, jump_addr)
     return self._add_entry(e)
 
@@ -205,7 +208,7 @@ class ExtRomBuilder(RomBuilder):
       self.left_bytes -= KickRomAccess.FOOTER_SIZE
     # account for header
     self.left_bytes -= KickRomAccess.EXT_HEADER_SIZE
-    self.build_offset = KickRomAccess.EXT_HEADER_SIZE
+    self.rom_off = KickRomAccess.EXT_HEADER_SIZE
 
   def build_rom(self):
     rom_data = RomBuilder.build_rom(self)
