@@ -84,6 +84,7 @@ class DosList:
     entry = DosListEntry(name,DosListVolumeDef)
     self._add_entry(entry)
     entry.access.w_s("dol_Type",2) #volume
+    entry.access.w_s("dol_Task",1) #something != 0
     entry.name    = name
     entry.assigns = [name+":"]
     return entry
@@ -92,6 +93,7 @@ class DosList:
     entry = DosListEntry(name,DosListAssignDef)
     self._add_entry(entry)
     entry.access.w_s("dol_Type",1) #directory
+    entry.access.w_s("dol_Task",1) #something != 0
     entry.name    = name
     entry.assigns = assign_names
     return entry

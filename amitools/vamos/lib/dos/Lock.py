@@ -18,25 +18,27 @@ class Lock:
     self.sys_path = sys_path
     self.name = name
     self.exclusive = exclusive
-    self.mem = None
-    self.b_addr  = 0
-    self.key     = 0
-    self.dirent  = None
+    self.mem      = None
+    self.b_addr   = 0
+    self.vol_addr = 0
+    self.key      = 0
+    self.dirent   = None
 
   def __str__(self):
     addr = 0
     if self.mem is not None:
       addr = self.mem.addr
-    return "[Lock:'%s'(ami='%s',sys='%s',key='%s',ex=%d)@%06x=b@%06x]" % (self.name, self.ami_path, self.sys_path, self.key, self.exclusive, addr, self.b_addr)
+    return "[Lock:'%s'(ami='%s',sys='%s',key='%s',ex=%d, vol=%d)@%06x=b@%06x]" % (self.name, self.ami_path, self.sys_path, self.key, self.exclusive, self.vol_addr, addr, self.b_addr)
 
   def alloc(self, alloc, vol_addr,generate_key):
-    self.keygen = generate_key
-    self.key    = self.keygen(self.sys_path)
-    name        = "Lock: %s" % self
-    self.mem    = alloc.alloc_struct(name, FileLockDef)
+    self.keygen   = generate_key
+    self.key      = self.keygen(self.sys_path)
+    name          = "Lock: %s" % self
+    self.mem      = alloc.alloc_struct(name, FileLockDef)
     self.mem.access.w_s("fl_Key"   ,self.key)
     self.mem.access.w_s("fl_Volume",vol_addr)
-    self.b_addr = self.mem.addr >> 2
+    self.b_addr   = self.mem.addr >> 2
+    self.vol_addr = vol_addr
     return self.b_addr
 
   def free(self, alloc):
