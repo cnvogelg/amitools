@@ -429,13 +429,17 @@ class DosLibrary(AmigaLibrary):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr,False)
     log_dos.info("SelectInput(fh=%s)" % fh)
+    cur_in = self.Input(ctx)
     ctx.process.set_input(fh)
+    return cur_in
 
   def SelectOutput(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
     log_dos.info("SelectOutput(fh=%s)" % fh)
+    cur_out = self.Output(ctx)
     ctx.process.set_output(fh)
+    return cur_out
 
   def Open(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
