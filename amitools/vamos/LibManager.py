@@ -173,7 +173,13 @@ class LibManager():
       tr = Trampoline(ctx,"close_lib[%s]" % lib.name)
       self._close_native_lib(lib, ctx, tr)
       if lib.ref_cnt == 0:
-        self._free_native_lib(lib, ctx, tr)
+        pass
+        # THOR: Do not release the library memory. Problem is that
+        # the SAS/C go leaves references to strings to its library
+        # segment pending in the QUAD: file, which then become
+        # invalid if the library is removed. In reality, we should
+        # only flush libs if we are low on memory.
+        #  self._free_native_lib(lib, ctx, tr)
       elif lib.ref_cnt < 0:
         raise VamosInternalError("CloseLib: invalid ref count?!")
       tr.final_rts()

@@ -678,10 +678,10 @@ int m68k_execute(int num_cycles)
 
 #if 0			
 			/* THOR: stupid tracing */
-			printf("PC = 0x%08x "
+			printf("0x%08x: %s - "
 			       "Dx:%08x,%08x,%08x,%08x,%08x,%08x,%08x,%08x "
 			       "Ax:%08x,%08x,%08x,%08x,%08x,%08x,%08x,%08x\n",
-			       REG_PC,
+			       REG_PC,m68ki_disassemble_quick(REG_PC,M68K_CPU_TYPE_68000),
 			       REG_D[0],REG_D[1],REG_D[2],REG_D[3],REG_D[4],REG_D[5],REG_D[6],REG_D[7],
 			       REG_A[0],REG_A[1],REG_A[2],REG_A[3],REG_A[4],REG_A[5],REG_A[6],REG_A[7]);
 #endif

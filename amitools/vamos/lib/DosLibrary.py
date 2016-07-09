@@ -560,7 +560,7 @@ class DosLibrary(AmigaLibrary):
     val = ctx.cpu.r_reg(REG_D2)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr,False)
     ch = fh.ungetc(val)
-    log_dos.info("UnGetC(%s, %d) -> ch=%c (%d)" % (fh, val, ch, ch))
+    log_dos.info("UnGetC(%s, %d) -> ch=%d (%d)" % (fh, val, ch, ch))
     return ch
 
   # ----- StdOut -----
@@ -970,6 +970,7 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("MatchFirst: pat='%s' anchor=%06x strlen=%d flags=%02x-> ok=%s" \
       % (pat, anchor_ptr, mfn.str_len, mfn.flags, mfn.ok))
     if not mfn.ok:
+      self.matches[anchor_ptr] = mfn
       self.setioerr(ctx,ERROR_BAD_TEMPLATE)
       return self.io_err
     log_dos.debug("MatchFirst: %s" % mfn.matcher)
@@ -985,6 +986,8 @@ class DosLibrary(AmigaLibrary):
       log_dos.info("MatchFirst: none found")
       self.matches[anchor_ptr] = mfn
     else:
+      #Dos also creates a matcher on failure...
+      self.matches[anchor_ptr] = mfn
       log_dos.info("MatchFirst: error: %d", self.io_err)
     return self.io_err
 
