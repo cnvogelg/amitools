@@ -137,6 +137,8 @@ def pytest_addoption(parser):
         help="write all vamos output to 'vamos.log'")
     parser.addoption("--gen-data", "-G", action="store_true", default=False,
         help="generate data files by using the output of the test program")
+    parser.addoption("--vamos-options", "-V", action="store", default=None,
+        help="add options to vamos run. separate options by plus: e.g. -V-t+-T")
 
 def pytest_runtest_setup(item):
   flv = item.config.getoption("--flavor")
@@ -152,7 +154,11 @@ def vamos(request):
   dbg = request.config.getoption("--use-debug-bins")
   dump = request.config.getoption("--dump-output")
   gen = request.config.getoption("--gen-data")
+  vopts = request.config.getoption("--vamos-options")
+  if vopts is not None:
+    vopts = vopts.split('+')
   return VamosTestRunner(request.param,
     use_debug_bins=dbg,
     dump_output=dump,
-    generate_data=gen)
+    generate_data=gen,
+    vopts=vopts)

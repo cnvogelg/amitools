@@ -43,16 +43,16 @@ class HunkCommand:
     # abort if hunk parser failed!
     if error_code != Hunk.RESULT_OK:
       print Hunk.result_names[error_code], hunk_file.error_string
-      if args.dump:
+      if self.args.dump:
         print_pretty(hunk_file.hunks)
       self.failed_files.append( (path, "READ: " + hunk_file.error_string) )
       return not self.args.stop
 
     # if verbose then print block structure
-    if args.verbose:
+    if self.args.verbose:
       print
       print "  hunks:    ",hunk_file.get_hunk_summary()
-      if args.dump:
+      if self.args.dump:
         print_pretty(hunk_file.hunks)
       print "  type:     ",
 
@@ -67,13 +67,13 @@ class HunkCommand:
     print Hunk.type_names[hunk_file.type],
 
     # if verbose then print hunk structure
-    if args.verbose:
+    if self.args.verbose:
       print
       print "  segments: ",hunk_file.get_segment_summary()
       print "  overlays: ",hunk_file.get_overlay_segment_summary()
       print "  libs:     ",hunk_file.get_libs_summary()
       print "  units:    ",hunk_file.get_units_summary()
-      if args.dump:
+      if self.args.dump:
         print_pretty(hunk_file.hunks)
     else:
       print
@@ -112,11 +112,12 @@ class HunkCommand:
     scanner = FileScanner(self.process_file,
                           error_handler=error_handler,
                           scanners=scanners)
-    for path in args.files:
+    for path in self.args.files:
       ok = scanner.scan(path)
       if not ok:
         print "ABORTED"
-    return cmd.result()
+        return False
+    return True
 
 # ----- Validator -----
 
@@ -131,6 +132,7 @@ class Validator(HunkCommand):
 class Info(HunkCommand):
 
   def handle_hunk_file(self, path, hunk_file):
+    args = self.args
     # verbose all hunk
     hs = HunkShow.HunkShow(hunk_file, \
       show_relocs=args.show_relocs, show_debug=args.show_debug, \
@@ -192,41 +194,46 @@ class ElfInfo:
     return 0
 
 # ----- main -----
-# call scanner and process all files with selected command
-cmd_map = {
-"validate" : Validator,
-"info" : Info,
-"elfinfo" : ElfInfo,
-"relocate" : Relocate
-}
+def main():
+  # call scanner and process all files with selected command
+  cmd_map = {
+  "validate" : Validator,
+  "info" : Info,
+  "elfinfo" : ElfInfo,
+  "relocate" : Relocate
+  }
 
-parser = argparse.ArgumentParser()
-parser.add_argument('command', help="command: "+",".join(cmd_map.keys()))
-parser.add_argument('files', nargs='+')
-parser.add_argument('-d', '--dump', action='store_true', default=False, help="dump the hunk structure")
-parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
-parser.add_argument('-s', '--stop', action='store_true', default=False, help="stop on error")
-parser.add_argument('-R', '--show-relocs', action='store_true', default=False, help="show relocation entries")
-parser.add_argument('-D', '--show-debug', action='store_true', default=False, help="show debug info entries")
-parser.add_argument('-A', '--disassemble', action='store_true', default=False, help="disassemble code segments")
-parser.add_argument('-S', '--disassemble-start', action='store', type=int, default=0, help="start address for dissassembly")
-parser.add_argument('-x', '--hexdump', action='store_true', default=False, help="dump segments in hex")
-parser.add_argument('-b', '--brief', action='store_true', default=False, help="show only brief information")
-parser.add_argument('-B', '--base-address', action='store', type=int, default=0, help="base address for relocation")
-parser.add_argument('-o', '--use-objdump', action='store_true', default=False, help="disassemble with m68k-elf-objdump instead of vda68k")
-parser.add_argument('-c', '--cpu', action='store', default='68000', help="disassemble for given cpu (objdump only)")
-args = parser.parse_args()
+  parser = argparse.ArgumentParser()
+  parser.add_argument('command', help="command: "+",".join(cmd_map.keys()))
+  parser.add_argument('files', nargs='+')
+  parser.add_argument('-d', '--dump', action='store_true', default=False, help="dump the hunk structure")
+  parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
+  parser.add_argument('-s', '--stop', action='store_true', default=False, help="stop on error")
+  parser.add_argument('-R', '--show-relocs', action='store_true', default=False, help="show relocation entries")
+  parser.add_argument('-D', '--show-debug', action='store_true', default=False, help="show debug info entries")
+  parser.add_argument('-A', '--disassemble', action='store_true', default=False, help="disassemble code segments")
+  parser.add_argument('-S', '--disassemble-start', action='store', type=int, default=0, help="start address for dissassembly")
+  parser.add_argument('-x', '--hexdump', action='store_true', default=False, help="dump segments in hex")
+  parser.add_argument('-b', '--brief', action='store_true', default=False, help="show only brief information")
+  parser.add_argument('-B', '--base-address', action='store', type=int, default=0, help="base address for relocation")
+  parser.add_argument('-o', '--use-objdump', action='store_true', default=False, help="disassemble with m68k-elf-objdump instead of vda68k")
+  parser.add_argument('-c', '--cpu', action='store', default='68000', help="disassemble for given cpu (objdump only)")
+  args = parser.parse_args()
 
-cmd = args.command
-if not cmd_map.has_key(cmd):
-  print "INVALID COMMAND:",cmd
-  print "valid commands are:"
-  for a in cmd_map:
-    print "  ",a
-  sys.exit(1)
-cmd_cls = cmd_map[cmd]
+  cmd = args.command
+  if not cmd_map.has_key(cmd):
+    print "INVALID COMMAND:",cmd
+    print "valid commands are:"
+    for a in cmd_map:
+      print "  ",a
+    return 1
+  cmd_cls = cmd_map[cmd]
 
-# execute command
-cmd = cmd_cls(args)
-res = cmd.run()
-sys.exit(res)
+  # execute command
+  cmd = cmd_cls(args)
+  res = cmd.run()
+  return res
+
+
+if __name__ == '__main__':
+  sys.exit(main())

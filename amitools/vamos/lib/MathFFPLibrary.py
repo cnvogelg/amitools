@@ -4,7 +4,7 @@ from amitools.vamos.Log import *
 
 class MathFFPLibrary(AmigaLibrary):
   name = "mathffp.library"
-  
+
   def __init__(self, config):
     AmigaLibrary.__init__(self, self.name, LibraryDef, config)
 

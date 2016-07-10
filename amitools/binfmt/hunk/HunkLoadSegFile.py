@@ -13,17 +13,68 @@ class HunkSegment:
     self.reloc_blk = None
     self.debug_blks = None
     self.debug_infos = None
-    self.size_longs = 0
-    self.size = 0
 
   def __repr__(self):
-    return "[seg=%s,symbol=%s,reloc=%s,debug=%s,debug_info=%s,size=%d]" % \
+    return "[seg=%s,symbol=%s,reloc=%s,debug=%s,debug_info=%s]" % \
       (self._blk_str(self.seg_blk),
        self._blk_str(self.symbol_blk),
        self._blk_str(self.reloc_blk),
        self._blk_str_list(self.debug_blks),
-       self._debug_infos_str(),
-       self.size)
+       self._debug_infos_str())
+
+  def setup_code(self, data):
+    data, size_longs = self._pad_data(data)
+    self.seg_blk = HunkSegmentBlock(HUNK_CODE, data, size_longs)
+
+  def setup_data(self, data):
+    data, size_longs = self._pad_data(data)
+    self.seg_blk = HunkSegmentBlock(HUNK_DATA, data, size_longs)
+
+  def _pad_data(self, data):
+    size_bytes = len(data)
+    bytes_mod = size_bytes % 4
+    if bytes_mod > 0:
+      add = 4 - bytes_mod
+      data = data + '\0' * add
+    size_long = int((size_bytes + 3)/4)
+    return data, size_long
+
+  def setup_bss(self, size_bytes):
+    size_longs = int((size_bytes + 3)/4)
+    self.seg_blk = HunkSegmentBlock(HUNK_BSS, None, size_longs)
+
+  def setup_relocs(self, relocs, force_long=False):
+    """relocs: ((hunk_num, (off1, off2, ...)), ...)"""
+    if force_long:
+      use_short = False
+    else:
+      use_short = self._are_relocs_short(relocs)
+    if use_short:
+      self.reloc_blk = HunkRelocWordBlock(HUNK_RELOC32SHORT, relocs)
+    else:
+      self.reloc_blk = HunkRelocLongBlock(HUNK_ABSRELOC32, relocs)
+
+  def setup_symbols(self, symbols):
+    """symbols: ((name, off), ...)"""
+    self.symbol_blk = HunkSymbolBlock(symbols)
+
+  def setup_debug(self, debug_info):
+    if self.debug_infos is None:
+      self.debug_infos = []
+    self.debug_infos.append(debug_info)
+    hd = HunkDebug()
+    debug_data = hd.encode(debug_info)
+    blk = HunkDebugBlock(debug_data)
+    if self.debug_blks is None:
+      self.debug_blks = []
+    self.debug_blks.append(blk)
+
+  def _are_relocs_short(self, relocs):
+    for hunk_num, offsets in relocs:
+      for off in offsets:
+        if off > 65535:
+          return False
+    return True
 
   def _debug_infos_str(self):
     if self.debug_infos is None:
@@ -75,6 +126,29 @@ class HunkSegment:
       else:
         raise HunkParseError("invalid hunk block")
 
+  def create(self, blocks):
+    # already has blocks?
+    if self.blocks is not None:
+      blocks += self.blocks
+      return self.seg_blk.size_longs
+    # start with segment block
+    if self.seg_blk is None:
+      raise HunkParseError("no segment block!")
+    self.blocks = [self.seg_blk]
+    # has relocations
+    if self.reloc_blk is not None:
+      self.blocks.append(self.reloc_blk)
+    # has debug?
+    if self.debug_blks is not None:
+      self.blocks += self.debug_blks
+    # has symbols?
+    if self.symbol_blk is not None:
+      self.blocks.append(self.symbol_blk)
+    # store blocks
+    blocks += self.blocks
+    # return size of segment
+    return self.seg_blk.size_longs
+
 
 class HunkLoadSegFile:
   """manage a LoadSeg() hunk file starting with HUNK_HEADER"""
@@ -84,6 +158,9 @@ class HunkLoadSegFile:
 
   def get_segments(self):
     return self.segments
+
+  def add_segment(self, seg):
+    self.segments.append(seg)
 
   def parse_block_file(self, bf):
     """assign hunk blocks into segments"""
@@ -154,6 +231,22 @@ class HunkLoadSegFile:
       self.segments[i].size_longs = hdr_blk.hunk_table[i]
       self.segments[i].size = self.segments[i].size_longs * 4
 
+  def create_block_file(self):
+    """create a HunkBlockFile from the segments given"""
+    # setup header block
+    self.hdr_blk = HunkHeaderBlock()
+    blks = [self.hdr_blk]
+    sizes = []
+    for seg in self.segments:
+      size = seg.create(blks)
+      sizes.append(size)
+      # add HUNK_END
+      blks.append(HunkEndBlock())
+    # finally setup header
+    self.hdr_blk.setup(sizes)
+    # create HunkBlockFile
+    return HunkBlockFile(blks)
+
 
 # mini test
 if __name__ == '__main__':
@@ -165,3 +258,18 @@ if __name__ == '__main__':
     lsf = HunkLoadSegFile()
     lsf.parse_block_file(bf)
     print(lsf.get_segments())
+    # write back
+    new_bf = lsf.create_block_file()
+    new_bf.write_path("a.out")
+    # compare read and written stream
+    with open(a, "rb") as fh:
+      data = fh.read()
+    with open("a.out", "rb") as fh:
+      new_data = fh.read()
+    if len(data) != len(new_data):
+      print("MISMATCH", len(data), len(new_data))
+    else:
+      for i in xrange(len(data)):
+        if data[i] != new_data[i]:
+          print("MISMATCH @%x" % i)
+      print("OK")

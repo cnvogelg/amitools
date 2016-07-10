@@ -88,7 +88,7 @@ class DosList:
     entry.name    = name
     entry.assigns = [name+":"]
     return entry
-  
+
   def add_assign(self, name, assign_names):
     entry = DosListEntry(name,DosListAssignDef)
     self._add_entry(entry)
@@ -109,8 +109,8 @@ class DosList:
       #print "*** Entry %s, Name address is %s,%s" % (entry.mem,name_addr,self.mem.access.r_bstr(name_addr))
       for dirs in entry.assigns:
         lock = lock_mgr.create_lock(None,dirs,False)
-        if lock == None:
-          print "%s does not exist" % dirs
+        if lock is None:
+          log_doslist.warning("%s does not exist", dirs)
         else:
           entry.locks.append(lock)
           if first:
@@ -147,7 +147,7 @@ class DosList:
       elif t == 2 and flags & self.LDF_VOLUMES:
         return entry
       entry = entry.next
-    return None  
+    return None
 
   def lock_dos_list(self,flags):
     # Yes, this algorithm is really the one in the

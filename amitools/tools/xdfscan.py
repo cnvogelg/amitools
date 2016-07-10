@@ -52,7 +52,7 @@ def scan(path, args):
     return scan_dir(path, args)
   elif os.path.isfile(path):
     return scan_file(path, args)
-  
+
 def scan_dir(path, args):
   for name in sorted(os.listdir(path)):
     epath = os.path.join(path, name)
@@ -71,7 +71,7 @@ def check_extension(path, args):
     if path.endswith(a):
       return True
   return False
-  
+
 def scan_file(path, args):
   if not check_extension(path, args):
     return 0
@@ -81,7 +81,7 @@ def scan_file(path, args):
     ret_str = ""
     stay = True
 
-    # create a block device for image file 
+    # create a block device for image file
     blkdev = factory.open(path, read_only=True)
 
     # create validator
@@ -99,17 +99,17 @@ def scan_file(path, args):
         if bootable:
           res.append("boot")
         else:
-          res.append("    ")        
+          res.append("    ")
         # invalid root
         res.append("nofs")
       else:
-        # 3. scan tree   
+        # 3. scan tree
         v.scan_dir_tree()
         # 4. scan files
         v.scan_files()
         # 5. scan_bitmap
         v.scan_bitmap()
-        
+
         # summary
         e, w = v.get_summary()
         if w > 0:
@@ -163,9 +163,11 @@ def main():
     ret = scan(i, args)
     if ret != 0:
       break
-  sys.exit(ret)
+  return ret
 
-try:
-  main()
-except KeyboardInterrupt, e:
-  print "aborting..."
+
+if __name__ == '__main__':
+  try:
+    sys.exit(main())
+  except KeyboardInterrupt, e:
+    print "aborting..."

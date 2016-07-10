@@ -3,12 +3,12 @@ import HunkDisassembler
 from amitools.util.HexDump import *
 
 class HunkShow:
-  
+
   def __init__(self, hunk_file, show_relocs=False, show_debug=False, \
                      disassemble=False, disassemble_start=0, hexdump=False, brief=False, \
                      use_objdump=False, cpu='68000'):
     self.hunk_file = hunk_file
-    
+
     # clone file refs
     self.header = hunk_file.header
     self.segments = hunk_file.segments
@@ -17,7 +17,7 @@ class HunkShow:
     self.overlay_segments = hunk_file.overlay_segments
     self.libs = hunk_file.libs
     self.units = hunk_file.units
-    
+
     self.show_relocs=show_relocs
     self.show_debug=show_debug
     self.disassemble=disassemble
@@ -26,7 +26,7 @@ class HunkShow:
     self.cpu = cpu
     self.hexdump=hexdump
     self.brief=brief
-  
+
   def show_segments(self):
     hunk_type = self.hunk_file.type
     if hunk_type == Hunk.TYPE_LOADSEG:
@@ -35,7 +35,7 @@ class HunkShow:
       self.show_unit_segments()
     elif hunk_type == Hunk.TYPE_LIB:
       self.show_lib_segments()
-      
+
   def show_lib_segments(self):
     for lib in self.libs:
       print "Library #%d" % lib['lib_no']
@@ -43,20 +43,20 @@ class HunkShow:
         self.print_unit(unit['unit_no'], unit['name'])
         for segment in unit['segments']:
           self.show_segment(segment, unit['segments'])
-      
+
   def show_unit_segments(self):
     for unit in self.units:
       self.print_unit(unit['unit_no'], unit['name'])
       for segment in unit['segments']:
         self.show_segment(segment, unit['segments'])
-  
+
   def show_loadseg_segments(self):
     # header + segments
     if not self.brief:
       self.print_header(self.header)
     for segment in self.segments:
       self.show_segment(segment, self.segments)
-    
+
     # overlay
     if self.overlay != None:
       print "Overlay"
@@ -66,7 +66,7 @@ class HunkShow:
           self.print_header(self.overlay_headers[o])
         for segment in self.overlay_segments[o]:
           self.show_segment(segment, self.overlay_segments[o])
-    
+
   def show_segment(self, hunk, seg_list):
     main = hunk[0]
 
@@ -87,9 +87,9 @@ class HunkShow:
       alloc_size = main['alloc_size']
     else:
       alloc_size = None
-    
+
     self.print_segment_header(hunk_no, type_name, size, name, data_file_offset, hunk_file_offset, alloc_size)
-    if self.hexdump:
+    if self.hexdump and 'data' in main:
       print_hex(main['data'],indent=8)
 
     for extra in hunk[1:]:
@@ -118,7 +118,7 @@ class HunkShow:
       if not self.brief:
         for d in info['defs']:
           self.print_symbol(d['value'],d['name'],"(type %d)" % d['type'])
- 
+
   def show_extra_hunk(self, hunk):
     hunk_type = hunk['type']
     if hunk_type in Hunk.reloc_hunks:
@@ -126,22 +126,22 @@ class HunkShow:
       self.print_extra("reloc","%s #%d" % (type_name, len(hunk['reloc'])))
       if not self.brief:
         self.show_reloc_hunk(hunk)
-        
+
     elif hunk_type == Hunk.HUNK_DEBUG:
       self.print_extra("debug","%s  offset=%08x" % (hunk['debug_type'], hunk['debug_offset']))
       if not self.brief:
         self.show_debug_hunk(hunk)
-    
+
     elif hunk_type == Hunk.HUNK_SYMBOL:
       self.print_extra("symbol","#%d" % (len(hunk['symbols'])))
       if not self.brief:
         self.show_symbol_hunk(hunk)
-    
+
     elif hunk_type == Hunk.HUNK_EXT:
       self.print_extra("ext","def #%d  ref #%d  common #%d" % (len(hunk['ext_def']),len(hunk['ext_ref']),len(hunk['ext_common'])))
       if not self.brief:
         self.show_ext_hunk(hunk)
-    
+
     else:
       self.print_extra("extra","%s" % hunk['type_name'])
 
@@ -167,11 +167,11 @@ class HunkShow:
     else:
       if self.show_debug:
         print_hex(hunk['data'],indent=8)
-    
+
   def show_symbol_hunk(self, hunk):
     for symbol in hunk['symbols']:
       self.print_symbol(symbol[1],symbol[0],"")
-      
+
   def show_ext_hunk(self, hunk):
     # definition
     for ext in hunk['ext_def']:
@@ -196,7 +196,7 @@ class HunkShow:
 
   def print_extra(self, type_name, info):
     print "\t\t%8s  %s" % (type_name, info)
-    
+
   def print_extra_sub(self, text):
     print "\t\t\t%s" % text
 
@@ -218,8 +218,8 @@ class HunkShow:
 
   def print_unit(self, no, name):
     print "  #%03d  UNIT  %s" % (no, name)
-        
 
 
 
-      
+
+

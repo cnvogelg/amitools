@@ -59,7 +59,7 @@ class LibManager():
     log_libmgr.log(level, "[%10s] %s", func, text)
 
   # ----- common -----
- 
+
   def open_dev(self, name, unit, flags, io, ctx):
     """ Open a device by name, unit and flags"""
     lib = self.open_lib(name,0,ctx)
@@ -72,7 +72,7 @@ class LibManager():
   def close_dev(self, dev_addr, ctx):
     lib = self.close_lib(dev_addr, ctx)
     return lib
-  
+
   def open_lib(self, name, ver, ctx):
     """open a new library in memory
        return new AmigaLibrary instance that is setup or None if lib was not found

@@ -360,7 +360,7 @@ class RDisk:
     pb = PartitionBlock(self.rawblk, blk_num)
     # setup dos env
     heads = self.rdb.phy_drv.heads
-    blk_per_trk = self.rdb.phy_drv.secs * heads
+    blk_per_trk = self.rdb.phy_drv.secs
     dos_env = PartitionDosEnv(low_cyl=cyl_range[0], high_cyl=cyl_range[1], surfaces=heads, \
                               blk_per_trk=blk_per_trk, dos_type=dos_type, boot_pri=boot_pri)
     self._adjust_dos_env(dos_env, more_dos_env)
@@ -380,7 +380,8 @@ class RDisk:
     # flush out all changes before we read again
     self.rawblk.flush()
     # create partition object and add to partition list
-    p = Partition(self.rawblk, blk_num, len(self.parts), blk_per_trk, self)
+    blk_per_cyl = blk_per_trk * heads
+    p = Partition(self.rawblk, blk_num, len(self.parts), blk_per_cyl, self)
     p.read()
     self.parts.append(p)
     return True

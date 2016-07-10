@@ -31,12 +31,9 @@ class Partition:
     self.valid = True
     return True
 
-  def create_blkdev(self, auto_close_rdisk=False):
+  def create_blkdev(self, auto_close_rdb_blkdev=False):
     """create a block device for accessing this partition"""
-    rdisk = None
-    if auto_close_rdisk:
-      rdisk = self.rdisk
-    return PartBlockDevice(self.blkdev, self.part_blk, rdisk)
+    return PartBlockDevice(self.blkdev, self.part_blk, auto_close_rdb_blkdev)
 
   def write(self):
     self.part_blk.write()

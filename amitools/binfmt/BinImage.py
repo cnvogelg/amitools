@@ -72,9 +72,10 @@ class SymbolTable:
 
 
 class DebugLineEntry:
-  def __init__(self, offset, src_line):
+  def __init__(self, offset, src_line, flags=0):
     self.offset = offset
     self.src_line = src_line
+    self.flags = flags
     self.file_ = None
 
   def get_offset(self):
@@ -83,14 +84,18 @@ class DebugLineEntry:
   def get_src_line(self):
     return self.src_line
 
+  def get_flags(self):
+    return self.flags
+
   def get_file(self):
     return self.file_
 
 
 class DebugLineFile:
-  def __init__(self, src_file, dir_name=None):
+  def __init__(self, src_file, dir_name=None, base_offset=0):
     self.src_file = src_file
     self.dir_name = dir_name
+    self.base_offset = base_offset
     self.entries = []
 
   def get_src_file(self):
@@ -101,6 +106,9 @@ class DebugLineFile:
 
   def get_entries(self):
     return self.entries
+
+  def get_base_offset(self):
+    return self.base_offset
 
   def add_entry(self, e):
     self.entries.append(e)
@@ -143,11 +151,11 @@ class Segment:
       symtab = ""
     # debug_line
     if self.debug_line is not None:
-      src_files = self.debug_line.get_src_files()
+      dl_files = self.debug_line.get_files()
       file_info = []
-      for src_file in src_files:
-        n = len(self.debug_line.get_entries(src_file))
-        file_info.append("(%s:#%d)" % (src_file, n))
+      for dl_file in dl_files:
+        n = len(dl_file.entries)
+        file_info.append("(%s:#%d)" % (dl_file.src_file, n))
       debug_line = "debug_line=" + ",".join(file_info)
     else:
       debug_line = ""
@@ -242,6 +250,12 @@ class BinImage:
 
   def __str__(self):
     return "<%s>" % ",".join(map(str,self.segments))
+
+  def get_size(self):
+    total_size = 0
+    for seg in self.segments:
+      total_size += seg.get_size()
+    return total_size
 
   def add_segment(self, seg):
     seg.id = len(self.segments)

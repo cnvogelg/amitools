@@ -3,7 +3,7 @@
 # build programs with the following compilers:
 # VBCC, GCC, AROS_GCC, SASC
 
-SOURCES_C = vprintf.c mem.c
+SOURCES_C = vprintf.c mem.c util_muldiv.c
 
 VPATH = src
 
@@ -12,6 +12,7 @@ BUILD_DIR ?= bin
 
 # external data
 SASC_INSTALL_DIR ?= $(HOME)/amiga/shared/sc
+export SASC_INSTALL_DIR
 
 # compilers
 VBCC = vc

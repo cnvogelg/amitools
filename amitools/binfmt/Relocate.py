@@ -33,40 +33,58 @@ class Relocate:
       addr += s + padding
     return addrs
 
-  def relocate(self, addrs):
+  def relocate_one_block(self, base_addr, padding=0):
+    total_size = self.get_total_size(padding)
+    data = bytearray(total_size)
+    addrs = self.get_seq_addrs(base_addr, padding)
+    offset = 0
+    segs = self.bin_img.get_segments()
+    for segment in segs:
+      self._copy_data(data, segment, offset)
+      self._reloc_data(data, segment, addrs, offset)
+      offset += segment.size + padding
+    return data
+
+  def relocate(self, addrs, in_data=None):
     """perform relocations on segments and return relocated data"""
-    datas = []
     segs = self.bin_img.get_segments()
     if len(segs) != len(addrs):
       raise ValueError("addrs != segments")
+    datas = []
     for segment in segs:
-      # allocate segment data
-      size = segment.size
-      data = bytearray(size)
-      src_data = segment.data
-      if src_data is not None:
-        src_len = len(src_data)
-        data[0:src_len] = src_data
-
-      if self.verbose:
-        print("#%02d @%06x +%06x" % (segment.id, addrs[segment.id], size))
-
-      # find relocations
-      to_segs = segment.get_reloc_to_segs()
-      for to_seg in to_segs:
-        # get target segment's address
-        to_id = to_seg.id
-        to_addr = addrs[to_id]
-        # get relocations
-        reloc = segment.get_reloc(to_seg)
-        for r in reloc.get_relocs():
-          self._reloc(segment.id, data, r, to_addr, to_id)
+      # allocate new buffer
+      data = bytearray(segment.size)
+      self._copy_data(data, segment)
+      self._reloc_data(data, segment, addrs)
       datas.append(data)
     return datas
 
-  def _reloc(self, my_id, data, reloc, to_addr, to_id):
+  def _copy_data(self, data, segment, offset=0):
+    # allocate segment data
+    size = segment.size
+    src_data = segment.data
+    if src_data is not None:
+      src_len = len(src_data)
+      data[offset:src_len+offset] = src_data
+
+    if self.verbose:
+      print("#%02d @%06x +%06x" % (segment.id, addrs[segment.id], size))
+
+  def _reloc_data(self, data, segment, addrs, offset=0):
+    # find relocations
+    to_segs = segment.get_reloc_to_segs()
+    for to_seg in to_segs:
+      # get target segment's address
+      to_id = to_seg.id
+      to_addr = addrs[to_id]
+      # get relocations
+      reloc = segment.get_reloc(to_seg)
+      for r in reloc.get_relocs():
+        self._reloc(segment.id, data, r, to_addr, to_id, offset)
+
+  def _reloc(self, my_id, data, reloc, to_addr, to_id, extra_offset):
     """relocate one entry"""
-    offset = reloc.get_offset()
+    offset = reloc.get_offset() + extra_offset
     delta = self._read_long(data, offset) + reloc.addend
     addr = to_addr + delta
     self._write_long(data, offset, addr)
@@ -95,3 +113,4 @@ if __name__ == '__main__':
       r = Relocate(bi, True)
       addrs = r.get_seq_addrs(0)
       datas = r.relocate(addrs)
+      data = r.relocate_one_block(0)

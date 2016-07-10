@@ -4,7 +4,7 @@ from amitools.vamos.Log import *
 
 class MathIEEEDoubBasLibrary(AmigaLibrary):
   name = "mathieeedoubbas.library"
-  
+
   def __init__(self, config):
     AmigaLibrary.__init__(self, self.name, LibraryDef, config)
 

@@ -17,7 +17,7 @@ class HunkParseError(Exception):
 class HunkBlock:
   """Base class for all hunk block types"""
 
-  blk_id = 0
+  blk_id = 0xdeadbeef
   sub_offset = None # used inside LIB
 
   def _read_long(self, f):
@@ -89,6 +89,16 @@ class HunkHeaderBlock(HunkBlock):
     self.last_hunk = 0
     self.hunk_table = []
 
+  def setup(self, hunk_sizes):
+    # easy setup for given number of hunks
+    n = len(hunk_sizes)
+    if n == 0:
+      raise HunkParseError("No hunks for HUNK_HEADER given")
+    self.table_size = n
+    self.first_hunk = 0
+    self.last_hunk = n-1
+    self.hunk_table = hunk_sizes
+
   def parse(self, f):
     # parse resident library names (AOS 1.x only)
     while True:
@@ -130,9 +140,11 @@ class HunkHeaderBlock(HunkBlock):
 
 class HunkSegmentBlock(HunkBlock):
   """HUNK_CODE, HUNK_DATA, HUNK_BSS"""
-  def __init__(self):
-    self.data = None
-    self.size_longs = 0
+  def __init__(self, blk_id=None, data=None, size_longs=0):
+    if blk_id is not None:
+      self.blk_id = blk_id
+    self.data = data
+    self.size_longs = size_longs
 
   def parse(self, f):
     size = self._read_long(f)
@@ -148,9 +160,14 @@ class HunkSegmentBlock(HunkBlock):
 
 class HunkRelocLongBlock(HunkBlock):
   """HUNK_ABSRELOC32 - relocations stored in longs"""
-  def __init__(self):
+  def __init__(self, blk_id=None, relocs=None):
+    if blk_id is not None:
+      self.blk_id = blk_id
     # map hunk number to list of relocations (i.e. byte offsets in long)
-    self.relocs = []
+    if relocs is None:
+      self.relocs = []
+    else:
+      self.relocs = relocs
 
   def parse(self, f):
     while True:
@@ -176,21 +193,26 @@ class HunkRelocLongBlock(HunkBlock):
 
 class HunkRelocWordBlock(HunkBlock):
   """HUNK_RELOC32SHORT - relocations stored in words"""
-  def __init__(self):
+  def __init__(self, blk_id=None, relocs=None):
+    if blk_id is not None:
+      self.blk_id = blk_id
     # list of tuples (hunk_no, [offsets])
-    self.relocs = []
+    if relocs is None:
+      self.relocs = []
+    else:
+      self.relocs = relocs
 
   def parse(self, f):
     num_words = 0
     while True:
-      num = self._read_word(f)
-      num_words = num_words + 1
-      if num == 0:
+      num_offs = self._read_word(f)
+      num_words += 1
+      if num_offs == 0:
         break
       hunk_num = self._read_word(f)
-      num_words = num_words + num + 1
+      num_words += num_offs + 1
       offsets = []
-      for i in xrange(num):
+      for i in xrange(num_offs):
         off = self._read_word(f)
         offsets.append(off)
       self.relocs.append((hunk_num, offsets))
@@ -198,9 +220,27 @@ class HunkRelocWordBlock(HunkBlock):
     if num_words % 2 == 1:
       self._read_word(f)
 
+  def write(self, f):
+    num_words = 0
+    for hunk_num, offsets in self.relocs:
+      num_offs = len(offsets)
+      self._write_word(f, num_offs)
+      self._write_word(f, hunk_num)
+      for i in xrange(num_offs):
+        self._write_word(f, offsets[i])
+      num_words += 2 + num_offs
+    # end
+    self._write_word(f, 0)
+    num_words += 1
+    # padding?
+    if num_words % 2 == 1:
+      self._write_word(f, 0)
+
 
 class HunkEndBlock(HunkBlock):
   """HUNK_END"""
+  blk_id = HUNK_END
+
   def parse(self, f):
     pass
   def write(self, f):
@@ -209,6 +249,8 @@ class HunkEndBlock(HunkBlock):
 
 class HunkOverlayBlock(HunkBlock):
   """HUNK_OVERLAY"""
+  blk_id = HUNK_OVERLAY
+
   def __init__(self):
     self.data = None
 
@@ -223,6 +265,8 @@ class HunkOverlayBlock(HunkBlock):
 
 class HunkBreakBlock(HunkBlock):
   """HUNK_BREAK"""
+  blk_id = HUNK_BREAK
+
   def parse(self, f):
     pass
   def write(self, f):
@@ -231,8 +275,10 @@ class HunkBreakBlock(HunkBlock):
 
 class HunkDebugBlock(HunkBlock):
   """HUNK_DEBUG"""
-  def __init__(self):
-    self.debug_data = None
+  blk_id = HUNK_DEBUG
+
+  def __init__(self, debug_data=None):
+    self.debug_data = debug_data
 
   def parse(self, f):
     num_longs = self._read_long(f)
@@ -247,8 +293,13 @@ class HunkDebugBlock(HunkBlock):
 
 class HunkSymbolBlock(HunkBlock):
   """HUNK_SYMBOL"""
-  def __init__(self):
-    self.symbols = []
+  blk_id = HUNK_SYMBOL
+
+  def __init__(self, symbols=None):
+    if symbols is None:
+      self.symbols = []
+    else:
+      self.symbols = symbols
 
   def parse(self, f):
     while True:
@@ -267,6 +318,8 @@ class HunkSymbolBlock(HunkBlock):
 
 class HunkUnitBlock(HunkBlock):
   """HUNK_UNIT"""
+  blk_id = HUNK_UNIT
+
   def __init__(self):
     self.name = None
 
@@ -279,6 +332,8 @@ class HunkUnitBlock(HunkBlock):
 
 class HunkNameBlock(HunkBlock):
   """HUNK_NAME"""
+  blk_id = HUNK_NAME
+
   def __init__(self):
     self.name = None
 
@@ -301,6 +356,8 @@ class HunkExtEntry:
 
 class HunkExtBlock(HunkBlock):
   """HUNK_EXT"""
+  blk_id = HUNK_EXT
+
   def __init__(self):
     self.entries = []
 
@@ -353,6 +410,8 @@ class HunkExtBlock(HunkBlock):
 
 class HunkLibBlock(HunkBlock):
   """HUNK_LIB"""
+  blk_id = HUNK_LIB
+
   def __init__(self):
     self.blocks = []
     self.offsets = []
@@ -440,6 +499,8 @@ class HunkIndexSymbolDef:
 
 class HunkIndexBlock(HunkBlock):
   """HUNK_INDEX"""
+  blk_id = HUNK_INDEX
+
   def __init__(self):
     self.strtab = None
     self.units = []
@@ -562,8 +623,11 @@ hunk_block_type_map = {
 
 class HunkBlockFile:
   """The HunkBlockFile holds the list of blocks found in a hunk file"""
-  def __init__(self):
-    self.blocks = []
+  def __init__(self, blocks=None):
+    if blocks is None:
+      self.blocks = []
+    else:
+      self.blocks = blocks
 
   def get_blocks(self):
     return self.blocks
@@ -609,11 +673,14 @@ class HunkBlockFile:
     self.write(f)
     f.close()
 
-  def write(self, f):
+  def write(self, f, isLoadSeg=False):
     """write a hunk file back to file object"""
     for block in self.blocks:
       # write block id
       block_id = block.blk_id
+      # convert id
+      if isLoadSeg and block_id == 1020:
+        block_id = 1015
       block_id_raw = struct.pack(">I",block_id)
       f.write(block_id_raw)
       # write block itself
@@ -677,9 +744,10 @@ if __name__ == '__main__':
     hbf = HunkBlockFile()
     hbf.read(fobj, True)
     fobj.close()
+    print(hbf.blocks)
     # write to new string stream
     nobj = StringIO.StringIO()
-    hbf.write(nobj)
+    hbf.write(nobj, True)
     new_data = nobj.getvalue()
     nobj.close()
     # dump debug data
@@ -692,7 +760,7 @@ if __name__ == '__main__':
     else:
       for i in xrange(len(data)):
         if data[i] != new_data[i]:
-          print("MISMATCH @", i)
+          print("MISMATCH @%x" % i)
       print("OK")
     # detect type of file
     t = hbf.detect_type()

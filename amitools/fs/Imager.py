@@ -31,7 +31,7 @@ class Imager:
     if type(u) != unicode:
       raise ValueError("to_path_str: must pass a unicode string")
     return u.encode(self.path_encoding)
-    
+
   def from_path_str(self, s):
     """convert a OS path name encoded string to unicode"""
     if type(s) != str:
@@ -44,7 +44,7 @@ class Imager:
       return u
 
   # ----- unpack -----
-  
+
   def unpack(self, volume, out_path):
     # check for volume path
     vol_name = volume.name.get_unicode()
@@ -81,16 +81,16 @@ class Imager:
     f = open(blkdev_path,"wb")
     f.write("%s\n" % volume.blkdev.get_chs_str())
     f.close()
-    
+
   def unpack_root(self, volume, vol_path):
     self.unpack_dir(volume.get_root_dir(), vol_path)
-  
+
   def unpack_dir(self, dir, path):
     if not os.path.exists(path):
       os.mkdir(path)
     for e in dir.get_entries():
       self.unpack_node(e, path)
-  
+
   def unpack_node(self, node, path):
     name = node.name.get_unicode_name()
     # store meta info
@@ -114,15 +114,15 @@ class Imager:
       fh.write(data)
       fh.close()
       self.total_bytes += len(data)
-  
+
   # ----- pack -----
-  
-  def pack(self, in_path, image_file, force=True, options=None):
+
+  def pack(self, in_path, image_file, force=True, options=None, dos_type=None):
     self.pack_begin(in_path)
     blkdev = self.pack_create_blkdev(in_path, image_file, force, options)
     if blkdev == None:
       raise IOError("Can't create block device for image: "+in_path)
-    volume = self.pack_create_volume(in_path, blkdev)
+    volume = self.pack_create_volume(in_path, blkdev, dos_type)
     if not volume.valid:
       raise IOError("Can't create volume for image: "+in_path)
     self.pack_root(in_path, volume)
@@ -136,7 +136,7 @@ class Imager:
     if os.path.exists(meta_path):
       self.meta_db = MetaDB()
       self.meta_db.load(meta_path)
-      
+
   def pack_end(self, in_path, volume):
     boot_code_path = in_path + ".bootcode"
     if os.path.exists(boot_code_path):
@@ -151,7 +151,7 @@ class Imager:
         bb.write()
       else:
         raise IOError("Invalid Boot Code")
-  
+
   def pack_create_blkdev(self, in_path, image_file, force=True, options=None):
     # try to read options from blkdev file
     if options == None or len(options) == 0:
@@ -164,12 +164,13 @@ class Imager:
         f.close()
     f = BlkDevFactory()
     return f.create(image_file, force=force, options=options)
-    
-  def pack_create_volume(self, in_path, blkdev):
+
+  def pack_create_volume(self, in_path, blkdev, dos_type=None):
     if self.meta_db != None:
       name = self.meta_db.get_volume_name()
       meta_info = self.meta_db.get_root_meta_info()
-      dos_type = self.meta_db.get_dos_type()
+      if dos_type is None:
+        dos_type = self.meta_db.get_dos_type()
     else:
       # try to derive volume name from image name
       if in_path == None or in_path == "":
@@ -179,14 +180,15 @@ class Imager:
         in_path = in_path[:-1]
       name = self.from_path_str(os.path.basename(in_path))
       meta_info = None
-      dos_type = DosType.DOS0
+      if dos_type is None:
+        dos_type = DosType.DOS0
     volume = ADFSVolume(blkdev)
     volume.create(FSString(name), meta_info, dos_type=dos_type)
     return volume
-  
+
   def pack_root(self, in_path, volume):
     self.pack_dir(in_path, volume.get_root_dir())
-  
+
   def pack_dir(self, in_path, parent_node):
     path = os.path.abspath(in_path)
     if not os.path.exists(path):
@@ -194,7 +196,7 @@ class Imager:
     for name in os.listdir(in_path):
       sub_path = os.path.join(in_path, name)
       self.pack_entry(sub_path, parent_node)
-      
+
   def pack_entry(self, in_path, parent_node):
     ami_name = self.from_path_str(os.path.basename(in_path))
     # retrieve meta info for path from DB

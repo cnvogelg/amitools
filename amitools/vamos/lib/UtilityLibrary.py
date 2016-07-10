@@ -4,7 +4,7 @@ from amitools.vamos.Log import *
 
 class UtilityLibrary(AmigaLibrary):
   name = "utility.library"
-  
+
   def __init__(self, config):
     AmigaLibrary.__init__(self, self.name, LibraryDef, config)
 
@@ -25,7 +25,7 @@ class UtilityLibrary(AmigaLibrary):
     c = (a * b) & 0xffffffff
     log_utility.info("UMult32(a=%u, b=%u) => %u", a, b, c)
     return c
-  
+
   def SMult32(self, ctx):
     # Z_{2^32} is a ring. It does not matter whether we multiply signed or unsigned
     a = ctx.cpu.r_reg(REG_D0)
@@ -49,7 +49,7 @@ class UtilityLibrary(AmigaLibrary):
       return +1
     else:
       return 0
-    
+
   def Strnicmp(self, ctx):
     str1_addr = ctx.cpu.r_reg(REG_A0)
     str2_addr = ctx.cpu.r_reg(REG_A1)
@@ -62,5 +62,5 @@ class UtilityLibrary(AmigaLibrary):
       return +1
     else:
       return 0
-    
-  
+
+
