@@ -9,7 +9,9 @@ class LabelRange:
     self.name = name
     self.addr = addr
     self.size = size
-    self.end = addr + size
+    self.end  = addr + size
+    self.next = None
+    self.prev = None
 
   def trace_mem_int(self, mode, width, addr, value, text="", level=logging.DEBUG, addon=""):
     val = self.trace_val_str[width] % value
