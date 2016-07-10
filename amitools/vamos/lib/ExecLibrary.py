@@ -180,6 +180,7 @@ class ExecLibrary(AmigaLibrary):
     if poolid in self._pools:
       pool = self._pools[poolid]
       del self._pools[poolid]
+      pool.__del__()
       del pool
       log_exec.info("DeletePooled: pool 0x%x" % poolid)
     else:

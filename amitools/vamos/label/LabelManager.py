@@ -9,44 +9,88 @@ class LabelManager:
   trace_val_str = ( "%02x      ", "%04x    ", "%08x" )
 
   def __init__(self):
-    self.ranges = []
+    self.first  = None
+    self.last   = None
     self.error_tracker = None # will be set later
 
+  # This is now all done manually with doubly linked
+  # lists. The reason for this is that the python built-in
+  # lists are ill-performing as the list grows larger,
+  # and this is a heavy-duty class.
   def add_label(self, range):
-    self.ranges.append(range)
+    assert range.next == None
+    assert range.prev == None
+    if self.last == None:
+      assert self.first == None
+      self.last  = range
+      self.first = range
+    else:
+      self.last.next = range
+      range.prev = self.last
+      self.last = range
 
   def remove_label(self, range):
-    if range in self.ranges:
-      self.ranges.remove(range)
-    else:
-      # try to find compatible: release all labels within the given range
-      # this is necessary because the label could be part of a puddle
-      # that is released in one go.
-      for r in self.ranges:
-        if r.addr >= range.addr and r.addr + r.size <= range.addr + range.size:
-          self.ranges.remove(r)
-          log_mem_int.log(logging.WARN, "remove_label: got=%s have=%s", range, r)
-          return
-      log_mem_int.log(logging.ERROR, "remove_label: invalid range %s", range)
+    if range.prev != None:
+      range.prev.next = range.next
+    if range.next != None:
+      range.next.prev = range.prev
+    if self.last == range:
+      self.last = range.prev
+    if self.first == range:
+      self.first = range.next
+    range.next = None
+    range.prev = None
 
+  def delete_labels_within(self,addr,size):
+    # try to find compatible: release all labels within the given range
+    # this is necessary because the label could be part of a puddle
+    # that is released in one go.
+    found = False
+    r     = self.first
+    while r != None:
+      if r.addr >= addr and r.addr + r.size <= addr + size:
+        s = r.next
+        log_mem_int.log(logging.WARN, "remove_label: got=%s have=%s", range, r)
+        self.remove_label(r)
+        r = s
+        found = True
+      else:
+        r = r.next
+    return found
+  
   def get_all_labels(self):
-    return self.ranges[:]
+    ranges = []
+    r      = self.first
+    while r != None:
+      ranges.append(r)
+      r = r.next
+    return ranges
 
   def dump(self):
-    for r in self.ranges:
+    r = self.first
+    while r != None:
       print r
+      r = r.next
 
+  # This is called quite often and hence
+  # a bit speed critical. It finds the
+  # range within which the given address
+  # lies.
   def get_label(self, addr):
-    for r in self.ranges:
-      if r.is_inside(addr):
+    r = self.first
+    while r != None:
+      if r.addr <= addr and addr < r.end:
         return r
+      r = r.next
     return None
 
   def get_intersecting_labels(self, addr, size):
     result = []
-    for r in self.ranges:
+    r = self.first
+    while r != None:
       if r.does_intersect(addr,size):
         result.append(r)
+      r = r.next
     return result
 
   def get_label_offset(self, addr):

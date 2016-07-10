@@ -56,7 +56,6 @@ class MemoryAlloc:
     """find best chunk that could take the given alloc
        return: index of chunk in free list or -1 if none found + bytes left in chunk
     """
-    potentials = {}
     chunk = self.free_first
     while chunk != None:
       left = chunk.does_fit(size)
@@ -65,15 +64,12 @@ class MemoryAlloc:
         return (chunk,0)
       # potential candidate: has some bytes left
       elif left > 0:
-        potentials[left] = chunk
+        # Don't make such a hassle. Return the first one that fits.
+        # This function takes too much time.
+        return (chunk,left)
       chunk = chunk.next
     # nothing found?
-    if len(potentials) == 0:
-      return (None,-1)
-    # sort keys
-    keys = sorted(potentials.keys())
-    best = keys[0]
-    return (potentials[best], best)
+    return (None,-1)
 
   def _remove_chunk(self, chunk):
     next = chunk.next
