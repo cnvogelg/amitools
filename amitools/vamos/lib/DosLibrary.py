@@ -429,13 +429,17 @@ class DosLibrary(AmigaLibrary):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr,False)
     log_dos.info("SelectInput(fh=%s)" % fh)
+    cur_in = self.Input(ctx)
     ctx.process.set_input(fh)
+    return cur_in
 
   def SelectOutput(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
     log_dos.info("SelectOutput(fh=%s)" % fh)
+    cur_out = self.Output(ctx)
     ctx.process.set_output(fh)
+    return cur_out
 
   def Open(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
@@ -560,7 +564,7 @@ class DosLibrary(AmigaLibrary):
     val = ctx.cpu.r_reg(REG_D2)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr,False)
     ch = fh.ungetc(val)
-    log_dos.info("UnGetC(%s, %d) -> ch=%c (%d)" % (fh, val, ch, ch))
+    log_dos.info("UnGetC(%s, %d) -> ch=%d (%d)" % (fh, val, ch, ch))
     return ch
 
   # ----- StdOut -----
@@ -771,7 +775,7 @@ class DosLibrary(AmigaLibrary):
       raise UnsupportedFeatureError("Lock: mode=%x" % mode)
 
     lock = self.lock_mgr.create_lock(self.get_current_dir(), name, lock_exclusive)
-    log_dos.info("Lock: '%s' exc=%s -> %s" % (name, lock_exclusive, lock))
+    log_dos.info("Lock: (%s) '%s' exc=%s -> %s" % (self.get_current_dir(), name, lock_exclusive, lock))
     if lock == None:
       self.setioerr(ctx,ERROR_OBJECT_NOT_FOUND)
       return 0
@@ -970,6 +974,7 @@ class DosLibrary(AmigaLibrary):
     log_dos.info("MatchFirst: pat='%s' anchor=%06x strlen=%d flags=%02x-> ok=%s" \
       % (pat, anchor_ptr, mfn.str_len, mfn.flags, mfn.ok))
     if not mfn.ok:
+      self.matches[anchor_ptr] = mfn
       self.setioerr(ctx,ERROR_BAD_TEMPLATE)
       return self.io_err
     log_dos.debug("MatchFirst: %s" % mfn.matcher)
@@ -985,6 +990,8 @@ class DosLibrary(AmigaLibrary):
       log_dos.info("MatchFirst: none found")
       self.matches[anchor_ptr] = mfn
     else:
+      #Dos also creates a matcher on failure...
+      self.matches[anchor_ptr] = mfn
       log_dos.info("MatchFirst: error: %d", self.io_err)
     return self.io_err
 
@@ -1111,7 +1118,7 @@ class DosLibrary(AmigaLibrary):
     else:
       addr = 0
     # fill result array and memory
-    args.generate_result(ctx.mem.access,addr,array_ptr)
+    resarray = args.generate_result(ctx.mem.access,addr,array_ptr)
     # alloc RD_Args
     if rdargs_ptr == 0:
       rdargs = ctx.alloc.alloc_struct("RDArgs", RDArgsDef)
@@ -1125,7 +1132,7 @@ class DosLibrary(AmigaLibrary):
     self.rdargs[rdargs.addr] = (rdargs, own)
     # result
     self.setioerr(ctx,NO_ERROR)
-    log_dos.info("ReadArgs: matched! result_mem=%06x rdargs=%s", addr, rdargs)
+    log_dos.info("ReadArgs: matched! result_mem=%06x rdargs=%s", addr, resarray)
     return rdargs.addr
 
   def FreeArgs(self, ctx):
@@ -1272,11 +1279,17 @@ class DosLibrary(AmigaLibrary):
       #Push-back the commands into the input buffer.
       new_input.setbuf(cmd)
       new_stdin = self.file_mgr.open(None,"*","rw")
+      outtag    = tag_list.find_tag('SYS_Output')
       # print "setting new input to %s" % new_input
       # and install this as current input. The shell will read from that
       # instead until it hits the EOF
       input_fhsi  = cli.r_s("cli_StandardInput")
       input_fhci  = cli.r_s("cli_CurrentInput")
+      if outtag != None and outtag.data != 0:
+        output_fhci = cli.r_s("cli_StandardOutput")
+        cli.w_s("cli_StandardOutput",outtag.data << 2)
+      else:
+        output_fhci = None
       cli.w_s("cli_CurrentInput",new_input.mem.addr)
       cli.w_s("cli_StandardInput",new_stdin.mem.addr)
       cli.w_s("cli_Background",self.DOSTRUE)
@@ -1298,6 +1311,8 @@ class DosLibrary(AmigaLibrary):
         cli.w_s("cli_StandardInput",input_fhsi)
         cli.w_s("cli_Background",self.DOSFALSE)
         cli.w_s("cli_Module",cur_module)
+        if output_fhci != None:
+          cli.w_s("cli_StandardOutput",output_fhci)
         # Channels are closed by the dying shell
         ctx.mem.access.w_bstr(cli.r_s("cli_SetName"),cur_setname)
         ctx.process.this_task.access.w_s("pr_CIS",input_fhci)
@@ -1510,13 +1525,16 @@ class DosLibrary(AmigaLibrary):
     cmd_dir_addr = clip.r_s("cli_CommandDir")
     for p in ctx.path_mgr.get_paths():
       if p != "C:" and p != "c:":
-        path = ctx.alloc.alloc_struct("Path(%s)" % p,PathDef)
         lock = self.lock_mgr.create_lock(None, p, False)
-        path.access.w_s("path_Lock",lock.mem.addr)
-        path.access.w_s("path_Next",cmd_dir_addr)
-        cmd_dir_addr = path.addr
-        clip.w_s("cli_CommandDir",cmd_dir_addr)
-        self.path.append((path,lock))
+        if lock != None:
+          path = ctx.alloc.alloc_struct("Path(%s)" % p,PathDef)
+          path.access.w_s("path_Lock",lock.mem.addr)
+          path.access.w_s("path_Next",cmd_dir_addr)
+          cmd_dir_addr = path.addr
+          clip.w_s("cli_CommandDir",cmd_dir_addr)
+          self.path.append((path,lock))
+        else:
+          log_dos.warning("Path %s does not exist, expect problems!", p)
     return 0
 
   def CliInitRun(self, ctx):

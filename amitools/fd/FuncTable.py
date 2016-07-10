@@ -49,6 +49,17 @@ class FuncTable:
     if bias > self.max_bias:
       self.max_bias = bias
 
+  def add_call(self,name,bias,arg,reg):
+    if len(arg) != len(reg):
+      raise IOError("Reg and Arg name mismatch in function definition")
+    else:
+      func_def = FuncDef(name, bias, False)
+      self.add_func(func_def)
+      if arg[0] != '':
+        num_args = len(arg)
+        for i in range(num_args):
+          func_def.add_arg(arg[i],reg[i])
+
   def dump(self):
     print("FuncTable:",self.base_name)
     for f in self.funcs:

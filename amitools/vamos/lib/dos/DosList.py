@@ -84,6 +84,7 @@ class DosList:
     entry = DosListEntry(name,DosListVolumeDef)
     self._add_entry(entry)
     entry.access.w_s("dol_Type",2) #volume
+    entry.access.w_s("dol_Task",1) #something != 0
     entry.name    = name
     entry.assigns = [name+":"]
     return entry
@@ -92,6 +93,7 @@ class DosList:
     entry = DosListEntry(name,DosListAssignDef)
     self._add_entry(entry)
     entry.access.w_s("dol_Type",1) #directory
+    entry.access.w_s("dol_Task",1) #something != 0
     entry.name    = name
     entry.assigns = assign_names
     return entry
@@ -107,7 +109,9 @@ class DosList:
       #print "*** Entry %s, Name address is %s,%s" % (entry.mem,name_addr,self.mem.access.r_bstr(name_addr))
       for dirs in entry.assigns:
         lock = lock_mgr.create_lock(None,dirs,False)
-        if lock is not None:
+        if lock is None:
+          log_doslist.warning("%s does not exist", dirs)
+        else:
           entry.locks.append(lock)
           if first:
             entry.access.w_s("dol_Lock",lock.mem.addr)

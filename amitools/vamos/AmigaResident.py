@@ -7,6 +7,7 @@ class AmigaResident:
 
   RTF_AUTOINIT = 1<<7
 
+  NT_DEVICE  = 3
   NT_LIBRARY = 9
 
   INIT_BYTE_B = 0xa0
@@ -59,7 +60,6 @@ class AmigaResident:
           res['auto_init'] = res['flags'] & self.RTF_AUTOINIT == self.RTF_AUTOINIT
           res['name'] = self.mem.access.r_cstr(res['name_ptr'])
           res['id'] = self.mem.access.r_cstr(res['id_ptr'])
-
           finds.append(res)
 
           # only first?

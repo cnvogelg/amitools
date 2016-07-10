@@ -30,6 +30,12 @@ class TagList:
     
   def add(self, tag, data):
     self.tags.append(Tag(tag,data, self.tag_info))
+
+  def find_tag(self, tagname):
+    for tag in self.tags:
+      if tag.name == tagname:
+        return tag
+    return None
   
   def __str__(self):
     return "[%s]" % ",".join(map(str, self.tags))

@@ -195,6 +195,8 @@ class PathManager:
         path = path[1:]
     # a parent path is given
     elif path[0] == '/':
+      if lock == None:
+        return "SYS:"
       abs_prefix = lock.ami_path
       while len(path)>0 and path[0] == '/':
         abs_prefix = self.ami_abs_parent_path(abs_prefix)

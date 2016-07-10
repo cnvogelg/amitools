@@ -18,6 +18,8 @@ from lib.ExecLibrary import ExecLibrary
 from lib.DosLibrary import DosLibrary
 from lib.UtilityLibrary import UtilityLibrary
 from lib.IntuitionLibrary import IntuitionLibrary
+from lib.MathFFPLibrary import MathFFPLibrary
+from lib.MathIEEEDoubBasLibrary import MathIEEEDoubBasLibrary
 
 from Log import *
 from CPU import *
@@ -322,6 +324,14 @@ class Vamos:
     utility_cfg = cfg.get_lib_config('utility.library')
     self.utility_lib_def = UtilityLibrary(utility_cfg)
     self.lib_mgr.register_vamos_lib(self.utility_lib_def)
+    # mathffp
+    mathffp_cfg = cfg.get_lib_config('mathffp.library')
+    self.mathffp_lib_def = MathFFPLibrary(mathffp_cfg)
+    self.lib_mgr.register_vamos_lib(self.mathffp_lib_def)
+    # mathdoubbas
+    mathdoubbas_cfg = cfg.get_lib_config('mathieeedoubbas.library')
+    self.mathdoubbas_lib_def = MathIEEEDoubBasLibrary(mathdoubbas_cfg)
+    self.lib_mgr.register_vamos_lib(self.mathdoubbas_lib_def)
 
   def open_base_libs(self):
     # open exec lib

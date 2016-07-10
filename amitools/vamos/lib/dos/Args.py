@@ -187,6 +187,8 @@ class Args:
           if val != False:
             if targ['n']:
               val = int(val)
+            else:
+              val = self.unquote(val)
             result[pos] = val
           # keyword not found
           else:
@@ -211,6 +213,8 @@ class Args:
             if val != False:
               if targ['n']:
                 val = int(val)
+              else:
+                val = self.unquote(val)
               result[pos] = val
               targ['x'] = False # disable to reject auto fill
       elif targ['f']:
@@ -247,7 +251,7 @@ class Args:
       elif targ['x']:
         # take from arraay
         if len(args)>0:
-          val = args[0]
+          val = self.unquote(args[0])
           del args[0]
         # no more value in arg
         else:
@@ -265,6 +269,8 @@ class Args:
               return False
         if targ['n'] and val != None:
           val = int(val)
+        else:
+          val = self.unquote(val)
         result[pos] = val
       elif targ['f']:
         res = None
@@ -298,6 +304,14 @@ class Args:
     self.result = result
     return True
 
+  #
+  # This should probably do much more....
+  def unquote(self,val):
+    if val != None:
+      if val.startswith('"') and val.endswith('"'):
+        return val[1:-1]
+    return val
+  
   def get_result(self):
     res = []
     for i in xrange(len(self.result)):
@@ -375,4 +389,4 @@ class Args:
 
       mem_access.w32(base_ptr,base_val)
       base_ptr += 4
-
+    return self.result
