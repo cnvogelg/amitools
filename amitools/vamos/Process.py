@@ -38,7 +38,8 @@ class Process:
     self.set_cwd()
 
   def free(self):
-    self.free_cwd()
+    if self.shell == False:
+      self.free_cwd()
     self.free_task_struct()
     self.free_shell_packet()
     self.free_cli_struct()

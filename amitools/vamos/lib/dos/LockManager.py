@@ -36,8 +36,8 @@ class LockManager:
     log_lock.info("registered: %s" % lock)
 
   def _unregister_lock(self, lock):
-    del self.locks_by_baddr[lock.b_addr]
     log_lock.info("unregistered: %s" % lock)
+    del self.locks_by_baddr[lock.b_addr]
     lock.free(self.alloc)
     del lock
 
