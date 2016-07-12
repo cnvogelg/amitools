@@ -49,10 +49,16 @@ class Lock:
   def examine_file(self, fib_mem, name, sys_path):
     # name
     name_addr = fib_mem.s_get_addr('fib_FileName')
+    # clear 32 name bytes
+    fib_mem.clear_data(name_addr, 32, 0)
     fib_mem.w_cstr(name_addr, name)
+    # comment
+    comment_addr = fib_mem.s_get_addr('fib_Comment')
+    fib_mem.w_cstr(comment_addr, "")
     # create the "inode" information
     key = self.keygen(sys_path)
     fib_mem.w_s('fib_DiskKey',key)
+    log_lock.debug("examine key: %08x", key)
     # type
     if os.path.isdir(sys_path):
       dirEntryType = 2
@@ -79,6 +85,10 @@ class Lock:
     if os.path.isfile(sys_path):
       size = os.path.getsize(sys_path)
       fib_mem.w_s('fib_Size', size)
+      blocks = int((size + 511) / 512)
+      fib_mem.w_s('fib_NumBlocks', blocks)
+    else:
+      fib_mem.w_s('fib_NumBlocks', 1)
     # date (use mtime here)
     date_addr = fib_mem.s_get_addr('fib_Date')
     date = AccessStruct(fib_mem.mem, DateStampDef, date_addr)
@@ -87,6 +97,9 @@ class Lock:
     date.w_s('ds_Days', at.tday)
     date.w_s('ds_Minute', at.tmin)
     date.w_s('ds_Tick', at.tick)
+    # fill in UID/GID
+    fib_mem.w_s('fib_OwnerUID', 0)
+    fib_mem.w_s('fib_OwnerGID', 0)
     return NO_ERROR
 
   def examine_lock(self, fib_mem):
