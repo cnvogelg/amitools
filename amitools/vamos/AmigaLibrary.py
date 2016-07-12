@@ -170,8 +170,12 @@ class AmigaLibrary:
     code.append('    if type(d0) is list:')
     code.append('      ctx.cpu.w_reg(REG_D0, d0[0] & 0xffffffff)')
     code.append('      ctx.cpu.w_reg(REG_D1, d0[1] & 0xffffffff)')
+    code.append('      res = "d0=%08x  d1=%08x" % d0')
     code.append('    else:')
     code.append('      ctx.cpu.w_reg(REG_D0, d0 & 0xffffffff)')
+    code.append('      res = "d0=%08x" % d0')
+    code.append('  else:')
+    code.append('    res = "none"')
 
     # timing code
     if need_timing:
@@ -184,7 +188,7 @@ class AmigaLibrary:
 
     # logging (end)
     if self.log_call:
-      code.append('  self.log("} END CALL: d0=%s (default)" % (d0), level=logging.INFO)')
+      code.append('  self.log("} END CALL: %s (default)" % res, level=logging.INFO)')
 
     # wrap exception handler
     if self.catch_ex:
