@@ -122,7 +122,9 @@ class HunkHeaderBlock(HunkBlock):
       hunk_size = self._read_long(f)
       if hunk_size < 0:
         raise HunkParseError("HUNK_HEADER contains invalid hunk_size")
-      self.hunk_table.append(hunk_size)
+      # note that the upper bits are the target memory type. We only have FAST,
+      # so let's forget about them for a moment.
+      self.hunk_table.append(hunk_size & 0x3fffffff)
 
   def write(self, f):
     # write residents
