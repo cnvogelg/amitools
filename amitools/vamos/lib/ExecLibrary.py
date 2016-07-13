@@ -5,6 +5,7 @@ from amitools.vamos.Exceptions import *
 from amitools.vamos.AccessStruct import AccessStruct
 from amitools.vamos.Trampoline import Trampoline
 from lexec.PortManager import PortManager
+from lexec.SemaphoreManager import SemaphoreManager
 from lexec.Pool import Pool
 import dos.Printf
 
@@ -31,6 +32,7 @@ class ExecLibrary(AmigaLibrary):
     self.access.w_s("MaxLocMem", ctx.ram_size)
     # create the port manager
     self.port_mgr = PortManager(ctx.alloc)
+    self.semaphore_mgr = SemaphoreManager(ctx.alloc,ctx.mem)
     self.mem      = ctx.mem
 
   def finish_lib(self, ctx):
@@ -474,4 +476,28 @@ class ExecLibrary(AmigaLibrary):
     log_exec.info("RawDoFmt: fmtString=%s -> %s" % (fmt,resultstr))
     return dataStream
 
-    
+  # ----- Semaphore Handling -----
+
+  def InitSemaphore(self,ctx):
+    addr = ctx.cpu.r_reg(REG_A0)
+    self.semaphore_mgr.InitSemaphore(addr)
+     
+  def AddSemaphore(self,ctx):
+    addr     = ctx.cpu.r_reg(REG_A1)
+    sstruct  = AccessStruct(cxt.mem,SignalSemaphoreDef,addr)
+    name_ptr = sstruct.r_s("ss_Link.ln_Name")
+    name     = ctx.mem.access.r_cstr(name_ptr)
+    self.semaphore_mgr.AddSemaphore(addr,name)
+     
+  def RemSemaphore(self,ctx):
+    addr = ctx.cpu.r_reg(REG_A1)
+    self.semaphore_mgr.RemSemaphore(addr)
+
+  def FindSemaphore(self,cxt):
+    name_ptr = ctx.cpu.r_reg(REG_A1)
+    name     = ctx.mem.access.r_cstr(name_ptr)
+    semaphore = self.semaphore_mgr.FindSemaphore(name)
+    if semaphore != None:
+      return semaphore.addr
+    else:
+      return 0
