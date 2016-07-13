@@ -314,7 +314,7 @@ class Vamos:
     self.lib_mgr.register_vamos_lib(self.exec_lib_def)
     # dos
     dos_cfg = cfg.get_lib_config('dos.library')
-    self.dos_lib_def = DosLibrary(self.mem, self.alloc, dos_cfg)
+    self.dos_lib_def = DosLibrary(self.mem, self.alloc, self.path_mgr, dos_cfg)
     self.lib_mgr.register_vamos_lib(self.dos_lib_def)
     # intuition
     int_cfg = cfg.get_lib_config('intuition.library')

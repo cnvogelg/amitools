@@ -8,6 +8,8 @@ from lexec.ExecStruct import ListDef, MinListDef, NodeDef
 from amitools.vamos.Exceptions import *
 from amitools.vamos.Log import log_dos
 from amitools.vamos.AccessStruct import AccessStruct
+from amitools.vamos.path.PathManager import PathManager
+from amitools.vamos.path.PathManager import AssignManager
 from dos.Args import *
 from dos.Error import *
 from dos.AmiTime import *
@@ -37,10 +39,11 @@ class DosLibrary(AmigaLibrary):
   GVF_LOCAL_ONLY        =	0x200
   GVF_BINARY_VAR	=	0x400
 
-  def __init__(self, mem, alloc, config):
+  def __init__(self, mem, alloc, path, config):
     AmigaLibrary.__init__(self, self.name, DosLibraryDef, config)
-    self.mem = mem
-    self.alloc = alloc
+    self.mem      = mem
+    self.alloc    = alloc
+    self.path_mgr = path
 
   def setup_lib(self, ctx):
     AmigaLibrary.setup_lib(self, ctx)
@@ -64,7 +67,7 @@ class DosLibrary(AmigaLibrary):
     self.dos_info = ctx.alloc.alloc_struct("DosInfo",DosInfoDef)
     self.root_struct.access.w_s("rn_Info",self.dos_info.addr)
     # setup dos list
-    self.dos_list = DosList(ctx.mem, ctx.alloc)
+    self.dos_list = DosList(self.path_mgr, self.path_mgr.assign_mgr, ctx.mem, ctx.alloc)
     baddr = self.dos_list.build_list(ctx.path_mgr)
     # create lock manager
     self.lock_mgr = LockManager(ctx.path_mgr, self.dos_list, ctx.alloc, ctx.mem)
@@ -1562,6 +1565,21 @@ class DosLibrary(AmigaLibrary):
     node  = ctx.cpu.r_reg(REG_D1)
     return self.dos_list.next_dos_entry(flags,node)
 
+  def AssignLock(self, ctx):
+    name_ptr  = ctx.cpu.r_reg(REG_D1)
+    lockbaddr = ctx.cpu.r_reg(REG_D2)
+    name      = ctx.mem.access.r_cstr(name_ptr)
+    if lockbaddr == 0:
+      log_dos.info("AssignLock (%s -> null)" % name)
+      self.dos_list.remove_assign(name)
+      return -1
+    else:
+      lock = self.lock_mgr.get_by_b_addr(lockbaddr)
+      log_dos.info("AssignLock (%s -> %s)" % (name,lock))
+      if self.dos_list.create_assign(name,lock) != None:
+        return -1
+      return 0
+    
   # ----- misc --------
 
   def StrToLong(self, ctx):

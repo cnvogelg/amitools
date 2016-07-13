@@ -66,7 +66,7 @@ class AssignManager:
     # make sure it maps to a volume or another assign
     split = self.ami_path_split_volume(path_name)
     if split == None:
-      raise VamosConfigError("assign has to map to volume or another assign: %s", path_name)
+      raise VamosConfigError("assign has to map to volume or another assign: %s" % path_name)
     # ensure trailing slash
     if path_name[-1] != '/' and path_name[-1] != ':':
       path_name += '/'
