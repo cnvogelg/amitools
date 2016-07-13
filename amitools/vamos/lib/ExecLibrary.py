@@ -481,22 +481,26 @@ class ExecLibrary(AmigaLibrary):
   def InitSemaphore(self,ctx):
     addr = ctx.cpu.r_reg(REG_A0)
     self.semaphore_mgr.InitSemaphore(addr)
+    log_exec.info("InitSemaphore(%06x)" % addr)
      
   def AddSemaphore(self,ctx):
     addr     = ctx.cpu.r_reg(REG_A1)
-    sstruct  = AccessStruct(cxt.mem,SignalSemaphoreDef,addr)
+    sstruct  = AccessStruct(ctx.mem,SignalSemaphoreDef,addr)
     name_ptr = sstruct.r_s("ss_Link.ln_Name")
     name     = ctx.mem.access.r_cstr(name_ptr)
     self.semaphore_mgr.AddSemaphore(addr,name)
+    log_exec.info("AddSemaphore(%06x,%s)" % (addr,name))
      
   def RemSemaphore(self,ctx):
     addr = ctx.cpu.r_reg(REG_A1)
     self.semaphore_mgr.RemSemaphore(addr)
+    log_exec.info("RemSemaphore(%06x)" % addr)
 
-  def FindSemaphore(self,cxt):
+  def FindSemaphore(self,ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name     = ctx.mem.access.r_cstr(name_ptr)
     semaphore = self.semaphore_mgr.FindSemaphore(name)
+    log_exec.info("FindSemaphore(%s) -> %s" % (name,semaphore))
     if semaphore != None:
       return semaphore.addr
     else:

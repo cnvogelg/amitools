@@ -13,14 +13,14 @@ class SemaphoreManager:
     self.semaphores_by_name = {}
 
   def InitSemaphore(self,addr):
-    semaphore = AccessStruct(self.mem,SignalSemaphoreDef,struct_addr=ds_ptr)
+    semaphore = AccessStruct(self.mem,SignalSemaphoreDef,struct_addr=addr)
     semaphore.w_s("ss_Owner",0)
     semaphore.w_s("ss_NestCount",0)
-    semaphore.w_s("ss_QueueCount",-1)
-    semaphore.w_s("ss_Link.ln_Type",NT_SIGNALSEM)
+    semaphore.w_s("ss_QueueCount",0xffff)
+    semaphore.w_s("ss_Link.ln_Type",self.NT_SIGNALSEM)
     semaphore.w_s("ss_WaitQueue.mlh_Head",semaphore.s_get_addr("ss_WaitQueue.mlh_Tail"))
     semaphore.w_s("ss_WaitQueue.mlh_Tail",0)
-    semaphore.w_s("ss_WaitQueue.mlh_TailPred",semaphore.s_get_add("ss_WaitQueue.mlh_Head"))
+    semaphore.w_s("ss_WaitQueue.mlh_TailPred",semaphore.s_get_addr("ss_WaitQueue.mlh_Head"))
     return self.register_semaphore(addr)
 
   def AddSemaphore(self,addr,name):
@@ -51,7 +51,7 @@ class SemaphoreManager:
       self.semaphores[addr] = semaphore
       return semaphore
     else:
-      return self.semaphore[addr]
+      return self.semaphores[addr]
 
   def unregister_semaphore(self, addr):
     if addr in self.semaphores:
