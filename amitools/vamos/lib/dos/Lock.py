@@ -106,21 +106,39 @@ class Lock:
     return self.examine_file(fib_mem, self.name, self.sys_path)
 
   def examine_next(self, fib_mem):
-    if self.dirent == None:
+    # start scan
+    if self.dirent is None:
       dirEntryType = fib_mem.r_s('fib_DirEntryType')
       if os.path.isdir(self.sys_path):
         self.dirent = os.listdir(self.sys_path)
       else:
         self.dirent = []
+      # assume that key stored in given FIB is my own one
+      # (otherwise no Examine() on my lock was done before..., aka broken code!)
+      fib_key = fib_mem.r_s('fib_DiskKey')
+      if fib_key != self.key:
+        self.dirent = self._handle_broken_scan(self.dirent, fib_key)
 
     if len(self.dirent) > 0:
-      aname = self.dirent[0]
-      apath = self.sys_path + "/" + self.dirent[0]
-      self.dirent = self.dirent[1:]
-      return self.examine_file(fib_mem, aname, apath)
+      entry = self.dirent.pop(0)
+      e_path = os.path.join(self.sys_path, entry)
+      return self.examine_file(fib_mem, entry, e_path)
+    else:
+      self.dirent = None
+      return ERROR_NO_MORE_ENTRIES
 
-    self.dirent = None
-    return ERROR_NO_MORE_ENTRIES
+  def _handle_broken_scan(self, entries, fib_key):
+    log_lock.warning("first ExNext() does not start at Examine()d lock! Broken Code!! lock_key=%08x fib_key=%08x (%s)",
+      self.key, fib_key, self.name)
+    # we shrink the dir list to start after the given key
+    # and simulate a continued scan as AmigaOS' FFS would do it
+    while len(entries) > 0:
+      entry = entries.pop(0)
+      e_path = os.path.join(self.sys_path, entry)
+      e_key = self.keygen(e_path)
+      if e_key == fib_key:
+        break
+    return entries
 
   def find_volume_node(self,dos_list):
     return self.mem.access.r_s("fl_Volume")
