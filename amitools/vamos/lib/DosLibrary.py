@@ -1,6 +1,7 @@
 import time
 import ctypes
 import re
+import os
 
 from amitools.vamos.AmigaLibrary import *
 from dos.DosStruct import *
@@ -226,6 +227,25 @@ class DosLibrary(AmigaLibrary):
     if str_time_ptr != 0:
       ctx.mem.access.w_cstr(str_time_ptr, time_str)
     return self.DOSTRUE
+
+  def SetFileDate(self, ctx):
+    ds_ptr   = ctx.cpu.r_reg(REG_D2)
+    ds       = AccessStruct(ctx.mem,DateStampDef,struct_addr=ds_ptr)
+    name_ptr = ctx.cpu.r_reg(REG_D1)
+    name     = ctx.mem.access.r_cstr(name_ptr)
+    ticks    = ds.r_s("ds_Tick")
+    minutes  = ds.r_s("ds_Minute")
+    days     = ds.r_s("ds_Days")
+    seconds  = ami_to_sys_time(AmiTime(days,minutes,ticks))
+    log_dos.info("SetFileDate: file=%s date=%d" % (name,seconds))
+    sys_path = self.path_mgr.ami_to_sys_path(self.get_current_dir(),name,searchMulti=True)
+    if sys_path == None:
+      log_file.info("file not found: '%s' -> '%s'" % (ami_path, sys_path))
+      self.setioerr(ctx,ERROR_OBJECT_NOT_FOUND)
+      return self.DOSFALSE
+    else:
+      os.utime(sys_path,(seconds,seconds))
+      return self.DOSTRUE
 
   # ----- Variables -----
 
