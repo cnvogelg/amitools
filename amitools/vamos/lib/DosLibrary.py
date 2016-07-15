@@ -478,7 +478,7 @@ class DosLibrary(AmigaLibrary):
       f_mode = "rb+"
     elif mode == 1004:
       mode_name = "r/w"
-      f_mode = "rb+"
+      f_mode = "rwb+"
     else:
       mode_name = "?"
 
@@ -718,6 +718,8 @@ class DosLibrary(AmigaLibrary):
     buflen    = ctx.cpu.r_reg(REG_D3)
     fh   = self.file_mgr.get_by_b_addr(fh_b_addr,False)
     line = fh.gets(buflen)
+    # Bummer! FIXME: There is currently no way this can communicate an I/O error
+    self.setioerr(ctx,0)
     log_dos.info("FGetS(%s,%d) -> '%s'" % (fh, buflen, line))
     ctx.mem.access.w_cstr(bufaddr,line)
     if line == "":
