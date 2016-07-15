@@ -45,18 +45,15 @@ class LabelManager:
     # try to find compatible: release all labels within the given range
     # this is necessary because the label could be part of a puddle
     # that is released in one go.
-    found = False
     r     = self.first
     while r != None:
       if r.addr >= addr and r.addr + r.size <= addr + size:
         s = r.next
-        log_mem_int.log(logging.WARN, "remove_label: got=%s have=%s", range, r)
+        log_mem_int.log(logging.WARN, "remove_labels_within: got= [@%06x +%06x]  have=%s", addr, size, r)
         self.remove_label(r)
         r = s
-        found = True
       else:
         r = r.next
-    return found
   
   def get_all_labels(self):
     ranges = []

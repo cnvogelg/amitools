@@ -166,7 +166,10 @@ ObtainQuickVector(interruptCode)(a0)
 execPrivate10()()
 execPrivate11()()
 execPrivate12()()
-execPrivate13()()
+##public
+*------- THOR: This is for the lazy ROM which does not like names...
+TaggedOpenLibrary(tag)(d0)
+##private
 execPrivate14()()
 execPrivate15()()
 ##public
