@@ -271,7 +271,7 @@ class LibManager():
 
   def _close_native_lib_part2(self, lib, ctx):
     result = ctx.cpu.r_reg(REG_D0)
-    self._unregister_open_lib(lib)
+    #self._unregister_open_lib(lib)
     self.lib_log("close_lib", "done closing native lib: %s seg_list=%06x" % (lib, result), level=logging.DEBUG)
 
   # ----- create/free native lib -----

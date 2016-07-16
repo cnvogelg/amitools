@@ -247,6 +247,11 @@ class DosLibrary(AmigaLibrary):
       os.utime(sys_path,(seconds,seconds))
       return self.DOSTRUE
 
+  def SetComment(self, ctx):
+    # the typical unixoid file system does not implement this
+    log_dos.warn("SetComment: not implemented")
+    return self.DOSTRUE
+
   # ----- Variables -----
 
   def find_var(self, ctx, name, flags):

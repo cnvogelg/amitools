@@ -159,7 +159,7 @@ class DosList:
     entry.alist   = []
     while alist_addr != 0:
       alist        = AccessStruct(self.mem,AssignListDef,alist_addr)
-      oldlock_addr = alist.access.r_s("al_Lock")
+      oldlock_addr = alist.r_s("al_Lock")
       oldlock      = self.lock_mgr.get_by_b_addr(oldlock_addr >> 2)
       self.lock_mgr.release_lock(oldlock)
       entry.alist.remove(alist)
