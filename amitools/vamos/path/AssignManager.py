@@ -109,6 +109,7 @@ class AssignManager:
   # Note: this follows recursive assigns, too
   def ami_path_resolve_assigns(self, ami_path):
     result = []
+    log_path.info("resolve_assign: ami_path='%s'", ami_path)
     split = self.ami_path_split_volume(ami_path)
     if split == None:
       return ami_path
@@ -118,6 +119,7 @@ class AssignManager:
         aname_list = self.assigns[name]
         for aname in aname_list:
           new_path = aname + split[1]
+          log_path.info("resolve_assign: ami_path='%s' potential targets='%s' resulting path='%s'", ami_path, aname, new_path)
           result += self.ami_path_resolve_assigns(new_path)
       # no assign
       else:
