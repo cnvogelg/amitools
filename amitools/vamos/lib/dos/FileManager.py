@@ -71,6 +71,8 @@ class FileManager:
       # and the file names behind are ignored.
       if uname.startswith('NIL:'):
         sys_name = "/dev/null"
+        if f_mode == "rwb+":
+          f_mode = "rb+"
         fobj = open(sys_name, f_mode)
         fh   = FileHandle(fobj, ami_path, sys_name, is_nil = True)
       elif uname == '*' or uname.startswith('CONSOLE:'):
@@ -86,9 +88,15 @@ class FileManager:
         # make some checks on existing file
         if os.path.exists(sys_path):
           # if not writeable -> no append mode
+          if f_mode == "rwb+":
+            f_mode = "rb+"
           if not os.access(sys_path, os.W_OK):
             if f_mode[-1] == '+':
               f_mode = f_mode[:-1]
+        else:
+          # if the file does not exist, but the mode is MODE_READWRITE, create it.
+          if f_mode == "rwb+":
+            f_mode = "wb+"
 
         log_file.debug("opening file: '%s' -> '%s' f_mode=%s" % (ami_path, sys_path, f_mode))
         fobj = open(sys_path, f_mode)

@@ -37,8 +37,8 @@ class LibManager():
     # --- config for auto lib ---
     # black and white list for auto creation of libs
     # (use sane or normal name)
-    self.black_list = []
-    self.white_list = ['icon.library']
+    #self.black_list = []
+    #self.white_list = ['icon.library']
     self.auto_create = False
 
   def register_vamos_lib(self, lib):

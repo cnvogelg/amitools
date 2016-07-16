@@ -117,6 +117,23 @@ class ExecLibrary(AmigaLibrary):
       log_exec.info("OpenLibrary: '%s' V%d -> %s@0x%06x" % (name, ver, lib, lib.addr_base_open))
       return lib.addr_base_open
 
+  def TaggedOpenLibrary(self, ctx):
+    tag = ctx.cpu.r_reg(REG_D0)
+    tags = ["graphics.library","layers.library","intuition.library","dos.library","icon.library","expansion.library",
+            "utility.library","keymap.library","gadtools.library","workbench.library"]
+    if tag > 0 and tag <= len(tags):
+      name = tags[tag - 1]
+      lib  = self.lib_mgr.open_lib(name, 0, ctx)
+      if lib == None:
+        log_exec.info("TaggedOpenLibrary: %d('%s') -> NULL" % (tag, name))
+        return 0
+      else:
+        log_exec.info("TaggedOpenLibrary: %d('%s') -> %s@0x%06x" % (tag, name, lib, lib.addr_base_open))
+        return lib.addr_base_open
+    else:
+      log_exec.warn("TaggedOpenLibrary: %d invalid tag -> NULL" % tag)
+      return 0
+
   def OldOpenLibrary(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name = ctx.mem.access.r_cstr(name_ptr)
@@ -184,7 +201,6 @@ class ExecLibrary(AmigaLibrary):
       pool = self._pools[poolid]
       del self._pools[poolid]
       pool.__del__()
-      del pool
       log_exec.info("DeletePooled: pool 0x%x" % poolid)
     else:
       raise VamosInternalError("DeletePooled: invalid memory pool: ptr=%06x" % poolid)
@@ -481,22 +497,26 @@ class ExecLibrary(AmigaLibrary):
   def InitSemaphore(self,ctx):
     addr = ctx.cpu.r_reg(REG_A0)
     self.semaphore_mgr.InitSemaphore(addr)
+    log_exec.info("InitSemaphore(%06x)" % addr)
      
   def AddSemaphore(self,ctx):
     addr     = ctx.cpu.r_reg(REG_A1)
-    sstruct  = AccessStruct(cxt.mem,SignalSemaphoreDef,addr)
+    sstruct  = AccessStruct(ctx.mem,SignalSemaphoreDef,addr)
     name_ptr = sstruct.r_s("ss_Link.ln_Name")
     name     = ctx.mem.access.r_cstr(name_ptr)
     self.semaphore_mgr.AddSemaphore(addr,name)
+    log_exec.info("AddSemaphore(%06x,%s)" % (addr,name))
      
   def RemSemaphore(self,ctx):
     addr = ctx.cpu.r_reg(REG_A1)
     self.semaphore_mgr.RemSemaphore(addr)
+    log_exec.info("RemSemaphore(%06x)" % addr)
 
-  def FindSemaphore(self,cxt):
+  def FindSemaphore(self,ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name     = ctx.mem.access.r_cstr(name_ptr)
     semaphore = self.semaphore_mgr.FindSemaphore(name)
+    log_exec.info("FindSemaphore(%s) -> %s" % (name,semaphore))
     if semaphore != None:
       return semaphore.addr
     else:

@@ -1,6 +1,7 @@
 import time
 import ctypes
 import re
+import os
 
 from amitools.vamos.AmigaLibrary import *
 from dos.DosStruct import *
@@ -226,6 +227,25 @@ class DosLibrary(AmigaLibrary):
     if str_time_ptr != 0:
       ctx.mem.access.w_cstr(str_time_ptr, time_str)
     return self.DOSTRUE
+
+  def SetFileDate(self, ctx):
+    ds_ptr   = ctx.cpu.r_reg(REG_D2)
+    ds       = AccessStruct(ctx.mem,DateStampDef,struct_addr=ds_ptr)
+    name_ptr = ctx.cpu.r_reg(REG_D1)
+    name     = ctx.mem.access.r_cstr(name_ptr)
+    ticks    = ds.r_s("ds_Tick")
+    minutes  = ds.r_s("ds_Minute")
+    days     = ds.r_s("ds_Days")
+    seconds  = ami_to_sys_time(AmiTime(days,minutes,ticks))
+    log_dos.info("SetFileDate: file=%s date=%d" % (name,seconds))
+    sys_path = self.path_mgr.ami_to_sys_path(self.get_current_dir(),name,searchMulti=True)
+    if sys_path == None:
+      log_file.info("file not found: '%s' -> '%s'" % (ami_path, sys_path))
+      self.setioerr(ctx,ERROR_OBJECT_NOT_FOUND)
+      return self.DOSFALSE
+    else:
+      os.utime(sys_path,(seconds,seconds))
+      return self.DOSTRUE
 
   # ----- Variables -----
 
@@ -458,7 +478,7 @@ class DosLibrary(AmigaLibrary):
       f_mode = "rb+"
     elif mode == 1004:
       mode_name = "r/w"
-      f_mode = "rb+"
+      f_mode = "rwb+"
     else:
       mode_name = "?"
 
@@ -477,6 +497,7 @@ class DosLibrary(AmigaLibrary):
       fh = self.file_mgr.get_by_b_addr(fh_b_addr)
       self.file_mgr.close(fh)
       log_dos.info("Close: %s" % fh)
+      self.setioerr(ctx,0)
     return self.DOSTRUE
 
   def Read(self, ctx):
@@ -515,8 +536,26 @@ class DosLibrary(AmigaLibrary):
     fh.write(data)
     got = len(data) / size
     log_dos.info("FWrite(%s, %06x, %d, %d) -> %d" % (fh, buf_ptr, size, number, got))
-    return size
+    return got
 
+  def FRead(self, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    buf_ptr = ctx.cpu.r_reg(REG_D2)
+    size = ctx.cpu.r_reg(REG_D3)
+    number = ctx.cpu.r_reg(REG_D4)
+    # Again, this is actually buffered I/O and I should really
+    # go through all the buffer logic. However, for the time
+    # being, keep it unbuffered.
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
+    data = fh.read(size * number)
+    if data == -1:
+      got = 0 # simple error handling
+    else:
+      got = len(data) / size
+      ctx.mem.access.w_data(buf_ptr, data)
+    log_dos.info("FRead(%s, %06x, %d, %d) -> %d" % (fh, buf_ptr, size, number, got))
+    return got
+    
   def Seek(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     pos = ctx.cpu.r_reg(REG_D2)
@@ -698,6 +737,8 @@ class DosLibrary(AmigaLibrary):
     buflen    = ctx.cpu.r_reg(REG_D3)
     fh   = self.file_mgr.get_by_b_addr(fh_b_addr,False)
     line = fh.gets(buflen)
+    # Bummer! FIXME: There is currently no way this can communicate an I/O error
+    self.setioerr(ctx,0)
     log_dos.info("FGetS(%s,%d) -> '%s'" % (fh, buflen, line))
     ctx.mem.access.w_cstr(bufaddr,line)
     if line == "":
@@ -1382,6 +1423,17 @@ class DosLibrary(AmigaLibrary):
     else:
       log_dos.info("UnLoadSeg:  NULL")
 
+  def InternalLoadSeg(self, ctx):
+    fh_baddr  = ctx.cpu.r_reg(REG_D0)
+    table_ptr = ctx.cpu.r_reg(REG_A0)
+    func_ptr  = ctx.cpu.r_reg(REG_A1)
+    stack_ptr = ctx.cpu.r_reg(REG_A2)
+    # FIXME: For now, just fail
+    log_dos.warn("InternalLoadSeg: fh=%06x table=%06x funcptr=%06x stack_ptr=%06x -> not implemented!" %
+                 (fh_baddr,table_ptr,func_ptr,stack_ptr))
+    self.setioerr(ctx, ERROR_OBJECT_WRONG_TYPE)
+    return 0
+    
   def RunCommand(self, ctx):
     b_addr   = ctx.cpu.r_reg(REG_D1)
     if not b_addr in self.seg_lists:

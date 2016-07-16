@@ -17,7 +17,6 @@ class Pool:
     while len(self.puddles) > 0:
       puddle = self.puddles.pop()
       puddle.__del__()
-      del puddle
 
   def __str__(self):
     poolstr = ""
