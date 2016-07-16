@@ -194,8 +194,9 @@ class LibManager():
       # not used any more
       if lib.ref_cnt == 0:
         # finally close lib
-        self._unregister_open_lib(lib,None)
-        self._free_vamos_lib(lib, ctx)
+        pass
+        #self._unregister_open_lib(lib,None)
+        #self._free_vamos_lib(lib, ctx)
       elif lib.ref_cnt < 0:
         raise VamosInternalError("CloseLib: invalid ref count?!")
 
