@@ -113,7 +113,7 @@ class DosList:
       entry.access.w_s("dol_Lock",lock.mem.addr)
       entry.next = self.first_entry
       self.first_entry = entry
-      self.assign_mgr.clear_assign(name.tolower())
+      self.assign_mgr.clear_assign(name.lower())
       self.assign_mgr.add_assign(name.lower(), [syspath])
       return entry
     else:
@@ -126,7 +126,7 @@ class DosList:
       entry.assigns = [name+":"]
       entry.locks   = [lock]
       self._release_locklist(entry)
-      self.assign_mgr.clear_assign(name.tolower())
+      self.assign_mgr.clear_assign(name.lower())
       self.assign_mgr.add_assign(name.lower(), [syspath])
       return entry
 
