@@ -3,6 +3,8 @@ from amitools.vamos.Log import log_doslist
 from amitools.vamos.AccessStruct import AccessStruct
 from DosStruct import DosListDeviceDef, DosListVolumeDef, DosListAssignDef, AssignListDef
 from amitools.vamos.lib.dos.LockManager import LockManager
+from amitools.vamos.path.AssignManager import AssignManager
+from amitools.vamos.path.PathManager import PathManager
 
 class DosListEntry:
   def __init__(self,name,struct_def):
@@ -16,9 +18,11 @@ class DosListEntry:
     return "[%s@%06x=b@%06x]" % (self.name, self.mem.addr, self.baddr)
 
 class DosList:
-  def __init__(self, mem, alloc):
+  def __init__(self, path_mgr, assign_mgr, mem, alloc):
     self.mem   = mem
     self.alloc = alloc
+    self.path_mgr   = path_mgr
+    self.assign_mgr = assign_mgr
     self.entries_by_b_addr = {}
     self.entries_by_name = {}
     self.entries = []
@@ -97,6 +101,73 @@ class DosList:
     entry.name    = name
     entry.assigns = assign_names
     return entry
+
+  # This call is used by the dos.library to create an
+  # assign or relocate one.
+  def create_assign(self, name, lock):
+    syspath = lock.ami_path
+    entry = self.get_entry_by_name(name)
+    if entry == None:
+      entry = self.add_assign(name,[name+":"])
+      entry.locks.append(lock)
+      entry.access.w_s("dol_Lock",lock.mem.addr)
+      entry.next = self.first_entry
+      self.first_entry = entry
+      self.assign_mgr.clear_assign(name.lower())
+      self.assign_mgr.add_assign(name.lower(), [syspath])
+      return entry
+    else:
+      if entry.access.r_s("dol_Type") != 1:
+        return None
+      oldlock_addr = entry.access.r_s("dol_Lock")
+      oldlock      = self.lock_mgr.get_by_b_addr(oldlock_addr >> 2)
+      self.lock_mgr.release_lock(oldlock)
+      entry.access.w_s("dol_Lock",lock.mem.addr)
+      entry.assigns = [name+":"]
+      entry.locks   = [lock]
+      self._release_locklist(entry)
+      self.assign_mgr.clear_assign(name.lower())
+      self.assign_mgr.add_assign(name.lower(), [syspath])
+      return entry
+
+  def remove_assign(self, name):
+    entry = self.get_entry_by_name(name)
+    if entry.access.r_s("dol_Type") != 1:
+      return None
+    if entry != None:
+      oldlock_addr = entry.access.r_s("dol_Lock")
+      oldlock      = self.lock_mgr.get_by_b_addr(oldlock_addr >> 2)
+      self.lock_mgr.release_lock(oldlock)
+      self._release_locklist(entry)
+      others      = self.first_entry
+      if others == entry:
+        self.first_entry = entry.next
+      else:
+        while others.next != None and others.next != entry:
+          others = others.next
+        if others.next == entry:
+          others.next = entry.next
+          others.access.w_s('dol_Next',entry.access.r_s('dol_Next'))
+      del self.entries_by_name[name.lower()]
+      del self.entries_by_b_addr[entry.baddr]
+      self.entries.remove(entry)
+      self.alloc.free_struct(entry.mem)
+      self.assign_mgr.clear_assign(name.lower())
+    return True
+
+  def _release_locklist(self, entry):
+    alist_addr    = entry.access.r_s("dol_List")
+    entry.access.w_s("dol_List",0)
+    entry.alist   = []
+    while alist_addr != 0:
+      alist        = AccessStruct(self.mem,AssignListDef,alist_addr)
+      oldlock_addr = alist.r_s("al_Lock")
+      oldlock      = self.lock_mgr.get_by_b_addr(oldlock_addr >> 2)
+      self.lock_mgr.release_lock(oldlock)
+      entry.alist.remove(alist)
+      nextaddr     = alist.access.r_s("al_Next")
+      self.alloc.free_struct(alist.mem)
+      alist_addr   = nextaddr
 
   # after creating the device list, the volume and assign
   # locks have to be added.

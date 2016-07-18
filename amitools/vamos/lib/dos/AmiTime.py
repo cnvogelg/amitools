@@ -20,3 +20,9 @@ def sys_to_ami_time(t):
   ts  += tmil           #seconds including milliseconds
   tick = int(ts * 50)   # 1/50 sec (tsk,tsk,tsk, no, *200 is not right here!)
   return AmiTime(tday, tmin, tick)
+
+def ami_to_sys_time(ami):
+  seconds  = ami.tick / 50.0 # ticks are 50th of a second
+  seconds += ami.tmin * 60   # convert minutes to seconds
+  seconds += ami.tday * 24 * 60 * 60
+  return seconds

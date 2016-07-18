@@ -17,7 +17,6 @@ class Pool:
     while len(self.puddles) > 0:
       puddle = self.puddles.pop()
       puddle.__del__()
-      del puddle
 
   def __str__(self):
     poolstr = ""
@@ -27,7 +26,7 @@ class Pool:
       else:
         poolstr = "%s,{%s}" % (poolstr,puddle)
     return poolstr
-        
+
   def AllocPooled(self, label_mgr, name, size):
     result = None
     if size >= self.thresh:

@@ -37,8 +37,8 @@ class LibManager():
     # --- config for auto lib ---
     # black and white list for auto creation of libs
     # (use sane or normal name)
-    self.black_list = []
-    self.white_list = ['icon.library']
+    #self.black_list = []
+    #self.white_list = ['icon.library']
     self.auto_create = False
 
   def register_vamos_lib(self, lib):
@@ -154,10 +154,10 @@ class LibManager():
 
         # create a (opt. fake/empty) vamos library
         self._create_vamos_lib(lib, ctx)
-        self._register_open_lib(lib)
+        self._register_open_lib(lib,None)
         lib.inc_usage()
 
-    self.lib_log("open_lib","leaving open_lib(): %s" % lib, level=logging.DEBUG)
+    self.lib_log("open_lib","leaving open_lib(): %s -> %06x" % (lib,lib.addr_base_open), level=logging.DEBUG)
     return lib
 
   # return instance or null
@@ -167,11 +167,13 @@ class LibManager():
       self.lib_log("close_lib","No library found at address %06x" % (addr))
       return None
     lib = self.open_libs_addr[addr]
+    lib.open_base_addr = addr
+    self.lib_log("close_lib","Closing %s at address %06x" % (lib.name,addr))
 
     # native lib handling
     if lib.is_native:
       tr = Trampoline(ctx,"close_lib[%s]" % lib.name)
-      self._close_native_lib(lib, ctx, tr)
+      self._close_native_lib(lib, addr, ctx, tr)
       if lib.ref_cnt == 0:
         pass
         # THOR: Do not release the library memory. Problem is that
@@ -192,8 +194,9 @@ class LibManager():
       # not used any more
       if lib.ref_cnt == 0:
         # finally close lib
-        self._unregister_open_lib(lib)
-        self._free_vamos_lib(lib, ctx)
+        pass
+        #self._unregister_open_lib(lib,None)
+        #self._free_vamos_lib(lib, ctx)
       elif lib.ref_cnt < 0:
         raise VamosInternalError("CloseLib: invalid ref count?!")
 
@@ -201,21 +204,26 @@ class LibManager():
 
   # ----- post-open setup -----
 
-  def _register_open_lib(self, lib):
+  def _register_open_lib(self, lib, libbase):
     # now register lib
     self.open_libs_addr[lib.addr_base] = lib
     # own base per open?
-    if lib.addr_base != lib.addr_base_open:
-      self.open_libs_addr[lib.addr_base_open] = lib
+    if libbase != None and lib.addr_base != libbase:
+      self.open_libs_addr[libbase] = lib
+      lib.addr_base_open = libbase
+    else:
+      lib.addr_base_open = lib.addr_base
     self.open_libs_name[lib.name] = lib
 
-  def _unregister_open_lib(self, lib):
+  def _unregister_open_lib(self, lib, libbase):
+    # we never really flush libraries, unless the library
+    # builds its own libbase on each invocation.
     # unregister lib
-    del self.open_libs_addr[lib.addr_base]
+    #del self.open_libs_addr[lib.addr_base]
     # own base per open?
-    if lib.addr_base != lib.addr_base_open:
-      del self.open_libs_addr[lib.addr_base_open]
-    del self.open_libs_name[lib.name]
+    if libbase != None and libbase != lib.addr_base:
+      del self.open_libs_addr[libbase]
+    #del self.open_libs_name[lib.name]
 
   # ----- open/close native lib -----
 
@@ -230,7 +238,7 @@ class LibManager():
       # RT_INIT lib does not know address yet - will be patched later
       open_addr = 0
       self.lib_log("open_lib","trampoline: open - needs patch", level=logging.DEBUG)
-    tr.save_all()
+    tr.save_all_but_d0()
     # we save an offset to lib_base patching later on
     lib.patch_off_open = tr.get_code_offset()
     tr.set_ax_l(6, lib_base)
@@ -239,7 +247,7 @@ class LibManager():
     def trap_open_native_lib():
       self._open_native_lib_part2(lib, ctx)
     tr.trap(trap_open_native_lib)
-    tr.restore_all()
+    tr.restore_all_but_d0()
 
     # update ref count
     lib.ref_cnt += 1
@@ -247,14 +255,14 @@ class LibManager():
 
   def _open_native_lib_part2(self, lib, ctx):
     lib.addr_base_open = ctx.cpu.r_reg(REG_D0)
-    self.lib_log("open_lib", "done opening native lib: %s" % lib, level=logging.DEBUG)
-    self._register_open_lib(lib)
+    self.lib_log("open_lib", "done opening native lib: %s -> %06x" % (lib,lib.addr_base_open), level=logging.DEBUG)
+    self._register_open_lib(lib,lib.addr_base_open)
 
-  def _close_native_lib(self, lib, ctx, tr):
+  def _close_native_lib(self, lib, lib_base, ctx, tr):
     """call Close() on native lib"""
     # add Close() call to trampoline
-    lib_base = lib.addr_base_open
     close_addr = ctx.mem.access.r32(lib_base - 10) # LVO_Close
+    lib.addr_base_open = lib_base
     self.lib_log("close_lib","trampoline: close @%06x (lib_base/a6=%06x)" % (close_addr,lib_base), level=logging.DEBUG)
     tr.save_all()
     tr.set_ax_l(6, lib_base)
@@ -271,7 +279,7 @@ class LibManager():
 
   def _close_native_lib_part2(self, lib, ctx):
     result = ctx.cpu.r_reg(REG_D0)
-    self._unregister_open_lib(lib)
+    self._unregister_open_lib(lib,lib.addr_base_open)
     self.lib_log("close_lib", "done closing native lib: %s seg_list=%06x" % (lib, result), level=logging.DEBUG)
 
   # ----- create/free native lib -----

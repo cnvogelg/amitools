@@ -13,9 +13,11 @@ class Puddle:
     self.chunks    = MemoryAlloc(self.mem, self.raw_mem.addr, size, self.raw_mem.addr, label_mgr)
 
   def __del__(self):
-    self.label_mgr.delete_labels_within(self.raw_mem.addr,self.raw_size)
-    self.chunks = None
-    self.alloc.free_memory(self.raw_mem)
+    if self.raw_mem != None:
+      self.label_mgr.delete_labels_within(self.raw_mem.addr,self.raw_size)
+      self.chunks = None
+      self.alloc.free_memory(self.raw_mem)
+      self.raw_mem = None
 
   def AllocPooled(self, name, size):
     return self.chunks.alloc_memory(name,size,True,False)
