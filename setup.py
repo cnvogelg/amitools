@@ -59,7 +59,7 @@ setup(
     packages = find_packages(),
     zip_safe = False,
     entry_points = scripts,
-    setup_requires = ['pytest-runner', 'setuptools_scm'],
+    setup_requires = ['pytest-runner'],
     tests_require= ['pytest'],
 #    install_requires = ['lhafile==0.2.1'],
     dependency_links = [
