@@ -106,7 +106,7 @@ class HunkCommand:
     # setup error handler
     def error_handler(sf, e):
       print "FAILED", sf.get_path(), e
-      return not args.stop
+      return not self.args.stop
     # setup scanners
     scanners = [ADFSScanner(), ZipScanner(), LhaScanner()]
     scanner = FileScanner(self.process_file,
