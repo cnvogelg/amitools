@@ -1,6 +1,16 @@
+import setuptools.command.build_ext
+
+from subprocess import call
 from setuptools import setup, find_packages
 from Cython.Build import cythonize
 from distutils.extension import Extension
+
+class BuildPyCommand(setuptools.command.build_ext.build_ext):
+  """Custom build command."""
+
+  def run(self):
+    call(['make', 'do_gen'])
+    setuptools.command.build_ext.build_ext.run(self)
 
 sourcefiles = [
   'musashi/emu.pyx',
@@ -42,6 +52,9 @@ scripts = {
 }
 
 setup(
+    cmdclass = {
+        'build_ext': BuildPyCommand,
+    },
     name = "amitools",
     description='A package to support development with classic Amiga m68k systems',
     long_description=open("README.md").read(),
