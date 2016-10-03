@@ -48,12 +48,17 @@ def read_fd(fname):
             arg = args.replace(',','/').split('/')
             reg = regs.replace(',','/').split('/')
             if len(arg) != len(reg):
-              raise IOError("Reg and Arg name mismatch in FD File")
-            else:
-              if arg[0] != '':
-                num_args = len(arg)
-                for i in range(num_args):
-                  func_def.add_arg(arg[i],reg[i])
+              # hack for double reg args found in mathieeedoub* libs
+              if len(arg) * 2 == len(reg):
+                arg_hi = map(lambda x: x + "_hi", arg)
+                arg_lo = map(lambda x: x + "_lo", arg)
+                arg = [x for pair in zip(arg_hi, arg_lo) for x in pair]
+              else:
+                raise IOError("Reg and Arg name mismatch in FD File")
+            if arg[0] != '':
+              num_args = len(arg)
+              for i in range(num_args):
+                func_def.add_arg(arg[i],reg[i])
           bias += 6
   f.close()
   return func_table
