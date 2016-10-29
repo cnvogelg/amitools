@@ -7,6 +7,7 @@ from amitools.vamos.Trampoline import Trampoline
 from lexec.PortManager import PortManager
 from lexec.SemaphoreManager import SemaphoreManager
 from lexec.Pool import Pool
+import lexec.Alloc
 import dos.Printf
 
 class ExecLibrary(AmigaLibrary):
@@ -531,3 +532,19 @@ class ExecLibrary(AmigaLibrary):
     addr = ctx.cpu.r_reg(REG_A0)
     # nop for now
     log_exec.info("ReleaseSemaphore(%06x) ignored" % addr)
+
+  # ----- Allocate/Deallocate -----
+
+  def Allocate(self,ctx):
+    mh_addr = ctx.cpu.r_reg(REG_A0)
+    num_bytes = ctx.cpu.r_reg(REG_D0)
+    blk_addr = lexec.Alloc.allocate(ctx, mh_addr, num_bytes)
+    log_exec.info("Allocate(%06x, %06x) -> %06x" % (mh_addr, num_bytes, blk_addr))
+    return blk_addr
+
+  def Deallocate(self,ctx):
+    mh_addr = ctx.cpu.r_reg(REG_A0)
+    blk_addr = ctx.cpu.r_reg(REG_A1)
+    num_bytes = ctx.cpu.r_reg(REG_D0)
+    lexec.Alloc.deallocate(ctx, mh_addr, blk_addr, num_bytes)
+    log_exec.info("Deallocate(%06x, %06x, %06x)" % (mh_addr, blk_addr, num_bytes))

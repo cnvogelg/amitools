@@ -268,3 +268,25 @@ class IORequestStruct(AmigaStruct):
     ('ULONG','io_Offset')
   ]
 IORequestDef = IORequestStruct()
+
+# MemChunk
+class MemChunk(AmigaStruct):
+  _name = "MemChunk"
+  _format = [
+    ('MemChunk*', 'mc_Next'),
+    ('ULONG', 'mc_Bytes')
+  ]
+MemChunkDef = MemChunk()
+
+# MemHeader
+class MemHeader(AmigaStruct):
+  _name = "MemHeader"
+  _format = [
+    ('Node', 'mh_Node'),
+    ('UWORD', 'mh_Attributes'),
+    ('MemChunk*', 'mh_First'),
+    ('APTR', 'mh_Lower'),
+    ('APTR', 'mh_Upper'),
+    ('ULONG', 'mh_Free')
+  ]
+MemHeaderDef = MemHeader()
