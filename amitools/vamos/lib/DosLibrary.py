@@ -252,6 +252,22 @@ class DosLibrary(AmigaLibrary):
     log_dos.warn("SetComment: not implemented")
     return self.DOSTRUE
 
+  def GetProgramName(self, ctx):
+    buf_ptr = ctx.cpu.r_reg(REG_D1)
+    max_len = ctx.cpu.r_reg(REG_D2)
+    prog_name = ctx.process.get_program_name()
+    n = len(prog_name)
+    # return error if name is too long, but copy buffer size
+    if n > max_len - 1:
+      self.setioerr(ctx,ERROR_LINE_TOOL_LONG)
+      ret = self.DOSFALSE
+      prog_name = prog_name[0:max_len]
+    else:
+      ret = self.DOSTRUE
+    ctx.mem.access.w_cstr(buf_ptr, prog_name)
+    log_dos.info("GetProgramName() -> '%s' (%d)" % (prog_name, max_len))
+    return ret
+
   # ----- Variables -----
 
   def find_var(self, ctx, name, flags):
@@ -560,7 +576,7 @@ class DosLibrary(AmigaLibrary):
       ctx.mem.access.w_data(buf_ptr, data)
     log_dos.info("FRead(%s, %06x, %d, %d) -> %d" % (fh, buf_ptr, size, number, got))
     return got
-    
+
   def Seek(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     pos = ctx.cpu.r_reg(REG_D2)
@@ -1438,7 +1454,7 @@ class DosLibrary(AmigaLibrary):
                  (fh_baddr,table_ptr,func_ptr,stack_ptr))
     self.setioerr(ctx, ERROR_OBJECT_WRONG_TYPE)
     return 0
-    
+
   def RunCommand(self, ctx):
     b_addr   = ctx.cpu.r_reg(REG_D1)
     if not b_addr in self.seg_lists:
@@ -1636,7 +1652,7 @@ class DosLibrary(AmigaLibrary):
       if self.dos_list.create_assign(name,lock) != None:
         return -1
       return 0
-    
+
   # ----- misc --------
 
   def StrToLong(self, ctx):

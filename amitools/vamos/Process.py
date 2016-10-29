@@ -273,3 +273,6 @@ class Process:
 
   def is_native_shell(self):
     return self.shell
+
+  def get_program_name(self):
+    return self.bin_basename

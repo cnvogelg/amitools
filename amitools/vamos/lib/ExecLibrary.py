@@ -261,7 +261,7 @@ class ExecLibrary(AmigaLibrary):
       return self.alloc.total()
     else:
       return self.alloc.available()
-      
+
 
   # ----- Message Passing -----
 
@@ -408,7 +408,7 @@ class ExecLibrary(AmigaLibrary):
     AccessStruct(ctx.mem, NodeDef, succ).w_s("ln_Pred", pred)
     log_exec.info("RemHead(%06x): %06x" % (list_addr, node_addr))
     return node_addr
-  
+
   def RemTail(self, ctx):
     list_addr = ctx.cpu.r_reg(REG_A0)
     l = AccessStruct(ctx.mem, ListDef, list_addr)
@@ -498,7 +498,7 @@ class ExecLibrary(AmigaLibrary):
     addr = ctx.cpu.r_reg(REG_A0)
     self.semaphore_mgr.InitSemaphore(addr)
     log_exec.info("InitSemaphore(%06x)" % addr)
-     
+
   def AddSemaphore(self,ctx):
     addr     = ctx.cpu.r_reg(REG_A1)
     sstruct  = AccessStruct(ctx.mem,SignalSemaphoreDef,addr)
@@ -506,7 +506,7 @@ class ExecLibrary(AmigaLibrary):
     name     = ctx.mem.access.r_cstr(name_ptr)
     self.semaphore_mgr.AddSemaphore(addr,name)
     log_exec.info("AddSemaphore(%06x,%s)" % (addr,name))
-     
+
   def RemSemaphore(self,ctx):
     addr = ctx.cpu.r_reg(REG_A1)
     self.semaphore_mgr.RemSemaphore(addr)
@@ -521,3 +521,13 @@ class ExecLibrary(AmigaLibrary):
       return semaphore.addr
     else:
       return 0
+
+  def ObtainSemaphore(self,ctx):
+    addr = ctx.cpu.r_reg(REG_A0)
+    # nop for now
+    log_exec.info("ObtainSemaphore(%06x) ignored" % addr)
+
+  def ReleaseSemaphore(self,ctx):
+    addr = ctx.cpu.r_reg(REG_A0)
+    # nop for now
+    log_exec.info("ReleaseSemaphore(%06x) ignored" % addr)
