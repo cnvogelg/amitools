@@ -118,7 +118,7 @@ class PathManager:
       log_path.info("ami_command_to_sys_path: ami_path=%s -> sys_path=%s" % (ami_path, sys_path))
       return sys_path
     else:
-      log_path.warn("ami_command_to_sys_path: ami_path='%s' not found!" % (ami_path))
+      log_path.info("ami_command_to_sys_path: ami_path='%s' not found!" % (ami_path))
       return None
 
   def ami_to_sys_path(self, lock, ami_path, searchMulti=False, mustExist=False):
@@ -127,7 +127,7 @@ class PathManager:
     # replace assigns
     norm_paths = self.assign_mgr.ami_path_resolve(abs_path)
     if len(norm_paths) == 0 or ami_path=="*":
-      log_path.warn("ami_to_sys_path: ami_path='%s' -> abs_path='%s' -> no resolved paths!" % (ami_path, abs_path))
+      log_path.info("ami_to_sys_path: ami_path='%s' -> abs_path='%s' -> no resolved paths!" % (ami_path, abs_path))
       return None
     # now we have paths with volume:abs/path
     sys_path = None
