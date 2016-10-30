@@ -63,6 +63,7 @@ def main():
   parser.add_argument('-A', '--auto-assign', action='store', default=None, help="define auto assign ami path, e.g. vol:/ami/path")
   parser.add_argument('-p', '--path', action='append', default=None, help="define command search ami path, e.g. c:")
   parser.add_argument('-d', '--cwd', action='store', default=None, help="set current working directory")
+  parser.add_argument('-P', '--pure-ami-paths', action='store_true', default=None, help="do not allow sys paths for binary")
   args = parser.parse_args()
 
   # --- init config ---
@@ -108,7 +109,18 @@ def main():
   if cwd is None:
     cwd = 'root:' + os.getcwd()
 
-  proc = Process(vamos, args.bin, args.args, stack_size=cfg.stack_size*1024,
+  # prepare binary path
+  binary = args.bin
+  if not cfg.pure_ami_paths:
+    # auto-convert abs paths to root:
+    if binary == os.path.abspath(binary):
+      binary = 'root:' + binary
+
+  # summary
+  log_main.info("bin='%s', args='%s', cwd='%s', shell='%s', stack=%d",
+    binary, args.args, cwd, args.shell, cfg.stack_size)
+
+  proc = Process(vamos, binary, args.args, stack_size=cfg.stack_size*1024,
                  shell=args.shell, cwd=cwd)
   if not proc.ok:
     sys.exit(1)
