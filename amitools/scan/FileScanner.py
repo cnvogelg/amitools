@@ -12,12 +12,13 @@ class FileScanner:
 
   def __init__(self, handler=None, ignore_filters=None, scanners=None,
                error_handler=None, ram_bytes=10 * 1024 * 1024,
-               skip_handler=None):
+               skip_handler=None, warning_handler=None):
     """the handler will be called with all the scanned files.
        the optional ignore_filters contains a list of glob pattern to
        ignore file names"""
     self.handler = handler
     self.error_handler = error_handler
+    self.warning_handler = warning_handler
     self.skip_handler = skip_handler
     self.ignore_filters = ignore_filters
     self.scanners = scanners
@@ -109,6 +110,11 @@ class FileScanner:
     sf = scan_file.create_clone(seekable, fb)
     scan_file.close()
     return sf
+
+  def warn(self, scan_file, msg):
+    wh = self.warning_handler
+    if wh is not None:
+      wh(scan_file, msg)
 
 
 # mini test

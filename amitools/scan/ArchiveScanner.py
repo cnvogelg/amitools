@@ -1,15 +1,21 @@
 from __future__ import print_function
 
 import zipfile
-import lhafile
 import StringIO
+
+# optional lhafile
+try:
+  import lhafile
+except ImportError:
+  lhafile = None
+
 
 class ArchiveScanner:
   """Scan archives and visit all files"""
 
   exts = [] # valid file extensions
 
-  def _create_archive_obj(self, fobj):
+  def _create_archive_obj(self, fobj, scanner):
     pass
 
   def _create_entry_scan_file(self, arc, info, sf):
@@ -30,7 +36,9 @@ class ArchiveScanner:
     else:
       sf = scan_file
     # create archive obj
-    arc = self._create_archive_obj(sf.get_fobj())
+    arc = self._create_archive_obj(sf, scanner)
+    if arc is None:
+      return True # simply ignore
     # get infos
     infos = arc.infolist()
     for info in infos:
@@ -48,8 +56,12 @@ class ZipScanner(ArchiveScanner):
 
   exts = [".zip"]
 
-  def _create_archive_obj(self, file_name):
-    return zipfile.ZipFile(file_name, "r")
+  def _create_archive_obj(self, sf, scanner):
+    try:
+      fobj = sf.get_fobj()
+      return zipfile.ZipFile(fobj, "r")
+    except Exception as e:
+      scanner.warn(sf, "error reading archive: %s" % e)
 
   def _create_entry_scan_file(self, arc, info, scan_file):
     name = info.filename
@@ -64,8 +76,15 @@ class LhaScanner(ArchiveScanner):
 
   exts = [".lha", ".lzh"]
 
-  def _create_archive_obj(self, file_name):
-    return lhafile.LhaFile(file_name, "r")
+  def _create_archive_obj(self, sf, scanner):
+    if lhafile:
+      try:
+        fobj = sf.get_fobj()
+        return lhafile.LhaFile(fobj, "r")
+      except Exception as e:
+        scanner.warn(sf, "error reading archive: %s" % e)
+    else:
+      scanner.warn(sf, "can't handle archive. missing 'lhafile' module.")
 
   def _create_entry_scan_file(self, arc, info, scan_file):
     data = arc.read(info.filename)
