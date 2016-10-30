@@ -1,0 +1,45 @@
+#!/usr/bin/env python2.7
+#
+# a small wrapper to run amitools' scripts from here without installation
+#
+# it assumes that this script resides in a directory of the amitools base dir
+
+from __future__ import print_function
+
+import os
+import sys
+import importlib
+
+# get current directory
+cur_dir = os.path.dirname(__file__)
+# amitools folder is in parent dir
+base_dir = os.path.abspath(os.path.join(cur_dir, os.pardir))
+# check for amitools dir
+at_dir = os.path.join(base_dir, "amitools")
+if not os.path.isdir(at_dir):
+  print("amitools: can't find 'amitools' dir in base dir!!", file=sys.stderr)
+  sys.exit(1)
+
+# add base dir to python path
+sys.path.insert(1, base_dir)
+
+# tool
+tool = os.path.basename(__file__)
+# tool module name
+tool_module = "amitools.tools." + tool
+main = None
+# import tool module
+try:
+  mod = importlib.import_module(tool_module)
+  mod_dict = mod.__dict__
+  # check for main function
+  if 'main' not in mod_dict:
+    print("amitools: no 'main' function in tool module found!", file=sys.stderr)
+    sys.exit(3)
+  main = mod_dict['main']
+except ImportError as e:
+  print("amitools: error importing tool '%s': %s" % (tool_module, e), file=sys.stderr)
+  sys.exit(2)
+
+# call tool
+main()

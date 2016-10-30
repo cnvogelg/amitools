@@ -23,9 +23,7 @@ will be very helpful.
    - [Cython][1] >= 0.21
  - All other packages are installed automatically, if missing:
    - [pytest][2]
-   - [lhafile - FS Edition][3]
-   - setuptools_scm
-   - pytest-runner
+   - [lhafile - FS Edition][3] (Optional: required to use lha file scanner)
  - First make sure to have the Python package installer ```pip```:
   - On Mac OS X using [MacPorts][4] (Tool is called ```pip-2.7``` here):
   ```
@@ -58,12 +56,7 @@ pacman -S mingw-w64-x86_64-python2-pip mingw-w64-x86_64-gcc git make
 
 ## Installation
 
- - The musashi CPU emulator required for vamos needs some code generated first:
-```
-make do_gen
-```
- - This will create some files in directory ```gen```
- - Now you can use Python's ```setuptools``` to install everything:
+ - You have multiple variants to install the tools with Python's `setuptools`:
    - **Global Install** is available for all users of your system and needs root privileges
    ```
 sudo python setup.py install
@@ -76,6 +69,12 @@ python setup.py install --user
    you to change/develop the code and test it immediately. (I prefer user install here)
    ```
 python setup.py develop --user
+```
+   - **Run In Place** allows you to run the binaries directly from the `bin` directory
+  without any installation. You need `setup.py` only to build the native library
+  of vamos:
+  ```
+python setup.py build
 ```
 
 ## Contents
