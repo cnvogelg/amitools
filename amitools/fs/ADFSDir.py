@@ -25,7 +25,7 @@ class ADFSDir(ADFSNode):
       return "[Dir]"
   
   def blocks_create_old(self, anon_blk):
-    ud = UserDirBlock(self.blkdev, anon_blk.blk_num)
+    ud = UserDirBlock(self.blkdev, anon_blk.blk_num, self.volume.is_longname)
     ud.set(anon_blk.data)
     if not ud.valid:
       raise FSError(INVALID_USER_DIR_BLOCK, block=anon_blk)
@@ -126,7 +126,7 @@ class ADFSDir(ADFSNode):
     blk_num = free_blks[0]
     blkdev = self.blkdev
     # create a UserDirBlock
-    ud = UserDirBlock(blkdev, blk_num)
+    ud = UserDirBlock(blkdev, blk_num, self.volume.is_longname)
     ud.create(parent_blk, name.get_ami_str(), meta_info.get_protect(), meta_info.get_comment_ami_str(), meta_info.get_mod_ts(), hash_chain_blk)
     ud.write()    
     self.set_block(ud)
@@ -147,7 +147,7 @@ class ADFSDir(ADFSNode):
       meta_info.set_current_as_mod_time()
       meta_info.set_default_protect()
     # check file name
-    fn = FileName(name, is_intl=self.volume.is_intl)
+    fn = FileName(name, is_intl=self.volume.is_intl,is_longname=self.volume.is_longname)
     if not fn.is_valid():
       raise FSError(INVALID_FILE_NAME, file_name=name, node=self)
     # does already exist an entry in this dir with this name?

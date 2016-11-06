@@ -8,6 +8,7 @@ from amitools.fs.block.FileListBlock import FileListBlock
 from amitools.fs.block.FileDataBlock import FileDataBlock
 from amitools.fs.block.BitmapBlock import BitmapBlock
 from amitools.fs.block.BitmapExtBlock import BitmapExtBlock
+from amitools.fs.block.CommentBlock import CommentBlock
 from amitools.fs.FSString import FSString
 import amitools.fs.DosType as DosType
 
@@ -45,7 +46,8 @@ class BlockScan:
   BT_FILE_DATA = 5
   BT_BITMAP = 6
   BT_BITMAP_EXT = 7
-  NUM_BT = 8
+  BT_COMMENT = 8
+  NUM_BT = 9
   
   def __init__(self, blkdev, log, dos_type):
     self.blkdev = blkdev
@@ -141,7 +143,7 @@ class BlockScan:
         elif blk.is_user_dir_block():
           bi.blk_type = self.BT_DIR
           bi.blk_status = self.BS_TYPE
-          user = UserDirBlock(self.blkdev, blk_num)
+          user = UserDirBlock(self.blkdev, blk_num, DosType.is_longname(self.dos_type))
           user.set(data)
           bi.name = FSString(user.name)
           bi.parent_blk = user.parent
@@ -153,7 +155,7 @@ class BlockScan:
         elif blk.is_file_header_block():
           bi.blk_type = self.BT_FILE_HDR
           bi.blk_status = self.BS_TYPE
-          fh = FileHeaderBlock(self.blkdev, blk_num)
+          fh = FileHeaderBlock(self.blkdev, blk_num, DosType.is_longname(self.dos_type))
           fh.set(data)
           bi.name = FSString(fh.name)
           bi.parent_blk = fh.parent
@@ -184,6 +186,12 @@ class BlockScan:
           bi.data_size = fd.data_size
           bi.hdr_key = fd.hdr_key
           bi.seq_num = fd.seq_num
+        elif blk.is_comment_block():
+          bi.blk_type = self.BT_COMMENT
+          bi.blk_status = self.BS_TYPE
+          cblk = CommentBlock(self.blkdev, blk_num)
+          bi.hdr_key = cblk.hdr_key
+          bi.own_key = cblk.own_key
               
     except IOError,e:
       self.log.msg(Log.ERROR, "Can't read block", blk_num)

@@ -3,6 +3,7 @@ import ctypes
 
 from block.BitmapBlock import BitmapBlock
 from block.BitmapExtBlock import BitmapExtBlock
+from DosType import *
 from FSError import *
 
 class ADFSBitmap:
@@ -93,6 +94,15 @@ class ADFSBitmap:
     self.write_only_bits()
       
   def write_only_bits(self):
+    # For DOS6 and DOS7, the root block contains the number of free blocks_used
+    # So we potentially have to update it even if only bits shall be rewritten
+    if rootblock_tracks_used_blocks(self.root_blk.fstype):
+      # TODO: Track the used blocks instead of recalculating it every time
+      blocks_used = self.get_num_used()
+      if blocks_used != self.root_blk.blocks_used:
+        self.root_blk.blocks_used = blocks_used
+        self.root_blk.write()
+    
     # write bitmap blocks
     off = 0
     for blk in self.bitmap_blks:
@@ -191,6 +201,13 @@ class ADFSBitmap:
         num+=1
     return num
 
+  def get_num_used(self):
+    num = 0
+    for i in xrange(self.bitmap_bits):
+      if not self.get_bit(i):
+        num+=1
+    return num
+    
   def alloc_n(self, num, start=None):
     free_blks = self.find_n_free(num, start)
     if free_blks == None:

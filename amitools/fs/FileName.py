@@ -3,12 +3,13 @@ from FSString import FSString
 class FileName:
   root_path_aliases = (u'', u'/', u':')
   
-  def __init__(self, name, is_intl=False):
+  def __init__(self, name, is_intl=False, is_longname=False):
     # check that name is a FSString
     if not isinstance(name, FSString):
       raise ValueError("FileName's name must be a FSString")
     self.name = name
     self.is_intl = is_intl
+    self.is_longname = is_longname
   
   def __str__(self):
     return self.name
@@ -26,7 +27,7 @@ class FileName:
     pc = self.name.get_unicode().split("/")
     p = []
     for path in pc:
-      p.append(FileName(FSString(path), is_intl=self.is_intl))
+      p.append(FileName(FSString(path), is_intl=self.is_intl, is_longname=self.is_longname))
     return p
   
   def get_dir_and_base_name(self):
@@ -77,7 +78,10 @@ class FileName:
           if o == ':' or o == '/':
             return False
         # check max size
-        if len(s) > 30:
+        if self.is_longname:
+          if len(s) > 110:
+              return False
+        elif len(s) > 30:
             return False
     return True
   

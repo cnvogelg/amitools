@@ -18,6 +18,7 @@ class Block:
   T_DATA = 8
   T_LIST = 16
   T_DIR_CACHE = 33
+  T_COMMENT = 64
   # block sub types
   ST_ROOT = 1
   ST_USERDIR = 2
@@ -56,6 +57,9 @@ class Block:
   
   def is_file_data_block(self):
     return self.type == Block.T_DATA
+  
+  def is_comment_block(self):
+    return self.type == Block.T_COMMENT
   
   def read(self):
     if self.data == None:

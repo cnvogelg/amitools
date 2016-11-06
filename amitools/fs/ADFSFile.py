@@ -1,3 +1,4 @@
+from block.EntryBlock import EntryBlock
 from block.FileHeaderBlock import FileHeaderBlock
 from block.FileListBlock import FileListBlock
 from block.FileDataBlock import FileDataBlock
@@ -22,7 +23,7 @@ class ADFSFile(ADFSNode):
   
   def blocks_create_old(self, anon_blk):
     # create file header block
-    fhb = FileHeaderBlock(self.blkdev, anon_blk.blk_num)
+    fhb = FileHeaderBlock(self.blkdev, anon_blk.blk_num, self.volume.is_longname)
     fhb.set(anon_blk.data)
     if not fhb.valid:
       raise FSError(INVALID_FILE_HEADER_BLOCK, block=anon_blk)
@@ -58,6 +59,8 @@ class ADFSFile(ADFSNode):
 
     # calc number of total blocks occupied by this file
     self.total_blks = 1 + my_num_ext_blks + my_num_data_blks
+    if self.block.comment_block_id != 0:
+        self.total_blks += 1
 
     return fhb
   
@@ -169,7 +172,7 @@ class ADFSFile(ADFSNode):
     ppb = self.volume.blkdev.block_longs - 56 # data pointer per block
     
     # create file header block
-    fhb = FileHeaderBlock(self.blkdev, fhb_num)
+    fhb = FileHeaderBlock(self.blkdev, fhb_num, self.volume.is_longname)
     byte_size = len(self.data)
     if self.num_data_blks > ppb:
       hdr_blks = self.data_blk_nums[0:ppb]

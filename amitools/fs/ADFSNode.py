@@ -1,3 +1,5 @@
+from block.CommentBlock import CommentBlock
+from block.EntryBlock import EntryBlock
 from FileName import FileName
 from MetaInfo import MetaInfo
 from ProtectFlags import ProtectFlags
@@ -22,12 +24,17 @@ class ADFSNode:
   
   def set_block(self, block):  
     self.block = block
-    self.name = FileName(FSString(self.block.name), is_intl=self.volume.is_intl)
+    self.name = FileName(FSString(self.block.name), is_intl=self.volume.is_intl,is_longname=self.volume.is_longname)
     self.valid = True
     self.create_meta_info()
     
   def create_meta_info(self):
-    self.meta_info = MetaInfo(self.block.protect, self.block.mod_ts, FSString(self.block.comment))
+    comment = self.block.comment
+    if self.block.comment_block_id != 0:
+        comment_block = CommentBlock(self.blkdev, self.block.comment_block_id)
+        comment_block.read()
+        comment = comment_block.comment
+    self.meta_info = MetaInfo(self.block.protect, self.block.mod_ts, FSString(comment))
 
   def get_file_name(self):
     return self.name
@@ -76,7 +83,29 @@ class ADFSNode:
     # alter comment
     comment = meta_info.get_comment()
     if comment != None and hasattr(self.block, "comment"):
-      self.block.comment = comment.get_ami_str()
+      if EntryBlock.needs_extra_comment_block(self.name.get_ami_str_name(), comment.get_ami_str()):
+        if self.block.comment_block_id == 0:
+          # Allocate and initialize extra block for comment
+          blks = self.volume.bitmap.alloc_n(1)
+          if blks is not None:
+            cblk = CommentBlock(self.blkdev, blks[0])
+            cblk.create(self.block.blk_num)
+            self.block.comment_block_id = cblk.blk_num
+            self.volume.bitmap.write_only_bits()
+          else:
+            raise FSError(NO_FREE_BLOCKS, node=self)
+        else:
+          cblk = CommentBlock(self.blkdev, self.block.comment_block_id)
+          cblk.read()
+        cblk.comment = comment.get_ami_str()
+        cblk.write()
+      else:
+        self.block.comment = comment.get_ami_str()
+        if self.block.comment_block_id != 0:
+          self.volume.bitmap.dealloc_n([self.block.comment_block_id])
+          self.block.comment_block_id = 0
+          self.volume.bitmap.write_only_bits()
+
       self.meta_info.set_comment(comment)
       dirty = True
       if record != None:
