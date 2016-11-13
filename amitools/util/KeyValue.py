@@ -29,4 +29,16 @@ def parse_key_value_strings(strs):
   for s in strs:
     parse_key_value_string(s, result)
   return result
-  
+
+def parse_keys_values_in_string(s):
+  """parse key1=value1,key2=value2,..."""
+  return parse_key_value_strings(s.split(','))
+
+def parse_name_args_string(s):
+  """parse name:key1=value,... and return name,args_dict"""
+  pos = s.find(":")
+  if pos == -1:
+    return s, {}
+  name = s[:pos]
+  args = parse_keys_values_in_string(s[pos+1:])
+  return name, args

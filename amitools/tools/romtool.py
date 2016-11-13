@@ -12,6 +12,7 @@ import logging
 
 from amitools.util.Logging import *
 from amitools.util.HexDump import *
+import amitools.util.KeyValue as KeyValue
 from amitools.rom.RomSplitter import *
 from amitools.rom.RomBuilder import *
 from amitools.rom.RomPatcher import *
@@ -259,16 +260,17 @@ def do_patch_cmd(args):
   # apply patches
   rp = RomPatcher(rom)
   for patch in args.patches:
-    logging.info("searching patch '%s'", patch)
-    p = rp.find_patch(patch)
+    name, patch_args = KeyValue.parse_name_args_string(patch)
+    logging.info("searching patch '%s' -> %s %s", patch, name, patch_args)
+    p = rp.find_patch(name)
     if p is None:
-      logging.error("can't find patch '%s'", patch)
+      logging.error("can't find patch '%s'", name)
       return 1
-    ok = rp.apply_patch(p)
+    ok = rp.apply_patch(p, patch_args)
     if ok:
-      logging.info("applied patch '%s'", patch)
+      logging.info("applied patch '%s'", name)
     else:
-      logging.error("error applying patch '%s'", patch)
+      logging.error("error applying patch '%s'", name)
       return 2
   # update kick sum
   rom_data = rp.get_patched_rom()
@@ -288,6 +290,10 @@ def do_patch_cmd(args):
 def do_patches_cmd(args):
   for p in patches:
     print("%-10s  %s" % (p.name, p.desc))
+    args_desc = p.args_desc
+    if args_desc is not None:
+      for ad in args_desc:
+        print("%10s    %-10s  %s" % ("", ad, args_desc[ad]))
 
 
 def do_combine_cmd(args):
@@ -464,7 +470,7 @@ def setup_patch_parser(parser):
   parser.add_argument('image',
                       help='rom image to be patched')
   parser.add_argument('patches', default=None, nargs='+',
-                      help='patches to be applied')
+                      help='patches to be applied: name[:arg1[=val1],...]')
   parser.add_argument('-o', '--output',
                       help='rom image file to be built')
   parser.set_defaults(cmd=do_patch_cmd)

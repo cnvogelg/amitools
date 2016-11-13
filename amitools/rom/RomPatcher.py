@@ -3,19 +3,26 @@ from RomAccess import RomAccess
 
 
 class RomPatch:
-  def __init__(self, name, desc):
+  def __init__(self, name, desc, args_desc=None):
     self.name = name
     self.desc = desc
+    self.args_desc = args_desc
 
-  def apply_patch(self, access):
+  def apply_patch(self, access, args=None):
     return False
+
+  def _ensure_arg(self, args, arg_name):
+    if arg_name not in args:
+      logging.error("%s: '%s' argument missing!" % (self.name, arg_name))
+      return False
+    return True
 
 
 class OneMegRomPatch(RomPatch):
   def __init__(self):
     RomPatch.__init__(self, "1mb_rom", "Patch Kickstart to support ext ROM with 512 KiB")
 
-  def apply_patch(self, access):
+  def apply_patch(self, access, args=None):
     off = 8
     while off < 0x400:
       v = access.read_long(off)
@@ -44,9 +51,46 @@ class OneMegRomPatch(RomPatch):
     return False
 
 
+class BootConRomPatch(RomPatch):
+  def __init__(self):
+    RomPatch.__init__(self, "boot_con", "Set the boot console",
+      { "name" : "name of the new console, e.g. 'CON:MyConsole'"})
+
+  def apply_patch(self, access, args):
+    # search CON:
+    data = access.get_data()
+    off = data.find("CON:")
+    if off == -1:
+      logging.error("console not found!")
+      return False
+    # find terminator
+    pos = data.find(chr(0), off)
+    if pos == -1:
+      logging.error("no console end found!")
+      return False
+    # build old string
+    con_old_len = pos - off
+    con_old = data[off:pos]
+    logging.info("@%08x: +%08x  old='%s'" % (off, con_old_len, con_old))
+    # check new string
+    if 'name' in args:
+      con_new = args['name']
+      con_new_len = len(con_new)
+      if con_new_len > con_old_len:
+        logging.error("new console name is too long (>%d)!" % con_len)
+        return False
+      # pad and write to rom
+      pad_len = con_old_len - con_new_len + 1
+      con_new += chr(0) * pad_len
+      data[off:pos+1] = con_new
+      logging.info("new='%s'" % (con_new_len))
+    return True
+
+
 # list of all available patch classes
 patches = [
-  OneMegRomPatch()
+  OneMegRomPatch(),
+  BootConRomPatch()
 ]
 
 
@@ -66,8 +110,8 @@ class RomPatcher:
       if p.name == name:
         return p
 
-  def apply_patch(self, patch):
-    return patch.apply_patch(self.access)
+  def apply_patch(self, patch, args=None):
+    return patch.apply_patch(self.access, args)
 
   def get_patched_rom(self):
     return self.access.get_data()
