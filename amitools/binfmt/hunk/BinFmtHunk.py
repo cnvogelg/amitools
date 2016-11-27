@@ -137,9 +137,9 @@ class BinFmtHunk:
     for seg in bi_segs:
       # add relocations?
       hseg = seg.file_data
-      reloc_blk = hseg.reloc_blk
-      if reloc_blk is not None:
-        self._add_hunk_relocs(reloc_blk, seg, bi_segs)
+      reloc_blks = hseg.reloc_blks
+      if reloc_blks is not None:
+        self._add_hunk_relocs(reloc_blks, seg, bi_segs)
       # add symbol table
       symbol_blk = hseg.symbol_blk
       if symbol_blk is not None:
@@ -151,24 +151,25 @@ class BinFmtHunk:
 
     return bi
 
-  def _add_hunk_relocs(self, blk, seg, all_segs):
+  def _add_hunk_relocs(self, blks, seg, all_segs):
     """add relocations to a segment"""
-    if blk.blk_id not in (Hunk.HUNK_ABSRELOC32, Hunk.HUNK_RELOC32SHORT):
-      raise HunkParseError("Invalid Relocations for BinImage: %d" % blk_id)
-    relocs = blk.relocs
-    for r in relocs:
-      hunk_num = r[0]
-      offsets = r[1]
-      to_seg = all_segs[hunk_num]
-      # create reloc for target segment or reuse one.
-      rl = seg.get_reloc(to_seg)
-      if rl == None:
-        rl = Relocations(to_seg)
-      # add offsets
-      for o in offsets:
-        r = Reloc(o)
-        rl.add_reloc(r)
-      seg.add_reloc(to_seg, rl)
+    for blk in blks:
+      if blk.blk_id not in (Hunk.HUNK_ABSRELOC32, Hunk.HUNK_RELOC32SHORT):
+        raise HunkParseError("Invalid Relocations for BinImage: %d" % blk_id)
+      relocs = blk.relocs
+      for r in relocs:
+        hunk_num = r[0]
+        offsets = r[1]
+        to_seg = all_segs[hunk_num]
+        # create reloc for target segment or reuse one.
+        rl = seg.get_reloc(to_seg)
+        if rl == None:
+          rl = Relocations(to_seg)
+        # add offsets
+        for o in offsets:
+          r = Reloc(o)
+          rl.add_reloc(r)
+        seg.add_reloc(to_seg, rl)
 
   def _add_hunk_symbols(self, blk, seg):
     """add symbols to segment"""

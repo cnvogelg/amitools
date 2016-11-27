@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import print_function
 
 from HunkBlockFile import *
 from HunkDebug import HunkDebug
@@ -10,7 +11,7 @@ class HunkSegment:
     self.blocks = None
     self.seg_blk = None
     self.symbol_blk = None
-    self.reloc_blk = None
+    self.reloc_blks = None
     self.debug_blks = None
     self.debug_infos = None
 
@@ -18,7 +19,7 @@ class HunkSegment:
     return "[seg=%s,symbol=%s,reloc=%s,debug=%s,debug_info=%s]" % \
       (self._blk_str(self.seg_blk),
        self._blk_str(self.symbol_blk),
-       self._blk_str(self.reloc_blk),
+       self._blk_str_list(self.reloc_blks),
        self._blk_str_list(self.debug_blks),
        self._debug_infos_str())
 
@@ -50,9 +51,9 @@ class HunkSegment:
     else:
       use_short = self._are_relocs_short(relocs)
     if use_short:
-      self.reloc_blk = HunkRelocWordBlock(HUNK_RELOC32SHORT, relocs)
+      self.reloc_blks = [HunkRelocWordBlock(HUNK_RELOC32SHORT, relocs)]
     else:
-      self.reloc_blk = HunkRelocLongBlock(HUNK_ABSRELOC32, relocs)
+      self.reloc_blks = [HunkRelocLongBlock(HUNK_ABSRELOC32, relocs)]
 
   def setup_symbols(self, symbols):
     """symbols: ((name, off), ...)"""
@@ -119,10 +120,9 @@ class HunkSegment:
             self.debug_infos = []
           self.debug_infos.append(debug_info)
       elif blk_id in (HUNK_ABSRELOC32, HUNK_RELOC32SHORT):
-        if self.reloc_blk is None:
-          self.reloc_blk = blk
-        else:
-          raise HunkParseError("duplicate relocs in hunk")
+        if self.reloc_blks is None:
+          self.reloc_blks = []
+        self.reloc_blks.append(blk)
       else:
         raise HunkParseError("invalid hunk block")
 
@@ -136,8 +136,8 @@ class HunkSegment:
       raise HunkParseError("no segment block!")
     self.blocks = [self.seg_blk]
     # has relocations
-    if self.reloc_blk is not None:
-      self.blocks.append(self.reloc_blk)
+    if self.reloc_blks is not None:
+      self.blocks += self.reloc_blks
     # has debug?
     if self.debug_blks is not None:
       self.blocks += self.debug_blks
