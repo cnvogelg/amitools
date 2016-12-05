@@ -1,10 +1,11 @@
 import time
 from Block import Block
+from EntryBlock import EntryBlock
 from ..ProtectFlags import ProtectFlags
 
-class UserDirBlock(Block):
-  def __init__(self, blkdev, blk_num):
-    Block.__init__(self, blkdev, blk_num, is_type=Block.T_SHORT, is_sub_type=Block.ST_USERDIR)
+class UserDirBlock(EntryBlock):
+  def __init__(self, blkdev, blk_num, is_longname):
+    EntryBlock.__init__(self, blkdev, blk_num, is_type=Block.T_SHORT, is_sub_type=Block.ST_USERDIR,is_longname=is_longname)
   
   def set(self, data):
     self._set_data(data)
@@ -22,9 +23,7 @@ class UserDirBlock(Block):
     # UserDir fields
     self.own_key = self._get_long(1)
     self.protect = self._get_long(-48)
-    self.comment = self._get_bstr(-46, 79)
-    self.mod_ts = self._get_timestamp(-23)
-    self.name = self._get_bstr(-20, 30)
+    self._read_nac_modts()
     self.hash_chain = self._get_long(-4)
     self.parent = self._get_long(-3)
     self.extension = self._get_long(-2)
@@ -64,9 +63,7 @@ class UserDirBlock(Block):
     Block._create_data(self)
     self._put_long(1, self.own_key)
     self._put_long(-48, self.protect)
-    self._put_bstr(-46, 79, self.comment)
-    self._put_timestamp(-23, self.mod_ts)
-    self._put_bstr(-20, 30, self.name)
+    self._write_nac_modts()
     self._put_long(-4, self.hash_chain)
     self._put_long(-3, self.parent)
     self._put_long(-2, self.extension)

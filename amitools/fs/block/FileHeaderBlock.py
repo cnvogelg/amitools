@@ -1,11 +1,13 @@
 import time
 from Block import Block
+from EntryBlock import EntryBlock
+from CommentBlock import CommentBlock
 from ..ProtectFlags import ProtectFlags
 from ..TimeStamp import *
 
-class FileHeaderBlock(Block):
-  def __init__(self, blkdev, blk_num):
-    Block.__init__(self, blkdev, blk_num, is_type=Block.T_SHORT, is_sub_type=Block.ST_FILE)
+class FileHeaderBlock(EntryBlock):
+  def __init__(self, blkdev, blk_num, is_longname):
+    EntryBlock.__init__(self, blkdev, blk_num, is_type=Block.T_SHORT, is_sub_type=Block.ST_FILE, is_longname=is_longname)
   
   def set(self, data):
     self._set_data(data)
@@ -37,9 +39,7 @@ class FileHeaderBlock(Block):
     self.protect = self._get_long(-48)
     self.protect_flags = ProtectFlags(self.protect)
     self.byte_size = self._get_long(-47)
-    self.comment = self._get_bstr(-46, 79)
-    self.mod_ts = self._get_timestamp(-23)
-    self.name = self._get_bstr(-20, 30)
+    self._read_nac_modts()
     self.hash_chain = self._get_long(-4)
     self.parent = self._get_long(-3)
     self.extension = self._get_long(-2)
@@ -59,9 +59,9 @@ class FileHeaderBlock(Block):
     
     self._put_long(-48, self.protect)
     self._put_long(-47, self.byte_size)
-    self._put_bstr(-46, 79, self.comment)
-    self._put_timestamp(-23, self.mod_ts)
-    self._put_bstr(-20, 30, self.name)
+
+    self._write_nac_modts()
+
     self._put_long(-4, self.hash_chain)
     self._put_long(-3, self.parent)
     self._put_long(-2, self.extension)

@@ -24,6 +24,7 @@ class ADFSVolume:
     self.is_ffs = None
     self.is_intl = None
     self.is_dircache = None
+    self.is_longname = None
     self.name = None
     self.meta_info = None
     
@@ -38,6 +39,7 @@ class ADFSVolume:
       self.is_ffs = DosType.is_ffs(dos_type)
       self.is_intl = DosType.is_intl(dos_type)
       self.is_dircache = DosType.is_dircache(dos_type)
+      self.is_longname = DosType.is_longname(dos_type)
       # read root 
       self.root = RootBlock(self.blkdev, self.boot.calc_root_blk)
       self.root.read()
@@ -57,24 +59,27 @@ class ADFSVolume:
     else:
       raise FSError(INVALID_BOOT_BLOCK, block=self.boot)
   
-  def create(self, name, meta_info=None, dos_type=None, boot_code=None, is_ffs=False, is_intl=False, is_dircache=False):
+  def create(self, name, meta_info=None, dos_type=None, boot_code=None, is_ffs=False, is_intl=False, is_dircache=False, is_longname=False):
     # determine dos_type
     if dos_type == None:
       dos_type = DosType.DOS0
-      if is_ffs:
-        dos_type |= DosType.DOS_MASK_FFS
-      if is_dircache:
+      if is_longname:
+        dos_type = DosType.DOS6
+      elif is_dircache:
         dos_type |= DosType.DOS_MASK_DIRCACHE
       elif is_intl:
         dos_type |= DosType.DOS_MASK_INTL
+      if is_ffs:
+        dos_type |= DosType.DOS_MASK_FFS
     # update flags
     self.is_ffs = DosType.is_ffs(dos_type)
     self.is_intl = DosType.is_intl(dos_type)
     self.is_dircache = DosType.is_dircache(dos_type)
+    self.is_longname = DosType.is_longname(dos_type)
     # convert and check volume name
     if not isinstance(name, FSString):
       raise ValueError("create's name must be a FSString")
-    fn = FileName(name, is_intl=self.is_intl)
+    fn = FileName(name, is_intl=self.is_intl, is_longname=False) # Volumes don't support long names
     if not fn.is_valid():
       raise FSError(INVALID_VOLUME_NAME, file_name=name, node=self)
     # create a boot block
@@ -92,7 +97,7 @@ class ADFSVolume:
     disk_ts = meta_info.get_disk_ts()
     mod_ts = meta_info.get_mod_ts()
     self.meta_info = meta_info
-    self.root.create(name.get_ami_str(), create_ts, disk_ts, mod_ts)
+    self.root.create(name.get_ami_str(), create_ts, disk_ts, mod_ts, fstype=dos_type)
     self.name = name
     # create bitmap
     self.bitmap = ADFSBitmap(self.root)
@@ -132,7 +137,7 @@ class ADFSVolume:
     if not isinstance(path_name, FSString):
       raise ValueError("get_path_name's path must be a FSString")
     # create and check file name
-    fn = FileName(path_name, is_intl=self.is_intl)
+    fn = FileName(path_name, is_intl=self.is_intl, is_longname=self.is_longname)
     if not fn.is_valid():
       raise FSError(INVALID_FILE_NAME, file_name=path_name, node=self)      
     # find node
@@ -162,7 +167,7 @@ class ADFSVolume:
     if suggest_name != None and not isinstance(suggest_name, FSString):
       raise ValueError("get_create_path_name's suggest_name must be a FSString")
     # is root path?
-    fn = FileName(path_name, is_intl=self.is_intl)
+    fn = FileName(path_name, is_intl=self.is_intl, is_longname=self.is_longname)
     if not fn.is_valid():
       raise FSError(INVALID_FILE_NAME, file_name=path_name, node=self)      
     # find node
@@ -278,7 +283,7 @@ class ADFSVolume:
     if not isinstance(name, FSString):
       raise ValueError("relabel's name must be a FSString")
     # validate file name
-    fn = FileName(name, is_intl=self.is_intl)
+    fn = FileName(name, is_intl=self.is_intl, is_longname=False)
     if not fn.is_valid():
       raise FSError(INVALID_VOLUME_NAME, file_name=name, node=self)
     # update root block
@@ -295,7 +300,7 @@ class ADFSVolume:
     if not isinstance(ami_path, FSString):
       raise ValueError("create_dir's ami_path must be a FSString")
     # check file path
-    fn = FileName(ami_path, is_intl=self.is_intl)
+    fn = FileName(ami_path, is_intl=self.is_intl, is_longname=self.is_longname)
     if not fn.is_valid():
       raise FSError(INVALID_FILE_NAME, file_name=ami_path)
     # split into dir and base name

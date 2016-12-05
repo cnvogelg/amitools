@@ -6,7 +6,7 @@ class RootBlock(Block):
   def __init__(self, blkdev, blk_num):
     Block.__init__(self, blkdev, blk_num, is_type=Block.T_SHORT, is_sub_type=Block.ST_ROOT)
   
-  def create(self, name, create_ts=None, disk_ts=None, mod_ts=None, extension=0):
+  def create(self, name, create_ts=None, disk_ts=None, mod_ts=None, extension=0, fstype=0):
     Block.create(self)
     # init fresh hash table
     self.hash_size = self.blkdev.block_longs - 56
@@ -28,6 +28,10 @@ class RootBlock(Block):
     for i in xrange(25):
       self.bitmap_ptrs.append(0)
     self.bitmap_ext_blk = 0
+    
+    # new stuff for DOS6 and DOS7
+    self.fstype = fstype
+    self.blocks_used = 0
     
     self.extension = extension
   
@@ -54,6 +58,10 @@ class RootBlock(Block):
     self._put_bstr(-20, 30, self.name)
     self._put_long(-2, self.extension)
     
+    # DOS6 and DOS7 stuff
+    self._put_long(-11, self.blocks_used)
+    self._put_long(-4, self.fstype)
+
     Block.write(self)
   
   def set(self, data):
@@ -97,7 +105,12 @@ class RootBlock(Block):
     # name
     self.name = self._get_bstr(-20, 30)
     self.extension = self._get_long(-2)
-    
+
+    # Number of used blocks (new in DOS6 and DOS7)
+    self.blocks_used = self._get_long(-11)
+    # filesystem type (new in DOS6 and DOS7, 0 in others)
+    self.fstype = self._get_long(-4)
+
     # check validity
     self.valid = True
     #self.valid = (self.bitmap_flag == 0xffffffff)
