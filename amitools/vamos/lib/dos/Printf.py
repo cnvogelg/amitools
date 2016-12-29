@@ -126,8 +126,13 @@ def printf_read_data(state, mem_access, data_ptr):
       else:
         data = '(null)'
     elif t == 'c': # char
-      data = mem_access.r16(data_ptr)
-      data_ptr += 2
+      l = e.length
+      if l is not None and "l" in l:
+        data = mem_access.r32(data_ptr)
+        data_ptr += 4
+      else:
+        data = mem_access.r16(data_ptr)
+        data_ptr += 2
       data = chr(data)
     elif t == '%':
       data = ord('%')
