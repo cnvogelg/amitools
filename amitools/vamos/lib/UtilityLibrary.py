@@ -35,7 +35,7 @@ class UtilityLibrary(AmigaLibrary):
     return c
 
   def ToUpper(self, ctx):
-    a = ctx.cpu.r_reg(REG_D0)
+    a = ctx.cpu.r_reg(REG_D0) & 0xff
     return ord(chr(a).upper())
 
   def Stricmp(self, ctx):
