@@ -622,6 +622,16 @@ class DosLibrary(AmigaLibrary):
     fh.write(chr(val))
     return val
 
+  def FPuts(self, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    str_ptr = ctx.cpu.r_reg(REG_D2)
+    str_dat = ctx.mem.access.r_cstr(str_ptr)
+    # write to stdout
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
+    ok = fh.write(str_dat)
+    log_dos.info("FPuts(%s,'%s')", (fh, str_dat))
+    return 0 # ok
+  
   def UnGetC(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     val = ctx.cpu.r_reg(REG_D2)
