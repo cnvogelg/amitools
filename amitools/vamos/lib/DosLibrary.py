@@ -1375,6 +1375,7 @@ class DosLibrary(AmigaLibrary):
       cur_lock    = self.lock_mgr.get_by_b_addr(current_dir >> 2)
       dup_lock    = self.lock_mgr.dup_lock(self.get_current_dir())
       cur_module  = cli.r_s("cli_Module")
+      cur_out     = ctx.process.this_task.access.r_s("pr_COS");
       cur_setname = ctx.mem.access.r_bstr(cli.r_s("cli_SetName"))
       cli.w_s("cli_Module",0)
       self.ctx.process.set_current_dir(dup_lock.mem.addr)
@@ -1391,6 +1392,7 @@ class DosLibrary(AmigaLibrary):
         # Channels are closed by the dying shell
         ctx.mem.access.w_bstr(cli.r_s("cli_SetName"),cur_setname)
         ctx.process.this_task.access.w_s("pr_CIS",input_fhci)
+        ctx.process.this_task.access.w_s("pr_COS",cur_out)
         #infile = self.file_mgr.get_by_b_addr(input_fhci >> 2,False)
         #infile.setbuf("")
         self.ctx.process.set_current_dir(current_dir)
