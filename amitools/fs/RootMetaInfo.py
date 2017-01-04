@@ -1,5 +1,8 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 import time
-from TimeStamp import *
+from .TimeStamp import *
 
 class RootMetaInfo:
   def __init__(self, create_ts=None, disk_ts=None, mod_ts=None):

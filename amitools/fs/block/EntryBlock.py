@@ -1,5 +1,8 @@
-from Block import Block
-from CommentBlock import CommentBlock
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .Block import Block
+from .CommentBlock import CommentBlock
 
 class EntryBlock(Block):
   """Base class for all block types that describe entries within a directory"""

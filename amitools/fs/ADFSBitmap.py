@@ -1,10 +1,13 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 import struct
 import ctypes
 
-from block.BitmapBlock import BitmapBlock
-from block.BitmapExtBlock import BitmapExtBlock
-from DosType import *
-from FSError import *
+from .block.BitmapBlock import BitmapBlock
+from .block.BitmapExtBlock import BitmapExtBlock
+from .DosType import *
+from .FSError import *
 
 class ADFSBitmap:
   def __init__(self, root_blk):
@@ -259,10 +262,10 @@ class ADFSBitmap:
     return True
 
   def dump(self):
-    print "Bitmap:"
-    print "  ext: ",self.ext_blks
-    print "  blks:",len(self.bitmap_blks)
-    print "  bits:",len(self.bitmap_data) * 8,self.blkdev.num_blocks
+    print("Bitmap:")
+    print("  ext: ",self.ext_blks)
+    print("  blks:",len(self.bitmap_blks))
+    print("  bits:",len(self.bitmap_data) * 8,self.blkdev.num_blocks)
     
   def create_draw_bitmap(self):
     bm = ctypes.create_string_buffer(self.blkdev.num_blocks)
@@ -315,7 +318,7 @@ class ADFSBitmap:
         line += " "
       if i % blk_cyl == blk_cyl - 1:
         if not brief or found:
-          print "%8d: %s" % (blk,line)
+          print("%8d: %s" % (blk,line))
         blk += blk_cyl
         line = ""
         found = False

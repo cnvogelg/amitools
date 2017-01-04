@@ -1,6 +1,9 @@
-from ADFSDir import ADFSDir
-from MetaInfo import MetaInfo
-import DosType
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .ADFSDir import ADFSDir
+from .MetaInfo import MetaInfo
+from . import DosType
 
 class ADFSVolDir(ADFSDir):
   def __init__(self, volume, root_block):

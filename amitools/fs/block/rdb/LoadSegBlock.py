@@ -1,3 +1,6 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 from ..Block import Block
 
 class LoadSegBlock(Block):
@@ -43,6 +46,6 @@ class LoadSegBlock(Block):
   def dump(self):
     Block.dump(self, "RDBlock")
     
-    print " size:           %d" % self.size
-    print " host_id:        %d" % self.host_id
-    print " next:           %s" % self._dump_ptr(self.next)
+    print(" size:           %d" % self.size)
+    print(" host_id:        %d" % self.host_id)
+    print(" next:           %s" % self._dump_ptr(self.next))

@@ -1,4 +1,7 @@
-from FSString import FSString
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .FSString import FSString
 
 class FileName:
   root_path_aliases = (u'', u'/', u':')

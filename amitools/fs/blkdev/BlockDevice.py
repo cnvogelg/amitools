@@ -1,5 +1,8 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 # a block device defines a set of blocks used by a file system
-from DiskGeometry import DiskGeometry
+from .DiskGeometry import DiskGeometry
 
 class BlockDevice:
   def _set_geometry(self, cyls=80, heads=2, sectors=11, block_bytes=512, reserved=2, bootblocks=2):
@@ -17,13 +20,13 @@ class BlockDevice:
     self.num_longs = self.num_blocks * self.block_longs
   
   def dump(self):
-    print "cylinders:  ",self.cyls
-    print "heads:      ",self.heads
-    print "sectors:    ",self.sectors
-    print "block_bytes:",self.block_bytes
-    print "reserved:   ",self.reserved
-    print "bootblocks: ",self.bootblocks
-  
+    print("cylinders:  ", self.cyls)
+    print("heads:      ", self.heads)
+    print("sectors:    ", self.sectors)
+    print("block_bytes:", self.block_bytes)
+    print("reserved:   ", self.reserved)
+    print("bootblocks: ", self.bootblocks)
+
   def _blk_to_offset(self, blk_num):
     return self.block_bytes * blk_num
   
@@ -46,5 +49,3 @@ class BlockDevice:
     return "chs=%d,%d,%d" % (self.cyls, self.heads, self.sectors)
   def get_chs_dict(self):
     return { 'chs' : "%d,%d,%d" % (self.cyls, self.heads, self.sectors) }
-
-

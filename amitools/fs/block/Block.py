@@ -1,3 +1,6 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 import struct
 import ctypes
 from ..TimeStamp import TimeStamp
@@ -216,9 +219,9 @@ class Block:
       return "%d" % ptr
   
   def dump(self, name, details=True):
-    print "%sBlock(%d):" % (name, self.blk_num)
+    print("%sBlock(%d):" % (name, self.blk_num))
     if details:
-      print " types:     %x/%x (valid: %x/%x)" % (self.type, self.sub_type, self.is_type, self.is_sub_type)
-      print " chksum:    0x%08x (got) 0x%08x (calc)" % (self.got_chksum, self.calc_chksum)
-      print " valid:     %s" % self.valid
+      print(" types:     %x/%x (valid: %x/%x)" % (self.type, self.sub_type, self.is_type, self.is_sub_type))
+      print(" chksum:    0x%08x (got) 0x%08x (calc)" % (self.got_chksum, self.calc_chksum))
+      print(" valid:     %s" % self.valid)
     

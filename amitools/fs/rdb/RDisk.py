@@ -1,9 +1,12 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 from amitools.fs.block.rdb.RDBlock import *
 from amitools.fs.block.rdb.PartitionBlock import *
 import amitools.util.ByteSize as ByteSize
 import amitools.fs.DosType as DosType
-from FileSystem import FileSystem
-from Partition import Partition
+from .FileSystem import FileSystem
+from .Partition import Partition
 
 class RDisk:
   def __init__(self, rawblk):

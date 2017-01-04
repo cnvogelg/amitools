@@ -1,5 +1,8 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 import time
-from Block import Block
+from .Block import Block
 from ..TimeStamp import *
 
 class RootBlock(Block):
@@ -118,15 +121,15 @@ class RootBlock(Block):
   
   def dump(self):
     Block.dump(self, "Root")
-    print " hash size: %d" % self.hash_size
-    print " hash table:%s" % self.hash_table
-    print " bmp flag:  0x%08x" % self.bitmap_flag
-    print " bmp ptrs:  %s" % self.bitmap_ptrs
-    print " bmp ext:   %d" % self.bitmap_ext_blk
-    print " mod_ts:    %s" % self.mod_ts
-    print " disk_ts:   %s" % self.disk_ts
-    print " create_ts: %s" % self.create_ts
-    print " disk name: %s" % self.name
-    print " extension: %s" % self.extension
+    print(" hash size: %d" % self.hash_size)
+    print(" hash table:%s" % self.hash_table)
+    print(" bmp flag:  0x%08x" % self.bitmap_flag)
+    print(" bmp ptrs:  %s" % self.bitmap_ptrs)
+    print(" bmp ext:   %d" % self.bitmap_ext_blk)
+    print(" mod_ts:    %s" % self.mod_ts)
+    print(" disk_ts:   %s" % self.disk_ts)
+    print(" create_ts: %s" % self.create_ts)
+    print(" disk name: %s" % self.name)
+    print(" extension: %s" % self.extension)
 
      

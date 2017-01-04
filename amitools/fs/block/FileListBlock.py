@@ -1,4 +1,7 @@
-from Block import Block
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .Block import Block
 
 class FileListBlock(Block):
   def __init__(self, blkdev, blk_num):
@@ -61,9 +64,9 @@ class FileListBlock(Block):
   
   def dump(self):
     Block.dump(self,"FileList")
-    print " own_key:    %d" % self.own_key
-    print " blk_cnt:    %d" % self.block_count
-    print " data blks:  %s" % self.data_blocks
-    print " parent:     %d" % self.parent
-    print " extension:  %d" % self.extension
+    print(" own_key:    %d" % self.own_key)
+    print(" blk_cnt:    %d" % self.block_count)
+    print(" data blks:  %s" % self.data_blocks)
+    print(" parent:     %d" % self.parent)
+    print(" extension:  %d" % self.extension)
   

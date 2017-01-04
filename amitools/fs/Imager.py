@@ -1,18 +1,21 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 import os
 import os.path
 import sys
 import unicodedata
 
-from ADFSDir import ADFSDir
-from ADFSFile import ADFSFile
-from ADFSVolume import ADFSVolume
-from MetaDB import MetaDB
-import DosType
+from .ADFSDir import ADFSDir
+from .ADFSFile import ADFSFile
+from .ADFSVolume import ADFSVolume
+from .MetaDB import MetaDB
+from . import DosType
 from amitools.fs.block.BootBlock import BootBlock
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 import amitools.util.KeyValue as KeyValue
-from FSString import FSString
+from .FSString import FSString
 
 class Imager:
   def __init__(self, path_encoding=None):

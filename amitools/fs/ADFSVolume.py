@@ -1,13 +1,16 @@
-from block.BootBlock import BootBlock
-from block.RootBlock import RootBlock
-from ADFSVolDir import ADFSVolDir
-from ADFSBitmap import ADFSBitmap
-from FileName import FileName
-from RootMetaInfo import RootMetaInfo
-from FSError import *
-from FSString import FSString
-from TimeStamp import TimeStamp
-import DosType
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .block.BootBlock import BootBlock
+from .block.RootBlock import RootBlock
+from .ADFSVolDir import ADFSVolDir
+from .ADFSBitmap import ADFSBitmap
+from .FileName import FileName
+from .RootMetaInfo import RootMetaInfo
+from .FSError import *
+from .FSString import FSString
+from .TimeStamp import TimeStamp
+from . import DosType
 import amitools.util.ByteSize as ByteSize
 
 class ADFSVolume:

@@ -1,7 +1,10 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 import time
 import struct
 
-from Block import Block
+from .Block import Block
 from ..ProtectFlags import ProtectFlags
 from ..TimeStamp import TimeStamp
 
@@ -61,15 +64,15 @@ class DirCacheRecord:
     return off + self.get_size()
     
   def dump(self):
-    print "DirCacheRecord(%s)(size=%d)" % (self.offset, self.get_size())
-    print "\tentry:      %s" % self.entry
-    print "\tsize:       %s" % self.size
+    print("DirCacheRecord(%s)(size=%d)" % (self.offset, self.get_size()))
+    print("\tentry:      %s" % self.entry)
+    print("\tsize:       %s" % self.size)
     pf = ProtectFlags(self.protect)
-    print "\tprotect:    0x%x 0b%s %s" % (self.protect, pf.bin_str(), pf)
-    print "\tmod_ts:     %s" % self.mod_ts
-    print "\tsub_type:   0x%x" % self.sub_type
-    print "\tname:       %s" % self.name
-    print "\tcomment:    %s" % self.comment
+    print("\tprotect:    0x%x 0b%s %s" % (self.protect, pf.bin_str(), pf))
+    print("\tmod_ts:     %s" % self.mod_ts)
+    print("\tsub_type:   0x%x" % self.sub_type)
+    print("\tname:       %s" % self.name)
+    print("\tcomment:    %s" % self.comment)
 
 class DirCacheBlock(Block):
   def __init__(self, blkdev, blk_num):
@@ -166,9 +169,9 @@ class DirCacheBlock(Block):
   
   def dump(self):
     Block.dump(self,"DirCache")
-    print " own_key:    %d" % (self.own_key)
-    print " parent:     %d" % (self.parent)
-    print " num_records:%d" % (self.num_records)
-    print " next_cache: %d" % (self.next_cache)
+    print(" own_key:    %d" % (self.own_key))
+    print(" parent:     %d" % (self.parent))
+    print(" num_records:%d" % (self.num_records))
+    print(" next_cache: %d" % (self.next_cache))
     for r in self.records:
       r.dump()

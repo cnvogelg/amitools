@@ -1,4 +1,7 @@
-from BlockDevice import BlockDevice
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .BlockDevice import BlockDevice
 import ctypes
 import gzip
 import io

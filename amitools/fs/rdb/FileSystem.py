@@ -1,3 +1,6 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 from amitools.fs.block.rdb.FSHeaderBlock import *
 from amitools.fs.block.rdb.LoadSegBlock import *
 from amitools.util.HexDump import *
@@ -106,12 +109,12 @@ class FileSystem:
     if self.fshd != None:
       self.fshd.dump()
     # only dump ids of lseg blocks
-    print "LoadSegBlocks:"
+    print("LoadSegBlocks:")
     ids = []
     for ls in self.lsegs:
       ids.append(str(ls.blk_num))
-    print " lseg blks:  %s" % ",".join(ids)
-    print " data size:  %d" % len(self.data)
+    print(" lseg blks:  %s" % ",".join(ids))
+    print(" data size:  %d" % len(self.data))
     if hex_dump:
       print_hex(self.data)
 

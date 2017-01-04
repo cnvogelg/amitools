@@ -1,5 +1,8 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 import time
-from Block import Block
+from .Block import Block
 
 class CommentBlock(Block):
   def __init__(self, blkdev, blk_num):
@@ -42,6 +45,6 @@ class CommentBlock(Block):
 
   def dump(self):
     Block.dump(self,"Comment")
-    print " own_key:    %d" % (self.own_key)
-    print " header_key: %d" % (self.header_key)
-    print " comment:    '%s'" % self.comment
+    print(" own_key:    %d" % (self.own_key))
+    print(" header_key: %d" % (self.header_key))
+    print(" comment:    '%s'" % self.comment)

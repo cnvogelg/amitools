@@ -1,11 +1,14 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 import os
 import os.path
 import stat
 import struct
-from ADFBlockDevice import ADFBlockDevice
-from HDFBlockDevice import HDFBlockDevice
-from RawBlockDevice import RawBlockDevice
-from DiskGeometry import DiskGeometry
+from .ADFBlockDevice import ADFBlockDevice
+from .HDFBlockDevice import HDFBlockDevice
+from .RawBlockDevice import RawBlockDevice
+from .DiskGeometry import DiskGeometry
 from amitools.fs.rdb.RDisk import RDisk
 import amitools.util.BlkDevTools as BlkDevTools
 
