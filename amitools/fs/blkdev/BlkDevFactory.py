@@ -36,7 +36,7 @@ class BlkDevFactory:
   def type_from_options(self, options):
     """look in options for type"""
     if options != None:
-      if options.has_key('type'):
+      if 'type' in options:
         t = options['type'].lower()
         if t in ('adf','adz'):
           return self.TYPE_ADF

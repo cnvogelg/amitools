@@ -68,7 +68,7 @@ class CommandQueue:
   
   def create_cmd_instance(self, cmd_line):
     name = cmd_line[0]
-    if self.cmd_map.has_key(name):
+    if name in self.cmd_map:
       if len(cmd_line) == 1:
         opts = []
       else:

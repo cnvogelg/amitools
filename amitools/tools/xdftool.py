@@ -26,6 +26,9 @@ import amitools.fs.DosType as DosType
 
 # system encoding
 def make_fsstr(s):
+  if sys.version_info[0] == 3:
+    if isinstance(s, str):
+      return FSString(s)
   # fetch default encoding (if available)
   encoding = sys.stdin.encoding
   if encoding is None:

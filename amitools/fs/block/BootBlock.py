@@ -2,8 +2,14 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import os.path
+import sys
+
 from .Block import Block
 import amitools.fs.DosType as DosType
+
+if sys.version_info[0] == 3:
+  xrange = range
+
 
 class BootBlock(Block):  
   def __init__(self, blkdev, blk_num=0):

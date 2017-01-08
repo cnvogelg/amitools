@@ -1,9 +1,15 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
+import sys
 import time
+
 from .Block import Block
 from ..TimeStamp import *
+
+if sys.version_info[0] == 3:
+  xrange = range
+
 
 class RootBlock(Block):
   def __init__(self, blkdev, blk_num):

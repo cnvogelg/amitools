@@ -1,4 +1,7 @@
-from BlockScan import BlockScan
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .BlockScan import BlockScan
 from amitools.fs.FSString import FSString
 from amitools.fs.FileName import FileName
 from amitools.fs.validate.Log import Log
@@ -223,12 +226,12 @@ class DirScan:
   def dump_dir_info(self, di, indent):
     """dump a single dir info structure and its sub dirs"""
     istr = "    " * indent
-    print istr, di
+    print(istr, di)
     for hash_value in sorted(di.get_chains().keys()):
       dc = di.get(hash_value)
-      print istr," ",dc
+      print(istr, " ", dc)
       for dce in dc.get_entries():
-        print istr,"  ",dce
+        print(istr, "  ", dce)
         sub = dce.sub
         if sub != None and dce.blk_info.blk_type == BlockScan.BT_DIR:
           self.dump_dir_info(sub, indent+1)
