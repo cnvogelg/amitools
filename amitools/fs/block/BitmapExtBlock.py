@@ -1,4 +1,7 @@
-from Block import Block
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .Block import Block
 from amitools.util.HexDump import *
 
 class BitmapExtBlock(Block):
@@ -42,6 +45,6 @@ class BitmapExtBlock(Block):
     
   def dump(self):
     Block.dump(self, "BitmapExtBlock", False)
-    print " bmp ptrs:  %s" % self.bitmap_ptrs
-    print " bmp ext:   %d" % self.bitmap_ext_blk
+    print(" bmp ptrs:  %s" % self.bitmap_ptrs)
+    print(" bmp ext:   %d" % self.bitmap_ext_blk)
   

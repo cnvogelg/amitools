@@ -1,3 +1,6 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 from ..Block import Block
 
 class RDBPhysicalDrive:
@@ -20,15 +23,15 @@ class RDBPhysicalDrive:
     self.step_rate = step_rate
   
   def dump(self):
-    print "PhysicalDrive"
-    print " cyls:           %d" % self.cyls
-    print " heads:          %d" % self.heads
-    print " secs:           %d" % self.secs
-    print " interleave:     %d" % self.interleave
-    print " parking_zone:   %d" % self.parking_zone
-    print " write_pre_comp: %d" % self.write_pre_comp
-    print " reduced_write:  %d" % self.reduced_write
-    print " step_rate:      %d" % self.step_rate
+    print("PhysicalDrive")
+    print(" cyls:           %d" % self.cyls)
+    print(" heads:          %d" % self.heads)
+    print(" secs:           %d" % self.secs)
+    print(" interleave:     %d" % self.interleave)
+    print(" parking_zone:   %d" % self.parking_zone)
+    print(" write_pre_comp: %d" % self.write_pre_comp)
+    print(" reduced_write:  %d" % self.reduced_write)
+    print(" step_rate:      %d" % self.step_rate)
   
   def read(self, blk):
     self.cyls = blk._get_long(16)
@@ -65,14 +68,14 @@ class RDBLogicalDrive:
     self.auto_park_secs = auto_park_secs
 
   def dump(self):
-    print "LogicalDrive"
-    print " rdb_blk_lo:     %d" % self.rdb_blk_lo
-    print " rdb_blk_hi:     %d" % self.rdb_blk_hi
-    print " lo_cyl:         %d" % self.lo_cyl
-    print " hi_cyl:         %d" % self.hi_cyl
-    print " cyl_blks:       %d" % self.cyl_blks
-    print " high_rdsk_blk:  %d" % self.high_rdsk_blk
-    print " auto_park_secs: %d" % self.auto_park_secs
+    print("LogicalDrive")
+    print(" rdb_blk_lo:     %d" % self.rdb_blk_lo)
+    print(" rdb_blk_hi:     %d" % self.rdb_blk_hi)
+    print(" lo_cyl:         %d" % self.lo_cyl)
+    print(" hi_cyl:         %d" % self.hi_cyl)
+    print(" cyl_blks:       %d" % self.cyl_blks)
+    print(" high_rdsk_blk:  %d" % self.high_rdsk_blk)
+    print(" auto_park_secs: %d" % self.auto_park_secs)
 
   def read(self, blk):
     self.rdb_blk_lo = blk._get_long(32)
@@ -104,13 +107,13 @@ class RDBDriveID:
     self.ctrl_revision = ctrl_revision
     
   def dump(self):
-    print "DriveID"
-    print " disk_vendor:    '%s'" % self.disk_vendor
-    print " disk_product:   '%s'" % self.disk_product
-    print " disk_revision:  '%s'" % self.disk_revision
-    print " ctrl_vendor:    '%s'" % self.ctrl_vendor
-    print " ctrl_product:   '%s'" % self.ctrl_product
-    print " ctrl_revision:  '%s'" % self.ctrl_revision
+    print("DriveID")
+    print(" disk_vendor:    '%s'" % self.disk_vendor)
+    print(" disk_product:   '%s'" % self.disk_product)
+    print(" disk_revision:  '%s'" % self.disk_revision)
+    print(" ctrl_vendor:    '%s'" % self.ctrl_vendor)
+    print(" ctrl_product:   '%s'" % self.ctrl_product)
+    print(" ctrl_revision:  '%s'" % self.ctrl_revision)
     
   def read(self, blk):
     self.disk_vendor = blk._get_cstr(40, 8)
@@ -199,14 +202,14 @@ class RDBlock(Block):
   def dump(self):
     Block.dump(self, "RigidDisk")
     
-    print " size:           %d" % self.size
-    print " host_id:        %d" % self.host_id
-    print " block_size:     %d" % self.block_size
-    print " flags:          0x%08x" % self.flags
-    print " badblk_list:    %s" % self._dump_ptr(self.badblk_list)
-    print " part_list:      %s" % self._dump_ptr(self.part_list)
-    print " fs_list:        %s" % self._dump_ptr(self.fs_list)
-    print " init_code:      %s" % self._dump_ptr(self.init_code)
+    print(" size:           %d" % self.size)
+    print(" host_id:        %d" % self.host_id)
+    print(" block_size:     %d" % self.block_size)
+    print(" flags:          0x%08x" % self.flags)
+    print(" badblk_list:    %s" % self._dump_ptr(self.badblk_list))
+    print(" part_list:      %s" % self._dump_ptr(self.part_list))
+    print(" fs_list:        %s" % self._dump_ptr(self.fs_list))
+    print(" init_code:      %s" % self._dump_ptr(self.init_code))
     
     self.phy_drv.dump()
     self.log_drv.dump()

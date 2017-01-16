@@ -2,6 +2,9 @@
 # xdfscan
 # quickly scan large sets of Amiga disk image files
 
+from __future__ import absolute_import
+from __future__ import print_function
+
 import sys
 import argparse
 import os.path
@@ -139,10 +142,10 @@ def scan_file(path, args):
     if args.verbose:
       v.log.dump()
     return ret_code
-  except IOError,e:
+  except IOError as e:
     log_path(path,"BLKDEV?")
     if args.verbose:
-      print e
+      print(e)
     return 0
 
 # ----- main -----
@@ -169,5 +172,5 @@ def main():
 if __name__ == '__main__':
   try:
     sys.exit(main())
-  except KeyboardInterrupt, e:
-    print "aborting..."
+  except KeyboardInterrupt as e:
+    print("aborting...")

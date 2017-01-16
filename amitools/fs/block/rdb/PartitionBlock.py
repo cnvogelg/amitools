@@ -1,3 +1,6 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 from amitools.fs.block.Block import *
 import amitools.fs.DosType as DosType
 
@@ -30,27 +33,27 @@ class PartitionDosEnv:
     self.boot_blocks = boot_blocks
 
   def dump(self):
-    print "DosEnv"
-    print " size:           %d" % self.size
-    print " block_size:     %d" % self.block_size
-    print " sec_org:        %d" % self.sec_org
-    print " surfaces:       %d" % self.surfaces
-    print " sec_per_blk:    %d" % self.sec_per_blk
-    print " blk_per_trk:    %d" % self.blk_per_trk
-    print " reserved:       %d" % self.reserved
-    print " pre_alloc:      %d" % self.pre_alloc
-    print " interleave:     %d" % self.interleave
-    print " low_cyl:        %d" % self.low_cyl
-    print " high_cyl:       %d" % self.high_cyl
-    print " num_buffer:     %d" % self.num_buffer
-    print " buf_mem_type:   0x%08x" % self.buf_mem_type
-    print " max_transfer:   0x%08x" % self.max_transfer
-    print " mask:           0x%08x" % self.mask
-    print " boot_pri:       %d" % self.boot_pri
-    print " dos_type:       0x%08x = %s" % (self.dos_type, DosType.num_to_tag_str(self.dos_type))
-    print " baud:           %d" % self.baud
-    print " control:        %d" % self.control
-    print " boot_blocks:    %d" % self.boot_blocks
+    print("DosEnv")
+    print(" size:           %d" % self.size)
+    print(" block_size:     %d" % self.block_size)
+    print(" sec_org:        %d" % self.sec_org)
+    print(" surfaces:       %d" % self.surfaces)
+    print(" sec_per_blk:    %d" % self.sec_per_blk)
+    print(" blk_per_trk:    %d" % self.blk_per_trk)
+    print(" reserved:       %d" % self.reserved)
+    print(" pre_alloc:      %d" % self.pre_alloc)
+    print(" interleave:     %d" % self.interleave)
+    print(" low_cyl:        %d" % self.low_cyl)
+    print(" high_cyl:       %d" % self.high_cyl)
+    print(" num_buffer:     %d" % self.num_buffer)
+    print(" buf_mem_type:   0x%08x" % self.buf_mem_type)
+    print(" max_transfer:   0x%08x" % self.max_transfer)
+    print(" mask:           0x%08x" % self.mask)
+    print(" boot_pri:       %d" % self.boot_pri)
+    print(" dos_type:       0x%08x = %s" % (self.dos_type, DosType.num_to_tag_str(self.dos_type)))
+    print(" baud:           %d" % self.baud)
+    print(" control:        %d" % self.control)
+    print(" boot_blocks:    %d" % self.boot_blocks)
 
   def read(self, blk):
     self.size = blk._get_long(32)
@@ -155,11 +158,11 @@ class PartitionBlock(Block):
   def dump(self):
     Block.dump(self, "Partition")
 
-    print " size:           %d" % self.size
-    print " host_id:        %d" % self.host_id
-    print " next:           %s" % self._dump_ptr(self.next)
-    print " flags:          0x%08x" % self.flags
-    print " dev_flags:      0x%08x" % self.dev_flags
-    print " drv_name:       '%s'" % self.drv_name
+    print(" size:           %d" % self.size)
+    print(" host_id:        %d" % self.host_id)
+    print(" next:           %s" % self._dump_ptr(self.next))
+    print(" flags:          0x%08x" % self.flags)
+    print(" dev_flags:      0x%08x" % self.dev_flags)
+    print(" drv_name:       '%s'" % self.drv_name)
 
     self.dos_env.dump()

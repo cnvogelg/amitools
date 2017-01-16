@@ -1,7 +1,10 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 import time
-from Block import Block
-from EntryBlock import EntryBlock
-from CommentBlock import CommentBlock
+from .Block import Block
+from .EntryBlock import EntryBlock
+from .CommentBlock import CommentBlock
 from ..ProtectFlags import ProtectFlags
 from ..TimeStamp import *
 
@@ -95,18 +98,18 @@ class FileHeaderBlock(EntryBlock):
     
   def dump(self):
     Block.dump(self,"FileHeader")
-    print " own_key:    %d" % self.own_key
-    print " blk_cnt:    %d" % self.block_count
-    print " first_data: %d" % self.first_data
+    print(" own_key:    %d" % self.own_key)
+    print(" blk_cnt:    %d" % self.block_count)
+    print(" first_data: %d" % self.first_data)
     if self.data_blocks != None:
-      print " data blks:  %s #%d" % (self.data_blocks, len(self.data_blocks))
+      print(" data blks:  %s #%d" % (self.data_blocks, len(self.data_blocks)))
     pf = ProtectFlags(self.protect)
-    print " protect:    0x%x 0b%s %s" % (self.protect, pf.bin_str(), pf)
-    print " byte_size:  %d" % self.byte_size
-    print " comment:    '%s'" % self.comment
-    print " mod_ts:     %s" % self.mod_ts
-    print " name:       '%s'" % self.name
-    print " hash_chain: %d" % self.hash_chain
-    print " parent:     %d" % self.parent
-    print " extension:  %d" % self.extension
+    print(" protect:    0x%x 0b%s %s" % (self.protect, pf.bin_str(), pf))
+    print(" byte_size:  %d" % self.byte_size)
+    print(" comment:    '%s'" % self.comment)
+    print(" mod_ts:     %s" % self.mod_ts)
+    print(" name:       '%s'" % self.name)
+    print(" hash_chain: %d" % self.hash_chain)
+    print(" parent:     %d" % self.parent)
+    print(" extension:  %d" % self.extension)
   

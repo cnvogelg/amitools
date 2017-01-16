@@ -1,8 +1,11 @@
-from BlockDevice import BlockDevice
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .BlockDevice import BlockDevice
 import os.path
 import os
 
-from ImageFile import ImageFile
+from .ImageFile import ImageFile
 
 class RawBlockDevice(BlockDevice):
   def __init__(self, raw_file, read_only=False, block_bytes=512, fobj=None):

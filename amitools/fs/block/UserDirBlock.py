@@ -1,6 +1,9 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 import time
-from Block import Block
-from EntryBlock import EntryBlock
+from .Block import Block
+from .EntryBlock import EntryBlock
 from ..ProtectFlags import ProtectFlags
 
 class UserDirBlock(EntryBlock):
@@ -74,13 +77,13 @@ class UserDirBlock(EntryBlock):
   
   def dump(self):
     Block.dump(self,"UserDir")
-    print " own_key:    %d" % (self.own_key)
+    print(" own_key:    %d" % (self.own_key))
     pf = ProtectFlags(self.protect)
-    print " protect:    0x%x 0b%s %s" % (self.protect, pf.bin_str(), pf)
-    print " comment:    '%s'" % self.comment
-    print " mod_ts:     %s" % self.mod_ts
-    print " name:       '%s'" % self.name
-    print " hash_chain: %d" % self.hash_chain
-    print " parent:     %d" % self.parent
-    print " extension:  %s" % self.extension
+    print(" protect:    0x%x 0b%s %s" % (self.protect, pf.bin_str(), pf))
+    print(" comment:    '%s'" % self.comment)
+    print(" mod_ts:     %s" % self.mod_ts)
+    print(" name:       '%s'" % self.name)
+    print(" hash_chain: %d" % self.hash_chain)
+    print(" parent:     %d" % self.parent)
+    print(" extension:  %s" % self.extension)
 

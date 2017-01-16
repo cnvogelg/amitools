@@ -1,11 +1,14 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 import os
 import os.path
 import stat
 import struct
-from ADFBlockDevice import ADFBlockDevice
-from HDFBlockDevice import HDFBlockDevice
-from RawBlockDevice import RawBlockDevice
-from DiskGeometry import DiskGeometry
+from .ADFBlockDevice import ADFBlockDevice
+from .HDFBlockDevice import HDFBlockDevice
+from .RawBlockDevice import RawBlockDevice
+from .DiskGeometry import DiskGeometry
 from amitools.fs.rdb.RDisk import RDisk
 import amitools.util.BlkDevTools as BlkDevTools
 
@@ -33,7 +36,7 @@ class BlkDevFactory:
   def type_from_options(self, options):
     """look in options for type"""
     if options != None:
-      if options.has_key('type'):
+      if 'type' in options:
         t = options['type'].lower()
         if t in ('adf','adz'):
           return self.TYPE_ADF

@@ -1,3 +1,6 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 class CommandQueue:
   def __init__(self, cmd_list, sep, cmd_map):
     self.cmd_list = cmd_list
@@ -65,7 +68,7 @@ class CommandQueue:
   
   def create_cmd_instance(self, cmd_line):
     name = cmd_line[0]
-    if self.cmd_map.has_key(name):
+    if name in self.cmd_map:
       if len(cmd_line) == 1:
         opts = []
       else:
@@ -76,7 +79,7 @@ class CommandQueue:
       return None
     
   def show_cmd_help(self, name):
-    print "INVALID COMMAND:",name
-    print "valid commands are:"
+    print("INVALID COMMAND:", name)
+    print("valid commands are:")
     for a in sorted(self.cmd_map):
-      print "  ",a
+      print ("  ", a)

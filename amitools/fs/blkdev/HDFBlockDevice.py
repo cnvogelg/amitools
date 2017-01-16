@@ -1,6 +1,9 @@
-from BlockDevice import BlockDevice
-from DiskGeometry import DiskGeometry
-from ImageFile import ImageFile
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .BlockDevice import BlockDevice
+from .DiskGeometry import DiskGeometry
+from .ImageFile import ImageFile
 import os.path
 import os
 

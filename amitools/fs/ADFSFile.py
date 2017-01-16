@@ -1,9 +1,12 @@
-from block.EntryBlock import EntryBlock
-from block.FileHeaderBlock import FileHeaderBlock
-from block.FileListBlock import FileListBlock
-from block.FileDataBlock import FileDataBlock
-from ADFSNode import ADFSNode
-from FSError import *
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .block.EntryBlock import EntryBlock
+from .block.FileHeaderBlock import FileHeaderBlock
+from .block.FileListBlock import FileListBlock
+from .block.FileDataBlock import FileDataBlock
+from .ADFSNode import ADFSNode
+from .FSError import *
 
 class ADFSFile(ADFSNode):
   def __init__(self, volume, parent):

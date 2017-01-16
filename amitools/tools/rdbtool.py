@@ -2,6 +2,9 @@
 # rdbtool
 # swiss army knife for rdb disk images or devices
 
+from __future__ import absolute_import
+from __future__ import print_function
+
 import sys
 import argparse
 import os.path
@@ -76,23 +79,23 @@ class FSCommandQueue(CommandQueue):
       exit_code = CommandQueue.run(self)
     except FSError as e:
       cmd = "'%s'" % " ".join(self.cmd_line)
-      print cmd,"FSError:",str(e)
+      print(cmd, "FSError:", str(e))
       exit_code = 3
     except IOError as e:
       cmd = "'%s'" % " ".join(self.cmd_line)
-      print cmd,"IOError:",str(e)
+      print(cmd, "IOError:", str(e))
       exit_code = 4
     finally:
       # close rdisk
       if self.rdisk != None:
         self.rdisk.close()
         if self.args.verbose:
-          print "closing rdisk:",self.img
+          print("closing rdisk:", self.img)
       # close blkdev
       if self.blkdev != None:
         self.blkdev.close()
         if self.args.verbose:
-          print "closing image:",self.img
+          print("closing image:", self.img)
     return exit_code
 
   def create_cmd(self, cclass, name, opts):
@@ -102,7 +105,7 @@ class FSCommandQueue(CommandQueue):
     if self.rdisk == None:
       self.rdisk = RDisk(self.blkdev)
       if self.args.verbose:
-        print "opening rdisk:",self.img
+        print("opening rdisk:", self.img)
       return self.rdisk.open()
     else:
       return True
@@ -115,10 +118,10 @@ class FSCommandQueue(CommandQueue):
       # auto add 'open' command
       pre_cmd = OpenCommand(self.args, [])
       if self.args.verbose:
-        print "auto open command:",self.cmd_line
+        print("auto open command:", self.cmd_line)
       exit_code = pre_cmd.run(self.blkdev, self.rdisk)
       if self.args.verbose:
-        print "auto open exit_code:",exit_code
+        print("auto open exit_code:", exit_code)
       if exit_code != 0:
         return exit_code
       self.blkdev = pre_cmd.blkdev
@@ -129,7 +132,7 @@ class FSCommandQueue(CommandQueue):
 
     # run first command
     if self.args.verbose:
-      print "command:",self.cmd_line
+      print("command:", self.cmd_line)
     if cmd.edit and self.args.read_only:
       raise IOError("Edit commands not allowed in read-only mode")
 
@@ -146,13 +149,13 @@ class FSCommandQueue(CommandQueue):
 
     # final exit code
     if self.args.verbose:
-      print "exit_code:",exit_code
+      print("exit_code:", exit_code)
     return exit_code
 
   def run_next(self, cmd_line, cmd):
     self.cmd_line = cmd_line
     if self.args.verbose:
-      print "command:",self.cmd_line
+      print("command:", self.cmd_line)
     # verify command
     if cmd.edit and self.args.read_only:
       raise IOError("Edit commands not allowed in read-only mode")
@@ -167,7 +170,7 @@ class FSCommandQueue(CommandQueue):
     if cmd.rdisk != None:
       self.rdisk = cmd.rdisk
     if self.args.verbose:
-      print "exit_code:",exit_code
+      print("exit_code:", exit_code)
     return exit_code
 
 # ----- Commands -------------------------------------------------------------
@@ -205,7 +208,7 @@ class CreateCommand(Command):
       raise IOError("Image File already exists: '%s'" % file_name)
     # make sure size is given
     if len(self.opts) < 1:
-      print "Usage: create ( size=<n> | chs=<c,h,s> )"
+      print("Usage: create ( size=<n> | chs=<c,h,s> )")
       return None
     # determine disk geometry
     opts = KeyValue.parse_key_value_strings(self.opts)
@@ -239,7 +242,7 @@ class InfoCommand(Command):
   def handle_rdisk(self, rdisk):
     lines = rdisk.get_info()
     for l in lines:
-      print l
+      print(l)
     return 0
 
 # --- Show rdisk structures ---
@@ -259,13 +262,13 @@ class MapCommand(Command):
     off = 0
     for i in bm:
       if num == 0:
-        print "%06d: " % off,
-      print i,
+        print("%06d: " % off, end="")
+      print(i, end="")
       off += 1
       num += 1
       if num == 16:
         num = 0
-        print
+        print("")
     return 0
 
 # --- Free Partition Ranges
@@ -274,7 +277,7 @@ class FreeCommand(Command):
   def handle_rdisk(self, rdisk):
     ranges = rdisk.get_free_cyl_ranges()
     for r in ranges:
-      print r
+      print(r)
     return 0
 
 # --- Add a partition ---
@@ -415,30 +418,30 @@ class AddCommand(PartEditCommand):
     self.parse_opts(rdisk)
     lo_hi = self.get_cyl_range()
     if lo_hi == None:
-      print "ERROR: invalid partition range given!"
+      print("ERROR: invalid partition range given!")
       return 1
     dostype = self.get_dos_type()
     if dostype == None:
-      print "ERROR: invalid dos type!"
+      print("ERROR: invalid dos type!")
       return 1
     drv_name = self.get_drv_name()
     if drv_name == None:
-      print "ERROR: invalid drive name!"
+      print("ERROR: invalid drive name!")
     flags = self.get_flags()
     boot_pri = self.get_boot_pri()
     more_dos_env = self.get_more_dos_env()
-    print "creating: '%s' %s %s" % (drv_name, lo_hi, num_to_tag_str(dostype))
+    print("creating: '%s' %s %s" % (drv_name, lo_hi, num_to_tag_str(dostype)))
     # add partition
     if rdisk.add_partition(drv_name, lo_hi, dos_type=dostype, flags=flags, boot_pri=boot_pri, more_dos_env=more_dos_env):
       return 0
     else:
-      print "ERROR: creating partition: '%s': %s" % (drv_name, lo_hi)
+      print("ERROR: creating partition: '%s': %s" % (drv_name, lo_hi))
       return 1
 
 class ChangeCommand(PartEditCommand):
   def handle_rdisk(self, rdisk):
     if len(self.opts) < 1:
-      print "Usage: change <id> [name=<s>] [dostype=<n|tag>] [automount=<b>] [bootable=<b>] [pri=<n>] " + self.get_more_dos_env_info()
+      print("Usage: change <id> [name=<s>] [dostype=<n|tag>] [automount=<b>] [bootable=<b>] [pri=<n>] " + self.get_more_dos_env_info())
       return 1
     else:
       p = rdisk.find_partition_by_string(self.opts[0])
@@ -453,10 +456,10 @@ class ChangeCommand(PartEditCommand):
         if rdisk.change_partition(p.num, drv_name=drv_name, dos_type=dostype, flags=flags, boot_pri=boot_pri, more_dos_env=more_dos_env):
           return 0
         else:
-          print "ERROR: changing partition: '%s'" % (drv_name)
+          print("ERROR: changing partition: '%s'" % (drv_name))
           return 1
       else:
-        print "Can't find partition: '%s'" % self.opts[0]
+        print("Can't find partition: '%s'" % self.opts[0])
         return 1
 
 # --- Fill empty space with partitions ---
@@ -471,15 +474,15 @@ class FillCommand(PartEditCommand):
     for lo_hi in ranges:
       drv_name = self.get_drv_name()
       if drv_name == None:
-        print "ERROR: invalid drive name!"
+        print("ERROR: invalid drive name!")
       dostype = self.get_dos_type()
       if dostype == None:
-        print "ERROR: invalid dostype given!"
+        print("ERROR: invalid dostype given!")
         return 1
-      print "creating: '%s' %s %s" % (drv_name, lo_hi, num_to_tag_str(dostype))
+      print("creating: '%s' %s %s" % (drv_name, lo_hi, num_to_tag_str(dostype)))
       # add partition
       if not rdisk.add_partition(drv_name, lo_hi, dos_type=dostype):
-        print "ERROR: creating partition: '%s': %s" % (drv_name, lo_hi)
+        print("ERROR: creating partition: '%s': %s" % (drv_name, lo_hi))
         return 1
     return 0
 
@@ -491,18 +494,18 @@ class DeleteCommand(Command):
 
   def handle_rdisk(self, rdisk):
     if len(self.opts) < 1:
-      print "Usage: delete <id>"
+      print("Usage: delete <id>")
       return 1
     else:
       p = rdisk.find_partition_by_string(self.opts[0])
       if p != None:
         if not rdisk.delete_partition(p.num):
-          print "ERROR: deleting partition: '%s'" % self.opts[0]
+          print("ERROR: deleting partition: '%s'" % self.opts[0])
           return 1
         else:
           return 0
       else:
-        print "Can't find partition: '%s'" % self.opts[0]
+        print("Can't find partition: '%s'" % self.opts[0])
         return 1
 
 # --- Filesystem Commands ---
@@ -510,13 +513,13 @@ class DeleteCommand(Command):
 class FSGetCommand(Command):
   def handle_rdisk(self, rdisk):
     if len(self.opts) < 2:
-      print "Usage: fsget <id> <file_name>"
+      print("Usage: fsget <id> <file_name>")
       return 1
     else:
       num = int(self.opts[0])
       fs = rdisk.get_filesystem(num)
       if fs == None:
-        print "fsget: invalid filesystem index",num
+        print("fsget: invalid filesystem index",num)
         return 1
       else:
         file_name = self.opts[1]
@@ -548,7 +551,7 @@ class FSAddCommand(Command):
     if len(self.opts) < 1:
       flag_info = map(lambda x : "[%s=<n>]" % x, valid_flags)
       flag_info = " ".join(flag_info)
-      print "Usage: fsadd <file_name> [dostype=<n|tag>] [version=<n.m>] " + flag_info
+      print("Usage: fsadd <file_name> [dostype=<n|tag>] [version=<n.m>] " + flag_info)
       return 1
     else:
       # parse options
@@ -583,7 +586,7 @@ class FSAddCommand(Command):
       if rdisk.add_filesystem(data, dos_type=dostype, version=version, dev_flags=dev_flags):
         return 0
       else:
-        print "ERROR adding filesystem! (no space in RDB left)"
+        print("ERROR adding filesystem! (no space in RDB left)")
         return 1
 
 class FSDeleteCommand(Command):
@@ -592,18 +595,18 @@ class FSDeleteCommand(Command):
 
   def handle_rdisk(self, rdisk):
     if len(self.opts) < 1:
-      print "Usage: fsdelete <fid>"
+      print("Usage: fsdelete <fid>")
       return 1
     else:
       fs = rdisk.find_filesystem_by_string(self.opts[0])
       if fs != None:
         if not rdisk.delete_filesystem(fs.num):
-          print "ERROR deleting filesystem: '%s'" % self.opts[0]
+          print("ERROR deleting filesystem: '%s'" % self.opts[0])
           return 1
         else:
           return 0
       else:
-        print "ERROR finding filesystem: '%s'" % self.opts[0]
+        print("ERROR finding filesystem: '%s'" % self.opts[0])
         return 1
 
 class FSFlagsCommand(Command):
@@ -612,7 +615,7 @@ class FSFlagsCommand(Command):
 
   def handle_rdisk(self, rdisk):
     if len(self.opts) < 2:
-      print "Usage: fsflags <fid> [ clear | key=<val> ... ]"
+      print("Usage: fsflags <fid> [ clear | key=<val> ... ]")
       return 1
     else:
       fs = rdisk.find_filesystem_by_string(self.opts[0])
@@ -629,7 +632,7 @@ class FSFlagsCommand(Command):
         fs.set_flags(flags, clear)
         return 0
       else:
-        print "ERROR finding filesystem: '%s'" % self.opts[0]
+        print("ERROR finding filesystem: '%s'" % self.opts[0])
         return 1
 
 # ----- main -----

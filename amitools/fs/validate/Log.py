@@ -1,3 +1,6 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 class LogEntry:
   """A class for a log entry"""
   names = ('debug','info ','WARN ','ERROR')
@@ -32,7 +35,7 @@ class Log:
   
   def dump(self):
     for e in self.entries:
-      print e
+      print(e)
   
   def get_num_level(self, level):
     num = 0

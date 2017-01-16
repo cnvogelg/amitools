@@ -1,4 +1,7 @@
-from FSString import FSString
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .FSString import FSString
 
 class FileName:
   root_path_aliases = (u'', u'/', u':')
@@ -45,7 +48,7 @@ class FileName:
       return None, self.name
     
   def get_upper_ami_str(self):
-    result = self.name.get_ami_str().upper();
+    result = self.name.get_ami_str().upper()
     if self.is_intl:
       r = ""
       for i in xrange(len(result)):
@@ -74,8 +77,10 @@ class FileName:
         s = self.name.get_ami_str()
         # check for invalid chars
         for c in s:
-          o = ord(c)
-          if o == ':' or o == '/':
+          # o = ord(c)
+          # if o == ':' or o == '/':
+          # FIXME: FS
+          if c == ':' or c == '/':
             return False
         # check max size
         if self.is_longname:
@@ -86,7 +91,7 @@ class FileName:
     return True
   
   def hash(self, hash_size=72):
-    up = self.get_upper_ami_str();
+    up = self.get_upper_ami_str()
     h = len(up)
     for c in up:
       h = h * 13;

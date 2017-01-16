@@ -1,4 +1,7 @@
-from BlockScan import BlockScan
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .BlockScan import BlockScan
 from amitools.fs.FSString import FSString
 from amitools.fs.FileName import FileName
 from amitools.fs.validate.Log import Log

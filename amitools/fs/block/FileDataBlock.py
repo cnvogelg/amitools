@@ -1,4 +1,7 @@
-from Block import Block
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .Block import Block
 
 class FileDataBlock(Block):
   def __init__(self, blkdev, blk_num):
@@ -49,8 +52,8 @@ class FileDataBlock(Block):
   
   def dump(self):
     Block.dump(self,"FileData")
-    print " hdr_key:    %d" % self.hdr_key
-    print " seq_num:    %d" % self.seq_num
-    print " data size:  %d" % self.data_size
-    print " next_data:  %d" % self.next_data
+    print(" hdr_key:    %d" % self.hdr_key)
+    print(" seq_num:    %d" % self.seq_num)
+    print(" data size:  %d" % self.data_size)
+    print(" next_data:  %d" % self.next_data)
   

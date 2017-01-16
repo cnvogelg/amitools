@@ -1,4 +1,7 @@
-from ADFSVolume import ADFSVolume
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .ADFSVolume import ADFSVolume
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 
 class Repacker:
@@ -79,5 +82,3 @@ class Repacker:
       out_file = out_dir.create_file(name, data, meta_info, False)
       out_file.flush()
     in_node.flush()
-
-      

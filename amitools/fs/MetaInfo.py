@@ -1,6 +1,9 @@
-from ProtectFlags import *
-from TimeStamp import *
-from FSString import FSString
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .ProtectFlags import *
+from .TimeStamp import *
+from .FSString import FSString
 
 class MetaInfo:
   def __init__(self, protect=None, mod_ts=None, comment=None, protect_flags=None):

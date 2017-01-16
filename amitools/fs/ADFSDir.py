@@ -1,13 +1,16 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 import struct
-from block.Block import Block
-from block.UserDirBlock import UserDirBlock
-from block.DirCacheBlock import * 
-from ADFSFile import ADFSFile
-from ADFSNode import ADFSNode
-from FileName import FileName
-from FSError import *
-from FSString import FSString
-from MetaInfo import *
+from .block.Block import Block
+from .block.UserDirBlock import UserDirBlock
+from .block.DirCacheBlock import *
+from .ADFSFile import ADFSFile
+from .ADFSNode import ADFSNode
+from .FileName import FileName
+from .FSError import *
+from .FSString import FSString
+from .MetaInfo import *
 
 class ADFSDir(ADFSNode):
   def __init__(self, volume, parent):

@@ -1,3 +1,6 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 import time
 
 from amitools.fs.block.Block import Block
@@ -193,7 +196,7 @@ class BlockScan:
           bi.hdr_key = cblk.hdr_key
           bi.own_key = cblk.own_key
               
-    except IOError,e:
+    except IOError as e:
       self.log.msg(Log.ERROR, "Can't read block", blk_num)
       bi = BlockInfo(blk_num)
       bi.blk_status = BS_READ_ERROR
@@ -241,5 +244,5 @@ class BlockScan:
   def dump(self):
     for b in self.block_map:
       if b != None:
-        print b
+        print(b)
 

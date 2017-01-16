@@ -1,4 +1,7 @@
-from Block import Block
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .Block import Block
 
 class BitmapBlock(Block):
   def __init__(self, blkdev, blk_num):
@@ -30,4 +33,3 @@ class BitmapBlock(Block):
   
   def dump(self):
     Block.dump(self,"Bitmap")
-  

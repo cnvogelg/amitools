@@ -1,3 +1,6 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 import time
 
 ts_empty_string = "--.--.---- --:--:--.--"
@@ -56,12 +59,11 @@ if __name__ == '__main__':
   ts.from_secs(123)
   ts2 = TimeStamp(days=ts.days, mins=ts.mins, ticks=ts.ticks)
   if ts2.get_secs() != 123:
-    print "FAIL"
+    print("FAIL")
   
   ts = TimeStamp()
   s = "05.01.2012 21:47:34 t40"
   ts.parse(s)
   txt = str(ts)
   if s != txt:
-    print "FAIL"
-  
+    print("FAIL")

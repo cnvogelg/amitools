@@ -1,3 +1,6 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 import subprocess
 import tempfile
 import os
@@ -56,4 +59,4 @@ class DisAsm:
   def dump(self, code):
     for line in code:
       ops = map(lambda x : "%04x" % x, line[1])
-      print "%08x:  %-20s  %s" % (line[0]," ".join(ops),line[2])
+      print("%08x:  %-20s  %s" % (line[0]," ".join(ops),line[2]))

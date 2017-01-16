@@ -1,11 +1,14 @@
-from block.CommentBlock import CommentBlock
-from block.EntryBlock import EntryBlock
-from FileName import FileName
-from MetaInfo import MetaInfo
-from ProtectFlags import ProtectFlags
-from TimeStamp import TimeStamp
-from FSError import *
-from FSString import FSString
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .block.CommentBlock import CommentBlock
+from .block.EntryBlock import EntryBlock
+from .FileName import FileName
+from .MetaInfo import MetaInfo
+from .ProtectFlags import ProtectFlags
+from .TimeStamp import TimeStamp
+from .FSError import *
+from .FSString import FSString
 import amitools.util.ByteSize as ByteSize
 
 class ADFSNode:

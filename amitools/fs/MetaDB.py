@@ -1,10 +1,13 @@
-from MetaInfo import MetaInfo
-from RootMetaInfo import RootMetaInfo
-from ProtectFlags import ProtectFlags
-from TimeStamp import TimeStamp
+from __future__ import absolute_import
+from __future__ import print_function
+
+from .MetaInfo import MetaInfo
+from .RootMetaInfo import RootMetaInfo
+from .ProtectFlags import ProtectFlags
+from .TimeStamp import TimeStamp
 from amitools.fs.block.BootBlock import BootBlock
-import DosType
-from FSString import FSString
+from . import DosType
+from .FSString import FSString
 
 class MetaDB:
   def __init__(self):
@@ -45,9 +48,9 @@ class MetaDB:
       return None
   
   def dump(self):
-    print self.vol_name, self.vol_meta, self.dos_type
+    print(self.vol_name, self.vol_meta, self.dos_type)
     for m in self.metas:
-      print m
+      print(m)
   
   # ----- load -----
     
