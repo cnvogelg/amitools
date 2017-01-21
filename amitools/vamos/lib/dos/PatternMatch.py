@@ -190,7 +190,7 @@ def pattern_parse(src_str, ignore_case=True, star_is_wild=False):
   # finally check blocks
   if len(blocks) > 0:
     return None
-  
+
   return Pattern(src_str, dst, ignore_case, has_wild)
 
 def _dump(num, level, txt):
