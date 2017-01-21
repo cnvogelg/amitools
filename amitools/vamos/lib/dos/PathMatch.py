@@ -125,7 +125,9 @@ class PathMatch:
               self.head_chain = chain
             prev_chain = chain
           else:
-            last.append(s)
+            last.append(pat.pat_str)
+            #thor: even if there is no wild-card, do not append the string directly
+            #since the escape-character ' still needs to be removed
         else:
           return False
     

@@ -124,7 +124,7 @@ def printf_read_data(state, mem_access, data_ptr):
       if cptr > 0:
         data = mem_access.r_cstr(cptr)
       else:
-        data = '(null)'
+        data = '' # thor: exec ignores NULL strings.
     elif t == 'c': # char
       l = e.length
       if l is not None and "l" in l:
