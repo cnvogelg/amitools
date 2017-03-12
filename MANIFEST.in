@@ -2,5 +2,6 @@ include MANIFEST.in
 include README.md
 include Makefile
 recursive-include amitools/data *
+recursive-include amitools/fs/block/bootcode *
 recursive-include musashi *.pyx *.c *.h readme.txt history.txt
 
