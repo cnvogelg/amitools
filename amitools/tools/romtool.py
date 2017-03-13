@@ -18,6 +18,7 @@ from amitools.rom.RomBuilder import *
 from amitools.rom.RomPatcher import *
 from amitools.rom.KickRom import *
 from amitools.rom.ResidentScan import *
+from amitools.rom.BlizKick import *
 from amitools.binfmt.hunk.BinFmtHunk import BinFmtHunk
 from amitools.binfmt.BinFmt import BinFmt
 
@@ -127,6 +128,14 @@ def do_build_cmd(args):
     # load image
     if bf.is_image(f):
       bin_img = bf.load_image(f)
+      # is it a blizkick module?
+      bkm = BlizKickModule(bin_img)
+      if bkm.get_type() == "module":
+        bkm.fix_module()
+      elif bkm.get_type() == "patch":
+        logging.error("BlizKick Patches are not supported, yet:", name)
+        return 5
+      # get image params
       size = bin_img.get_size()
       data = None
     else:
