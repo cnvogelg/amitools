@@ -42,10 +42,12 @@ class BlizKickModule(object):
   def fix_module(self):
     if self.bk_type != "module":
       return
-    seg = self.bin_img.get_segments()[0]
+    segs = self.bin_img.get_segments()
     # strip bk module header
+    seg = segs[0]
     data = seg.get_data()
     seg.data = data[6:]
+    seg.size -= 6
     # auto init flag set?
     flags = ord(seg.data[10])
     auto_init = (flags & 0x80) == 0x80
@@ -63,6 +65,11 @@ class BlizKickModule(object):
     # add relocs
     for o in offs:
       relocs.add_reloc(BinImage.Reloc(o))
+    # check if we can remove last data segment (contains only version info)
+    if len(segs) == 2 and segs[1].get_type() == BinImage.SEGMENT_TYPE_DATA:
+      data = segs[1].get_data()
+      if data[:5] == '$VER:':
+        self.bin_img.segments = [seg]
 
 
 # test
