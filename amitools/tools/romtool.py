@@ -145,8 +145,13 @@ def do_build_cmd(args):
         data = fh.read()
       size = len(data)
 
+    # calc long word padding
+    padding = 0
+    if size & 3 != 0:
+      padding = 4 - size & 3
+
     # handle kickety split
-    if kickety_split and rb.cross_kickety_split(size):
+    if kickety_split and rb.cross_kickety_split(size + padding):
       off = rb.get_rom_offset()
       logging.info("@%08x: adding kickety split", off)
       rb.add_kickety_split()
@@ -165,6 +170,15 @@ def do_build_cmd(args):
       e = rb.add_module(name, data)
       if e is None:
         logging.error("@%08x: can't add raw data '%s': %s", off, f, rb.get_error())
+        return 3
+
+    # add long word padding?
+    if padding != 0:
+      off = rb.get_rom_offset()
+      logging.info("@%08x: adding padding: +%d" % (off, padding))
+      e = rb.add_padding(padding)
+      if e is None:
+        logging.error("@%08x: can't add padding: %s", off, rb.get_error())
         return 3
 
   # build rom

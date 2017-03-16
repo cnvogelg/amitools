@@ -58,6 +58,18 @@ class RomEntryRomHdr:
     return data + hdr
 
 
+class RomEntryPadding:
+  def __init__(self, skip, value=0):
+    self.skip = skip
+    self.value = value
+
+  def get_size(self):
+    return self.skip
+
+  def get_data(self, addr):
+    return chr(self.value) * self.skip
+
+
 class RomBuilder:
   def __init__(self, size=512, base_addr=0xf80000, fill_byte=0xff):
     self.size = size # in KiB
@@ -121,6 +133,10 @@ class RomBuilder:
 
   def add_bin_img(self, name, bin_img):
     e = RomEntryBinImg(name, bin_img)
+    return self._add_entry(e)
+
+  def add_padding(self, skip, value=0):
+    e = RomEntryPadding(skip, value)
     return self._add_entry(e)
 
   def build_rom(self):
