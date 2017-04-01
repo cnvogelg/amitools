@@ -613,7 +613,7 @@ class DosLibrary(AmigaLibrary):
     # write to stdout
     fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
     ok = fh.write(str_dat)
-    log_dos.info("FPuts(%s,'%s')", (fh, str_dat))
+    log_dos.info("FPuts(%s,'%s')" % (fh, str_dat))
     return 0 # ok
   
   def UnGetC(self, ctx):

@@ -176,7 +176,7 @@ class Args:
           return False
 
       # keyword
-      elif targ['k']:
+      elif targ['k'] and not targ['m']:
         val = self._find_remove_key(targ['keys'], args, True)
         # keyword at end of line
         if val == None:
@@ -246,9 +246,12 @@ class Args:
         if targ['a'] and len(result[pos])==0:
           self.error = ERROR_REQUIRED_ARG_MISSING
           return False
+      pos = pos + 1
 
-      # normal entry
-      elif targ['x']:
+    pos = 0
+    for targ in targs:
+      # normal entry that is not yet filled
+      if targ['x'] and result[pos] == None:
         # take from arraay
         if len(args)>0:
           val = self.unquote(args[0])
