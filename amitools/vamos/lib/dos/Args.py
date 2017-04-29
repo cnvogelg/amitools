@@ -260,7 +260,7 @@ class Args:
         else:
           val = None
           if targ['a']: # required -> try to get from multi
-            if multi_pos != None and len(result[multi_pos])>0:
+            if multi_pos != None and result[multi_pos] != None and len(result[multi_pos])>0:
               val = result[multi_pos][-1]
               result[multi_pos] = result[multi_pos][:-1]
               # oops multi is empty!
