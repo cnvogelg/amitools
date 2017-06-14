@@ -58,6 +58,7 @@ class Args:
     inquote  = False
     inspace  = True
     asterisk = False
+    lastb    = None
     for b in argstring:
       if asterisk:
         if b == 'E' or b ==' e':
@@ -90,8 +91,14 @@ class Args:
           args += [arg]
           arg   = ""
           inspace = True
+        elif b == '"' and lastb == '=':
+          args += [arg[:-1]]
+          arg   = ""
+          inspace = False
+          inquote = True
         else:
           arg  += b
+      lastb=b
     if arg != "":
       args += [arg]
     return args
