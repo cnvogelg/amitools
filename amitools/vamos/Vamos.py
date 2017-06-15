@@ -20,6 +20,7 @@ from lib.UtilityLibrary import UtilityLibrary
 from lib.IntuitionLibrary import IntuitionLibrary
 from lib.MathFFPLibrary import MathFFPLibrary
 from lib.MathIEEEDoubBasLibrary import MathIEEEDoubBasLibrary
+from lib.TimerDevice import TimerDevice
 
 from Log import *
 from CPU import *
@@ -332,6 +333,10 @@ class Vamos:
     mathdoubbas_cfg = cfg.get_lib_config('mathieeedoubbas.library')
     self.mathdoubbas_lib_def = MathIEEEDoubBasLibrary(mathdoubbas_cfg)
     self.lib_mgr.register_vamos_lib(self.mathdoubbas_lib_def)
+    # timer
+    timer_cfg = cfg.get_lib_config('timer.device')
+    self.timer_dev_def = TimerDevice(timer_cfg)
+    self.lib_mgr.register_vamos_lib(self.timer_dev_def)
 
   def open_base_libs(self):
     # open exec lib
