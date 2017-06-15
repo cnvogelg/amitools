@@ -217,7 +217,7 @@ class VamosConfig(ConfigParser.SafeConfigParser):
   def _parse_lib_config(self):
     # run through all sections matching [<bla.library>]:
     for lib_name in self.sections():
-      if lib_name.endswith('.library'):
+      if lib_name.endswith('.library') or lib_name.endswith('.device'):
         # check for lib
         if lib_name in self.libs:
           lib = self.libs[lib_name]
@@ -244,7 +244,7 @@ class VamosConfig(ConfigParser.SafeConfigParser):
         else:
           lib, kv = r
           # generate lib name
-          if lib.endswith('.library'):
+          if lib.endswith('.library') or lib.endswith('.device'):
             lib_name = lib
           else:
             lib_name = lib + '.library'
