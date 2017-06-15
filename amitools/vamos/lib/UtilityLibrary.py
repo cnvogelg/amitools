@@ -20,6 +20,22 @@ class UtilityLibrary(AmigaLibrary):
     rem  = dividend % divisor
     log_utility.info("UDivMod32(dividend=%u, divisor=%u) => (quotient=%u, remainder=%u)" % (dividend, divisor, quot, rem))
     return [quot, rem]
+  
+  def SDivMod32(self, ctx):
+    dividend = ctx.cpu.r_reg(REG_D0)
+    if dividend >= 0x80000000:
+      dividend = dividend - 0x100000000
+    divisor = ctx.cpu.r_reg(REG_D1)
+    if divisor >= 0x80000000:
+      divisor = divisor - 0x100000000
+    quot = dividend / divisor
+    rem  = dividend % divisor
+    if quot < 0:
+      quot = quot + 0x100000000
+    if rem < 0:
+      rem = rem + 0x100000000
+    log_utility.info("UDivMod32(dividend=%u, divisor=%u) => (quotient=%u, remainder=%u)" % (dividend, divisor, quot, rem))
+    return [quot, rem]
 
   def UMult32(self, ctx):
     a = ctx.cpu.r_reg(REG_D0)
