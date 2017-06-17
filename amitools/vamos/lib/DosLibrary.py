@@ -455,7 +455,7 @@ class DosLibrary(AmigaLibrary):
 
   def SelectInput(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
-    fh = self.file_mgr.get_by_b_addr(fh_b_addr,False)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
     log_dos.info("SelectInput(fh=%s)" % fh)
     cur_in = self.Input(ctx)
     ctx.process.set_input(fh)
@@ -463,7 +463,7 @@ class DosLibrary(AmigaLibrary):
 
   def SelectOutput(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
-    fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr)
     log_dos.info("SelectOutput(fh=%s)" % fh)
     cur_out = self.Output(ctx)
     ctx.process.set_output(fh)
