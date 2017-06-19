@@ -130,10 +130,19 @@ class LibManager():
         # now check if the library has a native counterpart
         # if yes then create memory layout with it
         load_name = self._get_load_lib_name(name)
-        if ctx.seg_loader.can_load_seg(None,load_name,local_path=True):
+        self.lib_log("open_lib","load_lib_name: %s" % load_name, level=logging.INFO)
+
+        # pick current dir lock if available
+        # this allows to resolve relative paths given in load_name
+        cur_dir_lock = None
+        proc = ctx.process
+        if proc is not None:
+          cur_dir_lock = proc.cwd_lock
+
+        if ctx.seg_loader.can_load_seg(cur_dir_lock,load_name,local_path=True):
           # setup trampoline
           tr = Trampoline(ctx,"create_lib[%s]" % sane_name)
-          self._create_native_lib(lib, load_name, ctx, tr)
+          self._create_native_lib(lib, load_name, ctx, tr, cur_dir_lock)
           self._open_native_lib(lib, ctx, tr)
           tr.final_rts()
           tr.done()
@@ -283,12 +292,12 @@ class LibManager():
 
   # ----- create/free native lib -----
 
-  def _create_native_lib(self, lib, load_name, ctx, tr):
+  def _create_native_lib(self, lib, load_name, ctx, tr, cur_dir_lock=None):
     """load native lib from binary file and allocate memory"""
 
     # use seg_loader to load lib
     self.lib_log("load_lib","loading native lib: %s" % load_name)
-    lib.seg_list = ctx.seg_loader.load_seg(None,load_name,local_path=True)
+    lib.seg_list = ctx.seg_loader.load_seg(cur_dir_lock,load_name,local_path=True)
     if lib.seg_list == None:
       self.lib_log("load_lib","Can't load library file '%s'" % load_name, level=logging.ERROR)
       return None
