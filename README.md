@@ -22,28 +22,40 @@ will be very helpful.
  - The following Python packages are required to build/install the tools:
    - [Cython][1] >= 0.21
  - All other packages are installed automatically, if missing:
-   - [pytest][2]
+   - [pytest][2] (Optional: only required for testing)
    - [lhafile - FS Edition][3] (Optional: required to use lha file scanner)
+
+### Install pip
+
  - First make sure to have the Python package installer ```pip```:
-  - On Mac OS X using [MacPorts][4] (Tool is called ```pip-2.7``` here):
-  ```
+
+#### macOS
+
+ - On macOS using [MacPorts][4] (Tool is called ```pip-2.7``` here):
+```
 sudo port install py27-pip
 sudo pip-2.7 install cython
 ```
-  - On Linux Ubuntu:
+
+### Linux/Ubuntu
+
+ - On Linux Ubuntu use the provided packages ```python-pip```
   ```
 sudo apt-get install python-pip
 sudo pip install cython
 ```
-   - On Windows with [MSYS2][5] (use x86_64 version if possible):
-     - Install with exe installer
-     - Initial update is done with: (Open shell first)
-     ```
+
+### Windows
+
+ - On Windows with [MSYS2][5] (use x86_64 version if possible):
+   - Install with exe installer
+   - Initial update is done with: (Open shell first)
+```
 pacman -Sy
 pacman --needed -S bash pacman msys2-runtime
 ```
-     - Now close shell and re-open a new dev shell (```MinGW-w64 Win64 Shell```)
-     ```
+   - Now close shell and re-open a new dev shell (```MinGW-w64 Win64 Shell```)
+```
 pacman -Su
 pacman -S mingw-w64-x86_64-python2-pip mingw-w64-x86_64-gcc git make
 ```
@@ -52,28 +64,28 @@ pacman -S mingw-w64-x86_64-python2-pip mingw-w64-x86_64-gcc git make
 [2]: http://pytest.org
 [3]: https://github.com/FrodeSolheim/lhafile
 [4]: https://www.macports.org
-[5]: https://sourceforge.net/p/msys2/wiki/Home/
+[5]: https://github.com/msys2/msys2/wiki
 
 ## Installation
 
  - You have multiple variants to install the tools with Python's `setuptools`:
-   - **Global Install** is available for all users of your system and needs root privileges
-   ```
+ - **Global Install** is available for all users of your system and needs root privileges
+```
 sudo python setup.py install
 ```
-   - **User Install** is available for your user only but does not require special privileges
-   ```
+ - **User Install** is available for your user only but does not require special privileges
+```
 python setup.py install --user
 ```
-   - **Developer Setup** only links this code into your installation and allows
+ - **Developer Setup** only links this code into your installation and allows
    you to change/develop the code and test it immediately. (I prefer user install here)
-   ```
+```
 python setup.py develop --user
 ```
-   - **Run In Place** allows you to run the binaries directly from the `bin` directory
+ - **Run In Place** allows you to run the binaries directly from the `bin` directory
   without any installation. You need `setup.py` only to build the native library
   of vamos:
-  ```
+```
 python setup.py build
 ```
 
