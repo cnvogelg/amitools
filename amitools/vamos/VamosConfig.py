@@ -178,7 +178,9 @@ class VamosConfig(ConfigParser.SafeConfigParser):
         setattr(self, key, def_val)
 
   def _check_cpu(self, val):
-    return val in ('68000','68020','000','020','00','20')
+    return val in ('68000','68020','68030',
+      '000','020','030',
+      '00','20','30')
 
   def _set_value(self, key, value):
     if key in self._keys:

@@ -79,8 +79,15 @@ def main():
   # setup CPU
   if cfg.cpu in ('68000', '000', '00'):
     cpu_type = m68k.M68K_CPU_TYPE_68000
+    cfg.cpu = '68000'
   elif cfg.cpu in ('68020', '020', '20'):
     cpu_type = m68k.M68K_CPU_TYPE_68020
+    cfg.cpu = '68020'
+  elif cfg.cpu in ('68030', '030', '30'):
+    # fake 030 CPU only to set AttnFlags accordingly
+    cpu_type = m68k.M68K_CPU_TYPE_68020
+    cfg.cpu = '68030'
+    log_main.info("fake 68030 CPU selected")
   else:
     log_main.error("Invalid CPU type: %s" % cfg.cpu)
     sys.exit(1)

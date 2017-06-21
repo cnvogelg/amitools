@@ -26,8 +26,10 @@ class ExecLibrary(AmigaLibrary):
   def setup_lib(self, ctx):
     AmigaLibrary.setup_lib(self, ctx)
     # set some system contants
-    if ctx.cpu_type == '68020':
-      self.access.w_s("AttnFlags",2)
+    if ctx.cpu_type == '68030':
+      self.access.w_s("AttnFlags",7)
+    elif ctx.cpu_type == '68020':
+      self.access.w_s("AttnFlags",3)
     else:
       self.access.w_s("AttnFlags",0)
     self.access.w_s("MaxLocMem", ctx.ram_size)
