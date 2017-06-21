@@ -37,7 +37,7 @@ sudo port install py27-pip
 sudo pip-2.7 install cython
 ```
 
-### Linux/Ubuntu
+#### Linux/Ubuntu
 
  - On Linux Ubuntu use the provided packages ```python-pip```
   ```
@@ -45,7 +45,7 @@ sudo apt-get install python-pip
 sudo pip install cython
 ```
 
-### Windows
+#### Windows
 
  - On Windows with [MSYS2][5] (use x86_64 version if possible):
    - Install with exe installer
