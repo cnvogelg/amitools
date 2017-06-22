@@ -51,7 +51,8 @@ class ADFBlockDevice(BlockDevice):
     if self.read_only:
       self.data = data
     else:
-      self.data = ctypes.create_string_buffer(data)
+      self.data = ctypes.create_string_buffer(self.num_bytes)
+      self.data[:] = data
 
   def flush(self):
     # write dirty adf
