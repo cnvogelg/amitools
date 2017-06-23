@@ -117,8 +117,8 @@ class ExecLibrary(AmigaLibrary):
       log_exec.info("OpenLibrary: '%s' V%d -> NULL" % (name, ver))
       return 0
     else:
-      log_exec.info("OpenLibrary: '%s' V%d -> %s@0x%06x" % (name, ver, lib, lib.addr_base_open))
-      return lib.addr_base_open
+      log_exec.info("OpenLibrary: '%s' V%d -> %s" % (name, ver, lib))
+      return lib.addr_base
 
   def TaggedOpenLibrary(self, ctx):
     tag = ctx.cpu.r_reg(REG_D0)
@@ -131,8 +131,8 @@ class ExecLibrary(AmigaLibrary):
         log_exec.info("TaggedOpenLibrary: %d('%s') -> NULL" % (tag, name))
         return 0
       else:
-        log_exec.info("TaggedOpenLibrary: %d('%s') -> %s@0x%06x" % (tag, name, lib, lib.addr_base_open))
-        return lib.addr_base_open
+        log_exec.info("TaggedOpenLibrary: %d('%s') -> %s" % (tag, name, lib))
+        return lib.addr_base
     else:
       log_exec.warn("TaggedOpenLibrary: %d invalid tag -> NULL" % tag)
       return 0
@@ -142,7 +142,7 @@ class ExecLibrary(AmigaLibrary):
     name = ctx.mem.access.r_cstr(name_ptr)
     lib = self.lib_mgr.open_lib(name, 0, ctx)
     log_exec.info("OldOpenLibrary: '%s' -> %s" % (name, lib))
-    return lib.addr_base_open
+    return lib.addr_base
 
   def CloseLibrary(self, ctx):
     lib_addr = ctx.cpu.r_reg(REG_A1)
@@ -334,7 +334,7 @@ class ExecLibrary(AmigaLibrary):
       log_exec.info("OpenDevice: '%s' unit %d flags %d -> NULL" % (name, unit, flags))
       return -1
     else:
-      log_exec.info("OpenDevice: '%s' unit %d flags %d -> %s@0x%06x" % (name, unit, flags, lib, lib.addr_base_open))
+      log_exec.info("OpenDevice: '%s' unit %d flags %d -> %s" % (name, unit, flags, lib))
       return 0
 
   def CloseDevice(self,ctx):

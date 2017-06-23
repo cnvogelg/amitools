@@ -55,7 +55,6 @@ class AmigaLibrary:
     self.addr_base = 0
     self.addr_begin = 0
     self.addr_end = 0
-    self.addr_base_open = 0 # address returned by open as lib base
     self.label = None
     self.access = None
     self.lib_access = None
@@ -64,6 +63,10 @@ class AmigaLibrary:
     self.lock_in_memory = False
     self.traps = []
     # also an access object for the lib struct members are allocated
+
+    # handle multiple library bases if the lib returns a new instance
+    # with every OpenLibrary() call. its map of addr -> ref_cnt
+    self.open_lib_bases = {}
 
   def calc_neg_size_from_fd(self):
     """calc the neg size from the fd bias"""
@@ -284,13 +287,13 @@ class AmigaLibrary:
       addr -= 6
 
   def __str__(self):
-    return "[Lib %s V%d {+%d -%d} mem: V%d {+%d -%d} <%08x, %08x, %08x> open_base=%08x ref_cnt=%d]" % \
+    return "[Lib %s V%d {+%d -%d} mem: V%d {+%d -%d} <%08x, %08x, %08x> open_bases=%s ref_cnt=%d]" % \
       (self.name, self.version,
        self.pos_size, self.neg_size,
        self.mem_version,
        self.mem_pos_size, self.mem_neg_size,
        self.addr_begin, self.addr_base, self.addr_end,
-       self.addr_base_open, self.ref_cnt)
+       self.get_lib_base_str(), self.ref_cnt)
 
   def alloc_lib_base(self, ctx):
     """alloc memory for the library base"""
@@ -302,7 +305,6 @@ class AmigaLibrary:
     self.addr_begin = self.mem_obj.addr
     self.addr_base = self.addr_begin + self.mem_neg_size
     self.addr_end = self.addr_base + self.mem_pos_size
-    self.addr_base_open = self.addr_base
     # create memory label
     self.label = LabelLib(self.name, self.addr_begin, lib_size, self.addr_base, self.struct, self)
     ctx.label_mgr.add_label(self.label)
@@ -321,7 +323,6 @@ class AmigaLibrary:
     self.addr_begin = 0
     self.addr_base = 0
     self.addr_end = 0
-    self.addr_base_open = 0
     self.label = None
     self.access = None
     self.lib_access = None
@@ -424,3 +425,31 @@ class AmigaLibrary:
     sys.stderr.write("\n")
     raise
 
+  # handle lib bases
+
+  def add_lib_base(self, base_addr):
+    """store lib_base in multi bases. return True if base_addr was not used
+       before."""
+    if base_addr in self.open_lib_bases:
+      self.open_lib_bases[base_addr] = self.open_lib_bases[base_addr] + 1
+      return False
+    else:
+      self.open_lib_bases[base_addr] = 1
+      return True
+
+  def del_lib_base(self, base_addr):
+    """remove a lib base. return True if it was the last usage of the addr"""
+    num = self.open_lib_bases[base_addr] - 1
+    if num == 0:
+      del self.open_lib_bases[base_addr]
+      return True
+    else:
+      self.open_lib_bases[base_addr] = num
+      return False
+
+  def get_lib_base_str(self):
+    res = []
+    for a in self.open_lib_bases:
+      num = self.open_lib_bases[a]
+      res.append("@%08lx(#%d)" % (a,num))
+    return "[%s]" % ",".join(res)
