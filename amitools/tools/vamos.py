@@ -56,7 +56,7 @@ def main():
   # dirs
   parser.add_argument('-D', '--data-dir', action='store', default=None, help="set vamos data directory (default: %s)" % data_dir)
   # lib config
-  parser.add_argument('-O', '--lib-options', action='append', default=None, help="set lib options: <lib>:<key>=<value>,...")
+  parser.add_argument('-O', '--lib-options', action='append', default=None, help="set lib options: <lib>+<key>=<value>,...")
   # path config
   parser.add_argument('-a', '--assign', action='append', default=None, help="add AmigaOS assign: name:[+]/sys/path[,/more/path]")
   parser.add_argument('-V', '--volume', action='append', default=None, help="define AmigaOS volume: name:/abs/sys/path")

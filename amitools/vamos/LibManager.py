@@ -34,13 +34,6 @@ class LibManager():
     # libs will accumulate this if benchmarking is enabled
     self.bench_total = 0.0
 
-    # --- config for auto lib ---
-    # black and white list for auto creation of libs
-    # (use sane or normal name)
-    #self.black_list = []
-    #self.white_list = ['icon.library']
-    self.auto_create = False
-
   def register_vamos_lib(self, lib):
     """register an vamos library class"""
     self.vamos_libs[lib.get_name()] = lib
@@ -77,9 +70,14 @@ class LibManager():
     """open a new library in memory
        return new AmigaLibrary instance that is setup or None if lib was not found
 
+        name = string given to OpenLibrary and may contain path prefix
+          e.g. libs/bla.library or libs:foo/bla.library
+
        Note: may prepare a trampoline to finish operation!
     """
-    # sanitize lib name
+
+    # sanitize lib name, i.e. strip path component
+    # e.g. libs/bla.library -> bla.library
     sane_name = self._get_sane_lib_name(name)
 
     # is lib already opened?
@@ -87,128 +85,125 @@ class LibManager():
       self.lib_log("open_lib","opening already open lib: %s" % sane_name)
       lib = self.open_libs_name[sane_name]
       if lib.is_native:
-        # call Open()
-        tr = Trampoline(ctx,"open_lib[%s]" % sane_name)
-        self._open_native_lib(lib, ctx, tr)
-        tr.final_rts()
-        tr.done()
+        self._open_native_lib(lib, ctx)
       else:
-        # handle usage count
+        # vamos lib open: inc usage
         lib.inc_usage()
 
     # lib has to be openend
     else:
 
-      # first check if its an internal vamos library
-      if sane_name in self.vamos_libs:
-        self.lib_log("open_lib","opening vamos lib: %s" % sane_name)
-        lib = self.vamos_libs[sane_name]
-        is_vamos_lib = True
-      # otherwise create a new and empty AmigaLibrary
-      else:
-        self.lib_log("open_lib","create default lib: %s" % sane_name)
-        lib_cfg = self.cfg.get_lib_config(sane_name)
-        lib = AmigaLibrary(sane_name, LibraryDef, lib_cfg)
-        is_vamos_lib = False
+      # get lib config
+      # first search with original name and then sane_name without path
+      # finally resort to the default config (*.library)
+      lib_cfg = self.cfg.get_lib_config(name, sane_name)
+      self._dump_lib_cfg(name, lib_cfg)
 
-      # dump config of lib
-      self._dump_lib_cfg(lib.config)
-
-      # is lib mode = 'off' then reject open
-      mode = lib.config.mode
+      # depending on lib_cfg.mode decide what to do:
+      mode = lib_cfg.mode
       if mode == 'off':
-        self.lib_log("open_lib","reject open: mode='off': %s" % sane_name, level=logging.WARN)
-        return None
+        # config disabled lib -> so abort OpenLibrary()
+        self.lib_log("open_lib","reject open: mode='off': %s" % name, level=logging.WARN)
+        lib = None
+      elif mode == 'auto':
+        # auto (default) tries to open internal vamos lib first and if that
+        # fails tries a native amige lib
+        lib = self._open_vamos_internal_lib(sane_name, ctx)
+        if lib == None:
+          lib = self._load_and_open_native_lib(name, sane_name, lib_cfg, ctx)
+          if lib == None:
+            self.lib_log("open_lib","auto found neither vamos nor amiga lib: %s" % name)
+      elif mode == 'vamos':
+        # only try to find an internal vamos lib
+        lib = self._open_vamos_internal_lib(sane_name, ctx)
+        if lib == None:
+          self.lib_log("open_lib","no vamos lib found: %s" % name)
+      elif mode == 'amiga':
+        # only try to open an amiga lib
+        lib = self._load_and_open_native_lib(name, sane_name, lib_cfg, ctx)
+        if lib == None:
+          self.lib_log("open_lib","no amiga lib found: %s" % name)
+      elif mode == 'fake':
+        # create a fake lib for this library
+        lib = self._open_vamos_fake_lib(sane_name, lib_cfg, ctx)
+        if lib == None:
+          self.lib_log("open_lib","fake lib failed for: %s" % name)
 
-      # try to load an fd file for this lib
-      lib.fd = self._load_fd(sane_name)
-
-      # is native loading allowed?
-      native_loaded = False
-      native_allowed = mode in ('auto','amiga')
-      if native_allowed:
-        # now check if the library has a native counterpart
-        # if yes then create memory layout with it
-        load_name = self._get_load_lib_name(name)
-        self.lib_log("open_lib","load_lib_name: %s" % load_name, level=logging.INFO)
-
-        # pick current dir lock if available
-        # this allows to resolve relative paths given in load_name
-        cur_dir_lock = None
-        proc = ctx.process
-        if proc is not None:
-          cur_dir_lock = proc.cwd_lock
-
-        if ctx.seg_loader.can_load_seg(cur_dir_lock,load_name,local_path=True):
-          # setup trampoline
-          tr = Trampoline(ctx,"create_lib[%s]" % sane_name)
-          self._create_native_lib(lib, load_name, ctx, tr, cur_dir_lock)
-          self._open_native_lib(lib, ctx, tr)
-          tr.final_rts()
-          tr.done()
-          native_loaded = True
-
-      # no native lib available...
-      # either its a vamos lib or we auto create one from an FD file
-      if not native_loaded:
-        # we need to have an FD file otherwise we can't create lib
-        if lib.fd == None:
-          self.lib_log("create_lib","can't create auto lib without FD file: %s" % sane_name, level=logging.ERROR)
-          return None
-
-        # if not 'auto' or 'vamos' then fail now
-        if mode == 'amiga':
-          self.lib_log("open_lib","can't open amiga lib: %s" % sane_name, level=logging.WARN)
-          return None
-
-        # create a (opt. fake/empty) vamos library
-        self._create_vamos_lib(lib, ctx)
-        self._register_open_lib(lib,None)
-        lib.inc_usage()
-
-    self.lib_log("open_lib","leaving open_lib(): %s -> %06x" % (lib,lib.addr_base_open), level=logging.DEBUG)
+    if lib != None:
+      self.lib_log("open_lib","leaving open_lib(): %s -> %06x" % (lib,lib.addr_base_open), level=logging.DEBUG)
+    else:
+      self.lib_log("open_lib","leaving open_lib(): no lib!", level=logging.DEBUG)
     return lib
 
   # return instance or null
   def close_lib(self, addr, ctx):
     # get lib object
     if addr not in self.open_libs_addr:
-      self.lib_log("close_lib","No library found at address %06x" % (addr))
+      self.lib_log("close_lib","no library found at address %06x" % (addr), level=logging.ERROR)
       return None
     lib = self.open_libs_addr[addr]
     lib.open_base_addr = addr
-    self.lib_log("close_lib","Closing %s at address %06x" % (lib.name,addr))
+    self.lib_log("close_lib","closing %s at address %06x" % (lib.name,addr), level=logging.DEBUG)
 
-    # native lib handling
+    # close amiga lib
     if lib.is_native:
-      tr = Trampoline(ctx,"close_lib[%s]" % lib.name)
-      self._close_native_lib(lib, addr, ctx, tr)
-      if lib.ref_cnt == 0:
-        pass
-        # THOR: Do not release the library memory. Problem is that
-        # the SAS/C go leaves references to strings to its library
-        # segment pending in the QUAD: file, which then become
-        # invalid if the library is removed. In reality, we should
-        # only flush libs if we are low on memory.
-        #  self._free_native_lib(lib, ctx, tr)
-      elif lib.ref_cnt < 0:
-        raise VamosInternalError("CloseLib: invalid ref count?!")
-      tr.final_rts()
-      tr.done()
-
-    # own lib handling
+      self._close_native_lib(lib, addr, ctx)
+    # close vamos lib
     else:
-      # decrement usage
-      lib.dec_usage()
-      # not used any more
-      if lib.ref_cnt == 0:
-        # finally close lib
-        self._unregister_open_lib(lib,None)
-        self._free_vamos_lib(lib, ctx)
-      elif lib.ref_cnt < 0:
-        raise VamosInternalError("CloseLib: invalid ref count?!")
+      self._close_vamos_lib(lib, ctx)
 
     return lib
+
+  # ----- vamos lib -----
+
+  def _open_vamos_internal_lib(self, sane_name, ctx):
+    """try to open an internal vamos lib
+       return internal lib or None if not found"""
+    self.lib_log("open_lib","trying to open vamos lib: '%s'" % sane_name)
+    if sane_name not in self.vamos_libs:
+      return None
+
+    self.lib_log("open_lib","found vamos lib: %s" % sane_name)
+    lib = self.vamos_libs[sane_name]
+
+    return self._open_vamos_lib(sane_name, lib, ctx)
+
+  def _open_vamos_fake_lib(self, sane_name, lib_cfg, ctx):
+    """try to setup a fake lib from a given .fd file
+       return new lib or None if creation failed"""
+
+    # create empty lib
+    lib = AmigaLibrary(sane_name, LibraryDef, lib_cfg)
+
+    return self._open_vamos_lib(sane_name, lib, ctx)
+
+  def _open_vamos_lib(self, sane_name, lib, ctx):
+    # now we need an fd file to know about the structure of the lib
+    lib.fd = self._load_fd(sane_name)
+    if lib.fd == None:
+      self.lib_log("create_lib","can't create vamos lib without FD file: %s" % sane_name, level=logging.ERROR)
+      return None
+
+    # fill in structure from fd
+    self._create_vamos_lib(lib, ctx)
+    self._register_open_lib(lib,None)
+    lib.inc_usage()
+
+    return lib
+
+  def _close_vamos_lib(self, lib, ctx):
+    self.lib_log("close_lib","closing vamos lib '%s' ref_cnt: %d" % (lib.name, lib.ref_cnt))
+    # decrement usage
+    lib.dec_usage()
+    # not used any more
+    if lib.ref_cnt == 0:
+      self.lib_log("close_lib","freeing vamos lib '%s'" % (lib.name))
+      # finally free lib
+      self._unregister_open_lib(lib,None)
+      self._free_vamos_lib(lib, ctx)
+    elif lib.ref_cnt < 0:
+      raise VamosInternalError("CloseLib: invalid ref count?!")
+
 
   # ----- post-open setup -----
 
@@ -233,9 +228,52 @@ class LibManager():
       del self.open_libs_addr[libbase]
     #del self.open_libs_name[lib.name]
 
-  # ----- open/close native lib -----
+  # ----- open native lib -----
 
-  def _open_native_lib(self, lib, ctx, tr):
+  def _load_and_open_native_lib(self, name, sane_name, lib_cfg, ctx):
+    """try to load and open native lib
+       return new lib instance or None if lib was not found"""
+
+    # create empty lib
+    lib = AmigaLibrary(sane_name, LibraryDef, lib_cfg)
+
+    # determine file name from open_name, i.e. prepend LIBS: if no path is found
+    load_name = self._get_load_lib_name(name)
+    self.lib_log("load_lib","trying to load amiga lib: '%s'" % load_name, level=logging.INFO)
+
+    # pick current dir lock if available
+    # this allows to resolve relative paths given in load_name
+    cur_dir_lock = None
+    proc = ctx.process
+    if proc is not None:
+      cur_dir_lock = proc.cwd_lock
+
+    # is native lib available in file system?
+    if ctx.seg_loader.can_load_seg(cur_dir_lock, load_name, local_path=True):
+      self.lib_log("load_lib","found amiga lib: '%s'" % load_name)
+
+      # setup trampoline
+      tr = Trampoline(ctx,"create_lib[%s]" % sane_name)
+      self._create_native_lib(lib, load_name, ctx, tr, cur_dir_lock)
+      self._open_native_lib_int(lib, ctx, tr)
+      tr.final_rts()
+      tr.done()
+
+      # do we have an optional fd file for this lib?
+      lib.fd = self._load_fd(sane_name)
+
+      return lib
+    else:
+      return None
+
+  def _open_native_lib(self, lib, ctx):
+    # call Open()
+    tr = Trampoline(ctx,"open_lib[%s]" % sane_name)
+    self._open_native_lib_int(lib, ctx, tr)
+    tr.final_rts()
+    tr.done()
+
+  def _open_native_lib_int(self, lib, ctx, tr):
     """call Open() on native lib"""
     lib_base = lib.addr_base
     if lib_base != 0:
@@ -266,7 +304,25 @@ class LibManager():
     self.lib_log("open_lib", "done opening native lib: %s -> %06x" % (lib,lib.addr_base_open), level=logging.DEBUG)
     self._register_open_lib(lib,lib.addr_base_open)
 
-  def _close_native_lib(self, lib, lib_base, ctx, tr):
+  # ----- close native lib -----
+
+  def _close_native_lib(self, lib, lib_base, ctx):
+    self.lib_log("close_lib","closing native lib: '%s' ref_cnt: %d" % (lib.name, lib.ref_cnt))
+    tr = Trampoline(ctx,"close_lib[%s]" % lib.name)
+    self._close_native_lib_int(lib, lib_base, ctx, tr)
+    if lib.ref_cnt == 0:
+      # lib has no users and can be expunged/removed
+      expunge_mode = lib.config.expunge
+      if expunge_mode == 'last_close':
+        self.lib_log("close_lib","expunging native lib: '%s'" % lib.name)
+        # do it now
+        self._free_native_lib(lib, ctx, tr)
+    elif lib.ref_cnt < 0:
+      raise VamosInternalError("CloseLib: invalid ref count?!")
+    tr.final_rts()
+    tr.done()
+
+  def _close_native_lib_int(self, lib, lib_base, ctx, tr):
     """call Close() on native lib"""
     # add Close() call to trampoline
     close_addr = ctx.mem.access.r32(lib_base - 10) # LVO_Close
@@ -558,6 +614,8 @@ class LibManager():
       name = "libs:" + name
     return name
 
-  def _dump_lib_cfg(self, lib_cfg):
+  def _dump_lib_cfg(self, lib_name, lib_cfg):
+    items = ["for_lib='%s'" % lib_name, "use_cfg='%s'" % lib_cfg.name]
     for key in lib_cfg._keys:
-      self.lib_log("config","%s = %s" % (key, getattr(lib_cfg, key)))
+      items.append("%s=%s" % (key, getattr(lib_cfg, key)))
+    self.lib_log("config_lib", " ".join(items))

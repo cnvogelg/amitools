@@ -5,15 +5,18 @@ import os.path
 from Log import log_main
 
 class VamosLibConfig:
-  def __init__(self, mode='auto', version=0, profile=False):
+  def __init__(self, name, mode='auto', version=0, profile=False, expunge='last_close'):
+    self.name = name
     self.mode = mode
     self.version = version
     self.profile = profile
+    self.expunge = expunge
     # types of keys
     self._keys = {
       'mode' : str,
       'version' : int,
-      'profile' : bool
+      'profile' : bool,
+      'expunge' : str
     }
 
   def parse_key_value(self, lib_name, kv_str, errors):
@@ -52,11 +55,13 @@ class VamosLibConfig:
       errors.append("%s: invalid key: '%s'" % (lib_name, k))
 
   def _check_mode(self, v):
-    return v in ('auto', 'vamos', 'amiga', 'off')
+    return v in ('auto', 'vamos', 'amiga', 'fake', 'off')
 
   def _check_version(self, v):
     return v >= 0
 
+  def _check_expunge(self, v):
+    return v in ('last_close', 'shutdown', 'no_mem')
 
 
 class VamosConfig(ConfigParser.SafeConfigParser):
@@ -93,17 +98,20 @@ class VamosConfig(ConfigParser.SafeConfigParser):
     self._parse_lib_args(args)
     self._set_defaults()
 
-  def get_lib_config(self, lib_name):
+  def get_lib_config(self, lib_name, use_default=True, *more_names):
     """get a configuration object for the given lib"""
     # specific lib in config?
     if lib_name in self.libs:
       return self.libs[lib_name]
+    # search addtional names?
+    for lib_name in more_names:
+      if lib_name in self.libs:
+        return self.libs[lib_name]
     # default config
-    elif self.default_lib in self.libs:
-      return self.libs[default_lib]
-    # create default config
-    else:
-      return VamosLibConfig(version=40)
+    if self.default_lib in self.libs and use_default:
+      return self.libs[self.default_lib]
+    # none found
+    return None
 
   def get_args(self):
     """return the command line arguments"""
@@ -133,11 +141,12 @@ class VamosConfig(ConfigParser.SafeConfigParser):
         log_main.debug("config: [%s]  %s = %s", lib, key, getattr(cfg,key))
 
   def _reset(self):
-    # library config
+    # default library config
+    # make sure exec and dos is taken from vamos
     self.libs = {
-      'dos.library' : VamosLibConfig('vamos', 40, False),
-      'exec.library' : VamosLibConfig('vamos', 40, False),
-      'icon.library' : VamosLibConfig('auto', 0, False)
+      '*.library' : VamosLibConfig('*.library', 'auto', 40, False),
+      'exec.library' : VamosLibConfig('exec.library', 'vamos', 40, False),
+      'dos.library' : VamosLibConfig('dos.library', 'vamos', 40, False),
     }
     # define keys that can be set
     self._keys = {
@@ -226,7 +235,7 @@ class VamosConfig(ConfigParser.SafeConfigParser):
         if lib_name in self.libs:
           lib = self.libs[lib_name]
         else:
-          lib = VamosLibConfig()
+          lib = VamosLibConfig(lib_nam)
           self.libs[lib_name] = lib
         # walk through options
         for key in self.options(lib_name):
@@ -241,8 +250,8 @@ class VamosConfig(ConfigParser.SafeConfigParser):
     # parse lib options
     if hasattr(args, 'lib_options') and args.lib_options != None:
       for e in args.lib_options:
-        # lib:key=value,key=value
-        r = e.split(':')
+        # lib+key=value,key=value
+        r = e.split('+')
         if len(r) != 2:
           self.errors.append("Syntax error: '%s'" % e)
         else:
@@ -258,7 +267,7 @@ class VamosConfig(ConfigParser.SafeConfigParser):
             lib_cfg = self.libs[lib_name]
           else:
             # create new lib
-            lib_cfg = VamosLibConfig()
+            lib_cfg = VamosLibConfig(lib_name)
             self.libs[lib_name] = lib_cfg
           # parse key value
           lib_cfg.parse_key_value(lib_name, kv, self.errors)
