@@ -14,6 +14,9 @@ class Trap:
     return "[@%06x:%s:one_shot=%s]" % (self.addr, self.func, self.one_shot)
 
 class VamosRun:
+
+  exit_addr = 0x400
+
   def __init__(self, vamos, benchmark=False, shell=False):
     self.cpu   = vamos.cpu
     self.mem   = vamos.mem
@@ -47,10 +50,31 @@ class VamosRun:
     self.mem.access.w32(4, self.ctx.process.prog_start)
     self.cpu.pulse_reset()
 
-    # set end RESET opcode at 0 and execbase at 4
-    op_reset = 0x04e70
-    self.mem.access.w16(0, op_reset)
+    # clear long at 0 and set execbase at 4
+    self.mem.access.w32(0, 0)
     self.mem.access.w32(4, self.ctx.exec_lib.addr_base)
+
+    # at exit_addr (0x400) we setup the return actions after process end:
+    # we want to call a shutdown trap that is able to setup some cleanup
+    # trampoline if necessary. This requires that the trap is called via
+    # jsr so the auto_rts of the trap can be delayed by the stack entry
+    # the trampoline prepared...
+    # alloc trap
+    tid = self.ctx.traps.setup(self.shutdown_trap, auto_rts=True)
+    addr = self.exit_addr
+    # place the following code:
+    # 0x400: bsr.b 4
+    # 0x402: reset -> triggers end of CPU emu
+    # 0x404: trap (with auto_rts)
+    op_bsr = 0x6102
+    op_reset = 0x04e70
+    op_trap = 0xa000 + tid
+    self.mem.access.w16(addr, op_bsr)
+    self.mem.access.w16(addr+2, op_reset)
+    self.mem.access.w16(addr+4, op_trap)
+
+    # store location of reset opcode so reset handler knows what the final reset it
+    self.reset_addr = addr + 2
 
     # setup arg in D0/A0
     if self.shell:
@@ -71,6 +95,9 @@ class VamosRun:
     self.cpu.w_reg(REG_A5, self.ctx.dos_guard_base)
     self.cpu.w_reg(REG_A6, self.ctx.dos_guard_base)
 
+  def shutdown_trap(self, op, pc):
+    log_main.info("shutdown trap")
+
   def reset_func(self):
     """this callback is entered from CPU whenever a RESET opcode is encountered.
        dispatch to end vamos.
@@ -79,7 +106,7 @@ class VamosRun:
     sp = self.cpu.r_reg(REG_A7)
     a6 = self.cpu.r_reg(REG_A6)
     # addr == 0 or an error occurred -> end reached
-    if pc != 0 and not self.et.has_errors:
+    if pc != self.reset_addr and not self.et.has_errors:
       log_main.error("RESET encountered at pc 0x%06x sp 0x%06x a6 0x%06x - abort",pc,sp,a6)
       for x in range(-32,32,2):
         w = self.mem.access.r32(sp+x)

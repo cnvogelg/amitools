@@ -123,12 +123,16 @@ def main():
     if binary == os.path.abspath(binary):
       binary = 'root:' + binary
 
-  # summary
-  log_main.info("bin='%s', args='%s', cwd='%s', shell='%s', stack=%d",
-    binary, args.args, cwd, args.shell, cfg.stack_size)
+  # where does the process return?
+  exit_addr = VamosRun.exit_addr
 
+  # summary
+  log_main.info("bin='%s', args='%s', cwd='%s', shell='%s', stack=%d, exit_addr=%08x",
+    binary, args.args, cwd, args.shell, cfg.stack_size, exit_addr)
+
+  # create initial process
   proc = Process(vamos, binary, args.args, stack_size=cfg.stack_size*1024,
-                 shell=args.shell, cwd=cwd)
+                 shell=args.shell, cwd=cwd, exit_addr=exit_addr)
   if not proc.ok:
     sys.exit(1)
   vamos.set_main_process(proc)

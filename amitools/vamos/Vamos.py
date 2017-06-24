@@ -54,8 +54,12 @@ class Vamos:
     self.error_tracker = ErrorTracker(cpu, self.label_mgr)
     self.label_mgr.error_tracker = self.error_tracker
 
-    # set a label for first two dwords
-    label = LabelRange("zero_page",0,8)
+    # set a label for first region
+    label = LabelRange("zero_page",0,0x400)
+    self.label_mgr.add_label(label)
+
+    # shutdown range
+    label = LabelRange("shutdown",0x400,0x800)
     self.label_mgr.add_label(label)
 
     # create memory access
