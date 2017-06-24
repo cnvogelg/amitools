@@ -98,15 +98,15 @@ class VamosConfig(ConfigParser.SafeConfigParser):
     self._parse_lib_args(args)
     self._set_defaults()
 
-  def get_lib_config(self, lib_name, use_default=True, *more_names):
+  def get_lib_config(self, lib_name, sane_name=None, use_default=True):
     """get a configuration object for the given lib"""
     # specific lib in config?
     if lib_name in self.libs:
       return self.libs[lib_name]
-    # search addtional names?
-    for lib_name in more_names:
-      if lib_name in self.libs:
-        return self.libs[lib_name]
+    # search addtional sane_name?
+    if sane_name is not None:
+      if sane_name in self.libs:
+        return self.libs[sane_name]
     # default config
     if self.default_lib in self.libs and use_default:
       return self.libs[self.default_lib]

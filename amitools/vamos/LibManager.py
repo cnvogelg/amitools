@@ -51,6 +51,44 @@ class LibManager():
     """helper to create lib log messages"""
     log_libmgr.log(level, "[%10s] %s", func, text)
 
+  def shutdown(self, ctx):
+    """called from the shutdown trap after process execution to clean up libs.
+       mainly used to expunge native libs with expunge type "shutdown".
+       additionally force close libs that are still not closed due to invalid
+       ref counts"""
+    self.lib_log("shutdown","expunging native libs and check for orphaned libs")
+    self.expunge_libs(ctx)
+
+    # check for orphaned libs
+    libs = self.open_libs_name.values()
+    for lib in libs:
+
+      # check ref_cnt of lib: base libs are still open, but others should be closed
+      ref_cnt = lib.ref_cnt
+      if lib.is_base:
+        if ref_cnt != 1:
+          self.lib_log("shutdown","library ref count mismatch: '%s' #%d" % (lib.name, ref_cnt),
+            level=logging.ERROR)
+        ref_cnt -= 1
+      else:
+        if ref_cnt != 0:
+          self.lib_log("shutdown","library ref count mismatch: '%s' #%d" % (lib.name, ref_cnt),
+            level=logging.ERROR)
+
+      # try to close lib now
+      if ref_cnt > 0:
+        if lib.is_native:
+          self._force_close_native_lib(lib, ctx)
+        else:
+          self._force_close_vamos_lib(lib, ctx)
+
+  def expunge_libs(self, ctx):
+    self.lib_log("expunge","expunge native libs")
+    libs = self.open_libs_name.values()
+    for lib in libs:
+      if lib.is_native and lib.ref_cnt == 0:
+        self._expunge_native_lib(lib, ctx)
+
   # ----- common -----
 
   def open_dev(self, name, unit, flags, io, ctx):
@@ -82,8 +120,8 @@ class LibManager():
 
     # is lib already opened?
     if sane_name in self.open_libs_name:
-      self.lib_log("open_lib","opening already open lib: %s" % sane_name)
       lib = self.open_libs_name[sane_name]
+      self.lib_log("open_lib","opening already open lib: %s ref_cnt=%d" % (sane_name, lib.ref_cnt))
       if lib.is_native:
         self._open_native_lib(lib, ctx)
       else:
@@ -213,6 +251,11 @@ class LibManager():
     elif lib.ref_cnt < 0:
       raise VamosInternalError("CloseLib: invalid ref count?!")
 
+  def _force_close_vamos_lib(self, lib, ctx):
+    self.lib_log("close_lib","force closing vamos lib '%s' ref_cnt: %d" % (lib.name, lib.ref_cnt))
+    # 'fix' ref_cnt
+    ref_cnt = 1
+    self._close_vamos_lib(lib, ctx)
 
   # ----- manage lib maps -----
 
@@ -313,6 +356,14 @@ class LibManager():
 
   # ----- close native lib -----
 
+  def _force_close_native_lib(self, lib, ctx):
+    lib_bases = lib.get_all_lib_bases()
+    txt = ",".join(map(lambda x : "%08x" % x, lib_bases))
+    self.lib_log("close_lib","force closing native lib: '%s' ref_cnt: %d bases=%s" %
+      (lib.name, lib.ref_cnt, txt))
+    for lib_base in lib_bases:
+      self._close_native_lib(lib, lib_base, ctx)
+
   def _close_native_lib(self, lib, lib_base, ctx):
     self.lib_log("close_lib","closing native lib: '%s' ref_cnt: %d" % (lib.name, lib.ref_cnt))
     tr = Trampoline(ctx,"close_lib[%s]" % lib.name)
@@ -326,6 +377,13 @@ class LibManager():
         self._free_native_lib(lib, ctx, tr)
     elif lib.ref_cnt < 0:
       raise VamosInternalError("CloseLib: invalid ref count?!")
+    tr.final_rts()
+    tr.done()
+
+  def _expunge_native_lib(self, lib, ctx):
+    self.lib_log("expunge", "expunging native lib: '%s'" % lib.name)
+    tr = Trampoline(ctx,"expunge_lib[%s]" % lib.name)
+    self._free_native_lib(lib, ctx, tr)
     tr.final_rts()
     tr.done()
 

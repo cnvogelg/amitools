@@ -41,7 +41,7 @@ class DosLibrary(AmigaLibrary):
   GVF_BINARY_VAR	=	0x400
 
   def __init__(self, mem, alloc, path, config):
-    AmigaLibrary.__init__(self, self.name, DosLibraryDef, config)
+    AmigaLibrary.__init__(self, self.name, DosLibraryDef, config, is_base=True)
     self.mem      = mem
     self.alloc    = alloc
     self.path_mgr = path
@@ -631,7 +631,7 @@ class DosLibrary(AmigaLibrary):
     ok = fh.write(str_dat)
     log_dos.info("FPuts(%s,'%s')" % (fh, str_dat))
     return 0 # ok
-  
+
   def UnGetC(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     val = ctx.cpu.r_reg(REG_D2)

@@ -15,7 +15,7 @@ class AmigaLibrary:
   op_rts = 0x4e75
   op_reset = 0x4e70
 
-  def __init__(self, name, struct, config):
+  def __init__(self, name, struct, config, is_base=False):
     self.name = name
     self.struct = struct
     self.config = config
@@ -26,6 +26,7 @@ class AmigaLibrary:
 
     # lib flags
     self.is_native = False
+    self.is_base = is_base
 
     # stub generation flags
     self.profile = config.profile
@@ -287,13 +288,13 @@ class AmigaLibrary:
       addr -= 6
 
   def __str__(self):
-    return "[Lib %s V%d {+%d -%d} mem: V%d {+%d -%d} <%08x, %08x, %08x> open_bases=%s ref_cnt=%d]" % \
+    return "[Lib %s V%d {+%d -%d} mem: V%d {+%d -%d} <%08x, %08x, %08x> open_bases=%s ref_cnt=%d is_native=%s is_base=%s]" % \
       (self.name, self.version,
        self.pos_size, self.neg_size,
        self.mem_version,
        self.mem_pos_size, self.mem_neg_size,
        self.addr_begin, self.addr_base, self.addr_end,
-       self.get_lib_base_str(), self.ref_cnt)
+       self.get_lib_base_str(), self.ref_cnt, self.is_native, self.is_base)
 
   def alloc_lib_base(self, ctx):
     """alloc memory for the library base"""
@@ -453,3 +454,10 @@ class AmigaLibrary:
       num = self.open_lib_bases[a]
       res.append("@%08lx(#%d)" % (a,num))
     return "[%s]" % ",".join(res)
+
+  def get_all_lib_bases(self):
+    res = []
+    for addr in self.open_lib_bases:
+      num = self.open_lib_bases[addr]
+      res += [addr] * num
+    return res

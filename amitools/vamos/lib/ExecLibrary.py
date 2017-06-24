@@ -16,7 +16,7 @@ class ExecLibrary(AmigaLibrary):
   _poolid = 0x1000
 
   def __init__(self, lib_mgr, alloc, config):
-    AmigaLibrary.__init__(self, self.name, ExecLibraryDef, config)
+    AmigaLibrary.__init__(self, self.name, ExecLibraryDef, config, is_base=True)
     log_exec.info("open exec.library V%d", self.version)
     self.lib_mgr = lib_mgr
     self.alloc = alloc
@@ -151,7 +151,7 @@ class ExecLibrary(AmigaLibrary):
       if lib != None:
         log_exec.info("CloseLibrary: '%s' -> %06x" % (lib, lib.addr_base))
       else:
-        raise VamosInternalError("CloseLibrary: Unknown library to close: ptr=%06x" % lib_addr)
+        log_exec.error("CloseLibrary: @%06x ??" % lib_addr)
 
   def FindResident(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
