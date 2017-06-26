@@ -1,21 +1,47 @@
 # vamos - virtual Amiga OS
 
-## The virtual AmigaOS runtime (aka Wine for Amiga :)
+## Introduction: The virtual AmigaOS runtime (aka Wine for Amiga :)
 
-vamos is a tool that allows to run AmigaOS m68k binaries directly on your Mac
-or PC. It emulates the AmigaOS by providing implementations for some functions
-of the Exec and DOS library. It will run typical console binaries that do not
-rely on user interface (intuition) or graphics stuff. Its main focus is to run
-old compilers and assemblers to have some sort of "cross" compilers. This
-approach will not run any applications or games using direct hardware register
-access - for this a machine emulator like FS-UAE is the tool you will need...
+vamos is a tool that allows to run AmigaOS m68k CLI binaries directly on your
+Mac or PC. It emulates the AmigaOS by providing implementations for some
+functions of the Exec and DOS library. It will run typical console binaries
+that do not rely on user interface (intuition) or graphics stuff. Its main
+focus is to run old compilers and assemblers to have some sort of "cross"
+compilers.
 
-vamos uses the native Musashi m68k CPU Emulator written in C to run m68k code.
-I added a simple memory interface that provides some RAM space for the program
-code and added an interface for python to trap library calls and emulate their
-behavior in Mac OS.
+This approach will not run any applications or games using direct hardware
+register access - for this use case a machine emulator like FS-UAE is the tool
+you will need...
 
-# Features
+Remember, vamos is an API level emulator and never will be a full Amiga system
+emulator like WinUAE or FS-UAE!!
+
+## Overview on the Building Blocks
+
+vamos uses the native Musashi m68k CPU Emulator written in C to emulate m68k
+code. I added a simple memory interface that provides some RAM space for the
+program code and added an interface for python to trap library calls and
+emulate their behavior in Python.
+
+Every call to a library is trapped during execution and realized with own
+Python code or simply ignored if no trap is defined.
+
+All public in memory structures (e.g. ExecBase) are also provided. vamos
+implements a memory handler to allocate and free structures used in the heap
+of a program or for library data exchange.
+
+## Status
+
+While at the beginning, vamos was a work in progress and mostly a proof of
+concept that proved to be very instructive and even fairly fast. Its a
+playground for me to learn lots about AmigaOS, its binaries, its libraries and
+how they work together...
+
+With the help of many contributors it evolved into a useable CLI program
+emulator today that runs many Amiga devtools and is even able to build complex
+Amiga projects including AmigaOS itself!
+
+## Features
 
 * Fast m68k CPU emulation with Musashi CPU Emulator
 * Supports native library loading for application libs (e.g. SAS sc1.library)
@@ -23,42 +49,94 @@ behavior in Mac OS.
 * Exec Library supports: AllocMem/Vec, LoadLibrary
 * Many useful tracing and logging features
 
-
 ## 1. Installation
 
-vamos contains a native library for the CPU/memory emulation. This library
-needs to be compiled first. All other code is python and runs directly out of
-the box.
+See the `amitools` Installation README for further details.
 
-Build the library with:
+## 2. Configuration
 
-    cd musashi
-    make
+While some simply CLI programs run out of the box when using vamos, for
+typical applications some setup is required.
 
-This will create **libmusashi.so|.dylib** in this directory. Now you are ready
-to run vamos from the top-level directory!
+You can either define the environment used to run your application directly
+on the command line or by writing a `.vamsosrc` configuration file.
 
+The vamos environment consists of:
 
-## 2. Setup
+  - DOS Setup
+    - **volume mappings**
+    - **assigns**
+    - the command **path**
+  - Exec Setup
+    - **library** settings
+  - Hardware Settings
+    - CPU selection
+    - Memory config
+  - Vamos Settings
+    - **emulation settings**
+    - **diagnos/trace** options
+
+### 2.0 Config Files
 
 vamos uses a configuration file as source for setup information. It is usually
 named **.vamosrc** and is first searched in the **$HOME** directory and then
 in the current directory. You can also use the *-c* option to specify an own
-config file. The config file uses the syntax of the well-known .ini files.
+config file. The config file uses the syntax of the well-known `.ini` files.
+
+It consists of sections that are named in brackets, e.g. `[assigns]` followed
+by a list of key value pairs on a line each: `key=value`
 
 Additionally, you can specify the parameters also on the command line. These
 will overwrite the settings specified in a config file.
 
+Use the `-S` option on the command line to avoid loading any `.vamosrc` files
+even if they exist. This option is useful for testing when a clean setup is
+required.
+
 In the source archive see *config/sample_vamosrc* for an example config file.
 
-### 2.1 Volumes
+### 2.1 DOS Setup
 
-vamos works internally with AmigaOS compatible file and path names. An AmigaOS
-absolute path is usually rooted in a volume ("volname:abs/path/file"). vamos
-automatically translates these paths to host (Mac/PC) system paths for file
-access. This is done by specifying a volume to system path mapping.
+#### 2.1.1 Volumes
 
-In the config file the section volumes contains this mapping:
+AmigaOS uses **Volumes** to name(:) and identify the different file systems
+found on an Amiga system. In vamos a Volume is defined as a part of the host
+(i.e. Mac or PC) file system that will be exposed to the Amiga emulation.
+
+You specify a volume by giving a **host directory path**. All files below this
+path are considered to be part of the volume.
+
+On the command line you use the `-V` switch (used multiple times to create
+more volumes) and in the `vamosrc` config file you create a section called
+`[volumes]`:
+
+    vamos -V myvol:/sys/path/to/my/voldir
+
+    [volumes]
+    myvol=/sys/path/to/my/voldir
+
+A default volume called **root:** is created automatically and represents the
+root of your host's (Posix) file system. So every host file is mappable to the
+vamos world by simply prepending **root:** to its absolute path.
+
+While it is possible to map the same host file to different names in vamos
+using overlapping volume mappings it is not recommended to do so. This also
+means that files accessed by a custom volume should not also be used via
+**root:**.
+
+If multiple volumes share subtrees in the file system then the Amiga volume is
+always assigned from the longest path match. E.g. in our example above the
+path *~/amiga/wb310/c* is covered by *system:* and *home:* volume. The mapper
+then takes the longest match and thus this path is converted to *system:c*.
+
+Volume names are accessed like all other file paths in a case insenstive
+manner inside vamos (just the way AmigaOS handles it). However, the host
+directory path in the volume definition is case sensitive.
+
+It makes sense to define a **sys:** volume as some AmigaOS calls default to
+this volume.
+
+A typical example:
 
     [volumes]
     system=~/amiga/wb310
@@ -66,33 +144,34 @@ In the config file the section volumes contains this mapping:
     work=~/amiga/work
     shared=$HOME/amiga/shared
 
-This example defines the volume names system:. home:, work:, and shared: and
-assigns them native paths on the host computer.
+As you see, tilde is allowed as a synonym for your home directory for system
+paths. Also host environment variables can be expanded with a dollar sign.
 
-Note that the native path may contain ~ for your home directory. Even $ENV
-environment variable access is possible.
+#### 2.1.2 Assigns
 
-You can also specify volumes on the command line with:
+AmigaOS uses **Assigns** to give paths inside AmigaOS a new name alias (E.g.
+`c:` is a short hand for `sys:c` directory). An assign always maps a name to
+an absolute Amiga path starting with a volume or starting with another assign
+name.
 
-    ./vamos -V system:~/amiga/wb310 -V work:. ..
+In vamos assigns work similar: You specify an assign name and map it to an
+absolute Amiga path. Please note: no host path (on Mac/PC) is used here!
 
-By default vamos defines the root: volume name to be root of your file system
-(/). So every host system path can be mapped to an Amiga path.
+On the command line you define an assign with the `-a` switch (repeated for
+more assign definitions) and in the config file you create an `[assigns]`
+section:
 
-If multiple volumes share subtrees in the file system then the Amiga volume is
-always assigned from the longest path match. E.g. in our example above the
-path *~/amiga/wb310/c* is covered by *system:* and *home:* volume. The mapper
-then takes the longest match and thus this path is converted to *system:c*.
+    -a myassign:sys:path/to/dir
+    -a myalias:myassign:more/path
 
-### 2.2 Assigns
+    [assigns]
+    myassign=sys:path/to/dir
+    myalias=myassign:more/path
 
-AmigaOS also allows to use assigns to introduce some kind of virtual volume
-names that map to other amiga paths. Many applications use this mechanism to
-find their install directory (sc:) or things like includes (include:) or libs
-(lib:).
+Many applications use this mechanism to find their install directory (sc:) or
+things like includes (include:) or libs (lib:).
 
-vamos adapts this mechanism and allows to define assigns yourself in the
-config file or on the command line. The config file needs a section assigns:
+A typical example looks like:
 
     [assigns]
     sc=shared:sc
@@ -100,28 +179,26 @@ config file or on the command line. The config file needs a section assigns:
     lib=sc:lib
     c=system:c,sc:c
 
-*Note*: an assign might reference other assigns and also allows to specify
-multiple expansions seperated with commas.
+Like AmigaOS vamos also supports **Multi Assigns**. This special type of
+assign maps a single name to multiple paths. If a file is specified with a
+multi assign path then vamos searches the file in all locations attached to
+the multi assign.
 
-*Note2*: assigns always map to amiga paths and never directly to system paths.
-Mac system paths are only allowed when defining volumes.
+On the command line you start defining a multi assign by first creating a
+regular assign that maps a new name to a single absolute path. Then you add
+more paths to the same name with consecutive mapping calls. Use the
 
-On the command line assigns are given by *-a* options:
+    -a mymulti:sys:foo/bar
+    -a mymulti:+sys:bar/baz
 
-    ./vamos -a c:system:c -a lib:sc:lib ...
+In the config file you specify the whole list on a line separated by commas.
 
-If an assign is specified in the config file and later on the command line
-then the original assign in the config file is overwritten. You can extend an
-assign by writing a plus sign right at the beginning of the mapping:
+    [assigns]
+    mymulti=sys:foo/bar,sys:bar/baz
 
-    ./vamos -a c:+cool:c
+#### 2.1.3 Auto Assign
 
-This example will extend the c: assign that might be already defined in the
-config file and does not replace it.
-
-### 2.2 Auto Assign
-
-If an amiga path cannot be mapped to a Mac system path (because it uses
+If an amiga path cannot be mapped to a Mac/PC system path (because it uses
 undefined volume or assign names) then vamos will abort. You will then have to
 restart vamos and specify the required assign or volume mappings.
 
@@ -133,17 +210,215 @@ prefix.
 In the config file write this:
 
     [path]
-    auto_assign=system:
+    auto_assign=sys:
 
 On the command line give the -A option:
 
-    ./vamos -A system:
+    ./vamos -A sys:
 
-With this auto assign in place the unknown assign *t:* will be mapped to the
-amiga path *system:t*
+With this auto assign in place the unknown assign *t:* will be mapped
+automatically to the amiga path *sys:t*
 
+#### 2.1.4 Command Path
 
-## 3. Usage Examples
+Like the AmigaOS shell vamos searches commands on a list of AmigaOS paths
+called **path**.
+
+The path is defined either on the command line with:
+
+    ./vamos -p sys:c,sc:c
+
+Note a single list with absolute AmigaOS path seperated by comma is given.
+
+In the config file you state:
+
+    [path]
+    path=sys:c,sc:c
+
+#### 2.1.5 Current Working Directory
+
+Each AmigaOS process has a current working directory assigned to it. In vamos
+the cwd is automatically derived from the current host directory vamos was
+launched from. This directory is mapped to AmigaOS and used as the cwd there.
+
+If you want to specify another directory then use the command line to set
+another Amiga path:
+
+    vamos -d sys:ami/path
+
+Or in config file:
+
+    [vamos]
+    cwd=sys:ami/path
+
+#### 2.1.6 Permit Host Paths for Commands
+
+When a command path is given to vamos it finally also searches if a host
+path matches. If yes then the path is converted back to an Amiga path and
+this one is used internally to locate the executable.
+
+If you don't want this behaviour and if you want to enforce pure Amige paths
+given on the vamos command line then set the option `pure_ami_paths`.
+
+On the command line give the `-P`:
+
+    vamos -P
+
+or in the config file:
+
+    [vamos]
+    pure_ami_paths=True
+
+### 2.2 Exec Setup
+
+#### 2.2.1 Stack Size
+
+The command run by vamos needs a stack of a certain size to run without any
+issues.
+
+By default the stack size is set to 4 KiB.
+
+Use the command line switch `-s <KiB>` to set a new stack size.
+
+    vamos -s 16
+
+Or in the config write:
+
+    [vamos]
+    stack=16
+
+#### 2.2.2 Library Settings
+
+vamos allows you to control library loading in many ways. Please see
+[vamos Libraries](vamos-lib.md) for details.
+
+### 2.3 Hardware Settings
+
+#### 2.3.1 CPU Selection
+
+vamos can either emulate a 68000 (default) or a 68020 CPU. While the 68k
+can only address memory with 24 Bits, the 020 has a full 32 Bit address
+bus. Furthermore, the 020 has an extended instruction set.
+
+| CPU        | Alias       | Remarks  |
+| -----------|-------------|----------|
+| 68000      | 00,000      | 24 Bit   |
+| 68020      | 20,020      | 32 Bit   |
+| 68030      | 30,030      | Fakes only AttnFlags in Exec, still a 020 |
+
+On the command line use the `-C` switch:
+
+    vamos -C 20
+
+In the config file use:
+
+    [vamos]
+    cpu=68020
+
+#### 2.3.2 Memory Size
+
+vamos does not distinguish any memory types like a real Amiga does. It only
+manages a single large blob of memory used for your command, its data and
+the associated libraries.
+
+Specify the max size with the `-m <KiB>` on the command line:
+
+    vamos -m 8192
+
+Or in the config file:
+
+    [vamos]
+    ram_size=8192
+
+#### 2.3.3 Hardware Access Emulation
+
+As an OS level emulator vamos does not need to emulate lower aspects of the
+real Amiga like its custom chips or the CIAs. This is true to run OS-compliant
+programs and libraries. Unfortunately, some popular programs while working
+on API level most of the time perform some tasks by direct HW access.
+
+To be able to run such tools vamos supports to emulate some simple access
+patterns to the custom chips. Just enough to make some programs happy...
+
+When talking about HW Access here I mean the range of the custom chips and
+also the CIA addresses.
+
+| Mode | Description |
+|-----------|-------------|
+| emu       | Emulate Access |
+| ignore    | Ignore any access to the HW address ranges |
+| abort     | Abort vamos on the first access of a HW range |
+| disable   | No HW access detection at all |
+
+Note: If you want to allocate more memory than ranging from adress 0 to the
+beginning of the CIA range then you have to disable HW access completely.
+
+Specify the hardware access mode of vamos on the command line:
+
+    vamos -H emu
+
+Or in the config file:
+
+    [vamos]
+    hw_access=disable
+
+### 2.4 Vamos Settings
+
+#### 2.4.1 Emulation Settings
+
+TBD
+
+#### 2.4.2 Diagnosis and Tracing
+
+TBD
+
+## 3. Run a Program with vamos
+
+### 3.1 Program and Arguments
+
+A typical vamos call to run a program looks like this:
+
+    vamos ami_bin arg1 arg2 ...
+
+with `ami_bin` being the Amiga binary and `arg1 arg2 ...` being command line
+arguments for the binary.
+
+If you want to pass vamos options then provide them before the Amiga binary:
+
+    vamos -V myvol:~ ami_bin
+
+If you want to use dashes (`-`) in your Amiga command line then terminate
+the vamos option list with a double dash (`--`) first:
+
+    vamos -V myvol:~ -- ami_bin -my-amiga-option
+
+### 3.2 Program Search Path
+
+The given `ami_bin` Amiga executable is searched for at a number of places:
+
+  - if no local/abs path is given then the `path` is searched (see above)
+  - or the current working directory
+  - if a path is given then vamos tries to match an Amiga path first
+  - finally a system path is matched that is later converted to an Amiga path
+    automatically. (Disable this option with `pure_ami_paths=True)
+
+### 3.3 Run a Shell
+
+In addition to running regular Amiga executables, vamos is also capable to run
+a real Amiga Shell.
+
+As a binary you need an original `Shell-Seg` from a modern AmigaOS (e.g. 3.9).
+
+Now run vamos with the `-x` switch and pass in the `Shell-Seg` as your Amiga
+binary:
+
+    vamos -x Shell-Seg
+    0.SYS:>
+
+If available the shell reads the file `S:Vamos-Startup` as its startup
+configuration file.
+
+## 4. Usage Examples
 
 Pick an amiga binary (e.g. here I use the A68k assembler from aminet) and run it:
 

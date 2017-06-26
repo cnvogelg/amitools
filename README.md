@@ -95,33 +95,10 @@ python setup.py build
 
   - [vamos](doc/vamos.md) **V)irtual AM)iga OS**
 
-    The most ambitious project in the collection emulates the Amiga OS library
-    API so that native m68k Amiga OS 1.x - 3.x binaries can be loaded and
-    executed (think of Wine for Amiga :). With this approach only API conform
-    programs can be run (i.e. no direct hardware access is possible).
-
-    The goal is to run CLI programs relying on Exec and Dos library starting
-    with a minimal set of implemented functions. But the design of vamos is
-    flexible enough to add more libraries and more functions later on.
-
-    Remember, vamos is and never will be a full Amiga system emulator like
-    WinUAE or FS-UAE!!
-
-    It uses the Hunk library of amitools to load and relocate the binary. A
-    m68k CPU emulator is used to execute the code (here: Musashi emulator
-    in native C with Python binding generated via Cython.
-
-    Every call to a library is trapped during execution and realized with own
-    Python code or simply ignored if no trap is defined.
-
-    All public in memory structures (e.g. ExecBase) are also provided. vamos
-    implements a memory handler to allocate and free structures used in the
-    heap of a program or for library data exchange.
-
-    Currently, this is a work in progress and mostly a proof of concept that
-    is very instructive and even fairly fast. Its a playground for me to learn
-    lots about Amiga OS, its binaries, its libraries and how they work
-    together...
+    vamos allows you to run command line (CLI) Amiga programs on your host
+    Mac or PC. vamos is an API level Amiga OS Emulator that replaces exec
+    and dos calls with its own implementation and maps all file access to
+    your local file system.
 
   - [xdftool](doc/xdftool.txt)
 

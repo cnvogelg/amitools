@@ -112,7 +112,7 @@ def main():
 
   # --- create main process ---
   # setup current working dir
-  cwd = args.cwd
+  cwd = cfg.cwd
   if cwd is None:
     cwd = 'root:' + os.getcwd()
 

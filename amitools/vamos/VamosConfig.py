@@ -173,6 +173,7 @@ class VamosConfig(ConfigParser.SafeConfigParser):
       # dirs
       'data_dir' : (str, self.def_data_dir),
       # paths
+      'cwd' : (str, None),
       'pure_ami_paths' : (bool, False)
     }
     # prefill keys with None
