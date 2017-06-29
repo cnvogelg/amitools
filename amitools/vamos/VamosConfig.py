@@ -236,7 +236,7 @@ class VamosConfig(ConfigParser.SafeConfigParser):
         if lib_name in self.libs:
           lib = self.libs[lib_name]
         else:
-          lib = VamosLibConfig(lib_nam)
+          lib = VamosLibConfig(lib_name)
           self.libs[lib_name] = lib
         # walk through options
         for key in self.options(lib_name):

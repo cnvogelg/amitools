@@ -68,12 +68,12 @@ class LibManager():
       if lib.is_base:
         if ref_cnt != 1:
           self.lib_log("shutdown","library ref count mismatch: '%s' #%d" % (lib.name, ref_cnt),
-            level=logging.ERROR)
+            level=logging.WARN)
         ref_cnt -= 1
       else:
         if ref_cnt != 0:
           self.lib_log("shutdown","library ref count mismatch: '%s' #%d" % (lib.name, ref_cnt),
-            level=logging.ERROR)
+            level=logging.WARN)
 
       # try to close lib now
       if ref_cnt > 0:
