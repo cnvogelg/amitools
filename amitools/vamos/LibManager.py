@@ -273,7 +273,7 @@ class LibManager():
 
   def _unregister_lib_base(self, lib, lib_base):
     self.lib_log("map_lib","unregister lib base: %s -> @%08lx" % (lib.name, lib_base), level=logging.DEBUG)
-    del self.open_libs_addr[lib.addr_base]
+    del self.open_libs_addr[lib_base]
 
   # ----- open native lib -----
 
