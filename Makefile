@@ -10,7 +10,7 @@ GEN_INPUT = musashi/m68k_in.c
 
 GEN_SRC = m68kopdm.c m68kopnz.c m68kops.c
 GEN_HDR = m68kops.h
-GEN_FILES = $(patsubst %,$(GEN_DIR)/%,$(GEN_SRC) $(GEN_HDR))
+GEN_FILES = $(GEN_SRC:%=$(GEN_DIR)/%) $(GEN_HDR:%=$(GEN_DIR)/%)
 
 GEN_TOOL_SRC = musashi/m68kmake.c
 GEN_TOOL = m68kmake
