@@ -32,11 +32,13 @@ def make_fsstr(s):
   # fetch default encoding (if available)
   encoding = sys.stdin.encoding
   if encoding is None:
-    # assume win default encoding
-    if os.platform == "win32":
-      encoding = "cp1252"
-    else:
-      encoding = "utf-8"
+    encoding = "utf-8"
+    try:
+      if os.platform == "win32":
+        # set win default encoding
+        encoding = "cp1252"
+    except AttributeError:
+        pass
   u = s.decode(encoding)
   return FSString(u)
 
