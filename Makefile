@@ -45,7 +45,10 @@ clean_git:
 do_gen: $(BUILD_DIR)/$(GEN_TOOL) $(GEN_DIR) $(GEN_FILES)
 
 sdist: do_gen
-	$(PYTHON) setup.py sdist
+	$(PYTHON) setup.py sdist --formats=gztar,zip
+
+upload: sdist
+	twine upload dist/*
 
 $(BUILD_DIR)/$(GEN_TOOL): $(BUILD_DIR) $(GEN_TOOL_SRC)
 	$(CC) $(CFLAGS) -o $@ $(GEN_TOOL_SRC)

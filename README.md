@@ -19,11 +19,14 @@ will be very helpful.
 ## Prerequisites
 
  - Python 2.7.x is currently supported
- - The following Python packages are required to build/install the tools:
+ - pip
+
+### Optional Packages
+
+ - If you want to rebuild the C extension or work on the Git repo then you need:
    - [Cython][1] >= 0.21
- - All other packages are installed automatically, if missing:
-   - [pytest][2] (Optional: only required for testing)
-   - [lhafile - FS Edition][3] (Optional: required to use lha file scanner)
+ - Optional Package:
+   - [lhafile - FS Edition][2] (Optional: required to use lha file scanner)
 
 ### Install pip
 
@@ -31,7 +34,7 @@ will be very helpful.
 
 #### macOS
 
- - On macOS using [MacPorts][4] (Tool is called ```pip-2.7``` here):
+ - On macOS using [MacPorts][3] (Tool is called ```pip-2.7``` here):
 ```
 sudo port install py27-pip
 sudo pip-2.7 install cython
@@ -47,7 +50,7 @@ sudo pip install cython
 
 #### Windows
 
- - On Windows with [MSYS2][5] (use x86_64 version if possible):
+ - On Windows with [MSYS2][4] (use x86_64 version if possible):
    - Install with exe installer
    - Initial update is done with: (Open shell first)
 ```
@@ -61,12 +64,23 @@ pacman -S mingw-w64-x86_64-python2-pip mingw-w64-x86_64-gcc git make
 ```
 
 [1]: http://cython.org
-[2]: http://pytest.org
-[3]: https://github.com/FrodeSolheim/lhafile
-[4]: https://www.macports.org
-[5]: https://github.com/msys2/msys2/wiki
+[2]: https://github.com/FrodeSolheim/lhafile
+[3]: https://www.macports.org
+[4]: https://github.com/msys2/msys2/wiki
 
 ## Installation
+
+### The Easy Way
+
+```
+pip install amitools
+```
+
+Note: requires a host C compiler to compile the extension.
+
+### Developers
+
+ - Clone the Git repo: [amitools@git](https://github.com/cnvogelg/amitools)
 
  - You have multiple variants to install the tools with Python's `setuptools`:
  - **Global Install** is available for all users of your system and needs root privileges
@@ -83,10 +97,14 @@ python setup.py install --user
 python setup.py develop --user
 ```
  - **Run In Place** allows you to run the binaries directly from the `bin` directory
-  without any installation. You need `setup.py` only to build the native library
-  of vamos:
+   without any installation. You need `make` only to build the native library
+   of vamos:
 ```
-python setup.py build
+python setup.py build_ext -i
+```
+or simply
+```
+make
 ```
 
 ## Contents
