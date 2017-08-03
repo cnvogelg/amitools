@@ -18,38 +18,51 @@ will be very helpful.
 
 ## Prerequisites
 
- - Python 2.7.x is currently supported
+ - Python ```2.7.x```
  - pip
 
 ### Optional Packages
 
- - If you want to rebuild the C extension or work on the Git repo then you need:
-   - [Cython][1] >= 0.21
- - Optional Package:
-   - [lhafile - FS Edition][2] (Optional: required to use lha file scanner)
+ - [lhafile - FS Edition][1]: required to use ```.lha``` file scanner
 
 ### Install pip
 
- - First make sure to have the Python package installer ```pip```:
+First make sure to have the Python package installer ```pip```:
 
 #### macOS
 
- - On macOS using [MacPorts][3] (Tool is called ```pip-2.7``` here):
+On macOS you have multiple ways of installing ```pip```:
+
+#### System Python
+
+```
+sudo easy_install pip
+```
+
+#### MacPorts Package Manager
+
+On macOS using [MacPorts][2] package manager (Tool is called ```pip-2.7``` here):
 ```
 sudo port install py27-pip
-sudo pip-2.7 install cython
+```
+
+#### Homebrew Package Manager
+
+With the [Homebrew][3] package manager (```pip``` is included in the ```python``` package):
+```
+brew install python
 ```
 
 #### Linux/Ubuntu
 
- - On Linux Ubuntu use the provided packages ```python-pip```
-  ```
+On Linux Ubuntu use the provided packages ```python-pip```
+```
 sudo apt-get install python-pip
-sudo pip install cython
 ```
 
 #### Windows
 
+ - (I use the mingw gcc compiler here to build the extension)
  - On Windows with [MSYS2][4] (use x86_64 version if possible):
    - Install with exe installer
    - Initial update is done with: (Open shell first)
@@ -63,9 +76,9 @@ pacman -Su
 pacman -S mingw-w64-x86_64-python2-pip mingw-w64-x86_64-gcc git make
 ```
 
-[1]: http://cython.org
-[2]: https://github.com/FrodeSolheim/lhafile
-[3]: https://www.macports.org
+[1]: https://github.com/FrodeSolheim/lhafile
+[2]: https://www.macports.org
+[3]: https://brew.sh
 [4]: https://github.com/msys2/msys2/wiki
 
 ## Installation
@@ -76,11 +89,17 @@ pacman -S mingw-w64-x86_64-python2-pip mingw-w64-x86_64-gcc git make
 pip install amitools
 ```
 
-Note: requires a host C compiler to compile the extension.
+Note:
+ - on Linux/macOS use ``sudo`` to install
+ - requires a host C compiler to compile the extension.
 
-### Developers
+### Amitools Developers
 
  - Clone the Git repo: [amitools@git](https://github.com/cnvogelg/amitools)
+ - Ensure to have Cython installed:
+```
+sudo pip install cython
+```
 
  - You have multiple variants to install the tools with Python's `setuptools`:
  - **Global Install** is available for all users of your system and needs root privileges
