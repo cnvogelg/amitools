@@ -4,4 +4,4 @@ include Makefile
 recursive-include amitools/data *
 recursive-include amitools/fs/block/bootcode *
 recursive-include musashi *.pyx *.c *.h readme.txt history.txt
-
+recursive-include gen *.c *.h

@@ -6,4 +6,4 @@ dist/
 gen/
 emu.c
 emu.so
-
+.python-version

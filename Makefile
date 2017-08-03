@@ -39,7 +39,13 @@ clean: clean_gen
 clean_all: clean
 	rm -rf $(DIST_DIR)
 
+clean_git:
+	git clean -fxd
+
 do_gen: $(BUILD_DIR)/$(GEN_TOOL) $(GEN_DIR) $(GEN_FILES)
+
+sdist: do_gen
+	$(PYTHON) setup.py sdist
 
 $(BUILD_DIR)/$(GEN_TOOL): $(BUILD_DIR) $(GEN_TOOL_SRC)
 	$(CC) $(CFLAGS) -o $@ $(GEN_TOOL_SRC)
