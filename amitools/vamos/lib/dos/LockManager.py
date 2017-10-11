@@ -18,7 +18,8 @@ class LockManager:
     self.locks_by_baddr = {}
 
   def generate_key(self, system_path):
-    return os.lstat(system_path).st_ino
+    # truncate inodes > 32bit
+    return os.lstat(system_path).st_ino & 0xffffffff
 
   def _register_lock(self, lock):
     # look up volume
