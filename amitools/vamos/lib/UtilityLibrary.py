@@ -4,6 +4,9 @@ from amitools.vamos.lib.util.UtilStruct import TagItemDef
 from amitools.vamos.lib.util.TagList import *
 from amitools.vamos.Log import *
 
+#selco
+import datetime
+
 class UtilityLibrary(AmigaLibrary):
   name = "utility.library"
 
@@ -19,12 +22,8 @@ class UtilityLibrary(AmigaLibrary):
     quot = dividend / divisor
     rem  = dividend % divisor
     log_utility.info("UDivMod32(dividend=%u, divisor=%u) => (quotient=%u, remainder=%u)" % (dividend, divisor, quot, rem))
-#    return [quot, rem]
-#selco  -> sonst call_stub-exception
-# quotient:remainder d0/d1
-    ctx.cpu.w_reg(REG_D1,rem)
-    return quot
-
+    return [quot, rem]
+  
   def SDivMod32(self, ctx):
     dividend = ctx.cpu.r_reg(REG_D0)
     if dividend >= 0x80000000:
@@ -39,11 +38,7 @@ class UtilityLibrary(AmigaLibrary):
     if rem < 0:
       rem = rem + 0x100000000
     log_utility.info("UDivMod32(dividend=%u, divisor=%u) => (quotient=%u, remainder=%u)" % (dividend, divisor, quot, rem))
-#    return [quot, rem]
-#selco  -> sonst call_stub-exception
-# quotient:remainder d0/d1
-    ctx.cpu.w_reg(REG_D1,rem)
-    return quot
+    return [quot, rem]
 
   def UMult32(self, ctx):
     a = ctx.cpu.r_reg(REG_D0)
@@ -125,3 +120,25 @@ class UtilityLibrary(AmigaLibrary):
       return get_tag(ctx, ti_addr)[1]
     else:
       return defaultValue
+
+
+#selco
+  def Date2Amiga(self, ctx):
+    date_ptr = ctx.cpu.r_reg(REG_A0)
+    date = AccessStruct(ctx.mem, ClockDataDef, struct_addr=date_ptr)
+    
+    sec=date.r_s('sec')
+    min=date.r_s('min')
+    hour=date.r_s('hour')
+    mday=date.r_s('mday')
+    month=date.r_s('month')
+    year=date.r_s('year')
+    wday=date.r_s('wday')
+
+    time = datetime.datetime(year, month, mday, hour, min, sec)
+    epoch = datetime.datetime(1978, 01, 01, 00, 00, 00)
+
+    time_since_epoch = time - epoch
+
+    return long(time_since_epoch.total_seconds())
+
