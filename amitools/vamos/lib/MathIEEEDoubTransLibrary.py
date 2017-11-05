@@ -40,5 +40,17 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 
+#selco    
+  def IEEEDPCosh(self,ctx):
+    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    (hi,lo)=fromDouble(math.cosh(arg))
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
 
+#selco    
+  def IEEEDPAcos(self,ctx):
+    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    (hi,lo)=fromDouble(math.acos(arg))
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
 
