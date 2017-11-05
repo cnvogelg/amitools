@@ -1,0 +1,206 @@
+/*
+ * AF, selco, 05.Nov.2017
+ * test mathieeedoubxxx functions for vamos
+ * ~/opt/m68k-amigaos/bin/m68k-amigaos-gcc -I. -Wall -pedantic  mathieeedoubxxx_test.c -o mathieeedoubxxx_test -noixemul
+ *
+ * you will see %f from printf instead of values. Thats OK... If all is fine up to this point, add -lm to the compiler call to see hopefully perfect printf output
+ * (this adds a lot more math stuff that can fail)
+ *
+ * ~/opt/m68k-amigaos/bin/m68k-amigaos-gcc -I. -Wall -pedantic  mathieeedoubxxx_test.c -o mathieeedoubxxx_test -noixemul -lm
+*/
+
+
+#include <stdio.h>
+
+#include <limits.h>
+
+#include <exec/types.h>
+#include <clib/exec_protos.h>
+
+#include <libraries/mathieeedp.h>
+#include <clib/mathieeedoubbas_protos.h>
+
+struct Library *MathIeeeDoubBasBase;
+
+
+
+int printDouble(char *Function,double value,unsigned char *ExpectedResult)
+{
+    static unsigned char ResultArray[4];
+
+    double *ValuePtr=&value;
+    unsigned int i;
+    int Error=0;
+
+    printf("%s",Function);
+    printf("\nhere                    ");
+    for(i=0;i<8;i++)
+    {
+        ResultArray[i]=((unsigned char*)ValuePtr)[i];	
+	printf("%02x ",ResultArray[i]);
+    }
+
+    printf("\nreference real Amiga    ");
+
+    for(i=0;i<8;i++)
+    {
+            if(ResultArray[i]==ExpectedResult[i])
+            {
+                printf("%02x ",ExpectedResult[i]);
+            }
+            else
+            {
+                printf("\033[31m%02x\033[0m ",ExpectedResult[i]);
+		Error=1;
+            }
+    }
+
+    printf("\n\n");
+
+    return Error;
+
+}
+
+
+int IEEEDPFlt_Test(int value, unsigned char *ExpectedResult)
+{
+    double Result;
+    char Function[64];
+
+    Result=IEEEDPFlt(value);  // Condition codes all undefined
+
+    snprintf(Function,64,"IEEEDPFlt(%d)= ",value);
+    return  printDouble(Function,Result,ExpectedResult);
+}
+
+
+int IEEEDPMul_Test(double factor1, double factor2, unsigned char *ExpectedResult)
+{
+    double Result;
+    char Function[64];
+
+    Result=IEEEDPMul(factor1,factor2);  // Condition codes all undefined
+
+    snprintf(Function,64,"IEEEDPMul(%f * %f)= ",factor1,factor2);
+    return  printDouble(Function,Result,ExpectedResult);
+}
+
+int IEEEDPCmp_Test(double val1, double val2, unsigned char *ExpectedResult)
+{
+    double Result;
+    char Function[64];
+
+    Result=IEEEDPCmp(val1,val2);  // Condition codes ARE changed but not tested here !?!
+
+    snprintf(Function,64,"IEEEDPCmp(%f * %f)= ",val1,val2);
+    return  printDouble(Function,Result,ExpectedResult);
+
+}
+
+int main(void)
+{
+	MathIeeeDoubBasBase=OpenLibrary((unsigned char*)"mathieeedoubbas.library",34);
+	if(MathIeeeDoubBasBase)
+	{
+		{
+			unsigned char ExpectedResult[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+			IEEEDPFlt_Test(0,ExpectedResult);
+		}
+
+                {
+                        unsigned char ExpectedResult[8]={0x40, 0x8f, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        IEEEDPFlt_Test(1000,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0xc0, 0x8f, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        IEEEDPFlt_Test(-1000,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x41, 0xdf, 0xff, 0xff, 0xff, 0xc0, 0x00, 0x00};
+                        IEEEDPFlt_Test(INT_MAX,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0xc1, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        IEEEDPFlt_Test(INT_MIN,ExpectedResult);
+                }
+
+		printf("===============================================\n\n");
+
+                {
+                        unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        IEEEDPMul_Test(0,0,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x42, 0x7f, 0x3f, 0xff, 0xff, 0xc1, 0x80, 0x00};
+                        IEEEDPMul_Test(INT_MAX,1000,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0xc2, 0x7f, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        IEEEDPMul_Test(1000,INT_MIN,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x43, 0xcf, 0xff, 0xff, 0xff, 0x80, 0x00, 0x00};
+                        IEEEDPMul_Test(INT_MAX,INT_MAX,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x43, 0xd0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        IEEEDPMul_Test(INT_MIN,INT_MIN,ExpectedResult);
+                }
+
+                printf("===============================================\n\n");
+
+                {
+                        unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        IEEEDPCmp_Test(0,0,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        IEEEDPCmp_Test(1000,10,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0xbf, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        IEEEDPCmp_Test(-1000,10,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        IEEEDPCmp_Test(INT_MAX,10,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0xbf, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        IEEEDPCmp_Test(INT_MIN,10,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        IEEEDPCmp_Test(INT_MAX,INT_MAX,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        IEEEDPCmp_Test(INT_MIN,INT_MIN,ExpectedResult);
+                }
+
+                printf("===============================================\n\n");
+
+
+		CloseLibrary(MathIeeeDoubBasBase);
+	}
+	else
+	{
+		printf("Can't open mathieeedoubbas.library\n");
+	}
+
+
+	return 0;
+}
