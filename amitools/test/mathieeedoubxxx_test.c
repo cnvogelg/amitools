@@ -19,8 +19,10 @@
 
 #include <libraries/mathieeedp.h>
 #include <clib/mathieeedoubbas_protos.h>
+#include <clib/mathieeedoubtrans_protos.h>
 
 struct Library *MathIeeeDoubBasBase;
+struct Library *MathIeeeDoubTransBase;
 
 
 
@@ -200,6 +202,7 @@ int test_MathIeeeDoubBas(void)
 	else
 	{
 		printf("Can't open mathieeedoubbas.library\n");
+		Error++;
 	}
 
 
@@ -207,12 +210,73 @@ int test_MathIeeeDoubBas(void)
 }
 
 
+/* ####################################################################################################### */
+
+int IEEEDPAcos_Test(double value, unsigned char *ExpectedResult)
+{
+    double Result;
+    char Function[64];
+
+    Result=IEEEDPAcos(value);  // Condition codes all undefined
+
+    snprintf(Function,64,"IEEEDPAcos(%f)= ",value);
+    return  printDouble(Function,Result,ExpectedResult);
+}
+
+int test_MathIeeeDoubTrans(void)
+{
+	int Error=0;
+	MathIeeeDoubTransBase=OpenLibrary((unsigned char*)"mathieeedoubtrans.library",34);
+	if(MathIeeeDoubTransBase)
+	{
+		// acos is defined from -1 ... +1 ,and has values  -Pi/2 ... +Pi/2
+		{
+			unsigned char ExpectedResult[8]={0x40, 0x09, 0x21, 0xfb, 0x54, 0x44, 0x2d, 0x18};
+			Error+=IEEEDPAcos_Test(-1,ExpectedResult);
+		}
+
+		{
+			unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+			Error+=IEEEDPAcos_Test(1,ExpectedResult);
+		}
+
+		{
+			unsigned char ExpectedResult[8]={0x3f, 0xf9, 0x21, 0xfb, 0x54, 0x44, 0x2d, 0x18};
+			Error+=IEEEDPAcos_Test(0,ExpectedResult);
+		}
+
+		{
+			unsigned char ExpectedResult[8]={0x40, 0x00, 0xc1, 0x52, 0x38, 0x2d, 0x73, 0x66};
+			Error+=IEEEDPAcos_Test(-0.5,ExpectedResult);
+		}
+
+		{
+			unsigned char ExpectedResult[8]={0x3f, 0xf0, 0xc1, 0x52, 0x38, 0x2d, 0x73, 0x65};
+			Error+=IEEEDPAcos_Test(0.5,ExpectedResult);
+		}
+
+
+		printf("===============================================\n\n");
+
+
+		CloseLibrary(MathIeeeDoubTransBase);
+	}
+	else
+	{
+		printf("Can't open mathieeedoubtrans.library\n");
+		Error++;
+	}
+
+
+	return Error;
+}
+
 int main(void)
 {
 	int Error=0;
 	
 	Error+=test_MathIeeeDoubBas();
-//	Error+=test_MathIeeeDoubTrans();
+	Error+=test_MathIeeeDoubTrans();
 
 	if(Error)
 	{

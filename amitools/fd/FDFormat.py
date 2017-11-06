@@ -53,6 +53,8 @@ def read_fd(fname):
                 arg_hi = map(lambda x: x + "_hi", arg)
                 arg_lo = map(lambda x: x + "_lo", arg)
                 arg = [x for pair in zip(arg_hi, arg_lo) for x in pair]
+              elif name == "IEEEDPSincos":   # selco ugly hack for IEEEDPSincos() (Parameters is 1 + 2 registers)
+                arg = ["fp2", "parm_hi", "parm_lo"] 
               else:
                 raise IOError("Reg and Arg name mismatch in FD File")
             if arg[0] != '':
