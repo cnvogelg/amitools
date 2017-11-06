@@ -50,7 +50,11 @@ int printDouble(char *Function,double value,unsigned char *ExpectedResult)
             {
                 printf("%02x ",ExpectedResult[i]);
             }
-            else
+            else if ((i==7) && ((ResultArray[i]==ExpectedResult[i]+1) || (ResultArray[i]==ExpectedResult[i]-1))) // allow +-1 in lowest byte
+	    {
+                printf("\033[43m%02x\033[0m ",ExpectedResult[i]);
+	    }
+	    else
             {
                 printf("\033[31m%02x\033[0m ",ExpectedResult[i]);
 		Error=1;
