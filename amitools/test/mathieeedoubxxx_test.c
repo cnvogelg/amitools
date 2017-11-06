@@ -97,98 +97,99 @@ int IEEEDPCmp_Test(double val1, double val2, unsigned char *ExpectedResult)
 
 }
 
-int main(void)
+int test_MathIeeeDoubBas(void)
 {
+	int Error=0;
 	MathIeeeDoubBasBase=OpenLibrary((unsigned char*)"mathieeedoubbas.library",34);
 	if(MathIeeeDoubBasBase)
 	{
 		{
 			unsigned char ExpectedResult[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-			IEEEDPFlt_Test(0,ExpectedResult);
+			Error+=IEEEDPFlt_Test(0,ExpectedResult);
 		}
 
                 {
                         unsigned char ExpectedResult[8]={0x40, 0x8f, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        IEEEDPFlt_Test(1000,ExpectedResult);
+                        Error+=IEEEDPFlt_Test(1000,ExpectedResult);
                 }
 
                 {
                         unsigned char ExpectedResult[8]={0xc0, 0x8f, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        IEEEDPFlt_Test(-1000,ExpectedResult);
+                        Error+=IEEEDPFlt_Test(-1000,ExpectedResult);
                 }
 
                 {
                         unsigned char ExpectedResult[8]={0x41, 0xdf, 0xff, 0xff, 0xff, 0xc0, 0x00, 0x00};
-                        IEEEDPFlt_Test(INT_MAX,ExpectedResult);
+                        Error+=IEEEDPFlt_Test(INT_MAX,ExpectedResult);
                 }
 
                 {
                         unsigned char ExpectedResult[8]={0xc1, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        IEEEDPFlt_Test(INT_MIN,ExpectedResult);
+                        Error+=IEEEDPFlt_Test(INT_MIN,ExpectedResult);
                 }
 
 		printf("===============================================\n\n");
 
                 {
                         unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        IEEEDPMul_Test(0,0,ExpectedResult);
+                        Error+=IEEEDPMul_Test(0,0,ExpectedResult);
                 }
 
                 {
                         unsigned char ExpectedResult[8]={0x42, 0x7f, 0x3f, 0xff, 0xff, 0xc1, 0x80, 0x00};
-                        IEEEDPMul_Test(INT_MAX,1000,ExpectedResult);
+                        Error+=IEEEDPMul_Test(INT_MAX,1000,ExpectedResult);
                 }
 
                 {
                         unsigned char ExpectedResult[8]={0xc2, 0x7f, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        IEEEDPMul_Test(1000,INT_MIN,ExpectedResult);
+                        Error+=IEEEDPMul_Test(1000,INT_MIN,ExpectedResult);
                 }
 
                 {
                         unsigned char ExpectedResult[8]={0x43, 0xcf, 0xff, 0xff, 0xff, 0x80, 0x00, 0x00};
-                        IEEEDPMul_Test(INT_MAX,INT_MAX,ExpectedResult);
+                        Error+=IEEEDPMul_Test(INT_MAX,INT_MAX,ExpectedResult);
                 }
 
                 {
                         unsigned char ExpectedResult[8]={0x43, 0xd0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        IEEEDPMul_Test(INT_MIN,INT_MIN,ExpectedResult);
+                        Error+=IEEEDPMul_Test(INT_MIN,INT_MIN,ExpectedResult);
                 }
 
                 printf("===============================================\n\n");
 
                 {
                         unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        IEEEDPCmp_Test(0,0,ExpectedResult);
+                        Error+=IEEEDPCmp_Test(0,0,ExpectedResult);
                 }
 
                 {
                         unsigned char ExpectedResult[8]={0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        IEEEDPCmp_Test(1000,10,ExpectedResult);
+                        Error+=IEEEDPCmp_Test(1000,10,ExpectedResult);
                 }
 
                 {
                         unsigned char ExpectedResult[8]={0xbf, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        IEEEDPCmp_Test(-1000,10,ExpectedResult);
+                        Error+=IEEEDPCmp_Test(-1000,10,ExpectedResult);
                 }
 
                 {
                         unsigned char ExpectedResult[8]={0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        IEEEDPCmp_Test(INT_MAX,10,ExpectedResult);
+                        Error+=IEEEDPCmp_Test(INT_MAX,10,ExpectedResult);
                 }
 
                 {
                         unsigned char ExpectedResult[8]={0xbf, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        IEEEDPCmp_Test(INT_MIN,10,ExpectedResult);
+                        Error+=IEEEDPCmp_Test(INT_MIN,10,ExpectedResult);
                 }
 
                 {
                         unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        IEEEDPCmp_Test(INT_MAX,INT_MAX,ExpectedResult);
+                        Error+=IEEEDPCmp_Test(INT_MAX,INT_MAX,ExpectedResult);
                 }
 
                 {
                         unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        IEEEDPCmp_Test(INT_MIN,INT_MIN,ExpectedResult);
+                        Error+=IEEEDPCmp_Test(INT_MIN,INT_MIN,ExpectedResult);
                 }
 
                 printf("===============================================\n\n");
@@ -202,5 +203,41 @@ int main(void)
 	}
 
 
-	return 0;
+	return Error;
 }
+
+
+int main(void)
+{
+	int Error=0;
+	
+	Error+=test_MathIeeeDoubBas();
+//	Error+=test_MathIeeeDoubTrans();
+
+	if(Error)
+	{
+		printf("\033[31m%s\033[0m","Some tests failed!\n");
+	}
+	else
+	{
+                printf("\033[32m%s\033[0m","All tests passed\n");
+	}
+
+	return Error;
+}
+
+
+/*
+IEEEDPAdd(        mathieeedoubbas
+IEEEDPCmp(        mathieeedoubbas                   Test
+IEEEDPDiv(        mathieeedoubbas
+IEEEDPFix(        mathieeedoubbas
+IEEEDPFlt(        mathieeedoubbas                   Test
+IEEEDPMul(        mathieeedoubbas                   Test
+IEEEDPSub(        mathieeedoubbas
+
+IEEEDPAcos(       MathIEEEDoubTransLibrary
+IEEEDPLog10(      MathIEEEDoubTransLibrary
+IEEEDPSqrt(       MathIEEEDoubTransLibrary
+
+*/
