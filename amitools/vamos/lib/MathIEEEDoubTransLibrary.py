@@ -69,3 +69,12 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 
+#selco    
+  def IEEEDPPow(self,ctx):
+    x=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    y=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    (hi,lo)=fromDouble(math.pow(x,y))
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
+
+
