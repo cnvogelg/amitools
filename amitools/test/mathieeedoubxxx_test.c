@@ -20,15 +20,16 @@
 #include <libraries/mathieeedp.h>
 #include <clib/mathieeedoubbas_protos.h>
 #include <clib/mathieeedoubtrans_protos.h>
+#include <clib/utility_protos.h>
 
 struct Library *MathIeeeDoubBasBase;
 struct Library *MathIeeeDoubTransBase;
-
+struct Library *UtilityBase;
 
 
 int printDouble(char *Function,double value,unsigned char *ExpectedResult)
 {
-    static unsigned char ResultArray[4];
+    static unsigned char ResultArray[8];
 
     double *ValuePtr=&value;
     unsigned int i;
@@ -65,6 +66,46 @@ int printDouble(char *Function,double value,unsigned char *ExpectedResult)
 
     return Error;
 
+}
+
+int printLong(char *Function,long value,unsigned char *ExpectedResult)
+{
+    static unsigned char ResultArray[4];
+
+    long *ValuePtr=&value;
+    unsigned int i;
+    int Error=0;
+
+    printf("%s",Function);
+    printf("\nhere                    ");
+    for(i=0;i<4;i++)
+    {
+        ResultArray[i]=((unsigned char*)ValuePtr)[i];
+        printf("%02x ",ResultArray[i]);
+    }
+
+    printf("\nreference real Amiga    ");
+
+    for(i=0;i<4;i++)
+    {
+            if(ResultArray[i]==ExpectedResult[i])
+            {
+                printf("%02x ",ExpectedResult[i]);
+            }
+            else if ((i==7) && ((ResultArray[i]==ExpectedResult[i]+1) || (ResultArray[i]==ExpectedResult[i]-1))) // allow +-1 in lowest byte
+            {
+                printf("\033[43m%02x\033[0m ",ExpectedResult[i]);
+            }
+            else
+            {
+                printf("\033[31m%02x\033[0m ",ExpectedResult[i]);
+                Error=1;
+            }
+    }
+
+    printf("\n\n");
+
+    return Error;
 }
 
 
@@ -429,12 +470,105 @@ int test_MathIeeeDoubTrans(void)
 	return Error;
 }
 
+
+
+int SMult32_Test(long factor1, long factor2, unsigned char *ExpectedResult)
+{
+    double Result;
+    char Function[64];
+
+    Result=SMult32(factor1,factor2);
+
+    snprintf(Function,64,"SMult32(%ld * %ld)= ",factor1,factor2);
+    return  printLong(Function,Result,ExpectedResult);
+}
+
+
+int test_Utility(void)
+{
+        int Error=0;
+        UtilityBase=OpenLibrary((unsigned char*)"utility.library",34);
+        if(UtilityBase)
+        {
+
+                printf("utility.library %d.%d\n\n",UtilityBase->lib_Version,UtilityBase->lib_Revision);
+                // expeced results are from utility.library 40.1 (OS3.1)
+
+
+                {
+                        unsigned char ExpectedResult[4]={0x00, 0x00, 0x04, 0x00};
+                        Error+=SMult32_Test(32,32,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[4]={0x00, 0x00, 0x00, 0x01};
+                        Error+=SMult32_Test(INT_MAX,INT_MAX,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[4]={0xff, 0xff, 0xff, 0xfe};
+                        Error+=SMult32_Test(INT_MAX,2,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[4]={0xff, 0xff, 0xfc, 0x00};
+                        Error+=SMult32_Test(-32,32,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[4]={0x00, 0x00, 0x04, 0x00};
+                        Error+=SMult32_Test(-32,-32,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[4]={0x00, 0x00, 0x00, 0x00};
+                        Error+=SMult32_Test(INT_MIN,2,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[4]={0x00, 0x00, 0x00, 0x00};
+                        Error+=SMult32_Test(INT_MIN,INT_MIN,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[4]={0x80, 0x00, 0x00, 0x00};
+                        Error+=SMult32_Test(INT_MAX,INT_MIN,ExpectedResult);
+                }
+
+                printf("===============================================\n\n");
+
+                CloseLibrary(UtilityBase);
+        }
+        else
+        {
+                printf("Can't open mathieeedoubtrans.library\n");
+                Error++;
+        }
+
+
+        return Error;
+}
+
+
+
+
 int main(void)
 {
 	int Error=0;
 	
-	Error+=test_MathIeeeDoubBas();
-	Error+=test_MathIeeeDoubTrans();
+//	Error+=test_MathIeeeDoubBas();
+//	Error+=test_MathIeeeDoubTrans();
+	Error+=test_Utility();
+
+	printf("1     = %f\n",1.0);
+//	printf("0.1   = %f\n",0.1);
+//	printf("0.02  = %f\n",0.02);
+//	printf("1.23  = %f\n",1.23);
+//      printf("-1.23 = %f\n",-1.23);
+//	printf("-0.1  = %f\n",-0.1);
+//	printf("-0.02 = %f\n",-0.02);
+//	printf("PI    = %f\n",(double)3.141592653589793);
+	
 
 	if(Error)
 	{
