@@ -109,6 +109,9 @@ int test_MathIeeeDoubBas(void)
 	MathIeeeDoubBasBase=OpenLibrary((unsigned char*)"mathieeedoubbas.library",34);
 	if(MathIeeeDoubBasBase)
 	{
+		printf("mathieeedoubbas.library %d.%d\n\n",MathIeeeDoubBasBase->lib_Version,MathIeeeDoubBasBase->lib_Revision);
+                // expeced results are from mathieeedoubbas.library 38.1 (OS3.1)
+
 		{
 			unsigned char ExpectedResult[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 			Error+=IEEEDPFlt_Test(0,ExpectedResult);
@@ -227,12 +230,31 @@ int IEEEDPAcos_Test(double value, unsigned char *ExpectedResult)
     return  printDouble(Function,Result,ExpectedResult);
 }
 
+
+int IEEEDPSqrt_Test(double value, unsigned char *ExpectedResult)
+{
+    double Result;
+    char Function[64];
+
+    Result=IEEEDPSqrt(value);  // Condition codes all undefined
+
+    snprintf(Function,64,"IEEEDPSqrt(%f)= ",value);
+    return  printDouble(Function,Result,ExpectedResult);
+}
+
+
+
 int test_MathIeeeDoubTrans(void)
 {
 	int Error=0;
 	MathIeeeDoubTransBase=OpenLibrary((unsigned char*)"mathieeedoubtrans.library",34);
 	if(MathIeeeDoubTransBase)
 	{
+
+		printf("mathieeedoubtrans.library %d.%d\n\n",MathIeeeDoubTransBase->lib_Version,MathIeeeDoubTransBase->lib_Revision);
+                // expeced results are from mathieeedoubtrans.library 37.1 (OS3.1)
+
+
 		// acos is defined from -1 ... +1 ,and has values  -Pi/2 ... +Pi/2
 		{
 			unsigned char ExpectedResult[8]={0x40, 0x09, 0x21, 0xfb, 0x54, 0x44, 0x2d, 0x18};
@@ -250,7 +272,7 @@ int test_MathIeeeDoubTrans(void)
 		}
 
 		{
-			unsigned char ExpectedResult[8]={0x40, 0x00, 0xc1, 0x52, 0x38, 0x2d, 0x73, 0x66};
+			unsigned char ExpectedResult[8]={0x40, 0x00, 0xc1, 0x52, 0x38, 0x2d, 0x73, 0x65};
 			Error+=IEEEDPAcos_Test(-0.5,ExpectedResult);
 		}
 
@@ -262,6 +284,38 @@ int test_MathIeeeDoubTrans(void)
 
 		printf("===============================================\n\n");
 
+                {
+                        unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        Error+=IEEEDPSqrt_Test(0,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x40, 0x3f, 0x9f, 0x6e, 0x49, 0x90, 0xf2, 0x27};
+                        Error+=IEEEDPSqrt_Test(1000,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x43, 0xef, 0xff, 0xff, 0xef, 0xff, 0xff, 0xfb};
+                        Error+=IEEEDPSqrt_Test(FLT_MAX,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x5f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+                        Error+=IEEEDPSqrt_Test(DBL_MAX,ExpectedResult);
+                }
+
+/*
+                        IEEEDPSqrt()   
+                	Might have returned bare nonsense if the argument was out of range
+                        for pre-V45 releases. Returns NAN for V45 in these cases.
+*/
+                {
+                        unsigned char ExpectedResult[8]={0xff, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        Error+=IEEEDPSqrt_Test(-1000,ExpectedResult);
+                }
+
+
+                printf("===============================================\n\n");
 
 		CloseLibrary(MathIeeeDoubTransBase);
 	}
@@ -304,8 +358,8 @@ IEEEDPFlt(        mathieeedoubbas                   Test
 IEEEDPMul(        mathieeedoubbas                   Test
 IEEEDPSub(        mathieeedoubbas
 
-IEEEDPAcos(       MathIEEEDoubTransLibrary
+IEEEDPAcos(       MathIEEEDoubTransLibrary	    Test
 IEEEDPLog10(      MathIEEEDoubTransLibrary
-IEEEDPSqrt(       MathIEEEDoubTransLibrary
+IEEEDPSqrt(       MathIEEEDoubTransLibrary          Test
 
 */

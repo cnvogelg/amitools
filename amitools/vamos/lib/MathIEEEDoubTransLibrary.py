@@ -36,7 +36,11 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
 #selco    
   def IEEEDPSqrt(self,ctx):
     arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    (hi,lo)=fromDouble(math.sqrt(arg))
+    if arg < 0: # we should not crash for negative numbers!
+#      (hi,lo)=fromDouble(float('nan')  # not a number (7ff80000 00000000)
+      (hi,lo)=(0xfff80000,0)            # not a number, this is what is returned under AmigaOS3.9
+    else:
+      (hi,lo)=fromDouble(math.sqrt(arg))
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 
