@@ -58,3 +58,14 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 
+#selco    
+  def IEEEDPLog10(self,ctx):
+    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    if arg <= 0: # we should not crash for negative numbers!
+#      (hi,lo)=fromDouble(float('nan')  # not a number (7ff80000 00000000)
+      (hi,lo)=(0xfff80000,0)            # not a number, this is what is returned under AmigaOS3.9
+    else:
+      (hi,lo)=fromDouble(math.log10(arg))
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
+

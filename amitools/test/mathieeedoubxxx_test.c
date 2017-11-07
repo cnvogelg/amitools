@@ -103,6 +103,19 @@ int IEEEDPCmp_Test(double val1, double val2, unsigned char *ExpectedResult)
 
 }
 
+int IEEEDPFix_Test(double value, unsigned char *ExpectedResult)
+{
+    double Result;
+    char Function[64];
+
+    Result=IEEEDPFix(value);  // Condition codes all undefined
+
+    snprintf(Function,64,"IEEEDPFix(%f)= ",value);
+    return  printDouble(Function,Result,ExpectedResult);
+}
+
+
+
 int test_MathIeeeDoubBas(void)
 {
 	int Error=0;
@@ -202,6 +215,53 @@ int test_MathIeeeDoubBas(void)
                 }
 
                 printf("===============================================\n\n");
+               {
+                        unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        Error+=IEEEDPFix_Test(0,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x40, 0x8f, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        Error+=IEEEDPFix_Test(1000,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0xc0, 0x8f, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        Error+=IEEEDPFix_Test(-1000,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x41, 0xdf, 0xff, 0xff, 0xff, 0xc0, 0x00, 0x00};
+                        Error+=IEEEDPFix_Test(INT_MAX,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0xc1, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+                        Error+=IEEEDPFix_Test(INT_MIN,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x41, 0xdf, 0xff, 0xff, 0xff, 0xc0, 0x00, 0x00};
+                        Error+=IEEEDPFix_Test(2.0*INT_MAX,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0xc1, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        Error+=IEEEDPFix_Test(2.0*INT_MIN,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x41, 0xdf, 0xff, 0xff, 0xff, 0xc0, 0x00, 0x00};
+                        Error+=IEEEDPFix_Test(DBL_MAX,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        Error+=IEEEDPFix_Test(DBL_MIN,ExpectedResult);
+                }
+
+
+                printf("===============================================\n\n");
 
 
 		CloseLibrary(MathIeeeDoubBasBase);
@@ -242,6 +302,16 @@ int IEEEDPSqrt_Test(double value, unsigned char *ExpectedResult)
     return  printDouble(Function,Result,ExpectedResult);
 }
 
+int IEEEDPLog10_Test(double value, unsigned char *ExpectedResult)
+{
+    double Result;
+    char Function[64];
+
+    Result=IEEEDPLog10(value);  // Condition codes all undefined
+
+    snprintf(Function,64,"IEEEDPLog10(%f)= ",value);
+    return  printDouble(Function,Result,ExpectedResult);
+}
 
 
 int test_MathIeeeDoubTrans(void)
@@ -317,6 +387,36 @@ int test_MathIeeeDoubTrans(void)
 
                 printf("===============================================\n\n");
 
+               
+                // defined from 0 ... infinity 
+                {
+                        unsigned char ExpectedResult[8]={0xff, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        Error+=IEEEDPLog10_Test(0,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x40, 0x07, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+                        Error+=IEEEDPLog10_Test(1000,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x40, 0x43, 0x44, 0x13, 0x50, 0x67, 0xe3, 0x08};
+                        Error+=IEEEDPLog10_Test(FLT_MAX,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x40, 0x73, 0x44, 0x13, 0x50, 0x9f, 0x79, 0xfe};
+                        Error+=IEEEDPLog10_Test(DBL_MAX,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0xff, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        Error+=IEEEDPLog10_Test(-1000,ExpectedResult);
+                }
+
+
+                printf("===============================================\n\n");
+
 		CloseLibrary(MathIeeeDoubTransBase);
 	}
 	else
@@ -345,6 +445,7 @@ int main(void)
                 printf("\033[32m%s\033[0m","All tests passed\n");
 	}
 
+
 	return Error;
 }
 
@@ -353,13 +454,13 @@ int main(void)
 IEEEDPAdd(        mathieeedoubbas
 IEEEDPCmp(        mathieeedoubbas                   Test
 IEEEDPDiv(        mathieeedoubbas
-IEEEDPFix(        mathieeedoubbas
+IEEEDPFix(        mathieeedoubbas                   Test
 IEEEDPFlt(        mathieeedoubbas                   Test
 IEEEDPMul(        mathieeedoubbas                   Test
 IEEEDPSub(        mathieeedoubbas
 
 IEEEDPAcos(       MathIEEEDoubTransLibrary	    Test
-IEEEDPLog10(      MathIEEEDoubTransLibrary
+IEEEDPLog10(      MathIEEEDoubTransLibrary          Test
 IEEEDPSqrt(       MathIEEEDoubTransLibrary          Test
 
 */

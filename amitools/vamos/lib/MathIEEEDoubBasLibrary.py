@@ -49,6 +49,11 @@ class MathIEEEDoubBasLibrary(AmigaLibrary):
 
   def IEEEDPFix(self, ctx):
     arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+#selco return INT_MAX/INT_MIN in case of overflow
+    if arg>2147483647:     # amiga INT_MAX
+      arg=2147483647
+    elif arg<-2147483648:  # amiga INT_MIN
+      arg=-2147483648	
     return int(arg)
 
   def IEEEFlt(self, ctx):
