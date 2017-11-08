@@ -61,19 +61,29 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
 #selco    
   def IEEEDPLog10(self,ctx):
     arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    if arg <= 0: # we should not crash for negative numbers!
-#      (hi,lo)=fromDouble(float('nan')  # not a number (7ff80000 00000000)
-      (hi,lo)=(0xfff80000,0)            # not a number, this is what is returned under AmigaOS3.9
+    if arg < 0: # we should not crash for negative numbers!
+      #(hi,lo)=fromDouble(float('nan'))
+      (hi,lo)=(0xfff80000,0x00000000)
     else:
-      (hi,lo)=fromDouble(math.log10(arg))
+
+      try:
+        Result=math.log10(arg)
+        (hi,lo)=fromDouble(Result)
+      except ValueError:
+        (hi,lo)=fromDouble(float('-inf'))
+
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 
 #selco    
   def IEEEDPPow(self,ctx):
-    x=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     y=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    (hi,lo)=fromDouble(math.pow(x,y))
+    x=toDouble(ctx.cpu.r_reg(REG_D2),ctx.cpu.r_reg(REG_D3))
+    try:
+      Result=math.pow(y,x);
+      (hi,lo)=fromDouble(Result)
+    except OverflowError:
+      (hi,lo)=(0x7fefffff,0xffffffff)
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 

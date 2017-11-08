@@ -22,9 +22,17 @@
 #include <clib/mathieeedoubtrans_protos.h>
 #include <clib/utility_protos.h>
 
+#include <machine/float.h>   // for DBL_EPSILON
+
 struct Library *MathIeeeDoubBasBase;
 struct Library *MathIeeeDoubTransBase;
 struct Library *UtilityBase;
+
+
+int fequal(double a, double b)
+{
+    return fabs(a-b) <= 0.000001;  //DBL_EPSILON;
+}
 
 
 int printDouble(char *Function,double value,unsigned char *ExpectedResult)
@@ -34,6 +42,23 @@ int printDouble(char *Function,double value,unsigned char *ExpectedResult)
     double *ValuePtr=&value;
     unsigned int i;
     int Error=0;
+    char *WarningColorString;
+
+    if(fequal(value,*(double*)ExpectedResult))   // are both Amiga and vamon double-Result very very nearly the same?
+    {
+
+printf("FAST GLEICH\n");
+        WarningColorString="\033[43m";     // YES, no Error. print it YELLOW
+    }
+    else
+    {
+
+printf("\033[31mUNGLEICH vamos=%f %f\033[0m\n",value,*(double*)ExpectedResult);
+        WarningColorString="\033[31m";     // No, print differences RED
+        Error=1; 
+    }   
+
+
 
     printf("%s",Function);
     printf("\nhere                    ");
@@ -43,6 +68,9 @@ int printDouble(char *Function,double value,unsigned char *ExpectedResult)
 	printf("%02x ",ResultArray[i]);
     }
 
+    printf(" --> %f\n",value);
+
+
     printf("\nreference real Amiga    ");
 
     for(i=0;i<8;i++)
@@ -51,16 +79,14 @@ int printDouble(char *Function,double value,unsigned char *ExpectedResult)
             {
                 printf("%02x ",ExpectedResult[i]);
             }
-            else if ((i==7) && ((ResultArray[i]==ExpectedResult[i]+1) || (ResultArray[i]==ExpectedResult[i]-1))) // allow +-1 in lowest byte
-	    {
-                printf("\033[43m%02x\033[0m ",ExpectedResult[i]);
-	    }
 	    else
             {
-                printf("\033[31m%02x\033[0m ",ExpectedResult[i]);
-		Error=1;
+                printf("%s%02x\033[0m ",WarningColorString,ExpectedResult[i]);
             }
     }
+
+    printf(" --> %f",*(double*)ExpectedResult);
+
 
     printf("\n\n");
 
@@ -112,11 +138,11 @@ int printLong(char *Function,long value,unsigned char *ExpectedResult)
 int IEEEDPFlt_Test(int value, unsigned char *ExpectedResult)
 {
     double Result;
-    char Function[64];
+    static char Function[1024];
 
     Result=IEEEDPFlt(value);  // Condition codes all undefined
 
-    snprintf(Function,64,"IEEEDPFlt(%d)= ",value);
+    snprintf(Function,1024,"IEEEDPFlt(%d)= ",value);
     return  printDouble(Function,Result,ExpectedResult);
 }
 
@@ -124,22 +150,22 @@ int IEEEDPFlt_Test(int value, unsigned char *ExpectedResult)
 int IEEEDPMul_Test(double factor1, double factor2, unsigned char *ExpectedResult)
 {
     double Result;
-    char Function[64];
+    static char Function[1024];
 
     Result=IEEEDPMul(factor1,factor2);  // Condition codes all undefined
 
-    snprintf(Function,64,"IEEEDPMul(%f * %f)= ",factor1,factor2);
+    snprintf(Function,1024,"IEEEDPMul(%f * %f)= ",factor1,factor2);
     return  printDouble(Function,Result,ExpectedResult);
 }
 
 int IEEEDPCmp_Test(double val1, double val2, unsigned char *ExpectedResult)
 {
     double Result;
-    char Function[64];
+    static char Function[1024];
 
     Result=IEEEDPCmp(val1,val2);  // Condition codes ARE changed but not tested here !?!
 
-    snprintf(Function,64,"IEEEDPCmp(%f * %f)= ",val1,val2);
+    snprintf(Function,1024,"IEEEDPCmp(%f * %f)= ",val1,val2);
     return  printDouble(Function,Result,ExpectedResult);
 
 }
@@ -147,11 +173,11 @@ int IEEEDPCmp_Test(double val1, double val2, unsigned char *ExpectedResult)
 int IEEEDPFix_Test(double value, unsigned char *ExpectedResult)
 {
     double Result;
-    char Function[64];
+    static char Function[1024];
 
     Result=IEEEDPFix(value);  // Condition codes all undefined
 
-    snprintf(Function,64,"IEEEDPFix(%f)= ",value);
+    snprintf(Function,1024,"IEEEDPFix(%f)= ",value);
     return  printDouble(Function,Result,ExpectedResult);
 }
 
@@ -323,11 +349,11 @@ int test_MathIeeeDoubBas(void)
 int IEEEDPAcos_Test(double value, unsigned char *ExpectedResult)
 {
     double Result;
-    char Function[64];
+    static char Function[1024];
 
     Result=IEEEDPAcos(value);  // Condition codes all undefined
 
-    snprintf(Function,64,"IEEEDPAcos(%f)= ",value);
+    snprintf(Function,1024,"IEEEDPAcos(%f)= ",value);
     return  printDouble(Function,Result,ExpectedResult);
 }
 
@@ -335,22 +361,34 @@ int IEEEDPAcos_Test(double value, unsigned char *ExpectedResult)
 int IEEEDPSqrt_Test(double value, unsigned char *ExpectedResult)
 {
     double Result;
-    char Function[64];
+    static char Function[1024];
 
     Result=IEEEDPSqrt(value);  // Condition codes all undefined
 
-    snprintf(Function,64,"IEEEDPSqrt(%f)= ",value);
+    snprintf(Function,1024,"IEEEDPSqrt(%f)= ",value);
     return  printDouble(Function,Result,ExpectedResult);
 }
 
 int IEEEDPLog10_Test(double value, unsigned char *ExpectedResult)
 {
     double Result;
-    char Function[64];
+    static char Function[1024];
 
     Result=IEEEDPLog10(value);  // Condition codes all undefined
 
-    snprintf(Function,64,"IEEEDPLog10(%f)= ",value);
+    snprintf(Function,1024,"IEEEDPLog10(%f)= ",value);
+    return  printDouble(Function,Result,ExpectedResult);
+}
+
+
+int IEEEDPPow_Test(double value1, double value2, unsigned char *ExpectedResult)
+{
+    double Result;
+    static char Function[1024];
+
+    Result=IEEEDPPow(value1,value2);
+
+    snprintf(Function,1024,"IEEEDPPow(%f hoch %f)= ",value2,value1);
     return  printDouble(Function,Result,ExpectedResult);
 }
 
@@ -458,6 +496,40 @@ int test_MathIeeeDoubTrans(void)
 
                 printf("===============================================\n\n");
 
+               {
+                        unsigned char ExpectedResult[8]={0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        Error+=IEEEDPPow_Test(0,0,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        Error+=IEEEDPPow_Test(1000.0,0.0,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x7f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+                        Error+=IEEEDPPow_Test(FLT_MAX,FLT_MAX,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x7f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+                        Error+=IEEEDPPow_Test(DBL_MAX,DBL_MAX,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        Error+=IEEEDPPow_Test(-1000,-1000,ExpectedResult);
+                }
+
+                {
+                        unsigned char ExpectedResult[8]={0x40, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+                        Error+=IEEEDPPow_Test(3,4,ExpectedResult);
+                }
+
+
+                printf("===============================================\n\n");
+
+
 		CloseLibrary(MathIeeeDoubTransBase);
 	}
 	else
@@ -475,11 +547,11 @@ int test_MathIeeeDoubTrans(void)
 int SMult32_Test(long factor1, long factor2, unsigned char *ExpectedResult)
 {
     double Result;
-    char Function[64];
+    static char Function[1024];
 
     Result=SMult32(factor1,factor2);
 
-    snprintf(Function,64,"SMult32(%ld * %ld)= ",factor1,factor2);
+    snprintf(Function,1024,"SMult32(%ld * %ld)= ",factor1,factor2);
     return  printLong(Function,Result,ExpectedResult);
 }
 
@@ -557,17 +629,19 @@ int main(void)
 	int Error=0;
 	
 //	Error+=test_MathIeeeDoubBas();
-//	Error+=test_MathIeeeDoubTrans();
-	Error+=test_Utility();
+	Error+=test_MathIeeeDoubTrans();
+//	Error+=test_Utility();
+
+// some testprintfs with %f
 
 	printf("1     = %f\n",1.0);
-//	printf("0.1   = %f\n",0.1);
-//	printf("0.02  = %f\n",0.02);
-//	printf("1.23  = %f\n",1.23);
-//      printf("-1.23 = %f\n",-1.23);
-//	printf("-0.1  = %f\n",-0.1);
-//	printf("-0.02 = %f\n",-0.02);
-//	printf("PI    = %f\n",(double)3.141592653589793);
+	printf("0.1   = %f\n",0.1);
+	printf("0.02  = %f\n",0.02);
+	printf("1.23  = %f\n",1.23);
+        printf("-1.23 = %f\n",-1.23);
+	printf("-0.1  = %f\n",-0.1);
+	printf("-0.02 = %f\n",-0.02);
+	printf("PI    = %f\n",(double)3.141592653589793);
 	
 
 	if(Error)
