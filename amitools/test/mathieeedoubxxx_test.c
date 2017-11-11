@@ -125,7 +125,7 @@ int printLong(char *Function,long value,unsigned char *ExpectedResult)
             {
                 printf("%02x ",ExpectedResult[i]);
             }
-            else if ((i==7) && ((ResultArray[i]==ExpectedResult[i]+1) || (ResultArray[i]==ExpectedResult[i]-1))) // allow +-1 in lowest byte
+            else if ((i==3) && ((ResultArray[i]==ExpectedResult[i]+1) || (ResultArray[i]==ExpectedResult[i]-1))) // allow +-1 in lowest byte
             {
                 printf("\033[43m%02x\033[0m ",ExpectedResult[i]);
             }
@@ -154,6 +154,7 @@ int IEEEDPFlt_Test(int value, unsigned char *ExpectedResult)
 }
 
 
+/*
 int IEEEDPMul_Test(double factor1, double factor2, unsigned char *ExpectedResult)
 {
     double Result;
@@ -164,7 +165,37 @@ int IEEEDPMul_Test(double factor1, double factor2, unsigned char *ExpectedResult
     snprintf(Function,1024,"IEEEDPMul(%.16gf * %.16gf)= ",factor1,factor2);
     return  printDouble(Function,Result,ExpectedResult);
 }
+*/
+int double_is_double_double_test(double (*Function)(double,double),char *FunctionName, double value1, double value2,unsigned char ExpectedResult_0,
+		                                                                                                            unsigned char ExpectedResult_1,
+																													unsigned char ExpectedResult_2,
+																													unsigned char ExpectedResult_3,
+																													unsigned char ExpectedResult_4,
+																													unsigned char ExpectedResult_5,
+																													unsigned char ExpectedResult_6,
+																													unsigned char ExpectedResult_7)
+{
+    double Result;
+    unsigned char ExpectedResult[8];
+    static char FunctionLine[1024];
 
+    ExpectedResult[0]=ExpectedResult_0;
+    ExpectedResult[1]=ExpectedResult_1;
+    ExpectedResult[2]=ExpectedResult_2;
+    ExpectedResult[3]=ExpectedResult_3;
+    ExpectedResult[4]=ExpectedResult_4;
+    ExpectedResult[5]=ExpectedResult_5;
+    ExpectedResult[6]=ExpectedResult_6;
+    ExpectedResult[7]=ExpectedResult_7;
+
+    Result=Function(value1,value2);
+
+    snprintf(FunctionLine,1024,"%s(%.16gf , %.16gf) = ",FunctionName,value1,value2);
+    return  printDouble(FunctionLine,Result,ExpectedResult);
+}
+
+
+/*
 int IEEEDPCmp_Test(double val1, double val2, unsigned char *ExpectedResult)
 {
     double Result;
@@ -176,6 +207,30 @@ int IEEEDPCmp_Test(double val1, double val2, unsigned char *ExpectedResult)
     return  printDouble(Function,Result,ExpectedResult);
 
 }
+*/
+
+int long_is_double_double_test(long (*Function)(double,double),char *FunctionName, double value1, double value2,unsigned char ExpectedResult_0,
+		                                                                                                        unsigned char ExpectedResult_1,
+				  																							    unsigned char ExpectedResult_2,
+																											    unsigned char ExpectedResult_3)
+{
+    long Result;
+    unsigned char ExpectedResult[4];
+    static char FunctionLine[1024];
+
+    ExpectedResult[0]=ExpectedResult_0;
+    ExpectedResult[1]=ExpectedResult_1;
+    ExpectedResult[2]=ExpectedResult_2;
+    ExpectedResult[3]=ExpectedResult_3;
+
+    Result=Function(value1,value2);
+
+    snprintf(FunctionLine,1024,"%s(%.16g , %.16g) = ",FunctionName,value1,value2);
+    return  printLong(FunctionLine,Result,ExpectedResult);
+}
+
+
+
 
 int IEEEDPFix_Test(double value, unsigned char *ExpectedResult)
 {
@@ -224,69 +279,24 @@ int test_MathIeeeDoubBas(void)
                         Error+=IEEEDPFlt_Test(INT_MIN,ExpectedResult);
                 }
 
-		printf("===============================================\n\n");
+		        printf("===============================================\n\n");
 
-                {
-                        unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        Error+=IEEEDPMul_Test(0,0,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[8]={0x42, 0x7f, 0x3f, 0xff, 0xff, 0xc1, 0x80, 0x00};
-                        Error+=IEEEDPMul_Test(INT_MAX,1000,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[8]={0xc2, 0x7f, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        Error+=IEEEDPMul_Test(1000,INT_MIN,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[8]={0x43, 0xcf, 0xff, 0xff, 0xff, 0x80, 0x00, 0x00};
-                        Error+=IEEEDPMul_Test(INT_MAX,INT_MAX,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[8]={0x43, 0xd0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        Error+=IEEEDPMul_Test(INT_MIN,INT_MIN,ExpectedResult);
-                }
+                        Error= double_is_double_double_test(IEEEDPMul,"EEEDPMul",0,       0,         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+                        Error+=double_is_double_double_test(IEEEDPMul,"EEEDPMul",INT_MAX, 1000,      0x42, 0x7f, 0x3f, 0xff, 0xff, 0xc1, 0x80, 0x00);
+                        Error+=double_is_double_double_test(IEEEDPMul,"EEEDPMul",1000,    INT_MIN,   0xc2, 0x7f, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00);
+                        Error+=double_is_double_double_test(IEEEDPMul,"EEEDPMul",INT_MAX, INT_MAX,   0x43, 0xcf, 0xff, 0xff, 0xff, 0x80, 0x00, 0x00);
+                        Error+=double_is_double_double_test(IEEEDPMul,"EEEDPMul",INT_MIN, INT_MIN,   0x43, 0xd0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
 
                 printf("===============================================\n\n");
 
-                {
-                        unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        Error+=IEEEDPCmp_Test(0,0,ExpectedResult);
-                }
+                        Error+=long_is_double_double_test(IEEEDPCmp,"IEEEDPCmp",0,             0,    0x00,   0x00, 0x00, 0x00);
+                        Error+=long_is_double_double_test(IEEEDPCmp,"IEEEDPCmp",1000,         10,    0x00,   0x00, 0x00, 0x01);
+                        Error+=long_is_double_double_test(IEEEDPCmp,"IEEEDPCmp",-1000,        10,    0xff,   0xff, 0xff, 0xff);
+                        Error+=long_is_double_double_test(IEEEDPCmp,"IEEEDPCmp",INT_MAX,      10,    0x00,   0x00, 0x00, 0x01);
+                        Error+=long_is_double_double_test(IEEEDPCmp,"IEEEDPCmp",INT_MIN,      10,    0xff,   0xff, 0xff, 0xff);
+                        Error+=long_is_double_double_test(IEEEDPCmp,"IEEEDPCmp",INT_MAX, INT_MAX,    0x00,   0x00, 0x00, 0x00);
+                        Error+=long_is_double_double_test(IEEEDPCmp,"IEEEDPCmp",INT_MIN, INT_MIN,    0x00,   0x00, 0x00, 0x00);
 
-                {
-                        unsigned char ExpectedResult[8]={0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        Error+=IEEEDPCmp_Test(1000,10,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[8]={0xbf, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        Error+=IEEEDPCmp_Test(-1000,10,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[8]={0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        Error+=IEEEDPCmp_Test(INT_MAX,10,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[8]={0xbf, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        Error+=IEEEDPCmp_Test(INT_MIN,10,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        Error+=IEEEDPCmp_Test(INT_MAX,INT_MAX,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        Error+=IEEEDPCmp_Test(INT_MIN,INT_MIN,ExpectedResult);
-                }
 
                 printf("===============================================\n\n");
                {
@@ -636,8 +646,8 @@ int main(void)
 	int Error=0;
 	
 	Error+=test_MathIeeeDoubBas();
-	Error+=test_MathIeeeDoubTrans();
-	Error+=test_Utility();
+//	Error+=test_MathIeeeDoubTrans();
+//	Error+=test_Utility();
 
 // some testprintfs with %f
 
