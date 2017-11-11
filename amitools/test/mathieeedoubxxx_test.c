@@ -221,6 +221,25 @@ int long_is_double_double_test(long (*Function)(double,double),char *FunctionNam
     return  printLong(FunctionLine,Result,ExpectedResult);
 }
 
+int long_is_double_test(long (*Function)(double),char *FunctionName, double value1, unsigned char ExpectedResult_0,
+		                                                                            unsigned char ExpectedResult_1,
+				  								      							    unsigned char ExpectedResult_2,
+																					unsigned char ExpectedResult_3)
+{
+    long Result;
+    unsigned char ExpectedResult[4];
+    static char FunctionLine[1024];
+
+    ExpectedResult[0]=ExpectedResult_0;
+    ExpectedResult[1]=ExpectedResult_1;
+    ExpectedResult[2]=ExpectedResult_2;
+    ExpectedResult[3]=ExpectedResult_3;
+
+    Result=Function(value1);
+
+    snprintf(FunctionLine,1024,"%s(%.16g ) = ",FunctionName,value1);
+    return  printLong(FunctionLine,Result,ExpectedResult);
+}
 
 
 
@@ -272,50 +291,16 @@ int test_MathIeeeDoubBas(void)
 
 
                 printf("===============================================\n\n");
-               {
-                        unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        Error+=IEEEDPFix_Test(0,ExpectedResult);
-                }
+                        Error+=long_is_double_test(IEEEDPFix,"IEEEDPFix",0,              0x00, 0x00, 0x00, 0x00);
+                        Error+=long_is_double_test(IEEEDPFix,"IEEEDPFix",1000,           0x00, 0x00, 0x03, 0xe8);
+                        Error+=long_is_double_test(IEEEDPFix,"IEEEDPFix",-1000,          0xff, 0xff, 0xfc, 0x18);
+                        Error+=long_is_double_test(IEEEDPFix,"IEEEDPFix",INT_MAX,        0x7f, 0xff, 0xff, 0xff);
 
-                {
-                        unsigned char ExpectedResult[8]={0x40, 0x8f, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        Error+=IEEEDPFix_Test(1000,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[8]={0xc0, 0x8f, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        Error+=IEEEDPFix_Test(-1000,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[8]={0x41, 0xdf, 0xff, 0xff, 0xff, 0xc0, 0x00, 0x00};
-                        Error+=IEEEDPFix_Test(INT_MAX,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[8]={0xc1, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-                        Error+=IEEEDPFix_Test(INT_MIN,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[8]={0x41, 0xdf, 0xff, 0xff, 0xff, 0xc0, 0x00, 0x00};
-                        Error+=IEEEDPFix_Test(2.0*INT_MAX,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[8]={0xc1, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        Error+=IEEEDPFix_Test(2.0*INT_MIN,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[8]={0x41, 0xdf, 0xff, 0xff, 0xff, 0xc0, 0x00, 0x00};
-                        Error+=IEEEDPFix_Test(DBL_MAX,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                        Error+=IEEEDPFix_Test(DBL_MIN,ExpectedResult);
-                }
+                        Error+=long_is_double_test(IEEEDPFix,"IEEEDPFix",INT_MIN,        0x80, 0x00, 0x00, 0x00);
+                        Error+=long_is_double_test(IEEEDPFix,"IEEEDPFix",2.0*INT_MAX,    0x7f, 0xff, 0xff, 0xff);
+                        Error+=long_is_double_test(IEEEDPFix,"IEEEDPFix",2.0*INT_MIN,    0x80, 0x00, 0x00, 0x00);
+                        Error+=long_is_double_test(IEEEDPFix,"IEEEDPFix",DBL_MAX,        0x7f, 0xff, 0xff, 0xff);
+                        Error+=long_is_double_test(IEEEDPFix,"IEEEDPFix",DBL_MIN,        0x00, 0x00, 0x00, 0x00);
 
 
                 printf("===============================================\n\n");
