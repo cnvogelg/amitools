@@ -221,6 +221,28 @@ int long_is_double_double_test(long (*Function)(double,double),char *FunctionNam
     return  printLong(FunctionLine,Result,ExpectedResult);
 }
 
+int long_is_long_long_test(long (*Function)(long,long),char *FunctionName, long value1, long value2,unsigned char ExpectedResult_0,
+		                                                                                            unsigned char ExpectedResult_1,
+				  																					unsigned char ExpectedResult_2,
+																									unsigned char ExpectedResult_3)
+{
+    long Result;
+    unsigned char ExpectedResult[4];
+    static char FunctionLine[1024];
+
+    ExpectedResult[0]=ExpectedResult_0;
+    ExpectedResult[1]=ExpectedResult_1;
+    ExpectedResult[2]=ExpectedResult_2;
+    ExpectedResult[3]=ExpectedResult_3;
+
+    Result=Function(value1,value2);
+
+    snprintf(FunctionLine,1024,"%s(%d , %d) = ",FunctionName,value1,value2);
+    return  printLong(FunctionLine,Result,ExpectedResult);
+}
+
+
+
 int long_is_double_test(long (*Function)(double),char *FunctionName, double value1, unsigned char ExpectedResult_0,
 		                                                                            unsigned char ExpectedResult_1,
 				  								      							    unsigned char ExpectedResult_2,
@@ -413,61 +435,27 @@ int test_Utility(void)
         UtilityBase=OpenLibrary((unsigned char*)"utility.library",34);
         if(UtilityBase)
         {
+        	printf("utility.library %d.%d\n\n",UtilityBase->lib_Version,UtilityBase->lib_Revision);
+            // expeced results are from utility.library 40.1 (OS3.1)
 
-                printf("utility.library %d.%d\n\n",UtilityBase->lib_Version,UtilityBase->lib_Revision);
-                // expeced results are from utility.library 40.1 (OS3.1)
+            Error+=long_is_long_long_test(SMult32,"SMult32",     32,     32,    0x00, 0x00, 0x04, 0x00);
+            Error+=long_is_long_long_test(SMult32,"SMult32",INT_MAX,INT_MAX,    0x00, 0x00, 0x00, 0x01);
+            Error+=long_is_long_long_test(SMult32,"SMult32",INT_MAX,      2,    0xff, 0xff, 0xff, 0xfe);
+            Error+=long_is_long_long_test(SMult32,"SMult32",    -32,     32,    0xff, 0xff, 0xfc, 0x00);
+            Error+=long_is_long_long_test(SMult32,"SMult32",    -32,    -32,    0x00, 0x00, 0x04, 0x00);
+            Error+=long_is_long_long_test(SMult32,"SMult32",INT_MIN,      2,    0x00, 0x00, 0x00, 0x00);
+            Error+=long_is_long_long_test(SMult32,"SMult32",INT_MIN,INT_MIN,    0x00, 0x00, 0x00, 0x00);
+            Error+=long_is_long_long_test(SMult32,"SMult32",INT_MAX,INT_MIN,    0x80, 0x00, 0x00, 0x00);
 
+            printf("===============================================\n\n");
 
-                {
-                        unsigned char ExpectedResult[4]={0x00, 0x00, 0x04, 0x00};
-                        Error+=SMult32_Test(32,32,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[4]={0x00, 0x00, 0x00, 0x01};
-                        Error+=SMult32_Test(INT_MAX,INT_MAX,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[4]={0xff, 0xff, 0xff, 0xfe};
-                        Error+=SMult32_Test(INT_MAX,2,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[4]={0xff, 0xff, 0xfc, 0x00};
-                        Error+=SMult32_Test(-32,32,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[4]={0x00, 0x00, 0x04, 0x00};
-                        Error+=SMult32_Test(-32,-32,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[4]={0x00, 0x00, 0x00, 0x00};
-                        Error+=SMult32_Test(INT_MIN,2,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[4]={0x00, 0x00, 0x00, 0x00};
-                        Error+=SMult32_Test(INT_MIN,INT_MIN,ExpectedResult);
-                }
-
-                {
-                        unsigned char ExpectedResult[4]={0x80, 0x00, 0x00, 0x00};
-                        Error+=SMult32_Test(INT_MAX,INT_MIN,ExpectedResult);
-                }
-
-                printf("===============================================\n\n");
-
-                CloseLibrary(UtilityBase);
+            CloseLibrary(UtilityBase);
         }
         else
         {
-                printf("Can't open mathieeedoubtrans.library\n");
-                Error++;
+            printf("Can't open mathieeedoubtrans.library\n");
+            Error++;
         }
-
 
         return Error;
 }
@@ -509,16 +497,81 @@ int main(void)
 
 
 /*
-IEEEDPAdd(        mathieeedoubbas
-IEEEDPCmp(        mathieeedoubbas                   Test
-IEEEDPDiv(        mathieeedoubbas
-IEEEDPFix(        mathieeedoubbas                   Test
-IEEEDPFlt(        mathieeedoubbas                   Test
-IEEEDPMul(        mathieeedoubbas                   Test
-IEEEDPSub(        mathieeedoubbas
 
-IEEEDPAcos(       MathIEEEDoubTransLibrary	    Test
-IEEEDPLog10(      MathIEEEDoubTransLibrary          Test
-IEEEDPSqrt(       MathIEEEDoubTransLibrary          Test
+mathieeedoubbas.library
+     IEEEDPAbs()
+     IEEEDPAdd()
+     IEEEDPCeil()
+     IEEEDPCmp()               Test
+     IEEEDPDiv()
+     IEEEDPFix()               Test
+     IEEEDPFloor()
+     IEEEDPFlt()               Test
+     IEEEDPMul()               Test
+     IEEEDPNeg()
+     IEEEDPSub()
+     IEEEDPTst()
+
+
+mathieeedoubtrans.library
+     IEEEDPAcos()              Test
+     IEEEDPAsin()
+     IEEEDPAtan()
+     IEEEDPCos()
+     IEEEDPCosh()
+     IEEEDPExp()
+     IEEEDPFieee()
+     IEEEDPLog()
+     IEEEDPLog10()             Test
+     IEEEDPPow()
+     IEEEDPSin()
+     IEEEDPSincos()
+     IEEEDPSinh()
+     IEEEDPSqrt()              Test
+     IEEEDPTan()
+     IEEEDPTanh()
+     IEEEDPTieee()
+
+
+utility.library
+     AddNamedObject()
+     AllocateTagItems()
+     AllocNamedObjectA()
+     Amiga2Date()
+     ApplyTagChanges()
+     AttemptRemNamedObject()
+     CallHookPkt()
+     CheckDate()
+     CloneTagItems()
+     Date2Amiga()
+     FilterTagChanges()
+     FilterTagItems()
+     FindNamedObject()
+     FindTagItem()
+     FreeNamedObject()
+     FreeTagItems()
+     GetTagData()
+     GetUniqueID()
+     MapTags()
+     NamedObjectName()
+     NextTagItem()
+     PackBoolTags()
+     PackStructureTags()
+     RefreshTagItemClones()
+     ReleaseNamedObject()
+     RemNamedObject()
+     SDivMod32()
+     SMult32()                 Test
+     SMult64()
+     Stricmp()
+     Strnicmp()
+     TagInArray()
+     ToLower()
+     ToUpper()
+     UDivMod32()
+     UMult32()
+     UMult64()
+     UnpackStructureTags()
+
 
 */
