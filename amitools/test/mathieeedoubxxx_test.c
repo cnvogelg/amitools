@@ -11,6 +11,7 @@
 
 
 #include <stdio.h>
+#include <string.h>
 
 #include <limits.h>
 
@@ -22,7 +23,6 @@
 #include <clib/mathieeedoubtrans_protos.h>
 #include <clib/utility_protos.h>
 
-#include <machine/float.h>   // for DBL_EPSILON
 
 struct Library *MathIeeeDoubBasBase;
 struct Library *MathIeeeDoubTransBase;
@@ -31,7 +31,16 @@ struct Library *UtilityBase;
 
 int fequal(double a, double b)
 {
-    return fabs(a-b) <= 0.000001;  //DBL_EPSILON;
+	// It's difficult to compare floating point for equality, especially is they com from different platforms and languages
+	// the simple wa is a string compare...
+
+	static char val1str[1024];    // big enough to hold even long numbers, don't use the stack
+	static char val2str[1024];
+
+	snprintf(val1str,1024,"%f",a);
+	snprintf(val2str,1024,"%f",b);
+
+	return 0==strncmp(val1str,val2str,1024);
 }
 
 
@@ -47,13 +56,11 @@ int printDouble(char *Function,double value,unsigned char *ExpectedResult)
     if(fequal(value,*(double*)ExpectedResult))   // are both Amiga and vamon double-Result very very nearly the same?
     {
 
-printf("FAST GLEICH\n");
         WarningColorString="\033[43m";     // YES, no Error. print it YELLOW
     }
     else
     {
 
-printf("\033[31mUNGLEICH vamos=%f %f\033[0m\n",value,*(double*)ExpectedResult);
         WarningColorString="\033[31m";     // No, print differences RED
         Error=1; 
     }   
@@ -68,7 +75,7 @@ printf("\033[31mUNGLEICH vamos=%f %f\033[0m\n",value,*(double*)ExpectedResult);
 	printf("%02x ",ResultArray[i]);
     }
 
-    printf(" --> %f\n",value);
+    printf(" --> %.16g\n",value);
 
 
     printf("\nreference real Amiga    ");
@@ -85,7 +92,7 @@ printf("\033[31mUNGLEICH vamos=%f %f\033[0m\n",value,*(double*)ExpectedResult);
             }
     }
 
-    printf(" --> %f",*(double*)ExpectedResult);
+    printf(" --> %.16g",*(double*)ExpectedResult);
 
 
     printf("\n\n");
@@ -154,7 +161,7 @@ int IEEEDPMul_Test(double factor1, double factor2, unsigned char *ExpectedResult
 
     Result=IEEEDPMul(factor1,factor2);  // Condition codes all undefined
 
-    snprintf(Function,1024,"IEEEDPMul(%f * %f)= ",factor1,factor2);
+    snprintf(Function,1024,"IEEEDPMul(%.16gf * %.16gf)= ",factor1,factor2);
     return  printDouble(Function,Result,ExpectedResult);
 }
 
@@ -628,9 +635,9 @@ int main(void)
 {
 	int Error=0;
 	
-//	Error+=test_MathIeeeDoubBas();
+	Error+=test_MathIeeeDoubBas();
 	Error+=test_MathIeeeDoubTrans();
-//	Error+=test_Utility();
+	Error+=test_Utility();
 
 // some testprintfs with %f
 
@@ -638,7 +645,7 @@ int main(void)
 	printf("0.1   = %f\n",0.1);
 	printf("0.02  = %f\n",0.02);
 	printf("1.23  = %f\n",1.23);
-        printf("-1.23 = %f\n",-1.23);
+    printf("-1.23 = %f\n",-1.23);
 	printf("-0.1  = %f\n",-0.1);
 	printf("-0.02 = %f\n",-0.02);
 	printf("PI    = %f\n",(double)3.141592653589793);
