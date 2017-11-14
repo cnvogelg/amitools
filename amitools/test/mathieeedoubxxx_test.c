@@ -314,6 +314,14 @@ int test_MathIeeeDoubBas(void)
 
 		printf("===============================================\n\n");
 
+        Error+=double_is_double_double_test(IEEEDPAdd,"IEEEDPAdd",0,              0,    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+        Error+=double_is_double_double_test(IEEEDPAdd,"IEEEDPAdd",DBL_MAX,        1,    0x7f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+        Error+=double_is_double_double_test(IEEEDPAdd,"IEEEDPAdd",DBL_MIN,  DBL_MAX,    0x7f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+        Error+=double_is_double_double_test(IEEEDPAdd,"IEEEDPAdd",DBL_MAX,  DBL_MAX,    0x7f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+        Error+=double_is_double_double_test(IEEEDPAdd,"IEEEDPAdd",DBL_MAX, -DBL_MAX,    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+
+        printf("===============================================\n\n");
+
 		Error+=double_is_double_test(IEEEDPCeil,"IEEEDPCeil",      -1,    0xbf, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
 		Error+=double_is_double_test(IEEEDPCeil,"IEEEDPCeil",       1,    0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
 		Error+=double_is_double_test(IEEEDPCeil,"IEEEDPCeil",       0,    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
@@ -328,7 +336,6 @@ int test_MathIeeeDoubBas(void)
 
 		printf("===============================================\n\n");
 
-
 		Error+=double_is_long_test(IEEEDPFlt,"IEEEDPFlt",0,          0x00, 0x00,0x00,0x00,0x00,0x00,0x00,0x00);
         Error+=double_is_long_test(IEEEDPFlt,"IEEEDPFlt",1000,       0x40, 0x8f, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00);
         Error+=double_is_long_test(IEEEDPFlt,"IEEEDPFlt",-1000,      0xc0, 0x8f, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00);
@@ -337,13 +344,14 @@ int test_MathIeeeDoubBas(void)
 
 		printf("===============================================\n\n");
 
-        Error= double_is_double_double_test(IEEEDPMul,"EEEDPMul",0,       0,          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+        Error+=double_is_double_double_test(IEEEDPMul,"EEEDPMul",0,       0,          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
         Error+=double_is_double_double_test(IEEEDPMul,"EEEDPMul",INT_MAX, 1000,       0x42, 0x7f, 0x3f, 0xff, 0xff, 0xc1, 0x80, 0x00);
         Error+=double_is_double_double_test(IEEEDPMul,"EEEDPMul",1000,    INT_MIN,    0xc2, 0x7f, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00);
         Error+=double_is_double_double_test(IEEEDPMul,"EEEDPMul",INT_MAX, INT_MAX,    0x43, 0xcf, 0xff, 0xff, 0xff, 0x80, 0x00, 0x00);
         Error+=double_is_double_double_test(IEEEDPMul,"EEEDPMul",INT_MIN, INT_MIN,    0x43, 0xd0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
 
         printf("===============================================\n\n");
+
         Error+=double_is_double_test(IEEEDPNeg,"IEEEDPNeg",      -1,    0x3f, 0xf0, 0x00 ,0x00, 0x00, 0x00, 0x00, 0x00);
 		Error+=double_is_double_test(IEEEDPNeg,"IEEEDPNeg",       1,    0xbf, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
 		Error+=double_is_double_test(IEEEDPNeg,"IEEEDPNeg", FLT_MIN,    0xb8, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
@@ -397,7 +405,6 @@ int test_MathIeeeDoubBas(void)
 		printf("Can't open mathieeedoubbas.library\n");
 		Error++;
 	}
-
 	return Error;
 }
 
@@ -529,6 +536,7 @@ int main(void)
 	printf("PI    = %f\n",(double)3.141592653589793);
 	
 */
+
 	if(Error)
 	{
 		printf("\033[31m%s\033[0m","Some tests failed!\n");
@@ -546,7 +554,7 @@ int main(void)
 
 mathieeedoubbas.library
      IEEEDPAbs()               Test
-     IEEEDPAdd()
+     IEEEDPAdd()               Test
      IEEEDPCeil()              Test
      IEEEDPCmp()               Test
      IEEEDPDiv()

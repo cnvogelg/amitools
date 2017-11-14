@@ -104,7 +104,10 @@ class MathIEEEDoubBasLibrary(AmigaLibrary):
     arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     arg2=toDouble(ctx.cpu.r_reg(REG_D2),ctx.cpu.r_reg(REG_D3))
 #    print "%s + %s = %s" % (arg1,arg2,arg1+arg2)  #selco arg2
-    (hi,lo)=fromDouble(arg1+arg2)
+    Result=arg1+arg2
+    (hi,lo)=fromDouble(Result)
+    if Result==float('inf'):
+        (hi,lo)=(0x7fefffff, 0xffffffff)
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 
