@@ -545,16 +545,16 @@ int main(void)
 /*
 
 mathieeedoubbas.library
-     IEEEDPAbs()               Te
+     IEEEDPAbs()               Test
      IEEEDPAdd()
-     IEEEDPCeil()              Te
+     IEEEDPCeil()              Test
      IEEEDPCmp()               Test
      IEEEDPDiv()
      IEEEDPFix()               Test
-     IEEEDPFloor()             Te
+     IEEEDPFloor()             Test
      IEEEDPFlt()               Test
      IEEEDPMul()               Test
-     IEEEDPNeg()               Te
+     IEEEDPNeg()               Test
      IEEEDPSub()
      IEEEDPTst()
 

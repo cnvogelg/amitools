@@ -141,6 +141,15 @@ class MathIEEEDoubBasLibrary(AmigaLibrary):
   def IEEEDPCeil(self,ctx):
     arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     (hi,lo)=fromDouble(math.ceil(arg1))
+    if hi==0x80000000 and lo==0x00000000:   # on amiga zero is always positive
+        hi=0x00000000
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
+
+#selco
+  def IEEEDPNeg(self,ctx):
+    arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    (hi,lo)=fromDouble(-1*arg1)
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 
