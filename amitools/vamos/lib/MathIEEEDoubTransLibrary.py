@@ -52,11 +52,38 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
     return hi
 
 #selco    
+  def IEEEDPCos(self,ctx):
+    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    (hi,lo)=fromDouble(math.cos(arg))
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
+
+
+
+#selco    
   def IEEEDPAcos(self,ctx):
     arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     (hi,lo)=fromDouble(math.acos(arg))
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
+
+#selco    
+  def IEEEDPLog(self,ctx):
+    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    if arg < 0: # we should not crash for negative numbers!
+      #(hi,lo)=fromDouble(float('nan'))
+      (hi,lo)=(0xfff80000,0x00000000)
+    else:
+
+      try:
+        Result=math.log(arg)
+        (hi,lo)=fromDouble(Result)
+      except ValueError:
+        (hi,lo)=fromDouble(float('-inf'))
+
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
+
 
 #selco    
   def IEEEDPLog10(self,ctx):
@@ -87,4 +114,10 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 
+#selco    
+  def IEEEDPSin(self,ctx):
+    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    (hi,lo)=fromDouble(math.sin(arg))
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
 
