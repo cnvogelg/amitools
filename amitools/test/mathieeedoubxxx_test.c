@@ -7,6 +7,10 @@
  * (this adds a lot more math stuff that can fail)
  *
  * ~/opt/m68k-amigaos/bin/m68k-amigaos-gcc -I. -Wall -pedantic  mathieeedoubxxx_test.c -o mathieeedoubxxx_test -noixemul -lm
+ *
+ * getting 0x000,... from Amiga-Output:
+ * awk '/here/{print "0x"$2", 0x"$3", 0x"$4", 0x"$5", 0x"$6", 0x"$7", 0x"$8", 0x"$9}'
+ * end paste Output from Amiga
 */
 
 
@@ -364,6 +368,16 @@ int test_MathIeeeDoubBas(void)
 		Error+=double_is_double_test(IEEEDPNeg,"IEEEDPNeg",-DBL_MAX,    0x7f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
 
 		printf("===============================================\n\n");
+
+		Error+=double_is_double_double_test(IEEEDPSub,"IEEEDPSub",0,              0,    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_double_double_test(IEEEDPSub,"IEEEDPSub",0,        DBL_MAX,    0xff, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+        Error+=double_is_double_double_test(IEEEDPSub,"IEEEDPSub",DBL_MAX,        1,    0x7f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe);
+        Error+=double_is_double_double_test(IEEEDPSub,"IEEEDPSub",DBL_MAX,       -1,    0x7f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+        Error+=double_is_double_double_test(IEEEDPSub,"IEEEDPSub",DBL_MIN,  DBL_MAX,    0xff, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe);
+        Error+=double_is_double_double_test(IEEEDPSub,"IEEEDPSub",DBL_MAX,  DBL_MAX,    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+        Error+=double_is_double_double_test(IEEEDPSub,"IEEEDPSub",DBL_MAX, -DBL_MAX,    0x7f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+
+        printf("===============================================\n\n");
 
         Error+=long_is_double_double_test(IEEEDPCmp,"IEEEDPCmp",0,             0,    0x00, 0x00, 0x00, 0x00);
         Error+=long_is_double_double_test(IEEEDPCmp,"IEEEDPCmp",1000,         10,    0x00, 0x00, 0x00, 0x01);
