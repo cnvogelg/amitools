@@ -62,6 +62,13 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 
+#selco    
+  def IEEEDPExp(self,ctx):
+    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    (hi,lo)=fromDouble(math.exp(arg))
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
+
 
 
 #selco    
@@ -160,4 +167,12 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
     (hi,lo)=fromDouble(math.tan(arg))
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
+
+#selco    
+  def IEEEDPTanh(self,ctx):
+    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    (hi,lo)=fromDouble(math.tanh(arg))
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
+
 

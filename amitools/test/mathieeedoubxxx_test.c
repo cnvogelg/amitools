@@ -52,6 +52,9 @@ int fequal(double a, double b)
 
 	snprintf(val1str,1024,"%0.12f",a);
 	snprintf(val2str,1024,"%0.12f",b);
+	printf("fequal() %s\n",val1str);
+	printf("fequal() %s\n",val2str);
+
 	if( strncmp(val1str,val2str,1024))
 	{
 		snprintf(val1str,1024,"%0.12g",a);
@@ -535,6 +538,18 @@ int test_MathIeeeDoubTrans(void)
 
 		printf("===============================================\n\n");
 
+		Error+=double_is_double_test(IEEEDPExp,"IEEEDPExp",        0,    0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_double_test(IEEEDPExp,"IEEEDPExp",       PI,    0x40, 0x37, 0x24, 0x04, 0x6e, 0xb0, 0x93, 0x38);
+		Error+=double_is_double_test(IEEEDPExp,"IEEEDPExp",      -PI,    0x3f, 0xa6, 0x20, 0x22, 0x7b, 0x59, 0x8e, 0xf9);
+		Error+=double_is_double_test(IEEEDPExp,"IEEEDPExp",  123.456,    0x4b, 0x11, 0x42, 0x8e, 0x1c, 0xbc, 0x01, 0x43);
+		Error+=double_is_double_test(IEEEDPExp,"IEEEDPExp", -654.321,    0x04, 0xf0, 0x28, 0xe9, 0x2d, 0x0f, 0xce, 0xf5);
+		Error+=double_is_double_test(IEEEDPExp,"IEEEDPExp",  DBL_MIN,    0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_double_test(IEEEDPExp,"IEEEDPExp",  DBL_MAX,    0x7f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+		Error+=double_is_double_test(IEEEDPExp,"IEEEDPExp", -DBL_MIN,    0x3f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+		Error+=double_is_double_test(IEEEDPExp,"IEEEDPExp", -DBL_MAX,    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+
+		printf("===============================================\n\n");
+
 		Error+=double_is_double_test(IEEEDPLog,"IEEEDPLog",      0,    0xff, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
         Error+=double_is_double_test(IEEEDPLog,"IEEEDPLog",   1000,    0x40, 0x1b, 0xa1, 0x8a, 0x99, 0x8f, 0xff, 0xa0);
         Error+=double_is_double_test(IEEEDPLog,"IEEEDPLog",FLT_MAX,    0x40, 0x56, 0x2e, 0x42, 0xfe, 0xba, 0x39, 0xef);
@@ -607,6 +622,19 @@ int test_MathIeeeDoubTrans(void)
 //		Error+=double_is_double_test(IEEEDPTan,"IEEEDPTan", -DBL_MAX,    0xff, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);  // Amiga returns NaN here
 
         printf("===============================================\n\n");
+
+		Error+=double_is_double_test(IEEEDPTanh,"IEEEDPTanh",        0,    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_double_test(IEEEDPTanh,"IEEEDPTanh",       PI,    0x3f, 0xef, 0xe1, 0x75, 0xfa, 0x29, 0x28, 0x0f);
+		Error+=double_is_double_test(IEEEDPTanh,"IEEEDPTanh",      -PI,    0xbf, 0xef, 0xe1, 0x75, 0xfa, 0x29, 0x28, 0x0f);
+		Error+=double_is_double_test(IEEEDPTanh,"IEEEDPTanh",  123.456,    0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_double_test(IEEEDPTanh,"IEEEDPTanh", -654.321,    0xbf, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_double_test(IEEEDPTanh,"IEEEDPTanh",  DBL_MIN,    0x3c, 0x90, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_double_test(IEEEDPTanh,"IEEEDPTanh",  DBL_MAX,    0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_double_test(IEEEDPTanh,"IEEEDPTanh", -DBL_MIN,    0xbc, 0x90, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_double_test(IEEEDPTanh,"IEEEDPTanh", -DBL_MAX,    0xbf, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+
+		printf("===============================================\n\n");
+
 
 		CloseLibrary(MathIeeeDoubTransBase);
 	}
@@ -724,7 +752,7 @@ mathieeedoubtrans.library
      IEEEDPAtan()              Test
      IEEEDPCos()               Test
      IEEEDPCosh()              Test
-     IEEEDPExp()
+     IEEEDPExp()               Test
      IEEEDPFieee()
      IEEEDPLog()               Test
      IEEEDPLog10()             Test
@@ -734,7 +762,7 @@ mathieeedoubtrans.library
      IEEEDPSinh()              Test
      IEEEDPSqrt()              Test
      IEEEDPTan()               Test
-     IEEEDPTanh()
+     IEEEDPTanh()              Test
      IEEEDPTieee()
 
 
