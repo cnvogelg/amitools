@@ -14,6 +14,16 @@ def fromDouble(number):
     lo=(lo << 8) | ord(c)
   return (hi,lo)
 
+#selco
+def fromSingle(number):
+  FloatVal=0
+  st=struct.pack('>f',number)
+  for c in st[0:4]:
+#    print "ord(c)=" + str(ord(c))
+    FloatVal=(FloatVal << 8) | ord(c)
+#  print "FloatVal=" + str(FloatVal)  
+  return FloatVal
+
 def toDouble(hi,lo):
   st=""
   for i in range(0,4):
@@ -23,6 +33,14 @@ def toDouble(hi,lo):
     st=st+chr(lo >> 24)
     lo=(lo << 8) & 0xffffffff
   return struct.unpack('>d',st)[0]
+
+#selco
+def toSingle(hi):
+  st=""
+  for i in range(0,4):
+    st=st+chr(hi >> 24)
+    hi=(hi << 8) & 0xffffffff
+  return struct.unpack('>f',st)[0]
 
 class MathIEEEDoubTransLibrary(AmigaLibrary):
   name = "mathieeedoubtrans.library"
@@ -65,7 +83,11 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
 #selco    
   def IEEEDPExp(self,ctx):
     arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    (hi,lo)=fromDouble(math.exp(arg))
+    try:
+      Result=math.exp(arg)
+      (hi,lo)=fromDouble(Result)
+    except OverflowError:
+        (hi,lo)=(0x7fefffff, 0xffffffff)
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 
@@ -175,4 +197,16 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 
+#selco
+# double to single
+  def IEEEDPTieee(self,ctx):
+    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    FloatVal=struct.unpack('f', struct.pack('f', arg))[0]
+    if FloatVal==float('inf'):
+        ret=0x7f7fffff;
+    elif FloatVal==float('-inf'):
+        ret=0xff7fffff;
+    else:
+        ret=fromSingle(FloatVal)
 
+    return ret

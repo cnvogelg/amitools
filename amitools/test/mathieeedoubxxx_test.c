@@ -42,7 +42,7 @@ struct Library *UtilityBase;
 
 
 
-int fequal(double a, double b)
+int doubleequal(double a, double b)
 {
 	// It's difficult to compare floating point for equality, especially is they com from different platforms and languages
 	// the simple way is a string compare...
@@ -52,8 +52,8 @@ int fequal(double a, double b)
 
 	snprintf(val1str,1024,"%0.12f",a);
 	snprintf(val2str,1024,"%0.12f",b);
-	printf("fequal() %s\n",val1str);
-	printf("fequal() %s\n",val2str);
+//	printf("fequal() %s\n",val1str);
+//	printf("fequal() %s\n",val2str);
 
 	if( strncmp(val1str,val2str,1024))
 	{
@@ -68,6 +68,7 @@ int fequal(double a, double b)
 }
 
 
+
 int printDouble(char *Function,double value,unsigned char *ExpectedResult)
 {
     static unsigned char ResultArray[8];
@@ -77,7 +78,7 @@ int printDouble(char *Function,double value,unsigned char *ExpectedResult)
     int Error=0;
     char *WarningColorString;
 
-    if(fequal(value,*(double*)ExpectedResult))   // are both Amiga and vamon double-Result very very nearly the same?
+    if(doubleequal(value,*(double*)ExpectedResult))   // are both Amiga and vamon double-Result very very nearly the same?
     {
 
         WarningColorString="\033[43m";     // YES, no Error. print it YELLOW
@@ -159,6 +160,50 @@ int printLong(char *Function,long value,unsigned char *ExpectedResult)
                 Error=1;
             }
     }
+
+    printf("\n\n");
+
+    return Error;
+}
+
+int printFloat(char *Function,float value, unsigned char *ExpectedResult)
+{
+    static unsigned char ResultArray[4];
+
+    long *ValuePtr=(long*)&value;
+    unsigned int i;
+    int Error=0;
+
+    printf("%s",Function);
+    printf("\nhere                    ");
+    for(i=0;i<4;i++)
+    {
+        ResultArray[i]=((unsigned char*)ValuePtr)[i];
+        printf("%02x ",ResultArray[i]);
+    }
+
+    //printf(" --> %0.16g\n",value);
+
+    printf("\nreference real Amiga    ");
+
+    for(i=0;i<4;i++)
+    {
+            if(ResultArray[i]==ExpectedResult[i])
+            {
+                printf("%02x ",ExpectedResult[i]);
+            }
+            else if ((i==3) && ((ResultArray[i]==ExpectedResult[i]+1) || (ResultArray[i]==ExpectedResult[i]-1))) // allow +-1 in lowest byte
+            {
+                printf("\033[43m%02x\033[0m ",ExpectedResult[i]);
+            }
+            else
+            {
+                printf("\033[31m%02x\033[0m ",ExpectedResult[i]);
+                Error=1;
+            }
+    }
+
+    //printf(" --> %0.16g",*(float*)ExpectedResult);
 
     printf("\n\n");
 
@@ -286,6 +331,28 @@ int long_is_double_test(long (*Function)(double),char *FunctionName, double valu
     snprintf(FunctionLine,1024,"%s(%.16g ) = ",FunctionName,value1);
     return  printLong(FunctionLine,Result,ExpectedResult);
 }
+
+
+int float_is_double_test(float (*Function)(double),char *FunctionName, double value1, unsigned char ExpectedResult_0,
+		                                                                              unsigned char ExpectedResult_1,
+				  								       							      unsigned char ExpectedResult_2,
+													 								  unsigned char ExpectedResult_3)
+{
+    float Result;
+    unsigned char ExpectedResult[4];
+    static char FunctionLine[1024];
+
+    ExpectedResult[0]=ExpectedResult_0;
+    ExpectedResult[1]=ExpectedResult_1;
+    ExpectedResult[2]=ExpectedResult_2;
+    ExpectedResult[3]=ExpectedResult_3;
+
+    Result=Function(value1);
+
+    snprintf(FunctionLine,1024,"%s(%.16g ) = ",FunctionName,value1);
+    return  printFloat(FunctionLine,Result,ExpectedResult);
+}
+
 
 int double_is_double_test(double (*Function)(double),char *FunctionName, double value1, unsigned char ExpectedResult_0,
 		                                                                                unsigned char ExpectedResult_1,
@@ -635,6 +702,18 @@ int test_MathIeeeDoubTrans(void)
 
 		printf("===============================================\n\n");
 
+		Error+=float_is_double_test(IEEEDPTieee,"IEEEDPTieee",        0,    0x00, 0x00, 0x00, 0x00);
+
+		Error+=float_is_double_test(IEEEDPTieee,"IEEEDPTieee",       PI,    0x40, 0x49, 0x0f, 0xda);
+		Error+=float_is_double_test(IEEEDPTieee,"IEEEDPTieee",      -PI,    0xc0, 0x49, 0x0f, 0xda);
+		Error+=float_is_double_test(IEEEDPTieee,"IEEEDPTieee",  123.456,    0x42, 0xf6, 0xe9, 0x78);
+		Error+=float_is_double_test(IEEEDPTieee,"IEEEDPTieee", -654.321,    0xc4, 0x23, 0x94, 0x8b);
+		Error+=float_is_double_test(IEEEDPTieee,"IEEEDPTieee",  DBL_MIN,    0x00, 0x00, 0x00, 0x00);
+		Error+=float_is_double_test(IEEEDPTieee,"IEEEDPTieee",  DBL_MAX,    0x7f, 0x7f, 0xff, 0xff);
+		Error+=float_is_double_test(IEEEDPTieee,"IEEEDPTieee", -DBL_MIN,    0x80, 0x00, 0x00, 0x00);
+		Error+=float_is_double_test(IEEEDPTieee,"IEEEDPTieee", -DBL_MAX,    0xff, 0x7f, 0xff, 0xff);
+
+		printf("===============================================\n\n");
 
 		CloseLibrary(MathIeeeDoubTransBase);
 	}
