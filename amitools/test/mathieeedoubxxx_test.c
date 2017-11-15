@@ -526,17 +526,6 @@ int test_MathIeeeDoubTrans(void)
 		Error+=double_is_double_test(IEEEDPSin,"IEEEDPSin", -DBL_MIN,    0x80, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
 //		Error+=double_is_double_test(IEEEDPSin,"IEEEDPSin", -DBL_MAX,    0xff, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);  // Amiga returns -DBL_MAX here
 
-
-
-
-
-
-
-
-
-
-
-
 		printf("===============================================\n\n");
 
         Error+=double_is_double_test(IEEEDPSqrt,"IEEEDPSqrt",      0,    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
@@ -544,6 +533,19 @@ int test_MathIeeeDoubTrans(void)
         Error+=double_is_double_test(IEEEDPSqrt,"IEEEDPSqrt",FLT_MAX,    0x43, 0xef, 0xff, 0xff, 0xef, 0xff, 0xff, 0xfb);
         Error+=double_is_double_test(IEEEDPSqrt,"IEEEDPSqrt",DBL_MAX,    0x5f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
         Error+=double_is_double_test(IEEEDPSqrt,"IEEEDPSqrt",  -1000,    0xff, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+
+        printf("===============================================\n\n");
+
+        printf("Tan(): What is the definition-range on Amiga?");
+        Error+=double_is_double_test(IEEEDPTan,"IEEEDPTan",        0,    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+        Error+=double_is_double_test(IEEEDPTan,"IEEEDPTan",       PI,    0xbc, 0xa1, 0xa6, 0x26, 0x33, 0x14, 0x5c, 0x06);
+        Error+=double_is_double_test(IEEEDPTan,"IEEEDPTan",      -PI,    0x3c, 0xa1, 0xa6, 0x26, 0x33, 0x14, 0x5c, 0x06);
+		Error+=double_is_double_test(IEEEDPTan,"IEEEDPTan",  123.456,    0x3f, 0xf5, 0xa0, 0xfe, 0x5d, 0xa9, 0x48, 0x91);
+		Error+=double_is_double_test(IEEEDPTan,"IEEEDPTan", -654.321,    0xbf, 0xf2, 0xf4, 0x69, 0x9f, 0x00, 0xbf, 0x8f);
+		Error+=double_is_double_test(IEEEDPTan,"IEEEDPTan",  DBL_MIN,    0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+//		Error+=double_is_double_test(IEEEDPTan,"IEEEDPTan",  DBL_MAX,    0xff, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);  // Amiga returns NaN here
+		Error+=double_is_double_test(IEEEDPTan,"IEEEDPTan", -DBL_MIN,    0x80, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+//		Error+=double_is_double_test(IEEEDPTan,"IEEEDPTan", -DBL_MAX,    0xff, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);  // Amiga returns NaN here
 
         printf("===============================================\n\n");
 
@@ -672,7 +674,7 @@ mathieeedoubtrans.library
      IEEEDPSincos()
      IEEEDPSinh()
      IEEEDPSqrt()              Test
-     IEEEDPTan()
+     IEEEDPTan()               Test
      IEEEDPTanh()
      IEEEDPTieee()
 

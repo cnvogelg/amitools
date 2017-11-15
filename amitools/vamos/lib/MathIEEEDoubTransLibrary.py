@@ -120,4 +120,10 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
     (hi,lo)=fromDouble(math.sin(arg))
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
+#selco    
+  def IEEEDPTan(self,ctx):
+    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    (hi,lo)=fromDouble(math.tan(arg))
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
 
