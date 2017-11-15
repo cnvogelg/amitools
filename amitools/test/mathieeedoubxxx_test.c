@@ -535,7 +535,6 @@ int test_MathIeeeDoubTrans(void)
 
 		printf("===============================================\n\n");
 
-
 		Error+=double_is_double_test(IEEEDPLog,"IEEEDPLog",      0,    0xff, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
         Error+=double_is_double_test(IEEEDPLog,"IEEEDPLog",   1000,    0x40, 0x1b, 0xa1, 0x8a, 0x99, 0x8f, 0xff, 0xa0);
         Error+=double_is_double_test(IEEEDPLog,"IEEEDPLog",FLT_MAX,    0x40, 0x56, 0x2e, 0x42, 0xfe, 0xba, 0x39, 0xef);
@@ -571,6 +570,20 @@ int test_MathIeeeDoubTrans(void)
 //		Error+=double_is_double_test(IEEEDPSin,"IEEEDPSin",  DBL_MAX,    0x7f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);  // Amiga returns DBL_MAX here
 		Error+=double_is_double_test(IEEEDPSin,"IEEEDPSin", -DBL_MIN,    0x80, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
 //		Error+=double_is_double_test(IEEEDPSin,"IEEEDPSin", -DBL_MAX,    0xff, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);  // Amiga returns -DBL_MAX here
+
+		printf("===============================================\n\n");
+
+		// sinh is defined from -inf ... +inf ,and has values  -inf ... +inf
+
+		Error+=double_is_double_test(IEEEDPSinh,"IEEEDPSinh",        0,    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_double_test(IEEEDPSinh,"IEEEDPSinh",       PI,    0x40, 0x27, 0x18, 0xf4, 0x5d, 0x72, 0xe6, 0x71);
+		Error+=double_is_double_test(IEEEDPSinh,"IEEEDPSinh",      -PI,    0xc0, 0x27, 0x18, 0xf4, 0x5d, 0x72, 0xe6, 0x71);
+		Error+=double_is_double_test(IEEEDPSinh,"IEEEDPSinh",  123.456,    0x4b, 0x01, 0x42, 0x8e, 0x1c, 0xbc, 0x01, 0x43);
+		Error+=double_is_double_test(IEEEDPSinh,"IEEEDPSinh", -654.321,    0xfa, 0xdf, 0xae, 0xfc, 0xca, 0x88, 0xef, 0x64);
+		Error+=double_is_double_test(IEEEDPSinh,"IEEEDPSinh",  DBL_MIN,    0x3c, 0x90, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_double_test(IEEEDPSinh,"IEEEDPSinh",  DBL_MAX,    0x7f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+		Error+=double_is_double_test(IEEEDPSinh,"IEEEDPSinh", -DBL_MIN,    0xbc, 0x90, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_double_test(IEEEDPSinh,"IEEEDPSinh", -DBL_MAX,    0xff, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
 
 		printf("===============================================\n\n");
 
@@ -718,7 +731,7 @@ mathieeedoubtrans.library
      IEEEDPPow()               Test
      IEEEDPSin()               Test
      IEEEDPSincos()
-     IEEEDPSinh()
+     IEEEDPSinh()              Test
      IEEEDPSqrt()              Test
      IEEEDPTan()               Test
      IEEEDPTanh()

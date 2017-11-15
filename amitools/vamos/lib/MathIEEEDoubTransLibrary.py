@@ -139,6 +139,21 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
     (hi,lo)=fromDouble(math.sin(arg))
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
+
+#selco    
+  def IEEEDPSinh(self,ctx):
+    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    try:
+      Result=math.sinh(arg)
+      (hi,lo)=fromDouble(Result)
+    except OverflowError:
+        if arg<0:
+          (hi,lo)=(0xffefffff, 0xffffffff)
+        else:
+          (hi,lo)=(0x7fefffff, 0xffffffff)  
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
+
 #selco    
   def IEEEDPTan(self,ctx):
     arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
