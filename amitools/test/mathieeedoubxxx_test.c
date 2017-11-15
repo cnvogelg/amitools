@@ -391,6 +391,18 @@ int test_MathIeeeDoubBas(void)
 
         printf("===============================================\n\n");
 
+        Error+=double_is_double_double_test(IEEEDPDiv,"IEEEDPDiv", 0,              0,    0xff, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+        Error+=double_is_double_double_test(IEEEDPDiv,"IEEEDPDiv", 1000,          10,    0x40, 0x59, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+        Error+=double_is_double_double_test(IEEEDPDiv,"IEEEDPDiv", -1000,         10,    0xc0, 0x59, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+        Error+=double_is_double_double_test(IEEEDPDiv,"IEEEDPDiv", DBL_MAX,       10,    0x7f, 0xb9, 0x99, 0x99, 0x99, 0x99, 0x99, 0x98);
+        Error+=double_is_double_double_test(IEEEDPDiv,"IEEEDPDiv", DBL_MIN,       10,    0x00, 0x01, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99);
+        Error+=double_is_double_double_test(IEEEDPDiv,"IEEEDPDiv", DBL_MAX,  DBL_MAX,    0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+        Error+=double_is_double_double_test(IEEEDPDiv,"IEEEDPDiv", DBL_MIN,  DBL_MAX,    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+        Error+=double_is_double_double_test(IEEEDPDiv,"IEEEDPDiv",-DBL_MAX, -DBL_MAX,    0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+        Error+=double_is_double_double_test(IEEEDPDiv,"IEEEDPDiv",-DBL_MIN, -DBL_MIN,    0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+
+        printf("===============================================\n\n");
+
         Error+=long_is_double_test(IEEEDPFix,"IEEEDPFix",      0,        0x00, 0x00, 0x00, 0x00);
         Error+=long_is_double_test(IEEEDPFix,"IEEEDPFix",   1000,        0x00, 0x00, 0x03, 0xe8);
         Error+=long_is_double_test(IEEEDPFix,"IEEEDPFix",  -1000,        0xff, 0xff, 0xfc, 0x18);
@@ -583,7 +595,7 @@ mathieeedoubbas.library
      IEEEDPAdd()               Test
      IEEEDPCeil()              Test
      IEEEDPCmp()               Test
-     IEEEDPDiv()
+     IEEEDPDiv()               Test
      IEEEDPFix()               Test
      IEEEDPFloor()             Test
      IEEEDPFlt()               Test

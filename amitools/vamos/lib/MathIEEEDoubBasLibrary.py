@@ -134,7 +134,10 @@ class MathIEEEDoubBasLibrary(AmigaLibrary):
     arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     arg2=toDouble(ctx.cpu.r_reg(REG_D2),ctx.cpu.r_reg(REG_D3))
 #    print "%s / %s = %s" % (arg1,arg2,arg1/arg2)   #selco arg2
-    (hi,lo)=fromDouble(arg1/arg2)
+    if arg2==0:                                     #selco Amiga returns NaN (0xfff80000,0x00000000) here
+        (hi,lo)=(0xfff80000,0x00000000)             #python throws an exception
+    else:
+        (hi,lo)=fromDouble(arg1/arg2)
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
   
