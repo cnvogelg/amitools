@@ -47,7 +47,11 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
 #selco    
   def IEEEDPCosh(self,ctx):
     arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    (hi,lo)=fromDouble(math.cosh(arg))
+    try:
+      Result=math.cosh(arg)
+      (hi,lo)=fromDouble(Result)
+    except OverflowError:
+      (hi,lo)=(0x7fefffff, 0xffffffff)
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 
