@@ -469,7 +469,7 @@ int test_MathIeeeDoubTrans(void)
         // expeced results are from mathieeedoubtrans.library 37.1 (OS3.1)
 
 
-		// acos is defined from -1 ... +1 ,and has values  -Pi/2 ... +Pi/2
+		// acos is defined from -1 ... +1 ,and has values  0 ... Pi
 		Error+=double_is_double_test(IEEEDPAcos,"IEEEDPAcos",  -1, 0x40,    0x09, 0x21, 0xfb, 0x54, 0x44, 0x2d, 0x18);
 		Error+=double_is_double_test(IEEEDPAcos,"IEEEDPAcos",   1, 0x00,    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
 		Error+=double_is_double_test(IEEEDPAcos,"IEEEDPAcos",   0, 0x3f,    0xf9, 0x21, 0xfb, 0x54, 0x44, 0x2d, 0x18);
@@ -477,7 +477,30 @@ int test_MathIeeeDoubTrans(void)
 		Error+=double_is_double_test(IEEEDPAcos,"IEEEDPAcos", 0.5, 0x3f,    0xf0, 0xc1, 0x52, 0x38, 0x2d, 0x73, 0x65);
 
 		printf("===============================================\n\n");
-        printf("Cos(): What is the definition-range on Amiga?");
+
+		// asin is defined from -1 ... +1 ,and has values  -Pi/2 ... +Pi/2
+		Error+=double_is_double_test(IEEEDPAsin,"IEEEDPAsin",  -1,    0xbf, 0xf9, 0x21, 0xfb, 0x54, 0x44, 0x2d, 0x18);
+		Error+=double_is_double_test(IEEEDPAsin,"IEEEDPAsin",   1,    0x3f, 0xf9, 0x21, 0xfb, 0x54, 0x44, 0x2d, 0x18);
+		Error+=double_is_double_test(IEEEDPAsin,"IEEEDPAsin",   0,    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_double_test(IEEEDPAsin,"IEEEDPAsin",-0.5,    0xbf, 0xe0, 0xc1, 0x52, 0x38, 0x2d, 0x73, 0x66);
+		Error+=double_is_double_test(IEEEDPAsin,"IEEEDPAsin", 0.5,    0x3f, 0xe0, 0xc1, 0x52, 0x38, 0x2d, 0x73, 0x66);
+
+		printf("===============================================\n\n");
+
+		// atan is defined from -inf ... +inf ,and has values  -Pi/2 ... +Pi/2
+		Error+=double_is_double_test(IEEEDPAtan,"IEEEDPAtan",        0,    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_double_test(IEEEDPAtan,"IEEEDPAtan",       PI,    0x3f, 0xf4, 0x33, 0xb8, 0xa3, 0x22, 0xdd, 0xd3);
+		Error+=double_is_double_test(IEEEDPAtan,"IEEEDPAtan",      -PI,    0xbf, 0xf4, 0x33, 0xb8, 0xa3, 0x22, 0xdd, 0xd3);
+		Error+=double_is_double_test(IEEEDPAtan,"IEEEDPAtan",  123.456,    0x3f, 0xf9, 0x00, 0xcd, 0xfe, 0xb5, 0x60, 0xb3);
+		Error+=double_is_double_test(IEEEDPAtan,"IEEEDPAtan", -654.321,    0xbf, 0xf9, 0x1b, 0xb8, 0xca, 0x2d, 0xf8, 0x9a);
+		Error+=double_is_double_test(IEEEDPAtan,"IEEEDPAtan",  DBL_MIN,    0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_double_test(IEEEDPAtan,"IEEEDPAtan",  DBL_MAX,    0x3f, 0xf9, 0x21, 0xfb, 0x54, 0x44, 0x2d, 0x18);  // Amiga returns DBL_MAX here
+		Error+=double_is_double_test(IEEEDPAtan,"IEEEDPAtan", -DBL_MIN,    0x80, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_double_test(IEEEDPAtan,"IEEEDPAtan", -DBL_MAX,    0xbf, 0xf9, 0x21, 0xfb, 0x54, 0x44, 0x2d, 0x18);  // Amiga returns -DBL_MAX here
+
+		printf("===============================================\n\n");
+
+		printf("Cos(): What is the definition-range on Amiga?");
 		Error+=double_is_double_test(IEEEDPCos,"IEEEDPCos",        0,    0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
 		Error+=double_is_double_test(IEEEDPCos,"IEEEDPCos",       PI,    0xbf, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
 		Error+=double_is_double_test(IEEEDPCos,"IEEEDPCos",      -PI,    0xbf, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
@@ -661,8 +684,8 @@ mathieeedoubbas.library
 
 mathieeedoubtrans.library
      IEEEDPAcos()              Test
-     IEEEDPAsin()
-     IEEEDPAtan()
+     IEEEDPAsin()              Test
+     IEEEDPAtan()              Test
      IEEEDPCos()               Test
      IEEEDPCosh()
      IEEEDPExp()

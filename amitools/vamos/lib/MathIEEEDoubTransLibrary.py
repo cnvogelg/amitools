@@ -68,6 +68,21 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
     return hi
 
 #selco    
+  def IEEEDPAsin(self,ctx):
+    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    (hi,lo)=fromDouble(math.asin(arg))
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
+
+#selco    
+  def IEEEDPAtan(self,ctx):
+    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    (hi,lo)=fromDouble(math.atan(arg))
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
+
+
+#selco    
   def IEEEDPLog(self,ctx):
     arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     if arg < 0: # we should not crash for negative numbers!
