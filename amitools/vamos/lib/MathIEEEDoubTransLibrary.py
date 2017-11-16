@@ -51,14 +51,32 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
   def setup_lib(self, ctx):
     AmigaLibrary.setup_lib(self, ctx)
 
+
 #selco    
-  def IEEEDPSqrt(self,ctx):
+  def IEEEDPAcos(self,ctx):
     arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    if arg < 0: # we should not crash for negative numbers!
-#      (hi,lo)=fromDouble(float('nan')  # not a number (7ff80000 00000000)
-      (hi,lo)=(0xfff80000,0)            # not a number, this is what is returned under AmigaOS3.9
-    else:
-      (hi,lo)=fromDouble(math.sqrt(arg))
+    (hi,lo)=fromDouble(math.acos(arg))
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
+
+#selco    
+  def IEEEDPAsin(self,ctx):
+    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    (hi,lo)=fromDouble(math.asin(arg))
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
+
+#selco    
+  def IEEEDPAtan(self,ctx):
+    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    (hi,lo)=fromDouble(math.atan(arg))
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
+
+#selco    
+  def IEEEDPCos(self,ctx):
+    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    (hi,lo)=fromDouble(math.cos(arg))
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 
@@ -70,13 +88,6 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
       (hi,lo)=fromDouble(Result)
     except OverflowError:
       (hi,lo)=(0x7fefffff, 0xffffffff)
-    ctx.cpu.w_reg(REG_D1,lo)
-    return hi
-
-#selco    
-  def IEEEDPCos(self,ctx):
-    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    (hi,lo)=fromDouble(math.cos(arg))
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 
@@ -99,28 +110,6 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
     (hi,lo)=fromDouble(DoubleVal)
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
-                    
-#selco    
-  def IEEEDPAcos(self,ctx):
-    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    (hi,lo)=fromDouble(math.acos(arg))
-    ctx.cpu.w_reg(REG_D1,lo)
-    return hi
-
-#selco    
-  def IEEEDPAsin(self,ctx):
-    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    (hi,lo)=fromDouble(math.asin(arg))
-    ctx.cpu.w_reg(REG_D1,lo)
-    return hi
-
-#selco    
-  def IEEEDPAtan(self,ctx):
-    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    (hi,lo)=fromDouble(math.atan(arg))
-    ctx.cpu.w_reg(REG_D1,lo)
-    return hi
-
 
 #selco    
   def IEEEDPLog(self,ctx):
@@ -189,7 +178,6 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
     ctx.cpu.w_reg(REG_D1,Sin_lo)
     return Sin_hi
 
-
 #selco    
   def IEEEDPSinh(self,ctx):
     arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
@@ -201,6 +189,17 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
           (hi,lo)=(0xffefffff, 0xffffffff)
         else:
           (hi,lo)=(0x7fefffff, 0xffffffff)  
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
+
+#selco    
+  def IEEEDPSqrt(self,ctx):
+    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    if arg < 0: # we should not crash for negative numbers!
+#      (hi,lo)=fromDouble(float('nan')  # not a number (7ff80000 00000000)
+      (hi,lo)=(0xfff80000,0)            # not a number, this is what is returned under AmigaOS3.9
+    else:
+      (hi,lo)=fromDouble(math.sqrt(arg))
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 
@@ -229,5 +228,6 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
         ret=0xff7fffff;
     else:
         ret=fromSingle(FloatVal)
-
     return ret
+
+
