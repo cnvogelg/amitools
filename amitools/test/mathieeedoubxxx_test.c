@@ -353,6 +353,37 @@ int float_is_double_test(float (*Function)(double),char *FunctionName, double va
     return  printFloat(FunctionLine,Result,ExpectedResult);
 }
 
+int double_is_float_test(double (*Function)(float),char *FunctionName, float value1, unsigned char ExpectedResult_0,
+		                                                                             unsigned char ExpectedResult_1,
+																					 unsigned char ExpectedResult_2,
+																					 unsigned char ExpectedResult_3,
+																					 unsigned char ExpectedResult_4,
+																					 unsigned char ExpectedResult_5,
+																					 unsigned char ExpectedResult_6,
+																					 unsigned char ExpectedResult_7)
+{
+    double Result;
+    unsigned char ExpectedResult[8];
+    static char FunctionLine[1024];
+
+    ExpectedResult[0]=ExpectedResult_0;
+    ExpectedResult[1]=ExpectedResult_1;
+    ExpectedResult[2]=ExpectedResult_2;
+    ExpectedResult[3]=ExpectedResult_3;
+    ExpectedResult[4]=ExpectedResult_4;
+    ExpectedResult[5]=ExpectedResult_5;
+    ExpectedResult[6]=ExpectedResult_6;
+    ExpectedResult[7]=ExpectedResult_7;
+
+    Result=Function(value1);
+
+    snprintf(FunctionLine,1024,"%s(%.16g) = ",FunctionName,value1);
+    return  printDouble(FunctionLine,Result,ExpectedResult);
+}
+
+
+
+
 
 int double_is_double_test(double (*Function)(double),char *FunctionName, double value1, unsigned char ExpectedResult_0,
 		                                                                                unsigned char ExpectedResult_1,
@@ -617,6 +648,19 @@ int test_MathIeeeDoubTrans(void)
 
 		printf("===============================================\n\n");
 
+        // convert IEEE single to IEEE double
+		Error+=double_is_float_test(IEEEDPFieee,"IEEEDPFieee",        0,    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_float_test(IEEEDPFieee,"IEEEDPFieee",       PI,    0x40, 0x09, 0x21, 0xfb, 0x60, 0x00, 0x00, 0x00);
+		Error+=double_is_float_test(IEEEDPFieee,"IEEEDPFieee",      -PI,    0xc0, 0x09, 0x21, 0xfb, 0x60, 0x00, 0x00, 0x00);
+		Error+=double_is_float_test(IEEEDPFieee,"IEEEDPFieee",  123.456,    0x40, 0x5e, 0xdd, 0x2f, 0x20, 0x00, 0x00, 0x00);
+		Error+=double_is_float_test(IEEEDPFieee,"IEEEDPFieee", -654.321,    0xc0, 0x84, 0x72, 0x91, 0x60, 0x00, 0x00, 0x00);
+		Error+=double_is_float_test(IEEEDPFieee,"IEEEDPFieee",  FLT_MIN,    0x38, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_float_test(IEEEDPFieee,"IEEEDPFieee",  FLT_MAX,    0x47, 0xef, 0xff, 0xff, 0xe0, 0x00, 0x00, 0x00);
+		Error+=double_is_float_test(IEEEDPFieee,"IEEEDPFieee", -FLT_MIN,    0xb8, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_is_float_test(IEEEDPFieee,"IEEEDPFieee", -FLT_MAX,    0xc7, 0xef, 0xff, 0xff, 0xe0, 0x00, 0x00, 0x00);
+
+		printf("===============================================\n\n");
+
 		Error+=double_is_double_test(IEEEDPLog,"IEEEDPLog",      0,    0xff, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
         Error+=double_is_double_test(IEEEDPLog,"IEEEDPLog",   1000,    0x40, 0x1b, 0xa1, 0x8a, 0x99, 0x8f, 0xff, 0xa0);
         Error+=double_is_double_test(IEEEDPLog,"IEEEDPLog",FLT_MAX,    0x40, 0x56, 0x2e, 0x42, 0xfe, 0xba, 0x39, 0xef);
@@ -703,7 +747,6 @@ int test_MathIeeeDoubTrans(void)
 		printf("===============================================\n\n");
 
 		Error+=float_is_double_test(IEEEDPTieee,"IEEEDPTieee",        0,    0x00, 0x00, 0x00, 0x00);
-
 		Error+=float_is_double_test(IEEEDPTieee,"IEEEDPTieee",       PI,    0x40, 0x49, 0x0f, 0xda);
 		Error+=float_is_double_test(IEEEDPTieee,"IEEEDPTieee",      -PI,    0xc0, 0x49, 0x0f, 0xda);
 		Error+=float_is_double_test(IEEEDPTieee,"IEEEDPTieee",  123.456,    0x42, 0xf6, 0xe9, 0x78);
@@ -832,7 +875,7 @@ mathieeedoubtrans.library
      IEEEDPCos()               Test
      IEEEDPCosh()              Test
      IEEEDPExp()               Test
-     IEEEDPFieee()
+     IEEEDPFieee()             Test
      IEEEDPLog()               Test
      IEEEDPLog10()             Test
      IEEEDPPow()               Test
@@ -842,7 +885,7 @@ mathieeedoubtrans.library
      IEEEDPSqrt()              Test
      IEEEDPTan()               Test
      IEEEDPTanh()              Test
-     IEEEDPTieee()
+     IEEEDPTieee()             Test
 
 
 utility.library

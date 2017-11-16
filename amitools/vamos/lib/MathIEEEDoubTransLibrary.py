@@ -91,8 +91,15 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 
-
-
+#selco
+  # convert IEEE single to IEEE double
+  def IEEEDPFieee(self,ctx):
+    arg=toSingle(ctx.cpu.r_reg(REG_D0))
+    DoubleVal=struct.unpack('d', struct.pack('d', arg))[0]
+    (hi,lo)=fromDouble(DoubleVal)
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
+                    
 #selco    
   def IEEEDPAcos(self,ctx):
     arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
