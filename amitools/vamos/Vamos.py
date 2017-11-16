@@ -19,6 +19,7 @@ from lib.DosLibrary import DosLibrary
 from lib.UtilityLibrary import UtilityLibrary
 from lib.IntuitionLibrary import IntuitionLibrary
 from lib.MathFFPLibrary import MathFFPLibrary
+from lib.MathIEEESingBasLibrary import MathIEEESingBasLibrary   #selco
 from lib.MathIEEEDoubBasLibrary import MathIEEEDoubBasLibrary
 from lib.MathIEEEDoubTransLibrary import MathIEEEDoubTransLibrary  #selco
 from lib.TimerDevice import TimerDevice
@@ -334,6 +335,10 @@ class Vamos:
     mathffp_cfg = cfg.get_lib_config('mathffp.library')
     self.mathffp_lib_def = MathFFPLibrary(mathffp_cfg)
     self.lib_mgr.register_vamos_lib(self.mathffp_lib_def)
+    # mathsingbas #selco
+    mathsingbas_cfg = cfg.get_lib_config('mathieeesingbas.library')
+    self.mathsingbas_lib_def = MathIEEESingBasLibrary(mathsingbas_cfg)
+    self.lib_mgr.register_vamos_lib(self.mathsingbas_lib_def)
     # mathdoubbas
     mathdoubbas_cfg = cfg.get_lib_config('mathieeedoubbas.library')
     self.mathdoubbas_lib_def = MathIEEEDoubBasLibrary(mathdoubbas_cfg)
