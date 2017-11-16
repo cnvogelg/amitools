@@ -413,6 +413,61 @@ int double_is_double_test(double (*Function)(double),char *FunctionName, double 
     return  printDouble(FunctionLine,Result,ExpectedResult);
 }
 
+// return value1 is in D0, return value2 is is in *SecondResult
+int double_pointer_is_double_test(double (*Function)(double*,double),char *FunctionName, double *SecondResult, double value1, unsigned char ExpectedResult_0,
+		                                                                                                                      unsigned char ExpectedResult_1,
+																			                 			                      unsigned char ExpectedResult_2,
+																						                                      unsigned char ExpectedResult_3,
+																						                                      unsigned char ExpectedResult_4,
+																						                                      unsigned char ExpectedResult_5,
+																						                                      unsigned char ExpectedResult_6,
+																						                                      unsigned char ExpectedResult_7,
+																										                      unsigned char ExpectedPtrResult_0,
+                                                                                                                              unsigned char ExpectedPtrResult_1,
+                                                                                                                              unsigned char ExpectedPtrResult_2,
+                                                                                                                              unsigned char ExpectedPtrResult_3,
+                                                                                                                              unsigned char ExpectedPtrResult_4,
+                                                                                                                              unsigned char ExpectedPtrResult_5,
+                                                                                                                              unsigned char ExpectedPtrResult_6,
+                                                                                                                              unsigned char ExpectedPtrResult_7)
+{
+    double Result;
+    unsigned char ExpectedResult[8];
+    unsigned char ExpectedPtrResult[8];
+    static char FunctionLine[1024];
+    unsigned int Error=0;
+
+    ExpectedResult[0]=ExpectedResult_0;
+    ExpectedResult[1]=ExpectedResult_1;
+    ExpectedResult[2]=ExpectedResult_2;
+    ExpectedResult[3]=ExpectedResult_3;
+    ExpectedResult[4]=ExpectedResult_4;
+    ExpectedResult[5]=ExpectedResult_5;
+    ExpectedResult[6]=ExpectedResult_6;
+    ExpectedResult[7]=ExpectedResult_7;
+
+    ExpectedPtrResult[0]=ExpectedPtrResult_0;
+    ExpectedPtrResult[1]=ExpectedPtrResult_1;
+    ExpectedPtrResult[2]=ExpectedPtrResult_2;
+    ExpectedPtrResult[3]=ExpectedPtrResult_3;
+    ExpectedPtrResult[4]=ExpectedPtrResult_4;
+    ExpectedPtrResult[5]=ExpectedPtrResult_5;
+    ExpectedPtrResult[6]=ExpectedPtrResult_6;
+    ExpectedPtrResult[7]=ExpectedPtrResult_7;
+
+
+    Result=Function(SecondResult,value1);
+
+    snprintf(FunctionLine,1024,"%s %s (%.16g) = ",FunctionName,"(D0)",value1);
+    Error+=printDouble(FunctionLine,Result,ExpectedResult);
+    snprintf(FunctionLine,1024,"%s %s (%.16g) = ",FunctionName,"(Pointer)",value1);
+    Error+=printDouble(FunctionLine,*SecondResult,ExpectedPtrResult);
+
+    return Error;
+}
+
+
+
 
 int test_MathIeeeDoubBas(void)
 {
@@ -699,6 +754,22 @@ int test_MathIeeeDoubTrans(void)
 
 		printf("===============================================\n\n");
 
+		{
+			// return sin in D0 and cos in *Pointer
+			double Cosresult;
+        printf("IEEEDPSincos(): What is the definition-range on Amiga?\n");
+		Error+=double_pointer_is_double_test(IEEEDPSincos,"IEEEDPSincos", &Cosresult,        0,    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,    0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+		Error+=double_pointer_is_double_test(IEEEDPSincos,"IEEEDPSincos", &Cosresult,       PI,    0x3c, 0xa1, 0xa6, 0x26, 0x33, 0x14, 0x5c, 0x06,    0xbf, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+		Error+=double_pointer_is_double_test(IEEEDPSincos,"IEEEDPSincos", &Cosresult,      -PI,    0xbc, 0xa1, 0xa6, 0x26, 0x33, 0x14, 0x5c, 0x06,    0xbf, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+		Error+=double_pointer_is_double_test(IEEEDPSincos,"IEEEDPSincos", &Cosresult,  123.456,    0xbf, 0xe9, 0xb9, 0xda, 0xdc, 0x41, 0xae, 0xb5,    0xbf, 0xe3, 0x07, 0xe5, 0x98, 0x0a, 0x15, 0x58);
+		Error+=double_pointer_is_double_test(IEEEDPSincos,"IEEEDPSincos", &Cosresult, -654.321,    0xbf, 0xe8, 0x73, 0xf2, 0x25, 0x78, 0xfc, 0xb6,    0x3f, 0xe4, 0xa4, 0x1f, 0x23, 0xeb, 0x7d, 0x7d);
+		Error+=double_pointer_is_double_test(IEEEDPSincos,"IEEEDPSincos", &Cosresult,  DBL_MIN,    0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,    0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+//		Error+=double_pointer_is_double_test(IEEEDPSincos,"IEEEDPSincos", &Cosresult,  DBL_MAX,    0x7f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,    0x7f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);  // Amiga returns DBL_MAX here
+		Error+=double_pointer_is_double_test(IEEEDPSincos,"IEEEDPSincos", &Cosresult, -DBL_MIN,    0x80, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,    0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+//		Error+=double_pointer_is_double_test(IEEEDPSincos,"IEEEDPSincos", &Cosresult, -DBL_MAX,    0xff, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,    0xff, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);  // Amiga returns -DBL_MAX here
+		}
+		printf("===============================================\n\n");
+
 		// sinh is defined from -inf ... +inf ,and has values  -inf ... +inf
 
 		Error+=double_is_double_test(IEEEDPSinh,"IEEEDPSinh",        0,    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
@@ -880,7 +951,7 @@ mathieeedoubtrans.library
      IEEEDPLog10()             Test
      IEEEDPPow()               Test
      IEEEDPSin()               Test
-     IEEEDPSincos()
+     IEEEDPSincos()            Test
      IEEEDPSinh()              Test
      IEEEDPSqrt()              Test
      IEEEDPTan()               Test

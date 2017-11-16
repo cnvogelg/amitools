@@ -177,6 +177,20 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
     return hi
 
 #selco    
+  def IEEEDPSincos(self,ctx):
+    ptr=ctx.cpu.r_reg(REG_A0)
+    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    (Sin_hi,Sin_lo)=fromDouble(math.sin(arg))
+    (Cos_hi,Cos_lo)=fromDouble(math.cos(arg))
+
+    ctx.mem.access.w32(ptr,Cos_hi)   #write cos to ptr
+    ctx.mem.access.w32(ptr+4,Cos_lo)
+
+    ctx.cpu.w_reg(REG_D1,Sin_lo)
+    return Sin_hi
+
+
+#selco    
   def IEEEDPSinh(self,ctx):
     arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     try:
