@@ -24,3 +24,10 @@ class IntuitionLibrary(AmigaLibrary):
     msg = ctx.mem.access.r_cstr(IText)
     log_main.error("-----> AutoRequest '%s'",msg)
 
+#selco, 17. Nov.2017
+  def EasyRequestArgs(self,ctx):
+    EasyStruct = ctx.cpu.r_reg(REG_A1)
+    es_TextFormat = ctx.mem.access.r32(EasyStruct+12) # EasyStruct.es_TextFormat
+    msg = ctx.mem.access.r_cstr(es_TextFormat)
+    log_main.error("-----> AutoRequest '%s'",msg)
+
