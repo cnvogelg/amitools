@@ -132,7 +132,7 @@ class AmigaLibrary:
          if return value exists then set it in CPU's D0 register"""
       d0 = method(ctx)
       if d0 != None:
-        if type(d0) is list:
+        if type(d0) in (list,tuple):
           ctx.cpu.w_reg(REG_D0, d0[0] & 0xffffffff)
           ctx.cpu.w_reg(REG_D1, d0[1] & 0xffffffff)
         else:
@@ -171,10 +171,10 @@ class AmigaLibrary:
     # main call: call method and evaluate result
     code.append('  d0 = method(ctx)')
     code.append('  if d0 != None:')
-    code.append('    if type(d0) is list:')
+    code.append('    if type(d0) in (list,tuple):')
     code.append('      ctx.cpu.w_reg(REG_D0, d0[0] & 0xffffffff)')
     code.append('      ctx.cpu.w_reg(REG_D1, d0[1] & 0xffffffff)')
-    code.append('      res = "d0=%08x  d1=%08x" % d0')
+    code.append('      res = "d0=%08x  d1=%08x" % tuple(d0)')
     code.append('    else:')
     code.append('      ctx.cpu.w_reg(REG_D0, d0 & 0xffffffff)')
     code.append('      res = "d0=%08x" % d0')

@@ -4,7 +4,7 @@ import pytest
 import subprocess
 import os
 
-VAMOS_BIN="../vamos"
+VAMOS_BIN="../bin/vamos"
 VAMOS_ARGS=['-c', 'test.vamosrc']
 PROG_BIN_DIR="bin"
 

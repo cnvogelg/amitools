@@ -19,7 +19,7 @@ VBCC = vc
 GCC = m68k-amigaos-gcc
 AROS_GCC = m68k-aros-gcc
 AROS_ELF2HUNK = elf2hunk
-SASC = ../vamos -c sasc.vamosrc sc
+SASC = ../bin/vamos -c sasc.vamosrc sc
 
 # options
 VBCC_OPTS =
