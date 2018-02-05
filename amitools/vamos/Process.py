@@ -256,14 +256,20 @@ class Process:
     return self.ctx.dos_lib.file_mgr.get_by_b_addr(fh_b)
 
   def set_input(self, input_fh):
-    self.this_task.access.w_s("pr_CIS", input_fh.b_addr<<2) # compensate BCPL auto-conversion
+    if input_fh is None: # BNULL
+      self.this_task.access.w_s("pr_CIS", 0)
+    else:
+      self.this_task.access.w_s("pr_CIS", input_fh.b_addr<<2) # compensate BCPL auto-conversion
 
   def get_output(self):
     fh_b = self.this_task.access.r_s("pr_COS") >> 2
     return self.ctx.dos_lib.file_mgr.get_by_b_addr(fh_b)
 
   def set_output(self, output_fh):
-    self.this_task.access.w_s("pr_COS", output_fh.b_addr<<2) # compensate BCPL auto-conversion
+    if output_fh is None: # BNULL
+      self.this_task.access.w_s("pr_COS", 0)
+    else:
+      self.this_task.access.w_s("pr_COS", output_fh.b_addr<<2) # compensate BCPL auto-conversion
 
   def get_current_dir(self):
     return self.this_task.access.r_s("pr_CurrentDir")
