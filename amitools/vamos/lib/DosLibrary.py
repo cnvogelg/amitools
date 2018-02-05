@@ -1302,7 +1302,7 @@ class DosLibrary(AmigaLibrary):
           elif ch == ord("e") or ch == ord("E"):
             ch = 0x1b
         elif ch == 0 or ch == ord("\n") or ch < 0:
-          self.cs_ungetc(ctx)
+          self.cs_unget(ctx)
           ctx.mem.access.w8(buff_ptr, 0)
           return -1 # ITEM_ERROR
         elif ch == ord("\""):
