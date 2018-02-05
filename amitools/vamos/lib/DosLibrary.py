@@ -1256,12 +1256,17 @@ class DosLibrary(AmigaLibrary):
       self.cs_curchr = csource.access.r_s('CS_CurChr')
     else:
       self.cs_input = ctx.process.get_input()
-
+    # no pointer
     if buff_ptr == 0:
-        return 0 # ITEM_NOTHING
-
+      return 0 # ITEM_NOTHING
     # Well Known Bug: buff[0] = 0, even if maxchars == 0
     ctx.mem.access.w8(buff_ptr, 0)
+    if maxchars == 0:
+      return 0
+    # reset IOErr if not BNULL nor NIL:
+    if self.cs_input is not None and not self.cs_input.is_nil:
+      self.setioerr(ctx, 0)
+    # get item
     res = self._readItem(ctx,buff_ptr,maxchars)
     # Write back the updated csource ptr if we have one
     if (csource_ptr):
@@ -1322,7 +1327,7 @@ class DosLibrary(AmigaLibrary):
         if maxchars <= 0:
           ctx.mem.access.w8(buff_ptr - 1, 0)
           return -1 # ITEM_ERROR
-        maxchar = maxchars - 1
+        maxchars = maxchars - 1
         ch = self.cs_get(ctx)
         if ch == 0 or ch == ord("\n") or ch == ord(" ") or ch == ord("\t") or ch == ord("=") or ch < 0:
           # Know Bug: Don't UNGET for a space or equals sign
