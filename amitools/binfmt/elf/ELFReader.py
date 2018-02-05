@@ -87,6 +87,8 @@ class ELFReader:
         # add containing file symbol and its name
         if src_file_sym != None:
           sym.file_sym = src_file_sym
+        else:
+          sym.file_sym = None
         # add symbol to segment
         sym_sect = sym.section
         if sym_sect is not None:
