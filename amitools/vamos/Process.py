@@ -6,7 +6,7 @@ from lib.lexec.PortManager import *
 NT_PROCESS = 13
 
 class Process:
-  def __init__(self, ctx, bin_file, bin_args,
+  def __init__(self, ctx, bin_file, sys_args,
                input_fh=None, output_fh=None, stack_size=4096,
                exit_addr=0, shell=False, cwd=None, cwd_lock=None):
     self.ctx = ctx
@@ -24,11 +24,11 @@ class Process:
     # it through the private CliInit() call of the dos.library
     if not shell:
       self.shell = False
-      self.init_args(bin_args,input_fh)
+      self.init_args(sys_args, input_fh)
       self.init_cli_struct(input_fh, output_fh,self.bin_basename)
     else:
       self.arg = None
-      self.bin_args = None
+      self.arg_base = 0
       self.shell = True
       self.init_cli_struct(None,None,None)
     self.shell_message = None
@@ -132,28 +132,24 @@ class Process:
       return arg
 
   # ----- args -----
-  def init_args(self, bin_args, fh):
-    # setup arguments
-    self.bin_args = bin_args
-    text_args = ""
-    gap = False
-    for arg in bin_args:
-      if gap:
-        text_args = text_args + " "
-      text_args = text_args + self.quote_arg(arg)
-      gap = True
-    self.arg_text = text_args + "\n" # AmigaDOS appends a new line to the end
-    self.arg_len  = len(self.arg_text)
-    fh.setbuf(self.arg_text) # Tripos makes the input line available as buffered input for ReadItem()
-    self.arg_size = self.arg_len + 1
-    self.arg = self.ctx.alloc.alloc_memory(self.bin_basename + "_args", self.arg_size)
+  def init_args(self, sys_args, fh):
+    # quote args if necessary
+    sys_args = map(lambda x: self.quote_arg(x), sys_args)
+    # AmigaDOS appends a new line to the end
+    arg_text = " ".join(sys_args) + "\n"
+    self.arg_len  = len(arg_text)
+    # Tripos makes the input line available as buffered input for ReadItem()
+    fh.setbuf(arg_text)
+    # alloc and fill arg buffer
+    arg_size = self.arg_len + 1
+    self.arg = self.ctx.alloc.alloc_memory(self.bin_basename + "_args", arg_size)
     self.arg_base = self.arg.addr
-    self.ctx.mem.access.w_cstr(self.arg_base, self.arg_text)
-    log_proc.info("args: '%s' (%d)", self.arg_text[:-1], self.arg_size)
+    self.ctx.mem.access.w_cstr(self.arg_base, arg_text)
+    log_proc.info("args: '%s' (%d)", arg_text[:-1], arg_size)
     log_proc.info(self.arg)
 
   def free_args(self):
-    if self.arg != None:
+    if self.arg is not None:
       self.ctx.alloc.free_memory(self.arg)
 
   # ----- cli struct -----
@@ -229,7 +225,6 @@ class Process:
   # ----- task struct -----
   def init_task_struct(self, input_fh, output_fh):
     # Inject arguments into input stream (Needed for C:Execute)
-    #input_fh.ungets(self.arg_text)
     self.this_task = self.ctx.alloc.alloc_struct(self.bin_basename + "_ThisTask",ProcessDef)
     self.seglist   = self.ctx.alloc.alloc_memory("Process Seglist",24)
     self.this_task.access.w_s("pr_Task.tc_Node.ln_Type", NT_PROCESS)
@@ -242,6 +237,8 @@ class Process:
     varlist.access.w_s("mlh_Head",varlist.addr + 4)
     varlist.access.w_s("mlh_Tail",0)
     varlist.access.w_s("mlh_TailPred",varlist.addr)
+    # setup arg string
+    self.set_arg_str_ptr(self.arg_base)
 
   def free_task_struct(self):
     self.ctx.alloc.free_struct(self.this_task)
@@ -282,3 +279,9 @@ class Process:
 
   def get_program_name(self):
     return self.bin_basename
+
+  def get_arg_str_ptr(self):
+    return self.this_task.access.r_s("pr_Arguments")
+
+  def set_arg_str_ptr(self, ptr):
+    self.this_task.access.w_s("pr_Arguments", ptr)

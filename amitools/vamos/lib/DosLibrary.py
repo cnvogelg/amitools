@@ -267,8 +267,13 @@ class DosLibrary(AmigaLibrary):
     else:
       ret = self.DOSTRUE
     ctx.mem.access.w_cstr(buf_ptr, prog_name)
-    log_dos.info("GetProgramName() -> '%s' (%d)" % (prog_name, max_len))
+    log_dos.info("GetProgramName() -> '%s' (%d)", prog_name, max_len)
     return ret
+
+  def GetArgStr(self, ctx):
+    arg_ptr = ctx.process.get_arg_str_ptr()
+    log_dos.info("GetArgStr() -> %08x", arg_ptr)
+    return arg_ptr
 
   # ----- Variables -----
 
@@ -1176,20 +1181,17 @@ class DosLibrary(AmigaLibrary):
     # shell. The shell leaves the arguments in the buffer
     # of the input file handle.
     args = Args()
-    if ctx.process.bin_args is not None:
-      bin_args = ctx.process.bin_args
-    else:
-      raw_args = ctx.process.get_input().getbuf()
-      if raw_args == "?\n":
-        ctx.process.get_output().write(template+": ")
-        ctx.process.get_input().setbuf("")
-        raw_args = ctx.process.get_input().gets(512)
-      bin_args = args.split(raw_args)
-    log_dos.info("ReadArgs: args=%s template='%s' array_ptr=%06x rdargs_ptr=%06x" % (bin_args, template, array_ptr, rdargs_ptr))
+    raw_args = ctx.process.get_input().getbuf()
+    if raw_args == "?\n":
+      ctx.process.get_output().write(template+": ")
+      ctx.process.get_input().setbuf("")
+      raw_args = ctx.process.get_input().gets(512)
+    arg_list = args.split(raw_args)
+    log_dos.info("ReadArgs: args=%s template='%s' array_ptr=%06x rdargs_ptr=%06x" % (arg_list, template, array_ptr, rdargs_ptr))
     # try to parse argument string
     args.parse_template(template)
     args.prepare_input(ctx.mem.access,array_ptr)
-    ok = args.parse_string(bin_args)
+    ok = args.parse_string(arg_list)
     if not ok:
       self.setioerr(ctx,args.error)
       log_dos.info("ReadArgs: not matched -> io_err=%d/%s",self.io_err, dos_error_strings[self.io_err])
