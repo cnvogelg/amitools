@@ -26,6 +26,8 @@ import dos.PathPart
 from dos.DosList import DosList
 from dos.LockManager import LockManager
 from dos.FileManager import FileManager
+from dos.CSource import *
+from dos.Item import *
 
 class DosLibrary(AmigaLibrary):
   name = "dos.library"
@@ -1226,117 +1228,39 @@ class DosLibrary(AmigaLibrary):
     if own:
       self.alloc.free_struct(rdargs)
 
-  def cs_get(self, ctx):
-    if self.cs_input:
-      ch = self.cs_input.getc()
-    else:
-      if self.cs_curchr < self.cs_length:
-        ch = ctx.mem.access.r8(self.cs_buffer + self.cs_curchr)
-        self.cs_curchr = self.cs_curchr + 1
-      else:
-        ch = -1
-    return ch
-
-  def cs_unget(self, ctx):
-    if self.cs_input:
-      self.cs_input.ungetc(-1)
-    else:
-      self.cs_curchr = self.cs_curchr - 1
-
   def ReadItem(self, ctx):
     buff_ptr = ctx.cpu.r_reg(REG_D1)
     maxchars = ctx.cpu.r_reg(REG_D2)
-    csource_ptr = ctx.cpu.r_reg(REG_D3)
-    log_dos.info("ReadItem: buff_ptr=%06x maxchars=%d csource_ptr=%06x" % (buff_ptr, maxchars, csource_ptr))
-    if (csource_ptr):
-      csource = ctx.alloc.map_struct("CSource", csource_ptr, CSourceDef)
-      self.cs_input = None
-      self.cs_buffer = csource.access.r_s('CS_Buffer')
-      self.cs_length = csource.access.r_s('CS_Length')
-      self.cs_curchr = csource.access.r_s('CS_CurChr')
+    csrc_ptr = ctx.cpu.r_reg(REG_D3)
+    log_dos.info("ReadItem: buff_ptr=%06x maxchars=%d csource_ptr=%06x" % (buff_ptr, maxchars, csrc_ptr))
+    if csrc_ptr:
+      csrc = CSource()
+      csrc.read_s(ctx.alloc, csrc_ptr)
+      input_fh = None
     else:
-      self.cs_input = ctx.process.get_input()
+      input_fh = ctx.process.get_input()
+      csrc = FileCSource(input_fh)
     # no pointer
     if buff_ptr == 0:
       return 0 # ITEM_NOTHING
     # Well Known Bug: buff[0] = 0, even if maxchars == 0
     ctx.mem.access.w8(buff_ptr, 0)
-    if maxchars == 0:
+    if maxchars <= 0:
       return 0
     # reset IOErr if not BNULL nor NIL:
-    if self.cs_input is not None and not self.cs_input.is_nil:
+    if input_fh is not None and not input_fh.is_nil:
       self.setioerr(ctx, 0)
     # get item
-    res = self._readItem(ctx,buff_ptr,maxchars)
+    parser = ItemParser(csrc)
+    res, data = parser.read_item(maxchars)
+    log_dos.info("ReadItem: res=%d data=%s" % (res, data))
     # Write back the updated csource ptr if we have one
-    if (csource_ptr):
-      csource.access.w_s('CS_CurChr',self.cs_curchr)
-    result = ctx.mem.access.r_cstr(buff_ptr)
+    if csrc_ptr:
+      csrc.update_s(ctx.alloc, csrc_ptr)
+    # write string
+    if data is not None:
+      ctx.mem.access.w_cstr(buff_ptr, data)
     return res
-
-  def _readItem(self, ctx, buff_ptr, maxchars):
-    # Skip leading whitespace
-    while True:
-      ch = self.cs_get(ctx)
-      if ch != ord(" ") and ch != ord("\t"):
-        break
-
-    if ch == 0 or ch == ord("\n") or ch < 0 or ch == ord(";"):
-      if ch >= 0:
-        self.cs_unget(ctx)
-      return 0 # ITEM_NOTHING
-
-    if ch == ord("="):
-      return -2 # ITEM_EQUAL
-
-    if ch == ord("\""):
-      while True:
-        if maxchars <= 0:
-          ctx.mem.access.w8(buff_ptr - 1, 0)
-          return 0 # ITEM_NOTHING
-        maxchars = maxchars - 1
-        ch = self.cs_get(ctx)
-        if ch == ord("*"):
-          ch = self.cs_get(ctx)
-          if ch == 0 or ch == ord("\n") or ch < 0:
-            self.cs_unget(ctx)
-            ctx.mem.access.w8(buff_ptr, 0)
-            return -1 # ITEM_ERROR
-          elif ch == ord("n") or ch == ord("N"):
-            ch = ord("\n")
-          elif ch == ord("e") or ch == ord("E"):
-            ch = 0x1b
-        elif ch == 0 or ch == ord("\n") or ch < 0:
-          self.cs_unget(ctx)
-          ctx.mem.access.w8(buff_ptr, 0)
-          return -1 # ITEM_ERROR
-        elif ch == ord("\""):
-          ctx.mem.access.w8(buff_ptr, 0)
-          return 2 # ITEM_QUOTED
-        ctx.mem.access.w8(buff_ptr, ch)
-        buff_ptr = buff_ptr + 1
-      pass
-    else:
-      if maxchars <= 0:
-        ctx.mem.access.w8(buff_ptr - 1, 0)
-        return -1 # ITEM_ERROR
-      maxchars = maxchars - 1
-      ctx.mem.access.w8(buff_ptr, ch)
-      buff_ptr = buff_ptr + 1
-      while True:
-        if maxchars <= 0:
-          ctx.mem.access.w8(buff_ptr - 1, 0)
-          return -1 # ITEM_ERROR
-        maxchars = maxchars - 1
-        ch = self.cs_get(ctx)
-        if ch == 0 or ch == ord("\n") or ch == ord(" ") or ch == ord("\t") or ch == ord("=") or ch < 0:
-          # Know Bug: Don't UNGET for a space or equals sign
-          if ch != ord("=") and ch != ord(" ") and ch != ord("\t"):
-            self.cs_unget(ctx)
-          ctx.mem.access.w8(buff_ptr, 0)
-          return 1 # ITEM_UNQUOTED
-        ctx.mem.access.w8(buff_ptr, ch)
-        buff_ptr = buff_ptr + 1
 
   # ----- System/Execute -----
 
