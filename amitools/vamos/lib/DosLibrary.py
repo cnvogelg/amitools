@@ -1151,10 +1151,19 @@ class DosLibrary(AmigaLibrary):
     keyword_ptr  = ctx.cpu.r_reg(REG_D2)
     template     = ctx.mem.access.r_cstr(template_ptr)
     keyword      = ctx.mem.access.r_cstr(keyword_ptr)
-    args         = Args()
-    args.parse_template(template)
-    pos          = args.find_arg(keyword)
-    log_dos.info("FindArgs: template=%s keyword=%s -> %d" % (template,keyword,pos))
+    # parse template
+    tal = TemplateArgList.parse_string(template)
+    if tal is None:
+      # template parse error
+      log_dos.warn("FindArgs: invalid template=%s", template)
+      return -1
+    # find keyword
+    arg = tal.find_arg(keyword)
+    if arg is None:
+      pos = -1
+    else:
+      pos = arg.pos
+    log_dos.info("FindArgs: template=%s keyword=%s -> %s,%d", tal, keyword, arg, pos)
     return pos
 
   def ReadArgs(self, ctx):

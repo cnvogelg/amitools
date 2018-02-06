@@ -1,6 +1,114 @@
 import types
 from Error import *
 
+
+class TemplateArg:
+  """a parsed description of a template argument"""
+  TYPE_STRING = 0
+  TYPE_NUMBER = 1
+  TYPE_SWITCH = 2
+  TYPE_TOGGLE = 3
+
+  def __init__(self, keys, ktype, is_keyword=False, is_required=False,
+               is_multi=False, is_full=False):
+    self.keys = keys
+    self.ktype = ktype
+    self.is_keyword = is_keyword
+    self.is_required = is_required
+    self.is_multi = is_multi
+    self.is_full = is_full
+    self.pos = 0
+
+  def __str__(self):
+    return "(#%d:%s,%d,k=%s,r=%s,m=%s,f=%s)" % (
+      self.pos, ",".join(self.keys), self.ktype,
+      self.is_keyword, self.is_required,
+      self.is_multi, self.is_full)
+
+  def has_key(self, name):
+    key = name.upper()
+    return key in self.keys
+
+  @classmethod
+  def parse_string(cls, template):
+    """parse a template string keya=keyb/n/k"""
+    p = filter(lambda x: x!='', template.split("/"))
+    if len(p) == 0:
+      return None
+    keys_all = p[0]
+    flags_all = p[1:]
+    if keys_all == '':
+      return None
+    # keys
+    keys = map(lambda x: x.upper(), filter(lambda x: x!='', keys_all.split('=')))
+    if len(keys) == 0:
+      return None
+    # flags
+    flags = map(lambda x: x[0].upper(), flags_all)
+    ktype = cls.TYPE_STRING
+    is_keyword = False
+    is_required = False
+    is_multi = False
+    is_full = False
+    for ch in flags:
+      if ch == 'N':
+        ktype = cls.TYPE_NUMBER
+      elif ch == 'S':
+        ktype = cls.TYPE_SWITCH
+        is_keyword = True
+      elif ch == 'T':
+        ktype = cls.TYPE_TOGGLE
+        is_keyword = True
+      elif ch == 'A':
+        is_required = True
+      elif ch == 'K':
+        is_keyword = True
+      elif ch == 'M':
+        is_multi = True
+      elif ch == 'F':
+        is_full = True
+    return TemplateArg(keys, ktype, is_keyword, is_required, is_multi, is_full)
+
+
+class TemplateArgList:
+  """a parsed list of TemplateArg"""
+  def __init__(self):
+    self.targs = []
+
+  def __str__(self):
+    return "[#%d:%s]" % (self.len(), ",".join(map(str, self.targs)))
+
+  def append(self, targ):
+    targ.pos = len(self.targs)
+    self.targs.append(targ)
+
+  def len(self):
+    return len(self.targs)
+
+  def get_arg(self, pos):
+    if pos < 0 or pos >= len(self.targs):
+      return None
+    else:
+      return self.targs[pos]
+
+  def find_arg(self, name):
+    for t in self.targs:
+      if t.has_key(name):
+        return t
+
+  @staticmethod
+  def parse_string(template):
+    tal = TemplateArgList()
+    ps = template.split(',')
+    for p in ps:
+      if p != '':
+        targ = TemplateArg.parse_string(p)
+        if targ is None:
+          return None
+        tal.append(targ)
+    return tal
+
+
 #
 # THOR: FIXME: /F arguments eat *all* arguments, not just
 # the rest of the line. "set echo on" does not work due to
@@ -102,7 +210,7 @@ class Args:
     if arg != "":
       args += [arg]
     return args
-  
+
   def _find_remove_key(self, keys, in_list, extra):
     pos = self._find_key_pos_and_remove(keys, in_list)
     if pos != None:
@@ -139,7 +247,7 @@ class Args:
           return pos
       pos = pos + 1
     return -1
-    
+
   """apply an internal template to a given argument array, this already expects an array of strings.
   """
   def parse_string(self, in_args):
@@ -150,7 +258,7 @@ class Args:
     for a in in_args:
       b = a.split('=')
       args += b
-      
+
     # prepare result array
     result = []
     targs = self.targs
@@ -231,7 +339,7 @@ class Args:
     # scan for multi and non-key args
     multi_pos = None
     multi_targ = None
-    
+
     pos = 0
     for targ in targs:
       # multi
@@ -321,7 +429,7 @@ class Args:
       if val.startswith('"') and val.endswith('"'):
         return val[1:-1]
     return val
-  
+
   def get_result(self):
     res = []
     for i in xrange(len(self.result)):
