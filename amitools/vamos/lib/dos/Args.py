@@ -109,6 +109,128 @@ class TemplateArgList:
     return tal
 
 
+class ParseResultList:
+  """the class holds the parsing results. each template arg gets assigned
+     a single item (or not)"""
+
+  def __init__(self, targ_list):
+    """create with a template arg list"""
+    self.targ_list = targ_list
+    self.len = targ_list.len()
+    self.result = [None] * self.len
+
+  def __str__(self):
+    return ",".join(map(str, self.result))
+
+  def get_result(self, pos):
+    return self.result[pos]
+
+  def set_result(self, pos, val):
+    self.result[pos] = val
+
+  def calc_extra_result_size(self):
+    """return size of extra result in bytes.
+       we count the longs and chars that do not fit into the
+       result long array passed into ReadArgs()
+
+       return size in bytes, number of longs
+    """
+    num = self.len
+    num_longs = 0
+    num_chars = 0
+    for pos in xrange(num):
+      r = self.result[pos]
+      if r is not None:
+        targ = self.targ_list.get_arg(pos)
+        ktype = targ.ktype
+        if targ.is_multi:
+          # account list itself + null long
+          n = len(r)
+          if n > 0:
+            num_longs += n + 1
+            if ktype == TemplateArg.TYPE_STRING:
+              # reserve string + null byte
+              for s in r:
+                num_chars += len(s) + 1
+            elif ktype == TemplateArg.TYPE_NUMBER:
+              # reserve longs
+              num_longs += n
+        elif ktype == TemplateArg.TYPE_STRING or targ.is_full:
+          # store string + null byte
+          num_chars += len(r) + 1
+        elif ktype == TemplateArg.TYPE_NUMBER:
+          num_longs += 1
+
+    # calc total size
+    size = num_longs * 4 + num_chars
+    return size, num_longs
+
+  def generate_result(self, mem_access, array_ptr, extra_ptr, num_longs):
+    """now convert the values into memory array and extra array"""
+    num = self.len
+    char_ptr = extra_ptr + num_longs * 4
+    long_ptr = extra_ptr
+    for pos in xrange(num):
+      targ = self.targ_list.get_arg(pos)
+      ktype = targ.ktype
+      r = self.result[pos]
+      base_val = None
+      if r is None:
+        if targ.is_multi:
+          # always set array pointer to 0
+          base_val = 0
+      else:
+        if targ.is_multi:
+          n = len(r)
+          if n == 0:
+            base_val = 0
+          else:
+            if ktype == TemplateArg.TYPE_STRING:
+              # pointer to array
+              base_val = long_ptr
+              for s in r:
+                mem_access.w32(long_ptr, char_ptr)
+                mem_access.w_cstr(char_ptr, s)
+                long_ptr += 4
+                char_ptr += len(s) + 1
+            elif ktype == TemplateArg.TYPE_NUMBER:
+              # first the values
+              val_ptr = long_ptr
+              # then the pointers to the values
+              long_ptr += n * 4
+              base_val = long_ptr
+              for i in r:
+                mem_access.w32(long_ptr, val_ptr)
+                mem_access.w32(val_ptr, i)
+                long_ptr += 4
+                val_ptr += 4
+            # terminate pointer list
+            mem_access.w32(long_ptr,0)
+            long_ptr += 4
+        elif ktype == TemplateArg.TYPE_STRING or targ.is_full:
+          # store string + null byte
+          base_val = char_ptr
+          # append string
+          mem_access.w_cstr(char_ptr, r)
+          char_ptr += len(r) + 1
+        elif ktype == TemplateArg.TYPE_NUMBER:
+          # pointer to long
+          base_val = long_ptr
+          # write long
+          mem_access.w32(long_ptr,r)
+          long_ptr += 4
+        elif ktype == TemplateArg.TYPE_SWITCH:
+          base_val = -1
+        elif ktype == TemplateArg.TYPE_TOGGLE:
+          old_val = mem_access.r32(array_ptr)
+          base_val = 0 if old_val else -1
+
+      # update array pointer
+      if base_val is not None:
+        mem_access.w32(array_ptr, base_val)
+      array_ptr += 4
+
+
 #
 # THOR: FIXME: /F arguments eat *all* arguments, not just
 # the rest of the line. "set echo on" does not work due to
