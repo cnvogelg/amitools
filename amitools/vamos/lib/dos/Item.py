@@ -11,10 +11,33 @@ class ItemParser:
   def __init__(self, csrc):
     """set character source csrc that supports getc() and ungetc()"""
     self.csrc = csrc
+    self.last_unquoted_char = None
+
+  def read_eol(self):
+    """read until end of line"""
+    res = []
+    if self.last_unquoted_char is not None:
+      res.append(self.last_unquoted_char)
+
+    # read until eol
+    while True:
+      ch = self.csrc.getc()
+      if ch in (None, chr(0), "\n", ";"):
+        break
+      res.append(ch)
+
+    # AmigaOS curiosity:
+    # if the last read item was unquoted then remove trailing spaces
+    if self.last_unquoted_char is not None:
+      while len(res) >0 and res[-1] in (' ', '\t'):
+        res.pop()
+
+    return "".join(res)
 
   def read_item(self, maxchars):
     """returns (ITEM_*, buf)"""
     null = chr(0)
+    self.last_unquoted_char = None
 
     # skip leading whitespace
     while True:
@@ -88,9 +111,10 @@ class ItemParser:
             status = self.ITEM_UNQUOTED
             self.csrc.ungetc()
             break
-          if ch in (" ", "\t", "="):
+          elif ch in (" ", "\t", "="):
             # Know Bug: Don't UNGET for a space or equals sign
             status = self.ITEM_UNQUOTED
+            self.last_unquoted_char = ch
             break
           res.append(ch)
 

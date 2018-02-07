@@ -1,6 +1,9 @@
 from __future__ import print_function
 
+from amitools.vamos.lib.lexec.ExecStruct import *
+from amitools.vamos.lib.dos.CSource import CSource
 from amitools.vamos.lib.dos.Args import *
+from amitools.vamos.lib.dos.Error import *
 
 def template_arg_test():
   # string
@@ -9,7 +12,6 @@ def template_arg_test():
   assert(not ta.is_required)
   assert(ta.is_keyword)
   assert(not ta.is_multi)
-  assert(not ta.is_full)
   assert(ta.keys == ['A', 'B'])
   # number
   ta = TemplateArg.parse_string("my=fancy/n")
@@ -17,7 +19,6 @@ def template_arg_test():
   assert(not ta.is_required)
   assert(not ta.is_keyword)
   assert(not ta.is_multi)
-  assert(not ta.is_full)
   assert(ta.keys == ['MY', 'FANCY'])
   # switch
   ta = TemplateArg.parse_string("my=fancy/s")
@@ -25,28 +26,24 @@ def template_arg_test():
   assert(not ta.is_required)
   assert(ta.is_keyword)
   assert(not ta.is_multi)
-  assert(not ta.is_full)
   # toggle
   ta = TemplateArg.parse_string("my=fancy/t")
   assert(ta.ktype == TemplateArg.TYPE_TOGGLE)
   assert(not ta.is_required)
   assert(ta.is_keyword)
   assert(not ta.is_multi)
-  assert(not ta.is_full)
   # multi
   ta = TemplateArg.parse_string("my=fancy/m")
   assert(ta.ktype == TemplateArg.TYPE_STRING)
   assert(not ta.is_required)
   assert(not ta.is_keyword)
   assert(ta.is_multi)
-  assert(not ta.is_full)
   # full
   ta = TemplateArg.parse_string("my=fancy/f")
-  assert(ta.ktype == TemplateArg.TYPE_STRING)
+  assert(ta.ktype == TemplateArg.TYPE_FULL)
   assert(not ta.is_required)
   assert(not ta.is_keyword)
   assert(not ta.is_multi)
-  assert(ta.is_full)
 
 def template_arg_list_test():
   tal = TemplateArgList.parse_string("a=b/k,all/m")
@@ -161,4 +158,67 @@ def result_list2_test():
   da.assert_w32s(extra_ptr, 23, 42, extra_ptr, extra_ptr + 4, 0)
   da.assert_w_cstrs(extra_bptr, a)
 
+def check_parse_args(template, in_str, exp_res_list=None, error=NO_ERROR):
+  tal = TemplateArgList.parse_string(template)
+  assert tal is not None
+  p = ArgsParser(tal)
+  csrc = CSource(in_str + "\n")
+  result = p.parse(csrc)
+  print(dos_error_strings[result])
+  assert result == error
+  if error == NO_ERROR:
+    assert p.get_result_list().get_results() == exp_res_list
 
+def parse_args_basic_test():
+  # string
+  check_parse_args("AKEY", "hello", ["hello"])
+  # number
+  check_parse_args("AKEY/N", "123", [123])
+  check_parse_args("AKEY/N", "hello", error=ERROR_BAD_NUMBER)
+  check_parse_args("AKEY/N", "-1", error=ERROR_BAD_NUMBER)
+  # switch/toggle
+  check_parse_args("AKEY/S", "akey", [True])
+  check_parse_args("AKEY/T", "akey", [True])
+  check_parse_args("AKEY/S", "key", error=ERROR_TOO_MANY_ARGS)
+  check_parse_args("AKEY/T", "key", error=ERROR_TOO_MANY_ARGS)
+  # full
+  check_parse_args("AKEY/F", "hello world", ["hello world"])
+  # multi string
+  check_parse_args("MULTI/M", "hello world", [["hello", "world"]])
+  check_parse_args("MULTI/M", "", [None])
+  # multi number
+  check_parse_args("MULTI/M/N", "23 42", [[23, 42]])
+  check_parse_args("MULTI/M/N", "", [None])
+  check_parse_args("MULTI/M/N", "23 hu", error=ERROR_BAD_NUMBER)
+
+def parse_args_keyword_test():
+  # not set
+  check_parse_args("AKEY", "", [None])
+  # regular use
+  check_parse_args("AKEY", "akey hello", ["hello"])
+  check_parse_args("AKEY", "akey=hello", ["hello"])
+  # quoted string is accepted as value
+  check_parse_args("AKEY", '"akey"', ["akey"])
+  # if key is given then it needs a value
+  check_parse_args("AKEY", 'akey', error=ERROR_KEY_NEEDS_ARG)
+  # keyword required
+  check_parse_args("AKEY/K", "akey hello", ["hello"])
+  check_parse_args("AKEY/K", "akey=hello", ["hello"])
+  # keyword must be present
+  check_parse_args("AKEY/K", "hello", error=ERROR_TOO_MANY_ARGS)
+
+def parse_args_required_test():
+  # must be set
+  check_parse_args("AKEY/A", "", error=ERROR_REQUIRED_ARG_MISSING)
+
+def parse_args_multi_test():
+  check_parse_args("MULTI/M,AKEY", "hello", [["hello"], None])
+  # /M munges all
+  check_parse_args("MULTI/M,AKEY", "a b", [["a", "b"], None])
+  # but a key can fetch it
+  check_parse_args("MULTI/M,AKEY", "akey a b", [["b"], "a"])
+  # or if key is required
+  check_parse_args("MULTI/M,AKEY/A", "a b", [["a"], "b"])
+  # forced multi
+  check_parse_args("AKEY/A,MULTI/M/A,BKEY/A", "a b c", ["a", ["b"], "c"])
+  check_parse_args("AKEY/A,BKEY/A,MULTI/M/A,CKEY/A,DKEY/A", "a b c d e", ["a", "b", ["c"], "d", "e"])
