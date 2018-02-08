@@ -1177,51 +1177,108 @@ class DosLibrary(AmigaLibrary):
     array_ptr    = ctx.cpu.r_reg(REG_D2)
     rdargs_ptr   = ctx.cpu.r_reg(REG_D3)
 
-    # get args from process, unless we're running a native
-    # shell. The shell leaves the arguments in the buffer
-    # of the input file handle.
-    args = Args()
-    raw_args = ctx.process.get_input().getbuf()
-    if raw_args == "?\n":
-      ctx.process.get_output().write(template+": ")
-      ctx.process.get_input().setbuf("")
-      raw_args = ctx.process.get_input().gets(512)
-    arg_list = args.split(raw_args)
-    log_dos.info("ReadArgs: args=%s template='%s' array_ptr=%06x rdargs_ptr=%06x" % (arg_list, template, array_ptr, rdargs_ptr))
-    # try to parse argument string
-    args.parse_template(template)
-    args.prepare_input(ctx.mem.access,array_ptr)
-    ok = args.parse_string(arg_list)
-    if not ok:
-      self.setioerr(ctx,args.error)
-      log_dos.info("ReadArgs: not matched -> io_err=%d/%s",self.io_err, dos_error_strings[self.io_err])
+    # 1. Check Template
+    log_dos.info("ReadArgs: template='%s' array_ptr=%08x rdargs_ptr=%08x",
+      template, array_ptr, rdargs_ptr)
+    tal = TemplateArgList.parse_string(template)
+    log_dos.info("ReadArgs: tal=%s", tal)
+    if tal is None:
+      log_dos.warn("ReadArgs: bad template '%s'", template)
+      self.setioerr(ctx, ERROR_BAD_TEMPLATE)
       return 0
-    log_dos.debug("matched template: %s",args.get_result())
-    # calc size of result
-    size = args.calc_result_size()
-    log_dos.debug("longs=%d chars=%d size=%d" % (args.num_longs,args.num_chars,size))
-    # alloc result mem (extra longs and cstrs)
-    if size > 0:
-      addr = self._alloc_mem("ReadArgs(@%06x)" % self.get_callee_pc(ctx),size)
-    else:
-      addr = 0
-    # fill result array and memory
-    resarray = args.generate_result(ctx.mem.access,addr,array_ptr)
-    # alloc RD_Args
-    if rdargs_ptr == 0:
-      rdargs = ctx.alloc.alloc_struct("RDArgs", RDArgsDef)
-      own = True
-    else:
+
+    # 2. setup CSource for input
+    # use submitted csrc?
+    csrc_buf_ptr = 0
+    rdargs = None
+    if rdargs_ptr != 0:
       rdargs = ctx.alloc.map_struct("RDArgs", rdargs_ptr, RDArgsDef)
-      own = False
-    rdargs.access.w_s('RDA_Buffer',addr)
-    rdargs.access.w_s('RDA_BufSiz',size)
-    # store rdargs
-    self.rdargs[rdargs.addr] = (rdargs, own)
-    # result
-    self.setioerr(ctx,NO_ERROR)
-    log_dos.info("ReadArgs: matched! result_mem=%06x rdargs=%s", addr, resarray)
-    return rdargs.addr
+      csrc_buf_ptr = rdargs.access.r_s('RDA_Source.CS_Buffer')
+    if csrc_buf_ptr != 0:
+      # take given csrc and setup buffer
+      input_fh = None
+      csrc = CSource()
+      csrc.read_s(ctx.alloc, rdargs_ptr)
+    else:
+      # setup file based csrc and read first line
+      input_fh = ctx.process.get_input()
+      csrc = FileLineCSource(input_fh)
+      csrc.append_line()
+    log_dos.info("ReadArgs: input=%s csrc=%s", input_fh, csrc)
+
+    # 3. was help requested with '?'
+    if rdargs is None:
+      flags = 0
+      ext_help = None
+    else:
+      flags = rdargs.access.r_s('RDA_Flags')
+      ext_help_ptr = rdargs.access.r_s('RDA_ExtHelp')
+      ext_help = ctx.mem.access.r_cstr(ext_help_ptr) if ext_help_ptr else None
+    log_dos.info("ReadArgs: flags=%s ext_help=%s", flags, ext_help)
+    RDAF_NOPROMPT = 4
+    # prompting is allowed?
+    if flags & RDAF_NOPROMPT == 0:
+      ah = ArgsHelp(csrc)
+      # user entered '?'
+      if ah.want_help():
+        ctx.process.get_output().write(template+": ")
+        csrc.append_line()
+        msg = ext_help if ext_help else template
+        # ext help is shown on second '?'
+        while ah.want_help():
+          ctx.process.get_output().write(template+": ")
+          csrc.append_line()
+      csrc.rewind(ah.get_num_bytes())
+
+    # 4. parse csrc with given template
+    log_dos.info("ReadArgs: input: %s @%d", repr(csrc.buf), csrc.pos)
+    p = ArgsParser(tal)
+    error = p.parse(csrc)
+    result_list = p.get_result_list()
+    log_dos.info("ReadArgs: parse error=%d list=%s", error, result_list.get_results())
+
+    # 5. always sync back csrc position
+    if input_fh is None:
+      csrc.update_s(ctx.alloc, rdargs_ptr)
+
+    # parse failed
+    if error != 0:
+      rdargs_ptr = 0
+    # parse ok
+    else:
+      # 6. calc and allocate extra memory
+      total_bytes, num_longs = result_list.calc_extra_result_size()
+      log_dos.info("ReadArgs: extra memory: total_bytes=%d num_longs=%d",
+        total_bytes, num_longs)
+      if total_bytes > 0:
+        extra_ptr = self._alloc_mem("ReadArgs(@%06x)" % self.get_callee_pc(ctx), total_bytes)
+        if extra_ptr == 0:
+          log_dos.warn("ReadArgs: no memory for extra")
+          self.setioerr(ctx, ERROR_NO_FREE_STORE)
+          return 0
+      else:
+        extra_ptr = 0
+
+      # 7. write array and extra memory from result list
+      result_list.generate_result(ctx.mem.access, array_ptr, extra_ptr, num_longs)
+
+      # 8. alloc custom rdargs if none is given
+      if rdargs_ptr == 0:
+        rdargs = ctx.alloc.alloc_struct("RDArgs", RDArgsDef)
+        rdargs_ptr = rdargs.addr
+        own = True
+      else:
+        own = False
+      # own house keeping
+      self.rdargs[rdargs.addr] = (rdargs, own)
+
+      # 9. store extra buffer
+      rdargs.access.w_s('RDA_Buffer', extra_ptr)
+      rdargs.access.w_s('RDA_BufSiz', total_bytes)
+
+    # done
+    self.setioerr(ctx, error)
+    return rdargs_ptr
 
   def FreeArgs(self, ctx):
     rdargs_ptr = ctx.cpu.r_reg(REG_D1)

@@ -10,10 +10,22 @@ class CSource:
       self.len = 0
     self.pos = 0
 
+  def __repr__(self):
+    return "%s(%s)" % (self.__class__.__name__, repr(self.buf))
+
+  def reset(self):
+    self.pos = 0
+
+  def next_line(self):
+    while True:
+      c = self.getc()
+      if c is None or c == '\n':
+        break
+
   def getc(self):
     """return a character or None if EOF"""
     if self.buf is None:
-      return EOF
+      return None
     if self.pos < self.len:
       c = self.buf[self.pos]
       self.pos += 1
@@ -38,6 +50,36 @@ class CSource:
     """update current pointer only"""
     c = alloc.map_struct("CSource", ptr, CSourceDef)
     c.access.w_s('CS_CurChr', self.pos)
+
+  def append_line(self):
+    pass
+
+  def rewind(self, num):
+    if self.pos >= num:
+      self.pos -= num
+
+
+class FileLineCSource(CSource):
+  def __init__(self, fh):
+    CSource.__init__(self)
+    self.fh = fh
+
+  def append_line(self):
+    res = []
+    while True:
+      ch = self.fh.getc()
+      if ch == -1:
+        break
+      c = chr(ch)
+      res.append(c)
+      if c == '\n':
+        break
+    line = "".join(res)
+    if self.buf is None:
+      self.buf = line
+    else:
+      self.buf += line
+    self.len = len(self.buf)
 
 
 class FileCSource:
