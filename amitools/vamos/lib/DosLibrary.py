@@ -1231,7 +1231,7 @@ class DosLibrary(AmigaLibrary):
       csrc.rewind(ah.get_num_bytes())
 
     # 4. parse csrc with given template
-    log_dos.info("ReadArgs: input: %s @%d", repr(csrc.buf), csrc.pos)
+    log_dos.info("ReadArgs: parse input: %s @%d", repr(csrc.buf), csrc.pos)
     p = ArgsParser(tal)
     error = p.parse(csrc)
     result_list = p.get_result_list()

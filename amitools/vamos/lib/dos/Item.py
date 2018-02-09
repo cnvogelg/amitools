@@ -8,10 +8,11 @@ class ItemParser:
   ITEM_UNQUOTED = 1
   ITEM_QUOTED = 2
 
-  def __init__(self, csrc):
+  def __init__(self, csrc, eol_unget_bug=True):
     """set character source csrc that supports getc() and ungetc()"""
     self.csrc = csrc
     self.last_unquoted_char = None
+    self.eol_unget_bug = eol_unget_bug
 
   def read_eol(self):
     """read until end of line"""
@@ -109,7 +110,8 @@ class ItemParser:
           # terminate
           if ch in (None, null, "\n"):
             status = self.ITEM_UNQUOTED
-            self.csrc.ungetc()
+            if self.eol_unget_bug:
+              self.csrc.ungetc()
             break
           elif ch in (" ", "\t", "="):
             # Know Bug: Don't UNGET for a space or equals sign

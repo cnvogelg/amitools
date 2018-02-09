@@ -34,3 +34,18 @@ def item_parser3_test():
   check_item_eol('a  b  ', ItemParser.ITEM_UNQUOTED, 'a', '  b')
   check_item_eol('"a"  b', ItemParser.ITEM_QUOTED, 'a', '  b')
   check_item_eol('"a"  b  ', ItemParser.ITEM_QUOTED, 'a', '  b  ')
+
+def item_parser_eol_bug_test():
+  csrc = CSource('hello world')
+  ip = ItemParser(csrc)
+  maxbuf = 256
+  assert ip.read_item(maxbuf) == (ItemParser.ITEM_UNQUOTED, "hello")
+  assert ip.read_item(maxbuf) == (ItemParser.ITEM_UNQUOTED, "world")
+  # with eol_bug enabled we get last char again...
+  assert ip.read_item(maxbuf) == (ItemParser.ITEM_UNQUOTED, "d")
+  # now again with fixed parser
+  csrc = CSource('hello world')
+  ip = ItemParser(csrc, eol_unget_bug=False)
+  assert ip.read_item(maxbuf) == (ItemParser.ITEM_UNQUOTED, "hello")
+  assert ip.read_item(maxbuf) == (ItemParser.ITEM_UNQUOTED, "world")
+  assert ip.read_item(maxbuf) == (ItemParser.ITEM_NOTHING, None)

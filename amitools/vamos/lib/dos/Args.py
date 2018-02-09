@@ -225,10 +225,10 @@ class ParseResultList:
           mem_access.w32(long_ptr,r)
           long_ptr += 4
         elif ktype == TemplateArg.TYPE_SWITCH:
-          base_val = -1
+          base_val = 0xffffffff
         elif ktype == TemplateArg.TYPE_TOGGLE:
           old_val = mem_access.r32(array_ptr)
-          base_val = 0 if old_val else -1
+          base_val = 0 if old_val else 0xffffffff
 
       # update array pointer
       if base_val is not None:
@@ -251,7 +251,7 @@ class ArgsParser:
     """
     result_list = ParseResultList(self.targ_list)
     self.result_list = result_list
-    item_parser = ItemParser(csrc)
+    item_parser = ItemParser(csrc, eol_unget_bug=False)
 
     # ----- first pass -----
     # run through targs and check if a value is found on csrc

@@ -11,7 +11,7 @@ class CSource:
     self.pos = 0
 
   def __repr__(self):
-    return "%s(%s)" % (self.__class__.__name__, repr(self.buf))
+    return "%s(%d:%s)" % (self.__class__.__name__, self.len, repr(self.buf))
 
   def reset(self):
     self.pos = 0
@@ -66,14 +66,15 @@ class FileLineCSource(CSource):
 
   def append_line(self):
     res = []
-    while True:
-      ch = self.fh.getc()
-      if ch == -1:
-        break
-      c = chr(ch)
-      res.append(c)
-      if c == '\n':
-        break
+    if self.fh is not None:
+      while True:
+        ch = self.fh.getc()
+        if ch == -1:
+          break
+        c = chr(ch)
+        res.append(c)
+        if c == '\n':
+          break
     line = "".join(res)
     if self.buf is None:
       self.buf = line
