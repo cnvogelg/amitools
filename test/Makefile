@@ -3,7 +3,7 @@
 # build programs with the following compilers:
 # VBCC, GCC, AROS_GCC, SASC
 
-SOURCES_C = vprintf.c mem.c util_muldiv.c
+SOURCES_C = dos_readargs.c vprintf.c mem.c util_muldiv.c
 
 VPATH = src
 
@@ -13,16 +13,17 @@ BUILD_DIR ?= bin
 # external data
 SASC_INSTALL_DIR ?= $(HOME)/amiga/shared/sc
 export SASC_INSTALL_DIR
+NDK_DIR ?= /opt/m68k-amigaos/m68k-amigaos/ndk
 
 # compilers
-VBCC = vc
+VBCC_EXE = vc
 GCC = m68k-amigaos-gcc
 AROS_GCC = m68k-aros-gcc
 AROS_ELF2HUNK = elf2hunk
 SASC = ../bin/vamos -c sasc.vamosrc sc
 
 # options
-VBCC_OPTS =
+VBCC_OPTS = +aos68k -I$(NDK_DIR)/include
 GCC_OPTS  = -noixemul
 AROS_GCC_OPTS =
 SASC_OPTS = SMALLDATA SMALLCODE NOSTKCHK NOCHKABORT NOICONS STRICT ANSI
@@ -31,8 +32,8 @@ SASC_OPTS = SMALLDATA SMALLCODE NOSTKCHK NOCHKABORT NOICONS STRICT ANSI
 VBCC_OPTI = -O2
 GCC_OPTI = -O2
 AROS_GCC_OPTI = -O2
-SASC_OPTI = PARAMETERS=REGISTERS OPT OPTTIME OPTINLINE\
-            OPTSCHEDULE STRINGMERGE STRUCTUREEQUIVALENCE NODEBUG
+SASC_OPTI = PARAMETERS=REGISTERS OPT OPTTIME OPTINLINE DEBUG=F \
+            OPTSCHEDULE STRINGMERGE STRUCTUREEQUIVALENCE 
 
 # debug options
 VBCC_DEBUG = -g
@@ -83,7 +84,7 @@ $(BUILD_DIR):
 
 # rules for opt
 $(BUILD_DIR)/%$(VBCC_EXT) : %.c
-	$(VBCC) $(VBCC_OPTS) $(VBCC_OPTI) -o $@ $< $(VBCC_LIBS)
+	$(VBCC_EXE) $(VBCC_OPTS) $(VBCC_OPTI) -o $@ $< $(VBCC_LIBS)
 
 $(BUILD_DIR)/%$(GCC_EXT) : %.c
 	$(GCC) $(GCC_OPTS) $(GCC_OPTI) -o $@ $<
@@ -96,7 +97,7 @@ $(BUILD_DIR)/%$(SASC_EXT) : %.c
 
 # rules for dbg
 $(BUILD_DIR)/%$(VBCC_EXT)$(DBG_EXT) : %.c
-	$(VBCC) $(VBCC_OPTS) $(VBCC_DEBUG) -o $@ $< $(VBCC_LIBS)
+	$(VBCC_EXE) $(VBCC_OPTS) $(VBCC_DEBUG) -o $@ $< $(VBCC_LIBS)
 
 $(BUILD_DIR)/%$(GCC_EXT)$(DBG_EXT) : %.c
 	$(GCC) $(GCC_OPTS) $(GCC_DEBUG) -o $@ $<

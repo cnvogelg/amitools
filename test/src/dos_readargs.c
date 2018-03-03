@@ -37,7 +37,7 @@
 
 #define BEGIN_TEST(template, exp_error) \
   num_tests++; \
-  for(i=0;i<ARG_MAX;i++) { array[i]=0; } \
+  memset(array, 0, sizeof(LONG) * ARG_MAX); \
   cur_templ = template; \
   rdargs = ReadArgs(template, array, rdargs_in); \
   if(!rdargs) { \

@@ -9,12 +9,13 @@ VAMOS_ARGS=['-c', 'test.vamosrc']
 PROG_BIN_DIR="bin"
 
 class VamosTestRunner:
-  def __init__(self, flavor,
+  def __init__(self, flavor, vamos_bin,
                vopts=None,
                use_debug_bins=False,
                dump_output=False,
                generate_data=False):
     self.flavor = flavor
+    self.vamos_bin = vamos_bin
     self.vopts = vopts
     self.use_debug_bins = use_debug_bins
     self.dump_output = dump_output
@@ -53,7 +54,7 @@ class VamosTestRunner:
        - stdout as line array
     """
     # run vamos with prog
-    args = [VAMOS_BIN] + VAMOS_ARGS
+    args = [self.vamos_bin] + VAMOS_ARGS
     if self.vopts is not None:
       args = args + self.vopts
     prog_name = "curdir:bin/" + prog_args[0] + '_' + self.flavor
@@ -139,6 +140,8 @@ def pytest_addoption(parser):
         help="generate data files by using the output of the test program")
     parser.addoption("--vamos-options", "-V", action="store", default=None,
         help="add options to vamos run. separate options by plus: e.g. -V-t+-T")
+    parser.addoption("--vamos-executable", "-E", default=VAMOS_BIN,
+        help="replace the vamos executable (default: ../bin/vamos)")
 
 def pytest_runtest_setup(item):
   flv = item.config.getoption("--flavor")
@@ -155,10 +158,12 @@ def vamos(request):
   dump = request.config.getoption("--dump-output")
   gen = request.config.getoption("--gen-data")
   vopts = request.config.getoption("--vamos-options")
+  vamos_bin = request.config.getoption("--vamos-executable")
   if vopts is not None:
     vopts = vopts.split('+')
   return VamosTestRunner(request.param,
     use_debug_bins=dbg,
     dump_output=dump,
     generate_data=gen,
-    vopts=vopts)
+    vopts=vopts,
+    vamos_bin=vamos_bin)
