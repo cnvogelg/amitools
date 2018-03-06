@@ -4,7 +4,6 @@
 #include <proto/exec.h>
 #include <proto/dos.h>
 #include <proto/mathieeedoubbas.h>
-#include <proto/mathieeedoubtrans.h>
 
 #define FLT_MIN 1.17549435E-38
 #define FLT_MAX 3.40282347E+38
@@ -20,7 +19,6 @@ typedef struct MathIEEEBase BaseType;
 #endif
 
 BaseType *MathIeeeDoubBasBase;
-BaseType *MathIeeeDoubTransBase;
 
 static void print_double(STRPTR prefix, double d)
 {
@@ -191,30 +189,23 @@ int main(int argc, char *argv[])
 
   MathIeeeDoubBasBase = (BaseType *)OpenLibrary("mathieeedoubbas.library", 34);
   if(MathIeeeDoubBasBase) {
-    MathIeeeDoubTransBase = (BaseType *)OpenLibrary("mathieeedoubtrans.library", 34);
-    if(MathIeeeDoubTransBase) {
-      PutStr("ok!\n");
+    PutStr("ok!\n");
 
-      test_const();
+    test_const();
 
-      test_abs();
-      test_add();
-      test_ceil();
-      test_cmp();
-      test_div();
-      test_fix();
-      test_floor();
-      test_flt();
-      test_mul();
-      test_neg();
-      test_sub();
-      test_tst();
+    test_abs();
+    test_add();
+    test_ceil();
+    test_cmp();
+    test_div();
+    test_fix();
+    test_floor();
+    test_flt();
+    test_mul();
+    test_neg();
+    test_sub();
+    test_tst();
 
-      CloseLibrary((struct Library *)MathIeeeDoubTransBase);
-    } else {
-      PutStr("No mathieeedoubtrans.library!\n");
-      res = 2;
-    }
     CloseLibrary((struct Library *)MathIeeeDoubBasBase);
   } else {
     PutStr("No mathieeedoubbas.library!\n");

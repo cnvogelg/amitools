@@ -5,7 +5,8 @@
 
 SOURCES_C = dos_readargs.c vprintf.c mem.c
 SOURCES_C += util_muldiv.c util_date.c
-SOURCES_C += math_double.c math_single.c math_fast.c
+SOURCES_C += math_double.c math_double_trans.c
+SOURCES_C += math_single.c math_fast.c
 
 VPATH = src
 
