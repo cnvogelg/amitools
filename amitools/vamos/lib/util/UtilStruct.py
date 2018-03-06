@@ -9,3 +9,18 @@ class TagItemStruct(AmigaStruct):
   ]
 TagItemDef = TagItemStruct()
 
+#selco
+#ClockData
+class ClockDataStruct(AmigaStruct):
+  _name = "ClockData"
+  _format = [
+    ('UWORD', 'sec'),
+    ('UWORD', 'min'),
+    ('UWORD', 'hour'),
+    ('UWORD', 'mday'),
+    ('UWORD', 'month'),
+    ('UWORD', 'year'),
+    ('UWORD', 'wday')
+  ]
+ClockDataDef = ClockDataStruct()
+

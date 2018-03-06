@@ -4,6 +4,19 @@ from amitools.vamos.Log import *
 import struct
 import math
 
+#selco
+#taken from http://www.neotitans.com/resources/python/python-unsigned-32bit-value.html
+#Casting Python integers into signed 32-bit equivalents
+def int32(x):
+  if x>0xFFFFFFFF:
+    raise OverflowError
+  if x>0x7FFFFFFF:
+    x=int(0x100000000-x)
+    if x<2147483648:
+      return -x
+    else:
+      return -2147483648
+  return x
 
 def fromDouble(number):
   hi=0
@@ -36,12 +49,29 @@ class MathIEEEDoubBasLibrary(AmigaLibrary):
 
   def IEEEDPFix(self, ctx):
     arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+#selco return INT_MAX/INT_MIN in case of overflow
+    if arg>2147483647:     # amiga INT_MAX
+      arg=2147483647
+    elif arg<-2147483648:  # amiga INT_MIN
+      arg=-2147483648	
     return int(arg)
 
   def IEEEFlt(self, ctx):
     (hi,lo)=fromDouble(ctx.cpu.r_reg(REG_D0)+0.0)
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
+
+
+
+#selco
+# name above should have been IEEEDPFlt !???
+  def IEEEDPFlt(self, ctx):
+    integer32bit=int32(ctx.cpu.r_reg(REG_D0));   # we need to cast to 32bit integers here, otherwise negative values are wrong! 
+    (hi,lo)=fromDouble(integer32bit)
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
+
+
 
   def IEEEDPCmp(self, ctx):
     arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
@@ -73,23 +103,29 @@ class MathIEEEDoubBasLibrary(AmigaLibrary):
   def IEEEDPAdd(self,ctx):
     arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     arg2=toDouble(ctx.cpu.r_reg(REG_D2),ctx.cpu.r_reg(REG_D3))
-    print "%s + %s = %s" % (arg1,arg,arg1+arg2)
-    (hi,lo)=fromDouble(arg1+arg2)
+#    print "%s + %s = %s" % (arg1,arg2,arg1+arg2)  #selco arg2
+    Result=arg1+arg2
+    (hi,lo)=fromDouble(Result)
+    if Result==float('inf'):       #selco
+      (hi,lo)=(0x7fefffff, 0xffffffff)
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 
   def IEEEDPSub(self,ctx):
     arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     arg2=toDouble(ctx.cpu.r_reg(REG_D2),ctx.cpu.r_reg(REG_D3))
-    print "%s - %s = %s" % (arg1,arg,arg1-arg2)
-    (hi,lo)=fromDouble(arg1-arg2)
+#    print "%s - %s = %s" % (arg1,arg2,arg1-arg2)  #selco arg2
+    Result=arg1-arg2
+    (hi,lo)=fromDouble(Result)
+    if Result==float('inf'):       #selco
+      (hi,lo)=(0x7fefffff, 0xffffffff)
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
   
   def IEEEDPMul(self,ctx):
     arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     arg2=toDouble(ctx.cpu.r_reg(REG_D2),ctx.cpu.r_reg(REG_D3))
-    print "%s * %s = %s" % (arg1,arg,arg1*arg2)
+#    print "%s * %s = %s" % (arg1,arg2,arg1*arg2)   #selco arg2
     (hi,lo)=fromDouble(arg1*arg2)
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
@@ -97,8 +133,11 @@ class MathIEEEDoubBasLibrary(AmigaLibrary):
   def IEEEDPDiv(self,ctx):
     arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     arg2=toDouble(ctx.cpu.r_reg(REG_D2),ctx.cpu.r_reg(REG_D3))
-    print "%s / %s = %s" % (arg1,arg,arg1/arg2)
-    (hi,lo)=fromDouble(arg1/arg2)
+#    print "%s / %s = %s" % (arg1,arg2,arg1/arg2)   #selco arg2
+    if arg2==0:                                     #selco Amiga returns NaN (0xfff80000,0x00000000) here
+        (hi,lo)=(0xfff80000,0x00000000)             #python throws an exception
+    else:
+        (hi,lo)=fromDouble(arg1/arg2)
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
   
@@ -111,6 +150,15 @@ class MathIEEEDoubBasLibrary(AmigaLibrary):
   def IEEEDPCeil(self,ctx):
     arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     (hi,lo)=fromDouble(math.ceil(arg1))
+    if hi==0x80000000 and lo==0x00000000:   # on amiga zero is always positive
+        hi=0x00000000
+    ctx.cpu.w_reg(REG_D1,lo)
+    return hi
+
+#selco
+  def IEEEDPNeg(self,ctx):
+    arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    (hi,lo)=fromDouble(-1*arg1)
     ctx.cpu.w_reg(REG_D1,lo)
     return hi
 
