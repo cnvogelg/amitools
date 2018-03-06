@@ -535,6 +535,16 @@ class ExecLibrary(AmigaLibrary):
     # nop for now
     log_exec.info("ReleaseSemaphore(%06x) ignored" % addr)
 
+
+  # ----- Resources -----
+
+  def OpenResource(self,ctx):
+    name_ptr = ctx.cpu.r_reg(REG_A1)
+    name     = ctx.mem.access.r_cstr(name_ptr)
+    log_exec.info("OpenResource(%s) ignored" % name)
+    return 0
+
+
   # ----- Allocate/Deallocate -----
 
   def Allocate(self,ctx):
