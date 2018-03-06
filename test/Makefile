@@ -97,6 +97,7 @@ $(BUILD_DIR)/%$(AROS_GCC_EXT) : %.c
 $(BUILD_DIR)/%$(SASC_EXT) : %.c
 	$(SASC) $(SASC_OPTS) $(SASC_OPTI) LINK TO $@ $<
 
+
 # rules for dbg
 $(BUILD_DIR)/%$(VBCC_EXT)$(DBG_EXT) : %.c
 	$(VBCC_EXE) $(VBCC_OPTS) $(VBCC_DEBUG) -o $@ $< $(VBCC_LIBS)
@@ -111,3 +112,10 @@ $(BUILD_DIR)/%$(SASC_EXT)$(DBG_EXT) : %.c
 	$(SASC) $(SASC_OPTS) $(SASC_DEBUG) LINK TO $@ $<
 
 
+# special flags
+$(BUILD_DIR)/math_double_sc: SASC_OPTS += Math=i
+$(BUILD_DIR)/math_double_sc$(DBG_EXT): SASC_OPTS += Math=i
+$(BUILD_DIR)/math_single_sc: SASC_OPTS += Math=i
+$(BUILD_DIR)/math_single_sc$(DBG_EXT): SASC_OPTS += Math=i
+$(BUILD_DIR)/math_fast_sc: SASC_OPTS += Math=f
+$(BUILD_DIR)/math_fast_sc$(DBG_EXT): SASC_OPTS += Math=f

@@ -1,29 +1,10 @@
 from amitools.vamos.AmigaLibrary import *
 from amitools.vamos.lib.lexec.ExecStruct import LibraryDef
 from amitools.vamos.Log import *
-import struct
+from amitools.util.Math import *
+from amitools.vamos.Log import log_math
 import math
 
-
-def fromDouble(number):
-  hi=0
-  lo=0
-  st=struct.pack('>d',number)
-  for c in st[0:4]:
-    hi=(hi << 8) | ord(c)
-  for c in st[4:8]:
-    lo=(lo << 8) | ord(c)
-  return (hi,lo)
-
-def toDouble(hi,lo):
-  st=""
-  for i in range(0,4):
-    st=st+chr(hi >> 24)
-    hi=(hi << 8) & 0xffffffff
-  for i in range(0,4):
-    st=st+chr(lo >> 24)
-    lo=(lo << 8) & 0xffffffff
-  return struct.unpack('>d',st)[0]
 
 class MathIEEEDoubBasLibrary(AmigaLibrary):
   name = "mathieeedoubbas.library"
@@ -35,82 +16,98 @@ class MathIEEEDoubBasLibrary(AmigaLibrary):
     AmigaLibrary.setup_lib(self, ctx)
 
   def IEEEDPFix(self, ctx):
-    arg=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    return int(arg)
+    arg = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    if arg > Amiga_INT_MAX:
+      arg = Amiga_INT_MAX
+    elif arg < Amiga_INT_MIN:
+      arg = Amiga_INT_MIN
+    res = int(arg)
+    log_math.info("DPFix(%s) = %s", arg, res)
+    return res
 
-  def IEEEFlt(self, ctx):
-    (hi,lo)=fromDouble(ctx.cpu.r_reg(REG_D0)+0.0)
-    ctx.cpu.w_reg(REG_D1,lo)
-    return hi
+  def IEEEDPFlt(self, ctx):
+    i = int32(ctx.cpu.r_reg(REG_D0));
+    d = float(i)
+    log_math.info("DPFlt(%s) = %s", i, d)
+    return double_to_regs(d)
 
   def IEEEDPCmp(self, ctx):
-    arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    arg2=toDouble(ctx.cpu.r_reg(REG_D2),ctx.cpu.r_reg(REG_D3))
+    arg1 = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    arg2 = regs_to_double(ctx.cpu.r_reg(REG_D2),ctx.cpu.r_reg(REG_D3))
     if arg1<arg2:
-      return -1
+      res = -1
     elif arg1>arg2:
-      return +1
+      res = +1
     else:
-      return 0
-    
+      res =  0
+    log_math.info("DPCmp(%s, %s) = %s", arg1, arg2, res)
+    return res
+
   def IEEEDPTst(self,ctx):
-    arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    if arg1<0.0:
-      return -1
-    elif arg1>0.0:
-      return +1
+    arg = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    if arg < 0.0:
+      res =  -1
+    elif arg > 0.0:
+      res = +1
     else:
-      return 0
+      res = 0
+    log_math.info("DPTst(%s) = %s", arg, res)
+    return res
 
   def IEEEDPAbs(self,ctx):
-    arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    if arg1<0:
-      arg1=-arg1
-    (hi,lo)=fromDouble(arg1)
-    ctx.cpu.w_reg(REG_D1,lo)
-    return hi
+    arg = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    if arg < 0.0:
+      res = -arg
+    else:
+      res = arg
+    log_math.info("DPAbs(%s) = %s", arg, res)
+    return double_to_regs(res)
 
   def IEEEDPAdd(self,ctx):
-    arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    arg2=toDouble(ctx.cpu.r_reg(REG_D2),ctx.cpu.r_reg(REG_D3))
-    print "%s + %s = %s" % (arg1,arg,arg1+arg2)
-    (hi,lo)=fromDouble(arg1+arg2)
-    ctx.cpu.w_reg(REG_D1,lo)
-    return hi
+    arg1 = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    arg2 = regs_to_double(ctx.cpu.r_reg(REG_D2),ctx.cpu.r_reg(REG_D3))
+    res = arg1 + arg2
+    log_math.info("DPAdd(%s, %s) = %s", arg1, arg2, res)
+    return double_to_regs(res)
 
   def IEEEDPSub(self,ctx):
-    arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    arg2=toDouble(ctx.cpu.r_reg(REG_D2),ctx.cpu.r_reg(REG_D3))
-    print "%s - %s = %s" % (arg1,arg,arg1-arg2)
-    (hi,lo)=fromDouble(arg1-arg2)
-    ctx.cpu.w_reg(REG_D1,lo)
-    return hi
-  
-  def IEEEDPMul(self,ctx):
-    arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    arg2=toDouble(ctx.cpu.r_reg(REG_D2),ctx.cpu.r_reg(REG_D3))
-    print "%s * %s = %s" % (arg1,arg,arg1*arg2)
-    (hi,lo)=fromDouble(arg1*arg2)
-    ctx.cpu.w_reg(REG_D1,lo)
-    return hi
-  
-  def IEEEDPDiv(self,ctx):
-    arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    arg2=toDouble(ctx.cpu.r_reg(REG_D2),ctx.cpu.r_reg(REG_D3))
-    print "%s / %s = %s" % (arg1,arg,arg1/arg2)
-    (hi,lo)=fromDouble(arg1/arg2)
-    ctx.cpu.w_reg(REG_D1,lo)
-    return hi
-  
-  def IEEEDPFloor(self,ctx):
-    arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    (hi,lo)=fromDouble(math.floor(arg1))
-    ctx.cpu.w_reg(REG_D1,lo)
-    return hi
-  
-  def IEEEDPCeil(self,ctx):
-    arg1=toDouble(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    (hi,lo)=fromDouble(math.ceil(arg1))
-    ctx.cpu.w_reg(REG_D1,lo)
-    return hi
+    arg1 = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    arg2 = regs_to_double(ctx.cpu.r_reg(REG_D2),ctx.cpu.r_reg(REG_D3))
+    res = arg1 - arg2
+    log_math.info("DPSub(%s, %s) = %s", arg1, arg2, res)
+    return double_to_regs(res)
 
+  def IEEEDPMul(self,ctx):
+    arg1 = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    arg2 = regs_to_double(ctx.cpu.r_reg(REG_D2),ctx.cpu.r_reg(REG_D3))
+    res = arg1 * arg2
+    log_math.info("DPMul(%s, %s) = %s", arg1, arg2, res)
+    return double_to_regs(res)
+
+  def IEEEDPDiv(self,ctx):
+    arg1 = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    arg2 = regs_to_double(ctx.cpu.r_reg(REG_D2),ctx.cpu.r_reg(REG_D3))
+    if arg2 == 0.0:
+      res = float('NaN')
+    else:
+      res = arg1 / arg2
+    log_math.info("DPDiv(%s, %s) = %s", arg1, arg2, res)
+    return double_to_regs(res)
+
+  def IEEEDPFloor(self,ctx):
+    arg = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    res = math.floor(arg)
+    log_math.info("DPFloor(%s) = %s", arg, res)
+    return double_to_regs(res)
+
+  def IEEEDPCeil(self,ctx):
+    arg = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    res = math.ceil(arg)
+    log_math.info("DPCeil(%s) = %s", arg, res)
+    return double_to_regs(res, force_pos_zero=True)
+
+  def IEEEDPNeg(self,ctx):
+    arg = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
+    res = -arg
+    log_math.info("DPNeg(%s) = %s", arg, res)
+    return double_to_regs(res)
