@@ -21,7 +21,7 @@ int main(int argc, char *argv[])
     q = UDivMod32(10,2);
     Printf("%lu\n", q);
 
-    CloseLibrary(UtilityBase);
+    CloseLibrary((struct Library *)UtilityBase);
   }
   return 0;
 }

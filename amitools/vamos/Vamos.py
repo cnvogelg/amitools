@@ -19,7 +19,11 @@ from lib.DosLibrary import DosLibrary
 from lib.UtilityLibrary import UtilityLibrary
 from lib.IntuitionLibrary import IntuitionLibrary
 from lib.MathFFPLibrary import MathFFPLibrary
+from lib.MathTransLibrary import MathTransLibrary
 from lib.MathIEEEDoubBasLibrary import MathIEEEDoubBasLibrary
+from lib.MathIEEEDoubTransLibrary import MathIEEEDoubTransLibrary
+from lib.MathIEEESingBasLibrary import MathIEEESingBasLibrary
+from lib.MathIEEESingTransLibrary import MathIEEESingTransLibrary
 from lib.TimerDevice import TimerDevice
 
 from Log import *
@@ -333,10 +337,26 @@ class Vamos:
     mathffp_cfg = cfg.get_lib_config('mathffp.library')
     self.mathffp_lib_def = MathFFPLibrary(mathffp_cfg)
     self.lib_mgr.register_vamos_lib(self.mathffp_lib_def)
+    # mathtrans
+    mathtrans_cfg = cfg.get_lib_config('mathtrans.library')
+    self.mathtrans_lib_def = MathTransLibrary(mathtrans_cfg)
+    self.lib_mgr.register_vamos_lib(self.mathtrans_lib_def)
     # mathdoubbas
     mathdoubbas_cfg = cfg.get_lib_config('mathieeedoubbas.library')
     self.mathdoubbas_lib_def = MathIEEEDoubBasLibrary(mathdoubbas_cfg)
     self.lib_mgr.register_vamos_lib(self.mathdoubbas_lib_def)
+    # mathdoubtrans
+    mathdoubtrans_cfg = cfg.get_lib_config('mathieeedoubtrans.library')
+    self.mathdoubtrans_lib_def = MathIEEEDoubTransLibrary(mathdoubtrans_cfg)
+    self.lib_mgr.register_vamos_lib(self.mathdoubtrans_lib_def)
+    # mathsingbas
+    mathsingbas_cfg = cfg.get_lib_config('mathieeesingbas.library')
+    self.mathsingbas_lib_def = MathIEEESingBasLibrary(mathsingbas_cfg)
+    self.lib_mgr.register_vamos_lib(self.mathsingbas_lib_def)
+    # mathsingtrans
+    mathsingtrans_cfg = cfg.get_lib_config('mathieeesingtrans.library')
+    self.mathsingtrans_lib_def = MathIEEESingTransLibrary(mathsingtrans_cfg)
+    self.lib_mgr.register_vamos_lib(self.mathsingtrans_lib_def)
     # timer
     timer_cfg = cfg.get_lib_config('timer.device')
     self.timer_dev_def = TimerDevice(timer_cfg)

@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
     res = CheckDate(&cf);
     Printf("f8: %lu\n", res);
 
-    CloseLibrary(UtilityBase);
+    CloseLibrary((struct Library *)UtilityBase);
   }
   return 0;
 }

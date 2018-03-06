@@ -3,7 +3,9 @@
 # build programs with the following compilers:
 # VBCC, GCC, AROS_GCC, SASC
 
-SOURCES_C = dos_readargs.c vprintf.c mem.c util_muldiv.c
+SOURCES_C = dos_readargs.c vprintf.c mem.c
+SOURCES_C += util_muldiv.c util_date.c
+SOURCES_C += math_double.c math_single.c math_fast.c
 
 VPATH = src
 
@@ -33,7 +35,7 @@ VBCC_OPTI = -O2
 GCC_OPTI = -O2
 AROS_GCC_OPTI = -O2
 SASC_OPTI = PARAMETERS=REGISTERS OPT OPTTIME OPTINLINE DEBUG=F \
-            OPTSCHEDULE STRINGMERGE STRUCTUREEQUIVALENCE 
+            OPTSCHEDULE STRINGMERGE STRUCTUREEQUIVALENCE
 
 # debug options
 VBCC_DEBUG = -g
