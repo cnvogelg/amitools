@@ -2,6 +2,7 @@ from amitools.vamos.AmigaLibrary import *
 from amitools.vamos.lib.lexec.ExecStruct import LibraryDef
 from amitools.vamos.lib.util.UtilStruct import TagItemDef
 from amitools.vamos.lib.util.TagList import *
+from amitools.vamos.lib.util.AmiDate import *
 from amitools.vamos.Log import *
 
 class UtilityLibrary(AmigaLibrary):
@@ -20,7 +21,7 @@ class UtilityLibrary(AmigaLibrary):
     rem  = dividend % divisor
     log_utility.info("UDivMod32(dividend=%u, divisor=%u) => (quotient=%u, remainder=%u)" % (dividend, divisor, quot, rem))
     return [quot, rem]
-  
+
   def SDivMod32(self, ctx):
     dividend = ctx.cpu.r_reg(REG_D0)
     if dividend >= 0x80000000:
@@ -117,3 +118,35 @@ class UtilityLibrary(AmigaLibrary):
       return get_tag(ctx, ti_addr)[1]
     else:
       return defaultValue
+
+  # ---- Date -----
+
+  def Amiga2Date(self, ctx):
+    seconds = ctx.cpu.r_reg(REG_D0)
+    date_ptr = ctx.cpu.r_reg(REG_A0)
+
+    t = date_at(seconds)
+    log_utility.info("Amiga2Date: seconds=%d -> time=%s", seconds, t)
+    write_clock_data(t, ctx.mem, date_ptr)
+
+  def Date2Amiga(self, ctx):
+    date_ptr = ctx.cpu.r_reg(REG_A0)
+
+    t = read_clock_data(ctx.mem, date_ptr)
+    if t is None:
+      log_utility.warn("Date2Amiga: invalid date! @%08x", date_ptr)
+      return 0
+    seconds = seconds_since(t)
+    log_utility.info("Date2Amige: time=%s -> seconds=%u", time, seconds)
+    return seconds
+
+  def CheckDate(self, ctx):
+    date_ptr = ctx.cpu.r_reg(REG_A0)
+
+    t = read_clock_data(ctx.mem, date_ptr)
+    if t is None:
+      log_utility.info("CheckDate: invalid date! @%08x", date_ptr)
+      return 0
+    seconds = seconds_since(t)
+    log_utility.info("CheckDate: time=%s -> seconds=%u", time, seconds)
+    return seconds
