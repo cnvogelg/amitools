@@ -5,10 +5,8 @@
 #include <proto/dos.h>
 #include <proto/mathieeedoubbas.h>
 
-#define FLT_MIN 1.17549435E-38
-#define FLT_MAX 3.40282347E+38
-#define DBL_MIN 2.2250738585072014E-308
-#define DBL_MAX 1.7976931348623157E+308
+#include "math_double.h"
+
 #define INT_MIN (-2147483647-1)
 #define INT_MAX 2147483647
 
@@ -23,7 +21,7 @@ BaseType *MathIeeeDoubBasBase;
 static void print_double(STRPTR prefix, double d)
 {
   ULONG *u = (ULONG *)&d;
-  Printf("%s: %08lx %08x\n", prefix, u[0], u[1]);
+  Printf("%s: %08lx %08lx\n", prefix, u[0], u[1]);
 }
 
 static void print_long(STRPTR prefix, ULONG l)
@@ -50,8 +48,8 @@ static void test_abs(void)
   print_double("abs4", IEEEDPAbs(FLT_MAX));
   print_double("abs5", IEEEDPAbs(DBL_MIN));
   print_double("abs6", IEEEDPAbs(DBL_MAX));
-  print_double("abs7", IEEEDPAbs(-FLT_MAX));
-  print_double("abs8", IEEEDPAbs(-DBL_MAX));
+  print_double("abs7", IEEEDPAbs(FLT_MAX_NEG));
+  print_double("abs8", IEEEDPAbs(DBL_MAX_NEG));
 }
 
 static void test_add(void)
@@ -60,7 +58,7 @@ static void test_add(void)
   print_double("add1", IEEEDPAdd(DBL_MAX, 1.0));
   print_double("add2", IEEEDPAdd(DBL_MIN, DBL_MAX));
   print_double("add3", IEEEDPAdd(DBL_MAX, DBL_MAX));
-  print_double("add4", IEEEDPAdd(DBL_MAX, -DBL_MAX));
+  print_double("add4", IEEEDPAdd(DBL_MAX, DBL_MAX_NEG));
 }
 
 static void test_ceil(void)
@@ -72,10 +70,10 @@ static void test_ceil(void)
   print_double("ceil4", IEEEDPCeil(FLT_MAX));
   print_double("ceil5", IEEEDPCeil(DBL_MIN));
   print_double("ceil6", IEEEDPCeil(DBL_MAX));
-  print_double("ceil7", IEEEDPCeil(-FLT_MIN));
-  print_double("ceil8", IEEEDPCeil(-FLT_MAX));
-  print_double("ceil9", IEEEDPCeil(-DBL_MIN));
-  print_double("ceil10", IEEEDPCeil(-DBL_MAX));
+  print_double("ceil7", IEEEDPCeil(FLT_MIN_NEG));
+  print_double("ceil8", IEEEDPCeil(FLT_MAX_NEG));
+  print_double("ceil9", IEEEDPCeil(DBL_MIN_NEG));
+  print_double("ceil10", IEEEDPCeil(DBL_MAX_NEG));
 }
 
 static void test_cmp(void)
@@ -87,8 +85,8 @@ static void test_cmp(void)
   print_long("cmp4", IEEEDPCmp(DBL_MIN,10.0));
   print_long("cmp5", IEEEDPCmp(DBL_MAX,DBL_MAX));
   print_long("cmp6", IEEEDPCmp(DBL_MIN,DBL_MIN));
-  print_long("cmp7", IEEEDPCmp(-DBL_MAX,-DBL_MAX));
-  print_long("cmp8", IEEEDPCmp(-DBL_MIN,-DBL_MIN));
+  print_long("cmp7", IEEEDPCmp(DBL_MAX_NEG,DBL_MAX_NEG));
+  print_long("cmp8", IEEEDPCmp(DBL_MIN_NEG,DBL_MIN_NEG));
 }
 
 static void test_div(void)
@@ -103,8 +101,8 @@ static void test_div(void)
   print_double("div7", IEEEDPDiv(DBL_MIN, 10.0));
   print_double("div8", IEEEDPDiv(DBL_MAX, DBL_MAX));
   print_double("div9", IEEEDPDiv(DBL_MIN, DBL_MIN));
-  print_double("div10", IEEEDPDiv(-DBL_MAX, -DBL_MAX));
-  print_double("div11", IEEEDPDiv(-DBL_MIN, -DBL_MIN));
+  print_double("div10", IEEEDPDiv(DBL_MAX_NEG, DBL_MAX_NEG));
+  print_double("div11", IEEEDPDiv(DBL_MIN_NEG, DBL_MIN_NEG));
 }
 
 static void test_fix(void)
@@ -158,10 +156,10 @@ static void test_neg(void)
   print_double("neg4", IEEEDPNeg(FLT_MAX));
   print_double("neg5", IEEEDPNeg(DBL_MIN));
   print_double("neg6", IEEEDPNeg(DBL_MAX));
-  print_double("neg7", IEEEDPNeg(-FLT_MIN));
-  print_double("neg8", IEEEDPNeg(-FLT_MAX));
-  print_double("neg9", IEEEDPNeg(-DBL_MIN));
-  print_double("neg10", IEEEDPNeg(-DBL_MAX));
+  print_double("neg7", IEEEDPNeg(FLT_MIN_NEG));
+  print_double("neg8", IEEEDPNeg(FLT_MAX_NEG));
+  print_double("neg9", IEEEDPNeg(DBL_MIN_NEG));
+  print_double("neg10", IEEEDPNeg(DBL_MAX_NEG));
 }
 
 static void test_sub(void)
@@ -172,7 +170,7 @@ static void test_sub(void)
   print_double("sub3", IEEEDPSub(DBL_MAX, -1.0));
   print_double("sub4", IEEEDPSub(DBL_MIN, DBL_MAX));
   print_double("sub5", IEEEDPSub(DBL_MAX, DBL_MAX));
-  print_double("sub6", IEEEDPSub(DBL_MAX, -DBL_MAX));
+  print_double("sub6", IEEEDPSub(DBL_MAX, DBL_MAX_NEG));
 }
 
 static void test_tst(void)
@@ -182,8 +180,8 @@ static void test_tst(void)
   print_long("tst2", IEEEDPTst(-1000.0));
   print_long("tst3", IEEEDPTst(DBL_MAX));
   print_long("tst4", IEEEDPTst(DBL_MIN));
-  print_long("tst5", IEEEDPTst(-DBL_MAX));
-  print_long("tst6", IEEEDPTst(-DBL_MIN));
+  print_long("tst5", IEEEDPTst(DBL_MAX_NEG));
+  print_long("tst6", IEEEDPTst(DBL_MIN_NEG));
 }
 
 int main(int argc, char *argv[])
