@@ -1,4 +1,7 @@
+import pytest
 
-def run_test(vamos):
+def vprintf_test(vamos):
+  if vamos.flavor == "agcc":
+    pytest.skip("vprintf not supported")
   vamos.make_prog("vprintf")
   vamos.run_prog_check_data("vprintf")
