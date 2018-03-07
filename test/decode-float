@@ -1,0 +1,15 @@
+#!/usr/bin/env python
+from __future__ import print_function
+
+import struct
+import sys
+
+if len(sys.argv) != 2:
+  print("Usage: reg")
+  sys.exit(1)
+
+a = int(sys.argv[1], 16)
+s = struct.pack(">L", a)
+d = struct.unpack(">f", s)[0]
+print(d)
+

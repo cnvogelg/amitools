@@ -1,0 +1,16 @@
+#!/usr/bin/env python
+from __future__ import print_function
+
+import struct
+import sys
+
+if len(sys.argv) != 3:
+  print("Usage: r1 r2")
+  sys.exit(1)
+
+a = int(sys.argv[1], 16)
+b = int(sys.argv[2], 16)
+s = struct.pack(">LL", a, b)
+d = struct.unpack(">d", s)[0]
+print(d)
+

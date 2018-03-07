@@ -45,12 +45,5 @@ Amiga_DBL_POS_MAX = regs_to_double(0x7fefffff, 0xffffffff)
 Amiga_DBL_NEG_MAX = regs_to_double(0xffefffff, 0xffffffff)
 Amiga_DBL_NAN1 =    regs_to_double(0x7ff10000, 0x00000000)
 
-# typical conversions
-
-def double_inf_to_max(number):
-  if math.isinf(number):
-    if number > 0.0:
-      return Amiga_DBL_POS_MAX
-    else:
-      return Amiga_DBL_NEG_MAX
-  return number
+Amiga_FLT_POS_MAX = reg_to_float(0x7F7FFFFF)
+Amiga_FLT_NEG_MAX = reg_to_float(0xFF7FFFFF)

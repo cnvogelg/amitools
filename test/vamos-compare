@@ -1,0 +1,28 @@
+#!/bin/sh
+# vamos-compare
+#
+# compare the output of an Amiga binary run by vamos
+# with the "real one":
+
+for prog in "$@" ; do
+  echo "comparing $prog"
+  # run prog in vamos
+  VLOG=${prog}_vamos.log
+  vamos $prog > ${VLOG}
+  if [ $? -ne 0 ]; then
+    echo "FAILED: vamos"
+    exit 1
+  fi
+  # run prog in fs-uae-cli
+  FLOG=${prog}_fsuae.log
+  fs-uae-cli $prog > ${FLOG}
+  if [ $? -ne 0 ]; then
+    echo "FAILED: fs-uae-cli"
+    exit 1
+  fi
+  # compare
+  wc -l ${VLOG}
+  diff -y --suppress-common-lines ${VLOG} ${FLOG}
+  # clean up
+  rm -f ${prog}_vamos.log ${prog}_fsuae.log
+done

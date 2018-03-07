@@ -19,13 +19,19 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
     try:
       res = math.acos(arg)
     except ValueError:
-      res = float('nan')
+      res = float('-nan')
     log_math.info("DPAcos(%s) = %s", arg, res)
     return double_to_regs(res)
 
   def IEEEDPAsin(self,ctx):
     arg = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    res = math.asin(arg)
+    try:
+      res = math.asin(arg)
+    except ValueError:
+      if arg < 0.0:
+        res = float('nan')
+      else:
+        res = float('-nan')
     log_math.info("DPAsin(%s) = %s", arg, res)
     return double_to_regs(res)
 
@@ -67,20 +73,26 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
   def IEEEDPLog(self,ctx):
     arg = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     try:
-      res = math.log(arg)
+      if arg == 0.0:
+        res = float('-inf')
+      else:
+        res = math.log(arg)
     except ValueError:
-      res = float('-inf')
+      res = float('-nan')
     log_math.info("DPLog(%s) = %s", arg, res)
-    return double_to_regs(arg)
+    return double_to_regs(res)
 
   def IEEEDPLog10(self,ctx):
     arg=regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     try:
-      res = math.log10(arg)
+      if arg == 0.0:
+        res = float('-inf')
+      else:
+        res = math.log10(arg)
     except ValueError:
-      res = float('-inf')
+      res = float('-nan')
     log_math.info("DPLog10(%s) = %s", arg, res)
-    return double_to_regs(arg)
+    return double_to_regs(res)
 
   def IEEEDPPow(self,ctx):
     a = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
@@ -90,13 +102,13 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
     except OverflowError:
       res = float('inf')
     log_math.info("DPPow(%s, %s) = %s", a, b, res)
-    return double_to_regs(arg)
+    return double_to_regs(res)
 
   def IEEEDPSin(self,ctx):
     arg = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     res = math.sin(arg)
     log_math.info("DPSin(%s) = %s", arg, res)
-    return double_to_regs(arg)
+    return double_to_regs(res)
 
   def IEEEDPSincos(self,ctx):
     ptr = ctx.cpu.r_reg(REG_A0)
@@ -121,30 +133,39 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
       else:
         res = float('inf')
     log_math.info("DPSinh(%s) = %s", arg, res)
-    return double_to_regs(arg)
+    return double_to_regs(res)
 
   def IEEEDPSqrt(self,ctx):
     arg = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     try:
       res = math.sqrt(arg)
     except ValueError:
-      res = float('nan')
+      res = float('-nan')
     log_math.info("DPSqrt(%s) = %s", arg, res)
-    return double_to_regs(arg)
+    return double_to_regs(res)
 
   def IEEEDPTan(self,ctx):
     arg = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     res = math.tan(arg)
     log_math.info("DPTan(%s) = %s", arg, res)
-    return double_to_regs(arg)
+    return double_to_regs(res)
 
   def IEEEDPTanh(self,ctx):
     arg = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     res = math.tanh(arg)
     log_math.info("DPTanh(%s) = %s", arg, res)
-    return double_to_regs(arg)
+    return double_to_regs(res)
 
   def IEEEDPTieee(self,ctx):
     arg = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    log_math.info("DPTieee(%s)", arg)
-    return float_to_reg(arg)
+    try:
+      res = arg
+      f = float_to_reg(res)
+    except OverflowError:
+      if arg > 0.0:
+        res = float('inf')
+      else:
+        res = float('-inf')
+      f = float_to_reg(res)
+    log_math.info("DPTieee(%s) = %s", arg, res)
+    return f
