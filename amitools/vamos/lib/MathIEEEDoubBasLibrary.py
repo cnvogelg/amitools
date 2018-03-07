@@ -1,8 +1,7 @@
 from amitools.vamos.AmigaLibrary import *
 from amitools.vamos.lib.lexec.ExecStruct import LibraryDef
-from amitools.vamos.Log import *
-from amitools.util.Math import *
 from amitools.vamos.Log import log_math
+from amitools.util.Math import *
 import math
 
 
@@ -88,7 +87,13 @@ class MathIEEEDoubBasLibrary(AmigaLibrary):
     arg1 = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     arg2 = regs_to_double(ctx.cpu.r_reg(REG_D2),ctx.cpu.r_reg(REG_D3))
     if arg2 == 0.0:
-      res = float('NaN')
+      if arg1 == 0.0:
+        # Amiga returns sign bit set on nan...
+        res = float('-nan')
+      elif arg1 > 0.0:
+        res = float('inf')
+      else:
+        res = float('-inf')
     else:
       res = arg1 / arg2
     log_math.info("DPDiv(%s, %s) = %s", arg1, arg2, res)
@@ -103,8 +108,11 @@ class MathIEEEDoubBasLibrary(AmigaLibrary):
   def IEEEDPCeil(self,ctx):
     arg = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
     res = math.ceil(arg)
+    # Amiga forces pos zero
+    if res == -0.0:
+      res = 0.0
     log_math.info("DPCeil(%s) = %s", arg, res)
-    return double_to_regs(res, force_pos_zero=True)
+    return double_to_regs(res)
 
   def IEEEDPNeg(self,ctx):
     arg = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))

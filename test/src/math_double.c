@@ -94,14 +94,17 @@ static void test_cmp(void)
 static void test_div(void)
 {
   print_double("div0", IEEEDPDiv(0.0, 0.0));
-  print_double("div1", IEEEDPDiv(1000.0, 10.0));
-  print_double("div2", IEEEDPDiv(-1000.0, 10.0));
-  print_double("div3", IEEEDPDiv(DBL_MAX, 10.0));
-  print_double("div4", IEEEDPDiv(DBL_MIN, 10.0));
-  print_double("div5", IEEEDPDiv(DBL_MAX, DBL_MAX));
-  print_double("div6", IEEEDPDiv(DBL_MIN, DBL_MIN));
-  print_double("div7", IEEEDPDiv(-DBL_MAX, -DBL_MAX));
-  print_double("div8", IEEEDPDiv(-DBL_MIN, -DBL_MIN));
+  print_double("div1", IEEEDPDiv(-0.0, 0.0));
+  print_double("div2", IEEEDPDiv(1.0, 0.0));
+  print_double("div3", IEEEDPDiv(-1.0, 0.0));
+  print_double("div4", IEEEDPDiv(1000.0, 10.0));
+  print_double("div5", IEEEDPDiv(-1000.0, 10.0));
+  print_double("div6", IEEEDPDiv(DBL_MAX, 10.0));
+  print_double("div7", IEEEDPDiv(DBL_MIN, 10.0));
+  print_double("div8", IEEEDPDiv(DBL_MAX, DBL_MAX));
+  print_double("div9", IEEEDPDiv(DBL_MIN, DBL_MIN));
+  print_double("div10", IEEEDPDiv(-DBL_MAX, -DBL_MAX));
+  print_double("div11", IEEEDPDiv(-DBL_MIN, -DBL_MIN));
 }
 
 static void test_fix(void)
