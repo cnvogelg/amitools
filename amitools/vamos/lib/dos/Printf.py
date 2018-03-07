@@ -1,6 +1,7 @@
 """Handle printf like Functions including VPrintf and RawDoFmt"""
 
 import re
+from amitools.util.Math import *
 
 class printf_element:
   def __init__(self, txt, begin, end, etype, flags=None, width_limit=None, length=None):
@@ -114,9 +115,15 @@ def printf_read_data(state, mem_access, data_ptr):
       l = e.length
       if l is not None and "l" in l:
         data = mem_access.r32(data_ptr)
+        if t == 'd':
+          data = int32(data)
         data_ptr += 4
       else:
         data = mem_access.r16(data_ptr)
+        if t == 'd':
+          data = int16(data)
+        elif t == 'u':
+          data = signext16(data)
         data_ptr += 2
     elif t == 's': # STR
       cptr = mem_access.r32(data_ptr)

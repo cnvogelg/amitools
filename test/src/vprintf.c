@@ -7,6 +7,9 @@ int main(int argc, char *argv[])
   int b = 0xdead;
   int c = -1;
   char *s1 = "hello";
+  UWORD d = 0x0ead;
+  UWORD e = 0xdead;
+  ULONG f = 0xdeadbeef;
 
   /* integers (32 bit) */
   Printf("int1 %ld %lx %ld %lu %lx\n", a, b, c, c, c);
@@ -29,6 +32,10 @@ int main(int argc, char *argv[])
   Printf("strB '%-.10s'\n", s1);
   Printf("strC '%.2s'\n", s1);
   Printf("strD '%-.2s'\n", s1);
+
+  Printf("strE %d %x %u # %d %x %u\n", d, d, d, d, d, d);
+  Printf("strF %d %x %u # %d %x %u\n", e, e, e, e, e, e);
+  Printf("strG %ld %lx %lu # %ld %lx %lu\n", f, f, f, f, f, f);
 
   return 0;
 }

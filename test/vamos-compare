@@ -4,8 +4,9 @@
 # compare the output of an Amiga binary run by vamos
 # with the "real one":
 
+last_prog=""
 for prog in "$@" ; do
-  echo "comparing $prog"
+  echo "comparing vamos vs fsuae: $prog"
   # run prog in vamos
   VLOG=${prog}_vamos.log
   vamos $prog > ${VLOG}
@@ -23,6 +24,15 @@ for prog in "$@" ; do
   # compare
   wc -l ${VLOG}
   diff -y --suppress-common-lines ${VLOG} ${FLOG}
+  # compare to last
+  if [ "${last_prog}" != "" ]; then
+    echo "comparing vamos: ${last_prog} vs ${prog}"
+    diff -y --suppress-common-lines ${last_prog}_vamos.log ${VLOG}
+  fi
+  last_prog=${prog}
+done
+
+for prog in "$@" ; do
   # clean up
   rm -f ${prog}_vamos.log ${prog}_fsuae.log
 done

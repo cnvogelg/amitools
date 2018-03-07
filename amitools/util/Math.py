@@ -3,18 +3,24 @@
 import struct
 import math
 
-#taken from http://www.neotitans.com/resources/python/python-unsigned-32bit-value.html
-#Casting Python integers into signed 32-bit equivalents
 def int32(x):
-  if x > 0xFFFFFFFF:
-    raise OverflowError
-  if x > 0x7FFFFFFF:
-    x = int(0x100000000 - x)
-    if x < 2147483648:
-      return -x
-    else:
-      return -2147483648
-  return x
+  st = struct.pack('I', x)
+  return struct.unpack('i',st)[0]
+
+def int16(x):
+  st = struct.pack('H', x)
+  return struct.unpack('h',st)[0]
+
+def int8(x):
+  st = struct.pack('B', x)
+  return struct.unpack('b',st)[0]
+
+def signext16(x):
+  # extend sign bit of 16 bit value to 32 bit
+  if x & 0x8000 == 0x8000:
+    return 0xffff0000 | x
+  else:
+    return x
 
 def double_to_regs(number):
   """convert Python double to (hi, lo) reg pair"""
