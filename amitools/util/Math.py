@@ -34,7 +34,14 @@ def regs_to_double(hi,lo):
 
 def float_to_reg(number):
   """convert Python float to reg value"""
-  st = struct.pack('>f', number)
+  try:
+    st = struct.pack('>f', number)
+  except OverflowError:
+    if number > 0.0:
+      number = float('inf')
+    else:
+      number = float('-inf')
+    st = struct.pack('>f', number)
   return struct.unpack('>L',st)[0]
 
 def reg_to_float(reg):

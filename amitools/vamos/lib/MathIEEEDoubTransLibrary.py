@@ -158,14 +158,5 @@ class MathIEEEDoubTransLibrary(AmigaLibrary):
 
   def IEEEDPTieee(self,ctx):
     arg = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))
-    try:
-      res = arg
-      f = float_to_reg(res)
-    except OverflowError:
-      if arg > 0.0:
-        res = float('inf')
-      else:
-        res = float('-inf')
-      f = float_to_reg(res)
-    log_math.info("DPTieee(%s) = %s", arg, res)
-    return f
+    log_math.info("DPTieee(%s)", arg)
+    return float_to_reg(arg)
