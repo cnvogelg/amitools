@@ -1,6 +1,10 @@
 const ULONG ffp_zero[1]    = { 0x00000000UL };
 const ULONG ffp_one[1]     = { 0x80000041UL };
 const ULONG ffp_one_neg[1] = { 0x800000C1UL };
+const ULONG ffp_0_5[1]     = { 0x80000040UL };
+const ULONG ffp_0_5_neg[1] = { 0x800000C0UL };
+const ULONG ffp_2[1]       = { 0x80000042UL };
+const ULONG ffp_2_neg[1]   = { 0x800000C2UL };
 const ULONG ffp_10[1]      = { 0xA0000044UL };
 const ULONG ffp_10_neg[1]  = { 0xA00000C4UL };
 const ULONG ffp_1000[1]    = { 0xFA00004AUL };
@@ -19,6 +23,10 @@ const ULONG ffp_max_neg[1] = { 0xFFFFFFFFUL };
 #define FFP_ZERO (*(const FLOAT *)(const void *)ffp_zero)
 #define FFP_ONE (*(const FLOAT *)(const void *)ffp_one)
 #define FFP_ONE_NEG (*(const FLOAT *)(const void *)ffp_one_neg)
+#define FFP_0_5 (*(const FLOAT *)(const void *)ffp_0_5)
+#define FFP_0_5_NEG (*(const FLOAT *)(const void *)ffp_0_5_neg)
+#define FFP_2 (*(const FLOAT *)(const void *)ffp_2)
+#define FFP_2_NEG (*(const FLOAT *)(const void *)ffp_2_neg)
 #define FFP_10 (*(const FLOAT *)(const void *)ffp_10)
 #define FFP_10_NEG (*(const FLOAT *)(const void *)ffp_10_neg)
 #define FFP_1000 (*(const FLOAT *)(const void *)ffp_1000)
