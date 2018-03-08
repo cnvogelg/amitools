@@ -86,10 +86,10 @@ def float_to_ffp_reg(number):
   # extract 8 bit exponent
   exp = (i >> 23) & 0xff
   # too small?
-  if exp < 0x3e:
+  if exp <= 0x3e:
     return 0
   # too large?
-  elif exp > 0xbd:
+  elif exp >= 0xbd:
     exp = 0x7f
     mantissa = 0xffffff00
   # convert

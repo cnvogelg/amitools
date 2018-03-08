@@ -8,6 +8,8 @@
 #include "math_fast.h"
 #include "math_single.h"
 
+#define INT_MIN (-2147483647-1)
+#define INT_MAX 2147483647
 #define PI      3.14159265358979323846
 
 struct Library *MathTransBase;
@@ -33,6 +35,12 @@ void test_fieee(void)
   print_float("fieee10", SPFieee(FLT_FFP_MAX));
   print_float("fieee11", SPFieee(FLT_FFP_MIN_NEG));
   print_float("fieee12", SPFieee(FLT_FFP_MAX_NEG));
+  print_float("fieee13", SPFieee((float)INT_MIN));
+  print_float("fieee14", SPFieee((float)INT_MAX));
+  print_float("fieee15", SPFieee(10.0f));
+  print_float("fieee16", SPFieee(-10.0f));
+  print_float("fieee15", SPFieee(1000.0f));
+  print_float("fieee16", SPFieee(-1000.0f));
 }
 
 void test_tieee(void)
@@ -46,6 +54,8 @@ void test_tieee(void)
   print_float("tieee6", SPTieee(FFP_MIN_NEG));
   print_float("tieee7", SPTieee(FFP_MAX));
   print_float("tieee8", SPTieee(FFP_MAX_NEG));
+  print_float("tieee9", SPTieee(FFP_INT_MIN));
+  print_float("tieee10", SPTieee(FFP_INT_MAX));
 }
 
 int main(int argc, char *argv[])
