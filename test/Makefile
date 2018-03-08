@@ -6,7 +6,7 @@
 SOURCES_C = dos_readargs.c vprintf.c mem.c
 SOURCES_C += util_muldiv.c util_date.c
 SOURCES_C += math_double.c math_double_trans.c
-SOURCES_C += math_single.c
+SOURCES_C += math_single.c math_single_trans.c
 SOURCES_C += math_fast.c math_fast_trans.c
 
 VPATH = src
@@ -122,6 +122,8 @@ $(BUILD_DIR)/math_double_trans_sc$(DBG_EXT): SASC_OPTS += Math=i
 
 $(BUILD_DIR)/math_single_sc: SASC_OPTS += Math=i
 $(BUILD_DIR)/math_single_sc$(DBG_EXT): SASC_OPTS += Math=i
+$(BUILD_DIR)/math_single_trans_sc: SASC_OPTS += Math=i
+$(BUILD_DIR)/math_single_trans_sc$(DBG_EXT): SASC_OPTS += Math=i
 
 $(BUILD_DIR)/math_fast_sc: SASC_OPTS += Math=f
 $(BUILD_DIR)/math_fast_sc$(DBG_EXT): SASC_OPTS += Math=f
