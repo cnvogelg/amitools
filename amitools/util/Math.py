@@ -42,6 +42,76 @@ def reg_to_float(reg):
   st = struct.pack('>L', reg)
   return struct.unpack('>f',st)[0]
 
+# Motorola FFP
+#
+# 32 bit:
+# 31       23       15       7      0
+# MMMMMMMM MMMMMMMM MMMMMMMM SEEEEEEE
+#
+# - leading one in mantissa visible (one bit less accuracy)
+# - 7bit exponent in excess-64 notation
+#
+# Single IEEE:
+# SEEEEEEE EMMMMMMM MMMMMMMM MMMMMMMM
+#
+# - leading one is omitted
+# - 8bit exponent in excess-128 notation
+
+def float_to_ffp_reg(number):
+  """convert Python number to ffp register"""
+  # zero
+  if number == 0.0:
+    return 0
+  # nan -> zero
+  if math.isnan(number):
+    return 0
+  # inf -> largest value
+  if math.isinf(number):
+    if number < 0.0:
+      return 0xffffffff
+    else:
+      return 0xffffff7f
+  # convert float to 32bit num
+  b = struct.pack('>f', number)
+  i = struct.unpack('>L', b)[0]
+  # extract sign bit
+  sign = ord(b[0]) & 0x80
+  # extract 8 bit exponent
+  exp = (i >> 23) & 0xff
+  # too small?
+  if exp < 0x3e:
+    return 0
+  # too large?
+  elif exp > 0xbd:
+    exp = 0x7f
+    mantissa = 0xffffff00
+  # convert
+  else:
+    exp -= 0x3e
+    # mantissa (add leading one)
+    mantissa = (i << 8) & 0x7fffff00
+    mantissa |= 0x80000000
+  # resulting ffp
+  ffp = mantissa | sign | exp
+  return ffp
+
+def ffp_reg_to_float(ffp):
+  """convert ffp register to Python float"""
+  # zero
+  if ffp == 0:
+    return 0.0
+  # get sign bit
+  sign = ffp & 0x80
+  # get exponent: 0 .. 127 and shift to 8 bit range
+  exp = ffp & 0x7f
+  exp += 0x3e
+  # shift mantissa (skip leading one of ffp format)
+  mantissa = ffp >> 8
+  mantissa &= 0x007fffff
+  flt = sign << 24 | exp << 23 | mantissa
+  res = struct.unpack('>f', struct.pack('>L', flt))[0]
+  return res
+
 # Amiga constants
 
 Amiga_INT_MAX = 2147483647

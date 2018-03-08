@@ -33,8 +33,8 @@ static void test_const(void)
 {
   print_double("const0", DBL_MAX);
   print_double("const1", DBL_MIN);
-  print_double("const2", FLT_MAX);
-  print_double("const3", FLT_MIN);
+  print_double("const2", DBL_FLT_MAX);
+  print_double("const3", DBL_FLT_MIN);
   print_double("const4", (double)INT_MAX);
   print_double("const5", (double)INT_MIN);
 }
@@ -44,11 +44,11 @@ static void test_abs(void)
   print_double("abs0", IEEEDPAbs(0.0));
   print_double("abs1", IEEEDPAbs(-1.0));
   print_double("abs2", IEEEDPAbs(1.0));
-  print_double("abs3", IEEEDPAbs(FLT_MIN));
-  print_double("abs4", IEEEDPAbs(FLT_MAX));
+  print_double("abs3", IEEEDPAbs(DBL_FLT_MIN));
+  print_double("abs4", IEEEDPAbs(DBL_FLT_MAX));
   print_double("abs5", IEEEDPAbs(DBL_MIN));
   print_double("abs6", IEEEDPAbs(DBL_MAX));
-  print_double("abs7", IEEEDPAbs(FLT_MAX_NEG));
+  print_double("abs7", IEEEDPAbs(DBL_FLT_MAX_NEG));
   print_double("abs8", IEEEDPAbs(DBL_MAX_NEG));
 }
 
@@ -66,12 +66,12 @@ static void test_ceil(void)
   print_double("ceil0", IEEEDPCeil(-1.0));
   print_double("ceil1", IEEEDPCeil(1.0));
   print_double("ceil2", IEEEDPCeil(0.0));
-  print_double("ceil3", IEEEDPCeil(FLT_MIN));
-  print_double("ceil4", IEEEDPCeil(FLT_MAX));
+  print_double("ceil3", IEEEDPCeil(DBL_FLT_MIN));
+  print_double("ceil4", IEEEDPCeil(DBL_FLT_MAX));
   print_double("ceil5", IEEEDPCeil(DBL_MIN));
   print_double("ceil6", IEEEDPCeil(DBL_MAX));
-  print_double("ceil7", IEEEDPCeil(FLT_MIN_NEG));
-  print_double("ceil8", IEEEDPCeil(FLT_MAX_NEG));
+  print_double("ceil7", IEEEDPCeil(DBL_FLT_MIN_NEG));
+  print_double("ceil8", IEEEDPCeil(DBL_FLT_MAX_NEG));
   print_double("ceil9", IEEEDPCeil(DBL_MIN_NEG));
   print_double("ceil10", IEEEDPCeil(DBL_MAX_NEG));
 }
@@ -123,8 +123,8 @@ static void test_floor(void)
   print_double("floor0", IEEEDPFloor(-1.0));
   print_double("floor1", IEEEDPFloor(1.0));
   print_double("floor2", IEEEDPFloor(0.0));
-  print_double("floor3", IEEEDPFloor(FLT_MIN));
-  print_double("floor4", IEEEDPFloor(FLT_MAX));
+  print_double("floor3", IEEEDPFloor(DBL_FLT_MIN));
+  print_double("floor4", IEEEDPFloor(DBL_FLT_MAX));
   print_double("floor5", IEEEDPFloor(DBL_MIN));
   print_double("floor6", IEEEDPFloor(DBL_MAX));
 }
@@ -152,12 +152,12 @@ static void test_neg(void)
   print_double("neg0", IEEEDPNeg(-1.0));
   print_double("neg1", IEEEDPNeg(1.0));
   print_double("neg2", IEEEDPNeg(0.0));
-  print_double("neg3", IEEEDPNeg(FLT_MIN));
-  print_double("neg4", IEEEDPNeg(FLT_MAX));
+  print_double("neg3", IEEEDPNeg(DBL_FLT_MIN));
+  print_double("neg4", IEEEDPNeg(DBL_FLT_MAX));
   print_double("neg5", IEEEDPNeg(DBL_MIN));
   print_double("neg6", IEEEDPNeg(DBL_MAX));
-  print_double("neg7", IEEEDPNeg(FLT_MIN_NEG));
-  print_double("neg8", IEEEDPNeg(FLT_MAX_NEG));
+  print_double("neg7", IEEEDPNeg(DBL_FLT_MIN_NEG));
+  print_double("neg8", IEEEDPNeg(DBL_FLT_MAX_NEG));
   print_double("neg9", IEEEDPNeg(DBL_MIN_NEG));
   print_double("neg10", IEEEDPNeg(DBL_MAX_NEG));
 }

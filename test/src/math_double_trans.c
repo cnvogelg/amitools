@@ -6,6 +6,7 @@
 #include <proto/mathieeedoubtrans.h>
 
 #include "math_double.h"
+#include "math_single.h"
 
 #define INT_MIN (-2147483647-1)
 #define INT_MAX 2147483647
@@ -35,8 +36,8 @@ static void test_const(void)
 {
   print_double("const0", DBL_MAX);
   print_double("const1", DBL_MIN);
-  print_double("const2", FLT_MAX);
-  print_double("const3", FLT_MIN);
+  print_double("const2", DBL_FLT_MAX);
+  print_double("const3", DBL_FLT_MIN);
   print_double("const4", (double)INT_MAX);
   print_double("const5", (double)INT_MIN);
   print_double("const6", PI);
@@ -115,10 +116,10 @@ static void test_fieee(void)
   print_double("fieee0", IEEEDPFieee(0.0f));
   print_double("fieee1", IEEEDPFieee((float)PI));
   print_double("fieee2", IEEEDPFieee((float)-PI));
-  print_double("fieee3", IEEEDPFieee(FLT_FLT_MIN));
-  print_double("fieee4", IEEEDPFieee(FLT_FLT_MAX));
-  print_double("fieee5", IEEEDPFieee(FLT_FLT_MIN_NEG));
-  print_double("fieee6", IEEEDPFieee(FLT_FLT_MAX_NEG));
+  print_double("fieee3", IEEEDPFieee(FLT_MIN));
+  print_double("fieee4", IEEEDPFieee(FLT_MAX));
+  print_double("fieee5", IEEEDPFieee(FLT_MIN_NEG));
+  print_double("fieee6", IEEEDPFieee(FLT_MAX_NEG));
 }
 
 static void test_log(void)
@@ -147,7 +148,7 @@ static void test_pow(void)
 {
   print_double("pow0", IEEEDPPow(0.0, 0.0));
   print_double("pow1", IEEEDPPow(1000.0, 0.0));
-  print_double("pow2", IEEEDPPow(FLT_MAX, FLT_MAX));
+  print_double("pow2", IEEEDPPow(DBL_FLT_MAX, DBL_FLT_MAX));
   print_double("pow3", IEEEDPPow(DBL_MAX, DBL_MAX));
   print_double("pow4", IEEEDPPow(-1000.0, -1000.0));
   print_double("pow5", IEEEDPPow(3.0, 4.0));
@@ -233,10 +234,10 @@ static void test_tieee(void)
   print_float("tieee0", IEEEDPTieee(0.0));
   print_float("tieee1", IEEEDPTieee(PI));
   print_float("tieee2", IEEEDPTieee(-PI));
-  print_float("tieee3", IEEEDPTieee(FLT_MIN));
-  print_float("tieee4", IEEEDPTieee(FLT_MAX));
-  print_float("tieee5", IEEEDPTieee(FLT_MIN_NEG));
-  print_float("tieee6", IEEEDPTieee(FLT_MAX_NEG));
+  print_float("tieee3", IEEEDPTieee(DBL_FLT_MIN));
+  print_float("tieee4", IEEEDPTieee(DBL_FLT_MAX));
+  print_float("tieee5", IEEEDPTieee(DBL_FLT_MIN_NEG));
+  print_float("tieee6", IEEEDPTieee(DBL_FLT_MAX_NEG));
   print_float("tieee7", IEEEDPTieee(DBL_MIN));
   print_float("tieee8", IEEEDPTieee(DBL_MAX));
   print_float("tieee9", IEEEDPTieee(DBL_MIN_NEG));

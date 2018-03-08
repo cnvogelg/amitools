@@ -1,0 +1,23 @@
+ok!
+fieee0: 00000000
+fieee1: 80000041
+fieee2: 800000C1
+fieee3: C90FDB42
+fieee4: C90FDBC2
+fieee5: 00000000
+fieee6: FFFFFF7F
+fieee7: 00000000
+fieee8: FFFFFFFF
+fieee9: 80000001
+fieee10: FFFFFF7F
+fieee11: 80000081
+fieee12: FFFFFFFF
+tieee0: 00000000
+tieee1: 3F800000
+tieee2: BF800000
+tieee3: 40490FDB
+tieee4: C0490FDB
+tieee5: 1F800000
+tieee6: 9F800000
+tieee7: 5EFFFFFF
+tieee8: DEFFFFFF
