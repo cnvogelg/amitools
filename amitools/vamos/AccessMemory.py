@@ -7,6 +7,8 @@ class AccessMemory:
     """
     self.raw_mem = raw_mem
     self.label_mgr = label_mgr
+    # compatibility link
+    self.access = self
 
   # memory access
   def r32(self, addr):

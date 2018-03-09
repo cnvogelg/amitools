@@ -1,7 +1,6 @@
 from label.LabelManager import LabelManager
 from label.LabelRange import LabelRange
 from MemoryAlloc import MemoryAlloc
-from MainMemory import MainMemory
 from AccessMemory import AccessMemory
 from AmigaLibrary import AmigaLibrary
 from LibManager import LibManager
@@ -63,7 +62,7 @@ class Vamos:
       mem_label_mgr = None
 
     # create memory access
-    self.mem = MainMemory(raw_mem, mem_label_mgr)
+    self.mem = AccessMemory(raw_mem, mem_label_mgr)
     self._setup_memory(raw_mem)
 
     # create memory allocator
