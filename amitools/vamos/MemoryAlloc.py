@@ -36,21 +36,23 @@ class MemoryChunk:
     return self.size - size
 
 class MemoryAlloc:
-  def __init__(self, mem, addr, size, begin, label_mgr):
-    self.addr = addr
-    self.begin = begin
-    self.size = size
-    self.addrs = {}
-    self.mem_objs = {}
+  def __init__(self, mem, addr, size, label_mgr=None):
+    """mem is a AccessMemory-like interface.
+       setup allocator starting at addr with size bytes.
+       if label_mgr is set then labels are created for allocations.
+    """
     self.mem = mem
-    self.access = mem.access
+    self.addr = addr
+    self.size = size
     self.label_mgr = label_mgr
 
+    self.addrs = {}
+    self.mem_objs = {}
+
     # init free list
-    self.free_bytes = size - (begin - addr)
-    self.free_first = MemoryChunk(begin, self.free_bytes)
+    self.free_bytes = size
+    self.free_first = MemoryChunk(addr, self.free_bytes)
     self.free_entries = 1
-    #self.next_dump  = self.free_bytes - 0x10000
 
   def _find_best_chunk(self, size):
     """find best chunk that could take the given alloc
@@ -163,14 +165,10 @@ class MemoryAlloc:
     self.addrs[addr] = size
     self.free_bytes -= size
     # erase memory
-    self.mem.access.clear_data(addr, size, 0)
+    self.mem.clear_data(addr, size, 0)
     log_mem_alloc.info("[alloc @%06x-%06x: %06x bytes] %s", addr, addr+size, size, self._stat_info())
     if addr % 4:
       raise VamosInternalError("Memory pool is invalid, return address not aligned by a long word");
-    #if self.free_bytes < self.next_dump:
-    #  self.next_dump -= 0x10000
-    #  sys.stderr.write("\n\n**** Memory allocation dump ****\n");
-    #  self.dump_orphans()
     return addr
 
   def free_mem(self, addr, size):
@@ -218,15 +216,16 @@ class MemoryAlloc:
 
   def _dump_orphan(self, addr, size):
     log_mem_alloc.warn("orphan: [@%06x +%06x %06x]" % (addr, size, addr+size))
-    labels = self.label_mgr.get_intersecting_labels(addr,size)
-    for l in labels:
-      log_mem_alloc.warn("-> %s",l)
+    if self.label_mgr is not None:
+      labels = self.label_mgr.get_intersecting_labels(addr,size)
+      for l in labels:
+        log_mem_alloc.warn("-> %s",l)
 
   def dump_orphans(self):
     last = self.free_first
     # orphan at begin?
-    if last.addr != self.begin:
-      addr = self.begin
+    if last.addr != self.addr:
+      addr = self.addr
       size = last.addr - addr
       self._dump_orphan(addr, size)
     # walk along free list
@@ -256,12 +255,12 @@ class MemoryAlloc:
     addr = self.alloc_mem(size, except_on_failure)
     if addr == 0:
       return None
-    if add_label:
+    if add_label and self.label_mgr is not None:
       label = LabelRange(name, addr, size)
       self.label_mgr.add_label(label)
     else:
       label = None
-    mem = Memory(addr,size,label,self.mem.access)
+    mem = Memory(addr,size,label,self.mem)
     log_mem_alloc.info("alloc memory: %s",mem)
     self.mem_objs[addr] = mem
     return mem
@@ -277,8 +276,11 @@ class MemoryAlloc:
   def alloc_struct(self, name, struct):
     size = struct.get_size()
     addr = self.alloc_mem(size)
-    label = LabelStruct(name, addr, struct)
-    self.label_mgr.add_label(label)
+    if self.label_mgr is not None:
+      label = LabelStruct(name, addr, struct)
+      self.label_mgr.add_label(label)
+    else:
+      label = None
     access = AccessStruct(self.mem, struct, addr)
     mem = Memory(addr,size,label,access)
     log_mem_alloc.info("alloc struct: %s",mem)
@@ -288,14 +290,18 @@ class MemoryAlloc:
   def map_struct(self, name, addr, struct):
     size = struct.get_size()
     access = AccessStruct(self.mem, struct, addr)
-    label = self.label_mgr.get_label(addr)
+    if self.label_mgr is not None:
+      label = self.label_mgr.get_label(addr)
+    else:
+      label = None
     mem = Memory(addr,size,label,access)
     log_mem_alloc.info("map struct: %s",mem)
     return mem
 
   def free_struct(self, mem):
     log_mem_alloc.info("free struct: %s",mem)
-    self.label_mgr.remove_label(mem.label)
+    if self.label_mgr is not None:
+      self.label_mgr.remove_label(mem.label)
     self.free_mem(mem.addr, mem.size)
     del self.mem_objs[mem.addr]
 
@@ -303,17 +309,21 @@ class MemoryAlloc:
   def alloc_cstr(self, name, cstr):
     size = len(cstr) + 1
     addr = self.alloc_mem(size)
-    label = LabelRange(name, addr, size)
-    self.label_mgr.add_label(label)
-    self.mem.access.w_cstr(addr, cstr)
-    mem = Memory(addr,size,label,self.mem.access)
+    if self.label_mgr is not None:
+      label = LabelRange(name, addr, size)
+      self.label_mgr.add_label(label)
+    else:
+      label = None
+    self.mem.w_cstr(addr, cstr)
+    mem = Memory(addr,size,label,self.mem)
     log_mem_alloc.info("alloc c_str: %s",mem)
     self.mem_objs[addr] = mem
     return mem
 
   def free_cstr(self, mem):
     log_mem_alloc.info("free c_str: %s",mem)
-    self.label_mgr.remove_label(mem.label)
+    if self.label_mgr is not None:
+      self.label_mgr.remove_label(mem.label)
     self.free_mem(mem.addr, mem.size)
     del self.mem_objs[mem.addr]
 
@@ -321,22 +331,26 @@ class MemoryAlloc:
   def alloc_bstr(self, name, bstr):
     size = len(bstr) + 2 # front: count, end: extra zero for safety
     addr = self.alloc_mem(size)
-    label = LabelRange(name, addr, size)
-    self.label_mgr.add_label(label)
-    self.mem.access.w_bstr(addr, bstr)
-    mem = Memory(addr,size,label,self.mem.access)
+    if self.label_mgr is not None:
+      label = LabelRange(name, addr, size)
+      self.label_mgr.add_label(label)
+    else:
+      label = None
+    self.mem.w_bstr(addr, bstr)
+    mem = Memory(addr,size,label,self.mem)
     log_mem_alloc.info("alloc b_str: %s",mem)
     self.mem_objs[addr] = mem
     return mem
 
   def free_bstr(self, mem):
     log_mem_alloc.info("free b_str: %s",mem)
-    self.label_mgr.remove_label(mem.label)
+    if self.label_mgr is not None:
+      self.label_mgr.remove_label(mem.label)
     self.free_mem(mem.addr, mem.size)
     del self.mem_objs[mem.addr]
 
   def is_valid_address(self, addr):
-    if addr >= self.begin and addr < self.begin + self.size:
+    if addr >= self.addr and addr < self.addr + self.size:
       return True
     return False
 

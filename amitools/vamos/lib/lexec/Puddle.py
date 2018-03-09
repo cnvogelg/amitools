@@ -10,7 +10,7 @@ class Puddle:
     self.mem       = mem
     self.size      = size
     self.mem_obj   = self.alloc.alloc_memory(name, size)
-    self.chunks    = MemoryAlloc(self.mem, self.mem_obj.addr, size, self.mem_obj.addr, label_mgr)
+    self.chunks    = MemoryAlloc(self.mem, self.mem_obj.addr, size, label_mgr)
 
   def __del__(self):
     if self.mem_obj != None:

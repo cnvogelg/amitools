@@ -67,7 +67,8 @@ class Vamos:
 
     # create memory allocator
     self.mem_begin = 0x1000
-    self.alloc = MemoryAlloc(self.mem, 0, self.ram_size, self.mem_begin, self.label_mgr)
+    self.mem_size = self.ram_size - self.mem_begin
+    self.alloc = MemoryAlloc(self.mem, self.mem_begin, self.mem_size, self.label_mgr)
 
     # create segment loader
     self.seg_loader = SegmentLoader( self.mem, self.alloc, self.label_mgr, self.path_mgr )
