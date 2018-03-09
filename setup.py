@@ -90,7 +90,7 @@ setup(
     name = "amitools",
     description='A package to support development with classic Amiga m68k systems',
     long_description=open("README.md").read(),
-    version = "0.1.0",
+    version = "0.1.1",
     maintainer = "Christian Vogelgsang",
     maintainer_email = "chris@vogelgsang.org",
     url = "http://github.com/cnvogelg/amitools",

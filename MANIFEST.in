@@ -1,5 +1,6 @@
 include MANIFEST.in
 include README.md
+include CHANGELOG.md
 include Makefile
 recursive-include amitools/data *
 recursive-include amitools/fs/block/bootcode *
