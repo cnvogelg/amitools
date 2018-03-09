@@ -309,7 +309,7 @@ class DosLibrary(AmigaLibrary):
     node.w_s("lv_Value",buf_addr)
     node.w_s("lv_Len",size)
     if flags & self.GVF_BINARY_VAR:
-      ctx.mem.raw_mem.copy_block(buff_ptr,buf_addr,size)
+      ctx.mem.access.copy_data(buff_ptr,buf_addr,size)
     else:
       ctx.mem.access.w_cstr(buf_addr,value)
 
@@ -344,7 +344,7 @@ class DosLibrary(AmigaLibrary):
       if node != None:
         nodelen = node.r_s("lv_Len")
         if flags & self.GVF_BINARY_VAR:
-          ctx.mem.raw_mem.copy_block(node.r_s("lv_Value"),buff_ptr,min(nodelen,size))
+          ctx.mem.access.copy_data(node.r_s("lv_Value"),buff_ptr,min(nodelen,size))
           log_dos.info('GetVar("%s", 0x%x) -> %0x06x' % (name, flags, node.r_s("lv_Value")))
           self.setioerr(ctx,nodelen)
           return min(nodelen,size)

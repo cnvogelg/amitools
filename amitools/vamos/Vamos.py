@@ -54,9 +54,16 @@ class Vamos:
     label = LabelRange("shutdown",0x400,0x800)
     self.label_mgr.add_label(label)
 
+    # enable internal memory trace?
+    if cfg.internal_memory_trace:
+      mem_label_mgr = self.label_mgr
+      if not log_mem_int.isEnabledFor(logging.INFO):
+        log_mem_int.setLevel(logging.INFO)
+    else:
+      mem_label_mgr = None
+
     # create memory access
-    self.mem = MainMemory(raw_mem, self.error_tracker)
-    self.mem.ctx = self
+    self.mem = MainMemory(raw_mem, mem_label_mgr)
     self._setup_memory(raw_mem)
 
     # create memory allocator
@@ -99,21 +106,16 @@ class Vamos:
     else:
       raise VamosConfigError("Invalid HW Access mode: %s" % cfg.hw_access)
 
-  def _setup_memory(self, mem):
+  def _setup_memory(self, raw_mem):
     cfg = self.cfg
     # enable mem trace?
     if cfg.memory_trace:
-      mem.set_trace_mode(1)
-      mem.set_trace_func(self.label_mgr.trace_mem)
+      raw_mem.set_trace_mode(1)
+      raw_mem.set_trace_func(self.label_mgr.trace_mem)
       if not log_mem.isEnabledFor(logging.DEBUG):
         log_mem.setLevel(logging.DEBUG)
-    # enable internal memory trace?
-    if cfg.internal_memory_trace:
-      AccessMemory.label_mgr = self.label_mgr
-      if not log_mem_int.isEnabledFor(logging.INFO):
-        log_mem_int.setLevel(logging.INFO)
     # set invalid access handler for memory
-    mem.set_invalid_func(self.error_tracker.report_invalid_memory)
+    raw_mem.set_invalid_func(self.error_tracker.report_invalid_memory)
 
   # ----- process handling -----
 
@@ -319,7 +321,7 @@ class Vamos:
 
   def create_old_dos_guard(self):
     # create a guard memory for tracking invalid old dos access
-    self.dos_guard_base = self.mem.reserve_special_range()
+    self.dos_guard_base = self.raw_mem.reserve_special_range()
     self.dos_guard_size = 0x010000
     label = LabelRange("old_dos guard",self.dos_guard_base, self.dos_guard_size)
     self.label_mgr.add_label(label)

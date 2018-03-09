@@ -430,14 +430,14 @@ class ExecLibrary(AmigaLibrary):
     dest   = ctx.cpu.r_reg(REG_A1)
     length = ctx.cpu.r_reg(REG_D0)
     log_exec.info("CopyMem: source=%06x dest=%06x len=%06x" % (source,dest,length))
-    ctx.mem.raw_mem.copy_block(source, dest, length)
+    ctx.mem.access.copy_data(source, dest, length)
 
   def CopyMemQuick(self, ctx):
     source = ctx.cpu.r_reg(REG_A0)
     dest   = ctx.cpu.r_reg(REG_A1)
     length = ctx.cpu.r_reg(REG_D0)
     log_exec.info("CopyMemQuick: source=%06x dest=%06x len=%06x" % (source,dest,length))
-    ctx.mem.raw_mem.copy_block(source, dest, length)
+    ctx.mem.access.copy_data(source, dest, length)
 
   def TypeOfMem(self, ctx):
     addr = ctx.cpu.r_reg(REG_A1)

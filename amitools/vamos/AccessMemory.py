@@ -1,20 +1,14 @@
 import logging
 
 class AccessMemory:
-  # set this label manager to enable memory tracing!
-  label_mgr = None
-
-  def __init__(self, mem):
-    self.mem = mem
-    self.raw_mem = mem.raw_mem
+  def __init__(self, raw_mem, label_mgr=None):
+    """setup memory access.
+       pass a label manager if you want to enable internal memory traces
+    """
+    self.raw_mem = raw_mem
+    self.label_mgr = label_mgr
 
   # memory access
-  def rx(self, addr, width):
-    if width == 0:
-      return r8(addr)
-    elif width == 1:
-      return r16(addr)
-
   def r32(self, addr):
     val = self.raw_mem.r32(addr)
     if self.label_mgr != None:
@@ -74,6 +68,9 @@ class AccessMemory:
 
   def clear_data(self, addr, size, value):
     self.raw_mem.clear_block(addr, size, value)
+
+  def copy_data(self, src_addr, tgt_addr, size):
+    self.raw_mem.copy_block(src_addr, tgt_addr, size)
 
   # c string
   def r_cstr(self, addr):

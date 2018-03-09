@@ -3,7 +3,8 @@ from AccessMemory import AccessMemory
 
 class AccessStruct(AccessMemory):
   def __init__(self, mem, struct_def, struct_addr):
-    AccessMemory.__init__(self,mem)
+    AccessMemory.__init__(self, mem.access.raw_mem, mem.access.label_mgr)
+    self.mem = mem
     self.struct_addr = struct_addr
     self.struct_def = struct_def
     self.struct_type_name = self.struct_def.get_type_name()
