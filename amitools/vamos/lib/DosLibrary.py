@@ -42,16 +42,16 @@ class DosLibrary(AmigaLibrary):
   GVF_LOCAL_ONLY        =	0x200
   GVF_BINARY_VAR	=	0x400
 
-  def __init__(self, mem, alloc, path, config):
+  def __init__(self, config):
     AmigaLibrary.__init__(self, self.name, DosLibraryDef, config, is_base=True)
-    self.mem      = mem
-    self.alloc    = alloc
-    self.path_mgr = path
 
   def setup_lib(self, ctx):
     AmigaLibrary.setup_lib(self, ctx)
     log_dos.info("open dos.library V%d", self.version)
     # init own state
+    self.mem = ctx.mem
+    self.alloc = ctx.alloc
+    self.path_mgr = ctx.path_mgr
     self.io_err = 0
     self.ctx = ctx
     self.mem_allocs = {}

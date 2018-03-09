@@ -15,16 +15,16 @@ class ExecLibrary(AmigaLibrary):
   _pools = {}
   _poolid = 0x1000
 
-  def __init__(self, lib_mgr, alloc, config):
+  def __init__(self, config):
     AmigaLibrary.__init__(self, self.name, ExecLibraryDef, config, is_base=True)
-    log_exec.info("open exec.library V%d", self.version)
-    self.lib_mgr = lib_mgr
-    self.alloc = alloc
-    self._pools = {}
-    self._poolid = 0x1000
 
   def setup_lib(self, ctx):
     AmigaLibrary.setup_lib(self, ctx)
+    log_exec.info("open exec.library V%d", self.version)
+    self.lib_mgr = ctx.lib_mgr
+    self.alloc = ctx.alloc
+    self._pools = {}
+    self._poolid = 0x1000
     # set some system contants
     if ctx.cpu_type == '68030':
       self.access.w_s("AttnFlags",7)
