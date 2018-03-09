@@ -5,6 +5,7 @@ from MainMemory import MainMemory
 from AccessMemory import AccessMemory
 from AmigaLibrary import AmigaLibrary
 from LibManager import LibManager
+from LibRegistry import LibRegistry
 from SegmentLoader import SegmentLoader
 from path.PathManager import PathManager
 from ErrorTracker import ErrorTracker
@@ -12,19 +13,6 @@ from Trampoline import Trampoline
 from HardwareAccess import HardwareAccess
 from amitools.vamos.AccessStruct import AccessStruct
 from amitools.vamos.lib.dos.DosStruct import CLIDef
-
-# lib
-from lib.ExecLibrary import ExecLibrary
-from lib.DosLibrary import DosLibrary
-from lib.UtilityLibrary import UtilityLibrary
-from lib.IntuitionLibrary import IntuitionLibrary
-from lib.MathFFPLibrary import MathFFPLibrary
-from lib.MathTransLibrary import MathTransLibrary
-from lib.MathIEEEDoubBasLibrary import MathIEEEDoubBasLibrary
-from lib.MathIEEEDoubTransLibrary import MathIEEEDoubTransLibrary
-from lib.MathIEEESingBasLibrary import MathIEEESingBasLibrary
-from lib.MathIEEESingTransLibrary import MathIEEESingTransLibrary
-from lib.TimerDevice import TimerDevice
 
 from Log import *
 from CPU import *
@@ -79,14 +67,14 @@ class Vamos:
     self.seg_loader = SegmentLoader( self.mem, self.alloc, self.label_mgr, self.path_mgr )
 
     # lib manager
-    self.lib_mgr = LibManager( self.label_mgr, cfg)
+    self.lib_reg = LibRegistry()
+    self.lib_mgr = LibManager( self.label_mgr, self.lib_reg, cfg)
 
     # no current process right now
     self.process = None
     self.proc_list = []
 
   def init(self):
-    self.register_base_libs(self.cfg)
     self.create_old_dos_guard()
     self.open_base_libs()
     return True
@@ -315,59 +303,12 @@ class Vamos:
 
   # ----- init environment -----
 
-  def register_base_libs(self, cfg):
-    # register libraries
-    # exec
-    exec_cfg = cfg.get_lib_config('exec.library')
-    self.exec_lib_def = ExecLibrary(exec_cfg)
-    self.lib_mgr.register_vamos_lib(self.exec_lib_def)
-    # dos
-    dos_cfg = cfg.get_lib_config('dos.library')
-    self.dos_lib_def = DosLibrary(dos_cfg)
-    self.lib_mgr.register_vamos_lib(self.dos_lib_def)
-    # intuition
-    int_cfg = cfg.get_lib_config('intuition.library')
-    self.int_lib_def = IntuitionLibrary(int_cfg)
-    self.lib_mgr.register_vamos_lib(self.int_lib_def)
-    # utility
-    utility_cfg = cfg.get_lib_config('utility.library')
-    self.utility_lib_def = UtilityLibrary(utility_cfg)
-    self.lib_mgr.register_vamos_lib(self.utility_lib_def)
-    # mathffp
-    mathffp_cfg = cfg.get_lib_config('mathffp.library')
-    self.mathffp_lib_def = MathFFPLibrary(mathffp_cfg)
-    self.lib_mgr.register_vamos_lib(self.mathffp_lib_def)
-    # mathtrans
-    mathtrans_cfg = cfg.get_lib_config('mathtrans.library')
-    self.mathtrans_lib_def = MathTransLibrary(mathtrans_cfg)
-    self.lib_mgr.register_vamos_lib(self.mathtrans_lib_def)
-    # mathdoubbas
-    mathdoubbas_cfg = cfg.get_lib_config('mathieeedoubbas.library')
-    self.mathdoubbas_lib_def = MathIEEEDoubBasLibrary(mathdoubbas_cfg)
-    self.lib_mgr.register_vamos_lib(self.mathdoubbas_lib_def)
-    # mathdoubtrans
-    mathdoubtrans_cfg = cfg.get_lib_config('mathieeedoubtrans.library')
-    self.mathdoubtrans_lib_def = MathIEEEDoubTransLibrary(mathdoubtrans_cfg)
-    self.lib_mgr.register_vamos_lib(self.mathdoubtrans_lib_def)
-    # mathsingbas
-    mathsingbas_cfg = cfg.get_lib_config('mathieeesingbas.library')
-    self.mathsingbas_lib_def = MathIEEESingBasLibrary(mathsingbas_cfg)
-    self.lib_mgr.register_vamos_lib(self.mathsingbas_lib_def)
-    # mathsingtrans
-    mathsingtrans_cfg = cfg.get_lib_config('mathieeesingtrans.library')
-    self.mathsingtrans_lib_def = MathIEEESingTransLibrary(mathsingtrans_cfg)
-    self.lib_mgr.register_vamos_lib(self.mathsingtrans_lib_def)
-    # timer
-    timer_cfg = cfg.get_lib_config('timer.device')
-    self.timer_dev_def = TimerDevice(timer_cfg)
-    self.lib_mgr.register_vamos_lib(self.timer_dev_def)
-
   def open_base_libs(self):
     # open exec lib
-    self.exec_lib = self.lib_mgr.open_lib(ExecLibrary.name, 0, self)
+    self.exec_lib = self.lib_mgr.open_lib('exec.library', 0, self)
     log_mem_init.info(self.exec_lib)
     # open dos lib
-    self.dos_lib = self.lib_mgr.open_lib(DosLibrary.name, 0, self)
+    self.dos_lib = self.lib_mgr.open_lib('dos.library', 0, self)
     log_mem_init.info(self.dos_lib)
 
   def close_base_libs(self):

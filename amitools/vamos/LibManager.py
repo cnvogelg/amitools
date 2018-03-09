@@ -15,13 +15,12 @@ class LibManager():
 
   op_jmp = 0x4ef9
 
-  def __init__(self, label_mgr, cfg):
+  def __init__(self, label_mgr, lib_reg, cfg):
     self.label_mgr = label_mgr
+    self.lib_reg = lib_reg
     self.cfg = cfg
     self.data_dir = cfg.data_dir
 
-    # map of registered libs: name -> AmigaLibrary
-    self.vamos_libs = {}
     # map of opened libs: base_addr -> AmigaLibrary
     self.open_libs_addr = {}
     self.open_libs_name = {}
@@ -33,19 +32,6 @@ class LibManager():
 
     # libs will accumulate this if benchmarking is enabled
     self.bench_total = 0.0
-
-  def register_vamos_lib(self, lib):
-    """register an vamos library class"""
-    self.vamos_libs[lib.get_name()] = lib
-    # init lib class instance
-    lib.log_call = self.log_call
-    lib.log_dummy_call = self.log_dummy_call
-    lib.benchmark = self.benchmark
-    lib.lib_mgr = self
-
-  def unregister_vamos_lib(self, lib):
-    """unregister your vamos library class"""
-    del self.vamos_libs[lib.get_name()]
 
   def lib_log(self, func, text, level=logging.INFO):
     """helper to create lib log messages"""
@@ -146,14 +132,14 @@ class LibManager():
       elif mode == 'auto':
         # auto (default) tries to open internal vamos lib first and if that
         # fails tries a native amige lib
-        lib = self._open_vamos_internal_lib(sane_name, ctx)
+        lib = self._open_vamos_internal_lib(sane_name, lib_cfg, ctx)
         if lib == None:
           lib = self._load_and_open_native_lib(name, sane_name, lib_cfg, ctx)
           if lib == None:
             self.lib_log("open_lib","auto found neither vamos nor amiga lib: %s" % name)
       elif mode == 'vamos':
         # only try to find an internal vamos lib
-        lib = self._open_vamos_internal_lib(sane_name, ctx)
+        lib = self._open_vamos_internal_lib(sane_name, lib_cfg, ctx)
         if lib == None:
           self.lib_log("open_lib","no vamos lib found: %s" % name)
       elif mode == 'amiga':
@@ -194,15 +180,15 @@ class LibManager():
 
   # ----- vamos lib -----
 
-  def _open_vamos_internal_lib(self, sane_name, ctx):
+  def _open_vamos_internal_lib(self, sane_name, lib_cfg, ctx):
     """try to open an internal vamos lib
        return internal lib or None if not found"""
     self.lib_log("open_lib","trying to open vamos lib: '%s'" % sane_name)
-    if sane_name not in self.vamos_libs:
+    if not self.lib_reg.has_name(sane_name):
       return None
 
     self.lib_log("open_lib","found vamos lib: %s" % sane_name)
-    lib = self.vamos_libs[sane_name]
+    lib = self.lib_reg.open_lib(sane_name, lib_cfg)
 
     return self._open_vamos_lib(sane_name, lib, ctx)
 
@@ -211,7 +197,8 @@ class LibManager():
        return new lib or None if creation failed"""
 
     # create empty lib
-    lib = AmigaLibrary(sane_name, LibraryDef, lib_cfg)
+    self.lib_log("open_lib","create fake lib: %s" % sane_name)
+    lib = self.lib_reg.open_fake_lib(sane_name, lib_cfg)
 
     return self._open_vamos_lib(sane_name, lib, ctx)
 
@@ -221,6 +208,9 @@ class LibManager():
     if lib.fd == None:
       self.lib_log("create_lib","can't create vamos lib without FD file: %s" % sane_name, level=logging.ERROR)
       return None
+
+    # configure logging of lib
+    lib.config_logging(self.log_call, self.log_dummy_call, self.benchmark, self)
 
     # fill in structure from fd
     self._create_vamos_lib(lib, ctx)
@@ -248,6 +238,9 @@ class LibManager():
 
       # finally free lib
       self._free_vamos_lib(lib, ctx)
+
+      # close in registry
+      self.lib_reg.close_lib(lib)
     elif lib.ref_cnt < 0:
       raise VamosInternalError("CloseLib: invalid ref count?!")
 

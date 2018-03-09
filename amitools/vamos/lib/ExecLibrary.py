@@ -12,8 +12,6 @@ import dos.Printf
 
 class ExecLibrary(AmigaLibrary):
   name = "exec.library"
-  _pools = {}
-  _poolid = 0x1000
 
   def __init__(self, config):
     AmigaLibrary.__init__(self, self.name, ExecLibraryDef, config, is_base=True)

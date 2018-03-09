@@ -69,6 +69,12 @@ class AmigaLibrary:
     # with every OpenLibrary() call. its map of addr -> ref_cnt
     self.open_lib_bases = {}
 
+  def config_logging(self, log_call, log_dummy_call, benchmark, lib_mgr):
+    self.log_call = log_call
+    self.log_dummy_call = log_dummy_call
+    self.benchmark = benchmark
+    self.lib_mgr = lib_mgr
+
   def calc_neg_size_from_fd(self):
     """calc the neg size from the fd bias"""
     if self.fd == None:
