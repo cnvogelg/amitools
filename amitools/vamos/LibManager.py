@@ -188,9 +188,9 @@ class LibManager():
       return None
 
     self.lib_log("open_lib","found vamos lib: %s" % sane_name)
-    lib = self.lib_reg.open_lib(sane_name, lib_cfg)
+    lib_impl = self.lib_reg.open_lib(sane_name)
 
-    return self._open_vamos_lib(sane_name, lib, ctx)
+    return self._open_vamos_lib(sane_name, lib_impl, lib_cfg, ctx)
 
   def _open_vamos_fake_lib(self, sane_name, lib_cfg, ctx):
     """try to setup a fake lib from a given .fd file
@@ -198,11 +198,16 @@ class LibManager():
 
     # create empty lib
     self.lib_log("open_lib","create fake lib: %s" % sane_name)
-    lib = self.lib_reg.open_fake_lib(sane_name, lib_cfg)
+    lib_impl = self.lib_reg.open_fake_lib(sane_name)
 
-    return self._open_vamos_lib(sane_name, lib, ctx)
+    return self._open_vamos_lib(sane_name, lib_impl, lib_cfg, ctx)
 
-  def _open_vamos_lib(self, sane_name, lib, ctx):
+  def _open_vamos_lib(self, sane_name, lib_impl, lib_cfg, ctx):
+    # create lib from impl
+    struct = lib_impl.get_struct_def()
+    is_base = lib_impl.is_base_lib()
+    lib = AmigaLibrary(sane_name, struct, lib_cfg, is_base, lib_impl)
+
     # now we need an fd file to know about the structure of the lib
     lib.fd = self._load_fd(sane_name)
     if lib.fd == None:
@@ -240,7 +245,7 @@ class LibManager():
       self._free_vamos_lib(lib, ctx)
 
       # close in registry
-      self.lib_reg.close_lib(lib)
+      self.lib_reg.close_lib(lib.name)
     elif lib.ref_cnt < 0:
       raise VamosInternalError("CloseLib: invalid ref count?!")
 

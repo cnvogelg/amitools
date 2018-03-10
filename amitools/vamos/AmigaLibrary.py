@@ -15,7 +15,7 @@ class AmigaLibrary:
   op_rts = 0x4e75
   op_reset = 0x4e70
 
-  def __init__(self, name, struct, config, is_base=False):
+  def __init__(self, name, struct, config, is_base=False, impl=None):
     self.name = name
     self.struct = struct
     self.config = config
@@ -57,7 +57,6 @@ class AmigaLibrary:
     self.addr_begin = 0
     self.addr_end = 0
     self.label = None
-    self.access = None
     self.lib_access = None
     # number of users opening the lib
     self.ref_cnt = 0
@@ -68,6 +67,9 @@ class AmigaLibrary:
     # handle multiple library bases if the lib returns a new instance
     # with every OpenLibrary() call. its map of addr -> ref_cnt
     self.open_lib_bases = {}
+
+    # a vamos lib references its implementation class, the 'impl'
+    self.impl = impl
 
   def config_logging(self, log_call, log_dummy_call, benchmark, lib_mgr):
     self.log_call = log_call
@@ -88,7 +90,7 @@ class AmigaLibrary:
 
   def _get_class_methods(self):
     """return a map with method name to bound method mapping of this class"""
-    members = inspect.getmembers(self, predicate=inspect.ismethod)
+    members = inspect.getmembers(self.impl, predicate=inspect.ismethod)
     result = {}
     for member in members:
       name = member[0]
@@ -316,8 +318,8 @@ class AmigaLibrary:
     self.label = LabelLib(self.name, self.addr_begin, lib_size, self.addr_base, self.struct, self)
     ctx.label_mgr.add_label(self.label)
     # create access
-    self.access = AccessStruct(ctx.mem, self.struct, self.addr_base)
     self.lib_access = AccessStruct(ctx.mem, LibraryDef, self.addr_base)
+    self.access = self.lib_access
 
   def free_lib_base(self, ctx, free_alloc=True):
     """free memory for the library base"""
@@ -331,8 +333,8 @@ class AmigaLibrary:
     self.addr_base = 0
     self.addr_end = 0
     self.label = None
-    self.access = None
     self.lib_access = None
+    self.access = None
     # release all the traps so they can be recycled
     for tid in self.traps:
       ctx.traps.free(tid)
@@ -354,9 +356,16 @@ class AmigaLibrary:
     # If the library is a system library, better lock it in memory
     # to ensure that the traps are kept.
     self.lock_in_memory = lock_in_memory
+    # setup impl
+    if self.impl is not None:
+      self.impl.setup_lib(ctx, self.addr_base)
 
   def finish_lib(self, ctx):
     """the lib is no longer used in memory"""
+    # finish impl
+    if self.impl is not None:
+      self.impl.finish_lib(ctx)
+
     if self.ref_cnt != 0:
       self.log("lib ref count != 0: %d" % self.ref_cnt, level=logging.ERROR)
 

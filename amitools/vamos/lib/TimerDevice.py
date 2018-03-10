@@ -1,8 +1,5 @@
-from amitools.vamos.AmigaLibrary import *
-from amitools.vamos.lib.lexec.ExecStruct import LibraryDef
-from amitools.vamos.Log import *
+from amitools.vamos.libcore import LibImpl
 
-class TimerDevice(AmigaLibrary):
+class TimerDevice(LibImpl):
 
-  def __init__(self, name, config):
-    AmigaLibrary.__init__(self, name, LibraryDef, config)
+  pass

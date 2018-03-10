@@ -1,11 +1,8 @@
-from amitools.vamos.AmigaLibrary import *
-from amitools.vamos.lib.lexec.ExecStruct import LibraryDef
-from amitools.vamos.Log import *
+from amitools.vamos.CPU import *
+from amitools.vamos.libcore import LibImpl
+from amitools.vamos.Log import log_main
 
-class IntuitionLibrary(AmigaLibrary):
-
-  def __init__(self, name, config):
-    AmigaLibrary.__init__(self, name, LibraryDef, config)
+class IntuitionLibrary(LibImpl):
 
   def DisplayAlert(self, ctx):
     alert_num = ctx.cpu.r_reg(REG_D0)

@@ -1,4 +1,5 @@
-from amitools.vamos.AmigaLibrary import *
+from amitools.vamos.CPU import *
+from amitools.vamos.libcore import LibImpl
 from lexec.ExecStruct import *
 from amitools.vamos.Log import log_exec
 from amitools.vamos.Exceptions import *
@@ -10,18 +11,21 @@ from lexec.Pool import Pool
 import lexec.Alloc
 import dos.Printf
 
-class ExecLibrary(AmigaLibrary):
+class ExecLibrary(LibImpl):
 
-  def __init__(self, name, config):
-    AmigaLibrary.__init__(self, name, ExecLibraryDef, config, is_base=True)
+  def get_struct_def(self):
+    return ExecLibraryDef
 
-  def setup_lib(self, ctx):
-    AmigaLibrary.setup_lib(self, ctx)
-    log_exec.info("open exec.library V%d", self.version)
+  def is_base_lib(self):
+    return True
+
+  def setup_lib(self, ctx, base_addr):
+    log_exec.info("setup exec.library")
     self.lib_mgr = ctx.lib_mgr
     self.alloc = ctx.alloc
     self._pools = {}
     self._poolid = 0x1000
+    self.access = AccessStruct(ctx.mem, self.get_struct_def(), base_addr)
     # set some system contants
     if ctx.cpu_type == '68030':
       self.access.w_s("AttnFlags",7)
@@ -35,13 +39,17 @@ class ExecLibrary(AmigaLibrary):
     self.semaphore_mgr = SemaphoreManager(ctx.alloc,ctx.mem)
     self.mem      = ctx.mem
 
-  def finish_lib(self, ctx):
-    pass
-
   def set_this_task(self, process):
     self.access.w_s("ThisTask",process.this_task.addr)
     self.stk_lower = process.stack_base
     self.stk_upper = process.stack_end
+
+  # helper
+
+  def get_callee_pc(self,ctx):
+    """a call stub log helper to extract the callee's pc"""
+    sp = ctx.cpu.r_reg(REG_A7)
+    return ctx.mem.access.r32(sp)
 
   # ----- System -----
 

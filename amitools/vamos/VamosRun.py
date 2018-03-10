@@ -52,7 +52,7 @@ class VamosRun:
 
     # clear long at 0 and set execbase at 4
     self.mem.access.w32(0, 0)
-    self.mem.access.w32(4, self.ctx.exec_lib.addr_base)
+    self.mem.access.w32(4, self.ctx.exec_addr)
 
     # at exit_addr (0x400) we setup the return actions after process end:
     # we want to call a shutdown trap that is able to setup some cleanup

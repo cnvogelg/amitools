@@ -1,13 +1,10 @@
-from amitools.vamos.AmigaLibrary import *
-from amitools.vamos.lib.lexec.ExecStruct import LibraryDef
+from amitools.vamos.CPU import *
+from amitools.vamos.libcore import LibImpl
 from amitools.vamos.Log import log_math
 from amitools.util.Math import *
 
 
-class MathTransLibrary(AmigaLibrary):
-
-  def __init__(self, name, config):
-    AmigaLibrary.__init__(self, name, LibraryDef, config)
+class MathTransLibrary(LibImpl):
 
   def SPAcos(self,ctx):
     arg = ffp_reg_to_float(ctx.cpu.r_reg(REG_D0))

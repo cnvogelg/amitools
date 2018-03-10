@@ -2,8 +2,7 @@ import pytest
 
 from amitools.vamos.lib.DosLibrary import DosLibrary
 from amitools.vamos.lib.ExecLibrary import ExecLibrary
-from amitools.vamos.libcore.LibRegistry import LibRegistry
-from amitools.vamos.VamosConfig import VamosLibConfig
+from amitools.vamos.libcore import LibRegistry
 from amitools.vamos.Exceptions import VamosInternalError
 
 def lib_reg_find_cls_test():
@@ -30,36 +29,39 @@ def lib_reg_get_all_names_test():
 
 def lib_reg_open_test():
   lr = LibRegistry()
-  cfg = VamosLibConfig('dos.library')
-  lib = lr.open_lib('dos.library', cfg)
+  lib = lr.open_lib('dos.library')
   assert lib is not None
   # double open fails
   with pytest.raises(VamosInternalError):
-    lib = lr.open_lib('dos.library', cfg)
-  assert lib.name == 'dos.library'
+    lib = lr.open_lib('dos.library')
   assert lr.has_open_libs()
   assert lr.get_open_libs() == [lib]
-  lr.close_lib(lib)
+  lr.close_lib('dos.library')
   # double close fails
   with pytest.raises(VamosInternalError):
-    lib = lr.close_lib(lib)
+    lib = lr.close_lib('dos.library')
   assert not lr.has_open_libs()
   assert lr.get_open_libs() == []
 
-def lib_reg_open_test():
+def lib_reg_fake_open_test():
   lr = LibRegistry()
-  cfg = VamosLibConfig('fake.library')
-  lib = lr.open_fake_lib('fake.library', cfg)
+  lib = lr.open_fake_lib('fake.library')
   assert lib is not None
   # double open fails
   with pytest.raises(VamosInternalError):
-    lib = lr.open_fake_lib('fake.library', cfg)
-  assert lib.name == 'fake.library'
+    lib = lr.open_fake_lib('fake.library')
   assert lr.has_open_libs()
   assert lr.get_open_libs() == [lib]
-  lr.close_lib(lib)
+  lr.close_lib('fake.library')
   # double close fails
   with pytest.raises(VamosInternalError):
-    lib = lr.close_lib(lib)
+    lib = lr.close_lib('fake.library')
   assert not lr.has_open_libs()
   assert lr.get_open_libs() == []
+
+def lib_reg_open_all_test():
+  lr = LibRegistry()
+  all_names = lr.get_all_names()
+  for name in all_names:
+    lr.open_lib(name)
+    lr.close_lib(name)

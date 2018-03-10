@@ -3,7 +3,8 @@ import ctypes
 import re
 import os
 
-from amitools.vamos.AmigaLibrary import *
+from amitools.vamos.CPU import *
+from amitools.vamos.libcore import LibImpl
 from dos.DosStruct import *
 from lexec.ExecStruct import ListDef, MinListDef, NodeDef
 from amitools.vamos.Exceptions import *
@@ -29,7 +30,7 @@ from dos.FileManager import FileManager
 from dos.CSource import *
 from dos.Item import *
 
-class DosLibrary(AmigaLibrary):
+class DosLibrary(LibImpl):
   DOSFALSE = 0
   DOSTRUE = 0xffffffff
 
@@ -40,12 +41,14 @@ class DosLibrary(AmigaLibrary):
   GVF_LOCAL_ONLY        =	0x200
   GVF_BINARY_VAR	=	0x400
 
-  def __init__(self, name, config):
-    AmigaLibrary.__init__(self, name, DosLibraryDef, config, is_base=True)
+  def is_base_lib(self):
+    return True
 
-  def setup_lib(self, ctx):
-    AmigaLibrary.setup_lib(self, ctx)
-    log_dos.info("open dos.library V%d", self.version)
+  def get_struct_def(self):
+    return DosLibraryDef
+
+  def setup_lib(self, ctx, base_addr):
+    log_dos.info("setup dos.library")
     # init own state
     self.alloc = ctx.alloc
     self.path_mgr = ctx.path_mgr
@@ -59,6 +62,7 @@ class DosLibrary(AmigaLibrary):
     self.path = []
     self.resident = []
     self.local_vars = {}
+    self.access = AccessStruct(ctx.mem, self.get_struct_def(), base_addr)
     # setup RootNode
     self.root_struct = ctx.alloc.alloc_struct("RootNode",RootNodeDef)
     self.access.w_s("dl_Root",self.root_struct.addr)
@@ -103,7 +107,13 @@ class DosLibrary(AmigaLibrary):
     ctx.alloc.free_struct(self.root_struct)
     # free DosInfo
     ctx.alloc.free_struct(self.dos_info)
-    AmigaLibrary.finish_lib(self, ctx)
+
+  # helper
+
+  def get_callee_pc(self,ctx):
+    """a call stub log helper to extract the callee's pc"""
+    sp = ctx.cpu.r_reg(REG_A7)
+    return ctx.mem.access.r32(sp)
 
   # ----- IoErr -----
 

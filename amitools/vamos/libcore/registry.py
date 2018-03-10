@@ -1,12 +1,11 @@
 from amitools.vamos.Exceptions import VamosInternalError
-from amitools.vamos.AmigaLibrary import AmigaLibrary
-from amitools.vamos.lib.lexec.ExecStruct import LibraryDef
-import amitools.vamos.lib.LibList as LibList
+from .impl import LibImpl
 
 class LibRegistry:
   def __init__(self, vamos_libs=None):
     # use default list
     if vamos_libs is None:
+      import amitools.vamos.lib.LibList as LibList
       vamos_libs = LibList.vamos_libs
     # state
     self.vamos_libs = vamos_libs
@@ -36,31 +35,29 @@ class LibRegistry:
   def has_open_libs(self):
     return len(self.open_libs) > 0
 
-  def open_lib(self, name, lib_cfg):
+  def open_lib(self, name):
     """open a library and create instance of it"""
     # try to find class
     lib_cls = self.find_cls_by_name(name)
     if lib_cls is None:
       return None
-    lib = lib_cls(name, lib_cfg)
-    return self._int_open_lib(lib)
+    lib = lib_cls()
+    return self._int_open_lib(name, lib)
 
-  def open_fake_lib(self, name, lib_cfg):
+  def open_fake_lib(self, name):
     """open an empty fake lib of given name"""
     # create generic lib
-    lib = AmigaLibrary(name, LibraryDef, lib_cfg)
-    return self._int_open_lib(lib)
+    lib = LibImpl()
+    return self._int_open_lib(name, lib)
 
-  def _int_open_lib(self, lib):
-    name = lib.name
+  def _int_open_lib(self, name, lib):
     # only allow opening once
     if name in self.open_libs:
       raise VamosInternalError("Lib '%s' already opened!" % name)
     self.open_libs[name] = lib
     return lib
 
-  def close_lib(self, lib):
-    name = lib.name
+  def close_lib(self, name):
     if name not in self.open_libs:
       raise VamosInternalError("Lib '%s' not opened!" % name)
     del self.open_libs[name]

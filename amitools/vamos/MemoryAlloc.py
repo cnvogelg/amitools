@@ -45,6 +45,8 @@ class MemoryAlloc:
     self.addr = addr
     self.size = size
     self.label_mgr = label_mgr
+    # compat link
+    self.access = mem
 
     self.addrs = {}
     self.mem_objs = {}

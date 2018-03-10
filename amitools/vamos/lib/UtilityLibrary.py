@@ -1,14 +1,11 @@
-from amitools.vamos.AmigaLibrary import *
-from amitools.vamos.lib.lexec.ExecStruct import LibraryDef
+from amitools.vamos.CPU import *
+from amitools.vamos.libcore import LibImpl
 from amitools.vamos.lib.util.UtilStruct import TagItemDef
 from amitools.vamos.lib.util.TagList import *
 from amitools.vamos.lib.util.AmiDate import *
 from amitools.vamos.Log import *
 
-class UtilityLibrary(AmigaLibrary):
-
-  def __init__(self, name, config):
-    AmigaLibrary.__init__(self, name, LibraryDef, config)
+class UtilityLibrary(LibImpl):
 
   def UDivMod32(self, ctx):
     dividend = ctx.cpu.r_reg(REG_D0)
@@ -133,7 +130,7 @@ class UtilityLibrary(AmigaLibrary):
       log_utility.warn("Date2Amiga: invalid date! @%08x", date_ptr)
       return 0
     seconds = seconds_since(t)
-    log_utility.info("Date2Amige: time=%s -> seconds=%u", time, seconds)
+    log_utility.info("Date2Amige: time=%s -> seconds=%u", t, seconds)
     return seconds
 
   def CheckDate(self, ctx):
@@ -144,5 +141,5 @@ class UtilityLibrary(AmigaLibrary):
       log_utility.info("CheckDate: invalid date! @%08x", date_ptr)
       return 0
     seconds = seconds_since(t)
-    log_utility.info("CheckDate: time=%s -> seconds=%u", time, seconds)
+    log_utility.info("CheckDate: time=%s -> seconds=%u", t, seconds)
     return seconds

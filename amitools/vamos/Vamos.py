@@ -2,9 +2,8 @@ from label.LabelManager import LabelManager
 from label.LabelRange import LabelRange
 from MemoryAlloc import MemoryAlloc
 from AccessMemory import AccessMemory
-from AmigaLibrary import AmigaLibrary
 from LibManager import LibManager
-from libcore.LibRegistry import LibRegistry
+from .libcore import LibRegistry
 from SegmentLoader import SegmentLoader
 from path.PathManager import PathManager
 from ErrorTracker import ErrorTracker
@@ -306,18 +305,24 @@ class Vamos:
   # ----- init environment -----
 
   def open_base_libs(self):
+    log_main.info("open_base_libs")
     # open exec lib
-    self.exec_lib = self.lib_mgr.open_lib('exec.library', 0, self)
-    log_mem_init.info(self.exec_lib)
+    exec_amilib = self.lib_mgr.open_lib('exec.library', 0, self)
+    self.exec_addr = exec_amilib.addr_base
+    self.exec_lib = exec_amilib.impl
+    log_mem_init.info(exec_amilib)
     # open dos lib
-    self.dos_lib = self.lib_mgr.open_lib('dos.library', 0, self)
-    log_mem_init.info(self.dos_lib)
+    dos_amilib = self.lib_mgr.open_lib('dos.library', 0, self)
+    self.dos_addr = dos_amilib.addr_base
+    self.dos_lib = dos_amilib.impl
+    log_mem_init.info(dos_amilib)
 
   def close_base_libs(self):
+    log_main.info("close_base_libs")
     # close dos
-    self.lib_mgr.close_lib(self.dos_lib.addr_base, self)
+    self.lib_mgr.close_lib(self.dos_addr, self)
     # close exec
-    self.lib_mgr.close_lib(self.exec_lib.addr_base, self)
+    self.lib_mgr.close_lib(self.exec_addr, self)
 
   def create_old_dos_guard(self):
     # create a guard memory for tracking invalid old dos access
