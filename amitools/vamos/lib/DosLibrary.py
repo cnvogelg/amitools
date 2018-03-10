@@ -30,8 +30,6 @@ from dos.CSource import *
 from dos.Item import *
 
 class DosLibrary(AmigaLibrary):
-  name = "dos.library"
-
   DOSFALSE = 0
   DOSTRUE = 0xffffffff
 
@@ -42,8 +40,8 @@ class DosLibrary(AmigaLibrary):
   GVF_LOCAL_ONLY        =	0x200
   GVF_BINARY_VAR	=	0x400
 
-  def __init__(self, config):
-    AmigaLibrary.__init__(self, self.name, DosLibraryDef, config, is_base=True)
+  def __init__(self, name, config):
+    AmigaLibrary.__init__(self, name, DosLibraryDef, config, is_base=True)
 
   def setup_lib(self, ctx):
     AmigaLibrary.setup_lib(self, ctx)

@@ -6,13 +6,9 @@ import math
 
 
 class MathIEEEDoubBasLibrary(AmigaLibrary):
-  name = "mathieeedoubbas.library"
 
-  def __init__(self, config):
-    AmigaLibrary.__init__(self, self.name, LibraryDef, config)
-
-  def setup_lib(self, ctx):
-    AmigaLibrary.setup_lib(self, ctx)
+  def __init__(self, name, config):
+    AmigaLibrary.__init__(self, name, LibraryDef, config)
 
   def IEEEDPFix(self, ctx):
     arg = regs_to_double(ctx.cpu.r_reg(REG_D0),ctx.cpu.r_reg(REG_D1))

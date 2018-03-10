@@ -2,7 +2,7 @@ import pytest
 
 from amitools.vamos.lib.DosLibrary import DosLibrary
 from amitools.vamos.lib.ExecLibrary import ExecLibrary
-from amitools.vamos.LibRegistry import LibRegistry
+from amitools.vamos.libcore.LibRegistry import LibRegistry
 from amitools.vamos.VamosConfig import VamosLibConfig
 from amitools.vamos.Exceptions import VamosInternalError
 

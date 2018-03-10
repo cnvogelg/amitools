@@ -4,7 +4,7 @@ from MemoryAlloc import MemoryAlloc
 from AccessMemory import AccessMemory
 from AmigaLibrary import AmigaLibrary
 from LibManager import LibManager
-from LibRegistry import LibRegistry
+from libcore.LibRegistry import LibRegistry
 from SegmentLoader import SegmentLoader
 from path.PathManager import PathManager
 from ErrorTracker import ErrorTracker

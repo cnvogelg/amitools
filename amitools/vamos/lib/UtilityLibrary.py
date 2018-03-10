@@ -6,13 +6,9 @@ from amitools.vamos.lib.util.AmiDate import *
 from amitools.vamos.Log import *
 
 class UtilityLibrary(AmigaLibrary):
-  name = "utility.library"
 
-  def __init__(self, config):
-    AmigaLibrary.__init__(self, self.name, LibraryDef, config)
-
-  def setup_lib(self, ctx):
-    AmigaLibrary.setup_lib(self, ctx)
+  def __init__(self, name, config):
+    AmigaLibrary.__init__(self, name, LibraryDef, config)
 
   def UDivMod32(self, ctx):
     dividend = ctx.cpu.r_reg(REG_D0)

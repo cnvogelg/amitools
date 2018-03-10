@@ -11,10 +11,9 @@ import lexec.Alloc
 import dos.Printf
 
 class ExecLibrary(AmigaLibrary):
-  name = "exec.library"
 
-  def __init__(self, config):
-    AmigaLibrary.__init__(self, self.name, ExecLibraryDef, config, is_base=True)
+  def __init__(self, name, config):
+    AmigaLibrary.__init__(self, name, ExecLibraryDef, config, is_base=True)
 
   def setup_lib(self, ctx):
     AmigaLibrary.setup_lib(self, ctx)

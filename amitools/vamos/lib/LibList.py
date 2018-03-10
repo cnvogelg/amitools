@@ -10,16 +10,16 @@ from .MathTransLibrary import MathTransLibrary
 from .TimerDevice import TimerDevice
 from .UtilityLibrary import UtilityLibrary
 
-vamos_libs = (
-  DosLibrary,
-  ExecLibrary,
-  IntuitionLibrary,
-  MathFFPLibrary,
-  MathIEEEDoubBasLibrary,
-  MathIEEEDoubTransLibrary,
-  MathIEEESingBasLibrary,
-  MathIEEESingTransLibrary,
-  MathTransLibrary,
-  TimerDevice,
-  UtilityLibrary
-)
+vamos_libs = {
+  'dos.library' : DosLibrary,
+  'exec.library' : ExecLibrary,
+  'intuition.library' : IntuitionLibrary,
+  'mathffp.library' : MathFFPLibrary,
+  'mathieeedoubbas.library' : MathIEEEDoubBasLibrary,
+  'mathieeedoubtrans.library' : MathIEEEDoubTransLibrary,
+  'mathieeesingbas.library' : MathIEEESingBasLibrary,
+  'mathieeesingtrans.library' : MathIEEESingTransLibrary,
+  'mathtrans.library' : MathTransLibrary,
+  'timer.device' : TimerDevice,
+  'utility.library' : UtilityLibrary
+}

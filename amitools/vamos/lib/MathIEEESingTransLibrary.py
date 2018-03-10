@@ -6,13 +6,9 @@ import math
 
 
 class MathIEEESingTransLibrary(AmigaLibrary):
-  name = "mathieeesingtrans.library"
 
-  def __init__(self, config):
-    AmigaLibrary.__init__(self, self.name, LibraryDef, config)
-
-  def setup_lib(self, ctx):
-    AmigaLibrary.setup_lib(self, ctx)
+  def __init__(self, name, config):
+    AmigaLibrary.__init__(self, name, LibraryDef, config)
 
   def IEEESPAcos(self,ctx):
     arg = reg_to_float(ctx.cpu.r_reg(REG_D0))

@@ -3,13 +3,9 @@ from amitools.vamos.lib.lexec.ExecStruct import LibraryDef
 from amitools.vamos.Log import *
 
 class IntuitionLibrary(AmigaLibrary):
-  name = "intuition.library"
 
-  def __init__(self, config):
-    AmigaLibrary.__init__(self, self.name, LibraryDef, config)
-
-  def setup_lib(self, ctx):
-    AmigaLibrary.setup_lib(self, ctx)
+  def __init__(self, name, config):
+    AmigaLibrary.__init__(self, name, LibraryDef, config)
 
   def DisplayAlert(self, ctx):
     alert_num = ctx.cpu.r_reg(REG_D0)
