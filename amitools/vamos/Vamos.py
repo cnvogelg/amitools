@@ -3,7 +3,7 @@ from label.LabelRange import LabelRange
 from MemoryAlloc import MemoryAlloc
 from AccessMemory import AccessMemory
 from LibManager import LibManager
-from .libcore import LibRegistry
+from .libcore import LibRegistry, LibCtxMap, LibCtx
 from SegmentLoader import SegmentLoader
 from path.PathManager import PathManager
 from ErrorTracker import ErrorTracker
@@ -72,9 +72,15 @@ class Vamos:
     # create segment loader
     self.seg_loader = SegmentLoader( self.mem, self.alloc, self.label_mgr, self.path_mgr )
 
+    # setup lib context
+    ctx_map = LibCtxMap()
+    ctx_map.set_default_ctx(LibCtx(self.cpu, self.mem))
+    ctx_map.add_ctx('exec.library', self)
+    ctx_map.add_ctx('dos.library', self)
+
     # lib manager
     self.lib_reg = LibRegistry()
-    self.lib_mgr = LibManager( self.label_mgr, self.lib_reg, cfg)
+    self.lib_mgr = LibManager( self.label_mgr, self.lib_reg, ctx_map, cfg)
 
     # no current process right now
     self.process = None
@@ -307,12 +313,12 @@ class Vamos:
   def open_base_libs(self):
     log_main.info("open_base_libs")
     # open exec lib
-    exec_amilib = self.lib_mgr.open_lib('exec.library', 0, self)
+    exec_amilib = self.lib_mgr.open_lib('exec.library', 0)
     self.exec_addr = exec_amilib.addr_base
     self.exec_lib = exec_amilib.impl
     log_mem_init.info(exec_amilib)
     # open dos lib
-    dos_amilib = self.lib_mgr.open_lib('dos.library', 0, self)
+    dos_amilib = self.lib_mgr.open_lib('dos.library', 0)
     self.dos_addr = dos_amilib.addr_base
     self.dos_lib = dos_amilib.impl
     log_mem_init.info(dos_amilib)
@@ -320,9 +326,9 @@ class Vamos:
   def close_base_libs(self):
     log_main.info("close_base_libs")
     # close dos
-    self.lib_mgr.close_lib(self.dos_addr, self)
+    self.lib_mgr.close_lib(self.dos_addr)
     # close exec
-    self.lib_mgr.close_lib(self.exec_addr, self)
+    self.lib_mgr.close_lib(self.exec_addr)
 
   def create_old_dos_guard(self):
     # create a guard memory for tracking invalid old dos access

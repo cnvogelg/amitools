@@ -98,7 +98,7 @@ class VamosRun:
   def shutdown_trap(self, op, pc):
     log_main.info("shutdown trap")
     # trigger lib manager to shutdown libs
-    self.ctx.lib_mgr.shutdown(self.ctx)
+    self.ctx.lib_mgr.shutdown()
 
   def reset_func(self):
     """this callback is entered from CPU whenever a RESET opcode is encountered.

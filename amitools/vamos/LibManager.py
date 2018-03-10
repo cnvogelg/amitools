@@ -15,9 +15,10 @@ class LibManager():
 
   op_jmp = 0x4ef9
 
-  def __init__(self, label_mgr, lib_reg, cfg):
+  def __init__(self, label_mgr, lib_reg, ctx_map, cfg):
     self.label_mgr = label_mgr
     self.lib_reg = lib_reg
+    self.ctx_map = ctx_map
     self.cfg = cfg
     self.data_dir = cfg.data_dir
 
@@ -33,17 +34,20 @@ class LibManager():
     # libs will accumulate this if benchmarking is enabled
     self.bench_total = 0.0
 
+    # my context: exec.library
+    self.my_ctx = ctx_map.get_ctx('exec.library')
+
   def lib_log(self, func, text, level=logging.INFO):
     """helper to create lib log messages"""
     log_libmgr.log(level, "[%10s] %s", func, text)
 
-  def shutdown(self, ctx):
+  def shutdown(self):
     """called from the shutdown trap after process execution to clean up libs.
        mainly used to expunge native libs with expunge type "shutdown".
        additionally force close libs that are still not closed due to invalid
        ref counts"""
     self.lib_log("shutdown","expunging native libs and check for orphaned libs")
-    self.expunge_libs(ctx)
+    self.expunge_libs()
 
     # check for orphaned libs
     libs = self.open_libs_name.values()
@@ -64,33 +68,33 @@ class LibManager():
       # try to close lib now
       if ref_cnt > 0:
         if lib.is_native:
-          self._force_close_native_lib(lib, ctx)
+          self._force_close_native_lib(lib, self.my_ctx)
         else:
-          self._force_close_vamos_lib(lib, ctx)
+          self._force_close_vamos_lib(lib, self.my_ctx)
 
-  def expunge_libs(self, ctx):
+  def expunge_libs(self):
     self.lib_log("expunge","expunge native libs")
     libs = self.open_libs_name.values()
     for lib in libs:
       if lib.is_native and lib.ref_cnt == 0:
-        self._expunge_native_lib(lib, ctx)
+        self._expunge_native_lib(lib, self.my_ctx)
 
   # ----- common -----
 
-  def open_dev(self, name, unit, flags, io, ctx):
+  def open_dev(self, name, unit, flags, io):
     """ Open a device by name, unit and flags"""
-    lib = self.open_lib(name,0,ctx)
+    lib = self.open_lib(name,0)
     if lib != None:
       io.w_s("io_Device",lib.addr_base)
       return lib
     else:
       return None
 
-  def close_dev(self, dev_addr, ctx):
-    lib = self.close_lib(dev_addr, ctx)
+  def close_dev(self, dev_addr):
+    lib = self.close_lib(dev_addr)
     return lib
 
-  def open_lib(self, name, ver, ctx):
+  def open_lib(self, name, ver):
     """open a new library in memory
        return new AmigaLibrary instance that is setup or None if lib was not found
 
@@ -109,7 +113,7 @@ class LibManager():
       lib = self.open_libs_name[sane_name]
       self.lib_log("open_lib","opening already open lib: %s ref_cnt=%d" % (sane_name, lib.ref_cnt))
       if lib.is_native:
-        self._open_native_lib(lib, ctx)
+        self._open_native_lib(lib, self.my_ctx)
       else:
         # vamos lib open: inc usage
         lib.inc_usage()
@@ -132,24 +136,24 @@ class LibManager():
       elif mode == 'auto':
         # auto (default) tries to open internal vamos lib first and if that
         # fails tries a native amige lib
-        lib = self._open_vamos_internal_lib(sane_name, lib_cfg, ctx)
+        lib = self._open_vamos_internal_lib(sane_name, lib_cfg, self.my_ctx)
         if lib == None:
-          lib = self._load_and_open_native_lib(name, sane_name, lib_cfg, ctx)
+          lib = self._load_and_open_native_lib(name, sane_name, lib_cfg, self.my_ctx)
           if lib == None:
             self.lib_log("open_lib","auto found neither vamos nor amiga lib: %s" % name)
       elif mode == 'vamos':
         # only try to find an internal vamos lib
-        lib = self._open_vamos_internal_lib(sane_name, lib_cfg, ctx)
+        lib = self._open_vamos_internal_lib(sane_name, lib_cfg, self.my_ctx)
         if lib == None:
           self.lib_log("open_lib","no vamos lib found: %s" % name)
       elif mode == 'amiga':
         # only try to open an amiga lib
-        lib = self._load_and_open_native_lib(name, sane_name, lib_cfg, ctx)
+        lib = self._load_and_open_native_lib(name, sane_name, lib_cfg, self.my_ctx)
         if lib == None:
           self.lib_log("open_lib","no amiga lib found: %s" % name)
       elif mode == 'fake':
         # create a fake lib for this library
-        lib = self._open_vamos_fake_lib(sane_name, lib_cfg, ctx)
+        lib = self._open_vamos_fake_lib(sane_name, lib_cfg, self.my_ctx)
         if lib == None:
           self.lib_log("open_lib","fake lib failed for: %s" % name)
 
@@ -160,7 +164,7 @@ class LibManager():
     return lib
 
   # return instance or null
-  def close_lib(self, addr, ctx):
+  def close_lib(self, addr):
     # get lib object
     if addr not in self.open_libs_addr:
       self.lib_log("close_lib","no library found at address %06x" % (addr), level=logging.ERROR)
@@ -171,10 +175,10 @@ class LibManager():
 
     # close amiga lib
     if lib.is_native:
-      self._close_native_lib(lib, addr, ctx)
+      self._close_native_lib(lib, addr, self.my_ctx)
     # close vamos lib
     else:
-      self._close_vamos_lib(lib, ctx)
+      self._close_vamos_lib(lib, self.my_ctx)
 
     return lib
 
@@ -206,7 +210,8 @@ class LibManager():
     # create lib from impl
     struct = lib_impl.get_struct_def()
     is_base = lib_impl.is_base_lib()
-    lib = AmigaLibrary(sane_name, struct, lib_cfg, is_base, lib_impl)
+    lib_ctx = self.ctx_map.get_ctx(sane_name)
+    lib = AmigaLibrary(sane_name, struct, lib_cfg, is_base, lib_impl, lib_ctx)
 
     # now we need an fd file to know about the structure of the lib
     lib.fd = self._load_fd(sane_name)

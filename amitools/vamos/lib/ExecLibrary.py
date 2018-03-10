@@ -117,7 +117,7 @@ class ExecLibrary(LibImpl):
     ver = ctx.cpu.r_reg(REG_D0)
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name = ctx.mem.access.r_cstr(name_ptr)
-    lib = self.lib_mgr.open_lib(name, ver, ctx)
+    lib = self.lib_mgr.open_lib(name, ver)
     if lib == None:
       log_exec.info("OpenLibrary: '%s' V%d -> NULL" % (name, ver))
       return 0
@@ -131,7 +131,7 @@ class ExecLibrary(LibImpl):
             "utility.library","keymap.library","gadtools.library","workbench.library"]
     if tag > 0 and tag <= len(tags):
       name = tags[tag - 1]
-      lib  = self.lib_mgr.open_lib(name, 0, ctx)
+      lib  = self.lib_mgr.open_lib(name, 0)
       if lib == None:
         log_exec.info("TaggedOpenLibrary: %d('%s') -> NULL" % (tag, name))
         return 0
@@ -145,14 +145,14 @@ class ExecLibrary(LibImpl):
   def OldOpenLibrary(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name = ctx.mem.access.r_cstr(name_ptr)
-    lib = self.lib_mgr.open_lib(name, 0, ctx)
+    lib = self.lib_mgr.open_lib(name, 0)
     log_exec.info("OldOpenLibrary: '%s' -> %s" % (name, lib))
     return lib.addr_base
 
   def CloseLibrary(self, ctx):
     lib_addr = ctx.cpu.r_reg(REG_A1)
     if lib_addr != 0:
-      lib = self.lib_mgr.close_lib(lib_addr,ctx)
+      lib = self.lib_mgr.close_lib(lib_addr)
       if lib != None:
         log_exec.info("CloseLibrary: '%s' -> %06x" % (lib, lib.addr_base))
       else:
@@ -334,7 +334,7 @@ class ExecLibrary(LibImpl):
     io       = AccessStruct(ctx.mem, IORequestDef, io_addr)
     flags    = ctx.cpu.r_reg(REG_D1)
     name     = ctx.mem.access.r_cstr(name_ptr)
-    lib      = self.lib_mgr.open_dev(name, unit, flags, io, ctx)
+    lib      = self.lib_mgr.open_dev(name, unit, flags, io)
     if lib == None:
       log_exec.info("OpenDevice: '%s' unit %d flags %d -> NULL" % (name, unit, flags))
       return -1
@@ -348,7 +348,7 @@ class ExecLibrary(LibImpl):
       io       = AccessStruct(ctx.mem, IORequestDef, io_addr)
       dev_addr = io.r_s("io_Device")
       if dev_addr != 0:
-        dev = self.lib_mgr.close_dev(dev_addr,ctx)
+        dev = self.lib_mgr.close_dev(dev_addr)
         io.w_s("io_Device",0)
         if dev != None:
           log_exec.info("CloseDevice: '%s' -> %06x" % (dev, dev.addr_base))

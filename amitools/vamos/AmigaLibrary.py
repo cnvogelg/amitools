@@ -15,7 +15,7 @@ class AmigaLibrary:
   op_rts = 0x4e75
   op_reset = 0x4e70
 
-  def __init__(self, name, struct, config, is_base=False, impl=None):
+  def __init__(self, name, struct, config, is_base=False, impl=None, lib_ctx=None):
     self.name = name
     self.struct = struct
     self.config = config
@@ -70,6 +70,8 @@ class AmigaLibrary:
 
     # a vamos lib references its implementation class, the 'impl'
     self.impl = impl
+    # library context for all calls into lib
+    self.lib_ctx = lib_ctx
 
   def config_logging(self, log_call, log_dummy_call, benchmark, lib_mgr):
     self.log_call = log_call
@@ -224,7 +226,7 @@ class AmigaLibrary:
        returns True if trap was applied or False if no trap could be setup
     """
     # get call stub
-    call_stub = self._generate_call_stub(ctx, bias, name, method, args)
+    call_stub = self._generate_call_stub(self.lib_ctx, bias, name, method, args)
     # allocate a trap
     tid = ctx.traps.setup(call_stub, auto_rts=True)
     if tid < 0:
@@ -358,13 +360,13 @@ class AmigaLibrary:
     self.lock_in_memory = lock_in_memory
     # setup impl
     if self.impl is not None:
-      self.impl.setup_lib(ctx, self.addr_base)
+      self.impl.setup_lib(self.lib_ctx, self.addr_base)
 
   def finish_lib(self, ctx):
     """the lib is no longer used in memory"""
     # finish impl
     if self.impl is not None:
-      self.impl.finish_lib(ctx)
+      self.impl.finish_lib(self.lib_ctx)
 
     if self.ref_cnt != 0:
       self.log("lib ref count != 0: %d" % self.ref_cnt, level=logging.ERROR)
