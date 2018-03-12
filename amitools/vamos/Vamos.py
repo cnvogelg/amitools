@@ -11,6 +11,7 @@ from Trampoline import Trampoline
 from HardwareAccess import HardwareAccess
 from amitools.vamos.AccessStruct import AccessStruct
 from amitools.vamos.lib.dos.DosStruct import CLIDef
+from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 
 from Log import *
 from CPU import *
@@ -39,9 +40,13 @@ class Vamos:
     # path manager
     self.path_mgr = PathManager( cfg )
 
+    def terminate_func():
+      log_main.error("terminate emulation due to error!")
+      self.raw_mem.set_all_to_end()
+
     # create a label manager and error tracker
     self.label_mgr = LabelManager()
-    self.error_tracker = ErrorTracker(cpu, self.label_mgr)
+    self.error_tracker = ErrorTracker(cpu, self.label_mgr, terminate_func)
     self.label_mgr.error_tracker = self.error_tracker
 
     # set a label for first region
@@ -74,13 +79,18 @@ class Vamos:
 
     # setup lib context
     ctx_map = LibCtxMap()
+    self.exec_ctx = ExecLibCtx(self.cpu, self.mem, self.cpu_type, self.ram_size,
+                               self.label_mgr, self.alloc, self.traps,
+                               self.seg_loader)
     ctx_map.set_default_ctx(LibCtx(self.cpu, self.mem))
-    ctx_map.add_ctx('exec.library', self)
+    ctx_map.add_ctx('exec.library', self.exec_ctx)
     ctx_map.add_ctx('dos.library', self)
 
     # lib manager
     self.lib_reg = LibRegistry()
-    self.lib_mgr = LibManager( self.label_mgr, self.lib_reg, ctx_map, cfg)
+    self.lib_mgr = LibManager(self.label_mgr, self.lib_reg, ctx_map, cfg,
+                              self.error_tracker)
+    self.exec_ctx.set_lib_mgr(self.lib_mgr)
 
     # no current process right now
     self.process = None
@@ -127,6 +137,7 @@ class Vamos:
   def _set_this_task(self, proc):
     """tell exec about this process and all others referencing process from here"""
     self.process = proc
+    self.exec_ctx.set_process(proc)
     self.exec_lib.set_this_task(proc)
 
   def get_current_process(self):

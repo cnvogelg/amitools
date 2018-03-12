@@ -5,7 +5,7 @@ import traceback
 import CPU
 
 class ErrorTracker:
-  def __init__(self, cpu, label_mgr):
+  def __init__(self, cpu, label_mgr, terminate_func=None):
     self.cpu = cpu
     self.label_mgr = label_mgr
     self.vamos_error = None
@@ -15,6 +15,7 @@ class ErrorTracker:
     self.other_tb = None
     self.other_type = None
     self.other_value = None
+    self.terminate_func = terminate_func
 
   # direct callback from MEM module -> on error
   def report_invalid_memory(self, mode, width, addr):
@@ -36,6 +37,9 @@ class ErrorTracker:
       self.other_tb = traceback.extract_tb(exc_traceback)
       self.other_type = exc_type
       self.other_value = exc_value
+    # call terminate functions
+    if self.terminate_func is not None:
+      self.terminate_func()
 
   # show vamos error with machine state
   def dump_vamos_error(self):

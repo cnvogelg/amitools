@@ -15,7 +15,8 @@ class AmigaLibrary:
   op_rts = 0x4e75
   op_reset = 0x4e70
 
-  def __init__(self, name, struct, config, is_base=False, impl=None, lib_ctx=None):
+  def __init__(self, name, struct, config, is_base=False, impl=None,
+              lib_ctx=None, error_tracker=None):
     self.name = name
     self.struct = struct
     self.config = config
@@ -72,6 +73,8 @@ class AmigaLibrary:
     self.impl = impl
     # library context for all calls into lib
     self.lib_ctx = lib_ctx
+    # error tracker for exception reporting
+    self.error_tracker = error_tracker
 
   def config_logging(self, log_call, log_dummy_call, benchmark, lib_mgr):
     self.log_call = log_call
@@ -210,8 +213,8 @@ class AmigaLibrary:
       c.append("  try:")
       for l in code[1:]:
         c.append("  " + l)
-      c.append("  except:")
-      c.append("    self._handle_exc()")
+      c.append("  except Exception as exc:")
+      c.append("    self._handle_exc(exc)")
       code = c
 
     # generate code
@@ -436,12 +439,9 @@ class AmigaLibrary:
   def _account_benchmark_data(self, delta):
     self.lib_mgr.bench_total += delta
 
-  def _handle_exc(self):
+  def _handle_exc(self, exc):
     """handle an exception that occurred inside the call stub's python code"""
-    sys.stderr.write("\n**** Unexpected exception in library stub: %s " % sys.exc_info()[1])
-    traceback.print_tb(sys.exc_info()[2],file=sys.stderr)
-    sys.stderr.write("\n")
-    raise
+    self.error_tracker.report_error(exc)
 
   # handle lib bases
 
