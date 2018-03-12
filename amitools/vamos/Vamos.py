@@ -12,6 +12,7 @@ from HardwareAccess import HardwareAccess
 from amitools.vamos.AccessStruct import AccessStruct
 from amitools.vamos.lib.dos.DosStruct import CLIDef
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
+from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
 
 from Log import *
 from CPU import *
@@ -82,9 +83,12 @@ class Vamos:
     self.exec_ctx = ExecLibCtx(self.cpu, self.mem, self.cpu_type, self.ram_size,
                                self.label_mgr, self.alloc, self.traps,
                                self.seg_loader)
+    self.dos_ctx = DosLibCtx(self.cpu, self.mem, self.alloc, self.path_mgr,
+                             self.seg_loader, self.run_command,
+                             self.start_sub_process)
     ctx_map.set_default_ctx(LibCtx(self.cpu, self.mem))
     ctx_map.add_ctx('exec.library', self.exec_ctx)
-    ctx_map.add_ctx('dos.library', self)
+    ctx_map.add_ctx('dos.library', self.dos_ctx)
 
     # lib manager
     self.lib_reg = LibRegistry()
@@ -139,6 +143,7 @@ class Vamos:
     self.process = proc
     self.exec_ctx.set_process(proc)
     self.exec_lib.set_this_task(proc)
+    self.dos_ctx.set_process(proc)
 
   def get_current_process(self):
     return self.process
@@ -328,10 +333,13 @@ class Vamos:
     self.exec_addr = exec_amilib.addr_base
     self.exec_lib = exec_amilib.impl
     log_mem_init.info(exec_amilib)
+    # link exec to dos
+    self.dos_ctx.set_exec_lib(self.exec_lib)
     # open dos lib
     dos_amilib = self.lib_mgr.open_lib('dos.library', 0)
     self.dos_addr = dos_amilib.addr_base
     self.dos_lib = dos_amilib.impl
+    self.dos_ctx.set_dos_lib(self.dos_lib)
     log_mem_init.info(dos_amilib)
 
   def close_base_libs(self):

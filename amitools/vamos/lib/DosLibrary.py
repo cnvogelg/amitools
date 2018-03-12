@@ -1422,7 +1422,7 @@ class DosLibrary(LibImpl):
       # TODO: redirs
       log_dos.info("SystemTagList: bin='%s' args=%s", bin, args)
       # fetch current dir for current process
-      cur_proc = ctx.get_current_process()
+      cur_proc = ctx.process
       cwd_lock = cur_proc.cwd_lock
       cwd = cur_proc.cwd
       # create a process and run it...
