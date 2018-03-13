@@ -2,6 +2,7 @@ from __future__ import print_function
 
 from amitools.vamos.CPU import *
 from amitools.vamos.libcore import LibImpl
+from amitools.vamos.Exceptions import *
 
 class VamosTestLibrary(LibImpl):
 
@@ -28,4 +29,16 @@ class VamosTestLibrary(LibImpl):
     return b, a
 
   def RaiseError(self, ctx):
-    raise RuntimeError("VamosTest: RaiseError()")
+    str_addr = ctx.cpu.r_reg(REG_A0)
+    txt = ctx.mem.r_cstr(str_addr)
+    if txt == "RuntimeError":
+      e = RuntimeError("VamosTest")
+    elif txt == "VamosInternalError":
+      e = VamosInternalError("VamosTest")
+    elif txt == "InvalidMemoryAccessError":
+      e = InvalidMemoryAccessError('R', 2, 0x200)
+    else:
+      print("VamosTest: Invalid Error:", txt)
+      return
+    print("VamosTest: raise", e.__class__.__name__)
+    raise e

@@ -54,10 +54,12 @@
   (_Dummy__bn - 54))(_Dummy__bn, _Dummy_a, _Dummy_b); \
 });})
 
-#define RaiseError() ({ \
+#define RaiseError(str) ({ \
+  STRPTR _RaiseError_str = (str); \
+  ({ \
   register char * _RaiseError__bn __asm("a6") = (char *) (VAMOSTEST_BASE_NAME);\
-  ((VOID (*)(char * __asm("a6"))) \
-  (_RaiseError__bn - 60))(_RaiseError__bn); \
-})
+  ((VOID (*)(char * __asm("a6"), STRPTR __asm("a0"))) \
+  (_RaiseError__bn - 60))(_RaiseError__bn, _RaiseError_str); \
+});})
 
 #endif /*  _INLINE_VAMOSTEST_H  */

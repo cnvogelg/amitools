@@ -42,4 +42,7 @@ except ImportError as e:
   sys.exit(2)
 
 # call tool
-main()
+res = main()
+if res is None:
+  res = 0
+sys.exit(res)

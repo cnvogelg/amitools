@@ -9,7 +9,7 @@ SOURCES_C += util_muldiv.c util_date.c
 SOURCES_C += math_double.c math_double_trans.c
 SOURCES_C += math_single.c math_single_trans.c
 SOURCES_C += math_fast.c math_fast_trans.c
-SROUCES_C += test_hello.c
+SROUCES_C += test_hello.c test_raise.c
 
 VPATH = src
 

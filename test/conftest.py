@@ -47,14 +47,31 @@ class VamosTestRunner:
 
        kw_args:
        - stdin = string for stdin
+       - no_ts = no timestamps
        - variant = a postfix string to append to data file
 
        returns:
        - returncode of process
        - stdout as line array
+       - stderr as line array
     """
+
+    # stdin given?
+    if 'stdin' in kw_args:
+      stdin = kw_args['stdin']
+    else:
+      stdin = None
+
+    # timestamps?
+    if 'no_ts' in kw_args:
+      no_ts = kw_args['no_ts']
+    else:
+      no_ts = True
+
     # run vamos with prog
     args = [self.vamos_bin] + VAMOS_ARGS
+    if no_ts:
+      args.append('--no-ts')
     if self.vopts is not None:
       args = args + self.vopts
     prog_name = "curdir:bin/" + prog_args[0] + '_' + self.flavor
@@ -62,13 +79,7 @@ class VamosTestRunner:
       prog_name = prog_name + "_dbg"
     args.append(prog_name)
     if len(prog_args) > 1:
-      args = args + prog_args[1:]
-
-    # stdin given?
-    if 'stdin' in kw_args:
-      stdin = kw_args['stdin']
-    else:
-      stdin = None
+      args = args + list(prog_args[1:])
 
     # run and get stdout/stderr
     print("running:"," ".join(args))
@@ -77,6 +88,7 @@ class VamosTestRunner:
 
     # process stdout
     stdout = stdout.splitlines()
+    stderr = stderr.splitlines()
 
     # show?
     if self.dump_output:
@@ -96,18 +108,14 @@ class VamosTestRunner:
         f.write(line + "\n")
       f.close()
 
-    # show stderr
-    if len(stderr) > 0:
-      print(stderr)
-
-    return (p.returncode, stdout)
+    return (p.returncode, stdout, stderr)
 
   def run_prog_checked(self, *prog_args, **kw_args):
     """like run_prog() but check return value and assume its 0"""
-    retcode, stdout = self.run_prog(*prog_args, **kw_args)
+    retcode, stdout, stderr = self.run_prog(*prog_args, **kw_args)
     if retcode != 0:
       raise subprocess.CalledProcessError(retcode)
-    return stdout
+    return stdout, stderr
 
   def _compare(self, got, ok):
     for i in xrange(len(ok)):
@@ -117,7 +125,7 @@ class VamosTestRunner:
   def run_prog_check_data(self, *prog_args, **kw_args):
     """like run_prog_checked() but also verify the stdout
        and compare with the corresponding data file of the suite"""
-    stdout = self.run_prog_checked(*prog_args, **kw_args)
+    stdout, stderr = self.run_prog_checked(*prog_args, **kw_args)
     # compare stdout with data
     dat_path = self._get_data_path(prog_args[0], kw_args)
     f = open(dat_path, "r")
@@ -126,6 +134,8 @@ class VamosTestRunner:
       ok_stdout.append(l.strip())
     f.close()
     self._compare(stdout, ok_stdout)
+    # asser stderr to be empty
+    assert stderr == []
 
 # ----- pytest integration -----
 

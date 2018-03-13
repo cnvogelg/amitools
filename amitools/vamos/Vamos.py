@@ -43,7 +43,6 @@ class Vamos:
     self.path_mgr = PathManager( cfg )
 
     def terminate_func():
-      log_main.error("terminate emulation due to error!")
       self.raw_mem.set_all_to_end()
 
     # create a label manager and error tracker
@@ -109,7 +108,8 @@ class Vamos:
   def cleanup(self):
     self.cleanup_main_proc()
     self.close_base_libs()
-    self.alloc.dump_orphans()
+    if not self.error_tracker.has_errors:
+        self.alloc.dump_orphans()
 
   # ----- system setup -----
 

@@ -32,8 +32,9 @@
 	AROS_LCA(STRPTR, (___str), A0), \
 	struct Library *, VAMOSTEST_BASE_NAME, 6, /* s */)
 
-#define RaiseError() \
-	AROS_LC0(void, RaiseError, \
+#define RaiseError(___str) \
+	AROS_LC1(void, RaiseError, \
+	AROS_LCA(STRPTR, (___str), A0), \
 	struct Library *, VAMOSTEST_BASE_NAME, 10, /* s */)
 
 #define Swap(___a, ___b) \

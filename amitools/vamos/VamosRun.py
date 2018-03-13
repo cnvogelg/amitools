@@ -172,13 +172,11 @@ class VamosRun:
 
     # if errors happened then report them now
     if self.et.has_errors:
-      log_main.error("After %d cycles:", total_cycles)
-      self.et.dump()
       exit_code = 1
     else:
       # get exit code from CPU
       exit_code = int(self.cpu.r_reg(REG_D0))
-      log_main.info("exit code=%d", exit_code)
+    log_main.info("exit code=%d", exit_code)
 
     return exit_code
 

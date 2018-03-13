@@ -20,7 +20,7 @@ ULONG __Swap(__reg("a6") struct VamosTestBase *, __reg("d0") ULONG a, __reg("d1"
 ULONG __Dummy(__reg("a6") struct VamosTestBase *, __reg("d0") ULONG a, __reg("d1") ULONG b)="\tjsr\t-54(a6)";
 #define Dummy(a, b) __Dummy(VamosTestBase, (a), (b))
 
-VOID __RaiseError(__reg("a6") struct VamosTestBase *)="\tjsr\t-60(a6)";
-#define RaiseError() __RaiseError(VamosTestBase)
+VOID __RaiseError(__reg("a6") struct VamosTestBase *, __reg("a0") STRPTR str)="\tjsr\t-60(a6)";
+#define RaiseError(str) __RaiseError(VamosTestBase, (str))
 
 #endif /*  _VBCCINLINE_VAMOSTEST_H  */
