@@ -3,11 +3,13 @@
 # build programs with the following compilers:
 # VBCC, GCC, AROS_GCC, SASC
 
-SOURCES_C = dos_readargs.c vprintf.c mem.c
+SOURCES_C = dos_readargs.c dos_findarg.c
+SOURCES_C += vprintf.c mem.c
 SOURCES_C += util_muldiv.c util_date.c
 SOURCES_C += math_double.c math_double_trans.c
 SOURCES_C += math_single.c math_single_trans.c
 SOURCES_C += math_fast.c math_fast_trans.c
+SROUCES_C += test_hello.c
 
 VPATH = src
 
@@ -27,10 +29,11 @@ AROS_ELF2HUNK = elf2hunk
 SASC = ../bin/vamos -c sasc.vamosrc sc
 
 # options
-VBCC_OPTS = +aos68k -I$(NDK_DIR)/include
-GCC_OPTS  = -noixemul
-AROS_GCC_OPTS =
-SASC_OPTS = SMALLDATA SMALLCODE NOSTKCHK NOCHKABORT NOICONS STRICT ANSI
+VBCC_OPTS = +aos68k -I$(NDK_DIR)/include -Iinclude
+GCC_OPTS  = -noixemul -Iinclude
+AROS_GCC_OPTS = -Iinclude
+SASC_OPTS = SMALLDATA SMALLCODE NOSTKCHK NOCHKABORT NOICONS STRICT ANSI \
+            INCDIR=include
 
 # optimize options
 VBCC_OPTI = -O2

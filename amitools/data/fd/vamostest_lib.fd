@@ -1,0 +1,10 @@
+##base _VamosTestBase
+##bias 30
+##public
+PrintHello()()
+PrintString(str)(a0)
+Add(a,b)(d0,d1)
+Swap(a,b)(d0,d1)
+Dummy(a,b)(d0,d1)
+RaiseError()()
+##end

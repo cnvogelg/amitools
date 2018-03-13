@@ -9,6 +9,7 @@ from .MathIEEESingTransLibrary import MathIEEESingTransLibrary
 from .MathTransLibrary import MathTransLibrary
 from .TimerDevice import TimerDevice
 from .UtilityLibrary import UtilityLibrary
+from .VamosTestLibrary import VamosTestLibrary
 
 vamos_libs = {
   'dos.library' : DosLibrary,
@@ -21,5 +22,6 @@ vamos_libs = {
   'mathieeesingtrans.library' : MathIEEESingTransLibrary,
   'mathtrans.library' : MathTransLibrary,
   'timer.device' : TimerDevice,
-  'utility.library' : UtilityLibrary
+  'utility.library' : UtilityLibrary,
+  'vamostest.library' : VamosTestLibrary
 }
