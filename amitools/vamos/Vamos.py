@@ -13,7 +13,7 @@ from amitools.vamos.AccessStruct import AccessStruct
 from amitools.vamos.lib.dos.DosStruct import CLIDef
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
-from Process import Process
+from amitools.vamos.lib.dos.Process import Process
 
 from Log import *
 from CPU import *

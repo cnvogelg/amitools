@@ -22,7 +22,7 @@ from dos.PatternMatch import Pattern, pattern_parse, pattern_match
 from dos.MatchFirstNext import MatchFirstNext
 from amitools.vamos.label.LabelStruct import LabelStruct
 from dos.CommandLine import CommandLine
-from amitools.vamos.Process import Process
+from dos.Process import Process
 import dos.PathPart
 from dos.DosList import DosList
 from dos.LockManager import LockManager

@@ -1,7 +1,7 @@
-from Log import log_proc
-from lib.lexec.ExecStruct import *
-from lib.dos.DosStruct import *
-from lib.lexec.PortManager import *
+from amitools.vamos.Log import log_proc
+from amitools.vamos.lib.lexec.ExecStruct import *
+from amitools.vamos.lib.lexec.PortManager import *
+from DosStruct import *
 
 NT_PROCESS = 13
 
