@@ -18,7 +18,6 @@ from amitools.vamos.Log import *
 from amitools.vamos.Vamos import Vamos
 from amitools.vamos.VamosConfig import VamosConfig
 from amitools.vamos.VamosRun import VamosRun
-from amitools.vamos.Process import Process
 
 # ----- main -----------------------------------------------------------------
 def main():
@@ -106,11 +105,6 @@ def main():
   # setup traps
   traps = emu.Traps()
 
-  # combine to vamos instance
-  vamos = Vamos(mem, cpu, traps, cfg)
-  vamos.init()
-
-  # --- create main process ---
   # setup current working dir
   cwd = cfg.cwd
   if cwd is None:
@@ -130,12 +124,11 @@ def main():
   log_main.info("bin='%s', args='%s', cwd='%s', shell='%s', stack=%d, exit_addr=%08x",
     binary, args.args, cwd, args.shell, cfg.stack_size, exit_addr)
 
-  # create initial process
-  proc = Process(vamos, binary, args.args, stack_size=cfg.stack_size*1024,
-                 shell=args.shell, cwd=cwd, exit_addr=exit_addr)
-  if not proc.ok:
-    sys.exit(1)
-  vamos.set_main_process(proc)
+  stack_size=cfg.stack_size * 1024
+
+  # combine to vamos instance
+  vamos = Vamos(mem, cpu, traps, cfg)
+  vamos.init(binary, args.args, stack_size, args.shell, cwd, exit_addr)
 
   # ------ main loop ------
 
@@ -145,9 +138,6 @@ def main():
 
   # main loop
   exit_code = run.run(cfg.cycles_per_block, cfg.max_cycles)
-
-  # free process
-  proc.free()
 
   # shutdown vamos
   vamos.cleanup()

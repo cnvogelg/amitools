@@ -13,6 +13,7 @@ from amitools.vamos.AccessStruct import AccessStruct
 from amitools.vamos.lib.dos.DosStruct import CLIDef
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
+from Process import Process
 
 from Log import *
 from CPU import *
@@ -100,12 +101,13 @@ class Vamos:
     self.process = None
     self.proc_list = []
 
-  def init(self):
+  def init(self, binary, args, stack_size, shell, cwd, exit_addr):
     self.create_old_dos_guard()
     self.open_base_libs()
-    return True
+    return self.setup_main_proc(binary, args, stack_size, shell, cwd, exit_addr)
 
   def cleanup(self):
+    self.cleanup_main_proc()
     self.close_base_libs()
     self.alloc.dump_orphans()
 
@@ -147,11 +149,6 @@ class Vamos:
 
   def get_current_process(self):
     return self.process
-
-  def set_main_process(self, proc):
-    log_proc.info("set main process: %s", proc)
-    self.proc_list.append(proc)
-    self._set_this_task(proc)
 
   def start_sub_process(self, proc):
     log_proc.info("start sub process: %s", proc)
@@ -356,3 +353,19 @@ class Vamos:
     label = LabelRange("old_dos guard",self.dos_guard_base, self.dos_guard_size)
     self.label_mgr.add_label(label)
     log_mem_init.info(label)
+
+  # ----- main process -----
+
+  def setup_main_proc(self, binary, args, stack_size, shell, cwd, exit_addr):
+    proc = Process(self.dos_ctx, binary, args, stack_size=stack_size,
+                   shell=shell, cwd=cwd, exit_addr=exit_addr)
+    if not proc.ok:
+      return False
+    log_proc.info("set main process: %s", proc)
+    self.proc_list.append(proc)
+    self._set_this_task(proc)
+    self.main_proc = proc
+    return True
+
+  def cleanup_main_proc(self):
+    self.main_proc.free()
