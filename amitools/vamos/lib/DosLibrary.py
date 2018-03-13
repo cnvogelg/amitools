@@ -1410,25 +1410,22 @@ class DosLibrary(LibImpl):
     else:
       # parse "command line"
       cl = CommandLine()
-      if not cl.parse_string(cmd):
-        log_dos.info("SystemTagList: error parsing command: '%s'", cmd)
+      res = cl.parse_line(cmd)
+      if res != cl.LINE_OK:
+        log_dos.info("SystemTagList: error parsing command: '%s' -> %d", res)
         return 10 # RETURN_ERROR
-      args = cl.args
-      if len(args) == 0:
-        log_dos.info("SystemTagList: error parsing command: '%s'", cmd)
-        return 10 # RETURN_ERROR
-      bin = args[0]
-      args = args[1:]
       # TODO: redirs
-      log_dos.info("SystemTagList: bin='%s' args=%s", bin, args)
+      binary = cl.get_cmd()
+      arg_str = cl.get_arg_str()
+      log_dos.info("SystemTagList: bin='%s' arg_str='%s'", binary, arg_str[:-1])
       # fetch current dir for current process
       cur_proc = ctx.process
       cwd_lock = cur_proc.cwd_lock
       cwd = cur_proc.cwd
       # create a process and run it...
-      proc = Process(ctx, bin, args, cwd=cwd, cwd_lock=cwd_lock)
+      proc = Process(ctx, binary, arg_str, cwd=cwd, cwd_lock=cwd_lock)
       if not proc.ok:
-        log_dos.warn("SystemTagList: can't create process for '%s' args=%s", bin, args)
+        log_dos.warn("SystemTagList: can't create process for '%s' args=%s", binary, args)
         return self.DOSTRUE
       ctx.start_sub_process(proc)
 

@@ -101,10 +101,10 @@ class Vamos:
     self.process = None
     self.proc_list = []
 
-  def init(self, binary, args, stack_size, shell, cwd, exit_addr):
+  def init(self, binary, arg_str, stack_size, shell, cwd, exit_addr):
     self.create_old_dos_guard()
     self.open_base_libs()
-    return self.setup_main_proc(binary, args, stack_size, shell, cwd, exit_addr)
+    return self.setup_main_proc(binary, arg_str, stack_size, shell, cwd, exit_addr)
 
   def cleanup(self):
     self.cleanup_main_proc()
@@ -356,8 +356,8 @@ class Vamos:
 
   # ----- main process -----
 
-  def setup_main_proc(self, binary, args, stack_size, shell, cwd, exit_addr):
-    proc = Process(self.dos_ctx, binary, args, stack_size=stack_size,
+  def setup_main_proc(self, binary, arg_str, stack_size, shell, cwd, exit_addr):
+    proc = Process(self.dos_ctx, binary, arg_str, stack_size=stack_size,
                    shell=shell, cwd=cwd, exit_addr=exit_addr)
     if not proc.ok:
       return False

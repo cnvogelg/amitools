@@ -6,9 +6,12 @@ from DosStruct import *
 NT_PROCESS = 13
 
 class Process:
-  def __init__(self, ctx, bin_file, sys_args,
+  def __init__(self, ctx, bin_file, arg_str,
                input_fh=None, output_fh=None, stack_size=4096,
                exit_addr=0, shell=False, cwd=None, cwd_lock=None):
+    """bin_file  Amiga path to binary for process
+       arg_str   Shell-style parameter string with trailing newline
+    """
     self.ctx = ctx
     if input_fh == None:
       input_fh = self.ctx.dos_lib.file_mgr.get_input()
@@ -24,7 +27,7 @@ class Process:
     # it through the private CliInit() call of the dos.library
     if not shell:
       self.shell = False
-      self.init_args(sys_args, input_fh)
+      self.init_args(arg_str, input_fh)
       self.init_cli_struct(input_fh, output_fh,self.bin_basename)
     else:
       self.arg = None
@@ -121,31 +124,16 @@ class Process:
   def unload_binary(self):
     self.ctx.seg_loader.unload_seg(self.bin_seg_list)
 
-  def quote_arg(self,arg):
-    if " " in arg or arg == "":
-      out=arg.replace("*","**")
-      out=out.replace("\e","*e")
-      out=out.replace("\n","*n")
-      out=out.replace("\"","*\"")
-      return "\""+out+"\""
-    else:
-      return arg
-
   # ----- args -----
-  def init_args(self, sys_args, fh):
-    # quote args if necessary
-    sys_args = map(lambda x: self.quote_arg(x), sys_args)
-    # AmigaDOS appends a new line to the end
-    arg_text = " ".join(sys_args) + "\n"
-    self.arg_len  = len(arg_text)
+  def init_args(self, arg_str, fh):
     # Tripos makes the input line available as buffered input for ReadItem()
-    fh.setbuf(arg_text)
+    fh.setbuf(arg_str)
     # alloc and fill arg buffer
-    arg_size = self.arg_len + 1
-    self.arg = self.ctx.alloc.alloc_memory(self.bin_basename + "_args", arg_size)
+    self.arg_len  = len(arg_str)
+    self.arg = self.ctx.alloc.alloc_memory(self.bin_basename + "_args", self.arg_len + 1)
     self.arg_base = self.arg.addr
-    self.ctx.mem.access.w_cstr(self.arg_base, arg_text)
-    log_proc.info("args: '%s' (%d)", arg_text[:-1], arg_size)
+    self.ctx.mem.access.w_cstr(self.arg_base, arg_str)
+    log_proc.info("args: '%s' (%d)", arg_str[:-1], self.arg_len)
     log_proc.info(self.arg)
 
   def free_args(self):
@@ -219,8 +207,6 @@ class Process:
     addr = mem.addr
     self.ports[addr] = port
     return addr
-
-
 
   # ----- task struct -----
   def init_task_struct(self, input_fh, output_fh):

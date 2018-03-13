@@ -18,6 +18,8 @@ from amitools.vamos.Log import *
 from amitools.vamos.Vamos import Vamos
 from amitools.vamos.VamosConfig import VamosConfig
 from amitools.vamos.VamosRun import VamosRun
+from amitools.vamos.lib.dos.SysArgs import *
+from amitools.vamos.lib.dos.CommandLine import CommandLine
 
 # ----- main -----------------------------------------------------------------
 def main():
@@ -62,7 +64,9 @@ def main():
   parser.add_argument('-A', '--auto-assign', action='store', default=None, help="define auto assign ami path, e.g. vol:/ami/path")
   parser.add_argument('-p', '--path', action='append', default=None, help="define command search ami path, e.g. c:")
   parser.add_argument('-d', '--cwd', action='store', default=None, help="set current working directory")
+  # arg handling
   parser.add_argument('-P', '--pure-ami-paths', action='store_true', default=None, help="do not allow sys paths for binary")
+  parser.add_argument('-R', '--raw-arg', action='store_true', default=None, help="pass a single unmodified argument string")
   args = parser.parse_args()
 
   # --- init config ---
@@ -110,25 +114,43 @@ def main():
   if cwd is None:
     cwd = 'root:' + os.getcwd()
 
-  # prepare binary path
-  binary = args.bin
-  if not cfg.pure_ami_paths:
-    # auto-convert abs paths to root:
-    if binary == os.path.abspath(binary):
-      binary = 'root:' + binary
+  # --- binary and arg_str ---
+  # a single Amiga-like raw arg was passed
+  if args.raw_arg:
+    # check args
+    if len(args.args) > 0:
+      log_main.error("raw arg only allows a single argument!")
+      sys.exit(1)
+    # parse raw arg
+    cl = CommandLine()
+    res = cl.parse_line(args.bin)
+    if res != cl.LINE_OK:
+      log_main.error("raw arg is invalid! (error %d)", res)
+      sys.exit(1)
+    binary = cl.get_cmd()
+    arg_str = cl.get_arg_str()
+  else:
+    # setup binary
+    binary = args.bin
+    if not cfg.pure_ami_paths:
+      # if path exists on host system then make a root path
+      if os.path.exists(binary):
+        binary = "root:" + os.path.abspath(binary)
+    # combine remaining args to arg_str
+    arg_str = sys_args_to_ami_arg_str(args.args)
 
   # where does the process return?
   exit_addr = VamosRun.exit_addr
 
   # summary
-  log_main.info("bin='%s', args='%s', cwd='%s', shell='%s', stack=%d, exit_addr=%08x",
-    binary, args.args, cwd, args.shell, cfg.stack_size, exit_addr)
+  log_main.info("bin='%s', arg_str='%s', cwd='%s', shell='%s', stack=%d, exit_addr=%08x",
+    binary, arg_str[:-1], cwd, args.shell, cfg.stack_size, exit_addr)
 
   stack_size=cfg.stack_size * 1024
 
   # combine to vamos instance
   vamos = Vamos(mem, cpu, traps, cfg)
-  vamos.init(binary, args.args, stack_size, args.shell, cwd, exit_addr)
+  vamos.init(binary, arg_str, stack_size, args.shell, cwd, exit_addr)
 
   # ------ main loop ------
 
