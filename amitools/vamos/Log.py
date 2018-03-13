@@ -66,7 +66,7 @@ def log_help():
   for l in levels:
     print "  %s" % l
 
-def log_setup(arg=None, verbose=False, quiet=False, log_file=None):
+def log_setup(arg=None, verbose=False, quiet=False, log_file=None, no_ts=False):
   # setup handler
   if log_file != None:
     ch = logging.FileHandler(log_file, mode='w')
@@ -74,7 +74,10 @@ def log_setup(arg=None, verbose=False, quiet=False, log_file=None):
     ch = logging.StreamHandler()
   ch.setLevel(logging.DEBUG)
   # and formatter
-  formatter = logging.Formatter('%(asctime)s.%(msecs)03d %(name)10s:%(levelname)7s:  %(message)s', datefmt='%H:%M:%S')
+  if no_ts:
+    formatter = logging.Formatter('%(name)10s:%(levelname)7s:  %(message)s')
+  else:
+    formatter = logging.Formatter('%(asctime)s.%(msecs)03d %(name)10s:%(levelname)7s:  %(message)s', datefmt='%H:%M:%S')
   ch.setFormatter(formatter)
   for l in loggers:
     l.addHandler(ch)

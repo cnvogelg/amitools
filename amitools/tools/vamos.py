@@ -40,6 +40,7 @@ def main():
   parser.add_argument('-q', '--quiet', action='store_true', default=None, help="do not output any logging")
   parser.add_argument('-b', '--benchmark', action='store_true', default=None, help="enable benchmarking")
   parser.add_argument('-L', '--log-file', action='store', default=None, help="write all log messages to a file")
+  parser.add_argument('--no-ts', action='store_true', default=False, help="do not log with timestamp")
   # low-level tracing
   parser.add_argument('-I', '--instr-trace', action='store_true', default=None, help="enable instruction trace")
   parser.add_argument('-t', '--memory-trace', action='store_true', default=None, help="enable memory tracing (slower)")
@@ -73,7 +74,8 @@ def main():
   cfg = VamosConfig(extra_file=args.config_file, skip_defaults=args.skip_default_configs, args=args, def_data_dir=data_dir)
 
   # --- init logging ---
-  if not log_setup(cfg.logging, cfg.verbose, cfg.quiet, cfg.log_file):
+  if not log_setup(cfg.logging, cfg.verbose, cfg.quiet, cfg.log_file,
+                   args.no_ts):
     log_help()
     sys.exit(1)
   cfg.log()
