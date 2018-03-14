@@ -1,6 +1,36 @@
-from FuncTable import FuncTable
-from FuncDef import FuncDef
+import os
 import re
+from .FuncTable import FuncTable
+from .FuncDef import FuncDef
+from amitools.util.DataDir import get_data_sub_dir
+
+def get_fd_name(lib_name):
+  """return the name associated for a given library/device name"""
+  if lib_name.endswith(".device"):
+    fd_name = lib_name.replace(".device", "_lib.fd")
+  elif lib_name.endswith(".library"):
+    fd_name = lib_name.replace(".library", "_lib.fd")
+  else:
+    raise ValueError("can't find fd name for '%s'" % lib_name)
+  return fd_name
+
+def is_device(lib_name):
+  """return true if given name is associated with a device"""
+  return lib_name.endswith(".device")
+
+def read_lib_fd(lib_name, fd_dir=None, add_std_calls=True):
+  # get default path if none is given
+  if fd_dir is None:
+    fd_dir = get_data_sub_dir("fd")
+  # get fd path
+  fd_name = get_fd_name(lib_name)
+  fd_path = os.path.join(fd_dir, fd_name)
+  # try to read fd
+  fd = read_fd(fd_path)
+  fd.is_device = is_device(lib_name)
+  if add_std_calls:
+    fd.add_std_calls()
+  return fd
 
 def read_fd(fname):
   func_pat = "([A-Za-z][_A-Za-z00-9]+)\((.*)\)\((.*)\)"

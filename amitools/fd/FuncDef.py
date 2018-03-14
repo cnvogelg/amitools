@@ -3,6 +3,7 @@ class FuncDef:
   def __init__(self, name, bias, private=False):
     self.name = name
     self.bias = bias
+    self.index = (bias - 6) / 6
     self.private = private
     self.args = []
   def __str__(self):
@@ -11,6 +12,8 @@ class FuncDef:
     return self.name
   def get_bias(self):
     return self.bias
+  def get_index(self):
+    return self.index
   def is_private(self):
     return self.private
   def get_args(self):
@@ -25,6 +28,6 @@ class FuncDef:
     elif with_reg:
       return "( " + ", ".join(map(lambda x : "%s/%s" % (x[0],x[1]), self.args)) + " )"
     else:
-      return "( " + ", ".join(map(lambda x : "%s" % x[0], self.args)) + " )"      
+      return "( " + ", ".join(map(lambda x : "%s" % x[0], self.args)) + " )"
   def get_str(self, with_reg=True):
     return self.name + self.get_arg_str(with_reg)

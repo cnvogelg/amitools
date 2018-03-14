@@ -2,45 +2,61 @@ from FuncDef import FuncDef
 
 class FuncTable:
   """Store a function table"""
-  def __init__(self, base_name):
+  def __init__(self, base_name, is_device=False):
     self.funcs = []
     self.base_name = base_name
     self.bias_map = {}
     self.name_map = {}
+    self.index_tab = []
     self.max_bias = 0
-  
+    self.is_device = is_device
+
   def get_base_name(self):
     return self.base_name
-  
+
   def get_funcs(self):
     return self.funcs
-  
+
   def get_func_by_bias(self, bias):
     if bias in self.bias_map:
       return self.bias_map[bias]
     else:
       return None
-  
+
   def get_max_bias(self):
     return self.max_bias
-  
+
+  def get_neg_size(self):
+    return self.max_bias + 6
+
+  def get_num_indices(self):
+    return self.max_bias / 6
+
   def has_func(self, name):
     return name in self.name_map
-  
+
   def get_func_by_name(self, name):
     if name in self.name_map:
       return self.name_map[name]
     else:
       return None
-  
+
   def get_num_funcs(self):
     return len(self.funcs)
-  
+
+  def get_index_table(self):
+    return self.index_tab
+
+  def get_func_by_index(self, idx):
+    return self.index_tab[idx]
+
   def add_func(self, f):
     # add to list
     self.funcs.append(f)
     # store by bias
     bias = f.get_bias()
+    if bias in self.bias_map:
+      raise ValueError("bias %d already added!" % bias)
     self.bias_map[bias] = f
     # store by name
     name = f.get_name()
@@ -48,6 +64,12 @@ class FuncTable:
     # adjust max bias
     if bias > self.max_bias:
       self.max_bias = bias
+    # update index table
+    tab_len = bias / 6
+    while len(self.index_tab) < tab_len:
+      self.index_tab.append(None)
+    index = tab_len - 1
+    self.index_tab[index] = f
 
   def add_call(self,name,bias,arg,reg):
     if len(arg) != len(reg):
@@ -64,3 +86,15 @@ class FuncTable:
     print("FuncTable:",self.base_name)
     for f in self.funcs:
       f.dump()
+
+  def add_std_calls(self):
+    if self.is_device:
+      self.add_call("OpenDev",6,["IORequest","Unit"],["a1","d0"])
+      self.add_call("CloseDev",12,["IORequest"],["a1"])
+      self.add_call("ExpungeDev",18,["MyDev"],["a6"])
+      self.add_call("BeginIO",30,["IORequest"],["a1"])
+      self.add_call("AbortIO",36,["IORequest"],["a1"])
+    else:
+      self.add_call("OpenLib",6,["MyLib"],["a6"])
+      self.add_call("CloseLib",12,["MyLib"],["a6"])
+      self.add_call("ExpungeLib",18,["MyLib"],["a6"])
