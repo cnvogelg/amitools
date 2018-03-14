@@ -6,6 +6,10 @@ from amitools.vamos.Exceptions import *
 
 class VamosTestLibrary(LibImpl):
 
+  def ignore_func(self):
+    """a lower-case function that is ignored"""
+    pass
+
   def InvalidFunc(self, ctx):
     """a test function that does not exist in the .fd file"""
     pass

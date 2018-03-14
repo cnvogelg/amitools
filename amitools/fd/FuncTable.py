@@ -32,6 +32,9 @@ class FuncTable:
   def get_num_indices(self):
     return self.max_bias / 6
 
+  def get_all_func_names():
+    return self.name_map.keys()
+
   def has_func(self, name):
     return name in self.name_map
 
@@ -71,11 +74,11 @@ class FuncTable:
     index = tab_len - 1
     self.index_tab[index] = f
 
-  def add_call(self,name,bias,arg,reg):
+  def add_call(self,name,bias,arg,reg,is_std=False):
     if len(arg) != len(reg):
       raise IOError("Reg and Arg name mismatch in function definition")
     else:
-      func_def = FuncDef(name, bias, False)
+      func_def = FuncDef(name, bias, False, is_std)
       self.add_func(func_def)
       if arg[0] != '':
         num_args = len(arg)
@@ -89,12 +92,12 @@ class FuncTable:
 
   def add_std_calls(self):
     if self.is_device:
-      self.add_call("OpenDev",6,["IORequest","Unit"],["a1","d0"])
-      self.add_call("CloseDev",12,["IORequest"],["a1"])
-      self.add_call("ExpungeDev",18,["MyDev"],["a6"])
-      self.add_call("BeginIO",30,["IORequest"],["a1"])
-      self.add_call("AbortIO",36,["IORequest"],["a1"])
+      self.add_call("OpenDev",6,["IORequest","Unit"],["a1","d0"],True)
+      self.add_call("CloseDev",12,["IORequest"],["a1"],True)
+      self.add_call("ExpungeDev",18,["MyDev"],["a6"],True)
+      self.add_call("BeginIO",30,["IORequest"],["a1"],True)
+      self.add_call("AbortIO",36,["IORequest"],["a1"],True)
     else:
-      self.add_call("OpenLib",6,["MyLib"],["a6"])
-      self.add_call("CloseLib",12,["MyLib"],["a6"])
-      self.add_call("ExpungeLib",18,["MyLib"],["a6"])
+      self.add_call("OpenLib",6,["MyLib"],["a6"],True)
+      self.add_call("CloseLib",12,["MyLib"],["a6"],True)
+      self.add_call("ExpungeLib",18,["MyLib"],["a6"],True)
