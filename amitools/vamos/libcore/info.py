@@ -2,6 +2,7 @@ import datetime
 import re
 
 
+date_format = ".*\((\d+)\.(\d+)\.(\d+)\)"
 id_format = "([a-z.]+) (\d+)\.(\d)+ \((\d+)\.(\d+)\.(\d+)\)\r\n"
 
 
@@ -25,8 +26,19 @@ class LibInfo(object):
         self.date.day, self.date.month, self.date.year
     )
 
+  def __eq__(self, other):
+    return self.name == other.name and \
+        self.version == other.version and \
+        self.revision == other.revision and \
+        self.date == other.date and \
+        self.pos_size == other.pos_size and \
+        self.neg_size == other.neg_size
+
   def get_name(self):
     return self.name
+
+  def get_name_cstr_size(self):
+    return len(self.name) + 1
 
   def get_version(self):
     return self.version
@@ -43,6 +55,9 @@ class LibInfo(object):
   def get_id_string(self):
     return self.id_string
 
+  def get_id_string_cstr_size(self):
+    return len(self.id_string) + 1
+
   def get_date(self):
     return self.date
 
@@ -53,6 +68,19 @@ class LibInfo(object):
         self.name, self.version, self.revision, date_str
     )
     return id_str
+
+  @staticmethod
+  def extract_date(id_str):
+    """extract the data from an id_string"""
+    mo = re.match(date_format, id_str)
+    if mo is None:
+      return None
+    groups = mo.groups()
+    day = int(groups[0])
+    mon = int(groups[1])
+    year = int(groups[2])
+    date = datetime.date(year, mon, day)
+    return date
 
   @staticmethod
   def parse_id_string(id_str, pos_size, neg_size):
@@ -67,5 +95,5 @@ class LibInfo(object):
     day = int(groups[3])
     mon = int(groups[4])
     year = int(groups[5])
-    date = datetime.date(day=day, month=mon, year=year)
+    date = datetime.date(year, mon, day)
     return LibInfo(name, version, revision, date, pos_size, neg_size)

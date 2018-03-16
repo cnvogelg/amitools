@@ -2,10 +2,13 @@ import struct
 
 class MockMemory(object):
   """fake the machine's memory API and work on a large bytearray"""
-  def __init__(self, size_kib=16):
+  def __init__(self, size_kib=16, fill=0):
     self.size_kib = size_kib
     self.size_bytes = size_kib * 1024
     self.data = bytearray(self.size_bytes)
+    if fill != 0:
+      for i in xrange(self.size_bytes):
+        self.data[i] = fill
 
   def get_ram_size(self):
     return self.size_kib

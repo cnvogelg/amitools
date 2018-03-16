@@ -18,3 +18,7 @@ def libcore_info_idstr_test():
   assert info.get_id_string() == id_string
   date = datetime.date(day=24, month=12, year=2008)
   assert info.get_date() == date
+  date2 = LibInfo.extract_date(id_string)
+  assert info.get_date() == date2
+  info2 = LibInfo.parse_id_string(id_string, 36, 42)
+  assert info == info2
