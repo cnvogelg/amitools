@@ -326,18 +326,14 @@ class Vamos:
   def open_base_libs(self):
     log_main.info("open_base_libs")
     # open exec lib
-    exec_amilib = self.lib_mgr.open_lib('exec.library', 0)
-    self.exec_addr = exec_amilib.addr_base
-    self.exec_lib = exec_amilib.impl
-    log_mem_init.info(exec_amilib)
+    self.exec_addr = self.lib_mgr.open_lib('exec.library', 0)
+    self.exec_lib = self.lib_mgr.get_lib_impl(self.exec_addr)
     # link exec to dos
     self.dos_ctx.set_exec_lib(self.exec_lib)
     # open dos lib
-    dos_amilib = self.lib_mgr.open_lib('dos.library', 0)
-    self.dos_addr = dos_amilib.addr_base
-    self.dos_lib = dos_amilib.impl
+    self.dos_addr = self.lib_mgr.open_lib('dos.library', 0)
+    self.dos_lib = self.lib_mgr.get_lib_impl(self.dos_addr)
     self.dos_ctx.set_dos_lib(self.dos_lib)
-    log_mem_init.info(dos_amilib)
 
   def close_base_libs(self):
     log_main.info("close_base_libs")

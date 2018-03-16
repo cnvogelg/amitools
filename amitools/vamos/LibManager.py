@@ -82,22 +82,22 @@ class LibManager():
 
   # ----- common -----
 
+  def get_lib_impl(self, addr):
+    """return AmigaLibrary open at address"""
+    return self.open_libs_addr[addr].impl
+
   def open_dev(self, name, unit, flags, io):
     """ Open a device by name, unit and flags"""
-    lib = self.open_lib(name,0)
-    if lib != None:
-      io.w_s("io_Device",lib.addr_base)
-      return lib
-    else:
-      return None
+    addr = self.open_lib(name,0)
+    io.w_s("io_Device", addr)
+    return addr
 
   def close_dev(self, dev_addr):
-    lib = self.close_lib(dev_addr)
-    return lib
+    self.close_lib(dev_addr)
 
   def open_lib(self, name, ver):
     """open a new library in memory
-       return new AmigaLibrary instance that is setup or None if lib was not found
+       return base address of new lib or 0
 
         name = string given to OpenLibrary and may contain path prefix
           e.g. libs/bla.library or libs:foo/bla.library
@@ -162,7 +162,7 @@ class LibManager():
       self.lib_log("open_lib","leaving open_lib(): %s" % lib, level=logging.DEBUG)
     else:
       self.lib_log("open_lib","leaving open_lib(): no lib!", level=logging.DEBUG)
-    return lib
+    return lib.addr_base
 
   # return instance or null
   def close_lib(self, addr):
@@ -180,8 +180,6 @@ class LibManager():
     # close vamos lib
     else:
       self._close_vamos_lib(lib, self.my_ctx)
-
-    return lib
 
   # ----- vamos lib -----
 

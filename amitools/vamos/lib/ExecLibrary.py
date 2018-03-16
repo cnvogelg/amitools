@@ -117,13 +117,9 @@ class ExecLibrary(LibImpl):
     ver = ctx.cpu.r_reg(REG_D0)
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name = ctx.mem.access.r_cstr(name_ptr)
-    lib = self.lib_mgr.open_lib(name, ver)
-    if lib == None:
-      log_exec.info("OpenLibrary: '%s' V%d -> NULL" % (name, ver))
-      return 0
-    else:
-      log_exec.info("OpenLibrary: '%s' V%d -> %s" % (name, ver, lib))
-      return lib.addr_base
+    addr = self.lib_mgr.open_lib(name, ver)
+    log_exec.info("OpenLibrary: '%s' V%d -> %06x", name, ver, addr)
+    return addr
 
   def TaggedOpenLibrary(self, ctx):
     tag = ctx.cpu.r_reg(REG_D0)
@@ -131,13 +127,9 @@ class ExecLibrary(LibImpl):
             "utility.library","keymap.library","gadtools.library","workbench.library"]
     if tag > 0 and tag <= len(tags):
       name = tags[tag - 1]
-      lib  = self.lib_mgr.open_lib(name, 0)
-      if lib == None:
-        log_exec.info("TaggedOpenLibrary: %d('%s') -> NULL" % (tag, name))
-        return 0
-      else:
-        log_exec.info("TaggedOpenLibrary: %d('%s') -> %s" % (tag, name, lib))
-        return lib.addr_base
+      addr = self.lib_mgr.open_lib(name, 0)
+      log_exec.info("TaggedOpenLibrary: %d('%s') -> %06x", tag, name, addr)
+      return addr
     else:
       log_exec.warn("TaggedOpenLibrary: %d invalid tag -> NULL" % tag)
       return 0
@@ -145,18 +137,15 @@ class ExecLibrary(LibImpl):
   def OldOpenLibrary(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name = ctx.mem.access.r_cstr(name_ptr)
-    lib = self.lib_mgr.open_lib(name, 0)
-    log_exec.info("OldOpenLibrary: '%s' -> %s" % (name, lib))
-    return lib.addr_base
+    addr = self.lib_mgr.open_lib(name, 0)
+    log_exec.info("OldOpenLibrary: '%s' -> %06x", name, addr)
+    return addr
 
   def CloseLibrary(self, ctx):
     lib_addr = ctx.cpu.r_reg(REG_A1)
     if lib_addr != 0:
-      lib = self.lib_mgr.close_lib(lib_addr)
-      if lib != None:
-        log_exec.info("CloseLibrary: '%s' -> %06x" % (lib, lib.addr_base))
-      else:
-        log_exec.error("CloseLibrary: @%06x ??" % lib_addr)
+      log_exec.info("CloseLibrary: %06x", lib_addr)
+      self.lib_mgr.close_lib(lib_addr)
 
   def FindResident(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
@@ -334,12 +323,12 @@ class ExecLibrary(LibImpl):
     io       = AccessStruct(ctx.mem, IORequestDef, io_addr)
     flags    = ctx.cpu.r_reg(REG_D1)
     name     = ctx.mem.access.r_cstr(name_ptr)
-    lib      = self.lib_mgr.open_dev(name, unit, flags, io)
-    if lib == None:
-      log_exec.info("OpenDevice: '%s' unit %d flags %d -> NULL" % (name, unit, flags))
+    addr     = self.lib_mgr.open_dev(name, unit, flags, io)
+    if addr == 0:
+      log_exec.info("OpenDevice: '%s' unit %d flags %d -> NULL", name, unit, flags)
       return -1
     else:
-      log_exec.info("OpenDevice: '%s' unit %d flags %d -> %s" % (name, unit, flags, lib))
+      log_exec.info("OpenDevice: '%s' unit %d flags %d -> %06x", name, unit, flags, addr)
       return 0
 
   def CloseDevice(self,ctx):
@@ -348,12 +337,9 @@ class ExecLibrary(LibImpl):
       io       = AccessStruct(ctx.mem, IORequestDef, io_addr)
       dev_addr = io.r_s("io_Device")
       if dev_addr != 0:
-        dev = self.lib_mgr.close_dev(dev_addr)
-        io.w_s("io_Device",0)
-        if dev != None:
-          log_exec.info("CloseDevice: '%s' -> %06x" % (dev, dev.addr_base))
-        else:
-          raise VamosInternalError("CloseDevice: Unknown library to close: ptr=%06x" % dev_addr)
+        log_exec.info("CloseDevice: %06x", dev_addr)
+        self.lib_mgr.close_dev(dev_addr)
+        io.w_s("io_Device", 0)
 
   def WaitPort(self, ctx):
     port_addr = ctx.cpu.r_reg(REG_A0)
