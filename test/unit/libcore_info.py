@@ -4,7 +4,7 @@ from amitools.vamos.libcore import LibInfo
 
 def libcore_info_date_test():
   date = datetime.date(day=24, month=12, year=2008)
-  info = LibInfo('test.library', 42, 3, 36, 42, date=date)
+  info = LibInfo('test.library', 42, 3, date, 36, 42)
   txt = str(info)
   assert txt == "'test.library' 42.3 +36 -42 (24.12.2008)"
   assert info.get_id_string() == 'test.library 42.3 (24.12.2008)\r\n'
@@ -12,7 +12,7 @@ def libcore_info_date_test():
 
 def libcore_info_idstr_test():
   id_string = 'test.library 42.3 (24.12.2008)\r\n'
-  info = LibInfo('test.library', 42, 3, 36, 42, id_string=id_string)
+  info = LibInfo.parse_id_string(id_string, 36, 42)
   txt = str(info)
   assert txt == "'test.library' 42.3 +36 -42 (24.12.2008)"
   assert info.get_id_string() == id_string

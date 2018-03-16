@@ -7,22 +7,15 @@ id_format = "([a-z.]+) (\d+)\.(\d)+ \((\d+)\.(\d+)\.(\d+)\)\r\n"
 
 class LibInfo(object):
 
-  def __init__(self, name, version, revision, pos_size, neg_size,
-               id_string=None, date=None):
+  def __init__(self, name, version, revision, date, pos_size, neg_size):
     """pass either a valid id_string or a date object"""
     self.name = name
     self.version = version
     self.revision = revision
+    self.date = date
     self.pos_size = pos_size
     self.neg_size = neg_size
-    if id_string is None:
-      if date is None:
-        raise ValueError("both date and id_string is None!")
-      self.id_string = self.generate_id_string(date)
-      self.date = date
-    else:
-      self.id_string = id_string
-      self.date = self.parse_id_string(id_string)
+    self.id_string = self._generate_id_string()
 
   def __str__(self):
     return "'%s' %d.%d +%d -%d (%d.%d.%d)" % (
@@ -53,26 +46,26 @@ class LibInfo(object):
   def get_date(self):
     return self.date
 
-  def generate_id_string(self, date):
-    """use date and internals to create id string"""
+  def _generate_id_string(self):
+    date = self.date
     date_str = "%d.%d.%04d" % (date.day, date.month, date.year)
     id_str = "%s %d.%d (%s)\r\n" % (
         self.name, self.version, self.revision, date_str
     )
     return id_str
 
-  def parse_id_string(self, id_str):
+  @staticmethod
+  def parse_id_string(id_str, pos_size, neg_size):
     """parse string and return date"""
     mo = re.match(id_format, id_str)
     if mo is None:
-      raise ValueError("no valid id_string: " + id_str)
+      return None
     groups = mo.groups()
-    assert groups[0] == self.name
-    assert int(groups[1]) == self.version
-    assert int(groups[2]) == self.revision
+    name = groups[0]
+    version = int(groups[1])
+    revision = int(groups[2])
     day = int(groups[3])
     mon = int(groups[4])
     year = int(groups[5])
     date = datetime.date(day=day, month=mon, year=year)
-    self.date = date
-    return date
+    return LibInfo(name, version, revision, date, pos_size, neg_size)
