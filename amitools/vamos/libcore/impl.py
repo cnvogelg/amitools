@@ -21,8 +21,9 @@ class LibImpl(object):
 class LibImplScanner(object):
   """scan a vamos library implementation and extract function lists"""
 
-  def __init__(self):
+  def __init__(self, inc_std_funcs=False):
     self._reset()
+    self.inc_std_funcs = inc_std_funcs
 
   def _reset(self):
     self.valid_funcs = {}
@@ -92,7 +93,7 @@ class LibImplScanner(object):
     if len(funcs) != len(found_names):
       for func in funcs:
         # skip std functions
-        if not func.is_std():
+        if self.inc_std_funcs or not func.is_std():
           name = func.get_name()
           if name not in found_names:
             self.missing_funcs[name] = func

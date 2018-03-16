@@ -16,11 +16,13 @@ class VamosTestLibrary(LibImpl):
 
   def PrintHello(self, ctx):
     print("VamosTest: PrintHello()")
+    return 0
 
   def PrintString(self, ctx):
     str_addr = ctx.cpu.r_reg(REG_A0)
     txt = ctx.mem.r_cstr(str_addr)
     print("VamosTest: PrintString(%s)", txt)
+    return 0
 
   def Add(self, ctx):
     a = ctx.cpu.r_reg(REG_D0)

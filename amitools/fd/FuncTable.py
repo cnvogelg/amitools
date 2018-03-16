@@ -80,7 +80,7 @@ class FuncTable:
     else:
       func_def = FuncDef(name, bias, False, is_std)
       self.add_func(func_def)
-      if arg[0] != '':
+      if arg and len(arg) > 0:
         num_args = len(arg)
         for i in range(num_args):
           func_def.add_arg(arg[i],reg[i])
@@ -95,9 +95,11 @@ class FuncTable:
       self.add_call("OpenDev",6,["IORequest","Unit"],["a1","d0"],True)
       self.add_call("CloseDev",12,["IORequest"],["a1"],True)
       self.add_call("ExpungeDev",18,["MyDev"],["a6"],True)
+      self.add_call("_Empty",24,[],[],True)
       self.add_call("BeginIO",30,["IORequest"],["a1"],True)
       self.add_call("AbortIO",36,["IORequest"],["a1"],True)
     else:
       self.add_call("OpenLib",6,["MyLib"],["a6"],True)
       self.add_call("CloseLib",12,["MyLib"],["a6"],True)
       self.add_call("ExpungeLib",18,["MyLib"],["a6"],True)
+      self.add_call("_Empty",24,[],[],True)
