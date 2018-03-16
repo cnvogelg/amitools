@@ -1,6 +1,7 @@
 import datetime
 from amitools.vamos.lib.lexec.ExecStruct import LibraryDef
 from amitools.vamos.AccessStruct import AccessStruct
+from amitools.vamos.label import LabelLib
 from .info import LibInfo
 
 
@@ -15,10 +16,14 @@ class LibMem(object):
   LIBF_SUMUSED = 4
   LIBF_DELEXP = 8
 
-  def __init__(self, mem, addr):
+  def __init__(self, mem, addr, struct=None):
     self.mem = mem
     self.addr = addr
-    self.access = AccessStruct(mem, LibraryDef, addr)
+    if struct is None:
+      struct = LibraryDef
+    self.struct = struct
+    self.access = AccessStruct(mem, struct, addr)
+    self.label = None
 
   def init_base(self, pri=0):
     self.access.w_s("lib_Node.ln_Succ", 0)
@@ -103,3 +108,19 @@ class LibMem(object):
     lib_sum = self.calc_sum()
     got_sum = self.read_sum()
     return lib_sum == got_sum
+
+  def set_label(self, label_mgr):
+    name_addr = self.access.r_s("lib_Node.ln_Name")
+    name = self.mem.r_cstr(name_addr)
+    neg_size = self.access.r_s("lib_NegSize")
+    pos_size = self.access.r_s("lib_PosSize")
+    addr_begin = self.addr - neg_size
+    size = neg_size + pos_size
+    self.label = LabelLib(name, addr_begin, size,
+                          self.addr, self.struct, self)
+    label_mgr.add_label(self.label)
+    return self.label
+
+  def remove_label(self, label_mgr):
+    label_mgr.remove_label(self.label)
+    self.label = None

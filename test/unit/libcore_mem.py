@@ -2,6 +2,7 @@ import datetime
 from amitools.vamos.libcore import LibMem, LibInfo
 from amitools.vamos.machine import MockMemory
 from amitools.vamos.AccessMemory import AccessMemory
+from amitools.vamos.label import LabelManager
 
 
 def libcore_mem_base_test():
@@ -40,3 +41,7 @@ def libcore_mem_base_test():
   lib_mem.update_sum()
   assert lib_mem.read_sum() == lib_sum
   assert lib_mem.check_sum()
+  # label
+  lm = LabelManager()
+  label = lib_mem.set_label(lm)
+  lib_mem.remove_label(lm)
