@@ -6,6 +6,7 @@ from .impl import LibImplScanner
 from amitools.vamos.Exceptions import VamosInternalError
 from amitools.vamos.CPU import *
 
+
 class LibStub(object):
   """a lib stub is a frontend object instance that wraps all calls into
      a library implementation.
@@ -16,8 +17,10 @@ class LibStub(object):
      A wrapped call adds exception handler, return value processing
      or optional profiling features.
   """
-  def __init__(self, name, impl, fd, profile=None):
-    """create a stub for a given implementation and associated fd description"""
+
+  def __init__(self, name, fd, impl=None, profile=None):
+    """create a stub for a given implementation and
+       associated fd description"""
     self.name = name
     self.impl = impl
     self.fd = fd
@@ -47,7 +50,7 @@ class LibStub(object):
       if reg[0] == 'a':
         reg_num += 8
       val = ctx.cpu.r_reg(reg_num)
-      result.append("%s[%s]=%08x" % (name,reg,val))
+      result.append("%s[%s]=%08x" % (name, reg, val))
     return ", ".join(result)
 
   def _handle_exc(self):
@@ -59,6 +62,7 @@ class LibStub(object):
 class LibStubGen(object):
   """the lib stub generator scans a lib impl and creates stubs for all
      methods found there"""
+
   def __init__(self, exc_handler=None,
                log_missing=None, log_valid=None,
                ignore_invalid=True):
@@ -66,6 +70,21 @@ class LibStubGen(object):
     self.log_missing = log_missing
     self.log_valid = log_valid
     self.ignore_invalid = ignore_invalid
+
+  def gen_fake_stub(self, name, fd, ctx, profile=None):
+    """a fake stub exists without an implementation and only contains
+       "missing" functions
+    """
+    # create stub object
+    stub = LibStub(name, fd, profile=profile)
+
+    # iterate all functions in fd
+    for fd_func in fd.get_funcs():
+      stub_func = self.wrap_missing_func(fd_func, ctx, profile)
+      self._set_method(fd_func, stub, stub_func)
+
+    self._set_exc_handler(stub)
+    return stub
 
   def gen_stub(self, name, impl, fd, ctx, profile=None):
     # first scan the impl
@@ -75,44 +94,45 @@ class LibStubGen(object):
     num_invalid = scanner.get_num_invalid_funcs()
     num_error = scanner.get_num_error_funcs()
     if num_invalid > 0 and not self.ignore_invalid:
-      raise VamosInternalError("'%s' impl has %d invalid funcs!" % (name, num_invalid))
+      raise VamosInternalError(
+          "'%s' impl has %d invalid funcs!" % (name, num_invalid))
     if num_error > 0:
-      raise VamosInternalError("'%s' impl has %d error funcs!" % (name, num_error))
+      raise VamosInternalError(
+          "'%s' impl has %d error funcs!" % (name, num_error))
 
     # create stub object
-    stub = LibStub(name, impl, fd, profile)
+    stub = LibStub(name, fd, impl, profile)
 
     # generate valid funcs
     valid_funcs = scanner.get_valid_funcs().values()
     for fd_func, impl_method in valid_funcs:
       stub_func = self.wrap_func(fd_func, impl_method, ctx, profile)
-      # bind method to stub instance
-      stub_method = MethodType(stub_func, stub)
-      # store in stub
-      setattr(stub, fd_func.get_name(), stub_method)
-      # add to func tab
-      index = fd_func.get_index()
-      stub.func_tab[index] = stub_method
+      self._set_method(fd_func, stub, stub_func)
 
     # generate missing funcs
     missing_funcs = scanner.get_missing_funcs().values()
     for fd_func in missing_funcs:
       stub_func = self.wrap_missing_func(fd_func, ctx, profile)
-      # bind method to stub instance
-      stub_method = MethodType(stub_func, stub)
-      # store in stub
-      setattr(stub, fd_func.get_name(), stub_method)
-      # add to func tab
-      index = fd_func.get_index()
-      stub.func_tab[index] = stub_method
+      self._set_method(fd_func, stub, stub_func)
 
+    self._set_exc_handler(stub)
+    # return final stub
+    return stub
+
+  def _set_method(self, fd_func, stub, stub_func):
+    # bind method to stub instance
+    stub_method = MethodType(stub_func, stub)
+    # store in stub
+    setattr(stub, fd_func.get_name(), stub_method)
+    # add to func tab
+    index = fd_func.get_index()
+    stub.func_tab[index] = stub_method
+
+  def _set_exc_handler(self, stub):
     # (optional) replace exception handler of stub
     if self.exc_handler is not None:
       method = MethodType(self.exc_handler, stub)
       setattr(stub, "_handle_exc", method)
-
-    # return final stub
-    return stub
 
   def wrap_missing_func(self, fd_func, ctx, profile):
     """create a stub func for a missing function in impl
@@ -129,10 +149,12 @@ class LibStubGen(object):
       func_args = fd_func.get_args()
       bias = fd_func.get_bias()
       # with tracing
+
       def stub_func(this, *args, **kwargs):
         callee_pc = this._get_callee_pc(ctx)
-        call_info = "%4d %s( %s ) from PC=%06x" % (bias, name, this._gen_arg_dump(func_args, ctx), callee_pc)
-        log.warn("? CALL: %s -> d0=0 (default)",call_info)
+        call_info = "%4d %s( %s ) from PC=%06x" % (
+            bias, name, this._gen_arg_dump(func_args, ctx), callee_pc)
+        log.warn("? CALL: %s -> d0=0 (default)", call_info)
         ctx.cpu.w_reg(REG_D0, 0)
     func = stub_func
 
@@ -140,6 +162,7 @@ class LibStubGen(object):
     if profile:
       index = fd_func.get_index()
       prof = profile.get_func_prof(index)
+
       def profile_func(this, *args, **kwargs):
         stub_func(this, *args, **kwargs)
         prof.count(0.0)
@@ -174,9 +197,11 @@ class LibStubGen(object):
       name = fd_func.get_name()
       func_args = fd_func.get_args()
       bias = fd_func.get_bias()
+
       def log_func(this, *args, **kwargs):
         callee_pc = this._get_callee_pc(ctx)
-        call_info = "%4d %s( %s ) from PC=%06x" % (bias, name, this._gen_arg_dump(func_args, ctx), callee_pc)
+        call_info = "%4d %s( %s ) from PC=%06x" % (
+            bias, name, this._gen_arg_dump(func_args, ctx), callee_pc)
         log.info("{ CALL: %s" % call_info)
         res = base_func(this, *args, **kwargs)
         if res is not None:
@@ -197,6 +222,7 @@ class LibStubGen(object):
         call = log_func
       else:
         call = base_func
+
       def profile_func(this, *args, **kwargs):
         start = time.clock()
         call(this, *args, **kwargs)
