@@ -6,3 +6,4 @@ from .profile import LibFuncProfile, LibProfile
 from .patch import LibPatcherMultiTrap
 from .info import LibInfo
 from .mem import LibMem
+from .alloc import LibAllocMem

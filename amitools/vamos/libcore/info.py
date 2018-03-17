@@ -52,6 +52,9 @@ class LibInfo(object):
   def get_neg_size(self):
     return self.neg_size
 
+  def get_total_size(self):
+    return self.pos_size + self.neg_size
+
   def get_id_string(self):
     return self.id_string
 

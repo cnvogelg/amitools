@@ -25,6 +25,9 @@ class LibMem(object):
     self.access = AccessStruct(mem, struct, addr)
     self.label = None
 
+  def get_addr(self):
+    return self.addr
+
   def init_base(self, pri=0):
     self.access.w_s("lib_Node.ln_Succ", 0)
     self.access.w_s("lib_Node.ln_Pred", 0)
