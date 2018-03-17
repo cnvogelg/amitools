@@ -8,7 +8,7 @@ id_format = "([a-z.]+) (\d+)\.(\d)+ \((\d+)\.(\d+)\.(\d+)\)\r\n"
 
 class LibInfo(object):
 
-  def __init__(self, name, version, revision, date, pos_size, neg_size):
+  def __init__(self, name, version, revision, date, pos_size=0, neg_size=0):
     """pass either a valid id_string or a date object"""
     self.name = name
     self.version = version

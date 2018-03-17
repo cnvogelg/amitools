@@ -25,6 +25,9 @@ class LibMem(object):
     self.access = AccessStruct(mem, struct, addr)
     self.label = None
 
+  def __str__(self):
+    return "@%08x" % self.addr
+
   def get_addr(self):
     return self.addr
 
