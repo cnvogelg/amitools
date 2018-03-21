@@ -6,7 +6,7 @@ import time
 import inspect
 import sys, traceback
 
-from label.LabelLib import LabelLib
+from .label import LabelLib
 from AccessStruct import AccessStruct
 from lib.lexec.ExecStruct import LibraryDef
 

@@ -1,6 +1,6 @@
 from DosStruct import *
 from PathMatch import PathMatch
-from amitools.vamos.label.LabelStruct import LabelStruct
+from amitools.vamos.label import LabelStruct
 from amitools.vamos.AccessStruct import AccessStruct
 from Error import *
 
@@ -29,7 +29,7 @@ class MatchFirstNext:
     self.name = None
     self.path = None
     self.dir_lock = None
-    
+
   def first(self, ctx):
     # match first entry
     self.path = self.matcher.begin()
@@ -39,7 +39,7 @@ class MatchFirstNext:
     # get parent dir of first match
     dir_part = self.path_mgr.ami_dir_of_path(self.lock,self.path)
     abs_path = self.path_mgr.ami_abs_path(self.lock,dir_part)
-    
+
     # create base/last achain and set dir lock
     # THOR: this is still screwed up. Some utililties
     # most notably "dir" depend on a correctly setup
@@ -49,11 +49,11 @@ class MatchFirstNext:
     self.anchor.w_s('ap_Base', self.achain_dummy.addr)
     if not self._fill_lock(abs_path):
       return ERROR_OBJECT_NOT_FOUND
-    
+
     # fill first entry
     io_err = self._fill_fib(ctx, self.path)
     self._fill_parent_lock(self.path)
-    
+
     # init stack
     self.dodir_stack = []
     return io_err

@@ -1,11 +1,12 @@
 import logging
 from amitools.vamos.Log import *
 
+
 class LabelManager:
 
   def __init__(self):
-    self.first  = None
-    self.last   = None
+    self.first = None
+    self.last = None
 
   # This is now all done manually with doubly linked
   # lists. The reason for this is that the python built-in
@@ -16,7 +17,7 @@ class LabelManager:
     assert range.prev == None
     if self.last == None:
       assert self.first == None
-      self.last  = range
+      self.last = range
       self.first = range
     else:
       self.last.next = range
@@ -35,11 +36,11 @@ class LabelManager:
     range.next = None
     range.prev = None
 
-  def delete_labels_within(self,addr,size):
+  def delete_labels_within(self, addr, size):
     # try to find compatible: release all labels within the given range
     # this is necessary because the label could be part of a puddle
     # that is released in one go.
-    r     = self.first
+    r = self.first
     while r != None:
       if r.addr >= addr and r.addr + r.size <= addr + size:
         s = r.next
@@ -50,7 +51,7 @@ class LabelManager:
 
   def get_all_labels(self):
     ranges = []
-    r      = self.first
+    r = self.first
     while r != None:
       ranges.append(r)
       r = r.next
@@ -78,7 +79,7 @@ class LabelManager:
     result = []
     r = self.first
     while r != None:
-      if r.does_intersect(addr,size):
+      if r.does_intersect(addr, size):
         result.append(r)
       r = r.next
     return result

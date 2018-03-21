@@ -1,4 +1,4 @@
-from .LabelStruct import LabelStruct
+from .struct import LabelStruct
 
 
 class LabelLib(LabelStruct):

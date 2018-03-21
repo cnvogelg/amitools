@@ -10,7 +10,8 @@ class LabelRange:
     self.prev = None
 
   def __str__(self):
-    return "<@%06x +%06x %06x> [%s]" % (self.addr, self.size, self.addr + self.size, self.name)
+    return "<@%06x +%06x %06x> [%s]" % \
+      (self.addr, self.size, self.addr + self.size, self.name)
 
   def is_inside(self, addr):
     return ((self.addr <= addr) and (addr < self.end))

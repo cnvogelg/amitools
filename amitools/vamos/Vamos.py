@@ -1,5 +1,4 @@
-from label.LabelManager import LabelManager
-from label.LabelRange import LabelRange
+from .label import LabelManager, LabelRange
 from MemoryAlloc import MemoryAlloc
 from LibManager import LibManager
 from .libcore import LibRegistry, LibCtxMap, LibCtx

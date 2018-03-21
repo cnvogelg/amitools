@@ -20,7 +20,7 @@ import dos.Printf
 from dos.DosTags import DosTags
 from dos.PatternMatch import Pattern, pattern_parse, pattern_match
 from dos.MatchFirstNext import MatchFirstNext
-from amitools.vamos.label.LabelStruct import LabelStruct
+from amitools.vamos.label import LabelStruct
 from dos.CommandLine import CommandLine
 from dos.Process import Process
 import dos.PathPart

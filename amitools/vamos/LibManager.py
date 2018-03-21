@@ -1,4 +1,4 @@
-from label.LabelLib import LabelLib
+from .label import LabelLib
 from AmigaResident import AmigaResident
 from AmigaLibrary import AmigaLibrary
 from Trampoline import Trampoline

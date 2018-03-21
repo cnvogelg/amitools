@@ -2,7 +2,7 @@ import os.path
 
 from amitools.binfmt.BinFmt import BinFmt
 from amitools.binfmt.Relocate import Relocate
-from label.LabelSegment import LabelSegment
+from .label import LabelSegment
 from Log import *
 
 class Segment:

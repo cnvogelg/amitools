@@ -1,4 +1,4 @@
-from .LabelRange import LabelRange
+from .range import LabelRange
 
 
 class LabelStruct(LabelRange):
