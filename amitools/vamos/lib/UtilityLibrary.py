@@ -53,8 +53,8 @@ class UtilityLibrary(LibImpl):
   def Stricmp(self, ctx):
     str1_addr = ctx.cpu.r_reg(REG_A0)
     str2_addr = ctx.cpu.r_reg(REG_A1)
-    str1 = ctx.mem.access.r_cstr(str1_addr)
-    str2 = ctx.mem.access.r_cstr(str2_addr)
+    str1 = ctx.mem.r_cstr(str1_addr)
+    str2 = ctx.mem.r_cstr(str2_addr)
     log_utility.info("Stricmp(%08x=\"%s\",%08x=\"%s\")" % (str1_addr,str1,str2_addr,str2))
     if str1.lower() < str2.lower():
       return -1
@@ -67,8 +67,8 @@ class UtilityLibrary(LibImpl):
     str1_addr = ctx.cpu.r_reg(REG_A0)
     str2_addr = ctx.cpu.r_reg(REG_A1)
     length    = ctx.cpu.r_reg(REG_D0)
-    str1 = ctx.mem.access.r_cstr(str1_addr)[:length]
-    str2 = ctx.mem.access.r_cstr(str2_addr)[:length]
+    str1 = ctx.mem.r_cstr(str1_addr)[:length]
+    str2 = ctx.mem.r_cstr(str2_addr)[:length]
     log_utility.info("Strnicmp(%08x=\"%s\",%08x=\"%s\")" % (str1_addr,str1,str2_addr,str2))
     if str1.lower() < str2.lower():
       return -1
@@ -81,13 +81,13 @@ class UtilityLibrary(LibImpl):
 
   def NextTagItem(self, ctx):
     ti_ptr_addr = ctx.cpu.r_reg(REG_A0)
-    ti_addr = ctx.mem.access.r32(tr_ptr_addr)
+    ti_addr = ctx.mem.r32(tr_ptr_addr)
     ti_addr = next_tag_item(ctx, ti_addr)
     if ti_addr is None:
       next_addr = 0
     else:
       next_addr = ti_addr + 8
-    ctx.mem.access.w32(tr_ptr_addr, next_addr)
+    ctx.mem.w32(tr_ptr_addr, next_addr)
     return ti_addr
 
   def FindTagItem(self, ctx):

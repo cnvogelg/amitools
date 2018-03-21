@@ -113,7 +113,7 @@ class DosLibrary(LibImpl):
   def get_callee_pc(self,ctx):
     """a call stub log helper to extract the callee's pc"""
     sp = ctx.cpu.r_reg(REG_A7)
-    return ctx.mem.access.r32(sp)
+    return ctx.mem.r32(sp)
 
   # ----- IoErr -----
 
@@ -145,7 +145,7 @@ class DosLibrary(LibImpl):
     else:
       idx = errcode
     if hdr_ptr != 0:
-      hdr = ctx.mem.access.r_cstr(hdr_ptr)
+      hdr = ctx.mem.r_cstr(hdr_ptr)
     else:
       hdr = ""
     if dos_error_strings.has_key(idx):
@@ -158,7 +158,7 @@ class DosLibrary(LibImpl):
       txt = "%s: %s" % (hdr, err_str)
     else:
       txt = "%s" % err_str
-    ctx.mem.access.w_cstr(buf_ptr,txt[:buf_len-1])
+    ctx.mem.w_cstr(buf_ptr,txt[:buf_len-1])
     return self.DOSTRUE
 
   def PrintFault(self, ctx):
@@ -170,7 +170,7 @@ class DosLibrary(LibImpl):
       idx = self.io_err
     # get header string
     if hdr_ptr != 0:
-      hdr = ctx.mem.access.r_cstr(hdr_ptr)
+      hdr = ctx.mem.r_cstr(hdr_ptr)
     else:
       hdr = ""
     # get error string
@@ -229,18 +229,18 @@ class DosLibrary(LibImpl):
     time_str = time.strftime("%H:%M:%S", t)
     log_dos.info("DateToStr: result day='%s' date='%s' time='%s'", day_str, date_str, time_str)
     if str_day_ptr != 0:
-      ctx.mem.access.w_cstr(str_day_ptr, day_str)
+      ctx.mem.w_cstr(str_day_ptr, day_str)
     if str_date_ptr != 0:
-      ctx.mem.access.w_cstr(str_date_ptr, date_str)
+      ctx.mem.w_cstr(str_date_ptr, date_str)
     if str_time_ptr != 0:
-      ctx.mem.access.w_cstr(str_time_ptr, time_str)
+      ctx.mem.w_cstr(str_time_ptr, time_str)
     return self.DOSTRUE
 
   def SetFileDate(self, ctx):
     ds_ptr   = ctx.cpu.r_reg(REG_D2)
     ds       = AccessStruct(ctx.mem,DateStampDef,struct_addr=ds_ptr)
     name_ptr = ctx.cpu.r_reg(REG_D1)
-    name     = ctx.mem.access.r_cstr(name_ptr)
+    name     = ctx.mem.r_cstr(name_ptr)
     ticks    = ds.r_s("ds_Tick")
     minutes  = ds.r_s("ds_Minute")
     days     = ds.r_s("ds_Days")
@@ -272,7 +272,7 @@ class DosLibrary(LibImpl):
       prog_name = prog_name[0:max_len]
     else:
       ret = self.DOSTRUE
-    ctx.mem.access.w_cstr(buf_ptr, prog_name)
+    ctx.mem.w_cstr(buf_ptr, prog_name)
     log_dos.info("GetProgramName() -> '%s' (%d)", prog_name, max_len)
     return ret
 
@@ -294,7 +294,7 @@ class DosLibrary(LibImpl):
     node_addr = self._alloc_mem("ShellVar(%s)" % name,LocalVarDef.get_size() + len(name) + 1)
     name_addr = node_addr + LocalVarDef.get_size()
     node      = ctx.alloc.map_struct("ShellVar(%s) % name", node_addr, LocalVarDef)
-    ctx.mem.access.w_cstr(name_addr,name)
+    ctx.mem.w_cstr(name_addr,name)
     node.access.w_s("lv_Node.ln_Name",name_addr)
     node.access.w_s("lv_Node.ln_Type",flags & 0xff)
     node.access.w_s("lv_Value",0)
@@ -315,15 +315,15 @@ class DosLibrary(LibImpl):
     node.w_s("lv_Value",buf_addr)
     node.w_s("lv_Len",size)
     if flags & self.GVF_BINARY_VAR:
-      ctx.mem.access.copy_data(buff_ptr,buf_addr,size)
+      ctx.mem.copy_block(buff_ptr,buf_addr,size)
     else:
-      ctx.mem.access.w_cstr(buf_addr,value)
+      ctx.mem.w_cstr(buf_addr,value)
 
   def delete_var(self,ctx,node):
     buf_addr  = node.r_s("lv_Value")
     buf_len   = node.r_s("lv_Len")
     name_addr = node.r_s("lv_Node.ln_Name")
-    name      = ctx.mem.access.r_cstr(name_addr)
+    name      = ctx.mem.r_cstr(name_addr)
     if buf_addr != 0:
       self._free_mem(buf_addr)
     node.w_s("lv_Value",0)
@@ -344,19 +344,19 @@ class DosLibrary(LibImpl):
     if size == 0:
       self.setioerr(ctx, ERROR_BAD_NUMBER)
       return self.DOSFALSE
-    name = ctx.mem.access.r_cstr(name_ptr)
+    name = ctx.mem.r_cstr(name_ptr)
     if not flags & self.GVF_GLOBAL_ONLY:
       node = self.find_var(ctx,name,flags & 0xff)
       if node != None:
         nodelen = node.r_s("lv_Len")
         if flags & self.GVF_BINARY_VAR:
-          ctx.mem.access.copy_data(node.r_s("lv_Value"),buff_ptr,min(nodelen,size))
+          ctx.mem.copy_block(node.r_s("lv_Value"),buff_ptr,min(nodelen,size))
           log_dos.info('GetVar("%s", 0x%x) -> %0x06x' % (name, flags, node.r_s("lv_Value")))
           self.setioerr(ctx,nodelen)
           return min(nodelen,size)
         else:
-          value = ctx.mem.access.r_cstr(node.r_s("lv_Value"))
-          ctx.mem.access.w_cstr(buff_ptr,value[:size-1])
+          value = ctx.mem.r_cstr(node.r_s("lv_Value"))
+          ctx.mem.w_cstr(buff_ptr,value[:size-1])
           log_dos.info('GetVar("%s", 0x%x) -> %s' % (name, flags, value))
           self.setioerr(ctx,len(value))
           return min(nodelen-1,size-1)
@@ -365,7 +365,7 @@ class DosLibrary(LibImpl):
   def FindVar(self, ctx):
     name_ptr  = ctx.cpu.r_reg(REG_D1)
     vtype     = ctx.cpu.r_reg(REG_D2)
-    name      = ctx.mem.access.r_cstr(name_ptr)
+    name      = ctx.mem.r_cstr(name_ptr)
     node      = self.find_var(ctx,name,vtype)
     if node == None:
       self.setioerr(ctx,ERROR_OBJECT_NOT_FOUND)
@@ -380,7 +380,7 @@ class DosLibrary(LibImpl):
     buff_ptr  = ctx.cpu.r_reg(REG_D2)
     size      = ctx.cpu.r_reg(REG_D3)
     flags     = ctx.cpu.r_reg(REG_D4)
-    name      = ctx.mem.access.r_cstr(name_ptr)
+    name      = ctx.mem.r_cstr(name_ptr)
     if buff_ptr == 0:
       if not flags & self.GVF_GLOBAL_ONLY:
         node = self.find_var(ctx,name,vtype)
@@ -392,7 +392,7 @@ class DosLibrary(LibImpl):
         value = None
         log_dos.info('SetVar("%s") to %0x6x' % (name, buff_ptr))
       else:
-        value = ctx.mem.access.r_cstr(buff_ptr)
+        value = ctx.mem.r_cstr(buff_ptr)
         log_dos.info('SetVar("%s") to %s' % (name, value))
         size  = len(value) + 1
       if not flags & self.GVF_GLOBAL_ONLY:
@@ -407,7 +407,7 @@ class DosLibrary(LibImpl):
   def DeleteVar(self, ctx):
     name_ptr  = ctx.cpu.r_reg(REG_D1)
     flags     = ctx.cpu.r_reg(REG_D4)
-    name      = ctx.mem.access.r_cstr(name_ptr)
+    name      = ctx.mem.r_cstr(name_ptr)
     if not flags & self.GVF_GLOBAL_ONLY:
       node = self.find_var(ctx,name,flags)
       log_dos.info('DeleteVar("%s")' % name)
@@ -427,7 +427,7 @@ class DosLibrary(LibImpl):
 
   def FindSegment(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
-    needle   = ctx.mem.access.r_cstr(name_ptr)
+    needle   = ctx.mem.r_cstr(name_ptr)
     start    = ctx.cpu.r_reg(REG_D2)
     system   = ctx.cpu.r_reg(REG_D3)
     if start == 0:
@@ -438,7 +438,7 @@ class DosLibrary(LibImpl):
     while seg_addr != 0:
       segment  = AccessStruct(ctx.mem, SegmentDef, seg_addr)
       name_addr= seg_addr + SegmentDef.get_offset_for_name("seg_Name")[0]
-      name     = ctx.mem.access.r_bstr(name_addr)
+      name     = ctx.mem.r_bstr(name_addr)
       if name.lower() == needle.lower():
         if (system and segment.r_s("seg_UC") < 0) or (not system and segment.r_s("seg_UC") > 0):
           seg  = segment.r_s("seg_Seg")
@@ -451,7 +451,7 @@ class DosLibrary(LibImpl):
     name_ptr  = ctx.cpu.r_reg(REG_D1)
     seglist   = ctx.cpu.r_reg(REG_D2) << 2
     system    = ctx.cpu.r_reg(REG_D3)
-    name      = ctx.mem.access.r_cstr(name_ptr)
+    name      = ctx.mem.r_cstr(name_ptr)
     seg_addr  = self._alloc_mem("Segment",SegmentDef.get_size() + len(name) + 1)
     name_addr = seg_addr + SegmentDef.get_offset_for_name("seg_Name")[0]
     segment   = ctx.alloc.map_struct("Segment", seg_addr, SegmentDef)
@@ -459,7 +459,7 @@ class DosLibrary(LibImpl):
     segment.access.w_s("seg_Next",head_addr)
     segment.access.w_s("seg_UC",system)
     segment.access.w_s("seg_Seg",seglist)
-    ctx.mem.access.w_bstr(name_addr,name)
+    ctx.mem.w_bstr(name_addr,name)
     self.dos_info.access.w_s("di_NetHand",seg_addr)
     log_dos.info("AddSegment(%s,%06x) -> %06x" % (name,seglist,seg_addr))
     self.resident.append(seg_addr)
@@ -500,7 +500,7 @@ class DosLibrary(LibImpl):
 
   def Open(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
-    name = ctx.mem.access.r_cstr(name_ptr)
+    name = ctx.mem.r_cstr(name_ptr)
     mode = ctx.cpu.r_reg(REG_D2)
 
     # decode mode
@@ -541,7 +541,7 @@ class DosLibrary(LibImpl):
 
     fh = self.file_mgr.get_by_b_addr(fh_b_addr,False)
     data = fh.read(size)
-    ctx.mem.access.w_data(buf_ptr, data)
+    ctx.mem.w_block(buf_ptr, data)
     got = len(data)
     log_dos.info("Read(%s, %06x, %d) -> %d" % (fh, buf_ptr, size, got))
     return got
@@ -552,7 +552,7 @@ class DosLibrary(LibImpl):
     size = ctx.cpu.r_reg(REG_D3)
 
     fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
-    data = ctx.mem.access.r_data(buf_ptr,size)
+    data = ctx.mem.r_block(buf_ptr,size)
     fh.write(data)
     got = len(data)
     log_dos.info("Write(%s, %06x, %d) -> %d" % (fh, buf_ptr, size, got))
@@ -566,7 +566,7 @@ class DosLibrary(LibImpl):
     # Actually, this is buffered I/O, not unbuffered IO. For the
     # time being, keep it unbuffered.
     fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
-    data = ctx.mem.access.r_data(buf_ptr,size * number)
+    data = ctx.mem.r_block(buf_ptr,size * number)
     fh.write(data)
     got = len(data) / size
     log_dos.info("FWrite(%s, %06x, %d, %d) -> %d" % (fh, buf_ptr, size, number, got))
@@ -586,7 +586,7 @@ class DosLibrary(LibImpl):
       got = 0 # simple error handling
     else:
       got = len(data) / size
-      ctx.mem.access.w_data(buf_ptr, data)
+      ctx.mem.w_block(buf_ptr, data)
     log_dos.info("FRead(%s, %06x, %d, %d) -> %d" % (fh, buf_ptr, size, number, got))
     return got
 
@@ -638,7 +638,7 @@ class DosLibrary(LibImpl):
   def FPuts(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     str_ptr = ctx.cpu.r_reg(REG_D2)
-    str_dat = ctx.mem.access.r_cstr(str_ptr)
+    str_dat = ctx.mem.r_cstr(str_ptr)
     # write to stdout
     fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
     ok = fh.write(str_dat)
@@ -657,7 +657,7 @@ class DosLibrary(LibImpl):
 
   def PutStr(self, ctx):
     str_ptr = ctx.cpu.r_reg(REG_D1)
-    str_dat = ctx.mem.access.r_cstr(str_ptr)
+    str_dat = ctx.mem.r_cstr(str_ptr)
     # write to stdout
     fh = ctx.process.get_output()
     ok = fh.write(str_dat)
@@ -673,13 +673,13 @@ class DosLibrary(LibImpl):
   def VPrintf(self, ctx):
     format_ptr = ctx.cpu.r_reg(REG_D1)
     argv_ptr = ctx.cpu.r_reg(REG_D2)
-    fmt = ctx.mem.access.r_cstr(format_ptr)
+    fmt = ctx.mem.r_cstr(format_ptr)
     # write on output
     fh = ctx.process.get_output()
     log_dos.info("VPrintf: format='%s' argv=%06x" % (fmt,argv_ptr))
     # now decode printf
     ps = dos.Printf.printf_parse_string(fmt)
-    dos.Printf.printf_read_data(ps, ctx.mem.access, argv_ptr)
+    dos.Printf.printf_read_data(ps, ctx.mem, argv_ptr)
     log_dos.debug("VPrintf: parsed format: %s",ps)
     result = dos.Printf.printf_generate_output(ps)
     # write result
@@ -691,12 +691,12 @@ class DosLibrary(LibImpl):
     fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
     format_ptr = ctx.cpu.r_reg(REG_D2)
     argv_ptr = ctx.cpu.r_reg(REG_D3)
-    fmt = ctx.mem.access.r_cstr(format_ptr)
+    fmt = ctx.mem.r_cstr(format_ptr)
     # write on output
     log_dos.info("VFPrintf: format='%s' argv=%06x" % (fmt,argv_ptr))
     # now decode printf
     ps = dos.Printf.printf_parse_string(fmt)
-    dos.Printf.printf_read_data(ps, ctx.mem.access, argv_ptr)
+    dos.Printf.printf_read_data(ps, ctx.mem, argv_ptr)
     log_dos.debug("VFPrintf: parsed format: %s",ps)
     result = dos.Printf.printf_generate_output(ps)
     # write result
@@ -707,7 +707,7 @@ class DosLibrary(LibImpl):
     fh       = ctx.process.get_output()
     buf_addr = ctx.cpu.r_reg(REG_D1)
     siz      = ctx.cpu.r_reg(REG_D2)
-    buf      = ctx.mem.access.r_cstr(buf_addr)[:siz]
+    buf      = ctx.mem.r_cstr(buf_addr)[:siz]
     fh.write(buf)
     return len(buf)
 
@@ -716,7 +716,7 @@ class DosLibrary(LibImpl):
     fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
     fmt_ptr = ctx.cpu.r_reg(REG_D2)
     args_ptr = ctx.cpu.r_reg(REG_D3)
-    fmt = ctx.mem.access.r_cstr(fmt_ptr)
+    fmt = ctx.mem.r_cstr(fmt_ptr)
     log_dos.info("VFWritef: fh=%s format='%s' args_ptr=%06x" % (fh, fmt, args_ptr))
     out = ''
     pos = 0
@@ -734,7 +734,7 @@ class DosLibrary(LibImpl):
           n = 0
         ch = state[1:2]
         if ch == 'T':
-          out = out + ("%*s" % (-n, ctx.mem.access.r_cstr(val)))
+          out = out + ("%*s" % (-n, ctx.mem.r_cstr(val)))
         elif ch == 'O':
           out = out + ("%*O" % (-n, val))
         elif ch == 'X':
@@ -748,7 +748,7 @@ class DosLibrary(LibImpl):
         state = ''
       elif state == '%':
         if ch == 'S':
-          out = out + ctx.mem.access.r_cstr(val)
+          out = out + ctx.mem.r_cstr(val)
           state = ''
         elif ch == 'C':
           out = out + chr(val & 0xff)
@@ -766,7 +766,7 @@ class DosLibrary(LibImpl):
       else:
         if ch == '%':
           state = '%'
-          val = ctx.mem.access.r32(args_ptr)
+          val = ctx.mem.r32(args_ptr)
           args_ptr = args_ptr + 4
         else:
           out = out + ch
@@ -784,7 +784,7 @@ class DosLibrary(LibImpl):
     # Bummer! FIXME: There is currently no way this can communicate an I/O error
     self.setioerr(ctx,0)
     log_dos.info("FGetS(%s,%d) -> '%s'" % (fh, buflen, line))
-    ctx.mem.access.w_cstr(bufaddr,line)
+    ctx.mem.w_cstr(bufaddr,line)
     if line == "":
       return 0
     return bufaddr
@@ -793,7 +793,7 @@ class DosLibrary(LibImpl):
 
   def DeleteFile(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
-    name = ctx.mem.access.r_cstr(name_ptr)
+    name = ctx.mem.r_cstr(name_ptr)
     self.setioerr(ctx,self.file_mgr.delete(self.get_current_dir(ctx),name))
     log_dos.info("DeleteFile: '%s': err=%s" % (name, self.io_err))
     if self.io_err == NO_ERROR:
@@ -803,9 +803,9 @@ class DosLibrary(LibImpl):
 
   def Rename(self, ctx):
     old_name_ptr = ctx.cpu.r_reg(REG_D1)
-    old_name = ctx.mem.access.r_cstr(old_name_ptr)
+    old_name = ctx.mem.r_cstr(old_name_ptr)
     new_name_ptr = ctx.cpu.r_reg(REG_D2)
-    new_name = ctx.mem.access.r_cstr(new_name_ptr)
+    new_name = ctx.mem.r_cstr(new_name_ptr)
     lock = self.get_current_dir(ctx)
     self.setioerr(ctx,self.file_mgr.rename(lock, old_name, new_name))
     log_dos.info("Rename: '%s' -> '%s': err=%s" % (old_name, new_name, self.io_err))
@@ -816,7 +816,7 @@ class DosLibrary(LibImpl):
 
   def SetProtection(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
-    name = ctx.mem.access.r_cstr(name_ptr)
+    name = ctx.mem.r_cstr(name_ptr)
     mask = ctx.cpu.r_reg(REG_D2)
     lock = self.get_current_dir(ctx)
     self.setioerr(ctx,self.file_mgr.set_protection(lock, name, mask))
@@ -838,7 +838,7 @@ class DosLibrary(LibImpl):
 
   def IsFileSystem(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
-    name = ctx.mem.access.r_cstr(name_ptr)
+    name = ctx.mem.r_cstr(name_ptr)
     log_dos.info("IsFileSystem('%s'):" % name)
     lock = self.get_current_dir(ctx)
     res  = self.file_mgr.is_file_system(lock,name)
@@ -852,7 +852,7 @@ class DosLibrary(LibImpl):
 
   def Lock(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
-    name = ctx.mem.access.r_cstr(name_ptr)
+    name = ctx.mem.r_cstr(name_ptr)
     mode = ctx.cpu.r_reg(REG_D2)
 
     if mode == 0xffffffff:
@@ -905,7 +905,7 @@ class DosLibrary(LibImpl):
     fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
     err = lock.examine_lock(fib)
     name_addr = fib.s_get_addr('fib_FileName')
-    name      = fib.r_cstr(name_addr)
+    name      = ctx.mem.r_cstr(name_addr)
     log_dos.info("Examine: %s fib=%06x(%s) -> %s" % (lock, fib_ptr, name, err))
     self.setioerr(ctx,err)
     if err == NO_ERROR:
@@ -989,12 +989,12 @@ class DosLibrary(LibImpl):
       self.setioerr(ctx,ERROR_LINE_TOO_LONG)
       return self.DOSFALSE
     else:
-      ctx.mem.access.w_cstr(buf, name)
+      ctx.mem.w_cstr(buf, name)
       return self.DOSTRUE
 
   def CreateDir(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
-    name = ctx.mem.access.r_cstr(name_ptr)
+    name = ctx.mem.r_cstr(name_ptr)
     lock = self.get_current_dir(ctx)
     err  = self.file_mgr.create_dir(lock,name)
     if err != NO_ERROR:
@@ -1014,7 +1014,7 @@ class DosLibrary(LibImpl):
   def GetDeviceProc(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     last_devproc = ctx.cpu.r_reg(REG_D2)
-    name = ctx.mem.access.r_cstr(name_ptr)
+    name = ctx.mem.r_cstr(name_ptr)
     uname = name.upper()
     #
     # First filter out "real" devices.
@@ -1053,7 +1053,7 @@ class DosLibrary(LibImpl):
 
   def MatchFirst(self, ctx):
     pat_ptr = ctx.cpu.r_reg(REG_D1)
-    pat     = ctx.mem.access.r_cstr(pat_ptr)
+    pat     = ctx.mem.r_cstr(pat_ptr)
     anchor_ptr = ctx.cpu.r_reg(REG_D2)
     anchor = AccessStruct(ctx.mem,AnchorPathDef,struct_addr=anchor_ptr)
 
@@ -1118,7 +1118,7 @@ class DosLibrary(LibImpl):
     src_ptr = ctx.cpu.r_reg(REG_D1)
     dst_ptr = ctx.cpu.r_reg(REG_D2)
     dst_len = ctx.cpu.r_reg(REG_D3)
-    src = ctx.mem.access.r_cstr(src_ptr)
+    src = ctx.mem.r_cstr(src_ptr)
     pat = pattern_parse(src, ignore_case=ignore_case)
     log_dos.info("ParsePattern: src=%s ignore_case=%s -> pat=%s",src, ignore_case, pat)
     if pat == None:
@@ -1130,7 +1130,7 @@ class DosLibrary(LibImpl):
       if len(pat_str) >= dst_len:
         return -1
       else:
-        ctx.mem.access.w_cstr(dst_ptr, pat_str)
+        ctx.mem.w_cstr(dst_ptr, pat_str)
         if pat.has_wildcard:
           return 1
         else:
@@ -1142,8 +1142,8 @@ class DosLibrary(LibImpl):
   def MatchPattern(self, ctx, ignore_case=False):
     pat_ptr = ctx.cpu.r_reg(REG_D1)
     txt_ptr = ctx.cpu.r_reg(REG_D2)
-    pat = ctx.mem.access.r_cstr(pat_ptr)
-    txt = ctx.mem.access.r_cstr(txt_ptr)
+    pat = ctx.mem.r_cstr(pat_ptr)
+    txt = ctx.mem.r_cstr(txt_ptr)
     pattern = Pattern(None,pat,ignore_case,True)
     match   = pattern_match(pattern, txt, ignore_case)
     log_dos.info("MatchPattern: pat=%s txt=%s ignore_case=%s -> match=%s", pat, txt, ignore_case, match)
@@ -1160,8 +1160,8 @@ class DosLibrary(LibImpl):
   def FindArg(self, ctx):
     template_ptr = ctx.cpu.r_reg(REG_D1)
     keyword_ptr  = ctx.cpu.r_reg(REG_D2)
-    template     = ctx.mem.access.r_cstr(template_ptr)
-    keyword      = ctx.mem.access.r_cstr(keyword_ptr)
+    template     = ctx.mem.r_cstr(template_ptr)
+    keyword      = ctx.mem.r_cstr(keyword_ptr)
     # parse template
     tal = TemplateArgList.parse_string(template)
     if tal is None:
@@ -1179,7 +1179,7 @@ class DosLibrary(LibImpl):
 
   def ReadArgs(self, ctx):
     template_ptr = ctx.cpu.r_reg(REG_D1)
-    template     = ctx.mem.access.r_cstr(template_ptr)
+    template     = ctx.mem.r_cstr(template_ptr)
     array_ptr    = ctx.cpu.r_reg(REG_D2)
     rdargs_ptr   = ctx.cpu.r_reg(REG_D3)
 
@@ -1219,7 +1219,7 @@ class DosLibrary(LibImpl):
     else:
       flags = rdargs.access.r_s('RDA_Flags')
       ext_help_ptr = rdargs.access.r_s('RDA_ExtHelp')
-      ext_help = ctx.mem.access.r_cstr(ext_help_ptr) if ext_help_ptr else None
+      ext_help = ctx.mem.r_cstr(ext_help_ptr) if ext_help_ptr else None
     log_dos.info("ReadArgs: flags=%s ext_help=%s", flags, ext_help)
     RDAF_NOPROMPT = 4
     # prompting is allowed?
@@ -1266,7 +1266,7 @@ class DosLibrary(LibImpl):
         extra_ptr = 0
 
       # 7. write array and extra memory from result list
-      result_list.generate_result(ctx.mem.access, array_ptr, extra_ptr, num_longs)
+      result_list.generate_result(ctx.mem, array_ptr, extra_ptr, num_longs)
 
       # 8. alloc custom rdargs if none is given
       if rdargs_ptr == 0:
@@ -1318,7 +1318,7 @@ class DosLibrary(LibImpl):
     if buff_ptr == 0:
       return 0 # ITEM_NOTHING
     # Well Known Bug: buff[0] = 0, even if maxchars == 0
-    ctx.mem.access.w8(buff_ptr, 0)
+    ctx.mem.w8(buff_ptr, 0)
     if maxchars <= 0:
       return 0
     # reset IOErr if not BNULL nor NIL:
@@ -1333,7 +1333,7 @@ class DosLibrary(LibImpl):
       csrc.update_s(ctx.alloc, csrc_ptr)
     # write string
     if data is not None:
-      ctx.mem.access.w_cstr(buff_ptr, data)
+      ctx.mem.w_cstr(buff_ptr, data)
     return res
 
   # ----- System/Execute -----
@@ -1341,7 +1341,7 @@ class DosLibrary(LibImpl):
   def SystemTagList(self, ctx):
     cmd_ptr = ctx.cpu.r_reg(REG_D1)
     tagitem_ptr = ctx.cpu.r_reg(REG_D2)
-    cmd = ctx.mem.access.r_cstr(cmd_ptr)
+    cmd = ctx.mem.r_cstr(cmd_ptr)
     tag_list = taglist_parse_tagitem_ptr(ctx.mem, tagitem_ptr, DosTags)
     log_dos.info("SystemTagList: cmd='%s' tags=%s", cmd, tag_list)
     # cmd is at this point a full string of commands to execute.
@@ -1379,7 +1379,7 @@ class DosLibrary(LibImpl):
       dup_lock    = self.lock_mgr.dup_lock(self.get_current_dir(ctx))
       cur_module  = cli.r_s("cli_Module")
       cur_out     = ctx.process.this_task.access.r_s("pr_COS");
-      cur_setname = ctx.mem.access.r_bstr(cli.r_s("cli_SetName"))
+      cur_setname = ctx.mem.r_bstr(cli.r_s("cli_SetName"))
       cli.w_s("cli_Module",0)
       ctx.process.set_current_dir(dup_lock.mem.addr)
       self.cur_dir_lock = dup_lock
@@ -1393,7 +1393,7 @@ class DosLibrary(LibImpl):
         if output_fhci != None:
           cli.w_s("cli_StandardOutput",output_fhci)
         # Channels are closed by the dying shell
-        ctx.mem.access.w_bstr(cli.r_s("cli_SetName"),cur_setname)
+        ctx.mem.w_bstr(cli.r_s("cli_SetName"),cur_setname)
         ctx.process.this_task.access.w_s("pr_CIS",input_fhci)
         ctx.process.this_task.access.w_s("pr_COS",cur_out)
         #infile = self.file_mgr.get_by_b_addr(input_fhci >> 2,False)
@@ -1431,7 +1431,7 @@ class DosLibrary(LibImpl):
 
   def LoadSeg(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
-    name     = ctx.mem.access.r_cstr(name_ptr)
+    name     = ctx.mem.r_cstr(name_ptr)
     lock     = self.get_current_dir(ctx)
     seg_list = ctx.seg_loader.load_seg(lock,name,False,True)
     if seg_list == None:
@@ -1477,7 +1477,7 @@ class DosLibrary(LibImpl):
     args     = ctx.cpu.r_reg(REG_D3)
     length   = ctx.cpu.r_reg(REG_D4)
     fh       = ctx.process.get_input()
-    cmdline  = ctx.mem.access.r_cstr(args)
+    cmdline  = ctx.mem.r_cstr(args)
     ctx.process.get_input().setbuf(cmdline)
     log_dos.info("RunCommand: seglist=%06x(%s) stack=%d args=%s" % (b_addr, name, stack, cmdline))
     # round up the stack
@@ -1488,7 +1488,7 @@ class DosLibrary(LibImpl):
 
   def FilePart(self, ctx):
     addr = ctx.cpu.r_reg(REG_D1)
-    path = ctx.mem.access.r_cstr(addr)
+    path = ctx.mem.r_cstr(addr)
     pos  = dos.PathPart.file_part(path)
     if pos < len(path):
       log_dos.info("FilePart: path='%s' -> result='%s'", path, path[pos:])
@@ -1498,7 +1498,7 @@ class DosLibrary(LibImpl):
 
   def PathPart(self, ctx):
     addr = ctx.cpu.r_reg(REG_D1)
-    path = ctx.mem.access.r_cstr(addr)
+    path = ctx.mem.r_cstr(addr)
     pos  = dos.PathPart.path_part(path)
     if pos < len(path):
       log_dos.info("PathPart: path='%s' -> result='%s'", path, path[:pos])
@@ -1510,12 +1510,12 @@ class DosLibrary(LibImpl):
     dn_addr = ctx.cpu.r_reg(REG_D1)
     fn_addr = ctx.cpu.r_reg(REG_D2)
     size    = ctx.cpu.r_reg(REG_D3)
-    dn      = ctx.mem.access.r_cstr(dn_addr)
-    fn      = ctx.mem.access.r_cstr(fn_addr)
+    dn      = ctx.mem.r_cstr(dn_addr)
+    fn      = ctx.mem.r_cstr(fn_addr)
     np      = dos.PathPart.add_part(dn,fn,size)
     log_dos.info("AddPart: dn='%s' fn='%s' size=%d -> np='%s'", dn, fn, size, np)
     if np != None:
-      ctx.mem.access.w_cstr(dn_addr, np)
+      ctx.mem.w_cstr(dn_addr, np)
       return self.DOSTRUE
     else:
       return self.DOSFALSE
@@ -1591,10 +1591,10 @@ class DosLibrary(LibImpl):
     # the prompt and command name arguments. Unfortunately,
     # vamos does not necessarily do that, so cover this here.
     prompt_ptr = clip.r_s("cli_Prompt")
-    ctx.mem.access.w_bstr(prompt_ptr,"%N.%S> ")
+    ctx.mem.w_bstr(prompt_ptr,"%N.%S> ")
     # Get the current dir and install it.
     setname = clip.r_s("cli_SetName")
-    ctx.mem.access.w_bstr(setname,"SYS:")
+    ctx.mem.w_bstr(setname,"SYS:")
     # The native CliInit opens the CON window here. Don't do that
     # instead use Input and Output.
     # cli_CurrentInput would also be set to the input handle of
@@ -1653,7 +1653,7 @@ class DosLibrary(LibImpl):
   def AssignLock(self, ctx):
     name_ptr  = ctx.cpu.r_reg(REG_D1)
     lockbaddr = ctx.cpu.r_reg(REG_D2)
-    name      = ctx.mem.access.r_cstr(name_ptr)
+    name      = ctx.mem.r_cstr(name_ptr)
     if lockbaddr == 0:
       log_dos.info("AssignLock (%s -> null)" % name)
       self.dos_list.remove_assign(name)
@@ -1670,30 +1670,30 @@ class DosLibrary(LibImpl):
   def StrToLong(self, ctx):
     str_addr = ctx.cpu.r_reg(REG_D1)
     val_addr = ctx.cpu.r_reg(REG_D2)
-    string   = ctx.mem.access.r_cstr(str_addr)
+    string   = ctx.mem.r_cstr(str_addr)
     match    = re.search("(\+|\-|)[0-9]*",string)
     if len(match.group(0)) > 0:
-      ctx.mem.access.w32(val_addr,int(match.group(0)))
+      ctx.mem.w32(val_addr,int(match.group(0)))
       return len(match.group(0))
     else:
       return 0
 
   def SetCurrentDirName(self,ctx):
     str_addr = ctx.cpu.r_reg(REG_D1)
-    string   = ctx.mem.access.r_cstr(str_addr)[:79]
+    string   = ctx.mem.r_cstr(str_addr)[:79]
     cli_addr = self.Cli(ctx)
     cli      = AccessStruct(ctx.mem,CLIDef,struct_addr=cli_addr)
     setaddr  = cli.r_s("cli_SetName")
-    ctx.mem.access.w_bstr(setaddr,string)
+    ctx.mem.w_bstr(setaddr,string)
     return self.DOSTRUE
 
   def SetPrompt(self,ctx):
     str_addr = ctx.cpu.r_reg(REG_D1)
-    string   = ctx.mem.access.r_cstr(str_addr)[:59]
+    string   = ctx.mem.r_cstr(str_addr)[:59]
     cli_addr = self.Cli(ctx)
     cli      = AccessStruct(ctx.mem,CLIDef,struct_addr=cli_addr)
     setaddr  = cli.r_s("cli_Prompt")
-    ctx.mem.access.w_bstr(setaddr,string)
+    ctx.mem.w_bstr(setaddr,string)
     return self.DOSTRUE
 
   def DosGetString(self,ctx):
@@ -1704,7 +1704,7 @@ class DosLibrary(LibImpl):
       if errno in self.errstrings:
         return self.errstrings[errno]
       self.errstrings[errno] = self._alloc_mem("Error %d" % errno,len(dos_error_strings[errno]) + 1)
-      ctx.mem.access.w_cstr(self.errstrings[errno],dos_error_strings[errno])
+      ctx.mem.w_cstr(self.errstrings[errno],dos_error_strings[errno])
       return self.errstrings[errno]
     else:
       return 0

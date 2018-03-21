@@ -22,7 +22,7 @@ class AmigaResident:
     self.addr = addr
     self.size = size
     self.mem  = mem
-    self.data = mem.access.r_data(addr, size)
+    self.data = mem.r_block(addr, size)
 
   def r32(self, off):
     return struct.unpack_from(">I",self.data,off)[0]
@@ -58,8 +58,8 @@ class AmigaResident:
           }
           # eval values
           res['auto_init'] = res['flags'] & self.RTF_AUTOINIT == self.RTF_AUTOINIT
-          res['name'] = self.mem.access.r_cstr(res['name_ptr'])
-          res['id'] = self.mem.access.r_cstr(res['id_ptr'])
+          res['name'] = self.mem.r_cstr(res['name_ptr'])
+          res['id'] = self.mem.r_cstr(res['id_ptr'])
           finds.append(res)
 
           # only first?
@@ -82,7 +82,7 @@ class AmigaResident:
     # read auto init params
     addr = res['init_ptr']
     mem = res['mem']
-    a = all_mem.access
+    a = all_mem
     res['dataSize'] = a.r32(addr)
     res['vectors_ptr'] = a.r32(addr+4)
     res['struct_ptr'] = a.r32(addr+8)
@@ -98,7 +98,7 @@ class AmigaResident:
     res = []
     if addr == 0:
       return res
-    a = mem.access
+    a = mem
     while True:
       cmd = a.r8(addr)
       if cmd == self.INIT_END:
@@ -137,7 +137,7 @@ class AmigaResident:
     return res
 
   def parse_vectors(self, addr, all_mem):
-    a = all_mem.access
+    a = all_mem
     is_word = (a.r16(addr) == 0xffff)
     vec = []
     # 16 bit offsets
@@ -170,7 +170,7 @@ class AmigaResident:
     structure = res['struct']
     for s in structure:
       addr = base_addr + s[0]
-      mem.access.write_mem(s[2], addr, s[1])
+      mem.write(s[2], addr, s[1])
 
   def init_lib(self, res, lib, base_addr):
     a = lib.access

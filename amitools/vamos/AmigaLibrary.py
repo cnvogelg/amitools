@@ -106,7 +106,7 @@ class AmigaLibrary:
   def get_callee_pc(self,ctx):
     """a call stub log helper to extract the callee's pc"""
     sp = ctx.cpu.r_reg(REG_A7)
-    return ctx.mem.access.r32(sp)
+    return ctx.mem.r32(sp)
 
   def _gen_arg_dump(self,args,ctx):
     """a call stub helper to dump the registers of a call"""
@@ -240,7 +240,7 @@ class AmigaLibrary:
     # patch the lib in memory
     addr = self.addr_base - bias
     self.traps.append(tid)
-    ctx.mem.access.w16(addr,op)
+    ctx.mem.w16(addr,op)
     self.log("patch $%04x: op=$%04x '%s' [%s]" % (bias, op, name, method), level=logging.DEBUG)
     return True
 
@@ -296,7 +296,7 @@ class AmigaLibrary:
     bias = 6
     addr = self.addr_base
     while bias < self.neg_size:
-      ctx.mem.access.w16(addr,self.op_reset)
+      ctx.mem.w16(addr,self.op_reset)
       bias += 6
       addr -= 6
 
@@ -320,7 +320,7 @@ class AmigaLibrary:
     self.addr_base = self.addr_begin + self.mem_neg_size
     self.addr_end = self.addr_base + self.mem_pos_size
     # create memory label
-    self.label = LabelLib(self.name, self.addr_begin, lib_size, self.addr_base, self.struct, self)
+    self.label = LabelLib(self)
     ctx.label_mgr.add_label(self.label)
     # create access
     self.lib_access = AccessStruct(ctx.mem, LibraryDef, self.addr_base)

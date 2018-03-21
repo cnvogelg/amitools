@@ -49,7 +49,7 @@ class ExecLibrary(LibImpl):
   def get_callee_pc(self,ctx):
     """a call stub log helper to extract the callee's pc"""
     sp = ctx.cpu.r_reg(REG_A7)
-    return ctx.mem.access.r32(sp)
+    return ctx.mem.r32(sp)
 
   # ----- System -----
 
@@ -69,7 +69,7 @@ class ExecLibrary(LibImpl):
       log_exec.info("FindTask: me=%06x" % addr)
       return addr
     else:
-      task_name = ctx.mem.access.r_cstr(task_ptr)
+      task_name = ctx.mem.r_cstr(task_ptr)
       log_exec.info("Find Task: %s" % task_name)
       raise UnsupportedFeatureError("FindTask: other task!");
 
@@ -92,7 +92,7 @@ class ExecLibrary(LibImpl):
     old_upper = self.stk_upper
     old_pointer = ctx.cpu.r_reg(REG_A7) # addr of sys call return
     # get adress of callee
-    callee = ctx.mem.access.r32(old_pointer)
+    callee = ctx.mem.r32(old_pointer)
     # is a label attached to new addr
     label = ctx.label_mgr.get_label(new_lower)
     if label is not None:
@@ -107,7 +107,7 @@ class ExecLibrary(LibImpl):
     self.stk_upper = new_upper
     # put callee's address on new stack
     new_pointer -= 4
-    ctx.mem.access.w32(new_pointer,callee)
+    ctx.mem.w32(new_pointer,callee)
     # activate new stack
     ctx.cpu.w_reg(REG_A7, new_pointer)
 
@@ -116,7 +116,7 @@ class ExecLibrary(LibImpl):
   def OpenLibrary(self, ctx):
     ver = ctx.cpu.r_reg(REG_D0)
     name_ptr = ctx.cpu.r_reg(REG_A1)
-    name = ctx.mem.access.r_cstr(name_ptr)
+    name = ctx.mem.r_cstr(name_ptr)
     addr = self.lib_mgr.open_lib(name, ver)
     log_exec.info("OpenLibrary: '%s' V%d -> %06x", name, ver, addr)
     return addr
@@ -136,7 +136,7 @@ class ExecLibrary(LibImpl):
 
   def OldOpenLibrary(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
-    name = ctx.mem.access.r_cstr(name_ptr)
+    name = ctx.mem.r_cstr(name_ptr)
     addr = self.lib_mgr.open_lib(name, 0)
     log_exec.info("OldOpenLibrary: '%s' -> %06x", name, addr)
     return addr
@@ -149,7 +149,7 @@ class ExecLibrary(LibImpl):
 
   def FindResident(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
-    name = ctx.mem.access.r_cstr(name_ptr)
+    name = ctx.mem.r_cstr(name_ptr)
     log_exec.info("FindResident: '%s'" % (name))
     return 0
 
@@ -170,8 +170,7 @@ class ExecLibrary(LibImpl):
     poolid = ctx.cpu.r_reg(REG_A0)
     size   = (ctx.cpu.r_reg(REG_D0) + 7) & -8
     pc     = self.get_callee_pc(ctx)
-    tag    = ctx.label_mgr.get_mem_str(pc)
-    name   = "AllocPooled(%06x = %s)" % (pc,tag)
+    name   = "AllocPooled(%06x)" % pc
     if poolid in self._pools:
       pool = self._pools[poolid]
       mem = pool.AllocPooled(ctx.label_mgr ,name, size)
@@ -210,8 +209,7 @@ class ExecLibrary(LibImpl):
     flags = ctx.cpu.r_reg(REG_D1)
     # label alloc
     pc = self.get_callee_pc(ctx)
-    tag = ctx.label_mgr.get_mem_str(pc)
-    name = "AllocMem(%06x = %s)" % (pc,tag)
+    name = "AllocMem(%06x)" % pc
     mb = self.alloc.alloc_memory(name,size)
     log_exec.info("AllocMem: %s -> 0x%06x %d bytes" % (mb,mb.addr,size))
     return mb.addr
@@ -301,8 +299,7 @@ class ExecLibrary(LibImpl):
     size = ctx.cpu.r_reg(REG_D0)
     # label alloc
     pc   = self.get_callee_pc(ctx)
-    tag  = ctx.label_mgr.get_mem_str(pc)
-    name = "CreateIORequest(%06x = %s)" % (pc,tag)
+    name = "CreateIORequest(%06x)" % pc
     mb   = self.alloc.alloc_memory(name,size)
     log_exec.info("CreateIORequest: (%s,%s,%s) -> 0x%06x %d bytes" % (mb,port,size,mb.addr,size))
     return mb.addr
@@ -322,7 +319,7 @@ class ExecLibrary(LibImpl):
     io_addr  = ctx.cpu.r_reg(REG_A1)
     io       = AccessStruct(ctx.mem, IORequestDef, io_addr)
     flags    = ctx.cpu.r_reg(REG_D1)
-    name     = ctx.mem.access.r_cstr(name_ptr)
+    name     = ctx.mem.r_cstr(name_ptr)
     addr     = self.lib_mgr.open_dev(name, unit, flags, io)
     if addr == 0:
       log_exec.info("OpenDevice: '%s' unit %d flags %d -> NULL", name, unit, flags)
@@ -423,14 +420,14 @@ class ExecLibrary(LibImpl):
     dest   = ctx.cpu.r_reg(REG_A1)
     length = ctx.cpu.r_reg(REG_D0)
     log_exec.info("CopyMem: source=%06x dest=%06x len=%06x" % (source,dest,length))
-    ctx.mem.access.copy_data(source, dest, length)
+    ctx.mem.copy_block(source, dest, length)
 
   def CopyMemQuick(self, ctx):
     source = ctx.cpu.r_reg(REG_A0)
     dest   = ctx.cpu.r_reg(REG_A1)
     length = ctx.cpu.r_reg(REG_D0)
     log_exec.info("CopyMemQuick: source=%06x dest=%06x len=%06x" % (source,dest,length))
-    ctx.mem.access.copy_data(source, dest, length)
+    ctx.mem.copy_block(source, dest, length)
 
   def TypeOfMem(self, ctx):
     addr = ctx.cpu.r_reg(REG_A1)
@@ -447,24 +444,24 @@ class ExecLibrary(LibImpl):
     dataStream = ctx.cpu.r_reg(REG_A1)
     putProc    = ctx.cpu.r_reg(REG_A2)
     putData    = ctx.cpu.r_reg(REG_A3)
-    fmt        = ctx.mem.access.r_cstr(fmtString)
+    fmt        = ctx.mem.r_cstr(fmtString)
     ps         = dos.Printf.printf_parse_string(fmt)
-    dataStream = dos.Printf.printf_read_data(ps, ctx.mem.access, dataStream)
+    dataStream = dos.Printf.printf_read_data(ps, ctx.mem, dataStream)
     resultstr  = dos.Printf.printf_generate_output(ps)
     fmtstr     = resultstr+"\0"
     # Try to use a shortcut to avoid an unnecessary slow-down
     known      = False
-    putcode    = ctx.mem.access.r32(putProc)
+    putcode    = ctx.mem.r32(putProc)
     if putcode == 0x16c04e75:
       known    = True
     elif putcode == 0x4e55fffc: #link #-4,a5
-      putcode2 = ctx.mem.access.r32(putProc+4)
-      putcode3 = ctx.mem.access.r32(putProc+8)
-      putcode4 = ctx.mem.access.r16(putProc+12)
+      putcode2 = ctx.mem.r32(putProc+4)
+      putcode3 = ctx.mem.r32(putProc+8)
+      putcode4 = ctx.mem.r16(putProc+12)
       if putcode2 == 0x2b40fffc and putcode3 == 0x16c04e5d and putcode4 == 0x4e75:
         known = True
     if known:
-      ctx.mem.access.w_cstr(putData,fmtstr)
+      ctx.mem.w_cstr(putData,fmtstr)
     else:
       # This is a recursive trampoline that writes the formatted data through
       # the put-proc. Unfortunately, this is pretty convoluted.
@@ -497,7 +494,7 @@ class ExecLibrary(LibImpl):
     addr     = ctx.cpu.r_reg(REG_A1)
     sstruct  = AccessStruct(ctx.mem,SignalSemaphoreDef,addr)
     name_ptr = sstruct.r_s("ss_Link.ln_Name")
-    name     = ctx.mem.access.r_cstr(name_ptr)
+    name     = ctx.mem.r_cstr(name_ptr)
     self.semaphore_mgr.AddSemaphore(addr,name)
     log_exec.info("AddSemaphore(%06x,%s)" % (addr,name))
 
@@ -508,7 +505,7 @@ class ExecLibrary(LibImpl):
 
   def FindSemaphore(self,ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
-    name     = ctx.mem.access.r_cstr(name_ptr)
+    name     = ctx.mem.r_cstr(name_ptr)
     semaphore = self.semaphore_mgr.FindSemaphore(name)
     log_exec.info("FindSemaphore(%s) -> %s" % (name,semaphore))
     if semaphore != None:
@@ -531,7 +528,7 @@ class ExecLibrary(LibImpl):
 
   def OpenResource(self,ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
-    name     = ctx.mem.access.r_cstr(name_ptr)
+    name     = ctx.mem.r_cstr(name_ptr)
     log_exec.info("OpenResource(%s) ignored" % name)
     return 0
 

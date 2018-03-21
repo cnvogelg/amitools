@@ -74,6 +74,8 @@ class VamosTestRunner:
       args.append('--no-ts')
     if self.vopts is not None:
       args = args + self.vopts
+    if 'vargs' in kw_args:
+      args = args + kw_args['vargs']
     prog_name = "curdir:bin/" + prog_args[0] + '_' + self.flavor
     if self.use_debug_bins:
       prog_name = prog_name + "_dbg"
@@ -135,7 +137,8 @@ class VamosTestRunner:
     f.close()
     self._compare(stdout, ok_stdout)
     # asser stderr to be empty
-    assert stderr == []
+    if self.vopts is None:
+      assert stderr == []
 
 # ----- pytest integration -----
 

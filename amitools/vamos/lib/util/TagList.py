@@ -44,8 +44,8 @@ class TagList:
 def taglist_parse_tagitem_ptr(mem, addr, tag_info=None):
   result = TagList(tag_info)
   while True:
-    tag = mem.access.r32(addr)
-    data = mem.access.r32(addr+4)
+    tag = mem.r32(addr)
+    data = mem.r32(addr+4)
     if tag == TAG_DONE:
       break
     elif tag == TAG_IGNORE:

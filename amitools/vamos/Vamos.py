@@ -1,7 +1,6 @@
 from label.LabelManager import LabelManager
 from label.LabelRange import LabelRange
 from MemoryAlloc import MemoryAlloc
-from AccessMemory import AccessMemory
 from LibManager import LibManager
 from .libcore import LibRegistry, LibCtxMap, LibCtx
 from SegmentLoader import SegmentLoader
@@ -14,6 +13,7 @@ from amitools.vamos.lib.dos.DosStruct import CLIDef
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
 from amitools.vamos.lib.dos.Process import Process
+from amitools.vamos.trace import TraceManager, TraceMemory
 
 from Log import *
 from CPU import *
@@ -58,16 +58,14 @@ class Vamos:
     label = LabelRange("shutdown",0x400,0x800)
     self.label_mgr.add_label(label)
 
-    # enable internal memory trace?
+    # create memory access
+    self.trace_mgr = TraceManager(cpu, self.label_mgr)
     if cfg.internal_memory_trace:
-      mem_label_mgr = self.label_mgr
+      self.mem = TraceMemory(raw_mem, self.trace_mgr)
       if not log_mem_int.isEnabledFor(logging.INFO):
         log_mem_int.setLevel(logging.INFO)
     else:
-      mem_label_mgr = None
-
-    # create memory access
-    self.mem = AccessMemory(raw_mem, mem_label_mgr)
+      self.mem = raw_mem
     self._setup_memory(raw_mem)
 
     # create memory allocator
@@ -132,7 +130,7 @@ class Vamos:
     # enable mem trace?
     if cfg.memory_trace:
       raw_mem.set_trace_mode(1)
-      raw_mem.set_trace_func(self.label_mgr.trace_mem)
+      raw_mem.set_trace_func(self.trace_mgr.trace_mem)
       if not log_mem.isEnabledFor(logging.DEBUG):
         log_mem.setLevel(logging.DEBUG)
     # set invalid access handler for memory
@@ -192,7 +190,7 @@ class Vamos:
     return_addr = tr.get_code_addr(return_off)
     log_proc.debug("new_stack=%06x return_addr=%06x", new_stack, return_addr)
     # place return address for new process
-    self.mem.access.w32(new_stack, return_addr)
+    self.mem.w32(new_stack, return_addr)
 
   def stop_sub_process(self):
     # get return value
@@ -212,7 +210,7 @@ class Vamos:
     oldstacktop  = self.process.this_task.access.r_s("pr_Task.tc_SPUpper");
     old_stackptr = self.cpu.r_reg(REG_A7) # addr of sys call return
     # put stack size on top of stack
-    self.mem.access.w32(newstacktop - 4,stacksize)
+    self.mem.w32(newstacktop - 4,stacksize)
     # activate new stack
     new_stackptr = newstacktop - 8
     self.process.this_task.access.w_s("pr_Task.tc_SPLower",newstackbase)
@@ -263,7 +261,7 @@ class Vamos:
     return_addr = tr.get_code_addr(return_off)
     log_proc.debug("new_stack=%06x return_addr=%06x", new_stackptr, return_addr)
     # place return address for new process
-    self.mem.access.w32(new_stackptr, return_addr)
+    self.mem.w32(new_stackptr, return_addr)
 
   def run_shell(self,start_pc,packet,stacksize,trap_stop_handler):
     newstack     = self.alloc.alloc_memory("shell command stack",stacksize)
@@ -273,7 +271,7 @@ class Vamos:
     oldstacktop  = self.process.this_task.access.r_s("pr_Task.tc_SPUpper");
     old_stackptr = self.cpu.r_reg(REG_A7) # addr of sys call return
     # put stack size on top of stack
-    self.mem.access.w32(newstacktop - 4,stacksize)
+    self.mem.w32(newstacktop - 4,stacksize)
     # activate new stack
     new_stackptr = newstacktop - 8
     self.process.this_task.access.w_s("pr_Task.tc_SPLower",newstackbase)
@@ -319,7 +317,7 @@ class Vamos:
     return_addr = tr.get_code_addr(return_off)
     log_proc.debug("new_stack=%06x return_addr=%06x", new_stackptr, return_addr)
     # place return address for new process
-    self.mem.access.w32(new_stackptr, return_addr)
+    self.mem.w32(new_stackptr, return_addr)
 
   # ----- init environment -----
 

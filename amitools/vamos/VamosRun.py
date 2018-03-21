@@ -30,6 +30,7 @@ class VamosRun:
 
     self.benchmark = benchmark
     self.reg_dump = vamos.cfg.reg_dump
+    self.trace_mgr = vamos.trace_mgr
 
   def init(self):
     self._init_cpu()
@@ -46,13 +47,13 @@ class VamosRun:
     log_main.info("setting up m68k")
 
     # setup stack & first PC
-    self.mem.access.w32(0, self.ctx.process.stack_initial)
-    self.mem.access.w32(4, self.ctx.process.prog_start)
+    self.mem.w32(0, self.ctx.process.stack_initial)
+    self.mem.w32(4, self.ctx.process.prog_start)
     self.cpu.pulse_reset()
 
     # clear long at 0 and set execbase at 4
-    self.mem.access.w32(0, 0)
-    self.mem.access.w32(4, self.ctx.exec_addr)
+    self.mem.w32(0, 0)
+    self.mem.w32(4, self.ctx.exec_addr)
 
     # at exit_addr (0x400) we setup the return actions after process end:
     # we want to call a shutdown trap that is able to setup some cleanup
@@ -69,9 +70,9 @@ class VamosRun:
     op_bsr = 0x6102
     op_reset = 0x04e70
     op_trap = 0xa000 + tid
-    self.mem.access.w16(addr, op_bsr)
-    self.mem.access.w16(addr+2, op_reset)
-    self.mem.access.w16(addr+4, op_trap)
+    self.mem.w16(addr, op_bsr)
+    self.mem.w16(addr+2, op_reset)
+    self.mem.w16(addr+4, op_trap)
 
     # store location of reset opcode so reset handler knows what the final reset it
     self.reset_addr = addr + 2
@@ -111,7 +112,7 @@ class VamosRun:
     if pc != self.reset_addr and not self.et.has_errors:
       log_main.error("RESET encountered at pc 0x%06x sp 0x%06x a6 0x%06x - abort",pc,sp,a6)
       for x in range(-32,32,2):
-        w = self.mem.access.r32(sp+x)
+        w = self.mem.r32(sp+x)
         log_main.error("sp+%d : 0x%02x",x,w)
     # stop all
     self.cpu.end()
@@ -126,13 +127,7 @@ class VamosRun:
         log_instr.info(r)
     # disassemble line
     pc = self.cpu.r_reg(REG_PC)
-    label, sym, src = self.ctx.label_mgr.get_disasm_info(pc)
-    _,txt = self.cpu.disassemble(pc)
-    if sym is not None:
-      log_instr.info("%s%s:", " "*40, sym)
-    if src is not None:
-      log_instr.info("%s%s", " "*50, src)
-    log_instr.info("%-40s  %06x    %-20s" % (label, pc, txt))
+    self.trace_mgr.trace_code_line(pc)
 
   def _calc_benchmark(self, total_cycles, delta_time):
     python_time = self.ctx.lib_mgr.bench_total

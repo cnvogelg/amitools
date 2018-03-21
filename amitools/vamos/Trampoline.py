@@ -139,7 +139,7 @@ class Trampoline:
   def modify_long(self,offset,data):
     self.mem.access.w16(self.code_addr + offset + 2,(data >> 16) & 0xffff)
     self.mem.access.w16(self.code_addr + offset + 4,data         & 0xffff)
-  
+
   # ----- internals -----
 
   def _gen_trap_func(self, trap_func):
@@ -217,12 +217,12 @@ class Trampoline:
     # now write data
     for b in self.data:
       width,val = b
-      self.mem.access.write_mem(width, addr, val)
+      self.mem.access.write(width, addr, val)
       addr += 2**width
 
   def _setup_on_stack(self):
     old_stack = self.cpu.r_reg(REG_A7)
     new_stack = old_stack - 4
     self.cpu.w_reg(REG_A7, new_stack)
-    self.ctx.mem.access.w32(new_stack, self.mem.addr)
+    self.ctx.mem.w32(new_stack, self.mem.addr)
 

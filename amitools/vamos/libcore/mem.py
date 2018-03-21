@@ -122,11 +122,11 @@ class LibMem(object):
     pos_size = self.access.r_s("lib_PosSize")
     addr_begin = self.addr - neg_size
     size = neg_size + pos_size
-    self.label = LabelLib(name, addr_begin, size,
-                          self.addr, self.struct, self)
-    label_mgr.add_label(self.label)
+    # TODO: re-enable label
+    #self.label = LabelLib(self)
+    #label_mgr.add_label(self.label)
     return self.label
 
   def remove_label(self, label_mgr):
-    label_mgr.remove_label(self.label)
+    #label_mgr.remove_label(self.label)
     self.label = None

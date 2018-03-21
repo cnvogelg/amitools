@@ -1,13 +1,11 @@
 import datetime
 from amitools.vamos.libcore import LibMem, LibInfo
 from amitools.vamos.machine import MockMemory
-from amitools.vamos.AccessMemory import AccessMemory
 from amitools.vamos.label import LabelManager
 
 
 def libcore_mem_base_test():
-  raw_mem = MockMemory(fill=23)
-  mem = AccessMemory(raw_mem)
+  mem = MockMemory(fill=23)
   lib_mem = LibMem(mem, 0x100)
   date = datetime.date(2012, 11, 12)
   info = LibInfo('my.library', 42, 3, date, 36, 6*12)

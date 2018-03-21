@@ -93,9 +93,9 @@ class Process:
     # TOP: size
     # TOP-4: return from program -> magic_ed
     self.stack_initial = self.stack_end - 4
-    self.ctx.mem.access.w32(self.stack_initial, self.stack_size)
+    self.ctx.mem.w32(self.stack_initial, self.stack_size)
     self.stack_initial -= 4
-    self.ctx.mem.access.w32(self.stack_initial, self.exit_addr)
+    self.ctx.mem.w32(self.stack_initial, self.exit_addr)
 
   def free_stack(self):
     self.ctx.alloc.free_memory(self.stack)
@@ -132,7 +132,7 @@ class Process:
     self.arg_len  = len(arg_str)
     self.arg = self.ctx.alloc.alloc_memory(self.bin_basename + "_args", self.arg_len + 1)
     self.arg_base = self.arg.addr
-    self.ctx.mem.access.w_cstr(self.arg_base, arg_str)
+    self.ctx.mem.w_cstr(self.arg_base, arg_str)
     log_proc.info("args: '%s' (%d)", arg_str[:-1], self.arg_len)
     log_proc.info(self.arg)
 
@@ -159,7 +159,7 @@ class Process:
     self.cli.access.w_s("cli_CommandFile",self.cmdfile.addr)
     self.cli.access.w_s("cli_SetName",self.setname.addr)
     if name != None:
-      self.ctx.mem.access.w_bstr(self.cmdname.addr,name)
+      self.ctx.mem.w_bstr(self.cmdname.addr,name)
     log_proc.info(self.cli)
 
   def free_cli_struct(self):

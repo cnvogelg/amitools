@@ -393,7 +393,7 @@ class LibManager():
   def _close_native_lib_int(self, lib, lib_base, ctx, tr):
     """call Close() on native lib"""
     # add Close() call to trampoline
-    close_addr = ctx.mem.access.r32(lib_base - 10) # LVO_Close
+    close_addr = ctx.mem.r32(lib_base - 10) # LVO_Close
 
     # remove this lib_base addr
     if lib.del_lib_base(lib_base):
@@ -471,7 +471,7 @@ class LibManager():
 
   def _rtinit_native_lib(self, lib, ctx, tr, init_ptr):
     """library init done for RT_INIT style lib"""
-    exec_base = ctx.mem.access.r32(4)
+    exec_base = ctx.mem.r32(4)
     seg_list = lib.seg_list.b_addr
     tr.save_all()
     tr.set_dx_l(0, 0) # D0=0
@@ -486,8 +486,8 @@ class LibManager():
       (init_ptr, seg_list, exec_base), level=logging.DEBUG)
     # DEBUG
     addr = seg_list << 2
-    sl_len = ctx.mem.access.r32(addr-4)
-    sl_next = ctx.mem.access.r32(addr)
+    sl_len = ctx.mem.r32(addr-4)
+    sl_next = ctx.mem.r32(addr)
     self.lib_log("load_lib", "seglist: len=%d next=%4x" % (sl_len, sl_next))
     self.lib_log("load_lib", "seglist: %s" % lib.seg_list)
 
@@ -527,7 +527,7 @@ class LibManager():
       # setup trampoline to call init routine of library
       # D0 = lib_base, A0 = seg_list, A6 = exec base
       seg_list = lib.seg_list.b_addr
-      exec_base = ctx.mem.access.r32(4)
+      exec_base = ctx.mem.r32(4)
       lib_base = lib.addr_base
       tr.save_all()
       tr.set_dx_l(0, lib_base)
@@ -555,15 +555,15 @@ class LibManager():
     """set all library vectors to valid addresses"""
     addr = base_addr - 6
     for v in vectors:
-      mem.access.w16(addr,self.op_jmp)
-      mem.access.w32(addr+2,v)
+      mem.w16(addr,self.op_jmp)
+      mem.w32(addr+2,v)
       addr -= 6
 
   def _free_native_lib(self, lib, ctx, tr):
     # get expunge func
-    exec_base = ctx.mem.access.r32(4)
+    exec_base = ctx.mem.r32(4)
     lib_base = lib.addr_base
-    expunge_addr = ctx.mem.access.r32(lib_base - 16) # LVO_Expunge
+    expunge_addr = ctx.mem.r32(lib_base - 16) # LVO_Expunge
     if expunge_addr != 0:
       # setup trampoline to call expunge and then part2 of unload
       tr.save_all()

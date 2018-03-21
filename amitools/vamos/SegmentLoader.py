@@ -2,7 +2,6 @@ import os.path
 
 from amitools.binfmt.BinFmt import BinFmt
 from amitools.binfmt.Relocate import Relocate
-from AccessMemory import AccessMemory
 from label.LabelSegment import LabelSegment
 from Log import *
 
@@ -161,18 +160,18 @@ class SegmentLoader:
     for i in xrange(len(sizes)):
       # write data to segments
       addr = addrs[i]
-      self.mem.access.w_data(addr, datas[i])
+      self.mem.w_block(addr, datas[i])
       # link segment pointers
       if last_addr != None:
         b_addr = (addr-4) >> 2 # BCPL segment 'next' pointer
-        self.mem.access.w32(last_addr - 4, b_addr)
+        self.mem.w32(last_addr - 4, b_addr)
       # write size before segment pointer
       total_size = (sizes[i] + 8)
-      self.mem.access.w32(addr - 8, total_size)
+      self.mem.w32(addr - 8, total_size)
       last_addr = addr
 
     # clear final 'next' pointer
-    self.mem.access.w32(addr - 4, 0)
+    self.mem.w32(addr - 4, 0)
 
     return seg_list
 

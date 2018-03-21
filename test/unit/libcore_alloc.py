@@ -1,15 +1,13 @@
 import datetime
 from amitools.vamos.libcore import LibAllocMem, LibInfo
 from amitools.vamos.machine import MockMemory
-from amitools.vamos.AccessMemory import AccessMemory
 from amitools.vamos.label import LabelManager
 from amitools.vamos.MemoryAlloc import MemoryAlloc
 
 
 def libcore_alloc_base_test():
-  raw_mem = MockMemory(fill=23)
-  mem = AccessMemory(raw_mem)
-  size = raw_mem.get_ram_size() * 1024 - 0x100
+  mem = MockMemory(fill=23)
+  size = mem.get_ram_size() * 1024 - 0x100
   alloc = MemoryAlloc(mem, 0x100, size)
   # create info for lib
   date = datetime.date(2012, 11, 12)

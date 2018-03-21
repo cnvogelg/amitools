@@ -113,7 +113,7 @@ class FileHandle:
 
   def getbuf(self):
     return self.unch
-    
+
   def tell(self):
     return self.obj.tell()
 

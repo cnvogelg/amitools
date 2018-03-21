@@ -1,17 +1,11 @@
 import logging
 from amitools.vamos.Log import *
 
-MEMORY_WIDTH_BYTE = 0
-MEMORY_WIDTH_WORD = 1
-MEMORY_WIDTH_LONG = 2
-
 class LabelManager:
-  trace_val_str = ( "%02x      ", "%04x    ", "%08x" )
 
   def __init__(self):
     self.first  = None
     self.last   = None
-    self.error_tracker = None # will be set later
 
   # This is now all done manually with doubly linked
   # lists. The reason for this is that the python built-in
@@ -49,7 +43,6 @@ class LabelManager:
     while r != None:
       if r.addr >= addr and r.addr + r.size <= addr + size:
         s = r.next
-        log_mem_int.log(logging.WARN, "remove_labels_within: got= [@%06x +%06x]  have=%s", addr, size, r)
         self.remove_label(r)
         r = s
       else:
@@ -97,41 +90,3 @@ class LabelManager:
     else:
       off = addr - r.addr
       return (r, off)
-
-  # trace callback from CPU core
-  # mode is an integer with values 'R' and 'W' there
-  def trace_mem(self, mode, width, addr, val):
-    mode_char = chr(mode)
-    r = self.get_label(addr)
-    if r != None:
-      ok = r.trace_mem(mode_char, width, addr, val)
-      if ok:
-        return 0
-    self.error_tracker.report_invalid_memory(mode, width, addr)
-    return 1
-
-  def get_mem_str(self, addr):
-    label = self.get_label(addr)
-    if label != None:
-      return "@%06x +%06x %s" % (label.addr, addr - label.addr, label.name)
-    else:
-      return "N/A"
-
-  def get_disasm_info(self, addr):
-    label = self.get_label(addr)
-    if label != None:
-      mem = "@%06x +%06x %s" % (label.addr, addr - label.addr, label.name)
-      sym = label.get_symbol(addr)
-      src = label.get_src_info(addr)
-    else:
-      mem = "N/A"
-      sym = None
-      src = None
-    return (mem, sym, src)
-
-  def trace_int_block(self, mode, addr, size, text="", level=logging.DEBUG, addon=""):
-    log_mem_int.log(level, "%s(B): %06x: +%06x   %6s  [%s] %s", mode, addr, size, text, self.get_mem_str(addr), addon)
-
-  def trace_int_mem(self, mode, width, addr, value, text="", level=logging.DEBUG, addon=""):
-    val = self.trace_val_str[width] % value
-    log_mem_int.log(level, "%s(%d): %06x: %s  %6s  [%s] %s", mode, 2**width, addr, val, text, self.get_mem_str(addr), addon)

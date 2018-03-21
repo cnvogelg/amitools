@@ -68,4 +68,4 @@ class MockCPU(object):
     raise NotImplementedError()
 
   def disassemble(self, pc):
-    raise NotImplementedError()
+    return 2, "nop"

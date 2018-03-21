@@ -43,7 +43,7 @@ class CSource:
     c = alloc.map_struct("CSource", ptr, CSourceDef)
     buf_ptr = c.access.r_s('CS_Buffer')
     self.len = c.access.r_s('CS_Length')
-    self.buf = bytes(alloc.access.r_data(buf_ptr, self.len))
+    self.buf = bytes(alloc.mem.r_block(buf_ptr, self.len))
     self.pos = c.access.r_s('CS_CurChr')
 
   def update_s(self, alloc, ptr):

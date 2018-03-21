@@ -37,7 +37,7 @@ class MemoryChunk:
 
 class MemoryAlloc:
   def __init__(self, mem, addr, size, label_mgr=None):
-    """mem is a AccessMemory-like interface.
+    """mem is a interface.
        setup allocator starting at addr with size bytes.
        if label_mgr is set then labels are created for allocations.
     """
@@ -167,7 +167,7 @@ class MemoryAlloc:
     self.addrs[addr] = size
     self.free_bytes -= size
     # erase memory
-    self.mem.clear_data(addr, size, 0)
+    self.mem.clear_block(addr, size, 0)
     log_mem_alloc.info("[alloc @%06x-%06x: %06x bytes] %s", addr, addr+size, size, self._stat_info())
     if addr % 4:
       raise VamosInternalError("Memory pool is invalid, return address not aligned by a long word");

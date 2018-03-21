@@ -52,7 +52,7 @@ class FileManager:
       if check != fh:
         raise ValueError("Invalid File to unregister: %s" % fh)
     else:
-      raise ValueError("Invalid File to unregister: %s" % fh)       
+      raise ValueError("Invalid File to unregister: %s" % fh)
     del self.files_by_b_addr[fh.b_addr]
     log_file.info("unregistered: %s"% fh)
     fh.free_fh(self.alloc)
@@ -221,7 +221,7 @@ class FileManager:
       # get fh and read
       fh = self.get_by_b_addr(fh_b_addr)
       data = fh.read(size)
-      self.mem.access.w_data(buf_ptr, data)
+      self.mem.w_block(buf_ptr, data)
       got = len(data)
       log_file.info("DosPacket: Read fh_b_addr=%06x buf=%06x len=%06x -> got=%06x fh=%s", fh_b_addr, buf_ptr, size, got, fh)
       dos_pkt.w_s("dp_Res1", got)
@@ -230,7 +230,7 @@ class FileManager:
       buf_ptr   = dos_pkt.r_s("dp_Arg2")
       size      = dos_pkt.r_s("dp_Arg3")
       fh = self.get_by_b_addr(fh_b_addr)
-      data = self.mem.access.r_data(buf_ptr, size)
+      data = self.mem.r_block(buf_ptr, size)
       fh.write(data)
       put = len(data)
       log_file.info("DosPacket: Write fh=%06x buf=%06x len=%06x -> put=%06x fh=%s", fh_b_addr, buf_ptr, size, put, fh)

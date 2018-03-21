@@ -112,7 +112,7 @@ class MathIEEESingTransLibrary(LibImpl):
     vals_sin = float_to_reg(res_sin)
     vals_cos = float_to_reg(res_cos)
     #write cos to ptr
-    ctx.mem.access.w32(ptr, vals_cos)
+    ctx.mem.w32(ptr, vals_cos)
     return vals_sin
 
   def IEEESPSinh(self,ctx):

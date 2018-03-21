@@ -50,11 +50,12 @@ class Lock:
     # name
     name_addr = fib_mem.s_get_addr('fib_FileName')
     # clear 32 name bytes
-    fib_mem.clear_data(name_addr, 32, 0)
-    fib_mem.w_cstr(name_addr, name)
+    mem = fib_mem.mem
+    mem.clear_block(name_addr, 32, 0)
+    mem.w_cstr(name_addr, name)
     # comment
     comment_addr = fib_mem.s_get_addr('fib_Comment')
-    fib_mem.w_cstr(comment_addr, "")
+    mem.w_cstr(comment_addr, "")
     # create the "inode" information
     key = self.keygen(sys_path)
     fib_mem.w_s('fib_DiskKey',key)
@@ -141,4 +142,4 @@ class Lock:
     return entries
 
   def find_volume_node(self,dos_list):
-    return self.mem.access.r_s("fl_Volume")
+    return self.mem.r_s("fl_Volume")

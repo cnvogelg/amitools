@@ -1,18 +1,16 @@
 import datetime
 from amitools.vamos.libcore import LibCreator, LibInfo, LibCtx
 from amitools.vamos.machine import MockMemory, MockTraps, MockCPU
-from amitools.vamos.AccessMemory import AccessMemory
 from amitools.vamos.label import LabelManager
 from amitools.vamos.MemoryAlloc import MemoryAlloc
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 
 
 def setup():
-  raw_mem = MockMemory(fill=23)
+  mem = MockMemory(fill=23)
   traps = MockTraps()
   cpu = MockCPU()
-  mem = AccessMemory(raw_mem)
-  size = raw_mem.get_ram_size() * 1024 - 0x100
+  size = mem.get_ram_size() * 1024 - 0x100
   alloc = MemoryAlloc(mem, 0x100, size)
   ctx = LibCtx(cpu, mem)
   return mem, traps, alloc, ctx

@@ -112,8 +112,8 @@ class MathIEEEDoubTransLibrary(LibImpl):
     vals_sin = double_to_regs(res_sin)
     vals_cos = double_to_regs(res_cos)
     #write cos to ptr
-    ctx.mem.access.w32(ptr, vals_cos[0])
-    ctx.mem.access.w32(ptr+4, vals_cos[1])
+    ctx.mem.w32(ptr, vals_cos[0])
+    ctx.mem.w32(ptr+4, vals_cos[1])
     return vals_sin
 
   def IEEEDPSinh(self,ctx):

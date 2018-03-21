@@ -177,7 +177,7 @@ class DosList:
       first       = True
       assign_last = None
       name_addr   = entry.access.r_s("dol_Name")
-      #print "*** Entry %s, Name address is %s,%s" % (entry.mem,name_addr,self.mem.access.r_bstr(name_addr))
+      #print "*** Entry %s, Name address is %s,%s" % (entry.mem,name_addr,self.mem.r_bstr(name_addr))
       for dirs in entry.assigns:
         lock = lock_mgr.create_lock(None,dirs,False)
         if lock is None:
