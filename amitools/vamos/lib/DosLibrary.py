@@ -1433,15 +1433,16 @@ class DosLibrary(LibImpl):
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name     = ctx.mem.r_cstr(name_ptr)
     lock     = self.get_current_dir(ctx)
-    seg_list = ctx.seg_loader.load_seg(lock,name,False,True)
-    if seg_list == None:
-      log_dos.warn("LoadSeg: '%s' -> not found!" % (name))
-      return 0
-    else:
+    sys_path = self.path_mgr.ami_to_sys_path(lock, name, searchMulti=True)
+    if sys_path and os.path.exists(sys_path):
+      seg_list = ctx.seg_loader.load_seg(sys_path)
       log_dos.info("LoadSeg: '%s' -> %s" % (name, seg_list))
       b_addr = seg_list.b_addr
       self.seg_lists[b_addr] = (seg_list,name)
       return b_addr
+    else:
+      log_dos.warn("LoadSeg: '%s' -> not found!" % (name))
+      return 0
 
   def UnLoadSeg(self, ctx):
     b_addr = ctx.cpu.r_reg(REG_D1)
@@ -1451,7 +1452,7 @@ class DosLibrary(LibImpl):
       else:
         seg_list = self.seg_lists[b_addr][0]
         del self.seg_lists[b_addr]
-        ctx.seg_loader.unload_seg(seg_list,False)
+        ctx.seg_loader.unload_seg(seg_list)
         log_dos.info("UnLoadSeg:  %s" % seg_list)
     else:
       log_dos.info("UnLoadSeg:  NULL")

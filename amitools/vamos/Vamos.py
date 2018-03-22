@@ -2,7 +2,7 @@ from .label import LabelManager, LabelRange
 from .mem import MemoryAlloc, AccessStruct
 from LibManager import LibManager
 from .libcore import LibRegistry, LibCtxMap, LibCtx
-from SegmentLoader import SegmentLoader
+from .loader import SegmentLoader
 from path.PathManager import PathManager
 from ErrorTracker import ErrorTracker
 from Trampoline import Trampoline
@@ -72,13 +72,13 @@ class Vamos:
     self.alloc = MemoryAlloc(self.mem, self.mem_begin, self.mem_size, self.label_mgr)
 
     # create segment loader
-    self.seg_loader = SegmentLoader( self.mem, self.alloc, self.label_mgr, self.path_mgr )
+    self.seg_loader = SegmentLoader( self.mem, self.alloc, self.label_mgr )
 
     # setup lib context
     ctx_map = LibCtxMap()
     self.exec_ctx = ExecLibCtx(self.cpu, self.mem, self.cpu_type, self.ram_size,
                                self.label_mgr, self.alloc, self.traps,
-                               self.seg_loader)
+                               self.seg_loader, self.path_mgr)
     self.dos_ctx = DosLibCtx(self.cpu, self.mem, self.alloc, self.path_mgr,
                              self.seg_loader, self.run_command,
                              self.start_sub_process)

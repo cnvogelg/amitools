@@ -298,13 +298,16 @@ class LibManager():
     if proc is not None:
       cur_dir_lock = proc.cwd_lock
 
+    # map ami path of lib to sys_path
+    sys_path = ctx.path_mgr.ami_to_sys_path(cur_dir_lock, load_name, searchMulti=True)
+
     # is native lib available in file system?
-    if ctx.seg_loader.can_load_seg(cur_dir_lock, load_name, local_path=True):
+    if sys_path and os.path.exists(sys_path):
       self.lib_log("load_lib","found amiga lib: '%s'" % load_name)
 
       # setup trampoline
       tr = Trampoline(ctx,"create_lib[%s]" % sane_name)
-      self._create_native_lib(lib, load_name, ctx, tr, cur_dir_lock)
+      self._create_native_lib(lib, sys_path, ctx, tr)
       self._open_native_lib_int(lib, ctx, tr)
       tr.final_rts()
       tr.done()
@@ -419,14 +422,14 @@ class LibManager():
 
   # ----- create/free native lib -----
 
-  def _create_native_lib(self, lib, load_name, ctx, tr, cur_dir_lock=None):
+  def _create_native_lib(self, lib, sys_path, ctx, tr):
     """load native lib from binary file and allocate memory"""
 
     # use seg_loader to load lib
-    self.lib_log("load_lib","loading native lib: %s" % load_name)
-    lib.seg_list = ctx.seg_loader.load_seg(cur_dir_lock,load_name,local_path=True)
+    self.lib_log("load_lib","loading native lib: %s" % sys_path)
+    lib.seg_list = ctx.seg_loader.load_seg(sys_path)
     if lib.seg_list == None:
-      self.lib_log("load_lib","Can't load library file '%s'" % load_name, level=logging.ERROR)
+      self.lib_log("load_lib","Can't load library file '%s'" % sys_path, level=logging.ERROR)
       return None
 
     # check seg list for resident library struct
@@ -437,7 +440,7 @@ class LibManager():
     end = time.clock()
     delta = end - start;
     if res_list == None or len(res_list) != 1:
-      self.lib_log("load_lib","No single resident in %s found!" % load_name, level=logging.ERROR)
+      self.lib_log("load_lib","No single resident in %s found!" % sys_path, level=logging.ERROR)
       return None
 
     # make sure its a library

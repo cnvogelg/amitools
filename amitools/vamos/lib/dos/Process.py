@@ -1,3 +1,4 @@
+import os
 from amitools.vamos.Log import log_proc
 from amitools.vamos.lib.lexec.ExecStruct import *
 from amitools.vamos.lib.lexec.PortManager import *
@@ -104,10 +105,11 @@ class Process:
   def load_binary(self, lock, ami_bin_file, shell=False):
     self.bin_basename = self.ctx.path_mgr.ami_name_of_path(lock,ami_bin_file)
     self.bin_file     = ami_bin_file
-    self.bin_seg_list = self.ctx.seg_loader.load_seg(lock,ami_bin_file)
-    if self.bin_seg_list == None:
+    sys_path = self.ctx.path_mgr.ami_command_to_sys_path(lock, ami_bin_file)
+    if not sys_path or not os.path.exists(sys_path):
       log_proc.error("failed loading binary: %s", self.ctx.seg_loader.error)
       return False
+    self.bin_seg_list = self.ctx.seg_loader.load_seg(sys_path)
     self.prog_start = self.bin_seg_list.prog_start
     # THOR: If this is a shell, then the seglist requires BCPL linkage and
     # initialization of the GlobVec. Fortunately, for the 3.9 shell all this
