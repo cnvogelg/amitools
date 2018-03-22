@@ -8,10 +8,9 @@ from .seglist import SegList, Segment
 
 class SegmentLoader:
 
-  def __init__(self, mem, alloc, label_mgr):
+  def __init__(self, mem, alloc):
     self.mem = mem
     self.alloc = alloc
-    self.label_mgr = label_mgr
     self.error = None
     self.loaded_seg_lists = {}
     self.binfmt = BinFmt()
