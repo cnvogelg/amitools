@@ -1,6 +1,6 @@
 from amitools.vamos.Log import log_exec
 from amitools.vamos.Exceptions import *
-from amitools.vamos.MemoryAlloc import *
+from amitools.vamos.mem import MemoryAlloc
 
 class Puddle:
   def __init__(self, mem, alloc, label_mgr, name, size):

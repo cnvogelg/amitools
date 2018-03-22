@@ -1,6 +1,6 @@
 import datetime
 from amitools.vamos.lib.lexec.ExecStruct import LibraryDef
-from amitools.vamos.AccessStruct import AccessStruct
+from amitools.vamos.mem import AccessStruct
 from amitools.vamos.label import LabelLib
 from .info import LibInfo
 

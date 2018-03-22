@@ -1,4 +1,4 @@
-from amitools.vamos.AmigaStruct import AmigaStruct
+from amitools.vamos.mem import AmigaStruct
 
 class ProcessStruct(AmigaStruct):
   _name = "Process"

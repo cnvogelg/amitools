@@ -1,8 +1,8 @@
-from Exceptions import *
-from Log import log_mem_alloc
-from .label import LabelRange, LabelStruct
-from AccessStruct import AccessStruct
-import sys
+from amitools.vamos.Exceptions import *
+from amitools.vamos.Log import log_mem_alloc
+from amitools.vamos.label import LabelRange, LabelStruct
+from .access import AccessStruct
+
 
 class Memory:
   def __init__(self, addr, size, label, access):
@@ -10,13 +10,14 @@ class Memory:
     self.size = size
     self.label = label
     self.access = access
+
   def __str__(self):
     if self.label != None:
       return str(self.label)
     else:
       return "[@%06x +%06x %06x]" % (self.addr, self.size, self.addr+self.size)
 
-# free memory chunk
+
 class MemoryChunk:
   def __init__(self, addr, size):
     self.addr = addr
@@ -33,6 +34,7 @@ class MemoryChunk:
        return < 0 if it does not fit, 0 for exact fit, > 0 n wasted bytes
     """
     return self.size - size
+
 
 class MemoryAlloc:
   def __init__(self, mem, addr, size, label_mgr=None):
@@ -64,15 +66,15 @@ class MemoryAlloc:
       left = chunk.does_fit(size)
       # exact match
       if left == 0:
-        return (chunk,0)
+        return (chunk, 0)
       # potential candidate: has some bytes left
       elif left > 0:
         # Don't make such a hassle. Return the first one that fits.
         # This function takes too much time.
-        return (chunk,left)
+        return (chunk, left)
       chunk = chunk.next
     # nothing found?
-    return (None,-1)
+    return (None, -1)
 
   def _remove_chunk(self, chunk):
     next = chunk.next
@@ -139,9 +141,10 @@ class MemoryAlloc:
 
   def _stat_info(self):
     num_allocs = len(self.addrs)
-    return "(free %06x #%d) (allocs #%d)" % (self.free_bytes, self.free_entries, num_allocs)
+    return "(free %06x #%d) (allocs #%d)" % \
+        (self.free_bytes, self.free_entries, num_allocs)
 
-  def alloc_mem(self, size, except_on_fail = True):
+  def alloc_mem(self, size, except_on_fail=True):
     """allocate memory and return addr or 0 if no more memory"""
     # align size to 4 bytes
     size = (size + 3) & ~3
@@ -167,9 +170,11 @@ class MemoryAlloc:
     self.free_bytes -= size
     # erase memory
     self.mem.clear_block(addr, size, 0)
-    log_mem_alloc.info("[alloc @%06x-%06x: %06x bytes] %s", addr, addr+size, size, self._stat_info())
+    log_mem_alloc.info("[alloc @%06x-%06x: %06x bytes] %s",
+                       addr, addr+size, size, self._stat_info())
     if addr % 4:
-      raise VamosInternalError("Memory pool is invalid, return address not aligned by a long word");
+      raise VamosInternalError(
+          "Memory pool is invalid, return address not aligned by a long word")
     return addr
 
   def free_mem(self, addr, size):
@@ -188,18 +193,21 @@ class MemoryAlloc:
     if prev != None:
       new_chunk = self._merge_chunk(prev, chunk)
       if new_chunk != None:
-        log_mem_alloc.debug("merged: %s + this=%s -> %s", prev, chunk, new_chunk)
+        log_mem_alloc.debug("merged: %s + this=%s -> %s",
+                            prev, chunk, new_chunk)
         chunk = new_chunk
     next = chunk.next
     if next != None:
       new_chunk = self._merge_chunk(chunk, next)
       if new_chunk != None:
-        log_mem_alloc.debug("merged: this=%s + %s -> %s", chunk, next, new_chunk)
+        log_mem_alloc.debug("merged: this=%s + %s -> %s",
+                            chunk, next, new_chunk)
 
     # correct free bytes
     self.free_bytes += size
     num_allocs = len(self.addrs)
-    log_mem_alloc.info("[free  @%06x-%06x: %06x bytes] %s", addr, addr+size, size, self._stat_info())
+    log_mem_alloc.info("[free  @%06x-%06x: %06x bytes] %s",
+                       addr, addr+size, size, self._stat_info())
 
   def get_range_by_addr(self, addr):
     if self.addrs.has_key(addr):
@@ -218,9 +226,9 @@ class MemoryAlloc:
   def _dump_orphan(self, addr, size):
     log_mem_alloc.warn("orphan: [@%06x +%06x %06x]" % (addr, size, addr+size))
     if self.label_mgr is not None:
-      labels = self.label_mgr.get_intersecting_labels(addr,size)
+      labels = self.label_mgr.get_intersecting_labels(addr, size)
       for l in labels:
-        log_mem_alloc.warn("-> %s",l)
+        log_mem_alloc.warn("-> %s", l)
 
   def dump_orphans(self):
     last = self.free_first
@@ -239,7 +247,7 @@ class MemoryAlloc:
       cur = cur.next
     # orphan at end?
     addr = last.addr + last.size
-    end  = self.addr + self.size
+    end = self.addr + self.size
     if addr != end:
       self._dump_orphan(addr, end-addr)
 
@@ -252,7 +260,7 @@ class MemoryAlloc:
       return None
 
   # memory
-  def alloc_memory(self, name, size, add_label=True, except_on_failure = True):
+  def alloc_memory(self, name, size, add_label=True, except_on_failure=True):
     addr = self.alloc_mem(size, except_on_failure)
     if addr == 0:
       return None
@@ -261,13 +269,13 @@ class MemoryAlloc:
       self.label_mgr.add_label(label)
     else:
       label = None
-    mem = Memory(addr,size,label,self.mem)
-    log_mem_alloc.info("alloc memory: %s",mem)
+    mem = Memory(addr, size, label, self.mem)
+    log_mem_alloc.info("alloc memory: %s", mem)
     self.mem_objs[addr] = mem
     return mem
 
   def free_memory(self, mem):
-    log_mem_alloc.info("free memory: %s",mem)
+    log_mem_alloc.info("free memory: %s", mem)
     if mem.label != None:
       self.label_mgr.remove_label(mem.label)
     self.free_mem(mem.addr, mem.size)
@@ -283,8 +291,8 @@ class MemoryAlloc:
     else:
       label = None
     access = AccessStruct(self.mem, struct, addr)
-    mem = Memory(addr,size,label,access)
-    log_mem_alloc.info("alloc struct: %s",mem)
+    mem = Memory(addr, size, label, access)
+    log_mem_alloc.info("alloc struct: %s", mem)
     self.mem_objs[addr] = mem
     return mem
 
@@ -295,12 +303,12 @@ class MemoryAlloc:
       label = self.label_mgr.get_label(addr)
     else:
       label = None
-    mem = Memory(addr,size,label,access)
-    log_mem_alloc.info("map struct: %s",mem)
+    mem = Memory(addr, size, label, access)
+    log_mem_alloc.info("map struct: %s", mem)
     return mem
 
   def free_struct(self, mem):
-    log_mem_alloc.info("free struct: %s",mem)
+    log_mem_alloc.info("free struct: %s", mem)
     if self.label_mgr is not None:
       self.label_mgr.remove_label(mem.label)
     self.free_mem(mem.addr, mem.size)
@@ -316,13 +324,13 @@ class MemoryAlloc:
     else:
       label = None
     self.mem.w_cstr(addr, cstr)
-    mem = Memory(addr,size,label,self.mem)
-    log_mem_alloc.info("alloc c_str: %s",mem)
+    mem = Memory(addr, size, label, self.mem)
+    log_mem_alloc.info("alloc c_str: %s", mem)
     self.mem_objs[addr] = mem
     return mem
 
   def free_cstr(self, mem):
-    log_mem_alloc.info("free c_str: %s",mem)
+    log_mem_alloc.info("free c_str: %s", mem)
     if self.label_mgr is not None:
       self.label_mgr.remove_label(mem.label)
     self.free_mem(mem.addr, mem.size)
@@ -330,7 +338,7 @@ class MemoryAlloc:
 
   # bstr
   def alloc_bstr(self, name, bstr):
-    size = len(bstr) + 2 # front: count, end: extra zero for safety
+    size = len(bstr) + 2  # front: count, end: extra zero for safety
     addr = self.alloc_mem(size)
     if self.label_mgr is not None:
       label = LabelRange(name, addr, size)
@@ -338,13 +346,13 @@ class MemoryAlloc:
     else:
       label = None
     self.mem.w_bstr(addr, bstr)
-    mem = Memory(addr,size,label,self.mem)
-    log_mem_alloc.info("alloc b_str: %s",mem)
+    mem = Memory(addr, size, label, self.mem)
+    log_mem_alloc.info("alloc b_str: %s", mem)
     self.mem_objs[addr] = mem
     return mem
 
   def free_bstr(self, mem):
-    log_mem_alloc.info("free b_str: %s",mem)
+    log_mem_alloc.info("free b_str: %s", mem)
     if self.label_mgr is not None:
       self.label_mgr.remove_label(mem.label)
     self.free_mem(mem.addr, mem.size)
@@ -359,7 +367,7 @@ class MemoryAlloc:
     return self.size
 
   def available(self):
-    free  = 0
+    free = 0
     chunk = self.free_first
     while chunk != None:
       free += chunk.size
@@ -374,5 +382,3 @@ class MemoryAlloc:
         largest = chunk.size
       chunk = chunk.next
     return largest
-
-

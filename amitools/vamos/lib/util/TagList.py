@@ -1,5 +1,5 @@
 from UtilStruct import *
-from amitools.vamos.AccessStruct import AccessStruct
+from amitools.vamos.mem import AccessStruct
 
 TAG_DONE = 0
 TAG_IGNORE = 1

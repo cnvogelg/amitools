@@ -9,7 +9,7 @@ from dos.DosStruct import *
 from lexec.ExecStruct import ListDef, MinListDef, NodeDef
 from amitools.vamos.Exceptions import *
 from amitools.vamos.Log import log_dos
-from amitools.vamos.AccessStruct import AccessStruct
+from amitools.vamos.mem import AccessStruct
 from amitools.vamos.path.PathManager import PathManager
 from amitools.vamos.path.PathManager import AssignManager
 from dos.Args import *

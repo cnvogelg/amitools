@@ -1,7 +1,7 @@
 from DosStruct import *
 from PathMatch import PathMatch
 from amitools.vamos.label import LabelStruct
-from amitools.vamos.AccessStruct import AccessStruct
+from amitools.vamos.mem import AccessStruct
 from Error import *
 
 class MatchFirstNext:

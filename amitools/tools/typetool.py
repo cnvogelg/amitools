@@ -8,7 +8,7 @@
 
 import sys
 
-from amitools.vamos import AmigaStruct
+from amitools.vamos.mem import AmigaStruct
 from amitools.vamos.lib.lexec import ExecStruct
 from amitools.vamos.lib.dos import DosStruct
 from amitools.vamos.lib.util import UtilStruct

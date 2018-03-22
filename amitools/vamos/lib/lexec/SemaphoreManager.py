@@ -1,11 +1,11 @@
 from ExecStruct import SignalSemaphoreDef
-from amitools.vamos.AccessStruct import AccessStruct
+from amitools.vamos.mem import AccessStruct
 from amitools.vamos.Exceptions import *
 
 class SemaphoreManager:
-  
+
   NT_SIGNALSEM = 15
-  
+
   def __init__(self, alloc, mem):
     self.alloc = alloc
     self.mem   = mem
@@ -43,7 +43,7 @@ class SemaphoreManager:
 
   def has_semaphore(self, addr):
     return addr in self.semaphores
-  
+
   def register_semaphore(self,addr):
     if not self.has_semaphore(addr):
       name = "Semaphore@%06x" % addr
@@ -60,7 +60,7 @@ class SemaphoreManager:
       del self.semaphores[addr]
     else:
       raise VamosInternalError("Invalid Semaphore remove: %06x" % addr)
-    
+
 class Semaphore:
   def __init__(self, name, semaphore_mgr, addr=None, mem=None):
     self.name = name

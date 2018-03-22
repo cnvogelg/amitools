@@ -1,7 +1,7 @@
 import datetime
 
 from UtilStruct import ClockDataDef
-from amitools.vamos.AccessStruct import AccessStruct
+from amitools.vamos.mem import AccessStruct
 
 
 # when Amiga time began...

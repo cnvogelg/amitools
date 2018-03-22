@@ -8,17 +8,17 @@ class InvalidAmigaTypeException(Exception):
 
 def w_bptr(addr):
   return addr >> 2
-  
+
 def r_bptr(addr):
   return addr << 2
-  
+
 class AmigaStruct:
-  
+
   # overwrite these in derived class!
   _name = None
   _format = None
-  
-  # name all internal types 
+
+  # name all internal types
   # and map to (byte width in 2**n, w_convert, r_convert)
   _types = {
     'UBYTE' : (0,None),
@@ -34,10 +34,10 @@ class AmigaStruct:
     'VOIDFUNC' : (2,None),
     'void' : (2,None),
   }
-  
+
   def __init__(self):
     struct_pool[self._name] = self
-    
+
     # calc size of struct
     size = 0
     offsets = []
@@ -55,36 +55,36 @@ class AmigaStruct:
       type_name = e[0]
       if not self.validate_type_name(type_name):
         raise InvalidAmigaTypeException(type_name)
-      
+
       # calc size
       e_size = self.lookup_type_width(type_name)
       sizes.append(e_size)
       off += e_size
-      
+
       # is pointer?
       pointers.append(self._is_pointer(type_name))
       sub_types.append(self.get_sub_type(type_name))
-      
+
       # store name -> index mapping
       lookup[e[1]] = num
       num += 1
-    
+
     self._offsets = offsets
     self._sizes = sizes
     self._total_size = off
     self._lookup = lookup
     self._sub_types = sub_types
     self._pointers = pointers
-  
+
   def __str__(self):
     return "[Struct: %s size=%d]" % (self._name,self._total_size)
-  
+
   def get_size(self):
     return self._total_size
-    
+
   def get_type_name(self):
     return self._name
-    
+
   def dump(self, indent=0, num=0, base=0, name=""):
     istr = "  " * indent
     print "     @%04d       %s %s {" % (base, istr, self._name)
@@ -103,7 +103,7 @@ class AmigaStruct:
     off = total + base
     print "     @%04d =%04d %s } %s" % (off,total,istr,name)
     return num
-  
+
   # return (name, delta, type_name)
   def get_name_for_offset(self, offset, width, prefix=""):
     num = self.get_index_for_offset(offset)
@@ -126,12 +126,12 @@ class AmigaStruct:
       base_type = format[0]
       type_width = self._types[base_type][0]
       return (name,delta,base_type)
-  
+
   # return (off, width, convert_func_pair)
   def get_offset_for_name(self, name):
     parts = name.split('.')
     return self._get_offset_loop(parts)
-  
+
   def _get_offset_loop(self, parts, base=0):
     name = parts[0]
     if not self._lookup.has_key(name):
@@ -163,7 +163,7 @@ class AmigaStruct:
         return sub_type._get_offset_loop(parts[1:], base=type_offset)
       else:
         raise ValueError("Type key is no sub type: %s: %s" % (self._name,name))
-  
+
   def get_index_for_offset(self, offset):
     if offset < 0:
       return None
@@ -177,7 +177,7 @@ class AmigaStruct:
     if offset >= total:
       return None
     return num
-      
+
   def get_sub_type(self, full_type_name):
     if self._is_pointer(full_type_name):
       return None
@@ -186,7 +186,7 @@ class AmigaStruct:
       return struct_pool[type_name]
     else:
       return None
-    
+
   def validate_type_name(self, full_type_name):
     type_name = self._gen_pure_name(full_type_name)
     # is it an internal type
@@ -217,9 +217,9 @@ class AmigaStruct:
       base = t.get_size()
     else:
       raise InvalidAmigaTypeException(type_name)
-  
+
     return array_mult * base
-  
+
   def _gen_pure_name(self, name):
     # remove array post fixes and pointers
     comp = name.split('|')

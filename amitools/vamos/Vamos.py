@@ -1,5 +1,5 @@
 from .label import LabelManager, LabelRange
-from MemoryAlloc import MemoryAlloc
+from .mem import MemoryAlloc, AccessStruct
 from LibManager import LibManager
 from .libcore import LibRegistry, LibCtxMap, LibCtx
 from SegmentLoader import SegmentLoader
@@ -7,7 +7,6 @@ from path.PathManager import PathManager
 from ErrorTracker import ErrorTracker
 from Trampoline import Trampoline
 from HardwareAccess import HardwareAccess
-from amitools.vamos.AccessStruct import AccessStruct
 from amitools.vamos.lib.dos.DosStruct import CLIDef
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx

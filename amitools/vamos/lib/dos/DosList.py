@@ -1,6 +1,6 @@
 import logging
 from amitools.vamos.Log import log_doslist
-from amitools.vamos.AccessStruct import AccessStruct
+from amitools.vamos.mem import AccessStruct
 from DosStruct import DosListDeviceDef, DosListVolumeDef, DosListAssignDef, AssignListDef
 from amitools.vamos.lib.dos.LockManager import LockManager
 from amitools.vamos.path.AssignManager import AssignManager

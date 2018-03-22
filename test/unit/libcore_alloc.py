@@ -2,7 +2,7 @@ import datetime
 from amitools.vamos.libcore import LibAllocMem, LibInfo
 from amitools.vamos.machine import MockMemory
 from amitools.vamos.label import LabelManager
-from amitools.vamos.MemoryAlloc import MemoryAlloc
+from amitools.vamos.mem import MemoryAlloc
 
 
 def libcore_alloc_base_test():
