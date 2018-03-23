@@ -11,10 +11,14 @@ SOURCES_C += math_single.c math_single_trans.c
 SOURCES_C += math_fast.c math_fast_trans.c
 SROUCES_C += test_hello.c test_raise.c
 
+LIB_SOURCES_C = simple.c
+LIB_SRC_DIR = libs
+
 VPATH = src
 
 # directories
 BUILD_DIR ?= bin
+LIB_BUILD_DIR = $(BUILD_DIR)/libs
 
 # external data
 SASC_INSTALL_DIR ?= $(HOME)/amiga/shared/sc
@@ -31,6 +35,8 @@ SASC = ../bin/vamos -c sasc.vamosrc sc
 # options
 VBCC_OPTS = +aos68k -I$(NDK_DIR)/include -Iinclude
 GCC_OPTS  = -noixemul -Iinclude
+GCC_OPTS_LIB = -ramiga-lib -fbaserel
+GCC_OPTS_LIB_RES = -ramiga-libr -fbaserel
 AROS_GCC_OPTS = -Iinclude
 SASC_OPTS = SMALLDATA SMALLCODE NOSTKCHK NOCHKABORT NOICONS STRICT ANSI \
             INCDIR=include
@@ -73,14 +79,27 @@ PROGS_SASC_DBG = $(patsubst %.c,$(BUILD_DIR)/%$(SASC_EXT)$(DBG_EXT),$(SOURCES_C)
 
 PROGS_DBG = $(PROGS_VBCC_DBG) $(PROGS_GCC_DBG) $(PROGS_AROS_DBG) $(PROGS_SASC_DBG)
 
+# libraries (gcc only for now)
+LIBS_GCC = $(patsubst %.c,$(LIB_BUILD_DIR)/%.library,$(LIB_SOURCES_C))
+LIBS_GCC += $(patsubst %.c,$(LIB_BUILD_DIR)/%-res.library,$(LIB_SOURCES_C))
+LIBS = $(LIBS_GCC)
+
+LIBS_GCC_DBG  = $(patsubst %.c,$(LIB_BUILD_DIR)/%-dbg.library,$(LIB_SOURCES_C))
+LIBS_GCC_DBG += $(patsubst %.c,$(LIB_BUILD_DIR)/%-res-dbg.library,$(LIB_SOURCES_C))
+LIBS_DBG = $(LIBS_GCC_DBG)
+
 # --- rules ---
 
-all: $(PROGS) $(PROGS_DBG)
+all: $(PROGS) $(PROGS_DBG) $(LIBS) $(LIBS_DBG)
 
 opt: $(PROGS)
 debug: $(PROGS_DBG)
 
+libs: $(LIBS)
+libs-debug: $(LIBS_DBG)
+
 $(PROGS): $(BUILD_DIR)
+$(LIBS): $(LIB_BUILD_DIR)
 
 clean:
 	rm -rf $(BUILD_DIR)
@@ -88,6 +107,9 @@ clean:
 # dir rules
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
+
+$(LIB_BUILD_DIR):
+	mkdir -p $(LIB_BUILD_DIR)
 
 # rules for opt
 $(BUILD_DIR)/%$(VBCC_EXT) : %.c
@@ -115,6 +137,20 @@ $(BUILD_DIR)/%$(AROS_GCC_EXT)$(DBG_EXT) : %.c
 
 $(BUILD_DIR)/%$(SASC_EXT)$(DBG_EXT) : %.c
 	$(SASC) $(SASC_OPTS) $(SASC_DEBUG) LINK TO $@ $<
+
+
+# lib rules
+$(LIB_BUILD_DIR)/%.library : $(LIB_SRC_DIR)/%.c
+	$(GCC) $(GCC_OPTS) $(GCC_OPTI) $(GCC_OPTS_LIB) -o $@ $<
+
+$(LIB_BUILD_DIR)/%-res.library : $(LIB_SRC_DIR)/%.c
+	$(GCC) $(GCC_OPTS) $(GCC_OPTI) $(GCC_OPTS_LIB_RES) -o $@ $<
+
+$(LIB_BUILD_DIR)/%-dbg.library : $(LIB_SRC_DIR)/%.c
+	$(GCC) $(GCC_OPTS) $(GCC_DEBUG) $(GCC_OPTS_LIB) -o $@ $<
+
+$(LIB_BUILD_DIR)/%-res-dbg.library : $(LIB_SRC_DIR)/%.c
+	$(GCC) $(GCC_OPTS) $(GCC_DEBUG) $(GCC_OPTS_LIB_RES) -o $@ $<
 
 
 # special flags
