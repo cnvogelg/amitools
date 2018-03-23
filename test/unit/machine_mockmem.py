@@ -21,8 +21,8 @@ def machine_mem_block_test():
   mem.w_block(0, data)
   assert mem.r_block(0, len(data)) == data
   bdata = bytearray(data)
-  mem.w_block(0x100, data)
-  assert mem.r_block(0, len(data)) == bdata
+  mem.w_block(0x100, bdata)
+  assert mem.r_block(0x100, len(bdata)) == bdata
   mem.clear_block(0x200, 100, 42)
   assert mem.r_block(0x200, 100) == chr(42) * 100
   mem.copy_block(0x200, 0x300, 20)
