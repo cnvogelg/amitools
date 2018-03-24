@@ -12,5 +12,4 @@ def check_arg(vamos, args, arg_res):
   assert stderr == []
 
 def proc_args_test(vamos):
-  vamos.make_prog("proc_args")
   check_arg(vamos, [], "")

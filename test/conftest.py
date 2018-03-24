@@ -1,12 +1,77 @@
 # pytest fixture for vamos tests
 
+from __future__ import print_function
 import pytest
 import subprocess
 import os
 
-VAMOS_BIN="../bin/vamos"
-VAMOS_ARGS=['-c', 'test.vamosrc']
-PROG_BIN_DIR="bin"
+VAMOS_BIN = "../bin/vamos"
+VAMOS_ARGS = ['-c', 'test.vamosrc']
+PROG_BIN_DIR = "bin"
+PROG_SRC_DIR = "src"
+LIB_BIN_DIR = "bin/libs"
+LIB_SRC_DIR = "src/libs"
+
+
+class BinBuilder:
+  def __init__(self, lib_type=None):
+    if lib_type == 'none':
+      lib_type = None
+    self.lib_type = lib_type
+
+  def make_prog(self, prog_name, flavor, debug=False):
+    return self.make_progs([prog_name], flavor, debug)[0]
+
+  def make_progs(self, prog_names, flavor, debug=False):
+    bins = {}
+    for p in prog_names:
+      bin_path = os.path.join(PROG_BIN_DIR, p + '_' + flavor)
+      if debug:
+        bin_path = bin_path + "_dbg"
+      src_path = os.path.join(PROG_SRC_DIR, p + '.c')
+      bins[bin_path] = src_path
+    return self._build_bins(bins)
+
+  def make_lib(self, lib_name):
+    return self.make_libs([lib_name])[0]
+
+  def make_libs(self, lib_names):
+    bins = {}
+    for name in lib_names:
+      lib_name = name
+      if self.lib_type is not None:
+        lib_name += "-" + self.lib_type
+      lib_name += ".library"
+      bin_path = os.path.join(LIB_BIN_DIR, lib_name)
+      src_path = os.path.join(LIB_SRC_DIR, name + '.c')
+      bins[bin_path] = src_path
+    return self._build_bins(bins)
+
+  def _build_bins(self, bin_paths):
+    # check sources
+    all_bins = []
+    rebuild_bins = []
+    for binp in bin_paths:
+      all_bins.append(binp)
+      srcp = bin_paths[binp]
+      if not os.path.exists(srcp):
+        raise ValueError("source does not exist: '%s'" % srcp)
+      # if bin already exits check if its never
+      if os.path.exists(binp):
+        srct = os.path.getmtime(srcp)
+        bint = os.path.getmtime(binp)
+        if bint <= srct:
+          rebuild_bins.append(binp)
+      else:
+        rebuild_bins.append(binp)
+    # call make to rebuild bins
+    if len(rebuild_bins) > 0:
+      print("BinBuilder: making", " ".join(rebuild_bins))
+      args = ['make']
+      args += rebuild_bins
+      subprocess.check_call(args, stdout=subprocess.PIPE)
+    return all_bins
+
 
 class VamosTestRunner:
   def __init__(self, flavor, vamos_bin,
@@ -20,19 +85,7 @@ class VamosTestRunner:
     self.use_debug_bins = use_debug_bins
     self.dump_output = dump_output
     self.generate_data = generate_data
-
-  def make_prog(self, prog_name):
-    self.make_progs([prog_name])
-
-  def make_progs(self, prog_names):
-    # call make with all program paths to ensure they are built
-    args = ['make']
-    for p in prog_names:
-      path = os.path.join(PROG_BIN_DIR, p + '_' + self.flavor)
-      if self.use_debug_bins:
-        path = path + "_dbg"
-      args.append(path)
-    _ = subprocess.check_call(args, stdout=subprocess.PIPE)
+    self.bin_builder = BinBuilder()
 
   def _get_data_path(self, prog_name, kw_args):
     dat_path = ["data/" + prog_name]
@@ -55,6 +108,10 @@ class VamosTestRunner:
        - stdout as line array
        - stderr as line array
     """
+
+    # ensure that prog exists
+    self.bin_builder.make_prog(prog_args[0], self.flavor,
+                               self.use_debug_bins)
 
     # stdin given?
     if 'stdin' in kw_args:
@@ -84,7 +141,7 @@ class VamosTestRunner:
       args = args + list(prog_args[1:])
 
     # run and get stdout/stderr
-    print("running:"," ".join(args))
+    print("running:", " ".join(args))
     p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     (stdout, stderr) = p.communicate(stdin)
 
@@ -122,7 +179,7 @@ class VamosTestRunner:
   def _compare(self, got, ok):
     for i in xrange(len(ok)):
       assert (got[i] == ok[i])
-    assert (len(got)==len(ok)), "stdout line count differs"
+    assert (len(got) == len(ok)), "stdout line count differs"
 
   def run_prog_check_data(self, *prog_args, **kw_args):
     """like run_prog_checked() but also verify the stdout
@@ -142,19 +199,21 @@ class VamosTestRunner:
 
 # ----- pytest integration -----
 
+
 def pytest_addoption(parser):
-    parser.addoption("--flavor", "-F", action="store", default=None,
-        help="select an Amiga compiler flavor to test")
-    parser.addoption("--use-debug-bins", "-D", action="store_true", default=False,
-        help="run the debug versions of the Amiga binaries")
-    parser.addoption("--dump-output", "-O", action="store_true", default=False,
-        help="write all vamos output to 'vamos.log'")
-    parser.addoption("--gen-data", "-G", action="store_true", default=False,
-        help="generate data files by using the output of the test program")
-    parser.addoption("--vamos-options", "-V", action="store", default=None,
-        help="add options to vamos run. separate options by plus: e.g. -V-t+-T")
-    parser.addoption("--vamos-executable", "-E", default=VAMOS_BIN,
-        help="replace the vamos executable (default: ../bin/vamos)")
+  parser.addoption("--flavor", "-F", action="store", default=None,
+                   help="select an Amiga compiler flavor to test")
+  parser.addoption("--use-debug-bins", "-D", action="store_true", default=False,
+                   help="run the debug versions of the Amiga binaries")
+  parser.addoption("--dump-output", "-O", action="store_true", default=False,
+                   help="write all vamos output to 'vamos.log'")
+  parser.addoption("--gen-data", "-G", action="store_true", default=False,
+                   help="generate data files by using the output of the test program")
+  parser.addoption("--vamos-options", "-V", action="store", default=None,
+                   help="add options to vamos run. separate options by plus: e.g. -V-t+-T")
+  parser.addoption("--vamos-executable", "-E", default=VAMOS_BIN,
+                   help="replace the vamos executable (default: ../bin/vamos)")
+
 
 def pytest_runtest_setup(item):
   flv = item.config.getoption("--flavor")
@@ -162,6 +221,13 @@ def pytest_runtest_setup(item):
     kw = item.keywords
     if flv not in kw:
       pytest.skip("disabled flavor")
+
+
+@pytest.fixture(scope="module",
+                params=['none', 'res', 'dbg', 'res-dbg'])
+def binbuild(request):
+  return BinBuilder(request.param)
+
 
 @pytest.fixture(scope="module",
                 params=['vc', 'gcc', 'agcc', 'sc'])
@@ -175,8 +241,8 @@ def vamos(request):
   if vopts is not None:
     vopts = vopts.split('+')
   return VamosTestRunner(request.param,
-    use_debug_bins=dbg,
-    dump_output=dump,
-    generate_data=gen,
-    vopts=vopts,
-    vamos_bin=vamos_bin)
+                         use_debug_bins=dbg,
+                         dump_output=dump,
+                         generate_data=gen,
+                         vopts=vopts,
+                         vamos_bin=vamos_bin)

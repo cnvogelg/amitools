@@ -1,13 +1,11 @@
 
 def test_raise_invalid_test(vamos):
-  vamos.make_prog("test_raise")
   retcode, stdout, stderr = vamos.run_prog("test_raise", "bla")
   assert retcode == 0
   assert stdout == ["VamosTest: Invalid Error: bla"]
   assert stderr == []
 
 def test_raise_runtime_error_test(vamos):
-  vamos.make_prog("test_raise")
   retcode, stdout, stderr = vamos.run_prog("test_raise", "RuntimeError")
   assert retcode == 1
   assert stdout == ["VamosTest: raise RuntimeError"]
@@ -15,7 +13,6 @@ def test_raise_runtime_error_test(vamos):
   assert stderr[-1] == "RuntimeError: VamosTest"
 
 def test_raise_vamos_internal_error_test(vamos):
-  vamos.make_prog("test_raise")
   retcode, stdout, stderr = vamos.run_prog("test_raise", "VamosInternalError")
   assert retcode == 1
   assert stdout == ["VamosTest: raise VamosInternalError"]
@@ -23,7 +20,6 @@ def test_raise_vamos_internal_error_test(vamos):
   assert '      main:  ERROR:  VamosInternalError: Internal Vamos Error: VamosTest' in stderr
 
 def test_raise_invalid_memory_access_error_test(vamos):
-  vamos.make_prog("test_raise")
   retcode, stdout, stderr = vamos.run_prog("test_raise", "InvalidMemoryAccessError")
   assert retcode == 1
   assert stdout == ["VamosTest: raise InvalidMemoryAccessError"]
