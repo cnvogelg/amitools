@@ -14,19 +14,20 @@ LIB_SRC_DIR = "src/libs"
 
 
 class BinBuilder:
-  def __init__(self, lib_type=None):
-    if lib_type == 'none':
-      lib_type = None
-    self.lib_type = lib_type
+  def __init__(self, flavor, debug=False):
+    if flavor == 'none':
+      flavor = None
+    self.flavor = flavor
+    self.debug = debug
 
-  def make_prog(self, prog_name, flavor, debug=False):
-    return self.make_progs([prog_name], flavor, debug)[0]
+  def make_prog(self, prog_name):
+    return self.make_progs([prog_name])[0]
 
-  def make_progs(self, prog_names, flavor, debug=False):
+  def make_progs(self, prog_names):
     bins = {}
     for p in prog_names:
-      bin_path = os.path.join(PROG_BIN_DIR, p + '_' + flavor)
-      if debug:
+      bin_path = os.path.join(PROG_BIN_DIR, p + '_' + self.flavor)
+      if self.debug:
         bin_path = bin_path + "_dbg"
       src_path = os.path.join(PROG_SRC_DIR, p + '.c')
       bins[bin_path] = src_path
@@ -39,8 +40,8 @@ class BinBuilder:
     bins = {}
     for name in lib_names:
       lib_name = name
-      if self.lib_type is not None:
-        lib_name += "-" + self.lib_type
+      if self.flavor is not None:
+        lib_name += "-" + self.flavor
       lib_name += ".library"
       bin_path = os.path.join(LIB_BIN_DIR, lib_name)
       src_path = os.path.join(LIB_SRC_DIR, name + '.c')
@@ -85,7 +86,7 @@ class VamosTestRunner:
     self.use_debug_bins = use_debug_bins
     self.dump_output = dump_output
     self.generate_data = generate_data
-    self.bin_builder = BinBuilder()
+    self.bin_builder = BinBuilder(flavor, use_debug_bins)
 
   def _get_data_path(self, prog_name, kw_args):
     dat_path = ["data/" + prog_name]
@@ -110,8 +111,7 @@ class VamosTestRunner:
     """
 
     # ensure that prog exists
-    self.bin_builder.make_prog(prog_args[0], self.flavor,
-                               self.use_debug_bins)
+    self.bin_builder.make_prog(prog_args[0])
 
     # stdin given?
     if 'stdin' in kw_args:
