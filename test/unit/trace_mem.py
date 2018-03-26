@@ -41,13 +41,36 @@ def trace_mem_rw_test(caplog):
   assert tmem.read(2, 8) == 0xcafebabe
   lvl = logging.INFO
   assert caplog.record_tuples == [
-    ('mem_int', lvl, 'W(1): 000000: 2a                [??] '),
-    ('mem_int', lvl, 'R(1): 000000: 2a                [??] '),
-    ('mem_int', lvl, 'W(2): 000002: 1267              [??] '),
-    ('mem_int', lvl, 'R(2): 000002: 1267              [??] '),
-    ('mem_int', lvl, 'W(4): 000004: deadbeef          [??] '),
-    ('mem_int', lvl, 'R(4): 000004: deadbeef          [??] '),
-    ('mem_int', lvl, 'W(4): 000008: cafebabe          [??] '),
-    ('mem_int', lvl, 'R(4): 000008: cafebabe          [??] ')
+      ('mem_int', lvl, 'W(1): 000000: 2a                [??] '),
+      ('mem_int', lvl, 'R(1): 000000: 2a                [??] '),
+      ('mem_int', lvl, 'W(2): 000002: 1267              [??] '),
+      ('mem_int', lvl, 'R(2): 000002: 1267              [??] '),
+      ('mem_int', lvl, 'W(4): 000004: deadbeef          [??] '),
+      ('mem_int', lvl, 'R(4): 000004: deadbeef          [??] '),
+      ('mem_int', lvl, 'W(4): 000008: cafebabe          [??] '),
+      ('mem_int', lvl, 'R(4): 000008: cafebabe          [??] ')
   ]
 
+
+def trace_mem_rws_test(caplog):
+  caplog.set_level(logging.INFO)
+  tmem = setup_tmem()
+  tmem.w8s(0, -42)
+  assert tmem.r8s(0) == -42
+  tmem.w16s(2, -4711)
+  assert tmem.r16s(2) == -4711
+  tmem.w32s(4, -0x1eadbeef)
+  assert tmem.r32s(4) == -0x1eadbeef
+  tmem.writes(2, 8, -0x2afebabe)
+  assert tmem.reads(2, 8) == -0x2afebabe
+  lvl = logging.INFO
+  assert caplog.record_tuples == [
+      ('mem_int', lvl, 'W(1): 000000: -2a                [??] '),
+      ('mem_int', lvl, 'R(1): 000000: -2a                [??] '),
+      ('mem_int', lvl, 'W(2): 000002: -1267              [??] '),
+      ('mem_int', lvl, 'R(2): 000002: -1267              [??] '),
+      ('mem_int', lvl, 'W(4): 000004: -1eadbeef          [??] '),
+      ('mem_int', lvl, 'R(4): 000004: -1eadbeef          [??] '),
+      ('mem_int', lvl, 'W(4): 000008: -2afebabe          [??] '),
+      ('mem_int', lvl, 'R(4): 000008: -2afebabe          [??] ')
+  ]

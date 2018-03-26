@@ -35,6 +35,34 @@ class TraceMemory:
     self.mem.w8(addr, val)
     self.trace_mgr.trace_int_mem('W', 0, addr, val)
 
+  # signed memory access
+  def r32s(self, addr):
+    val = self.mem.r32s(addr)
+    self.trace_mgr.trace_int_mem('R', 2, addr, val)
+    return val
+
+  def r16s(self, addr):
+    val = self.mem.r16s(addr)
+    self.trace_mgr.trace_int_mem('R', 1, addr, val)
+    return val
+
+  def r8s(self, addr):
+    val = self.mem.r8s(addr)
+    self.trace_mgr.trace_int_mem('R', 0, addr, val)
+    return val
+
+  def w32s(self, addr, val):
+    self.mem.w32s(addr, val)
+    self.trace_mgr.trace_int_mem('W', 2, addr, val)
+
+  def w16s(self, addr, val):
+    self.mem.w16s(addr, val)
+    self.trace_mgr.trace_int_mem('W', 1, addr, val)
+
+  def w8s(self, addr, val):
+    self.mem.w8s(addr, val)
+    self.trace_mgr.trace_int_mem('W', 0, addr, val)
+
   # arbitrary width
   def read(self, width, addr):
     val = self.mem.read(width, addr)
@@ -43,6 +71,16 @@ class TraceMemory:
 
   def write(self, width, addr, val):
     self.mem.write(width, addr, val)
+    self.trace_mgr.trace_int_mem('W', width, addr, val)
+
+  # signed arbitrary width
+  def reads(self, width, addr):
+    val = self.mem.reads(width, addr)
+    self.trace_mgr.trace_int_mem('R', width, addr, val)
+    return val
+
+  def writes(self, width, addr, val):
+    self.mem.writes(width, addr, val)
     self.trace_mgr.trace_int_mem('W', width, addr, val)
 
   # block access
