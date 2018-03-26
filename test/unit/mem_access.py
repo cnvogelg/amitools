@@ -25,8 +25,10 @@ def mem_access_rw_field_node_test():
   a = AccessStruct(mem, NodeDef, 0x42)
   a.w_s('ln_Succ', 42)
   a.w_s('ln_Pred', 21)
+  a.w_s('ln_Pri', -27)
   assert a.r_s('ln_Succ') == 42
   assert a.r_s('ln_Pred') == 21
+  assert a.r_s('ln_Pri') == -27
 
 
 def mem_access_rw_sub_field_task_test():
@@ -45,3 +47,10 @@ def mem_access_invalid_node_test():
     a.w_s('bla', 12)
   with pytest.raises(ValueError):
     a.r_s('blub', 12)
+
+
+def mem_access_s_get_addr_test():
+  mem = MockMemory()
+  a = AccessStruct(mem, NodeDef, 0x42)
+  assert a.s_get_addr('ln_Succ') == 0x42
+  assert a.s_get_addr('ln_Pred') == 0x46

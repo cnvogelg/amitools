@@ -27,21 +27,22 @@ class AmigaStruct:
   _format = None
 
   # name all internal types
-  # and map to (byte width in 2**n, w_convert, r_convert)
+  # and map to (byte width in 2**n, (w_convert, r_convert), signed)
   _types = {
-      'UBYTE': (0, None),
-      'BYTE': (0, None),
-      'char': (0, None),
-      'UWORD': (1, None),
-      'WORD': (1, None),
-      'ULONG': (2, None),
-      'LONG': (2, None),
-      'APTR': (2, None),
-      'BPTR': (2, (w_bptr, r_bptr)),
-      'BSTR': (2, (w_bptr, r_bptr)),
-      'VOIDFUNC': (2, None),
-      'void': (2, None),
+      'UBYTE': (0, None, False),
+      'BYTE': (0, None, True),
+      'char': (0, None, False),
+      'UWORD': (1, None, False),
+      'WORD': (1, None, True),
+      'ULONG': (2, None, False),
+      'LONG': (2, None, True),
+      'APTR': (2, None, False),
+      'BPTR': (2, (w_bptr, r_bptr), False),
+      'BSTR': (2, (w_bptr, r_bptr), False),
+      'VOIDFUNC': (2, None, False),
+      'void': (2, None, False),
   }
+  _ptr_type = (2, None, False)
 
   _size_to_width = [
       None, 0, 1, None, 2
@@ -134,14 +135,26 @@ class AmigaStruct:
     if sub_type is not None:
       return sub_type.read_data(mem, addr)
     else:
-      width = self._size_to_width[size]
-      val = mem.read(width, addr)
       base_type = self._base_types[index]
       if base_type is not None:
-        conv = base_type[1]
-        if conv != None and do_conv:
-          val = conv[1](val)
-      return val
+        return self._read_base(mem, base_type, addr, do_conv)
+      else:
+        width = self._size_to_width[size]
+        return mem.read(width, addr)
+
+  def _read_base(self, mem, base_type, addr, do_conv=True):
+    width = base_type[0]
+    conv = base_type[1]
+    signed = base_type[2]
+    # read value
+    if signed:
+      val = mem.reads(width, addr)
+    else:
+      val = mem.read(width, addr)
+    # convert?
+    if conv != None and do_conv:
+      val = conv[1](val)
+    return val
 
   def write_field_index(self, mem, addr, index, val, do_conv=True):
     off = self._offsets[index]
@@ -151,28 +164,38 @@ class AmigaStruct:
     if sub_type is not None:
       sub_type.write_data(mem, addr, val)
     else:
-      width = self._size_to_width[size]
       base_type = self._base_types[index]
       if base_type is not None:
-        conv = base_type[1]
-        if conv != None and do_conv:
-          val = conv[0](val)
+        self._write_base(mem, base_type, addr, val)
+      else:
+        width = self._size_to_width[size]
+        mem.write(width, addr, val)
+
+  def _write_base(self, mem, base_type, addr, val, do_conv=True):
+    width = base_type[0]
+    conv = base_type[1]
+    signed = base_type[2]
+    # convert?
+    if conv != None and do_conv:
+      val = conv[0](val)
+    # write value
+    if signed:
+      mem.writes(width, addr, val)
+    else:
       mem.write(width, addr, val)
 
   def read_field(self, mem, addr, name, do_conv=True):
-    off, width, conv = self.get_offset_for_name(name)
+    off, base_type = self.get_offset_for_name(name)
     addr += off
-    val = mem.read(width, addr)
-    if conv != None and do_conv:
-      val = conv[1](val)
+    val = self._read_base(mem, base_type, addr, do_conv)
+    width = base_type[0]
     return val, off, width
 
   def write_field(self, mem, addr, name, val, do_conv=True):
-    off, width, conv = self.get_offset_for_name(name)
-    if conv != None and do_conv:
-      val = conv[0](val)
+    off, base_type = self.get_offset_for_name(name)
     addr += off
-    mem.write(width, addr, val)
+    self._write_base(mem, base_type, addr, val, do_conv)
+    width = base_type[0]
     return off, width
 
   def dump(self, indent=0, num=0, base=0, name=""):
@@ -240,7 +263,7 @@ class AmigaStruct:
     if len(parts) == 1:
       # a pointer type -> return pointer itself
       if pointer:
-        return (type_offset, 2, None)
+        return (type_offset, self._ptr_type)
       # a embedded sub type -> get first elemen of sub type
       elif sub_type != None:
         first_name = sub_type._format[0][1]
@@ -249,7 +272,7 @@ class AmigaStruct:
       else:
         base_type = self._gen_pure_name(format[0])
         base_format = self._types[base_type]
-        return (type_offset, base_format[0], base_format[1])
+        return (type_offset, base_format)
     # more names:
     else:
       if sub_type != None:

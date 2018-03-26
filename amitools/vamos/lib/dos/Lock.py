@@ -64,7 +64,7 @@ class Lock:
     if os.path.isdir(sys_path):
       dirEntryType = 2
     else:
-      dirEntryType = (-3) & 0xffffffff
+      dirEntryType = -3
     fib_mem.w_s('fib_DirEntryType', dirEntryType )
     fib_mem.w_s('fib_EntryType',    dirEntryType )
     # protection

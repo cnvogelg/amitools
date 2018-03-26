@@ -27,7 +27,7 @@ class AccessStruct(object):
     return val
 
   def s_get_addr(self, name):
-    off, width, conv = self.struct_def.get_offset_for_name(name)
+    off, base_type = self.struct_def.get_offset_for_name(name)
     return self.struct_addr + off
 
   def r_all(self):
