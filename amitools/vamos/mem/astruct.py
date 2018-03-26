@@ -1,16 +1,24 @@
+import collections
+
+
 struct_pool = {}
+
 
 class InvalidAmigaTypeException(Exception):
   def __init__(self, type_name):
     self.type_name = type_name
+
   def __str__(self):
     return self.type_name
+
 
 def w_bptr(addr):
   return addr >> 2
 
+
 def r_bptr(addr):
   return addr << 2
+
 
 class AmigaStruct:
 
@@ -21,19 +29,23 @@ class AmigaStruct:
   # name all internal types
   # and map to (byte width in 2**n, w_convert, r_convert)
   _types = {
-    'UBYTE' : (0,None),
-    'BYTE' : (0,None),
-    'char' : (0,None),
-    'UWORD' : (1,None),
-    'WORD' : (1,None),
-    'ULONG' : (2,None),
-    'LONG' : (2,None),
-    'APTR' : (2,None),
-    'BPTR' : (2,(w_bptr,r_bptr)),
-    'BSTR' : (2,(w_bptr,r_bptr)),
-    'VOIDFUNC' : (2,None),
-    'void' : (2,None),
+      'UBYTE': (0, None),
+      'BYTE': (0, None),
+      'char': (0, None),
+      'UWORD': (1, None),
+      'WORD': (1, None),
+      'ULONG': (2, None),
+      'LONG': (2, None),
+      'APTR': (2, None),
+      'BPTR': (2, (w_bptr, r_bptr)),
+      'BSTR': (2, (w_bptr, r_bptr)),
+      'VOIDFUNC': (2, None),
+      'void': (2, None),
   }
+
+  _size_to_width = [
+      None, 0, 1, None, 2
+  ]
 
   def __init__(self):
     struct_pool[self._name] = self
@@ -43,6 +55,7 @@ class AmigaStruct:
     offsets = []
     sizes = []
     sub_types = []
+    base_types = []
     pointers = []
     off = 0
     lookup = {}
@@ -64,6 +77,7 @@ class AmigaStruct:
       # is pointer?
       pointers.append(self._is_pointer(type_name))
       sub_types.append(self.get_sub_type(type_name))
+      base_types.append(self.get_base_type(type_name))
 
       # store name -> index mapping
       lookup[e[1]] = num
@@ -74,16 +88,92 @@ class AmigaStruct:
     self._total_size = off
     self._lookup = lookup
     self._sub_types = sub_types
+    self._base_types = base_types
     self._pointers = pointers
+    self._nt_class = None
 
   def __str__(self):
-    return "[Struct: %s size=%d]" % (self._name,self._total_size)
+    return "[Struct: %s size=%d]" % (self._name, self._total_size)
 
   def get_size(self):
     return self._total_size
 
   def get_type_name(self):
     return self._name
+
+  def get_all_field_names(self):
+    return map(lambda x: x[1], self._format)
+
+  def get_data_class(self):
+    if self._nt_class is None:
+      name = self._name + "Data"
+      fields = self.get_all_field_names()
+      self._nt_class = collections.namedtuple(name, fields)
+    return self._nt_class
+
+  def read_data(self, mem, addr):
+    cls = self.get_data_class()
+    vals = []
+    num = len(self._format)
+    for idx in xrange(num):
+      val = self.read_field_index(mem, addr, idx)
+      vals.append(val)
+    return cls(*vals)
+
+  def write_data(self, mem, addr, data):
+    num = len(self._format)
+    for idx in xrange(num):
+      val = data[idx]
+      self.write_field_index(mem, addr, idx, val)
+
+  def read_field_index(self, mem, addr, index, do_conv=True):
+    off = self._offsets[index]
+    addr += off
+    size = self._sizes[index]
+    sub_type = self._sub_types[index]
+    if sub_type is not None:
+      return sub_type.read_data(mem, addr)
+    else:
+      width = self._size_to_width[size]
+      val = mem.read(width, addr)
+      base_type = self._base_types[index]
+      if base_type is not None:
+        conv = base_type[1]
+        if conv != None and do_conv:
+          val = conv[1](val)
+      return val
+
+  def write_field_index(self, mem, addr, index, val, do_conv=True):
+    off = self._offsets[index]
+    addr += off
+    size = self._sizes[index]
+    sub_type = self._sub_types[index]
+    if sub_type is not None:
+      sub_type.write_data(mem, addr, val)
+    else:
+      width = self._size_to_width[size]
+      base_type = self._base_types[index]
+      if base_type is not None:
+        conv = base_type[1]
+        if conv != None and do_conv:
+          val = conv[0](val)
+      mem.write(width, addr, val)
+
+  def read_field(self, mem, addr, name, do_conv=True):
+    off, width, conv = self.get_offset_for_name(name)
+    addr += off
+    val = mem.read(width, addr)
+    if conv != None and do_conv:
+      val = conv[1](val)
+    return val, off, width
+
+  def write_field(self, mem, addr, name, val, do_conv=True):
+    off, width, conv = self.get_offset_for_name(name)
+    if conv != None and do_conv:
+      val = conv[0](val)
+    addr += off
+    mem.write(width, addr, val)
+    return off, width
 
   def dump(self, indent=0, num=0, base=0, name=""):
     istr = "  " * indent
@@ -96,12 +186,14 @@ class AmigaStruct:
       if sub_type != None:
         num = sub_type.dump(indent=indent+1, num=num, base=off, name=f[1])
       else:
-        print "%04d @%04d/%04x +%04d %s   %-10s %-20s  (ptr=%s, sub=%s)" % (num, off, off, size, istr, f[0], f[1], self._pointers[i], sub_type!=None)
+        print "%04d @%04d/%04x +%04d %s   %-10s %-20s  (ptr=%s, sub=%s)" % \
+            (num, off, off, size, istr, f[0], f[1],
+             self._pointers[i], sub_type != None)
         num += 1
       i += 1
     total = self._total_size
     off = total + base
-    print "     @%04d =%04d %s } %s" % (off,total,istr,name)
+    print "     @%04d =%04d %s } %s" % (off, total, istr, name)
     return num
 
   # return (name, delta, type_name)
@@ -117,7 +209,7 @@ class AmigaStruct:
     name = prefix + format[1]
     # a pointer type
     if pointer:
-      return (name,delta,format[0])
+      return (name, delta, format[0])
     # a embedded sub type
     elif sub_type != None:
       return sub_type.get_name_for_offset(delta, width, prefix=name+".")
@@ -125,7 +217,7 @@ class AmigaStruct:
     else:
       base_type = format[0]
       type_width = self._types[base_type][0]
-      return (name,delta,base_type)
+      return (name, delta, base_type)
 
   # return (off, width, convert_func_pair)
   def get_offset_for_name(self, name):
@@ -135,7 +227,8 @@ class AmigaStruct:
   def _get_offset_loop(self, parts, base=0):
     name = parts[0]
     if not self._lookup.has_key(name):
-      raise ValueError("Invalid Type key %s: %s %s" %  (self,name,self._lookup))
+      raise ValueError("Invalid Type key %s: %s %s" %
+                       (self, name, self._lookup))
     num = self._lookup[name]
 
     type_offset = base + self._offsets[num]
@@ -162,7 +255,8 @@ class AmigaStruct:
       if sub_type != None:
         return sub_type._get_offset_loop(parts[1:], base=type_offset)
       else:
-        raise ValueError("Type key is no sub type: %s: %s" % (self._name,name))
+        raise ValueError("Type key is no sub type: %s: %s" %
+                         (self._name, name))
 
   def get_index_for_offset(self, offset):
     if offset < 0:
@@ -184,6 +278,15 @@ class AmigaStruct:
     type_name = self._gen_pure_name(full_type_name)
     if struct_pool.has_key(type_name):
       return struct_pool[type_name]
+    else:
+      return None
+
+  def get_base_type(self, full_type_name):
+    if self._is_pointer(full_type_name):
+      return None
+    type_name = self._gen_pure_name(full_type_name)
+    if self._types.has_key(type_name):
+      return self._types[type_name]
     else:
       return None
 
@@ -226,5 +329,5 @@ class AmigaStruct:
     type_name = comp[0].split('*')[0]
     return type_name
 
-  def _is_pointer(self,name):
+  def _is_pointer(self, name):
     return name.find('*') != -1
