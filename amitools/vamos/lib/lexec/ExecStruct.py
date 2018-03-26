@@ -290,3 +290,20 @@ class MemHeader(AmigaStruct):
     ('ULONG', 'mh_Free')
   ]
 MemHeaderDef = MemHeader()
+
+# Resident
+class Resident(AmigaStruct):
+  _name = "Resident"
+  _format = [
+    ('UWORD', 'rt_MatchWord'),
+    ('APTR', 'rt_MatchTag'),
+    ('APTR', 'rt_EndSkip'),
+    ('UBYTE', 'rt_Flags'),
+    ('UBYTE', 'rt_Version'),
+    ('UBYTE', 'rt_Type'),
+    ('BYTE', 'rt_Pri'),
+    ('char*', 'rt_Name'),
+    ('char*', 'rt_IdString'),
+    ('APTR', 'rt_Init')
+  ]
+ResidentDef = Resident()

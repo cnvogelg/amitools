@@ -8,6 +8,21 @@ class Segment:
     self.label = label
     self.bin_img_seg = bin_img_seg
 
+  def get_name(self):
+    return self.name
+
+  def get_addr(self):
+    return self.addr
+
+  def get_start(self):
+    return self.start
+
+  def get_size(self):
+    return self.size
+
+  def get_end(self):
+    return self.end
+
   def __str__(self):
     return "[Seg:'%s':%06x-%06x]" % (self.name, self.addr, self.end)
 
@@ -28,6 +43,12 @@ class SegList:
       self.prog_start = segment.addr + 8  # begin of first code segment
     self.segments.append(segment)
     self.size += segment.size
+
+  def get_segment(self, num_seg):
+    return self.segments[num_seg]
+
+  def get_total_size(self):
+    return self.size
 
   def __str__(self):
     return "[SegList:ami='%s':sys='%s':b_addr=%06x," \

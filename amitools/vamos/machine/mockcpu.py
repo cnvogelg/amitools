@@ -1,7 +1,10 @@
+import ctypes
 from amitools.vamos.CPU import *
+
 
 class MockCPU(object):
   """fake a real CPU API by providing at least the registers"""
+
   def __init__(self):
     self.d_regs = [0] * 16
     self.a_regs = [0] * 16
@@ -9,10 +12,16 @@ class MockCPU(object):
     self.sr = 0
 
   def _check_val(self, val, max_val=0xffffffff):
-    if type(val) is not int:
-      raise ValueError("value is not an int!: %s" % val)
+    if type(val) not in (int, long):
+      raise TypeError("value is not an int!: %s" % val)
     if val < 0 or val > max_val:
-      raise ValueError("value is out of range: %s" % val)
+      raise OverflowError("value is out of range: %s" % val)
+
+  def _check_sval(self, val, min_val=-0x80000000, max_val=0x7fffffff):
+    if type(val) not in (int, long):
+      raise TypeError("value is not an int!: %s" % val)
+    if val < min_val or val > max_val:
+      raise OverflowError("value is out of range: %s" % val)
 
   def w_reg(self, reg, val):
     self._check_val(val)
@@ -25,7 +34,7 @@ class MockCPU(object):
     else:
       raise ValueError("invalid reg: %d" % reg)
 
-  def r_reg(self,reg):
+  def r_reg(self, reg):
     if reg <= REG_D7:
       return self.d_regs[reg]
     elif reg <= REG_A7:
@@ -34,6 +43,29 @@ class MockCPU(object):
       return self.pc
     else:
       raise ValueError("invalid reg: %d" % reg)
+
+  def ws_reg(self, reg, val):
+    self._check_sval(val)
+    val = ctypes.c_uint(val).value
+    if reg <= REG_D7:
+      self.d_regs[reg] = val
+    elif reg <= REG_A7:
+      self.a_regs[reg - REG_A0] = val
+    elif reg == REG_PC:
+      self.pc = val
+    else:
+      raise ValueError("invalid reg: %d" % reg)
+
+  def rs_reg(self, reg):
+    if reg <= REG_D7:
+      val = self.d_regs[reg]
+    elif reg <= REG_A7:
+      val = self.a_regs[reg - REG_A0]
+    elif reg == REG_PC:
+      val = self.pc
+    else:
+      raise ValueError("invalid reg: %d" % reg)
+    return ctypes.c_int(val).value
 
   def w_pc(self, val):
     self._check_val(val)

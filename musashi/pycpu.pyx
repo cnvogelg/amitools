@@ -53,17 +53,23 @@ cdef class CPU:
     m68k_init()
     self.cpu_type = cpu_type
 
-  cdef long long r_reg_internal(self,int reg):
-      return m68k_get_reg(NULL, <m68k_register_t>reg)
+  cdef unsigned int r_reg_internal(self, m68k_register_t reg):
+    return m68k_get_reg(NULL, reg)
 
-  cdef void w_reg_internal(self,int reg,long long v):
-      m68k_set_reg(<m68k_register_t>reg,<unsigned int>(v & 0xffffffff))
-                   
+  cdef void w_reg_internal(self, m68k_register_t reg, unsigned int v):
+    m68k_set_reg(reg, v)
+
   def w_reg(self, reg, val):
     self.w_reg_internal(reg,val)
-  
+
   def r_reg(self,reg):
     return self.r_reg_internal(reg)
+
+  def ws_reg(self, m68k_register_t reg, int val):
+    m68k_set_reg(reg, <unsigned int>(val))
+
+  def rs_reg(self, m68k_register_t reg):
+    return <int>m68k_get_reg(NULL, reg)
 
   def w_pc(self, val):
     self.w_reg_internal(M68K_REG_PC,val)
