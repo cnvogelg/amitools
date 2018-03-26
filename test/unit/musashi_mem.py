@@ -1,10 +1,9 @@
 import pytest
-import struct
-from amitools.vamos.machine import MockMemory
+from musashi import emu
 
 
-def machine_mem_rw_test():
-  mem = MockMemory()
+def musashi_mem_rw_test():
+  mem = emu.Memory(16)
 
   mem.w8(0x100, 42)
   assert mem.r8(0x100) == 42
@@ -25,28 +24,28 @@ def machine_mem_rw_test():
   assert mem.read(2, 0x304) == 0x11223344
 
   # invalid values
-  with pytest.raises(ValueError):
+  with pytest.raises(OverflowError):
     mem.w8(0x100, 0x100)
-  with pytest.raises(ValueError):
+  with pytest.raises(OverflowError):
     mem.w8(0x100, -1)
   # invalid values
-  with pytest.raises(struct.error):
+  with pytest.raises(OverflowError):
     mem.w16(0x100, 0x10000)
-  with pytest.raises(struct.error):
+  with pytest.raises(OverflowError):
     mem.w16(0x100, -2)
   # invalid values
-  with pytest.raises(struct.error):
+  with pytest.raises(OverflowError):
     mem.w32(0x100, 0x100000000)
-  with pytest.raises(struct.error):
+  with pytest.raises(OverflowError):
     mem.w32(0x100, -3)
   # invalid type
-  with pytest.raises(ValueError):
+  with pytest.raises(TypeError):
     mem.w8(0x100, 'hello')
   # invalid type
-  with pytest.raises(struct.error):
+  with pytest.raises(TypeError):
     mem.w16(0x100, 'hello')
   # invalid type
-  with pytest.raises(struct.error):
+  with pytest.raises(TypeError):
     mem.w32(0x100, 'hello')
   # invalid width
   with pytest.raises(ValueError):
@@ -55,8 +54,8 @@ def machine_mem_rw_test():
     mem.read(7, 0x202)
 
 
-def machine_mem_rws_test():
-  mem = MockMemory()
+def musashi_mem_rws_test():
+  mem = emu.Memory(16)
 
   mem.w8s(0x100, 42)
   assert mem.r8s(0x100) == 42
@@ -81,28 +80,28 @@ def machine_mem_rws_test():
   assert mem.reads(2, 0x304) == -0x11223344
 
   # invalid values
-  with pytest.raises(struct.error):
+  with pytest.raises(OverflowError):
     mem.w8s(0x100, 0x80)
-  with pytest.raises(struct.error):
+  with pytest.raises(OverflowError):
     mem.w8s(0x100, -0x81)
   # invalid values
-  with pytest.raises(struct.error):
+  with pytest.raises(OverflowError):
     mem.w16s(0x100, 0x8000)
-  with pytest.raises(struct.error):
+  with pytest.raises(OverflowError):
     mem.w16s(0x100, -0x8001)
   # invalid values
-  with pytest.raises(struct.error):
+  with pytest.raises(OverflowError):
     mem.w32s(0x100, 0x80000000)
-  with pytest.raises(struct.error):
+  with pytest.raises(OverflowError):
     mem.w32s(0x100, -0x80000001)
   # invalid type
-  with pytest.raises(struct.error):
+  with pytest.raises(TypeError):
     mem.w8s(0x100, 'hello')
   # invalid type
-  with pytest.raises(struct.error):
+  with pytest.raises(TypeError):
     mem.w16s(0x100, 'hello')
   # invalid type
-  with pytest.raises(struct.error):
+  with pytest.raises(TypeError):
     mem.w32s(0x100, 'hello')
   # invalid width
   with pytest.raises(ValueError):
@@ -111,8 +110,8 @@ def machine_mem_rws_test():
     mem.reads(7, 0x202)
 
 
-def machine_mem_block_test():
-  mem = MockMemory()
+def musashi_mem_block_test():
+  mem = emu.Memory(16)
   data = "hello, world!"
   mem.w_block(0, data)
   assert mem.r_block(0, len(data)) == data
@@ -125,8 +124,8 @@ def machine_mem_block_test():
   assert mem.r_block(0x300, 21) == chr(42) * 20 + chr(0)
 
 
-def machine_mem_cstr_test():
-  mem = MockMemory()
+def musashi_mem_cstr_test():
+  mem = emu.Memory(16)
   data = "hello, world"
   mem.w_cstr(0, data)
   assert mem.r_cstr(0) == data
@@ -135,8 +134,8 @@ def machine_mem_cstr_test():
   assert mem.r_cstr(100) == empty
 
 
-def machine_mem_bstr_test():
-  mem = MockMemory()
+def musashi_mem_bstr_test():
+  mem = emu.Memory(16)
   data = "hello, world"
   mem.w_bstr(0, data)
   assert mem.r_bstr(0) == data

@@ -1,7 +1,9 @@
 import struct
 
+
 class MockMemory(object):
   """fake the machine's memory API and work on a large bytearray"""
+
   def __init__(self, size_kib=16, fill=0):
     self.size_kib = size_kib
     self.size_bytes = size_kib * 1024
@@ -28,10 +30,12 @@ class MockMemory(object):
   def set_special_range_write_func(self, page_addr, width, func):
     raise NotImplementedError()
 
-  def set_special_range_read_funcs(self, addr, num_pages=1, r8=None, r16=None, r32=None):
+  def set_special_range_read_funcs(self, addr, num_pages=1,
+                                   r8=None, r16=None, r32=None):
     raise NotImplementedError()
 
-  def set_special_range_write_funcs(self, addr, num_pages=1, w8=None, w16=None, w32=None):
+  def set_special_range_write_funcs(self, addr, num_pages=1,
+                                    w8=None, w16=None, w32=None):
     raise NotImplementedError()
 
   def set_trace_mode(self, on):
@@ -40,7 +44,7 @@ class MockMemory(object):
   def set_trace_func(self, func):
     raise NotImplementedError()
 
-  def set_invalid_func(self,func):
+  def set_invalid_func(self, func):
     raise NotImplementedError()
 
   # memory access (full range including special)
@@ -62,6 +66,25 @@ class MockMemory(object):
   def w32(self, addr, value):
     struct.pack_into(">I", self.data, addr, value)
 
+  # signed memory access (full range including special)
+  def r8s(self, addr):
+    return struct.unpack_from(">b", self.data, addr)[0]
+
+  def r16s(self, addr):
+    return struct.unpack_from(">h", self.data, addr)[0]
+
+  def r32s(self, addr):
+    return struct.unpack_from(">i", self.data, addr)[0]
+
+  def w8s(self, addr, value):
+    struct.pack_into(">b", self.data, addr, value)
+
+  def w16s(self, addr, value):
+    struct.pack_into(">h", self.data, addr, value)
+
+  def w32s(self, addr, value):
+    struct.pack_into(">i", self.data, addr, value)
+
   # arbitrary width (full range including special)
   def read(self, width, addr):
     if width == 0:
@@ -80,6 +103,27 @@ class MockMemory(object):
       self.w16(addr, value)
     elif width == 2:
       self.w32(addr, value)
+    else:
+      raise ValueError("invalid width: %s" % width)
+
+  # signed arbitrary width (full range including special)
+  def reads(self, width, addr):
+    if width == 0:
+      return self.r8s(addr)
+    elif width == 1:
+      return self.r16s(addr)
+    elif width == 2:
+      return self.r32s(addr)
+    else:
+      raise ValueError("invalid width: %s" % width)
+
+  def writes(self, width, addr, value):
+    if width == 0:
+      self.w8s(addr, value)
+    elif width == 1:
+      self.w16s(addr, value)
+    elif width == 2:
+      self.w32s(addr, value)
     else:
       raise ValueError("invalid width: %s" % width)
 
@@ -145,4 +189,3 @@ class MockMemory(object):
     self.data[addr] = chr(size)
     addr += 1
     self.data[addr:addr+size] = string
-

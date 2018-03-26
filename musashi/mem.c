@@ -170,7 +170,7 @@ void print_cpu_state(m68ki_cpu_core *cpu)
   int i;
   volatile int *p = 0;
   unsigned int a7 = cpu->dar[8 + 7];
-  
+
   fprintf(stderr,"CPU crashed - detailed information:\n");
   fprintf(stderr,"PC          : 0x%08x\n",cpu->pc);
   fprintf(stderr,"Previous PC : 0x%08x\n",cpu->ppc);
@@ -195,11 +195,11 @@ void print_cpu_state(m68ki_cpu_core *cpu)
       fprintf(stderr,"\n");
   }
   fprintf(stderr,"\n");
-#if 0  
+#if 0
   *p++;
 #endif
 }
-			    
+
 void crash_me(void)
 {
   print_cpu_state(&m68ki_cpu);
@@ -327,7 +327,7 @@ void m68k_write_memory_32(unsigned int address, unsigned int value)
 unsigned int m68k_read_disassembler_16 (unsigned int address)
 {
   uint page = address >> 16;
-  
+
   if (page < NUM_PAGES) {
     uint val = r_func[page][1](address, r_ctx[page][1]);
     return val;
@@ -352,8 +352,8 @@ unsigned int m68k_read_disassembler_32 (unsigned int address)
 int mem_init(uint ram_size_kib)
 {
   int i;
-  ram_size = ram_size_kib * 1024;
-  ram_pages = ram_size_kib / 64;
+  ram_pages = (ram_size_kib + 63) / 64;
+  ram_size = ram_pages * 64 * 1024;
   ram_data = (uint8_t *)malloc(ram_size);
 
   for(i=0;i<NUM_PAGES;i++) {
