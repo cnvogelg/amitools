@@ -37,3 +37,6 @@ class AccessStruct(object):
   def w_all(self, nt):
     """set values stored in a named tuple"""
     self.struct_def.write_data(self.mem, self.struct_addr, nt)
+
+  def get_size(self):
+    return self.struct_def.get_size()
