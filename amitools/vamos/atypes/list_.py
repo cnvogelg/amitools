@@ -43,7 +43,7 @@ class List(object):
       return "[List:@%06x,h=%06x,t=%06x,tp=%06x,%s]" % \
           (self.head_addr, self.get_head(),
            self.get_tail(), self.get_tail_pred(),
-           NodeType.to_str(self.get_type()))
+           self.get_type())
 
   def __eq__(self, other):
     return self.mem == other.mem and self.head_addr == other.head_addr
@@ -67,10 +67,10 @@ class List(object):
     return self.access.r_s('lh_TailPred')
 
   def set_type(self, lt):
-    self.access.w_s('lh_Type', lt)
+    self.access.w_s('lh_Type', int(lt))
 
   def get_type(self):
-    return self.access.r_s('lh_Type')
+    return NodeType(self.access.r_s('lh_Type'))
 
   # ----- list ops -----
 
