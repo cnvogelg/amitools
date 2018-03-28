@@ -7,6 +7,7 @@ def atype_enum_test():
   class MyEnum:
     a = 3
     b = 4
+    c = 0xffffffff
   # to_str
   assert MyEnum.to_str(3) == "a"
   with pytest.raises(ValueError):
@@ -16,3 +17,14 @@ def atype_enum_test():
   assert MyEnum.from_str("a") == 3
   with pytest.raises(ValueError):
     MyEnum.from_str("bla")
+  # instance
+  a = MyEnum('a')
+  assert a.get_value() == 3
+  assert str(a) == 'a'
+  assert int(a) == 3
+  assert a == MyEnum(3)
+  c = MyEnum('c')
+  assert c.get_value() == 0xffffffff
+  assert str(c) == 'c'
+  assert int(c) == 0xffffffff
+  assert long(c) == 0xffffffff

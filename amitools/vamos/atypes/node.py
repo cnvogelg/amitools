@@ -48,8 +48,7 @@ class Node(object):
     else:
       return "[Node:@%06x,p=%06x,s=%06x,%s,%d,'%s']" % \
           (self.addr, self.get_pred(), self.get_succ(),
-           NodeType.to_str(self.get_type()),
-           self.get_pri(), self.get_name())
+           self.get_type(), self.get_pri(), self.get_name())
 
   def __eq__(self, other):
     return self.mem == other.mem and self.addr == other.addr
@@ -70,7 +69,7 @@ class Node(object):
     return Node(self.mem, self.get_pred())
 
   def get_type(self):
-    return self.access.r_s('ln_Type')
+    return NodeType(self.access.r_s('ln_Type'))
 
   def get_pri(self):
     if self.min_node:
@@ -95,7 +94,7 @@ class Node(object):
     self.access.w_s('ln_Pred', addr)
 
   def set_type(self, nt):
-    self.access.w_s('ln_Type', nt)
+    self.access.w_s('ln_Type', int(nt))
 
   def set_pri(self, pri):
     if self.min_node:

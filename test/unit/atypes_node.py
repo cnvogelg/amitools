@@ -29,7 +29,8 @@ def atypes_node_base_test():
   # check node
   assert node.get_succ() == 1234
   assert node.get_pred() == 5678
-  assert node.get_type() == NodeType.NT_LIBRARY
+  assert int(node.get_type()) == NodeType.NT_LIBRARY
+  assert node.get_type() == NodeType(NodeType.NT_LIBRARY)
   assert node.get_pri() == -3
   assert node.get_name_addr() == 0
   assert node.get_name() == text
@@ -44,10 +45,11 @@ def atypes_node_setup_test():
   # check node
   assert node.get_succ() == 1234
   assert node.get_pred() == 5678
-  assert node.get_type() == NodeType.NT_DEVICE
+  assert int(node.get_type()) == NodeType.NT_DEVICE
   assert node.get_pri() == -5
   assert node.get_name_addr() == 12
   assert node.get_name() == text
+  node.set_type(NodeType(NodeType.NT_DEVICE))
 
 
 def atypes_node_min_setup_test():
