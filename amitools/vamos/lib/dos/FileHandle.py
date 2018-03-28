@@ -1,6 +1,6 @@
 import os
 import sys
-from DosStruct import FileHandleDef
+from amitools.vamos.astructs import FileHandleDef
 
 class FileHandle:
   """represent an AmigaOS file handle (FH) in vamos"""

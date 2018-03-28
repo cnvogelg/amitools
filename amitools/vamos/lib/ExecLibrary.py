@@ -1,6 +1,6 @@
 from amitools.vamos.CPU import *
 from amitools.vamos.libcore import LibImpl
-from lexec.ExecStruct import *
+from amitools.vamos.astructs import *
 from amitools.vamos.Log import log_exec
 from amitools.vamos.Exceptions import *
 from amitools.vamos.mem import AccessStruct

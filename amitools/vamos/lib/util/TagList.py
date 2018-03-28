@@ -1,4 +1,4 @@
-from UtilStruct import *
+from amitools.vamos.astructs import TagItemDef
 from amitools.vamos.mem import AccessStruct
 
 TAG_DONE = 0

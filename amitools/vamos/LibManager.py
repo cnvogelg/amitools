@@ -3,7 +3,7 @@ from AmigaResident import AmigaResident
 from AmigaLibrary import AmigaLibrary
 from Trampoline import Trampoline
 from CPU import *
-from lib.lexec.ExecStruct import LibraryDef
+from .astructs import LibraryDef
 from Exceptions import *
 from Log import log_libmgr, log_lib
 import amitools.fd.FDFormat as FDFormat

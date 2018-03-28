@@ -5,8 +5,7 @@ import os
 
 from amitools.vamos.CPU import *
 from amitools.vamos.libcore import LibImpl
-from dos.DosStruct import *
-from lexec.ExecStruct import ListDef, MinListDef, NodeDef
+from amitools.vamos.astructs import *
 from amitools.vamos.Exceptions import *
 from amitools.vamos.Log import log_dos
 from amitools.vamos.mem import AccessStruct

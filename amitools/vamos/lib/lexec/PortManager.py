@@ -1,4 +1,4 @@
-from ExecStruct import MsgPortDef
+from amitools.vamos.astructs import MsgPortDef
 from amitools.vamos.Exceptions import *
 
 class Port:

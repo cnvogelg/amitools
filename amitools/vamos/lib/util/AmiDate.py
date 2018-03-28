@@ -1,6 +1,6 @@
 import datetime
 
-from UtilStruct import ClockDataDef
+from amitools.vamos.astructs import ClockDataDef
 from amitools.vamos.mem import AccessStruct
 
 

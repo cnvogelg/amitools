@@ -8,7 +8,7 @@ import sys, traceback
 
 from .label import LabelLib
 from .mem import AccessStruct
-from lib.lexec.ExecStruct import LibraryDef
+from .astructs import LibraryDef
 
 class AmigaLibrary:
 

@@ -1,4 +1,4 @@
-from DosStruct import CSourceDef
+from amitools.vamos.astructs import CSourceDef
 
 class CSource:
   """Simulate the AmigaDOS csource interface"""

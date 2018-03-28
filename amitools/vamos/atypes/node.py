@@ -1,4 +1,4 @@
-from amitools.vamos.lib.lexec.ExecStruct import NodeDef
+from amitools.vamos.astructs import NodeDef
 from amitools.vamos.mem import AccessStruct
 from .nodetype import NodeType
 

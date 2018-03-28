@@ -1,4 +1,4 @@
-from DosStruct import *
+from amitools.vamos.astructs import AnchorPathDef, AChainDef, FileInfoBlockDef
 from PathMatch import PathMatch
 from amitools.vamos.label import LabelStruct
 from amitools.vamos.mem import AccessStruct

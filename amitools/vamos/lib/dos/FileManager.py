@@ -7,8 +7,7 @@ import stat
 
 from amitools.vamos.Log import log_file
 from amitools.vamos.mem import AccessStruct
-from DosStruct import DosPacketDef
-from amitools.vamos.lib.lexec.ExecStruct import MessageDef
+from amitools.vamos.astructs import MessageDef, DosPacketDef
 from Error import *
 from DosProtection import DosProtection
 from FileHandle import FileHandle

@@ -5,7 +5,7 @@ from amitools.vamos.Log import log_lock
 from amitools.vamos.label import LabelRange
 from amitools.vamos.Exceptions import *
 from amitools.vamos.mem import AccessStruct
-from DosStruct import *
+from amitools.vamos.astructs import DosListVolumeDef
 from Error import *
 from Lock import Lock
 

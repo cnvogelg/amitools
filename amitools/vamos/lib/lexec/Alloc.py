@@ -2,7 +2,7 @@
 
 from amitools.vamos.Log import log_exec
 from amitools.vamos.mem import AccessStruct
-from ExecStruct import MemHeaderDef, MemChunkDef
+from amitools.vamos.astructs import MemHeaderDef, MemChunkDef
 
 class MemChunk:
   def __init__(self, mc_next=None, mc_bytes=None, addr=None):
