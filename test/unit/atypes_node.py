@@ -18,21 +18,21 @@ def atypes_node_type_from_str_test():
 def atypes_node_base_test():
   mem = MockMemory()
   text = 'hello, world!'
-  mem.w_cstr(0, text)
+  mem.w_cstr(12, text)
   node = Node(mem, 0x42)
   # set node
   node.set_succ(1234)
   node.set_pred(5678)
   node.set_type(NodeType.NT_LIBRARY)
   node.set_pri(-3)
-  node.set_name_addr(0)
+  node.set_name_addr(12)
   # check node
   assert node.get_succ() == 1234
   assert node.get_pred() == 5678
   assert int(node.get_type()) == NodeType.NT_LIBRARY
   assert node.get_type() == NodeType(NodeType.NT_LIBRARY)
   assert node.get_pri() == -3
-  assert node.get_name_addr() == 0
+  assert node.get_name_addr() == 12
   assert node.get_name() == text
 
 

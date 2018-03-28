@@ -1,5 +1,6 @@
 from amitools.vamos.astructs import NodeDef
 from amitools.vamos.mem import AccessStruct
+from .atype import AmigaType
 from .enum import EnumType
 
 
@@ -31,14 +32,12 @@ class NodeType(object):
   NT_EXTENDED = 255
 
 
+@AmigaType(NodeDef, wrap={'type': (NodeType, long)})
 class Node(object):
   """wrap an Exec Node in memory an allow to operate on its values.
      also suppors MinNode by simply not using any ops on type, pri, and name"""
 
-  def __init__(self, mem, addr, min_node=False):
-    self.mem = mem
-    self.addr = addr
-    self.access = AccessStruct(mem, NodeDef, addr)
+  def __init__(self, min_node=False):
     self.min_node = min_node
 
   def __str__(self):
@@ -53,75 +52,22 @@ class Node(object):
   def __eq__(self, other):
     return self.mem == other.mem and self.addr == other.addr
 
-  def get_size(self):
-    return self.access.get_size()
-
-  def get_succ(self):
-    return self.access.r_s('ln_Succ')
-
-  def get_pred(self):
-    return self.access.r_s('ln_Pred')
-
   def get_succ_node(self):
     return Node(self.mem, self.get_succ())
 
   def get_pred_node(self):
     return Node(self.mem, self.get_pred())
 
-  def get_type(self):
-    return NodeType(self.access.r_s('ln_Type'))
-
-  def get_pri(self):
-    if self.min_node:
-      raise RuntimeError("min_node has no pri!")
-    return self.access.r_s('ln_Pri')
-
-  def get_name(self):
-    if self.min_node:
-      raise RuntimeError("min_node has no name!")
-    name_addr = self.access.r_s('ln_Name')
-    return self.mem.r_cstr(name_addr)
-
-  def get_name_addr(self):
-    if self.min_node:
-      raise RuntimeError("min_node has no pri!")
-    return self.access.r_s('ln_Name')
-
-  def set_succ(self, addr):
-    self.access.w_s('ln_Succ', addr)
-
-  def set_pred(self, addr):
-    self.access.w_s('ln_Pred', addr)
-
-  def set_type(self, nt):
-    self.access.w_s('ln_Type', int(nt))
-
-  def set_pri(self, pri):
-    if self.min_node:
-      raise RuntimeError("min_node has no pri!")
-    self.access.w_s('ln_Pri', pri)
-
-  def set_name_addr(self, addr):
-    if self.min_node:
-      raise RuntimeError("min_node has no name!")
-    self.access.w_s('ln_Name', addr)
-
   def setup(self, succ, pred, nt, pri, name_addr):
-    self.access.w_s('ln_Succ', succ)
-    self.access.w_s('ln_Pred', pred)
-    self.access.w_s('ln_Type', nt)
-    self.access.w_s('ln_Pri', pri)
-    self.access.w_s('ln_Name', name_addr)
+    self.set_succ(succ)
+    self.set_pred(pred)
+    self.set_type(nt)
+    self.set_pri(pri)
+    self.set_name_addr(name_addr)
 
   def min_setup(self, succ, pred):
-    self.access.w_s('ln_Succ', succ)
-    self.access.w_s('ln_Pred', pred)
-
-  def get_node(self):
-    return self.access.r_all()
-
-  def set_node(self, node):
-    self.access.w_all(node)
+    self.set_succ(succ)
+    self.set_pred(pred)
 
   # ----- node ops -----
 

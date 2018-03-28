@@ -171,7 +171,7 @@ def atypes_list_iter_at_test():
 
 def add_node(alist, addr, name):
   n = Node(alist.mem, addr)
-  addr += n.get_size()
+  addr += n.get_all_size()
   name_addr = addr
   alist.mem.w_cstr(addr, name)
   addr += len(name) + 1

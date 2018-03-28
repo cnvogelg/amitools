@@ -1,6 +1,7 @@
 from amitools.vamos.astructs import ListDef
 from amitools.vamos.mem import AccessStruct
 from .node import Node, NodeType
+from .atype import AmigaType
 
 
 class ListIter(object):
@@ -25,14 +26,13 @@ class ListIter(object):
     return res
 
 
+@AmigaType(ListDef, wrap={'type': (NodeType, long)})
 class List(object):
 
-  def __init__(self, mem, addr, min_list=False):
-    self.mem = mem
-    self.head_addr = addr
-    self.tail_addr = addr + 4
+  def __init__(self, min_list=False):
+    self.head_addr = self.addr
+    self.tail_addr = self.addr + 4
     self.min_list = min_list
-    self.access = AccessStruct(mem, ListDef, addr)
 
   def __str__(self):
     if self.min_list:
@@ -47,30 +47,6 @@ class List(object):
 
   def __eq__(self, other):
     return self.mem == other.mem and self.head_addr == other.head_addr
-
-  def set_head(self, head):
-    self.access.w_s('lh_Head', head)
-
-  def get_head(self):
-    return self.access.r_s('lh_Head')
-
-  def set_tail(self, tail):
-    self.access.w_s('lh_Tail', tail)
-
-  def get_tail(self):
-    return self.access.r_s('lh_Tail')
-
-  def set_tail_pred(self, tp):
-    self.access.w_s('lh_TailPred', tp)
-
-  def get_tail_pred(self):
-    return self.access.r_s('lh_TailPred')
-
-  def set_type(self, lt):
-    self.access.w_s('lh_Type', int(lt))
-
-  def get_type(self):
-    return NodeType(self.access.r_s('lh_Type'))
 
   # ----- list ops -----
 
