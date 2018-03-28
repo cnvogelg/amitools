@@ -1,8 +1,21 @@
+import pytest
 from amitools.vamos.machine import MockMemory
 from amitools.vamos.atypes import Node, NodeType
 
 
-def libnative_node_base_test():
+def atypes_node_type_to_str_test():
+  assert NodeType.to_str(NodeType.NT_UNKNOWN) == 'NT_UNKNOWN'
+  with pytest.raises(ValueError):
+    NodeType.to_str(-1)
+
+
+def atypes_node_type_from_str_test():
+  assert NodeType.from_str('NT_INTERRUPT') == NodeType.NT_INTERRUPT
+  with pytest.raises(ValueError):
+    NodeType.from_str('bla')
+
+
+def atypes_node_base_test():
   mem = MockMemory()
   text = 'hello, world!'
   mem.w_cstr(0, text)
@@ -22,7 +35,7 @@ def libnative_node_base_test():
   assert node.get_name() == text
 
 
-def libnative_node_setup_test():
+def atypes_node_setup_test():
   mem = MockMemory()
   text = 'hello, world!'
   mem.w_cstr(12, text)
@@ -37,7 +50,7 @@ def libnative_node_setup_test():
   assert node.get_name() == text
 
 
-def libnative_node_min_setup_test():
+def atypes_node_min_setup_test():
   mem = MockMemory()
   node = Node(mem, 0x42)
   node.min_setup(1234, 5678)
@@ -46,7 +59,7 @@ def libnative_node_min_setup_test():
   assert node.get_pred() == 5678
 
 
-def libnative_node_str_test():
+def atypes_node_str_test():
   mem = MockMemory()
   text = 'hello, world!'
   mem.w_cstr(12, text)

@@ -1,3 +1,4 @@
-from .nodetype import NodeType
-from .node import Node
+from .enum import EnumType
+from .bitfield import BitFieldType
+from .node import Node, NodeType
 from .list_ import List
