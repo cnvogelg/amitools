@@ -1,7 +1,7 @@
 # helper for Allocate()/Deallocate()
 
 from amitools.vamos.Log import log_exec
-from amitools.vamos.astructs import AccessStruct, MemHeaderDef, MemChunkDef
+from amitools.vamos.astructs import AccessStruct, MemHeaderStruct, MemChunkStruct
 
 class MemChunk:
   def __init__(self, mc_next=None, mc_bytes=None, addr=None):
@@ -15,12 +15,12 @@ class MemChunk:
 
   def read(self, ctx, mc_addr):
     self.addr = mc_addr
-    mc = AccessStruct(ctx.mem, MemChunkDef, mc_addr)
+    mc = AccessStruct(ctx.mem, MemChunkStruct, mc_addr)
     self.next = mc.r_s('mc_Next')
     self.bytes = mc.r_s('mc_Bytes')
 
   def write(self, ctx):
-    mc = AccessStruct(ctx.mem, MemChunkDef, self.addr)
+    mc = AccessStruct(ctx.mem, MemChunkStruct, self.addr)
     mc.w_s('mc_Next', self.next)
     mc.w_s('mc_Bytes', self.bytes)
 
@@ -48,7 +48,7 @@ class MemHdr:
 
   def read(self, ctx, mh_addr):
     self.addr = mh_addr
-    mh = AccessStruct(ctx.mem, MemHeaderDef, mh_addr)
+    mh = AccessStruct(ctx.mem, MemHeaderStruct, mh_addr)
     self.first = mh.r_s('mh_First')
     self.lower = mh.r_s('mh_Lower')
     self.upper = mh.r_s('mh_Upper')
@@ -56,7 +56,7 @@ class MemHdr:
     self.total = self.upper - self.lower
 
   def write(self, ctx):
-    mh = AccessStruct(ctx.mem, MemHeaderDef, self.addr)
+    mh = AccessStruct(ctx.mem, MemHeaderStruct, self.addr)
     # only update first/free
     mh.w_s('mh_First', self.first)
     mh.w_s('mh_Free', self.free)

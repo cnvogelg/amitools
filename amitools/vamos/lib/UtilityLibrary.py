@@ -1,6 +1,5 @@
 from amitools.vamos.CPU import *
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.astructs import TagItemDef
 from amitools.vamos.lib.util.TagList import *
 from amitools.vamos.lib.util.AmiDate import *
 from amitools.vamos.Log import *

@@ -43,7 +43,7 @@ class DosLibrary(LibImpl):
     return True
 
   def get_struct_def(self):
-    return DosLibraryDef
+    return DosLibraryStruct
 
   def setup_lib(self, ctx, base_addr):
     log_dos.info("setup dos.library")
@@ -62,10 +62,10 @@ class DosLibrary(LibImpl):
     self.local_vars = {}
     self.access = AccessStruct(ctx.mem, self.get_struct_def(), base_addr)
     # setup RootNode
-    self.root_struct = ctx.alloc.alloc_struct("RootNode",RootNodeDef)
+    self.root_struct = ctx.alloc.alloc_struct("RootNode",RootNodeStruct)
     self.access.w_s("dl_Root",self.root_struct.addr)
     # setup DosInfo
-    self.dos_info = ctx.alloc.alloc_struct("DosInfo",DosInfoDef)
+    self.dos_info = ctx.alloc.alloc_struct("DosInfo",DosInfoStruct)
     self.root_struct.access.w_s("rn_Info",self.dos_info.addr)
     # setup dos list
     self.dos_list = DosList(self.path_mgr, self.path_mgr.assign_mgr, ctx.mem, ctx.alloc)
@@ -197,7 +197,7 @@ class DosLibrary(LibImpl):
 
   def DateStamp(self, ctx):
     ds_ptr = ctx.cpu.r_reg(REG_D1)
-    ds = AccessStruct(ctx.mem,DateStampDef,struct_addr=ds_ptr)
+    ds = AccessStruct(ctx.mem,DateStampStruct,struct_addr=ds_ptr)
     t = time.time()
     at = sys_to_ami_time(t)
     log_dos.info("DateStamp: ptr=%06x sys_time=%d time=%s", ds_ptr, t, at)
@@ -208,7 +208,7 @@ class DosLibrary(LibImpl):
 
   def DateToStr(self, ctx):
     dt_ptr = ctx.cpu.r_reg(REG_D1)
-    dt = AccessStruct(ctx.mem,DateTimeDef,struct_addr=dt_ptr)
+    dt = AccessStruct(ctx.mem,DateTimeStruct,struct_addr=dt_ptr)
     ds_day = dt.r_s("dat_Stamp.ds_Days")
     ds_min = dt.r_s("dat_Stamp.ds_Minute")
     ds_tick = dt.r_s("dat_Stamp.ds_Tick")
@@ -236,7 +236,7 @@ class DosLibrary(LibImpl):
 
   def SetFileDate(self, ctx):
     ds_ptr   = ctx.cpu.r_reg(REG_D2)
-    ds       = AccessStruct(ctx.mem,DateStampDef,struct_addr=ds_ptr)
+    ds       = AccessStruct(ctx.mem,DateStampStruct,struct_addr=ds_ptr)
     name_ptr = ctx.cpu.r_reg(REG_D1)
     name     = ctx.mem.r_cstr(name_ptr)
     ticks    = ds.r_s("ds_Tick")
@@ -289,15 +289,15 @@ class DosLibrary(LibImpl):
 
   def create_var(self, ctx, name, flags):
     varlist   = ctx.process.get_local_vars()
-    node_addr = self._alloc_mem("ShellVar(%s)" % name,LocalVarDef.get_size() + len(name) + 1)
-    name_addr = node_addr + LocalVarDef.get_size()
-    node      = ctx.alloc.map_struct("ShellVar(%s) % name", node_addr, LocalVarDef)
+    node_addr = self._alloc_mem("ShellVar(%s)" % name,LocalVarStruct.get_size() + len(name) + 1)
+    name_addr = node_addr + LocalVarStruct.get_size()
+    node      = ctx.alloc.map_struct("ShellVar(%s) % name", node_addr, LocalVarStruct)
     ctx.mem.w_cstr(name_addr,name)
     node.access.w_s("lv_Node.ln_Name",name_addr)
     node.access.w_s("lv_Node.ln_Type",flags & 0xff)
     node.access.w_s("lv_Value",0)
     head_addr = varlist.access.r_s("mlh_Head")
-    head      = AccessStruct(ctx.mem, NodeDef, head_addr)
+    head      = AccessStruct(ctx.mem, NodeStruct, head_addr)
     head.w_s("ln_Pred",node_addr)
     varlist.access.w_s("mlh_Head",node_addr)
     node.access.w_s("lv_Node.ln_Succ",head_addr)
@@ -327,8 +327,8 @@ class DosLibrary(LibImpl):
     node.w_s("lv_Value",0)
     succ = node.r_s("lv_Node.ln_Succ")
     pred = node.r_s("lv_Node.ln_Pred")
-    AccessStruct(ctx.mem, NodeDef, pred).w_s("ln_Succ", succ)
-    AccessStruct(ctx.mem, NodeDef, succ).w_s("ln_Pred", pred)
+    AccessStruct(ctx.mem, NodeStruct, pred).w_s("ln_Succ", succ)
+    AccessStruct(ctx.mem, NodeStruct, succ).w_s("ln_Pred", pred)
     self._free_mem(node.struct_addr)
     for k in self.local_vars.keys():
       if self.local_vars[k] == node:
@@ -431,11 +431,11 @@ class DosLibrary(LibImpl):
     if start == 0:
       seg_addr = self.dos_info.access.r_s("di_NetHand")
     else:
-      seg_addr = AccessStruct(ctx.mem, SegmentDef, start).r_s("seg_Next")
+      seg_addr = AccessStruct(ctx.mem, SegmentStruct, start).r_s("seg_Next")
     log_dos.info("FindSegment(%s)" % needle)
     while seg_addr != 0:
-      segment  = AccessStruct(ctx.mem, SegmentDef, seg_addr)
-      name_addr= seg_addr + SegmentDef.get_offset_for_name("seg_Name")[0]
+      segment  = AccessStruct(ctx.mem, SegmentStruct, seg_addr)
+      name_addr= seg_addr + SegmentStruct.get_offset_for_name("seg_Name")[0]
       name     = ctx.mem.r_bstr(name_addr)
       if name.lower() == needle.lower():
         if (system and segment.r_s("seg_UC") < 0) or (not system and segment.r_s("seg_UC") > 0):
@@ -450,9 +450,9 @@ class DosLibrary(LibImpl):
     seglist   = ctx.cpu.r_reg(REG_D2) << 2
     system    = ctx.cpu.r_reg(REG_D3)
     name      = ctx.mem.r_cstr(name_ptr)
-    seg_addr  = self._alloc_mem("Segment",SegmentDef.get_size() + len(name) + 1)
-    name_addr = seg_addr + SegmentDef.get_offset_for_name("seg_Name")[0]
-    segment   = ctx.alloc.map_struct("Segment", seg_addr, SegmentDef)
+    seg_addr  = self._alloc_mem("Segment",SegmentStruct.get_size() + len(name) + 1)
+    name_addr = seg_addr + SegmentStruct.get_offset_for_name("seg_Name")[0]
+    segment   = ctx.alloc.map_struct("Segment", seg_addr, SegmentStruct)
     head_addr = self.dos_info.access.r_s("di_NetHand")
     segment.access.w_s("seg_Next",head_addr)
     segment.access.w_s("seg_UC",system)
@@ -900,7 +900,7 @@ class DosLibrary(LibImpl):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     fib_ptr = ctx.cpu.r_reg(REG_D2)
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-    fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
+    fib = AccessStruct(ctx.mem,FileInfoBlockStruct,struct_addr=fib_ptr)
     err = lock.examine_lock(fib)
     name_addr = fib.s_get_addr('fib_FileName')
     name      = ctx.mem.r_cstr(name_addr)
@@ -915,7 +915,7 @@ class DosLibrary(LibImpl):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     info_ptr = ctx.cpu.r_reg(REG_D2)
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-    info = AccessStruct(ctx.mem,InfoDataDef,struct_addr=info_ptr)
+    info = AccessStruct(ctx.mem,InfoDataStruct,struct_addr=info_ptr)
     vol  = lock.find_volume_node(self.dos_list)
     if vol != None:
       info.w_s('id_NumSoftErrors',0)
@@ -937,7 +937,7 @@ class DosLibrary(LibImpl):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     fib_ptr = ctx.cpu.r_reg(REG_D2)
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-    fib = AccessStruct(ctx.mem,FileInfoBlockDef,struct_addr=fib_ptr)
+    fib = AccessStruct(ctx.mem,FileInfoBlockStruct,struct_addr=fib_ptr)
     err = lock.examine_next(fib)
     name_addr = fib.s_get_addr('fib_FileName')
     name      = fib.r_cstr(name_addr)
@@ -1025,10 +1025,10 @@ class DosLibrary(LibImpl):
       volume   = ctx.path_mgr.ami_volume_of_path(abs_name)
       vol_lock = self.lock_mgr.create_lock(None,volume+":", False)
     fs_port  = self.file_mgr.get_fs_handler_port()
-    addr     = self._alloc_mem("DevProc:%s" % name, DevProcDef.get_size())
+    addr     = self._alloc_mem("DevProc:%s" % name, DevProcStruct.get_size())
     log_dos.info("GetDeviceProc: name='%s' devproc=%06x -> volume=%s devproc=%06x lock=%06x",
                  name, last_devproc, volume, addr, vol_lock.b_addr)
-    devproc = AccessStruct(ctx.mem,DevProcDef,struct_addr=addr)
+    devproc = AccessStruct(ctx.mem,DevProcStruct,struct_addr=addr)
     devproc.w_s('dvp_Port', fs_port)
     if vol_lock == None:
       devproc.w_s('dvp_Lock', 0)
@@ -1039,7 +1039,7 @@ class DosLibrary(LibImpl):
 
   def FreeDeviceProc(self, ctx):
     addr     = ctx.cpu.r_reg(REG_D1)
-    devproc  = AccessStruct(ctx.mem,DevProcDef,struct_addr=addr)
+    devproc  = AccessStruct(ctx.mem,DevProcStruct,struct_addr=addr)
     vol_lock = devproc.r_s('dvp_Lock')
     if vol_lock != 0:
       lock = self.lock_mgr.get_by_b_addr(vol_lock >> 2)
@@ -1053,7 +1053,7 @@ class DosLibrary(LibImpl):
     pat_ptr = ctx.cpu.r_reg(REG_D1)
     pat     = ctx.mem.r_cstr(pat_ptr)
     anchor_ptr = ctx.cpu.r_reg(REG_D2)
-    anchor = AccessStruct(ctx.mem,AnchorPathDef,struct_addr=anchor_ptr)
+    anchor = AccessStruct(ctx.mem,AnchorPathStruct,struct_addr=anchor_ptr)
 
     # create MatchFirstNext instance
     mfn = MatchFirstNext(ctx.path_mgr, self.lock_mgr, self.get_current_dir(ctx), pat, anchor)
@@ -1196,7 +1196,7 @@ class DosLibrary(LibImpl):
     csrc_buf_ptr = 0
     rdargs = None
     if rdargs_ptr != 0:
-      rdargs = ctx.alloc.map_struct("RDArgs", rdargs_ptr, RDArgsDef)
+      rdargs = ctx.alloc.map_struct("RDArgs", rdargs_ptr, RDArgsStruct)
       csrc_buf_ptr = rdargs.access.r_s('RDA_Source.CS_Buffer')
     if csrc_buf_ptr != 0:
       # take given csrc and setup buffer
@@ -1268,7 +1268,7 @@ class DosLibrary(LibImpl):
 
       # 8. alloc custom rdargs if none is given
       if rdargs_ptr == 0:
-        rdargs = ctx.alloc.alloc_struct("RDArgs", RDArgsDef)
+        rdargs = ctx.alloc.alloc_struct("RDArgs", RDArgsStruct)
         rdargs_ptr = rdargs.addr
         own = True
       else:
@@ -1347,7 +1347,7 @@ class DosLibrary(LibImpl):
     # anyhow.
     if ctx.process.is_native_shell():
       cli_addr = ctx.process.get_cli_struct()
-      cli      = AccessStruct(ctx.mem,CLIDef,struct_addr=cli_addr)
+      cli      = AccessStruct(ctx.mem,CLIStruct,struct_addr=cli_addr)
       new_input = self.file_mgr.open(None,"NIL:","r")
       if new_input == None:
         log_dos.warn("SystemTagList: can't create new input file handle for SystemTagList('%s')", cmd)
@@ -1526,22 +1526,22 @@ class DosLibrary(LibImpl):
     tags_ptr = ctx.cpu.r_reg(REG_D2)
     if obj_type == 0: # DOS_FILEHANDLE
       name = "DOS_FILEHANDLE"
-      struct_def = FileHandleDef
+      struct_def = FileHandleStruct
     elif obj_type == 1: # DOS_EXALLCONTROL
       name = "DOS_EXALLCONTROL"
       struct_def = None
     elif obj_type == 2: # DOS_FIB
       name = "DOS_FIB"
-      struct_def = FileInfoBlockDef
+      struct_def = FileInfoBlockStruct
     elif obj_type == 3: # DOS_STDPKT
       name = "DOS_STDPKT"
-      struct_def = DosPacketDef
+      struct_def = DosPacketStruct
     elif obj_type == 4: # DOS_CLI
       name = "DOS_CLI"
-      struct_def = CLIDef
+      struct_def = CLIStruct
     elif obj_type == 5: # DOS_RDARGS
       name = "DOS_RDARGS"
-      struct_def = RDArgsDef
+      struct_def = RDArgsStruct
     else:
       log_dos.error("AllocDosObject: invalid type=%d", obj_type)
       return 0
@@ -1583,7 +1583,7 @@ class DosLibrary(LibImpl):
   def CliInit(self,ctx):
     log_dos.info("CliInit")
     clip_addr = self.Cli(ctx)
-    clip      = AccessStruct(ctx.mem,CLIDef,clip_addr)
+    clip      = AccessStruct(ctx.mem,CLIStruct,clip_addr)
     clip.w_s("cli_FailLevel",10)
     clip.w_s("cli_DefaultStack", ctx.process.stack_size >> 2) # in longs
     # Typically, the creator of the CLI would also initialize
@@ -1614,7 +1614,7 @@ class DosLibrary(LibImpl):
       if p != "C:" and p != "c:":
         lock = self.lock_mgr.create_lock(None, p, False)
         if lock != None:
-          path = ctx.alloc.alloc_struct("Path(%s)" % p,PathDef)
+          path = ctx.alloc.alloc_struct("Path(%s)" % p,PathStruct)
           path.access.w_s("path_Lock",lock.mem.addr)
           path.access.w_s("path_Next",cmd_dir_addr)
           cmd_dir_addr = path.addr
@@ -1626,7 +1626,7 @@ class DosLibrary(LibImpl):
 
   def CliInitRun(self, ctx):
     clip_addr = self.Cli(ctx)
-    clip      = AccessStruct(ctx.mem,CLIDef,struct_addr=clip_addr)
+    clip      = AccessStruct(ctx.mem,CLIStruct,struct_addr=clip_addr)
     pkt       = ctx.cpu.r_reg(REG_A0)
     log_dos.info("CliInitRun (0x%06x)" % pkt)
     # This would typically initialize the CLI for running a command
@@ -1681,7 +1681,7 @@ class DosLibrary(LibImpl):
     str_addr = ctx.cpu.r_reg(REG_D1)
     string   = ctx.mem.r_cstr(str_addr)[:79]
     cli_addr = self.Cli(ctx)
-    cli      = AccessStruct(ctx.mem,CLIDef,struct_addr=cli_addr)
+    cli      = AccessStruct(ctx.mem,CLIStruct,struct_addr=cli_addr)
     setaddr  = cli.r_s("cli_SetName")
     ctx.mem.w_bstr(setaddr,string)
     return self.DOSTRUE
@@ -1690,7 +1690,7 @@ class DosLibrary(LibImpl):
     str_addr = ctx.cpu.r_reg(REG_D1)
     string   = ctx.mem.r_cstr(str_addr)[:59]
     cli_addr = self.Cli(ctx)
-    cli      = AccessStruct(ctx.mem,CLIDef,struct_addr=cli_addr)
+    cli      = AccessStruct(ctx.mem,CLIStruct,struct_addr=cli_addr)
     setaddr  = cli.r_s("cli_Prompt")
     ctx.mem.w_bstr(setaddr,string)
     return self.DOSTRUE

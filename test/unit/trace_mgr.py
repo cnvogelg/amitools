@@ -2,7 +2,7 @@ import logging
 from amitools.vamos.trace import TraceManager
 from amitools.vamos.label import *
 from amitools.vamos.machine import *
-from amitools.vamos.astructs import NodeDef, LibraryDef
+from amitools.vamos.astructs import NodeStruct, LibraryStruct
 
 
 class FakeLib:
@@ -10,7 +10,7 @@ class FakeLib:
     self.name = "fake.library"
     self.addr_begin = 0x300
     self.addr_base = 0x320
-    self.struct = LibraryDef
+    self.struct = LibraryStruct
     self.mem_pos_size = self.struct.get_size()
     self.mem_neg_size = 0x20
     self.fd = None
@@ -22,7 +22,7 @@ def setup_tm():
   lm = LabelManager()
   tm = TraceManager(cpu, lm)
   lm.add_label(LabelRange("range", 0x100, 0x100))
-  lm.add_label(LabelStruct("node", 0x200, NodeDef))
+  lm.add_label(LabelStruct("node", 0x200, NodeStruct))
   lib = FakeLib()
   lm.add_label(LabelLib(lib))
   return tm

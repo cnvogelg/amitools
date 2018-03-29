@@ -1,4 +1,4 @@
-from amitools.vamos.astructs import MsgPortDef
+from amitools.vamos.astructs import MsgPortStruct
 from amitools.vamos.Exceptions import *
 
 class Port:
@@ -44,7 +44,7 @@ class PortManager:
     self.ports = {}
 
   def create_port(self, name, py_msg_handler):
-    mem = self.alloc.alloc_struct(name,MsgPortDef)
+    mem = self.alloc.alloc_struct(name,MsgPortStruct)
     port = Port(name, self, mem=mem, handler=py_msg_handler)
     addr = mem.addr
     self.ports[addr] = port

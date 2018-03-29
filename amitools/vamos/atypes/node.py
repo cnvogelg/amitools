@@ -1,4 +1,4 @@
-from amitools.vamos.astructs import NodeDef
+from amitools.vamos.astructs import NodeStruct
 from .atype import AmigaType
 from .enum import EnumType
 
@@ -31,7 +31,7 @@ class NodeType(object):
   NT_EXTENDED = 255
 
 
-@AmigaType(NodeDef, wrap={'type': (NodeType, long)})
+@AmigaType(NodeStruct, wrap={'type': (NodeType, long)})
 class Node(object):
   """wrap an Exec Node in memory an allow to operate on its values.
      also suppors MinNode by simply not using any ops on type, pri, and name"""

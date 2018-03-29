@@ -4,7 +4,7 @@ import logging
 from amitools.vamos.Log import log_lock
 from amitools.vamos.label import LabelRange
 from amitools.vamos.Exceptions import *
-from amitools.vamos.astructs import AccessStruct, DosListVolumeDef
+from amitools.vamos.astructs import AccessStruct, DosListVolumeStruct
 from Error import *
 from Lock import Lock
 
@@ -97,7 +97,7 @@ class LockManager:
       return "SYS:"
     else:
       vol_addr  = lock.mem.access.r_s("fl_Volume")
-      volnode   = AccessStruct(self.mem,DosListVolumeDef,vol_addr)
+      volnode   = AccessStruct(self.mem,DosListVolumeStruct,vol_addr)
       name_addr = volnode.r_s("dol_Name")
       name = self.mem.access.r_bstr(name_addr) + ":"
       return name

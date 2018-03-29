@@ -1,5 +1,5 @@
 import datetime
-from amitools.vamos.astructs import AccessStruct, LibraryDef
+from amitools.vamos.astructs import AccessStruct, LibraryStruct
 from amitools.vamos.label import LabelLib
 from .info import LibInfo
 
@@ -19,7 +19,7 @@ class LibMem(object):
     self.mem = mem
     self.addr = addr
     if struct is None:
-      struct = LibraryDef
+      struct = LibraryStruct
     self.struct = struct
     self.access = AccessStruct(mem, struct, addr)
     self.label = None

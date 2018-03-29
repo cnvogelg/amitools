@@ -1,10 +1,10 @@
 from amitools.vamos.machine import MockMemory
 from amitools.vamos.atypes import AmigaType, NodeType
-from amitools.vamos.astructs import NodeDef
+from amitools.vamos.astructs import NodeStruct
 
 
 def atypes_atype_node_base_test():
-  @AmigaType(NodeDef, wrap={'type' : NodeType})
+  @AmigaType(NodeStruct, wrap={'type' : NodeType})
   class MyNode:
     pass
   mem = MockMemory()
@@ -16,7 +16,7 @@ def atypes_atype_node_base_test():
 
 
 def atypes_atype_node_ctor_test():
-  @AmigaType(NodeDef, wrap={'type' : NodeType})
+  @AmigaType(NodeStruct, wrap={'type' : NodeType})
   class MyNode:
     def __init__(self, bla):
       self.bla = bla

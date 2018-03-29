@@ -7,7 +7,7 @@ import inspect
 import sys, traceback
 
 from .label import LabelLib
-from .astructs import AccessStruct, LibraryDef
+from .astructs import AccessStruct, LibraryStruct
 
 class AmigaLibrary:
 
@@ -322,7 +322,7 @@ class AmigaLibrary:
     self.label = LabelLib(self)
     ctx.label_mgr.add_label(self.label)
     # create access
-    self.lib_access = AccessStruct(ctx.mem, LibraryDef, self.addr_base)
+    self.lib_access = AccessStruct(ctx.mem, LibraryStruct, self.addr_base)
     self.access = self.lib_access
 
   def free_lib_base(self, ctx, free_alloc=True):

@@ -1,17 +1,17 @@
+from .astructdef import AmigaStructDef
 from .astruct import AmigaStruct
 
 # TagItem
+@AmigaStructDef
 class TagItemStruct(AmigaStruct):
-  _name = "TagItem"
   _format = [
     ('ULONG','ti_Tag'),
     ('ULONG','ti_Data')
   ]
-TagItemDef = TagItemStruct()
 
 # ClockData
+@AmigaStructDef
 class ClockDataStruct(AmigaStruct):
-  _name = "ClockData"
   _format = [
     ('UWORD', 'sec'),
     ('UWORD', 'min'),
@@ -21,4 +21,3 @@ class ClockDataStruct(AmigaStruct):
     ('UWORD', 'year'),
     ('UWORD', 'wday')
   ]
-ClockDataDef = ClockDataStruct()

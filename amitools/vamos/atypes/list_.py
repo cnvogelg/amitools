@@ -1,4 +1,4 @@
-from amitools.vamos.astructs import ListDef
+from amitools.vamos.astructs import ListStruct
 from .node import Node, NodeType
 from .atype import AmigaType
 
@@ -25,7 +25,7 @@ class ListIter(object):
     return res
 
 
-@AmigaType(ListDef, wrap={'type': (NodeType, long)})
+@AmigaType(ListStruct, wrap={'type': (NodeType, long)})
 class List(object):
 
   def __init__(self, min_list=False):

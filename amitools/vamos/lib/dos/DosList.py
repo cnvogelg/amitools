@@ -1,6 +1,6 @@
 import logging
 from amitools.vamos.Log import log_doslist
-from amitools.vamos.astructs import AccessStruct, DosListDeviceDef, DosListVolumeDef, DosListAssignDef, AssignListDef
+from amitools.vamos.astructs import AccessStruct, DosListDeviceStruct, DosListVolumeStruct, DosListAssignStruct, AssignListStruct
 from amitools.vamos.lib.dos.LockManager import LockManager
 from amitools.vamos.path.AssignManager import AssignManager
 from amitools.vamos.path.PathManager import PathManager
@@ -84,7 +84,7 @@ class DosList:
     log_doslist.info("add entry: %s", entry)
 
   def add_volume(self, name):
-    entry = DosListEntry(name,DosListVolumeDef)
+    entry = DosListEntry(name,DosListVolumeStruct)
     self._add_entry(entry)
     entry.access.w_s("dol_Type",2) #volume
     entry.access.w_s("dol_Task",1) #something != 0
@@ -93,7 +93,7 @@ class DosList:
     return entry
 
   def add_assign(self, name, assign_names):
-    entry = DosListEntry(name,DosListAssignDef)
+    entry = DosListEntry(name,DosListAssignStruct)
     self._add_entry(entry)
     entry.access.w_s("dol_Type",1) #directory
     entry.access.w_s("dol_Task",1) #something != 0
@@ -159,7 +159,7 @@ class DosList:
     entry.access.w_s("dol_List",0)
     entry.alist   = []
     while alist_addr != 0:
-      alist        = AccessStruct(self.mem,AssignListDef,alist_addr)
+      alist        = AccessStruct(self.mem,AssignListStruct,alist_addr)
       oldlock_addr = alist.r_s("al_Lock")
       oldlock      = self.lock_mgr.get_by_b_addr(oldlock_addr >> 2)
       self.lock_mgr.release_lock(oldlock)
@@ -187,7 +187,7 @@ class DosList:
             entry.access.w_s("dol_Lock",lock.mem.addr)
             first = False
           else:
-            assign_entry = self.alloc.alloc_struct("AssignList",AssignListDef)
+            assign_entry = self.alloc.alloc_struct("AssignList",AssignListStruct)
             entry.alist.append(assign_entry)
             assign_entry.access.w_s("al_Next",0)
             assign_entry.access.w_s("al_Lock",lock.mem.addr)

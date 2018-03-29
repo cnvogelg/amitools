@@ -1,6 +1,6 @@
 import os
 import sys
-from amitools.vamos.astructs import FileHandleDef
+from amitools.vamos.astructs import FileHandleStruct
 
 class FileHandle:
   """represent an AmigaOS file handle (FH) in vamos"""
@@ -26,7 +26,7 @@ class FileHandle:
 
   def alloc_fh(self, alloc, fs_handler_port):
     name = "File:" + self.name
-    self.mem = alloc.alloc_struct(name, FileHandleDef)
+    self.mem = alloc.alloc_struct(name, FileHandleStruct)
     self.b_addr = self.mem.addr >> 2
     # -- fill filehandle
     # use baddr of FH itself as identifier

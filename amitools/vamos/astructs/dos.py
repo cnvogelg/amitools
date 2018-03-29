@@ -1,7 +1,8 @@
+from .astructdef import AmigaStructDef
 from .astruct import AmigaStruct
 
+@AmigaStructDef
 class ProcessStruct(AmigaStruct):
-  _name = "Process"
   _format = [
     ('Task','pr_Task'),
     ('MsgPort','pr_MsgPort'),
@@ -32,10 +33,9 @@ class ProcessStruct(AmigaStruct):
     ('ULONG','pr_ShellPrivate'),
     ('BPTR','pr_CES'),
   ]
-ProcessDef = ProcessStruct()
 
+@AmigaStructDef
 class CLIStruct(AmigaStruct):
-  _name = "CLI"
   _format = [
     ('LONG','cli_Result2'),
     ('BSTR','cli_SetName'),
@@ -54,20 +54,18 @@ class CLIStruct(AmigaStruct):
     ('BPTR','cli_StandardOutput'),
     ('BPTR','cli_Module'),
   ]
-CLIDef = CLIStruct()
 
+@AmigaStructDef
 class DateStampStruct(AmigaStruct):
-  _name = "DateStamp"
   _format = [
     ('LONG','ds_Days'),
     ('LONG','ds_Minute'),
     ('LONG','ds_Tick')
   ]
-DateStampDef = DateStampStruct()
 
 # the union in DosList is splitted up into own types
+@AmigaStructDef
 class DosListDeviceStruct(AmigaStruct):
-  _name = "DosListDevice"
   _format = [
     ('BPTR','dol_Next'),
     ('LONG','dol_Type'),
@@ -81,10 +79,9 @@ class DosListDeviceStruct(AmigaStruct):
     ('BPTR','dol_GlobVec'),
     ('BSTR','dol_Name')
   ]
-DosListDeviceDef = DosListDeviceStruct()
 
+@AmigaStructDef
 class DosListVolumeStruct(AmigaStruct):
-  _name = "DosListVolume"
   _format = [
     ('BPTR','dol_Next'),
     ('LONG','dol_Type'),
@@ -96,18 +93,16 @@ class DosListVolumeStruct(AmigaStruct):
     ('LONG','dol_Padding0'),
     ('BSTR','dol_Name')
   ]
-DosListVolumeDef = DosListVolumeStruct()
 
+@AmigaStructDef
 class AssignListStruct(AmigaStruct):
-  _name = "AssignList"
   _format = [
     ('AssignList*','al_Next'),
     ('BPTR','al_Lock')
   ]
-AssignListDef = AssignListStruct()
 
+@AmigaStructDef
 class DosListAssignStruct(AmigaStruct):
-  _name = "DosListAssign"
   _format = [
     ('BPTR','dol_Next'),
     ('LONG','dol_Type'),
@@ -118,10 +113,9 @@ class DosListAssignStruct(AmigaStruct):
     ('LONG|4','dol_Padding'),
     ('BSTR','dol_Name')
   ]
-DosListAssignDef = DosListAssignStruct()
 
+@AmigaStructDef
 class DosInfoStruct(AmigaStruct):
-  _name = "DosInfo"
   _format = [
     ('BPTR','di_McName'),
     ('BPTR','di_DevInfo'),
@@ -132,10 +126,9 @@ class DosInfoStruct(AmigaStruct):
     ('SignalSemaphore','di_EntryLock'),
     ('SignalSemaphore','di_DeleteLock')
   ]
-DosInfoDef = DosInfoStruct()
 
+@AmigaStructDef
 class RootNodeStruct(AmigaStruct):
-  _name = "RootNode"
   _format = [
     ('BPTR','rn_TaskArray'),
     ('BPTR','rn_ConsoleSegment'),
@@ -148,10 +141,9 @@ class RootNodeStruct(AmigaStruct):
     ('BPTR','rn_ShellSegment'),
     ('LONG','rn_Flags')
   ]
-RootNodeDef = RootNodeStruct()
 
+@AmigaStructDef
 class DosLibraryStruct(AmigaStruct):
-  _name = "Dos"
   _format = [
     ('Library','lib'),
     ('RootNode*','dl_Root'),
@@ -164,10 +156,9 @@ class DosLibraryStruct(AmigaStruct):
     ('APTR','dl_UtilityBase'),
     ('APTR','dl_IntuitionBase')
   ]
-DosLibraryDef = DosLibraryStruct()
 
+@AmigaStructDef
 class FileInfoBlockStruct(AmigaStruct):
-  _name = "FileInfoBlock"
   _format = [
     ('LONG','fib_DiskKey'),
     ('LONG','fib_DirEntryType'),
@@ -182,10 +173,9 @@ class FileInfoBlockStruct(AmigaStruct):
     ('UWORD','fib_OwnerGID'),
     ('char|32','fib_Reserved')
   ]
-FileInfoBlockDef = FileInfoBlockStruct()
 
+@AmigaStructDef
 class FileHandleStruct(AmigaStruct):
-  _name = "FileHandle"
   _format = [
     ('void*','fh_Link'),
     ('void*','fh_Port'),
@@ -199,10 +189,9 @@ class FileHandleStruct(AmigaStruct):
     ('LONG','fh_Args'),
     ('LONG','fh_Arg2')
   ]
-FileHandleDef = FileHandleStruct()
 
+@AmigaStructDef
 class FileLockStruct(AmigaStruct):
-  _name = "FileLock"
   _format = [
     ('BPTR','fl_Link'),
     ('LONG','fl_Key'),
@@ -210,10 +199,9 @@ class FileLockStruct(AmigaStruct):
     ('void*','fl_Task'),
     ('BPTR','fl_Volume')
   ]
-FileLockDef = FileLockStruct()
 
+@AmigaStructDef
 class DosPacketStruct(AmigaStruct):
-  _name = "DosPacket"
   _format = [
     ('Message*','dp_Link'),
     ('MsgPort*','dp_Port'),
@@ -228,10 +216,9 @@ class DosPacketStruct(AmigaStruct):
     ('LONG','dp_Arg6'),
     ('LONG','dp_Arg7')
   ]
-DosPacketDef = DosPacketStruct()
 
+@AmigaStructDef
 class AChainStruct(AmigaStruct):
-  _name = "AChain"
   _format = [
     ('AChain*','an_Child'),
     ('AChain*','an_Parent'),
@@ -240,10 +227,9 @@ class AChainStruct(AmigaStruct):
     ('BYTE','an_Flags'),
     ('UBYTE','an_String')
   ]
-AChainDef = AChainStruct()
 
+@AmigaStructDef
 class AnchorPathStruct(AmigaStruct):
-  _name = "AnchorPath"
   _format = [
     ('AChain*','ap_Base'),
     ('AChain*','ap_Last'),
@@ -255,29 +241,26 @@ class AnchorPathStruct(AmigaStruct):
     ('FileInfoBlock','ap_Info'),
     ('UBYTE','ap_Buf')
   ]
-AnchorPathDef = AnchorPathStruct()
 
+@AmigaStructDef
 class DevProcStruct(AmigaStruct):
-  _name = "DosProc"
   _format = [
     ('MsgPort*','dvp_Port'),
     ('BPTR','dvp_Lock'),
     ('ULONG','dvp_Flags'),
     ('void*','dvp_DevNode')
   ]
-DevProcDef = DevProcStruct()
 
+@AmigaStructDef
 class CSourceStruct(AmigaStruct):
-  _name = "CSource"
   _format = [
     ('UBYTE*','CS_Buffer'),
     ('LONG','CS_Length'),
     ('LONG','CS_CurChr')
   ]
-CSourceDef = CSourceStruct()
 
+@AmigaStructDef
 class RDArgsStruct(AmigaStruct):
-  _name = "RDArgs"
   _format = [
     ('CSource','RDA_Source'),
     ('LONG','RDA_DAList'),
@@ -286,10 +269,9 @@ class RDArgsStruct(AmigaStruct):
     ('UBYTE*','RDA_ExtHelp'),
     ('LONG','RDA_Flags')
   ]
-RDArgsDef = RDArgsStruct()
 
+@AmigaStructDef
 class DateTimeStruct(AmigaStruct):
-  _name = "DateTime"
   _format = [
     ('DateStamp','dat_Stamp'),
     ('UBYTE','dat_Format'),
@@ -298,10 +280,9 @@ class DateTimeStruct(AmigaStruct):
     ('UBYTE*','dat_StrDate'),
     ('UBYTE*','dat_StrTime')
   ]
-DateTimeDef = DateTimeStruct()
 
+@AmigaStructDef
 class InfoDataStruct(AmigaStruct):
-  _name = "InfoData"
   _format = [
     ('LONG','id_NumSoftErrors'),
     ('LONG','id_UnitNumber'),
@@ -313,32 +294,28 @@ class InfoDataStruct(AmigaStruct):
     ('BPTR','id_VolumeNode'),
     ('LONG','id_InUse')
     ]
-InfoDataDef = InfoDataStruct()
 
+@AmigaStructDef
 class SegmentStruct(AmigaStruct):
-  _name = "Segment"
   _format = [
     ('BPTR','seg_Next'),
     ('LONG','seg_UC'),
     ('BPTR','seg_Seg'),
     ('UBYTE','seg_Name')
     ]
-SegmentDef = SegmentStruct()
 
+@AmigaStructDef
 class LocalVarStruct(AmigaStruct):
-  _name = "LocalVar"
   _format = [
     ('Node','lv_Node'),
     ('UWORD','lv_Flags'),
     ('UBYTE*','lv_Value'),
     ('ULONG','lv_Len')
   ]
-LocalVarDef = LocalVarStruct()
 
+@AmigaStructDef
 class PathStruct(AmigaStruct):
-  _name = "Path"
   _format = [
     ('BPTR','path_Next'),
     ('BPTR','path_Lock')
   ]
-PathDef = PathStruct()

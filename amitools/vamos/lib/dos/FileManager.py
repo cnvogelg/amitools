@@ -6,7 +6,7 @@ import errno
 import stat
 
 from amitools.vamos.Log import log_file
-from amitools.vamos.astructs import AccessStruct, MessageDef, DosPacketDef
+from amitools.vamos.astructs import AccessStruct, MessageStruct, DosPacketStruct
 from Error import *
 from DosProtection import DosProtection
 from FileHandle import FileHandle
@@ -205,9 +205,9 @@ class FileManager:
   # callback from port manager for fs handler port
   # -> Async I/O
   def put_msg(self, port_mgr, msg_addr):
-    msg = AccessStruct(self.mem,MessageDef,struct_addr=msg_addr)
+    msg = AccessStruct(self.mem,MessageStruct,struct_addr=msg_addr)
     dos_pkt_addr = msg.r_s("mn_Node.ln_Name")
-    dos_pkt = AccessStruct(self.mem,DosPacketDef,struct_addr=dos_pkt_addr)
+    dos_pkt = AccessStruct(self.mem,DosPacketStruct,struct_addr=dos_pkt_addr)
     reply_port_addr = dos_pkt.r_s("dp_Port")
     pkt_type = dos_pkt.r_s("dp_Type")
     log_file.info("DosPacket: msg=%06x -> pkt=%06x: reply_port=%06x type=%06x", msg_addr, dos_pkt_addr, reply_port_addr, pkt_type)

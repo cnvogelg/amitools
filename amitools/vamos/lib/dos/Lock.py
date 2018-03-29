@@ -4,7 +4,7 @@ import uuid
 
 from amitools.vamos.Log import log_lock
 
-from amitools.vamos.astructs import AccessStruct, FileLockDef, DateStampDef
+from amitools.vamos.astructs import AccessStruct, FileLockStruct, DateStampStruct
 from DosProtection import DosProtection
 from AmiTime import *
 from Error import *
@@ -33,7 +33,7 @@ class Lock:
     self.keygen   = generate_key
     self.key      = self.keygen(self.sys_path)
     name          = "Lock: %s" % self
-    self.mem      = alloc.alloc_struct(name, FileLockDef)
+    self.mem      = alloc.alloc_struct(name, FileLockStruct)
     self.mem.access.w_s("fl_Key"   ,self.key)
     self.mem.access.w_s("fl_Volume",vol_addr)
     self.b_addr   = self.mem.addr >> 2
@@ -91,7 +91,7 @@ class Lock:
       fib_mem.w_s('fib_NumBlocks', 1)
     # date (use mtime here)
     date_addr = fib_mem.s_get_addr('fib_Date')
-    date = AccessStruct(fib_mem.mem, DateStampDef, date_addr)
+    date = AccessStruct(fib_mem.mem, DateStampStruct, date_addr)
     t = os.path.getmtime(sys_path)
     at = sys_to_ami_time(t)
     date.w_s('ds_Days', at.tday)

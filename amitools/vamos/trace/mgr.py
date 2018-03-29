@@ -94,15 +94,15 @@ class TraceManager(object):
   def _get_struct_extra(self, label, addr, width):
     delta = addr - label.struct_begin
     if delta >= 0 and delta < label.struct_size:
-      try:
-        name, off, val_type_name = label.struct.get_name_for_offset(
-            delta, width)
-        type_name = label.struct.get_type_name()
-        addon = "%s+%d = %s(%s)+%d" % (type_name, delta,
-                                       name, val_type_name, off)
-        return "Struct", addon
-      except Exception:
-        return "Struct", "??"
+      struct = label.struct(None, addr)
+      st, field, f_delta = struct.get_struct_field_for_offset(delta)
+
+      type_name = struct.get_type_name()
+      name = st.get_field_path_name(field)
+      type_sig = field.type_sig
+      addon = "%s+%d = %s(%s)+%d" % (type_name, delta,
+                                     name, type_sig, f_delta)
+      return "Struct", addon
     else:
       return "", ""
 

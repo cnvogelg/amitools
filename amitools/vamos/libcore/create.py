@@ -1,4 +1,4 @@
-from amitools.vamos.astructs import LibraryDef
+from amitools.vamos.astructs import LibraryStruct
 from amitools.fd import read_lib_fd
 from .base import LibIntBase
 from .stub import LibStubGen
@@ -35,7 +35,7 @@ class LibCreator(object):
     # create stub
     if impl is None:
       stub = self.stub_gen.gen_fake_stub(name, fd, ctx, profile)
-      struct = LibraryDef
+      struct = LibraryStruct
     else:
       stub = self.stub_gen.gen_stub(name, impl, fd, ctx, profile)
       struct = impl.get_struct_def()

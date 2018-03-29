@@ -1,8 +1,9 @@
+from .astructdef import AmigaStructDef
 from .astruct import AmigaStruct
 
 # Node
+@AmigaStructDef
 class NodeStruct(AmigaStruct):
-  _name = "Node"
   _format = [
     ('Node*','ln_Succ'),
     ('Node*','ln_Pred'),
@@ -10,20 +11,18 @@ class NodeStruct(AmigaStruct):
     ('BYTE','ln_Pri'),
     ('char*','ln_Name')
   ]
-NodeDef = NodeStruct()
 
 # MinNode
+@AmigaStructDef
 class MinNodeStruct(AmigaStruct):
-  _name = "MinNode"
   _format = [
     ('MinNode*','mln_Succ'),
     ('MinNode*','mln_Pred')
   ]
-MinNodeDef = MinNodeStruct()
 
 # Library
+@AmigaStructDef
 class LibraryStruct(AmigaStruct):
-  _name = "Library"
   _format = [
     ('Node','lib_Node'),
     ('UBYTE','lib_Flags'),
@@ -36,11 +35,10 @@ class LibraryStruct(AmigaStruct):
     ('ULONG','lib_Sum'),
     ('UWORD','lib_OpenCnt')
   ]
-LibraryDef = LibraryStruct()
 
 # List
+@AmigaStructDef
 class ListStruct(AmigaStruct):
-  _name = "List"
   _format = [
     ('Node*','lh_Head'),
     ('Node*','lh_Tail'),
@@ -48,21 +46,19 @@ class ListStruct(AmigaStruct):
     ('UBYTE','lh_Type'),
     ('UBYTE','l_pad')
   ]
-ListDef = ListStruct()
 
 # MinList
+@AmigaStructDef
 class MinListStruct(AmigaStruct):
-  _name = "MinList"
   _format = [
     ('MinNode*','mlh_Head'),
     ('MinNode*','mlh_Tail'),
     ('MinNode*','mlh_TailPred')
   ]
-MinListDef = MinListStruct()
 
 # MsgPort
+@AmigaStructDef
 class MsgPortStruct(AmigaStruct):
-  _name = "MsgPort"
   _format = [
     ('Node','mp_Node'),
     ('UBYTE','mp_Flags'),
@@ -70,40 +66,36 @@ class MsgPortStruct(AmigaStruct):
     ('void*','mp_SigTask'),
     ('List','mp_MsgList')
   ]
-MsgPortDef = MsgPortStruct()
 
 # Message
+@AmigaStructDef
 class MessageStruct(AmigaStruct):
-  _name = "Message"
   _format = [
     ('Node','mn_Node'),
     ('MsgPort*','mn_ReplyPort'),
     ('UWORD','mn_Length')
   ]
-MessageDef = MessageStruct()
 
 # IntVector
+@AmigaStructDef
 class IntVectorStruct(AmigaStruct):
-  _name = "IntVector"
   _format = [
     ('APTR','iv_Data'),
     ('VOIDFUNC','iv_Code'),
     ('Node*','iv_Node')
   ]
-IntVectorDef = IntVectorStruct()
 
 # SoftIntList
+@AmigaStructDef
 class SoftIntListStruct(AmigaStruct):
-  _name = "SoftIntList"
   _format = [
     ('List','sh_List'),
     ('UWORD','sh_Pad')
   ]
-SoftIntListDef = SoftIntListStruct()
 
 # Task
+@AmigaStructDef
 class TaskStruct(AmigaStruct):
-  _name = "Task"
   _format = [
     ('Node','tc_Node'),
     ('UBYTE','tc_Flags'),
@@ -128,10 +120,9 @@ class TaskStruct(AmigaStruct):
     ('List','tc_MemEntry'),
     ('APTR','tc_UserData')
   ]
-TaskDef = TaskStruct()
 
+@AmigaStructDef
 class ExecLibraryStruct(AmigaStruct):
-  _name = "ExecLibrary"
   _format = [
     ('Library','LibNode'),
     # Static System Variables
@@ -200,29 +191,26 @@ class ExecLibraryStruct(AmigaStruct):
     ('MinList','ex_MemHandlers'),
     ('APTR','ex_MemHandler')
   ]
-ExecLibraryDef = ExecLibraryStruct()
 
 # StackSwap
+@AmigaStructDef
 class StackSwapStruct(AmigaStruct):
-  _name = "StackSwap"
   _format = [
     ('APTR', 'stk_Lower'),
     ('ULONG', 'stk_Upper'),
     ('APTR', 'stk_Pointer')
   ]
-StackSwapDef = StackSwapStruct()
 
 # Semaphores
+@AmigaStructDef
 class SemaphoreRequestStruct(AmigaStruct):
-  _name = "SemaphoreRequest"
   _format = [
     ('MinNode','sr_Link'),
     ('Task*','sr_Waiter')
   ]
-SemaphoreRequestDef = SemaphoreRequestStruct()
 
+@AmigaStructDef
 class SignalSemaphoreStruct(AmigaStruct):
-  _name = "SignalSemaphore"
   _format = [
     ('Node','ss_Link'),
     ('WORD','ss_NestCount'),
@@ -231,30 +219,27 @@ class SignalSemaphoreStruct(AmigaStruct):
     ('Task*','ss_Owner'),
     ('WORD','ss_QueueCount')
   ]
-SignalSemaphoreDef = SignalSemaphoreStruct()
 
 # Device
+@AmigaStructDef
 class DeviceStruct(AmigaStruct):
-  _name = "Device"
   _format = [
     ('Library','dd_Library')
   ]
-DeviceDef = DeviceStruct()
 
 # Unit
+@AmigaStructDef
 class UnitStruct(AmigaStruct):
-  _name = "Unit"
   _format = [
     ('MsgPort','unit_MsgPort'),
     ('UBYTE','unit_flags'),
     ('UBYTE','unit_pad'),
     ('UWORD','unit_OpenCnt')
   ]
-UnitDef = UnitStruct()
 
 # IORequests
+@AmigaStructDef
 class IORequestStruct(AmigaStruct):
-  _name = "IORequest"
   _format = [
     ('Message','io_Message'),
     ('Device','io_Device'),
@@ -267,20 +252,18 @@ class IORequestStruct(AmigaStruct):
     ('ULONG','io_Data'),
     ('ULONG','io_Offset')
   ]
-IORequestDef = IORequestStruct()
 
 # MemChunk
-class MemChunk(AmigaStruct):
-  _name = "MemChunk"
+@AmigaStructDef
+class MemChunkStruct(AmigaStruct):
   _format = [
     ('MemChunk*', 'mc_Next'),
     ('ULONG', 'mc_Bytes')
   ]
-MemChunkDef = MemChunk()
 
 # MemHeader
-class MemHeader(AmigaStruct):
-  _name = "MemHeader"
+@AmigaStructDef
+class MemHeaderStruct(AmigaStruct):
   _format = [
     ('Node', 'mh_Node'),
     ('UWORD', 'mh_Attributes'),
@@ -289,11 +272,10 @@ class MemHeader(AmigaStruct):
     ('APTR', 'mh_Upper'),
     ('ULONG', 'mh_Free')
   ]
-MemHeaderDef = MemHeader()
 
 # Resident
-class Resident(AmigaStruct):
-  _name = "Resident"
+@AmigaStructDef
+class ResidentStruct(AmigaStruct):
   _format = [
     ('UWORD', 'rt_MatchWord'),
     ('APTR', 'rt_MatchTag'),
@@ -306,4 +288,3 @@ class Resident(AmigaStruct):
     ('char*', 'rt_IdString'),
     ('APTR', 'rt_Init')
   ]
-ResidentDef = Resident()

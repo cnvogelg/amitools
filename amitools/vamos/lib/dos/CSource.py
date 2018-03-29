@@ -1,4 +1,4 @@
-from amitools.vamos.astructs import CSourceDef
+from amitools.vamos.astructs import CSourceStruct
 
 class CSource:
   """Simulate the AmigaDOS csource interface"""
@@ -40,7 +40,7 @@ class CSource:
 
   def read_s(self, alloc, ptr):
     """read structure from Amiga memory"""
-    c = alloc.map_struct("CSource", ptr, CSourceDef)
+    c = alloc.map_struct("CSource", ptr, CSourceStruct)
     buf_ptr = c.access.r_s('CS_Buffer')
     self.len = c.access.r_s('CS_Length')
     self.buf = bytes(alloc.mem.r_block(buf_ptr, self.len))
@@ -48,7 +48,7 @@ class CSource:
 
   def update_s(self, alloc, ptr):
     """update current pointer only"""
-    c = alloc.map_struct("CSource", ptr, CSourceDef)
+    c = alloc.map_struct("CSource", ptr, CSourceStruct)
     c.access.w_s('CS_CurChr', self.pos)
 
   def append_line(self):

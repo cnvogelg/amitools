@@ -1,4 +1,4 @@
-from amitools.vamos.astructs import AccessStruct, SignalSemaphoreDef
+from amitools.vamos.astructs import AccessStruct, SignalSemaphoreStruct
 from amitools.vamos.Exceptions import *
 
 class SemaphoreManager:
@@ -12,7 +12,7 @@ class SemaphoreManager:
     self.semaphores_by_name = {}
 
   def InitSemaphore(self,addr):
-    semaphore = AccessStruct(self.mem,SignalSemaphoreDef,struct_addr=addr)
+    semaphore = AccessStruct(self.mem,SignalSemaphoreStruct,struct_addr=addr)
     semaphore.w_s("ss_Owner",0)
     semaphore.w_s("ss_NestCount",0)
     semaphore.w_s("ss_QueueCount",0xffff)

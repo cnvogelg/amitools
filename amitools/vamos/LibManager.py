@@ -3,7 +3,7 @@ from AmigaResident import AmigaResident
 from AmigaLibrary import AmigaLibrary
 from Trampoline import Trampoline
 from CPU import *
-from .astructs import LibraryDef
+from .astructs import LibraryStruct
 from Exceptions import *
 from Log import log_libmgr, log_lib
 import amitools.fd.FDFormat as FDFormat
@@ -285,7 +285,7 @@ class LibManager():
        return new lib instance or None if lib was not found"""
 
     # create empty lib
-    lib = AmigaLibrary(sane_name, LibraryDef, lib_cfg)
+    lib = AmigaLibrary(sane_name, LibraryStruct, lib_cfg)
 
     # determine file name from open_name, i.e. prepend LIBS: if no path is found
     load_name = self._get_load_lib_name(name)

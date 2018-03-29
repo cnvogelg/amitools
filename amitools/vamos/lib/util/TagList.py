@@ -1,4 +1,4 @@
-from amitools.vamos.astructs import AccessStruct, TagItemDef
+from amitools.vamos.astructs import AccessStruct, TagItemStruct
 
 TAG_DONE = 0
 TAG_IGNORE = 1
@@ -77,7 +77,7 @@ def next_tag_item(ctx, ti_addr):
       return ti_addr
 
 def get_tag(ctx, ti_addr):
-  ti = AccessStruct(ctx.mem, TagItemDef, ti_addr)
+  ti = AccessStruct(ctx.mem, TagItemStruct, ti_addr)
   tag = ti.r_s("ti_Tag")
   data = ti.r_s("ti_Data")
   return tag, data

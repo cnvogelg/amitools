@@ -143,7 +143,7 @@ class Process:
 
   # ----- cli struct -----
   def init_cli_struct(self, input_fh, output_fh, name):
-    self.cli = self.ctx.alloc.alloc_struct(self.bin_basename + "_CLI",CLIDef)
+    self.cli = self.ctx.alloc.alloc_struct(self.bin_basename + "_CLI",CLIStruct)
     self.cli.access.w_s("cli_DefaultStack", self.stack_size / 4) # in longs
     if input_fh != None:
       self.cli.access.w_s("cli_StandardInput", input_fh.b_addr)
@@ -189,8 +189,8 @@ class Process:
   def run_system(self):
     if self.shell_packet == None:
       # Ok, here we have to create a DosPacket for the shell startup
-      self.shell_message = self.ctx.alloc.alloc_struct("Shell Startup Message",MessageDef)
-      self.shell_packet  = self.ctx.alloc.alloc_struct("Shell Startup Packet",DosPacketDef)
+      self.shell_message = self.ctx.alloc.alloc_struct("Shell Startup Message",MessageStruct)
+      self.shell_packet  = self.ctx.alloc.alloc_struct("Shell Startup Packet",DosPacketStruct)
       self.shell_port    = self.ctx.exec_lib.port_mgr.create_port("Shell Startup Port",None)
     self.shell_packet.access.w_s("dp_Type",1) # indicate RUN
     self.shell_packet.access.w_s("dp_Res2",0) # indicate correct startup
@@ -203,7 +203,7 @@ class Process:
     return self.shell_packet.addr
 
   def create_port(self, name, py_msg_handler):
-    mem = self.alloc.alloc_struct(name,MsgPortDef)
+    mem = self.alloc.alloc_struct(name,MsgPortStruct)
     port = Port(name, self, mem=mem, handler=py_msg_handler)
     addr = mem.addr
     self.ports[addr] = port
@@ -212,7 +212,7 @@ class Process:
   # ----- task struct -----
   def init_task_struct(self, input_fh, output_fh):
     # Inject arguments into input stream (Needed for C:Execute)
-    self.this_task = self.ctx.alloc.alloc_struct(self.bin_basename + "_ThisTask",ProcessDef)
+    self.this_task = self.ctx.alloc.alloc_struct(self.bin_basename + "_ThisTask",ProcessStruct)
     self.seglist   = self.ctx.alloc.alloc_memory("Process Seglist",24)
     self.this_task.access.w_s("pr_Task.tc_Node.ln_Type", NT_PROCESS)
     self.this_task.access.w_s("pr_SegList",self.seglist.addr)
@@ -233,7 +233,7 @@ class Process:
 
   def get_local_vars(self):
     localvars_addr = self.this_task.access.s_get_addr("pr_LocalVars")
-    return self.ctx.alloc.map_struct("MinList", localvars_addr, MinListDef)
+    return self.ctx.alloc.map_struct("MinList", localvars_addr, MinListStruct)
 
   def get_input(self):
     fh_b = self.this_task.access.r_s("pr_CIS") >> 2

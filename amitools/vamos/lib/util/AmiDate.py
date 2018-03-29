@@ -1,6 +1,6 @@
 import datetime
 
-from amitools.vamos.astructs import AccessStruct, ClockDataDef
+from amitools.vamos.astructs import AccessStruct, ClockDataStruct
 
 
 # when Amiga time began...
@@ -9,7 +9,7 @@ amiga_epoch = datetime.datetime(1978, 1, 1, 0, 0, 0)
 
 def write_clock_data(dt, mem, data_ptr):
   """convert Python datetime struct to Amiga ClockData stored at pointer"""
-  data = AccessStruct(mem, ClockDataDef, struct_addr=data_ptr)
+  data = AccessStruct(mem, ClockDataStruct, struct_addr=data_ptr)
   # fill in date struct
   data.w_s('sec', dt.second)
   data.w_s('min', dt.minute)
@@ -24,7 +24,7 @@ def read_clock_data(mem, data_ptr):
   """read Amiga ClockData and return corresponding Python datetime
      return None if data is invalid
   """
-  data = AccessStruct(mem, ClockDataDef, struct_addr=data_ptr)
+  data = AccessStruct(mem, ClockDataStruct, struct_addr=data_ptr)
   # read date struct
   sec=data.r_s('sec')
   minute=data.r_s('min')

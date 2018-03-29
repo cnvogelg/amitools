@@ -13,7 +13,7 @@ import dos.Printf
 class ExecLibrary(LibImpl):
 
   def get_struct_def(self):
-    return ExecLibraryDef
+    return ExecLibraryStruct
 
   def is_base_lib(self):
     return True
@@ -81,7 +81,7 @@ class ExecLibrary(LibImpl):
 
   def StackSwap(self, ctx):
     stsw_ptr = ctx.cpu.r_reg(REG_A0)
-    stsw = AccessStruct(ctx.mem,StackSwapDef,struct_addr=stsw_ptr)
+    stsw = AccessStruct(ctx.mem,StackSwapStruct,struct_addr=stsw_ptr)
     # get new stack values
     new_lower = stsw.r_s('stk_Lower')
     new_upper = stsw.r_s('stk_Upper')
@@ -316,7 +316,7 @@ class ExecLibrary(LibImpl):
     name_ptr = ctx.cpu.r_reg(REG_A0)
     unit     = ctx.cpu.r_reg(REG_D0)
     io_addr  = ctx.cpu.r_reg(REG_A1)
-    io       = AccessStruct(ctx.mem, IORequestDef, io_addr)
+    io       = AccessStruct(ctx.mem, IORequestStruct, io_addr)
     flags    = ctx.cpu.r_reg(REG_D1)
     name     = ctx.mem.r_cstr(name_ptr)
     addr     = self.lib_mgr.open_dev(name, unit, flags, io)
@@ -330,7 +330,7 @@ class ExecLibrary(LibImpl):
   def CloseDevice(self,ctx):
     io_addr  = ctx.cpu.r_reg(REG_A1)
     if io_addr != 0:
-      io       = AccessStruct(ctx.mem, IORequestDef, io_addr)
+      io       = AccessStruct(ctx.mem, IORequestStruct, io_addr)
       dev_addr = io.r_s("io_Device")
       if dev_addr != 0:
         log_exec.info("CloseDevice: %06x", dev_addr)
@@ -354,63 +354,63 @@ class ExecLibrary(LibImpl):
     list_addr = ctx.cpu.r_reg(REG_A0)
     node_addr = ctx.cpu.r_reg(REG_A1)
     log_exec.info("AddTail(%06x, %06x)" % (list_addr, node_addr))
-    l = AccessStruct(ctx.mem, ListDef, list_addr)
-    n = AccessStruct(ctx.mem, NodeDef, node_addr)
+    l = AccessStruct(ctx.mem, ListStruct, list_addr)
+    n = AccessStruct(ctx.mem, NodeStruct, node_addr)
     n.w_s("ln_Succ", l.s_get_addr("lh_Tail"))
     tp = l.r_s("lh_TailPred")
     n.w_s("ln_Pred", tp)
-    AccessStruct(ctx.mem, NodeDef, tp).w_s("ln_Succ", node_addr)
+    AccessStruct(ctx.mem, NodeStruct, tp).w_s("ln_Succ", node_addr)
     l.w_s("lh_TailPred", node_addr)
 
   def AddHead(self, ctx):
     list_addr = ctx.cpu.r_reg(REG_A0)
     node_addr = ctx.cpu.r_reg(REG_A1)
     log_exec.info("AddHead(%06x, %06x)" % (list_addr, node_addr))
-    l = AccessStruct(ctx.mem, ListDef, list_addr)
-    n = AccessStruct(ctx.mem, NodeDef, node_addr)
+    l = AccessStruct(ctx.mem, ListStruct, list_addr)
+    n = AccessStruct(ctx.mem, NodeStruct, node_addr)
     n.w_s("ln_Pred", l.s_get_addr("lh_Head"))
     h = l.r_s("lh_Head")
     n.w_s("ln_Succ", h)
-    AccessStruct(ctx.mem, NodeDef, h).w_s("ln_Pred", node_addr)
+    AccessStruct(ctx.mem, NodeStruct, h).w_s("ln_Pred", node_addr)
     l.w_s("lh_Head", node_addr)
 
   def Remove(self, ctx):
     node_addr = ctx.cpu.r_reg(REG_A1)
-    n = AccessStruct(ctx.mem, NodeDef, node_addr)
+    n = AccessStruct(ctx.mem, NodeStruct, node_addr)
     succ = n.r_s("ln_Succ")
     pred = n.r_s("ln_Pred")
     log_exec.info("Remove(%06x): ln_Pred=%06x ln_Succ=%06x" % (node_addr, pred, succ))
-    AccessStruct(ctx.mem, NodeDef, pred).w_s("ln_Succ", succ)
-    AccessStruct(ctx.mem, NodeDef, succ).w_s("ln_Pred", pred)
+    AccessStruct(ctx.mem, NodeStruct, pred).w_s("ln_Succ", succ)
+    AccessStruct(ctx.mem, NodeStruct, succ).w_s("ln_Pred", pred)
     return node_addr
 
   def RemHead(self, ctx):
     list_addr = ctx.cpu.r_reg(REG_A0)
-    l = AccessStruct(ctx.mem, ListDef, list_addr)
+    l = AccessStruct(ctx.mem, ListStruct, list_addr)
     node_addr = l.r_s("lh_Head")
-    n = AccessStruct(ctx.mem, NodeDef, node_addr)
+    n = AccessStruct(ctx.mem, NodeStruct, node_addr)
     succ = n.r_s("ln_Succ")
     pred = n.r_s("ln_Pred")
     if succ == 0:
       log_exec.info("RemHead(%06x): null" % list_addr)
       return 0
-    AccessStruct(ctx.mem, NodeDef, pred).w_s("ln_Succ", succ)
-    AccessStruct(ctx.mem, NodeDef, succ).w_s("ln_Pred", pred)
+    AccessStruct(ctx.mem, NodeStruct, pred).w_s("ln_Succ", succ)
+    AccessStruct(ctx.mem, NodeStruct, succ).w_s("ln_Pred", pred)
     log_exec.info("RemHead(%06x): %06x" % (list_addr, node_addr))
     return node_addr
 
   def RemTail(self, ctx):
     list_addr = ctx.cpu.r_reg(REG_A0)
-    l = AccessStruct(ctx.mem, ListDef, list_addr)
+    l = AccessStruct(ctx.mem, ListStruct, list_addr)
     node_addr = l.r_s("lh_TailPred")
-    n = AccessStruct(ctx.mem, NodeDef, node_addr)
+    n = AccessStruct(ctx.mem, NodeStruct, node_addr)
     succ = n.r_s("ln_Succ")
     pred = n.r_s("ln_Pred")
     if pred == 0:
       log_exec.info("RemTail(%06x): null" % list_addr)
       return 0
-    AccessStruct(ctx.mem, NodeDef, pred).w_s("ln_Succ", succ)
-    AccessStruct(ctx.mem, NodeDef, succ).w_s("ln_Pred", pred)
+    AccessStruct(ctx.mem, NodeStruct, pred).w_s("ln_Succ", succ)
+    AccessStruct(ctx.mem, NodeStruct, succ).w_s("ln_Pred", pred)
     log_exec.info("RemTail(%06x): %06x" % (list_addr, node_addr))
     return node_addr
 
@@ -491,7 +491,7 @@ class ExecLibrary(LibImpl):
 
   def AddSemaphore(self,ctx):
     addr     = ctx.cpu.r_reg(REG_A1)
-    sstruct  = AccessStruct(ctx.mem,SignalSemaphoreDef,addr)
+    sstruct  = AccessStruct(ctx.mem,SignalSemaphoreStruct,addr)
     name_ptr = sstruct.r_s("ss_Link.ln_Name")
     name     = ctx.mem.r_cstr(name_ptr)
     self.semaphore_mgr.AddSemaphore(addr,name)
