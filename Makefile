@@ -42,6 +42,9 @@ clean_all: clean
 clean_git:
 	git clean -fxd
 
+clean_py:
+	find . -name *.pyc -exec rm {} \;
+
 do_gen: $(BUILD_DIR)/$(GEN_TOOL) $(GEN_DIR) $(GEN_FILES)
 
 sdist: do_gen

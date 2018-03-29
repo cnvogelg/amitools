@@ -2,7 +2,7 @@ import logging
 from amitools.vamos.trace import TraceManager
 from amitools.vamos.label import *
 from amitools.vamos.machine import *
-from amitools.vamos.lib.lexec.ExecStruct import NodeDef, LibraryDef
+from amitools.vamos.astructs import NodeDef, LibraryDef
 
 
 class FakeLib:

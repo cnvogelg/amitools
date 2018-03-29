@@ -1,7 +1,6 @@
-from amitools.vamos.astructs import AnchorPathDef, AChainDef, FileInfoBlockDef
+from amitools.vamos.astructs import AccessStruct, AnchorPathDef, AChainDef, FileInfoBlockDef
 from PathMatch import PathMatch
 from amitools.vamos.label import LabelStruct
-from amitools.vamos.mem import AccessStruct
 from Error import *
 
 class MatchFirstNext:

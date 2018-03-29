@@ -6,8 +6,7 @@ import errno
 import stat
 
 from amitools.vamos.Log import log_file
-from amitools.vamos.mem import AccessStruct
-from amitools.vamos.astructs import MessageDef, DosPacketDef
+from amitools.vamos.astructs import AccessStruct, MessageDef, DosPacketDef
 from Error import *
 from DosProtection import DosProtection
 from FileHandle import FileHandle

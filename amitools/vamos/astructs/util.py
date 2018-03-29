@@ -1,4 +1,4 @@
-from amitools.vamos.mem import AmigaStruct
+from .astruct import AmigaStruct
 
 # TagItem
 class TagItemStruct(AmigaStruct):

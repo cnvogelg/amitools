@@ -1,5 +1,6 @@
 from .label import LabelManager, LabelRange
-from .mem import MemoryAlloc, AccessStruct
+from .mem import MemoryAlloc
+from .astructs import AccessStruct
 from LibManager import LibManager
 from .libcore import LibRegistry, LibCtxMap, LibCtx
 from .loader import SegmentLoader

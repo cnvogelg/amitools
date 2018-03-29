@@ -1,5 +1,5 @@
 import inspect
-from amitools.vamos.lib.lexec.ExecStruct import LibraryDef
+from amitools.vamos.astructs import LibraryDef
 
 class LibImpl(object):
   """base class for all Python-based library implementations"""

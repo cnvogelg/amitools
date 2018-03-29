@@ -1,5 +1,4 @@
-from ExecStruct import SignalSemaphoreDef
-from amitools.vamos.mem import AccessStruct
+from amitools.vamos.astructs import AccessStruct, SignalSemaphoreDef
 from amitools.vamos.Exceptions import *
 
 class SemaphoreManager:

@@ -1,7 +1,7 @@
 from amitools.vamos.Exceptions import *
 from amitools.vamos.Log import log_mem_alloc
 from amitools.vamos.label import LabelRange, LabelStruct
-from .access import AccessStruct
+from amitools.vamos.astructs import AccessStruct
 
 
 class Memory:

@@ -1,5 +1,5 @@
 import re
-from amitools.vamos.mem import AccessStruct
+from amitools.vamos.astructs import AccessStruct
 
 
 def name_convert(name):

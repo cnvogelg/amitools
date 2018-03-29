@@ -7,8 +7,7 @@ import inspect
 import sys, traceback
 
 from .label import LabelLib
-from .mem import AccessStruct
-from .astructs import LibraryDef
+from .astructs import AccessStruct, LibraryDef
 
 class AmigaLibrary:
 

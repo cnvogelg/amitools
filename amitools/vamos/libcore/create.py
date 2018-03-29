@@ -1,4 +1,4 @@
-from amitools.vamos.lib.lexec.ExecStruct import LibraryDef
+from amitools.vamos.astructs import LibraryDef
 from amitools.fd import read_lib_fd
 from .base import LibIntBase
 from .stub import LibStubGen

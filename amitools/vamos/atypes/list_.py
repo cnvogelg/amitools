@@ -1,5 +1,4 @@
 from amitools.vamos.astructs import ListDef
-from amitools.vamos.mem import AccessStruct
 from .node import Node, NodeType
 from .atype import AmigaType
 

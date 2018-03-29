@@ -1,5 +1,4 @@
 from amitools.vamos.astructs import NodeDef
-from amitools.vamos.mem import AccessStruct
 from .atype import AmigaType
 from .enum import EnumType
 

@@ -1,6 +1,5 @@
 import pytest
-from amitools.vamos.lib.lexec.ExecStruct import NodeDef, TaskDef
-from amitools.vamos.mem import AccessStruct
+from amitools.vamos.astructs import AccessStruct, NodeDef, TaskDef
 from amitools.vamos.machine import MockMemory
 
 

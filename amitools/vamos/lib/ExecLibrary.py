@@ -3,7 +3,6 @@ from amitools.vamos.libcore import LibImpl
 from amitools.vamos.astructs import *
 from amitools.vamos.Log import log_exec
 from amitools.vamos.Exceptions import *
-from amitools.vamos.mem import AccessStruct
 from amitools.vamos.Trampoline import Trampoline
 from lexec.PortManager import PortManager
 from lexec.SemaphoreManager import SemaphoreManager

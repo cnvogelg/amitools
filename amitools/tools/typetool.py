@@ -8,7 +8,6 @@
 
 import sys
 
-from amitools.vamos.mem import AmigaStruct
 from amitools.vamos.astructs import *
 
 # --- args ---
