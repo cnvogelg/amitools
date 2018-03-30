@@ -37,11 +37,19 @@ class MemoryChunk:
 
 
 class MemoryAlloc:
-  def __init__(self, mem, addr, size, label_mgr=None):
+  def __init__(self, mem, addr=0, size=0, label_mgr=None):
     """mem is a interface.
        setup allocator starting at addr with size bytes.
        if label_mgr is set then labels are created for allocations.
     """
+    # if no size is specified then take mem total
+    if addr == 0 and size == 0:
+      size = mem.get_ram_size_kib() * 1024
+    # if addr == 0 skip 0 to never return NULL pointer!
+    if addr == 0:
+      addr = 4
+      size -= 4
+
     self.mem = mem
     self.addr = addr
     self.size = size

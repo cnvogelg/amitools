@@ -7,8 +7,7 @@ from amitools.vamos.mem import MemoryAlloc
 
 def libcore_alloc_base_test():
   mem = MockMemory(fill=23)
-  size = mem.get_ram_size() * 1024 - 0x100
-  alloc = MemoryAlloc(mem, 0x100, size)
+  alloc = MemoryAlloc(mem)
   # create info for lib
   date = datetime.date(2012, 11, 12)
   info = LibInfo('my.library', 42, 3, date, 36, 6*12)

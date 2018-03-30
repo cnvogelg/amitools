@@ -4,6 +4,7 @@ from musashi import emu
 
 def musashi_mem_rw_test():
   mem = emu.Memory(16)
+  assert mem.get_ram_size_kib() == 16
 
   mem.w8(0x100, 42)
   assert mem.r8(0x100) == 42

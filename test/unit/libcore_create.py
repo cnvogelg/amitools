@@ -10,8 +10,7 @@ def setup():
   mem = MockMemory(fill=23)
   traps = MockTraps()
   cpu = MockCPU()
-  size = mem.get_ram_size() * 1024 - 0x100
-  alloc = MemoryAlloc(mem, 0x100, size)
+  alloc = MemoryAlloc(mem)
   ctx = LibCtx(cpu, mem)
   return mem, traps, alloc, ctx
 

@@ -12,7 +12,7 @@ class MockMemory(object):
       for i in xrange(self.size_bytes):
         self.data[i] = fill
 
-  def get_ram_size(self):
+  def get_ram_size_kib(self):
     return self.size_kib
 
   def set_all_to_end(self):

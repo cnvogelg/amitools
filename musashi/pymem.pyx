@@ -54,7 +54,7 @@ cdef void special_write_func_wrapper(uint addr, uint value, void *ctx) except *:
 
 # public Memory class
 cdef class Memory:
-  cdef uint ram_size
+  cdef uint ram_size_kib
   cdef uint ram_bytes
   cdef unsigned char *ram_ptr
   # keep python refs of callback funcs otherwise wrapper might loose the object
@@ -64,7 +64,7 @@ cdef class Memory:
 
   def __cinit__(self, ram_size_kib):
     mem_init(ram_size_kib)
-    self.ram_size = ram_size_kib
+    self.ram_size_kib = ram_size_kib
     self.ram_bytes = ram_size_kib * 1024
     self.ram_ptr = mem_raw_ptr()
     self.special_funcs = set()
@@ -72,8 +72,8 @@ cdef class Memory:
   def __dealloc__(self):
     mem_free()
 
-  def get_ram_size(self):
-    return self.ram_size
+  def get_ram_size_kib(self):
+    return self.ram_size_kib
 
   def set_all_to_end(self):
     mem_set_all_to_end()
