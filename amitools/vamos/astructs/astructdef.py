@@ -167,10 +167,11 @@ class AmigaStructDecorator(object):
     name = cls.__name__
     if not name.endswith('Struct'):
       raise RuntimeError("cls must be named *Struct")
-    return name[:-len('Struct')]
+    base_name = name[:-len('Struct')]
+    return base_name
 
 
 def AmigaStructDef(cls):
   """a class decorator that setups up an amiga struct class"""
-  deco = AmigaStructDecorator()
-  return deco.decorate(cls)
+  decorator = AmigaStructDecorator()
+  return decorator.decorate(cls)

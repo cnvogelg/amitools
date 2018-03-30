@@ -22,9 +22,10 @@ def atype_enum_test():
   assert a.get_value() == 3
   assert str(a) == 'a'
   assert int(a) == 3
+  assert a == 3
   assert a == MyEnum(3)
   c = MyEnum('c')
   assert c.get_value() == 0xffffffff
   assert str(c) == 'c'
   assert int(c) == 0xffffffff
-  assert long(c) == 0xffffffff
+  assert c == 0xffffffff

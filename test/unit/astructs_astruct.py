@@ -2,15 +2,26 @@ from amitools.vamos.machine import MockMemory
 from amitools.vamos.astructs import AmigaStruct, AmigaStructDef
 
 
+@AmigaStructDef
+class MyStruct(AmigaStruct):
+  _format = [
+      ('WORD', 'ms_Word'),
+      ('UWORD', 'ms_Pad'),
+      ('BPTR', 'ms_SegList'),
+      ('LONG', 'ms_StackSize'),
+  ]
+
+
+@AmigaStructDef
+class SubStruct(AmigaStruct):
+  _format = [
+      ('My', 'ss_My'),
+      ('My*', 'ss_MyPtr'),
+      ('Sub*', 'ss_SubPtr')
+  ]
+
+
 def astruct_astruct_base_test():
-  @AmigaStructDef
-  class MyStruct(AmigaStruct):
-    _format = [
-        ('WORD', 'ms_Word'),
-        ('UWORD', 'ms_Pad'),
-        ('BPTR', 'ms_SegList'),
-        ('LONG', 'ms_StackSize'),
-    ]
   # check class
   assert MyStruct.get_type_name() == 'My'
   assert MyStruct.get_size() == 12
@@ -46,13 +57,6 @@ def astruct_astruct_base_test():
 
 
 def astruct_astruct_sub_struct_test():
-  @AmigaStructDef
-  class SubStruct(AmigaStruct):
-    _format = [
-        ('My', 'ss_My'),
-        ('My*', 'ss_MyPtr'),
-        ('Sub*', 'ss_SubPtr')
-    ]
   # check class
   assert SubStruct.get_type_name() == 'Sub'
   assert SubStruct.get_size() == 20

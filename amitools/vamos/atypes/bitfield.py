@@ -15,8 +15,8 @@ def BitFieldType(cls):
         raise ValueError("no bit mask in bit field: " % name)
       _name_to_val[name] = val
       _val_to_name[val] = name
-  setattr(cls, '_name_to_val', _name_to_val)
-  setattr(cls, '_val_to_name', _val_to_name)
+  cls._name_to_val = _name_to_val
+  cls._val_to_name = _val_to_name
 
   def to_strs(cls, val, check=True):
     res = []
@@ -70,13 +70,13 @@ def BitFieldType(cls):
     bmask = cls._get_bit_mask(what)
     return val & bmask == 0
 
-  setattr(cls, 'to_str', classmethod(to_str))
-  setattr(cls, 'from_str', classmethod(from_str))
-  setattr(cls, 'to_strs', classmethod(to_strs))
-  setattr(cls, 'from_strs', classmethod(from_strs))
-  setattr(cls, '_get_bit_mask', classmethod(_get_bit_mask))
-  setattr(cls, 'is_set', classmethod(is_set))
-  setattr(cls, 'is_clr', classmethod(is_clr))
+  cls.to_str = classmethod(to_str)
+  cls.from_str = classmethod(from_str)
+  cls.to_strs = classmethod(to_strs)
+  cls.from_strs = classmethod(from_strs)
+  cls._get_bit_mask = classmethod(_get_bit_mask)
+  cls.is_set = classmethod(is_set)
+  cls.is_clr = classmethod(is_clr)
 
   def __init__(self, *values):
     val = 0
@@ -91,20 +91,21 @@ def BitFieldType(cls):
   def __int__(self):
     return int(self.value)
 
-  def __long__(self):
-    return self.value
-
   def __eq__(self, other):
-    return self.value == other.value
+    if isinstance(other, cls):
+      return self.value == other.value
+    elif type(other) is int:
+      return self.value == other
+    else:
+      return NotImplemented
 
   def get_value(self):
     return self.value
 
-  setattr(cls, '__init__', __init__)
-  setattr(cls, '__str__', __str__)
-  setattr(cls, '__int__', __int__)
-  setattr(cls, '__long__', __long__)
-  setattr(cls, '__eq__', __eq__)
-  setattr(cls, 'get_value', get_value)
+  cls.__init__ = __init__
+  cls.__str__ = __str__
+  cls.__int__ = __int__
+  cls.__eq__ = __eq__
+  cls.get_value = get_value
 
   return cls

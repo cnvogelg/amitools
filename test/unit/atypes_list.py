@@ -171,13 +171,13 @@ def atypes_list_iter_at_test():
 
 def add_node(alist, addr, name):
   n = Node(alist.mem, addr)
-  addr += n.get_all_size()
+  addr += n.get_type_size()
   name_addr = addr
   alist.mem.w_cstr(addr, name)
   addr += len(name) + 1
   if addr & 3 != 0:
     addr = (addr & ~0x3) + 4
-  n.set_name_addr(name_addr)
+  n.set_name(name_addr)
   alist.add_tail(n)
   return n, addr
 

@@ -1,5 +1,6 @@
 from amitools.vamos.astructs import NodeStruct
 from .atype import AmigaType
+from .atypedef import AmigaTypeDef
 from .enum import EnumType
 
 
@@ -31,38 +32,30 @@ class NodeType(object):
   NT_EXTENDED = 255
 
 
-@AmigaType(NodeStruct, wrap={'type': (NodeType, long)})
-class Node(object):
+@AmigaTypeDef(NodeStruct, wrap={'type': NodeType})
+class Node(AmigaType):
   """wrap an Exec Node in memory an allow to operate on its values.
      also suppors MinNode by simply not using any ops on type, pri, and name"""
 
-  def __init__(self, min_node=False):
+  def __init__(self, mem, addr, min_node=False):
+    AmigaType.__init__(self, mem, addr)
     self.min_node = min_node
 
   def __str__(self):
     if self.min_node:
       return "[MinNode:@%06x,p=%06x,s=%06x]" % \
-          (self.addr, self.get_pred(), self.get_succ())
+          (self.addr, self.get_pred(True), self.get_succ(True))
     else:
       return "[Node:@%06x,p=%06x,s=%06x,%s,%d,'%s']" % \
-          (self.addr, self.get_pred(), self.get_succ(),
+          (self.addr, self.get_pred(True), self.get_succ(True),
            self.get_type(), self.get_pri(), self.get_name())
 
-  def __eq__(self, other):
-    return self.mem == other.mem and self.addr == other.addr
-
-  def get_succ_node(self):
-    return Node(self.mem, self.get_succ())
-
-  def get_pred_node(self):
-    return Node(self.mem, self.get_pred())
-
-  def setup(self, succ, pred, nt, pri, name_addr):
+  def setup(self, succ, pred, nt, pri, name):
     self.set_succ(succ)
     self.set_pred(pred)
     self.set_type(nt)
     self.set_pri(pri)
-    self.set_name_addr(name_addr)
+    self.set_name(name)
 
   def min_setup(self, succ, pred):
     self.set_succ(succ)
@@ -73,25 +66,22 @@ class Node(object):
   def remove(self, clear=True):
     succ = self.get_succ()
     pred = self.get_pred()
-    if succ == 0 or pred == 0:
+    if succ is None or pred is None:
       raise ValueError("remove node without succ/pred!")
-    sn = Node(self.mem, succ)
-    pn = Node(self.mem, pred)
-    sn.set_pred(pred)
-    pn.set_succ(succ)
+    succ.set_pred(pred)
+    pred.set_succ(succ)
     if clear:
-      self.set_succ(0)
-      self.set_pred(0)
+      self.set_succ(None)
+      self.set_pred(None)
 
   def find_name(self, name):
     """find name after this node"""
     if self.min_node:
       raise RuntimeError("min_node has no name!")
     succ = self.get_succ()
-    if succ == 0:
+    if succ is None:
       return None
-    succ_node = Node(self.mem, succ)
-    succ_name = succ_node.get_name()
+    succ_name = succ.get_name()
     if succ_name == name:
-      return succ_node
-    return succ_node.find_name(name)
+      return succ
+    return succ.find_name(name)

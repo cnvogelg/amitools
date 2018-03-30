@@ -1,6 +1,7 @@
 from amitools.vamos.astructs import ListStruct
 from .node import Node, NodeType
 from .atype import AmigaType
+from .atypedef import AmigaTypeDef
 
 
 class ListIter(object):
@@ -9,7 +10,7 @@ class ListIter(object):
     self.alist = alist
     self.mem = self.alist.mem
     if start_node is None:
-      self.node = Node(self.mem, alist.get_head())
+      self.node = alist.head.get_succ()
     else:
       self.node = start_node
 
@@ -18,34 +19,32 @@ class ListIter(object):
 
   def next(self):
     succ = self.node.get_succ()
-    if succ == 0:
+    if succ is None:
       raise StopIteration()
     res = self.node
-    self.node = Node(self.mem, succ)
+    self.node = succ
     return res
 
 
-@AmigaType(ListStruct, wrap={'type': (NodeType, long)})
-class List(object):
+@AmigaTypeDef(ListStruct, wrap={'type': NodeType})
+class List(AmigaType):
 
-  def __init__(self, min_list=False):
-    self.head_addr = self.addr
-    self.tail_addr = self.addr + 4
+  def __init__(self, mem, addr, min_list=False):
+    AmigaType.__init__(self, mem, addr)
+    self.head = Node(mem, self.addr, min_node=True)
+    self.tail = Node(mem, self.addr + 4, min_node=True)
     self.min_list = min_list
 
   def __str__(self):
     if self.min_list:
       return "[MinList:@%06x,h=%06x,t=%06x,tp=%06x]" % \
-          (self.head_addr, self.get_head(),
-           self.get_tail(), self.get_tail_pred())
+          (self.addr, self.get_head(True),
+           self.get_tail(True), self.get_tail_pred(True))
     else:
       return "[List:@%06x,h=%06x,t=%06x,tp=%06x,%s]" % \
-          (self.head_addr, self.get_head(),
-           self.get_tail(), self.get_tail_pred(),
+          (self.addr, self.get_head(True),
+           self.get_tail(True), self.get_tail_pred(True),
            self.get_type())
-
-  def __eq__(self, other):
-    return self.mem == other.mem and self.head_addr == other.head_addr
 
   # ----- list ops -----
 
@@ -53,13 +52,13 @@ class List(object):
     return ListIter(self)
 
   def __len__(self):
-    node = Node(self.mem, self.get_head())
     l = 0
-    succ = node.get_succ()
-    while succ != 0:
+    node = self.head.get_succ()
+    while True:
+      node = node.get_succ()
+      if node is None:
+        break
       l += 1
-      node = Node(self.mem, succ)
-      succ = node.get_succ()
     return l
 
   def iter_at(self, node):
@@ -67,61 +66,52 @@ class List(object):
 
   def new_list(self, lt):
     self.set_type(lt)
-    self.set_head(self.tail_addr)
+    self.set_head(self.tail)
     self.set_tail(0)
-    self.set_tail_pred(self.head_addr)
+    self.set_tail_pred(self.head)
 
   def new_min_list(self):
-    self.set_head(self.tail_addr)
+    self.set_head(self.tail)
     self.set_tail(0)
-    self.set_tail_pred(self.head_addr)
+    self.set_tail_pred(self.head)
 
   def add_head(self, node):
-    na = node.addr
-    node.set_pred(self.head_addr)
-    head = self.get_head()
-    node.set_succ(head)
-    n = Node(self.mem, head)
-    n.set_pred(na)
-    self.set_head(na)
+    n = self.head.get_succ()
+    node.set_pred(self.head)
+    node.set_succ(n)
+    self.head.set_succ(node)
+    n.set_pred(node)
 
   def add_tail(self, node):
-    na = node.addr
-    node.set_succ(self.tail_addr)
     tp = self.get_tail_pred()
+    node.set_succ(self.tail)
+    self.tail.set_pred(node)
     node.set_pred(tp)
-    n = Node(self.mem, tp)
-    n.set_succ(na)
-    self.set_tail_pred(na)
+    tp.set_succ(node)
 
   def rem_head(self):
-    head = self.get_head()
-    hn = Node(self.mem, head)
-    succ = hn.get_succ()
-    if succ == 0:
+    node = self.head.get_succ()
+    if node is None:
       return None
-    hn.remove()
-    return hn
+    node.remove()
+    return node
 
   def rem_tail(self):
-    tp = self.get_tail_pred()
-    tn = Node(self.mem, tp)
-    pred = tn.get_pred()
-    if pred == 0:
+    node = self.get_tail_pred()
+    if node is None:
       return None
-    tn.remove()
-    return tn
+    node.remove()
+    return node
 
   def insert(self, node, pred):
-    if pred is not None and pred.addr != 0 and pred.addr != self.head_addr:
+    if pred is not None and pred != self.head:
       pred_succ = pred.get_succ()
-      if pred_succ != 0:
+      if pred_succ:
         # normal node
         node.set_succ(pred_succ)
-        node.set_pred(pred.addr)
-        pred_succ_node = Node(self.mem, pred_succ)
-        pred_succ_node.set_pred(node.addr)
-        pred.set_succ(node.addr)
+        node.set_pred(pred)
+        pred_succ.set_pred(node)
+        pred.set_succ(node)
       else:
         # last node
         self.add_tail(node)

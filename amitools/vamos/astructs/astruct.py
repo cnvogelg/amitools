@@ -77,6 +77,11 @@ class AmigaStruct(object):
     return cls._data_class
 
   @classmethod
+  def find_struct(cls, name):
+    if name in cls._struct_pool:
+      return cls._struct_pool[name]
+
+  @classmethod
   def dump_type(self, indent=0, num=0, base=0, name="", data=None):
     istr = "  " * indent
     print "     @%04d       %s %s {" % (base, istr, self._type_name)
@@ -115,7 +120,12 @@ class AmigaStruct(object):
     self.parent = None
 
   def __eq__(self, other):
-    return self.mem == other.mem and self.addr == other.addr
+    if type(other) is int:
+      return self.addr == other
+    elif isinstance(other, AmigaStruct):
+      return self.addr == other.addr
+    else:
+      return NotImplemented
 
   def __str__(self):
     return "[AStruct:%s,@%06x+%06x]" % \

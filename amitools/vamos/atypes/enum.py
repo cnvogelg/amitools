@@ -12,8 +12,9 @@ def EnumType(cls):
     if type(val) in (int, long):
       _name_to_val[name] = val
       _val_to_name[val] = name
-  setattr(cls, '_name_to_val', _name_to_val)
-  setattr(cls, '_val_to_name', _val_to_name)
+
+  cls._name_to_val = _name_to_val
+  cls._val_to_name = _val_to_name
 
   def to_str(cls, val, check=True):
     if val in cls._val_to_name:
@@ -28,8 +29,8 @@ def EnumType(cls):
       return cls._name_to_val[name]
     raise ValueError("'%s' is an unknown Enum string" % name)
 
-  setattr(cls, 'to_str', classmethod(to_str))
-  setattr(cls, 'from_str', classmethod(from_str))
+  cls.to_str = classmethod(to_str)
+  cls.from_str = classmethod(from_str)
 
   def __init__(self, value):
     if type(value) is str:
@@ -50,16 +51,20 @@ def EnumType(cls):
     return self.value
 
   def __eq__(self, other):
-    return self.value == other.value
+    if isinstance(other, cls):
+      return self.value == other.value
+    elif type(other) is int:
+      return self.value == other
+    else:
+      return NotImplemented
 
   def get_value(self):
     return self.value
 
-  setattr(cls, '__init__', __init__)
-  setattr(cls, '__str__', __str__)
-  setattr(cls, '__int__', __int__)
-  setattr(cls, '__long__', __long__)
-  setattr(cls, '__eq__', __eq__)
-  setattr(cls, 'get_value', get_value)
+  cls.__init__ = __init__
+  cls.__str__ = __str__
+  cls.__int__ = __int__
+  cls.__eq__ = __eq__
+  cls.get_value = get_value
 
   return cls
