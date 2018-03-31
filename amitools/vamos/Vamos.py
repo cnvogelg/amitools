@@ -21,7 +21,7 @@ class Vamos:
 
   def __init__(self, raw_mem, cpu, traps, cfg):
     self.raw_mem = raw_mem
-    self.ram_size = raw_mem.get_ram_size() * 1024 # in bytes
+    self.ram_size = raw_mem.get_ram_size_kib() * 1024 # in bytes
     self.cpu = cpu
     self.cpu_type = cfg.cpu
     self.traps = traps

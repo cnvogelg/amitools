@@ -1,4 +1,4 @@
-from amitools.vamos.astructs import NodeStruct
+from amitools.vamos.astructs import NodeStruct, MinNodeStruct
 from .atype import AmigaType
 from .atypedef import AmigaTypeDef
 from .enum import EnumType
@@ -50,6 +50,12 @@ class Node(AmigaType):
           (self.addr, self.get_pred(True), self.get_succ(True),
            self.get_type(), self.get_pri(), self.get_name())
 
+  @classmethod
+  def alloc_min(cls, mem, alloc, tag=None, size=None):
+    if size is None:
+      size = MinNodeStruct.get_size()
+    return cls.alloc(mem, alloc, tag, size)
+
   def setup(self, succ, pred, nt, pri, name):
     self.set_succ(succ)
     self.set_pred(pred)
@@ -57,7 +63,7 @@ class Node(AmigaType):
     self.set_pri(pri)
     self.set_name(name)
 
-  def min_setup(self, succ, pred):
+  def setup_min(self, succ, pred):
     self.set_succ(succ)
     self.set_pred(pred)
 

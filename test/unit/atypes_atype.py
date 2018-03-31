@@ -1,7 +1,7 @@
 from amitools.vamos.machine import MockMemory
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.astructs import AmigaStruct, AmigaStructDef
-from amitools.vamos.atypes import AmigaType, AmigaTypeDef
+from amitools.vamos.atypes import AmigaType, AmigaTypeDef, CString
 
 
 @AmigaStructDef
@@ -11,6 +11,7 @@ class MyStruct(AmigaStruct):
       ('UWORD', 'ms_Pad'),
       ('BPTR', 'ms_SegList'),
       ('LONG', 'ms_StackSize'),
+      ('char*', 'ms_String')
   ]
 
 
@@ -53,6 +54,7 @@ def atypes_atype_base_test():
 
   # create a type instance
   mem = MockMemory()
+  alloc = MemoryAlloc(mem, addr=0x100)
   mt = MyType(mem, 0x10)
   # regular values (signed/unsigend)
   mt.set_word(-3)
@@ -64,6 +66,16 @@ def atypes_atype_base_test():
   assert mt.get_pad(raw=True) == 3
   mt.set_pad(21, raw=True)
   assert mt.get_pad() == Bla(21)
+  # cstring
+  assert type(mt.get_string()) is CString
+  txt = "hello, word!"
+  cstr = CString.alloc(mem, alloc, txt)
+  cstr_addr = cstr.get_addr()
+  mt.set_string(cstr)
+  assert mt.get_string() == txt
+  assert mt.get_string() == CString(mem, cstr_addr)
+  assert mt.get_string(ptr=True) == cstr_addr
+  cstr.free()
 
 
 def atypes_atype_complex_test():
@@ -128,3 +140,25 @@ def atypes_atype_struct_test():
   assert st.get_sub_ptr() is None
   assert st.get_sub_ptr(ptr=True) == 0
 
+
+def atypes_atype_alloc_test():
+  @AmigaTypeDef(MyStruct, wrap={'pad': (Bla.getf, Bla.setf)})
+  class MyType(AmigaType):
+    pass
+
+  @AmigaTypeDef(SubStruct)
+  class SubType(AmigaType):
+    pass
+
+  mem = MockMemory()
+  alloc = MemoryAlloc(mem)
+  # my type
+  mt = MyType.alloc(mem, alloc)
+  assert mt
+  assert mt.get_addr() != 0
+  mt.free()
+  # sub
+  st = SubType.alloc(mem, alloc)
+  assert st
+  assert st.get_addr() != 0
+  st.free()

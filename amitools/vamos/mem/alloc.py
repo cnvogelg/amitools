@@ -43,8 +43,9 @@ class MemoryAlloc:
        if label_mgr is set then labels are created for allocations.
     """
     # if no size is specified then take mem total
-    if addr == 0 and size == 0:
+    if size == 0:
       size = mem.get_ram_size_kib() * 1024
+      size -= addr
     # if addr == 0 skip 0 to never return NULL pointer!
     if addr == 0:
       addr = 4
@@ -290,8 +291,9 @@ class MemoryAlloc:
     del self.mem_objs[mem.addr]
 
   # struct
-  def alloc_struct(self, name, struct):
-    size = struct.get_size()
+  def alloc_struct(self, name, struct, size=None):
+    if size is None:
+      size = struct.get_size()
     addr = self.alloc_mem(size)
     if self.label_mgr is not None:
       label = LabelStruct(name, addr, struct)

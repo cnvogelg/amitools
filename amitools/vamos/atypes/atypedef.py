@@ -1,5 +1,6 @@
 import re
 from .atype import AmigaType
+from .cstring import CString
 
 
 class AmigaTypeDecorator(object):
@@ -121,20 +122,22 @@ class AmigaTypeDecorator(object):
   def _gen_cstr_get_set(self, base_name, cls, field):
     index = field.index
 
-    def get_cstr(self, addr=False):
+    def get_cstr(self, ptr=False):
       """return the c_str or "" if ptr==0
          or the addr of the pointer (addr=True)"""
-      ptr = self.struct.read_field_index(index)
-      if addr:
-        return ptr
-      return self.mem.r_cstr(ptr)
+      addr = self.struct.read_field_index(index)
+      if ptr:
+        return addr
+      return CString(self.mem, addr)
 
     def set_cstr(self, val):
       """set a c_str either by address or with a CString object"""
       if type(val) is int:
         ptr = val
+      elif isinstance(val, CString):
+        ptr = val.get_addr()
       else:
-        ptr = val.addr
+        raise ValueError("set cstring: wrong value: %s" % val)
       self.struct.write_field_index(index, ptr)
     self._setup_get_set(base_name, cls, get_cstr, set_cstr)
 

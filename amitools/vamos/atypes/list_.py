@@ -1,4 +1,4 @@
-from amitools.vamos.astructs import ListStruct
+from amitools.vamos.astructs import ListStruct, MinListStruct
 from .node import Node, NodeType
 from .atype import AmigaType
 from .atypedef import AmigaTypeDef
@@ -45,6 +45,12 @@ class List(AmigaType):
           (self.addr, self.get_head(True),
            self.get_tail(True), self.get_tail_pred(True),
            self.get_type())
+
+  @classmethod
+  def alloc_min(cls, mem, alloc, tag=None, size=None):
+    if size is None:
+      size = MinListStruct.get_size()
+    return cls.alloc(mem, alloc, tag, size)
 
   # ----- list ops -----
 
