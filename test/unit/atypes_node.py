@@ -79,10 +79,10 @@ def atypes_node_str_test():
 def atypes_node_alloc_test():
   mem = MockMemory()
   alloc = MemoryAlloc(mem)
-  node = Node.alloc(mem, alloc)
+  node = Node.alloc(alloc)
   assert node.get_size() == NodeStruct.get_size()
   node.free()
   # min
-  node = Node.alloc_min(mem, alloc)
+  node = Node.alloc_min(alloc)
   assert node.get_size() == MinNodeStruct.get_size()
   node.free()

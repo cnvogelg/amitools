@@ -59,13 +59,14 @@ class AmigaType(object):
     return self.struct.write_data()
 
   @classmethod
-  def alloc(cls, mem, alloc, tag=None, size=None):
+  def alloc(cls, alloc, tag=None, size=None, add_label=True):
     if tag is None:
       tag = cls._type_name
     if size is None:
       size = cls.get_type_size()
     struct = cls.get_type_struct()
-    mem_obj = alloc.alloc_struct(tag, struct, size)
+    mem_obj = alloc.alloc_struct(tag, struct, size, add_label=add_label)
+    mem = alloc.get_mem()
     obj = cls(mem, mem_obj.addr)
     obj.alloc = alloc
     obj.mem_obj = mem_obj

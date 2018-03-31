@@ -207,12 +207,12 @@ def atypes_list_find_name_test():
 def atypes_list_alloc_test():
   mem = MockMemory()
   alloc = MemoryAlloc(mem)
-  l = List.alloc(mem, alloc)
+  l = List.alloc(alloc)
   assert type(l) is List
   assert l.get_size() == ListStruct.get_size()
   l.free()
   # min
-  l = List.alloc_min(mem, alloc)
+  l = List.alloc_min(alloc)
   assert type(l) is List
   assert l.get_size() == MinListStruct.get_size()
   l.free()

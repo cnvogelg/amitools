@@ -51,10 +51,10 @@ class Node(AmigaType):
            self.get_type(), self.get_pri(), self.get_name())
 
   @classmethod
-  def alloc_min(cls, mem, alloc, tag=None, size=None):
+  def alloc_min(cls, alloc, tag=None, size=None):
     if size is None:
       size = MinNodeStruct.get_size()
-    return cls.alloc(mem, alloc, tag, size)
+    return cls.alloc(alloc, tag, size)
 
   def setup(self, succ, pred, nt, pri, name):
     self.set_succ(succ)

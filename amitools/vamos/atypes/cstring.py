@@ -14,6 +14,9 @@ class CString(object):
   def __str__(self):
     return self.get_string()
 
+  def __int__(self):
+    return self.addr
+
   def __eq__(self, other):
     if type(other) is int:
       return self.addr == other
@@ -46,7 +49,7 @@ class CString(object):
       raise RuntimeError("string not allocated!")
 
   @staticmethod
-  def alloc(mem, alloc, txt, tag=None):
+  def alloc(alloc, txt, tag=None):
     """allocate memory for the given txt with the allocator
 
     Returns a CString object with allocation info.
@@ -54,6 +57,7 @@ class CString(object):
     """
     if tag is None:
       tag = "CString('%s')" % txt
+    mem = alloc.get_mem()
     # NULL ptr
     if txt is None:
       mem_obj = None

@@ -9,7 +9,7 @@ def atypes_cstring_base_test():
   alloc = MemoryAlloc(mem)
   # simple string
   txt = "hello, world!"
-  cs = CString.alloc(mem, alloc, txt)
+  cs = CString.alloc(alloc, txt)
   assert cs
   assert mem.r_cstr(cs.get_addr()) == txt
   assert cs.get_string() == txt
@@ -24,7 +24,7 @@ def atypes_cstring_empty_test():
   alloc = MemoryAlloc(mem)
   # empty string
   txt = ""
-  cs = CString.alloc(mem, alloc, txt)
+  cs = CString.alloc(alloc, txt)
   assert cs
   assert mem.r_cstr(cs.get_addr()) == txt
   assert cs.get_string() == txt
@@ -37,7 +37,7 @@ def atypes_cstring_null_test():
   mem = MockMemory()
   alloc = MemoryAlloc(mem)
   # no string
-  cs = CString.alloc(mem, alloc, None)
+  cs = CString.alloc(alloc, None)
   assert cs
   assert cs.get_addr() == 0
   assert cs.get_string() is None

@@ -69,7 +69,7 @@ def atypes_atype_base_test():
   # cstring
   assert type(mt.get_string()) is CString
   txt = "hello, word!"
-  cstr = CString.alloc(mem, alloc, txt)
+  cstr = CString.alloc(alloc, txt)
   cstr_addr = cstr.get_addr()
   mt.set_string(cstr)
   assert mt.get_string() == txt
@@ -153,12 +153,12 @@ def atypes_atype_alloc_test():
   mem = MockMemory()
   alloc = MemoryAlloc(mem)
   # my type
-  mt = MyType.alloc(mem, alloc)
+  mt = MyType.alloc(alloc)
   assert mt
   assert mt.get_addr() != 0
   mt.free()
   # sub
-  st = SubType.alloc(mem, alloc)
+  st = SubType.alloc(alloc)
   assert st
   assert st.get_addr() != 0
   st.free()

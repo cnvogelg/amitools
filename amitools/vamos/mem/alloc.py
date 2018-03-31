@@ -66,6 +66,15 @@ class MemoryAlloc:
     self.free_first = MemoryChunk(addr, self.free_bytes)
     self.free_entries = 1
 
+  def get_mem(self):
+    return self.mem
+
+  def get_addr(self):
+    return self.addr
+
+  def get_size(self):
+    return self.size
+
   def _find_best_chunk(self, size):
     """find best chunk that could take the given alloc
        return: index of chunk in free list or -1 if none found + bytes left in chunk
@@ -291,11 +300,11 @@ class MemoryAlloc:
     del self.mem_objs[mem.addr]
 
   # struct
-  def alloc_struct(self, name, struct, size=None):
+  def alloc_struct(self, name, struct, size=None, add_label=True):
     if size is None:
       size = struct.get_size()
     addr = self.alloc_mem(size)
-    if self.label_mgr is not None:
+    if self.label_mgr is not None and add_label:
       label = LabelStruct(name, addr, struct)
       self.label_mgr.add_label(label)
     else:

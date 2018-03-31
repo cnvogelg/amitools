@@ -47,10 +47,10 @@ class List(AmigaType):
            self.get_type())
 
   @classmethod
-  def alloc_min(cls, mem, alloc, tag=None, size=None):
+  def alloc_min(cls, alloc, tag=None, size=None):
     if size is None:
       size = MinListStruct.get_size()
-    return cls.alloc(mem, alloc, tag, size)
+    return cls.alloc(alloc, tag, size)
 
   # ----- list ops -----
 
