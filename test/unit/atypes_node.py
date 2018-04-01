@@ -86,3 +86,5 @@ def atypes_node_alloc_test():
   node = Node.alloc_min(alloc)
   assert node.get_size() == MinNodeStruct.get_size()
   node.free()
+  assert alloc.is_all_free()
+

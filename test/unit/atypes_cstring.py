@@ -17,6 +17,7 @@ def atypes_cstring_base_test():
   assert cs == cs.get_addr()
   assert cs == CString(mem, cs.get_addr())
   cs.free()
+  assert alloc.is_all_free()
 
 
 def atypes_cstring_empty_test():
@@ -31,6 +32,7 @@ def atypes_cstring_empty_test():
   assert cs == txt
   assert cs == cs.get_addr()
   cs.free()
+  assert alloc.is_all_free()
 
 
 def atypes_cstring_null_test():

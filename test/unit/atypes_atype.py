@@ -162,3 +162,4 @@ def atypes_atype_alloc_test():
   assert st
   assert st.get_addr() != 0
   st.free()
+  assert alloc.is_all_free()

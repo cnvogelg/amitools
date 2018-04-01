@@ -75,6 +75,15 @@ class MemoryAlloc:
   def get_size(self):
     return self.size
 
+  def get_label_mgr(self):
+    return self.label_mgr
+
+  def get_free_bytes(self):
+    return self.free_bytes
+
+  def is_all_free(self):
+    return self.size == self.free_bytes
+
   def _find_best_chunk(self, size):
     """find best chunk that could take the given alloc
        return: index of chunk in free list or -1 if none found + bytes left in chunk
@@ -199,7 +208,10 @@ class MemoryAlloc:
     # first check if its a right alloc
     if not self.addrs.has_key(addr):
       raise VamosInternalError("Invalid Free'd Memory at %06x" % addr)
+    # align size to 4 bytes
+    size = (size + 3) & ~3
     real_size = self.addrs[addr]
+    assert size == real_size
     # remove from valid allocs
     del self.addrs[addr]
     # create a new free chunk

@@ -89,7 +89,7 @@ def BitFieldType(cls):
     return self.to_str(self.value, False)
 
   def __int__(self):
-    return int(self.value)
+    return self.value
 
   def __eq__(self, other):
     if isinstance(other, cls):

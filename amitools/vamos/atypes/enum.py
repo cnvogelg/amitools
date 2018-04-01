@@ -45,9 +45,6 @@ def EnumType(cls):
     return self.to_str(self.value, False)
 
   def __int__(self):
-    return int(self.value)
-
-  def __long__(self):
     return self.value
 
   def __eq__(self, other):

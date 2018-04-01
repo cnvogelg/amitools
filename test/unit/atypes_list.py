@@ -216,3 +216,4 @@ def atypes_list_alloc_test():
   assert type(l) is List
   assert l.get_size() == MinListStruct.get_size()
   l.free()
+  assert alloc.is_all_free()
