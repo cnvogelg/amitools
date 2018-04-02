@@ -58,6 +58,37 @@ class MemoryCache(object):
     addr -= self.start_addr
     struct.pack_into(">I", self.data, addr, value)
 
+  # signed memory access (full range including special)
+  def r8s(self, addr):
+    self._check(addr)
+    addr -= self.start_addr
+    return struct.unpack_from(">b", self.data, addr)[0]
+
+  def r16s(self, addr):
+    self._check(addr, 2)
+    addr -= self.start_addr
+    return struct.unpack_from(">h", self.data, addr)[0]
+
+  def r32s(self, addr):
+    self._check(addr, 4)
+    addr -= self.start_addr
+    return struct.unpack_from(">i", self.data, addr)[0]
+
+  def w8s(self, addr, value):
+    self._check(addr)
+    addr -= self.start_addr
+    struct.pack_into(">b", self.data, addr, value)
+
+  def w16s(self, addr, value):
+    self._check(addr, 2)
+    addr -= self.start_addr
+    struct.pack_into(">h", self.data, addr, value)
+
+  def w32s(self, addr, value):
+    self._check(addr, 4)
+    addr -= self.start_addr
+    struct.pack_into(">i", self.data, addr, value)
+
   # arbitrary width (full range including special)
   def read(self, width, addr):
     if width == 0:
@@ -76,6 +107,27 @@ class MemoryCache(object):
       self.w16(addr, value)
     elif width == 2:
       self.w32(addr, value)
+    else:
+      raise ValueError("invalid width: %s" % width)
+
+  # signed arbitrary width (full range including special)
+  def reads(self, width, addr):
+    if width == 0:
+      return self.r8s(addr)
+    elif width == 1:
+      return self.r16s(addr)
+    elif width == 2:
+      return self.r32s(addr)
+    else:
+      raise ValueError("invalid width: %s" % width)
+
+  def writes(self, width, addr, value):
+    if width == 0:
+      self.w8s(addr, value)
+    elif width == 1:
+      self.w16s(addr, value)
+    elif width == 2:
+      self.w32s(addr, value)
     else:
       raise ValueError("invalid width: %s" % width)
 

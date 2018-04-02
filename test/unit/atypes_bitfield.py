@@ -39,6 +39,7 @@ def atypes_bitfield_test():
   # instance
   a = MyBF('a')
   assert str(a) == 'a'
+  assert repr(a) == "MyBF('a')"
   assert int(a) == 1
   assert a == 1
   assert a == MyBF(1)

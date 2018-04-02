@@ -56,6 +56,60 @@ def mem_cache_rwx_read_test():
   assert cmem.read(2, 0x304) == 0x11223344
 
 
+def mem_cache_rwxs_write_test():
+  mem = MemoryCache(0x100, 0x210)
+  # build cache contents
+  mem.w8s(0x100, -42)
+  assert mem.r8s(0x100) == -42
+  mem.w16s(0x200, -0x1ead)
+  assert mem.r16s(0x200) == -0x1ead
+  mem.w32s(0x300, -0x2afebabe)
+  assert mem.r32s(0x300) == -0x2afebabe
+  mem.writes(0, 0x101, -43)
+  assert mem.reads(0, 0x101) == -43
+  mem.writes(1, 0x202, -0x1234)
+  assert mem.reads(1, 0x202) == -0x1234
+  mem.writes(2, 0x304, -0x11223344)
+  assert mem.reads(2, 0x304) == -0x11223344
+  # write to main mem
+  main_mem = MockMemory()
+  mem.write_cache(main_mem)
+  # check main mem
+  assert main_mem.r8s(0x100) == -42
+  assert main_mem.r16s(0x200) == -0x1ead
+  assert main_mem.r32s(0x300) == -0x2afebabe
+  assert main_mem.reads(0, 0x101) == -43
+  assert main_mem.reads(1, 0x202) == -0x1234
+  assert main_mem.reads(2, 0x304) == -0x11223344
+
+
+def mem_cache_rwxs_read_test():
+  mem = MockMemory()
+  # build main mem contents
+  mem.w8s(0x100, -42)
+  assert mem.r8s(0x100) == -42
+  mem.w16s(0x200, -0x1ead)
+  assert mem.r16s(0x200) == -0x1ead
+  mem.w32s(0x300, -0x2afebabe)
+  assert mem.r32s(0x300) == -0x2afebabe
+  mem.writes(0, 0x101, -43)
+  assert mem.reads(0, 0x101) == -43
+  mem.writes(1, 0x202, -0x1234)
+  assert mem.reads(1, 0x202) == -0x1234
+  mem.writes(2, 0x304, -0x11223344)
+  assert mem.reads(2, 0x304) == -0x11223344
+  # write to cache
+  cmem = MemoryCache(0x100, 0x210)
+  cmem.read_cache(mem)
+  # check cache mem
+  assert cmem.r8s(0x100) == -42
+  assert cmem.r16s(0x200) == -0x1ead
+  assert cmem.r32s(0x300) == -0x2afebabe
+  assert cmem.reads(0, 0x101) == -43
+  assert cmem.reads(1, 0x202) == -0x1234
+  assert cmem.reads(2, 0x304) == -0x11223344
+
+
 def mem_cache_block_write_test():
   mem = MemoryCache(0x100, 0x220)
   data = "hello, world!"

@@ -60,6 +60,10 @@ class AmigaType(object):
 
   @classmethod
   def alloc(cls, alloc, tag=None, size=None, add_label=True):
+    return cls._alloc(alloc, tag=tag, size=size, add_label=add_label)
+
+  @classmethod
+  def _alloc(cls, alloc, tag=None, size=None, add_label=True):
     if tag is None:
       tag = cls._type_name
     if size is None:

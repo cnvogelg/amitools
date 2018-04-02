@@ -21,6 +21,7 @@ def atype_enum_test():
   a = MyEnum('a')
   assert a.get_value() == 3
   assert str(a) == 'a'
+  assert repr(a) == "MyEnum('a')"
   assert int(a) == 3
   assert a == 3
   assert a == MyEnum(3)

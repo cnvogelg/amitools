@@ -88,6 +88,9 @@ def BitFieldType(cls):
   def __str__(self):
     return self.to_str(self.value, False)
 
+  def __repr__(self):
+    return "%s('%s')" % (self.__class__.__name__, str(self))
+
   def __int__(self):
     return self.value
 
@@ -104,6 +107,7 @@ def BitFieldType(cls):
 
   cls.__init__ = __init__
   cls.__str__ = __str__
+  cls.__repr__ = __repr__
   cls.__int__ = __int__
   cls.__eq__ = __eq__
   cls.get_value = get_value

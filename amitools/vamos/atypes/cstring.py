@@ -17,6 +17,9 @@ class CString(object):
   def __int__(self):
     return self.addr
 
+  def __repr__(self):
+    return "CString(@%06x:%s)" % (self.addr, self.get_string())
+
   def __eq__(self, other):
     if type(other) is int:
       return self.addr == other
