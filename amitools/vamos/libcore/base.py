@@ -36,6 +36,9 @@ class LibBase(object):
   def remove_lib_mem(self, lib_mem):
     self.lib_mems.remove(lib_mem)
 
+  def free(self):
+    pass
+
 
 class LibIntBase(LibBase):
   """a vamos interal lib has a stub, a impl and allocator and patcher"""
@@ -60,3 +63,17 @@ class LibIntBase(LibBase):
 
   def get_profile(self):
     return self.profile
+
+  def free(self,):
+    # call cleanup func in impl
+    if self.impl is not None:
+      self.impl.finish_lib(self.ctx)
+    # cleanup patcher
+    self.patcher.cleanup()
+    # free lib mems
+    for lib in self.get_lib_mems():
+      lib.free()
+    # clear members but leave alone ctx and profile
+    self.stub = None
+    self.impl = None
+    self.patcher = None

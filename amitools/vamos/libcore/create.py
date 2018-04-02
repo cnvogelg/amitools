@@ -70,20 +70,3 @@ class LibCreator(object):
     if impl is not None:
       impl.setup_lib(ctx, addr)
     return base
-
-  def free_lib(self, base):
-    # call cleanup func in impl
-    if base.impl is not None:
-      base.impl.finish_lib(base.ctx)
-    # cleanup patcher
-    base.patcher.cleanup()
-    # allocator
-    library = base.get_lib_mems()[0]
-    library.free()
-    # remove lib base
-    base.remove_lib_mem(library)
-    # clear members but leave alone ctx and profile
-    base.stub = None
-    base.impl = None
-    base.alloc = None
-    base.patcher = None

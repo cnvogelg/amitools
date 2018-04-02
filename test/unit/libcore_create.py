@@ -25,7 +25,7 @@ def libcore_create_lib_default_test():
   creator = LibCreator(alloc, traps)
   lib = creator.create_lib(info, ctx, impl)
   # free lib
-  creator.free_lib(lib)
+  lib.free()
   assert alloc.is_all_free()
 
 
@@ -39,7 +39,7 @@ def libcore_create_lib_fake_test():
   creator = LibCreator(alloc, traps)
   lib = creator.create_lib(info, ctx, impl)
   # free lib
-  creator.free_lib(lib)
+  lib.free()
   assert alloc.is_all_free()
 
 
@@ -54,7 +54,7 @@ def libcore_create_lib_label_mgr_test():
   creator = LibCreator(alloc, traps, label_mgr)
   lib = creator.create_lib(info, ctx, impl)
   # free lib
-  creator.free_lib(lib)
+  lib.free()
   assert alloc.is_all_free()
 
 
@@ -68,5 +68,5 @@ def libcore_create_lib_profile_test():
   creator = LibCreator(alloc, traps)
   lib = creator.create_lib(info, ctx, impl, do_profile=True)
   # free lib
-  creator.free_lib(lib)
+  lib.free()
   assert alloc.is_all_free()
