@@ -40,13 +40,12 @@ class LibBase(object):
 class LibIntBase(LibBase):
   """a vamos interal lib has a stub, a impl and allocator and patcher"""
 
-  def __init__(self, info, struct, fd, impl, stub, ctx, alloc, patcher,
+  def __init__(self, info, struct, fd, impl, stub, ctx, patcher,
                profile=None):
     LibBase.__init__(self, info, struct, fd)
     self.impl = impl
     self.stub = stub
     self.ctx = ctx
-    self.alloc = alloc
     self.patcher = patcher
     self.profile = profile
 
@@ -55,9 +54,6 @@ class LibIntBase(LibBase):
 
   def get_stub(self):
     return self.stub
-
-  def get_alloc(self):
-    return self.alloc
 
   def get_patcher(self):
     return self.neg_size

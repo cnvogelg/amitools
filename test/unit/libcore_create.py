@@ -26,6 +26,7 @@ def libcore_create_lib_default_test():
   lib = creator.create_lib(info, ctx, impl)
   # free lib
   creator.free_lib(lib)
+  assert alloc.is_all_free()
 
 
 def libcore_create_lib_fake_test():
@@ -39,6 +40,7 @@ def libcore_create_lib_fake_test():
   lib = creator.create_lib(info, ctx, impl)
   # free lib
   creator.free_lib(lib)
+  assert alloc.is_all_free()
 
 
 def libcore_create_lib_label_mgr_test():
@@ -53,6 +55,7 @@ def libcore_create_lib_label_mgr_test():
   lib = creator.create_lib(info, ctx, impl)
   # free lib
   creator.free_lib(lib)
+  assert alloc.is_all_free()
 
 
 def libcore_create_lib_profile_test():
@@ -66,3 +69,4 @@ def libcore_create_lib_profile_test():
   lib = creator.create_lib(info, ctx, impl, do_profile=True)
   # free lib
   creator.free_lib(lib)
+  assert alloc.is_all_free()
