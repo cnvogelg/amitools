@@ -71,6 +71,8 @@ class Library(AmigaType):
     # calc size
     if pos_size is None:
       pos_size = cls.get_type_size()
+    # round neg_size to multiple of four
+    neg_size = (neg_size + 3) & ~3
     total_size = pos_size + neg_size
     # allocate lib
     mem_obj = alloc.alloc_memory(None, total_size, add_label=False)
@@ -113,3 +115,36 @@ class Library(AmigaType):
     if self.label:
       self.alloc.get_label_mgr().remove_label(self.label)
       self.label = None
+
+  def calc_sum(self):
+    """calc the lib sum and return it"""
+    neg_size = self.get_neg_size()
+    addr = self.addr - neg_size
+    lib_sum = 0
+    while addr < self.addr:
+      val = self.mem.r32(addr)
+      lib_sum += val
+      addr += 4
+    lib_sum &= 0xffffffff
+    return lib_sum
+
+  def update_sum(self):
+    """calc new lib sum and store it"""
+    lib_sum = self.calc_sum()
+    self.set_sum(lib_sum)
+
+  def check_sum(self):
+    """calc and compare lib sum with stored value"""
+    lib_sum = self.calc_sum()
+    got_sum = self.get_sum()
+    return lib_sum == got_sum
+
+  def inc_open_cnt(self):
+    cnt = self.get_open_cnt()
+    cnt += 1
+    self.set_open_cnt(cnt)
+
+  def dec_open_cnt(self):
+    cnt = self.get_open_cnt()
+    cnt -= 1
+    self.set_open_cnt(cnt)
