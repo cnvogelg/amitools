@@ -1,5 +1,5 @@
 import ctypes
-from amitools.vamos.CPU import *
+from .regs import *
 
 
 class MockCPU(object):

@@ -1,4 +1,4 @@
-from CPU import *
+from amitools.vamos.machine.regs import *
 from Log import *
 
 import logging

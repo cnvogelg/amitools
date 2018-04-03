@@ -2,7 +2,7 @@ from .label import LabelLib
 from AmigaResident import AmigaResident
 from AmigaLibrary import AmigaLibrary
 from Trampoline import Trampoline
-from CPU import *
+from .machine.regs import *
 from .astructs import LibraryStruct
 from Exceptions import *
 from Log import log_libmgr, log_lib

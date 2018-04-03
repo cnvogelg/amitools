@@ -1,6 +1,6 @@
 from __future__ import print_function
 
-from amitools.vamos.CPU import *
+from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.Exceptions import *
 

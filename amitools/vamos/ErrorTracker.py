@@ -1,8 +1,8 @@
 from Log import log_main
 from Exceptions import *
+from .machine import CPUState
 import sys
 import traceback
-import CPU
 
 class ErrorTracker:
   def __init__(self, cpu, label_mgr, terminate_func=None):
@@ -48,7 +48,7 @@ class ErrorTracker:
       if label is not None:
         log_main.error("@%08x -> +%06x %s", addr, offset, label)
     # give CPU state dump
-    cpu_state = CPU.CPUState()
+    cpu_state = CPUState()
     cpu_state.get(self.cpu)
     pc = cpu_state.pc
     label, offset = self.label_mgr.get_label_offset(pc)

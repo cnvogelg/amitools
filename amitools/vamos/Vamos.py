@@ -14,7 +14,7 @@ from amitools.vamos.lib.dos.Process import Process
 from amitools.vamos.trace import TraceManager, TraceMemory
 
 from Log import *
-from CPU import *
+from .machine.regs import *
 from Exceptions import *
 
 class Vamos:

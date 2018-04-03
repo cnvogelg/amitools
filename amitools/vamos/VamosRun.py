@@ -1,7 +1,7 @@
 import time
 import logging
 
-from CPU import *
+from .machine.regs import *
 from Log import log_main, log_instr
 from Exceptions import *
 

@@ -1,4 +1,4 @@
-from amitools.vamos.CPU import *
+from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.astructs import *
 from amitools.vamos.Log import log_exec
