@@ -24,6 +24,7 @@ typedef void (*trap_func_t)(uint opcode, uint pc, void *data);
 
 /* ----- API ----- */
 extern void trap_init(void);
+extern int trap_aline(uint opcode, uint pc);
 
 extern int  trap_setup(trap_func_t func, int flags, void *data);
 extern void trap_free(int id);

@@ -15,12 +15,11 @@ class LibManager():
 
   op_jmp = 0x4ef9
 
-  def __init__(self, label_mgr, lib_reg, ctx_map, cfg, error_tracker):
+  def __init__(self, label_mgr, lib_reg, ctx_map, cfg):
     self.label_mgr = label_mgr
     self.lib_reg = lib_reg
     self.ctx_map = ctx_map
     self.cfg = cfg
-    self.error_tracker = error_tracker
     self.data_dir = cfg.data_dir
 
     # map of opened libs: base_addr -> AmigaLibrary
@@ -210,8 +209,7 @@ class LibManager():
     struct = lib_impl.get_struct_def()
     is_base = lib_impl.is_base_lib()
     lib_ctx = self.ctx_map.get_ctx(sane_name)
-    lib = AmigaLibrary(sane_name, struct, lib_cfg, is_base, lib_impl, lib_ctx,
-                       self.error_tracker)
+    lib = AmigaLibrary(sane_name, struct, lib_cfg, is_base, lib_impl, lib_ctx)
 
     # now we need an fd file to know about the structure of the lib
     lib.fd = self._load_fd(sane_name)

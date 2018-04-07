@@ -6,6 +6,7 @@ from amitools.vamos.machine import *
 
 def musashi_cpustate_rw_test():
   cpu = emu.CPU(M68K_CPU_TYPE_68000)
+  cpu.w_pc(0)
   cpu.w_sr(0x2700)
   for i in xrange(16):
     cpu.w_reg(i, i)

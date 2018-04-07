@@ -1,18 +1,15 @@
 # mem.h
 cdef extern from "mem.h":
   ctypedef unsigned int uint
-  ctypedef uint (*read_func_t)(uint addr, void *ctx) except *
-  ctypedef void (*write_func_t)(uint addr, uint value, void *ctx) except *
-  ctypedef void (*invalid_func_t)(int mode, int width, uint addr, void *ctx) except *
-  ctypedef int (*trace_func_t)(int mode, int width, uint addr, uint val, void *ctx) except *
+  ctypedef uint (*read_func_t)(uint addr, void *ctx)
+  ctypedef void (*write_func_t)(uint addr, uint value, void *ctx)
+  ctypedef void (*invalid_func_t)(int mode, int width, uint addr, void *ctx)
+  ctypedef void (*trace_func_t)(int mode, int width, uint addr, uint val, void *ctx)
 
   int mem_init(uint ram_size_kib)
   void mem_free()
 
   void mem_set_invalid_func(invalid_func_t func, void *ctx)
-  void mem_set_all_to_end()
-  int  mem_is_end()
-
   void mem_set_trace_mode(int on)
   void mem_set_trace_func(trace_func_t func, void *ctx)
 
@@ -36,19 +33,19 @@ from libc.string cimport memcpy, memset, strlen, strcpy
 from libc.stdlib cimport malloc, free
 
 # wrapper functions
-cdef int trace_func_wrapper(int mode, int width, uint addr, uint val, void *ctx) except *:
+cdef void trace_func_wrapper(int mode, int width, uint addr, uint val, void *ctx):
   cdef object py_func = <object>ctx
-  return py_func(mode, width, addr, val)
+  py_func(chr(mode), width, addr, val)
 
-cdef void invalid_func_wrapper(int mode, int width, uint addr, void *ctx) except *:
+cdef void invalid_func_wrapper(int mode, int width, uint addr, void *ctx):
   cdef object py_func = <object>ctx
-  py_func(mode, width, addr)
+  py_func(chr(mode), width, addr)
 
-cdef uint special_read_func_wrapper(uint addr, void *ctx) except *:
+cdef uint special_read_func_wrapper(uint addr, void *ctx):
   cdef object py_func = <object>ctx
   return py_func(addr)
 
-cdef void special_write_func_wrapper(uint addr, uint value, void *ctx) except *:
+cdef void special_write_func_wrapper(uint addr, uint value, void *ctx):
   cdef object py_func = <object>ctx
   py_func(addr, value)
 
@@ -58,7 +55,8 @@ cdef class Memory:
   cdef uint ram_bytes
   cdef unsigned char *ram_ptr
   # keep python refs of callback funcs otherwise wrapper might loose the object
-  cdef set special_funcs
+  cdef set special_read_funcs
+  cdef set special_write_funcs
   cdef object trace_func
   cdef object invalid_func
 
@@ -67,19 +65,21 @@ cdef class Memory:
     self.ram_size_kib = ram_size_kib
     self.ram_bytes = ram_size_kib * 1024
     self.ram_ptr = mem_raw_ptr()
-    self.special_funcs = set()
+    self.special_read_funcs = set()
+    self.special_write_funcs = set()
 
-  def __dealloc__(self):
+  def cleanup(self):
+    self.set_trace_func(None)
+    self.set_invalid_func(None)
+    self.special_read_funcs.clear()
+    self.special_write_funcs.clear()
     mem_free()
 
   def get_ram_size_kib(self):
     return self.ram_size_kib
 
-  def set_all_to_end(self):
-    mem_set_all_to_end()
-
-  def is_end(self):
-    return mem_is_end()
+  def get_ram_size_bytes(self):
+    return self.ram_bytes
 
   def reserve_special_range(self,num_pages=1):
     return mem_reserve_special_range(num_pages)
@@ -87,12 +87,12 @@ cdef class Memory:
   cpdef set_special_range_read_func(self, uint page_addr, uint width, func):
     mem_set_special_range_read_func(page_addr, width, special_read_func_wrapper, <void *>func)
     # keep func ref
-    self.special_funcs.add(func)
+    self.special_read_funcs.add(func)
 
   cpdef set_special_range_write_func(self,uint page_addr, uint width, func):
     mem_set_special_range_write_func(page_addr, width, special_write_func_wrapper, <void *>func)
     # keep func ref
-    self.special_funcs.add(func)
+    self.special_write_funcs.add(func)
 
   def set_special_range_read_funcs(self, uint addr, uint num_pages=1, r8=None, r16=None, r32=None):
     for i in range(num_pages):
@@ -116,13 +116,20 @@ cdef class Memory:
 
   def set_trace_mode(self,on):
     mem_set_trace_mode(on)
+
   def set_trace_func(self,func):
-    mem_set_trace_func(trace_func_wrapper, <void *>func)
+    if func is None:
+      mem_set_trace_func(NULL, NULL)
+    else:
+      mem_set_trace_func(trace_func_wrapper, <void *>func)
     # keep func ref
     self.trace_func = func
 
   def set_invalid_func(self,func):
-    mem_set_invalid_func(invalid_func_wrapper, <void *>func)
+    if func is None:
+      mem_set_invalid_func(NULL, NULL)
+    else:
+      mem_set_invalid_func(invalid_func_wrapper, <void *>func)
     # keep func ref
     self.invalid_func = func
 

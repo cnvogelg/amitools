@@ -9,9 +9,7 @@ class TraceManager(object):
     self.label_mgr = label_mgr
 
   # trace callback from CPU core
-  # mode is an integer with values 'R' and 'W' there
-  def trace_mem(self, mode_int, width, addr, value=0):
-    mode = chr(mode_int)
+  def trace_mem(self, mode, width, addr, value=0):
     self._trace_mem(log_mem, mode, width, addr, value)
     return 0
 

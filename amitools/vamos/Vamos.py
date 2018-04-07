@@ -5,7 +5,6 @@ from LibManager import LibManager
 from .libcore import LibRegistry, LibCtxMap, LibCtx
 from .loader import SegmentLoader
 from path.PathManager import PathManager
-from ErrorTracker import ErrorTracker
 from Trampoline import Trampoline
 from HardwareAccess import HardwareAccess
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
@@ -19,12 +18,14 @@ from Exceptions import *
 
 class Vamos:
 
-  def __init__(self, raw_mem, cpu, traps, cfg):
-    self.raw_mem = raw_mem
-    self.ram_size = raw_mem.get_ram_size_kib() * 1024 # in bytes
-    self.cpu = cpu
-    self.cpu_type = cfg.cpu
-    self.traps = traps
+  def __init__(self, machine, cfg):
+    self.machine = machine
+    self.mem = machine.get_mem()
+    self.raw_mem = self.mem
+    self.ram_size = self.mem.get_ram_size_bytes()
+    self.cpu = machine.get_cpu()
+    self.cpu_type = machine.get_cpu_type()
+    self.traps = machine.get_traps()
     self.cfg = cfg
 
     # too much RAM requested?
@@ -34,19 +35,14 @@ class Vamos:
 
     # setup custom chips
     if self.cfg.hw_access != "disable":
-      self.hw_access = HardwareAccess(raw_mem)
+      self.hw_access = HardwareAccess(self.mem)
       self._setup_hw_access()
 
     # path manager
-    self.path_mgr = PathManager( cfg )
-
-    def terminate_func():
-      self.raw_mem.set_all_to_end()
+    self.path_mgr = PathManager(cfg)
 
     # create a label manager and error tracker
     self.label_mgr = LabelManager()
-    self.error_tracker = ErrorTracker(cpu, self.label_mgr, terminate_func)
-    self.label_mgr.error_tracker = self.error_tracker
 
     # set a label for first region
     label = LabelRange("zero_page",0,0x400)
@@ -57,14 +53,32 @@ class Vamos:
     self.label_mgr.add_label(label)
 
     # create memory access
-    self.trace_mgr = TraceManager(cpu, self.label_mgr)
+    self.trace_mgr = TraceManager(self.cpu, self.label_mgr)
     if cfg.internal_memory_trace:
-      self.mem = TraceMemory(raw_mem, self.trace_mgr)
+      self.mem = TraceMemory(self.mem, self.trace_mgr)
       if not log_mem_int.isEnabledFor(logging.INFO):
         log_mem_int.setLevel(logging.INFO)
-    else:
-      self.mem = raw_mem
-    self._setup_memory(raw_mem)
+    # enable mem trace?
+    if cfg.memory_trace:
+      self.machine.set_cpu_mem_trace_hook(self.trace_mgr.trace_mem)
+      if not log_mem.isEnabledFor(logging.INFO):
+        log_mem.setLevel(logging.INFO)
+    # instr trace
+    if cfg.instr_trace:
+      if not log_instr.isEnabledFor(logging.INFO):
+        log_instr.setLevel(logging.INFO)
+      cpu = self.cpu
+      trace_mgr = self.trace_mgr
+      def instr_hook():
+        # add register dump
+        if cfg.reg_dump:
+          res = self.cpu.dump_state()
+          for r in res:
+            log_instr.info(r)
+        # disassemble line
+        pc = cpu.r_reg(REG_PC)
+        trace_mgr.trace_code_line(pc)
+      self.machine.set_instr_hook(instr_hook)
 
     # create memory allocator
     self.mem_begin = 0x1000
@@ -88,23 +102,26 @@ class Vamos:
 
     # lib manager
     self.lib_reg = LibRegistry()
-    self.lib_mgr = LibManager(self.label_mgr, self.lib_reg, ctx_map, cfg,
-                              self.error_tracker)
+    self.lib_mgr = LibManager(self.label_mgr, self.lib_reg, ctx_map, cfg)
     self.exec_ctx.set_lib_mgr(self.lib_mgr)
+    # on shutdown trigger lib manager to shutdown libs
+    def shutdown():
+      self.lib_mgr.shutdown()
+    self.machine.set_shutdown_hook(shutdown)
 
     # no current process right now
     self.process = None
     self.proc_list = []
 
-  def init(self, binary, arg_str, stack_size, shell, cwd, exit_addr):
+  def init(self, binary, arg_str, stack_size, shell, cwd):
     self.create_old_dos_guard()
     self.open_base_libs()
-    return self.setup_main_proc(binary, arg_str, stack_size, shell, cwd, exit_addr)
+    return self.setup_main_proc(binary, arg_str, stack_size, shell, cwd)
 
-  def cleanup(self):
+  def cleanup(self, ok):
     self.cleanup_main_proc()
     self.close_base_libs()
-    if not self.error_tracker.has_errors:
+    if ok:
         self.alloc.dump_orphans()
 
   # ----- system setup -----
@@ -122,17 +139,6 @@ class Vamos:
       pass
     else:
       raise VamosConfigError("Invalid HW Access mode: %s" % cfg.hw_access)
-
-  def _setup_memory(self, raw_mem):
-    cfg = self.cfg
-    # enable mem trace?
-    if cfg.memory_trace:
-      raw_mem.set_trace_mode(1)
-      raw_mem.set_trace_func(self.trace_mgr.trace_mem)
-      if not log_mem.isEnabledFor(logging.DEBUG):
-        log_mem.setLevel(logging.DEBUG)
-    # set invalid access handler for memory
-    raw_mem.set_invalid_func(self.error_tracker.report_invalid_memory)
 
   # ----- process handling -----
 
@@ -330,6 +336,8 @@ class Vamos:
     self.dos_addr = self.lib_mgr.open_lib('dos.library', 0)
     self.dos_lib = self.lib_mgr.get_lib_impl(self.dos_addr)
     self.dos_ctx.set_dos_lib(self.dos_lib)
+    # set exec base @4
+    self.machine.set_zero_mem(0, self.exec_addr)
 
   def close_base_libs(self):
     log_main.info("close_base_libs")
@@ -348,9 +356,9 @@ class Vamos:
 
   # ----- main process -----
 
-  def setup_main_proc(self, binary, arg_str, stack_size, shell, cwd, exit_addr):
+  def setup_main_proc(self, binary, arg_str, stack_size, shell, cwd):
     proc = Process(self.dos_ctx, binary, arg_str, stack_size=stack_size,
-                   shell=shell, cwd=cwd, exit_addr=exit_addr)
+                   shell=shell, cwd=cwd)
     if not proc.ok:
       return False
     log_proc.info("set main process: %s", proc)
@@ -358,6 +366,20 @@ class Vamos:
     self._set_this_task(proc)
     self.main_proc = proc
     return True
+
+  def get_initial_sp(self):
+    return self.main_proc.get_initial_sp()
+
+  def get_initial_pc(self):
+    return self.main_proc.get_initial_pc()
+
+  def get_initial_regs(self):
+    regs = self.main_proc.get_initial_regs()
+    # to track old dos values
+    regs[REG_A2] = self.dos_guard_base
+    regs[REG_A5] = self.dos_guard_base
+    regs[REG_A6] = self.dos_guard_base
+    return regs
 
   def cleanup_main_proc(self):
     self.main_proc.free()

@@ -15,7 +15,7 @@ class AmigaLibrary:
   op_reset = 0x4e70
 
   def __init__(self, name, struct, config, is_base=False, impl=None,
-              lib_ctx=None, error_tracker=None):
+              lib_ctx=None):
     self.name = name
     self.struct = struct
     self.config = config
@@ -33,7 +33,6 @@ class AmigaLibrary:
     self.log_call = False
     self.log_dummy_call = False
     self.benchmark = False
-    self.catch_ex = True
 
     # proposal of size
     self.pos_size = self.struct.get_size()
@@ -72,8 +71,6 @@ class AmigaLibrary:
     self.impl = impl
     # library context for all calls into lib
     self.lib_ctx = lib_ctx
-    # error tracker for exception reporting
-    self.error_tracker = error_tracker
 
   def config_logging(self, log_call, log_dummy_call, benchmark, lib_mgr):
     self.log_call = log_call
@@ -162,7 +159,7 @@ class AmigaLibrary:
       return self._generate_dummy_call_stub(ctx, bias, name, args)
 
     # if extra processing is disabled then create a compact call stub
-    if not self.log_call and not self.benchmark and not self.profile and not self.catch_ex:
+    if not self.log_call and not self.benchmark and not self.profile:
       return self._generate_fast_call_stub(ctx, method)
 
     # ... otherwise processing is enabled and we need to synthesise a
@@ -205,16 +202,6 @@ class AmigaLibrary:
     # logging (end)
     if self.log_call:
       code.append('  self.log("} END CALL: %s (default)" % res, level=logging.INFO)')
-
-    # wrap exception handler
-    if self.catch_ex:
-      c = [code[0]]
-      c.append("  try:")
-      for l in code[1:]:
-        c.append("  " + l)
-      c.append("  except Exception as exc:")
-      c.append("    self._handle_exc(exc)")
-      code = c
 
     # generate code
     l = {}
@@ -437,10 +424,6 @@ class AmigaLibrary:
 
   def _account_benchmark_data(self, delta):
     self.lib_mgr.bench_total += delta
-
-  def _handle_exc(self, exc):
-    """handle an exception that occurred inside the call stub's python code"""
-    self.error_tracker.report_error(exc)
 
   # handle lib bases
 

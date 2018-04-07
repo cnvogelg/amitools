@@ -26,13 +26,13 @@ typedef struct entry entry_t;
 static entry_t traps[NUM_TRAPS];
 static entry_t *first_free;
 
-static int trap_aline(uint opcode, uint pc)
+int trap_aline(uint opcode, uint pc)
 {
   uint off = opcode & TRAP_MASK;
   trap_func_t func = traps[off].trap;
   void *data = traps[off].data;
   int flags = traps[off].flags;
-  
+
   /* a one shot trap is removed before it is triggered
   ** otherwise, trap-functions used to capture "end-of-call"s
   ** of shell processes would never be released.

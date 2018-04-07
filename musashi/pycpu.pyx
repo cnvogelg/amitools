@@ -1,5 +1,7 @@
 # cython binding for musashi
 
+from libc.stdlib cimport malloc, free
+
 # m68k.h
 cdef extern from "m68k.h":
   ctypedef enum m68k_register_t:
@@ -25,24 +27,48 @@ cdef extern from "m68k.h":
   unsigned int m68k_get_reg(void* context, m68k_register_t reg)
   void m68k_set_reg(m68k_register_t reg, unsigned int value)
 
-  void m68k_set_pc_changed_callback(void (*callback)(unsigned int new_pc) except *)
-  void m68k_set_reset_instr_callback(void (*callback)() except *)
-  void m68k_set_instr_hook_callback(void (*callback)() except *)
+  void m68k_set_pc_changed_callback(void (*callback)(unsigned int new_pc))
+  void m68k_set_reset_instr_callback(void (*callback)())
+  void m68k_set_instr_hook_callback(void (*callback)())
 
   unsigned int m68k_disassemble(char* str_buff, unsigned int pc, unsigned int cpu_type)
 
+  unsigned int m68k_context_size()
+  unsigned int m68k_get_context(void* dst)
+  void m68k_set_context(void* dst)
+
 # wrapper
 cdef object pc_changed_func
-cdef void pc_changed_func_wrapper(unsigned int new_pc) except *:
+cdef void pc_changed_func_wrapper(unsigned int new_pc):
   pc_changed_func(new_pc)
 
 cdef object reset_instr_func
-cdef void reset_instr_func_wrapper() except *:
+cdef void reset_instr_func_wrapper():
   reset_instr_func()
 
 cdef object instr_hook_func
-cdef void instr_hook_func_wrapper() except *:
+cdef void instr_hook_func_wrapper():
   instr_hook_func()
+
+# public CPUContext
+cdef class CPUContext:
+  cdef void *data
+  cdef unsigned int size
+
+  def __cinit__(self, unsigned int size):
+    self.data = malloc(size)
+    if self.data == NULL:
+      raise MemoryError()
+    self.size = size
+
+  cdef void *get_data(self):
+    return self.data
+
+  def r_reg(self, int reg):
+    return m68k_get_reg(self.data, <m68k_register_t>reg)
+
+  def __dealloc__(self):
+    free(self.data)
 
 # public CPU class
 cdef class CPU:
@@ -52,6 +78,11 @@ cdef class CPU:
     m68k_set_cpu_type(cpu_type)
     m68k_init()
     self.cpu_type = cpu_type
+
+  def cleanup(self):
+    self.set_pc_changed_callback(None)
+    self.set_reset_instr_callback(None)
+    self.set_instr_hook_callback(None)
 
   cdef unsigned int r_reg_internal(self, m68k_register_t reg):
     return m68k_get_reg(NULL, reg)
@@ -95,20 +126,39 @@ cdef class CPU:
   def set_pc_changed_callback(self, py_func):
     global pc_changed_func
     pc_changed_func = py_func
-    m68k_set_pc_changed_callback(pc_changed_func_wrapper)
+    if py_func is None:
+      m68k_set_pc_changed_callback(NULL)
+    else:
+      m68k_set_pc_changed_callback(pc_changed_func_wrapper)
 
   def set_reset_instr_callback(self, py_func):
     global reset_instr_func
     reset_instr_func = py_func
-    m68k_set_reset_instr_callback(reset_instr_func_wrapper)
+    if py_func is None:
+      m68k_set_reset_instr_callback(NULL)
+    else:
+      m68k_set_reset_instr_callback(reset_instr_func_wrapper)
 
   def set_instr_hook_callback(self, py_func):
     global instr_hook_func
     instr_hook_func = py_func
-    m68k_set_instr_hook_callback(instr_hook_func_wrapper)
+    if py_func is None:
+      m68k_set_instr_hook_callback(NULL)
+    else:
+      m68k_set_instr_hook_callback(instr_hook_func_wrapper)
 
   def disassemble(self, unsigned int pc):
     cdef char line[80]
     cdef unsigned int size
     size = m68k_disassemble(line, pc, self.cpu_type)
     return (size, line)
+
+  def get_cpu_context(self):
+    cdef unsigned int size = m68k_context_size()
+    cdef CPUContext ctx = CPUContext(size)
+    cdef void *data = ctx.get_data()
+    m68k_get_context(data)
+    return ctx
+
+  def set_cpu_context(self, CPUContext ctx):
+    m68k_set_context(ctx.get_data())

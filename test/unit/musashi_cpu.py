@@ -27,3 +27,10 @@ def musashi_cpu_rws_reg_test():
     cpu.ws_reg(M68K_REG_D0, -0x80000001)
   with pytest.raises(TypeError):
     cpu.ws_reg(M68K_REG_D0, "hello")
+
+
+def musashi_cpu_rw_context_test():
+  cpu = emu.CPU(M68K_CPU_TYPE_68000)
+  ctx = cpu.get_cpu_context()
+  cpu.set_cpu_context(ctx)
+

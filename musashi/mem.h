@@ -20,16 +20,13 @@ typedef uint (*read_func_t)(uint addr, void *ctx);
 typedef void (*write_func_t)(uint addr, uint value, void *ctx);
 
 typedef void (*invalid_func_t)(int mode, int width, uint addr, void *ctx);
-typedef int (*trace_func_t)(int mode, int width, uint addr, uint val, void *ctx);
+typedef void (*trace_func_t)(int mode, int width, uint addr, uint val, void *ctx);
 
 /* ----- API ----- */
 extern int  mem_init(uint ram_size_kib);
 extern void mem_free(void);
 
 extern void mem_set_invalid_func(invalid_func_t func, void *ctx);
-extern void mem_set_all_to_end(void);
-extern int  mem_is_end(void);
-
 extern void mem_set_trace_mode(int on);
 extern void mem_set_trace_func(trace_func_t func, void *ctx);
 

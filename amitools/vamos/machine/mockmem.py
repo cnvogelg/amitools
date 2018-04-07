@@ -15,6 +15,9 @@ class MockMemory(object):
   def get_ram_size_kib(self):
     return self.size_kib
 
+  def get_ram_size_bytes(self):
+    return self.size_bytes
+
   def set_all_to_end(self):
     raise NotImplementedError()
 

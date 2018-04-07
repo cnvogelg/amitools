@@ -50,17 +50,17 @@ def trace_mgr_mem_test(caplog):
   caplog.set_level(logging.INFO)
   tm = setup_tm()
   # no label
-  tm.trace_mem(ord('R'), 2, 0)
-  tm.trace_mem(ord('W'), 1, 4, 23)
+  tm.trace_mem('R', 2, 0)
+  tm.trace_mem('W', 1, 4, 23)
   # range label
-  tm.trace_mem(ord('R'), 2, 0x100)
-  tm.trace_mem(ord('W'), 1, 0x120, 42)
+  tm.trace_mem('R', 2, 0x100)
+  tm.trace_mem('W', 1, 0x120, 42)
   # struct label
-  tm.trace_mem(ord('R'), 2, 0x200)
-  tm.trace_mem(ord('W'), 1, 0x208, 21)
+  tm.trace_mem('R', 2, 0x200)
+  tm.trace_mem('W', 1, 0x208, 21)
   # lib
-  tm.trace_mem(ord('R'), 1, 0x300, 0xa000)
-  tm.trace_mem(ord('R'), 1, 0x320)
+  tm.trace_mem('R', 1, 0x300, 0xa000)
+  tm.trace_mem('R', 1, 0x320)
   check_log("mem", caplog.record_tuples)
 
 

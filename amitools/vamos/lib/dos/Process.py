@@ -1,4 +1,5 @@
 import os
+from amitools.vamos.machine.regs import *
 from amitools.vamos.Log import log_proc
 from amitools.vamos.astructs import *
 from amitools.vamos.lib.lexec.PortManager import *
@@ -8,7 +9,7 @@ NT_PROCESS = 13
 class Process:
   def __init__(self, ctx, bin_file, arg_str,
                input_fh=None, output_fh=None, stack_size=4096,
-               exit_addr=0, shell=False, cwd=None, cwd_lock=None):
+               shell=False, cwd=None, cwd_lock=None):
     """bin_file  Amiga path to binary for process
        arg_str   Shell-style parameter string with trailing newline
     """
@@ -21,7 +22,7 @@ class Process:
     self.ok = self.load_binary(self.cwd_lock,bin_file,shell)
     if not self.ok:
       return
-    self.init_stack(stack_size, exit_addr)
+    self.init_stack(stack_size)
     # thor: the boot shell creates its own CLI if it is not there.
     # but for now, supply it with the Vamos CLI and let it initialize
     # it through the private CliInit() call of the dos.library
@@ -81,8 +82,7 @@ class Process:
 
   # ----- stack -----
   # stack size in KiB
-  def init_stack(self, stack_size, exit_addr):
-    self.exit_addr = exit_addr
+  def init_stack(self, stack_size):
     self.stack_size = stack_size
     self.stack = self.ctx.alloc.alloc_memory( self.bin_basename + "_stack", self.stack_size )
     self.stack_base = self.stack.addr
@@ -91,14 +91,16 @@ class Process:
     log_proc.info(self.stack)
     # prepare stack
     # TOP: size
-    # TOP-4: return from program -> magic_ed
+    # TOP-4: return from program
     self.stack_initial = self.stack_end - 4
     self.ctx.mem.w32(self.stack_initial, self.stack_size)
     self.stack_initial -= 4
-    self.ctx.mem.w32(self.stack_initial, self.exit_addr)
 
   def free_stack(self):
     self.ctx.alloc.free_memory(self.stack)
+
+  def get_initial_sp(self):
+    return self.stack_initial
 
   # ----- binary -----
   def load_binary(self, lock, ami_bin_file, shell=False):
@@ -125,6 +127,9 @@ class Process:
   def unload_binary(self):
     self.ctx.seg_loader.unload_seg(self.bin_seg_list)
 
+  def get_initial_pc(self):
+    return self.prog_start
+
   # ----- args -----
   def init_args(self, arg_str, fh):
     # Tripos makes the input line available as buffered input for ReadItem()
@@ -140,6 +145,23 @@ class Process:
   def free_args(self):
     if self.arg is not None:
       self.ctx.alloc.free_memory(self.arg)
+
+  # ----- startup -----
+  def get_initial_regs(self):
+    regs = {}
+    if self.shell:
+      # thor: If we run a shell through vamos, then
+      # BPCL places the BPTR to the parameter packet into
+      # d1. The default shell can work without ParmPkt
+      # thus leave this at zero for this time.
+      regs[REG_D1] = 0
+    else:
+      regs[REG_D0] = self.arg_len
+      regs[REG_A0] = self.arg_base
+    # d2=stack_size.  this value is also in 4(sp) (see Process.init_stack), but
+    # various C programs rely on it being present (1.3-3.1 at least have it).
+    regs[REG_D2] = self.stack_size
+    return regs
 
   # ----- cli struct -----
   def init_cli_struct(self, input_fh, output_fh, name):
