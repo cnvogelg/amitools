@@ -173,7 +173,8 @@ class VamosTestRunner:
     """like run_prog() but check return value and assume its 0"""
     retcode, stdout, stderr = self.run_prog(*prog_args, **kw_args)
     if retcode != 0:
-      raise subprocess.CalledProcessError(retcode)
+      cmd = " ".join(prog_args)
+      raise subprocess.CalledProcessError(retcode, cmd)
     return stdout, stderr
 
   def _compare(self, got, ok):

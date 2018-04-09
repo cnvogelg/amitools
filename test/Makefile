@@ -3,8 +3,9 @@
 # build programs with the following compilers:
 # VBCC, GCC, AROS_GCC, SASC
 
-SOURCES_C = dos_readargs.c dos_findarg.c
-SOURCES_C += vprintf.c mem.c
+SOURCES_C = exec_semaphore.c exec_copymem.c
+SOURCES_C += dos_readargs.c dos_findarg.c
+SOURCES_C += vprintf.c
 SOURCES_C += util_muldiv.c util_date.c
 SOURCES_C += math_double.c math_double_trans.c
 SOURCES_C += math_single.c math_single_trans.c

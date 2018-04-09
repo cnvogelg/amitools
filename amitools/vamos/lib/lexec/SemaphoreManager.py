@@ -15,7 +15,7 @@ class SemaphoreManager:
     semaphore = AccessStruct(self.mem,SignalSemaphoreStruct,struct_addr=addr)
     semaphore.w_s("ss_Owner",0)
     semaphore.w_s("ss_NestCount",0)
-    semaphore.w_s("ss_QueueCount",0xffff)
+    semaphore.w_s("ss_QueueCount",-1)
     semaphore.w_s("ss_Link.ln_Type",self.NT_SIGNALSEM)
     semaphore.w_s("ss_WaitQueue.mlh_Head",semaphore.s_get_addr("ss_WaitQueue.mlh_Tail"))
     semaphore.w_s("ss_WaitQueue.mlh_Tail",0)

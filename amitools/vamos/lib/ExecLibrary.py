@@ -517,6 +517,17 @@ class ExecLibrary(LibImpl):
     # nop for now
     log_exec.info("ObtainSemaphore(%06x) ignored" % addr)
 
+  def ObtainSemaphoreShared(self,ctx):
+    addr = ctx.cpu.r_reg(REG_A0)
+    # nop for now
+    log_exec.info("ObtainSemaphoreShared(%06x) ignored" % addr)
+
+  def AttemptSemaphore(self,ctx):
+    addr = ctx.cpu.r_reg(REG_A0)
+    # nop for now
+    log_exec.info("AttemptSemaphore(%06x) ignored" % addr)
+    return 1
+
   def ReleaseSemaphore(self,ctx):
     addr = ctx.cpu.r_reg(REG_A0)
     # nop for now
