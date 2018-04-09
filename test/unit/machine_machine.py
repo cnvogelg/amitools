@@ -77,17 +77,21 @@ def machine_machine_cpu_mem_trace_test():
   rs = m.run(code, stack)
   assert rs.done
   assert rs.error is None
-  assert a[0] == ('W',1,0x800,op_rts)
+  assert a[0] == ('W', 1, 0x800, op_rts)
   m.cleanup()
 
 
-def machine_machine_cpu_mem_invalid_test():
+def machine_machine_cpu_mem_invalid_test(caplog):
   m, cpu, mem, traps, code, stack = create_machine()
   a = []
   rs = m.run(0xf80000, stack)
   assert rs.done
   assert type(rs.error) == InvalidMemoryAccessError
   m.cleanup()
+  log = caplog.record_tuples
+  assert ('machine', logging.ERROR, '----- ERROR in CPU Run #1 -----') in log
+  assert ('machine', logging.ERROR,
+          'InvalidMemoryAccessError: Invalid Memory Access R(2): f80000') in log
 
 
 def machine_machine_run_nested_ok_test():

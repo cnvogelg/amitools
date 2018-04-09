@@ -193,9 +193,12 @@ class Machine(object):
     self.shutdown_func()
 
   def _invalid_mem_access(self, mode, width, addr):
-    log_machine.debug("invalid memore access: mode=%s width=%d addr=%06x",
+    log_machine.debug("invalid memory access: mode=%s width=%d addr=%06x",
                       mode, width, addr)
     run_state = self.get_cur_run_state()
+    # already a pending error?
+    if run_state.error:
+      return
     run_state.error = InvalidMemoryAccessError(mode, width, addr)
     run_state.done = True
     # end time slice of cpu

@@ -1,7 +1,9 @@
+import sys
+import traceback
+
 from amitools.vamos.Log import log_machine
 from amitools.vamos.Exceptions import *
 from .cpustate import CPUState
-import traceback
 
 
 class ErrorReporter:
@@ -18,14 +20,18 @@ class ErrorReporter:
     self._log_run_state()
     self._log_mem_info(error)
     self._log_cpu_state()
-    self._log_py_exc()
+    self._log_exc(error)
 
-  def _log_py_exc(self):
-    # show exception
-    lines = traceback.format_exc().split('\n')
-    for line in lines:
-      if line != "":
-        log_machine.error(line)
+  def _log_exc(self, error):
+    # show traceback if exception is pending
+    if sys.exc_info()[0]:
+      lines = traceback.format_exc().split('\n')
+      for line in lines:
+        if line != "":
+          log_machine.error(line)
+    else:
+      etype = error.__class__.__name__
+      log_machine.error("%s: %s", etype, error)
 
   def _log_run_state(self):
     # get current run_state
@@ -58,10 +64,11 @@ class ErrorReporter:
       log_machine.error(d)
     # stack range dump
     sp = cpu_state.ax[7]
-    vals = []
+    self._log_stack(sp)
 
   def _log_stack(self, sp):
     ram_total = self.machine.get_ram_total()
+    vals = []
     for x in range(-32, 32, 4):
       addr = sp + x
       if addr < ram_total:
