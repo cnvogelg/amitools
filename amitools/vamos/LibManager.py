@@ -159,9 +159,10 @@ class LibManager():
 
     if lib != None:
       self.lib_log("open_lib","leaving open_lib(): %s" % lib, level=logging.DEBUG)
+      return lib.addr_base
     else:
       self.lib_log("open_lib","leaving open_lib(): no lib!", level=logging.DEBUG)
-    return lib.addr_base
+      return 0
 
   # return instance or null
   def close_lib(self, addr):
