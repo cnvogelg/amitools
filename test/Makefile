@@ -14,6 +14,7 @@ SOURCES_C += test_hello.c test_raise.c
 SOURCES_C += lib_testnix.c
 
 LIB_GCC_SOURCES_C = testnix.c
+LIB_SC_SOURCES_C = testsc.c
 LIB_SRC_DIR = libs
 
 VPATH = src
@@ -21,10 +22,12 @@ VPATH = src
 # directories
 BUILD_DIR ?= bin
 LIB_BUILD_DIR = $(BUILD_DIR)/libs
-LIB_BUILD_DIRS = $(LIB_BUILD_DIR) $(patsubst %,$(LIB_BUILD_DIR)-%,res dbg res-dbg)
+LIB_POSTFIXES = gcc gcc-dbg gcc-res gcc-res-dbg
+LIB_POSTFIXES += sc sc-dbg sc-res sc-res-dbg
+LIB_BUILD_DIRS = $(LIB_BUILD_DIR) $(patsubst %,$(LIB_BUILD_DIR)-%,$(LIB_POSTFIXES))
 
 # external data
-SASC_INSTALL_DIR ?= $(HOME)/amiga/shared/sc
+SASC_INSTALL_DIR ?= volumes/sc
 export SASC_INSTALL_DIR
 NDK_DIR ?= /opt/m68k-amigaos/m68k-amigaos/ndk
 
@@ -34,6 +37,7 @@ GCC = m68k-amigaos-gcc
 AROS_GCC = m68k-aros-gcc
 AROS_ELF2HUNK = elf2hunk
 SASC = ../bin/vamos -c sasc.vamosrc sc
+SLINK = ../bin/vamos -c sasc.vamosrc slink
 
 # options
 VBCC_OPTS = +aos68k -I$(NDK_DIR)/include -Iinclude
@@ -43,6 +47,10 @@ GCC_OPTS_LIB_RES = -ramiga-libr -fbaserel
 AROS_GCC_OPTS = -Iinclude
 SASC_OPTS = SMALLDATA SMALLCODE NOSTKCHK NOCHKABORT NOICONS STRICT ANSI \
             INCDIR=include
+SLINK_OPTS = SD NOICONS LIBVERSION 1 LIBREVISION 0 LIBPREFIX _LIB \
+             LIB lib:sc.lib FROM lib:libent.o
+SLINK_OPTS_DEF = $(SLINK_OPTS) lib:libinit.o
+SLINK_OPTS_RES = $(SLINK_OPTS) lib:libinitr.o
 
 # optimize options
 VBCC_OPTI = -O2
@@ -82,14 +90,24 @@ PROGS_SASC_DBG = $(patsubst %.c,$(BUILD_DIR)/%$(SASC_EXT)$(DBG_EXT),$(SOURCES_C)
 
 PROGS_DBG = $(PROGS_VBCC_DBG) $(PROGS_GCC_DBG) $(PROGS_AROS_DBG) $(PROGS_SASC_DBG)
 
-# libraries (gcc only for now)
-LIBS_GCC = $(patsubst %.c,$(LIB_BUILD_DIR)/%.library,$(LIB_GCC_SOURCES_C))
-LIBS_GCC += $(patsubst %.c,$(LIB_BUILD_DIR)-res/%.library,$(LIB_GCC_SOURCES_C))
+# libraries: gcc
+LIBS_GCC = $(patsubst %.c,$(LIB_BUILD_DIR)-gcc/%.library,$(LIB_GCC_SOURCES_C))
+LIBS_GCC += $(patsubst %.c,$(LIB_BUILD_DIR)-gcc-res/%.library,$(LIB_GCC_SOURCES_C))
 LIBS = $(LIBS_GCC)
 
-LIBS_GCC_DBG  = $(patsubst %.c,$(LIB_BUILD_DIR)-dbg/%.library,$(LIB_GCC_SOURCES_C))
-LIBS_GCC_DBG += $(patsubst %.c,$(LIB_BUILD_DIR)-res-dbg/%.library,$(LIB_GCC_SOURCES_C))
+LIBS_GCC_DBG  = $(patsubst %.c,$(LIB_BUILD_DIR)-gcc-dbg/%.library,$(LIB_GCC_SOURCES_C))
+LIBS_GCC_DBG += $(patsubst %.c,$(LIB_BUILD_DIR)-gcc-res-dbg/%.library,$(LIB_GCC_SOURCES_C))
 LIBS_DBG = $(LIBS_GCC_DBG)
+
+# libraries: sc
+LIBS_SC  = $(patsubst %.c,$(LIB_BUILD_DIR)-sc/%.library,$(LIB_SC_SOURCES_C))
+LIBS_SC += $(patsubst %.c,$(LIB_BUILD_DIR)-sc-res/%.library,$(LIB_SC_SOURCES_C))
+LIBS += $(LIBS_SC)
+
+LIBS_SC_DBG  = $(patsubst %.c,$(LIB_BUILD_DIR)-sc-dbg/%.library,$(LIB_SC_SOURCES_C))
+LIBS_SC_DBG += $(patsubst %.c,$(LIB_BUILD_DIR)-sc-res-dbg/%.library,$(LIB_SC_SOURCES_C))
+LIBS_DBG += $(LIBS_SC_DBG)
+
 
 # --- rules ---
 
@@ -143,18 +161,49 @@ $(BUILD_DIR)/%$(SASC_EXT)$(DBG_EXT) : %.c
 	$(SASC) $(SASC_OPTS) $(SASC_DEBUG) LINK TO $@ $<
 
 
-# lib rules
-$(LIB_BUILD_DIR)/%.library : $(LIB_SRC_DIR)/%.c
+# lib rules: gcc
+$(LIB_BUILD_DIR)-gcc/%.library : $(LIB_SRC_DIR)/%.c
 	$(GCC) $(GCC_OPTS) $(GCC_OPTI) $(GCC_OPTS_LIB) -o $@ $<
 
-$(LIB_BUILD_DIR)-res/%.library : $(LIB_SRC_DIR)/%.c
+$(LIB_BUILD_DIR)-gcc-res/%.library : $(LIB_SRC_DIR)/%.c
 	$(GCC) $(GCC_OPTS) $(GCC_OPTI) $(GCC_OPTS_LIB_RES) -o $@ $<
 
-$(LIB_BUILD_DIR)-dbg/%.library : $(LIB_SRC_DIR)/%.c
+$(LIB_BUILD_DIR)-gcc-dbg/%.library : $(LIB_SRC_DIR)/%.c
 	$(GCC) $(GCC_OPTS) $(GCC_DEBUG) $(GCC_OPTS_LIB) -o $@ $<
 
-$(LIB_BUILD_DIR)-res-dbg/%.library : $(LIB_SRC_DIR)/%.c
+$(LIB_BUILD_DIR)-gcc-res-dbg/%.library : $(LIB_SRC_DIR)/%.c
 	$(GCC) $(GCC_OPTS) $(GCC_DEBUG) $(GCC_OPTS_LIB_RES) -o $@ $<
+
+
+# lib rules: sc
+$(LIB_BUILD_DIR)-sc/%.o: $(LIB_SRC_DIR)/%.c
+	$(SASC) libcode nostackcheck objectname=$@ $<
+
+$(LIB_BUILD_DIR)-sc/%.library : $(LIB_BUILD_DIR)-sc/%.o
+	$(SLINK) LIBFD $(FD_FILE) TO $@ $(SLINK_OPTS_DEF) $<
+
+$(LIB_BUILD_DIR)-sc-dbg/%.o: $(LIB_SRC_DIR)/%.c
+	$(SASC) libcode nostackcheck debug line objectname=$@ $<
+
+$(LIB_BUILD_DIR)-sc-dbg/%.library : $(LIB_BUILD_DIR)-sc-dbg/%.o
+	$(SLINK) LIBFD $(FD_FILE) TO $@ $(SLINK_OPTS_DEF) $<
+
+$(LIB_BUILD_DIR)-sc-res/%.o: $(LIB_SRC_DIR)/%.c
+	$(SASC) libcode nostackcheck objectname=$@ $<
+
+$(LIB_BUILD_DIR)-sc-res/%.library : $(LIB_BUILD_DIR)-sc/%.o
+	$(SLINK) LIBFD $(FD_FILE) TO $@ $(SLINK_OPTS_RES) $<
+
+$(LIB_BUILD_DIR)-sc-res-dbg/%.o: $(LIB_SRC_DIR)/%.c
+	$(SASC) libcode nostackcheck debug line objectname=$@ $<
+
+$(LIB_BUILD_DIR)-sc-res-dbg/%.library : $(LIB_BUILD_DIR)-sc-dbg/%.o
+	$(SLINK) LIBFD $(FD_FILE) TO $@ $(SLINK_OPTS_RES) $<
+
+$(LIB_BUILD_DIR)-sc/testsc.library: FD_FILE=../amitools/data/fd/testsc_lib.fd
+$(LIB_BUILD_DIR)-sc-dbg/testsc.library: FD_FILE=../amitools/data/fd/testsc_lib.fd
+$(LIB_BUILD_DIR)-sc-res/testsc.library: FD_FILE=../amitools/data/fd/testsc_lib.fd
+$(LIB_BUILD_DIR)-sc-res-dbg/testsc.library: FD_FILE=../amitools/data/fd/testsc_lib.fd
 
 
 # special flags

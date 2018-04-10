@@ -1,0 +1,5 @@
+##base _TestNixBase
+##bias 30
+##public
+Add(a,b)(d0,d1)
+##end

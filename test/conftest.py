@@ -226,8 +226,14 @@ def pytest_runtest_setup(item):
 
 
 @pytest.fixture(scope="module",
-                params=['none', 'res', 'dbg', 'res-dbg'])
+                params=['gcc', 'gcc-res', 'gcc-dbg', 'gcc-res-dbg'])
 def buildlibnix(request):
+  return BinBuilder(request.param)
+
+
+@pytest.fixture(scope="module",
+                params=['sc', 'sc-res', 'sc-dbg', 'sc-res-dbg'])
+def buildlibsc(request):
   return BinBuilder(request.param)
 
 

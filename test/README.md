@@ -36,7 +36,7 @@ AmigaOS binaries:
 Krystian Baclawski's great script suite called
 [m68k-amigaos-toolchain](https://github.com/cahirwpz/m68k-amigaos-toolchain)
 allows to greatly simplify the installation of gcc 2.95 and vbcc cross on
-*nix based plattforms.
+unix based plattforms.
 
 #### Prerequisites
 
@@ -116,6 +116,6 @@ with vamos.
 
 The `Makefile` in this directory contains a line *SASC_INSTALL_DIR* that
 describes the location where the `sc` directory of the Amiga installation
-can be found in the host file system. The default is `$HOME/amiga/shared/sc`.
+can be found in the host file system. The default is `volumes/sc`.
 
 EOF
