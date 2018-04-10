@@ -14,6 +14,7 @@ from amitools.vamos.trace import TraceManager, TraceMemory
 
 from Log import *
 from .machine.regs import *
+from .machine import CPUState
 from Exceptions import *
 
 class Vamos:
@@ -69,10 +70,12 @@ class Vamos:
         log_instr.setLevel(logging.INFO)
       cpu = self.cpu
       trace_mgr = self.trace_mgr
+      state = CPUState()
       def instr_hook():
         # add register dump
         if cfg.reg_dump:
-          res = self.cpu.dump_state()
+          state.get(cpu)
+          res = state.dump()
           for r in res:
             log_instr.info(r)
         # disassemble line
