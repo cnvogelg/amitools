@@ -3,8 +3,8 @@ from amitools.vamos.machine import MockMemory
 from amitools.vamos.mem import MemoryAlloc
 
 
-def loader_segload_test(binbuild):
-  lib_file = binbuild.make_lib('simple')
+def loader_segload_test(buildlibnix):
+  lib_file = buildlibnix.make_lib('testnix')
   mem = MockMemory(fill=23)
   alloc = MemoryAlloc(mem)
   loader = SegmentLoader(mem, alloc)

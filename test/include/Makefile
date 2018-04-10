@@ -1,7 +1,7 @@
 # AmigaOS library header generation helper
 
-BASE=vamostest
-LIBTYPE=VamosTestBase
+BASE?=vamostest
+LIBTYPE?=VamosTestBase
 ARCH=m68k
 
 # the tools
@@ -23,9 +23,17 @@ FD_OPTS=-a $(ARCH) -i $(FD) -c $(CLIB) -l $(LIBTYPE)
 
 FILES=$(VC_INLINE) $(GCC_INLINE) $(AGCC_DEFINE) $(PROTO) $(PRAGMA)
 
-all: $(FILES)
+all:
+	$(MAKE) lib BASE=vamostest LIBTYPE=VamosTestBase
+	$(MAKE) lib BASE=testnix LIBTYPE=Library
 
 clean:
+	$(MAKE) clean-lib BASE=vamostest LIBTYPE=VamosTestBase
+	$(MAKE) clean-lib BASE=testnix LIBTYPE=Library
+
+lib: $(FILES)
+
+clean-lib:
 	rm -f $(FILES)
 
 $(VC_INLINE): $(FD)

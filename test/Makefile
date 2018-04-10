@@ -10,9 +10,10 @@ SOURCES_C += util_muldiv.c util_date.c
 SOURCES_C += math_double.c math_double_trans.c
 SOURCES_C += math_single.c math_single_trans.c
 SOURCES_C += math_fast.c math_fast_trans.c
-SROUCES_C += test_hello.c test_raise.c
+SOURCES_C += test_hello.c test_raise.c
+SOURCES_C += lib_testnix.c
 
-LIB_SOURCES_C = simple.c
+LIB_GCC_SOURCES_C = testnix.c
 LIB_SRC_DIR = libs
 
 VPATH = src
@@ -20,6 +21,7 @@ VPATH = src
 # directories
 BUILD_DIR ?= bin
 LIB_BUILD_DIR = $(BUILD_DIR)/libs
+LIB_BUILD_DIRS = $(LIB_BUILD_DIR) $(patsubst %,$(LIB_BUILD_DIR)-%,res dbg res-dbg)
 
 # external data
 SASC_INSTALL_DIR ?= $(HOME)/amiga/shared/sc
@@ -81,12 +83,12 @@ PROGS_SASC_DBG = $(patsubst %.c,$(BUILD_DIR)/%$(SASC_EXT)$(DBG_EXT),$(SOURCES_C)
 PROGS_DBG = $(PROGS_VBCC_DBG) $(PROGS_GCC_DBG) $(PROGS_AROS_DBG) $(PROGS_SASC_DBG)
 
 # libraries (gcc only for now)
-LIBS_GCC = $(patsubst %.c,$(LIB_BUILD_DIR)/%.library,$(LIB_SOURCES_C))
-LIBS_GCC += $(patsubst %.c,$(LIB_BUILD_DIR)/%-res.library,$(LIB_SOURCES_C))
+LIBS_GCC = $(patsubst %.c,$(LIB_BUILD_DIR)/%.library,$(LIB_GCC_SOURCES_C))
+LIBS_GCC += $(patsubst %.c,$(LIB_BUILD_DIR)-res/%.library,$(LIB_GCC_SOURCES_C))
 LIBS = $(LIBS_GCC)
 
-LIBS_GCC_DBG  = $(patsubst %.c,$(LIB_BUILD_DIR)/%-dbg.library,$(LIB_SOURCES_C))
-LIBS_GCC_DBG += $(patsubst %.c,$(LIB_BUILD_DIR)/%-res-dbg.library,$(LIB_SOURCES_C))
+LIBS_GCC_DBG  = $(patsubst %.c,$(LIB_BUILD_DIR)-dbg/%.library,$(LIB_GCC_SOURCES_C))
+LIBS_GCC_DBG += $(patsubst %.c,$(LIB_BUILD_DIR)-res-dbg/%.library,$(LIB_GCC_SOURCES_C))
 LIBS_DBG = $(LIBS_GCC_DBG)
 
 # --- rules ---
@@ -96,11 +98,12 @@ all: $(PROGS) $(PROGS_DBG) $(LIBS) $(LIBS_DBG)
 opt: $(PROGS)
 debug: $(PROGS_DBG)
 
+all-libs: libs libs-debug
 libs: $(LIBS)
 libs-debug: $(LIBS_DBG)
 
 $(PROGS): $(BUILD_DIR)
-$(LIBS): $(LIB_BUILD_DIR)
+$(LIBS): $(LIB_BUILD_DIRS)
 
 clean:
 	rm -rf $(BUILD_DIR)
@@ -109,8 +112,8 @@ clean:
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-$(LIB_BUILD_DIR):
-	mkdir -p $(LIB_BUILD_DIR)
+$(LIB_BUILD_DIRS):
+	mkdir -p $(LIB_BUILD_DIRS)
 
 # rules for opt
 $(BUILD_DIR)/%$(VBCC_EXT) : %.c
@@ -144,13 +147,13 @@ $(BUILD_DIR)/%$(SASC_EXT)$(DBG_EXT) : %.c
 $(LIB_BUILD_DIR)/%.library : $(LIB_SRC_DIR)/%.c
 	$(GCC) $(GCC_OPTS) $(GCC_OPTI) $(GCC_OPTS_LIB) -o $@ $<
 
-$(LIB_BUILD_DIR)/%-res.library : $(LIB_SRC_DIR)/%.c
+$(LIB_BUILD_DIR)-res/%.library : $(LIB_SRC_DIR)/%.c
 	$(GCC) $(GCC_OPTS) $(GCC_OPTI) $(GCC_OPTS_LIB_RES) -o $@ $<
 
-$(LIB_BUILD_DIR)/%-dbg.library : $(LIB_SRC_DIR)/%.c
+$(LIB_BUILD_DIR)-dbg/%.library : $(LIB_SRC_DIR)/%.c
 	$(GCC) $(GCC_OPTS) $(GCC_DEBUG) $(GCC_OPTS_LIB) -o $@ $<
 
-$(LIB_BUILD_DIR)/%-res-dbg.library : $(LIB_SRC_DIR)/%.c
+$(LIB_BUILD_DIR)-res-dbg/%.library : $(LIB_SRC_DIR)/%.c
 	$(GCC) $(GCC_OPTS) $(GCC_DEBUG) $(GCC_OPTS_LIB_RES) -o $@ $<
 
 

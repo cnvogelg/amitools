@@ -3,8 +3,8 @@
 #include <stabs.h>
 
 /* constants required for libnix lib support */
-const char LibName[]="simple.library";
-const char LibIdString[]="simple.library 1.0 (07.07.2007)";
+const char LibName[]="testnix.library";
+const char LibIdString[]="testnix.library 1.0 (07.07.2007)";
 const UWORD LibVersion=1;
 const UWORD LibRevision=0;
 
@@ -29,11 +29,11 @@ void __UserLibCleanup(void)
 
 /* user funcs */
 
-ADDTABL_1(__UserFunc,d0); /* One Argument in d0 */
+ADDTABL_2(Add,d0,d1);
 
-int __UserFunc(long a)
+ULONG Add(ULONG a, ULONG b)
 {
-  return a*2;
+  return a + b;
 }
 
 /* end func table marker (required) */

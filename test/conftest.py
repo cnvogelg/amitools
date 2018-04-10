@@ -40,10 +40,11 @@ class BinBuilder:
     bins = {}
     for name in lib_names:
       lib_name = name
+      lib_bin_dir = LIB_BIN_DIR
       if self.flavor is not None:
-        lib_name += "-" + self.flavor
+        lib_bin_dir += "-" + self.flavor
       lib_name += ".library"
-      bin_path = os.path.join(LIB_BIN_DIR, lib_name)
+      bin_path = os.path.join(lib_bin_dir, lib_name)
       src_path = os.path.join(LIB_SRC_DIR, name + '.c')
       bins[bin_path] = src_path
     return self._build_bins(bins)
@@ -226,7 +227,7 @@ def pytest_runtest_setup(item):
 
 @pytest.fixture(scope="module",
                 params=['none', 'res', 'dbg', 'res-dbg'])
-def binbuild(request):
+def buildlibnix(request):
   return BinBuilder(request.param)
 
 

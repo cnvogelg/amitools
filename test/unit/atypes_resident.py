@@ -4,8 +4,8 @@ from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.atypes import Resident, ResidentFlags, NodeType
 
 
-def load_lib(mem, binbuild):
-  lib_file = binbuild.make_lib('simple')
+def load_lib(mem, buildlibnix):
+  lib_file = buildlibnix.make_lib('testnix')
   alloc = MemoryAlloc(mem)
   loader = SegmentLoader(mem, alloc)
   seg_list = loader.load_seg(lib_file)
@@ -16,9 +16,9 @@ def load_lib(mem, binbuild):
   return addr, size, end
 
 
-def atypes_resident_find_lib_test(binbuild):
+def atypes_resident_find_lib_test(buildlibnix):
   mem = MockMemory(fill=23)
-  addr, size, end = load_lib(mem, binbuild)
+  addr, size, end = load_lib(mem, buildlibnix)
   # search list
   res = Resident.find(mem, addr, size, only_first=False)
   assert len(res) == 1
@@ -30,9 +30,9 @@ def atypes_resident_find_lib_test(binbuild):
   assert res == [res2]
 
 
-def atypes_resident_read_lib_test(binbuild):
+def atypes_resident_read_lib_test(buildlibnix):
   mem = MockMemory(fill=23)
-  addr, size, end = load_lib(mem, binbuild)
+  addr, size, end = load_lib(mem, buildlibnix)
   res = Resident.find(mem, addr, size)
   assert res.get_match_word() == res.RTC_MATCHWORD
   assert res.get_match_tag() == res.get_addr()
@@ -41,8 +41,8 @@ def atypes_resident_read_lib_test(binbuild):
   assert res.get_version() == 0
   assert res.get_type() == NodeType.NT_LIBRARY
   assert res.get_pri() == 0
-  assert res.get_name() == "simple.library"
-  assert res.get_id_string() == "simple.library 1.0 (07.07.2007)"
+  assert res.get_name() == "testnix.library"
+  assert res.get_id_string() == "testnix.library 1.0 (07.07.2007)"
   assert res.get_init() > 0
 
 
