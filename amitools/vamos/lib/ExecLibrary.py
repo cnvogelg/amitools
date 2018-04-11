@@ -1,4 +1,5 @@
 from amitools.vamos.machine.regs import *
+from amitools.vamos.libnative import MakeLib
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.astructs import *
 from amitools.vamos.Log import log_exec
@@ -111,6 +112,15 @@ class ExecLibrary(LibImpl):
     ctx.cpu.w_reg(REG_A7, new_pointer)
 
   # ----- Libraries -----
+
+  def MakeFunctions(self, ctx):
+    target = ctx.cpu.r_reg(REG_A0)
+    func_array = ctx.cpu.r_reg(REG_A1)
+    func_disp = ctx.cpu.r_reg(REG_A2)
+    log_exec.info("MakeFunctions: target=%06x, func_array=%06x, func_disp=%06x",
+                  target, func_array, func_disp)
+    ml = MakeLib(ctx.mem)
+    return ml.make_functions(target, func_array, func_disp)
 
   def OpenLibrary(self, ctx):
     ver = ctx.cpu.r_reg(REG_D0)
