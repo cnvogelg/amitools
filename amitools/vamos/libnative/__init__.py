@@ -1,1 +1,2 @@
-from .makelib import MakeLib
+from .makefuncs import MakeFuncs
+from .initstruct import InitStruct, InitStructBuilder

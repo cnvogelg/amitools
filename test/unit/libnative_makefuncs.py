@@ -1,5 +1,5 @@
 from amitools.vamos.machine import MockMemory
-from amitools.vamos.libnative import MakeLib
+from amitools.vamos.libnative import MakeFuncs
 from amitools.vamos.machine.opcodes import op_jmp
 
 
@@ -15,8 +15,8 @@ def make_functions_offset_test():
   # build func table
   disp_base = 0x1000
   lib_base = 0x800
-  ml = MakeLib(mem)
-  size = ml.make_functions(lib_base, 0, disp_base)
+  mf = MakeFuncs(mem)
+  size = mf.make_functions(lib_base, 0, disp_base)
   assert size == len(offsets) * 6
   # check jump table
   ptr = lib_base - 6
@@ -37,8 +37,8 @@ def make_functions_ptr_test():
   mem.w32s(ptr, -1)
   # build func table
   lib_base = 0x800
-  ml = MakeLib(mem)
-  size = ml.make_functions(lib_base, 0)
+  mf = MakeFuncs(mem)
+  size = mf.make_functions(lib_base, 0)
   assert size == len(fptrs) * 6
   # check jump table
   ptr = lib_base - 6

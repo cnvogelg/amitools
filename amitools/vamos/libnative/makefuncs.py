@@ -1,7 +1,7 @@
 from amitools.vamos.machine.opcodes import op_jmp
 
 
-class MakeLib(object):
+class MakeFuncs(object):
 
   def __init__(self, mem):
     self.mem = mem
@@ -38,3 +38,4 @@ class MakeLib(object):
         src_ptr += 4
         dst_ptr -= 6
     return size
+
