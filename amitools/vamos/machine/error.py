@@ -36,7 +36,8 @@ class ErrorReporter:
   def _log_run_state(self):
     # get current run_state
     run_state = self.machine.get_cur_run_state()
-    log_machine.error("Initial PC=%06x, SP=%06x", run_state.pc, run_state.sp)
+    log_machine.error("Run: '%s': Initial PC=%06x, SP=%06x",
+                      run_state.name, run_state.pc, run_state.sp)
 
   def _log_mem_info(self, error):
     # memory error?

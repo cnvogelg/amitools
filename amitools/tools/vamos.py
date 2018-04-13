@@ -189,7 +189,7 @@ def main():
   # run!
   run_state = machine.run(pc, sp, set_regs=set_regs, get_regs=get_regs,
                           cycles_per_run=cfg.cycles_per_block,
-                          max_cycles=cfg.max_cycles)
+                          max_cycles=cfg.max_cycles, name="main")
 
   ok = False
   if run_state.done:

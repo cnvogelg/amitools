@@ -11,7 +11,8 @@ from amitools.vamos.label import LabelManager
 
 
 class RunState(object):
-  def __init__(self, pc, sp, ret_addr):
+  def __init__(self, name, pc, sp, ret_addr):
+    self.name = name
     self.pc = pc
     self.sp = sp
     self.ret_addr = ret_addr
@@ -22,9 +23,9 @@ class RunState(object):
     self.regs = None
 
   def __str__(self):
-    return "RunState(pc=%06x,sp=%06x,ret_addr=%06x,error=%s,done=%s," \
+    return "RunState('%s', pc=%06x,sp=%06x,ret_addr=%06x,error=%s,done=%s," \
         "cycles=%s,time_delta=%s,regs=%s)" % \
-        (self.pc, self.sp, self.ret_addr, self.error, self.done,
+        (self.name, self.pc, self.sp, self.ret_addr, self.error, self.done,
          self.cycles, self.time_delta, self.regs)
 
 
@@ -251,9 +252,12 @@ class Machine(object):
     return len(self.run_states)
 
   def run(self, pc, sp=None, set_regs=None, get_regs=None,
-          max_cycles=0, cycles_per_run=0):
+          max_cycles=0, cycles_per_run=0, name=None):
     mem = self.mem
     cpu = self.cpu
+
+    if name is None:
+      name = "default"
 
     # current run nesting level
     nesting = len(self.run_states)
@@ -261,8 +265,8 @@ class Machine(object):
     # return reset opcode for this run
     ret_addr = self.run_reset_addr + nesting * 4
 
-    log_machine.info("run#%d: begin pc=%06x, sp=%06x, ret_addr=%06x",
-                     nesting, pc, sp, ret_addr)
+    log_machine.info("run#%d(%s): begin pc=%06x, sp=%06x, ret_addr=%06x",
+                     nesting, name, pc, sp, ret_addr)
 
     # get cpu context
     if nesting > 0:
@@ -293,7 +297,7 @@ class Machine(object):
     mem.w32(4, self.mem4)
 
     # create run state for this run and push it
-    run_state = RunState(pc, sp, ret_addr)
+    run_state = RunState(name, pc, sp, ret_addr)
     self.run_states.append(run_state)
 
     # setup regs
@@ -339,7 +343,7 @@ class Machine(object):
     # pop
     self.run_states.pop()
 
-    log_machine.info("run #%d: end. state=%s", nesting, run_state)
+    log_machine.info("run #%d(%s): end. state=%s", nesting, name, run_state)
 
     # if run_state has error and we are not a top-level raise an error
     # so the running trap code gets aborted and propagates the abort
