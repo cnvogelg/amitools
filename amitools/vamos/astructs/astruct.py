@@ -61,6 +61,27 @@ class AmigaStruct(object):
     return cls._name_to_field[name]
 
   @classmethod
+  def get_fields_by_path(cls, name):
+    parts = name.split('.')
+    return cls.get_fields_for_parts(parts)
+
+  @classmethod
+  def get_fields_for_parts(cls, parts):
+    struct = cls
+    res = []
+    for name in parts:
+      field = struct.get_field_by_name(name)
+      res.append(field)
+      struct = field.struct_type
+    return res
+
+  @classmethod
+  def get_field_offset_for_path(cls, name):
+    fields = cls.get_fields_by_path(name)
+    offsets = map(lambda x : x.offset, fields)
+    return sum(offsets)
+
+  @classmethod
   def get_field_by_index(cls, idx):
     return cls._fields[idx]
 
@@ -253,6 +274,10 @@ class AmigaStruct(object):
           return struct.get_struct_field_for_offset(delta)
         # no sub struct
         return self, field, delta
+
+  def get_offset_for_name(self, name):
+    struct, field = self.get_struct_field_for_name(name)
+    return struct.addr + field.offset
 
   def get_struct_field_for_name(self, name):
     """return (struct, field)"""

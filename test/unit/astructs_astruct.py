@@ -30,6 +30,9 @@ def astruct_astruct_base_test():
   assert MyStruct.get_field_by_name('ms_Word')
   assert MyStruct.get_field_names(
   ) == ['ms_Word', 'ms_Pad', 'ms_SegList', 'ms_StackSize']
+  # offset
+  assert MyStruct.get_field_offset_for_path('ms_SegList') == 4
+  assert MyStruct.get_field_offset_for_path('ms_Pad') == 2
   MyStruct.dump_type()
   # data class
   dc = MyStruct.get_data_class()
@@ -64,6 +67,8 @@ def astruct_astruct_sub_struct_test():
   assert SubStruct.get_num_fields() == 3
   assert SubStruct.get_field_by_name('ss_My')
   assert SubStruct.get_field_names() == ['ss_My', 'ss_MyPtr', 'ss_SubPtr']
+  assert SubStruct.get_field_offset_for_path('ss_My') == 0
+  assert SubStruct.get_field_offset_for_path('ss_My.ms_SegList') == 4
   SubStruct.dump_type()
   # check instance
   mem = MockMemory()
