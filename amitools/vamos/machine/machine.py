@@ -63,7 +63,7 @@ class Machine(object):
   shutdown_trap_addr = 0x422
   ram_begin = 0x800
 
-  def __init__(self, cpu_type, ram_size_kib=1024,
+  def __init__(self, cpu_type=M68K_CPU_TYPE_68000, ram_size_kib=1024,
                use_labels=True):
     # setup musashi components
     self.cpu_type = cpu_type
@@ -265,9 +265,6 @@ class Machine(object):
     # return reset opcode for this run
     ret_addr = self.run_reset_addr + nesting * 4
 
-    log_machine.info("run#%d(%s): begin pc=%06x, sp=%06x, ret_addr=%06x",
-                     nesting, name, pc, sp, ret_addr)
-
     # get cpu context
     if nesting > 0:
       cpu_ctx = cpu.get_cpu_context()
@@ -281,6 +278,9 @@ class Machine(object):
       else:
         sp = cpu.r_reg(REG_A7)
         sp -= 4
+
+    log_machine.info("run#%d(%s): begin pc=%06x, sp=%06x, ret_addr=%06x",
+                     nesting, name, pc, sp, ret_addr)
 
     # store return address on stack
     mem.w32(sp, ret_addr)
