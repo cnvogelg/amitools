@@ -50,6 +50,12 @@ class SegList:
   def get_total_size(self):
     return self.size
 
+  def get_baddr(self):
+    return self.b_addr
+
+  def get_prog_start(self):
+    return self.prog_start
+
   def __str__(self):
     return "[SegList:ami='%s':sys='%s':b_addr=%06x," \
         "prog=%06x,segs=#%d,size=%d,usage=%d]" % \

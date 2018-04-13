@@ -11,62 +11,19 @@ class SegmentLoader:
   def __init__(self, mem, alloc):
     self.mem = mem
     self.alloc = alloc
-    self.error = None
-    self.loaded_seg_lists = {}
     self.binfmt = BinFmt()
 
-  # load binary file into seglist
-  def load_seg(self, sys_bin_file, allow_reuse=False):
-    # check if seg list already loaded in a parent process
-    # Bummer! This cannot work unless commands are resident!
-    if allow_reuse and self.loaded_seg_lists.has_key(sys_bin_file):
-      seg_list = self.loaded_seg_lists[sys_bin_file]
-      seg_list.usage += 1
-      return seg_list
-
-    # really load new seg list
-    seg_list = self._load_seg(sys_bin_file)
-    if seg_list == None:
-      return None
-
-    # store in cache if allowed by caller
-    if allow_reuse:
-      self.loaded_seg_lists[sys_bin_file] = seg_list
-    return seg_list
-
-  # unload seg list
-  def unload_seg(self, seg_list, allow_reuse=False):
-    sys_bin_file = seg_list.sys_bin_file
-    # check that file is in cache
-    if not allow_reuse or sys_bin_file in self.loaded_seg_lists:
-      seg_list.usage -= 1
-      # no more used
-      if seg_list.usage == 0:
-        if sys_bin_file in self.loaded_seg_lists:
-          del self.loaded_seg_lists[sys_bin_file]
-        self._unload_seg(seg_list)
-      return True
-    else:
-      self.error = "seglist not found in loaded seglists!"
-      return False
-
   # load sys_bin_file
-  def _load_seg(self, sys_bin_file):
+  def load_seglist(self, sys_bin_file):
     base_name = os.path.basename(sys_bin_file)
 
     # does file exist?
     if not os.path.isfile(sys_bin_file):
-      self.error = "Can't find '%s'" % sys_bin_file
       return None
 
     # try to load bin image in supported format (e.g. HUNK or ELF)
-    try:
-      bin_img = self.binfmt.load_image(sys_bin_file)
-      if bin_img is None:
-        self.error = "Error loading '%s': unsupported format" % sys_bin_file
-        return None
-    except Exception as e:
-      self.error = "Error loading '%s': %s" % (sys_bin_file, e)
+    bin_img = self.binfmt.load_image(sys_bin_file)
+    if bin_img is None:
       return None
 
     # create relocator
@@ -118,10 +75,10 @@ class SegmentLoader:
 
     return seg_list
 
-  def _unload_seg(self, seg_list):
+  def unload_seglist(self, seg_list):
     for seg in seg_list.segments:
       # free memory of segment
       self.alloc.free_mem(seg.addr, seg.size)
       # remove label of segment
-      if self.alloc.label_mgr != None:
+      if self.alloc.label_mgr:
         self.alloc.label_mgr.remove_label(seg.label)

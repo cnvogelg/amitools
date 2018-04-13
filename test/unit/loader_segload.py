@@ -8,5 +8,7 @@ def loader_segload_test(buildlibnix):
   mem = MockMemory(fill=23)
   alloc = MemoryAlloc(mem)
   loader = SegmentLoader(mem, alloc)
-  seg_list = loader.load_seg(lib_file)
+  seg_list = loader.load_seglist(lib_file)
   assert seg_list is not None
+  loader.unload_seglist(seg_list)
+  assert alloc.is_all_free()

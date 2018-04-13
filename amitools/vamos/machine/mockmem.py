@@ -18,12 +18,6 @@ class MockMemory(object):
   def get_ram_size_bytes(self):
     return self.size_bytes
 
-  def set_all_to_end(self):
-    raise NotImplementedError()
-
-  def is_end(self):
-    raise NotImplementedError()
-
   def reserve_special_range(self, num_pages=1):
     raise NotImplementedError()
 

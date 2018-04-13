@@ -8,7 +8,7 @@ def load_lib(mem, buildlibnix):
   lib_file = buildlibnix.make_lib('testnix')
   alloc = MemoryAlloc(mem)
   loader = SegmentLoader(mem, alloc)
-  seg_list = loader.load_seg(lib_file)
+  seg_list = loader.load_seglist(lib_file)
   seg0 = seg_list.get_segment(0)
   addr = seg0.get_addr()
   size = seg0.get_size()

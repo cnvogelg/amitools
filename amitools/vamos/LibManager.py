@@ -426,7 +426,7 @@ class LibManager():
 
     # use seg_loader to load lib
     self.lib_log("load_lib","loading native lib: %s" % sys_path)
-    lib.seg_list = ctx.seg_loader.load_seg(sys_path)
+    lib.seg_list = ctx.seg_loader.load_seglist(sys_path)
     if lib.seg_list == None:
       self.lib_log("load_lib","Can't load library file '%s'" % sys_path, level=logging.ERROR)
       return None
@@ -593,7 +593,7 @@ class LibManager():
     self._unregister_lib_name(lib)
 
     # unload seg_list
-    ctx.seg_loader.unload_seg(lib.seg_list)
+    ctx.seg_loader.unload_seglist(lib.seg_list)
     lib.seg_list = None
 
     self.lib_log("free_lib","done freeing native lib: %s" % lib)
