@@ -93,7 +93,8 @@ class Vamos:
 
     # setup lib context
     ctx_map = LibCtxMap()
-    self.exec_ctx = ExecLibCtx(self.cpu, self.mem, self.cpu_type, self.ram_size,
+    self.exec_ctx = ExecLibCtx(self.cpu, self.mem, self.machine,
+                               self.cpu_type, self.ram_size,
                                self.label_mgr, self.alloc, self.traps,
                                self.seg_loader, self.path_mgr)
     self.dos_ctx = DosLibCtx(self.cpu, self.mem, self.alloc, self.path_mgr,

@@ -1,5 +1,5 @@
 from amitools.vamos.machine.regs import *
-from amitools.vamos.libnative import MakeFuncs, InitStruct
+from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.astructs import *
 from amitools.vamos.Log import log_exec
@@ -130,6 +130,19 @@ class ExecLibrary(LibImpl):
                   init_tab, memory, size)
     i = InitStruct(ctx.mem)
     i.init_struct(init_tab, memory, size)
+
+  def MakeLibrary(self, ctx):
+    vectors = ctx.cpu.r_reg(REG_A0)
+    struct = ctx.cpu.r_reg(REG_A1)
+    init = ctx.cpu.r_reg(REG_A2)
+    dsize = ctx.cpu.r_reg(REG_D0)
+    seglist = ctx.cpu.r_reg(REG_D1)
+    ml = MakeLib(ctx.machine, ctx.alloc)
+    lib_base, mobj = ml.make_library(vectors, struct, init, dsize, seglist)
+    log_exec.info("MakeLibrary: vectors=%06x, struct=%06x, init=%06x, " \
+                  "dsize=%06x seglist=%06x -> lib_base=%06x, mobj=%s",
+                  vectors, struct, init, dsize, seglist, lib_base, mobj)
+    return lib_base
 
   def OpenLibrary(self, ctx):
     ver = ctx.cpu.r_reg(REG_D0)
