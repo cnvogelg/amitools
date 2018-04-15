@@ -302,3 +302,25 @@ class AmigaStruct(object):
     struct = st(self.mem, self.addr + field.offset)
     struct.parent = self
     return struct
+
+  def __getattr__(self, name):
+    if name in self._name_to_field:
+      field = self._name_to_field[name]
+      if field.struct_type:
+        # allow to access sub struct
+        return self.create_struct(field)
+      else:
+        # access value
+        return self.read_field_index(field.index)
+    else:
+      raise AttributeError
+
+  def __setattr__(self, name, val):
+    if name in ('mem', 'addr', 'parent'):
+      object.__setattr__(self, name, val)
+    elif name in self._name_to_field:
+      field = self._name_to_field[name]
+      self.write_field_index(field.index, val)
+    else:
+      raise AttributeError
+

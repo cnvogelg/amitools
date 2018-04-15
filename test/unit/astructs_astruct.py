@@ -27,7 +27,8 @@ def astruct_astruct_base_test():
   assert MyStruct.get_size() == 12
   assert len(MyStruct.get_fields()) == 4
   assert MyStruct.get_num_fields() == 4
-  assert MyStruct.get_field_by_name('ms_Word')
+  ms_Word = MyStruct.get_field_by_name('ms_Word')
+  assert MyStruct.ms_Word_field == ms_Word
   assert MyStruct.get_field_names(
   ) == ['ms_Word', 'ms_Pad', 'ms_SegList', 'ms_StackSize']
   # offset
@@ -57,6 +58,9 @@ def astruct_astruct_base_test():
   addr = ms.get_field_addr(stack_field)
   assert ms.get_struct_field_for_addr(addr) == (ms, stack_field, 0)
   assert ms.get_struct_field_for_name('ms_StackSize') == (ms, stack_field)
+  # getattr/setattr
+  ms.ms_Word = 2000
+  assert ms.ms_Word == 2000
 
 
 def astruct_astruct_sub_struct_test():
@@ -92,3 +96,8 @@ def astruct_astruct_sub_struct_test():
   assert ss.get_struct_field_for_addr(addr) == (ms, stack_field, 0)
   assert ss.get_struct_field_for_name(
       'ss_My.ms_StackSize') == (ms, stack_field)
+  # getattr/setattr
+  ss.ss_My.ms_Word = 2000
+  assert ss.ss_My.ms_Word == 2000
+
+

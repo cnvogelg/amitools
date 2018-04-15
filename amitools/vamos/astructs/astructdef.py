@@ -86,6 +86,12 @@ class AmigaStructDecorator(object):
       name_to_field[name] = field
       names.append(name)
 
+      # add name to class directly
+      field_name = name + "_field"
+      if getattr(cls, field_name, None) is not None:
+        raise RuntimeError("field '%s' already a member of class!" % name)
+      setattr(cls, field_name, field)
+
       index += 1
       offset += size
       total_size += size
