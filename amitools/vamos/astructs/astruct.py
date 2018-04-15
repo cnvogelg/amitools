@@ -136,44 +136,44 @@ class AmigaStruct(object):
   # ----- instance -----
 
   def __init__(self, mem, addr):
-    self.mem = mem
-    self.addr = addr
-    self.parent = None
+    self._mem = mem
+    self._addr = addr
+    self._parent = None
 
   def __eq__(self, other):
     if type(other) is int:
-      return self.addr == other
+      return self._addr == other
     elif isinstance(other, AmigaStruct):
-      return self.addr == other.addr
+      return self._addr == other._addr
     else:
       return NotImplemented
 
   def __str__(self):
     return "[AStruct:%s,@%06x+%06x]" % \
-        (self._type_name, self.addr, self._total_size)
+        (self._type_name, self._addr, self._total_size)
 
   def get_mem(self):
-    return self.mem
+    return self._mem
 
   def get_addr(self):
-    return self.addr
+    return self._addr
 
   def get_parent(self):
-    return self.parent
+    return self._parent
 
   def get_path_name(self):
     my_name = self.get_type_name()
-    if self.parent:
-      return self.parent.get_path_name() + "." + my_name
+    if self._parent:
+      return self._parent.get_path_name() + "." + my_name
     else:
       return my_name
 
   def get_field_path_name(self, field):
     my_name = field.name
-    if self.parent:
-      addr = self.addr + field.offset
-      st, p_field, _ = self.parent.get_struct_field_for_addr(addr, recurse=False)
-      return self.parent.get_field_path_name(p_field) + "." + my_name
+    if self._parent:
+      addr = self._addr + field.offset
+      st, p_field, _ = self._parent.get_struct_field_for_addr(addr, recurse=False)
+      return self._parent.get_field_path_name(p_field) + "." + my_name
     else:
       return my_name
 
@@ -192,10 +192,10 @@ class AmigaStruct(object):
 
   def read_field_index(self, index, do_conv=True):
     field = self._fields[index]
-    addr = self.addr + field.offset
+    addr = self._addr + field.offset
     # pointer
     if field.is_pointer:
-      return self.mem.r32(addr)
+      return self._mem.r32(addr)
     # embedded struct type
     elif field.struct_type:
       struct = self.create_struct(field)
@@ -207,9 +207,9 @@ class AmigaStruct(object):
       signed = base_type[2]
       # read value
       if signed:
-        val = self.mem.reads(width, addr)
+        val = self._mem.reads(width, addr)
       else:
-        val = self.mem.read(width, addr)
+        val = self._mem.read(width, addr)
       # convert?
       if conv != None and do_conv:
         val = conv[1](val)
@@ -217,10 +217,10 @@ class AmigaStruct(object):
 
   def write_field_index(self, index, val, do_conv=True):
     field = self._fields[index]
-    addr = self.addr + field.offset
+    addr = self._addr + field.offset
     # pointer
     if field.is_pointer:
-      self.mem.w32(addr, val)
+      self._mem.w32(addr, val)
     # embedded struct type
     elif field.struct_type:
       struct = self.create_struct(field)
@@ -235,9 +235,9 @@ class AmigaStruct(object):
         val = conv[0](val)
       # write value
       if signed:
-        self.mem.writes(width, addr, val)
+        self._mem.writes(width, addr, val)
       else:
-        self.mem.write(width, addr, val)
+        self._mem.write(width, addr, val)
 
   def read_field(self, name, do_conv=True):
     struct, field = self.get_struct_field_for_name(name)
@@ -258,10 +258,10 @@ class AmigaStruct(object):
     self.dump_type(data=data)
 
   def get_field_addr(self, field):
-    return self.addr + field.offset
+    return self._addr + field.offset
 
   def get_struct_field_for_addr(self, addr, recurse=True):
-    return self.get_struct_field_for_offset(addr - self.addr, recurse)
+    return self.get_struct_field_for_offset(addr - self._addr, recurse)
 
   def get_struct_field_for_offset(self, offset, recurse=True):
     """return (struct, field, delta) or None"""
@@ -277,7 +277,7 @@ class AmigaStruct(object):
 
   def get_offset_for_name(self, name):
     struct, field = self.get_struct_field_for_name(name)
-    return struct.addr + field.offset
+    return struct._addr + field.offset
 
   def get_struct_field_for_name(self, name):
     """return (struct, field)"""
@@ -299,8 +299,8 @@ class AmigaStruct(object):
     st = field.struct_type
     if st is None:
       return None
-    struct = st(self.mem, self.addr + field.offset)
-    struct.parent = self
+    struct = st(self._mem, self._addr + field.offset)
+    struct._parent = self
     return struct
 
   def __getattr__(self, name):
@@ -316,7 +316,7 @@ class AmigaStruct(object):
       raise AttributeError
 
   def __setattr__(self, name, val):
-    if name in ('mem', 'addr', 'parent'):
+    if name in ('_mem', '_addr', '_parent'):
       object.__setattr__(self, name, val)
     elif name in self._name_to_field:
       field = self._name_to_field[name]

@@ -14,7 +14,7 @@ class AccessStruct(object):
     struct, field = self.struct.write_field(name, val, do_conv)
     if self.trace_mgr is not None:
       off = field.offset
-      addr = struct.addr + off
+      addr = struct.get_addr() + off
       tname = struct.get_type_name()
       addon = "%s+%d = %s" % (tname, off, name)
       width = self._size_to_width[field.size]
@@ -25,7 +25,7 @@ class AccessStruct(object):
     struct, field, val = self.struct.read_field_ext(name, do_conv)
     if self.trace_mgr is not None:
       off = field.offset
-      addr = struct.addr + off
+      addr = struct.get_addr() + off
       tname = struct.get_type_name()
       addon = "%s+%d = %s" % (tname, off, name)
       width = self._size_to_width[field.size]
