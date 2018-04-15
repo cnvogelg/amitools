@@ -1,6 +1,6 @@
 from amitools.vamos.machine import MockMemory
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.atypes import List, Node, NodeType
+from amitools.vamos.atypes import List, MinList, Node, NodeType, MinNode
 from amitools.vamos.astructs import ListStruct, MinListStruct
 
 
@@ -13,8 +13,8 @@ def new_list():
 
 def new_min_list():
   mem = MockMemory()
-  l = List(mem, 0x40, True)
-  l.new_min_list()
+  l = MinList(mem, 0x40)
+  l.new_list()
   return l
 
 
@@ -211,9 +211,13 @@ def atypes_list_alloc_test():
   assert type(l) is List
   assert l.get_size() == ListStruct.get_size()
   l.free()
-  # min
-  l = List.alloc_min(alloc)
-  assert type(l) is List
+
+
+def atypes_list_alloc_min_test():
+  mem = MockMemory()
+  alloc = MemoryAlloc(mem)
+  l = MinList.alloc(alloc)
+  assert type(l) is MinList
   assert l.get_size() == MinListStruct.get_size()
   l.free()
   assert alloc.is_all_free()

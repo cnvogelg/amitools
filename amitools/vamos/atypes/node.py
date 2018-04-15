@@ -32,29 +32,48 @@ class NodeType(object):
   NT_EXTENDED = 255
 
 
-@AmigaTypeDef(NodeStruct, wrap={'type': NodeType})
-class Node(AmigaType):
-  """wrap an Exec Node in memory an allow to operate on its values.
-     also suppors MinNode by simply not using any ops on type, pri, and name"""
+# common funcs for nodes
 
-  def __init__(self, mem, addr, min_node=False):
-    AmigaType.__init__(self, mem, addr)
-    self.min_node = min_node
+def remove(self, clear=True):
+  succ = self.get_succ()
+  pred = self.get_pred()
+  if succ is None or pred is None:
+    raise ValueError("remove node without succ/pred!")
+  succ.set_pred(pred)
+  pred.set_succ(succ)
+  if clear:
+    self.set_succ(None)
+    self.set_pred(None)
+
+
+funcs = {
+    'remove': remove
+}
+
+
+@AmigaTypeDef(MinNodeStruct, funcs=funcs)
+class MinNode(AmigaType):
+  """wrap an Exec MinNode in memory an allow to operate on its values.
+  """
 
   def __str__(self):
-    if self.min_node:
-      return "[MinNode:@%06x,p=%06x,s=%06x]" % \
-          (self.addr, self.get_pred(True), self.get_succ(True))
-    else:
-      return "[Node:@%06x,p=%06x,s=%06x,%s,%d,'%s']" % \
-          (self.addr, self.get_pred(True), self.get_succ(True),
-           self.get_type(), self.get_pri(), self.get_name())
+    return "[MinNode:@%06x,p=%06x,s=%06x]" % \
+        (self.addr, self.get_pred(True), self.get_succ(True))
 
-  @classmethod
-  def alloc_min(cls, alloc, tag=None, size=None):
-    if size is None:
-      size = MinNodeStruct.get_size()
-    return cls.alloc(alloc, tag, size)
+  def setup(self, succ, pred):
+    self.set_succ(succ)
+    self.set_pred(pred)
+
+
+@AmigaTypeDef(NodeStruct, wrap={'type': NodeType}, funcs=funcs)
+class Node(AmigaType):
+  """wrap an Exec Node in memory an allow to operate on its values.
+  """
+
+  def __str__(self):
+    return "[Node:@%06x,p=%06x,s=%06x,%s,%d,'%s']" % \
+        (self.addr, self.get_pred(True), self.get_succ(True),
+         self.get_type(), self.get_pri(), self.get_name())
 
   def setup(self, succ, pred, nt, pri, name):
     self.set_succ(succ)
@@ -63,27 +82,10 @@ class Node(AmigaType):
     self.set_pri(pri)
     self.set_name(name)
 
-  def setup_min(self, succ, pred):
-    self.set_succ(succ)
-    self.set_pred(pred)
-
   # ----- node ops -----
-
-  def remove(self, clear=True):
-    succ = self.get_succ()
-    pred = self.get_pred()
-    if succ is None or pred is None:
-      raise ValueError("remove node without succ/pred!")
-    succ.set_pred(pred)
-    pred.set_succ(succ)
-    if clear:
-      self.set_succ(None)
-      self.set_pred(None)
 
   def find_name(self, name):
     """find name after this node"""
-    if self.min_node:
-      raise RuntimeError("min_node has no name!")
     succ = self.get_succ()
     if succ is None:
       return None

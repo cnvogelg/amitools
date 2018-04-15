@@ -1,7 +1,7 @@
 import pytest
 from amitools.vamos.machine import MockMemory
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.atypes import Node, NodeType
+from amitools.vamos.atypes import Node, NodeType, MinNode
 from amitools.vamos.astructs import NodeStruct, MinNodeStruct
 
 
@@ -56,8 +56,8 @@ def atypes_node_setup_test():
 
 def atypes_node_setup_min_test():
   mem = MockMemory()
-  node = Node(mem, 0x42)
-  node.setup_min(1234, 5678)
+  node = MinNode(mem, 0x42)
+  node.setup(1234, 5678)
   # check node
   assert node.get_succ() == 1234
   assert node.get_pred() == 5678
@@ -71,9 +71,29 @@ def atypes_node_str_test():
   node.setup(0x1234, 0x5678, NodeType.NT_DEVICE, -5, 12)
   assert str(node) == \
       "[Node:@000042,p=005678,s=001234,NT_DEVICE,-5,'hello, world!']"
-  min_node = Node(mem, 0x80, True)
-  min_node.setup_min(0x1234, 0x5678)
+
+
+def atypes_node_str_min_test():
+  mem = MockMemory()
+  min_node = MinNode(mem, 0x80)
+  min_node.setup(0x1234, 0x5678)
   assert str(min_node) == "[MinNode:@000080,p=005678,s=001234]"
+
+
+def atypes_node_remove_test():
+  mem = MockMemory()
+  text = 'hello, world!'
+  mem.w_cstr(12, text)
+  node = Node(mem, 0x80)
+  node.setup(0x60, 0x100, NodeType.NT_DEVICE, -5, 12)
+  node.remove()
+
+
+def atypes_node_remove_min_test():
+  mem = MockMemory()
+  min_node = MinNode(mem, 0x80)
+  min_node.setup(0x60, 0x100)
+  min_node.remove()
 
 
 def atypes_node_alloc_test():
@@ -82,9 +102,12 @@ def atypes_node_alloc_test():
   node = Node.alloc(alloc)
   assert node.get_size() == NodeStruct.get_size()
   node.free()
-  # min
-  node = Node.alloc_min(alloc)
+
+
+def atypes_node_alloc_min_test():
+  mem = MockMemory()
+  alloc = MemoryAlloc(mem)
+  node = MinNode.alloc(alloc)
   assert node.get_size() == MinNodeStruct.get_size()
   node.free()
   assert alloc.is_all_free()
-

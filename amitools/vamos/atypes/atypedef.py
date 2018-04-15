@@ -4,11 +4,12 @@ from .cstring import CString
 
 
 class AmigaTypeDecorator(object):
-  def __init__(self, struct_def, wrap, allow_struct):
+  def __init__(self, struct_def, wrap, funcs, allow_struct):
     if wrap is None:
       wrap = {}
     self.struct_def = struct_def
     self.wrap = wrap
+    self.funcs = funcs
     self.allow_struct = allow_struct
 
   def decorate(self, cls):
@@ -20,7 +21,15 @@ class AmigaTypeDecorator(object):
     cls._type_pool[name] = cls
     # finally create methods
     self._gen_field_methods(cls)
+    # add custom functions
+    if self.funcs:
+      self._add_custom_funcs(cls, self.funcs)
     return cls
+
+  def _add_custom_funcs(self, cls, funcs):
+    for name in funcs:
+      func = funcs[name]
+      setattr(cls, name, func)
 
   def _validate_class(self, cls):
     # make sure cls is derived from AmigaStruct
@@ -198,10 +207,10 @@ class AmigaTypeDecorator(object):
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 
-def AmigaTypeDef(struct_def, wrap=None, allow_struct=False):
+def AmigaTypeDef(struct_def, wrap=None, funcs=None, allow_struct=False):
   """a class decorator that automatically adds get/set methods
      for AmigaStruct fields"""
-  decorator = AmigaTypeDecorator(struct_def, wrap, allow_struct)
+  decorator = AmigaTypeDecorator(struct_def, wrap, funcs, allow_struct)
 
   def deco_func(cls):
     return decorator.decorate(cls)
