@@ -23,8 +23,8 @@ class Resident(AmigaType):
   def __init__(self, mem, addr):
     AmigaType.__init__(self, mem, addr)
     # extra alloc info
-    self.name_obj = None
-    self.id_str_obj = None
+    self._name_obj = None
+    self._id_str_obj = None
 
   @classmethod
   def find(cls, mem, addr, size, only_first=True, mem_cache=True):
@@ -82,8 +82,8 @@ class Resident(AmigaType):
       raise ValueError("id_str must be str or CString")
     # allocate resident
     res = cls._alloc(alloc)
-    res.name_obj = name_obj
-    res.id_str_obj = id_str_obj
+    res._name_obj = name_obj
+    res._id_str_obj = id_str_obj
     res.set_name(name)
     res.set_id_string(id_str)
     return res
@@ -93,13 +93,13 @@ class Resident(AmigaType):
       raise RuntimeError("can't free")
     AmigaType.free(self)
     # cleanup name
-    if self.name_obj:
-      self.name_obj.free()
-      self.name_obj = None
+    if self._name_obj:
+      self._name_obj.free()
+      self._name_obj = None
     # cleanup id str
-    if self.id_str_obj:
-      self.id_str_obj.free()
-      self.id_str_obj = None
+    if self._id_str_obj:
+      self._id_str_obj.free()
+      self._id_str_obj = None
 
   def setup(self, flags=0, version=0, type=NodeType.NT_LIBRARY, pri=0, init=0):
     self.set_match_word(self.RTC_MATCHWORD)

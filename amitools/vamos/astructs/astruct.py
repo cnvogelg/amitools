@@ -316,7 +316,7 @@ class AmigaStruct(object):
       raise AttributeError
 
   def __setattr__(self, name, val):
-    if name in ('_mem', '_addr', '_parent'):
+    if name[0] == '_':
       object.__setattr__(self, name, val)
     elif name in self._name_to_field:
       field = self._name_to_field[name]

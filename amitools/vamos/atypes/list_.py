@@ -8,9 +8,9 @@ class ListIter(object):
 
   def __init__(self, alist, start_node=None):
     self.alist = alist
-    self.mem = self.alist.mem
+    self.mem = self.alist._mem
     if start_node is None:
-      self.node = alist.head.get_succ()
+      self.node = alist._head.get_succ()
     else:
       self.node = start_node
 
@@ -34,7 +34,7 @@ def iter_func(self):
 
 def len_func(self):
   l = 0
-  node = self.head.get_succ()
+  node = self._head.get_succ()
   while True:
     node = node.get_succ()
     if node is None:
@@ -48,23 +48,23 @@ def iter_at(self, node):
 
 
 def add_head(self, node):
-  n = self.head.get_succ()
-  node.set_pred(self.head)
+  n = self._head.get_succ()
+  node.set_pred(self._head)
   node.set_succ(n)
-  self.head.set_succ(node)
+  self._head.set_succ(node)
   n.set_pred(node)
 
 
 def add_tail(self, node):
   tp = self.get_tail_pred()
-  node.set_succ(self.tail)
-  self.tail.set_pred(node)
+  node.set_succ(self._tail)
+  self._tail.set_pred(node)
   node.set_pred(tp)
   tp.set_succ(node)
 
 
 def rem_head(self):
-  node = self.head.get_succ()
+  node = self._head.get_succ()
   if node is None:
     return None
   node.remove()
@@ -80,7 +80,7 @@ def rem_tail(self):
 
 
 def insert(self, node, pred):
-  if pred is not None and pred != self.head:
+  if pred is not None and pred != self._head:
     pred_succ = pred.get_succ()
     if pred_succ:
       # normal node
@@ -113,8 +113,8 @@ class MinList(AmigaType):
 
   def __init__(self, mem, addr):
     AmigaType.__init__(self, mem, addr)
-    self.head = MinNode(mem, self.addr)
-    self.tail = MinNode(mem, self.addr + 4)
+    self._head = MinNode(mem, self.addr)
+    self._tail = MinNode(mem, self.addr + 4)
 
   def __str__(self):
     return "[MinList:@%06x,h=%06x,t=%06x,tp=%06x]" % \
@@ -122,9 +122,9 @@ class MinList(AmigaType):
          self.get_tail(True), self.get_tail_pred(True))
 
   def new_list(self):
-    self.set_head(self.tail)
+    self.set_head(self._tail)
     self.set_tail(0)
-    self.set_tail_pred(self.head)
+    self.set_tail_pred(self._head)
 
 
 @AmigaTypeDef(ListStruct, wrap={'type': NodeType}, funcs=funcs)
@@ -132,8 +132,8 @@ class List(AmigaType):
 
   def __init__(self, mem, addr):
     AmigaType.__init__(self, mem, addr)
-    self.head = Node(mem, self.addr)
-    self.tail = Node(mem, self.addr + 4)
+    self._head = Node(mem, self.addr)
+    self._tail = Node(mem, self.addr + 4)
 
   def __str__(self):
     return "[List:@%06x,h=%06x,t=%06x,tp=%06x,%s]" % \
@@ -145,9 +145,9 @@ class List(AmigaType):
 
   def new_list(self, lt):
     self.set_type(lt)
-    self.set_head(self.tail)
+    self.set_head(self._tail)
     self.set_tail(0)
-    self.set_tail_pred(self.head)
+    self.set_tail_pred(self._head)
 
   def enqueue(self, node):
     pred = None

@@ -89,7 +89,7 @@ class AmigaTypeDecorator(object):
     gen_type = self._get_gen_type(cls, field)
 
     def get_struct_ptr(self, ptr=False):
-      addr = self.struct.read_field_index(index)
+      addr = self._struct.read_field_index(index)
       if ptr:
         return addr
       if addr == 0:
@@ -102,7 +102,7 @@ class AmigaTypeDecorator(object):
           val = 0
         else:
           val = val.addr
-      self.struct.write_field_index(index, val)
+      self._struct.write_field_index(index, val)
     self._setup_get_set(base_name, cls, get_struct_ptr, set_struct_ptr)
 
   def _gen_struct_get(self, base_name, cls, field):
@@ -134,7 +134,7 @@ class AmigaTypeDecorator(object):
     def get_cstr(self, ptr=False):
       """return the c_str or "" if ptr==0
          or the addr of the pointer (addr=True)"""
-      addr = self.struct.read_field_index(index)
+      addr = self._struct.read_field_index(index)
       if ptr:
         return addr
       return CString(self.mem, addr)
@@ -147,7 +147,7 @@ class AmigaTypeDecorator(object):
         ptr = val.get_addr()
       else:
         raise ValueError("set cstring: wrong value: %s" % val)
-      self.struct.write_field_index(index, ptr)
+      self._struct.write_field_index(index, ptr)
     self._setup_get_set(base_name, cls, get_cstr, set_cstr)
 
   def _setup_get_set(self, base_name, cls, get_func, set_func):
@@ -158,10 +158,10 @@ class AmigaTypeDecorator(object):
     index = field.index
 
     def get_func(self):
-      return self.struct.read_field_index(index)
+      return self._struct.read_field_index(index)
 
     def set_func(self, val):
-      self.struct.write_field_index(index, val)
+      self._struct.write_field_index(index, val)
     self._setup_get_set(base_name, cls, get_func, set_func)
 
   def _gen_wrap_get_set(self, base_name, cls, field, wrap_funcs):
@@ -179,21 +179,21 @@ class AmigaTypeDecorator(object):
     index = field.index
     if get_wrap:
       def get_func(self, raw=False):
-        val = self.struct.read_field_index(index)
+        val = self._struct.read_field_index(index)
         if raw:
           return val
         return get_wrap(val)
     else:
       def get_func(self):
-        return self.struct.read_field_index(index)
+        return self._struct.read_field_index(index)
     if set_wrap:
       def set_func(self, val, raw=False):
         if not raw:
           val = set_wrap(val)
-        self.struct.write_field_index(index, val)
+        self._struct.write_field_index(index, val)
     else:
       def set_func(self, val):
-        self.struct.write_field_index(index, val)
+        self._struct.write_field_index(index, val)
     self._setup_get_set(base_name, cls, get_func, set_func)
 
   def _name_convert(self, name):

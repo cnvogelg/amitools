@@ -24,39 +24,39 @@ class AmigaType(object):
 
   def __init__(self, mem, addr):
     assert type(addr) is int
-    self.mem = mem
-    self.addr = addr
-    self.struct = self._struct_def(mem, addr)
+    self._mem = mem
+    self._addr = addr
+    self._struct = self._struct_def(mem, addr)
     # allocation extra info
-    self.alloc = None
-    self.mem_obj = None
-    self.size = None
+    self._alloc = None
+    self._mem_obj = None
+    self._size = None
 
   def __eq__(self, other):
     if type(other) is int:
-      return self.addr == other
+      return self._addr == other
     elif isinstance(other, AmigaType):
-      return self.addr == other.addr
+      return self._addr == other._addr
     else:
       return NotImplemented
 
   def get_mem(self):
-    return self.mem
+    return self._mem
 
   def get_addr(self):
-    return self.addr
+    return self._addr
 
   def read_data(self):
-    return self.struct.read_data()
+    return self._struct.read_data()
 
   def get_size(self):
-    if self.size:
-      return self.size
+    if self._size:
+      return self._size
     else:
       return self.get_type_size()
 
   def write_data(self):
-    return self.struct.write_data()
+    return self._struct.write_data()
 
   @classmethod
   def alloc(cls, alloc, tag=None, size=None, add_label=True):
@@ -72,16 +72,38 @@ class AmigaType(object):
     mem_obj = alloc.alloc_struct(tag, struct, size, add_label=add_label)
     mem = alloc.get_mem()
     obj = cls(mem, mem_obj.addr)
-    obj.alloc = alloc
-    obj.mem_obj = mem_obj
-    obj.size = size
+    obj._alloc = alloc
+    obj._mem_obj = mem_obj
+    obj._size = size
     return obj
 
   def free(self):
-    if self.alloc:
-      self.alloc.free_struct(self.mem_obj)
-      self.alloc = None
-      self.mem_obj = None
-      self.addr = 0
+    if self._alloc:
+      self._alloc.free_struct(self._mem_obj)
+      self._alloc = None
+      self._mem_obj = None
+      self._addr = 0
     else:
       raise RuntimeError("can't free")
+
+  def __getattr__(self, name):
+    # find associated getter
+    if name.startswith('get_') or name.startswith('set_'):
+      raise AttributeError
+    func_name = 'get_' + name
+    func = getattr(self, func_name, None)
+    if func:
+      return func()
+    else:
+      raise AttributeError
+
+  def __setattr__(self, name, val):
+    if name[0] == '_':
+      object.__setattr__(self, name, val)
+    else:
+      func_name = 'set_' + name
+      func = getattr(self, func_name, None)
+      if func:
+        func(val)
+      else:
+        raise AttributeError
