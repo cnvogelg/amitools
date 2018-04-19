@@ -44,6 +44,12 @@ def atypes_resident_read_lib_test(buildlibnix):
   assert res.get_name() == "testnix.library"
   assert res.get_id_string() == "testnix.library 1.0 (07.07.2007)"
   assert res.get_init() > 0
+  ai = res.get_auto_init()
+  assert ai.get_addr() == res.get_init()
+  assert ai.get_pos_size() > 0
+  assert ai.get_functions() > 0
+  assert ai.get_init_struct() == 0
+  assert ai.get_init_func() > 0
 
 
 def atypes_resident_alloc_test():

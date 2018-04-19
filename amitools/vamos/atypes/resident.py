@@ -1,4 +1,4 @@
-from amitools.vamos.astructs import ResidentStruct
+from amitools.vamos.astructs import ResidentStruct, AutoInitStruct
 from amitools.vamos.mem import MemoryCache
 from .bitfield import BitFieldType
 from .node import NodeType
@@ -13,6 +13,11 @@ class ResidentFlags:
   RTF_AFTERDOS = 1 << 2
   RTF_SINGLETASK = 1 << 1
   RTF_COLDSTART = 1 << 0
+
+
+@AmigaTypeDef(AutoInitStruct)
+class AutoInit(AmigaType):
+  pass
 
 
 @AmigaTypeDef(ResidentStruct, wrap={'flags': ResidentFlags, 'type': NodeType})
@@ -110,3 +115,9 @@ class Resident(AmigaType):
     self.set_type(type)
     self.set_pri(pri)
     self.set_init(init)
+
+  def get_auto_init(self):
+    return AutoInit(self._mem, self.get_init())
+
+  def set_auto_init(self, val):
+    self.set_init(val._addr)

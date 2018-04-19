@@ -288,3 +288,14 @@ class ResidentStruct(AmigaStruct):
     ('char*', 'rt_IdString'),
     ('APTR', 'rt_Init')
   ]
+
+# AutoInit used in Residents
+@AmigaStructDef
+class AutoInitStruct(AmigaStruct):
+  _format = [
+    ('ULONG', 'ai_PosSize'),
+    ('APTR', 'ai_Functions'),
+    ('APTR', 'ai_InitStruct'),
+    ('APTR', 'ai_InitFunc')
+  ]
+
