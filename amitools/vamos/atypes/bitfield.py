@@ -102,6 +102,18 @@ def BitFieldType(cls):
     else:
       return NotImplemented
 
+  def has_bits(self, what):
+    bmask = self._get_bit_mask(what)
+    return self.value & bmask == bmask
+
+  def set_bits(self, what):
+    bmask = self._get_bit_mask(what)
+    self.value |= bmask
+
+  def clr_bits(self, what):
+    bmask = self._get_bit_mask(what)
+    self.value &= ~bmask
+
   def get_value(self):
     return self.value
 
@@ -111,5 +123,8 @@ def BitFieldType(cls):
   cls.__int__ = __int__
   cls.__eq__ = __eq__
   cls.get_value = get_value
+  cls.has_bits = has_bits
+  cls.set_bits = set_bits
+  cls.clr_bits = clr_bits
 
   return cls

@@ -43,10 +43,18 @@ def atypes_bitfield_test():
   assert int(a) == 1
   assert a == 1
   assert a == MyBF(1)
+  assert a.has_bits(1)
+  assert a.has_bits('a')
   ac = MyBF('c|a')
   assert str(ac) == 'a|c'
   assert int(ac) == 5
   assert ac == 5
+  assert ac.has_bits('a')
+  assert ac.has_bits(1)
+  ac.clr_bits(1)
+  assert not ac.has_bits(1)
+  ac.set_bits(1)
+  assert ac.has_bits(1)
   ac2 = MyBF('c', 'a')
   assert str(ac2) == 'a|c'
   assert int(ac2) == 5
