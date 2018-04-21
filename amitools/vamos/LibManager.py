@@ -432,8 +432,8 @@ class LibManager():
       return None
 
     # check seg list for resident library struct
-    seg0 = lib.seg_list.segments[0]
-    ar = AmigaResident(seg0.addr, seg0.size, ctx.mem)
+    seg0 = lib.seg_list.get_segment()
+    ar = AmigaResident(seg0.get_addr(), seg0.get_size(), ctx.mem)
     start = time.clock()
     res_list = ar.find_residents()
     end = time.clock()
@@ -474,7 +474,7 @@ class LibManager():
   def _rtinit_native_lib(self, lib, ctx, tr, init_ptr):
     """library init done for RT_INIT style lib"""
     exec_base = ctx.mem.r32(4)
-    seg_list = lib.seg_list.b_addr
+    seg_list = lib.seg_list.get_baddr()
     tr.save_all()
     tr.set_dx_l(0, 0) # D0=0
     tr.set_ax_l(0, seg_list) # A0 = SegList
@@ -528,7 +528,7 @@ class LibManager():
       # now prepare to execute library init code
       # setup trampoline to call init routine of library
       # D0 = lib_base, A0 = seg_list, A6 = exec base
-      seg_list = lib.seg_list.b_addr
+      seg_list = lib.seg_list.get_baddr()
       exec_base = ctx.mem.r32(4)
       lib_base = lib.addr_base
       tr.save_all()
@@ -593,7 +593,7 @@ class LibManager():
     self._unregister_lib_name(lib)
 
     # unload seg_list
-    ctx.seg_loader.unload_seglist(lib.seg_list)
+    lib.seg_list.free()
     lib.seg_list = None
 
     self.lib_log("free_lib","done freeing native lib: %s" % lib)

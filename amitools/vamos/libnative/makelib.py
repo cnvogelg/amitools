@@ -14,7 +14,7 @@ class MakeLib(object):
                    pos_size, seglist_baddr, label_name=None, run_sp=None):
     """Exec's MakeLibrary
 
-       return lib_base, mem_obj or None, None
+       return lib_base, mem_obj or 0, None
     """
     neg_size, offsets = self._calc_neg_size(vectors_addr)
     neg_size = self._round_long(neg_size)
@@ -47,19 +47,25 @@ class MakeLib(object):
 
     # init func?
     if init_func_addr != 0:
-      set_regs = {
-          REG_D0: lib_base,
-          REG_A0: seglist_baddr,
-          REG_A6: self.mem.r32(4)
-      }
-      get_regs = [REG_D0]
-      # run machine and share current sp
-      rs = self.machine.run(init_func_addr, sp=run_sp,
-                            set_regs=set_regs, get_regs=get_regs,
-                            name=label_name)
-      lib_base = rs.regs[REG_D0]
+      lib_base = self.run_init(init_func_addr, lib_base, seglist_baddr,
+                               label_name, run_sp)
 
     return lib_base, mobj
+
+  def run_init(self, init_func_addr, lib_base, seglist_baddr, label_name,
+               run_sp=None):
+    set_regs = {
+        REG_D0: lib_base,
+        REG_A0: seglist_baddr,
+        REG_A6: self.mem.r32(4)
+    }
+    get_regs = [REG_D0]
+    # run machine and share current sp
+    rs = self.machine.run(init_func_addr, sp=run_sp,
+                          set_regs=set_regs, get_regs=get_regs,
+                          name=label_name)
+    lib_base = rs.regs[REG_D0]
+    return lib_base
 
   def _round_long(self, v):
     rem = v & 3

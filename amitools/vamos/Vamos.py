@@ -89,7 +89,7 @@ class Vamos:
     self.alloc = MemoryAlloc(self.mem, self.mem_begin, self.mem_size, self.label_mgr)
 
     # create segment loader
-    self.seg_loader = SegmentLoader( self.mem, self.alloc)
+    self.seg_loader = SegmentLoader(self.alloc)
 
     # setup lib context
     ctx_map = LibCtxMap()

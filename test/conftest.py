@@ -254,3 +254,27 @@ def vamos(request):
                          generate_data=gen,
                          vopts=vopts,
                          vamos_bin=vamos_bin)
+
+
+@pytest.fixture(scope="module",
+                params=['mach', 'mach-label', 'mock', 'mock-label'])
+def mem_alloc(request):
+  from amitools.vamos.machine import Machine, MockMemory
+  from amitools.vamos.mem import MemoryAlloc
+  from amitools.vamos.label import LabelManager
+  n = request.param
+  if n == 'mach':
+    m = Machine(use_labels=False)
+    mem = m.get_mem()
+    return mem, MemoryAlloc(mem)
+  elif n == 'mach-label':
+    m = Machine()
+    mem = m.get_mem()
+    return mem, MemoryAlloc(mem, label_mgr=m.get_label_mgr())
+  elif n == 'mock':
+    mem = MockMemory(fill=23)
+    return mem, MemoryAlloc(mem)
+  else:
+    mem = MockMemory(fill=23)
+    lm = LabelManager()
+    return mem, MemoryAlloc(mem, label_mgr=lm)

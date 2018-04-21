@@ -7,12 +7,12 @@ from amitools.vamos.atypes import Resident, ResidentFlags, NodeType
 def load_lib(mem, buildlibnix):
   lib_file = buildlibnix.make_lib('testnix')
   alloc = MemoryAlloc(mem)
-  loader = SegmentLoader(mem, alloc)
+  loader = SegmentLoader(alloc)
   seg_list = loader.load_seglist(lib_file)
-  seg0 = seg_list.get_segment(0)
-  addr = seg0.get_addr()
-  size = seg0.get_size()
-  end = seg0.get_end()
+  seg = seg_list.get_segment()
+  addr = seg.get_addr()
+  size = seg.get_size()
+  end = seg.get_end()
   return addr, size, end
 
 
@@ -22,12 +22,14 @@ def atypes_resident_find_lib_test(buildlibnix):
   # search list
   res = Resident.find(mem, addr, size, only_first=False)
   assert len(res) == 1
+  assert res[0].is_valid()
   res_obj = res[0]
   assert res_obj.get_addr() > addr
   assert res_obj.get_addr() < end
   # search first only
   res2 = Resident.find(mem, addr, size)
   assert res == [res2]
+  assert res2.is_valid()
 
 
 def atypes_resident_read_lib_test(buildlibnix):
@@ -50,6 +52,7 @@ def atypes_resident_read_lib_test(buildlibnix):
   assert ai.get_functions() > 0
   assert ai.get_init_struct() == 0
   assert ai.get_init_func() > 0
+  assert res.is_valid()
 
 
 def atypes_resident_alloc_test():

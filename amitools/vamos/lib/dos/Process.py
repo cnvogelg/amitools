@@ -111,7 +111,7 @@ class Process:
       log_proc.error("failed loading binary: %s", self.ctx.seg_loader.error)
       return False
     self.bin_seg_list = self.ctx.seg_loader.load_seglist(sys_path)
-    self.prog_start = self.bin_seg_list.prog_start
+    self.prog_start = self.bin_seg_list.get_segment().get_addr()
     # THOR: If this is a shell, then the seglist requires BCPL linkage and
     # initialization of the GlobVec. Fortunately, for the 3.9 shell all this
     # magic is not really required, and the BCPL call-in (we use) is at
@@ -120,12 +120,12 @@ class Process:
       self.prog_start += 8
       self.shell_start = self.prog_start
     log_proc.info("loaded binary: %s", self.bin_seg_list)
-    for seg in self.bin_seg_list.segments:
+    for seg in self.bin_seg_list:
       log_proc.info(seg)
     return True
 
   def unload_binary(self):
-    self.ctx.seg_loader.unload_seglist(self.bin_seg_list)
+    self.bin_seg_list.free()
 
   def get_initial_pc(self):
     return self.prog_start

@@ -106,6 +106,11 @@ class Resident(AmigaType):
       self._id_str_obj.free()
       self._id_str_obj = None
 
+  def is_valid(self):
+    if self.match_word != self.RTC_MATCHWORD:
+      return False
+    return self.match_tag == self.get_addr()
+
   def setup(self, flags=0, version=0, type=NodeType.NT_LIBRARY, pri=0, init=0):
     self.set_match_word(self.RTC_MATCHWORD)
     self.set_match_tag(self.addr)

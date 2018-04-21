@@ -1435,7 +1435,7 @@ class DosLibrary(LibImpl):
     if sys_path and os.path.exists(sys_path):
       seg_list = ctx.seg_loader.load_seglist(sys_path)
       log_dos.info("LoadSeg: '%s' -> %s" % (name, seg_list))
-      b_addr = seg_list.b_addr
+      b_addr = seg_list.get_baddr()
       self.seg_lists[b_addr] = (seg_list,name)
       return b_addr
     else:
@@ -1450,7 +1450,7 @@ class DosLibrary(LibImpl):
       else:
         seg_list = self.seg_lists[b_addr][0]
         del self.seg_lists[b_addr]
-        ctx.seg_loader.unload_seglist(seg_list)
+        seg_list.free()
         log_dos.info("UnLoadSeg:  %s" % seg_list)
     else:
       log_dos.info("UnLoadSeg:  NULL")
