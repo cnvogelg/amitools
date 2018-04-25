@@ -2,6 +2,8 @@ from amitools.vamos.machine.regs import *
 from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.astructs import *
+from amitools.vamos.atypes import ExecLibrary as ExecLibraryType
+from amitools.vamos.atypes import NodeType
 from amitools.vamos.Log import log_exec
 from amitools.vamos.Exceptions import *
 from amitools.vamos.Trampoline import Trampoline
@@ -25,22 +27,24 @@ class ExecLibrary(LibImpl):
     self.alloc = ctx.alloc
     self._pools = {}
     self._poolid = 0x1000
-    self.access = AccessStruct(ctx.mem, self.get_struct_def(), base_addr)
+    self.exec_lib = ExecLibraryType(ctx.mem, base_addr)
+    # init lib list
+    self.exec_lib.lib_list.new_list(NodeType.NT_LIBRARY)
     # set some system contants
     if ctx.cpu_type == '68030':
-      self.access.w_s("AttnFlags",7)
+      self.exec_lib.attn_flags = 7
     elif ctx.cpu_type == '68020':
-      self.access.w_s("AttnFlags",3)
+      self.exec_lib.attn_flags = 3
     else:
-      self.access.w_s("AttnFlags",0)
-    self.access.w_s("MaxLocMem", ctx.ram_size)
+      self.exec_lib.attn_flags = 0
+    self.exec_lib.max_loc_mem = ctx.ram_size
     # create the port manager
     self.port_mgr = PortManager(ctx.alloc)
     self.semaphore_mgr = SemaphoreManager(ctx.alloc,ctx.mem)
     self.mem      = ctx.mem
 
   def set_this_task(self, process):
-    self.access.w_s("ThisTask",process.this_task.addr)
+    self.exec_lib.this_task = process.this_task.addr
     self.stk_lower = process.stack_base
     self.stk_upper = process.stack_end
 
@@ -65,7 +69,7 @@ class ExecLibrary(LibImpl):
   def FindTask(self, ctx):
     task_ptr = ctx.cpu.r_reg(REG_A1)
     if task_ptr == 0:
-      addr = self.access.r_s("ThisTask")
+      addr = self.exec_lib.this_task.get_addr()
       log_exec.info("FindTask: me=%06x" % addr)
       return addr
     else:
