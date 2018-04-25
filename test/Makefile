@@ -5,7 +5,7 @@
 
 SOURCES_C = exec_semaphore.c exec_copymem.c
 SOURCES_C += exec_makefuncs.c exec_initstruct.c
-SOURCES_C += exec_makelib.c
+SOURCES_C += exec_makelib.c exec_libfuncs.c
 SOURCES_C += dos_readargs.c dos_findarg.c
 SOURCES_C += vprintf.c
 SOURCES_C += util_muldiv.c util_date.c

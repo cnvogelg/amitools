@@ -26,7 +26,7 @@ class LibFuncs(object):
   def sum_library(self, lib_base):
     lib = Library(self.mem, lib_base)
     lib.flags.clr_bits(LibFlags.LIBF_CHANGED | LibFlags.LIBF_SUMUSED)
-    lib.update_sum()
+    return lib.update_sum()
 
   def rem_library(self, lib_base, run_sp=None):
     seglist = self._run_expunge(lib_base, run_sp)

@@ -1,9 +1,9 @@
 from amitools.vamos.machine.regs import *
-from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib
+from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib, LibFuncs
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.astructs import *
 from amitools.vamos.atypes import ExecLibrary as ExecLibraryType
-from amitools.vamos.atypes import NodeType
+from amitools.vamos.atypes import NodeType, Node, List
 from amitools.vamos.Log import log_exec
 from amitools.vamos.Exceptions import *
 from amitools.vamos.Trampoline import Trampoline
@@ -147,6 +147,24 @@ class ExecLibrary(LibImpl):
                   "dsize=%06x seglist=%06x -> lib_base=%06x, mobj=%s",
                   vectors, struct, init, dsize, seglist, lib_base, mobj)
     return lib_base
+
+  def AddLibrary(self, ctx):
+    lib_addr = ctx.cpu.r_reg(REG_A1)
+    log_exec.info("AddLibrary: lib=%06x", lib_addr)
+    lf = LibFuncs(ctx.machine, ctx.alloc)
+    lf.add_library(lib_addr, exec_lib=self.exec_lib)
+
+  def SumLibrary(self, ctx):
+    lib_addr = ctx.cpu.r_reg(REG_A1)
+    lf = LibFuncs(ctx.machine, ctx.alloc)
+    lib_sum = lf.sum_library(lib_addr)
+    log_exec.info("SumLibrary: lib=%06x -> sum=%08x", lib_addr, lib_sum)
+
+  def RemLibrary(self, ctx):
+    lib_addr = ctx.cpu.r_reg(REG_A1)
+    lf = LibFuncs(ctx.machine, ctx.alloc)
+    seglist = lf.rem_library(lib_addr)
+    log_exec.info("RemLibrary: lib=%06x -> seglist=%06x", lib_addr, seglist)
 
   def OpenLibrary(self, ctx):
     ver = ctx.cpu.r_reg(REG_D0)
@@ -449,6 +467,19 @@ class ExecLibrary(LibImpl):
     AccessStruct(ctx.mem, NodeStruct, succ).w_s("ln_Pred", pred)
     log_exec.info("RemTail(%06x): %06x" % (list_addr, node_addr))
     return node_addr
+
+  def FindName(self, ctx):
+    list_addr = ctx.cpu.r_reg(REG_A0)
+    name_ptr = ctx.cpu.r_reg(REG_A1)
+    name = ctx.mem.r_cstr(name_ptr)
+    list_t = List(ctx.mem, list_addr)
+    match = list_t.find_name(name)
+    log_exec.info("FindName: start=%s, name='%s' -> match=%s",
+                  list_t, name, match)
+    if match:
+      return match.get_addr()
+    else:
+      return 0
 
   def CopyMem(self, ctx):
     source = ctx.cpu.r_reg(REG_A0)

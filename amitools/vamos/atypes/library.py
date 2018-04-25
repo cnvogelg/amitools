@@ -132,6 +132,7 @@ class Library(AmigaType):
     """calc new lib sum and store it"""
     lib_sum = self.calc_sum()
     self.set_sum(lib_sum)
+    return lib_sum
 
   def check_sum(self):
     """calc and compare lib sum with stored value"""
