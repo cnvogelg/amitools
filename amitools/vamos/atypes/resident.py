@@ -1,4 +1,4 @@
-from amitools.vamos.astructs import ResidentStruct, AutoInitStruct
+from amitools.vamos.astructs import ResidentStruct, AutoInitStruct, LibraryStruct
 from amitools.vamos.mem import MemoryCache
 from .bitfield import BitFieldType
 from .node import NodeType
@@ -17,7 +17,14 @@ class ResidentFlags:
 
 @AmigaTypeDef(AutoInitStruct)
 class AutoInit(AmigaType):
-  pass
+
+  def setup(self, pos_size=0, functions=0, init_struct=0, init_func=0):
+    if pos_size == 0:
+      pos_size = LibraryStruct.get_size()
+    self.pos_size = pos_size
+    self.functions = functions
+    self.init_struct = init_struct
+    self.init_func = init_func
 
 
 @AmigaTypeDef(ResidentStruct, wrap={'flags': ResidentFlags, 'type': NodeType})

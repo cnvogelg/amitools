@@ -8,5 +8,5 @@ from .atypedef import AmigaTypeDef
 from .node import Node, NodeType, MinNode
 from .list_ import List, MinList
 from .library import Library, LibFlags
-from .resident import Resident, ResidentFlags
+from .resident import Resident, ResidentFlags, AutoInit
 from .execlib import Task, ExecLibrary
