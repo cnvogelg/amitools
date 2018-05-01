@@ -77,7 +77,7 @@ def machine_machine_cpu_mem_trace_test():
   rs = m.run(code, stack)
   assert rs.done
   assert rs.error is None
-  assert a[0] == ('W', 1, 0x800, op_rts)
+  assert a[0] == ('R', 2, 0, 0x1800)
   m.cleanup()
 
 

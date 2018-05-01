@@ -28,6 +28,14 @@ cdef extern from "mem.h":
   unsigned char *mem_raw_ptr()
   uint mem_raw_size()
 
+  int mem_ram_r8(uint addr, uint *val)
+  int mem_ram_r16(uint addr, uint *val)
+  int mem_ram_r32(uint addr, uint *val)
+
+  int mem_ram_w8(uint addr, uint val)
+  int mem_ram_w16(uint addr, uint val)
+  int mem_ram_w32(uint addr, uint val)
+
 # string.h
 from libc.string cimport memcpy, memset, strlen, strcpy
 from libc.stdlib cimport malloc, free
@@ -48,6 +56,15 @@ cdef uint special_read_func_wrapper(uint addr, void *ctx):
 cdef void special_write_func_wrapper(uint addr, uint value, void *ctx):
   cdef object py_func = <object>ctx
   py_func(addr, value)
+
+class MemoryError(StandardError):
+  def __init__(self, addr, op, size=None):
+    self.addr = addr
+    self.op = op
+    self.size = size
+
+  def __repr__(self):
+    return "MemoryError(%06x, %s, %s)" % (self.addr, self.op, self.size)
 
 # public Memory class
 cdef class Memory:
@@ -133,51 +150,77 @@ cdef class Memory:
     # keep func ref
     self.invalid_func = func
 
-  # memory access (full range including special)
+  def _raise_ram_error(self, addr, op, width):
+    raise MemoryError(addr, op, width)
+
+  # memory access (RAM only!)
   cpdef r8(self, uint addr):
-    return m68k_read_memory_8(addr)
+    cdef uint val;
+    if mem_ram_r8(addr, &val):
+      self._raise_ram_error(addr, 'R', 0)
+    return val
   cpdef r16(self, uint addr):
-    return m68k_read_memory_16(addr)
+    cdef uint val;
+    if mem_ram_r16(addr, &val):
+      self._raise_ram_error(addr, 'R', 1)
+    return val
   cpdef r32(self, uint addr):
-    return m68k_read_memory_32(addr)
+    cdef uint val;
+    if mem_ram_r32(addr, &val):
+      self._raise_ram_error(addr, 'R', 2)
+    return val
   cpdef w8(self, uint addr, uint value):
     if value > 0xff:
       raise OverflowError("value does not fit into byte")
-    m68k_write_memory_8(addr, value)
+    if mem_ram_w8(addr, value):
+      self._raise_ram_error(addr, 'W', 0)
   cpdef w16(self, uint addr, uint value):
     if value > 0xffff:
       raise OverflowError("value does not fit into word")
-    m68k_write_memory_16(addr, value)
+    if mem_ram_w16(addr, value):
+      self._raise_ram_error(addr, 'W', 1)
   cpdef w32(self, uint addr, uint value):
-    m68k_write_memory_32(addr, value)
+    if mem_ram_w32(addr, value):
+      self._raise_ram_error(addr, 'W', 2)
 
-  # signed memory access (full range including special)
+  # signed memory access (RAM only!)
   cpdef r8s(self, uint addr):
-    cdef uint val = m68k_read_memory_8(addr)
+    cdef uint val;
+    if mem_ram_r8(addr, &val):
+      self._raise_ram_error(addr, 'R', 0)
     # sign extend
     if val & 0x80 == 0x80:
       val |= 0xffffff00
     return <int>(val)
   cpdef r16s(self, uint addr):
-    cdef uint val = m68k_read_memory_16(addr)
+    cdef uint val;
+    if mem_ram_r16(addr, &val):
+      self._raise_ram_error(addr, 'R', 1)
     # sign extend
     if val & 0x8000 == 0x8000:
       val |= 0xffff0000
     return <int>(val)
   cpdef r32s(self, uint addr):
-    return <int>m68k_read_memory_32(addr)
+    cdef uint val;
+    if mem_ram_r32(addr, &val):
+      self._raise_ram_error(addr, 'R', 2)
+    return <int>(val)
   cpdef w8s(self, uint addr, int value):
     if value < -0x80 or value > 0x7f:
       raise OverflowError("value does not fit into byte")
     cdef uint val = <uint>value & 0xff
-    m68k_write_memory_8(addr, val)
+    if mem_ram_w8(addr, val):
+      self._raise_ram_error(addr, 'W', 0)
   cpdef w16s(self, uint addr, int value):
     if value < -0x8000 or value > 0x7fff:
       raise OverflowError("value does not fit into word")
     cdef uint val = <uint>value & 0xffff
-    m68k_write_memory_16(addr, val)
+    if mem_ram_w16(addr, val):
+      self._raise_ram_error(addr, 'W', 1)
   cpdef w32s(self, uint addr, int value):
-    m68k_write_memory_32(addr, <uint>value)
+    cdef uint val = <uint>(value)
+    if mem_ram_w32(addr, val):
+      self._raise_ram_error(addr, 'W', 2)
 
   # arbitrary width (full range including special)
   def read(self, uint width, uint addr):
@@ -222,7 +265,7 @@ cdef class Memory:
   # block access via str/bytearray (only RAM!)
   def r_block(self,uint addr,uint size):
     if (addr+size) > self.ram_bytes:
-      raise ValueError("no RAM")
+      self._raise_ram_error(addr, 'R', size)
     res = bytearray(size)
     cdef unsigned char *ptr = res
     cdef const unsigned char *ram = self.ram_ptr + addr
@@ -231,43 +274,45 @@ cdef class Memory:
   def w_block(self,uint addr,data):
     cdef uint size = len(data)
     if (addr+size) > self.ram_bytes:
-      raise ValueError("no RAM")
+      self._raise_ram_error(addr, 'W', size)
     cdef const unsigned char *ptr = data
     cdef unsigned char *ram = self.ram_ptr + addr
     memcpy(ram, ptr, size)
 
   def clear_block(self,uint addr,uint size,unsigned char value):
     if (addr+size) > self.ram_bytes:
-      raise ValueError("no RAM")
+      self._raise_ram_error(addr, 'W', size)
     cdef unsigned char *ram = self.ram_ptr + addr
     memset(ram,value,size)
 
   def copy_block(self,uint from_addr, uint to_addr, uint size):
-    if (from_addr+size) > self.ram_bytes or (to_addr+size) > self.ram_bytes:
-      raise ValueError("no RAM")
+    if (from_addr+size) > self.ram_bytes:
+      self._raise_ram_error(from_addr, 'R', size)
+    if (to_addr+size) > self.ram_bytes:
+      self._raise_ram_error(to_addr, 'W', size)
     cdef unsigned char *from_ptr = self.ram_ptr + from_addr
     cdef unsigned char *to_ptr = self.ram_ptr + to_addr
     memcpy(to_ptr, from_ptr, size)
 
   # helpers for c-strings (only RAM)
   def r_cstr(self,uint addr):
-    if addr > self.ram_bytes:
-      raise ValueError("no RAM")
+    if addr >= self.ram_bytes:
+      self._raise_ram_error(addr, 'R', None)
     cdef unsigned char *ram = self.ram_ptr + addr
     cdef bytes result = ram
     return result
 
   def w_cstr(self,uint addr,bytes string):
-    if addr > self.ram_bytes:
-      raise ValueError("no RAM")
+    if addr >= self.ram_bytes:
+      self._raise_ram_error(addr, 'W', None)
     cdef const char *ptr = string
     cdef char *ram = <char *>self.ram_ptr + addr
     strcpy(ram, ptr)
 
   # helpers for bcpl-strings (only RAM)
   def r_bstr(self,uint addr):
-    if addr > self.ram_bytes:
-      raise ValueError("no RAM")
+    if addr >= self.ram_bytes:
+      self._raise_ram_error(addr, 'R', None)
     cdef uint size
     cdef char *data
     cdef unsigned char *ram = self.ram_ptr + addr + 1
@@ -280,8 +325,8 @@ cdef class Memory:
     return result
 
   def w_bstr(self,uint addr,bytes string):
-    if addr > self.ram_bytes:
-      raise ValueError("no RAM")
+    if addr >= self.ram_bytes:
+      self._raise_ram_error(addr, 'W', None)
     cdef uint size = len(string)
     cdef unsigned char *ptr = string
     cdef unsigned char *ram = self.ram_ptr + addr

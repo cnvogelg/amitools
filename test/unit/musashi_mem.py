@@ -54,6 +54,24 @@ def musashi_mem_rw_test():
   with pytest.raises(ValueError):
     mem.read(7, 0x202)
 
+  # out of range
+  with pytest.raises(emu.MemoryError):
+    mem.w8(0x10000, 0)
+  with pytest.raises(emu.MemoryError):
+    mem.w16(0x10000, 0)
+  with pytest.raises(emu.MemoryError):
+    mem.w32(0x10000, 0)
+  with pytest.raises(emu.MemoryError):
+    mem.write(0, 0x10000, 0)
+  with pytest.raises(emu.MemoryError):
+    mem.r8(0x10000)
+  with pytest.raises(emu.MemoryError):
+    mem.r16(0x10000)
+  with pytest.raises(emu.MemoryError):
+    mem.r32(0x10000)
+  with pytest.raises(emu.MemoryError):
+    mem.read(0, 0x10000)
+
 
 def musashi_mem_rws_test():
   mem = emu.Memory(16)
@@ -109,6 +127,24 @@ def musashi_mem_rws_test():
     mem.writes(7, 0x202, 12)
   with pytest.raises(ValueError):
     mem.reads(7, 0x202)
+
+  # out of range
+  with pytest.raises(emu.MemoryError):
+    mem.w8s(0x10000, 0)
+  with pytest.raises(emu.MemoryError):
+    mem.w16s(0x10000, 0)
+  with pytest.raises(emu.MemoryError):
+    mem.w32s(0x10000, 0)
+  with pytest.raises(emu.MemoryError):
+    mem.writes(0, 0x10000, 0)
+  with pytest.raises(emu.MemoryError):
+    mem.r8s(0x10000)
+  with pytest.raises(emu.MemoryError):
+    mem.r16s(0x10000)
+  with pytest.raises(emu.MemoryError):
+    mem.r32s(0x10000)
+  with pytest.raises(emu.MemoryError):
+    mem.reads(0, 0x10000)
 
 
 def musashi_mem_block_test():

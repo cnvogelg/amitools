@@ -45,4 +45,12 @@ extern void m68k_write_memory_8(unsigned int address, unsigned int value);
 extern void m68k_write_memory_16(unsigned int address, unsigned int value);
 extern void m68k_write_memory_32(unsigned int address, unsigned int value);
 
+extern int mem_ram_r8(uint addr, uint *val);
+extern int mem_ram_r16(uint addr, uint *val);
+extern int mem_ram_r32(uint addr, uint *val);
+
+extern int mem_ram_w8(uint addr, uint val);
+extern int mem_ram_w16(uint addr, uint val);
+extern int mem_ram_w32(uint addr, uint val);
+
 #endif

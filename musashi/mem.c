@@ -323,3 +323,70 @@ void mem_set_special_range_write_func(uint page_addr, uint width, write_func_t f
   w_func[page][width] = func;
   w_ctx[page][width] = ctx;
 }
+
+/* RAM access */
+
+int mem_ram_r8(uint addr, uint *val)
+{
+  if(addr < ram_size) {
+    *val = ram_data[addr];
+    return 0;
+  } else {
+    return 1;
+  }
+}
+
+int mem_ram_r16(uint addr, uint *val)
+{
+  if(addr < (ram_size - 1)) {
+    *val = (ram_data[addr] << 8) | ram_data[addr+1];
+    return 0;
+  } else {
+    return 1;
+  }
+}
+
+int mem_ram_r32(uint addr, uint *val)
+{
+  if(addr < (ram_size - 3)) {
+    *val = (ram_data[addr] << 24) | (ram_data[addr+1] << 16) | (ram_data[addr+2] << 8) | (ram_data[addr+3]);
+    return 0;
+  } else {
+    return 1;
+  }
+}
+
+int mem_ram_w8(uint addr, uint val)
+{
+  if(addr < ram_size) {
+    ram_data[addr] = (uint8_t)(val & 0xff);
+    return 0;
+  } else {
+    return 1;
+  }
+}
+
+int mem_ram_w16(uint addr, uint val)
+{
+  if(addr < (ram_size - 1)) {
+    ram_data[addr] = val >> 8;
+    ram_data[addr+1] = val & 0xff;
+    return 0;
+  } else {
+    return 1;
+  }
+}
+
+int mem_ram_w32(uint addr, uint val)
+{
+  if(addr < (ram_size - 3)) {
+    ram_data[addr]   = val >> 24;
+    ram_data[addr+1] = (val >> 16) & 0xff;
+    ram_data[addr+2] = (val >> 8) & 0xff;
+    ram_data[addr+3] = val & 0xff;
+    return 0;
+  } else {
+    return 1;
+  }
+}
+
