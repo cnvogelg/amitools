@@ -4,7 +4,7 @@
 #include <proto/dos.h>
 #include "compiler.h"
 
-static REG_FUNC APTR expunge(REG(APTR lib_base,d0))
+static REG_FUNC APTR expunge(REG(APTR lib_base,a6))
 {
   /* remove lib from lib list */
   Remove(lib_base);
