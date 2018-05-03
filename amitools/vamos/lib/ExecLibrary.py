@@ -1,5 +1,5 @@
 from amitools.vamos.machine.regs import *
-from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib, LibFuncs
+from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib, LibFuncs, InitRes
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.astructs import *
 from amitools.vamos.atypes import ExecLibrary as ExecLibraryType
@@ -147,6 +147,15 @@ class ExecLibrary(LibImpl):
                   "dsize=%06x seglist=%06x -> lib_base=%06x, mobj=%s",
                   vectors, struct, init, dsize, seglist, lib_base, mobj)
     return lib_base
+
+  def InitResident(self, ctx):
+    resident = ctx.cpu.r_reg(REG_A1)
+    seglist = ctx.cpu.r_reg(REG_D1)
+    ir = InitRes(ctx.machine, ctx.alloc)
+    base, mobj = ir.init_resident(resident, seglist)
+    log_exec.info("InitResident: res=%06x, seglist=%06x -> base=%06x, mobj=%s",
+                  resident, seglist, base, mobj)
+    return base
 
   def AddLibrary(self, ctx):
     lib_addr = ctx.cpu.r_reg(REG_A1)

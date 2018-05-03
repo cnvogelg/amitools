@@ -61,7 +61,7 @@ class LibFuncs(object):
     # call expunge func on lib
     func_addr = lib_base - lvo * 6
     set_regs = {
-        REG_D0: lib_base
+      REG_A6: lib_base
     }
     get_regs = [REG_D0]
     # run machine and share current sp if none is given
