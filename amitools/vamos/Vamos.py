@@ -43,15 +43,15 @@ class Vamos:
     self.path_mgr = PathManager(cfg)
 
     # create a label manager and error tracker
-    self.label_mgr = LabelManager()
+    self.label_mgr = machine.get_label_mgr()
 
     # set a label for first region
-    label = LabelRange("zero_page",0,0x400)
-    self.label_mgr.add_label(label)
-
-    # shutdown range
-    label = LabelRange("shutdown",0x400,0x800)
-    self.label_mgr.add_label(label)
+    if self.label_mgr:
+      label = LabelRange("vbr",0,0x400)
+      self.label_mgr.add_label(label)
+      # shutdown range
+      label = LabelRange("machine",0x400,0x800)
+      self.label_mgr.add_label(label)
 
     # create memory access
     self.trace_mgr = TraceManager(self.cpu, self.label_mgr)
@@ -354,9 +354,10 @@ class Vamos:
     # create a guard memory for tracking invalid old dos access
     self.dos_guard_base = self.raw_mem.reserve_special_range()
     self.dos_guard_size = 0x010000
-    label = LabelRange("old_dos guard",self.dos_guard_base, self.dos_guard_size)
-    self.label_mgr.add_label(label)
-    log_mem_init.info(label)
+    if self.label_mgr:
+      label = LabelRange("old_dos guard",self.dos_guard_base, self.dos_guard_size)
+      self.label_mgr.add_label(label)
+      log_mem_init.info(label)
 
   # ----- main process -----
 

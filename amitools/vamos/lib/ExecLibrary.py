@@ -98,9 +98,10 @@ class ExecLibrary(LibImpl):
     # get adress of callee
     callee = ctx.mem.r32(old_pointer)
     # is a label attached to new addr
-    label = ctx.label_mgr.get_label(new_lower)
-    if label is not None:
-      label.name = label.name + "=Stack"
+    if ctx.label_mgr:
+      label = ctx.label_mgr.get_label(new_lower)
+      if label is not None:
+        label.name = label.name + "=Stack"
     # we report the old stack befor callee
     old_pointer += 4
     log_exec.info("StackSwap: old(lower=%06x,upper=%06x,ptr=%06x) new(lower=%06x,upper=%06x,ptr=%06x)" % (old_lower,old_upper,old_pointer,new_lower,new_upper,new_pointer))

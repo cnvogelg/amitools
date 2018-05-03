@@ -161,6 +161,7 @@ class VamosConfig(ConfigParser.SafeConfigParser):
       'memory_trace' : (bool, False),
       'internal_memory_trace' : (bool, False),
       'reg_dump' : (bool, False),
+      'labels' : (bool, False),
       # cpu emu
       'cpu' : (str, "68000"),
       'max_cycles' : (int, 0),

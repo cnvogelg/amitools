@@ -306,8 +306,11 @@ class AmigaLibrary:
     self.addr_base = self.addr_begin + self.mem_neg_size
     self.addr_end = self.addr_base + self.mem_pos_size
     # create memory label
-    self.label = LabelLib(self)
-    ctx.label_mgr.add_label(self.label)
+    if ctx.label_mgr:
+      self.label = LabelLib(self)
+      ctx.label_mgr.add_label(self.label)
+    else:
+      self.label = None
     # create access
     self.lib_access = AccessStruct(ctx.mem, LibraryStruct, self.addr_base)
     self.access = self.lib_access
@@ -317,7 +320,8 @@ class AmigaLibrary:
     # free memory
     if free_alloc:
       ctx.alloc.free_memory(self.mem_obj)
-    ctx.label_mgr.remove_label(self.label)
+    if self.label:
+      ctx.label_mgr.remove_label(self.label)
     # clean up
     self.mem_obj = None
     self.addr_begin = 0

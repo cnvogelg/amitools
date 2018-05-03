@@ -58,12 +58,14 @@ def main():
                       default=None, help="enable internal memory tracing (slow)")
   parser.add_argument('-r', '--reg-dump', action='store_true',
                       default=None, help="add register dump to instruction trace")
+  parser.add_argument('-B', '--labels', action='store_true',
+                      default=None, help="add memory labels for detailed infos")
   # cpu emu
   parser.add_argument('-C', '--cpu', action='store', default=None,
                       help="Set type of CPU to emulate (68000 or 68020)")
-  parser.add_argument('-y', '--max-cycles', action='store', type=int,
+  parser.add_argument('--max-cycles', action='store', type=int,
                       default=None, help="maximum number of cycles to execute")
-  parser.add_argument('-B', '--cycles-per-block', action='store',
+  parser.add_argument('--cycles-per-block', action='store',
                       type=int, default=None, help="cycles per block")
   # system
   parser.add_argument('-m', '--ram-size', action='store',
@@ -173,7 +175,7 @@ def main():
   stack_size = cfg.stack_size * 1024
 
   # setup machine
-  machine = Machine(cpu_type, cfg.ram_size)
+  machine = Machine(cpu_type, cfg.ram_size, use_labels=cfg.labels)
 
   # combine to vamos instance
   vamos = Vamos(machine, cfg)

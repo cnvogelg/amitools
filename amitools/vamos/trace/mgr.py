@@ -37,6 +37,8 @@ class TraceManager(object):
   # ----- internal -----
 
   def _get_disasm_info(self, addr):
+    if not self.label_mgr:
+      return "N/A", None, None
     label = self.label_mgr.get_label(addr)
     sym = None
     src = None
@@ -72,6 +74,8 @@ class TraceManager(object):
              text, info, addon)
 
   def _get_mem_info(self, addr, width=None):
+    if not self.label_mgr:
+      return "??", None
     label = self.label_mgr.get_label(addr)
     if label is not None:
       txt = "@%06x +%06x %s" % (label.addr, addr - label.addr, label.name)
