@@ -14,8 +14,7 @@ class LibStub(object):
      It is suitable for binding these functions to traps of the machine
      emulation.
 
-     A wrapped call adds exception handler, return value processing
-     or optional profiling features.
+     A wrapped call return value processing or optional profiling features.
   """
 
   def __init__(self, name, fd, impl=None, profile=None):
@@ -63,10 +62,9 @@ class LibStubGen(object):
   """the lib stub generator scans a lib impl and creates stubs for all
      methods found there"""
 
-  def __init__(self, exc_handler=None,
+  def __init__(self,
                log_missing=None, log_valid=None,
                ignore_invalid=True):
-    self.exc_handler = exc_handler
     self.log_missing = log_missing
     self.log_valid = log_valid
     self.ignore_invalid = ignore_invalid
@@ -83,7 +81,6 @@ class LibStubGen(object):
       stub_func = self.wrap_missing_func(fd_func, ctx, profile)
       self._set_method(fd_func, stub, stub_func)
 
-    self._set_exc_handler(stub)
     return stub
 
   def gen_stub(self, name, impl, fd, ctx, profile=None):
@@ -115,7 +112,6 @@ class LibStubGen(object):
       stub_func = self.wrap_missing_func(fd_func, ctx, profile)
       self._set_method(fd_func, stub, stub_func)
 
-    self._set_exc_handler(stub)
     # return final stub
     return stub
 
@@ -127,12 +123,6 @@ class LibStubGen(object):
     # add to func tab
     index = fd_func.get_index()
     stub.func_tab[index] = stub_method
-
-  def _set_exc_handler(self, stub):
-    # (optional) replace exception handler of stub
-    if self.exc_handler is not None:
-      method = MethodType(self.exc_handler, stub)
-      setattr(stub, "_handle_exc", method)
 
   def wrap_missing_func(self, fd_func, ctx, profile):
     """create a stub func for a missing function in impl
@@ -178,17 +168,14 @@ class LibStubGen(object):
     def base_func(this, *args, **kwargs):
       """the base function to call the impl,
          set return vals, and catch exceptions"""
-      try:
-        res = impl_method(ctx)
-        if res is not None:
-          if type(res) in (list, tuple):
-            ctx.cpu.w_reg(REG_D0, res[0] & 0xffffffff)
-            ctx.cpu.w_reg(REG_D1, res[1] & 0xffffffff)
-          else:
-            ctx.cpu.w_reg(REG_D0, res & 0xffffffff)
-        return res
-      except:
-        this._handle_exc()
+      res = impl_method(ctx)
+      if res is not None:
+        if type(res) in (list, tuple):
+          ctx.cpu.w_reg(REG_D0, res[0] & 0xffffffff)
+          ctx.cpu.w_reg(REG_D1, res[1] & 0xffffffff)
+        else:
+          ctx.cpu.w_reg(REG_D0, res & 0xffffffff)
+      return res
     func = base_func
 
     # wrap around logging method?

@@ -10,18 +10,16 @@ from .profile import LibProfile
 class LibCreator(object):
   """create a vamos internal libs"""
 
-  def __init__(self, alloc, traps, label_mgr=None,
+  def __init__(self, alloc, traps,
                fd_dir=None,
-               exc_handler=None, log_missing=None, log_valid=None,
+               log_missing=None, log_valid=None,
                profile_all=False):
     self.alloc = alloc
     self.traps = traps
-    self.label_mgr = label_mgr
     # options
     self.fd_dir = fd_dir
     self.profile_all = profile_all
-    self.stub_gen = LibStubGen(exc_handler=exc_handler,
-                               log_missing=log_missing, log_valid=log_valid)
+    self.stub_gen = LibStubGen(log_missing=log_missing, log_valid=log_valid)
 
   def _create_library(self, info):
     name = info.get_name()

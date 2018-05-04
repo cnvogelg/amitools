@@ -43,21 +43,6 @@ def libcore_create_lib_fake_test():
   assert alloc.is_all_free()
 
 
-def libcore_create_lib_label_mgr_test():
-  mem, traps, alloc, ctx = setup()
-  impl = VamosTestLibrary()
-  label_mgr = LabelManager()
-  # create info for lib
-  date = datetime.date(2012, 11, 12)
-  info = LibInfo('vamostest.library', 42, 3, date)
-  # create lib
-  creator = LibCreator(alloc, traps, label_mgr)
-  lib = creator.create_lib(info, ctx, impl)
-  # free lib
-  lib.free()
-  assert alloc.is_all_free()
-
-
 def libcore_create_lib_profile_test():
   mem, traps, alloc, ctx = setup()
   impl = VamosTestLibrary()

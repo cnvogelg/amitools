@@ -129,7 +129,7 @@ def libcore_stub_gen_log_profile_test(caplog):
   _check_profile(fd, profile)
 
 
-def libcore_stub_gen_exc_default_test(capsys):
+def libcore_stub_gen_exc_default_test():
   name = 'vamostest.library'
   impl = VamosTestLibrary()
   fd = read_lib_fd(name)
@@ -142,32 +142,6 @@ def libcore_stub_gen_exc_default_test(capsys):
   ctx.mem.w_cstr(0, 'RuntimeError')
   with pytest.raises(RuntimeError):
     stub.RaiseError()
-  # check for traceback
-  captured = capsys.readouterr()
-  lines = captured.err.strip().split('\n')
-  assert lines[0] == 'Traceback (most recent call last):'
-  assert lines[-1] == 'RuntimeError: VamosTest'
-
-
-def libcore_stub_gen_exc_custom_test(capsys):
-  name = 'vamostest.library'
-  impl = VamosTestLibrary()
-  fd = read_lib_fd(name)
-  ctx = _create_ctx()
-  # create stub
-
-  def custom_handler(self):
-    print("hello, world!")
-  gen = LibStubGen(exc_handler=custom_handler)
-  stub = gen.gen_stub(name, impl, fd, ctx)
-  _check_stub(stub)
-  # call func
-  ctx.mem.w_cstr(0, 'RuntimeError')
-  stub.RaiseError()
-  # check for traceback
-  captured = capsys.readouterr()
-  lines = captured.out.strip().split('\n')
-  assert lines[-1] == "hello, world!"
 
 
 def libcore_stub_gen_multi_arg(capsys):
