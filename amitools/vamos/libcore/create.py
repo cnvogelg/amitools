@@ -1,7 +1,7 @@
 from amitools.vamos.astructs import LibraryStruct
 from amitools.vamos.atypes import Library
 from amitools.fd import read_lib_fd
-from .base import LibIntBase
+from .vlib import VLib
 from .stub import LibStubGen
 from .patch import LibPatcherMultiTrap
 from .profile import LibProfile
@@ -63,10 +63,9 @@ class LibCreator(object):
     patcher.patch_jump_table(addr)
     # fix lib sum
     library.update_sum()
-    # create base
-    base = LibIntBase(info, struct, fd, impl, stub, ctx, patcher, profile)
-    base.add_lib_mem(library)
+    # create vamos lib and combine all pieces
+    vlib = VLib(library, info, struct, fd, impl, stub, ctx, patcher, profile)
     # finally call startup func in impl
     if impl is not None:
       impl.setup_lib(ctx, addr)
-    return base
+    return vlib
