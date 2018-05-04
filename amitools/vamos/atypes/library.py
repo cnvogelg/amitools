@@ -1,5 +1,6 @@
 from amitools.vamos.astructs import LibraryStruct
 from amitools.vamos.label import LabelLib
+from amitools.vamos.machine.opcodes import op_rts
 from .atype import AmigaType
 from .atypedef import AmigaTypeDef
 from .node import NodeType
@@ -46,6 +47,19 @@ class Library(AmigaType):
     self.set_revision(revision)
     self.set_sum(0)
     self.set_open_cnt(0)
+
+  def fill_funcs(self, opcode=None, param=None):
+    """quickly fill the function table of a library with an opcode and param"""
+    if opcode is None:
+      opcode = op_rts
+    neg_size = self.neg_size
+    off = 6
+    while off < neg_size:
+      addr = self._addr - off
+      self._mem.w16(addr, opcode)
+      if param:
+        self._mem.w32(addr + 2, param)
+      off += 6
 
   @classmethod
   def alloc(cls, alloc, name, id_str, neg_size, pos_size=None):

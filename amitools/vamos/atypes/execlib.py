@@ -57,6 +57,9 @@ class ExecLibrary(AmigaType):
     self.semaphore_list.new_list(NodeType.NT_SEMAPHORE)
     self.mem_handlers.new_list()
 
+  def fill_funcs(self, opcode=None, param=None):
+    self.lib_node.fill_funcs(opcode, param)
+
   @classmethod
   def alloc(cls, alloc, name, id_str, neg_size, pos_size=None):
     pos_size = cls.get_type_size()

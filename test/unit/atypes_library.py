@@ -1,5 +1,6 @@
 import pytest
 from amitools.vamos.machine import MockMemory
+from amitools.vamos.machine.opcodes import op_rts
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.astructs import LibraryStruct
 from amitools.vamos.atypes import Library, CString, NodeType, LibFlags
@@ -43,6 +44,10 @@ def atypes_library_base_test():
   assert lib.get_open_cnt() == 0
   assert lib.get_name() == name
   assert lib.get_id_string() == id_str
+  # fill funcs
+  lib.fill_funcs()
+  lib_base = lib.get_addr()
+  assert mem.r16(lib_base - 6) == op_rts
   # done
   lib.free()
   assert alloc.is_all_free()

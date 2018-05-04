@@ -72,10 +72,10 @@ class ErrorReporter:
     vals = []
     for x in range(-32, 32, 4):
       addr = sp + x
-      if addr < ram_total:
+      if addr >= 0 and addr < ram_total:
         val = self.mem.r32(sp + x)
         vals.append("SP%+03d=%06x" % (x, val))
       else:
-        vals.append("SP%+03d=------")
+        vals.append("SP%+03d=------" % x)
     log_machine.error(" ".join(vals[0:8]))
     log_machine.error(" ".join(vals[8:]))
