@@ -1,6 +1,7 @@
 import inspect
 from amitools.vamos.astructs import LibraryStruct
 
+
 class LibImpl(object):
   """base class for all Python-based library implementations"""
 
@@ -11,10 +12,19 @@ class LibImpl(object):
     """return the structure of your library pos_size"""
     return LibraryStruct
 
+  def get_version(self):
+    return 40
+
   def setup_lib(self, ctx, base_addr):
     pass
 
   def finish_lib(self, ctx):
+    pass
+
+  def open_lib(self, ctx, open_cnt):
+    pass
+
+  def close_lib(self, ctx, open_cnt):
     pass
 
 

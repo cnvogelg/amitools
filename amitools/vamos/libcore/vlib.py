@@ -15,6 +15,7 @@ class VLib(object):
     self.ctx = ctx
     self.patcher = patcher
     self.profile = profile
+    self._setup()
 
   def get_library(self):
     return self.library
@@ -40,9 +41,23 @@ class VLib(object):
   def get_profile(self):
     return self.profile
 
-  def free(self,):
+  def get_name(self):
+    return self.info.get_name()
+
+  def get_addr(self):
+    return self.library.get_addr()
+
+  def _setup(self):
+    if self.impl:
+      self.impl.setup_lib(self.ctx, self.get_addr())
+
+  def free(self):
+    # check open cnt
+    oc = self.library.open_cnt
+    if oc > 0:
+      raise RuntimeError("vlib.free(): has open_cnt: %d" % oc)
     # call cleanup func in impl
-    if self.impl is not None:
+    if self.impl:
       self.impl.finish_lib(self.ctx)
     # cleanup patcher
     self.patcher.cleanup()
@@ -53,3 +68,20 @@ class VLib(object):
     self.stub = None
     self.impl = None
     self.patcher = None
+
+  def open(self):
+    lib = self.library
+    lib.inc_open_cnt()
+    # report open to impl
+    if self.impl:
+      self.impl.open_lib(self.ctx, lib.open_cnt)
+
+  def close(self):
+    lib = self.library
+    lib.dec_open_cnt()
+    oc = lib.open_cnt
+    if oc < 0:
+      raise ValueError("vlib.close(): open_cnt < 0: %d" % oc)
+    # report close to impl
+    if self.impl:
+      self.impl.close_lib(self.ctx, lib.open_cnt)

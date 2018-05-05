@@ -63,7 +63,4 @@ class LibCreator(object):
     library.update_sum()
     # create vamos lib and combine all pieces
     vlib = VLib(library, info, struct, fd, impl, stub, ctx, patcher, profile)
-    # finally call startup func in impl
-    if impl is not None:
-      impl.setup_lib(ctx, addr)
     return vlib

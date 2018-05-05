@@ -23,9 +23,17 @@ def libcore_create_lib_default_test():
   info = LibInfo('vamostest.library', 42, 3, date)
   # create lib
   creator = LibCreator(alloc, traps)
-  lib = creator.create_lib(info, ctx, impl)
+  vlib = creator.create_lib(info, ctx, impl)
+  assert impl.get_cnt() == 0
+  # open
+  vlib.open()
+  assert impl.get_cnt() == 1
+  # close
+  vlib.close()
+  assert impl.get_cnt() == 0
   # free lib
-  lib.free()
+  vlib.free()
+  assert impl.get_cnt() is None
   assert alloc.is_all_free()
 
 

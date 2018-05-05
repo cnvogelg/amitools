@@ -6,6 +6,24 @@ from amitools.vamos.Exceptions import *
 
 class VamosTestLibrary(LibImpl):
 
+  def setup_lib(self, ctx, base_addr):
+    self.cnt = 0
+
+  def finish_lib(self, ctx):
+    self.cnt = None
+
+  def open_lib(self, ctx, open_cnt):
+    self.cnt = open_cnt
+
+  def close_lib(self, ctx, open_cnt):
+    self.cnt = open_cnt
+
+  def get_version(self):
+    return 23
+
+  def get_cnt(self):
+    return self.cnt
+
   def ignore_func(self):
     """a lower-case function that is ignored"""
     pass

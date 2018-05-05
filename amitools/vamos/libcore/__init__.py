@@ -7,3 +7,4 @@ from .patch import LibPatcherMultiTrap
 from .info import LibInfo
 from .vlib import VLib
 from .create import LibCreator
+from .mgr import VLibManager
