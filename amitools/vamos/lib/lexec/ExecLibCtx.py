@@ -2,19 +2,18 @@ from amitools.vamos.libcore import LibCtx
 
 class ExecLibCtx(LibCtx):
 
-  def __init__(self, cpu, mem, machine, cpu_type, ram_size, label_mgr, alloc, traps,
-               seg_loader, path_mgr):
-    LibCtx.__init__(self, cpu, mem)
+  def __init__(self, machine, alloc, seg_loader, path_mgr):
+    LibCtx.__init__(self, machine.get_cpu(), machine.get_mem())
     self.machine = machine
-    self.cpu_type = cpu_type
-    self.ram_size = ram_size
-    self.label_mgr = label_mgr
-    self.lib_mgr = None
+    self.traps = machine.get_traps()
+    self.cpu_type = machine.get_cpu_type()
+    self.ram_size = self.mem.get_ram_size_bytes()
+    self.label_mgr = machine.get_label_mgr()
     self.alloc = alloc
-    self.traps = traps
-    self.process = None
     self.seg_loader = seg_loader
     self.path_mgr = path_mgr
+    self.lib_mgr = None
+    self.process = None
 
   def set_lib_mgr(self, lib_mgr):
     self.lib_mgr = lib_mgr
