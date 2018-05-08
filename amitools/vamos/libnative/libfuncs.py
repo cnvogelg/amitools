@@ -14,6 +14,17 @@ class LibFuncs(object):
     self.mem = machine.get_mem()
     self.alloc = alloc
 
+  def find_library(self, lib_name, exec_lib=None):
+    """find lib by name and return base addr or 0"""
+    if exec_lib is None:
+      exec_addr = self.mem.r32(4)
+      exec_lib = ExecLibrary(self.mem, exec_addr)
+    node = exec_lib.lib_list.find_name(lib_name)
+    if node:
+      return node.get_addr()
+    else:
+      return 0
+
   def add_library(self, lib_base, exec_lib=None):
     lib = Library(self.mem, lib_base)
     lib.node.type = NodeType.NT_LIBRARY

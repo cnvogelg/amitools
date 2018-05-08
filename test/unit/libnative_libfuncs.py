@@ -9,7 +9,7 @@ from amitools.vamos.loader import SegList
 def libnative_libfuncs_add_library_test():
   machine = Machine()
   mem = machine.get_mem()
-  alloc = MemoryAlloc(mem)
+  alloc = MemoryAlloc.for_machine(machine)
   # setup exec lib
   exec_lib = ExecLibrary.alloc(alloc, "exec.library", "bla", 36)
   exec_lib.setup()
@@ -27,6 +27,7 @@ def libnative_libfuncs_add_library_test():
   assert len(exec_lib.lib_list) == 1
   assert [a for a in exec_lib.lib_list] == [lib]
   assert lib.sum == 0xdeadbeef
+  assert lf.find_library("my.library") == lib.get_addr()
   # cleanup
   lib.free()
   exec_lib.free()
@@ -36,7 +37,7 @@ def libnative_libfuncs_add_library_test():
 def libnative_libfuncs_sum_library_test():
   machine = Machine()
   mem = machine.get_mem()
-  alloc = MemoryAlloc(mem)
+  alloc = MemoryAlloc.for_machine(machine)
   # new lib
   lib = Library.alloc(alloc, "my.library", "bla", 36)
   lib.setup()
@@ -56,7 +57,7 @@ def libnative_libfuncs_rem_library_test():
   cpu = machine.get_cpu()
   traps = machine.get_traps()
   sp = machine.get_ram_begin() - 4
-  alloc = MemoryAlloc(mem)
+  alloc = MemoryAlloc.for_machine(machine)
   # new lib
   lib = Library.alloc(alloc, "my.library", "bla", 36)
   lib.setup()
@@ -85,7 +86,7 @@ def libnative_libfuncs_close_library_test():
   cpu = machine.get_cpu()
   traps = machine.get_traps()
   sp = machine.get_ram_begin() - 4
-  alloc = MemoryAlloc(mem)
+  alloc = MemoryAlloc.for_machine(machine)
   # new lib
   lib = Library.alloc(alloc, "my.library", "bla", 36)
   lib.setup()
@@ -114,7 +115,7 @@ def libnative_libfuncs_open_library_test():
   cpu = machine.get_cpu()
   traps = machine.get_traps()
   sp = machine.get_ram_begin() - 4
-  alloc = MemoryAlloc(mem)
+  alloc = MemoryAlloc.for_machine(machine)
   # new lib
   lib = Library.alloc(alloc, "my.library", "bla", 36)
   lib.setup()

@@ -66,6 +66,12 @@ class MemoryAlloc:
     self.free_first = MemoryChunk(addr, self.free_bytes)
     self.free_entries = 1
 
+  @classmethod
+  def for_machine(cls, machine):
+    return cls(machine.get_mem(),
+               addr=machine.get_ram_begin(),
+               label_mgr=machine.get_label_mgr())
+
   def get_mem(self):
     return self.mem
 

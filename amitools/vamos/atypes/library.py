@@ -1,5 +1,5 @@
 from amitools.vamos.astructs import LibraryStruct
-from amitools.vamos.label import LabelLib
+from amitools.vamos.label import LabelStruct
 from amitools.vamos.machine.opcodes import op_rts
 from .atype import AmigaType
 from .atypedef import AmigaTypeDef
@@ -19,12 +19,14 @@ class LibFlags(object):
 @AmigaTypeDef(LibraryStruct, wrap={'flags': LibFlags})
 class Library(AmigaType):
 
-  def __init__(self, mem, addr):
+  def __init__(self, mem, addr, alloc=None):
     AmigaType.__init__(self, mem, addr)
     # extra alloc info
     self._name_obj = None
     self._id_str_obj = None
     self._label = None
+    self._alloc = alloc
+    self._mem_obj = None
 
   def set_name(self, val):
     self.get_node().set_name(val)
@@ -101,8 +103,10 @@ class Library(AmigaType):
     # add label?
     label_mgr = alloc.get_label_mgr()
     if label_mgr:
-      lib._label = LabelLib(lib)
-      label_mgr.add_label(lib.label)
+      # TODO: replace with LabelLib
+      lib._label = LabelStruct(name, mem_obj.addr, lib.get_type_struct(),
+                               size=total_size, offset=neg_size)
+      label_mgr.add_label(lib._label)
     # set name and id_str
     lib._name_obj = name_obj
     lib._id_str_obj = id_str_obj
@@ -113,10 +117,11 @@ class Library(AmigaType):
   def free(self):
     if not self._alloc:
       raise RuntimeError("can't free")
-    self._alloc.free_memory(self._mem_obj)
-    self._alloc = None
-    self._mem_obj = None
-    self._addr = 0
+    mem_obj = self._mem_obj
+    if mem_obj is None:
+      addr = self._addr - self.neg_size
+      mem_obj = self._alloc.get_memory(addr)
+    self._alloc.free_memory(mem_obj)
     # cleanup name
     if self._name_obj:
       self._name_obj.free()
@@ -129,6 +134,10 @@ class Library(AmigaType):
     if self._label:
       self._alloc.get_label_mgr().remove_label(self._label)
       self._label = None
+    # clear state
+    self._alloc = None
+    self._mem_obj = None
+    self._addr = 0
 
   def calc_sum(self):
     """calc the lib sum and return it"""

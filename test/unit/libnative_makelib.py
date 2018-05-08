@@ -10,7 +10,7 @@ def libnative_makelib_test():
   machine = Machine()
   mem = machine.get_mem()
   sp = machine.get_ram_begin() - 4
-  alloc = MemoryAlloc(mem)
+  alloc = MemoryAlloc.for_machine(machine)
 
   # build lib info in memory
   vectors = 0x100

@@ -22,7 +22,7 @@ def libnative_initres_init_test(buildlibnix):
   mem = machine.get_mem()
   cpu = machine.get_cpu()
   traps = machine.get_traps()
-  alloc = MemoryAlloc(mem)
+  alloc = MemoryAlloc.for_machine(machine)
   init_addr = machine.get_ram_begin() - 4
   sp = init_addr - 4
   # load lib
@@ -55,7 +55,7 @@ def libnative_initres_autoinit_test(buildlibnix):
   mem = machine.get_mem()
   cpu = machine.get_cpu()
   traps = machine.get_traps()
-  alloc = MemoryAlloc(mem)
+  alloc = MemoryAlloc.for_machine(machine)
   init_addr = machine.get_ram_begin() - 4
   sp = init_addr - 4
   # load lib
