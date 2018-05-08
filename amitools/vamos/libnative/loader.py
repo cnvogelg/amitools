@@ -25,8 +25,34 @@ class LibLoader(object):
       return 0
     # init resident
     lib_base, mem_obj = self.initres.init_resident(
-      res.get_addr(), seglist.get_baddr(), run_sp=run_sp)
+        res.get_addr(), seglist.get_baddr(), run_sp=run_sp)
     # unload seglist on error
     if lib_base == 0:
       seglist.free()
     return lib_base
+
+  @staticmethod
+  def get_lib_base_name(lib_name):
+    result = lib_name
+    pos = result.rfind('/')
+    if pos != -1:
+      result = result[pos+1:]
+    pos = result.rfind(':')
+    if pos != -1:
+      result = result[pos+1:]
+    return result.lower()
+
+  @staticmethod
+  def get_lib_search_paths(lib_name, base_dir=None):
+    """return list of Amiga paths where to search for library"""
+    if base_dir is None:
+      base_dir = "libs"
+    # relative path
+    if lib_name.find(':') == -1:
+      base_name = base_dir + "/" + lib_name
+      return [lib_name, base_name,
+              "PROGDIR:" + lib_name, "PROGDIR:" + base_name,
+              base_dir + ":" + lib_name]
+    # absolute path
+    else:
+      return [lib_name]
