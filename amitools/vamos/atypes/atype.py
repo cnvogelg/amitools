@@ -59,6 +59,13 @@ class AmigaType(object):
     return self._struct.write_data()
 
   @classmethod
+  def init_from(cls, other):
+    if isinstance(other, AmigaType):
+      return cls(other._mem, other._addr)
+    else:
+      raise ValueError("no AType!")
+
+  @classmethod
   def alloc(cls, alloc, tag=None, size=None, add_label=True):
     return cls._alloc(alloc, tag=tag, size=size, add_label=add_label)
 

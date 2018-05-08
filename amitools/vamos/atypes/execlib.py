@@ -64,7 +64,7 @@ class ExecLibrary(AmigaType):
   def alloc(cls, alloc, name, id_str, neg_size, pos_size=None):
     pos_size = cls.get_type_size()
     lib = Library.alloc(alloc, name, id_str, neg_size, pos_size)
-    exec_lib = ExecLibrary(lib._mem, lib._addr)
+    exec_lib = ExecLibrary.init_from(lib)
     exec_lib._lib = lib
     return exec_lib
 
