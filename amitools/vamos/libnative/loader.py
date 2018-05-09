@@ -44,7 +44,7 @@ class LibLoader(object):
         lib_base, seglist = self.load_lib(sys_path, run_sp)
         if lib_base != 0:
           return lib_base, seglist, sys_path, ami_path
-    return 0, 0, None, None
+    return 0, None, None, None
 
   @staticmethod
   def get_lib_base_name(lib_name):
@@ -67,7 +67,7 @@ class LibLoader(object):
       base_name = base_dir + "/" + lib_name
       return [lib_name, base_name,
               "PROGDIR:" + lib_name, "PROGDIR:" + base_name,
-              base_dir + ":" + lib_name]
+              base_dir.upper() + ":" + lib_name]
     # absolute path
     else:
       return [lib_name]
