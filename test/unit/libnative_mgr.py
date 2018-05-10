@@ -37,12 +37,16 @@ def libnative_mgr_test(buildlibnix):
   # open_lib
   lib_base = mgr.open_lib("testnix.library", run_sp=sp)
   assert lib_base > 0
+  assert mgr.is_lib_addr(lib_base)
+  assert mgr.get_lib_addr_for_name("testnix.library") == lib_base
   # close lib
   seglist = mgr.close_lib(lib_base, run_sp=sp)
   assert seglist == 0
   # expunge lib
   left = mgr.shutdown(run_sp=sp)
   assert left == 0
+  assert not mgr.is_lib_addr(lib_base)
+  assert mgr.get_lib_addr_for_name("testnix.library") == 0
   # we have to manually clean the lib here (as Exec FreeMem() does not work)
   lib = Library(mem, lib_base, alloc)
   lib.free()

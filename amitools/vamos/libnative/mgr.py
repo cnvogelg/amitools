@@ -13,6 +13,15 @@ class NativeLibManager(object):
     # state
     self.addr_name = {}
 
+  def is_lib_addr(self, addr):
+    return addr in self.addr_name
+
+  def get_lib_addr_for_name(self, name):
+    for addr in self.addr_name:
+      if self.addr_name[addr] == name:
+        return addr
+    return 0
+
   def shutdown(self, run_sp=None):
     """return number of libs still left unexpunged"""
     return self.expunge_libs(run_sp)

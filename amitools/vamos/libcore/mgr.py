@@ -113,9 +113,9 @@ class VLibManager(object):
     self._rem_vlib(vlib)
     return True
 
-  def load_lib_name(self, name, do_profile=False, allow_fake=False):
+  def load_lib_name(self, name, version=0, revision=0, do_profile=False, allow_fake=False):
     date = datetime.date(day=7, month=7, year=2007)
-    info = LibInfo(name, 0, 0, date)
+    info = LibInfo(name, version, revision, date)
     return self.load_lib(info, do_profile, allow_fake)
 
   def load_lib(self, lib_info, do_profile=False, allow_fake=False):
