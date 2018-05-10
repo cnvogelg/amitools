@@ -17,10 +17,7 @@ class NativeLibManager(object):
     return addr in self.addr_name
 
   def get_lib_addr_for_name(self, name):
-    for addr in self.addr_name:
-      if self.addr_name[addr] == name:
-        return addr
-    return 0
+    return self.funcs.find_library(name)
 
   def shutdown(self, run_sp=None):
     """return number of libs still left unexpunged"""

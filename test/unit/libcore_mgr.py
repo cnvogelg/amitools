@@ -40,11 +40,11 @@ def libcore_mgr_bootstrap_shutdown_test():
   assert alloc.is_all_free()
 
 
-def libcore_mgr_load_test():
+def libcore_mgr_make_test():
   machine, alloc, mgr = setup()
   exec_vlib = mgr.bootstrap_exec()
-  # load vamos test
-  test_vlib = mgr.load_lib_name('vamostest.library')
+  # make vamos test lib
+  test_vlib = mgr.make_lib_name('vamostest.library')
   test_base = test_vlib.get_addr()
   assert test_vlib
   assert mgr.get_vlib_by_name('vamostest.library') == test_vlib
@@ -54,6 +54,103 @@ def libcore_mgr_load_test():
   assert impl.get_cnt() == 0
   lib = test_vlib.get_library()
   assert lib.version == impl.get_version()
+  # shutdown
+  left = mgr.shutdown()
+  assert left == 0
+  assert alloc.is_all_free()
+
+
+def libcore_mgr_make_version_revision_test():
+  machine, alloc, mgr = setup()
+  exec_vlib = mgr.bootstrap_exec()
+  # make vamos test lib
+  test_vlib = mgr.make_lib_name('vamostest.library', version=11, revision=23)
+  test_base = test_vlib.get_addr()
+  assert test_vlib
+  assert mgr.get_vlib_by_name('vamostest.library') == test_vlib
+  assert mgr.get_vlib_by_addr(test_base) == test_vlib
+  impl = test_vlib.get_impl()
+  assert impl
+  assert impl.get_cnt() == 0
+  lib = test_vlib.get_library()
+  assert lib.version == 11
+  assert lib.revision == 23
+  # shutdown
+  left = mgr.shutdown()
+  assert left == 0
+  assert alloc.is_all_free()
+
+
+def libcore_mgr_make_profile_test():
+  machine, alloc, mgr = setup()
+  exec_vlib = mgr.bootstrap_exec()
+  # make vamos test lib
+  test_vlib = mgr.make_lib_name('vamostest.library', do_profile=True)
+  test_base = test_vlib.get_addr()
+  assert test_vlib
+  assert mgr.get_vlib_by_name('vamostest.library') == test_vlib
+  assert mgr.get_vlib_by_addr(test_base) == test_vlib
+  impl = test_vlib.get_impl()
+  assert impl
+  assert impl.get_cnt() == 0
+  assert test_vlib.profile
+  # shutdown
+  left = mgr.shutdown()
+  assert left == 0
+  assert alloc.is_all_free()
+
+
+def libcore_mgr_make_fake_test():
+  machine, alloc, mgr = setup()
+  exec_vlib = mgr.bootstrap_exec()
+  # make vamos test lib
+  test_vlib = mgr.make_lib_name('testnix.library')
+  assert test_vlib is None
+  test_vlib = mgr.make_lib_name('testnix.library', allow_fake=True)
+  test_base = test_vlib.get_addr()
+  assert test_vlib
+  assert mgr.get_vlib_by_name('testnix.library') == test_vlib
+  assert mgr.get_vlib_by_addr(test_base) == test_vlib
+  impl = test_vlib.get_impl()
+  assert impl is None
+  # shutdown
+  left = mgr.shutdown()
+  assert left == 0
+  assert alloc.is_all_free()
+
+
+def libcore_mgr_make_open_test():
+  machine, alloc, mgr = setup()
+  exec_vlib = mgr.bootstrap_exec()
+  # make vamos test lib
+  test_vlib = mgr.make_lib_name('vamostest.library')
+  test_base = test_vlib.get_addr()
+  impl = test_vlib.get_impl()
+  lib = test_vlib.get_library()
+  assert lib.version == impl.get_version()
+  assert impl.get_cnt() == 0
+  assert mgr.open_lib_name('vamostest.library') == test_vlib
+  assert impl.get_cnt() == 1
+  assert not mgr.expunge_lib(test_vlib)
+  assert mgr.close_lib(test_vlib)
+  assert impl.get_cnt() is None
+  # shutdown
+  left = mgr.shutdown()
+  assert left == 0
+  assert alloc.is_all_free()
+
+
+def libcore_mgr_open_test():
+  machine, alloc, mgr = setup()
+  exec_vlib = mgr.bootstrap_exec()
+  # make vamos test lib
+  test_vlib = mgr.open_lib_name('vamostest.library')
+  impl = test_vlib.get_impl()
+  lib = test_vlib.get_library()
+  assert lib.version == impl.get_version()
+  assert impl.get_cnt() == 1
+  assert mgr.close_lib(test_vlib)
+  assert impl.get_cnt() is None
   # shutdown
   left = mgr.shutdown()
   assert left == 0

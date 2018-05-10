@@ -43,11 +43,12 @@ class VLibManager(object):
   def add_ctx(self, name, ctx):
     self.ctx_map.add_ctx(name, ctx)
 
-  def bootstrap_exec(self, exec_info=None, exec_ctx=None, do_profile=False):
+  def bootstrap_exec(self, exec_info=None, exec_ctx=None,
+                     do_profile=False, version=0, revision=0):
     """setup exec library"""
     if exec_info is None:
       date = datetime.date(day=7, month=7, year=2007)
-      exec_info = LibInfo('exec.library', 0, 0, date)
+      exec_info = LibInfo('exec.library', version, revision, date)
     if exec_ctx:
       self.ctx_map.add_ctx('exec.library', exec_ctx)
     # make sure its an exec info
@@ -113,15 +114,38 @@ class VLibManager(object):
     self._rem_vlib(vlib)
     return True
 
-  def load_lib_name(self, name, version=0, revision=0, do_profile=False, allow_fake=False):
+  def make_lib_name(self, name, version=0, revision=0, do_profile=False,
+                    allow_fake=False):
     date = datetime.date(day=7, month=7, year=2007)
     info = LibInfo(name, version, revision, date)
-    return self.load_lib(info, do_profile, allow_fake)
+    return self.make_lib(info, do_profile, allow_fake)
 
-  def load_lib(self, lib_info, do_profile=False, allow_fake=False):
+  def make_lib(self, lib_info, do_profile=False, allow_fake=False):
     vlib = self._create_vlib(lib_info, do_profile, allow_fake)
-    self._add_vlib(vlib)
+    if vlib:
+      self._add_vlib(vlib)
     return vlib
+
+  def open_lib_name(self, name, version=0, revision=0, do_profile=False,
+                    allow_fake=False):
+    vlib = self.get_vlib_by_name(name)
+    if not vlib:
+      vlib = self.make_lib_name(name, version, revision, do_profile, allow_fake)
+    if vlib:
+      vlib.open()
+    return vlib
+
+  def open_lib(self, lib_info, do_profile=False, allow_fake=False):
+    vlib = self.get_vlib_by_name(name)
+    if not vlib:
+      vlib = self.make_lib(lib_info, do_profile, allow_fake)
+    if vlib:
+      vlib.open()
+    return vlib
+
+  def close_lib(self, vlib):
+    vlib.close()
+    return self.expunge_lib(vlib)
 
   def _create_vlib(self, lib_info, do_profile, allow_fake):
     # get lib ctx
