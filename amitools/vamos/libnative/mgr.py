@@ -4,7 +4,7 @@ from .loader import LibLoader
 from .libfuncs import LibFuncs
 
 
-class NativeLibManager(object):
+class ALibManager(object):
   def __init__(self, machine, alloc, path_mgr, segloader=None):
     self.loader = LibLoader(machine, alloc, segloader)
     self.funcs = LibFuncs(machine, alloc)
