@@ -62,7 +62,7 @@ class LibFuncs(object):
 
   def _run_close(self, lib_base, run_sp=None):
     """call lib close and return seg_list or 0"""
-    return self._run_lvo(lib_base, self.LVO_Close, "LibOpen", run_sp)
+    return self._run_lvo(lib_base, self.LVO_Close, "LibClose", run_sp)
 
   def _run_expunge(self, lib_base, run_sp=None):
     """call lib expunge and return seg_list or 0"""

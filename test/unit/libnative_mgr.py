@@ -1,4 +1,6 @@
 import pytest
+import logging
+from amitools.vamos.Log import log_libmgr
 from amitools.vamos.libnative import ALibManager
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.machine import Machine
@@ -23,6 +25,7 @@ def setup():
 def libnative_mgr_test(buildlibnix):
   if buildlibnix.flavor not in ('gcc', 'gcc-dbg'):
     pytest.skip("only single base lib supported")
+  log_libmgr.setLevel(logging.INFO)
   machine, alloc, sp, mem, exec_lib = setup()
   # load
   lib_file = buildlibnix.make_lib('testnix')
@@ -46,7 +49,7 @@ def libnative_mgr_test(buildlibnix):
   left = mgr.shutdown(run_sp=sp)
   assert left == 0
   assert not mgr.is_lib_addr(lib_base)
-  #assert mgr.get_lib_addr_for_name("testnix.library") == 0
+  assert mgr.get_lib_addr_for_name("testnix.library") == 0
   # we have to manually clean the lib here (as Exec FreeMem() does not work)
   lib = Library(mem, lib_base, alloc)
   lib.free()
