@@ -175,7 +175,8 @@ def main():
   stack_size = cfg.stack_size * 1024
 
   # setup machine
-  machine = Machine(cpu_type, cfg.ram_size, use_labels=cfg.labels)
+  machine = Machine(cpu_type, cfg.ram_size,
+                    use_labels=cfg.labels, raise_on_main_run=False)
 
   # combine to vamos instance
   vamos = Vamos(machine, cfg)

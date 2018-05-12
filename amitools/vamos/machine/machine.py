@@ -64,12 +64,13 @@ class Machine(object):
   ram_begin = 0x800
 
   def __init__(self, cpu_type=M68K_CPU_TYPE_68000, ram_size_kib=1024,
-               use_labels=True):
+               use_labels=True, raise_on_main_run=True):
     # setup musashi components
     self.cpu_type = cpu_type
     self.cpu = emu.CPU(cpu_type)
     self.mem = emu.Memory(ram_size_kib)
     self.traps = emu.Traps()
+    self.raise_on_main_run = raise_on_main_run
     # internal state
     if use_labels:
       self.label_mgr = LabelManager()
@@ -347,8 +348,9 @@ class Machine(object):
 
     # if run_state has error and we are not a top-level raise an error
     # so the running trap code gets aborted and propagates the abort
-    if nesting > 0 and run_state.error:
-      pc = cpu.r_pc()
-      raise NestedCPURunError(pc, run_state.error)
+    if run_state.error:
+      if nesting > 0 or self.raise_on_main_run:
+        pc = cpu.r_pc()
+        raise NestedCPURunError(pc, run_state.error)
 
     return run_state
