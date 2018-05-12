@@ -105,7 +105,7 @@ def libcore_mgr_make_fake_test():
   # make vamos test lib
   test_vlib = mgr.make_lib_name('testnix.library')
   assert test_vlib is None
-  test_vlib = mgr.make_lib_name('testnix.library', allow_fake=True)
+  test_vlib = mgr.make_lib_name('testnix.library', fake=True)
   test_base = test_vlib.get_addr()
   assert test_vlib
   assert mgr.get_vlib_by_name('testnix.library') == test_vlib

@@ -115,30 +115,30 @@ class VLibManager(object):
     return True
 
   def make_lib_name(self, name, version=0, revision=0, do_profile=False,
-                    allow_fake=False):
+                    fake=False):
     date = datetime.date(day=7, month=7, year=2007)
     info = LibInfo(name, version, revision, date)
-    return self.make_lib(info, do_profile, allow_fake)
+    return self.make_lib(info, do_profile, fake)
 
-  def make_lib(self, lib_info, do_profile=False, allow_fake=False):
-    vlib = self._create_vlib(lib_info, do_profile, allow_fake)
+  def make_lib(self, lib_info, do_profile=False, fake=False):
+    vlib = self._create_vlib(lib_info, do_profile, fake)
     if vlib:
       self._add_vlib(vlib)
     return vlib
 
   def open_lib_name(self, name, version=0, revision=0, do_profile=False,
-                    allow_fake=False):
+                    fake=False):
     vlib = self.get_vlib_by_name(name)
     if not vlib:
-      vlib = self.make_lib_name(name, version, revision, do_profile, allow_fake)
+      vlib = self.make_lib_name(name, version, revision, do_profile, fake)
     if vlib:
       vlib.open()
     return vlib
 
-  def open_lib(self, lib_info, do_profile=False, allow_fake=False):
+  def open_lib(self, lib_info, do_profile=False, fake=False):
     vlib = self.get_vlib_by_name(name)
     if not vlib:
-      vlib = self.make_lib(lib_info, do_profile, allow_fake)
+      vlib = self.make_lib(lib_info, do_profile, fake)
     if vlib:
       vlib.open()
     return vlib
@@ -147,22 +147,23 @@ class VLibManager(object):
     vlib.close()
     return self.expunge_lib(vlib)
 
-  def _create_vlib(self, lib_info, do_profile, allow_fake):
+  def _create_vlib(self, lib_info, do_profile, fake):
     # get lib ctx
     name = lib_info.get_name()
     ctx = self.ctx_map.get_ctx(name)
     # get impl
-    name = lib_info.get_name()
-    impl_cls = self.lib_reg.find_cls_by_name(name)
-    if impl_cls:
-      impl = impl_cls()
-      # adjust version?
-      if lib_info.version == 0:
-        lib_info.version = impl.get_version()
-    elif allow_fake:
+    if fake:
       impl = None
     else:
-      return None
+      name = lib_info.get_name()
+      impl_cls = self.lib_reg.find_cls_by_name(name)
+      if impl_cls:
+        impl = impl_cls()
+        # adjust version?
+        if lib_info.version == 0:
+          lib_info.version = impl.get_version()
+      else:
+        return None
     # create lib
     vlib = self.creator.create_lib(lib_info, ctx, impl, do_profile)
     return vlib
