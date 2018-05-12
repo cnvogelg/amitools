@@ -10,7 +10,7 @@ log_machine.setLevel(logging.DEBUG)
 
 
 def create_machine():
-  m = Machine(Machine.CPU_TYPE_68000)
+  m = Machine(Machine.CPU_TYPE_68000, raise_on_main_run=False)
   cpu = m.get_cpu()
   mem = m.get_mem()
   traps = m.get_traps()
