@@ -91,11 +91,15 @@ class LibStubGen(object):
     num_invalid = scanner.get_num_invalid_funcs()
     num_error = scanner.get_num_error_funcs()
     if num_invalid > 0 and not self.ignore_invalid:
+      names = scanner.get_invalid_func_names()
+      txt = ",".join(names)
       raise VamosInternalError(
-          "'%s' impl has %d invalid funcs!" % (name, num_invalid))
+          "'%s' impl has %d invalid funcs: %s" % (name, num_invalid, txt))
     if num_error > 0:
+      names = scanner.get_error_func_names()
+      txt = ",".join(names)
       raise VamosInternalError(
-          "'%s' impl has %d error funcs!" % (name, num_error))
+          "'%s' impl has %d error funcs: %s" % (name, num_error, txt))
 
     # create stub object
     stub = LibStub(name, fd, impl, profile)

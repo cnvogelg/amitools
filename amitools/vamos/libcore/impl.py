@@ -57,6 +57,18 @@ class LibImplScanner(object):
     """return map: name -> (fd_func, method)"""
     return self.error_funcs
 
+  def get_valid_func_names(self):
+    return sorted(self.valid_funcs.keys())
+
+  def get_missing_func_names(self):
+    return sorted(self.missing_funcs.keys())
+
+  def get_invalid_func_names(self):
+    return sorted(self.invalid_funcs.keys())
+
+  def get_error_func_names(self):
+    return sorted(self.error_funcs.keys())
+
   def get_num_valid_funcs(self):
     return len(self.valid_funcs)
 
@@ -87,8 +99,8 @@ class LibImplScanner(object):
     for name, method in members:
       # is a func in the fd?
       if fd.has_func(name):
+        func = fd.get_func_by_name(name)
         if self._check_argspec(method):
-          func = fd.get_func_by_name(name)
           self.valid_funcs[name] = (func, method)
         else:
           self.error_funcs[name] = (func, method)
