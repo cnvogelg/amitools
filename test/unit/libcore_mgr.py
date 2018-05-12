@@ -2,7 +2,6 @@ from amitools.vamos.libcore import VLibManager, LibRegistry, LibCtxMap
 from amitools.vamos.machine import Machine
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
-from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
 from amitools.vamos.loader import SegmentLoader
 
 

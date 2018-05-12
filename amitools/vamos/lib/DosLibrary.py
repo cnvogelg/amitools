@@ -1112,7 +1112,7 @@ class DosLibrary(LibImpl):
 
   # ----- Pattern Parsing and Matching -----
 
-  def ParsePattern(self, ctx, ignore_case=False):
+  def parsePattern(self, ctx, ignore_case=False):
     src_ptr = ctx.cpu.r_reg(REG_D1)
     dst_ptr = ctx.cpu.r_reg(REG_D2)
     dst_len = ctx.cpu.r_reg(REG_D3)
@@ -1134,10 +1134,13 @@ class DosLibrary(LibImpl):
         else:
           return 0
 
+  def ParsePattern(self, ctx):
+    return self.ParsePattern(ctx)
+
   def ParsePatternNoCase(self, ctx):
     return self.ParsePattern(ctx, ignore_case=True)
 
-  def MatchPattern(self, ctx, ignore_case=False):
+  def matchPattern(self, ctx, ignore_case=False):
     pat_ptr = ctx.cpu.r_reg(REG_D1)
     txt_ptr = ctx.cpu.r_reg(REG_D2)
     pat = ctx.mem.r_cstr(pat_ptr)
@@ -1150,8 +1153,11 @@ class DosLibrary(LibImpl):
     else:
       return 0
 
+  def MatchPattern(self, ctx):
+    return self.matchPattern(ctx)
+
   def MatchPatternNoCase(self, ctx):
-    return self.MatchPattern(ctx, ignore_case=True)
+    return self.matchPattern(ctx, ignore_case=True)
 
   # ----- Args -----
 

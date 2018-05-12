@@ -95,9 +95,9 @@ class Vamos:
     ctx_map = LibCtxMap()
     self.exec_ctx = ExecLibCtx(self.machine, self.alloc,
                                self.seg_loader, self.path_mgr)
-    self.dos_ctx = DosLibCtx(self.cpu, self.mem, self.alloc, self.path_mgr,
-                             self.seg_loader, self.run_command,
-                             self.start_sub_process)
+    self.dos_ctx = DosLibCtx(self.machine, self.alloc,
+                             self.seg_loader, self.path_mgr,
+                             self.run_command, self.start_sub_process)
     ctx_map.set_default_ctx(LibCtx(self.cpu, self.mem))
     ctx_map.add_ctx('exec.library', self.exec_ctx)
     ctx_map.add_ctx('dos.library', self.dos_ctx)

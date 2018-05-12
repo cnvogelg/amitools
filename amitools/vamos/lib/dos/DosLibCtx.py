@@ -2,17 +2,17 @@ from amitools.vamos.libcore import LibCtx
 
 class DosLibCtx(LibCtx):
 
-  def __init__(self, cpu, mem, alloc, path_mgr, seg_loader,
+  def __init__(self, machine, alloc, seg_loader, path_mgr,
                run_command, start_sub_process):
-    LibCtx.__init__(self, cpu, mem)
+    LibCtx.__init__(self, machine.get_cpu(), machine.get_mem())
     self.alloc = alloc
     self.path_mgr = path_mgr
-    self.exec_lib = None
     self.seg_loader = seg_loader
     self.run_command = run_command
     self.start_sub_process = start_sub_process
-    self.process = None
     # compat for process
+    self.process = None
+    self.exec_lib = None
     self.dos_lib = None
 
   def set_exec_lib(self, exec_lib):
