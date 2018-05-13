@@ -9,7 +9,8 @@ from amitools.vamos.libnative import InitRes
 def load_lib(alloc, buildlibnix):
   lib_file = buildlibnix.make_lib('testnix')
   loader = SegmentLoader(alloc)
-  seg_list = loader.load_seglist(lib_file)
+  info = loader.int_load_sys_seglist(lib_file)
+  seg_list = info.seglist
   seg = seg_list.get_segment()
   addr = seg.get_addr()
   size = seg.get_size()

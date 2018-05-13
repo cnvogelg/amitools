@@ -464,7 +464,7 @@ class DosLibrary(LibImpl):
     # Adding a resident command to the registered seglists.
     b_addr = seglist >> 2
     if b_addr not in self.seg_lists:
-      self.seg_lists[b_addr] = (None,name)
+      self.seg_lists[b_addr] = name
     return -1
 
   # ----- File Ops -----
@@ -1439,10 +1439,9 @@ class DosLibrary(LibImpl):
     lock     = self.get_current_dir(ctx)
     sys_path = self.path_mgr.ami_to_sys_path(lock, name, searchMulti=True)
     if sys_path and os.path.exists(sys_path):
-      seg_list = ctx.seg_loader.load_seglist(sys_path)
-      log_dos.info("LoadSeg: '%s' -> %s" % (name, seg_list))
-      b_addr = seg_list.get_baddr()
-      self.seg_lists[b_addr] = (seg_list,name)
+      b_addr = ctx.seg_loader.load_sys_seglist(sys_path)
+      log_dos.info("LoadSeg: '%s' -> %06x" % (name, b_addr))
+      self.seg_lists[b_addr] = name
       return b_addr
     else:
       log_dos.warn("LoadSeg: '%s' -> not found!" % (name))
@@ -1454,10 +1453,9 @@ class DosLibrary(LibImpl):
       if not self.seg_lists.has_key(b_addr):
         raise VamosInternalError("Trying to unload unknown LoadSeg seg_list: b_addr=%06x" % b_addr)
       else:
-        seg_list = self.seg_lists[b_addr][0]
         del self.seg_lists[b_addr]
-        seg_list.free()
-        log_dos.info("UnLoadSeg:  %s" % seg_list)
+        ctx.seg_loader.unload_seglist(b_addr)
+        log_dos.info("UnLoadSeg: %06x" % b_addr)
     else:
       log_dos.info("UnLoadSeg:  NULL")
 
@@ -1477,7 +1475,7 @@ class DosLibrary(LibImpl):
     if not b_addr in self.seg_lists:
       raise VamosInternalError("Trying to run unknown LoadSeg seg_list: b_addr=%06x" % b_addr)
     else:
-      name = self.seg_lists[b_addr][1]
+      name = self.seg_lists[b_addr]
     stack    = ctx.cpu.r_reg(REG_D2)
     args     = ctx.cpu.r_reg(REG_D3)
     length   = ctx.cpu.r_reg(REG_D4)

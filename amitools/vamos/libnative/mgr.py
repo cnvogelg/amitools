@@ -51,10 +51,10 @@ class ALibInfo(object):
 
 
 class ALibManager(object):
-  def __init__(self, machine, alloc, path_mgr, segloader=None):
+  def __init__(self, machine, alloc, segloader):
+    self.segloader = segloader
     self.loader = LibLoader(machine, alloc, segloader)
     self.funcs = LibFuncs(machine, alloc)
-    self.path_mgr = path_mgr
     self.mem = machine.get_mem()
     # state
     self.lib_infos = []
@@ -123,16 +123,18 @@ class ALibManager(object):
     # not found... try to load it
     if not lib_info:
       log_libmgr.info("loading native lib: '%s'", lib_name)
-      load_addr, seglist, sys_path, ami_path = self.loader.load_lib_name(
-          self.path_mgr, lib_name, lock, run_sp)
+      load_addr, seglist_baddr = self.loader.load_ami_lib(
+          lib_name, lock, run_sp)
       # even loading failed... abort
       if load_addr == 0:
         log_libmgr.info("[native] -open_lib: load failed!")
         return 0
-      log_libmgr.info("loaded: @%06x  %s", load_addr, seglist)
-      log_libmgr.info("loaded: path sys='%s' ami='%s'", sys_path, ami_path)
+      log_libmgr.info("loaded: @%06x  seglist: @%06x",
+                      load_addr, seglist_baddr)
+      info = self.segloader.get_info(seglist_baddr)
+      log_libmgr.info("loaded: %s", info)
       # store original load addr and name in info
-      lib_info = self._add_info(base_name, load_addr, seglist.get_baddr())
+      lib_info = self._add_info(base_name, load_addr, seglist_baddr)
       loaded = True
     else:
       load_addr = lib_info.get_load_addr()

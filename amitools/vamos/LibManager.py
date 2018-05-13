@@ -426,13 +426,14 @@ class LibManager():
 
     # use seg_loader to load lib
     self.lib_log("load_lib","loading native lib: %s" % sys_path)
-    lib.seg_list = ctx.seg_loader.load_seglist(sys_path)
-    if lib.seg_list == None:
+    lib.seg_list = ctx.seg_loader.load_sys_seglist(sys_path)
+    if lib.seg_list == 0:
       self.lib_log("load_lib","Can't load library file '%s'" % sys_path, level=logging.ERROR)
       return None
 
     # check seg list for resident library struct
-    seg0 = lib.seg_list.get_segment()
+    info = ctx.seg_loader.get_info(lib.seg_list)
+    seg0 = info.seglist.get_segment()
     ar = AmigaResident(seg0.get_addr(), seg0.get_size(), ctx.mem)
     start = time.clock()
     res_list = ar.find_residents()
@@ -474,7 +475,7 @@ class LibManager():
   def _rtinit_native_lib(self, lib, ctx, tr, init_ptr):
     """library init done for RT_INIT style lib"""
     exec_base = ctx.mem.r32(4)
-    seg_list = lib.seg_list.get_baddr()
+    seg_list = lib.seg_list
     tr.save_all()
     tr.set_dx_l(0, 0) # D0=0
     tr.set_ax_l(0, seg_list) # A0 = SegList
@@ -491,7 +492,7 @@ class LibManager():
     sl_len = ctx.mem.r32(addr-4)
     sl_next = ctx.mem.r32(addr)
     self.lib_log("load_lib", "seglist: len=%d next=%4x" % (sl_len, sl_next))
-    self.lib_log("load_lib", "seglist: %s" % lib.seg_list)
+    self.lib_log("load_lib", "seglist: @%06x" % lib.seg_list)
 
   def _rtinit_done_native_lib(self, lib, ctx):
     lib_base = ctx.cpu.r_reg(REG_D0)
@@ -528,7 +529,7 @@ class LibManager():
       # now prepare to execute library init code
       # setup trampoline to call init routine of library
       # D0 = lib_base, A0 = seg_list, A6 = exec base
-      seg_list = lib.seg_list.get_baddr()
+      seg_list = lib.seg_list
       exec_base = ctx.mem.r32(4)
       lib_base = lib.addr_base
       tr.save_all()
@@ -593,7 +594,7 @@ class LibManager():
     self._unregister_lib_name(lib)
 
     # unload seg_list
-    lib.seg_list.free()
+    ctx.seg_loader.unload_seglist(lib.seg_list)
     lib.seg_list = None
 
     self.lib_log("free_lib","done freeing native lib: %s" % lib)

@@ -15,7 +15,7 @@ class LibManager(object):
   MODE_AMIGA = 'amiga'
   MODE_FAKE = 'fake'
 
-  def __init__(self, machine, alloc, path_mgr, segloader=None,
+  def __init__(self, machine, alloc, segloader,
                cfg=None, profile_all=None):
     self.mem = machine.get_mem()
     self.cfg = cfg
@@ -25,7 +25,7 @@ class LibManager(object):
       else:
         self.profile_all = False
     self.vlib_mgr = VLibManager(machine, alloc, profile_all=profile_all)
-    self.alib_mgr = ALibManager(machine, alloc, path_mgr, segloader)
+    self.alib_mgr = ALibManager(machine, alloc, segloader)
 
   def add_ctx(self, name, ctx):
     """allow to add vlib contexts"""

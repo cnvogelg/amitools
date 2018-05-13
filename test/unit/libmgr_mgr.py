@@ -16,8 +16,8 @@ def setup(path_mgr=None, cfg=None, profile_all=None):
   # machine.show_instr(True)
   sp = machine.get_ram_begin() - 4
   alloc = MemoryAlloc.for_machine(machine)
-  segloader = SegmentLoader(alloc)
-  mgr = LibManager(machine, alloc, path_mgr, segloader,
+  segloader = SegmentLoader(alloc, path_mgr)
+  mgr = LibManager(machine, alloc, segloader,
                    cfg=cfg, profile_all=profile_all)
   # setup ctx map
   cpu = machine.get_cpu()

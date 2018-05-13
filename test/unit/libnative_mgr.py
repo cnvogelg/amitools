@@ -2,6 +2,7 @@ import pytest
 import logging
 from amitools.vamos.Log import log_libmgr
 from amitools.vamos.libnative import ALibManager
+from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.machine import Machine
 from amitools.vamos.atypes import ExecLibrary, Library
@@ -36,7 +37,8 @@ def libnative_mgr_test(buildlibnix):
         return lib_file
 
   pm = PathMgrMock()
-  mgr = ALibManager(machine, alloc, pm)
+  segload = SegmentLoader(alloc, pm)
+  mgr = ALibManager(machine, alloc, segload)
   # open_lib
   lib_base = mgr.open_lib("testnix.library", run_sp=sp)
   assert lib_base > 0
@@ -73,7 +75,8 @@ def libnative_mgr_fail_test():
       return None
 
   pm = PathMgrMock()
-  mgr = ALibManager(machine, alloc, pm)
+  segload = SegmentLoader(alloc, pm)
+  mgr = ALibManager(machine, alloc, segload)
   # open_lib
   lib_base = mgr.open_lib("testnix.library", run_sp=sp)
   assert lib_base == 0

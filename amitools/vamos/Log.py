@@ -14,7 +14,7 @@ log_machine = logging.getLogger('machine')
 
 log_lib = logging.getLogger('lib')
 log_libmgr = logging.getLogger('libmgr')
-log_res = logging.getLogger('res')
+log_segload = logging.getLogger('segload')
 
 log_path = logging.getLogger('path')
 log_file = logging.getLogger('file')
@@ -35,7 +35,7 @@ log_hw = logging.getLogger('hw')
 loggers = [
   log_main, log_mem, log_mem_init, log_mem_alloc, log_mem_int,
   log_instr, log_lib, log_libmgr, log_path, log_file, log_lock,
-  log_doslist, log_res, log_dos, log_exec, log_proc, log_prof,
+  log_doslist, log_segload, log_dos, log_exec, log_proc, log_prof,
   log_tp, log_utility, log_hw, log_math, log_machine
 ]
 
