@@ -9,6 +9,12 @@ from amitools.vamos.libnative import ALibManager, LibLoader
 class LibManager(object):
   """the library manager handles both native and vamos libs"""
 
+  MODE_OFF = 'off'
+  MODE_AUTO = 'auto'
+  MODE_VAMOS = 'vamos'
+  MODE_AMIGA = 'amiga'
+  MODE_FAKE = 'fake'
+
   def __init__(self, machine, alloc, path_mgr, segloader=None,
                cfg=None, profile_all=None):
     self.mem = machine.get_mem()
@@ -99,7 +105,7 @@ class LibManager(object):
     log_libmgr.info("params: mode=%s, version=%d, do_profile=%s",
                     mode, version, do_profile)
     # handle mode
-    if mode == 'off':
+    if mode == self.MODE_OFF:
       return 0
     try_vlib, try_alib, fake = self._map_mode(mode)
 
@@ -134,19 +140,19 @@ class LibManager(object):
     return addr
 
   def _map_mode(self, mode):
-    if mode == 'auto':
+    if mode == self.MODE_AUTO:
       try_vlib = True
       try_alib = True
       fake = False
-    elif mode == 'vamos':
+    elif mode == self.MODE_VAMOS:
       try_vlib = True
       try_alib = False
       fake = False
-    elif mode == 'amiga':
+    elif mode == self.MODE_AMIGA:
       try_vlib = False
       try_alib = True
       fake = False
-    elif mode == 'fake':
+    elif mode == self.MODE_FAKE:
       try_vlib = True
       try_alib = False
       fake = True

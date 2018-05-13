@@ -13,7 +13,7 @@ def setup(path_mgr=None, cfg=None, profile_all=None):
   log_libmgr.setLevel(logging.INFO)
   log_exec.setLevel(logging.INFO)
   machine = Machine()
-  #machine.show_instr(True)
+  # machine.show_instr(True)
   sp = machine.get_ram_begin() - 4
   alloc = MemoryAlloc.for_machine(machine)
   segloader = SegmentLoader(alloc)
@@ -52,6 +52,23 @@ def libmgr_mgr_bootstrap_shutdown_test():
   assert alloc.is_all_free()
 
 
+def libmgr_mgr_open_fail_test():
+  class PathMgrMock:
+    def ami_to_sys_path(self, lock, ami_path, mustExist=True):
+      return None
+  pm = PathMgrMock()
+  machine, alloc, mgr, sp = setup(path_mgr=pm)
+  mgr.bootstrap_exec()
+  # open non-existing lib
+  lib_base = mgr.open_lib("blubber.library")
+  assert lib_base == 0
+  # shutdown
+  left = mgr.shutdown()
+  assert left == 0
+  # exec is now gone and mem is sane
+  assert alloc.is_all_free()
+
+
 def libmgr_mgr_open_vlib_test():
   machine, alloc, mgr, sp = setup()
   exec_vlib = mgr.bootstrap_exec()
@@ -79,7 +96,8 @@ def libmgr_mgr_open_vlib_fake_test():
   machine, alloc, mgr, sp = setup()
   exec_vlib = mgr.bootstrap_exec()
   # make vamos test lib
-  test_base = mgr.open_lib('dos.library', 36, mode='fake', version=40)
+  test_base = mgr.open_lib(
+      'dos.library', 36, mode=LibManager.MODE_FAKE, version=40)
   assert test_base > 0
   vmgr = mgr.vlib_mgr
   test_vlib = vmgr.get_vlib_by_addr(test_base)
@@ -100,7 +118,8 @@ def libmgr_mgr_open_vlib_too_new_test():
   machine, alloc, mgr, sp = setup()
   exec_vlib = mgr.bootstrap_exec()
   # make vamos test lib
-  test_base = mgr.open_lib('dos.library', 41, mode='fake', version=40)
+  test_base = mgr.open_lib(
+      'dos.library', 41, mode=LibManager.MODE_FAKE, version=40)
   assert test_base == 0
   # shutdown
   left = mgr.shutdown()
@@ -108,43 +127,91 @@ def libmgr_mgr_open_vlib_too_new_test():
   assert alloc.is_all_free()
 
 
-def libmgr_mgr_open_alib_test(buildlibnix):
-  lib_file = buildlibnix.make_lib('testnix')
+class ALibHelper(object):
+  def __init__(self, lib_file, lib_name):
+    class PathMgrMock:
+      def ami_to_sys_path(self, lock, ami_path, mustExist=True):
+        if ami_path == 'LIBS:' + lib_name:
+          return lib_file
+    pm = PathMgrMock()
+    self.machine, self.alloc, self.mgr, self.sp = setup(path_mgr=pm)
+    self.mgr.bootstrap_exec()
+    self.dos_base = self.mgr.open_lib(
+        'dos.library', mode=LibManager.MODE_FAKE, version=40)
 
-  class PathMgrMock:
-    def ami_to_sys_path(self, lock, ami_path, mustExist=True):
-      if ami_path == 'LIBS:testnix.library':
-        return lib_file
-  pm = PathMgrMock()
-  machine, alloc, mgr, sp = setup(path_mgr=pm)
-  exec_vlib = mgr.bootstrap_exec()
-  # open fake dos.lib
-  dos_base = mgr.open_lib('dos.library', mode='fake', version=40)
+  def shutdown(self):
+    # close dos
+    self.mgr.close_lib(self.dos_base)
+    # expunge lib
+    left = self.mgr.shutdown(run_sp=self.sp)
+    assert left == 0
+    assert self.alloc.is_all_free()
+
+
+def open_alib(lib_file, lib_name, **kw_args):
+  h = ALibHelper(lib_file, lib_name)
+  mgr = h.mgr
   # open_lib
-  lib_base = mgr.open_lib("testnix.library", run_sp=sp)
+  lib_base = mgr.open_lib(lib_name, run_sp=h.sp, **kw_args)
   assert lib_base > 0
   amgr = mgr.alib_mgr
   assert amgr.is_lib_addr(lib_base)
-  lib_info = amgr.get_lib_info_for_name("testnix.library")
+  lib_info = amgr.get_lib_info_for_name(lib_name)
   assert lib_info
   assert lib_info.is_base_addr(lib_base)
   # close lib
-  seglist = mgr.close_lib(lib_base, run_sp=sp)
+  seglist = mgr.close_lib(lib_base, run_sp=h.sp)
   assert not amgr.is_lib_addr(lib_base)
   assert seglist == 0
-  lib_info = amgr.get_lib_info_for_name("testnix.library")
+  lib_info = amgr.get_lib_info_for_name(lib_name)
   assert lib_info
   assert not lib_info.is_base_addr(lib_base)
   # expunge lib
   load_addr = lib_info.get_load_addr()
-  seglist = mgr.expunge_lib(load_addr, run_sp=sp)
+  seglist = mgr.expunge_lib(load_addr, run_sp=h.sp)
   assert seglist > 0
   assert not amgr.is_lib_addr(lib_base)
-  lib_info = amgr.get_lib_info_for_name("testnix.library")
+  lib_info = amgr.get_lib_info_for_name(lib_name)
   assert not lib_info
-  # close dos
-  mgr.close_lib(dos_base)
-  # expunge lib
-  left = mgr.shutdown(run_sp=sp)
-  assert left == 0
-  assert alloc.is_all_free()
+  # shutdown
+  h.shutdown()
+
+
+def libmgr_mgr_open_alib_libnix_test(buildlibnix):
+  lib_file = buildlibnix.make_lib('testnix')
+  lib_name = "testnix.library"
+  open_alib(lib_file, lib_name)
+
+
+def libmgr_mgr_open_alib_libsc_test(buildlibsc):
+  lib_file = buildlibsc.make_lib("testsc")
+  lib_name = "testsc.library"
+  open_alib(lib_file, lib_name)
+
+
+def libmgr_mgr_open_alib_libnix_mode_native_test(buildlibnix):
+  lib_file = buildlibnix.make_lib('testnix')
+  lib_name = "testnix.library"
+  open_alib(lib_file, lib_name, mode=LibManager.MODE_AMIGA)
+
+
+def libmgr_mgr_open_alib_libsc_mode_native_test(buildlibsc):
+  lib_file = buildlibsc.make_lib("testsc")
+  lib_name = "testsc.library"
+  open_alib(lib_file, lib_name, mode=LibManager.MODE_AMIGA)
+
+
+def libmgr_mgr_open_alib_libnix_mode_off_test(buildlibnix):
+  lib_file = buildlibnix.make_lib('testnix')
+  lib_name = "testnix.library"
+  h = ALibHelper(lib_file, lib_name)
+  assert h.mgr.open_lib(lib_name, mode=LibManager.MODE_OFF) == 0
+  h.shutdown()
+
+
+def libmgr_mgr_open_alib_libsc_mode_off_test(buildlibsc):
+  lib_file = buildlibsc.make_lib("testsc")
+  lib_name = "testsc.library"
+  h = ALibHelper(lib_file, lib_name)
+  assert h.mgr.open_lib(lib_name, mode=LibManager.MODE_OFF) == 0
+  h.shutdown()
