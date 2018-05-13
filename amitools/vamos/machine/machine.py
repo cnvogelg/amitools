@@ -5,6 +5,7 @@ from musashi.m68k import *
 from .regs import *
 from .opcodes import *
 from .error import ErrorReporter
+from .cpustate import CPUState
 from amitools.vamos.Exceptions import *
 from amitools.vamos.Log import log_machine
 from amitools.vamos.label import LabelManager
@@ -181,6 +182,24 @@ class Machine(object):
 
   def set_instr_hook(self, func):
     self.cpu.set_instr_hook_callback(func)
+
+  def show_instr(self, show_regs=False):
+    if show_regs:
+      state = CPUState()
+      def instr_hook():
+        state.get(self.cpu)
+        res = state.dump()
+        for r in res:
+          log_machine.info(r)
+        pc = self.cpu.r_pc()
+        _, txt = self.cpu.disassemble(pc)
+        log_machine.info("%06x: %s", pc, txt)
+    else:
+      def instr_hook():
+        pc = self.cpu.r_pc()
+        _, txt = self.cpu.disassemble(pc)
+        log_machine.info("%06x: %s", pc, txt)
+    self.set_instr_hook(instr_hook)
 
   def set_cpu_mem_trace_hook(self, func):
     self.mem.set_trace_mode(1)
