@@ -97,7 +97,7 @@ class ALibManager(object):
     log_libmgr.info("[native] +expunge_lib: base=@%06x", base_addr)
     if not self.is_lib_addr(base_addr, True):
       raise ValueError("expunge_lib: invalid lib_base=%06x" % base_addr)
-    seglist = self.funcs.rem_library(base_addr, run_sp)
+    seglist = self.funcs.rem_library(base_addr, self.segloader, run_sp)
     info = self._rem_info(base_addr, seglist)
     log_libmgr.info("[native] -expunge_lib: seglist=%06x, info=%s",
                     seglist, info)
@@ -107,7 +107,7 @@ class ALibManager(object):
     log_libmgr.info("[native] +close_lib: base=@%06x", base_addr)
     if not self.is_lib_addr(base_addr):
       raise ValueError("close_lib: invalid lib_base=%06x" % base_addr)
-    seglist = self.funcs.close_library(base_addr, run_sp)
+    seglist = self.funcs.close_library(base_addr, self.segloader, run_sp)
     info = self._rem_info(base_addr, seglist)
     log_libmgr.info("[native] -close_lib: seglist=%06x, info=%s",
                     seglist, info)

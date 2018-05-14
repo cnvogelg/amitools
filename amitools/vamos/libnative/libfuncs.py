@@ -39,21 +39,19 @@ class LibFuncs(object):
     lib.flags.clr_bits(LibFlags.LIBF_CHANGED | LibFlags.LIBF_SUMUSED)
     return lib.update_sum()
 
-  def rem_library(self, lib_base, run_sp=None):
+  def rem_library(self, lib_base, seg_loader, run_sp=None):
     seglist = self._run_expunge(lib_base, run_sp)
     if seglist != 0:
-      sl = SegList(self.alloc, seglist)
-      sl.free()
+      seg_loader.unload_seglist(seglist)
     return seglist
 
   def open_library(self, lib_base, run_sp=None):
     return self._run_open(lib_base, run_sp)
 
-  def close_library(self, lib_base, run_sp=None):
+  def close_library(self, lib_base, seg_loader, run_sp=None):
     seglist = self._run_close(lib_base, run_sp)
     if seglist != 0:
-      sl = SegList(self.alloc, seglist)
-      sl.free()
+      seg_loader.unload_seglist(seglist)
     return seglist
 
   def _run_open(self, lib_base, run_sp=None):

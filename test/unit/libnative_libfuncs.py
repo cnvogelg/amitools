@@ -3,7 +3,7 @@ from amitools.vamos.machine.regs import *
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.libnative import LibFuncs
 from amitools.vamos.atypes import ExecLibrary, Library, LibFlags
-from amitools.vamos.loader import SegList
+from amitools.vamos.loader import SegList, SegmentLoader
 
 
 def libnative_libfuncs_add_library_test():
@@ -58,11 +58,13 @@ def libnative_libfuncs_rem_library_test():
   traps = machine.get_traps()
   sp = machine.get_ram_begin() - 4
   alloc = MemoryAlloc.for_machine(machine)
+  segloader = SegmentLoader(alloc)
   # new lib
   lib = Library.alloc(alloc, "my.library", "bla", 36)
   lib.setup()
   # setup seglist
   seglist = SegList.alloc(alloc, [64])
+  segloader.register_seglist(seglist.get_baddr())
   # setup expunge func
 
   def expunge_func(op, pc):
@@ -73,11 +75,12 @@ def libnative_libfuncs_rem_library_test():
   mem.w16(exp_addr, trap_id | 0xa000)
   # add lib
   lf = LibFuncs(machine, alloc)
-  sl = lf.rem_library(lib.get_addr(), run_sp=sp)
+  sl = lf.rem_library(lib.get_addr(), segloader, run_sp=sp)
   assert seglist.get_baddr() == sl
   # cleanup
   lib.free()
   assert alloc.is_all_free()
+  assert segloader.shutdown() == 0
 
 
 def libnative_libfuncs_close_library_test():
@@ -87,11 +90,13 @@ def libnative_libfuncs_close_library_test():
   traps = machine.get_traps()
   sp = machine.get_ram_begin() - 4
   alloc = MemoryAlloc.for_machine(machine)
+  segloader = SegmentLoader(alloc)
   # new lib
   lib = Library.alloc(alloc, "my.library", "bla", 36)
   lib.setup()
   # setup seglist
   seglist = SegList.alloc(alloc, [64])
+  segloader.register_seglist(seglist.get_baddr())
   # setup expunge func
 
   def close_func(op, pc):
@@ -102,11 +107,12 @@ def libnative_libfuncs_close_library_test():
   mem.w16(exp_addr, trap_id | 0xa000)
   # add lib
   lf = LibFuncs(machine, alloc)
-  sl = lf.close_library(lib.get_addr(), run_sp=sp)
+  sl = lf.close_library(lib.get_addr(), segloader, run_sp=sp)
   assert seglist.get_baddr() == sl
   # cleanup
   lib.free()
   assert alloc.is_all_free()
+  assert segloader.shutdown() == 0
 
 
 def libnative_libfuncs_open_library_test():
