@@ -69,3 +69,31 @@ def loader_segload_ami_load_unload_test(buildlibnix, mem_alloc):
   assert info is None
   assert loader.shutdown() == 0
   assert alloc.is_all_free()
+
+
+def loader_segload_register(mem_alloc):
+  mem, alloc = mem_alloc
+  loader = SegmentLoader(alloc)
+  # my seglist
+  seglist = SegList.alloc(mem, [64])
+  baddr = seglist.get_baddr()
+  loader.register_seglist(baddr)
+  # unload registered seglist
+  assert loader.unload_seglist(baddr)
+  assert loader.shutdown() == 0
+  assert alloc.is_all_free()
+
+
+def loader_segload_unregister(mem_alloc):
+  mem, alloc = mem_alloc
+  loader = SegmentLoader(alloc)
+  # my seglist
+  seglist = SegList.alloc(mem, [64])
+  baddr = seglist.get_baddr()
+  loader.register_seglist(baddr)
+  loader.unregister_seglist(baddr)
+  # unload registered seglist
+  assert not loader.unload_seglist(baddr)
+  assert loader.shutdown() == 0
+  assert alloc.is_all_free()
+

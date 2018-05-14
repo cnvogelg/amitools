@@ -8,7 +8,7 @@ from .seglist import SegList
 
 
 class SegLoadInfo(object):
-  def __init__(self, seglist, bin_img, sys_file, ami_file=None):
+  def __init__(self, seglist, bin_img=None, sys_file=None, ami_file=None):
     self.seglist = seglist
     self.bin_img = bin_img
     self.sys_file = sys_file
@@ -60,6 +60,7 @@ class SegmentLoader(object):
       log_segload.error("unknown seglist at @%06x", seglist_baddr)
       return False
     info = self.infos[seglist_baddr]
+    log_segload.info("unload seglist: %s", info)
     del self.infos[seglist_baddr]
     info.seglist.free()
     return True
@@ -69,9 +70,23 @@ class SegmentLoader(object):
     if seglist_baddr in self.infos:
       return self.infos[seglist_baddr]
 
+  def register_seglist(self, baddr):
+    """register custom seglist"""
+    info = SegLoadInfo(SegList(self.alloc, baddr))
+    log_segload.info("register seglist: %s", info)
+    self.infos[baddr] = info
+
+  def unregister_seglist(self, baddr):
+    """remove custom seglist"""
+    info = self.infos[baddr]
+    log_segload.info("unregister seglist: %s", info)
+    del self.infos[baddr]
+
   def shutdown(self):
     """check orphan seglists on shutdown and return number of orphans"""
-    for info in self.infos:
+    log_segload.info("shutdown")
+    for baddr in self.infos:
+      info = self.infos[baddr]
       log_segload.warn("orphaned seglist: %s", info)
       # try to free list
       info.seglist.free()
