@@ -173,7 +173,7 @@ class ExecLibrary(LibImpl):
   def RemLibrary(self, ctx):
     lib_addr = ctx.cpu.r_reg(REG_A1)
     lf = LibFuncs(ctx.machine, ctx.alloc)
-    seglist = lf.rem_library(lib_addr)
+    seglist = lf.rem_library(lib_addr, ctx.seg_loader)
     log_exec.info("RemLibrary: lib=%06x -> seglist=%06x", lib_addr, seglist)
 
   def OpenLibrary(self, ctx):
