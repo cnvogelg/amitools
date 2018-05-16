@@ -242,7 +242,7 @@ class UnitStruct(AmigaStruct):
 class IORequestStruct(AmigaStruct):
   _format = [
     ('Message','io_Message'),
-    ('Device','io_Device'),
+    ('Device*','io_Device'),
     ('Unit','io_Unit'),
     ('UWORD','io_Command'),
     ('UBYTE','io_Flags'),
