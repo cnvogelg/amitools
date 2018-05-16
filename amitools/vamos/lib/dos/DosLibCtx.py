@@ -4,7 +4,7 @@ class DosLibCtx(LibCtx):
 
   def __init__(self, machine, alloc, seg_loader, path_mgr,
                run_command, start_sub_process):
-    LibCtx.__init__(self, machine.get_cpu(), machine.get_mem())
+    LibCtx.__init__(self, machine)
     self.alloc = alloc
     self.path_mgr = path_mgr
     self.seg_loader = seg_loader

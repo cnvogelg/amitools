@@ -4,15 +4,14 @@ import pytest
 
 from amitools.vamos.libcore import LibStubGen, LibCtx
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
-from amitools.vamos.machine import MockCPU, MockMemory
+from amitools.vamos.machine import MockMachine
 from amitools.vamos.libcore import LibProfile
 from amitools.fd import read_lib_fd
 
 
 def _create_ctx():
-  cpu = MockCPU()
-  mem = MockMemory()
-  return LibCtx(cpu, mem)
+  machine = MockMachine()
+  return LibCtx(machine)
 
 
 def _create_stub(do_profile=False, do_log=False):

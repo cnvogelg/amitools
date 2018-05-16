@@ -14,7 +14,7 @@ class VLibManager(object):
     if lib_reg is None:
       lib_reg = LibRegistry()
     if ctx_map is None:
-      ctx_map = LibCtxMap()
+      ctx_map = LibCtxMap(machine)
     self.machine = machine
     self.mem = machine.get_mem()
     self.alloc = alloc
@@ -43,14 +43,12 @@ class VLibManager(object):
   def add_ctx(self, name, ctx):
     self.ctx_map.add_ctx(name, ctx)
 
-  def bootstrap_exec(self, exec_info=None, exec_ctx=None,
+  def bootstrap_exec(self, exec_info=None,
                      do_profile=False, version=0, revision=0):
     """setup exec library"""
     if exec_info is None:
       date = datetime.date(day=7, month=7, year=2007)
       exec_info = LibInfo('exec.library', version, revision, date)
-    if exec_ctx:
-      self.ctx_map.add_ctx('exec.library', exec_ctx)
     # make sure its an exec info
     assert exec_info.get_name() == 'exec.library'
     # create vlib
@@ -166,6 +164,8 @@ class VLibManager(object):
         return None
     # create lib
     vlib = self.creator.create_lib(lib_info, ctx, impl, do_profile)
+    # store vlib in context
+    ctx.vlib = vlib
     return vlib
 
   def _add_vlib(self, vlib):

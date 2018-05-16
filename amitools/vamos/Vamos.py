@@ -92,20 +92,18 @@ class Vamos:
     self.seg_loader = SegmentLoader(self.alloc, self.path_mgr)
 
     # setup lib context
-    ctx_map = LibCtxMap()
+    ctx_map = LibCtxMap(self.machine)
     self.exec_ctx = ExecLibCtx(self.machine, self.alloc,
                                self.seg_loader, self.path_mgr)
     self.dos_ctx = DosLibCtx(self.machine, self.alloc,
                              self.seg_loader, self.path_mgr,
                              self.run_command, self.start_sub_process)
-    ctx_map.set_default_ctx(LibCtx(self.cpu, self.mem))
     ctx_map.add_ctx('exec.library', self.exec_ctx)
     ctx_map.add_ctx('dos.library', self.dos_ctx)
 
     # lib manager
     self.lib_reg = LibRegistry()
     self.lib_mgr = LibManager(self.label_mgr, self.lib_reg, ctx_map, cfg)
-    self.exec_ctx.set_lib_mgr(self.lib_mgr)
     # on shutdown trigger lib manager to shutdown libs
     def shutdown():
       self.lib_mgr.shutdown()

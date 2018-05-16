@@ -1,6 +1,7 @@
 import logging
 import pytest
 from amitools.vamos.Log import log_libmgr, log_exec
+from amitools.vamos.libcore import LibCtx
 from amitools.vamos.libmgr import LibManager
 from amitools.vamos.machine import Machine
 from amitools.vamos.mem import MemoryAlloc
@@ -24,7 +25,6 @@ def setup(path_mgr=None, cfg=None, profile_all=None):
   mem = machine.get_mem()
   cpu_type = machine.get_cpu_type()
   exec_ctx = ExecLibCtx(machine, alloc, segloader, path_mgr)
-  exec_ctx.set_lib_mgr(mgr)
   mgr.add_ctx('exec.library', exec_ctx)
   dos_ctx = DosLibCtx(machine, alloc, segloader, path_mgr, None, None)
   mgr.add_ctx('dos.library', dos_ctx)
@@ -41,6 +41,7 @@ def libmgr_mgr_bootstrap_shutdown_test():
   vmgr = mgr.vlib_mgr
   assert vmgr.get_vlib_by_name('exec.library') == exec_vlib
   assert vmgr.get_vlib_by_addr(exec_base) == exec_vlib
+  assert exec_vlib.get_ctx() == vmgr.ctx_map.get_ctx('exec.library')
   assert exec_lib.open_cnt == 1
   assert machine.get_mem().r32(4) == exec_base
   # we can't expunge exec
@@ -78,6 +79,7 @@ def libmgr_mgr_open_vlib_test():
   vmgr = mgr.vlib_mgr
   test_vlib = vmgr.get_vlib_by_addr(test_base)
   assert test_vlib
+  assert type(test_vlib.get_ctx()) == LibCtx
   assert vmgr.get_vlib_by_name('vamostest.library') == test_vlib
   impl = test_vlib.get_impl()
   assert impl

@@ -36,6 +36,7 @@ class LibManager():
 
     # my context: exec.library
     self.my_ctx = ctx_map.get_ctx('exec.library')
+    self.my_ctx.lib_mgr = self
 
   def lib_log(self, func, text, level=logging.INFO):
     """helper to create lib log messages"""
@@ -210,6 +211,7 @@ class LibManager():
     struct = lib_impl.get_struct_def()
     is_base = lib_impl.is_base_lib()
     lib_ctx = self.ctx_map.get_ctx(sane_name)
+    lib_ctx.lib_mgr = self
     lib = AmigaLibrary(sane_name, struct, lib_cfg, is_base, lib_impl, lib_ctx)
 
     # now we need an fd file to know about the structure of the lib

@@ -29,15 +29,16 @@ class LibManager(object):
 
   def add_ctx(self, name, ctx):
     """allow to add vlib contexts"""
+    ctx.lib_mgr = self
     self.vlib_mgr.add_ctx(name, ctx)
 
-  def bootstrap_exec(self, exec_info=None, exec_ctx=None, do_profile=None):
+  def bootstrap_exec(self, exec_info=None, do_profile=None):
     """setup exec vlib as first and essential lib"""
     lib_cfg = None
     if self.cfg:
       lib_cfg = self.cfg.get_lib_config("exec.library")
     do_profile = self._get_do_profile(lib_cfg, do_profile)
-    return self.vlib_mgr.bootstrap_exec(exec_info, exec_ctx, do_profile)
+    return self.vlib_mgr.bootstrap_exec(exec_info, do_profile)
 
   def shutdown(self, run_sp=None):
     """cleanup libs

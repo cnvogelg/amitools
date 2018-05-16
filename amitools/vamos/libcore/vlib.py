@@ -35,6 +35,9 @@ class VLib(object):
   def get_stub(self):
     return self.stub
 
+  def get_ctx(self):
+    return self.ctx
+
   def get_patcher(self):
     return self.neg_size
 

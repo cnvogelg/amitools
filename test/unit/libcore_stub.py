@@ -4,7 +4,7 @@ import pytest
 
 from amitools.vamos.libcore import LibStubGen, LibCtx
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
-from amitools.vamos.machine import MockCPU, MockMemory
+from amitools.vamos.machine import MockMachine
 from amitools.vamos.libcore import LibProfile
 from amitools.fd import read_lib_fd
 
@@ -52,9 +52,8 @@ def _check_log_fake(caplog):
 
 
 def _create_ctx():
-  cpu = MockCPU()
-  mem = MockMemory()
-  return LibCtx(cpu, mem)
+  machine = MockMachine()
+  return LibCtx(machine)
 
 
 def libcore_stub_gen_base_test():

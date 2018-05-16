@@ -5,9 +5,8 @@ from amitools.fd import read_lib_fd
 
 
 def _create_ctx():
-  cpu = MockCPU()
-  mem = MockMemory()
-  return LibCtx(cpu, mem)
+  machine = MockMachine()
+  return LibCtx(machine)
 
 
 def libcore_patch_multi_trap_test(capsys):
