@@ -201,6 +201,9 @@ class Machine(object):
         log_machine.info("%06x: %s", pc, txt)
     self.set_instr_hook(instr_hook)
 
+  def hide_instr(self):
+    self.set_instr_hook(None)
+
   def set_cpu_mem_trace_hook(self, func):
     self.mem.set_trace_mode(1)
     self.mem.set_trace_func(func)
@@ -322,7 +325,8 @@ class Machine(object):
 
     # setup regs
     if set_regs:
-      log_machine.info("run#%d: set_regs=%s", nesting, set_regs)
+      set_regs_txt = self._print_regs(set_regs)
+      log_machine.info("run#%d: set_regs=%s", nesting, set_regs_txt)
       for reg in set_regs:
         val = set_regs[reg]
         cpu.w_reg(reg, val)
@@ -350,7 +354,8 @@ class Machine(object):
       for reg in get_regs:
         val = cpu.r_reg(reg)
         regs[reg] = val
-      log_machine.info("run #%d: get_regs=%s", nesting, regs)
+      regs_text = self._print_regs(regs)
+      log_machine.info("run #%d: get_regs=%s", nesting, regs_text)
       run_state.regs = regs
 
     # restore cpu context
@@ -373,3 +378,13 @@ class Machine(object):
         raise NestedCPURunError(pc, run_state.error)
 
     return run_state
+
+  def _print_regs(self, regs):
+    res = {}
+    for r in regs:
+      v = regs[r]
+      key = reg_to_str[r]
+      val = "%06x" % v
+      res[key] = val
+    return res
+
