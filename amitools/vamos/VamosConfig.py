@@ -144,7 +144,7 @@ class VamosConfig(ConfigParser.SafeConfigParser):
     # default library config
     # make sure exec and dos is taken from vamos
     self.libs = {
-      '*.library' : VamosLibConfig('*.library', 'auto', 40, False),
+      '*.library' : VamosLibConfig('*.library', 'auto', 0, False),
       'exec.library' : VamosLibConfig('exec.library', 'vamos', 40, False),
       'dos.library' : VamosLibConfig('dos.library', 'vamos', 40, False),
     }
@@ -155,6 +155,7 @@ class VamosConfig(ConfigParser.SafeConfigParser):
       'verbose' : (int, 0),
       'quiet' : (bool, False),
       'benchmark' : (bool, False),
+      'profile' : (bool, False),
       'log_file' : (str, None),
       # low-level tracing
       'instr_trace' : (bool, False),
