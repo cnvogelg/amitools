@@ -32,6 +32,14 @@ class LibManager(object):
     ctx.lib_mgr = self
     self.vlib_mgr.add_ctx(name, ctx)
 
+  def get_vlib_by_addr(self, addr):
+    """return associated vlib for a base lib address"""
+    return self.vlib_mgr.get_vlib_by_addr(addr)
+
+  def get_vlib_by_name(self, name):
+    """return associated vlib for a name"""
+    return self.vlib_mgr.get_vlib_by_name(name)
+
   def bootstrap_exec(self, exec_info=None, do_profile=None):
     """setup exec vlib as first and essential lib"""
     lib_cfg = None
@@ -45,21 +53,26 @@ class LibManager(object):
 
     try to expunge all libs and report still open ones
     """
-    vleft = self.vlib_mgr.shutdown()
-    if vleft > 0:
-      log_libmgr.warn("shutdown: can't expunge %d vamos libs/devs!", vleft)
+    log_libmgr.info("+shutdown")
     aleft = self.alib_mgr.shutdown(run_sp)
     if aleft > 0:
       log_libmgr.warn("shutdown: can't expunge %d amiga libs/devs!", aleft)
-    return vleft + aleft
+    vleft = self.vlib_mgr.shutdown()
+    if vleft > 0:
+      log_libmgr.warn("shutdown: can't expunge %d vamos libs/devs!", vleft)
+    left = vleft + aleft
+    log_libmgr.info("-shutdwon: aleft=%d, vleft=%d", aleft, vleft)
+    return left
 
   def expunge_libs(self, run_sp=None):
     """expunge all unused libs
 
        return number of libs _not_ expunged
     """
-    vleft = self.vlib_mgr.expunge_libs()
+    log_libmgr.info("+expunge_libs")
     aleft = self.alib_mgr.expunge_libs(run_sp)
+    vleft = self.vlib_mgr.expunge_libs()
+    log_libmgr.info("-expunge_libs: aleft=%d, vleft=%d", aleft, vleft)
     return vleft + aleft
 
   def expunge_devs(self, run_sp=None):
@@ -67,7 +80,10 @@ class LibManager(object):
 
        return number of libs _not_ expunged
     """
+    log_libmgr.info("+expunge_devs")
+    aleft = 0 # TBD
     vleft = self.vlib_mgr.expunge_devs()
+    log_libmgr.info("-expunge_devs: aleft=%d, vleft=%d", aleft, vleft)
     return vleft
 
   def expunge_lib(self, addr, run_sp=None):
@@ -75,6 +91,7 @@ class LibManager(object):
 
        return True if lib was expunged
     """
+    log_libmgr.info("expunge_lib: @%06x", addr)
     vlib = self.vlib_mgr.get_vlib_by_addr(addr)
     if vlib:
       return self.vlib_mgr.expunge_lib(vlib)
@@ -89,6 +106,7 @@ class LibManager(object):
 
        return True if lib was expunged, too
     """
+    log_libmgr.info("close_lib: @%06x", addr)
     vlib = self.vlib_mgr.get_vlib_by_addr(addr)
     if vlib:
       return self.vlib_mgr.close_lib(vlib)
