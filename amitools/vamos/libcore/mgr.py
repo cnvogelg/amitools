@@ -1,6 +1,6 @@
 import datetime
 import logging
-from amitools.vamos.Log import log_lib
+from amitools.vamos.Log import log_lib, log_libmgr
 from amitools.vamos.libcore import LibCreator, LibInfo, LibRegistry, LibCtxMap
 from amitools.vamos.atypes import ExecLibrary
 
@@ -82,11 +82,14 @@ class VLibManager(object):
 
     try to expunge all libs and report still open ones
     """
+    log_libmgr.info("[vamos] +shutdown")
     # dec exec's open cnt
     self.exec_lib.lib_node.dec_open_cnt()
     # now expunge all libs
     left_libs = self.expunge_libs()
     left_devs = self.expunge_devs()
+    log_libmgr.info("[vamos] +shutdown: left libs=%d, devs=%d",
+                    left_libs, left_devs)
     return left_libs + left_devs
 
   def expunge_libs(self):
