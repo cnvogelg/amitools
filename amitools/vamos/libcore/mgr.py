@@ -85,15 +85,27 @@ class VLibManager(object):
     # dec exec's open cnt
     self.exec_lib.lib_node.dec_open_cnt()
     # now expunge all libs
-    return self.expunge_libs()
+    left_libs = self.expunge_libs()
+    left_devs = self.expunge_devs()
+    return left_libs + left_devs
 
   def expunge_libs(self):
     """expunge all unused vlibs
 
        return number of libs _not_ expunged
     """
+    return self._expunge_list(self.exec_lib.lib_list)
+
+  def expunge_devs(self):
+    """expunge all unused vlibs
+
+       return number of libs _not_ expunged
+    """
+    return self._expunge_list(self.exec_lib.device_list)
+
+  def _expunge_list(self, node_list):
     left_libs = 0
-    for node in self.exec_lib.lib_list:
+    for node in node_list:
       lib_base = node.get_addr()
       # is it a vlib?
       if lib_base in self.addr_vlib:
@@ -136,7 +148,7 @@ class VLibManager(object):
   def open_lib(self, lib_info, do_profile=False, fake=False):
     vlib = self.get_vlib_by_name(name)
     if not vlib:
-      vlib = self.make_lib(lib_info, do_profile, fake)
+      vlib = self.make_lib(lib_info, do_profile, fake, is_dev)
     if vlib:
       vlib.open()
     return vlib
@@ -176,7 +188,10 @@ class VLibManager(object):
     self.name_vlib[name] = vlib
     # add lib to exec lib list
     lib = vlib.get_library()
-    self.exec_lib.lib_list.enqueue(lib.node)
+    if vlib.is_device():
+      self.exec_lib.device_list.enqueue(lib.node)
+    else:
+      self.exec_lib.lib_list.enqueue(lib.node)
 
   def _rem_vlib(self, vlib):
     addr = vlib.get_addr()

@@ -154,3 +154,44 @@ def libcore_mgr_open_test():
   left = mgr.shutdown()
   assert left == 0
   assert alloc.is_all_free()
+
+
+def libcore_mgr_make_open_dev_test():
+  machine, alloc, mgr = setup()
+  exec_vlib = mgr.bootstrap_exec()
+  # make vamos test lib
+  test_vlib = mgr.make_lib_name('vamostestdev.device')
+  test_base = test_vlib.get_addr()
+  impl = test_vlib.get_impl()
+  lib = test_vlib.get_library()
+  assert test_vlib.is_device()
+  assert lib.version == impl.get_version()
+  assert impl.get_cnt() == 0
+  assert mgr.open_lib_name('vamostestdev.device') == test_vlib
+  assert impl.get_cnt() == 1
+  assert not mgr.expunge_lib(test_vlib)
+  assert mgr.close_lib(test_vlib)
+  assert impl.get_cnt() is None
+  # shutdown
+  left = mgr.shutdown()
+  assert left == 0
+  assert alloc.is_all_free()
+
+
+def libcore_mgr_open_dev_test():
+  machine, alloc, mgr = setup()
+  exec_vlib = mgr.bootstrap_exec()
+  # make vamos test lib
+  test_vlib = mgr.open_lib_name('vamostestdev.device')
+  impl = test_vlib.get_impl()
+  lib = test_vlib.get_library()
+  assert test_vlib.is_device()
+  assert lib.version == impl.get_version()
+  assert impl.get_cnt() == 1
+  assert mgr.close_lib(test_vlib)
+  assert impl.get_cnt() is None
+  # shutdown
+  left = mgr.shutdown()
+  assert left == 0
+  assert alloc.is_all_free()
+

@@ -5,7 +5,7 @@ class VLib(object):
   """
 
   def __init__(self, library, info, struct, fd, impl, stub, ctx, patcher,
-               profile=None):
+               profile=None, is_dev=False):
     self.library = library
     self.info = info
     self.struct = struct
@@ -15,6 +15,7 @@ class VLib(object):
     self.ctx = ctx
     self.patcher = patcher
     self.profile = profile
+    self.is_dev = is_dev
     self._setup()
 
   def get_library(self):
@@ -43,6 +44,9 @@ class VLib(object):
 
   def get_profile(self):
     return self.profile
+
+  def is_device(self):
+    return self.is_dev
 
   def get_name(self):
     return self.info.get_name()

@@ -30,6 +30,7 @@ class ExecLibrary(LibImpl):
     self.exec_lib = ExecLibraryType(ctx.mem, base_addr)
     # init lib list
     self.exec_lib.lib_list.new_list(NodeType.NT_LIBRARY)
+    self.exec_lib.device_list.new_list(NodeType.NT_DEVICE)
     # set some system contants
     if ctx.cpu_type == '68030':
       self.exec_lib.attn_flags = 7

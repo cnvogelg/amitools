@@ -47,10 +47,10 @@ class LibManager(object):
     """
     vleft = self.vlib_mgr.shutdown()
     if vleft > 0:
-      log_libmgr.warn("shutdown: can't expunge %d vamos libs!", vleft)
+      log_libmgr.warn("shutdown: can't expunge %d vamos libs/devs!", vleft)
     aleft = self.alib_mgr.shutdown(run_sp)
     if aleft > 0:
-      log_libmgr.warn("shutdown: can't expunge %d amiga libs!", aleft)
+      log_libmgr.warn("shutdown: can't expunge %d amiga libs/devs!", aleft)
     return vleft + aleft
 
   def expunge_libs(self, run_sp=None):
@@ -61,6 +61,14 @@ class LibManager(object):
     vleft = self.vlib_mgr.expunge_libs()
     aleft = self.alib_mgr.expunge_libs(run_sp)
     return vleft + aleft
+
+  def expunge_devs(self, run_sp=None):
+    """expunge all unused devs
+
+       return number of libs _not_ expunged
+    """
+    vleft = self.vlib_mgr.expunge_devs()
+    return vleft
 
   def expunge_lib(self, addr, run_sp=None):
     """expunge a library given by base address
@@ -185,7 +193,7 @@ class LibManager(object):
     else:
       lib_cfg = None
       mode = "auto"
-      version = 0 # take lib version
+      version = 0  # take lib version
     do_profile = self._get_do_profile(lib_cfg, force_do_profile)
     if force_mode:
       mode = force_mode

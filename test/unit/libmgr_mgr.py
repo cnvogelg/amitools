@@ -94,6 +94,30 @@ def libmgr_mgr_open_vlib_test():
   assert alloc.is_all_free()
 
 
+def libmgr_mgr_open_vlib_dev_test():
+  machine, alloc, mgr, sp = setup()
+  exec_vlib = mgr.bootstrap_exec()
+  # make vamos test lib
+  test_base = mgr.open_lib('vamostestdev.device')
+  assert test_base > 0
+  vmgr = mgr.vlib_mgr
+  test_vlib = vmgr.get_vlib_by_addr(test_base)
+  assert test_vlib
+  assert type(test_vlib.get_ctx()) == LibCtx
+  assert vmgr.get_vlib_by_name('vamostestdev.device') == test_vlib
+  impl = test_vlib.get_impl()
+  assert impl
+  assert impl.get_cnt() == 1
+  lib = test_vlib.get_library()
+  assert lib.version == impl.get_version()
+  mgr.close_lib(test_base)
+  assert impl.get_cnt() is None
+  # shutdown
+  left = mgr.shutdown()
+  assert left == 0
+  assert alloc.is_all_free()
+
+
 def libmgr_mgr_open_vlib_fake_test():
   machine, alloc, mgr, sp = setup()
   exec_vlib = mgr.bootstrap_exec()

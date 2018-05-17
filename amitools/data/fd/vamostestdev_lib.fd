@@ -1,0 +1,5 @@
+##base _VamosTestDevBase
+##bias 42
+##public
+Add(a,b)(a0/a1)
+##end

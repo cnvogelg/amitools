@@ -1,5 +1,5 @@
 from amitools.vamos.astructs import LibraryStruct
-from amitools.vamos.atypes import Library
+from amitools.vamos.atypes import Library, NodeType
 from amitools.fd import read_lib_fd
 from .vlib import VLib
 from .stub import LibStubGen
@@ -21,7 +21,11 @@ class LibCreator(object):
     self.profile_all = profile_all
     self.stub_gen = LibStubGen(log_missing=log_missing, log_valid=log_valid)
 
-  def _create_library(self, info):
+  def _create_library(self, info, is_dev):
+    if is_dev:
+      ltype = NodeType.NT_DEVICE
+    else:
+      ltype = NodeType.NT_LIBRARY
     name = info.get_name()
     id_str = info.get_id_string()
     neg_size = info.get_neg_size()
@@ -29,13 +33,20 @@ class LibCreator(object):
     library = Library.alloc(self.alloc, name, id_str, neg_size, pos_size)
     version = info.get_version()
     revision = info.get_revision()
-    library.setup(version=version, revision=revision)
+    library.setup(version=version, revision=revision, type=ltype)
     return library
 
   def create_lib(self, info, ctx, impl=None, do_profile=False):
     name = info.get_name()
+    if name.endswith('.device'):
+      is_dev = True
+    elif name.endswith('.library'):
+      is_dev = False
+    else:
+      raise ValueError("create_lib: %s is neither lib nor dev!" % name)
     # get fd
     fd = read_lib_fd(name, self.fd_dir)
+    assert fd.is_device == is_dev
     # profile?
     if do_profile or self.profile_all:
       profile = LibProfile(name, fd)
@@ -54,7 +65,7 @@ class LibCreator(object):
     if info.neg_size == 0:
       info.neg_size = fd.get_neg_size()
     # allocate and init lib
-    library = self._create_library(info)
+    library = self._create_library(info, is_dev)
     addr = library.get_addr()
     # patcher
     patcher = LibPatcherMultiTrap(self.alloc.mem, self.traps, stub)
@@ -62,5 +73,6 @@ class LibCreator(object):
     # fix lib sum
     library.update_sum()
     # create vamos lib and combine all pieces
-    vlib = VLib(library, info, struct, fd, impl, stub, ctx, patcher, profile)
+    vlib = VLib(library, info, struct, fd, impl,
+                stub, ctx, patcher, profile, is_dev)
     return vlib
