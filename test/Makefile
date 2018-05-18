@@ -116,7 +116,13 @@ LIBS_DBG += $(LIBS_SC_DBG)
 
 # --- rules ---
 
-all: $(PROGS) $(PROGS_DBG) $(LIBS) $(LIBS_DBG)
+all: check $(PROGS) $(PROGS_DBG) $(LIBS) $(LIBS_DBG)
+
+check:
+	@if [ ! -d volumes/sc ]; then \
+		echo "directory 'volumes/sc' is missing!" ; \
+		exit 1 ; \
+	fi
 
 opt: $(PROGS)
 debug: $(PROGS_DBG)

@@ -1,5 +1,5 @@
 [volumes]
-sc=${SASC_INSTALL_DIR}
+sc=volumes/sc
 base=.
 
 [assigns]
