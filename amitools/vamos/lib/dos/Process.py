@@ -108,7 +108,7 @@ class Process:
     self.bin_file     = ami_bin_file
     sys_path = self.ctx.path_mgr.ami_command_to_sys_path(lock, ami_bin_file)
     if not sys_path or not os.path.exists(sys_path):
-      log_proc.error("failed loading binary: %s", self.ctx.seg_loader.error)
+      log_proc.error("failed loading binary: %s -> %s", ami_bin_file, sys_path)
       return False
     self.bin_seg_list = self.ctx.seg_loader.load_sys_seglist(sys_path)
     info = self.ctx.seg_loader.get_info(self.bin_seg_list)

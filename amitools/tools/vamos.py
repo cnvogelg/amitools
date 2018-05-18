@@ -180,7 +180,9 @@ def main():
 
   # combine to vamos instance
   vamos = Vamos(machine, cfg)
-  vamos.init(binary, arg_str, stack_size, args.shell, cwd)
+  if not vamos.init(binary, arg_str, stack_size, args.shell, cwd):
+    log_main.error("vamos init failed")
+    return 1
 
   # ------ main loop ------
 
