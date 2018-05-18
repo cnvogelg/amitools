@@ -3,7 +3,6 @@ import pytest
 
 
 def lib_testnix_test(vamos, buildlibnix):
-  pytest.skip("needs MakeLibrary()")
   lib_file = buildlibnix.make_lib("testnix")
   libs_dir = os.path.basename(os.path.dirname(lib_file))
   vargs = ["-alibs:bin:" + libs_dir]

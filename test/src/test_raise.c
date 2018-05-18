@@ -12,7 +12,7 @@ int main(int argc, char *argv[])
     error = argv[1];
   }
 
-  if ((VamosTestBase = (struct VamosTestBase *)OpenLibrary("vamostest.library", 37)))
+  if ((VamosTestBase = (struct VamosTestBase *)OpenLibrary("vamostest.library", 23)))
   {
     RaiseError((STRPTR)error);
     CloseLibrary((struct Library *)VamosTestBase);

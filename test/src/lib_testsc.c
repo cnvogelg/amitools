@@ -8,7 +8,7 @@ int main(int argc, char *argv[])
   ULONG a = 21;
   ULONG b = 23;
 
-  TestNixBase = OpenLibrary("testsc.library", 37);
+  TestNixBase = OpenLibrary("testsc.library", 1);
   if(TestNixBase != NULL)
   {
     ULONG c = Add(a, b);

@@ -6,7 +6,7 @@ struct VamosTestBase *VamosTestBase;
 
 int main(int argc, char *argv[])
 {
-  if ((VamosTestBase = (struct VamosTestBase *)OpenLibrary("vamostest.library", 37)))
+  if ((VamosTestBase = (struct VamosTestBase *)OpenLibrary("vamostest.library", 23)))
   {
     PrintHello();
     CloseLibrary((struct Library *)VamosTestBase);
