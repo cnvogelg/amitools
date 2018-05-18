@@ -1,6 +1,41 @@
+import struct
 from amitools.vamos.machine.regs import *
-from amitools.vamos.Trampoline import Trampoline
 from amitools.vamos.lib.dos.Printf import *
+
+# setup loop code fragment:
+# +0000: 243c <len-1.l>       move.l #<len-1>,d2
+# +0006: 49f9 <fmtstr_addr>   lea    fmtstr_addr,a4
+# loop:
+# +000c: 101c                 move.b (a4)+,d0
+# +000e: 4eb9 <putproc>       jsr    putproc
+# +0014: 51ca fff6            dbra   d2,loop
+# +0018: 4e75                 rts
+# =001a
+
+code_hex = (
+  0x243c, 0, 0,
+  0x49f9, 0, 0,
+  0x101c,
+  0x4eb9, 0, 0,
+  0x51ca, 0xfff6,
+  0x4e75
+)
+code_bin = "".join(map(lambda x:struct.pack(">H",x), code_hex))
+
+def _setup_fragment(ctx, fmt_str, put_proc):
+  fmt_len = len(fmt_str)
+  code_len = len(code_bin)
+  assert code_len == 0x1a
+  size = fmt_len + code_len
+  mem_obj = ctx.alloc.alloc_memory("RawDoFmtFrag", size)
+  addr = mem_obj.addr
+  fmt_addr = addr + 0x1a
+  ctx.mem.w_block(addr, code_bin)
+  ctx.mem.w32(addr+2, fmt_len-1)
+  ctx.mem.w32(addr+8, fmt_addr)
+  ctx.mem.w32(addr+16, put_proc)
+  ctx.mem.w_cstr(addr+0x1a, fmt_str)
+  return mem_obj
 
 def raw_do_fmt(ctx, fmtString, dataStream, putProc, putData):
   fmt        = ctx.mem.r_cstr(fmtString)
@@ -22,21 +57,12 @@ def raw_do_fmt(ctx, fmtString, dataStream, putProc, putData):
   if known:
     ctx.mem.w_cstr(putData,fmtstr)
   else:
-    # This is a recursive trampoline that writes the formatted data through
-    # the put-proc. Unfortunately, this is pretty convoluted.
-    def _make_trampoline(fmtstr,olda3,newa3,ctx):
-      if len(fmtstr) > 0:
-        tr = Trampoline(ctx,"RawDoFmt")
-        tr.set_dx_l(0,ord(fmtstr[0:1]))
-        tr.set_ax_l(2,putProc)
-        tr.set_ax_l(3,newa3)
-        tr.jsr(putProc)
-        def _done_func():
-          a3 = ctx.cpu.r_reg(REG_A3)
-          _make_trampoline(fmtstr[1:],olda3,a3,ctx)
-        tr.final_rts(_done_func)
-        tr.done()
-      else:
-        ctx.cpu.w_reg(REG_A3,olda3)
-    _make_trampoline(fmtstr,putData,putData,ctx)
+    mem_obj = _setup_fragment(ctx, fmtstr, putProc)
+    set_regs = {
+      REG_A2 : putProc,
+      REG_A3 : putData
+    }
+    addr = mem_obj.addr
+    ctx.machine.run(addr, set_regs=set_regs, name="RawDoFmt")
+    ctx.alloc.free_memory(mem_obj)
   return dataStream, fmt, resultstr, known
