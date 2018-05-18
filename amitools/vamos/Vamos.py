@@ -1,9 +1,9 @@
 from .label import LabelManager, LabelRange
 from .mem import MemoryAlloc
 from .astructs import AccessStruct
-from LibManager import LibManager
 from .libcore import LibRegistry, LibCtxMap, LibCtx
 from .loader import SegmentLoader
+from .libmgr import LibManager
 from path.PathManager import PathManager
 from Trampoline import Trampoline
 from HardwareAccess import HardwareAccess
@@ -91,23 +91,16 @@ class Vamos:
     # create segment loader
     self.seg_loader = SegmentLoader(self.alloc, self.path_mgr)
 
-    # setup lib context
-    ctx_map = LibCtxMap(self.machine)
+    # setup lib manager
     self.exec_ctx = ExecLibCtx(self.machine, self.alloc,
                                self.seg_loader, self.path_mgr)
     self.dos_ctx = DosLibCtx(self.machine, self.alloc,
                              self.seg_loader, self.path_mgr,
                              self.run_command, self.start_sub_process)
-    ctx_map.add_ctx('exec.library', self.exec_ctx)
-    ctx_map.add_ctx('dos.library', self.dos_ctx)
-
-    # lib manager
-    self.lib_reg = LibRegistry()
-    self.lib_mgr = LibManager(self.label_mgr, self.lib_reg, ctx_map, cfg)
-    # on shutdown trigger lib manager to shutdown libs
-    def shutdown():
-      self.lib_mgr.shutdown()
-    self.machine.set_shutdown_hook(shutdown)
+    self.lib_mgr = LibManager(self.machine, self.alloc, self.seg_loader, self.cfg)
+    self.lib_mgr.add_ctx('exec.library', self.exec_ctx)
+    self.lib_mgr.add_ctx('dos.library', self.dos_ctx)
+    self.lib_mgr.bootstrap_exec()
 
     # no current process right now
     self.process = None
@@ -121,6 +114,9 @@ class Vamos:
   def cleanup(self, ok):
     self.cleanup_main_proc()
     self.close_base_libs()
+    # shutdown of libmgr needs temp stack
+    sp = self.machine.get_ram_begin() - 4
+    self.lib_mgr.shutdown(run_sp=sp)
     if ok:
         self.alloc.dump_orphans()
 
@@ -329,12 +325,14 @@ class Vamos:
     log_main.info("open_base_libs")
     # open exec lib
     self.exec_addr = self.lib_mgr.open_lib('exec.library', 0)
-    self.exec_lib = self.lib_mgr.get_lib_impl(self.exec_addr)
+    exec_vlib = self.lib_mgr.get_vlib_by_addr(self.exec_addr)
+    self.exec_lib = exec_vlib.get_impl()
     # link exec to dos
     self.dos_ctx.set_exec_lib(self.exec_lib)
     # open dos lib
     self.dos_addr = self.lib_mgr.open_lib('dos.library', 0)
-    self.dos_lib = self.lib_mgr.get_lib_impl(self.dos_addr)
+    dos_vlib = self.lib_mgr.get_vlib_by_addr(self.dos_addr)
+    self.dos_lib = dos_vlib.get_impl()
     self.dos_ctx.set_dos_lib(self.dos_lib)
     # set exec base @4
     self.machine.set_zero_mem(0, self.exec_addr)

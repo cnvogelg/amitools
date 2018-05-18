@@ -384,7 +384,8 @@ class ExecLibrary(LibImpl):
     io       = AccessStruct(ctx.mem, IORequestStruct, io_addr)
     flags    = ctx.cpu.r_reg(REG_D1)
     name     = ctx.mem.r_cstr(name_ptr)
-    addr     = self.lib_mgr.open_dev(name, unit, flags, io)
+    addr     = self.lib_mgr.open_lib(name)
+    io.w_s("io_Device", addr)
     if addr == 0:
       log_exec.info("OpenDevice: '%s' unit %d flags %d -> NULL", name, unit, flags)
       return -1
@@ -399,7 +400,7 @@ class ExecLibrary(LibImpl):
       dev_addr = io.r_s("io_Device")
       if dev_addr != 0:
         log_exec.info("CloseDevice: %06x", dev_addr)
-        self.lib_mgr.close_dev(dev_addr)
+        self.lib_mgr.close_lib(dev_addr)
         io.w_s("io_Device", 0)
 
   def WaitPort(self, ctx):
