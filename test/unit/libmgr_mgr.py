@@ -181,13 +181,13 @@ def open_alib(lib_file, lib_name, **kw_args):
   lib_base = mgr.open_lib(lib_name, run_sp=h.sp, **kw_args)
   assert lib_base > 0
   amgr = mgr.alib_mgr
-  assert amgr.is_lib_addr(lib_base)
+  assert amgr.is_base_addr(lib_base)
   lib_info = amgr.get_lib_info_for_name(lib_name)
   assert lib_info
   assert lib_info.is_base_addr(lib_base)
   # close lib
   seglist = mgr.close_lib(lib_base, run_sp=h.sp)
-  assert not amgr.is_lib_addr(lib_base)
+  assert not amgr.is_base_addr(lib_base)
   assert seglist == 0
   lib_info = amgr.get_lib_info_for_name(lib_name)
   assert lib_info
@@ -196,7 +196,7 @@ def open_alib(lib_file, lib_name, **kw_args):
   load_addr = lib_info.get_load_addr()
   seglist = mgr.expunge_lib(load_addr, run_sp=h.sp)
   assert seglist > 0
-  assert not amgr.is_lib_addr(lib_base)
+  assert not amgr.is_load_addr(lib_base)
   lib_info = amgr.get_lib_info_for_name(lib_name)
   assert not lib_info
   # shutdown

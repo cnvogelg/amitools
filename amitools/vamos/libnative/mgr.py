@@ -43,6 +43,9 @@ class ALibInfo(object):
   def get_num_base_addrs(self):
     return len(self.base_addrs)
 
+  def is_load_addr(self, addr):
+    return addr == self.load_addr
+
   def is_base_addr(self, addr):
     for base_addr in self.base_addrs:
       if base_addr == addr:
@@ -59,16 +62,21 @@ class ALibManager(object):
     # state
     self.lib_infos = []
 
-  def is_lib_addr(self, addr, with_load_addr=False):
+  def is_base_addr(self, addr):
     """check if a given addr is the lib base of a native lib
-
-       includes both original base addr and mult instance bases"""
+       return info if found or None
+    """
     for info in self.lib_infos:
       if info.is_base_addr(addr):
-        return True
-      if with_load_addr and addr == info.get_load_addr():
-        return True
-    return False
+        return info
+
+  def is_load_addr(self, addr):
+    """check if a given addr is the lib load addr
+       return info if found or None
+    """
+    for info in self.lib_infos:
+      if info.is_load_addr(addr):
+        return info
 
   def get_lib_info_for_name(self, name):
     """return the (original loaded) base addr of lib given by name"""
@@ -93,22 +101,24 @@ class ALibManager(object):
     log_libmgr.info("[native] -expunge_libs: %d left", left_libs)
     return left_libs
 
-  def expunge_lib(self, base_addr, run_sp=None):
-    log_libmgr.info("[native] +expunge_lib: base=@%06x", base_addr)
-    if not self.is_lib_addr(base_addr, True):
-      raise ValueError("expunge_lib: invalid lib_base=%06x" % base_addr)
-    seglist = self.funcs.rem_library(base_addr, self.segloader, run_sp)
-    info = self._rem_info(base_addr, seglist)
+  def expunge_lib(self, load_addr, run_sp=None):
+    log_libmgr.info("[native] +expunge_lib: load=@%06x", load_addr)
+    info = self.is_load_addr(load_addr)
+    if not info:
+      raise ValueError("expunge_lib: invalid lib_load=%06x" % load_addr)
+    seglist = self.funcs.rem_library(load_addr, self.segloader, run_sp)
+    self._rem_info(load_addr, info, seglist, False)
     log_libmgr.info("[native] -expunge_lib: seglist=%06x, info=%s",
                     seglist, info)
     return seglist
 
   def close_lib(self, base_addr, run_sp=None):
     log_libmgr.info("[native] +close_lib: base=@%06x", base_addr)
-    if not self.is_lib_addr(base_addr):
+    info = self.is_base_addr(base_addr)
+    if not info:
       raise ValueError("close_lib: invalid lib_base=%06x" % base_addr)
     seglist = self.funcs.close_library(base_addr, self.segloader, run_sp)
-    info = self._rem_info(base_addr, seglist)
+    self._rem_info(base_addr, info, seglist, True)
     log_libmgr.info("[native] -close_lib: seglist=%06x, info=%s",
                     seglist, info)
     return seglist
@@ -162,15 +172,12 @@ class ALibManager(object):
     self.lib_infos.append(lib_info)
     return lib_info
 
-  def _rem_info(self, base_addr, seglist_baddr):
-    for info in self.lib_infos:
-      # remvoe base addr
-      if info.is_base_addr(base_addr):
-        info.del_base_addr(base_addr)
-      # if seglist is given remove info, too
-      if seglist_baddr > 0:
-        assert info.get_num_base_addrs() == 0
-        assert info.get_seglist_baddr() == seglist_baddr
-        self.lib_infos.remove(info)
-      return info
-    raise RuntimeError("invalid base_addr @%06x for infos" % base_addr)
+  def _rem_info(self, addr, info, seglist_baddr, is_base):
+    # remove base addr
+    if info.is_base_addr(addr):
+      info.del_base_addr(addr)
+    # cleanup seglist
+    if seglist_baddr > 0:
+      assert info.get_num_base_addrs() == 0
+      assert info.get_seglist_baddr() == seglist_baddr
+      self.lib_infos.remove(info)

@@ -95,7 +95,7 @@ class LibManager(object):
     vlib = self.vlib_mgr.get_vlib_by_addr(addr)
     if vlib:
       return self.vlib_mgr.expunge_lib(vlib)
-    elif self.alib_mgr.is_lib_addr(addr, True):
+    elif self.alib_mgr.is_load_addr(addr):
       seglist = self.alib_mgr.expunge_lib(addr, run_sp)
       return seglist != 0
     else:
@@ -110,7 +110,7 @@ class LibManager(object):
     vlib = self.vlib_mgr.get_vlib_by_addr(addr)
     if vlib:
       return self.vlib_mgr.close_lib(vlib)
-    elif self.alib_mgr.is_lib_addr(addr):
+    elif self.alib_mgr.is_base_addr(addr):
       seglist = self.alib_mgr.close_lib(addr, run_sp)
       return seglist != 0
     else:
