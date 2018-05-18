@@ -174,11 +174,15 @@ class ALibHelper(object):
     assert self.alloc.is_all_free()
 
 
-def open_alib(lib_file, lib_name, **kw_args):
+def open_alib(lib_file, lib_name, ok=True, **kw_args):
   h = ALibHelper(lib_file, lib_name)
   mgr = h.mgr
   # open_lib
   lib_base = mgr.open_lib(lib_name, run_sp=h.sp, **kw_args)
+  if not ok:
+    assert lib_base == 0
+    h.shutdown()
+    return
   assert lib_base > 0
   amgr = mgr.alib_mgr
   assert amgr.is_base_addr(lib_base)
@@ -213,6 +217,18 @@ def libmgr_mgr_open_alib_libsc_test(buildlibsc):
   lib_file = buildlibsc.make_lib("testsc")
   lib_name = "testsc.library"
   open_alib(lib_file, lib_name)
+
+
+def libmgr_mgr_open_alib_libnix_ver_fail_test(buildlibnix):
+  lib_file = buildlibnix.make_lib('testnix')
+  lib_name = "testnix.library"
+  open_alib(lib_file, lib_name, ok=False, open_ver=99)
+
+
+def libmgr_mgr_open_alib_libsc_ver_fail_test(buildlibsc):
+  lib_file = buildlibsc.make_lib("testsc")
+  lib_name = "testsc.library"
+  open_alib(lib_file, lib_name, ok=False, open_ver=99)
 
 
 def libmgr_mgr_open_alib_libnix_mode_native_test(buildlibnix):

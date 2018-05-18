@@ -155,6 +155,7 @@ class LibManager(object):
 
     # got a lib? check version
     if addr > 0:
+      save_addr = addr
       if open_ver > 0:
         addr = self._check_version(full_name, addr, open_ver)
       # lib is too old: close again
@@ -162,7 +163,7 @@ class LibManager(object):
         if vlib:
           self.vlib_mgr.close_lib(vlib)
         else:
-          self.alib_mgr.close_lib(addr)
+          self.alib_mgr.close_lib(save_addr, run_sp=run_sp)
     # result lib base
     return addr
 
