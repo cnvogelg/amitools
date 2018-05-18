@@ -558,7 +558,8 @@ class ExecLibrary(LibImpl):
         else:
           ctx.cpu.w_reg(REG_A3,olda3)
       _make_trampoline(fmtstr,putData,putData,ctx)
-    log_exec.info("RawDoFmt: fmtString=%s -> %s" % (fmt,resultstr))
+    log_exec.info("RawDoFmt: fmtString=%s -> %s (known=%s)" % \
+        (fmt, resultstr, known))
     return dataStream
 
   # ----- Semaphore Handling -----

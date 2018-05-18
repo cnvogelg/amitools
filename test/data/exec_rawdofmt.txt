@@ -1,0 +1,21 @@
+putcode1
+Hello, world!
+CStr: 'Huhu'
+BStr: 'Hoi!'
+LONG: a=23 b=42
+WORD: a=23 b=42
+CHAR: 'Hi!'
+putcode2
+Hello, world!
+CStr: 'Huhu'
+BStr: 'Hoi!'
+LONG: a=23 b=42
+WORD: a=23 b=42
+CHAR: 'Hi!'
+putcode3
+Hello, world!
+CStr: 'Huhu'
+BStr: 'Hoi!'
+LONG: a=23 b=42
+WORD: a=23 b=42
+CHAR: 'Hi!'
