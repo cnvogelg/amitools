@@ -119,6 +119,25 @@ class Vamos:
     self.lib_mgr.shutdown(run_sp=sp)
     if ok:
         self.alloc.dump_orphans()
+        self._save_profile()
+
+  def _save_profile(self):
+    if self.cfg.profile:
+      profiler = self.lib_mgr.get_vlib_profiler()
+      num_libs = profiler.get_num_libs()
+      if num_libs == 0:
+        log_main.warn("profiling enabled but no lib profiles found!")
+      else:
+        # save file
+        file = self.cfg.profile_file
+        if file:
+          append = self.cfg.profile_file_append
+          log_main.info("writing %d lib profiles to '%s' (append=%s)",
+                        num_libs, file, append)
+          profiler.save_json_file(file, append)
+        # dump
+        if self.cfg.profile_dump:
+          profiler.dump(log_prof.info)
 
   # ----- system setup -----
 

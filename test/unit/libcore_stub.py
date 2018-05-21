@@ -21,8 +21,8 @@ def _check_profile(fd, profile):
   dummy_func = fd.get_func_by_name('Dummy')
   print_hello_prof = profile.get_func_prof(print_hello_func.get_index())
   dummy_func_prof = profile.get_func_prof(dummy_func.get_index())
-  assert print_hello_prof.get_calls() == 1
-  assert dummy_func_prof.get_calls() == 1
+  assert print_hello_prof.get_num_calls() == 1
+  assert dummy_func_prof.get_num_calls() == 1
   profile.dump()
 
 

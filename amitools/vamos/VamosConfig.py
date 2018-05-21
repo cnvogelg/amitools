@@ -154,9 +154,14 @@ class VamosConfig(ConfigParser.SafeConfigParser):
       'logging' : (str, None),
       'verbose' : (int, 0),
       'quiet' : (bool, False),
-      'benchmark' : (bool, False),
-      'profile' : (bool, False),
       'log_file' : (str, None),
+      # profiling
+      'profile' : (bool, False),
+      'profile_samples' : (bool, False),
+      'profile_all' : (bool, False),
+      'profile_file_append' : (bool, False),
+      'profile_file' : (str, None),
+      'profile_dump' : (bool, False),
       # low-level tracing
       'instr_trace' : (bool, False),
       'memory_trace' : (bool, False),

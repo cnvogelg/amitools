@@ -1,5 +1,5 @@
 import datetime
-from amitools.vamos.libcore import LibCreator, LibInfo, LibCtx
+from amitools.vamos.libcore import LibCreator, LibInfo, LibCtx, LibProfiler
 from amitools.vamos.machine import MockMachine
 from amitools.vamos.label import LabelManager
 from amitools.vamos.mem import MemoryAlloc
@@ -59,8 +59,11 @@ def libcore_create_lib_profile_test():
   date = datetime.date(2012, 11, 12)
   info = LibInfo('vamostest.library', 42, 3, date)
   # create lib
-  creator = LibCreator(alloc, traps)
+  profiler = LibProfiler()
+  creator = LibCreator(alloc, traps, profiler=profiler)
   lib = creator.create_lib(info, ctx, impl, do_profile=True)
+  prof = profiler.get_profile('vamostest.library')
+  assert prof
   # free lib
   lib.free()
   assert alloc.is_all_free()

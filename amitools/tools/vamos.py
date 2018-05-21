@@ -43,12 +43,23 @@ def main():
                       default=None, help="be more verbos")
   parser.add_argument('-q', '--quiet', action='store_true',
                       default=None, help="do not output any logging")
-  parser.add_argument('-b', '--benchmark', action='store_true',
-                      default=None, help="enable benchmarking")
   parser.add_argument('-L', '--log-file', action='store',
                       default=None, help="write all log messages to a file")
   parser.add_argument('--no-ts', action='store_true',
                       default=False, help="do not log with timestamp")
+  # profiling config
+  parser.add_argument('--profile', action='store_true',
+                      default=None, help="collect call infos of vamos libs")
+  parser.add_argument('--profile-samples', action='store_true',
+                      default=None, help="store each lib call individually")
+  parser.add_argument('--profile-all', action='store_true',
+                      default=None, help="profile all vamos libraries and devices")
+  parser.add_argument('--profile-file-append', action='store_true',
+                      default=None, help="if profile file exists add data")
+  parser.add_argument('--profile-file', action='store',
+                      default=None, help="file name for profile data")
+  parser.add_argument('--profile-dump', action='store_true',
+                      default=None, help="dump the profile result to log")
   # low-level tracing
   parser.add_argument('-I', '--instr-trace', action='store_true',
                       default=None, help="enable instruction trace")

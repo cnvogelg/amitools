@@ -92,11 +92,17 @@ def libcore_mgr_make_profile_test():
   impl = test_vlib.get_impl()
   assert impl
   assert impl.get_cnt() == 0
-  assert test_vlib.profile
+  prof = test_vlib.profile
+  assert prof
+  profiler = mgr.get_profiler()
+  assert profiler
+  assert profiler.get_profile('vamostest.library') == prof
   # shutdown
   left = mgr.shutdown()
   assert left == 0
   assert alloc.is_all_free()
+  # profile survives
+  assert profiler.get_profile('vamostest.library') == prof
 
 
 def libcore_mgr_make_fake_test():

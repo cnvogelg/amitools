@@ -4,7 +4,6 @@ from amitools.fd import read_lib_fd
 from .vlib import VLib
 from .stub import LibStubGen
 from .patch import LibPatcherMultiTrap
-from .profile import LibProfile
 
 
 class LibCreator(object):
@@ -13,12 +12,13 @@ class LibCreator(object):
   def __init__(self, alloc, traps,
                fd_dir=None,
                log_missing=None, log_valid=None,
-               profile_all=False):
+               profile_all=False, profiler=None):
     self.alloc = alloc
     self.traps = traps
     # options
     self.fd_dir = fd_dir
     self.profile_all = profile_all
+    self.profiler = profiler
     self.stub_gen = LibStubGen(log_missing=log_missing, log_valid=log_valid)
 
   def _create_library(self, info, is_dev):
@@ -48,8 +48,8 @@ class LibCreator(object):
     fd = read_lib_fd(name, self.fd_dir)
     assert fd.is_device == is_dev
     # profile?
-    if do_profile or self.profile_all:
-      profile = LibProfile(name, fd)
+    if self.profiler and (do_profile or self.profile_all):
+      profile = self.profiler.add_profile(name, fd)
     else:
       profile = None
     # create stub

@@ -16,15 +16,23 @@ class LibManager(object):
   MODE_FAKE = 'fake'
 
   def __init__(self, machine, alloc, segloader,
-               cfg=None, profile_all=None):
+               cfg=None, profile_all=None, profile_add_samples=None):
     self.mem = machine.get_mem()
     self.cfg = cfg
     if profile_all is None:
+      # take profile settings from config
       if cfg:
-        self.profile_all = cfg.profile
+        self.profile_all = cfg.profile_all and cfg.profile
       else:
         self.profile_all = False
-    self.vlib_mgr = VLibManager(machine, alloc, profile_all=profile_all)
+    if profile_add_samples is None:
+      if cfg:
+        self.add_samples = cfg.profile_samples
+      else:
+        self.add_samples = False
+    self.vlib_mgr = VLibManager(machine, alloc,
+                                profile_all=self.profile_all,
+                                profile_add_samples=self.add_samples)
     self.alib_mgr = ALibManager(machine, alloc, segloader)
 
   def add_ctx(self, name, ctx):
@@ -39,6 +47,10 @@ class LibManager(object):
   def get_vlib_by_name(self, name):
     """return associated vlib for a name"""
     return self.vlib_mgr.get_vlib_by_name(name)
+
+  def get_vlib_profiler(self):
+    """access the profiler"""
+    return self.vlib_mgr.get_profiler()
 
   def bootstrap_exec(self, exec_info=None, do_profile=None):
     """setup exec vlib as first and essential lib"""
@@ -222,7 +234,10 @@ class LibManager(object):
 
   def _get_do_profile(self, lib_cfg=None, do_profile=None):
     if do_profile is None:
+      # profile master switch in config must be enabled
       if lib_cfg:
+        if not self.cfg.profile:
+          return False
         do_profile = lib_cfg.profile
       else:
         do_profile = self.profile_all

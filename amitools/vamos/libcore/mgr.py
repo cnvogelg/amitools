@@ -1,7 +1,7 @@
 import datetime
 import logging
 from amitools.vamos.Log import log_lib, log_libmgr
-from amitools.vamos.libcore import LibCreator, LibInfo, LibRegistry, LibCtxMap
+from amitools.vamos.libcore import LibCreator, LibInfo, LibRegistry, LibCtxMap, LibProfiler
 from amitools.vamos.atypes import ExecLibrary
 
 
@@ -10,7 +10,7 @@ class VLibManager(object):
 
   def __init__(self, machine, alloc,
                lib_reg=None, ctx_map=None,
-               profile_all=False):
+               profile_all=False, profile_add_samples=False):
     if lib_reg is None:
       lib_reg = LibRegistry()
     if ctx_map is None:
@@ -21,6 +21,7 @@ class VLibManager(object):
     self.lib_reg = lib_reg
     self.ctx_map = ctx_map
     self.profile_all = profile_all
+    self.profiler = LibProfiler(profile_add_samples)
     # tools
     self._setup_creator()
     # state
@@ -38,7 +39,8 @@ class VLibManager(object):
       log_valid = log_lib
     self.creator = LibCreator(self.alloc, self.machine.get_traps(),
                               log_missing=log_missing, log_valid=log_valid,
-                              profile_all=self.profile_all)
+                              profile_all=self.profile_all,
+                              profiler=self.profiler)
 
   def add_ctx(self, name, ctx):
     self.ctx_map.add_ctx(name, ctx)
@@ -76,6 +78,10 @@ class VLibManager(object):
     """return associated vlib for a name"""
     if name in self.name_vlib:
       return self.name_vlib[name]
+
+  def get_profiler(self):
+    """return the lib profiler"""
+    return self.profiler
 
   def shutdown(self):
     """cleanup libs
