@@ -1,5 +1,5 @@
 import StringIO
-from amitools.vamos.libcore import LibProfile, LibFuncProfile, LibProfiler
+from amitools.vamos.libcore import LibProfile, LibFuncProfile, LibProfiler, LibProfilerConfig
 from amitools.fd import read_lib_fd
 
 
@@ -58,9 +58,10 @@ def libcore_profile_samples_test():
 def libcore_profile_profiler_test():
   name = 'vamostest.library'
   fd = read_lib_fd(name)
-  p = LibProfiler()
+  c = LibProfilerConfig(profiling=True, libs=[name])
+  p = LibProfiler(c)
   assert not p.get_profile(name)
-  prof = p.add_profile(name, fd)
+  prof = p.create_profile(name, fd)
   assert prof
   assert prof == p.get_profile(name)
   assert p.get_all_lib_names() == [name]
@@ -70,8 +71,11 @@ def libcore_profile_profiler_test():
 def gen_prof(add_samples=False):
   name = 'vamostest.library'
   fd = read_lib_fd(name)
-  p = LibProfiler(add_samples)
-  lp = p.add_profile(name, fd)
+  cfg = LibProfilerConfig(profiling=True, all_libs=True,
+                          add_samples=add_samples)
+  p = LibProfiler(cfg)
+  lp = p.create_profile(name, fd)
+  assert lp
   # get func
   func_name = "Add"
   func = fd.get_func_by_name(func_name)

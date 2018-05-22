@@ -16,23 +16,11 @@ class LibManager(object):
   MODE_FAKE = 'fake'
 
   def __init__(self, machine, alloc, segloader,
-               cfg=None, profile_all=None, profile_add_samples=None):
+               cfg=None, profiler_cfg=None):
     self.mem = machine.get_mem()
     self.cfg = cfg
-    if profile_all is None:
-      # take profile settings from config
-      if cfg:
-        self.profile_all = cfg.profile_all and cfg.profile
-      else:
-        self.profile_all = False
-    if profile_add_samples is None:
-      if cfg:
-        self.add_samples = cfg.profile_samples
-      else:
-        self.add_samples = False
     self.vlib_mgr = VLibManager(machine, alloc,
-                                profile_all=self.profile_all,
-                                profile_add_samples=self.add_samples)
+                                profiler_cfg=profiler_cfg)
     self.alib_mgr = ALibManager(machine, alloc, segloader)
 
   def add_ctx(self, name, ctx):
@@ -48,17 +36,12 @@ class LibManager(object):
     """return associated vlib for a name"""
     return self.vlib_mgr.get_vlib_by_name(name)
 
-  def get_vlib_profiler(self):
-    """access the profiler"""
-    return self.vlib_mgr.get_profiler()
-
-  def bootstrap_exec(self, exec_info=None, do_profile=None):
+  def bootstrap_exec(self, exec_info=None):
     """setup exec vlib as first and essential lib"""
     lib_cfg = None
     if self.cfg:
       lib_cfg = self.cfg.get_lib_config("exec.library")
-    do_profile = self._get_do_profile(lib_cfg, do_profile)
-    return self.vlib_mgr.bootstrap_exec(exec_info, do_profile)
+    return self.vlib_mgr.bootstrap_exec(exec_info)
 
   def shutdown(self, run_sp=None):
     """cleanup libs
@@ -93,7 +76,7 @@ class LibManager(object):
        return number of libs _not_ expunged
     """
     log_libmgr.info("+expunge_devs")
-    aleft = 0 # TBD
+    aleft = 0  # TBD
     vleft = self.vlib_mgr.expunge_devs()
     log_libmgr.info("-expunge_devs: aleft=%d, vleft=%d", aleft, vleft)
     return vleft
@@ -129,7 +112,7 @@ class LibManager(object):
       log_libmgr.error("close: unknown lib @%06x!", addr)
 
   def open_lib(self, full_name, open_ver=0, lock=None, run_sp=None,
-               mode=None, version=None, do_profile=None):
+               mode=None, version=None):
     """open a library
 
        return lib_base addr or 0
@@ -139,10 +122,10 @@ class LibManager(object):
     log_libmgr.info("open_lib: '%s' ver=%d -> base_name='%s'",
                     full_name, open_ver, base_name)
     # get lib params
-    mode, version, do_profile = self._get_lib_params(
-        full_name, base_name, mode, version, do_profile)
-    log_libmgr.info("params: mode=%s, version=%d, do_profile=%s",
-                    mode, version, do_profile)
+    mode, version = self._get_lib_params(
+        full_name, base_name, mode, version)
+    log_libmgr.info("params: mode=%s, version=%d",
+                    mode, version)
     # handle mode
     if mode == self.MODE_OFF:
       return 0
@@ -154,7 +137,6 @@ class LibManager(object):
     if try_vlib:
       vlib = self.vlib_mgr.open_lib_name(base_name,
                                          version=version,
-                                         do_profile=do_profile,
                                          fake=fake)
       if vlib:
         addr = vlib.get_addr()
@@ -214,7 +196,7 @@ class LibManager(object):
       return addr
 
   def _get_lib_params(self, full_name, base_name,
-                      force_mode, force_version, force_do_profile):
+                      force_mode, force_version):
     # get lib config
     if self.cfg:
       lib_cfg = self.cfg.get_lib_config(full_name, base_name)
@@ -225,23 +207,11 @@ class LibManager(object):
       lib_cfg = None
       mode = "auto"
       version = 0  # take lib version
-    do_profile = self._get_do_profile(lib_cfg, force_do_profile)
     if force_mode:
       mode = force_mode
     if force_version:
       version = force_version
-    return mode, version, do_profile
-
-  def _get_do_profile(self, lib_cfg=None, do_profile=None):
-    if do_profile is None:
-      # profile master switch in config must be enabled
-      if lib_cfg:
-        if not self.cfg.profile:
-          return False
-        do_profile = lib_cfg.profile
-      else:
-        do_profile = self.profile_all
-    return do_profile
+    return mode, version
 
   def _dump_lib_cfg(self, lib_name, lib_cfg):
     items = ["for_lib='%s'" % lib_name, "use_cfg='%s'" % lib_cfg.name]

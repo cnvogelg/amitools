@@ -1,7 +1,7 @@
 from .label import LabelManager, LabelRange
 from .mem import MemoryAlloc
 from .astructs import AccessStruct
-from .libcore import LibRegistry, LibCtxMap, LibCtx
+from .libcore import LibProfilerConfig
 from .loader import SegmentLoader
 from .libmgr import LibManager
 from path.PathManager import PathManager
@@ -92,12 +92,14 @@ class Vamos:
     self.seg_loader = SegmentLoader(self.alloc, self.path_mgr)
 
     # setup lib manager
+    profiler_cfg = self._get_profiler_config(cfg)
     self.exec_ctx = ExecLibCtx(self.machine, self.alloc,
                                self.seg_loader, self.path_mgr)
     self.dos_ctx = DosLibCtx(self.machine, self.alloc,
                              self.seg_loader, self.path_mgr,
                              self.run_command, self.start_sub_process)
-    self.lib_mgr = LibManager(self.machine, self.alloc, self.seg_loader, self.cfg)
+    self.lib_mgr = LibManager(self.machine, self.alloc, self.seg_loader,
+                              self.cfg, profiler_cfg=profiler_cfg)
     self.lib_mgr.add_ctx('exec.library', self.exec_ctx)
     self.lib_mgr.add_ctx('dos.library', self.dos_ctx)
     self.lib_mgr.bootstrap_exec()
@@ -105,6 +107,19 @@ class Vamos:
     # no current process right now
     self.process = None
     self.proc_list = []
+
+  def _get_profiler_config(self, cfg):
+    profile_libs = cfg.profile_libs
+    if profile_libs:
+      profile_libs = profile_libs.split(",")
+    profiler_cfg = LibProfilerConfig(profiling=cfg.profile,
+                                     all_libs=cfg.profile_all_libs,
+                                     libs=profile_libs,
+                                     add_samples=cfg.profile_samples,
+                                     file=cfg.profile_file,
+                                     append=cfg.profile_file_append,
+                                     dump=cfg.profile_dump)
+    return profiler_cfg
 
   def init(self, binary, arg_str, stack_size, shell, cwd):
     self.create_old_dos_guard()
@@ -119,25 +134,6 @@ class Vamos:
     self.lib_mgr.shutdown(run_sp=sp)
     if ok:
         self.alloc.dump_orphans()
-        self._save_profile()
-
-  def _save_profile(self):
-    if self.cfg.profile:
-      profiler = self.lib_mgr.get_vlib_profiler()
-      num_libs = profiler.get_num_libs()
-      if num_libs == 0:
-        log_main.warn("profiling enabled but no lib profiles found!")
-      else:
-        # save file
-        file = self.cfg.profile_file
-        if file:
-          append = self.cfg.profile_file_append
-          log_main.info("writing %d lib profiles to '%s' (append=%s)",
-                        num_libs, file, append)
-          profiler.save_json_file(file, append)
-        # dump
-        if self.cfg.profile_dump:
-          profiler.dump(log_prof.info)
 
   # ----- system setup -----
 

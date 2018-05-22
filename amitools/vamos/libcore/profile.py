@@ -1,5 +1,6 @@
 from __future__ import print_function
 import json
+from amitools.vamos.Log import log_prof
 
 
 class LibFuncProfile(object):
@@ -151,17 +152,86 @@ class LibProfile(object):
     return res
 
 
-class LibProfiler(object):
-  def __init__(self, add_samples=False):
-    self.lib_profiles = {}
+class LibProfilerConfig(object):
+  def __init__(self, profiling=False, all_libs=False, libs=None,
+               add_samples=False, file=None, append=False, dump=False):
+    if libs is None:
+      libs = []
+    self.profiling = profiling
+    self.all_libs = all_libs
+    self.libs = libs
     self.add_samples = add_samples
+    self.file = file
+    self.append = append
+    self.dump = dump
 
-  def add_profile(self, lib_name, fd):
+  def is_profiling(self):
+    return self.profiling
+
+  def profile_all_libs(self):
+    return self.all_libs
+
+  def profile_libs(self):
+    return self.libs
+
+  def profile_lib(self, name):
+    if self.all_libs:
+      return True
+    return name in self.libs
+
+  def get_add_samples(self):
+    return self.add_samples
+
+  def get_file(self):
+    return self.file
+
+  def get_file_append(self):
+    return self.append
+
+  def get_dump(self):
+    return self.dump
+
+  def __repr__(self):
+    return "LibProfilerConfig(profiling=%s, all_libs=%s, libs=%s, " \
+        "add_samples=%s, file=%s, append=%s, dump=%s)" % \
+        (self.profiling, self.all_libs, self.libs, self.add_samples,
+           self.file, self.append, self.dump)
+
+
+class LibProfiler(object):
+  def __init__(self, cfg=None):
+    self.lib_profiles = {}
+    self.cfg = cfg
+
+  def shutdown(self):
+    """dump or save file"""
+    if self.cfg and self.cfg.is_profiling():
+      num_libs = self.get_num_libs()
+      if num_libs == 0:
+        log_prof.warn("profiling enabled but no lib profiles found!")
+      else:
+        # save file
+        file = self.cfg.get_file()
+        if file:
+          append = self.cfg.get_file_append()
+          log_prof.info("writing %d lib profiles to '%s' (append=%s)",
+                        num_libs, file, append)
+          self.save_json_file(file, append)
+        # dump
+        if self.cfg.get_dump():
+          self.dump(log_prof.info)
+
+  def create_profile(self, lib_name, fd):
     """get or create a new profile for a library"""
+    # profiling disabled
+    if not self.cfg or not self.cfg.is_profiling():
+      return None
+    # already created profile
     if lib_name in self.lib_profiles:
       return self.lib_profiles[lib_name]
-    else:
-      prof = LibProfile(lib_name, fd, self.add_samples)
+    elif self.cfg.profile_lib(lib_name):
+      # shall we create a profile for this lib?
+      prof = LibProfile(lib_name, fd, self.cfg.get_add_samples())
       self.lib_profiles[lib_name] = prof
       return prof
 

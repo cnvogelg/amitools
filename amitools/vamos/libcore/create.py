@@ -12,12 +12,11 @@ class LibCreator(object):
   def __init__(self, alloc, traps,
                fd_dir=None,
                log_missing=None, log_valid=None,
-               profile_all=False, profiler=None):
+               profiler=None):
     self.alloc = alloc
     self.traps = traps
     # options
     self.fd_dir = fd_dir
-    self.profile_all = profile_all
     self.profiler = profiler
     self.stub_gen = LibStubGen(log_missing=log_missing, log_valid=log_valid)
 
@@ -36,7 +35,7 @@ class LibCreator(object):
     library.setup(version=version, revision=revision, type=ltype)
     return library
 
-  def create_lib(self, info, ctx, impl=None, do_profile=False):
+  def create_lib(self, info, ctx, impl=None):
     name = info.get_name()
     if name.endswith('.device'):
       is_dev = True
@@ -48,8 +47,8 @@ class LibCreator(object):
     fd = read_lib_fd(name, self.fd_dir)
     assert fd.is_device == is_dev
     # profile?
-    if self.profiler and (do_profile or self.profile_all):
-      profile = self.profiler.add_profile(name, fd)
+    if self.profiler:
+      profile = self.profiler.create_profile(name, fd)
     else:
       profile = None
     # create stub

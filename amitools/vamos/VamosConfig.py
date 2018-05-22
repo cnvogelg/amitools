@@ -5,17 +5,15 @@ import os.path
 from Log import log_main
 
 class VamosLibConfig:
-  def __init__(self, name, mode='auto', version=0, profile=False, expunge='last_close'):
+  def __init__(self, name, mode='auto', version=0, expunge='last_close'):
     self.name = name
     self.mode = mode
     self.version = version
-    self.profile = profile
     self.expunge = expunge
     # types of keys
     self._keys = {
       'mode' : str,
       'version' : int,
-      'profile' : bool,
       'expunge' : str
     }
 
@@ -158,7 +156,8 @@ class VamosConfig(ConfigParser.SafeConfigParser):
       # profiling
       'profile' : (bool, False),
       'profile_samples' : (bool, False),
-      'profile_all' : (bool, False),
+      'profile_libs' : (str, None),
+      'profile_all_libs' : (bool, False),
       'profile_file_append' : (bool, False),
       'profile_file' : (str, None),
       'profile_dump' : (bool, False),

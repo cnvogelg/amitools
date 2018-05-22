@@ -52,7 +52,9 @@ def main():
                       default=None, help="collect call infos of vamos libs")
   parser.add_argument('--profile-samples', action='store_true',
                       default=None, help="store each lib call individually")
-  parser.add_argument('--profile-all', action='store_true',
+  parser.add_argument('--profile-libs', action='store',
+                      default=None, help="lib/dev name list to profile")
+  parser.add_argument('--profile-all-libs', action='store_true',
                       default=None, help="profile all vamos libraries and devices")
   parser.add_argument('--profile-file-append', action='store_true',
                       default=None, help="if profile file exists add data")

@@ -10,7 +10,7 @@ from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
 from amitools.vamos.loader import SegmentLoader
 
 
-def setup(path_mgr=None, cfg=None, profile_all=None):
+def setup(path_mgr=None, cfg=None, profiler_cfg=None):
   log_libmgr.setLevel(logging.INFO)
   log_exec.setLevel(logging.INFO)
   machine = Machine()
@@ -19,7 +19,7 @@ def setup(path_mgr=None, cfg=None, profile_all=None):
   alloc = MemoryAlloc.for_machine(machine)
   segloader = SegmentLoader(alloc, path_mgr)
   mgr = LibManager(machine, alloc, segloader,
-                   cfg=cfg, profile_all=profile_all)
+                   cfg=cfg, profiler_cfg=profiler_cfg)
   # setup ctx map
   cpu = machine.get_cpu()
   mem = machine.get_mem()

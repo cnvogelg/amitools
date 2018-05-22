@@ -1,14 +1,14 @@
-from amitools.vamos.libcore import VLibManager, LibRegistry, LibCtxMap
+from amitools.vamos.libcore import VLibManager, LibRegistry, LibCtxMap, LibProfilerConfig
 from amitools.vamos.machine import Machine
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.loader import SegmentLoader
 
 
-def setup():
+def setup(profiler_cfg=None):
   machine = Machine()
   alloc = MemoryAlloc(machine.get_mem(), machine.get_ram_begin())
-  mgr = VLibManager(machine, alloc)
+  mgr = VLibManager(machine, alloc, profiler_cfg=profiler_cfg)
   # setup ctx map
   cpu = machine.get_cpu()
   mem = machine.get_mem()
@@ -81,10 +81,11 @@ def libcore_mgr_make_version_revision_test():
 
 
 def libcore_mgr_make_profile_test():
-  machine, alloc, mgr = setup()
+  lpc = LibProfilerConfig(profiling=True, all_libs=True)
+  machine, alloc, mgr = setup(lpc)
   exec_vlib = mgr.bootstrap_exec()
   # make vamos test lib
-  test_vlib = mgr.make_lib_name('vamostest.library', do_profile=True)
+  test_vlib = mgr.make_lib_name('vamostest.library')
   test_base = test_vlib.get_addr()
   assert test_vlib
   assert mgr.get_vlib_by_name('vamostest.library') == test_vlib
