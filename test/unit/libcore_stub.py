@@ -143,7 +143,7 @@ def libcore_stub_gen_exc_default_test():
     stub.RaiseError()
 
 
-def libcore_stub_gen_multi_arg(capsys):
+def libcore_stub_gen_multi_arg(caplog):
   caplog.set_level(logging.INFO)
   name = 'vamostest.library'
   impl = VamosTestLibrary()

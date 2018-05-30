@@ -201,3 +201,19 @@ def machine_machine_run_nested_raise_test():
   traps.free(tid)
   traps.free(tid2)
   m.cleanup()
+
+
+def machine_machine_run_trap_unbound_test(capfd):
+  m, cpu, mem, traps, code, stack = create_machine()
+  # place an unbound trap
+  mem.w16(code, 0xa100)
+  # single RTS to immediately return from run
+  mem.w16(code+2, op_rts)
+  rs = m.run(code, stack)
+  assert rs.done
+  assert rs.error is None
+  m.cleanup()
+  captured = capfd.readouterr()
+  assert captured.out.strip().split('\n') == [
+      'UNBOUND TRAP: code=a100, pc=000800'
+  ]

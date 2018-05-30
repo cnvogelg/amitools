@@ -7,6 +7,7 @@
 #include "traps.h"
 #include "m68k.h"
 #include <string.h>
+#include <stdio.h>
 
 #define NUM_TRAPS  0x1000
 #define TRAP_MASK  0x0fff
@@ -14,10 +15,8 @@
 
 
 struct entry {
-  union {
-    trap_func_t trap;
-    struct entry *next;
-  };
+  trap_func_t trap;
+  struct entry *next;
   void *data;
   int flags;
 };
@@ -25,6 +24,11 @@ typedef struct entry entry_t;
 
 static entry_t traps[NUM_TRAPS];
 static entry_t *first_free;
+
+static void trap_unbound(uint opcode, uint pc, void *data)
+{
+  printf("UNBOUND TRAP: code=%04x, pc=%06x\n", opcode, pc);
+}
 
 int trap_aline(uint opcode, uint pc)
 {
@@ -57,9 +61,15 @@ void trap_init(void)
   /* setup free list */
   first_free = &traps[0];
   for(i=0;i<(NUM_TRAPS-1);i++) {
+    traps[i].trap = trap_unbound;
     traps[i].next = &traps[i+1];
+    traps[i].flags = 0;
+    traps[i].data = NULL;
   }
+  traps[NUM_TRAPS-1].trap = trap_unbound;
   traps[NUM_TRAPS-1].next = NULL;
+  traps[NUM_TRAPS-1].flags = 0;
+  traps[NUM_TRAPS-1].data = NULL;
 
   /* setup my trap handler */
   m68k_set_aline_hook_callback(trap_aline);
@@ -91,5 +101,8 @@ void trap_free(int id)
 {
   /* insert trap into free list */
   traps[id].next = first_free;
+  traps[id].trap = trap_unbound;
+  traps[id].flags = 0;
+  traps[id].data = NULL;
   first_free = &traps[id];
 }
