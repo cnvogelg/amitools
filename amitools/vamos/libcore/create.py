@@ -67,7 +67,7 @@ class LibCreator(object):
     library = self._create_library(info, is_dev)
     addr = library.get_addr()
     # patcher
-    patcher = LibPatcherMultiTrap(self.alloc.mem, self.traps, stub)
+    patcher = LibPatcherMultiTrap(self.alloc, self.traps, stub)
     patcher.patch_jump_table(addr)
     # fix lib sum
     library.update_sum()
