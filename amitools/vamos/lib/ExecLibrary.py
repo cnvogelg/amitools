@@ -170,6 +170,16 @@ class ExecLibrary(LibImpl):
     lib_sum = lf.sum_library(lib_addr)
     log_exec.info("SumLibrary: lib=%06x -> sum=%08x", lib_addr, lib_sum)
 
+  def SetFunction(self, ctx):
+    lib_addr = ctx.cpu.r_reg(REG_A1)
+    lvo = ctx.cpu.rs_reg(REG_A0)
+    new_func = ctx.cpu.r_reg(REG_D0)
+    lf = LibFuncs(ctx.machine, ctx.alloc)
+    old_func = lf.set_function(lib_addr, lvo, new_func)
+    log_exec.info("SetFunction: lib=%06x, lvo=%d, new_func=%06x -> old_func=%06x",
+                  lib_addr, lvo, new_func, old_func)
+    return old_func
+
   def RemLibrary(self, ctx):
     lib_addr = ctx.cpu.r_reg(REG_A1)
     lf = LibFuncs(ctx.machine, ctx.alloc)

@@ -1,6 +1,7 @@
 from amitools.vamos.atypes import Library, LibFlags, NodeType, ExecLibrary
 from amitools.vamos.loader import SegList
 from amitools.vamos.machine.regs import *
+from amitools.vamos.machine.opcodes import op_jmp
 
 
 class LibFuncs(object):
@@ -54,6 +55,27 @@ class LibFuncs(object):
       seg_loader.unload_seglist(seglist)
     return seglist
 
+  def set_function(self, lib_base, lvo, new_func_addr):
+    """return old func addr or None if patch failed"""
+    lib = Library(self.mem, lib_base)
+    neg_size = lib.neg_size
+    if lvo < 0:
+      lvo = -lvo
+    # check lvo range
+    if lvo >= neg_size:
+      return None
+    # check that jmp is at lvo
+    addr = lib_base - lvo
+    jmp = self.mem.r16(addr)
+    if jmp != op_jmp:
+      return None
+    # set new function
+    old_func = self.mem.r32(addr+2)
+    self.mem.w32(addr+2, new_func_addr)
+    # sum lib
+    self.sum_library(lib_base)
+    return old_func
+
   def _run_open(self, lib_base, run_sp=None):
     """call lib open and returns lib_base"""
     return self._run_lvo(lib_base, self.LVO_Open, "LibOpen", run_sp)
@@ -70,7 +92,7 @@ class LibFuncs(object):
     # call expunge func on lib
     func_addr = lib_base - lvo * 6
     set_regs = {
-      REG_A6: lib_base
+        REG_A6: lib_base
     }
     get_regs = [REG_D0]
     # run machine and share current sp if none is given

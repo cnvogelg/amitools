@@ -1,5 +1,6 @@
 from amitools.vamos.machine import Machine
 from amitools.vamos.machine.regs import *
+from amitools.vamos.machine.opcodes import op_jmp
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.libnative import LibFuncs
 from amitools.vamos.atypes import ExecLibrary, Library, LibFlags
@@ -137,6 +138,37 @@ def libnative_libfuncs_open_library_test():
   lf = LibFuncs(machine, alloc)
   lib_base = lf.open_library(lib.get_addr(), run_sp=sp)
   assert lib_base == 0xcafebabe
+  # cleanup
+  lib.free()
+  assert alloc.is_all_free()
+
+
+def libnative_libfuncs_set_function_test():
+  machine = Machine()
+  mem = machine.get_mem()
+  cpu = machine.get_cpu()
+  sp = machine.get_ram_begin() - 4
+  alloc = MemoryAlloc.for_machine(machine)
+  # new lib
+  lib = Library.alloc(alloc, "my.library", "bla", 36)
+  lib_addr = lib.get_addr()
+  lib.setup()
+  lib.fill_funcs(op_jmp, 0xcafebabe)
+  assert lib.neg_size == 36
+  # patch function
+  lvo = -30
+  addr = lib.get_addr() + lvo
+  assert mem.r16(addr) == op_jmp
+  assert mem.r32(addr+2) == 0xcafebabe
+  lf = LibFuncs(machine, alloc)
+  old_addr = lf.set_function(lib_addr, lvo, 0xdeadbeef)
+  assert old_addr == 0xcafebabe
+  assert mem.r16(addr) == op_jmp
+  assert mem.r32(addr+2) == 0xdeadbeef
+  assert lib.check_sum()
+  # invalid function
+  old_addr = lf.set_function(lib_addr, -36, 0)
+  assert old_addr is None
   # cleanup
   lib.free()
   assert alloc.is_all_free()

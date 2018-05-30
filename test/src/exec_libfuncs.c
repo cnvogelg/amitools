@@ -26,6 +26,7 @@ int main(int argc, char *argv[])
   ULONG pos_size = sizeof(struct Library);
   UBYTE *lib_begin;
   int result = 0;
+  APTR old_func;
 
   /* make lib */
   lib = MakeLibrary(vectors, NULL, NULL, pos_size, (BPTR)NULL);
@@ -45,6 +46,15 @@ int main(int argc, char *argv[])
     result++;
   } else {
     PutStr("lib found after add.\n");
+  }
+
+  /* Patch Lib */
+  old_func = SetFunction(lib, -6, (APTR)0xcafebabe);
+  if(old_func != (APTR)0x200) {
+    PutStr("wrong old_func!\n");
+    result++;
+  } else {
+    PutStr("set function ok.\n");
   }
 
   /* sum library */
