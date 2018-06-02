@@ -27,7 +27,7 @@ class MainParser(object):
 
   def add_parser(self, sub_parser):
     self.parsers.append(sub_parser)
-    sub_parser.setup_args(self, self.ap)
+    sub_parser.setup_args(self.ap)
 
   def parse(self, paths, args=None):
     """convenience function that combines all other calls.
@@ -39,17 +39,21 @@ class MainParser(object):
          try given paths for configs. first match wins.
        finally parse args.
 
-       return cfg_file that was read or None
+       return (cfg_file, read_ok) or (None, True) on skip
     """
     self.add_file_arg()
     self.add_skip_arg()
     cfg_file, skip_cfgs = self.pre_parse_args(args)
     if cfg_file:
-      self.parse_config_auto(cfg_file)
+      res = self.parse_config_auto(cfg_file)
+      ok = res is not None
     elif not skip_cfgs:
-      cfg_file = self.parse_files(paths)
+      cfg_file, res = self.parse_files(paths)
+      ok = res is not None
+    else:
+      ok = True
     self.parse_args(args)
-    return cfg_file
+    return cfg_file, ok
 
   def add_file_arg(self, name=None, long_name=None, arg_name=None,
                    args=None):
@@ -105,13 +109,14 @@ class MainParser(object):
 
   def parse_dict_config(self, cfg_dict):
     for parser in self.parsers:
-      parser.parse_dict_config(self, cfg_dict)
+      parser.parse_config(cfg_dict, 'dict')
 
   def parse_files(self, paths):
     for file in paths:
       if os.path.exists(file):
-        self.parse_config_auto(file)
-        return file
+        res = self.parse_config_auto(file)
+        return file, res
+    return None, None
 
   def parse_config_auto(self, file):
     is_str = type(file) is str
@@ -143,7 +148,7 @@ class MainParser(object):
     # report to parsers
     if cfg_dict:
       for parser in self.parsers:
-        parser.parse_ini_config(self, cfg_dict)
+        parser.parse_config(cfg_dict, 'ini')
     return cfg_dict
 
   def parse_json_config(self, file_name):
@@ -167,7 +172,7 @@ class MainParser(object):
     # report to parsers
     if cfg_dict:
       for parser in self.parsers:
-        parser.parse_dict_config(self, cfg_dict)
+        parser.parse_config(cfg_dict, 'json')
     return cfg_dict
 
   def parse_args(self, args=None):
@@ -176,7 +181,7 @@ class MainParser(object):
       self.args = self.ap.parse_args(args)
     # notify parsers about args
     for parser in self.parsers:
-      parser.parse_args(self, self.args)
+      parser.parse_args(self.args)
     return self.args
 
   def _auto_detect_format(self, file_obj):

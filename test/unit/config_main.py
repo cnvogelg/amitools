@@ -161,8 +161,72 @@ def config_main_parse_test(tmpdir):
   cfg2 = str(tmpdir.join("cfg2"))
   paths = [cfg1, cfg2]
   mp = MainParser()
-  assert mp.parse(paths, args=[]) == cfg1
+  assert mp.parse(paths, args=[]) == (cfg1, True)
   mp = MainParser()
-  assert mp.parse(paths, args=['-S']) is None
+  assert mp.parse(paths, args=['-S']) == (None, True)
   mp = MainParser()
-  assert mp.parse(paths, args=['-c', cfg2]) == cfg2
+  assert mp.parse(paths, args=['-c', cfg2]) == (cfg2, True)
+
+
+def config_main_parse_fail_test(tmpdir):
+  tmpdir.join("cfg1").write("[hello\na=1")
+  tmpdir.join("cfg2").write("[hello\nb=1")
+  cfg1 = str(tmpdir.join("cfg1"))
+  cfg2 = str(tmpdir.join("cfg2"))
+  paths = [cfg1, cfg2]
+  mp = MainParser()
+  assert mp.parse(paths, args=[]) == (cfg1, False)
+  mp = MainParser()
+  assert mp.parse(paths, args=['-S']) == (None, True)
+  mp = MainParser()
+  assert mp.parse(paths, args=['-c', cfg2]) == (cfg2, False)
+
+
+def gen_parser():
+  def_cfg = {"a": {"v": 1,
+                   "w": ValueList(str),
+                   "x": True},
+             "b": "hello",
+             "c": ValueDict(int)}
+  arg_cfg = {"a": {"v": Argument("-v", action='store_const', const=2),
+                   "w": Argument("-w"),
+                   "x": Argument("-x", action='store_false')},
+             "b": Argument("-b"),
+             "c": Argument("-C")}
+  return Parser(def_cfg, arg_cfg)
+
+
+def config_main_parser_config_test(tmpdir):
+  mp = MainParser()
+  p = gen_parser()
+  mp.add_parser(p)
+  tmpdir.join("cfg1").write("[a]\nv=3")
+  cfg1 = str(tmpdir.join("cfg1"))
+  paths = [cfg1]
+  # run without args
+  assert mp.parse(paths, args=[]) == (cfg1, True)
+  assert p.get_cfg_dict() == {
+      "a": {"v": 3, # from config
+            "w": None,
+            "x": True},
+      "b": "hello",
+      "c": None
+  }
+
+
+def config_main_parser_args_test(tmpdir):
+  mp = MainParser()
+  p = gen_parser()
+  mp.add_parser(p)
+  tmpdir.join("cfg1").write("[a]\nv=3")
+  cfg1 = str(tmpdir.join("cfg1"))
+  paths = [cfg1]
+  # run with args
+  assert mp.parse(paths, args=['-v']) == (cfg1, True)
+  assert p.get_cfg_dict() == {
+      "a": {"v": 2, # from args
+            "w": None,
+            "x": True},
+      "b": "hello",
+      "c": None
+  }
