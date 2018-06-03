@@ -1,5 +1,5 @@
 import pytest
-from amitools.vamos.config.value import *
+from amitools.vamos.cfgcore.value import *
 
 
 def config_value_parse_str_test():

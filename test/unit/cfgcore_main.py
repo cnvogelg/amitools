@@ -1,4 +1,4 @@
-from amitools.vamos.config import *
+from amitools.vamos.cfgcore import *
 from StringIO import StringIO
 import logging
 import os

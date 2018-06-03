@@ -1,4 +1,4 @@
-from amitools.vamos.config import Argument, ArgumentDict
+from amitools.vamos.cfgcore import Argument, ArgumentDict
 import argparse
 
 

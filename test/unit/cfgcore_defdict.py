@@ -1,4 +1,4 @@
-from amitools.vamos.config import *
+from amitools.vamos.cfgcore import *
 
 
 def config_defdict_empty_test():
