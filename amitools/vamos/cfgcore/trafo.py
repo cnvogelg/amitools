@@ -10,7 +10,7 @@ class DictTrafo(object):
     else:
       self.prefix = None
 
-  def transform(self, in_dict, trafo_dict=None):
+  def transform(self, in_dict, trafo_dict=None, keep_none=False):
     if trafo_dict is None:
       trafo_dict = self.trafo_dict
     res = {}
@@ -23,7 +23,8 @@ class DictTrafo(object):
         vres = self.read_rel_path(val, in_dict)
       else:
         raise ValueError("invalid type in trafo_dict: %s" + val)
-      res[key] = vres
+      if vres is not None or keep_none:
+        res[key] = vres
     return res
 
   def read_rel_path(self, path, in_dict):
