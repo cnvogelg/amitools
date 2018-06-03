@@ -77,3 +77,28 @@ def config_parser_arg_test():
       "b": "cool",
       "c": {"a": 10, "b": 20}
   }
+
+
+def config_parser_ini_trafo_test():
+  def_cfg = {"a": {"v": 1,
+                   "w": ValueList(str),
+                   "x": True},
+             "b": "hello",
+             "c": ValueDict(int)}
+  trafo_cfg = {"a" : {"v" : "V",
+                      "w" : "W",
+                      "x" : "X"}
+              }
+  p = Parser(def_cfg, ini_trafo=trafo_cfg)
+  # update with some args
+  m = {
+    "V": 23,
+    "W": ["hello", "world"],
+    "X": False
+  }
+  p.parse_config(m, 'ini')
+  assert p.get_cfg_dict() == {
+      "a": {"v": 23, "w": ["hello", "world"], "x": False},
+      "b": "hello",
+      "c": None,
+  }

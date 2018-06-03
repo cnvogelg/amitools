@@ -1,16 +1,20 @@
 from .value import Value, ValueList, ValueDict
 from .defdict import DefaultDict
 from .argdict import ArgumentDict
+from .trafo import DictTrafo
 
 
 class Parser(object):
 
   def __init__(self, def_cfg=None, arg_cfg=None,
-               arg_sect=None, arg_desc=None):
+               arg_sect=None, arg_desc=None,
+               ini_trafo=None):
     self.def_dict = DefaultDict(def_cfg)
     self.arg_dict = ArgumentDict(arg_cfg)
     self.arg_sect = arg_sect
     self.arg_desc = arg_desc
+    self.ini_trafo = ini_trafo
+    self.dict_trafo = DictTrafo(ini_trafo)
     self.cfg = self.def_dict.gen_dict()
 
   def get_def_cfg(self):
@@ -35,4 +39,6 @@ class Parser(object):
     return ad
 
   def parse_config(self, cfg_dict, file_format):
+    if file_format == 'ini' and self.ini_trafo:
+      cfg_dict = self.dict_trafo.transform(cfg_dict)
     self.def_dict.merge_cfg(self.cfg, cfg_dict)
