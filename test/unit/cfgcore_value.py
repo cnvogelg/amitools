@@ -43,6 +43,17 @@ def config_value_list_test():
   assert l.parse("bla") == ["bla"]
   assert l.parse("a,b") == ["a", "b"]
   assert l.parse(["a", "b"]) == ["a", "b"]
+  assert l.parse(["a,b", "c"]) == ["a", "b", "c"]
+
+
+def config_value_list_int_test():
+  l = ValueList(int)
+  assert l.parse("12") == [12]
+  assert l.parse("1,2") == [1, 2]
+  assert l.parse(["1", "2"]) == [1, 2]
+  assert l.parse([1, 2]) == [1, 2]
+  assert l.parse(["1,2", "3"]) == [1, 2, 3]
+  assert l.parse(["1,2", 3]) == [1, 2, 3]
 
 
 def config_value_list_nest_value_test():
@@ -79,9 +90,21 @@ def config_value_dict_test():
   assert d.parse({'a': 'b', 'c': 'd'}) == {'a': 'b', 'c': 'd'}
   # allow list of partial dicts
   assert d.parse(['a:b', 'c:d']) == {'a': 'b', 'c': 'd'}
-  assert d.parse(['a:b', {'c':'d'}]) == {'a': 'b', 'c': 'd'}
+  assert d.parse(['a:b', {'c': 'd'}]) == {'a': 'b', 'c': 'd'}
   # last one wins in list
   assert d.parse(['a:b', 'a:d']) == {'a': 'd'}
+
+
+def config_value_dict_int_test():
+  d = ValueDict(int)
+  assert d.parse("a:1") == {'a': 1}
+  assert d.parse("a:1,c:2") == {'a': 1, 'c': 2}
+  assert d.parse({'a': 1, 'c': 2}) == {'a': 1, 'c': 2}
+  # allow list of partial dicts
+  assert d.parse(['a:1', 'c:2']) == {'a': 1, 'c': 2}
+  assert d.parse(['a:1', {'c': '2'}]) == {'a': 1, 'c': 2}
+  # last one wins in list
+  assert d.parse(['a:1', 'a:2']) == {'a': 2}
 
 
 def config_value_dict_nest_value_test():

@@ -102,16 +102,23 @@ class ValueList(object):
     elif type(val) is str:
       # split string by sep
       val = split_nest(val, self.sep, self.sub_nest_pair)
-    elif type(val) not in (list, tuple):
+      recurse = False
+    elif type(val) in (list, tuple):
+      recurse = True
+    else:
       raise ValueError("expected list or tuple: %s" % val)
     # rebuild list
     res = []
     for v in val:
       if self.is_sub_value:
         r = self.item_type.parse(v)
+        res.append(r)
+      elif type(v) is str and recurse:
+        rs = self.parse(v)
+        res += rs
       else:
         r = parse_scalar(self.item_type, v, self.allow_none)
-      res.append(r)
+        res.append(r)
     return res
 
   def __eq__(self, other):
