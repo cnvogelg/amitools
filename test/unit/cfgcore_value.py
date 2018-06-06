@@ -44,6 +44,9 @@ def config_value_list_test():
   assert l.parse("a,b") == ["a", "b"]
   assert l.parse(["a", "b"]) == ["a", "b"]
   assert l.parse(["a,b", "c"]) == ["a", "b", "c"]
+  # old value and append
+  assert l.parse(["a,b", "c"], ["x", "y"]) == ["a", "b", "c"]
+  assert l.parse("+a,b", ["x", "y"]) == ["x", "y", "a", "b"]
 
 
 def config_value_list_int_test():
@@ -93,6 +96,9 @@ def config_value_dict_test():
   assert d.parse(['a:b', {'c': 'd'}]) == {'a': 'b', 'c': 'd'}
   # last one wins in list
   assert d.parse(['a:b', 'a:d']) == {'a': 'd'}
+  # old value and append
+  assert d.parse("a:b", {"x": "y"}) == {'a': 'b'}
+  assert d.parse("+a:b", {"x": "y"}) == {'a': 'b', 'x': 'y'}
 
 
 def config_value_dict_int_test():
@@ -121,8 +127,25 @@ def config_value_dict_nest_list_test():
   assert d.parse({'a': ['b', 'c']}) == {'a': ['b', 'c']}
   d = ValueDict(ValueList(str))
   assert d.parse("a:(b,c)") == {'a': ['b', 'c']}
+  # allow to omit ()) if sub string has no key:value pair
+  assert d.parse("a:b,c") == {'a': ['b', 'c']}
+  assert d.parse("a:b,c,z:x") == {'a': ['b', 'c'], 'z': ['x']}
+  with pytest.raises(ValueError):
+    d.parse("a,b")
+  # append to list
+  assert d.parse("a:(b,c)", {'a': ['x']}) == {'a': ['b', 'c']}
+  assert d.parse("a:(+b,c)", {'a': ['x'], 'z': []}) == {'a': ['x', 'b', 'c']}
+  assert d.parse("+a:(b,c)", {'a': ['x'], 'z': []}
+                 ) == {'a': ['b', 'c'], 'z': []}
 
 
 def config_value_dict_nest_dict_test():
   d = ValueDict(ValueDict(str))
   assert d.parse("a:{b:c}") == {'a': {'b': 'c'}}
+  # append
+  assert d.parse("a:{b:c}", {'a': {'z': 'oi'}, 'b': {'x': 'hu'}}) == {
+      'a': {'b': 'c'}}
+  assert d.parse("+a:{b:c}", {'a': {'z': 'oi'}, 'b': {'x': 'hu'}}) == {
+      'a': {'b': 'c'}, 'b': {'x': 'hu'}}
+  assert d.parse("a:{+b:c}", {'a': {'z': 'oi'}, 'b': {'x': 'hu'}}) == {
+      'a': {'b': 'c', 'z': 'oi'}}

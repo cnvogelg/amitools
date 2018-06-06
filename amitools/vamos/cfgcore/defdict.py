@@ -52,7 +52,7 @@ class DefaultDict(object):
       self.merge_cfg(mval, oval, dval)
     else:
       # overwrite my key
-      mine[key] = dval.parse(oval)
+      mine[key] = dval.parse(oval, mval)
 
   def _check_default_cfg(self, cfg):
     t = type(cfg)

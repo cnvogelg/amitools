@@ -65,7 +65,7 @@ class Value(object):
     else:
       self.default = None
 
-  def parse(self, val):
+  def parse(self, val, old_val=None):
     return parse_scalar(self.item_type, val, self.allow_none)
 
   def __eq__(self, other):
@@ -78,10 +78,11 @@ class Value(object):
 
 class ValueList(object):
   def __init__(self, item_type, default=None, allow_none=None,
-               sep=',', nest_pair='()'):
+               sep=',', nest_pair='()', append='+'):
     self.item_type = item_type
     self.sep = sep
     self.nest_pair = nest_pair
+    self.append = append
     self.is_sub_value = type(item_type) in (Value, ValueList, ValueDict)
     if self.is_sub_value:
       self.sub_nest_pair = item_type.nest_pair
@@ -96,19 +97,27 @@ class ValueList(object):
     else:
       self.default = None
 
-  def parse(self, val):
+  def parse(self, val, old_val=None):
+    append = False
     if val is None:
       return []
     elif type(val) is str:
-      # split string by sep
-      val = split_nest(val, self.sep, self.sub_nest_pair)
-      recurse = False
+      if len(val) > 0:
+        if val[0] == self.append:
+          append = True
+          val = val[1:]
+        # split string by sep
+        val = split_nest(val, self.sep, self.sub_nest_pair)
+        recurse = False
     elif type(val) in (list, tuple):
       recurse = True
     else:
       raise ValueError("expected list or tuple: %s" % val)
     # rebuild list
-    res = []
+    if old_val and append:
+      res = old_val[:]
+    else:
+      res = []
     for v in val:
       if self.is_sub_value:
         r = self.item_type.parse(v)
@@ -133,11 +142,12 @@ class ValueList(object):
 
 class ValueDict(object):
   def __init__(self, item_type, default=None, allow_none=None,
-               sep=',', kv_sep=':', nest_pair='{}'):
+               sep=',', kv_sep=':', nest_pair='{}', append='+'):
     self.item_type = item_type
     self.sep = sep
     self.kv_sep = kv_sep
     self.nest_pair = nest_pair
+    self.append = append
     self.is_sub_value = type(item_type) in (Value, ValueList, ValueDict)
     if self.is_sub_value:
       self.sub_nest_pair = item_type.nest_pair
@@ -152,17 +162,33 @@ class ValueDict(object):
     else:
       self.default = None
 
-  def parse(self, val):
+  def parse(self, val, old_val=None):
+    append = False
     if val is None:
       return {}
     elif type(val) is str:
       # convert str to dict
-      d = {}
-      kvs = split_nest(val, self.sep, self.sub_nest_pair, True)
-      for kv in kvs:
-        key, val = split_nest(kv, self.kv_sep, self.sub_nest_pair)
-        d[key] = val
-      val = d
+      if len(val) > 0:
+        # do append?
+        if self.append == val[0]:
+          val = val[1:]
+          append = True
+        d = {}
+        # split string by ',' to separate key, val pairs
+        kvs = split_nest(val, self.sep, self.sub_nest_pair, True)
+        last_key = None
+        for kv in kvs:
+          # if colon is in substring assign value to key
+          if self.kv_sep in kv:
+            key, val = split_nest(kv, self.kv_sep, self.sub_nest_pair)
+            d[key] = val
+            last_key = key
+          elif not last_key:
+            raise ValueError("no key:value found!")
+          else:
+            # append this sub string to last key
+            d[key] = d[key] + self.sep + kv
+        val = d
     elif type(val) in (list, tuple):
       # allow list of entries and merge them
       res = {}
@@ -173,11 +199,15 @@ class ValueDict(object):
     elif type(val) is not dict:
       raise ValueError("expected dict: %s" % val)
     # rebuild dict
-    res = {}
+    if old_val and append:
+      res = old_val.copy()
+    else:
+      res = {}
     for key in val:
       v = val[key]
       if self.is_sub_value:
-        r = self.item_type.parse(v)
+        old_sub = old_val[key] if old_val and key in old_val else None
+        r = self.item_type.parse(v, old_sub)
       else:
         r = parse_scalar(self.item_type, v, self.allow_none)
       res[key] = r
