@@ -99,6 +99,8 @@ def config_value_dict_test():
   # old value and append
   assert d.parse("a:b", {"x": "y"}) == {'a': 'b'}
   assert d.parse("+a:b", {"x": "y"}) == {'a': 'b', 'x': 'y'}
+  # colon in value
+  assert d.parse("a:b:c") == {'a': 'b:c'}
 
 
 def config_value_dict_int_test():

@@ -180,9 +180,15 @@ class ValueDict(object):
         for kv in kvs:
           # if colon is in substring assign value to key
           if self.kv_sep in kv:
-            key, val = split_nest(kv, self.kv_sep, self.sub_nest_pair)
-            d[key] = val
-            last_key = key
+            elems = split_nest(kv, self.kv_sep, self.sub_nest_pair)
+            if len(elems) >= 2:
+              key = elems[0]
+              # join extra colon elements
+              val = self.kv_sep.join(elems[1:])
+              d[key] = val
+              last_key = key
+            else:
+              raise ValueError("no colon found!")
           elif not last_key:
             raise ValueError("no key:value found!")
           else:
