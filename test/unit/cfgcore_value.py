@@ -10,6 +10,7 @@ def config_value_parse_str_test():
 
 
 def config_value_parse_int_test():
+  assert parse_scalar(int, 0) == 0
   assert parse_scalar(int, 12) == 12
   assert parse_scalar(int, "12") == 12
   with pytest.raises(ValueError):
@@ -36,6 +37,12 @@ def config_value_split_nest_test():
   assert split_nest("foo,(bar,(baz,foo))") == ["foo", "bar,(baz,foo)"]
   assert split_nest("foo,{bar,(baz,foo)}", nest_pair='{}') == [
       "foo", "bar,(baz,foo)"]
+
+
+def config_value_test():
+  v = Value(int, 0)
+  print(v)
+  assert v.default == 0
 
 
 def config_value_list_test():
@@ -91,6 +98,10 @@ def config_value_dict_test():
   assert d.parse("a:b") == {'a': 'b'}
   assert d.parse("a:b,c:d") == {'a': 'b', 'c': 'd'}
   assert d.parse({'a': 'b', 'c': 'd'}) == {'a': 'b', 'c': 'd'}
+  # other seps
+  d2 = ValueDict(str, kv_sep='=', sep='+')
+  assert d2.parse("a=b") == {'a': 'b'}
+  assert d2.parse("a=b+c=d") == {'a': 'b', 'c': 'd'}
   # allow list of partial dicts
   assert d.parse(['a:b', 'c:d']) == {'a': 'b', 'c': 'd'}
   assert d.parse(['a:b', {'c': 'd'}]) == {'a': 'b', 'c': 'd'}
@@ -151,3 +162,6 @@ def config_value_dict_nest_dict_test():
       'a': {'b': 'c'}, 'b': {'x': 'hu'}}
   assert d.parse("a:{+b:c}", {'a': {'z': 'oi'}, 'b': {'x': 'hu'}}) == {
       'a': {'b': 'c', 'z': 'oi'}}
+  # other sep
+  d2 = ValueDict(ValueDict(str), kv_sep='=', sep='+')
+  assert d2.parse("a=b:c") == {'a': {'b': 'c'}}

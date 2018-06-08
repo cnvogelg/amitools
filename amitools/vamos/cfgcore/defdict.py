@@ -13,9 +13,14 @@ class DefaultDict(object):
   def get_cfg(self):
     return self.default
 
-  def gen_dict(self):
+  def get_default(self):
+    return self.default
+
+  def gen_dict(self, default=None):
     """generate a pure dictionary holding the default values"""
-    return self._gen_default_dict(self.default)
+    if default is None:
+      default = self.default
+    return self._gen_default_dict(default)
 
   def _gen_default_dict(self, def_cfg):
     res = {}

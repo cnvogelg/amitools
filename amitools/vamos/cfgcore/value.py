@@ -60,7 +60,7 @@ class Value(object):
       self.allow_none = item_type is str
     else:
       self.allow_none = allow_none
-    if default:
+    if default is not None:
       self.default = self.parse(default)
     else:
       self.default = None
@@ -73,7 +73,8 @@ class Value(object):
         self.default == other.default
 
   def __repr__(self):
-    return "Value(%s, default=%s)" % (self.item_type, self.default)
+    return "Value(%s, default=%s, allow_none=%s)" % \
+        (self.item_type, self.default, self.allow_none)
 
 
 class ValueList(object):
