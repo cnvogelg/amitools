@@ -4,6 +4,11 @@ class Argument(object):
     self.args = args
     self.kwargs = kwargs
     self.arg = None
+    if 'order' in kwargs:
+      self.order = kwargs['order']
+      del kwargs['order']
+    else:
+      self.order = None
 
   def __repr__(self):
     return "Argument(%s, %s)" % (self.args, self.kwargs)
@@ -28,13 +33,23 @@ class ArgumentDict(object):
   def add_args(self, parser, arg_dict=None):
     if arg_dict is None:
       arg_dict = self.arg_dict
+    # collect args
+    args = []
+    self._collect_args(arg_dict, args)
+    # sort'em
+    args.sort(key=lambda x: x.order)
+    # finally add args
+    for arg in args:
+      arg.add(parser)
+
+  def _collect_args(self, arg_dict, res):
     for key in arg_dict:
       val = arg_dict[key]
       vtype = type(val)
       if vtype is dict:
-        self.add_args(parser, val)
+        self._collect_args(val, res)
       else:
-        val.add(parser)
+        res.append(val)
 
   def gen_dict(self, args, arg_dict=None, skip_none=True):
     if arg_dict is None:

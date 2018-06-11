@@ -31,3 +31,19 @@ def config_argdict_simple_test():
     "a": False,
     "b": 'hi'
   }
+
+
+def config_argdict_order_test():
+  cfg = {
+    "a": Argument('first', order=1),
+    "b": Argument('second', order=2)
+  }
+  ad = ArgumentDict(cfg)
+  ap = argparse.ArgumentParser()
+  ad.add_args(ap)
+  # check order
+  args = ap.parse_args(['first', 'second'])
+  assert ad.gen_dict(args) == {
+    "a": 'first',
+    "b": 'second'
+  }
