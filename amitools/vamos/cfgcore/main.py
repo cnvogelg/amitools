@@ -29,7 +29,7 @@ class MainParser(object):
     self.parsers.append(sub_parser)
     sub_parser.setup_args(self.ap)
 
-  def parse(self, paths, args=None):
+  def parse(self, paths=None, args=None):
     """convenience function that combines all other calls.
 
        add file and skip args.
@@ -107,11 +107,15 @@ class MainParser(object):
       skip_cfg = getattr(self.args, self.skip_arg_name, False)
     return cfg_file, skip_cfg
 
-  def parse_dict_config(self, cfg_dict):
+  def parse_dict_config(self, cfg_dict, file_format=None):
+    if file_format is None:
+      file_format = 'dict'
     for parser in self.parsers:
-      parser.parse_config(cfg_dict, 'dict')
+      parser.parse_config(cfg_dict, file_format)
 
   def parse_files(self, paths):
+    if paths is None:
+      return None, None
     for file in paths:
       if os.path.exists(file):
         res = self.parse_config_auto(file)
