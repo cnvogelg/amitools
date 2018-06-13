@@ -4,6 +4,7 @@ from __future__ import print_function
 import pytest
 import subprocess
 import os
+import hashlib
 
 VAMOS_BIN = "../bin/vamos"
 VAMOS_ARGS = ['-c', 'test.vamosrc']
@@ -134,16 +135,24 @@ class VamosTestRunner:
       args = args + self.vopts
     if 'vargs' in kw_args:
       args = args + kw_args['vargs']
+
+    # built binaries have special prog names
     prog_name = "curdir:bin/" + prog_args[0] + '_' + self.flavor
     if self.use_debug_bins:
       prog_name = prog_name + "_dbg"
+
     args.append(prog_name)
     if len(prog_args) > 1:
       args = args + list(prog_args[1:])
 
     # run and get stdout/stderr
     print("running:", " ".join(args))
-    p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if stdin:
+      stdin_flag = subprocess.PIPE
+    else:
+      stdin_flag = None
+    p = subprocess.Popen(args, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, stdin=stdin_flag)
     (stdout, stderr) = p.communicate(stdin)
 
     # process stdout
@@ -198,6 +207,68 @@ class VamosTestRunner:
     # asser stderr to be empty
     if self.vopts is None:
       assert stderr == []
+
+
+class VamosRunner:
+
+  def __init__(self, vamos_bin, vopts):
+    self.vamos_bin = vamos_bin
+    self.vopts = vopts
+
+  def run_prog(self, *prog_args, **kw_args):
+    # stdin given?
+    if 'stdin' in kw_args:
+      stdin = kw_args['stdin']
+    else:
+      stdin = None
+
+    # timestamps?
+    if 'no_ts' in kw_args:
+      no_ts = kw_args['no_ts']
+    else:
+      no_ts = True
+
+    # run vamos with prog
+    args = [self.vamos_bin] + VAMOS_ARGS
+    if no_ts:
+      args.append('--no-ts')
+    if 'vargs' in kw_args:
+      args = args + kw_args['vargs']
+
+    args = args + list(prog_args)
+
+    # run and get stdout/stderr
+    print("running:", " ".join(args))
+    print("stdin:", stdin)
+    if stdin:
+      stdin_flag = subprocess.PIPE
+    else:
+      stdin_flag = None
+    p = subprocess.Popen(args, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, stdin=stdin_flag)
+    (stdout, stderr) = p.communicate(stdin)
+
+    # process stdout
+    stdout = stdout.splitlines()
+    stderr = stderr.splitlines()
+    return (p.returncode, stdout, stderr)
+
+  def _get_sha1(self, file_name):
+    h = hashlib.sha1()
+    with open(file_name, "rb") as fh:
+      data = fh.read()
+      h.update(data)
+      return h.hexdigest()
+
+  def skip_if_prog_not_available(self, file_name, sha1_sum=None):
+    if not os.path.exists(file_name):
+      pytest.skip("prog not found: " + file_name)
+    if sha1_sum:
+      file_sum = self._get_sha1(file_name)
+      print(file_sum, file_name)
+      if file_sum != sha1_sum:
+        pytest.skip("prog wrong hash: got=%s want=%s" % (file_sum, sha1_sum))
+
 
 # ----- pytest integration -----
 
@@ -254,6 +325,15 @@ def vamos(request):
                          generate_data=gen,
                          vopts=vopts,
                          vamos_bin=vamos_bin)
+
+
+@pytest.fixture(scope="module")
+def vrun(request):
+  vopts = request.config.getoption("--vamos-options")
+  vamos_bin = request.config.getoption("--vamos-executable")
+  if vopts is not None:
+    vopts = vopts.split('+')
+  return VamosRunner(vopts=vopts, vamos_bin=vamos_bin)
 
 
 @pytest.fixture(scope="module",

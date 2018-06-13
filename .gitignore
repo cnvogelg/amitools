@@ -7,3 +7,5 @@ gen/
 emu.c
 emu.so
 .python-version
+.cache
+.pytest_cache
