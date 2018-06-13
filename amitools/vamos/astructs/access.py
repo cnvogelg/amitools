@@ -34,7 +34,7 @@ class AccessStruct(object):
     return val
 
   def s_get_addr(self, name):
-    return self.struct.get_offset_for_name(name)
+    return self.struct.get_addr_for_name(name)
 
   def r_all(self):
     """return a namedtuple with all values of the struct"""

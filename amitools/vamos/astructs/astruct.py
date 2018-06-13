@@ -76,6 +76,11 @@ class AmigaStruct(object):
     return res
 
   @classmethod
+  def get_field_offset_by_name(cls, name):
+    field = cls.get_field_by_name(name)
+    return field.offset
+
+  @classmethod
   def get_field_offset_for_path(cls, name):
     fields = cls.get_fields_by_path(name)
     offsets = map(lambda x : x.offset, fields)
@@ -275,7 +280,7 @@ class AmigaStruct(object):
         # no sub struct
         return self, field, delta
 
-  def get_offset_for_name(self, name):
+  def get_addr_for_name(self, name):
     struct, field = self.get_struct_field_for_name(name)
     return struct._addr + field.offset
 

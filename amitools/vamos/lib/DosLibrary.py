@@ -329,7 +329,7 @@ class DosLibrary(LibImpl):
     pred = node.r_s("lv_Node.ln_Pred")
     AccessStruct(ctx.mem, NodeStruct, pred).w_s("ln_Succ", succ)
     AccessStruct(ctx.mem, NodeStruct, succ).w_s("ln_Pred", pred)
-    self._free_mem(node.struct_addr)
+    self._free_mem(node.struct._addr)
     for k in self.local_vars.keys():
       if self.local_vars[k] == node:
         del self.local_vars[k]
@@ -435,7 +435,7 @@ class DosLibrary(LibImpl):
     log_dos.info("FindSegment(%s)" % needle)
     while seg_addr != 0:
       segment  = AccessStruct(ctx.mem, SegmentStruct, seg_addr)
-      name_addr= seg_addr + SegmentStruct.get_offset_for_name("seg_Name")[0]
+      name_addr= seg_addr + SegmentStruct.get_field_offset_by_name("seg_Name")
       name     = ctx.mem.r_bstr(name_addr)
       if name.lower() == needle.lower():
         if (system and segment.r_s("seg_UC") < 0) or (not system and segment.r_s("seg_UC") > 0):
@@ -451,7 +451,7 @@ class DosLibrary(LibImpl):
     system    = ctx.cpu.r_reg(REG_D3)
     name      = ctx.mem.r_cstr(name_ptr)
     seg_addr  = self._alloc_mem("Segment",SegmentStruct.get_size() + len(name) + 1)
-    name_addr = seg_addr + SegmentStruct.get_offset_for_name("seg_Name")[0]
+    name_addr = seg_addr + SegmentStruct.get_field_offset_by_name("seg_Name")
     segment   = ctx.alloc.map_struct("Segment", seg_addr, SegmentStruct)
     head_addr = self.dos_info.access.r_s("di_NetHand")
     segment.access.w_s("seg_Next",head_addr)
@@ -1027,7 +1027,7 @@ class DosLibrary(LibImpl):
     fs_port  = self.file_mgr.get_fs_handler_port()
     addr     = self._alloc_mem("DevProc:%s" % name, DevProcStruct.get_size())
     log_dos.info("GetDeviceProc: name='%s' devproc=%06x -> volume=%s devproc=%06x lock=%06x",
-                 name, last_devproc, volume, addr, vol_lock.b_addr)
+                 name, last_devproc, volume, addr, vol_lock)
     devproc = AccessStruct(ctx.mem,DevProcStruct,struct_addr=addr)
     devproc.w_s('dvp_Port', fs_port)
     if vol_lock == None:

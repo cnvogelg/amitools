@@ -299,7 +299,7 @@ class InfoDataStruct(AmigaStruct):
 class SegmentStruct(AmigaStruct):
   _format = [
     ('BPTR','seg_Next'),
-    ('LONG','seg_UC'),
+    ('ULONG','seg_UC'),
     ('BPTR','seg_Seg'),
     ('UBYTE','seg_Name')
     ]
