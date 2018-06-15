@@ -35,6 +35,6 @@ class LogParser(Parser):
         "quiet": "quiet",
       }
     }
-    Parser.__init__(self, def_cfg, arg_cfg,
+    Parser.__init__(self, "log", def_cfg, arg_cfg,
                     "logging", "enable logging channels, write to file",
                     ini_trafo, ini_prefix)

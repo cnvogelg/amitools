@@ -26,7 +26,7 @@ class LibsParser(Parser):
                          action='append',
                          help="set lib/dev options: <lib>=<key>=<value>,...")
     }
-    Parser.__init__(self, def_cfg, arg_cfg,
+    Parser.__init__(self, "libs", def_cfg, arg_cfg,
                     "libs/devs", "configure vamos libraries and devices")
     self.lib_default = self.def_dict.get_default()['libs']['*.library']
     self.dev_default = self.def_dict.get_default()['devs']['*.device']

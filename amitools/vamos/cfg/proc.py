@@ -43,6 +43,6 @@ class ProcessParser(Parser):
             "stack": "stack_size"
         }
     }
-    Parser.__init__(self, def_cfg, arg_cfg,
+    Parser.__init__(self, "proc", def_cfg, arg_cfg,
                     "process", "command process options",
                     ini_trafo, ini_prefix)

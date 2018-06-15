@@ -1,10 +1,14 @@
 from .cfgdict import ConfigDict
 
 
+def _check_enum(val, enum):
+  if enum and val not in enum:
+    raise ValueError("invalid enum: %s of %s" % (val, enum))
+
+
 def parse_scalar(val_type, val, allow_none=False, enum=None):
   if type(val) is val_type:
-    if enum and val not in enum:
-      raise ValueError("invalid enum: %s of %s" % (val, enum))
+    _check_enum(val, enum)
     return val
   # none handling
   if val is None:
@@ -20,10 +24,16 @@ def parse_scalar(val_type, val, allow_none=False, enum=None):
         return True
       elif lv in ("off", "false"):
         return False
+  # int special strings
+  if val_type is int:
+    if type(val) is str:
+      if val.startswith("0x"):
+        val = int(val[2:], 16)
+      elif val.startswith("$"):
+        val = int(val[1:], 16)
   # convert type
   val = val_type(val)
-  if enum and val not in enum:
-    raise ValueError("invalid enum: %s of %s" % (val, enum))
+  _check_enum(val, enum)
   return val
 
 

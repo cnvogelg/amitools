@@ -19,17 +19,24 @@ class MainParser(object):
       debug = 'AMITOOLS_CONFIG_DEBUG' in os.environ
     self.parsers = []
     self.ap = argparse.ArgumentParser(*args, **kwargs)
+    self._patch_arg_exit()
     self._setup_logging(debug)
     self.args = None
     self.arg_grp = None
     self.file_arg_name = None
     self.skip_arg_name = None
 
+  def _patch_arg_exit(self):
+    self.ap_error = None
+    def error(this, message):
+      self.ap_error = message
+    self.ap.error = error.__get__(self.ap, argparse.ArgumentParser)
+
   def add_parser(self, sub_parser):
     self.parsers.append(sub_parser)
     sub_parser.setup_args(self.ap)
 
-  def parse(self, paths=None, args=None):
+  def parse(self, paths=None, args=None, cfg_dict=None):
     """convenience function that combines all other calls.
 
        add file and skip args.
@@ -39,21 +46,36 @@ class MainParser(object):
          try given paths for configs. first match wins.
        finally parse args.
 
-       return (cfg_file, read_ok) or (None, True) on skip
+       return True if parsing was without errors else False
     """
     self.add_file_arg()
     self.add_skip_arg()
-    cfg_file, skip_cfgs = self.pre_parse_args(args)
+    self.add_config_debug()
+    ok, cfg_file, skip_cfgs = self.pre_parse_args(args)
+    if not ok:
+      return False
+    # enable config debug
+    log_cfg.info("args: cfg_file=%s, skip_cfgs=%s", cfg_file, skip_cfgs)
+    # read config given in args
     if cfg_file:
       res = self.parse_config_auto(cfg_file)
       ok = res is not None
-    elif not skip_cfgs:
+      log_cfg.info("args: cfg_file '%s' is ok: %s", cfg_file, ok)
+    # try to read given config paths
+    elif not skip_cfgs and paths:
+      log_cfg.info("paths: try config files: %s", paths)
       cfg_file, res = self.parse_files(paths)
       ok = res is not None
+      log_cfg.info("paths: cfg_file '%s' is ok: %s", cfg_file, ok)
     else:
       ok = True
-    self.parse_args(args)
-    return cfg_file, ok
+    # additional config?
+    if ok and cfg_dict:
+      ok = self.parse_dict_config(cfg_dict)
+      log_cfg.info("cfg_dict: ok: %s", ok)
+    # handle args
+    self.parse_args()
+    return ok
 
   def add_file_arg(self, name=None, long_name=None, arg_name=None,
                    args=None):
@@ -87,6 +109,12 @@ class MainParser(object):
                               help="do not read any configuration files")
     self.skip_arg_name = arg_name
 
+  def add_config_debug(self):
+    self._ensure_arg_group()
+    self.arg_grp.add_argument('--config-debug',
+                              action='store_true', default=False,
+                              help="debug config parsing")
+
   def _ensure_arg_group(self):
     if self.arg_grp is None:
       self.arg_grp = self.ap.add_argument_group(
@@ -99,19 +127,31 @@ class MainParser(object):
        Returns (cfg_file, skip_cfg) or (None, False)
     """
     self.args = self.ap.parse_args(args)
+    if self.ap_error:
+      log_cfg.error("args: %s", self.ap_error)
+      return False, None, False
     cfg_file = None
     skip_cfg = False
     if self.file_arg_name:
       cfg_file = getattr(self.args, self.file_arg_name, None)
     if self.skip_arg_name:
       skip_cfg = getattr(self.args, self.skip_arg_name, False)
-    return cfg_file, skip_cfg
+    # enable config debug via arg?
+    config_debug = getattr(self.args, "config_debug", False)
+    if config_debug:
+      self._enable_logging()
+    return True, cfg_file, skip_cfg
 
   def parse_dict_config(self, cfg_dict, file_format=None):
     if file_format is None:
       file_format = 'dict'
     for parser in self.parsers:
-      parser.parse_config(cfg_dict, file_format)
+      try:
+        parser.parse_config(cfg_dict, file_format)
+      except ValueError as e:
+        log_cfg.error("%s: failed: %s", parser.name, e)
+        return False
+    return True
 
   def parse_files(self, paths):
     if paths is None:
@@ -152,7 +192,11 @@ class MainParser(object):
     # report to parsers
     if cfg_dict:
       for parser in self.parsers:
-        parser.parse_config(cfg_dict, 'ini')
+        try:
+          parser.parse_config(cfg_dict, 'ini')
+        except ValueError as e:
+          log_cfg.error("%s: failed: %s", parser.name, e)
+          return None
     return cfg_dict
 
   def parse_json_config(self, file_name):
@@ -176,17 +220,20 @@ class MainParser(object):
     # report to parsers
     if cfg_dict:
       for parser in self.parsers:
-        parser.parse_config(cfg_dict, 'json')
+        try:
+          parser.parse_config(cfg_dict, 'json')
+        except ValueError as e:
+          log_cfg.error("%s: failed: %s", parser.name, e)
+          return None
     return cfg_dict
 
-  def parse_args(self, args=None):
+  def parse_args(self):
     # if args were not already parsed by pre_parse_args() above
     if self.args is None:
-      self.args = self.ap.parse_args(args)
+      raise RuntimeError("run pre_parse_args() first!")
     # notify parsers about args
     for parser in self.parsers:
       parser.parse_args(self.args)
-    return self.args
 
   def _auto_detect_format(self, file_obj):
     for line in file_obj:
@@ -209,6 +256,9 @@ class MainParser(object):
     else:
       log_cfg.setLevel(logging.WARN)
     log_cfg.debug("logging setup")
+
+  def _enable_logging(self):
+    log_cfg.setLevel(logging.DEBUG)
 
   def _read_ini_file(self, file_name):
     is_str = type(file_name) is str

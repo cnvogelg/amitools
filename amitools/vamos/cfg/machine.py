@@ -39,6 +39,6 @@ class MachineParser(Parser):
             "hw_access": "hw_access"
         }
     }
-    Parser.__init__(self, def_cfg, arg_cfg,
+    Parser.__init__(self, "machine", def_cfg, arg_cfg,
                     "machine", "cpu and memory options",
                     ini_trafo, ini_prefix)

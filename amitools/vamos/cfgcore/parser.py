@@ -6,9 +6,10 @@ from .trafo import DictTrafo
 
 class Parser(object):
 
-  def __init__(self, def_cfg=None, arg_cfg=None,
+  def __init__(self, name, def_cfg=None, arg_cfg=None,
                arg_sect=None, arg_desc=None,
                ini_trafo=None, ini_prefix=None):
+    self.name = name
     self.def_dict = DefaultDict(def_cfg)
     self.arg_dict = ArgumentDict(arg_cfg)
     self.arg_sect = arg_sect

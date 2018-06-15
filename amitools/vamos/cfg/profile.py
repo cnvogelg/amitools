@@ -34,5 +34,5 @@ class ProfileParser(Parser):
             }
         }
     }
-    Parser.__init__(self, def_cfg, arg_cfg,
+    Parser.__init__(self, "profile", def_cfg, arg_cfg,
                     "profile", "lib profiling options")

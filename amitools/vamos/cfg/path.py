@@ -23,5 +23,5 @@ class PathParser(Parser):
         "volumes": Argument('-V', '--volume', action='append',
                             help="define AmigaOS volume: name:/abs/sys/path")
     }
-    Parser.__init__(self, def_cfg, arg_cfg,
+    Parser.__init__(self, "path", def_cfg, arg_cfg,
                     "paths", "define volumes, assigns, and the search path")

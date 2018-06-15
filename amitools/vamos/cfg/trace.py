@@ -35,6 +35,6 @@ class TraceParser(Parser):
             "labels": "labels"
         }
     }
-    Parser.__init__(self, def_cfg, arg_cfg,
+    Parser.__init__(self, "trace", def_cfg, arg_cfg,
                     "trace", "control low-level machine tracing",
                     ini_trafo, ini_prefix)

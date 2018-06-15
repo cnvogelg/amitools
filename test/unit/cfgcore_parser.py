@@ -3,7 +3,7 @@ import argparse
 
 
 def config_parser_default_empty_test():
-  p = Parser()
+  p = Parser("a")
   assert p.get_def_cfg().get_cfg() == {}
   assert p.get_arg_cfg().get_cfg() == {}
   assert p.get_cfg_dict() == {}
@@ -15,7 +15,7 @@ def config_parser_default_test():
                    "x": True},
              "b": "hello",
              "c": ValueDict(int)}
-  p = Parser(def_cfg)
+  p = Parser("a", def_cfg)
   # check internal default
   def_cfg = p.get_def_cfg().get_cfg()
   assert def_cfg == {
@@ -39,7 +39,7 @@ def config_parser_config_test():
                    "x": True},
              "b": "hello",
              "c": ValueDict(int)}
-  p = Parser(def_cfg)
+  p = Parser("a", def_cfg)
   # update with some config
   m = {
       "a": {"v": 3, "w": "a,b", "x": False},
@@ -65,7 +65,7 @@ def config_parser_arg_test():
                    "x": Argument("-x", action='store_false')},
              "b": Argument("-b"),
              "c": Argument("-c")}
-  p = Parser(def_cfg, arg_cfg)
+  p = Parser("a", def_cfg, arg_cfg)
   # update with some args
   ap = argparse.ArgumentParser()
   p.setup_args(ap)
@@ -85,16 +85,16 @@ def config_parser_ini_trafo_test():
                    "x": True},
              "b": "hello",
              "c": ValueDict(int)}
-  trafo_cfg = {"a" : {"v" : "V",
-                      "w" : "W",
-                      "x" : "X"}
-              }
-  p = Parser(def_cfg, ini_trafo=trafo_cfg)
+  trafo_cfg = {"a": {"v": "V",
+                     "w": "W",
+                     "x": "X"}
+               }
+  p = Parser("a", def_cfg, ini_trafo=trafo_cfg)
   # update with some args
   m = {
-    "V": 23,
-    "W": ["hello", "world"],
-    "X": False
+      "V": 23,
+      "W": ["hello", "world"],
+      "X": False
   }
   p.parse_config(m, 'ini')
   assert p.get_cfg_dict() == {

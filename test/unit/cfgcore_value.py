@@ -16,6 +16,8 @@ def config_value_parse_int_test():
   assert parse_scalar(int, 0) == 0
   assert parse_scalar(int, 12) == 12
   assert parse_scalar(int, "12") == 12
+  assert parse_scalar(int, "0xf") == 15
+  assert parse_scalar(int, "$ff") == 255
   with pytest.raises(ValueError):
     parse_scalar(int, None)
   assert parse_scalar(int, None, True) is None
