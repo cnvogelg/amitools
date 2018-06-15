@@ -1,4 +1,5 @@
 from .value import Value, ValueList, ValueDict
+from .cfgdict import ConfigDict
 
 
 class DefaultDict(object):
@@ -7,7 +8,7 @@ class DefaultDict(object):
     if default is None:
       default = {}
     self._check_default_cfg(default)
-    self.default = {}
+    self.default = ConfigDict()
     self._rebuild_default_cfg(default, self.default)
 
   def get_cfg(self):
@@ -23,10 +24,10 @@ class DefaultDict(object):
     return self._gen_default_dict(default)
 
   def _gen_default_dict(self, def_cfg):
-    res = {}
+    res = ConfigDict()
     for key in def_cfg:
       val = def_cfg[key]
-      if type(val) is dict:
+      if type(val) is ConfigDict:
         res[key] = self._gen_default_dict(val)
       else:
         res[key] = val.default
@@ -46,13 +47,13 @@ class DefaultDict(object):
       def_key = key
     # create dict if missing
     if key not in mine:
-      mine[key] = {}
+      mine[key] = ConfigDict()
     oval = other[key]
     dval = default[def_key]
     mval = mine[key]
-    if type(dval) is dict:
+    if type(dval) is ConfigDict:
       # recurse in dict
-      if type(oval) is not dict:
+      if type(oval) not in (ConfigDict, dict):
         raise ValueError("expected dict key: %s" % key)
       self.merge_cfg(mval, oval, dval)
     else:
@@ -63,7 +64,7 @@ class DefaultDict(object):
     t = type(cfg)
     if t in (bool, str, int, Value, ValueList, ValueDict):
       pass
-    elif t is dict:
+    elif t in (dict, ConfigDict):
       for key in cfg:
         v = cfg[key]
         self._check_default_cfg(v)
@@ -77,8 +78,8 @@ class DefaultDict(object):
       if t in (bool, int, str):
         # auto wrap in Value
         out_cfg[key] = Value(t, val)
-      elif t is dict:
-        new_dict = {}
+      elif t in (dict, ConfigDict):
+        new_dict = ConfigDict()
         out_cfg[key] = new_dict
         self._rebuild_default_cfg(val, new_dict)
       elif t in (Value, ValueList, ValueDict):
