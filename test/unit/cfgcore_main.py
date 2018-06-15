@@ -212,6 +212,13 @@ def config_main_parser_config_test(tmpdir):
       "b": "hello",
       "c": None
   }
+  assert mp.get_cfg_dict() == {
+      "a": {"v": 3,  # from config
+            "w": None,
+            "x": True},
+      "b": "hello",
+      "c": None
+  }
 
 
 def config_main_parser_config_fail_test(tmpdir, caplog):

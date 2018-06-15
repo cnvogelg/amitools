@@ -3,7 +3,10 @@ import ConfigParser
 import json
 import logging
 import os
+import pprint
+import StringIO
 from .value import Value, ValueList, ValueDict
+from .cfgdict import ConfigDict
 
 
 # get and configure a config logger before all other loggers
@@ -75,7 +78,20 @@ class MainParser(object):
       log_cfg.info("cfg_dict: ok: %s", ok)
     # handle args
     self.parse_args()
+    # dump config?
+    if getattr(self.args, 'config_dump', False):
+      self._dump_config()
     return ok
+
+  def get_cfg_dict(self):
+    res = ConfigDict()
+    for parser in self.parsers:
+      d = parser.get_cfg_dict()
+      for key in d:
+        if key in res:
+          raise ValueError("duplicate key in cfg: %s", key)
+        res[key] = d[key]
+    return res
 
   def add_file_arg(self, name=None, long_name=None, arg_name=None,
                    args=None):
@@ -114,6 +130,9 @@ class MainParser(object):
     self.arg_grp.add_argument('--config-debug',
                               action='store_true', default=False,
                               help="debug config parsing")
+    self.arg_grp.add_argument('--config-dump',
+                              action='store_true', default=False,
+                              help="dump final config")
 
   def _ensure_arg_group(self):
     if self.arg_grp is None:
@@ -284,3 +303,13 @@ class MainParser(object):
       for key, val in p.items(sec):
         sec_dict[key] = val
     return res
+
+  def _dump_config(self):
+    out = StringIO.StringIO()
+    cfg = self.get_cfg_dict()
+    pprint.pprint(cfg, out)
+    res = out.getvalue()
+    out.close()
+    self._enable_logging()
+    for line in res.splitlines():
+      log_cfg.info(line)
