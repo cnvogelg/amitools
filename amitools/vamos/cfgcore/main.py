@@ -77,7 +77,11 @@ class MainParser(object):
       ok = self.parse_dict_config(cfg_dict)
       log_cfg.info("cfg_dict: ok: %s", ok)
     # handle args
-    self.parse_args()
+    try:
+      self.parse_args()
+    except ValueError as e:
+      log_cfg.error("args: parser failed: %s", e)
+      return False
     # dump config?
     if getattr(self.args, 'config_dump', False):
       self._dump_config()

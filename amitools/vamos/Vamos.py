@@ -126,14 +126,13 @@ class Vamos:
     self.open_base_libs()
     return self.setup_main_proc(binary, arg_str, stack_size, shell, cwd)
 
-  def cleanup(self, ok):
+  def cleanup(self):
     self.cleanup_main_proc()
     self.close_base_libs()
     # shutdown of libmgr needs temp stack
     sp = self.machine.get_ram_begin() - 4
     self.lib_mgr.shutdown(run_sp=sp)
-    if ok:
-        self.alloc.dump_orphans()
+    self.alloc.dump_orphans()
 
   # ----- system setup -----
 

@@ -268,6 +268,21 @@ def config_main_parser_args_fail_test(tmpdir, caplog):
   ]
 
 
+def config_main_parser_args_fail2_test(tmpdir, caplog):
+  mp = MainParser()
+  p = gen_parser()
+  mp.add_parser(p)
+  tmpdir.join("cfg1").write("[a]\nv=3")
+  cfg1 = str(tmpdir.join("cfg1"))
+  paths = [cfg1]
+  # run with args
+  assert not mp.parse(paths, args=['-C', 'a:hugo'])
+  assert caplog.record_tuples == [
+      ('config', logging.ERROR,
+       "args: parser failed: invalid literal for int() with base 10: 'hugo'")
+  ]
+
+
 def config_main_parser_dict_test(tmpdir):
   mp = MainParser()
   p = gen_parser()

@@ -1,5 +1,7 @@
+from __future__ import print_function
 import logging
 import logging.config
+from .cfgcore import log_cfg
 
 # --- vamos loggers ---
 
@@ -21,7 +23,7 @@ log_file = logging.getLogger('file')
 log_lock = logging.getLogger('lock')
 log_doslist = logging.getLogger('doslist')
 
-log_dos  = logging.getLogger('dos')
+log_dos = logging.getLogger('dos')
 log_exec = logging.getLogger('exec')
 log_utility = logging.getLogger('utility')
 log_math = logging.getLogger('math')
@@ -33,23 +35,24 @@ log_tp = logging.getLogger('tp')
 log_hw = logging.getLogger('hw')
 
 loggers = [
-  log_main, log_mem, log_mem_init, log_mem_alloc, log_mem_int,
-  log_instr, log_lib, log_libmgr, log_path, log_file, log_lock,
-  log_doslist, log_segload, log_dos, log_exec, log_proc, log_prof,
-  log_tp, log_utility, log_hw, log_math, log_machine
+    log_main, log_mem, log_mem_init, log_mem_alloc, log_mem_int,
+    log_instr, log_lib, log_libmgr, log_path, log_file, log_lock,
+    log_doslist, log_segload, log_dos, log_exec, log_proc, log_prof,
+    log_tp, log_utility, log_hw, log_math, log_machine
 ]
 
 # --- end ---
 
 OFF = 100
 levels = {
-  "debug" : logging.DEBUG,
-  "info" : logging.INFO,
-  "warn" : logging.WARN,
-  "error" : logging.ERROR,
-  "fatal" : logging.FATAL,
-  "off" : OFF
+    "debug": logging.DEBUG,
+    "info": logging.INFO,
+    "warn": logging.WARN,
+    "error": logging.ERROR,
+    "fatal": logging.FATAL,
+    "off": OFF
 }
+
 
 def log_parse_level(name):
   if levels.has_key(name):
@@ -57,35 +60,38 @@ def log_parse_level(name):
   else:
     return None
 
+
 def log_help():
-  print "logging channels:"
+  print("logging channels:")
   names = map(lambda x: x.name, loggers)
   for n in sorted(names):
-    print "  %s" % n
-  print
-  print "logging levels:"
+    print("  %s" % n)
+  print()
+  print("logging levels:")
   for l in levels:
-    print "  %s" % l
+    print("  %s" % l)
 
-def log_setup(arg=None, verbose=False, quiet=False, log_file=None, no_ts=False):
+
+def log_setup(log_cfg):
   # setup handler
-  if log_file != None:
-    ch = logging.FileHandler(log_file, mode='w')
+  if log_cfg.file != None:
+    ch = logging.FileHandler(log_cfg.file, mode='w')
   else:
     ch = logging.StreamHandler()
   ch.setLevel(logging.DEBUG)
   # and formatter
-  if no_ts:
-    formatter = logging.Formatter('%(name)10s:%(levelname)7s:  %(message)s')
+  if log_cfg.timestamps:
+    formatter = logging.Formatter(
+        '%(asctime)s.%(msecs)03d %(name)10s:%(levelname)7s:  %(message)s', datefmt='%H:%M:%S')
   else:
-    formatter = logging.Formatter('%(asctime)s.%(msecs)03d %(name)10s:%(levelname)7s:  %(message)s', datefmt='%H:%M:%S')
+    formatter = logging.Formatter('%(name)10s:%(levelname)7s:  %(message)s')
   ch.setFormatter(formatter)
   for l in loggers:
     l.addHandler(ch)
 
   # setup default
   level = logging.WARN
-  if quiet:
+  if log_cfg.quiet:
     level = logging.ERROR
   for l in loggers:
     l.setLevel(level)
@@ -94,31 +100,38 @@ def log_setup(arg=None, verbose=False, quiet=False, log_file=None, no_ts=False):
   log_prof.setLevel(logging.INFO)
 
   # is verbose enabled?
-  if verbose:
+  if log_cfg.verbose:
     log_main.setLevel(logging.INFO)
 
   # parse args
-  if arg != None:
-    kvs = arg.split(',')
-    for kv in kvs:
-      if kv.find(':') == -1:
+  levels = log_cfg.levels
+  if levels:
+    return _setup_levels(levels)
+  else:
+    return True
+
+
+def _setup_levels(levels):
+  for name in levels:
+    # get and parse level
+    lvl = levels[name]
+    level = log_parse_level(lvl)
+    if level == None:
+      log_cfg.error("invalid log level: %s", lvl)
+      return False
+    # find logger
+    if name == 'all':
+      for l in loggers:
+        l.setLevel(level)
+    else:
+      found = False
+      for l in loggers:
+        if l.name == name:
+          l.setLevel(level)
+          found = True
+          break
+      if not found:
+        log_cfg.error("invalid logger: %s", name)
         return False
-      else:
-        name,level_name = kv.lower().split(':')
-        level = log_parse_level(level_name)
-        if level == None:
-          return False
-        if name == 'all':
-          for l in loggers:
-            l.setLevel(level)
-        else:
-          found = False
-          for l in loggers:
-            if l.name == name:
-              l.setLevel(level)
-              found = True
-              break
-          if not found:
-            return False
 
   return True

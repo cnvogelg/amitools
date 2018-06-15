@@ -1,13 +1,14 @@
 import os
 import argparse
 
-from amitools.vamos.machine import Machine
-from amitools.vamos.machine.regs import *
-from amitools.vamos.Log import *
-from amitools.vamos.Vamos import Vamos
-from amitools.vamos.VamosConfig import VamosConfig
-from amitools.vamos.lib.dos.SysArgs import *
-from amitools.vamos.lib.dos.CommandLine import CommandLine
+from .cfg import VamosMainParser
+from .machine import Machine
+from .machine.regs import *
+from .Log import *
+from .Vamos import Vamos
+from .VamosConfig import VamosConfig
+from .lib.dos.SysArgs import *
+from .lib.dos.CommandLine import CommandLine
 
 RET_CODE_CONFIG_ERROR = 1000
 
@@ -29,6 +30,11 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   home_dir = os.path.dirname(__file__)
   data_dir = os.path.join(home_dir, "data")
 
+  # --- new config ---
+  mp = VamosMainParser()
+  if not mp.parse(cfg_files, args, cfg_dict):
+    return RET_CODE_CONFIG_ERROR
+
   # --- args --
   args = parse_args(data_dir)
 
@@ -37,11 +43,10 @@ def main(cfg_files=None, args=None, cfg_dict=None):
                     skip_defaults=args.skip_default_configs, args=args, def_data_dir=data_dir)
 
   # --- init logging ---
-  if not log_setup(cfg.logging, cfg.verbose, cfg.quiet, cfg.log_file,
-                   args.no_ts):
+  log_cfg = mp.get_log_dict().logging
+  if not log_setup(log_cfg):
     log_help()
     return RET_CODE_CONFIG_ERROR
-  cfg.log()
 
   # ----- vamos! ---------------------------------------------------------------
   # setup CPU
@@ -143,7 +148,10 @@ def main(cfg_files=None, args=None, cfg_dict=None):
     exit_code = 0
 
   # shutdown vamos
-  vamos.cleanup(ok)
+  if ok:
+    vamos.cleanup()
+
+  machine.cleanup()
 
   # exit
   log_main.info("vamos is exiting")

@@ -1,4 +1,4 @@
-from .main import MainParser
+from .main import MainParser, log_cfg
 from .parser import Parser
 from .value import Value, ValueList, ValueDict
 from .defdict import DefaultDict
