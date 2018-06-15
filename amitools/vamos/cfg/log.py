@@ -3,9 +3,10 @@ from amitools.vamos.cfgcore import *
 
 class LogParser(Parser):
   def __init__(self, ini_prefix=None):
+    levels = ("debug", "info", "warn", "error", "fatal", "off")
     def_cfg = {
         "logging": {
-            "levels": ValueDict(str),
+            "levels": ValueDict(str, enum=levels),
             "file": Value(str),
             "verbose": False,
             "quiet": False,

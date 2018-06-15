@@ -8,7 +8,6 @@ def cfg_profile_dict_test():
       "profile": {
           "libs": {
               "names": ["exec.library", "dos.library"],
-              "all": True,
               "calls": True
           },
           "output":  {
@@ -28,7 +27,6 @@ def cfg_profile_args_test():
   lp.setup_args(ap)
   args = ap.parse_args(
       ['--profile-libs', 'exec.library,dos.library',
-       '--profile-all-libs',
        '--profile-lib-calls',
        '--profile-file', 'foo/bar',
        '--profile-file-append',
@@ -38,7 +36,6 @@ def cfg_profile_args_test():
       "profile": {
           "libs": {
               "names": ["exec.library", "dos.library"],
-              "all": True,
               "calls": True
           },
           "output":  {

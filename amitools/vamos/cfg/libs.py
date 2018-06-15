@@ -3,19 +3,21 @@ from amitools.vamos.cfgcore import *
 
 class LibsParser(Parser):
   def __init__(self):
+    modes = ('auto', 'vamos', 'amiga', 'fake', 'off')
+    expunges = ('last_close', 'shutdown', 'no_mem')
     def_cfg = {
         'libs': {
             "*.library": {
-                "mode": "auto",
+                "mode": Value(str, "auto", enum=modes),
                 "version": 0,
-                "expunge": "shutdown"
+                "expunge": Value(str, "shutdown", enum=expunges)
             }
         },
         'devs': {
             "*.device": {
-                "mode": "auto",
+                "mode": Value(str, "auto", enum=modes),
                 "version": 0,
-                "expunge": "shutdown"
+                "expunge": Value(str, "shutdown", enum=expunges)
             }
         }
     }

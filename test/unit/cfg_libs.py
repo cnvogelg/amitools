@@ -7,9 +7,9 @@ def cfg_libs_dict_test():
   input_dict = {
       'libs': {
           "*.library": {
-              "mode": "blubber",
+              "mode": "vamos",
               "version": 42,
-              "expunge": "foo"
+              "expunge": "last_close"
           },
           "test.library": {
               "mode": "amiga",
@@ -19,14 +19,14 @@ def cfg_libs_dict_test():
       },
       'devs': {
           "*.device": {
-              "mode": "bla",
+              "mode": "fake",
               "version": 0,
-              "expunge": "bar"
+              "expunge": "no_mem"
           },
           "test.device": {
-              "mode": "blubber",
+              "mode": "off",
               "version": 42,
-              "expunge": "baz"
+              "expunge": "no_mem"
           }
       }
   }
@@ -38,9 +38,9 @@ def cfg_libs_ini_test():
   lp = LibsParser()
   ini_dict = {
       "*.library": {
-          "mode": "blubber",
+          "mode": "vamos",
           "version": 42,
-          "expunge": "foo"
+          "expunge": "no_mem"
       },
       "test.library": {
           "mode": "amiga",
@@ -48,23 +48,23 @@ def cfg_libs_ini_test():
           "expunge": "shutdown"
       },
       "*.device": {
-          "mode": "bla",
+          "mode": "fake",
           "version": 0,
-          "expunge": "bar"
+          "expunge": "last_close"
       },
       "test.device": {
-          "mode": "blubber",
+          "mode": "off",
           "version": 42,
-          "expunge": "baz"
+          "expunge": "shutdown"
       }
   }
   lp.parse_config(ini_dict, 'ini')
   assert lp.get_cfg_dict() == {
       'libs': {
           "*.library": {
-              "mode": "blubber",
+              "mode": "vamos",
               "version": 42,
-              "expunge": "foo"
+              "expunge": "no_mem"
           },
           "test.library": {
               "mode": "amiga",
@@ -74,14 +74,14 @@ def cfg_libs_ini_test():
       },
       'devs': {
           "*.device": {
-              "mode": "bla",
+              "mode": "fake",
               "version": 0,
-              "expunge": "bar"
+              "expunge": "last_close"
           },
           "test.device": {
-              "mode": "blubber",
+              "mode": "off",
               "version": 42,
-              "expunge": "baz"
+              "expunge": "shutdown"
           }
       }
   }
@@ -92,16 +92,16 @@ def cfg_libs_args_test():
   ap = argparse.ArgumentParser()
   lp.setup_args(ap)
   args = ap.parse_args(
-      ['-O', '*.library=mode:vamos,version:42,expunge:never',
+      ['-O', '*.library=mode:vamos,version:42,expunge:last_close',
        '-O', 'test.library=mode:amiga',
-       '-O', '*.device=mode:bla+test.device=mode:foo,version:42,expunge:baz'])
+       '-O', '*.device=mode:amiga+test.device=mode:fake,version:42,expunge:no_mem'])
   lp.parse_args(args)
   assert lp.get_cfg_dict() == {
       "libs": {
           "*.library": {
               "mode": "vamos",
               "version": 42,
-              "expunge": "never"
+              "expunge": "last_close"
           },
           "test.library": {
               "mode": "amiga",
@@ -111,14 +111,14 @@ def cfg_libs_args_test():
       },
       "devs": {
           "*.device": {
-              "mode": "bla",
+              "mode": "amiga",
               "version": 0,
               "expunge": "shutdown"
           },
           "test.device": {
-              "mode": "foo",
+              "mode": "fake",
               "version": 42,
-              "expunge": "baz"
+              "expunge": "no_mem"
           }
       }
   }

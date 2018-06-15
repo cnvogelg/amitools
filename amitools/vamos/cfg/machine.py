@@ -3,13 +3,17 @@ from amitools.vamos.cfgcore import *
 
 class MachineParser(Parser):
   def __init__(self, ini_prefix=None):
+    cpus = ('68000', '68020', '68030',
+            '000', '020', '030',
+            '00', '20', '30')
+    hw_access = ('emu', 'ignore', 'abort', 'disable')
     def_cfg = {
         "machine": {
-            "cpu": "68000",
+            "cpu": Value(str, "68000", enum=cpus),
             "max_cycles": 0,
             "cycles_per_block": 1000,
             "ram_size": 1024,
-            "hw_access": "emu"
+            "hw_access": Value(str, "emu", enum=hw_access)
         }
     }
     arg_cfg = {

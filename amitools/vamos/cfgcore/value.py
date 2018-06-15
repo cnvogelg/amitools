@@ -1,6 +1,10 @@
+from .cfgdict import ConfigDict
 
-def parse_scalar(val_type, val, allow_none=False):
+
+def parse_scalar(val_type, val, allow_none=False, enum=None):
   if type(val) is val_type:
+    if enum and val not in enum:
+      raise ValueError("invalid enum: %s of %s" % (val, enum))
     return val
   # none handling
   if val is None:
@@ -16,7 +20,11 @@ def parse_scalar(val_type, val, allow_none=False):
         return True
       elif lv in ("off", "false"):
         return False
-  return val_type(val)
+  # convert type
+  val = val_type(val)
+  if enum and val not in enum:
+    raise ValueError("invalid enum: %s of %s" % (val, enum))
+  return val
 
 
 def split_nest(in_str, sep=',', nest_pair='()', keep_nest=False):
@@ -53,20 +61,21 @@ def split_nest(in_str, sep=',', nest_pair='()', keep_nest=False):
 
 
 class Value(object):
-  def __init__(self, item_type, default=None, allow_none=None):
+  def __init__(self, item_type, default=None, allow_none=None, enum=None):
     self.item_type = item_type
     self.nest_pair = None
     if allow_none is None:
       self.allow_none = item_type is str
     else:
       self.allow_none = allow_none
+    self.enum = enum
     if default is not None:
       self.default = self.parse(default)
     else:
       self.default = None
 
   def parse(self, val, old_val=None):
-    return parse_scalar(self.item_type, val, self.allow_none)
+    return parse_scalar(self.item_type, val, self.allow_none, self.enum)
 
   def __eq__(self, other):
     return self.item_type == other.item_type and \
@@ -78,7 +87,7 @@ class Value(object):
 
 
 class ValueList(object):
-  def __init__(self, item_type, default=None, allow_none=None,
+  def __init__(self, item_type, default=None, allow_none=None, enum=None,
                sep=',', nest_pair='()', append='+'):
     self.item_type = item_type
     self.sep = sep
@@ -93,6 +102,7 @@ class ValueList(object):
       self.allow_none = item_type is str
     else:
       self.allow_none = allow_none
+    self.enum = enum
     if default:
       self.default = self.parse(default)
     else:
@@ -127,7 +137,7 @@ class ValueList(object):
         rs = self.parse(v)
         res += rs
       else:
-        r = parse_scalar(self.item_type, v, self.allow_none)
+        r = parse_scalar(self.item_type, v, self.allow_none, self.enum)
         res.append(r)
     return res
 
@@ -142,8 +152,9 @@ class ValueList(object):
 
 
 class ValueDict(object):
-  def __init__(self, item_type, default=None, allow_none=None,
-               sep=',', kv_sep=':', nest_pair='{}', append='+'):
+  def __init__(self, item_type, default=None, allow_none=None, enum=None,
+               sep=',', kv_sep=':', nest_pair='{}', append='+',
+               valid_keys=None):
     self.item_type = item_type
     self.sep = sep
     self.kv_sep = kv_sep
@@ -158,6 +169,8 @@ class ValueDict(object):
       self.allow_none = item_type is str
     else:
       self.allow_none = allow_none
+    self.enum = enum
+    self.valid_keys = valid_keys
     if default:
       self.default = self.parse(default)
     else:
@@ -203,20 +216,24 @@ class ValueDict(object):
         d = self.parse(elem)
         res.update(d)
       return res
-    elif type(val) is not dict:
+    elif type(val) not in (dict, ConfigDict):
       raise ValueError("expected dict: %s" % val)
     # rebuild dict
     if old_val and append:
       res = old_val.copy()
     else:
-      res = {}
+      res = ConfigDict()
     for key in val:
+      # check key
+      if self.valid_keys and key not in self.valid_keys:
+        raise ValueError("invalid key %s in %s" % (key, self.valid_keys))
+      # convert value
       v = val[key]
       if self.is_sub_value:
         old_sub = old_val[key] if old_val and key in old_val else None
         r = self.item_type.parse(v, old_sub)
       else:
-        r = parse_scalar(self.item_type, v, self.allow_none)
+        r = parse_scalar(self.item_type, v, self.allow_none, self.enum)
       res[key] = r
     return res
 

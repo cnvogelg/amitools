@@ -7,6 +7,9 @@ def config_value_parse_str_test():
   with pytest.raises(ValueError):
     parse_scalar(str, None)
   assert parse_scalar(str, None, True) is None
+  assert parse_scalar(str, "hello", enum=("hello")) == "hello"
+  with pytest.raises(ValueError):
+    parse_scalar(str, "hello", enum=("world"))
 
 
 def config_value_parse_int_test():
@@ -41,8 +44,13 @@ def config_value_split_nest_test():
 
 def config_value_test():
   v = Value(int, 0)
-  print(v)
   assert v.default == 0
+  # enum
+  v = Value(int, 0, enum=(0, 1, 2))
+  assert v.default == 0
+  assert v.parse(0) == 0
+  with pytest.raises(ValueError):
+    v.parse(3)
 
 
 def config_value_list_test():
@@ -54,6 +62,11 @@ def config_value_list_test():
   # old value and append
   assert l.parse(["a,b", "c"], ["x", "y"]) == ["a", "b", "c"]
   assert l.parse("+a,b", ["x", "y"]) == ["x", "y", "a", "b"]
+  # enum
+  l = ValueList(str, enum=("a", "b"))
+  assert l.parse("a,b") == ["a", "b"]
+  with pytest.raises(ValueError):
+    l.parse("a,c")
 
 
 def config_value_list_int_test():
@@ -112,6 +125,16 @@ def config_value_dict_test():
   assert d.parse("+a:b", {"x": "y"}) == {'a': 'b', 'x': 'y'}
   # colon in value
   assert d.parse("a:b:c") == {'a': 'b:c'}
+  # enum
+  d = ValueDict(str, enum=('a', 'b'))
+  assert d.parse('x:a') == {'x' : 'a'}
+  with pytest.raises(ValueError):
+    d.parse('x:c')
+  # valid keys
+  d = ValueDict(str, valid_keys=('a', 'b'))
+  assert d.parse('a:x') == {'a' : 'x'}
+  with pytest.raises(ValueError):
+    d.parse('c:x')
 
 
 def config_value_dict_int_test():
