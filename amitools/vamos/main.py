@@ -36,9 +36,9 @@ def main(cfg_files=None, args=None, cfg_dict=None):
     return RET_CODE_CONFIG_ERROR
 
   # --- old config --
-  args = parse_args(data_dir)
-  cfg = VamosConfig(extra_file=args.config_file,
-                    skip_defaults=args.skip_default_configs, args=args, def_data_dir=data_dir)
+  old_args = parse_args(data_dir)
+  old_cfg = VamosConfig(extra_file=old_args.config_file,
+                        skip_defaults=old_args.skip_default_configs, args=old_args, def_data_dir=data_dir)
 
   # --- init logging ---
   log_cfg = mp.get_log_dict().logging
@@ -54,30 +54,33 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   if not machine:
     return RET_CODE_CONFIG_ERROR
 
-  # setup memory
-  if cfg.hw_access != "disable":
+  # setup memory map
+  memmap_cfg = mp.get_machine_dict().memmap
+  if memmap_cfg.hw_access != "disable":
     max_mem = 0xbf0000 / 1024
-    if cfg.ram_size >= max_mem:
+    if machine_cfg.ram_size >= max_mem:
       log_main.error("too much RAM requested. max allowed KiB: %d", max_mem)
       return RET_CODE_CONFIG_ERROR
-  log_main.info("setting up main memory with %s KiB RAM: top=%06x" %
-                (cfg.ram_size, cfg.ram_size * 1024))
 
+  # --- path: cwd ---
   # setup current working dir
-  cwd = cfg.cwd
+  path_cfg = mp.get_path_dict().path
+  cwd = path_cfg.cwd
   if cwd is None:
     cwd = 'root:' + os.getcwd()
 
-  # --- binary and arg_str ---
+  # --- proc: binary and arg_str ---
   # a single Amiga-like raw arg was passed
-  if args.raw_arg:
+  proc_cfg = mp.get_proc_dict().process
+  cmd_cfg = proc_cfg.command
+  if cmd_cfg.raw_arg:
     # check args
-    if len(args.args) > 0:
+    if len(cmd_cfg.args) > 0:
       log_main.error("raw arg only allows a single argument!")
       return RET_CODE_CONFIG_ERROR
     # parse raw arg
     cl = CommandLine()
-    res = cl.parse_line(args.bin)
+    res = cl.parse_line(cmd_cfg.binary)
     if res != cl.LINE_OK:
       log_main.error("raw arg is invalid! (error %d)", res)
       return RET_CODE_CONFIG_ERROR
@@ -85,23 +88,22 @@ def main(cfg_files=None, args=None, cfg_dict=None):
     arg_str = cl.get_arg_str()
   else:
     # setup binary
-    binary = args.bin
-    if not cfg.pure_ami_paths:
+    binary = cmd_cfg.binary
+    if not cmd_cfg.pure_ami_path:
       # if path exists on host system then make a root path
       if os.path.exists(binary):
         binary = "root:" + os.path.abspath(binary)
     # combine remaining args to arg_str
-    arg_str = sys_args_to_ami_arg_str(args.args)
+    arg_str = sys_args_to_ami_arg_str(cmd_cfg.args)
 
   # summary
+  stack_size = proc_cfg.stack * 1024
   log_main.info("bin='%s', arg_str='%s', cwd='%s', shell='%s', stack=%d",
-                binary, arg_str[:-1], cwd, args.shell, cfg.stack_size)
-
-  stack_size = cfg.stack_size * 1024
+                binary, arg_str[:-1], cwd, cmd_cfg.shell, stack_size)
 
   # combine to vamos instance
-  vamos = Vamos(machine, cfg)
-  if not vamos.init(binary, arg_str, stack_size, args.shell, cwd):
+  vamos = Vamos(machine, old_cfg)
+  if not vamos.init(binary, arg_str, stack_size, cmd_cfg.shell, cwd):
     log_main.error("vamos init failed")
     return 1
 
@@ -129,7 +131,7 @@ def main(cfg_files=None, args=None, cfg_dict=None):
       log_main.info("done. exit code=%d", exit_code)
   else:
     log_main.info(
-        "vamos was stopped after %d cycles. ignoring result", cfg.max_cycles)
+        "vamos was stopped after %d cycles. ignoring result", machine_cfg.max_cycles)
     exit_code = 0
 
   # shutdown vamos

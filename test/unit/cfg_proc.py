@@ -13,7 +13,7 @@ def cfg_proc_dict_test():
               "pure_ami_path": True,
               "raw_arg": True
           },
-          "stack": 4096
+          "stack": 4
       }
   }
   lp.parse_config(input_dict, 'dict')
@@ -27,7 +27,7 @@ def cfg_proc_ini_test():
           "shell": True,
           "pure_ami_paths": True,
           "raw_arg": True,
-          "stack_size": 4096
+          "stack_size": 4
       }
   }
   lp.parse_config(ini_dict, 'ini')
@@ -40,7 +40,7 @@ def cfg_proc_ini_test():
               "pure_ami_path": True,
               "raw_arg": True
           },
-          "stack": 4096
+          "stack": 4
       }
   }
 
@@ -50,7 +50,7 @@ def cfg_proc_args_test():
   ap = argparse.ArgumentParser()
   lp.setup_args(ap)
   args = ap.parse_args(
-      ['-x', '-P', '-R', '-s', '4096', 'foo', 'a', 'b'])
+      ['-x', '-P', '-R', '-s', '4', 'foo', 'a', 'b'])
   lp.parse_args(args)
   assert lp.get_cfg_dict() == {
       "process": {
@@ -61,6 +61,6 @@ def cfg_proc_args_test():
               "pure_ami_path": True,
               "raw_arg": True
           },
-          "stack": 4096
+          "stack": 4
       }
   }

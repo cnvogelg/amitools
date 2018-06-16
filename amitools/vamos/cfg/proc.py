@@ -12,7 +12,7 @@ class ProcessParser(Parser):
                 "pure_ami_path": False,
                 "raw_arg": False
             },
-            "stack": 8192
+            "stack": 8
         }
     }
     arg_cfg = {
