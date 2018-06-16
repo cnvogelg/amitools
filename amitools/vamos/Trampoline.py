@@ -1,7 +1,7 @@
 from Exceptions import *
 from .machine.regs import *
 
-from Log import log_tp
+from .log import log_tp
 
 class Trampoline:
 

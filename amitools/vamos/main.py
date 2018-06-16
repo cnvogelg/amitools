@@ -4,7 +4,7 @@ import argparse
 from .cfg import VamosMainParser
 from .machine import Machine
 from .machine.regs import *
-from .Log import *
+from .log import *
 from .Vamos import Vamos
 from .VamosConfig import VamosConfig
 from .lib.dos.SysArgs import *

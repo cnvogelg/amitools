@@ -2,7 +2,7 @@ from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.lib.util.TagList import *
 from amitools.vamos.lib.util.AmiDate import *
-from amitools.vamos.Log import *
+from amitools.vamos.log import *
 
 class UtilityLibrary(LibImpl):
 

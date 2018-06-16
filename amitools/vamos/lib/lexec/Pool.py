@@ -1,4 +1,4 @@
-from amitools.vamos.Log import log_exec
+from amitools.vamos.log import log_exec
 from amitools.vamos.Exceptions import *
 from Puddle import Puddle
 
@@ -34,7 +34,7 @@ class Pool:
       if puddle != None:
         self.puddles.append(puddle)
         result = puddle.AllocPooled(name + self.name, size)
-    else: 
+    else:
       for puddle in self.puddles:
         result = puddle.AllocPooled(name + self.name, size)
         if result != None:
@@ -45,7 +45,7 @@ class Pool:
         if puddle != None:
           self.puddles.append(puddle)
           result = puddle.AllocPooled(name + self.name, size)
-    if result == None: 
+    if result == None:
       log_exec.info("AllocPooled: Unable to allocate memory (%x)", size)
     return result
 

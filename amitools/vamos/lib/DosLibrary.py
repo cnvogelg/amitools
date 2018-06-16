@@ -7,7 +7,7 @@ from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.astructs import *
 from amitools.vamos.Exceptions import *
-from amitools.vamos.Log import log_dos
+from amitools.vamos.log import log_dos
 from amitools.vamos.path.PathManager import PathManager
 from amitools.vamos.path.PathManager import AssignManager
 from dos.Args import *

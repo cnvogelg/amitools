@@ -12,7 +12,7 @@ from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
 from amitools.vamos.lib.dos.Process import Process
 from amitools.vamos.trace import TraceManager, TraceMemory
 
-from Log import *
+from .log import *
 from .machine.regs import *
 from .machine import CPUState
 from Exceptions import *

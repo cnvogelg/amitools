@@ -2,7 +2,7 @@ import ConfigParser
 import os
 import os.path
 
-from Log import log_main
+from .log import log_main
 
 class VamosLibConfig:
   def __init__(self, name, mode='auto', version=0, expunge='last_close'):

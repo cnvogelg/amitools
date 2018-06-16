@@ -7,7 +7,7 @@ from .opcodes import *
 from .error import ErrorReporter
 from .cpustate import CPUState
 from amitools.vamos.Exceptions import *
-from amitools.vamos.Log import log_machine
+from amitools.vamos.log import log_machine
 from amitools.vamos.label import LabelManager
 
 

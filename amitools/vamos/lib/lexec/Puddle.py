@@ -1,4 +1,4 @@
-from amitools.vamos.Log import log_exec
+from amitools.vamos.log import log_exec
 from amitools.vamos.Exceptions import *
 from amitools.vamos.mem import MemoryAlloc
 

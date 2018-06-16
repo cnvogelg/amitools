@@ -1,6 +1,6 @@
 import logging
 import pytest
-from amitools.vamos.Log import log_libmgr, log_exec
+from amitools.vamos.log import log_libmgr, log_exec
 from amitools.vamos.libcore import LibCtx
 from amitools.vamos.libmgr import LibManager
 from amitools.vamos.machine import Machine

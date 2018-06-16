@@ -1,6 +1,6 @@
 # helper for Allocate()/Deallocate()
 
-from amitools.vamos.Log import log_exec
+from amitools.vamos.log import log_exec
 from amitools.vamos.astructs import AccessStruct, MemHeaderStruct, MemChunkStruct
 
 class MemChunk:

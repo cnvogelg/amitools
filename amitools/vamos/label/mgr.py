@@ -1,5 +1,5 @@
 import logging
-from amitools.vamos.Log import *
+from amitools.vamos.log import *
 
 
 class LabelManager:

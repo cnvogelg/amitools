@@ -1,6 +1,6 @@
 from __future__ import print_function
 import json
-from amitools.vamos.Log import log_prof
+from amitools.vamos.log import log_prof
 
 
 class LibFuncProfile(object):

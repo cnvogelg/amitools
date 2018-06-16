@@ -1,4 +1,4 @@
-from amitools.vamos.Log import *
+from amitools.vamos.log import *
 from amitools.vamos.Exceptions import *
 import os
 

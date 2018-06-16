@@ -1,6 +1,6 @@
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.Log import log_main
+from amitools.vamos.log import log_main
 
 class IntuitionLibrary(LibImpl):
 

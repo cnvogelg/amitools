@@ -2,7 +2,7 @@ from __future__ import print_function
 from amitools.vamos.machine import Machine, CPUState
 from amitools.vamos.machine.opcodes import *
 from amitools.vamos.Exceptions import *
-from amitools.vamos.Log import log_machine
+from amitools.vamos.log import log_machine
 import logging
 
 

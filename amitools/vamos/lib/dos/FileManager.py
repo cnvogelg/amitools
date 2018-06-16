@@ -5,7 +5,7 @@ import logging
 import errno
 import stat
 
-from amitools.vamos.Log import log_file
+from amitools.vamos.log import log_file
 from amitools.vamos.astructs import AccessStruct, MessageStruct, DosPacketStruct
 from Error import *
 from DosProtection import DosProtection

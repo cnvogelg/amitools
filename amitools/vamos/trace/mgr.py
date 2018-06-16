@@ -1,4 +1,4 @@
-from amitools.vamos.Log import log_mem, log_mem_int, log_instr
+from amitools.vamos.log import log_mem, log_mem_int, log_instr
 
 
 class TraceManager(object):

@@ -1,7 +1,7 @@
 import os.path
 import logging
 
-from amitools.vamos.Log import log_lock
+from amitools.vamos.log import log_lock
 from amitools.vamos.label import LabelRange
 from amitools.vamos.Exceptions import *
 from amitools.vamos.astructs import AccessStruct, DosListVolumeStruct

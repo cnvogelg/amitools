@@ -1,6 +1,6 @@
 import datetime
 import logging
-from amitools.vamos.Log import log_lib, log_libmgr
+from amitools.vamos.log import log_lib, log_libmgr
 from amitools.vamos.libcore import LibCreator, LibInfo, LibRegistry, LibCtxMap, LibProfiler
 from amitools.vamos.atypes import ExecLibrary
 

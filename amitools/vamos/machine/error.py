@@ -1,7 +1,7 @@
 import sys
 import traceback
 
-from amitools.vamos.Log import log_machine
+from amitools.vamos.log import log_machine
 from amitools.vamos.Exceptions import *
 from .cpustate import CPUState
 

@@ -3,7 +3,7 @@ import os.path
 from amitools.binfmt.BinFmt import BinFmt
 from amitools.binfmt.Relocate import Relocate
 from amitools.vamos.label import LabelSegment
-from amitools.vamos.Log import log_segload
+from amitools.vamos.log import log_segload
 from .seglist import SegList
 
 

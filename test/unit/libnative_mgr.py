@@ -1,6 +1,6 @@
 import pytest
 import logging
-from amitools.vamos.Log import log_libmgr
+from amitools.vamos.log import log_libmgr
 from amitools.vamos.libnative import ALibManager
 from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.mem import MemoryAlloc

@@ -1,6 +1,6 @@
 import os
 import os.path
-from amitools.vamos.Log import *
+from amitools.vamos.log import *
 from amitools.vamos.Exceptions import *
 
 class VolumeManager():

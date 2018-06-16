@@ -2,7 +2,7 @@ import os
 import stat
 import uuid
 
-from amitools.vamos.Log import log_lock
+from amitools.vamos.log import log_lock
 
 from amitools.vamos.astructs import AccessStruct, FileLockStruct, DateStampStruct
 from DosProtection import DosProtection

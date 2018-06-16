@@ -4,7 +4,7 @@ from amitools.vamos.libcore import LibImpl
 from amitools.vamos.astructs import *
 from amitools.vamos.atypes import ExecLibrary as ExecLibraryType
 from amitools.vamos.atypes import NodeType, Node, List
-from amitools.vamos.Log import log_exec
+from amitools.vamos.log import log_exec
 from amitools.vamos.Exceptions import *
 from lexec.PortManager import PortManager
 from lexec.SemaphoreManager import SemaphoreManager

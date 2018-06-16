@@ -1,4 +1,4 @@
-from Log import log_hw
+from log import log_hw
 
 class HardwareAccess:
   """As an OS-level emulator vamos usually does not need to emulate
