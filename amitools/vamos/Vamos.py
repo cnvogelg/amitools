@@ -19,7 +19,7 @@ from .error import *
 
 class Vamos:
 
-  def __init__(self, machine, cfg):
+  def __init__(self, machine, main_cfg, old_cfg):
     self.machine = machine
     self.mem = machine.get_mem()
     self.raw_mem = self.mem
@@ -27,20 +27,21 @@ class Vamos:
     self.cpu = machine.get_cpu()
     self.cpu_type = machine.get_cpu_type()
     self.traps = machine.get_traps()
-    self.cfg = cfg
 
     # too much RAM requested?
     # our "custom chips" start at $BFxxxx so we allow RAM only to be below
-    if self.ram_size >= 0xbf0000 and self.cfg.hw_access != "disable":
+    memmap_cfg = main_cfg.get_machine_dict().memmap
+    if self.ram_size >= 0xbf0000 and memmap_cfg.hw_access != "disable":
       raise VamosConfigError("Too much RAM configured! Only up to $BF0000 allowed.")
 
     # setup custom chips
-    if self.cfg.hw_access != "disable":
+    hw_access = memmap_cfg.hw_access
+    if hw_access != "disable":
       self.hw_access = HardwareAccess(self.mem)
-      self._setup_hw_access()
+      self._setup_hw_access(hw_access)
 
     # path manager
-    self.path_mgr = PathManager(cfg)
+    self.path_mgr = PathManager(old_cfg)
 
     # create a label manager and error tracker
     self.label_mgr = machine.get_label_mgr()
@@ -54,18 +55,19 @@ class Vamos:
       self.label_mgr.add_label(label)
 
     # create memory access
+    trace_cfg = main_cfg.get_trace_dict().trace
     self.trace_mgr = TraceManager(self.cpu, self.label_mgr)
-    if cfg.internal_memory_trace:
+    if trace_cfg.internal_memory:
       self.mem = TraceMemory(self.mem, self.trace_mgr)
       if not log_mem_int.isEnabledFor(logging.INFO):
         log_mem_int.setLevel(logging.INFO)
     # enable mem trace?
-    if cfg.memory_trace:
+    if trace_cfg.memory:
       self.machine.set_cpu_mem_trace_hook(self.trace_mgr.trace_mem)
       if not log_mem.isEnabledFor(logging.INFO):
         log_mem.setLevel(logging.INFO)
     # instr trace
-    if cfg.instr_trace:
+    if trace_cfg.instr:
       if not log_instr.isEnabledFor(logging.INFO):
         log_instr.setLevel(logging.INFO)
       cpu = self.cpu
@@ -73,7 +75,7 @@ class Vamos:
       state = CPUState()
       def instr_hook():
         # add register dump
-        if cfg.reg_dump:
+        if trace_cfg.reg_dump:
           state.get(cpu)
           res = state.dump()
           for r in res:
@@ -92,14 +94,14 @@ class Vamos:
     self.seg_loader = SegmentLoader(self.alloc, self.path_mgr)
 
     # setup lib manager
-    profiler_cfg = self._get_profiler_config(cfg)
+    profiler_cfg = self._get_profiler_config(main_cfg)
     self.exec_ctx = ExecLibCtx(self.machine, self.alloc,
                                self.seg_loader, self.path_mgr)
     self.dos_ctx = DosLibCtx(self.machine, self.alloc,
                              self.seg_loader, self.path_mgr,
                              self.run_command, self.start_sub_process)
     self.lib_mgr = LibManager(self.machine, self.alloc, self.seg_loader,
-                              self.cfg, profiler_cfg=profiler_cfg)
+                              old_cfg, profiler_cfg=profiler_cfg)
     self.lib_mgr.add_ctx('exec.library', self.exec_ctx)
     self.lib_mgr.add_ctx('dos.library', self.dos_ctx)
     self.lib_mgr.bootstrap_exec()
@@ -108,17 +110,22 @@ class Vamos:
     self.process = None
     self.proc_list = []
 
-  def _get_profiler_config(self, cfg):
-    profile_libs = cfg.profile_libs
-    if profile_libs:
-      profile_libs = profile_libs.split(",")
-    profiler_cfg = LibProfilerConfig(profiling=cfg.profile,
-                                     all_libs=cfg.profile_all_libs,
-                                     libs=profile_libs,
-                                     add_samples=cfg.profile_samples,
-                                     file=cfg.profile_file,
-                                     append=cfg.profile_file_append,
-                                     dump=cfg.profile_dump)
+  def _get_profiler_config(self, main_cfg):
+    cfg = main_cfg.get_profile_dict().profile
+    names = cfg.libs.names
+    if names:
+      profiling = True
+      all_libs = 'all' in names
+    else:
+      profiling = False
+      all_libs = False
+    profiler_cfg = LibProfilerConfig(profiling=profiling,
+                                     all_libs=all_libs,
+                                     libs=names,
+                                     add_samples=cfg.libs.calls,
+                                     file=cfg.output.file,
+                                     append=cfg.output.append,
+                                     dump=cfg.output.dump)
     return profiler_cfg
 
   def init(self, binary, arg_str, stack_size, shell, cwd):
@@ -136,19 +143,18 @@ class Vamos:
 
   # ----- system setup -----
 
-  def _setup_hw_access(self):
+  def _setup_hw_access(self, hw_access):
     # direct hw access
-    cfg = self.cfg
-    if cfg.hw_access == "emu":
+    if hw_access == "emu":
       self.hw_access.set_mode(HardwareAccess.MODE_EMU)
-    elif cfg.hw_access == "ignore":
+    elif hw_access == "ignore":
       self.hw_access.set_mode(HardwareAccess.MODE_IGNORE)
-    elif cfg.hw_access == "abort":
+    elif hw_access == "abort":
       self.hw_access.set_mode(HardwareAccess.MODE_ABORT)
-    elif cfg.hw_access == "disable":
+    elif hw_access == "disable":
       pass
     else:
-      raise VamosConfigError("Invalid HW Access mode: %s" % cfg.hw_access)
+      raise VamosConfigError("Invalid HW Access mode: %s" % hw_access)
 
   # ----- process handling -----
 

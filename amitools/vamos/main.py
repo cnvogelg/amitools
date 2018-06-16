@@ -102,7 +102,7 @@ def main(cfg_files=None, args=None, cfg_dict=None):
                 binary, arg_str[:-1], cwd, cmd_cfg.shell, stack_size)
 
   # combine to vamos instance
-  vamos = Vamos(machine, old_cfg)
+  vamos = Vamos(machine, mp, old_cfg)
   if not vamos.init(binary, arg_str, stack_size, cmd_cfg.shell, cwd):
     log_main.error("vamos init failed")
     return 1
