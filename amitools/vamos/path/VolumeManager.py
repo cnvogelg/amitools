@@ -1,7 +1,7 @@
 import os
 import os.path
 from amitools.vamos.log import *
-from amitools.vamos.Exceptions import *
+from amitools.vamos.error import *
 
 class VolumeManager():
   def __init__(self):

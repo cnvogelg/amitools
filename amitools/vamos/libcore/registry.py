@@ -1,4 +1,4 @@
-from amitools.vamos.Exceptions import VamosInternalError
+from amitools.vamos.error import VamosInternalError
 from .impl import LibImpl
 
 class LibRegistry:

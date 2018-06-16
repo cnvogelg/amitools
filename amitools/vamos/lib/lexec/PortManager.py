@@ -1,5 +1,5 @@
 from amitools.vamos.astructs import MsgPortStruct
-from amitools.vamos.Exceptions import *
+from amitools.vamos.error import *
 
 class Port:
   def __init__(self, name, port_mgr, addr=None, mem=None, handler=None):

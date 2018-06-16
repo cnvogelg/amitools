@@ -2,7 +2,7 @@ from __future__ import print_function
 
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.Exceptions import *
+from amitools.vamos.error import *
 
 class VamosTestLibrary(LibImpl):
 

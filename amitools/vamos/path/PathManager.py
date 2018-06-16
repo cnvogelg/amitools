@@ -1,7 +1,7 @@
 import os.path
 import os
 from amitools.vamos.log import log_path
-from amitools.vamos.Exceptions import *
+from amitools.vamos.error import *
 from VolumeManager import VolumeManager
 from AssignManager import AssignManager
 from amitools.vamos.lib.dos.LockManager import LockManager

@@ -1,5 +1,5 @@
 from amitools.vamos.log import log_exec
-from amitools.vamos.Exceptions import *
+from amitools.vamos.error import *
 from Puddle import Puddle
 
 class Pool:

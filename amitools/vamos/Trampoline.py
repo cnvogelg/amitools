@@ -1,4 +1,4 @@
-from Exceptions import *
+from .error import *
 from .machine.regs import *
 
 from .log import log_tp

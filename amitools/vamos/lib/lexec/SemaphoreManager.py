@@ -1,5 +1,5 @@
 from amitools.vamos.astructs import AccessStruct, SignalSemaphoreStruct
-from amitools.vamos.Exceptions import *
+from amitools.vamos.error import *
 
 class SemaphoreManager:
 

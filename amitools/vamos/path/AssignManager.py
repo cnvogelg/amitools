@@ -1,5 +1,5 @@
 from amitools.vamos.log import *
-from amitools.vamos.Exceptions import *
+from amitools.vamos.error import *
 import os
 
 class AssignManager:

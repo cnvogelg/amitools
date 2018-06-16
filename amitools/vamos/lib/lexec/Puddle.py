@@ -1,5 +1,5 @@
 from amitools.vamos.log import log_exec
-from amitools.vamos.Exceptions import *
+from amitools.vamos.error import *
 from amitools.vamos.mem import MemoryAlloc
 
 class Puddle:

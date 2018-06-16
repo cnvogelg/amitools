@@ -6,7 +6,7 @@ from .regs import *
 from .opcodes import *
 from .error import ErrorReporter
 from .cpustate import CPUState
-from amitools.vamos.Exceptions import *
+from amitools.vamos.error import *
 from amitools.vamos.log import log_machine
 from amitools.vamos.label import LabelManager
 

@@ -3,7 +3,7 @@ import time
 import traceback
 
 from .impl import LibImplScanner
-from amitools.vamos.Exceptions import VamosInternalError
+from amitools.vamos.error import VamosInternalError
 from amitools.vamos.machine.regs import *
 
 

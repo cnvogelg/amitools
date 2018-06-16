@@ -3,7 +3,7 @@ import pytest
 from amitools.vamos.lib.DosLibrary import DosLibrary
 from amitools.vamos.lib.ExecLibrary import ExecLibrary
 from amitools.vamos.libcore import LibRegistry
-from amitools.vamos.Exceptions import VamosInternalError
+from amitools.vamos.error import VamosInternalError
 
 def lib_reg_find_cls_test():
   lr = LibRegistry()

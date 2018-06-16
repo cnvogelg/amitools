@@ -1,4 +1,4 @@
-from amitools.vamos.Exceptions import *
+from amitools.vamos.error import *
 from amitools.vamos.log import log_mem_alloc
 from amitools.vamos.label import LabelRange, LabelStruct
 from amitools.vamos.astructs import AccessStruct
