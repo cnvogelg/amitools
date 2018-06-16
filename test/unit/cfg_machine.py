@@ -8,8 +8,10 @@ def cfg_machine_dict_test():
       "machine": {
           "cpu": "68020",
           "max_cycles": 23,
-          "cycles_per_block": 42,
-          "ram_size": 512,
+          "cycles_per_run": 42,
+          "ram_size": 512
+      },
+      "memmap": {
           "hw_access": "abort"
       }
   }
@@ -23,7 +25,7 @@ def cfg_machine_ini_test():
       "vamos": {
           "cpu": "68020",
           "max_cycles": 23,
-          "cycles_per_block": 42,
+          "cycles_per_run": 42,
           "ram_size": 512,
           "hw_access": "abort"
       }
@@ -33,8 +35,10 @@ def cfg_machine_ini_test():
       "machine": {
           "cpu": "68020",
           "max_cycles": 23,
-          "cycles_per_block": 42,
-          "ram_size": 512,
+          "cycles_per_run": 42,
+          "ram_size": 512
+      },
+      "memmap": {
           "hw_access": "abort"
       }
   }
@@ -55,8 +59,10 @@ def cfg_machine_args_test():
       "machine": {
           "cpu": "68020",
           "max_cycles": 23,
-          "cycles_per_block": 42,
-          "ram_size": 512,
+          "cycles_per_run": 42,
+          "ram_size": 512
+      },
+      "memmap": {
           "hw_access": "abort"
       }
   }

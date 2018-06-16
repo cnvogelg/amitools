@@ -35,10 +35,8 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   if not mp.parse(cfg_files, args, cfg_dict):
     return RET_CODE_CONFIG_ERROR
 
-  # --- args --
+  # --- old config --
   args = parse_args(data_dir)
-
-  # --- init config ---
   cfg = VamosConfig(extra_file=args.config_file,
                     skip_defaults=args.skip_default_configs, args=args, def_data_dir=data_dir)
 
@@ -49,22 +47,12 @@ def main(cfg_files=None, args=None, cfg_dict=None):
     return RET_CODE_CONFIG_ERROR
 
   # ----- vamos! ---------------------------------------------------------------
-  # setup CPU
-  if cfg.cpu in ('68000', '000', '00'):
-    cpu_type = Machine.CPU_TYPE_68000
-    cfg.cpu = '68000'
-  elif cfg.cpu in ('68020', '020', '20'):
-    cpu_type = Machine.CPU_TYPE_68020
-    cfg.cpu = '68020'
-  elif cfg.cpu in ('68030', '030', '30'):
-    # fake 030 CPU only to set AttnFlags accordingly
-    cpu_type = Machine.CPU_TYPE_68020
-    cfg.cpu = '68030'
-    log_main.info("fake 68030 CPU selected")
-  else:
-    log_main.error("Invalid CPU type: %s" % cfg.cpu)
+  # setup machine
+  machine_cfg = mp.get_machine_dict().machine
+  use_labels = mp.get_trace_dict().trace.labels
+  machine = Machine.from_cfg(machine_cfg, use_labels)
+  if not machine:
     return RET_CODE_CONFIG_ERROR
-  log_main.info("setting up CPU: %s = %d" % (cfg.cpu, cpu_type))
 
   # setup memory
   if cfg.hw_access != "disable":
@@ -111,10 +99,6 @@ def main(cfg_files=None, args=None, cfg_dict=None):
 
   stack_size = cfg.stack_size * 1024
 
-  # setup machine
-  machine = Machine(cpu_type, cfg.ram_size,
-                    use_labels=cfg.labels, raise_on_main_run=False)
-
   # combine to vamos instance
   vamos = Vamos(machine, cfg)
   if not vamos.init(binary, arg_str, stack_size, args.shell, cwd):
@@ -129,9 +113,10 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   set_regs = vamos.get_initial_regs()
 
   # run!
-  run_state = machine.run(pc, sp, set_regs=set_regs, get_regs=get_regs,
-                          cycles_per_run=cfg.cycles_per_block,
-                          max_cycles=cfg.max_cycles, name="main")
+  run_state = machine.run(pc, sp,
+                          set_regs=set_regs,
+                          get_regs=get_regs,
+                          name="main")
 
   ok = False
   if run_state.done:

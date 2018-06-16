@@ -3,6 +3,7 @@ from amitools.vamos.machine import Machine, CPUState
 from amitools.vamos.machine.opcodes import *
 from amitools.vamos.error import *
 from amitools.vamos.log import log_machine
+from amitools.vamos.cfgcore import ConfigDict
 import logging
 
 
@@ -217,3 +218,21 @@ def machine_machine_run_trap_unbound_test(capfd):
   assert captured.out.strip().split('\n') == [
       'UNBOUND TRAP: code=a100, pc=000800'
   ]
+
+
+def machine_machine_cfg_test():
+  cfg = ConfigDict({
+      'cpu': '68020',
+      'ram_size': 2048,
+      'max_cycles': 128,
+      'cycles_per_run': 2000
+  })
+  m = Machine.from_cfg(cfg, True)
+  assert m
+  assert m.get_cpu_type() == Machine.CPU_TYPE_68020
+  assert m.get_cpu_name() == '68020'
+  assert m.get_ram_total_kib() == 2048
+  assert m.max_cycles == 128
+  assert m.cycles_per_run == 2000
+  assert m.get_label_mgr()
+

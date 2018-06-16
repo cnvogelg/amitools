@@ -56,7 +56,6 @@ class Machine(object):
 
   CPU_TYPE_68000 = M68K_CPU_TYPE_68000
   CPU_TYPE_68020 = M68K_CPU_TYPE_68020
-  CPU_TYPE_68030 = M68K_CPU_TYPE_68030
 
   run_reset_addr = 0x400
   run_max_nesting = 16
@@ -65,9 +64,13 @@ class Machine(object):
   ram_begin = 0x800
 
   def __init__(self, cpu_type=M68K_CPU_TYPE_68000, ram_size_kib=1024,
-               use_labels=True, raise_on_main_run=True):
+               use_labels=True, raise_on_main_run=True,
+               cycles_per_run=1000, max_cycles=0, cpu_name=None):
+    if cpu_name is None:
+      cpu_name = self._get_cpu_name(cpu_type)
     # setup musashi components
     self.cpu_type = cpu_type
+    self.cpu_name = cpu_name
     self.cpu = emu.CPU(cpu_type)
     self.mem = emu.Memory(ram_size_kib)
     self.traps = emu.Traps()
@@ -85,7 +88,8 @@ class Machine(object):
     self.mem4 = 0
     self.shutdown_func = None
     self.instr_hook = None
-    self.cycles_per_run = 1000
+    self.cycles_per_run = cycles_per_run
+    self.max_cycles = max_cycles
     self.bail_out = False
     # call init
     self._alloc_trap()
@@ -101,6 +105,50 @@ class Machine(object):
     self.cpu = None
     self.mem = None
     self.traps = None
+
+  @classmethod
+  def from_cfg(cls, machine_cfg, use_labels=False):
+    """extract machine parameters from the config
+
+       return new Machine() or None on config error
+    """
+    cpu = machine_cfg.cpu
+    cpu_type, cpu_name = cls.parse_cpu_type(cpu)
+    if cpu_type is None:
+      log_machine.error("invalid CPU type given: %s", cpu)
+      return None
+    ram_size = machine_cfg.ram_size
+    cycles_per_run = machine_cfg.cycles_per_run
+    max_cycles = machine_cfg.max_cycles
+    log_machine.info("cpu=%s(%d), ram_size=%d, labels=%s, "
+                     "cycles_per_run=%d, max_cycles=%d",
+                     cpu_name, cpu_type, ram_size, use_labels,
+                     cycles_per_run, max_cycles)
+    return cls(cpu_type, ram_size,
+               raise_on_main_run=False,
+               use_labels=use_labels,
+               cycles_per_run=cycles_per_run,
+               max_cycles=max_cycles)
+
+  @classmethod
+  def parse_cpu_type(cls, cpu_str):
+    if cpu_str in ('68000', '000', '00'):
+      return cls.CPU_TYPE_68000, '68000'
+    elif cpu_str in ('68020', '020', '20'):
+      return cls.CPU_TYPE_68020, '68020'
+    elif cpu_str in ('68030', '030', '30'):
+      # fake 030 CPU only to set AttnFlags accordingly
+      return cls.CPU_TYPE_68020, '68030(fake)'
+    else:
+      return None, None
+
+  def _get_cpu_name(self, cpu_type):
+    if cpu_type == self.CPU_TYPE_68000:
+      return '68000'
+    elif cpu_type == self.CPU_TYPE_68020:
+      return '68020'
+    else:
+      return None
 
   def _alloc_trap(self):
     self.shutdown_tid = self.traps.setup(self._shutdown_trap, auto_rts=True)
@@ -140,6 +188,9 @@ class Machine(object):
   def get_cpu_type(self):
     return self.cpu_type
 
+  def get_cpu_name(self):
+    return self.cpu_name
+
   def get_mem(self):
     return self.mem
 
@@ -160,6 +211,9 @@ class Machine(object):
   def get_ram_total(self):
     """number of total bytes in RAM including zero range"""
     return self.ram_total
+
+  def get_ram_total_kib(self):
+    return self.ram_total / 1024
 
   def set_zero_mem(self, mem0, mem4):
     """define the long words at memory address 0 and 4 that are written
@@ -186,6 +240,7 @@ class Machine(object):
   def show_instr(self, show_regs=False):
     if show_regs:
       state = CPUState()
+
       def instr_hook():
         state.get(self.cpu)
         res = state.dump()
@@ -331,10 +386,14 @@ class Machine(object):
         val = set_regs[reg]
         cpu.w_reg(reg, val)
 
-    # main execution loop of run
-    total_cycles = 0
+    # get cycle params either from this call or from default
     if not cycles_per_run:
       cycles_per_run = self.cycles_per_run
+    if not max_cycles:
+      max_cycles = self.max_cycles
+
+    # main execution loop of run
+    total_cycles = 0
     start_time = time.clock()
     try:
       while not run_state.done:
@@ -387,4 +446,3 @@ class Machine(object):
       val = "%06x" % v
       res[key] = val
     return res
-
