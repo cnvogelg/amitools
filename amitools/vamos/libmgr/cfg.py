@@ -26,7 +26,7 @@ class LibCfg(object):
       EXPUNGE_MODE_SHUTDOWN
   )
 
-  def __init__(self, create_mode=None, do_profile=False,
+  def __init__(self, create_mode=None,
                force_version=None, expunge_mode=None):
     # set defaults
     if create_mode is None:
@@ -39,15 +39,18 @@ class LibCfg(object):
       raise ValueError("invalid expunge mode: " + expunge_mode)
     # store values
     self.create_mode = create_mode
-    self.do_profile = do_profile
     self.force_version = force_version
     self.expunge_mode = expunge_mode
 
+  @classmethod
+  def from_dict(cls, cfg):
+    create_mode = cfg.mode
+    force_version = cfg.version
+    expunge_mode = cfg.expunge
+    return cls(create_mode, force_version, expunge_mode)
+
   def get_create_mode(self):
     return self.create_mode
-
-  def get_do_profile(self):
-    return self.do_profile
 
   def get_force_version(self):
     return self.force_version
@@ -57,56 +60,81 @@ class LibCfg(object):
 
   def __eq__(self, other):
     return self.create_mode == other.create_mode and \
-        self.do_profile == other.do_profile and \
         self.force_version == other.force_version and \
         self.expunge_mode == other.expunge_mode
 
   def __ne__(self, other):
     return self.create_mode != other.create_mode or \
-        self.do_profile != other.do_profile or \
         self.force_version != other.force_version or \
         self.expunge_mode != other.expunge_mode
 
   def __repr__(self):
-    return "LibCfg(create_mode=%s, do_profile=%s," \
+    return "LibCfg(create_mode=%s," \
         " force_version=%s, expunge_mode=%s)" % \
-        (self.create_mode, self.do_profile,
+        (self.create_mode,
          self.force_version, self.expunge_mode)
 
 
 class LibMgrCfg(object):
   """hold config options of the lib manager"""
 
-  def __init__(self, do_profile_all=False,
-               profile_add_samples=False,
-               def_cfg=None):
-    if def_cfg is None:
-      def_cfg = LibCfg()
-    self.do_profile_all = do_profile_all
-    self.profile_add_samples = profile_add_samples
-    self.def_cfg = def_cfg
-    self.cfg_map = {}
+  def __init__(self, lib_default=None, dev_default=None):
+    if lib_default is None:
+      lib_default = LibCfg()
+    if dev_default is None:
+      dev_default = LibCfg()
+    self.lib_default = lib_default
+    self.dev_default = dev_default
+    self.libs = {}
+    self.devs = {}
 
-  def get_do_profile_all(self):
-    return self.do_profile_all
+  @classmethod
+  def from_dict(cls, cfg_dict):
+    mgr = cls()
+    # add libs
+    lib_cfg = cfg_dict.libs
+    for lib in lib_cfg:
+      cfg = LibCfg.from_dict(lib_cfg[lib])
+      if lib == '*.library':
+        mgr.set_lib_default(cfg)
+      else:
+        mgr.add_lib_cfg(lib, cfg)
+    # add devs
+    dev_cfg = cfg_dict.devs
+    for dev in dev_cfg:
+      cfg = LibCfg.from_dict(dev_cfg[dev])
+      if dev == '*.device':
+        mgr.set_dev_default(cfg)
+      else:
+        mgr.add_dev_cfg(dev, cfg)
+    return mgr
 
-  def get_profile_add_samples(self):
-    return self.profile_add_samples
+  def set_lib_default(self, lib_cfg):
+    self.lib_default = lib_cfg
 
-  def set_def_cfg(self, lib_cfg):
-    self.def_cfg = lib_cfg
+  def set_dev_default(self, lib_cfg):
+    self.dev_default = lib_cfg
 
-  def get_def_cfg(self):
-    return self.def_cfg
+  def get_lib_default(self):
+    return self.lib_default
 
-  def add_cfg(self, name, lib_cfg):
-    self.cfg_map[name] = lib_cfg
+  def get_dev_default(self):
+    return self.dev_default
 
-  def get_cfg(self, name, or_default=True):
-    if name in self.cfg_map:
-      return self.cfg_map[name]
-    if or_default:
-      return self.def_cfg
+  def add_lib_cfg(self, name, lib_cfg):
+    self.libs[name] = lib_cfg
 
-  def get_all_names(self):
-    return sorted(self.cfg_map.keys())
+  def add_dev_cfg(self, name, lib_cfg):
+    self.devs[name] = lib_cfg
+
+  def get_lib_cfg(self, name, allow_default=True):
+    if name in self.libs:
+      return self.libs[name]
+    if allow_default:
+      return self.lib_default
+
+  def get_dev_cfg(self, name, allow_default=True):
+    if name in self.devs:
+      return self.devs[name]
+    if allow_default:
+      return self.dev_default
