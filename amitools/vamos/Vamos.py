@@ -4,7 +4,7 @@ from .astructs import AccessStruct
 from .libcore import LibProfilerConfig
 from .loader import SegmentLoader
 from .libmgr import LibManager
-from path.PathManager import PathManager
+from .path import PathManager
 from Trampoline import Trampoline
 from HardwareAccess import HardwareAccess
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx

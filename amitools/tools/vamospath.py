@@ -10,7 +10,7 @@ import os
 
 from amitools.vamos.log import *
 from amitools.vamos.VamosConfig import *
-from amitools.vamos.path.PathManager import PathManager
+from amitools.vamos.path import PathManager
 from amitools.vamos.lib.dos.PathMatch import PathMatch
 
 def main():

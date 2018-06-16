@@ -8,8 +8,7 @@ from amitools.vamos.libcore import LibImpl
 from amitools.vamos.astructs import *
 from amitools.vamos.error import *
 from amitools.vamos.log import log_dos
-from amitools.vamos.path.PathManager import PathManager
-from amitools.vamos.path.PathManager import AssignManager
+from amitools.vamos.path import PathManager, AssignManager
 from dos.Args import *
 from dos.Error import *
 from dos.AmiTime import *

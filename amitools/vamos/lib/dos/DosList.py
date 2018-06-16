@@ -2,8 +2,7 @@ import logging
 from amitools.vamos.log import log_doslist
 from amitools.vamos.astructs import AccessStruct, DosListDeviceStruct, DosListVolumeStruct, DosListAssignStruct, AssignListStruct
 from amitools.vamos.lib.dos.LockManager import LockManager
-from amitools.vamos.path.AssignManager import AssignManager
-from amitools.vamos.path.PathManager import PathManager
+from amitools.vamos.path import PathManager, AssignManager
 
 class DosListEntry:
   def __init__(self,name,struct_def):

@@ -2,8 +2,8 @@ import os.path
 import os
 from amitools.vamos.log import log_path
 from amitools.vamos.error import *
-from VolumeManager import VolumeManager
-from AssignManager import AssignManager
+from .volume import VolumeManager
+from .assign import AssignManager
 from amitools.vamos.lib.dos.LockManager import LockManager
 from amitools.vamos.lib.dos.Lock import Lock
 
