@@ -9,17 +9,12 @@ class VLibManager(object):
   """handle a set of vlib instances"""
 
   def __init__(self, machine, alloc,
-               lib_reg=None, ctx_map=None,
                profiler_cfg=None):
-    if lib_reg is None:
-      lib_reg = LibRegistry()
-    if ctx_map is None:
-      ctx_map = LibCtxMap(machine)
     self.machine = machine
     self.mem = machine.get_mem()
     self.alloc = alloc
-    self.lib_reg = lib_reg
-    self.ctx_map = ctx_map
+    self.lib_reg = LibRegistry()
+    self.ctx_map = LibCtxMap(machine)
     self.profiler = LibProfiler(profiler_cfg)
     # tools
     self._setup_creator()
@@ -39,6 +34,9 @@ class VLibManager(object):
     self.creator = LibCreator(self.alloc, self.machine.get_traps(),
                               log_missing=log_missing, log_valid=log_valid,
                               profiler=self.profiler)
+
+  def add_impl_cls(self, name, impl_cls):
+    self.lib_reg.add_lib_impl(name, impl_cls)
 
   def add_ctx(self, name, ctx):
     self.ctx_map.add_ctx(name, ctx)
@@ -173,7 +171,7 @@ class VLibManager(object):
       impl = None
     else:
       name = lib_info.get_name()
-      impl_cls = self.lib_reg.find_cls_by_name(name)
+      impl_cls = self.lib_reg.get_lib_impl(name)
       if impl_cls:
         impl = impl_cls()
         # adjust version?

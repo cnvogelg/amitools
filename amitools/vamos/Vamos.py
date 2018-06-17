@@ -11,6 +11,7 @@ from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
 from amitools.vamos.lib.dos.Process import Process
 from amitools.vamos.trace import TraceManager, TraceMemory
+from .lib.LibList import vamos_libs
 
 from .log import *
 from .machine.regs import *
@@ -106,6 +107,9 @@ class Vamos:
                               lib_mgr_cfg, profiler_cfg=profiler_cfg)
     self.lib_mgr.add_ctx('exec.library', self.exec_ctx)
     self.lib_mgr.add_ctx('dos.library', self.dos_ctx)
+    for name in vamos_libs:
+      cls = vamos_libs[name]
+      self.lib_mgr.add_impl_cls(name, cls)
     self.lib_mgr.bootstrap_exec()
 
     # no current process right now

@@ -1,3 +1,6 @@
+from amitools.vamos.lib.ExecLibrary import ExecLibrary
+from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
+from amitools.vamos.lib.VamosTestDevice import VamosTestDevice
 from amitools.vamos.libcore import VLibManager, LibRegistry, LibCtxMap, LibProfilerConfig
 from amitools.vamos.machine import Machine
 from amitools.vamos.mem import MemoryAlloc
@@ -16,6 +19,9 @@ def setup(profiler_cfg=None):
   segloader = SegmentLoader(alloc)
   exec_ctx = ExecLibCtx(machine, alloc, segloader, None)
   mgr.add_ctx('exec.library', exec_ctx)
+  mgr.add_impl_cls('exec.library', ExecLibrary)
+  mgr.add_impl_cls('vamostest.library', VamosTestLibrary)
+  mgr.add_impl_cls('vamostestdev.device', VamosTestDevice)
   return machine, alloc, mgr
 
 

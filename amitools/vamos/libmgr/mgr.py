@@ -24,6 +24,10 @@ class LibManager(object):
     ctx.lib_mgr = self
     self.vlib_mgr.add_ctx(name, ctx)
 
+  def add_impl_cls(self, name, impl_cls):
+    """allow to add vlib impl classes"""
+    self.vlib_mgr.add_impl_cls(name, impl_cls)
+
   def get_vlib_by_addr(self, addr):
     """return associated vlib for a base lib address"""
     return self.vlib_mgr.get_vlib_by_addr(addr)

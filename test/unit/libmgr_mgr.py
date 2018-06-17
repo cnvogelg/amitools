@@ -7,6 +7,10 @@ from amitools.vamos.machine import Machine
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
+from amitools.vamos.lib.ExecLibrary import ExecLibrary
+from amitools.vamos.lib.DosLibrary import DosLibrary
+from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
+from amitools.vamos.lib.VamosTestDevice import VamosTestDevice
 from amitools.vamos.loader import SegmentLoader
 
 
@@ -27,8 +31,12 @@ def setup(path_mgr=None, profiler_cfg=None):
   cpu_type = machine.get_cpu_type()
   exec_ctx = ExecLibCtx(machine, alloc, segloader, path_mgr)
   mgr.add_ctx('exec.library', exec_ctx)
+  mgr.add_impl_cls('exec.library', ExecLibrary)
   dos_ctx = DosLibCtx(machine, alloc, segloader, path_mgr, None, None)
   mgr.add_ctx('dos.library', dos_ctx)
+  mgr.add_impl_cls('dos.library', DosLibrary)
+  mgr.add_impl_cls('vamostest.library', VamosTestLibrary)
+  mgr.add_impl_cls('vamostestdev.device', VamosTestDevice)
   return machine, alloc, mgr, sp, cfg
 
 
