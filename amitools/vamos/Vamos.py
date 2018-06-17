@@ -3,7 +3,7 @@ from .mem import MemoryAlloc
 from .astructs import AccessStruct
 from .libcore import LibProfilerConfig
 from .loader import SegmentLoader
-from .libmgr import LibManager
+from .libmgr import LibManager, LibMgrCfg
 from .path import PathManager
 from Trampoline import Trampoline
 from HardwareAccess import HardwareAccess
@@ -100,8 +100,10 @@ class Vamos:
     self.dos_ctx = DosLibCtx(self.machine, self.alloc,
                              self.seg_loader, self.path_mgr,
                              self.run_command, self.start_sub_process)
+    libs_cfg = main_cfg.get_libs_dict()
+    lib_mgr_cfg = LibMgrCfg.from_dict(libs_cfg)
     self.lib_mgr = LibManager(self.machine, self.alloc, self.seg_loader,
-                              old_cfg, profiler_cfg=profiler_cfg)
+                              lib_mgr_cfg, profiler_cfg=profiler_cfg)
     self.lib_mgr.add_ctx('exec.library', self.exec_ctx)
     self.lib_mgr.add_ctx('dos.library', self.dos_ctx)
     self.lib_mgr.bootstrap_exec()

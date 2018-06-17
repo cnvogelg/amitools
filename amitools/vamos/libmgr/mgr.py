@@ -4,24 +4,20 @@ from amitools.vamos.log import log_libmgr
 from amitools.vamos.atypes import Library
 from amitools.vamos.libcore import VLibManager
 from amitools.vamos.libnative import ALibManager, LibLoader
+from .cfg import LibCfg
 
 
 class LibManager(object):
   """the library manager handles both native and vamos libs"""
 
-  MODE_OFF = 'off'
-  MODE_AUTO = 'auto'
-  MODE_VAMOS = 'vamos'
-  MODE_AMIGA = 'amiga'
-  MODE_FAKE = 'fake'
-
-  def __init__(self, machine, alloc, segloader,
-               cfg=None, profiler_cfg=None):
+  def __init__(self, machine, alloc, segloader, cfg,
+               profiler_cfg=None):
     self.mem = machine.get_mem()
     self.cfg = cfg
     self.vlib_mgr = VLibManager(machine, alloc,
                                 profiler_cfg=profiler_cfg)
     self.alib_mgr = ALibManager(machine, alloc, segloader)
+    cfg.dump(log_libmgr.info)
 
   def add_ctx(self, name, ctx):
     """allow to add vlib contexts"""
@@ -38,10 +34,13 @@ class LibManager(object):
 
   def bootstrap_exec(self, exec_info=None):
     """setup exec vlib as first and essential lib"""
-    lib_cfg = None
-    if self.cfg:
-      lib_cfg = self.cfg.get_lib_config("exec.library")
-    return self.vlib_mgr.bootstrap_exec(exec_info)
+    version = 0
+    lib_cfg = self.cfg.get_lib_cfg("exec.library")
+    force_version = lib_cfg.get_force_version()
+    if force_version is not None:
+      version = force_version
+      log_libmgr.info("exec: force version: %s", version)
+    return self.vlib_mgr.bootstrap_exec(exec_info, version)
 
   def shutdown(self, run_sp=None):
     """cleanup libs
@@ -111,8 +110,7 @@ class LibManager(object):
     else:
       log_libmgr.error("close: unknown lib @%06x!", addr)
 
-  def open_lib(self, full_name, open_ver=0, lock=None, run_sp=None,
-               mode=None, version=None):
+  def open_lib(self, full_name, version=0, lock=None, run_sp=None):
     """open a library
 
        return lib_base addr or 0
@@ -120,14 +118,13 @@ class LibManager(object):
     # get base name
     base_name = LibLoader.get_lib_base_name(full_name)
     log_libmgr.info("open_lib: '%s' ver=%d -> base_name='%s'",
-                    full_name, open_ver, base_name)
+                    full_name, version, base_name)
     # get lib params
-    mode, version = self._get_lib_params(
-        full_name, base_name, mode, version)
-    log_libmgr.info("params: mode=%s, version=%d",
-                    mode, version)
+    lib_cfg = self.cfg.get_cfg(full_name, base_name)
+    log_libmgr.info("-> cfg: %s", lib_cfg)
     # handle mode
-    if mode == self.MODE_OFF:
+    mode = lib_cfg.get_create_mode()
+    if mode == LibCfg.CREATE_MODE_OFF:
       return 0
     try_vlib, try_alib, fake = self._map_mode(mode)
 
@@ -135,12 +132,20 @@ class LibManager(object):
     addr = 0
     vlib = None
     if try_vlib:
+      # get presented version of lib
+      lib_version = 0
+      force_version = lib_cfg.get_force_version()
+      if force_version is not None:
+        lib_version = force_version
+      log_libmgr.info("vlib: version=%d, fake=%s", lib_version, fake)
+      # open vlib
       vlib = self.vlib_mgr.open_lib_name(base_name,
-                                         version=version,
+                                         version=lib_version,
                                          fake=fake)
       if vlib:
         addr = vlib.get_addr()
         log_libmgr.info("got vlib: @%06x", addr)
+
     # try amiga lib
     if try_alib and addr == 0:
       addr = self.alib_mgr.open_lib(full_name, lock, run_sp)
@@ -150,31 +155,32 @@ class LibManager(object):
     # got a lib? check version
     if addr > 0:
       save_addr = addr
-      if open_ver > 0:
-        addr = self._check_version(full_name, addr, open_ver)
+      if version > 0:
+        addr = self._check_version(full_name, addr, version)
       # lib is too old: close again
       if addr == 0:
         if vlib:
           self.vlib_mgr.close_lib(vlib)
         else:
           self.alib_mgr.close_lib(save_addr, run_sp=run_sp)
+
     # result lib base
     return addr
 
   def _map_mode(self, mode):
-    if mode == self.MODE_AUTO:
+    if mode == LibCfg.CREATE_MODE_AUTO:
       try_vlib = True
       try_alib = True
       fake = False
-    elif mode == self.MODE_VAMOS:
+    elif mode == LibCfg.CREATE_MODE_VAMOS:
       try_vlib = True
       try_alib = False
       fake = False
-    elif mode == self.MODE_AMIGA:
+    elif mode == LibCfg.CREATE_MODE_AMIGA:
       try_vlib = False
       try_alib = True
       fake = False
-    elif mode == self.MODE_FAKE:
+    elif mode == LibCfg.CREATE_MODE_FAKE:
       try_vlib = True
       try_alib = False
       fake = True
@@ -194,27 +200,3 @@ class LibManager(object):
       log_libmgr.info("lib '%s' version %d ok for open version %d",
                       name, lib_ver, open_ver)
       return addr
-
-  def _get_lib_params(self, full_name, base_name,
-                      force_mode, force_version):
-    # get lib config
-    if self.cfg:
-      lib_cfg = self.cfg.get_lib_config(full_name, base_name)
-      self._dump_lib_cfg(full_name, lib_cfg)
-      mode = lib_cfg.mode
-      version = lib_cfg.version
-    else:
-      lib_cfg = None
-      mode = "auto"
-      version = 0  # take lib version
-    if force_mode:
-      mode = force_mode
-    if force_version:
-      version = force_version
-    return mode, version
-
-  def _dump_lib_cfg(self, lib_name, lib_cfg):
-    items = ["for_lib='%s'" % lib_name, "use_cfg='%s'" % lib_cfg.name]
-    for key in lib_cfg._keys:
-      items.append("%s=%s" % (key, getattr(lib_cfg, key)))
-    log_libmgr.info(" ".join(items))

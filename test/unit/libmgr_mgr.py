@@ -2,7 +2,7 @@ import logging
 import pytest
 from amitools.vamos.log import log_libmgr, log_exec
 from amitools.vamos.libcore import LibCtx
-from amitools.vamos.libmgr import LibManager
+from amitools.vamos.libmgr import LibManager, LibMgrCfg, LibCfg
 from amitools.vamos.machine import Machine
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
@@ -10,7 +10,7 @@ from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
 from amitools.vamos.loader import SegmentLoader
 
 
-def setup(path_mgr=None, cfg=None, profiler_cfg=None):
+def setup(path_mgr=None, profiler_cfg=None):
   log_libmgr.setLevel(logging.INFO)
   log_exec.setLevel(logging.INFO)
   machine = Machine()
@@ -18,8 +18,9 @@ def setup(path_mgr=None, cfg=None, profiler_cfg=None):
   sp = machine.get_ram_begin() - 4
   alloc = MemoryAlloc.for_machine(machine)
   segloader = SegmentLoader(alloc, path_mgr)
-  mgr = LibManager(machine, alloc, segloader,
-                   cfg=cfg, profiler_cfg=profiler_cfg)
+  cfg = LibMgrCfg()
+  mgr = LibManager(machine, alloc, segloader, cfg,
+                   profiler_cfg=profiler_cfg)
   # setup ctx map
   cpu = machine.get_cpu()
   mem = machine.get_mem()
@@ -28,11 +29,11 @@ def setup(path_mgr=None, cfg=None, profiler_cfg=None):
   mgr.add_ctx('exec.library', exec_ctx)
   dos_ctx = DosLibCtx(machine, alloc, segloader, path_mgr, None, None)
   mgr.add_ctx('dos.library', dos_ctx)
-  return machine, alloc, mgr, sp
+  return machine, alloc, mgr, sp, cfg
 
 
 def libmgr_mgr_bootstrap_shutdown_test():
-  machine, alloc, mgr, sp = setup()
+  machine, alloc, mgr, sp, cfg = setup()
   # bootstrap exec
   exec_vlib = mgr.bootstrap_exec()
   exec_base = exec_vlib.get_addr()
@@ -58,7 +59,7 @@ def libmgr_mgr_open_fail_test():
     def ami_to_sys_path(self, lock, ami_path, mustExist=True):
       return None
   pm = PathMgrMock()
-  machine, alloc, mgr, sp = setup(path_mgr=pm)
+  machine, alloc, mgr, sp, cfg = setup(path_mgr=pm)
   mgr.bootstrap_exec()
   # open non-existing lib
   lib_base = mgr.open_lib("blubber.library")
@@ -71,7 +72,7 @@ def libmgr_mgr_open_fail_test():
 
 
 def libmgr_mgr_open_vlib_test():
-  machine, alloc, mgr, sp = setup()
+  machine, alloc, mgr, sp, cfg = setup()
   exec_vlib = mgr.bootstrap_exec()
   # make vamos test lib
   test_base = mgr.open_lib('vamostest.library')
@@ -95,7 +96,7 @@ def libmgr_mgr_open_vlib_test():
 
 
 def libmgr_mgr_open_vlib_dev_test():
-  machine, alloc, mgr, sp = setup()
+  machine, alloc, mgr, sp, cfg = setup()
   exec_vlib = mgr.bootstrap_exec()
   # make vamos test lib
   test_base = mgr.open_lib('vamostestdev.device')
@@ -119,11 +120,13 @@ def libmgr_mgr_open_vlib_dev_test():
 
 
 def libmgr_mgr_open_vlib_fake_test():
-  machine, alloc, mgr, sp = setup()
+  machine, alloc, mgr, sp, cfg = setup()
   exec_vlib = mgr.bootstrap_exec()
   # make vamos test lib
-  test_base = mgr.open_lib(
-      'dos.library', 36, mode=LibManager.MODE_FAKE, version=40)
+  cfg.add_lib_cfg('dos.library',
+                  LibCfg(create_mode=LibCfg.CREATE_MODE_FAKE,
+                         force_version=40))
+  test_base = mgr.open_lib('dos.library', 36)
   assert test_base > 0
   vmgr = mgr.vlib_mgr
   test_vlib = vmgr.get_vlib_by_addr(test_base)
@@ -141,11 +144,13 @@ def libmgr_mgr_open_vlib_fake_test():
 
 
 def libmgr_mgr_open_vlib_too_new_test():
-  machine, alloc, mgr, sp = setup()
+  machine, alloc, mgr, sp, cfg = setup()
   exec_vlib = mgr.bootstrap_exec()
   # make vamos test lib
-  test_base = mgr.open_lib(
-      'dos.library', 41, mode=LibManager.MODE_FAKE, version=40)
+  cfg.add_lib_cfg('dos.library',
+                  LibCfg(create_mode=LibCfg.CREATE_MODE_FAKE,
+                         force_version=40))
+  test_base = mgr.open_lib('dos.library', 41)
   assert test_base == 0
   # shutdown
   left = mgr.shutdown()
@@ -160,10 +165,12 @@ class ALibHelper(object):
         if ami_path == 'LIBS:' + lib_name:
           return lib_file
     pm = PathMgrMock()
-    self.machine, self.alloc, self.mgr, self.sp = setup(path_mgr=pm)
+    self.machine, self.alloc, self.mgr, self.sp, self.cfg = setup(path_mgr=pm)
     self.mgr.bootstrap_exec()
-    self.dos_base = self.mgr.open_lib(
-        'dos.library', mode=LibManager.MODE_FAKE, version=40)
+    self.cfg.add_lib_cfg('dos.library',
+                         LibCfg(create_mode=LibCfg.CREATE_MODE_FAKE,
+                                force_version=40))
+    self.dos_base = self.mgr.open_lib('dos.library')
 
   def shutdown(self):
     # close dos
@@ -174,11 +181,14 @@ class ALibHelper(object):
     assert self.alloc.is_all_free()
 
 
-def open_alib(lib_file, lib_name, ok=True, **kw_args):
+def open_alib(lib_file, lib_name, ok=True, version=0, mode=None):
   h = ALibHelper(lib_file, lib_name)
   mgr = h.mgr
+  # setup config
+  if mode:
+    h.cfg.add_lib_cfg(lib_name, LibCfg(create_mode=mode))
   # open_lib
-  lib_base = mgr.open_lib(lib_name, run_sp=h.sp, **kw_args)
+  lib_base = mgr.open_lib(lib_name, run_sp=h.sp, version=version)
   if not ok:
     assert lib_base == 0
     h.shutdown()
@@ -222,38 +232,34 @@ def libmgr_mgr_open_alib_libsc_test(buildlibsc):
 def libmgr_mgr_open_alib_libnix_ver_fail_test(buildlibnix):
   lib_file = buildlibnix.make_lib('testnix')
   lib_name = "testnix.library"
-  open_alib(lib_file, lib_name, ok=False, open_ver=99)
+  open_alib(lib_file, lib_name, ok=False, version=99)
 
 
 def libmgr_mgr_open_alib_libsc_ver_fail_test(buildlibsc):
   lib_file = buildlibsc.make_lib("testsc")
   lib_name = "testsc.library"
-  open_alib(lib_file, lib_name, ok=False, open_ver=99)
+  open_alib(lib_file, lib_name, ok=False, version=99)
 
 
 def libmgr_mgr_open_alib_libnix_mode_native_test(buildlibnix):
   lib_file = buildlibnix.make_lib('testnix')
   lib_name = "testnix.library"
-  open_alib(lib_file, lib_name, mode=LibManager.MODE_AMIGA)
+  open_alib(lib_file, lib_name, mode=LibCfg.CREATE_MODE_AMIGA)
 
 
 def libmgr_mgr_open_alib_libsc_mode_native_test(buildlibsc):
   lib_file = buildlibsc.make_lib("testsc")
   lib_name = "testsc.library"
-  open_alib(lib_file, lib_name, mode=LibManager.MODE_AMIGA)
+  open_alib(lib_file, lib_name, mode=LibCfg.CREATE_MODE_AMIGA)
 
 
 def libmgr_mgr_open_alib_libnix_mode_off_test(buildlibnix):
   lib_file = buildlibnix.make_lib('testnix')
   lib_name = "testnix.library"
-  h = ALibHelper(lib_file, lib_name)
-  assert h.mgr.open_lib(lib_name, mode=LibManager.MODE_OFF) == 0
-  h.shutdown()
+  open_alib(lib_file, lib_name, ok=False, mode=LibCfg.CREATE_MODE_OFF)
 
 
 def libmgr_mgr_open_alib_libsc_mode_off_test(buildlibsc):
   lib_file = buildlibsc.make_lib("testsc")
   lib_name = "testsc.library"
-  h = ALibHelper(lib_file, lib_name)
-  assert h.mgr.open_lib(lib_name, mode=LibManager.MODE_OFF) == 0
-  h.shutdown()
+  open_alib(lib_file, lib_name, ok=False, mode=LibCfg.CREATE_MODE_OFF)
