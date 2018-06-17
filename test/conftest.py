@@ -267,7 +267,7 @@ class VamosRunner:
       file_sum = self._get_sha1(file_name)
       print(file_sum, file_name)
       if file_sum != sha1_sum:
-        pytest.skip("prog wrong hash: got=%s want=%s" % (file_sum, sha1_sum))
+        raise RuntimeError("prog wrong hash: got=%s want=%s" % (file_sum, sha1_sum))
 
 
 # ----- pytest integration -----
