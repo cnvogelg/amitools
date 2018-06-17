@@ -112,8 +112,8 @@ def libmgr_cfg_mgr_from_dict_default_test():
   assert dev_default.get_expunge_mode() == LibCfg.EXPUNGE_MODE_LAST_CLOSE
 
 
-def libmgr_cfg_mgr_from_dict_custom_test():
-  cfg = ConfigDict({
+def get_custom_cfg():
+  return ConfigDict({
       'libs': ConfigDict({
           '*.library': ConfigDict({
               'mode': 'fake',
@@ -139,6 +139,10 @@ def libmgr_cfg_mgr_from_dict_custom_test():
           })
       })
   })
+
+
+def libmgr_cfg_mgr_from_dict_custom_test():
+  cfg = get_custom_cfg()
   mgr = LibMgrCfg.from_dict(cfg)
   assert mgr
   lib_cfg = mgr.get_lib_cfg('foo.library')
@@ -151,3 +155,44 @@ def libmgr_cfg_mgr_from_dict_custom_test():
   assert dev_cfg.get_create_mode() == LibCfg.CREATE_MODE_FAKE
   assert dev_cfg.get_force_version() == 23
   assert dev_cfg.get_expunge_mode() == LibCfg.EXPUNGE_MODE_SHUTDOWN
+
+
+def libmgr_cfg_mgr_auto_test():
+  cfg = get_custom_cfg()
+  mgr = LibMgrCfg.from_dict(cfg)
+  assert mgr
+  lib_cfg = mgr.get_cfg('foo.library')
+  assert lib_cfg
+  assert lib_cfg.get_create_mode() == LibCfg.CREATE_MODE_AMIGA
+  assert lib_cfg.get_force_version() == 42
+  assert lib_cfg.get_expunge_mode() == LibCfg.EXPUNGE_MODE_LAST_CLOSE
+  lib_default = mgr.get_cfg(['bla.library'])
+  assert lib_default
+  assert lib_default.get_create_mode() == LibCfg.CREATE_MODE_FAKE
+  assert lib_default.get_force_version() == 23
+  assert lib_default.get_expunge_mode() == LibCfg.EXPUNGE_MODE_SHUTDOWN
+  dev_cfg = mgr.get_cfg('bar.device')
+  assert dev_cfg
+  assert dev_cfg.get_create_mode() == LibCfg.CREATE_MODE_FAKE
+  assert dev_cfg.get_force_version() == 23
+  assert dev_cfg.get_expunge_mode() == LibCfg.EXPUNGE_MODE_SHUTDOWN
+  dev_default = mgr.get_cfg(['bla.device'])
+  assert dev_default
+  assert dev_default.get_create_mode() == LibCfg.CREATE_MODE_AMIGA
+  assert dev_default.get_force_version() == 42
+  assert dev_default.get_expunge_mode() == LibCfg.EXPUNGE_MODE_LAST_CLOSE
+
+
+def libmgr_cfg_dump_test(capsys):
+  cfg = get_custom_cfg()
+  mgr = LibMgrCfg.from_dict(cfg)
+  mgr.dump()
+  captured = capsys.readouterr()
+  assert captured.out.splitlines() == [
+      "libs config:",
+      "  default: LibCfg(create_mode=fake, force_version=23, expunge_mode=shutdown)",
+      "  lib 'foo.library': LibCfg(create_mode=amiga, force_version=42, expunge_mode=last_close)",
+      "devs config:",
+      "  default: LibCfg(create_mode=amiga, force_version=42, expunge_mode=last_close)",
+      "  dev 'bar.device': LibCfg(create_mode=fake, force_version=23, expunge_mode=shutdown)"
+  ]

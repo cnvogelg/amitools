@@ -127,6 +127,25 @@ class LibMgrCfg(object):
   def add_dev_cfg(self, name, lib_cfg):
     self.devs[name] = lib_cfg
 
+  def get_cfg(self, names, allow_default=True):
+    is_lib = True
+    if type(names) is str:
+      names = [names]
+    for name in names:
+      if name.endswith('.library'):
+        cfg = self.get_lib_cfg(name, False)
+      elif name.endswith('.device'):
+        cfg = self.get_dev_cfg(name, False)
+        is_lib = False
+      else:
+        raise ValueError("invalid name lib/dev: " + name)
+      if cfg:
+        return cfg
+    if is_lib:
+      return self.get_lib_default()
+    else:
+      return self.get_dev_default()
+
   def get_lib_cfg(self, name, allow_default=True):
     if name in self.libs:
       return self.libs[name]
@@ -138,3 +157,13 @@ class LibMgrCfg(object):
       return self.devs[name]
     if allow_default:
       return self.dev_default
+
+  def dump(self, write=print):
+    write("libs config:")
+    write("  default: %s" % self.lib_default)
+    for lib in self.libs:
+      write("  lib '%s': %s" % (lib, self.libs[lib]))
+    write("devs config:")
+    write("  default: %s" %self.dev_default)
+    for dev in self.devs:
+      write("  dev '%s': %s" % (dev, self.devs[dev]))
