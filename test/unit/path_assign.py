@@ -23,12 +23,14 @@ def path_assign_add_del_test(tmpdir):
   assert a.is_assign('foo')
   assert a.is_assign('FOO')
   assert a.is_assign('Foo')
-  assert a.get_all_assigns() == ['foo']
+  assert a.get_all_names() == ['foo']
+  assert a.get_assign('Foo') == ['bla:']
   # ok
   assert a.add_assign('Baz', 'foo:bla/blup')
   assert a.is_assign('baz')
   assert a.is_assign('BAZ')
-  assert a.get_all_assigns() == ['foo', 'Baz']
+  assert a.get_all_names() == ['foo', 'Baz']
+  assert a.get_assign('baz') == ['foo:bla/blup/']
   # invalid path
   assert not a.add_assign('bar', 'bla')
   # duplicate
@@ -62,6 +64,8 @@ def path_assign_resolve_test(tmpdir):
                                  'blA:blub/bla/plop/my/path']
   # invalid assign
   assert ar('what:is/here') is None
+  # non recursive
+  assert ar('Baz:', False) == 'foo:bla/plop/'
 
 
 def path_assign_config_test(tmpdir):

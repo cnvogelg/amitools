@@ -17,8 +17,13 @@ class AssignManager:
         return False
     return True
 
-  def get_all_assigns(self):
+  def get_all_names(self):
     return self.orig_names.values()
+
+  def get_assign(self, name):
+    lo_name = name.lower()
+    if lo_name in self.assigns:
+      return self.assigns[lo_name]
 
   def is_assign(self, name):
     return name.lower() in self.assigns
@@ -103,7 +108,7 @@ class AssignManager:
         remainder = ami_path[pos+1:]
       return (name, remainder)
 
-  def resolve_assigns(self, ami_path):
+  def resolve_assigns(self, ami_path, recursive=True):
     """replace all assigns found in path until only a volume path exists.
        do not touch relative paths.
 
@@ -130,7 +135,10 @@ class AssignManager:
           new_path = aname + split[1]
           log_path.info("resolve_assign: ami_path='%s' -> single assign: '%s'",
                         ami_path, new_path)
-          return self.resolve_assigns(new_path)
+          if recursive:
+            return self.resolve_assigns(new_path)
+          else:
+            return new_path
         # multi assign
         else:
           result = []
@@ -139,7 +147,8 @@ class AssignManager:
             log_path.info(
                 "resolve_assign: ami_path='%s' -> multi assign: '%s'",
                 ami_path, new_path)
-            new_path = self.resolve_assigns(new_path)
+            if recursive:
+              new_path = self.resolve_assigns(new_path)
             if type(new_path) is str:
               result.append(new_path)
             else:
