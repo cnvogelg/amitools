@@ -1,100 +1,99 @@
-from amitools.vamos.log import *
-from amitools.vamos.error import *
-import os
+from amitools.vamos.log import log_path
+
 
 class AssignManager:
   def __init__(self, vol_mgr):
     self.vol_mgr = vol_mgr
     self.assigns = {}
-    self.auto_assign = None
+    self.orig_names = {}
 
   def parse_config(self, cfg):
-    if cfg == None:
-      return
-    sect = 'assigns'
-    if cfg.has_section(sect):
-      opts = cfg.options(sect)
-      for name in opts:
-        paths = cfg.get(sect, name)
-        self.set_assign(name, paths)
+    if cfg is None:
+      return False
+    assigns = cfg.assigns
+    for assign in assigns:
+      paths = assigns[assign]
+      if not self.add_assign(assign, paths):
+        return False
+    return True
 
-    # check for [path] -> auto_assign
-    sect = 'path'
-    if cfg.has_option(sect, 'auto_assign'):
-      aa = cfg.get(sect, 'auto_assign')
-      if aa != None:
-        self.set_auto_assign(aa)
+  def get_all_assigns(self):
+    return self.orig_names.values()
 
-  def parse_strings(self, strs):
-    if strs == None:
-      return
-    for s in strs:
-      pos = s.find(':')
-      if pos == -1:
-        raise VamosConfigError("invalid assign: %s" % s)
-      name = s[:pos]
-      paths = s[pos+1:]
-      self.set_assign(name, paths)
+  def is_assign(self, name):
+    return name.lower() in self.assigns
 
-  def set_auto_assign(self, val):
-    if val == None:
-      return
-    val,is_vol = self._ensure_volume_or_assign(val)
-    if not is_vol:
-      raise VamosConfigError("auto assign must map to volume!")
-    self.auto_assign = val
+  def add_assign(self, name, path_list, append=False):
+    # also allow path string instead of list
+    if type(path_list) is str:
+      path_list = [path_list]
 
-  def set_assign(self, name, paths):
-    if len(paths) == 0:
-      raise VamosConfigError("invalid assign: %s" % name)
-    # append assign or clear first?
-    if paths[0] == '+':
-      paths = paths[1:]
+    # check name: empty?
+    if len(name) == 0:
+      log_path.error("empty assign added!")
+      return False
+    # check name: is volume?
+    lo_name = name.lower()
+    if self.vol_mgr.is_volume(lo_name):
+      log_path.error(
+          "assign with a volume name: %s", name)
+      return False
+    # check name: duplicate assign
+    elif lo_name in self.assigns:
+      log_path.error(
+          "duplicate assign: %s", name)
+      return False
+
+    # check path_list
+    alist = []
+    for path_name in path_list:
+      if not self._ensure_volume_or_assign(path_name):
+        return False
+      # ensure trailing slash
+      if path_name[-1] != '/' and path_name[-1] != ':':
+        path_name += '/'
+      alist.append(path_name)
+
+    # setup assign list
+    if append and self.assigns.has_key(lo_name):
+      self.assigns[lo_name] += alist
     else:
-      self.clear_assign(name)
-    # split multi assign
-    path_list = paths.split(',')
-    if path_list == None:
-      raise VamosConfigError("invalid assign: %s" % name)
-    # add assign
-    if len(path_list) > 0:
-      self.add_assign(name, path_list)
+      self.assigns[lo_name] = alist
+    # save exact cased name
+    self.orig_names[lo_name] = name
+
+    log_path.info("add assign: name='%s' -> paths=%s", name, alist)
+    return True
+
+  def del_assign(self, name):
+    lo_name = name.lower()
+    if self.assigns.has_key(lo_name):
+      alist = self.assigns[lo_name]
+      log_path.info("del assign: name='%s' -> paths=%s", name, alist)
+      del self.assigns[lo_name]
+      del self.orig_names[lo_name]
+      return True
+    else:
+      log_path.error("assign not found: %s", name)
+      return False
 
   def _ensure_volume_or_assign(self, path_name):
     if len(path_name) == 0:
-      raise VamosConfigError("invalid empty assign: %s",path_name)
+      log_path.error("invalid empty assign: %s", path_name)
+      return False
     # make sure it maps to a volume or another assign
-    split = self.ami_path_split_volume(path_name)
-    if split == None:
-      raise VamosConfigError("assign has to map to volume or another assign: %s" % path_name)
-    # ensure trailing slash
-    if path_name[-1] != '/' and path_name[-1] != ':':
-      path_name += '/'
-    # check if its a volume
-    is_vol = self.vol_mgr.is_ami_volume(split[0])
-    return path_name, is_vol
+    split = self._split_volume_remainder(path_name)
+    if split is None:
+      log_path.error(
+          "assign has to map to volume or another assign: %s", path_name)
+      return False
+    return True
 
-  def add_assign(self, name, path_list):
-    if self.assigns.has_key(name):
-      alist = self.assigns[name]
-    else:
-      alist = []
-      self.assigns[name] = alist
-    # check path_list
-    for p in path_list:
-      p,is_vol = self._ensure_volume_or_assign(p)
-      alist.append(p)
-    log_path.info("add_assign: name='%s' -> paths=%s", name, alist)
-
-  def clear_assign(self, name):
-    if self.assigns.has_key(name):
-      del self.assigns[name]
-
-  # return (volume,remainder) or none if no volume found
-  def ami_path_split_volume(self, ami_path):
+  def _split_volume_remainder(self, ami_path):
+    """return (volume, remainder) or none if no volume found"""
     pos = ami_path.find(':')
     # no assign expansion
-    if pos == -1:
+    if pos <= 0:
       return None
     else:
       name = ami_path[:pos].lower()
@@ -102,61 +101,57 @@ class AssignManager:
         remainder = ''
       else:
         remainder = ami_path[pos+1:]
-      return (name,remainder)
+      return (name, remainder)
 
-  # check if path contains assign prefix
-  # returns: list of reachable paths
-  # Note: this follows recursive assigns, too
-  def ami_path_resolve_assigns(self, ami_path):
-    result = []
+  def resolve_assigns(self, ami_path):
+    """replace all assigns found in path until only a volume path exists.
+       do not touch relative paths.
+
+        return: original path if path is not absolute
+        or: string if no multi assigns are involved
+        or: list of string if multi assigns were encountered
+        or: None if neither assign nor volume is given
+    """
     log_path.info("resolve_assign: ami_path='%s'", ami_path)
-    split = self.ami_path_split_volume(ami_path)
-    if split == None:
+    split = self._split_volume_remainder(ami_path)
+    if split is None:
+      # relative path
+      log_path.debug("resolve_assign: ami_path='%s' is rel_path!",
+                     ami_path)
       return ami_path
     else:
-      name = split[0]
+      # is assign
+      name = split[0].lower()
       if self.assigns.has_key(name):
         aname_list = self.assigns[name]
-        for aname in aname_list:
+        # single assign
+        if len(aname_list) == 1:
+          aname = aname_list[0]
           new_path = aname + split[1]
-          log_path.info("resolve_assign: ami_path='%s' potential targets='%s' resulting path='%s'", ami_path, aname, new_path)
-          result += self.ami_path_resolve_assigns(new_path)
-      # no assign
+          log_path.info("resolve_assign: ami_path='%s' -> single assign: '%s'",
+                        ami_path, new_path)
+          return self.resolve_assigns(new_path)
+        # multi assign
+        else:
+          result = []
+          for aname in aname_list:
+            new_path = aname + split[1]
+            log_path.info(
+                "resolve_assign: ami_path='%s' -> multi assign: '%s'",
+                ami_path, new_path)
+            new_path = self.resolve_assigns(new_path)
+            if type(new_path) is str:
+              result.append(new_path)
+            else:
+              result += new_path
+          return result
+      # is volume path
+      elif self.vol_mgr.is_volume(name):
+        log_path.debug("resolve_assign: ami_path='%s' is vol_path!",
+                       ami_path)
+        return ami_path
+      # invalid assign/volume
       else:
-        result.append(ami_path)
-
-    log_path.debug("resolve_assign: ami_path='%s' -> paths=%s", ami_path, result)
-    return result
-
-  # in: ami_path with optional volume/assign
-  # out: assign replaced by auto_assign or None if no auto_assign defined
-  def ami_path_resolve_auto_assigns(self, ami_path):
-    # get volume name -> if none found then return input
-    split = self.ami_path_split_volume(ami_path)
-    if split == None:
-      return ami_path
-    # do not resolve volume names!
-    vol_name = split[0]
-    if self.vol_mgr.is_ami_volume(vol_name):
-      return ami_path
-    # no auto assign defined
-    if self.auto_assign == None:
-      return None
-    # apply auto assign
-    new_path = self.auto_assign + split[0] + '/' + split[1]
-    log_path.debug("resolve_auto_assign: ami_path='%s' -> new_path='%s'", ami_path, new_path)
-    return new_path
-
-  # full resolve: assigns + auto assigns
-  def ami_path_resolve(self, ami_path):
-    ami_path = self.ami_path_resolve_assigns(ami_path)
-    result = []
-    for p in ami_path:
-      p = self.ami_path_resolve_auto_assigns(p)
-      if p != None:
-        result.append(p)
-    return result
-
-  def get_all_assigns(self):
-    return (self.assigns,self.auto_assign)
-
+        log_path.error("resolve_assign: ami_path='%s' has invalid assign!",
+                       ami_path)
+        return None

@@ -1,186 +1,176 @@
 import os
 import os.path
 from amitools.vamos.log import *
-from amitools.vamos.error import *
+import logging
+
 
 class VolumeManager():
   def __init__(self):
     # build map of volumes to sys_paths and vice versa
     self.volume2sys = {}
     self.sys2volume = {}
-    # ensure to define sys: volume
-    self.set_volume('root','/')
+    self.orig_names = {}
 
   def parse_config(self, cfg):
-    if cfg == None:
-      return
-    sect = 'volumes'
-    if cfg.has_section(sect):
-      opts = cfg.options(sect)
-      for vol_name in opts:
-        sys_path = cfg.get(sect, vol_name)
-        self.set_volume(vol_name, sys_path)
+    if cfg is None:
+      return False
+    vols = cfg.volumes
+    for vol_name in vols:
+      sys_path = vols[vol_name]
+      if not self.add_volume(vol_name, sys_path):
+        return False
+    return True
 
-  def parse_strings(self, strs):
-    if strs == None:
-      return
-    for s in strs:
-      pos = s.find(':')
-      if pos == -1:
-        raise VamosConfigError('No colon in volume define: %s' % s)
-      vol_name = s[:pos]
-      sys_path = s[pos+1:]
-      self.set_volume(vol_name, sys_path)
-
-  def set_volume(self, name, sys_path):
+  def add_volume(self, name, sys_path):
     # ensure volume name is lower case
-    name = name.lower()
+    lo_name = name.lower()
+    # check path and name
+    sys_path = self._sanitize_sys_path(sys_path)
+    if not os.path.exists(sys_path):
+      log_path.error("invalid volume path: '%s' -> %s" %
+                     (name, sys_path))
+      return False
+    elif sys_path in self.sys2volume:
+      log_path.error("duplicate volume mapping: '%s' -> %s" %
+                     (name, sys_path))
+      return False
+    elif lo_name in self.volume2sys:
+      log_path.error("duplicate volume name: '%s'", name)
+      return False
+    else:
+      log_path.info("add volume: '%s:' -> %s", name, sys_path)
+      self.volume2sys[lo_name] = sys_path
+      self.sys2volume[sys_path] = lo_name
+      self.orig_names[lo_name] = name
+      return True
+
+  def _sanitize_sys_path(self, sys_path):
     # expand system path
-    sys_path = os.path.expanduser( sys_path )
-    sys_path = os.path.expandvars( sys_path )
-    abs_path = os.path.abspath( sys_path )
+    sys_path = os.path.expanduser(sys_path)
+    sys_path = os.path.expandvars(sys_path)
+    abs_path = os.path.abspath(sys_path)
     # remove trailing slash
     if len(abs_path) > 1 and abs_path[-1] == '/':
       abs_path = abs_path[:-1]
-    # check if volume is not already defined and the map is valid
-    if not os.path.exists(abs_path):
-      log_path.error("ignoring invalid volume path: '%s' -> %s" % (name, abs_path))
-    elif self.sys2volume.has_key(abs_path):
-      log_path.error("ignoring duplicate volume: '%s' -> %s" % (name, abs_path))
-    else:
-      # clear old mapping first
-      if self.volume2sys.has_key(name):
-        self.del_volume(name)
-      log_path.info("set_volume: '%s:' -> %s" % (name, abs_path))
-      self.volume2sys[name] = abs_path
-      self.sys2volume[abs_path] = name
+    return abs_path
 
   def del_volume(self, name):
-    if not self.volume2sys.has_key(name):
-      return
-    sys_path = self.volume2sys[name]
-    del self.volume2sys[name]
+    lo_name = name.lower()
+    if lo_name not in self.volume2sys:
+      return False
+    sys_path = self.volume2sys[lo_name]
+    del self.volume2sys[lo_name]
     del self.sys2volume[sys_path]
+    del self.orig_names[lo_name]
+    log_path.info("del volume: '%s:' -> %s", name, sys_path)
+    return True
 
-  def config_done(self):
-    # sort volume list by length
-    self.vol_list = self.sys2volume.keys()
-    self.vol_list.sort(reverse=True)
-    log_path.debug("vol_list=%s",self.vol_list)
+  def is_volume(self, name):
+    return name.lower() in self.volume2sys
 
-  def _is_path_begin(self, begin, path):
-    pl = len(path)
-    bl = len(begin)
-    if bl <= pl:
-      part = path[:bl]
-      if pl > bl:
-        remainder = path[bl:]
-      else:
-        remainder = ""
-      if part == begin:
-        return remainder
-    return None
-
-  def is_ami_volume(self, vol_name):
-    name = vol_name.lower()
-    return self.volume2sys.has_key(name)
-
-  # in: ami path
-  # out: sys_path if it exists and None if not
-  def valid_volume_ami_to_sys_path(self, ami_path):
-    # make sure it contains a volume name
-    pos = ami_path.find(':')
-    if pos == -1:
-      return None
-    sys_path = self.ami_to_sys_path(ami_path, True)
-    if sys_path == None:
-      return None
-    if not os.path.exists(sys_path):
-      return None
-    return sys_path
-
-  # in: system path
-  # out: None or "ami_volume:ami_path"
-  def sys_to_ami_path_pair(self, sys_path):
-    for vol_sys_path in self.vol_list:
-      remainder = self._is_path_begin(vol_sys_path, sys_path)
-      if remainder != None:
-        # remove leading slash
-        if len(remainder)>0 and remainder[0] == '/':
-          remainder = remainder[1:]
-        # get volume name and build amiga path
-        vol_name = self.sys2volume[vol_sys_path]
-        ami_path = vol_name + ":" + remainder
-        log_path.debug("vol: sys_to_ami_path: sys='%s' -> ami='%s'", sys_path, ami_path)
-        return (vol_name, remainder)
-    return None
+  def get_all_names(self):
+    return self.orig_names.values()
 
   def sys_to_ami_path(self, sys_path):
-    vol_path = self.sys_to_ami_path_pair(sys_path)
-    if vol_path == None:
-      return None
-    return "%s:%s" % vol_path
+    """try to map a system path back to an amiga path
 
-  # in: amiga path with optional volume prefix
-  # out: sys_path or None if volume not found
-  # Note: if no volume is found then the path is returned as is
-  # The method automatically matches to case of sys path
-  def ami_to_sys_path(self, ami_path, mustExist=False):
+       if multiple volumes overlap then take the shortest amiga path
+
+       return ami_path or None if sys_path can't be mapped
+    """
+    res_len = None
+    result = None
+    for vol_sys_path in self.sys2volume:
+      cp = os.path.commonprefix([vol_sys_path, sys_path])
+      if cp == vol_sys_path:
+        remainder = sys_path[len(vol_sys_path):]
+        n = len(remainder)
+        if n > 0 and remainder[0] == '/':
+          remainder = remainder[1:]
+          n -= 1
+        # get volume name and build amiga path
+        vol_name = self.sys2volume[vol_sys_path]
+        vol_name = self.orig_names[vol_name]
+        ami_path = vol_name + ":" + remainder
+        log_path.debug(
+            "vol: sys_to_ami_path: sys='%s' -> ami='%s'", sys_path, ami_path)
+        if result is None or n < res_len:
+          result = ami_path
+          res_len = n
+    # return best result
+    log_path.info(
+        "vol: sys_to_ami_path: sys='%s' -> ami=%s", sys_path, result)
+    return result
+
+  def ami_to_sys_path(self, ami_path, fast=False):
+    """Map an Amiga path to a system path.
+
+       An absolute Amiga path with volume prefix is expected.
+       Any other path returns None.
+
+       If volume does not exist also return None.
+
+       It replaces the volume with the sys_path prefix.
+       Furthermore, the remaining Amiga path is mapped to
+       the system file system and case corrected if a
+       corresponding entry is found.
+
+       If 'fast' mode is enabled then the original case
+       of the path elements is kept if the underlying FS
+       is case insensitive.
+
+       Return None on error or system path
+    """
+    log_path.setLevel(logging.DEBUG)
     # find volume
     pos = ami_path.find(':')
-    if pos == -1:
-      return ami_path
+    if pos <= 0:
+      log_path.debug("vol: ami_to_sys_path: empty volume: %s", ami_path)
+      return None
     vol_name = ami_path[:pos].lower()
     # check volume name
-    if self.volume2sys.has_key(vol_name):
+    if vol_name in self.volume2sys:
       remainder = ami_path[pos+1:]
+
+      # invalid volume:/... path
+      if len(remainder) > 0 and remainder[0] == '/':
+        log_path.error("vol: ami_to_sys_path: invalid :/ path: %s", ami_path)
+        return None
+
       dirs = remainder.split('/')
       vol_sys_path = self.volume2sys[vol_name]
-      sys_path = self._follow_path_no_case(vol_sys_path, dirs, mustExist)
-      if sys_path == None:
-        log_path.debug("vol: ami_to_sys_path: ami='%s' -> sys='%s' not found!", ami_path, sys_path)
-        return None
-      else:
-        log_path.debug("vol: ami_to_sys_path: ami='%s' -> sys='%s' mustExit=%s", ami_path, sys_path, mustExist)
-        return sys_path
+      sys_path = self._follow_path_no_case(vol_sys_path, dirs, fast)
+      log_path.info("vol: ami_to_sys_path: ami='%s' -> sys='%s'", ami_path, sys_path)
+      return sys_path
     else:
-      log_path.error("vol: ami_to_sys_path: volume='%s' not found!", vol_name )
+      log_path.error("vol: ami_to_sys_path: volume='%s' not found: %s",
+                     vol_name, ami_path)
       return None
 
-  def _follow_path_no_case(self, base, dirs, mustExist):
+  def _follow_path_no_case(self, base, dirs, fast):
     # base is the name (no more dirs)
     if len(dirs) == 0:
-      if mustExist:
-        if os.path.exists(base):
-          return base
-        else:
-          return None
-      else:
-        return base
+      return base
     # make sure base is a dir
     if not os.path.isdir(base):
-      return None
+      # assume remainder is new
+      return os.path.join(base, os.path.join(*dirs))
     # dir component to search
     d = dirs[0]
-    dl = len(d)
     # check for direct match first
-    dp = os.path.join(base,d)
-    if os.path.exists(dp):
-      return self._follow_path_no_case(dp, dirs[1:], mustExist)
+    if fast:
+      dp = os.path.join(base, d)
+      if os.path.exists(dp):
+        return self._follow_path_no_case(dp, dirs[1:], fast)
     # read dir and check for no case variant
     dlow = d.lower()
     files = os.listdir(base)
+    dl = len(d)
     for f in files:
       if len(f) == dl:
         flow = f.lower()
         if flow == dlow:
           res = os.path.join(base, f)
-          return self._follow_path_no_case(res, dirs[1:], mustExist)
+          return self._follow_path_no_case(res, dirs[1:], fast)
     # can't find it -> we assume rest of path is new
-    if mustExist:
-      return None
-    else:
-      return os.path.join(base, os.path.join(*dirs))
-
-  def get_all_names(self):
-    return self.volume2sys.keys()
+    return os.path.join(base, os.path.join(*dirs))
