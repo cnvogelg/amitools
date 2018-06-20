@@ -8,18 +8,18 @@ class PathParser(Parser):
             "command": ValueList(str, ["c:"]),
             "cwd": Value(str)
         },
-        "assigns": ValueDict(str),
+        "assigns": ValueDict(ValueList(str, sep='+')),
         "volumes": ValueDict(str)
     }
     arg_cfg = {
         "path": {
-            "command": Argument('-p', '--path', action='store',
+            "command": Argument('-p', '--path', action='append',
                                 help="define command search ami path, e.g. c:,sc:c"),
             "cwd": Argument('--cwd', action='store',
                             help="set the current working directory")
         },
         "assigns": Argument('-a', '--assign', action='append',
-                            help="add AmigaOS assign: name:/sys/path[,/more/path]"),
+                            help="add AmigaOS assign: name:/sys/path[+/more/path]"),
         "volumes": Argument('-V', '--volume', action='append',
                             help="define AmigaOS volume: name:/abs/sys/path")
     }
