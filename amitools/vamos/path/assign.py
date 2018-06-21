@@ -149,6 +149,8 @@ class AssignManager:
                 ami_path, new_path)
             if recursive:
               new_path = self.resolve_assigns(new_path)
+              if new_path is None:
+                return None
             if type(new_path) is str:
               result.append(new_path)
             else:
@@ -161,6 +163,6 @@ class AssignManager:
         return ami_path
       # invalid assign/volume
       else:
-        log_path.error("resolve_assign: ami_path='%s' has invalid assign!",
+        log_path.error("resolve_assign: ami_path='%s' has invalid prefix!",
                        ami_path)
         return None

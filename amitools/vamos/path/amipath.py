@@ -4,7 +4,7 @@ class AmiPathError(Exception):
     self.reason = reason
 
   def __str__(self):
-    return "AmiPathError: %s: %s" % (self.path, self.reason)
+    return "path='%s': %s" % (self.path, self.reason)
 
 
 class AmiPath(object):

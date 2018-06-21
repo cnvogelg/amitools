@@ -8,8 +8,8 @@ class AmiPathEnv(object):
       cwd = "sys:"
     if cmd_paths is None:
       cmd_paths = ["c:"]
-    self.cwd = cwd
-    self.cmd_paths = cmd_paths
+    self.set_cwd(cwd)
+    self.set_cmd_paths(cmd_paths)
 
   def parse_config(self, cfg):
     if cfg is None:
