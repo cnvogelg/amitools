@@ -226,7 +226,47 @@ class AmiPath(object):
       postfix = p[:last_pos]
     return self.rebuild(self.prefix(), postfix)
 
-  def get_names(self, with_special_name=False):
+  def filename(self):
+    """return the filename component of a path
+
+       even if the path is terminated with '/' the last component is taken
+
+       return filename or None if not found
+    """
+    names = self.names()
+    if len(names) == 0:
+      return None
+    return names[-1]
+
+  def dirname(self):
+    """return the dirname component of a path
+
+       return dirname or None if not found
+    """
+    names = self.names(True)
+    n = len(names)
+    if n == 0:
+      return None
+    if names[0] in (':', '/'):
+      special = names[0]
+      return special + "/".join(names[1:-1])
+    elif n > 1:
+      return "/".join(names[:-1])
+    else:
+      return None
+
+  def absdirname(self):
+    """return the dirname component of a path including prefix if available"""
+    dirname = self.dirname()
+    prefix = self.prefix()
+    if dirname and prefix:
+      return prefix + ":" + dirname
+    elif prefix:
+      return prefix + ":"
+    else:
+      return dirname
+
+  def names(self, with_special_name=False):
     """return a list of strings with the names contained in postfix
 
     Note if skip_leading is False then a parent or prefix local path

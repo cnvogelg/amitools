@@ -138,28 +138,68 @@ def path_amipath_parent_test():
   assert AmiPath("bar").parent() == AmiPath()
 
 
-def path_amipath_get_names_test():
-  assert AmiPath("foo/bar").get_names() == ['foo', 'bar']
-  assert AmiPath("foo:bar/baz").get_names() == ['bar', 'baz']
-  assert AmiPath("foo:bar").get_names() == ['bar']
-  assert AmiPath("foo:").get_names() == []
-  assert AmiPath("/bar").get_names() == ['bar']
-  assert AmiPath("/bar/").get_names() == ['bar']
-  assert AmiPath("/").get_names() == []
-  assert AmiPath(":").get_names() == []
-  assert AmiPath(":bar").get_names() == ['bar']
-  assert AmiPath("bar").get_names() == ['bar']
+def path_amipath_names_test():
+  assert AmiPath("foo/bar").names() == ['foo', 'bar']
+  assert AmiPath("foo:bar/baz").names() == ['bar', 'baz']
+  assert AmiPath("foo:bar").names() == ['bar']
+  assert AmiPath("foo:").names() == []
+  assert AmiPath("/bar").names() == ['bar']
+  assert AmiPath("/bar/").names() == ['bar']
+  assert AmiPath("/").names() == []
+  assert AmiPath(":").names() == []
+  assert AmiPath(":bar").names() == ['bar']
+  assert AmiPath("bar").names() == ['bar']
   # with special name
-  assert AmiPath("foo/bar").get_names(True) == ['foo', 'bar']
-  assert AmiPath("foo:bar/baz").get_names(True) == ['bar', 'baz']
-  assert AmiPath("foo:bar").get_names(True) == ['bar']
-  assert AmiPath("foo:").get_names(True) == []
-  assert AmiPath("/bar").get_names(True) == ['/', 'bar']
-  assert AmiPath("/bar/").get_names(True) == ['/', 'bar']
-  assert AmiPath("/").get_names(True) == ['/']
-  assert AmiPath(":").get_names(True) == [':']
-  assert AmiPath(":bar").get_names(True) == [':', 'bar']
-  assert AmiPath("bar").get_names(True) == ['bar']
+  assert AmiPath("foo/bar").names(True) == ['foo', 'bar']
+  assert AmiPath("foo:bar/baz").names(True) == ['bar', 'baz']
+  assert AmiPath("foo:bar").names(True) == ['bar']
+  assert AmiPath("foo:").names(True) == []
+  assert AmiPath("/bar").names(True) == ['/', 'bar']
+  assert AmiPath("/bar/").names(True) == ['/', 'bar']
+  assert AmiPath("/").names(True) == ['/']
+  assert AmiPath(":").names(True) == [':']
+  assert AmiPath(":bar").names(True) == [':', 'bar']
+  assert AmiPath("bar").names(True) == ['bar']
+
+
+def path_amipath_filename_test():
+  assert AmiPath("foo/bar").filename() == 'bar'
+  assert AmiPath("foo:bar/baz").filename() == 'baz'
+  assert AmiPath("foo:bar").filename() == 'bar'
+  assert AmiPath("foo:").filename() is None
+  assert AmiPath("/bar").filename() == 'bar'
+  assert AmiPath("/bar/").filename() == 'bar'
+  assert AmiPath("/").filename() is None
+  assert AmiPath(":").filename() is None
+  assert AmiPath(":bar").filename() == 'bar'
+  assert AmiPath("bar").filename() == 'bar'
+
+
+def path_amipath_dirname_test():
+  assert AmiPath("foo/bar").dirname() == 'foo'
+  assert AmiPath("foo:bar/baz").dirname() == 'bar'
+  assert AmiPath("foo:bar/baz").dirname() == 'bar'
+  assert AmiPath("foo:bar").dirname() is None
+  assert AmiPath("foo:").dirname() is None
+  assert AmiPath("/bar").dirname() == '/'
+  assert AmiPath("/bar/").dirname() == '/'
+  assert AmiPath("/").dirname() == '/'
+  assert AmiPath(":").dirname() == ':'
+  assert AmiPath(":bar").dirname() == ':'
+  assert AmiPath("bar").dirname() is None
+
+
+def path_amipath_absdirname_test():
+  assert AmiPath("foo/bar").absdirname() == 'foo'
+  assert AmiPath("foo:bar/baz").absdirname() == 'foo:bar'
+  assert AmiPath("foo:bar").absdirname() == 'foo:'
+  assert AmiPath("foo:").absdirname() == 'foo:'
+  assert AmiPath("/bar").absdirname() == '/'
+  assert AmiPath("/bar/").absdirname() == '/'
+  assert AmiPath("/").absdirname() == '/'
+  assert AmiPath(":").absdirname() == ':'
+  assert AmiPath(":bar").absdirname() == ':'
+  assert AmiPath("bar").absdirname() is None
 
 
 def path_amipath_join_abs_test():
