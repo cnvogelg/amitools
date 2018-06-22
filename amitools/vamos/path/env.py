@@ -15,10 +15,14 @@ class AmiPathEnv(object):
     if cfg is None:
       return False
     path = cfg.path
-    if not self.set_cwd(path.cwd):
+    if path is None:
       return False
-    if not self.set_cmd_paths(path.command):
-      return False
+    if path.cwd:
+      if not self.set_cwd(path.cwd):
+        return False
+    if path.command:
+      if not self.set_cmd_paths(path.command):
+        return False
     return True
 
   def get_cwd(self):

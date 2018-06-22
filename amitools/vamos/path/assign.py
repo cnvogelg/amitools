@@ -11,6 +11,8 @@ class AssignManager:
     if cfg is None:
       return False
     assigns = cfg.assigns
+    if assigns is None:
+      return False
     for assign in assigns:
       paths = assigns[assign]
       if not self.add_assign(assign, paths):

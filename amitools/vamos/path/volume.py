@@ -15,6 +15,8 @@ class VolumeManager():
     if cfg is None:
       return False
     vols = cfg.volumes
+    if vols is None:
+      return False
     for vol_name in vols:
       sys_path = vols[vol_name]
       if not self.add_volume(vol_name, sys_path):
@@ -121,7 +123,6 @@ class VolumeManager():
 
        Return None on error or system path
     """
-    log_path.setLevel(logging.DEBUG)
     # find volume
     pos = ami_path.find(':')
     if pos <= 0:
