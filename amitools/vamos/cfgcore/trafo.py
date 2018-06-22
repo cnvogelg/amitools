@@ -19,7 +19,7 @@ class DictTrafo(object):
       tval = type(val)
       if tval is dict:
         vres = self.transform(in_dict, val)
-      elif tval in (str, tuple):
+      elif tval in (str, tuple, list):
         vres = self.read_rel_path(val, in_dict)
       else:
         raise ValueError("invalid type in trafo_dict: %s" + val)

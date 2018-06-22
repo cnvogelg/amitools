@@ -16,7 +16,7 @@ def cfg_path_ini_test():
           "devs": "sys:devs"
       },
       "path": {
-          "command": "c:,work:c",
+          "path": "c:,work:c",
           "cwd": "~/amiga"
       }
   }
