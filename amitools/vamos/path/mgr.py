@@ -77,11 +77,17 @@ class PathManager:
   def get_all_assign_names(self):
     return self.assign_mgr.get_all_names()
 
+  def get_assign(self, assign):
+    return self.assign_mgr.get_assign(assign)
+
   def get_cmd_paths(self):
     return self.default_env.get_cmd_paths()
 
   def get_cwd(self):
     return self.default_env.get_cwd()
+
+  def get_env(self):
+    return self.default_env
 
   def is_prefix_valid(self, ami_path):
     """check if prefix is either a volume or assign name"""
