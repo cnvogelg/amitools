@@ -89,12 +89,14 @@ def path_amipath_prefix_postfix_test():
   assert p.prefix() == "foo"
   assert p.postfix() == "bar"
   assert p.postfix(True) == "bar"
-  assert AmiPath.build(p.prefix(), p.postfix()) == p
+  assert p.postfix(skip_trailing=False) == "bar/"
+  assert AmiPath.build(p.prefix(), p.postfix(skip_trailing=False)) == p
   p = AmiPath("foo/bar/")
   assert p.prefix() is None
   assert p.postfix() == "foo/bar"
   assert p.postfix(True) == "foo/bar"
-  assert AmiPath.build(p.prefix(), p.postfix()) == p
+  assert p.postfix(skip_trailing=False)
+  assert AmiPath.build(p.prefix(), p.postfix(skip_trailing=False)) == p
   p = AmiPath(":bla")
   assert p.prefix() is None
   assert p.postfix() == ":bla"
@@ -219,6 +221,7 @@ def path_amipath_join_abs_test():
   # abs join local
   assert AmiPath("foo:").join(AmiPath()) == AmiPath("foo:")
   assert AmiPath("foo:").join(AmiPath("bar")) == AmiPath("foo:bar")
+  assert AmiPath("foo:baz").join(AmiPath()) == AmiPath("foo:baz")
   assert AmiPath("foo:baz").join(AmiPath("bar")) == AmiPath("foo:baz/bar")
 
 

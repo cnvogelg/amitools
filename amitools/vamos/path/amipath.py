@@ -44,6 +44,10 @@ class AmiPath(object):
   def __repr__(self):
     return "AmiPath('{}')".format(self.pstr)
 
+  def is_cwd(self):
+    """is the current working dir"""
+    return len(self.pstr) == 0
+
   def is_local(self):
     """is it a local path?"""
     return self.pstr.find(':') <= 0
@@ -102,7 +106,7 @@ class AmiPath(object):
         res = res.lower()
       return res
 
-  def postfix(self, skip_leading=False, lower=False):
+  def postfix(self, skip_leading=False, lower=False, skip_trailing=True):
     """the postfix string of the path.
 
     A relative path is returned as is.
@@ -114,7 +118,7 @@ class AmiPath(object):
     if pos > 0:
       p = p[pos+1:]
     # strip trailing slash if any
-    if len(p) > 1 and p[-1] == '/':
+    if skip_trailing and len(p) > 1 and p[-1] == '/':
       p = p[:-1]
     # strip parent local
     if skip_leading and len(p) > 0 and p[0] in ('/', ':'):
@@ -141,16 +145,14 @@ class AmiPath(object):
     elif not isinstance(other, AmiPath):
       return False
     # case insensitive
-    return self.prefix(lower=True) == other.prefix(lower=True) and \
-        self.postfix(lower=True) == other.postfix(lower=True)
+    return self.pstr.lower() == other.pstr.lower()
 
   def __ne__(self, other):
     if type(other) is str:
       other = AmiPath(other)
     elif not isinstance(other, AmiPath):
       return True
-    return self.prefix(lower=True) != other.prefix(lower=True) or \
-        self.postfix(lower=True) != other.postfix(lower=True)
+    return self.pstr.lower() != other.pstr.lower()
 
   def is_valid(self):
     if not self.is_syntax_valid():
@@ -293,8 +295,11 @@ class AmiPath(object):
 
     Note:May return None if join is not possible.
     """
+    # join with cwd returns path itself
+    if opath.is_cwd():
+      return self
     # if other is absolute then replace my path
-    if opath.is_absolute():
+    elif opath.is_absolute():
       return opath
     # other is parent relative?
     elif opath.is_parent_local():
@@ -306,12 +311,15 @@ class AmiPath(object):
       if my is not None:
         prefix = self.prefix()
         my_post = my.postfix()
+        o_post = opath.postfix(True)
         if my_post == '':
-          postfix = opath.postfix(True)
+          postfix = o_post
         elif my_post == ':':
-          postfix = ':' + opath.postfix(True)
+          postfix = ':' + o_post
+        elif len(o_post) > 0:
+          postfix = my_post + "/" + o_post
         else:
-          postfix = my_post + opath.postfix()
+          postfix = my_post
         return self.rebuild(prefix, postfix)
       else:
         raise AmiPathError(self, "can't join parent relative path")
