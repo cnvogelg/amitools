@@ -30,7 +30,7 @@ def path_assign_add_del_test(tmpdir):
   assert a.is_assign('baz')
   assert a.is_assign('BAZ')
   assert a.get_all_names() == ['foo', 'Baz']
-  assert a.get_assign('baz') == ['foo:bla/blup/']
+  assert a.get_assign('baz') == ['foo:bla/blup']
   # invalid path
   assert not a.add_assign('bar', 'bla')
   # duplicate
@@ -67,7 +67,8 @@ def path_assign_resolve_test(tmpdir):
   # not an assign
   assert ar('what:is/here') == 'what:is/here'
   # non recursive
-  assert ar('Baz:', False) == 'foo:bla/plop/'
+  assert ar('Baz:', False) == 'foo:bla/plop'
+  assert ar('MULTI:', False) == ['foo:tmp', 'baz:']
 
 
 def path_assign_config_test(tmpdir):

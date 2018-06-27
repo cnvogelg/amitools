@@ -56,9 +56,6 @@ class AssignManager:
     for path_name in path_list:
       if not self._ensure_volume_or_assign(path_name):
         return False
-      # ensure trailing slash
-      if path_name[-1] != '/' and path_name[-1] != ':':
-        path_name += '/'
       alist.append(path_name)
 
     # setup assign list
@@ -105,10 +102,19 @@ class AssignManager:
     else:
       name = ami_path[:pos].lower()
       if ami_path[-1] == ':':
-        remainder = ''
+        remainder = None
       else:
         remainder = ami_path[pos+1:]
       return (name, remainder)
+
+  def _concat_assign(self, aname, remainder):
+    if remainder:
+      if aname[-1] not in (':', '/'):
+        return aname + "/" + remainder
+      else:
+        return aname + remainder
+    else:
+      return aname
 
   def resolve_assigns(self, ami_path, recursive=True):
     """replace all assigns found in path until only a volume path exists.
@@ -130,11 +136,12 @@ class AssignManager:
       # is assign
       name = split[0].lower()
       if self.assigns.has_key(name):
+        remainder = split[1]
         aname_list = self.assigns[name]
         # single assign
         if len(aname_list) == 1:
           aname = aname_list[0]
-          new_path = aname + split[1]
+          new_path = self._concat_assign(aname, remainder)
           log_path.info("resolve_assign: ami_path='%s' -> single assign: '%s'",
                         ami_path, new_path)
           if recursive:
@@ -145,7 +152,7 @@ class AssignManager:
         else:
           result = []
           for aname in aname_list:
-            new_path = aname + split[1]
+            new_path = self._concat_assign(aname, remainder)
             log_path.info(
                 "resolve_assign: ami_path='%s' -> multi assign: '%s'",
                 ami_path, new_path)

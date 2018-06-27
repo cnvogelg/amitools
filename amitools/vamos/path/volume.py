@@ -28,7 +28,7 @@ class VolumeManager():
     lo_name = name.lower()
     # check path and name
     sys_path = self.resolve_sys_path(sys_path)
-    if not os.path.exists(sys_path):
+    if not os.path.isdir(sys_path):
       log_path.error("invalid volume path: '%s' -> %s" %
                      (name, sys_path))
       return False
@@ -56,9 +56,6 @@ class VolumeManager():
     sys_path = os.path.expanduser(sys_path)
     sys_path = os.path.expandvars(sys_path)
     abs_path = os.path.abspath(sys_path)
-    # remove trailing slash
-    if len(abs_path) > 1 and abs_path[-1] == '/':
-      abs_path = abs_path[:-1]
     return abs_path
 
   def del_volume(self, name):
@@ -75,16 +72,25 @@ class VolumeManager():
   def is_volume(self, name):
     return name.lower() in self.volume2sys
 
+  def get_volume_sys_path(self, name):
+    return self.volume2sys[name.lower()]
+
   def get_all_names(self):
     return self.orig_names.values()
 
+  def is_sys_path_abs(self, sys_path):
+    return os.path.isabs(sys_path)
+
   def sys_to_ami_path(self, sys_path):
-    """try to map a system path back to an amiga path
+    """try to map an absolute system path back to an amiga path
 
        if multiple volumes overlap then take the shortest amiga path
 
        return ami_path or None if sys_path can't be mapped
     """
+    if not os.path.isabs(sys_path):
+      log_path.error("vol: sys_to_ami_path: no abs path: '%s'", sys_path)
+      return None
     res_len = None
     result = None
     for vol_sys_path in self.sys2volume:
@@ -136,17 +142,25 @@ class VolumeManager():
     vol_name = ami_path[:pos].lower()
     # check volume name
     if vol_name in self.volume2sys:
+      vol_sys_path = self.volume2sys[vol_name]
       remainder = ami_path[pos+1:]
 
+      # only volume name given
+      if len(remainder) == 0:
+        log_path.info("vol: direct volume: ami='%s' -> sys='%s'",
+                      ami_path, vol_sys_path)
+        return vol_sys_path
+
       # invalid volume:/... path
-      if len(remainder) > 0 and remainder[0] == '/':
+      if remainder[0] == '/':
         log_path.error("vol: ami_to_sys_path: invalid :/ path: %s", ami_path)
         return None
 
+      # follow ami path along in sys world
       dirs = remainder.split('/')
-      vol_sys_path = self.volume2sys[vol_name]
       sys_path = self._follow_path_no_case(vol_sys_path, dirs, fast)
-      log_path.info("vol: ami_to_sys_path: ami='%s' -> sys='%s'", ami_path, sys_path)
+      log_path.info("vol: ami_to_sys_path: ami='%s' -> sys='%s'",
+                    ami_path, sys_path)
       return sys_path
     else:
       log_path.error("vol: ami_to_sys_path: volume='%s' not found: %s",

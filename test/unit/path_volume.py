@@ -10,8 +10,6 @@ def path_volume_resolve_sys_path_test(tmpdir):
   assert rsp(p) == p
   # user home
   assert rsp("~") == os.path.expanduser("~")
-  # no trailing slash
-  assert rsp(p + "/") == p
   # env var
   os.environ["TEST_PATH"] = p
   assert rsp("${TEST_PATH}") == p
@@ -27,6 +25,7 @@ def path_volume_add_del_test(tmpdir):
   assert v.add_volume("My", my_path)
   assert v.get_all_names() == ['My']
   assert v.is_volume('MY')
+  assert v.get_volume_sys_path('MY') == my_path
   # duplicate path mapping
   assert not v.add_volume("foo", my_path)
   # duplicate path name
@@ -57,6 +56,8 @@ def path_volume_sys_to_ami_test(tmpdir):
   assert s2a(str(mp2.join("bla/blub"))) == "nested:bla/blub"
   # non existing
   assert s2a(str(tmpdir)) is None
+  # not abosulte
+  assert s2a("bla") is None
 
 
 def path_volume_ami_to_sys_test(tmpdir):
@@ -70,10 +71,11 @@ def path_volume_ami_to_sys_test(tmpdir):
   assert v.add_volume("My", my_path)
   # base path
   a2s = v.ami_to_sys_path
-  assert a2s("my:") == my_path + "/"
+  assert a2s("my:") == my_path
   assert a2s("my:unkown/PATH") == os.path.join(my_path, "unkown", "PATH")
+  # follow along case of path in sys fs
   assert a2s("my:foo/bar/baz") == sub_path
-  # fast mode
+  # fast mode on case insensitive fs does not adjust ami path
   if ci_fs:
     assert a2s("my:foo", True) == os.path.join(my_path, "foo")
   else:

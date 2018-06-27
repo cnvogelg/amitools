@@ -1,6 +1,12 @@
+import os
 import pytest
-from amitools.vamos.path import PathManager, AmiPath, AmiPathError, AmiPathEnv
+from amitools.vamos.path import *
 from amitools.vamos.cfgcore import ConfigDict
+import logging
+from amitools.vamos.log import log_path
+
+
+log_path.setLevel(logging.DEBUG)
 
 
 def path_mgr_default_test():
@@ -106,11 +112,15 @@ def path_mgr_abspath_test(tmpdir):
   assert ap("") == cur_dir
   assert ap("baz") == cur_dir.join(AmiPath("baz"))
   assert ap("/baz") == cur_dir.join(AmiPath("/baz"))
+  # invalid rel
+  with pytest.raises(AmiPathError):
+    env = AmiPathEnv(cwd="foo:")
+    ap("/", env=env)
   # no volpath!
   env = AmiPathEnv(cwd="blub:")
   with pytest.raises(AmiPathError):
     ap(AmiPath("rel"), env=env)
-  # othe volpath
+  # other volpath
   env = AmiPathEnv(cwd="work:blub")
   assert ap("baz", env=env) == env.get_cwd().join(AmiPath("baz"))
 
@@ -128,6 +138,10 @@ def path_mgr_volpath_test(tmpdir):
   env = AmiPathEnv(cwd=cwd)
   assert vp(AmiPath(), env=env) == cwd
   assert vp(AmiPath("foo"), env=env) == cwd.join(AmiPath("foo"))
+  # invalid relpath
+  with pytest.raises(AmiPathError):
+    env = AmiPathEnv(cwd="foo:")
+    assert vp("/", env=env) == cwd
   # volpath
   assert vp(AmiPath("work:bla")) == AmiPath("work:bla")
   # multi assign
@@ -135,6 +149,11 @@ def path_mgr_volpath_test(tmpdir):
     vp(AmiPath("a:bla"))
   # assign
   assert vp(AmiPath("b:foo")) == AmiPath("root:bla/foo")
+  # unknown prefix
+  assert vp(AmiPath("what:is/this")) is None
+  # strict: unknown prefix
+  with pytest.raises(AmiPathError):
+    vp("what:is/this", strict=True)
 
 
 def path_mgr_volpaths_test(tmpdir):
@@ -150,6 +169,10 @@ def path_mgr_volpaths_test(tmpdir):
   env = AmiPathEnv(cwd=cwd)
   assert vp(AmiPath(), env=env) == [cwd]
   assert vp(AmiPath("foo"), env=env) == [cwd.join(AmiPath("foo"))]
+  # invalid relpath
+  with pytest.raises(AmiPathError):
+    env = AmiPathEnv(cwd="foo:")
+    assert vp("/", env=env) == cwd
   # volpath
   assert vp(AmiPath("work:bla")) == [AmiPath("work:bla")]
   # multi assign
@@ -157,6 +180,11 @@ def path_mgr_volpaths_test(tmpdir):
                                   AmiPath("sys:c/foo/bla")]
   # assign
   assert vp(AmiPath("b:foo")) == [AmiPath("root:bla/foo")]
+  # unknown prefix
+  assert vp("what:is/this") == []
+  # strict: unknown prefix
+  with pytest.raises(AmiPathError):
+    vp("what:is/this", strict=True)
 
 
 def path_mgr_resolve_assigns_test(tmpdir):
@@ -193,6 +221,7 @@ def path_mgr_cmdpaths_test(tmpdir):
   p = AmiPath("bla/blub")
   assert cp(p) == [cur_dir.join(p)]
   assert cp(p, make_volpaths=False) == [p]
+  # invalid command path
   p = AmiPath("bla/blub/")
   with pytest.raises(AmiPathError):
     cp(p)
@@ -216,3 +245,49 @@ def path_mgr_cmdpaths_test(tmpdir):
   assert cp(p, make_volpaths=False) == [AmiPath('root:baz/cmd'),
                                         AmiPath('a:cmd'),
                                         AmiPath('c:cmd')]
+
+
+def path_mgr_to_sys_path_test(tmpdir):
+  pm = setup_pm(tmpdir)
+  tsp = pm.to_sys_path
+  sys_sys_path = pm.get_volume_sys_path('sys')
+  sys_root_path = pm.get_volume_sys_path('root')
+  # vol path
+  assert tsp("sys:") == sys_sys_path
+  # assign path
+  assert tsp("c:") == os.path.join(sys_sys_path, "c")
+  # relpath
+  assert tsp("") == os.path.join(sys_root_path, "baz")
+  assert tsp("what/next") == os.path.join(sys_root_path, "baz", "what", "next")
+  # relpath env
+  env = AmiPathEnv(cwd="sys:")
+  assert tsp("", env=env) == os.path.join(sys_sys_path)
+  assert tsp("foo/bar", env=env) == os.path.join(sys_sys_path, "foo", "bar")
+  # invalid relpath
+  with pytest.raises(AmiPathError):
+    tsp("/", env=env)
+  # unknown prefix
+  assert tsp("unknown:") is None
+  with pytest.raises(AmiPathError):
+    tsp("unknown:", strict=True)
+
+
+def path_mgr_from_sys_path_test(tmpdir):
+  pm = setup_pm(tmpdir)
+  fsp = pm.from_sys_path
+  sys_sys_path = pm.get_volume_sys_path('sys')
+  sys_root_path = pm.get_volume_sys_path('root')
+  assert pm.get_vol_mgr().add_volume("cwd", ".")
+  sys_cwd_path = pm.get_volume_sys_path('cwd')
+  # abs sys path
+  assert fsp(sys_sys_path) == 'sys:'
+  assert fsp(sys_root_path) == 'root:'
+  assert fsp(sys_cwd_path) == 'cwd:'
+  assert fsp(os.path.join(sys_sys_path, "my", "Path")) == 'sys:my/Path'
+  # rel sys path
+  assert fsp(".") == "cwd:"
+  assert fsp("my/Path") == "cwd:my/Path"
+  # can't map
+  assert fsp("..") is None
+  with pytest.raises(SysPathError):
+    fsp("..", strict=True)

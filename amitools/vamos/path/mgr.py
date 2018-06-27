@@ -5,6 +5,15 @@ from .volume import VolumeManager
 from .assign import AssignManager
 
 
+class SysPathError(Exception):
+  def __init__(self, path, reason):
+    self.path = path
+    self.reason = reason
+
+  def __str__(self):
+    return "path='%s': %s" % (self.path, self.reason)
+
+
 class PathManager:
 
   def __init__(self, vol_mgr=None, assign_mgr=None, env=None):
@@ -74,6 +83,9 @@ class PathManager:
   def get_all_volume_names(self):
     return self.vol_mgr.get_all_names()
 
+  def get_volume_sys_path(self, vol_name):
+    return self.vol_mgr.get_volume_sys_path(vol_name)
+
   def get_all_assign_names(self):
     return self.assign_mgr.get_all_names()
 
@@ -90,7 +102,10 @@ class PathManager:
     return self.default_env
 
   def is_prefix_valid(self, ami_path):
-    """check if prefix is either a volume or assign name"""
+    """check if prefix is either a volume or assign name
+
+       raise AmiPathError is path is relative
+    """
     if type(ami_path) is str:
       ami_path = AmiPath(ami_path)
     p = ami_path.prefix()
@@ -107,7 +122,7 @@ class PathManager:
   def is_volume_path(self, ami_path):
     """check if the prefix is a valid volume name.
 
-    A relative path always returns False
+       raise AmiPathError is path is relative
     """
     if type(ami_path) is str:
       ami_path = AmiPath(ami_path)
@@ -122,7 +137,7 @@ class PathManager:
   def is_assign_path(self, ami_path):
     """check if the prefix is a valid assign name.
 
-    A relative path always returns False
+       raise AmiPathError is path is relative
     """
     if type(ami_path) is str:
       ami_path = AmiPath(ami_path)
@@ -147,7 +162,10 @@ class PathManager:
       return True
 
   def is_multi_assign_path(self, ami_path):
-    """check if path resolves to multiple paths"""
+    """check if path resolves to multiple paths
+
+       raise AmiPathError is path is relative
+    """
     if type(ami_path) is str:
       ami_path = AmiPath(ami_path)
     # expand along assigns until a multi assign or a volume is found
@@ -168,16 +186,20 @@ class PathManager:
         ami_path = AmiPath(alist[0])
 
   def abspath(self, ami_path, env=None):
-    """return an absolute path
+    """return an absolute Amiga path
 
     If the path is already absolute then return path itself.
     Otherwise create a new AmiPath object with the absolute path
     by joining this path with the current directory of the path env.
+
+    An AmiPathError is raised if the relative path cannot be joined
+    to the current directory, e.g.:  "foo:".join("/")
     """
     if type(ami_path) is str:
       ami_path = AmiPath(ami_path)
     # already absolute?
     if ami_path.is_absolute():
+      log_path.debug("abspath: is_absolute: '%s'", ami_path)
       return ami_path
     # get current directory and join cur dir with my path
     if env is None:
@@ -186,17 +208,24 @@ class PathManager:
     else:
       # make sure its a volume path
       cwd = env.get_cwd()
-      if not self.is_volume_path(cwd):
-        raise AmiPathError(cwd, "cwd is not volpath!")
-    return cwd.join(ami_path)
+    if not self.is_volume_path(cwd):
+      raise AmiPathError(cwd, "cwd is not volpath!")
+    res_path = cwd.join(ami_path)
+    log_path.debug("abspath: relpath='%s' cwd='%s' -> join '%s'",
+                   ami_path, cwd, res_path)
+    return res_path
 
-  def volpath(self, ami_path, env=None):
+  def volpath(self, ami_path, env=None, strict=False):
     """return a volume path.
 
-    If its not a multi path then return the one and only resolved
-    volume path for this path.
+    Try to resolve a path to a single volume path. If
+    assigns are encountered that resolve to multiple paths
+    then an AmiPathError is raised.
 
-    For a multi path a AmiPathError is raised!
+    If the path has an unknown prefix then return None
+    of if 'strict' is True then raise an AmiPathError.
+
+    Raises AmiPathError is relative path is invalid.
     """
     if type(ami_path) is str:
       ami_path = AmiPath(ami_path)
@@ -206,22 +235,30 @@ class PathManager:
     # if its already a volume path then keep it
     elif self.is_volume_path(ami_path):
       return ami_path
-    else:
+    # if its an assign path: resolve it
+    elif self.is_assign_path(ami_path):
       # resolve assigns
-      res = self.assign_mgr.resolve_assigns(str(ami_path), True)
-      if res is None:
-        raise AmiPathError(ami_path, "invalid prefix!")
-      elif type(res) is str:
-        return AmiPath(res)
+      res_path = self.assign_mgr.resolve_assigns(str(ami_path))
+      if type(res_path) is str:
+        return AmiPath(res_path)
       else:
-        raise AmiPathError(
-            ami_path, "volpath() encountered multi assigns!")
+        raise AmiPathError(ami_path,
+                           "volpath() encountered multi assigns! (%s)"
+                           % str(res_path))
+    # unknown prefix
+    elif strict:
+      raise AmiPathError(ami_path, "volpath(): invalid prefix!")
+    else:
+      return None
 
-  def volpaths(self, ami_path, env=None):
+  def volpaths(self, ami_path, env=None, strict=False):
     """return a list of volume paths for this path.
 
     If the path resolves to multiple paths then all resulting paths
     are generated by recursevily applying multi-assigns.
+
+    If the prefix does not exist then return an empty list
+    or if strict is True rais an
     """
     if type(ami_path) is str:
       ami_path = AmiPath(ami_path)
@@ -229,29 +266,35 @@ class PathManager:
       return [self.abspath(ami_path, env)]
     elif self.is_volume_path(ami_path):
       return [ami_path]
-    else:
+    elif self.is_assign_path(ami_path):
       # assigns
       res = self.assign_mgr.resolve_assigns(str(ami_path))
-      if res is None:
-        raise AmiPathError(ami_path, "invalid prefix!")
-      elif type(res) is str:
+      if type(res) is str:
         return [AmiPath(res)]
       else:
         return [AmiPath(x) for x in res]
+    elif strict:
+      raise AmiPathError(ami_path, "volpaths(): invalid prefix!")
+    else:
+      return []
 
   def resolve_assigns(self, ami_path, recursive=False):
     """if path is prefixed by an assign name then resolve the assign.
 
     return a list of AmiPaths if mutliple assigns are involved
     or return a single path
+
+    If the path is relative or if the prefix is not an assign then
+    path is returned as is.
+
+    Returns a list of AmiPaths if the assign chain resolved to multiple
+    paths otherwise a single AmiPath() is returned.
     """
     if type(ami_path) is str:
       ami_path = AmiPath(ami_path)
     if ami_path.is_absolute() and self.is_assign_path(ami_path):
       res = self.assign_mgr.resolve_assigns(str(ami_path), recursive)
-      if res is None:
-        raise AmiPathError(ami_path, "invalid prefix!")
-      elif type(res) is str:
+      if type(res) is str:
         return AmiPath(res)
       else:
         return [AmiPath(x) for x in res]
@@ -264,7 +307,7 @@ class PathManager:
 
     If the path contains a name only then a list containing the
     current cmd paths form the path env are returned. If
-    with_cur_dir is enabled then the current dir is added as well.
+    prepend_cur_dir is enabled then the current dir is added as well.
 
     If this path is not a name only then it is converted to a
     volpath and returned in a single item list.
@@ -274,6 +317,7 @@ class PathManager:
     if type(ami_path) is str:
       ami_path = AmiPath(ami_path)
     if ami_path.is_name_only():
+      # only a command name is given
       if env is None:
         env = self.default_env
       # get cmd paths
@@ -299,3 +343,37 @@ class PathManager:
         return [ami_path]
     else:
       raise AmiPathError(ami_path, "can't derive cmdpaths")
+
+  def to_sys_path(self, ami_path, env=None, strict=False):
+    """Convert an Amiga path to a sys path
+
+       If path is not a volume path it will be converted with volpath()
+       first.
+    """
+    if type(ami_path) is str:
+      ami_path = AmiPath(ami_path)
+    if ami_path.is_local() or not self.is_volume_path(ami_path):
+      ami_path = self.volpath(ami_path, env=env, strict=strict)
+      if ami_path is None:
+        return None
+    res = self.vol_mgr.ami_to_sys_path(str(ami_path))
+    return res
+
+  def from_sys_path(self, sys_path, strict=False):
+    """Convert sys path to AmiPath
+
+       If sys_path is not absolute then resolve it first.
+
+       If path is not mappable return None or
+       if strict mode is True then raise an SysPathError
+    """
+    vm = self.vol_mgr
+    if not vm.is_sys_path_abs(sys_path):
+      sys_path = vm.resolve_sys_path(sys_path)
+    ami_path = vm.sys_to_ami_path(sys_path)
+    if ami_path:
+      return AmiPath(ami_path)
+    elif strict:
+      raise SysPathError(sys_path, "can't map to ami path!")
+    else:
+      return None
