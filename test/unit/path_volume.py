@@ -3,6 +3,21 @@ from amitools.vamos.path import VolumeManager
 from amitools.vamos.cfgcore import ConfigDict
 
 
+def path_volume_resolve_sys_path_test(tmpdir):
+  v = VolumeManager()
+  rsp = v.resolve_sys_path
+  p = str(tmpdir)
+  assert rsp(p) == p
+  # user home
+  assert rsp("~") == os.path.expanduser("~")
+  # no trailing slash
+  assert rsp(p + "/") == p
+  # env var
+  os.environ["TEST_PATH"] = p
+  assert rsp("${TEST_PATH}") == p
+  assert rsp("${TEST_PATH}/bla") == os.path.join(p, "bla")
+
+
 def path_volume_add_del_test(tmpdir):
   v = VolumeManager()
   assert v.get_all_names() == []

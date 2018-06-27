@@ -27,7 +27,7 @@ class VolumeManager():
     # ensure volume name is lower case
     lo_name = name.lower()
     # check path and name
-    sys_path = self._sanitize_sys_path(sys_path)
+    sys_path = self.resolve_sys_path(sys_path)
     if not os.path.exists(sys_path):
       log_path.error("invalid volume path: '%s' -> %s" %
                      (name, sys_path))
@@ -46,7 +46,12 @@ class VolumeManager():
       self.orig_names[lo_name] = name
       return True
 
-  def _sanitize_sys_path(self, sys_path):
+  def resolve_sys_path(self, sys_path):
+    """replace ~ (home) or environment variables in path and
+       make path absolute
+
+       return resolved path
+    """
     # expand system path
     sys_path = os.path.expanduser(sys_path)
     sys_path = os.path.expandvars(sys_path)
