@@ -112,12 +112,12 @@ class AssignManager:
 
   def resolve_assigns(self, ami_path, recursive=True):
     """replace all assigns found in path until only a volume path exists.
-       do not touch relative paths.
+       do not touch relative paths or abs paths without assign prefix.
 
         return: original path if path is not absolute
+                or does not contain assign prefix
         or: string if no multi assigns are involved
         or: list of string if multi assigns were encountered
-        or: None if neither assign nor volume is given
     """
     log_path.info("resolve_assign: ami_path='%s'", ami_path)
     split = self._split_volume_remainder(ami_path)
@@ -158,13 +158,8 @@ class AssignManager:
             else:
               result += new_path
           return result
-      # is volume path
-      elif self.vol_mgr.is_volume(name):
-        log_path.debug("resolve_assign: ami_path='%s' is vol_path!",
+      # prefix is not an assign
+      else:
+        log_path.debug("resolve_assign: ami_path='%s' has no assign!",
                        ami_path)
         return ami_path
-      # invalid assign/volume
-      else:
-        log_path.error("resolve_assign: ami_path='%s' has invalid prefix!",
-                       ami_path)
-        return None

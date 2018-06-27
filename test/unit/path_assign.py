@@ -54,6 +54,8 @@ def path_assign_resolve_test(tmpdir):
   assert ar(':rel/path') == ':rel/path'
   # volume path
   assert ar('Bla:abs/path') == 'Bla:abs/path'
+  assert ar('BLA:abs/path') == 'BLA:abs/path'
+  assert ar('bla:abs/path') == 'bla:abs/path'
   # single assign
   assert ar('Foo:my/path') == 'blA:blub/my/path'
   assert ar('foo:my/path') == 'blA:blub/my/path'
@@ -62,8 +64,8 @@ def path_assign_resolve_test(tmpdir):
   # multi assign
   assert ar('multi:my/path') == ['blA:blub/tmp/my/path',
                                  'blA:blub/bla/plop/my/path']
-  # invalid assign
-  assert ar('what:is/here') is None
+  # not an assign
+  assert ar('what:is/here') == 'what:is/here'
   # non recursive
   assert ar('Baz:', False) == 'foo:bla/plop/'
 
@@ -85,6 +87,8 @@ def path_assign_config_test(tmpdir):
   assert ar(':rel/path') == ':rel/path'
   # volume path
   assert ar('Bla:abs/path') == 'Bla:abs/path'
+  assert ar('BLA:abs/path') == 'BLA:abs/path'
+  assert ar('bla:abs/path') == 'bla:abs/path'
   # single assign
   assert ar('Foo:my/path') == 'blA:blub/my/path'
   assert ar('foo:my/path') == 'blA:blub/my/path'
@@ -93,5 +97,5 @@ def path_assign_config_test(tmpdir):
   # multi assign
   assert ar('multi:my/path') == ['blA:blub/tmp/my/path',
                                  'blA:blub/bla/plop/my/path']
-  # invalid assign
-  assert ar('what:is/here') is None
+  # not an assign
+  assert ar('what:is/here') == 'what:is/here'
