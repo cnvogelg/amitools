@@ -82,6 +82,12 @@ class PathManager:
       return False
     return True
 
+  def dump(self):
+    self.vol_mgr.dump()
+    self.assign_mgr.dump()
+    self.default_env.dump()
+    log_path.info("---")
+
   def validate(self):
     return self.validate_assigns()
 
@@ -91,7 +97,7 @@ class PathManager:
       try:
         paths = self.assign_mgr.get_assign(a)
         for path in paths:
-          self.volpaths(path)
+          self.volpaths(path, strict=True)
       except AmiPathError as e:
         log_path.error("invalid assign: '%s': %s", a, e)
         return False

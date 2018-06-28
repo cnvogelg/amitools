@@ -1,6 +1,6 @@
 import os
 import os.path
-from amitools.vamos.log import *
+from amitools.vamos.log import log_path
 import logging
 
 
@@ -22,6 +22,13 @@ class VolumeManager():
       if not self.add_volume(vol_name, sys_path):
         return False
     return True
+
+  def dump(self):
+    log_path.info("--- volume config ---")
+    for vol in sorted(self.volume2sys):
+      sys_path = self.volume2sys[vol]
+      orig_name = self.orig_names[vol]
+      log_path.info("%s: sys_path=%s (%s)", vol, sys_path, orig_name)
 
   def add_volume(self, name, sys_path):
     # ensure volume name is lower case

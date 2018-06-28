@@ -19,6 +19,13 @@ class AssignManager:
         return False
     return True
 
+  def dump(self):
+    log_path.info("--- assigns ---")
+    for a in self.assigns:
+      alist = self.assigns[a]
+      orig_name = self.orig_names[a]
+      log_path.info("%s: %s (%s)", a, alist, orig_name)
+
   def get_all_names(self):
     return self.orig_names.values()
 

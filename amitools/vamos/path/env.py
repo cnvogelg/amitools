@@ -53,6 +53,11 @@ class AmiPathEnv(object):
       return False
     return True
 
+  def dump(self):
+    log_path.info("--- env ---")
+    log_path.info("cwd: %s", self.cwd)
+    log_path.info("cmd_paths: %s", self.cmd_paths)
+
   def is_resolved(self):
     return self.cwd.is_resolved() and self.cmd_paths.is_resolved()
 
