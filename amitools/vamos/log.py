@@ -72,15 +72,15 @@ def log_help():
     print("  %s" % l)
 
 
-def log_setup(log_cfg):
+def log_setup(cfg):
   # setup handler
-  if log_cfg.file != None:
-    ch = logging.FileHandler(log_cfg.file, mode='w')
+  if cfg.file != None:
+    ch = logging.FileHandler(cfg.file, mode='w')
   else:
     ch = logging.StreamHandler()
   ch.setLevel(logging.DEBUG)
   # and formatter
-  if log_cfg.timestamps:
+  if cfg.timestamps:
     formatter = logging.Formatter(
         '%(asctime)s.%(msecs)03d %(name)10s:%(levelname)7s:  %(message)s', datefmt='%H:%M:%S')
   else:
@@ -91,20 +91,23 @@ def log_setup(log_cfg):
 
   # setup default
   level = logging.WARN
-  if log_cfg.quiet:
+  if cfg.quiet:
+    log_cfg.info("log: quiet!")
     level = logging.ERROR
   for l in loggers:
+    log_cfg.info("log: %s -> %s", l.name, level)
     l.setLevel(level)
 
   # special default for profiling
   log_prof.setLevel(logging.INFO)
 
   # is verbose enabled?
-  if log_cfg.verbose:
+  if cfg.verbose:
+    log_cfg.info("log: verbose: set main to INFO")
     log_main.setLevel(logging.INFO)
 
   # parse args
-  levels = log_cfg.levels
+  levels = cfg.levels
   if levels:
     return _setup_levels(levels)
   else:
