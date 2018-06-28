@@ -9,6 +9,11 @@ class Argument(object):
       del kwargs['order']
     else:
       self.order = None
+    # auto add default=None if action is store_true/false
+    if 'action' in kwargs:
+      what = kwargs['action']
+      if what in ('store_true', 'store_false'):
+        kwargs['default'] = None
 
   def __repr__(self):
     return "Argument(%s, %s)" % (self.args, self.kwargs)

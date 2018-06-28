@@ -90,12 +90,13 @@ def cfg_path_ini_args_test():
   lp.setup_args(ap)
   args = ap.parse_args(
       ['-p', '+work:c',
+       '-p', '+sys:t',
        '--cwd', '~/amiga',
        '-a', '+c:+sc:c',
-       '-a', 'c:+work:c',
+       '-a', '+c:+work:c',
        '-a', 'devs:sys:devs',
        '-V', '+work:~/amiga/work',
-       '-V', 'home:~'
+       '-V', '+home:~'
        ])
   lp.parse_args(args)
   assert lp.get_cfg_dict() == {
@@ -110,7 +111,7 @@ def cfg_path_ini_args_test():
           "devs": ["sys:devs"]
       },
       "path": {
-          "command": ["c:", "work:c"],
+          "command": ["c:", "work:c", "sys:t"],
           "cwd": "~/amiga"
       }
   }
