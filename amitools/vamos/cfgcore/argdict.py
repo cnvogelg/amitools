@@ -13,7 +13,8 @@ class Argument(object):
     if 'action' in kwargs:
       what = kwargs['action']
       if what in ('store_true', 'store_false'):
-        kwargs['default'] = None
+        if 'default' not in kwargs:
+          kwargs['default'] = None
 
   def __repr__(self):
     return "Argument(%s, %s)" % (self.args, self.kwargs)
