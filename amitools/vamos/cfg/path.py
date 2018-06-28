@@ -15,7 +15,7 @@ class PathParser(Parser):
     def_cfg = {
         "path": {
             "command": ValueList(str, ["c:"]),
-            "cwd": Value(str)
+            "cwd": Value(str, "::.")
         },
         "assigns": ValueDict(ValueList(str, sep='+'), default=def_assigns),
         "volumes": ValueDict(str, default=def_volumes)

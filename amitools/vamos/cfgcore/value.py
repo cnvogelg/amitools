@@ -84,7 +84,7 @@ class Value(object):
     else:
       self.default = None
 
-  def parse(self, val, old_val=None):
+  def parse(self, val, old_val=None, append=False):
     return parse_scalar(self.item_type, val, self.allow_none, self.enum)
 
   def __eq__(self, other):
@@ -118,8 +118,7 @@ class ValueList(object):
     else:
       self.default = None
 
-  def parse(self, val, old_val=None):
-    append = False
+  def parse(self, val, old_val=None, append=False):
     if val is None:
       return []
     elif type(val) is str:
@@ -144,7 +143,7 @@ class ValueList(object):
         r = self.item_type.parse(v)
         res.append(r)
       elif type(v) is str and recurse:
-        rs = self.parse(v)
+        rs = self.parse(v, old_val)
         res += rs
       else:
         r = parse_scalar(self.item_type, v, self.allow_none, self.enum)
@@ -186,8 +185,7 @@ class ValueDict(object):
     else:
       self.default = None
 
-  def parse(self, val, old_val=None):
-    append = False
+  def parse(self, val, old_val=None, append=False):
     if val is None:
       return {}
     elif type(val) is str:
@@ -221,10 +219,12 @@ class ValueDict(object):
         val = d
     elif type(val) in (list, tuple):
       # allow list of entries and merge them
-      res = {}
+      res = ConfigDict()
       for elem in val:
-        d = self.parse(elem)
+        d = self.parse(elem, old_val, append=append)
         res.update(d)
+        old_val = d
+        append = True
       return res
     elif type(val) not in (dict, ConfigDict):
       raise ValueError("expected dict: %s" % val)
@@ -240,7 +240,10 @@ class ValueDict(object):
       # convert value
       v = val[key]
       if self.is_sub_value:
-        old_sub = old_val[key] if old_val and key in old_val else None
+        if old_val and key in old_val:
+          old_sub = old_val[key]
+        else:
+          old_sub = None
         r = self.item_type.parse(v, old_sub)
       else:
         r = parse_scalar(self.item_type, v, self.allow_none, self.enum)
