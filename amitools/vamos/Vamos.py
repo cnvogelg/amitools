@@ -41,7 +41,8 @@ class Vamos:
     hw_access = memmap_cfg.hw_access
     if hw_access != "disable":
       self.hw_access = HardwareAccess(self.mem)
-      self._setup_hw_access(hw_access)
+      if not self._setup_hw_access(hw_access):
+        return False
 
     # create a label manager and error tracker
     self.label_mgr = self.machine.get_label_mgr()
@@ -159,7 +160,9 @@ class Vamos:
     elif hw_access == "disable":
       pass
     else:
-      raise VamosConfigError("Invalid HW Access mode: %s" % hw_access)
+      log_main.error("Invalid HW Access mode: %s", hw_access)
+      return False
+    return True
 
   # ----- process handling -----
 

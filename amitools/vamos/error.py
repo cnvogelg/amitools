@@ -76,11 +76,3 @@ class VamosInternalError(VamosError):
 
   def __str__(self):
     return "Internal Vamos Error: %s" % self._what
-
-
-class VamosConfigError(VamosError):
-  def __init__(self, what):
-    self._what = what
-
-  def __str__(self):
-    return "Config Error: %s" % self._what
