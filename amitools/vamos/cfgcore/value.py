@@ -144,6 +144,7 @@ class ValueList(object):
         res.append(r)
       elif type(v) is str and recurse:
         rs = self.parse(v, old_val)
+        old_val = None
         res += rs
       else:
         r = parse_scalar(self.item_type, v, self.allow_none, self.enum)
