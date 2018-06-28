@@ -1,6 +1,6 @@
 [volumes]
 sc=volumes/sc
-base=.
+sys=.
 
 [assigns]
 include=sc:include

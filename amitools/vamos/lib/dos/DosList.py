@@ -48,9 +48,10 @@ class DosList:
         last_entry.next = entry
         last_entry.access.w_s('dol_Next', entry.baddr)
       last_entry = entry
-    assigns,auto_assigns = path_mgr.get_all_assigns()
+    assigns = path_mgr.get_all_assign_names()
     for assign in assigns:
-      entry = self.add_assign(assign,assigns[assign])
+      alist = path_mgr.get_assign(assign)
+      entry = self.add_assign(assign, alist)
       if last_entry is None:
         self.first_entry = entry
       else:

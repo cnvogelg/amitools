@@ -6,9 +6,9 @@ from .machine import Machine
 from .machine.regs import *
 from .log import *
 from .Vamos import Vamos
-from .VamosConfig import VamosConfig
 from .lib.dos.SysArgs import *
 from .lib.dos.CommandLine import CommandLine
+from .path import VamosPathManager
 
 RET_CODE_CONFIG_ERROR = 1000
 
@@ -35,11 +35,6 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   if not mp.parse(cfg_files, args, cfg_dict):
     return RET_CODE_CONFIG_ERROR
 
-  # --- old config --
-  old_args = parse_args(data_dir)
-  old_cfg = VamosConfig(extra_file=old_args.config_file,
-                        skip_defaults=old_args.skip_default_configs, args=old_args, def_data_dir=data_dir)
-
   # --- init logging ---
   log_cfg = mp.get_log_dict().logging
   if not log_setup(log_cfg):
@@ -62,12 +57,11 @@ def main(cfg_files=None, args=None, cfg_dict=None):
       log_main.error("too much RAM requested. max allowed KiB: %d", max_mem)
       return RET_CODE_CONFIG_ERROR
 
-  # --- path: cwd ---
-  # setup current working dir
-  path_cfg = mp.get_path_dict().path
-  cwd = path_cfg.cwd
-  if cwd is None:
-    cwd = 'root:' + os.getcwd()
+  # setup path manager
+  path_mgr = VamosPathManager()
+  if not path_mgr.parse_config(mp.get_path_dict()):
+    log_main.error("path setup failed!")
+    return RET_CODE_CONFIG_ERROR
 
   # --- proc: binary and arg_str ---
   # a single Amiga-like raw arg was passed
@@ -90,20 +84,25 @@ def main(cfg_files=None, args=None, cfg_dict=None):
     # setup binary
     binary = cmd_cfg.binary
     if not cmd_cfg.pure_ami_path:
-      # if path exists on host system then make a root path
+      # if path exists on host system then make an ami path
       if os.path.exists(binary):
-        binary = "root:" + os.path.abspath(binary)
+        sys_binary = binary
+        binary = path_mgr.from_sys_path(binary)
+        if not binary:
+          log_main.error("can't map binary: %s", sys_binary)
+          return RET_CODE_CONFIG_ERROR
     # combine remaining args to arg_str
     arg_str = sys_args_to_ami_arg_str(cmd_cfg.args)
 
   # summary
   stack_size = proc_cfg.stack * 1024
-  log_main.info("bin='%s', arg_str='%s', cwd='%s', shell='%s', stack=%d",
-                binary, arg_str[:-1], cwd, cmd_cfg.shell, stack_size)
+  log_main.info("binary: '%s'", binary)
+  log_main.info("args:   '%s'", arg_str[:-1])
+  log_main.info("stack:  %d", stack_size)
 
   # combine to vamos instance
-  vamos = Vamos(machine, mp, old_cfg)
-  if not vamos.init(binary, arg_str, stack_size, cmd_cfg.shell, cwd):
+  vamos = Vamos(machine, path_mgr)
+  if not vamos.init(binary, arg_str, stack_size, cmd_cfg.shell, mp):
     log_main.error("vamos init failed")
     return 1
 

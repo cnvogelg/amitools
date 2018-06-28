@@ -4,7 +4,6 @@ from .astructs import AccessStruct
 from .libcore import LibProfilerConfig
 from .loader import SegmentLoader
 from .libmgr import LibManager, LibMgrCfg
-from .path import PathManager
 from Trampoline import Trampoline
 from HardwareAccess import HardwareAccess
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
@@ -20,7 +19,7 @@ from .error import *
 
 class Vamos:
 
-  def __init__(self, machine, main_cfg, old_cfg):
+  def __init__(self, machine, path_mgr):
     self.machine = machine
     self.mem = machine.get_mem()
     self.raw_mem = self.mem
@@ -28,12 +27,15 @@ class Vamos:
     self.cpu = machine.get_cpu()
     self.cpu_type = machine.get_cpu_type()
     self.traps = machine.get_traps()
+    self.path_mgr = path_mgr
 
+  def init(self, binary, arg_str, stack_size, shell, main_cfg):
     # too much RAM requested?
     # our "custom chips" start at $BFxxxx so we allow RAM only to be below
     memmap_cfg = main_cfg.get_machine_dict().memmap
     if self.ram_size >= 0xbf0000 and memmap_cfg.hw_access != "disable":
-      raise VamosConfigError("Too much RAM configured! Only up to $BF0000 allowed.")
+      log_main.error("Too much RAM configured! Only up to $BF0000 allowed.")
+      return False
 
     # setup custom chips
     hw_access = memmap_cfg.hw_access
@@ -41,11 +43,8 @@ class Vamos:
       self.hw_access = HardwareAccess(self.mem)
       self._setup_hw_access(hw_access)
 
-    # path manager
-    self.path_mgr = PathManager(old_cfg)
-
     # create a label manager and error tracker
-    self.label_mgr = machine.get_label_mgr()
+    self.label_mgr = self.machine.get_label_mgr()
 
     # set a label for first region
     if self.label_mgr:
@@ -116,6 +115,11 @@ class Vamos:
     self.process = None
     self.proc_list = []
 
+    self.create_old_dos_guard()
+    self.open_base_libs()
+    cwd = str(self.path_mgr.get_cwd())
+    return self.setup_main_proc(binary, arg_str, stack_size, shell, cwd)
+
   def _get_profiler_config(self, main_cfg):
     cfg = main_cfg.get_profile_dict().profile
     names = cfg.libs.names
@@ -133,11 +137,6 @@ class Vamos:
                                      append=cfg.output.append,
                                      dump=cfg.output.dump)
     return profiler_cfg
-
-  def init(self, binary, arg_str, stack_size, shell, cwd):
-    self.create_old_dos_guard()
-    self.open_base_libs()
-    return self.setup_main_proc(binary, arg_str, stack_size, shell, cwd)
 
   def cleanup(self):
     self.cleanup_main_proc()

@@ -71,7 +71,6 @@ class DosLibrary(LibImpl):
     baddr = self.dos_list.build_list(ctx.path_mgr)
     # create lock manager
     self.lock_mgr = LockManager(ctx.path_mgr, self.dos_list, ctx.alloc, ctx.mem)
-    ctx.path_mgr.setup(self.lock_mgr)
     # equip the DosList with all the locks
     self.dos_list.add_locks(self.lock_mgr)
     # create file manager
@@ -1613,7 +1612,7 @@ class DosLibrary(LibImpl):
     #
     # Create the path
     cmd_dir_addr = clip.r_s("cli_CommandDir")
-    for p in ctx.path_mgr.get_paths():
+    for p in ctx.path_mgr.get_cmd_paths():
       if p != "C:" and p != "c:":
         lock = self.lock_mgr.create_lock(None, p, False)
         if lock != None:
