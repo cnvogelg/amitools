@@ -80,6 +80,7 @@ class PathManager:
       return False
     if not self.validate():
       return False
+    self.dump()
     return True
 
   def dump(self):
