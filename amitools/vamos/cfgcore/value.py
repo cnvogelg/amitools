@@ -84,7 +84,7 @@ class Value(object):
     else:
       self.default = None
 
-  def parse(self, val, old_val=None, append=False):
+  def parse(self, val, old_val=None):
     return parse_scalar(self.item_type, val, self.allow_none, self.enum)
 
   def __eq__(self, other):
@@ -98,11 +98,11 @@ class Value(object):
 
 class ValueList(object):
   def __init__(self, item_type, default=None, allow_none=None, enum=None,
-               sep=',', nest_pair='()', append='+'):
+               sep=',', nest_pair='()', clear_mark='*'):
     self.item_type = item_type
     self.sep = sep
     self.nest_pair = nest_pair
-    self.append = append
+    self.clear_mark = clear_mark
     self.is_sub_value = type(item_type) in (Value, ValueList, ValueDict)
     if self.is_sub_value:
       self.sub_nest_pair = item_type.nest_pair
@@ -118,34 +118,33 @@ class ValueList(object):
     else:
       self.default = None
 
-  def parse(self, val, old_val=None, append=False):
+  def parse(self, val, old_val=None):
     if val is None:
       return []
     elif type(val) is str:
-      if len(val) > 0:
-        if val[0] == self.append:
-          append = True
-          val = val[1:]
-        # split string by sep
-        val = split_nest(val, self.sep, self.sub_nest_pair)
-        recurse = False
+      # split string by sep
+      val = split_nest(val, self.sep, self.sub_nest_pair)
+      recurse = False
     elif type(val) in (list, tuple):
       recurse = True
     else:
       raise ValueError("expected list or tuple: %s" % val)
-    # rebuild list
-    if old_val and append:
+    # start with old_val if available
+    if old_val:
       res = old_val[:]
     else:
       res = []
+    # rebuild list
     for v in val:
-      if self.is_sub_value:
+      if v == self.clear_mark:
+        # reset list
+        res = []
+      elif type(v) is str and recurse:
+        # parse sub string
+        res += self.parse(v)
+      elif self.is_sub_value:
         r = self.item_type.parse(v)
         res.append(r)
-      elif type(v) is str and recurse:
-        rs = self.parse(v, old_val)
-        old_val = None
-        res += rs
       else:
         r = parse_scalar(self.item_type, v, self.allow_none, self.enum)
         res.append(r)
@@ -154,22 +153,25 @@ class ValueList(object):
   def __eq__(self, other):
     return self.item_type == other.item_type and \
         self.default == other.default and \
-        self.sep == other.sep
+        self.sep == other.sep and \
+        self.nest_pair == other.nest_pair and \
+        self.clear_mark == other.clear_mark
 
   def __repr__(self):
-    return "ValueList(%s, default=%s, sep=%s)" % \
-        (self.item_type, self.default, self.sep)
+    return "ValueList(%s, default=%s, sep=%s, nest_pair=%s, clear_mark=%s)" % \
+        (self.item_type, self.default, self.sep, self.nest_pair,
+         self.clear_mark)
 
 
 class ValueDict(object):
   def __init__(self, item_type, default=None, allow_none=None, enum=None,
-               sep=',', kv_sep=':', nest_pair='{}', append='+',
+               sep=',', kv_sep=':', nest_pair='{}', clear_mark='*',
                valid_keys=None):
     self.item_type = item_type
     self.sep = sep
     self.kv_sep = kv_sep
     self.nest_pair = nest_pair
-    self.append = append
+    self.clear_mark = clear_mark
     self.is_sub_value = type(item_type) in (Value, ValueList, ValueDict)
     if self.is_sub_value:
       self.sub_nest_pair = item_type.nest_pair
@@ -186,51 +188,55 @@ class ValueDict(object):
     else:
       self.default = None
 
-  def parse(self, val, old_val=None, append=False):
+  def _str_to_dict(self, val):
+    # convert str to dict
+    d = {}
+    # split string by ',' to separate key, val pairs
+    kvs = split_nest(val, self.sep, self.sub_nest_pair, True)
+    last_key = None
+    has_clear = False
+    for kv in kvs:
+      # clear mark?
+      if self.clear_mark == kv:
+        d = {}
+        has_clear = True
+      # if colon is in substring assign value to key
+      elif self.kv_sep in kv:
+        elems = split_nest(kv, self.kv_sep, self.sub_nest_pair)
+        if len(elems) >= 2:
+          key = elems[0]
+          # join extra colon elements
+          val = self.kv_sep.join(elems[1:])
+          d[key] = val
+          last_key = key
+        else:
+          raise ValueError("no colon found!")
+      elif not last_key:
+        raise ValueError("no key:value found!")
+      else:
+        # append this sub string to last key
+        d[key] = d[key] + self.sep + kv
+    return d, has_clear
+
+  def parse(self, val, old_val=None):
     if val is None:
       return {}
     elif type(val) is str:
-      # convert str to dict
-      if len(val) > 0:
-        # do append?
-        if self.append == val[0]:
-          val = val[1:]
-          append = True
-        d = {}
-        # split string by ',' to separate key, val pairs
-        kvs = split_nest(val, self.sep, self.sub_nest_pair, True)
-        last_key = None
-        for kv in kvs:
-          # if colon is in substring assign value to key
-          if self.kv_sep in kv:
-            elems = split_nest(kv, self.kv_sep, self.sub_nest_pair)
-            if len(elems) >= 2:
-              key = elems[0]
-              # join extra colon elements
-              val = self.kv_sep.join(elems[1:])
-              d[key] = val
-              last_key = key
-            else:
-              raise ValueError("no colon found!")
-          elif not last_key:
-            raise ValueError("no key:value found!")
-          else:
-            # append this sub string to last key
-            d[key] = d[key] + self.sep + kv
-        val = d
+      val, has_clear = self._str_to_dict(val)
+      if has_clear:
+        old_val = None
     elif type(val) in (list, tuple):
       # allow list of entries and merge them
       res = ConfigDict()
       for elem in val:
-        d = self.parse(elem, old_val, append=append)
+        d = self.parse(elem, old_val)
         res.update(d)
         old_val = d
-        append = True
       return res
     elif type(val) not in (dict, ConfigDict):
       raise ValueError("expected dict: %s" % val)
     # rebuild dict
-    if old_val and append:
+    if old_val:
       res = old_val.copy()
     else:
       res = ConfigDict()
@@ -255,8 +261,12 @@ class ValueDict(object):
     return self.item_type == other.item_type and \
         self.default == other.default and \
         self.sep == other.sep and \
-        self.kv_sep == other.kv_sep
+        self.kv_sep == other.kv_sep and \
+        self.nest_pair == other.nest_pair and \
+        self.clear_mark == other.clear_mark
 
   def __repr__(self):
-    return "ValueDict(%s, default=%s, sep=%s, kv_sep=%s)" % \
-        (self.item_type, self.default, self.sep, self.kv_sep)
+    return "ValueDict(%s, default=%s, sep=%s, kv_sep=%s, " \
+        "nest_pair=%s, clear_mark=%s)" % \
+        (self.item_type, self.default, self.sep, self.kv_sep,
+         self.nest_pair, self.clear_mark)

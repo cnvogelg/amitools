@@ -3,22 +3,13 @@ from amitools.vamos.cfgcore import *
 
 class PathParser(Parser):
   def __init__(self):
-    def_volumes = {
-        "root": "/",
-        "sys": "."
-    }
-    def_assigns = {
-        "c": ["sys:c"],
-        "libs": ["sys:libs"],
-        "devs": ["sys:devs"]
-    }
     def_cfg = {
         "path": {
-            "command": ValueList(str, ["c:"]),
-            "cwd": Value(str, "::.")
+            "command": ValueList(str),
+            "cwd": Value(str)
         },
-        "assigns": ValueDict(ValueList(str, sep='+'), default=def_assigns),
-        "volumes": ValueDict(str, default=def_volumes)
+        "assigns": ValueDict(ValueList(str, sep='+')),
+        "volumes": ValueDict(str)
     }
     arg_cfg = {
         "path": {

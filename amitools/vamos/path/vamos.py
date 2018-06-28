@@ -9,30 +9,19 @@ class VamosPathManager(PathManager):
   """The VamosPathManager keeps the old vamos path manager API (for now)
      but has already the new PathManager under the hood.
   """
-
-  def parse_config(self, cfg):
-    if not self.vol_mgr.parse_config(cfg):
-      return False
-    if not self._ensure_volume('root', '/'):
-      return False
-    if not self._ensure_volume('sys', '.'):
-      return False
-    if not self.assign_mgr.parse_config(cfg):
-      return False
-    if not self.default_env.parse_config(cfg):
-      return False
-    if not self.validate():
-      return False
-    self.dump()
-    return True
-
-  def _ensure_volume(self, name, sys_path):
-    vol_mgr = self.get_vol_mgr()
-    if not vol_mgr.is_volume(name):
-      log_path.info("adding missing volume '%s': %s", name, sys_path)
-      return vol_mgr.add_volume(name, sys_path)
-    else:
-      return True
+  def __init__(self):
+    def_vols = {
+      'root': '/',
+      'sys': '.'
+    }
+    def_assigns = {
+      'c': ['sys:c'],
+      'libs': ['sys:libs'],
+      'devs': ['sys:devs']
+    }
+    cwd = '::.'
+    cmd_paths = ['c:']
+    PathManager.__init__(self, def_vols, def_assigns, cwd, cmd_paths)
 
   def _get_lock_env(self, lock):
     cmd_paths = self.get_default_env().get_cmd_paths()

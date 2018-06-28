@@ -9,10 +9,10 @@ class AssignManager:
 
   def parse_config(self, cfg):
     if cfg is None:
-      return False
+      return True
     assigns = cfg.assigns
     if assigns is None:
-      return False
+      return True
     for assign in assigns:
       paths = assigns[assign]
       if not self.add_assign(assign, paths):
@@ -36,6 +36,17 @@ class AssignManager:
 
   def is_assign(self, name):
     return name.lower() in self.assigns
+
+  def add_assigns(self, assigns, force=False):
+    if not assigns:
+      return True
+    for assign in assigns:
+      alist = assigns[assign]
+      exists = self.vol_mgr.is_volume(assign) or self.is_assign(assign)
+      if force or not exists:
+        if not self.add_assign(assign, alist):
+          return False
+    return True
 
   def add_assign(self, name, path_list, append=False):
     # also allow path string instead of list

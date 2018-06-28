@@ -34,10 +34,10 @@ class AmiPathEnv(object):
 
   def parse_config(self, cfg):
     if cfg is None:
-      return False
+      return True
     path = cfg.path
     if path is None:
-      return False
+      return True
     if path.cwd:
       self.cwd.set(path.cwd)
     if path.command:

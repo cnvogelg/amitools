@@ -13,10 +13,10 @@ class VolumeManager():
 
   def parse_config(self, cfg):
     if cfg is None:
-      return False
+      return True
     vols = cfg.volumes
     if vols is None:
-      return False
+      return True
     for vol_name in vols:
       sys_path = vols[vol_name]
       if not self.add_volume(vol_name, sys_path):
@@ -29,6 +29,17 @@ class VolumeManager():
       sys_path = self.volume2sys[vol]
       orig_name = self.orig_names[vol]
       log_path.info("%s: sys_path=%s (%s)", vol, sys_path, orig_name)
+
+  def add_volumes(self, volumes, force=False):
+    if not volumes:
+      return True
+    for volume in volumes:
+      sys_path = volumes[volume]
+      exists = self.is_volume(volume)
+      if force or not exists:
+        if not self.add_volume(volume, sys_path):
+          return False
+    return True
 
   def add_volume(self, name, sys_path):
     # ensure volume name is lower case

@@ -62,8 +62,10 @@ def config_value_list_test():
   assert l.parse(["a", "b"]) == ["a", "b"]
   assert l.parse(["a,b", "c"]) == ["a", "b", "c"]
   # old value and append
-  assert l.parse(["a,b", "c"], ["x", "y"]) == ["a", "b", "c"]
-  assert l.parse("+a,b", ["x", "y"]) == ["x", "y", "a", "b"]
+  assert l.parse(["a,b", "c"], ["x", "y"]) == ["x", "y", "a", "b", "c"]
+  assert l.parse("*,a,b", ["x", "y"]) == ["a", "b"]
+  assert l.parse(["a", "b", "c"], ["x", "y"]) == ["x", "y", "a", "b", "c"]
+  assert l.parse(["*", "a", "b"], ["x", "y"]) == ["a", "b"]
   # enum
   l = ValueList(str, enum=("a", "b"))
   assert l.parse("a,b") == ["a", "b"]
@@ -123,18 +125,19 @@ def config_value_dict_test():
   # last one wins in list
   assert d.parse(['a:b', 'a:d']) == {'a': 'd'}
   # old value and append
-  assert d.parse("a:b", {"x": "y"}) == {'a': 'b'}
-  assert d.parse("+a:b", {"x": "y"}) == {'a': 'b', 'x': 'y'}
+  assert d.parse("a:b", {"x": "y"}) == {'a': 'b', 'x': 'y'}
+  # nuke old
+  assert d.parse("*,a:b", {"x": "y"}) == {'a': 'b'}
   # colon in value
   assert d.parse("a:b:c") == {'a': 'b:c'}
   # enum
   d = ValueDict(str, enum=('a', 'b'))
-  assert d.parse('x:a') == {'x' : 'a'}
+  assert d.parse('x:a') == {'x': 'a'}
   with pytest.raises(ValueError):
     d.parse('x:c')
   # valid keys
   d = ValueDict(str, valid_keys=('a', 'b'))
-  assert d.parse('a:x') == {'a' : 'x'}
+  assert d.parse('a:x') == {'a': 'x'}
   with pytest.raises(ValueError):
     d.parse('c:x')
 
@@ -171,22 +174,23 @@ def config_value_dict_nest_list_test():
   with pytest.raises(ValueError):
     d.parse("a,b")
   # append to list
-  assert d.parse("a:(b,c)", {'a': ['x']}) == {'a': ['b', 'c']}
-  assert d.parse("a:(+b,c)", {'a': ['x'], 'z': []}) == {'a': ['x', 'b', 'c']}
-  assert d.parse("+a:(b,c)", {'a': ['x'], 'z': []}
+  assert d.parse("a:(b,c)", {'a': ['x']}) == {'a': ['x', 'b', 'c']}
+  assert d.parse("a:(*,b,c)", {'a': ['x'], 'z': []}
                  ) == {'a': ['b', 'c'], 'z': []}
+  assert d.parse("*,a:(b,c)", {'a': ['x'], 'z': []}
+                 ) == {'a': ['b', 'c']}
 
 
 def config_value_dict_nest_dict_test():
   d = ValueDict(ValueDict(str))
   assert d.parse("a:{b:c}") == {'a': {'b': 'c'}}
   # append
-  assert d.parse("a:{b:c}", {'a': {'z': 'oi'}, 'b': {'x': 'hu'}}) == {
+  assert d.parse("*,a:{b:c}", {'a': {'z': 'oi'}, 'b': {'x': 'hu'}}) == {
       'a': {'b': 'c'}}
-  assert d.parse("+a:{b:c}", {'a': {'z': 'oi'}, 'b': {'x': 'hu'}}) == {
-      'a': {'b': 'c'}, 'b': {'x': 'hu'}}
-  assert d.parse("a:{+b:c}", {'a': {'z': 'oi'}, 'b': {'x': 'hu'}}) == {
-      'a': {'b': 'c', 'z': 'oi'}}
+  assert d.parse("a:{b:c}", {'a': {'z': 'oi'}, 'b': {'x': 'hu'}}) == {
+      'a': {'b': 'c', 'z': 'oi'}, 'b': {'x': 'hu'}}
+  assert d.parse("*,a:{*,b:c}", {'a': {'z': 'oi'}, 'b': {'x': 'hu'}}) == {
+      'a': {'b': 'c'}}
   # other sep
   d2 = ValueDict(ValueDict(str), kv_sep='=', sep='+')
   assert d2.parse("a=b:c") == {'a': {'b': 'c'}}

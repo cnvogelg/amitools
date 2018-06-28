@@ -89,14 +89,14 @@ def cfg_path_ini_args_test():
   ap = argparse.ArgumentParser()
   lp.setup_args(ap)
   args = ap.parse_args(
-      ['-p', '+work:c',
-       '-p', '+sys:t',
+      ['-p', 'work:c',
+       '-p', 'sys:t',
        '--cwd', '~/amiga',
-       '-a', '+c:+sc:c',
-       '-a', '+c:+work:c',
+       '-a', 'c:sc:c',
+       '-a', 'c:work:c',
        '-a', 'devs:sys:devs',
-       '-V', '+work:~/amiga/work',
-       '-V', '+home:~'
+       '-V', 'work:~/amiga/work',
+       '-V', 'home:~'
        ])
   lp.parse_args(args)
   assert lp.get_cfg_dict() == {
