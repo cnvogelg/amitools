@@ -37,14 +37,47 @@ def path_mgr_config_test(tmpdir):
       }
   })
   assert pm.parse_config(cfg)
+  assert sorted(pm.get_all_volume_names()) == ["home", "sys", "work"]
+  assert sorted(pm.get_all_assign_names()) == ["c", "devs", "libs"]
+  assert pm.get_cwd() == "work:"
+  assert pm.get_cmd_paths() == ["c:", "work:c"]
+
+
+def path_mgr_config_esc_sys_test(tmpdir):
+  sys_path = str(tmpdir.mkdir("sys"))
+  work_path = str(tmpdir.mkdir("work"))
+  pm = PathManager()
+  cfg = ConfigDict({
+      "volumes": {
+          "sys": sys_path,
+          "work": work_path,
+          "home": "~"
+      },
+      "assigns": {
+          "c": ["sys:c", "home:c"],
+          "libs": ["sys:libs"],
+          "devs": ["sys:devs"]
+      },
+      "path": {
+          "command": ["::" + work_path],
+          "cwd": "::~"
+      }
+  })
+  assert pm.parse_config(cfg)
+  assert sorted(pm.get_all_volume_names()) == ["home", "sys", "work"]
+  assert sorted(pm.get_all_assign_names()) == ["c", "devs", "libs"]
+  assert pm.get_cwd() == "home:"
+  assert pm.get_cmd_paths() == ["work:"]
 
 
 def setup_pm(tmpdir):
   root_path = str(tmpdir)
   sys_path = str(tmpdir.mkdir("sys"))
   work_path = str(tmpdir.mkdir("work"))
-  env = AmiPathEnv(cwd="root:baz", cmd_paths=["a:", "c:"])
-  pm = PathManager(env=env)
+  pm = PathManager()
+  env = pm.get_default_env()
+  env.set_cwd("root:baz")
+  env.set_cmd_paths(["a:", "c:"])
   vm = pm.get_vol_mgr()
   am = pm.get_assign_mgr()
   vm.add_volume("root", root_path)
@@ -291,3 +324,53 @@ def path_mgr_from_sys_path_test(tmpdir):
   assert fsp("..") is None
   with pytest.raises(SysPathError):
     fsp("..", strict=True)
+
+
+def path_mgr_resolve_esc_sys_path_test(tmpdir):
+  pm = setup_pm(tmpdir)
+  sys_sys_path = pm.get_volume_sys_path('sys')
+  assert pm.get_vol_mgr().add_volume("cwd", ".")
+  sys_cwd_path = pm.get_volume_sys_path('cwd')
+  resp = pm.resolve_esc_sys_path
+  # ami path
+  assert resp("bla:") == AmiPath("bla:")
+  assert resp("rel") == AmiPath("rel")
+  assert resp("") == AmiPath()
+  # esc sys path
+  # invalid empty
+  with pytest.raises(AmiPathError):
+    resp("::")
+  # valid abs
+  assert resp("::" + sys_sys_path) == "sys:"
+  # valid rel
+  assert resp("::.") == "cwd:"
+  # invalid sys
+  assert resp("::..") is None
+  with pytest.raises(SysPathError):
+    resp("::..", strict=True)
+
+
+def path_mgr_create_env_test(tmpdir):
+  pm = setup_pm(tmpdir)
+  sys_sys_path = pm.get_volume_sys_path('sys')
+  assert pm.get_vol_mgr().add_volume("cwd", ".")
+  sys_cwd_path = pm.get_volume_sys_path('cwd')
+  def_env = pm.get_default_env()
+  # create clone of default env
+  env = pm.create_env()
+  assert env == def_env
+  # set cwd
+  env = pm.create_env(cwd="what:")
+  with pytest.raises(AmiPathError):
+    env.get_cwd()
+  env.set_cwd("root:")
+  assert env.get_cwd() == "root:"
+  assert env.get_cmd_paths() == def_env.get_cmd_paths()
+  # set cmd_paths
+  env = pm.create_env(cmd_paths=["b:"])
+  assert env.get_cwd() == "root:baz"
+  assert env.get_cmd_paths() == ["b:"]
+  # set both
+  env = pm.create_env(cwd="work:bla", cmd_paths=["d:"])
+  assert env.get_cwd() == "work:bla"
+  assert env.get_cmd_paths() == ["d:"]

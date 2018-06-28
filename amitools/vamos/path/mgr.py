@@ -14,18 +14,39 @@ class SysPathError(Exception):
     return "path='%s': %s" % (self.path, self.reason)
 
 
-class PathManager:
+class PathManagerEnv(AmiPathEnv):
+  def __init__(self, path_mgr, cwd=None, cmd_paths=None):
+    self.path_mgr = path_mgr
+    AmiPathEnv.__init__(self, cwd, cmd_paths)
 
-  def __init__(self, vol_mgr=None, assign_mgr=None, env=None):
-    if vol_mgr is None:
-      vol_mgr = VolumeManager()
-    if assign_mgr is None:
-      assign_mgr = AssignManager(vol_mgr)
-    if env is None:
-      env = AmiPathEnv()
-    self.vol_mgr = vol_mgr
-    self.assign_mgr = assign_mgr
-    self.default_env = env
+  def _cwd_path_resolver(self, ami_path):
+    """resolve and check cwd"""
+    # allow escaped sys paths
+    ami_path = self.path_mgr.resolve_esc_sys_path(ami_path)
+    # common check
+    ami_path = AmiPathEnv._cwd_path_resolver(self, ami_path)
+    # make sure its a volpath
+    if not self.path_mgr.is_volume_path(ami_path):
+      raise AmiPathError(ami_path, "cwd must be a volpath!")
+    return ami_path
+
+  def _cmd_path_resolver(self, ami_path):
+    """resolve and check a command path"""
+    # allow escaped sys paths
+    ami_path = self.path_mgr.resolve_esc_sys_path(ami_path)
+    # common check
+    ami_path = AmiPathEnv._cmd_path_resolver(self, ami_path)
+    # make sure its a valid prefix path
+    if not self.path_mgr.is_prefix_valid(ami_path):
+      raise AmiPathError(ami_path, "cmd path must have a valid prefix!")
+    return ami_path
+
+
+class PathManager:
+  def __init__(self):
+    self.vol_mgr = VolumeManager()
+    self.assign_mgr = AssignManager(self.vol_mgr)
+    self.default_env = PathManagerEnv(self)
 
   def get_vol_mgr(self):
     return self.vol_mgr
@@ -35,6 +56,20 @@ class PathManager:
 
   def get_default_env(self):
     return self.default_env
+
+  def create_env(self, cwd=None, cmd_paths=None):
+    """return a new AmiPathEnv
+
+       either share cwd or cmd_paths with current default env or
+       set own values.
+
+       make sure that the env has a valid path_resolver
+    """
+    if cwd is None:
+      cwd = self.default_env.get_cwd()
+    if cmd_paths is None:
+      cmd_paths = self.default_env.get_cmd_paths()
+    return PathManagerEnv(self, cwd, cmd_paths)
 
   def parse_config(self, cfg):
     if not self.vol_mgr.parse_config(cfg):
@@ -48,7 +83,7 @@ class PathManager:
     return True
 
   def validate(self):
-    return self.validate_assigns() and self.validate_env(self.default_env)
+    return self.validate_assigns()
 
   def validate_assigns(self):
     assigns = self.assign_mgr.get_all_names()
@@ -59,24 +94,6 @@ class PathManager:
           self.volpaths(path)
       except AmiPathError as e:
         log_path.error("invalid assign: '%s': %s", a, e)
-        return False
-    return True
-
-  def validate_env(self, env):
-    # check work dir
-    cwd = env.get_cwd()
-    try:
-      self.volpath(cwd)
-    except AmiPathError:
-      log_path.error("invalid cwd: '%s'", cwd)
-      return False
-    # check cmd paths
-    cmd_paths = env.get_cmd_paths()
-    for p in cmd_paths:
-      try:
-        self.volpaths(p)
-      except AmiPathError as e:
-        log_path.error("invalid command path: '%s': %s", p, e)
         return False
     return True
 
@@ -97,9 +114,6 @@ class PathManager:
 
   def get_cwd(self):
     return self.default_env.get_cwd()
-
-  def get_env(self):
-    return self.default_env
 
   def is_prefix_valid(self, ami_path):
     """check if prefix is either a volume or assign name
@@ -377,3 +391,28 @@ class PathManager:
       raise SysPathError(sys_path, "can't map to ami path!")
     else:
       return None
+
+  def resolve_esc_sys_path(self, ami_path, strict=False):
+    """resolve an escaped sys path inside an ami path
+
+       An escaped sys path starts with a '::' and an absolute or relative sys
+       path. If an escaped path is detected then we try to convert this
+       path from sys to ami path and return it.
+
+       Any amiga path is returned untouched.
+
+       If the sys path cannot be resolved then return None
+       or raise a SysPathError is strict is True.
+
+       An empty sys path raises an AmiPathError
+    """
+    if type(ami_path) is str:
+      ami_path = AmiPath(ami_path)
+    ap = str(ami_path)
+    if ap.startswith('::'):
+      sys_path = ap[2:]
+      if len(sys_path) == 0:
+        raise AmiPathError(ami_path, "empty esc sys path!")
+      return self.from_sys_path(sys_path, strict)
+    else:
+      return ami_path

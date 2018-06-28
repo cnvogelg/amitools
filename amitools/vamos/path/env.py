@@ -1,4 +1,5 @@
 from .amipath import AmiPath, AmiPathError
+from .lazypath import LazyPath, LazyPathList
 from amitools.vamos.log import log_path
 
 
@@ -8,8 +9,28 @@ class AmiPathEnv(object):
       cwd = "sys:"
     if cmd_paths is None:
       cmd_paths = ["c:"]
-    self.set_cwd(cwd)
-    self.set_cmd_paths(cmd_paths)
+    self.cwd = LazyPath(cwd, self._cmd_path_resolver)
+    self.cmd_paths = LazyPathList(cmd_paths, self._cmd_path_resolver)
+
+  def __repr__(self):
+    return "AmiPathEnv(cwd=%s, cmd_paths=%s)" % (self.cwd, self.cmd_paths)
+
+  def __str__(self):
+    return "[cwd=%s, cmd_paths=%s]" % (self.cwd, self.cmd_paths)
+
+  def __eq__(self, other):
+    if not isinstance(other, AmiPathEnv):
+      return NotImplemented
+    self.resolve()
+    other.resolve()
+    return self.cwd == other.cwd and self.cmd_paths == other.cmd_paths
+
+  def __ne__(self, other):
+    if not isinstance(other, AmiPathEnv):
+      return NotImplemented
+    self.resolve()
+    other.resolve()
+    return self.cwd != other.cwd or self.cmd_paths != other.cmd_paths
 
   def parse_config(self, cfg):
     if cfg is None:
@@ -18,72 +39,81 @@ class AmiPathEnv(object):
     if path is None:
       return False
     if path.cwd:
-      if not self.set_cwd(path.cwd):
-        return False
+      self.cwd.set(path.cwd)
     if path.command:
-      if not self.set_cmd_paths(path.command):
-        return False
+      self.cmd_paths.set(path.command)
+    # enforce validation
+    try:
+      log_path.debug("env: parse_config: %s", cfg)
+      self.cwd.resolve()
+      self.cmd_paths.resolve()
+      log_path.debug("env: done: %s", self)
+    except AmiPathError as e:
+      log_path.error("env: parse config error: %s", e)
+      return False
     return True
 
+  def is_resolved(self):
+    return self.cwd.is_resolved() and self.cmd_paths.is_resolved()
+
+  def is_cwd_resolved(self):
+    return self.cwd.is_resolved()
+
+  def are_cmd_paths_resolved(self):
+    return self.cmd_paths.is_resolved()
+
+  def resolve(self, force=False):
+    if force or not self.cwd.is_resolved():
+      self.cwd.resolve()
+    if force or not self.cmd_paths.is_resolved():
+      self.cmd_paths.resolve()
+
   def get_cwd(self):
-    """get the current working dir as AmiPath"""
-    return self.cwd
+    """get the current working dir as a resolved AmiPath"""
+    return self.cwd.get_resolved()
 
   def set_cwd(self, cwd):
     """set the current working dir as AmiPath or str"""
-    if type(cwd) is str:
-      cwd = AmiPath(cwd)
-    if not self._check_cwd(cwd):
-      return False
-    self.cwd = cwd
-    return True
+    self.cwd.set(cwd)
+
+  def get_cwd_lazy_path(self):
+    """access internal lazy path instance of cwd"""
+    return self.cwd
 
   def get_cmd_paths(self):
-    """return list of command paths"""
-    return self.cmd_paths
+    """return resolved list of command paths"""
+    return self.cmd_paths.get_resolved()
 
   def set_cmd_paths(self, cmd_paths):
-    cps = []
-    for cp in cmd_paths:
-      if type(cp) is str:
-        cp = AmiPath(cp)
-      if not self._check_cmd_path(cp):
-        return False
-      cps.append(cp)
-    self.cmd_paths = cps
-    return True
+    """set a new list of command paths"""
+    self.cmd_paths.set(cmd_paths)
 
-  def add_cmd_path(self, cp, prepend=False):
-    if type(cp) is str:
-      cp = AmiPath(cp)
-    if not self._check_cmd_path(cp):
-      return False
-    if prepend:
-      self.cmd_paths.insert(0, cp)
-    else:
-      self.cmd_paths.append(cp)
-    return True
+  def get_cmd_paths_lazy_path_list(self):
+    """access internal lazy path list instance of cmd paths"""
+    return self.cmd_paths
 
-  def del_cmd_path(self, cp):
-    if cp in self.cmd_paths:
-      self.cmd_paths.remove(cp)
-      return True
-    else:
-      return False
+  def append_cmd_path(self, path):
+    """append a new cmd path"""
+    self.cmd_paths.append(path)
 
-  def _check_cwd(self, cwd):
-    if not isinstance(cwd, AmiPath):
-      log_path.error("invalid cwd path: %s", cwd)
-      return False
-    if not cwd.is_absolute():
-      log_path.error("current work dir is not absolute: %s", cwd)
-      return False
-    return True
+  def prepend_cmd_path(self, path):
+    """prepend a new cmd path"""
+    self.cmd_paths.prepend(path)
 
-  def _check_cmd_path(self, cp):
-    if not isinstance(cp, AmiPath):
-      log_path.error("inavlid command path: %s", cp)
-    if not cp.is_absolute():
-      log_path.error("command path is not absolute: %s", cp)
-      return False
-    return True
+  def remove_cmd_path(self, path):
+    """remove a cmd path from the list"""
+    self.cmd_paths.remove(path)
+
+  def _cwd_path_resolver(self, ami_path):
+    """resolve and check cwd"""
+    # assume cwd is absolute
+    if not ami_path.is_absolute():
+      raise AmiPathError(ami_path, "cwd is not absolute!")
+    return ami_path
+
+  def _cmd_path_resolver(self, ami_path):
+    """resolve and check a command path"""
+    # assume cmd path is absolute
+    if not ami_path.is_absolute():
+      raise AmiPathError(ami_path, "cmd path is not absolute!")
+    return ami_path
