@@ -1,7 +1,7 @@
 import os
 
 from .cfg import VamosMainParser
-from .machine import Machine
+from .machine import Machine, MemoryMap
 from .machine.regs import *
 from .log import *
 from .Vamos import Vamos
@@ -29,7 +29,7 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   home_dir = os.path.dirname(__file__)
   data_dir = os.path.join(home_dir, "data")
 
-  # --- new config ---
+  # --- parse config ---
   mp = VamosMainParser()
   if not mp.parse(cfg_files, args, cfg_dict):
     return RET_CODE_CONFIG_ERROR
@@ -40,7 +40,6 @@ def main(cfg_files=None, args=None, cfg_dict=None):
     log_help()
     return RET_CODE_CONFIG_ERROR
 
-  # ----- vamos! ---------------------------------------------------------------
   # setup machine
   machine_cfg = mp.get_machine_dict().machine
   use_labels = mp.get_trace_dict().trace.labels
@@ -49,12 +48,11 @@ def main(cfg_files=None, args=None, cfg_dict=None):
     return RET_CODE_CONFIG_ERROR
 
   # setup memory map
-  memmap_cfg = mp.get_machine_dict().memmap
-  if memmap_cfg.hw_access != "disable":
-    max_mem = 0xbf0000 / 1024
-    if machine_cfg.ram_size >= max_mem:
-      log_main.error("too much RAM requested. max allowed KiB: %d", max_mem)
-      return RET_CODE_CONFIG_ERROR
+  mem_map_cfg = mp.get_machine_dict().memmap
+  mem_map = MemoryMap(machine)
+  if not mem_map.parse_config(mem_map_cfg):
+    log_main.error("memory map setup failed!")
+    return RET_CODE_CONFIG_ERROR
 
   # setup path manager
   path_mgr = VamosPathManager()
@@ -100,7 +98,7 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   log_main.info("stack:  %d", stack_size)
 
   # combine to vamos instance
-  vamos = Vamos(machine, path_mgr)
+  vamos = Vamos(machine, mem_map, path_mgr)
   if not vamos.init(binary, arg_str, stack_size, cmd_cfg.shell, mp):
     log_main.error("vamos init failed")
     return 1

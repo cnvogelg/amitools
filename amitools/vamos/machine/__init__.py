@@ -6,3 +6,5 @@ from .mocktraps import MockTraps
 from .mockmachine import MockMachine
 from .machine import Machine
 from .opcodes import *
+from .hwaccess import HWAccess, HWAccessError
+from .memmap import MemoryMap

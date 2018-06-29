@@ -208,6 +208,10 @@ class Machine(object):
     """number of useable bytes for applications starting at ram begin"""
     return self.ram_bytes
 
+  def get_ram_kib(self):
+    """number of useable bytes for applications starting at ram begin"""
+    return self.ram_bytes / 1024
+
   def get_ram_total(self):
     """number of total bytes in RAM including zero range"""
     return self.ram_total

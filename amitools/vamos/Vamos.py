@@ -5,7 +5,6 @@ from .libcore import LibProfilerConfig
 from .loader import SegmentLoader
 from .libmgr import LibManager, LibMgrCfg
 from Trampoline import Trampoline
-from HardwareAccess import HardwareAccess
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
 from amitools.vamos.lib.dos.Process import Process
@@ -19,8 +18,9 @@ from .error import *
 
 class Vamos:
 
-  def __init__(self, machine, path_mgr):
+  def __init__(self, machine, mem_map, path_mgr):
     self.machine = machine
+    self.mem_map = mem_map
     self.mem = machine.get_mem()
     self.raw_mem = self.mem
     self.ram_size = self.mem.get_ram_size_bytes()
@@ -30,30 +30,8 @@ class Vamos:
     self.path_mgr = path_mgr
 
   def init(self, binary, arg_str, stack_size, shell, main_cfg):
-    # too much RAM requested?
-    # our "custom chips" start at $BFxxxx so we allow RAM only to be below
-    memmap_cfg = main_cfg.get_machine_dict().memmap
-    if self.ram_size >= 0xbf0000 and memmap_cfg.hw_access != "disable":
-      log_main.error("Too much RAM configured! Only up to $BF0000 allowed.")
-      return False
-
-    # setup custom chips
-    hw_access = memmap_cfg.hw_access
-    if hw_access != "disable":
-      self.hw_access = HardwareAccess(self.mem)
-      if not self._setup_hw_access(hw_access):
-        return False
-
     # create a label manager and error tracker
     self.label_mgr = self.machine.get_label_mgr()
-
-    # set a label for first region
-    if self.label_mgr:
-      label = LabelRange("vbr",0,0x400)
-      self.label_mgr.add_label(label)
-      # shutdown range
-      label = LabelRange("machine",0x400,0x800)
-      self.label_mgr.add_label(label)
 
     # create memory access
     trace_cfg = main_cfg.get_trace_dict().trace
@@ -116,7 +94,6 @@ class Vamos:
     self.process = None
     self.proc_list = []
 
-    self.create_old_dos_guard()
     self.open_base_libs()
     cwd = str(self.path_mgr.get_cwd())
     return self.setup_main_proc(binary, arg_str, stack_size, shell, cwd)
@@ -146,23 +123,6 @@ class Vamos:
     sp = self.machine.get_ram_begin() - 4
     self.lib_mgr.shutdown(run_sp=sp)
     self.alloc.dump_orphans()
-
-  # ----- system setup -----
-
-  def _setup_hw_access(self, hw_access):
-    # direct hw access
-    if hw_access == "emu":
-      self.hw_access.set_mode(HardwareAccess.MODE_EMU)
-    elif hw_access == "ignore":
-      self.hw_access.set_mode(HardwareAccess.MODE_IGNORE)
-    elif hw_access == "abort":
-      self.hw_access.set_mode(HardwareAccess.MODE_ABORT)
-    elif hw_access == "disable":
-      pass
-    else:
-      log_main.error("Invalid HW Access mode: %s", hw_access)
-      return False
-    return True
 
   # ----- process handling -----
 
@@ -194,9 +154,10 @@ class Vamos:
     # various C programs rely on it being present (1.3-3.1 at least have it).
     tr.set_dx_l(2, proc.stack_size)
     # to track old dos values
-    tr.set_ax_l(2, self.dos_guard_base)
-    tr.set_ax_l(5, self.dos_guard_base)
-    tr.set_ax_l(6, self.dos_guard_base)
+    odg = self.mem_map.get_old_dos_guard_base()
+    tr.set_ax_l(2, odg)
+    tr.set_ax_l(5, odg)
+    tr.set_ax_l(6, odg)
     # save old stack and set new stack
     tr.write_ax_l(7, old_stack_off, True) # write to data offset (dc.l above)
     new_stack = proc.stack_initial
@@ -257,9 +218,10 @@ class Vamos:
     # various C programs rely on it being present (1.3-3.1 at least have it).
     tr.set_dx_l(2, stacksize)
     # to track old dos values
-    tr.set_ax_l(2, self.dos_guard_base)
-    tr.set_ax_l(5, self.dos_guard_base)
-    tr.set_ax_l(6, self.dos_guard_base)
+    odg = self.mem_map.get_old_dos_guard_base()
+    tr.set_ax_l(2, odg)
+    tr.set_ax_l(5, odg)
+    tr.set_ax_l(6, odg)
     # save old stack and set new stack
     tr.write_ax_l(7, old_stack_off, True) # write to data offset (dc.l above)
     tr.set_ax_l(7, new_stackptr)
@@ -317,9 +279,10 @@ class Vamos:
     # various C programs rely on it being present (1.3-3.1 at least have it).
     tr.set_dx_l(2, stacksize)
     # to track old dos values
-    tr.set_ax_l(2, self.dos_guard_base)
-    tr.set_ax_l(5, self.dos_guard_base)
-    tr.set_ax_l(6, self.dos_guard_base)
+    odg = self.mem_map.get_old_dos_guard_base()
+    tr.set_ax_l(2, odg)
+    tr.set_ax_l(5, odg)
+    tr.set_ax_l(6, odg)
     # save old stack and set new stack
     tr.write_ax_l(7, old_stack_off, True) # write to data offset (dc.l above)
     tr.set_ax_l(7, new_stackptr)
@@ -372,15 +335,6 @@ class Vamos:
     # close exec
     self.lib_mgr.close_lib(self.exec_addr)
 
-  def create_old_dos_guard(self):
-    # create a guard memory for tracking invalid old dos access
-    self.dos_guard_base = self.raw_mem.reserve_special_range()
-    self.dos_guard_size = 0x010000
-    if self.label_mgr:
-      label = LabelRange("old_dos guard",self.dos_guard_base, self.dos_guard_size)
-      self.label_mgr.add_label(label)
-      log_mem_init.info(label)
-
   # ----- main process -----
 
   def setup_main_proc(self, binary, arg_str, stack_size, shell, cwd):
@@ -403,9 +357,10 @@ class Vamos:
   def get_initial_regs(self):
     regs = self.main_proc.get_initial_regs()
     # to track old dos values
-    regs[REG_A2] = self.dos_guard_base
-    regs[REG_A5] = self.dos_guard_base
-    regs[REG_A6] = self.dos_guard_base
+    odg = self.mem_map.get_old_dos_guard_base()
+    regs[REG_A2] = odg
+    regs[REG_A5] = odg
+    regs[REG_A6] = odg
     return regs
 
   def cleanup_main_proc(self):
