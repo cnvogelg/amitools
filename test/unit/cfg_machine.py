@@ -12,7 +12,8 @@ def cfg_machine_dict_test():
           "ram_size": 512
       },
       "memmap": {
-          "hw_access": "abort"
+          "hw_access": "abort",
+          "old_dos_guard": True
       }
   }
   lp.parse_config(input_dict, 'dict')
@@ -27,7 +28,8 @@ def cfg_machine_ini_test():
           "max_cycles": 23,
           "cycles_per_run": 42,
           "ram_size": 512,
-          "hw_access": "abort"
+          "hw_access": "abort",
+          "old_dos_guard": True,
       }
   }
   lp.parse_config(ini_dict, 'ini')
@@ -39,7 +41,8 @@ def cfg_machine_ini_test():
           "ram_size": 512
       },
       "memmap": {
-          "hw_access": "abort"
+          "hw_access": "abort",
+          "old_dos_guard": True
       }
   }
 
@@ -52,6 +55,7 @@ def cfg_machine_args_test():
       ['-C', '68020',
        '--max-cycles', '23',
        '--cycles-per-block', '42',
+       '--old-dos-guard',
        '-m', '512',
        '-H', 'abort'])
   lp.parse_args(args)
@@ -63,6 +67,7 @@ def cfg_machine_args_test():
           "ram_size": 512
       },
       "memmap": {
-          "hw_access": "abort"
+          "hw_access": "abort",
+          "old_dos_guard": True
       }
   }

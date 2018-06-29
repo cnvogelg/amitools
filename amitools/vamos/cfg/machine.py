@@ -15,7 +15,8 @@ class MachineParser(Parser):
             "ram_size": 1024
         },
         "memmap": {
-            "hw_access": Value(str, "emu", enum=hw_access)
+            "hw_access": Value(str, "emu", enum=hw_access),
+            "old_dos_guard": False
         }
     }
     arg_cfg = {
@@ -31,7 +32,9 @@ class MachineParser(Parser):
         },
         "memmap": {
             "hw_access": Argument('-H', '--hw-access', action='store',
-                                  help="What to do on direct HW access? (emu,ignore,abort,disable)")
+                                  help="What to do on direct HW access? (emu,ignore,abort,disable)"),
+            "old_dos_guard": Argument('--old-dos-guard', action='store_true',
+                                      help="Reserve memory range to track access to BCPL addrs")
         }
     }
     ini_trafo = {
@@ -42,7 +45,8 @@ class MachineParser(Parser):
             "ram_size": "ram_size"
         },
         "memmap": {
-            "hw_access": "hw_access"
+            "hw_access": "hw_access",
+            "old_dos_guard": "old_dos_guard"
         }
     }
     Parser.__init__(self, "machine", def_cfg, arg_cfg,
