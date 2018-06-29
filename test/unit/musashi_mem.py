@@ -308,3 +308,83 @@ def musashi_mem_bstr_test():
   empty = ""
   mem.w_bstr(100, empty)
   assert mem.r_bstr(100) == empty
+
+
+class TraceAssert(object):
+  def __init__(self, mem, mode, width, addr, value):
+    self.mem = mem
+    self.want = (mode, width, addr, value)
+
+  def __enter__(self):
+    self.mem.set_trace_mode(True)
+    self.mem.set_trace_func(self.trace_func)
+    self.match = None
+    return self
+
+  def __exit__(self, type, value, traceback):
+    self.mem.set_trace_mode(False)
+    self.mem.set_trace_func(None)
+    assert self.match == self.want
+
+  def trace_func(self, mode, width, addr, value):
+    self.match = (mode, width, addr, value)
+
+
+def musashi_mem_trace_test():
+  mem = emu.Memory(16)
+  with TraceAssert(mem, 'R', 0, 0x100, 0):
+    mem.cpu_r8(0x100)
+  with TraceAssert(mem, 'R', 1, 0x100, 0):
+    mem.cpu_r16(0x100)
+  with TraceAssert(mem, 'R', 2, 0x100, 0):
+    mem.cpu_r32(0x100)
+  with TraceAssert(mem, 'W', 0, 0x100, 0x42):
+    mem.cpu_w8(0x100, 0x42)
+  with TraceAssert(mem, 'W', 1, 0x100, 0xdead):
+    mem.cpu_w16(0x100, 0xdead)
+  with TraceAssert(mem, 'W', 2, 0x100, 0xcafebabe):
+    mem.cpu_w32(0x100, 0xcafebabe)
+
+
+def musashi_mem_trace_error_test():
+  mem = emu.Memory(16)
+
+  def trace_func(mode, width, addr, value):
+    raise ValueError("bonk!")
+  mem.set_trace_mode(True)
+  mem.set_trace_func(trace_func)
+  with pytest.raises(ValueError):
+    mem.cpu_r8(0x100)
+  with pytest.raises(ValueError):
+    mem.cpu_w8(0x100, 0)
+  mem.set_trace_mode(False)
+  mem.set_trace_func(None)
+
+
+def musashi_mem_invalid_access_error_test():
+  mem = emu.Memory(16)
+
+  def invalid_func(mode, width, addr):
+    raise ValueError("bonk!")
+  mem.set_invalid_func(invalid_func)
+  with pytest.raises(ValueError):
+    mem.cpu_r8(0x100000)
+  with pytest.raises(ValueError):
+    mem.cpu_w8(0x100000, 0)
+  mem.set_invalid_func(None)
+
+
+def musashi_mem_special_rw_error_test():
+  mem = emu.Memory(16)
+
+  def read(addr):
+    raise ValueError("blonk!")
+
+  def write(addr, val):
+    raise ValueError("blonk!")
+  mem.set_special_range_read_funcs(0xbf0000, 1, read, None, None)
+  mem.set_special_range_write_funcs(0xbf0000, 1, write, None, None)
+  with pytest.raises(ValueError):
+    mem.cpu_r8(0xbf0000)
+  with pytest.raises(ValueError):
+    mem.cpu_w8(0xbf0000, 42)

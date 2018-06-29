@@ -118,7 +118,9 @@ cdef class CPU:
     m68k_pulse_reset()
 
   def execute(self, num_cycles):
-    return m68k_execute(num_cycles)
+    cdef int cycles = m68k_execute(num_cycles)
+    check_mem_exc()
+    return cycles
 
   def end(self):
     m68k_end_timeslice()

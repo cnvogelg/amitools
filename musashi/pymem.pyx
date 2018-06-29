@@ -39,23 +39,54 @@ cdef extern from "mem.h":
 # string.h
 from libc.string cimport memcpy, memset, strlen, strcpy
 from libc.stdlib cimport malloc, free
+import sys
 
 # wrapper functions
+cdef object mem_callback_exc
+cdef check_mem_exc():
+  # raise a mem exception
+  global mem_callback_exc
+  if mem_callback_exc:
+    exc = mem_callback_exc
+    mem_callback_exc = None
+    raise exc[0], exc[1], exc[2]
+
 cdef void trace_func_wrapper(int mode, int width, uint addr, uint val, void *ctx):
   cdef object py_func = <object>ctx
-  py_func(chr(mode), width, addr, val)
+  try:
+    py_func(chr(mode), width, addr, val)
+  except:
+    global mem_callback_exc
+    mem_callback_exc = sys.exc_info()
+    m68k_end_timeslice()
 
 cdef void invalid_func_wrapper(int mode, int width, uint addr, void *ctx):
   cdef object py_func = <object>ctx
-  py_func(chr(mode), width, addr)
+  try:
+    py_func(chr(mode), width, addr)
+  except:
+    global mem_callback_exc
+    mem_callback_exc = sys.exc_info()
+    m68k_end_timeslice()
 
 cdef uint special_read_func_wrapper(uint addr, void *ctx):
   cdef object py_func = <object>ctx
-  return py_func(addr)
+  try:
+    return py_func(addr)
+  except:
+    global mem_callback_exc
+    mem_callback_exc = sys.exc_info()
+    m68k_end_timeslice()
+    return 0
 
 cdef void special_write_func_wrapper(uint addr, uint value, void *ctx):
   cdef object py_func = <object>ctx
-  py_func(addr, value)
+  try:
+    py_func(addr, value)
+  except:
+    global mem_callback_exc
+    mem_callback_exc = sys.exc_info()
+    m68k_end_timeslice()
 
 class MemoryError(StandardError):
   def __init__(self, addr, op, size=None):
@@ -155,51 +186,66 @@ cdef class Memory:
 
   # CPU-like memory access (not RAM only!)
   cpdef cpu_r8(self, uint addr):
-    return m68k_read_memory_8(addr)
+    cdef uint val = m68k_read_memory_8(addr)
+    check_mem_exc()
+    return val
   cpdef cpu_r16(self, uint addr):
-    return m68k_read_memory_16(addr)
+    cdef uint val = m68k_read_memory_16(addr)
+    check_mem_exc()
+    return val
   cpdef cpu_r32(self, uint addr):
-    return m68k_read_memory_32(addr)
+    cdef uint val = m68k_read_memory_32(addr)
+    check_mem_exc()
+    return val
   cpdef cpu_w8(self, uint addr, uint value):
     if value > 0xff:
       raise OverflowError("value does not fit into byte")
     m68k_write_memory_8(addr, value)
+    check_mem_exc()
   cpdef cpu_w16(self, uint addr, uint value):
     if value > 0xffff:
       raise OverflowError("value does not fit into word")
     m68k_write_memory_16(addr, value)
+    check_mem_exc()
   cpdef cpu_w32(self, uint addr, uint value):
     m68k_write_memory_32(addr, value)
+    check_mem_exc()
 
   # CPU-like signed memory access (not RAM only!)
   cpdef cpu_r8s(self, uint addr):
     cdef uint val = m68k_read_memory_8(addr)
+    check_mem_exc()
     # sign extend
     if val & 0x80 == 0x80:
       val |= 0xffffff00
     return <int>(val)
   cpdef cpu_r16s(self, uint addr):
     cdef uint val = m68k_read_memory_16(addr)
+    check_mem_exc()
     # sign extend
     if val & 0x8000 == 0x8000:
       val |= 0xffff0000
     return <int>(val)
   cpdef cpu_r32s(self, uint addr):
     cdef uint val = m68k_read_memory_32(addr)
+    check_mem_exc()
     return <int>(val)
   cpdef cpu_w8s(self, uint addr, int value):
     if value < -0x80 or value > 0x7f:
       raise OverflowError("value does not fit into byte")
     cdef uint val = <uint>value & 0xff
     m68k_write_memory_8(addr, val)
+    check_mem_exc()
   cpdef cpu_w16s(self, uint addr, int value):
     if value < -0x8000 or value > 0x7fff:
       raise OverflowError("value does not fit into word")
     cdef uint val = <uint>value & 0xffff
     m68k_write_memory_16(addr, val)
+    check_mem_exc()
   cpdef cpu_w32s(self, uint addr, int value):
     cdef uint val = <uint>(value)
     m68k_write_memory_32(addr, val)
+    check_mem_exc()
 
   # memory access (RAM only!)
   cpdef r8(self, uint addr):
