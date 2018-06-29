@@ -153,6 +153,54 @@ cdef class Memory:
   def _raise_ram_error(self, addr, op, width):
     raise MemoryError(addr, op, width)
 
+  # CPU-like memory access (not RAM only!)
+  cpdef cpu_r8(self, uint addr):
+    return m68k_read_memory_8(addr)
+  cpdef cpu_r16(self, uint addr):
+    return m68k_read_memory_16(addr)
+  cpdef cpu_r32(self, uint addr):
+    return m68k_read_memory_32(addr)
+  cpdef cpu_w8(self, uint addr, uint value):
+    if value > 0xff:
+      raise OverflowError("value does not fit into byte")
+    m68k_write_memory_8(addr, value)
+  cpdef cpu_w16(self, uint addr, uint value):
+    if value > 0xffff:
+      raise OverflowError("value does not fit into word")
+    m68k_write_memory_16(addr, value)
+  cpdef cpu_w32(self, uint addr, uint value):
+    m68k_write_memory_32(addr, value)
+
+  # CPU-like signed memory access (not RAM only!)
+  cpdef cpu_r8s(self, uint addr):
+    cdef uint val = m68k_read_memory_8(addr)
+    # sign extend
+    if val & 0x80 == 0x80:
+      val |= 0xffffff00
+    return <int>(val)
+  cpdef cpu_r16s(self, uint addr):
+    cdef uint val = m68k_read_memory_16(addr)
+    # sign extend
+    if val & 0x8000 == 0x8000:
+      val |= 0xffff0000
+    return <int>(val)
+  cpdef cpu_r32s(self, uint addr):
+    cdef uint val = m68k_read_memory_32(addr)
+    return <int>(val)
+  cpdef cpu_w8s(self, uint addr, int value):
+    if value < -0x80 or value > 0x7f:
+      raise OverflowError("value does not fit into byte")
+    cdef uint val = <uint>value & 0xff
+    m68k_write_memory_8(addr, val)
+  cpdef cpu_w16s(self, uint addr, int value):
+    if value < -0x8000 or value > 0x7fff:
+      raise OverflowError("value does not fit into word")
+    cdef uint val = <uint>value & 0xffff
+    m68k_write_memory_16(addr, val)
+  cpdef cpu_w32s(self, uint addr, int value):
+    cdef uint val = <uint>(value)
+    m68k_write_memory_32(addr, val)
+
   # memory access (RAM only!)
   cpdef r8(self, uint addr):
     cdef uint val;

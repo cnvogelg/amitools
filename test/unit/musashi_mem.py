@@ -147,6 +147,135 @@ def musashi_mem_rws_test():
     mem.reads(0, 0x10000)
 
 
+class InvalidMemAccess(object):
+  def __init__(self, mem, mode, width, addr):
+    self.mem = mem
+    self.want = (mode, width, addr)
+
+  def __enter__(self):
+    self.mem.set_invalid_func(self.invalid_func)
+    self.match = None
+    return self
+
+  def __exit__(self, type, value, traceback):
+    self.mem.set_invalid_func(None)
+    assert self.match == self.want
+
+  def invalid_func(self, mode, width, addr):
+    self.match = (mode, width, addr)
+
+
+def musashi_mem_cpu_rw_test():
+  mem = emu.Memory(16)
+  assert mem.get_ram_size_kib() == 16
+
+  mem.cpu_w8(0x100, 42)
+  assert mem.cpu_r8(0x100) == 42
+
+  mem.cpu_w16(0x200, 0xdead)
+  assert mem.cpu_r16(0x200) == 0xdead
+
+  mem.cpu_w32(0x300, 0xcafebabe)
+  assert mem.cpu_r32(0x300) == 0xcafebabe
+
+  # invalid values
+  with pytest.raises(OverflowError):
+    mem.cpu_w8(0x100, 0x100)
+  with pytest.raises(OverflowError):
+    mem.cpu_w8(0x100, -1)
+  # invalid values
+  with pytest.raises(OverflowError):
+    mem.cpu_w16(0x100, 0x10000)
+  with pytest.raises(OverflowError):
+    mem.cpu_w16(0x100, -2)
+  # invalid values
+  with pytest.raises(OverflowError):
+    mem.cpu_w32(0x100, 0x100000000)
+  with pytest.raises(OverflowError):
+    mem.cpu_w32(0x100, -3)
+  # invalid type
+  with pytest.raises(TypeError):
+    mem.cpu_w8(0x100, 'hello')
+  # invalid type
+  with pytest.raises(TypeError):
+    mem.cpu_w16(0x100, 'hello')
+  # invalid type
+  with pytest.raises(TypeError):
+    mem.cpu_w32(0x100, 'hello')
+
+  # out of range
+  with InvalidMemAccess(mem, 'W', 0, 0x10000):
+    mem.cpu_w8(0x10000, 0)
+  with InvalidMemAccess(mem, 'W', 1, 0x10000):
+    mem.cpu_w16(0x10000, 0)
+  with InvalidMemAccess(mem, 'W', 2, 0x10000):
+    mem.cpu_w32(0x10000, 0)
+  with InvalidMemAccess(mem, 'R', 0, 0x10000):
+    mem.cpu_r8(0x10000)
+  with InvalidMemAccess(mem, 'R', 1, 0x10000):
+    mem.cpu_r16(0x10000)
+  with InvalidMemAccess(mem, 'R', 2, 0x10000):
+    mem.cpu_r32(0x10000)
+
+
+def musashi_mem_cpu_rws_test():
+  mem = emu.Memory(16)
+
+  mem.cpu_w8s(0x100, 42)
+  assert mem.cpu_r8s(0x100) == 42
+  mem.cpu_w8s(0x100, -23)
+  assert mem.cpu_r8s(0x100) == -23
+
+  mem.cpu_w16s(0x200, 0x7ead)
+  assert mem.cpu_r16s(0x200) == 0x7ead
+  mem.cpu_w16s(0x200, -0x1000)
+  assert mem.cpu_r16s(0x200) == -0x1000
+
+  mem.cpu_w32s(0x300, 0x1afebabe)
+  assert mem.cpu_r32s(0x300) == 0x1afebabe
+  mem.cpu_w32s(0x300, -0xafebabe)
+  assert mem.cpu_r32s(0x300) == -0xafebabe
+
+  # invalid values
+  with pytest.raises(OverflowError):
+    mem.cpu_w8s(0x100, 0x80)
+  with pytest.raises(OverflowError):
+    mem.cpu_w8s(0x100, -0x81)
+  # invalid values
+  with pytest.raises(OverflowError):
+    mem.cpu_w16s(0x100, 0x8000)
+  with pytest.raises(OverflowError):
+    mem.cpu_w16s(0x100, -0x8001)
+  # invalid values
+  with pytest.raises(OverflowError):
+    mem.cpu_w32s(0x100, 0x80000000)
+  with pytest.raises(OverflowError):
+    mem.cpu_w32s(0x100, -0x80000001)
+  # invalid type
+  with pytest.raises(TypeError):
+    mem.cpu_w8s(0x100, 'hello')
+  # invalid type
+  with pytest.raises(TypeError):
+    mem.cpu_w16s(0x100, 'hello')
+  # invalid type
+  with pytest.raises(TypeError):
+    mem.cpu_w32s(0x100, 'hello')
+
+  # out of range
+  with InvalidMemAccess(mem, 'W', 0, 0x10000):
+    mem.cpu_w8s(0x10000, 0)
+  with InvalidMemAccess(mem, 'W', 1, 0x10000):
+    mem.cpu_w16s(0x10000, 0)
+  with InvalidMemAccess(mem, 'W', 2, 0x10000):
+    mem.cpu_w32s(0x10000, 0)
+  with InvalidMemAccess(mem, 'R', 0, 0x10000):
+    mem.cpu_r8s(0x10000)
+  with InvalidMemAccess(mem, 'R', 1, 0x10000):
+    mem.cpu_r16s(0x10000)
+  with InvalidMemAccess(mem, 'R', 2, 0x10000):
+    mem.cpu_r32s(0x10000)
+
+
 def musashi_mem_block_test():
   mem = emu.Memory(16)
   data = "hello, world!"
