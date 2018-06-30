@@ -1,15 +1,66 @@
+import logging
 from amitools.vamos.log import log_mem, log_mem_int, log_instr
+from amitools.vamos.machine import CPUState
+from .mem import TraceMemory
 
 
 class TraceManager(object):
   trace_val_str = ("%02x      ", "%04x    ", "%08x")
 
-  def __init__(self, cpu, label_mgr):
-    self.cpu = cpu
-    self.label_mgr = label_mgr
+  def __init__(self, machine):
+    self.machine = machine
+    self.cpu = machine.get_cpu()
+    self.label_mgr = machine.get_label_mgr()
+    # state
+    self.mem_tracer = None
+
+  def parse_config(self, cfg):
+    if not cfg:
+      return True
+    if cfg.vamos_ram:
+      self.setup_vamos_ram_trace()
+    if cfg.memory:
+      self.setup_cpu_mem_trace()
+    if cfg.instr:
+      with_regs = cfg.reg_dump
+      self.setup_cpu_instr_trace(with_regs)
+    return True
+
+  def setup_vamos_ram_trace(self):
+    mem = self.machine.get_mem()
+    self.mem_tracer = TraceMemory(mem, self)
+    if not log_mem_int.isEnabledFor(logging.INFO):
+      log_mem_int.setLevel(logging.INFO)
+
+  def setup_cpu_mem_trace(self):
+    self.machine.set_cpu_mem_trace_hook(self.trace_cpu_mem)
+    if not log_mem_int.isEnabledFor(logging.INFO):
+      log_mem_int.setLevel(logging.INFO)
+
+  def setup_cpu_instr_trace(self, with_regs):
+    if not log_instr.isEnabledFor(logging.INFO):
+      log_instr.setLevel(logging.INFO)
+    cpu = self.cpu
+    state = CPUState()
+    if with_regs:
+      def instr_hook():
+        # add register dump
+        state.get(cpu)
+        res = state.dump()
+        for r in res:
+          log_instr.info(r)
+        # disassemble line
+        pc = cpu.r_reg(REG_PC)
+        self.trace_code_line(pc)
+    else:
+      def instr_hook():
+        # disassemble line
+        pc = cpu.r_reg(REG_PC)
+        self.trace_code_line(pc)
+    self.machine.set_instr_hook(instr_hook)
 
   # trace callback from CPU core
-  def trace_mem(self, mode, width, addr, value=0):
+  def trace_cpu_mem(self, mode, width, addr, value=0):
     self._trace_mem(log_mem, mode, width, addr, value)
     return 0
 

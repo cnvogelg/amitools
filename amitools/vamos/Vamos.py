@@ -7,7 +7,6 @@ from Trampoline import Trampoline
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
 from amitools.vamos.lib.dos.Process import Process
-from amitools.vamos.trace import TraceManager, TraceMemory
 from .lib.LibList import vamos_libs
 
 from .log import *
@@ -32,37 +31,6 @@ class Vamos:
   def init(self, binary, arg_str, stack_size, shell, main_cfg):
     # create a label manager and error tracker
     self.label_mgr = self.machine.get_label_mgr()
-
-    # create memory access
-    trace_cfg = main_cfg.get_trace_dict().trace
-    self.trace_mgr = TraceManager(self.cpu, self.label_mgr)
-    if trace_cfg.internal_memory:
-      self.mem = TraceMemory(self.mem, self.trace_mgr)
-      if not log_mem_int.isEnabledFor(logging.INFO):
-        log_mem_int.setLevel(logging.INFO)
-    # enable mem trace?
-    if trace_cfg.memory:
-      self.machine.set_cpu_mem_trace_hook(self.trace_mgr.trace_mem)
-      if not log_mem.isEnabledFor(logging.INFO):
-        log_mem.setLevel(logging.INFO)
-    # instr trace
-    if trace_cfg.instr:
-      if not log_instr.isEnabledFor(logging.INFO):
-        log_instr.setLevel(logging.INFO)
-      cpu = self.cpu
-      trace_mgr = self.trace_mgr
-      state = CPUState()
-      def instr_hook():
-        # add register dump
-        if trace_cfg.reg_dump:
-          state.get(cpu)
-          res = state.dump()
-          for r in res:
-            log_instr.info(r)
-        # disassemble line
-        pc = cpu.r_reg(REG_PC)
-        trace_mgr.trace_code_line(pc)
-      self.machine.set_instr_hook(instr_hook)
 
     # create segment loader
     self.seg_loader = SegmentLoader(self.alloc, self.path_mgr)

@@ -3,6 +3,7 @@ from amitools.vamos.trace import TraceManager
 from amitools.vamos.label import *
 from amitools.vamos.machine import *
 from amitools.vamos.astructs import NodeStruct, LibraryStruct
+from amitools.vamos.cfgcore import ConfigDict
 
 
 class FakeLib:
@@ -17,10 +18,9 @@ class FakeLib:
 
 
 def setup_tm():
-  mem = MockMemory()
-  cpu = MockCPU()
-  lm = LabelManager()
-  tm = TraceManager(cpu, lm)
+  machine = MockMachine()
+  lm = machine.get_label_mgr()
+  tm = TraceManager(machine)
   lm.add_label(LabelRange("range", 0x100, 0x100))
   lm.add_label(LabelStruct("node", 0x200, NodeStruct))
   lib = FakeLib()
@@ -46,21 +46,33 @@ def check_log(chn, records):
   ]
 
 
+def trace_mgr_parse_config_test():
+  cfg = ConfigDict({
+      'vamos_ram': True,
+      'memory': True,
+      'instr': True,
+      'reg_dump': True
+  })
+  machine = Machine()
+  tm = TraceManager(machine)
+  assert tm.parse_config(cfg)
+
+
 def trace_mgr_mem_test(caplog):
   caplog.set_level(logging.INFO)
   tm = setup_tm()
   # no label
-  tm.trace_mem('R', 2, 0)
-  tm.trace_mem('W', 1, 4, 23)
+  tm.trace_cpu_mem('R', 2, 0)
+  tm.trace_cpu_mem('W', 1, 4, 23)
   # range label
-  tm.trace_mem('R', 2, 0x100)
-  tm.trace_mem('W', 1, 0x120, 42)
+  tm.trace_cpu_mem('R', 2, 0x100)
+  tm.trace_cpu_mem('W', 1, 0x120, 42)
   # struct label
-  tm.trace_mem('R', 2, 0x200)
-  tm.trace_mem('W', 1, 0x208, 21)
+  tm.trace_cpu_mem('R', 2, 0x200)
+  tm.trace_cpu_mem('W', 1, 0x208, 21)
   # lib
-  tm.trace_mem('R', 1, 0x300, 0xa000)
-  tm.trace_mem('R', 1, 0x320)
+  tm.trace_cpu_mem('R', 1, 0x300, 0xa000)
+  tm.trace_cpu_mem('R', 1, 0x320)
   check_log("mem", caplog.record_tuples)
 
 

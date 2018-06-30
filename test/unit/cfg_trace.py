@@ -8,7 +8,7 @@ def cfg_trace_dict_test():
       "trace": {
           "instr": True,
           "memory": True,
-          "internal_memory": True,
+          "vamos_ram": True,
           "reg_dump": True,
           "labels": True
       }
@@ -33,7 +33,7 @@ def cfg_trace_ini_test():
       "trace": {
           "instr": True,
           "memory": True,
-          "internal_memory": True,
+          "vamos_ram": True,
           "reg_dump": True,
           "labels": True
       }
@@ -51,7 +51,7 @@ def cfg_trace_args_test():
       "trace": {
           "instr": True,
           "memory": True,
-          "internal_memory": True,
+          "vamos_ram": True,
           "reg_dump": True,
           "labels": True
       }

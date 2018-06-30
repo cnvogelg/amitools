@@ -7,7 +7,7 @@ class TraceParser(Parser):
         "trace": {
             "instr": False,
             "memory": False,
-            "internal_memory": False,
+            "vamos_ram": False,
             "reg_dump": False,
             "labels": False
         }
@@ -17,9 +17,9 @@ class TraceParser(Parser):
             "instr": Argument('-I', '--instr-trace', action='store_true',
                               help="enable instruction trace"),
             "memory": Argument('-t', '--memory-trace', action='store_true',
-                               help="enable memory tracing (slower)"),
-            "internal_memory": Argument('-T', '--internal-memory-trace', action='store_true',
-                                        help="enable internal memory tracing (slow)"),
+                               help="enable CPU memory tracing (slower)"),
+            "vamos_ram": Argument('-T', '--vamos-ram-trace', action='store_true',
+                                  help="enable Vamos RAM memory tracing (slow)"),
             "reg_dump": Argument('-r', '--reg-dump', action='store_true',
                                  help="add register dump to instruction trace"),
             "labels": Argument('-B', '--labels', action='store_true',
@@ -30,7 +30,7 @@ class TraceParser(Parser):
         "trace": {
             "instr": "instr_trace",
             "memory": "memory_trace",
-            "internal_memory": "internal_memory_trace",
+            "vamos_ram": "internal_memory_trace",
             "reg_dump": "reg_dump",
             "labels": "labels"
         }

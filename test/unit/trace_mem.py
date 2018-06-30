@@ -17,10 +17,10 @@ class FakeLib:
 
 
 def setup_tmem():
-  mem = MockMemory()
-  cpu = MockCPU()
-  lm = LabelManager()
-  tm = TraceManager(cpu, lm)
+  machine = MockMachine()
+  mem = machine.get_mem()
+  lm = machine.get_label_mgr()
+  tm = TraceManager(machine)
   lm.add_label(LabelRange("range", 0x100, 0x100))
   lm.add_label(LabelStruct("node", 0x200, NodeStruct))
   lib = FakeLib()

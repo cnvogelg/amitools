@@ -8,6 +8,7 @@ from .Vamos import Vamos
 from .lib.dos.SysArgs import *
 from .lib.dos.CommandLine import CommandLine
 from .path import VamosPathManager
+from .trace import TraceManager
 
 RET_CODE_CONFIG_ERROR = 1000
 
@@ -52,6 +53,13 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   mem_map = MemoryMap(machine)
   if not mem_map.parse_config(mem_map_cfg):
     log_main.error("memory map setup failed!")
+    return RET_CODE_CONFIG_ERROR
+
+  # setup trace manager
+  trace_mgr_cfg = mp.get_trace_dict().trace
+  trace_mgr = TraceManager(machine)
+  if not trace_mgr.parse_config(trace_mgr_cfg):
+    log_main.error("tracing setup failed!")
     return RET_CODE_CONFIG_ERROR
 
   # setup path manager
