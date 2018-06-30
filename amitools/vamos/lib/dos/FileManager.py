@@ -31,10 +31,9 @@ class FileManager:
     self._register_file(self.std_input)
     self._register_file(self.std_output)
 
-  def finish(self,have_native_shell):
-    if not have_native_shell: #the Shell otherwise closes the streams for us
-      self._unregister_file(self.std_input)
-      self._unregister_file(self.std_output)
+  def finish(self):
+    self._unregister_file(self.std_input)
+    self._unregister_file(self.std_output)
 
   def get_fs_handler_port(self):
     return self.fs_handler_port
@@ -108,7 +107,9 @@ class FileManager:
 
   def close(self, fh):
     fh.close()
-    self._unregister_file(fh)
+    # do not unregister stdin/stdout. it will be done in finish()
+    if fh not in (self.std_input, self.std_output):
+      self._unregister_file(fh)
 
   def get_by_b_addr(self, b_addr, for_writing = None):
     if b_addr == 0:

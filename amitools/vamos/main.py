@@ -9,6 +9,7 @@ from .lib.dos.SysArgs import *
 from .lib.dos.CommandLine import CommandLine
 from .path import VamosPathManager
 from .trace import TraceManager
+from .libmgr import SetupLibManager
 
 RET_CODE_CONFIG_ERROR = 1000
 
@@ -68,6 +69,22 @@ def main(cfg_files=None, args=None, cfg_dict=None):
     log_main.error("path setup failed!")
     return RET_CODE_CONFIG_ERROR
 
+  # legacy vamos instance
+  vamos = Vamos(machine, mem_map, path_mgr)
+
+  # setup lib mgr
+  slm = SetupLibManager(machine, mem_map, path_mgr)
+  if not slm.parse_config(mp):
+    log_main.error("lib manager setup failed!")
+    return RET_CODE_CONFIG_ERROR
+  slm.setup(vamos)
+  slm.open_base_libs()
+
+  # legacy quirks
+  vamos.dos_ctx = slm.dos_ctx
+  vamos.exec_ctx = slm.exec_ctx
+  vamos.exec_lib = slm.exec_impl
+
   # --- proc: binary and arg_str ---
   # a single Amiga-like raw arg was passed
   proc_cfg = mp.get_proc_dict().process
@@ -105,9 +122,8 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   log_main.info("args:   '%s'", arg_str[:-1])
   log_main.info("stack:  %d", stack_size)
 
-  # combine to vamos instance
-  vamos = Vamos(machine, mem_map, path_mgr)
-  if not vamos.init(binary, arg_str, stack_size, cmd_cfg.shell, mp):
+  # setup main proc
+  if not vamos.setup_main_proc(binary, arg_str, stack_size, cmd_cfg.shell):
     log_main.error("vamos init failed")
     return 1
 
@@ -138,11 +154,17 @@ def main(cfg_files=None, args=None, cfg_dict=None):
         "vamos was stopped after %d cycles. ignoring result", machine_cfg.max_cycles)
     exit_code = 0
 
-  # shutdown vamos
+  # shutdown main proc
   if ok:
-    vamos.cleanup()
-    mem_map.cleanup()
+    vamos.cleanup_main_proc()
 
+  # libs shutdown
+  slm.close_base_libs()
+  slm.cleanup()
+
+  # mem_map and machine shutdown
+  if ok:
+    mem_map.cleanup()
   machine.cleanup()
 
   # exit

@@ -84,7 +84,7 @@ class DosLibrary(LibImpl):
     # free port
     ctx.exec_lib.port_mgr.free_port(self.fs_handler_port)
     # finish file manager
-    self.file_mgr.finish(ctx.process.is_native_shell())
+    self.file_mgr.finish()
     # free dos list
     self.dos_list.free_list()
     # free path

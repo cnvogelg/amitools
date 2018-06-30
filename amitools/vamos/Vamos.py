@@ -1,18 +1,8 @@
-from .label import LabelManager, LabelRange
-from .astructs import AccessStruct
-from .libcore import LibProfilerConfig
-from .loader import SegmentLoader
-from .libmgr import LibManager, LibMgrCfg
 from Trampoline import Trampoline
-from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
-from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
 from amitools.vamos.lib.dos.Process import Process
-from .lib.LibList import vamos_libs
 
-from .log import *
+from .log import log_proc
 from .machine.regs import *
-from .machine import CPUState
-from .error import *
 
 class Vamos:
 
@@ -27,64 +17,9 @@ class Vamos:
     self.traps = machine.get_traps()
     self.path_mgr = path_mgr
     self.alloc = mem_map.get_alloc()
-
-  def init(self, binary, arg_str, stack_size, shell, main_cfg):
-    # create a label manager and error tracker
-    self.label_mgr = self.machine.get_label_mgr()
-
-    # create segment loader
-    self.seg_loader = SegmentLoader(self.alloc, self.path_mgr)
-
-    # setup lib manager
-    profiler_cfg = self._get_profiler_config(main_cfg)
-    self.exec_ctx = ExecLibCtx(self.machine, self.alloc,
-                               self.seg_loader, self.path_mgr)
-    self.dos_ctx = DosLibCtx(self.machine, self.alloc,
-                             self.seg_loader, self.path_mgr,
-                             self.run_command, self.start_sub_process)
-    libs_cfg = main_cfg.get_libs_dict()
-    lib_mgr_cfg = LibMgrCfg.from_dict(libs_cfg)
-    self.lib_mgr = LibManager(self.machine, self.alloc, self.seg_loader,
-                              lib_mgr_cfg, profiler_cfg=profiler_cfg)
-    self.lib_mgr.add_ctx('exec.library', self.exec_ctx)
-    self.lib_mgr.add_ctx('dos.library', self.dos_ctx)
-    for name in vamos_libs:
-      cls = vamos_libs[name]
-      self.lib_mgr.add_impl_cls(name, cls)
-    self.lib_mgr.bootstrap_exec()
-
     # no current process right now
     self.process = None
     self.proc_list = []
-
-    self.open_base_libs()
-    cwd = str(self.path_mgr.get_cwd())
-    return self.setup_main_proc(binary, arg_str, stack_size, shell, cwd)
-
-  def _get_profiler_config(self, main_cfg):
-    cfg = main_cfg.get_profile_dict().profile
-    names = cfg.libs.names
-    if names:
-      profiling = True
-      all_libs = 'all' in names
-    else:
-      profiling = False
-      all_libs = False
-    profiler_cfg = LibProfilerConfig(profiling=profiling,
-                                     all_libs=all_libs,
-                                     libs=names,
-                                     add_samples=cfg.libs.calls,
-                                     file=cfg.output.file,
-                                     append=cfg.output.append,
-                                     dump=cfg.output.dump)
-    return profiler_cfg
-
-  def cleanup(self):
-    self.cleanup_main_proc()
-    self.close_base_libs()
-    # shutdown of libmgr needs temp stack
-    sp = self.machine.get_ram_begin() - 4
-    self.lib_mgr.shutdown(run_sp=sp)
 
   # ----- process handling -----
 
@@ -272,34 +207,10 @@ class Vamos:
     # place return address for new process
     self.mem.w32(new_stackptr, return_addr)
 
-  # ----- init environment -----
-
-  def open_base_libs(self):
-    log_main.info("open_base_libs")
-    # open exec lib
-    self.exec_addr = self.lib_mgr.open_lib('exec.library', 0)
-    exec_vlib = self.lib_mgr.get_vlib_by_addr(self.exec_addr)
-    self.exec_lib = exec_vlib.get_impl()
-    # link exec to dos
-    self.dos_ctx.set_exec_lib(self.exec_lib)
-    # open dos lib
-    self.dos_addr = self.lib_mgr.open_lib('dos.library', 0)
-    dos_vlib = self.lib_mgr.get_vlib_by_addr(self.dos_addr)
-    self.dos_lib = dos_vlib.get_impl()
-    self.dos_ctx.set_dos_lib(self.dos_lib)
-    # set exec base @4
-    self.machine.set_zero_mem(0, self.exec_addr)
-
-  def close_base_libs(self):
-    log_main.info("close_base_libs")
-    # close dos
-    self.lib_mgr.close_lib(self.dos_addr)
-    # close exec
-    self.lib_mgr.close_lib(self.exec_addr)
-
   # ----- main process -----
 
-  def setup_main_proc(self, binary, arg_str, stack_size, shell, cwd):
+  def setup_main_proc(self, binary, arg_str, stack_size, shell):
+    cwd = str(self.path_mgr.get_cwd())
     proc = Process(self.dos_ctx, binary, arg_str, stack_size=stack_size,
                    shell=shell, cwd=cwd)
     if not proc.ok:
