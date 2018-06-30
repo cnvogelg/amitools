@@ -85,7 +85,6 @@ class Vamos:
     # shutdown of libmgr needs temp stack
     sp = self.machine.get_ram_begin() - 4
     self.lib_mgr.shutdown(run_sp=sp)
-    self.alloc.dump_orphans()
 
   # ----- process handling -----
 

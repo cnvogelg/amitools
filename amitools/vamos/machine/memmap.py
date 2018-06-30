@@ -56,6 +56,10 @@ class MemoryMap(object):
     log_mem_map.info("dos guard base: @%08x", self.dos_guard_base)
     return True
 
+  def cleanup(self):
+    if self.alloc:
+      self.alloc.dump_orphans()
+
   def setup_hw_access(self, mode_str):
     self.hw_access = HWAccess.from_mode_str(self.machine, mode_str)
     log_mem_map.info("setup hw access: %s", mode_str)

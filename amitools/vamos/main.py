@@ -141,6 +141,7 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   # shutdown vamos
   if ok:
     vamos.cleanup()
+    mem_map.cleanup()
 
   machine.cleanup()
 
