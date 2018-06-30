@@ -1,5 +1,4 @@
 from .label import LabelManager, LabelRange
-from .mem import MemoryAlloc
 from .astructs import AccessStruct
 from .libcore import LibProfilerConfig
 from .loader import SegmentLoader
@@ -28,6 +27,7 @@ class Vamos:
     self.cpu_type = machine.get_cpu_type()
     self.traps = machine.get_traps()
     self.path_mgr = path_mgr
+    self.alloc = mem_map.get_alloc()
 
   def init(self, binary, arg_str, stack_size, shell, main_cfg):
     # create a label manager and error tracker
@@ -63,11 +63,6 @@ class Vamos:
         pc = cpu.r_reg(REG_PC)
         trace_mgr.trace_code_line(pc)
       self.machine.set_instr_hook(instr_hook)
-
-    # create memory allocator
-    self.mem_begin = 0x1000
-    self.mem_size = self.ram_size - self.mem_begin
-    self.alloc = MemoryAlloc(self.mem, self.mem_begin, self.mem_size, self.label_mgr)
 
     # create segment loader
     self.seg_loader = SegmentLoader(self.alloc, self.path_mgr)
