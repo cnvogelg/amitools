@@ -96,14 +96,14 @@ def tag_str_to_num(s):
 
 def num_to_tag_str(l):
   """Convert the DosType in a 32 bit value to its 4 letter tag string"""
-  a = chr((l >> 24) & 0xff)
-  b = chr((l >> 16) & 0xff)
-  c = chr((l >> 8) & 0xff)
+  a = bytes(bytearray(((l >> 24) & 0xff),))
+  b = bytes(bytearray(((l >> 16) & 0xff),))
+  c = bytes(bytearray(((l >> 8) & 0xff),))
   last = (l & 0xff)
   if last < 32:
-    last = chr(last + 48)
+    last = bytes(bytearray((last + 48),))
   else:
-    last = chr(last)
+    last = bytes(bytearray((last),))
   return a+b+c+last
 
 def get_dos_type_str(dos_type):

@@ -181,14 +181,14 @@ class Block:
   
   def _put_bstr(self, loc, max_size, bstr):
     if bstr == None:
-      bstr = ""
+      bstr = b""
     n = len(bstr)
     if n > max_size:
       bstr = bstr[:max_size]
     if loc < 0:
       loc = self.block_longs + loc
     loc = loc * 4
-    self.data[loc] = chr(len(bstr))
+    self.data[loc] = bytearray((len(bstr),))
     if len(bstr) > 0:
       self.data[loc+1:loc+1+len(bstr)] = bstr
   

@@ -40,7 +40,7 @@ class ADFSBitmap:
     # create data and preset with 0xff
     self.bitmap_data = ctypes.create_string_buffer(self.bitmap_all_blk_bytes)
     for i in range(self.bitmap_all_blk_bytes):
-      self.bitmap_data[i] = chr(0xff)
+      self.bitmap_data[i] = b'\xff'
 
     # clear bit for root block
     blk_pos = self.root_blk.blk_num
@@ -271,7 +271,7 @@ class ADFSBitmap:
   def create_draw_bitmap(self):
     bm = ctypes.create_string_buffer(self.blkdev.num_blocks)
     for i in range(self.blkdev.num_blocks):
-      bm[i] = chr(0)
+      bm[i] = b'\x00'
     return bm
 
   def print_free(self, brief=False):

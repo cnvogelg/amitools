@@ -53,12 +53,12 @@ class DirCacheRecord:
     struct.pack_into(">IIIHHHHH",data,off,self.entry,self.size,self.protect,0,0,ts.days,ts.mins,ts.ticks)
     # name
     name_len = len(self.name)
-    data[off + 23] = chr(name_len)
+    data[off + 23] = bytearray((name_len,))
     name_off = off + 24
     data[name_off : name_off + name_len] = self.name
     # comment
     comment_len = len(self.comment)
-    data[off + 24 + name_len] = chr(comment_len)
+    data[off + 24 + name_len] = bytearray((comment_len),)
     comment_off = off + 25 + name_len
     data[comment_off : comment_off + comment_len] = self.comment
     return off + self.get_size()

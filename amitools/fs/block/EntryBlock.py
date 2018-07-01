@@ -26,7 +26,7 @@ class EntryBlock(Block):
       else:
         # Comment is located in an extra block
         self.comment_block_id = self._get_long(-18)
-        self.comment = ""
+        self.comment = b""
       self.mod_ts = self._get_timestamp(-15)
     else:
       self.comment = self._get_bstr(-46, 79)
@@ -37,9 +37,9 @@ class EntryBlock(Block):
     """Writes the name, comment, and modifcation timestamp"""
     if self.is_longname:
       if self.comment_block_id != 0:
-        nac = chr(len(self.name)) + self.name + chr(0)
+        nac = bytes(bytearray((len(self.name),))) + self.name + b'\x00'
       else:
-        nac = chr(len(self.name)) + self.name + chr(len(self.comment)) + self.comment
+        nac = bytes(bytearray((len(self.name),))) + self.name + bytes(bytearray((len(self.comment),))) + self.comment
       self._put_cstr(-46, 122, nac)
       self._put_long(-18, self.comment_block_id)
       self._put_timestamp(-15, self.mod_ts)

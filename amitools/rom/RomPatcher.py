@@ -64,7 +64,7 @@ class BootConRomPatch(RomPatch):
       logging.error("console not found!")
       return False
     # find terminator
-    pos = data.find(chr(0), off)
+    pos = data.find(b'\x00', off)
     if pos == -1:
       logging.error("no console end found!")
       return False
@@ -81,7 +81,7 @@ class BootConRomPatch(RomPatch):
         return False
       # pad and write to rom
       pad_len = con_old_len - con_new_len + 1
-      con_new += chr(0) * pad_len
+      con_new += b'\x00' * pad_len
       data[off:pos+1] = con_new
       logging.info("new='%s'" % (con_new_len))
     return True

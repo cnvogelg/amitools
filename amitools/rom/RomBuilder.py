@@ -53,7 +53,7 @@ class RomEntryRomHdr:
     return self.skip + 8
 
   def get_data(self, addr):
-    data = chr(0xff) * self.skip
+    data = b'\xff' * self.skip
     hdr = struct.pack(">II", 0x11114ef9, self.jmp_addr)
     return data + hdr
 
@@ -67,7 +67,7 @@ class RomEntryPadding:
     return self.skip
 
   def get_data(self, addr):
-    return chr(self.value) * self.skip
+    return bytes(bytearray((self.value),)) * self.skip
 
 
 class RomBuilder:
@@ -150,7 +150,7 @@ class RomBuilder:
       off += n
       addr += n
     # fill empty space
-    fill = chr(self.fill_byte)
+    fill = bytes(bytearray((self.fill_byte),))
     while off < self.size_bytes:
       rom_data[off] = fill
       off += 1
