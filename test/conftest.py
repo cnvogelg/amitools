@@ -98,6 +98,15 @@ class VamosTestRunner:
     dat_path.append(".txt")
     return "".join(dat_path)
 
+  def make_prog(self, prog_name):
+    self.bin_builder.make_prog(prog_name)
+
+  def get_prog_bin_name(self, prog_name):
+    bin_name = "curdir:bin/" + prog_name + '_' + self.flavor
+    if self.use_debug_bins:
+      bin_name += "_dbg"
+    return bin_name
+
   def run_prog(self, *prog_args, **kw_args):
     """run an AmigaOS binary with vamos
 
@@ -113,7 +122,7 @@ class VamosTestRunner:
     """
 
     # ensure that prog exists
-    self.bin_builder.make_prog(prog_args[0])
+    self.make_prog(prog_args[0])
 
     # stdin given?
     if 'stdin' in kw_args:
@@ -137,10 +146,7 @@ class VamosTestRunner:
       args = args + kw_args['vargs']
 
     # built binaries have special prog names
-    prog_name = "curdir:bin/" + prog_args[0] + '_' + self.flavor
-    if self.use_debug_bins:
-      prog_name = prog_name + "_dbg"
-
+    prog_name = self.get_prog_bin_name(prog_args[0])
     args.append(prog_name)
     if len(prog_args) > 1:
       args = args + list(prog_args[1:])
@@ -267,7 +273,8 @@ class VamosRunner:
       file_sum = self._get_sha1(file_name)
       print(file_sum, file_name)
       if file_sum != sha1_sum:
-        raise RuntimeError("prog wrong hash: got=%s want=%s" % (file_sum, sha1_sum))
+        raise RuntimeError("prog wrong hash: got=%s want=%s" %
+                           (file_sum, sha1_sum))
 
 
 # ----- pytest integration -----
@@ -276,14 +283,17 @@ class VamosRunner:
 def pytest_addoption(parser):
   parser.addoption("--flavor", "-F", action="store", default=None,
                    help="select an Amiga compiler flavor to test")
-  parser.addoption("--use-debug-bins", "-D", action="store_true", default=False,
+  parser.addoption("--use-debug-bins", "-D", action="store_true",
+                   default=False,
                    help="run the debug versions of the Amiga binaries")
   parser.addoption("--dump-output", "-O", action="store_true", default=False,
                    help="write all vamos output to 'vamos.log'")
   parser.addoption("--gen-data", "-G", action="store_true", default=False,
-                   help="generate data files by using the output of the test program")
+                   help="generate data files by using the output of "
+                   "the test program")
   parser.addoption("--vamos-options", "-V", action="store", default=None,
-                   help="add options to vamos run. separate options by plus: e.g. -V-t+-T")
+                   help="add options to vamos run. separate options by plus:"
+                   " e.g. -V-t+-T")
   parser.addoption("--vamos-executable", "-E", default=VAMOS_BIN,
                    help="replace the vamos executable (default: ../bin/vamos)")
 
