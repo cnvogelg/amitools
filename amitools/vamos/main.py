@@ -3,10 +3,8 @@ import os
 from .cfg import VamosMainParser
 from .machine import Machine, MemoryMap
 from .machine.regs import *
-from .log import *
+from .log import log_main, log_setup
 from .Vamos import Vamos
-from .lib.dos.SysArgs import *
-from .lib.dos.CommandLine import CommandLine
 from .path import VamosPathManager
 from .trace import TraceManager
 from .libmgr import SetupLibManager
@@ -85,47 +83,11 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   vamos.exec_ctx = slm.exec_ctx
   vamos.exec_lib = slm.exec_impl
 
-  # --- proc: binary and arg_str ---
-  # a single Amiga-like raw arg was passed
-  proc_cfg = mp.get_proc_dict().process
-  cmd_cfg = proc_cfg.command
-  if cmd_cfg.raw_arg:
-    # check args
-    if len(cmd_cfg.args) > 0:
-      log_main.error("raw arg only allows a single argument!")
-      return RET_CODE_CONFIG_ERROR
-    # parse raw arg
-    cl = CommandLine()
-    res = cl.parse_line(cmd_cfg.binary)
-    if res != cl.LINE_OK:
-      log_main.error("raw arg is invalid! (error %d)", res)
-      return RET_CODE_CONFIG_ERROR
-    binary = cl.get_cmd()
-    arg_str = cl.get_arg_str()
-  else:
-    # setup binary
-    binary = cmd_cfg.binary
-    if not cmd_cfg.pure_ami_path:
-      # if path exists on host system then make an ami path
-      if os.path.exists(binary):
-        sys_binary = binary
-        binary = path_mgr.from_sys_path(binary)
-        if not binary:
-          log_main.error("can't map binary: %s", sys_binary)
-          return RET_CODE_CONFIG_ERROR
-    # combine remaining args to arg_str
-    arg_str = sys_args_to_ami_arg_str(cmd_cfg.args)
-
-  # summary
-  stack_size = proc_cfg.stack * 1024
-  log_main.info("binary: '%s'", binary)
-  log_main.info("args:   '%s'", arg_str[:-1])
-  log_main.info("stack:  %d", stack_size)
-
   # setup main proc
-  if not vamos.setup_main_proc(binary, arg_str, stack_size, cmd_cfg.shell):
-    log_main.error("vamos init failed")
-    return 1
+  proc_cfg = mp.get_proc_dict().process
+  if not vamos.setup_main_proc(proc_cfg):
+    log_main.error("main proc setup failed!")
+    return RET_CODE_CONFIG_ERROR
 
   # ------ main loop ------
 
