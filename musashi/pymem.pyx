@@ -88,7 +88,7 @@ cdef void special_write_func_wrapper(uint addr, uint value, void *ctx):
     mem_callback_exc = sys.exc_info()
     m68k_end_timeslice()
 
-class MemoryError(StandardError):
+class MemoryError(Exception):
   def __init__(self, addr, op, size=None):
     self.addr = addr
     self.op = op
