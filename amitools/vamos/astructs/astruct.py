@@ -185,13 +185,13 @@ class AmigaStruct(object):
   def read_data(self):
     cls = self._data_class
     vals = []
-    for idx in xrange(self._num_fields):
+    for idx in range(self._num_fields):
       val = self.read_field_index(idx)
       vals.append(val)
     return cls(*vals)
 
   def write_data(self, data):
-    for idx in xrange(self._num_fields):
+    for idx in range(self._num_fields):
       val = data[idx]
       self.write_field_index(idx, val)
 

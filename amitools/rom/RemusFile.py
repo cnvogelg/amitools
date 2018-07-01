@@ -119,7 +119,7 @@ class RemusSplitFile(RemusFile):
         off = entry.reloc_off
         num_relocs = self._read_long(off)
         if num_relocs != u32_max:
-          for i in xrange(num_relocs):
+          for i in range(num_relocs):
             off += 4
             reloc_off = self._read_long(off)
             entry.relocs.append(reloc_off)

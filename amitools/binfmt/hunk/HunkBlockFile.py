@@ -118,7 +118,7 @@ class HunkHeaderBlock(HunkBlock):
 
     # determine number of hunks in size table
     num_hunks = self.last_hunk - self.first_hunk + 1
-    for a in xrange(num_hunks):
+    for a in range(num_hunks):
       hunk_size = self._read_long(f)
       if hunk_size < 0:
         raise HunkParseError("HUNK_HEADER contains invalid hunk_size")
@@ -178,7 +178,7 @@ class HunkRelocLongBlock(HunkBlock):
         break
       hunk_num = self._read_long(f)
       offsets = []
-      for i in xrange(num):
+      for i in range(num):
         off = self._read_long(f)
         offsets.append(off)
       self.relocs.append((hunk_num, offsets))
@@ -214,7 +214,7 @@ class HunkRelocWordBlock(HunkBlock):
       hunk_num = self._read_word(f)
       num_words += num_offs + 1
       offsets = []
-      for i in xrange(num_offs):
+      for i in range(num_offs):
         off = self._read_word(f)
         offsets.append(off)
       self.relocs.append((hunk_num, offsets))
@@ -228,7 +228,7 @@ class HunkRelocWordBlock(HunkBlock):
       num_offs = len(offsets)
       self._write_word(f, num_offs)
       self._write_word(f, hunk_num)
-      for i in xrange(num_offs):
+      for i in range(num_offs):
         self._write_word(f, offsets[i])
       num_words += 2 + num_offs
     # end
@@ -382,7 +382,7 @@ class HunkExtBlock(HunkBlock):
       elif ext_type >= 0x80:
         num_refs = self._read_long(f)
         offsets = []
-        for i in xrange(num_refs):
+        for i in range(num_refs):
           off = self._read_long(f)
           offsets.append(off)
       # is a definition
@@ -523,7 +523,7 @@ class HunkIndexBlock(HunkBlock):
       num_words -= 3
       unit_entry = HunkIndexUnitEntry(name_off, first_hunk_long_off)
       self.units.append(unit_entry)
-      for i in xrange(num_hunks):
+      for i in range(num_hunks):
         # hunk description
         name_off = self._read_word(f)
         hunk_longs = self._read_word(f)
@@ -532,12 +532,12 @@ class HunkIndexBlock(HunkBlock):
         unit_entry.index_hunks.append(hunk_entry)
         # refs
         num_refs = self._read_word(f)
-        for j in xrange(num_refs):
+        for j in range(num_refs):
           name_off = self._read_word(f)
           hunk_entry.sym_refs.append(HunkIndexSymbolRef(name_off))
         # defs
         num_defs = self._read_word(f)
-        for j in xrange(num_defs):
+        for j in range(num_defs):
           name_off = self._read_word(f)
           value = self._read_word(f)
           stype = self._read_word(f)
@@ -760,7 +760,7 @@ if __name__ == '__main__':
     if len(data) != len(new_data):
       print("MISMATCH", len(data), len(new_data))
     else:
-      for i in xrange(len(data)):
+      for i in range(len(data)):
         if data[i] != new_data[i]:
           print("MISMATCH @%x" % i)
       print("OK")

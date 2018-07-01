@@ -100,7 +100,7 @@ class DirCacheBlock(Block):
 
     # get records
     off = 24
-    for i in xrange(self.num_records):
+    for i in range(self.num_records):
       r = DirCacheRecord()
       off = r.get(self.data, off)
       if off == -1:

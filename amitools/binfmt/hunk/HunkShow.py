@@ -61,7 +61,7 @@ class HunkShow:
     if self.overlay != None:
       print "Overlay"
       num_ov = len(self.overlay_headers)
-      for o in xrange(num_ov):
+      for o in range(num_ov):
         if not self.brief:
           self.print_header(self.overlay_headers[o])
         for segment in self.overlay_segments[o]:

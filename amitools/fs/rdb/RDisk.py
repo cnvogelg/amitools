@@ -107,7 +107,7 @@ class RDisk:
 
   def get_block_map(self):
     res = []
-    for i in xrange(self.max_blks):
+    for i in range(self.max_blks):
       blk = None
       # check partitions
       if i == 0:
@@ -308,7 +308,7 @@ class RDisk:
 
   def get_free_blocks(self):
     res = []
-    for i in xrange(self.max_blks):
+    for i in range(self.max_blks):
       if i not in self.used_blks:
         res.append(i)
     return res

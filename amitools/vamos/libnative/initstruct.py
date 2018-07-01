@@ -37,7 +37,7 @@ class InitStruct(object):
       # apply offset
       if typ == 2 or typ == 3:
         mem = memory_ptr + offset
-      rng = xrange(cnt + 1)
+      rng = range(cnt + 1)
       # op: repeat cnt+1 times
       if typ == 1:
         if siz == 0:  # LONG

@@ -86,7 +86,7 @@ class HunkDisassembler:
 
               # calc offset
               addr = 0
-              for i in xrange(num_words):
+              for i in range(num_words):
                 addr = addr * 0x10000 + word[word_offset+i]
               
               reloc_type_name = h['type_name'].replace("HUNK_","").lower()

@@ -194,7 +194,7 @@ class VamosTestRunner:
     return stdout, stderr
 
   def _compare(self, got, ok):
-    for i in xrange(len(ok)):
+    for i in range(len(ok)):
       assert (got[i] == ok[i])
     assert (len(got) == len(ok)), "stdout line count differs"
 

@@ -143,7 +143,7 @@ class ParseResultList:
     num = self.len
     num_longs = 0
     num_chars = 0
-    for pos in xrange(num):
+    for pos in range(num):
       r = self.result[pos]
       if r is not None:
         targ = self.targ_list.get_arg(pos)
@@ -175,7 +175,7 @@ class ParseResultList:
     num = self.len
     char_ptr = extra_ptr + num_longs * 4
     long_ptr = extra_ptr
-    for pos in xrange(num):
+    for pos in range(num):
       targ = self.targ_list.get_arg(pos)
       ktype = targ.ktype
       r = self.result[pos]
@@ -351,7 +351,7 @@ class ArgsParser:
 
     # now assign remaining multi buffer
     num_multi = len(multi_buffer)
-    for pos in xrange(num_targ):
+    for pos in range(num_targ):
       targ = self.targ_list.get_arg(pos)
       if targ.is_multi:
         # required but empty?
@@ -375,7 +375,7 @@ class ArgsParser:
     return self.result_list
 
   def _convert_numbers(self, result_list):
-    for pos in xrange(self.len):
+    for pos in range(self.len):
       targ = self.targ_list.get_arg(pos)
       # is arg a number?
       if targ.ktype == TemplateArg.TYPE_NUMBER:

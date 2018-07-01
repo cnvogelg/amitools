@@ -63,7 +63,7 @@ class LibProfile(object):
   def _build_table(self, fd):
     num_index = fd.get_num_indices()
     ft = []
-    for i in xrange(num_index):
+    for i in range(num_index):
       func = fd.get_func_by_index(i)
       if func is None:
         ft.append(None)

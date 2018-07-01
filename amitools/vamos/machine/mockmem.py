@@ -9,7 +9,7 @@ class MockMemory(object):
     self.size_bytes = size_kib * 1024
     self.data = bytearray(self.size_bytes)
     if fill != 0:
-      for i in xrange(self.size_bytes):
+      for i in range(self.size_bytes):
         self.data[i] = fill
 
   def get_ram_size_kib(self):

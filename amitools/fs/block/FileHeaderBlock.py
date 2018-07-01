@@ -36,7 +36,7 @@ class FileHeaderBlock(EntryBlock):
     if bc > mbc:
       bc = mbc
     self.data_blocks = []
-    for i in xrange(bc):
+    for i in range(bc):
       self.data_blocks.append(self._get_long(-51-i))
     
     self.protect = self._get_long(-48)
@@ -57,7 +57,7 @@ class FileHeaderBlock(EntryBlock):
     self._put_long(4, self.first_data)
     
     # data blocks
-    for i in xrange(len(self.data_blocks)):
+    for i in range(len(self.data_blocks)):
       self._put_long(-51-i, self.data_blocks[i])
     
     self._put_long(-48, self.protect)

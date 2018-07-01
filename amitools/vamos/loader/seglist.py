@@ -97,7 +97,7 @@ class SegList:
     mem = alloc.get_mem()
     last_addr = 0
     first_addr = 0
-    for i in xrange(len(sizes)):
+    for i in range(len(sizes)):
       size = sizes[i]
       size = (size + 3) & ~3
       seg_size = size + 8  # add next segment pointer and size field

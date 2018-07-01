@@ -13,7 +13,7 @@ class ELFReader:
     shentsize = ef.header.shentsize
     f.seek(shoff, os.SEEK_SET)
     shnum = ef.header.shnum
-    for i in xrange(shnum):
+    for i in range(shnum):
       sh = ELFSectionHeader()
       sh_data = f.read(shentsize)
       sh.parse(sh_data)

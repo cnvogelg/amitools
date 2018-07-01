@@ -51,7 +51,7 @@ class FileName:
     result = self.name.get_ami_str().upper()
     if self.is_intl:
       r = ""
-      for i in xrange(len(result)):
+      for i in range(len(result)):
         o = ord(result[i])
         if o >= 224 and o <= 254 and o != 247:
           r += chr(o - (ord('a')-ord('A')))

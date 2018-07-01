@@ -227,7 +227,7 @@ class HunkLoadSegFile:
       self.segments.append(seg)
     # set size in segments
     n = len(second)
-    for i in xrange(n):
+    for i in range(n):
       self.segments[i].size_longs = hdr_blk.hunk_table[i]
       self.segments[i].size = self.segments[i].size_longs * 4
 
@@ -269,7 +269,7 @@ if __name__ == '__main__':
     if len(data) != len(new_data):
       print("MISMATCH", len(data), len(new_data))
     else:
-      for i in xrange(len(data)):
+      for i in range(len(data)):
         if data[i] != new_data[i]:
           print("MISMATCH @%x" % i)
       print("OK")

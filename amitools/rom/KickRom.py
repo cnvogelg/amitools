@@ -54,7 +54,7 @@ class KickRomAccess(RomAccess):
     # expect 0x0019 ... 0x001f
     off = self.size - 14
     num = 0x19
-    for i in xrange(7):
+    for i in range(7):
       val = self.read_word(off)
       if val != num:
         return False
@@ -82,7 +82,7 @@ class KickRomAccess(RomAccess):
     num_longs = self.size // 4
     off = 0
     max_u32 = 0xffffffff
-    for i in xrange(num_longs):
+    for i in range(num_longs):
       val = struct.unpack_from(">I", self.rom_data, off)[0]
       if off != skip_off:
         chk_sum += val
@@ -142,7 +142,7 @@ class KickRomAccess(RomAccess):
   def write_footer(self):
     off = self.size - 0x10
     num = 0x18
-    for i in xrange(8):
+    for i in range(8):
       self.write_word(off, num)
       num += 1
       off += 2
@@ -203,7 +203,7 @@ class Loader(object):
   def _decode(cls, img, rom_key):
     data = bytearray(img)
     n = len(rom_key)
-    for i in xrange(len(data)):
+    for i in range(len(data)):
       off = i % n
       data[i] = data[i] ^ ord(rom_key[off])
     return bytes(data)

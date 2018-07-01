@@ -160,11 +160,11 @@ class Machine(object):
     m = self.mem
     # m68k exception vector table
     addr = 8
-    for i in xrange(254):
+    for i in range(254):
       m.w32(addr, self.reset_exvec_addr)
     # run reset table
     addr = self.run_reset_addr
-    for i in xrange(self.run_max_nesting):
+    for i in range(self.run_max_nesting):
       m.w16(addr, op_reset)
       addr += 2
     assert addr == self.reset_exvec_addr

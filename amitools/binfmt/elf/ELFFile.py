@@ -23,7 +23,7 @@ class ELFPart:
     decoded = struct.unpack(">"+fmt, data)
     if len(decoded) != nlen:
       raise ELFParseError("data decode error")
-    for i in xrange(nlen):
+    for i in range(nlen):
       setattr(self, self._names[i], decoded[i])
 
   def _decode_flags(self, value, names):
@@ -193,7 +193,7 @@ class ELFSectionSymbolTable(ELFSectionWithData):
     self.symtab = symtab
     off = 0
     idx = 0
-    for n in xrange(num):
+    for n in range(num):
       entry = ELFSymbol(idx)
       entry_data = self.data[off:off+entsize]
       entry.parse(entry_data)
@@ -241,7 +241,7 @@ class ELFSectionRelocationsWithAddend(ELFSectionWithData):
     rela = []
     self.rela = rela
     off = 0
-    for n in xrange(num):
+    for n in range(num):
       entry = ELFRelocationWithAddend()
       entry_data = self.data[off:off+entsize]
       entry.parse(entry_data)
