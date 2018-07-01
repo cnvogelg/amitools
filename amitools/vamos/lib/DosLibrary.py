@@ -1427,7 +1427,7 @@ class DosLibrary(LibImpl):
       # create a process and run it...
       proc = Process(ctx, binary, arg_str, cwd=cwd, cwd_lock=cwd_lock)
       if not proc.ok:
-        log_dos.warn("SystemTagList: can't create process for '%s' args=%s", binary, args)
+        log_dos.warn("SystemTagList: can't create process for '%s' args=%s", binary, arg_str)
         return self.DOSTRUE
       ctx.start_sub_process(proc)
 
