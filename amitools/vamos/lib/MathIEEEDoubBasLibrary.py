@@ -88,7 +88,7 @@ class MathIEEEDoubBasLibrary(LibImpl):
       else:
         res = float('-inf')
     else:
-      res = arg1 / arg2
+      res = arg1 // arg2
     log_math.info("DPDiv(%s, %s) = %s", arg1, arg2, res)
     return double_to_regs(res)
 

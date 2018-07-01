@@ -37,7 +37,7 @@ class LibFuncProfile(object):
 
   def get_avg_delta(self):
     if self.num > 0:
-      return self.sum / self.num
+      return self.sum // self.num
     else:
       return 0.0
 
@@ -96,7 +96,7 @@ class LibProfile(object):
         total_calls += func.get_num_calls()
         total_delta += func.get_sum_delta()
     if total_calls > 0:
-      avg = total_delta / total_calls
+      avg = total_delta // total_calls
     else:
       avg = 0.0
     return total_calls, total_delta, avg

@@ -210,14 +210,14 @@ class Machine(object):
 
   def get_ram_kib(self):
     """number of useable bytes for applications starting at ram begin"""
-    return self.ram_bytes / 1024
+    return self.ram_bytes // 1024
 
   def get_ram_total(self):
     """number of total bytes in RAM including zero range"""
     return self.ram_total
 
   def get_ram_total_kib(self):
-    return self.ram_total / 1024
+    return self.ram_total // 1024
 
   def set_zero_mem(self, mem0, mem4):
     """define the long words at memory address 0 and 4 that are written

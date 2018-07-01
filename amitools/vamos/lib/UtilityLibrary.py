@@ -9,7 +9,7 @@ class UtilityLibrary(LibImpl):
   def UDivMod32(self, ctx):
     dividend = ctx.cpu.r_reg(REG_D0)
     divisor = ctx.cpu.r_reg(REG_D1)
-    quot = dividend / divisor
+    quot = dividend // divisor
     rem  = dividend % divisor
     log_utility.info("UDivMod32(dividend=%u, divisor=%u) => (quotient=%u, remainder=%u)" % (dividend, divisor, quot, rem))
     return [quot, rem]
@@ -21,7 +21,7 @@ class UtilityLibrary(LibImpl):
     divisor = ctx.cpu.r_reg(REG_D1)
     if divisor >= 0x80000000:
       divisor = divisor - 0x100000000
-    quot = dividend / divisor
+    quot = dividend // divisor
     rem  = dividend % divisor
     if quot < 0:
       quot = quot + 0x100000000

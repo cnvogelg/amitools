@@ -82,7 +82,7 @@ class HunkDisassembler:
           offsets = reloc[hunk_num]
           for off in offsets:
             if off >= addr and off + num_words * 2 <= end_addr:
-              word_offset = (off - addr) / 2 # in words
+              word_offset = (off - addr) // 2 # in words
 
               # calc offset
               addr = 0
@@ -116,7 +116,7 @@ class HunkDisassembler:
             num_words = self.map_ext_ref_to_num_words[ext['type']]
             for ref in refs:
               if ref >= addr and ref < end_addr:
-                word_offset = (ref - addr) / 2
+                word_offset = (ref - addr) // 2
                 type_name = ext['type_name'].replace("EXT_","").lower()
                 return (word_offset, num_words, ext['name'], type_name)            
     return None

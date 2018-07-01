@@ -77,7 +77,7 @@ class Partition:
     part_bytes = self.get_num_bytes()
     extra = ""
     if total_blks != 0:
-      ratio = 100.0 * part_blks / total_blks
+      ratio = 100.0 * part_blks // total_blks
       extra += "%6.2f%%  " % ratio
     # add dos type
     dos_type = de.dos_type

@@ -388,7 +388,7 @@ class PartEditCommand(Command):
         bytes = ByteSize.parse_byte_size_str(size[:-1])
         if bytes == None:
           return None
-        cyls = bytes / self.rdisk.get_cylinder_bytes()
+        cyls = bytes // self.rdisk.get_cylinder_bytes()
       # size in percent
       elif size[-1] == '%':
         prc = float(size[:-1])

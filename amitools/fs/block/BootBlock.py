@@ -29,7 +29,7 @@ class BootBlock(Block):
     self.dos_type = dos_type    
     self.valid_dos_type = True
     # root blk
-    self.calc_root_blk = int(self.blkdev.num_blocks / 2)
+    self.calc_root_blk = int(self.blkdev.num_blocks // 2)
     if root_blk != None:
       self.got_root_blk = root_blk
     else:
@@ -82,7 +82,7 @@ class BootBlock(Block):
     self.got_root_blk = self._get_long(2)
     self.calc_chksum = self._calc_chksum()
     # calc position of root block
-    self.calc_root_blk = int(self.blkdev.num_blocks / 2)
+    self.calc_root_blk = int(self.blkdev.num_blocks // 2)
     # check validity
     self.valid_chksum = self.got_chksum == self.calc_chksum
     self.valid_dos_type = DosType.is_valid(self.dos_type)

@@ -21,8 +21,8 @@ class BitmapScan:
     # now calculate the size of the bitmap
     num_blks = self.block_scan.blkdev.num_blocks - self.block_scan.blkdev.reserved
     block_longs = self.block_scan.blkdev.block_longs - 1 # all longs are available for bitmap
-    self.num_bm_lwords = int((num_blks + 31) / 32) # 32 blocks fit in a long word
-    self.num_bm_blocks = int((self.num_bm_lwords + block_longs - 1) / block_longs)
+    self.num_bm_lwords = int((num_blks + 31) // 32) # 32 blocks fit in a long word
+    self.num_bm_blocks = int((self.num_bm_lwords + block_longs - 1) // block_longs)
     self.log.msg(Log.DEBUG,"Total Bitmap DWORDs: %d  (block %d)" % (self.num_bm_lwords, block_longs))
     self.log.msg(Log.DEBUG,"Number of Bitmap Blocks: %d" % self.num_bm_blocks)
     # calc the bitmask in the last word

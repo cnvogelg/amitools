@@ -177,7 +177,7 @@ class TraceManager(object):
         # is it trapped?
         if value & 0xa000 == 0xa000:
           delta = label.lib_base - addr
-          off = delta / 6
+          off = delta // 6
           addon = "-%d [%d]  " % (delta, off)
           addon += self._get_fd_str(label.lib, delta)
           return "TRAP", addon

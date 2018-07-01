@@ -57,7 +57,7 @@ class LibJumpTable(object):
     self._mem = mem
     self._lib_base = lib_base
     self._neg_size = neg_size
-    self._max_index = (neg_size - 6) / 6
+    self._max_index = (neg_size - 6) // 6
     self._fd = fd
     self._create = create
 
@@ -87,7 +87,7 @@ class LibJumpTable(object):
       if key % 6 != 0:
         raise IndexError
       # convert to index
-      key = (-key - 6) / 6
+      key = (-key - 6) // 6
     # index access
     if key > self._max_index:
       raise IndexError
@@ -102,7 +102,7 @@ class LibJumpTable(object):
       if key % 6 != 0:
         raise IndexError
       # convert to index
-      key = (-key - 6) / 6
+      key = (-key - 6) // 6
     # index access
     if key > self._max_index:
       raise IndexError

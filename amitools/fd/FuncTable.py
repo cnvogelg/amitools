@@ -30,7 +30,7 @@ class FuncTable:
     return self.max_bias + 6
 
   def get_num_indices(self):
-    return self.max_bias / 6
+    return self.max_bias // 6
 
   def get_all_func_names():
     return self.name_map.keys()
@@ -68,7 +68,7 @@ class FuncTable:
     if bias > self.max_bias:
       self.max_bias = bias
     # update index table
-    tab_len = bias / 6
+    tab_len = bias // 6
     while len(self.index_tab) < tab_len:
       self.index_tab.append(None)
     index = tab_len - 1

@@ -138,4 +138,3 @@ class RootBlock(Block):
     print(" disk name: %s" % self.name)
     print(" extension: %s" % self.extension)
 
-     

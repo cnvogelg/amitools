@@ -79,7 +79,7 @@ class KickRomAccess(RomAccess):
   def calc_check_sum(self, skip_off=None):
     """Check internal kickstart checksum and return True if is correct"""
     chk_sum = 0
-    num_longs = self.size / 4
+    num_longs = self.size // 4
     off = 0
     max_u32 = 0xffffffff
     for i in xrange(num_longs):

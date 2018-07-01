@@ -185,7 +185,7 @@ class DwarfDebugLine:
 
   def decode_special_opcode(self, opc):
     adj_opc = opc - self.opc_base
-    addr_addend = (adj_opc / self.line_range) * self.min_instr_len
+    addr_addend = (adj_opc // self.line_range) * self.min_instr_len
     line_addend = self.line_base + (adj_opc % self.line_range)
     return (addr_addend, line_addend)
 

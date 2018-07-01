@@ -465,7 +465,7 @@ class HunkLibBlock(HunkBlock):
     # fill in size
     end = f.tell()
     size = end - start - 4
-    num_longs = size / 4
+    num_longs = size // 4
     f.seek(start, 0)
     self._write_long(f, num_longs)
     f.seek(end, 0)
@@ -513,7 +513,7 @@ class HunkIndexBlock(HunkBlock):
     # string table size
     strtab_size = self._read_word(f)
     self.strtab = f.read(strtab_size)
-    num_words = num_words - (strtab_size / 2) - 1
+    num_words = num_words - (strtab_size // 2) - 1
     # read index unit blocks
     while num_words > 1:
       # unit description
@@ -557,7 +557,7 @@ class HunkIndexBlock(HunkBlock):
     size_strtab = len(self.strtab)
     self._write_word(f, size_strtab)
     f.write(self.strtab)
-    num_words += size_strtab / 2 + 1
+    num_words += size_strtab // 2 + 1
     # write unit blocks
     for unit in self.units:
       self._write_word(f, unit.name_off)

@@ -3,7 +3,7 @@ class FuncDef:
   def __init__(self, name, bias, private=False, is_std=False):
     self.name = name
     self.bias = bias
-    self.index = (bias - 6) / 6
+    self.index = (bias - 6) // 6
     self.private = private
     self.std = is_std
     self.args = []

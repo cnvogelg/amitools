@@ -11,7 +11,7 @@ class RomAccess:
     else:
       raise ValueError("rom_data must be bytes or bytearray")
     self.size = len(rom_data)
-    self.kib = int(self.size / 1024)
+    self.kib = int(self.size // 1024)
 
   def get_size(self):
     return self.size

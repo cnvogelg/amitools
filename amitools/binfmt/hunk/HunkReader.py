@@ -921,7 +921,7 @@ class HunkReader:
       found = False
       for segment in segment_list:
         hunk_no = segment[0]['hunk_no']
-        lib_off = segment[0]['hunk_lib_offset'] / 4 # is in longwords
+        lib_off = segment[0]['hunk_lib_offset'] // 4 # is in longwords
         if lib_off == hunk_offset:
           # found segment
           num_segs = len(unit['hunk_infos'])

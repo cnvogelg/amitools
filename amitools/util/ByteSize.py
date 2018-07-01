@@ -23,7 +23,7 @@ def to_byte_size_str(size, kibi_units=True):
   else:
     # run through scales
     for scale in "KMGT":
-      next = size / unit
+      next = size // unit
       if next < 10:
         frac = float(size) / unit
         if frac > 9.9:

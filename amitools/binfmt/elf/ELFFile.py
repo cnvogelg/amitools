@@ -188,7 +188,7 @@ class ELFSectionSymbolTable(ELFSectionWithData):
 
   def decode(self):
     entsize = self.header.entsize
-    num = self.header.size / entsize
+    num = self.header.size // entsize
     symtab = []
     self.symtab = symtab
     off = 0
@@ -237,7 +237,7 @@ class ELFSectionRelocationsWithAddend(ELFSectionWithData):
 
   def decode(self):
     entsize = self.header.entsize
-    num = self.header.size / entsize
+    num = self.header.size // entsize
     rela = []
     self.rela = rela
     off = 0

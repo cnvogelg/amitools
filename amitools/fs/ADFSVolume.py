@@ -125,7 +125,7 @@ class ADFSVolume:
     btotal = total * bb
     bfree  = free * bb
     bused  = used * bb
-    prc_free = 10000 * free / total
+    prc_free = 10000 * free // total
     prc_used = 10000 - prc_free
     res.append("total:  %10d  %s  %12d" % (total, ByteSize.to_byte_size_str(btotal), btotal))
     res.append("used:   %10d  %s  %12d  %5.2f%%" % (used, ByteSize.to_byte_size_str(bused), bused, prc_used / 100.0))

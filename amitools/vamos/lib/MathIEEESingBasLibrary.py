@@ -87,7 +87,7 @@ class MathIEEESingBasLibrary(LibImpl):
       else:
         res = float('-inf')
     else:
-      res = arg1 / arg2
+      res = arg1 // arg2
     log_math.info("SPDiv(%s, %s) = %s", arg1, arg2, res)
     return float_to_reg(res)
 

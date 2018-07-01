@@ -208,7 +208,7 @@ class ADFSNode:
     btotal = total * bb
     bdata = data * bb
     bfs = fs * bb
-    prc_data = 10000 * data / total
+    prc_data = 10000 * data // total
     prc_fs = 10000 - prc_data
     res = []
     res.append("sum:    %10d  %s  %12d" % (total, ByteSize.to_byte_size_str(btotal), btotal))

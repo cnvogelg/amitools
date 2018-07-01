@@ -16,7 +16,7 @@ class BlockDevice:
     self.num_tracks = self.cyls * self.heads
     self.num_blocks = self.num_tracks * self.sectors
     self.num_bytes = self.num_blocks * self.block_bytes
-    self.block_longs = self.block_bytes / 4
+    self.block_longs = self.block_bytes // 4
     self.num_longs = self.num_blocks * self.block_longs
   
   def dump(self):
