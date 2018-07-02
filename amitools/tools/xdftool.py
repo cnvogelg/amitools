@@ -525,7 +525,7 @@ class RelabelCmd(Command):
       print("Usage: relabel <new_name>")
       return 1
     name = self.opts[0]
-    node = vol.relabel(name)
+    node = vol.relabel(FSString(name))
     return 0
 
 # ----- Block Tools -----
