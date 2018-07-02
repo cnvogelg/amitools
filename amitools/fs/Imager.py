@@ -59,7 +59,7 @@ class Imager:
       vol_path = out_path
     else:
       path = os.path.abspath(out_path)
-      vol_path = os.path.join(path, self.to_path_str(vol_name))
+      vol_path = os.path.join(path, self.to_path_str(vol_name).decode(self.path_encoding))
     if os.path.exists(vol_path):
       raise IOError("Unpack directory already exists: "+vol_path)
     # check for meta file
@@ -85,9 +85,9 @@ class Imager:
       f.write(volume.boot.boot_code)
       f.close()
     # save blkdev
-    f = open(blkdev_path,"wb")
-    f.write("%s\n" % volume.blkdev.get_chs_str())
-    f.close()
+    with open(blkdev_path,"w") as f:
+      f.write(volume.blkdev.get_chs_str())
+      f.write("\n")
 
   def unpack_root(self, volume, vol_path):
     self.unpack_dir(volume.get_root_dir(), vol_path)
@@ -107,7 +107,7 @@ class Imager:
       self.meta_db.set_meta_info(node_path.get_unicode(), node.meta_info)
     # sub dir
     if node.is_dir():
-      sub_dir = os.path.join(path, self.to_path_str(name))
+      sub_dir = os.path.join(path, self.to_path_str(name).decode(self.path_encoding))
       os.mkdir(sub_dir)
       for sub_node in node.get_entries():
         self.unpack_node(sub_node, sub_dir)
@@ -116,7 +116,7 @@ class Imager:
     elif node.is_file():
       data = node.get_file_data()
       node.flush()
-      file_path = os.path.join(path, self.to_path_str(name))
+      file_path = os.path.join(path, self.to_path_str(name).decode(self.path_encoding))
       fh = open(file_path, "wb")
       fh.write(data)
       fh.close()
@@ -164,11 +164,10 @@ class Imager:
     if options == None or len(options) == 0:
       blkdev_path = in_path + ".blkdev"
       if os.path.exists(blkdev_path):
-        f = open(blkdev_path, "rb")
-        options = {}
-        for line in f:
-          KeyValue.parse_key_value_string(line, options)
-        f.close()
+        with open(blkdev_path, "r") as f:
+          options = {}
+          for line in f:
+            KeyValue.parse_key_value_string(line, options)
     f = BlkDevFactory()
     return f.create(image_file, force=force, options=options)
 

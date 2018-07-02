@@ -45,10 +45,7 @@ class MetaDB:
     self.metas[path] = meta_info
   
   def get_meta_info(self, path):
-    if self.metas.has_key(path):
-      return self.metas[path]
-    else:
-      return None
+    return self.metas.get(path)
   
   def dump(self):
     print(self.vol_name, self.vol_meta, self.dos_type)
@@ -75,7 +72,9 @@ class MetaDB:
       raise IOError("Invalid xdfmeta header! (no colon in line)")
     # first extract volume name
     vol_name = line[:pos]
-    self.vol_name = vol_name.decode("UTF-8")
+    if isinstance(vol_name, bytes):
+      vol_name = vol_name.decode("UTF-8")
+    self.vol_name = vol_name
     line = line[pos+1:]
     # now get parameters
     comp = line.split(',')
@@ -106,7 +105,9 @@ class MetaDB:
     pos = line.find(':')
     if pos == -1:
       raise IOError("Invalid xdfmeta file! (no colon in line)")
-    path = line[:pos].decode("UTF-8")
+    path = line[:pos]
+    if isinstance(path, bytes):
+      path = path.decode("UTF-8")
     # prot
     line = line[pos+1:]
     pos = line.find(',')
@@ -124,7 +125,10 @@ class MetaDB:
     time = TimeStamp()
     time.parse(time_str)
     # comment
-    comment = FSString(line[pos+1:].decode("UTF-8"))
+    comment = line[pos+1:]
+    if isinstance(comment, bytes):
+      comment = comment.decode("UTF-8")
+    comment = FSString(comment)
     # meta info
     mi = MetaInfo(protect_flags=prot, mod_ts=time, comment=comment)
     self.set_meta_info(path, mi)
@@ -137,16 +141,19 @@ class MetaDB:
     mi = self.vol_meta
     num = self.dos_type - DosType.DOS0 + ord('0')
     dos_type_str = "DOS%c" % num
-    vol_name = self.vol_name.encode("UTF-8")
-    line = "%s:%s,%s,%s,%s\n" % (vol_name, dos_type_str, mi.get_create_ts(), mi.get_disk_ts(), mi.get_mod_ts())
+    line = "%s:%s,%s,%s,%s\n" % (self.vol_name, dos_type_str, mi.get_create_ts(), mi.get_disk_ts(), mi.get_mod_ts())
+    if isinstance("", bytes):
+      line = line.encode('UTF-8')
     f.write(line)
     # entries
     for path in sorted(self.metas):
       meta_info = self.metas[path]
       protect = meta_info.get_protect_short_str()
       mod_time = meta_info.get_mod_time_str()
-      comment = meta_info.get_comment_unicode_str().encode("UTF-8")
-      path_name = path.encode("UTF-8")
+      comment = meta_info.get_comment_unicode_str()
+      path_name = path
       line = "%s:%s,%s,%s\n" % (path_name, protect, mod_time, comment)
+      if isinstance("", bytes):
+        line = line.encode("UTF-8")
       f.write(line)
     f.close()
