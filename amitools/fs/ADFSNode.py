@@ -10,6 +10,7 @@ from .TimeStamp import TimeStamp
 from .FSError import *
 from .FSString import FSString
 import amitools.util.ByteSize as ByteSize
+import sys
 
 class ADFSNode:
   def __init__(self, volume, parent):
@@ -150,7 +151,10 @@ class ADFSNode:
     return u'%-40s       %8s  %s' % (istr + self.name.get_unicode_name(), self.get_size_str(), extra)
     
   def list(self, indent=0, all=False, detail=False, encoding="UTF-8"):
-    print(self.get_list_str(indent=indent, all=all, detail=detail).encode(encoding))
+    to_print = self.get_list_str(indent=indent, all=all, detail=detail)
+    if sys.version_info.major < 3:
+      to_print = to_print.encode(encoding)
+    print(to_print)
 
   def get_size_str(self):
     # re-implemented in derived classes!
