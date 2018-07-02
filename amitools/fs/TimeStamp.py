@@ -26,6 +26,7 @@ class TimeStamp:
     return self.secs
   
   def from_secs(self, secs):
+    secs = int(secs)
     ticks = secs * 50
     mins = ticks // (50 * 60)
     self.ticks = ticks % (50 * 60)
