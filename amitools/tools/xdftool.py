@@ -508,7 +508,7 @@ class TimeCmd(Command):
       return 1
     name = self.opts[0]
     tstr = self.opts[1]
-    node = vol.get_path_name(name)
+    node = vol.get_path_name(FSString(name))
     if node != None:
       node.change_mod_ts_by_string(tstr)
       return 0

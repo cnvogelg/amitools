@@ -1,3 +1,6 @@
+import sys
+
+
 INVALID_BOOT_BLOCK = 1
 INVALID_ROOT_BLOCK = 2
 INVALID_USER_DIR_BLOCK = 3
@@ -55,22 +58,26 @@ class FSError(Exception):
     self.extra = extra
     
   def __str__(self):
-    return self.__unicode__().encode("UTF-8")
+    if sys.version_info.major < 3:
+      return self.__unicode__().encode("UTF-8")
+    else:
+      return self.__unicode__()
     
   def __unicode__(self):
-    if error_names.has_key(self.code):
-      code_str = unicode(error_names[self.code])
+    str_ = str if sys.version_info.major >= 3 else unicode
+    if self.code in error_names:
+      code_str = str_(error_names[self.code])
     else:
       code_str = u"?"
     srcs = []
     if self.node != None:
-      srcs.append(u"node=" + unicode(self.node))
+      srcs.append(u"node=" + str_(self.node))
     if self.block != None:
-      srcs.append(u"block=" + unicode(self.block))
+      srcs.append(u"block=" + str_(self.block))
     if self.file_name != None:
       srcs.append(u"file_name=" + self.file_name.get_unicode())
     if self.extra != None:
-      srcs.append(unicode(self.extra))
+      srcs.append(str_(self.extra))
     return u"%s(%d):%s" % (code_str, self.code, ",".join(srcs))
 
     

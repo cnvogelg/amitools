@@ -23,7 +23,10 @@ class FSString:
     return self.__str__()
   
   def __str__(self):
-    return self.__unicode__().encode("UTF-8")
+    if sys.version_info.major < 3:
+      return self.__unicode__().encode("UTF-8")
+    else:
+      return self.__unicode__()
     
   def __unicode__(self):
     return self.txt

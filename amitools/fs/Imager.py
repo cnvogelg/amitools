@@ -17,6 +17,8 @@ from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 import amitools.util.KeyValue as KeyValue
 from .FSString import FSString
 
+str_ = str if sys.version_info.major >= 3 else unicode
+
 class Imager:
   def __init__(self, path_encoding=None):
     self.meta_db = None
@@ -31,13 +33,15 @@ class Imager:
 
   def to_path_str(self, u):
     """convert a unicode string to OS path name encoding"""
-    if type(u) != unicode:
+    if type(u) != str_:
       raise ValueError("to_path_str: must pass a unicode string")
     return u.encode(self.path_encoding)
 
   def from_path_str(self, s):
     """convert a OS path name encoded string to unicode"""
-    if type(s) != str:
+    if sys.version_info.major >= 3 and type(s) == str:
+      return s
+    if type(s) != bytes:
       raise ValueError("from_path_str: must pass a string")
     u = s.decode(self.path_encoding)
     # on Mac OS X normalize from decomposed form

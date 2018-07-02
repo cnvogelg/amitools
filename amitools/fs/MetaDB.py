@@ -8,6 +8,9 @@ from .TimeStamp import TimeStamp
 from amitools.fs.block.BootBlock import BootBlock
 from . import DosType
 from .FSString import FSString
+import sys
+
+str_ = str if sys.version_info.major >= 3 else unicode
 
 class MetaDB:
   def __init__(self):
@@ -23,7 +26,7 @@ class MetaDB:
     return self.vol_meta
   
   def set_volume_name(self, name):
-    if type(name) != unicode:
+    if type(name) != str_:
       raise ValueError("set_volume_name must be unicode")
     self.vol_name = name
   
@@ -37,7 +40,7 @@ class MetaDB:
     return self.dos_type
   
   def set_meta_info(self, path, meta_info):
-    if type(path) != unicode:
+    if type(path) != str_:
       raise ValueError("set_meta_info: path must be unicode")
     self.metas[path] = meta_info
   
