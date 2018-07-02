@@ -16,7 +16,7 @@ class ADFSVolDir(ADFSDir):
   
   def draw_on_bitmap(self, bm, show_all=False, first=True):
     blk_num = self.block.blk_num
-    bm[blk_num] = 'V'
+    bm[blk_num] = b'V'
     if show_all or first:
       self.ensure_entries()
       for e in self.entries:
