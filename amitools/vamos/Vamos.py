@@ -92,67 +92,60 @@ class Vamos:
 
   # ----- overload a process for RunCommand -----
 
-  def run_command(self,start_pc,argsptr,arglen,stacksize):
-    newstack     = self.alloc.alloc_memory("shell command stack",stacksize)
-    newstackbase = newstack.addr
-    newstacktop  = newstackbase + stacksize
-    oldstackbase = self.process.this_task.access.r_s("pr_Task.tc_SPLower");
-    oldstacktop  = self.process.this_task.access.r_s("pr_Task.tc_SPUpper");
-    old_stackptr = self.cpu.r_reg(REG_A7) # addr of sys call return
+  def run_command(self, start_pc, args_ptr, args_len, stack_size):
+    newstack      = self.alloc.alloc_memory("RunCommandStack", stack_size)
+    newstack_base = newstack.addr
+    newstack_top  = newstack_base + stack_size
+    oldstack_base = self.process.this_task.access.r_s("pr_Task.tc_SPLower");
+    oldstack_top  = self.process.this_task.access.r_s("pr_Task.tc_SPUpper");
     # put stack size on top of stack
-    self.mem.w32(newstacktop - 4,stacksize)
+    self.mem.w32(newstack_top - 4, stack_size)
     # activate new stack
-    new_stackptr = newstacktop - 8
-    self.process.this_task.access.w_s("pr_Task.tc_SPLower",newstackbase)
-    self.process.this_task.access.w_s("pr_Task.tc_SPUpper",newstacktop)
+    self.process.this_task.access.w_s("pr_Task.tc_SPLower", newstack_base)
+    self.process.this_task.access.w_s("pr_Task.tc_SPUpper", newstack_top)
     # NOTE: the Manx fexec and BPCL mess is not (yet) setup here.
-    # setup trampoline to enter sub process
-    tr = Trampoline(self, "RunCommand")
-    # reserve a long for old stack
-    old_stack_off = tr.dc_l(0)
-    # code starts
-    tr.save_all_but_d0()
+
+    # setup machine run
+    sp = newstack_top - 8
+    pc = start_pc
+
     # new proc registers: d0=arg_len a0=arg_cptr
-    tr.set_dx_l(0, arglen)
-    tr.set_ax_l(0, argsptr)
     # d2=stack_size.  this value is also in 4(sp) (see Process.init_stack), but
     # various C programs rely on it being present (1.3-3.1 at least have it).
-    tr.set_dx_l(2, stacksize)
-    # to track old dos values
     odg = self.mem_map.get_old_dos_guard_base()
-    tr.set_ax_l(2, odg)
-    tr.set_ax_l(5, odg)
-    tr.set_ax_l(6, odg)
-    # save old stack and set new stack
-    tr.write_ax_l(7, old_stack_off, True) # write to data offset (dc.l above)
-    tr.set_ax_l(7, new_stackptr)
-    # call code! (jmp - return value is on stack)
-    tr.jmp(start_pc)
-    # restore stack (set a label to return from new stack - see below)
-    return_off = tr.get_code_offset()
-    tr.read_ax_l(7, old_stack_off, True) # read from data offset (dc.l above)
-    # restore regs
-    tr.restore_all_but_d0()
-    # keep the old input file handle
+    set_regs = {
+      REG_D0: args_len,
+      REG_A0: args_ptr,
+      REG_D2: stack_size,
+      REG_A2: odg,
+      REG_A5: odg,
+      REG_A6: odg
+    }
+    get_regs = [REG_D0]
+
+    # run machine
+    run_state = self.machine.run(pc, sp,
+        set_regs=set_regs,
+        get_regs=get_regs,
+        name="RunCommand")
+
+    # return value
+    ret_code = run_state.regs[REG_D0]
+    log_proc.info("return from RunCommand: ret_code=%d", ret_code)
+
+    # clear input
     input_fh = self.process.get_input()
-    # trap to clean up sub process resources
-    def trap_stop_run_command():
-      ret_code = self.cpu.r_reg(REG_D0)
-      log_proc.info("return from RunCommand: ret_code=%d", ret_code)
-      self.cpu.w_reg(REG_A7,old_stackptr)
-      self.process.this_task.access.w_s("pr_Task.tc_SPLower",oldstackbase)
-      self.process.this_task.access.w_s("pr_Task.tc_SPUpper",oldstacktop)
-      self.alloc.free_memory(newstack)
-      input_fh.setbuf("")
-      # The return code remains in d0 as is
-    tr.final_rts(trap_stop_run_command)
-    # realize trampoline in memory (data+code)
-    tr.done()
-    # get label addr -> set as return value of new stack
-    return_addr = tr.get_code_addr(return_off)
-    log_proc.debug("new_stack=%06x return_addr=%06x", new_stackptr, return_addr)
-    # place return address for new process
-    self.mem.w32(new_stackptr, return_addr)
+    input_fh.setbuf("")
+
+    # restore stack values
+    self.process.this_task.access.w_s("pr_Task.tc_SPLower", oldstack_base)
+    self.process.this_task.access.w_s("pr_Task.tc_SPUpper", oldstack_top)
+
+    # free new stack
+    self.alloc.free_memory(newstack)
+
+    # result code
+    return ret_code
 
   def run_shell(self,start_pc,packet,stacksize,trap_stop_handler):
     newstack     = self.alloc.alloc_memory("shell command stack",stacksize)

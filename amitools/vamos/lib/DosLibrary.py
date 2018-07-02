@@ -1483,7 +1483,8 @@ class DosLibrary(LibImpl):
     log_dos.info("RunCommand: seglist=%06x(%s) stack=%d args=%s" % (b_addr, name, stack, cmdline))
     # round up the stack
     stack    = (stack + 3) & -4
-    ctx.run_command((b_addr << 2) + 4,args,length,stack)
+    prog_start = (b_addr << 2) + 4
+    return ctx.run_command(prog_start, args, length, stack)
 
   # ----- Path Helper -----
 
