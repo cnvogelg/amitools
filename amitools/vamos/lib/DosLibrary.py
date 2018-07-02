@@ -1429,7 +1429,7 @@ class DosLibrary(LibImpl):
       if not proc.ok:
         log_dos.warn("SystemTagList: can't create process for '%s' args=%s", binary, arg_str)
         return self.DOSTRUE
-      ctx.start_sub_process(proc)
+      return ctx.run_sub_process(proc)
 
   def LoadSeg(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)

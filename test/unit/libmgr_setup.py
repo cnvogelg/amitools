@@ -12,7 +12,7 @@ def libmgr_setup_default_test():
   slm = SetupLibManager(machine, mem_map, path_mgr)
   vamos_legacy = ConfigDict({
       'run_command': None,
-      'start_sub_process': None
+      'run_sub_process': None
   })
   slm.setup(vamos_legacy)
   slm.open_base_libs()

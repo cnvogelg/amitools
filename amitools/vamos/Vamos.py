@@ -23,7 +23,6 @@ class Vamos:
     self.alloc = mem_map.get_alloc()
     # no current process right now
     self.process = None
-    self.proc_list = []
 
   # ----- process handling -----
 
@@ -37,58 +36,42 @@ class Vamos:
   def get_current_process(self):
     return self.process
 
-  def start_sub_process(self, proc):
+  def run_sub_process(self, proc):
     log_proc.info("start sub process: %s", proc)
-    self.proc_list.append(proc)
     self._set_this_task(proc)
 
-    # setup trampoline to enter sub process
-    tr = Trampoline(self, "SubProcJump")
-    # reserve a long for old stack
-    old_stack_off = tr.dc_l(0)
-    # code starts
-    tr.save_all_but_d0()
+    # setup machine run
+    sp = proc.stack_initial
+    pc = proc.prog_start
+
     # new proc registers: d0=arg_len a0=arg_cptr
-    tr.set_dx_l(0, proc.arg_len)
-    tr.set_ax_l(0, proc.arg_base)
     # d2=stack_size.  this value is also in 4(sp) (see Process.init_stack), but
     # various C programs rely on it being present (1.3-3.1 at least have it).
-    tr.set_dx_l(2, proc.stack_size)
-    # to track old dos values
     odg = self.mem_map.get_old_dos_guard_base()
-    tr.set_ax_l(2, odg)
-    tr.set_ax_l(5, odg)
-    tr.set_ax_l(6, odg)
-    # save old stack and set new stack
-    tr.write_ax_l(7, old_stack_off, True) # write to data offset (dc.l above)
-    new_stack = proc.stack_initial
-    tr.set_ax_l(7, new_stack)
-    # call code! (jmp - return value is on stack)
-    tr.jmp(proc.prog_start)
-    # restore stack (set a label to return from new stack - see below)
-    return_off = tr.get_code_offset()
-    tr.read_ax_l(7, old_stack_off, True) # read from data offset (dc.l above)
-    # restore regs
-    tr.restore_all_but_d0()
-    # trap to clean up sub process resources
-    def trap_stop_sub_process():
-      self.stop_sub_process()
-    tr.final_rts(trap_stop_sub_process)
-    # realize trampoline in memory (data+code)
-    tr.done()
-    # get label addr -> set as return value of new stack
-    return_addr = tr.get_code_addr(return_off)
-    log_proc.debug("new_stack=%06x return_addr=%06x", new_stack, return_addr)
-    # place return address for new process
-    self.mem.w32(new_stack, return_addr)
+    set_regs = {
+      REG_D0: proc.arg_len,
+      REG_A0: proc.arg_base,
+      REG_D2: proc.stack_size,
+      REG_A2: odg,
+      REG_A5: odg,
+      REG_A6: odg
+    }
+    get_regs = [REG_D0]
 
-  def stop_sub_process(self):
-    # get return value
-    ret_code = self.cpu.r_reg(REG_D0)
-    # pop process
-    proc = self.proc_list.pop()
-    log_proc.info("stop sub process: %s ret_code=%d", proc, ret_code)
+    # run machine
+    run_state = self.machine.run(pc, sp,
+        set_regs=set_regs,
+        get_regs=get_regs,
+        name="SubProcJump")
+
+    # return value
+    ret_code = run_state.regs[REG_D0]
+    log_proc.info("return from sub process: ret_code=%d", ret_code)
+
+    # cleanup proc
     proc.free()
+
+    return ret_code
 
   # ----- overload a process for RunCommand -----
 
@@ -249,7 +232,6 @@ class Vamos:
     if not proc.ok:
       return False
     log_proc.info("set main process: %s", proc)
-    self.proc_list.append(proc)
     self._set_this_task(proc)
     self.main_proc = proc
     return True
