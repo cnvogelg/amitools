@@ -67,6 +67,10 @@ class BinBuilder:
           rebuild_bins.append(binp)
       else:
         rebuild_bins.append(binp)
+        # create bin dir if its mising
+        bin_dir = os.path.dirname(binp)
+        if not os.path.exists(bin_dir):
+          os.makedirs(bin_dir)
     # call make to rebuild bins
     if len(rebuild_bins) > 0:
       print("BinBuilder: making", " ".join(rebuild_bins))
