@@ -112,9 +112,9 @@ class HunkDebug:
     size = self._read_long(buf,pos) * 4
     off = pos + 4
     data = buf[off:off+size]
-    pos = data.find('\0')
+    pos = data.find(b'\0')
     if pos == 0:
-      return "", size
+      return b"", size
     elif pos != -1:
       return data[:pos], size
     else:
@@ -126,7 +126,7 @@ class HunkDebug:
     self._write_long(f, num_longs)
     add = num_longs * 4 - n
     if add > 0:
-      s += '\0' * add
+      s += b'\0' * add
     f.write(s)
 
   def _read_long(self, buf, pos):

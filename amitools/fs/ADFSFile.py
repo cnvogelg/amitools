@@ -74,7 +74,7 @@ class ADFSFile(ADFSNode):
     total_size = 0
     is_ffs = self.volume.is_ffs
     byte_size = self.block.byte_size
-    data = ""
+    data = b""
     for blk in self.data_blk_nums:
       if is_ffs:
         # ffs has raw data blocks
@@ -227,7 +227,7 @@ class ADFSFile(ADFSNode):
       if is_ffs:
         # pad block
         if size < bs:
-          d += '\0' * (bs-size)
+          d += b'\0' * (bs-size)
         # write raw block data in FFS
         self.blkdev.write_block(blk_num, d)
       else:

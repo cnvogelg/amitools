@@ -37,7 +37,7 @@ class EntryBlock(Block):
     """Writes the name, comment, and modifcation timestamp"""
     if self.is_longname:
       if self.comment_block_id != 0:
-        nac = bytes(bytearray((len(self.name),))) + self.name + b'\x00'
+        nac = bytes(bytearray((len(self.name),))) + self.name + b'\0'
       else:
         nac = bytes(bytearray((len(self.name),))) + self.name + bytes(bytearray((len(self.comment),))) + self.comment
       self._put_cstr(-46, 122, nac)

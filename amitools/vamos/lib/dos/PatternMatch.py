@@ -332,7 +332,7 @@ def pattern_match(pattern, in_str, ignore_case=True, debug=False):
       p_ch = pat[pat_pos]
       cmd = ord(p_ch)
     else:
-      p_ch = '\0'
+      p_ch = b'\0'
       cmd = 0
 
     # DEBUG
@@ -515,7 +515,7 @@ def pattern_match(pattern, in_str, ignore_case=True, debug=False):
       if str_pos < n_str:
         s_ch = tr(in_str[str_pos])
       else:
-        s_ch = '\0'
+        s_ch = b'\0'
   
       # char matched
       if p_ch == s_ch:

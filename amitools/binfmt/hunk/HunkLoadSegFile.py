@@ -36,7 +36,7 @@ class HunkSegment:
     bytes_mod = size_bytes % 4
     if bytes_mod > 0:
       add = 4 - bytes_mod
-      data = data + '\0' * add
+      data = data + b'\0' * add
     size_long = int((size_bytes + 3)/4)
     return data, size_long
 

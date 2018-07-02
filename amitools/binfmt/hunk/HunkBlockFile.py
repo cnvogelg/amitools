@@ -49,7 +49,7 @@ class HunkBlock:
     data = f.read(size)
     if len(data) < size:
       return -1,None
-    endpos = data.find('\0')
+    endpos = data.find(b'\0')
     if endpos == -1:
       return size,data
     elif endpos == 0:

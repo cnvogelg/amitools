@@ -132,7 +132,7 @@ class ELFSectionStringTable(ELFSectionWithData):
     o = 0
     strtab = []
     while o < l:
-      n = self.data.find('\0',o)
+      n = self.data.find(b'\0',o)
       if n == -1:
         raise ELFParseError("Invalid strtab!")
       if n > 0:

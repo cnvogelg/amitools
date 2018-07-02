@@ -84,16 +84,16 @@ class HunkReader:
     data = f.read(size)
     if len(data) < size:
       return -1,None
-    endpos = data.find('\0')
+    endpos = data.find(b'\0')
     if endpos == -1:
       return size,data
     elif endpos == 0:
-      return 0,""
+      return 0,b""
     else:
       return size,data[:endpos]
 
   def get_index_name(self, strtab, offset):
-    end = strtab.find('\0',offset)
+    end = strtab.find(b'\0',offset)
     if end == -1:
       return strtab[offset:]
     else:

@@ -101,7 +101,7 @@ class BootBlock(Block):
     pos = len(boot_code) - 4
     while pos > 0:
       tag = boot_code[pos:pos+3]
-      if tag != 'DOS' and ord(boot_code[pos])!=0:
+      if tag != 'DOS' and boot_code[pos] != b'\0':
         pos += 4
         break
       pos -= 4

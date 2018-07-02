@@ -115,7 +115,7 @@ class ADFSBitmap:
 
   def read(self):
     self.bitmap_blks = []
-    bitmap_data = ""
+    bitmap_data = b""
 
     # get bitmap blocks from root block
     blocks = self.root_blk.bitmap_ptrs
@@ -271,7 +271,7 @@ class ADFSBitmap:
   def create_draw_bitmap(self):
     bm = ctypes.create_string_buffer(self.blkdev.num_blocks)
     for i in range(self.blkdev.num_blocks):
-      bm[i] = b'\x00'
+      bm[i] = b'\0'
     return bm
 
   def print_free(self, brief=False):
