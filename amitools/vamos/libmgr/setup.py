@@ -61,8 +61,7 @@ class SetupLibManager(object):
                                self.seg_loader, self.path_mgr)
     self.dos_ctx = DosLibCtx(self.machine, self.alloc,
                              self.seg_loader, self.path_mgr,
-                             vamos_legacy.run_command,
-                             vamos_legacy.run_sub_process)
+                             vamos_legacy)
     # create lib mgr
     self.lib_mgr = LibManager(self.machine, self.alloc, self.seg_loader,
                               self.lib_mgr_cfg,

@@ -75,7 +75,7 @@ class Vamos:
 
   # ----- overload a process for RunCommand -----
 
-  def run_command(self, start_pc, args_ptr, args_len, stack_size):
+  def run_command(self, start_pc, args_ptr, args_len, stack_size, reg_d1=0):
     newstack      = self.alloc.alloc_memory("RunCommandStack", stack_size)
     newstack_base = newstack.addr
     newstack_top  = newstack_base + stack_size
@@ -98,6 +98,7 @@ class Vamos:
     odg = self.mem_map.get_old_dos_guard_base()
     set_regs = {
       REG_D0: args_len,
+      REG_D1: reg_d1,
       REG_A0: args_ptr,
       REG_D2: stack_size,
       REG_A2: odg,

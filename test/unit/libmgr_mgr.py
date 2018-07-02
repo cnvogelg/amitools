@@ -32,7 +32,7 @@ def setup(path_mgr=None, profiler_cfg=None):
   exec_ctx = ExecLibCtx(machine, alloc, segloader, path_mgr)
   mgr.add_ctx('exec.library', exec_ctx)
   mgr.add_impl_cls('exec.library', ExecLibrary)
-  dos_ctx = DosLibCtx(machine, alloc, segloader, path_mgr, None, None)
+  dos_ctx = DosLibCtx(machine, alloc, segloader, path_mgr, None)
   mgr.add_ctx('dos.library', dos_ctx)
   mgr.add_impl_cls('dos.library', DosLibrary)
   mgr.add_impl_cls('vamostest.library', VamosTestLibrary)

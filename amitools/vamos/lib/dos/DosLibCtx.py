@@ -3,13 +3,12 @@ from amitools.vamos.libcore import LibCtx
 class DosLibCtx(LibCtx):
 
   def __init__(self, machine, alloc, seg_loader, path_mgr,
-               run_command, run_sub_process):
+               vamos):
     LibCtx.__init__(self, machine)
     self.alloc = alloc
     self.path_mgr = path_mgr
     self.seg_loader = seg_loader
-    self.run_command = run_command
-    self.run_sub_process = run_sub_process
+    self.vamos = vamos
     # compat for process
     self.process = None
     self.exec_lib = None

@@ -30,6 +30,7 @@ from dos.Item import *
 class DosLibrary(LibImpl):
   DOSFALSE = 0
   DOSTRUE = 0xffffffff
+  DOSTRUE_S = -1
 
   LV_VAR   = 0	# an variable
   LV_ALIAS = 1	# an alias
@@ -1372,7 +1373,7 @@ class DosLibrary(LibImpl):
         output_fhci = None
       cli.w_s("cli_CurrentInput",new_input.mem.addr)
       cli.w_s("cli_StandardInput",new_stdin.mem.addr)
-      cli.w_s("cli_Background",self.DOSTRUE)
+      cli.w_s("cli_Background",self.DOSTRUE_S)
       # Create the Packet for the background process.
       packet      = ctx.process.run_system()
       stacksize   = cli.r_s("cli_DefaultStack") << 2
@@ -1407,7 +1408,7 @@ class DosLibrary(LibImpl):
         log_dos.info("SystemTagList returned: cmd='%s' tags=%s", cmd, tag_list)
         return 0
       # The return code remains in d0 as is
-      ctx.run_shell(ctx.process.shell_start,packet,stacksize,trap_stop_run_command)
+      ctx.vamos.run_shell(ctx.process.shell_start,packet,stacksize,trap_stop_run_command)
       return self.DOSTRUE
     else:
       # parse "command line"
@@ -1429,7 +1430,7 @@ class DosLibrary(LibImpl):
       if not proc.ok:
         log_dos.warn("SystemTagList: can't create process for '%s' args=%s", binary, arg_str)
         return self.DOSTRUE
-      return ctx.run_sub_process(proc)
+      return ctx.vamos.run_sub_process(proc)
 
   def LoadSeg(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
@@ -1484,7 +1485,7 @@ class DosLibrary(LibImpl):
     # round up the stack
     stack    = (stack + 3) & -4
     prog_start = (b_addr << 2) + 4
-    return ctx.run_command(prog_start, args, length, stack)
+    return ctx.vamos.run_command(prog_start, args, length, stack)
 
   # ----- Path Helper -----
 
