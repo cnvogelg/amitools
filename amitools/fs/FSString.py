@@ -12,10 +12,10 @@ class FSString:
     """
     if sys.version_info[0] == 3 and type(txt) == str:
       self.txt = txt
+    elif type(txt) == bytes:
+      self.txt = txt.decode(encoding)
     elif type(txt) == unicode:
       self.txt = txt
-    elif type(txt) == str:
-      self.txt = txt.decode(encoding)
     else:
       raise ValueError("FSString must be str or unicode!")
       
