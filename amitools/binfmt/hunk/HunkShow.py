@@ -72,18 +72,18 @@ class HunkShow:
 
     # unit hunks are named
     name = ""
-    if hunk[0].has_key('name'):
+    if 'name' in hunk[0]:
       name = "'%s'" % main['name']
 
     type_name = main['type_name'].replace("HUNK_","")
     size = main['size']
     hunk_no = main['hunk_no']
-    if main.has_key('data_file_offset'):
+    if 'data_file_offset' in main:
       data_file_offset = main['data_file_offset']
     else:
       data_file_offset = None
     hunk_file_offset = main['hunk_file_offset']
-    if main.has_key('alloc_size'):
+    if 'alloc_size' in main:
       alloc_size = main['alloc_size']
     else:
       alloc_size = None
@@ -96,7 +96,7 @@ class HunkShow:
       self.show_extra_hunk(extra)
 
     # index hunk info is embedded if its in a lib
-    if main.has_key('index_hunk'):
+    if 'index_hunk' in main:
       self.show_index_info(main['index_hunk'])
 
     if main['type'] == Hunk.HUNK_CODE and self.disassemble and len(main['data'])>0:
@@ -107,13 +107,13 @@ class HunkShow:
 
   def show_index_info(self, info):
     # references from index
-    if info.has_key('refs'):
+    if 'refs' in info:
       self.print_extra("refs","#%d" % len(info['refs']))
       if not self.brief:
         for ref in info['refs']:
           self.print_symbol(-1,ref['name'],"(%d bits)" % ref['bits'])
     # defines from index
-    if info.has_key('defs'):
+    if 'defs' in info:
       self.print_extra("defs","#%d" % len(info['defs']))
       if not self.brief:
         for d in info['defs']:

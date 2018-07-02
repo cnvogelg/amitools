@@ -93,7 +93,7 @@ class TemplateArgList:
 
   def find_arg(self, name):
     for t in self.targs:
-      if t.has_key(name):
+      if name in t:
         return t
 
   @staticmethod

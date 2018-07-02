@@ -12,7 +12,7 @@ class Tag:
     self.user = (tag & TAG_USER == TAG_USER)
     self.tag = tag & ~TAG_USER
     self.data = data
-    if tag_info != None and tag_info.has_key(self.tag):
+    if tag_info != None and self.tag in tag_info:
       self.name = tag_info[self.tag]
     else:
       self.name = None

@@ -52,7 +52,7 @@ class HunkRelocate:
       data = ctypes.create_string_buffer(alloc_size)      
       
       # fill in segment data
-      if main_hunk.has_key('data'):
+      if 'data' in main_hunk:
         data.value = main_hunk['data']
         
       if self.verbose:

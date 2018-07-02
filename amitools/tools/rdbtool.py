@@ -228,7 +228,7 @@ class InitCommand(OpenCommand):
   def init_rdisk(self, blkdev):
     opts = KeyValue.parse_key_value_strings(self.opts)
     # number of cylinders for RDB
-    if opts.has_key('rdb_cyls'):
+    if 'rdb_cyls' in opts:
       rdb_cyls = int(opts['rdb_cyls'])
     else:
       rdb_cyls = 1
@@ -291,9 +291,9 @@ class PartEditCommand(Command):
     self.rdisk = rdisk
 
   def get_dos_type(self, empty=False):
-    if self.popts.has_key('fs'):
+    if 'fs' in self.popts:
       fs_str = self.popts['fs']
-    elif self.popts.has_key('dostype'):
+    elif 'dostype' in self.popts:
       fs_str = self.popts['dostype']
     elif not empty:
       fs_str = self.args.dostype
@@ -302,7 +302,7 @@ class PartEditCommand(Command):
     return parse_dos_type_str(str(fs_str))
 
   def get_drv_name(self, empty=False):
-    if self.popts.has_key('name'):
+    if 'name' in self.popts:
       drv_name = self.popts['name']
     elif empty:
       drv_name = None
@@ -311,7 +311,7 @@ class PartEditCommand(Command):
     return drv_name
 
   def get_bootable(self, empty=False):
-    if self.popts.has_key('bootable'):
+    if 'bootable' in self.popts:
       return bool(self.popts['bootable'])
     elif not empty:
       return False
@@ -319,7 +319,7 @@ class PartEditCommand(Command):
       return None
 
   def get_boot_pri(self, empty=False):
-    if self.popts.has_key('pri'):
+    if 'pri' in self.popts:
       return self.popts['pri']
     elif not empty:
       return 0
@@ -327,7 +327,7 @@ class PartEditCommand(Command):
       return None
 
   def get_automount(self, empty=False):
-    if self.popts.has_key('automount'):
+    if 'automount' in self.popts:
       return bool(self.popts['automount'])
     elif not empty:
       return True
@@ -368,17 +368,17 @@ class PartEditCommand(Command):
 
   def get_cyl_range(self):
     start = None
-    if self.popts.has_key('start'):
+    if 'start' in self.popts:
       start = int(self.popts['start'])
     # range with start=<n> end=<n>
-    if self.popts.has_key('end'):
+    if 'end' in self.popts:
       end = int(self.popts['end'])
       if start == None or end <= start:
         return None
       else:
         return (start, end)
     # expect a size
-    elif self.popts.has_key('size'):
+    elif 'size' in self.popts:
       size = self.popts['size']
       cyls = None
       if type(size) == int:
@@ -537,9 +537,9 @@ class FSAddCommand(Command):
     self.popts = KeyValue.parse_key_value_strings(self.opts)
 
   def get_dos_type(self):
-    if self.popts.has_key('fs'):
+    if 'fs' in self.popts:
       fs_str = self.popts['fs']
-    elif self.popts.has_key('dostype'):
+    elif 'dostype' in self.popts:
       fs_str = self.popts['dostype']
     else:
       fs_str = self.args.dostype
@@ -569,7 +569,7 @@ class FSAddCommand(Command):
       if ver == None:
         ver = (0,0)
       # overwrite version from options
-      if opts.has_key('version'):
+      if 'version' in opts:
         vstr = opts['version']
         pos = vstr.find('.')
         if pos != -1:

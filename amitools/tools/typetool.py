@@ -25,7 +25,7 @@ def main():
   type_name = sys.argv[1]
 
   # --- find type ---
-  if not AmigaStruct.struct_pool.has_key(type_name):
+  if type_name not in AmigaStruct.struct_pool:
     print "Can't find type: %s" % type_name
     return 1
   type_def = AmigaStruct.struct_pool[type_name]

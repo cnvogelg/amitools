@@ -144,7 +144,7 @@ class DosLibrary(LibImpl):
       hdr = ctx.mem.r_cstr(hdr_ptr)
     else:
       hdr = ""
-    if dos_error_strings.has_key(idx):
+    if idx in dos_error_strings:
       err_str = dos_error_strings[idx]
     else:
       err_str = "%d ERROR" % self.io_err
@@ -170,7 +170,7 @@ class DosLibrary(LibImpl):
     else:
       hdr = ""
     # get error string
-    if dos_error_strings.has_key(idx):
+    if idx in dos_error_strings:
       err_str = dos_error_strings[idx]
     else:
       err_str = "%d ERROR" % self.io_err
@@ -1083,7 +1083,7 @@ class DosLibrary(LibImpl):
     anchor_ptr = ctx.cpu.r_reg(REG_D1)
     log_dos.info("MatchNext: anchor=%06x" % (anchor_ptr))
     # retrieve match
-    if not self.matches.has_key(anchor_ptr):
+    if anchor_ptr not in self.matches:
       raise VamosInternalError("MatchNext: No matcher found for %06x" % anchor_ptr)
     mfn = self.matches[anchor_ptr]
     # has matches?
@@ -1101,7 +1101,7 @@ class DosLibrary(LibImpl):
     anchor_ptr = ctx.cpu.r_reg(REG_D1)
     log_dos.info("MatchEnd: anchor=%06x " % (anchor_ptr))
     # retrieve match
-    if not self.matches.has_key(anchor_ptr):
+    if anchor_ptr not in self.matches:
       raise VamosInternalError("MatchEnd: No matcher found for %06x" % anchor_ptr)
     mfn = self.matches[anchor_ptr]
     del self.matches[anchor_ptr]
@@ -1292,7 +1292,7 @@ class DosLibrary(LibImpl):
     rdargs_ptr = ctx.cpu.r_reg(REG_D1)
     log_dos.info("FreeArgs: %06x" % rdargs_ptr)
     # find rdargs
-    if not self.rdargs.has_key(rdargs_ptr):
+    if rdargs_ptr not in self.rdargs:
       raise VamosInternalError("Can't find RDArgs: %06x" % rdargs_ptr)
     rdargs, own = self.rdargs[rdargs_ptr]
     del self.rdargs[rdargs_ptr]
@@ -1448,7 +1448,7 @@ class DosLibrary(LibImpl):
   def UnLoadSeg(self, ctx):
     b_addr = ctx.cpu.r_reg(REG_D1)
     if b_addr != 0:
-      if not self.seg_lists.has_key(b_addr):
+      if b_addr not in self.seg_lists:
         raise VamosInternalError("Trying to unload unknown LoadSeg seg_list: b_addr=%06x" % b_addr)
       else:
         del self.seg_lists[b_addr]
@@ -1727,7 +1727,7 @@ class DosLibrary(LibImpl):
     return mem.addr
 
   def _free_mem(self, addr):
-    if self.mem_allocs.has_key(addr):
+    if addr in self.mem_allocs:
       mem = self.mem_allocs[addr]
       self.alloc.free_memory(mem)
       del self.mem_allocs[addr]

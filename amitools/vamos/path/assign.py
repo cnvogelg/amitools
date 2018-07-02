@@ -77,7 +77,7 @@ class AssignManager:
       alist.append(path_name)
 
     # setup assign list
-    if append and self.assigns.has_key(lo_name):
+    if append and lo_name in self.assigns:
       self.assigns[lo_name] += alist
     else:
       self.assigns[lo_name] = alist
@@ -89,7 +89,7 @@ class AssignManager:
 
   def del_assign(self, name):
     lo_name = name.lower()
-    if self.assigns.has_key(lo_name):
+    if lo_name in self.assigns:
       alist = self.assigns[lo_name]
       log_path.info("del assign: name='%s' -> paths=%s", name, alist)
       del self.assigns[lo_name]
@@ -153,7 +153,7 @@ class AssignManager:
     else:
       # is assign
       name = split[0].lower()
-      if self.assigns.has_key(name):
+      if name in self.assigns:
         remainder = split[1]
         aname_list = self.assigns[name]
         # single assign

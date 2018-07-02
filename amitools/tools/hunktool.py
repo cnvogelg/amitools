@@ -34,7 +34,7 @@ class HunkCommand:
     self.failed_files = []
 
   def handle_file(self, path, hunk_file, error_code, delta):
-    if not self.counts.has_key(error_code):
+    if error_code not in self.counts:
       self.counts[error_code] = 0
     self.counts[error_code] += 1
 
@@ -224,7 +224,7 @@ def main():
   args = parser.parse_args()
 
   cmd = args.command
-  if not cmd_map.has_key(cmd):
+  if cmd not in cmd_map:
     print "INVALID COMMAND:",cmd
     print "valid commands are:"
     for a in cmd_map:

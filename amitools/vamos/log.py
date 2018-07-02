@@ -55,7 +55,7 @@ levels = {
 
 
 def log_parse_level(name):
-  if levels.has_key(name):
+  if name in levels:
     return levels[name]
   else:
     return None

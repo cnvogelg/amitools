@@ -34,7 +34,7 @@ class ELFPart:
     return result
 
   def _decode_value(self, value, names):
-    if names.has_key(value):
+    if value in names:
       return names[value]
     else:
       return None
@@ -104,7 +104,7 @@ class ELFSection:
 
   def get_rela_by_section(self, sect):
     """return a list of relocations from the given section"""
-    if self.reloc_by_sect.has_key(sect):
+    if sect in self.reloc_by_sect:
       return self.reloc_by_sect[sect]
     else:
       return []

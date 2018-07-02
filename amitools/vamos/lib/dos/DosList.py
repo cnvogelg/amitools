@@ -198,13 +198,13 @@ class DosList:
             assign_last = assign_entry.access
 
   def get_entry_by_b_addr(self, baddr):
-    if not self.entries_by_b_addr.has_key(baddr):
+    if baddr not in self.entries_by_b_addr:
       return None
     else:
       return self.entries_by_b_addr[baddr]
 
   def get_entry_by_name(self, name):
-    if not self.entries_by_name.has_key(name.lower()):
+    if name.lower() not in self.entries_by_name:
       return None
     else:
       return self.entries_by_name[name.lower()]

@@ -141,7 +141,7 @@ class ELFReader:
 
       # add entry to section list
       tgt_sect = entry.section
-      if by_sect.has_key(tgt_sect):
+      if tgt_sect in by_sect:
         by_sect_list = by_sect[tgt_sect]
       else:
         by_sect_list = []

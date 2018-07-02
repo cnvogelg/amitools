@@ -30,7 +30,7 @@ class HunkReader:
           result.append(v)
       return "[" + ",".join(result) + "]"
     elif type(obj) == DictType:
-      if obj.has_key('type_name'):
+      if 'type_name' in obj:
         type_name = obj['type_name']
         return type_name.replace('HUNK_','')
       else:
@@ -470,7 +470,7 @@ class HunkReader:
       ext = { 'type' : ext_type, 'name' : ext_name }
 
       # check and setup type name
-      if not ext_names.has_key(ext_type):
+      if ext_type not in ext_names:
         self.error_string = "%s has unspported ext entry %d" % (hunk['type_name'],ext_type)
         return RESULT_INVALID_HUNK_FILE
       ext['type_name'] = ext_names[ext_type]
@@ -565,7 +565,7 @@ class HunkReader:
       hunk_flags = hunk_raw_type & HUNK_FLAGS_MASK
 
       # check range of hunk type
-      if not hunk_names.has_key(hunk_type):
+      if hunk_type not in hunk_names:
         # no hunk file?
         if is_first_hunk:
           self.error_string = "No hunk file: '%s' type was %d" % (hfile, hunk_type)

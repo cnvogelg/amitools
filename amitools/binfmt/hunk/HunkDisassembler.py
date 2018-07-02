@@ -74,7 +74,7 @@ class HunkDisassembler:
   def find_reloc(self, hunk, addr, word):
     end_addr = addr + len(word) * 2
     for h in hunk[1:]:
-      valid = self.map_reloc_to_num_words.has_key(h['type'])
+      valid = h['type'] in self.map_reloc_to_num_words
       if valid:
         num_words = self.map_reloc_to_num_words[h['type']]
         reloc = h['reloc']
@@ -111,7 +111,7 @@ class HunkDisassembler:
       if h['type'] == Hunk.HUNK_EXT:
         for ext in h['ext_ref']:
           refs = ext['refs']
-          valid = self.map_ext_ref_to_num_words.has_key(ext['type'])
+          valid = ext['type'] in self.map_ext_ref_to_num_words
           if valid:
             num_words = self.map_ext_ref_to_num_words[ext['type']]
             for ref in refs:
@@ -133,9 +133,9 @@ class HunkDisassembler:
   # search the index of a lib for a definition
   def find_index_def(self, hunk, addr):
     main = hunk[0]
-    if main.has_key('index_hunk'):
+    if 'index_hunk' in main:
       info = main['index_hunk']
-      if info.has_key('defs'):
+      if 'defs' in info:
         for d in info['defs']:
           if d['value'] == addr:
             return d['name']
