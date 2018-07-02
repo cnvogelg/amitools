@@ -1376,7 +1376,7 @@ class DosLibrary(LibImpl):
       cli.w_s("cli_Background",self.DOSTRUE_S)
       # Create the Packet for the background process.
       packet      = ctx.process.run_system()
-      stacksize   = cli.r_s("cli_DefaultStack") << 2
+      stack_size  = cli.r_s("cli_DefaultStack") << 2
       current_dir = ctx.process.get_current_dir()
       cur_lock    = self.lock_mgr.get_by_b_addr(current_dir >> 2)
       dup_lock    = self.lock_mgr.dup_lock(self.get_current_dir(ctx))
@@ -1386,30 +1386,32 @@ class DosLibrary(LibImpl):
       cli.w_s("cli_Module",0)
       ctx.process.set_current_dir(dup_lock.mem.addr)
       self.cur_dir_lock = dup_lock
-      # print "*** Current input is %s" % input_fh
-      # trap to clean up sub process resources
-      def trap_stop_run_command(ret_code):
-        cli.w_s("cli_CurrentInput",input_fhci)
-        cli.w_s("cli_StandardInput",input_fhsi)
-        cli.w_s("cli_Background",self.DOSFALSE)
-        cli.w_s("cli_Module",cur_module)
-        if output_fhci != None:
-          cli.w_s("cli_StandardOutput",output_fhci)
-        # Channels are closed by the dying shell
-        ctx.mem.w_bstr(cli.r_s("cli_SetName"),cur_setname)
-        ctx.process.this_task.access.w_s("pr_CIS",input_fhci)
-        ctx.process.this_task.access.w_s("pr_COS",cur_out)
-        #infile = self.file_mgr.get_by_b_addr(input_fhci >> 2,False)
-        #infile.setbuf("")
-        ctx.process.set_current_dir(current_dir)
-        self.cur_dir_lock = self.lock_mgr.get_by_b_addr(current_dir >> 2)
-        ctx.cpu.w_reg(REG_D0,0)
-        self.setioerr(ctx, ret_code)
-        log_dos.info("SystemTagList returned: cmd='%s' tags=%s", cmd, tag_list)
-        return 0
-      # The return code remains in d0 as is
-      ctx.vamos.run_shell(ctx.process.shell_start,packet,stacksize,trap_stop_run_command)
-      return self.DOSTRUE
+
+      # run command
+      reg_d1 = packet >> 2
+      code_start = ctx.process.shell_start
+      log_dos.info("(Shell)SystemTagList: pc=%06x", code_start)
+      ret_code = ctx.vamos.run_command(code_start, 0, 0, stack_size, reg_d1)
+      log_dos.info("(Shell)SystemTagList returned: cmd='%s' tags=%s: ret_code=%d",
+                   cmd, tag_list, ret_code)
+
+      # shutdown
+      cli.w_s("cli_CurrentInput",input_fhci)
+      cli.w_s("cli_StandardInput",input_fhsi)
+      cli.w_s("cli_Background",self.DOSFALSE)
+      cli.w_s("cli_Module",cur_module)
+      if output_fhci != None:
+        cli.w_s("cli_StandardOutput",output_fhci)
+      # Channels are closed by the dying shell
+      ctx.mem.w_bstr(cli.r_s("cli_SetName"),cur_setname)
+      ctx.process.this_task.access.w_s("pr_CIS",input_fhci)
+      ctx.process.this_task.access.w_s("pr_COS",cur_out)
+      #infile = self.file_mgr.get_by_b_addr(input_fhci >> 2,False)
+      #infile.setbuf("")
+      ctx.process.set_current_dir(current_dir)
+      self.cur_dir_lock = self.lock_mgr.get_by_b_addr(current_dir >> 2)
+      self.setioerr(ctx, ret_code)
+      return 0
     else:
       # parse "command line"
       cl = CommandLine()
@@ -1480,12 +1482,17 @@ class DosLibrary(LibImpl):
     length   = ctx.cpu.r_reg(REG_D4)
     fh       = ctx.process.get_input()
     cmdline  = ctx.mem.r_cstr(args)
-    ctx.process.get_input().setbuf(cmdline)
+    # push command line into input buffer
+    input_fh = ctx.process.get_input()
+    input_fh.setbuf(cmdline)
     log_dos.info("RunCommand: seglist=%06x(%s) stack=%d args=%s" % (b_addr, name, stack, cmdline))
     # round up the stack
     stack    = (stack + 3) & -4
     prog_start = (b_addr << 2) + 4
-    return ctx.vamos.run_command(prog_start, args, length, stack)
+    ret_code = ctx.vamos.run_command(prog_start, args, length, stack)
+    # clear input
+    input_fh.setbuf("")
+    return ret_code
 
   # ----- Path Helper -----
 
