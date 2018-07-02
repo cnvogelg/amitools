@@ -188,7 +188,7 @@ class Block:
     if loc < 0:
       loc = self.block_longs + loc
     loc = loc * 4
-    self.data[loc] = bytearray((len(bstr),))
+    self.data[loc] = bytes(bytearray((len(bstr),)))
     if len(bstr) > 0:
       self.data[loc+1:loc+1+len(bstr)] = bstr
   
