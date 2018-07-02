@@ -36,9 +36,8 @@ class DisAsm:
   def disassemble(self, data, start=0):
     # write to temp file
     tmpname = tempfile.mktemp()
-    out = file(tmpname,"wb")
-    out.write(data)
-    out.close()
+    with open(tmpname,"wb") as out:
+      out.write(data)
     
     if self.use_objdump:
       cmd = ["m68k-elf-objdump","-D","-b","binary","-m",self.cpu,tmpname]

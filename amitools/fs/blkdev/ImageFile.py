@@ -88,10 +88,9 @@ class ImageFile:
         self.fobj.write(block)
       self.fobj.seek(0,0)
     else:
-      fh = file(self.file_name, "wb")
-      for i in range(num_blocks):
-        fh.write(block)
-      fh.close()
+      with open(self.file_name, "wb") as fh:
+        for i in range(num_blocks):
+          fh.write(block)
 
 
 # --- mini test ---
@@ -105,7 +104,7 @@ if __name__ == '__main__':
     im.write_blk(0,d)
     im.close()
     # read fobj
-    fobj = file(a,"r+b")
+    fobj = open(a,"r+b")
     im = ImageFile(a,fobj=fobj)
     im.open()
     d = im.read_blk(0)
