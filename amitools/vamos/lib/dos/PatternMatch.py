@@ -330,6 +330,7 @@ def pattern_match(pattern, in_str, ignore_case=True, debug=False):
     # get next pattern character/command
     if pat_pos < n_pat:
       p_ch = pat[pat_pos]
+      p_ch = p_ch if isinstance(p_ch, int) else ord(p_ch)
       cmd = ord(p_ch)
     else:
       p_ch = b'\0'

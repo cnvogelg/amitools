@@ -4,7 +4,7 @@ from __future__ import print_function
 
 
 def _get_vis_char(d):
-  v = ord(d)
+  v = d if isinstance(d, int) else ord(d)
   if v >= 32 and v < 127:
     return "%c" % d
   else:
@@ -16,7 +16,9 @@ def get_hex_line(addr, line, indent=0, num=16):
   out = " " * indent
   out += "%08x: " % addr
   for d in line:
-    out += "%02x " % ord(d)
+    if not isinstance(d, int):
+      d = ord(d)
+    out += "%02x " % d
   for d in range(skip):
     out += "   "
   out += " "

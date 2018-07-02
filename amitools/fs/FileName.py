@@ -95,7 +95,7 @@ class FileName:
     h = len(up)
     for c in up:
       h = h * 13;
-      h += ord(c)
+      h += ord(c) if not isinstance(c, int) else c
       h &= 0x7ff
     h = h % hash_size
     return h
