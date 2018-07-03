@@ -6,6 +6,10 @@ import time
 ts_empty_string = "--.--.---- --:--:--.--"
 ts_format = "%d.%m.%Y %H:%M:%S"
 
+# Python time functions will provide seconds from 'epoch',
+# which is 1970, but Amiga specs say that 1978 is the base year.
+amiga_epoch = time.mktime(time.strptime("01.01.1978 00:00:00", ts_format))
+
 class TimeStamp:
   def __init__(self, days=0, mins=0, ticks=0):
     self.days = days
@@ -15,7 +19,7 @@ class TimeStamp:
     self.sub_secs = (ticks % 50)
   
   def __str__(self):
-    t = time.localtime(self.secs)
+    t = time.localtime(self.secs + amiga_epoch)
     ts = time.strftime(ts_format, t)
     return "%s t%02d" % (ts, self.sub_secs)
     
@@ -26,6 +30,7 @@ class TimeStamp:
     return self.secs
   
   def from_secs(self, secs):
+    secs = int(secs - amiga_epoch)
     ticks = secs * 50
     mins = ticks / (50 * 60)
     self.ticks = ticks % (50 * 60)
@@ -46,7 +51,7 @@ class TimeStamp:
     # parse normal time
     try:
       ts = time.strptime(s, ts_format)
-      secs = time.mktime(ts)
+      secs = int(time.mktime(ts))
       self.from_secs(secs)
       self.sub_secs = ticks
       self.ticks += ticks
