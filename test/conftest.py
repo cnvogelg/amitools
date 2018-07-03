@@ -14,6 +14,10 @@ LIB_BIN_DIR = "bin/libs"
 LIB_SRC_DIR = "src/libs"
 
 
+my_dir = os.path.dirname(__file__)
+os.chdir(my_dir)
+
+
 class BinBuilder:
   def __init__(self, flavor, debug=False):
     if flavor == 'none':

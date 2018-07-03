@@ -10,3 +10,5 @@ emu.pyd
 .python-version
 .cache
 .pytest_cache
+.eggs
+.tox
