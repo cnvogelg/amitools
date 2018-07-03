@@ -6,6 +6,7 @@ dist/
 gen/
 emu.c
 emu.so
+emu.pyd
 .python-version
 .cache
 .pytest_cache

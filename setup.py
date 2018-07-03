@@ -2,24 +2,29 @@ from __future__ import print_function
 
 import os
 import sys
-import setuptools.command.build_ext
+import subprocess
 
-from subprocess import call
 from setuptools import setup, find_packages
 from distutils.extension import Extension
+from distutils.command.build_ext import build_ext
+from distutils.command.clean import clean
+import distutils.ccompiler as ccompiler
+from distutils.core import Command
+from distutils.dir_util import remove_tree
+from distutils import log
 
 # has cython?
 try:
-    from Cython.Build import cythonize
-    has_cython = True
+  from Cython.Build import cythonize
+  has_cython = True
 except ImportError:
-    has_cython = False
+  has_cython = False
 
 # use cython?
 use_cython = has_cython
 if '--no-cython' in sys.argv:
-    use_cython = False
-    sys.argv.remove('--no-cython')
+  use_cython = False
+  sys.argv.remove('--no-cython')
 print("use_cython:", use_cython)
 
 # if generated file is missing cython is required
@@ -30,36 +35,153 @@ if not os.path.exists(ext_file) and not use_cython:
   sys.exit(1)
 
 
-class BuildPyCommand(setuptools.command.build_ext.build_ext):
-  """Custom build command."""
+gen_src = [
+    'm68kopac.c',
+    'm68kopdm.c',
+    'm68kopnz.c',
+    'm68kops.c'
+]
+
+gen_tool = "build/m68kmake"
+gen_tool_src = "musashi/m68kmake.c"
+gen_tool_obj = "build/musashi/m68kmake.o"
+gen_input = "musashi/m68k_in.c"
+gen_dir = "gen"
+gen_src = list(map(lambda x: os.path.join(gen_dir, x), gen_src))
+build_dir = "build"
+
+# check compiler
+is_msvc = sys.platform == 'win32' and sys.version.lower().find('msc') != -1
+
+
+class my_build_ext(build_ext):
+  """overwrite build_ext to generate code first"""
 
   def run(self):
-    call(['make', 'do_gen'])
-    setuptools.command.build_ext.build_ext.run(self)
+    self.run_command('gen')
+    build_ext.run(self)
+
+
+class my_clean(clean):
+  """overwrite clean to clean_gen first"""
+
+  def run(self):
+    self.run_command('clean_gen')
+    clean.run(self)
+
+
+class GenCommand(Command):
+  """my custom code generation command"""
+  description = "generate code for Musashi CPU emulator"
+  user_options = []
+
+  def initialize_options(self):
+    pass
+
+  def finalize_options(self):
+    pass
+
+  def run(self):
+    # ensure dir exists
+    if not os.path.isdir(gen_dir):
+      log.info("creating '{}' dir".format(gen_dir))
+      os.mkdir(gen_dir)
+    if not os.path.isdir(build_dir):
+      log.info("creating '{}' dir".format(build_dir))
+      os.mkdir(build_dir)
+    # build tool first?
+    if not os.path.exists(gen_tool):
+      cc = ccompiler.new_compiler()
+      log.info("building '{}' tool".format(gen_tool))
+      # win fixes
+      src = gen_tool_src.replace("/", os.path.sep)
+      print("tool source:", src)
+      obj = gen_tool_obj.replace(".o", cc.obj_extension)
+      obj = obj.replace("/", os.path.sep)
+      print("tool object:", obj)
+      # compile
+      if is_msvc:
+        defines = [('_CRT_SECURE_NO_WARNINGS', None)]
+      else:
+        defines = None
+      cc.compile(sources=[src], output_dir=build_dir, macros=defines)
+      # link
+      if is_msvc:
+        ld_args = ['/MANIFEST']
+      else:
+        ld_args = None
+      cc.link_executable(
+          objects=[obj], output_progname=gen_tool,
+          extra_postargs=ld_args)
+      # remove
+      os.remove(obj)
+    # generate source?
+    if not os.path.exists(gen_src[0]):
+      log.info("generating source files")
+      cmd = [gen_tool, gen_dir, gen_input]
+      subprocess.check_call(cmd)
+
+
+class CleanGenCommand(Command):
+  """my custom code generation cleanup command"""
+  description = "remove generated code for Musashi CPU emulator"
+  user_options = []
+
+  def initialize_options(self):
+    pass
+
+  def finalize_options(self):
+    pass
+
+  def run(self):
+    if os.path.exists(gen_dir):
+      remove_tree(gen_dir, dry_run=self.dry_run)
+    # remove tool
+    if os.path.exists(gen_tool):
+      os.remove(gen_tool)
+
+
+# my custom commands
+cmdclass = {
+    'gen': GenCommand,
+    'clean_gen': CleanGenCommand,
+    'build_ext': my_build_ext,
+    'clean': my_clean
+}
+command_options = {}
+
 
 cython_file = 'musashi/emu.pyx'
 sourcefiles = [
-  'musashi/traps.c',
-  'musashi/mem.c',
-  'musashi/m68kcpu.c',
-  'musashi/m68kdasm.c',
-  'gen/m68kopac.c',
-  'gen/m68kopdm.c',
-  'gen/m68kopnz.c',
-  'gen/m68kops.c'
+    'musashi/traps.c',
+    'musashi/mem.c',
+    'musashi/m68kcpu.c',
+    'musashi/m68kdasm.c',
+    'gen/m68kopac.c',
+    'gen/m68kopdm.c',
+    'gen/m68kopnz.c',
+    'gen/m68kops.c'
 ]
 depends = [
-  'musashi/pycpu.pyx',
-  'musashi/pymem.pyx',
-  'musashi/pytraps.pyx'
+    'musashi/pycpu.pyx',
+    'musashi/pymem.pyx',
+    'musashi/pytraps.pyx'
 ]
 inc_dirs = [
-  'musashi',
-  'gen'
+    'musashi',
+    'gen'
 ]
 
+# add missing vc headers
+if is_msvc:
+    inc_dirs.append('musashi/win')
+    defines = [('_CRT_SECURE_NO_WARNINGS', None)]
+else:
+    defines = None
+
 extensions = [Extension("musashi.emu", sourcefiles,
-  depends=depends, include_dirs=inc_dirs)]
+                        depends=depends, include_dirs=inc_dirs,
+                        define_macros=defines)]
 
 # use cython?
 if use_cython:
@@ -69,50 +191,48 @@ else:
   sourcefiles.append(ext_file)
 
 scripts = {
-  'console_scripts' : [
-    'fdtool = amitools.tools.fdtool:main',
-    'geotool = amitools.tools.geotool:main',
-    'hunktool = amitools.tools.hunktool:main',
-    'rdbtool = amitools.tools.rdbtool:main',
-    'romtool = amitools.tools.romtool:main',
-    'typetool = amitools.tools.typetool:main',
-    'vamos = amitools.tools.vamos:main',
-    'vamospath = amitools.tools.vamospath:main',
-    'xdfscan = amitools.tools.xdfscan:main',
-    'xdftool = amitools.tools.xdftool:main'
-  ]
+    'console_scripts': [
+        'fdtool = amitools.tools.fdtool:main',
+        'geotool = amitools.tools.geotool:main',
+        'hunktool = amitools.tools.hunktool:main',
+        'rdbtool = amitools.tools.rdbtool:main',
+        'romtool = amitools.tools.romtool:main',
+        'typetool = amitools.tools.typetool:main',
+        'vamos = amitools.tools.vamos:main',
+        'vamospath = amitools.tools.vamospath:main',
+        'xdfscan = amitools.tools.xdfscan:main',
+        'xdftool = amitools.tools.xdftool:main'
+    ]
 }
 
 setup(
-    cmdclass = {
-        'build_ext': BuildPyCommand,
-    },
-    name = "amitools",
+    cmdclass=cmdclass,
+    command_options=command_options,
+    name="amitools",
     description='A package to support development with classic Amiga m68k systems',
     long_description=open("README.md").read(),
-    version = "0.1.1",
-    maintainer = "Christian Vogelgsang",
-    maintainer_email = "chris@vogelgsang.org",
-    url = "http://github.com/cnvogelg/amitools",
-    classifiers = [
+    version="0.1.1",
+    maintainer="Christian Vogelgsang",
+    maintainer_email="chris@vogelgsang.org",
+    url="http://github.com/cnvogelg/amitools",
+    classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
         "Programming Language :: Python",
         "Topic :: System :: Emulators",
     ],
-    license = "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
-    packages = find_packages(),
-    zip_safe = False,
-    entry_points = scripts,
-    setup_requires = ['pytest-runner'],
-    tests_require= ['pytest'],
-#    install_requires = ['lhafile==0.2.1'],
-    dependency_links = [
-      "http://github.com/FrodeSolheim/python-lhafile/zipball/master#egg=lhafile-0.2.1"
+    license="License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
+    packages=find_packages(),
+    zip_safe=False,
+    entry_points=scripts,
+    setup_requires=['pytest-runner'],
+    tests_require=['pytest'],
+    #    install_requires = ['lhafile==0.2.1'],
+    dependency_links=[
+        "http://github.com/FrodeSolheim/python-lhafile/zipball/master#egg=lhafile-0.2.1"
     ],
-    ext_modules = extensions,
-# win problems:
-#    use_scm_version=True,
+    ext_modules=extensions,
+    # win problems:
+    #    use_scm_version=True,
     include_package_data=True
 )
-
