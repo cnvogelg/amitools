@@ -68,7 +68,8 @@ class BinBuilder:
       if os.path.exists(binp):
         srct = os.path.getmtime(srcp)
         bint = os.path.getmtime(binp)
-        if bint <= srct:
+        # allow 10s delta
+        if bint + 10 <= srct:
           rebuild_bins.append(binp)
       else:
         rebuild_bins.append(binp)
