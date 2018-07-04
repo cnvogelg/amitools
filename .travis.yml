@@ -1,0 +1,40 @@
+sudo: false
+language: python
+python:
+  - "2.7"
+
+env:
+  global:
+    - NEWEST_PYTHON=2.7
+
+matrix:
+  include:
+    - os: osx
+      language: generic
+      env:
+        - TOXENV=py27
+        - BREW_INSTALL=python
+    - os: osx
+      language: generic
+      env:
+        - TOXENV=py36
+        - BREW_INSTALL=python3
+
+install:
+  - |
+    if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
+      if [[ -n "$BREW_INSTALL" ]]; then
+        brew update
+        brew install "$BREW_INSTALL"
+      fi
+      sudo pip install tox
+    fi
+  - pip install tox-travis
+
+script: tox
+
+after_success:
+  - |
+    if [[ $TRAVIS_PYTHON_VERSION == $NEWEST_PYTHON && $TRAVIS_OS_NAME == 'linux' ]]; then
+      pip install python-coveralls && coveralls
+    fi
