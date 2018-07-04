@@ -19,11 +19,12 @@ os.chdir(my_dir)
 
 
 class BinBuilder:
-  def __init__(self, flavor, debug=False):
+  def __init__(self, flavor, debug=False, auto_build=False):
     if flavor == 'none':
       flavor = None
     self.flavor = flavor
     self.debug = debug
+    self.auto_build = auto_build
 
   def make_prog(self, prog_name):
     return self.make_progs([prog_name])[0]
@@ -77,10 +78,14 @@ class BinBuilder:
           os.makedirs(bin_dir)
     # call make to rebuild bins
     if len(rebuild_bins) > 0:
-      print("BinBuilder: making", " ".join(rebuild_bins))
-      args = ['make']
-      args += rebuild_bins
-      subprocess.check_call(args, stdout=subprocess.PIPE)
+      info = " ".join(rebuild_bins)
+      if self.auto_build:
+        print("BinBuilder: making", info)
+        args = ['make']
+        args += rebuild_bins
+        subprocess.check_call(args, stdout=subprocess.PIPE)
+      else:
+        raise RuntimeError("Rebuild needed for: " + info)
     return all_bins
 
 
@@ -89,14 +94,15 @@ class VamosTestRunner:
                vopts=None,
                use_debug_bins=False,
                dump_output=False,
-               generate_data=False):
+               generate_data=False,
+               auto_build=False):
     self.flavor = flavor
     self.vamos_bin = vamos_bin
     self.vopts = vopts
     self.use_debug_bins = use_debug_bins
     self.dump_output = dump_output
     self.generate_data = generate_data
-    self.bin_builder = BinBuilder(flavor, use_debug_bins)
+    self.bin_builder = BinBuilder(flavor, use_debug_bins, auto_build)
 
   def _get_data_path(self, prog_name, kw_args):
     dat_path = ["data/" + prog_name]
@@ -304,6 +310,8 @@ def pytest_addoption(parser):
                    " e.g. -V-t+-T")
   parser.addoption("--vamos-executable", "-E", default=VAMOS_BIN,
                    help="replace the vamos executable (default: ../bin/vamos)")
+  parser.addoption("--auto-build", default=False, action="store_true",
+                   help="automatically rebuild binaries if source is newer")
 
 
 def pytest_runtest_setup(item):
@@ -317,13 +325,15 @@ def pytest_runtest_setup(item):
 @pytest.fixture(scope="module",
                 params=['gcc', 'gcc-res', 'gcc-dbg', 'gcc-res-dbg'])
 def buildlibnix(request):
-  return BinBuilder(request.param)
+  auto_build = request.config.getoption("--auto-build")
+  return BinBuilder(request.param, auto_build=auto_build)
 
 
 @pytest.fixture(scope="module",
                 params=['sc', 'sc-res', 'sc-dbg', 'sc-res-dbg'])
 def buildlibsc(request):
-  return BinBuilder(request.param)
+  auto_build = request.config.getoption("--auto-build")
+  return BinBuilder(request.param, auto_build=auto_build)
 
 
 @pytest.fixture(scope="module",
@@ -335,6 +345,7 @@ def vamos(request):
   gen = request.config.getoption("--gen-data")
   vopts = request.config.getoption("--vamos-options")
   vamos_bin = request.config.getoption("--vamos-executable")
+  auto_build = request.config.getoption("--auto-build")
   if vopts is not None:
     vopts = vopts.split('+')
   return VamosTestRunner(request.param,
@@ -342,7 +353,8 @@ def vamos(request):
                          dump_output=dump,
                          generate_data=gen,
                          vopts=vopts,
-                         vamos_bin=vamos_bin)
+                         vamos_bin=vamos_bin,
+                         auto_build=auto_build)
 
 
 @pytest.fixture(scope="module")

@@ -17,7 +17,8 @@ SOURCES_C += math_single.c math_single_trans.c
 SOURCES_C += math_fast.c math_fast_trans.c
 SOURCES_C += test_hello.c test_raise.c
 SOURCES_C += test_devtimer.c
-SOURCES_C += lib_testnix.c
+SOURCES_C += lib_testnix.c lib_testsc.c
+SOURCES_C += proc_args.c
 
 LIB_GCC_SOURCES_C = testnix.c
 LIB_SC_SOURCES_C = testsc.c
@@ -114,10 +115,14 @@ LIBS_SC_DBG  = $(patsubst %.c,$(LIB_BUILD_DIR)-sc-dbg/%.library,$(LIB_SC_SOURCES
 LIBS_SC_DBG += $(patsubst %.c,$(LIB_BUILD_DIR)-sc-res-dbg/%.library,$(LIB_SC_SOURCES_C))
 LIBS_DBG += $(LIBS_SC_DBG)
 
-
 # --- rules ---
 
-all: check $(PROGS) $(PROGS_DBG) $(LIBS) $(LIBS_DBG)
+test:
+	./vamos-test --auto-build
+
+rebuild: clean build
+
+build: check $(PROGS) $(PROGS_DBG) $(LIBS) $(LIBS_DBG)
 
 check:
 	@if [ ! -d volumes/sc ]; then \
@@ -157,6 +162,7 @@ $(BUILD_DIR)/%$(AROS_GCC_EXT) : %.c
 
 $(BUILD_DIR)/%$(SASC_EXT) : %.c
 	$(SASC) $(SASC_OPTS) $(SASC_OPTI) LINK TO $@ $<
+	rm -f $@.lnk $(<:.c=.o)
 
 
 # rules for dbg
@@ -171,6 +177,7 @@ $(BUILD_DIR)/%$(AROS_GCC_EXT)$(DBG_EXT) : %.c
 
 $(BUILD_DIR)/%$(SASC_EXT)$(DBG_EXT) : %.c
 	$(SASC) $(SASC_OPTS) $(SASC_DEBUG) LINK TO $@ $<
+	rm -f $@.lnk $(<:.c=.o)
 
 
 # lib rules: gcc
