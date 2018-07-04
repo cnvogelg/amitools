@@ -227,10 +227,7 @@ setup(
     entry_points=scripts,
     setup_requires=['pytest-runner'],
     tests_require=['pytest'],
-    #    install_requires = ['lhafile==0.2.1'],
-    dependency_links=[
-        "http://github.com/FrodeSolheim/python-lhafile/zipball/master#egg=lhafile-0.2.1"
-    ],
+    install_requires = ['lhafile'],
     ext_modules=extensions,
     # win problems:
     #    use_scm_version=True,

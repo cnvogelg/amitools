@@ -10,26 +10,9 @@ env:
 matrix:
   include:
     - os: osx
-      language: generic
-      env:
-        - TOXENV=py27
-        - BREW_INSTALL=python
+      language: python
 
 install:
-  - |
-    if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
-      if [[ -n "$BREW_INSTALL" ]]; then
-        brew update
-        brew install "$BREW_INSTALL"
-      fi
-      sudo pip install tox
-    fi
   - pip install tox-travis
 
 script: tox
-
-after_success:
-  - |
-    if [[ $TRAVIS_PYTHON_VERSION == $NEWEST_PYTHON && $TRAVIS_OS_NAME == 'linux' ]]; then
-      pip install python-coveralls && coveralls
-    fi
