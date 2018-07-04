@@ -14,11 +14,6 @@ matrix:
       env:
         - TOXENV=py27
         - BREW_INSTALL=python
-    - os: osx
-      language: generic
-      env:
-        - TOXENV=py36
-        - BREW_INSTALL=python3
 
 install:
   - |
