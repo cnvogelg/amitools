@@ -29,7 +29,7 @@ def path_assign_add_del_test(tmpdir):
   assert a.add_assign('Baz', 'foo:bla/blup')
   assert a.is_assign('baz')
   assert a.is_assign('BAZ')
-  assert a.get_all_names() == ['foo', 'Baz']
+  assert sorted(a.get_all_names()) == ['Baz', 'foo']
   assert a.get_assign('baz') == ['foo:bla/blup']
   # invalid path
   assert not a.add_assign('bar', 'bla')
