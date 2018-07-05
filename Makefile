@@ -38,3 +38,6 @@ sdist:
 upload: sdist
 	twine upload dist/*
 
+docker-build:
+	docker build -t amitools-tox .
+
