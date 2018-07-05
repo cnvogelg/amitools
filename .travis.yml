@@ -2,6 +2,8 @@ sudo: false
 language: python
 python:
   - "2.7"
+env:
+  - PIP=pip
 
 matrix:
   include:
@@ -10,13 +12,14 @@ matrix:
       language: generic
       env:
         - TOXENV=py27
+        - PIP=pip2
 
 install:
   - |
     if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
-      pip install tox
+      $PIP install tox
     fi
-  - pip install cython
-  - pip install tox-travis
+  - $PIP install cython
+  - $PIP install tox-travis
 
 script: tox
