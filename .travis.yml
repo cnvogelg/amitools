@@ -8,8 +8,19 @@ matrix:
     - os: linux
     - os: osx
       language: generic
+      env:
+        - TOXENV=py27
+        - BREW_INSTALL=python
 
 install:
+  - |
+    if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
+      if [[ -n "$BREW_INSTALL" ]]; then
+        brew update
+        brew install "$BREW_INSTALL"
+      fi
+      pip install tox
+    fi
   - pip install cython
   - pip install tox-travis
 
