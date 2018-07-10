@@ -1,9 +1,10 @@
-from amitools.vamos.astructs import ExecLibraryStruct, SoftIntListStruct, IntVectorStruct, TaskStruct
+from amitools.vamos.astructs import ExecLibraryStruct, SoftIntListStruct, IntVectorStruct
 from .library import Library
 from .atype import AmigaType
 from .atypedef import AmigaTypeDef
 from .bitfield import BitFieldType
 from .node import NodeType
+from .task import Task
 
 
 @BitFieldType
@@ -25,11 +26,6 @@ class SoftIntList(AmigaType):
 
 @AmigaTypeDef(IntVectorStruct)
 class IntVector(AmigaType):
-  pass
-
-
-@AmigaTypeDef(TaskStruct)
-class Task(AmigaType):
   pass
 
 
