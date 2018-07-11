@@ -25,17 +25,18 @@ typedef struct entry entry_t;
 static entry_t traps[NUM_TRAPS];
 static entry_t *first_free;
 
-static void trap_unbound(uint opcode, uint pc, void *data)
-{
-  printf("UNBOUND TRAP: code=%04x, pc=%06x\n", opcode, pc);
-}
-
 int trap_aline(uint opcode, uint pc)
 {
   uint off = opcode & TRAP_MASK;
   trap_func_t func = traps[off].trap;
   void *data = traps[off].data;
   int flags = traps[off].flags;
+
+  /* unbound trap? */
+  if(func == NULL) {
+    /* regular m68k ALINE exception */
+    return M68K_ALINE_EXCEPT;
+  }
 
   /* a one shot trap is removed before it is triggered
   ** otherwise, trap-functions used to capture "end-of-call"s
@@ -61,12 +62,12 @@ void trap_init(void)
   /* setup free list */
   first_free = &traps[0];
   for(i=0;i<(NUM_TRAPS-1);i++) {
-    traps[i].trap = trap_unbound;
+    traps[i].trap = NULL;
     traps[i].next = &traps[i+1];
     traps[i].flags = 0;
     traps[i].data = NULL;
   }
-  traps[NUM_TRAPS-1].trap = trap_unbound;
+  traps[NUM_TRAPS-1].trap = NULL;
   traps[NUM_TRAPS-1].next = NULL;
   traps[NUM_TRAPS-1].flags = 0;
   traps[NUM_TRAPS-1].data = NULL;
@@ -101,7 +102,7 @@ void trap_free(int id)
 {
   /* insert trap into free list */
   traps[id].next = first_free;
-  traps[id].trap = trap_unbound;
+  traps[id].trap = NULL;
   traps[id].flags = 0;
   traps[id].data = NULL;
   first_free = &traps[id];

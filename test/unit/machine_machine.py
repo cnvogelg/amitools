@@ -10,45 +10,27 @@ import logging
 log_machine.setLevel(logging.DEBUG)
 
 
-def create_machine():
-  m = Machine(Machine.CPU_TYPE_68000, raise_on_main_run=False)
+def create_machine(cpu_type=Machine.CPU_TYPE_68000):
+  m = Machine(cpu_type, raise_on_main_run=False)
   cpu = m.get_cpu()
   mem = m.get_mem()
-  traps = m.get_traps()
   code = m.get_ram_begin()
-  stack = code + 0x1000
-  return m, cpu, mem, traps, code, stack
+  stack = m.get_scratch_top()
+  return m, cpu, mem, code, stack
 
 
 def machine_machine_run_rts_test():
-  m, cpu, mem, traps, code, stack = create_machine()
+  m, cpu, mem, code, stack = create_machine()
   # single RTS to immediately return from run
   mem.w16(code, op_rts)
   rs = m.run(code, stack)
   assert rs.done
   assert rs.error is None
-  m.cleanup()
-
-
-def machine_machine_shutdown_test():
-  m, cpu, mem, traps, code, stack = create_machine()
-  a = []
-  # set shutdown handler
-
-  def my_shutdown():
-    a.append(1)
-  m.set_shutdown_hook(my_shutdown)
-  # single RTS to immediately return from run
-  mem.w16(code, op_rts)
-  rs = m.run(code, stack)
-  assert rs.done
-  assert rs.error is None
-  assert a == [1]
   m.cleanup()
 
 
 def machine_machine_instr_hook_test():
-  m, cpu, mem, traps, code, stack = create_machine()
+  m, cpu, mem, code, stack = create_machine()
   a = []
   # set instr hook
 
@@ -66,7 +48,7 @@ def machine_machine_instr_hook_test():
 
 
 def machine_machine_cpu_mem_trace_test():
-  m, cpu, mem, traps, code, stack = create_machine()
+  m, cpu, mem, code, stack = create_machine()
   a = []
   # set instr hook
 
@@ -78,12 +60,12 @@ def machine_machine_cpu_mem_trace_test():
   rs = m.run(code, stack)
   assert rs.done
   assert rs.error is None
-  assert a[0] == ('R', 2, 0, 0x1800)
+  assert a[0] == ('R', 2, 0, stack)
   m.cleanup()
 
 
 def machine_machine_cpu_mem_invalid_test(caplog):
-  m, cpu, mem, traps, code, stack = create_machine()
+  m, cpu, mem, code, stack = create_machine()
   a = []
   rs = m.run(0xf80000, stack)
   assert rs.done
@@ -96,77 +78,66 @@ def machine_machine_cpu_mem_invalid_test(caplog):
 
 
 def machine_machine_run_nested_ok_test():
-  m, cpu, mem, traps, code, stack = create_machine()
+  m, cpu, mem, code, stack = create_machine()
   a = []
   res = []
 
   def nested2(op, pc):
     a.append(3)
 
-  tid2 = traps.setup(nested2, auto_rts=True)
-  opc2 = 0xa000 | tid2
-  ncode = code + 0x100
-  mem.w16(ncode, opc2)
+  addr2 = m.setup_quick_trap(nested2)
 
   def nested(op, pc):
     a.append(1)
-    rs = m.run(ncode)
+    rs = m.run(addr2)
     res.append(rs)
     a.append(2)
 
-  tid = traps.setup(nested, auto_rts=True)
-  opc = 0xa000 | tid
-  mem.w16(code, opc)
-  rs = m.run(code, stack)
+  addr = m.setup_quick_trap(nested)
+  rs = m.run(addr, stack)
   assert rs.done
   assert rs.error is None
   assert a == [1, 3, 2]
   rs2 = res[0]
   assert rs2.done
   assert rs2.error is None
-  traps.free(tid)
-  traps.free(tid2)
   m.cleanup()
 
 
 def machine_machine_run_raise_test():
-  m, cpu, mem, traps, code, stack = create_machine()
+  m, cpu, mem, code, stack = create_machine()
   error = ValueError("bla")
 
   def nested(op, pc):
     raise error
 
-  tid = traps.setup(nested, auto_rts=True)
-  opc = 0xa000 | tid
-  mem.w16(code, opc)
-  rs = m.run(code, stack)
+  addr = m.setup_quick_trap(nested)
+  rs = m.run(addr, stack)
   assert rs.done
   assert rs.error == error
-  traps.free(tid)
   m.cleanup()
 
 
 def machine_machine_run_raise2_test():
-  m, cpu, mem, traps, code, stack = create_machine()
+  m, cpu, mem, code, stack = create_machine()
   error = ValueError("bla")
 
   def nested(op, pc):
     raise error
 
-  tid = traps.setup(nested)
-  opc = 0xa000 | tid
-  mem.w16(code, opc)
-  mem.w16(code+2, op_nop)
-  mem.w16(code+4, op_rts)
+  addr = m.setup_quick_trap(nested)
+  mem.w16(code, op_jmp)
+  mem.w32(code+2, addr)
+  mem.w16(code+6, op_nop)
+  mem.w16(code+8, op_rts)
   rs = m.run(code, stack)
   assert rs.done
   assert rs.error == error
-  traps.free(tid)
   m.cleanup()
 
 
 def machine_machine_run_nested_raise_test():
-  m, cpu, mem, traps, code, stack = create_machine()
+  m, cpu, mem, code, stack = create_machine()
   a = []
   res = []
   error = ValueError("bla")
@@ -174,12 +145,12 @@ def machine_machine_run_nested_raise_test():
   def nested2(op, pc):
     raise error
 
-  tid2 = traps.setup(nested2)
-  opc2 = 0xa000 | tid2
   ncode = code + 0x100
-  mem.w16(ncode, opc2)
-  mem.w16(ncode+2, op_nop)
-  mem.w16(ncode+2, op_rts)
+  addr2 = m.setup_quick_trap(nested2)
+  mem.w16(ncode, op_jmp)
+  mem.w32(ncode+2, addr2)
+  mem.w16(ncode+6, op_nop)
+  mem.w16(ncode+8, op_rts)
 
   def nested(op, pc):
     a.append(1)
@@ -187,37 +158,42 @@ def machine_machine_run_nested_raise_test():
     res.append(rs)
     a.append(2)
 
-  tid = traps.setup(nested)
-  opc = 0xa000 | tid
-  mem.w16(code, opc)
-  mem.w16(code+2, op_nop)
-  mem.w16(code+4, op_rts)
+  addr = m.setup_quick_trap(nested)
+  mem.w16(code, op_jmp)
+  mem.w32(code+2, addr)
+  mem.w16(code+6, op_nop)
+  mem.w16(code+8, op_rts)
 
   rs = m.run(code, stack)
   assert rs.done
-  assert type(rs.error) == NestedCPURunError
+  assert type(rs.error) is NestedCPURunError
   assert rs.error.error == error
   assert a == [1]
-
-  traps.free(tid)
-  traps.free(tid2)
   m.cleanup()
 
 
-def machine_machine_run_trap_unbound_test(capfd):
-  m, cpu, mem, traps, code, stack = create_machine()
-  # place an unbound trap
+def machine_machine_run_trap_unbound_test():
+  m, cpu, mem, code, stack = create_machine()
+  # place an unbound trap -> raise ALINE exception
   mem.w16(code, 0xa100)
   # single RTS to immediately return from run
   mem.w16(code+2, op_rts)
   rs = m.run(code, stack)
   assert rs.done
-  assert rs.error is None
+  assert type(rs.error) is InvalidCPUStateError
+  assert rs.error.pc == code
   m.cleanup()
-  captured = capfd.readouterr()
-  assert captured.out.strip().split('\n') == [
-      'UNBOUND TRAP: code=a100, pc=000800'
-  ]
+
+
+def machine_machine_run_addr_exc_test():
+  m, cpu, mem, code, stack = create_machine()
+  m.show_instr()
+  # invalid odd address!
+  rs = m.run(code+1, stack)
+  assert rs.done
+  assert type(rs.error) is InvalidCPUStateError
+  assert rs.error.pc == code+1
+  m.cleanup()
 
 
 def machine_machine_cfg_test():
@@ -235,4 +211,3 @@ def machine_machine_cfg_test():
   assert m.max_cycles == 128
   assert m.cycles_per_run == 2000
   assert m.get_label_mgr()
-

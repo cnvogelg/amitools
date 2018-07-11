@@ -146,7 +146,8 @@
  * access a word or longword at an odd address.
  * NOTE: This is only emulated properly for 68000 mode.
  */
-#define M68K_EMULATE_ADDRESS_ERROR  OPT_OFF
+/* CV Patch */
+#define M68K_EMULATE_ADDRESS_ERROR  OPT_ON
 
 
 /* Turn ON to enable logging of illegal instruction calls.
@@ -160,7 +161,7 @@
 /* ---------- CV AddOns ---------- */
 
 /* Intercept illegal A-Line opcodes and call hook.
-   Hook prototype is: int hook() 
+   Hook prototype is: int hook()
    If return == 0 then normal A-Line exception handling is performed.
    Otherwise nothing is done.
  */

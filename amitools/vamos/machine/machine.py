@@ -37,20 +37,32 @@ class Machine(object):
 
      Minimal Memory Layout:
      ----------------------
+
+     VBR
+
      000000    SP before Reset / Later mem0
      000004    PC before Reset / Later mem4
 
-     000008    Exception Vectors
-     ......    mapped to RESET @ 0x400
-     0003FC
+     000008    BEGIN Exception Vectors
+     ......    mapped to RESET @ 4FC
+     0003FC    END Exception Vectors
+
+     Machine Area
 
      000400    RESET opcode for run nesting 0
      000402    RESET opcode for run nesting 1
      ...
-     00041C    RESET opcode for run nesting 15
-     000420    RESET opcode for Exception Vectors
-     000422    TRAP (autorts) for shutdown func
+     0004F8    RESET opcode for run nesting 125
+     0004FC    RESET opcode for exception
 
+     000500    Quick Trap 0
+     000502    Quick Trap 1
+     ...       ...
+     0005FC    Quick Trap 127
+
+     000600    BEGIN of scratch area
+     ...       e.g. used for sys stack
+     0007FC    END of scratch area
      000800    RAM begin. useable by applications
   """
 
@@ -58,10 +70,12 @@ class Machine(object):
   CPU_TYPE_68020 = M68K_CPU_TYPE_68020
 
   run_reset_addr = 0x400
-  run_max_nesting = 16
-  reset_exvec_addr = 0x420
-  shutdown_trap_addr = 0x422
+  run_max_nesting = 126
+  reset_exvec_addr = 0x4FC
   ram_begin = 0x800
+  scratch_begin = 0x600
+  quick_trap_begin = 0x500
+  quick_trap_num = 128
 
   def __init__(self, cpu_type=M68K_CPU_TYPE_68000, ram_size_kib=1024,
                use_labels=True, raise_on_main_run=True,
@@ -86,19 +100,18 @@ class Machine(object):
     self.run_states = []
     self.mem0 = 0
     self.mem4 = 0
-    self.shutdown_func = None
     self.instr_hook = None
     self.cycles_per_run = cycles_per_run
     self.max_cycles = max_cycles
     self.bail_out = False
     # call init
-    self._alloc_trap()
     self._init_base_mem()
     self._setup_handler()
+    self._setup_quick_traps()
 
   def cleanup(self):
     """clean up after use"""
-    self._free_trap()
+    self._cleanup_quick_traps()
     self.cpu.cleanup()
     self.mem.cleanup()
     self.traps.cleanup()
@@ -150,18 +163,13 @@ class Machine(object):
     else:
       return None
 
-  def _alloc_trap(self):
-    self.shutdown_tid = self.traps.setup(self._shutdown_trap, auto_rts=True)
-
-  def _free_trap(self):
-    self.traps.free(self.shutdown_tid)
-
   def _init_base_mem(self):
     m = self.mem
     # m68k exception vector table
     addr = 8
     for i in xrange(254):
       m.w32(addr, self.reset_exvec_addr)
+      addr += 4
     # run reset table
     addr = self.run_reset_addr
     for i in xrange(self.run_max_nesting):
@@ -170,9 +178,6 @@ class Machine(object):
     assert addr == self.reset_exvec_addr
     # reset exc vector
     m.w16(self.reset_exvec_addr, op_reset)
-    # trap for shutdown
-    opc = op_trap | self.shutdown_tid
-    m.w16(self.shutdown_trap_addr, opc)
 
   def _setup_handler(self):
     # reset opcode handler
@@ -181,6 +186,45 @@ class Machine(object):
     self.mem.set_invalid_func(self._invalid_mem_access)
     # set traps exception handler
     self.traps.set_exc_func(self._trap_exc_handler)
+
+  def _setup_quick_traps(self):
+    m = self.mem
+    addr = self.quick_trap_begin
+    for i in xrange(self.quick_trap_num):
+      m.w16(addr, 0)
+      addr += 2
+
+  def _cleanup_quick_traps(self):
+    m = self.mem
+    addr = self.quick_trap_begin
+    for i in xrange(self.quick_trap_num):
+      v = m.r16(addr)
+      addr += 2
+      if v != 0:
+        tid = v & 0xfff
+        self.traps.free(tid)
+
+  def setup_quick_trap(self, func):
+    m = self.mem
+    addr = self.quick_trap_begin
+    for i in xrange(self.quick_trap_num):
+      v = m.r16(addr)
+      if v == 0:
+        tid = self.traps.setup(func, auto_rts=True)
+        opc = 0xa000 | tid
+        m.w16(addr, opc)
+        return addr
+      addr += 2
+
+  def free_quick_trap(self, addr):
+    off = addr - self.quick_trap_begin
+    if off < 0 or off >= self.quick_trap_num or off & 1:
+      raise ValueError("invalid quick trap addr: %06x" % addr)
+    m = self.mem
+    opc = m.r16(addr)
+    tid = opc & 0xfff
+    self.traps.free(tid)
+    m.w16(addr, 0)
 
   def get_cpu(self):
     return self.cpu
@@ -199,6 +243,12 @@ class Machine(object):
 
   def get_label_mgr(self):
     return self.label_mgr
+
+  def get_scratch_top(self):
+    return self.ram_begin - 4
+
+  def get_scratch_begin(self):
+    return self.scratch_begin
 
   def get_ram_begin(self):
     """start of useable RAM for applications"""
@@ -232,12 +282,6 @@ class Machine(object):
   def set_cycles_per_run(self, num):
     self.cycles_per_run = num
 
-  def set_shutdown_hook(self, func):
-    """set a function to trigger before top-level run ends.
-       its a trap that still runs during m68k execution.
-    """
-    self.shutdown_func = func
-
   def set_instr_hook(self, func):
     self.cpu.set_instr_hook_callback(func)
 
@@ -270,10 +314,6 @@ class Machine(object):
   def get_cur_run_state(self):
     assert len(self.run_states) > 0
     return self.run_states[-1]
-
-  def _shutdown_trap(self, op, pc):
-    log_machine.debug("trigger shutdown func")
-    self.shutdown_func()
 
   def _invalid_mem_access(self, mode, width, addr):
     log_machine.debug("invalid memory access: mode=%s width=%d addr=%06x",
@@ -318,8 +358,9 @@ class Machine(object):
       return
     # m68k Exception Triggered
     elif pc == self.reset_exvec_addr:
-      exc_num = callee_pc >> 2
-      txt = "m68k Exception #%d" % exc_num
+      sr = self.mem.r16(sp)
+      pc = self.mem.r32(sp+2)
+      txt = "m68k Exception: sr=%04x" % sr
     # some other unexpected RESET opcode found
     else:
       txt = "Unexpected RESET opcode"
@@ -366,10 +407,6 @@ class Machine(object):
 
     # store return address on stack
     mem.w32(sp, ret_addr)
-    # if a shutdown func is set then push its trap addr to stack, too
-    if self.shutdown_func and nesting == 0:
-      sp -= 4
-      mem.w32(sp, self.shutdown_trap_addr)
 
     # pulse reset to setup PC, SP and restore mem0,4
     mem.w32(0, sp)
