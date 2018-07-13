@@ -11,7 +11,7 @@ from .list_ import List, MinList
 from .library import Library, LibFlags
 from .resident import Resident, ResidentFlags, AutoInit
 from .execlib import ExecLibrary
-from .task import Task
+from .task import Task, TaskFlags, TaskState
 from .msg import MsgPort, Message
 
 # dos
