@@ -60,7 +60,18 @@ On Linux Ubuntu use the provided packages ```python-pip```
 sudo apt-get install python-pip
 ```
 
-#### Windows
+#### Windows with Visual Studio
+
+  - Install the latest native Windows Python 2.7.x from [python.org][6]
+  - There is a special Edition for Visual Studio available that allows
+    to compile Python 2.7 modules: Install [VCPython2.7][5]
+  - Open the Command Shell of the Compiler and run
+```
+C:\Python27\Scripts
+pip install amitools
+```
+
+#### Windows with MSYS2
 
  - (I use the mingw gcc compiler here to build the extension)
  - On Windows with [MSYS2][4] (use x86_64 version if possible):
@@ -80,6 +91,9 @@ pacman -S mingw-w64-x86_64-python2-pip mingw-w64-x86_64-gcc git make
 [2]: https://www.macports.org
 [3]: https://brew.sh
 [4]: https://github.com/msys2/msys2/wiki
+[5]: https://www.microsoft.com/en-gb/download/details.aspx?id=44266
+[6]: https://www.python.org
+
 
 ## Installation
 
