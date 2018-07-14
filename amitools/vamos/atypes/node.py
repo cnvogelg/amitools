@@ -1,7 +1,8 @@
 from amitools.vamos.astructs import NodeStruct, MinNodeStruct
-from .atype import AmigaType
+from .atype import AmigaType, AmigaTypeWithName
 from .atypedef import AmigaTypeDef
 from .enum import EnumType
+from .cstring import CString
 
 
 @EnumType
@@ -66,7 +67,7 @@ class MinNode(AmigaType):
 
 
 @AmigaTypeDef(NodeStruct, wrap={'type': NodeType}, funcs=funcs)
-class Node(AmigaType):
+class Node(AmigaTypeWithName):
   """wrap an Exec Node in memory an allow to operate on its values.
   """
 
@@ -75,12 +76,13 @@ class Node(AmigaType):
         (self.addr, self.get_pred(True), self.get_succ(True),
          self.get_type(), self.get_pri(), self.get_name())
 
-  def setup(self, succ, pred, nt, pri, name):
+  def setup(self, succ, pred, nt, pri, name=None):
     self.set_succ(succ)
     self.set_pred(pred)
     self.set_type(nt)
     self.set_pri(pri)
-    self.set_name(name)
+    if name:
+      self.set_name(name)
 
   # ----- node ops -----
 

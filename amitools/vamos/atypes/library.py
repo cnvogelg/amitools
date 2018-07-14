@@ -22,8 +22,8 @@ class Library(AmigaType):
   def __init__(self, mem, addr, alloc=None):
     AmigaType.__init__(self, mem, addr)
     # extra alloc info
-    self._name_obj = None
-    self._id_str_obj = None
+    self._name_cstr = None
+    self._id_str_cstr = None
     self._label = None
     self._alloc = alloc
     self._mem_obj = None
@@ -66,24 +66,6 @@ class Library(AmigaType):
   @classmethod
   def alloc(cls, alloc, name, id_str, neg_size, pos_size=None):
     """alocate library and optional name and id_str CStrings"""
-    # handle name
-    if type(name) is CString:
-      name_obj = None
-    elif type(name) is str:
-      tag = "LibName(%s)" % name
-      name_obj = CString.alloc(alloc, name, tag)
-      name = name_obj
-    else:
-      raise ValueError("name must be str or CString")
-    # handle id_str
-    if type(id_str) is CString:
-      id_str_obj = None
-    elif type(id_str) is str:
-      tag = "LibIdStr(%s)" % name
-      id_str_obj = CString.alloc(alloc, id_str, tag)
-      id_str = id_str_obj
-    else:
-      raise ValueError("id_str must be str or CString")
     # calc size
     if pos_size is None:
       pos_size = cls.get_type_size()
@@ -108,10 +90,12 @@ class Library(AmigaType):
                                size=total_size, offset=neg_size)
       label_mgr.add_label(lib._label)
     # set name and id_str
-    lib._name_obj = name_obj
-    lib._id_str_obj = id_str_obj
-    lib.set_name(name)
-    lib.set_id_string(id_str)
+    if name:
+      lib._name_cstr = CString.alloc(alloc, name)
+      lib.set_name(lib._name_cstr)
+    if id_str:
+      lib._id_str_cstr = CString.alloc(alloc, id_str)
+      lib.set_id_string(lib._id_str_cstr)
     return lib
 
   def free(self):
@@ -123,13 +107,13 @@ class Library(AmigaType):
       mem_obj = self._alloc.get_memory(addr)
     self._alloc.free_memory(mem_obj)
     # cleanup name
-    if self._name_obj:
-      self._name_obj.free()
-      self._name_obj = None
+    if self._name_cstr:
+      self._name_cstr.free()
+      self._name_cstr = None
     # cleanup id str
-    if self._id_str_obj:
-      self._id_str_obj.free()
-      self._id_str_obj = None
+    if self._id_str_cstr:
+      self._id_str_cstr.free()
+      self._id_str_cstr = None
     # cleanup label
     if self._label:
       self._alloc.get_label_mgr().remove_label(self._label)

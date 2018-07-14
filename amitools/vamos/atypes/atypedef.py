@@ -1,5 +1,5 @@
 import re
-from .atype import AmigaType
+from .atype import AmigaType, AmigaTypeWithName
 from .cstring import CString
 
 
@@ -33,7 +33,8 @@ class AmigaTypeDecorator(object):
 
   def _validate_class(self, cls):
     # make sure cls is derived from AmigaStruct
-    if cls.__bases__ != (AmigaType, ):
+    if cls.__bases__ != (AmigaType, ) and \
+       cls.__bases__ != (AmigaTypeWithName, ):
       raise RuntimeError("cls must dervive from AmigaType")
     # get name of type
     name = self.struct_def.get_type_name()

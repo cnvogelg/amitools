@@ -1,5 +1,5 @@
 from amitools.vamos.astructs import TaskStruct
-from .atype import AmigaType
+from .atype import AmigaTypeWithName
 from .atypedef import AmigaTypeDef
 from .bitfield import BitFieldType
 from .enum import EnumType
@@ -29,14 +29,7 @@ class TaskState(object):
 
 
 @AmigaTypeDef(TaskStruct, wrap={'Flags': TaskFlags, 'State': TaskState})
-class Task(AmigaType):
-
-  def __init__(self, mem, addr, alloc=None):
-    AmigaType.__init__(self, mem, addr)
-    # extra alloc info
-    self._alloc = alloc
-    self._name_obj = None
-    self._mem_obj = None
+class Task(AmigaTypeWithName):
 
   def setup(self, pri=0, flags=0, nt=NodeType.NT_TASK):
     node = self.get_node()
@@ -46,29 +39,6 @@ class Task(AmigaType):
     self.set_flags(flags)
     self.set_state(TaskState.TS_INVALID)
     self.mem_entry.new_list(NodeType.NT_MEMORY)
-
-  @classmethod
-  def alloc(cls, alloc, name):
-    # handle name
-    tag = name
-    if type(name) is CString:
-      name_obj = None
-    elif type(name) is str:
-      tag = "TaskName(%s)" % name
-      name_obj = CString.alloc(alloc, name, tag)
-      name = name_obj
-    else:
-      raise ValueError("name must be str or CString")
-    task = cls._alloc(alloc, tag)
-    task.set_name(name)
-    task._name_obj = name_obj
-    return task
-
-  def free(self):
-    AmigaType.free(self)
-    if self._name_obj:
-      self._name_obj.free()
-      self._name_obj = None
 
   def set_name(self, val):
     self.get_node().set_name(val)

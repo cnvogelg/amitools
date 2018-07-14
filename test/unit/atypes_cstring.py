@@ -43,5 +43,21 @@ def atypes_cstring_null_test():
   assert cs
   assert cs.get_addr() == 0
   assert cs.get_string() is None
-  with pytest.raises(RuntimeError):
-    cs.free()
+  cs.free()
+  assert alloc.is_all_free()
+
+
+def atypes_cstring_alloc_cstr_test():
+  mem = MockMemory()
+  alloc = MemoryAlloc(mem)
+  # no string
+  cs = CString.alloc(alloc, "bla")
+  cs2 = CString.alloc(alloc, cs)
+  assert cs
+  assert cs.get_string() == "bla"
+  assert cs2
+  assert cs2.get_string() == "bla"
+  cs.free()
+  cs2.free()
+  assert alloc.is_all_free()
+

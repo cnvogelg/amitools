@@ -1,3 +1,6 @@
+from .cstring import CString
+
+
 class AmigaType(object):
 
   # will be set by decorator
@@ -114,3 +117,26 @@ class AmigaType(object):
         func(val)
       else:
         raise AttributeError
+
+
+class AmigaTypeWithName(AmigaType):
+  def __init__(self, mem, addr, alloc=None):
+    AmigaType.__init__(self, mem, addr)
+    # extra alloc info
+    self._name_cstr = None
+
+  def set_name(self, name):
+    pass
+
+  @classmethod
+  def alloc(cls, alloc, name=None):
+    obj = cls._alloc(alloc, name)
+    if name:
+      obj._name_cstr = CString.alloc(alloc, name)
+      obj.set_name(obj._name_cstr)
+    return obj
+
+  def free(self):
+    AmigaType.free(self)
+    if self._name_cstr:
+      self._name_cstr.free()

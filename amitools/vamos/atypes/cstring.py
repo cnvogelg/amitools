@@ -48,8 +48,6 @@ class CString(object):
       self.mem_obj = None
       self.alloc = None
       self.addr = 0
-    else:
-      raise RuntimeError("string not allocated!")
 
   @staticmethod
   def alloc(alloc, txt, tag=None):
@@ -58,6 +56,8 @@ class CString(object):
     Returns a CString object with allocation info.
     You can free() the object later on
     """
+    if type(txt) is CString:
+      return txt
     if tag is None:
       tag = "CString('%s')" % txt
     mem = alloc.get_mem()

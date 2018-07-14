@@ -2,7 +2,7 @@ from .enum import EnumType
 from .bitfield import BitFieldType
 from .cstring import CString
 
-from .atype import AmigaType
+from .atype import AmigaType, AmigaTypeWithName
 from .atypedef import AmigaTypeDef
 
 # exec
@@ -12,7 +12,7 @@ from .library import Library, LibFlags
 from .resident import Resident, ResidentFlags, AutoInit
 from .execlib import ExecLibrary
 from .task import Task, TaskFlags, TaskState
-from .msg import MsgPort, Message
+from .msg import MsgPort, Message, MsgPortFlags
 
 # dos
 from .process import Process, CLI

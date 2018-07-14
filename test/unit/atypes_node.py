@@ -102,6 +102,17 @@ def atypes_node_alloc_test():
   node = Node.alloc(alloc)
   assert node.get_size() == NodeStruct.get_size()
   node.free()
+  assert alloc.is_all_free()
+
+
+def atypes_node_alloc_name_test():
+  mem = MockMemory()
+  alloc = MemoryAlloc(mem)
+  node = Node.alloc(alloc, "foobar")
+  assert node.get_size() == NodeStruct.get_size()
+  assert node.get_name() == "foobar"
+  node.free()
+  assert alloc.is_all_free()
 
 
 def atypes_node_alloc_min_test():
