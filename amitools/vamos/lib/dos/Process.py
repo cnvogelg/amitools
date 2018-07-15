@@ -169,11 +169,11 @@ class Process:
     self.cli = self.ctx.alloc.alloc_struct(self.bin_basename + "_CLI",CLIStruct)
     self.cli.access.w_s("cli_DefaultStack", self.stack_size / 4) # in longs
     if input_fh != None:
-      self.cli.access.w_s("cli_StandardInput", input_fh.b_addr)
-      self.cli.access.w_s("cli_CurrentInput", input_fh.b_addr)
+      self.cli.access.w_s("cli_StandardInput", input_fh.b_addr << 2)
+      self.cli.access.w_s("cli_CurrentInput", input_fh.b_addr << 2)
     if output_fh != None:
-      self.cli.access.w_s("cli_StandardOutput", output_fh.b_addr)
-      self.cli.access.w_s("cli_CurrentOutput", output_fh.b_addr)
+      self.cli.access.w_s("cli_StandardOutput", output_fh.b_addr << 2)
+      self.cli.access.w_s("cli_CurrentOutput", output_fh.b_addr << 2)
     self.prompt  = self.ctx.alloc.alloc_memory("cli_Prompt",60)
     self.cmdname = self.ctx.alloc.alloc_memory("cli_CommandName",104)
     self.cmdfile = self.ctx.alloc.alloc_memory("cli_CommandFile",40)

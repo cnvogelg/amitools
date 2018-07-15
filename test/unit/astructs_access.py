@@ -45,7 +45,7 @@ def mem_access_invalid_node_test():
   with pytest.raises(KeyError):
     a.w_s('bla', 12)
   with pytest.raises(KeyError):
-    a.r_s('blub', 12)
+    a.r_s('blub')
 
 
 def mem_access_s_get_addr_test():

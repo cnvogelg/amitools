@@ -1,12 +1,5 @@
 import collections
-
-
-def w_bptr(addr):
-  return addr >> 2
-
-
-def r_bptr(addr):
-  return addr << 2
+from .baddr import BAddr
 
 
 class AmigaStruct(object):
@@ -18,22 +11,22 @@ class AmigaStruct(object):
   _format = None
 
   # name all internal types
-  # and map to (byte width in 2**n, (w_convert, r_convert), signed)
+  # and map to (byte width in 2**n, is_bcpl_ptr, signed)
   _types = {
-      'UBYTE': (0, None, False),
-      'BYTE': (0, None, True),
-      'char': (0, None, False),
-      'UWORD': (1, None, False),
-      'WORD': (1, None, True),
-      'ULONG': (2, None, False),
-      'LONG': (2, None, True),
-      'APTR': (2, None, False),
-      'BPTR': (2, (w_bptr, r_bptr), False),
-      'BSTR': (2, (w_bptr, r_bptr), False),
-      'VOIDFUNC': (2, None, False),
-      'void': (2, None, False),
+      'UBYTE': (0, False, False),
+      'BYTE': (0, False, True),
+      'char': (0, False, False),
+      'UWORD': (1, False, False),
+      'WORD': (1, False, True),
+      'ULONG': (2, False, False),
+      'LONG': (2, False, True),
+      'APTR': (2, False, False),
+      'BPTR': (2, True, False),
+      'BSTR': (2, True, False),
+      'VOIDFUNC': (2, False, False),
+      'void': (2, False, False),
   }
-  _ptr_type = (2, None, False)
+  _ptr_type = (2, False, False)
 
   # these values are filled by the decorator
   _type_name = None
@@ -83,7 +76,7 @@ class AmigaStruct(object):
   @classmethod
   def get_field_offset_for_path(cls, name):
     fields = cls.get_fields_by_path(name)
-    offsets = map(lambda x : x.offset, fields)
+    offsets = map(lambda x: x.offset, fields)
     return sum(offsets)
 
   @classmethod
@@ -177,7 +170,8 @@ class AmigaStruct(object):
     my_name = field.name
     if self._parent:
       addr = self._addr + field.offset
-      st, p_field, _ = self._parent.get_struct_field_for_addr(addr, recurse=False)
+      st, p_field, _ = self._parent.get_struct_field_for_addr(
+          addr, recurse=False)
       return self._parent.get_field_path_name(p_field) + "." + my_name
     else:
       return my_name
@@ -195,7 +189,7 @@ class AmigaStruct(object):
       val = data[idx]
       self.write_field_index(idx, val)
 
-  def read_field_index(self, index, do_conv=True):
+  def read_field_index(self, index):
     field = self._fields[index]
     addr = self._addr + field.offset
     # pointer
@@ -208,19 +202,19 @@ class AmigaStruct(object):
     else:
       base_type = field.base_type
       width = base_type[0]
-      conv = base_type[1]
+      is_baddr = base_type[1]
       signed = base_type[2]
       # read value
       if signed:
         val = self._mem.reads(width, addr)
       else:
         val = self._mem.read(width, addr)
-      # convert?
-      if conv != None and do_conv:
-        val = conv[1](val)
+      # auto convert baddr
+      if is_baddr:
+        val = BAddr(val)
       return val
 
-  def write_field_index(self, index, val, do_conv=True):
+  def write_field_index(self, index, val):
     field = self._fields[index]
     addr = self._addr + field.offset
     # pointer
@@ -233,29 +227,31 @@ class AmigaStruct(object):
     else:
       base_type = field.base_type
       width = base_type[0]
-      conv = base_type[1]
+      is_baddr = base_type[1]
       signed = base_type[2]
       # convert?
-      if conv != None and do_conv:
-        val = conv[0](val)
+      if is_baddr:
+        if type(val) is not BAddr:
+          val = BAddr.from_addr(val)
+        val = val.get_baddr()
       # write value
       if signed:
         self._mem.writes(width, addr, val)
       else:
         self._mem.write(width, addr, val)
 
-  def read_field(self, name, do_conv=True):
+  def read_field(self, name):
     struct, field = self.get_struct_field_for_name(name)
-    return struct.read_field_index(field.index, do_conv)
+    return struct.read_field_index(field.index)
 
-  def read_field_ext(self, name, do_conv=True):
+  def read_field_ext(self, name):
     struct, field = self.get_struct_field_for_name(name)
-    val = struct.read_field_index(field.index, do_conv)
+    val = struct.read_field_index(field.index)
     return struct, field, val
 
-  def write_field(self, name, val, do_conv=True):
+  def write_field(self, name, val):
     struct, field = self.get_struct_field_for_name(name)
-    struct.write_field_index(field.index, val, do_conv)
+    struct.write_field_index(field.index, val)
     return struct, field
 
   def dump(self):
@@ -328,4 +324,3 @@ class AmigaStruct(object):
       self.write_field_index(field.index, val)
     else:
       raise AttributeError
-

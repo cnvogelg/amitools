@@ -46,7 +46,7 @@ class DosList:
         self.first_entry = entry
       else:
         last_entry.next = entry
-        last_entry.access.w_s('dol_Next', entry.baddr)
+        last_entry.access.w_s('dol_Next', entry.baddr << 2)
       last_entry = entry
     assigns = path_mgr.get_all_assign_names()
     for assign in assigns:
@@ -56,7 +56,7 @@ class DosList:
         self.first_entry = entry
       else:
         last_entry.next = entry
-        last_entry.access.w_s('dol_Next', entry.baddr)
+        last_entry.access.w_s('dol_Next', entry.baddr << 2)
       last_entry = entry
 
   def free_list(self):

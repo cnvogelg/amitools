@@ -1,5 +1,5 @@
 from amitools.vamos.machine import MockMemory
-from amitools.vamos.astructs import AmigaStruct, AmigaStructDef
+from amitools.vamos.astructs import AmigaStruct, AmigaStructDef, BAddr
 
 
 @AmigaStructDef
@@ -100,4 +100,21 @@ def astruct_astruct_sub_struct_test():
   ss.ss_My.ms_Word = 2000
   assert ss.ss_My.ms_Word == 2000
 
+
+def astruct_astruct_baddr_test():
+  mem = MockMemory()
+  ms = MyStruct(mem, 0x10)
+  # write int (addr) to baddr
+  ms.ms_SegList = 0x100
+  # baddr auto converts back to addr
+  assert ms.ms_SegList == 0x100
+  # but its an BAddr
+  assert type(ms.ms_SegList) is BAddr
+  assert ms.ms_SegList == BAddr(0x40)
+  # baddr is stored in mem
+  assert mem.r32(0x14) == 0x40
+  # write baddr
+  ms.ms_SegList = BAddr(0x20)
+  assert ms.ms_SegList == BAddr(0x20)
+  assert mem.r32(0x14) == 0x20
 

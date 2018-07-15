@@ -10,8 +10,8 @@ class AccessStruct(object):
     self.struct = struct_def(mem, struct_addr)
     self.trace_mgr = getattr(self.mem, 'trace_mgr', None)
 
-  def w_s(self, name, val, do_conv=True):
-    struct, field = self.struct.write_field(name, val, do_conv)
+  def w_s(self, name, val):
+    struct, field = self.struct.write_field(name, val)
     if self.trace_mgr is not None:
       off = field.offset
       addr = struct.get_addr() + off
@@ -21,8 +21,8 @@ class AccessStruct(object):
       self.trace_mgr.trace_int_mem('W', width, addr, val,
                                    text="Struct", addon=addon)
 
-  def r_s(self, name, do_conv=True):
-    struct, field, val = self.struct.read_field_ext(name, do_conv)
+  def r_s(self, name):
+    struct, field, val = self.struct.read_field_ext(name)
     if self.trace_mgr is not None:
       off = field.offset
       addr = struct.get_addr() + off
