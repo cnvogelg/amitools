@@ -90,7 +90,7 @@ class AmigaTypeDecorator(object):
     gen_type = self._get_gen_type(cls, field)
 
     def get_struct_ptr(self, ptr=False):
-      addr = self._struct.read_field_index(index)
+      addr = int(self._struct.read_field_index(index))
       if ptr:
         return addr
       if addr == 0:
@@ -101,8 +101,12 @@ class AmigaTypeDecorator(object):
       if not type(val) is int:
         if val is None:
           val = 0
-        else:
+        elif isinstance(val, gen_type):
+          # make sure its the correct type
           val = val.addr
+        else:
+          raise ValueError("invalid type assign: want=%s, got=%s" %
+                           (gen_type, type(val)))
       self._struct.write_field_index(index, val)
     self._setup_get_set(base_name, cls, get_struct_ptr, set_struct_ptr)
 

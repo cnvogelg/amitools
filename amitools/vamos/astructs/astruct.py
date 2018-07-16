@@ -194,7 +194,10 @@ class AmigaStruct(object):
     addr = self._addr + field.offset
     # pointer
     if field.is_pointer:
-      return self._mem.r32(addr)
+      val = self._mem.r32(addr)
+      if field.is_baddr:
+        val = BAddr(val)
+      return val
     # embedded struct type
     elif field.struct_type:
       struct = self.create_struct(field)
@@ -219,6 +222,10 @@ class AmigaStruct(object):
     addr = self._addr + field.offset
     # pointer
     if field.is_pointer:
+      if field.is_baddr:
+        if type(val) is not BAddr:
+          val = BAddr.from_addr(int(val))
+        val = val.get_baddr()
       self._mem.w32(addr, val)
     # embedded struct type
     elif field.struct_type:
@@ -232,7 +239,7 @@ class AmigaStruct(object):
       # convert?
       if is_baddr:
         if type(val) is not BAddr:
-          val = BAddr.from_addr(val)
+          val = BAddr.from_addr(int(val))
         val = val.get_baddr()
       # write value
       if signed:

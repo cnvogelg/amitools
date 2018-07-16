@@ -16,4 +16,4 @@ from .task import Task, TaskFlags, TaskState
 from .msg import MsgPort, Message, MsgPortFlags
 
 # dos
-from .process import Process, CLI
+from .process import CLI, Process

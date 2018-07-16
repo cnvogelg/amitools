@@ -1,13 +1,24 @@
 from amitools.vamos.astructs import ProcessStruct, CLIStruct
-from .atype import AmigaType
+from .atype import AmigaTypeWithName, AmigaType
 from .atypedef import AmigaTypeDef
-
-
-@AmigaTypeDef(ProcessStruct)
-class Process(AmigaType):
-  pass
+from .node import NodeType
 
 
 @AmigaTypeDef(CLIStruct)
 class CLI(AmigaType):
   pass
+
+
+@AmigaTypeDef(ProcessStruct)
+class Process(AmigaTypeWithName):
+
+  def setup(self):
+    self.task.setup(nt=NodeType.NT_PROCESS)
+    self.msg_port.setup()
+    self.local_vars.new_list()
+
+  def set_name(self, val):
+    self.task.node.name = val
+
+  def get_name(self, ptr=False):
+    return self.task.node.get_name(ptr)

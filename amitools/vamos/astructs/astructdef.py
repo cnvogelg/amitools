@@ -19,6 +19,7 @@ Field = collections.namedtuple('Field',
                                 'struct_type',
                                 'base_type',
                                 'is_pointer',
+                                'is_baddr',
                                 'index'
                                 ])
 
@@ -68,6 +69,7 @@ class AmigaStructDecorator(object):
       is_pointer = self._is_pointer(type_sig)
       struct_type = self._get_struct_type(pure_name)
       base_type = self._get_base_type(pure_name)
+      is_baddr = self._is_baddr(base_type, type_sig)
 
       # its my type
       if pure_name == my_name:
@@ -79,7 +81,8 @@ class AmigaStructDecorator(object):
       field = Field(type_sig=type_sig, name=name,
                     offset=offset, size=size, end=offset+size,
                     struct_type=struct_type, base_type=base_type,
-                    is_pointer=is_pointer, index=index)
+                    is_pointer=is_pointer, is_baddr=is_baddr,
+                    index=index)
       fields.append(field)
 
       # store name -> index mapping
@@ -139,7 +142,15 @@ class AmigaStructDecorator(object):
     return array_mult * base
 
   def _is_pointer(self, name):
-    return name.find('*') != -1
+    return name.find('*') != -1 or name.find('#') != -1
+
+  def _is_baddr(self, base_type, name):
+    if base_type:
+      return base_type[1]
+    elif name.find('#') != -1:
+      return True
+    else:
+      return False
 
   def _validate_type_signature(self, my_name, type_sig):
     type_name = self._get_pure_name(type_sig)
@@ -159,6 +170,7 @@ class AmigaStructDecorator(object):
     # remove array post fixes and pointers
     comp = name.split('|')
     type_name = comp[0].split('*')[0]
+    type_name = type_name.split('#')[0]
     return type_name
 
   def _validate_class(self, cls):
