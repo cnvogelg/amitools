@@ -16,4 +16,5 @@ from .task import Task, TaskFlags, TaskState
 from .msg import MsgPort, Message, MsgPortFlags
 
 # dos
-from .process import CLI, Process
+from .lock import FileLock, FileHandle
+from .process import CLI, Process, PathList

@@ -3,23 +3,59 @@ from .astruct import AmigaStruct
 
 
 @AmigaStructDef
+class FileLockStruct(AmigaStruct):
+  _format = [
+      ('FileLock#', 'fl_Link'),
+      ('LONG', 'fl_Key'),
+      ('LONG', 'fl_Access'),
+      ('void*', 'fl_Task'),
+      ('BPTR', 'fl_Volume')
+  ]
+
+
+@AmigaStructDef
+class FileHandleStruct(AmigaStruct):
+  _format = [
+      ('void*', 'fh_Link'),
+      ('void*', 'fh_Port'),
+      ('void*', 'fh_Type'),
+      ('LONG', 'fh_Buf'),
+      ('LONG', 'fh_Pos'),
+      ('LONG', 'fh_End'),
+      ('LONG', 'fh_Funcs'),
+      ('LONG', 'fh_Func2'),
+      ('LONG', 'fh_Func3'),
+      ('LONG', 'fh_Args'),
+      ('LONG', 'fh_Arg2')
+  ]
+
+
+@AmigaStructDef
+class PathListStruct(AmigaStruct):
+  _format = [
+      ('PathList#', 'pl_Next'),
+      ('FileLock#', 'pl_Lock')
+  ]
+
+
+@AmigaStructDef
 class CLIStruct(AmigaStruct):
   _format = [
       ('LONG', 'cli_Result2'),
       ('BSTR', 'cli_SetName'),
-      ('BPTR', 'cli_CommandDir'),
+      ('PathList#', 'cli_CommandDir'),
       ('LONG', 'cli_ReturnCode'),
       ('BSTR', 'cli_CommandName'),
       ('LONG', 'cli_FailLevel'),
       ('BSTR', 'cli_Prompt'),
-      ('BPTR', 'cli_StandardInput'),
-      ('BPTR', 'cli_CurrentInput'),
+      ('FileHandle#', 'cli_StandardInput'),
+      ('FileHandle#', 'cli_CurrentInput'),
       ('BSTR', 'cli_CommandFile'),
       ('LONG', 'cli_Interactive'),
       ('LONG', 'cli_Background'),
-      ('BPTR', 'cli_CurrentOutput'),
+      ('FileHandle#', 'cli_CurrentOutput'),
       ('LONG', 'cli_DefaultStack'),
-      ('BPTR', 'cli_StandardOutput'),
+      ('FileHandle#', 'cli_StandardOutput'),
       ('BPTR', 'cli_Module'),
   ]
 
@@ -37,9 +73,9 @@ class ProcessStruct(AmigaStruct):
       ('LONG', 'pr_TaskNum'),
       ('BPTR', 'pr_StackBase'),
       ('LONG', 'pr_Result2'),
-      ('BPTR', 'pr_CurrentDir'),
-      ('BPTR', 'pr_CIS'),
-      ('BPTR', 'pr_COS'),
+      ('FileLock#', 'pr_CurrentDir'),
+      ('FileHandle#', 'pr_CIS'),
+      ('FileHandle#', 'pr_COS'),
       ('APTR', 'pr_ConsoleTask'),
       ('APTR', 'pr_FileSystemTask'),
       ('CLI#', 'pr_CLI'),
@@ -47,14 +83,14 @@ class ProcessStruct(AmigaStruct):
       ('APTR', 'pr_PktWait'),
       ('APTR', 'pr_WindowPtr'),
       # 2.0
-      ('BPTR', 'pr_HomeDir'),
+      ('FileLock#', 'pr_HomeDir'),
       ('LONG', 'pr_Flags'),
       ('VOIDFUNC', 'pr_ExitCode'),
       ('LONG', 'pr_ExitData'),
       ('UBYTE*', 'pr_Arguments'),
       ('MinList', 'pr_LocalVars'),
       ('ULONG', 'pr_ShellPrivate'),
-      ('BPTR', 'pr_CES'),
+      ('FileHandle#', 'pr_CES'),
   ]
 
 
@@ -184,34 +220,6 @@ class FileInfoBlockStruct(AmigaStruct):
       ('UWORD', 'fib_OwnerUID'),
       ('UWORD', 'fib_OwnerGID'),
       ('char|32', 'fib_Reserved')
-  ]
-
-
-@AmigaStructDef
-class FileHandleStruct(AmigaStruct):
-  _format = [
-      ('void*', 'fh_Link'),
-      ('void*', 'fh_Port'),
-      ('void*', 'fh_Type'),
-      ('LONG', 'fh_Buf'),
-      ('LONG', 'fh_Pos'),
-      ('LONG', 'fh_End'),
-      ('LONG', 'fh_Funcs'),
-      ('LONG', 'fh_Func2'),
-      ('LONG', 'fh_Func3'),
-      ('LONG', 'fh_Args'),
-      ('LONG', 'fh_Arg2')
-  ]
-
-
-@AmigaStructDef
-class FileLockStruct(AmigaStruct):
-  _format = [
-      ('BPTR', 'fl_Link'),
-      ('LONG', 'fl_Key'),
-      ('LONG', 'fl_Access'),
-      ('void*', 'fl_Task'),
-      ('BPTR', 'fl_Volume')
   ]
 
 
