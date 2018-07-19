@@ -64,3 +64,13 @@ def atypes_bstring_alloc_bstr_test():
   bs2.free()
   assert alloc.is_all_free()
 
+
+def atypes_bstring_max_size_test():
+  mem = MockMemory()
+  alloc = MemoryAlloc(mem)
+  bs = BString.alloc(alloc, "bla")
+  assert bs.get_max_size() == 3
+  bs.set_string("foo")
+  assert bs == "foo"
+  with pytest.raises(ValueError):
+    bs.set_string("foo!")

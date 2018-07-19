@@ -5,11 +5,12 @@ class CString(object):
   re-allocating memory for it.
   """
 
-  def __init__(self, mem, addr, alloc=None, mem_obj=None):
+  def __init__(self, mem, addr, alloc=None, mem_obj=None, max_size=None):
     self.mem = mem
     self.addr = addr
     self.alloc = alloc
     self.mem_obj = mem_obj
+    self.max_size = max_size
 
   def __str__(self):
     return self.get_string()
@@ -42,12 +43,28 @@ class CString(object):
     else:
       return self.mem.r_cstr(self.addr)
 
+  def get_max_size(self):
+    return self.max_size
+
+  def get_size(self):
+    return len(self.get_string())
+
+  def set_string(self, txt):
+    if self.max_size:
+      if len(txt) > self.max_size:
+        raise ValueError("new string too long!")
+    if self.addr == 0:
+      raise ValueError("cstr is NULL")
+    else:
+      self.mem.w_cstr(self.addr, txt)
+
   def free(self):
     if self.alloc:
       self.alloc.free_cstr(self.mem_obj)
       self.mem_obj = None
       self.alloc = None
       self.addr = 0
+      self.max_size = 0
 
   @staticmethod
   def alloc(alloc, txt, tag=None):
@@ -66,8 +83,10 @@ class CString(object):
       mem_obj = None
       alloc = None
       addr = 0
+      n = 0
     # valid string
     else:
       mem_obj = alloc.alloc_cstr(tag, txt)
       addr = mem_obj.addr
-    return CString(mem, addr, alloc, mem_obj)
+      n = len(txt)
+    return CString(mem, addr, alloc, mem_obj, n)

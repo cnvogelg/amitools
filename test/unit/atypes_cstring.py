@@ -61,3 +61,13 @@ def atypes_cstring_alloc_cstr_test():
   cs2.free()
   assert alloc.is_all_free()
 
+
+def atypes_cstring_max_size_test():
+  mem = MockMemory()
+  alloc = MemoryAlloc(mem)
+  cs = CString.alloc(alloc, "bla")
+  assert cs.get_max_size() == 3
+  cs.set_string("foo")
+  assert cs == "foo"
+  with pytest.raises(ValueError):
+    cs.set_string("foo!")
