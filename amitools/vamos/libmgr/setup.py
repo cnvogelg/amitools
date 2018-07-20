@@ -9,10 +9,12 @@ from .mgr import LibManager
 
 
 class SetupLibManager(object):
-  def __init__(self, machine, mem_map, path_mgr, lib_cfg=None, profiler_cfg=None):
+  def __init__(self, machine, mem_map, scheduler, path_mgr,
+               lib_cfg=None, profiler_cfg=None):
     self.machine = machine
     self.mem_map = mem_map
     self.path_mgr = path_mgr
+    self.scheduler = scheduler
     self.alloc = mem_map.get_alloc()
     self.lib_mgr_cfg = lib_cfg
     self.profiler_cfg = profiler_cfg
@@ -60,7 +62,7 @@ class SetupLibManager(object):
     self.exec_ctx = ExecLibCtx(self.machine, self.alloc,
                                self.seg_loader, self.path_mgr)
     self.dos_ctx = DosLibCtx(self.machine, self.alloc,
-                             self.seg_loader, self.path_mgr,
+                             self.seg_loader, self.path_mgr, self.scheduler,
                              vamos_legacy)
     # create lib mgr
     self.lib_mgr = LibManager(self.machine, self.alloc, self.seg_loader,

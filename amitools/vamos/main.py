@@ -8,6 +8,7 @@ from .Vamos import Vamos
 from .path import VamosPathManager
 from .trace import TraceManager
 from .libmgr import SetupLibManager
+from .schedule import Scheduler
 
 RET_CODE_CONFIG_ERROR = 1000
 
@@ -67,11 +68,14 @@ def main(cfg_files=None, args=None, cfg_dict=None):
     log_main.error("path setup failed!")
     return RET_CODE_CONFIG_ERROR
 
+  # setup scheduler
+  scheduler = Scheduler(machine)
+
   # legacy vamos instance
-  vamos = Vamos(machine, mem_map, path_mgr)
+  vamos = Vamos(mem_map, path_mgr)
 
   # setup lib mgr
-  slm = SetupLibManager(machine, mem_map, path_mgr)
+  slm = SetupLibManager(machine, mem_map, scheduler, path_mgr)
   if not slm.parse_config(mp):
     log_main.error("lib manager setup failed!")
     return RET_CODE_CONFIG_ERROR
@@ -85,24 +89,19 @@ def main(cfg_files=None, args=None, cfg_dict=None):
 
   # setup main proc
   proc_cfg = mp.get_proc_dict().process
-  if not vamos.setup_main_proc(proc_cfg):
+  main_proc = vamos.setup_main_proc(proc_cfg)
+  if not main_proc:
     log_main.error("main proc setup failed!")
     return RET_CODE_CONFIG_ERROR
 
-  # ------ main loop ------
+  # main loop
+  task = main_proc.get_task()
+  scheduler.add_task(task)
+  scheduler.schedule()
 
-  sp = vamos.get_initial_sp()
-  pc = vamos.get_initial_pc()
-  get_regs = [REG_D0]
-  set_regs = vamos.get_initial_regs()
-
-  # run!
-  run_state = machine.run(pc, sp,
-                          set_regs=set_regs,
-                          get_regs=get_regs,
-                          name="main")
-
+  # check proc result
   ok = False
+  run_state = task.get_run_state()
   if run_state.done:
     if run_state.error:
       log_main.error("vamos failed!")
@@ -118,7 +117,7 @@ def main(cfg_files=None, args=None, cfg_dict=None):
 
   # shutdown main proc
   if ok:
-    vamos.cleanup_main_proc()
+    main_proc.free()
 
   # libs shutdown
   slm.close_base_libs()

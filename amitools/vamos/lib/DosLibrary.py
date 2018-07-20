@@ -1391,7 +1391,7 @@ class DosLibrary(LibImpl):
       reg_d1 = packet >> 2
       code_start = ctx.process.shell_start
       log_dos.info("(Shell)SystemTagList: pc=%06x", code_start)
-      ret_code = ctx.vamos.run_command(code_start, 0, 0, stack_size, reg_d1)
+      ret_code = ctx.vamos.run_command(ctx.scheduler, code_start, 0, 0, stack_size, reg_d1)
       log_dos.info("(Shell)SystemTagList returned: cmd='%s' tags=%s: ret_code=%d",
                    cmd, tag_list, ret_code)
 
@@ -1432,7 +1432,7 @@ class DosLibrary(LibImpl):
       if not proc.ok:
         log_dos.warn("SystemTagList: can't create process for '%s' args=%s", binary, arg_str)
         return self.DOSTRUE
-      return ctx.vamos.run_sub_process(proc)
+      return ctx.vamos.run_sub_process(ctx.scheduler, proc)
 
   def LoadSeg(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_D1)
@@ -1489,7 +1489,7 @@ class DosLibrary(LibImpl):
     # round up the stack
     stack    = (stack + 3) & -4
     prog_start = (b_addr << 2) + 4
-    ret_code = ctx.vamos.run_command(prog_start, args, length, stack)
+    ret_code = ctx.vamos.run_command(ctx.scheduler, prog_start, args, length, stack)
     # clear input
     input_fh.setbuf("")
     return ret_code

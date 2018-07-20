@@ -3,7 +3,7 @@ from amitools.vamos.machine.regs import *
 from amitools.vamos.log import log_proc
 from amitools.vamos.astructs import *
 from amitools.vamos.lib.lexec.PortManager import *
-from amitools.vamos.schedule import Stack
+from amitools.vamos.schedule import Stack, Task
 
 NT_PROCESS = 13
 
@@ -43,6 +43,7 @@ class Process:
     self.shell_port    = None
     self.init_task_struct(input_fh, output_fh)
     self.set_cwd()
+    self._init_task()
 
   def free(self):
     if self.shell == False:
@@ -51,7 +52,8 @@ class Process:
     self.free_shell_packet()
     self.free_cli_struct()
     self.free_args()
-    self.stack.free()
+    # stack is freed by scheduler
+    #self.stack.free()
     self.unload_binary()
 
   def __str__(self):
@@ -84,9 +86,6 @@ class Process:
       lock_mgr.release_lock(self.cwd_lock)
 
   # ----- stack -----
-  def get_initial_sp(self):
-    return self.stack.get_initial_sp()
-
   def get_stack(self):
     return self.stack
 
@@ -116,9 +115,6 @@ class Process:
   def unload_binary(self):
     self.ctx.seg_loader.unload_seglist(self.bin_seg_list)
 
-  def get_initial_pc(self):
-    return self.prog_start
-
   # ----- args -----
   def init_args(self, arg_str, fh):
     # Tripos makes the input line available as buffered input for ReadItem()
@@ -135,8 +131,8 @@ class Process:
     if self.arg is not None:
       self.ctx.alloc.free_memory(self.arg)
 
-  # ----- startup -----
-  def get_initial_regs(self):
+  # ----- scheduler task setup -----
+  def _get_start_regs(self):
     regs = {}
     if self.shell:
       # thor: If we run a shell through vamos, then
@@ -151,6 +147,16 @@ class Process:
     # various C programs rely on it being present (1.3-3.1 at least have it).
     regs[REG_D2] = self.stack.get_size()
     return regs
+
+  def _init_task(self):
+    name = self.bin_basename
+    init_pc = self.prog_start
+    start_regs = self._get_start_regs()
+    return_regs = [REG_D0]
+    self.task = Task(name, init_pc, self.stack, start_regs, return_regs)
+
+  def get_task(self):
+    return self.task
 
   # ----- cli struct -----
   def init_cli_struct(self, input_fh, output_fh, name):
