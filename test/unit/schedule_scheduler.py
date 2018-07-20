@@ -1,6 +1,6 @@
 from amitools.vamos.machine import Machine
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.proc import Scheduler, Task, Stack
+from amitools.vamos.schedule import Scheduler, Task, Stack
 from amitools.vamos.machine.opcodes import *
 from amitools.vamos.machine.regs import *
 
@@ -20,7 +20,7 @@ def create_task(alloc, pc, start_regs=None, return_regs=None, name=None):
   return task
 
 
-def proc_scheduler_simple_task_test():
+def schedule_scheduler_simple_task_test():
   machine, sched, alloc = setup()
   mem = alloc.get_mem()
   pc = machine.get_scratch_begin()
@@ -35,7 +35,7 @@ def proc_scheduler_simple_task_test():
   machine.cleanup()
 
 
-def proc_scheduler_cb_test():
+def schedule_scheduler_cb_test():
   tasks = []
 
   def cb(task):
@@ -56,7 +56,7 @@ def proc_scheduler_cb_test():
   assert tasks == [task, None]
 
 
-def proc_scheduler_recursive_add_test():
+def schedule_scheduler_recursive_add_test():
   tasks = []
 
   def cb(task):
@@ -87,7 +87,7 @@ def proc_scheduler_recursive_add_test():
   assert tasks == [task, task2, task, None]
 
 
-def proc_scheduler_sub_task_test():
+def schedule_scheduler_sub_task_test():
   tasks = []
 
   def cb(task):

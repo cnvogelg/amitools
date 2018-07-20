@@ -1,7 +1,7 @@
-from amitools.vamos.proc import Stack
+from amitools.vamos.schedule import Stack
 
 
-def proc_stack_default_test(mem_alloc):
+def schedule_stack_default_test(mem_alloc):
   mem, alloc = mem_alloc
   st = Stack.alloc(alloc, 4096)
   assert st
