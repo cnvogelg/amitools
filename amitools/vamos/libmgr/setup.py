@@ -76,6 +76,8 @@ class SetupLibManager(object):
       self.lib_mgr.add_impl_cls(name, cls)
     # finally bootstrap exec
     self.lib_mgr.bootstrap_exec()
+    # setup scheduler call back
+    self.scheduler.set_cur_task_callback(self.cur_task_callback)
     # return lib_mgr
     return self.lib_mgr
 
@@ -111,3 +113,11 @@ class SetupLibManager(object):
     # close exec
     self.lib_mgr.close_lib(self.exec_addr)
     log_libmgr.info("closed exec")
+
+  def cur_task_callback(self, task):
+    log_libmgr.info("current task: %s", task)
+    if task:
+      proc = task.process
+      self.exec_ctx.set_process(proc)
+      self.exec_impl.set_this_task(proc)
+      self.dos_ctx.set_process(proc)

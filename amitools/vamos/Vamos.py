@@ -15,24 +15,11 @@ class Vamos:
     self.mem_map = mem_map
     self.path_mgr = path_mgr
     self.alloc = mem_map.get_alloc()
-    # no current process right now
-    self.process = None
 
   # ----- process handling -----
 
-  def _set_this_task(self, proc):
-    """tell exec about this process and all others referencing process from here"""
-    self.process = proc
-    self.exec_ctx.set_process(proc)
-    self.exec_lib.set_this_task(proc)
-    self.dos_ctx.set_process(proc)
-
-  def get_current_process(self):
-    return self.process
-
   def run_sub_process(self, scheduler, proc):
     log_proc.info("start sub process: %s", proc)
-    self._set_this_task(proc)
 
     task = proc.get_task()
     self._add_odg_regs(task)
@@ -51,14 +38,14 @@ class Vamos:
 
   # ----- overload a process for RunCommand -----
 
-  def run_command(self, scheduler, start_pc, args_ptr, args_len, stack_size, reg_d1=0):
+  def run_command(self, scheduler, process, start_pc, args_ptr, args_len, stack_size, reg_d1=0):
     new_stack = Stack.alloc(self.alloc, stack_size)
     # save old stack
-    oldstack_upper = self.process.this_task.access.r_s("pr_Task.tc_SPLower")
-    oldstack_lower = self.process.this_task.access.r_s("pr_Task.tc_SPUpper")
+    oldstack_upper = process.this_task.access.r_s("pr_Task.tc_SPLower")
+    oldstack_lower = process.this_task.access.r_s("pr_Task.tc_SPUpper")
     # activate new stack
-    self.process.this_task.access.w_s("pr_Task.tc_SPLower", new_stack.get_upper())
-    self.process.this_task.access.w_s("pr_Task.tc_SPUpper", new_stack.get_lower())
+    process.this_task.access.w_s("pr_Task.tc_SPLower", new_stack.get_upper())
+    process.this_task.access.w_s("pr_Task.tc_SPUpper", new_stack.get_lower())
     # NOTE: the Manx fexec and BPCL mess is not (yet) setup here.
 
     # setup sub task
@@ -89,8 +76,8 @@ class Vamos:
     log_proc.info("return from RunCommand: ret_code=%d", ret_code)
 
     # restore stack values
-    self.process.this_task.access.w_s("pr_Task.tc_SPLower", oldstack_lower)
-    self.process.this_task.access.w_s("pr_Task.tc_SPUpper", oldstack_upper)
+    process.this_task.access.w_s("pr_Task.tc_SPLower", oldstack_lower)
+    process.this_task.access.w_s("pr_Task.tc_SPUpper", oldstack_upper)
 
     # result code
     return ret_code
@@ -140,7 +127,6 @@ class Vamos:
     if not proc.ok:
       return None
     log_proc.info("set main process: %s", proc)
-    self._set_this_task(proc)
     # add some regs
     task = proc.get_task()
     self._add_odg_regs(task)

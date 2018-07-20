@@ -154,6 +154,8 @@ class Process:
     start_regs = self._get_start_regs()
     return_regs = [REG_D0]
     self.task = Task(name, init_pc, self.stack, start_regs, return_regs)
+    # store back ref to process
+    self.task.process = self
 
   def get_task(self):
     return self.task
