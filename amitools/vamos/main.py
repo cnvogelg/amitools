@@ -4,11 +4,11 @@ from .cfg import VamosMainParser
 from .machine import Machine, MemoryMap
 from .machine.regs import *
 from .log import log_main, log_setup
-from .Vamos import Vamos
 from .path import VamosPathManager
 from .trace import TraceManager
 from .libmgr import SetupLibManager
 from .schedule import Scheduler
+from .lib.dos.Process import Process
 
 RET_CODE_CONFIG_ERROR = 1000
 
@@ -71,9 +71,6 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   # setup scheduler
   scheduler = Scheduler(machine)
 
-  # legacy vamos instance
-  vamos = Vamos(path_mgr)
-
   # setup lib mgr
   slm = SetupLibManager(machine, mem_map, scheduler, path_mgr)
   if not slm.parse_config(mp):
@@ -82,14 +79,9 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   slm.setup()
   slm.open_base_libs()
 
-  # legacy quirks
-  vamos.dos_ctx = slm.dos_ctx
-  vamos.exec_ctx = slm.exec_ctx
-  vamos.exec_lib = slm.exec_impl
-
   # setup main proc
   proc_cfg = mp.get_proc_dict().process
-  main_proc = vamos.setup_main_proc(proc_cfg)
+  main_proc = Process.create_main_proc(proc_cfg, path_mgr, slm.dos_ctx)
   if not main_proc:
     log_main.error("main proc setup failed!")
     return RET_CODE_CONFIG_ERROR
