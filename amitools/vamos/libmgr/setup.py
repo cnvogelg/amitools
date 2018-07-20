@@ -52,7 +52,7 @@ class SetupLibManager(object):
                                           append=cfg.output.append,
                                           dump=cfg.output.dump)
 
-  def setup(self, vamos_legacy):
+  def setup(self):
     # create def cfg
     if self.lib_mgr_cfg is None:
       self.lib_mgr_cfg = LibMgrCfg()
@@ -64,7 +64,7 @@ class SetupLibManager(object):
                                self.seg_loader, self.path_mgr)
     self.dos_ctx = DosLibCtx(self.machine, self.alloc,
                              self.seg_loader, self.path_mgr, self.scheduler,
-                             odg_base, vamos_legacy)
+                             odg_base)
     # create lib mgr
     self.lib_mgr = LibManager(self.machine, self.alloc, self.seg_loader,
                               self.lib_mgr_cfg,

@@ -79,7 +79,7 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   if not slm.parse_config(mp):
     log_main.error("lib manager setup failed!")
     return RET_CODE_CONFIG_ERROR
-  slm.setup(vamos)
+  slm.setup()
   slm.open_base_libs()
 
   # legacy quirks
