@@ -11,10 +11,8 @@ from .schedule import Stack, Task
 
 class Vamos:
 
-  def __init__(self, mem_map, path_mgr):
-    self.mem_map = mem_map
+  def __init__(self, path_mgr):
     self.path_mgr = path_mgr
-    self.alloc = mem_map.get_alloc()
 
   # ----- process handling -----
 
@@ -22,7 +20,6 @@ class Vamos:
     log_proc.info("start sub process: %s", proc)
 
     task = proc.get_task()
-    self._add_odg_regs(task)
 
     scheduler.add_task(task)
 
@@ -39,7 +36,9 @@ class Vamos:
   # ----- overload a process for RunCommand -----
 
   def run_command(self, scheduler, process, start_pc, args_ptr, args_len, stack_size, reg_d1=0):
-    new_stack = Stack.alloc(self.alloc, stack_size)
+    ctx = process.ctx
+    alloc = ctx.alloc
+    new_stack = Stack.alloc(alloc, stack_size)
     # save old stack
     oldstack_upper = process.this_task.access.r_s("pr_Task.tc_SPLower")
     oldstack_lower = process.this_task.access.r_s("pr_Task.tc_SPUpper")
@@ -54,15 +53,14 @@ class Vamos:
     # new proc registers: d0=arg_len a0=arg_cptr
     # d2=stack_size.  this value is also in 4(sp) (see Process.init_stack), but
     # various C programs rely on it being present (1.3-3.1 at least have it).
-    odg = self.mem_map.get_old_dos_guard_base()
     set_regs = {
         REG_D0: args_len,
         REG_D1: reg_d1,
         REG_A0: args_ptr,
         REG_D2: stack_size,
-        REG_A2: odg,
-        REG_A5: odg,
-        REG_A6: odg
+        REG_A2: ctx.odg_base,
+        REG_A5: ctx.odg_base,
+        REG_A6: ctx.odg_base
     }
     get_regs = [REG_D0]
     task = Task("RunCommand", start_pc, new_stack, set_regs, get_regs)
@@ -127,14 +125,4 @@ class Vamos:
     if not proc.ok:
       return None
     log_proc.info("set main process: %s", proc)
-    # add some regs
-    task = proc.get_task()
-    self._add_odg_regs(task)
     return proc
-
-  def _add_odg_regs(self, task):
-    regs = task.get_start_regs()
-    odg = self.mem_map.get_old_dos_guard_base()
-    regs[REG_A2] = odg
-    regs[REG_A5] = odg
-    regs[REG_A6] = odg

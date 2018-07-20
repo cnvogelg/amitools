@@ -59,11 +59,12 @@ class SetupLibManager(object):
     # create segment loader
     self.seg_loader = SegmentLoader(self.alloc, self.path_mgr)
     # setup contexts
+    odg_base = self.mem_map.get_old_dos_guard_base()
     self.exec_ctx = ExecLibCtx(self.machine, self.alloc,
                                self.seg_loader, self.path_mgr)
     self.dos_ctx = DosLibCtx(self.machine, self.alloc,
                              self.seg_loader, self.path_mgr, self.scheduler,
-                             vamos_legacy)
+                             odg_base, vamos_legacy)
     # create lib mgr
     self.lib_mgr = LibManager(self.machine, self.alloc, self.seg_loader,
                               self.lib_mgr_cfg,

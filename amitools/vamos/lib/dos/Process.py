@@ -146,6 +146,10 @@ class Process:
     # d2=stack_size.  this value is also in 4(sp) (see Process.init_stack), but
     # various C programs rely on it being present (1.3-3.1 at least have it).
     regs[REG_D2] = self.stack.get_size()
+    # fill old dos regs with guard
+    regs[REG_A2] = self.ctx.odg_base
+    regs[REG_A5] = self.ctx.odg_base
+    regs[REG_A6] = self.ctx.odg_base
     return regs
 
   def _init_task(self):

@@ -72,7 +72,7 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   scheduler = Scheduler(machine)
 
   # legacy vamos instance
-  vamos = Vamos(mem_map, path_mgr)
+  vamos = Vamos(path_mgr)
 
   # setup lib mgr
   slm = SetupLibManager(machine, mem_map, scheduler, path_mgr)
