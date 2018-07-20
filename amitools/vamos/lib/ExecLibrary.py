@@ -45,8 +45,8 @@ class ExecLibrary(LibImpl):
 
   def set_this_task(self, process):
     self.exec_lib.this_task = process.this_task.addr
-    self.stk_lower = process.stack_base
-    self.stk_upper = process.stack_end
+    self.stk_lower = process.get_stack().get_lower()
+    self.stk_upper = process.get_stack().get_upper()
 
   # helper
 

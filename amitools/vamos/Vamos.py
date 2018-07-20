@@ -40,7 +40,7 @@ class Vamos:
     self._set_this_task(proc)
 
     # setup machine run
-    sp = proc.stack_initial
+    sp = proc.get_stack().get_initial_sp()
     pc = proc.prog_start
 
     # new proc registers: d0=arg_len a0=arg_cptr
@@ -50,7 +50,7 @@ class Vamos:
     set_regs = {
       REG_D0: proc.arg_len,
       REG_A0: proc.arg_base,
-      REG_D2: proc.stack_size,
+      REG_D2: proc.get_stack().get_size(),
       REG_A2: odg,
       REG_A5: odg,
       REG_A6: odg

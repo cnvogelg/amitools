@@ -1596,7 +1596,7 @@ class DosLibrary(LibImpl):
     clip_addr = self.Cli(ctx)
     clip      = AccessStruct(ctx.mem,CLIStruct,clip_addr)
     clip.w_s("cli_FailLevel",10)
-    clip.w_s("cli_DefaultStack", ctx.process.stack_size >> 2) # in longs
+    clip.w_s("cli_DefaultStack", ctx.process.get_stack().get_size() >> 2) # in longs
     # Typically, the creator of the CLI would also initialize
     # the prompt and command name arguments. Unfortunately,
     # vamos does not necessarily do that, so cover this here.

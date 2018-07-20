@@ -3,6 +3,7 @@ from amitools.vamos.machine.regs import *
 from amitools.vamos.log import log_proc
 from amitools.vamos.astructs import *
 from amitools.vamos.lib.lexec.PortManager import *
+from amitools.vamos.schedule import Stack
 
 NT_PROCESS = 13
 
@@ -22,7 +23,9 @@ class Process:
     self.ok = self.load_binary(self.cwd_lock,bin_file,shell)
     if not self.ok:
       return
-    self.init_stack(stack_size)
+    # setup stack
+    self.stack = Stack.alloc(self.ctx.alloc, stack_size)
+    log_proc.info(self.stack)
     # thor: the boot shell creates its own CLI if it is not there.
     # but for now, supply it with the Vamos CLI and let it initialize
     # it through the private CliInit() call of the dos.library
@@ -48,7 +51,7 @@ class Process:
     self.free_shell_packet()
     self.free_cli_struct()
     self.free_args()
-    self.free_stack()
+    self.stack.free()
     self.unload_binary()
 
   def __str__(self):
@@ -81,26 +84,11 @@ class Process:
       lock_mgr.release_lock(self.cwd_lock)
 
   # ----- stack -----
-  # stack size in KiB
-  def init_stack(self, stack_size):
-    self.stack_size = stack_size
-    self.stack = self.ctx.alloc.alloc_memory( self.bin_basename + "_stack", self.stack_size )
-    self.stack_base = self.stack.addr
-    self.stack_end = self.stack_base + self.stack_size
-    log_proc.info("stack: base=%06x end=%06x", self.stack_base, self.stack_end)
-    log_proc.info(self.stack)
-    # prepare stack
-    # TOP: size
-    # TOP-4: return from program
-    self.stack_initial = self.stack_end - 4
-    self.ctx.mem.w32(self.stack_initial, self.stack_size)
-    self.stack_initial -= 4
-
-  def free_stack(self):
-    self.ctx.alloc.free_memory(self.stack)
-
   def get_initial_sp(self):
-    return self.stack_initial
+    return self.stack.get_initial_sp()
+
+  def get_stack(self):
+    return self.stack
 
   # ----- binary -----
   def load_binary(self, lock, ami_bin_file, shell=False):
@@ -161,13 +149,13 @@ class Process:
       regs[REG_A0] = self.arg_base
     # d2=stack_size.  this value is also in 4(sp) (see Process.init_stack), but
     # various C programs rely on it being present (1.3-3.1 at least have it).
-    regs[REG_D2] = self.stack_size
+    regs[REG_D2] = self.stack.get_size()
     return regs
 
   # ----- cli struct -----
   def init_cli_struct(self, input_fh, output_fh, name):
     self.cli = self.ctx.alloc.alloc_struct(self.bin_basename + "_CLI",CLIStruct)
-    self.cli.access.w_s("cli_DefaultStack", self.stack_size / 4) # in longs
+    self.cli.access.w_s("cli_DefaultStack", self.stack.get_size() / 4) # in longs
     if input_fh != None:
       self.cli.access.w_s("cli_StandardInput", input_fh.b_addr << 2)
       self.cli.access.w_s("cli_CurrentInput", input_fh.b_addr << 2)
