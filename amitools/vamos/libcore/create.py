@@ -20,7 +20,7 @@ class LibCreator(object):
     self.profiler = profiler
     self.stub_gen = LibStubGen(log_missing=log_missing, log_valid=log_valid)
 
-  def _create_library(self, info, is_dev):
+  def _create_library(self, info, is_dev, fd):
     if is_dev:
       ltype = NodeType.NT_DEVICE
     else:
@@ -29,7 +29,7 @@ class LibCreator(object):
     id_str = info.get_id_string()
     neg_size = info.get_neg_size()
     pos_size = info.get_pos_size()
-    library = Library.alloc(self.alloc, name, id_str, neg_size, pos_size)
+    library = Library.alloc(self.alloc, name, id_str, neg_size, pos_size, fd)
     version = info.get_version()
     revision = info.get_revision()
     library.setup(version=version, revision=revision, type=ltype)
@@ -64,7 +64,7 @@ class LibCreator(object):
     if info.neg_size == 0:
       info.neg_size = fd.get_neg_size()
     # allocate and init lib
-    library = self._create_library(info, is_dev)
+    library = self._create_library(info, is_dev, fd)
     addr = library.get_addr()
     # patcher
     patcher = LibPatcherMultiTrap(self.alloc, self.traps, stub)

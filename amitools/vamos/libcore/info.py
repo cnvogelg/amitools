@@ -2,8 +2,8 @@ import datetime
 import re
 
 
-date_format = ".*\((\d+)\.(\d+)\.(\d+)\)"
-id_format = "([a-z.]+) (\d+)\.(\d)+ \((\d+)\.(\d+)\.(\d+)\)\r\n"
+date_format = r".*\((\d+)\.(\d+)\.(\d+)\)"
+id_format = r"([a-z.]+) (\d+)\.(\d)+ \((\d+)\.(\d+)\.(\d+)\)\r\n"
 
 
 class LibInfo(object):

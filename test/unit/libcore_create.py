@@ -11,7 +11,7 @@ def setup():
   mem = machine.get_mem()
   traps = machine.get_traps()
   cpu = machine.get_cpu()
-  alloc = MemoryAlloc(mem)
+  alloc = MemoryAlloc.for_machine(machine)
   ctx = LibCtx(machine)
   return mem, traps, alloc, ctx
 
@@ -47,6 +47,25 @@ def libcore_create_lib_fake_test():
   # create lib
   creator = LibCreator(alloc, traps)
   lib = creator.create_lib(info, ctx, impl)
+  # free lib
+  lib.free()
+  assert alloc.is_all_free()
+
+
+def libcore_create_lib_label_test():
+  mem, traps, alloc, ctx = setup()
+  impl = None
+  # create info for lib
+  date = datetime.date(2012, 11, 12)
+  info = LibInfo('vamostest.library', 42, 3, date)
+  # create lib
+  creator = LibCreator(alloc, traps)
+  lib = creator.create_lib(info, ctx, impl)
+  # check label
+  assert alloc.get_label_mgr()
+  label = lib.get_library()._label
+  assert label
+  assert label.fd == lib.get_fd()
   # free lib
   lib.free()
   assert alloc.is_all_free()

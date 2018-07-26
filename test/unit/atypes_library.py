@@ -4,11 +4,12 @@ from amitools.vamos.machine.opcodes import op_rts
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.astructs import LibraryStruct
 from amitools.vamos.atypes import Library, CString, NodeType, LibFlags
+from amitools.vamos.label import LabelLib
+from amitools.fd import read_lib_fd
 
 
-def atypes_library_base_test():
-  mem = MockMemory()
-  alloc = MemoryAlloc(mem)
+def atypes_library_base_test(mem_alloc):
+  mem, alloc = mem_alloc
   # alloc lib
   name = "my.library"
   id_str = "my.library 1.2"
@@ -53,9 +54,8 @@ def atypes_library_base_test():
   assert alloc.is_all_free()
 
 
-def atypes_library_sum_test():
-  mem = MockMemory()
-  alloc = MemoryAlloc(mem)
+def atypes_library_sum_test(mem_alloc):
+  mem, alloc = mem_alloc
   # alloc lib
   name = "my.library"
   id_str = "my.library 1.2"
@@ -77,9 +77,8 @@ def atypes_library_sum_test():
   assert alloc.is_all_free()
 
 
-def atypes_libary_open_cnt_test():
-  mem = MockMemory()
-  alloc = MemoryAlloc(mem)
+def atypes_libary_open_cnt_test(mem_alloc):
+  mem, alloc = mem_alloc
   # alloc lib
   name = "my.library"
   id_str = "my.library 1.2"
@@ -92,6 +91,25 @@ def atypes_libary_open_cnt_test():
   assert lib.get_open_cnt() == 1
   lib.dec_open_cnt()
   assert lib.get_open_cnt() == 0
+  # done
+  lib.free()
+  assert alloc.is_all_free()
+
+
+def atypes_library_label_test(mem_alloc):
+  mem, alloc = mem_alloc
+  name = "vamostest.library"
+  id_str = "vamostest.library 0.1"
+  fd = read_lib_fd("vamostest.library")
+  neg_size = fd.get_neg_size()
+  lib = Library.alloc(alloc, name, id_str, neg_size, fd=fd)
+  # check for label
+  if alloc.get_label_mgr():
+    assert lib._label
+    assert isinstance(lib._label, LabelLib)
+    assert lib._label.fd == fd
+  else:
+    assert not lib._label
   # done
   lib.free()
   assert alloc.is_all_free()

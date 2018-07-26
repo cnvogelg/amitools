@@ -1,5 +1,5 @@
 from amitools.vamos.astructs import LibraryStruct
-from amitools.vamos.label import LabelStruct
+from amitools.vamos.label import LabelLib
 from amitools.vamos.machine.opcodes import op_rts
 from .atype import AmigaType
 from .atypedef import AmigaTypeDef
@@ -64,7 +64,7 @@ class Library(AmigaType):
       off += 6
 
   @classmethod
-  def alloc(cls, alloc, name, id_str, neg_size, pos_size=None):
+  def alloc(cls, alloc, name, id_str, neg_size, pos_size=None, fd=None):
     """alocate library and optional name and id_str CStrings"""
     # calc size
     if pos_size is None:
@@ -85,9 +85,8 @@ class Library(AmigaType):
     # add label?
     label_mgr = alloc.get_label_mgr()
     if label_mgr:
-      # TODO: replace with LabelLib
-      lib._label = LabelStruct(name, mem_obj.addr, lib.get_type_struct(),
-                               size=total_size, offset=neg_size)
+      struct = lib.get_type_struct()
+      lib._label = LabelLib(name, addr_base, neg_size, pos_size, struct, fd)
       label_mgr.add_label(lib._label)
     # set name and id_str
     if name:

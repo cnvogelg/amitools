@@ -5,17 +5,6 @@ from amitools.vamos.machine import *
 from amitools.vamos.astructs import NodeStruct, LibraryStruct
 
 
-class FakeLib:
-  def __init__(self):
-    self.name = "fake.library"
-    self.addr_begin = 0x300
-    self.addr_base = 0x320
-    self.struct = LibraryStruct
-    self.mem_pos_size = self.struct.get_size()
-    self.mem_neg_size = 0x20
-    self.fd = None
-
-
 def setup_tmem():
   machine = MockMachine()
   mem = machine.get_mem()
@@ -23,8 +12,8 @@ def setup_tmem():
   tm = TraceManager(machine)
   lm.add_label(LabelRange("range", 0x100, 0x100))
   lm.add_label(LabelStruct("node", 0x200, NodeStruct))
-  lib = FakeLib()
-  lm.add_label(LabelLib(lib))
+  lm.add_label(LabelLib("fake.library", 0x320, 0x20,
+                        LibraryStruct.get_size(), LibraryStruct))
   return TraceMemory(mem, tm)
 
 

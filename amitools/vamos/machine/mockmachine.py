@@ -24,3 +24,6 @@ class MockMachine(object):
 
   def get_label_mgr(self):
     return self.label_mgr
+
+  def get_ram_begin(self):
+    return 0x800

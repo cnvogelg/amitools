@@ -4,17 +4,7 @@ from amitools.vamos.label import *
 from amitools.vamos.machine import *
 from amitools.vamos.astructs import NodeStruct, LibraryStruct
 from amitools.vamos.cfgcore import ConfigDict
-
-
-class FakeLib:
-  def __init__(self):
-    self.name = "fake.library"
-    self.addr_begin = 0x300
-    self.addr_base = 0x320
-    self.struct = LibraryStruct
-    self.mem_pos_size = self.struct.get_size()
-    self.mem_neg_size = 0x20
-    self.fd = None
+from amitools.fd import read_lib_fd
 
 
 def setup_tm():
@@ -23,8 +13,12 @@ def setup_tm():
   tm = TraceManager(machine)
   lm.add_label(LabelRange("range", 0x100, 0x100))
   lm.add_label(LabelStruct("node", 0x200, NodeStruct))
-  lib = FakeLib()
-  lm.add_label(LabelLib(lib))
+  lm.add_label(LabelLib("fake.library", 0x320, 0x20,
+                        LibraryStruct.get_size(), LibraryStruct))
+  fd = read_lib_fd("vamostest.library")
+  neg_size = fd.get_neg_size()
+  lm.add_label(LabelLib("vamostest.library", 0x400, neg_size,
+                        LibraryStruct.get_size(), LibraryStruct, fd))
   return tm
 
 
@@ -40,9 +34,13 @@ def check_log(chn, records):
       (chn, lvl,
           'W(2): 000208: 0015      Struct  [@000200 +000008 node] Node+8 = ln_Type(UBYTE)+0'),
       (chn, lvl,
-          'R(2): 000300: a000        TRAP  [@000300 +000000 fake.library] -32 [5]  '),
+          'R(2): 000300: 0000        JUMP  [@000300 +000000 fake.library] -32  [5]+2'),
       (chn, lvl,
-          'R(2): 000320: 0000      Struct  [@000300 +000020 fake.library] Library+0 = lib_Node.ln_Succ(Node*)+0')
+          'R(2): 000320: 0000      Struct  [@000300 +000020 fake.library] Library+0 = lib_Node.ln_Succ(Node*)+0'),
+      (chn, lvl,
+          'R(2): 0003dc: 0000        JUMP  [@0003be +00001e vamostest.library] -36  [6]  PrintString( str/a0 )'),
+      (chn, lvl,
+          'R(2): 000420: 0000      Struct  [@0003be +000062 vamostest.library] Library+32 = lib_OpenCnt(UWORD)+0')
   ]
 
 
@@ -71,8 +69,11 @@ def trace_mgr_mem_test(caplog):
   tm.trace_cpu_mem('R', 2, 0x200)
   tm.trace_cpu_mem('W', 1, 0x208, 21)
   # lib
-  tm.trace_cpu_mem('R', 1, 0x300, 0xa000)
+  tm.trace_cpu_mem('R', 1, 0x300)
   tm.trace_cpu_mem('R', 1, 0x320)
+  # lib with fd
+  tm.trace_cpu_mem('R', 1, 0x400 - 36)
+  tm.trace_cpu_mem('R', 1, 0x420)
   check_log("mem", caplog.record_tuples)
 
 
@@ -89,8 +90,11 @@ def trace_mgr_int_mem_test(caplog):
   tm.trace_int_mem('R', 2, 0x200)
   tm.trace_int_mem('W', 1, 0x208, 21)
   # lib
-  tm.trace_int_mem('R', 1, 0x300, 0xa000)
+  tm.trace_int_mem('R', 1, 0x300)
   tm.trace_int_mem('R', 1, 0x320)
+  # lib with fd
+  tm.trace_int_mem('R', 1, 0x400 - 36)
+  tm.trace_int_mem('R', 1, 0x420)
   check_log("mem_int", caplog.record_tuples)
 
 
@@ -108,8 +112,15 @@ def trace_mgr_int_block_test(caplog):
 def trace_mgr_code_line_test(caplog):
   caplog.set_level(logging.INFO)
   tm = setup_tm()
+  # range
   tm.trace_code_line(0x100)
+  # lib
+  tm.trace_code_line(0x300)
+  # lib with fd
+  tm.trace_code_line(0x400 - 36)
   lvl = logging.INFO
   assert caplog.record_tuples == [
-      ('instr', lvl, '@000100 +000000 range                     000100    nop                 ')
+      ('instr', lvl, '@000100 +000000 range                     000100    nop                   '),
+      ('instr', lvl, '@000300 +000000 fake.library(-32)         000300    nop                   '),
+      ('instr', lvl, '@0003be +00001e vamostest.library(-36)    0003dc    nop                   ; PrintString')
   ]
