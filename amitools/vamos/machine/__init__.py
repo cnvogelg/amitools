@@ -8,3 +8,4 @@ from .machine import Machine
 from .opcodes import *
 from .hwaccess import HWAccess, HWAccessError
 from .memmap import MemoryMap
+from .disasm import DisAsm

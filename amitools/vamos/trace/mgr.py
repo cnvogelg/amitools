@@ -1,7 +1,7 @@
 import logging
 from amitools.vamos.log import log_mem, log_mem_int, log_instr
 from amitools.vamos.label import LabelStruct, LabelLib, LabelSegment
-from amitools.vamos.machine import CPUState
+from amitools.vamos.machine import CPUState, DisAsm
 from amitools.vamos.machine.regs import *
 from .mem import TraceMemory
 
@@ -13,6 +13,7 @@ class TraceManager(object):
     self.machine = machine
     self.cpu = machine.get_cpu()
     self.label_mgr = machine.get_label_mgr()
+    self.disasm = DisAsm(machine)
     # state
     self.mem_tracer = None
 
@@ -80,7 +81,7 @@ class TraceManager(object):
 
   def trace_code_line(self, pc):
     label, sym, src, addon = self._get_disasm_info(pc)
-    _, txt = self.cpu.disassemble(pc)
+    _, txt = self.disasm.disassemble(pc)
     if sym is not None:
       log_instr.info("%s%s:", " "*40, sym)
     if src is not None:

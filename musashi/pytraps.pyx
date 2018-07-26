@@ -57,3 +57,8 @@ cdef class Traps:
 
   def trigger(self, uint opcode, uint pc):
     return trap_aline(opcode, pc)
+
+  def get_func(self, tid):
+    if tid in self.func_map:
+      return self.func_map[tid]
+
