@@ -12,19 +12,20 @@ def profiler_main_disabled_test(caplog):
   assert caplog.record_tuples == []
 
 
-def profiler_main_config_test(caplog):
+def profiler_main_config_test(caplog, tmpdir):
+  path = str(tmpdir.join("prof.json"))
   mp = MainProfiler()
   cfg = ConfigDict({
       'enabled': True,
       'output': {
           'dump': True,
-          'file': 'foo',
+          'file': path,
           'append': True
       }
   })
   assert mp.parse_config(cfg)
   assert mp.enabled
-  assert mp.file == 'foo'
+  assert mp.file == path
   assert mp.append
   mp.setup()
   mp.shutdown()
@@ -39,7 +40,7 @@ def profiler_main_def_profiler_test(caplog):
       'enabled': True,
       'output': {
           'dump': True,
-          'file': 'foo',
+          'file': None,
           'append': True
       }
   })
