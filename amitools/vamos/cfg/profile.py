@@ -5,6 +5,7 @@ class ProfileParser(Parser):
   def __init__(self):
     def_cfg = {
         "profile": {
+            "enabled": False,
             "libs": {
                 "names": ValueList(str),
                 "calls": False
@@ -18,6 +19,8 @@ class ProfileParser(Parser):
     }
     arg_cfg = {
         "profile": {
+            "enabled": Argument('--profile', action='store_true',
+                                help="enable vamos profiler"),
             "libs": {
                 "names": Argument('--profile-libs', action='append',
                                   help="lib/dev name list to profile or 'all'"),
@@ -35,4 +38,4 @@ class ProfileParser(Parser):
         }
     }
     Parser.__init__(self, "profile", def_cfg, arg_cfg,
-                    "profile", "lib profiling options")
+                    "profile", "profiling options")

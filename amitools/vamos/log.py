@@ -41,6 +41,10 @@ loggers = [
     log_tp, log_utility, log_hw, log_math, log_machine
 ]
 
+preset = {
+  log_prof : logging.INFO
+}
+
 # --- end ---
 
 OFF = 100
@@ -96,10 +100,10 @@ def log_setup(cfg):
     level = logging.ERROR
   for l in loggers:
     log_cfg.info("log: %s -> %s", l.name, level)
-    l.setLevel(level)
-
-  # special default for profiling
-  log_prof.setLevel(logging.INFO)
+    if l in preset:
+      l.setLevel(preset[l])
+    else:
+      l.setLevel(level)
 
   # is verbose enabled?
   if cfg.verbose:

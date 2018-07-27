@@ -6,6 +6,7 @@ def cfg_profile_dict_test():
   lp = ProfileParser()
   input_dict = {
       "profile": {
+          "enabled": True,
           "libs": {
               "names": ["exec.library", "dos.library"],
               "calls": True
@@ -26,7 +27,8 @@ def cfg_profile_args_test():
   ap = argparse.ArgumentParser()
   lp.setup_args(ap)
   args = ap.parse_args(
-      ['--profile-libs', 'exec.library,dos.library',
+      ['--profile',
+       '--profile-libs', 'exec.library,dos.library',
        '--profile-lib-calls',
        '--profile-file', 'foo/bar',
        '--profile-file-append',
@@ -34,6 +36,7 @@ def cfg_profile_args_test():
   lp.parse_args(args)
   assert lp.get_cfg_dict() == {
       "profile": {
+          "enabled": True,
           "libs": {
               "names": ["exec.library", "dos.library"],
               "calls": True
