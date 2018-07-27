@@ -20,7 +20,7 @@ class InitRes(object):
       return 0, None
 
     if label_name is None:
-      label_name = "InitResident(%s)" % res.name
+      label_name = "%s_init" % res.name
 
     auto_init = res.flags.has_bits(ResidentFlags.RTF_AUTOINIT)
     if auto_init:
@@ -42,8 +42,9 @@ class InitRes(object):
 
       # now call init
       if ai.init_func != 0:
+        run_name = "InitResident:%s" % res.name
         lib_base = ml.run_init(
-            ai.init_func, lib_base, seg_list_baddr, label_name, run_sp)
+            ai.init_func, lib_base, seg_list_baddr, run_name, run_sp)
 
       if lib_base == 0:
         return 0, None
