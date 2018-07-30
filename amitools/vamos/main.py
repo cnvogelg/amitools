@@ -8,6 +8,7 @@ from .path import VamosPathManager
 from .trace import TraceManager
 from .libmgr import SetupLibManager
 from .schedule import Scheduler
+from .profiler import MainProfiler
 from .lib.dos.Process import Process
 
 RET_CODE_CONFIG_ERROR = 1000
@@ -41,6 +42,11 @@ def main(cfg_files=None, args=None, cfg_dict=None):
     log_help()
     return RET_CODE_CONFIG_ERROR
 
+  # setup main profiler
+  main_profiler = MainProfiler()
+  prof_cfg = mp.get_profile_dict().profile
+  main_profiler.parse_config(prof_cfg)
+
   # setup machine
   machine_cfg = mp.get_machine_dict().machine
   use_labels = mp.get_trace_dict().trace.labels
@@ -72,11 +78,18 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   scheduler = Scheduler(machine)
 
   # setup lib mgr
-  slm = SetupLibManager(machine, mem_map, scheduler, path_mgr)
-  if not slm.parse_config(mp):
+  lib_cfg = mp.get_libs_dict()
+  slm = SetupLibManager(machine, mem_map, scheduler,
+                        path_mgr, main_profiler=main_profiler)
+  if not slm.parse_config(lib_cfg):
     log_main.error("lib manager setup failed!")
     return RET_CODE_CONFIG_ERROR
   slm.setup()
+
+  # setup profiler
+  main_profiler.setup()
+
+  # open base libs
   slm.open_base_libs()
 
   # setup main proc
@@ -113,6 +126,7 @@ def main(cfg_files=None, args=None, cfg_dict=None):
 
   # libs shutdown
   slm.close_base_libs()
+  main_profiler.shutdown()
   slm.cleanup()
 
   # mem_map and machine shutdown

@@ -1,4 +1,3 @@
-from amitools.vamos.libcore import LibProfilerConfig
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
 from amitools.vamos.lib.LibList import vamos_libs
@@ -10,47 +9,25 @@ from .mgr import LibManager
 
 class SetupLibManager(object):
   def __init__(self, machine, mem_map, scheduler, path_mgr,
-               lib_cfg=None, profiler_cfg=None):
+               lib_cfg=None, main_profiler=None):
     self.machine = machine
     self.mem_map = mem_map
     self.path_mgr = path_mgr
     self.scheduler = scheduler
     self.alloc = mem_map.get_alloc()
     self.lib_mgr_cfg = lib_cfg
-    self.profiler_cfg = profiler_cfg
+    self.main_profiler = main_profiler
     # state
     self.seg_loader = None
     self.exec_ctx = None
     self.dos_ctx = None
     self.lib_mgr = None
 
-  def parse_config(self, main_cfg):
-    if not main_cfg:
+  def parse_config(self, cfg):
+    if not cfg:
       return True
-    cfg = main_cfg.get_profile_dict().profile
-    self.parse_profiler_cfg(cfg)
-    cfg = main_cfg.get_libs_dict()
-    self.parse_lib_mgr_cfg(cfg)
-    return True
-
-  def parse_lib_mgr_cfg(self, cfg):
     self.lib_mgr_cfg = LibMgrCfg.from_dict(cfg)
-
-  def parse_profiler_cfg(self, cfg):
-    names = cfg.libs.names
-    if names:
-      profiling = True
-      all_libs = 'all' in names
-    else:
-      profiling = False
-      all_libs = False
-    self.profiler_cfg = LibProfilerConfig(profiling=profiling,
-                                          all_libs=all_libs,
-                                          libs=names,
-                                          add_samples=cfg.libs.calls,
-                                          file=cfg.output.file,
-                                          append=cfg.output.append,
-                                          dump=cfg.output.dump)
+    return True
 
   def setup(self):
     # create def cfg
@@ -68,15 +45,13 @@ class SetupLibManager(object):
     # create lib mgr
     self.lib_mgr = LibManager(self.machine, self.alloc, self.seg_loader,
                               self.lib_mgr_cfg,
-                              profiler_cfg=self.profiler_cfg)
+                              main_profiler=self.main_profiler)
     self.lib_mgr.add_ctx('exec.library', self.exec_ctx)
     self.lib_mgr.add_ctx('dos.library', self.dos_ctx)
     # add all vamos libs
     for name in vamos_libs:
       cls = vamos_libs[name]
       self.lib_mgr.add_impl_cls(name, cls)
-    # finally bootstrap exec
-    self.lib_mgr.bootstrap_exec()
     # setup scheduler call back
     self.scheduler.set_cur_task_callback(self.cur_task_callback)
     # return lib_mgr
@@ -89,6 +64,8 @@ class SetupLibManager(object):
 
   def open_base_libs(self):
     log_libmgr.info("opening base libs...")
+    # first bootstrap exec
+    self.lib_mgr.bootstrap_exec()
     # open exec lib
     self.exec_addr = self.lib_mgr.open_lib('exec.library', 0)
     self.exec_vlib = self.lib_mgr.get_vlib_by_addr(self.exec_addr)

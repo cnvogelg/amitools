@@ -25,6 +25,6 @@ class Profiler(object):
     """stop profiling"""
     pass
 
-  def dump(self, log):
+  def dump(self, write):
     """dump the state to the given log channel"""
     pass

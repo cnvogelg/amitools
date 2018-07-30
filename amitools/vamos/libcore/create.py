@@ -4,6 +4,7 @@ from amitools.fd import read_lib_fd
 from .vlib import VLib
 from .stub import LibStubGen
 from .patch import LibPatcherMultiTrap
+from .profile import LibProfiler
 
 
 class LibCreator(object):
@@ -12,12 +13,12 @@ class LibCreator(object):
   def __init__(self, alloc, traps,
                fd_dir=None,
                log_missing=None, log_valid=None,
-               profiler=None):
+               lib_profiler=None):
     self.alloc = alloc
     self.traps = traps
     # options
     self.fd_dir = fd_dir
-    self.profiler = profiler
+    self.profiler = lib_profiler
     self.stub_gen = LibStubGen(log_missing=log_missing, log_valid=log_valid)
 
   def _create_library(self, info, is_dev, fd):
@@ -34,6 +35,9 @@ class LibCreator(object):
     revision = info.get_revision()
     library.setup(version=version, revision=revision, type=ltype)
     return library
+
+  def get_profiler(self):
+    return self.profiler
 
   def create_lib(self, info, ctx, impl=None):
     name = info.get_name()

@@ -5,7 +5,7 @@ import pytest
 from amitools.vamos.libcore import LibStubGen, LibCtx
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.machine import MockMachine
-from amitools.vamos.libcore import LibProfile
+from amitools.vamos.libcore import LibProfileData
 from amitools.fd import read_lib_fd
 
 
@@ -20,7 +20,7 @@ def _create_stub(do_profile=False, do_log=False):
   fd = read_lib_fd(name)
   ctx = _create_ctx()
   if do_profile:
-    profile = LibProfile(name, fd)
+    profile = LibProfileData.from_fd(name, fd)
   else:
     profile = None
   if do_log:

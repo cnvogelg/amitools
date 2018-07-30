@@ -14,7 +14,7 @@ from amitools.vamos.lib.VamosTestDevice import VamosTestDevice
 from amitools.vamos.loader import SegmentLoader
 
 
-def setup(path_mgr=None, profiler_cfg=None):
+def setup(path_mgr=None):
   log_libmgr.setLevel(logging.INFO)
   log_exec.setLevel(logging.INFO)
   machine = Machine()
@@ -23,8 +23,7 @@ def setup(path_mgr=None, profiler_cfg=None):
   alloc = MemoryAlloc.for_machine(machine)
   segloader = SegmentLoader(alloc, path_mgr)
   cfg = LibMgrCfg()
-  mgr = LibManager(machine, alloc, segloader, cfg,
-                   profiler_cfg=profiler_cfg)
+  mgr = LibManager(machine, alloc, segloader, cfg)
   # setup ctx map
   cpu = machine.get_cpu()
   mem = machine.get_mem()

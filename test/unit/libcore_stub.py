@@ -5,7 +5,7 @@ import pytest
 from amitools.vamos.libcore import LibStubGen, LibCtx
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.machine import MockMachine
-from amitools.vamos.libcore import LibProfile
+from amitools.vamos.libcore import LibProfileData
 from amitools.fd import read_lib_fd
 
 
@@ -76,7 +76,7 @@ def libcore_stub_gen_profile_test():
   impl = VamosTestLibrary()
   fd = read_lib_fd(name)
   ctx = _create_ctx()
-  profile = LibProfile(name, fd)
+  profile = LibProfileData.from_fd(name, fd)
   # create stub
   gen = LibStubGen()
   stub = gen.gen_stub(name, impl, fd, ctx, profile)
@@ -115,7 +115,7 @@ def libcore_stub_gen_log_profile_test(caplog):
   ctx = _create_ctx()
   log_missing = logging.getLogger('missing')
   log_valid = logging.getLogger('valid')
-  profile = LibProfile(name, fd)
+  profile = LibProfileData.from_fd(name, fd)
   # create stub
   gen = LibStubGen(log_missing=log_missing, log_valid=log_valid)
   stub = gen.gen_stub(name, impl, fd, ctx, profile)
@@ -151,7 +151,7 @@ def libcore_stub_gen_multi_arg(caplog):
   ctx = _create_ctx()
   log_missing = logging.getLogger('missing')
   log_valid = logging.getLogger('valid')
-  profile = LibProfile(name, fd)
+  profile = LibProfileData.from_fd(name, fd)
   # create stub
   gen = LibStubGen(log_missing=log_missing, log_valid=log_valid)
   stub = gen.gen_stub(name, impl, fd, ctx, profile)
@@ -182,7 +182,7 @@ def libcore_stub_gen_fake_profile_test():
   name = 'vamostest.library'
   fd = read_lib_fd(name)
   ctx = _create_ctx()
-  profile = LibProfile(name, fd)
+  profile = LibProfileData.from_fd(name, fd)
   # create stub
   gen = LibStubGen()
   stub = gen.gen_fake_stub(name, fd, ctx, profile)
@@ -219,7 +219,7 @@ def libcore_stub_gen_fake_log_profile_test(caplog):
   ctx = _create_ctx()
   log_missing = logging.getLogger('missing')
   log_valid = logging.getLogger('valid')
-  profile = LibProfile(name, fd)
+  profile = LibProfileData.from_fd(name, fd)
   # create stub
   gen = LibStubGen(log_missing=log_missing, log_valid=log_valid)
   stub = gen.gen_fake_stub(name, fd, ctx, profile)

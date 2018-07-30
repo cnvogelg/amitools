@@ -9,13 +9,15 @@ class VLibManager(object):
   """handle a set of vlib instances"""
 
   def __init__(self, machine, alloc,
-               profiler_cfg=None):
+               main_profiler=None, prof_names=None, prof_calls=False):
     self.machine = machine
     self.mem = machine.get_mem()
     self.alloc = alloc
     self.lib_reg = LibRegistry()
     self.ctx_map = LibCtxMap(machine)
-    self.profiler = LibProfiler(profiler_cfg)
+    self.lib_profiler = LibProfiler(prof_names, prof_calls)
+    if main_profiler:
+      main_profiler.add_profiler(self.lib_profiler)
     # tools
     self._setup_creator()
     # state
@@ -33,7 +35,7 @@ class VLibManager(object):
       log_valid = log_lib
     self.creator = LibCreator(self.alloc, self.machine.get_traps(),
                               log_missing=log_missing, log_valid=log_valid,
-                              profiler=self.profiler)
+                              lib_profiler=self.lib_profiler)
 
   def add_impl_cls(self, name, impl_cls):
     self.lib_reg.add_lib_impl(name, impl_cls)
@@ -76,8 +78,7 @@ class VLibManager(object):
       return self.name_vlib[name]
 
   def get_profiler(self):
-    """return the lib profiler"""
-    return self.profiler
+    return self.lib_profiler
 
   def shutdown(self):
     """cleanup libs
@@ -92,8 +93,6 @@ class VLibManager(object):
     left_devs = self.expunge_devs()
     log_libmgr.info("[vamos] +shutdown: left libs=%d, devs=%d",
                     left_libs, left_devs)
-    # finally shutdown profiler
-    self.profiler.shutdown()
     return left_libs + left_devs
 
   def expunge_libs(self):

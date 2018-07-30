@@ -11,11 +11,11 @@ class LibManager(object):
   """the library manager handles both native and vamos libs"""
 
   def __init__(self, machine, alloc, segloader, cfg,
-               profiler_cfg=None):
+               main_profiler=None):
     self.mem = machine.get_mem()
     self.cfg = cfg
     self.vlib_mgr = VLibManager(machine, alloc,
-                                profiler_cfg=profiler_cfg)
+                                main_profiler=main_profiler)
     self.alib_mgr = ALibManager(machine, alloc, segloader)
     cfg.dump(log_libmgr.info)
 

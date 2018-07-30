@@ -1,17 +1,19 @@
 from amitools.vamos.lib.ExecLibrary import ExecLibrary
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.lib.VamosTestDevice import VamosTestDevice
-from amitools.vamos.libcore import VLibManager, LibRegistry, LibCtxMap, LibProfilerConfig
+from amitools.vamos.libcore import VLibManager, LibRegistry, LibCtxMap
 from amitools.vamos.machine import Machine
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.loader import SegmentLoader
 
 
-def setup(profiler_cfg=None):
+def setup(main_profiler=None, prof_names=None, prof_calls=False):
   machine = Machine()
   alloc = MemoryAlloc(machine.get_mem(), machine.get_ram_begin())
-  mgr = VLibManager(machine, alloc, profiler_cfg=profiler_cfg)
+  mgr = VLibManager(machine, alloc,
+                    main_profiler=main_profiler,
+                    prof_names=prof_names, prof_calls=prof_calls)
   # setup ctx map
   cpu = machine.get_cpu()
   mem = machine.get_mem()
@@ -87,8 +89,10 @@ def libcore_mgr_make_version_revision_test():
 
 
 def libcore_mgr_make_profile_test():
-  lpc = LibProfilerConfig(profiling=True, all_libs=True)
-  machine, alloc, mgr = setup(lpc)
+  machine, alloc, mgr = setup(prof_names=['all'])
+  profiler = mgr.get_profiler()
+  assert profiler
+  profiler.setup()
   exec_vlib = mgr.bootstrap_exec()
   # make vamos test lib
   test_vlib = mgr.make_lib_name('vamostest.library')
@@ -101,8 +105,6 @@ def libcore_mgr_make_profile_test():
   assert impl.get_cnt() == 0
   prof = test_vlib.profile
   assert prof
-  profiler = mgr.get_profiler()
-  assert profiler
   assert profiler.get_profile('vamostest.library') == prof
   # shutdown
   left = mgr.shutdown()

@@ -45,6 +45,10 @@ class MainProfiler(object):
     self.profilers[name] = prof
     return True
 
+  def get_profiler(self, name):
+    if name in self.profilers:
+      return self.profilers[name]
+
   def setup(self):
     """after adding all profilers prepare profiling (if enabled)"""
     if not self.enabled:
@@ -80,7 +84,7 @@ class MainProfiler(object):
       for name in self.profilers:
         prof = self.profilers[name]
         log_prof.info("----- profiler '%s' -----", name)
-        prof.dump(log_prof)
+        prof.dump(log_prof.info)
 
   def _try_load_data(self):
     if os.path.exists(self.file):

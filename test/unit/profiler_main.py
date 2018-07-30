@@ -124,8 +124,8 @@ class MyProfiler(Profiler):
   def shutdown(self):
     self.got_shutdown = True
 
-  def dump(self, log):
-    log.info("foo=%d, bar='%s'", self.foo, self.bar)
+  def dump(self, write):
+    write("foo=%d, bar='%s'", self.foo, self.bar)
 
 
 def profiler_main_test_prof_cfg_test():
