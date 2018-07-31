@@ -155,7 +155,7 @@ class LibStubGen(object):
     # wrap profiling?
     if profile:
       index = fd_func.get_index()
-      prof = profile.get_func_prof(index)
+      prof = profile.get_func_by_index(index)
 
       def profile_func(this, *args, **kwargs):
         stub_func(this, *args, **kwargs)
@@ -208,7 +208,7 @@ class LibStubGen(object):
     # wrap profiling?
     if profile:
       index = fd_func.get_index()
-      prof = profile.get_func_prof(index)
+      prof = profile.get_func_by_index(index)
       if log:
         call = log_func
       else:

@@ -20,7 +20,7 @@ def _create_stub(do_profile=False, do_log=False):
   fd = read_lib_fd(name)
   ctx = _create_ctx()
   if do_profile:
-    profile = LibProfileData.from_fd(name, fd)
+    profile = LibProfileData(fd)
   else:
     profile = None
   if do_log:

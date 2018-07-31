@@ -14,7 +14,7 @@ class ProfDataFile(object):
   def save_json_fobj(self, fobj):
     # add header key
     self.data['vamos_profile'] = '1.0'
-    json.dump(self.data, fobj, sort_keys=True)
+    json.dump(self.data, fobj, sort_keys=True, indent=2)
 
   def load_json_file(self, name):
     with open(name, "r") as fh:

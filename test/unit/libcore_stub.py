@@ -19,11 +19,11 @@ def _check_stub(stub):
 def _check_profile(fd, profile):
   print_hello_func = fd.get_func_by_name('PrintHello')
   dummy_func = fd.get_func_by_name('Dummy')
-  print_hello_prof = profile.get_func_prof(print_hello_func.get_index())
-  dummy_func_prof = profile.get_func_prof(dummy_func.get_index())
+  print_hello_prof = profile.get_func_by_index(print_hello_func.get_index())
+  dummy_func_prof = profile.get_func_by_index(dummy_func.get_index())
   assert print_hello_prof.get_num_calls() == 1
   assert dummy_func_prof.get_num_calls() == 1
-  profile.dump()
+  profile.dump("bla")
 
 
 def _check_log(caplog):
@@ -76,7 +76,7 @@ def libcore_stub_gen_profile_test():
   impl = VamosTestLibrary()
   fd = read_lib_fd(name)
   ctx = _create_ctx()
-  profile = LibProfileData.from_fd(name, fd)
+  profile = LibProfileData(fd)
   # create stub
   gen = LibStubGen()
   stub = gen.gen_stub(name, impl, fd, ctx, profile)
@@ -115,7 +115,7 @@ def libcore_stub_gen_log_profile_test(caplog):
   ctx = _create_ctx()
   log_missing = logging.getLogger('missing')
   log_valid = logging.getLogger('valid')
-  profile = LibProfileData.from_fd(name, fd)
+  profile = LibProfileData(fd)
   # create stub
   gen = LibStubGen(log_missing=log_missing, log_valid=log_valid)
   stub = gen.gen_stub(name, impl, fd, ctx, profile)
@@ -151,7 +151,7 @@ def libcore_stub_gen_multi_arg(caplog):
   ctx = _create_ctx()
   log_missing = logging.getLogger('missing')
   log_valid = logging.getLogger('valid')
-  profile = LibProfileData.from_fd(name, fd)
+  profile = LibProfileData(fd)
   # create stub
   gen = LibStubGen(log_missing=log_missing, log_valid=log_valid)
   stub = gen.gen_stub(name, impl, fd, ctx, profile)
@@ -182,7 +182,7 @@ def libcore_stub_gen_fake_profile_test():
   name = 'vamostest.library'
   fd = read_lib_fd(name)
   ctx = _create_ctx()
-  profile = LibProfileData.from_fd(name, fd)
+  profile = LibProfileData(fd)
   # create stub
   gen = LibStubGen()
   stub = gen.gen_fake_stub(name, fd, ctx, profile)
@@ -219,7 +219,7 @@ def libcore_stub_gen_fake_log_profile_test(caplog):
   ctx = _create_ctx()
   log_missing = logging.getLogger('missing')
   log_valid = logging.getLogger('valid')
-  profile = LibProfileData.from_fd(name, fd)
+  profile = LibProfileData(fd)
   # create stub
   gen = LibStubGen(log_missing=log_missing, log_valid=log_valid)
   stub = gen.gen_fake_stub(name, fd, ctx, profile)

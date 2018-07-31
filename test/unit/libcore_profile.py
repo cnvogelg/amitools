@@ -6,8 +6,8 @@ from amitools.vamos.profiler import MainProfiler
 
 
 def libcore_profile_func_data_test():
-  func_data = LibFuncProfileData("Foo")
-  assert func_data.get_name() == 'Foo'
+  func_data = LibFuncProfileData(42)
+  assert func_data.get_func_id() == 42
   assert func_data.get_num_calls() == 0
   assert func_data.get_deltas() is None
   assert func_data.get_sum_delta() == 0.0
@@ -25,16 +25,16 @@ def libcore_profile_func_data_test():
   func_data2 = LibFuncProfileData.from_dict(data_dict)
   assert func_data2 == func_data
   # ne
-  func_data3 = LibFuncProfileData("Bar")
+  func_data3 = LibFuncProfileData(23)
   assert func_data != func_data3
   # str
-  assert str(
-      func_data) == "Foo                        3 calls    6000.000 ms  avg    2000.000 ms"
+  assert func_data.dump(
+      "Foo") == "Foo                        3 calls    6000.000 ms  avg    2000.000 ms"
 
 
 def libcore_profile_func_data_samples_test():
-  func_data = LibFuncProfileData("Foo", True)
-  assert func_data.get_name() == 'Foo'
+  func_data = LibFuncProfileData(42, True)
+  assert func_data.get_func_id() == 42
   assert func_data.get_num_calls() == 0
   assert func_data.get_deltas() == []
   assert func_data.get_sum_delta() == 0.0
@@ -52,7 +52,7 @@ def libcore_profile_func_data_samples_test():
   func_data2 = LibFuncProfileData.from_dict(data_dict, True)
   assert func_data2 == func_data
   # ne
-  func_data3 = LibFuncProfileData("Foo")
+  func_data3 = LibFuncProfileData(23)
   assert func_data != func_data3
 
 
@@ -60,12 +60,15 @@ def libcore_profile_data_test():
   # from fd
   name = 'dos.library'
   fd = read_lib_fd(name)
-  prof = LibProfileData.from_fd(name, fd)
+  prof = LibProfileData(fd)
   # get func
   func_name = "Input"
   func = fd.get_func_by_name(func_name)
-  func_prof = prof.get_func_prof(func.get_index())
-  assert func_prof.get_name() == func_name
+  idx = func.get_index()
+  func_prof = prof.get_func_by_index(idx)
+  assert func_prof
+  assert func_prof.get_func_id() == idx
+  assert prof.get_func_by_name(func_name) == func_prof
   # count
   func_prof.count(1.0)
   func_prof.count(2.0)
@@ -74,13 +77,15 @@ def libcore_profile_data_test():
   assert prof.get_total_str() == \
       "LIB TOTAL                  3 calls    6000.000 ms" \
       "  avg    2000.000 ms"
-  assert prof.get_avail_funcs() == [func_prof]
+  prof.remove_empty()
+  assert prof.get_all_funcs() == [func_prof]
   # to/from dict
   data_dict = prof.get_data()
   prof2 = LibProfileData.from_dict(data_dict)
   assert prof == prof2
   # get func
-  func_prof2 = prof2.get_func_prof(func.get_index())
+  prof2.setup_func_table(fd)
+  func_prof2 = prof2.get_func_by_index(idx)
   assert func_prof == func_prof2
 
 
@@ -88,12 +93,14 @@ def libcore_profile_data_samples_test():
   # from fd
   name = 'dos.library'
   fd = read_lib_fd(name)
-  prof = LibProfileData.from_fd(name, fd, True)
+  prof = LibProfileData(fd, True)
   # get func
   func_name = "Input"
   func = fd.get_func_by_name(func_name)
-  func_prof = prof.get_func_prof(func.get_index())
-  assert func_prof.get_name() == func_name
+  idx = func.get_index()
+  func_prof = prof.get_func_by_index(idx)
+  assert func_prof
+  assert func_prof.get_func_id() == idx
   # count
   func_prof.count(1.0)
   func_prof.count(2.0)
@@ -102,12 +109,14 @@ def libcore_profile_data_samples_test():
   assert prof.get_total_str() == \
       "LIB TOTAL                  3 calls    6000.000 ms" \
       "  avg    2000.000 ms"
+  prof.remove_empty()
   # to/from dict
   data_dict = prof.get_data()
   prof2 = LibProfileData.from_dict(data_dict)
   assert prof == prof2
   # get func
-  func_prof2 = prof2.get_func_prof(func.get_index())
+  prof2.setup_func_table(fd)
+  func_prof2 = prof2.get_func_by_index(func.get_index())
   assert func_prof == func_prof2
 
 
@@ -153,6 +162,38 @@ def libcore_profiler_profiler_config_test():
   assert prof2.set_data(data)
   p2 = prof2.get_profile(name)
   assert p == p2
+
+
+def libcore_profiler_profiler_reuse_test():
+  name = 'dos.library'
+  fd = read_lib_fd(name)
+  prof = LibProfiler()
+  prof.parse_config(ConfigDict({
+      "names": [name],
+      "calls": True
+  }))
+  prof.setup()
+  p = prof.create_profile(name, fd)
+  assert p
+  f = p.get_func_by_name("Input")
+  assert f
+  idx = f.get_func_id()
+  assert p.get_func_by_index(idx) == f
+  f.count(1.0)
+  # store/restore
+  data = prof.get_data()
+  prof2 = LibProfiler()
+  assert prof2.set_data(data)
+  prof2.setup()
+  # reuse profile
+  p2 = prof2.create_profile(name, fd)
+  assert p == p2
+  f2 = p2.get_func_by_name("Input")
+  assert f2.get_num_calls() == 1
+  f2.count(1.0)
+  assert f2.get_num_calls() == 2
+  idx = f2.get_func_id()
+  assert p2.get_func_by_index(idx) == f2
 
 
 def libcore_profiler_main_profiler_test():
