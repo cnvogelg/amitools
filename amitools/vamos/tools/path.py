@@ -4,7 +4,7 @@ import sys
 from amitools.vamos.cfgcore import *
 from amitools.vamos.cfg import *
 from amitools.vamos.log import log_main, log_setup
-from amitools.vamos.path import VamosPathManager
+from amitools.vamos.path import VamosPathManager, AmiPathError
 
 
 class MainPathParser(MainParser):
@@ -36,6 +36,15 @@ def add_path_args(arg_parse):
   s2a_parser.add_argument('input', help='input path')
 
 
+def report_path(path):
+  if path is None:
+    print("path not found!", file=sys.stderr)
+    return 1
+  else:
+    print(path)
+    return 0
+
+
 def path_main(cfg_files=None, args=None, cfg_dict=None):
   # --- parse config ---
   mp = MainPathParser()
@@ -58,21 +67,13 @@ def path_main(cfg_files=None, args=None, cfg_dict=None):
   # parse my args
   args = mp.get_args()
   cmd = args.path_cmd
-  if cmd == 'ami2sys':
-    res = path_mgr.to_sys_path(args.input)
-    if res:
-      print(res)
-      return 0
-    else:
-      print("path not founc!", file=sys.stderr)
-      return 1
-  elif cmd == 'sys2ami':
-    res = path_mgr.from_sys_path(args.input)
-    if res:
-      print(res)
-      return 0
-    else:
-      print("path not founc!", file=sys.stderr)
-      return 1
-
-  return 0
+  try:
+    if cmd == 'ami2sys':
+      res = path_mgr.to_sys_path(args.input)
+      return report_path(res)
+    elif cmd == 'sys2ami':
+      res = path_mgr.from_sys_path(args.input)
+      return report_path(res)
+  except AmiPathError as e:
+    print(str(e), file=sys.stderr)
+    return 1
