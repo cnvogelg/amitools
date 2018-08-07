@@ -292,6 +292,25 @@ class VamosRunner:
                            (file_sum, sha1_sum))
 
 
+class ToolRunner:
+
+  def run(self, tool, *prog_args):
+    # setup args
+    tool_path = os.path.join("..", "bin", tool)
+    if not os.path.exists(tool_path):
+      pytest.skip("tool not found: " + tool_path)
+    args = [tool_path] + list(prog_args)
+    print("running tool:", " ".join(args))
+    p = subprocess.Popen(args, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
+    (stdout, stderr) = p.communicate()
+
+    # process stdout
+    stdout = stdout.splitlines()
+    stderr = stderr.splitlines()
+    return (p.returncode, stdout, stderr)
+
+
 # ----- pytest integration -----
 
 
@@ -365,6 +384,11 @@ def vrun(request):
   if vopts is not None:
     vopts = vopts.split('+')
   return VamosRunner(vopts=vopts, vamos_bin=vamos_bin)
+
+
+@pytest.fixture(scope="module")
+def toolrun():
+  return ToolRunner()
 
 
 @pytest.fixture(scope="module",
