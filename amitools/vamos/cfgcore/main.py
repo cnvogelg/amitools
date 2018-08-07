@@ -39,6 +39,12 @@ class MainParser(object):
     self.parsers.append(sub_parser)
     sub_parser.setup_args(self.ap)
 
+  def get_arg_parser(self):
+    return self.ap
+
+  def get_args(self):
+    return self.args
+
   def parse(self, paths=None, args=None, cfg_dict=None):
     """convenience function that combines all other calls.
 
@@ -68,7 +74,7 @@ class MainParser(object):
     elif not skip_cfgs and paths:
       log_cfg.info("paths: try config files: %s", paths)
       cfg_file, res = self.parse_files(paths)
-      ok = res is not None
+      ok = res is not None or cfg_file is None
       log_cfg.info("paths: cfg_file '%s' is ok: %s", cfg_file, ok)
     else:
       ok = True

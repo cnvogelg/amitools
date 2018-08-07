@@ -182,6 +182,27 @@ def config_main_parse_fail_test(tmpdir):
   assert not mp.parse(paths, args=['-c', cfg2])
 
 
+def config_main_parse_skip_nonexist_test(tmpdir):
+  cfg1 = str(tmpdir.join("cfg1"))
+  cfg2 = str(tmpdir.join("cfg2"))
+  paths = [cfg1, cfg2]
+  mp = MainParser()
+  assert mp.parse(paths, args=[])
+  mp = MainParser()
+  assert mp.parse(paths, args=['-S'])
+  mp = MainParser()
+  assert not mp.parse(paths, args=['-c', cfg2])
+
+
+def config_main_parse_custom_args_test(tmpdir):
+  mp = MainParser()
+  p = mp.get_arg_parser()
+  p.add_argument("--fusel", action='store')
+  assert mp.parse(args=['--fusel', 'bla'])
+  args = mp.get_args()
+  assert args.fusel == 'bla'
+
+
 def gen_parser():
   def_cfg = {"a": {"v": 1,
                    "w": ValueList(str),
