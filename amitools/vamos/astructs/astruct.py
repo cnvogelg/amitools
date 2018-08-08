@@ -54,6 +54,28 @@ class AmigaStruct(object):
     return cls._name_to_field[name]
 
   @classmethod
+  def get_field_by_offset(cls, offset):
+    for f in cls._fields:
+      end = f.offset + f.size
+      if offset >= f.offset and offset < end:
+        return f
+
+  @classmethod
+  def get_fields_by_offset(cls, offset):
+    res = []
+    while True:
+      f = cls.get_field_by_offset(offset)
+      if f is None:
+        break
+      res.append(f)
+      s = f.struct_type
+      if not s or f.is_pointer:
+        break
+      offset -= f.offset
+      cls = s
+    return res
+
+  @classmethod
   def get_fields_by_path(cls, name):
     parts = name.split('.')
     return cls.get_fields_for_parts(parts)
@@ -99,6 +121,14 @@ class AmigaStruct(object):
   def find_struct(cls, name):
     if name in cls._struct_pool:
       return cls._struct_pool[name]
+
+  @classmethod
+  def get_all_structs(cls):
+    return cls._struct_pool.values()
+
+  @classmethod
+  def get_all_struct_names(cls):
+    return cls._struct_pool.keys()
 
   @classmethod
   def dump_type(self, indent=0, num=0, base=0, name="", data=None):

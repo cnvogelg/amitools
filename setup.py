@@ -200,6 +200,7 @@ scripts = {
         'typetool = amitools.tools.typetool:main',
         'vamos = amitools.tools.vamos:main',
         'vamospath = amitools.tools.vamospath:main',
+        'vamostool = amitools.tools.vamostool:main',
         'xdfscan = amitools.tools.xdfscan:main',
         'xdftool = amitools.tools.xdftool:main'
     ]

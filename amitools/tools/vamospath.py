@@ -8,7 +8,7 @@
 import sys
 import os
 
-from amitools.vamos.tools.path import path_main
+from amitools.vamos.tools import tools_main, PathTool
 
 
 def main():
@@ -18,7 +18,8 @@ def main():
       # then in home dir
       os.path.expanduser("~/.vamosrc"),
   )
-  sys.exit(path_main(cfg_files))
+  tools = [PathTool()]
+  sys.exit(tools_main(tools, cfg_files))
 
 
 if __name__ == '__main__':

@@ -1,14 +1,12 @@
 #!/usr/bin/env python2.7
 #
-# typetool [options] <path>
+# vamostool
 #
-# a tool to inspect types
-#
+# written by Christian Vogelgsang (chris@vogelgsang.org)
 
 import sys
 import os
-
-from amitools.vamos.tools import tools_main, TypeTool
+from amitools.vamos.tools import tools_main, PathTool, TypeTool
 
 
 def main():
@@ -18,7 +16,7 @@ def main():
       # then in home dir
       os.path.expanduser("~/.vamosrc"),
   )
-  tools = [TypeTool()]
+  tools = [PathTool(), TypeTool()]
   sys.exit(tools_main(tools, cfg_files))
 
 
