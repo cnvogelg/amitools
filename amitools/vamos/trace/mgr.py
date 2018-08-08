@@ -37,8 +37,8 @@ class TraceManager(object):
 
   def setup_cpu_mem_trace(self):
     self.machine.set_cpu_mem_trace_hook(self.trace_cpu_mem)
-    if not log_mem_int.isEnabledFor(logging.INFO):
-      log_mem_int.setLevel(logging.INFO)
+    if not log_mem.isEnabledFor(logging.INFO):
+      log_mem.setLevel(logging.INFO)
 
   def setup_cpu_instr_trace(self, with_regs):
     if not log_instr.isEnabledFor(logging.INFO):

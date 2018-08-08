@@ -27,3 +27,6 @@ class MockMachine(object):
 
   def get_ram_begin(self):
     return 0x800
+
+  def set_cpu_mem_trace_hook(self, func):
+    pass

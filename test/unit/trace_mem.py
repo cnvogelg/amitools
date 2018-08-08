@@ -3,6 +3,7 @@ from amitools.vamos.trace import *
 from amitools.vamos.label import *
 from amitools.vamos.machine import *
 from amitools.vamos.astructs import NodeStruct, LibraryStruct
+from amitools.vamos.log import log_mem_int
 
 
 def setup_tmem():
@@ -19,6 +20,7 @@ def setup_tmem():
 
 def trace_mem_rw_test(caplog):
   caplog.set_level(logging.INFO)
+  log_mem_int.setLevel(logging.INFO)
   tmem = setup_tmem()
   tmem.w8(0, 42)
   assert tmem.r8(0) == 42
@@ -43,6 +45,7 @@ def trace_mem_rw_test(caplog):
 
 def trace_mem_rws_test(caplog):
   caplog.set_level(logging.INFO)
+  log_mem_int.setLevel(logging.INFO)
   tmem = setup_tmem()
   tmem.w8s(0, -42)
   assert tmem.r8s(0) == -42

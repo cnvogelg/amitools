@@ -59,6 +59,7 @@ def trace_mgr_parse_config_test():
 def trace_mgr_mem_test(caplog):
   caplog.set_level(logging.INFO)
   tm = setup_tm()
+  tm.setup_cpu_mem_trace()
   # no label
   tm.trace_cpu_mem('R', 2, 0)
   tm.trace_cpu_mem('W', 1, 4, 23)
@@ -80,6 +81,7 @@ def trace_mgr_mem_test(caplog):
 def trace_mgr_int_mem_test(caplog):
   caplog.set_level(logging.INFO)
   tm = setup_tm()
+  tm.setup_vamos_ram_trace()
   # no label
   tm.trace_int_mem('R', 2, 0)
   tm.trace_int_mem('W', 1, 4, 23)
@@ -101,6 +103,7 @@ def trace_mgr_int_mem_test(caplog):
 def trace_mgr_int_block_test(caplog):
   caplog.set_level(logging.INFO)
   tm = setup_tm()
+  tm.setup_vamos_ram_trace()
   tm.trace_int_block('R', 0x100, 0x20)
   lvl = logging.INFO
   assert caplog.record_tuples == [
@@ -112,6 +115,7 @@ def trace_mgr_int_block_test(caplog):
 def trace_mgr_code_line_test(caplog):
   caplog.set_level(logging.INFO)
   tm = setup_tm()
+  tm.setup_vamos_ram_trace()
   # range
   tm.trace_code_line(0x100)
   # lib
