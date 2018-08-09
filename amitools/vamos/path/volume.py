@@ -51,8 +51,9 @@ class VolumeManager():
                      (name, sys_path))
       return False
     elif sys_path in self.sys2volume:
-      log_path.error("duplicate volume mapping: '%s' -> %s" %
-                     (name, sys_path))
+      dup = self.sys2volume[sys_path]
+      log_path.error("duplicate volume mapping: '%s' and '%s' -> %s" %
+                     (name, dup, sys_path))
       return False
     elif lo_name in self.volume2sys:
       log_path.error("duplicate volume name: '%s'", name)
