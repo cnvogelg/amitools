@@ -6,7 +6,8 @@ class PathParser(Parser):
     def_cfg = {
         "path": {
             "command": ValueList(str),
-            "cwd": Value(str)
+            "cwd": Value(str),
+            "vols_base_dir": Value(str, "~/.vamos/volumes")
         },
         "assigns": ValueDict(ValueList(str, sep='+')),
         "volumes": ValueDict(str)
@@ -16,7 +17,9 @@ class PathParser(Parser):
             "command": Argument('-p', '--path', action='append',
                                 help="define command search ami path, e.g. c:,sc:c"),
             "cwd": Argument('--cwd', action='store',
-                            help="set the current working directory")
+                            help="set the current working directory"),
+            "vols_base_dir": Argument("--vols-base-dir", action='store',
+                                      help="set directory for local volumes")
         },
         "assigns": Argument('-a', '--assign', action='append',
                             help="add AmigaOS assign: name:/sys/path[+/more/path]"),

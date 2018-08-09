@@ -12,7 +12,7 @@ class VamosPathManager(PathManager):
   def __init__(self):
     def_vols = {
       'root': '/',
-      'sys': '.'
+      'sys': None # local volume
     }
     def_assigns = {
       'c': ['sys:c'],

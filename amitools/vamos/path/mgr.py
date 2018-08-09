@@ -44,8 +44,8 @@ class PathManagerEnv(AmiPathEnv):
 
 class PathManager:
   def __init__(self, def_volumes=None, def_assigns=None,
-               cwd=None, cmd_paths=None):
-    self.vol_mgr = VolumeManager()
+               cwd=None, cmd_paths=None, vols_base_dir=None):
+    self.vol_mgr = VolumeManager(vols_base_dir)
     self.assign_mgr = AssignManager(self.vol_mgr)
     self.default_env = PathManagerEnv(self, cwd, cmd_paths)
     self.def_volumes = def_volumes
@@ -75,9 +75,11 @@ class PathManager:
     return PathManagerEnv(self, cwd, cmd_paths)
 
   def parse_config(self, cfg):
+    vols_base_dir = cfg.path.vols_base_dir
+    self.vol_mgr.set_vols_base_dir(vols_base_dir)
     if not self.vol_mgr.parse_config(cfg):
       return False
-    if not self.vol_mgr.add_volumes(self.def_volumes):
+    if not self.vol_mgr.add_volumes(self.def_volumes, create_local=True):
       return False
     if not self.assign_mgr.parse_config(cfg):
       return False

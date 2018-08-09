@@ -5,11 +5,16 @@ import logging
 
 
 class VolumeManager():
-  def __init__(self):
+  def __init__(self, vols_base_dir=None):
     # build map of volumes to sys_paths and vice versa
     self.volume2sys = {}
     self.sys2volume = {}
     self.orig_names = {}
+    self.vols_base_dir = vols_base_dir
+    self.local_vols = {}
+
+  def set_vols_base_dir(self, dir):
+    self.vols_base_dir = dir
 
   def parse_config(self, cfg):
     if cfg is None:
@@ -30,22 +35,30 @@ class VolumeManager():
       orig_name = self.orig_names[vol]
       log_path.info("%s: sys_path=%s (%s)", vol, sys_path, orig_name)
 
-  def add_volumes(self, volumes, force=False):
+  def add_volumes(self, volumes, force=False, create_local=False):
     if not volumes:
       return True
     for volume in volumes:
       sys_path = volumes[volume]
       exists = self.is_volume(volume)
       if force or not exists:
-        if not self.add_volume(volume, sys_path):
+        if not self.add_volume(volume, sys_path, create_local):
           return False
     return True
 
-  def add_volume(self, name, sys_path):
+  def add_volume(self, name, sys_path=None, create_local=False):
     # ensure volume name is lower case
     lo_name = name.lower()
+    # is it a local volume?
+    is_local = False
+    if sys_path is None or sys_path == "":
+      sys_path = self.setup_local_sys_path(name, create_local)
+      if not sys_path:
+        return False
+      is_local = True
+    else:
+      sys_path = self.resolve_sys_path(sys_path)
     # check path and name
-    sys_path = self.resolve_sys_path(sys_path)
     if not os.path.isdir(sys_path):
       log_path.error("invalid volume path: '%s' -> %s" %
                      (name, sys_path))
@@ -63,7 +76,45 @@ class VolumeManager():
       self.volume2sys[lo_name] = sys_path
       self.sys2volume[sys_path] = lo_name
       self.orig_names[lo_name] = name
+      self.local_vols[lo_name] = is_local
       return True
+
+  def setup_local_sys_path(self, vol_name, create_local=False):
+    """create a local sys path by appending vol_name to vols_base_dir
+
+       if path is missing you may allow to create it
+
+       return resulting sys_path or None on error
+    """
+    # first ensure that vols_base_dir exists
+    base_dir = self.resolve_sys_path(self.vols_base_dir)
+    if not os.path.isdir(base_dir):
+      try:
+        log_path.info("creating volume base dir: %s", base_dir)
+        os.makedirs(base_dir)
+      except OSError as e:
+        log_path.error("error creating volume base dir: %s -> %s",
+                       base_dir, e)
+        return None
+    else:
+      log_path.debug("found base dir: %s", base_dir)
+    # build volume sys path
+    sys_path = os.path.join(base_dir, vol_name)
+    # path already exists
+    if os.path.isdir(sys_path):
+      log_path.info("found local volume dir: %s", sys_path)
+      return sys_path
+    if not create_local:
+      log_path.error("local volume dir does not exist: %s", sys_path)
+      return None
+    # try to create path
+    try:
+      log_path.info("creating local volume dir: %s", sys_path)
+      os.mkdir(sys_path)
+      return sys_path
+    except OSError as e:
+      log_path.error("error creating local volume dir: %s -> %s", sys_path, e)
+      return None
 
   def resolve_sys_path(self, sys_path):
     """replace ~ (home) or environment variables in path and
@@ -85,6 +136,7 @@ class VolumeManager():
     del self.volume2sys[lo_name]
     del self.sys2volume[sys_path]
     del self.orig_names[lo_name]
+    del self.local_vols[lo_name]
     log_path.info("del volume: '%s:' -> %s", name, sys_path)
     return True
 
@@ -99,6 +151,9 @@ class VolumeManager():
 
   def is_sys_path_abs(self, sys_path):
     return os.path.isabs(sys_path)
+
+  def is_local_volume(self, name):
+    return self.local_vols[name.lower()]
 
   def sys_to_ami_path(self, sys_path):
     """try to map an absolute system path back to an amiga path

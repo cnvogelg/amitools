@@ -17,13 +17,14 @@ def path_mgr_default_test():
 
 
 def path_mgr_config_test(tmpdir):
+  vols_base = str(tmpdir.mkdir("volumes"))
+  tmpdir.join("volumes").mkdir("work")
   sys_path = str(tmpdir.mkdir("sys"))
-  work_path = str(tmpdir.mkdir("work"))
   pm = PathManager()
   cfg = ConfigDict({
       "volumes": {
           "sys": sys_path,
-          "work": work_path,
+          "work": "", # local volume
           "home": "~"
       },
       "assigns": {
@@ -33,7 +34,8 @@ def path_mgr_config_test(tmpdir):
       },
       "path": {
           "command": ["c:", "work:c"],
-          "cwd": "work:"
+          "cwd": "work:",
+          "vols_base_dir": vols_base
       }
   })
   assert pm.parse_config(cfg)
@@ -60,8 +62,9 @@ def path_mgr_config_esc_sys_test(tmpdir):
       },
       "path": {
           "command": ["::" + work_path],
-          "cwd": "::~"
-      }
+          "cwd": "::~",
+          "vols_base_dir": None
+     }
   })
   assert pm.parse_config(cfg)
   assert sorted(pm.get_all_volume_names()) == ["home", "sys", "work"]

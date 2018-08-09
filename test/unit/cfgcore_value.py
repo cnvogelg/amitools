@@ -112,6 +112,7 @@ def config_value_list_nest_dict_rest():
 
 def config_value_dict_test():
   d = ValueDict(str)
+  assert d.parse("a:") == {'a': ''}
   assert d.parse("a:b") == {'a': 'b'}
   assert d.parse("a:b,c:d") == {'a': 'b', 'c': 'd'}
   assert d.parse({'a': 'b', 'c': 'd'}) == {'a': 'b', 'c': 'd'}
@@ -135,6 +136,8 @@ def config_value_dict_test():
   assert d.parse('x:a') == {'x': 'a'}
   with pytest.raises(ValueError):
     d.parse('x:c')
+  with pytest.raises(ValueError):
+    d.parse('x:')
   # valid keys
   d = ValueDict(str, valid_keys=('a', 'b'))
   assert d.parse('a:x') == {'a': 'x'}
@@ -144,6 +147,8 @@ def config_value_dict_test():
 
 def config_value_dict_int_test():
   d = ValueDict(int)
+  with pytest.raises(ValueError):
+    d.parse("a:")
   assert d.parse("a:1") == {'a': 1}
   assert d.parse("a:1,c:2") == {'a': 1, 'c': 2}
   assert d.parse({'a': 1, 'c': 2}) == {'a': 1, 'c': 2}
@@ -163,6 +168,7 @@ def config_value_dict_nest_value_test():
 
 def config_value_dict_nest_list_test():
   d = ValueDict(ValueList(str, sep='+'))
+  assert d.parse("a:") == {'a': []}
   assert d.parse("a:b") == {'a': ['b']}
   assert d.parse("a:b+c") == {'a': ['b', 'c']}
   assert d.parse({'a': ['b', 'c']}) == {'a': ['b', 'c']}
@@ -183,6 +189,7 @@ def config_value_dict_nest_list_test():
 
 def config_value_dict_nest_dict_test():
   d = ValueDict(ValueDict(str))
+  assert d.parse("a:") == {'a': {}}
   assert d.parse("a:{b:c}") == {'a': {'b': 'c'}}
   # append
   assert d.parse("*,a:{b:c}", {'a': {'z': 'oi'}, 'b': {'x': 'hu'}}) == {

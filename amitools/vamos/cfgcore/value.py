@@ -203,10 +203,14 @@ class ValueDict(object):
       # if colon is in substring assign value to key
       elif self.kv_sep in kv:
         elems = split_nest(kv, self.kv_sep, self.sub_nest_pair)
-        if len(elems) >= 2:
+        n = len(elems)
+        if n > 0:
           key = elems[0]
           # join extra colon elements
-          val = self.kv_sep.join(elems[1:])
+          if n > 1:
+            val = self.kv_sep.join(elems[1:])
+          else:
+            val = ""
           d[key] = val
           last_key = key
         else:

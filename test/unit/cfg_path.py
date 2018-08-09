@@ -34,7 +34,8 @@ def cfg_path_ini_test():
       },
       "path": {
           "command": ["c:", "work:c"],
-          "cwd": "~/amiga"
+          "cwd": "~/amiga",
+          "vols_base_dir": "~/.vamos/volumes"
       }
   }
 
@@ -49,14 +50,17 @@ def cfg_path_args_test():
        '-a', 'c:sys:c+sc:c,libs:sys:libs',
        '-a', 'devs:sys:devs',
        '-V', 'sys:~/.vamos/sys',
-       '-V', 'work:~/amiga/work,home:~'
+       '-V', 'work:~/amiga/work,home:~',
+       '-V', 'local:',
+       '--vols-base-dir', '/bla'
        ])
   lp.parse_args(args)
   assert lp.get_cfg_dict() == {
       "volumes": {
           "sys": "~/.vamos/sys",
           "work": "~/amiga/work",
-          "home": "~"
+          "home": "~",
+          "local": ""
       },
       "assigns": {
           "c": ["sys:c", "sc:c"],
@@ -65,7 +69,8 @@ def cfg_path_args_test():
       },
       "path": {
           "command": ["c:", "work:c"],
-          "cwd": "~/amiga"
+          "cwd": "~/amiga",
+          "vols_base_dir": "/bla"
       }
   }
 
@@ -96,14 +101,17 @@ def cfg_path_ini_args_test():
        '-a', 'c:work:c',
        '-a', 'devs:sys:devs',
        '-V', 'work:~/amiga/work',
-       '-V', 'home:~'
+       '-V', 'home:~',
+       '-V', 'local:',
+       '--vols-base-dir', '/bla'
        ])
   lp.parse_args(args)
   assert lp.get_cfg_dict() == {
       "volumes": {
           "sys": "~/.vamos/sys",
           "work": "~/amiga/work",
-          "home": "~"
+          "home": "~",
+          "local": ""
       },
       "assigns": {
           "c": ["sys:c", "sc:c", "work:c"],
@@ -112,6 +120,7 @@ def cfg_path_ini_args_test():
       },
       "path": {
           "command": ["c:", "work:c", "sys:t"],
-          "cwd": "~/amiga"
+          "cwd": "~/amiga",
+          "vols_base_dir": "/bla"
       }
   }

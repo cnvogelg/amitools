@@ -25,6 +25,7 @@ def path_volume_add_del_test(tmpdir):
   assert v.add_volume("My", my_path)
   assert v.get_all_names() == ['My']
   assert v.is_volume('MY')
+  assert not v.is_local_volume('MY')
   assert v.get_volume_sys_path('MY') == my_path
   # duplicate path mapping
   assert not v.add_volume("foo", my_path)
@@ -36,6 +37,26 @@ def path_volume_add_del_test(tmpdir):
   assert v.del_volume("my")
   # invalid name
   assert not v.del_volume("baz")
+
+
+def path_volume_add_local_test(tmpdir):
+  vols_dir = str(tmpdir.join("volumes"))
+  v = VolumeManager(vols_base_dir=vols_dir)
+  # without create
+  assert not v.add_volume("My")
+  # with create
+  assert v.add_volume("My", create_local=True)
+  assert v.is_local_volume("My")
+  # check for vol dir
+  vol_path = os.path.join(vols_dir, "My")
+  assert os.path.isdir(vol_path)
+  assert v.get_volume_sys_path("My") == vol_path
+  # create multiple
+  assert v.add_volumes({"foo": None, "bar": None}, create_local=True)
+  for vol in ("foo", "bar"):
+    vol_path = os.path.join(vols_dir, vol)
+    assert os.path.isdir(vol_path)
+    assert v.get_volume_sys_path(vol) == vol_path
 
 
 def path_volume_sys_to_ami_test(tmpdir):
