@@ -24,7 +24,7 @@ def path_mgr_config_test(tmpdir):
   cfg = ConfigDict({
       "volumes": {
           "sys": sys_path,
-          "work": "", # local volume
+          "work": "",  # local volume
           "home": "~"
       },
       "assigns": {
@@ -64,7 +64,7 @@ def path_mgr_config_esc_sys_test(tmpdir):
           "command": ["::" + work_path],
           "cwd": "::~",
           "vols_base_dir": None
-     }
+      }
   })
   assert pm.parse_config(cfg)
   assert sorted(pm.get_all_volume_names()) == ["home", "sys", "work"]
@@ -283,11 +283,16 @@ def path_mgr_cmdpaths_test(tmpdir):
                                         AmiPath('c:cmd')]
 
 
+def get_volume_sys_path(pm, vol_name):
+  vol = pm.get_volume(vol_name)
+  return vol.get_res_path()
+
+
 def path_mgr_to_sys_path_test(tmpdir):
   pm = setup_pm(tmpdir)
   tsp = pm.to_sys_path
-  sys_sys_path = pm.get_volume_sys_path('sys')
-  sys_root_path = pm.get_volume_sys_path('root')
+  sys_sys_path = get_volume_sys_path(pm, 'sys')
+  sys_root_path = get_volume_sys_path(pm, 'root')
   # vol path
   assert tsp("sys:") == sys_sys_path
   # assign path
@@ -311,10 +316,10 @@ def path_mgr_to_sys_path_test(tmpdir):
 def path_mgr_from_sys_path_test(tmpdir):
   pm = setup_pm(tmpdir)
   fsp = pm.from_sys_path
-  sys_sys_path = pm.get_volume_sys_path('sys')
-  sys_root_path = pm.get_volume_sys_path('root')
+  sys_sys_path = get_volume_sys_path(pm, 'sys')
+  sys_root_path = get_volume_sys_path(pm, 'root')
   assert pm.get_vol_mgr().add_volume("cwd", ".")
-  sys_cwd_path = pm.get_volume_sys_path('cwd')
+  sys_cwd_path = get_volume_sys_path(pm, 'cwd')
   # abs sys path
   assert fsp(sys_sys_path) == 'sys:'
   assert fsp(sys_root_path) == 'root:'
@@ -331,9 +336,9 @@ def path_mgr_from_sys_path_test(tmpdir):
 
 def path_mgr_resolve_esc_sys_path_test(tmpdir):
   pm = setup_pm(tmpdir)
-  sys_sys_path = pm.get_volume_sys_path('sys')
+  sys_sys_path = get_volume_sys_path(pm, 'sys')
   assert pm.get_vol_mgr().add_volume("cwd", ".")
-  sys_cwd_path = pm.get_volume_sys_path('cwd')
+  sys_cwd_path = get_volume_sys_path(pm, 'cwd')
   resp = pm.resolve_esc_sys_path
   # ami path
   assert resp("bla:") == AmiPath("bla:")
@@ -355,9 +360,9 @@ def path_mgr_resolve_esc_sys_path_test(tmpdir):
 
 def path_mgr_create_env_test(tmpdir):
   pm = setup_pm(tmpdir)
-  sys_sys_path = pm.get_volume_sys_path('sys')
+  sys_sys_path = get_volume_sys_path(pm, 'sys')
   assert pm.get_vol_mgr().add_volume("cwd", ".")
-  sys_cwd_path = pm.get_volume_sys_path('cwd')
+  sys_cwd_path = get_volume_sys_path(pm, 'cwd')
   def_env = pm.get_default_env()
   # create clone of default env
   env = pm.create_env()

@@ -79,7 +79,7 @@ class PathManager:
     self.vol_mgr.set_vols_base_dir(vols_base_dir)
     if not self.vol_mgr.parse_config(cfg):
       return False
-    if not self.vol_mgr.add_volumes(self.def_volumes, create_local=True):
+    if self.vol_mgr.add_volumes(self.def_volumes, create_local=True) is False:
       return False
     if not self.assign_mgr.parse_config(cfg):
       return False
@@ -116,8 +116,8 @@ class PathManager:
   def get_all_volume_names(self):
     return self.vol_mgr.get_all_names()
 
-  def get_volume_sys_path(self, vol_name):
-    return self.vol_mgr.get_volume_sys_path(vol_name)
+  def get_volume(self, vol_name):
+    return self.vol_mgr.get_volume(vol_name)
 
   def get_all_assign_names(self):
     return self.assign_mgr.get_all_names()
@@ -397,10 +397,7 @@ class PathManager:
        If path is not mappable return None or
        if strict mode is True then raise an SysPathError
     """
-    vm = self.vol_mgr
-    if not vm.is_sys_path_abs(sys_path):
-      sys_path = vm.resolve_sys_path(sys_path)
-    ami_path = vm.sys_to_ami_path(sys_path)
+    ami_path = self.vol_mgr.sys_to_ami_path(sys_path)
     if ami_path:
       return AmiPath(ami_path)
     elif strict:

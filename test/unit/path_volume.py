@@ -1,11 +1,10 @@
 import os
-from amitools.vamos.path import VolumeManager
+from amitools.vamos.path import VolumeManager, resolve_sys_path
 from amitools.vamos.cfgcore import ConfigDict
 
 
 def path_volume_resolve_sys_path_test(tmpdir):
-  v = VolumeManager()
-  rsp = v.resolve_sys_path
+  rsp = resolve_sys_path
   p = str(tmpdir)
   assert rsp(p) == p
   # user home
@@ -22,11 +21,12 @@ def path_volume_add_del_test(tmpdir):
   my_path = str(tmpdir.mkdir("bla"))
   no_path = str(tmpdir.join("hugo"))
   # ok
-  assert v.add_volume("My", my_path)
+  vol = v.add_volume("My", my_path)
+  assert vol
   assert v.get_all_names() == ['My']
   assert v.is_volume('MY')
-  assert not v.is_local_volume('MY')
-  assert v.get_volume_sys_path('MY') == my_path
+  assert not vol.is_local()
+  assert vol.get_res_path() == my_path
   # duplicate path mapping
   assert not v.add_volume("foo", my_path)
   # duplicate path name
@@ -45,18 +45,37 @@ def path_volume_add_local_test(tmpdir):
   # without create
   assert not v.add_volume("My")
   # with create
-  assert v.add_volume("My", create_local=True)
-  assert v.is_local_volume("My")
+  vol = v.add_volume("My", create_local=True)
+  assert vol
+  assert vol.is_local()
   # check for vol dir
   vol_path = os.path.join(vols_dir, "My")
   assert os.path.isdir(vol_path)
-  assert v.get_volume_sys_path("My") == vol_path
+  assert vol.get_res_path() == vol_path
   # create multiple
-  assert v.add_volumes({"foo": None, "bar": None}, create_local=True)
-  for vol in ("foo", "bar"):
-    vol_path = os.path.join(vols_dir, vol)
+  vols = v.add_volumes({"foo": None, "bar": None}, create_local=True)
+  assert vols
+  for vol in vols:
+    vol_path = os.path.join(vols_dir, vol.get_name())
     assert os.path.isdir(vol_path)
-    assert v.get_volume_sys_path(vol) == vol_path
+    assert vol.get_res_path() == vol_path
+
+
+def path_volume_create_rel_sys_path_test(tmpdir):
+  v = VolumeManager()
+  org = tmpdir.mkdir("bla")
+  my_path = str(org)
+  # ok
+  vol = v.add_volume("My", my_path)
+  assert vol
+  # single path
+  path = vol.create_rel_sys_path("bla")
+  assert path == str(org.join("bla"))
+  assert os.path.isdir(path)
+  # multi path
+  path = vol.create_rel_sys_path(["foo", "bar"])
+  assert path == str(org.join("foo").join("bar"))
+  assert os.path.isdir(path)
 
 
 def path_volume_sys_to_ami_test(tmpdir):
