@@ -46,7 +46,8 @@ class AssignManager(object):
 
   def dump(self):
     log_path.info("--- assigns ---")
-    for a in sorted(self.assigns_by_name):
+    for name in sorted(self.assigns_by_name):
+      a = self.assigns_by_name[name]
       log_path.info("%s", a)
 
   def get_all_names(self):
