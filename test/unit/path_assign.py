@@ -24,13 +24,13 @@ def path_assign_add_del_test(tmpdir):
   assert a.is_assign('FOO')
   assert a.is_assign('Foo')
   assert a.get_all_names() == ['foo']
-  assert a.get_assign('Foo') == ['bla:']
+  assert a.get_assign('Foo').get_assigns() == ['bla:']
   # ok
   assert a.add_assign('Baz', 'foo:bla/blup')
   assert a.is_assign('baz')
   assert a.is_assign('BAZ')
   assert sorted(a.get_all_names()) == ['Baz', 'foo']
-  assert a.get_assign('baz') == ['foo:bla/blup']
+  assert a.get_assign('baz').get_assigns() == ['foo:bla/blup']
   # invalid path
   assert not a.add_assign('bar', 'bla')
   # duplicate

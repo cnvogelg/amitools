@@ -83,7 +83,7 @@ class PathManager:
       return False
     if not self.assign_mgr.parse_config(cfg):
       return False
-    if not self.assign_mgr.add_assigns(self.def_assigns):
+    if self.assign_mgr.add_assigns(self.def_assigns) is False:
       return False
     if not self.default_env.parse_config(cfg):
       return False
@@ -105,7 +105,7 @@ class PathManager:
     assigns = self.assign_mgr.get_all_names()
     for a in assigns:
       try:
-        paths = self.assign_mgr.get_assign(a)
+        paths = self.assign_mgr.get_assign(a).get_assigns()
         for path in paths:
           self.volpaths(path, strict=True)
       except AmiPathError as e:
@@ -204,12 +204,13 @@ class PathManager:
       if p is None:
         raise AmiPathError(ami_path, "no prefix in path")
       # get assign list or None
-      alist = self.assign_mgr.get_assign(p)
+      a = self.assign_mgr.get_assign(p)
       # no more assign: is volume
-      if alist is None:
+      if a is None:
         return False
       # already a multi assign. stop
-      elif len(alist) > 1:
+      alist = a.get_assigns()
+      if len(alist) > 1:
         return True
       # resolve single assign as it might ref a multi assign
       else:

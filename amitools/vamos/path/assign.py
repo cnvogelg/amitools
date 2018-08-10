@@ -1,11 +1,36 @@
 from amitools.vamos.log import log_path
 
 
-class AssignManager:
+class Assign(object):
+  def __init__(self, name, assigns):
+    self.name = name
+    self.assigns = assigns
+    self.lo_name = name.lower()
+
+  def __str__(self):
+    return "Assign(%s(%s):%r)" % \
+        (self.name, self.lo_name, self.assigns)
+
+  def get_name(self):
+    """return original name of assign"""
+    return self.name
+
+  def get_lo_name(self):
+    """return normalized name of assign, i.e. lower case"""
+    return self.lo_name
+
+  def get_assigns(self):
+    """return list of assigned paths"""
+    return self.assigns
+
+  def append(self, paths):
+    self.assigns += paths
+
+
+class AssignManager(object):
   def __init__(self, vol_mgr):
     self.vol_mgr = vol_mgr
-    self.assigns = {}
-    self.orig_names = {}
+    self.assigns_by_name = {}
 
   def parse_config(self, cfg):
     if cfg is None:
@@ -21,32 +46,33 @@ class AssignManager:
 
   def dump(self):
     log_path.info("--- assigns ---")
-    for a in self.assigns:
-      alist = self.assigns[a]
-      orig_name = self.orig_names[a]
-      log_path.info("%s: %s (%s)", a, alist, orig_name)
+    for a in sorted(self.assigns_by_name):
+      log_path.info("%s", a)
 
   def get_all_names(self):
-    return self.orig_names.values()
+    return map(lambda x: x.get_name(), self.assigns_by_name.values())
 
   def get_assign(self, name):
     lo_name = name.lower()
-    if lo_name in self.assigns:
-      return self.assigns[lo_name]
+    if lo_name in self.assigns_by_name:
+      return self.assigns_by_name[lo_name]
 
   def is_assign(self, name):
-    return name.lower() in self.assigns
+    return name.lower() in self.assigns_by_name
 
   def add_assigns(self, assigns, force=False):
     if not assigns:
-      return True
+      return []
+    res = []
     for assign in assigns:
       alist = assigns[assign]
       exists = self.vol_mgr.is_volume(assign) or self.is_assign(assign)
       if force or not exists:
-        if not self.add_assign(assign, alist):
+        a = self.add_assign(assign, alist)
+        if not a:
           return False
-    return True
+        res.append(a)
+    return res
 
   def add_assign(self, name, path_list, append=False):
     # also allow path string instead of list
@@ -64,7 +90,7 @@ class AssignManager:
           "assign with a volume name: %s", name)
       return False
     # check name: duplicate assign
-    elif lo_name in self.assigns:
+    elif lo_name in self.assigns_by_name:
       log_path.error(
           "duplicate assign: %s", name)
       return False
@@ -77,23 +103,22 @@ class AssignManager:
       alist.append(path_name)
 
     # setup assign list
-    if append and self.assigns.has_key(lo_name):
-      self.assigns[lo_name] += alist
+    if append and self.assigns_by_name.has_key(lo_name):
+      a = self.assigns_by_name[lo_name]
+      a.append(alist)
     else:
-      self.assigns[lo_name] = alist
-    # save exact cased name
-    self.orig_names[lo_name] = name
+      a = Assign(name, alist)
+      self.assigns_by_name[lo_name] = Assign(name, alist)
 
-    log_path.info("add assign: name='%s' -> paths=%s", name, alist)
-    return True
+    log_path.info("add assign: %s", a)
+    return a
 
   def del_assign(self, name):
     lo_name = name.lower()
-    if self.assigns.has_key(lo_name):
-      alist = self.assigns[lo_name]
-      log_path.info("del assign: name='%s' -> paths=%s", name, alist)
-      del self.assigns[lo_name]
-      del self.orig_names[lo_name]
+    if self.assigns_by_name.has_key(lo_name):
+      a = self.assigns_by_name[lo_name]
+      log_path.info("del assign: %s", a)
+      del self.assigns_by_name[lo_name]
       return True
     else:
       log_path.error("assign not found: %s", name)
@@ -153,9 +178,10 @@ class AssignManager:
     else:
       # is assign
       name = split[0].lower()
-      if self.assigns.has_key(name):
+      if self.assigns_by_name.has_key(name):
         remainder = split[1]
-        aname_list = self.assigns[name]
+        assign = self.assigns_by_name[name]
+        aname_list = assign.get_assigns()
         # single assign
         if len(aname_list) == 1:
           aname = aname_list[0]

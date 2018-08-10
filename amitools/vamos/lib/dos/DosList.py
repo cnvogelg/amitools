@@ -50,7 +50,7 @@ class DosList:
       last_entry = entry
     assigns = path_mgr.get_all_assign_names()
     for assign in assigns:
-      alist = path_mgr.get_assign(assign)
+      alist = path_mgr.get_assign(assign).get_assigns()
       entry = self.add_assign(assign, alist)
       if last_entry is None:
         self.first_entry = entry
