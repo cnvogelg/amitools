@@ -81,17 +81,42 @@ def cfgcore_dicttrafo_tuple_prefix_test():
   dt = DictTrafo(cfg, prefix=("x", "y"))
   data = {
       "x": {
-        "y" : {
-          "tree": {
-              "A": 12,
-              "B": "hello",
-              "C": [1, 2, 3]
+          "y": {
+              "tree": {
+                  "A": 12,
+                  "B": "hello",
+                  "C": [1, 2, 3]
+              }
           }
-        }
       }
   }
   assert dt.transform(data) == {
       "a": {"x": 12,
             "y": "hello"},
       "b": [1, 2, 3]
+  }
+
+
+def cfgcore_dicttrafo_callable_test():
+  cfg = {
+      "a": {"x": (lambda k, x: x*2, ("tree", "A")),
+            "y": (lambda k, x: x+" world", ("tree", "B"))},
+      "b": (lambda k, x: sum(x), ("tree", "C"))
+  }
+  dt = DictTrafo(cfg, prefix=("x", "y"))
+  data = {
+      "x": {
+          "y": {
+              "tree": {
+                  "A": 12,
+                  "B": "hello",
+                  "C": [1, 2, 3]
+              }
+          }
+      }
+  }
+  assert dt.transform(data) == {
+      "a": {"x": 24,
+            "y": "hello world"},
+      "b": 6
   }

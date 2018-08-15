@@ -306,13 +306,32 @@ class MainParser(object):
       log_cfg.error("%s: IO error: %s", log_name, e)
       return None
     # convert to dictionary
+    list_sections = self._get_list_sections()
     res = {}
     for sec in p.sections():
-      sec_dict = {}
-      res[sec] = sec_dict
-      for key, val in p.items(sec):
-        sec_dict[key] = val
+      # create a section list
+      if sec in list_sections:
+        sec_list = []
+        res[sec] = sec_list
+        for key, val in p.items(sec):
+          sec_list.append([key, val])
+      else:
+        # create a section dictionary
+        sec_dict = {}
+        res[sec] = sec_dict
+        for key, val in p.items(sec):
+          sec_dict[key] = val
     return res
+
+  def _get_list_sections(self):
+    # ask all parsers for sections to be converted to lists
+    ls = set()
+    for p in self.parsers:
+      pls = p.get_ini_list_sections()
+      if pls:
+        for s in pls:
+          ls.add(s)
+    return ls
 
   def _dump_config(self):
     out = StringIO.StringIO()

@@ -203,7 +203,7 @@ def config_main_parse_custom_args_test(tmpdir):
   assert args.fusel == 'bla'
 
 
-def gen_parser():
+def gen_parser(list_sections=None):
   def_cfg = {"a": {"v": 1,
                    "w": ValueList(str),
                    "x": True},
@@ -214,7 +214,7 @@ def gen_parser():
                    "x": Argument("-x", action='store_false')},
              "b": Argument("-b"),
              "c": Argument("-C")}
-  return Parser("parser", def_cfg, arg_cfg)
+  return Parser("parser", def_cfg, arg_cfg, ini_list_sections=list_sections)
 
 
 def config_main_parser_config_test(tmpdir):
@@ -227,13 +227,6 @@ def config_main_parser_config_test(tmpdir):
   # run without args
   assert mp.parse(paths, args=[])
   assert p.get_cfg_dict() == {
-      "a": {"v": 3,  # from config
-            "w": None,
-            "x": True},
-      "b": "hello",
-      "c": None
-  }
-  assert mp.get_cfg_dict() == {
       "a": {"v": 3,  # from config
             "w": None,
             "x": True},

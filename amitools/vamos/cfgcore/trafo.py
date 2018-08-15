@@ -17,10 +17,17 @@ class DictTrafo(object):
     for key in trafo_dict:
       val = trafo_dict[key]
       tval = type(val)
+      # sub dict
       if tval is dict:
         vres = self.transform(in_dict, val)
+      # (callable, rel_path)
+      elif tval is tuple and len(val) == 2 and callable(val[0]):
+        rel_path = self.read_rel_path(val[1], in_dict)
+        vres = val[0](key, rel_path)
+      # a rel_path in in_dict
       elif tval in (str, tuple, list):
         vres = self.read_rel_path(val, in_dict)
+      # invalid
       else:
         raise ValueError("invalid type in trafo_dict: %s" + val)
       if vres is not None or keep_none:

@@ -8,7 +8,8 @@ class Parser(object):
 
   def __init__(self, name, def_cfg=None, arg_cfg=None,
                arg_sect=None, arg_desc=None,
-               ini_trafo=None, ini_prefix=None):
+               ini_trafo=None, ini_prefix=None,
+               ini_list_sections=None):
     self.name = name
     self.def_dict = DefaultDict(def_cfg)
     self.arg_dict = ArgumentDict(arg_cfg)
@@ -17,6 +18,7 @@ class Parser(object):
     self.ini_trafo = ini_trafo
     self.dict_trafo = DictTrafo(ini_trafo, ini_prefix)
     self.cfg = self.def_dict.gen_dict()
+    self.ini_list_sections = ini_list_sections
 
   def get_def_cfg(self):
     return self.def_dict
@@ -26,6 +28,9 @@ class Parser(object):
 
   def get_cfg_dict(self):
     return self.cfg
+
+  def get_ini_list_sections(self):
+    return self.ini_list_sections
 
   def setup_args(self, argparse):
     if self.arg_sect:
