@@ -17,48 +17,57 @@ def path_volume_resolve_sys_path_test(tmpdir):
 
 def path_volume_add_del_test(tmpdir):
   v = VolumeManager()
+  assert v.setup()
   assert v.get_all_names() == []
   my_path = str(tmpdir.mkdir("bla"))
   no_path = str(tmpdir.join("hugo"))
   # ok
-  vol = v.add_volume("My", my_path)
+  vol = v.add_volume("My:" + my_path)
   assert vol
   assert v.get_all_names() == ['My']
   assert v.is_volume('MY')
-  assert not vol.is_local()
-  assert vol.get_res_path() == my_path
+  assert vol.is_setup
+  assert vol.get_path() == my_path
+  assert v.add_volume("foo:" + my_path)
+  assert v.get_all_names() == ['My', 'foo']
   # duplicate path mapping
-  assert not v.add_volume("foo", my_path)
+  assert not v.add_volume("foo:" + my_path)
   # duplicate path name
-  assert not v.add_volume("my", no_path)
+  assert not v.add_volume("my:" + no_path)
   # invalid path
-  assert not v.add_volume("foo", no_path)
+  assert not v.add_volume("foo:" + no_path)
   # ok
   assert v.del_volume("my")
+  assert not vol.is_setup
+  assert v.get_all_names() == ['foo']
   # invalid name
   assert not v.del_volume("baz")
+  # shutdown
+  v.shutdown()
 
 
 def path_volume_add_local_test(tmpdir):
   vols_dir = str(tmpdir.join("volumes"))
   v = VolumeManager(vols_base_dir=vols_dir)
+  v.setup()
   # without create
   assert not v.add_volume("My")
   # with create
   vol = v.add_volume("My", create_local=True)
   assert vol
-  assert vol.is_local()
   # check for vol dir
   vol_path = os.path.join(vols_dir, "My")
   assert os.path.isdir(vol_path)
-  assert vol.get_res_path() == vol_path
+  assert vol.get_path() == vol_path
   # create multiple
-  vols = v.add_volumes({"foo": None, "bar": None}, create_local=True)
+  vols = v.add_volumes(["foo", "bar"], create_local=True)
   assert vols
   for vol in vols:
     vol_path = os.path.join(vols_dir, vol.get_name())
     assert os.path.isdir(vol_path)
-    assert vol.get_res_path() == vol_path
+    assert vol.get_path() == vol_path
+  # shutdown
+  v.shutdown()
 
 
 def path_volume_create_rel_sys_path_test(tmpdir):
@@ -66,7 +75,7 @@ def path_volume_create_rel_sys_path_test(tmpdir):
   org = tmpdir.mkdir("bla")
   my_path = str(org)
   # ok
-  vol = v.add_volume("My", my_path)
+  vol = v.add_volume("My:" + my_path)
   assert vol
   # single path
   path = vol.create_rel_sys_path("bla")
@@ -85,8 +94,8 @@ def path_volume_sys_to_ami_test(tmpdir):
   no_path = str(tmpdir.join("hugo"))
   mp2 = mp.mkdir("blub")
   my_path2 = str(mp2)
-  assert v.add_volume("My", my_path)
-  assert v.add_volume("nested", my_path2)
+  assert v.add_volume("My:" + my_path)
+  assert v.add_volume("nested:" + my_path2)
   # exisitng path
   s2a = v.sys_to_ami_path
   assert s2a(my_path) == 'My:'
@@ -108,7 +117,7 @@ def path_volume_ami_to_sys_test(tmpdir):
   # case insensitive file system?
   ci_fs = os.path.exists(os.path.join(my_path, "foo"))
   sub_path = str(mp2)
-  assert v.add_volume("My", my_path)
+  assert v.add_volume("My:" + my_path)
   # base path
   a2s = v.ami_to_sys_path
   assert a2s("my:") == my_path
@@ -126,9 +135,9 @@ def path_volume_cfg_test(tmpdir):
   my_path = str(tmpdir.mkdir("bla"))
   v = VolumeManager()
   cfg = ConfigDict({
-      'volumes': ConfigDict({
-          'my': my_path
-      })
+      'volumes': [
+          'my:' + my_path
+      ]
   })
   assert v.parse_config(cfg)
   assert v.get_all_names() == ['my']

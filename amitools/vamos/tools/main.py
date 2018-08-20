@@ -48,9 +48,15 @@ def tools_main(tools, cfg_files=None, args=None, cfg_dict=None):
 
   # run tool
   if single:
-    return tool.run(ap_args)
+    result = tool.run(ap_args)
   else:
+    result = 1
     for tool in tools:
       if tool.get_name() == ap_args.tools_cmd:
-        return tool.run(ap_args)
-    return 1
+        result = tool.run(ap_args)
+        break
+
+  # shutdown
+  tool.shutdown()
+
+  return result

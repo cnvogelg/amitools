@@ -2,14 +2,30 @@ from amitools.vamos.cfg import PathParser
 import argparse
 
 
+def cfg_path_ini_empty_test():
+  lp = PathParser()
+  ini_dict = {
+  }
+  lp.parse_config(ini_dict, 'ini')
+  assert lp.get_cfg_dict() == {
+      "volumes": None,
+      "assigns": None,
+      "path": {
+          "command": None,
+          "cwd": None,
+          "vols_base_dir": "~/.vamos/volumes"
+      }
+  }
+
+
 def cfg_path_ini_test():
   lp = PathParser()
   ini_dict = {
-      "volumes": {
-          "sys": "~/.vamos/sys",
-          "work": "~/amiga/work",
-          "home": "~"
-      },
+      "volumes": [
+          ["sys", "~/.vamos/sys"],
+          ["work", "~/amiga/work"],
+          ["home", "~"]
+      ],
       "assigns": {
           "c": "sys:c+sc:c",
           "libs": "sys:libs",
@@ -22,11 +38,11 @@ def cfg_path_ini_test():
   }
   lp.parse_config(ini_dict, 'ini')
   assert lp.get_cfg_dict() == {
-      "volumes": {
-          "sys": "~/.vamos/sys",
-          "work": "~/amiga/work",
-          "home": "~"
-      },
+      "volumes": [
+          "sys:~/.vamos/sys",
+          "work:~/amiga/work",
+          "home:~"
+      ],
       "assigns": {
           "c": ["sys:c", "sc:c"],
           "libs": ["sys:libs"],
@@ -56,12 +72,12 @@ def cfg_path_args_test():
        ])
   lp.parse_args(args)
   assert lp.get_cfg_dict() == {
-      "volumes": {
-          "sys": "~/.vamos/sys",
-          "work": "~/amiga/work",
-          "home": "~",
-          "local": ""
-      },
+      "volumes": [
+          "sys:~/.vamos/sys",
+          "work:~/amiga/work",
+          "home:~",
+          "local:"
+      ],
       "assigns": {
           "c": ["sys:c", "sc:c"],
           "libs": ["sys:libs"],
@@ -78,9 +94,9 @@ def cfg_path_args_test():
 def cfg_path_ini_args_test():
   lp = PathParser()
   ini_dict = {
-      "volumes": {
-          "sys": "~/.vamos/sys",
-      },
+      "volumes": [
+          ["sys", "~/.vamos/sys"],
+      ],
       "assigns": {
           "c": "sys:c",
           "libs": "sys:libs",
@@ -107,12 +123,12 @@ def cfg_path_ini_args_test():
        ])
   lp.parse_args(args)
   assert lp.get_cfg_dict() == {
-      "volumes": {
-          "sys": "~/.vamos/sys",
-          "work": "~/amiga/work",
-          "home": "~",
-          "local": ""
-      },
+      "volumes": [
+          "sys:~/.vamos/sys",
+          "work:~/amiga/work",
+          "home:~",
+          "local:"
+      ],
       "assigns": {
           "c": ["sys:c", "sc:c", "work:c"],
           "libs": ["sys:libs"],

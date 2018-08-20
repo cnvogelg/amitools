@@ -30,7 +30,13 @@ class PathTool(Tool):
   def setup(self, args):
     self.path_mgr = VamosPathManager()
     cfg_dict = self.path_parser.get_cfg_dict()
-    return self.path_mgr.parse_config(cfg_dict)
+    ok = self.path_mgr.parse_config(cfg_dict)
+    if not ok:
+      return False
+    return self.path_mgr.setup()
+
+  def shutdown(self):
+    self.path_mgr.shutdown()
 
   def get_path_mgr(self):
     return self.path_mgr

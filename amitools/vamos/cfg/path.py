@@ -10,7 +10,7 @@ class PathParser(Parser):
             "vols_base_dir": Value(str, "~/.vamos/volumes")
         },
         "assigns": ValueDict(ValueList(str, sep='+')),
-        "volumes": ValueDict(str)
+        "volumes": ValueList(str)
     }
     arg_cfg = {
         "path": {
@@ -26,9 +26,19 @@ class PathParser(Parser):
         "volumes": Argument('-V', '--volume', action='append',
                             help="define AmigaOS volume: name:/abs/sys/path")
     }
+
+    def list_merge(main_key, in_list):
+      """convert a list of key-val-pairs to list with "key:val" entries"""
+      if in_list is None:
+        return None
+      res = []
+      for key, val in in_list:
+        res.append(key + ":" + val)
+      return res
+
     ini_trafo = {
         "assigns": "assigns",
-        "volumes": "volumes",
+        "volumes": (list_merge, "volumes"),
         "path": {
             "command": ["path", "path"],
             "cwd": ["path", "cwd"]
@@ -36,4 +46,5 @@ class PathParser(Parser):
     }
     Parser.__init__(self, "path", def_cfg, arg_cfg,
                     "paths", "define volumes, assigns, and the search path",
-                    ini_trafo)
+                    ini_trafo,
+                    ini_list_sections=['volumes'])

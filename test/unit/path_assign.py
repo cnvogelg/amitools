@@ -4,7 +4,7 @@ from amitools.vamos.cfgcore import ConfigDict
 
 def setup_am(my_path):
   v = VolumeManager()
-  v.add_volume("bla", my_path)
+  v.add_volume("bla:" + my_path)
   a = AssignManager(v)
   return a
 

@@ -20,3 +20,6 @@ class Tool(object):
 
   def run(self, args):
     return 0
+
+  def shutdown(self):
+    pass

@@ -9,19 +9,39 @@ class VamosPathManager(PathManager):
   """The VamosPathManager keeps the old vamos path manager API (for now)
      but has already the new PathManager under the hood.
   """
-  def __init__(self):
-    def_vols = {
-      'root': '/',
-      'sys': None # local volume
-    }
+
+  def __init__(self, vols_base_dir=None):
     def_assigns = {
-      'c': ['sys:c'],
-      'libs': ['sys:libs'],
-      'devs': ['sys:devs']
+        'c': ['sys:c'],
+        'libs': ['sys:libs'],
+        'devs': ['sys:devs']
     }
     cwd = '::.'
     cmd_paths = ['c:']
-    PathManager.__init__(self, def_vols, def_assigns, cwd, cmd_paths)
+    if not vols_base_dir:
+      vols_base_dir = "~/.vamos/volumes"
+    PathManager.__init__(self, def_assigns, cwd, cmd_paths, vols_base_dir)
+
+  def setup(self):
+    vm = self.get_vol_mgr()
+    # add a default 'system' volume if none is given
+    if vm.get_num_volumes() == 0:
+      log_path.info("adding default 'system:' volume")
+      if not vm.add_volume('system:', True):
+        return False
+    # add root volume
+    if not vm.is_volume('root'):
+      log_path.info("adding missing 'root:' volume")
+      if not vm.add_volume('root:/'):
+        return False
+    # add 'sys:' assign to boot volume
+    am = self.get_assign_mgr()
+    if not am.is_assign('sys') and not vm.is_volume('sys'):
+      volume = vm.get_boot_volume()
+      log_path.info("assigning boot volume to sys: %s", volume)
+      if not am.add_assign('sys', [volume.get_name()+ ":"]):
+        return False
+    return PathManager.setup(self)
 
   def _get_lock_env(self, lock):
     cmd_paths = self.get_default_env().get_cmd_paths()
@@ -148,7 +168,7 @@ class VamosPathManager(PathManager):
       return None
     files = os.listdir(sys_path)
     log_path.info("ami_list_dir: path='%s' -> sys_path='%s' -> files=%s",
-      ami_path, sys_path, files)
+                  ami_path, sys_path, files)
     return files
 
   def ami_path_exists(self, cwd_lock, ami_path):

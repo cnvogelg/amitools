@@ -71,6 +71,9 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   # setup path manager
   path_mgr = VamosPathManager()
   if not path_mgr.parse_config(mp.get_path_dict()):
+    log_main.error("path config failed!")
+    return RET_CODE_CONFIG_ERROR
+  if not path_mgr.setup():
     log_main.error("path setup failed!")
     return RET_CODE_CONFIG_ERROR
 
@@ -130,6 +133,7 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   slm.cleanup()
 
   # mem_map and machine shutdown
+  path_mgr.shutdown()
   if ok:
     mem_map.cleanup()
   machine.cleanup()

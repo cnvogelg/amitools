@@ -1,6 +1,6 @@
 [volumes]
+wb=volumes/wb
 curdir=.
-sys=volumes/sys
 
 [assigns]
 bin=curdir:bin

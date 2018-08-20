@@ -42,15 +42,6 @@ class AmiPathEnv(object):
       self.cwd.set(path.cwd)
     if path.command:
       self.cmd_paths.set(path.command)
-    # enforce validation
-    try:
-      log_path.debug("env: parse_config: %s", cfg)
-      self.cwd.resolve()
-      self.cmd_paths.resolve()
-      log_path.debug("env: done: %s", self)
-    except AmiPathError as e:
-      log_path.error("env: parse config error: %s", e)
-      return False
     return True
 
   def dump(self):

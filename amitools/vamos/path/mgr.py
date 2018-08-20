@@ -25,9 +25,9 @@ class PathManagerEnv(AmiPathEnv):
     ami_path = self.path_mgr.resolve_esc_sys_path(ami_path)
     # common check
     ami_path = AmiPathEnv._cwd_path_resolver(self, ami_path)
-    # make sure its a volpath
-    if not self.path_mgr.is_volume_path(ami_path):
-      raise AmiPathError(ami_path, "cwd must be a volpath!")
+    # make sure its a valid prefix path
+    if not self.path_mgr.is_prefix_valid(ami_path):
+      raise AmiPathError(ami_path, "cwd must have a valid prefix!")
     return ami_path
 
   def _cmd_path_resolver(self, ami_path):
@@ -43,12 +43,11 @@ class PathManagerEnv(AmiPathEnv):
 
 
 class PathManager:
-  def __init__(self, def_volumes=None, def_assigns=None,
+  def __init__(self, def_assigns=None,
                cwd=None, cmd_paths=None, vols_base_dir=None):
     self.vol_mgr = VolumeManager(vols_base_dir)
     self.assign_mgr = AssignManager(self.vol_mgr)
     self.default_env = PathManagerEnv(self, cwd, cmd_paths)
-    self.def_volumes = def_volumes
     self.def_assigns = def_assigns
 
   def get_vol_mgr(self):
@@ -72,25 +71,35 @@ class PathManager:
       cwd = self.default_env.get_cwd()
     if cmd_paths is None:
       cmd_paths = self.default_env.get_cmd_paths()
-    return PathManagerEnv(self, cwd, cmd_paths)
+    env = PathManagerEnv(self, cwd, cmd_paths)
+    env.resolve()
+    log_path.info("created env: %s", env)
+    return env
 
   def parse_config(self, cfg):
     vols_base_dir = cfg.path.vols_base_dir
     self.vol_mgr.set_vols_base_dir(vols_base_dir)
     if not self.vol_mgr.parse_config(cfg):
       return False
-    if self.vol_mgr.add_volumes(self.def_volumes, create_local=True) is False:
-      return False
     if not self.assign_mgr.parse_config(cfg):
-      return False
-    if self.assign_mgr.add_assigns(self.def_assigns) is False:
       return False
     if not self.default_env.parse_config(cfg):
       return False
+    return True
+
+  def setup(self):
+    if not self.vol_mgr.setup():
+      return False
+    if self.assign_mgr.add_assigns(self.def_assigns) is False:
+      return False
     if not self.validate():
       return False
+    self.default_env.resolve()
     self.dump()
     return True
+
+  def shutdown(self):
+    self.vol_mgr.shutdown()
 
   def dump(self):
     self.vol_mgr.dump()
@@ -239,8 +248,6 @@ class PathManager:
     else:
       # make sure its a volume path
       cwd = env.get_cwd()
-    if not self.is_volume_path(cwd):
-      raise AmiPathError(cwd, "cwd is not volpath!")
     res_path = cwd.join(ami_path)
     log_path.debug("abspath: relpath='%s' cwd='%s' -> join '%s'",
                    ami_path, cwd, res_path)

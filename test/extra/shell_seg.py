@@ -3,7 +3,7 @@ import pytest
 
 def check_shell_seg(vrun):
   sha1 = "46f464571edf3c9c5259dfe832be3a06d564f1c5"
-  vrun.skip_if_prog_not_available("volumes/sys/l/Shell-Seg", sha1)
+  vrun.skip_if_prog_not_available("volumes/wb/l/Shell-Seg", sha1)
 
 
 def shell_seg_endcli_test(vrun):
