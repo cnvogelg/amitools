@@ -43,12 +43,11 @@ class PathManagerEnv(AmiPathEnv):
 
 
 class PathManager:
-  def __init__(self, def_assigns=None,
+  def __init__(self,
                cwd=None, cmd_paths=None, vols_base_dir=None):
     self.vol_mgr = VolumeManager(vols_base_dir)
     self.assign_mgr = AssignManager(self.vol_mgr)
     self.default_env = PathManagerEnv(self, cwd, cmd_paths)
-    self.def_assigns = def_assigns
 
   def get_vol_mgr(self):
     return self.vol_mgr
@@ -90,7 +89,7 @@ class PathManager:
   def setup(self):
     if not self.vol_mgr.setup():
       return False
-    if self.assign_mgr.add_assigns(self.def_assigns) is False:
+    if not self.assign_mgr.setup():
       return False
     if not self.validate():
       return False
@@ -99,6 +98,7 @@ class PathManager:
     return True
 
   def shutdown(self):
+    self.assign_mgr.shutdown()
     self.vol_mgr.shutdown()
 
   def dump(self):

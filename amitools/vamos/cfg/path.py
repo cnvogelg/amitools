@@ -9,7 +9,7 @@ class PathParser(Parser):
             "cwd": Value(str),
             "vols_base_dir": Value(str, "~/.vamos/volumes")
         },
-        "assigns": ValueDict(ValueList(str, sep='+')),
+        "assigns": ValueList(str),
         "volumes": ValueList(str)
     }
     arg_cfg = {
@@ -37,7 +37,7 @@ class PathParser(Parser):
       return res
 
     ini_trafo = {
-        "assigns": "assigns",
+        "assigns": (list_merge, "assigns"),
         "volumes": (list_merge, "volumes"),
         "path": {
             "command": ["path", "path"],
@@ -47,4 +47,4 @@ class PathParser(Parser):
     Parser.__init__(self, "path", def_cfg, arg_cfg,
                     "paths", "define volumes, assigns, and the search path",
                     ini_trafo,
-                    ini_list_sections=['volumes'])
+                    ini_list_sections=['volumes', 'assigns'])

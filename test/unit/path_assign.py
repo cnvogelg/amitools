@@ -12,42 +12,67 @@ def setup_am(my_path):
 def path_assign_add_del_test(tmpdir):
   my_path = str(tmpdir)
   a = setup_am(my_path)
+  a.setup()
   # invalid
-  assert not a.add_assign('', 'foo:')
-  assert not a.add_assign('foo', '')
+  assert not a.add_assign('')
+  assert not a.add_assign('foo')
+  assert not a.add_assign('foo:')
   # volume of same name
-  assert not a.add_assign('bla', 'foo:')
-  assert not a.add_assign('BLA', 'foo:')
+  assert not a.add_assign('bla:foo:')
+  assert not a.add_assign('BLA:foo:')
   # ok
-  assert a.add_assign('foo', 'bla:')
+  assert a.add_assign('foo:bla:')
   assert a.is_assign('foo')
   assert a.is_assign('FOO')
   assert a.is_assign('Foo')
   assert a.get_all_names() == ['foo']
   assert a.get_assign('Foo').get_assigns() == ['bla:']
   # ok
-  assert a.add_assign('Baz', 'foo:bla/blup')
+  assert a.add_assign('Baz:foo:bla/blup')
   assert a.is_assign('baz')
   assert a.is_assign('BAZ')
-  assert sorted(a.get_all_names()) == ['Baz', 'foo']
+  assert a.get_all_names() == ['foo', 'Baz']
   assert a.get_assign('baz').get_assigns() == ['foo:bla/blup']
   # invalid path
-  assert not a.add_assign('bar', 'bla')
+  assert not a.add_assign('bar:bla')
   # duplicate
-  assert not a.add_assign('foo', 'blub:')
-  assert not a.add_assign('FOO', 'blub:')
+  assert not a.add_assign('foo:blub:')
+  assert not a.add_assign('FOO:blub:')
   # del foo
   assert a.del_assign('foo')
   # not found
   assert not a.del_assign('bar')
+  a.shutdown()
+
+
+def path_assign_add_multi_test(tmpdir):
+  my_path = str(tmpdir)
+  a = setup_am(my_path)
+  # add multiple assigns
+  a1 = a.add_assign('foo:bla:+bla:tmp')
+  assert a1
+  assert a1.get_assigns() == ['bla:', 'bla:tmp']
+  # replace foo
+  a2 = a.add_assign('foo:bla:pop')
+  assert a2
+  assert a2.get_assigns() == ['bla:pop']
+  # append
+  a3 = a.add_assign('foo:+bla:pip')
+  assert a3
+  assert a2 is a3
+  assert a3.get_assigns() == ['bla:pop', 'bla:pip']
+  # try setup
+  assert a.setup()
+  a.shutdown()
 
 
 def path_assign_resolve_test(tmpdir):
   my_path = str(tmpdir)
   a = setup_am(my_path)
-  a.add_assign('Foo', 'blA:blub')
-  a.add_assign('Baz', 'foo:bla/plop')
-  a.add_assign('multi', ['foo:tmp', 'baz:'])
+  a.setup()
+  a.add_assign('Foo:blA:blub')
+  a.add_assign('Baz:foo:bla/plop')
+  a.add_assign('multi:foo:tmp+baz:')
   ar = a.resolve_assigns
   # relative paths
   assert ar('rel/path') == 'rel/path'
@@ -69,19 +94,21 @@ def path_assign_resolve_test(tmpdir):
   # non recursive
   assert ar('Baz:', False) == 'foo:bla/plop'
   assert ar('MULTI:', False) == ['foo:tmp', 'baz:']
+  a.shutdown()
 
 
 def path_assign_config_test(tmpdir):
   my_path = str(tmpdir)
   a = setup_am(my_path)
   cfg = ConfigDict({
-      "assigns": ConfigDict({
-          "Foo": "blA:blub",
-          "Baz": 'foo:bla/plop',
-          'multi': ['foo:tmp', 'baz:']
-      })
+      "assigns": [
+          "Foo:blA:blub",
+          "Baz:foo:bla/plop",
+          "multi:foo:tmp+baz:"
+      ]
   })
   assert a.parse_config(cfg)
+  a.setup()
   ar = a.resolve_assigns
   # relative paths
   assert ar('rel/path') == 'rel/path'
@@ -100,3 +127,4 @@ def path_assign_config_test(tmpdir):
                                  'blA:blub/bla/plop/my/path']
   # not an assign
   assert ar('what:is/here') == 'what:is/here'
+  a.shutdown()

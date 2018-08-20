@@ -1,4 +1,5 @@
 from amitools.vamos.log import log_path
+from amitools.vamos.cfgcore import split_nest
 
 
 class Assign(object):
@@ -6,6 +7,7 @@ class Assign(object):
     self.name = name
     self.assigns = assigns
     self.lo_name = name.lower()
+    self.is_setup = False
 
   def __str__(self):
     return "Assign(%s(%s):%r)" % \
@@ -26,10 +28,22 @@ class Assign(object):
   def append(self, paths):
     self.assigns += paths
 
+  def setup(self, mgr):
+    for a in self.assigns:
+      log_path.info("assign '%s': checking: %s", self.name, a)
+      if not mgr._ensure_volume_or_assign(a):
+        return False
+    return True
+
+  def shutdown(self):
+    pass
+
 
 class AssignManager(object):
   def __init__(self, vol_mgr):
     self.vol_mgr = vol_mgr
+    self.assigns = []
+    self.is_setup = False
     self.assigns_by_name = {}
 
   def parse_config(self, cfg):
@@ -38,20 +52,34 @@ class AssignManager(object):
     assigns = cfg.assigns
     if assigns is None:
       return True
-    for assign in assigns:
-      paths = assigns[assign]
-      if not self.add_assign(assign, paths):
+    for spec in assigns:
+      if not self.add_assign(spec):
         return False
     return True
 
   def dump(self):
     log_path.info("--- assigns ---")
-    for name in sorted(self.assigns_by_name):
-      a = self.assigns_by_name[name]
+    for a in self.assigns:
       log_path.info("%s", a)
 
+  def setup(self):
+    log_path.debug("setting up assigns")
+    for a in self.assigns:
+      if not a.setup(self):
+        log_path.error("error setting up assign: %s", a)
+        return False
+      a.is_setup = True
+    self.is_setup = True
+    return True
+
+  def shutdown(self):
+    log_path.debug("shutting down assigns")
+    for a in self.assigns:
+      a.shutdown()
+      a.is_setup = False
+
   def get_all_names(self):
-    return map(lambda x: x.get_name(), self.assigns_by_name.values())
+    return map(lambda x: x.get_name(), self.assigns)
 
   def get_assign(self, name):
     lo_name = name.lower()
@@ -61,69 +89,100 @@ class AssignManager(object):
   def is_assign(self, name):
     return name.lower() in self.assigns_by_name
 
-  def add_assigns(self, assigns, force=False):
+  def add_assigns(self, specs, force=False):
     if not assigns:
       return []
     res = []
-    for assign in assigns:
-      alist = assigns[assign]
-      exists = self.vol_mgr.is_volume(assign) or self.is_assign(assign)
-      if force or not exists:
-        a = self.add_assign(assign, alist)
-        if not a:
-          return False
-        res.append(a)
+    for spec in specs:
+      a = self.add_assign(assign, alist)
+      if not a:
+        return False
+      res.append(a)
     return res
 
-  def add_assign(self, name, path_list, append=False):
-    # also allow path string instead of list
-    if type(path_list) is str:
-      path_list = [path_list]
+  def add_assign(self, spec):
+    assign = self._parse_spec(spec)
+    if assign is None:
+      return None
 
-    # check name: empty?
-    if len(name) == 0:
-      log_path.error("empty assign added!")
-      return False
     # check name: is volume?
-    lo_name = name.lower()
+    lo_name = assign.get_lo_name()
     if self.vol_mgr.is_volume(lo_name):
-      log_path.error(
-          "assign with a volume name: %s", name)
-      return False
+      log_path.error("assign with a volume name is not allowed: %s", lo_name)
+      return None
     # check name: duplicate assign
     elif lo_name in self.assigns_by_name:
-      log_path.error(
-          "duplicate assign: %s", name)
-      return False
+      # after setup do not allow duplicate volumes
+      if self.is_setup:
+        log_path.error("duplicate assign: %s", lo_name)
+        return None
+      # before setup simply overwrite existing assign
+      else:
+        old_assign = self.assigns_by_name[lo_name]
+        log_path.info("overwriting assign: %s", old_assign)
+        self.assigns.remove(old_assign)
+        del self.assigns_by_name[lo_name]
 
-    # check path_list
-    alist = []
-    for path_name in path_list:
-      if not self._ensure_volume_or_assign(path_name):
-        return False
-      alist.append(path_name)
+    # after global setup try to setup assign immediately
+    if self.is_setup:
+      if not assign.setup(self):
+        log_path.error("error setting up assign: %s", assign)
+        return None
+      assign.is_setup = True
 
-    # setup assign list
-    if append and self.assigns_by_name.has_key(lo_name):
-      a = self.assigns_by_name[lo_name]
-      a.append(alist)
-    else:
-      a = Assign(name, alist)
-      self.assigns_by_name[lo_name] = Assign(name, alist)
-
-    log_path.info("add assign: %s", a)
-    return a
+    # finally add assign
+    log_path.info("adding assign: %s", assign)
+    self.assigns_by_name[lo_name] = assign
+    self.assigns.append(assign)
+    return assign
 
   def del_assign(self, name):
     lo_name = name.lower()
-    if self.assigns_by_name.has_key(lo_name):
-      a = self.assigns_by_name[lo_name]
-      log_path.info("del assign: %s", a)
-      del self.assigns_by_name[lo_name]
-      return True
-    else:
-      log_path.error("assign not found: %s", name)
+    if lo_name not in self.assigns_by_name:
       return False
+    a = self.assigns_by_name[lo_name]
+    a.shutdown()
+    a.is_setup = False
+    self.assigns.remove(a)
+    del self.assigns_by_name[lo_name]
+    log_path.info("delete assign: %s", a)
+    return True
+
+  def _parse_spec(self, spec):
+    col_pos = spec.find(':')
+    if col_pos == -1:
+      log_path.error("no colon in assign spec: %s", spec)
+      return None
+    # split into assign name and list
+    name = spec[:col_pos]
+    alist = spec[col_pos+1:]
+    if len(name) == 0 or len(alist) == 0:
+      log_path.error("empty assign spec name or list: %s", spec)
+      return None
+    # if list starts with a '+' then append to old list
+    if alist[0] == '+':
+      append = True
+      alist = alist[1:]
+    else:
+      append = False
+    # split list into pairs
+    elements = split_nest(alist, sep='+')
+    if len(elements) == 0:
+      log_path.error("no elements in assign spec list: %s", spec)
+      return None
+    # append?
+    if append:
+      assign = self.get_assign(name)
+      if assign:
+        log_path.info("appending to existing assign: name='%s': %r",
+                      name, elements)
+        assign.append(elements)
+        return assign
+      log_path.warn("can't append to non-existing assign: '%s'", name)
+      # fall through
+    log_path.info("create new assign: name='%s': %r",
+                  name, elements)
+    return Assign(name, elements)
 
   def _ensure_volume_or_assign(self, path_name):
     if len(path_name) == 0:

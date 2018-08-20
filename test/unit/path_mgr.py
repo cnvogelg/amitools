@@ -27,11 +27,11 @@ def path_mgr_config_test(tmpdir):
           "work",  # local volume
           "home:~"
       ],
-      "assigns": {
-          "c": ["sys:c", "home:c"],
-          "libs": ["sys:libs"],
-          "devs": ["sys:devs"]
-      },
+      "assigns": [
+          "c:sys:c+home:c",
+          "libs:sys:libs",
+          "devs:sys:devs"
+      ],
       "path": {
           "command": ["c:", "work:c"],
           "cwd": "work:",
@@ -40,7 +40,7 @@ def path_mgr_config_test(tmpdir):
   })
   assert pm.parse_config(cfg)
   assert pm.get_all_volume_names() == ["sys", "work", "home"]
-  assert sorted(pm.get_all_assign_names()) == ["c", "devs", "libs"]
+  assert pm.get_all_assign_names() == ["c", "libs", "devs"]
   assert pm.get_cwd() == "work:"
   assert pm.get_cmd_paths() == ["c:", "work:c"]
 
@@ -55,11 +55,11 @@ def path_mgr_config_esc_sys_test(tmpdir):
           "work:" + work_path,
           "home:~"
       ],
-      "assigns": {
-          "c": ["sys:c", "home:c"],
-          "libs": ["sys:libs"],
-          "devs": ["sys:devs"]
-      },
+      "assigns": [
+          "c:sys:c+home:c",
+          "libs:sys:libs",
+          "devs:sys:devs"
+      ],
       "path": {
           "command": ["::" + work_path],
           "cwd": "::~",
@@ -68,9 +68,25 @@ def path_mgr_config_esc_sys_test(tmpdir):
   })
   assert pm.parse_config(cfg)
   assert pm.get_all_volume_names() == ["sys", "work", "home"]
-  assert sorted(pm.get_all_assign_names()) == ["c", "devs", "libs"]
+  assert pm.get_all_assign_names() == ["c", "libs", "devs"]
   assert pm.get_cwd() == "home:"
   assert pm.get_cmd_paths() == ["work:"]
+
+
+def path_mgr_config_empty_test():
+  pm = PathManager()
+  cfg = ConfigDict({
+      "volumes": None,
+      "assigns": None,
+      "path": {
+          "command": None,
+          "cwd": None,
+          "vols_base_dir": None
+      }
+  })
+  assert pm.parse_config(cfg)
+  assert pm.get_all_volume_names() == []
+  assert pm.get_all_assign_names() == []
 
 
 def setup_pm(tmpdir):
@@ -86,10 +102,10 @@ def setup_pm(tmpdir):
   vm.add_volume("root:" + root_path)
   vm.add_volume("sys:" + sys_path)
   vm.add_volume("work:" + work_path)
-  am.add_assign("a", ["b:", "c:foo"])
-  am.add_assign("b", ["root:bla"])
-  am.add_assign("c", ["sys:c"])
-  am.add_assign("d", ["a:"])
+  am.add_assign("a:b:+c:foo")
+  am.add_assign("b:root:bla")
+  am.add_assign("c:sys:c")
+  am.add_assign("d:a:")
   assert pm.setup()
   return pm
 

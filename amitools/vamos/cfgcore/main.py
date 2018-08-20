@@ -220,6 +220,7 @@ class MainParser(object):
     cfg_dict = self._read_ini_file(file_name)
     # report to parsers
     if cfg_dict:
+      log_cfg.debug("ini file input: %s", cfg_dict)
       for parser in self.parsers:
         try:
           parser.parse_config(cfg_dict, 'ini')

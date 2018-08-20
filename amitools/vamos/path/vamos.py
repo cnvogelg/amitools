@@ -11,16 +11,11 @@ class VamosPathManager(PathManager):
   """
 
   def __init__(self, vols_base_dir=None):
-    def_assigns = {
-        'c': ['sys:c'],
-        'libs': ['sys:libs'],
-        'devs': ['sys:devs']
-    }
     cwd = '::.'
     cmd_paths = ['c:']
     if not vols_base_dir:
       vols_base_dir = "~/.vamos/volumes"
-    PathManager.__init__(self, def_assigns, cwd, cmd_paths, vols_base_dir)
+    PathManager.__init__(self, cwd, cmd_paths, vols_base_dir)
 
   def setup(self):
     vm = self.get_vol_mgr()
@@ -38,9 +33,19 @@ class VamosPathManager(PathManager):
     am = self.get_assign_mgr()
     if not am.is_assign('sys') and not vm.is_volume('sys'):
       volume = vm.get_boot_volume()
-      log_path.info("assigning boot volume to sys: %s", volume)
-      if not am.add_assign('sys', [volume.get_name()+ ":"]):
+      spec = "sys:%s:" % volume.get_name()
+      log_path.info("assigning boot volume to sys: %s", spec)
+      if not am.add_assign(spec):
         return False
+    # add default assigns if missing
+    def_assigns = ['c', 'libs', 'devs']
+    for da in def_assigns:
+      if not vm.is_volume(da) and not am.is_assign(da):
+        spec = "%s:sys:%s" % (da, da)
+        log_path.info("adding default assign: %s", spec)
+        if not am.add_assign(spec):
+          return False
+    # finally regular pm setup
     return PathManager.setup(self)
 
   def _get_lock_env(self, lock):

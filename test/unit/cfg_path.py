@@ -26,11 +26,11 @@ def cfg_path_ini_test():
           ["work", "~/amiga/work"],
           ["home", "~"]
       ],
-      "assigns": {
-          "c": "sys:c+sc:c",
-          "libs": "sys:libs",
-          "devs": "sys:devs"
-      },
+      "assigns": [
+          ["c", "sys:c+sc:c"],
+          ["libs", "sys:libs"],
+          ["devs", "sys:devs"]
+      ],
       "path": {
           "path": "c:,work:c",
           "cwd": "~/amiga"
@@ -43,11 +43,11 @@ def cfg_path_ini_test():
           "work:~/amiga/work",
           "home:~"
       ],
-      "assigns": {
-          "c": ["sys:c", "sc:c"],
-          "libs": ["sys:libs"],
-          "devs": ["sys:devs"]
-      },
+      "assigns": [
+          "c:sys:c+sc:c",
+          "libs:sys:libs",
+          "devs:sys:devs"
+      ],
       "path": {
           "command": ["c:", "work:c"],
           "cwd": "~/amiga",
@@ -78,11 +78,11 @@ def cfg_path_args_test():
           "home:~",
           "local:"
       ],
-      "assigns": {
-          "c": ["sys:c", "sc:c"],
-          "libs": ["sys:libs"],
-          "devs": ["sys:devs"]
-      },
+      "assigns": [
+          "c:sys:c+sc:c",
+          "libs:sys:libs",
+          "devs:sys:devs"
+      ],
       "path": {
           "command": ["c:", "work:c"],
           "cwd": "~/amiga",
@@ -97,10 +97,10 @@ def cfg_path_ini_args_test():
       "volumes": [
           ["sys", "~/.vamos/sys"],
       ],
-      "assigns": {
-          "c": "sys:c",
-          "libs": "sys:libs",
-      },
+      "assigns": [
+          ["c", "sys:c"],
+          ["libs", "sys:libs"],
+      ],
       "path": {
           "path": "c:",
           "cwd": "~/amiga"
@@ -129,11 +129,13 @@ def cfg_path_ini_args_test():
           "home:~",
           "local:"
       ],
-      "assigns": {
-          "c": ["sys:c", "sc:c", "work:c"],
-          "libs": ["sys:libs"],
-          "devs": ["sys:devs"]
-      },
+      "assigns": [
+          "c:sys:c",
+          "libs:sys:libs",
+          "c:sc:c",
+          "c:work:c",
+          "devs:sys:devs"
+      ],
       "path": {
           "command": ["c:", "work:c", "sys:t"],
           "cwd": "~/amiga",
