@@ -1,5 +1,6 @@
 from amitools.vamos.log import log_path
 from amitools.vamos.cfgcore import split_nest
+from .spec import Spec
 
 
 class Assign(object):
@@ -149,26 +150,19 @@ class AssignManager(object):
     return True
 
   def _parse_spec(self, spec):
-    col_pos = spec.find(':')
-    if col_pos == -1:
-      log_path.error("no colon in assign spec: %s", spec)
-      return None
-    # split into assign name and list
-    name = spec[:col_pos]
-    alist = spec[col_pos+1:]
-    if len(name) == 0 or len(alist) == 0:
-      log_path.error("empty assign spec name or list: %s", spec)
-      return None
-    # if list starts with a '+' then append to old list
-    if alist[0] == '+':
-      append = True
-      alist = alist[1:]
-    else:
-      append = False
-    # split list into pairs
-    elements = split_nest(alist, sep='+')
+    # auto convert spec string
+    if type(spec) is str:
+      try:
+        spec = Spec.parse(spec)
+      except ValueError as e:
+        log_path.error("error parsing spec: %r -> %s", spec, e)
+        return None
+    # check spec
+    append = spec.get_append()
+    name = spec.get_name()
+    elements = spec.get_src_list()
     if len(elements) == 0:
-      log_path.error("no elements in assign spec list: %s", spec)
+      log_path.error("no elements in assign: %r", spec)
       return None
     # append?
     if append:

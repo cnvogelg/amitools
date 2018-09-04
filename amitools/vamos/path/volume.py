@@ -2,6 +2,7 @@ import os
 import os.path
 from amitools.vamos.log import log_path
 import logging
+from .spec import Spec
 
 
 def resolve_sys_path(sys_path):
@@ -174,31 +175,31 @@ class VolumeManager(object):
     return volume
 
   def _parse_spec(self, spec, create_local):
-    name = None
-    path = None
-    col_pos = spec.find(':')
-    # no colon: local path
-    if col_pos == -1:
-      name = spec
-    elif col_pos == 0:
-      path = spec[1:]
-      name = os.path.basename(path)
-    else:
-      name = spec[:col_pos]
-      path = spec[col_pos+1:]
-    log_path.debug("name='%s', path='%s'", name, path)
-    if name is None or name == "":
-      return None
-    # local path
-    if path is None or path == "":
+    # auto parse string spec
+    if type(spec) is str:
+      try:
+        spec = Spec.parse(spec)
+      except ValueError as e:
+        log_path.error("error parsing spec: %r -> %s", spec, e)
+        return None
+    # check spec
+    name = spec.get_name()
+    src_list = spec.get_src_list()
+    n = len(src_list)
+    if n == 0:
+      # local path
       path = self._get_local_vol_path(name)
       log_path.debug("local path='%s'", path)
       if path is None:
         return None
-    # resolve sys path
-    else:
-      path = resolve_sys_path(path)
+    elif n == 1:
+      path = resolve_sys_path(src_list[0])
       log_path.debug("resolved path='%s'", path)
+    if n > 1:
+      log_path.error("only one source in volume spec allowed!")
+      return None
+    log_path.debug("name='%s', path='%s'", name, path)
+    # create volume
     return Volume(name, path, create_local)
 
   def _get_local_vol_path(self, name):
