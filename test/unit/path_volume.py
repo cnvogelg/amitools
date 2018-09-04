@@ -53,14 +53,14 @@ def path_volume_add_local_test(tmpdir):
   # without create
   assert not v.add_volume("My")
   # with create
-  vol = v.add_volume("My", create_local=True)
+  vol = v.add_volume("My?create")
   assert vol
   # check for vol dir
   vol_path = os.path.join(vols_dir, "My")
   assert os.path.isdir(vol_path)
   assert vol.get_path() == vol_path
   # create multiple
-  vols = v.add_volumes(["foo", "bar"], create_local=True)
+  vols = v.add_volumes(["foo?create", "bar?create"])
   assert vols
   for vol in vols:
     vol_path = os.path.join(vols_dir, vol.get_name())

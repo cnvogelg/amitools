@@ -22,7 +22,7 @@ class VamosPathManager(PathManager):
     # add a default 'system' volume if none is given
     if vm.get_num_volumes() == 0:
       log_path.info("adding default 'system:' volume")
-      if not vm.add_volume('system:', True):
+      if not vm.add_volume('system:?create'):
         return False
     # add root volume
     if not vm.is_volume('root'):

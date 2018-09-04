@@ -58,3 +58,9 @@ def path_spec_parse_cfg_test():
   assert s.get_cfg() == {'key': 'val', 'key2': True, 'key3': False}
   assert s.get_src_list() == []
   assert not s.get_append()
+  # ok: 'key' is short for key=True
+  s = Spec.parse("foo?key")
+  assert s.get_name() == "foo"
+  assert s.get_cfg() == {'key': True}
+  assert s.get_src_list() == []
+  assert not s.get_append()

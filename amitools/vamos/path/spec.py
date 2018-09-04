@@ -71,17 +71,22 @@ class Spec(object):
     cfg = {}
     for p in cfg_pairs:
       kv = split_nest(p, sep='=')
-      if len(kv) != 2:
+      n = len(kv)
+      if n == 1:
+        key = kv[0]
+        val = True
+      elif n == 2:
+        key, val = kv
+        # value conversion
+        vl = val.lower()
+        if vl in ("true", "on", ""):
+          val = True
+        elif vl in ("false", "off"):
+          val = False
+      else:
         raise ValueError("not a key value pair in config!")
-      key, val = kv
       if len(key) == 0:
         raise ValueError("invalid key!")
-      # value conversion
-      vl = val.lower()
-      if vl in ("true", "on", ""):
-        val = True
-      elif vl in ("false", "off"):
-        val = False
       cfg[key] = val
     return cfg
 

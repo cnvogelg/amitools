@@ -19,17 +19,19 @@ def resolve_sys_path(sys_path):
 
 
 class Volume(object):
-  def __init__(self, name, path, create_local=False):
+  def __init__(self, name, path, cfg=None):
+    if cfg is None:
+      cfg = {}
     self.name = name
     self.path = path
     self.lo_name = name.lower()
-    self.create_local = create_local
+    self.cfg = cfg
     self.is_setup = False
 
   def __str__(self):
-    return "Volume(%s(%s):%s,local=%s,is_setup=%s)" % \
+    return "Volume(%s(%s):%s,cfg=%r,is_setup=%s)" % \
         (self.name, self.lo_name, self.path,
-         self.create_local, self.is_setup)
+         self.cfg, self.is_setup)
 
   def get_name(self):
     """return volume name in original lo/up case writing"""
@@ -43,11 +45,15 @@ class Volume(object):
     """return normalized volume name in lower case"""
     return self.lo_name
 
+  def get_cfg(self):
+    """return volume configuration"""
+    return self.cfg
+
   def setup(self):
     path = self.path
     # does path exist?
     if not os.path.isdir(path):
-      if self.create_local:
+      if 'create' in self.cfg:
         if not self._create_path(path):
           return False
       else:
@@ -129,20 +135,20 @@ class VolumeManager(object):
       volume.shutdown()
       volume.is_setup = False
 
-  def add_volumes(self, volumes, create_local=False):
+  def add_volumes(self, volumes):
     if not volumes:
       return []
     res = []
     for volume in volumes:
-      vol = self.add_volume(volume, create_local)
+      vol = self.add_volume(volume)
       if not vol:
         return False
       res.append(vol)
     return res
 
-  def add_volume(self, spec, create_local=False):
+  def add_volume(self, spec):
     # get volume for spec
-    volume = self._parse_spec(spec, create_local)
+    volume = self._parse_spec(spec)
     if volume is None:
       log_path.error("invalid volume spec: '%s'", spec)
       return None
@@ -174,7 +180,7 @@ class VolumeManager(object):
     self.volumes.append(volume)
     return volume
 
-  def _parse_spec(self, spec, create_local):
+  def _parse_spec(self, spec):
     # auto parse string spec
     if type(spec) is str:
       try:
@@ -185,6 +191,7 @@ class VolumeManager(object):
     # check spec
     name = spec.get_name()
     src_list = spec.get_src_list()
+    cfg = spec.get_cfg()
     n = len(src_list)
     if n == 0:
       # local path
@@ -200,7 +207,7 @@ class VolumeManager(object):
       return None
     log_path.debug("name='%s', path='%s'", name, path)
     # create volume
-    return Volume(name, path, create_local)
+    return Volume(name, path, cfg)
 
   def _get_local_vol_path(self, name):
     base_dir = self._setup_base_dir()
