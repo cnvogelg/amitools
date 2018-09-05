@@ -97,6 +97,39 @@ def path_assign_resolve_test(tmpdir):
   a.shutdown()
 
 
+def path_assign_resolve_as_list_test(tmpdir):
+  my_path = str(tmpdir)
+  a = setup_am(my_path)
+  a.setup()
+  a.add_assign('Foo:blA:blub')
+  a.add_assign('Baz:foo:bla/plop')
+  a.add_assign('multi:foo:tmp+baz:')
+
+  def ar(path, recursive=True):
+    return a.resolve_assigns(path, recursive, as_list=True)
+  # relative paths
+  assert ar('rel/path') == ['rel/path']
+  assert ar(':rel/path') == [':rel/path']
+  # volume path
+  assert ar('Bla:abs/path') == ['Bla:abs/path']
+  assert ar('BLA:abs/path') == ['BLA:abs/path']
+  assert ar('bla:abs/path') == ['bla:abs/path']
+  # single assign
+  assert ar('Foo:my/path') == ['blA:blub/my/path']
+  assert ar('foo:my/path') == ['blA:blub/my/path']
+  # single assign recursive
+  assert ar('baz:my/path') == ['blA:blub/bla/plop/my/path']
+  # multi assign
+  assert ar('multi:my/path') == ['blA:blub/tmp/my/path',
+                                 'blA:blub/bla/plop/my/path']
+  # not an assign
+  assert ar('what:is/here') == ['what:is/here']
+  # non recursive
+  assert ar('Baz:', False) == ['foo:bla/plop']
+  assert ar('MULTI:', False) == ['foo:tmp', 'baz:']
+  a.shutdown()
+
+
 def path_assign_config_test(tmpdir):
   my_path = str(tmpdir)
   a = setup_am(my_path)
@@ -127,4 +160,17 @@ def path_assign_config_test(tmpdir):
                                  'blA:blub/bla/plop/my/path']
   # not an assign
   assert ar('what:is/here') == 'what:is/here'
+  a.shutdown()
+
+
+def path_assign_cfg_create_test(tmpdir):
+  my_path = str(tmpdir)
+  a = setup_am(my_path)
+  a.setup()
+  # no dir created
+  assert a.add_assign("foo:bla:blub")
+  assert not tmpdir.join("blub").check(dir=1)
+  # dir created
+  assert a.add_assign("bar:bla:blub?create")
+  assert tmpdir.join("blub").check(dir=1)
   a.shutdown()

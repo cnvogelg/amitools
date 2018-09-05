@@ -10,4 +10,7 @@ def path_vamos_mgr_test(tmpdir):
   assert vm.is_volume('root')
   am = vpm.get_assign_mgr()
   assert am.is_assign('sys')
+  assert am.is_assign('c')
+  assert am.is_assign('devs')
+  assert am.is_assign('libs')
   vpm.shutdown()

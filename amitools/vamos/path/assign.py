@@ -4,15 +4,18 @@ from .spec import Spec
 
 
 class Assign(object):
-  def __init__(self, name, assigns):
+  def __init__(self, name, assigns, cfg=None):
+    if cfg is None:
+      cfg = {}
     self.name = name
     self.assigns = assigns
     self.lo_name = name.lower()
+    self.cfg = cfg
     self.is_setup = False
 
   def __str__(self):
-    return "Assign(%s(%s):%r)" % \
-        (self.name, self.lo_name, self.assigns)
+    return "Assign(%s(%s):%r,cfg=%r)" % \
+        (self.name, self.lo_name, self.assigns, self.cfg)
 
   def get_name(self):
     """return original name of assign"""
@@ -26,15 +29,47 @@ class Assign(object):
     """return list of assigned paths"""
     return self.assigns
 
+  def get_cfg(self):
+    """return assign config"""
+    return self.cfg
+
   def append(self, paths):
     self.assigns += paths
 
   def setup(self, mgr):
+    vmgr = mgr.get_volume_mgr()
     for a in self.assigns:
       log_path.info("assign '%s': checking: %s", self.name, a)
-      if not mgr._ensure_volume_or_assign(a):
-        return False
+      # check assign
+      volpaths = mgr.resolve_assigns(a, as_list=True)
+      for volpath in volpaths:
+        res = mgr._split_volume_remainder(volpath)
+        if res is None:
+          log_path.error("assign '%s': no absolute path: %s",
+                         self.name, volpath)
+          return False
+        # resolve volume
+        volname, rel_dir = res
+        volume = vmgr.get_volume(volname)
+        if not volume:
+          log_path.error("assign '%s': volume not found: %s", self.name, a)
+          return False
+        # create assign dir?
+        if 'create' in self.cfg:
+          if not self._create_dir(volume, rel_dir):
+            return False
     return True
+
+  def _create_dir(self, volume, rel_dir):
+    log_path.debug("%s: create assign dir: rel_dir='%s'", self.name, rel_dir)
+    path = volume.create_rel_sys_path(rel_dir)
+    if not path:
+      log_path.error("assign '%s': can't create relative dir: %s",
+                     self.name, rel_dir)
+      return False
+    else:
+      log_path.debug("created sys path: %s", path)
+      return True
 
   def shutdown(self):
     pass
@@ -46,6 +81,9 @@ class AssignManager(object):
     self.assigns = []
     self.is_setup = False
     self.assigns_by_name = {}
+
+  def get_volume_mgr(self):
+    return self.vol_mgr
 
   def parse_config(self, cfg):
     if cfg is None:
@@ -160,6 +198,7 @@ class AssignManager(object):
     # check spec
     append = spec.get_append()
     name = spec.get_name()
+    cfg = spec.get_cfg()
     elements = spec.get_src_list()
     if len(elements) == 0:
       log_path.error("no elements in assign: %r", spec)
@@ -176,19 +215,7 @@ class AssignManager(object):
       # fall through
     log_path.info("create new assign: name='%s': %r",
                   name, elements)
-    return Assign(name, elements)
-
-  def _ensure_volume_or_assign(self, path_name):
-    if len(path_name) == 0:
-      log_path.error("invalid empty assign: %s", path_name)
-      return False
-    # make sure it maps to a volume or another assign
-    split = self._split_volume_remainder(path_name)
-    if split is None:
-      log_path.error(
-          "assign has to map to volume or another assign: %s", path_name)
-      return False
-    return True
+    return Assign(name, elements, cfg)
 
   def _split_volume_remainder(self, ami_path):
     """return (volume, remainder) or none if no volume found"""
@@ -213,7 +240,7 @@ class AssignManager(object):
     else:
       return aname
 
-  def resolve_assigns(self, ami_path, recursive=True):
+  def resolve_assigns(self, ami_path, recursive=True, as_list=False):
     """replace all assigns found in path until only a volume path exists.
        do not touch relative paths or abs paths without assign prefix.
 
@@ -228,7 +255,10 @@ class AssignManager(object):
       # relative path
       log_path.debug("resolve_assign: ami_path='%s' is rel_path!",
                      ami_path)
-      return ami_path
+      if as_list:
+        return [ami_path]
+      else:
+        return ami_path
     else:
       # is assign
       name = split[0].lower()
@@ -243,7 +273,9 @@ class AssignManager(object):
           log_path.info("resolve_assign: ami_path='%s' -> single assign: '%s'",
                         ami_path, new_path)
           if recursive:
-            return self.resolve_assigns(new_path)
+            return self.resolve_assigns(new_path, recursive, as_list)
+          elif as_list:
+            return [new_path]
           else:
             return new_path
         # multi assign
@@ -255,7 +287,7 @@ class AssignManager(object):
                 "resolve_assign: ami_path='%s' -> multi assign: '%s'",
                 ami_path, new_path)
             if recursive:
-              new_path = self.resolve_assigns(new_path)
+              new_path = self.resolve_assigns(new_path, recursive, as_list)
               if new_path is None:
                 return None
             if type(new_path) is str:
@@ -267,4 +299,7 @@ class AssignManager(object):
       else:
         log_path.debug("resolve_assign: ami_path='%s' has no assign!",
                        ami_path)
-        return ami_path
+        if as_list:
+          return [ami_path]
+        else:
+          return ami_path
