@@ -142,3 +142,34 @@ def path_volume_cfg_test(tmpdir):
   assert v.parse_config(cfg)
   assert v.get_all_names() == ['my']
   assert v.is_volume('MY')
+
+
+def path_volume_create_test(tmpdir):
+  v = VolumeManager()
+  assert v.setup()
+  spec = "my:" + str(tmpdir) + "/bla"
+  # dir does not exist -> can't create
+  assert not v.add_volume(spec)
+  # create
+  assert v.add_volume(spec + "?create")
+  # check
+  assert tmpdir.join("bla").check(dir=1)
+  # shutdown
+  v.shutdown()
+
+
+def path_volume_temp_test(tmpdir):
+  v = VolumeManager()
+  assert v.setup()
+  spec = "my:" + str(tmpdir)
+  # dir does exist -> no temp possible
+  assert not v.add_volume(spec + "?temp")
+  # create temp
+  spec += "/bla"
+  assert v.add_volume(spec + "?temp")
+  # check that temp dir exists
+  assert tmpdir.join("bla").check(dir=1)
+  # shutdown
+  v.shutdown()
+  # now temp is gone
+  assert not tmpdir.join("bla").check()

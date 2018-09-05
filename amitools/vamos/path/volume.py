@@ -1,5 +1,6 @@
 import os
 import os.path
+import shutil
 from amitools.vamos.log import log_path
 import logging
 from .spec import Spec
@@ -51,8 +52,12 @@ class Volume(object):
 
   def setup(self):
     path = self.path
+    # temp dir?
+    if 'temp' in self.cfg:
+      if not self._create_temp(path):
+        return False
     # does path exist?
-    if not os.path.isdir(path):
+    elif not os.path.isdir(path):
       if 'create' in self.cfg:
         if not self._create_path(path):
           return False
@@ -62,7 +67,28 @@ class Volume(object):
     return True
 
   def shutdown(self):
-    pass
+    if 'temp' in self.cfg:
+      self._delete_temp(self.path)
+
+  def _create_temp(self, path):
+    if os.path.exists(path):
+      log_path.error("temp volume volume path already exists: '%s'", path)
+      return False
+    # create temp dir
+    try:
+      log_path.debug("creating temp dir: %s", path)
+      os.makedirs(path)
+      return True
+    except OSError:
+      log_path.error("error creating temp dir: '%s'", path)
+      return False
+
+  def _delete_temp(self, path):
+    try:
+      log_path.debug("removing temp dir: %s", path)
+      shutil.rmtree(path)
+    except:
+      log_path.error("error removing temp dir: '%s'", path)
 
   def _create_path(self, path):
     # try to create path
