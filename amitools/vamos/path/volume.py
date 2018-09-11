@@ -104,6 +104,10 @@ class Volume(object):
     if type(rel_path) in (list, tuple):
       rel_path = os.path.join(*rel_path)
     dir_path = os.path.join(self.path, rel_path)
+    if os.path.isdir(dir_path):
+      log_path.debug("rel sys path in volume already exists '%s' + %s -> %s",
+                     self.name, rel_path, dir_path)
+      return dir_path
     try:
       log_path.debug("creating rel sys path in volume '%s' + %s -> %s",
                      self.name, rel_path, dir_path)

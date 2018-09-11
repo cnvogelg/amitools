@@ -145,7 +145,7 @@ def path_volume_cfg_test(tmpdir):
 
 
 def path_volume_create_test(tmpdir):
-  v = VolumeManager()
+  v = VolumeManager(str(tmpdir))
   assert v.setup()
   spec = "my:" + str(tmpdir) + "/bla"
   # dir does not exist -> can't create
@@ -159,7 +159,7 @@ def path_volume_create_test(tmpdir):
 
 
 def path_volume_temp_test(tmpdir):
-  v = VolumeManager()
+  v = VolumeManager(str(tmpdir))
   assert v.setup()
   spec = "my:" + str(tmpdir)
   # dir does exist -> no temp possible

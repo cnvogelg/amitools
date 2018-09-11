@@ -22,7 +22,7 @@ class PathManagerEnv(AmiPathEnv):
   def _cwd_path_resolver(self, ami_path):
     """resolve and check cwd"""
     # allow escaped sys paths
-    ami_path = self.path_mgr.resolve_esc_sys_path(ami_path)
+    ami_path = self.path_mgr.resolve_esc_sys_path(ami_path, True)
     # common check
     ami_path = AmiPathEnv._cwd_path_resolver(self, ami_path)
     # make sure its a valid prefix path
@@ -33,7 +33,7 @@ class PathManagerEnv(AmiPathEnv):
   def _cmd_path_resolver(self, ami_path):
     """resolve and check a command path"""
     # allow escaped sys paths
-    ami_path = self.path_mgr.resolve_esc_sys_path(ami_path)
+    ami_path = self.path_mgr.resolve_esc_sys_path(ami_path, True)
     # common check
     ami_path = AmiPathEnv._cmd_path_resolver(self, ami_path)
     # make sure its a valid prefix path
@@ -44,7 +44,27 @@ class PathManagerEnv(AmiPathEnv):
 
 class PathManager:
   def __init__(self,
-               cwd=None, cmd_paths=None, vols_base_dir=None):
+               cwd=None, cmd_paths=None, vols_base_dir=None,
+               add_system_vol=True, add_root_vol=True, add_ram_vol=True,
+               auto_assigns=None, auto_assigns_mkdir=True,
+               sys_vol=None):
+    # set defaults
+    if not cwd:
+      cwd = '::.'
+    if not cmd_paths:
+      cmd_paths = ['c:']
+    if not vols_base_dir:
+      vols_base_dir = "~/.vamos/volumes"
+    if not auto_assigns:
+      auto_assigns = ['c', 's', 'libs', 'devs', 't']
+    # options
+    self.add_system_vol = add_system_vol
+    self.add_root_vol = add_root_vol
+    self.add_ram_vol = add_ram_vol
+    self.auto_assigns = auto_assigns
+    self.auto_assigns_mkdir = auto_assigns_mkdir
+    self.sys_vol = sys_vol
+    # setup sub mgr
     self.vol_mgr = VolumeManager(vols_base_dir)
     self.assign_mgr = AssignManager(self.vol_mgr)
     self.default_env = PathManagerEnv(self, cwd, cmd_paths)
@@ -87,6 +107,10 @@ class PathManager:
     return True
 
   def setup(self):
+    if not self._add_auto_volumes():
+      return False
+    if not self._add_auto_assigns():
+      return False
     if not self.vol_mgr.setup():
       return False
     if not self.assign_mgr.setup():
@@ -95,6 +119,57 @@ class PathManager:
       return False
     self.default_env.resolve()
     self.dump()
+    return True
+
+  def _add_auto_volumes(self):
+    vm = self.get_vol_mgr()
+    # add a default 'system' volume if none is given
+    if vm.get_num_volumes() == 0 and self.add_system_vol:
+      log_path.info("auto adding default 'system:' volume")
+      if not vm.add_volume('system:?create'):
+        return False
+    # add a root: volume for whole filesys
+    if not vm.is_volume('root') and self.add_root_vol:
+      log_path.info("auto adding 'root:' volume")
+      if not vm.add_volume('root:/'):
+        return False
+    # add a ram: volume for temporary files
+    if not vm.is_volume('ram') and self.add_ram_vol:
+      log_path.info("auto adding 'ram:' volume")
+      if not vm.add_volume('ram:?temp'):
+        return False
+    # done
+    return True
+
+  def _add_auto_assigns(self):
+    vm = self.get_vol_mgr()
+    am = self.get_assign_mgr()
+    # setup 'sys:' assign
+    if not am.is_assign('sys') and not vm.is_volume('sys'):
+      vol_name = self.sys_vol
+      if not vol_name:
+        volume = vm.get_boot_volume()
+        vol_name = volume.get_name()
+      log_path.info("assign volume '%s' as 'sys:'", vol_name)
+      spec = "sys:%s:" % vol_name
+      if not am.add_assign(spec):
+        return False
+    # add auto assigns
+    for aa in self.auto_assigns:
+      aa = aa.lower()
+      if not am.is_assign(aa) and not vm.is_volume(aa):
+        if aa == 't':
+          vol = 'ram'
+        else:
+          vol = 'sys'
+        opt = ""
+        if self.auto_assigns_mkdir:
+          opt = "?create"
+        spec = "%s:%s:%s%s" % (aa, vol, aa, opt)
+        log_path.info("adding auto assign: %s", spec)
+        if not am.add_assign(spec):
+          return False
+    # done
     return True
 
   def shutdown(self):

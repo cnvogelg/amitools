@@ -93,7 +93,7 @@ def setup_pm(tmpdir):
   root_path = str(tmpdir)
   sys_path = str(tmpdir.mkdir("sys"))
   work_path = str(tmpdir.mkdir("work"))
-  pm = PathManager()
+  pm = PathManager(vols_base_dir=str(tmpdir))
   env = pm.get_default_env()
   env.set_cwd("root:baz")
   env.set_cmd_paths(["a:", "c:"])
@@ -417,4 +417,21 @@ def path_mgr_create_env_test(tmpdir):
   assert env.get_cwd() == "work:bla"
   assert env.get_cmd_paths() == ["d:"]
   # shutdown
+  pm.shutdown()
+
+
+def path_mgr_auto_volume_assign_test(tmpdir):
+  pm = PathManager(vols_base_dir=str(tmpdir))
+  assert pm.setup()
+  vm = pm.get_vol_mgr()
+  assert vm.is_volume('system')
+  assert vm.is_volume('root')
+  assert vm.is_volume('ram')
+  am = pm.get_assign_mgr()
+  assert am.is_assign('sys')
+  assert am.is_assign('c')
+  assert am.is_assign('t')
+  assert am.is_assign('s')
+  assert am.is_assign('devs')
+  assert am.is_assign('libs')
   pm.shutdown()
