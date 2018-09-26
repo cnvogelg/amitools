@@ -69,7 +69,7 @@ class MatchFirstNext:
     # store path name of first name at end of structure
     if self.str_len > 0:
       path_ptr = self.anchor.s_get_addr('ap_Buf')
-      self.anchor.w_cstr(path_ptr, path)
+      self.anchor.mem.w_cstr(path_ptr, path)
     return io_err
 
   def _fill_lock(self, path):
@@ -88,7 +88,7 @@ class MatchFirstNext:
 
   def _push_dodir(self, name, path):
     abs_path    = self.path_mgr.ami_abs_path(self.lock,path)
-    dir_entries = self.path_mgr.ami_list_dir(self.lock,path)
+    dir_entries = sorted(self.path_mgr.ami_list_dir(self.lock,path))
     # its really a dir
     if dir_entries != None:
       self.dodir_stack.append((name, path, dir_entries))
@@ -99,7 +99,7 @@ class MatchFirstNext:
       name, path, dir_entries = self.dodir_stack[-1]
       # entry left in current dodir?
       if len(dir_entries) > 0:
-        sub_name = dir_entries.pop()
+        sub_name = dir_entries.pop(0)
         if path == "":
           sub_path = sub_name
         elif path[-1] in (':','/'):
@@ -114,7 +114,7 @@ class MatchFirstNext:
         flags &= ~self.DODIR
         self.dodir_stack.pop()
         self._fill_parent_lock(path)
-        return name, path, flags
+        return None, None, flags
     else:
       flags &= ~self.DODIR
       self._fill_lock("")

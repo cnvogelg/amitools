@@ -131,16 +131,16 @@ class VamosPathManager(PathManager):
     sys_path = self.ami_to_sys_path(cwd_lock, ami_path, mustExist=True)
     if sys_path is None:
       return None
-    if not os.path.isdir(sys_path):
+    if not os.path.isdir(str(sys_path)):
       return None
-    files = os.listdir(sys_path)
+    files = os.listdir(str(sys_path))
     log_path.info("ami_list_dir: path='%s' -> sys_path='%s' -> files=%s",
                   ami_path, sys_path, files)
     return files
 
   def ami_path_exists(self, cwd_lock, ami_path):
-    sys_path = self.ami_to_sys_path(lock, ami_path, mustExist=True)
-    exists = os.path.exists(sys_path)
+    sys_path = self.ami_to_sys_path(cwd_lock, ami_path, mustExist=True)
+    exists = os.path.exists(str(sys_path))
     log_path.info("ami_path_exists: path='%s' -> sys_path='%s' -> exists=%s",
                   ami_path, sys_path, exists)
     return exists
