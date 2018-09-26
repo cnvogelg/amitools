@@ -114,7 +114,7 @@ class MatchFirstNext:
         flags &= ~self.DODIR
         self.dodir_stack.pop()
         self._fill_parent_lock(path)
-        return None, None, flags
+        return name, path, flags
     else:
       flags &= ~self.DODIR
       self._fill_lock("")

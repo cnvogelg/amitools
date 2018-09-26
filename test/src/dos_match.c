@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
   } else {
     fib = &ap->ap_Info;
     while(1) {
-      Printf("%s %s %ld\n", fib->fib_FileName, &ap->ap_Buf, fib->fib_Size);
+      Printf("%s %s %ld %ld\n", fib->fib_FileName, &ap->ap_Buf, fib->fib_Size, ap->ap_Flags);
 
       error = MatchNext(ap);
       if(error == ERROR_NO_MORE_ENTRIES) {
