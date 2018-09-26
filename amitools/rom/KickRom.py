@@ -230,6 +230,6 @@ if __name__ == '__main__':
   print("base %08x" % kh.get_base_addr())
   print("get chk_sum=%08x" % kh.read_check_sum())
   print("calc chk_sum=%08x" % kh.recalc_check_sum())
-#  with open("out.rom", "wb") as fh:
-#    fh.write(ks.get_data())
+  with open("out.rom", "wb") as fh:
+    fh.write(ks.get_data())
 

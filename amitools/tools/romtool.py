@@ -78,10 +78,12 @@ def do_split_cmd(args):
       logging.info("writing index to '%s'", idx_path)
       rs.write_index_file(idx_path)
     # extract entries
+    logging.debug("extract module: fixes=%s, patches=%s",
+                  args.fixes, args.patches)
     bfh = BinFmtHunk()
     for e in entries:
       rs.print_entry(logging.info, e)
-      bin_img = rs.extract_bin_img(e)
+      bin_img = rs.extract_bin_img(e, args.fixes, args.patches)
       out_file = os.path.join(out_path, e.name)
       logging.info("writing file '%s'", out_file)
       bfh.save_image(out_file, bin_img)
@@ -242,6 +244,16 @@ def do_dump_cmd(args):
       logging.error("Not a KickROM! Can't detect base address.")
       return 3
   print_hex(rom, num=args.columns, base_addr=base_addr)
+
+
+def do_copy_cmd(args):
+  in_img = args.in_image
+  logging.info("loading ROM from '%s'", in_img)
+  rom = KickRom.Loader.load(in_img)
+  out_img = args.out_image
+  logging.info("saving ROM to '%s'", out_img)
+  with open(out_img, "wb") as fh:
+    fh.write(rom)
 
 
 def do_info_cmd(args):
@@ -430,6 +442,11 @@ def setup_split_parser(parser):
                       help="do not create sub directory with version name")
   parser.add_argument('--no-index', default=False, action='store_true',
                       help="do not create an 'index.txt' in output path")
+  parser.add_argument('-p', '--patches', default=False, action='store_true',
+                      help='apply optional patches to modules')
+  parser.add_argument('-f', '--no-fixes', dest='fixes', default=True,
+                      action='store_false',
+                      help='do not apply available fixes to modules')
   parser.set_defaults(cmd=do_split_cmd)
 
 
@@ -520,6 +537,16 @@ def setup_scan_parser(parser):
   parser.set_defaults(cmd=do_scan_cmd)
 
 
+def setup_copy_parser(parser):
+  parser.add_argument('in_image', help='rom image to read')
+  parser.add_argument('out_image', help='rom image to be written')
+  parser.add_argument('-b', '--rom-addr', default=None,
+                      help="use this base address for ROM. otherwise guess.")
+  parser.add_argument('-i', '--show-info', default=False, action='store_true',
+                      help="show more details on resident")
+  parser.set_defaults(cmd=do_copy_cmd)
+
+
 def parse_args():
   """parse args and return (args, opts)"""
   parser = argparse.ArgumentParser(description=desc)
@@ -566,6 +593,9 @@ def parse_args():
   # split
   split_parser = sub_parsers.add_parser('split', help='split a ROM into modules')
   setup_split_parser(split_parser)
+  # copy
+  copy_parser = sub_parsers.add_parser('copy', help='copy ROM image and fix on the fly')
+  setup_copy_parser(copy_parser)
 
   # parse
   return parser.parse_args()
