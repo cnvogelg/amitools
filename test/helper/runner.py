@@ -6,25 +6,15 @@ import hashlib
 from .builder import BinBuilder
 
 
-VAMOS_BIN = "../bin/vamos"
-VAMOS_ARGS = ['-c', 'test.vamosrc']
-
-
 class VamosTestRunner:
   def __init__(self, flavor, vamos_bin=None, vamos_args=None,
-               vopts=None,
                use_debug_bins=False,
                dump_output=False,
                generate_data=False,
                auto_build=False):
-    if not vamos_bin:
-      vamos_bin = VAMOS_BIN
-    if not vamos_args:
-      vamos_args = VAMOS_ARGS
     self.flavor = flavor
     self.vamos_bin = vamos_bin
     self.vamos_args = vamos_args
-    self.vopts = vopts
     self.use_debug_bins = use_debug_bins
     self.dump_output = dump_output
     self.generate_data = generate_data
@@ -80,8 +70,6 @@ class VamosTestRunner:
     args = [self.vamos_bin] + self.vamos_args
     if no_ts:
       args.append('--no-ts')
-    if self.vopts is not None:
-      args = args + self.vopts
     if 'vargs' in kw_args:
       args = args + kw_args['vargs']
 
@@ -151,20 +139,14 @@ class VamosTestRunner:
     f.close()
     self._compare(stdout, ok_stdout)
     # asser stderr to be empty
-    if self.vopts is None:
-      assert stderr == []
+    assert stderr == []
 
 
 class VamosRunner:
 
-  def __init__(self, vamos_bin=None, vamos_args=None, vopts=None):
-    if not vamos_bin:
-      vamos_bin = VAMOS_BIN
-    if not vamos_args:
-      vamos_args = VAMOS_ARGS
+  def __init__(self, vamos_bin=None, vamos_args=None):
     self.vamos_bin = vamos_bin
     self.vamos_args = vamos_args
-    self.vopts = vopts
 
   def run_prog(self, *prog_args, **kw_args):
     # stdin given?

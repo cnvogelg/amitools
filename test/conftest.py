@@ -1,14 +1,19 @@
 # pytest fixture for vamos tests
 
+from __future__ import print_function
 import pytest
 import os
 from helper import *
 
 
+VAMOS_BIN = "../bin/vamos"
+VAMOS_ARGS = ['-c', 'test.vamosrc']
+
 my_dir = os.path.dirname(__file__)
 os.chdir(my_dir)
 
 # ----- pytest integration -----
+
 
 def pytest_addoption(parser):
   parser.addoption("--flavor", "-F", action="store", default=None,
@@ -21,13 +26,51 @@ def pytest_addoption(parser):
   parser.addoption("--gen-data", "-G", action="store_true", default=False,
                    help="generate data files by using the output of "
                    "the test program")
-  parser.addoption("--vamos-options", "-V", action="store", default=None,
-                   help="add options to vamos run. separate options by plus:"
-                   " e.g. -V-t+-T")
-  parser.addoption("--vamos-executable", "-E", default=None,
+  parser.addoption("--vamos-args", "-V", action="append", default=None,
+                   help="add options to vamos run, e.g. -V-t")
+  parser.addoption("--vamos-bin", "-E", default=None,
                    help="replace the vamos executable (default: ../bin/vamos)")
   parser.addoption("--auto-build", default=False, action="store_true",
                    help="automatically rebuild binaries if source is newer")
+  parser.addoption("--profile", "-P", action="store_true", default=False,
+                   help="create a profile file")
+  parser.addoption("--profile-file", action="store", default="vamos-prof.json",
+                   help="set the profile file name")
+
+
+def pytest_configure(config):
+  # change vamos binary
+  global VAMOS_BIN
+  vamos_bin = config.getoption('vamos_bin')
+  if vamos_bin:
+    VAMOS_BIN = vamos_bin
+  # change vamos options
+  global VAMOS_ARGS
+  vamos_args = config.getoption('vamos_args')
+  if vamos_args:
+    VAMOS_ARGS += vamos_args
+  # enable profiling
+  if config.getoption('profile'):
+    file = config.getoption("profile_file")
+    file = os.path.abspath(file)
+    print("creating profile: %s" % file)
+    # clear profile file if existing
+    if os.path.exists(file):
+      os.remove(file)
+    # add options to vamos
+    prof_opts = [
+        '--profile-libs', 'all',
+        '--profile-file', file,
+        '--profile-file-append',
+        '--profile'
+    ]
+    VAMOS_ARGS += prof_opts
+  # show settings
+  print("vamos:", VAMOS_BIN, " ".join(VAMOS_ARGS))
+
+
+def pytest_unconfigure(config):
+  pass
 
 
 def pytest_runtest_setup(item):
@@ -59,27 +102,21 @@ def vamos(request):
   dbg = request.config.getoption("--use-debug-bins")
   dump = request.config.getoption("--dump-output")
   gen = request.config.getoption("--gen-data")
-  vopts = request.config.getoption("--vamos-options")
-  vamos_bin = request.config.getoption("--vamos-executable")
   auto_build = request.config.getoption("--auto-build")
-  if vopts is not None:
-    vopts = vopts.split('+')
-  return VamosTestRunner(request.param,
+  flavor = request.param
+  return VamosTestRunner(flavor,
                          use_debug_bins=dbg,
                          dump_output=dump,
                          generate_data=gen,
-                         vopts=vopts,
-                         vamos_bin=vamos_bin,
+                         vamos_bin=VAMOS_BIN,
+                         vamos_args=VAMOS_ARGS,
                          auto_build=auto_build)
 
 
 @pytest.fixture(scope="module")
 def vrun(request):
-  vopts = request.config.getoption("--vamos-options")
-  vamos_bin = request.config.getoption("--vamos-executable")
-  if vopts is not None:
-    vopts = vopts.split('+')
-  return VamosRunner(vopts=vopts, vamos_bin=vamos_bin)
+  return VamosRunner(vamos_bin=VAMOS_BIN,
+                     vamos_args=VAMOS_ARGS)
 
 
 @pytest.fixture(scope="module")
