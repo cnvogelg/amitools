@@ -43,6 +43,12 @@ class PathManagerEnv(AmiPathEnv):
 
 
 class PathManager:
+  default_cwd = '::.'
+  default_cmd_paths = ['c:']
+  default_vols_base_dir = "~/.vamos/volumes"
+  default_auto_volumes = ['root', 'ram']
+  default_auto_assigns = ['c', 's', 'libs', 'devs', 't']
+
   def __init__(self,
                cwd=None, cmd_paths=None, vols_base_dir=None,
                auto_volumes=None,
@@ -50,15 +56,15 @@ class PathManager:
                sys_vol=None):
     # set defaults
     if not cwd:
-      cwd = '::.'
+      cwd = self.default_cwd
     if not cmd_paths:
-      cmd_paths = ['c:']
+      cmd_paths = self.default_cmd_paths
     if not vols_base_dir:
-      vols_base_dir = "~/.vamos/volumes"
+      vols_base_dir = self.default_vols_base_dir
     if not auto_volumes:
-      auto_volumes = ['root', 'ram']
+      auto_volumes = self.default_auto_volumes
     if not auto_assigns:
-      auto_assigns = ['c', 's', 'libs', 'devs', 't']
+      auto_assigns = self.default_auto_assigns
     # options
     self.auto_volumes = auto_volumes
     self.auto_assigns = auto_assigns
@@ -97,7 +103,10 @@ class PathManager:
 
   def parse_config(self, cfg):
     vols_base_dir = cfg.path.vols_base_dir
-    self.vol_mgr.set_vols_base_dir(vols_base_dir)
+    if vols_base_dir:
+      self.vol_mgr.set_vols_base_dir(vols_base_dir)
+    self._parse_auto_volumes(cfg)
+    self._parse_auto_assigns(cfg)
     if not self.vol_mgr.parse_config(cfg):
       return False
     if not self.assign_mgr.parse_config(cfg):
@@ -105,6 +114,22 @@ class PathManager:
     if not self.default_env.parse_config(cfg):
       return False
     return True
+
+  def _parse_auto_volumes(self, cfg):
+    av = cfg.path.auto_volumes
+    if av is None:
+      av = self.default_auto_volumes
+    elif av == ['off']:
+      av = []
+    self.auto_volumes = av
+
+  def _parse_auto_assigns(self, cfg):
+    aa = cfg.path.auto_assigns
+    if aa is None:
+      aa = self.default_auto_assigns
+    elif aa == ['off']:
+      aa = []
+    self.auto_assigns = aa
 
   def setup(self):
     if not self._add_auto_volumes():

@@ -13,7 +13,9 @@ def cfg_path_ini_empty_test():
       "path": {
           "command": None,
           "cwd": None,
-          "vols_base_dir": "~/.vamos/volumes"
+          "vols_base_dir": "~/.vamos/volumes",
+          "auto_assigns": None,
+          "auto_volumes": None
       }
   }
 
@@ -33,7 +35,9 @@ def cfg_path_ini_test():
       ],
       "path": {
           "path": "c:,work:c",
-          "cwd": "~/amiga"
+          "cwd": "~/amiga",
+          "auto_volumes": ['a', 'b'],
+          "auto_assigns": ['c', 'd']
       }
   }
   lp.parse_config(ini_dict, 'ini')
@@ -51,7 +55,9 @@ def cfg_path_ini_test():
       "path": {
           "command": ["c:", "work:c"],
           "cwd": "~/amiga",
-          "vols_base_dir": "~/.vamos/volumes"
+          "vols_base_dir": "~/.vamos/volumes",
+          "auto_volumes": ['a', 'b'],
+          "auto_assigns": ['c', 'd']
       }
   }
 
@@ -68,6 +74,8 @@ def cfg_path_args_test():
        '-V', 'sys:~/.vamos/sys',
        '-V', 'work:~/amiga/work,home:~',
        '-V', 'local:',
+       '--auto-volumes', 'a,b',
+       '--auto-assigns', 'c,d',
        '--vols-base-dir', '/bla'
        ])
   lp.parse_args(args)
@@ -86,7 +94,9 @@ def cfg_path_args_test():
       "path": {
           "command": ["c:", "work:c"],
           "cwd": "~/amiga",
-          "vols_base_dir": "/bla"
+          "vols_base_dir": "/bla",
+          "auto_volumes": ['a', 'b'],
+          "auto_assigns": ['c', 'd']
       }
   }
 
@@ -103,7 +113,9 @@ def cfg_path_ini_args_test():
       ],
       "path": {
           "path": "c:",
-          "cwd": "~/amiga"
+          "cwd": "~/amiga",
+          "auto_volumes": ['a'],
+          "auto_assigns": ['x']
       }
   }
   lp.parse_config(ini_dict, 'ini')
@@ -119,7 +131,9 @@ def cfg_path_ini_args_test():
        '-V', 'work:~/amiga/work',
        '-V', 'home:~',
        '-V', 'local:',
-       '--vols-base-dir', '/bla'
+       '--vols-base-dir', '/bla',
+       '--auto-volumes', 'b,c',
+       '--auto-assigns', 'y,z'
        ])
   lp.parse_args(args)
   assert lp.get_cfg_dict() == {
@@ -139,6 +153,8 @@ def cfg_path_ini_args_test():
       "path": {
           "command": ["c:", "work:c", "sys:t"],
           "cwd": "~/amiga",
-          "vols_base_dir": "/bla"
+          "vols_base_dir": "/bla",
+          "auto_volumes": ['a', 'b', 'c'],
+          "auto_assigns": ['x', 'y', 'z']
       }
   }

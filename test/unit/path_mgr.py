@@ -35,14 +35,51 @@ def path_mgr_config_test(tmpdir):
       "path": {
           "command": ["c:", "work:c"],
           "cwd": "work:",
-          "vols_base_dir": vols_base
+          "vols_base_dir": vols_base,
+          "auto_assigns": None,
+          "auto_volumes": None
       }
   })
   assert pm.parse_config(cfg)
+  assert pm.setup()
+  assert pm.get_all_volume_names() == ["sys", "work", "home", "root", "ram"]
+  assert pm.get_all_assign_names() == ["c", "libs", "devs", "s", "t"]
+  assert pm.get_cwd() == "work:"
+  assert pm.get_cmd_paths() == ["c:", "work:c"]
+  pm.shutdown()
+
+
+def path_mgr_config_auto_empty_test(tmpdir):
+  vols_base = str(tmpdir.mkdir("volumes"))
+  tmpdir.join("volumes").mkdir("work")
+  sys_path = str(tmpdir.mkdir("sys"))
+  pm = PathManager()
+  cfg = ConfigDict({
+      "volumes": [
+          "sys:" + sys_path,
+          "work",  # local volume
+          "home:~"
+      ],
+      "assigns": [
+          "c:sys:c+home:c",
+          "libs:sys:libs",
+          "devs:sys:devs"
+      ],
+      "path": {
+          "command": ["c:", "work:c"],
+          "cwd": "work:",
+          "vols_base_dir": vols_base,
+          "auto_assigns": [],
+          "auto_volumes": []
+      }
+  })
+  assert pm.parse_config(cfg)
+  assert pm.setup()
   assert pm.get_all_volume_names() == ["sys", "work", "home"]
   assert pm.get_all_assign_names() == ["c", "libs", "devs"]
   assert pm.get_cwd() == "work:"
   assert pm.get_cmd_paths() == ["c:", "work:c"]
+  pm.shutdown()
 
 
 def path_mgr_config_esc_sys_test(tmpdir):
@@ -63,14 +100,18 @@ def path_mgr_config_esc_sys_test(tmpdir):
       "path": {
           "command": ["::" + work_path],
           "cwd": "::~",
-          "vols_base_dir": None
+          "vols_base_dir": None,
+          "auto_assigns": [],
+          "auto_volumes": []
       }
   })
   assert pm.parse_config(cfg)
+  assert pm.setup()
   assert pm.get_all_volume_names() == ["sys", "work", "home"]
   assert pm.get_all_assign_names() == ["c", "libs", "devs"]
   assert pm.get_cwd() == "home:"
   assert pm.get_cmd_paths() == ["work:"]
+  pm.shutdown()
 
 
 def path_mgr_config_empty_test():
@@ -79,14 +120,18 @@ def path_mgr_config_empty_test():
       "volumes": None,
       "assigns": None,
       "path": {
-          "command": None,
-          "cwd": None,
-          "vols_base_dir": None
+          "command": ["sys:c"],
+          "cwd": "sys:",
+          "vols_base_dir": None,
+          "auto_volumes": [],
+          "auto_assigns": []
       }
   })
   assert pm.parse_config(cfg)
-  assert pm.get_all_volume_names() == []
-  assert pm.get_all_assign_names() == []
+  assert pm.setup()
+  assert pm.get_all_volume_names() == ['system']
+  assert pm.get_all_assign_names() == ['sys']
+  pm.shutdown()
 
 
 def setup_pm(tmpdir):

@@ -7,7 +7,9 @@ class PathParser(Parser):
         "path": {
             "command": ValueList(str),
             "cwd": Value(str),
-            "vols_base_dir": Value(str, "~/.vamos/volumes")
+            "vols_base_dir": Value(str, "~/.vamos/volumes"),
+            "auto_assigns": ValueList(str),
+            "auto_volumes": ValueList(str)
         },
         "assigns": ValueList(str),
         "volumes": ValueList(str)
@@ -19,7 +21,11 @@ class PathParser(Parser):
             "cwd": Argument('--cwd', action='store',
                             help="set the current working directory"),
             "vols_base_dir": Argument("--vols-base-dir", action='store',
-                                      help="set directory for local volumes")
+                                      help="set directory for local volumes"),
+            "auto_volumes": Argument('--auto-volumes', action='append',
+                                     help="select the auto volumes"),
+            "auto_assigns": Argument('-A', '--auto-assigns', action='append',
+                                     help="select the auto assigns")
         },
         "assigns": Argument('-a', '--assign', action='append',
                             help="add AmigaOS assign: name:/sys/path[+/more/path]"),
@@ -41,7 +47,9 @@ class PathParser(Parser):
         "volumes": (list_merge, "volumes"),
         "path": {
             "command": ["path", "path"],
-            "cwd": ["path", "cwd"]
+            "cwd": ["path", "cwd"],
+            "auto_volumes": ["path", "auto_volumes"],
+            "auto_assigns": ["path", "auto_assigns"]
         }
     }
     Parser.__init__(self, "path", def_cfg, arg_cfg,
