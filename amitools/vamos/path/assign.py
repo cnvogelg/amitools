@@ -114,6 +114,7 @@ class AssignManager(object):
   def shutdown(self):
     log_path.debug("shutting down assigns")
     for a in self.assigns:
+      log_path.info("cleaning up assign: %s", a)
       a.shutdown()
       a.is_setup = False
 

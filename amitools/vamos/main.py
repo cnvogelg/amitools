@@ -70,70 +70,75 @@ def main(cfg_files=None, args=None, cfg_dict=None):
 
   # setup path manager
   path_mgr = VamosPathManager()
-  if not path_mgr.parse_config(mp.get_path_dict()):
-    log_main.error("path config failed!")
-    return RET_CODE_CONFIG_ERROR
-  if not path_mgr.setup():
-    log_main.error("path setup failed!")
-    return RET_CODE_CONFIG_ERROR
+  try:
+    if not path_mgr.parse_config(mp.get_path_dict()):
+      log_main.error("path config failed!")
+      return RET_CODE_CONFIG_ERROR
+    if not path_mgr.setup():
+      log_main.error("path setup failed!")
+      return RET_CODE_CONFIG_ERROR
 
-  # setup scheduler
-  scheduler = Scheduler(machine)
+    # setup scheduler
+    scheduler = Scheduler(machine)
 
-  # setup lib mgr
-  lib_cfg = mp.get_libs_dict()
-  slm = SetupLibManager(machine, mem_map, scheduler,
-                        path_mgr, main_profiler=main_profiler)
-  if not slm.parse_config(lib_cfg):
-    log_main.error("lib manager setup failed!")
-    return RET_CODE_CONFIG_ERROR
-  slm.setup()
+    # setup lib mgr
+    lib_cfg = mp.get_libs_dict()
+    slm = SetupLibManager(machine, mem_map, scheduler,
+                          path_mgr, main_profiler=main_profiler)
+    if not slm.parse_config(lib_cfg):
+      log_main.error("lib manager setup failed!")
+      return RET_CODE_CONFIG_ERROR
+    slm.setup()
 
-  # setup profiler
-  main_profiler.setup()
+    # setup profiler
+    main_profiler.setup()
 
-  # open base libs
-  slm.open_base_libs()
+    # open base libs
+    slm.open_base_libs()
 
-  # setup main proc
-  proc_cfg = mp.get_proc_dict().process
-  main_proc = Process.create_main_proc(proc_cfg, path_mgr, slm.dos_ctx)
-  if not main_proc:
-    log_main.error("main proc setup failed!")
-    return RET_CODE_CONFIG_ERROR
+    # setup main proc
+    proc_cfg = mp.get_proc_dict().process
+    main_proc = Process.create_main_proc(proc_cfg, path_mgr, slm.dos_ctx)
+    if not main_proc:
+      log_main.error("main proc setup failed!")
+      return RET_CODE_CONFIG_ERROR
 
-  # main loop
-  task = main_proc.get_task()
-  scheduler.add_task(task)
-  scheduler.schedule()
+    # main loop
+    task = main_proc.get_task()
+    scheduler.add_task(task)
+    scheduler.schedule()
 
-  # check proc result
-  ok = False
-  run_state = task.get_run_state()
-  if run_state.done:
-    if run_state.error:
-      log_main.error("vamos failed!")
-      exit_code = 1
+    # check proc result
+    ok = False
+    run_state = task.get_run_state()
+    if run_state.done:
+      if run_state.error:
+        log_main.error("vamos failed!")
+        exit_code = 1
+      else:
+        ok = True
+        exit_code = run_state.regs[REG_D0]
+        log_main.info("done. exit code=%d", exit_code)
     else:
-      ok = True
-      exit_code = run_state.regs[REG_D0]
-      log_main.info("done. exit code=%d", exit_code)
-  else:
-    log_main.info(
-        "vamos was stopped after %d cycles. ignoring result", machine_cfg.max_cycles)
-    exit_code = 0
+      log_main.info(
+          "vamos was stopped after %d cycles. ignoring result", machine_cfg.max_cycles)
+      exit_code = 0
 
-  # shutdown main proc
-  if ok:
-    main_proc.free()
+    # shutdown main proc
+    if ok:
+      main_proc.free()
 
-  # libs shutdown
-  slm.close_base_libs()
-  main_profiler.shutdown()
-  slm.cleanup()
+    # libs shutdown
+    slm.close_base_libs()
+    main_profiler.shutdown()
+    slm.cleanup()
+
+  finally:
+    # always shutdown path manager to ensure that
+    # external resources are cleaned up properly
+    path_mgr.shutdown()
 
   # mem_map and machine shutdown
-  path_mgr.shutdown()
   if ok:
     mem_map.cleanup()
   machine.cleanup()

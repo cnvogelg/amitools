@@ -162,6 +162,7 @@ class VolumeManager(object):
     # shutdown all volumes
     log_path.debug("shutting down volumes")
     for volume in self.volumes:
+      log_path.info("cleaning up volume: %s", volume)
       volume.shutdown()
       volume.is_setup = False
 

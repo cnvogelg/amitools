@@ -179,6 +179,7 @@ class PathManager:
     return True
 
   def shutdown(self):
+    log_path.info("shutting down paths")
     self.assign_mgr.shutdown()
     self.vol_mgr.shutdown()
 
