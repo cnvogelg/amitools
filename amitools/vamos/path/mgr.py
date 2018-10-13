@@ -45,7 +45,7 @@ class PathManagerEnv(AmiPathEnv):
 class PathManager:
   def __init__(self,
                cwd=None, cmd_paths=None, vols_base_dir=None,
-               add_system_vol=True, add_root_vol=True, add_ram_vol=True,
+               auto_volumes=None,
                auto_assigns=None, auto_assigns_mkdir=True,
                sys_vol=None):
     # set defaults
@@ -55,12 +55,12 @@ class PathManager:
       cmd_paths = ['c:']
     if not vols_base_dir:
       vols_base_dir = "~/.vamos/volumes"
+    if not auto_volumes:
+      auto_volumes = ['root', 'ram']
     if not auto_assigns:
       auto_assigns = ['c', 's', 'libs', 'devs', 't']
     # options
-    self.add_system_vol = add_system_vol
-    self.add_root_vol = add_root_vol
-    self.add_ram_vol = add_ram_vol
+    self.auto_volumes = auto_volumes
     self.auto_assigns = auto_assigns
     self.auto_assigns_mkdir = auto_assigns_mkdir
     self.sys_vol = sys_vol
@@ -123,21 +123,27 @@ class PathManager:
 
   def _add_auto_volumes(self):
     vm = self.get_vol_mgr()
-    # add a default 'system' volume if none is given
-    if vm.get_num_volumes() == 0 and self.add_system_vol:
-      log_path.info("auto adding default 'system:' volume")
+    am = self.get_assign_mgr()
+    # require a default 'system' volume if none is given
+    if vm.get_num_volumes() == 0:
+      log_path.info("no volume exists: auto adding default 'system:' volume")
       if not vm.add_volume('system:?create'):
         return False
-    # add a root: volume for whole filesys
-    if not vm.is_volume('root') and self.add_root_vol:
-      log_path.info("auto adding 'root:' volume")
-      if not vm.add_volume('root:/'):
-        return False
-    # add a ram: volume for temporary files
-    if not vm.is_volume('ram') and self.add_ram_vol:
-      log_path.info("auto adding 'ram:' volume")
-      if not vm.add_volume('ram:?temp'):
-        return False
+    # run through auto volumes
+    for av in self.auto_volumes:
+      av = av.lower()
+      if not am.is_assign(av) and not vm.is_volume(av):
+        if av == 'root':
+          spec = "root:/"
+        elif av == 'ram':
+          spec = "ram:?temp"
+        else:
+          log_path.error("invalid auto volume: '%s'", av)
+          return False
+        # add auto volume
+        log_path.info("auto adding volume: %s", spec)
+        if not vm.add_volume(spec):
+          return False
     # done
     return True
 

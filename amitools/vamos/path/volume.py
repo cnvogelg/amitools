@@ -195,7 +195,7 @@ class VolumeManager(object):
         old_volume = self.vols_by_name[lo_name]
         log_path.info("overwriting volume: %s", old_volume)
         self.volumes.remove(old_volume)
-        del self.volumes_by_name[lo_name]
+        del self.vols_by_name[lo_name]
 
     # after global setup try to setup volume immediately
     if self.is_setup:

@@ -93,7 +93,7 @@ def setup_pm(tmpdir):
   root_path = str(tmpdir)
   sys_path = str(tmpdir.mkdir("sys"))
   work_path = str(tmpdir.mkdir("work"))
-  pm = PathManager(vols_base_dir=str(tmpdir))
+  pm = PathManager(vols_base_dir=str(tmpdir), auto_volumes=[], auto_assigns=[])
   env = pm.get_default_env()
   env.set_cwd("root:baz")
   env.set_cmd_paths(["a:", "c:"])
