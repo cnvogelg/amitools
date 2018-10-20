@@ -462,6 +462,71 @@ class ChangeCommand(PartEditCommand):
         print("Can't find partition: '%s'" % self.opts[0])
         return 1
 
+# --- Export/Import file system image ---
+
+class ExportCommand(Command):
+  def handle_rdisk(self, rdisk):
+    if len(self.opts) < 2:
+      print("Usage: export <id> <file>")
+      return 1
+    else:
+      part = self.opts[0]
+      file_name = self.opts[1]
+      p = rdisk.find_partition_by_string(part)
+      if p != None:
+        blkdev = p.create_blkdev()
+        blkdev.open()
+        num_blks = blkdev.num_blocks
+        print("exporting '%s' (%d blocks) to '%s'" % \
+            (p.get_drive_name(), num_blks, file_name))
+        try:
+          with open(file_name, "wb") as fh:
+            for b in xrange(num_blks):
+              data = blkdev.read_block(b)
+              fh.write(data)
+        except IOError as e:
+          print("Error writing file: '%s': %s" % (file_name, e))
+          return 1
+        blkdev.close()
+        return 0
+      else:
+        print("Can't find partition: '%s'" % part)
+        return 1
+
+class ImportCommand(Command):
+  def handle_rdisk(self, rdisk):
+    if len(self.opts) < 2:
+      print("Usage: import <id> <file>")
+      return 1
+    else:
+      part = self.opts[0]
+      file_name = self.opts[1]
+      p = rdisk.find_partition_by_string(part)
+      if p != None:
+        part_dev = p.create_blkdev()
+        part_dev.open()
+        num_blks = part_dev.num_blocks
+        blk_size = part_dev.block_bytes
+        total = num_blks * blk_size
+        # open image
+        file_size = os.path.getsize(file_name)
+        # check sizes
+        if total != file_size:
+          print("size mismatch: partition=%d != file=%d",
+                total, file_size)
+          return 1
+        print("importing '%s' (%d blocks) to '%s'" % \
+            (file_name, num_blks, p.get_drive_name()))
+        with open(file_name, "rb") as fh:
+          for b in xrange(num_blks):
+            data = fh.read(blk_size)
+            part_dev.write_block(b, data)
+        part_dev.close()
+        return 0
+      else:
+        print("Can't find partition: '%s'" % part)
+        return 1
+
 # --- Fill empty space with partitions ---
 
 class FillCommand(PartEditCommand):
@@ -653,7 +718,9 @@ def main():
   "fsflags" : FSFlagsCommand,
   "map" : MapCommand,
   "delete" : DeleteCommand,
-  "change" : ChangeCommand
+  "change" : ChangeCommand,
+  "export" : ExportCommand,
+  "import" : ImportCommand
   }
 
   parser = argparse.ArgumentParser()
