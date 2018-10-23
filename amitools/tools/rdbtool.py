@@ -17,6 +17,7 @@ from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 from amitools.fs.DosType import *
 from amitools.fs.block.rdb.PartitionBlock import PartitionBlock, PartitionDosEnv
 from amitools.fs.block.rdb.FSHeaderBlock import FSHeaderDeviceNode
+from amitools.fs.block.BootBlock import BootBlock
 import amitools.util.KeyValue as KeyValue
 import amitools.util.ByteSize as ByteSize
 import amitools.util.VerTag as VerTag
@@ -505,20 +506,28 @@ class ImportCommand(Command):
       if p != None:
         part_dev = p.create_blkdev()
         part_dev.open()
-        num_blks = part_dev.num_blocks
+        part_blks = part_dev.num_blocks
         blk_size = part_dev.block_bytes
-        total = num_blks * blk_size
+        total = part_blks * blk_size
         # open image
         file_size = os.path.getsize(file_name)
+        file_blks = file_size / blk_size
+        if file_size % blk_size != 0:
+          print("image file not block size aligned!")
+          return 1
         # check sizes
-        if total != file_size:
-          print("size mismatch: partition=%d != file=%d",
+        if total < file_size:
+          print("import image too large: partition=%d != file=%d",
                 total, file_size)
           return 1
-        print("importing '%s' (%d blocks) to '%s'" % \
-            (file_name, num_blks, p.get_drive_name()))
+        if total > file_size:
+          delta = total - file_size
+          print("WARNING: import file too small: %d unused blocks", delta)
+        print("importing '%s' (%d blocks) to '%s' (%d blocks)" % \
+            (file_name, file_blks, p.get_drive_name(), part_blks))
+        # copy image
         with open(file_name, "rb") as fh:
-          for b in xrange(num_blks):
+          for b in xrange(file_blks):
             data = fh.read(blk_size)
             part_dev.write_block(b, data)
         part_dev.close()
