@@ -3,7 +3,7 @@ import os
 from .cfg import VamosMainParser
 from .machine import Machine, MemoryMap
 from .machine.regs import *
-from .log import log_main, log_setup
+from .log import log_main, log_setup, log_help
 from .path import VamosPathManager
 from .trace import TraceManager
 from .libmgr import SetupLibManager
