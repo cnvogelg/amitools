@@ -98,11 +98,12 @@ class Value(object):
 
 class ValueList(object):
   def __init__(self, item_type, default=None, allow_none=None, enum=None,
-               sep=',', nest_pair='()', clear_mark='*'):
+               sep=',', nest_pair='()', clear_mark='*', allow_split=True):
     self.item_type = item_type
     self.sep = sep
     self.nest_pair = nest_pair
     self.clear_mark = clear_mark
+    self.allow_split = allow_split
     self.is_sub_value = type(item_type) in (Value, ValueList, ValueDict)
     if self.is_sub_value:
       self.sub_nest_pair = item_type.nest_pair
@@ -123,7 +124,10 @@ class ValueList(object):
       return []
     elif type(val) is str:
       # split string by sep
-      val = split_nest(val, self.sep, self.sub_nest_pair)
+      if self.allow_split:
+        val = split_nest(val, self.sep, self.sub_nest_pair)
+      else:
+        val = [val]
       recurse = False
     elif type(val) in (list, tuple):
       recurse = True
@@ -155,12 +159,14 @@ class ValueList(object):
         self.default == other.default and \
         self.sep == other.sep and \
         self.nest_pair == other.nest_pair and \
-        self.clear_mark == other.clear_mark
+        self.clear_mark == other.clear_mark and \
+        self.allow_split == other.allow_split
 
   def __repr__(self):
-    return "ValueList(%s, default=%s, sep=%s, nest_pair=%s, clear_mark=%s)" % \
+    return "ValueList(%s, default=%s, sep=%s, nest_pair=%s, " \
+        "clear_mark=%s, allow_split=%s)" % \
         (self.item_type, self.default, self.sep, self.nest_pair,
-         self.clear_mark)
+         self.clear_mark, self.allow_split)
 
 
 class ValueDict(object):

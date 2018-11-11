@@ -73,6 +73,14 @@ def config_value_list_test():
     l.parse("a,c")
 
 
+def config_value_list_no_split_test():
+  l = ValueList(str, allow_split=False)
+  assert l.parse("bla") == ["bla"]
+  assert l.parse("a,b") == ["a,b"]
+  assert l.parse(["a", "b"]) == ["a", "b"]
+  assert l.parse(["a,b", "c"]) == ["a,b", "c"]
+
+
 def config_value_list_int_test():
   l = ValueList(int)
   assert l.parse("12") == [12]

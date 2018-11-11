@@ -7,7 +7,7 @@ class ProcessParser(Parser):
         "process": {
             "command": {
                 "binary": Value(str),
-                "args": ValueList(str),
+                "args": ValueList(str, allow_split=False),
                 "shell": False,
                 "pure_ami_path": False,
                 "raw_arg": False

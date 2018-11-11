@@ -8,7 +8,7 @@ def cfg_proc_dict_test():
       "process": {
           "command": {
               "binary": "foo",
-              "args": ["a", "b"],
+              "args": ["a", "b", "c,d", "(e)", "*f"],
               "shell": True,
               "pure_ami_path": True,
               "raw_arg": True
@@ -50,13 +50,13 @@ def cfg_proc_args_test():
   ap = argparse.ArgumentParser()
   lp.setup_args(ap)
   args = ap.parse_args(
-      ['-x', '-P', '-R', '-s', '4', 'foo', 'a', 'b'])
+      ['-x', '-P', '-R', '-s', '4', 'foo', 'a', 'b', 'c,d', '(e)', '*f'])
   lp.parse_args(args)
   assert lp.get_cfg_dict() == {
       "process": {
           "command": {
               "binary": "foo",
-              "args": ["a", "b"],
+              "args": ["a", "b", "c,d", "(e)", "*f"],
               "shell": True,
               "pure_ami_path": True,
               "raw_arg": True
