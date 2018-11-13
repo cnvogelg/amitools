@@ -3,6 +3,7 @@ wb=volumes/wb
 curdir=.
 
 [assigns]
+sys=wb:
 bin=curdir:bin
 
 [path]

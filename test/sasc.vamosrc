@@ -3,6 +3,7 @@ wb=volumes/wb
 sc=volumes/sc
 
 [assigns]
+sys=wb:
 include=sc:include
 includeasm=sc:include
 lib=sc:lib
