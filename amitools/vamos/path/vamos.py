@@ -22,24 +22,24 @@ class VamosPathManager(PathManager):
   # ----- API -----
 
   def ami_command_to_sys_path(self, cwd_lock, ami_path):
-    """lookup a command on path if it does not contain a relative or absolute path
-       otherwise perform normal 'ami_to_sys_path' conversion"""
+    """lookup a command on path if it does not contain a relative or
+       absolute path. otherwise perform normal 'ami_to_sys_path' conversion"""
     env = self._get_lock_env(cwd_lock)
     cmd_paths = self.cmdpaths(ami_path, env=env)
     log_path.info(
-        "ami_command_to_sys_path: ami_path=%s -> cmd_paths=%s" %
-        (ami_path, ",".join(map(str, cmd_paths))))
+        "ami_command_to_sys_path: ami_path=%s -> cmd_paths=%s",
+        ami_path, ",".join(map(str, cmd_paths)))
     # check if ami path exists as sys path
     for cmd_path in cmd_paths:
       sys_path = self.to_sys_path(str(cmd_path))
       if os.path.isfile(sys_path):
         log_path.info(
-            "ami_command_to_sys_path: ami_path=%s -> sys_path=%s" %
-            (ami_path, sys_path))
+            "ami_command_to_sys_path: ami_path=%s -> sys_path=%s",
+            ami_path, sys_path)
         return sys_path
     # nothing found
     log_path.info(
-        "ami_command_to_sys_path: ami_path='%s' not found!" % (ami_path))
+        "ami_command_to_sys_path: ami_path='%s' not found!", ami_path)
     return None
 
   def ami_to_sys_path(self, cwd_lock, ami_path,
@@ -63,15 +63,15 @@ class VamosPathManager(PathManager):
     if sys_path is None and not mustExist:
       sys_path = self.to_sys_path(str(paths[0]))
     log_path.info("ami_to_sys_path: ami_path='%s'"
-                  " -> volpaths=%s -> sys_path='%s'" %
-                  (ami_path, ",".join(map(str, paths)), sys_path))
+                  " -> volpaths=%s -> sys_path='%s'",
+                  ami_path, ",".join(map(str, paths)), sys_path)
     return sys_path
 
   def sys_to_ami_path(self, sys_path):
     ami_path = self.from_sys_path(sys_path)
     log_path.info("sys_to_ami_path: sys_path='%s' -> abs_path='%s' "
-                  "-> ami_path='%s'" %
-                  (sys_path, ami_path))
+                  "-> ami_path='%s'",
+                  sys_path, ami_path)
     return ami_path
 
   def ami_abs_parent_path(self, path):
