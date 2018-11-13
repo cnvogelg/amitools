@@ -284,10 +284,6 @@ class VolumeManager(object):
     if lo_name in self.vols_by_name:
       return self.vols_by_name[lo_name]
 
-  def get_boot_volume(self):
-    if len(self.volumes) > 0:
-      return self.volumes[0]
-
   def get_all_names(self):
     return map(lambda x: x.get_name(), self.volumes)
 

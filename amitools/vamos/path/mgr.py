@@ -177,12 +177,12 @@ class PathManager:
     am = self.get_assign_mgr()
     # setup 'sys:' assign
     if not am.is_assign('sys') and not vm.is_volume('sys'):
-      vol_name = self.sys_vol
-      if not vol_name:
-        volume = vm.get_boot_volume()
-        vol_name = volume.get_name()
-      log_path.info("assign volume '%s' as 'sys:'", vol_name)
-      spec = "sys:%s:" % vol_name
+      # try to map to system:
+      if not am.is_assign('system') and not vm.is_volume('system'):
+        log_path.info("no sys: defined: auto adding default 'system:' volume")
+        if not vm.add_volume('system:?create'):
+          return False
+      spec = "sys:system:"
       if not am.add_assign(spec):
         return False
     # add auto assigns
