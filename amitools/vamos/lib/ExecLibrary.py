@@ -31,9 +31,9 @@ class ExecLibrary(LibImpl):
     self.exec_lib.lib_list.new_list(NodeType.NT_LIBRARY)
     self.exec_lib.device_list.new_list(NodeType.NT_DEVICE)
     # set some system contants
-    if ctx.cpu_type == '68030':
+    if ctx.cpu_name == '68030(fake)':
       self.exec_lib.attn_flags = 7
-    elif ctx.cpu_type == '68020':
+    elif ctx.cpu_name == '68020':
       self.exec_lib.attn_flags = 3
     else:
       self.exec_lib.attn_flags = 0

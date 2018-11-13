@@ -141,7 +141,8 @@ class Machine(object):
                raise_on_main_run=False,
                use_labels=use_labels,
                cycles_per_run=cycles_per_run,
-               max_cycles=max_cycles)
+               max_cycles=max_cycles,
+               cpu_name=cpu_name)
 
   @classmethod
   def parse_cpu_type(cls, cpu_str):
