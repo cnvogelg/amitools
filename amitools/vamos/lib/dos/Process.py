@@ -94,13 +94,18 @@ class Process:
   def load_binary(self, lock, ami_bin_file, shell=False):
     self.bin_basename = self.ctx.path_mgr.ami_name_of_path(lock,ami_bin_file)
     self.bin_file     = ami_bin_file
-    sys_path = self.ctx.path_mgr.ami_command_to_sys_path(lock, ami_bin_file)
-    if not sys_path or not os.path.exists(sys_path):
+    sys_path, ami_path = self.ctx.path_mgr.ami_command_to_sys_path(lock, ami_bin_file)
+    if not sys_path:
       log_proc.error("failed loading binary: %s -> %s", ami_bin_file, sys_path)
       return False
     self.bin_seg_list = self.ctx.seg_loader.load_sys_seglist(sys_path)
     info = self.ctx.seg_loader.get_info(self.bin_seg_list)
     self.prog_start = info.seglist.get_segment().get_addr()
+    # set home dir and get lock
+    self.home_dir = self.ctx.path_mgr.ami_dir_of_path(lock, ami_path)
+    lock_mgr = self.ctx.dos_lib.lock_mgr
+    self.home_lock = lock_mgr.create_lock(lock, self.home_dir, False)
+    log_proc.info("home dir: %s", self.home_lock)
     # THOR: If this is a shell, then the seglist requires BCPL linkage and
     # initialization of the GlobVec. Fortunately, for the 3.9 shell all this
     # magic is not really required, and the BCPL call-in (we use) is at
@@ -115,6 +120,9 @@ class Process:
 
   def unload_binary(self):
     self.ctx.seg_loader.unload_seglist(self.bin_seg_list)
+    # unlock home dir
+    lock_mgr = self.ctx.dos_lib.lock_mgr
+    lock_mgr.release_lock(self.home_lock)
 
   # ----- args -----
   def init_args(self, arg_str, fh):
@@ -243,6 +251,7 @@ class Process:
     self.this_task.access.w_s("pr_CLI", self.cli.addr)
     self.this_task.access.w_s("pr_CIS", input_fh.b_addr<<2) # compensate BCPL auto-conversion
     self.this_task.access.w_s("pr_COS", output_fh.b_addr<<2) # compensate BCPL auto-conversion
+    self.this_task.access.w_s("pr_HomeDir", self.home_lock.b_addr << 2)
     varlist = self.get_local_vars()
     # Initialize the list of local shell variables
     varlist.access.w_s("mlh_Head",varlist.addr + 4)
@@ -284,6 +293,12 @@ class Process:
 
   def set_current_dir(self,lock):
     self.this_task.access.w_s("pr_CurrentDir",lock)
+
+  def get_home_dir(self):
+    return self.this_task.access.r_s("pr_HomeDir")
+
+  def set_home_dir(self, lock_addr):
+    self.this_task.access.w_s("pr_HomeDir", lock_addr)
 
   def is_native_shell(self):
     return self.shell

@@ -274,6 +274,15 @@ class DosLibrary(LibImpl):
     log_dos.info("GetProgramName() -> '%s' (%d)", prog_name, max_len)
     return ret
 
+  def GetProgramDir(self, ctx):
+    prog_dir_addr = ctx.process.get_home_dir()
+    prog_dir_lock = self.lock_mgr.get_by_b_addr(prog_dir_addr >> 2)
+    log_dos.info("GetProgramDir() -> %s", prog_dir_lock)
+    if prog_dir_lock:
+      return prog_dir_lock.b_addr
+    else:
+      return 0
+
   def GetArgStr(self, ctx):
     arg_ptr = ctx.process.get_arg_str_ptr()
     log_dos.info("GetArgStr() -> %08x", arg_ptr)

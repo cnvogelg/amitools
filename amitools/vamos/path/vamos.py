@@ -34,13 +34,13 @@ class VamosPathManager(PathManager):
       sys_path = self.to_sys_path(str(cmd_path))
       if os.path.isfile(sys_path):
         log_path.info(
-            "ami_command_to_sys_path: ami_path=%s -> sys_path=%s",
-            ami_path, sys_path)
-        return sys_path
+            "ami_command_to_sys_path: ami_path=%s -> sys_path=%s, ami_path=%s",
+            ami_path, sys_path, cmd_path)
+        return sys_path, cmd_path
     # nothing found
     log_path.info(
         "ami_command_to_sys_path: ami_path='%s' not found!", ami_path)
-    return None
+    return None, None
 
   def ami_to_sys_path(self, cwd_lock, ami_path,
                       searchMulti=False, mustExist=False):
