@@ -114,7 +114,8 @@ class LibManager(object):
     else:
       log_libmgr.error("close: unknown lib @%06x!", addr)
 
-  def open_lib(self, full_name, version=0, lock=None, run_sp=None):
+  def open_lib(self, full_name, version=0, cwd_lock=None, run_sp=None,
+               progdir_lock=None):
     """open a library
 
        return lib_base addr or 0
@@ -152,7 +153,7 @@ class LibManager(object):
 
     # try amiga lib
     if try_alib and addr == 0:
-      addr = self.alib_mgr.open_lib(full_name, lock, run_sp)
+      addr = self.alib_mgr.open_lib(full_name, cwd_lock, run_sp, progdir_lock)
       if addr > 0:
         log_libmgr.info("got alib: @%06x", addr)
 

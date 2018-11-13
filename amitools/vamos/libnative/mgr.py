@@ -123,8 +123,9 @@ class ALibManager(object):
                     seglist, info)
     return seglist
 
-  def open_lib(self, lib_name, lock=None, run_sp=None):
-    log_libmgr.info("[native] +open_lib: lib_name='%s'", lib_name)
+  def open_lib(self, lib_name, cwd_lock=None, run_sp=None, progdir_lock=None):
+    log_libmgr.info("[native] +open_lib: lib_name='%s', cwd=%s, progdir=%s",
+                    lib_name, cwd_lock, progdir_lock)
     # multict lib base name
     base_name = self.loader.get_lib_base_name(lib_name)
     # find library
@@ -134,7 +135,7 @@ class ALibManager(object):
     if not lib_info:
       log_libmgr.info("loading native lib: '%s'", lib_name)
       load_addr, seglist_baddr = self.loader.load_ami_lib(
-          lib_name, lock, run_sp)
+          lib_name, cwd_lock, run_sp, progdir_lock)
       # even loading failed... abort
       if load_addr == 0:
         log_libmgr.info("[native] -open_lib: load failed!")
@@ -150,6 +151,7 @@ class ALibManager(object):
       load_addr = lib_info.get_load_addr()
       loaded = False
     # got lib: open lib... may return new base!
+    log_libmgr.debug("[native] call open lib: load_addr=%06x", load_addr)
     lib_base = self.funcs.open_library(load_addr, run_sp)
     # save base addr
     if lib_base > 0:

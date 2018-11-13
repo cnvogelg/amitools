@@ -190,7 +190,13 @@ class ExecLibrary(LibImpl):
     ver = ctx.cpu.r_reg(REG_D0)
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name = ctx.mem.r_cstr(name_ptr)
-    addr = self.lib_mgr.open_lib(name, ver)
+    proc = ctx.process
+    if proc:
+      cwd = proc.get_current_dir_lock()
+      pd = proc.get_home_dir_lock()
+    else:
+      cwd, pd = None, None
+    addr = self.lib_mgr.open_lib(name, ver, cwd_lock=cwd, progdir_lock=pd)
     log_exec.info("OpenLibrary: '%s' V%d -> %06x", name, ver, addr)
     return addr
 
@@ -210,7 +216,13 @@ class ExecLibrary(LibImpl):
   def OldOpenLibrary(self, ctx):
     name_ptr = ctx.cpu.r_reg(REG_A1)
     name = ctx.mem.r_cstr(name_ptr)
-    addr = self.lib_mgr.open_lib(name, 0)
+    proc = ctx.process
+    if proc:
+      cwd = proc.get_current_dir_lock()
+      pd = proc.get_home_dir_lock()
+    else:
+      cwd, pd = None, None
+    addr = self.lib_mgr.open_lib(name, 0, cwd_lock=cwd, progdir_lock=pd)
     log_exec.info("OldOpenLibrary: '%s' -> %06x", name, addr)
     return addr
 

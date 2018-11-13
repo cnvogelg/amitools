@@ -312,6 +312,16 @@ class Process:
   def set_arg_str_ptr(self, ptr):
     self.this_task.access.w_s("pr_Arguments", ptr)
 
+  def get_current_dir_lock(self):
+    lock_mgr = self.ctx.dos_lib.lock_mgr
+    lock_baddr = self.get_current_dir() >> 2
+    return lock_mgr.get_by_b_addr(lock_baddr)
+
+  def get_home_dir_lock(self):
+    lock_mgr = self.ctx.dos_lib.lock_mgr
+    lock_baddr = self.get_home_dir() >> 2
+    return lock_mgr.get_by_b_addr(lock_baddr)
+
   # create main proc
 
   @classmethod
