@@ -117,6 +117,9 @@ class VLibManager(object):
       if lib_base in self.addr_vlib:
         vlib = self.addr_vlib[lib_base]
         if not self.expunge_lib(vlib):
+          lib = vlib.get_library()
+          log_libmgr.warn("can't expunge: '%s' with open count %d",
+                          lib.name, lib.open_cnt)
           left_libs += 1
     return left_libs
 
