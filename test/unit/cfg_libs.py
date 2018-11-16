@@ -10,13 +10,13 @@ def cfg_libs_dict_test():
               "mode": "vamos",
               "version": 42,
               "expunge": "last_close",
-              "num_fake_calls": 0
+              "num_fake_funcs": 0
           },
           "test.library": {
               "mode": "amiga",
               "version": 0,
               "expunge": "shutdown",
-              "num_fake_calls": 0
+              "num_fake_funcs": 0
           }
       },
       'devs': {
@@ -24,13 +24,13 @@ def cfg_libs_dict_test():
               "mode": "fake",
               "version": 0,
               "expunge": "no_mem",
-              "num_fake_calls": 0
+              "num_fake_funcs": 0
           },
           "test.device": {
               "mode": "off",
               "version": 42,
               "expunge": "no_mem",
-              "num_fake_calls": 0
+              "num_fake_funcs": 0
           }
       }
   }
@@ -45,25 +45,25 @@ def cfg_libs_ini_test():
           "mode": "vamos",
           "version": 42,
           "expunge": "no_mem",
-          "num_fake_calls": 1
+          "num_fake_funcs": 1
       },
       "test.library": {
           "mode": "amiga",
           "version": 0,
           "expunge": "shutdown",
-          "num_fake_calls": 2
+          "num_fake_funcs": 2
       },
       "*.device": {
           "mode": "fake",
           "version": 0,
           "expunge": "last_close",
-          "num_fake_calls": 3
+          "num_fake_funcs": 3
       },
       "test.device": {
           "mode": "off",
           "version": 42,
           "expunge": "shutdown",
-          "num_fake_calls": 4
+          "num_fake_funcs": 4
       }
   }
   lp.parse_config(ini_dict, 'ini')
@@ -73,13 +73,13 @@ def cfg_libs_ini_test():
               "mode": "vamos",
               "version": 42,
               "expunge": "no_mem",
-              "num_fake_calls": 1
+              "num_fake_funcs": 1
           },
           "test.library": {
               "mode": "amiga",
               "version": 0,
               "expunge": "shutdown",
-              "num_fake_calls": 2
+              "num_fake_funcs": 2
           }
       },
       'devs': {
@@ -87,13 +87,13 @@ def cfg_libs_ini_test():
               "mode": "fake",
               "version": 0,
               "expunge": "last_close",
-              "num_fake_calls": 3
+              "num_fake_funcs": 3
           },
           "test.device": {
               "mode": "off",
               "version": 42,
               "expunge": "shutdown",
-              "num_fake_calls": 4
+              "num_fake_funcs": 4
           }
       }
   }
@@ -104,7 +104,7 @@ def cfg_libs_args_test():
   ap = argparse.ArgumentParser()
   lp.setup_args(ap)
   args = ap.parse_args(
-      ['-O', '*.library=mode:vamos,version:42,expunge:last_close,num_fake_calls:1',
+      ['-O', '*.library=mode:vamos,version:42,expunge:last_close,num_fake_funcs:1',
        '-O', 'test.library=mode:amiga',
        '-O', '*.device=mode:amiga+test.device=mode:fake,version:42,expunge:no_mem'])
   lp.parse_args(args)
@@ -114,13 +114,13 @@ def cfg_libs_args_test():
               "mode": "vamos",
               "version": 42,
               "expunge": "last_close",
-              "num_fake_calls": 1
+              "num_fake_funcs": 1
           },
           "test.library": {
               "mode": "amiga",
               "version": 0,
               "expunge": "shutdown",
-              "num_fake_calls": 0
+              "num_fake_funcs": 0
           }
       },
       "devs": {
@@ -128,13 +128,13 @@ def cfg_libs_args_test():
               "mode": "amiga",
               "version": 0,
               "expunge": "shutdown",
-              "num_fake_calls": 0
+              "num_fake_funcs": 0
           },
           "test.device": {
               "mode": "fake",
               "version": 42,
               "expunge": "no_mem",
-              "num_fake_calls": 0
+              "num_fake_funcs": 0
           }
       }
   }

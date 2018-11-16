@@ -159,7 +159,7 @@ def libcore_mgr_make_fake_without_fd_cfg_test():
   machine, alloc, mgr = setup()
   exec_vlib = mgr.bootstrap_exec()
   # lib_cfg
-  Cfg = collections.namedtuple('Cfg', ['num_fake_calls'])
+  Cfg = collections.namedtuple('Cfg', ['num_fake_funcs'])
   lib_cfg = Cfg(10)
   # make vamos test lib
   test_vlib = mgr.make_lib_name('foo.library', lib_cfg=lib_cfg)

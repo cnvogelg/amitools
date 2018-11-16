@@ -156,7 +156,7 @@ def libmgr_mgr_open_vlib_fake_no_fd_test():
   # make vamos test lib
   cfg.add_lib_cfg('foo.library',
                   LibCfg(create_mode=LibCfg.CREATE_MODE_FAKE,
-                         force_version=40, num_fake_calls=10))
+                         force_version=40, num_fake_funcs=10))
   test_base = mgr.open_lib('foo.library', 36)
   assert test_base > 0
   vmgr = mgr.vlib_mgr

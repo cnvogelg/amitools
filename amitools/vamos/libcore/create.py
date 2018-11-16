@@ -38,7 +38,7 @@ class LibCreator(object):
 
   def _generate_fake_fd(self, name, lib_cfg):
     if lib_cfg:
-      num_calls = lib_cfg.num_fake_calls
+      num_calls = lib_cfg.num_fake_funcs
     else:
       num_calls = 0
     return generate_fd(name, num_calls)

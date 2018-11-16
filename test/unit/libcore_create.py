@@ -76,7 +76,7 @@ def libcore_create_lib_fake_without_fd_cfg_test():
   date = datetime.date(2012, 11, 12)
   info = LibInfo('foo.library', 42, 3, date)
   # lib_cfg
-  Cfg = collections.namedtuple('Cfg', ['num_fake_calls'])
+  Cfg = collections.namedtuple('Cfg', ['num_fake_funcs'])
   lib_cfg = Cfg(10)
   # create lib
   creator = LibCreator(alloc, traps)

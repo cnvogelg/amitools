@@ -28,7 +28,7 @@ class LibCfg(object):
 
   def __init__(self, create_mode=None,
                force_version=None, expunge_mode=None,
-               num_fake_calls=0):
+               num_fake_funcs=0):
     # set defaults
     if create_mode is None:
       create_mode = self.CREATE_MODE_AUTO
@@ -42,15 +42,15 @@ class LibCfg(object):
     self.create_mode = create_mode
     self.force_version = force_version
     self.expunge_mode = expunge_mode
-    self.num_fake_calls = num_fake_calls
+    self.num_fake_funcs = num_fake_funcs
 
   @classmethod
   def from_dict(cls, cfg):
     create_mode = cfg.mode
     force_version = cfg.version
     expunge_mode = cfg.expunge
-    num_fake_calls = cfg.num_fake_calls
-    return cls(create_mode, force_version, expunge_mode, num_fake_calls)
+    num_fake_funcs = cfg.num_fake_funcs
+    return cls(create_mode, force_version, expunge_mode, num_fake_funcs)
 
   def get_create_mode(self):
     return self.create_mode
@@ -61,27 +61,27 @@ class LibCfg(object):
   def get_expunge_mode(self):
     return self.expunge_mode
 
-  def get_num_fake_calls(self):
-    return self.num_fake_calls
+  def get_num_fake_funcs(self):
+    return self.num_fake_funcs
 
   def __eq__(self, other):
     return self.create_mode == other.create_mode and \
         self.force_version == other.force_version and \
         self.expunge_mode == other.expunge_mode and \
-        self.num_fake_calls == other.num_fake_calls
+        self.num_fake_funcs == other.num_fake_funcs
 
   def __ne__(self, other):
     return self.create_mode != other.create_mode or \
         self.force_version != other.force_version or \
         self.expunge_mode != other.expunge_mode or \
-        self.num_fake_calls != other.num_fake_calls
+        self.num_fake_funcs != other.num_fake_funcs
 
   def __repr__(self):
     return "LibCfg(create_mode=%s," \
-        " force_version=%s, expunge_mode=%s, num_fake_calls=%d)" % \
+        " force_version=%s, expunge_mode=%s, num_fake_funcs=%d)" % \
         (self.create_mode,
          self.force_version, self.expunge_mode,
-         self.num_fake_calls)
+         self.num_fake_funcs)
 
 
 class LibMgrCfg(object):
