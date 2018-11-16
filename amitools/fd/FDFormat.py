@@ -14,6 +14,15 @@ def get_fd_name(lib_name):
     raise ValueError("can't find fd name for '%s'" % lib_name)
   return fd_name
 
+def get_base_name(lib_name):
+  if lib_name.endswith(".device"):
+    base_name = lib_name.replace(".device", "Base")
+  elif lib_name.endswith(".library"):
+    base_name = lib_name.replace(".library", "Base")
+  else:
+    raise ValueError("can't find base name for '%s'" % lib_name)
+  return "_" + base_name[0].upper() + base_name[1:]
+
 def is_device(lib_name):
   """return true if given name is associated with a device"""
   return lib_name.endswith(".device")
@@ -25,12 +34,30 @@ def read_lib_fd(lib_name, fd_dir=None, add_std_calls=True):
   # get fd path
   fd_name = get_fd_name(lib_name)
   fd_path = os.path.join(fd_dir, fd_name)
+  if not os.path.isfile(fd_path):
+    return None
   # try to read fd
   fd = read_fd(fd_path)
   fd.is_device = is_device(lib_name)
   if add_std_calls:
     fd.add_std_calls()
   return fd
+
+def generate_fd(lib_name, num_calls=0, add_std_calls=True):
+  base = get_base_name(lib_name)
+  func_table = FuncTable(base)
+  func_table.is_device = is_device(lib_name)
+  offset = func_table.get_num_std_calls() + 1
+  bias = offset * 6
+  while offset <= num_calls:
+    n = "FakeFunc_%d" % offset
+    f = FuncDef(n, bias)
+    func_table.add_func(f)
+    offset += 1
+    bias += 6
+  if add_std_calls:
+    func_table.add_std_calls()
+  return func_table
 
 def read_fd(fname):
   func_pat = "([A-Za-z][_A-Za-z00-9]+)\((.*)\)\((.*)\)"

@@ -90,6 +90,12 @@ class FuncTable:
     for f in self.funcs:
       f.dump()
 
+  def get_num_std_calls(self):
+    if self.is_device:
+      return 6
+    else:
+      return 4
+
   def add_std_calls(self):
     if self.is_device:
       self.add_call("OpenDev",6,["IORequest","Unit"],["a1","d0"],True)

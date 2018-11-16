@@ -1,8 +1,30 @@
 from amitools.fd import *
 
+def fd_format_get_base_name_test():
+  assert get_base_name("bla.library") == '_BlaBase'
+  assert get_base_name("foo.device") == '_FooBase'
+
 def fd_format_get_fd_name_test():
   assert get_fd_name('vamostest.library') == 'vamostest_lib.fd'
   assert get_fd_name('timer.device') == 'timer_lib.fd'
+
+def fd_format_generate_fd_default_test():
+  fd = generate_fd('bla.library')
+  assert fd
+  assert fd.get_base_name() == "_BlaBase"
+  assert fd.get_max_bias() == 24
+  assert fd.get_neg_size() == 30
+  assert fd.get_num_indices() == 4
+
+def fd_format_generate_fd_num_call_test():
+  fd = generate_fd('bla.device', 10)
+  assert fd
+  assert fd.get_base_name() == "_BlaBase"
+  assert fd.get_max_bias() == 60
+  assert fd.get_neg_size() == 66
+  assert fd.get_num_indices() == 10
+  assert fd.get_func_by_index(0).get_name() == "OpenDev"
+  assert fd.get_func_by_index(9).get_name() == "FakeFunc_10"
 
 def fd_format_read_vamostest_lib_test():
   fd = read_lib_fd('vamostest.library')
