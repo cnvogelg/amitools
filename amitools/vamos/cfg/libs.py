@@ -10,14 +10,16 @@ class LibsParser(Parser):
             "*.library": {
                 "mode": Value(str, "auto", enum=modes),
                 "version": 0,
-                "expunge": Value(str, "shutdown", enum=expunges)
+                "expunge": Value(str, "shutdown", enum=expunges),
+                "num_fake_calls": 0
             }
         },
         'devs': {
             "*.device": {
                 "mode": Value(str, "auto", enum=modes),
                 "version": 0,
-                "expunge": Value(str, "shutdown", enum=expunges)
+                "expunge": Value(str, "shutdown", enum=expunges),
+                "num_fake_calls": 0
             }
         }
     }

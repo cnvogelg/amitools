@@ -1,4 +1,5 @@
 import datetime
+import collections
 from amitools.vamos.libcore import LibCreator, LibInfo, LibCtx, LibProfiler
 from amitools.vamos.machine import MockMachine
 from amitools.vamos.label import LabelManager
@@ -38,7 +39,7 @@ def libcore_create_lib_default_test():
   assert alloc.is_all_free()
 
 
-def libcore_create_lib_fake_test():
+def libcore_create_lib_fake_with_fd_test():
   mem, traps, alloc, ctx = setup()
   impl = None
   # create info for lib
@@ -47,6 +48,41 @@ def libcore_create_lib_fake_test():
   # create lib
   creator = LibCreator(alloc, traps)
   lib = creator.create_lib(info, ctx, impl)
+  # free lib
+  lib.free()
+  assert alloc.is_all_free()
+
+
+def libcore_create_lib_fake_without_fd_test():
+  mem, traps, alloc, ctx = setup()
+  impl = None
+  # create info for lib
+  date = datetime.date(2012, 11, 12)
+  info = LibInfo('foo.library', 42, 3, date)
+  # create lib
+  creator = LibCreator(alloc, traps)
+  lib = creator.create_lib(info, ctx, impl)
+  assert lib.get_fd().get_neg_size() == 30
+  assert lib.get_library().neg_size == 32
+  # free lib
+  lib.free()
+  assert alloc.is_all_free()
+
+
+def libcore_create_lib_fake_without_fd_cfg_test():
+  mem, traps, alloc, ctx = setup()
+  impl = None
+  # create info for lib
+  date = datetime.date(2012, 11, 12)
+  info = LibInfo('foo.library', 42, 3, date)
+  # lib_cfg
+  Cfg = collections.namedtuple('Cfg', ['num_fake_calls'])
+  lib_cfg = Cfg(10)
+  # create lib
+  creator = LibCreator(alloc, traps)
+  lib = creator.create_lib(info, ctx, impl, lib_cfg)
+  assert lib.get_fd().get_neg_size() == 66
+  assert lib.get_library().neg_size == 68
   # free lib
   lib.free()
   assert alloc.is_all_free()

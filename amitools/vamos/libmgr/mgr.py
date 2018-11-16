@@ -146,7 +146,8 @@ class LibManager(object):
       # open vlib
       vlib = self.vlib_mgr.open_lib_name(base_name,
                                          version=lib_version,
-                                         fake=fake)
+                                         fake=fake,
+                                         lib_cfg=lib_cfg)
       if vlib:
         addr = vlib.get_addr()
         log_libmgr.info("got vlib: @%06x", addr)

@@ -1,6 +1,6 @@
 from amitools.vamos.astructs import LibraryStruct
 from amitools.vamos.atypes import Library, NodeType
-from amitools.fd import read_lib_fd
+from amitools.fd import read_lib_fd, generate_fd
 from .vlib import VLib
 from .stub import LibStubGen
 from .patch import LibPatcherMultiTrap
@@ -36,10 +36,17 @@ class LibCreator(object):
     library.setup(version=version, revision=revision, type=ltype)
     return library
 
+  def _generate_fake_fd(self, name, lib_cfg):
+    if lib_cfg:
+      num_calls = lib_cfg.num_fake_calls
+    else:
+      num_calls = 0
+    return generate_fd(name, num_calls)
+
   def get_profiler(self):
     return self.profiler
 
-  def create_lib(self, info, ctx, impl=None):
+  def create_lib(self, info, ctx, impl=None, lib_cfg=None):
     name = info.get_name()
     if name.endswith('.device'):
       is_dev = True
@@ -47,9 +54,10 @@ class LibCreator(object):
       is_dev = False
     else:
       raise ValueError("create_lib: %s is neither lib nor dev!" % name)
-    # get fd
+    # get fd: either read from fd or fake one
     fd = read_lib_fd(name, self.fd_dir)
-    assert fd.is_device == is_dev
+    if fd is None:
+      fd = self._generate_fake_fd(name, lib_cfg)
     # profile?
     if self.profiler:
       profile = self.profiler.create_profile(name, fd)

@@ -1,3 +1,4 @@
+import collections
 from amitools.vamos.lib.ExecLibrary import ExecLibrary
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.lib.VamosTestDevice import VamosTestDevice
@@ -114,7 +115,7 @@ def libcore_mgr_make_profile_test():
   assert profiler.get_profile('vamostest.library') == prof
 
 
-def libcore_mgr_make_fake_test():
+def libcore_mgr_make_fake_with_fd_test():
   machine, alloc, mgr = setup()
   exec_vlib = mgr.bootstrap_exec()
   # make vamos test lib
@@ -127,6 +128,51 @@ def libcore_mgr_make_fake_test():
   assert mgr.get_vlib_by_addr(test_base) == test_vlib
   impl = test_vlib.get_impl()
   assert impl is None
+  # shutdown
+  left = mgr.shutdown()
+  assert left == 0
+  assert alloc.is_all_free()
+
+
+def libcore_mgr_make_fake_without_fd_test():
+  machine, alloc, mgr = setup()
+  exec_vlib = mgr.bootstrap_exec()
+  # make vamos test lib
+  test_vlib = mgr.make_lib_name('foo.library')
+  assert test_vlib is None
+  test_vlib = mgr.make_lib_name('foo.library', fake=True)
+  test_base = test_vlib.get_addr()
+  assert test_vlib
+  assert mgr.get_vlib_by_name('foo.library') == test_vlib
+  assert mgr.get_vlib_by_addr(test_base) == test_vlib
+  impl = test_vlib.get_impl()
+  assert impl is None
+  assert test_vlib.get_fd().get_neg_size() == 30
+  assert test_vlib.get_library().neg_size == 32
+  # shutdown
+  left = mgr.shutdown()
+  assert left == 0
+  assert alloc.is_all_free()
+
+
+def libcore_mgr_make_fake_without_fd_cfg_test():
+  machine, alloc, mgr = setup()
+  exec_vlib = mgr.bootstrap_exec()
+  # lib_cfg
+  Cfg = collections.namedtuple('Cfg', ['num_fake_calls'])
+  lib_cfg = Cfg(10)
+  # make vamos test lib
+  test_vlib = mgr.make_lib_name('foo.library', lib_cfg=lib_cfg)
+  assert test_vlib is None
+  test_vlib = mgr.make_lib_name('foo.library', fake=True, lib_cfg=lib_cfg)
+  test_base = test_vlib.get_addr()
+  assert test_vlib
+  assert mgr.get_vlib_by_name('foo.library') == test_vlib
+  assert mgr.get_vlib_by_addr(test_base) == test_vlib
+  impl = test_vlib.get_impl()
+  assert impl is None
+  assert test_vlib.get_fd().get_neg_size() == 66
+  assert test_vlib.get_library().neg_size == 68
   # shutdown
   left = mgr.shutdown()
   assert left == 0

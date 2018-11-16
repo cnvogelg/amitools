@@ -8,18 +8,20 @@ def libmgr_cfg_lib_default_test():
   assert lc.get_create_mode() == LibCfg.CREATE_MODE_AUTO
   assert lc.get_force_version() is None
   assert lc.get_expunge_mode() == LibCfg.EXPUNGE_MODE_LAST_CLOSE
+  assert lc.get_num_fake_calls() == 0
   txt = str(lc)
-  assert txt == "LibCfg(create_mode=auto, force_version=None, expunge_mode=last_close)"
+  assert txt == "LibCfg(create_mode=auto, force_version=None, expunge_mode=last_close, num_fake_calls=0)"
 
 
 def libmgr_cfg_lib_custom_test():
   lc = LibCfg(LibCfg.CREATE_MODE_OFF,
-              1, LibCfg.EXPUNGE_MODE_NO_MEM)
+              1, LibCfg.EXPUNGE_MODE_NO_MEM, 42)
   assert lc.get_create_mode() == LibCfg.CREATE_MODE_OFF
   assert lc.get_force_version() is 1
   assert lc.get_expunge_mode() == LibCfg.EXPUNGE_MODE_NO_MEM
+  assert lc.get_num_fake_calls() == 42
   txt = str(lc)
-  assert txt == "LibCfg(create_mode=off, force_version=1, expunge_mode=no_mem)"
+  assert txt == "LibCfg(create_mode=off, force_version=1, expunge_mode=no_mem, num_fake_calls=42)"
 
 
 def libmgr_cfg_lib_fail_test():
@@ -87,14 +89,16 @@ def libmgr_cfg_mgr_from_dict_default_test():
           '*.library': ConfigDict({
               'mode': 'fake',
               'version': 23,
-              'expunge': 'shutdown'
+              'expunge': 'shutdown',
+              'num_fake_calls': 1
           })
       }),
       'devs': ConfigDict({
           '*.device': ConfigDict({
               'mode': 'amiga',
               'version': 42,
-              'expunge': 'last_close'
+              'expunge': 'last_close',
+              'num_fake_calls': 2
           })
       })
   })
@@ -105,11 +109,13 @@ def libmgr_cfg_mgr_from_dict_default_test():
   assert lib_default.get_create_mode() == LibCfg.CREATE_MODE_FAKE
   assert lib_default.get_force_version() == 23
   assert lib_default.get_expunge_mode() == LibCfg.EXPUNGE_MODE_SHUTDOWN
+  assert lib_default.get_num_fake_calls() == 1
   dev_default = mgr.get_dev_default()
   assert dev_default
   assert dev_default.get_create_mode() == LibCfg.CREATE_MODE_AMIGA
   assert dev_default.get_force_version() == 42
   assert dev_default.get_expunge_mode() == LibCfg.EXPUNGE_MODE_LAST_CLOSE
+  assert dev_default.get_num_fake_calls() == 2
 
 
 def get_custom_cfg():
@@ -118,24 +124,40 @@ def get_custom_cfg():
           '*.library': ConfigDict({
               'mode': 'fake',
               'version': 23,
-              'expunge': 'shutdown'
+              'expunge': 'shutdown',
+              'num_fake_calls': 1
           }),
           'foo.library': ConfigDict({
               'mode': 'amiga',
               'version': 42,
-              'expunge': 'last_close'
+              'expunge': 'last_close',
+              'num_fake_calls': 2
+          }),
+          'libs/foo.library': ConfigDict({
+              'mode': 'vamos',
+              'version': 43,
+              'expunge': 'last_close',
+              'num_fake_calls': 10
           })
       }),
       'devs': ConfigDict({
           '*.device': ConfigDict({
               'mode': 'amiga',
               'version': 42,
-              'expunge': 'last_close'
+              'expunge': 'last_close',
+              'num_fake_calls': 3
           }),
           'bar.device': ConfigDict({
               'mode': 'fake',
               'version': 23,
-              'expunge': 'shutdown'
+              'expunge': 'shutdown',
+              'num_fake_calls': 4
+          }),
+          'devs/bar.device': ConfigDict({
+              'mode': 'vamos',
+              'version': 43,
+              'expunge': 'last_close',
+              'num_fake_calls': 11
           })
       })
   })
@@ -150,11 +172,13 @@ def libmgr_cfg_mgr_from_dict_custom_test():
   assert lib_cfg.get_create_mode() == LibCfg.CREATE_MODE_AMIGA
   assert lib_cfg.get_force_version() == 42
   assert lib_cfg.get_expunge_mode() == LibCfg.EXPUNGE_MODE_LAST_CLOSE
+  assert lib_cfg.get_num_fake_calls() == 2
   dev_cfg = mgr.get_dev_cfg('bar.device')
   assert dev_cfg
   assert dev_cfg.get_create_mode() == LibCfg.CREATE_MODE_FAKE
   assert dev_cfg.get_force_version() == 23
   assert dev_cfg.get_expunge_mode() == LibCfg.EXPUNGE_MODE_SHUTDOWN
+  assert dev_cfg.get_num_fake_calls() == 4
 
 
 def libmgr_cfg_mgr_auto_test():
@@ -166,21 +190,59 @@ def libmgr_cfg_mgr_auto_test():
   assert lib_cfg.get_create_mode() == LibCfg.CREATE_MODE_AMIGA
   assert lib_cfg.get_force_version() == 42
   assert lib_cfg.get_expunge_mode() == LibCfg.EXPUNGE_MODE_LAST_CLOSE
+  assert lib_cfg.get_num_fake_calls() == 2
   lib_default = mgr.get_cfg(['bla.library'])
   assert lib_default
   assert lib_default.get_create_mode() == LibCfg.CREATE_MODE_FAKE
   assert lib_default.get_force_version() == 23
   assert lib_default.get_expunge_mode() == LibCfg.EXPUNGE_MODE_SHUTDOWN
+  assert lib_default.get_num_fake_calls() == 1
   dev_cfg = mgr.get_cfg('bar.device')
   assert dev_cfg
   assert dev_cfg.get_create_mode() == LibCfg.CREATE_MODE_FAKE
   assert dev_cfg.get_force_version() == 23
   assert dev_cfg.get_expunge_mode() == LibCfg.EXPUNGE_MODE_SHUTDOWN
+  assert dev_cfg.get_num_fake_calls() == 4
   dev_default = mgr.get_cfg(['bla.device'])
   assert dev_default
   assert dev_default.get_create_mode() == LibCfg.CREATE_MODE_AMIGA
   assert dev_default.get_force_version() == 42
   assert dev_default.get_expunge_mode() == LibCfg.EXPUNGE_MODE_LAST_CLOSE
+  assert dev_default.get_num_fake_calls() == 3
+
+
+def libmgr_cfg_mgr_base_name_test():
+  cfg = get_custom_cfg()
+  mgr = LibMgrCfg.from_dict(cfg)
+  assert mgr
+  # fall back to 'foo.library' not the default
+  lib_cfg = mgr.get_cfg('bla/foo.library')
+  assert lib_cfg
+  assert lib_cfg.get_create_mode() == LibCfg.CREATE_MODE_AMIGA
+  assert lib_cfg.get_force_version() == 42
+  assert lib_cfg.get_expunge_mode() == LibCfg.EXPUNGE_MODE_LAST_CLOSE
+  assert lib_cfg.get_num_fake_calls() == 2
+  # use exact match
+  lib_cfg = mgr.get_cfg('libs/foo.library')
+  assert lib_cfg
+  assert lib_cfg.get_create_mode() == LibCfg.CREATE_MODE_VAMOS
+  assert lib_cfg.get_force_version() == 43
+  assert lib_cfg.get_expunge_mode() == LibCfg.EXPUNGE_MODE_LAST_CLOSE
+  assert lib_cfg.get_num_fake_calls() == 10
+  # fall back to 'bar.device' not the default
+  dev_cfg = mgr.get_cfg('baz/bar.device')
+  assert dev_cfg
+  assert dev_cfg.get_create_mode() == LibCfg.CREATE_MODE_FAKE
+  assert dev_cfg.get_force_version() == 23
+  assert dev_cfg.get_expunge_mode() == LibCfg.EXPUNGE_MODE_SHUTDOWN
+  assert dev_cfg.get_num_fake_calls() == 4
+  # use exact match
+  dev_cfg = mgr.get_cfg('devs/bar.device')
+  assert dev_cfg
+  assert dev_cfg.get_create_mode() == LibCfg.CREATE_MODE_VAMOS
+  assert dev_cfg.get_force_version() == 43
+  assert dev_cfg.get_expunge_mode() == LibCfg.EXPUNGE_MODE_LAST_CLOSE
+  assert dev_cfg.get_num_fake_calls() == 11
 
 
 def libmgr_cfg_dump_test(capsys):
@@ -190,9 +252,11 @@ def libmgr_cfg_dump_test(capsys):
   captured = capsys.readouterr()
   assert captured.out.splitlines() == [
       "libs config:",
-      "  default: LibCfg(create_mode=fake, force_version=23, expunge_mode=shutdown)",
-      "  lib 'foo.library': LibCfg(create_mode=amiga, force_version=42, expunge_mode=last_close)",
+      "  default: LibCfg(create_mode=fake, force_version=23, expunge_mode=shutdown, num_fake_calls=1)",
+      "  lib 'foo.library': LibCfg(create_mode=amiga, force_version=42, expunge_mode=last_close, num_fake_calls=2)",
+      "  lib 'libs/foo.library': LibCfg(create_mode=vamos, force_version=43, expunge_mode=last_close, num_fake_calls=10)",
       "devs config:",
-      "  default: LibCfg(create_mode=amiga, force_version=42, expunge_mode=last_close)",
-      "  dev 'bar.device': LibCfg(create_mode=fake, force_version=23, expunge_mode=shutdown)"
+      "  default: LibCfg(create_mode=amiga, force_version=42, expunge_mode=last_close, num_fake_calls=3)",
+      "  dev 'bar.device': LibCfg(create_mode=fake, force_version=23, expunge_mode=shutdown, num_fake_calls=4)",
+      "  dev 'devs/bar.device': LibCfg(create_mode=vamos, force_version=43, expunge_mode=last_close, num_fake_calls=11)"
   ]

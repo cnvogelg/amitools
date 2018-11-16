@@ -133,29 +133,31 @@ class VLibManager(object):
     self._rem_vlib(vlib)
     return True
 
-  def make_lib_name(self, name, version=0, revision=0, fake=False):
+  def make_lib_name(self, name, version=0, revision=0, fake=False,
+                    lib_cfg=None):
     date = datetime.date(day=7, month=7, year=2007)
     info = LibInfo(name, version, revision, date)
-    return self.make_lib(info, fake)
+    return self.make_lib(info, fake, lib_cfg)
 
-  def make_lib(self, lib_info, fake=False):
-    vlib = self._create_vlib(lib_info, fake)
+  def make_lib(self, lib_info, fake=False, lib_cfg=None):
+    vlib = self._create_vlib(lib_info, fake, lib_cfg)
     if vlib:
       self._add_vlib(vlib)
     return vlib
 
-  def open_lib_name(self, name, version=0, revision=0, fake=False):
+  def open_lib_name(self, name, version=0, revision=0, fake=False,
+                    lib_cfg=None):
     vlib = self.get_vlib_by_name(name)
     if not vlib:
-      vlib = self.make_lib_name(name, version, revision, fake)
+      vlib = self.make_lib_name(name, version, revision, fake, lib_cfg)
     if vlib:
       vlib.open()
     return vlib
 
-  def open_lib(self, lib_info, fake=False):
+  def open_lib(self, lib_info, fake=False, lib_cfg=None):
     vlib = self.get_vlib_by_name(name)
     if not vlib:
-      vlib = self.make_lib(lib_info, fake, is_dev)
+      vlib = self.make_lib(lib_info, fake, lib_cfg)
     if vlib:
       vlib.open()
     return vlib
@@ -164,7 +166,7 @@ class VLibManager(object):
     vlib.close()
     return self.expunge_lib(vlib)
 
-  def _create_vlib(self, lib_info, fake):
+  def _create_vlib(self, lib_info, fake, lib_cfg=None):
     # get lib ctx
     name = lib_info.get_name()
     ctx = self.ctx_map.get_ctx(name)
@@ -182,7 +184,7 @@ class VLibManager(object):
       else:
         return None
     # create lib
-    vlib = self.creator.create_lib(lib_info, ctx, impl)
+    vlib = self.creator.create_lib(lib_info, ctx, impl, lib_cfg)
     # store vlib in context
     ctx.vlib = vlib
     return vlib

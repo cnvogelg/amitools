@@ -126,7 +126,7 @@ def libmgr_mgr_open_vlib_dev_test():
   assert alloc.is_all_free()
 
 
-def libmgr_mgr_open_vlib_fake_test():
+def libmgr_mgr_open_vlib_fake_fd_test():
   machine, alloc, mgr, sp, cfg = setup()
   exec_vlib = mgr.bootstrap_exec()
   # make vamos test lib
@@ -143,6 +143,31 @@ def libmgr_mgr_open_vlib_fake_test():
   assert impl is None
   lib = test_vlib.get_library()
   assert lib.version == 40
+  mgr.close_lib(test_base)
+  # shutdown
+  left = mgr.shutdown()
+  assert left == 0
+  assert alloc.is_all_free()
+
+
+def libmgr_mgr_open_vlib_fake_no_fd_test():
+  machine, alloc, mgr, sp, cfg = setup()
+  exec_vlib = mgr.bootstrap_exec()
+  # make vamos test lib
+  cfg.add_lib_cfg('foo.library',
+                  LibCfg(create_mode=LibCfg.CREATE_MODE_FAKE,
+                         force_version=40, num_fake_calls=10))
+  test_base = mgr.open_lib('foo.library', 36)
+  assert test_base > 0
+  vmgr = mgr.vlib_mgr
+  test_vlib = vmgr.get_vlib_by_addr(test_base)
+  assert test_vlib
+  assert vmgr.get_vlib_by_name('foo.library') == test_vlib
+  impl = test_vlib.get_impl()
+  assert impl is None
+  lib = test_vlib.get_library()
+  assert lib.version == 40
+  assert lib.neg_size == 68
   mgr.close_lib(test_base)
   # shutdown
   left = mgr.shutdown()

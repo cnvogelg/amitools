@@ -27,7 +27,8 @@ class LibCfg(object):
   )
 
   def __init__(self, create_mode=None,
-               force_version=None, expunge_mode=None):
+               force_version=None, expunge_mode=None,
+               num_fake_calls=0):
     # set defaults
     if create_mode is None:
       create_mode = self.CREATE_MODE_AUTO
@@ -41,13 +42,15 @@ class LibCfg(object):
     self.create_mode = create_mode
     self.force_version = force_version
     self.expunge_mode = expunge_mode
+    self.num_fake_calls = num_fake_calls
 
   @classmethod
   def from_dict(cls, cfg):
     create_mode = cfg.mode
     force_version = cfg.version
     expunge_mode = cfg.expunge
-    return cls(create_mode, force_version, expunge_mode)
+    num_fake_calls = cfg.num_fake_calls
+    return cls(create_mode, force_version, expunge_mode, num_fake_calls)
 
   def get_create_mode(self):
     return self.create_mode
@@ -58,21 +61,27 @@ class LibCfg(object):
   def get_expunge_mode(self):
     return self.expunge_mode
 
+  def get_num_fake_calls(self):
+    return self.num_fake_calls
+
   def __eq__(self, other):
     return self.create_mode == other.create_mode and \
         self.force_version == other.force_version and \
-        self.expunge_mode == other.expunge_mode
+        self.expunge_mode == other.expunge_mode and \
+        self.num_fake_calls == other.num_fake_calls
 
   def __ne__(self, other):
     return self.create_mode != other.create_mode or \
         self.force_version != other.force_version or \
-        self.expunge_mode != other.expunge_mode
+        self.expunge_mode != other.expunge_mode or \
+        self.num_fake_calls != other.num_fake_calls
 
   def __repr__(self):
     return "LibCfg(create_mode=%s," \
-        " force_version=%s, expunge_mode=%s)" % \
+        " force_version=%s, expunge_mode=%s, num_fake_calls=%d)" % \
         (self.create_mode,
-         self.force_version, self.expunge_mode)
+         self.force_version, self.expunge_mode,
+         self.num_fake_calls)
 
 
 class LibMgrCfg(object):
@@ -147,23 +156,44 @@ class LibMgrCfg(object):
       return self.get_dev_default()
 
   def get_lib_cfg(self, name, allow_default=True):
+    # try to find given name
     if name in self.libs:
       return self.libs[name]
+    # try to find base name
+    base_name = self._get_base_name(name)
+    if base_name in self.libs:
+      return self.libs[base_name]
+    # or use default
     if allow_default:
       return self.lib_default
 
   def get_dev_cfg(self, name, allow_default=True):
+    # try to find given name
     if name in self.devs:
       return self.devs[name]
+    # try to find base name
+    base_name = self._get_base_name(name)
+    if base_name in self.devs:
+      return self.devs[base_name]
+    # or use default
     if allow_default:
       return self.dev_default
+
+  def _get_base_name(self, name):
+    pos = name.find(':')
+    if pos != -1:
+      name = name[pos+1:]
+    pos = name.rfind('/')
+    if pos != -1:
+      name = name[pos+1:]
+    return name
 
   def dump(self, write=print):
     write("libs config:")
     write("  default: %s" % self.lib_default)
-    for lib in self.libs:
+    for lib in sorted(self.libs):
       write("  lib '%s': %s" % (lib, self.libs[lib]))
     write("devs config:")
     write("  default: %s" %self.dev_default)
-    for dev in self.devs:
+    for dev in sorted(self.devs):
       write("  dev '%s': %s" % (dev, self.devs[dev]))
