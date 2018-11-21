@@ -39,6 +39,8 @@ class PathParser(Parser):
         return None
       res = []
       for key, val in in_list:
+        # replace old multi assign style with comma (,) to plus '+'
+        val = val.replace(',', '+')
         res.append(key + ":" + val)
       return res
 

@@ -29,7 +29,7 @@ def cfg_path_ini_test():
           ["home", "~"]
       ],
       "assigns": [
-          ["c", "sys:c+sc:c"],
+          ["c", "sys:c,sc:c,home:c"],
           ["libs", "sys:libs"],
           ["devs", "sys:devs"]
       ],
@@ -48,7 +48,7 @@ def cfg_path_ini_test():
           "home:~"
       ],
       "assigns": [
-          "c:sys:c+sc:c",
+          "c:sys:c+sc:c+home:c",
           "libs:sys:libs",
           "devs:sys:devs"
       ],
