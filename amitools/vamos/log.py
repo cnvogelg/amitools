@@ -42,7 +42,7 @@ loggers = [
 ]
 
 preset = {
-  log_prof : logging.INFO
+    log_prof: logging.INFO
 }
 
 # --- end ---
@@ -55,6 +55,14 @@ levels = {
     "error": logging.ERROR,
     "fatal": logging.FATAL,
     "off": OFF
+}
+levels_str = {
+    logging.DEBUG: "debug",
+    logging.INFO: "info",
+    logging.WARN: "warn",
+    logging.ERROR: "error",
+    logging.FATAL: "fatal",
+    OFF: "off"
 }
 
 
@@ -99,7 +107,7 @@ def log_setup(cfg):
     log_cfg.info("log: quiet!")
     level = logging.ERROR
   for l in loggers:
-    log_cfg.info("log: %s -> %s", l.name, level)
+    log_cfg.info("log: %s -> %s", l.name, levels_str[level])
     if l in preset:
       l.setLevel(preset[l])
     else:

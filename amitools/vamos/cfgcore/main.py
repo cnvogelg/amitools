@@ -31,6 +31,7 @@ class MainParser(object):
 
   def _patch_arg_exit(self):
     self.ap_error = None
+
     def error(this, message):
       self.ap_error = message
     self.ap.error = error.__get__(self.ap, argparse.ArgumentParser)
@@ -64,6 +65,8 @@ class MainParser(object):
     if not ok:
       return False
     # enable config debug
+    log_cfg.info("input paths: %r, args: %r, cfg_dict: %r",
+                 paths, args, cfg_dict)
     log_cfg.info("args: cfg_file=%s, skip_cfgs=%s", cfg_file, skip_cfgs)
     # read config given in args
     if cfg_file:
