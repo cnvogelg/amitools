@@ -94,6 +94,8 @@ class Resident:
   @classmethod
   def _parse_cstr(cls, access, off, base_addr):
     str_ptr = access.read_long(off)
+    if str_ptr == 0:
+      return None
     str_off = str_ptr - base_addr
     res = ""
     rom = access.rom_data

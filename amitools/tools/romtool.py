@@ -399,8 +399,14 @@ def do_scan_cmd(args):
   for off in offs:
     r = rs.get_resident(off)
     nt = r.get_node_type_str()
-    name = r.name.strip()
-    id_string = r.id_string.strip()
+    if r.name:
+      name = r.name.strip()
+    else:
+      name = '""'
+    if r.id_string:
+      id_string = r.id_string.strip()
+    else:
+      id_string = '""'
     if info:
       print("@%08x  name:       %s" % (off, name))
       spc = " " * 10
