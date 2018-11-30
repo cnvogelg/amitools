@@ -99,8 +99,8 @@ class LibFuncProfileData(object):
     n = self.num
     s = self.sum * 1000
     a = self.get_avg_delta() * 1000
-    return "%-20s  %6d calls  %10.3f ms  avg  %10.3f ms" % \
-        (name, n, s, a)
+    return "%-20s  %6d calls  %10.3f ms  avg  %10.3f ms  %s" % \
+        (name, n, s, a, self.tag)
 
 
 class LibProfileData(object):

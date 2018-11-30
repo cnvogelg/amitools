@@ -23,7 +23,7 @@ def fd_format_generate_fd_num_call_test():
   assert fd.get_max_bias() == 60
   assert fd.get_neg_size() == 66
   assert fd.get_num_indices() == 10
-  assert fd.get_func_by_index(0).get_name() == "OpenDev"
+  assert fd.get_func_by_index(0).get_name() == "_OpenDev"
   assert fd.get_func_by_index(9).get_name() == "FakeFunc_10"
 
 def fd_format_read_vamostest_lib_test():
@@ -35,17 +35,17 @@ def fd_format_read_vamostest_lib_test():
   # check entries
   tab = fd.get_index_table()
   assert len(tab) == fd.get_num_indices()
-  open_lib = fd.get_func_by_name("OpenLib")
+  open_lib = fd.get_func_by_name("_OpenLib")
   assert fd.get_func_by_index(0) == open_lib
   assert tab[0] == open_lib
   assert open_lib.get_index() == 0
   assert open_lib.get_bias() == 6
-  close_lib = fd.get_func_by_name("CloseLib")
+  close_lib = fd.get_func_by_name("_CloseLib")
   assert fd.get_func_by_index(1) == close_lib
   assert tab[1] == close_lib
   assert close_lib.get_index() == 1
   assert close_lib.get_bias() == 12
-  expunge_lib = fd.get_func_by_name("ExpungeLib")
+  expunge_lib = fd.get_func_by_name("_ExpungeLib")
   assert fd.get_func_by_index(2) == expunge_lib
   assert tab[2] == expunge_lib
   assert expunge_lib.get_index() == 2
@@ -60,17 +60,17 @@ def fd_format_read_timer_dev_test():
   # check entries
   tab = fd.get_index_table()
   assert len(tab) == fd.get_num_indices()
-  open_lib = fd.get_func_by_name("OpenDev")
+  open_lib = fd.get_func_by_name("_OpenDev")
   assert fd.get_func_by_index(0) == open_lib
   assert tab[0] == open_lib
   assert open_lib.get_index() == 0
   assert open_lib.get_bias() == 6
-  close_lib = fd.get_func_by_name("CloseDev")
+  close_lib = fd.get_func_by_name("_CloseDev")
   assert fd.get_func_by_index(1) == close_lib
   assert tab[1] == close_lib
   assert close_lib.get_index() == 1
   assert close_lib.get_bias() == 12
-  expunge_lib = fd.get_func_by_name("ExpungeDev")
+  expunge_lib = fd.get_func_by_name("_ExpungeDev")
   assert fd.get_func_by_index(2) == expunge_lib
   assert tab[2] == expunge_lib
   assert expunge_lib.get_index() == 2

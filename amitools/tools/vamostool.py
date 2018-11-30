@@ -6,7 +6,8 @@
 
 import sys
 import os
-from amitools.vamos.tools import tools_main, PathTool, TypeTool
+
+from amitools.vamos.tools import *
 
 
 def main():
@@ -16,7 +17,7 @@ def main():
       # then in home dir
       os.path.expanduser("~/.vamosrc"),
   )
-  tools = [PathTool(), TypeTool()]
+  tools = [PathTool(), TypeTool(), LibProfilerTool()]
   sys.exit(tools_main(tools, cfg_files))
 
 

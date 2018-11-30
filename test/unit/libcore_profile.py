@@ -29,7 +29,7 @@ def libcore_profile_func_data_test():
   assert func_data != func_data3
   # str
   assert func_data.dump(
-      "Foo") == "Foo                        3 calls    6000.000 ms  avg    2000.000 ms"
+      "Foo") == "Foo                        3 calls    6000.000 ms  avg    2000.000 ms  None"
 
 
 def libcore_profile_func_data_samples_test():

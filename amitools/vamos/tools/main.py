@@ -1,4 +1,4 @@
-from amitools.vamos.log import log_main, log_setup
+from amitools.vamos.log import log_main, log_setup, log_help
 from amitools.vamos.cfgcore import MainParser
 from amitools.vamos.cfg import LogParser
 
@@ -57,6 +57,10 @@ def tools_main(tools, cfg_files=None, args=None, cfg_dict=None):
         break
 
   # shutdown
-  tool.shutdown()
+  if single:
+    tool.shutdown()
+  else:
+    for tool in tools:
+      tool.shutdown()
 
   return result
