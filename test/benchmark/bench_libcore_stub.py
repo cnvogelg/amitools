@@ -2,7 +2,7 @@ from __future__ import print_function
 import logging
 import pytest
 
-from amitools.vamos.libcore import LibStubGen, LibCtx
+from amitools.vamos.libcore import LibStubGen, LibCtx, LibImplScanner
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.machine import MockMachine
 from amitools.vamos.libcore import LibProfileData
@@ -18,6 +18,8 @@ def _create_stub(do_profile=False, do_log=False):
   name = 'vamostest.library'
   impl = VamosTestLibrary()
   fd = read_lib_fd(name)
+  scanner = LibImplScanner()
+  scan = scanner.scan(name, impl, fd)
   ctx = _create_ctx()
   if do_profile:
     profile = LibProfileData(fd)
@@ -31,7 +33,7 @@ def _create_stub(do_profile=False, do_log=False):
     log_valid = None
   # create stub
   gen = LibStubGen(log_missing=log_missing, log_valid=log_valid)
-  stub = gen.gen_stub(name, impl, fd, ctx, profile)
+  stub = gen.gen_stub(scan, ctx, profile)
   return stub
 
 

@@ -216,10 +216,10 @@ class LibProfiler(Profiler):
 
   name = "libs"
 
-  def __init__(self, names=None, calls=False):
+  def __init__(self, names=None, add_calls=False):
     self.lib_profiles = {}
     self.names = names
-    self.calls = calls
+    self.add_calls = add_calls
     self.enabled = False
 
   def get_name(self):
@@ -229,7 +229,7 @@ class LibProfiler(Profiler):
     if not cfg:
       return True
     self.names = cfg.names
-    self.calls = cfg.calls
+    self.add_calls = cfg.calls
     return True
 
   def set_data(self, data_dict):
@@ -256,8 +256,8 @@ class LibProfiler(Profiler):
       self.names = []
     self.all = 'all' in self.names
     self.enabled = True
-    log_prof.debug("libs: names=%s, all=%s, calls=%s",
-                   self.names, self.all, self.calls)
+    log_prof.debug("libs: names=%s, all=%s, add_calls=%s",
+                   self.names, self.all, self.add_calls)
 
   def shutdown(self):
     for name in self.lib_profiles:
@@ -267,7 +267,7 @@ class LibProfiler(Profiler):
     if num_libs == 0:
       log_prof.warn("profiling enabled but no lib profiles found!")
 
-  def create_profile(self, lib_name, fd):
+  def create_profile(self, lib_name, fd, func_tags=None):
     """get or create a new profile for a library"""
     # profiling disabled
     if not self.enabled:
@@ -282,7 +282,7 @@ class LibProfiler(Profiler):
     elif self.all or lib_name in self.names:
       # shall we create a profile for this lib?
       log_prof.debug("libs: create '%s' -> NEW", lib_name)
-      prof = LibProfileData(fd, self.calls)
+      prof = LibProfileData(fd, self.add_calls)
       self.lib_profiles[lib_name] = prof
       return prof
     else:

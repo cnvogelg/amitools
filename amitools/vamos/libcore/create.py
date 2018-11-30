@@ -4,7 +4,7 @@ from amitools.fd import read_lib_fd, generate_fd
 from .vlib import VLib
 from .stub import LibStubGen
 from .patch import LibPatcherMultiTrap
-from .profile import LibProfiler
+from .impl import LibImplScanner
 
 
 class LibCreator(object):
@@ -46,7 +46,7 @@ class LibCreator(object):
   def get_profiler(self):
     return self.profiler
 
-  def create_lib(self, info, ctx, impl=None, lib_cfg=None):
+  def create_lib(self, info, ctx, impl=None, lib_cfg=None, check=False):
     name = info.get_name()
     if name.endswith('.device'):
       is_dev = True
@@ -58,17 +58,30 @@ class LibCreator(object):
     fd = read_lib_fd(name, self.fd_dir)
     if fd is None:
       fd = self._generate_fake_fd(name, lib_cfg)
-    # profile?
+    # if impl is available scan it
+    scan = None
+    if impl:
+      scanner = LibImplScanner()
+      if check:
+        scan = scanner.scan_checked(name, impl, fd)
+      else:
+        scan = scanner.scan(name, impl, fd)
+    # add profile?
     if self.profiler:
-      profile = self.profiler.create_profile(name, fd)
+      # get some impl information
+      if scan:
+        func_tags = scan.get_func_tags()
+      else:
+        func_tags = None
+      profile = self.profiler.create_profile(name, fd, func_tags)
     else:
       profile = None
     # create stub
-    if impl is None:
+    if scan is None:
       stub = self.stub_gen.gen_fake_stub(name, fd, ctx, profile)
       struct = LibraryStruct
     else:
-      stub = self.stub_gen.gen_stub(name, impl, fd, ctx, profile)
+      stub = self.stub_gen.gen_stub(scan, ctx, profile)
       struct = impl.get_struct_def()
     # adjust info pos/neg size
     if info.pos_size == 0:

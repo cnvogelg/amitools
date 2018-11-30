@@ -1,4 +1,4 @@
-from .impl import LibImpl, LibImplScanner
+from .impl import LibImpl, LibImplScanner, LibImplScan
 from .registry import LibRegistry
 from .ctx import LibCtx, LibCtxMap
 from .stub import LibStub, LibStubGen

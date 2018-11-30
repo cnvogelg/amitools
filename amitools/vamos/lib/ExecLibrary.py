@@ -17,9 +17,6 @@ class ExecLibrary(LibImpl):
   def get_struct_def(self):
     return ExecLibraryStruct
 
-  def is_base_lib(self):
-    return True
-
   def setup_lib(self, ctx, base_addr):
     log_exec.info("setup exec.library")
     self.lib_mgr = ctx.lib_mgr

@@ -2,9 +2,7 @@ from types import MethodType
 import time
 import traceback
 
-from .impl import LibImplScanner
-from amitools.vamos.error import VamosInternalError
-from amitools.vamos.machine.regs import *
+from amitools.vamos.machine.regs import REG_D0, REG_D1, REG_A7
 
 
 class LibStub(object):
@@ -83,35 +81,21 @@ class LibStubGen(object):
 
     return stub
 
-  def gen_stub(self, name, impl, fd, ctx, profile=None):
-    # first scan the impl
-    scanner = LibImplScanner(inc_std_funcs=True)
-    scanner.scan(impl, fd)
-    # raise an error if impl is not valid
-    num_invalid = scanner.get_num_invalid_funcs()
-    num_error = scanner.get_num_error_funcs()
-    if num_invalid > 0 and not self.ignore_invalid:
-      names = scanner.get_invalid_func_names()
-      txt = ",".join(names)
-      raise VamosInternalError(
-          "'%s' impl has %d invalid funcs: %s" % (name, num_invalid, txt))
-    if num_error > 0:
-      names = scanner.get_error_func_names()
-      txt = ",".join(names)
-      raise VamosInternalError(
-          "'%s' impl has %d error funcs: %s" % (name, num_error, txt))
-
+  def gen_stub(self, impl_scan, ctx, profile=None):
     # create stub object
+    name = impl_scan.get_name()
+    fd = impl_scan.get_fd()
+    impl = impl_scan.get_impl()
     stub = LibStub(name, fd, impl, profile)
 
     # generate valid funcs
-    valid_funcs = scanner.get_valid_funcs().values()
+    valid_funcs = impl_scan.get_valid_funcs().values()
     for fd_func, impl_method in valid_funcs:
       stub_func = self.wrap_func(fd_func, impl_method, ctx, profile)
       self._set_method(fd_func, stub, stub_func)
 
     # generate missing funcs
-    missing_funcs = scanner.get_missing_funcs().values()
+    missing_funcs = impl_scan.get_missing_funcs().values()
     for fd_func in missing_funcs:
       stub_func = self.wrap_missing_func(fd_func, ctx, profile)
       self._set_method(fd_func, stub, stub_func)

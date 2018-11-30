@@ -13,8 +13,10 @@ def libcore_patch_multi_trap_test(capsys):
   machine = MockMachine()
   ctx = LibCtx(machine)
   # create stub
+  scanner = LibImplScanner()
+  scan = scanner.scan(name, impl, fd)
   gen = LibStubGen()
-  stub = gen.gen_stub(name, impl, fd, ctx)
+  stub = gen.gen_stub(scan, ctx)
   # now patcher
   alloc = MemoryAlloc(ctx.mem)
   traps = machine.get_traps()

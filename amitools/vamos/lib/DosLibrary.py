@@ -40,9 +40,6 @@ class DosLibrary(LibImpl):
   GVF_LOCAL_ONLY        =	0x200
   GVF_BINARY_VAR	=	0x400
 
-  def is_base_lib(self):
-    return True
-
   def get_struct_def(self):
     return DosLibraryStruct
 

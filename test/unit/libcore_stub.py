@@ -2,7 +2,7 @@ from __future__ import print_function
 import logging
 import pytest
 
-from amitools.vamos.libcore import LibStubGen, LibCtx
+from amitools.vamos.libcore import LibStubGen, LibCtx, LibImplScanner
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.machine import MockMachine
 from amitools.vamos.libcore import LibProfileData
@@ -29,13 +29,13 @@ def _check_profile(fd, profile):
 def _check_log(caplog):
   assert caplog.record_tuples == [
       ('valid', logging.INFO,
-          '{ CALL:   30 PrintHello(  ) from PC=000000'),
+       '{ CALL:   30 PrintHello(  ) from PC=000000'),
       ('valid', logging.INFO,
-          '} CALL: -> d0=00000000'),
+       '} CALL: -> d0=00000000'),
       ('missing', logging.WARN,
-          '? CALL:   54 Dummy( a[d0]=00000000, b[d1]=00000000 ) from PC=000000 -> d0=0 (default)'),
+       '? CALL:   54 Dummy( a[d0]=00000000, b[d1]=00000000 ) from PC=000000 -> d0=0 (default)'),
       ('valid', logging.INFO,
-          '{ CALL:   48 Swap( a[d0]=00000000, b[d1]=00000000 ) from PC=000000'),
+       '{ CALL:   48 Swap( a[d0]=00000000, b[d1]=00000000 ) from PC=000000'),
       ('valid', logging.INFO, '} CALL: -> d0=00000000, d1=00000000')
   ]
 
@@ -43,11 +43,11 @@ def _check_log(caplog):
 def _check_log_fake(caplog):
   assert caplog.record_tuples == [
       ('missing', logging.WARN,
-          '? CALL:   30 PrintHello(  ) from PC=000000 -> d0=0 (default)'),
+       '? CALL:   30 PrintHello(  ) from PC=000000 -> d0=0 (default)'),
       ('missing', logging.WARN,
-          '? CALL:   54 Dummy( a[d0]=00000000, b[d1]=00000000 ) from PC=000000 -> d0=0 (default)'),
+       '? CALL:   54 Dummy( a[d0]=00000000, b[d1]=00000000 ) from PC=000000 -> d0=0 (default)'),
       ('missing', logging.WARN,
-          '? CALL:   48 Swap( a[d0]=00000000, b[d1]=00000000 ) from PC=000000 -> d0=0 (default)')
+       '? CALL:   48 Swap( a[d0]=00000000, b[d1]=00000000 ) from PC=000000 -> d0=0 (default)')
   ]
 
 
@@ -56,14 +56,20 @@ def _create_ctx():
   return LibCtx(machine)
 
 
-def libcore_stub_gen_base_test():
+def _create_scan():
   name = 'vamostest.library'
   impl = VamosTestLibrary()
   fd = read_lib_fd(name)
+  scanner = LibImplScanner()
+  return scanner.scan(name, impl, fd, True)
+
+
+def libcore_stub_gen_base_test():
+  scan = _create_scan()
   ctx = _create_ctx()
   # create stub
   gen = LibStubGen()
-  stub = gen.gen_stub(name, impl, fd, ctx)
+  stub = gen.gen_stub(scan, ctx)
   _check_stub(stub)
   # call func
   stub.PrintHello()
@@ -72,33 +78,29 @@ def libcore_stub_gen_base_test():
 
 
 def libcore_stub_gen_profile_test():
-  name = 'vamostest.library'
-  impl = VamosTestLibrary()
-  fd = read_lib_fd(name)
+  scan = _create_scan()
   ctx = _create_ctx()
-  profile = LibProfileData(fd)
+  profile = LibProfileData(scan.get_fd())
   # create stub
   gen = LibStubGen()
-  stub = gen.gen_stub(name, impl, fd, ctx, profile)
+  stub = gen.gen_stub(scan, ctx, profile)
   _check_stub(stub)
   # call func
   stub.PrintHello()
   stub.Dummy()
   stub.Swap()
-  _check_profile(fd, profile)
+  _check_profile(scan.get_fd(), profile)
 
 
 def libcore_stub_gen_log_test(caplog):
   caplog.set_level(logging.INFO)
-  name = 'vamostest.library'
-  impl = VamosTestLibrary()
-  fd = read_lib_fd(name)
+  scan = _create_scan()
   ctx = _create_ctx()
   log_missing = logging.getLogger('missing')
   log_valid = logging.getLogger('valid')
   # create stub
   gen = LibStubGen(log_missing=log_missing, log_valid=log_valid)
-  stub = gen.gen_stub(name, impl, fd, ctx)
+  stub = gen.gen_stub(scan, ctx)
   _check_stub(stub)
   # call func
   stub.PrintHello()
@@ -109,33 +111,29 @@ def libcore_stub_gen_log_test(caplog):
 
 def libcore_stub_gen_log_profile_test(caplog):
   caplog.set_level(logging.INFO)
-  name = 'vamostest.library'
-  impl = VamosTestLibrary()
-  fd = read_lib_fd(name)
+  scan = _create_scan()
   ctx = _create_ctx()
   log_missing = logging.getLogger('missing')
   log_valid = logging.getLogger('valid')
-  profile = LibProfileData(fd)
+  profile = LibProfileData(scan.get_fd())
   # create stub
   gen = LibStubGen(log_missing=log_missing, log_valid=log_valid)
-  stub = gen.gen_stub(name, impl, fd, ctx, profile)
+  stub = gen.gen_stub(scan, ctx, profile)
   _check_stub(stub)
   # call func
   stub.PrintHello()
   stub.Dummy()
   stub.Swap()
   _check_log(caplog)
-  _check_profile(fd, profile)
+  _check_profile(scan.get_fd(), profile)
 
 
 def libcore_stub_gen_exc_default_test():
-  name = 'vamostest.library'
-  impl = VamosTestLibrary()
-  fd = read_lib_fd(name)
+  scan = _create_scan()
   ctx = _create_ctx()
   # create stub
   gen = LibStubGen()
-  stub = gen.gen_stub(name, impl, fd, ctx)
+  stub = gen.gen_stub(scan, ctx)
   _check_stub(stub)
   # call func
   ctx.mem.w_cstr(0, 'RuntimeError')
@@ -145,23 +143,21 @@ def libcore_stub_gen_exc_default_test():
 
 def libcore_stub_gen_multi_arg(caplog):
   caplog.set_level(logging.INFO)
-  name = 'vamostest.library'
-  impl = VamosTestLibrary()
-  fd = read_lib_fd(name)
+  scan = _create_scan()
   ctx = _create_ctx()
   log_missing = logging.getLogger('missing')
   log_valid = logging.getLogger('valid')
-  profile = LibProfileData(fd)
+  profile = LibProfileData(scan.get_fd())
   # create stub
   gen = LibStubGen(log_missing=log_missing, log_valid=log_valid)
-  stub = gen.gen_stub(name, impl, fd, ctx, profile)
+  stub = gen.gen_stub(scan, ctx, profile)
   _check_stub(stub)
   # call func
   stub.PrintHello(1, 2, a=3)
   stub.Dummy(3, b='hello')
   stub.Swap('hugo', None, c=3)
   _check_log(caplog)
-  _check_profile(fd, profile)
+  _check_profile(scan.get_fd(), profile)
 
 
 def libcore_stub_gen_fake_base_test():

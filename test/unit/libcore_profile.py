@@ -217,7 +217,7 @@ def libcore_profiler_main_profiler_test():
   assert mp.add_profiler(prof)
   mp.setup()
   assert prof.names == [name]
-  assert prof.calls
+  assert prof.add_calls
   p = prof.create_profile(name, fd)
   assert p
   mp.shutdown()
