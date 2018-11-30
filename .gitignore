@@ -12,3 +12,5 @@ emu.pyd
 .pytest_cache
 .eggs
 .tox
+.idea
+.vscode
