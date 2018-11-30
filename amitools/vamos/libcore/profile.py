@@ -16,20 +16,23 @@ class LibFuncProfileData(object):
     self.sum = 0.0
     self.num = 0
     self.add_samples = add_samples
+    self.tag = None
 
   def __eq__(self, other):
     return self.func_id == other.func_id and \
         self.add_samples == other.add_samples and \
         self.deltas == other.deltas and \
         self.sum == other.sum and \
-        self.num == other.num
+        self.num == other.num and \
+        self.tag == other.tag
 
   def __ne__(self, other):
     return self.func_id != other.func_id or \
         self.add_samples != other.add_samples or \
         self.deltas != other.deltas or \
         self.sum != other.sum or \
-        self.num != other.num
+        self.num != other.num or \
+        self.tag != other.tag
 
   @classmethod
   def from_dict(cls, data_dict, add_samples=False):
@@ -39,6 +42,8 @@ class LibFuncProfileData(object):
       d.deltas = data_dict.deltas
     else:
       d.deltas = None
+    if 'tag' in data_dict:
+      d.tag = data_dict.tag
     d.sum = data_dict.sum
     d.num = data_dict.num
     return d
@@ -51,6 +56,8 @@ class LibFuncProfileData(object):
     })
     if self.deltas is not None:
       cfg['deltas'] = self.deltas
+    if self.tag:
+      cfg['tag'] = self.tag
     return cfg
 
   def count(self, delta):
@@ -78,9 +85,15 @@ class LibFuncProfileData(object):
     else:
       return 0.0
 
+  def set_tag(self, tag):
+    self.tag = tag
+
+  def get_tag(self):
+    return self.tag
+
   def __repr__(self):
-    return "LibProfileFuncData(func_id=%r,add_samples=%r):num=%r,sum=%r,deltas=%r" % \
-        (self.func_id, self.add_samples, self.num, self.sum, self.deltas)
+    return "LibProfileFuncData(func_id=%r,add_samples=%r):num=%r,sum=%r,deltas=%r,tag=%r" % \
+        (self.func_id, self.add_samples, self.num, self.sum, self.deltas, self.tag)
 
   def dump(self, name):
     n = self.num
@@ -138,7 +151,7 @@ class LibProfileData(object):
       funcs[name] = data
     return res
 
-  def setup_func_table(self, fd):
+  def setup_func_table(self, fd, func_tags=None):
     self.fd = fd
     num_func = fd.get_num_indices()
     self.func_table = []
@@ -151,6 +164,10 @@ class LibProfileData(object):
         else:
           func = LibFuncProfileData(idx, self.add_samples)
           self.func_map[name] = func
+        # add tag?
+        if func_tags and name in func_tags:
+          tag = func_tags[name]
+          func.set_tag(tag)
       else:
         func = None
       self.func_table.append(func)
@@ -216,9 +233,10 @@ class LibProfiler(Profiler):
 
   name = "libs"
 
-  def __init__(self, names=None, add_calls=False):
+  def __init__(self, names=None, add_calls=False, add_all=False):
     self.lib_profiles = {}
     self.names = names
+    self.add_all = add_all
     self.add_calls = add_calls
     self.enabled = False
 
@@ -254,15 +272,15 @@ class LibProfiler(Profiler):
   def setup(self):
     if self.names is None:
       self.names = []
-    self.all = 'all' in self.names
+    self.add_all = 'all' in self.names
     self.enabled = True
     log_prof.debug("libs: names=%s, all=%s, add_calls=%s",
-                   self.names, self.all, self.add_calls)
+                   self.names, self.add_all, self.add_calls)
 
   def shutdown(self):
     for name in self.lib_profiles:
       prof = self.lib_profiles[name]
-      prof.remove_empty()
+      # prof.remove_empty()
     num_libs = self.get_num_libs()
     if num_libs == 0:
       log_prof.warn("profiling enabled but no lib profiles found!")
@@ -277,9 +295,9 @@ class LibProfiler(Profiler):
     if lib_name in self.lib_profiles:
       log_prof.debug("libs: create '%s' -> reuse", lib_name)
       prof = self.lib_profiles[lib_name]
-      prof.setup_func_table(fd)
+      prof.setup_func_table(fd, func_tags)
       return prof
-    elif self.all or lib_name in self.names:
+    elif self.add_all or lib_name in self.names:
       # shall we create a profile for this lib?
       log_prof.debug("libs: create '%s' -> NEW", lib_name)
       prof = LibProfileData(fd, self.add_calls)

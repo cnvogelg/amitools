@@ -63,9 +63,9 @@ class LibCreator(object):
     if impl:
       scanner = LibImplScanner()
       if check:
-        scan = scanner.scan_checked(name, impl, fd)
+        scan = scanner.scan_checked(name, impl, fd, True)
       else:
-        scan = scanner.scan(name, impl, fd)
+        scan = scanner.scan(name, impl, fd, True)
     # add profile?
     if self.profiler:
       # get some impl information
