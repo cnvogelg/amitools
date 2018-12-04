@@ -186,13 +186,16 @@ def machine_machine_run_trap_unbound_test():
 
 
 def machine_machine_run_addr_exc_test():
+  # check for address exception
+  # currently disabled in musashi!
   m, cpu, mem, code, stack = create_machine()
   m.show_instr()
-  # invalid odd address!
-  rs = m.run(code+1, stack)
+  # move.l $1,d4
+  mem.w32(code, 0x28380001)
+  mem.w16(code+4, op_rts)
+  rs = m.run(code, stack)
   assert rs.done
-  assert type(rs.error) is InvalidCPUStateError
-  assert rs.error.pc == code+1
+  assert rs.error is None
   m.cleanup()
 
 

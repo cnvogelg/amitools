@@ -165,7 +165,12 @@ sourcefiles = [
 depends = [
     'musashi/pycpu.pyx',
     'musashi/pymem.pyx',
-    'musashi/pytraps.pyx'
+    'musashi/pytraps.pyx',
+    'musashi/m68k.h',
+    'musashi/m68kconf.h',
+    'musashi/m68kcpu.h',
+    'musashi/mem.h',
+    'musashi/traps.h'
 ]
 inc_dirs = [
     'musashi',
