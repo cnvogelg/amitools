@@ -49,11 +49,8 @@ class Machine(object):
 
      Machine Area
 
-     000400    RESET opcode for run nesting 0
-     000402    RESET opcode for run nesting 1
-     ...
-     0004F8    RESET opcode for run nesting 125
-     0004FC    RESET opcode for exception
+     000400    run_exit trap
+     000402    exception handling trap
 
      000500    Quick Trap 0
      000502    Quick Trap 1
@@ -69,9 +66,8 @@ class Machine(object):
   CPU_TYPE_68000 = M68K_CPU_TYPE_68000
   CPU_TYPE_68020 = M68K_CPU_TYPE_68020
 
-  run_reset_addr = 0x400
-  run_max_nesting = 126
-  reset_exvec_addr = 0x4FC
+  run_exit_addr = 0x400
+  hw_exc_addr = 0x402
   ram_begin = 0x800
   scratch_begin = 0x600
   quick_trap_begin = 0x500
@@ -103,13 +99,14 @@ class Machine(object):
     self.max_cycles = max_cycles
     self.bail_out = False
     # call init
-    self._init_cpu()
-    self._init_base_mem()
     self._setup_handler()
     self._setup_quick_traps()
+    self._init_cpu()
+    self._init_base_mem()
 
   def cleanup(self):
     """clean up after use"""
+    self._cleanup_handler()
     self._cleanup_quick_traps()
     self.cpu.cleanup()
     self.mem.cleanup()
@@ -165,25 +162,27 @@ class Machine(object):
 
   def _init_cpu(self):
     # sp and pc does not matter we will overwrite it anyway
-    self.mem.w32(0, 0x800) # init sp
-    self.mem.w32(4, 0x400) # init pc
+    self.mem.w32(0, 0x800)  # init sp
+    self.mem.w32(4, 0x400)  # init pc
     self.cpu.pulse_reset()
+    # drop supervisor
+    sr = self.cpu.r_sr()
+    sr &= ~0x2000
+    self.cpu.w_sr(sr)
 
   def _init_base_mem(self):
     m = self.mem
     # m68k exception vector table
     addr = 8
     for i in xrange(254):
-      m.w32(addr, self.reset_exvec_addr)
+      m.w32(addr, self.hw_exc_addr)
       addr += 4
-    # run reset table
-    addr = self.run_reset_addr
-    for i in xrange(self.run_max_nesting):
-      m.w16(addr, op_reset)
-      addr += 2
-    assert addr == self.reset_exvec_addr
-    # reset exc vector
-    m.w16(self.reset_exvec_addr, op_reset)
+    # run_exit trap
+    addr = self.run_exit_addr
+    m.w16(addr, self.run_exit_tid | 0xa000)
+    # hw_exc trap
+    addr = self.hw_exc_addr
+    m.w16(addr, self.hw_exc_tid | 0xa000)
 
   def _setup_handler(self):
     # reset opcode handler
@@ -192,6 +191,13 @@ class Machine(object):
     self.mem.set_invalid_func(self._invalid_mem_access)
     # set traps exception handler
     self.traps.set_exc_func(self._trap_exc_handler)
+    # allocate a trap for exit_run and hw_exception
+    self.run_exit_tid = self.traps.setup(self._run_exit_handler)
+    self.hw_exc_tid = self.traps.setup(self._hw_exc_handler)
+
+  def _cleanup_handler(self):
+    self.traps.free(self.hw_exc_tid)
+    self.traps.free(self.run_exit_tid)
 
   def _setup_quick_traps(self):
     m = self.mem
@@ -318,61 +324,67 @@ class Machine(object):
     assert len(self.run_states) > 0
     return self.run_states[-1]
 
-  def _invalid_mem_access(self, mode, width, addr):
-    log_machine.debug("invalid memory access: mode=%s width=%d addr=%06x",
-                      mode, width, addr)
+  def _run_exit_handler(self, opcode, pc):
+    """regular end of a machine run"""
+    sp = self.cpu.r_reg(REG_A7)
+    callee_pc = self.mem.r32(sp)
+    log_machine.debug("run exit: opcode=%04x, pc=%06x, sp=%06x, callee=%06x",
+                      opcode, pc, sp, callee_pc)
+    run_state = self.get_cur_run_state()
+    run_state.done = True
+    self.cpu.end()
+
+  def _terminate_run(self, error):
+    """end a machine run with error state"""
     run_state = self.get_cur_run_state()
     # already a pending error?
     if run_state.error:
       return
-    run_state.error = InvalidMemoryAccessError(mode, width, addr)
+    run_state.error = error
     run_state.done = True
     # end time slice of cpu
     self.cpu.end()
     # report error
     self.error_reporter.report_error(run_state.error)
 
+  def _invalid_mem_access(self, mode, width, addr):
+    """triggered by invalid memory access"""
+    log_machine.debug("invalid memory access: mode=%s width=%d addr=%06x",
+                      mode, width, addr)
+    error = InvalidMemoryAccessError(mode, width, addr)
+    self._terminate_run(error)
+
   def _trap_exc_handler(self, op, pc):
+    """triggerd if Python code in a trap raised a Python exception"""
     log_machine.debug("trap exception handler: op=%04x pc=%06x", op, pc)
-    run_state = self.get_cur_run_state()
     # get pending exception
     exc_info = sys.exc_info()
     if exc_info:
-      run_state.error = exc_info[1]
-    run_state.done = True
-    # end time slice of cpu
-    self.cpu.end()
-    # report error
-    self.error_reporter.report_error(run_state.error)
+      error = exc_info[1]
+    else:
+      error = RuntimeError("No exception?!")
+    self._terminate_run(error)
 
-  def _reset_opcode_handler(self):
-    run_state = self.get_cur_run_state()
+  def _hw_exc_handler(self, opcode, pc):
+    """an m68k Hardware Exception was triggered"""
     # get current pc
-    pc = self.cpu.r_pc() - 2
     sp = self.cpu.r_reg(REG_A7)
     callee_pc = self.mem.r32(sp)
-    # get current run state
-    ret_addr = run_state.ret_addr
-    log_machine.debug("reset handler: pc=%06x sp=%06x callee=%06x ret_pc=%06x",
-                      pc, sp, callee_pc, ret_addr)
-    if pc == ret_addr:
-      run_state.done = True
-      self.cpu.end()
-      return
+    log_machine.debug("hw exception: pc=%06x sp=%06x callee=%06x",
+                      pc, sp, callee_pc)
     # m68k Exception Triggered
-    elif pc == self.reset_exvec_addr:
-      sr = self.mem.r16(sp)
-      pc = self.mem.r32(sp+2)
-      txt = "m68k Exception: sr=%04x" % sr
-    # some other unexpected RESET opcode found
-    else:
-      txt = "Unexpected RESET opcode"
-    # report error
-    run_state.error = InvalidCPUStateError(pc, txt)
-    run_state.done = True
-    self.cpu.end()
-    # report error
-    self.error_reporter.report_error(run_state.error)
+    sr = self.mem.r16(sp)
+    pc = self.mem.r32(sp + 2)
+    txt = "m68k Exception: sr=%04x" % sr
+    error = InvalidCPUStateError(pc, txt)
+    self._terminate_run(error)
+
+  def _reset_opcode_handler(self):
+    """a reset opcode was encountered"""
+    pc = self.cpu.r_pc() - 2
+    txt = "Unexpected RESET opcode"
+    error = InvalidCPUStateError(pc, txt)
+    self._terminate_run(error)
 
   def get_run_nesting(self):
     return len(self.run_states)
@@ -388,8 +400,8 @@ class Machine(object):
     # current run nesting level
     nesting = len(self.run_states)
 
-    # return reset opcode for this run
-    ret_addr = self.run_reset_addr + nesting * 4
+    # return address of a run is always run_end_addr
+    ret_addr = self.run_exit_addr
 
     # get cpu context
     if nesting > 0:

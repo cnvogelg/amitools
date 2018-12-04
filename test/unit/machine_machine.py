@@ -186,6 +186,18 @@ def machine_machine_run_trap_unbound_test():
   m.cleanup()
 
 
+def machine_machine_run_reset_test():
+  m, cpu, mem, code, stack = create_machine()
+  # place a reset opcode
+  mem.w16(code, op_reset)
+  mem.w16(code+2, op_rts)
+  rs = m.run(code, stack)
+  assert rs.done
+  assert type(rs.error) is InvalidCPUStateError
+  assert rs.error.pc == code
+  m.cleanup()
+
+
 def machine_machine_run_addr_exc_test():
   # check for address exception
   # currently disabled in musashi!
