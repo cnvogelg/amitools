@@ -18,6 +18,10 @@ class LibProfilerTool(Tool):
     parser = sub.add_parser('dump',
                             help='display library function profile info')
     parser.add_argument('input', help='profile json file')
+    # missing
+    parser = sub.add_parser('missing',
+                            help='display missing library functions')
+    parser.add_argument('input', help='profile json file')
     # coverage
     parser = sub.add_parser('coverage',
                             help='display library function coverage info')
@@ -37,7 +41,9 @@ class LibProfilerTool(Tool):
     cmd = args.libprof_cmd
     if cmd == 'dump':
       return self._do_dump()
-    if cmd == 'coverage':
+    elif cmd == 'missing':
+      return self._do_missing()
+    elif cmd == 'coverage':
       return self._do_coverage(args)
     else:
       return 1
@@ -62,6 +68,14 @@ class LibProfilerTool(Tool):
   def _do_dump(self):
     self.profiler.dump()
     return 0
+
+  def _do_missing(self):
+    p = self.profiler
+    for lib_name, lib_prof in p.get_all_libs():
+      print(lib_name)
+      for func_name, func_prof in lib_prof.get_all_funcs():
+        if func_prof.tag != LibImplScan.TAG_VALID:
+          print("    ", func_name)
 
   def _do_coverage(self, args):
     print("%-40s total         valid        called" % 'library')
