@@ -78,7 +78,7 @@ def libcore_profile_data_test():
       "LIB TOTAL                  3 calls    6000.000 ms" \
       "  avg    2000.000 ms"
   prof.remove_empty()
-  assert prof.get_all_funcs() == [func_prof]
+  assert [x for x in prof.get_all_funcs()] == [(func_name, func_prof)]
   # to/from dict
   data_dict = prof.get_data()
   prof2 = LibProfileData.from_dict(data_dict)

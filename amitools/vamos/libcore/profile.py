@@ -194,11 +194,10 @@ class LibProfileData(object):
     return sorted(self.func_map.keys())
 
   def get_all_funcs(self):
-    res = []
+    """return a generator for func_name, func tuples"""
     for name in sorted(self.func_map.keys()):
       func = self.func_map[name]
-      res.append(func)
-    return res
+      yield name, func
 
   def get_total(self):
     total_calls = 0
@@ -312,6 +311,13 @@ class LibProfiler(Profiler):
 
   def get_all_lib_names(self):
     return sorted(self.lib_profiles.keys())
+
+  def get_all_libs(self):
+    """return generator for lib_name, lib tuples"""
+    lib_names = self.get_all_lib_names()
+    for lib_name in lib_names:
+      lib = self.lib_profiles[lib_name]
+      yield lib_name, lib
 
   def get_num_libs(self):
     return len(self.lib_profiles)

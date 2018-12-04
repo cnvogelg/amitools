@@ -22,6 +22,8 @@ class LibProfilerTool(Tool):
     parser = sub.add_parser('coverage',
                             help='display library function coverage info')
     parser.add_argument('input', help='profile json file')
+    parser.add_argument('-f', '--functions', action='store_true', default=False,
+                        help='show uncovered functions')
 
   def setup(self, args):
     return True
@@ -36,7 +38,7 @@ class LibProfilerTool(Tool):
     if cmd == 'dump':
       return self._do_dump()
     if cmd == 'coverage':
-      return self._do_coverage()
+      return self._do_coverage(args)
     else:
       return 1
 
@@ -61,28 +63,36 @@ class LibProfilerTool(Tool):
     self.profiler.dump()
     return 0
 
-  def _do_coverage(self):
+  def _do_coverage(self, args):
     print("%-40s total         valid        called" % 'library')
-    lib_names = self.profiler.get_all_lib_names()
-    for lib_name in lib_names:
-      lib_prof = self.profiler.get_profile(lib_name)
-      func_names = lib_prof.get_all_func_names()
-      num_valid = 0
-      num_covered = 0
-      num_total = 0
-      for func_name in func_names:
-        func_prof = lib_prof.get_func_by_name(func_name)
-        if func_prof.tag == LibImplScan.TAG_VALID:
-          num_valid += 1
-          if func_prof.num > 0:
-            num_covered += 1
-        num_total += 1
-      impl_ratio = 100.0 * num_valid / num_total
-      if num_valid > 0:
-        coverage = 100.0 * num_covered / num_valid
-      else:
-        coverage = 0.0
-      print("%-40s  %4d  %6.2f  "
-            "%4d  %6.2f  %4d" % (lib_name, num_total, impl_ratio,
-                                 num_valid, coverage, num_covered))
+    p = self.profiler
+    for lib_name, lib_prof in p.get_all_libs():
+      self._print_lib_cov(lib_name, lib_prof)
+      if args.functions:
+        self._print_funcs(lib_prof)
     return 0
+
+  def _print_lib_cov(self, lib_name, lib_prof):
+    num_valid = 0
+    num_covered = 0
+    num_total = 0
+    for _, func_prof in lib_prof.get_all_funcs():
+      if func_prof.tag == LibImplScan.TAG_VALID:
+        num_valid += 1
+        if func_prof.num > 0:
+          num_covered += 1
+      num_total += 1
+    impl_ratio = 100.0 * num_valid / num_total
+    if num_valid > 0:
+      coverage = 100.0 * num_covered / num_valid
+    else:
+      coverage = 0.0
+    print("%-40s  %4d  %6.2f  "
+          "%4d  %6.2f  %4d" % (lib_name, num_total, impl_ratio,
+                               num_valid, coverage, num_covered))
+
+  def _print_funcs(self, lib_prof):
+    for name, func_prof in lib_prof.get_all_funcs():
+      if func_prof.tag == LibImplScan.TAG_VALID:
+        if func_prof.num == 0:
+          print("   ", name)
