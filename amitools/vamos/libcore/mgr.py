@@ -59,7 +59,6 @@ class VLibManager(object):
     lib_base = vlib.get_library().get_addr()
     self.exec_lib = ExecLibrary(self.mem, lib_base)
     # store lib base
-    self.mem.w32(4, lib_base)
     self.machine.set_zero_mem(0, lib_base)
     # with exec_lib in place we can add exec's vlib
     self._add_vlib(vlib)

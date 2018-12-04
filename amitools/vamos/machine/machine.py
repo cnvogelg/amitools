@@ -44,7 +44,7 @@ class Machine(object):
      000004    PC before Reset / Later mem4
 
      000008    BEGIN Exception Vectors
-     ......    mapped to RESET @ 4FC
+     ......
      0003FC    END Exception Vectors
 
      Machine Area
@@ -88,23 +88,22 @@ class Machine(object):
     self.cpu = emu.CPU(cpu_type)
     self.mem = emu.Memory(ram_size_kib)
     self.traps = emu.Traps()
-    self.raise_on_main_run = raise_on_main_run
     # internal state
     if use_labels:
       self.label_mgr = LabelManager()
     else:
       self.label_mgr = None
+    self.raise_on_main_run = raise_on_main_run
     self.ram_total = ram_size_kib * 1024
     self.ram_bytes = self.ram_total - self.ram_begin
     self.error_reporter = ErrorReporter(self)
     self.run_states = []
-    self.mem0 = 0
-    self.mem4 = 0
     self.instr_hook = None
     self.cycles_per_run = cycles_per_run
     self.max_cycles = max_cycles
     self.bail_out = False
     # call init
+    self._init_cpu()
     self._init_base_mem()
     self._setup_handler()
     self._setup_quick_traps()
@@ -163,6 +162,12 @@ class Machine(object):
       return '68020'
     else:
       return None
+
+  def _init_cpu(self):
+    # sp and pc does not matter we will overwrite it anyway
+    self.mem.w32(0, 0x800) # init sp
+    self.mem.w32(4, 0x400) # init pc
+    self.cpu.pulse_reset()
 
   def _init_base_mem(self):
     m = self.mem
@@ -274,11 +279,8 @@ class Machine(object):
     """define the long words at memory address 0 and 4 that are written
        after a reset was performed. On Amiga typically 0 and ExecBase.
     """
-    self.mem0 = mem0
-    self.mem4 = mem4
-
-  def get_zero_mem(self):
-    return self.mem0, self.mem4
+    self.mem.w32(0, mem0)
+    self.mem.w32(4, mem4)
 
   def set_cycles_per_run(self, num):
     self.cycles_per_run = num
@@ -409,12 +411,9 @@ class Machine(object):
     # store return address on stack
     mem.w32(sp, ret_addr)
 
-    # pulse reset to setup PC, SP and restore mem0,4
-    mem.w32(0, sp)
-    mem.w32(4, pc)
-    self.cpu.pulse_reset()
-    mem.w32(0, self.mem0)
-    mem.w32(4, self.mem4)
+    # setup pc, sp
+    cpu.w_pc(pc)
+    cpu.w_reg(REG_A7, sp)
 
     # create run state for this run and push it
     run_state = RunState(name, pc, sp, ret_addr)

@@ -79,9 +79,6 @@ class SetupLibManager(object):
     self.dos_impl = self.dos_vlib.get_impl()
     self.dos_ctx.set_dos_lib(self.dos_impl)
     log_libmgr.info("open base lib: dos:  @%06x", self.dos_addr)
-    # set exec base @4
-    log_libmgr.debug("setting execbase @4")
-    self.machine.set_zero_mem(0, self.exec_addr)
 
   def close_base_libs(self):
     log_libmgr.info("closing base libs...")
