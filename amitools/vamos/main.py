@@ -119,6 +119,7 @@ def main(cfg_files=None, args=None, cfg_dict=None):
         ok = True
         exit_code = run_state.regs[REG_D0]
         log_main.info("done. exit code=%d", exit_code)
+        log_main.info("total cycles: %d", run_state.cycles)
     else:
       log_main.info(
           "vamos was stopped after %d cycles. ignoring result", machine_cfg.max_cycles)
