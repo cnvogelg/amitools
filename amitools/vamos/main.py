@@ -1,4 +1,7 @@
 import os
+import cProfile
+import StringIO
+import pstats
 
 from .cfg import VamosMainParser
 from .machine import Machine, MemoryMap
@@ -147,3 +150,30 @@ def main(cfg_files=None, args=None, cfg_dict=None):
   # exit
   log_main.info("vamos is exiting")
   return exit_code
+
+
+def main_profile(cfg_files=None, args=None, cfg_dict=None,
+                 profile_file=None, dump_profile=True):
+  """Run vamos main with profiling enabled.
+
+     Either dump profile after run or write a profile file.
+  """
+  # profile run
+  cpr = cProfile.Profile()
+  cpr.enable()
+  ret_code = main(cfg_files, args, cfg_dict)
+  cpr.disable()
+  # write file
+  cpr.dump_stats(profile_file)
+  # show profile?
+  if dump_profile:
+    sio = StringIO.StringIO()
+    sortby = 'cumulative'
+    ps = pstats.Stats(cpr, stream=sio).sort_stats(sortby)
+    ps.strip_dirs()
+    ps.print_stats()
+    txt = sio.getvalue()
+    lines = txt.split('\n')
+    for i in xrange(min(25, len(lines))):
+      print(lines[i])
+  return ret_code
