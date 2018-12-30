@@ -52,62 +52,33 @@
 #endif
 
 /* Data types used in this emulation core */
-#undef sint8
-#undef sint16
-#undef sint32
-#undef sint64
-#undef uint8
-#undef uint16
-#undef uint32
-#undef uint64
-#undef sint
-#undef uint
-
-#define sint8  signed   char			/* ASG: changed from char to signed char */
-#define sint16 signed   short
-#define sint32 signed   long
-#define uint8  unsigned char
-#define uint16 unsigned short
-#define uint32 unsigned long
-
+/* CV: use typedefs for all Musashi types */
 /* signed and unsigned int must be at least 32 bits wide */
-#define sint   signed   int
-//#define uint   unsigned int
-typedef unsigned int uint;
-
-#if M68K_USE_64_BIT
-#define sint64 signed   long long
-#define uint64 unsigned long long
-#else
-#define sint64 sint32
-#define uint64 uint32
-#endif /* M68K_USE_64_BIT */
-
-
+typedef signed int      sint;
+typedef unsigned int    uint;
 
 /* Allow for architectures that don't have 8-bit sizes */
 #if UCHAR_MAX == 0xff
+  typedef signed   char		sint8;
+  typedef unsigned char   uint8;
 	#define MAKE_INT_8(A) (sint8)(A)
 #else
-	#undef  sint8
-	#define sint8  signed   int
-	#undef  uint8
-	#define uint8  unsigned int
+  typedef signed int      sint8;
+	typedef unsigned int    uint8;
 	INLINE sint MAKE_INT_8(uint value)
 	{
 		return (value & 0x80) ? value | ~0xff : value & 0xff;
 	}
 #endif /* UCHAR_MAX == 0xff */
 
-
 /* Allow for architectures that don't have 16-bit sizes */
 #if USHRT_MAX == 0xffff
+  typedef signed   short  sint16;
+  typedef unsigned short  uint16;
 	#define MAKE_INT_16(A) (sint16)(A)
 #else
-	#undef  sint16
-	#define sint16 signed   int
-	#undef  uint16
-	#define uint16 unsigned int
+  typedef signed int      sint16;
+	typedef unsigned int    uint16;
 	INLINE sint MAKE_INT_16(uint value)
 	{
 		return (value & 0x8000) ? value | ~0xffff : value & 0xffff;
@@ -117,18 +88,25 @@ typedef unsigned int uint;
 
 /* Allow for architectures that don't have 32-bit sizes */
 #if ULONG_MAX == 0xffffffff
+  typedef signed   long   sint32;
+  typedef unsigned long   uint32;
 	#define MAKE_INT_32(A) (sint32)(A)
 #else
-	#undef  sint32
-	#define sint32  signed   int
-	#undef  uint32
-	#define uint32  unsigned int
+  typedef signed int      sint32;
+	typedef unsigned int    uint32;
 	INLINE sint MAKE_INT_32(uint value)
 	{
 		return (value & 0x80000000) ? value | ~0xffffffff : value & 0xffffffff;
 	}
 #endif /* ULONG_MAX == 0xffffffff */
 
+#if M68K_USE_64_BIT
+  typedef signed   long long  sint64;
+  typedef unsigned long long  uint64;
+#else
+  typedef sint32              sint64;
+  typedef uint32              uint64;
+#endif /* M68K_USE_64_BIT */
 
 
 
