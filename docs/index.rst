@@ -6,6 +6,7 @@ amitools Documentation
     :hidden:
 
     tools/xdftool
+    tools/rdbtool
 
 The ``amitools`` are an extensive set of command line tools and Python
 libraries that support developers when cross-developing for the Amiga
@@ -14,7 +15,8 @@ computer.
 Tools
 -----
 
-* :doc:`tools/xdftool`
+* :doc:`tools/xdftool` - disk image file tool
+* :doc:`tools/rdbtool` - disk partition tool
 
 Project Links
 -------------

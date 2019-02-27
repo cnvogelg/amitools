@@ -1,8 +1,10 @@
 .. highlight :: text
 
-##################################################
-xdftool - the universal Amiga disk image file tool
-##################################################
+#######
+xdftool
+#######
+
+*the universal Amiga disk image file tool*
 
 ************
 Introduction
@@ -17,7 +19,7 @@ extract their contents. Furthermore, you can
 * copy your own files to it
 * master own images
 * repack existing images
-* work on partitions inside RDISK/RDB hdf image
+* work on partitions inside RDISK/RDB hdf images or on real disks
 
 *****
 Usage
@@ -425,7 +427,7 @@ Example::
 ``relabel`` - Change the name of the volume
 -------------------------------------------
 
-:: 
+::
 
   relabel <new_name>
 
