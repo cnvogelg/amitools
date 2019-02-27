@@ -93,7 +93,6 @@ class ImageFile:
         fh.write(block)
       fh.close()
 
-
 # --- mini test ---
 if __name__ == '__main__':
   import sys

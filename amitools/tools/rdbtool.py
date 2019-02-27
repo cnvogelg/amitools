@@ -185,18 +185,45 @@ class OpenCommand(Command):
     # make sure image file exists
     if not os.path.exists(file_name):
       raise IOError("Image File not found: '%s'" % file_name)
-    # open existing raw block device
-    blkdev = RawBlockDevice(file_name, self.args.read_only)
-    blkdev.open()
-    # try to guess geometry
-    geo = DiskGeometry()
-    num_blocks = blkdev.num_blocks
-    block_bytes = blkdev.block_bytes
+    # parse opts
     opts = KeyValue.parse_key_value_strings(self.opts)
-    if geo.detect(num_blocks * block_bytes, opts) == None:
+    # is a block size given in options? if yes then enforce it
+    bs = 512
+    opts_bs = self._get_opts_block_size(opts)
+    if opts_bs:
+      bs = opts_bs
+    # setup initial raw block dev with default block size
+    blkdev = RawBlockDevice(file_name, self.args.read_only, block_bytes=bs)
+    blkdev.open()
+    # if no bs was given in options then try to find out block size
+    # from an existing rdb
+    if not opts_bs:
+      rd = RDisk(blkdev)
+      bs = rd.peek_block_size()
+      # real block size differs: re-open dev with correct size
+      if bs and bs != blkdev.block_bytes:
+        blkdev.close()
+        blkdev = RawBlockDevice(file_name, self.args.read_only,
+                                block_bytes=bs)
+        blkdev.open()
+    # try to guess geometry
+    file_size = blkdev.num_blocks * blkdev.block_bytes
+    geo = DiskGeometry(block_bytes=bs)
+    if not geo.detect(file_size, opts):
       raise IOError("Can't detect geometry of disk: '%s'" % file_name)
+    # make sure block size is still the same
+    if geo.block_bytes != bs:
+      raise IOError("Invalid geo block size chosen: %d" % geo.block_bytes)
+    # keep geo
     blkdev.geo = geo
     return blkdev
+
+  def _get_opts_block_size(self, opts):
+    if opts and 'bs' in opts:
+      bs = int(opts['bs'])
+      if bs % 512 != 0 or bs < 512:
+        raise IOError("Invalid block size given!")
+      return bs
 
 # --- Create new RDISK device/image ---
 
@@ -209,19 +236,18 @@ class CreateCommand(Command):
       raise IOError("Image File already exists: '%s'" % file_name)
     # make sure size is given
     if len(self.opts) < 1:
-      print("Usage: create ( size=<n> | chs=<c,h,s> )")
+      print("Usage: create ( size=<n> | chs=<c,h,s> ) [bs=<n>]")
       return None
     # determine disk geometry
     opts = KeyValue.parse_key_value_strings(self.opts)
     geo = DiskGeometry()
-    if geo.setup(opts) == None:
+    if not geo.setup(opts):
       raise IOError("Can't set geometry of disk: '%s'" % file_name)
-    else:
-      # create new empty image file for geometry
-      blkdev = RawBlockDevice(file_name)
-      blkdev.create(geo.get_num_blocks())
-      blkdev.geo = geo
-      return blkdev
+    # create new empty image file for geometry
+    blkdev = RawBlockDevice(file_name, block_bytes=geo.block_bytes)
+    blkdev.create(geo.get_num_blocks())
+    blkdev.geo = geo
+    return blkdev
 
 # --- Init existing disk image ---
 
