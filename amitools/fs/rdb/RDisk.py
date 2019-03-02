@@ -371,7 +371,9 @@ class RDisk:
       if hasattr(dos_env, key):
         setattr(dos_env, key, int(p[1]))
 
-  def add_partition(self, drv_name, cyl_range, dev_flags=0, flags=0, dos_type=DosType.DOS0, boot_pri=0, more_dos_env=None):
+  def add_partition(self, drv_name, cyl_range, dev_flags=0, flags=0,
+                    dos_type=DosType.DOS0, boot_pri=0, more_dos_env=None,
+                    fs_block_size=None):
     # cyl range is not free anymore or invalid
     if not self.check_cyl_range(*cyl_range):
       return False
@@ -384,6 +386,12 @@ class RDisk:
     self._update_hi_blk()
     # crete a new parttion block
     pb = PartitionBlock(self.rawblk, blk_num)
+    # setup fs block size (may be multiple sectors)
+    if not fs_block_size:
+      fs_block_size = self.block_bytes
+    sec_per_blk = int(fs_block_size / self.block_bytes)
+    if sec_per_blk < 1 or sec_per_blk > 16:
+      raise IOError("Invalid sec_per_blk: " + sec_per_blk)
     # block size in longs
     bsl = self.block_bytes >> 2
     # setup dos env
@@ -391,7 +399,7 @@ class RDisk:
     blk_per_trk = self.rdb.phy_drv.secs
     dos_env = PartitionDosEnv(low_cyl=cyl_range[0], high_cyl=cyl_range[1], surfaces=heads,
                               blk_per_trk=blk_per_trk, dos_type=dos_type, boot_pri=boot_pri,
-                              block_size=bsl)
+                              block_size=bsl, sec_per_blk=sec_per_blk)
     self._adjust_dos_env(dos_env, more_dos_env)
     pb.create(drv_name, dos_env, flags=flags)
     pb.write()
@@ -415,7 +423,9 @@ class RDisk:
     self.parts.append(p)
     return True
 
-  def change_partition(self, pid, drv_name=None, dev_flags=None, dos_type=None, flags=None, boot_pri=None, more_dos_env=None):
+  def change_partition(self, pid, drv_name=None, dev_flags=None,
+                       dos_type=None, flags=None, boot_pri=None,
+                       more_dos_env=None, fs_block_size=None):
     # partition not found
     if pid < 0 or pid >= len(self.parts):
       return False
@@ -441,6 +451,12 @@ class RDisk:
     if boot_pri != None:
       pb.dos_env.boot_pri = boot_pri
       dirty = True
+    # change fs block size
+    if fs_block_size:
+      sec_per_blk = int(fs_block_size / self.block_bytes)
+      if sec_per_blk < 1 or sec_per_blk > 16:
+        raise IOError("Invalid sec_per_blk: " + sec_per_blk)
+      ph.dos_env.sec_per_blk = sec_per_blk
     # update dos env
     if more_dos_env is not None:
       self._adjust_dos_env(pb.dos_env, more_dos_env)

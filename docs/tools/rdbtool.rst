@@ -113,6 +113,8 @@ disks you may want to increase the block size to 1024, 2048, or 4096. Use the
 
   > rdbtool create size=32Gi bs=4096
 
+.. note:: Amigas only support RDBs with a 512 byte block size!
+
 
 ``open`` - Open existing image for processing
 ---------------------------------------------
@@ -149,6 +151,8 @@ the ``open`` command. This is useful if you want to overwrite an existing RDB
 with a different block size on a disk::
 
   > rdbtool /dev/disk1 open bs=4096 + init
+
+.. note:: Amigas only support RDBs with a 512 byte block size!
 
 
 Inspect the Partition Layout
@@ -227,7 +231,7 @@ option to set the number of cylinders to reserve for RDB::
 
   add  <size> [ name=<name> ] [ dostype|fs=<dostag> ]
               [ bootable[=true|false] ] [ pri=<priority> ]
-              [ automount=true|false ]
+              [ automount=true|false ] [ bs=<n> ]
 
 This command creates a new partition.
 
@@ -275,6 +279,11 @@ Additionally you can select the boot priority with ``pri=<n>``::
 
   > rdbtool test.img add size=10% bootable pri=10
 
+The ``bs`` option allows you to specify the block size of the file system.
+By default ``rdbtool`` uses the block size of the RDB parition itself, e.g.
+512. The file system block size must be a multiple of the parition block
+size, e.g. 1024, 2048, 4096, or 8192.
+
 
 ``change`` - Modify parameters of an existing partition
 -------------------------------------------------------
@@ -283,12 +292,14 @@ Additionally you can select the boot priority with ``pri=<n>``::
 
   change <id>  [ name=<name> ] [ dostype|fs=<dostag> ]
                [ bootable[=true|false] ] [ pri=<priority> ]
-               [ automount=true|false ]
+               [ automount=true|false ] [ bs=<n> ]
 
 The ``<id>`` is the number of the paritition as given in the ``info`` command.
 You can also use the device name to select a partition::
 
   > rdbtool test.img change 0 name=CH0 bootable=true
+
+For options see the ``add`` command.
 
 
 ``free`` - Show free cylinder range in partition layout
@@ -311,7 +322,9 @@ command will return nothing.
 
 ::
 
-  fill
+  fill [ name=<name> ] [ dostype|fs=<dostag> ]
+       [ bootable[=true|false] ] [ pri=<priority> ]
+       [ automount=true|false ] [ bs=<n> ]
 
 This command takes the free space in a partition layout and creates a new
 partition that fills this space.
@@ -327,6 +340,8 @@ calculating the size of the final partition::
   # create 2 partitions with 50% size each
   > rdbtool test.img init + add size=50% + fill
   > rdbtool test.img init + add size=10% + add size=20% + fill
+
+For options see the ``add`` command.
 
 
 ``delete`` - Delete an existing partition

@@ -361,6 +361,14 @@ class PartEditCommand(Command):
     else:
       return None
 
+  def get_fs_block_size(self, empty=False):
+    if self.popts.has_key('bs'):
+      return int(self.popts['bs'])
+    elif not empty:
+      return 512
+    else:
+      return None
+
   def get_flags(self, empty=False, old_flags=0):
     flags = 0
     bootable = self.get_bootable(empty=empty)
@@ -457,9 +465,12 @@ class AddCommand(PartEditCommand):
     flags = self.get_flags()
     boot_pri = self.get_boot_pri()
     more_dos_env = self.get_more_dos_env()
+    fs_bs = self.get_fs_block_size(empty=True)
     print("creating: '%s' %s %s" % (drv_name, lo_hi, num_to_tag_str(dostype)))
     # add partition
-    if rdisk.add_partition(drv_name, lo_hi, dos_type=dostype, flags=flags, boot_pri=boot_pri, more_dos_env=more_dos_env):
+    if rdisk.add_partition(drv_name, lo_hi, dos_type=dostype, flags=flags,
+                           boot_pri=boot_pri, more_dos_env=more_dos_env,
+                           fs_block_size=fs_bs):
       return 0
     else:
       print("ERROR: creating partition: '%s': %s" % (drv_name, lo_hi))
@@ -478,9 +489,13 @@ class ChangeCommand(PartEditCommand):
         drv_name = self.get_drv_name(empty=True)
         flags = self.get_flags(empty=True, old_flags=p.get_flags())
         boot_pri = self.get_boot_pri(empty=True)
+        fs_bs = self.get_fs_block_size(empty=True)
         more_dos_env = self.get_more_dos_env()
         # change partition
-        if rdisk.change_partition(p.num, drv_name=drv_name, dos_type=dostype, flags=flags, boot_pri=boot_pri, more_dos_env=more_dos_env):
+        if rdisk.change_partition(p.num, drv_name=drv_name, dos_type=dostype, 
+                                  flags=flags, boot_pri=boot_pri,
+                                  more_dos_env=more_dos_env,
+                                  fs_block_size=fs_bs):
           return 0
         else:
           print("ERROR: changing partition: '%s'" % (drv_name))
@@ -579,9 +594,15 @@ class FillCommand(PartEditCommand):
       if dostype == None:
         print("ERROR: invalid dostype given!")
         return 1
+      flags = self.get_flags()
+      boot_pri = self.get_boot_pri()
+      more_dos_env = self.get_more_dos_env()
+      fs_bs = self.get_fs_block_size(empty=True)
       print("creating: '%s' %s %s" % (drv_name, lo_hi, num_to_tag_str(dostype)))
       # add partition
-      if not rdisk.add_partition(drv_name, lo_hi, dos_type=dostype):
+      if not rdisk.add_partition(drv_name, lo_hi, dos_type=dostype, flags=flags,
+                                 boot_pri=boot_pri, more_dos_env=more_dos_env,
+                                 fs_block_size=fs_bs):
         print("ERROR: creating partition: '%s': %s" % (drv_name, lo_hi))
         return 1
     return 0
