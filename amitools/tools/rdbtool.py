@@ -199,13 +199,14 @@ class OpenCommand(Command):
     # from an existing rdb
     if not opts_bs:
       rd = RDisk(blkdev)
-      bs = rd.peek_block_size()
+      peek_bs = rd.peek_block_size()
       # real block size differs: re-open dev with correct size
-      if bs and bs != blkdev.block_bytes:
+      if peek_bs and peek_bs != blkdev.block_bytes:
         blkdev.close()
         blkdev = RawBlockDevice(file_name, self.args.read_only,
-                                block_bytes=bs)
+                                block_bytes=peek_bs)
         blkdev.open()
+        bs = peek_bs
     # try to guess geometry
     file_size = blkdev.num_blocks * blkdev.block_bytes
     geo = DiskGeometry(block_bytes=bs)
@@ -492,7 +493,7 @@ class ChangeCommand(PartEditCommand):
         fs_bs = self.get_fs_block_size(empty=True)
         more_dos_env = self.get_more_dos_env()
         # change partition
-        if rdisk.change_partition(p.num, drv_name=drv_name, dos_type=dostype, 
+        if rdisk.change_partition(p.num, drv_name=drv_name, dos_type=dostype,
                                   flags=flags, boot_pri=boot_pri,
                                   more_dos_env=more_dos_env,
                                   fs_block_size=fs_bs):
