@@ -6,6 +6,7 @@ amitools Documentation
     :hidden:
 
     tools/xdftool
+    tools/xdfscan
     tools/rdbtool
 
 The ``amitools`` are an extensive set of command line tools and Python
@@ -16,6 +17,7 @@ Tools
 -----
 
 * :doc:`tools/xdftool` - disk image file tool
+* :doc:`tools/xdfscan` - scan and validate multiple disk images
 * :doc:`tools/rdbtool` - disk partition tool
 
 Project Links
