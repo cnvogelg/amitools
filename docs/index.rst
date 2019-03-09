@@ -8,6 +8,7 @@ amitools Documentation
     tools/xdftool
     tools/xdfscan
     tools/rdbtool
+    tools/romtool
 
 The ``amitools`` are an extensive set of command line tools and Python
 libraries that support developers when cross-developing for the Amiga
@@ -19,6 +20,7 @@ Tools
 * :doc:`tools/xdftool` - disk image file tool
 * :doc:`tools/xdfscan` - scan and validate multiple disk images
 * :doc:`tools/rdbtool` - disk partition tool
+* :doc:`tools/romtool` - scan and edit Kickstart ROM files
 
 Project Links
 -------------
