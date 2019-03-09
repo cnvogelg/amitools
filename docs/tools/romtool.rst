@@ -198,7 +198,7 @@ You can filter the list of ROMs by specifying a query that supports wildcards
   @00f80000  +00080000  sum=54876dab  sum_off=0007ffe8  Kickstart 37.175(A3000)
   ...
 
-A list of the contained module entries is shown with the `-m` switch::
+A list of the contained module entries is shown with the ``-m`` switch::
 
   $ romtool list -r Kick*40.60* -m
   @00f80000  +00080000  sum=8f4549a5  sum_off=0007ffe8  Kickstart 40.60 (CD32 Main)
