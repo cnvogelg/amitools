@@ -15,7 +15,7 @@ cdef object trap_exc_func
 from cpython.exc cimport PyErr_Print
 
 cdef void trap_wrapper(uint opcode, uint pc, void *data):
-  cdef object py_func = <object>data;
+  cdef object py_func = <object>data
   try:
     py_func(opcode, pc)
   except:
