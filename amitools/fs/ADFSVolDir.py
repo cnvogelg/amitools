@@ -34,5 +34,6 @@ class ADFSVolDir(ADFSDir):
   def get_list_str(self, indent=0, all=False, detail=False):
     a = ADFSDir.get_list_str(self, indent=indent, all=all, detail=detail)
     a += DosType.get_dos_type_str(self.volume.get_dos_type())
+    a += " #%d" % self.block_bytes
     return a
 

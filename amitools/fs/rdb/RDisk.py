@@ -17,13 +17,29 @@ class RDisk:
     self.fs = []
     self.used_blks = []
     self.max_blks = 0
+    self.block_bytes = 0
 
-  def open(self):
-    # read RDB
+  def peek_block_size(self):
     self.rdb = RDBlock(self.rawblk)
     if not self.rdb.read():
       self.valid = False
-      return False
+      return None
+    return self.rdb.block_size
+
+  def open(self):
+    # read RDB
+    if not self.rdb:
+      self.rdb = RDBlock(self.rawblk)
+      if not self.rdb.read():
+        self.valid = False
+        return False
+
+    # check block size of rdb vs. raw block device
+    if self.rdb.block_size != self.rawblk.block_bytes:
+      raise IOError("block size mismatch: rdb=%d != device=%d" % \
+                    (self.rdb.block_size, self.rawblk.block_bytes))
+    self.block_bytes = self.rdb.block_size
+
     # create used block list
     self.used_blks = [self.rdb.blk_num]
 
@@ -66,7 +82,8 @@ class RDisk:
     return True
 
   def close(self):
-    pass
+    self.rdb = None
+    self.valid = False
 
   # ----- query -----
 
@@ -87,7 +104,8 @@ class RDisk:
     pd = self.rdb.phy_drv
     total_blks = self.get_total_blocks()
     total_bytes = self.get_total_bytes()
-    extra="heads=%d sectors=%d" % (pd.heads, pd.secs)
+    bs = self.rdb.block_size
+    extra="heads=%d sectors=%d block_size=%d" % (pd.heads, pd.secs, bs)
     res.append("PhysicalDisk:        %8d %8d  %10d  %s  %s" \
       % (0, pd.cyls-1, total_blks, ByteSize.to_byte_size_str(total_bytes), extra))
     # logical disk info
@@ -100,6 +118,9 @@ class RDisk:
     # add partitions
     for p in self.parts:
       res.append(p.get_info(logic_blks))
+      extra = p.get_extra_infos()
+      for e in extra:
+        res.append("%s%s" % (" " * 70, e))
     # add fileystems
     for f in self.fs:
       res.append(f.get_info())
@@ -137,22 +158,22 @@ class RDisk:
     cyls = ld.hi_cyl - ld.lo_cyl + 1
     return cyls * ld.cyl_blks
 
-  def get_logical_bytes(self, block_bytes=512):
-    return self.get_logical_blocks() * block_bytes
+  def get_logical_bytes(self):
+    return self.get_logical_blocks() * self.block_bytes
 
   def get_total_blocks(self):
     pd = self.rdb.phy_drv
     return pd.cyls * pd.heads * pd.secs
 
-  def get_total_bytes(self, block_bytes=512):
-    return self.get_total_blocks() * block_bytes
+  def get_total_bytes(self):
+    return self.get_total_blocks() * self.block_bytes
 
   def get_cylinder_blocks(self):
     ld = self.rdb.log_drv
     return ld.cyl_blks
 
-  def get_cylinder_bytes(self, block_bytes=512):
-    return self.get_cylinder_blocks() * block_bytes
+  def get_cylinder_bytes(self):
+    return self.get_cylinder_blocks() * self.block_bytes
 
   def get_num_partitions(self):
     return len(self.parts)
@@ -237,8 +258,10 @@ class RDisk:
     phy_drv = RDBPhysicalDrive(cyls, heads, secs)
     log_drv = RDBLogicalDrive(rdb_blk_hi=rdb_blk_hi, lo_cyl=rdb_cyls, hi_cyl=cyls-1, cyl_blks=cyl_blks, high_rdsk_blk=hi_rdb_blk)
     drv_id = RDBDriveID(disk_vendor, disk_product, disk_revision, ctrl_vendor, ctrl_product, ctrl_revision)
+    self.block_bytes = self.rawblk.block_bytes
     self.rdb = RDBlock(self.rawblk)
-    self.rdb.create(phy_drv, log_drv, drv_id, flags=flags)
+    self.rdb.create(phy_drv, log_drv, drv_id,
+                    block_size=self.block_bytes, flags=flags)
     self.rdb.write()
 
     self.used_blks = [self.rdb.blk_num]
@@ -348,7 +371,9 @@ class RDisk:
       if hasattr(dos_env, key):
         setattr(dos_env, key, int(p[1]))
 
-  def add_partition(self, drv_name, cyl_range, dev_flags=0, flags=0, dos_type=DosType.DOS0, boot_pri=0, more_dos_env=None):
+  def add_partition(self, drv_name, cyl_range, dev_flags=0, flags=0,
+                    dos_type=DosType.DOS0, boot_pri=0, more_dos_env=None,
+                    fs_block_size=None):
     # cyl range is not free anymore or invalid
     if not self.check_cyl_range(*cyl_range):
       return False
@@ -361,11 +386,20 @@ class RDisk:
     self._update_hi_blk()
     # crete a new parttion block
     pb = PartitionBlock(self.rawblk, blk_num)
+    # setup fs block size (may be multiple sectors)
+    if not fs_block_size:
+      fs_block_size = self.block_bytes
+    sec_per_blk = int(fs_block_size / self.block_bytes)
+    if sec_per_blk < 1 or sec_per_blk > 16:
+      raise IOError("Invalid sec_per_blk: " + sec_per_blk)
+    # block size in longs
+    bsl = self.block_bytes >> 2
     # setup dos env
     heads = self.rdb.phy_drv.heads
     blk_per_trk = self.rdb.phy_drv.secs
-    dos_env = PartitionDosEnv(low_cyl=cyl_range[0], high_cyl=cyl_range[1], surfaces=heads, \
-                              blk_per_trk=blk_per_trk, dos_type=dos_type, boot_pri=boot_pri)
+    dos_env = PartitionDosEnv(low_cyl=cyl_range[0], high_cyl=cyl_range[1], surfaces=heads,
+                              blk_per_trk=blk_per_trk, dos_type=dos_type, boot_pri=boot_pri,
+                              block_size=bsl, sec_per_blk=sec_per_blk)
     self._adjust_dos_env(dos_env, more_dos_env)
     pb.create(drv_name, dos_env, flags=flags)
     pb.write()
@@ -389,7 +423,9 @@ class RDisk:
     self.parts.append(p)
     return True
 
-  def change_partition(self, pid, drv_name=None, dev_flags=None, dos_type=None, flags=None, boot_pri=None, more_dos_env=None):
+  def change_partition(self, pid, drv_name=None, dev_flags=None,
+                       dos_type=None, flags=None, boot_pri=None,
+                       more_dos_env=None, fs_block_size=None):
     # partition not found
     if pid < 0 or pid >= len(self.parts):
       return False
@@ -415,6 +451,12 @@ class RDisk:
     if boot_pri != None:
       pb.dos_env.boot_pri = boot_pri
       dirty = True
+    # change fs block size
+    if fs_block_size:
+      sec_per_blk = int(fs_block_size / self.block_bytes)
+      if sec_per_blk < 1 or sec_per_blk > 16:
+        raise IOError("Invalid sec_per_blk: " + sec_per_blk)
+      ph.dos_env.sec_per_blk = sec_per_blk
     # update dos env
     if more_dos_env is not None:
       self._adjust_dos_env(pb.dos_env, more_dos_env)

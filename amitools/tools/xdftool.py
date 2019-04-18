@@ -214,7 +214,10 @@ class FormatCmd(Command):
   def init_blkdev(self, image_file):
     opts = KeyValue.parse_key_value_strings(self.opts[1:])
     f = BlkDevFactory()
-    return f.create(image_file, options=opts, force=self.args.force)
+    blkdev = f.open(image_file, options=opts, read_only=False,
+                    none_if_missing=True)
+    if not blkdev:
+      return f.create(image_file, options=opts, force=self.args.force)
 
   def init_vol(self, blkdev):
     vol = ADFSVolume(blkdev)

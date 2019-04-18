@@ -10,6 +10,7 @@ class Partition:
     self.num = num
     self.cyl_blks = cyl_blks
     self.rdisk = rdisk
+    self.block_bytes = rdisk.block_bytes
     self.part_blk = None
 
   def get_next_partition_blk(self):
@@ -43,14 +44,16 @@ class Partition:
   def dump(self):
     self.part_blk.dump()
 
+  def get_num_cyls(self):
+    p = self.part_blk
+    return p.dos_env.high_cyl - p.dos_env.low_cyl + 1
+
   def get_num_blocks(self):
     """return total number of blocks in this partition"""
-    p = self.part_blk
-    cyls = p.dos_env.high_cyl - p.dos_env.low_cyl + 1
-    return cyls * self.cyl_blks
+    return self.get_num_cyls() * self.cyl_blks
 
-  def get_num_bytes(self, block_size=512):
-    return self.get_num_blocks() * block_size
+  def get_num_bytes(self):
+    return self.get_num_blocks() * self.block_bytes
 
   def get_drive_name(self):
     return self.part_blk.drv_name
@@ -83,17 +86,29 @@ class Partition:
     dos_type = de.dos_type
     extra += DosType.num_to_tag_str(dos_type)
     extra += "/0x%04x" % dos_type
-    # max transfer
-    extra += " max_transfer=0x%x" % de.max_transfer
-    extra += " mask=0x%x" % de.mask
-    extra += " num_buffer=%d" % de.num_buffer
-    # add flags
-    flags = p.flags
-    if flags & PartitionBlock.FLAG_BOOTABLE == PartitionBlock.FLAG_BOOTABLE:
-      extra += " bootable pri=%d" % de.boot_pri
-    if flags & PartitionBlock.FLAG_NO_AUTOMOUNT == PartitionBlock.FLAG_NO_AUTOMOUNT:
-      extra += " no_automount"
     return "Partition: #%d %-06s %8d %8d  %10d  %s  %s" \
       % (self.num, name, de.low_cyl, de.high_cyl, part_blks, ByteSize.to_byte_size_str(part_bytes), extra)
 
-
+  def get_extra_infos(self):
+    result = []
+    p = self.part_blk
+    de = p.dos_env
+    # layout
+    result.append("blk_longs=%d, sec/blk=%d, surf=%d, blk/trk=%d" % \
+                  (de.block_size, de.sec_per_blk, de.surfaces, de.blk_per_trk))
+    result.append("fs_block_size=%d" % (de.block_size * 4 * de.sec_per_blk))
+    # max transfer
+    result.append("max_transfer=0x%x" % de.max_transfer)
+    result.append("mask=0x%x" % de.mask)
+    result.append("num_buffer=%d" % de.num_buffer)
+    # add flags
+    flags = p.flags
+    if flags & PartitionBlock.FLAG_BOOTABLE == PartitionBlock.FLAG_BOOTABLE:
+      result.append("bootable pri=%d" % de.boot_pri)
+    else:
+      result.append("not bootable")
+    if flags & PartitionBlock.FLAG_NO_AUTOMOUNT == PartitionBlock.FLAG_NO_AUTOMOUNT:
+      result.append("no automount")
+    else:
+      result.append("automount")
+    return result

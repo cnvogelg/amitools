@@ -29,8 +29,8 @@ class RawBlockDevice(BlockDevice):
   def close(self):
     self.img_file.close()
 
-  def read_block(self, blk_num):
-    return self.img_file.read_blk(blk_num)
+  def read_block(self, blk_num, num_blks=1):
+    return self.img_file.read_blk(blk_num, num_blks)
 
-  def write_block(self, blk_num, data):
-    self.img_file.write_blk(blk_num, data)
+  def write_block(self, blk_num, data, num_blks=1):
+    self.img_file.write_blk(blk_num, data, num_blks)

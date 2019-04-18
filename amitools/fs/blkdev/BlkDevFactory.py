@@ -76,12 +76,24 @@ class BlkDevFactory:
     else:
       return None
 
-  def open(self, img_file, read_only=False, options=None, fobj=None):
+  def _get_block_size(self, options):
+    if options and 'bs' in options:
+      bs = int(options['bs'])
+      if bs % 512 != 0 and bs < 512:
+        raise ValueError("invalid block size given: %d" % bs)
+      return bs
+    else:
+      return 512
+
+  def open(self, img_file, read_only=False, options=None, fobj=None,
+           none_if_missing=False):
     """open an existing image file"""
     # file base check
     if fobj is None:
       # make sure image file exists
       if not os.path.exists(img_file):
+        if none_if_missing:
+          return None
         raise IOError("image file not found")
       # is readable?
       if not os.access(img_file, os.R_OK):
@@ -107,22 +119,32 @@ class BlkDevFactory:
     t = self.detect_type(img_file, fobj, options)
     if t == None:
       raise IOError("can't detect type of image file")
+    # get block size
+    bs = self._get_block_size(options)
     # create blkdev
     if t == self.TYPE_ADF:
       blkdev = ADFBlockDevice(img_file, read_only, fobj=fobj)
       blkdev.open()
     elif t == self.TYPE_HDF:
       # detect geometry
-      geo = DiskGeometry()
+      geo = DiskGeometry(block_bytes=bs)
       if not geo.detect(size, options):
         raise IOError("can't detect geometry of HDF image file")
-      blkdev = HDFBlockDevice(img_file, read_only, fobj=fobj)
+      blkdev = HDFBlockDevice(img_file, read_only, fobj=fobj, block_size=bs)
       blkdev.open(geo)
     else:
-      rawdev = RawBlockDevice(img_file, read_only, fobj=fobj)
+      rawdev = RawBlockDevice(img_file, read_only, fobj=fobj, block_bytes=bs)
       rawdev.open()
-      # create rdisk instance
+      # check block size stored in rdb
       rdisk = RDisk(rawdev)
+      rdb_bs = rdisk.peek_block_size()
+      if rdb_bs != bs:
+        # adjust block size and re-open
+        rawdev.close()
+        bs = rdb_bs
+        rawdev = RawBlockDevice(img_file, read_only, fobj=fobj, block_bytes=bs)
+        rawdev.open()
+        rdisk = RDisk(rawdev)
       if not rdisk.open():
         raise IOError("can't open rdisk of image file")
       # determine partition
@@ -151,6 +173,8 @@ class BlkDevFactory:
       raise IOError("can't detect type of image file")
     if t == self.TYPE_RDISK:
       raise IOError("can't create rdisk. use rdbtool first")
+    # get block size
+    bs = self._get_block_size(options)
     # create blkdev
     if t == self.TYPE_ADF:
       blkdev = ADFBlockDevice(img_file, fobj=fobj)
@@ -160,7 +184,7 @@ class BlkDevFactory:
       geo = DiskGeometry()
       if not geo.setup(options):
         raise IOError("can't determine geometry of HDF image file")
-      blkdev = HDFBlockDevice(img_file, fobj=fobj)
+      blkdev = HDFBlockDevice(img_file, fobj=fobj, block_size=bs)
       blkdev.create(geo)
     return blkdev
 
