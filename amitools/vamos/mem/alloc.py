@@ -50,7 +50,7 @@ class MemoryAlloc:
     if addr == 0:
       addr = 4
       size -= 4
-
+      
     self.mem = mem
     self.addr = addr
     self.size = size
@@ -297,7 +297,7 @@ class MemoryAlloc:
 
   # memory
   def alloc_memory(self, name, size, add_label=True, except_on_failure=True):
-    addr = self.alloc_mem(size, except_on_failure)
+    addr = self.alloc_mem(int(size), except_on_failure)
     if addr == 0:
       return None
     if add_label and self.label_mgr is not None:
