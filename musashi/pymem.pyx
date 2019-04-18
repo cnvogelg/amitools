@@ -249,17 +249,17 @@ cdef class Memory:
 
   # memory access (RAM only!)
   cpdef r8(self, uint addr):
-    cdef uint val;
+    cdef uint val
     if mem_ram_r8(addr, &val):
       self._raise_ram_error(addr, 'R', 0)
     return val
   cpdef r16(self, uint addr):
-    cdef uint val;
+    cdef uint val
     if mem_ram_r16(addr, &val):
       self._raise_ram_error(addr, 'R', 1)
     return val
   cpdef r32(self, uint addr):
-    cdef uint val;
+    cdef uint val
     if mem_ram_r32(addr, &val):
       self._raise_ram_error(addr, 'R', 2)
     return val
@@ -279,7 +279,7 @@ cdef class Memory:
 
   # signed memory access (RAM only!)
   cpdef r8s(self, uint addr):
-    cdef uint val;
+    cdef uint val
     if mem_ram_r8(addr, &val):
       self._raise_ram_error(addr, 'R', 0)
     # sign extend
@@ -287,7 +287,7 @@ cdef class Memory:
       val |= 0xffffff00
     return <int>(val)
   cpdef r16s(self, uint addr):
-    cdef uint val;
+    cdef uint val
     if mem_ram_r16(addr, &val):
       self._raise_ram_error(addr, 'R', 1)
     # sign extend
@@ -295,7 +295,7 @@ cdef class Memory:
       val |= 0xffff0000
     return <int>(val)
   cpdef r32s(self, uint addr):
-    cdef uint val;
+    cdef uint val
     if mem_ram_r32(addr, &val):
       self._raise_ram_error(addr, 'R', 2)
     return <int>(val)
