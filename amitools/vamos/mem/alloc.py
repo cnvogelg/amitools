@@ -50,7 +50,7 @@ class MemoryAlloc:
     if addr == 0:
       addr = 4
       size -= 4
-      
+
     self.mem = mem
     self.addr = addr
     self.size = size
@@ -180,7 +180,7 @@ class MemoryAlloc:
   def alloc_mem(self, size, except_on_fail=True):
     """allocate memory and return addr or 0 if no more memory"""
     # align size to 4 bytes
-    size = (size + 3) & ~3
+    size = int((size + 3) & ~3)
     # find best free chunk
     chunk, left = self._find_best_chunk(size)
     # out of memory?
@@ -297,7 +297,7 @@ class MemoryAlloc:
 
   # memory
   def alloc_memory(self, name, size, add_label=True, except_on_failure=True):
-    addr = self.alloc_mem(int(size), except_on_failure)
+    addr = self.alloc_mem(size, except_on_failure)
     if addr == 0:
       return None
     if add_label and self.label_mgr is not None:
