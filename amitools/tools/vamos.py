@@ -32,7 +32,7 @@ def main():
   # regular run
   else:
     ret_code = vmain(cfg_files)
-  sys.exit(ret_code)
+  if ret_code <> 0: sys.exit(ret_code)
 
 
 if __name__ == '__main__':

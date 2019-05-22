@@ -180,7 +180,7 @@ class MemoryAlloc:
   def alloc_mem(self, size, except_on_fail=True):
     """allocate memory and return addr or 0 if no more memory"""
     # align size to 4 bytes
-    size = (size + 3) & ~3
+    size = int((size + 3) & ~3)
     # find best free chunk
     chunk, left = self._find_best_chunk(size)
     # out of memory?
