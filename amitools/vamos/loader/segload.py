@@ -146,6 +146,6 @@ class SegmentLoader(object):
     # write contents to allocated memory
     for i in xrange(len(sizes)):
       # write data to segments
-      self.mem.w_block(addrs[i], datas[i])
+      self.mem.w_block(addrs[i], "".join(map(chr,datas[i])))
 
     return SegLoadInfo(seg_list, bin_img, sys_bin_file)

@@ -272,10 +272,13 @@ class AmigaStruct(object):
           val = BAddr.from_addr(int(val))
         val = val.get_baddr()
       # write value
+      if val > 2^31 - 1:
+        signed = False
+      #print "%s %d  %s %d  %s %d" %(type(width), width, type(addr), addr, type(val), val)
       if signed:
-        self._mem.writes(width, addr, val)
+        self._mem.writes(width, addr, int(val))
       else:
-        self._mem.write(width, addr, val)
+        self._mem.write(width, addr, int(val))
 
   def read_field(self, name):
     struct, field = self.get_struct_field_for_name(name)
