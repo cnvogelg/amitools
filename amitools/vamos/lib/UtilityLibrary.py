@@ -4,6 +4,8 @@ from amitools.vamos.lib.util.TagList import *
 from amitools.vamos.lib.util.AmiDate import *
 from amitools.vamos.log import *
 
+from math import trunc
+
 class UtilityLibrary(LibImpl):
 
   def UDivMod32(self, ctx):
@@ -21,13 +23,16 @@ class UtilityLibrary(LibImpl):
     divisor = ctx.cpu.r_reg(REG_D1)
     if divisor >= 0x80000000:
       divisor = divisor - 0x100000000
-    quot = dividend / divisor
-    rem  = dividend % divisor
+
+    # python modulos differs from c modulo
+    quot = trunc(float(dividend) / divisor)
+    rem  = dividend - divisor * quot
+
     if quot < 0:
       quot = quot + 0x100000000
     if rem < 0:
       rem = rem + 0x100000000
-    log_utility.info("UDivMod32(dividend=%u, divisor=%u) => (quotient=%u, remainder=%u)" % (dividend, divisor, quot, rem))
+    log_utility.info("SDivMod32(dividend=%u, divisor=%u) => (quotient=%u, remainder=%u)" % (dividend, divisor, quot, rem))
     return [quot, rem]
 
   def UMult32(self, ctx):
