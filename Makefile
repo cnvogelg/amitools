@@ -1,6 +1,6 @@
 # Makefile for musashi
 
-BUILD_DIR = dist
+BUILD_DIR = build
 DIST_DIR = dist
 
 PYTHON = python

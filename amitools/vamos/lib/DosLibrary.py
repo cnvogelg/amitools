@@ -481,10 +481,14 @@ class DosLibrary(LibImpl):
     return cli_addr
 
   def Input(self, ctx):
-    return ctx.process.this_task.access.r_s("pr_CIS") >> 2
+    inp_bptr = ctx.process.this_task.access.r_s("pr_CIS") >> 2
+    log_dos.info("Input() -> b%06x" % inp_bptr)
+    return inp_bptr
 
   def Output(self, ctx):
-    return ctx.process.this_task.access.r_s("pr_COS") >> 2
+    out_bptr = ctx.process.this_task.access.r_s("pr_COS") >> 2
+    log_dos.info("Output() -> b%06x" % out_bptr)
+    return out_bptr
 
   def SelectInput(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
@@ -832,6 +836,9 @@ class DosLibrary(LibImpl):
 
   def IsInteractive(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    log_dos.info("IsInteractive: @%06x" % fh_b_addr)
+    if fh_b_addr == 0:
+      return self.DOSFALSE
     fh = self.file_mgr.get_by_b_addr(fh_b_addr,False)
     res = fh.is_interactive()
     log_dos.info("IsInteractive(%s): %s" % (fh, res))
