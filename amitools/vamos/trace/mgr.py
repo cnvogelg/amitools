@@ -92,7 +92,7 @@ class TraceManager(object):
 
   def _get_disasm_info(self, addr):
     if not self.label_mgr:
-      return "N/A", None, None
+      return "N/A", None, None, ""
     label = self.label_mgr.get_label(addr)
     sym = None
     src = None
