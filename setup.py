@@ -31,7 +31,7 @@ print("use_cython:", use_cython)
 ext_file = 'musashi/emu.c'
 if not os.path.exists(ext_file) and not use_cython:
   print("generated cython file missing! cython is essential to proceed!")
-  print("please install with: pip install cyton")
+  print("please install with: pip install cython")
   sys.exit(1)
 
 
