@@ -6,7 +6,7 @@ from .astruct import AmigaStruct
 class FileLockStruct(AmigaStruct):
   _format = [
       ('FileLock#', 'fl_Link'),
-      ('LONG', 'fl_Key'),
+      ('ULONG', 'fl_Key'),
       ('LONG', 'fl_Access'),
       ('void*', 'fl_Task'),
       ('BPTR', 'fl_Volume')
