@@ -1,0 +1,10 @@
+#!/bin/sh
+# drun <container> <prog> [options]
+# run make inside a container
+CONTAINER="$1"
+if [ "$CONTAINER" == "" ]; then
+    echo "Usage: $0 <container> <prog> [options]"
+    exit 1
+fi
+shift
+exec docker run -t --rm -u $UID -v $PWD:$PWD -w $PWD $CONTAINER "$@"
