@@ -27,6 +27,18 @@ if '--no-cython' in sys.argv:
   sys.argv.remove('--no-cython')
 print("use_cython:", use_cython)
 
+# check cython version
+if use_cython:
+  try:
+    from Cython import __version__ as cyver
+    print("cython version:", cyver)
+    if float(cyver) < 0.25:
+      print("cython is too old < 0.25! please update first!")
+      sys.exit(1)
+  except ImportError:
+    print("cython is too old! please update first!")
+    sys.exit(1)
+
 # if generated file is missing cython is required
 ext_file = 'musashi/emu.c'
 if not os.path.exists(ext_file) and not use_cython:
@@ -237,5 +249,6 @@ setup(
     ext_modules=extensions,
     # win problems:
     #    use_scm_version=True,
-    include_package_data=True
+    include_package_data=True,
+    python_requires='~=2.7'
 )
