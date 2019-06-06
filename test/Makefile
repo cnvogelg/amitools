@@ -49,7 +49,7 @@ SLINK = $(VAMOS) -c sasc.vamosrc slink
 
 # options
 VBCC_OPTS = +aos68k -Iinclude
-GCC_OPTS  = -noixemul -Iinclude
+GCC_OPTS  = -noixemul -Iinclude -Werror
 GCC_OPTS_LIB = -ramiga-lib -fbaserel
 GCC_OPTS_LIB_RES = -ramiga-libr -resident
 AROS_GCC_OPTS = -Iinclude
