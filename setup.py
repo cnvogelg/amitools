@@ -12,6 +12,7 @@ import distutils.ccompiler as ccompiler
 from distutils.core import Command
 from distutils.dir_util import remove_tree
 from distutils import log
+from pkg_resources import parse_version
 
 # has cython?
 try:
@@ -32,7 +33,7 @@ if use_cython:
   try:
     from Cython import __version__ as cyver
     print("cython version:", cyver)
-    if float(cyver) < 0.25:
+    if parse_version(cyver) < parse_version("0.25"):
       print("cython is too old < 0.25! please update first!")
       sys.exit(1)
   except ImportError:
