@@ -11,7 +11,7 @@ int main(int argc, char *argv[])
   };
 
   if(argc != 2) {
-    Printf("Usage: %s <cmd_line>\n", argv[0]);
+    Printf("Usage: %s <cmd_line>\n", (ULONG)argv[0]);
     return 1;
   }
 

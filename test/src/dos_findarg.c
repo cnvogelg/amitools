@@ -10,7 +10,8 @@ static int test(STRPTR template, STRPTR key, LONG res)
   } else {
     msg = "FAIL";
   }
-  Printf("FindArg(%s,%s)=%ld  == %ld  %s\n", template, key, r, res, msg);
+  Printf("FindArg(%s,%s)=%ld  == %ld  %s\n",
+    (ULONG)template, (ULONG)key, r, res, (ULONG)msg);
   if(r != res) {
     return 1;
   } else {

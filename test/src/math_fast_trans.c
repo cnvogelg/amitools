@@ -17,7 +17,7 @@ struct Library *MathTransBase;
 static void print_float(STRPTR prefix, FLOAT f)
 {
   const ULONG *u = (const ULONG *)(const void *)&f;
-  Printf("%s: %08lx\n", prefix, *u);
+  Printf("%s: %08lx\n", (ULONG)prefix, *u);
 }
 
 static void test_const(void)

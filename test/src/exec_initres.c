@@ -10,7 +10,7 @@ static struct Resident *find_res(BPTR seg)
   STRPTR data = (STRPTR)(BADDR(seg)) + sizeof(BPTR);
   ULONG i;
 
-  Printf("SEG:%08lx, ADDR:%08lx, SIZE:%08lx\n", seg, data, size);
+  Printf("SEG:%08lx, ADDR:%08lx, SIZE:%08lx\n", seg, (ULONG)data, size);
   for(i=0;i<size;i+=2) {
     struct Resident *res = (struct Resident *)data;
     if(res->rt_MatchWord == RTC_MATCHWORD && res->rt_MatchTag == res) {
@@ -29,13 +29,13 @@ int main(int argc, char *argv[])
   struct Library *lib;
 
   if(argc != 2) {
-    Printf("Usage: %s <file>\n", argv[0]);
+    Printf("Usage: %s <file>\n", (ULONG)argv[0]);
     return 1;
   }
 
   seglist = LoadSeg(argv[1]);
   if(seglist == 0) {
-    Printf("No seglist found: %s\n", argv[1]);
+    Printf("No seglist found: %s\n", (ULONG)argv[1]);
     return 2;
   }
 

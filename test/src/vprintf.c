@@ -17,21 +17,21 @@ int main(int argc, char *argv[])
   Printf("int3 '%-10ld' '%-10lx'\n", a, b);
 
   /* strings */
-  Printf("str1 '%s'\n", s1);
-  Printf("str2 '%10s'\n", s1);
-  Printf("str3 '%-10s'\n", s1);
-  Printf("str4 '%2s'\n", s1);
-  Printf("str5 '%-2s'\n", s1);
+  Printf("str1 '%s'\n", (ULONG)s1);
+  Printf("str2 '%10s'\n", (ULONG)s1);
+  Printf("str3 '%-10s'\n", (ULONG)s1);
+  Printf("str4 '%2s'\n", (ULONG)s1);
+  Printf("str5 '%-2s'\n", (ULONG)s1);
 
   /* play with limit/width */
-  Printf("str6 '%10.s'\n", s1);
-  Printf("str7 '%-10.s'\n", s1);
-  Printf("str8 '%2.s'\n", s1);
-  Printf("str9 '%-2.s'\n", s1);
-  Printf("strA '%.10s'\n", s1);
-  Printf("strB '%-.10s'\n", s1);
-  Printf("strC '%.2s'\n", s1);
-  Printf("strD '%-.2s'\n", s1);
+  Printf("str6 '%10.s'\n", (ULONG)s1);
+  Printf("str7 '%-10.s'\n", (ULONG)s1);
+  Printf("str8 '%2.s'\n", (ULONG)s1);
+  Printf("str9 '%-2.s'\n", (ULONG)s1);
+  Printf("strA '%.10s'\n", (ULONG)s1);
+  Printf("strB '%-.10s'\n", (ULONG)s1);
+  Printf("strC '%.2s'\n", (ULONG)s1);
+  Printf("strD '%-.2s'\n", (ULONG)s1);
 
   Printf("strE %d %x %u # %d %x %u\n", d, d, d, d, d, d);
   Printf("strF %d %x %u # %d %x %u\n", e, e, e, e, e, e);

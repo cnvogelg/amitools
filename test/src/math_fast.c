@@ -15,12 +15,12 @@ struct Library *MathBase;
 static void print_float(STRPTR prefix, FLOAT f)
 {
   const ULONG *u = (const ULONG *)(const void *)&f;
-  Printf("%s: %08lx\n", prefix, *u);
+  Printf("%s: %08lx\n", (ULONG)prefix, *u);
 }
 
 static void print_long(STRPTR prefix, ULONG l)
 {
-  Printf("%s: %08lx\n", prefix, l);
+  Printf("%s: %08lx\n", (ULONG)prefix, l);
 }
 
 static void test_const(void)
