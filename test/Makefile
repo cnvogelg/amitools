@@ -131,7 +131,7 @@ vbcc: $(PROGS_VBCC) $(PROGS_VBCC_DBG)
 
 aros: $(PROGS_AROS) $(PROGS_AROS_DBG)
 
-sasc: $(PROGS_SASC) $(PROGS_SASC_DBG)
+sasc: $(PROGS_SASC) $(PROGS_SASC_DBG) $(LIBS_SC) $(LIBS_SC_DBG)
 
 build-docker: check gcc-docker aros-docker vbcc-docker sasc-docker
 
@@ -145,7 +145,7 @@ vbcc-docker:
 	docker/drun amiga-vbcc /usr/bin/make vbcc
 
 sasc-docker:
-	docker/drun amitools /usr/bin/make sasc VAMOS=vamos HOME=$(PWD)
+	docker/drun --dir .. amitools /usr/bin/make sasc VAMOS=vamos HOME=$(PWD)
 
 check:
 	@if [ ! -d volumes/sc ]; then \
