@@ -14,4 +14,5 @@ RUN apt-get update && \
 
 ENV PATH=/opt/m68k-aros/bin/linux-x86_64/tools/crosstools/:$PATH
 
-COPY --from=builder /opt/m68k-aros/ /opt/m68k-aros/
+COPY --from=builder /opt/m68k-aros/bin/linux-x86_64/tools/crosstools/ /opt/m68k-aros/bin/linux-x86_64/tools/crosstools/
+COPY --from=builder /opt/m68k-aros/bin/amiga-m68k/AROS/Developer/ /opt/m68k-aros/bin/amiga-m68k/AROS/Developer/
