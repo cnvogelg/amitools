@@ -19,7 +19,8 @@ int __UserLibInit(struct Library *myLib)
   myLibPtr = myLib;
 
   SysBase = *(struct ExecBase **)4L;
-  return (DOSBase=(struct DosLibrary *)OpenLibrary("dos.library",33L))!=NULL;
+  DOSBase=(struct DosLibrary *)OpenLibrary("dos.library",33L);
+  return DOSBase==NULL;
 }
 
 void __UserLibCleanup(void)
