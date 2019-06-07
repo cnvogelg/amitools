@@ -10,7 +10,7 @@ def shell_seg_endcli_test(vrun):
   check_shell_seg(vrun)
   stdin = "endcli\n"
   retcode, stdout, stderr = vrun.run_prog(
-      'sys:l/Shell-Seg', vargs=['-x'], stdin=stdin)
+      'wb:l/Shell-Seg', vargs=['-x'], stdin=stdin)
   assert retcode == 212
   assert stdout == ["\x0f0.SYS:> PROCESS 0 ENDING"]
   assert stderr == []
@@ -22,7 +22,7 @@ def shell_seg_proc_args_test(vrun, vamos):
   cmd_name = vamos.get_prog_bin_name("proc_args")
   stdin = cmd_name + "\nendcli\n"
   retcode, stdout, stderr = vrun.run_prog(
-      'sys:l/Shell-Seg', vargs=['-x'], stdin=stdin)
+      'wb:l/Shell-Seg', vargs=['-x'], stdin=stdin)
   assert retcode == 212
   assert stdout == [
       '\x0f0.SYS:> a0:NULL',
@@ -38,7 +38,7 @@ def shell_seg_run_proc_args_test(vrun, vamos):
   cmd_name = vamos.get_prog_bin_name("proc_args")
   stdin = "run " + cmd_name + "\nendcli\n"
   retcode, stdout, stderr = vrun.run_prog(
-      'sys:l/Shell-Seg', vargs=['-x'], stdin=stdin)
+      'wb:l/Shell-Seg', vargs=['-x'], stdin=stdin)
   assert retcode == 212
   assert stdout == [
       "\x0f0.SYS:> \x0f0.SYS:> PROCESS 0 ENDING"
