@@ -2,7 +2,7 @@ import pytest
 
 
 def check_shell_seg(vrun):
-  sha1 = "46f464571edf3c9c5259dfe832be3a06d564f1c5"
+  sha1 = "8609de3b11da6b5d40d375a8d383fa2513316b28"
   vrun.skip_if_prog_not_available("volumes/wb/l/Shell-Seg", sha1)
 
 
@@ -11,7 +11,7 @@ def shell_seg_endcli_test(vrun):
   stdin = "endcli\n"
   retcode, stdout, stderr = vrun.run_prog(
       'sys:l/Shell-Seg', vargs=['-x'], stdin=stdin)
-  assert retcode == 200
+  assert retcode == 212
   assert stdout == ["\x0f0.SYS:> PROCESS 0 ENDING"]
   assert stderr == []
 
@@ -23,7 +23,7 @@ def shell_seg_proc_args_test(vrun, vamos):
   stdin = cmd_name + "\nendcli\n"
   retcode, stdout, stderr = vrun.run_prog(
       'sys:l/Shell-Seg', vargs=['-x'], stdin=stdin)
-  assert retcode == 200
+  assert retcode == 212
   assert stdout == [
       '\x0f0.SYS:> a0:NULL',
       'in:"\\n"',
@@ -39,7 +39,7 @@ def shell_seg_run_proc_args_test(vrun, vamos):
   stdin = "run " + cmd_name + "\nendcli\n"
   retcode, stdout, stderr = vrun.run_prog(
       'sys:l/Shell-Seg', vargs=['-x'], stdin=stdin)
-  assert retcode == 200
+  assert retcode == 212
   assert stdout == [
       "\x0f0.SYS:> \x0f0.SYS:> PROCESS 0 ENDING"
   ]
