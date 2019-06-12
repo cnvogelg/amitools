@@ -37,19 +37,19 @@ LIB_BUILD_DIRS = $(LIB_BUILD_DIR) $(patsubst %,$(LIB_BUILD_DIR)-%,$(LIB_POSTFIXE
 # external data
 SASC_INSTALL_DIR ?= volumes/sc
 export SASC_INSTALL_DIR
-NDK_DIR ?= /opt/m68k-amigaos/m68k-amigaos/ndk
 
 # compilers
 VBCC_EXE = vc
 GCC = m68k-amigaos-gcc
 AROS_GCC = m68k-aros-gcc
 AROS_ELF2HUNK = elf2hunk
-SASC = ../bin/vamos -c sasc.vamosrc sc
-SLINK = ../bin/vamos -c sasc.vamosrc slink
+VAMOS = ../bin/vamos
+SASC = $(VAMOS) -c sasc.vamosrc sc
+SLINK = $(VAMOS) -c sasc.vamosrc slink
 
 # options
-VBCC_OPTS = +aos68k -I$(NDK_DIR)/include -Iinclude
-GCC_OPTS  = -noixemul -Iinclude
+VBCC_OPTS = +aos68k -Iinclude
+GCC_OPTS  = -noixemul -Iinclude -Werror
 GCC_OPTS_LIB = -ramiga-lib -fbaserel
 GCC_OPTS_LIB_RES = -ramiga-libr -resident
 AROS_GCC_OPTS = -Iinclude
@@ -124,6 +124,28 @@ test:
 rebuild: clean build
 
 build: check $(PROGS) $(PROGS_DBG) $(LIBS) $(LIBS_DBG)
+
+gcc: $(PROGS_GCC) $(PROGS_GCC_DBG) $(LIBS_GCC) $(LIBS_GCC_DBG)
+
+vbcc: $(PROGS_VBCC) $(PROGS_VBCC_DBG)
+
+aros: $(PROGS_AROS) $(PROGS_AROS_DBG)
+
+sasc: $(PROGS_SASC) $(PROGS_SASC_DBG) $(LIBS_SC) $(LIBS_SC_DBG)
+
+build-docker: check gcc-docker aros-docker vbcc-docker sasc-docker
+
+gcc-docker:
+	docker/drun amiga-gcc6 /usr/bin/make gcc
+
+aros-docker:
+	docker/drun m68k-aros /usr/bin/make aros
+
+vbcc-docker:
+	docker/drun amiga-vbcc /usr/bin/make vbcc
+
+sasc-docker:
+	docker/drun --dir .. amitools /usr/bin/make sasc VAMOS=vamos HOME=$(PWD)
 
 check:
 	@if [ ! -d volumes/sc ]; then \

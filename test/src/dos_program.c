@@ -9,11 +9,11 @@ int main(int argc, char *argv[])
   BOOL ok;
 
   ok = GetProgramName(buf, 255);
-  Printf("%08lx %s\n", ok, buf);
+  Printf("%08lx %s\n", ok, (ULONG)buf);
 
   lock = GetProgramDir();
   ok = Examine(lock, &fib);
-  Printf("%08lx %s\n", ok, fib.fib_FileName);
+  Printf("%08lx %s\n", ok, (ULONG)fib.fib_FileName);
 
   return 0;
 }

@@ -33,7 +33,7 @@
 
 #define ERROR_MSG \
   Printf("line %ld: csrc=%ld rdargs_in=@%08lx template='%s' input='%s'\n",\
-    __LINE__, (LONG)use_csrc, (ULONG)rdargs_in, cur_templ, cur_str); \
+    __LINE__, (LONG)use_csrc, (ULONG)rdargs_in, (ULONG)cur_templ, (ULONG)cur_str); \
 
 #define BEGIN_TEST(template, exp_error) \
   num_tests++; \
@@ -74,7 +74,7 @@
   } \
   else if(strcmp(str, val)!=0) { \
     ERROR_MSG \
-    Printf("#%ld: string mismatch: %s != %s\n", pos, str, val); \
+    Printf("#%ld: string mismatch: %s != %s\n", pos, (ULONG)str, (ULONG)val); \
     num_errors++; \
   }
 

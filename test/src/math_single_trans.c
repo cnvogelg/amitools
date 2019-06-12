@@ -22,7 +22,7 @@ BaseType *MathIeeeSingTransBase;
 static void print_float(STRPTR prefix, float f)
 {
   ULONG *u = (ULONG *)&f;
-  Printf("%s: %08lx\n", prefix, *u);
+  Printf("%s: %08lx\n", (ULONG)prefix, *u);
 }
 
 static void test_const(void)

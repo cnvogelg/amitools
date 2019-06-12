@@ -522,20 +522,20 @@ class HunkReader:
   """Read a hunk file and build internal hunk structure
      Return status and set self.error_string on failure
   """
-  def read_file(self, hfile, v37_compat=None):
+  def read_file(self, hfile):
     with open(hfile, "rb") as f:
-      return self.read_file_obj(hfile, f, v37_compat)
+      return self.read_file_obj(hfile, f)
 
   """Read a hunk from memory"""
-  def read_mem(self, name, data, v37_compat=None):
+  def read_mem(self, name, data):
     fobj = StringIO.StringIO(data)
-    return self.read_file_obj(name, fobj, v37_compat)
+    return self.read_file_obj(name, fobj)
 
-  def read_file_obj(self, hfile, f, v37_compat):
+  def read_file_obj(self, hfile, f):
     self.hunks = []
     is_first_hunk = True
+    is_exe = False
     was_end = False
-    was_potentail_v37_hunk = False
     was_overlay = False
     self.error_string = None
     lib_size = 0
@@ -573,10 +573,6 @@ class HunkReader:
         elif was_end:
           # garbage after an end tag is ignored
           return RESULT_OK
-        elif was_potentail_v37_hunk:
-          # auto fix v37 -> reread whole file
-          f.seek(0)
-          return self.read_file_obj(hfile, f, True)
         elif was_overlay:
           # seems to be a custom overlay -> read to end of file
           ov_custom_data = f.read()
@@ -587,14 +583,20 @@ class HunkReader:
           return RESULT_INVALID_HUNK_FILE
       else:
         # check for valid first hunk type
-        if is_first_hunk and not self.is_valid_first_hunk_type(hunk_type):
-          self.error_string = "No hunk file: '%s' first hunk type was %d" % (hfile, hunk_type)
-          return RESULT_NO_HUNK_FILE
+        if is_first_hunk:
+          if not self.is_valid_first_hunk_type(hunk_type):
+            self.error_string = "No hunk file: '%s' first hunk type was %d" % (hfile, hunk_type)
+            return RESULT_NO_HUNK_FILE
+          else:
+            is_exe = hunk_type == HUNK_HEADER
 
         is_first_hunk = False
         was_end = False
-        was_potentail_v37_hunk = False
         was_overlay = False
+
+        # V37 fix: in an executable DREL32 is wrongly assigned and actually is a RELOC32SHORT
+        if hunk_type == HUNK_DREL32 and is_exe:
+          hunk_type = HUNK_RELOC32SHORT
 
         hunk = { 'type' : hunk_type, 'hunk_file_offset' : hunk_file_offset }
         self.hunks.append(hunk)
@@ -607,16 +609,6 @@ class HunkReader:
           lib_size -= last_hunk_size
         if lib_size > 0:
           hunk['in_lib'] = True
-
-        # V37 fix?
-        if hunk_type == HUNK_DREL32:
-          # try to fix automatically...
-          if v37_compat == None:
-            was_potentail_v37_hunk = True
-          # fix was forced
-          elif v37_compat:
-            hunk_type = HUNK_RELOC32SHORT
-            hunk['fixes'] = 'v37'
 
         # ----- HUNK_HEADER -----
         if hunk_type == HUNK_HEADER:
@@ -633,10 +625,6 @@ class HunkReader:
           or hunk_type == HUNK_DREL32 or hunk_type == HUNK_DREL16 or hunk_type == HUNK_DREL8 \
           or hunk_type == HUNK_RELRELOC26:
           result = self.parse_reloc(f,hunk)
-          # auto fix v37 bug?
-          if hunk_type == HUNK_DREL32 and result != RESULT_OK and v37_compat == None:
-            f.seek(0)
-            return self.read_file_obj(hfile, f, True)
         # ---- HUNK_<reloc short> -----
         elif hunk_type == HUNK_RELOC32SHORT:
           result = self.parse_reloc_short(f,hunk)

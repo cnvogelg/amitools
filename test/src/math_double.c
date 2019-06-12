@@ -21,12 +21,12 @@ BaseType *MathIeeeDoubBasBase;
 static void print_double(STRPTR prefix, double d)
 {
   ULONG *u = (ULONG *)&d;
-  Printf("%s: %08lx %08lx\n", prefix, u[0], u[1]);
+  Printf("%s: %08lx %08lx\n", (ULONG)prefix, u[0], u[1]);
 }
 
 static void print_long(STRPTR prefix, ULONG l)
 {
-  Printf("%s: %08lx\n", prefix, l);
+  Printf("%s: %08lx\n", (ULONG)prefix, l);
 }
 
 static void test_const(void)

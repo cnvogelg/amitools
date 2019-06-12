@@ -8,7 +8,7 @@
 #define REG_FUNC
 #else
 #define REG(t,r)  t __asm(#r)
-#define REG_FUNC __attribute__((regparm))
+#define REG_FUNC
 #endif
 #else
 #ifdef __VBCC__

@@ -23,13 +23,13 @@ BaseType *MathIeeeDoubTransBase;
 static void print_double(STRPTR prefix, double d)
 {
   ULONG *u = (ULONG *)&d;
-  Printf("%s: %08lx %08lx\n", prefix, u[0], u[1]);
+  Printf("%s: %08lx %08lx\n", (ULONG)prefix, u[0], u[1]);
 }
 
 static void print_float(STRPTR prefix, float f)
 {
   ULONG *u = (ULONG *)&f;
-  Printf("%s: %08lx\n", prefix, *u);
+  Printf("%s: %08lx\n", (ULONG)prefix, *u);
 }
 
 static void test_const(void)

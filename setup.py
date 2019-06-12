@@ -12,6 +12,7 @@ import distutils.ccompiler as ccompiler
 from distutils.core import Command
 from distutils.dir_util import remove_tree
 from distutils import log
+from pkg_resources import parse_version
 
 # has cython?
 try:
@@ -26,6 +27,18 @@ if '--no-cython' in sys.argv:
   use_cython = False
   sys.argv.remove('--no-cython')
 print("use_cython:", use_cython)
+
+# check cython version
+if use_cython:
+  try:
+    from Cython import __version__ as cyver
+    print("cython version:", cyver)
+    if parse_version(cyver) < parse_version("0.25"):
+      print("cython is too old < 0.25! please update first!")
+      sys.exit(1)
+  except ImportError:
+    print("cython is too old! please update first!")
+    sys.exit(1)
 
 # if generated file is missing cython is required
 ext_file = 'musashi/emu.c'
@@ -237,5 +250,6 @@ setup(
     ext_modules=extensions,
     # win problems:
     #    use_scm_version=True,
-    include_package_data=True
+    include_package_data=True,
+    python_requires='~=2.7'
 )

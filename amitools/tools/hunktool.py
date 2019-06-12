@@ -94,7 +94,7 @@ class HunkCommand:
     fobj = scan_file.get_fobj()
     hunk_file = HunkReader.HunkReader()
     start = time.clock()
-    result = hunk_file.read_file_obj(path,fobj,None)
+    result = hunk_file.read_file_obj(path,fobj)
     end = time.clock()
     delta = end - start
     # ignore non hunk files

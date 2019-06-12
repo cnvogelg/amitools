@@ -1,5 +1,6 @@
 #include <proto/testnix.h>
 #include <proto/exec.h>
+#include <proto/dos.h>
 
 struct Library *TestNixBase;
 

@@ -1,0 +1,21 @@
+#!/bin/sh
+# drun [--dir <dir>] <container> <prog> [options]
+# run command inside a container and mount current dir
+
+# allow a relative dir first
+if [ "$1" == "--dir" ]; then
+    DIR="`cd "$PWD/$2";pwd`"
+    shift 2
+else
+    DIR="$PWD"
+fi
+
+# expect container name
+CONTAINER="$1"
+if [ "$CONTAINER" == "" ]; then
+    echo "Usage: $0 <container> <prog> [options]"
+    exit 1
+fi
+shift
+
+exec docker run -t --rm -u $UID -v "$DIR:$DIR" -w $PWD $CONTAINER "$@"
