@@ -912,6 +912,7 @@ class DosLibrary(LibImpl):
   def Examine(self, ctx):
     lock_b_addr = ctx.cpu.r_reg(REG_D1)
     fib_ptr = ctx.cpu.r_reg(REG_D2)
+
     lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
     fib = AccessStruct(ctx.mem,FileInfoBlockStruct,struct_addr=fib_ptr)
     err = lock.examine_lock(fib)
@@ -919,6 +920,31 @@ class DosLibrary(LibImpl):
     name      = ctx.mem.r_cstr(name_addr)
     log_dos.info("Examine: %s fib=%06x(%s) -> %s" % (lock, fib_ptr, name, err))
     self.setioerr(ctx,err)
+    if err == NO_ERROR:
+      return self.DOSTRUE
+    else:
+      return self.DOSFALSE
+
+  def ExamineFH(self, ctx):
+    fh_b_addr = ctx.cpu.r_reg(REG_D1)
+    fib_ptr = ctx.cpu.r_reg(REG_D2)
+
+    fh = self.file_mgr.get_by_b_addr(fh_b_addr,False)
+    lock = self.lock_mgr.create_lock(self.get_current_dir(ctx), fh.ami_path, False)
+    log_dos.info("Lock: (%s) '%s' exc=%s -> %s" % (self.get_current_dir(ctx), fh.ami_path, False, lock))
+    if lock == None:
+      self.setioerr(ctx,ERROR_OBJECT_NOT_FOUND)
+      return self.DOSFALSE
+
+    fib = AccessStruct(ctx.mem,FileInfoBlockStruct,struct_addr=fib_ptr)
+    err = lock.examine_lock(fib)
+    name_addr = fib.s_get_addr('fib_FileName')
+    name      = ctx.mem.r_cstr(name_addr)
+    log_dos.info("ExamineFH: %s fib=%06x(%s) -> %s" % (fh, fib_ptr, name, err))
+    self.setioerr(ctx,err)
+
+    log_dos.info("UnLock: %s" % (lock))
+    self.lock_mgr.release_lock(lock)
     if err == NO_ERROR:
       return self.DOSTRUE
     else:
