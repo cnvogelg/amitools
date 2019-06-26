@@ -1,2 +1,2 @@
-from builder import BinBuilder
-from runner import VamosTestRunner, VamosRunner, ToolRunner
+from .builder import BinBuilder
+from .runner import VamosTestRunner, VamosRunner, ToolRunner

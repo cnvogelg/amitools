@@ -100,6 +100,9 @@ class Process:
       return False
     self.bin_seg_list = self.ctx.seg_loader.load_sys_seglist(sys_path)
     info = self.ctx.seg_loader.get_info(self.bin_seg_list)
+    if not info:
+      log_proc.error("failed getting binary info: %s", ami_bin_file)
+      return False
     self.prog_start = info.seglist.get_segment().get_addr()
     # set home dir and get lock
     self.home_dir = self.ctx.path_mgr.ami_dir_of_path(lock, ami_path)

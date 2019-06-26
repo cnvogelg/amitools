@@ -1,10 +1,10 @@
-from __future__ import print_function
+
 
 from amitools.binfmt.BinImage import *
-from HunkBlockFile import HunkBlockFile, HunkParseError
-from HunkLoadSegFile import HunkLoadSegFile, HunkSegment
-from HunkDebug import *
-import Hunk
+from .HunkBlockFile import HunkBlockFile, HunkParseError
+from .HunkLoadSegFile import HunkLoadSegFile, HunkSegment
+from .HunkDebug import *
+from . import Hunk
 
 class BinFmtHunk:
   """Handle Amiga's native Hunk file format"""

@@ -278,16 +278,16 @@ def musashi_mem_cpu_rws_test():
 
 def musashi_mem_block_test():
   mem = emu.Memory(16)
-  data = "hello, world!"
+  data = b"hello, world!"
   mem.w_block(0, data)
   assert mem.r_block(0, len(data)) == data
   bdata = bytearray(data)
   mem.w_block(0x100, bdata)
   assert mem.r_block(0x100, len(bdata)) == bdata
   mem.clear_block(0x200, 100, 42)
-  assert mem.r_block(0x200, 100) == chr(42) * 100
+  assert mem.r_block(0x200, 100) == bytes([42] * 100)
   mem.copy_block(0x200, 0x300, 20)
-  assert mem.r_block(0x300, 21) == chr(42) * 20 + chr(0)
+  assert mem.r_block(0x300, 21) == bytes([42] * 20) + b'\0'
 
 
 def musashi_mem_cstr_test():

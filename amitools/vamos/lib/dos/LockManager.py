@@ -5,8 +5,8 @@ from amitools.vamos.log import log_lock
 from amitools.vamos.label import LabelRange
 from amitools.vamos.error import *
 from amitools.vamos.astructs import AccessStruct, DosListVolumeStruct
-from Error import *
-from Lock import Lock
+from .Error import *
+from .Lock import Lock
 
 class LockManager:
   def __init__(self, path_mgr, dos_list, alloc, mem):
@@ -27,7 +27,7 @@ class LockManager:
     volume = self.dos_list.get_entry_by_name(volume_name)
     if volume is None:
       vol_baddr = 0
-      log_lock.warn("lock volume? volume=%s lock=%s",volume,lock)
+      log_lock.warning("lock volume? volume=%s lock=%s",volume,lock)
     else:
       vol_baddr = volume.mem.addr
     # allocate lock struct

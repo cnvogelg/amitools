@@ -1,5 +1,5 @@
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 from .block.CommentBlock import CommentBlock
 from .block.EntryBlock import EntryBlock
@@ -142,12 +142,12 @@ class ADFSNode:
     self.change_meta_info(MetaInfo(mod_ts=t))
 
   def get_list_str(self, indent=0, all=False, detail=False):
-    istr = u'  ' * indent
+    istr = '  ' * indent
     if detail:
       extra = self.get_detail_str()
     else:
       extra = self.meta_info.get_str_line()
-    return u'%-40s       %8s  %s' % (istr + self.name.get_unicode_name(), self.get_size_str(), extra)
+    return '%-40s       %8s  %s' % (istr + self.name.get_unicode_name(), self.get_size_str(), extra)
     
   def list(self, indent=0, all=False, detail=False, encoding="UTF-8"):
     print(self.get_list_str(indent=indent, all=all, detail=detail).encode(encoding))
@@ -183,7 +183,7 @@ class ADFSNode:
 
   def get_node_path_name(self, with_vol=False):
     r = self.get_node_path()
-    return FSString(u"/".join(r))
+    return FSString("/".join(r))
 
   def get_detail_str(self):
     return ""

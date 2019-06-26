@@ -46,23 +46,23 @@ class HWAccess:
       raise ValueError("invalid hwaccess mode: %s" % mode_str)
 
   def cia_r8(self, addr):
-    log_hw.warn("CIA read byte @%06x", addr)
+    log_hw.warning("CIA read byte @%06x", addr)
     if self.mode == self.MODE_ABORT:
       raise HWAccessError('R', 0, addr)
     return 0
 
   def cia_w8(self, addr, val):
-    log_hw.warn("CIA write byte @%06x: %02x", addr, val)
+    log_hw.warning("CIA write byte @%06x: %02x", addr, val)
     if self.mode == self.MODE_ABORT:
       raise HWAccessError('W', 0, addr)
 
   def cc_r16(self, addr):
-    log_hw.warn("Custom Chip read word @%06x", addr)
+    log_hw.warning("Custom Chip read word @%06x", addr)
     if self.mode == self.MODE_ABORT:
       raise HWAccessError('R', 1, addr)
     return 0
 
   def cc_w16(self, addr, val):
-    log_hw.warn("Custom Chip write word @%06x: %04x", addr, val)
+    log_hw.warning("Custom Chip write word @%06x: %04x", addr, val)
     if self.mode == self.MODE_ABORT:
       raise HWAccessError('W', 1, addr)

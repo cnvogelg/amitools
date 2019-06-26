@@ -11,7 +11,7 @@ class UtilityLibrary(LibImpl):
   def UDivMod32(self, ctx):
     dividend = ctx.cpu.r_reg(REG_D0)
     divisor = ctx.cpu.r_reg(REG_D1)
-    quot = dividend / divisor
+    quot = dividend // divisor
     rem  = dividend % divisor
     log_utility.info("UDivMod32(dividend=%u, divisor=%u) => (quotient=%u, remainder=%u)" % (dividend, divisor, quot, rem))
     return [quot, rem]
@@ -131,7 +131,7 @@ class UtilityLibrary(LibImpl):
 
     t = read_clock_data(ctx.mem, date_ptr)
     if t is None:
-      log_utility.warn("Date2Amiga: invalid date! @%08x", date_ptr)
+      log_utility.warning("Date2Amiga: invalid date! @%08x", date_ptr)
       return 0
     seconds = seconds_since(t)
     log_utility.info("Date2Amige: time=%s -> seconds=%u", t, seconds)

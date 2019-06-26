@@ -1,10 +1,10 @@
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 from .FSString import FSString
 
 class FileName:
-  root_path_aliases = (u'', u'/', u':')
+  root_path_aliases = ('', '/', ':')
   
   def __init__(self, name, is_intl=False, is_longname=False):
     # check that name is a FSString
@@ -36,7 +36,7 @@ class FileName:
   def get_dir_and_base_name(self):
     """Return portion after last slash '/' or the full name in unicode"""
     s = self.name.get_unicode()
-    pos = s.rfind(u'/')
+    pos = s.rfind('/')
     if pos != -1:
       dir_name = s[:pos]
       file_name = s[pos+1:]
@@ -51,7 +51,7 @@ class FileName:
     result = self.name.get_ami_str().upper()
     if self.is_intl:
       r = ""
-      for i in xrange(len(result)):
+      for i in range(len(result)):
         o = ord(result[i])
         if o >= 224 and o <= 254 and o != 247:
           r += chr(o - (ord('a')-ord('A')))

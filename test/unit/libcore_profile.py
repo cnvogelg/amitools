@@ -1,4 +1,4 @@
-import StringIO
+import io
 from amitools.vamos.libcore import LibProfileData, LibFuncProfileData, LibProfiler
 from amitools.fd import read_lib_fd
 from amitools.vamos.cfgcore import ConfigDict

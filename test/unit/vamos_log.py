@@ -6,12 +6,12 @@ from amitools.vamos.log import *
 def do_log():
   log_main.debug("debug")
   log_main.info("info")
-  log_main.warn("warn")
+  log_main.warning("warn")
   log_main.error("error")
 
   log_mem.debug("debug")
   log_mem.info("info")
-  log_mem.warn("warn")
+  log_mem.warning("warn")
   log_mem.error("error")
 
 

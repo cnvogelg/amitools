@@ -1,6 +1,6 @@
 import ctypes
 import struct
-import Hunk
+from . import Hunk
 
 class HunkRelocate:
   
@@ -52,11 +52,11 @@ class HunkRelocate:
       data = ctypes.create_string_buffer(alloc_size)      
       
       # fill in segment data
-      if main_hunk.has_key('data'):
+      if 'data' in main_hunk:
         data.value = main_hunk['data']
         
       if self.verbose:
-        print "#%02d @ %06x" % (hunk_no, addr[hunk_no])
+        print("#%02d @ %06x" % (hunk_no, addr[hunk_no]))
       
       # find relocation hunks
       for hunk in segment[1:]:
@@ -79,7 +79,7 @@ class HunkRelocate:
     addr = hunk_addr + delta
     self.write_long(data, offset, addr)
     if self.verbose:
-      print "#%02d + %06x: %06x (delta) + %06x (hunk_addr) -> %06x" % (hunk_no, offset, delta, hunk_addr, addr)
+      print("#%02d + %06x: %06x (delta) + %06x (hunk_addr) -> %06x" % (hunk_no, offset, delta, hunk_addr, addr))
     
   def read_long(self, data, offset):
     bytes = data[offset:offset+4]

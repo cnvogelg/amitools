@@ -17,7 +17,7 @@ class ListIter(object):
   def __iter__(self):
     return self
 
-  def next(self):
+  def __next__(self):
     succ = self.node.get_succ()
     if succ is None:
       raise StopIteration()

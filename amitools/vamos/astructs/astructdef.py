@@ -107,13 +107,13 @@ class AmigaStructDecorator(object):
     cls._num_fields = index
 
   def _get_struct_type(self, pure_name):
-    if self.struct_pool.has_key(pure_name):
+    if pure_name in self.struct_pool:
       return self.struct_pool[pure_name]
     else:
       return None
 
   def _get_base_type(self, pure_name):
-    if self.types.has_key(pure_name):
+    if pure_name in self.types:
       return self.types[pure_name]
     else:
       return None
@@ -130,10 +130,10 @@ class AmigaStructDecorator(object):
     if self._is_pointer(type_name):
       base = 4
     # look for standard type
-    elif self.types.has_key(type_name):
+    elif type_name in self.types:
       base = 2 ** self.types[type_name][0]
     # look for user type
-    elif self.struct_pool.has_key(type_name):
+    elif type_name in self.struct_pool:
       t = self.struct_pool[type_name]
       base = t.get_size()
     else:
@@ -158,10 +158,10 @@ class AmigaStructDecorator(object):
     if type_name == my_name:
       return type_name
     # is it an internal type?
-    elif self.types.has_key(type_name):
+    elif type_name in self.types:
       return type_name
     # a sub type?
-    elif self.struct_pool.has_key(type_name):
+    elif type_name in self.struct_pool:
       return type_name
     else:
       raise InvalidAmigaTypeException(type_name)

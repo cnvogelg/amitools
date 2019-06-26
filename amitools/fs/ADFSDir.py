@@ -1,5 +1,5 @@
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 import struct
 from .block.Block import Block
@@ -57,7 +57,7 @@ class ADFSDir(ADFSNode):
   
   def _init_name_hash(self):
     self.name_hash = []
-    for i in xrange(self.block.hash_size):
+    for i in range(self.block.hash_size):
       self.name_hash.append([])      
   
   def read(self, recursive=False):
@@ -66,7 +66,7 @@ class ADFSDir(ADFSNode):
      
     # create initial list with blk_num/hash_index for dir scan
     blocks = []
-    for i in xrange(self.block.hash_size):
+    for i in range(self.block.hash_size):
       blk_num = self.block.hash_table[i]
       if blk_num != 0:
         blocks.append((blk_num,i))
@@ -231,7 +231,7 @@ class ADFSDir(ADFSNode):
     names = self.name_hash[hash_key]
     # find my node
     pos = None
-    for i in xrange(len(names)):
+    for i in range(len(names)):
       if names[i] == node:
         pos = i
         break
@@ -431,7 +431,7 @@ class ADFSDir(ADFSNode):
     dcb = None
     record = None
     n = len(self.dcache_blks)
-    for i in xrange(n):
+    for i in range(n):
       dcb = self.dcache_blks[i]
       record = dcb.get_record_by_name(name)
       if record != None:

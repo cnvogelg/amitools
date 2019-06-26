@@ -82,7 +82,7 @@ def float_to_ffp_reg(number):
   b = struct.pack('>f', number)
   i = struct.unpack('>L', b)[0]
   # extract sign bit
-  sign = ord(b[0]) & 0x80
+  sign = b[0] & 0x80
   # extract 8 bit exponent
   exp = (i >> 23) & 0xff
   # too small?

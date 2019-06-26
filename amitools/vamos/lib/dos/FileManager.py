@@ -7,9 +7,9 @@ import stat
 
 from amitools.vamos.log import log_file
 from amitools.vamos.astructs import AccessStruct, MessageStruct, DosPacketStruct
-from Error import *
-from DosProtection import DosProtection
-from FileHandle import FileHandle
+from .Error import *
+from .DosProtection import DosProtection
+from .FileHandle import FileHandle
 
 class FileManager:
   def __init__(self, path_mgr, alloc, mem):
@@ -26,8 +26,8 @@ class FileManager:
   def setup(self, fs_handler_port):
     self.fs_handler_port = fs_handler_port
     # setup std input/output
-    self.std_input = FileHandle(sys.stdin,'<STDIN>','',need_close=False)
-    self.std_output = FileHandle(sys.stdout,'<STDOUT>','',need_close=False)
+    self.std_input = FileHandle(sys.stdin.buffer,'<STDIN>','',need_close=False)
+    self.std_output = FileHandle(sys.stdout.buffer,'<STDOUT>','',need_close=False)
     self._register_file(self.std_input)
     self._register_file(self.std_output)
 
@@ -74,7 +74,7 @@ class FileManager:
         fh   = FileHandle(fobj, ami_path, sys_name, is_nil = True)
       elif uname == '*' or uname.startswith('CONSOLE:'):
         sys_name = ''
-        fh = FileHandle(sys.stdout,'*','',need_close=False)
+        fh = FileHandle(sys.stdout.buffer,'*','',need_close=False)
       else:
         # map to system path
         sys_path = self.path_mgr.ami_to_sys_path(lock,ami_path,searchMulti=True)

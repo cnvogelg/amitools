@@ -1,9 +1,9 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # xdftool
 # swiss army knife for adf and hdf amiga disk images
 
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 import sys
 import argparse
@@ -819,7 +819,7 @@ def main():
 
   parser = argparse.ArgumentParser()
   parser.add_argument('image_file')
-  parser.add_argument('command_list', nargs='+', help="command: "+",".join(cmd_map.keys()))
+  parser.add_argument('command_list', nargs='+', help="command: "+",".join(list(cmd_map.keys())))
   parser.add_argument('-v', '--verbose', action='store_true', default=False, help="be more verbos")
   parser.add_argument('-s', '--seperator', default='+', help="set the command separator char sequence")
   parser.add_argument('-r', '--read-only', action='store_true', default=False, help="read-only operation")

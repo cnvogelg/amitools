@@ -1,5 +1,5 @@
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 import os
 import os.path
@@ -149,7 +149,7 @@ class BlkDevFactory:
         raise IOError("can't open rdisk of image file")
       # determine partition
       p = "0"
-      if options != None and options.has_key('part'):
+      if options != None and 'part' in options:
         p = str(options['part'])
       part = rdisk.find_partition_by_string(p)
       if part == None:
@@ -192,7 +192,7 @@ class BlkDevFactory:
 # --- mini test ---
 if __name__ == '__main__':
   import sys
-  import StringIO
+  import io
   bdf = BlkDevFactory()
   for a in sys.argv[1:]:
     # open by file
@@ -202,7 +202,7 @@ if __name__ == '__main__':
     # open via fobj
     fobj = file(a,"rb")
     data = fobj.read()
-    nobj = StringIO.StringIO(data)
+    nobj = io.StringIO(data)
     blkdev = bdf.open("bluna"+a, fobj=nobj)
     print(a, blkdev.__class__.__name__)
     blkdev.close()

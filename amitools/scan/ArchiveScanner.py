@@ -1,7 +1,7 @@
-from __future__ import print_function
+
 
 import zipfile
-import StringIO
+import io
 
 # optional lhafile
 try:
@@ -61,7 +61,7 @@ class ZipScanner(ArchiveScanner):
       fobj = sf.get_fobj()
       return zipfile.ZipFile(fobj, "r")
     except Exception as e:
-      scanner.warn(sf, "error reading archive: %s" % e)
+      scanner.warning(sf, "error reading archive: %s" % e)
 
   def _create_entry_scan_file(self, arc, info, scan_file):
     name = info.filename
@@ -82,13 +82,13 @@ class LhaScanner(ArchiveScanner):
         fobj = sf.get_fobj()
         return lhafile.LhaFile(fobj, "r")
       except Exception as e:
-        scanner.warn(sf, "error reading archive: %s" % e)
+        scanner.warning(sf, "error reading archive: %s" % e)
     else:
-      scanner.warn(sf, "can't handle archive. missing 'lhafile' module.")
+      scanner.warning(sf, "can't handle archive. missing 'lhafile' module.")
 
   def _create_entry_scan_file(self, arc, info, scan_file):
     data = arc.read(info.filename)
-    fobj = StringIO.StringIO(data)
+    fobj = io.StringIO(data)
     size = info.file_size
     name = info.filename
     return scan_file.create_sub_path(name, fobj, size, True, False)
@@ -97,7 +97,7 @@ class LhaScanner(ArchiveScanner):
 # mini test
 if __name__ == '__main__':
   import sys
-  from FileScanner import FileScanner
+  from .FileScanner import FileScanner
 
   ifs = ['*.txt']
   def handler(scan_file):

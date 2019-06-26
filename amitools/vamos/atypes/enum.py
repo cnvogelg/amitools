@@ -9,7 +9,7 @@ def EnumType(cls):
   _val_to_name = {}
   mem = inspect.getmembers(cls)
   for name, val in mem:
-    if type(val) in (int, long):
+    if type(val) in (int, int):
       _name_to_val[name] = val
       _val_to_name[val] = name
 

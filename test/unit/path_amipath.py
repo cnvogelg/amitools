@@ -213,7 +213,7 @@ def path_amipath_join_abs_test():
                                      ) == AmiPath("foo:bar/baz")
   assert AmiPath("foo:bar/boo").join(AmiPath("/")) == AmiPath("foo:bar")
   with pytest.raises(AmiPathError):
-    print(AmiPath("foo:").join(AmiPath("/baz")))
+    print((AmiPath("foo:").join(AmiPath("/baz"))))
   # abs join prefix local
   assert AmiPath("foo:bar").join(AmiPath(":baz")) == AmiPath("foo:baz")
   assert AmiPath("foo:bar/boo").join(AmiPath(":baz")) == AmiPath("foo:baz")
@@ -233,7 +233,7 @@ def path_amipath_join_local_test():
   assert AmiPath("bar/boo").join(AmiPath("/baz")) == AmiPath("bar/baz")
   assert AmiPath("bar/boo").join(AmiPath("/")) == AmiPath("bar")
   with pytest.raises(AmiPathError):
-    print(AmiPath().join(AmiPath("/baz")))
+    print((AmiPath().join(AmiPath("/baz"))))
   # local join prefix local
   assert AmiPath("bar").join(AmiPath(":baz")) == AmiPath(":baz")
   assert AmiPath("bar/boo").join(AmiPath(":baz")) == AmiPath(":baz")

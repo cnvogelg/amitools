@@ -89,13 +89,13 @@ class LibStubGen(object):
     stub = LibStub(name, fd, impl, profile)
 
     # generate valid funcs
-    valid_funcs = impl_scan.get_valid_funcs().values()
+    valid_funcs = list(impl_scan.get_valid_funcs().values())
     for fd_func, impl_method in valid_funcs:
       stub_func = self.wrap_func(fd_func, impl_method, ctx, profile)
       self._set_method(fd_func, stub, stub_func)
 
     # generate missing funcs
-    missing_funcs = impl_scan.get_missing_funcs().values()
+    missing_funcs = list(impl_scan.get_missing_funcs().values())
     for fd_func in missing_funcs:
       stub_func = self.wrap_missing_func(fd_func, ctx, profile)
       self._set_method(fd_func, stub, stub_func)
@@ -132,7 +132,7 @@ class LibStubGen(object):
         callee_pc = this._get_callee_pc(ctx)
         call_info = "%4d %s( %s ) from PC=%06x" % (
             bias, name, this._gen_arg_dump(func_args, ctx), callee_pc)
-        log.warn("? CALL: %s -> d0=0 (default)", call_info)
+        log.warning("? CALL: %s -> d0=0 (default)", call_info)
         ctx.cpu.w_reg(REG_D0, 0)
     func = stub_func
 

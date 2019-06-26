@@ -1,5 +1,5 @@
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 from .block.EntryBlock import EntryBlock
 from .block.FileHeaderBlock import FileHeaderBlock
@@ -163,12 +163,12 @@ class ADFSFile(ADFSNode):
     fhb_num = free_blks[0]
     # ... for ext
     self.ext_blk_nums = []
-    for i in xrange(self.num_ext_blks):
+    for i in range(self.num_ext_blks):
       self.ext_blk_nums.append(free_blks[1+i])
     # ... for data
     off = 1 + self.num_ext_blks
     self.data_blk_nums = []
-    for i in xrange(self.num_data_blks):
+    for i in range(self.num_data_blks):
       self.data_blk_nums.append(free_blks[off])
       off += 1
     
@@ -190,7 +190,7 @@ class ADFSFile(ADFSNode):
     
     # create file list (=ext) blocks
     ext_off = ppb
-    for i in xrange(self.num_ext_blks):
+    for i in range(self.num_ext_blks):
       flb = FileListBlock(self.blkdev, self.ext_blk_nums[i])
       if i == self.num_ext_blks - 1:
         ext_blk = 0

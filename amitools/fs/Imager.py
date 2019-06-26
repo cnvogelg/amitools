@@ -1,5 +1,5 @@
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 import os
 import os.path
@@ -31,7 +31,7 @@ class Imager:
 
   def to_path_str(self, u):
     """convert a unicode string to OS path name encoding"""
-    if type(u) != unicode:
+    if type(u) != str:
       raise ValueError("to_path_str: must pass a unicode string")
     return u.encode(self.path_encoding)
 
@@ -205,8 +205,8 @@ class Imager:
     # retrieve meta info for path from DB
     if self.meta_db != None:
       ami_path = parent_node.get_node_path_name().get_unicode()
-      if ami_path != u"":
-        ami_path += u"/" + ami_name
+      if ami_path != "":
+        ami_path += "/" + ami_name
       else:
         ami_path = ami_name
       meta_info = self.meta_db.get_meta_info(ami_path)

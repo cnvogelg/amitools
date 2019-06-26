@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 
 import argparse
 import array
@@ -38,14 +38,14 @@ for line in off:
   if valid == 0x60ff:
     # check distance
     if far == 0 or far == 0xffff:
-      print "OK: %08x  distance: %d" % (addr, distance)
+      print("OK: %08x  distance: %d" % (addr, distance))
       # patch!
       opcode = opcode & 0xff00
       struct.pack_into(">HhH",bin_data,addr,opcode,distance,nop)
     else:
-      print "INVALID(too far): %08x  %04x  %08x" % (addr,opcode,distance)
+      print("INVALID(too far): %08x  %04x  %08x" % (addr,opcode,distance))
   else:
-    print "INVALID(no branch): %08x  %04x  %08x" % (addr,opcode,distance)
+    print("INVALID(no branch): %08x  %04x  %08x" % (addr,opcode,distance))
   
 off.close()
 
@@ -54,11 +54,11 @@ output = args.output
 if output == None:
   output = args.bin_file + ".patched"
 
-print "writing '%s'..." % output,
+print("writing '%s'..." % output, end=' ')
 out = file(output, "wb")
 bin_data.tofile(out)
 out.close()
-print "done"
+print("done")
 
   
   

@@ -9,12 +9,12 @@ from .cstring import CString
 
 @BitFieldType
 class TaskFlags(object):
-  TF_PROCTIME = (1L << 0)
-  TF_ETASK = (1L << 3)
-  TF_STACKCHK = (1L << 4)
-  TF_EXCEPT = (1L << 5)
-  TF_SWITCH = (1L << 6)
-  TF_LAUNCH = (1L << 7)
+  TF_PROCTIME = (1 << 0)
+  TF_ETASK = (1 << 3)
+  TF_STACKCHK = (1 << 4)
+  TF_EXCEPT = (1 << 5)
+  TF_SWITCH = (1 << 6)
+  TF_LAUNCH = (1 << 7)
 
 
 @EnumType

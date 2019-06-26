@@ -1,5 +1,5 @@
 from amitools.util.DisAsm import DisAsm
-import Hunk
+from . import Hunk
 
 class HunkDisassembler:
  
@@ -74,7 +74,7 @@ class HunkDisassembler:
   def find_reloc(self, hunk, addr, word):
     end_addr = addr + len(word) * 2
     for h in hunk[1:]:
-      valid = self.map_reloc_to_num_words.has_key(h['type'])
+      valid = h['type'] in self.map_reloc_to_num_words
       if valid:
         num_words = self.map_reloc_to_num_words[h['type']]
         reloc = h['reloc']
@@ -86,7 +86,7 @@ class HunkDisassembler:
 
               # calc offset
               addr = 0
-              for i in xrange(num_words):
+              for i in range(num_words):
                 addr = addr * 0x10000 + word[word_offset+i]
               
               reloc_type_name = h['type_name'].replace("HUNK_","").lower()
@@ -111,7 +111,7 @@ class HunkDisassembler:
       if h['type'] == Hunk.HUNK_EXT:
         for ext in h['ext_ref']:
           refs = ext['refs']
-          valid = self.map_ext_ref_to_num_words.has_key(ext['type'])
+          valid = ext['type'] in self.map_ext_ref_to_num_words
           if valid:
             num_words = self.map_ext_ref_to_num_words[ext['type']]
             for ref in refs:
@@ -133,9 +133,9 @@ class HunkDisassembler:
   # search the index of a lib for a definition
   def find_index_def(self, hunk, addr):
     main = hunk[0]
-    if main.has_key('index_hunk'):
+    if 'index_hunk' in main:
       info = main['index_hunk']
-      if info.has_key('defs'):
+      if 'defs' in info:
         for d in info['defs']:
           if d['value'] == addr:
             return d['name']
@@ -203,7 +203,7 @@ class HunkDisassembler:
         
       # create final line
       if symbol != None:
-        print "\t\t\t\t%s:" % symbol
-      print "%08x\t%-20s\t%-30s %s" % (addr," ".join(map(lambda x: "%04x" %x, word)),code,comment)
+        print("\t\t\t\t%s:" % symbol)
+      print("%08x\t%-20s\t%-30s %s" % (addr," ".join(["%04x" %x for x in word]),code,comment))
       
   

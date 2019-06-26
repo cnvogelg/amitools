@@ -212,7 +212,7 @@ class MemoryAlloc:
 
   def free_mem(self, addr, size):
     # first check if its a right alloc
-    if not self.addrs.has_key(addr):
+    if addr not in self.addrs:
       raise VamosInternalError("Invalid Free'd Memory at %06x" % addr)
     # align size to 4 bytes
     size = (size + 3) & ~3
@@ -246,7 +246,7 @@ class MemoryAlloc:
                        addr, addr+size, size, self._stat_info())
 
   def get_range_by_addr(self, addr):
-    if self.addrs.has_key(addr):
+    if addr in self.addrs:
       return self.addrs[addr]
     else:
       return None
@@ -260,11 +260,11 @@ class MemoryAlloc:
       chunk = chunk.next
 
   def _dump_orphan(self, addr, size):
-    log_mem_alloc.warn("orphan: [@%06x +%06x %06x]" % (addr, size, addr+size))
+    log_mem_alloc.warning("orphan: [@%06x +%06x %06x]" % (addr, size, addr+size))
     if self.label_mgr is not None:
       labels = self.label_mgr.get_intersecting_labels(addr, size)
       for l in labels:
-        log_mem_alloc.warn("-> %s", l)
+        log_mem_alloc.warning("-> %s", l)
 
   def dump_orphans(self):
     last = self.free_first
@@ -290,7 +290,7 @@ class MemoryAlloc:
   # ----- convenience functions with label creation -----
 
   def get_memory(self, addr):
-    if self.mem_objs.has_key(addr):
+    if addr in self.mem_objs:
       return self.mem_objs[addr]
     else:
       return None

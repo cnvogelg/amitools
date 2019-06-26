@@ -1,4 +1,4 @@
-from __future__ import print_function
+
 import os
 import pytest
 import subprocess
@@ -83,6 +83,7 @@ class VamosTestRunner:
     print("running:", " ".join(args))
     if stdin:
       stdin_flag = subprocess.PIPE
+      stdin = stdin.encode('latin-1')
     else:
       stdin_flag = None
     p = subprocess.Popen(args, stdout=subprocess.PIPE,
@@ -90,8 +91,8 @@ class VamosTestRunner:
     (stdout, stderr) = p.communicate(stdin)
 
     # process stdout
-    stdout = stdout.splitlines()
-    stderr = stderr.splitlines()
+    stdout = stdout.decode('latin-1').splitlines()
+    stderr = stderr.decode('latin-1').splitlines()
 
     # show?
     if self.dump_output:
@@ -122,7 +123,7 @@ class VamosTestRunner:
     return stdout, stderr
 
   def _compare(self, got, ok):
-    for i in xrange(len(ok)):
+    for i in range(len(ok)):
       assert (got[i] == ok[i])
     assert (len(got) == len(ok)), "stdout line count differs"
 
@@ -218,6 +219,6 @@ class ToolRunner:
     (stdout, stderr) = p.communicate()
 
     # process stdout
-    stdout = stdout.splitlines()
-    stderr = stderr.splitlines()
+    stdout = stdout.decode('latin-1').splitlines()
+    stderr = stderr.decode('latin-1').splitlines()
     return (p.returncode, stdout, stderr)

@@ -1,8 +1,8 @@
 import fnmatch
 import struct
 
-import KickRom
-import RemusFile
+from . import KickRom
+from . import RemusFile
 import amitools.util.DataDir as DataDir
 from amitools.binfmt.BinImage import *
 

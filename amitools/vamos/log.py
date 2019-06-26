@@ -1,4 +1,4 @@
-from __future__ import print_function
+
 import logging
 import logging.config
 from .cfgcore import log_cfg
@@ -67,7 +67,7 @@ levels_str = {
 
 
 def log_parse_level(name):
-  if levels.has_key(name):
+  if name in levels:
     return levels[name]
   else:
     return None
@@ -75,7 +75,7 @@ def log_parse_level(name):
 
 def log_help():
   print("logging channels:")
-  names = map(lambda x: x.name, loggers)
+  names = [x.name for x in loggers]
   for n in sorted(names):
     print("  %s" % n)
   print()

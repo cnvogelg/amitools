@@ -180,7 +180,7 @@ class Segment:
     self.relocs[to_seg] = relocs
 
   def get_reloc_to_segs(self):
-    keys = self.relocs.keys()
+    keys = list(self.relocs.keys())
     return sorted(keys, key=lambda x: x.id)
 
   def get_reloc(self, to_seg):

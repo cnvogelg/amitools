@@ -1,5 +1,5 @@
 import struct
-from ELF import *
+from .ELF import *
 
 
 class ELFParseError(Exception):
@@ -23,7 +23,7 @@ class ELFPart:
     decoded = struct.unpack(">"+fmt, data)
     if len(decoded) != nlen:
       raise ELFParseError("data decode error")
-    for i in xrange(nlen):
+    for i in range(nlen):
       setattr(self, self._names[i], decoded[i])
 
   def _decode_flags(self, value, names):
@@ -34,7 +34,7 @@ class ELFPart:
     return result
 
   def _decode_value(self, value, names):
-    if names.has_key(value):
+    if value in names:
       return names[value]
     else:
       return None
@@ -49,13 +49,13 @@ class ELFIdentifier(ELFPart):
   def parse(self, ident_data):
     # magic
     magic = ident_data[0:4]
-    if magic != "\177ELF":
+    if magic != b"\177ELF":
       raise ELFParseError("No ELF Magic found!")
-    self.class_ = ord(ident_data[4])
-    self.data = ord(ident_data[5])
-    self.version = ord(ident_data[6])
-    self.osabi = ord(ident_data[7])
-    self.abiversion = ord(ident_data[8])
+    self.class_ = ident_data[4]
+    self.data = ident_data[5]
+    self.version = ident_data[6]
+    self.osabi = ident_data[7]
+    self.abiversion = ident_data[8]
 
 
 class ELFHeader(ELFPart):
@@ -104,13 +104,13 @@ class ELFSection:
 
   def get_rela_by_section(self, sect):
     """return a list of relocations from the given section"""
-    if self.reloc_by_sect.has_key(sect):
+    if sect in self.reloc_by_sect:
       return self.reloc_by_sect[sect]
     else:
       return []
 
   def get_rela_sections(self):
-    return sorted(self.reloc_by_sect.keys(), key=lambda x : x.idx)
+    return sorted(list(self.reloc_by_sect.keys()), key=lambda x : x.idx)
 
   def get_symbols(self):
     return self.symbols
@@ -132,7 +132,7 @@ class ELFSectionStringTable(ELFSectionWithData):
     o = 0
     strtab = []
     while o < l:
-      n = self.data.find('\0',o)
+      n = self.data.find(b'\0',o)
       if n == -1:
         raise ELFParseError("Invalid strtab!")
       if n > 0:
@@ -188,12 +188,12 @@ class ELFSectionSymbolTable(ELFSectionWithData):
 
   def decode(self):
     entsize = self.header.entsize
-    num = self.header.size / entsize
+    num = self.header.size // entsize
     symtab = []
     self.symtab = symtab
     off = 0
     idx = 0
-    for n in xrange(num):
+    for n in range(num):
       entry = ELFSymbol(idx)
       entry_data = self.data[off:off+entsize]
       entry.parse(entry_data)
@@ -237,11 +237,11 @@ class ELFSectionRelocationsWithAddend(ELFSectionWithData):
 
   def decode(self):
     entsize = self.header.entsize
-    num = self.header.size / entsize
+    num = self.header.size // entsize
     rela = []
     self.rela = rela
     off = 0
-    for n in xrange(num):
+    for n in range(num):
       entry = ELFRelocationWithAddend()
       entry_data = self.data[off:off+entsize]
       entry.parse(entry_data)

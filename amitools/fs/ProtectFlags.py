@@ -1,5 +1,5 @@
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 from .FSError import *
 
@@ -24,7 +24,7 @@ class ProtectFlags:
     txt = ""
     pos = self.flag_num - 1
     m = 1 << pos
-    for i in xrange(self.flag_num):
+    for i in range(self.flag_num):
       bit = self.mask & m == m
       show = '-'
       flg = self.flag_txt[i]
@@ -43,7 +43,7 @@ class ProtectFlags:
   def bin_str(self):
     res = ""
     m = 1 << (self.flag_num - 1)
-    for i in xrange(self.flag_num):
+    for i in range(self.flag_num):
       if m & self.mask == m:
         res += "1"
       else:
@@ -67,7 +67,7 @@ class ProtectFlags:
       else:
         mask = None   
         is_low = None
-        for i in xrange(self.flag_num):
+        for i in range(self.flag_num):
           flg = self.flag_txt[i]
           flg_low = flg.lower()
           if flg_low == a:

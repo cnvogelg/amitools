@@ -174,7 +174,7 @@ class Machine(object):
     m = self.mem
     # m68k exception vector table
     addr = 8
-    for i in xrange(254):
+    for i in range(254):
       m.w32(addr, self.hw_exc_addr)
       addr += 4
     # run_exit trap
@@ -202,14 +202,14 @@ class Machine(object):
   def _setup_quick_traps(self):
     m = self.mem
     addr = self.quick_trap_begin
-    for i in xrange(self.quick_trap_num):
+    for i in range(self.quick_trap_num):
       m.w16(addr, 0)
       addr += 2
 
   def _cleanup_quick_traps(self):
     m = self.mem
     addr = self.quick_trap_begin
-    for i in xrange(self.quick_trap_num):
+    for i in range(self.quick_trap_num):
       v = m.r16(addr)
       addr += 2
       if v != 0:
@@ -219,7 +219,7 @@ class Machine(object):
   def setup_quick_trap(self, func):
     m = self.mem
     addr = self.quick_trap_begin
-    for i in xrange(self.quick_trap_num):
+    for i in range(self.quick_trap_num):
       v = m.r16(addr)
       if v == 0:
         tid = self.traps.setup(func, auto_rts=True)

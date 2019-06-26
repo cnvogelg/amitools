@@ -1,5 +1,5 @@
 import logging
-from RomAccess import RomAccess
+from .RomAccess import RomAccess
 
 
 class RomPatch:

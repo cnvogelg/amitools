@@ -30,7 +30,7 @@ class LibLoader(object):
     res = Resident.find(self.mem, seg.get_addr(), seg.get_size())
     # unload seglist if no resident was found
     if not res:
-      log_libmgr.warn("%s: no resident found!", lib_name)
+      log_libmgr.warning("%s: no resident found!", lib_name)
       self.segloader.unload_seglist(seglist_baddr)
       return 0, 0
     # init resident
@@ -38,7 +38,7 @@ class LibLoader(object):
         res.get_addr(), seglist.get_baddr(), run_sp=run_sp)
     # unload seglist on error
     if lib_base == 0:
-      log_libmgr.warn("%s: init resident failed!", lib_name)
+      log_libmgr.warning("%s: init resident failed!", lib_name)
       self.segloader.unload_seglist(seglist_baddr)
       return 0, 0
     return lib_base, seglist_baddr

@@ -63,7 +63,7 @@ class printf_state:
     self.fragments = fragments
 
   def __str__(self):
-    return "[elements:%s, fragments:%s]" % (map(str, self.elements), self.fragments)
+    return "[elements:%s, fragments:%s]" % (list(map(str, self.elements)), self.fragments)
 
 printf_re_format = "%([-]?)([0-9]*\.?[0-9]*)?([l])?([bduxsc%])"
 
@@ -169,16 +169,16 @@ def printf(string, mem_access, data_ptr):
 # test
 if __name__ == '__main__':
   txt = "hello %s... %d what a number %2ld.. now align %-4.2s!"
-  print txt
+  print(txt)
   elements, fragments = printf_parse_string(txt)
   for e in elements:
-    print e
-  print fragments
+    print(e)
+  print(fragments)
 
   txt = "%s begin and last %d"
-  print txt
+  print(txt)
   elements, fragments = printf_parse_string(txt)
   for e in elements:
-    print e
-  print fragments
+    print(e)
+  print(fragments)
 

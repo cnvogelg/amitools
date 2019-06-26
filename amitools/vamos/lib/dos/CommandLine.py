@@ -50,7 +50,7 @@ class CommandLine:
   def parse_line(self, line):
     self._reset()
     max_char = 512
-    csrc = CSource(line)
+    csrc = CSource(line.encode('latin-1'))
 
     # read command
     parser = ItemParser(csrc, False)

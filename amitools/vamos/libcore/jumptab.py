@@ -42,7 +42,7 @@ class LibJumpTableIter(object):
   def __iter__(self):
     return self
 
-  def next(self):
+  def __next__(self):
     if self.idx >= self.jt._max_index:
       raise StopIteration
     idx = self.idx
@@ -87,7 +87,7 @@ class LibJumpTable(object):
       if key % 6 != 0:
         raise IndexError
       # convert to index
-      key = (-key - 6) / 6
+      key = (-key - 6) // 6
     # index access
     if key > self._max_index:
       raise IndexError
@@ -102,7 +102,7 @@ class LibJumpTable(object):
       if key % 6 != 0:
         raise IndexError
       # convert to index
-      key = (-key - 6) / 6
+      key = (-key - 6) // 6
     # index access
     if key > self._max_index:
       raise IndexError

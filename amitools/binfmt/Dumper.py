@@ -1,5 +1,5 @@
-from __future__ import print_function
-from BinImage import *
+
+from .BinImage import *
 import amitools.util.HexDump as HexDump
 
 class Dumper:
@@ -49,7 +49,7 @@ class Dumper:
 # mini test
 if __name__ == '__main__':
   import sys
-  from BinFmt import BinFmt
+  from .BinFmt import BinFmt
   bf = BinFmt()
   for a in sys.argv[1:]:
     bi = bf.load_image(a)

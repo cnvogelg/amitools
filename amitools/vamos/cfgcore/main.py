@@ -1,10 +1,10 @@
 import argparse
-import ConfigParser
+import configparser
 import json
 import logging
 import os
 import pprint
-import StringIO
+import io
 from .value import Value, ValueList, ValueDict
 from .cfgdict import ConfigDict
 
@@ -296,13 +296,13 @@ class MainParser(object):
   def _read_ini_file(self, file_name):
     is_str = type(file_name) is str
     log_name = file_name if is_str else "???"
-    p = ConfigParser.SafeConfigParser()
+    p = configparser.ConfigParser()
     try:
       if is_str:
         p.read(file_name)
       else:
-        p.readfp(file_name)
-    except ConfigParser.Error as e:
+        p.read_file(file_name)
+    except configparser.Error as e:
       txt = str(e).replace('\n', '  ')
       log_cfg.error("%s: ini parser failed: %s", log_name, txt)
       return None
@@ -338,7 +338,7 @@ class MainParser(object):
     return ls
 
   def _dump_config(self):
-    out = StringIO.StringIO()
+    out = io.StringIO()
     cfg = self.get_cfg_dict()
     pprint.pprint(cfg, out)
     res = out.getvalue()

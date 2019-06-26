@@ -98,7 +98,7 @@ class AmigaStruct(object):
   @classmethod
   def get_field_offset_for_path(cls, name):
     fields = cls.get_fields_by_path(name)
-    offsets = map(lambda x: x.offset, fields)
+    offsets = [x.offset for x in fields]
     return sum(offsets)
 
   @classmethod
@@ -124,16 +124,16 @@ class AmigaStruct(object):
 
   @classmethod
   def get_all_structs(cls):
-    return cls._struct_pool.values()
+    return list(cls._struct_pool.values())
 
   @classmethod
   def get_all_struct_names(cls):
-    return cls._struct_pool.keys()
+    return list(cls._struct_pool.keys())
 
   @classmethod
   def dump_type(self, indent=0, num=0, base=0, name="", data=None):
     istr = "  " * indent
-    print "     @%04d       %s %s {" % (base, istr, self._type_name)
+    print("     @%04d       %s %s {" % (base, istr, self._type_name))
     i = 0
     for f in self._fields:
       offset = f.offset
@@ -151,14 +151,14 @@ class AmigaStruct(object):
           data_str = "= %-10s" % str(data[i])
         else:
           data_str = ""
-        print "#%04d %04d @%04d/%04x +%04d %s  %s  %-10s %-20s  (ptr=%s, sub=%s)" % \
+        print("#%04d %04d @%04d/%04x +%04d %s  %s  %-10s %-20s  (ptr=%s, sub=%s)" % \
             (i, num, offset, offset, size, istr, data_str, f.type_sig, f.name,
-             f.is_pointer, bool(struct_type))
+             f.is_pointer, bool(struct_type)))
         num += 1
       i += 1
     total = self._total_size
     off = total + base
-    print "     @%04d =%04d %s } %s" % (off, total, istr, name)
+    print("     @%04d =%04d %s } %s" % (off, total, istr, name))
     return num
 
   # ----- instance -----
@@ -209,13 +209,13 @@ class AmigaStruct(object):
   def read_data(self):
     cls = self._data_class
     vals = []
-    for idx in xrange(self._num_fields):
+    for idx in range(self._num_fields):
       val = self.read_field_index(idx)
       vals.append(val)
     return cls(*vals)
 
   def write_data(self, data):
-    for idx in xrange(self._num_fields):
+    for idx in range(self._num_fields):
       val = data[idx]
       self.write_field_index(idx, val)
 

@@ -3,6 +3,7 @@ from amitools.vamos.astructs import CSourceStruct
 class CSource:
   """Simulate the AmigaDOS csource interface"""
   def __init__(self, buf=None):
+    assert buf is None or isinstance(buf, bytes)
     self.buf = buf
     if buf is not None:
       self.len = len(buf)
@@ -29,7 +30,7 @@ class CSource:
     if self.pos < self.len:
       c = self.buf[self.pos]
       self.pos += 1
-      return c
+      return chr(c)
     else:
       return None
 
@@ -71,11 +72,10 @@ class FileLineCSource(CSource):
         ch = self.fh.getc()
         if ch == -1:
           break
-        c = chr(ch)
-        res.append(c)
-        if c == '\n':
+        res.append(ch)
+        if ch == b'\n':
           break
-    line = "".join(res)
+    line = bytes(res)
     if self.buf is None:
       self.buf = line
     else:
@@ -98,7 +98,7 @@ class FileCSource:
       return None
     else:
       self.last_ch = ch
-      return chr(ch)
+      return ch
 
   def ungetc(self):
     if self.last_ch is not None:

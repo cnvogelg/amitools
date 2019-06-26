@@ -70,7 +70,7 @@ class BinBuilder:
     if len(rebuild_bins) > 0:
       info = " ".join(rebuild_bins)
       if self.auto_build:
-        print("BinBuilder: making", info)
+        print(("BinBuilder: making", info))
         args = ['make']
         args += rebuild_bins
         subprocess.check_call(args, stdout=subprocess.PIPE)

@@ -1,9 +1,9 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # based heavily on "iops" by Benjamin Schweizer
 # https://github.com/gopher/iops
 
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 import sys
 import array
@@ -20,10 +20,10 @@ def getblkdevsize(dev):
         DKIOCGETBLOCKCOUNT = 0x40086419 # _IOR('d', 25, uint64_t)
 
         fh = open(dev, 'r')
-        buf = array.array('B', range(0,4))  # uint32
+        buf = array.array('B', list(range(0,4)))  # uint32
         r = fcntl.ioctl(fh.fileno(), DKIOCGETBLOCKSIZE, buf, 1)
         blocksize = struct.unpack('I', buf)[0]
-        buf = array.array('B', range(0,8))  # uint64
+        buf = array.array('B', list(range(0,8)))  # uint64
         r = fcntl.ioctl(fh.fileno(), DKIOCGETBLOCKCOUNT, buf, 1)
         blockcount = struct.unpack('Q', buf)[0]
         fh.close()
@@ -35,7 +35,7 @@ def getblkdevsize(dev):
         DIOCGMEDIASIZE = 0x40086481 # _IOR('d', 129, uint64_t)
 
         fh = open(dev, 'r')
-        buf = array.array('B', range(0,8))  # off_t / int64
+        buf = array.array('B', list(range(0,8)))  # off_t / int64
         r = fcntl.ioctl(fh.fileno(), DIOCGMEDIASIZE, buf, 1)
         size = struct.unpack('q', buf)[0]
         fh.close()

@@ -1,12 +1,12 @@
 # scan a set of file
 
-from __future__ import print_function
+
 
 import os
 import fnmatch
 import tempfile
 
-from ScanFile import ScanFile
+from .ScanFile import ScanFile
 
 class FileScanner:
 

@@ -3,7 +3,7 @@ class FuncDef:
   def __init__(self, name, bias, private=False, is_std=False):
     self.name = name
     self.bias = bias
-    self.index = (bias - 6) / 6
+    self.index = (bias - 6) // 6
     self.private = private
     self.std = is_std
     self.args = []
@@ -24,13 +24,13 @@ class FuncDef:
   def add_arg(self, name, reg):
     self.args.append((name, reg))
   def dump(self):
-    print(self.name,self.bias,self.private,self.args)
+    print((self.name,self.bias,self.private,self.args))
   def get_arg_str(self, with_reg=True):
     if len(self.args) == 0:
       return "()"
     elif with_reg:
-      return "( " + ", ".join(map(lambda x : "%s/%s" % (x[0],x[1]), self.args)) + " )"
+      return "( " + ", ".join(["%s/%s" % (x[0],x[1]) for x in self.args]) + " )"
     else:
-      return "( " + ", ".join(map(lambda x : "%s" % x[0], self.args)) + " )"
+      return "( " + ", ".join(["%s" % x[0] for x in self.args]) + " )"
   def get_str(self, with_reg=True):
     return self.name + self.get_arg_str(with_reg)

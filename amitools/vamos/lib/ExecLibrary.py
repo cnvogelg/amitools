@@ -6,11 +6,11 @@ from amitools.vamos.atypes import ExecLibrary as ExecLibraryType
 from amitools.vamos.atypes import NodeType, Node, List
 from amitools.vamos.log import log_exec
 from amitools.vamos.error import *
-from lexec.PortManager import PortManager
-from lexec.SemaphoreManager import SemaphoreManager
-from lexec.Pool import Pool
-from lexec.RawDoFmt import raw_do_fmt
-import lexec.Alloc
+from .lexec.PortManager import PortManager
+from .lexec.SemaphoreManager import SemaphoreManager
+from .lexec.Pool import Pool
+from .lexec.RawDoFmt import raw_do_fmt
+from .lexec import Alloc
 
 class ExecLibrary(LibImpl):
 
@@ -207,7 +207,7 @@ class ExecLibrary(LibImpl):
       log_exec.info("TaggedOpenLibrary: %d('%s') -> %06x", tag, name, addr)
       return addr
     else:
-      log_exec.warn("TaggedOpenLibrary: %d invalid tag -> NULL" % tag)
+      log_exec.warning("TaggedOpenLibrary: %d invalid tag -> NULL" % tag)
       return 0
 
   def OldOpenLibrary(self, ctx):
@@ -612,7 +612,7 @@ class ExecLibrary(LibImpl):
   def Allocate(self,ctx):
     mh_addr = ctx.cpu.r_reg(REG_A0)
     num_bytes = ctx.cpu.r_reg(REG_D0)
-    blk_addr = lexec.Alloc.allocate(ctx, mh_addr, num_bytes)
+    blk_addr = Alloc.allocate(ctx, mh_addr, num_bytes)
     log_exec.info("Allocate(%06x, %06x) -> %06x" % (mh_addr, num_bytes, blk_addr))
     return blk_addr
 
@@ -620,5 +620,5 @@ class ExecLibrary(LibImpl):
     mh_addr = ctx.cpu.r_reg(REG_A0)
     blk_addr = ctx.cpu.r_reg(REG_A1)
     num_bytes = ctx.cpu.r_reg(REG_D0)
-    lexec.Alloc.deallocate(ctx, mh_addr, blk_addr, num_bytes)
+    Alloc.deallocate(ctx, mh_addr, blk_addr, num_bytes)
     log_exec.info("Deallocate(%06x, %06x, %06x)" % (mh_addr, blk_addr, num_bytes))

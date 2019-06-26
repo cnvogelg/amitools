@@ -9,7 +9,7 @@ class MockMemory(object):
     self.size_bytes = size_kib * 1024
     self.data = bytearray(self.size_bytes)
     if fill != 0:
-      for i in xrange(self.size_bytes):
+      for i in range(self.size_bytes):
         self.data[i] = fill
 
   def get_ram_size_kib(self):
@@ -139,8 +139,7 @@ class MockMemory(object):
   def clear_block(self, addr, size, value):
     if (addr + size) > self.size_bytes:
       raise ValueError("block too large")
-    empty = chr(value) * size
-    self.data[addr:addr+size] = empty
+    self.data[addr:addr+size] = bytes([value] * size)
 
   def copy_block(self, from_addr, to_addr, size):
     if (from_addr+size) > self.size_bytes or \
@@ -158,14 +157,14 @@ class MockMemory(object):
       ch = self.data[addr]
       if ch == 0:
         break
-      res.append(chr(ch))
+      res.append(ch)
       addr += 1
-    return "".join(res)
+    return bytes(res).decode('latin-1')
 
   def w_cstr(self, addr, string):
     if addr > self.size_bytes:
       raise ValueError("no RAM")
-    data = string + chr(0)
+    data = string.encode('latin-1') + b'\0'
     size = len(data)
     self.data[addr:addr+size] = data
 
@@ -175,7 +174,8 @@ class MockMemory(object):
       raise ValueError("no RAM")
     size = self.data[addr]
     addr += 1
-    return self.data[addr:addr+size]
+    data = self.data[addr:addr+size]
+    return data.decode('latin-1')
 
   def w_bstr(self, addr, string):
     if addr > self.size_bytes:
@@ -183,6 +183,6 @@ class MockMemory(object):
     size = len(string)
     if size > 255:
       raise ValueError("string too long")
-    self.data[addr] = chr(size)
+    self.data[addr] = size
     addr += 1
-    self.data[addr:addr+size] = string
+    self.data[addr:addr+size] = string.encode('latin-1')

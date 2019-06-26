@@ -1,4 +1,4 @@
-from PatternMatch import pattern_parse, pattern_match
+from .PatternMatch import pattern_parse, pattern_match
 
 class PathMatchChain:
   def __init__(self, lock, pattern, prefix="", parent=None):
@@ -160,7 +160,7 @@ class PathMatch:
       self.head_chain.reset()
       return self.head_chain.next(self.path_mgr, self.prefix, self.postfix)
       
-  def next(self):
+  def __next__(self):
     # no wildcard?
     if self.head_chain == None:
       return None
@@ -173,4 +173,4 @@ if __name__ == '__main__':
   import sys
   pm = PathMatch(None)
   pm.parse(sys.argv[1])
-  print pm
+  print(pm)

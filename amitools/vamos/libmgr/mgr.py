@@ -54,10 +54,10 @@ class LibManager(object):
     log_libmgr.info("+shutdown")
     aleft = self.alib_mgr.shutdown(run_sp)
     if aleft > 0:
-      log_libmgr.warn("shutdown: can't expunge %d amiga libs/devs!", aleft)
+      log_libmgr.warning("shutdown: can't expunge %d amiga libs/devs!", aleft)
     vleft = self.vlib_mgr.shutdown()
     if vleft > 0:
-      log_libmgr.warn("shutdown: can't expunge %d vamos libs/devs!", vleft)
+      log_libmgr.warning("shutdown: can't expunge %d vamos libs/devs!", vleft)
     left = vleft + aleft
     log_libmgr.info("-shutdwon: aleft=%d, vleft=%d", aleft, vleft)
     return left
@@ -199,7 +199,7 @@ class LibManager(object):
     lib = Library(self.mem, addr)
     lib_ver = lib.version
     if lib_ver < open_ver:
-      log_libmgr.warn("lib '%s' has too low version: %d < %d",
+      log_libmgr.warning("lib '%s' has too low version: %d < %d",
                       name, lib_ver, open_ver)
       return 0
     else:

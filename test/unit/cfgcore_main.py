@@ -1,5 +1,5 @@
 from amitools.vamos.cfgcore import *
-from StringIO import StringIO
+from io import StringIO
 import logging
 import os
 
@@ -44,7 +44,7 @@ def config_main_ini_error_test(caplog):
   assert mp.parse_ini_config(io) is None
   assert caplog.record_tuples == [
       ('config', logging.ERROR,
-       "???: ini parser failed: File contains no section headers.  file: <???>, line: 2  '[hello\\n'")
+       "???: ini parser failed: File contains no section headers.  file: '<???>', line: 2  '[hello\\n'")
   ]
 
 
@@ -84,7 +84,8 @@ def config_main_json_error_test(caplog):
   assert mp.parse_json_config(io) is None
   assert caplog.record_tuples == [
       ('config', logging.ERROR,
-       "???: json parser failed: Expecting object: line 3 column 20 (char 33)")
+       '???: json parser failed: Expecting property name enclosed in double quotes: '
+       'line 4 column 1 (char 34)')
   ]
 
 

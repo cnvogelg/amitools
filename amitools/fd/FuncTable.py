@@ -1,4 +1,4 @@
-from FuncDef import FuncDef
+from .FuncDef import FuncDef
 
 class FuncTable:
   """Store a function table"""
@@ -30,10 +30,10 @@ class FuncTable:
     return self.max_bias + 6
 
   def get_num_indices(self):
-    return self.max_bias / 6
+    return self.max_bias // 6
 
   def get_all_func_names():
-    return self.name_map.keys()
+    return list(self.name_map.keys())
 
   def has_func(self, name):
     return name in self.name_map
@@ -68,7 +68,7 @@ class FuncTable:
     if bias > self.max_bias:
       self.max_bias = bias
     # update index table
-    tab_len = bias / 6
+    tab_len = bias // 6
     while len(self.index_tab) < tab_len:
       self.index_tab.append(None)
     index = tab_len - 1
@@ -86,7 +86,7 @@ class FuncTable:
           func_def.add_arg(arg[i],reg[i])
 
   def dump(self):
-    print("FuncTable:",self.base_name)
+    print(("FuncTable:",self.base_name))
     for f in self.funcs:
       f.dump()
 

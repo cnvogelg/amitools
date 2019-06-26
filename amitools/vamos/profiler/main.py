@@ -39,7 +39,7 @@ class MainProfiler(object):
     if self.cfg and name in self.cfg:
       sub_cfg = self.cfg[name]
       if not prof.parse_config(sub_cfg):
-        log_prof.warn("skipped profiler '%s'", name)
+        log_prof.warning("skipped profiler '%s'", name)
         return False
     log_prof.debug("added profiler '%s'", name)
     self.profilers[name] = prof
@@ -56,7 +56,7 @@ class MainProfiler(object):
 
     # if profiling enabled and neither dump nor file is enabled then dump
     if self.file is None and self.dump is False:
-      log_prof.warn(
+      log_prof.warning(
           "profiling enabled, but no output selected. enabling dump!")
       self.dump = True
 
@@ -65,13 +65,13 @@ class MainProfiler(object):
       self._try_load_data()
 
     # prepare all profilers
-    for prof in self.profilers.values():
+    for prof in list(self.profilers.values()):
       prof.setup()
 
   def shutdown(self):
     """after collecting profiling data write data or dump it"""
     # shutdown all profilers
-    for prof in self.profilers.values():
+    for prof in list(self.profilers.values()):
       prof.shutdown()
 
     # save data?

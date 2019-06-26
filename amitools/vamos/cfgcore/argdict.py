@@ -8,7 +8,7 @@ class Argument(object):
       self.order = kwargs['order']
       del kwargs['order']
     else:
-      self.order = None
+      self.order = 0
     # auto add default=None if action is store_true/false
     if 'action' in kwargs:
       what = kwargs['action']

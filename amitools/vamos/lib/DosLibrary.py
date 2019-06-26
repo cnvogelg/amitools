@@ -9,23 +9,22 @@ from amitools.vamos.astructs import *
 from amitools.vamos.error import *
 from amitools.vamos.log import log_dos
 from amitools.vamos.path import PathManager, AssignManager
-from dos.Args import *
-from dos.Error import *
-from dos.AmiTime import *
-from util.TagList import *
-import dos.Printf
-from dos.DosTags import DosTags
-from dos.PatternMatch import Pattern, pattern_parse, pattern_match
-from dos.MatchFirstNext import MatchFirstNext
+from .dos.Args import *
+from .dos.Error import *
+from .dos.AmiTime import *
+from .util.TagList import *
+from .dos import Printf, PathPart
+from .dos.DosTags import DosTags
+from .dos.PatternMatch import Pattern, pattern_parse, pattern_match
+from .dos.MatchFirstNext import MatchFirstNext
 from amitools.vamos.label import LabelStruct
-from dos.CommandLine import CommandLine
-from dos.Process import Process
-import dos.PathPart
-from dos.DosList import DosList
-from dos.LockManager import LockManager
-from dos.FileManager import FileManager
-from dos.CSource import *
-from dos.Item import *
+from .dos.CommandLine import CommandLine
+from .dos.Process import Process
+from .dos.DosList import DosList
+from .dos.LockManager import LockManager
+from .dos.FileManager import FileManager
+from .dos.CSource import *
+from .dos.Item import *
 from amitools.vamos.dos import run_command, run_sub_process
 
 class DosLibrary(LibImpl):
@@ -95,7 +94,7 @@ class DosLibrary(LibImpl):
       self._free_mem(res)
     # free shell variables
     while len(self.local_vars) > 0:
-      var = self.local_vars.values()[0]
+      var = list(self.local_vars.values())[0]
       self.delete_var(ctx,var)
     # self.delete_var(ctx,var)
     # free RootNode
@@ -143,7 +142,7 @@ class DosLibrary(LibImpl):
       hdr = ctx.mem.r_cstr(hdr_ptr)
     else:
       hdr = ""
-    if dos_error_strings.has_key(idx):
+    if idx in dos_error_strings:
       err_str = dos_error_strings[idx]
     else:
       err_str = "%d ERROR" % self.io_err
@@ -169,7 +168,7 @@ class DosLibrary(LibImpl):
     else:
       hdr = ""
     # get error string
-    if dos_error_strings.has_key(idx):
+    if idx in dos_error_strings:
       err_str = dos_error_strings[idx]
     else:
       err_str = "%d ERROR" % self.io_err
@@ -180,7 +179,7 @@ class DosLibrary(LibImpl):
     else:
       txt = "%s\n" % err_str
     fh = ctx.process.get_output()
-    fh.write(txt)
+    fh.write(txt.encode("latin-1"))
     return self.DOSTRUE
 
 
@@ -252,7 +251,7 @@ class DosLibrary(LibImpl):
 
   def SetComment(self, ctx):
     # the typical unixoid file system does not implement this
-    log_dos.warn("SetComment: not implemented")
+    log_dos.warning("SetComment: not implemented")
     return self.DOSTRUE
 
   def GetProgramName(self, ctx):
@@ -336,7 +335,7 @@ class DosLibrary(LibImpl):
     AccessStruct(ctx.mem, NodeStruct, pred).w_s("ln_Succ", succ)
     AccessStruct(ctx.mem, NodeStruct, succ).w_s("ln_Pred", pred)
     self._free_mem(node.struct._addr)
-    for k in self.local_vars.keys():
+    for k in list(self.local_vars.keys()):
       if self.local_vars[k] == node:
         del self.local_vars[k]
 
@@ -446,7 +445,7 @@ class DosLibrary(LibImpl):
       if name.lower() == needle.lower():
         if (system and segment.r_s("seg_UC") < 0) or (not system and segment.r_s("seg_UC") > 0):
           seg  = segment.r_s("seg_Seg")
-          log_dos.info("FindSegment(%s) -> %06x" % (name,seg))
+          log_dos.info("FindSegment(%s) -> %s" % (name,seg))
           return seg_addr
       seg_addr = segment.r_s("seg_Next")
     return 0
@@ -640,13 +639,13 @@ class DosLibrary(LibImpl):
     val = ctx.cpu.r_reg(REG_D2)
     fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
     log_dos.info("FPutC(%s, '%c' (%d))" % (fh, val, val))
-    fh.write(chr(val))
+    fh.write(bytes((val,)))
     return val
 
   def FPuts(self, ctx):
     fh_b_addr = ctx.cpu.r_reg(REG_D1)
     str_ptr = ctx.cpu.r_reg(REG_D2)
-    str_dat = ctx.mem.r_cstr(str_ptr)
+    str_dat = ctx.mem.r_cbytes(str_ptr)
     # write to stdout
     fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
     ok = fh.write(str_dat)
@@ -665,7 +664,7 @@ class DosLibrary(LibImpl):
 
   def PutStr(self, ctx):
     str_ptr = ctx.cpu.r_reg(REG_D1)
-    str_dat = ctx.mem.r_cstr(str_ptr)
+    str_dat = ctx.mem.r_cbytes(str_ptr)
     # write to stdout
     fh = ctx.process.get_output()
     ok = fh.write(str_dat)
@@ -686,12 +685,12 @@ class DosLibrary(LibImpl):
     fh = ctx.process.get_output()
     log_dos.info("VPrintf: format='%s' argv=%06x" % (fmt,argv_ptr))
     # now decode printf
-    ps = dos.Printf.printf_parse_string(fmt)
-    dos.Printf.printf_read_data(ps, ctx.mem, argv_ptr)
+    ps = Printf.printf_parse_string(fmt)
+    Printf.printf_read_data(ps, ctx.mem, argv_ptr)
     log_dos.debug("VPrintf: parsed format: %s",ps)
-    result = dos.Printf.printf_generate_output(ps)
+    result = Printf.printf_generate_output(ps)
     # write result
-    fh.write(result)
+    fh.write(result.encode("latin-1"))
     return len(result)
 
   def VFPrintf(self, ctx):
@@ -703,12 +702,12 @@ class DosLibrary(LibImpl):
     # write on output
     log_dos.info("VFPrintf: format='%s' argv=%06x" % (fmt,argv_ptr))
     # now decode printf
-    ps = dos.Printf.printf_parse_string(fmt)
-    dos.Printf.printf_read_data(ps, ctx.mem, argv_ptr)
+    ps = Printf.printf_parse_string(fmt)
+    Printf.printf_read_data(ps, ctx.mem, argv_ptr)
     log_dos.debug("VFPrintf: parsed format: %s",ps)
-    result = dos.Printf.printf_generate_output(ps)
+    result = Printf.printf_generate_output(ps)
     # write result
-    fh.write(result)
+    fh.write(result.encode("latin-1"))
     return len(result)
 
   def WriteChars(self, ctx):
@@ -778,8 +777,9 @@ class DosLibrary(LibImpl):
           args_ptr = args_ptr + 4
         else:
           out = out + ch
-    fh.write(out)
-    return len(out)
+    data = out.encode("latin-1")
+    fh.write(data)
+    return len(data)
 
   # ----- Stdin --------
 
@@ -1065,7 +1065,7 @@ class DosLibrary(LibImpl):
       vol_lock = self.lock_mgr.create_lock(None,volume+":", False)
     fs_port  = self.file_mgr.get_fs_handler_port()
     addr     = self._alloc_mem("DevProc:%s" % name, DevProcStruct.get_size())
-    log_dos.info("GetDeviceProc: name='%s' devproc=%06x -> volume=%s devproc=%06x lock=%06x",
+    log_dos.info("GetDeviceProc: name='%s' devproc=%06x -> volume=%s devproc=%06x lock=%s",
                  name, last_devproc, volume, addr, vol_lock)
     devproc = AccessStruct(ctx.mem,DevProcStruct,struct_addr=addr)
     devproc.w_s('dvp_Port', fs_port)
@@ -1124,7 +1124,7 @@ class DosLibrary(LibImpl):
     anchor_ptr = ctx.cpu.r_reg(REG_D1)
     log_dos.info("MatchNext: anchor=%06x" % (anchor_ptr))
     # retrieve match
-    if not self.matches.has_key(anchor_ptr):
+    if anchor_ptr not in self.matches:
       raise VamosInternalError("MatchNext: No matcher found for %06x" % anchor_ptr)
     mfn = self.matches[anchor_ptr]
     # has matches?
@@ -1142,7 +1142,7 @@ class DosLibrary(LibImpl):
     anchor_ptr = ctx.cpu.r_reg(REG_D1)
     log_dos.info("MatchEnd: anchor=%06x " % (anchor_ptr))
     # retrieve match
-    if not self.matches.has_key(anchor_ptr):
+    if anchor_ptr not in self.matches:
       raise VamosInternalError("MatchEnd: No matcher found for %06x" % anchor_ptr)
     mfn = self.matches[anchor_ptr]
     del self.matches[anchor_ptr]
@@ -1209,7 +1209,7 @@ class DosLibrary(LibImpl):
     tal = TemplateArgList.parse_string(template)
     if tal is None:
       # template parse error
-      log_dos.warn("FindArgs: invalid template=%s", template)
+      log_dos.warning("FindArgs: invalid template=%s", template)
       return -1
     # find keyword
     arg = tal.find_arg(keyword)
@@ -1232,7 +1232,7 @@ class DosLibrary(LibImpl):
     tal = TemplateArgList.parse_string(template)
     log_dos.info("ReadArgs: tal=%s", tal)
     if tal is None:
-      log_dos.warn("ReadArgs: bad template '%s'", template)
+      log_dos.warning("ReadArgs: bad template '%s'", template)
       self.setioerr(ctx, ERROR_BAD_TEMPLATE)
       return 0
 
@@ -1302,7 +1302,7 @@ class DosLibrary(LibImpl):
       if total_bytes > 0:
         extra_ptr = self._alloc_mem("ReadArgs(@%06x)" % self.get_callee_pc(ctx), total_bytes)
         if extra_ptr == 0:
-          log_dos.warn("ReadArgs: no memory for extra")
+          log_dos.warning("ReadArgs: no memory for extra")
           self.setioerr(ctx, ERROR_NO_FREE_STORE)
           return 0
       else:
@@ -1333,7 +1333,7 @@ class DosLibrary(LibImpl):
     rdargs_ptr = ctx.cpu.r_reg(REG_D1)
     log_dos.info("FreeArgs: %06x" % rdargs_ptr)
     # find rdargs
-    if not self.rdargs.has_key(rdargs_ptr):
+    if rdargs_ptr not in self.rdargs:
       raise VamosInternalError("Can't find RDArgs: %06x" % rdargs_ptr)
     rdargs, own = self.rdargs[rdargs_ptr]
     del self.rdargs[rdargs_ptr]
@@ -1395,7 +1395,7 @@ class DosLibrary(LibImpl):
       cli      = AccessStruct(ctx.mem,CLIStruct,struct_addr=cli_addr)
       new_input = self.file_mgr.open(None,"NIL:","r")
       if new_input == None:
-        log_dos.warn("SystemTagList: can't create new input file handle for SystemTagList('%s')", cmd)
+        log_dos.warning("SystemTagList: can't create new input file handle for SystemTagList('%s')", cmd)
         return 0xffffffff
       #Push-back the commands into the input buffer.
       new_input.setbuf(cmd)
@@ -1470,7 +1470,7 @@ class DosLibrary(LibImpl):
       # create a process and run it...
       proc = Process(ctx, binary, arg_str, cwd=cwd, cwd_lock=cwd_lock)
       if not proc.ok:
-        log_dos.warn("SystemTagList: can't create process for '%s' args=%s", binary, arg_str)
+        log_dos.warning("SystemTagList: can't create process for '%s' args=%s", binary, arg_str)
         return self.DOSTRUE
       return run_sub_process(ctx.scheduler, proc)
 
@@ -1485,13 +1485,13 @@ class DosLibrary(LibImpl):
       self.seg_lists[b_addr] = name
       return b_addr
     else:
-      log_dos.warn("LoadSeg: '%s' -> not found!" % (name))
+      log_dos.warning("LoadSeg: '%s' -> not found!" % (name))
       return 0
 
   def UnLoadSeg(self, ctx):
     b_addr = ctx.cpu.r_reg(REG_D1)
     if b_addr != 0:
-      if not self.seg_lists.has_key(b_addr):
+      if b_addr not in self.seg_lists:
         raise VamosInternalError("Trying to unload unknown LoadSeg seg_list: b_addr=%06x" % b_addr)
       else:
         del self.seg_lists[b_addr]
@@ -1506,7 +1506,7 @@ class DosLibrary(LibImpl):
     func_ptr  = ctx.cpu.r_reg(REG_A1)
     stack_ptr = ctx.cpu.r_reg(REG_A2)
     # FIXME: For now, just fail
-    log_dos.warn("InternalLoadSeg: fh=%06x table=%06x funcptr=%06x stack_ptr=%06x -> not implemented!" %
+    log_dos.warning("InternalLoadSeg: fh=%06x table=%06x funcptr=%06x stack_ptr=%06x -> not implemented!" %
                  (fh_baddr,table_ptr,func_ptr,stack_ptr))
     self.setioerr(ctx, ERROR_OBJECT_WRONG_TYPE)
     return 0
@@ -1539,7 +1539,7 @@ class DosLibrary(LibImpl):
   def FilePart(self, ctx):
     addr = ctx.cpu.r_reg(REG_D1)
     path = ctx.mem.r_cstr(addr)
-    pos  = dos.PathPart.file_part(path)
+    pos  = PathPart.file_part(path)
     if pos < len(path):
       log_dos.info("FilePart: path='%s' -> result='%s'", path, path[pos:])
     else:
@@ -1549,7 +1549,7 @@ class DosLibrary(LibImpl):
   def PathPart(self, ctx):
     addr = ctx.cpu.r_reg(REG_D1)
     path = ctx.mem.r_cstr(addr)
-    pos  = dos.PathPart.path_part(path)
+    pos  = PathPart.path_part(path)
     if pos < len(path):
       log_dos.info("PathPart: path='%s' -> result='%s'", path, path[:pos])
     else:
@@ -1562,7 +1562,7 @@ class DosLibrary(LibImpl):
     size    = ctx.cpu.r_reg(REG_D3)
     dn      = ctx.mem.r_cstr(dn_addr)
     fn      = ctx.mem.r_cstr(fn_addr)
-    np      = dos.PathPart.add_part(dn,fn,size)
+    np      = PathPart.add_part(dn,fn,size)
     log_dos.info("AddPart: dn='%s' fn='%s' size=%d -> np='%s'", dn, fn, size, np)
     if np != None:
       ctx.mem.w_cstr(dn_addr, np)
@@ -1597,7 +1597,7 @@ class DosLibrary(LibImpl):
       log_dos.error("AllocDosObject: invalid type=%d", obj_type)
       return 0
     if struct_def is None:
-      log_dos.warn("AllocDosObject: unsupported type=%d/%s", obj_type, name)
+      log_dos.warning("AllocDosObject: unsupported type=%d/%s", obj_type, name)
       return 0
     # allocate struct
     dos_obj = ctx.alloc.alloc_struct(name, struct_def)
@@ -1623,7 +1623,7 @@ class DosLibrary(LibImpl):
       del self.dos_objs[ptr]
       # check type
       if obj_type != entry[1]:
-        log_dos.warn("FreeDosObject: type mismatch %d != %d", obj_type, entry[1])
+        log_dos.warning("FreeDosObject: type mismatch %d != %d", obj_type, entry[1])
       # free struct
       ctx.alloc.free_struct(entry[0])
     else:
@@ -1721,7 +1721,7 @@ class DosLibrary(LibImpl):
     str_addr = ctx.cpu.r_reg(REG_D1)
     val_addr = ctx.cpu.r_reg(REG_D2)
     string   = ctx.mem.r_cstr(str_addr)
-    match    = re.search("(\+|\-|)[0-9]*",string)
+    match    = re.search(r"(\+|\-|)[0-9]*",string)
     if len(match.group(0)) > 0:
       ctx.mem.w32(val_addr,int(match.group(0)))
       return len(match.group(0))
@@ -1776,7 +1776,7 @@ class DosLibrary(LibImpl):
     return mem.addr
 
   def _free_mem(self, addr):
-    if self.mem_allocs.has_key(addr):
+    if addr in self.mem_allocs:
       mem = self.mem_allocs[addr]
       self.alloc.free_memory(mem)
       del self.mem_allocs[addr]

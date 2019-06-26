@@ -1,11 +1,11 @@
-from __future__ import print_function
+
 
 from amitools.vamos.astructs import *
 from amitools.vamos.lib.dos.CSource import CSource
 from amitools.vamos.lib.dos.Item import ItemParser
 
 def item_parser1_test():
-  csrc = CSource('hello world\n')
+  csrc = CSource(b'hello world\n')
   ip = ItemParser(csrc)
   maxbuf = 256
   assert ip.read_item(maxbuf) == (ItemParser.ITEM_UNQUOTED, "hello")
@@ -13,7 +13,7 @@ def item_parser1_test():
   assert ip.read_item(maxbuf) == (ItemParser.ITEM_NOTHING, None)
 
 def item_parser2_test():
-  csrc = CSource('"hello space" "world*n"\n')
+  csrc = CSource(b'"hello space" "world*n"\n')
   ip = ItemParser(csrc)
   maxbuf = 256
   assert ip.read_item(maxbuf) == (ItemParser.ITEM_QUOTED, "hello space")
@@ -21,7 +21,7 @@ def item_parser2_test():
   assert ip.read_item(maxbuf) == (ItemParser.ITEM_NOTHING, None)
 
 def check_item_eol(in_str, itype, item, eol):
-  csrc = CSource(in_str + '\n')
+  csrc = CSource((in_str + '\n').encode('latin-1'))
   ip = ItemParser(csrc)
   maxbuf = 256
   assert ip.read_item(maxbuf) == (itype, item)
@@ -36,7 +36,7 @@ def item_parser3_test():
   check_item_eol('"a"  b  ', ItemParser.ITEM_QUOTED, 'a', '  b  ')
 
 def item_parser_eol_bug_test():
-  csrc = CSource('hello world')
+  csrc = CSource(b'hello world')
   ip = ItemParser(csrc)
   maxbuf = 256
   assert ip.read_item(maxbuf) == (ItemParser.ITEM_UNQUOTED, "hello")
@@ -44,7 +44,7 @@ def item_parser_eol_bug_test():
   # with eol_bug enabled we get last char again...
   assert ip.read_item(maxbuf) == (ItemParser.ITEM_UNQUOTED, "d")
   # now again with fixed parser
-  csrc = CSource('hello world')
+  csrc = CSource(b'hello world')
   ip = ItemParser(csrc, eol_unget_bug=False)
   assert ip.read_item(maxbuf) == (ItemParser.ITEM_UNQUOTED, "hello")
   assert ip.read_item(maxbuf) == (ItemParser.ITEM_UNQUOTED, "world")

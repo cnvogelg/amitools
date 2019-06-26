@@ -1,5 +1,5 @@
-import Hunk
-import HunkDisassembler
+from . import Hunk
+from . import HunkDisassembler
 from amitools.util.HexDump import *
 
 class HunkShow:
@@ -38,7 +38,7 @@ class HunkShow:
 
   def show_lib_segments(self):
     for lib in self.libs:
-      print "Library #%d" % lib['lib_no']
+      print("Library #%d" % lib['lib_no'])
       for unit in lib['units']:
         self.print_unit(unit['unit_no'], unit['name'])
         for segment in unit['segments']:
@@ -59,9 +59,9 @@ class HunkShow:
 
     # overlay
     if self.overlay != None:
-      print "Overlay"
+      print("Overlay")
       num_ov = len(self.overlay_headers)
-      for o in xrange(num_ov):
+      for o in range(num_ov):
         if not self.brief:
           self.print_header(self.overlay_headers[o])
         for segment in self.overlay_segments[o]:
@@ -72,18 +72,18 @@ class HunkShow:
 
     # unit hunks are named
     name = ""
-    if hunk[0].has_key('name'):
+    if 'name' in hunk[0]:
       name = "'%s'" % main['name']
 
     type_name = main['type_name'].replace("HUNK_","")
     size = main['size']
     hunk_no = main['hunk_no']
-    if main.has_key('data_file_offset'):
+    if 'data_file_offset' in main:
       data_file_offset = main['data_file_offset']
     else:
       data_file_offset = None
     hunk_file_offset = main['hunk_file_offset']
-    if main.has_key('alloc_size'):
+    if 'alloc_size' in main:
       alloc_size = main['alloc_size']
     else:
       alloc_size = None
@@ -96,24 +96,24 @@ class HunkShow:
       self.show_extra_hunk(extra)
 
     # index hunk info is embedded if its in a lib
-    if main.has_key('index_hunk'):
+    if 'index_hunk' in main:
       self.show_index_info(main['index_hunk'])
 
     if main['type'] == Hunk.HUNK_CODE and self.disassemble and len(main['data'])>0:
       disas = HunkDisassembler.HunkDisassembler(use_objdump = self.use_objdump, cpu = self.cpu)
-      print
+      print()
       disas.show_disassembly(hunk, seg_list, self.disassemble_start)
-      print
+      print()
 
   def show_index_info(self, info):
     # references from index
-    if info.has_key('refs'):
+    if 'refs' in info:
       self.print_extra("refs","#%d" % len(info['refs']))
       if not self.brief:
         for ref in info['refs']:
           self.print_symbol(-1,ref['name'],"(%d bits)" % ref['bits'])
     # defines from index
-    if info.has_key('defs'):
+    if 'defs' in info:
       self.print_extra("defs","#%d" % len(info['defs']))
       if not self.brief:
         for d in info['defs']:
@@ -192,13 +192,13 @@ class HunkShow:
   # ----- printing -----
 
   def print_header(self, hdr):
-    print "\t      header (segments: first=%d, last=%d, table size=%d)" % (hdr['first_hunk'], hdr['last_hunk'], hdr['table_size'])
+    print("\t      header (segments: first=%d, last=%d, table size=%d)" % (hdr['first_hunk'], hdr['last_hunk'], hdr['table_size']))
 
   def print_extra(self, type_name, info):
-    print "\t\t%8s  %s" % (type_name, info)
+    print("\t\t%8s  %s" % (type_name, info))
 
   def print_extra_sub(self, text):
-    print "\t\t\t%s" % text
+    print("\t\t\t%s" % text)
 
   def print_segment_header(self, hunk_no, type_name, size, name, data_file_offset, hunk_file_offset, alloc_size):
     extra = ""
@@ -207,17 +207,17 @@ class HunkShow:
     extra += "file header @%08x" % hunk_file_offset
     if data_file_offset != None:
       extra += "  data @%08x" % data_file_offset
-    print "\t#%03d  %-5s  size %08x  %s  %s" % (hunk_no, type_name, size, extra, name)
+    print("\t#%03d  %-5s  size %08x  %s  %s" % (hunk_no, type_name, size, extra, name))
 
   def print_symbol(self,addr,name,extra):
     if addr == -1:
       a = "xxxxxxxx"
     else:
       a = "%08x" % addr
-    print "\t\t\t%s  %-32s  %s" % (a,name,extra)
+    print("\t\t\t%s  %-32s  %s" % (a,name,extra))
 
   def print_unit(self, no, name):
-    print "  #%03d  UNIT  %s" % (no, name)
+    print("  #%03d  UNIT  %s" % (no, name))
 
 
 

@@ -1,6 +1,6 @@
 # pytest fixture for vamos tests
 
-from __future__ import print_function
+
 import pytest
 import os
 from helper import *

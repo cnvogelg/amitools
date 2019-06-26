@@ -63,7 +63,7 @@ class FileHandle:
         return -1
       try:
         d = self.obj.read(1)
-        if d == "":
+        if d == b"":
           return -1
       except IOError:
         return -1

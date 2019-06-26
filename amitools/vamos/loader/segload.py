@@ -87,7 +87,7 @@ class SegmentLoader(object):
     log_segload.info("shutdown")
     for baddr in self.infos:
       info = self.infos[baddr]
-      log_segload.warn("orphaned seglist: %s", info)
+      log_segload.warning("orphaned seglist: %s", info)
       # try to free list
       info.seglist.free()
     return len(self.infos)
@@ -128,7 +128,7 @@ class SegmentLoader(object):
     # build label names
     if self.alloc.label_mgr:
       labels = []
-      for i in xrange(len(sizes)):
+      for i in range(len(sizes)):
         name = "%s_%d:%s" % (base_name, i, names[i].lower())
         labels.append(name)
     else:
@@ -144,7 +144,7 @@ class SegmentLoader(object):
     datas = relocator.relocate(addrs)
 
     # write contents to allocated memory
-    for i in xrange(len(sizes)):
+    for i in range(len(sizes)):
       # write data to segments
       self.mem.w_block(addrs[i], datas[i])
 

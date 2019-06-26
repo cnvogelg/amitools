@@ -19,7 +19,7 @@ will be very helpful.
 
 ## Prerequisites
 
-- Python ```2.7.x```
+- Python >= ```3.4```
 - pip
 
 ### Optional Packages
@@ -41,17 +41,9 @@ On macOS you have multiple ways of installing ```pip```:
 sudo easy_install pip
 ```
 
-#### MacPorts Package Manager
-
-On macOS using [MacPorts][2] package manager (Tool is called ```pip-2.7``` here):
-
-```bash
-sudo port install py27-pip
-```
-
 #### Homebrew Package Manager
 
-With the [Homebrew][3] package manager (```pip``` is included in the ```python``` package):
+With the [Homebrew][3] package manager (```pip``` is included in the ```python3``` package):
 
 ```bash
 brew install python
@@ -76,13 +68,13 @@ python get-pip.py
 
 #### Windows with Visual Studio
 
-- Install the latest native Windows Python 2.7.x from [python.org][6]
+- Install the latest native Windows Python >= 3.4 from [python.org][6]
 - There is a special Edition for Visual Studio available that allows
-  to compile Python 2.7 modules: Install [VCPython2.7][5]
+  to compile Python 3.x modules: Install [VCpython3][5]
 - Open the Command Shell of the Compiler and run
 
 ```bash
-cd C:\Python27\Scripts
+cd C:\Python3x\Scripts
 pip install amitools
 ```
 

@@ -1,5 +1,5 @@
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 import struct
 import ctypes
@@ -39,7 +39,7 @@ class ADFSBitmap:
   def create(self):
     # create data and preset with 0xff
     self.bitmap_data = ctypes.create_string_buffer(self.bitmap_all_blk_bytes)
-    for i in xrange(self.bitmap_all_blk_bytes):
+    for i in range(self.bitmap_all_blk_bytes):
       self.bitmap_data[i] = chr(0xff)
 
     # clear bit for root block
@@ -48,7 +48,7 @@ class ADFSBitmap:
     blk_pos += 1
 
     # create ext blocks
-    for i in xrange(self.num_ext):
+    for i in range(self.num_ext):
       bm_ext = BitmapExtBlock(self.blkdev, blk_pos)
       bm_ext.create()
       self.clr_bit(blk_pos)
@@ -56,7 +56,7 @@ class ADFSBitmap:
       self.ext_blks.append(bm_ext)
 
     # create bitmap blocks
-    for i in xrange(self.bitmap_num_blks):
+    for i in range(self.bitmap_num_blks):
       bm = BitmapBlock(self.blkdev, blk_pos)
       bm.create()
       self.clr_bit(blk_pos)
@@ -66,7 +66,7 @@ class ADFSBitmap:
     # set pointers to ext blocks
     if self.num_ext > 0:
       self.root_blk.bitmap_ext_blk = self.ext_blks[0].blk_num
-      for i in xrange(self.num_ext-1):
+      for i in range(self.num_ext-1):
         bm_ext = self.ext_blks[i]
         bm_ext_next = self.ext_blks[i+1]
         bm_ext.bitmap_ext_blk = bm_ext_next.blk_num
@@ -74,7 +74,7 @@ class ADFSBitmap:
     # set pointers to bitmap blocks
     cur_ext_index = 0
     cur_ext_pos = 0
-    for i in xrange(self.bitmap_num_blks):
+    for i in range(self.bitmap_num_blks):
       blk_num = self.bitmap_blks[i].blk_num
       if i < self.num_blks_in_root:
         # pointers in root block
@@ -189,7 +189,7 @@ class ADFSBitmap:
     if num == 1:
       return [first_blk]
     result = [first_blk]
-    for i in xrange(num-1):
+    for i in range(num-1):
       blk_num = self.find_free()
       if blk_num == None:
         return None
@@ -200,14 +200,14 @@ class ADFSBitmap:
 
   def get_num_free(self):
     num = 0
-    for i in xrange(self.bitmap_bits):
+    for i in range(self.bitmap_bits):
       if self.get_bit(i):
         num+=1
     return num
 
   def get_num_used(self):
     num = 0
-    for i in xrange(self.bitmap_bits):
+    for i in range(self.bitmap_bits):
       if not self.get_bit(i):
         num+=1
     return num
@@ -270,14 +270,14 @@ class ADFSBitmap:
 
   def create_draw_bitmap(self):
     bm = ctypes.create_string_buffer(self.blkdev.num_blocks)
-    for i in xrange(self.blkdev.num_blocks):
+    for i in range(self.blkdev.num_blocks):
       bm[i] = chr(0)
     return bm
 
   def print_free(self, brief=False):
     bm = self.create_draw_bitmap()
     res = self.blkdev.reserved
-    for i in xrange(self.blkdev.num_blocks):
+    for i in range(self.blkdev.num_blocks):
       if i >= res and self.get_bit(i):
         bm[i] = 'F'
     self.print_draw_bitmap(bm, brief)
@@ -285,7 +285,7 @@ class ADFSBitmap:
   def print_used(self, brief=False):
     bm = self.create_draw_bitmap()
     res = self.blkdev.reserved
-    for i in xrange(self.blkdev.num_blocks):
+    for i in range(self.blkdev.num_blocks):
       if i >= res and not self.get_bit(i):
         bm[i] = '#'
     self.print_draw_bitmap(bm, brief)
@@ -308,7 +308,7 @@ class ADFSBitmap:
     blk = 0
     blk_cyl = self.blkdev.sectors * self.blkdev.heads
     found = False
-    for i in xrange(self.blkdev.num_blocks):
+    for i in range(self.blkdev.num_blocks):
       c = bm[i]
       if ord(c) == 0:
         c = '.'

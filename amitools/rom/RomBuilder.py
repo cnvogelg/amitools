@@ -3,7 +3,7 @@ import struct
 
 from amitools.binfmt.BinImage import *
 from amitools.binfmt.Relocate import *
-from KickRom import KickRomAccess
+from .KickRom import KickRomAccess
 
 
 class RomEntryRaw:

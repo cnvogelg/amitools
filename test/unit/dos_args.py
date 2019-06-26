@@ -1,4 +1,4 @@
-from __future__ import print_function
+
 
 from amitools.vamos.astructs import *
 from amitools.vamos.lib.dos.CSource import CSource
@@ -162,7 +162,8 @@ def check_parse_args(template, in_str, exp_res_list=None, error=NO_ERROR):
   tal = TemplateArgList.parse_string(template)
   assert tal is not None
   p = ArgsParser(tal)
-  csrc = CSource(in_str + "\n")
+  data = (in_str + "\n").encode('latin-1')
+  csrc = CSource(data)
   result = p.parse(csrc)
   print(dos_error_strings[result])
   assert result == error

@@ -1,4 +1,4 @@
-from RomAccess import RomAccess
+from .RomAccess import RomAccess
 
 
 RTC_MATCHWORD  = 0x4AFC
@@ -145,10 +145,10 @@ class ResidentScan:
           base_map[base_addr] += 1
     # one match
     if len(base_map) == 1:
-      addr = base_map.keys()[0]
+      addr = list(base_map.keys())[0]
       return addr
     else:
-      return sorted(base_map.keys(), key=lambda x:base_map[x])
+      return sorted(list(base_map.keys()), key=lambda x:base_map[x])
 
   def get_all_resident_pos(self):
     offs = self.get_all_matchwords()

@@ -1,7 +1,7 @@
 from amitools.vamos.astructs import AccessStruct, AnchorPathStruct, AChainStruct, FileInfoBlockStruct
-from PathMatch import PathMatch
+from .PathMatch import PathMatch
 from amitools.vamos.label import LabelStruct
-from Error import *
+from .Error import *
 
 class MatchFirstNext:
 
@@ -137,7 +137,7 @@ class MatchFirstNext:
 
     # no dodir -> use matcher
     if path == None:
-      path = self.matcher.next()
+      path = next(self.matcher)
       # no more matches
       if path == None:
         return ERROR_NO_MORE_ENTRIES

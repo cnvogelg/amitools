@@ -194,7 +194,7 @@ def pattern_parse(src_str, ignore_case=True, star_is_wild=False):
   return Pattern(src_str, dst, ignore_case, has_wild)
 
 def _dump(num, level, txt):
-  print "%02d" % num," " * level,txt
+  print("%02d" % num," " * level,txt)
 
 def pattern_dump(pattern):
   level = 0
@@ -341,8 +341,8 @@ def pattern_match(pattern, in_str, ignore_case=True, debug=False):
         cmdx = p_txt[cmd]
       else:
         cmdx = p_ch
-      print "match: pat_pos=%d str_pos=%d p_ch=%s markers=%s" % \
-        (pat_pos, str_pos, cmdx, markers)
+      print("match: pat_pos=%d str_pos=%d p_ch=%s markers=%s" % \
+        (pat_pos, str_pos, cmdx, markers))
     
     # --- REPBEG - repeat begin ----------------------------------------------
     if cmd == P_REPBEG:
@@ -376,7 +376,7 @@ def pattern_match(pattern, in_str, ignore_case=True, debug=False):
         # drop all markers including my NOT marker
         markers.drop(pos)
         if debug:
-          print "strip markers"
+          print("strip markers")
       else:
         m = markers.get(pos)
         str_pos += 1
@@ -384,7 +384,7 @@ def pattern_match(pattern, in_str, ignore_case=True, debug=False):
         if str_pos > m.str_pos:
           m.str_pos = str_pos
           if debug:
-            print "update marker:",m
+            print("update marker:",m)
 
       # try next marker
       get_next_marker = True
@@ -522,12 +522,12 @@ def pattern_match(pattern, in_str, ignore_case=True, debug=False):
         str_pos += 1
         pat_pos += 1
         if debug:
-          print "\tchar match: %c == %c" % (p_ch, s_ch)
+          print("\tchar match: %c == %c" % (p_ch, s_ch))
 
       # no char match
       else:
         if debug:
-          print "\tchar mismatch: %c != %c" % (p_ch, s_ch)
+          print("\tchar mismatch: %c != %c" % (p_ch, s_ch))
         get_next_marker = True
 
     # get next marker to try
@@ -536,7 +536,7 @@ def pattern_match(pattern, in_str, ignore_case=True, debug=False):
       if m == None:
         return False
       if debug:
-        print "next marker:",m," on stack:",markers
+        print("next marker:",m," on stack:",markers)
       (flag, pat_pos, str_pos) = m.get()
       if flag and str_pos < n_str:
         markers.push(Marker(True, pat_pos, str_pos + 1))
@@ -547,16 +547,16 @@ if __name__ == '__main__':
   a = sys.argv[1:]
   a_n = len(a)
   if a_n < 1:
-    print "Usage:",sys.argv[0],"<pattern> [match]"
+    print("Usage:",sys.argv[0],"<pattern> [match]")
   else:
     pat = pattern_parse(a[0])
     if pat == None:
-      print "Error parsing pattern!"
+      print("Error parsing pattern!")
       sys.exit(1)
     else:
       pattern_dump(pat)
       if a_n > 1:
         for a in sys.argv[2:]:
           match = pattern_match(pat, a, debug=True)
-          print "'%s' -> %s" % (a, match)
+          print("'%s' -> %s" % (a, match))
   

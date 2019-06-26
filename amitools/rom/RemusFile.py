@@ -1,4 +1,4 @@
-from __future__ import print_function
+
 
 import os
 import struct
@@ -48,13 +48,13 @@ class RemusRomModuleExtra(object):
 
   def dump(self):
     if len(self.relocs) > 0:
-      print("    relocs: ", ",".join(map(lambda x: "%08x" % x, self.relocs)))
+      print("    relocs: ", ",".join(["%08x" % x for x in self.relocs]))
     if len(self.patches) > 0:
-      print("    patches:", ",".join(map(lambda x: "%08x:%08x" % x, self.patches)))
+      print("    patches:", ",".join(["%08x:%08x" % x for x in self.patches]))
     if len(self.brelocs) > 0:
-      print("    brelocs:", ",".join(map(lambda x: "%08x" % x, self.brelocs)))
+      print("    brelocs:", ",".join(["%08x" % x for x in self.brelocs]))
     if len(self.fixes) > 0:
-      print("    fixes:  ", ",".join(map(lambda x: "%08x:%08x" % x, self.fixes)))
+      print("    fixes:  ", ",".join(["%08x:%08x" % x for x in self.fixes]))
     if self.chk_sum:
       print("    chk_sum: %08x" % self.chk_sum)
 
@@ -225,39 +225,39 @@ class RemusSplitFile(RemusFile):
       # short patch
       if flags & FLAG_SHORT_PATCHES:
         num = self._read_word()
-        for i in xrange(num):
+        for i in range(num):
           offset = self._read_word()
           val = self._read_long()
           patches.append((offset,val))
       # long patch
       if flags & FLAG_LONG_PATCHES:
         num_patches = self._read_word()
-        for i in xrange(num_patches):
+        for i in range(num_patches):
           offset = self._read_long()
           val = self._read_long()
           patches.append((offset,val))
       # short relocs
       if flags & FLAG_SHORT_RELOCS:
         num_short_relocs = self._read_word()
-        for i in xrange(num_short_relocs):
+        for i in range(num_short_relocs):
           off = self._read_word()
           relocs.append(off)
       # long relocs
       if flags & FLAG_LONG_RELOCS:
         num_long_relocs = self._read_word()
-        for i in xrange(num_long_relocs):
+        for i in range(num_long_relocs):
           off = self._read_long()
           relocs.append(off)
       # old dos.library BCPL relocs
       if flags & FLAG_SHORT_BCPL_RELOCS:
         num = self._read_word()
-        for i in xrange(num):
+        for i in range(num):
           off = self._read_word()
           brelocs.append(off)
       # fixes
       if flags & FLAG_FIXES:
         num = self._read_word()
-        for i in xrange(num):
+        for i in range(num):
           off = self._read_long()
           val = self._read_long()
           fixes.append((off,val))
@@ -372,7 +372,7 @@ class RemusFileSet(object):
 
 if __name__ == '__main__':
   import sys
-  import KickRom
+  from . import KickRom
 
   if len(sys.argv) > 0:
     for f in sys.argv[1:]:

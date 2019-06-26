@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 # sphinx config
 
-project = u'amitools'
-copyright = u'2019, Christian Vogelgsang'
-author = u'Christian Vogelgsang'
+project = 'amitools'
+copyright = '2019, Christian Vogelgsang'
+author = 'Christian Vogelgsang'
 
-version = u'0.2'
-release = u'0.2.0'
+version = '0.2'
+release = '0.2.0'
 
 # -- General configuration ---------------------------------------------------
 extensions = [

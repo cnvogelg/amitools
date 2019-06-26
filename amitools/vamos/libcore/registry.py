@@ -18,8 +18,8 @@ class LibRegistry:
 
   def get_all_impls(self):
     """return all registered lib classes"""
-    return self.impls.values()
+    return list(self.impls.values())
 
   def get_all_names(self):
     """return all registered lib class names"""
-    return self.impls.keys()
+    return list(self.impls.keys())

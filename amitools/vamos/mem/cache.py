@@ -146,8 +146,7 @@ class MemoryCache(object):
   def clear_block(self, addr, size, value):
     self._check(addr, size)
     addr -= self.start_addr
-    empty = chr(value) * size
-    self.data[addr:addr+size] = empty
+    self.data[addr:addr+size] = bytes([value] * size)
 
   def copy_block(self, from_addr, to_addr, size):
     self._check(from_addr, size)
@@ -166,12 +165,12 @@ class MemoryCache(object):
       ch = self.data[addr]
       if ch == 0:
         break
-      res.append(chr(ch))
+      res.append(ch)
       addr += 1
-    return "".join(res)
+    return bytes(res).decode('latin-1')
 
   def w_cstr(self, addr, string):
-    data = string + chr(0)
+    data = string.encode('latin1') + b'\0'
     size = len(data)
     self._check(addr, size)
     addr -= self.start_addr
@@ -183,12 +182,14 @@ class MemoryCache(object):
     addr -= self.start_addr
     size = self.data[addr]
     addr += 1
-    return self.data[addr:addr+size]
+    data = self.data[addr:addr+size]
+    return data.decode('latin-1')
 
   def w_bstr(self, addr, string):
-    size = len(string)
+    data = string.encode('latin-1')
+    size = len(data)
     self._check(addr, size)
     addr -= self.start_addr
-    self.data[addr] = chr(size)
+    self.data[addr] = size
     addr += 1
-    self.data[addr:addr+size] = string
+    self.data[addr:addr+size] = data

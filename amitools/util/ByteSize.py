@@ -55,7 +55,7 @@ def parse_byte_size_str(s):
     unit = 1000
   # check for scale
   scale = s[-1]
-  if scale in scale_map.keys():
+  if scale in list(scale_map.keys()):
     factor = unit ** scale_map[scale]
     if n == 1:
       return None
@@ -76,7 +76,7 @@ if __name__ == '__main__':
   for a in sys.argv[1:]:
     v = parse_byte_size_str(a)
     if v != None:
-      print(a, ":", v, "=", to_byte_size_str(v), "=", to_byte_size_str(v, False))
+      print((a, ":", v, "=", to_byte_size_str(v), "=", to_byte_size_str(v, False)))
     else:
-      print(a, ":", v)
+      print((a, ":", v))
       

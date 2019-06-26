@@ -1,4 +1,4 @@
-from __future__ import print_function
+
 import struct
 
 class Relocate:
@@ -104,7 +104,7 @@ class Relocate:
 # mini test
 if __name__ == '__main__':
   import sys
-  from BinFmt import BinFmt
+  from .BinFmt import BinFmt
   bf = BinFmt()
   for a in sys.argv[1:]:
     bi = bf.load_image(a)

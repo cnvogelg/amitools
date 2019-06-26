@@ -1,9 +1,9 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # romtool
 #
 # work with Amiga ROM files aka Kickstarts
 
-from __future__ import print_function
+
 
 import sys
 import argparse
@@ -100,7 +100,7 @@ def do_build_cmd(args):
   fill_byte = int(args.fill_byte, 16)
   rom_rev = args.rom_rev
   if rom_rev is not None:
-    rom_rev = map(int, rom_rev.split("."))
+    rom_rev = list(map(int, rom_rev.split(".")))
   add_footer = args.add_footer
   # select rom builder
   if rom_type == 'kick':
@@ -270,7 +270,7 @@ def do_info_cmd(args):
     ('magic_reset', kh.check_magic_reset()),
     ('is_kick', kh.is_kick_rom())
   ]
-  c = map(lambda x:"%-20s  %s" % (x[0], "ok" if x[1] else "NOK"), checks)
+  c = ["%-20s  %s" % (x[0], "ok" if x[1] else "NOK") for x in checks]
   for i in c:
     print(i)
   values = [
@@ -280,7 +280,7 @@ def do_info_cmd(args):
     ('rom_rev', '%d.%d', kh.read_rom_ver_rev()),
     ('exec_rev', '%d.%d', kh.read_exec_ver_rev())
   ]
-  v = map(lambda x:"%-20s  %s" % (x[0], x[1] % x[2]), values)
+  v = ["%-20s  %s" % (x[0], x[1] % x[2]) for x in values]
   for i in v:
     print(i)
 
@@ -387,7 +387,7 @@ def do_scan_cmd(args):
       logging.error("can't guess base address of ROM!")
       return 1
     elif type(base_addr) is list:
-      addrs = map(hex, base_addr)
+      addrs = list(map(hex, base_addr))
       logging.error("multiple addresses guessed: %s", ",".join(addrs))
       return 2
     else:

@@ -5,9 +5,9 @@ import uuid
 from amitools.vamos.log import log_lock
 
 from amitools.vamos.astructs import AccessStruct, FileLockStruct, DateStampStruct
-from DosProtection import DosProtection
-from AmiTime import *
-from Error import *
+from .DosProtection import DosProtection
+from .AmiTime import *
+from .Error import *
 
 class Lock:
   """represent an AmigaOS Lock in vamos"""

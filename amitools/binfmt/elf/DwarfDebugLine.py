@@ -1,5 +1,5 @@
-from __future__ import print_function
-import StringIO
+
+import io
 import struct
 
 class LineState:
@@ -52,7 +52,7 @@ class DwarfDebugLine:
     # get (optional) relocations
     rela = elf_file.get_section_by_name(".rela.debug_line")
     # start parsing
-    self.input = StringIO.StringIO(debug_line.data)
+    self.input = io.StringIO(debug_line.data)
     # decode header
     if not self.decode_header():
       return False
@@ -308,7 +308,7 @@ class DwarfDebugLine:
 # mini test
 if __name__ == '__main__':
   import sys
-  from ELFReader import ELFReader
+  from .ELFReader import ELFReader
   reader = ELFReader()
   for a in sys.argv[1:]:
     f = open(a, "rb")

@@ -1,4 +1,4 @@
-from __future__ import print_function
+
 
 import os
 import sys
@@ -60,7 +60,7 @@ gen_tool_src = "musashi/m68kmake.c"
 gen_tool_obj = "build/musashi/m68kmake.o"
 gen_input = "musashi/m68k_in.c"
 gen_dir = "gen"
-gen_src = list(map(lambda x: os.path.join(gen_dir, x), gen_src))
+gen_src = list([os.path.join(gen_dir, x) for x in gen_src])
 build_dir = "build"
 
 # check compiler
@@ -252,5 +252,5 @@ setup(
     # win problems:
     #    use_scm_version=True,
     include_package_data=True,
-    python_requires='~=2.7'
+    python_requires='~=3.4'
 )

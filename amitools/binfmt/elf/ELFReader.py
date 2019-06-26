@@ -2,8 +2,8 @@
 
 import struct
 import os
-from ELF import *
-from ELFFile import *
+from .ELF import *
+from .ELFFile import *
 
 
 class ELFReader:
@@ -13,7 +13,7 @@ class ELFReader:
     shentsize = ef.header.shentsize
     f.seek(shoff, os.SEEK_SET)
     shnum = ef.header.shnum
-    for i in xrange(shnum):
+    for i in range(shnum):
       sh = ELFSectionHeader()
       sh_data = f.read(shentsize)
       sh.parse(sh_data)
@@ -141,7 +141,7 @@ class ELFReader:
 
       # add entry to section list
       tgt_sect = entry.section
-      if by_sect.has_key(tgt_sect):
+      if tgt_sect in by_sect:
         by_sect_list = by_sect[tgt_sect]
       else:
         by_sect_list = []

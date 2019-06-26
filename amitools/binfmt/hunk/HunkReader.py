@@ -2,9 +2,9 @@
 
 import os
 import struct
-import StringIO
+import io
 from types import *
-from Hunk import *
+from .Hunk import *
 
 class HunkReader:
   """Load Amiga executable Hunk structures"""
@@ -30,12 +30,12 @@ class HunkReader:
           result.append(v)
       return "[" + ",".join(result) + "]"
     elif type(obj) == DictType:
-      if obj.has_key('type_name'):
+      if 'type_name' in obj:
         type_name = obj['type_name']
         return type_name.replace('HUNK_','')
       else:
         result = []
-        for k in obj.keys():
+        for k in list(obj.keys()):
           v = self.get_struct_summary(obj[k])
           if v != None:
             result.append(k + ":" + v)
@@ -129,7 +129,7 @@ class HunkReader:
     # determine number of hunks in size table
     num_hunks = last_hunk - first_hunk + 1
     hunk_table = []
-    for a in xrange(num_hunks):
+    for a in range(num_hunks):
       hunk_info = {}
       hunk_size = self.read_long(f)
       if hunk_size < 0:
@@ -194,7 +194,7 @@ class HunkReader:
         return RESULT_INVALID_HUNK_FILE
 
       offsets = []
-      for a in xrange(num_relocs & 0xffff):
+      for a in range(num_relocs & 0xffff):
         offset = self.read_long(f)
         if offset < 0:
           self.error_string = "%s has invalid relocation #%d offset %d (num_relocs=%d hunk_num=%d, offset=%d)" \
@@ -228,7 +228,7 @@ class HunkReader:
       offsets = []
       count = num_relocs & 0xffff
       total_words += count + 2
-      for a in xrange(count):
+      for a in range(count):
         offset = self.read_word(f)
         if offset < 0:
           self.error_string = "%s has invalid relocation #%d offset %d (num_relocs=%d hunk_num=%d, offset=%d)" \
@@ -380,7 +380,7 @@ class HunkReader:
       # for all hunks in unit
       ihunks = []
       unit['hunk_infos'] = ihunks
-      for a in xrange(num_hunks):
+      for a in range(num_hunks):
         ihunk = {}
         ihunks.append(ihunk)
 
@@ -401,7 +401,7 @@ class HunkReader:
         if num_refs > 0:
           refs = []
           ihunk['refs'] = refs
-          for b in xrange(num_refs):
+          for b in range(num_refs):
             ref = {}
             name_offset = self.read_word(f)
             total_size -= 2
@@ -421,7 +421,7 @@ class HunkReader:
         if num_defs > 0:
           defs = []
           ihunk['defs'] = defs
-          for b in xrange(num_defs):
+          for b in range(num_defs):
             name_offset = self.read_word(f)
             def_value = self.read_word(f)
             def_type_flags = self.read_word(f)
@@ -470,7 +470,7 @@ class HunkReader:
       ext = { 'type' : ext_type, 'name' : ext_name }
 
       # check and setup type name
-      if not ext_names.has_key(ext_type):
+      if ext_type not in ext_names:
         self.error_string = "%s has unspported ext entry %d" % (hunk['type_name'],ext_type)
         return RESULT_INVALID_HUNK_FILE
       ext['type_name'] = ext_names[ext_type]
@@ -489,7 +489,7 @@ class HunkReader:
         if num_refs == 0:
           num_refs = 1
         refs = []
-        for a in xrange(num_refs):
+        for a in range(num_refs):
           ref = self.read_long(f)
           refs.append(ref)
         ext['refs'] = refs
@@ -528,7 +528,7 @@ class HunkReader:
 
   """Read a hunk from memory"""
   def read_mem(self, name, data):
-    fobj = StringIO.StringIO(data)
+    fobj = io.StringIO(data)
     return self.read_file_obj(name, fobj)
 
   def read_file_obj(self, hfile, f):
@@ -565,7 +565,7 @@ class HunkReader:
       hunk_flags = hunk_raw_type & HUNK_FLAGS_MASK
 
       # check range of hunk type
-      if not hunk_names.has_key(hunk_type):
+      if hunk_type not in hunk_names:
         # no hunk file?
         if is_first_hunk:
           self.error_string = "No hunk file: '%s' type was %d" % (hfile, hunk_type)
@@ -913,7 +913,7 @@ class HunkReader:
         if lib_off == hunk_offset:
           # found segment
           num_segs = len(unit['hunk_infos'])
-          for i in xrange(num_segs):
+          for i in range(num_segs):
             info = unit['hunk_infos'][i]
             seg = segment_list[hunk_no+i]
             unit_segments.append(seg)

@@ -1,7 +1,7 @@
-from __future__ import print_function
+
 
 import os
-import StringIO
+import io
 
 class ScanFile:
   """a file that is currently scanned"""
@@ -69,7 +69,7 @@ class ScanFile:
     # create a string buffer
     else:
       data = src_fobj.read()
-      fobj = StringIO.StringIO(data)
+      fobj = io.StringIO(data)
     # close old scan file
     src_fobj.close()
     # create promoted file

@@ -40,7 +40,7 @@ def machine_mem_rw_test():
   with pytest.raises(struct.error):
     mem.w32(0x100, -3)
   # invalid type
-  with pytest.raises(ValueError):
+  with pytest.raises(TypeError):
     mem.w8(0x100, 'hello')
   # invalid type
   with pytest.raises(struct.error):
@@ -113,16 +113,16 @@ def machine_mem_rws_test():
 
 def machine_mem_block_test():
   mem = MockMemory()
-  data = "hello, world!"
+  data = b"hello, world!"
   mem.w_block(0, data)
   assert mem.r_block(0, len(data)) == data
   bdata = bytearray(data)
   mem.w_block(0x100, bdata)
   assert mem.r_block(0x100, len(bdata)) == bdata
   mem.clear_block(0x200, 100, 42)
-  assert mem.r_block(0x200, 100) == chr(42) * 100
+  assert mem.r_block(0x200, 100) == bytes([42] * 100)
   mem.copy_block(0x200, 0x300, 20)
-  assert mem.r_block(0x300, 21) == chr(42) * 20 + chr(0)
+  assert mem.r_block(0x300, 21) == bytes([42] * 20) + b'\0'
 
 
 def machine_mem_cstr_test():

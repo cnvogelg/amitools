@@ -39,7 +39,7 @@ class DiskGeometry:
     algo = None
     if options != None:
       (c, h, s) = self._parse_chs(options)
-      if options.has_key('algo'):
+      if 'algo' in options:
         algo = int(options['algo'])
     # chs if fully specified then take this one
     if c != None and h != None and s != None:
@@ -73,7 +73,7 @@ class DiskGeometry:
       return self.get_num_bytes()
     else:
       # we require a size
-      if not options.has_key('size'):
+      if 'size' not in options:
         return None
       # parse size
       size = options['size']
@@ -83,7 +83,7 @@ class DiskGeometry:
           return None
       # select guess algo
       algo = None
-      if options.has_key('algo'):
+      if 'algo' in options:
         algo = int(options['algo'])
       # guess size
       return self._guess_for_size(size, approx=True, algo=algo, secs=s, heads=h)  
@@ -93,16 +93,16 @@ class DiskGeometry:
     h = None
     s = None
     # chs=<n>,<n>,<n>
-    if options.has_key('chs'):
+    if 'chs' in options:
       comp = options['chs'].split(',')
       if len(comp) == 3:
-        return map(lambda x: int(x), comp)
+        return [int(x) for x in comp]
     else:
-      if options.has_key('s'):
+      if 's' in options:
         s = int(options['s'])
-      if options.has_key('h'):
+      if 'h' in options:
         h = int(options['h'])
-      if options.has_key('c'):
+      if 'c' in options:
         c = int(options['c'])
     return (c,h,s)
 

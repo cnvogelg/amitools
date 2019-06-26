@@ -14,7 +14,7 @@ class DosProtection:
   def __str__(self):
     txt = "[%02x]" % self.mask
     val = 64
-    for i in xrange(7):
+    for i in range(7):
       if self.mask & val == val:
         txt += '-'
       else:

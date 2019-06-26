@@ -1,5 +1,5 @@
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 import struct
 import ctypes
@@ -149,7 +149,7 @@ class Block:
   
   def _calc_chksum(self):
     chksum = 0
-    for i in xrange(self.block_longs):
+    for i in range(self.block_longs):
       if i != self.chk_loc:
         chksum += self._get_long(i)
     return (-chksum) & 0xffffffff

@@ -285,7 +285,7 @@ class VolumeManager(object):
       return self.vols_by_name[lo_name]
 
   def get_all_names(self):
-    return map(lambda x: x.get_name(), self.volumes)
+    return [x.get_name() for x in self.volumes]
 
   def sys_to_ami_path(self, sys_path):
     """try to map an absolute system path back to an amiga path

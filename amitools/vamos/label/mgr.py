@@ -60,7 +60,7 @@ class LabelManager:
   def dump(self):
     r = self.first
     while r != None:
-      print r
+      print(r)
       r = r.next
 
   # This is called quite often and hence

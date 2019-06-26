@@ -1,5 +1,5 @@
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 from .MetaInfo import MetaInfo
 from .RootMetaInfo import RootMetaInfo
@@ -23,7 +23,7 @@ class MetaDB:
     return self.vol_meta
   
   def set_volume_name(self, name):
-    if type(name) != unicode:
+    if type(name) != str:
       raise ValueError("set_volume_name must be unicode")
     self.vol_name = name
   
@@ -37,12 +37,12 @@ class MetaDB:
     return self.dos_type
   
   def set_meta_info(self, path, meta_info):
-    if type(path) != unicode:
+    if type(path) != str:
       raise ValueError("set_meta_info: path must be unicode")
     self.metas[path] = meta_info
   
   def get_meta_info(self, path):
-    if self.metas.has_key(path):
+    if path in self.metas:
       return self.metas[path]
     else:
       return None

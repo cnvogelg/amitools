@@ -1,5 +1,5 @@
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 import subprocess
 import tempfile
@@ -15,7 +15,7 @@ class DisAsm:
     result = []
     for l in lines:
       addr = int(l[0:8],16)
-      word = map(lambda x: int(x,16),l[10:30].split())      
+      word = [int(x,16) for x in l[10:30].split()]      
       code = l[30:]
       result.append((addr,word,code))
     return result
@@ -29,7 +29,7 @@ class DisAsm:
         code = l[26:]
       
         addr = int(addr_str,16)
-        word = map(lambda x: int(x,16),word_str)
+        word = [int(x,16) for x in word_str]
         result.append((addr,word,code))
     return result
  
@@ -58,5 +58,5 @@ class DisAsm:
 
   def dump(self, code):
     for line in code:
-      ops = map(lambda x : "%04x" % x, line[1])
+      ops = ["%04x" % x for x in line[1]]
       print("%08x:  %-20s  %s" % (line[0]," ".join(ops),line[2]))

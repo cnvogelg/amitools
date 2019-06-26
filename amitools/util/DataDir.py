@@ -1,6 +1,6 @@
 # DataDir.py - return location of my data directory
 
-from __future__ import print_function
+
 
 import os.path
 

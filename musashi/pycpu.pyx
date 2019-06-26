@@ -153,7 +153,7 @@ cdef class CPU:
     cdef char line[80]
     cdef unsigned int size
     size = m68k_disassemble(line, pc, self.cpu_type)
-    return (size, line)
+    return (size, line.decode('latin-1'))
 
   def get_cpu_context(self):
     cdef unsigned int size = m68k_context_size()

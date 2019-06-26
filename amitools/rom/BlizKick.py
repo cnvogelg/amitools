@@ -82,6 +82,6 @@ if __name__ == '__main__':
       bin_img = bf.load_image(f)
       print(bin_img)
       bkm = BlizKickModule(bin_img)
-      print(bkm.bk_type)
+      print((bkm.bk_type))
       bkm.fix_module()
 

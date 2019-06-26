@@ -20,7 +20,7 @@ code_hex = (
   0x51ca, 0xfff6,
   0x4e75
 )
-code_bin = "".join(map(lambda x:struct.pack(">H",x), code_hex))
+code_bin = b"".join([struct.pack(">H",x) for x in code_hex])
 
 def _setup_fragment(ctx, fmt_str, put_proc):
   fmt_len = len(fmt_str)

@@ -1,5 +1,5 @@
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 import os.path
 import sys
@@ -36,7 +36,7 @@ class BootBlock(Block):
       self.got_root_blk = self.calc_root_blk      
     # create extra blks
     self.extra_blks = []
-    for i in xrange(self.num_extra):
+    for i in range(self.num_extra):
       b = Block(self.blkdev, self.blk_num + 1 + i)
       b._create_data()
       self.extra_blks.append(b)
@@ -60,7 +60,7 @@ class BootBlock(Block):
     n = self.blkdev.block_longs
     chksum = 0
     for blk in all_blks:
-      for i in xrange(n):
+      for i in range(n):
         if i != 1: # skip chksum
           chksum += blk._get_long(i)
           if chksum > 0xffffffff:
@@ -72,7 +72,7 @@ class BootBlock(Block):
     self._read_data()
     # read extra boot blocks
     self.extra_blks = []
-    for i in xrange(self.num_extra):
+    for i in range(self.num_extra):
       b = Block(self.blkdev, self.blk_num + 1 + i)
       b._read_data()
       self.extra_blks.append(b)

@@ -1,4 +1,4 @@
-from __future__ import print_function
+
 from amitools.vamos.log import log_prof
 from amitools.vamos.profiler import Profiler
 from amitools.vamos.cfgcore import ConfigDict
@@ -155,7 +155,7 @@ class LibProfileData(object):
     self.fd = fd
     num_func = fd.get_num_indices()
     self.func_table = []
-    for idx in xrange(num_func):
+    for idx in range(num_func):
       fd_func = fd.get_func_by_index(idx)
       if fd_func:
         name = fd_func.get_name()
@@ -282,7 +282,7 @@ class LibProfiler(Profiler):
       # prof.remove_empty()
     num_libs = self.get_num_libs()
     if num_libs == 0:
-      log_prof.warn("profiling enabled but no lib profiles found!")
+      log_prof.warning("profiling enabled but no lib profiles found!")
 
   def create_profile(self, lib_name, fd, func_tags=None):
     """get or create a new profile for a library"""

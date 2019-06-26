@@ -25,12 +25,12 @@ class CPUState:
     # data register
     dx = []
     self.dx = dx
-    for i in xrange(8):
+    for i in range(8):
       dx.append(cpu.r_reg(i))
     # addr register
     ax = []
     self.ax = ax
-    for i in xrange(8):
+    for i in range(8):
       ax.append(cpu.r_reg(8+i))
 
   def set(self, cpu):

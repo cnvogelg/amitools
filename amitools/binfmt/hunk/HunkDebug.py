@@ -1,6 +1,6 @@
-from __future__ import print_function
+
 import struct
-import StringIO
+import io
 
 
 class HunkDebugLineEntry:
@@ -56,7 +56,7 @@ class HunkDebugAny:
 class HunkDebug:
   def encode(self, debug_info):
     """encode a debug info and return a debug_data chunk"""
-    out = StringIO.StringIO()
+    out = io.StringIO()
     # +0: base offset
     self._write_long(out, debug_info.base_offset)
     # +4: type tag
@@ -140,7 +140,7 @@ class HunkDebug:
 # ----- mini test -----
 if __name__ == '__main__':
   import sys
-  from HunkBlockFile import HunkBlockFile, HunkDebugBlock
+  from .HunkBlockFile import HunkBlockFile, HunkDebugBlock
   hd = HunkDebug()
   for a in sys.argv[1:]:
     hbf = HunkBlockFile()

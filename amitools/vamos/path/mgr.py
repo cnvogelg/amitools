@@ -474,7 +474,7 @@ class PathManager:
       else:
         res = cmd_paths
       # join our name
-      res = list(map(lambda x: x.join(ami_path), res))
+      res = list([x.join(ami_path) for x in res])
       # add current dir
       if prepend_cur_dir:
         cur_dir = env.get_cwd()

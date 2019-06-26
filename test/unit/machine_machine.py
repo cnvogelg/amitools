@@ -1,4 +1,4 @@
-from __future__ import print_function
+
 from amitools.vamos.machine import Machine, CPUState
 from amitools.vamos.machine.opcodes import *
 from amitools.vamos.error import *

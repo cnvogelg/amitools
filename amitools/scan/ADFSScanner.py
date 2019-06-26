@@ -1,6 +1,6 @@
 """Scan an ADF image an visit all files"""
 
-import StringIO
+import io
 
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 from amitools.fs.ADFSVolume import ADFSVolume
@@ -50,7 +50,7 @@ class ADFSScanner:
       node.flush()
       size = len(data)
       path = node.get_node_path_name().get_unicode()
-      fobj = StringIO.StringIO(data)
+      fobj = io.StringIO(data)
       sf = scan_file.create_sub_path(path, fobj, size, True, False)
       ok = scanner.scan_obj(sf)
       sf.close()
@@ -59,17 +59,17 @@ class ADFSScanner:
 # mini test
 if __name__ == '__main__':
   import sys
-  from FileScanner import FileScanner
+  from .FileScanner import FileScanner
 
   ifs = ['*.txt']
   def handler(scan_file):
     print(scan_file)
     return True
   def skip_handler(scan_file):
-    print("SKIP:", scan_file)
+    print(("SKIP:", scan_file))
     return True
   def error_handler(scan_file, error):
-    print("FAILED:", scan_file, error)
+    print(("FAILED:", scan_file, error))
     raise error
   scanners = [ADFSScanner()]
   fs = FileScanner(handler, ignore_filters=ifs, error_handler=error_handler,

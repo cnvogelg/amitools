@@ -1,6 +1,6 @@
 import os
 import cProfile
-import StringIO
+import io
 import pstats
 
 from .cfg import VamosMainParser
@@ -167,13 +167,13 @@ def main_profile(cfg_files=None, args=None, cfg_dict=None,
   cpr.dump_stats(profile_file)
   # show profile?
   if dump_profile:
-    sio = StringIO.StringIO()
+    sio = io.StringIO()
     sortby = 'cumulative'
     ps = pstats.Stats(cpr, stream=sio).sort_stats(sortby)
     ps.strip_dirs()
     ps.print_stats()
     txt = sio.getvalue()
     lines = txt.split('\n')
-    for i in xrange(min(25, len(lines))):
-      print(lines[i])
+    for i in range(min(25, len(lines))):
+      print((lines[i]))
   return ret_code

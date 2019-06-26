@@ -1,10 +1,10 @@
-from __future__ import print_function
+
 
 from amitools.binfmt.BinImage import *
-from ELFFile import *
-from ELF import *
-from ELFReader import ELFReader
-from DwarfDebugLine import DwarfDebugLine
+from .ELFFile import *
+from .ELF import *
+from .ELFReader import ELFReader
+from .DwarfDebugLine import DwarfDebugLine
 
 
 class BinFmtELF:
@@ -66,14 +66,14 @@ class BinFmtELF:
       seg_type = None
       name = sect.name_str
       flags = 0
-      if name == '.text':
+      if name == b'.text':
         seg_type = SEGMENT_TYPE_CODE
-      elif name == '.data':
+      elif name == b'.data':
         seg_type = SEGMENT_TYPE_DATA
-      elif name == '.rodata':
+      elif name == b'.rodata':
         seg_type = SEGMENT_TYPE_DATA
         flags = SEGMENT_FLAG_READ_ONLY
-      elif name == '.bss':
+      elif name == b'.bss':
         seg_type = SEGMENT_TYPE_BSS
       # we got a segment
       if seg_type is not None:

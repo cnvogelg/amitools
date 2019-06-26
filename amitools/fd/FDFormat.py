@@ -86,7 +86,7 @@ def read_fd(fname):
           elif cmd == "end":
             break
           else:
-            print "Invalid command:",cmda
+            print("Invalid command:",cmda)
             return None
         # a function
         else:
@@ -107,8 +107,8 @@ def read_fd(fname):
             if len(arg) != len(reg):
               # hack for double reg args found in mathieeedoub* libs
               if len(arg) * 2 == len(reg):
-                arg_hi = map(lambda x: x + "_hi", arg)
-                arg_lo = map(lambda x: x + "_lo", arg)
+                arg_hi = [x + "_hi" for x in arg]
+                arg_lo = [x + "_lo" for x in arg]
                 arg = [x for pair in zip(arg_hi, arg_lo) for x in pair]
               else:
                 raise IOError("Reg and Arg name mismatch in FD File")
@@ -147,8 +147,8 @@ def write_fd(fname, fd, add_private):
       if args == None:
         line += "()()"
       else:
-        line += "(" + ",".join(map(lambda x : x[0], args)) + ")"
-        line += "(" + "/".join(map(lambda x : x[1], args)) + ")"
+        line += "(" + ",".join([x[0] for x in args]) + ")"
+        line += "(" + "/".join([x[1] for x in args]) + ")"
       fo.write("%s\n" % line)
   fo.write("##end\n")
   fo.close()

@@ -12,13 +12,13 @@ class MockCPU(object):
     self.sr = 0
 
   def _check_val(self, val, max_val=0xffffffff):
-    if type(val) not in (int, long):
+    if type(val) not in (int, int):
       raise TypeError("value is not an int!: %s" % val)
     if val < 0 or val > max_val:
       raise OverflowError("value is out of range: %s" % val)
 
   def _check_sval(self, val, min_val=-0x80000000, max_val=0x7fffffff):
-    if type(val) not in (int, long):
+    if type(val) not in (int, int):
       raise TypeError("value is not an int!: %s" % val)
     if val < min_val or val > max_val:
       raise OverflowError("value is out of range: %s" % val)

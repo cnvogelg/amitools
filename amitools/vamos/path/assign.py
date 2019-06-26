@@ -119,7 +119,7 @@ class AssignManager(object):
       a.is_setup = False
 
   def get_all_names(self):
-    return map(lambda x: x.get_name(), self.assigns)
+    return [x.get_name() for x in self.assigns]
 
   def get_assign(self, name):
     lo_name = name.lower()
@@ -212,7 +212,7 @@ class AssignManager(object):
                       name, elements)
         assign.append(elements)
         return assign
-      log_path.warn("can't append to non-existing assign: '%s'", name)
+      log_path.warning("can't append to non-existing assign: '%s'", name)
       # fall through
     log_path.info("create new assign: name='%s': %r",
                   name, elements)
@@ -263,7 +263,7 @@ class AssignManager(object):
     else:
       # is assign
       name = split[0].lower()
-      if self.assigns_by_name.has_key(name):
+      if name in self.assigns_by_name:
         remainder = split[1]
         assign = self.assigns_by_name[name]
         aname_list = assign.get_assigns()

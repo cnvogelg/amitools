@@ -1,4 +1,4 @@
-from __future__ import print_function
+
 
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl

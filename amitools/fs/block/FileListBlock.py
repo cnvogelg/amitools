@@ -1,5 +1,5 @@
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 from .Block import Block
 
@@ -30,7 +30,7 @@ class FileListBlock(Block):
     if bc > mbc:
       bc = mbc
     self.data_blocks = []
-    for i in xrange(bc):
+    for i in range(bc):
       self.data_blocks.append(self._get_long(-51-i))
     
     self.parent = self._get_long(-3)
@@ -55,7 +55,7 @@ class FileListBlock(Block):
     self._put_long(2, self.block_count)
     
     # data blocks
-    for i in xrange(len(self.data_blocks)):
+    for i in range(len(self.data_blocks)):
       self._put_long(-51-i, self.data_blocks[i])
     
     self._put_long(-3, self.parent)

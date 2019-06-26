@@ -58,19 +58,19 @@ class FSError(Exception):
     return self.__unicode__().encode("UTF-8")
     
   def __unicode__(self):
-    if error_names.has_key(self.code):
-      code_str = unicode(error_names[self.code])
+    if self.code in error_names:
+      code_str = str(error_names[self.code])
     else:
-      code_str = u"?"
+      code_str = "?"
     srcs = []
     if self.node != None:
-      srcs.append(u"node=" + unicode(self.node))
+      srcs.append("node=" + str(self.node))
     if self.block != None:
-      srcs.append(u"block=" + unicode(self.block))
+      srcs.append("block=" + str(self.block))
     if self.file_name != None:
-      srcs.append(u"file_name=" + self.file_name.get_unicode())
+      srcs.append("file_name=" + self.file_name.get_unicode())
     if self.extra != None:
-      srcs.append(unicode(self.extra))
-    return u"%s(%d):%s" % (code_str, self.code, ",".join(srcs))
+      srcs.append(str(self.extra))
+    return "%s(%d):%s" % (code_str, self.code, ",".join(srcs))
 
     

@@ -1,5 +1,5 @@
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 import time
 from .Block import Block
@@ -34,7 +34,7 @@ class UserDirBlock(EntryBlock):
     # hash table of entries
     self.hash_table = []
     self.hash_size = self.blkdev.block_longs - 56
-    for i in xrange(self.hash_size):
+    for i in range(self.hash_size):
       self.hash_table.append(self._get_long(6+i))
     
     self.valid = (self.own_key == self.blk_num)
@@ -57,7 +57,7 @@ class UserDirBlock(EntryBlock):
     # empty hash table
     self.hash_table = []
     self.hash_size = self.blkdev.block_longs - 56
-    for i in xrange(self.hash_size):
+    for i in range(self.hash_size):
       self.hash_table.append(0)
     self.valid = True
     return True
@@ -71,7 +71,7 @@ class UserDirBlock(EntryBlock):
     self._put_long(-3, self.parent)
     self._put_long(-2, self.extension)
     # hash table
-    for i in xrange(self.hash_size):
+    for i in range(self.hash_size):
       self._put_long(6+i, self.hash_table[i])
     Block.write(self)
   

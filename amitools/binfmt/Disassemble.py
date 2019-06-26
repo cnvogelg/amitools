@@ -1,5 +1,5 @@
 from amitools.util.DisAsm import DisAsm
-from BinImage import *
+from .BinImage import *
 
 class Disassemble:
   """allows to disassemble code segments of a BinImage"""
@@ -45,7 +45,7 @@ class Disassemble:
         result.append(line)
 
       # create final line
-      line = "%08x\t%-20s\t%-30s  " % (addr," ".join(map(lambda x: "%04x" %x, word)),code)
+      line = "%08x\t%-20s\t%-30s  " % (addr," ".join(["%04x" %x for x in word]),code)
 
       # create line info
       size = len(word) * 2
@@ -63,7 +63,7 @@ class Disassemble:
 # mini test
 if __name__ == '__main__':
   import sys
-  from BinFmt import BinFmt
+  from .BinFmt import BinFmt
   bf = BinFmt()
   for a in sys.argv[1:]:
     bi = bf.load_image(a)

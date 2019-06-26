@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 #
 # fdtool <file.fd> ...
 #
@@ -12,13 +12,13 @@ import amitools.fd.FDFormat as FDFormat
 
 def dump(fname, fd, add_private):
   print(fname)
-  print("  base: %s" % fd.get_base_name())
+  print(("  base: %s" % fd.get_base_name()))
   funcs = fd.get_funcs()
   num = 1
   for f in funcs:
     if add_private or not f.is_private():
       bias = f.get_bias()
-      print("  #%04d  %5d  0x%04x  %30s %s" % (num,bias,bias,f.get_name(),f.get_arg_str()))
+      print(("  #%04d  %5d  0x%04x  %30s %s" % (num,bias,bias,f.get_name(),f.get_arg_str())))
       num += 1
 
 # ----- generate -----
@@ -32,7 +32,7 @@ def generate_python_code(fd, add_private):
         args = tuple(args)
       else:
         args = None
-      print "    (%d, '%s', %s)," % (f.get_bias(),f.get_name(),args)
+      print("    (%d, '%s', %s)," % (f.get_bias(),f.get_name(),args))
 
 def generate_sasc_code(fname, fd, add_private, prefix=""):
   funcs = fd.get_funcs()

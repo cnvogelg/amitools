@@ -112,44 +112,44 @@ def mem_cache_rwxs_read_test():
 
 def mem_cache_block_write_test():
   mem = MemoryCache(0x100, 0x220)
-  data = "hello, world!"
+  data = b"hello, world!"
   mem.w_block(0x100, data)
   assert mem.r_block(0x100, len(data)) == data
   bdata = bytearray(data)
   mem.w_block(0x180, bdata)
   assert mem.r_block(0x180, len(bdata)) == bdata
   mem.clear_block(0x200, 100, 42)
-  assert mem.r_block(0x200, 100) == chr(42) * 100
+  assert mem.r_block(0x200, 100) == bytes([42] * 100)
   mem.copy_block(0x200, 0x300, 20)
-  assert mem.r_block(0x300, 21) == chr(42) * 20 + chr(0)
+  assert mem.r_block(0x300, 21) == bytes([42] * 20) + b'\0'
   # write to main mem
   main_mem = MockMemory()
   mem.write_cache(main_mem)
   assert main_mem.r_block(0x100, len(data)) == data
   assert main_mem.r_block(0x180, len(bdata)) == bdata
-  assert main_mem.r_block(0x200, 100) == chr(42) * 100
-  assert main_mem.r_block(0x300, 21) == chr(42) * 20 + chr(0)
+  assert main_mem.r_block(0x200, 100) == bytes([42] * 100)
+  assert main_mem.r_block(0x300, 21) == bytes([42] * 20) + b'\0'
 
 
 def mem_cache_block_read_test():
   mem = MockMemory()
-  data = "hello, world!"
+  data = b"hello, world!"
   mem.w_block(0x100, data)
   assert mem.r_block(0x100, len(data)) == data
   bdata = bytearray(data)
   mem.w_block(0x180, bdata)
   assert mem.r_block(0x180, len(bdata)) == bdata
   mem.clear_block(0x200, 100, 42)
-  assert mem.r_block(0x200, 100) == chr(42) * 100
+  assert mem.r_block(0x200, 100) == bytes([42] * 100)
   mem.copy_block(0x200, 0x300, 20)
-  assert mem.r_block(0x300, 21) == chr(42) * 20 + chr(0)
+  assert mem.r_block(0x300, 21) == bytes([42] * 20) + b'\0'
   # write to main mem
   cmem = MemoryCache(0x100, 0x220)
   cmem.read_cache(mem)
   assert cmem.r_block(0x100, len(data)) == data
   assert cmem.r_block(0x180, len(bdata)) == bdata
-  assert cmem.r_block(0x200, 100) == chr(42) * 100
-  assert cmem.r_block(0x300, 21) == chr(42) * 20 + chr(0)
+  assert cmem.r_block(0x200, 100) == bytes([42] * 100)
+  assert cmem.r_block(0x300, 21) == bytes([42] * 20) + b'\0'
 
 
 def mem_cache_cstr_write_test():

@@ -1,5 +1,5 @@
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 from .ProtectFlags import *
 from .TimeStamp import *
@@ -21,10 +21,10 @@ class MetaInfo:
     res.append(self.get_mod_time_str())
     comment = self.get_comment()
     if comment == None:
-      res.append(u'')
+      res.append('')
     else:
       res.append(self.get_comment().get_unicode())
-    return u'  '.join(res)
+    return '  '.join(res)
     
   def get_mod_time_str(self):
     if self.mod_ts != None:
@@ -109,4 +109,4 @@ class MetaInfo:
     if self.comment != None:
       return self.comment.get_unicode()
     else:
-      return u""
+      return ""

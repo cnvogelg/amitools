@@ -159,11 +159,11 @@ class LibImplScanner(object):
           "'%s' impl has %d error funcs: %s" % (name, num_error, txt))
 
   def _check_argspec(self, method):
-    (args, varargs, keywords, defaults) = inspect.getargspec(method)
-    if varargs is not None:
+    fas = inspect.getfullargspec(method)
+    if fas.varargs is not None:
       return False
-    if keywords is not None:
+    if fas.varkw is not None:
       return False
-    if defaults is not None:
+    if fas.defaults is not None:
       return False
-    return args == ['self', 'ctx']
+    return fas.args == ['self', 'ctx']

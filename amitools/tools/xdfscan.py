@@ -1,9 +1,9 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # xdfscan
 # quickly scan large sets of Amiga disk image files
 
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 import sys
 import argparse
