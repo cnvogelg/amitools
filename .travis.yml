@@ -4,18 +4,20 @@ python:
   - "3.4"
   - "3.5"
   - "3.6"
-  - "3.7"
 env:
   - PIP=pip
 
 matrix:
   include:
     - os: linux
+      python: 3.7
+      dist: xenial
+      sudo: true
     - os: osx
       language: generic
       env:
-        - TOXENV=py27
-        - PIP=pip2
+        - TOXENV=py36
+        - PIP=pip3
 
 install:
   - |
