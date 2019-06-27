@@ -12,6 +12,7 @@ class KickRomAccess(RomAccess):
   ROMHDR_SIZE = 8
   ROMHDR_256K = 0x11114ef9
   ROMHDR_512K = 0x11144ef9
+  ROMHDR_EXT  = 0x11144ef9
 
   def __init__(self, rom_data):
     RomAccess.__init__(self, rom_data)
@@ -38,7 +39,8 @@ class KickRomAccess(RomAccess):
     if self.kib == 512:
       return val == self.ROMHDR_512K
     elif self.kib == 256:
-      return val == self.ROMHDR_256K
+      # Extended roms also have 0x11144ef9
+      return (val == self.ROMHDR_256K) or (val == self.ROMHDR_EXT)
     else:
       return False
 
