@@ -52,7 +52,7 @@ def do_split_cmd(args):
   rs = RomSplitter()
   rom = rs.find_rom(ri)
   if rom is None:
-    logging.error(ri, "not found in split database!")
+    logging.error("'%s' was not found in split database!", ri)
     return 100
   else:
     rs.print_rom(logging.info)
