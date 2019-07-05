@@ -283,11 +283,14 @@ class UnpackCmd(Command):
   def handle_vol(self, vol):
     n = len(self.opts)
     if n == 0:
-      print("Usage: unpack <out_path>")
+      print("Usage: unpack <out_path> [fsuae]")
       return 1
     else:
+      meta_mode = Imager.META_MODE_DB
+      if 'fsuae' in self.opts:
+        meta_mode = Imager.META_MODE_FSUAE
       out_path = self.opts[0]
-      img = Imager()
+      img = Imager(meta_mode=meta_mode)
       img.unpack(vol, out_path)
       if self.args.verbose:
         print("Unpacked %d bytes" % (img.get_total_bytes()))

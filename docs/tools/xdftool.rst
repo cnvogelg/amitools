@@ -524,7 +524,7 @@ expand or shrink the image.
 
 ::
 
-  unpack <sys_dir>
+  unpack <sys_dir> [fsuae]
 
 The disk image volume's directory tree will be completely extracted to the
 host file system at ``<sys_dir>``. First a directory with the volume's name is
@@ -538,10 +538,15 @@ A ``<volume_name>.bootcode`` file is created if the disk image is bootable. A
 ``<volume_name>.blkdev`` file is created to store the disk geometry of disk
 image's block device.
 
+If ``fsuae`` option is given then the meta data of each file is written to
+a FS-UAE compatible ``.uaem`` file right next to the original file. Use this
+option if you want to use the unpacked directory as a volume inside FS-UAE.
+
 Example::
 
   > xdftool mydisk.adf unpack .   ; unpack full image to current directory
   > xdftool mydisk.hdf unpack .   ; same for hard disk images
+  > xdftool mydisk.hdf unpack .  fsuae  ; store meta info in .uaem files
 
 
 ``pack`` - Create a disk image from host files
@@ -558,6 +563,9 @@ in the disk image will be lost and overwritten!!!
 If a MetaDB called ``<volume_dir>.xdfmeta`` exists then the files in the
 images will be created with correct protection flags, modification time and
 comment.
+
+Pack automatically detects if a FS-UAE meta file with ``.uaem`` extension is
+available and then extracts the file's meta info there.
 
 If a boot code file called ``<volume_dir>.bootcode`` is available then this
 code is written to the image``s boot block and made bootable.
