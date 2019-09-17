@@ -219,7 +219,7 @@ def do_diff_cmd(args):
   if args.rom_addr:
     base_addr = int(args.rom_addr, 16)
   elif args.show_address:
-    kh = KickRom.Helper(rom_a)
+    kh = KickRom.KickRomAccess(rom_a)
     if kh.is_kick_rom():
       base_addr = kh.get_base_addr()
     else:
@@ -237,7 +237,7 @@ def do_dump_cmd(args):
   if args.rom_addr:
     base_addr = int(args.rom_addr, 16)
   elif args.show_address:
-    kh = KickRom.Helper(rom)
+    kh = KickRom.KickRomAccess(rom)
     if kh.is_kick_rom():
       base_addr = kh.get_base_addr()
     else:
