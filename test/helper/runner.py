@@ -207,6 +207,15 @@ class VamosRunner:
 
 class ToolRunner:
 
+  def run_checked(self, tool, *prog_args):
+    ret_code, stdout, stderr = self.run(tool, *prog_args)
+    if stderr:
+      for line in stderr:
+        print(line)
+    assert ret_code == 0
+    assert stderr == []
+    return stdout
+
   def run(self, tool, *prog_args):
     # setup args
     tool_path = os.path.join("..", "bin", tool)
@@ -222,3 +231,21 @@ class ToolRunner:
     stdout = stdout.decode('latin-1').splitlines()
     stderr = stderr.decode('latin-1').splitlines()
     return (p.returncode, stdout, stderr)
+
+  def _get_sha1(self, file_name):
+    h = hashlib.sha1()
+    with open(file_name, "rb") as fh:
+      data = fh.read()
+      h.update(data)
+      return h.hexdigest()
+
+  def skip_if_data_file_not_available(self, file_name, sha1_sum=None):
+    if not os.path.exists(file_name):
+      print("data file not found:", file_name)
+      pytest.skip("data file not found: " + file_name)
+    if sha1_sum:
+      file_sum = self._get_sha1(file_name)
+      print(file_sum, file_name)
+      if file_sum != sha1_sum:
+        raise RuntimeError("data file has wrong hash: got=%s want=%s" %
+                           (file_sum, sha1_sum))

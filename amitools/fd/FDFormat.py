@@ -60,7 +60,7 @@ def generate_fd(lib_name, num_calls=0, add_std_calls=True):
   return func_table
 
 def read_fd(fname):
-  func_pat = "([A-Za-z][_A-Za-z00-9]+)\((.*)\)\((.*)\)"
+  func_pat = r"([A-Za-z][_A-Za-z00-9]+)\((.*)\)\((.*)\)"
   func_table = None
   bias = 0
   private = True

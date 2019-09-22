@@ -65,7 +65,7 @@ class printf_state:
   def __str__(self):
     return "[elements:%s, fragments:%s]" % (list(map(str, self.elements)), self.fragments)
 
-printf_re_format = "%([-]?)([0-9]*\.?[0-9]*)?([l])?([bduxsc%])"
+printf_re_format = r"%([-]?)([0-9]*\.?[0-9]*)?([l])?([bduxsc%])"
 
 def printf_parse_string(string):
   # groups in pattern:

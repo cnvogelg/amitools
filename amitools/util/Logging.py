@@ -2,7 +2,7 @@
 #
 # helper for logging
 
-from . import logging
+import logging
 
 FORMAT='%(asctime)-15s  %(levelname)-10s  %(name)-10s  %(message)s'
 
