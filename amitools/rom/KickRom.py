@@ -85,7 +85,7 @@ class KickRomAccess(RomAccess):
     off = 0
     max_u32 = 0xffffffff
     for i in xrange(num_longs):
-      val = struct.unpack_from(">I", self.rom_data, off)[0]
+      val = struct.unpack_from(">I", buffer(self.rom_data), off)[0]
       if off != skip_off:
         chk_sum += val
       off += 4
@@ -172,7 +172,6 @@ class KickRomAccess(RomAccess):
 
   def get_base_addr(self):
     return self.read_boot_pc() & ~0xffff
-
 
 class Loader(object):
   """Load kick rom images in different formats"""

@@ -219,7 +219,7 @@ def do_diff_cmd(args):
   if args.rom_addr:
     base_addr = int(args.rom_addr, 16)
   elif args.show_address:
-    kh = KickRom.Helper(rom_a)
+    kh = KickRom.KickRomAccess(rom_a)
     if kh.is_kick_rom():
       base_addr = kh.get_base_addr()
     else:
@@ -237,7 +237,7 @@ def do_dump_cmd(args):
   if args.rom_addr:
     base_addr = int(args.rom_addr, 16)
   elif args.show_address:
-    kh = KickRom.Helper(rom)
+    kh = KickRom.KickRomAccess(rom)
     if kh.is_kick_rom():
       base_addr = kh.get_base_addr()
     else:
@@ -250,10 +250,14 @@ def do_copy_cmd(args):
   in_img = args.in_image
   logging.info("loading ROM from '%s'", in_img)
   rom = KickRom.Loader.load(in_img)
+  kh = KickRomAccess(rom)
+  if args.fix_checksum:
+    kh.make_writable()
+    kh.write_check_sum()
   out_img = args.out_image
   logging.info("saving ROM to '%s'", out_img)
   with open(out_img, "wb") as fh:
-    fh.write(rom)
+    fh.write(kh.get_data())
 
 
 def do_info_cmd(args):
@@ -546,10 +550,8 @@ def setup_scan_parser(parser):
 def setup_copy_parser(parser):
   parser.add_argument('in_image', help='rom image to read')
   parser.add_argument('out_image', help='rom image to be written')
-  parser.add_argument('-b', '--rom-addr', default=None,
-                      help="use this base address for ROM. otherwise guess.")
-  parser.add_argument('-i', '--show-info', default=False, action='store_true',
-                      help="show more details on resident")
+  parser.add_argument('-c', '--fix-checksum', default=False, action='store_true',
+                      help="fix checksum on written image")
   parser.set_defaults(cmd=do_copy_cmd)
 
 
