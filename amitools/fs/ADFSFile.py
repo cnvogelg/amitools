@@ -140,7 +140,7 @@ class ADFSFile(ADFSNode):
     """given the file size: how many data blocks do we need to store the file?"""
     bb = self.get_data_block_contents_bytes()
     ds = self.data_size
-    return (ds + bb -1 ) / bb
+    return (ds + bb -1 ) // bb
   
   def calc_number_of_list_blks(self):
     """given the file size: how many list blocks do we need to store the data blk ptrs?"""
@@ -152,7 +152,7 @@ class ADFSFile(ADFSNode):
       return 0
     else:
       db -= ppb
-      return (db + ppb - 1) / ppb 
+      return (db + ppb - 1) // ppb 
   
   def blocks_get_create_num(self):
     # determine number of blocks to create

@@ -177,11 +177,12 @@ class Block:
     if size == 0:
       return ""
     name = self.data[loc+1:loc+1+size]
-    return name
+    return name.decode('latin-1')
   
   def _put_bstr(self, loc, max_size, bstr):
     if bstr == None:
       bstr = ""
+    bstr = bstr.encode('latin-1')
     n = len(bstr)
     if n > max_size:
       bstr = bstr[:max_size]
@@ -202,11 +203,12 @@ class Block:
         break
       s += c
       n += 1
-    return s
+    return s.decode('latin-1')
     
   def _put_cstr(self, loc, max_size, cstr):
     if cstr == None:
       cstr = ""
+    cstr = cstr.encode('latin-1')
     n = min(max_size, len(cstr))
     loc = loc * 4
     if n > 0:

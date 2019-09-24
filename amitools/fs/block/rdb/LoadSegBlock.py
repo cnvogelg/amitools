@@ -27,7 +27,7 @@ class LoadSegBlock(Block):
     if self.data == None:
       self._create_data()
     self.data[20:20+len(data)] = data
-    self.size = (20 + len(data)) / 4
+    self.size = (20 + len(data)) // 4
   
   def get_data(self):
     return self.data[20:20+(self.size-5)*4]

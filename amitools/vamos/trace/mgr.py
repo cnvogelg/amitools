@@ -181,7 +181,7 @@ class TraceManager(object):
     # inside jump table
     if addr < label.base_addr:
       delta = label.base_addr - addr
-      slot = delta / 6
+      slot = delta // 6
       rel = delta % 6
       if rel == 0:
         addon = "-%d  [%d]" % (delta, slot)

@@ -55,9 +55,6 @@ class FSError(Exception):
     self.extra = extra
     
   def __str__(self):
-    return self.__unicode__().encode("UTF-8")
-    
-  def __unicode__(self):
     if self.code in error_names:
       code_str = str(error_names[self.code])
     else:

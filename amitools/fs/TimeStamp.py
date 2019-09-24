@@ -15,7 +15,7 @@ class TimeStamp:
     self.days = days
     self.mins = mins
     self.ticks = ticks
-    self.secs = days * 24 * 60 * 60 + mins * 60 + (ticks / 50)
+    self.secs = days * 24 * 60 * 60 + mins * 60 + (ticks // 50)
     self.sub_secs = (ticks % 50)
   
   def __str__(self):
@@ -32,9 +32,9 @@ class TimeStamp:
   def from_secs(self, secs):
     secs = int(secs - amiga_epoch)
     ticks = secs * 50
-    mins = ticks / (50 * 60)
+    mins = ticks // (50 * 60)
     self.ticks = ticks % (50 * 60)
-    self.days = mins / (60 * 24)
+    self.days = mins // (60 * 24)
     self.mins = mins % (60 * 24)
     self.secs = secs
     self.sub_secs = 0

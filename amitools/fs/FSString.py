@@ -7,25 +7,20 @@ class FSString:
   """
   
   def __init__(self, txt, encoding="Latin-1"):
-    """Init the string. Either with a unicode string or with a 8-Bit string.
+    """Init the string. Either with a string or with bytes.
        If the latter is given then the "encoding" flag determines the encoding.
     """
-    if sys.version_info[0] == 3 and type(txt) == str:
+    if type(txt) is str:
       self.txt = txt
-    elif type(txt) == str:
-      self.txt = txt
-    elif type(txt) == str:
+    elif type(txt) is bytes:
       self.txt = txt.decode(encoding)
     else:
-      raise ValueError("FSString must be str or unicode!")
+      raise ValueError("FSString must be str or bytes!")
       
   def __repr__(self):
-    return self.__str__()
+    return "FSString({})".format(self.txt)
   
   def __str__(self):
-    return self.__unicode__().encode("UTF-8")
-    
-  def __unicode__(self):
     return self.txt
   
   def get_unicode(self):

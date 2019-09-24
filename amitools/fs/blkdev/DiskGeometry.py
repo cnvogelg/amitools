@@ -35,7 +35,7 @@ class DiskGeometry:
     h = None
     s = None
     self._update_block_size(options)
-    num_blocks = byte_size / self.block_bytes
+    num_blocks = byte_size // self.block_bytes
     algo = None
     if options != None:
       (c, h, s) = self._parse_chs(options)
@@ -107,7 +107,7 @@ class DiskGeometry:
     return (c,h,s)
 
   def _guess_for_size1(self, size, approx=True, secs=None, heads=None):
-    mb = size / 1024
+    mb = size // 1024
     if secs == None:
       secs = 63
     if heads == None:  
@@ -121,7 +121,7 @@ class DiskGeometry:
         heads = 128
       else:
         heads = 256
-    cyls = (size / self.block_bytes) / (secs * heads)
+    cyls = (size // self.block_bytes) // (secs * heads)
     geo_size = cyls * secs * heads * self.block_bytes
     # keep approx values or match
     if approx or geo_size == size:
@@ -137,7 +137,7 @@ class DiskGeometry:
       heads = 1
     if secs == None:
       secs = 32
-    cyls = (size / self.block_bytes) / (secs * heads)
+    cyls = (size // self.block_bytes) // (secs * heads)
     # keep approx values or match
     geo_size = cyls * secs * heads * self.block_bytes
     if approx or geo_size == size:

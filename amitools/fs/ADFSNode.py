@@ -150,7 +150,7 @@ class ADFSNode:
     return '%-40s       %8s  %s' % (istr + self.name.get_unicode_name(), self.get_size_str(), extra)
     
   def list(self, indent=0, all=False, detail=False, encoding="UTF-8"):
-    print(self.get_list_str(indent=indent, all=all, detail=detail).encode(encoding))
+    print(self.get_list_str(indent=indent, all=all, detail=detail))
 
   def get_size_str(self):
     # re-implemented in derived classes!

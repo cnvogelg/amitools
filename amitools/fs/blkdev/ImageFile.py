@@ -22,7 +22,7 @@ class ImageFile:
       self.fobj.seek(0,2) # end of file
       self.size = self.fobj.tell()
       self.fobj.seek(0,0) # return to begin
-      self.num_blocks = self.size / self.block_bytes
+      self.num_blocks = self.size // self.block_bytes
     # file name given
     else:
       # is readable?
@@ -41,7 +41,7 @@ class ImageFile:
         self.size = os.path.getsize(self.file_name)
       if self.size == 0:
         raise IOError("Empty image file detected!")
-      self.num_blocks = self.size / self.block_bytes
+      self.num_blocks = self.size // self.block_bytes
       # open raw file
       if self.read_only:
         flags = "rb"

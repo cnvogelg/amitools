@@ -85,7 +85,7 @@ class Lock:
     if os.path.isfile(sys_path):
       size = os.path.getsize(sys_path)
       fib_mem.w_s('fib_Size', size)
-      blocks = int((size + 511) / 512)
+      blocks = (size + 511) // 512
       fib_mem.w_s('fib_NumBlocks', blocks)
     else:
       fib_mem.w_s('fib_NumBlocks', 1)

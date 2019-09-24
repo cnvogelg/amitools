@@ -112,7 +112,7 @@ class FileScan:
     block_data_bytes = self.block_scan.blkdev.block_bytes
     if not self.ffs:
       block_data_bytes -= 24
-    file_est_blocks = (bi.byte_size + block_data_bytes - 1) / block_data_bytes
+    file_est_blocks = (bi.byte_size + block_data_bytes - 1) // block_data_bytes
     num_data_blocks = len(linked_data_blocks)
     if file_est_blocks != num_data_blocks:
       self.log.msg(Log.ERROR, "File %s with %d bytes has wrong number of data blocks: got %d != expect %d" % (info, bi.byte_size, num_data_blocks, file_est_blocks), bi.blk_num)

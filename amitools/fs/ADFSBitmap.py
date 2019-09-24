@@ -23,16 +23,16 @@ class ADFSBitmap:
     self.bitmap_blk_longs = root_blk.blkdev.block_longs - 1
     # calc size of bitmap
     self.bitmap_bits = self.blkdev.num_blocks - self.blkdev.reserved
-    self.bitmap_longs = (self.bitmap_bits + 31) / 32
-    self.bitmap_bytes = (self.bitmap_bits + 7) / 8
+    self.bitmap_longs = (self.bitmap_bits + 31) // 32
+    self.bitmap_bytes = (self.bitmap_bits + 7) // 8
     # number of blocks required for bitmap (and bytes consumed there)
-    self.bitmap_num_blks = (self.bitmap_longs + self.bitmap_blk_longs - 1) / self.bitmap_blk_longs
+    self.bitmap_num_blks = (self.bitmap_longs + self.bitmap_blk_longs - 1) // self.bitmap_blk_longs
     self.bitmap_all_blk_bytes = self.bitmap_num_blks * self.bitmap_blk_bytes
     # blocks stored in root and in every ext block
     self.num_blks_in_root = len(self.root_blk.bitmap_ptrs)
     self.num_blks_in_ext = self.blkdev.block_longs - 1
     # number of ext blocks required
-    self.num_ext = (self.bitmap_num_blks - self.num_blks_in_root + self.num_blks_in_ext - 1) / (self.num_blks_in_ext)
+    self.num_ext = (self.bitmap_num_blks - self.num_blks_in_root + self.num_blks_in_ext - 1) // (self.num_blks_in_ext)
     # start a root block
     self.find_start = root_blk.blk_num
 
@@ -115,7 +115,7 @@ class ADFSBitmap:
 
   def read(self):
     self.bitmap_blks = []
-    bitmap_data = ""
+    bitmap_data = bytearray()
 
     # get bitmap blocks from root block
     blocks = self.root_blk.bitmap_ptrs
@@ -230,7 +230,7 @@ class ADFSBitmap:
     if off < self.blkdev.reserved or off >= self.blkdev.num_blocks:
       return None
     off = (off - self.blkdev.reserved)
-    long_off = off / 32
+    long_off = off // 32
     bit_off = off % 32
     val = struct.unpack_from(">I", self.bitmap_data, long_off * 4)[0]
     mask = 1 << bit_off
@@ -241,7 +241,7 @@ class ADFSBitmap:
     if off < self.blkdev.reserved or off >= self.blkdev.num_blocks:
       return False
     off = (off - self.blkdev.reserved)
-    long_off = off / 32
+    long_off = off // 32
     bit_off = off % 32
     val = struct.unpack_from(">I", self.bitmap_data, long_off * 4)[0]
     mask = 1 << bit_off
@@ -254,7 +254,7 @@ class ADFSBitmap:
     if off < self.blkdev.reserved or off >= self.blkdev.num_blocks:
       return False
     off = (off - self.blkdev.reserved)
-    long_off = off / 32
+    long_off = off // 32
     bit_off = off % 32
     val = struct.unpack_from(">I", self.bitmap_data, long_off * 4)[0]
     mask = 1 << bit_off

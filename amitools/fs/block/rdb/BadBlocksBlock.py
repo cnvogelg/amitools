@@ -54,7 +54,7 @@ class BadBlockBlock(Block):
     print(" size:           %d" % self.size)
     print(" host_id:        %d" % self.host_id)
     print(" next:           %s" % self._dump_ptr(self.next))
-    n = len(self.block_pairs) / 2
+    n = len(self.block_pairs) // 2
     o = 0
     for i in range(n):
       print(" bad=%d good=%d" % (self.block_pairs[o], self.block_pairs[o+1]))

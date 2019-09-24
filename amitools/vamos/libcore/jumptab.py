@@ -57,7 +57,7 @@ class LibJumpTable(object):
     self._mem = mem
     self._lib_base = lib_base
     self._neg_size = neg_size
-    self._max_index = (neg_size - 6) / 6
+    self._max_index = (neg_size - 6) // 6
     self._fd = fd
     self._create = create
 

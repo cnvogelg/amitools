@@ -92,7 +92,7 @@ class HunkDebug:
       src_file, src_size = self._read_string(debug_data, 8)
       dl = HunkDebugLine(src_file, base_offset)
       off = 12 + src_size
-      num = (len(debug_data) - off) / 8
+      num = (len(debug_data) - off) // 8
       for i in range(num):
         src_line = self._read_long(debug_data, off)
         offset = self._read_long(debug_data, off+4)

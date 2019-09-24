@@ -389,7 +389,7 @@ class RDisk:
     # setup fs block size (may be multiple sectors)
     if not fs_block_size:
       fs_block_size = self.block_bytes
-    sec_per_blk = int(fs_block_size / self.block_bytes)
+    sec_per_blk = int(fs_block_size // self.block_bytes)
     if sec_per_blk < 1 or sec_per_blk > 16:
       raise IOError("Invalid sec_per_blk: " + sec_per_blk)
     # block size in longs
@@ -453,7 +453,7 @@ class RDisk:
       dirty = True
     # change fs block size
     if fs_block_size:
-      sec_per_blk = int(fs_block_size / self.block_bytes)
+      sec_per_blk = int(fs_block_size // self.block_bytes)
       if sec_per_blk < 1 or sec_per_blk > 16:
         raise IOError("Invalid sec_per_blk: " + sec_per_blk)
       ph.dos_env.sec_per_blk = sec_per_blk

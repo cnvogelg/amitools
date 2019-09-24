@@ -421,10 +421,10 @@ class PartEditCommand(Command):
         cyls = size
       # size in bytes
       elif size[-1] in ('b','B'):
-        bytes = ByteSize.parse_byte_size_str(size[:-1])
-        if bytes == None:
+        num_bytes = ByteSize.parse_byte_size_str(size[:-1])
+        if num_bytes == None:
           return None
-        cyls = bytes / self.rdisk.get_cylinder_bytes()
+        cyls = num_bytes // self.rdisk.get_cylinder_bytes()
       # size in percent
       elif size[-1] == '%':
         prc = float(size[:-1])
@@ -553,7 +553,7 @@ class ImportCommand(Command):
         total = part_blks * blk_size
         # open image
         file_size = os.path.getsize(file_name)
-        file_blks = file_size / blk_size
+        file_blks = file_size // blk_size
         if file_size % blk_size != 0:
           print("image file not block size aligned!")
           return 1

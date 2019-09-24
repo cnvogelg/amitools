@@ -56,16 +56,16 @@ class Validator:
       root_blk_num = self.boot.got_root_blk
       # check root block number
       if root_blk_num == 0:
-        new_root = self.blkdev.num_blocks / 2
+        new_root = self.blkdev.num_blocks // 2
         self.log.msg(Log.INFO,"Boot contains not Root blk. Using default: %d" % new_root,root_blk_num)
         root_blk_num = new_root      
       elif root_blk_num < self.blkdev.reserved or root_blk_num > self.blkdev.num_blocks:
-        new_root = self.blkdev.num_blocks / 2
+        new_root = self.blkdev.num_blocks // 2
         self.log.msg(Log.INFO,"Invalid root block number: given %d using guess %d" % (root_blk_num, new_root),root_blk_num)
         root_blk_num = new_root
     else:
       # guess root block number
-      root_blk_num = self.blkdev.num_blocks / 2
+      root_blk_num = self.blkdev.num_blocks // 2
       self.log.msg(Log.INFO,"Guessed root block number",root_blk_num)
     # read root block
     root = RootBlock(self.blkdev, root_blk_num)

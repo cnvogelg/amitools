@@ -575,7 +575,7 @@ class DosLibrary(LibImpl):
     fh = self.file_mgr.get_by_b_addr(fh_b_addr,True)
     data = ctx.mem.r_block(buf_ptr,size * number)
     fh.write(data)
-    got = len(data) / size
+    got = len(data) // size
     log_dos.info("FWrite(%s, %06x, %d, %d) -> %d" % (fh, buf_ptr, size, number, got))
     return got
 
@@ -592,7 +592,7 @@ class DosLibrary(LibImpl):
     if data == -1:
       got = 0 # simple error handling
     else:
-      got = len(data) / size
+      got = len(data) // size
       ctx.mem.w_block(buf_ptr, data)
     log_dos.info("FRead(%s, %06x, %d, %d) -> %d" % (fh, buf_ptr, size, number, got))
     return got

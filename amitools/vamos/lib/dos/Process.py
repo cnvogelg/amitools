@@ -179,7 +179,7 @@ class Process:
   # ----- cli struct -----
   def init_cli_struct(self, input_fh, output_fh, name):
     self.cli = self.ctx.alloc.alloc_struct(self.bin_basename + "_CLI",CLIStruct)
-    self.cli.access.w_s("cli_DefaultStack", self.stack.get_size() / 4) # in longs
+    self.cli.access.w_s("cli_DefaultStack", self.stack.get_size() // 4) # in longs
     if input_fh != None:
       self.cli.access.w_s("cli_StandardInput", input_fh.b_addr << 2)
       self.cli.access.w_s("cli_CurrentInput", input_fh.b_addr << 2)
