@@ -45,6 +45,8 @@ def parse_dos_type_str(string):
   if "ffs" in comp:
     if "dc" in comp or "dircache" in comp:
       return DOS_FFS_INTL_DIRCACHE
+    elif "ln" in comp or "longname" in comp:
+      return DOS_FFS_INTL_LONGNAME
     elif "intl" in comp:
       return DOS_FFS_INTL
     else:
@@ -52,13 +54,15 @@ def parse_dos_type_str(string):
   elif "ofs" in comp:
     if "dc" in comp or "dircache" in comp:
       return DOS_OFS_INTL_DIRCACHE
+    elif "ln" in comp or "longname" in comp:
+      return DOS_OFS_INTL_LONGNAME
     elif "intl" in comp:
       return DOS_OFS_INTL
     else:
       return DOS_OFS
   else:
     n = len(string)
-    # use 'DOS0' .. 'DOS5'
+    # use 'DOS0' .. 'DOS7'
     if n == 4 and string[0:3] == 'DOS':
       off = ord(string[3]) - ord('0')
       if off >= 0 and off <= 7:

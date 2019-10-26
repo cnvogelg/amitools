@@ -238,12 +238,25 @@ Example::
 
 ::
 
-  format <volume_name> [ffs] [intl] [dircache] [<create options>]
+  format <volume_name> [dostype] [<create options>]
 
 A new and blank *OFS/FFS* file system will be created on the given image file.
-All data previously stored there will be lost!!! The ``<volume_name>`` gives
-the name of the new file system. The options ``ffs``, ``intl``, and or
-``dircache`` allow to select the type of file system you want to create.
+
+.. warning::
+
+  All data previously stored there will be lost!!!
+
+The ``<volume_name>`` gives the name of the new file system. The optional
+``dos_type`` gives the file system variant. Its the base type ``ofs`` or
+``ffs`` combined with variant flags added with a plus ``+`` (and no spaces).
+Or you give a ``DOSx`` type of the file system in the range of ``DOS0`` and
+``DOS7``.
+
+The following variant flags are recognized:
+
+* ``intl`` for international mode.
+* ``dc`` or ``dircache`` for directory caching
+* ``ln`` or ``longname`` for long file name support
 
 If the disk image file you specify does not exist on disk yet then an implicit
 ``create`` command will be executed first. If the file already exists you must
@@ -256,6 +269,7 @@ Example::
   > xdftool empty.hdf format Work chs=640,1,32 ; create with given geometry
   > xdftool empty.hdf format Work size=10M ffs ; create an FFS hdf image
   > xdftool empty.hdf create size=10M + format Work ffs ; same result
+  > xdftool empty.hdf format Work size=10M ffs+ln ; create with long name support
 
 
 ``boot`` - Alter the boot block
