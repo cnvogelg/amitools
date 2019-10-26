@@ -173,17 +173,25 @@ class Imager:
         raise IOError("Invalid Boot Code")
 
   def pack_create_blkdev(self, in_path, image_file, force=True, options=None):
-    # try to read options from blkdev file
-    if options == None or len(options) == 0:
-      blkdev_path = in_path + ".blkdev"
-      if os.path.exists(blkdev_path):
-        f = open(blkdev_path, "rb")
-        options = {}
-        for line in f:
-          KeyValue.parse_key_value_string(line, options)
-        f.close()
-    f = BlkDevFactory()
-    return f.create(image_file, force=force, options=options)
+    factory = BlkDevFactory()
+    blkdev = None
+    if not force:
+      # try to open an existing image or return None
+      blkdev = factory.open(image_file, none_if_missing=True)
+
+    if not blkdev:
+      # try to read options from blkdev file
+      if options == None or len(options) == 0:
+        blkdev_path = in_path + ".blkdev"
+        if os.path.exists(blkdev_path):
+          f = open(blkdev_path, "rb")
+          options = {}
+          for line in f:
+            KeyValue.parse_key_value_string(line, options)
+          f.close()
+      # create a new blkdev
+      blkdev = factory.create(image_file, force=force, options=options)
+    return blkdev
 
   def pack_create_volume(self, in_path, blkdev, dos_type=None):
     if self.meta_db != None:
