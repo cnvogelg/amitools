@@ -19,6 +19,7 @@ class ADFSDir(ADFSNode):
     self.entries = None
     self.dcache_blks = None
     self.name_hash = None
+    self.hash_size = 72
     self.valid = False
     
   def __repr__(self):
@@ -57,7 +58,8 @@ class ADFSDir(ADFSNode):
   
   def _init_name_hash(self):
     self.name_hash = []
-    for i in xrange(self.block.hash_size):
+    self.hash_size = self.block.hash_size
+    for i in xrange(self.hash_size):
       self.name_hash.append([])      
   
   def read(self, recursive=False):
@@ -117,7 +119,7 @@ class ADFSDir(ADFSNode):
     return self.entries
   
   def has_name(self, fn):
-    fn_hash = fn.hash()
+    fn_hash = fn.hash(hash_size=self.hash_size)
     fn_up = fn.get_upper_ami_str()
     node_list = self.name_hash[fn_hash]
     for node in node_list:
@@ -157,7 +159,7 @@ class ADFSDir(ADFSNode):
     if self.has_name(fn):
       raise FSError(NAME_ALREADY_EXISTS, file_name=name, node=self)
     # calc hash index of name
-    fn_hash = fn.hash()
+    fn_hash = fn.hash(hash_size=self.hash_size)
     hash_chain = self.name_hash[fn_hash]
     if len(hash_chain) == 0:
       hash_chain_blk = 0
@@ -227,7 +229,7 @@ class ADFSDir(ADFSNode):
     if node not in self.entries:
       raise FSError(INTERNAL_ERROR, node=node, extra="node not in entries")      
     # get hash key
-    hash_key = node.name.hash()
+    hash_key = node.name.hash(hash_size=self.hash_size)
     names = self.name_hash[hash_key]
     # find my node
     pos = None
