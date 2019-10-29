@@ -426,7 +426,7 @@ This command changes the modification time associated with the
 given ``<ami_path>`` file or directory. The time string must have the following
 notation (and needs to be quoted because of the contained spaces)::
 
-  '06.07.1986 14:38:56 t45'
+  '06.07.1986 14:38:56.45'
   '06.07.1986 14:38:56'
 
 The first notation allows to specify the number of ticks (1/50th s) in a time
@@ -434,7 +434,7 @@ stamp.
 
 Example::
 
-  > xdftool mydisk.adf time test '06.07.1986 14:38:56 t45'
+  > xdftool mydisk.adf time test '06.07.1986 14:38:56.45'
   > xdftool mydisk.adf time mydir '06.07.1986 14:38:56'
 
 
@@ -474,9 +474,9 @@ commands require a valid time string (see ``time`` command above for details).
 Example::
 
   > xdftool my.adf root show
-  > xdftool my.adf root create_time '06.07.1986 14:38:56 t45'
+  > xdftool my.adf root create_time '06.07.1986 14:38:56.45'
   > xdftool my.adf root disk_time '06.07.1986 14:38:56'
-  > xdftool my.adf root time '06.07.1986 14:38:56 t45'
+  > xdftool my.adf root time '06.07.1986 14:38:56.45'
 
 
 Pack/Repack/Unpack Images
