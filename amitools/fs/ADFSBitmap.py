@@ -37,8 +37,13 @@ class ADFSBitmap:
     self.find_start = root_blk.blk_num
     # was bitmap modified?
     self.dirty = False
+    # for DOS6/7 track used blocks
+    self.num_used = 0
 
   def create(self):
+    # clear local count
+    self.num_used = 0
+
     # create data and preset with 0xff
     self.bitmap_data = ctypes.create_string_buffer(self.bitmap_all_blk_bytes)
     for i in xrange(self.bitmap_all_blk_bytes):
@@ -99,7 +104,7 @@ class ADFSBitmap:
       self._write_bitmap_blks()
       # in DOS6/DOS7 update root block stats
       if rootblock_tracks_used_blocks(self.root_blk.fstype):
-        self.root_blk.blocks_used = self.get_num_used()
+        self.root_blk.blocks_used = self.num_used
       # always write root (bitmap pointers)
       self.root_blk.write()
 
@@ -119,6 +124,10 @@ class ADFSBitmap:
   def read(self):
     self.bitmap_blks = []
     bitmap_data = ""
+
+    # DOS6/7: update num used
+    if rootblock_tracks_used_blocks(self.root_blk.fstype):
+      self.num_used = self.root_blk.blocks_used
 
     # get bitmap blocks from root block
     blocks = self.root_blk.bitmap_ptrs
@@ -203,15 +212,17 @@ class ADFSBitmap:
 
   def get_num_free(self):
     num = 0
+    res = self.blkdev.reserved
     for i in xrange(self.bitmap_bits):
-      if self.get_bit(i):
+      if self.get_bit(i + res):
         num+=1
     return num
 
   def get_num_used(self):
     num = 0
+    res = self.blkdev.reserved
     for i in xrange(self.bitmap_bits):
-      if not self.get_bit(i):
+      if not self.get_bit(i + res):
         num+=1
     return num
 
@@ -246,10 +257,11 @@ class ADFSBitmap:
     bit_off = off % 32
     val = struct.unpack_from(">I", self.bitmap_data, long_off * 4)[0]
     mask = 1 << bit_off
-    val = val | mask
-    struct.pack_into(">I", self.bitmap_data, long_off * 4, val)
-    self.dirty = True
-    return True
+    if val & mask == 0:
+      val = val | mask
+      struct.pack_into(">I", self.bitmap_data, long_off * 4, val)
+      self.dirty = True
+      self.num_used -= 1
 
   # mark as used
   def clr_bit(self, off):
@@ -260,16 +272,27 @@ class ADFSBitmap:
     bit_off = off % 32
     val = struct.unpack_from(">I", self.bitmap_data, long_off * 4)[0]
     mask = 1 << bit_off
-    val = val & ~mask
-    struct.pack_into(">I", self.bitmap_data, long_off * 4, val)
-    self.dirty = False
-    return True
+    if val & mask == mask:
+      val = val & ~mask
+      struct.pack_into(">I", self.bitmap_data, long_off * 4, val)
+      self.dirty = True
+      self.num_used += 1
 
   def dump(self):
     print("Bitmap:")
     print("  ext: ",self.ext_blks)
     print("  blks:",len(self.bitmap_blks))
     print("  bits:",len(self.bitmap_data) * 8,self.blkdev.num_blocks)
+
+  def print_info(self):
+    num_free = self.get_num_free()
+    num_used = self.get_num_used()
+    print("num free:", num_free)
+    print("num used:", num_used)
+    if rootblock_tracks_used_blocks(self.root_blk.fstype):
+      print("num used:", self.num_used, "(cached in root)")
+    print("sum:     ", num_free + num_used)
+    print("total:   ", self.bitmap_bits)
 
   def create_draw_bitmap(self):
     bm = ctypes.create_string_buffer(self.blkdev.num_blocks)

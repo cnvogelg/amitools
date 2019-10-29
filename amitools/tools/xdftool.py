@@ -578,7 +578,7 @@ class BitmapCmd(Command):
   def handle_vol(self, vol):
     n = len(self.opts)
     if n == 0:
-      print("Usage: bitmap ( free | used | find [n] | all | maps | root [all] | node <path> [all] [entries]) [brief]")
+      print("Usage: bitmap ( info | free | used | find [n] | all | maps | root [all] | node <path> [all] [entries]) [brief]")
       return 1
     cmd = self.opts[0]
 
@@ -588,7 +588,10 @@ class BitmapCmd(Command):
       brief = True
       self.opts = self.opts[:-1]
 
-    if cmd == 'free':
+    if cmd == 'info':
+      vol.bitmap.print_info()
+      return 0
+    elif cmd == 'free':
       vol.bitmap.print_free(brief)
       return 0
     elif cmd == 'used':

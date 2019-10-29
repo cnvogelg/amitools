@@ -638,6 +638,7 @@ commands are suitable for experts only.
 
 ::
 
+  bitmap info
   bitmap free [brief]
   bitmap used [brief]
   bitmap find [n]
@@ -645,6 +646,8 @@ commands are suitable for experts only.
   bitmap maps [brief]
   bitmap root [brief]
   bitmap node <ami_path> [all] [entries] [brief]
+
+The ``info`` command calculates the free and used blocks.
 
 The ``free`` and ``used`` commands show the unallocated/allocated blocks on
 the disk. Use the ``brief`` option to show only bitmap lines with contents.
