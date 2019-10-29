@@ -92,9 +92,10 @@ class Imager:
       f = open(boot_code_path,"wb")
       f.write(volume.boot.boot_code)
       f.close()
-    # save blkdev
+    # save blkdev: geo and block size
     f = open(blkdev_path,"wb")
-    f.write("%s\n" % volume.blkdev.get_chs_str())
+    f.write("%s\n%s\n" % (volume.blkdev.get_chs_str(),
+      volume.blkdev.get_block_size_str()))
     f.close()
 
   def unpack_root(self, volume, vol_path):

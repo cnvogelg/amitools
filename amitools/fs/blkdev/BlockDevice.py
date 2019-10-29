@@ -49,3 +49,5 @@ class BlockDevice:
     return "chs=%d,%d,%d" % (self.cyls, self.heads, self.sectors)
   def get_chs_dict(self):
     return { 'chs' : "%d,%d,%d" % (self.cyls, self.heads, self.sectors) }
+  def get_block_size_str(self):
+    return "bs=%d" % self.block_bytes
