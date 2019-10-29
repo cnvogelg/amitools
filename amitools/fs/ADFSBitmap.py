@@ -35,6 +35,8 @@ class ADFSBitmap:
     self.num_ext = (self.bitmap_num_blks - self.num_blks_in_root + self.num_blks_in_ext - 1) / (self.num_blks_in_ext)
     # start a root block
     self.find_start = root_blk.blk_num
+    # was bitmap modified?
+    self.dirty = False
 
   def create(self):
     # create data and preset with 0xff
@@ -87,25 +89,26 @@ class ADFSBitmap:
           cur_ext_pos = 0
           cur_ext_index += 1
     self.valid = True
+    self.dirty = True
 
   def write(self):
-    # write root block
-    self.root_blk.write()
+    if self.dirty:
+      self.dirty = False
+      # update bitmap
+      self._write_ext_blks()
+      self._write_bitmap_blks()
+      # in DOS6/DOS7 update root block stats
+      if rootblock_tracks_used_blocks(self.root_blk.fstype):
+        self.root_blk.blocks_used = self.get_num_used()
+      # always write root (bitmap pointers)
+      self.root_blk.write()
+
+  def _write_ext_blks(self):
     # write ext blocks
     for ext_blk in self.ext_blks:
       ext_blk.write()
-    self.write_only_bits()
 
-  def write_only_bits(self):
-    # For DOS6 and DOS7, the root block contains the number of free blocks_used
-    # So we potentially have to update it even if only bits shall be rewritten
-    if rootblock_tracks_used_blocks(self.root_blk.fstype):
-      # TODO: Track the used blocks instead of recalculating it every time
-      blocks_used = self.get_num_used()
-      if blocks_used != self.root_blk.blocks_used:
-        self.root_blk.blocks_used = blocks_used
-        self.root_blk.write()
-
+  def _write_bitmap_blks(self):
     # write bitmap blocks
     off = 0
     for blk in self.bitmap_blks:
@@ -218,13 +221,11 @@ class ADFSBitmap:
       return None
     for b in free_blks:
       self.clr_bit(b)
-    self.write_only_bits()
     return free_blks
 
   def dealloc_n(self, blks):
     for b in blks:
       self.set_bit(b)
-    self.write_only_bits()
 
   def get_bit(self, off):
     if off < self.blkdev.reserved or off >= self.blkdev.num_blocks:
@@ -247,6 +248,7 @@ class ADFSBitmap:
     mask = 1 << bit_off
     val = val | mask
     struct.pack_into(">I", self.bitmap_data, long_off * 4, val)
+    self.dirty = True
     return True
 
   # mark as used
@@ -260,6 +262,7 @@ class ADFSBitmap:
     mask = 1 << bit_off
     val = val & ~mask
     struct.pack_into(">I", self.bitmap_data, long_off * 4, val)
+    self.dirty = False
     return True
 
   def dump(self):
