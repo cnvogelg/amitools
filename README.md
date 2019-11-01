@@ -177,7 +177,7 @@ The new Documentation of `amitools` is hosted on [readthedocs][8]
 
 ### Tools
 
-- [vamos](doc/vamos.md) **V)irtual AM)iga OS**
+- [vamos](docs/vamos.md) **V)irtual AM)iga OS**
 
   vamos allows you to run command line (CLI) Amiga programs on your host
   Mac or PC. vamos is an API level Amiga OS Emulator that replaces exec
