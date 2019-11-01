@@ -16,10 +16,18 @@ from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 import amitools.util.KeyValue as KeyValue
 from .FSString import FSString
+from .MetaInfoFSUAE import MetaInfoFSUAE
 
 class Imager:
-  def __init__(self, path_encoding=None):
+
+  META_MODE_NONE = 0
+  META_MODE_DB = 1
+  META_MODE_FSUAE = 2
+
+  def __init__(self, path_encoding=None, meta_mode=META_MODE_DB):
+    self.meta_mode = meta_mode
     self.meta_db = None
+    self.meta_fsuae = None
     self.total_bytes = 0
     self.path_encoding = path_encoding
     # get path name encoding for host file system
@@ -67,22 +75,27 @@ class Imager:
     if os.path.exists(blkdev_path):
       raise IOError("Unpack blkdev file aready exists:"+blkdev_path)
     # create volume path
-    self.meta_db = MetaDB()
+    if self.meta_mode != self.META_MODE_NONE:
+      self.meta_db = MetaDB()
+    if self.meta_mode == self.META_MODE_FSUAE:
+      self.meta_fsuae = MetaInfoFSUAE()
     self.unpack_root(volume, vol_path)
     # save meta db
-    self.meta_db.set_volume_name(volume.name.get_unicode())
-    self.meta_db.set_root_meta_info(volume.get_meta_info())
-    self.meta_db.set_dos_type(volume.boot.dos_type)
-    self.meta_db.save(meta_path)
+    if self.meta_db:
+      self.meta_db.set_volume_name(volume.name.get_unicode())
+      self.meta_db.set_root_meta_info(volume.get_meta_info())
+      self.meta_db.set_dos_type(volume.boot.dos_type)
+      self.meta_db.save(meta_path)
     # save boot code
     if volume.boot.boot_code != None:
       boot_code_path = vol_path + ".bootcode"
       f = open(boot_code_path,"wb")
       f.write(volume.boot.boot_code)
       f.close()
-    # save blkdev
+    # save blkdev: geo and block size
     f = open(blkdev_path,"wb")
-    f.write("%s\n" % volume.blkdev.get_chs_str())
+    f.write("%s\n%s\n" % (volume.blkdev.get_chs_str(),
+      volume.blkdev.get_block_size_str()))
     f.close()
 
   def unpack_root(self, volume, vol_path):
@@ -96,14 +109,19 @@ class Imager:
 
   def unpack_node(self, node, path):
     name = node.name.get_unicode_name()
+    file_path = os.path.join(path, self.to_path_str(name))
     # store meta info
-    if self.meta_db != None:
+    if self.meta_mode == self.META_MODE_DB:
       # get path as FSString
       node_path = node.get_node_path_name()
       self.meta_db.set_meta_info(node_path.get_unicode(), node.meta_info)
+    # store meta in .uaem file
+    elif self.meta_mode == self.META_MODE_FSUAE:
+      uaem_path = file_path + self.meta_fsuae.get_suffix()
+      self.meta_fsuae.save_meta(uaem_path, node.meta_info)
     # sub dir
     if node.is_dir():
-      sub_dir = os.path.join(path, self.to_path_str(name))
+      sub_dir = file_path
       os.mkdir(sub_dir)
       for sub_node in node.get_entries():
         self.unpack_node(sub_node, sub_dir)
@@ -112,7 +130,6 @@ class Imager:
     elif node.is_file():
       data = node.get_file_data()
       node.flush()
-      file_path = os.path.join(path, self.to_path_str(name))
       fh = open(file_path, "wb")
       fh.write(data)
       fh.close()
@@ -139,6 +156,7 @@ class Imager:
     if os.path.exists(meta_path):
       self.meta_db = MetaDB()
       self.meta_db.load(meta_path)
+    self.meta_fsuae = MetaInfoFSUAE()
 
   def pack_end(self, in_path, volume):
     boot_code_path = in_path + ".bootcode"
@@ -156,17 +174,25 @@ class Imager:
         raise IOError("Invalid Boot Code")
 
   def pack_create_blkdev(self, in_path, image_file, force=True, options=None):
-    # try to read options from blkdev file
-    if options == None or len(options) == 0:
-      blkdev_path = in_path + ".blkdev"
-      if os.path.exists(blkdev_path):
-        f = open(blkdev_path, "rb")
-        options = {}
-        for line in f:
-          KeyValue.parse_key_value_string(line, options)
-        f.close()
-    f = BlkDevFactory()
-    return f.create(image_file, force=force, options=options)
+    factory = BlkDevFactory()
+    blkdev = None
+    if not force:
+      # try to open an existing image or return None
+      blkdev = factory.open(image_file, none_if_missing=True)
+
+    if not blkdev:
+      # try to read options from blkdev file
+      if options == None or len(options) == 0:
+        blkdev_path = in_path + ".blkdev"
+        if os.path.exists(blkdev_path):
+          f = open(blkdev_path, "rb")
+          options = {}
+          for line in f:
+            KeyValue.parse_key_value_string(line, options)
+          f.close()
+      # create a new blkdev
+      blkdev = factory.create(image_file, force=force, options=options)
+    return blkdev
 
   def pack_create_volume(self, in_path, blkdev, dos_type=None):
     if self.meta_db != None:
@@ -201,9 +227,17 @@ class Imager:
       self.pack_entry(sub_path, parent_node)
 
   def pack_entry(self, in_path, parent_node):
+    # skip .uaem files
+    if self.meta_fsuae.is_meta_file(in_path):
+      return
+    # convert amiga name
     ami_name = self.from_path_str(os.path.basename(in_path))
+    # check for meta file
+    meta_path = in_path + self.meta_fsuae.get_suffix()
+    if os.path.isfile(meta_path):
+      meta_info = self.meta_fsuae.load_meta(meta_path)
     # retrieve meta info for path from DB
-    if self.meta_db != None:
+    elif self.meta_db != None:
       ami_path = parent_node.get_node_path_name().get_unicode()
       if ami_path != "":
         ami_path += "/" + ami_name

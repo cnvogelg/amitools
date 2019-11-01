@@ -83,7 +83,7 @@ class MetaDB:
     if len(dos_type_str) != 4:
       raise IOError("Invalid xdfmeta dostype string")
     num = ord(dos_type_str[3]) - ord('0')
-    if num < 0 or num > 5:
+    if num < 0 or num > 7:
       raise IOError("Invalid xdfmeta dostype number")
     self.dos_type = DosType.DOS0 + num
     # then time stamps

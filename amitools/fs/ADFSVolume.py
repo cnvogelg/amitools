@@ -113,7 +113,8 @@ class ADFSVolume:
     self.valid = True
   
   def close(self):
-    pass
+    # flush bitmap state (if it was dirty)
+    self.bitmap.write()
 
   def get_info(self):
     """return an array of strings with information on the volume"""

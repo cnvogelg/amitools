@@ -12,12 +12,14 @@ class HDFBlockDevice(BlockDevice):
     self.img_file = ImageFile(hdf_file, read_only, block_size, fobj)
 
   def create(self, geo, reserved=2):
-    self._set_geometry(geo.cyls, geo.heads, geo.secs, reserved=reserved)
+    self._set_geometry(geo.cyls, geo.heads, geo.secs, reserved=reserved,
+      block_bytes=self.img_file.block_bytes)
     self.img_file.create(geo.get_num_blocks())
     self.img_file.open()
 
   def open(self, geo, reserved=2):
-    self._set_geometry(geo.cyls, geo.heads, geo.secs, reserved=reserved)
+    self._set_geometry(geo.cyls, geo.heads, geo.secs, reserved=reserved,
+      block_bytes=self.img_file.block_bytes)
     self.img_file.open()
 
   def flush(self):

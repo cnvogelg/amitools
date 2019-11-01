@@ -1,4 +1,5 @@
 import sys
+import unicodedata
 
 
 class FSString:
@@ -27,5 +28,7 @@ class FSString:
     return self.txt
   
   def get_ami_str(self):
-    return self.txt.encode("Latin-1")
+    # make sure to normalize utf-8
+    nrm = unicodedata.normalize("NFKC", self.txt)
+    return nrm.encode("Latin-1")
   

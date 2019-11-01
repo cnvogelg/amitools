@@ -17,6 +17,7 @@ Features
 * concatenate a Kickstart and Ext ROM to a 1 Meg ROM
 * patch a ROM
 * scan a ROM for residents
+* copy a ROM
 
 .. _Remus/Romsplit: http://www.doobreynet.co.uk/
 
@@ -333,3 +334,20 @@ Options:
 
 * ``-o <out_img>`` write generated ROM to given file. Do not forget to specify
   this switch otherwise no output will be generated!
+
+
+``copy`` command
+================
+
+Copy a rom to a new file.  In the future, additional transformations may be
+possible::
+
+  $ romtool copy kick.rom duplicate.rom
+
+Copy ``kick.rom`` to a new ``duplicate.rom`` file.
+
+Options:
+
+* ``-c``, ``--fix-checksum`` after the copy fix the checksum of the written
+image.  For example, if the source rom has been modified with a hex editor or
+a find/replace operation, then this option can be used to correct the checksum.

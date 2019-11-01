@@ -94,7 +94,6 @@ class ADFSNode:
             cblk = CommentBlock(self.blkdev, blks[0])
             cblk.create(self.block.blk_num)
             self.block.comment_block_id = cblk.blk_num
-            self.volume.bitmap.write_only_bits()
           else:
             raise FSError(NO_FREE_BLOCKS, node=self)
         else:
@@ -107,7 +106,6 @@ class ADFSNode:
         if self.block.comment_block_id != 0:
           self.volume.bitmap.dealloc_n([self.block.comment_block_id])
           self.block.comment_block_id = 0
-          self.volume.bitmap.write_only_bits()
 
       self.meta_info.set_comment(comment)
       dirty = True

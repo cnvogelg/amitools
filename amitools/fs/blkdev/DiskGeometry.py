@@ -138,6 +138,10 @@ class DiskGeometry:
     if secs == None:
       secs = 32
     cyls = (size // self.block_bytes) // (secs * heads)
+    # keep cyls low
+    while cyls > 65535:
+      cyls //= 2
+      heads *= 2
     # keep approx values or match
     geo_size = cyls * secs * heads * self.block_bytes
     if approx or geo_size == size:

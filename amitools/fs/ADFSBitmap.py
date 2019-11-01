@@ -35,8 +35,15 @@ class ADFSBitmap:
     self.num_ext = (self.bitmap_num_blks - self.num_blks_in_root + self.num_blks_in_ext - 1) // (self.num_blks_in_ext)
     # start a root block
     self.find_start = root_blk.blk_num
+    # was bitmap modified?
+    self.dirty = False
+    # for DOS6/7 track used blocks
+    self.num_used = 0
 
   def create(self):
+    # clear local count
+    self.num_used = 0
+
     # create data and preset with 0xff
     self.bitmap_data = ctypes.create_string_buffer(self.bitmap_all_blk_bytes)
     for i in range(self.bitmap_all_blk_bytes):
@@ -87,25 +94,26 @@ class ADFSBitmap:
           cur_ext_pos = 0
           cur_ext_index += 1
     self.valid = True
+    self.dirty = True
 
   def write(self):
-    # write root block
-    self.root_blk.write()
+    if self.dirty:
+      self.dirty = False
+      # update bitmap
+      self._write_ext_blks()
+      self._write_bitmap_blks()
+      # in DOS6/DOS7 update root block stats
+      if rootblock_tracks_used_blocks(self.root_blk.fstype):
+        self.root_blk.blocks_used = self.num_used
+      # always write root (bitmap pointers)
+      self.root_blk.write()
+
+  def _write_ext_blks(self):
     # write ext blocks
     for ext_blk in self.ext_blks:
       ext_blk.write()
-    self.write_only_bits()
 
-  def write_only_bits(self):
-    # For DOS6 and DOS7, the root block contains the number of free blocks_used
-    # So we potentially have to update it even if only bits shall be rewritten
-    if rootblock_tracks_used_blocks(self.root_blk.fstype):
-      # TODO: Track the used blocks instead of recalculating it every time
-      blocks_used = self.get_num_used()
-      if blocks_used != self.root_blk.blocks_used:
-        self.root_blk.blocks_used = blocks_used
-        self.root_blk.write()
-
+  def _write_bitmap_blks(self):
     # write bitmap blocks
     off = 0
     for blk in self.bitmap_blks:
@@ -116,6 +124,10 @@ class ADFSBitmap:
   def read(self):
     self.bitmap_blks = []
     bitmap_data = bytearray()
+
+    # DOS6/7: update num used
+    if rootblock_tracks_used_blocks(self.root_blk.fstype):
+      self.num_used = self.root_blk.blocks_used
 
     # get bitmap blocks from root block
     blocks = self.root_blk.bitmap_ptrs
@@ -200,15 +212,17 @@ class ADFSBitmap:
 
   def get_num_free(self):
     num = 0
+    res = self.blkdev.reserved
     for i in range(self.bitmap_bits):
-      if self.get_bit(i):
+      if self.get_bit(i + res):
         num+=1
     return num
 
   def get_num_used(self):
     num = 0
+    res = self.blkdev.reserved
     for i in range(self.bitmap_bits):
-      if not self.get_bit(i):
+      if not self.get_bit(i + res):
         num+=1
     return num
 
@@ -218,13 +232,11 @@ class ADFSBitmap:
       return None
     for b in free_blks:
       self.clr_bit(b)
-    self.write_only_bits()
     return free_blks
 
   def dealloc_n(self, blks):
     for b in blks:
       self.set_bit(b)
-    self.write_only_bits()
 
   def get_bit(self, off):
     if off < self.blkdev.reserved or off >= self.blkdev.num_blocks:
@@ -245,9 +257,11 @@ class ADFSBitmap:
     bit_off = off % 32
     val = struct.unpack_from(">I", self.bitmap_data, long_off * 4)[0]
     mask = 1 << bit_off
-    val = val | mask
-    struct.pack_into(">I", self.bitmap_data, long_off * 4, val)
-    return True
+    if val & mask == 0:
+      val = val | mask
+      struct.pack_into(">I", self.bitmap_data, long_off * 4, val)
+      self.dirty = True
+      self.num_used -= 1
 
   # mark as used
   def clr_bit(self, off):
@@ -258,15 +272,27 @@ class ADFSBitmap:
     bit_off = off % 32
     val = struct.unpack_from(">I", self.bitmap_data, long_off * 4)[0]
     mask = 1 << bit_off
-    val = val & ~mask
-    struct.pack_into(">I", self.bitmap_data, long_off * 4, val)
-    return True
+    if val & mask == mask:
+      val = val & ~mask
+      struct.pack_into(">I", self.bitmap_data, long_off * 4, val)
+      self.dirty = True
+      self.num_used += 1
 
   def dump(self):
     print("Bitmap:")
     print("  ext: ",self.ext_blks)
     print("  blks:",len(self.bitmap_blks))
     print("  bits:",len(self.bitmap_data) * 8,self.blkdev.num_blocks)
+
+  def print_info(self):
+    num_free = self.get_num_free()
+    num_used = self.get_num_used()
+    print("num free:", num_free)
+    print("num used:", num_used)
+    if rootblock_tracks_used_blocks(self.root_blk.fstype):
+      print("num used:", self.num_used, "(cached in root)")
+    print("sum:     ", num_free + num_used)
+    print("total:   ", self.bitmap_bits)
 
   def create_draw_bitmap(self):
     bm = ctypes.create_string_buffer(self.blkdev.num_blocks)

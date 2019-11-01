@@ -19,7 +19,10 @@ class ProtectFlags:
   
   def __init__(self, mask=0):
     self.mask = mask
-    
+
+  def get_mask(self):
+    return self.mask
+
   def __str__(self):
     txt = ""
     pos = self.flag_num - 1
@@ -53,7 +56,31 @@ class ProtectFlags:
 
   def short_str(self):
     return str(self).replace("-","")
-    
+
+  def parse_full(self, s):
+    """parse a string with all flags"""
+    n = len(self.flag_txt)
+    if len(s) != n:
+      raise ValueError("full string size mismatch!")
+    mask = 0
+    for i in xrange(n):
+      val = s[i]
+      ref = self.flag_txt[i]
+      ref_lo = ref.lower()
+      if val not in (ref, ref_lo, '-'):
+        raise ValueError("invalid protect char: " + val)
+      is_lo = ref == ref_lo
+      is_blank = val == '-'
+      if is_lo:
+        do_set = is_blank
+      else:
+        do_set = not is_blank
+      if do_set:
+        bit_pos = n - i - 1
+        bit_mask = 1 << bit_pos
+        mask |= bit_mask
+    self.mask = mask
+
   def parse(self, s):
     if len(s) == 0:
       return

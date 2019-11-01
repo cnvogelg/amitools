@@ -238,12 +238,25 @@ Example::
 
 ::
 
-  format <volume_name> [ffs] [intl] [dircache] [<create options>]
+  format <volume_name> [dostype] [<create options>]
 
 A new and blank *OFS/FFS* file system will be created on the given image file.
-All data previously stored there will be lost!!! The ``<volume_name>`` gives
-the name of the new file system. The options ``ffs``, ``intl``, and or
-``dircache`` allow to select the type of file system you want to create.
+
+.. warning::
+
+  All data previously stored there will be lost!!!
+
+The ``<volume_name>`` gives the name of the new file system. The optional
+``dos_type`` gives the file system variant. Its the base type ``ofs`` or
+``ffs`` combined with variant flags added with a plus ``+`` (and no spaces).
+Or you give a ``DOSx`` type of the file system in the range of ``DOS0`` and
+``DOS7``.
+
+The following variant flags are recognized:
+
+* ``intl`` for international mode.
+* ``dc`` or ``dircache`` for directory caching
+* ``ln`` or ``longname`` for long file name support
 
 If the disk image file you specify does not exist on disk yet then an implicit
 ``create`` command will be executed first. If the file already exists you must
@@ -256,6 +269,7 @@ Example::
   > xdftool empty.hdf format Work chs=640,1,32 ; create with given geometry
   > xdftool empty.hdf format Work size=10M ffs ; create an FFS hdf image
   > xdftool empty.hdf create size=10M + format Work ffs ; same result
+  > xdftool empty.hdf format Work size=10M ffs+ln ; create with long name support
 
 
 ``boot`` - Alter the boot block
@@ -412,7 +426,7 @@ This command changes the modification time associated with the
 given ``<ami_path>`` file or directory. The time string must have the following
 notation (and needs to be quoted because of the contained spaces)::
 
-  '06.07.1986 14:38:56 t45'
+  '06.07.1986 14:38:56.45'
   '06.07.1986 14:38:56'
 
 The first notation allows to specify the number of ticks (1/50th s) in a time
@@ -420,7 +434,7 @@ stamp.
 
 Example::
 
-  > xdftool mydisk.adf time test '06.07.1986 14:38:56 t45'
+  > xdftool mydisk.adf time test '06.07.1986 14:38:56.45'
   > xdftool mydisk.adf time mydir '06.07.1986 14:38:56'
 
 
@@ -460,9 +474,9 @@ commands require a valid time string (see ``time`` command above for details).
 Example::
 
   > xdftool my.adf root show
-  > xdftool my.adf root create_time '06.07.1986 14:38:56 t45'
+  > xdftool my.adf root create_time '06.07.1986 14:38:56.45'
   > xdftool my.adf root disk_time '06.07.1986 14:38:56'
-  > xdftool my.adf root time '06.07.1986 14:38:56 t45'
+  > xdftool my.adf root time '06.07.1986 14:38:56.45'
 
 
 Pack/Repack/Unpack Images
@@ -524,7 +538,7 @@ expand or shrink the image.
 
 ::
 
-  unpack <sys_dir>
+  unpack <sys_dir> [fsuae]
 
 The disk image volume's directory tree will be completely extracted to the
 host file system at ``<sys_dir>``. First a directory with the volume's name is
@@ -538,10 +552,15 @@ A ``<volume_name>.bootcode`` file is created if the disk image is bootable. A
 ``<volume_name>.blkdev`` file is created to store the disk geometry of disk
 image's block device.
 
+If ``fsuae`` option is given then the meta data of each file is written to
+a FS-UAE compatible ``.uaem`` file right next to the original file. Use this
+option if you want to use the unpacked directory as a volume inside FS-UAE.
+
 Example::
 
   > xdftool mydisk.adf unpack .   ; unpack full image to current directory
   > xdftool mydisk.hdf unpack .   ; same for hard disk images
+  > xdftool mydisk.hdf unpack .  fsuae  ; store meta info in .uaem files
 
 
 ``pack`` - Create a disk image from host files
@@ -558,6 +577,9 @@ in the disk image will be lost and overwritten!!!
 If a MetaDB called ``<volume_dir>.xdfmeta`` exists then the files in the
 images will be created with correct protection flags, modification time and
 comment.
+
+Pack automatically detects if a FS-UAE meta file with ``.uaem`` extension is
+available and then extracts the file's meta info there.
 
 If a boot code file called ``<volume_dir>.bootcode`` is available then this
 code is written to the image``s boot block and made bootable.
@@ -616,6 +638,7 @@ commands are suitable for experts only.
 
 ::
 
+  bitmap info
   bitmap free [brief]
   bitmap used [brief]
   bitmap find [n]
@@ -623,6 +646,8 @@ commands are suitable for experts only.
   bitmap maps [brief]
   bitmap root [brief]
   bitmap node <ami_path> [all] [entries] [brief]
+
+The ``info`` command calculates the free and used blocks.
 
 The ``free`` and ``used`` commands show the unallocated/allocated blocks on
 the disk. Use the ``brief`` option to show only bitmap lines with contents.

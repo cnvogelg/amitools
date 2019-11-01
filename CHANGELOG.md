@@ -1,5 +1,26 @@
 # Change Log
 
+## [0.3.0][3] (2019-11-01)
+
+### xdftool
+
+* Filesystem bitmaps are cached now to speed up packing
+* Pack/Unpack/Repack support for block size > 512 and DOS 6/7
+* Use a new notation for timestamp ticks `.00`
+* Auto open first partition when using a RDB image
+* Added `ln`/`longname` as alias for DOS 6/7 when formatting
+* Allow to unpack/pack with meta info stored in FS-UAE .uaem files
+* Fixed packing of files with decomposed unicode names (#106)
+
+### rdbtool
+
+* Fixed geometry setup of large (>4GiB) images
+
+### romtool
+
+* Added new option to fix kick sum when copying (@daleking)
+
+
 ## [0.2.0][2] (2019-06-27)
 
 ### vamos
@@ -60,5 +81,6 @@
 * First public release
 
 
-[1]: https://github.com/cnvogelg/amitools/tree/v0.2.0
-[2]: https://github.com/cnvogelg/amitools/tree/v0.1.0
+[1]: https://github.com/cnvogelg/amitools/tree/v0.1.0
+[2]: https://github.com/cnvogelg/amitools/tree/v0.2.0
+[3]: https://github.com/cnvogelg/amitools/tree/v0.3.0

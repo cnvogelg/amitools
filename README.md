@@ -165,30 +165,30 @@ make
 
 ## Contents
 
-The new Documentation of `amitools` is hosted on [readthedocs][1]
+The new Documentation of `amitools` is hosted on [readthedocs][8]
 
 ### Tools
 
-- [vamos](doc/vamos.md) **V)irtual AM)iga OS**
+- [vamos](docs/vamos.md) **V)irtual AM)iga OS**
 
   vamos allows you to run command line (CLI) Amiga programs on your host
   Mac or PC. vamos is an API level Amiga OS Emulator that replaces exec
   and dos calls with its own implementation and maps all file access to
   your local file system.
 
-- [xdftool][2]
+- [xdftool][9]
 
   Create and modify ADF or HDF disk image files.
 
-- [xdfscan][3]
+- [xdfscan][10]
 
   Scan directory trees for ADF or HDF disk image files and verify the contents.
 
-- [rdbtool][4]
+- [rdbtool][11]
 
   Create or modify disk images with Rigid Disk Block (RDB)
 
-- [romtool][5]
+- [romtool][12]
 
   A tool to inspect, dissect, and build Amiga Kickstart ROM images to be
   used with emulators, run with soft kickers or burned into flash ROMs.
@@ -215,11 +215,11 @@ The new Documentation of `amitools` is hosted on [readthedocs][1]
 
   You can query functions and find their jump table offset.
 
-[1]: https://amitools.readthedocs.io/
-[2]: https://amitools.readthedocs.io/en/latest/tools/xdftool.html
-[3]: https://amitools.readthedocs.io/en/latest/tools/xdfscan.html
-[4]: https://amitools.readthedocs.io/en/latest/tools/rdbtool.html
-[5]: https://amitools.readthedocs.io/en/latest/tools/romtool.html
+[8]: https://amitools.readthedocs.io/
+[9]: https://amitools.readthedocs.io/en/latest/tools/xdftool.html
+[10]: https://amitools.readthedocs.io/en/latest/tools/xdfscan.html
+[11]: https://amitools.readthedocs.io/en/latest/tools/rdbtool.html
+[12]: https://amitools.readthedocs.io/en/latest/tools/romtool.html
 
 ### Python Libraries
 
