@@ -5,8 +5,8 @@ project = u'amitools'
 copyright = u'2019, Christian Vogelgsang'
 author = u'Christian Vogelgsang'
 
-version = u'0.2'
-release = u'0.2.0'
+version = u'0.3'
+release = u'0.3.0'
 
 # -- General configuration ---------------------------------------------------
 extensions = [
