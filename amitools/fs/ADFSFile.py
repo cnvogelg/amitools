@@ -74,7 +74,7 @@ class ADFSFile(ADFSNode):
     total_size = 0
     is_ffs = self.volume.is_ffs
     byte_size = self.block.byte_size
-    data = ""
+    data = bytearray()
     for blk in self.data_blk_nums:
       if is_ffs:
         # ffs has raw data blocks
@@ -184,7 +184,9 @@ class ADFSFile(ADFSNode):
       hdr_blks = self.data_blk_nums
       hdr_ext = 0
       
-    fhb.create(parent_blk, name.get_ami_str(), hdr_blks, hdr_ext, byte_size, meta_info.get_protect(), meta_info.get_comment_ami_str(), meta_info.get_mod_ts(), hash_chain_blk)
+    fhb.create(parent_blk, name, hdr_blks, hdr_ext, byte_size,
+               meta_info.get_protect(), meta_info.get_comment(),
+               meta_info.get_mod_ts(), hash_chain_blk)
     fhb.write() 
     self.set_block(fhb)
     
@@ -227,7 +229,7 @@ class ADFSFile(ADFSNode):
       if is_ffs:
         # pad block
         if size < bs:
-          d += '\0' * (bs-size)
+          d += b'\0' * (bs-size)
         # write raw block data in FFS
         self.blkdev.write_block(blk_num, d)
       else:

@@ -169,6 +169,19 @@ class Block:
     self._put_long(loc+1, ts.mins)
     self._put_long(loc+2, ts.ticks)
   
+  def _get_bytes(self, loc, size):
+    if loc < 0:
+      loc = self.block_longs + loc
+    loc = loc * 4
+    return self.data[loc:loc+size]
+
+  def _put_bytes(self, loc, data):
+    if loc < 0:
+      loc = self.block_longs + loc
+    loc = loc * 4
+    size = len(data)
+    self.data[loc:loc+size] = data
+
   def _get_bstr(self, loc, max_size):
     if loc < 0:
       loc = self.block_longs + loc
@@ -177,7 +190,7 @@ class Block:
     if size > max_size:
       return None
     if size == 0:
-      return ""
+      return FSString()
     name = self.data[loc+1:loc+1+size]
     return FSString(name)
 

@@ -32,12 +32,13 @@ class ADFSNode:
     self.create_meta_info()
     
   def create_meta_info(self):
-    comment = self.block.comment
     if self.block.comment_block_id != 0:
         comment_block = CommentBlock(self.blkdev, self.block.comment_block_id)
         comment_block.read()
         comment = comment_block.comment
-    self.meta_info = MetaInfo(self.block.protect, self.block.mod_ts, FSString(comment))
+    else:
+        comment = self.block.comment
+    self.meta_info = MetaInfo(self.block.protect, self.block.mod_ts, comment)
 
   def get_file_name(self):
     return self.name
@@ -59,7 +60,7 @@ class ADFSNode:
     # dircache?
     rebuild_dircache = False
     if self.volume.is_dircache and self.parent != None:
-      record = self.parent.get_dircache_record(self.name.get_ami_str_name())
+      record = self.parent.get_dircache_record(self.name)
       if record == None:
         raise FSError(INTERNAL_ERROR, node=self)
     else:
@@ -86,7 +87,7 @@ class ADFSNode:
     # alter comment
     comment = meta_info.get_comment()
     if comment != None and hasattr(self.block, "comment"):
-      if EntryBlock.needs_extra_comment_block(self.name.get_ami_str_name(), comment.get_ami_str()):
+      if EntryBlock.needs_extra_comment_block(self.name, comment):
         if self.block.comment_block_id == 0:
           # Allocate and initialize extra block for comment
           blks = self.volume.bitmap.alloc_n(1)
@@ -99,10 +100,10 @@ class ADFSNode:
         else:
           cblk = CommentBlock(self.blkdev, self.block.comment_block_id)
           cblk.read()
-        cblk.comment = comment.get_ami_str()
+        cblk.comment = comment
         cblk.write()
       else:
-        self.block.comment = comment.get_ami_str()
+        self.block.comment = comment
         if self.block.comment_block_id != 0:
           self.volume.bitmap.dealloc_n([self.block.comment_block_id])
           self.block.comment_block_id = 0
@@ -110,8 +111,8 @@ class ADFSNode:
       self.meta_info.set_comment(comment)
       dirty = True
       if record != None:
-        rebuild_dircache = len(record.comment) < comment 
-        record.comment = comment.get_ami_str()
+        rebuild_dircache = len(record.comment) < comment
+        record.comment = comment
     
     # really need update?
     if dirty:

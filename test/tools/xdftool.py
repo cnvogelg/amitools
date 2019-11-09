@@ -37,7 +37,18 @@ DISK_SIZES = (
     "10M"
 )
 
-XDFSpec = collections.namedtuple('xdf_spec', ['file_name', 'size'])
+XDFSpec = collections.namedtuple('XDFSpec', ['file_name', 'size'])
+
+TEST_DATA = {
+    "empty": b"",
+    "hello": b"hello, world!",
+    "byterange": bytes([x for x in range(256)]),
+    "10k": bytes([x % 256 for x in range(10 * 1024)]),
+    "100k": bytes([x % 256 for x in range(100 * 1024)])
+}
+
+DataFile = collections.namedtuple('DataFile', 
+                                  ['file_path', 'file_name', 'data'])
 
 
 @pytest.fixture(params=ADF_LIST)
@@ -84,6 +95,16 @@ def xdftool(toolrun):
     return run
 
 
+@pytest.fixture(params=TEST_DATA.keys())
+def test_files(request, tmpdir):
+    test_file = request.param
+    data = TEST_DATA[test_file]
+    test_path = tmpdir / test_file
+    with open(str(test_path), "wb") as fh:
+        fh.write(data)
+    return DataFile(str(test_path), test_file, data)
+
+
 def xdftool_list_test(xdftool, adf_file):
     """list contents of various disks"""
     xdftool(adf_file, "list")
@@ -100,3 +121,22 @@ def xdftool_format_test(xdftool, dos_format, xdfs):
             ("create", xdfs.size),
             ("format", "Foo", dos_format))
     xdftool(xdfs.file_name, "list")
+
+
+def create_disk(xdftool, dos_format, xdfs):
+    xdftool(xdfs.file_name,
+            ("create", xdfs.size),
+            ("format", "Foo", dos_format))
+
+
+def xdftool_write_read_test(xdftool, dos_format, xdfs, test_files):
+    """write a file and read it back"""
+    create_disk(xdftool, dos_format, xdfs)
+    xdftool(xdfs.file_name,
+            ("write", test_files.file_path))
+    read_file = test_files.file_path + "-read"
+    xdftool(xdfs.file_name,
+            ("read", test_files.file_name, read_file))
+    with open(read_file, "rb") as fh:
+        read_data = fh.read()
+        assert read_data == test_files.data

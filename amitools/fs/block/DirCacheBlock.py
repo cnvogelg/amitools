@@ -7,23 +7,24 @@ import struct
 from .Block import Block
 from ..ProtectFlags import ProtectFlags
 from ..TimeStamp import TimeStamp
+from ..FSString import FSString
 
 class DirCacheRecord:
-  def __init__(self, entry=0, size=0, protect=0, mod_ts=None, sub_type=0, name='', comment=''):
+  def __init__(self, entry=0, size=0, protect=0, mod_ts=None, sub_type=0, name='', comment=None):
     self.entry = entry
     self.size = size
     self.protect = protect
     self.mod_ts = mod_ts
     self.sub_type = sub_type
     self.name = name
-    if comment == None:
-      self.comment = ''
+    if comment is None:
+      self.comment = FSString()
     else:
       self.comment = comment
     self.offset = None
   
   def get_size(self):
-    total_len = 25 + len(self.name) + len(self.comment)
+    total_len = 25 + len(self.name.get_ami_str()) + len(self.comment.get_ami_str())
     align_len = (total_len + 1) & ~1
     return align_len
     
@@ -39,11 +40,11 @@ class DirCacheRecord:
     # name
     name_len = ord(data[off + 23])
     name_off = off + 24
-    self.name = data[name_off : name_off + name_len]
+    self.name = FSString(data[name_off : name_off + name_len])
     # comment
     comment_len = ord(data[off + name_len + 24])
     comment_off = off + 25 + name_len
-    self.comment = data[comment_off : comment_off + comment_len]
+    self.comment = FSString(data[comment_off : comment_off + comment_len])
     return off + self.get_size()
     
   def put(self, data, off):
@@ -52,15 +53,17 @@ class DirCacheRecord:
     ts = self.mod_ts
     struct.pack_into(">IIIHHHHH",data,off,self.entry,self.size,self.protect,0,0,ts.days,ts.mins,ts.ticks)
     # name
-    name_len = len(self.name)
-    data[off + 23] = chr(name_len)
+    name = self.name.get_ami_str()
+    name_len = len(name)
+    data[off + 23] = name_len
     name_off = off + 24
-    data[name_off : name_off + name_len] = self.name
+    data[name_off : name_off + name_len] = name
     # comment
-    comment_len = len(self.comment)
-    data[off + 24 + name_len] = chr(comment_len)
+    comment = self.comment.get_ami_str()
+    comment_len = len(comment)
+    data[off + 24 + name_len] = comment_len
     comment_off = off + 25 + name_len
-    data[comment_off : comment_off + comment_len] = self.comment
+    data[comment_off : comment_off + comment_len] = comment
     return off + self.get_size()
     
   def dump(self):

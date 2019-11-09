@@ -7,6 +7,7 @@ from .EntryBlock import EntryBlock
 from .CommentBlock import CommentBlock
 from ..ProtectFlags import ProtectFlags
 from ..TimeStamp import *
+from ..FSString import FSString
 
 class FileHeaderBlock(EntryBlock):
   def __init__(self, blkdev, blk_num, is_longname):
@@ -84,11 +85,13 @@ class FileHeaderBlock(EntryBlock):
     self.protect = protect
     self.protect_flags = ProtectFlags(self.protect)
     self.byte_size = byte_size
-    if comment == None:
-      self.comment = ''
+    if comment is None:
+      self.comment = FSString()
     else:
+      assert isinstance(comment, FSString)
       self.comment = comment
     self.mod_ts = mod_ts
+    assert isinstance(name, FSString)
     self.name = name
     self.hash_chain = hash_chain
     self.parent = parent

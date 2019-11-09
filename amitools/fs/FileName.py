@@ -50,13 +50,13 @@ class FileName:
   def get_upper_ami_str(self):
     result = self.name.get_ami_str().upper()
     if self.is_intl:
-      r = ""
+      r = bytearray()
       for i in range(len(result)):
-        o = ord(result[i])
+        o = result[i]
         if o >= 224 and o <= 254 and o != 247:
-          r += chr(o - (ord('a')-ord('A')))
+          r.append(o - (ord('a')-ord('A')))
         else:
-          r += chr(o)
+          r.append(o)
       return r
     else:
       return result
@@ -95,7 +95,7 @@ class FileName:
     h = len(up)
     for c in up:
       h = h * 13;
-      h += ord(c)
+      h += c
       h &= 0x7ff
     h = h % hash_size
     return h

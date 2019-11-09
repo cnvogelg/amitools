@@ -384,7 +384,8 @@ class ADFSDir(ADFSNode):
   def _dircache_add_entry(self, name, meta_info, entry_blk, size, update_myself=True):
     # create a new dircache record
     r = DirCacheRecord(entry=entry_blk, size=size, protect=meta_info.get_protect(), \
-                       mod_ts=meta_info.get_mod_ts(), sub_type=0, name=name, comment=meta_info.get_comment())
+                       mod_ts=meta_info.get_mod_ts(), sub_type=0, name=name,
+                       comment=meta_info.get_comment())
     return self._dircache_add_entry_int(r, update_myself)
     
   def _dircache_add_entry_int(self, r, update_myself=True):
