@@ -1,14 +1,10 @@
 
 
 
-import sys
 import time
 
 from .Block import Block
 from ..TimeStamp import *
-
-if sys.version_info[0] == 3:
-  xrange = range
 
 
 class RootBlock(Block):

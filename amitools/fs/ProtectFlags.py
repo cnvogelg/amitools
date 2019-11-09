@@ -63,7 +63,7 @@ class ProtectFlags:
     if len(s) != n:
       raise ValueError("full string size mismatch!")
     mask = 0
-    for i in xrange(n):
+    for i in range(n):
       val = s[i]
       ref = self.flag_txt[i]
       ref_lo = ref.lower()

@@ -153,7 +153,7 @@ cdef class Memory:
       addr += 0x10000
 
   def set_special_range_write_funcs(self, uint addr, uint num_pages=1, w8=None, w16=None, w32=None):
-    for i in xrange(num_pages):
+    for i in range(num_pages):
       if w8 != None:
         self.set_special_range_write_func(addr, 0, w8)
       if w16 != None:

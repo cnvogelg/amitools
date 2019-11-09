@@ -2,13 +2,9 @@
 
 
 import os.path
-import sys
 
 from .Block import Block
 import amitools.fs.DosType as DosType
-
-if sys.version_info[0] == 3:
-  xrange = range
 
 
 class BootBlock(Block):  
