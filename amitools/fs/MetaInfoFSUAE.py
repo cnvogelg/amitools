@@ -22,7 +22,7 @@ class MetaInfoFSUAE:
 
     def load_meta(self, path):
         with open(path, "rb") as fh:
-            data = fh.read()
+            data = fh.read().decode('utf-8')
             return self.parse_data(data)
     
     def parse_data(self, data):
@@ -62,10 +62,10 @@ class MetaInfoFSUAE:
         time_stamp = meta_info.get_mod_ts()
         ts = time_stamp.format(TS_FORMAT)
         ts += ".%02d" % time_stamp.get_sub_secs()
-        comment = meta_info.get_comment_ami_str()
+        comment = meta_info.get_comment_unicode_str()
         return "%s %s %s\n" % (protect, ts, comment)
 
     def save_meta(self, path, meta_info):
         with open(path, "wb") as fh:
             txt = self.generate_data(meta_info)
-            fh.write(txt)
+            fh.write(txt.encode('utf-8'))
