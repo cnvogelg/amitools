@@ -200,7 +200,7 @@ if __name__ == '__main__':
     print(a, blkdev.__class__.__name__)
     blkdev.close()
     # open via fobj
-    fobj = file(a,"rb")
+    fobj = open(a,"rb")
     data = fobj.read()
     nobj = io.StringIO(data)
     blkdev = bdf.open("bluna"+a, fobj=nobj)

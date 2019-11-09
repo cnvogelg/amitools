@@ -47,7 +47,7 @@ class ADFSVolume:
       self.root = RootBlock(self.blkdev, self.boot.calc_root_blk)
       self.root.read()
       if self.root.valid:
-        self.name = FSString(self.root.name)
+        self.name = self.root.name
         # build meta info
         self.meta_info = RootMetaInfo( self.root.create_ts, self.root.disk_ts, self.root.mod_ts )
         # create root dir
@@ -100,7 +100,7 @@ class ADFSVolume:
     disk_ts = meta_info.get_disk_ts()
     mod_ts = meta_info.get_mod_ts()
     self.meta_info = meta_info
-    self.root.create(name.get_ami_str(), create_ts, disk_ts, mod_ts, fstype=dos_type)
+    self.root.create(fn.get_name(), create_ts, disk_ts, mod_ts, fstype=dos_type)
     self.name = name
     # create bitmap
     self.bitmap = ADFSBitmap(self.root)

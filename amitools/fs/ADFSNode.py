@@ -27,7 +27,7 @@ class ADFSNode:
   
   def set_block(self, block):  
     self.block = block
-    self.name = FileName(FSString(self.block.name), is_intl=self.volume.is_intl,is_longname=self.volume.is_longname)
+    self.name = FileName(self.block.name, is_intl=self.volume.is_intl,is_longname=self.volume.is_longname)
     self.valid = True
     self.create_meta_info()
     

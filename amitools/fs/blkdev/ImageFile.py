@@ -82,13 +82,13 @@ class ImageFile:
   def create(self, num_blocks):
     if self.read_only:
       raise IOError("Can't create image file in read only mode")
-    block = '\0' * self.block_bytes
+    block = b'\0' * self.block_bytes
     if self.fobj is not None:
       for i in range(num_blocks):
         self.fobj.write(block)
       self.fobj.seek(0,0)
     else:
-      fh = file(self.file_name, "wb")
+      fh = open(self.file_name, "wb")
       for i in range(num_blocks):
         fh.write(block)
       fh.close()
@@ -104,7 +104,7 @@ if __name__ == '__main__':
     im.write_blk(0,d)
     im.close()
     # read fobj
-    fobj = file(a,"r+b")
+    fobj = open(a,"r+b")
     im = ImageFile(a,fobj=fobj)
     im.open()
     d = im.read_blk(0)

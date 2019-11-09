@@ -4,6 +4,8 @@
 import struct
 import ctypes
 from ..TimeStamp import TimeStamp
+from ..FSString import FSString
+
 
 class Block:
   # mark end of block list
@@ -177,19 +179,21 @@ class Block:
     if size == 0:
       return ""
     name = self.data[loc+1:loc+1+size]
-    return name.decode('latin-1')
-  
-  def _put_bstr(self, loc, max_size, bstr):
-    if bstr == None:
-      bstr = ""
-    bstr = bstr.encode('latin-1')
+    return FSString(name)
+
+  def _put_bstr(self, loc, max_size, fs_str):
+    if fs_str is None:
+      fs_str = FSString()
+    assert isinstance(fs_str, FSString)
+    bstr = fs_str.get_ami_str()
+    assert len(bstr) < 256
     n = len(bstr)
     if n > max_size:
       bstr = bstr[:max_size]
     if loc < 0:
       loc = self.block_longs + loc
     loc = loc * 4
-    self.data[loc] = chr(len(bstr))
+    self.data[loc] = len(bstr)
     if len(bstr) > 0:
       self.data[loc+1:loc+1+len(bstr)] = bstr
   
@@ -203,12 +207,13 @@ class Block:
         break
       s += c
       n += 1
-    return s.decode('latin-1')
+    return FSString(s)
     
-  def _put_cstr(self, loc, max_size, cstr):
-    if cstr == None:
-      cstr = ""
-    cstr = cstr.encode('latin-1')
+  def _put_cstr(self, loc, max_size, fs_str):
+    if fs_str is None:
+      fs_str = FSString()
+    assert isinstance(fs_str, FSString)
+    cstr = fs_str.get_ami_str()
     n = min(max_size, len(cstr))
     loc = loc * 4
     if n > 0:

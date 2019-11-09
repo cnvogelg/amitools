@@ -55,7 +55,7 @@ if output == None:
   output = args.bin_file + ".patched"
 
 print("writing '%s'..." % output, end=' ')
-out = file(output, "wb")
+out = open(output, "wb")
 bin_data.tofile(out)
 out.close()
 print("done")

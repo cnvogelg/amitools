@@ -36,7 +36,7 @@ class DisAsm:
   def disassemble(self, data, start=0):
     # write to temp file
     tmpname = tempfile.mktemp()
-    out = file(tmpname,"wb")
+    out = open(tmpname,"wb")
     out.write(data)
     out.close()
     
