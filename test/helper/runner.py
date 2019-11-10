@@ -207,16 +207,20 @@ class VamosRunner:
 
 class ToolRunner:
 
-  def run_checked(self, tool, *prog_args):
-    ret_code, stdout, stderr = self.run(tool, *prog_args)
+  def run_checked(self, tool, *prog_args, raw_output=False):
+    ret_code, stdout, stderr = self.run(tool, *prog_args,
+                                        raw_output=raw_output)
     if stderr:
       for line in stderr:
         print(line)
+    if stdout:
+      for line in stdout:
+        print(line)
     assert ret_code == 0
-    assert stderr == []
+    assert len(stderr) == 0
     return stdout
 
-  def run(self, tool, *prog_args):
+  def run(self, tool, *prog_args, raw_output=False):
     # setup args
     tool_path = os.path.join("..", "bin", tool)
     if not os.path.exists(tool_path):
@@ -228,8 +232,9 @@ class ToolRunner:
     (stdout, stderr) = p.communicate()
 
     # process stdout
-    stdout = stdout.decode('latin-1').splitlines()
-    stderr = stderr.decode('latin-1').splitlines()
+    if not raw_output:
+      stdout = stdout.decode('latin-1').splitlines()
+      stderr = stderr.decode('latin-1').splitlines()
     return (p.returncode, stdout, stderr)
 
   def _get_sha1(self, file_name):

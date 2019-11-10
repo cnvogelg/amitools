@@ -356,7 +356,7 @@ class TypeCmd(Command):
     else:
       name = make_fsstr(p[0])
       data = vol.read_file(name)
-      print(data)
+      sys.stdout.buffer.write(data)
       return 0
 
 class ReadCmd(Command):

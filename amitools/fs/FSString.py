@@ -24,6 +24,18 @@ class FSString:
   def __str__(self):
     return self.txt
   
+  def __eq__(self, other):
+    if isinstance(other, FSString):
+      return self.txt == other.txt
+    else:
+      return False
+
+  def __ne__(self, other):
+    if isinstance(other, FSString):
+      return self.txt != other.txt
+    else:
+      return True
+
   def get_unicode(self):
     return self.txt
   

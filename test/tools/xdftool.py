@@ -78,7 +78,7 @@ def xdfs(request, tmpdir):
 
 @pytest.fixture
 def xdftool(toolrun):
-    def run(xdf_file, *cmds):
+    def run(xdf_file, *cmds, raw_output=False):
         args = []
         for cmd in cmds:
             if type(cmd) in (tuple, list):
@@ -91,8 +91,18 @@ def xdftool(toolrun):
                 args.append(cmd)
             # plus seperates commands
             args.append('+')
-        toolrun.run_checked("xdftool", xdf_file, *args[:-1])
+        return toolrun.run_checked("xdftool", xdf_file, *args[:-1],
+                                   raw_output=raw_output)
     return run
+
+
+@pytest.fixture
+def xdf_img(xdftool, xdfs, dos_format):
+    """create formatted image"""
+    xdftool(xdfs.file_name,
+            ("create", xdfs.size),
+            ("format", "Foo", dos_format))
+    return xdfs
 
 
 @pytest.fixture(params=TEST_DATA.keys())
@@ -123,20 +133,40 @@ def xdftool_format_test(xdftool, dos_format, xdfs):
     xdftool(xdfs.file_name, "list")
 
 
-def create_disk(xdftool, dos_format, xdfs):
-    xdftool(xdfs.file_name,
-            ("create", xdfs.size),
-            ("format", "Foo", dos_format))
-
-
-def xdftool_write_read_test(xdftool, dos_format, xdfs, test_files):
+def xdftool_write_read_test(xdftool, xdf_img, test_files):
     """write a file and read it back"""
-    create_disk(xdftool, dos_format, xdfs)
-    xdftool(xdfs.file_name,
+    # write file
+    xdftool(xdf_img.file_name,
             ("write", test_files.file_path))
+    # read file back
     read_file = test_files.file_path + "-read"
-    xdftool(xdfs.file_name,
+    xdftool(xdf_img.file_name,
             ("read", test_files.file_name, read_file))
+    # compare
     with open(read_file, "rb") as fh:
         read_data = fh.read()
         assert read_data == test_files.data
+    # type file
+    output = xdftool(xdf_img.file_name,
+                     ("type", test_files.file_name),
+                     raw_output=True)
+    assert output == test_files.data
+
+
+def xdftool_write_delete_test(xdftool, xdf_img, test_files):
+    """write a file and delete it"""
+    # write file
+    xdftool(xdf_img.file_name,
+            ("write", test_files.file_path))
+    # delete it
+    xdftool(xdf_img.file_name,
+            ("delete", test_files.file_name))
+
+
+def xdftool_makedir_test(xdftool, xdf_img):
+    # create dir
+    xdftool(xdf_img.file_name,
+            ("makedir", "bla"))
+    # delete it
+    xdftool(xdf_img.file_name,
+            ("delete", "bla"))

@@ -176,5 +176,6 @@ class DirCacheBlock(Block):
     print(" parent:     %d" % (self.parent))
     print(" num_records:%d" % (self.num_records))
     print(" next_cache: %d" % (self.next_cache))
+    print(" num records:%d" % len(self.records))
     for r in self.records:
       r.dump()

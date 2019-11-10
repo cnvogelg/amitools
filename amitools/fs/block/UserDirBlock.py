@@ -5,6 +5,7 @@ import time
 from .Block import Block
 from .EntryBlock import EntryBlock
 from ..ProtectFlags import ProtectFlags
+from ..FSString import FSString
 
 class UserDirBlock(EntryBlock):
   def __init__(self, blkdev, blk_num, is_longname):
@@ -44,8 +45,8 @@ class UserDirBlock(EntryBlock):
     Block.create(self)
     self.own_key = self.blk_num
     self.protect = protect
-    if comment == None:
-      self.comment = ''
+    if comment is None:
+      self.comment = FSString()
     else:
       self.comment = comment
     # timestamps

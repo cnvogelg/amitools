@@ -132,7 +132,7 @@ class ADFSDir(ADFSNode):
     blkdev = self.blkdev
     # create a UserDirBlock
     ud = UserDirBlock(blkdev, blk_num, self.volume.is_longname)
-    ud.create(parent_blk, name.get_ami_str(), meta_info.get_protect(), meta_info.get_comment_ami_str(), meta_info.get_mod_ts(), hash_chain_blk)
+    ud.create(parent_blk, name, meta_info.get_protect(), meta_info.get_comment(), meta_info.get_mod_ts(), hash_chain_blk)
     ud.write()    
     self.set_block(ud)
     self._init_name_hash()
@@ -441,7 +441,7 @@ class ADFSDir(ADFSNode):
         pos = i
         break
     if record == None:
-      raise FSError(INTERNAL_ERROR, node=self)
+      raise FSError(INTERNAL_ERROR, node=self, extra="no dc record!")
     # remove entry from this block
     dcb.remove_record(record)
     # remove whole block?
