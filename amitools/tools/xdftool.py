@@ -218,6 +218,8 @@ class FormatCmd(Command):
                     none_if_missing=True)
     if not blkdev:
       return f.create(image_file, options=opts, force=self.args.force)
+    else:
+      return blkdev
 
   def init_vol(self, blkdev):
     vol = ADFSVolume(blkdev)

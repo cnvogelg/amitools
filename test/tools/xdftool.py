@@ -1,5 +1,6 @@
 import pytest
 import collections
+import os
 
 ADF_LIST = (
     "amiga-os-100-workbench.adf",
@@ -39,16 +40,44 @@ DISK_SIZES = (
 
 XDFSpec = collections.namedtuple('XDFSpec', ['file_name', 'size'])
 
+DATA_bytes = bytes([x for x in range(256)])
+DATA_10k = bytes([x % 256 for x in range(10 * 1024)])
+DATA_100k = bytes([x % 256 for x in range(100 * 1024)])
+
 TEST_DATA = {
     "empty": b"",
     "hello": b"hello, world!",
-    "byterange": bytes([x for x in range(256)]),
-    "10k": bytes([x % 256 for x in range(10 * 1024)]),
-    "100k": bytes([x % 256 for x in range(100 * 1024)])
+    "byterange": DATA_bytes,
+    "10k": DATA_10k,
+    "100k": DATA_100k
 }
 
 DataFile = collections.namedtuple('DataFile', 
                                   ['file_path', 'file_name', 'data'])
+
+TEST_TREES = {
+    "simple": {
+        "foo": {},
+        "bar": b"Hello, world!"
+    },
+    "deep": {
+        "foo": {
+            "bar": {
+                "baz": {
+                    "hello": b"Hello, world!"
+                }
+            }
+        },
+    },
+    "data": {
+        "bytes": DATA_bytes,
+        "10k": DATA_10k,
+        "100k": DATA_100k
+    }
+}
+
+XDFData = collections.namedtuple('XDFData',
+                                 ['spec', 'build', 'check', 'delete'])
 
 
 @pytest.fixture(params=ADF_LIST)
@@ -103,6 +132,66 @@ def xdf_img(xdftool, xdfs, dos_format):
             ("create", xdfs.size),
             ("format", "Foo", dos_format))
     return xdfs
+
+
+@pytest.fixture(params=TEST_TREES.keys())
+def xdf_img_data(request, xdf_img, xdftool, tmpdir):
+    test_tree = request.param
+    tree = TEST_TREES[test_tree]
+
+    def build_node(node, path, cmds):
+        path_name = "/".join(path)
+        if isinstance(node, dict):
+            cmds.append(("makedir", path_name))
+            for name in node:
+                build_node(node[name], path + [name], cmds)
+        else:
+            tmp_file = os.path.join(str(tmpdir), "_".join(path))
+            with open(tmp_file, "wb") as fh:
+                fh.write(node)
+            cmds.append(("write", tmp_file, path_name))
+
+    def build_func():
+        cmds = []
+        for node in tree:
+            build_node(tree[node], [node], cmds)
+        xdftool(xdf_img.file_name, *cmds)
+
+    def check_node(node, path):
+        path_name = "/".join(path)
+        # list entry
+        output = xdftool(xdf_img.file_name,
+                         ("list", path_name))
+        # split
+        file_name, size, *_ = output[0].split()
+        if isinstance(node, dict):
+            assert size == "DIR"
+            for name in node:
+                check_node(node[name], path + [name])
+        else:
+            data = xdftool(xdf_img.file_name,
+                           ("type", path_name),
+                           raw_output=True)
+            assert data == node
+
+    def check_func():
+        for node in tree:
+            check_node(tree[node], [node])
+
+    def delete_node(node, path, cmds):
+        path_name = "/".join(path)
+        if isinstance(node, dict):
+            for name in node:
+                delete_node(node[name], path + [name], cmds)
+        cmds.append(("delete", path_name))
+
+    def delete_func():
+        cmds = []
+        for node in tree:
+            delete_node(tree[node], [node], cmds)
+        xdftool(xdf_img.file_name, *cmds)
+
+    return XDFData(xdf_img, build_func, check_func, delete_func)
 
 
 @pytest.fixture(params=TEST_DATA.keys())
@@ -170,3 +259,13 @@ def xdftool_makedir_test(xdftool, xdf_img):
     # delete it
     xdftool(xdf_img.file_name,
             ("delete", "bla"))
+
+
+def xdftool_create_tree_test(xdftool, xdf_img_data):
+    """create various file/dir trees"""
+    # build tree
+    xdf_img_data.build()
+    # check created tree
+    xdf_img_data.check()
+    # delete tree
+    xdf_img_data.delete()

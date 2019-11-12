@@ -472,10 +472,10 @@ class ADFSDir(ADFSNode):
       return None
     
   def get_dircache_record(self, name):
-    if self.dcache_blks != None:
+    if self.dcache_blks:
       for dcb in self.dcache_blks:
         record = dcb.get_record_by_name(name)
-        if record != None:
+        if record:
           return record
     return None
   

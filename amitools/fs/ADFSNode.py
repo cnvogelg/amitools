@@ -59,34 +59,34 @@ class ADFSNode:
 
     # dircache?
     rebuild_dircache = False
-    if self.volume.is_dircache and self.parent != None:
-      record = self.parent.get_dircache_record(self.name)
-      if record == None:
-        raise FSError(INTERNAL_ERROR, node=self)
+    if self.volume.is_dircache and self.parent:
+      record = self.parent.get_dircache_record(self.name.get_name())
+      if not record:
+        raise FSError(INTERNAL_ERROR, node=self, extra="dc not found!")
     else:
       record = None
         
     # alter protect flags
     protect = meta_info.get_protect()
-    if protect != None and hasattr(self.block, 'protect'):
+    if protect and hasattr(self.block, 'protect'):
       self.block.protect = protect
       self.meta_info.set_protect(protect)
       dirty = True
-      if record != None:
+      if record:
         record.protect = protect
 
     # alter mod time
     mod_ts = meta_info.get_mod_ts()
-    if mod_ts != None:
+    if mod_ts:
       self.block.mod_ts = mod_ts
       self.meta_info.set_mod_ts(mod_ts)
       dirty = True
-      if record != None:
+      if record:
         record.mod_ts = mod_ts
     
     # alter comment
     comment = meta_info.get_comment()
-    if comment != None and hasattr(self.block, "comment"):
+    if comment and hasattr(self.block, "comment"):
       if EntryBlock.needs_extra_comment_block(self.name, comment):
         if self.block.comment_block_id == 0:
           # Allocate and initialize extra block for comment
@@ -110,7 +110,7 @@ class ADFSNode:
 
       self.meta_info.set_comment(comment)
       dirty = True
-      if record != None:
+      if record:
         rebuild_dircache = len(record.comment) < comment
         record.comment = comment
     
@@ -118,7 +118,7 @@ class ADFSNode:
     if dirty:
       self.block.write()
       # dirache update
-      if record != None:
+      if record:
         self.parent.update_dircache_record(record, rebuild_dircache)        
       
   def change_comment(self, comment):
