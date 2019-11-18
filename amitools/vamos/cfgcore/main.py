@@ -275,6 +275,9 @@ class MainParser(object):
         return 'json'
       elif l.startswith('['):
         return 'ini'
+      elif l.startswith('#'):
+        # ignore comment
+        pass
       elif len(l) > 0:
         return None
 

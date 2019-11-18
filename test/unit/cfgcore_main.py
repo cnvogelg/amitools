@@ -35,6 +35,31 @@ sys=/home/me
       }}
 
 
+def config_main_ini_comment_test():
+  mp = MainParser()
+  cfg = """
+# comment
+[hello]
+key=value
+what=on
+number=12
+
+[more]
+sys=/home/me
+"""
+  io = StringIO(cfg)
+  res = mp.parse_ini_config(io)
+  assert res == {
+      "hello": {
+          "key": "value",
+          "what": "on",
+          "number": "12"
+      },
+      "more": {
+          "sys": "/home/me"
+      }}
+
+
 def config_main_ini_error_test(caplog):
   mp = MainParser()
   cfg = """
