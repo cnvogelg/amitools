@@ -3,7 +3,6 @@ cdef extern from "traps.h":
   int TRAP_DEFAULT
   int TRAP_AUTO_RTS
   int TRAP_ONE_SHOT
-  ctypedef unsigned int uint
   ctypedef void (*trap_func_t)(uint opcode, uint pc, void *data)
   void trap_init()
   int  trap_setup(trap_func_t func, int flags, void *data)
