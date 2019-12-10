@@ -29,7 +29,8 @@ cdef extern from "m68k.h":
 
   void m68k_set_pc_changed_callback(void (*callback)(unsigned int new_pc))
   void m68k_set_reset_instr_callback(void (*callback)())
-  void m68k_set_instr_hook_callback(void (*callback)())
+  void m68k_set_illg_instr_callback(int (*callback)(int opcode))
+  void m68k_set_instr_hook_callback(void (*callback)(unsigned int pc))
 
   unsigned int m68k_disassemble(char* str_buff, unsigned int pc, unsigned int cpu_type)
 
@@ -47,7 +48,7 @@ cdef void reset_instr_func_wrapper():
   reset_instr_func()
 
 cdef object instr_hook_func
-cdef void instr_hook_func_wrapper():
+cdef void instr_hook_func_wrapper(unsigned int pc):
   instr_hook_func()
 
 # public CPUContext

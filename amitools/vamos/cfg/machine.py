@@ -3,9 +3,9 @@ from amitools.vamos.cfgcore import *
 
 class MachineParser(Parser):
   def __init__(self, ini_prefix=None):
-    cpus = ('68000', '68020', '68030',
-            '000', '020', '030',
-            '00', '20', '30')
+    cpus = ('68000', '68020', '68030', '68040',
+            '000', '020', '030', '040',
+            '00', '20', '30', '40')
     hw_access = ('emu', 'ignore', 'abort', 'disable')
     def_cfg = {
         "machine": {
@@ -22,7 +22,7 @@ class MachineParser(Parser):
     arg_cfg = {
         "machine": {
             "cpu": Argument('-C', '--cpu', action='store',
-                            help="Set type of CPU to emulate (68000 or 68020)"),
+                            help="Set type of CPU to emulate (68000, 68020 or 68040)"),
             "max_cycles": Argument('--max-cycles', action='store', type=int,
                                    help="maximum number of cycles to execute"),
             "cycles_per_run": Argument('--cycles-per-block', action='store',
