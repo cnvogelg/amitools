@@ -388,7 +388,7 @@ class ReadCmd(Command):
       fh.close()
     # its a dir
     elif node.is_dir():
-      img = Imager()
+      img = Imager(meta_mode=Imager.META_MODE_NONE)
       img.unpack_dir(node, out_name)
     node.flush()
     return 0
@@ -449,7 +449,7 @@ class WriteCmd(Command):
         print("Invalid path", ami_path)
         return 2
       node = parent_node.create_dir(dir_name)
-      img = Imager()
+      img = Imager(meta_mode=Imager.META_MODE_NONE)
       img.pack_dir(sys_file, node)
 
     return 0

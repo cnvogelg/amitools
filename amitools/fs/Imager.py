@@ -27,7 +27,7 @@ class Imager:
   def __init__(self, path_encoding=None, meta_mode=META_MODE_DB):
     self.meta_mode = meta_mode
     self.meta_db = None
-    self.meta_fsuae = None
+    self.meta_fsuae = MetaInfoFSUAE()
     self.total_bytes = 0
     self.path_encoding = path_encoding
     # get path name encoding for host file system
@@ -77,8 +77,6 @@ class Imager:
     # create volume path
     if self.meta_mode != self.META_MODE_NONE:
       self.meta_db = MetaDB()
-    if self.meta_mode == self.META_MODE_FSUAE:
-      self.meta_fsuae = MetaInfoFSUAE()
     self.unpack_root(volume, vol_path)
     # save meta db
     if self.meta_db:
@@ -156,7 +154,6 @@ class Imager:
     if os.path.exists(meta_path):
       self.meta_db = MetaDB()
       self.meta_db.load(meta_path)
-    self.meta_fsuae = MetaInfoFSUAE()
 
   def pack_end(self, in_path, volume):
     boot_code_path = in_path + ".bootcode"
