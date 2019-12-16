@@ -98,10 +98,12 @@ class TraceManager(object):
     src = None
     addon = ""
     if label:
-      mem = "@%06x +%06x %s" % (label.addr, addr - label.addr, label.name)
+      rel_addr = addr - label.addr
       if isinstance(label, LabelSegment):
-        sym, src = self._get_segment_info(label.segment, label.addr, addr)
-      elif isinstance(label, LabelLib):
+        rel_addr = rel_addr - 8 # real start of code in segment
+        sym, src = self._get_segment_info(label.segment, rel_addr)
+      mem = "@%06x +%06x %s" % (label.addr, rel_addr, label.name)
+      if isinstance(label, LabelLib):
         delta, fd_name = self._get_lib_short_info(addr, label)
         mem += "(-%d)" % delta
         if fd_name:
@@ -110,8 +112,7 @@ class TraceManager(object):
       mem = "N/A"
     return mem, sym, src, addon
 
-  def _get_segment_info(self, segment, segment_addr, addr):
-    rel_addr = addr - segment_addr
+  def _get_segment_info(self, segment, rel_addr):
     sym = segment.find_symbol(rel_addr)
     info = segment.find_debug_line(rel_addr)
     if info is None:
