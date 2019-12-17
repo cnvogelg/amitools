@@ -21,6 +21,7 @@ class Process:
     if output_fh == None:
       output_fh = self.ctx.dos_lib.file_mgr.get_output()
     self.init_cwd(cwd, cwd_lock)
+    
     self.ok = self.load_binary(self.cwd_lock,bin_file,shell)
     if not self.ok:
       return
@@ -99,6 +100,9 @@ class Process:
       log_proc.error("failed loading binary: %s -> %s", ami_bin_file, sys_path)
       return False
     self.bin_seg_list = self.ctx.seg_loader.load_sys_seglist(sys_path)
+    if self.bin_seg_list == 0:
+      log_proc.error("failed loading seglist: %s", sys_path)
+      return False
     info = self.ctx.seg_loader.get_info(self.bin_seg_list)
     if not info:
       log_proc.error("failed getting binary info: %s", ami_bin_file)

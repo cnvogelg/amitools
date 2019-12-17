@@ -5,6 +5,9 @@ class CPUState:
     self.sr = None
     self.dx = None
     self.ax = None
+    self.usp = None
+    self.isp = None
+    self.msp = None
 
   sr_chars = "CVZNX"
 
@@ -22,6 +25,9 @@ class CPUState:
   def get(self, cpu):
     self.pc = cpu.r_pc()
     self.sr = cpu.r_sr()
+    self.usp = cpu.r_usp()
+    self.isp = cpu.r_isp()
+    self.msp = cpu.r_msp()
     # data register
     dx = []
     self.dx = dx
@@ -36,6 +42,9 @@ class CPUState:
   def set(self, cpu):
     cpu.w_pc(self.pc)
     cpu.w_sr(self.sr)
+    cpu.w_usp(self.usp)
+    cpu.w_isp(self.isp)
+    cpu.w_msp(self.msp)
     num = 0
     for v in self.dx:
       cpu.w_reg(num, v)
@@ -46,7 +55,8 @@ class CPUState:
 
   def dump(self):
     res = []
-    res.append("PC=%08x  SR=%s" % (self.pc, self._sr_str(self.sr)))
+    res.append("PC=%08x  SR=%s    USP=%08x ISP=%08x MSP=%08x" %
+      (self.pc, self._sr_str(self.sr), self.usp, self.isp, self.msp))
     # data register
     dx = []
     pos = 0

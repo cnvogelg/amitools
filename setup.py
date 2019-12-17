@@ -169,10 +169,8 @@ sourcefiles = [
     'musashi/traps.c',
     'musashi/mem.c',
     'musashi/m68kcpu.c',
+    'musashi/m68kfpu.c',
     'musashi/m68kdasm.c',
-    'gen/m68kopac.c',
-    'gen/m68kopdm.c',
-    'gen/m68kopnz.c',
     'gen/m68kops.c'
 ]
 depends = [

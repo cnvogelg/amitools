@@ -32,6 +32,8 @@ class ExecLibrary(LibImpl):
       self.exec_lib.attn_flags = 7
     elif ctx.cpu_name == '68020':
       self.exec_lib.attn_flags = 3
+    elif ctx.cpu_name == '68040':
+      self.exec_lib.attn_flags = 127
     else:
       self.exec_lib.attn_flags = 0
     self.exec_lib.max_loc_mem = ctx.ram_size

@@ -65,6 +65,7 @@ class Machine(object):
 
   CPU_TYPE_68000 = M68K_CPU_TYPE_68000
   CPU_TYPE_68020 = M68K_CPU_TYPE_68020
+  CPU_TYPE_68040 = M68K_CPU_TYPE_68040
 
   run_exit_addr = 0x400
   hw_exc_addr = 0x402
@@ -149,6 +150,8 @@ class Machine(object):
     elif cpu_str in ('68030', '030', '30'):
       # fake 030 CPU only to set AttnFlags accordingly
       return cls.CPU_TYPE_68020, '68030(fake)'
+    elif cpu_str in ('68040', '040', '40'):
+      return cls.CPU_TYPE_68040, '68040'
     else:
       return None, None
 
@@ -157,6 +160,8 @@ class Machine(object):
       return '68000'
     elif cpu_type == self.CPU_TYPE_68020:
       return '68020'
+    elif cpu_type == self.CPU_TYPE_68040:
+      return '68040'
     else:
       return None
 
@@ -164,6 +169,10 @@ class Machine(object):
     # sp and pc does not matter we will overwrite it anyway
     self.mem.w32(0, 0x800)  # init sp
     self.mem.w32(4, 0x400)  # init pc
+    # set supervisor stacks
+    self.cpu.w_isp(0x700)
+    self.cpu.w_msp(0x780)
+    # trigger reset (read sp and init pc)
     self.cpu.pulse_reset()
     # drop supervisor
     sr = self.cpu.r_sr()
