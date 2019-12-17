@@ -99,6 +99,9 @@ class Process:
       log_proc.error("failed loading binary: %s -> %s", ami_bin_file, sys_path)
       return False
     self.bin_seg_list = self.ctx.seg_loader.load_sys_seglist(sys_path)
+    if self.bin_seg_list == 0:
+      log_proc.error("failed loading seglist: %s", sys_path)
+      return False
     info = self.ctx.seg_loader.get_info(self.bin_seg_list)
     self.prog_start = info.seglist.get_segment().get_addr()
     # set home dir and get lock

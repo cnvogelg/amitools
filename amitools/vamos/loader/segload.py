@@ -110,11 +110,13 @@ class SegmentLoader(object):
 
     # does file exist?
     if not os.path.isfile(sys_bin_file):
+      log_segload.debug("no file: %s", sys_bin_file)
       return None
 
     # try to load bin image in supported format (e.g. HUNK or ELF)
     bin_img = self.binfmt.load_image(sys_bin_file)
     if bin_img is None:
+      log_segload.debug("load_image failed: %s", sys_bin_file)
       return None
 
     # create relocator
