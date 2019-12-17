@@ -164,6 +164,10 @@ class Machine(object):
     # sp and pc does not matter we will overwrite it anyway
     self.mem.w32(0, 0x800)  # init sp
     self.mem.w32(4, 0x400)  # init pc
+    # set supervisor stacks
+    self.cpu.w_isp(0x700)
+    self.cpu.w_msp(0x780)
+    # trigger reset (read sp and init pc)
     self.cpu.pulse_reset()
     # drop supervisor
     sr = self.cpu.r_sr()

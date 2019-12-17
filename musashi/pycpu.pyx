@@ -67,6 +67,21 @@ cdef class CPUContext:
   def r_reg(self, int reg):
     return m68k_get_reg(self.data, <m68k_register_t>reg)
 
+  def r_pc(self):
+    return m68k_get_reg(self.data, M68K_REG_PC)
+
+  def r_sp(self):
+    return m68k_get_reg(self.data, M68K_REG_SP)
+
+  def r_usp(self):
+    return m68k_get_reg(self.data, M68K_REG_USP)
+
+  def r_isp(self):
+    return m68k_get_reg(self.data, M68K_REG_ISP)
+
+  def r_msp(self):
+    return m68k_get_reg(self.data, M68K_REG_MSP)
+
   def __dealloc__(self):
     free(self.data)
 
@@ -113,6 +128,24 @@ cdef class CPU:
 
   def r_sr(self):
     return self.r_reg_internal(M68K_REG_SR)
+
+  def w_usp(self, val):
+    self.w_reg_internal(M68K_REG_USP,val)
+
+  def r_usp(self):
+    return self.r_reg_internal(M68K_REG_USP)
+
+  def w_isp(self, val):
+    self.w_reg_internal(M68K_REG_ISP,val)
+
+  def r_isp(self):
+    return self.r_reg_internal(M68K_REG_ISP)
+
+  def w_msp(self, val):
+    self.w_reg_internal(M68K_REG_MSP,val)
+
+  def r_msp(self):
+    return self.r_reg_internal(M68K_REG_MSP)
 
   def pulse_reset(self):
     m68k_pulse_reset()
