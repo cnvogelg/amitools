@@ -22,8 +22,6 @@ class Process:
       output_fh = self.ctx.dos_lib.file_mgr.get_output()
     self.init_cwd(cwd, cwd_lock)
     
-    self.align = self.ctx.alloc.alloc_memory("align", 57196)
-    
     self.ok = self.load_binary(self.cwd_lock,bin_file,shell)
     if not self.ok:
       return
@@ -59,7 +57,6 @@ class Process:
     # stack is freed by scheduler
     #self.stack.free()
     self.unload_binary()
-    self.ctx.alloc.free_memory(self.align)
 
   def __str__(self):
     return "[bin='%s']" % self.bin_file
