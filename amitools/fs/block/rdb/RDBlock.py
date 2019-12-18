@@ -2,6 +2,7 @@
 
 
 from ..Block import Block
+from amitools.fs.FSString import FSString
 
 class RDBPhysicalDrive:
   def __init__(self, cyls=0, heads=0, secs=0, 
@@ -99,12 +100,12 @@ class RDBLogicalDrive:
 class RDBDriveID:
   def __init__(self, disk_vendor="", disk_product="", disk_revision="", 
                ctrl_vendor="", ctrl_product="", ctrl_revision=""):
-    self.disk_vendor = disk_vendor
-    self.disk_product = disk_product
-    self.disk_revision = disk_revision
-    self.ctrl_vendor = ctrl_vendor
-    self.ctrl_product = ctrl_product
-    self.ctrl_revision = ctrl_revision
+    self.disk_vendor = FSString(disk_vendor)
+    self.disk_product = FSString(disk_product)
+    self.disk_revision = FSString(disk_revision)
+    self.ctrl_vendor = FSString(ctrl_vendor)
+    self.ctrl_product = FSString(ctrl_product)
+    self.ctrl_revision = FSString(ctrl_revision)
     
   def dump(self):
     print("DriveID")

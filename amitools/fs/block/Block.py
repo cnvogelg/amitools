@@ -212,7 +212,7 @@ class Block:
   
   def _get_cstr(self, loc, max_size):
     n = 0
-    s = ""
+    s = b""
     loc = loc * 4
     while n < max_size:
       c = self.data[loc+n]

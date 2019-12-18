@@ -207,7 +207,7 @@ class VamosRunner:
 
 class ToolRunner:
 
-  def run_checked(self, tool, *prog_args, raw_output=False):
+  def run_checked(self, tool, *prog_args, raw_output=False, return_code=0):
     ret_code, stdout, stderr = self.run(tool, *prog_args,
                                         raw_output=raw_output)
     if stderr:
@@ -216,7 +216,7 @@ class ToolRunner:
     if stdout:
       for line in stdout:
         print(line)
-    assert ret_code == 0
+    assert ret_code == return_code
     assert len(stderr) == 0
     return stdout
 

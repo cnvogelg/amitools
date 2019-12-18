@@ -11,6 +11,7 @@ import os.path
 
 from amitools.util.CommandQueue import CommandQueue
 from amitools.fs.FSError import FSError
+from amitools.fs.FSString import FSString
 from amitools.fs.rdb.RDisk import RDisk
 from amitools.fs.blkdev.RawBlockDevice import RawBlockDevice
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
@@ -336,7 +337,7 @@ class PartEditCommand(Command):
       drv_name = None
     else:
       drv_name = "%s%d" % (self.args.drive_prefix, self.rdisk.get_num_partitions())
-    return drv_name
+    return FSString(drv_name)
 
   def get_bootable(self, empty=False):
     if 'bootable' in self.popts:

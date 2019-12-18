@@ -3,6 +3,7 @@
 
 from amitools.fs.block.Block import *
 import amitools.fs.DosType as DosType
+from amitools.fs.FSString import FSString
 
 class PartitionDosEnv:
   valid_keys = ('max_transfer', 'mask', 'num_buffer', 'reserved', 'boot_pri', 'pre_alloc', 'boot_blocks')
@@ -115,6 +116,7 @@ class PartitionBlock(Block):
     self.flags = flags
 
     self.dev_flags = dev_flags
+    assert isinstance(drv_name, FSString)
     self.drv_name = drv_name
 
     if dos_env == None:
