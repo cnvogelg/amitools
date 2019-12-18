@@ -4,8 +4,6 @@ python:
   - "3.4"
   - "3.5"
   - "3.6"
-env:
-  - PIP=pip
 
 matrix:
   include:
@@ -16,15 +14,15 @@ matrix:
     - os: osx
       language: generic
       env:
-        - TOXENV=py36
-        - PIP=pip3
+        - PYTHON_VERSION=3.7.5
+        - TOXENV=py37
 
 install:
   - |
     if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
-      $PIP install tox
+      pyenv install $PYTHON_VERSION
     fi
-  - $PIP install cython
-  - $PIP install tox-travis
+  - pip install cython
+  - pip install tox-travis
 
 script: tox
