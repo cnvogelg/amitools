@@ -131,7 +131,7 @@ class BlockScan:
           bi.blk_status = self.BS_TYPE
           root = RootBlock(self.blkdev, blk_num)
           root.set(data)
-          bi.name = FSString(root.name)
+          bi.name = root.name
           bi.hash_table = root.hash_table
           bi.parent_blk = 0
           self.log.msg(Log.DEBUG, "Found Root: '%s'" % bi.name, blk_num)
@@ -148,7 +148,7 @@ class BlockScan:
           bi.blk_status = self.BS_TYPE
           user = UserDirBlock(self.blkdev, blk_num, DosType.is_longname(self.dos_type))
           user.set(data)
-          bi.name = FSString(user.name)
+          bi.name = user.name
           bi.parent_blk = user.parent
           bi.next_blk = user.hash_chain
           bi.hash_table = user.hash_table
@@ -160,7 +160,7 @@ class BlockScan:
           bi.blk_status = self.BS_TYPE
           fh = FileHeaderBlock(self.blkdev, blk_num, DosType.is_longname(self.dos_type))
           fh.set(data)
-          bi.name = FSString(fh.name)
+          bi.name = fh.name
           bi.parent_blk = fh.parent
           bi.next_blk = fh.hash_chain
           bi.own_key = fh.own_key
