@@ -8,7 +8,8 @@ DISK_SIZES = (
     "50M"
 )
 
-IMGSpec = collections.namedtuple('IMGSpec', ['file_name', 'size', 'part_list'])
+IMGSpec = collections.namedtuple('IMGSpec', ['file_name', 'size',
+                                             'fs_block_size', 'part_list'])
 
 PARTITION_LIST = (
     [("DH0", "size=100%")],
@@ -17,14 +18,24 @@ PARTITION_LIST = (
     [("DH0", "size=10%"), ("DH1", "size=20%"), ("DH2", None)]
 )
 
+FS_BLOCK_SIZES = (
+    512, 4096
+)
+
+
+@pytest.fixture(params=FS_BLOCK_SIZES)
+def fs_block_size(request):
+    """return fs block size"""
+    return request.param
+
 
 @pytest.fixture(params=DISK_SIZES)
-def img_file(request, tmpdir):
+def img_file(request, fs_block_size, tmpdir):
     """return IMGSpec for various disks"""
     size = request.param
-    file_name = tmpdir / "disk-" + size + ".hdf"
+    file_name = tmpdir / "disk-" + size + "-" + str(fs_block_size) + ".hdf"
     size = "size=" + size
-    return IMGSpec(str(file_name), size, None)
+    return IMGSpec(str(file_name), size, fs_block_size, None)
 
 
 @pytest.fixture
@@ -42,7 +53,8 @@ def rdbtool(toolrun):
                 args.append(cmd)
             # plus seperates commands
             args.append('+')
-        return toolrun.run_checked("rdbtool", *opts, img_file, *args[:-1],
+        cmd = ["rdbtool"] + list(opts) + [img_file] + args[:-1]
+        return toolrun.run_checked(*cmd,
                                    raw_output=raw_output,
                                    return_code=return_code)
     return run
@@ -52,13 +64,15 @@ def rdbtool(toolrun):
 def partitions(rdbtool, img_file, request):
     rdbtool(img_file.file_name, ("create", img_file.size), ("init",))
     part_list = request.param
+    fs_bs = "bs=" + str(img_file.fs_block_size)
     for part in part_list:
         name, size = part
         if size:
-            rdbtool(img_file.file_name, ("add", size))
+            rdbtool(img_file.file_name, ("add", size, fs_bs))
         else:
-            rdbtool(img_file.file_name, ("fill"))
-    return IMGSpec(img_file.file_name, img_file.size, part_list)
+            rdbtool(img_file.file_name, ("fill", fs_bs))
+    return IMGSpec(img_file.file_name, img_file.size,
+                   img_file.fs_block_size, part_list)
 
 
 def rdbtool_create_test(rdbtool, img_file):
@@ -78,5 +92,58 @@ def rdbtool_init_test(rdbtool, img_file):
     rdbtool(img_file.file_name, ("create", img_file.size), ("init",))
 
 
-def rdbtool_info_test(rdbtool, partitions):
-    rdbtool(partitions.file_name, ("info"))
+# test with partitions
+
+
+def rdbtool_info_all_test(rdbtool, partitions):
+    rdbtool(partitions.file_name, "info")
+    rdbtool(partitions.file_name, "open", "info")
+
+
+def rdbtool_info_part_test(rdbtool, partitions):
+    for part in partitions.part_list:
+        rdbtool(partitions.file_name, ("info", part[0]))
+    for part_no in range(len(partitions.part_list)):
+        rdbtool(partitions.file_name, ("info", str(part_no)))
+
+
+def rdbtool_show_test(rdbtool, partitions):
+    rdbtool(partitions.file_name, "show")
+    rdbtool(partitions.file_name, "open", "show")
+
+
+def rdbtool_delete_by_name_test(rdbtool, partitions):
+    for part in partitions.part_list:
+        rdbtool(partitions.file_name, ("delete", part[0]), "show", "info")
+
+
+def rdbtool_delete_by_id_test(rdbtool, partitions):
+    for part in range(len(partitions.part_list)):
+        rdbtool(partitions.file_name, ("delete", "0"), "show", "info")
+
+
+CHANGE_OPTS = [
+    ('max_transfer', '0xdeadbeef'),
+    ('mask', '0xcafebabe'),
+    ('bootable', '1'),
+    ('automount', '0'),
+    ('pri', '5'),
+    ('num_buffer', '10')
+]
+
+
+def rdbtool_change_test(rdbtool, partitions):
+    for opt, val in CHANGE_OPTS:
+        arg = opt + "=" + val
+        out = rdbtool(partitions.file_name, ("change", "0", arg),
+                      ("info", "0"))
+        res = "\n".join(out)
+        assert res.find(arg) > 0
+
+
+def rdbtool_export_import_test(rdbtool, partitions, tmpdir):
+    part_file = str(tmpdir / "part.img")
+    print(part_file)
+    for part in partitions.part_list:
+        rdbtool(partitions.file_name, ("export", part[0], part_file))
+        rdbtool(partitions.file_name, ("import", part[0], part_file))

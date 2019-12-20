@@ -269,7 +269,10 @@ class InitCommand(OpenCommand):
 
 class InfoCommand(Command):
   def handle_rdisk(self, rdisk):
-    lines = rdisk.get_info()
+    part_name = None
+    if len(self.opts) > 0:
+      part_name = self.opts[0]
+    lines = rdisk.get_info(part_name)
     for l in lines:
       print(l)
     return 0
@@ -334,7 +337,7 @@ class PartEditCommand(Command):
     if 'name' in self.popts:
       drv_name = self.popts['name']
     elif empty:
-      drv_name = None
+      return None
     else:
       drv_name = "%s%d" % (self.args.drive_prefix, self.rdisk.get_num_partitions())
     return FSString(drv_name)
@@ -511,7 +514,7 @@ class ChangeCommand(PartEditCommand):
 class ExportCommand(Command):
   def handle_rdisk(self, rdisk):
     if len(self.opts) < 2:
-      print("Usage: export <id> <file>")
+      print("Usage: export <partition> <file>")
       return 1
     else:
       part = self.opts[0]
@@ -540,7 +543,7 @@ class ExportCommand(Command):
 class ImportCommand(Command):
   def handle_rdisk(self, rdisk):
     if len(self.opts) < 2:
-      print("Usage: import <id> <file>")
+      print("Usage: import <partition> <file>")
       return 1
     else:
       part = self.opts[0]

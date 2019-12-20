@@ -163,7 +163,7 @@ Inspect the Partition Layout
 
 ::
 
-  info
+  info [partition]
 
 This command gives an overview of the partitions and file systems stored in
 the RDB blocks. It will return something like::
@@ -181,6 +181,11 @@ the RDB blocks. It will return something like::
   Partition: #8 'DH6'      5954     7817     1878912  917Mi   23.85%  DOS3
   FileSystem #0                                              DOS1 version=40.1 size=24588
 
+If a partition name (.e.g ``DH0``) or index (e.g. ``3``) is given then only
+the information for a single partition is displayed::
+
+  > rdbtool test.hdf info DH0
+  Partition: #1 'DH0'       104      205      102816   50Mi    1.31%  DOS3
 
 ``show`` - Show internal block representation of the RDB data structures
 ------------------------------------------------------------------------
@@ -379,6 +384,32 @@ used for each block::
 Example::
 
   > rdbtool mydisk.rdb map
+
+
+Import/Export Partitions
+========================
+
+``export`` - Export Data of a Partition into a File
+---------------------------------------------------
+
+::
+
+  export <partition> <file_name>
+
+Store the raw byte contents of a partition into the given file.
+As a result a file system image will be written. You can use the result
+as a RDB-less image in ``xdftool``.
+
+
+``import`` - Import Data from a File into a Partition
+-----------------------------------------------------
+
+::
+
+  import <partition> <file_name>
+
+Read the raw partition data from a given file into an existing partition.
+You typically use a RDB-less file system image as input.
 
 
 Working with File System Drivers

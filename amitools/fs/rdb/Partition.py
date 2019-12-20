@@ -104,11 +104,11 @@ class Partition:
     # add flags
     flags = p.flags
     if flags & PartitionBlock.FLAG_BOOTABLE == PartitionBlock.FLAG_BOOTABLE:
-      result.append("bootable pri=%d" % de.boot_pri)
+      result.append("bootable=1 pri=%d" % de.boot_pri)
     else:
-      result.append("not bootable")
+      result.append("bootable=0")
     if flags & PartitionBlock.FLAG_NO_AUTOMOUNT == PartitionBlock.FLAG_NO_AUTOMOUNT:
-      result.append("no automount")
+      result.append("automount=0")
     else:
-      result.append("automount")
+      result.append("automount=1")
     return result

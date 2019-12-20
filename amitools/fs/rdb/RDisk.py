@@ -98,32 +98,46 @@ class RDisk:
     for fs in self.fs:
       fs.dump(hex_dump)
 
-  def get_info(self):
+  def get_info(self, part_name=None):
     res = []
+    part = None
+    # only show single partition
+    if part_name:
+      part = self.find_partition_by_string(part_name)
+      if not part:
+        res.append("Partition not found: %s!" % part_name)
+        return res
     # physical disk info
-    pd = self.rdb.phy_drv
-    total_blks = self.get_total_blocks()
-    total_bytes = self.get_total_bytes()
-    bs = self.rdb.block_size
-    extra="heads=%d sectors=%d block_size=%d" % (pd.heads, pd.secs, bs)
-    res.append("PhysicalDisk:        %8d %8d  %10d  %s  %s" \
-      % (0, pd.cyls-1, total_blks, ByteSize.to_byte_size_str(total_bytes), extra))
-    # logical disk info
-    ld = self.rdb.log_drv
-    extra="rdb_blks=[%d:%d,#%d] used=[hi=%d,#%d] cyl_blks=%d" % (ld.rdb_blk_lo, ld.rdb_blk_hi, self.max_blks, ld.high_rdsk_blk, len(self.used_blks), ld.cyl_blks)
-    logic_blks = self.get_logical_blocks()
-    logic_bytes = self.get_logical_bytes()
-    res.append("LogicalDisk:         %8d %8d  %10d  %s  %s" \
-      % (ld.lo_cyl, ld.hi_cyl, logic_blks, ByteSize.to_byte_size_str(logic_bytes), extra))
-    # add partitions
-    for p in self.parts:
-      res.append(p.get_info(logic_blks))
-      extra = p.get_extra_infos()
+    if part:
+      logic_blks = self.get_logical_blocks()
+      res.append(part.get_info(logic_blks))
+      extra = part.get_extra_infos()
       for e in extra:
         res.append("%s%s" % (" " * 70, e))
-    # add fileystems
-    for f in self.fs:
-      res.append(f.get_info())
+    else:
+      pd = self.rdb.phy_drv
+      total_blks = self.get_total_blocks()
+      total_bytes = self.get_total_bytes()
+      bs = self.rdb.block_size
+      extra="heads=%d sectors=%d block_size=%d" % (pd.heads, pd.secs, bs)
+      res.append("PhysicalDisk:        %8d %8d  %10d  %s  %s" \
+        % (0, pd.cyls-1, total_blks, ByteSize.to_byte_size_str(total_bytes), extra))
+      # logical disk info
+      ld = self.rdb.log_drv
+      extra="rdb_blks=[%d:%d,#%d] used=[hi=%d,#%d] cyl_blks=%d" % (ld.rdb_blk_lo, ld.rdb_blk_hi, self.max_blks, ld.high_rdsk_blk, len(self.used_blks), ld.cyl_blks)
+      logic_blks = self.get_logical_blocks()
+      logic_bytes = self.get_logical_bytes()
+      res.append("LogicalDisk:         %8d %8d  %10d  %s  %s" \
+        % (ld.lo_cyl, ld.hi_cyl, logic_blks, ByteSize.to_byte_size_str(logic_bytes), extra))
+      # add partitions
+      for p in self.parts:
+        res.append(p.get_info(logic_blks))
+        extra = p.get_extra_infos()
+        for e in extra:
+          res.append("%s%s" % (" " * 70, e))
+      # add fileystems
+      for f in self.fs:
+        res.append(f.get_info())
     return res
 
   def get_block_map(self):
@@ -188,7 +202,7 @@ class RDisk:
     lo_name = name.lower()
     num = 0
     for p in self.parts:
-      drv_name = p.get_drive_name().lower()
+      drv_name = p.get_drive_name().get_unicode().lower()
       if drv_name == lo_name:
         return p
     return None
