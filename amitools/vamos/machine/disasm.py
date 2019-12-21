@@ -12,6 +12,10 @@ class DisAsm(object):
       txt = self._parse_trap(tid)
     return num_bytes, txt
 
+  def disassemble_raw(self, pc, data):
+    num_bytes, txt = self.cpu.disassemble_raw(pc, data)
+    return num_bytes, txt
+
   def _parse_trap(self, tid):
     func = self.traps.get_func(tid)
     if func:
