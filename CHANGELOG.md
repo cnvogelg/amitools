@@ -1,5 +1,22 @@
 # Change Log
 
+## [0.4.0][4] (2019-11-2)1
+
+### global
+
+* Moved to Python 3 (>= 3.4) (#86, #95)
+
+### xdftool
+
+* Fixed `read`/`write` with directories (#121)
+* Fixed file name hashing when block size > 512 (#116)
+
+### vamos
+
+* Musashi m68k CPU emulator updated to v3.32 (@bebbo)
+* Fixed `.ini` format detection if it starts with a comment ()
+
+
 ## [0.3.0][3] (2019-11-01)
 
 ### xdftool
@@ -84,3 +101,4 @@
 [1]: https://github.com/cnvogelg/amitools/tree/v0.1.0
 [2]: https://github.com/cnvogelg/amitools/tree/v0.2.0
 [3]: https://github.com/cnvogelg/amitools/tree/v0.3.0
+[4]: https://github.com/cnvogelg/amitools/tree/v0.4.0

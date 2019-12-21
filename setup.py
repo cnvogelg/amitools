@@ -229,7 +229,7 @@ setup(
     description='A package to support development with classic Amiga m68k systems',
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    version="0.3.0",
+    version="0.4.0",
     maintainer="Christian Vogelgsang",
     maintainer_email="chris@vogelgsang.org",
     url="http://github.com/cnvogelg/amitools",
