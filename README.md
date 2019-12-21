@@ -5,9 +5,9 @@
 
 ## Introduction
 
-`amitools` is a collection of Python (currently version **2.x only for now**)
-tools that I've written to work with *Amiga OS* binaries and files on Mac OS X
-and all other *nix-like platforms supporting Python. Windows might work as
+`amitools` is a collection of Python 3 tools that I've written to work with
+*Amiga OS* binaries and files on Mac OS X and all other *nix-like platforms
+supporting Python. Windows might work as
 well, but is heavily untested. However, patches are welcome.
 
 I focus with my tools on classic Amiga setups, i.e. a 680x0 based system with
