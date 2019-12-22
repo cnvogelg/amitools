@@ -6,7 +6,7 @@ class HunkShow:
 
   def __init__(self, hunk_file, show_relocs=False, show_debug=False, \
                      disassemble=False, disassemble_start=0, hexdump=False, brief=False, \
-                     use_objdump=False, cpu='68000'):
+                     cpu='68000'):
     self.hunk_file = hunk_file
 
     # clone file refs
@@ -22,7 +22,6 @@ class HunkShow:
     self.show_debug=show_debug
     self.disassemble=disassemble
     self.disassemble_start=disassemble_start
-    self.use_objdump=use_objdump
     self.cpu = cpu
     self.hexdump=hexdump
     self.brief=brief
@@ -100,7 +99,7 @@ class HunkShow:
       self.show_index_info(main['index_hunk'])
 
     if main['type'] == Hunk.HUNK_CODE and self.disassemble and len(main['data'])>0:
-      disas = HunkDisassembler.HunkDisassembler(use_objdump = self.use_objdump, cpu = self.cpu)
+      disas = HunkDisassembler.HunkDisassembler(cpu = self.cpu)
       print()
       disas.show_disassembly(hunk, seg_list, self.disassemble_start)
       print()

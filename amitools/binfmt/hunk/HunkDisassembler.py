@@ -1,10 +1,10 @@
-from amitools.util.DisAsm import DisAsm
+from amitools.vamos.machine import DisAsm
 from . import Hunk
 
 class HunkDisassembler:
  
-  def __init__(self, use_objdump = False, cpu = '68000'):
-    self.disasm = DisAsm(use_objdump, cpu)
+  def __init__(self, cpu='68000'):
+    self.disasm = DisAsm.create(cpu)
  
   def get_symtab(self, hunk):
     for h in hunk[1:]:
@@ -155,7 +155,7 @@ class HunkDisassembler:
   
   def show_disassembly(self, hunk, seg_list, start):
     main = hunk[0]
-    lines = self.disasm.disassemble(main['data'],start)
+    lines = self.disasm.disassemble_block(main['data'],start)
     # show line by line
     for l in lines:
       addr = l[0]

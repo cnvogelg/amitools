@@ -1,10 +1,10 @@
-from amitools.util.DisAsm import DisAsm
+from amitools.vamos.machine import DisAsm
 from .BinImage import *
 
 class Disassemble:
   """allows to disassemble code segments of a BinImage"""
-  def __init__(self, use_objdump=False, cpu='68000'):
-    self.disasm = DisAsm(use_objdump, cpu)
+  def __init__(self, cpu='68000'):
+    self.disasm = DisAsm.create(cpu)
 
   def _get_line_info(self, segment, addr, size):
     infos = []
@@ -29,7 +29,7 @@ class Disassemble:
 
     # generate raw assembly
     data = segment.data
-    lines = self.disasm.disassemble(data)
+    lines = self.disasm.disassemble_block(data)
 
     # process lines
     result = []

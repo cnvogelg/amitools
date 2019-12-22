@@ -29,6 +29,9 @@ def machine_disasm_raw_test():
     assert disasm.disassemble_raw(0, buf) == (2, "move.b  (A4)+, D0")
     buf = b"\x48\xe7\x3f\x3e"
     assert disasm.disassemble_raw(0, buf) == (4, "movem.l D2-D7/A2-A6, -(A7)")
+    # too short buffer
+    buf = b"\x48\xe7"
+    assert disasm.disassemble_raw(0, buf) == (0, "")
 
 
 def machine_disasm_line_test():
@@ -42,6 +45,9 @@ def machine_disasm_line_test():
     buf = b"\x48\xe7\x3f\x3e"
     assert disasm.disassemble_line(0x300, buf) == (
         0x300, [0x48e7, 0x3f3e], "movem.l D2-D7/A2-A6, -(A7)")
+    # too short buffer
+    buf = b"\x48\xe7"
+    assert disasm.disassemble_line(0, buf) == (0, [], "")
 
 
 def machine_disasm_block_test():
@@ -57,7 +63,7 @@ def machine_disasm_block_test():
 def machine_disasm_block_dump_test():
     mach = Machine()
     disasm = DisAsm(mach)
-    buf = b"\x4e\x75" + b"\x10\x1c" + b"\x48\xe7\x3f\x3e"
+    buf = b"\x4e\x75" + b"\x10\x1c" + b"\x48\xe7\x3f\x3e" + b"\x48\xe7"
     code = disasm.disassemble_block(buf, 0x100)
     result = []
 

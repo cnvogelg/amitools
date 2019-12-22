@@ -23,11 +23,15 @@ class DisAsm(object):
 
   def disassemble_raw(self, pc, data):
     num_bytes, txt = self.cpu.disassemble_raw(pc, data)
+    if num_bytes > len(data):
+      return 0, ""
     return num_bytes, txt
 
   def disassemble_line(self, pc, data):
     """disassemble a line and return (pc, words, code)"""
     num_bytes, txt = self.disassemble_raw(pc, data)
+    if num_bytes == 0:
+      return (pc, [], "")
     words = []
     pos = 0
     num_words = num_bytes // 2
@@ -45,6 +49,8 @@ class DisAsm(object):
     code = []
     while off < num:
       pc, words, txt = self.disassemble_line(pc, data[off:])
+      if len(words) == 0:
+        break
       code.append((pc, words, txt))
       num_bytes = len(words) * 2
       off += num_bytes

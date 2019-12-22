@@ -18,7 +18,6 @@ from amitools.fs.block.BootBlock import BootBlock
 from amitools.fs.block.RootBlock import RootBlock
 from amitools.util.CommandQueue import CommandQueue
 from amitools.util.HexDump import *
-from amitools.util.DisAsm import DisAsm
 import amitools.util.KeyValue as KeyValue
 from amitools.fs.rdb.RDisk import RDisk
 from amitools.fs.FSString import FSString
@@ -716,9 +715,10 @@ class BootCmd(Command):
         if 'hex' in self.opts:
           print_hex(bb.boot_code)
         if 'asm' in self.opts:
-          dis = DisAsm()
-          code = dis.disassemble(bb.boot_code)
-          dis.dump(code)
+          from amitools.vamos.machine import DisAsm
+          dis = DisAsm.create()
+          code = dis.disassemble_block(bb.boot_code)
+          dis.dump_block(code)
       return 0
     # boot read <file>
     elif cmd == 'read':

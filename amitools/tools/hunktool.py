@@ -140,7 +140,7 @@ class Info(HunkCommand):
     hs = HunkShow.HunkShow(hunk_file, \
       show_relocs=args.show_relocs, show_debug=args.show_debug, \
       disassemble=args.disassemble, disassemble_start=args.disassemble_start, \
-      use_objdump=args.use_objdump, cpu=args.cpu, \
+      cpu=args.cpu, \
       hexdump=args.hexdump, \
       brief=args.brief)
     hs.show_segments()
@@ -219,7 +219,6 @@ def main():
   parser.add_argument('-x', '--hexdump', action='store_true', default=False, help="dump segments in hex")
   parser.add_argument('-b', '--brief', action='store_true', default=False, help="show only brief information")
   parser.add_argument('-B', '--base-address', action='store', type=int, default=0, help="base address for relocation")
-  parser.add_argument('-o', '--use-objdump', action='store_true', default=False, help="disassemble with m68k-elf-objdump instead of vda68k")
   parser.add_argument('-c', '--cpu', action='store', default='68000', help="disassemble for given cpu (objdump only)")
   args = parser.parse_args()
 
