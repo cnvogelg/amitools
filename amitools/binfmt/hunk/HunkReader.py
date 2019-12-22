@@ -84,20 +84,20 @@ class HunkReader:
     data = f.read(size)
     if len(data) < size:
       return -1,None
-    endpos = data.find('\0')
+    endpos = data.find(b'\0')
     if endpos == -1:
-      return size,data
+      return size,data.decode('latin-1')
     elif endpos == 0:
       return 0,""
     else:
-      return size,data[:endpos]
+      return size,data[:endpos].decode('latin-1')
 
   def get_index_name(self, strtab, offset):
-    end = strtab.find('\0',offset)
+    end = strtab.find(b'\0',offset)
     if end == -1:
-      return strtab[offset:]
+      return strtab[offset:].decode('latin-1')
     else:
-      return strtab[offset:end]
+      return strtab[offset:end].decode('latin-1')
 
   def is_valid_first_hunk_type(self, hunk_type):
     return hunk_type == HUNK_HEADER or hunk_type == HUNK_LIB or hunk_type == HUNK_UNIT
@@ -437,7 +437,7 @@ class HunkReader:
     if total_size == 2:
       self.read_word(f)
     elif total_size != 0:
-      self.error_string = "%s has invalid padding" % (hunk['type_name'])
+      self.error_string = "%s has invalid padding: %d" % (hunk['type_name'], total_size)
       return RESULT_INVALID_HUNK_FILE
     return RESULT_OK
 
