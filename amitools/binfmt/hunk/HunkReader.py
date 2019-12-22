@@ -360,8 +360,6 @@ class HunkReader:
       # read name of unit
       name_offset = self.read_word(f)
       total_size -= 2
-      if name_offset == 0:
-        break
 
       unit = {}
       units.append(unit)
