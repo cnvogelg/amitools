@@ -1,8 +1,17 @@
+from .machine import Machine
+
 class DisAsm(object):
   def __init__(self, machine):
     self.machine = machine
     self.cpu = machine.get_cpu()
     self.traps = machine.get_traps()
+
+  @classmethod
+  def create(cls, cpu_name='68000'):
+    cpu_type, cpu_name = Machine.parse_cpu_type(cpu_name)
+    assert cpu_type
+    machine = Machine(cpu_type=cpu_type)
+    return cls(machine)
 
   def disassemble(self, pc):
     num_bytes, txt = self.cpu.disassemble(pc)

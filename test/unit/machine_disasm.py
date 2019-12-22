@@ -68,3 +68,12 @@ def machine_disasm_block_dump_test():
         "00000100:  4e75                  rts",
         "00000102:  101c                  move.b  (A4)+, D0",
         "00000104:  48e7 3f3e             movem.l D2-D7/A2-A6, -(A7)"]
+
+
+def machine_disasm_create_test():
+    disasm = DisAsm.create()
+    buf = b"\x4e\x75"
+    assert disasm.disassemble_raw(0, buf) == (2, "rts")
+    disasm = DisAsm.create("68020")
+    buf = b"\x60\xff\x11\x22\x33\x44"
+    assert disasm.disassemble_raw(0, buf) == (6, "bra     $11223346; (2+)")
