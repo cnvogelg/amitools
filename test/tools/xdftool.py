@@ -76,9 +76,6 @@ TEST_TREES = {
     }
 }
 
-XDFData = collections.namedtuple('XDFData',
-                                 ['spec', 'build', 'check', 'delete'])
-
 
 @pytest.fixture(params=ADF_LIST)
 def adf_file(request, toolrun):
@@ -134,64 +131,144 @@ def xdf_img(xdftool, xdfs, dos_format):
     return xdfs
 
 
-@pytest.fixture(params=TEST_TREES.keys())
-def xdf_img_data(request, xdf_img, xdftool, tmpdir):
-    test_tree = request.param
-    tree = TEST_TREES[test_tree]
+class XDFFileTree:
+    def __init__(self, xdftool, img_file, name, tree, tmpdir):
+        self.name = name
+        self.xdftool = xdftool
+        self.img_file = img_file
+        self.tree = tree
+        self.tmpdir = tmpdir
 
-    def build_node(node, path, cmds):
+    def _create_node_cmds(self, node, path, cmds):
         path_name = "/".join(path)
+        real_path = os.path.join(self.tmpdir, path_name)
         if isinstance(node, dict):
             cmds.append(("makedir", path_name))
+            os.mkdir(real_path)
             for name in node:
-                build_node(node[name], path + [name], cmds)
+                self._create_node_cmds(node[name], path + [name], cmds)
         else:
-            tmp_file = os.path.join(str(tmpdir), "_".join(path))
-            with open(tmp_file, "wb") as fh:
+            with open(real_path, "wb") as fh:
                 fh.write(node)
-            cmds.append(("write", tmp_file, path_name))
+            cmds.append(("write", real_path, path_name))
 
-    def build_func():
+    def create(self):
+        """create tree in xdftool"""
         cmds = []
-        for node in tree:
-            build_node(tree[node], [node], cmds)
-        xdftool(xdf_img.file_name, *cmds)
+        for node in self.tree:
+            self._create_node_cmds(self.tree[node], [node], cmds)
+        self.xdftool(self.img_file, *cmds)
 
-    def check_node(node, path):
+    def _check_node(self, node, path):
         path_name = "/".join(path)
         # list entry
-        output = xdftool(xdf_img.file_name,
-                         ("list", path_name))
+        output = self.xdftool(self.img_file,
+                              ("list", path_name))
         # split
-        file_name, size, *_ = output[0].split()
+        _, size, *_ = output[0].split()
         if isinstance(node, dict):
             assert size == "DIR"
             for name in node:
-                check_node(node[name], path + [name])
+                self._check_node(node[name], path + [name])
         else:
-            data = xdftool(xdf_img.file_name,
-                           ("type", path_name),
-                           raw_output=True)
+            data = self.xdftool(self.img_file,
+                                ("type", path_name),
+                                raw_output=True)
             assert data == node
 
-    def check_func():
-        for node in tree:
-            check_node(tree[node], [node])
+    def check(self):
+        """compare data in image with file sys"""
+        for node in self.tree:
+            self._check_node(self.tree[node], [node])
 
-    def delete_node(node, path, cmds):
+    def _delete_node_cmds(self, node, path, cmds):
         path_name = "/".join(path)
         if isinstance(node, dict):
             for name in node:
-                delete_node(node[name], path + [name], cmds)
+                self._delete_node_cmds(node[name], path + [name], cmds)
         cmds.append(("delete", path_name))
 
-    def delete_func():
+    def delete(self):
         cmds = []
-        for node in tree:
-            delete_node(tree[node], [node], cmds)
-        xdftool(xdf_img.file_name, *cmds)
+        for node in self.tree:
+            self._delete_node_cmds(self.tree[node], [node], cmds)
+        self.xdftool(self.img_file, *cmds)
 
-    return XDFData(xdf_img, build_func, check_func, delete_func)
+    def get_file_tree(self):
+        return FileTree(self.name, self.tree, self.tmpdir)
+
+
+class FileTree:
+    def __init__(self, name, tree, tmpdir):
+        self.name = name
+        self.tree = tree
+        self.tmpdir = tmpdir
+
+    def _create_node(self, node, path):
+        path_name = "/".join(path)
+        real_path = os.path.join(self.tmpdir, path_name)
+        if isinstance(node, dict):
+            os.mkdir(real_path)
+            for name in node:
+                self._create_node(node[name], path + [name])
+        else:
+            with open(real_path, "wb") as fh:
+                fh.write(node)
+
+    def create(self):
+        """only write files to file system"""
+        for node in self.tree:
+            self._create_node(self.tree[node], [node])
+
+    def _check_node(self, node, path):
+        path_name = "/".join(path)
+        real_path = os.path.join(self.tmpdir, path_name)
+        if isinstance(node, dict):
+            assert os.path.isdir(real_path)
+            for name in node:
+                self._check_node(node[name], path + [name])
+        else:
+            with open(real_path, "rb") as fh:
+                data = fh.read()
+                assert data == node
+
+    def check(self):
+        """compare data on file sys with the tree"""
+        for node in self.tree:
+            self._check_node(self.tree[node], [node])
+
+    def _delete_node(self, node, path):
+        path_name = "/".join(path)
+        real_path = os.path.join(self.tmpdir, path_name)
+        if isinstance(node, dict):
+            for name in node:
+                self._delete_node(node[name], path + [name])
+            os.rmdir(real_path)
+        else:
+            os.remove(real_path)
+
+    def delete(self):
+        for node in self.tree:
+            self._delete_node(self.tree[node], [node])
+
+    def get_xdf_file_tree(self, img_file, xdftool):
+        return XDFFileTree(xdftool, img_file, self.name, self.tree, self.tmpdir)
+
+
+@pytest.fixture(params=TEST_TREES.keys())
+def xdf_file_tree(request, xdf_img, xdftool, tmpdir):
+    test_tree = request.param
+    tree = TEST_TREES[test_tree]
+    my_dir = tmpdir.mkdir(test_tree)
+    return XDFFileTree(xdftool, xdf_img.file_name, test_tree, tree, str(my_dir))
+
+
+@pytest.fixture(params=TEST_TREES.keys())
+def file_tree(request, tmpdir):
+    test_tree = request.param
+    tree = TEST_TREES[test_tree]
+    my_dir = tmpdir.mkdir(test_tree)
+    return FileTree(test_tree, tree, str(my_dir))
 
 
 @pytest.fixture(params=TEST_DATA.keys())
@@ -261,11 +338,56 @@ def xdftool_makedir_test(xdftool, xdf_img):
             ("delete", "bla"))
 
 
-def xdftool_create_tree_test(xdftool, xdf_img_data):
+def xdftool_create_tree_test(xdftool, xdf_file_tree):
     """create various file/dir trees"""
+    file_tree = xdf_file_tree.get_file_tree()
     # build tree
-    xdf_img_data.build()
+    xdf_file_tree.create()
+    # check file system consistency
+    file_tree.check()
     # check created tree
-    xdf_img_data.check()
+    xdf_file_tree.check()
     # delete tree
-    xdf_img_data.delete()
+    xdf_file_tree.delete()
+    # delete on file system
+    file_tree.delete()
+
+
+def xdftool_pack_test(xdftool, xdf_file_tree):
+    # create test files in fs
+    file_tree = xdf_file_tree.get_file_tree()
+    file_tree.create()
+    # pack tree
+    xdftool(xdf_file_tree.img_file, ("pack", file_tree.tmpdir))
+    # check image contents
+    xdf_file_tree.check()
+
+
+def xdftool_unpack_test(xdftool, xdf_file_tree):
+    # create test files in xdf
+    xdf_file_tree.create()
+    # clean test files
+    file_tree = xdf_file_tree.get_file_tree()
+    file_tree.delete()
+    # unpack tree from xdf to fs
+    xdftool(xdf_file_tree.img_file, ("unpack", file_tree.tmpdir))
+    # check fs contents
+    file_tree.tmpdir = os.path.join(file_tree.tmpdir, "Foo")
+    file_tree.check()
+
+
+def xdftool_pack_unpack_test(xdftool, xdf_file_tree):
+    # create test files in fs
+    file_tree = xdf_file_tree.get_file_tree()
+    file_tree.create()
+    # pack tree
+    xdftool(xdf_file_tree.img_file, ("pack", file_tree.tmpdir))
+    # check image contents
+    xdf_file_tree.check()
+    # delete files in fs
+    file_tree.delete()
+    # unpack tree from xdf to fs
+    xdftool(xdf_file_tree.img_file, ("unpack", file_tree.tmpdir))
+    # check fs contents
+    file_tree.tmpdir = os.path.join(file_tree.tmpdir, file_tree.name)
+    file_tree.check()

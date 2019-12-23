@@ -37,23 +37,6 @@ class Imager:
   def get_total_bytes(self):
     return self.total_bytes
 
-  def to_path_str(self, u):
-    """convert a unicode string to OS path name encoding"""
-    if type(u) != str:
-      raise ValueError("to_path_str: must pass a unicode string")
-    return u.encode(self.path_encoding)
-
-  def from_path_str(self, s):
-    """convert a OS path name encoded string to unicode"""
-    if type(s) != str:
-      raise ValueError("from_path_str: must pass a string")
-    u = s.decode(self.path_encoding)
-    # on Mac OS X normalize from decomposed form
-    if sys.platform.startswith('darwin'):
-      return unicodedata.normalize('NFC',u)
-    else:
-      return u
-
   # ----- unpack -----
 
   def unpack(self, volume, out_path):
@@ -63,7 +46,7 @@ class Imager:
       vol_path = out_path
     else:
       path = os.path.abspath(out_path)
-      vol_path = os.path.join(path, self.to_path_str(vol_name))
+      vol_path = os.path.join(path, vol_name)
     if os.path.exists(vol_path):
       raise IOError("Unpack directory already exists: "+vol_path)
     # check for meta file
@@ -92,8 +75,9 @@ class Imager:
       f.close()
     # save blkdev: geo and block size
     f = open(blkdev_path,"wb")
-    f.write("%s\n%s\n" % (volume.blkdev.get_chs_str(),
-      volume.blkdev.get_block_size_str()))
+    msg = "%s\n%s\n" % (volume.blkdev.get_chs_str(),
+      volume.blkdev.get_block_size_str())
+    f.write(msg.encode('UTF-8'))
     f.close()
 
   def unpack_root(self, volume, vol_path):
@@ -107,7 +91,7 @@ class Imager:
 
   def unpack_node(self, node, path):
     name = node.name.get_unicode_name()
-    file_path = os.path.join(path, self.to_path_str(name))
+    file_path = os.path.join(path, name)
     # store meta info
     if self.meta_mode == self.META_MODE_DB:
       # get path as FSString
@@ -204,7 +188,7 @@ class Imager:
       # remove trailing slash
       if in_path[-1] == '/':
         in_path = in_path[:-1]
-      name = self.from_path_str(os.path.basename(in_path))
+      name = os.path.basename(in_path)
       meta_info = None
       if dos_type is None:
         dos_type = DosType.DOS0
@@ -228,7 +212,7 @@ class Imager:
     if self.meta_fsuae.is_meta_file(in_path):
       return
     # convert amiga name
-    ami_name = self.from_path_str(os.path.basename(in_path))
+    ami_name = FSString(os.path.basename(in_path)).get_ami_str()
     # check for meta file
     meta_path = in_path + self.meta_fsuae.get_suffix()
     if os.path.isfile(meta_path):
