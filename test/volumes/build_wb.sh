@@ -13,9 +13,9 @@ fi
 
 # check if 'wb' already exists
 WB_OUT="wb"
-if [ -d "$WB_OUT" ]; then
-    echo "ouput dir '$WB_OUT' already exists!"
-    exit 1
+if [ ! -d "$WB_OUT" ]; then
+    echo "creating ouput dir '$WB_OUT'"
+    mkdir "$WB_OUT"
 fi
 
 # check dirs
@@ -33,16 +33,15 @@ fi
 # unpack workbench
 echo "unpacking Workbench3.1.4"
 ../../bin/xdftool $WB_ADF unpack .
-mv "$WB_DIR" "$WB_OUT"
+cp -a $WB_DIR/* $WB_OUT/
+rm -rf "$WB_DIR"
 rm "${WB_DIR}.blkdev" "${WB_DIR}.bootcode" "${WB_DIR}.xdfmeta"
 
 # unpack modules
 echo "unpacking Modules*_3.1.4"
 ../../bin/xdftool $MOD_ADF unpack .
-for DIR in C DEVS L LIBS ; do
-    cp -a $MOD_DIR/$DIR/ $WB_OUT/$DIR/
-done
+cp -a $MOD_DIR/* $WB_OUT/
 rm -rf "$MOD_DIR"
-rm "${MOD_DIR}.blkdev" "${MOD_DIR}.xdfmeta"
+rm "${MOD_DIR}.blkdev" "${MOD_DIR}.bootcode" "${MOD_DIR}.xdfmeta"
 
 echo "done"
