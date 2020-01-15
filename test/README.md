@@ -26,63 +26,43 @@ sudo pip install pytest
 amitools currently supports the following cross-compilers to create the
 AmigaOS binaries:
 
-  - *gcc*: gcc 2.95 with AmigaOS support
+  - *gcc*: gcc 6.5 with AmigaOS support
   - *vc*: [vbcc](http://sun.hasenbraten.de/vbcc/) and [vasm]()
   - *agcc*: gcc 4.x with AROS m68k support
   - *sc*: SAS C v6.52 Amiga version running in vamos (commercial)
 
-### 3.1 m68k-amigaos-toolchain
+### 3.1 amiga-gcc
 
-Krystian Baclawski's great script suite called
-[m68k-amigaos-toolchain](https://github.com/cahirwpz/m68k-amigaos-toolchain)
-allows to greatly simplify the installation of gcc 2.95 and vbcc cross on
-unix based plattforms.
+Use Bebbo's GCC 6.5 port for Amiga: [amiga-gcc](https://github.com/bebbo/amiga-gcc)
 
-#### Prerequisites
-
-  - Mac OS X
-    - Install [MacPorts](http://macports.org)
-    - Install the following Ports:
-
-```
-> sudo port install wget lha unzip
-```
-
-#### Build
-
-  - create a user accessible installation directory
-
-```
-> sudo mkdir -p /opt/m68k-amigaos
-> sudo chown $USER /opt/m68k-amigaos
-```
-
-  - run build and install
-
-```
-> git clone https://github.com/cahirwpz/m68k-amigaos-toolchain
-> cd m68k-amiga-toolchain
-> (cd archives && ./fetch.sh)
-> ./bootstrap.sh --prefix=/opt/m68k-amigaos build
-```
-
+  - see build instructions there
   - add the bin directory to your PATH (also add to your shell startup)
 
       > export PATH=/opt/m68k-amigaos/bin:$PATH
 
-### 3.2 AROS
+### 3.2 vbcc
+
+Install `vbcc` from your favorite package source
+
+  - MacOS
+    - Use [Homebrew](http://brew.sh)
+
+      > brew tap tditlu/amiga
+      > brew install vbcc vasm vlink
+
+### 3.3 AROS
 
 AROS now supports m68k directly and also provides a gcc 4.x based toolchain
 to build m68k binaries
 
 #### Prerequisites
 
-  - Mac OS X
-    - Install [MacPorts](http://macports.org)
-    - Install the following Ports:
+  - MacOS
+    - Install [Homebrew](http://brew.sh)
+    - Install the following packets:
 
 ```
-> sudo port install gawk gsed netpbm
+> brew install gawk gnu-sed netpbm
 ```
 
 #### Build
@@ -100,15 +80,15 @@ to build m68k binaries
 > git clone http://repo.or.cz/AROS.git
 > mkdir AROS-build
 > cd AROS-build
-> ../AROS/configure --target=m68k-amiga --with-aros-toolchain-install=/opt/m68k-aros
-> make tools-crosstools
+> ../AROS/configure --target=amiga-m68k --with-aros-toolchain-install=/opt/m68k-aros
+> make crosstools
 ```
 
   - add the bin directory to your PATH (also add to your shell startup)
 
       > export PATH=/opt/m68k-aros:$PATH
 
-### 3.3 SAS C 6.52
+### 3.4 SAS C 6.52
 
 This is no cross-compiler but the native Amiga compiler. You will need a
 pre-installed directory tree from the Amiga installation to run it here
