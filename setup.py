@@ -191,7 +191,7 @@ inc_dirs = [
 # add missing vc headers
 if is_msvc:
     inc_dirs.append('musashi/win')
-    defines = [('_CRT_SECURE_NO_WARNINGS', None)]
+    defines = [('_CRT_SECURE_NO_WARNINGS', None), ('_USE_MATH_DEFINES', None)]
 else:
     defines = None
 
