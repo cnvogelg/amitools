@@ -13,7 +13,7 @@ class FileHandle:
     self.b_addr = 0
     self.need_close = need_close
     # buffering
-    self.unch = ""
+    self.unch = bytearray()
     self.ch = -1
     self.is_nil = is_nil
 
@@ -41,6 +41,7 @@ class FileHandle:
   # --- file ops ---
 
   def write(self, data):
+    assert(isinstance(data, (bytes, bytearray)))
     try:
       self.obj.write(data)
       return len(data)
@@ -56,8 +57,8 @@ class FileHandle:
 
   def getc(self):
     if len(self.unch) > 0:
-      d = self.unch[0]
-      self.unch = self.unch[1:len(self.unch)]
+      self.ch = self.unch[0]
+      del self.unch[0]
     else:
       if self.is_nil:
         return -1
@@ -65,35 +66,35 @@ class FileHandle:
         d = self.obj.read(1)
         if d == b"":
           return -1
+        self.ch = d[0]
       except IOError:
         return -1
-    self.ch = ord(d)
     return self.ch
 
   def gets(self,len):
-    res = ""
+    res = bytearray()
     ch = -1
     #print "fgets from %s" % self
     while len>0:
       len -= 1
-      ch   = self.getc()
+      ch = self.getc()
       if ch < 0:
-        return res
-      res  = res + chr(ch)
+        return res.decode('latin-1')
+      res.append(ch)
       if ch == 10:
-        return res
+        return res.decode('latin-1')
     # apparently, python-I/O does not keep the unread
     # part of a line in a buffer, so we have to (bummer!)
     # Do that now so that the next read gets the rest
     # of the line.
-    remains = ""
+    remains = bytearray()
     while ch != 10:
       ch = self.getc()
       if ch == -1:
         break
-      remains = remains + chr(ch)
+      remains.append(ch)
     self.unch = remains + self.unch
-    return res
+    return res.decode('latin-1')
 
   def ungetc(self, var):
     if var == 0xffffffff:
@@ -102,14 +103,18 @@ class FileHandle:
       var = self.ch
       self.ch = -1
     if var >= 0:
-      self.unch = chr(var) + self.unch
+      self.unch.insert(0, var)
     return var
 
   def ungets(self, s):
-    self.unch = self.unch + s
+    if isinstance(s, str):
+      s = s.encode('latin-1')
+    self.unch = self.unch + bytearray(s)
 
   def setbuf(self,s):
-    self.unch = s
+    if isinstance(s, str):
+      s = s.encode('latin-1')
+    self.unch = bytearray(s)
 
   def getbuf(self):
     return self.unch

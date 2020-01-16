@@ -73,7 +73,7 @@ class FileLineCSource(CSource):
         if ch == -1:
           break
         res.append(ch)
-        if ch == b'\n':
+        if ch == 10:
           break
     line = bytes(res)
     if self.buf is None:

@@ -7,7 +7,7 @@ SOURCES_C = exec_semaphore.c exec_copymem.c
 SOURCES_C += exec_makefuncs.c exec_initstruct.c
 SOURCES_C += exec_makelib.c exec_libfuncs.c
 SOURCES_C += exec_initres.c exec_rawdofmt.c
-SOURCES_C += dos_readargs.c dos_findarg.c
+SOURCES_C += dos_readargs.c dos_readargs2.c dos_findarg.c
 SOURCES_C += dos_loadseg.c dos_runcmd.c
 SOURCES_C += dos_system.c dos_match.c
 SOURCES_C += dos_program.c
@@ -48,7 +48,7 @@ SASC = $(VAMOS) -c sasc.vamosrc sc
 SLINK = $(VAMOS) -c sasc.vamosrc slink
 
 # options
-VBCC_OPTS = +aos68k -Iinclude
+VBCC_OPTS = +aos68k -Iinclude -Indk_include/include_h
 GCC_OPTS  = -noixemul -Iinclude -Werror
 GCC_OPTS_LIB = -ramiga-lib -fbaserel
 GCC_OPTS_LIB_RES = -ramiga-libr -resident
