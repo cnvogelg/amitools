@@ -204,6 +204,12 @@ class VamosRunner:
         raise RuntimeError("prog wrong hash: got=%s want=%s" %
                            (file_sum, sha1_sum))
 
+  def add_volume_or_skip(self, vol_name, vol_path):
+    if not os.path.exists(vol_path):
+      pytest.skip("optional volume not found: " + vol_path)
+    arg = "-V{}:{}".format(vol_name, vol_path)
+    self.vamos_args.append(arg)
+
 
 class ToolRunner:
 
