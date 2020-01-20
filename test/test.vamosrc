@@ -1,5 +1,4 @@
 [volumes]
-wb=volumes/wb
 curdir=.
 
 [assigns]
