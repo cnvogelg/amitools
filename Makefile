@@ -4,7 +4,6 @@ BUILD_DIR = build
 DIST_DIR = dist
 
 PYTHON ?= python3
-PIP ?= pip3
 
 SHOW_CMD = open
 #PYTHON = python-dbg
@@ -35,16 +34,16 @@ help:
 	@echo "upload      upload dist with twin to pypi"
 
 init:
-	$(PIP) install --upgrade setuptools pip
-	$(PIP) install --upgrade -r requirements-dev.txt
-	$(PIP) install --upgrade -r requirements-test.txt
-	$(PIP) install --upgrade --editable .
+	$(PYTHON) -m pip install --upgrade setuptools pip
+	$(PYTHON) -m pip install --upgrade -r requirements-dev.txt
+	$(PYTHON) -m pip install --upgrade -r requirements-test.txt
+	$(PYTHON) -m pip install --upgrade --editable .
 
 init_user:
-	$(PIP) install --user --upgrade setuptools pip
-	$(PIP) install --user --upgrade -r requirements-dev.txt
-	$(PIP) install --user --upgrade -r requirements-test.txt
-	$(PIP) install --user --upgrade --editable .
+	$(PYTHON) -m pip install --user --upgrade setuptools pip
+	$(PYTHON) -m pip install --user --upgrade -r requirements-dev.txt
+	$(PYTHON) -m pip install --user --upgrade -r requirements-test.txt
+	$(PYTHON) -m pip install --user --upgrade --editable .
 
 build:
 	$(PYTHON) setup.py build_ext -i
