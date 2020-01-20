@@ -2,16 +2,22 @@ import pytest
 import collections
 import os
 
+
+# tag a parameter for full testing
+def tag_full(value):
+    return pytest.param(value, marks=pytest.mark.full)
+
+
 ADF_LIST = (
-    "amiga-os-100-workbench.adf",
-    "amiga-os-110-workbench.adf",
-    "amiga-os-120-workbench.adf",
-    "amiga-os-134-extras.adf",
-    "amiga-os-134-workbench.adf",
-    "amiga-os-200-workbench.adf",
-    "amiga-os-204-workbench.adf",
-    "amiga-os-210-workbench.adf",
-    "amiga-os-300-workbench.adf",
+    tag_full("amiga-os-100-workbench.adf"),
+    tag_full("amiga-os-110-workbench.adf"),
+    tag_full("amiga-os-120-workbench.adf"),
+    tag_full("amiga-os-134-extras.adf"),
+    tag_full("amiga-os-134-workbench.adf"),
+    tag_full("amiga-os-200-workbench.adf"),
+    tag_full("amiga-os-204-workbench.adf"),
+    tag_full("amiga-os-210-workbench.adf"),
+    tag_full("amiga-os-300-workbench.adf"),
     "amiga-os-310-extras.adf",
     "amiga-os-310-fonts.adf",
     "amiga-os-310-install.adf",
@@ -24,18 +30,18 @@ ADF_LIST = (
 DOS_FORMATS = (
     "DOS0",
     "DOS1",
-    "DOS2",
-    "DOS3",
-    "DOS4",
-    "DOS5",
-    "DOS6",
-    "DOS7"
+    tag_full("DOS2"),
+    tag_full("DOS3"),
+    tag_full("DOS4"),
+    tag_full("DOS5"),
+    tag_full("DOS6"),
+    tag_full("DOS7")
 )
 
 DISK_SIZES = (
     "880K",
     "1M",
-    "10M"
+    tag_full("10M")
 )
 
 XDFSpec = collections.namedtuple('XDFSpec', ['file_name', 'size'])
@@ -51,6 +57,9 @@ TEST_DATA = {
     "10k": DATA_10k,
     "100k": DATA_100k
 }
+TEST_DATA_FULL = ["100k"]
+TEST_DATA_KEYS = [tag_full(a) if a in TEST_DATA_FULL else a
+                  for a in TEST_DATA]
 
 DataFile = collections.namedtuple('DataFile', 
                                   ['file_path', 'file_name', 'data'])
@@ -75,6 +84,9 @@ TEST_TREES = {
         "100k": DATA_100k
     }
 }
+TEST_TREES_FULL = ["100k"]
+TEST_TREES_KEYS = [tag_full(a) if a in TEST_TREES_FULL else a
+                   for a in TEST_TREES]
 
 
 @pytest.fixture(params=ADF_LIST)
@@ -255,7 +267,7 @@ class FileTree:
         return XDFFileTree(xdftool, img_file, self.name, self.tree, self.tmpdir)
 
 
-@pytest.fixture(params=TEST_TREES.keys())
+@pytest.fixture(params=TEST_TREES_KEYS)
 def xdf_file_tree(request, xdf_img, xdftool, tmpdir):
     test_tree = request.param
     tree = TEST_TREES[test_tree]
@@ -263,7 +275,7 @@ def xdf_file_tree(request, xdf_img, xdftool, tmpdir):
     return XDFFileTree(xdftool, xdf_img.file_name, test_tree, tree, str(my_dir))
 
 
-@pytest.fixture(params=TEST_TREES.keys())
+@pytest.fixture(params=TEST_TREES_KEYS)
 def file_tree(request, tmpdir):
     test_tree = request.param
     tree = TEST_TREES[test_tree]
@@ -271,7 +283,7 @@ def file_tree(request, tmpdir):
     return FileTree(test_tree, tree, str(my_dir))
 
 
-@pytest.fixture(params=TEST_DATA.keys())
+@pytest.fixture(params=TEST_DATA_KEYS)
 def test_files(request, tmpdir):
     test_file = request.param
     data = TEST_DATA[test_file]
