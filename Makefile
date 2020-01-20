@@ -4,7 +4,7 @@ BUILD_DIR = build
 DIST_DIR = dist
 
 PYTHON ?= python3
-PIP ?= pip3
+PIP ?= $(PYTHON) -m pip
 
 SHOW_CMD = open
 #PYTHON = python-dbg
