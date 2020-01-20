@@ -14,7 +14,6 @@ os.chdir(my_dir)
 
 # ----- pytest integration -----
 
-
 def pytest_addoption(parser):
   parser.addoption("--flavor", "-F", action="store", default=None,
                    help="select an Amiga compiler flavor to test")
@@ -36,6 +35,8 @@ def pytest_addoption(parser):
                    help="create a profile file")
   parser.addoption("--profile-file", action="store", default="vamos-prof.json",
                    help="set the profile file name")
+  parser.addoption("--full-suite", action="store_true", default=False,
+                   help="run full test suite and include all tests")
 
 
 def pytest_configure(config):
@@ -71,6 +72,15 @@ def pytest_configure(config):
 
 def pytest_unconfigure(config):
   pass
+
+
+def pytest_collection_modifyitems(config, items):
+  if config.getoption("--full-suite"):
+    return
+  skip_full = pytest.mark.skip(reason="skip full")
+  for item in items:
+    if item.get_closest_marker("full"):
+      item.add_marker(skip_full)
 
 
 def pytest_runtest_setup(item):

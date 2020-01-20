@@ -1,45 +1,50 @@
 import pytest
 
+# tag a parameter for full testing
+def tag_full(value):
+    return pytest.param(value, marks=pytest.mark.full)
+
+
 AROS_ROM = "roms/aros-20130502.rom"
 AROS_EXT = "roms/aros-20130502-ext.rom"
 
 ROM_LIST = (
-    "amiga-boot-a1000.rom",
-    "amiga-boot-a4091.rom",
-    "amiga-boot-a590.rom",
-    "amiga-crt-310-cd32-fmv.rom",
-    "amiga-os-070.rom",
-    "amiga-os-100.rom",
-    "amiga-os-110.rom",
-    "amiga-os-120.rom",
-    "amiga-os-130-cdtv-ext.rom",
+    tag_full("amiga-boot-a1000.rom"),
+    tag_full("amiga-boot-a4091.rom"),
+    tag_full("amiga-boot-a590.rom"),
+    tag_full("amiga-crt-310-cd32-fmv.rom"),
+    tag_full("amiga-os-070.rom"),
+    tag_full("amiga-os-100.rom"),
+    tag_full("amiga-os-110.rom"),
+    tag_full("amiga-os-120.rom"),
+    tag_full("amiga-os-130-cdtv-ext.rom"),
     "amiga-os-130.rom",
-    "amiga-os-140-a3000.rom",
-    "amiga-os-204.rom",
+    tag_full("amiga-os-140-a3000.rom"),
+    tag_full("amiga-os-204.rom"),
     "amiga-os-205.rom",
-    "amiga-os-300.rom",
+    tag_full("amiga-os-300.rom"),
     "amiga-os-310-a1200.rom",
     "amiga-os-310-a3000.rom",
     "amiga-os-310-a4000.rom",
     "amiga-os-310-a500.rom",
     "amiga-os-310-cd32-ext.rom",
     "amiga-os-310-cd32.rom",
-    "amiga-os-320-walker.rom",
-    "amiga-os-3x0-a4000.rom",
+    tag_full("amiga-os-320-walker.rom"),
+    tag_full("amiga-os-3x0-a4000.rom"),
     "aros-20130502-ext.rom",
     "aros-20130502.rom",
-    "logica-dialoga-200.rom"
+    tag_full("logica-dialoga-200.rom")
 )
 
 SPLIT_ROM = (
-    "amiga-os-204.rom",
+    tag_full("amiga-os-204.rom"),
     "amiga-os-205.rom",
     "amiga-os-310-a1200.rom",
     "amiga-os-310-a3000.rom",
     "amiga-os-310-a4000.rom",
     "amiga-os-310-a500.rom",
     "amiga-os-310-cd32.rom",
-    "amiga-os-3x0-a4000.rom"
+    tag_full("amiga-os-3x0-a4000.rom")
 )
 
 SPLIT_EXT = (
