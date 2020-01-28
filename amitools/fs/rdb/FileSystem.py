@@ -37,7 +37,7 @@ class FileSystem:
     # read lseg blocks
     lseg_blk = self.fshd.dev_node.seg_list_blk
     self.lsegs = []
-    data = ""
+    data = b""
     while lseg_blk != 0xffffffff:
       ls = LoadSegBlock(self.blkdev, lseg_blk)
       if not ls.read():
