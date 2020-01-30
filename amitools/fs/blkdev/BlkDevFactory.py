@@ -60,7 +60,7 @@ class BlkDevFactory:
       hdr = fobj.read(4)
       fobj.seek(0,0)
     # check for 'RDISK':
-    if hdr == 'RDSK':
+    if hdr == b'RDSK':
       return self.TYPE_RDISK
     return None
 
