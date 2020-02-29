@@ -199,9 +199,9 @@ class LibStubGen(object):
         call = base_func
 
       def profile_func(this, *args, **kwargs):
-        start = time.clock()
+        start = time.perf_counter()
         call(this, *args, **kwargs)
-        end = time.clock()
+        end = time.perf_counter()
         delta = end - start
         prof.count(delta)
       func = profile_func
