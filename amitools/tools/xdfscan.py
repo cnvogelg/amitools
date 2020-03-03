@@ -19,12 +19,12 @@ from amitools.fs.validate.Progress import Progress
 class MyProgress(Progress):
   def __init__(self):
     Progress.__init__(self)
-    self.clk = int(time.clock() * 1000)
+    self.clk = int(time.perf_counter() * 1000)
   def begin(self, msg):
     Progress.begin(self, msg)
   def add(self):
     Progress.add(self)
-    clk = int(time.clock() * 1000)
+    clk = int(time.perf_counter() * 1000)
     delta = clk - self.clk
     # update display every 250ms
     if delta > 250:

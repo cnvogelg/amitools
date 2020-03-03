@@ -456,7 +456,7 @@ class Machine(object):
 
     # main execution loop of run
     total_cycles = 0
-    start_time = time.clock()
+    start_time = time.perf_counter()
     try:
       while not run_state.done:
         log_machine.debug("+ cpu.execute")
@@ -467,7 +467,7 @@ class Machine(object):
           break
     except Exception as e:
       self.error_reporter.report_error(e)
-    end_time = time.clock()
+    end_time = time.perf_counter()
 
     # retrieve regs
     if get_regs:
