@@ -7,3 +7,6 @@ def dos_readargs_test(vamos):
 
 def dos_readargs2_test(vamos):
   vamos.run_prog_checked("dos_readargs2")
+
+def dos_readargs2_prompt_test(vamos):
+  vamos.run_prog_checked("dos_readargs2", "?", stdin="\n")

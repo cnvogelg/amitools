@@ -1274,12 +1274,12 @@ class DosLibrary(LibImpl):
       ah = ArgsHelp(csrc)
       # user entered '?'
       if ah.want_help():
-        ctx.process.get_output().write(template+": ")
+        ctx.process.get_output().write(template.encode('latin1')+b": ")
         csrc.append_line()
         msg = ext_help if ext_help else template
         # ext help is shown on second '?'
         while ah.want_help():
-          ctx.process.get_output().write(template+": ")
+          ctx.process.get_output().write(template.encode('latin1')+b": ")
           csrc.append_line()
       csrc.rewind(ah.get_num_bytes())
 
