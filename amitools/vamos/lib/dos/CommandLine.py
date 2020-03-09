@@ -66,7 +66,7 @@ class CommandLine:
       if quoted:
         if ch == '"': # end quote
           quoted = False
-        if ch is (None, '\n'):
+        if ch in (None, '\n'):
           # error: premature end
           return self.PREMATURE_END
         arg_res.append(ch)
