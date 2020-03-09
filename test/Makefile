@@ -10,7 +10,7 @@ SOURCES_C += exec_initres.c exec_rawdofmt.c
 SOURCES_C += dos_readargs.c dos_readargs2.c dos_findarg.c
 SOURCES_C += dos_loadseg.c dos_runcmd.c
 SOURCES_C += dos_system.c dos_match.c
-SOURCES_C += dos_program.c
+SOURCES_C += dos_program.c dos_seek.c
 SOURCES_C += vprintf.c
 SOURCES_C += util_muldiv.c util_date.c
 SOURCES_C += math_double.c math_double_trans.c
@@ -145,7 +145,7 @@ vbcc-docker:
 	docker/drun amiga-vbcc /usr/bin/make vbcc
 
 sasc-docker:
-	docker/drun --dir .. amitools /usr/bin/make sasc VAMOS=vamos HOME=$(PWD)
+	docker/drun --dir ../.. amitools /usr/bin/make sasc VAMOS=vamos HOME=$(PWD)
 
 check:
 	@if [ ! -d volumes/sc ]; then \

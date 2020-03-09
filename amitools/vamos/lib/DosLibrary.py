@@ -620,8 +620,12 @@ class DosLibrary(LibImpl):
       raise UnsupportedFeatureError("Seek: mode=%d" % mode)
 
     old_pos = fh.tell()
-    fh.seek(pos, whence)
+    new_pos = fh.seek(pos, whence)
     log_dos.info("Seek(%s, %06x, %s) -> old_pos=%06x" % (fh, pos, mode_str, old_pos))
+    if new_pos == -1:
+      self.setioerr(ctx, ERROR_SEEK_ERROR)
+    else:
+      self.setioerr(ctx, 0)
     return old_pos
 
   def FGetC(self, ctx):
