@@ -18,6 +18,8 @@ help:
 	@echo "init_user   initialize project (--user mode)"
 	@echo "build       build native extension"
 	@echo
+	@echo "format      format source code with black"
+	@echo
 	@echo "test        run tests"
 	@echo "docker-tox  build tox docker container"
 	@echo
@@ -48,6 +50,9 @@ init_user:
 
 build:
 	$(PYTHON) setup.py build_ext -i
+
+format:
+	black .
 
 # testing
 test:

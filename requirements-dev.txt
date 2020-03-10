@@ -3,3 +3,5 @@ sphinx
 twine
 tox
 tox-pyenv
+black
+
