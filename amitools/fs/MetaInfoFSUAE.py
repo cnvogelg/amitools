@@ -11,20 +11,19 @@ TS_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 class MetaInfoFSUAE:
-
     @staticmethod
     def is_meta_file(path):
         return path.lower().endswith(".uaem")
-    
+
     @staticmethod
     def get_suffix():
         return ".uaem"
 
     def load_meta(self, path):
         with open(path, "rb") as fh:
-            data = fh.read().decode('utf-8')
+            data = fh.read().decode("utf-8")
             return self.parse_data(data)
-    
+
     def parse_data(self, data):
         if data.endswith("\n"):
             data = data[:-1]
@@ -68,4 +67,4 @@ class MetaInfoFSUAE:
     def save_meta(self, path, meta_info):
         with open(path, "wb") as fh:
             txt = self.generate_data(meta_info)
-            fh.write(txt.encode('utf-8'))
+            fh.write(txt.encode("utf-8"))

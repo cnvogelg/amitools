@@ -4,8 +4,8 @@ import struct
 import amitools.binfmt.BinImage as BinImage
 
 BKMODULE_ID = 0x707A4E75
-BK_MODULE_ID = 0x4afc
-BK_PATCH_ID = 0x4e71
+BK_MODULE_ID = 0x4AFC
+BK_PATCH_ID = 0x4E71
 
 
 class BlizKickModule:
@@ -75,14 +75,15 @@ class BlizKickModule:
         # check if we can remove last data segment (contains only version info)
         if len(segs) == 2 and segs[1].get_type() == BinImage.SEGMENT_TYPE_DATA:
             data = segs[1].get_data()
-            if data[:5] == '$VER:':
+            if data[:5] == "$VER:":
                 self.bin_img.segments = [seg]
 
 
 # test
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
     from amitools.binfmt.BinFmt import BinFmt
+
     bfmt = BinFmt()
     for f in sys.argv[1:]:
         if bfmt.is_image(f):

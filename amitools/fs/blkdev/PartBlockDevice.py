@@ -1,12 +1,9 @@
-
-
 from .BlockDevice import BlockDevice
 import os.path
 import os
 
 
 class PartBlockDevice(BlockDevice):
-
     def __init__(self, raw_blkdev, part_blk, auto_close=False):
         self.raw_blkdev = raw_blkdev
         self.part_blk = part_blk
@@ -36,8 +33,7 @@ class PartBlockDevice(BlockDevice):
         boot_blocks = dos_env.boot_blocks
         if boot_blocks == 0:
             boot_blocks = 2
-        self._set_geometry(cyls, heads, secs, block_bytes,
-                           reserved, boot_blocks)
+        self._set_geometry(cyls, heads, secs, block_bytes, reserved, boot_blocks)
         return True
 
     def flush(self):
@@ -50,19 +46,25 @@ class PartBlockDevice(BlockDevice):
 
     def read_block(self, blk_num):
         if blk_num >= self.num_blocks:
-            raise ValueError("Invalid Part block num: got %d but max is %d" % (
-                blk_num, self.num_blocks))
+            raise ValueError(
+                "Invalid Part block num: got %d but max is %d"
+                % (blk_num, self.num_blocks)
+            )
         num_blks = self.sec_per_blk
         off = self.blk_off + (blk_num * num_blks)
         return self.raw_blkdev.read_block(off, num_blks=num_blks)
 
     def write_block(self, blk_num, data):
         if blk_num >= self.num_blocks:
-            raise ValueError("Invalid Part block num: got %d but max is %d" % (
-                blk_num, self.num_blocks))
+            raise ValueError(
+                "Invalid Part block num: got %d but max is %d"
+                % (blk_num, self.num_blocks)
+            )
         if len(data) != self.block_bytes:
-            raise ValueError("Invalid Part block size written: got %d but size is %d" % (
-                len(data), self.block_bytes))
+            raise ValueError(
+                "Invalid Part block size written: got %d but size is %d"
+                % (len(data), self.block_bytes)
+            )
         num_blks = self.sec_per_blk
         off = self.blk_off + (blk_num * num_blks)
         self.raw_blkdev.write_block(off, data, num_blks=num_blks)

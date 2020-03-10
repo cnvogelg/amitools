@@ -2,25 +2,20 @@ import pytest
 import collections
 
 
-DISK_SIZES = (
-    "1M",
-    "10M",
-    "50M"
-)
+DISK_SIZES = ("1M", "10M", "50M")
 
-IMGSpec = collections.namedtuple('IMGSpec', ['file_name', 'size',
-                                             'fs_block_size', 'part_list'])
+IMGSpec = collections.namedtuple(
+    "IMGSpec", ["file_name", "size", "fs_block_size", "part_list"]
+)
 
 PARTITION_LIST = (
     [("DH0", "size=100%")],
     [("DH0", None)],
     [("DH0", "size=50%"), ("DH1", None)],
-    [("DH0", "size=10%"), ("DH1", "size=20%"), ("DH2", None)]
+    [("DH0", "size=10%"), ("DH1", "size=20%"), ("DH2", None)],
 )
 
-FS_BLOCK_SIZES = (
-    512, 4096
-)
+FS_BLOCK_SIZES = (512, 4096)
 
 
 @pytest.fixture(params=FS_BLOCK_SIZES)
@@ -52,11 +47,10 @@ def rdbtool(toolrun):
                 # single command
                 args.append(cmd)
             # plus seperates commands
-            args.append('+')
+            args.append("+")
         cmd = ["rdbtool"] + list(opts) + [img_file] + args[:-1]
-        return toolrun.run_checked(*cmd,
-                                   raw_output=raw_output,
-                                   return_code=return_code)
+        return toolrun.run_checked(*cmd, raw_output=raw_output, return_code=return_code)
+
     return run
 
 
@@ -71,8 +65,7 @@ def partitions(rdbtool, img_file, request):
             rdbtool(img_file.file_name, ("add", size, fs_bs))
         else:
             rdbtool(img_file.file_name, ("fill", fs_bs))
-    return IMGSpec(img_file.file_name, img_file.size,
-                   img_file.fs_block_size, part_list)
+    return IMGSpec(img_file.file_name, img_file.size, img_file.fs_block_size, part_list)
 
 
 def rdbtool_create_test(rdbtool, img_file):
@@ -123,20 +116,19 @@ def rdbtool_delete_by_id_test(rdbtool, partitions):
 
 
 CHANGE_OPTS = [
-    ('max_transfer', '0xdeadbeef'),
-    ('mask', '0xcafebabe'),
-    ('bootable', '1'),
-    ('automount', '0'),
-    ('pri', '5'),
-    ('num_buffer', '10')
+    ("max_transfer", "0xdeadbeef"),
+    ("mask", "0xcafebabe"),
+    ("bootable", "1"),
+    ("automount", "0"),
+    ("pri", "5"),
+    ("num_buffer", "10"),
 ]
 
 
 def rdbtool_change_test(rdbtool, partitions):
     for opt, val in CHANGE_OPTS:
         arg = opt + "=" + val
-        out = rdbtool(partitions.file_name, ("change", "0", arg),
-                      ("info", "0"))
+        out = rdbtool(partitions.file_name, ("change", "0", arg), ("info", "0"))
         res = "\n".join(out)
         assert res.find(arg) > 0
 

@@ -5,9 +5,9 @@ from .atypedef import AmigaTypeDef
 
 @AmigaTypeDef(FileLockStruct)
 class FileLock(AmigaType):
-  pass
+    pass
 
 
 @AmigaTypeDef(FileHandleStruct)
 class FileHandle(AmigaType):
-  pass
+    pass

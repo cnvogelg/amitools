@@ -7,10 +7,10 @@ import amitools.util.DataDir as DataDir
 from amitools.binfmt.BinImage import (
     BinImage,
     Segment,
-    Relocations, 
+    Relocations,
     Reloc,
     BIN_IMAGE_TYPE_HUNK,
-    SEGMENT_TYPE_CODE
+    SEGMENT_TYPE_CODE,
 )
 
 
@@ -50,20 +50,28 @@ class RomSplitter:
 
     def print_rom(self, out, show_entries=False):
         rom = self.remus_rom
-        out("rom @%06x  +%06x  sum=%08x@%08x  %s" %
-            (rom.base_addr, rom.size, rom.chk_sum, rom.sum_off, rom.name))
+        out(
+            "rom @%06x  +%06x  sum=%08x@%08x  %s"
+            % (rom.base_addr, rom.size, rom.chk_sum, rom.sum_off, rom.name)
+        )
         if show_entries:
             for module in rom.modules:
                 self.print_entry(out, module)
 
     def print_entry(self, out, entry):
-        out("    @%06x  +%06x  =%06x  (r:%5d,f:%2d,p:%2d)  sum=%08x  %s" %
-            (entry.offset, entry.size, entry.offset+entry.size,
-             len(entry.extra.relocs),
-             len(entry.extra.fixes),
-             len(entry.extra.patches),
-             entry.extra.chk_sum,
-             entry.name))
+        out(
+            "    @%06x  +%06x  =%06x  (r:%5d,f:%2d,p:%2d)  sum=%08x  %s"
+            % (
+                entry.offset,
+                entry.size,
+                entry.offset + entry.size,
+                len(entry.extra.relocs),
+                len(entry.extra.fixes),
+                len(entry.extra.patches),
+                entry.extra.chk_sum,
+                entry.name,
+            )
+        )
 
     def print_entries(self, out, entries):
         for e in entries:
@@ -81,7 +89,7 @@ class RomSplitter:
 
     def extract_entry(self, entry, fixes=True, patches=False):
         """return data, relocs"""
-        data = self.rom_data[entry.offset:entry.offset+entry.size]
+        data = self.rom_data[entry.offset : entry.offset + entry.size]
         extra = entry.extra
         relocs = extra.relocs
         entry_addr = self.remus_rom.base_addr + entry.offset
@@ -102,8 +110,9 @@ class RomSplitter:
         for off in relocs:
             addr = struct.unpack_from(">I", data, off)[0]
             if addr < base_addr:
-                raise ValueError("Invalid relocatable address: %08x base=%08x"
-                                 % (addr, base_addr))
+                raise ValueError(
+                    "Invalid relocatable address: %08x base=%08x" % (addr, base_addr)
+                )
             addr -= base_addr
             struct.pack_into(">I", data, off, addr)
         return data

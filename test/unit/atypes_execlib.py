@@ -4,18 +4,17 @@ from amitools.vamos.atypes import ExecLibrary
 
 
 def atypes_execlib_base_test():
-  mem = MockMemory()
-  el = ExecLibrary(mem, 0x100)
-  el.setup()
-  el.fill_funcs()
+    mem = MockMemory()
+    el = ExecLibrary(mem, 0x100)
+    el.setup()
+    el.fill_funcs()
 
 
 def atypes_execlib_alloc_test():
-  mem = MockMemory()
-  alloc = MemoryAlloc(mem)
-  el = ExecLibrary.alloc(alloc, "exec.library", "bla", 20)
-  el.setup()
-  el.fill_funcs()
-  el.free()
-  assert alloc.is_all_free()
-
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    el = ExecLibrary.alloc(alloc, "exec.library", "bla", 20)
+    el.setup()
+    el.fill_funcs()
+    el.free()
+    assert alloc.is_all_free()

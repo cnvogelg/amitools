@@ -3,8 +3,7 @@ import struct
 
 
 class RemusRom(object):
-    def __init__(self, sum_off, chk_sum, size, base_addr, name, short_name,
-                 flags):
+    def __init__(self, sum_off, chk_sum, size, base_addr, name, short_name, flags):
         self.sum_off = sum_off
         self.chk_sum = chk_sum
         self.size = size
@@ -15,17 +14,35 @@ class RemusRom(object):
         self.modules = []
 
     def __repr__(self):
-        return "RemusRom(sum_off=%08x,chk_sum=%08x,size=%08x,base_addr=%08x," \
-               "name=%s,short_name=%s,flags=%x)" % \
-               (self.sum_off, self.chk_sum, self.size, self.base_addr,
-                self.name, self.short_name, self.flags)
+        return (
+            "RemusRom(sum_off=%08x,chk_sum=%08x,size=%08x,base_addr=%08x,"
+            "name=%s,short_name=%s,flags=%x)"
+            % (
+                self.sum_off,
+                self.chk_sum,
+                self.size,
+                self.base_addr,
+                self.name,
+                self.short_name,
+                self.flags,
+            )
+        )
 
     def dump(self):
-        print("(%04x) #%04x  @%08x  +%08x  =%08x  %08x: %08x  %-24s  %s" %
-              (self.flags, len(self.modules), self.base_addr, self.size,
-               self.base_addr + self.size,
-               self.sum_off, self.chk_sum,
-               self.short_name, self.name))
+        print(
+            "(%04x) #%04x  @%08x  +%08x  =%08x  %08x: %08x  %-24s  %s"
+            % (
+                self.flags,
+                len(self.modules),
+                self.base_addr,
+                self.size,
+                self.base_addr + self.size,
+                self.sum_off,
+                self.chk_sum,
+                self.short_name,
+                self.name,
+            )
+        )
         for m in self.modules:
             m.dump()
 
@@ -40,22 +57,21 @@ class RemusRomModuleExtra(object):
         self.fixes = fixes
 
     def __repr__(self):
-        return "RemusRomModuleExtra(relocs=%r,patches=%r,chk_sum=%08x," \
-               "brelocs=%r,fixes=%r)" % \
-               (self.relocs, self.patches, self.chk_sum, self.brelocs,
-                self.fixes)
+        return (
+            "RemusRomModuleExtra(relocs=%r,patches=%r,chk_sum=%08x,"
+            "brelocs=%r,fixes=%r)"
+            % (self.relocs, self.patches, self.chk_sum, self.brelocs, self.fixes)
+        )
 
     def dump(self):
         if len(self.relocs) > 0:
             print("    relocs: ", ",".join(["%08x" % x for x in self.relocs]))
         if len(self.patches) > 0:
-            print("    patches:", ",".join(
-                ["%08x:%08x" % x for x in self.patches]))
+            print("    patches:", ",".join(["%08x:%08x" % x for x in self.patches]))
         if len(self.brelocs) > 0:
             print("    brelocs:", ",".join(["%08x" % x for x in self.brelocs]))
         if len(self.fixes) > 0:
-            print("    fixes:  ", ",".join(
-                ["%08x:%08x" % x for x in self.fixes]))
+            print("    fixes:  ", ",".join(["%08x:%08x" % x for x in self.fixes]))
         if self.chk_sum:
             print("    chk_sum: %08x" % self.chk_sum)
 
@@ -69,17 +85,22 @@ class RemusRomModule(object):
         self.extra = None
 
     def __repr__(self):
-        return "RemusRomModule(name=%s,offset=%08x,size=%08x,extra_off=%08x)" \
-            % (self.name, self.offset, self.size, self.extra_off)
+        return "RemusRomModule(name=%s,offset=%08x,size=%08x,extra_off=%08x)" % (
+            self.name,
+            self.offset,
+            self.size,
+            self.extra_off,
+        )
 
     def dump(self):
         if self.extra:
             flags = self.extra.flags
         else:
             flags = 0
-        print("  @%08x  +%08x  =%08x  %s  (%02x)" %
-              (self.offset, self.size, self.offset + self.size, self.name,
-               flags))
+        print(
+            "  @%08x  +%08x  =%08x  %s  (%02x)"
+            % (self.offset, self.size, self.offset + self.size, self.name, flags)
+        )
         if self.extra:
             self.extra.dump()
 
@@ -98,8 +119,7 @@ class RemusFile(object):
         # check header
         len_hdr = self._read_long()
         if len_hdr != self.header:
-            raise IOError("Wrong header! %08x != %08x" %
-                          (self.header, len_hdr))
+            raise IOError("Wrong header! %08x != %08x" % (self.header, len_hdr))
         # read version
         self.version = self._read_long()
         self.path = path
@@ -126,14 +146,14 @@ class RemusFile(object):
                 break
             res.append(self.data[pos])
             pos += 1
-        return bytes(res).decode('latin-1')
+        return bytes(res).decode("latin-1")
 
 
 class RemusSplitFile(RemusFile):
-    u32_max = 0xffffffff
+    u32_max = 0xFFFFFFFF
 
     def __init__(self):
-        RemusFile.__init__(self, 0x524d5346)
+        RemusFile.__init__(self, 0x524D5346)
         self.roms = []
 
     def load(self, path):
@@ -172,8 +192,7 @@ class RemusSplitFile(RemusFile):
             flags = 0
         name = self._read_string(name_off)
         short_name = self._read_string(short_name_off)
-        rom = RemusRom(sum_off, chk_sum, size, base_addr,
-                       name, short_name, flags)
+        rom = RemusRom(sum_off, chk_sum, size, base_addr, name, short_name, flags)
         # store
         string_offs.add(name_off)
         string_offs.add(short_name_off)
@@ -209,7 +228,7 @@ class RemusSplitFile(RemusFile):
         FLAG_SHORT_BCPL_RELOCS = 0x10
         FLAG_CHK_SUM = 0x40
         FLAG_FIXES = 0x80
-        FLAG_MASK = 0xdf
+        FLAG_MASK = 0xDF
         # parse extras
         extra_map = {}
         for extra_off in extra_offs:
@@ -269,8 +288,7 @@ class RemusSplitFile(RemusFile):
             if flags & FLAG_CHK_SUM:
                 chk_sum = self._read_long()
             # create extra
-            e = RemusRomModuleExtra(
-                flags, relocs, patches, chk_sum, brelocs, fixes)
+            e = RemusRomModuleExtra(flags, relocs, patches, chk_sum, brelocs, fixes)
             extra_map[extra_off] = e
             # check end of record
             # if self.offset not in extra_offs and self.offset != end_off:
@@ -306,18 +324,22 @@ class RemusIdEntry(object):
         self.name = name
 
     def __repr__(self):
-        return "RemusIdEntry(count=%x,bogus=%08x,chk_sum=%08x,name=%s" % \
-               (self.count, self.bogus, self.chk_sum, self.name)
+        return "RemusIdEntry(count=%x,bogus=%08x,chk_sum=%08x,name=%s" % (
+            self.count,
+            self.bogus,
+            self.chk_sum,
+            self.name,
+        )
 
 
 class RemusIdFile(RemusFile):
     def __init__(self):
-        RemusFile.__init__(self, 0x524d4944)
+        RemusFile.__init__(self, 0x524D4944)
         self.entries = []
 
     def load(self, path):
         RemusFile.load(self, path)
-        u16_max = 0xffff
+        u16_max = 0xFFFF
         # loop: new rom
         while True:
             # parse rom entry
@@ -333,8 +355,7 @@ class RemusIdFile(RemusFile):
 
     def dump(self):
         for e in self.entries:
-            print("%04x  %08x  %08x  %s" %
-                  (e.count, e.bogus, e.chk_sum, e.name))
+            print("%04x  %08x  %08x  %s" % (e.count, e.bogus, e.chk_sum, e.name))
 
 
 class RemusFileSet(object):
@@ -377,7 +398,7 @@ class RemusFileSet(object):
         return roms
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
     from .kickrom import Loader, KickRomAccess
 

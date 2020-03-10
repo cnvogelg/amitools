@@ -12,9 +12,9 @@ class KickRomAccess(RomAccess):
     EXT_HEADER_SIZE = 0x10
     FOOTER_SIZE = 0x18
     ROMHDR_SIZE = 8
-    ROMHDR_256K = 0x11114ef9
-    ROMHDR_512K = 0x11144ef9
-    ROMHDR_EXT = 0x11144ef9
+    ROMHDR_256K = 0x11114EF9
+    ROMHDR_512K = 0x11144EF9
+    ROMHDR_EXT = 0x11144EF9
 
     def __init__(self, rom_data):
         RomAccess.__init__(self, rom_data)
@@ -81,14 +81,14 @@ class KickRomAccess(RomAccess):
         return self.read_rom_size_field() == self.size
 
     def check_magic_reset(self):
-        return self.read_word(0xd0) == 0x4e70
+        return self.read_word(0xD0) == 0x4E70
 
     def calc_check_sum(self, skip_off=None):
         """Check internal kickstart checksum and return True if is correct"""
         chk_sum = 0
         num_longs = self.size // 4
         off = 0
-        max_u32 = 0xffffffff
+        max_u32 = 0xFFFFFFFF
         for i in range(num_longs):
             val = struct.unpack_from(">I", self.rom_data, off)[0]
             if off != skip_off:
@@ -132,12 +132,12 @@ class KickRomAccess(RomAccess):
             offset = 0
             hdr = self.ROMHDR_512K
         self.write_long(offset, hdr)
-        self.write_long(offset+4, jump_addr)
+        self.write_long(offset + 4, jump_addr)
 
     def write_ext_header(self, jump_addr, rom_rev):
         self.write_header(jump_addr)
         self.write_word(8, 0)
-        self.write_word(10, 0xffff)
+        self.write_word(10, 0xFFFF)
         self.write_word(12, rom_rev[0])
         self.write_word(14, rom_rev[1])
 
@@ -156,8 +156,7 @@ class KickRomAccess(RomAccess):
 
     def write_rom_ver_rev(self, rom_rev):
         """get (ver, rev) version info from ROM"""
-        return struct.pack_into(">HH", self.rom_data, 12,
-                                rom_rev[0], rom_rev[1])
+        return struct.pack_into(">HH", self.rom_data, 12, rom_rev[0], rom_rev[1])
 
     def read_boot_pc(self):
         """return PC for booting the ROM"""
@@ -177,11 +176,12 @@ class KickRomAccess(RomAccess):
         return self.read_long(off)
 
     def get_base_addr(self):
-        return self.read_boot_pc() & ~0xffff
+        return self.read_boot_pc() & ~0xFFFF
 
 
 class Loader(object):
     """Load kick rom images in different formats"""
+
     @classmethod
     def load(cls, kick_file, rom_key_file=None):
         raw_img = None
@@ -191,7 +191,7 @@ class Loader(object):
             raw_img = fh.read()
         # coded rom?
         need_key = False
-        if raw_img[:11] == b'AMIROMTYPE1':
+        if raw_img[:11] == b"AMIROMTYPE1":
             rom_img = raw_img[11:]
             need_key = True
         else:
@@ -218,16 +218,17 @@ class Loader(object):
 
 
 # tiny test
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
+
     args = sys.argv
     n = len(args)
     if n > 1:
         ks_file = args[1]
     else:
-        ks_file = 'amiga-os-310-a500.rom'
+        ks_file = "amiga-os-310-a500.rom"
     print(ks_file)
-    ks = Loader.load(ks_file, 'rom.key')
+    ks = Loader.load(ks_file, "rom.key")
     kh = KickRomAccess(ks)
     print("is_kick_rom", kh.is_kick_rom())
     print("detect_kick_rom", kh.detect_kick_rom())

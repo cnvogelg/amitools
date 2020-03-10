@@ -52,8 +52,8 @@ class RomEntryRomHdr:
         return self.skip + 8
 
     def get_data(self, addr):
-        data = chr(0xff) * self.skip
-        hdr = struct.pack(">II", 0x11114ef9, self.jmp_addr)
+        data = chr(0xFF) * self.skip
+        hdr = struct.pack(">II", 0x11114EF9, self.jmp_addr)
         return data + hdr
 
 
@@ -70,7 +70,7 @@ class RomEntryPadding:
 
 
 class RomBuilder:
-    def __init__(self, size=512, base_addr=0xf80000, fill_byte=0xff):
+    def __init__(self, size=512, base_addr=0xF80000, fill_byte=0xFF):
         self.size = size  # in KiB
         self.base_addr = base_addr
         self.fill_byte = fill_byte
@@ -114,7 +114,7 @@ class RomBuilder:
         files = []
         for mod in names:
             # is an index file?
-            if mod.endswith('.txt'):
+            if mod.endswith(".txt"):
                 base_path = os.path.dirname(mod)
                 with open(mod, "r") as fh:
                     for line in fh:
@@ -145,7 +145,7 @@ class RomBuilder:
         off = self.rom_off
         for mod in self.modules:
             n = mod.get_size()
-            rom_data[off: off+n] = mod.get_data(addr)
+            rom_data[off : off + n] = mod.get_data(addr)
             off += n
             addr += n
         # fill empty space
@@ -157,8 +157,7 @@ class RomBuilder:
 
 
 class KickRomBuilder(RomBuilder):
-    def __init__(self, size, kickety_split=True, rom_ver=None,
-                 **kw_args):
+    def __init__(self, size, kickety_split=True, rom_ver=None, **kw_args):
         RomBuilder.__init__(self, size, **kw_args)
         self.rom_ver = rom_ver
         # do we need a rom header at 256k border? (the original ROMs do this)
@@ -180,8 +179,7 @@ class KickRomBuilder(RomBuilder):
     def cross_kickety_split(self, num_bytes):
         if self.kickety_split:
             new_off = self.data_off + num_bytes
-            return self.data_off < self.split_offset and \
-                new_off > self.split_offset
+            return self.data_off < self.split_offset and new_off > self.split_offset
         else:
             return False
 
@@ -208,8 +206,9 @@ class KickRomBuilder(RomBuilder):
 
 
 class ExtRomBuilder(RomBuilder):
-    def __init__(self, size, rom_ver=None, add_footer=False,
-                 kick_addr=0xf80000, **kw_args):
+    def __init__(
+        self, size, rom_ver=None, add_footer=False, kick_addr=0xF80000, **kw_args
+    ):
         RomBuilder.__init__(self, size, **kw_args)
         # kick addr for jump
         self.kick_addr = kick_addr
@@ -230,7 +229,7 @@ class ExtRomBuilder(RomBuilder):
         rom_data = RomBuilder.build_rom(self)
         # write a header
         kh = KickRomAccess(rom_data)
-        kh.write_ext_header(self.kick_addr+2, self.rom_ver)
+        kh.write_ext_header(self.kick_addr + 2, self.rom_ver)
         # write footer
         if self.add_footer:
             kh.write_ext_footer()

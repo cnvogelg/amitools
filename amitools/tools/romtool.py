@@ -72,8 +72,7 @@ def do_split_cmd(args):
             logging.info("writing index to '%s'", idx_path)
             rs.write_index_file(idx_path)
         # extract entries
-        logging.debug("extract module: fixes=%s, patches=%s",
-                      args.fixes, args.patches)
+        logging.debug("extract module: fixes=%s, patches=%s", args.fixes, args.patches)
         bfh = BinFmtHunk()
         for e in entries:
             rs.print_entry(logging.info, e)
@@ -97,18 +96,31 @@ def do_build_cmd(args):
         rom_rev = list(map(int, rom_rev.split(".")))
     add_footer = args.add_footer
     # select rom builder
-    if rom_type == 'kick':
+    if rom_type == "kick":
         logging.info("building %d KiB Kick ROM @%08x", rom_size, kick_addr)
-        rb = rom.KickRomBuilder(rom_size,
-                                base_addr=kick_addr, fill_byte=fill_byte,
-                                kickety_split=kickety_split, rom_ver=rom_rev)
-    elif rom_type == 'ext':
-        logging.info("building %d KiB Ext ROM @%08x Rev %r for Kick @%08x",
-                     rom_size, ext_addr, rom_rev, kick_addr)
-        rb = rom.ExtRomBuilder(rom_size,
-                               base_addr=ext_addr, fill_byte=fill_byte,
-                               add_footer=add_footer, rom_ver=rom_rev,
-                               kick_addr=kick_addr)
+        rb = rom.KickRomBuilder(
+            rom_size,
+            base_addr=kick_addr,
+            fill_byte=fill_byte,
+            kickety_split=kickety_split,
+            rom_ver=rom_rev,
+        )
+    elif rom_type == "ext":
+        logging.info(
+            "building %d KiB Ext ROM @%08x Rev %r for Kick @%08x",
+            rom_size,
+            ext_addr,
+            rom_rev,
+            kick_addr,
+        )
+        rb = rom.ExtRomBuilder(
+            rom_size,
+            base_addr=ext_addr,
+            fill_byte=fill_byte,
+            add_footer=add_footer,
+            rom_ver=rom_rev,
+            kick_addr=kick_addr,
+        )
     else:
         logging.error("Unknown rom_type=%s", rom_type)
         return 1
@@ -130,8 +142,7 @@ def do_build_cmd(args):
             if bkm.get_type() == "module":
                 bkm.fix_module()
             elif bkm.get_type() == "patch":
-                logging.error("BlizKick Patches are not supported, yet: %s",
-                              name)
+                logging.error("BlizKick Patches are not supported, yet: %s", name)
                 return 5
             # get image params
             size = bin_img.get_size()
@@ -160,16 +171,18 @@ def do_build_cmd(args):
             logging.info("@%08x: adding module '%s'", off, f)
             e = rb.add_bin_img(name, bin_img)
             if e is None:
-                logging.error("@%08x: can't add module '%s': %s",
-                              off, f, rb.get_error())
+                logging.error(
+                    "@%08x: can't add module '%s': %s", off, f, rb.get_error()
+                )
                 return 3
         # add data
         else:
             logging.info("@%08x: adding raw data '%s'", off, f)
             e = rb.add_module(name, data)
             if e is None:
-                logging.error("@%08x: can't add raw data '%s': %s",
-                              off, f, rb.get_error())
+                logging.error(
+                    "@%08x: can't add raw data '%s': %s", off, f, rb.get_error()
+                )
                 return 3
 
         # add long word padding?
@@ -178,14 +191,14 @@ def do_build_cmd(args):
             logging.info("@%08x: adding padding: +%d" % (off, padding))
             e = rb.add_padding(padding)
             if e is None:
-                logging.error("@%08x: can't add padding: %s",
-                              off, rb.get_error())
+                logging.error("@%08x: can't add padding: %s", off, rb.get_error())
                 return 3
 
     # build rom
     off = rb.get_rom_offset()
-    logging.info("@%08x: padding %d bytes with %02x",
-                 off, rb.get_bytes_left(), fill_byte)
+    logging.info(
+        "@%08x: padding %d bytes with %02x", off, rb.get_bytes_left(), fill_byte
+    )
     rom_data = rb.build_rom()
     if rom_data is None:
         logging.error("building ROM failed: %s", rb.get_error())
@@ -212,8 +225,7 @@ def do_diff_cmd(args):
     size_a = len(rom_a)
     size_b = len(rom_b)
     if not args.force and size_a != size_b:
-        logging.error(
-            "ROM differ in size (%08x != %08x). Aborting", size_a, size_b)
+        logging.error("ROM differ in size (%08x != %08x). Aborting", size_a, size_b)
         return 2
     # do diff
     base_addr = 0
@@ -226,8 +238,9 @@ def do_diff_cmd(args):
         else:
             logging.error("Not a KickROM! Can't detect base address.")
             return 3
-    print_hex_diff(rom_a, rom_b, num=args.columns, show_same=args.same,
-                   base_addr=base_addr)
+    print_hex_diff(
+        rom_a, rom_b, num=args.columns, show_same=args.same, base_addr=base_addr
+    )
 
 
 def do_dump_cmd(args):
@@ -266,24 +279,24 @@ def do_info_cmd(args):
     rom_img = rom.Loader.load(img)
     kh = rom.KickRomAccess(rom_img)
     checks = [
-        ('size', kh.check_size()),
-        ('header', kh.check_header()),
-        ('footer', kh.check_footer()),
-        ('size_field', kh.check_size()),
-        ('chk_sum', kh.verify_check_sum()),
-        ('kickety_split', kh.check_kickety_split()),
-        ('magic_reset', kh.check_magic_reset()),
-        ('is_kick', kh.is_kick_rom())
+        ("size", kh.check_size()),
+        ("header", kh.check_header()),
+        ("footer", kh.check_footer()),
+        ("size_field", kh.check_size()),
+        ("chk_sum", kh.verify_check_sum()),
+        ("kickety_split", kh.check_kickety_split()),
+        ("magic_reset", kh.check_magic_reset()),
+        ("is_kick", kh.is_kick_rom()),
     ]
     c = ["%-20s  %s" % (x[0], "ok" if x[1] else "NOK") for x in checks]
     for i in c:
         print(i)
     values = [
-        ('check_sum', '%08x', kh.read_check_sum()),
-        ('base_addr', '%08x', kh.get_base_addr()),
-        ('boot_pc', '%08x', kh.read_boot_pc()),
-        ('rom_rev', '%d.%d', kh.read_rom_ver_rev()),
-        ('exec_rev', '%d.%d', kh.read_exec_ver_rev())
+        ("check_sum", "%08x", kh.read_check_sum()),
+        ("base_addr", "%08x", kh.get_base_addr()),
+        ("boot_pc", "%08x", kh.read_boot_pc()),
+        ("rom_rev", "%d.%d", kh.read_rom_ver_rev()),
+        ("exec_rev", "%d.%d", kh.read_exec_ver_rev()),
     ]
     v = ["%-20s  %s" % (x[0], x[1] % x[2]) for x in values]
     for i in v:
@@ -354,7 +367,7 @@ def do_combine_cmd(args):
     if ka.get_size_kib() != 512:
         logging.error("Not a 512 MiB Kick ROM image!")
         return 2
-    if ka.get_base_addr() != 0xf80000:
+    if ka.get_base_addr() != 0xF80000:
         logging.error("Kick ROM base address is not 0xf80000!")
         return 3
     # check ext
@@ -423,112 +436,176 @@ def do_scan_cmd(args):
             print(spc, "init off:   %08x" % r.init_off)
             print(spc, "skip off:   %08x" % r.skip_off)
         else:
-            print("@%08x  +%08x  %-12s  %+4d  %s  %s" %
-                  (off, r.skip_off, nt, r.pri, name, id_string))
+            print(
+                "@%08x  +%08x  %-12s  %+4d  %s  %s"
+                % (off, r.skip_off, nt, r.pri, name, id_string)
+            )
 
 
 def setup_list_parser(parser):
-    parser.add_argument('-r', '--rom', default=None,
-                        help='query rom name by wildcard')
-    parser.add_argument('-m', '--modules', default=False, action='store_true',
-                        help="show entries of ROMs")
+    parser.add_argument("-r", "--rom", default=None, help="query rom name by wildcard")
+    parser.add_argument(
+        "-m",
+        "--modules",
+        default=False,
+        action="store_true",
+        help="show entries of ROMs",
+    )
     parser.set_defaults(cmd=do_list_cmd)
 
 
 def setup_query_parser(parser):
-    parser.add_argument('rom_image',
-                        help='rom image to be checked')
-    parser.add_argument('-m', '--modules', default=None,
-                        help='query module by wildcard')
+    parser.add_argument("rom_image", help="rom image to be checked")
+    parser.add_argument(
+        "-m", "--modules", default=None, help="query module by wildcard"
+    )
     parser.set_defaults(cmd=do_query_cmd)
 
 
 def setup_split_parser(parser):
-    parser.add_argument('rom_image',
-                        help='rom image file to be split')
-    parser.add_argument('-o', '--output-dir',
-                        help='store modules in this base dir')
-    parser.add_argument('-m', '--modules', default=None,
-                        help='query module by wildcard')
-    parser.add_argument('--no-version-dir', default=False, action='store_true',
-                        help="do not create sub directory with version name")
-    parser.add_argument('--no-index', default=False, action='store_true',
-                        help="do not create an 'index.txt' in output path")
-    parser.add_argument('-p', '--patches', default=False, action='store_true',
-                        help='apply optional patches to modules')
-    parser.add_argument('-f', '--no-fixes', dest='fixes', default=True,
-                        action='store_false',
-                        help='do not apply available fixes to modules')
+    parser.add_argument("rom_image", help="rom image file to be split")
+    parser.add_argument("-o", "--output-dir", help="store modules in this base dir")
+    parser.add_argument(
+        "-m", "--modules", default=None, help="query module by wildcard"
+    )
+    parser.add_argument(
+        "--no-version-dir",
+        default=False,
+        action="store_true",
+        help="do not create sub directory with version name",
+    )
+    parser.add_argument(
+        "--no-index",
+        default=False,
+        action="store_true",
+        help="do not create an 'index.txt' in output path",
+    )
+    parser.add_argument(
+        "-p",
+        "--patches",
+        default=False,
+        action="store_true",
+        help="apply optional patches to modules",
+    )
+    parser.add_argument(
+        "-f",
+        "--no-fixes",
+        dest="fixes",
+        default=True,
+        action="store_false",
+        help="do not apply available fixes to modules",
+    )
     parser.set_defaults(cmd=do_split_cmd)
 
 
 def setup_build_parser(parser):
-    parser.add_argument('modules', default=None, nargs='+',
-                        help='modules or index.txt files to be added')
-    parser.add_argument('-o', '--output',
-                        help='rom image file to be built')
-    parser.add_argument('-t', '--rom-type', default='kick',
-                        help="what type of ROM to build (kick, ext)")
-    parser.add_argument('-s', '--rom-size', default=512, type=int,
-                        help="size of ROM in KiB")
-    parser.add_argument('-a', '--kick-addr', default="f80000",
-                        help="base address of Kick ROM in hex")
-    parser.add_argument('-e', '--ext-addr', default="e00000",
-                        help="base address of Ext ROM in hex")
-    parser.add_argument('-f', '--add-footer', default=False,
-                        action='store_true',
-                        help="add footer with check sum to Ext ROM")
-    parser.add_argument('-r', '--rom-rev', default=None,
-                        help="set ROM revision, e.g. 45.10")
-    parser.add_argument('-k', '--kickety_split', default=False,
-                        action='store_true',
-                        help="add 'kickety split' romhdr at center of ROM")
-    parser.add_argument('-b', '--fill-byte', default='ff',
-                        help="fill byte in hex for empty ranges")
+    parser.add_argument(
+        "modules",
+        default=None,
+        nargs="+",
+        help="modules or index.txt files to be added",
+    )
+    parser.add_argument("-o", "--output", help="rom image file to be built")
+    parser.add_argument(
+        "-t", "--rom-type", default="kick", help="what type of ROM to build (kick, ext)"
+    )
+    parser.add_argument(
+        "-s", "--rom-size", default=512, type=int, help="size of ROM in KiB"
+    )
+    parser.add_argument(
+        "-a", "--kick-addr", default="f80000", help="base address of Kick ROM in hex"
+    )
+    parser.add_argument(
+        "-e", "--ext-addr", default="e00000", help="base address of Ext ROM in hex"
+    )
+    parser.add_argument(
+        "-f",
+        "--add-footer",
+        default=False,
+        action="store_true",
+        help="add footer with check sum to Ext ROM",
+    )
+    parser.add_argument(
+        "-r", "--rom-rev", default=None, help="set ROM revision, e.g. 45.10"
+    )
+    parser.add_argument(
+        "-k",
+        "--kickety_split",
+        default=False,
+        action="store_true",
+        help="add 'kickety split' romhdr at center of ROM",
+    )
+    parser.add_argument(
+        "-b", "--fill-byte", default="ff", help="fill byte in hex for empty ranges"
+    )
     parser.set_defaults(cmd=do_build_cmd)
 
 
 def setup_diff_parser(parser):
-    parser.add_argument('image_a', help='rom image a')
-    parser.add_argument('image_b', help='rom image b')
-    parser.add_argument('-s', '--same', default=False, action='store_true',
-                        help="show same lines of ROMs")
-    parser.add_argument('-a', '--show-address', default=False,
-                        action='store_true',
-                        help="show KickROM address (otherwise image offset)")
-    parser.add_argument('-b', '--rom-addr', default=None,
-                        help="use hex base address for output")
-    parser.add_argument('-f', '--force', default=False, action='store_true',
-                        help="diff ROMs even if size differs")
-    parser.add_argument('-c', '--columns', default=8, type=int,
-                        help="number of bytes shown per line")
+    parser.add_argument("image_a", help="rom image a")
+    parser.add_argument("image_b", help="rom image b")
+    parser.add_argument(
+        "-s",
+        "--same",
+        default=False,
+        action="store_true",
+        help="show same lines of ROMs",
+    )
+    parser.add_argument(
+        "-a",
+        "--show-address",
+        default=False,
+        action="store_true",
+        help="show KickROM address (otherwise image offset)",
+    )
+    parser.add_argument(
+        "-b", "--rom-addr", default=None, help="use hex base address for output"
+    )
+    parser.add_argument(
+        "-f",
+        "--force",
+        default=False,
+        action="store_true",
+        help="diff ROMs even if size differs",
+    )
+    parser.add_argument(
+        "-c", "--columns", default=8, type=int, help="number of bytes shown per line"
+    )
     parser.set_defaults(cmd=do_diff_cmd)
 
 
 def setup_dump_parser(parser):
-    parser.add_argument('image', help='rom image to be dumped')
-    parser.add_argument('-a', '--show-address', default=False,
-                        action='store_true',
-                        help="show KickROM address (otherwise image offset)")
-    parser.add_argument('-b', '--rom-addr', default=None,
-                        help="use hex base address for output")
-    parser.add_argument('-c', '--columns', default=16, type=int,
-                        help="number of bytes shown per line")
+    parser.add_argument("image", help="rom image to be dumped")
+    parser.add_argument(
+        "-a",
+        "--show-address",
+        default=False,
+        action="store_true",
+        help="show KickROM address (otherwise image offset)",
+    )
+    parser.add_argument(
+        "-b", "--rom-addr", default=None, help="use hex base address for output"
+    )
+    parser.add_argument(
+        "-c", "--columns", default=16, type=int, help="number of bytes shown per line"
+    )
     parser.set_defaults(cmd=do_dump_cmd)
 
 
 def setup_info_parser(parser):
-    parser.add_argument('image', help='rom image to be analyzed')
+    parser.add_argument("image", help="rom image to be analyzed")
     parser.set_defaults(cmd=do_info_cmd)
 
 
 def setup_patch_parser(parser):
-    parser.add_argument('image',
-                        help='rom image to be patched')
-    parser.add_argument('patches', default=None, nargs='+',
-                        help='patches to be applied: name[:arg1[=val1],...]')
-    parser.add_argument('-o', '--output',
-                        help='rom image file to be built')
+    parser.add_argument("image", help="rom image to be patched")
+    parser.add_argument(
+        "patches",
+        default=None,
+        nargs="+",
+        help="patches to be applied: name[:arg1[=val1],...]",
+    )
+    parser.add_argument("-o", "--output", help="rom image file to be built")
     parser.set_defaults(cmd=do_patch_cmd)
 
 
@@ -537,28 +614,40 @@ def setup_patches_parser(parser):
 
 
 def setup_combine_parser(parser):
-    parser.add_argument('kick_rom', help='kick rom to be combined')
-    parser.add_argument('ext_rom', help='ext rom to be combined')
+    parser.add_argument("kick_rom", help="kick rom to be combined")
+    parser.add_argument("ext_rom", help="ext rom to be combined")
     parser.set_defaults(cmd=do_combine_cmd)
-    parser.add_argument('-o', '--output',
-                        help='rom image file to be built')
+    parser.add_argument("-o", "--output", help="rom image file to be built")
 
 
 def setup_scan_parser(parser):
-    parser.add_argument('image', help='rom image to be scanned')
-    parser.add_argument('-b', '--rom-addr', default=None,
-                        help="use this base address for ROM. otherwise guess.")
-    parser.add_argument('-i', '--show-info', default=False,
-                        action='store_true',
-                        help="show more details on resident")
+    parser.add_argument("image", help="rom image to be scanned")
+    parser.add_argument(
+        "-b",
+        "--rom-addr",
+        default=None,
+        help="use this base address for ROM. otherwise guess.",
+    )
+    parser.add_argument(
+        "-i",
+        "--show-info",
+        default=False,
+        action="store_true",
+        help="show more details on resident",
+    )
     parser.set_defaults(cmd=do_scan_cmd)
 
 
 def setup_copy_parser(parser):
-    parser.add_argument('in_image', help='rom image to read')
-    parser.add_argument('out_image', help='rom image to be written')
-    parser.add_argument('-c', '--fix-checksum', default=False, action='store_true',
-                        help="fix checksum on written image")
+    parser.add_argument("in_image", help="rom image to read")
+    parser.add_argument("out_image", help="rom image to be written")
+    parser.add_argument(
+        "-c",
+        "--fix-checksum",
+        default=False,
+        action="store_true",
+        help="fix checksum on written image",
+    )
     parser.set_defaults(cmd=do_copy_cmd)
 
 
@@ -567,63 +656,63 @@ def parse_args():
     parser = argparse.ArgumentParser(description=DESC)
 
     # global options
-    parser.add_argument('-k', '--rom-key', default='rom.key',
-                        help='the path of a rom.key file if you want to '
-                             'process crypted ROMs')
+    parser.add_argument(
+        "-k",
+        "--rom-key",
+        default="rom.key",
+        help="the path of a rom.key file if you want to " "process crypted ROMs",
+    )
     add_logging_options(parser)
 
     # sub parsers
     sub_parsers = parser.add_subparsers(help="sub commands")
 
     # build
-    build_parser = sub_parsers.add_parser(
-        'build', help='build a ROM from modules')
+    build_parser = sub_parsers.add_parser("build", help="build a ROM from modules")
     setup_build_parser(build_parser)
     # combine
     combine_parser = sub_parsers.add_parser(
-        'combine', help='combine a kick and an ext ROM to a 1 MiB ROM')
+        "combine", help="combine a kick and an ext ROM to a 1 MiB ROM"
+    )
     setup_combine_parser(combine_parser)
     # diff
     diff_parser = sub_parsers.add_parser(
-        'diff', help='show differences in two ROM images')
+        "diff", help="show differences in two ROM images"
+    )
     setup_diff_parser(diff_parser)
     # dump
-    dump_parser = sub_parsers.add_parser('dump', help='dump a ROM image')
+    dump_parser = sub_parsers.add_parser("dump", help="dump a ROM image")
     setup_dump_parser(dump_parser)
     # info
-    info_parser = sub_parsers.add_parser(
-        'info', help='print infos on a ROM image')
+    info_parser = sub_parsers.add_parser("info", help="print infos on a ROM image")
     setup_info_parser(info_parser)
     # list
-    list_parser = sub_parsers.add_parser(
-        'list', help='list ROMs in split data')
+    list_parser = sub_parsers.add_parser("list", help="list ROMs in split data")
     setup_list_parser(list_parser)
     # patch
-    patch_parser = sub_parsers.add_parser('patch', help='patch a ROM image')
+    patch_parser = sub_parsers.add_parser("patch", help="patch a ROM image")
     setup_patch_parser(patch_parser)
     # patches
-    patches_parser = sub_parsers.add_parser(
-        'patches', help='show available patches')
+    patches_parser = sub_parsers.add_parser("patches", help="show available patches")
     setup_patches_parser(patches_parser)
     # query
-    query_parser = sub_parsers.add_parser(
-        'query', help='query if ROM is in split data')
+    query_parser = sub_parsers.add_parser("query", help="query if ROM is in split data")
     setup_query_parser(query_parser)
     # scan
-    scan_parser = sub_parsers.add_parser('scan', help='scan ROM for residents')
+    scan_parser = sub_parsers.add_parser("scan", help="scan ROM for residents")
     setup_scan_parser(scan_parser)
     # split
-    split_parser = sub_parsers.add_parser(
-        'split', help='split a ROM into modules')
+    split_parser = sub_parsers.add_parser("split", help="split a ROM into modules")
     setup_split_parser(split_parser)
     # copy
     copy_parser = sub_parsers.add_parser(
-        'copy', help='copy ROM image and fix on the fly')
+        "copy", help="copy ROM image and fix on the fly"
+    )
     setup_copy_parser(copy_parser)
 
     # parse
     args = parser.parse_args()
-    if 'cmd' not in args:
+    if "cmd" not in args:
         parser.print_help()
         sys.exit(1)
     return args
@@ -645,5 +734,5 @@ def main():
 
 
 # ----- entry point -----
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

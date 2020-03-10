@@ -3,16 +3,16 @@ from .romaccess import RomAccess
 
 RTC_MATCHWORD = 0x4AFC
 
-RTF_AUTOINIT = (1 << 7)
-RTF_AFTERDOS = (1 << 2)
-RTF_SINGLETASK = (1 << 1)
-RTF_COLDSTART = (1 << 0)
+RTF_AUTOINIT = 1 << 7
+RTF_AFTERDOS = 1 << 2
+RTF_SINGLETASK = 1 << 1
+RTF_COLDSTART = 1 << 0
 
 flag_names = {
     RTF_AUTOINIT: "RTF_AUTOINIT",
     RTF_AFTERDOS: "RTF_AFTERDOS",
     RTF_SINGLETASK: "RTF_SINGLETASK",
-    RTF_COLDSTART: "RTF_COLDSTART"
+    RTF_COLDSTART: "RTF_COLDSTART",
 }
 
 NT_UNKNOWN = 0
@@ -26,13 +26,14 @@ nt_names = {
     NT_TASK: "NT_TASK",
     NT_DEVICE: "NT_DEVICE",
     NT_RESOURCE: "NT_RESOURCE",
-    NT_LIBRARY: "NT_LIBRARY"
+    NT_LIBRARY: "NT_LIBRARY",
 }
 
 
 class Resident:
-    def __init__(self, off, flags, version, node_type, pri, name, id_string,
-                 init_off, skip_off):
+    def __init__(
+        self, off, flags, version, node_type, pri, name, id_string, init_off, skip_off
+    ):
         self.off = off
         self.flags = flags
         self.version = version
@@ -44,10 +45,21 @@ class Resident:
         self.skip_off = skip_off
 
     def __repr__(self):
-        return "Resident(@off=%08x,flags=%02x,version=%d,node_type=%d," \
-               "pri=%d,name=%s,id_string=%s,init_off=%08x,skip_off=%08x)" % \
-            (self.off, self.flags, self.version, self.node_type, self.pri,
-             self.name, self.id_string, self.init_off, self.skip_off)
+        return (
+            "Resident(@off=%08x,flags=%02x,version=%d,node_type=%d,"
+            "pri=%d,name=%s,id_string=%s,init_off=%08x,skip_off=%08x)"
+            % (
+                self.off,
+                self.flags,
+                self.version,
+                self.node_type,
+                self.pri,
+                self.name,
+                self.id_string,
+                self.init_off,
+                self.skip_off,
+            )
+        )
 
     def get_flags_strings(self):
         f = self.flags
@@ -71,26 +83,27 @@ class Resident:
         if mw != RTC_MATCHWORD:
             raise ValueError("No RTC_MATCHWORD at resident offset!")
         # +2 RT_MATCHTAG
-        tag_ptr = access.read_long(off+2)
+        tag_ptr = access.read_long(off + 2)
         if tag_ptr != base_addr + off:
             raise ValueError("Wrong MatchTag pointer in resident!")
         # +6 RT_ENDSKIP
-        end_skip_ptr = access.read_long(off+6)
+        end_skip_ptr = access.read_long(off + 6)
         end_skip_off = end_skip_ptr - base_addr
         # +10..13 RT_FLAGS, RT_VERSION, RT_TYPE, RT_PRI
-        flags = access.read_byte(off+10)
-        version = access.read_byte(off+11)
-        rtype = access.read_byte(off+12)
-        pri = access.read_sbyte(off+13)
+        flags = access.read_byte(off + 10)
+        version = access.read_byte(off + 11)
+        rtype = access.read_byte(off + 12)
+        pri = access.read_sbyte(off + 13)
         # +14: RT_NAME
-        name = cls._parse_cstr(access, off+14, base_addr)
+        name = cls._parse_cstr(access, off + 14, base_addr)
         # +18: RT_IDSTRING
-        id_string = cls._parse_cstr(access, off+18, base_addr)
+        id_string = cls._parse_cstr(access, off + 18, base_addr)
         # +22: RT_INIT
-        init_ptr = access.read_long(off+22)
+        init_ptr = access.read_long(off + 22)
         init_off = init_ptr - base_addr
-        return Resident(off, flags, version, rtype, pri, name, id_string,
-                        init_off, end_skip_off)
+        return Resident(
+            off, flags, version, rtype, pri, name, id_string, init_off, end_skip_off
+        )
 
     @classmethod
     def _parse_cstr(cls, access, off, base_addr):
@@ -106,11 +119,10 @@ class Resident:
                 break
             res.append(c)
             str_off += 1
-        return bytes(res).decode('latin-1')
+        return bytes(res).decode("latin-1")
 
 
 class ResidentScan:
-
     def __init__(self, rom_data, base_addr=0):
         self.access = RomAccess(rom_data)
         self.base_addr = base_addr
@@ -136,10 +148,10 @@ class ResidentScan:
             return None
         base_map = {}
         for off in offs:
-            tag_ptr = self.access.read_long(off+2)
-            tag_off = tag_ptr & 0xffff
+            tag_ptr = self.access.read_long(off + 2)
+            tag_off = tag_ptr & 0xFFFF
             if tag_off == off:
-                base_addr = tag_ptr & ~0xffff
+                base_addr = tag_ptr & ~0xFFFF
                 if base_addr not in base_map:
                     base_map[base_addr] = 1
                 else:
@@ -158,7 +170,7 @@ class ResidentScan:
         res = []
         for off in offs:
             # check tag ptr
-            tag_ptr = self.access.read_long(off+2)
+            tag_ptr = self.access.read_long(off + 2)
             if tag_ptr == self.base_addr + off:
                 res.append(off)
         return res
@@ -167,7 +179,7 @@ class ResidentScan:
         mw = self.access.read_word(off)
         if mw != RTC_MATCHWORD:
             return False
-        tag_ptr = self.access.read_long(off+2)
+        tag_ptr = self.access.read_long(off + 2)
         return tag_ptr == self.base_addr + off
 
     def get_resident(self, off):

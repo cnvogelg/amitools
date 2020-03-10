@@ -13,27 +13,25 @@ from amitools.vamos.main import main_profile
 
 
 def main():
-  cfg_files = (
-      # first look in current dir
-      os.path.join(os.getcwd(), ".vamosrc"),
-      # then in home dir
-      os.path.expanduser("~/.vamosrc"),
-  )
-  # profile run?
-  if 'VAMOS_PROFILE' in os.environ:
-    vamos_profile = os.environ['VAMOS_PROFILE']
-    if vamos_profile == 'dump':
-      profile_file = None
+    cfg_files = (
+        # first look in current dir
+        os.path.join(os.getcwd(), ".vamosrc"),
+        # then in home dir
+        os.path.expanduser("~/.vamosrc"),
+    )
+    # profile run?
+    if "VAMOS_PROFILE" in os.environ:
+        vamos_profile = os.environ["VAMOS_PROFILE"]
+        if vamos_profile == "dump":
+            profile_file = None
+        else:
+            profile_file = vamos_profile
+        ret_code = main_profile(cfg_files, profile_file=profile_file, dump_profile=True)
+    # regular run
     else:
-      profile_file = vamos_profile
-    ret_code = main_profile(cfg_files,
-                            profile_file=profile_file,
-                            dump_profile=True)
-  # regular run
-  else:
-    ret_code = vmain(cfg_files)
-  sys.exit(ret_code)
+        ret_code = vmain(cfg_files)
+    sys.exit(ret_code)
 
 
-if __name__ == '__main__':
-  main()
+if __name__ == "__main__":
+    main()

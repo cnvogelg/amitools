@@ -24,7 +24,7 @@ ADF_LIST = (
     "amiga-os-310-locale.adf",
     "amiga-os-310-storage.adf",
     "amiga-os-310-workbench.adf",
-    "aros-20130502-boot.adf"
+    "aros-20130502-boot.adf",
 )
 
 DOS_FORMATS = (
@@ -35,16 +35,12 @@ DOS_FORMATS = (
     tag_full("DOS4"),
     tag_full("DOS5"),
     tag_full("DOS6"),
-    tag_full("DOS7")
+    tag_full("DOS7"),
 )
 
-DISK_SIZES = (
-    "880K",
-    "1M",
-    tag_full("10M")
-)
+DISK_SIZES = ("880K", "1M", tag_full("10M"))
 
-XDFSpec = collections.namedtuple('XDFSpec', ['file_name', 'size'])
+XDFSpec = collections.namedtuple("XDFSpec", ["file_name", "size"])
 
 DATA_bytes = bytes([x for x in range(256)])
 DATA_10k = bytes([x % 256 for x in range(10 * 1024)])
@@ -55,38 +51,20 @@ TEST_DATA = {
     "hello": b"hello, world!",
     "byterange": DATA_bytes,
     "10k": DATA_10k,
-    "100k": DATA_100k
+    "100k": DATA_100k,
 }
 TEST_DATA_FULL = ["100k"]
-TEST_DATA_KEYS = [tag_full(a) if a in TEST_DATA_FULL else a
-                  for a in TEST_DATA]
+TEST_DATA_KEYS = [tag_full(a) if a in TEST_DATA_FULL else a for a in TEST_DATA]
 
-DataFile = collections.namedtuple('DataFile', 
-                                  ['file_path', 'file_name', 'data'])
+DataFile = collections.namedtuple("DataFile", ["file_path", "file_name", "data"])
 
 TEST_TREES = {
-    "simple": {
-        "foo": {},
-        "bar": b"Hello, world!"
-    },
-    "deep": {
-        "foo": {
-            "bar": {
-                "baz": {
-                    "hello": b"Hello, world!"
-                }
-            }
-        },
-    },
-    "data": {
-        "bytes": DATA_bytes,
-        "10k": DATA_10k,
-        "100k": DATA_100k
-    }
+    "simple": {"foo": {}, "bar": b"Hello, world!"},
+    "deep": {"foo": {"bar": {"baz": {"hello": b"Hello, world!"}}},},
+    "data": {"bytes": DATA_bytes, "10k": DATA_10k, "100k": DATA_100k},
 }
 TEST_TREES_FULL = ["100k"]
-TEST_TREES_KEYS = [tag_full(a) if a in TEST_TREES_FULL else a
-                   for a in TEST_TREES]
+TEST_TREES_KEYS = [tag_full(a) if a in TEST_TREES_FULL else a for a in TEST_TREES]
 
 
 @pytest.fixture(params=ADF_LIST)
@@ -128,18 +106,18 @@ def xdftool(toolrun):
                 # single command
                 args.append(cmd)
             # plus seperates commands
-            args.append('+')
-        return toolrun.run_checked("xdftool", xdf_file, *args[:-1],
-                                   raw_output=raw_output)
+            args.append("+")
+        return toolrun.run_checked(
+            "xdftool", xdf_file, *args[:-1], raw_output=raw_output
+        )
+
     return run
 
 
 @pytest.fixture
 def xdf_img(xdftool, xdfs, dos_format):
     """create formatted image"""
-    xdftool(xdfs.file_name,
-            ("create", xdfs.size),
-            ("format", "Foo", dos_format))
+    xdftool(xdfs.file_name, ("create", xdfs.size), ("format", "Foo", dos_format))
     return xdfs
 
 
@@ -174,8 +152,7 @@ class XDFFileTree:
     def _check_node(self, node, path):
         path_name = "/".join(path)
         # list entry
-        output = self.xdftool(self.img_file,
-                              ("list", path_name))
+        output = self.xdftool(self.img_file, ("list", path_name))
         # split
         _, size, *_ = output[0].split()
         if isinstance(node, dict):
@@ -183,9 +160,7 @@ class XDFFileTree:
             for name in node:
                 self._check_node(node[name], path + [name])
         else:
-            data = self.xdftool(self.img_file,
-                                ("type", path_name),
-                                raw_output=True)
+            data = self.xdftool(self.img_file, ("type", path_name), raw_output=True)
             assert data == node
 
     def check(self):
@@ -305,49 +280,39 @@ def xdftool_create_test(xdftool, xdfs):
 
 def xdftool_format_test(xdftool, dos_format, xdfs):
     """format disk image"""
-    xdftool(xdfs.file_name,
-            ("create", xdfs.size),
-            ("format", "Foo", dos_format))
+    xdftool(xdfs.file_name, ("create", xdfs.size), ("format", "Foo", dos_format))
     xdftool(xdfs.file_name, "list")
 
 
 def xdftool_write_read_test(xdftool, xdf_img, test_files):
     """write a file and read it back"""
     # write file
-    xdftool(xdf_img.file_name,
-            ("write", test_files.file_path))
+    xdftool(xdf_img.file_name, ("write", test_files.file_path))
     # read file back
     read_file = test_files.file_path + "-read"
-    xdftool(xdf_img.file_name,
-            ("read", test_files.file_name, read_file))
+    xdftool(xdf_img.file_name, ("read", test_files.file_name, read_file))
     # compare
     with open(read_file, "rb") as fh:
         read_data = fh.read()
         assert read_data == test_files.data
     # type file
-    output = xdftool(xdf_img.file_name,
-                     ("type", test_files.file_name),
-                     raw_output=True)
+    output = xdftool(xdf_img.file_name, ("type", test_files.file_name), raw_output=True)
     assert output == test_files.data
 
 
 def xdftool_write_delete_test(xdftool, xdf_img, test_files):
     """write a file and delete it"""
     # write file
-    xdftool(xdf_img.file_name,
-            ("write", test_files.file_path))
+    xdftool(xdf_img.file_name, ("write", test_files.file_path))
     # delete it
-    xdftool(xdf_img.file_name,
-            ("delete", test_files.file_name))
+    xdftool(xdf_img.file_name, ("delete", test_files.file_name))
 
 
 def xdftool_makedir_test(xdftool, xdf_img):
     # create dir
-    xdftool(xdf_img.file_name,
-            ("makedir", "bla"))
+    xdftool(xdf_img.file_name, ("makedir", "bla"))
     # delete it
-    xdftool(xdf_img.file_name,
-            ("delete", "bla"))
+    xdftool(xdf_img.file_name, ("delete", "bla"))
 
 
 def xdftool_create_tree_test(xdftool, xdf_file_tree):
