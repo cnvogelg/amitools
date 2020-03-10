@@ -323,6 +323,10 @@ class Machine(object):
         self.mem.w32(0, mem0)
         self.mem.w32(4, mem4)
 
+    def set_mem(self, mem):
+        """replace the memory instance with a wrapped one, e.g. for tracing"""
+        self.mem = mem
+
     def set_cycles_per_run(self, num):
         self.cycles_per_run = num
 

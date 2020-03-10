@@ -7,6 +7,43 @@ class TraceMemory:
         self.mem = mem
         self.trace_mgr = trace_mgr
 
+    def cleanup(self):
+        self.mem.cleanup()
+
+    def get_ram_size_kib(self):
+        return self.mem.get_ram_size_kib()
+
+    def get_ram_size_bytes(self):
+        return self.mem.get_ram_size_bytes()
+
+    def reserve_special_range(self, num_pages=1):
+        return self.mem.reserve_special_range(num_pages)
+
+    def set_special_range_read_func(self, page_addr, width, func):
+        return self.mem.set_special_range_read_func(page_addr, width, func)
+
+    def set_special_range_write_func(self, page_addr, width, func):
+        return self.mem.set_special_range_write_func(page_addr, width, func)
+
+    def set_special_range_read_funcs(
+        self, addr, num_pages=1, r8=None, r16=None, r32=None
+    ):
+        return self.mem.set_special_range_read_funcs(addr, num_pages, r8, r16, r32)
+
+    def set_special_range_write_funcs(
+        self, addr, num_pages=1, w8=None, w16=None, w32=None
+    ):
+        return self.mem.set_special_range_write_funcs(addr, num_pages, w8, w16, w32)
+
+    def set_trace_mode(self, on):
+        return self.mem.set_trace_mode(on)
+
+    def set_trace_func(self, func):
+        return self.mem.set_trace_func(func)
+
+    def set_invalid_func(self, func):
+        return self.mem.set_invalid_func(func)
+
     # memory access
     def r32(self, addr):
         val = self.mem.r32(addr)

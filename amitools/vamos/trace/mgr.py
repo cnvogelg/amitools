@@ -34,6 +34,8 @@ class TraceManager(object):
         self.mem_tracer = TraceMemory(mem, self)
         if not log_mem_int.isEnabledFor(logging.INFO):
             log_mem_int.setLevel(logging.INFO)
+        # replace machine mem with trace memory
+        self.machine.set_mem(self.mem_tracer)
 
     def setup_cpu_mem_trace(self):
         self.machine.set_cpu_mem_trace_hook(self.trace_cpu_mem)
@@ -126,7 +128,7 @@ class TraceManager(object):
         return sym, src
 
     def _trace_mem(self, log, mode, width, addr, value, text="", addon=""):
-        val = self.trace_val_str[width] % value
+        val = self.trace_val_str[width] % int(value)
         info, label = self._get_mem_info(addr)
         if text == "" and addon == "" and label is not None:
             text, addon = self._get_label_extra(label, mode, addr, width, value)
