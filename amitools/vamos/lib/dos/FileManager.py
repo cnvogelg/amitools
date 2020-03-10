@@ -34,7 +34,6 @@ class FileManager:
             # create unbuffered raw stream if its a tty
             if os.isatty(fileno):
                 raw_fobj = open(fileno, mode, buffering=0)
-                need_close = True
         except:
             pass
         return FileHandle(raw_fobj, ami_name, sys_name, need_close=need_close)
