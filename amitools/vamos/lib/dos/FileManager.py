@@ -23,19 +23,26 @@ class FileManager:
     self.umask = os.umask(0)
     os.umask(self.umask)
 
-  def _create_fh(self, fileno, mode, ami_name, sys_name):
-    # create unbuffered raw stream if its a tty
-    if os.isatty(fileno):
-      fobj = open(fileno, mode, buffering=0)
-    else:
-      fobj = open(fileno, mode)
-    return FileHandle(fobj, ami_name, sys_name, need_close=True)
+  def _create_fh(self, fobj, mode, ami_name, sys_name):
+    # by default use the raw buffer of the fobj
+    raw_fobj = fobj.buffer
+    need_close = False
+    # try to get a fd from fobj
+    try:
+      fileno = fobj.fileno()
+      # create unbuffered raw stream if its a tty
+      if os.isatty(fileno):
+        raw_fobj = open(fileno, mode, buffering=0)
+        need_close = True
+    except:
+      pass
+    return FileHandle(raw_fobj, ami_name, sys_name, need_close=need_close)
 
   def setup(self, fs_handler_port):
     self.fs_handler_port = fs_handler_port
     # setup std input/output
-    self.std_input = self._create_fh(sys.stdin.fileno(), 'rb', '<STDIN>', '/dev/stdin')
-    self.std_output = self._create_fh(sys.stdout.fileno(), 'wb', '<STDOUT>', '/dev/stdout')
+    self.std_input = self._create_fh(sys.stdin, 'rb', '<STDIN>', '/dev/stdin')
+    self.std_output = self._create_fh(sys.stdout, 'wb', '<STDOUT>', '/dev/stdout')
     self._register_file(self.std_input)
     self._register_file(self.std_output)
 
@@ -82,7 +89,7 @@ class FileManager:
         fh   = FileHandle(fobj, ami_path, sys_name, is_nil = True)
       elif uname == '*' or uname.startswith('CONSOLE:'):
         sys_name = ''
-        fh = self._create_fh(sys.stdout.fileno(), 'wb', '*', '')
+        fh = self._create_fh(sys.stdout, 'wb', '*', '')
       else:
         # map to system path
         sys_path = self.path_mgr.ami_to_sys_path(lock,ami_path,searchMulti=True)
