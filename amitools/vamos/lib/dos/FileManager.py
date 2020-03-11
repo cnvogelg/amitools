@@ -13,8 +13,9 @@ from .FileHandle import FileHandle
 
 
 class FileManager:
-    def __init__(self, path_mgr, alloc, mem):
+    def __init__(self, path_mgr, port_mgr, alloc, mem):
         self.path_mgr = path_mgr
+        self.port_mgr = port_mgr
         self.alloc = alloc
         self.mem = mem
 
@@ -23,6 +24,29 @@ class FileManager:
         # get current umask
         self.umask = os.umask(0)
         os.umask(self.umask)
+
+        # setup ports
+        # currently we use a single fake port for all devices
+        self.fs_handler_port = port_mgr.create_port("FakeFSPort", self.fs_put_msg)
+        log_file.info("dos fs handler port: %06x" % self.fs_handler_port)
+        # create console handler
+        self.console_handler_port = port_mgr.create_port(
+            "ConsolePort", self.console_put_msg
+        )
+        log_file.info("dos console port: %06x" % self.console_handler_port)
+
+        # setup std input/output
+        self.std_input = self._create_fh(sys.stdin, "rb", "<STDIN>", "/dev/stdin")
+        self.std_output = self._create_fh(sys.stdout, "wb", "<STDOUT>", "/dev/stdout")
+        self._register_file(self.std_input)
+        self._register_file(self.std_output)
+
+    def finish(self):
+        self._unregister_file(self.std_input)
+        self._unregister_file(self.std_output)
+        # free ports
+        self.port_mgr.free_port(self.fs_handler_port)
+        self.port_mgr.free_port(self.console_handler_port)
 
     def _create_fh(self, fobj, mode, ami_name, sys_name):
         # by default use the raw buffer of the fobj
@@ -34,24 +58,15 @@ class FileManager:
             # create unbuffered raw stream if its a tty
             if os.isatty(fileno):
                 raw_fobj = open(fileno, mode, buffering=0)
-        except:
+        except Exception:
             pass
         return FileHandle(raw_fobj, ami_name, sys_name, need_close=need_close)
 
-    def setup(self, fs_handler_port):
-        self.fs_handler_port = fs_handler_port
-        # setup std input/output
-        self.std_input = self._create_fh(sys.stdin, "rb", "<STDIN>", "/dev/stdin")
-        self.std_output = self._create_fh(sys.stdout, "wb", "<STDOUT>", "/dev/stdout")
-        self._register_file(self.std_input)
-        self._register_file(self.std_output)
-
-    def finish(self):
-        self._unregister_file(self.std_input)
-        self._unregister_file(self.std_output)
-
     def get_fs_handler_port(self):
         return self.fs_handler_port
+
+    def get_console_handler_port(self):
+        return self.console_handler_port
 
     def _register_file(self, fh):
         baddr = fh.alloc_fh(self.alloc, self.fs_handler_port)
@@ -237,14 +252,14 @@ class FileManager:
 
     # callback from port manager for fs handler port
     # -> Async I/O
-    def put_msg(self, port_mgr, msg_addr):
+    def fs_put_msg(self, port_mgr, msg_addr):
         msg = AccessStruct(self.mem, MessageStruct, struct_addr=msg_addr)
         dos_pkt_addr = msg.r_s("mn_Node.ln_Name")
         dos_pkt = AccessStruct(self.mem, DosPacketStruct, struct_addr=dos_pkt_addr)
         reply_port_addr = dos_pkt.r_s("dp_Port")
         pkt_type = dos_pkt.r_s("dp_Type")
         log_file.info(
-            "DosPacket: msg=%06x -> pkt=%06x: reply_port=%06x type=%06x",
+            "FS DosPacket: msg=%06x -> pkt=%06x: reply_port=%06x type=%06x",
             msg_addr,
             dos_pkt_addr,
             reply_port_addr,
@@ -288,6 +303,27 @@ class FileManager:
             dos_pkt.w_s("dp_Res1", put)
         else:
             raise UnsupportedFeatureError("Unsupported DosPacket: type=%d" % pkt_type)
+        # do reply
+        if not port_mgr.has_port(reply_port_addr):
+            port_mgr.register_port(reply_port_addr)
+        port_mgr.put_msg(reply_port_addr, msg_addr)
+
+    # handle console packet
+    def console_put_msg(self, port_mgr, msg_addr):
+        msg = AccessStruct(self.mem, MessageStruct, struct_addr=msg_addr)
+        dos_pkt_addr = msg.r_s("mn_Node.ln_Name")
+        dos_pkt = AccessStruct(self.mem, DosPacketStruct, struct_addr=dos_pkt_addr)
+        reply_port_addr = dos_pkt.r_s("dp_Port")
+        pkt_type = dos_pkt.r_s("dp_Type")
+        log_file.info(
+            "Console DosPacket: msg=%06x -> pkt=%06x: reply_port=%06x type=%06x",
+            msg_addr,
+            dos_pkt_addr,
+            reply_port_addr,
+            pkt_type,
+        )
+        # fake result
+        dos_pkt.w_s("dp_Res1", 0)
         # do reply
         if not port_mgr.has_port(reply_port_addr):
             port_mgr.register_port(reply_port_addr)

@@ -75,17 +75,11 @@ class DosLibrary(LibImpl):
         # equip the DosList with all the locks
         self.dos_list.add_locks(self.lock_mgr)
         # create file manager
-        self.file_mgr = FileManager(ctx.path_mgr, ctx.alloc, ctx.mem)
-        # currently we use a single fake port for all devices
-        self.fs_handler_port = ctx.exec_lib.port_mgr.create_port(
-            "FakeFSPort", self.file_mgr
+        self.file_mgr = FileManager(
+            ctx.path_mgr, ctx.exec_lib.port_mgr, ctx.alloc, ctx.mem
         )
-        log_dos.info("dos fs handler port: %06x" % self.fs_handler_port)
-        self.file_mgr.setup(self.fs_handler_port)
 
     def finish_lib(self, ctx):
-        # free port
-        ctx.exec_lib.port_mgr.free_port(self.fs_handler_port)
         # finish file manager
         self.file_mgr.finish()
         # free dos list

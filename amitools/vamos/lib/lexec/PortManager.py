@@ -22,8 +22,8 @@ class Port:
         return "<Port:name=%s,addr=%06x>" % (self.name, self.addr)
 
     def put_msg(self, msg_addr):
-        if self.handler is not None:
-            self.handler.put_msg(self.port_mgr, msg_addr)
+        if self.handler:
+            self.handler(self.port_mgr, msg_addr)
         else:
             self.queue.append(msg_addr)
 

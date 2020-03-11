@@ -261,13 +261,6 @@ class Process:
             self.ctx.exec_lib.port_mgr.get_msg(self.shell_port)
         return self.shell_packet.addr
 
-    def create_port(self, name, py_msg_handler):
-        mem = self.alloc.alloc_struct(name, MsgPortStruct)
-        port = Port(name, self, mem=mem, handler=py_msg_handler)
-        addr = mem.addr
-        self.ports[addr] = port
-        return addr
-
     # ----- task struct -----
     def init_task_struct(self, input_fh, output_fh):
         # Inject arguments into input stream (Needed for C:Execute)
@@ -284,6 +277,13 @@ class Process:
         self.this_task.access.w_s(
             "pr_COS", output_fh.b_addr << 2
         )  # compensate BCPL auto-conversion
+        # setup console task
+        console_task = self.ctx.dos_lib.file_mgr.get_console_handler_port()
+        self.this_task.access.w_s("pr_ConsoleTask", console_task)
+        # setup file sys task
+        fs_task = self.ctx.dos_lib.file_mgr.get_fs_handler_port()
+        self.this_task.access.w_s("pr_FileSystemTask", fs_task)
+        # set home dir
         self.this_task.access.w_s("pr_HomeDir", self.home_lock.b_addr << 2)
         varlist = self.get_local_vars()
         # Initialize the list of local shell variables
