@@ -31,3 +31,6 @@ class MockMachine(object):
 
     def set_cpu_mem_trace_hook(self, func):
         pass
+
+    def set_mem(self, mem):
+        self.mem = mem
