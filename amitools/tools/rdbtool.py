@@ -830,7 +830,7 @@ class FSFlagsCommand(Command):
 
 
 # ----- main -----
-def main():
+def main(argv=None, defaults=None):
     # call scanner and process all files with selected command
     cmd_map = {
         "open": OpenCommand,
@@ -886,7 +886,9 @@ def main():
     parser.add_argument(
         "-t", "--dostype", default="ffs+intl", help="set default dos type"
     )
-    args = parser.parse_args()
+    if defaults:
+        parser.set_defaults(defaults)
+    args = parser.parse_args(argv)
 
     cmd_list = args.command_list
     sep = args.seperator

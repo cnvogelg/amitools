@@ -861,7 +861,7 @@ class BlkDevCmd(Command):
 
 
 # ----- main -----
-def main():
+def main(argv=None, defaults=None):
     # call scanner and process all files with selected command
     cmd_map = {
         "open": OpenCmd,
@@ -913,7 +913,9 @@ def main():
         default=False,
         help="force overwrite existing image",
     )
-    args = parser.parse_args()
+    if defaults:
+        parser.set_defaults(defaults)
+    args = parser.parse_args(argv)
 
     cmd_list = args.command_list
     sep = args.seperator
