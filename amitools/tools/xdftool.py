@@ -42,32 +42,47 @@ def make_fsstr(s):
 
 # ----- commands -----
 class Command:
-    def __init__(self, args, opts, edit=False):
+    def __init__(self, args, opts, edit=False, force_init=False):
         self.args = args
         self.opts = opts
         self.edit = edit
         self.exit_code = 0
+        self.force_init = force_init
 
         self.volume = None
         self.blkdev = None
 
     def run(self, blkdev, vol):
+        # force re-init of volume/blkdev
+        if self.force_init:
+            # close old volume
+            if vol:
+                vol.close()
+                vol = None
+                self.volume = None
+            # close old blkdev
+            if blkdev:
+                blkdev.close()
+                blkdev = None
+                self.blkdev = None
+
         # optional init blkdev function
         if hasattr(self, "init_blkdev"):
-            if blkdev == None:
+            if not blkdev:
+                # setup new blkdev
                 self.blkdev = self.init_blkdev(self.args.image_file)
-                if self.blkdev == None:
+                if not self.blkdev:
                     return 5
                 blkdev = self.blkdev
 
         # optional init volume function
         if hasattr(self, "init_vol"):
             # close old
-            if vol != None:
+            if vol:
                 vol.close()
             # create new volume
             self.volume = self.init_vol(blkdev)
-            if self.volume == None:
+            if not self.volume:
                 return 6
             vol = self.volume
 
@@ -123,14 +138,6 @@ class FSCommandQueue(CommandQueue):
     def create_cmd(self, cclass, name, opts):
         return cclass(self.args, opts)
 
-    def _open_volume(self):
-        # setup volume
-        if self.volume == None:
-            self.volume = ADFSVolume(self.blkdev)
-            if self.args.verbose:
-                print("opening volume:", self.img)
-            self.volume.open()
-
     def run_first(self, cmd_line, cmd):
         self.cmd_line = cmd_line
 
@@ -146,9 +153,7 @@ class FSCommandQueue(CommandQueue):
             if exit_code != 0:
                 return exit_code
             self.blkdev = pre_cmd.blkdev
-            # setup volume (if necessary)
-            if cmd.need_volume():
-                self._open_volume()
+            self.volume = pre_cmd.volume
 
         # run first command
         if self.args.verbose:
@@ -180,8 +185,8 @@ class FSCommandQueue(CommandQueue):
         if cmd.edit and self.args.read_only:
             raise IOError("Edit commands not allowed in read-only mode")
         # make sure volume is set up
-        if self.volume == None and cmd.need_volume():
-            self._open_volume()
+        if not self.volume and cmd.need_volume():
+            raise IOError("Command needs volume")
         # run command
         exit_code = cmd.run(self.blkdev, self.volume)
         if cmd.blkdev != None:
@@ -197,10 +202,18 @@ class FSCommandQueue(CommandQueue):
 
 
 class OpenCmd(Command):
+    def __init__(self, args, opts):
+        Command.__init__(self, args, opts, force_init=True)
+
     def init_blkdev(self, image_file):
         opts = KeyValue.parse_key_value_strings(self.opts)
         f = BlkDevFactory()
         return f.open(image_file, options=opts, read_only=self.args.read_only)
+
+    def init_vol(self, blkdev):
+        vol = ADFSVolume(self.blkdev)
+        vol.open()
+        return vol
 
 
 class CreateCmd(Command):
