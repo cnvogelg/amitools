@@ -46,46 +46,10 @@ class Command:
         self.args = args
         self.opts = opts
         self.edit = edit
-        self.exit_code = 0
         self.force_init = force_init
-
-        self.volume = None
-        self.blkdev = None
+        self.exit_code = 0
 
     def run(self, blkdev, vol):
-        # force re-init of volume/blkdev
-        if self.force_init:
-            # close old volume
-            if vol:
-                vol.close()
-                vol = None
-                self.volume = None
-            # close old blkdev
-            if blkdev:
-                blkdev.close()
-                blkdev = None
-                self.blkdev = None
-
-        # optional init blkdev function
-        if hasattr(self, "init_blkdev"):
-            if not blkdev:
-                # setup new blkdev
-                self.blkdev = self.init_blkdev(self.args.image_file)
-                if not self.blkdev:
-                    return 5
-                blkdev = self.blkdev
-
-        # optional init volume function
-        if hasattr(self, "init_vol"):
-            # close old
-            if vol:
-                vol.close()
-            # create new volume
-            self.volume = self.init_vol(blkdev)
-            if not self.volume:
-                return 6
-            vol = self.volume
-
         # common handler
         if hasattr(self, "handle_blkdev"):
             return self.handle_blkdev(blkdev)
@@ -97,8 +61,11 @@ class Command:
     def has_init_blkdev(self):
         return hasattr(self, "init_blkdev")
 
+    def has_init_vol(self):
+        return hasattr(self, "init_vol")
+
     def need_volume(self):
-        return hasattr(self, "handle_vol") and not hasattr(self, "init_vol")
+        return hasattr(self, "handle_vol")
 
 
 # ----- command handler -----
@@ -106,6 +73,9 @@ class FSCommandQueue(CommandQueue):
     def __init__(self, args, cmd_list, sep, cmd_map):
         CommandQueue.__init__(self, cmd_list, sep, cmd_map)
         self.args = args
+        self.cmd_line = None
+        self.init_blkdev = None
+        self.init_vol = None
         self.blkdev = None
         self.volume = None
 
@@ -123,76 +93,77 @@ class FSCommandQueue(CommandQueue):
             print(cmd, "IOError:", e)
             exit_code = 4
         finally:
-            # close volume
-            if self.volume != None:
-                self.volume.close()
-                if self.args.verbose:
-                    print("closing volume:", self.img)
-            # close blkdev
-            if self.blkdev != None:
-                self.blkdev.close()
-                if self.args.verbose:
-                    print("closing image:", self.img)
+            self._close_all()
         return exit_code
+
+    def _close_all(self):
+        # close volume
+        if self.volume:
+            self.volume.close()
+            self.volume = None
+            if self.args.verbose:
+                print("closing volume:", self.img)
+        # close blkdev
+        if self.blkdev:
+            self.blkdev.close()
+            self.blkdev = None
+            if self.args.verbose:
+                print("closing image:", self.img)
 
     def create_cmd(self, cclass, name, opts):
         return cclass(self.args, opts)
 
     def run_first(self, cmd_line, cmd):
-        self.cmd_line = cmd_line
-
         # check if first command is an init command
         if not cmd.has_init_blkdev():
             # auto add 'open' command
             pre_cmd = OpenCmd(self.args, [])
-            if self.args.verbose:
-                print("auto open command:", self.cmd_line)
-            exit_code = pre_cmd.run(self.blkdev, self.volume)
-            if self.args.verbose:
-                print("auto open exit_code:", exit_code)
-            if exit_code != 0:
-                return exit_code
-            self.blkdev = pre_cmd.blkdev
-            self.volume = pre_cmd.volume
+            # store methods if its needed later on
+            self.init_vol = pre_cmd.init_vol
+            self.init_blkdev = pre_cmd.init_blkdev
 
-        # run first command
-        if self.args.verbose:
-            print("command:", self.cmd_line)
-        if cmd.edit and self.args.read_only:
-            raise IOError("Edit commands not allowed in read-only mode")
-
-        # check code of command after __init__ parsing
-        if cmd.exit_code != 0:
-            return cmd.exit_code
-
-        # perform command
-        exit_code = cmd.run(self.blkdev, self.volume)
-        if cmd.blkdev != None:
-            self.blkdev = cmd.blkdev
-        if cmd.volume != None:
-            self.volume = cmd.volume
-
-        # final exit code
-        if self.args.verbose:
-            print("exit_code:", exit_code)
-        return exit_code
+        # pass on to regular command handling
+        return self.run_next(cmd_line, cmd)
 
     def run_next(self, cmd_line, cmd):
+        # keep current command line in case of error reporting
         self.cmd_line = cmd_line
         if self.args.verbose:
             print("command:", self.cmd_line)
         # verify command
         if cmd.edit and self.args.read_only:
             raise IOError("Edit commands not allowed in read-only mode")
-        # make sure volume is set up
+        # check code of command after __init__ parsing
+        if cmd.exit_code != 0:
+            return cmd.exit_code
+
+        # update init_vol/init_blkdev if available in current command
+        if cmd.has_init_blkdev():
+            self.init_blkdev = cmd.init_blkdev
+        if cmd.has_init_vol():
+            self.init_vol = cmd.init_vol
+
+        # force re-init of blkdev (e.g. by opening another partition)
+        if cmd.force_init:
+            self._close_all()
+
+        # setup blkdev if missing or new one needed
+        if not self.blkdev:
+            self.blkdev = self.init_blkdev(self.img)
+            if self.args.verbose:
+                print("setup blkdev: %s" % self.img)
+
+        # make sure volume is set up if needed
         if not self.volume and cmd.need_volume():
-            raise IOError("Command needs volume")
+            if self.init_vol:
+                self.volume = self.init_vol(self.blkdev)
+                if self.args.verbose:
+                    print("setup volume: %s" % self.img)
+            else:
+                raise IOError("Need volume but none available")
+
         # run command
         exit_code = cmd.run(self.blkdev, self.volume)
-        if cmd.blkdev != None:
-            self.blkdev = cmd.blkdev
-        if cmd.volume != None:
-            self.volume = cmd.volume
         if self.args.verbose:
             print("exit_code:", exit_code)
         return exit_code
@@ -211,7 +182,7 @@ class OpenCmd(Command):
         return f.open(image_file, options=opts, read_only=self.args.read_only)
 
     def init_vol(self, blkdev):
-        vol = ADFSVolume(self.blkdev)
+        vol = ADFSVolume(blkdev)
         vol.open()
         return vol
 
@@ -254,6 +225,10 @@ class FormatCmd(Command):
             vol_name = make_fsstr(self.opts[0])
             vol.create(vol_name, dos_type=dos_type)
             return vol
+
+    def handle_vol(self, volume):
+        # need fake handle_vol otherwise init_vol is not called
+        pass
 
 
 # ----- Pack/Unpack -----

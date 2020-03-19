@@ -268,6 +268,52 @@ def test_files(request, tmpdir):
     return DataFile(str(test_path), test_file, data)
 
 
+# ----- rdbtool helper -----
+
+
+@pytest.fixture
+def rdbtool(toolrun):
+    def run(rdb_file, *cmds, raw_output=False):
+        args = []
+        for cmd in cmds:
+            if type(cmd) in (tuple, list):
+                # command args are given in tuple
+                for c in cmd:
+                    if c:
+                        args.append(c)
+            else:
+                # single command
+                args.append(cmd)
+            # plus seperates commands
+            args.append("+")
+        return toolrun.run_checked(
+            "rdbtool", rdb_file, *args[:-1], raw_output=raw_output
+        )
+
+    return run
+
+
+# list of (partions, rdbtool commands)
+TEST_RDB_FILES = [
+    (("DH0",), (("create", "size=10M"), ("init",), ("fill",))),
+    (
+        ("DH0", "DH1"),
+        (("create", "size=10M"), ("init",), ("add", "size=50%"), ("fill",)),
+    ),
+]
+
+
+@pytest.fixture(params=TEST_RDB_FILES)
+def rdb_files(request, rdbtool, tmpdir):
+    num_part, rdbtool_cmds = request.param
+    rdb_file = str(tmpdir / "test.rdb")
+    rdbtool(rdb_file, *rdbtool_cmds)
+    return num_part, rdb_file
+
+
+# ----- tests -----
+
+
 def xdftool_list_test(xdftool, adf_file):
     """list contents of various disks"""
     xdftool(adf_file, "list")
@@ -282,6 +328,13 @@ def xdftool_format_test(xdftool, dos_format, xdfs):
     """format disk image"""
     xdftool(xdfs.file_name, ("create", xdfs.size), ("format", "Foo", dos_format))
     xdftool(xdfs.file_name, "list")
+
+
+def xdftool_format_adf_test(xdftool, dos_format, tmpdir):
+    """format disk image without create first"""
+    file_name = str(tmpdir / "test.adf")
+    xdftool(file_name, ("format", "Foo", dos_format))
+    xdftool(file_name, "list")
 
 
 def xdftool_write_read_test(xdftool, xdf_img, test_files):
@@ -368,3 +421,28 @@ def xdftool_pack_unpack_test(xdftool, xdf_file_tree):
     # check fs contents
     file_tree.tmpdir = os.path.join(file_tree.tmpdir, file_tree.name)
     file_tree.check()
+
+
+# rdb partition tests
+
+
+def xdftool_rdb_open_part_by_name_test(xdftool, rdb_files):
+    part_list, rdb_file = rdb_files
+    for part in part_list:
+        xdftool(rdb_file, ("open", "part=" + part))
+
+
+def xdftool_rdb_open_part_by_num_test(xdftool, rdb_files):
+    part_list, rdb_file = rdb_files
+    for part in range(len(part_list)):
+        xdftool(rdb_file, ("open", "part=" + str(part)))
+
+
+def xdftool_rdb_open_format_test(xdftool, rdb_files):
+    part_list, rdb_file = rdb_files
+    for part in part_list:
+        name = "foo_" + part
+        xdftool(rdb_file, ("open", "part=" + part), ("format", name), ("list",))
+    # list again
+    for part in part_list:
+        xdftool(rdb_file, ("open", "part=" + part), ("list",))
