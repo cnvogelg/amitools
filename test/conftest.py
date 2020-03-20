@@ -46,10 +46,10 @@ def pytest_addoption(parser):
     )
     parser.addoption(
         "--vamos-args",
-        "-V",
+        "-A",
         action="append",
         default=None,
-        help="add options to vamos run, e.g. -V-t",
+        help="add options to vamos run, e.g. -A-t",
     )
     parser.addoption(
         "--vamos-bin",
