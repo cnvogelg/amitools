@@ -70,7 +70,7 @@ class MetaDB:
             raise IOError("Invalid xdfmeta header! (no colon in line)")
         # first extract volume name
         vol_name = line[:pos]
-        self.vol_name = vol_name.decode("UTF-8")
+        self.vol_name = vol_name
         line = line[pos + 1 :]
         # now get parameters
         comp = line.split(",")
@@ -101,7 +101,7 @@ class MetaDB:
         pos = line.find(":")
         if pos == -1:
             raise IOError("Invalid xdfmeta file! (no colon in line)")
-        path = line[:pos].decode("UTF-8")
+        path = line[:pos]
         # prot
         line = line[pos + 1 :]
         pos = line.find(",")
@@ -119,7 +119,7 @@ class MetaDB:
         time = TimeStamp()
         time.parse(time_str)
         # comment
-        comment = FSString(line[pos + 1 :].decode("UTF-8"))
+        comment = FSString(line[pos + 1 :])
         # meta info
         mi = MetaInfo(protect_flags=prot, mod_ts=time, comment=comment)
         self.set_meta_info(path, mi)
@@ -132,7 +132,7 @@ class MetaDB:
         mi = self.vol_meta
         num = self.dos_type - DosType.DOS0 + ord("0")
         dos_type_str = "DOS%c" % num
-        vol_name = self.vol_name.encode("UTF-8")
+        vol_name = self.vol_name
         line = "%s:%s,%s,%s,%s\n" % (
             vol_name,
             dos_type_str,
@@ -146,8 +146,8 @@ class MetaDB:
             meta_info = self.metas[path]
             protect = meta_info.get_protect_short_str()
             mod_time = meta_info.get_mod_time_str()
-            comment = meta_info.get_comment_unicode_str().encode("UTF-8")
-            path_name = path.encode("UTF-8")
+            comment = meta_info.get_comment_unicode_str()
+            path_name = path
             line = "%s:%s,%s,%s\n" % (path_name, protect, mod_time, comment)
             f.write(line)
         f.close()

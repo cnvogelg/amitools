@@ -72,12 +72,12 @@ class Imager:
             f.write(volume.boot.boot_code)
             f.close()
         # save blkdev: geo and block size
-        f = open(blkdev_path, "wb")
+        f = open(blkdev_path, "w")
         msg = "%s\n%s\n" % (
             volume.blkdev.get_chs_str(),
             volume.blkdev.get_block_size_str(),
         )
-        f.write(msg.encode("UTF-8"))
+        f.write(msg)
         f.close()
 
     def unpack_root(self, volume, vol_path):
@@ -166,7 +166,7 @@ class Imager:
             if options == None or len(options) == 0:
                 blkdev_path = in_path + ".blkdev"
                 if os.path.exists(blkdev_path):
-                    f = open(blkdev_path, "rb")
+                    f = open(blkdev_path, "r")
                     options = {}
                     for line in f:
                         KeyValue.parse_key_value_string(line, options)
@@ -212,7 +212,7 @@ class Imager:
         if self.meta_fsuae.is_meta_file(in_path):
             return
         # convert amiga name
-        ami_name = FSString(os.path.basename(in_path)).get_ami_str()
+        ami_name = FSString(os.path.basename(in_path)).get_unicode()
         # check for meta file
         meta_path = in_path + self.meta_fsuae.get_suffix()
         if os.path.isfile(meta_path):
