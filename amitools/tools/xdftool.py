@@ -228,7 +228,7 @@ class FormatCmd(Command):
 
     def handle_vol(self, volume):
         # need fake handle_vol otherwise init_vol is not called
-        pass
+        return 0
 
 
 # ----- Pack/Unpack -----
