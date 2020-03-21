@@ -40,7 +40,9 @@ DOS_FORMATS = (
 
 DISK_SIZES = ("880K", "1M", tag_full("10M"))
 
-XDFSpec = collections.namedtuple("XDFSpec", ["file_name", "size"])
+XDFSpec = collections.namedtuple(
+    "XDFSpec", ["file_name", "size", "vol_name", "dos_format"]
+)
 
 DATA_bytes = bytes([x for x in range(256)])
 DATA_10k = bytes([x % 256 for x in range(10 * 1024)])
@@ -62,9 +64,12 @@ TEST_TREES = {
     "simple": {"foo": {}, "bar": b"Hello, world!"},
     "deep": {"foo": {"bar": {"baz": {"hello": b"Hello, world!"}}},},
     "data": {"bytes": DATA_bytes, "10k": DATA_10k, "100k": DATA_100k},
+    "latin": {"H\u00e4ll\u00f6": DATA_bytes, "D\u00dcR": {}},
 }
 TEST_TREES_FULL = ["100k"]
 TEST_TREES_KEYS = [tag_full(a) if a in TEST_TREES_FULL else a for a in TEST_TREES]
+
+VOLUME_NAMES = ["Foo", "F\u00e4\u00f6"]
 
 
 @pytest.fixture(params=ADF_LIST)
@@ -79,9 +84,14 @@ def dos_format(request):
     return request.param
 
 
+@pytest.fixture(params=VOLUME_NAMES)
+def vol_name(request):
+    return request.param
+
+
 @pytest.fixture(params=DISK_SIZES)
-def xdfs(request, tmpdir):
-    """return (xdf_file, xdf_size_spec) for various disks"""
+def xdfs(request, tmpdir, vol_name, dos_format):
+    """return (xdf_file, xdf_size_spec, vol_name) for various disks"""
     size = request.param
     if size == "880K":
         file_name = tmpdir / "disk.adf"
@@ -89,7 +99,7 @@ def xdfs(request, tmpdir):
     else:
         file_name = tmpdir / "disk-" + size + ".hdf"
         size = "size=" + size
-    return XDFSpec(str(file_name), size)
+    return XDFSpec(str(file_name), size, vol_name, dos_format)
 
 
 @pytest.fixture
@@ -115,17 +125,23 @@ def xdftool(toolrun):
 
 
 @pytest.fixture
-def xdf_img(xdftool, xdfs, dos_format):
+def xdf_img(xdftool, xdfs):
     """create formatted image"""
-    xdftool(xdfs.file_name, ("create", xdfs.size), ("format", "Foo", dos_format))
+    xdftool(
+        xdfs.file_name,
+        ("create", xdfs.size),
+        ("format", xdfs.vol_name, xdfs.dos_format),
+    )
     return xdfs
 
 
 class XDFFileTree:
-    def __init__(self, xdftool, img_file, name, tree, tmpdir):
+    def __init__(self, xdftool, xdf_img, name, tree, tmpdir):
         self.name = name
         self.xdftool = xdftool
-        self.img_file = img_file
+        self.xdf_img = xdf_img
+        self.img_file = xdf_img.file_name
+        self.vol_name = xdf_img.vol_name
         self.tree = tree
         self.tmpdir = tmpdir
 
@@ -247,7 +263,7 @@ def xdf_file_tree(request, xdf_img, xdftool, tmpdir):
     test_tree = request.param
     tree = TEST_TREES[test_tree]
     my_dir = tmpdir.mkdir(test_tree)
-    return XDFFileTree(xdftool, xdf_img.file_name, test_tree, tree, str(my_dir))
+    return XDFFileTree(xdftool, xdf_img, test_tree, tree, str(my_dir))
 
 
 @pytest.fixture(params=TEST_TREES_KEYS)
@@ -324,16 +340,20 @@ def xdftool_create_test(xdftool, xdfs):
     xdftool(xdfs.file_name, ("create", xdfs.size))
 
 
-def xdftool_format_test(xdftool, dos_format, xdfs):
+def xdftool_format_test(xdftool, xdfs):
     """format disk image"""
-    xdftool(xdfs.file_name, ("create", xdfs.size), ("format", "Foo", dos_format))
+    xdftool(
+        xdfs.file_name,
+        ("create", xdfs.size),
+        ("format", xdfs.vol_name, xdfs.dos_format),
+    )
     xdftool(xdfs.file_name, "list")
 
 
-def xdftool_format_adf_test(xdftool, dos_format, tmpdir):
+def xdftool_format_adf_test(xdftool, dos_format, tmpdir, vol_name):
     """format disk image without create first"""
     file_name = str(tmpdir / "test.adf")
-    xdftool(file_name, ("format", "Foo", dos_format))
+    xdftool(file_name, ("format", vol_name, dos_format))
     xdftool(file_name, "list")
 
 
@@ -402,7 +422,7 @@ def xdftool_unpack_test(xdftool, xdf_file_tree):
     # unpack tree from xdf to fs
     xdftool(xdf_file_tree.img_file, ("unpack", file_tree.tmpdir))
     # check fs contents
-    file_tree.tmpdir = os.path.join(file_tree.tmpdir, "Foo")
+    file_tree.tmpdir = os.path.join(file_tree.tmpdir, xdf_file_tree.vol_name)
     file_tree.check()
 
 
