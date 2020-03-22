@@ -570,7 +570,8 @@ class BlockCmd(Command):
             vol.boot.dump()
             return 0
         elif cmd == "root":
-            vol.root.dump()
+            with_data = "data" in self.opts
+            vol.root_dir.dump_blocks(with_data)
             return 0
         elif cmd == "node":
             if n == 1:

@@ -119,6 +119,7 @@ class ADFSVolume:
         self.bitmap.write()  # writes root block, too
         # create empty root dir
         self.root_dir = ADFSVolDir(self, self.root)
+        self.root_dir.create_extra_blks()
         self.root_dir.read()
         # all ok
         self.valid = True

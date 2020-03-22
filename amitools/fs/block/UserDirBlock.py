@@ -92,6 +92,8 @@ class UserDirBlock(EntryBlock):
 
     def dump(self):
         Block.dump(self, "UserDir")
+        print(" hash size: %d" % self.hash_size)
+        print(" hash table:%s" % self.hash_table)
         print(" own_key:    %d" % (self.own_key))
         pf = ProtectFlags(self.protect)
         print(" protect:    0x%x 0b%s %s" % (self.protect, pf.bin_str(), pf))

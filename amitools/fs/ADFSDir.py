@@ -30,6 +30,13 @@ class ADFSDir(ADFSNode):
         else:
             return "[Dir]"
 
+    def create_extra_blks(self):
+        # create a single empty dir cache block
+        if self.volume.is_dircache:
+            self.dcache_blks = []
+            dcb = self._dircache_add_block(True)
+            dcb.write()
+
     def blocks_create_old(self, anon_blk):
         ud = UserDirBlock(self.blkdev, anon_blk.blk_num, self.volume.is_longname)
         ud.set(anon_blk.data)
@@ -144,11 +151,14 @@ class ADFSDir(ADFSNode):
             meta_info.get_protect(),
             meta_info.get_comment(),
             meta_info.get_mod_ts(),
-            hash_chain_blk,
+            hash_chain_blk
         )
         ud.write()
         self.set_block(ud)
         self._init_name_hash()
+        # DOS5: create extra blocks
+        if self.volume.is_dircache:
+            self.create_extra_blks()
         return blk_num
 
     def blocks_get_create_num(self):
@@ -475,8 +485,8 @@ class ADFSDir(ADFSNode):
             raise FSError(INTERNAL_ERROR, node=self, extra="no dc record!")
         # remove entry from this block
         dcb.remove_record(record)
-        # remove whole block?
-        if dcb.is_empty():
+        # remove whole block? (but keep at least one)
+        if dcb.is_empty() and len(self.dcache_blks) > 1:
             # next block following me
             if pos == n - 1:
                 next = 0
