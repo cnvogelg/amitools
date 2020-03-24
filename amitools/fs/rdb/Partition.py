@@ -80,27 +80,23 @@ class Partition:
 
     def _get_info_str(self, total_blks):
         """return a string line with typical info about this partition"""
+        json_obj = loads(self._get_info_json(total_blks))
+
         p = self.part_blk
         de = p.dos_env
-        name = "'%s'" % p.drv_name
-        part_blks = self.get_num_blocks()
-        part_bytes = self.get_num_bytes()
         extra = ""
-        if total_blks != 0:
-            ratio = 100.0 * part_blks / total_blks
-            extra += "%6.2f%%  " % ratio
+        if json_obj[self.num].get('ratio'):
+            extra += "%s  " % json_obj[self.num]['ratio']
         # add dos type
-        dos_type = de.dos_type
-        extra += DosType.num_to_tag_str(dos_type)
-        extra += "/0x%04x" % dos_type
+        extra += "%s/%s" % (json_obj[self.num]['dos_type'], json_obj[self.num]['dos_type_hex'])
 
         return "Partition: #%d %-06s %8d %8d  %10d  %s  %s" % (
             self.num,
-            name,
-            de.low_cyl,
-            de.high_cyl,
-            part_blks,
-            ByteSize.to_byte_size_str(part_bytes),
+            json_obj[self.num]['name'],
+            json_obj[self.num]['start_cyl'],
+            json_obj[self.num]['end_cyl'],
+            json_obj[self.num]['blocks'],
+            json_obj[self.num]['size'],
             extra,
         )
 
@@ -126,7 +122,7 @@ class Partition:
 
         if total_blks != 0:
             ratio = 100.0 * part_blks / total_blks
-            json_obj[self.num]["ratio"] = "%6.2f%%  " % ratio
+            json_obj[self.num]["ratio"] = "%.2f%%" % ratio
 
         return dumps(json_obj)
 
