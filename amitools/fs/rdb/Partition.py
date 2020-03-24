@@ -2,6 +2,7 @@ from amitools.fs.block.rdb.PartitionBlock import *
 from amitools.fs.blkdev.PartBlockDevice import PartBlockDevice
 import amitools.util.ByteSize as ByteSize
 import amitools.fs.DosType as DosType
+from json import dumps, loads
 
 
 class Partition:
@@ -72,7 +73,12 @@ class Partition:
         else:
             return (de.low_cyl, de.high_cyl)
 
-    def get_info(self, total_blks=0):
+    def get_info(self, total_blks=0, json_out=False):
+        if json_out:
+            return self._get_info_json(total_blks)
+        return self._get_info_str(total_blks)
+
+    def _get_info_str(self, total_blks):
         """return a string line with typical info about this partition"""
         p = self.part_blk
         de = p.dos_env
@@ -87,6 +93,7 @@ class Partition:
         dos_type = de.dos_type
         extra += DosType.num_to_tag_str(dos_type)
         extra += "/0x%04x" % dos_type
+
         return "Partition: #%d %-06s %8d %8d  %10d  %s  %s" % (
             self.num,
             name,
@@ -97,28 +104,80 @@ class Partition:
             extra,
         )
 
-    def get_extra_infos(self):
-        result = []
+    def _get_info_json(self,total_blks):
+        """return a json string with typical info about this partition"""
+
         p = self.part_blk
-        de = p.dos_env
-        # layout
+        name = "'%s'" % p.drv_name
+        part_blks = self.get_num_blocks()
+        part_bytes = self.get_num_bytes()
+
+        json_obj = {
+            self.num: {
+                "name": name,
+                "start_cyl": p.dos_env.low_cyl,
+                "end_cyl": p.dos_env.high_cyl,
+                "blocks": part_blks,
+                "size": ByteSize.to_byte_size_str(part_bytes),
+                "dos_type": DosType.num_to_tag_str(p.dos_env.dos_type),
+                "dos_type_hex": "0x%04x" % p.dos_env.dos_type
+            }
+        }
+
+        if total_blks != 0:
+            ratio = 100.0 * part_blks / total_blks
+            json_obj[self.num]["ratio"] = "%6.2f%%  " % ratio
+
+        return dumps(json_obj)
+
+    def get_extra_infos(self, json_out=False):
+        if json_out:
+            return self._get_extra_infos_json()
+        return self._get_extra_infos_str()
+
+    def _get_extra_infos_str(self):
+        json_obj = loads(self._get_extra_infos_json())
+
+        result = []
         result.append(
             "blk_longs=%d, sec/blk=%d, surf=%d, blk/trk=%d"
-            % (de.block_size, de.sec_per_blk, de.surfaces, de.blk_per_trk)
+            % (json_obj['blk_longs'], json_obj['sec_blk'], json_obj['surf'], json_obj['blk_trk'])
         )
-        result.append("fs_block_size=%d" % (de.block_size * 4 * de.sec_per_blk))
+        result.append("fs_block_size=%s" % json_obj['fs_block_size'])
         # max transfer
-        result.append("max_transfer=0x%x" % de.max_transfer)
-        result.append("mask=0x%x" % de.mask)
-        result.append("num_buffer=%d" % de.num_buffer)
+        result.append("max_transfer=%s" % json_obj['max_transfer'])
+        result.append("mask=%s" % json_obj['mask'])
+        result.append("num_buffer=%s" % json_obj['num_buffer'])
+        # Flags
+        result.append("bootable=%d" % json_obj['bootable'])
+        if json_obj.get('priority') is not None:
+            result.append("pri=%d" % json_obj['priority'])
+        result.append("automount=%d" % json_obj['automount'])
+
+        return result
+
+    def _get_extra_infos_json(self):
+        p = self.part_blk
+
+        json_obj = {
+          "blk_longs": p.dos_env.block_size,
+          "sec_blk": p.dos_env.sec_per_blk,
+          "surf": p.dos_env.surfaces,
+          "blk_trk": p.dos_env.blk_per_trk,
+          "fs_block_size": "%d" % (p.dos_env.block_size * 4 * p.dos_env.sec_per_blk),
+          "max_transfer": "0x%x" % p.dos_env.max_transfer,
+          "mask": "0x%x" % p.dos_env.mask,
+          "num_buffer": "%d" % p.dos_env.num_buffer,
+          "bootable": 0,
+          "automount": 1
+        }
         # add flags
         flags = p.flags
         if flags & PartitionBlock.FLAG_BOOTABLE == PartitionBlock.FLAG_BOOTABLE:
-            result.append("bootable=1 pri=%d" % de.boot_pri)
-        else:
-            result.append("bootable=0")
+            json_obj['bootable'] = 1
+            json_obj['priority'] = p.dos_env.boot_pri
+
         if flags & PartitionBlock.FLAG_NO_AUTOMOUNT == PartitionBlock.FLAG_NO_AUTOMOUNT:
-            result.append("automount=0")
-        else:
-            result.append("automount=1")
-        return result
+            json_obj['automount'] = 0
+
+        return dumps(json_obj)
