@@ -97,7 +97,7 @@ pacman -Su
 pacman -S mingw-w64-x86_64-python2-pip mingw-w64-x86_64-gcc git make
 ```
 
-[1]: https://github.com/FrodeSolheim/lhafile
+[1]: https://github.com/FrodeSolheim/python-lhafile
 [2]: https://www.macports.org
 [3]: https://brew.sh
 [4]: https://github.com/msys2/msys2/wiki
