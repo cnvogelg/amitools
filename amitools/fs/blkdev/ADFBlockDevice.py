@@ -1,7 +1,4 @@
 from .BlockDevice import BlockDevice
-import ctypes
-import gzip
-import io
 
 
 class ADFBlockDevice(BlockDevice):
@@ -20,8 +17,6 @@ class ADFBlockDevice(BlockDevice):
         self.fobj = fobj
         self.dirty = False
         self.hd = hd
-        lo = adf_file.lower()
-        self.gzipped = lo.endswith(".adz") or lo.endswith(".adf.gz")
 
     def create(self):
         if self.read_only:
@@ -29,30 +24,18 @@ class ADFBlockDevice(BlockDevice):
         sectors = 22 if self.hd else 11
         self._set_geometry(sectors=sectors)  # set default geometry
         # allocate image in memory
-        self.data = ctypes.create_string_buffer(self.num_bytes)
+        self.data = bytearray(self.num_bytes)
         self.dirty = True
 
     def open(self):
         sectors = 22 if self.hd else 11
         self._set_geometry(sectors=sectors)  # set default geometry
-        close = True
-        # open adf file via fobj
-        if self.fobj is not None:
-            if self.gzipped:
-                fh = gzip.GzipFile(self.adf_file, "rb", fileobj=self.fobj)
-            else:
-                fh = self.fobj
-                close = False
-        # open adf file
+        # read from fobj or open adf file
+        if self.fobj:
+            data = self.fobj.read(self.num_bytes)
         else:
-            if self.gzipped:
-                fh = gzip.open(self.adf_file, "rb")
-            else:
-                fh = io.open(self.adf_file, "rb")
-        # read image
-        data = fh.read(self.num_bytes)
-        # close input file
-        if close:
+            fh = open(self.adf_file, "rb")
+            data = fh.read(self.num_bytes)
             fh.close()
         # check size
         if len(data) != self.num_bytes:
@@ -63,30 +46,20 @@ class ADFBlockDevice(BlockDevice):
         if self.read_only:
             self.data = data
         else:
-            self.data = ctypes.create_string_buffer(self.num_bytes)
-            self.data[:] = data
+            self.data = bytearray(data)
 
     def flush(self):
         # write dirty adf
         if self.dirty and not self.read_only:
-            close = True
-            if self.fobj is not None:
+            # write to fobj
+            if self.fobj:
                 # seek fobj to beginning
                 self.fobj.seek(0, 0)
-                if self.gzipped:
-                    fh = gzip.GzipFile(self.adf_file, "wb", fileobj=self.fobj)
-                else:
-                    fh = self.fobj
-                    close = False
+                self.fobj.write(self.data)
+            # write to file
             else:
-                if self.gzipped:
-                    fh = gzip.open(self.adf_file, "wb")
-                else:
-                    fh = io.open(self.adf_file, "wb")
-            # write image
-            fh.write(self.data)
-            # close file
-            if close:
+                fh = open(self.adf_file, "wb")
+                fh.write(self.data)
                 fh.close()
             self.dirty = False
 
@@ -94,7 +67,7 @@ class ADFBlockDevice(BlockDevice):
         self.flush()
         self.data = None
         # now close fobj
-        if self.fobj is not None:
+        if self.fobj:
             self.fobj.close()
 
     def read_block(self, blk_num):
