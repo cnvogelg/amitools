@@ -30,12 +30,12 @@ class MyProgress(Progress):
         # update display every 250ms
         if delta > 250:
             self.clk = clk
-            print("%s: %d" % (self.msg, self.num), end='\r'),
+            print("%s: %d" % (self.msg, self.num), end="\r"),
             sys.stdout.flush()
 
 
 def pre_log_path(path, msg):
-    print("%20s  %s  " % (msg, path), end='\r'),
+    print("%20s  %s  " % (msg, path), end="\r"),
     sys.stdout.flush()
 
 
@@ -44,7 +44,7 @@ def log_path(path, msg):
 
 
 def print_block(percent):
-    print("%3.1f%%" % (percent / 10.0), end='\r'),
+    print("%3.1f%%" % (percent / 10.0), end="\r"),
     sys.stdout.flush()
 
 

@@ -54,12 +54,21 @@ class Validator:
         if self.boot != None:
             # retrieve root block number from boot block
             root_blk_num = self.boot.got_root_blk
+            # guessed root
+            new_root = self.blkdev.num_blocks // 2
             # check root block number
             if root_blk_num == 0:
-                new_root = self.blkdev.num_blocks // 2
                 self.log.msg(
                     Log.INFO,
                     "Boot contains not Root blk. Using default: %d" % new_root,
+                    root_blk_num,
+                )
+                root_blk_num = new_root
+            # HD boot disks have invalid root of 880
+            if root_blk_num == 880 and new_root == 880 * 2:
+                self.log.msg(
+                    Log.INFO,
+                    "Boot contains invalid HD Root blk. Using default: %d" % new_root,
                     root_blk_num,
                 )
                 root_blk_num = new_root
@@ -67,7 +76,6 @@ class Validator:
                 root_blk_num < self.blkdev.reserved
                 or root_blk_num > self.blkdev.num_blocks
             ):
-                new_root = self.blkdev.num_blocks // 2
                 self.log.msg(
                     Log.INFO,
                     "Invalid root block number: given %d using guess %d"
