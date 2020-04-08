@@ -30,12 +30,12 @@ class MyProgress(Progress):
         # update display every 250ms
         if delta > 250:
             self.clk = clk
-            print("%s: %d\r" % (self.msg, self.num)),
+            print("%s: %d" % (self.msg, self.num), end='\r'),
             sys.stdout.flush()
 
 
 def pre_log_path(path, msg):
-    print("%20s  %s  \r" % (msg, path)),
+    print("%20s  %s  " % (msg, path), end='\r'),
     sys.stdout.flush()
 
 
@@ -44,7 +44,7 @@ def log_path(path, msg):
 
 
 def print_block(percent):
-    print("%3.1f%%\r" % (percent / 10.0)),
+    print("%3.1f%%" % (percent / 10.0), end='\r'),
     sys.stdout.flush()
 
 
@@ -90,8 +90,6 @@ def scan_file(path, args):
     try:
         pre_log_path(path, "scan")
         ret_code = 0
-        ret_str = ""
-        stay = True
 
         # create a block device for image file
         blkdev = factory.open(path, read_only=True)
@@ -212,5 +210,5 @@ def main():
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except KeyboardInterrupt as e:
+    except KeyboardInterrupt:
         print("aborting...")

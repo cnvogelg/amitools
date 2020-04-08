@@ -12,7 +12,7 @@ class ADFSScanner:
 
     def can_handle(self, scan_file):
         base_name = scan_file.get_basename().lower()
-        for ext in self.factory.valid_extensions:
+        for ext in self.factory.EXT_MAP:
             if base_name.endswith(ext):
                 return True
         return False
