@@ -136,12 +136,12 @@ class BlkDevFactory:
             if not read_only:
                 raise IOError("can't write gzip'ed image files!")
             # automatically wrap a fobj to unzip
-            fobj = gzip.GzipFile(self.adf_file, "rb", fileobj=fobj)
-            # get uncompressed size
-            size = fobj.size
+            fobj = gzip.GzipFile(img_file, "rb", fileobj=fobj)
             # remove gzip flag from type
             t = t & self.TYPE_MASK
-        elif fobj:
+
+        # retrieve size
+        if fobj:
             # get size from fobj
             fobj.seek(0, 2)
             size = fobj.tell()
