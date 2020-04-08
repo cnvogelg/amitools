@@ -1,7 +1,4 @@
 from .BlockDevice import BlockDevice
-import os.path
-import os
-
 from .ImageFile import ImageFile
 
 

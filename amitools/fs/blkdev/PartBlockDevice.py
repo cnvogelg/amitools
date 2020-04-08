@@ -1,6 +1,4 @@
 from .BlockDevice import BlockDevice
-import os.path
-import os
 
 
 class PartBlockDevice(BlockDevice):

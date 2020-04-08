@@ -1,8 +1,5 @@
 from .BlockDevice import BlockDevice
-from .DiskGeometry import DiskGeometry
 from .ImageFile import ImageFile
-import os.path
-import os
 
 
 class HDFBlockDevice(BlockDevice):

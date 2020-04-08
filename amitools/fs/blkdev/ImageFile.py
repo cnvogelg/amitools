@@ -1,8 +1,6 @@
 import os
 import stat
 import amitools.util.BlkDevTools as BlkDevTools
-import zlib
-import io
 
 
 class ImageFile:
@@ -11,14 +9,12 @@ class ImageFile:
         self.read_only = read_only
         self.block_bytes = block_bytes
         self.fobj = fobj
-        self.fh = None
         self.size = 0
         self.num_blocks = 0
 
     def open(self):
         # file obj?
-        if self.fobj is not None:
-            self.fh = self.fobj
+        if self.fobj:
             # get size via seek
             self.fobj.seek(0, 2)  # end of file
             self.size = self.fobj.tell()
@@ -48,7 +44,7 @@ class ImageFile:
                 flags = "rb"
             else:
                 flags = "r+b"
-            self.fh = io.open(self.file_name, flags)
+            self.fobj = open(self.file_name, flags)
 
     def read_blk(self, blk_num, num_blks=1):
         if blk_num >= self.num_blocks:
@@ -57,10 +53,10 @@ class ImageFile:
                 % (blk_num, self.num_blocks)
             )
         off = blk_num * self.block_bytes
-        if off != self.fh.tell():
-            self.fh.seek(off, os.SEEK_SET)
+        if off != self.fobj.tell():
+            self.fobj.seek(off, os.SEEK_SET)
         num = self.block_bytes * num_blks
-        data = self.fh.read(num)
+        data = self.fobj.read(num)
         return data
 
     def write_blk(self, blk_num, data, num_blks=1):
@@ -77,17 +73,16 @@ class ImageFile:
                 % (len(data), self.block_bytes)
             )
         off = blk_num * self.block_bytes
-        if off != self.fh.tell():
-            self.fh.seek(off, os.SEEK_SET)
-        self.fh.write(data)
+        if off != self.fobj.tell():
+            self.fobj.seek(off, os.SEEK_SET)
+        self.fobj.write(data)
 
     def flush(self):
-        self.fh.flush()
+        self.fobj.flush()
 
     def close(self):
-        if self.fh != None:
-            self.fh.close()
-            self.fh = None
+        self.fobj.close()
+        self.fobj = None
 
     def create(self, num_blocks):
         if self.read_only:
