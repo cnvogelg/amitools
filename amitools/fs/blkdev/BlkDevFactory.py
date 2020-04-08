@@ -1,7 +1,7 @@
 import os
 import os.path
 import stat
-import struct
+import gzip
 from .ADFBlockDevice import ADFBlockDevice
 from .HDFBlockDevice import HDFBlockDevice
 from .RawBlockDevice import RawBlockDevice
@@ -13,35 +13,65 @@ import amitools.util.BlkDevTools as BlkDevTools
 class BlkDevFactory:
     """the block device factory opens or creates image files suitable as a block device for file system access."""
 
-    valid_extensions = (".adf", ".adz", ".adf.gz", ".hdf", ".rdisk")
+    valid_extensions = (".adf", ".adz", ".adf.gz", ".hdf", ".hdf.gz", ".hdz", ".rdb")
+
+    GZIP_MASK = 0x10
+    TYPE_MASK = 0x0F
 
     TYPE_ADF = 1
     TYPE_HDF = 2
-    TYPE_RDISK = 3
+    TYPE_RDB = 3
+    TYPE_ADF_HD = 4
+
+    TYPE_ADF_GZ = TYPE_ADF | GZIP_MASK
+    TYPE_HDF_GZ = TYPE_HDF | GZIP_MASK
+    TYPE_RDB_GZ = TYPE_RDB | GZIP_MASK
+    TYPE_ADF_HD_GZ = TYPE_ADF_HD | GZIP_MASK
+
+    TYPE_MAP = {
+        "adf": TYPE_ADF,
+        "hdf": TYPE_HDF,
+        "rdb": TYPE_RDB,
+        "adf_hd": TYPE_ADF_HD,
+        "adf.gz": TYPE_ADF_GZ,
+        "hdf.gz": TYPE_HDF_GZ,
+        "adf_hd.gz": TYPE_ADF_HD_GZ,
+    }
+
+    EXT_MAP = {
+        ".adf": TYPE_ADF,
+        ".adz": TYPE_ADF_GZ,
+        ".adf.gz": TYPE_ADF_GZ,
+        ".hdf": TYPE_HDF,
+        ".hdz": TYPE_HDF_GZ,
+        ".hdf.gz": TYPE_HDF_GZ,
+        ".rdb": TYPE_RDB,
+        ".rdisk": TYPE_RDB,
+        ".rdb.gz": TYPE_RDB_GZ,
+        ".rdisk.gz": TYPE_RDB_GZ,
+    }
 
     def detect_type(self, img_file, fobj, options=None):
         """try to detect the type of a given img_file name"""
         # 1. take type from options
         t = self.type_from_options(options)
-        if t == None:
+        if not t:
             # 2. look in file
             t = self.type_from_contents(img_file, fobj)
-            if t == None:
+            if not t:
                 # 3. from extension
                 t = self.type_from_extension(img_file)
         return t
 
     def type_from_options(self, options):
         """look in options for type"""
-        if options != None:
+        if options:
             if "type" in options:
                 t = options["type"].lower()
-                if t in ("adf", "adz"):
-                    return self.TYPE_ADF
-                elif t == "hdf":
-                    return self.TYPE_HDF
-                elif t == "rdisk":
-                    return self.TYPE_RDISK
+                if t in self.TYPE_MAP:
+                    return self.TYPE_MAP[t]
+                else:
+                    raise ValueError("invalid 'type' given: %s" % t)
         return None
 
     def type_from_contents(self, img_file, fobj):
@@ -59,20 +89,16 @@ class BlkDevFactory:
             fobj.seek(0, 0)
         # check for 'RDISK':
         if hdr == b"RDSK":
-            return self.TYPE_RDISK
+            return self.TYPE_RDB
         return None
 
     def type_from_extension(self, img_file):
         """look at file extension for type of image"""
-        ext = img_file.lower()
-        if ext.endswith(".adf") or ext.endswith(".adz") or ext.endswith(".adf.gz"):
-            return self.TYPE_ADF
-        elif ext.endswith(".hdf"):
-            return self.TYPE_HDF
-        elif ext.endswith(".rdsk"):
-            return self.TYPE_RDISK
-        else:
-            return None
+        lo_name = img_file.lower()
+        for ext, typ in self.EXT_MAP.items():
+            if lo_name.endswith(ext):
+                return typ
+        return None
 
     def _get_block_size(self, options):
         if options and "bs" in options:
@@ -88,7 +114,7 @@ class BlkDevFactory:
     ):
         """open an existing image file"""
         # file base check
-        if fobj is None:
+        if not fobj:
             # make sure image file exists
             if not os.path.exists(img_file):
                 if none_if_missing:
@@ -100,7 +126,30 @@ class BlkDevFactory:
             # is writeable? -> no: enforce read_only
             if not os.access(img_file, os.W_OK):
                 read_only = True
-            # check size
+
+        # detect type
+        t = self.detect_type(img_file, fobj, options)
+        if t is None:
+            raise IOError("can't detect type of image file")
+
+        # is gzipped?
+        if t & self.GZIP_MASK:
+            # only supported for read access for now
+            if not read_only:
+                raise IOError("can't write gzip'ed image files!")
+            # automatically wrap a fobj to unzip
+            fobj = gzip.GzipFile(self.adf_file, "rb", fileobj=fobj)
+            # get uncompressed size
+            size = fobj.size
+            # remove gzip flag from type
+            t = t & self.TYPE_MASK
+        elif fobj:
+            # get size from fobj
+            fobj.seek(0, 2)
+            size = fobj.tell()
+            fobj.seek(0, 0)
+        else:
+            # get size from file/blk dev/char dev
             st = os.stat(img_file)
             mode = st.st_mode
             if stat.S_ISBLK(mode) or stat.S_ISCHR(mode):
@@ -109,20 +158,20 @@ class BlkDevFactory:
                 size = os.path.getsize(img_file)
             if size == 0:
                 raise IOError("image file is empty")
-        # fobj
-        else:
-            fobj.seek(0, 2)
-            size = fobj.tell()
-            fobj.seek(0, 0)
-        # detect type
-        t = self.detect_type(img_file, fobj, options)
-        if t == None:
-            raise IOError("can't detect type of image file")
+
         # get block size
         bs = self._get_block_size(options)
-        # create blkdev
-        if t == self.TYPE_ADF:
-            blkdev = ADFBlockDevice(img_file, read_only, fobj=fobj)
+
+        # now create blkdev
+        if t in (self.TYPE_ADF, self.TYPE_ADF_HD):
+            # check sizes
+            if size in ADFBlockDevice.DD_IMG_SIZES:
+                hd = False
+            elif size in ADFBlockDevice.HD_IMG_SIZES:
+                hd = True
+            else:
+                raise IOError("invalid ADF images size: %d" % size)
+            blkdev = ADFBlockDevice(img_file, read_only, fobj=fobj, hd=hd)
             blkdev.open()
         elif t == self.TYPE_HDF:
             # detect geometry
@@ -166,17 +215,25 @@ class BlkDevFactory:
                 # not writeable?
                 if not os.access(img_file, os.W_OK):
                     raise IOError("can't write image file")
+
         # detect type
         t = self.detect_type(img_file, fobj, options)
-        if t == None:
+        if t is None:
             raise IOError("can't detect type of image file")
-        if t == self.TYPE_RDISK:
+        if t & self.GZIP_MASK:
+            raise IOError("can't create gzip'ed image files")
+        if t == self.TYPE_RDB:
             raise IOError("can't create rdisk. use rdbtool first")
+
         # get block size
         bs = self._get_block_size(options)
+
         # create blkdev
         if t == self.TYPE_ADF:
             blkdev = ADFBlockDevice(img_file, fobj=fobj)
+            blkdev.create()
+        elif t == self.TYPE_ADF_HD:
+            blkdev = ADFBlockDevice(img_file, fobj=fobj, hd=True)
             blkdev.create()
         else:
             # determine geometry from size or chs

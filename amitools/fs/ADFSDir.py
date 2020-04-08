@@ -151,7 +151,7 @@ class ADFSDir(ADFSNode):
             meta_info.get_protect(),
             meta_info.get_comment(),
             meta_info.get_mod_ts(),
-            hash_chain_blk
+            hash_chain_blk,
         )
         ud.write()
         self.set_block(ud)

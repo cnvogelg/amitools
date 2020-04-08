@@ -5,24 +5,36 @@ import io
 
 
 class ADFBlockDevice(BlockDevice):
-    def __init__(self, adf_file, read_only=False, fobj=None):
+
+    # number of total sectors for DD/HD disks
+    DD_SECS = 80 * 2 * 11
+    HD_SECS = 80 * 2 * 22
+
+    # byte size (without/with error code byte)
+    DD_IMG_SIZES = (DD_SECS * 512, DD_SECS * 513)
+    HD_IMG_SIZES = (HD_SECS * 512, HD_SECS * 513)
+
+    def __init__(self, adf_file, read_only=False, fobj=None, hd=False):
         self.adf_file = adf_file
         self.read_only = read_only
         self.fobj = fobj
         self.dirty = False
+        self.hd = hd
         lo = adf_file.lower()
         self.gzipped = lo.endswith(".adz") or lo.endswith(".adf.gz")
 
     def create(self):
         if self.read_only:
             raise IOError("ADF creation not allowed in read-only mode!")
-        self._set_geometry()  # set default geometry
+        sectors = 22 if self.hd else 11
+        self._set_geometry(sectors=sectors)  # set default geometry
         # allocate image in memory
         self.data = ctypes.create_string_buffer(self.num_bytes)
         self.dirty = True
 
     def open(self):
-        self._set_geometry()  # set default geometry
+        sectors = 22 if self.hd else 11
+        self._set_geometry(sectors=sectors)  # set default geometry
         close = True
         # open adf file via fobj
         if self.fobj is not None:
