@@ -140,6 +140,15 @@ class FSHeaderDeviceNode:
         blk._put_long(18, self.seg_list_blk)
         blk._put_long(19, self.global_vec)
 
+    def clear_flags(self):
+        self.ftype = 0
+        self.task = 0
+        self.lock = 0
+        self.handler = 0
+        self.stack_size = 0
+        self.priority = 0
+        self.startup = 0
+
 
 class FSHeaderBlock(Block):
     def __init__(self, blkdev, blk_num):
@@ -242,3 +251,7 @@ class FSHeaderBlock(Block):
     def set_flag(self, key, value):
         mask = self.dev_node.set_flags([(key, value)])
         self.patch_flags |= mask
+
+    def clear_flags(self):
+        self.patch_flags = 0x180
+        self.dev_node.clear_flags()

@@ -85,6 +85,46 @@ def rdbtool_init_test(rdbtool, img_file):
     rdbtool(img_file.file_name, ("create", img_file.size), ("init",))
 
 
+# test file systems
+
+
+def rdbtool_fsadd_test(rdbtool, img_file):
+    rdbtool(img_file.file_name, ("create", img_file.size), ("init", "rdb_cyls=4"))
+    rdbtool(img_file.file_name, ("fsadd", "progs/pfs3aio", "dostype=PFS3"))
+    rdbtool(img_file.file_name, ("info"))
+
+
+def rdbtool_fsget_test(rdbtool, img_file, tmpdir):
+    rdbtool(img_file.file_name, ("create", img_file.size), ("init", "rdb_cyls=4"))
+    rdbtool(img_file.file_name, ("fsadd", "progs/pfs3aio", "dostype=PFS3"))
+    # fsget
+    tmp_file = str(tmpdir / "filesys")
+    rdbtool(img_file.file_name, ("fsget", "0", tmp_file))
+    with open("progs/pfs3aio", "rb") as fh:
+        src_data = fh.read()
+    with open(tmp_file, "rb") as fh:
+        tgt_data = fh.read()
+    assert src_data == tgt_data
+
+
+def rdbtool_fsdelete_test(rdbtool, img_file):
+    rdbtool(img_file.file_name, ("create", img_file.size), ("init", "rdb_cyls=4"))
+    rdbtool(img_file.file_name, ("fsadd", "progs/pfs3aio", "dostype=PFS3"))
+    # fsdelete
+    rdbtool(img_file.file_name, ("fsdelete", "0"))
+    rdbtool(img_file.file_name, ("info"))
+
+
+def rdbtool_fsflags_test(rdbtool, img_file):
+    rdbtool(img_file.file_name, ("create", img_file.size), ("init", "rdb_cyls=4"))
+    rdbtool(img_file.file_name, ("fsadd", "progs/pfs3aio", "dostype=PFS3"))
+    # fsflags
+    rdbtool(img_file.file_name, ("fsflags", "0", "clear"))
+    rdbtool(img_file.file_name, ("info"))
+    rdbtool(img_file.file_name, ("fsflags", "0", "stack_size=8192"))
+    rdbtool(img_file.file_name, ("info"))
+
+
 # test with partitions
 
 

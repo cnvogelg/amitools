@@ -1,6 +1,6 @@
 import re
 
-tag = "$VER:"
+tag = b"$VER:"
 
 
 def find(data):
@@ -17,8 +17,8 @@ def find(data):
     return data[start:end].strip()
 
 
-def get_version(str):
-    m = re.search("\s(\d+)\.(\d+)\s", str)
+def get_version(data):
+    m = re.search("\s(\d+)\.(\d+)\s", data.decode("latin-1"))
     if m == None:
         return None
     else:

@@ -142,12 +142,12 @@ class FileSystem:
     # ----- edit -----
 
     def clear_flags(self):
-        self.fshd.patch_flags = 0
+        self.fshd.clear_flags()
         self.fshd.write()
         return True
 
     def set_flags(self, flags, clear=False):
         if clear:
-            self.fshd.patch_flags = 0
+            self.fshd.clear_flags()
         self.fshd.set_flags(flags)
         self.fshd.write()

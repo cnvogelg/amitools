@@ -753,9 +753,9 @@ class FSAddCommand(Command):
             # get version from binary
             tag = VerTag.find(data)
             ver = None
-            if tag != None:
+            if tag:
                 ver = VerTag.get_version(tag)
-            if ver == None:
+            if not ver:
                 ver = (0, 0)
             # overwrite version from options
             if "version" in opts:
