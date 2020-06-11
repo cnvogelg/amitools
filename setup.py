@@ -250,5 +250,5 @@ setup(
     # win problems:
     #    use_scm_version=True,
     include_package_data=True,
-    python_requires="~=3.4",
+    python_requires="~=3.5",
 )
