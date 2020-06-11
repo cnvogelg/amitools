@@ -315,8 +315,7 @@ class ADFSVolume:
         if not fn.is_valid():
             raise FSError(INVALID_VOLUME_NAME, file_name=name, node=self)
         # update root block
-        ami_name = name.get_ami_str()
-        self.root.name = ami_name
+        self.root.name = name
         self.root.write()
         # store internally
         self.name = name

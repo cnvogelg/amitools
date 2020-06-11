@@ -357,6 +357,15 @@ def xdftool_format_adf_test(xdftool, dos_format, tmpdir, vol_name):
     xdftool(file_name, "list")
 
 
+def xdftool_relabel_adf_test(xdftool, dos_format, tmpdir, vol_name):
+    """format disk image without create first"""
+    file_name = str(tmpdir / "test.adf")
+    xdftool(file_name, ("format", vol_name, dos_format))
+    xdftool(file_name, "list")
+    xdftool(file_name, ("relabel", "FooBar"))
+    xdftool(file_name, "list")
+
+
 def xdftool_write_read_test(xdftool, xdf_img, test_files):
     """write a file and read it back"""
     # write file
