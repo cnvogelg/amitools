@@ -1,6 +1,34 @@
 # Change Log
 
-## [0.4.0][4] (2019-11-2)1
+## [0.5.0][5] (2020-06-13)
+
+### global
+
+* Requires Python 3.5 minimum
+* Python 3.8 compatible (#132)
+* Lots of Python 3 fixes
+* vamos-test: renamed -V switch to -A
+* xdf/rdbtool: allow to call main() with custom args and defaults
+* use black for source code formatting
+* introduced full test suite to limit tests in normal runs
+* fixed reading HUNK_INDEX with empty unit names
+* switched disasm to machine DisAsm
+
+### xdftool 
+
+* added support for HD disk images
+* in DOS5 (DirCache) fixed creating empty directories
+* allow multiple open part commands in a single command list
+
+### vamos
+
+* fixed internal mem trace with -T
+* use unbuffered I/O on ttys
+* dos:ReadArgs: fixed prompt with '?'
+* dos:Seek now sets IoErr correctly
+
+
+## [0.4.0][4] (2019-11-2)
 
 ### global
 
@@ -102,3 +130,4 @@
 [2]: https://github.com/cnvogelg/amitools/tree/v0.2.0
 [3]: https://github.com/cnvogelg/amitools/tree/v0.3.0
 [4]: https://github.com/cnvogelg/amitools/tree/v0.4.0
+[5]: https://github.com/cnvogelg/amitools/tree/v0.5.0

@@ -2,11 +2,11 @@
 # sphinx config
 
 project = "amitools"
-copyright = "2019, Christian Vogelgsang"
+copyright = "2020, Christian Vogelgsang"
 author = "Christian Vogelgsang"
 
-version = "0.4"
-release = "0.4.0"
+version = "0.5"
+release = "0.5.0"
 
 # -- General configuration ---------------------------------------------------
 extensions = [
