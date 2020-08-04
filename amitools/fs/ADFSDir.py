@@ -309,7 +309,7 @@ class ADFSDir(ADFSNode):
 
         # (optional) wipe blocks
         if wipe:
-            clr_blk = "\0" * self.blkdev.block_bytes
+            clr_blk = b"\0" * self.blkdev.block_bytes
             for blk_num in blk_nums:
                 self.blkdev.write_block(blk_num, clr_blk)
             # wipe a potentially free'ed dircache block, too

@@ -390,6 +390,14 @@ def xdftool_write_delete_test(xdftool, xdf_img, test_files):
     xdftool(xdf_img.file_name, ("delete", test_files.file_name))
 
 
+def xdftool_write_delete_wipe_test(xdftool, xdf_img, test_files):
+    """write a file and delete it with wipe option"""
+    # write file
+    xdftool(xdf_img.file_name, ("write", test_files.file_path))
+    # delete it
+    xdftool(xdf_img.file_name, ("delete", test_files.file_name, "wipe"))
+
+
 def xdftool_makedir_test(xdftool, xdf_img):
     # create dir
     xdftool(xdf_img.file_name, ("makedir", "bla"))
