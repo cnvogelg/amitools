@@ -1260,7 +1260,7 @@ class DosLibrary(LibImpl):
         pat = ctx.mem.r_cstr(pat_ptr)
         txt = ctx.mem.r_cstr(txt_ptr)
         pattern = Pattern(None, pat, ignore_case, True)
-        match = pattern_match(pattern, txt, ignore_case)
+        match = pattern_match(pattern, txt)
         log_dos.info(
             "MatchPattern: pat=%s txt=%s ignore_case=%s -> match=%s",
             pat,

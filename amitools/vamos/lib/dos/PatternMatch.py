@@ -287,7 +287,8 @@ class MarkerStack:
         return self.stack[pos]
 
     def drop(self, pos):
-        self.stack = self.stack[: pos - 1]
+        # drop markers including the one at pos
+        self.stack = self.stack[:pos]
 
     def __str__(self):
         return ",".join(map(str, self.stack))
@@ -335,9 +336,9 @@ def _scan_or_block(pat, pat_pos, str_pos, markers):
         pat_pos += 1
 
 
-def pattern_match(pattern, in_str, ignore_case=True, debug=False):
+def pattern_match(pattern, in_str, debug=False):
     """match pattern pat against str and return True/False"""
-    if ignore_case:
+    if pattern.ignore_case:
         tr = lambda x: x.lower()
     else:
         tr = lambda x: x
@@ -403,7 +404,7 @@ def pattern_match(pattern, in_str, ignore_case=True, debug=False):
                 # drop all markers including my NOT marker
                 markers.drop(pos)
                 if debug:
-                    print("strip markers")
+                    print("strip markers, pos=", pos)
             else:
                 m = markers.get(pos)
                 str_pos += 1
@@ -561,6 +562,8 @@ def pattern_match(pattern, in_str, ignore_case=True, debug=False):
         if get_next_marker:
             m = markers.pop()
             if m == None:
+                if debug:
+                    print("no next marker. end")
                 return False
             if debug:
                 print("next marker:", m, " on stack:", markers)
