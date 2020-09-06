@@ -790,6 +790,15 @@ static void fpgen_rm_reg(uint16 w2)
 		source = REG_FP[src].f;
 	}
 
+	int round = (opmode & 0x40) != 0;
+    int to_double = 0;
+	if (round) {
+		to_double = (opmode & 0x4) != 0;
+		opmode &= ~0x40;
+		if (to_double)
+			opmode &= ~0x4;
+	}
+
 	switch (opmode)
 	{
 		case 0x00:		// FMOVE
@@ -889,6 +898,13 @@ static void fpgen_rm_reg(uint16 w2)
 		// FSGLMUL
 
 		default:	fatalerror("fpgen_rm_reg: unimplemented opmode %02X at %08X\n", opmode, REG_PC-4);
+	}
+	
+	if (round) {
+		if (to_double)
+			REG_FP[dst].f = (double) REG_FP[dst].f;
+		else
+			REG_FP[dst].f = (float) REG_FP[dst].f;
 	}
 }
 
