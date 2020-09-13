@@ -166,8 +166,8 @@ sourcefiles = [
     "musashi/traps.c",
     "musashi/mem.c",
     "musashi/m68kcpu.c",
-    "musashi/m68kfpu.c",
     "musashi/m68kdasm.c",
+    "musashi/softfloat/softfloat.c",
     "gen/m68kops.c",
 ]
 depends = [
@@ -179,6 +179,11 @@ depends = [
     "musashi/m68kcpu.h",
     "musashi/mem.h",
     "musashi/traps.h",
+    "musashi/softfloat/mamesf.h",
+    "musashi/softfloat/milieu.h",
+    "musashi/softfloat/softfloat.h",
+    "musashi/softfloat/softfloat-macros",
+    "musashi/softfloat/softfloat-specialize"
 ]
 inc_dirs = ["musashi", "gen"]
 
