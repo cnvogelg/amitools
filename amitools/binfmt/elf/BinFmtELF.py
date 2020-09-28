@@ -1,6 +1,7 @@
-from amitools.binfmt.BinImage import *
-from .ELFFile import *
-from .ELF import *
+from amitools.binfmt.BinImage import BIN_IMAGE_TYPE_ELF, SEGMENT_TYPE_CODE, SEGMENT_TYPE_DATA, SEGMENT_FLAG_READ_ONLY, SEGMENT_TYPE_BSS, Segment, Relocations,\
+    SymbolTable, Symbol, Reloc, DebugLine, DebugLineFile, DebugLineEntry, BinImage
+from .ELFFile import ELFIdentifier, ELFHeader, ELFParseError
+from .ELF import EM_68K, ELFOSABI_AROS, ELFOSABI_SYSV
 from .ELFReader import ELFReader
 from .DwarfDebugLine import DwarfDebugLine
 
