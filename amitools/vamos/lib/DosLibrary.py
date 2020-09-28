@@ -243,7 +243,7 @@ class DosLibrary(LibImpl):
     log_dos.info("SetFileDate: file=%s date=%d" % (name,seconds))
     sys_path = self.path_mgr.ami_to_sys_path(self.get_current_dir(ctx),name,searchMulti=True)
     if sys_path == None:
-      log_file.info("file not found: '%s' -> '%s'" % (ami_path, sys_path))
+      log_dos.info("file not found: '%s' -> '%s'" % (name, sys_path))
       self.setioerr(ctx,ERROR_OBJECT_NOT_FOUND)
       return self.DOSFALSE
     else:
@@ -262,7 +262,7 @@ class DosLibrary(LibImpl):
     n = len(prog_name)
     # return error if name is too long, but copy buffer size
     if n > max_len - 1:
-      self.setioerr(ctx,ERROR_LINE_TOOL_LONG)
+      self.setioerr(ctx,ERROR_LINE_TOO_LONG)
       ret = self.DOSFALSE
       prog_name = prog_name[0:max_len]
     else:
@@ -385,6 +385,7 @@ class DosLibrary(LibImpl):
     size      = ctx.cpu.r_reg(REG_D3)
     flags     = ctx.cpu.r_reg(REG_D4)
     name      = ctx.mem.r_cstr(name_ptr)
+    vtype     = flags & 0xff
     if buff_ptr == 0:
       if not flags & self.GVF_GLOBAL_ONLY:
         node = self.find_var(ctx,name,vtype)
@@ -729,6 +730,7 @@ class DosLibrary(LibImpl):
     out = ''
     pos = 0
     state = ''
+    val = 0
     while pos < len(fmt):
       ch = fmt[pos].upper()
       pos = pos + 1
@@ -1174,10 +1176,10 @@ class DosLibrary(LibImpl):
           return 0
 
   def ParsePattern(self, ctx):
-    return self.ParsePattern(ctx)
+    return self.parsePattern(ctx, False)
 
   def ParsePatternNoCase(self, ctx):
-    return self.ParsePattern(ctx, ignore_case=True)
+    return self.parsePattern(ctx, True)
 
   def matchPattern(self, ctx, ignore_case=False):
     pat_ptr = ctx.cpu.r_reg(REG_D1)
