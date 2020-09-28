@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 #
 # vamostool
 #
@@ -11,15 +11,15 @@ from amitools.vamos.tools import *
 
 
 def main():
-  cfg_files = (
-      # first look in current dir
-      os.path.join(os.getcwd(), ".vamosrc"),
-      # then in home dir
-      os.path.expanduser("~/.vamosrc"),
-  )
-  tools = [PathTool(), TypeTool(), LibProfilerTool()]
-  sys.exit(tools_main(tools, cfg_files))
+    cfg_files = (
+        # first look in current dir
+        os.path.join(os.getcwd(), ".vamosrc"),
+        # then in home dir
+        os.path.expanduser("~/.vamosrc"),
+    )
+    tools = [PathTool(), TypeTool(), LibProfilerTool()]
+    sys.exit(tools_main(tools, cfg_files))
 
 
-if __name__ == '__main__':
-  sys.exit(main())
+if __name__ == "__main__":
+    sys.exit(main())

@@ -33,6 +33,7 @@ cdef extern from "m68k.h":
   void m68k_set_instr_hook_callback(void (*callback)(unsigned int pc))
 
   unsigned int m68k_disassemble(char* str_buff, unsigned int pc, unsigned int cpu_type)
+  unsigned int m68k_disassemble_raw(char* str_buff, unsigned int pc, const unsigned char* opdata, const unsigned char* argdata, unsigned int cpu_type)
 
   unsigned int m68k_context_size()
   unsigned int m68k_get_context(void* dst)
@@ -187,7 +188,13 @@ cdef class CPU:
     cdef char line[80]
     cdef unsigned int size
     size = m68k_disassemble(line, pc, self.cpu_type)
-    return (size, line)
+    return (size, line.decode('latin-1'))
+
+  def disassemble_raw(self, unsigned int pc, const unsigned char[::1] raw_mem):
+    cdef char line[80]
+    cdef unsigned int size
+    size = m68k_disassemble_raw(line, pc, &raw_mem[0], NULL, self.cpu_type)
+    return (size, line.decode('latin-1'))
 
   def get_cpu_context(self):
     cdef unsigned int size = m68k_context_size()

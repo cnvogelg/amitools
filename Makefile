@@ -3,7 +3,9 @@
 BUILD_DIR = build
 DIST_DIR = dist
 
-PYTHON = python
+PYTHON ?= python3
+PIP ?= $(PYTHON) -m pip
+
 SHOW_CMD = open
 #PYTHON = python-dbg
 
@@ -13,7 +15,10 @@ SHOW_CMD = open
 
 help:
 	@echo "init        initialize project"
+	@echo "init_user   initialize project (--user mode)"
 	@echo "build       build native extension"
+	@echo
+	@echo "format      format source code with black"
 	@echo
 	@echo "test        run tests"
 	@echo "docker-tox  build tox docker container"
@@ -32,13 +37,22 @@ help:
 	@echo "upload      upload dist with twin to pypi"
 
 init:
-	pip install --upgrade setuptools pip
-	pip install --upgrade -r requirements-dev.txt
-	pip install --upgrade -r requirements-test.txt
-	pip install --upgrade --editable .
+	$(PIP) install --upgrade setuptools pip
+	$(PIP) install --upgrade -r requirements-dev.txt
+	$(PIP) install --upgrade -r requirements-test.txt
+	$(PIP) install --upgrade --editable .
+
+init_user:
+	$(PIP) install --user --upgrade setuptools pip
+	$(PIP) install --user --upgrade -r requirements-dev.txt
+	$(PIP) install --user --upgrade -r requirements-test.txt
+	$(PIP) install --user --upgrade --editable .
 
 build:
 	$(PYTHON) setup.py build_ext -i
+
+format:
+	black .
 
 # testing
 test:

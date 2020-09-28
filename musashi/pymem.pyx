@@ -88,7 +88,7 @@ cdef void special_write_func_wrapper(uint addr, uint value, void *ctx):
     mem_callback_exc = sys.exc_info()
     m68k_end_timeslice()
 
-class MemoryError(StandardError):
+class MemoryError(Exception):
   def __init__(self, addr, op, size=None):
     self.addr = addr
     self.op = op
@@ -153,7 +153,7 @@ cdef class Memory:
       addr += 0x10000
 
   def set_special_range_write_funcs(self, uint addr, uint num_pages=1, w8=None, w16=None, w32=None):
-    for i in xrange(num_pages):
+    for i in range(num_pages):
       if w8 != None:
         self.set_special_range_write_func(addr, 0, w8)
       if w16 != None:
@@ -389,22 +389,28 @@ cdef class Memory:
     memcpy(to_ptr, from_ptr, size)
 
   # helpers for c-strings (only RAM)
-  def r_cstr(self,uint addr):
+  cpdef r_cbytes(self,uint addr):
     if addr >= self.ram_bytes:
       self._raise_ram_error(addr, 'R', None)
     cdef unsigned char *ram = self.ram_ptr + addr
     cdef bytes result = ram
     return result
 
-  def w_cstr(self,uint addr,bytes string):
+  cpdef w_cbytes(self,uint addr,bytes string):
     if addr >= self.ram_bytes:
       self._raise_ram_error(addr, 'W', None)
     cdef const char *ptr = string
     cdef char *ram = <char *>self.ram_ptr + addr
     strcpy(ram, ptr)
 
+  def r_cstr(self, uint addr):
+    return self.r_cbytes(addr).decode("latin-1")
+
+  def w_cstr(self, uint addr, str string):
+    self.w_cbytes(addr, string.encode("latin-1"))
+
   # helpers for bcpl-strings (only RAM)
-  def r_bstr(self,uint addr):
+  cpdef r_bbytes(self,uint addr):
     if addr >= self.ram_bytes:
       self._raise_ram_error(addr, 'R', None)
     cdef uint size
@@ -418,7 +424,7 @@ cdef class Memory:
     free(data)
     return result
 
-  def w_bstr(self,uint addr,bytes string):
+  cpdef w_bbytes(self,uint addr,bytes string):
     if addr >= self.ram_bytes:
       self._raise_ram_error(addr, 'W', None)
     cdef uint size = len(string)
@@ -427,3 +433,9 @@ cdef class Memory:
     ram[0] = <unsigned char>size
     ram += 1
     memcpy(ram, ptr, size)
+
+  def r_bstr(self, uint addr):
+    return self.r_bbytes(addr).decode("latin-1")
+
+  def w_bstr(self, uint addr, str string):
+    self.w_bbytes(addr, string.encode("latin-1"))

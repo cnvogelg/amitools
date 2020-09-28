@@ -13,17 +13,17 @@ from .VamosTestLibrary import VamosTestLibrary
 from .VamosTestDevice import VamosTestDevice
 
 vamos_libs = {
-  'dos.library' : DosLibrary,
-  'exec.library' : ExecLibrary,
-  'intuition.library' : IntuitionLibrary,
-  'mathffp.library' : MathFFPLibrary,
-  'mathieeedoubbas.library' : MathIEEEDoubBasLibrary,
-  'mathieeedoubtrans.library' : MathIEEEDoubTransLibrary,
-  'mathieeesingbas.library' : MathIEEESingBasLibrary,
-  'mathieeesingtrans.library' : MathIEEESingTransLibrary,
-  'mathtrans.library' : MathTransLibrary,
-  'timer.device' : TimerDevice,
-  'utility.library' : UtilityLibrary,
-  'vamostest.library' : VamosTestLibrary,
-  'vamostestdev.device': VamosTestDevice
+    "dos.library": DosLibrary,
+    "exec.library": ExecLibrary,
+    "intuition.library": IntuitionLibrary,
+    "mathffp.library": MathFFPLibrary,
+    "mathieeedoubbas.library": MathIEEEDoubBasLibrary,
+    "mathieeedoubtrans.library": MathIEEEDoubTransLibrary,
+    "mathieeesingbas.library": MathIEEESingBasLibrary,
+    "mathieeesingtrans.library": MathIEEESingTransLibrary,
+    "mathtrans.library": MathTransLibrary,
+    "timer.device": TimerDevice,
+    "utility.library": UtilityLibrary,
+    "vamostest.library": VamosTestLibrary,
+    "vamostestdev.device": VamosTestDevice,
 }

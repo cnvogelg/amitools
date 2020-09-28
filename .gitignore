@@ -1,11 +1,13 @@
 *.egg-info
 *.egg
 *.pyc
+__pycache__/
 build/
 dist/
 gen/
 emu.c
 emu.so
+emu.*.so
 emu.pyd
 .python-version
 .cache

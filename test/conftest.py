@@ -1,13 +1,13 @@
 # pytest fixture for vamos tests
 
-from __future__ import print_function
+
 import pytest
 import os
 from helper import *
 
 
 VAMOS_BIN = "../bin/vamos"
-VAMOS_ARGS = ['-c', 'test.vamosrc']
+VAMOS_ARGS = ["-c", "test.vamosrc"]
 
 my_dir = os.path.dirname(__file__)
 os.chdir(my_dir)
@@ -16,133 +16,188 @@ os.chdir(my_dir)
 
 
 def pytest_addoption(parser):
-  parser.addoption("--flavor", "-F", action="store", default=None,
-                   help="select an Amiga compiler flavor to test")
-  parser.addoption("--use-debug-bins", "-D", action="store_true",
-                   default=False,
-                   help="run the debug versions of the Amiga binaries")
-  parser.addoption("--dump-output", "-O", action="store_true", default=False,
-                   help="write all vamos output to 'vamos.log'")
-  parser.addoption("--gen-data", "-G", action="store_true", default=False,
-                   help="generate data files by using the output of "
-                   "the test program")
-  parser.addoption("--vamos-args", "-V", action="append", default=None,
-                   help="add options to vamos run, e.g. -V-t")
-  parser.addoption("--vamos-bin", "-E", default=None,
-                   help="replace the vamos executable (default: ../bin/vamos)")
-  parser.addoption("--auto-build", default=False, action="store_true",
-                   help="automatically rebuild binaries if source is newer")
-  parser.addoption("--profile", "-P", action="store_true", default=False,
-                   help="create a profile file")
-  parser.addoption("--profile-file", action="store", default="vamos-prof.json",
-                   help="set the profile file name")
+    parser.addoption(
+        "--flavor",
+        "-F",
+        action="store",
+        default=None,
+        help="select an Amiga compiler flavor to test",
+    )
+    parser.addoption(
+        "--use-debug-bins",
+        "-D",
+        action="store_true",
+        default=False,
+        help="run the debug versions of the Amiga binaries",
+    )
+    parser.addoption(
+        "--dump-output",
+        "-O",
+        action="store_true",
+        default=False,
+        help="write all vamos output to 'vamos.log'",
+    )
+    parser.addoption(
+        "--gen-data",
+        "-G",
+        action="store_true",
+        default=False,
+        help="generate data files by using the output of " "the test program",
+    )
+    parser.addoption(
+        "--vamos-args",
+        "-A",
+        action="append",
+        default=None,
+        help="add options to vamos run, e.g. -A-t",
+    )
+    parser.addoption(
+        "--vamos-bin",
+        "-E",
+        default=None,
+        help="replace the vamos executable (default: ../bin/vamos)",
+    )
+    parser.addoption(
+        "--auto-build",
+        default=False,
+        action="store_true",
+        help="automatically rebuild binaries if source is newer",
+    )
+    parser.addoption(
+        "--profile",
+        "-P",
+        action="store_true",
+        default=False,
+        help="create a profile file",
+    )
+    parser.addoption(
+        "--profile-file",
+        action="store",
+        default="vamos-prof.json",
+        help="set the profile file name",
+    )
+    parser.addoption(
+        "--full-suite",
+        action="store_true",
+        default=False,
+        help="run full test suite and include all tests",
+    )
 
 
 def pytest_configure(config):
-  # change vamos binary
-  global VAMOS_BIN
-  vamos_bin = config.getoption('vamos_bin')
-  if vamos_bin:
-    VAMOS_BIN = vamos_bin
-  # change vamos options
-  global VAMOS_ARGS
-  vamos_args = config.getoption('vamos_args')
-  if vamos_args:
-    VAMOS_ARGS += vamos_args
-  # enable profiling
-  if config.getoption('profile'):
-    file = config.getoption("profile_file")
-    file = os.path.abspath(file)
-    print("creating profile: %s" % file)
-    # clear profile file if existing
-    if os.path.exists(file):
-      os.remove(file)
-    # add options to vamos
-    prof_opts = [
-        '--profile-libs', 'all',
-        '--profile-file', file,
-        '--profile-file-append',
-        '--profile'
-    ]
-    VAMOS_ARGS += prof_opts
-  # show settings
-  print("vamos:", VAMOS_BIN, " ".join(VAMOS_ARGS))
+    # change vamos binary
+    global VAMOS_BIN
+    vamos_bin = config.getoption("vamos_bin")
+    if vamos_bin:
+        VAMOS_BIN = vamos_bin
+    # change vamos options
+    global VAMOS_ARGS
+    vamos_args = config.getoption("vamos_args")
+    if vamos_args:
+        VAMOS_ARGS += vamos_args
+    # enable profiling
+    if config.getoption("profile"):
+        file = config.getoption("profile_file")
+        file = os.path.abspath(file)
+        print("creating profile: %s" % file)
+        # clear profile file if existing
+        if os.path.exists(file):
+            os.remove(file)
+        # add options to vamos
+        prof_opts = [
+            "--profile-libs",
+            "all",
+            "--profile-file",
+            file,
+            "--profile-file-append",
+            "--profile",
+        ]
+        VAMOS_ARGS += prof_opts
+    # show settings
+    print("vamos:", VAMOS_BIN, " ".join(VAMOS_ARGS))
 
 
 def pytest_unconfigure(config):
-  pass
+    pass
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--full-suite"):
+        return
+    skip_full = pytest.mark.skip(reason="skip full")
+    for item in items:
+        if item.get_closest_marker("full"):
+            item.add_marker(skip_full)
 
 
 def pytest_runtest_setup(item):
-  flv = item.config.getoption("--flavor")
-  if flv is not None:
-    kw = item.keywords
-    if flv not in kw:
-      pytest.skip("disabled flavor")
+    flv = item.config.getoption("--flavor")
+    if flv is not None:
+        kw = item.keywords
+        if flv not in kw:
+            pytest.skip("disabled flavor")
 
 
-@pytest.fixture(scope="module",
-                params=['gcc', 'gcc-res', 'gcc-dbg', 'gcc-res-dbg'])
+@pytest.fixture(scope="module", params=["gcc", "gcc-res", "gcc-dbg", "gcc-res-dbg"])
 def buildlibnix(request):
-  auto_build = request.config.getoption("--auto-build")
-  return BinBuilder(request.param, auto_build=auto_build)
+    auto_build = request.config.getoption("--auto-build")
+    return BinBuilder(request.param, auto_build=auto_build)
 
 
-@pytest.fixture(scope="module",
-                params=['sc', 'sc-res', 'sc-dbg', 'sc-res-dbg'])
+@pytest.fixture(scope="module", params=["sc", "sc-res", "sc-dbg", "sc-res-dbg"])
 def buildlibsc(request):
-  auto_build = request.config.getoption("--auto-build")
-  return BinBuilder(request.param, auto_build=auto_build)
+    auto_build = request.config.getoption("--auto-build")
+    return BinBuilder(request.param, auto_build=auto_build)
 
 
-@pytest.fixture(scope="module",
-                params=['vc', 'gcc', 'agcc', 'sc'])
+@pytest.fixture(scope="module", params=["vc", "gcc", "agcc", "sc"])
 def vamos(request):
-  """Run vamos with test programs"""
-  dbg = request.config.getoption("--use-debug-bins")
-  dump = request.config.getoption("--dump-output")
-  gen = request.config.getoption("--gen-data")
-  auto_build = request.config.getoption("--auto-build")
-  flavor = request.param
-  return VamosTestRunner(flavor,
-                         use_debug_bins=dbg,
-                         dump_output=dump,
-                         generate_data=gen,
-                         vamos_bin=VAMOS_BIN,
-                         vamos_args=VAMOS_ARGS,
-                         auto_build=auto_build)
+    """Run vamos with test programs"""
+    dbg = request.config.getoption("--use-debug-bins")
+    dump = request.config.getoption("--dump-output")
+    gen = request.config.getoption("--gen-data")
+    auto_build = request.config.getoption("--auto-build")
+    flavor = request.param
+    return VamosTestRunner(
+        flavor,
+        use_debug_bins=dbg,
+        dump_output=dump,
+        generate_data=gen,
+        vamos_bin=VAMOS_BIN,
+        vamos_args=VAMOS_ARGS,
+        auto_build=auto_build,
+    )
 
 
 @pytest.fixture(scope="module")
 def vrun(request):
-  return VamosRunner(vamos_bin=VAMOS_BIN,
-                     vamos_args=VAMOS_ARGS)
+    return VamosRunner(vamos_bin=VAMOS_BIN, vamos_args=VAMOS_ARGS)
 
 
 @pytest.fixture(scope="module")
 def toolrun():
-  return ToolRunner()
+    return ToolRunner()
 
 
-@pytest.fixture(scope="module",
-                params=['mach', 'mach-label', 'mock', 'mock-label'])
+@pytest.fixture(scope="module", params=["mach", "mach-label", "mock", "mock-label"])
 def mem_alloc(request):
-  from amitools.vamos.machine import Machine, MockMemory
-  from amitools.vamos.mem import MemoryAlloc
-  from amitools.vamos.label import LabelManager
-  n = request.param
-  if n == 'mach':
-    m = Machine(use_labels=False)
-    mem = m.get_mem()
-    return mem, MemoryAlloc(mem)
-  elif n == 'mach-label':
-    m = Machine()
-    mem = m.get_mem()
-    return mem, MemoryAlloc(mem, label_mgr=m.get_label_mgr())
-  elif n == 'mock':
-    mem = MockMemory(fill=23)
-    return mem, MemoryAlloc(mem)
-  else:
-    mem = MockMemory(fill=23)
-    lm = LabelManager()
-    return mem, MemoryAlloc(mem, label_mgr=lm)
+    from amitools.vamos.machine import Machine, MockMemory
+    from amitools.vamos.mem import MemoryAlloc
+    from amitools.vamos.label import LabelManager
+
+    n = request.param
+    if n == "mach":
+        m = Machine(use_labels=False)
+        mem = m.get_mem()
+        return mem, MemoryAlloc(mem)
+    elif n == "mach-label":
+        m = Machine()
+        mem = m.get_mem()
+        return mem, MemoryAlloc(mem, label_mgr=m.get_label_mgr())
+    elif n == "mock":
+        mem = MockMemory(fill=23)
+        return mem, MemoryAlloc(mem)
+    else:
+        mem = MockMemory(fill=23)
+        lm = LabelManager()
+        return mem, MemoryAlloc(mem, label_mgr=lm)

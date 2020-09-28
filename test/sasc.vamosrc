@@ -15,3 +15,7 @@ path=sc:c
 [vamos]
 quiet=True
 ram_size=2048
+
+[icon.library]
+mode=vamos
+

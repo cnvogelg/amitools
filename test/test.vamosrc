@@ -1,6 +1,6 @@
 [volumes]
-wb=volumes/wb
 curdir=.
+root=/
 
 [assigns]
 sys=ram:
