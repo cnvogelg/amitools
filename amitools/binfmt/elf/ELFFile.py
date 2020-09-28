@@ -122,6 +122,7 @@ class ELFSection:
         self.symbols = []
         self.relocations = None
         self.reloc_by_sect = {}
+        self.bss = None
 
     def get_rela(self):
         """return a list with all relocations"""
