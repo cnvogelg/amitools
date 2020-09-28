@@ -14,6 +14,10 @@ import lexec.Alloc
 
 class ExecLibrary(LibImpl):
 
+  
+  def __init__(self):
+      self.used_mask = 0
+
   def get_struct_def(self):
     return ExecLibraryStruct
 
@@ -395,7 +399,7 @@ class ExecLibrary(LibImpl):
       log_exec.info("DeleteIOREquest: 0x%06x -> %s" % (req,mb))
       self.alloc.free_memory(mb)
     else:
-      raise VamosInternalError("DeleteIORequest: Unknown IORequest to delete: ptr=%06x" % addr)
+      raise VamosInternalError("DeleteIORequest: Unknown IORequest to delete: ptr=%06x" % req)
 
   def OpenDevice(self,ctx):
     name_ptr = ctx.cpu.r_reg(REG_A0)
@@ -624,3 +628,20 @@ class ExecLibrary(LibImpl):
     num_bytes = ctx.cpu.r_reg(REG_D0)
     lexec.Alloc.deallocate(ctx, mh_addr, blk_addr, num_bytes)
     log_exec.info("Deallocate(%06x, %06x, %06x)" % (mh_addr, blk_addr, num_bytes))
+
+  def AllocSignal(self, ctx):
+    mask = ctx.cpu.r_reg(REG_D0)
+    i = 1
+    while i < 0x80000000:
+        if (self.used_mask & i) == 0:
+            self.used_mask |= i
+            break
+        i += i
+    log_exec.info("AllocSignal(%08x) -> %08x" % (mask, i))
+    return i
+
+  def FreeSignal(self, ctx):
+    sig = ctx.cpu.r_reg(REG_D0)
+    self.used_mask &= ~sig
+    log_exec.info("FreeSignal(%08x)" % (sig))
+    return 0
