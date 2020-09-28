@@ -61,19 +61,18 @@ class BinFmtELF:
         # walk through elf sections
         sect_to_seg = {}
         for sect in elf.sections:
+            if sect.header.type_ == 0 or sect.header.type_ == 4:
+                continue
             # determine segment type
             seg_type = None
             name = sect.name_str
             flags = 0
-            if name == b".text":
+            if name.startswith(b".text"):
                 seg_type = SEGMENT_TYPE_CODE
-            elif name == b".data":
-                seg_type = SEGMENT_TYPE_DATA
-            elif name == b".rodata":
-                seg_type = SEGMENT_TYPE_DATA
-                flags = SEGMENT_FLAG_READ_ONLY
             elif name == b".bss":
                 seg_type = SEGMENT_TYPE_BSS
+            else:
+                seg_type = SEGMENT_TYPE_DATA
             # we got a segment
             if seg_type is not None:
                 size = sect.header.size
