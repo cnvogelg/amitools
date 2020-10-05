@@ -1,6 +1,5 @@
 """A class for reading and writing ELF format binaries (esp. Amiga m68k ones)"""
 
-import struct
 import os
 from .ELF import *
 from .ELFFile import *

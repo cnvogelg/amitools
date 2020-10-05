@@ -3,7 +3,7 @@ from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib, LibFuncs, I
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.astructs import *
 from amitools.vamos.atypes import ExecLibrary as ExecLibraryType
-from amitools.vamos.atypes import NodeType, Node, List
+from amitools.vamos.atypes import NodeType, List
 from amitools.vamos.log import log_exec
 from amitools.vamos.error import *
 from .lexec.PortManager import PortManager
