@@ -826,6 +826,13 @@ class DosLibrary(LibImpl):
         fh_b_addr = ctx.cpu.r_reg(REG_D1)
         bufaddr = ctx.cpu.r_reg(REG_D2)
         buflen = ctx.cpu.r_reg(REG_D3)
+
+        # Hack for 'endcli': check FH if fh_End was set to 0 (faked EOF)
+        fh_acc = AccessStruct(ctx.mem, FileHandleStruct, fh_b_addr << 2)
+        fh_end = fh_acc.r_s("fh_End")
+        if fh_end == 0:
+            return 0
+
         fh = self.file_mgr.get_by_b_addr(fh_b_addr, False)
         line = fh.gets(buflen)
         # Bummer! FIXME: There is currently no way this can communicate an I/O error

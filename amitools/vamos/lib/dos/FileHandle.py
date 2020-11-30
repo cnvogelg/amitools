@@ -41,6 +41,8 @@ class FileHandle:
         self.mem.access.w_s("fh_Args", self.b_addr)
         # set port
         self.mem.access.w_s("fh_Type", fs_handler_port)
+        # buffer handling: set fh_End != 0 (to prepare for EOF hack in FGetS)
+        self.mem.access.w_s("fh_End", 1)
         return self.b_addr
 
     def free_fh(self, alloc):
