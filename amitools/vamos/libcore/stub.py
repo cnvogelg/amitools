@@ -192,9 +192,9 @@ class LibStubGen(object):
                 res = base_func(this, *args, **kwargs)
                 if res is not None:
                     if type(res) in (list, tuple):
-                        res_str = "d0=%08x, d1=%08x" % tuple(res)
+                        res_str = "d0=%08x, d1=%08x" % tuple(map(int, res))
                     else:
-                        res_str = "d0=%08x" % res
+                        res_str = "d0=%08x" % int(res)
                 else:
                     res_str = "n/a"
                 log.info("} CALL: -> %s" % res_str)
