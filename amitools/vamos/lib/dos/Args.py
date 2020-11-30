@@ -39,15 +39,14 @@ class TemplateArg:
     @classmethod
     def parse_string(cls, template):
         """parse a template string keya=keyb/n/k"""
-        p = [x for x in template.split("/") if x != ""]
+        # allow empty key!
+        p = [x for x in template.split("/")]
         if len(p) == 0:
             return None
         keys_all = p[0]
         flags_all = p[1:]
-        if keys_all == "":
-            return None
         # keys
-        keys = [x.upper() for x in [x for x in keys_all.split("=") if x != ""]]
+        keys = [x.upper() for x in keys_all.split("=")]
         if len(keys) == 0:
             return None
         # flags
