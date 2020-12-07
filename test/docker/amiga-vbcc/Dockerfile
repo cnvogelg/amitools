@@ -1,4 +1,4 @@
-FROM debian:8 AS builder
+FROM debian:10 AS builder
 
 RUN apt-get update && \
   apt-get install -y build-essential wget lhasa
@@ -20,8 +20,8 @@ RUN cd vlink && make
 RUN cp vlink/vlink /opt/vbcc/bin/
 
 # vbcc
-RUN wget http://server.owl.de/~frank/tags/vbcc0_9fP1.tar.gz
-RUN tar xvfz vbcc0_9fP1.tar.gz
+RUN wget http://server.owl.de/~frank/tags/vbcc0_9g.tar.gz
+RUN tar xvfz vbcc0_9g.tar.gz
 RUN mkdir vbcc/bin
 RUN cd vbcc && printf 'y\ny\nsigned char\ny\nunsigned char\nn\ny\nsigned short\nn\ny\nunsigned short\nn\ny\nsigned int\nn\ny\nunsigned int\nn\ny\nsigned long long\nn\ny\nunsigned long long\nn\ny\nfloat\nn\ny\ndouble\n' | make TARGET=m68k
 RUN cd vbcc && printf 'y\ny\nsigned char\ny\nunsigned char\nn\ny\nsigned short\nn\ny\nunsigned short\nn\ny\nsigned int\nn\ny\nunsigned int\nn\ny\nsigned long long\nn\ny\nunsigned long long\nn\ny\nfloat\nn\ny\ndouble\n' | make TARGET=m68ks
@@ -55,7 +55,7 @@ RUN cd /opt/vbcc/targets/m68k-amigaos/include && for a in /opt/vbcc/ndk/include/
 RUN cd /opt/vbcc/targets/m68k-kick13/include && for a in /opt/vbcc/ndk/include/* ; do ln -s $a ; done
 
 # runtime
-FROM debian:8
+FROM debian:10
 
 RUN apt-get update && \
   apt-get install -y make
