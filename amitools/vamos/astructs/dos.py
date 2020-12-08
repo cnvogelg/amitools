@@ -199,12 +199,12 @@ class DosLibraryStruct(AmigaStruct):
 @AmigaStructDef
 class FileInfoBlockStruct(AmigaStruct):
     _format = [
-        ("LONG", "fib_DiskKey"),
+        ("ULONG", "fib_DiskKey"),
         ("LONG", "fib_DirEntryType"),
         ("char|108", "fib_FileName"),
         ("LONG", "fib_Protection"),
         ("LONG", "fib_EntryType"),
-        ("LONG", "fib_Size"),
+        ("ULONG", "fib_Size"),
         ("LONG", "fib_NumBlocks"),
         ("DateStamp", "fib_Date"),
         ("char|80", "fib_Comment"),

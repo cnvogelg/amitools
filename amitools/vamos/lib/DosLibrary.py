@@ -1033,12 +1033,14 @@ class DosLibrary(LibImpl):
         fib = AccessStruct(ctx.mem, FileInfoBlockStruct, struct_addr=fib_ptr)
         err = lock.examine_next(fib)
         name_addr = fib.s_get_addr("fib_FileName")
-        name = fib.r_cstr(name_addr)
+        name = ctx.mem.r_cstr(name_addr)
         log_dos.info("ExNext: %s fib=%06x (%s) -> %s" % (lock, fib_ptr, name, err))
         self.setioerr(ctx, err)
         if err == NO_ERROR:
+            self.setioerr(ctx, 0)
             return self.DOSTRUE
         else:
+            self.setioerr(ctx, ERROR_NO_MORE_ENTRIES)
             return self.DOSFALSE
 
     def ParentDir(self, ctx):
