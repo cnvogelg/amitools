@@ -753,7 +753,7 @@ class DosLibrary(LibImpl):
         fh = ctx.process.get_output()
         buf_addr = ctx.cpu.r_reg(REG_D1)
         siz = ctx.cpu.r_reg(REG_D2)
-        buf = ctx.mem.r_cstr(buf_addr)[:siz]
+        buf = ctx.mem.r_cbytes(buf_addr)[:siz]
         fh.write(buf)
         return len(buf)
 
