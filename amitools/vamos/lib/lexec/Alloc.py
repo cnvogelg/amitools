@@ -204,15 +204,16 @@ def deallocate(ctx, mh_addr, blk_addr, num_bytes):
             mc.addr = blk_addr
             mc.bytes += num_bytes
             mc.write(ctx)
-            mc_last.next = blk_addr
-            mc_last.write(ctx)
+            if mc_last:
+                mc_last.next = blk_addr
+                mc_last.write(ctx)
             log_exec.debug("grow cur: %s", mc)
         # no merging possible -> create a new chunk between last and cur
         else:
             next_addr = mc.addr if mc is not None else 0
             mc_new = MemChunk(next_addr, num_bytes, blk_addr)
             mc_new.write(ctx)
-            if mc_last is not None:
+            if mc_last:
                 mc_last.next = mc_new.addr
                 mc_last.write(ctx)
                 log_exec.debug("new after: %s", mc_new)
