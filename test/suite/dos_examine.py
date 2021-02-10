@@ -14,9 +14,15 @@ def dos_examine_test(vamos, tmpdir):
     rc, stdout, stderr = vamos.run_prog("dos_examine", "root:" + str(test_dir)[1:])
     assert rc == 0
     assert stderr == []
+    # allow any order of foo or bar
     assert stdout == [
         'Examine: bla',
         '   14 foo',
         '<DIR> bar',
+        'ok'
+    ] or stdout == [
+        'Examine: bla',
+        '<DIR> bar',
+        '   14 foo',
         'ok'
     ]
