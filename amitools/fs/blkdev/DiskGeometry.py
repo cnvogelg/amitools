@@ -1,4 +1,5 @@
 import amitools.util.ByteSize as ByteSize
+from amitools.fs.blkdev.ImageFile import ImageFile
 
 
 class DiskGeometry:
@@ -42,14 +43,13 @@ class DiskGeometry:
         h = None
         s = None
         self._update_block_size(options)
-        num_blocks = byte_size // self.block_bytes
         algo = None
-        if options != None:
+        if options:
             (c, h, s) = self._parse_chs(options)
             if "algo" in options:
                 algo = int(options["algo"])
         # chs if fully specified then take this one
-        if c != None and h != None and s != None:
+        if c and h and s:
             self.cyls = c
             self.heads = h
             self.secs = s
@@ -61,33 +61,42 @@ class DiskGeometry:
         else:
             return self._guess_for_size(byte_size, algo=algo, secs=s, heads=h)
 
-    def setup(self, options):
+    def setup(self, options, cyls=None, heads=None, sectors=None):
         """setup a new geometry by giving options
        return bytes required by geometry or None if geometry is invalid
     """
-        if options == None:
+        if options is None:
             return False
-        c = None
-        h = None
-        s = None
         (c, h, s) = self._parse_chs(options)
+        if not c:
+            c = cyls
+        if not h:
+            h = heads
+        if not s:
+            s = sectors
         self._update_block_size(options)
         # chs is fully specified
-        if c != None and h != None and s != None:
+        if c and h and s:
             self.cyls = c
             self.heads = h
             self.secs = s
             return self.get_num_bytes()
         else:
+            # fetch size from another image
+            if "from" in options:
+                file_name = options["from"]
+                size = ImageFile.get_image_size(file_name)
             # we require a size
-            if "size" not in options:
+            elif "size" in options:
+                # parse size
+                size = options["size"]
+                if type(size) != int:
+                    size = ByteSize.parse_byte_size_str(size)
+                    if size is None:
+                        return None
+            # no size given
+            else:
                 return None
-            # parse size
-            size = options["size"]
-            if type(size) != int:
-                size = ByteSize.parse_byte_size_str(size)
-                if size == None:
-                    return None
             # select guess algo
             algo = None
             if "algo" in options:
@@ -115,9 +124,9 @@ class DiskGeometry:
 
     def _guess_for_size1(self, size, approx=True, secs=None, heads=None):
         mb = size // 1024
-        if secs == None:
+        if not secs:
             secs = 63
-        if heads == None:
+        if not heads:
             if mb <= 504 * 1024:
                 heads = 16
             elif mb <= 1008 * 1024:
@@ -140,9 +149,9 @@ class DiskGeometry:
             return None
 
     def _guess_for_size2(self, size, approx=True, secs=None, heads=None):
-        if heads == None:
+        if not heads:
             heads = 1
-        if secs == None:
+        if not secs:
             secs = 32
         cyls = (size // self.block_bytes) // (secs * heads)
         # keep cyls low
@@ -172,12 +181,12 @@ class DiskGeometry:
                 min_algo = None
                 for a in algos:
                     s = a(size, True, secs, heads)
-                    if s != None:
+                    if s:
                         delta = abs(size - s)
                         if delta < min_diff:
                             min_diff = delta
                             min_algo = a
-                if min_algo != None:
+                if min_algo:
                     return min_algo(size, True, secs, heads)
                 else:
                     return None

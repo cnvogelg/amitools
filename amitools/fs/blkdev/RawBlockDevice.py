@@ -9,7 +9,10 @@ class RawBlockDevice(BlockDevice):
     def create(self, num_blocks):
         self.img_file.create(num_blocks)
         self.open()
-        self.num_blocks = num_blocks
+
+    def resize(self, new_blocks):
+        self.img_file.resize(new_blocks)
+        self.open()
 
     def open(self):
         self.img_file.open()

@@ -12,6 +12,17 @@ class ImageFile:
         self.size = 0
         self.num_blocks = 0
 
+    @staticmethod
+    def get_image_size(file_name):
+        # is it a block/char device?
+        st = os.stat(file_name)
+        mode = st.st_mode
+        if stat.S_ISBLK(mode) or stat.S_ISCHR(mode):
+            return BlkDevTools.getblkdevsize(file_name)
+        else:
+            # get size and make sure its not empty
+            return os.path.getsize(file_name)
+
     def open(self):
         # file obj?
         if self.fobj:
@@ -28,14 +39,8 @@ class ImageFile:
             # is writeable?
             if not os.access(self.file_name, os.W_OK):
                 self.read_only = True
-            # is it a block/char device?
-            st = os.stat(self.file_name)
-            mode = st.st_mode
-            if stat.S_ISBLK(mode) or stat.S_ISCHR(mode):
-                self.size = BlkDevTools.getblkdevsize(self.file_name)
-            else:
-                # get size and make sure its not empty
-                self.size = os.path.getsize(self.file_name)
+            # get image size
+            self.size = ImageFile.get_image_size(self.file_name)
             if self.size == 0:
                 raise IOError("Empty image file detected!")
             self.num_blocks = self.size // self.block_bytes
@@ -87,15 +92,25 @@ class ImageFile:
     def create(self, num_blocks):
         if self.read_only:
             raise IOError("Can't create image file in read only mode")
-        block = b"\0" * self.block_bytes
+        total_size = num_blocks * self.block_bytes
         if self.fobj is not None:
-            for i in range(num_blocks):
-                self.fobj.write(block)
+            self.fobj.truncate(total_size)
             self.fobj.seek(0, 0)
         else:
             fh = open(self.file_name, "wb")
-            for i in range(num_blocks):
-                fh.write(block)
+            fh.truncate(total_size)
+            fh.close()
+
+    def resize(self, new_blocks):
+        if self.read_only:
+            raise IOError("Can't grow image file in read only mode")
+        total_size = new_blocks * self.block_bytes
+        if self.fobj is not None:
+            self.fobj.truncate(total_size)
+            self.fobj.seek(0, 0)  # seek start
+        else:
+            fh = open(self.file_name, "ab")
+            fh.truncate(total_size)
             fh.close()
 
 

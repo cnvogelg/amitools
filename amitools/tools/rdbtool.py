@@ -3,6 +3,7 @@
 # swiss army knife for rdb disk images or devices
 
 
+from amitools.util.HexDump import get_hex_line
 import sys
 import argparse
 import os.path
@@ -13,6 +14,7 @@ from amitools.fs.FSString import FSString
 from amitools.fs.rdb.RDisk import RDisk
 from amitools.fs.blkdev.RawBlockDevice import RawBlockDevice
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
+from amitools.fs.blkdev.ImageFile import ImageFile
 from amitools.fs.DosType import *
 from amitools.fs.block.rdb.PartitionBlock import PartitionBlock, PartitionDosEnv
 from amitools.fs.block.rdb.FSHeaderBlock import FSHeaderDeviceNode
@@ -32,6 +34,8 @@ class Command:
         self.rdisk = None
 
     def run(self, blkdev, rdisk):
+        self.blkdev = blkdev
+        self.rdisk = rdisk
         # optional init blkdev function
         if hasattr(self, "init_blkdev"):
             if blkdev == None:
@@ -244,7 +248,7 @@ class CreateCommand(Command):
             raise IOError("Image File already exists: '%s'" % file_name)
         # make sure size is given
         if len(self.opts) < 1:
-            print("Usage: create ( size=<n> | chs=<c,h,s> ) [bs=<n>]")
+            print("Usage: create ( size=<n> | chs=<c,h,s> | from=<img> ) [bs=<n>]")
             return None
         # determine disk geometry
         opts = KeyValue.parse_key_value_strings(self.opts)
@@ -254,6 +258,42 @@ class CreateCommand(Command):
         # create new empty image file for geometry
         blkdev = RawBlockDevice(file_name, block_bytes=geo.block_bytes)
         blkdev.create(geo.get_num_blocks())
+        blkdev.geo = geo
+        return blkdev
+
+
+# --- Change size of blkdev image ---
+
+
+class ResizeCommand(Command):
+    def __init__(self, args, opts):
+        Command.__init__(self, args, opts, edit=True)
+
+    def init_blkdev(self, file_name):
+        # do not overwrite an existing image file
+        if not os.path.exists(file_name):
+            raise IOError("Image File does not exist: '%s'" % file_name)
+        # make sure size is given
+        if len(self.opts) < 1:
+            print("Usage: resize ( size=<n> | chs=<c,h,s> | from=<img> ) [bs=<n>]")
+            return None
+        # determine disk geometry
+        opts = KeyValue.parse_key_value_strings(self.opts)
+        geo = DiskGeometry()
+        if not geo.setup(opts):
+            raise IOError("Can't set geometry of disk: '%s'" % file_name)
+        # grow or shrink image file
+        cur_size = ImageFile.get_image_size(file_name)
+        new_size = geo.get_num_bytes()
+        if cur_size == new_size:
+            print("Image size unchanged")
+        elif cur_size < new_size:
+            print("Growing image")
+        else:
+            print("Shrinking image")
+        new_blocks = new_size // geo.block_bytes
+        blkdev = RawBlockDevice(file_name, block_bytes=geo.block_bytes)
+        blkdev.resize(new_blocks)
         blkdev.geo = geo
         return blkdev
 
@@ -282,6 +322,16 @@ class InfoCommand(Command):
         part_name = None
         if len(self.opts) > 0:
             part_name = self.opts[0]
+        else:
+            # blkdev info
+            geo = self.blkdev.geo
+            extra = "heads=%d sectors=%d block_size=%d" % (
+                geo.heads, geo.secs, geo.block_bytes
+            )
+            print("BlockDevice:         %8d %8d  %10d  %s  %s" %
+                  (0, geo.cyls - 1,  geo.get_num_blocks(),
+                   ByteSize.to_byte_size_str(geo.get_num_bytes()),
+                   extra))
         lines = rdisk.get_info(part_name)
         for l in lines:
             print(l)
@@ -835,6 +885,7 @@ def main(argv=None, defaults=None):
     cmd_map = {
         "open": OpenCommand,
         "create": CreateCommand,
+        "resize": ResizeCommand,
         "init": InitCommand,
         "info": InfoCommand,
         "show": ShowCommand,

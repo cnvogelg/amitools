@@ -86,7 +86,7 @@ for existing devices available through block device names.
 
 ::
 
-  create [ size=<size> | chs=<cyl>,<heads>,<secs> ] [ bs=<n> ]
+  create [ size=<size> | chs=<cyl>,<heads>,<secs> | from=<img> ] [ bs=<n> ]
 
 The ``create`` operation is used to create a new image file. The create
 command needs a size parameter::
@@ -100,6 +100,12 @@ you can give the geometry with::
   > rdbtool test.img create chs=10,1,32
 
 Here 10 cylinders, 1 head and 32 sectors are defined.
+
+Another way to specify the size of the new image is to give the file name
+of an existing image or real device. This is useful to create a new image
+of compatible size::
+
+  > rbdtool test.img create from=other.img
 
 You can only use the ``create`` command if the given image file does not exist
 yet. If it already exists then an error message is generated. However, you can
@@ -153,6 +159,19 @@ with a different block size on a disk::
   > rdbtool /dev/disk1 open bs=4096 + init
 
 .. note:: Amigas only support RDBs with a 512 byte block size!
+
+
+``resize`` - Change size of existing image
+---------------------------------------------
+
+::
+
+  resize [ chs=<cyl>,<heads>,<secs> | c=<cyl> h=<heads> s=<secs> | from=<img> ] [ bs=<n> ]
+
+Similar to the ``create`` command you can specify the new size of an image.
+It will be either shrunk or grown.
+
+.. note:: The RDB that may be already on the disk is not touched or adjusted!
 
 
 Inspect the Partition Layout
