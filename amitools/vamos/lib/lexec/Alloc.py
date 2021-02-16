@@ -156,16 +156,21 @@ def deallocate(ctx, mh_addr, blk_addr, num_bytes):
     mh.read(ctx, mh_addr)
     log_exec.debug("read: %s", mh)
 
+    # sanity check
+    if blk_addr < mh.lower or (blk_addr + num_bytes - 1) > mh.upper:
+        log_exec.error("deallocate: block outside of mem header!")
+
     # no mem chunks?
     if mh.first == 0:
-        # assume that the whole memory is returned
-        if num_bytes != mh.total or blk_addr != mh.lower or mh.free != 0:
-            log_exec.error("Invalid deallocation: num_bytes != mh.total")
-        # create a new mc
-        mc = MemChunk(0, num_bytes, mh.lower)
+        # sanity check
+        if mh.free != 0:
+            log_exec.error("deallocate: internal error: first=0 but free!=0!")
+
+        # create new and only mem chunk in deallocated range
+        mc = MemChunk(0, num_bytes, blk_addr)
         mc.write(ctx)
         log_exec.debug("single: %s", mc)
-        mh.first = mh.lower
+        mh.first = blk_addr
     else:
         # find chunk right before/after the returned block
         mc_last = None
@@ -204,15 +209,16 @@ def deallocate(ctx, mh_addr, blk_addr, num_bytes):
             mc.addr = blk_addr
             mc.bytes += num_bytes
             mc.write(ctx)
-            mc_last.next = blk_addr
-            mc_last.write(ctx)
+            if mc_last:
+                mc_last.next = blk_addr
+                mc_last.write(ctx)
             log_exec.debug("grow cur: %s", mc)
         # no merging possible -> create a new chunk between last and cur
         else:
             next_addr = mc.addr if mc is not None else 0
             mc_new = MemChunk(next_addr, num_bytes, blk_addr)
             mc_new.write(ctx)
-            if mc_last is not None:
+            if mc_last:
                 mc_last.next = mc_new.addr
                 mc_last.write(ctx)
                 log_exec.debug("new after: %s", mc_new)

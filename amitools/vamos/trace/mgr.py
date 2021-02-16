@@ -77,6 +77,7 @@ class TraceManager(object):
         self._trace_mem(log_mem_int, mode, width, addr, value, text, addon)
 
     def trace_int_block(self, mode, addr, size, text="", addon=""):
+        addr = int(addr)
         info, label = self._get_mem_info(addr)
         log_mem_int.info(
             "%s(B): %06x: +%06x   %6s  [%s] %s", mode, addr, size, text, info, addon

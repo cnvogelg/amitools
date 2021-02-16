@@ -94,11 +94,16 @@ class Lock:
         # size
         if os.path.isfile(sys_path):
             size = os.path.getsize(sys_path)
+            # limit to 32bit
+            if size > 0xffffffff:
+                size = 0xffffffff
             fib_mem.w_s("fib_Size", size)
             blocks = (size + 511) // 512
             fib_mem.w_s("fib_NumBlocks", blocks)
+            log_lock.debug("examine lock: '%s' size=%d, blocks=%d", sys_path, size, blocks)
         else:
             fib_mem.w_s("fib_NumBlocks", 1)
+            log_lock.debug("examine lock: '%s' no file", sys_path)
         # date (use mtime here)
         date_addr = fib_mem.s_get_addr("fib_Date")
         date = AccessStruct(fib_mem.mem, DateStampStruct, date_addr)

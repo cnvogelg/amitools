@@ -10,8 +10,8 @@ SOURCES_C += exec_initres.c exec_rawdofmt.c
 SOURCES_C += dos_readargs.c dos_readargs2.c dos_findarg.c
 SOURCES_C += dos_loadseg.c dos_runcmd.c
 SOURCES_C += dos_system.c dos_match.c
-SOURCES_C += dos_program.c dos_seek.c
-SOURCES_C += vprintf.c
+SOURCES_C += dos_program.c dos_seek.c dos_examine.c
+SOURCES_C += vprintf.c dos_stdout.c
 SOURCES_C += util_muldiv.c util_date.c
 SOURCES_C += math_double.c math_double_trans.c
 SOURCES_C += math_single.c math_single_trans.c
@@ -20,6 +20,12 @@ SOURCES_C += test_hello.c test_raise.c
 SOURCES_C += test_devtimer.c
 SOURCES_C += lib_testnix.c lib_testsc.c
 SOURCES_C += proc_args.c
+
+# compile a single source only?
+ifdef ONLY_SOURCE
+SOURCES_C := $(filter $(ONLY_SOURCE), $(SOURCES_C))
+endif
+export ONLY_SOURCE
 
 LIB_GCC_SOURCES_C = testnix.c
 LIB_SC_SOURCES_C = testsc.c
@@ -136,16 +142,16 @@ sasc: $(PROGS_SASC) $(PROGS_SASC_DBG) $(LIBS_SC) $(LIBS_SC_DBG)
 build-docker: check gcc-docker aros-docker vbcc-docker sasc-docker
 
 gcc-docker:
-	docker/drun amiga-gcc6 /usr/bin/make gcc
+	docker/drun amiga-gcc6 /usr/bin/make gcc ONLY_SOURCE=$(ONLY_SOURCE)
 
 aros-docker:
-	docker/drun m68k-aros /usr/bin/make aros
+	docker/drun m68k-aros /usr/bin/make aros ONLY_SOURCE=$(ONLY_SOURCE)
 
 vbcc-docker:
-	docker/drun amiga-vbcc /usr/bin/make vbcc
+	docker/drun amiga-vbcc /usr/bin/make vbcc ONLY_SOURCE=$(ONLY_SOURCE)
 
 sasc-docker:
-	docker/drun --dir ../.. amitools /usr/bin/make sasc VAMOS=vamos HOME=$(PWD)
+	docker/drun --dir ../.. amitools /usr/bin/make sasc VAMOS=vamos HOME=$(PWD) ONLY_SOURCE=$(ONLY_SOURCE)
 
 check:
 	@if [ ! -d volumes/sc ]; then \

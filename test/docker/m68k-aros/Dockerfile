@@ -1,13 +1,15 @@
-FROM debian:8 AS builder
+FROM debian:10 AS builder
 
 RUN apt-get update && \
   apt-get install -y build-essential netpbm git automake make bison flex \
-    python python-mako libpng12-dev wget texinfo
-RUN git clone https://github.com/aros-development-team/AROS.git
-RUN mkdir -p /opt/m68k-aros
-RUN cd opt/m68k-aros && /AROS/configure --target=amiga-m68k && make
+    python3 python3-mako libpng-dev wget texinfo
+RUN mkdir -p /opt/
+RUN git clone https://github.com/aros-development-team/AROS.git && \
+  cd AROS && git submodule init && git submodule update
+RUN mv AROS /opt/m68k-aros
+RUN cd opt/m68k-aros && ./configure --target=amiga-m68k && make
 
-FROM debian:8
+FROM debian:10
 
 RUN apt-get update && \
   apt-get install -y make

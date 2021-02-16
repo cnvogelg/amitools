@@ -164,3 +164,30 @@ class TraceMemory:
         self.trace_mgr.trace_int_block(
             "W", addr, len(bstr), text="BSTR", addon="'%s'" % bstr
         )
+
+    # bytes
+    def r_cbytes(self, addr):
+        cbytes = self.mem.r_cbytes(addr)
+        self.trace_mgr.trace_int_block(
+            "R", addr, len(cbytes), text="CBYT", addon="%r" % cbytes
+        )
+        return cbytes
+
+    def w_cbytes(self, addr, cbytes):
+        self.mem.w_cbytes(addr, cbytes)
+        self.trace_mgr.trace_int_block(
+            "W", addr, len(cbytes), text="CBYT", addon="%r" % cbytes
+        )
+
+    def r_bbytes(self, addr):
+        bbytes = self.mem.r_bbytes(addr)
+        self.trace_mgr.trace_int_block(
+            "R", addr, len(bbytes), text="BBYT", addon="%r" % bbytes
+        )
+        return bbytes
+
+    def w_bbytes(self, addr, bbytes):
+        self.mem.w_bbytes(addr, bbytes)
+        self.trace_mgr.trace_int_block(
+            "W", addr, len(bbytes), text="BBYT", addon="%r" % bbytes
+        )

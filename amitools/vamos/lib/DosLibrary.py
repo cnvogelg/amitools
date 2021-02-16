@@ -753,7 +753,7 @@ class DosLibrary(LibImpl):
         fh = ctx.process.get_output()
         buf_addr = ctx.cpu.r_reg(REG_D1)
         siz = ctx.cpu.r_reg(REG_D2)
-        buf = ctx.mem.r_cstr(buf_addr)[:siz]
+        buf = ctx.mem.r_cbytes(buf_addr)[:siz]
         fh.write(buf)
         return len(buf)
 
@@ -827,6 +827,13 @@ class DosLibrary(LibImpl):
         fh_b_addr = ctx.cpu.r_reg(REG_D1)
         bufaddr = ctx.cpu.r_reg(REG_D2)
         buflen = ctx.cpu.r_reg(REG_D3)
+
+        # Hack for 'endcli': check FH if fh_End was set to 0 (faked EOF)
+        fh_acc = AccessStruct(ctx.mem, FileHandleStruct, fh_b_addr << 2)
+        fh_end = fh_acc.r_s("fh_End")
+        if fh_end == 0:
+            return 0
+
         fh = self.file_mgr.get_by_b_addr(fh_b_addr, False)
         line = fh.gets(buflen)
         # Bummer! FIXME: There is currently no way this can communicate an I/O error
@@ -1027,12 +1034,14 @@ class DosLibrary(LibImpl):
         fib = AccessStruct(ctx.mem, FileInfoBlockStruct, struct_addr=fib_ptr)
         err = lock.examine_next(fib)
         name_addr = fib.s_get_addr("fib_FileName")
-        name = fib.r_cstr(name_addr)
+        name = ctx.mem.r_cstr(name_addr)
         log_dos.info("ExNext: %s fib=%06x (%s) -> %s" % (lock, fib_ptr, name, err))
         self.setioerr(ctx, err)
         if err == NO_ERROR:
+            self.setioerr(ctx, 0)
             return self.DOSTRUE
         else:
+            self.setioerr(ctx, ERROR_NO_MORE_ENTRIES)
             return self.DOSFALSE
 
     def ParentDir(self, ctx):
