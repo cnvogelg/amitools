@@ -623,7 +623,6 @@ static floatx80 READ_EA_FPE(int mode, int reg, uint32 di_mode_ea)
 			fpr = load_extended_float80(ea);
 			break;
 		}
-
 		case 3:		// (An)+
 		{
 			uint32 ea = REG_A[reg];
@@ -634,13 +633,19 @@ static floatx80 READ_EA_FPE(int mode, int reg, uint32 di_mode_ea)
       case 5:		// (d16, An)  (added by JFF)
 		{
 		  fpr = load_extended_float80(di_mode_ea);
-	  	break;
-
+		  break;
 		}
-		case 7:	// extended modes
+	  case 7:	// extended modes
 		{
 			switch (reg)
 			{
+				case 1:		// (xxx).L
+					{
+						uint32 d1 = OPER_I_16();
+						uint32 d2 = OPER_I_16();
+						fpr = int32_to_floatx80((d1 << 16) | d2);
+					}
+					break;
 				case 2:	// (d16, PC)
 					{
 						uint32 ea = EA_PCDI_32();
