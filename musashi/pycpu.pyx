@@ -24,6 +24,7 @@ cdef extern from "m68k.h":
   int m68k_execute(int num_cycles)
   void m68k_end_timeslice()
 
+  double m68k_get_fpreg(void* context, int reg)
   unsigned int m68k_get_reg(void* context, m68k_register_t reg)
   void m68k_set_reg(m68k_register_t reg, unsigned int value)
 
@@ -66,6 +67,9 @@ cdef class CPUContext:
   cdef void *get_data(self):
     return self.data
 
+  def r_fpreg(self, int reg):
+    return m68k_get_fpreg(self.data, reg)
+
   def r_reg(self, int reg):
     return m68k_get_reg(self.data, <m68k_register_t>reg)
 
@@ -100,6 +104,12 @@ cdef class CPU:
     self.set_pc_changed_callback(None)
     self.set_reset_instr_callback(None)
     self.set_instr_hook_callback(None)
+
+  def get_cpu_type(self):
+      return self.cpu_type
+
+  def r_fpreg(self, int reg):
+    return m68k_get_fpreg(NULL, reg)
 
   cdef unsigned int r_reg_internal(self, m68k_register_t reg):
     return m68k_get_reg(NULL, reg)

@@ -373,6 +373,8 @@ void m68k_set_context(void* dst);
 void m68k_state_register(const char *type, int index);
 
 
+double m68k_get_fpreg(void* context, int reg);
+
 /* Peek at the internals of a CPU context.  This can either be a context
  * retrieved using m68k_get_context() or the currently running context.
  * If context is NULL, the currently running CPU context will be used.

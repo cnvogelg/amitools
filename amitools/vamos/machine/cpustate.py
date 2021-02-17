@@ -1,9 +1,11 @@
+from musashi.m68k import M68K_CPU_TYPE_68040
 class CPUState:
     def __init__(self):
         self.pc = None
         self.sr = None
         self.dx = None
         self.ax = None
+        self.fx = None
         self.usp = None
         self.isp = None
         self.msp = None
@@ -37,6 +39,12 @@ class CPUState:
         self.ax = ax
         for i in range(8):
             ax.append(cpu.r_reg(8 + i))
+            
+        if cpu.get_cpu_type() == M68K_CPU_TYPE_68040:
+            fx = []
+            self.fx = fx
+            for i in range(8):
+                fx.append(cpu.r_fpreg(i))
 
     def set(self, cpu):
         cpu.w_pc(self.pc)
@@ -72,4 +80,12 @@ class CPUState:
             ax.append("A%d=%08x" % (pos, a))
             pos += 1
         res.append("  ".join(ax))
+
+        fx = []
+        pos = 0
+        for f in self.fx:
+            fx.append("F%d=%g" % (pos, f))
+            pos += 1
+        if len(fx) > 0:
+            res.append("  ".join(fx))
         return res
