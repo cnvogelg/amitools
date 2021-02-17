@@ -567,10 +567,26 @@ static uint64 READ_EA_64(int ea)
 			h2 = m68ki_read_32(ea+4);
 			return  (uint64)(h1) << 32 | (uint64)(h2);
 		}
+		case 6:		// (An) + (Xn) + d8
+		{
+			uint32 ea = EA_AY_IX_16();
+			h1 = m68ki_read_32(ea+0);
+			h2 = m68ki_read_32(ea+4);
+			return  (uint64)(h1) << 32 | (uint64)(h2);
+		}
 		case 7:
 		{
 			switch (reg)
 			{
+				case 1:		// (xxx).L
+				{
+					uint32 d1 = OPER_I_16();
+					uint32 d2 = OPER_I_16();
+					uint32 ea = (d1 << 16) | d2;
+					h1 = m68ki_read_32(ea+0);
+					h2 = m68ki_read_32(ea+4);
+					return  (uint64)(h1) << 32 | (uint64)(h2);
+				}
 				case 4:		// #<data>
 				{
 					h1 = OPER_I_32();
@@ -944,6 +960,38 @@ static void WRITE_EA_64(int ea, uint64 data)
 			m68ki_write_32(ea+4, (uint32)(data));
 			break;
 		}
+
+		case 6:		// (An) + (Xn) + d8
+		{
+			uint32 ea = EA_AY_IX_16();
+			m68ki_write_32(ea+0, (uint32)(data >> 32));
+			m68ki_write_32(ea+4, (uint32)(data));
+			break;
+		}
+		case 7:
+		{
+			switch (reg)
+			{
+				case 1:		// (xxx).L
+				{
+					uint32 d1 = OPER_I_16();
+					uint32 d2 = OPER_I_16();
+					uint32 ea = (d1 << 16) | d2;
+					m68ki_write_32(ea+0, (uint32)(data >> 32));
+					m68ki_write_32(ea+4, (uint32)(data));
+					break;
+				}
+				case 2:		// (d16, PC)
+				{
+					uint32 ea = EA_PCDI_32();
+					m68ki_write_32(ea+0, (uint32)(data >> 32));
+					m68ki_write_32(ea+4, (uint32)(data));
+					break;
+				}
+				default:	fatalerror("M68kFPU: WRITE_EA_64: unhandled mode %d, data %08X%08X at %08X\n", mode, reg, (uint32)(data >> 32), (uint32)(data), REG_PC);
+			}
+			break;
+		}
 		default:	fatalerror("M68kFPU: WRITE_EA_64: unhandled mode %d, reg %d, data %08X%08X at %08X\n", mode, reg, (uint32)(data >> 32), (uint32)(data), REG_PC);
 	}
 }
@@ -1243,7 +1291,14 @@ static void fpgen_rm_reg(uint16 w2)
 		case 0x20:		// FDIV
 		{
 			REG_FP[dst] = floatx80_div(REG_FP[dst], source);
-		    SET_CONDITION_CODES(REG_FP[dst]); // JFF
+		    	SET_CONDITION_CODES(REG_FP[dst]); // JFF
+			USE_CYCLES(43);
+			break;
+		}
+		case 0x24:		// FSGLDIV
+		{
+			REG_FP[dst] = double_to_fx80((float)fx80_to_double(floatx80_div(REG_FP[dst], source)));
+		    	SET_CONDITION_CODES(REG_FP[dst]); // JFF
 			USE_CYCLES(43);
 			break;
 		}
@@ -1258,6 +1313,13 @@ static void fpgen_rm_reg(uint16 w2)
 		case 0x23:		// FMUL
 		{
 			REG_FP[dst] = floatx80_mul(REG_FP[dst], source);
+			SET_CONDITION_CODES(REG_FP[dst]);
+			USE_CYCLES(11);
+			break;
+		}
+		case 0x27:		// FSGLMUL
+		{
+			REG_FP[dst] = double_to_fx80((float)fx80_to_double(floatx80_mul(REG_FP[dst], source)));
 			SET_CONDITION_CODES(REG_FP[dst]);
 			USE_CYCLES(11);
 			break;
