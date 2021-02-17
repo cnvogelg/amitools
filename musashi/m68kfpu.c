@@ -643,7 +643,7 @@ static floatx80 READ_EA_FPE(int mode, int reg, uint32 di_mode_ea)
 					{
 						uint32 d1 = OPER_I_16();
 						uint32 d2 = OPER_I_16();
-						fpr = int32_to_floatx80((d1 << 16) | d2);
+						fpr = load_extended_float80((d1 << 16) | d2);
 					}
 					break;
 				case 2:	// (d16, PC)
