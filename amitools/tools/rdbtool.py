@@ -314,6 +314,55 @@ class InitCommand(OpenCommand):
         return rdisk
 
 
+# --- Adjust Range of RDB ---
+
+
+class AdjustCommand(Command):
+    def handle_rdisk(self, rdisk):
+        # arguments
+        if len(self.opts) < 1:
+            print("Usage: adjust ( auto [force] | lo=<cyl> hi=<cyl> [phys] )")
+            return None
+        opts = KeyValue.parse_key_value_strings(self.opts)
+        if 'auto' in opts:
+            # automatic mode
+            # get max cyl from image
+            total_blocks = self.blkdev.geo.get_num_blocks()
+            c, h, s = rdisk.get_cyls_heads_secs()
+            num_cyl = total_blocks // (h * s)
+            if num_cyl > 65535:
+                if 'force' not in opts:
+                    print("ERROR: cylinder count too high:", num_cyl)
+                    return 1
+            lo_cyl = None
+            hi_cyl = num_cyl - 1
+            phys = True
+        else:
+            # manual mode
+            if 'lo' in opts:
+                lo_cyl = int(opts['lo'])
+            else:
+                lo_cyl = None
+            if 'hi' in opts:
+                hi_cyl = int(opts['hi'])
+            else:
+                hi_cyl = None
+            if 'phys' in opts:
+                phys = opts['phys']
+            else:
+                phys = False
+        # try to resize
+        if lo_cyl or hi_cyl:
+            ok = rdisk.resize(lo_cyl, hi_cyl, phys)
+            if not ok:
+                print("ERROR: Adjustment of RDB failed!")
+                return 1
+        else:
+            print("ERROR: no adjust options given!")
+            return 1
+        return 0
+
+
 # --- Info about rdisk ----
 
 
@@ -887,6 +936,7 @@ def main(argv=None, defaults=None):
         "create": CreateCommand,
         "resize": ResizeCommand,
         "init": InitCommand,
+        "adjust" : AdjustCommand,
         "info": InfoCommand,
         "show": ShowCommand,
         "free": FreeCommand,

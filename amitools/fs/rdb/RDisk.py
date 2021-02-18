@@ -198,6 +198,10 @@ class RDisk:
     def get_logical_bytes(self):
         return self.get_logical_blocks() * self.block_bytes
 
+    def get_cyls_heads_secs(self):
+        pd = self.rdb.phy_drv
+        return pd.cyls, pd.heads, pd.secs
+
     def get_total_blocks(self):
         pd = self.rdb.phy_drv
         return pd.cyls * pd.heads * pd.secs
@@ -320,6 +324,41 @@ class RDisk:
         self.used_blks = [self.rdb.blk_num]
         self.max_blks = self.rdb.log_drv.rdb_blk_hi + 1
         self.valid = True
+
+    def resize(self, new_lo_cyl=None, new_hi_cyl=None, adjust_physical=False):
+        # if the rdb region has to be minimized then check if no partition 
+        # is in the way
+        if not new_lo_cyl:
+            new_lo_cyl = self.rdb.log_drv.lo_cyl
+        if not new_hi_cyl:
+            new_hi_cyl = self.rdb.log_drv.hi_cyl
+        # same range? silently ignore and return true
+        if new_lo_cyl == self.rdb.log_drv.lo_cyl and \
+           new_hi_cyl == self.rdb.log_drv.hi_cyl:
+            return True
+        # invalid range
+        if new_lo_cyl > new_hi_cyl:
+            return False
+        # check partitions
+        for p in self.parts:
+            (lo, hi) = p.get_cyl_range()
+            if lo < new_lo_cyl:
+                return False
+            if hi > new_hi_cyl:
+                return False
+        # need to adjust phyisical disc?
+        if new_hi_cyl != self.rdb.phy_drv.cyls - 1:
+            if adjust_physical:
+                self.rdb.phy_drv.cyls = new_hi_cyl + 1
+            else:
+                # not allowed to grow physical disk. abort!
+                return False
+        # adjust logical range
+        self.rdb.log_drv.lo_cyl = new_lo_cyl
+        self.rdb.log_drv.hi_cyl = new_hi_cyl
+        # update block
+        self.rdb.write()
+        return True
 
     def get_cyl_range(self):
         log_drv = self.rdb.log_drv

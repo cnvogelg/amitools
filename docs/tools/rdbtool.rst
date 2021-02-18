@@ -171,7 +171,10 @@ with a different block size on a disk::
 Similar to the ``create`` command you can specify the new size of an image.
 It will be either shrunk or grown.
 
-.. note:: The RDB that may be already on the disk is not touched or adjusted!
+.. note:: 
+
+  The RDB that may be already on the disk is not touched or adjusted!
+  Use the ``adjust`` command to adjust the RDB as well.
 
 
 Inspect the Partition Layout
@@ -246,6 +249,34 @@ sufficient to hold the RDB data structures. In this case use the ``rdb_cyls``
 option to set the number of cylinders to reserve for RDB::
 
   > rdbtool test.img create size=10Mi + init rdb_cyls=2
+
+
+``adjust`` - Adjust range of existing RDB structure
+---------------------------------------------------
+
+::
+
+  adjust ( auto [ force ] | [ lo=<cyl> ] [ hi=<cyl> ] [ phys ] )
+
+This command changes the range on the disk that the current RDB covers.
+It is very handy if you copy a pre-existing image file to a real medium
+(e.g. compact flash card) with a larger size.
+
+You can either use the ``auto`` mode that automatically increases the RDB
+range to cover the full image or medium. If the cylinder number gets too
+large then you need to add the ``force`` option to allow the change.
+
+  > rdbtool /dev/disk4 adjust auto
+
+In manual mode you have to specify the new range of the RDB by giving either
+the ``lo`` and/or ``hi`` cylinder. If you add the ``phys`` option then 
+not only the logical range of the RDB will be changed but also its
+physical extend.
+
+  > rdbtool test.img adjust hi=1000 phys
+
+The ``adjust`` command will abort with an error if the existing partitions
+do not fit into the new range.
 
 
 ``add`` - Add a new partition
