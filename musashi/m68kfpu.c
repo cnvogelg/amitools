@@ -630,6 +630,13 @@ static floatx80 READ_EA_FPE(int mode, int reg, uint32 di_mode_ea)
 			fpr = load_extended_float80(ea);
 			break;
 		}
+		case 4:		// -(An)
+		{
+			REG_A[reg] -= 12;
+			uint32 ea = REG_A[reg];
+			fpr = load_extended_float80(ea);
+			break;
+		}
       case 5:		// (d16, An)  (added by JFF)
 		{
 		  fpr = load_extended_float80(di_mode_ea);
@@ -698,6 +705,13 @@ static floatx80 READ_EA_PACK(int ea)
 		{
 			uint32 ea = REG_A[reg];
 			REG_A[reg] += 12;
+			fpr = load_pack_float80(ea);
+			break;
+		}
+		case 4:		// -(An)
+		{
+			REG_A[reg] -= 12;
+			uint32 ea = REG_A[reg];
 			fpr = load_pack_float80(ea);
 			break;
 		}
