@@ -963,6 +963,15 @@ static void WRITE_EA_64(int ea, uint64 data)
 			m68ki_write_32(ea+4, (uint32)(data));
 			break;
 		}
+		case 3:		// (An)+
+		{
+			uint32 ea;
+			ea = REG_A[reg];
+			REG_A[reg] += 8;
+			m68ki_write_32(ea+0, (uint32)(data >> 32));
+			m68ki_write_32(ea+4, (uint32)(data));
+			break;
+		}
 		case 4:		// -(An)
 		{
 			uint32 ea;
@@ -1059,6 +1068,15 @@ static void WRITE_EA_FPE(int mode, int reg, floatx80 fpr, uint32 di_mode_ea)
 		{
 			switch (reg)
 			{
+				case 1:		// (xxx).L
+				{
+					uint32 d1 = OPER_I_16();
+					uint32 d2 = OPER_I_16();
+					uint32 ea = (d1 << 16) | d2;
+					store_extended_float80(ea, fpr);
+					break;
+				}
+
 				default:	fatalerror("M68kFPU: WRITE_EA_FPE: unhandled mode %d, reg %d, at %08X\n", mode, reg, REG_PC);
 			}
 			break;
