@@ -1213,8 +1213,62 @@ static void fpgen_rm_reg(uint16 w2)
 						source = int32_to_floatx80((sint32)10*10);
 						break;
 
+					case 0x35:	// 10^4
+						source = int32_to_floatx80((sint32)10000);
+						break;
+
+					case 0x36:  // 10^8
+						source = double_to_fx80(1e8);
+						break;
+
+					case 0x37:  // 10^16
+						source = double_to_fx80(1e16);
+						break;
+
+					case 0x38:  // 10^32
+						source = double_to_fx80(1e32);
+						break;
+
+					case 0x39:  // 10^64
+						source = double_to_fx80(1e64);
+						break;
+
+					case 0x3a:  // 10^128
+						source = double_to_fx80(1e128);
+						break;
+
+					case 0x3b:  // 10^256
+						source = double_to_fx80(1e256);
+						break;
+
+					case 0x3c:  // 10^512
+						source = double_to_fx80(1e256);
+						source = floatx80_mul(source, source);
+						break;
+
+					case 0x3d:  // 10^1024
+						source = double_to_fx80(1e256);
+						source = floatx80_mul(source, source);
+						source = floatx80_mul(source, source);
+						break;
+
+					case 0x3e:  // 10^2048
+						source = double_to_fx80(1e256);
+						source = floatx80_mul(source, source);
+						source = floatx80_mul(source, source);
+						source = floatx80_mul(source, source);
+						break;
+
+					case 0x3f:  // 10^4096
+						source = double_to_fx80(1e256);
+						source = floatx80_mul(source, source);
+						source = floatx80_mul(source, source);
+						source = floatx80_mul(source, source);
+						source = floatx80_mul(source, source);
+						break;
+
 					default:
-						fatalerror("fmove_rm_reg: unknown constant ROM offset %x at %08x\n", w2&0x7f, REG_PC-4);
+						source = int32_to_floatx80((sint32)0);
 						break;
 				}
 
