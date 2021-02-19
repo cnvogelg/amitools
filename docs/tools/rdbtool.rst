@@ -279,6 +279,30 @@ The ``adjust`` command will abort with an error if the existing partitions
 do not fit into the new range.
 
 
+``remap`` - Change geometry of existing RDB structure
+-----------------------------------------------------
+
+::
+
+  remap [ s=<sectors> ] [ h=<heads> ]
+
+This command allows to change the interal geometry of the disk image.
+The geometry consists of cylinders, heads, and sectors. Typically, the
+number of heads and sectors is chosen in such a way that the number
+of cylinders spanning the image does not grow too large.
+
+If you want to ``adjust`` an RDB to a larger device size then the cylinder
+ranges might get too large. In this case use the ``remap`` command first
+to increase the sectors and/or heads to keep the cylinders in a reasonable
+range.
+
+  > rdbtool image.rdb remap s=32 h=8
+
+Note that the ``remap`` operation is only allowed if the physical and logical
+disk layout can be converted to the new values without any resizing. 
+Additionally, all partition ranges must be mappable as well.
+
+
 ``add`` - Add a new partition
 -----------------------------
 

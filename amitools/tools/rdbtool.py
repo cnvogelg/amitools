@@ -90,6 +90,10 @@ class FSCommandQueue(CommandQueue):
             cmd = "'%s'" % " ".join(self.cmd_line)
             print(cmd, "IOError:", str(e))
             exit_code = 4
+        except ValueError as e:
+            cmd = "'%s'" % " ".join(self.cmd_line)
+            print(cmd, "ValueError:", str(e))
+            exit_code = 4
         finally:
             # close rdisk
             if self.rdisk != None:
@@ -353,13 +357,31 @@ class AdjustCommand(Command):
                 phys = False
         # try to resize
         if lo_cyl or hi_cyl:
-            ok = rdisk.resize(lo_cyl, hi_cyl, phys)
-            if not ok:
-                print("ERROR: Adjustment of RDB failed!")
-                return 1
+            rdisk.resize(lo_cyl, hi_cyl, phys)
         else:
             print("ERROR: no adjust options given!")
             return 1
+        return 0
+
+
+# --- Remap RDB: Change Cylinder Block Size ---
+
+
+class RemapCommand(Command):
+    def handle_rdisk(self, rdisk):
+        # arguments
+        if len(self.opts) < 1:
+            print("Usage: remap secs=<secs> heads=<heads>")
+            return None
+        opts = KeyValue.parse_key_value_strings(self.opts)
+        geo = DiskGeometry()
+        c, h, s = rdisk.get_cyls_heads_secs()
+        if not geo.setup(opts, cyls=c, heads=h, sectors=s):
+            raise ValueError("Can't set new geometry!")
+        if geo.cyls != c:
+            raise ValueError("Do not change cylinders!")
+        print("Remap to", geo.heads, "heads and", geo.secs, "sectors")
+        rdisk.remap(geo.heads, geo.secs)
         return 0
 
 
@@ -937,6 +959,7 @@ def main(argv=None, defaults=None):
         "resize": ResizeCommand,
         "init": InitCommand,
         "adjust" : AdjustCommand,
+        "remap": RemapCommand,
         "info": InfoCommand,
         "show": ShowCommand,
         "free": FreeCommand,

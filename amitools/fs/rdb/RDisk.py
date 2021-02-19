@@ -34,7 +34,7 @@ class RDisk:
 
         # check block size of rdb vs. raw block device
         if self.rdb.block_size != self.rawblk.block_bytes:
-            raise IOError(
+            raise ValueError(
                 "block size mismatch: rdb=%d != device=%d"
                 % (self.rdb.block_size, self.rawblk.block_bytes)
             )
@@ -335,30 +335,109 @@ class RDisk:
         # same range? silently ignore and return true
         if new_lo_cyl == self.rdb.log_drv.lo_cyl and \
            new_hi_cyl == self.rdb.log_drv.hi_cyl:
-            return True
+            return
         # invalid range
         if new_lo_cyl > new_hi_cyl:
-            return False
+            raise ValueError("Invalid cylinder range: %d > %d" %
+                             (new_lo_cyl, new_hi_cyl))
         # check partitions
         for p in self.parts:
             (lo, hi) = p.get_cyl_range()
-            if lo < new_lo_cyl:
-                return False
-            if hi > new_hi_cyl:
-                return False
+            if lo < new_lo_cyl or hi > new_hi_cyl:
+                raise ValueError("Partition %d does not fit in new range!"
+                                 % p.num)
         # need to adjust phyisical disc?
         if new_hi_cyl != self.rdb.phy_drv.cyls - 1:
             if adjust_physical:
                 self.rdb.phy_drv.cyls = new_hi_cyl + 1
             else:
                 # not allowed to grow physical disk. abort!
-                return False
+                raise ValueError("Need to adjust physical disk!")
         # adjust logical range
         self.rdb.log_drv.lo_cyl = new_lo_cyl
         self.rdb.log_drv.hi_cyl = new_hi_cyl
         # update block
         self.rdb.write()
-        return True
+
+    def remap(self, new_heads=None, new_secs=None):
+        """Change the RDB structure to use new head and sector values"""
+        old_heads = self.rdb.phy_drv.heads
+        old_secs = self.rdb.phy_drv.secs
+        if not new_heads:
+            new_heads = old_heads
+        if not new_secs:
+            new_secs = old_secs
+        # nothing to do?
+        if new_heads == old_heads and \
+           new_secs == old_secs:
+            return
+        # validate if remapping is possible
+        old_cyl_blocks = old_heads * old_secs
+        new_cyl_blocks = new_heads * new_secs
+        if old_cyl_blocks > new_cyl_blocks:
+            # finer resolution wanted
+            # check that factor is integer multiple
+            if old_cyl_blocks % new_cyl_blocks != 0:
+                raise ValueError("Smaller cylinder blocks are not a multiple!")
+            factor = old_cyl_blocks // new_cyl_blocks
+            # no further checks required
+
+            # conversion op
+            def op(x):
+                return x * factor
+        else:
+            # coarser resolution wanted
+            # check that factor is integer multiple
+            if new_cyl_blocks & old_cyl_blocks != 0:
+                raise ValueError("Larger cylinder blocks are not a multiple!")
+            factor = new_cyl_blocks // old_cyl_blocks
+
+            def check(x):
+                return x % factor == 0
+            # check physical drive range
+            pd = self.rdb.phy_drv
+            if not check(pd.cyls):
+                raise ValueError("Physical Range %d can't be remapped!" % pd.cyls)
+            # check logical drive range
+            ld = self.rdb.log_drv
+            if not check(ld.lo_cyl) or not check(ld.hi_cyl):
+                raise ValueError("Logical Range [%d,%d] can't be remapped!"
+                                 % (ld.lo_cyl, ld.hi_cyl))
+            # check partition lo/hi cyls
+            for p in self.parts:
+                lo, hi = p.get_cyl_range()
+                if not check(lo) or not check(hi):
+                    raise ValueError("Partition %d [%d,%d] can't be remapped!" 
+                                     % (p.num, lo, hi))
+
+            # conversion op
+            def op(x):
+                return x // factor
+
+        # new blocks per cylinder
+        cyl_blks = new_heads * new_secs
+        # process RDB's cyl values with 'op':
+        # change physical disk
+        pd = self.rdb.phy_drv
+        pd.heads = new_heads
+        pd.secs = new_secs
+        pd.cyls = op(pd.cyls)
+        # change logical disk
+        ld = self.rdb.log_drv
+        ld.lo_cyl = op(ld.lo_cyl)
+        ld.hi_cyl = op(ld.hi_cyl)
+        ld.cyl_blks = cyl_blks
+        # update rdb
+        self.rdb.write()
+        # change partitions
+        for p in self.parts:
+            p.cyl_blks = cyl_blks
+            de = p.part_blk.dos_env
+            de.low_cyl = op(de.low_cyl)
+            de.high_cyl = op(de.high_cyl)
+            de.blk_per_trk = cyl_blks
+            p.part_blk.write()
+        # done
 
     def get_cyl_range(self):
         log_drv = self.rdb.log_drv
@@ -491,7 +570,7 @@ class RDisk:
             fs_block_size = self.block_bytes
         sec_per_blk = int(fs_block_size // self.block_bytes)
         if sec_per_blk < 1 or sec_per_blk > 16:
-            raise IOError("Invalid sec_per_blk: " + sec_per_blk)
+            raise ValueError("Invalid sec_per_blk: " + sec_per_blk)
         # block size in longs
         bsl = self.block_bytes >> 2
         # setup dos env
@@ -570,8 +649,8 @@ class RDisk:
         if fs_block_size:
             sec_per_blk = int(fs_block_size // self.block_bytes)
             if sec_per_blk < 1 or sec_per_blk > 16:
-                raise IOError("Invalid sec_per_blk: " + sec_per_blk)
-            ph.dos_env.sec_per_blk = sec_per_blk
+                raise ValueError("Invalid sec_per_blk: " + sec_per_blk)
+            pb.dos_env.sec_per_blk = sec_per_blk
         # update dos env
         if more_dos_env is not None:
             self._adjust_dos_env(pb.dos_env, more_dos_env)

@@ -116,10 +116,16 @@ class DiskGeometry:
         else:
             if "s" in options:
                 s = int(options["s"])
+            if "sectors" in options:
+                s = int(options["sectors"])
             if "h" in options:
                 h = int(options["h"])
+            if "heads" in options:
+                h = int(options["heads"])
             if "c" in options:
                 c = int(options["c"])
+            if "cylinders" in options:
+                c = int(options["cylinders"])
         return (c, h, s)
 
     def _guess_for_size1(self, size, approx=True, secs=None, heads=None):
