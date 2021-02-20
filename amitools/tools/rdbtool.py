@@ -680,23 +680,12 @@ class ExportCommand(Command):
             part = self.opts[0]
             file_name = self.opts[1]
             p = rdisk.find_partition_by_string(part)
-            if p != None:
-                blkdev = p.create_blkdev()
-                blkdev.open()
-                num_blks = blkdev.num_blocks
+            if p:
                 print(
                     "exporting '%s' (%d blocks) to '%s'"
-                    % (p.get_drive_name(), num_blks, file_name)
+                    % (p.get_drive_name(), p.get_num_blocks(), file_name)
                 )
-                try:
-                    with open(file_name, "wb") as fh:
-                        for b in range(num_blks):
-                            data = blkdev.read_block(b)
-                            fh.write(data)
-                except IOError as e:
-                    print("Error writing file: '%s': %s" % (file_name, e))
-                    return 1
-                blkdev.close()
+                p.export_data(file_name)
                 return 0
             else:
                 print("Can't find partition: '%s'" % part)
@@ -712,39 +701,12 @@ class ImportCommand(Command):
             part = self.opts[0]
             file_name = self.opts[1]
             p = rdisk.find_partition_by_string(part)
-            if p != None:
-                part_dev = p.create_blkdev()
-                part_dev.open()
-                part_blks = part_dev.num_blocks
-                blk_size = part_dev.block_bytes
-                total = part_blks * blk_size
-                # open image
-                file_size = os.path.getsize(file_name)
-                file_blks = file_size // blk_size
-                if file_size % blk_size != 0:
-                    print("image file not block size aligned!")
-                    return 1
-                # check sizes
-                if total < file_size:
-                    print(
-                        "import image too large: partition=%d != file=%d",
-                        total,
-                        file_size,
-                    )
-                    return 1
-                if total > file_size:
-                    delta = total - file_size
-                    print("WARNING: import file too small: %d unused blocks", delta)
+            if p:
                 print(
-                    "importing '%s' (%d blocks) to '%s' (%d blocks)"
-                    % (file_name, file_blks, p.get_drive_name(), part_blks)
+                    "importing '%s' to '%s' (%d blocks)"
+                    % (file_name, p.get_drive_name(), p.get_num_blocks())
                 )
-                # copy image
-                with open(file_name, "rb") as fh:
-                    for b in range(file_blks):
-                        data = fh.read(blk_size)
-                        part_dev.write_block(b, data)
-                part_dev.close()
+                p.import_data(file_name)
                 return 0
             else:
                 print("Can't find partition: '%s'" % part)
