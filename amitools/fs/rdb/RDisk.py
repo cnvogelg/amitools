@@ -555,10 +555,10 @@ class RDisk:
     ):
         # cyl range is not free anymore or invalid
         if not self.check_cyl_range(*cyl_range):
-            return False
+            raise ValueError("Partition range is not free!")
         # no space left for partition block
         if not self._has_free_rdb_blocks(1):
-            return False
+            raise ValueError("No space left in RDB for partition block!")
         # allocate block for partition
         blk_num = self._alloc_rdb_blocks(1)[0]
         self.used_blks.append(blk_num)
@@ -607,7 +607,7 @@ class RDisk:
         p = Partition(self.rawblk, blk_num, len(self.parts), blk_per_cyl, self)
         p.read()
         self.parts.append(p)
-        return True
+        return p
 
     def change_partition(
         self,

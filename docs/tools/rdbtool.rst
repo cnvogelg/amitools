@@ -364,6 +364,32 @@ By default ``rdbtool`` uses the block size of the RDB parition itself, e.g.
 size, e.g. 1024, 2048, 4096, or 8192.
 
 
+``addimg`` - Add a new partition from an image file
+---------------------------------------------------
+
+::
+
+  addimg <file> [ start=<cyl> ]
+                [ name=<name> ] [ dostype|fs=<dostag> ]
+                [ bootable[=true|false] ] [ pri=<priority> ]
+                [ automount=true|false ] [ bs=<n> ]
+
+This command creates a new partition from the contents of a given partition
+image file. The size of the partition is automatically derived from the file
+size. The start of the partition is either given with the ``start`` option
+or selected automatically from the next free range in the partition table. 
+
+Note that the image size must be a multiple of the cylinder size. Otherwise
+the partition can't be added.
+
+The ``dostype`` is automatically derived from the first four bytes of the
+image file. The file system block size can't be detected automatically and
+must be given with the ``bs`` option if a non-standard (512 bytes) size is
+used.
+
+See the ``add`` command for an explanation of the other options.
+
+
 ``change`` - Modify parameters of an existing partition
 -------------------------------------------------------
 

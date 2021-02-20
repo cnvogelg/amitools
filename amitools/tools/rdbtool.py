@@ -600,23 +600,25 @@ class AddCommand(PartEditCommand):
     def handle_rdisk(self, rdisk):
         self.parse_opts(rdisk)
         lo_hi = self.get_cyl_range()
-        if lo_hi == None:
+        if not lo_hi:
             print("ERROR: invalid partition range given!")
             return 1
         dostype = self.get_dos_type()
-        if dostype == None:
+        if not dostype:
             print("ERROR: invalid dos type!")
             return 1
         drv_name = self.get_drv_name()
-        if drv_name == None:
+        if not drv_name:
             print("ERROR: invalid drive name!")
+            return 1
         flags = self.get_flags()
         boot_pri = self.get_boot_pri()
         more_dos_env = self.get_more_dos_env()
         fs_bs = self.get_fs_block_size(empty=True)
-        print("creating: '%s' %s %s" % (drv_name, lo_hi, num_to_tag_str(dostype)))
+        print("creating: '%s' %s %s" % (drv_name, lo_hi,
+              num_to_tag_str(dostype)))
         # add partition
-        if rdisk.add_partition(
+        rdisk.add_partition(
             drv_name,
             lo_hi,
             dos_type=dostype,
@@ -624,11 +626,62 @@ class AddCommand(PartEditCommand):
             boot_pri=boot_pri,
             more_dos_env=more_dos_env,
             fs_block_size=fs_bs,
-        ):
-            return 0
-        else:
-            print("ERROR: creating partition: '%s': %s" % (drv_name, lo_hi))
+        )
+        return 0
+
+
+class AddImageCommand(PartEditCommand):
+    def handle_rdisk(self, rdisk):
+        if len(self.opts) < 1:
+            print("Usage: addimg <file> [start=<cyl>]")
             return 1
+        else:
+            file_name = self.opts[0]
+            self.opts = self.opts[1:]
+            self.parse_opts(rdisk)
+            # get cyl number
+            file_size = os.path.getsize(file_name)
+            cyl_bytes = rdisk.get_cylinder_bytes()
+            if file_size % cyl_bytes != 0:
+                print("ERROR: file size not multiple of cylinder bytes:", cyl_bytes)
+                return 1
+            num_cyls = file_size // cyl_bytes
+            # get cyl start
+            if 'start' in self.popts:
+                start = int(self.popts['start'])
+            else:
+                start = rdisk.find_free_cyl_range_start(num_cyls)
+                if not start:
+                    print("ERROR: no partition region found for image with",
+                          num_cyls, "cylinders!")
+                    return 1
+            lo_hi = (start, start + num_cyls - 1)
+            # more options
+            dostype = self.get_dos_type(empty=True)
+            if not dostype:
+                dostype = read_dostype_from_file(file_name)
+            drv_name = self.get_drv_name()
+            if not drv_name:
+                print("ERROR: invalid drive name!")
+                return 1
+            flags = self.get_flags()
+            boot_pri = self.get_boot_pri()
+            more_dos_env = self.get_more_dos_env()
+            fs_bs = self.get_fs_block_size(empty=True)
+            print("creating: '%s' %s %s from '%s'" % (drv_name, lo_hi,
+                  num_to_tag_str(dostype), file_name))
+            # add partition
+            p = rdisk.add_partition(
+                drv_name,
+                lo_hi,
+                dos_type=dostype,
+                flags=flags,
+                boot_pri=boot_pri,
+                more_dos_env=more_dos_env,
+                fs_block_size=fs_bs,
+            )
+            # import partition from file
+            p.import_data(file_name)
 
 
 class ChangeCommand(PartEditCommand):
@@ -737,7 +790,7 @@ class FillCommand(PartEditCommand):
             fs_bs = self.get_fs_block_size(empty=True)
             print("creating: '%s' %s %s" % (drv_name, lo_hi, num_to_tag_str(dostype)))
             # add partition
-            if not rdisk.add_partition(
+            rdisk.add_partition(
                 drv_name,
                 lo_hi,
                 dos_type=dostype,
@@ -745,9 +798,7 @@ class FillCommand(PartEditCommand):
                 boot_pri=boot_pri,
                 more_dos_env=more_dos_env,
                 fs_block_size=fs_bs,
-            ):
-                print("ERROR: creating partition: '%s': %s" % (drv_name, lo_hi))
-                return 1
+            )
         return 0
 
 
@@ -926,6 +977,7 @@ def main(argv=None, defaults=None):
         "show": ShowCommand,
         "free": FreeCommand,
         "add": AddCommand,
+        "addimg" : AddImageCommand,
         "fill": FillCommand,
         "fsget": FSGetCommand,
         "fsadd": FSAddCommand,

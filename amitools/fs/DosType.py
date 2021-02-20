@@ -1,5 +1,7 @@
 """Helper functions and constants useable with DosTypes"""
 
+import struct
+
 # raw dos types
 DOS0 = 0x444F5300
 DOS1 = 0x444F5301
@@ -151,3 +153,10 @@ def is_longname(dos_type):
 def rootblock_tracks_used_blocks(dos_type):
     """checks if the number of used blocks is stored within the rootblock"""
     return (dos_type == DOS6) or (dos_type == DOS7)
+
+
+def read_dostype_from_file(file_name):
+    """read the dostype from the first four bytes of a file"""
+    with open(file_name, "rb") as fh:
+        data = fh.read(4)
+        return struct.unpack_from(">I", data)[0]
