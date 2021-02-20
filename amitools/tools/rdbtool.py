@@ -682,6 +682,7 @@ class AddImageCommand(PartEditCommand):
             )
             # import partition from file
             p.import_data(file_name)
+            return 0
 
 
 class ChangeCommand(PartEditCommand):
