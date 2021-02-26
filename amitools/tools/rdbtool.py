@@ -90,6 +90,10 @@ class FSCommandQueue(CommandQueue):
             cmd = "'%s'" % " ".join(self.cmd_line)
             print(cmd, "IOError:", str(e))
             exit_code = 4
+        except ValueError as e:
+            cmd = "'%s'" % " ".join(self.cmd_line)
+            print(cmd, "ValueError:", str(e))
+            exit_code = 4
         finally:
             # close rdisk
             if self.rdisk != None:
@@ -314,6 +318,73 @@ class InitCommand(OpenCommand):
         return rdisk
 
 
+# --- Adjust Range of RDB ---
+
+
+class AdjustCommand(Command):
+    def handle_rdisk(self, rdisk):
+        # arguments
+        if len(self.opts) < 1:
+            print("Usage: adjust ( auto [force] | lo=<cyl> hi=<cyl> [phys] )")
+            return None
+        opts = KeyValue.parse_key_value_strings(self.opts)
+        if 'auto' in opts:
+            # automatic mode
+            # get max cyl from image
+            total_blocks = self.blkdev.geo.get_num_blocks()
+            c, h, s = rdisk.get_cyls_heads_secs()
+            num_cyl = total_blocks // (h * s)
+            if num_cyl > 65535:
+                if 'force' not in opts:
+                    print("ERROR: cylinder count too high:", num_cyl)
+                    return 1
+            lo_cyl = None
+            hi_cyl = num_cyl - 1
+            phys = True
+        else:
+            # manual mode
+            if 'lo' in opts:
+                lo_cyl = int(opts['lo'])
+            else:
+                lo_cyl = None
+            if 'hi' in opts:
+                hi_cyl = int(opts['hi'])
+            else:
+                hi_cyl = None
+            if 'phys' in opts:
+                phys = opts['phys']
+            else:
+                phys = False
+        # try to resize
+        if lo_cyl or hi_cyl:
+            rdisk.resize(lo_cyl, hi_cyl, phys)
+        else:
+            print("ERROR: no adjust options given!")
+            return 1
+        return 0
+
+
+# --- Remap RDB: Change Cylinder Block Size ---
+
+
+class RemapCommand(Command):
+    def handle_rdisk(self, rdisk):
+        # arguments
+        if len(self.opts) < 1:
+            print("Usage: remap secs=<secs> heads=<heads>")
+            return None
+        opts = KeyValue.parse_key_value_strings(self.opts)
+        geo = DiskGeometry()
+        c, h, s = rdisk.get_cyls_heads_secs()
+        if not geo.setup(opts, cyls=c, heads=h, sectors=s):
+            raise ValueError("Can't set new geometry!")
+        if geo.cyls != c:
+            raise ValueError("Do not change cylinders!")
+        print("Remap to", geo.heads, "heads and", geo.secs, "sectors")
+        rdisk.remap(geo.heads, geo.secs)
+        return 0
+
+
 # --- Info about rdisk ----
 
 
@@ -529,23 +600,25 @@ class AddCommand(PartEditCommand):
     def handle_rdisk(self, rdisk):
         self.parse_opts(rdisk)
         lo_hi = self.get_cyl_range()
-        if lo_hi == None:
+        if not lo_hi:
             print("ERROR: invalid partition range given!")
             return 1
         dostype = self.get_dos_type()
-        if dostype == None:
+        if not dostype:
             print("ERROR: invalid dos type!")
             return 1
         drv_name = self.get_drv_name()
-        if drv_name == None:
+        if not drv_name:
             print("ERROR: invalid drive name!")
+            return 1
         flags = self.get_flags()
         boot_pri = self.get_boot_pri()
         more_dos_env = self.get_more_dos_env()
         fs_bs = self.get_fs_block_size(empty=True)
-        print("creating: '%s' %s %s" % (drv_name, lo_hi, num_to_tag_str(dostype)))
+        print("creating: '%s' %s %s" % (drv_name, lo_hi,
+              num_to_tag_str(dostype)))
         # add partition
-        if rdisk.add_partition(
+        rdisk.add_partition(
             drv_name,
             lo_hi,
             dos_type=dostype,
@@ -553,11 +626,63 @@ class AddCommand(PartEditCommand):
             boot_pri=boot_pri,
             more_dos_env=more_dos_env,
             fs_block_size=fs_bs,
-        ):
-            return 0
-        else:
-            print("ERROR: creating partition: '%s': %s" % (drv_name, lo_hi))
+        )
+        return 0
+
+
+class AddImageCommand(PartEditCommand):
+    def handle_rdisk(self, rdisk):
+        if len(self.opts) < 1:
+            print("Usage: addimg <file> [start=<cyl>]")
             return 1
+        else:
+            file_name = self.opts[0]
+            self.opts = self.opts[1:]
+            self.parse_opts(rdisk)
+            # get cyl number
+            file_size = os.path.getsize(file_name)
+            cyl_bytes = rdisk.get_cylinder_bytes()
+            if file_size % cyl_bytes != 0:
+                print("ERROR: file size not multiple of cylinder bytes:", cyl_bytes)
+                return 1
+            num_cyls = file_size // cyl_bytes
+            # get cyl start
+            if 'start' in self.popts:
+                start = int(self.popts['start'])
+            else:
+                start = rdisk.find_free_cyl_range_start(num_cyls)
+                if not start:
+                    print("ERROR: no partition region found for image with",
+                          num_cyls, "cylinders!")
+                    return 1
+            lo_hi = (start, start + num_cyls - 1)
+            # more options
+            dostype = self.get_dos_type(empty=True)
+            if not dostype:
+                dostype = read_dostype_from_file(file_name)
+            drv_name = self.get_drv_name()
+            if not drv_name:
+                print("ERROR: invalid drive name!")
+                return 1
+            flags = self.get_flags()
+            boot_pri = self.get_boot_pri()
+            more_dos_env = self.get_more_dos_env()
+            fs_bs = self.get_fs_block_size(empty=True)
+            print("creating: '%s' %s %s from '%s'" % (drv_name, lo_hi,
+                  num_to_tag_str(dostype), file_name))
+            # add partition
+            p = rdisk.add_partition(
+                drv_name,
+                lo_hi,
+                dos_type=dostype,
+                flags=flags,
+                boot_pri=boot_pri,
+                more_dos_env=more_dos_env,
+                fs_block_size=fs_bs,
+            )
+            # import partition from file
+            p.import_data(file_name)
+            return 0
 
 
 class ChangeCommand(PartEditCommand):
@@ -609,23 +734,12 @@ class ExportCommand(Command):
             part = self.opts[0]
             file_name = self.opts[1]
             p = rdisk.find_partition_by_string(part)
-            if p != None:
-                blkdev = p.create_blkdev()
-                blkdev.open()
-                num_blks = blkdev.num_blocks
+            if p:
                 print(
                     "exporting '%s' (%d blocks) to '%s'"
-                    % (p.get_drive_name(), num_blks, file_name)
+                    % (p.get_drive_name(), p.get_num_blocks(), file_name)
                 )
-                try:
-                    with open(file_name, "wb") as fh:
-                        for b in range(num_blks):
-                            data = blkdev.read_block(b)
-                            fh.write(data)
-                except IOError as e:
-                    print("Error writing file: '%s': %s" % (file_name, e))
-                    return 1
-                blkdev.close()
+                p.export_data(file_name)
                 return 0
             else:
                 print("Can't find partition: '%s'" % part)
@@ -641,39 +755,12 @@ class ImportCommand(Command):
             part = self.opts[0]
             file_name = self.opts[1]
             p = rdisk.find_partition_by_string(part)
-            if p != None:
-                part_dev = p.create_blkdev()
-                part_dev.open()
-                part_blks = part_dev.num_blocks
-                blk_size = part_dev.block_bytes
-                total = part_blks * blk_size
-                # open image
-                file_size = os.path.getsize(file_name)
-                file_blks = file_size // blk_size
-                if file_size % blk_size != 0:
-                    print("image file not block size aligned!")
-                    return 1
-                # check sizes
-                if total < file_size:
-                    print(
-                        "import image too large: partition=%d != file=%d",
-                        total,
-                        file_size,
-                    )
-                    return 1
-                if total > file_size:
-                    delta = total - file_size
-                    print("WARNING: import file too small: %d unused blocks", delta)
+            if p:
                 print(
-                    "importing '%s' (%d blocks) to '%s' (%d blocks)"
-                    % (file_name, file_blks, p.get_drive_name(), part_blks)
+                    "importing '%s' to '%s' (%d blocks)"
+                    % (file_name, p.get_drive_name(), p.get_num_blocks())
                 )
-                # copy image
-                with open(file_name, "rb") as fh:
-                    for b in range(file_blks):
-                        data = fh.read(blk_size)
-                        part_dev.write_block(b, data)
-                part_dev.close()
+                p.import_data(file_name)
                 return 0
             else:
                 print("Can't find partition: '%s'" % part)
@@ -704,7 +791,7 @@ class FillCommand(PartEditCommand):
             fs_bs = self.get_fs_block_size(empty=True)
             print("creating: '%s' %s %s" % (drv_name, lo_hi, num_to_tag_str(dostype)))
             # add partition
-            if not rdisk.add_partition(
+            rdisk.add_partition(
                 drv_name,
                 lo_hi,
                 dos_type=dostype,
@@ -712,9 +799,7 @@ class FillCommand(PartEditCommand):
                 boot_pri=boot_pri,
                 more_dos_env=more_dos_env,
                 fs_block_size=fs_bs,
-            ):
-                print("ERROR: creating partition: '%s': %s" % (drv_name, lo_hi))
-                return 1
+            )
         return 0
 
 
@@ -887,10 +972,13 @@ def main(argv=None, defaults=None):
         "create": CreateCommand,
         "resize": ResizeCommand,
         "init": InitCommand,
+        "adjust" : AdjustCommand,
+        "remap": RemapCommand,
         "info": InfoCommand,
         "show": ShowCommand,
         "free": FreeCommand,
         "add": AddCommand,
+        "addimg" : AddImageCommand,
         "fill": FillCommand,
         "fsget": FSGetCommand,
         "fsadd": FSAddCommand,

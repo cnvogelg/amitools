@@ -1,3 +1,4 @@
+import os
 from amitools.fs.block.rdb.PartitionBlock import *
 from amitools.fs.blkdev.PartBlockDevice import PartBlockDevice
 import amitools.util.ByteSize as ByteSize
@@ -122,3 +123,46 @@ class Partition:
         else:
             result.append("automount=1")
         return result
+
+    # ----- Import/Export -----
+
+    def export_data(self, file_name):
+        """Export contents of partition to file"""
+        blkdev = self.create_blkdev()
+        blkdev.open()
+        num_blks = blkdev.num_blocks
+        with open(file_name, "wb") as fh:
+            for b in range(num_blks):
+                data = blkdev.read_block(b)
+                fh.write(data)
+        blkdev.close()
+
+    def import_data(self, file_name):
+        """Import contents of partition from file"""
+        part_dev = self.create_blkdev()
+        part_dev.open()
+        part_blks = part_dev.num_blocks
+        blk_size = part_dev.block_bytes
+        total = part_blks * blk_size
+        # open image
+        file_size = os.path.getsize(file_name)
+        file_blks = file_size // blk_size
+        if file_size % blk_size != 0:
+            raise ValueError("image file not block size aligned!")
+        # check sizes
+        if total < file_size:
+            raise ValueError(
+                "import image too large: partition=%d != file=%d" %
+                (total, file_size)
+            )
+        if total > file_size:
+            raise ValueError(
+                "import image too small: partition=%d != file=%d" %
+                (total, file_size)
+            )
+        # copy image
+        with open(file_name, "rb") as fh:
+            for b in range(file_blks):
+                data = fh.read(blk_size)
+                part_dev.write_block(b, data)
+        part_dev.close()

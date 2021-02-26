@@ -171,7 +171,10 @@ with a different block size on a disk::
 Similar to the ``create`` command you can specify the new size of an image.
 It will be either shrunk or grown.
 
-.. note:: The RDB that may be already on the disk is not touched or adjusted!
+.. note:: 
+
+  The RDB that may be already on the disk is not touched or adjusted!
+  Use the ``adjust`` command to adjust the RDB as well.
 
 
 Inspect the Partition Layout
@@ -248,6 +251,58 @@ option to set the number of cylinders to reserve for RDB::
   > rdbtool test.img create size=10Mi + init rdb_cyls=2
 
 
+``adjust`` - Adjust range of existing RDB structure
+---------------------------------------------------
+
+::
+
+  adjust ( auto [ force ] | [ lo=<cyl> ] [ hi=<cyl> ] [ phys ] )
+
+This command changes the range on the disk that the current RDB covers.
+It is very handy if you copy a pre-existing image file to a real medium
+(e.g. compact flash card) with a larger size.
+
+You can either use the ``auto`` mode that automatically increases the RDB
+range to cover the full image or medium. If the cylinder number gets too
+large then you need to add the ``force`` option to allow the change.
+
+  > rdbtool /dev/disk4 adjust auto
+
+In manual mode you have to specify the new range of the RDB by giving either
+the ``lo`` and/or ``hi`` cylinder. If you add the ``phys`` option then 
+not only the logical range of the RDB will be changed but also its
+physical extend.
+
+  > rdbtool test.img adjust hi=1000 phys
+
+The ``adjust`` command will abort with an error if the existing partitions
+do not fit into the new range.
+
+
+``remap`` - Change geometry of existing RDB structure
+-----------------------------------------------------
+
+::
+
+  remap [ s=<sectors> ] [ h=<heads> ]
+
+This command allows to change the interal geometry of the disk image.
+The geometry consists of cylinders, heads, and sectors. Typically, the
+number of heads and sectors is chosen in such a way that the number
+of cylinders spanning the image does not grow too large.
+
+If you want to ``adjust`` an RDB to a larger device size then the cylinder
+ranges might get too large. In this case use the ``remap`` command first
+to increase the sectors and/or heads to keep the cylinders in a reasonable
+range.
+
+  > rdbtool image.rdb remap s=32 h=8
+
+Note that the ``remap`` operation is only allowed if the physical and logical
+disk layout can be converted to the new values without any resizing. 
+Additionally, all partition ranges must be mappable as well.
+
+
 ``add`` - Add a new partition
 -----------------------------
 
@@ -307,6 +362,32 @@ The ``bs`` option allows you to specify the block size of the file system.
 By default ``rdbtool`` uses the block size of the RDB parition itself, e.g.
 512. The file system block size must be a multiple of the parition block
 size, e.g. 1024, 2048, 4096, or 8192.
+
+
+``addimg`` - Add a new partition from an image file
+---------------------------------------------------
+
+::
+
+  addimg <file> [ start=<cyl> ]
+                [ name=<name> ] [ dostype|fs=<dostag> ]
+                [ bootable[=true|false] ] [ pri=<priority> ]
+                [ automount=true|false ] [ bs=<n> ]
+
+This command creates a new partition from the contents of a given partition
+image file. The size of the partition is automatically derived from the file
+size. The start of the partition is either given with the ``start`` option
+or selected automatically from the next free range in the partition table. 
+
+Note that the image size must be a multiple of the cylinder size. Otherwise
+the partition can't be added.
+
+The ``dostype`` is automatically derived from the first four bytes of the
+image file. The file system block size can't be detected automatically and
+must be given with the ``bs`` option if a non-standard (512 bytes) size is
+used.
+
+See the ``add`` command for an explanation of the other options.
 
 
 ``change`` - Modify parameters of an existing partition
