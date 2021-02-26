@@ -1,4 +1,5 @@
 from musashi.m68k import M68K_CPU_TYPE_68040
+from hyperlink._url import NoneType
 class CPUState:
     def __init__(self):
         self.pc = None
@@ -81,11 +82,12 @@ class CPUState:
             pos += 1
         res.append("  ".join(ax))
 
-        fx = []
-        pos = 0
-        for f in self.fx:
-            fx.append("F%d=%g" % (pos, f))
-            pos += 1
-        if len(fx) > 0:
-            res.append("  ".join(fx))
+        if not type(self.fx) is NoneType:
+            fx = []
+            pos = 0
+            for f in self.fx:
+                fx.append("F%d=%g" % (pos, f))
+                pos += 1
+            if len(fx) > 0:
+                res.append("  ".join(fx))
         return res
