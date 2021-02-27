@@ -107,7 +107,7 @@ def allocate(ctx, mh_addr, num_bytes):
         mc_next = mc.read_next(ctx)
         log_exec.debug("read: %s", mc_next)
         if mc_next is None:
-            log_exec.warning("invalid mem chunk list!")
+#            log_exec.warning("invalid mem chunk list!")
             return 0
         mc_last = mc
         mc = mc_next
