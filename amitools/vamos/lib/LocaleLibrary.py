@@ -7,7 +7,7 @@ class LocaleLibrary(LibImpl):
     def OpenLocale(self, ctx):
         self.name = ctx.cpu.r_reg(REG_A0)
         # dummy
-        return 1
+        return 0
 
     def CloseLocale(self, ctx):
         self.locale = ctx.cpu.r_reg(REG_A0)
