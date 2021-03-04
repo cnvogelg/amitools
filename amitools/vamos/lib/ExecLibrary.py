@@ -458,7 +458,7 @@ class ExecLibrary(LibImpl):
             self.alloc.free_memory(mb)
         else:
             raise VamosInternalError(
-                "DeleteIORequest: Unknown IORequest to delete: ptr=%06x" % addr
+                "DeleteIORequest: Unknown IORequest to delete: ptr=%06x" % req
             )
 
     def OpenDevice(self, ctx):
