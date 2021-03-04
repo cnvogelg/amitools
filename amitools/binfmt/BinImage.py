@@ -13,13 +13,17 @@ bin_image_type_names = ["hunk", "elf"]
 
 
 class Reloc:
-    def __init__(self, offset, width=2, addend=0):
+    def __init__(self, offset, type, width=2, addend=0):
         self.offset = offset
+        self.type = type
         self.width = width
         self.addend = addend
 
     def get_offset(self):
         return self.offset
+
+    def get_type(self):
+        return self.type
 
     def get_width(self):
         return self.width

@@ -74,6 +74,7 @@ class Relocate:
     def _reloc_data(self, data, segment, addrs, offset=0):
         # find relocations
         to_segs = segment.get_reloc_to_segs()
+        my_addr = addrs[segment.id]
         for to_seg in to_segs:
             # get target segment's address
             to_id = to_seg.id
@@ -81,13 +82,18 @@ class Relocate:
             # get relocations
             reloc = segment.get_reloc(to_seg)
             for r in reloc.get_relocs():
-                self._reloc(segment.id, data, r, to_addr, to_id, offset)
+                self._reloc(segment.id, data, r, my_addr, to_addr, to_id, offset)
 
-    def _reloc(self, my_id, data, reloc, to_addr, to_id, extra_offset):
+    def _reloc(self, my_id, data, reloc, my_addr, to_addr, to_id, extra_offset):
         """relocate one entry"""
         offset = reloc.get_offset() + extra_offset
         delta = self._read_long(data, offset) + reloc.addend
-        addr = to_addr + delta
+        if reloc.get_type() == 1:
+            addr = to_addr + delta
+        elif reloc.get_type() == 4:
+            addr = delta + to_addr - my_addr - offset
+        else:
+            raise(Exception("unsupported type %d" % reloc.get_type()))
         self._write_long(data, offset, addr)
         if self.verbose:
             print(

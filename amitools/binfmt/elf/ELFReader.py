@@ -1,6 +1,5 @@
 """A class for reading and writing ELF format binaries (esp. Amiga m68k ones)"""
 
-import struct
 import os
 from .ELF import *
 from .ELFFile import *
@@ -25,6 +24,8 @@ class ELFReader:
             idx += 1
             sect = self._load_section(f, sect_hdr, idx)
             ef.sections.append(sect)
+            if sect_hdr.type_ == SHT_NOBITS:
+                ef.bss = sect
 
     def _load_section(self, f, sect_hdr, idx):
         t = sect_hdr.type_
@@ -62,17 +63,22 @@ class ELFReader:
             raise ELFParseError("Invalid strtab for symtab: " + strtab_seg_num)
         strtab = sections[strtab_seg_num]
         if strtab.__class__ != ELFSectionStringTable:
-            raise ELFParserError("Invalid strtab segment for symtab")
+            raise ELFParseError("Invalid strtab segment for symtab")
         # resolve all symbol names
         for sym in sect.symtab:
             sym.name_str = strtab.get_string(sym.name)
 
-    def _resolve_symtab_indices(self, sect, sections):
+    def _resolve_symtab_indices(self, sect, ef, sections):
         for sym in sect.symtab:
             if sym.shndx_str == None:
                 # refers a valid section
                 idx = sym.shndx
-                sym.section = sections[idx]
+                if idx == 65522: # common
+                    sym.section = ef.bss
+                    sym.value = ef.bss.header.size
+                    ef.bss.header.size += sym.size + 3 & ~3
+                else:
+                    sym.section = sections[idx]
 
     def _assign_symbols_to_sections(self, sect):
         src_file_sym = None
@@ -196,7 +202,7 @@ class ELFReader:
                 # get names in symtab
                 self._resolve_symtab_names(sect, ef.sections)
                 # link sections to symbols
-                self._resolve_symtab_indices(sect, ef.sections)
+                self._resolve_symtab_indices(sect, ef, ef.sections)
                 # assign symbols to sections
                 self._assign_symbols_to_sections(sect)
 

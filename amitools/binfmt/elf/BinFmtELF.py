@@ -1,6 +1,7 @@
-from amitools.binfmt.BinImage import *
-from .ELFFile import *
-from .ELF import *
+from amitools.binfmt.BinImage import BIN_IMAGE_TYPE_ELF, SEGMENT_TYPE_CODE, SEGMENT_TYPE_DATA, SEGMENT_FLAG_READ_ONLY, SEGMENT_TYPE_BSS, Segment, Relocations,\
+    SymbolTable, Symbol, Reloc, DebugLine, DebugLineFile, DebugLineEntry, BinImage
+from .ELFFile import ELFIdentifier, ELFHeader, ELFParseError
+from .ELF import EM_68K, ELFOSABI_AROS, ELFOSABI_SYSV
 from .ELFReader import ELFReader
 from .DwarfDebugLine import DwarfDebugLine
 
@@ -60,19 +61,18 @@ class BinFmtELF:
         # walk through elf sections
         sect_to_seg = {}
         for sect in elf.sections:
+            if sect.header.type_ == 0 or sect.header.type_ == 4:
+                continue
             # determine segment type
             seg_type = None
             name = sect.name_str
             flags = 0
-            if name == b".text":
+            if name.startswith(b".text"):
                 seg_type = SEGMENT_TYPE_CODE
-            elif name == b".data":
-                seg_type = SEGMENT_TYPE_DATA
-            elif name == b".rodata":
-                seg_type = SEGMENT_TYPE_DATA
-                flags = SEGMENT_FLAG_READ_ONLY
             elif name == b".bss":
                 seg_type = SEGMENT_TYPE_BSS
+            else:
+                seg_type = SEGMENT_TYPE_DATA
             # we got a segment
             if seg_type is not None:
                 size = sect.header.size
@@ -118,7 +118,7 @@ class BinFmtELF:
                 seg.add_reloc(to_seg, rl)
                 # add relocations
                 for rel in sect.get_rela_by_section(tgt_sect):
-                    r = Reloc(rel.offset, addend=rel.section_addend)
+                    r = Reloc(rel.offset, rel.type_, addend=rel.section_addend)
                     rl.add_reloc(r)
 
     def add_elf_symbols(self, symbols, seg):

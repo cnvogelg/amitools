@@ -65,4 +65,4 @@ STT_values = {
 
 STV_values = {0: "DEFAULT", 1: "INTERNAL", 2: "HIDDEN", 3: "PROTECTED"}
 
-R_68K_values = {0: "68K_NONE", 1: "68K_32"}
+R_68K_values = {0: "68K_NONE", 1: "68K_32", 4: "68K_PC32"}
