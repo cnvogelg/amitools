@@ -1,4 +1,3 @@
-from .SysArgs import ami_quote_str
 from .Item import ItemParser
 from .CSource import CSource
 
