@@ -103,11 +103,15 @@ def allocate(ctx, mh_addr, num_bytes):
     mc_last = None
     mc = mh.read_first(ctx)
     log_exec.debug("read: %s", mc)
+    check_free = 0
     while mc.bytes < num_bytes:
+        check_free += mc.bytes
         mc_next = mc.read_next(ctx)
         log_exec.debug("read: %s", mc_next)
         if mc_next is None:
-            log_exec.warning("invalid mem chunk list!")
+            # validate mem chunks
+            assert check_free == mh.free
+            # no memory found. chunks are too fragmented
             return 0
         mc_last = mc
         mc = mc_next
