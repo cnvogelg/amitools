@@ -6,7 +6,7 @@
 ## Introduction
 
 `amitools` is a collection of Python 3 tools that I've written to work with
-*Amiga OS* binaries and files on Mac OS X and all other *nix-like platforms
+*Amiga OS* binaries and files on macOS and all other *nix-like platforms
 supporting Python. Windows might work as
 well, but is heavily untested. However, patches are welcome.
 
@@ -29,11 +29,11 @@ will be very helpful.
 
 ### Install pip
 
-First make sure to have the Python package installer ```pip```:
+First make sure to have the Python 3 package installer ```pip3```:
 
 #### macOS
 
-On macOS you have multiple ways of installing ```pip```:
+On macOS you have multiple ways of installing ```pip3```:
 
 #### System Python
 
@@ -43,18 +43,18 @@ sudo easy_install pip
 
 #### Homebrew Package Manager
 
-With the [Homebrew][3] package manager (```pip``` is included in the ```python3``` package):
+With the [Homebrew][3] package manager (```pip3``` is included in the ```python3``` package):
 
 ```bash
-brew install python
+brew install python3
 ```
 
 #### Linux/Ubuntu
 
-On Linux Ubuntu use the provided packages ```python-pip```
+On Linux Ubuntu use the provided packages ```python3-pip```
 
 ```bash
-sudo apt-get install python-pip
+sudo apt-get install python3-pip
 ```
 
 #### Centos
@@ -63,12 +63,12 @@ To get pip run:
 
 ```bash
 curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py"
-python get-pip.py
+python3 get-pip.py
 ```
 
 #### Windows with Visual Studio
 
-- Install the latest native Windows Python >= 3.4 from [python.org][6]
+- Install the latest native Windows Python >= 3.5 from [python.org][6]
 - There is a special Edition for Visual Studio available that allows
   to compile Python 3.x modules: Install [VCpython3][5]
 - Open the Command Shell of the Compiler and run
@@ -110,7 +110,7 @@ pacman -S mingw-w64-x86_64-python2-pip mingw-w64-x86_64-gcc git make
 ### The Easy Way for Users
 
 ```bash
-pip install amitools
+pip3 install amitools
 ```
 
 Note:
@@ -125,7 +125,7 @@ Note:
 - Ensure to have Cython (version >= **0.25**) installed:
 
 ```bash
-sudo pip install cython
+sudo pip3 install cython
 ```
 
 You have multiple variants to install the tools with Python's `setuptools`:
@@ -133,20 +133,20 @@ You have multiple variants to install the tools with Python's `setuptools`:
 - **Global Install** is available for all users of your system and needs root privileges
 
 ```bash
-sudo python setup.py install
+sudo python3 setup.py install
 ```
 
 - **User Install** is available for your user only but does not require special privileges
 
 ```bash
-python setup.py install --user
+python3 setup.py install --user
 ```
 
 - **Developer Setup** only links this code into your installation and allows
    you to change/develop the code and test it immediately. (I prefer user install here)
 
 ```bash
-python setup.py develop --user
+python3 setup.py develop --user
 ```
 
 - **Run In Place** allows you to run the binaries directly from the `bin` directory
@@ -154,7 +154,7 @@ python setup.py develop --user
    of vamos:
 
 ```bash
-python setup.py build_ext -i
+python3 setup.py build_ext -i
 ```
 
 or if you have installed `GNU make` simply use:
