@@ -23,4 +23,7 @@ ULONG __Dummy(__reg("a6") struct VamosTestBase *, __reg("d0") ULONG a, __reg("d1
 VOID __RaiseError(__reg("a6") struct VamosTestBase *, __reg("a0") STRPTR str)="\tjsr\t-60(a6)";
 #define RaiseError(str) __RaiseError(VamosTestBase, (str))
 
+ULONG __ExecutePy(__reg("a6") struct VamosTestBase *, __reg("d0") ULONG argc, __reg("a0") STRPTR * argv)="\tjsr\t-66(a6)";
+#define ExecutePy(argc, argv) __ExecutePy(VamosTestBase, (argc), (argv))
+
 #endif /*  _VBCCINLINE_VAMOSTEST_H  */

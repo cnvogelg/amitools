@@ -1,0 +1,10 @@
+==id $Id: testnix_lib.sfd,v 1.0 2021/03/17 22:04:32 noname Exp $
+* "testnix.library"
+==base _TestNixBase
+==basetype struct Library *
+==libname testnix.library
+==bias 30
+==public
+==include <exec/types.h>
+ULONG Add(ULONG a, ULONG b) (d0,d1)
+==end

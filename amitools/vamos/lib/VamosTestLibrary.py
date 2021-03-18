@@ -1,3 +1,6 @@
+import code
+import os.path
+
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.error import *
@@ -64,3 +67,70 @@ class VamosTestLibrary(LibImpl):
             return
         print("VamosTest: raise", e.__class__.__name__)
         raise e
+
+    def _ExecutePyUsage(self):
+        print("""ExecutePy Usage:
+-e '<eval_string>'      # return value in d0
+-x '<exec_string>'      # return value in 'rc' var
+-f '<exec_host_file>'   # return value in 'rc' var
+-c '<exec_host_file>' '<func>  # call function 'func(ctx)' and return value
+""")
+
+    def ExecutePy(self, ctx):
+        """execute python code in the current context"""
+        # read args
+        argc = ctx.cpu.r_reg(REG_D0)
+        argv = ctx.cpu.r_reg(REG_A0)
+        args = []
+        for i in range(argc):
+            ptr = ctx.mem.r32(argv)
+            txt = ctx.mem.r_cstr(ptr)
+            args.append(txt)
+            argv += 4
+        # local and global variables
+        loc = {
+            'rc' : 0,
+            'ctx' : ctx
+        }
+        glob = globals()
+        # mode of operation
+        if argc == 0:
+            # nor args - run interactive
+            code.interact(banner="vamos REPL", exitmsg="back to vamos",
+                          local=loc)
+            rc = loc['rc']
+        elif argc < 2:
+            # invalid usage
+            self._ExecutePyUsage()
+            rc = 2
+        else:
+            op = args[0]
+            val = args[1]
+            if op == '-e':
+                # eval string
+                rc = eval(val, glob, loc)
+            elif op == '-x':
+                # exec string
+                exec(val, glob, loc)
+                rc = loc['rc']
+            elif op == '-f':
+                # exec script file
+                with open(val) as fh:
+                    exec(fh.read(), glob, loc)
+                rc = loc['rc']
+            elif op == '-c' and argc > 2:
+                # exec function(ctx) in file
+                func_name = args[2]
+                with open(val) as fh:
+                    exec(fh.read(), glob, loc)
+                func = loc[func_name]
+                rc = func(ctx)
+            else:
+                self._ExecutePyUsage()
+                rc = 2
+        # check return value
+        if type(rc) is not int:
+            print("ExecutePy: invalid return value:", rc)
+            rc = 3
+        # fetch return code
+        return rc

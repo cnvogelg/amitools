@@ -61,12 +61,12 @@ def check_log(chn, records):
         (
             chn,
             lvl,
-            "R(2): 0003dc: 0000        JUMP  [@0003be +00001e vamostest.library] -36  [6]  PrintString( str/a0 )",
+            "R(2): 0003dc: 0000        JUMP  [@0003b8 +000024 vamostest.library] -36  [6]  PrintString( str/a0 )",
         ),
         (
             chn,
             lvl,
-            "R(2): 000420: 0000      Struct  [@0003be +000062 vamostest.library] Library+32 = lib_OpenCnt(UWORD)+0",
+            "R(2): 000420: 0000      Struct  [@0003b8 +000068 vamostest.library] Library+32 = lib_OpenCnt(UWORD)+0",
         ),
     ]
 
@@ -160,6 +160,6 @@ def trace_mgr_code_line_test(caplog):
         (
             "instr",
             lvl,
-            "@0003be +00001e vamostest.library(-36)    0003dc    nop                   ; PrintString",
+            "@0003b8 +000024 vamostest.library(-36)    0003dc    nop                   ; PrintString",
         ),
     ]

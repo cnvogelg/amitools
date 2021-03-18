@@ -2,6 +2,7 @@ import os
 import pytest
 import subprocess
 import hashlib
+import inspect
 from .builder import BinBuilder
 
 
@@ -77,6 +78,9 @@ class VamosTestRunner:
         if "vargs" in kw_args:
             args = args + kw_args["vargs"]
 
+        # terminate args
+        args.append("--")
+
         # built binaries have special prog names
         prog_name = self.get_prog_bin_name(prog_args[0])
         args.append(prog_name)
@@ -146,6 +150,18 @@ class VamosTestRunner:
         self._compare(stdout, ok_stdout)
         # asser stderr to be empty
         assert stderr == []
+
+
+    def run_ctx_func(self, ctx_func, tmpdir, **kw_args):
+        """use test_execpy binary to run the given func in a lib context"""
+        func_name = ctx_func.__name__
+        # write file with code of function
+        src_code = inspect.getsource(ctx_func)
+        script_file = tmpdir / (func_name + "_script.py")
+        script_file.write_text(src_code, "utf-8")
+        # now run 'test_execpy'
+        prog_args = ['test_execpy', '-c', str(script_file), func_name]
+        return self.run_prog(*prog_args, **kw_args)
 
 
 class VamosRunner:

@@ -15,6 +15,7 @@ ULONG Add(ULONG a, ULONG b);
 ULONG Swap(ULONG a, ULONG b);
 ULONG Dummy(ULONG a, ULONG b);
 VOID RaiseError(STRPTR error);
+ULONG ExecutePy(ULONG argc, STRPTR *argv);
 
 #ifdef __cplusplus
 }
