@@ -88,13 +88,15 @@ class LibStubGen(object):
 
         # generate valid funcs
         valid_funcs = list(impl_scan.get_valid_funcs().values())
-        for fd_func, impl_method in valid_funcs:
-            stub_func = self.wrap_func(fd_func, impl_method, ctx, profile)
+        for impl_func in valid_funcs:
+            fd_func = impl_func.fd_func
+            stub_func = self.wrap_func(impl_func, ctx, profile)
             self._set_method(fd_func, stub, stub_func)
 
         # generate missing funcs
         missing_funcs = list(impl_scan.get_missing_funcs().values())
-        for fd_func in missing_funcs:
+        for impl_func in missing_funcs:
+            fd_func = impl_func.fd_func
             stub_func = self.wrap_missing_func(fd_func, ctx, profile)
             self._set_method(fd_func, stub, stub_func)
 
@@ -154,15 +156,16 @@ class LibStubGen(object):
         # return created func
         return func
 
-    def wrap_func(self, fd_func, impl_method, ctx, profile):
+    def wrap_func(self, impl_func, ctx, profile):
         """create a stub func for a valid impl func
        returns an unbound method for the stub instaance
     """
+        fd_func = impl_func.fd_func
 
         def base_func(this, *args, **kwargs):
             """the base function to call the impl,
          set return vals, and catch exceptions"""
-            res = impl_method(ctx)
+            res = impl_func.method(ctx)
             if res is not None:
                 if type(res) in (list, tuple):
                     ctx.cpu.w_reg(REG_D0, res[0] & 0xFFFFFFFF)

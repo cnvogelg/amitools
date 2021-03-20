@@ -75,10 +75,10 @@ class LibCreator(object):
         if self.profiler:
             # get some impl information
             if scan:
-                func_tags = scan.get_func_tags()
+                impl_funcs = scan.get_all_funcs()
             else:
-                func_tags = None
-            profile = self.profiler.create_profile(name, fd, func_tags)
+                impl_funcs = None
+            profile = self.profiler.create_profile(name, fd, impl_funcs)
         else:
             profile = None
         # create stub
