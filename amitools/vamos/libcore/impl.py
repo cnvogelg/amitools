@@ -31,7 +31,6 @@ class LibImpl(object):
 LibImplFunc = collections.namedtuple(
     "LibImplFunc",
     ("name", "fd_func", "tag", "method", "extra_args"),
-    defaults=(None, None),
 )
 
 
@@ -140,7 +139,13 @@ class LibImplScanner(object):
             else:
                 # if name is camel case then it is invalid
                 if name[0].isupper():
-                    impl_func = LibImplFunc(name, None, LibImplScan.TAG_INVALID, method)
+                    impl_func = LibImplFunc(
+                        name,
+                        None,
+                        LibImplScan.TAG_INVALID,
+                        method,
+                        None,
+                    )
                     res.invalid_funcs[name] = impl_func
                     res.all_funcs[name] = impl_func
         # now check for missing functions
@@ -151,7 +156,9 @@ class LibImplScanner(object):
                 if inc_std_funcs or not fd_func.is_std():
                     name = fd_func.get_name()
                     if name not in found_names:
-                        impl_func = LibImplFunc(name, fd_func, LibImplScan.TAG_MISSING)
+                        impl_func = LibImplFunc(
+                            name, fd_func, LibImplScan.TAG_MISSING, None, None
+                        )
                         res.missing_funcs[name] = impl_func
                         res.all_funcs[name] = impl_func
 
@@ -206,7 +213,7 @@ class LibImplScanner(object):
         # prepare impl_func
         func_name = fd_func.get_name()
         tag = LibImplScan.TAG_ERROR
-        impl_func = LibImplFunc(func_name, fd_func, tag, method)
+        impl_func = LibImplFunc(func_name, fd_func, tag, method, None)
         # inspect method
         fas = inspect.getfullargspec(method)
         if fas.varargs is not None:
