@@ -117,7 +117,7 @@ class TemplateArgList:
 
 class ParseResultList:
     """the class holds the parsing results. each template arg gets assigned
-     a single item (or not)"""
+    a single item (or not)"""
 
     def __init__(self, targ_list):
         """create with a template arg list"""
@@ -141,11 +141,11 @@ class ParseResultList:
 
     def calc_extra_result_size(self):
         """return size of extra result in bytes.
-       we count the longs and chars that do not fit into the
-       result long array passed into ReadArgs()
+        we count the longs and chars that do not fit into the
+        result long array passed into ReadArgs()
 
-       return size in bytes, number of longs
-    """
+        return size in bytes, number of longs
+        """
         num = self.len
         num_longs = 0
         num_chars = 0
@@ -253,8 +253,8 @@ class ArgsParser:
 
     def parse(self, csrc, maxbuf=256):
         """input is read from csrc
-       return NO_ERROR or ERROR_*
-    """
+        return NO_ERROR or ERROR_*
+        """
         result_list = ParseResultList(self.targ_list)
         self.result_list = result_list
         item_parser = ItemParser(csrc, eol_unget_bug=False)
@@ -430,9 +430,9 @@ class ArgsHelp:
 
     def want_help(self):
         """check if a line has a '?' as a help request.
-       if yes return True and consume the whole line from csrc.
-       otherwise return False and rewind the whole line from csrc.
-    """
+        if yes return True and consume the whole line from csrc.
+        otherwise return False and rewind the whole line from csrc.
+        """
         escaped = False
         quoted = False
         seen_space = True

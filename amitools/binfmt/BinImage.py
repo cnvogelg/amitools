@@ -247,8 +247,7 @@ class Segment:
 
 
 class BinImage:
-    """A binary image contains all the segments of a program's binary image.
-  """
+    """A binary image contains all the segments of a program's binary image."""
 
     def __init__(self, file_type):
         self.segments = []

@@ -1,8 +1,8 @@
 class VLib(object):
     """a vamos interal lib.
 
-  A vamos internal lib has a stub, a impl and allocator and patcher
-  """
+    A vamos internal lib has a stub, a impl and allocator and patcher
+    """
 
     def __init__(
         self,

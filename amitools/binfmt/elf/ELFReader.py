@@ -73,7 +73,7 @@ class ELFReader:
             if sym.shndx_str == None:
                 # refers a valid section
                 idx = sym.shndx
-                if idx == 65522: # common
+                if idx == 65522:  # common
                     sym.section = ef.bss
                     sym.value = ef.bss.header.size
                     ef.bss.header.size += sym.size + 3 & ~3
@@ -159,7 +159,7 @@ class ELFReader:
 
     def load(self, f):
         """load an ELF file from the given file object f
-       and return an ELFFile instance or None if loading failed"""
+        and return an ELFFile instance or None if loading failed"""
 
         ef = ELFFile()
 

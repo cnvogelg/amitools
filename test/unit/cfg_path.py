@@ -94,8 +94,13 @@ def cfg_path_args_test():
 def cfg_path_ini_args_test():
     lp = PathParser()
     ini_dict = {
-        "volumes": [["sys", "~/.vamos/sys"],],
-        "assigns": [["c", "sys:c"], ["libs", "sys:libs"],],
+        "volumes": [
+            ["sys", "~/.vamos/sys"],
+        ],
+        "assigns": [
+            ["c", "sys:c"],
+            ["libs", "sys:libs"],
+        ],
         "path": {
             "path": "c:",
             "cwd": "~/amiga",

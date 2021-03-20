@@ -118,8 +118,8 @@ class DirScan:
 
     def scan_dir(self, dir_bi, progress):
         """check a directory by scanning through the hash table entries and follow the chains
-       Returns (all_chains_ok, dir_obj)
-    """
+        Returns (all_chains_ok, dir_obj)
+        """
         # create new dir info
         di = DirInfo(dir_bi)
         self.dirs.append(di)

@@ -92,8 +92,8 @@ class VLibManager(object):
     def shutdown(self):
         """cleanup libs
 
-    try to expunge all libs and report still open ones
-    """
+        try to expunge all libs and report still open ones
+        """
         log_libmgr.info("[vamos] +shutdown")
         # dec exec's open cnt
         self.exec_lib.lib_node.dec_open_cnt()
@@ -108,15 +108,15 @@ class VLibManager(object):
     def expunge_libs(self):
         """expunge all unused vlibs
 
-       return number of libs _not_ expunged
-    """
+        return number of libs _not_ expunged
+        """
         return self._expunge_list(self.exec_lib.lib_list)
 
     def expunge_devs(self):
         """expunge all unused vlibs
 
-       return number of libs _not_ expunged
-    """
+        return number of libs _not_ expunged
+        """
         return self._expunge_list(self.exec_lib.device_list)
 
     def _expunge_list(self, node_list):

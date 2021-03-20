@@ -8,8 +8,8 @@ class MakeFuncs(object):
     def make_functions(self, lib_base_ptr, func_array_ptr, disp_base_ptr=0):
         """Exec's MakeFunctions() call
 
-       returns table size in bytes
-    """
+        returns table size in bytes
+        """
         size = 0
         src_ptr = func_array_ptr
         dst_ptr = lib_base_ptr - 6

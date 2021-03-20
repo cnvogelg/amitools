@@ -22,8 +22,8 @@ class MakeLib(object):
     ):
         """Exec's MakeLibrary
 
-       return lib_base, mem_obj or 0, None
-    """
+        return lib_base, mem_obj or 0, None
+        """
         neg_size, offsets = self._calc_neg_size(vectors_addr)
         neg_size = self._round_long(neg_size)
         pos_size = self._round_long(pos_size)

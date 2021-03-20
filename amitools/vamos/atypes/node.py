@@ -54,8 +54,7 @@ funcs = {"remove": remove}
 
 @AmigaTypeDef(MinNodeStruct, funcs=funcs)
 class MinNode(AmigaType):
-    """wrap an Exec MinNode in memory an allow to operate on its values.
-  """
+    """wrap an Exec MinNode in memory an allow to operate on its values."""
 
     def __str__(self):
         return "[MinNode:@%06x,p=%06x,s=%06x]" % (
@@ -71,8 +70,7 @@ class MinNode(AmigaType):
 
 @AmigaTypeDef(NodeStruct, wrap={"type": NodeType}, funcs=funcs)
 class Node(AmigaTypeWithName):
-    """wrap an Exec Node in memory an allow to operate on its values.
-  """
+    """wrap an Exec Node in memory an allow to operate on its values."""
 
     def __str__(self):
         return "[Node:@%06x,p=%06x,s=%06x,%s,%d,'%s']" % (

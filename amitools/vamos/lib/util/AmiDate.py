@@ -22,8 +22,8 @@ def write_clock_data(dt, mem, data_ptr):
 
 def read_clock_data(mem, data_ptr):
     """read Amiga ClockData and return corresponding Python datetime
-     return None if data is invalid
-  """
+    return None if data is invalid
+    """
     data = AccessStruct(mem, ClockDataStruct, struct_addr=data_ptr)
     # read date struct
     sec = data.r_s("sec")

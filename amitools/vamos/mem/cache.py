@@ -3,7 +3,7 @@ import struct
 
 class MemoryCache(object):
     """copy a region of emulator memory to a python bytearray
-     to work on it faster"""
+    to work on it faster"""
 
     def __init__(self, start_addr, size_bytes):
         """create cache of given byte size representing addr range"""

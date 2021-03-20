@@ -411,7 +411,7 @@ class DosLibrary(LibImpl):
         size = ctx.cpu.r_reg(REG_D3)
         flags = ctx.cpu.r_reg(REG_D4)
         name = ctx.mem.r_cstr(name_ptr)
-        vtype = flags & 0xff
+        vtype = flags & 0xFF
         if buff_ptr == 0:
             if not flags & self.GVF_GLOBAL_ONLY:
                 node = self.find_var(ctx, name, vtype)

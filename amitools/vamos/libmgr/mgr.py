@@ -47,8 +47,8 @@ class LibManager(object):
     def shutdown(self, run_sp=None):
         """cleanup libs
 
-    try to expunge all libs and report still open ones
-    """
+        try to expunge all libs and report still open ones
+        """
         log_libmgr.info("+shutdown")
         aleft = self.alib_mgr.shutdown(run_sp)
         if aleft > 0:
@@ -63,8 +63,8 @@ class LibManager(object):
     def expunge_libs(self, run_sp=None):
         """expunge all unused libs
 
-       return number of libs _not_ expunged
-    """
+        return number of libs _not_ expunged
+        """
         log_libmgr.info("+expunge_libs")
         aleft = self.alib_mgr.expunge_libs(run_sp)
         vleft = self.vlib_mgr.expunge_libs()
@@ -74,8 +74,8 @@ class LibManager(object):
     def expunge_devs(self, run_sp=None):
         """expunge all unused devs
 
-       return number of libs _not_ expunged
-    """
+        return number of libs _not_ expunged
+        """
         log_libmgr.info("+expunge_devs")
         aleft = 0  # TBD
         vleft = self.vlib_mgr.expunge_devs()
@@ -85,8 +85,8 @@ class LibManager(object):
     def expunge_lib(self, addr, run_sp=None):
         """expunge a library given by base address
 
-       return True if lib was expunged
-    """
+        return True if lib was expunged
+        """
         log_libmgr.info("expunge_lib: @%06x", addr)
         vlib = self.vlib_mgr.get_vlib_by_addr(addr)
         if vlib:
@@ -100,8 +100,8 @@ class LibManager(object):
     def close_lib(self, addr, run_sp=None):
         """close a library
 
-       return True if lib was expunged, too
-    """
+        return True if lib was expunged, too
+        """
         log_libmgr.info("close_lib: @%06x", addr)
         vlib = self.vlib_mgr.get_vlib_by_addr(addr)
         if vlib:
@@ -117,8 +117,8 @@ class LibManager(object):
     ):
         """open a library
 
-       return lib_base addr or 0
-    """
+        return lib_base addr or 0
+        """
         # get base name
         base_name = LibLoader.get_lib_base_name(full_name)
         log_libmgr.info(

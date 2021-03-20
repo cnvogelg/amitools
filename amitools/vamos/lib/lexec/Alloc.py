@@ -81,7 +81,7 @@ class MemHdr:
             return mc
 
 
-def validate(ctx,mh):
+def validate(ctx, mh):
     log_exec.debug("Header: %s", mh)
     sum_free = 0
     mc = mh.read_first(ctx)
@@ -175,8 +175,12 @@ def deallocate(ctx, mh_addr, blk_addr, num_bytes, check=False):
     if ex != 0:
         num_bytes += 8 - ex
 
-    log_exec.debug("DEALLOC: mh_addr=%06x, blk_addr=%06x, num_bytes=%d",
-                   mh_addr, blk_addr, num_bytes)
+    log_exec.debug(
+        "DEALLOC: mh_addr=%06x, blk_addr=%06x, num_bytes=%d",
+        mh_addr,
+        blk_addr,
+        num_bytes,
+    )
 
     # read mem header
     mh = MemHdr()

@@ -33,9 +33,9 @@ def to_byte_size_str(size, kibi_units=True):
 
 def parse_byte_size_str(s):
     """parse a string to derive a byte value.
-     can read e.g. 10Ki, 2.1k or 2048.
-     returns None if the string is invalid or a byte value
-  """
+    can read e.g. 10Ki, 2.1k or 2048.
+    returns None if the string is invalid or a byte value
+    """
     s = s.lower()
     n = len(s)
     if n == 0:

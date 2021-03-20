@@ -22,11 +22,11 @@ class Scheduler(object):
 
     def schedule(self):
         """main work call for scheduler. at least one task must be added.
-       terminates if there are no more tasks to schedule or if a task
-       failed.
+        terminates if there are no more tasks to schedule or if a task
+        failed.
 
-       return None or failed task
-    """
+        return None or failed task
+        """
         if self.last_task is None:
             raise RuntimeError("no task was added!")
         return self.fail_task
@@ -34,10 +34,10 @@ class Scheduler(object):
     def add_task(self, task):
         """add a new task and prepare for execution.
 
-       currently the task is also executed in place here.
+        currently the task is also executed in place here.
 
-       returns True if task was added
-    """
+        returns True if task was added
+        """
         self.tasks.append(task)
         self.last_task = task
         # prepare to run task
@@ -67,11 +67,11 @@ class Scheduler(object):
     def run_sub_task(self, sub_task):
         """run a given sub task in the context of the current task
 
-      for now the sub task directly runs in the current task
-      and returns when its finished
+        for now the sub task directly runs in the current task
+        and returns when its finished
 
-      returns return regs of sub task
-    """
+        returns return regs of sub task
+        """
         if len(self.tasks) == 0:
             raise ValueError("no tasks are running!")
         # prepare run of sub task

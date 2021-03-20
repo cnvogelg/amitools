@@ -24,10 +24,10 @@ class Validator:
 
     def scan_boot(self):
         """Step 1: scan boot block.
-       Returns (True, x) if boot block has a valid dos type.
-       Returns (x, True) if boot block is bootable
-       Invalid checksum of the block is tolerated but remarked.
-    """
+        Returns (True, x) if boot block has a valid dos type.
+        Returns (x, True) if boot block is bootable
+        Invalid checksum of the block is tolerated but remarked.
+        """
         # check boot block
         boot = BootBlock(self.blkdev)
         boot.read()
@@ -48,9 +48,9 @@ class Validator:
 
     def scan_root(self):
         """Step 2: scan root block.
-       Try to determine root block from boot block or guess number.
-       Returns True if the root block could be decoded.
-    """
+        Try to determine root block from boot block or guess number.
+        Returns True if the root block could be decoded.
+        """
         if self.boot != None:
             # retrieve root block number from boot block
             root_blk_num = self.boot.got_root_blk
@@ -102,7 +102,7 @@ class Validator:
 
     def scan_dir_tree(self):
         """Step 3: scan directory structure
-       Return false if structure is not healthy"""
+        Return false if structure is not healthy"""
         self.block_scan = BlockScan(self.blkdev, self.log, self.dos_type)
         self.dir_scan = DirScan(self.block_scan, self.log)
         ok = self.dir_scan.scan_tree(self.root.blk_num, progress=self.progress)

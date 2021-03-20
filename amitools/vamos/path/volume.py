@@ -8,10 +8,10 @@ from .spec import Spec
 
 def resolve_sys_path(sys_path):
     """replace ~ (home) or environment variables in path and
-     make path absolute
+    make path absolute
 
-     return resolved path
-  """
+    return resolved path
+    """
     # expand system path
     sys_path = os.path.expanduser(sys_path)
     sys_path = os.path.expandvars(sys_path)
@@ -305,10 +305,10 @@ class VolumeManager(object):
     def sys_to_ami_path(self, sys_path):
         """try to map an absolute system path back to an amiga path
 
-       if multiple volumes overlap then take the shortest amiga path
+        if multiple volumes overlap then take the shortest amiga path
 
-       return ami_path or None if sys_path can't be mapped
-    """
+        return ami_path or None if sys_path can't be mapped
+        """
         if not os.path.isabs(sys_path):
             sys_path = resolve_sys_path(sys_path)
             log_path.debug("vol: sys_to_ami_path: resolved rel path: %s", sys_path)
@@ -339,22 +339,22 @@ class VolumeManager(object):
     def ami_to_sys_path(self, ami_path, fast=False):
         """Map an Amiga path to a system path.
 
-       An absolute Amiga path with volume prefix is expected.
-       Any other path returns None.
+        An absolute Amiga path with volume prefix is expected.
+        Any other path returns None.
 
-       If volume does not exist also return None.
+        If volume does not exist also return None.
 
-       It replaces the volume with the sys_path prefix.
-       Furthermore, the remaining Amiga path is mapped to
-       the system file system and case corrected if a
-       corresponding entry is found.
+        It replaces the volume with the sys_path prefix.
+        Furthermore, the remaining Amiga path is mapped to
+        the system file system and case corrected if a
+        corresponding entry is found.
 
-       If 'fast' mode is enabled then the original case
-       of the path elements is kept if the underlying FS
-       is case insensitive.
+        If 'fast' mode is enabled then the original case
+        of the path elements is kept if the underlying FS
+        is case insensitive.
 
-       Return None on error or system path
-    """
+        Return None on error or system path
+        """
         # find volume
         pos = ami_path.find(":")
         if pos <= 0:

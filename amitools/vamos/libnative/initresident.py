@@ -13,8 +13,8 @@ class InitRes(object):
         self, resident_addr, seg_list_baddr, label_name=None, run_sp=None, exec_lib=None
     ):
         """Implement Exec's InitResident
-       Returns lib_base, mem_obj or lib_base, 0 or 0, None
-    """
+        Returns lib_base, mem_obj or lib_base, 0 or 0, None
+        """
         res = Resident(self.mem, resident_addr)
         if not res.is_valid():
             return 0, None

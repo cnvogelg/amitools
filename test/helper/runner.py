@@ -45,16 +45,16 @@ class VamosTestRunner:
     def run_prog(self, *prog_args, **kw_args):
         """run an AmigaOS binary with vamos
 
-       kw_args:
-       - stdin = string for stdin
-       - no_ts = no timestamps
-       - variant = a postfix string to append to data file
+        kw_args:
+        - stdin = string for stdin
+        - no_ts = no timestamps
+        - variant = a postfix string to append to data file
 
-       returns:
-       - returncode of process
-       - stdout as line array
-       - stderr as line array
-    """
+        returns:
+        - returncode of process
+        - stdout as line array
+        - stderr as line array
+        """
 
         # ensure that prog exists
         self.make_prog(prog_args[0])
@@ -138,7 +138,7 @@ class VamosTestRunner:
 
     def run_prog_check_data(self, *prog_args, **kw_args):
         """like run_prog_checked() but also verify the stdout
-       and compare with the corresponding data file of the suite"""
+        and compare with the corresponding data file of the suite"""
         stdout, stderr = self.run_prog_checked(*prog_args, **kw_args)
         # compare stdout with data
         dat_path = self._get_data_path(prog_args[0], kw_args)
@@ -151,7 +151,6 @@ class VamosTestRunner:
         # asser stderr to be empty
         assert stderr == []
 
-
     def run_ctx_func(self, ctx_func, tmpdir, **kw_args):
         """use test_execpy binary to run the given func in a lib context"""
         func_name = ctx_func.__name__
@@ -160,7 +159,7 @@ class VamosTestRunner:
         script_file = tmpdir / (func_name + "_script.py")
         script_file.write_text(src_code, "utf-8")
         # now run 'test_execpy'
-        prog_args = ['test_execpy', '-c', str(script_file), func_name]
+        prog_args = ["test_execpy", "-c", str(script_file), func_name]
         return self.run_prog(*prog_args, **kw_args)
 
 

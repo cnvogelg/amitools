@@ -13,10 +13,10 @@ class HWAccessError(InvalidMemoryAccessError):
 
 class HWAccess:
     """As an OS-level emulator vamos usually does not need to emulate
-     any custom chips. Unfortunately, some libs (e.g. xvs.library)
-     need custom chip access to work correctly. We emulate a minimal
-     sub set to make those broken (i.e. non OS-compliant) libs work.
-  """
+    any custom chips. Unfortunately, some libs (e.g. xvs.library)
+    need custom chip access to work correctly. We emulate a minimal
+    sub set to make those broken (i.e. non OS-compliant) libs work.
+    """
 
     MODE_IGNORE = 0
     MODE_EMU = 1

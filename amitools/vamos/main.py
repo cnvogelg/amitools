@@ -29,7 +29,7 @@ def main(cfg_files=None, args=None, cfg_dict=None):
 
     if an internal error occurred then return:
       RET_CODE_CONFIG_ERROR (1000): config error
-  """
+    """
     # retrieve vamos home and data dir
     home_dir = os.path.dirname(__file__)
     data_dir = os.path.join(home_dir, "data")
@@ -160,8 +160,8 @@ def main_profile(
 ):
     """Run vamos main with profiling enabled.
 
-     Either dump profile after run or write a profile file.
-  """
+    Either dump profile after run or write a profile file.
+    """
     # profile run
     cpr = cProfile.Profile()
     cpr.enable()

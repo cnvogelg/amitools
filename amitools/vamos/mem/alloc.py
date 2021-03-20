@@ -31,17 +31,17 @@ class MemoryChunk:
 
     def does_fit(self, size):
         """check if new size would fit into chunk
-       return < 0 if it does not fit, 0 for exact fit, > 0 n wasted bytes
-    """
+        return < 0 if it does not fit, 0 for exact fit, > 0 n wasted bytes
+        """
         return self.size - size
 
 
 class MemoryAlloc:
     def __init__(self, mem, addr=0, size=0, label_mgr=None):
         """mem is a interface.
-       setup allocator starting at addr with size bytes.
-       if label_mgr is set then labels are created for allocations.
-    """
+        setup allocator starting at addr with size bytes.
+        if label_mgr is set then labels are created for allocations.
+        """
         # if no size is specified then take mem total
         if size == 0:
             size = mem.get_ram_size_kib() * 1024
@@ -94,8 +94,8 @@ class MemoryAlloc:
 
     def _find_best_chunk(self, size):
         """find best chunk that could take the given alloc
-       return: index of chunk in free list or -1 if none found + bytes left in chunk
-    """
+        return: index of chunk in free list or -1 if none found + bytes left in chunk
+        """
         chunk = self.free_first
         while chunk != None:
             left = chunk.does_fit(size)

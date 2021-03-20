@@ -6,61 +6,66 @@ from amitools.vamos.log import *
 
 import string
 
+
 class LocaleLibrary(LibImpl):
-  def OpenLocale(self, ctx):
-    name = ctx.cpu.r_reg(REG_A0)
-    # dummy
-    return 0
+    def OpenLocale(self, ctx):
+        name = ctx.cpu.r_reg(REG_A0)
+        # dummy
+        return 0
 
-  def CloseLocale(self, ctx):
-    locale = ctx.cpu.r_reg(REG_A0)
-    # dummy - accept all
+    def CloseLocale(self, ctx):
+        locale = ctx.cpu.r_reg(REG_A0)
+        # dummy - accept all
 
-  def IsUpper(self, ctx):
-    locale = ctx.cpu.r_reg(REG_A0)
-    character = ctx.cpu.r_reg(REG_D0)
-    return chr(character) in string.uppercase
+    def IsUpper(self, ctx):
+        locale = ctx.cpu.r_reg(REG_A0)
+        character = ctx.cpu.r_reg(REG_D0)
+        return chr(character) in string.uppercase
 
-  def IsLower(self, ctx):
-    locale = ctx.cpu.r_reg(REG_A0)
-    character = ctx.cpu.r_reg(REG_D0)
-    return chr(character) in string.lowercase
+    def IsLower(self, ctx):
+        locale = ctx.cpu.r_reg(REG_A0)
+        character = ctx.cpu.r_reg(REG_D0)
+        return chr(character) in string.lowercase
 
-  def IsDigit(self, ctx):
-    locale = ctx.cpu.r_reg(REG_A0)
-    character = ctx.cpu.r_reg(REG_D0)
-    return chr(character) in string.digits
+    def IsDigit(self, ctx):
+        locale = ctx.cpu.r_reg(REG_A0)
+        character = ctx.cpu.r_reg(REG_D0)
+        return chr(character) in string.digits
 
-  def IsPrint(self, ctx):
-    locale = ctx.cpu.r_reg(REG_A0)
-    character = ctx.cpu.r_reg(REG_D0)
-    return chr(character) in string.printable
+    def IsPrint(self, ctx):
+        locale = ctx.cpu.r_reg(REG_A0)
+        character = ctx.cpu.r_reg(REG_D0)
+        return chr(character) in string.printable
 
-  def IsCntrl(self, ctx):
-    locale = ctx.cpu.r_reg(REG_A0)
-    character = ctx.cpu.r_reg(REG_D0)
-    #maybe not ok...
-    return character < 32 and not chr(character) in string.printable
+    def IsCntrl(self, ctx):
+        locale = ctx.cpu.r_reg(REG_A0)
+        character = ctx.cpu.r_reg(REG_D0)
+        # maybe not ok...
+        return character < 32 and not chr(character) in string.printable
 
-  def IsXDigit(self, ctx):
-    locale = ctx.cpu.r_reg(REG_A0)
-    character = ctx.cpu.r_reg(REG_D0)
-    return chr(character) in string.hexdigits
+    def IsXDigit(self, ctx):
+        locale = ctx.cpu.r_reg(REG_A0)
+        character = ctx.cpu.r_reg(REG_D0)
+        return chr(character) in string.hexdigits
 
-  def IsSpace(self, ctx):
-    locale = ctx.cpu.r_reg(REG_A0)
-    character = ctx.cpu.r_reg(REG_D0)
-    return chr(character) in string.whitespace
+    def IsSpace(self, ctx):
+        locale = ctx.cpu.r_reg(REG_A0)
+        character = ctx.cpu.r_reg(REG_D0)
+        return chr(character) in string.whitespace
 
-  def IsPunct(self, ctx):
-    locale = ctx.cpu.r_reg(REG_A0)
-    character = ctx.cpu.r_reg(REG_D0)
-    return chr(character) in string.punctuation
+    def IsPunct(self, ctx):
+        locale = ctx.cpu.r_reg(REG_A0)
+        character = ctx.cpu.r_reg(REG_D0)
+        return chr(character) in string.punctuation
 
-  def IsGraph(self, ctx):
-    locale = ctx.cpu.r_reg(REG_A0)
-    character = ctx.cpu.r_reg(REG_D0)
-    return chr(character) in string.printable and not chr(character) in string.whitespace
+    def IsGraph(self, ctx):
+        locale = ctx.cpu.r_reg(REG_A0)
+        character = ctx.cpu.r_reg(REG_D0)
+        return (
+            chr(character) in string.printable
+            and not chr(character) in string.whitespace
+        )
+
 
 """
   def CloseCatalog(self, ctx):

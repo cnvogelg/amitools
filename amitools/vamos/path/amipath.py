@@ -10,30 +10,30 @@ class AmiPathError(Exception):
 class AmiPath(object):
     """holds a single Amiga path either in relative or absolute format.
 
-  A path is considered 'absolute' if it starts with a volume: or
-  assign: prefix.
+    A path is considered 'absolute' if it starts with a volume: or
+    assign: prefix.
 
-  A relative path can only be resolved with the current directory stored
-  in the associated path environment.
+    A relative path can only be resolved with the current directory stored
+    in the associated path environment.
 
-  A colon prefixed path is also considered relative, e.g. ':bla'.
-  It is local to the prefix of the current directory.
+    A colon prefixed path is also considered relative, e.g. ':bla'.
+    It is local to the prefix of the current directory.
 
-  The empty string '' represents the current directory of the associated
-  environment.
+    The empty string '' represents the current directory of the associated
+    environment.
 
-  In a 'volume path' all assigns are resolved and it
-  always starts with a valid volume: prefix.
+    In a 'volume path' all assigns are resolved and it
+    always starts with a valid volume: prefix.
 
-  Valid path syntax is:
+    Valid path syntax is:
 
-  (prefix:)?(name)?(/name)+/?
+    (prefix:)?(name)?(/name)+/?
 
-  prefix: all but '/:', may be empty
-  name: all but '/:', non-empty
+    prefix: all but '/:', may be empty
+    name: all but '/:', non-empty
 
-  ':/', '//' is invalid
-  """
+    ':/', '//' is invalid
+    """
 
     def __init__(self, pstr=""):
         self.pstr = pstr
@@ -78,8 +78,8 @@ class AmiPath(object):
     def ends_with_name(self):
         """make sure the path ends with a name
 
-    A path ending with / or : is not valid.
-    """
+        A path ending with / or : is not valid.
+        """
         p = self.pstr
         # empty is invalid
         if len(p) == 0:
@@ -93,10 +93,10 @@ class AmiPath(object):
     def prefix(self, lower=False):
         """if the path is absolute then a prefix string is returned.
 
-    The prefix in a valid abs path is either an assign or volume name.
+        The prefix in a valid abs path is either an assign or volume name.
 
-    A relative path has a None prefix.
-    """
+        A relative path has a None prefix.
+        """
         pos = self.pstr.find(":")
         if pos <= 0:
             return None
@@ -109,9 +109,9 @@ class AmiPath(object):
     def postfix(self, skip_leading=False, lower=False, skip_trailing=True):
         """the postfix string of the path.
 
-    A relative path is returned as is.
-    The postifx of an absolute path is starting with the colon ':'
-    """
+        A relative path is returned as is.
+        The postifx of an absolute path is starting with the colon ':'
+        """
         p = self.pstr
         pos = p.find(":")
         # skip prefix
@@ -165,8 +165,8 @@ class AmiPath(object):
     def is_syntax_valid(self):
         """check if a path has valid syntax.
 
-    Returns True if all checks passed otherwise False
-    """
+        Returns True if all checks passed otherwise False
+        """
         # valid cases
         s = self.pstr
         if s in (":", "", "/"):
@@ -194,20 +194,20 @@ class AmiPath(object):
     def parent(self):
         """return a new path with the last path component removed.
 
-    Returns None if stripping is not possible.
+        Returns None if stripping is not possible.
 
-    The path is not expanded (to a absolute or even volume path)!
+        The path is not expanded (to a absolute or even volume path)!
 
-    Example:
-        bar -> ''
-        foo/bar -> foo
-        baz:foo/bar -> baz:foo
-        baz:foo -> ''
-        /bar -> /
-        / -> None
-        :foo -> foo
-        foo: -> None
-    """
+        Example:
+            bar -> ''
+            foo/bar -> foo
+            baz:foo/bar -> baz:foo
+            baz:foo -> ''
+            /bar -> /
+            / -> None
+            :foo -> foo
+            foo: -> None
+        """
         p = self.postfix()
         if p in ("/", ":"):
             return None
@@ -231,10 +231,10 @@ class AmiPath(object):
     def filename(self):
         """return the filename component of a path
 
-       even if the path is terminated with '/' the last component is taken
+        even if the path is terminated with '/' the last component is taken
 
-       return filename or None if not found
-    """
+        return filename or None if not found
+        """
         names = self.names()
         if len(names) == 0:
             return None
@@ -243,8 +243,8 @@ class AmiPath(object):
     def dirname(self):
         """return the dirname component of a path
 
-       return dirname or None if not found
-    """
+        return dirname or None if not found
+        """
         names = self.names(True)
         n = len(names)
         if n == 0:
@@ -271,9 +271,9 @@ class AmiPath(object):
     def names(self, with_special_name=False):
         """return a list of strings with the names contained in postfix
 
-    Note if skip_leading is False then a parent or prefix local path
-    gets a special name prefixed: '/' or ':'
-    """
+        Note if skip_leading is False then a parent or prefix local path
+        gets a special name prefixed: '/' or ':'
+        """
         p = self.postfix(not with_special_name)
         n = len(p)
         if n == 0:
@@ -291,10 +291,10 @@ class AmiPath(object):
     def join(self, opath):
         """join this path with the given path.
 
-    If expand is True then this path can be made absolute if necessary.
+        If expand is True then this path can be made absolute if necessary.
 
-    Note:May return None if join is not possible.
-    """
+        Note:May return None if join is not possible.
+        """
         # join with cwd returns path itself
         if opath.is_cwd():
             return self

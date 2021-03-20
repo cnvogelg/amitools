@@ -1,9 +1,9 @@
 class CString(object):
     """Manage C-Strings (with zero termination) in Amiga memory.
 
-  The string is immutable as changing strings typically requires
-  re-allocating memory for it.
-  """
+    The string is immutable as changing strings typically requires
+    re-allocating memory for it.
+    """
 
     def __init__(self, mem, addr, alloc=None, mem_obj=None, max_size=None):
         self.mem = mem
@@ -70,9 +70,9 @@ class CString(object):
     def alloc(alloc, txt, tag=None):
         """allocate memory for the given txt with the allocator
 
-    Returns a CString object with allocation info.
-    You can free() the object later on
-    """
+        Returns a CString object with allocation info.
+        You can free() the object later on
+        """
         if type(txt) is CString:
             return txt
         if tag is None:

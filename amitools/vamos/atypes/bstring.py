@@ -1,9 +1,9 @@
 class BString(object):
     """Manage BCPL-Strings in Amiga memory.
 
-  The string is immutable as changing strings typically requires
-  re-allocating memory for it.
-  """
+    The string is immutable as changing strings typically requires
+    re-allocating memory for it.
+    """
 
     def __init__(self, mem, addr, alloc=None, mem_obj=None, max_size=None):
         self.mem = mem
@@ -75,9 +75,9 @@ class BString(object):
     def alloc(alloc, txt, tag=None):
         """allocate memory for the given txt with the allocator
 
-    Returns a BString object with allocation info.
-    You can free() the object later on
-    """
+        Returns a BString object with allocation info.
+        You can free() the object later on
+        """
         if type(txt) is BString:
             return txt
         if tag is None:

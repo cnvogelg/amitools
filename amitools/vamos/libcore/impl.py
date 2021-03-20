@@ -28,20 +28,20 @@ class LibImpl(object):
         pass
 
 
-LibImplFunc = collections.namedtuple('LibImplFunc',
-                                     ('name', 'fd_func', 'tag',
-                                      'method', 'extra_args'),
-                                     defaults=(None, None))
+LibImplFunc = collections.namedtuple(
+    "LibImplFunc",
+    ("name", "fd_func", "tag", "method", "extra_args"),
+    defaults=(None, None),
+)
 
 
-LibImplFuncArg = collections.namedtuple('LibImplFuncArg',
-                                         ('name', 'reg', 'type'))
+LibImplFuncArg = collections.namedtuple("LibImplFuncArg", ("name", "reg", "type"))
 
 
 class LibImplScan(object):
     """scan result of a vamos library implementation
 
-     it contains extracted function lists"""
+    it contains extracted function lists"""
 
     TAG_VALID = "valid"
     TAG_ERROR = "error"
@@ -140,8 +140,7 @@ class LibImplScanner(object):
             else:
                 # if name is camel case then it is invalid
                 if name[0].isupper():
-                    impl_func = LibImplFunc(name, None,
-                                            LibImplScan.TAG_INVALID, method)
+                    impl_func = LibImplFunc(name, None, LibImplScan.TAG_INVALID, method)
                     res.invalid_funcs[name] = impl_func
                     res.all_funcs[name] = impl_func
         # now check for missing functions
@@ -152,8 +151,7 @@ class LibImplScanner(object):
                 if inc_std_funcs or not fd_func.is_std():
                     name = fd_func.get_name()
                     if name not in found_names:
-                        impl_func = LibImplFunc(name, fd_func,
-                                                LibImplScan.TAG_MISSING)
+                        impl_func = LibImplFunc(name, fd_func, LibImplScan.TAG_MISSING)
                         res.missing_funcs[name] = impl_func
                         res.all_funcs[name] = impl_func
 
@@ -232,5 +230,6 @@ class LibImplScanner(object):
         else:
             extra_args = None
         # impl_func is valid
-        return LibImplFunc(func_name, fd_func, LibImplScan.TAG_VALID,
-                           method, extra_args)
+        return LibImplFunc(
+            func_name, fd_func, LibImplScan.TAG_VALID, method, extra_args
+        )

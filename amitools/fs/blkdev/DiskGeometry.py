@@ -37,8 +37,8 @@ class DiskGeometry:
 
     def detect(self, byte_size, options=None):
         """detect a geometry from a given image size and optional options.
-       return bytes required by geometry or None if geomtry is invalid
-    """
+        return bytes required by geometry or None if geomtry is invalid
+        """
         c = None
         h = None
         s = None
@@ -63,8 +63,8 @@ class DiskGeometry:
 
     def setup(self, options, cyls=None, heads=None, sectors=None):
         """setup a new geometry by giving options
-       return bytes required by geometry or None if geometry is invalid
-    """
+        return bytes required by geometry or None if geometry is invalid
+        """
         if options is None:
             return False
         (c, h, s) = self._parse_chs(options)

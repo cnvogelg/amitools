@@ -183,7 +183,7 @@ depends = [
     "musashi/softfloat/milieu.h",
     "musashi/softfloat/softfloat.h",
     "musashi/softfloat/softfloat-macros",
-    "musashi/softfloat/softfloat-specialize"
+    "musashi/softfloat/softfloat-specialize",
 ]
 inc_dirs = ["musashi", "gen"]
 

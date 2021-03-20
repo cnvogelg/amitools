@@ -2,7 +2,15 @@ from amitools.vamos.astructs.dos import CLIStruct, DosPacketStruct, ProcessStruc
 from amitools.vamos.astructs.exec_ import MessageStruct, MinListStruct
 from amitools.vamos.lib.dos import CommandLine
 from amitools.vamos.log import log_proc
-from amitools.vamos.machine.regs import REG_D0, REG_D1, REG_D2, REG_A0, REG_A2, REG_A5, REG_A6
+from amitools.vamos.machine.regs import (
+    REG_D0,
+    REG_D1,
+    REG_D2,
+    REG_A0,
+    REG_A2,
+    REG_A5,
+    REG_A6,
+)
 from amitools.vamos.schedule import Stack, Task
 import os
 
@@ -26,8 +34,8 @@ class Process:
         cwd_lock=None,
     ):
         """bin_file  Amiga path to binary for process
-       arg_str   Shell-style parameter string with trailing newline
-    """
+        arg_str   Shell-style parameter string with trailing newline
+        """
         self.ctx = ctx
         if input_fh == None:
             input_fh = self.ctx.dos_lib.file_mgr.get_input()

@@ -66,9 +66,7 @@ def libcore_impl_scan_vamos_test():
     assert error_func.fd_func == fd.get_func_by_name("PrintHello")
     assert error_func.method == impl.PrintHello
     assert error_func.tag == LibImplScan.TAG_ERROR
-    assert error_funcs == {
-        "PrintHello": error_func
-    }
+    assert error_funcs == {"PrintHello": error_func}
     error_names = res.get_error_func_names()
     assert error_names == ["PrintHello"]
 
@@ -97,7 +95,7 @@ def libcore_impl_scan_vamos_extra_args_test():
 
     # setup test function with annotated args
     # also test name replacement with _ if it collides with Python
-    def PrintString(self, ctx, str_ : str):
+    def PrintString(self, ctx, str_: str):
         pass
 
     impl.PrintString = PrintString.__get__(impl, impl.__class__)
@@ -113,8 +111,8 @@ def libcore_impl_scan_vamos_extra_args_test():
     assert valid_func.method == impl.ExecutePy
     assert valid_func.tag == LibImplScan.TAG_VALID
     assert valid_func.extra_args == [
-        LibImplFuncArg('argc', REG_D0, int),
-        LibImplFuncArg('argv', REG_A0, int),
+        LibImplFuncArg("argc", REG_D0, int),
+        LibImplFuncArg("argv", REG_A0, int),
     ]
 
     valid_func = res.get_func_by_name("PrintString")
@@ -123,5 +121,5 @@ def libcore_impl_scan_vamos_extra_args_test():
     assert valid_func.method == impl.PrintString
     assert valid_func.tag == LibImplScan.TAG_VALID
     assert valid_func.extra_args == [
-        LibImplFuncArg('str', REG_A0, str),
+        LibImplFuncArg("str", REG_A0, str),
     ]

@@ -40,9 +40,9 @@ class Resident(AmigaType):
     @classmethod
     def find(cls, mem, addr, size, only_first=True, mem_cache=True):
         """scan a memory region for resident structures and return the residents.
-       if 'only_first' is set return a single instance or None.
-       otherwise a list of Resident objects.
-    """
+        if 'only_first' is set return a single instance or None.
+        otherwise a list of Resident objects.
+        """
         # use a memory cache to speed up search
         if mem_cache:
             memc = MemoryCache(addr, size)

@@ -3,7 +3,7 @@ def test_execpy_exec_test(vamos):
     code = "rc = 42 ; print('hello, world!')"
     retcode, stdout, stderr = vamos.run_prog("test_execpy", "-x", code)
     assert retcode == 42
-    assert stdout == ['hello, world!']
+    assert stdout == ["hello, world!"]
     assert stderr == []
 
 
@@ -24,7 +24,7 @@ print('hello, world!')"""
     script_file.write_text(code, "utf-8")
     retcode, stdout, stderr = vamos.run_prog("test_execpy", "-f", str(script_file))
     assert retcode == 42
-    assert stdout == ['hello, world!']
+    assert stdout == ["hello, world!"]
     assert stderr == []
 
 
@@ -37,15 +37,17 @@ def test_execpy_ctx_func_test(vamos, tmpdir):
 """
     script_file = tmpdir / "script"
     script_file.write_text(code, "utf-8")
-    retcode, stdout, stderr = vamos.run_prog("test_execpy", "-c", str(script_file), "foobar")
+    retcode, stdout, stderr = vamos.run_prog(
+        "test_execpy", "-c", str(script_file), "foobar"
+    )
     assert retcode == 42
-    assert stdout == ['hello, world!', "<class 'amitools.vamos.libcore.ctx.LibCtx'>"]
+    assert stdout == ["hello, world!", "<class 'amitools.vamos.libcore.ctx.LibCtx'>"]
     assert stderr == []
 
 
 def foobar(ctx):
     """the test ctx_func"""
-    print('hello, world!')
+    print("hello, world!")
     print(type(ctx))
     return 42
 
@@ -54,5 +56,5 @@ def test_execpy_vamos_ctx_func_test(vamos, tmpdir):
     # now use the vamos helper to run a function in lib ctx
     retcode, stdout, stderr = vamos.run_ctx_func(foobar, tmpdir)
     assert retcode == 42
-    assert stdout == ['hello, world!', "<class 'amitools.vamos.libcore.ctx.LibCtx'>"]
+    assert stdout == ["hello, world!", "<class 'amitools.vamos.libcore.ctx.LibCtx'>"]
     assert stderr == []

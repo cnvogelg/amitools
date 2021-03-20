@@ -141,7 +141,7 @@ class AmigaTypeDecorator(object):
 
         def get_cstr(self, ptr=False):
             """return the c_str or "" if ptr==0
-         or the addr of the pointer (addr=True)"""
+            or the addr of the pointer (addr=True)"""
             addr = self._struct.read_field_index(index)
             if ptr:
                 return addr
@@ -227,7 +227,7 @@ class AmigaTypeDecorator(object):
 
 def AmigaTypeDef(struct_def, wrap=None, funcs=None, allow_struct=False):
     """a class decorator that automatically adds get/set methods
-     for AmigaStruct fields"""
+    for AmigaStruct fields"""
     decorator = AmigaTypeDecorator(struct_def, wrap, funcs, allow_struct)
 
     def deco_func(cls):

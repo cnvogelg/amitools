@@ -65,12 +65,14 @@ class VamosTestLibrary(LibImpl):
         raise e
 
     def _ExecutePyUsage(self):
-        print("""ExecutePy Usage:
+        print(
+            """ExecutePy Usage:
 -e '<eval_string>'      # return value in d0
 -x '<exec_string>'      # return value in 'rc' var
 -f '<exec_host_file>'   # return value in 'rc' var
 -c '<exec_host_file>' '<func>  # call function 'func(ctx)' and return value
-""")
+"""
+        )
 
     def ExecutePy(self, ctx, argc, argv):
         """execute python code in the current context"""
@@ -82,17 +84,13 @@ class VamosTestLibrary(LibImpl):
             args.append(txt)
             argv += 4
         # local and global variables
-        loc = {
-            'rc' : 0,
-            'ctx' : ctx
-        }
+        loc = {"rc": 0, "ctx": ctx}
         glob = globals()
         # mode of operation
         if argc == 0:
             # nor args - run interactive
-            code.interact(banner="vamos REPL", exitmsg="back to vamos",
-                          local=loc)
-            rc = loc['rc']
+            code.interact(banner="vamos REPL", exitmsg="back to vamos", local=loc)
+            rc = loc["rc"]
         elif argc < 2:
             # invalid usage
             self._ExecutePyUsage()
@@ -100,19 +98,19 @@ class VamosTestLibrary(LibImpl):
         else:
             op = args[0]
             val = args[1]
-            if op == '-e':
+            if op == "-e":
                 # eval string
                 rc = eval(val, glob, loc)
-            elif op == '-x':
+            elif op == "-x":
                 # exec string
                 exec(val, glob, loc)
-                rc = loc['rc']
-            elif op == '-f':
+                rc = loc["rc"]
+            elif op == "-f":
                 # exec script file
                 with open(val) as fh:
                     exec(fh.read(), glob, loc)
-                rc = loc['rc']
-            elif op == '-c' and argc > 2:
+                rc = loc["rc"]
+            elif op == "-c" and argc > 2:
                 # exec function(ctx) in file
                 func_name = args[2]
                 with open(val) as fh:

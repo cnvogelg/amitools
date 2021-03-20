@@ -26,17 +26,14 @@ class LineState:
         return state
 
     def __str__(self):
-        return (
-            "[address=%08x file=%d line=%d column=%d is_stmt=%s basic_block=%s end_sequence=%d]"
-            % (
-                self.address,
-                self.file,
-                self.line,
-                self.column,
-                self.is_stmt,
-                self.basic_block,
-                self.end_sequence,
-            )
+        return "[address=%08x file=%d line=%d column=%d is_stmt=%s basic_block=%s end_sequence=%d]" % (
+            self.address,
+            self.file,
+            self.line,
+            self.column,
+            self.is_stmt,
+            self.basic_block,
+            self.end_sequence,
         )
 
 

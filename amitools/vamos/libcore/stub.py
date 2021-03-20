@@ -7,17 +7,17 @@ from amitools.vamos.machine.regs import REG_D0, REG_D1, REG_A7
 
 class LibStub(object):
     """a lib stub is a frontend object instance that wraps all calls into
-     a library implementation.
+    a library implementation.
 
-     It is suitable for binding these functions to traps of the machine
-     emulation.
+    It is suitable for binding these functions to traps of the machine
+    emulation.
 
-     A wrapped call return value processing or optional profiling features.
-  """
+    A wrapped call return value processing or optional profiling features.
+    """
 
     def __init__(self, name, fd, impl=None, profile=None):
         """create a stub for a given implementation and
-       associated fd description"""
+        associated fd description"""
         self.name = name
         self.impl = impl
         self.fd = fd
@@ -58,7 +58,7 @@ class LibStub(object):
 
 class LibStubGen(object):
     """the lib stub generator scans a lib impl and creates stubs for all
-     methods found there"""
+    methods found there"""
 
     def __init__(self, log_missing=None, log_valid=None, ignore_invalid=True):
         self.log_missing = log_missing
@@ -67,8 +67,8 @@ class LibStubGen(object):
 
     def gen_fake_stub(self, name, fd, ctx, profile=None):
         """a fake stub exists without an implementation and only contains
-       "missing" functions
-    """
+        "missing" functions
+        """
         # create stub object
         stub = LibStub(name, fd, profile=profile)
 
@@ -114,8 +114,8 @@ class LibStubGen(object):
 
     def wrap_missing_func(self, fd_func, ctx, profile):
         """create a stub func for a missing function in impl
-       returns an unbound method for the stub instance
-    """
+        returns an unbound method for the stub instance
+        """
         log = self.log_missing
         if log is None:
             # without tracing
@@ -161,7 +161,7 @@ class LibStubGen(object):
 
         def base_func(this, *args, **kwargs):
             """the base function to call the impl,
-         set return vals, and catch exceptions"""
+            set return vals, and catch exceptions"""
             res = method(ctx)
             if res is not None:
                 if type(res) in (list, tuple):
@@ -175,11 +175,11 @@ class LibStubGen(object):
 
     def _gen_base_extra_args_func(self, method, ctx, extra_args):
         """generate a function that fills arguments from registers."""
-        reg_list = map(lambda x : x.reg, extra_args)
+        reg_list = map(lambda x: x.reg, extra_args)
 
         def base_func(this, *args, **kwargs):
             """the base function to call the impl,
-         set return vals, and catch exceptions"""
+            set return vals, and catch exceptions"""
             args = []
             for reg in reg_list:
                 arg_val = ctx.cpu.r_reg(reg)
@@ -238,8 +238,8 @@ class LibStubGen(object):
 
     def wrap_func(self, impl_func, ctx, profile):
         """create a stub func for a valid impl func
-       returns an unbound method for the stub instaance
-    """
+        returns an unbound method for the stub instaance
+        """
         fd_func = impl_func.fd_func
 
         # do we need to read some registers into extra args?

@@ -152,13 +152,11 @@ class Partition:
         # check sizes
         if total < file_size:
             raise ValueError(
-                "import image too large: partition=%d != file=%d" %
-                (total, file_size)
+                "import image too large: partition=%d != file=%d" % (total, file_size)
             )
         if total > file_size:
             raise ValueError(
-                "import image too small: partition=%d != file=%d" %
-                (total, file_size)
+                "import image too small: partition=%d != file=%d" % (total, file_size)
             )
         # copy image
         with open(file_name, "rb") as fh:

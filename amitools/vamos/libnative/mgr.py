@@ -68,16 +68,16 @@ class ALibManager(object):
 
     def is_base_addr(self, addr):
         """check if a given addr is the lib base of a native lib
-       return info if found or None
-    """
+        return info if found or None
+        """
         for info in self.lib_infos:
             if info.is_base_addr(addr):
                 return info
 
     def is_load_addr(self, addr):
         """check if a given addr is the lib load addr
-       return info if found or None
-    """
+        return info if found or None
+        """
         for info in self.lib_infos:
             if info.is_load_addr(addr):
                 return info

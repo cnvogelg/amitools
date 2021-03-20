@@ -65,8 +65,8 @@ class BlockScan:
 
     def scan_all(self, progress=lambda x: x):
         """Scan all blocks of the given block device
-       Return True if there is a chance that a file system will be found there
-    """
+        Return True if there is a chance that a file system will be found there
+        """
         # range to scan
         begin_blk = self.blkdev.reserved
         num_blk = self.blkdev.num_blocks - self.blkdev.reserved

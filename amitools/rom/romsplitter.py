@@ -36,7 +36,7 @@ class RomSplitter:
 
     def find_rom(self, rom_path):
         """load ROM and try to find a matching dat file.
-           Returns True if ROM was matched"""
+        Returns True if ROM was matched"""
         self.rom_data = kickrom.Loader.load(rom_path)
         # get check sum
         kh = kickrom.KickRomAccess(self.rom_data)

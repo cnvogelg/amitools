@@ -93,7 +93,7 @@ class Relocate:
         elif reloc.get_type() == 4:
             addr = delta + to_addr - my_addr - offset
         else:
-            raise(Exception("unsupported type %d" % reloc.get_type()))
+            raise (Exception("unsupported type %d" % reloc.get_type()))
         self._write_long(data, offset, addr)
         if self.verbose:
             print(
