@@ -19,7 +19,7 @@ will be very helpful.
 
 ## Prerequisites
 
-- Python >= ```3.5```
+- Python >= ```3.6```
 - pip
 
 ### Optional Packages
@@ -68,7 +68,7 @@ python3 get-pip.py
 
 #### Windows with Visual Studio
 
-- Install the latest native Windows Python >= 3.5 from [python.org][6]
+- Install the latest native Windows Python >= 3.6 from [python.org][6]
 - There is a special Edition for Visual Studio available that allows
   to compile Python 3.x modules: Install [VCpython3][5]
 - Open the Command Shell of the Compiler and run
