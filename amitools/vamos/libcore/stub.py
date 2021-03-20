@@ -156,16 +156,13 @@ class LibStubGen(object):
         # return created func
         return func
 
-    def wrap_func(self, impl_func, ctx, profile):
-        """create a stub func for a valid impl func
-       returns an unbound method for the stub instaance
-    """
-        fd_func = impl_func.fd_func
+    def _gen_base_func(self, method, ctx):
+        """generate a function that calls the method with the ctx."""
 
         def base_func(this, *args, **kwargs):
             """the base function to call the impl,
          set return vals, and catch exceptions"""
-            res = impl_func.method(ctx)
+            res = method(ctx)
             if res is not None:
                 if type(res) in (list, tuple):
                     ctx.cpu.w_reg(REG_D0, res[0] & 0xFFFFFFFF)
@@ -174,52 +171,92 @@ class LibStubGen(object):
                     ctx.cpu.w_reg(REG_D0, res & 0xFFFFFFFF)
             return res
 
-        func = base_func
+        return base_func
+
+    def _gen_base_extra_args_func(self, method, ctx, extra_args):
+        """generate a function that fills arguments from registers."""
+        reg_list = map(lambda x : x.reg, extra_args)
+
+        def base_func(this, *args, **kwargs):
+            """the base function to call the impl,
+         set return vals, and catch exceptions"""
+            args = []
+            for reg in reg_list:
+                arg_val = ctx.cpu.r_reg(reg)
+                args.append(arg_val)
+            res = method(ctx, *args)
+            if res is not None:
+                if type(res) in (list, tuple):
+                    ctx.cpu.w_reg(REG_D0, res[0] & 0xFFFFFFFF)
+                    ctx.cpu.w_reg(REG_D1, res[1] & 0xFFFFFFFF)
+                else:
+                    ctx.cpu.w_reg(REG_D0, res & 0xFFFFFFFF)
+            return res
+
+        return base_func
+
+    def _gen_log_func(selgf, fd_func, base_func, ctx, log):
+        """wrap the base function with logging."""
+        name = fd_func.get_name()
+        func_args = fd_func.get_args()
+        bias = fd_func.get_bias()
+
+        def log_func(this, *args, **kwargs):
+            callee_pc = this._get_callee_pc(ctx)
+            call_info = "%4d %s( %s ) from PC=%06x" % (
+                bias,
+                name,
+                this._gen_arg_dump(func_args, ctx),
+                callee_pc,
+            )
+            log.info("{ CALL: %s" % call_info)
+            res = base_func(this, *args, **kwargs)
+            if res is not None:
+                if type(res) in (list, tuple):
+                    res_str = "d0=%08x, d1=%08x" % tuple(map(int, res))
+                else:
+                    res_str = "d0=%08x" % int(res)
+            else:
+                res_str = "n/a"
+            log.info("} CALL: -> %s" % res_str)
+
+        return log_func
+
+    def _gen_profile_func(self, fd_func, profile, func):
+        """wrap profiling around func"""
+        index = fd_func.get_index()
+        prof = profile.get_func_by_index(index)
+
+        def profile_func(this, *args, **kwargs):
+            start = time.perf_counter()
+            func(this, *args, **kwargs)
+            end = time.perf_counter()
+            delta = end - start
+            prof.count(delta)
+
+        return profile_func
+
+    def wrap_func(self, impl_func, ctx, profile):
+        """create a stub func for a valid impl func
+       returns an unbound method for the stub instaance
+    """
+        fd_func = impl_func.fd_func
+
+        # do we need to read some registers into extra args?
+        method = impl_func.method
+        extra_args = impl_func.extra_args
+        if extra_args:
+            func = self._gen_base_extra_args_func(method, ctx, extra_args)
+        else:
+            func = self._gen_base_func(method, ctx)
 
         # wrap around logging method?
         log = self.log_valid
         if log:
-            name = fd_func.get_name()
-            func_args = fd_func.get_args()
-            bias = fd_func.get_bias()
-
-            def log_func(this, *args, **kwargs):
-                callee_pc = this._get_callee_pc(ctx)
-                call_info = "%4d %s( %s ) from PC=%06x" % (
-                    bias,
-                    name,
-                    this._gen_arg_dump(func_args, ctx),
-                    callee_pc,
-                )
-                log.info("{ CALL: %s" % call_info)
-                res = base_func(this, *args, **kwargs)
-                if res is not None:
-                    if type(res) in (list, tuple):
-                        res_str = "d0=%08x, d1=%08x" % tuple(map(int, res))
-                    else:
-                        res_str = "d0=%08x" % int(res)
-                else:
-                    res_str = "n/a"
-                log.info("} CALL: -> %s" % res_str)
-
-            func = log_func
+            func = self._gen_log_func(fd_func, func, ctx, log)
 
         # wrap profiling?
         if profile:
-            index = fd_func.get_index()
-            prof = profile.get_func_by_index(index)
-            if log:
-                call = log_func
-            else:
-                call = base_func
-
-            def profile_func(this, *args, **kwargs):
-                start = time.perf_counter()
-                call(this, *args, **kwargs)
-                end = time.perf_counter()
-                delta = end - start
-                prof.count(delta)
-
-            func = profile_func
+            func = self._gen_profile_func(fd_func, profile, func)
 
         return func

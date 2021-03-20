@@ -1,7 +1,7 @@
 import pytest
 from amitools.fd import read_lib_fd
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
-from amitools.vamos.libcore import LibImplScanner, LibImplScan
+from amitools.vamos.libcore import LibImplScanner, LibImplScan, LibImplFuncArg
 from amitools.vamos.error import VamosInternalError
 from amitools.vamos.machine.regs import *
 
@@ -95,12 +95,6 @@ def libcore_impl_scan_vamos_extra_args_test():
     fd = read_lib_fd(name)
     impl = VamosTestLibrary()
 
-    # setup test function with plain args
-    def ExecutePy(self, ctx, argc, argv):
-        pass
-
-    impl.ExecutePy = ExecutePy.__get__(impl, impl.__class__)
-
     # setup test function with annotated args
     # also test name replacement with _ if it collides with Python
     def PrintString(self, ctx, str_ : str):
@@ -118,16 +112,16 @@ def libcore_impl_scan_vamos_extra_args_test():
     assert valid_func.fd_func == fd.get_func_by_name("ExecutePy")
     assert valid_func.method == impl.ExecutePy
     assert valid_func.tag == LibImplScan.TAG_VALID
-    assert valid_func.extra_args == {
-        'argc': [int, REG_D0],
-        'argv': [int, REG_A0],
-    }
+    assert valid_func.extra_args == [
+        LibImplFuncArg('argc', REG_D0, int),
+        LibImplFuncArg('argv', REG_A0, int),
+    ]
 
     valid_func = res.get_func_by_name("PrintString")
     assert valid_func.name == "PrintString"
     assert valid_func.fd_func == fd.get_func_by_name("PrintString")
     assert valid_func.method == impl.PrintString
     assert valid_func.tag == LibImplScan.TAG_VALID
-    assert valid_func.extra_args == {
-        'str_': [str, REG_A0],
-    }
+    assert valid_func.extra_args == [
+        LibImplFuncArg('str', REG_A0, str),
+    ]

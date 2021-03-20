@@ -37,24 +37,20 @@ class VamosTestLibrary(LibImpl):
         print("VamosTest: PrintHello()")
         return 0
 
-    def PrintString(self, ctx):
-        str_addr = ctx.cpu.r_reg(REG_A0)
+    def PrintString(self, ctx, str_addr):
         txt = ctx.mem.r_cstr(str_addr)
         print("VamosTest: PrintString(%s)", txt)
         return 0
 
-    def Add(self, ctx):
-        a = ctx.cpu.r_reg(REG_D0)
-        b = ctx.cpu.r_reg(REG_D1)
+    def Add(self, ctx, a, b):
+        """define input values directly as function arguments"""
         return a + b
 
-    def Swap(self, ctx):
-        a = ctx.cpu.r_reg(REG_D0)
-        b = ctx.cpu.r_reg(REG_D1)
+    def Swap(self, ctx, a, b):
+        """define input values directly as function arguments"""
         return b, a
 
-    def RaiseError(self, ctx):
-        str_addr = ctx.cpu.r_reg(REG_A0)
+    def RaiseError(self, ctx, str_addr):
         txt = ctx.mem.r_cstr(str_addr)
         if txt == "RuntimeError":
             e = RuntimeError("VamosTest")
@@ -76,11 +72,9 @@ class VamosTestLibrary(LibImpl):
 -c '<exec_host_file>' '<func>  # call function 'func(ctx)' and return value
 """)
 
-    def ExecutePy(self, ctx):
+    def ExecutePy(self, ctx, argc, argv):
         """execute python code in the current context"""
         # read args
-        argc = ctx.cpu.r_reg(REG_D0)
-        argv = ctx.cpu.r_reg(REG_A0)
         args = []
         for i in range(argc):
             ptr = ctx.mem.r32(argv)

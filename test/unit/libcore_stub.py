@@ -6,6 +6,7 @@ from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.machine import MockMachine
 from amitools.vamos.libcore import LibProfileData
 from amitools.fd import read_lib_fd
+from amitools.vamos.machine.regs import *
 
 
 def _check_stub(stub):
@@ -86,7 +87,15 @@ def libcore_stub_gen_base_test():
     # call func
     stub.PrintHello()
     stub.Dummy()
+    # check arg transfer
+    ctx.cpu.w_reg(REG_D0, 21)
+    ctx.cpu.w_reg(REG_D1, 10)
     stub.Swap()
+    assert ctx.cpu.r_reg(REG_D0) == 10
+    assert ctx.cpu.r_reg(REG_D1) == 21
+    # check return
+    stub.Add()
+    assert ctx.cpu.r_reg(REG_D0) == 31
 
 
 def libcore_stub_gen_profile_test():

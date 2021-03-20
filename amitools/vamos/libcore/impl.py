@@ -34,6 +34,10 @@ LibImplFunc = collections.namedtuple('LibImplFunc',
                                      defaults=(None, None))
 
 
+LibImplFuncArg = collections.namedtuple('LibImplFuncArg',
+                                         ('name', 'reg', 'type'))
+
+
 class LibImplScan(object):
     """scan result of a vamos library implementation
 
@@ -174,7 +178,33 @@ class LibImplScanner(object):
                 "'%s' impl has %d error funcs: %s" % (name, num_error, txt)
             )
 
+    def _gen_extra_args(self, more_args, fd_func, anno):
+        """extract more args of func that are suitable to be mapped to regs"""
+        extra_args = []
+        fd_args = fd_func.get_args()
+        num_fd_args = len(fd_args)
+        if len(more_args) != num_fd_args:
+            return None
+        # make sure arg names match
+        for i in range(num_fd_args):
+            fd_arg_name = fd_args[i][0]
+            impl_arg_name = more_args[i]
+            # impl arg must have the fd arg as a prefix
+            if not impl_arg_name.startswith(fd_arg_name):
+                return None
+            # find CPU register
+            reg_str = "REG_" + fd_args[i][1].upper()
+            reg = str_to_reg_map[reg_str]
+            # find type
+            py_type = int
+            if impl_arg_name in anno:
+                py_type = anno[impl_arg_name]
+            arg = LibImplFuncArg(fd_arg_name, reg, py_type)
+            extra_args.append(arg)
+        return extra_args
+
     def _gen_impl_func(self, fd_func, method):
+        """describe the impl func"""
         # prepare impl_func
         func_name = fd_func.get_name()
         tag = LibImplScan.TAG_ERROR
@@ -194,30 +224,13 @@ class LibImplScanner(object):
         if fas.args[:2] != ["self", "ctx"]:
             return impl_func
         # extra args? must be function arguments
-        extra_args = {}
         if num_args > 2:
-            fd_args = fd_func.get_args()
-            num_fd_args = len(fd_args)
-            if num_args != (2 + num_fd_args):
-                return impl_func
-            # make sure arg names match
-            for i in range(num_fd_args):
-                fd_arg_name = fd_args[i][0]
-                impl_arg_name = fas.args[2+i]
-                # allow arg name or name_ (if it collides with python)
-                if impl_arg_name not in (fd_arg_name, fd_arg_name + "_"):
-                    return impl_func
-                # default mapping is int
-                # find CPU register
-                reg_str = "REG_" + fd_args[i][1].upper()
-                reg = str_to_reg_map[reg_str]
-                extra_args[impl_arg_name] = [int, reg]
-            # update type annotations if any
             anno = fas.annotations
-            for name in extra_args:
-                if name in anno:
-                    arg_type = anno[name]
-                    extra_args[impl_arg_name][0] = arg_type
+            extra_args = self._gen_extra_args(fas.args[2:], fd_func, anno)
+            if not extra_args:
+                return impl_func
+        else:
+            extra_args = None
         # impl_func is valid
         return LibImplFunc(func_name, fd_func, LibImplScan.TAG_VALID,
                            method, extra_args)
