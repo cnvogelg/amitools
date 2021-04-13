@@ -109,6 +109,8 @@ pacman -S mingw-w64-x86_64-python2-pip mingw-w64-x86_64-gcc git make
 
 ### The Easy Way for Users
 
+#### Release Version
+
 ```bash
 pip3 install amitools
 ```
@@ -117,6 +119,15 @@ Note:
 
 - on Linux/macOS may use ``sudo`` to install for all users
 - requires a host C compiler to compile the extension.
+
+#### Current Version from GitHub
+
+```bash
+pip3 install -U  git+https://github.com/cnvogelg/amitools.git
+```
+
+This will install the latest version found in the github repository.
+You find the latest features but it may also be unstable from time to time.
 
 ### Developers
 
@@ -160,7 +171,14 @@ python3 setup.py build_ext -i
 or if you have installed `GNU make` simply use:
 
 ```bash
-make
+make init       # global or virtualenv setup
+make init_user  # user setup
+```
+
+For more help on the `make` targets run:
+
+```bash
+make help
 ```
 
 ## Contents
