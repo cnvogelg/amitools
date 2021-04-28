@@ -26,7 +26,7 @@ class OneMegRomPatch(RomPatch):
 
     def apply_patch(self, access, args=None):
         off = 8
-        while off < 0x400:
+        while off < 0x430:
             v = access.read_long(off)
             if v == 0xF80000:
                 v4 = access.read_long(off + 4)
