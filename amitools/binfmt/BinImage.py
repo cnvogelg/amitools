@@ -11,9 +11,12 @@ BIN_IMAGE_TYPE_ELF = 1
 
 bin_image_type_names = ["hunk", "elf"]
 
+BIN_IMAGE_RELOC_32 = 1
+BIN_IMAGE_RELOC_PC32 = 4
+
 
 class Reloc:
-    def __init__(self, offset, type, width=2, addend=0):
+    def __init__(self, offset, type=BIN_IMAGE_RELOC_32, width=2, addend=0):
         self.offset = offset
         self.type = type
         self.width = width

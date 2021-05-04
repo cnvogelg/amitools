@@ -166,7 +166,7 @@ class BinFmtHunk:
                     rl = Relocations(to_seg)
                 # add offsets
                 for o in offsets:
-                    r = Reloc(o, 1)
+                    r = Reloc(o)
                     rl.add_reloc(r)
                 seg.add_reloc(to_seg, rl)
 

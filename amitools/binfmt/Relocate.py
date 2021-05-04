@@ -1,4 +1,5 @@
 import struct
+from .BinImage import BIN_IMAGE_RELOC_32, BIN_IMAGE_RELOC_PC32
 
 
 class Relocate:
@@ -88,9 +89,9 @@ class Relocate:
         """relocate one entry"""
         offset = reloc.get_offset() + extra_offset
         delta = self._read_long(data, offset) + reloc.addend
-        if reloc.get_type() == 1:
+        if reloc.get_type() == BIN_IMAGE_RELOC_32:
             addr = to_addr + delta
-        elif reloc.get_type() == 4:
+        elif reloc.get_type() == BIN_IMAGE_RELOC_PC32:
             addr = delta + to_addr - my_addr - offset
         else:
             raise (Exception("unsupported type %d" % reloc.get_type()))
