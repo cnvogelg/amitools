@@ -2,6 +2,7 @@
 
 import os
 import struct
+import logging
 
 from .romaccess import RomAccess
 
@@ -40,7 +41,7 @@ class KickRomAccess(RomAccess):
     def check_header(self):
         # expect 0x1114 0x4ef9
         val = self.read_long(0)
-        print("Header %08x" % val, self.kib)
+        logging.debug("Header %08x" % val, self.kib)
         if self.kib == 512:
             return val == self.ROMHDR_512K
         elif self.kib == 256:
