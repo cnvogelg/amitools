@@ -4,6 +4,7 @@ import os.path
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.error import *
+from amitools.vamos.astructs import CSTR
 
 
 class VamosTestLibrary(LibImpl):
@@ -37,9 +38,8 @@ class VamosTestLibrary(LibImpl):
         print("VamosTest: PrintHello()")
         return 0
 
-    def PrintString(self, ctx, str_addr):
-        txt = ctx.mem.r_cstr(str_addr)
-        print("VamosTest: PrintString(%s)", txt)
+    def PrintString(self, ctx, txt: CSTR):
+        print("VamosTest: PrintString('%s')" % txt.str)
         return 0
 
     def Add(self, ctx, a, b):
@@ -50,8 +50,8 @@ class VamosTestLibrary(LibImpl):
         """define input values directly as function arguments"""
         return b, a
 
-    def RaiseError(self, ctx, str_addr):
-        txt = ctx.mem.r_cstr(str_addr)
+    def RaiseError(self, ctx, txt_ptr: CSTR):
+        txt = txt_ptr.str
         if txt == "RuntimeError":
             e = RuntimeError("VamosTest")
         elif txt == "VamosInternalError":

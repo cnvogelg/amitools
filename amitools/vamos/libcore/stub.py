@@ -175,14 +175,18 @@ class LibStubGen(object):
 
     def _gen_base_extra_args_func(self, method, ctx, extra_args):
         """generate a function that fills arguments from registers."""
-        reg_list = map(lambda x: x.reg, extra_args)
 
         def base_func(this, *args, **kwargs):
             """the base function to call the impl,
             set return vals, and catch exceptions"""
             args = []
-            for reg in reg_list:
-                arg_val = ctx.cpu.r_reg(reg)
+            for arg in extra_args:
+                arg_val = ctx.cpu.r_reg(arg.reg)
+                arg_type = arg.type
+                # int: keep value
+                if arg_type is not int:
+                    # bind to type
+                    arg_val = arg_type(cpu=ctx.cpu, reg=arg.reg, mem=ctx.mem)
                 args.append(arg_val)
             res = method(ctx, *args)
             if res is not None:

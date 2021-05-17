@@ -41,6 +41,12 @@ def _check_log(caplog):
             "{ CALL:   48 Swap( a[d0]=00000000, b[d1]=00000000 ) from PC=000000",
         ),
         ("valid", logging.INFO, "} CALL: -> d0=00000000, d1=00000000"),
+        (
+            "valid",
+            logging.INFO,
+            "{ CALL:   36 PrintString( str[a0]=00000010 ) from PC=000000",
+        ),
+        ("valid", logging.INFO, "} CALL: -> d0=00000000"),
     ]
 
 
@@ -61,11 +67,20 @@ def _check_log_fake(caplog):
             logging.WARN,
             "? CALL:   48 Swap( a[d0]=00000000, b[d1]=00000000 ) from PC=000000 -> d0=0 (default)",
         ),
+        (
+            "missing",
+            logging.WARN,
+            "? CALL:   36 PrintString( str[a0]=00000010 ) from PC=000000 -> d0=0 "
+            "(default)",
+        ),
     ]
 
 
 def _create_ctx():
     machine = MockMachine()
+    # prepare PrintString()
+    machine.mem.w_cstr(0x10, "hello, world!")
+    machine.cpu.w_reg(REG_A0, 0x10)
     return LibCtx(machine)
 
 
@@ -77,7 +92,7 @@ def _create_scan():
     return scanner.scan(name, impl, fd, True)
 
 
-def libcore_stub_gen_base_test():
+def libcore_stub_gen_base_test(capsys):
     scan = _create_scan()
     ctx = _create_ctx()
     # create stub
@@ -86,6 +101,8 @@ def libcore_stub_gen_base_test():
     _check_stub(stub)
     # call func
     stub.PrintHello()
+    cap = capsys.readouterr()
+    assert cap.out.strip() == "VamosTest: PrintHello()"
     stub.Dummy()
     # check arg transfer
     ctx.cpu.w_reg(REG_D0, 21)
@@ -96,6 +113,9 @@ def libcore_stub_gen_base_test():
     # check return
     stub.Add()
     assert ctx.cpu.r_reg(REG_D0) == 31
+    stub.PrintString()
+    cap = capsys.readouterr()
+    assert cap.out.strip() == "VamosTest: PrintString('hello, world!')"
 
 
 def libcore_stub_gen_profile_test():
@@ -110,6 +130,7 @@ def libcore_stub_gen_profile_test():
     stub.PrintHello()
     stub.Dummy()
     stub.Swap()
+    stub.PrintString()
     _check_profile(scan.get_fd(), profile)
 
 
@@ -127,6 +148,7 @@ def libcore_stub_gen_log_test(caplog):
     stub.PrintHello()
     stub.Dummy()
     stub.Swap()
+    stub.PrintString()
     _check_log(caplog)
 
 
@@ -145,6 +167,7 @@ def libcore_stub_gen_log_profile_test(caplog):
     stub.PrintHello()
     stub.Dummy()
     stub.Swap()
+    stub.PrintString()
     _check_log(caplog)
     _check_profile(scan.get_fd(), profile)
 
@@ -157,12 +180,13 @@ def libcore_stub_gen_exc_default_test():
     stub = gen.gen_stub(scan, ctx)
     _check_stub(stub)
     # call func
-    ctx.mem.w_cstr(0, "RuntimeError")
+    ctx.cpu.w_reg(REG_A0, 0x20)
+    ctx.mem.w_cstr(0x20, "RuntimeError")
     with pytest.raises(RuntimeError):
         stub.RaiseError()
 
 
-def libcore_stub_gen_multi_arg(caplog):
+def libcore_stub_gen_multi_arg_test(caplog):
     caplog.set_level(logging.INFO)
     scan = _create_scan()
     ctx = _create_ctx()
@@ -177,6 +201,7 @@ def libcore_stub_gen_multi_arg(caplog):
     stub.PrintHello(1, 2, a=3)
     stub.Dummy(3, b="hello")
     stub.Swap("hugo", None, c=3)
+    stub.PrintString("a", b=4, c=5)
     _check_log(caplog)
     _check_profile(scan.get_fd(), profile)
 
@@ -193,6 +218,7 @@ def libcore_stub_gen_fake_base_test():
     stub.PrintHello()
     stub.Dummy()
     stub.Swap()
+    stub.PrintString()
 
 
 def libcore_stub_gen_fake_profile_test():
@@ -208,6 +234,7 @@ def libcore_stub_gen_fake_profile_test():
     stub.PrintHello()
     stub.Dummy()
     stub.Swap()
+    stub.PrintString()
     _check_profile(fd, profile)
 
 
@@ -226,6 +253,7 @@ def libcore_stub_gen_fake_log_test(caplog):
     stub.PrintHello()
     stub.Dummy()
     stub.Swap()
+    stub.PrintString()
     _check_log_fake(caplog)
 
 
@@ -245,5 +273,6 @@ def libcore_stub_gen_fake_log_profile_test(caplog):
     stub.PrintHello()
     stub.Dummy()
     stub.Swap()
+    stub.PrintString()
     _check_log_fake(caplog)
     _check_profile(fd, profile)

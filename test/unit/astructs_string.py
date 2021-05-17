@@ -35,6 +35,14 @@ def astructs_string_cstr_test():
     assert cstr.str == "now!"
 
 
+def astructs_string_cstr_reg_test():
+    txt = "hello, world!"
+    mem.w_cstr(0x40, txt)
+    cpu.w_reg(REG_D0, 0x40)
+    cstr = CSTR(cpu=cpu, reg=REG_D0, mem=mem)
+    assert cstr.str == txt
+
+
 def astructs_string_cstr_null_test():
     mem.w32(0, 0)
     cstr = CSTR(mem=mem, addr=0)
@@ -104,6 +112,14 @@ def astructs_string_bstr_test():
     # access via 'str'
     bstr.str = "now!"
     assert bstr.str == "now!"
+
+
+def astructs_string_cstr_reg_test():
+    txt = "hello, world!"
+    mem.w_bstr(0x40, txt)
+    cpu.w_reg(REG_D0, 0x10)  # BADDR
+    bstr = BSTR(cpu=cpu, reg=REG_D0, mem=mem)
+    assert bstr.str == txt
 
 
 def astructs_string_bstr_null_test():

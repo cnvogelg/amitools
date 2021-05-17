@@ -1,5 +1,5 @@
 import pytest
-from amitools.vamos.machine import MockMemory
+from amitools.vamos.machine import MockMemory, MockCPU, REG_D0
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.astructs import (
     AmigaStruct,
@@ -100,6 +100,20 @@ def astructs_astruct_base_inst_test():
     # try to assign field directly -> forbidden!
     with pytest.raises(AttributeError):
         ms.ms_Word = 42
+
+
+def astructs_astruct_base_inst_reg_test():
+    cpu = MockCPU()
+    mem = MockMemory()
+    ms = MyStruct(mem, 0x10)
+    ms.ms_Word.val = 42
+    # prepare pointer
+    cpu.w_reg(REG_D0, 0x10)
+    MyStructAPtr = APTR(MyStruct)
+    ptr = MyStructAPtr(cpu=cpu, reg=REG_D0, mem=mem)
+    assert ptr.aptr == 0x10
+    ms2 = ptr.ref
+    assert ms2.ms_Word.val == 42
 
 
 def astructs_astruct_base_inst_setup_test():

@@ -195,8 +195,8 @@ class LibImplScanner(object):
             fd_arg_name = fd_args[i][0]
             impl_arg_name = more_args[i]
             # impl arg must have the fd arg as a prefix
-            if not impl_arg_name.startswith(fd_arg_name):
-                return None
+            # if not impl_arg_name.startswith(fd_arg_name):
+            #    return None
             # find CPU register
             reg_str = "REG_" + fd_args[i][1].upper()
             reg = str_to_reg_map[reg_str]
