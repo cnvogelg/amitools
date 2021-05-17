@@ -128,7 +128,7 @@ class RomSplitter:
             rl = Relocations(seg)
             # add offsets
             for o in relocs:
-                r = Reloc(o)
+                r = Reloc(o, 1)
                 rl.add_reloc(r)
             seg.add_reloc(seg, rl)
         # return final binary image

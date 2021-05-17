@@ -71,7 +71,7 @@ class BlizKickModule:
         seg.add_reloc(seg, relocs)
         # add relocs
         for o in offs:
-            relocs.add_reloc(BinImage.Reloc(o))
+            relocs.add_reloc(BinImage.Reloc(o, 1))
         # check if we can remove last data segment (contains only version info)
         if len(segs) == 2 and segs[1].get_type() == BinImage.SEGMENT_TYPE_DATA:
             data = segs[1].get_data()
