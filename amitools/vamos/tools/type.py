@@ -1,7 +1,7 @@
 import sys
 
 from .tool import Tool
-from amitools.vamos.astructs import AmigaStruct
+from amitools.vamos.astructs import AmigaStructTypes, TypeDumper
 from amitools.vamos.cfgcore import parse_scalar
 
 
@@ -29,46 +29,56 @@ class TypeTool(Tool):
         type_cmd = args.type_cmd
         # list
         if type_cmd == "list":
-            type_names = AmigaStruct.get_all_struct_names()
+            type_names = AmigaStructTypes.get_all_struct_names()
             for tn in sorted(type_names):
                 print(tn)
             return 0
         # dump
         elif type_cmd == "dump":
             name = args.type_name
-            s = AmigaStruct.find_struct(name)
+            s = AmigaStructTypes.find_struct(name)
             if s is None:
                 print("type '%s' not found!" % name, file=sys.stderr)
                 return 1
             else:
-                s.dump_type()
+                td = TypeDumper()
+                td.dump(s)
                 return 0
         # lookup
         elif type_cmd == "lookup":
             name = args.type_name
-            s = AmigaStruct.find_struct(name)
+            s = AmigaStructTypes.find_struct(name)
             if s is None:
                 print("type '%s' not found!" % name, file=sys.stderr)
                 return 1
             else:
                 field_path = args.type_field_path
-                try:
-                    fields = s.get_fields_by_path(field_path)
-                    return self._dump_fields(field_path, fields)
-                except KeyError as e:
-                    print("Field not found:", e, file=sys.stderr)
+                field_names = field_path.split(".")
+                field_defs = s.sdef.find_sub_field_defs_by_name(*field_names)
+                if field_defs:
+                    td = TypeDumper()
+                    td.dump_fields(*field_defs)
+                    return 0
+                else:
+                    print("Field not found:", field_path, file=sys.stderr)
                     return 1
         # offset
         elif type_cmd == "offset":
             name = args.type_name
-            s = AmigaStruct.find_struct(name)
+            s = AmigaStructTypes.find_struct(name)
             if s is None:
                 print("type '%s' not found!" % name, file=sys.stderr)
                 return 1
             else:
                 offset = parse_scalar(int, args.type_offset)
-                fields = s.get_fields_by_offset(offset)
-                return self._dump_fields("@%04x" % offset, fields)
+                field_defs, delta = s.sdef.find_sub_field_defs_by_offset(offset)
+                if field_defs:
+                    td = TypeDumper()
+                    td.dump_fields(*field_defs)
+                    return 0
+                else:
+                    print("No Field found at", offset, file=sys.stderr)
+                    return 1
 
     def _dump_fields(self, where, fields):
         if len(fields) == 0:

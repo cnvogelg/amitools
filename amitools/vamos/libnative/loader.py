@@ -1,6 +1,6 @@
 from amitools.vamos.log import log_libmgr
 from .initresident import InitRes
-from amitools.vamos.atypes import Resident
+from amitools.vamos.libtypes import Resident
 from amitools.vamos.loader import SegmentLoader, SegList
 
 

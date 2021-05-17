@@ -1,7 +1,7 @@
 import datetime
 import logging
 from amitools.vamos.log import log_libmgr
-from amitools.vamos.atypes import Library
+from amitools.vamos.libtypes import Library
 from amitools.vamos.libcore import VLibManager
 from amitools.vamos.libnative import ALibManager, LibLoader
 from .cfg import LibCfg
@@ -196,7 +196,7 @@ class LibManager(object):
     def _check_version(self, name, addr, open_ver):
         # check version
         lib = Library(self.mem, addr)
-        lib_ver = lib.version
+        lib_ver = lib.version.val
         if lib_ver < open_ver:
             log_libmgr.warning(
                 "lib '%s' has too low version: %d < %d", name, lib_ver, open_ver

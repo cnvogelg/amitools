@@ -1,6 +1,6 @@
 import os
 import sys
-from amitools.vamos.astructs import FileHandleStruct
+from amitools.vamos.libstructs import FileHandleStruct
 
 
 class FileHandle:

@@ -2,7 +2,7 @@ import logging
 from amitools.vamos.trace import TraceManager
 from amitools.vamos.label import *
 from amitools.vamos.machine import *
-from amitools.vamos.astructs import NodeStruct, LibraryStruct
+from amitools.vamos.libstructs import NodeStruct, LibraryStruct
 from amitools.vamos.cfgcore import ConfigDict
 from amitools.fd import read_lib_fd
 
@@ -46,7 +46,7 @@ def check_log(chn, records):
         (
             chn,
             lvl,
-            "W(2): 000208: 0015      Struct  [@000200 +000008 node] Node+8 = ln_Type(UBYTE)+0",
+            "W(2): 000208: 0015      Struct  [@000200 +000008 node] Node+8 = ln_Type(NodeType)+0",
         ),
         (
             chn,

@@ -6,7 +6,9 @@ import errno
 import stat
 
 from amitools.vamos.log import log_file
-from amitools.vamos.astructs import AccessStruct, MessageStruct, DosPacketStruct
+from amitools.vamos.error import UnsupportedFeatureError
+from amitools.vamos.astructs import AccessStruct
+from amitools.vamos.libstructs import MessageStruct, DosPacketStruct
 from .Error import *
 from .DosProtection import DosProtection
 from .FileHandle import FileHandle
@@ -58,7 +60,7 @@ class FileManager:
             fileno = fobj.fileno()
             # create unbuffered raw stream if its a tty
             if os.isatty(fileno):
-                fobj = open(fileno, mode, buffering=0)
+                fobj = open(fileno, "wb", buffering=0)
                 log_file.debug(
                     "open no buffering: fileno=%s -> %s, fileno=%s",
                     fileno,

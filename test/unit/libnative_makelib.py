@@ -2,8 +2,8 @@ from amitools.vamos.libnative import MakeLib, InitStructBuilder
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.machine import Machine
 from amitools.vamos.machine.opcodes import *
-from amitools.vamos.astructs import LibraryStruct
-from amitools.vamos.atypes import Library
+from amitools.vamos.libstructs import LibraryStruct
+from amitools.vamos.libtypes import Library
 
 
 def libnative_makelib_test():
@@ -23,7 +23,7 @@ def libnative_makelib_test():
 
     init_tab = 0x200
     ib = InitStructBuilder(mem, init_tab)
-    name_off = LibraryStruct.get_field_offset_for_path("lib_Node.ln_Name")
+    name_off = LibraryStruct.sdef.lib_Node.ln_Name.base_offset
     ib.init_long(name_off, name_addr)
     ib.end()
 
@@ -41,9 +41,9 @@ def libnative_makelib_test():
 
     # check library
     lib = Library(mem, lib_base)
-    assert lib.get_name() == "bla.library"
-    assert lib.get_pos_size() == 36
-    assert lib.get_neg_size() == 20  # round_long(3*6)
+    assert lib.name.str == "bla.library"
+    assert lib.pos_size.val == 36
+    assert lib.neg_size.val == 20  # round_long(3*6)
     assert mem.r32(lib_base - 4) == 0x400
     assert mem.r32(lib_base - 10) == 0x600
     assert mem.r32(lib_base - 16) == 0x800

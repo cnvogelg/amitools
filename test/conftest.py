@@ -31,11 +31,18 @@ def pytest_addoption(parser):
         help="run the debug versions of the Amiga binaries",
     )
     parser.addoption(
-        "--dump-output",
+        "--dump-file",
         "-O",
         action="store_true",
         default=False,
         help="write all vamos output to 'vamos.log'",
+    )
+    parser.addoption(
+        "--dump-console",
+        "-C",
+        action="store_true",
+        default=False,
+        help="write all vamos output to stdout",
     )
     parser.addoption(
         "--gen-data",
@@ -154,14 +161,16 @@ def buildlibsc(request):
 def vamos(request):
     """Run vamos with test programs"""
     dbg = request.config.getoption("--use-debug-bins")
-    dump = request.config.getoption("--dump-output")
+    dump_file = request.config.getoption("--dump-file")
+    dump_console = request.config.getoption("--dump-console")
     gen = request.config.getoption("--gen-data")
     auto_build = request.config.getoption("--auto-build")
     flavor = request.param
     return VamosTestRunner(
         flavor,
         use_debug_bins=dbg,
-        dump_output=dump,
+        dump_file=dump_file,
+        dump_console=dump_console,
         generate_data=gen,
         vamos_bin=VAMOS_BIN,
         vamos_args=VAMOS_ARGS,

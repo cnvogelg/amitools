@@ -2,13 +2,8 @@ from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.machine import Machine
 from amitools.vamos.machine.regs import *
-from amitools.vamos.atypes import (
-    Resident,
-    ResidentFlags,
-    NodeType,
-    AutoInit,
-    ExecLibrary,
-)
+from amitools.vamos.libtypes import Resident, ExecLibrary, Library
+from amitools.vamos.libstructs import ResidentFlags, NodeType, AutoInitStruct
 from amitools.vamos.libnative import InitRes
 
 
@@ -43,8 +38,10 @@ def libnative_initres_init_test(buildlibnix):
     trap_id = traps.setup(init_func, auto_rts=True)
     mem.w16(init_addr, trap_id | 0xA000)
     # build fake resident
-    res = Resident.alloc(alloc, "bla.library", "blub")
-    res.setup(flags=0, version=42, type=NodeType.NT_LIBRARY, pri=-7, init=init_addr)
+    res = Resident.alloc(alloc, name="bla.library", id_string="blub")
+    res.new_resident(
+        flags=0, version=42, type=NodeType.NT_LIBRARY, pri=-7, init=init_addr
+    )
     # init resident
     ir = InitRes(machine, alloc)
     lib_base, mem_obj = ir.init_resident(res.get_addr(), seglist.get_baddr(), run_sp=sp)
@@ -79,16 +76,17 @@ def libnative_initres_autoinit_test(buildlibnix):
     mem.w32(vectors + 8, 0x800)
     mem.w32(vectors + 12, 0xFFFFFFFF)
     # build fake resident
-    res = Resident.alloc(alloc, "bla.library", "blub")
-    res.setup(
+    res = Resident.alloc(alloc, name="bla.library", id_string="blub")
+    res.new_resident(
         flags=ResidentFlags.RTF_AUTOINIT, version=42, type=NodeType.NT_LIBRARY, pri=-7
     )
-    auto_init = AutoInit.alloc(alloc)
-    auto_init.setup(functions=vectors, init_func=init_addr)
-    res.set_auto_init(auto_init)
+    auto_init = AutoInitStruct.alloc(alloc, functions=vectors, init_func=init_addr)
+    res.init.ref = auto_init
     # setup exec lib
-    exec_lib = ExecLibrary.alloc(alloc, "exec.library", "bla", 36)
-    exec_lib.setup()
+    exec_lib = ExecLibrary.alloc(
+        alloc, name="exec.library", id_string="bla", neg_size=36
+    )
+    exec_lib.new_lib()
     mem.w32(4, exec_lib.get_addr())
     # init resident
     ir = InitRes(machine, alloc)
@@ -97,6 +95,12 @@ def libnative_initres_autoinit_test(buildlibnix):
     )
     assert lib_base
     assert mem_obj
+    # check lib
+    lib = Library(mem, lib_base)
+    assert lib.name.str == "bla.library"
+    assert lib.id_string.str == "blub"
+    assert lib.neg_size.val == 20  # fits the 3*6 vectors
+    # clean up
     seglist.free()
     res.free()
     auto_init.free()

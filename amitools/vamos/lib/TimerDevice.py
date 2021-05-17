@@ -1,6 +1,7 @@
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.machine.regs import *
-from amitools.vamos.astructs import *
+from amitools.vamos.machine.regs import REG_A0
+from amitools.vamos.astructs import AccessStruct
+from amitools.vamos.libstructs import DateStampStruct
 
 from datetime import datetime
 

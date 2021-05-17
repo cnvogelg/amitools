@@ -1,6 +1,6 @@
 import inspect
 import collections
-from amitools.vamos.astructs import LibraryStruct
+from amitools.vamos.libstructs import LibraryStruct
 from amitools.vamos.error import VamosInternalError
 from amitools.vamos.machine import str_to_reg_map
 

@@ -1,5 +1,5 @@
-from amitools.vamos.astructs.dos import CLIStruct, DosPacketStruct, ProcessStruct
-from amitools.vamos.astructs.exec_ import MessageStruct, MinListStruct
+from amitools.vamos.libstructs.dos import CLIStruct, DosPacketStruct, ProcessStruct
+from amitools.vamos.libstructs.exec_ import MessageStruct, MinListStruct
 from amitools.vamos.lib.dos import CommandLine
 from amitools.vamos.log import log_proc
 from amitools.vamos.machine.regs import (

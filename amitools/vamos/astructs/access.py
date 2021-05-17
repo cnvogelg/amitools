@@ -1,3 +1,7 @@
+from .astruct import AmigaStruct
+from .pointer import BCPLPointerType
+
+
 class AccessStruct(object):
 
     _size_to_width = [None, 0, 1, None, 2]
@@ -5,43 +9,45 @@ class AccessStruct(object):
     def __init__(self, mem, struct_def, struct_addr):
         self.mem = mem
         self.struct = struct_def(mem, struct_addr)
-        self.trace_mgr = getattr(self.mem, "trace_mgr", None)
 
     def w_s(self, name, val):
-        struct, field = self.struct.write_field(name, val)
-        if self.trace_mgr is not None:
-            off = field.offset
-            addr = struct.get_addr() + off
-            tname = struct.get_type_name()
-            addon = "%s+%d = %s" % (tname, off, name)
-            width = self._size_to_width[field.size]
-            self.trace_mgr.trace_int_mem(
-                "W", width, addr, val, text="Struct", addon=addon
-            )
+        field, field_def = self._get_field_for_name(name)
+        # BPTR auto conversion
+        if issubclass(field_def.type, BCPLPointerType):
+            field.set_ref_addr(val)
+        else:
+            field.set(val)
 
     def r_s(self, name):
-        struct, field, val = self.struct.read_field_ext(name)
-        if self.trace_mgr is not None:
-            off = field.offset
-            addr = struct.get_addr() + off
-            tname = struct.get_type_name()
-            addon = "%s+%d = %s" % (tname, off, name)
-            width = self._size_to_width[field.size]
-            self.trace_mgr.trace_int_mem(
-                "R", width, addr, val, text="Struct", addon=addon
-            )
+        field, field_def = self._get_field_for_name(name)
+        # BPTR auto conversion
+        if issubclass(field_def.type, BCPLPointerType):
+            val = field.get_ref_addr()
+        else:
+            val = field.get()
         return val
 
     def s_get_addr(self, name):
-        return self.struct.get_addr_for_name(name)
-
-    def r_all(self):
-        """return a namedtuple with all values of the struct"""
-        return self.struct.read_data()
-
-    def w_all(self, nt):
-        """set values stored in a named tuple"""
-        self.struct.write_data(nt)
+        field, _ = self._get_field_for_name(name)
+        return field.get_addr()
 
     def get_size(self):
-        return self.struct.get_size()
+        return self.struct.get_byte_size()
+
+    def _get_field_for_name(self, name):
+        struct = self.struct
+        field_def = None
+        field = None
+        # walk along fields in name "bla.foo.bar"
+        for field_name in name.split("."):
+            assert struct is not None
+            field_def = struct.sdef.find_field_def_by_name(field_name)
+            if not field_def:
+                raise KeyError(self, name)
+            field = struct.sfields.get_field_by_index(field_def.index)
+            # find potential next struct
+            if isinstance(field, AmigaStruct):
+                struct = field
+            else:
+                struct = None
+        return field, field_def

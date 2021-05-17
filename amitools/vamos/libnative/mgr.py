@@ -1,5 +1,5 @@
 from amitools.vamos.log import log_libmgr
-from amitools.vamos.atypes import Library
+from amitools.vamos.libtypes import Library
 from .loader import LibLoader
 from .libfuncs import LibFuncs
 

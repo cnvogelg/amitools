@@ -5,10 +5,28 @@ import os
 
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.astructs import *
+from amitools.vamos.astructs import AccessStruct
+from amitools.vamos.libstructs import (
+    DosLibraryStruct,
+    DosInfoStruct,
+    RootNodeStruct,
+    DateStampStruct,
+    DateTimeStruct,
+    LocalVarStruct,
+    NodeStruct,
+    SegmentStruct,
+    FileHandleStruct,
+    FileInfoBlockStruct,
+    InfoDataStruct,
+    DevProcStruct,
+    AnchorPathStruct,
+    RDArgsStruct,
+    CLIStruct,
+    DosPacketStruct,
+    PathStruct,
+)
 from amitools.vamos.error import *
 from amitools.vamos.log import log_dos
-from amitools.vamos.path import PathManager, AssignManager
 from .dos.Args import *
 from .dos.Error import *
 from .dos.AmiTime import *
@@ -17,7 +35,6 @@ from .dos import Printf, PathPart
 from .dos.DosTags import DosTags
 from .dos.PatternMatch import Pattern, pattern_parse, pattern_match
 from .dos.MatchFirstNext import MatchFirstNext
-from amitools.vamos.label import LabelStruct
 from .dos.CommandLine import CommandLine
 from .dos.Process import Process
 from .dos.DosList import DosList
@@ -260,7 +277,7 @@ class DosLibrary(LibImpl):
             self.get_current_dir(ctx), name, searchMulti=True
         )
         if sys_path == None:
-            log_dos.info("file not found: '%s' -> '%s'" % (ami_path, sys_path))
+            log_dos.info("file not found: '%s' -> '%s'" % (name, sys_path))
             self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
             return self.DOSFALSE
         else:
@@ -468,7 +485,7 @@ class DosLibrary(LibImpl):
         log_dos.info("FindSegment(%s)" % needle)
         while seg_addr != 0:
             segment = AccessStruct(ctx.mem, SegmentStruct, seg_addr)
-            name_addr = seg_addr + SegmentStruct.get_field_offset_by_name("seg_Name")
+            name_addr = seg_addr + SegmentStruct.sdef.seg_Name.offset
             name = ctx.mem.r_bstr(name_addr)
             if name.lower() == needle.lower():
                 if (system and segment.r_s("seg_UC") < 0) or (
@@ -486,7 +503,7 @@ class DosLibrary(LibImpl):
         system = ctx.cpu.r_reg(REG_D3)
         name = ctx.mem.r_cstr(name_ptr)
         seg_addr = self._alloc_mem("Segment", SegmentStruct.get_size() + len(name) + 1)
-        name_addr = seg_addr + SegmentStruct.get_field_offset_by_name("seg_Name")
+        name_addr = seg_addr + SegmentStruct.sdef.seg_Name.offset
         segment = ctx.alloc.map_struct("Segment", seg_addr, SegmentStruct)
         head_addr = self.dos_info.access.r_s("di_NetHand")
         segment.access.w_s("seg_Next", head_addr)

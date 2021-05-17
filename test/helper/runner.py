@@ -13,7 +13,8 @@ class VamosTestRunner:
         vamos_bin=None,
         vamos_args=None,
         use_debug_bins=False,
-        dump_output=False,
+        dump_file=False,
+        dump_console=False,
         generate_data=False,
         auto_build=False,
     ):
@@ -21,7 +22,8 @@ class VamosTestRunner:
         self.vamos_bin = vamos_bin
         self.vamos_args = vamos_args
         self.use_debug_bins = use_debug_bins
-        self.dump_output = dump_output
+        self.dump_file = dump_file
+        self.dump_console = dump_console
         self.generate_data = generate_data
         self.bin_builder = BinBuilder(flavor, use_debug_bins, auto_build)
 
@@ -104,13 +106,28 @@ class VamosTestRunner:
         stderr = stderr.decode("latin-1").splitlines()
 
         # show?
-        if self.dump_output:
-            fh = open("vamos.log", "w+")
+        if self.dump_file:
+            fh = open("vamos.log", "a")
             fh.write(" ".join(args) + "\n")
+            fh.write("---stdout---\n")
             for line in stdout:
                 fh.write(line)
                 fh.write("\n")
+            fh.write("---stderr---\n")
+            for line in stdout:
+                fh.write(line)
+                fh.write("\n")
+            fh.write("---end---\n")
             fh.close()
+
+        if self.dump_console:
+            print("---stdout---")
+            for line in stdout:
+                print(line)
+            print("---stderr---")
+            for line in stderr:
+                print(line)
+            print("---end---")
 
         # generate data?
         if self.generate_data:

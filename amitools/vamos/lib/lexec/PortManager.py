@@ -1,4 +1,4 @@
-from amitools.vamos.astructs import MsgPortStruct
+from amitools.vamos.libstructs import MsgPortStruct
 from amitools.vamos.error import *
 
 

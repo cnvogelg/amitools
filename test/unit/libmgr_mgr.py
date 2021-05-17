@@ -50,7 +50,7 @@ def libmgr_mgr_bootstrap_shutdown_test():
     assert vmgr.get_vlib_by_name("exec.library") == exec_vlib
     assert vmgr.get_vlib_by_addr(exec_base) == exec_vlib
     assert exec_vlib.get_ctx() == vmgr.ctx_map.get_ctx("exec.library")
-    assert exec_lib.open_cnt == 1
+    assert exec_lib.open_cnt.val == 1
     assert machine.get_mem().r32(4) == exec_base
     # we can't expunge exec
     assert not mgr.expunge_lib(exec_base)
@@ -94,7 +94,7 @@ def libmgr_mgr_open_vlib_test():
     assert impl
     assert impl.get_cnt() == 1
     lib = test_vlib.get_library()
-    assert lib.version == impl.get_version()
+    assert lib.version.val == impl.get_version()
     mgr.close_lib(test_base)
     assert impl.get_cnt() is None
     # shutdown
@@ -118,7 +118,7 @@ def libmgr_mgr_open_vlib_dev_test():
     assert impl
     assert impl.get_cnt() == 1
     lib = test_vlib.get_library()
-    assert lib.version == impl.get_version()
+    assert lib.version.val == impl.get_version()
     mgr.close_lib(test_base)
     assert impl.get_cnt() is None
     # shutdown
@@ -143,7 +143,7 @@ def libmgr_mgr_open_vlib_fake_fd_test():
     impl = test_vlib.get_impl()
     assert impl is None
     lib = test_vlib.get_library()
-    assert lib.version == 40
+    assert lib.version.val == 40
     mgr.close_lib(test_base)
     # shutdown
     left = mgr.shutdown()
@@ -170,8 +170,8 @@ def libmgr_mgr_open_vlib_fake_no_fd_test():
     impl = test_vlib.get_impl()
     assert impl is None
     lib = test_vlib.get_library()
-    assert lib.version == 40
-    assert lib.neg_size == 68
+    assert lib.version.val == 40
+    assert lib.neg_size.val == 68
     mgr.close_lib(test_base)
     # shutdown
     left = mgr.shutdown()

@@ -71,7 +71,7 @@ class VLib(object):
 
     def free(self):
         # check open cnt
-        oc = self.library.open_cnt
+        oc = self.library.open_cnt.val
         if oc > 0:
             raise RuntimeError("vlib.free(): has open_cnt: %d" % oc)
         # call cleanup func in impl
@@ -92,14 +92,14 @@ class VLib(object):
         lib.inc_open_cnt()
         # report open to impl
         if self.impl:
-            self.impl.open_lib(self.ctx, lib.open_cnt)
+            self.impl.open_lib(self.ctx, lib.open_cnt.val)
 
     def close(self):
         lib = self.library
         lib.dec_open_cnt()
-        oc = lib.open_cnt
+        oc = lib.open_cnt.val
         if oc < 0:
             raise ValueError("vlib.close(): open_cnt < 0: %d" % oc)
         # report close to impl
         if self.impl:
-            self.impl.close_lib(self.ctx, lib.open_cnt)
+            self.impl.close_lib(self.ctx, lib.open_cnt.val)

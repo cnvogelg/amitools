@@ -8,7 +8,7 @@ from amitools.vamos.libcore import (
     LibCtxMap,
     LibProfiler,
 )
-from amitools.vamos.atypes import ExecLibrary
+from amitools.vamos.libtypes import ExecLibrary
 
 
 class VLibManager(object):
@@ -129,7 +129,9 @@ class VLibManager(object):
                 if not self.expunge_lib(vlib):
                     lib = vlib.get_library()
                     log_libmgr.warning(
-                        "can't expunge: '%s' with open count %d", lib.name, lib.open_cnt
+                        "can't expunge: '%s' with open count %d",
+                        lib.name,
+                        lib.open_cnt.val,
                     )
                     left_libs += 1
         return left_libs
@@ -138,7 +140,7 @@ class VLibManager(object):
         """expunge a vlib"""
         lib = vlib.get_library()
         # still open?
-        if lib.open_cnt > 0:
+        if lib.open_cnt.val > 0:
             return False
         # vlib?
         self._rem_vlib(vlib)

@@ -1,4 +1,5 @@
-from amitools.vamos.astructs import AccessStruct, SignalSemaphoreStruct
+from amitools.vamos.astructs import AccessStruct
+from amitools.vamos.libstructs import SignalSemaphoreStruct
 from amitools.vamos.error import *
 
 

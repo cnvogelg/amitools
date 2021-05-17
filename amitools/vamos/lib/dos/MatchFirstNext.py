@@ -1,5 +1,5 @@
-from amitools.vamos.astructs import (
-    AccessStruct,
+from amitools.vamos.astructs import AccessStruct
+from amitools.vamos.libstructs import (
     AnchorPathStruct,
     AChainStruct,
     FileInfoBlockStruct,

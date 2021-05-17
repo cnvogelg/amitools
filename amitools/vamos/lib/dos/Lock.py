@@ -4,7 +4,8 @@ import uuid
 
 from amitools.vamos.log import log_lock
 
-from amitools.vamos.astructs import AccessStruct, FileLockStruct, DateStampStruct
+from amitools.vamos.astructs import AccessStruct
+from amitools.vamos.libstructs import FileLockStruct, DateStampStruct
 from .DosProtection import DosProtection
 from .AmiTime import *
 from .Error import *
