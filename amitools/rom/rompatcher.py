@@ -56,6 +56,43 @@ class OneMegRomPatch(RomPatch):
         logging.error("Exec Table not found!")
         return False
 
+class FourMegRomPatch(RomPatch):
+    def __init__(self):
+        RomPatch.__init__(
+            self, "4mb_rom", "Patch Kickstart to support ext ROM with 3584 KiB"
+        )
+
+    def apply_patch(self, access, args=None):
+        off = 8
+        while off < 0x430:
+            v = access.read_long(off)
+            if v == 0xF80000:
+                v4 = access.read_long(off + 4)
+                v8 = access.read_long(off + 8)
+                vc = access.read_long(off + 0xC)
+                v10 = access.read_long(off + 0x10)
+                if (
+                    v4 == 0x1000000
+                    and v8 == 0xF00000
+                    and vc == 0xF80000
+                    and v10 == 0xFFFFFFFF
+                ):
+                    vp8 = access.read_long(off - 8)
+                    if vp8 == 0xF80000:
+                        access.write_long(off - 4, 0x1000000)
+                        access.write_long(off, 0x1000000)
+                        access.write_long(off + 4, 0x1400000)
+                        logging.info("@%08x Variant A", off)
+                        return True
+                    else:
+                        access.write_long(off, 0xF00000)
+                        access.write_long(off + 8, 0x1000000)
+                        access.write_long(off + 0xC, 0x1400000)
+                        logging.info("@%08x Variant B", off)
+                        return True
+            off += 2
+        logging.error("Exec Table not found!")
+        return False
 
 class BootConRomPatch(RomPatch):
     def __init__(self):
@@ -100,7 +137,7 @@ class BootConRomPatch(RomPatch):
 class RomPatcher:
 
     # list of all available patch classes
-    patches = [OneMegRomPatch(), BootConRomPatch()]
+    patches = [OneMegRomPatch(), FourMegRomPatch(), BootConRomPatch()]
 
     def __init__(self, rom):
         self.access = RomAccess(rom)
