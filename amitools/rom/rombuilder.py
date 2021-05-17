@@ -168,8 +168,8 @@ class KickRomBuilder(RomBuilder):
             self.kickety_split = False
             self.split_offset = None
         # check size
-        if size not in (256, 512):
-            raise ValueError("KickROM size must be 256 or 512 KiB!")
+        if size not in (256, 512, 3584):
+            raise ValueError("KickROM size must be 256, 512 or 3584 KiB!")
         # we need a footer
         self.left_bytes -= KickRomAccess.FOOTER_SIZE
         # extra rom header takes 8
