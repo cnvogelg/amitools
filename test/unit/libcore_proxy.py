@@ -39,6 +39,28 @@ class MyStub:
         self.ctx.cpu.w_reg(REG_D1, 2 * self.string_count)
 
 
+class MyMachine:
+    def __init__(self):
+        self.pc = None
+        self.sp = None
+        self.set_regs = None
+        self.get_regs = None
+        self.name = None
+        self.regs = None
+
+    def run(self, pc, sp=None, set_regs=None, get_regs=None, name=None):
+        self.pc = pc
+        self.sp = sp
+        self.set_regs = set_regs
+        self.get_regs = get_regs
+        self.name = name
+        if len(get_regs) == 2:
+            self.regs = {REG_D0: 23, REG_D1: 42}
+        else:
+            self.regs = {REG_D0: 11}
+        return self
+
+
 def libcore_proxy_gen_stub_test():
     ctx = _create_ctx()
     lib_fd = _create_fd()
@@ -82,3 +104,30 @@ def libcore_proxy_gen_stub_test():
     assert stub.string_kwargs == {"foo": "bar"}
     assert ctx.cpu.r_reg(REG_D0) == stub.string_count
     assert ctx.cpu.r_reg(REG_D1) == stub.string_count * 2
+
+
+def libcore_proxy_gen_libcall_test():
+    machine = MyMachine()
+    ctx = _create_ctx()
+    ctx.machine = machine
+    lib_fd = _create_fd()
+    gen = LibProxyGen()
+    base_addr = 0x1000
+    # gen prxoy
+    VamosTestProxy = gen.gen_proxy_for_libcall("VamosTestProxy", lib_fd)
+    # check some functions
+    type_dict = VamosTestProxy.__dict__
+    assert "PrintString" in type_dict
+    assert "PrintHello" in type_dict
+    # create proxy instance
+    proxy = VamosTestProxy(ctx, base_addr)
+    # call hello
+    ret = proxy.PrintHello()
+    assert ret == 11
+    assert machine.set_regs == {}
+    assert machine.get_regs == [REG_D0]
+    # call string
+    ret = proxy.PrintString(0x10, ret_d1=True)
+    assert ret == (23, 42)
+    assert machine.set_regs == {REG_A0: 0x10}
+    assert machine.get_regs == [REG_D0, REG_D1]
