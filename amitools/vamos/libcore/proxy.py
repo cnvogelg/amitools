@@ -69,7 +69,11 @@ class LibProxyGen:
 
             # perform native run
             res = self.ctx.machine.run(
-                jump_addr, sp=self.run_sp, set_regs=reg_map, get_regs=ret_regs, name=name
+                jump_addr,
+                sp=self.run_sp,
+                set_regs=reg_map,
+                get_regs=ret_regs,
+                name=name,
             )
 
             if ret_d1:

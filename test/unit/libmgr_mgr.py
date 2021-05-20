@@ -101,7 +101,7 @@ def libmgr_mgr_open_vlib_test():
     proxy_mgr = LibProxyManager(mgr)
     proxy = proxy_mgr.open_lib_proxy("vamostest.library")
     assert proxy
-    assert proxy.Add(2,3) == 5
+    assert proxy.Add(2, 3) == 5
     proxy_mgr.close_lib_proxy(proxy)
     # shutdown
     left = mgr.shutdown()
@@ -131,7 +131,7 @@ def libmgr_mgr_open_vlib_dev_test():
     proxy_mgr = LibProxyManager(mgr)
     proxy = proxy_mgr.open_lib_proxy("vamostestdev.device")
     assert proxy
-    assert proxy.Add(1,2) == 3
+    assert proxy.Add(1, 2) == 3
     proxy_mgr.close_lib_proxy(proxy)
     # shutdown
     left = mgr.shutdown()
@@ -266,7 +266,7 @@ def open_alib(lib_file, lib_name, ok=True, version=0, mode=None):
     proxy_mgr = LibProxyManager(mgr)
     proxy = proxy_mgr.open_lib_proxy(lib_name, run_sp=h.sp)
     assert proxy
-    assert proxy.Add(3,4) == 7
+    assert proxy.Add(3, 4) == 7
     proxy_mgr.close_lib_proxy(proxy, run_sp=h.sp)
     # shutdown
     h.shutdown()
