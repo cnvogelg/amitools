@@ -2,7 +2,7 @@ import logging
 import pytest
 from amitools.vamos.log import log_libmgr, log_exec
 from amitools.vamos.libcore import LibCtx
-from amitools.vamos.libmgr import LibManager, LibMgrCfg, LibCfg
+from amitools.vamos.libmgr import LibManager, LibMgrCfg, LibCfg, LibProxyManager
 from amitools.vamos.machine import Machine
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
@@ -97,6 +97,12 @@ def libmgr_mgr_open_vlib_test():
     assert lib.version.val == impl.get_version()
     mgr.close_lib(test_base)
     assert impl.get_cnt() is None
+    # try to open a proxy
+    proxy_mgr = LibProxyManager(mgr)
+    proxy = proxy_mgr.open_lib_proxy("vamostest.library")
+    assert proxy
+    assert proxy.Add(2,3) == 5
+    proxy_mgr.close_lib_proxy(proxy)
     # shutdown
     left = mgr.shutdown()
     assert left == 0
@@ -121,6 +127,12 @@ def libmgr_mgr_open_vlib_dev_test():
     assert lib.version.val == impl.get_version()
     mgr.close_lib(test_base)
     assert impl.get_cnt() is None
+    # try to open a proxy
+    proxy_mgr = LibProxyManager(mgr)
+    proxy = proxy_mgr.open_lib_proxy("vamostestdev.device")
+    assert proxy
+    assert proxy.Add(1,2) == 3
+    proxy_mgr.close_lib_proxy(proxy)
     # shutdown
     left = mgr.shutdown()
     assert left == 0
@@ -250,6 +262,12 @@ def open_alib(lib_file, lib_name, ok=True, version=0, mode=None):
     assert not amgr.is_load_addr(lib_base)
     lib_info = amgr.get_lib_info_for_name(lib_name)
     assert not lib_info
+    # proxy
+    proxy_mgr = LibProxyManager(mgr)
+    proxy = proxy_mgr.open_lib_proxy(lib_name, run_sp=h.sp)
+    assert proxy
+    assert proxy.Add(3,4) == 7
+    proxy_mgr.close_lib_proxy(proxy, run_sp=h.sp)
     # shutdown
     h.shutdown()
 

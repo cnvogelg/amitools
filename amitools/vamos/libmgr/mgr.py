@@ -11,6 +11,7 @@ class LibManager(object):
     def __init__(self, machine, alloc, segloader, cfg, main_profiler=None):
         self.mem = machine.get_mem()
         self.cfg = cfg
+        self.machine = machine
         self.vlib_mgr = VLibManager(machine, alloc, main_profiler=main_profiler)
         self.alib_mgr = ALibManager(machine, alloc, segloader)
         cfg.dump(log_libmgr.info)
@@ -34,7 +35,7 @@ class LibManager(object):
 
     def get_alib_info_by_addr(self, addr):
         """return associated alib info for a base lib address"""
-        return self.alib.is_base_addr(addr)
+        return self.alib_mgr.is_base_addr(addr)
 
     def bootstrap_exec(self, exec_info=None):
         """setup exec vlib as first and essential lib"""

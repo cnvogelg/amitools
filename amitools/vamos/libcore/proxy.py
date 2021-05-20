@@ -10,9 +10,10 @@ class LibProxy:
     is called directly.
     """
 
-    def __init__(self, ctx, base_addr=None):
+    def __init__(self, ctx, base_addr=None, run_sp=None):
         self.ctx = ctx
         self.base_addr = base_addr
+        self.run_sp = run_sp
 
 
 class LibProxyGen:
@@ -52,7 +53,7 @@ class LibProxyGen:
 
         return stub_call
 
-    def _gen_lib_call(self, arg_regs, bias, sp=None, name=None):
+    def _gen_lib_call(self, arg_regs, bias, name=None):
         def lib_call(self, *args, **kwargs):
             reg_map = {}
             for reg, val in zip(arg_regs, args):
@@ -68,7 +69,7 @@ class LibProxyGen:
 
             # perform native run
             res = self.ctx.machine.run(
-                jump_addr, sp=sp, set_regs=reg_map, get_regs=ret_regs, name=name
+                jump_addr, sp=self.run_sp, set_regs=reg_map, get_regs=ret_regs, name=name
             )
 
             if ret_d1:
