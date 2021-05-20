@@ -1,5 +1,3 @@
-import datetime
-import logging
 from amitools.vamos.log import log_libmgr
 from amitools.vamos.libtypes import Library
 from amitools.vamos.libcore import VLibManager
@@ -33,6 +31,10 @@ class LibManager(object):
     def get_vlib_by_name(self, name):
         """return associated vlib for a name"""
         return self.vlib_mgr.get_vlib_by_name(name)
+
+    def get_alib_info_by_addr(self, addr):
+        """return associated alib info for a base lib address"""
+        return self.alib.is_base_addr(addr)
 
     def bootstrap_exec(self, exec_info=None):
         """setup exec vlib as first and essential lib"""

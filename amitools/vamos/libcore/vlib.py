@@ -51,7 +51,7 @@ class VLib(object):
         return self.ctx
 
     def get_patcher(self):
-        return self.neg_size
+        return self.patcher
 
     def get_profile(self):
         return self.profile
