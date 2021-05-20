@@ -55,6 +55,7 @@ def libnative_mgr_test(buildlibnix):
     lib_info = mgr.get_lib_info_for_name("testnix.library")
     assert lib_info
     assert lib_info.is_base_addr(lib_base)
+    assert lib_info.get_lib_fd()
     # close lib
     seglist = mgr.close_lib(lib_base, run_sp=sp)
     assert seglist == 0
