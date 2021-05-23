@@ -49,12 +49,17 @@ def foobar(ctx):
     """the test ctx_func"""
     print("hello, world!")
     print(type(ctx))
+    print(sorted(ctx.__dict__))
     return 42
 
 
-def test_execpy_vamos_ctx_func_test(vamos, tmpdir):
+def test_execpy_vamos_ctx_func_test(vamos):
     # now use the vamos helper to run a function in lib ctx
-    retcode, stdout, stderr = vamos.run_ctx_func(foobar, tmpdir)
+    retcode, stdout, stderr = vamos.run_ctx_func(foobar)
     assert retcode == 42
-    assert stdout == ["hello, world!", "<class 'amitools.vamos.libcore.ctx.LibCtx'>"]
+    assert stdout == [
+        "hello, world!",
+        "<class 'amitools.vamos.libcore.ctx.LibCtx'>",
+        "['cpu', 'machine', 'mem', 'vlib']",
+    ]
     assert stderr == []

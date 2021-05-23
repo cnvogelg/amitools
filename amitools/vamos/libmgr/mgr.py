@@ -18,7 +18,6 @@ class LibManager(object):
 
     def add_ctx(self, name, ctx):
         """allow to add vlib contexts"""
-        ctx.lib_mgr = self
         self.vlib_mgr.add_ctx(name, ctx)
 
     def add_impl_cls(self, name, impl_cls):

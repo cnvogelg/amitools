@@ -28,7 +28,7 @@ def setup(path_mgr=None):
     cpu = machine.get_cpu()
     mem = machine.get_mem()
     cpu_type = machine.get_cpu_type()
-    exec_ctx = ExecLibCtx(machine, alloc, segloader, path_mgr)
+    exec_ctx = ExecLibCtx(machine, alloc, segloader, path_mgr, mgr)
     mgr.add_ctx("exec.library", exec_ctx)
     mgr.add_impl_cls("exec.library", ExecLibrary)
     dos_ctx = DosLibCtx(machine, alloc, segloader, path_mgr, None, None)
@@ -49,7 +49,7 @@ def libmgr_mgr_bootstrap_shutdown_test():
     vmgr = mgr.vlib_mgr
     assert vmgr.get_vlib_by_name("exec.library") == exec_vlib
     assert vmgr.get_vlib_by_addr(exec_base) == exec_vlib
-    assert exec_vlib.get_ctx() == vmgr.ctx_map.get_ctx("exec.library")
+    assert exec_vlib.get_ctx() == vmgr.ctx_map["exec.library"]
     assert exec_lib.open_cnt.val == 1
     assert machine.get_mem().r32(4) == exec_base
     # we can't expunge exec

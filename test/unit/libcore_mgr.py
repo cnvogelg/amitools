@@ -2,7 +2,7 @@ import collections
 from amitools.vamos.lib.ExecLibrary import ExecLibrary
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.lib.VamosTestDevice import VamosTestDevice
-from amitools.vamos.libcore import VLibManager, LibRegistry, LibCtxMap
+from amitools.vamos.libcore import VLibManager
 from amitools.vamos.machine import Machine
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
@@ -24,7 +24,7 @@ def setup(main_profiler=None, prof_names=None, prof_calls=False):
     mem = machine.get_mem()
     cpu_type = machine.get_cpu_type()
     segloader = SegmentLoader(alloc)
-    exec_ctx = ExecLibCtx(machine, alloc, segloader, None)
+    exec_ctx = ExecLibCtx(machine, alloc, segloader, None, None)
     mgr.add_ctx("exec.library", exec_ctx)
     mgr.add_impl_cls("exec.library", ExecLibrary)
     mgr.add_impl_cls("vamostest.library", VamosTestLibrary)

@@ -168,15 +168,13 @@ class VamosTestRunner:
         # asser stderr to be empty
         assert stderr == []
 
-    def run_ctx_func(self, ctx_func, tmpdir, **kw_args):
+    def run_ctx_func(self, ctx_func, **kw_args):
         """use test_execpy binary to run the given func in a lib context"""
         func_name = ctx_func.__name__
-        # write file with code of function
-        src_code = inspect.getsource(ctx_func)
-        script_file = tmpdir / (func_name + "_script.py")
-        script_file.write_text(src_code, "utf-8")
+        # get source file
+        src_file = inspect.getfile(ctx_func)
         # now run 'test_execpy'
-        prog_args = ["test_execpy", "-c", str(script_file), func_name]
+        prog_args = ["test_execpy", "-c", src_file, func_name]
         return self.run_prog(*prog_args, **kw_args)
 
 

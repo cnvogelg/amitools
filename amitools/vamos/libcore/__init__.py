@@ -1,6 +1,6 @@
 from .impl import LibImpl, LibImplScanner, LibImplScan, LibImplFunc, LibImplFuncArg
 from .registry import LibRegistry
-from .ctx import LibCtx, LibCtxMap
+from .ctx import LibCtx
 from .stub import LibStub, LibStubGen
 from .proxy import LibProxy, LibProxyGen
 from .profile import LibFuncProfileData, LibProfileData, LibProfiler

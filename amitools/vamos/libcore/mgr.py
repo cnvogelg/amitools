@@ -4,8 +4,8 @@ from amitools.vamos.log import log_lib, log_libmgr
 from amitools.vamos.libcore import (
     LibCreator,
     LibInfo,
+    LibCtx,
     LibRegistry,
-    LibCtxMap,
     LibProfiler,
 )
 from amitools.vamos.libtypes import ExecLibrary
@@ -21,7 +21,7 @@ class VLibManager(object):
         self.mem = machine.get_mem()
         self.alloc = alloc
         self.lib_reg = LibRegistry()
-        self.ctx_map = LibCtxMap(machine)
+        self.ctx_map = {}
         self.lib_profiler = LibProfiler(prof_names, prof_calls)
         if main_profiler:
             main_profiler.add_profiler(self.lib_profiler)
@@ -52,7 +52,7 @@ class VLibManager(object):
         self.lib_reg.add_lib_impl(name, impl_cls)
 
     def add_ctx(self, name, ctx):
-        self.ctx_map.add_ctx(name, ctx)
+        self.ctx_map[name] = ctx
 
     def bootstrap_exec(self, exec_info=None, version=0, revision=0):
         """setup exec library"""
@@ -180,7 +180,11 @@ class VLibManager(object):
     def _create_vlib(self, lib_info, fake, lib_cfg=None):
         # get lib ctx
         name = lib_info.get_name()
-        ctx = self.ctx_map.get_ctx(name)
+        ctx = self.ctx_map.get(name, None)
+        # create new context?
+        if not ctx:
+            ctx = LibCtx(self.machine)
+            self.ctx_map[name] = ctx
         # get impl
         if fake:
             impl = None
