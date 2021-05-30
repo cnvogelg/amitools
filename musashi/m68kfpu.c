@@ -560,6 +560,14 @@ static uint64 READ_EA_64(int ea)
 			h2 = m68ki_read_32(ea+4);
 			return  (uint64)(h1) << 32 | (uint64)(h2);
 		}
+		case 4:		// -(An)
+		{
+			REG_A[reg] -= 8;
+			uint32 ea = REG_A[reg];
+			h1 = m68ki_read_32(ea+0);
+			h2 = m68ki_read_32(ea+4);
+			return  (uint64)(h1) << 32 | (uint64)(h2);
+		}
 		case 5:		// (d16, An)
 		{
 			uint32 ea = EA_AY_DI_32();
