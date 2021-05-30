@@ -9,4 +9,4 @@ def dos_system_test(vamos):
 
 def dos_system_not_found_test(vamos):
     rc, stdout, stderr = vamos.run_prog("dos_system", "bla hello!")
-    assert rc & 255 == 255
+    assert rc == 255

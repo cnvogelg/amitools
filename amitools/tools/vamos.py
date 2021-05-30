@@ -12,7 +12,7 @@ from amitools.vamos.main import main as vmain
 from amitools.vamos.main import main_profile
 
 
-def main():
+def main(args=None):
     cfg_files = (
         # first look in current dir
         os.path.join(os.getcwd(), ".vamosrc"),
@@ -26,12 +26,14 @@ def main():
             profile_file = None
         else:
             profile_file = vamos_profile
-        ret_code = main_profile(cfg_files, profile_file=profile_file, dump_profile=True)
+        ret_code = main_profile(
+            cfg_files, args=args, profile_file=profile_file, dump_profile=True
+        )
     # regular run
     else:
-        ret_code = vmain(cfg_files)
-    sys.exit(ret_code)
+        ret_code = vmain(cfg_files, args=args)
+    return ret_code
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

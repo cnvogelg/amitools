@@ -10,7 +10,7 @@ import os
 from amitools.vamos.tools import *
 
 
-def main():
+def main(args=None):
     cfg_files = (
         # first look in current dir
         os.path.join(os.getcwd(), ".vamosrc"),
@@ -18,7 +18,7 @@ def main():
         os.path.expanduser("~/.vamosrc"),
     )
     tools = [PathTool(), TypeTool(), LibProfilerTool()]
-    sys.exit(tools_main(tools, cfg_files))
+    return tools_main(tools, cfg_files, args)
 
 
 if __name__ == "__main__":

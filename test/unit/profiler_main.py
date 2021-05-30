@@ -4,6 +4,7 @@ from amitools.vamos.cfgcore import ConfigDict
 
 
 def profiler_main_disabled_test(caplog):
+    caplog.set_level(logging.DEBUG, "prof")
     mp = MainProfiler()
     assert mp.parse_config(None)
     assert not mp.add_profiler(Profiler())
@@ -13,6 +14,7 @@ def profiler_main_disabled_test(caplog):
 
 
 def profiler_main_config_test(caplog, tmpdir):
+    caplog.set_level(logging.INFO, "prof")
     path = str(tmpdir.join("prof.json"))
     mp = MainProfiler()
     cfg = ConfigDict(
@@ -24,11 +26,13 @@ def profiler_main_config_test(caplog, tmpdir):
     assert mp.append
     mp.setup()
     mp.shutdown()
-    assert caplog.record_tuples == []
+    assert caplog.record_tuples == [
+        ("prof", logging.INFO, "---------- Profiling Results ----------"),
+    ]
 
 
 def profiler_main_def_profiler_test(caplog):
-    caplog.set_level(logging.INFO)
+    caplog.set_level(logging.INFO, "prof")
     p = Profiler()
     mp = MainProfiler(enabled=True)
     cfg = ConfigDict(
@@ -45,7 +49,7 @@ def profiler_main_def_profiler_test(caplog):
 
 
 def profiler_main_file_test(caplog, tmpdir):
-    caplog.set_level(logging.DEBUG)
+    caplog.set_level(logging.DEBUG, "prof")
     path = str(tmpdir.join("prof.json"))
     p = Profiler()
     mp = MainProfiler(enabled=True)
@@ -153,7 +157,7 @@ def profiler_main_test_prof_load_test(tmpdir):
 
 
 def profiler_main_test_prof_dump_test(caplog):
-    caplog.set_level(logging.INFO)
+    caplog.set_level(logging.INFO, "prof")
     cfg = ConfigDict(
         {"enabled": True, "output": {"dump": True, "file": None, "append": True}}
     )

@@ -1,9 +1,74 @@
 import os
+import sys
 import pytest
 import subprocess
 import hashlib
 import inspect
+import io
+import importlib
 from .builder import BinBuilder
+from amitools.vamos.main import main as vamos_main
+
+
+def run_proc(args, stdin_str=None, raw_output=False):
+    if stdin_str:
+        stdin_bytes = stdin_str.encode("latin-1")
+        stdin_flag = subprocess.PIPE
+    else:
+        stdin_bytes = None
+        stdin_flag = None
+
+    p = subprocess.Popen(
+        args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_flag
+    )
+    (stdout, stderr) = p.communicate(stdin_bytes)
+
+    # process stdout
+    if not raw_output:
+        stdout = stdout.decode("latin-1").splitlines()
+        stderr = stderr.decode("latin-1").splitlines()
+    returncode = p.returncode
+    return returncode, stdout, stderr
+
+
+def run_func(func, args, stdin_str=None, raw_output=False):
+    """run a function with args but redirect stdin, stdout, stderr like
+    a subprocess would do"""
+    # redirect i/o stream
+    old_stdin = sys.stdin
+    if stdin_str:
+        stdin_bytes = stdin_str.encode("latin-1")
+        sys.stdin = io.TextIOWrapper(io.BytesIO(stdin_bytes))
+
+    # run vamos directly
+    old_stdout = sys.stdout
+    old_stderr = sys.stderr
+    stdout_bytes_io = io.BytesIO()
+    stderr_bytes_io = io.BytesIO()
+    new_stdout = io.TextIOWrapper(stdout_bytes_io)
+    new_stderr = io.TextIOWrapper(stderr_bytes_io)
+    sys.stdout = new_stdout
+    sys.stderr = new_stderr
+
+    try:
+        returncode = func(args)
+    finally:
+        # restore i/o streams
+        sys.stdin = old_stdin
+        sys.stdout = old_stdout
+        sys.stderr = old_stderr
+
+    new_stdout.flush()
+    new_stderr.flush()
+    stdout = stdout_bytes_io.getvalue()
+    stderr = stderr_bytes_io.getvalue()
+
+    # process stdout
+    if not raw_output:
+        stdout = stdout.decode("latin-1").splitlines()
+        stderr = stderr.decode("latin-1").splitlines()
+
+    return returncode, stdout, stderr
 
 
 class VamosTestRunner:
@@ -17,6 +82,7 @@ class VamosTestRunner:
         dump_console=False,
         generate_data=False,
         auto_build=False,
+        run_subproc=False,
     ):
         self.flavor = flavor
         self.vamos_bin = vamos_bin
@@ -25,6 +91,7 @@ class VamosTestRunner:
         self.dump_file = dump_file
         self.dump_console = dump_console
         self.generate_data = generate_data
+        self.run_subproc = run_subproc
         self.bin_builder = BinBuilder(flavor, use_debug_bins, auto_build)
 
     def _get_data_path(self, prog_name, kw_args):
@@ -91,19 +158,14 @@ class VamosTestRunner:
 
         # run and get stdout/stderr
         print("running:", " ".join(args))
-        if stdin:
-            stdin_flag = subprocess.PIPE
-            stdin = stdin.encode("latin-1")
+        if self.run_subproc:
+            returncode, stdout, stderr = run_proc(args, stdin)
         else:
-            stdin_flag = None
-        p = subprocess.Popen(
-            args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_flag
-        )
-        (stdout, stderr) = p.communicate(stdin)
 
-        # process stdout
-        stdout = stdout.decode("latin-1").splitlines()
-        stderr = stderr.decode("latin-1").splitlines()
+            def run(args):
+                return vamos_main(args=args)
+
+            returncode, stdout, stderr = run_func(run, args[1:], stdin)
 
         # show?
         if self.dump_file:
@@ -138,7 +200,7 @@ class VamosTestRunner:
                 f.write(line + "\n")
             f.close()
 
-        return (p.returncode, stdout, stderr)
+        return (returncode, stdout, stderr)
 
     def run_prog_checked(self, *prog_args, **kw_args):
         """like run_prog() but check return value and assume its 0"""
@@ -179,9 +241,10 @@ class VamosTestRunner:
 
 
 class VamosRunner:
-    def __init__(self, vamos_bin=None, vamos_args=None):
+    def __init__(self, vamos_bin=None, vamos_args=None, run_subproc=False):
         self.vamos_bin = vamos_bin
         self.vamos_args = vamos_args
+        self.run_subproc = run_subproc
 
     def run_prog(self, *prog_args, **kw_args):
         # stdin given?
@@ -208,19 +271,14 @@ class VamosRunner:
         # run and get stdout/stderr
         print("running:", " ".join(args))
         print("stdin:", stdin)
-        if stdin:
-            stdin_flag = subprocess.PIPE
+        if self.run_subproc:
+            return run_proc(args, stdin)
         else:
-            stdin_flag = None
-        p = subprocess.Popen(
-            args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_flag
-        )
-        (stdout, stderr) = p.communicate(stdin)
 
-        # process stdout
-        stdout = stdout.splitlines()
-        stderr = stderr.splitlines()
-        return (p.returncode, stdout, stderr)
+            def run(args):
+                return vamos_main(args=args)
+
+            return run_func(run, args[1:], stdin)
 
     def _get_sha1(self, file_name):
         h = hashlib.sha1()
@@ -248,6 +306,9 @@ class VamosRunner:
 
 
 class ToolRunner:
+    def __init__(self, run_subproc=False):
+        self.run_subproc = run_subproc
+
     def run_checked(self, tool, *prog_args, raw_output=False, return_code=0):
         ret_code, stdout, stderr = self.run(tool, *prog_args, raw_output=raw_output)
         if stderr:
@@ -267,14 +328,18 @@ class ToolRunner:
             pytest.skip("tool not found: " + tool_path)
         args = [tool_path] + list(prog_args)
         print("running tool:", " ".join(args))
-        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        (stdout, stderr) = p.communicate()
 
-        # process stdout
-        if not raw_output:
-            stdout = stdout.decode("latin-1").splitlines()
-            stderr = stderr.decode("latin-1").splitlines()
-        return (p.returncode, stdout, stderr)
+        if self.run_subproc:
+            return run_proc(args, raw_output=raw_output)
+        else:
+            # find tool func
+            tool_mod_name = "amitools.tools." + tool
+            tool_mod = importlib.import_module(tool_mod_name)
+
+            def run(args):
+                return tool_mod.main(args=args)
+
+            return run_func(run, args[1:], raw_output=raw_output)
 
     def _get_sha1(self, file_name):
         h = hashlib.sha1()

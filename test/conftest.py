@@ -89,6 +89,12 @@ def pytest_addoption(parser):
         default=False,
         help="run full test suite and include all tests",
     )
+    parser.addoption(
+        "--run-subproc",
+        action="store_true",
+        default=False,
+        help="run vamos binaries via subprocess and not directly inside pytest",
+    )
 
 
 def pytest_configure(config):
@@ -165,6 +171,7 @@ def vamos(request):
     dump_console = request.config.getoption("--dump-console")
     gen = request.config.getoption("--gen-data")
     auto_build = request.config.getoption("--auto-build")
+    run_subproc = request.config.getoption("--run-subproc")
     flavor = request.param
     return VamosTestRunner(
         flavor,
@@ -175,17 +182,22 @@ def vamos(request):
         vamos_bin=VAMOS_BIN,
         vamos_args=VAMOS_ARGS,
         auto_build=auto_build,
+        run_subproc=run_subproc,
     )
 
 
 @pytest.fixture(scope="module")
 def vrun(request):
-    return VamosRunner(vamos_bin=VAMOS_BIN, vamos_args=VAMOS_ARGS)
+    run_subproc = request.config.getoption("--run-subproc")
+    return VamosRunner(
+        vamos_bin=VAMOS_BIN, vamos_args=VAMOS_ARGS, run_subproc=run_subproc
+    )
 
 
 @pytest.fixture(scope="module")
-def toolrun():
-    return ToolRunner()
+def toolrun(request):
+    run_subproc = request.config.getoption("--run-subproc")
+    return ToolRunner(run_subproc=run_subproc)
 
 
 @pytest.fixture(scope="module", params=["mach", "mach-label", "mock", "mock-label"])
