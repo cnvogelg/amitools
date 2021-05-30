@@ -56,7 +56,7 @@ class Process:
         self.shell_message = None
         self.shell_packet = None
         self.shell_port = None
-        self.init_task_struct(input_fh, output_fh)
+        self.init_task_struct(input_fh, output_fh, self.stack)
         self.set_cwd()
         self._init_task()
 
@@ -265,7 +265,7 @@ class Process:
         return self.shell_packet.addr
 
     # ----- task struct -----
-    def init_task_struct(self, input_fh, output_fh):
+    def init_task_struct(self, input_fh, output_fh, stack):
         # Inject arguments into input stream (Needed for C:Execute)
         self.this_task = self.ctx.alloc.alloc_struct(
             self.bin_basename + "_ThisTask", ProcessStruct
@@ -280,6 +280,11 @@ class Process:
         self.this_task.access.w_s(
             "pr_COS", output_fh.b_addr << 2
         )  # compensate BCPL auto-conversion
+        
+        # init stack
+        self.this_task.access.w_s("pr_Task.tc_SPUpper", stack.upper)
+        self.this_task.access.w_s("pr_Task.tc_SPLower", stack.lower)
+        
         # setup console task
         console_task = self.ctx.dos_lib.file_mgr.get_console_handler_port()
         self.this_task.access.w_s("pr_ConsoleTask", console_task)
