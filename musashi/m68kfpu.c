@@ -1169,6 +1169,11 @@ static void WRITE_EA_PACK(int ea, int k, floatx80 fpr)
 	}
 }
 
+static inline int is_inf(floatx80 reg) {
+	if (((reg.high & 0x7fff) == 0x7fff) && ((reg.low<<1) == 0))
+		return reg.high & 0x8000 ? -1 : 1;
+	return 0;
+}
 
 static void fpgen_rm_reg(uint16 w2)
 {
@@ -1471,8 +1476,30 @@ static void fpgen_rm_reg(uint16 w2)
 		case 0x38:		// FCMP
 		{
 			floatx80 res;
-			res = floatx80_sub(REG_FP[dst], source);
-			SET_CONDITION_CODES(res);
+			// handle inf in comparison if there is no nan.
+			int d = is_inf(REG_FP[dst]);
+			int s = is_inf(source);
+			if (!floatx80_is_nan(REG_FP[dst]) && !floatx80_is_nan(source) && (d || s))
+			{
+				REG_FPSR &= ~(FPCC_N|FPCC_Z|FPCC_I|FPCC_NAN);
+
+				if (s < 0) {
+					if (d < 0)
+						REG_FPSR |= FPCC_N | FPCC_Z;
+				} else
+				if (s > 0) {
+					if (d > 0)
+						REG_FPSR |= FPCC_Z;
+					else
+						REG_FPSR |= FPCC_N;
+				} else
+				if (d < 0)
+					REG_FPSR |= FPCC_N;
+
+			} else {
+				res = floatx80_sub(REG_FP[dst], source);
+				SET_CONDITION_CODES(res);
+			}
 			USE_CYCLES(7);
 			break;
 		}
