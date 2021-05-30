@@ -642,6 +642,12 @@ static floatx80 READ_EA_FPE(int mode, int reg, uint32 di_mode_ea)
 		  fpr = load_extended_float80(di_mode_ea);
 		  break;
 		}
+	  case 6:		// (An) + (Xn) + d8
+		{
+		  uint32 ea = EA_AY_IX_16();
+		  fpr = load_extended_float80(ea);
+		  break;
+		}
 	  case 7:	// extended modes
 		{
 			switch (reg)
