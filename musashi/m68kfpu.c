@@ -375,6 +375,16 @@ static uint8 READ_EA_8(int ea)
 			uint32 ea = REG_A[reg];
 			return m68ki_read_8(ea);
 		}
+		case 3:		// (An)+
+		{
+			uint32 ea = EA_AY_PI_8();
+			return m68ki_read_8(ea);
+		}
+		case 4:		// -(An)
+		{
+			uint32 ea = EA_AY_PD_8();
+			return m68ki_read_8(ea);
+		}
 		case 5:		// (d16, An)
 		{
 			uint32 ea = EA_AY_DI_8();
@@ -429,6 +439,16 @@ static uint16 READ_EA_16(int ea)
 		case 2:		// (An)
 		{
 			uint32 ea = REG_A[reg];
+			return m68ki_read_16(ea);
+		}
+		case 3:		// (An)+
+		{
+			uint32 ea = EA_AY_PI_16();
+			return m68ki_read_16(ea);
+		}
+		case 4:		// -(An)
+		{
+			uint32 ea = EA_AY_PD_16();
 			return m68ki_read_16(ea);
 		}
 		case 5:		// (d16, An)
@@ -491,6 +511,11 @@ static uint32 READ_EA_32(int ea)
 		case 3:		// (An)+
 		{
 			uint32 ea = EA_AY_PI_32();
+			return m68ki_read_32(ea);
+		}
+		case 4:		// -(An)
+		{
+			uint32 ea = EA_AY_PD_32();
 			return m68ki_read_32(ea);
 		}
 		case 5:		// (d16, An)
