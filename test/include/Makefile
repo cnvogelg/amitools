@@ -6,7 +6,7 @@ ARCH=m68k
 
 # the tools
 FD2PRAGMA=fd2pragma
-FD2INLINE=fd2inline
+SFDC=sfdc
 
 # the source file
 FD=../../amitools/data/fd/$(BASE)_lib.fd
@@ -18,10 +18,11 @@ GCC_INLINE=inline/$(BASE).h
 AGCC_DEFINE=defines/$(BASE).h
 PROTO=proto/$(BASE).h
 PRAGMA=pragma/$(BASE).h
+SFD=sfd/$(BASE)_lib.sfd
 
 FD_OPTS=-a $(ARCH) -i $(FD) -c $(CLIB) -l $(LIBTYPE)
 
-FILES=$(VC_INLINE) $(GCC_INLINE) $(AGCC_DEFINE) $(PROTO) $(PRAGMA)
+FILES=$(VC_INLINE) $(GCC_INLINE) $(AGCC_DEFINE) $(PROTO) $(PRAGMA) $(SFD)
 
 all:
 	$(MAKE) lib BASE=vamostest LIBTYPE=VamosTestBase
@@ -36,14 +37,17 @@ lib: $(FILES)
 clean-lib:
 	rm -f $(FILES)
 
+$(SFD): $(FD)
+	$(FD2PRAGMA) $(FD_OPTS) -s 112 -t sfd
+
 $(VC_INLINE): $(FD)
 	$(FD2PRAGMA) $(FD_OPTS) -s 70 -t inline
 
 $(GCC_INLINE): $(FD)
 	$(FD2PRAGMA) $(FD_OPTS) -s 47 -t inline
 
-$(AGCC_DEFINE): $(FD)
-	$(FD2INLINE) --target=m68k-aros --mode=new $(FD) $(CLIB) -o $@
+$(AGCC_DEFINE): $(SFD)
+	$(SFDC) --target=m68k-aros --mode=macros $(SFD) -o $@
 
 $(PROTO): $(FD)
 	$(FD2PRAGMA) $(FD_OPTS) -s 38 -t proto

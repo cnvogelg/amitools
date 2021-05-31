@@ -43,36 +43,36 @@ class RunState(object):
 
 class Machine(object):
     """the main interface to the m68k emulation including CPU, memory,
-     and traps. The machine does only a minimal setup of RAM and the CPU.
-     It provides a way to run m68k code.
+    and traps. The machine does only a minimal setup of RAM and the CPU.
+    It provides a way to run m68k code.
 
-     Minimal Memory Layout:
-     ----------------------
+    Minimal Memory Layout:
+    ----------------------
 
-     VBR
+    VBR
 
-     000000    SP before Reset / Later mem0
-     000004    PC before Reset / Later mem4
+    000000    SP before Reset / Later mem0
+    000004    PC before Reset / Later mem4
 
-     000008    BEGIN Exception Vectors
-     ......
-     0003FC    END Exception Vectors
+    000008    BEGIN Exception Vectors
+    ......
+    0003FC    END Exception Vectors
 
-     Machine Area
+    Machine Area
 
-     000400    run_exit trap
-     000402    exception handling trap
+    000400    run_exit trap
+    000402    exception handling trap
 
-     000500    Quick Trap 0
-     000502    Quick Trap 1
-     ...       ...
-     0005FC    Quick Trap 127
+    000500    Quick Trap 0
+    000502    Quick Trap 1
+    ...       ...
+    0005FC    Quick Trap 127
 
-     000600    BEGIN of scratch area
-     ...       e.g. used for sys stack
-     0007FC    END of scratch area
-     000800    RAM begin. useable by applications
-  """
+    000600    BEGIN of scratch area
+    ...       e.g. used for sys stack
+    0007FC    END of scratch area
+    000800    RAM begin. useable by applications
+    """
 
     CPU_TYPE_68000 = M68K_CPU_TYPE_68000
     CPU_TYPE_68020 = M68K_CPU_TYPE_68020
@@ -138,8 +138,8 @@ class Machine(object):
     def from_cfg(cls, machine_cfg, use_labels=False):
         """extract machine parameters from the config
 
-       return new Machine() or None on config error
-    """
+        return new Machine() or None on config error
+        """
         cpu = machine_cfg.cpu
         cpu_type, cpu_name = cls.parse_cpu_type(cpu)
         if cpu_type is None:
@@ -318,8 +318,8 @@ class Machine(object):
 
     def set_zero_mem(self, mem0, mem4):
         """define the long words at memory address 0 and 4 that are written
-       after a reset was performed. On Amiga typically 0 and ExecBase.
-    """
+        after a reset was performed. On Amiga typically 0 and ExecBase.
+        """
         self.mem.w32(0, mem0)
         self.mem.w32(4, mem4)
 

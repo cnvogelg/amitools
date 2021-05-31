@@ -1,1 +1,1 @@
-from .main import main
+# python module marker

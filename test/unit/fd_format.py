@@ -34,9 +34,9 @@ def fd_format_generate_fd_num_call_test():
 def fd_format_read_vamostest_lib_test():
     fd = read_lib_fd("vamostest.library")
     assert fd.get_base_name() == "_VamosTestBase"
-    assert fd.get_max_bias() == 60
-    assert fd.get_neg_size() == 66
-    assert fd.get_num_indices() == 10
+    assert fd.get_max_bias() == 66
+    assert fd.get_neg_size() == 72
+    assert fd.get_num_indices() == 11
     # check entries
     tab = fd.get_index_table()
     assert len(tab) == fd.get_num_indices()

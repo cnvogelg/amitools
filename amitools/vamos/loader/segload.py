@@ -56,7 +56,7 @@ class SegmentLoader(object):
 
     def unload_seglist(self, seglist_baddr):
         """unregister given seglist baddr and free seglist.
-       return True if seglist was unloaded"""
+        return True if seglist was unloaded"""
         if seglist_baddr not in self.infos:
             log_segload.error("unknown seglist at @%06x", seglist_baddr)
             return False

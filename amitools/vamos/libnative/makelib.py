@@ -1,6 +1,6 @@
 from .makefuncs import MakeFuncs
 from .initstruct import InitStruct
-from amitools.vamos.atypes import Library
+from amitools.vamos.libtypes import Library
 from amitools.vamos.machine.regs import *
 
 
@@ -22,8 +22,8 @@ class MakeLib(object):
     ):
         """Exec's MakeLibrary
 
-       return lib_base, mem_obj or 0, None
-    """
+        return lib_base, mem_obj or 0, None
+        """
         neg_size, offsets = self._calc_neg_size(vectors_addr)
         neg_size = self._round_long(neg_size)
         pos_size = self._round_long(pos_size)
@@ -44,9 +44,7 @@ class MakeLib(object):
             mf.make_functions(lib_base, vectors_addr)
 
         # lib object and set neg/pos size
-        lib = Library(self.mem, lib_base)
-        lib.set_neg_size(neg_size)
-        lib.set_pos_size(pos_size)
+        lib = Library(self.mem, addr, neg_size=neg_size, pos_size=pos_size)
 
         # init struct?
         if init_struct_addr != 0:

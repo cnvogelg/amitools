@@ -165,15 +165,17 @@ class TraceManager(object):
             return "", ""
 
     def _get_struct_extra(self, label, addr, width):
-        delta = addr - label.struct_begin
-        if delta >= 0 and delta < label.struct_size:
-            struct = label.struct(None, addr)
-            st, field, f_delta = struct.get_struct_field_for_offset(delta)
-
-            type_name = struct.get_type_name()
-            name = st.get_field_path_name(field)
-            type_sig = field.type_sig
-            addon = "%s+%d = %s(%s)+%d" % (type_name, delta, name, type_sig, f_delta)
+        offset = addr - label.struct_begin
+        if offset >= 0 and offset < label.struct_size:
+            # find sub fields and delta
+            struct = label.struct
+            sub_field_defs, delta = label.struct.sdef.find_sub_field_defs_by_offset(
+                offset
+            )
+            type_name = struct.sdef.get_type_name()
+            name = ".".join(map(lambda x: x.name, sub_field_defs))
+            type_sig = sub_field_defs[-1].type.get_signature()
+            addon = "%s+%d = %s(%s)+%d" % (type_name, offset, name, type_sig, delta)
             return "Struct", addon
         else:
             return "", ""

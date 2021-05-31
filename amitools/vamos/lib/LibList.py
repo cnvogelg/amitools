@@ -17,7 +17,7 @@ vamos_libs = {
     "dos.library": DosLibrary,
     "exec.library": ExecLibrary,
     "intuition.library": IntuitionLibrary,
-    "locale.library" : LocaleLibrary,
+    "locale.library": LocaleLibrary,
     "mathffp.library": MathFFPLibrary,
     "mathieeedoubbas.library": MathIEEEDoubBasLibrary,
     "mathieeedoubtrans.library": MathIEEEDoubTransLibrary,

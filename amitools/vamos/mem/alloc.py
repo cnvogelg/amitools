@@ -1,6 +1,6 @@
 from amitools.vamos.error import *
 from amitools.vamos.log import log_mem_alloc
-from amitools.vamos.label import LabelRange, LabelStruct
+from amitools.vamos.label import LabelRange, LabelStruct, LabelLib
 from amitools.vamos.astructs import AccessStruct
 
 
@@ -31,17 +31,17 @@ class MemoryChunk:
 
     def does_fit(self, size):
         """check if new size would fit into chunk
-       return < 0 if it does not fit, 0 for exact fit, > 0 n wasted bytes
-    """
+        return < 0 if it does not fit, 0 for exact fit, > 0 n wasted bytes
+        """
         return self.size - size
 
 
 class MemoryAlloc:
     def __init__(self, mem, addr=0, size=0, label_mgr=None):
         """mem is a interface.
-       setup allocator starting at addr with size bytes.
-       if label_mgr is set then labels are created for allocations.
-    """
+        setup allocator starting at addr with size bytes.
+        if label_mgr is set then labels are created for allocations.
+        """
         # if no size is specified then take mem total
         if size == 0:
             size = mem.get_ram_size_kib() * 1024
@@ -94,8 +94,8 @@ class MemoryAlloc:
 
     def _find_best_chunk(self, size):
         """find best chunk that could take the given alloc
-       return: index of chunk in free list or -1 if none found + bytes left in chunk
-    """
+        return: index of chunk in free list or -1 if none found + bytes left in chunk
+        """
         chunk = self.free_first
         while chunk != None:
             left = chunk.does_fit(size)
@@ -364,6 +364,36 @@ class MemoryAlloc:
 
     def free_struct(self, mem):
         log_mem_alloc.info("free struct: %s", mem)
+        if self.label_mgr is not None:
+            self.label_mgr.remove_label(mem.label)
+        self.free_mem(mem.addr, mem.size)
+        del self.mem_objs[mem.addr]
+
+    # library
+    def alloc_lib(
+        self, name, lib_struct, pos_size=0, neg_size=0, fd=None, add_label=True
+    ):
+        if pos_size == 0:
+            pos_size = lib_struct.get_size()
+        # round neg_size to multiple of four
+        neg_size = (neg_size + 3) & ~3
+        size = neg_size + pos_size
+        # alloc full size
+        addr = self.alloc_mem(size)
+        base_addr = addr + neg_size
+        if self.label_mgr is not None and add_label:
+            label = LabelLib(name, base_addr, neg_size, pos_size, lib_struct, fd)
+            self.label_mgr.add_label(label)
+        else:
+            label = None
+        access = AccessStruct(self.mem, lib_struct, base_addr)
+        mem = Memory(addr, size, label, access)
+        log_mem_alloc.info("alloc lib: %s", mem)
+        self.mem_objs[addr] = mem
+        return mem
+
+    def free_lib(self, mem):
+        log_mem_alloc.info("free lib: %s", mem)
         if self.label_mgr is not None:
             self.label_mgr.remove_label(mem.label)
         self.free_mem(mem.addr, mem.size)

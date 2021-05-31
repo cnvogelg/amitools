@@ -3,8 +3,8 @@ special_chars = (" ", '"', "*", "\n", "\x1b")
 
 def ami_quote_str(chars):
     """perform Amiga-like shell quoting with surrounding "..." quotes
-     an special chars quoted with asterisk *
-  """
+    an special chars quoted with asterisk *
+    """
     if chars == "":
         return '""'
     res = ['"']
@@ -41,11 +41,11 @@ def sys_arg_to_ami_arg(sys_arg):
 
 def sys_args_to_ami_arg_str(sys_args):
     """convert a regular argv[] array of your host system to a single
-     string used as an Amiga argument
+    string used as an Amiga argument
 
-     this function handles automatic quoting if necessary and
-     also appends a final newline
-  """
+    this function handles automatic quoting if necessary and
+    also appends a final newline
+    """
     ami_args = []
     for sys_arg in sys_args:
         ami_arg = sys_arg_to_ami_arg(sys_arg)

@@ -1,8 +1,7 @@
 import logging
 from amitools.vamos.log import log_doslist
-from amitools.vamos.astructs import (
-    AccessStruct,
-    DosListDeviceStruct,
+from amitools.vamos.astructs import AccessStruct
+from amitools.vamos.libstructs import (
     DosListVolumeStruct,
     DosListAssignStruct,
     AssignListStruct,

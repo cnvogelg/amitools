@@ -241,6 +241,7 @@ def do_diff_cmd(args):
     print_hex_diff(
         rom_a, rom_b, num=args.columns, show_same=args.same, base_addr=base_addr
     )
+    return 0
 
 
 def do_dump_cmd(args):
@@ -258,6 +259,7 @@ def do_dump_cmd(args):
             logging.error("Not a KickROM! Can't detect base address.")
             return 3
     print_hex(rom_img, num=args.columns, base_addr=base_addr)
+    return 0
 
 
 def do_copy_cmd(args):
@@ -272,6 +274,7 @@ def do_copy_cmd(args):
     logging.info("saving ROM to '%s'", out_img)
     with open(out_img, "wb") as fh:
         fh.write(kh.get_data())
+    return 0
 
 
 def do_info_cmd(args):
@@ -301,6 +304,7 @@ def do_info_cmd(args):
     v = ["%-20s  %s" % (x[0], x[1] % x[2]) for x in values]
     for i in v:
         print(i)
+    return 0
 
 
 def do_patch_cmd(args):
@@ -347,6 +351,7 @@ def do_patches_cmd(args):
         if args_desc is not None:
             for ad in args_desc:
                 print("%10s    %-10s  %s" % ("", ad, args_desc[ad]))
+    return 0
 
 
 def do_combine_cmd(args):
@@ -440,6 +445,7 @@ def do_scan_cmd(args):
                 "@%08x  +%08x  %-12s  %+4d  %s  %s"
                 % (off, r.skip_off, nt, r.pri, name, id_string)
             )
+    return 0
 
 
 def setup_list_parser(parser):
@@ -651,7 +657,7 @@ def setup_copy_parser(parser):
     parser.set_defaults(cmd=do_copy_cmd)
 
 
-def parse_args():
+def parse_args(args=None):
     """parse args and return (args, opts)"""
     parser = argparse.ArgumentParser(description=DESC)
 
@@ -711,23 +717,25 @@ def parse_args():
     setup_copy_parser(copy_parser)
 
     # parse
-    args = parser.parse_args()
-    if "cmd" not in args:
+    opts = parser.parse_args(args=args)
+    if "cmd" not in opts:
         parser.print_help()
         sys.exit(1)
-    return args
+    return opts
 
 
 # ----- main -----
-def main():
+def main(args=None):
     # parse args and init logging
-    args = parse_args()
-    setup_logging(args)
+    opts = parse_args(args)
+    setup_logging(opts)
     # say hello
     logging.info("Welcom to romtool")
     # run command
     try:
-        return args.cmd(args)
+        result = opts.cmd(opts)
+        assert type(result) is int
+        return result
     except IOError as e:
         logging.error("IO Error: %s", e)
         return 1

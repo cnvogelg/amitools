@@ -10,12 +10,10 @@ def check_shell_seg(vrun):
 def shell_seg_endcli_test(vrun):
     check_shell_seg(vrun)
     stdin = "endcli\n"
-    retcode, stdout, stderr = vrun.run_prog(
-        "wb:l/Shell-Seg", vargs=["-x"], stdin=stdin.encode("latin-1")
-    )
-    assert retcode == 212
-    assert stdout == [b"\x0f0.SYS:> PROCESS 0 ENDING"]
+    retcode, stdout, stderr = vrun.run_prog("wb:l/Shell-Seg", vargs=["-x"], stdin=stdin)
+    assert stdout == ["\x0f0.SYS:> PROCESS 0 ENDING"]
     assert stderr == []
+    assert retcode == 212
 
 
 def shell_seg_proc_args_test(vrun, vamos):
@@ -23,16 +21,14 @@ def shell_seg_proc_args_test(vrun, vamos):
     vamos.make_prog("proc_args")
     cmd_name = vamos.get_prog_bin_name("proc_args")
     stdin = cmd_name + "\nendcli\n"
-    retcode, stdout, stderr = vrun.run_prog(
-        "wb:l/Shell-Seg", vargs=["-x"], stdin=stdin.encode("latin-1")
-    )
-    assert retcode == 212
+    retcode, stdout, stderr = vrun.run_prog("wb:l/Shell-Seg", vargs=["-x"], stdin=stdin)
     assert stdout == [
-        b"\x0f0.SYS:> a0:NULL",
-        b'in:"\\n"',
-        b"\x0f0.SYS:> PROCESS 0 ENDING",
+        "\x0f0.SYS:> a0:NULL",
+        'in:"\\n"',
+        "\x0f0.SYS:> PROCESS 0 ENDING",
     ]
     assert stderr == []
+    assert retcode == 212
 
 
 def shell_seg_run_proc_args_test(vrun, vamos):
@@ -40,9 +36,7 @@ def shell_seg_run_proc_args_test(vrun, vamos):
     vamos.make_prog("proc_args")
     cmd_name = vamos.get_prog_bin_name("proc_args")
     stdin = "run " + cmd_name + "\nendcli\n"
-    retcode, stdout, stderr = vrun.run_prog(
-        "wb:l/Shell-Seg", vargs=["-x"], stdin=stdin.encode("latin-1")
-    )
-    assert retcode == 212
-    assert stdout == [b"\x0f0.SYS:> \x0f0.SYS:> PROCESS 0 ENDING"]
+    retcode, stdout, stderr = vrun.run_prog("wb:l/Shell-Seg", vargs=["-x"], stdin=stdin)
+    assert stdout == ["\x0f0.SYS:> \x0f0.SYS:> PROCESS 0 ENDING"]
     assert stderr == []
+    assert retcode == 212

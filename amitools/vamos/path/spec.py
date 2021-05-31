@@ -4,9 +4,9 @@ from amitools.vamos.cfgcore import split_nest
 class Spec(object):
     """a volume or assign specifier string parsed into components
 
-      format:
-        name:[+][src][+src][?key=val,key=val]
-  """
+    format:
+      name:[+][src][+src][?key=val,key=val]
+    """
 
     def __init__(self, name, src_list=None, cfg=None, append=False):
         if cfg is None:

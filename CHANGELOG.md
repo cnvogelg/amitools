@@ -1,5 +1,40 @@
 # Change Log
 
+## [0.6.0][6] (2021-04-13)
+
+### global
+
+* Requires Python 3.6 minimum
+* Added Python 3.9 support
+* Update README to py3 (#153)
+
+### rdbtool
+
+* added 'addimg', 'remap', and 'adjust' command
+
+### xdftool
+
+* py3 fix for delete with wipe
+
+### vamos
+
+* allow fd arguments in func impls
+* added ctx func support for testing
+* Allocate()/Deallocate() fixes (#152)
+* dos.library fixes (@bebbo #151)
+* import fixes (@bebbo #151)
+* added ReadEClock in timer.device (@bebbo #151)
+* added locale.library (@bebbo #151)
+* fixed ExNext()
+* fixed WriteChars()
+* fixed closing console
+* added support for 'endcli'
+* dos ReadArgs() allow empty key (fixes 'echo')
+* trace BADDR fixes
+* updated Musashi to 4.10
+* dos pattern match: fixed not-any patterns e.g. ~(#?.o)
+
+
 ## [0.5.0][5] (2020-06-13)
 
 ### global
@@ -14,7 +49,7 @@
 * fixed reading HUNK_INDEX with empty unit names
 * switched disasm to machine DisAsm
 
-### xdftool 
+### xdftool
 
 * added support for HD disk images
 * in DOS5 (DirCache) fixed creating empty directories
@@ -89,7 +124,7 @@
 * allow to auto create assign dirs
 * machine: removed obsolete Trampoline (replaced by machine sub runs)
 * complete rewrite of config infrastructure. added .json configs
-* rewrote lib handling and support creation via MakeLibrary() 
+* rewrote lib handling and support creation via MakeLibrary()
 * replaced VamosRun with a machine layer
 * honor cwd and progdir in OpenLibrary() calls
 * added GetProgramDir()
@@ -131,3 +166,4 @@
 [3]: https://github.com/cnvogelg/amitools/tree/v0.3.0
 [4]: https://github.com/cnvogelg/amitools/tree/v0.4.0
 [5]: https://github.com/cnvogelg/amitools/tree/v0.5.0
+[6]: https://github.com/cnvogelg/amitools/tree/v0.6.0

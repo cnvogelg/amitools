@@ -20,8 +20,8 @@ class FileScanner:
         warning_handler=None,
     ):
         """the handler will be called with all the scanned files.
-       the optional ignore_filters contains a list of glob pattern to
-       ignore file names"""
+        the optional ignore_filters contains a list of glob pattern to
+        ignore file names"""
         self.handler = handler
         self.error_handler = error_handler
         self.warning_handler = warning_handler

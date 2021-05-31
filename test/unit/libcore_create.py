@@ -63,7 +63,7 @@ def libcore_create_lib_fake_without_fd_test():
     creator = LibCreator(alloc, traps)
     lib = creator.create_lib(info, ctx, impl)
     assert lib.get_fd().get_neg_size() == 30
-    assert lib.get_library().neg_size == 32
+    assert lib.get_library().neg_size.val == 32
     # free lib
     lib.free()
     assert alloc.is_all_free()
@@ -82,7 +82,7 @@ def libcore_create_lib_fake_without_fd_cfg_test():
     creator = LibCreator(alloc, traps)
     lib = creator.create_lib(info, ctx, impl, lib_cfg)
     assert lib.get_fd().get_neg_size() == 66
-    assert lib.get_library().neg_size == 68
+    assert lib.get_library().neg_size.val == 68
     # free lib
     lib.free()
     assert alloc.is_all_free()
@@ -99,7 +99,7 @@ def libcore_create_lib_label_test():
     lib = creator.create_lib(info, ctx, impl)
     # check label
     assert alloc.get_label_mgr()
-    label = lib.get_library()._label
+    label = lib.get_library()._mem_obj.label
     assert label
     assert label.fd == lib.get_fd()
     # free lib

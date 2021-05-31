@@ -1,5 +1,5 @@
-from amitools.vamos.astructs import LibraryStruct
-from amitools.vamos.atypes import Library, NodeType
+from amitools.vamos.libstructs import LibraryStruct, NodeType
+from amitools.vamos.libtypes import Library
 from amitools.fd import read_lib_fd, generate_fd
 from .vlib import VLib
 from .stub import LibStubGen
@@ -35,10 +35,17 @@ class LibCreator(object):
         id_str = info.get_id_string()
         neg_size = info.get_neg_size()
         pos_size = info.get_pos_size()
-        library = Library.alloc(self.alloc, name, id_str, neg_size, pos_size, fd)
+        library = Library.alloc(
+            self.alloc,
+            name=name,
+            id_string=id_str,
+            neg_size=neg_size,
+            pos_size=pos_size,
+            fd=fd,
+        )
         version = info.get_version()
         revision = info.get_revision()
-        library.setup(version=version, revision=revision, type=ltype)
+        library.new_lib(version=version, revision=revision, type=ltype)
         return library
 
     def _generate_fake_fd(self, name, lib_cfg):
@@ -75,10 +82,10 @@ class LibCreator(object):
         if self.profiler:
             # get some impl information
             if scan:
-                func_tags = scan.get_func_tags()
+                impl_funcs = scan.get_all_funcs()
             else:
-                func_tags = None
-            profile = self.profiler.create_profile(name, fd, func_tags)
+                impl_funcs = None
+            profile = self.profiler.create_profile(name, fd, impl_funcs)
         else:
             profile = None
         # create stub

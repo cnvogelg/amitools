@@ -16,6 +16,7 @@ def machine_hwaccess_create_test():
 
 
 def machine_hwaccess_ignore_test(caplog):
+    caplog.set_level(logging.WARN, "hw")
     machine = Machine()
     mem = machine.get_mem()
     hw = HWAccess.from_mode_str(machine, "ignore")
@@ -32,6 +33,7 @@ def machine_hwaccess_ignore_test(caplog):
 
 
 def machine_hwaccess_abort_test(caplog):
+    caplog.set_level(logging.WARN, "hw")
     machine = Machine()
     mem = machine.get_mem()
     hw = HWAccess.from_mode_str(machine, "abort")

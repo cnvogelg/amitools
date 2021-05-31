@@ -64,7 +64,7 @@ def generate_sasc_code(fname, fd, add_private, prefix=""):
 
 
 # ----- main -----
-def main():
+def main(args=None):
     # parse args
     parser = argparse.ArgumentParser()
     parser.add_argument("files", nargs="+")
@@ -99,7 +99,7 @@ def main():
         default="",
         help="add prefix to functions in C",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(args=args)
 
     # main loop
     files = args.files

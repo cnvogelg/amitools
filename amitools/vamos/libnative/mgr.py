@@ -1,14 +1,15 @@
 from amitools.vamos.log import log_libmgr
-from amitools.vamos.atypes import Library
+from amitools.fd import read_lib_fd
 from .loader import LibLoader
 from .libfuncs import LibFuncs
 
 
 class ALibInfo(object):
-    def __init__(self, name, load_addr, seglist_baddr):
+    def __init__(self, name, load_addr, seglist_baddr, lib_fd=None):
         self.name = name
         self.load_addr = load_addr
         self.seglist_baddr = seglist_baddr
+        self.lib_fd = lib_fd
         self.base_addrs = {}
 
     def __str__(self):
@@ -32,6 +33,9 @@ class ALibInfo(object):
 
     def get_seglist_baddr(self):
         return self.seglist_baddr
+
+    def get_lib_fd(self):
+        return self.lib_fd
 
     def add_base_addr(self, base_addr):
         if base_addr in self.base_addrs:
@@ -68,16 +72,16 @@ class ALibManager(object):
 
     def is_base_addr(self, addr):
         """check if a given addr is the lib base of a native lib
-       return info if found or None
-    """
+        return info if found or None
+        """
         for info in self.lib_infos:
             if info.is_base_addr(addr):
                 return info
 
     def is_load_addr(self, addr):
         """check if a given addr is the lib load addr
-       return info if found or None
-    """
+        return info if found or None
+        """
         for info in self.lib_infos:
             if info.is_load_addr(addr):
                 return info
@@ -150,8 +154,11 @@ class ALibManager(object):
             log_libmgr.info("loaded: @%06x  seglist: @%06x", load_addr, seglist_baddr)
             info = self.segloader.get_info(seglist_baddr)
             log_libmgr.info("loaded: %s", info)
+            # try to load associated fd (if available)
+            fd = read_lib_fd(base_name, add_std_calls=False)
+            log_libmgr.info("loaded FD: '%s' -> %r", base_name, fd is not None)
             # store original load addr and name in info
-            lib_info = self._add_info(base_name, load_addr, seglist_baddr)
+            lib_info = self._add_info(base_name, load_addr, seglist_baddr, fd)
             loaded = True
         else:
             load_addr = lib_info.get_load_addr()
@@ -179,8 +186,8 @@ class ALibManager(object):
             if info.get_name() == base_name:
                 return info
 
-    def _add_info(self, base_name, load_addr, seglist_baddr):
-        lib_info = ALibInfo(base_name, load_addr, seglist_baddr)
+    def _add_info(self, base_name, load_addr, seglist_baddr, fd):
+        lib_info = ALibInfo(base_name, load_addr, seglist_baddr, fd)
         self.lib_infos.append(lib_info)
         return lib_info
 

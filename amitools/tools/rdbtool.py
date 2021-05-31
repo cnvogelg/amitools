@@ -328,14 +328,14 @@ class AdjustCommand(Command):
             print("Usage: adjust ( auto [force] | lo=<cyl> hi=<cyl> [phys] )")
             return None
         opts = KeyValue.parse_key_value_strings(self.opts)
-        if 'auto' in opts:
+        if "auto" in opts:
             # automatic mode
             # get max cyl from image
             total_blocks = self.blkdev.geo.get_num_blocks()
             c, h, s = rdisk.get_cyls_heads_secs()
             num_cyl = total_blocks // (h * s)
             if num_cyl > 65535:
-                if 'force' not in opts:
+                if "force" not in opts:
                     print("ERROR: cylinder count too high:", num_cyl)
                     return 1
             lo_cyl = None
@@ -343,16 +343,16 @@ class AdjustCommand(Command):
             phys = True
         else:
             # manual mode
-            if 'lo' in opts:
-                lo_cyl = int(opts['lo'])
+            if "lo" in opts:
+                lo_cyl = int(opts["lo"])
             else:
                 lo_cyl = None
-            if 'hi' in opts:
-                hi_cyl = int(opts['hi'])
+            if "hi" in opts:
+                hi_cyl = int(opts["hi"])
             else:
                 hi_cyl = None
-            if 'phys' in opts:
-                phys = opts['phys']
+            if "phys" in opts:
+                phys = opts["phys"]
             else:
                 phys = False
         # try to resize
@@ -397,12 +397,20 @@ class InfoCommand(Command):
             # blkdev info
             geo = self.blkdev.geo
             extra = "heads=%d sectors=%d block_size=%d" % (
-                geo.heads, geo.secs, geo.block_bytes
+                geo.heads,
+                geo.secs,
+                geo.block_bytes,
             )
-            print("BlockDevice:         %8d %8d  %10d  %s  %s" %
-                  (0, geo.cyls - 1,  geo.get_num_blocks(),
-                   ByteSize.to_byte_size_str(geo.get_num_bytes()),
-                   extra))
+            print(
+                "BlockDevice:         %8d %8d  %10d  %s  %s"
+                % (
+                    0,
+                    geo.cyls - 1,
+                    geo.get_num_blocks(),
+                    ByteSize.to_byte_size_str(geo.get_num_bytes()),
+                    extra,
+                )
+            )
         lines = rdisk.get_info(part_name)
         for l in lines:
             print(l)
@@ -615,8 +623,7 @@ class AddCommand(PartEditCommand):
         boot_pri = self.get_boot_pri()
         more_dos_env = self.get_more_dos_env()
         fs_bs = self.get_fs_block_size(empty=True)
-        print("creating: '%s' %s %s" % (drv_name, lo_hi,
-              num_to_tag_str(dostype)))
+        print("creating: '%s' %s %s" % (drv_name, lo_hi, num_to_tag_str(dostype)))
         # add partition
         rdisk.add_partition(
             drv_name,
@@ -647,13 +654,16 @@ class AddImageCommand(PartEditCommand):
                 return 1
             num_cyls = file_size // cyl_bytes
             # get cyl start
-            if 'start' in self.popts:
-                start = int(self.popts['start'])
+            if "start" in self.popts:
+                start = int(self.popts["start"])
             else:
                 start = rdisk.find_free_cyl_range_start(num_cyls)
                 if not start:
-                    print("ERROR: no partition region found for image with",
-                          num_cyls, "cylinders!")
+                    print(
+                        "ERROR: no partition region found for image with",
+                        num_cyls,
+                        "cylinders!",
+                    )
                     return 1
             lo_hi = (start, start + num_cyls - 1)
             # more options
@@ -668,8 +678,10 @@ class AddImageCommand(PartEditCommand):
             boot_pri = self.get_boot_pri()
             more_dos_env = self.get_more_dos_env()
             fs_bs = self.get_fs_block_size(empty=True)
-            print("creating: '%s' %s %s from '%s'" % (drv_name, lo_hi,
-                  num_to_tag_str(dostype), file_name))
+            print(
+                "creating: '%s' %s %s from '%s'"
+                % (drv_name, lo_hi, num_to_tag_str(dostype), file_name)
+            )
             # add partition
             p = rdisk.add_partition(
                 drv_name,
@@ -965,20 +977,20 @@ class FSFlagsCommand(Command):
 
 
 # ----- main -----
-def main(argv=None, defaults=None):
+def main(args=None, defaults=None):
     # call scanner and process all files with selected command
     cmd_map = {
         "open": OpenCommand,
         "create": CreateCommand,
         "resize": ResizeCommand,
         "init": InitCommand,
-        "adjust" : AdjustCommand,
+        "adjust": AdjustCommand,
         "remap": RemapCommand,
         "info": InfoCommand,
         "show": ShowCommand,
         "free": FreeCommand,
         "add": AddCommand,
-        "addimg" : AddImageCommand,
+        "addimg": AddImageCommand,
         "fill": FillCommand,
         "fsget": FSGetCommand,
         "fsadd": FSAddCommand,
@@ -1027,7 +1039,7 @@ def main(argv=None, defaults=None):
     )
     if defaults:
         parser.set_defaults(defaults)
-    args = parser.parse_args(argv)
+    args = parser.parse_args(args)
 
     cmd_list = args.command_list
     sep = args.seperator

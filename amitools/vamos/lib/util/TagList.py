@@ -1,4 +1,5 @@
-from amitools.vamos.astructs import AccessStruct, TagItemStruct
+from amitools.vamos.astructs import AccessStruct
+from amitools.vamos.libstructs import TagItemStruct
 
 TAG_DONE = 0
 TAG_IGNORE = 1

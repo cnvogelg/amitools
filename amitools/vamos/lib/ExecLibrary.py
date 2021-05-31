@@ -1,11 +1,20 @@
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib, LibFuncs, InitRes
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.astructs import *
-from amitools.vamos.atypes import ExecLibrary as ExecLibraryType
-from amitools.vamos.atypes import NodeType, List
+from amitools.vamos.astructs import AccessStruct
+from amitools.vamos.libstructs import (
+    ExecLibraryStruct,
+    StackSwapStruct,
+    IORequestStruct,
+    ListStruct,
+    NodeStruct,
+    NodeType,
+    SignalSemaphoreStruct,
+)
+from amitools.vamos.libtypes import ExecLibrary as ExecLibraryType
+from amitools.vamos.libtypes import List
 from amitools.vamos.log import log_exec
-from amitools.vamos.error import *
+from amitools.vamos.error import VamosInternalError, UnsupportedFeatureError
 from .lexec.PortManager import PortManager
 from .lexec.SemaphoreManager import SemaphoreManager
 from .lexec.Pool import Pool
@@ -28,22 +37,22 @@ class ExecLibrary(LibImpl):
         self.exec_lib.lib_list.new_list(NodeType.NT_LIBRARY)
         self.exec_lib.device_list.new_list(NodeType.NT_DEVICE)
         # set some system contants
+        attn_flags = 0
         if ctx.cpu_name == "68030(fake)":
-            self.exec_lib.attn_flags = 7
+            attn_flags = 7
         elif ctx.cpu_name == "68020":
-            self.exec_lib.attn_flags = 3
+            attn_flags = 3
         elif ctx.cpu_name == "68040":
-            self.exec_lib.attn_flags = 127
-        else:
-            self.exec_lib.attn_flags = 0
-        self.exec_lib.max_loc_mem = ctx.ram_size
+            attn_flags = 127
+        self.exec_lib.attn_flags.val = attn_flags
+        self.exec_lib.max_loc_mem.val = ctx.ram_size
         # create the port manager
         self.port_mgr = PortManager(ctx.alloc)
         self.semaphore_mgr = SemaphoreManager(ctx.alloc, ctx.mem)
         self.mem = ctx.mem
 
     def set_this_task(self, process):
-        self.exec_lib.this_task = process.this_task.addr
+        self.exec_lib.this_task.aptr = process.this_task.addr
         self.stk_lower = process.get_stack().get_lower()
         self.stk_upper = process.get_stack().get_upper()
 
@@ -71,7 +80,7 @@ class ExecLibrary(LibImpl):
     def FindTask(self, ctx):
         task_ptr = ctx.cpu.r_reg(REG_A1)
         if task_ptr == 0:
-            addr = self.exec_lib.this_task.get_addr()
+            addr = self.exec_lib.this_task.aptr
             log_exec.info("FindTask: me=%06x" % addr)
             return addr
         else:

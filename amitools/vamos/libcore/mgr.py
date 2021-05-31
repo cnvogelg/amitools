@@ -4,11 +4,11 @@ from amitools.vamos.log import log_lib, log_libmgr
 from amitools.vamos.libcore import (
     LibCreator,
     LibInfo,
+    LibCtx,
     LibRegistry,
-    LibCtxMap,
     LibProfiler,
 )
-from amitools.vamos.atypes import ExecLibrary
+from amitools.vamos.libtypes import ExecLibrary
 
 
 class VLibManager(object):
@@ -21,7 +21,7 @@ class VLibManager(object):
         self.mem = machine.get_mem()
         self.alloc = alloc
         self.lib_reg = LibRegistry()
-        self.ctx_map = LibCtxMap(machine)
+        self.ctx_map = {}
         self.lib_profiler = LibProfiler(prof_names, prof_calls)
         if main_profiler:
             main_profiler.add_profiler(self.lib_profiler)
@@ -52,7 +52,7 @@ class VLibManager(object):
         self.lib_reg.add_lib_impl(name, impl_cls)
 
     def add_ctx(self, name, ctx):
-        self.ctx_map.add_ctx(name, ctx)
+        self.ctx_map[name] = ctx
 
     def bootstrap_exec(self, exec_info=None, version=0, revision=0):
         """setup exec library"""
@@ -92,8 +92,8 @@ class VLibManager(object):
     def shutdown(self):
         """cleanup libs
 
-    try to expunge all libs and report still open ones
-    """
+        try to expunge all libs and report still open ones
+        """
         log_libmgr.info("[vamos] +shutdown")
         # dec exec's open cnt
         self.exec_lib.lib_node.dec_open_cnt()
@@ -108,15 +108,15 @@ class VLibManager(object):
     def expunge_libs(self):
         """expunge all unused vlibs
 
-       return number of libs _not_ expunged
-    """
+        return number of libs _not_ expunged
+        """
         return self._expunge_list(self.exec_lib.lib_list)
 
     def expunge_devs(self):
         """expunge all unused vlibs
 
-       return number of libs _not_ expunged
-    """
+        return number of libs _not_ expunged
+        """
         return self._expunge_list(self.exec_lib.device_list)
 
     def _expunge_list(self, node_list):
@@ -129,7 +129,9 @@ class VLibManager(object):
                 if not self.expunge_lib(vlib):
                     lib = vlib.get_library()
                     log_libmgr.warning(
-                        "can't expunge: '%s' with open count %d", lib.name, lib.open_cnt
+                        "can't expunge: '%s' with open count %d",
+                        lib.name,
+                        lib.open_cnt.val,
                     )
                     left_libs += 1
         return left_libs
@@ -138,7 +140,7 @@ class VLibManager(object):
         """expunge a vlib"""
         lib = vlib.get_library()
         # still open?
-        if lib.open_cnt > 0:
+        if lib.open_cnt.val > 0:
             return False
         # vlib?
         self._rem_vlib(vlib)
@@ -178,7 +180,11 @@ class VLibManager(object):
     def _create_vlib(self, lib_info, fake, lib_cfg=None):
         # get lib ctx
         name = lib_info.get_name()
-        ctx = self.ctx_map.get_ctx(name)
+        ctx = self.ctx_map.get(name, None)
+        # create new context?
+        if not ctx:
+            ctx = LibCtx(self.machine)
+            self.ctx_map[name] = ctx
         # get impl
         if fake:
             impl = None

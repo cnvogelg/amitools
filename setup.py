@@ -44,7 +44,7 @@ if use_cython:
 ext_file = "musashi/emu.c"
 if not os.path.exists(ext_file) and not use_cython:
     print("generated cython file missing! cython is essential to proceed!")
-    print("please install with: pip install cython")
+    print("please install with: pip3 install cython")
     sys.exit(1)
 
 
@@ -183,7 +183,7 @@ depends = [
     "musashi/softfloat/milieu.h",
     "musashi/softfloat/softfloat.h",
     "musashi/softfloat/softfloat-macros",
-    "musashi/softfloat/softfloat-specialize"
+    "musashi/softfloat/softfloat-specialize",
 ]
 inc_dirs = ["musashi", "gen"]
 
@@ -234,7 +234,7 @@ setup(
     description="A package to support development with classic Amiga m68k systems",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    version="0.5.0",
+    version="0.6.0",
     maintainer="Christian Vogelgsang",
     maintainer_email="chris@vogelgsang.org",
     url="http://github.com/cnvogelg/amitools",
@@ -255,5 +255,5 @@ setup(
     # win problems:
     #    use_scm_version=True,
     include_package_data=True,
-    python_requires="~=3.5",
+    python_requires="~=3.6",
 )

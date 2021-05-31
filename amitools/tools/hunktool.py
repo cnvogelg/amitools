@@ -216,7 +216,7 @@ class ElfInfo:
 
 
 # ----- main -----
-def main():
+def main(args=None):
     # call scanner and process all files with selected command
     cmd_map = {
         "validate": Validator,
@@ -299,7 +299,7 @@ def main():
         default="68000",
         help="disassemble for given cpu (objdump only)",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(args=args)
 
     cmd = args.command
     if cmd not in cmd_map:

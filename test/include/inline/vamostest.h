@@ -62,4 +62,13 @@
   (_RaiseError__bn - 60))(_RaiseError__bn, _RaiseError_str); \
 });})
 
+#define ExecutePy(argc, argv) ({ \
+  ULONG _ExecutePy_argc = (argc); \
+  STRPTR * _ExecutePy_argv = (argv); \
+  ({ \
+  register char * _ExecutePy__bn __asm("a6") = (char *) (VAMOSTEST_BASE_NAME);\
+  ((ULONG (*)(char * __asm("a6"), ULONG __asm("d0"), STRPTR * __asm("a0"))) \
+  (_ExecutePy__bn - 66))(_ExecutePy__bn, _ExecutePy_argc, _ExecutePy_argv); \
+});})
+
 #endif /*  _INLINE_VAMOSTEST_H  */

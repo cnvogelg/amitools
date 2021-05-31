@@ -7,8 +7,8 @@ from .amipath import AmiPath, AmiPathError
 
 class VamosPathManager(PathManager):
     """The VamosPathManager keeps the old vamos path manager API (for now)
-     but has already the new PathManager under the hood.
-  """
+    but has already the new PathManager under the hood.
+    """
 
     def _get_lock_env(self, lock):
         cmd_paths = self.get_default_env().get_cmd_paths()
@@ -23,7 +23,7 @@ class VamosPathManager(PathManager):
 
     def ami_command_to_sys_path(self, cwd_lock, ami_path):
         """lookup a command on path if it does not contain a relative or
-       absolute path. otherwise perform normal 'ami_to_sys_path' conversion"""
+        absolute path. otherwise perform normal 'ami_to_sys_path' conversion"""
         env = self._get_lock_env(cwd_lock)
         cmd_paths = self.cmdpaths(ami_path, env=env)
         log_path.info(

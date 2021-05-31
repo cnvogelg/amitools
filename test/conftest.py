@@ -31,11 +31,18 @@ def pytest_addoption(parser):
         help="run the debug versions of the Amiga binaries",
     )
     parser.addoption(
-        "--dump-output",
+        "--dump-file",
         "-O",
         action="store_true",
         default=False,
         help="write all vamos output to 'vamos.log'",
+    )
+    parser.addoption(
+        "--dump-console",
+        "-C",
+        action="store_true",
+        default=False,
+        help="write all vamos output to stdout",
     )
     parser.addoption(
         "--gen-data",
@@ -81,6 +88,12 @@ def pytest_addoption(parser):
         action="store_true",
         default=False,
         help="run full test suite and include all tests",
+    )
+    parser.addoption(
+        "--run-subproc",
+        action="store_true",
+        default=False,
+        help="run vamos binaries via subprocess and not directly inside pytest",
     )
 
 
@@ -154,29 +167,37 @@ def buildlibsc(request):
 def vamos(request):
     """Run vamos with test programs"""
     dbg = request.config.getoption("--use-debug-bins")
-    dump = request.config.getoption("--dump-output")
+    dump_file = request.config.getoption("--dump-file")
+    dump_console = request.config.getoption("--dump-console")
     gen = request.config.getoption("--gen-data")
     auto_build = request.config.getoption("--auto-build")
+    run_subproc = request.config.getoption("--run-subproc")
     flavor = request.param
     return VamosTestRunner(
         flavor,
         use_debug_bins=dbg,
-        dump_output=dump,
+        dump_file=dump_file,
+        dump_console=dump_console,
         generate_data=gen,
         vamos_bin=VAMOS_BIN,
         vamos_args=VAMOS_ARGS,
         auto_build=auto_build,
+        run_subproc=run_subproc,
     )
 
 
 @pytest.fixture(scope="module")
 def vrun(request):
-    return VamosRunner(vamos_bin=VAMOS_BIN, vamos_args=VAMOS_ARGS)
+    run_subproc = request.config.getoption("--run-subproc")
+    return VamosRunner(
+        vamos_bin=VAMOS_BIN, vamos_args=VAMOS_ARGS, run_subproc=run_subproc
+    )
 
 
 @pytest.fixture(scope="module")
-def toolrun():
-    return ToolRunner()
+def toolrun(request):
+    run_subproc = request.config.getoption("--run-subproc")
+    return ToolRunner(run_subproc=run_subproc)
 
 
 @pytest.fixture(scope="module", params=["mach", "mach-label", "mock", "mock-label"])

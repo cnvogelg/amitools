@@ -143,6 +143,10 @@ def log_setup(cfg):
         return True
 
 
+def log_shutdown():
+    logging.shutdown()
+
+
 def _setup_levels(levels):
     for name in levels:
         # get and parse level

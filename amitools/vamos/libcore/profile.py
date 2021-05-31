@@ -91,16 +91,13 @@ class LibFuncProfileData(object):
         return self.tag
 
     def __repr__(self):
-        return (
-            "LibProfileFuncData(func_id=%r,add_samples=%r):num=%r,sum=%r,deltas=%r,tag=%r"
-            % (
-                self.func_id,
-                self.add_samples,
-                self.num,
-                self.sum,
-                self.deltas,
-                self.tag,
-            )
+        return "LibProfileFuncData(func_id=%r,add_samples=%r):num=%r,sum=%r,deltas=%r,tag=%r" % (
+            self.func_id,
+            self.add_samples,
+            self.num,
+            self.sum,
+            self.deltas,
+            self.tag,
         )
 
     def dump(self, name):
@@ -164,7 +161,7 @@ class LibProfileData(object):
             funcs[name] = data
         return res
 
-    def setup_func_table(self, fd, func_tags=None):
+    def setup_func_table(self, fd, impl_funcs=None):
         self.fd = fd
         num_func = fd.get_num_indices()
         self.func_table = []
@@ -178,8 +175,8 @@ class LibProfileData(object):
                     func = LibFuncProfileData(idx, self.add_samples)
                     self.func_map[name] = func
                 # add tag?
-                if func_tags and name in func_tags:
-                    tag = func_tags[name]
+                if impl_funcs and name in impl_funcs:
+                    tag = impl_funcs[name].tag
                     func.set_tag(tag)
             else:
                 func = None
@@ -300,7 +297,7 @@ class LibProfiler(Profiler):
         if num_libs == 0:
             log_prof.warning("profiling enabled but no lib profiles found!")
 
-    def create_profile(self, lib_name, fd, func_tags=None):
+    def create_profile(self, lib_name, fd, impl_funcs=None):
         """get or create a new profile for a library"""
         # profiling disabled
         if not self.enabled:
@@ -310,7 +307,7 @@ class LibProfiler(Profiler):
         if lib_name in self.lib_profiles:
             log_prof.debug("libs: create '%s' -> reuse", lib_name)
             prof = self.lib_profiles[lib_name]
-            prof.setup_func_table(fd, func_tags)
+            prof.setup_func_table(fd, impl_funcs)
             return prof
         elif self.add_all or lib_name in self.names:
             # shall we create a profile for this lib?

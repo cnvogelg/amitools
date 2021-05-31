@@ -35,8 +35,8 @@ class HunkBlock:
 
     def _read_name(self, f):
         """read name stored in longs
-       return size, string
-    """
+        return size, string
+        """
         num_longs = self._read_long(f)
         if num_longs == 0:
             return 0, ""
@@ -718,7 +718,7 @@ class HunkBlockFile:
 
     def peek_type(self, f):
         """look into given file obj stream to determine file format.
-       stream is read and later on seek'ed back."""
+        stream is read and later on seek'ed back."""
         pos = f.tell()
         tag = f.read(4)
         # EOF

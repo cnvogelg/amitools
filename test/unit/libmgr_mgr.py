@@ -2,7 +2,7 @@ import logging
 import pytest
 from amitools.vamos.log import log_libmgr, log_exec
 from amitools.vamos.libcore import LibCtx
-from amitools.vamos.libmgr import LibManager, LibMgrCfg, LibCfg
+from amitools.vamos.libmgr import LibManager, LibMgrCfg, LibCfg, LibProxyManager
 from amitools.vamos.machine import Machine
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
@@ -28,7 +28,7 @@ def setup(path_mgr=None):
     cpu = machine.get_cpu()
     mem = machine.get_mem()
     cpu_type = machine.get_cpu_type()
-    exec_ctx = ExecLibCtx(machine, alloc, segloader, path_mgr)
+    exec_ctx = ExecLibCtx(machine, alloc, segloader, path_mgr, mgr)
     mgr.add_ctx("exec.library", exec_ctx)
     mgr.add_impl_cls("exec.library", ExecLibrary)
     dos_ctx = DosLibCtx(machine, alloc, segloader, path_mgr, None, None)
@@ -49,8 +49,8 @@ def libmgr_mgr_bootstrap_shutdown_test():
     vmgr = mgr.vlib_mgr
     assert vmgr.get_vlib_by_name("exec.library") == exec_vlib
     assert vmgr.get_vlib_by_addr(exec_base) == exec_vlib
-    assert exec_vlib.get_ctx() == vmgr.ctx_map.get_ctx("exec.library")
-    assert exec_lib.open_cnt == 1
+    assert exec_vlib.get_ctx() == vmgr.ctx_map["exec.library"]
+    assert exec_lib.open_cnt.val == 1
     assert machine.get_mem().r32(4) == exec_base
     # we can't expunge exec
     assert not mgr.expunge_lib(exec_base)
@@ -94,9 +94,15 @@ def libmgr_mgr_open_vlib_test():
     assert impl
     assert impl.get_cnt() == 1
     lib = test_vlib.get_library()
-    assert lib.version == impl.get_version()
+    assert lib.version.val == impl.get_version()
     mgr.close_lib(test_base)
     assert impl.get_cnt() is None
+    # try to open a proxy
+    proxy_mgr = LibProxyManager(mgr)
+    proxy = proxy_mgr.open_lib_proxy("vamostest.library")
+    assert proxy
+    assert proxy.Add(2, 3) == 5
+    proxy_mgr.close_lib_proxy(proxy)
     # shutdown
     left = mgr.shutdown()
     assert left == 0
@@ -118,9 +124,15 @@ def libmgr_mgr_open_vlib_dev_test():
     assert impl
     assert impl.get_cnt() == 1
     lib = test_vlib.get_library()
-    assert lib.version == impl.get_version()
+    assert lib.version.val == impl.get_version()
     mgr.close_lib(test_base)
     assert impl.get_cnt() is None
+    # try to open a proxy
+    proxy_mgr = LibProxyManager(mgr)
+    proxy = proxy_mgr.open_lib_proxy("vamostestdev.device")
+    assert proxy
+    assert proxy.Add(1, 2) == 3
+    proxy_mgr.close_lib_proxy(proxy)
     # shutdown
     left = mgr.shutdown()
     assert left == 0
@@ -143,7 +155,7 @@ def libmgr_mgr_open_vlib_fake_fd_test():
     impl = test_vlib.get_impl()
     assert impl is None
     lib = test_vlib.get_library()
-    assert lib.version == 40
+    assert lib.version.val == 40
     mgr.close_lib(test_base)
     # shutdown
     left = mgr.shutdown()
@@ -170,8 +182,8 @@ def libmgr_mgr_open_vlib_fake_no_fd_test():
     impl = test_vlib.get_impl()
     assert impl is None
     lib = test_vlib.get_library()
-    assert lib.version == 40
-    assert lib.neg_size == 68
+    assert lib.version.val == 40
+    assert lib.neg_size.val == 68
     mgr.close_lib(test_base)
     # shutdown
     left = mgr.shutdown()
@@ -250,6 +262,12 @@ def open_alib(lib_file, lib_name, ok=True, version=0, mode=None):
     assert not amgr.is_load_addr(lib_base)
     lib_info = amgr.get_lib_info_for_name(lib_name)
     assert not lib_info
+    # proxy
+    proxy_mgr = LibProxyManager(mgr)
+    proxy = proxy_mgr.open_lib_proxy(lib_name, run_sp=h.sp)
+    assert proxy
+    assert proxy.Add(3, 4) == 7
+    proxy_mgr.close_lib_proxy(proxy, run_sp=h.sp)
     # shutdown
     h.shutdown()
 

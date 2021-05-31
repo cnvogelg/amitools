@@ -1,4 +1,5 @@
-from amitools.vamos.atypes import Resident, ResidentFlags, Library, LibFlags, NodeType
+from amitools.vamos.libtypes import Resident, Library
+from amitools.vamos.libstructs import ResidentFlags, LibFlags, NodeType
 from .makelib import MakeLib
 from .libfuncs import LibFuncs
 
@@ -13,8 +14,8 @@ class InitRes(object):
         self, resident_addr, seg_list_baddr, label_name=None, run_sp=None, exec_lib=None
     ):
         """Implement Exec's InitResident
-       Returns lib_base, mem_obj or lib_base, 0 or 0, None
-    """
+        Returns lib_base, mem_obj or lib_base, 0 or 0, None
+        """
         res = Resident(self.mem, resident_addr)
         if not res.is_valid():
             return 0, None
@@ -24,15 +25,15 @@ class InitRes(object):
 
         auto_init = res.flags.has_bits(ResidentFlags.RTF_AUTOINIT)
         if auto_init:
-            ai = res.get_auto_init()
+            ai = res.init.ref
 
             # create lib without calling init
             ml = MakeLib(self.machine, self.alloc)
             lib_base, mem_obj = ml.make_library(
-                ai.functions,
-                ai.init_struct,
+                ai.functions.aptr,
+                ai.init_struct.aptr,
                 0,
-                ai.pos_size,
+                ai.pos_size.val,
                 seg_list_baddr,
                 label_name=label_name,
                 run_sp=run_sp,
@@ -41,22 +42,22 @@ class InitRes(object):
             # fill lib
             lib = Library(self.mem, lib_base)
             flags = LibFlags.LIBF_CHANGED | LibFlags.LIBF_SUMUSED
-            lib.setup(version=res.version, type=res.type, flags=flags)
-            lib.name = res.name
-            lib.id_string = res.id_string
+            lib.new_lib(version=res.version, type=res.type.val, flags=flags)
+            lib.name.aptr = res.name.aptr
+            lib.id_string.aptr = res.id_string.aptr
 
             # now call init
-            if ai.init_func != 0:
-                run_name = "InitResident:%s" % res.name
+            if ai.init_func.aptr != 0:
+                run_name = "InitResident:%s" % res.name.str
                 lib_base = ml.run_init(
-                    ai.init_func, lib_base, seg_list_baddr, run_name, run_sp
+                    ai.init_func.aptr, lib_base, seg_list_baddr, run_name, run_sp
                 )
 
             if lib_base == 0:
                 return 0, None
 
             # add lib to exec list
-            rtype = res.type
+            rtype = res.type.val
             if rtype == NodeType.NT_LIBRARY:
                 lf = LibFuncs(self.machine, self.alloc)
                 lf.add_library(lib_base, exec_lib)
@@ -66,13 +67,15 @@ class InitRes(object):
             elif rtype == NodeType.NT_RESOURCE:
                 # TODO
                 raise NotImplementedError("InitResident(NT_RESOURCE)")
+            else:
+                raise ValueError("InitResident: invalid type!")
 
         else:
             # no auto init, lib_base, or mem_obj
             lib_base = 0
             mem_obj = None
             # call init func
-            init_func = res.init
+            init_func = res.init.aptr
             if init_func != 0:
                 ml = MakeLib(self.machine, self.alloc)
                 lib_base = ml.run_init(

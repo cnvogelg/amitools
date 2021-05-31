@@ -4,7 +4,8 @@ import uuid
 
 from amitools.vamos.log import log_lock
 
-from amitools.vamos.astructs import AccessStruct, FileLockStruct, DateStampStruct
+from amitools.vamos.astructs import AccessStruct
+from amitools.vamos.libstructs import FileLockStruct, DateStampStruct
 from .DosProtection import DosProtection
 from .AmiTime import *
 from .Error import *
@@ -95,12 +96,14 @@ class Lock:
         if os.path.isfile(sys_path):
             size = os.path.getsize(sys_path)
             # limit to 32bit
-            if size > 0xffffffff:
-                size = 0xffffffff
+            if size > 0xFFFFFFFF:
+                size = 0xFFFFFFFF
             fib_mem.w_s("fib_Size", size)
             blocks = (size + 511) // 512
             fib_mem.w_s("fib_NumBlocks", blocks)
-            log_lock.debug("examine lock: '%s' size=%d, blocks=%d", sys_path, size, blocks)
+            log_lock.debug(
+                "examine lock: '%s' size=%d, blocks=%d", sys_path, size, blocks
+            )
         else:
             fib_mem.w_s("fib_NumBlocks", 1)
             log_lock.debug("examine lock: '%s' no file", sys_path)

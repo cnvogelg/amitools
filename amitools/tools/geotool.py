@@ -9,8 +9,11 @@ from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 
 
-def main():
-    a = sys.argv
+def main(args=None):
+    if not args:
+        a = sys.argv
+    else:
+        a = args
     n = len(a)
     if n < 3:
         print(

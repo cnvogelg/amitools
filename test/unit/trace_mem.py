@@ -2,7 +2,7 @@ import logging
 from amitools.vamos.trace import *
 from amitools.vamos.label import *
 from amitools.vamos.machine import *
-from amitools.vamos.astructs import NodeStruct, LibraryStruct
+from amitools.vamos.libstructs import NodeStruct, LibraryStruct
 from amitools.vamos.log import log_mem_int
 
 

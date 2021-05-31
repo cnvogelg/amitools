@@ -1,7 +1,8 @@
 # helper for Allocate()/Deallocate()
 
 from amitools.vamos.log import log_exec
-from amitools.vamos.astructs import AccessStruct, MemHeaderStruct, MemChunkStruct
+from amitools.vamos.astructs import AccessStruct
+from amitools.vamos.libstructs import MemHeaderStruct, MemChunkStruct
 
 
 class MemChunk:
@@ -73,12 +74,31 @@ class MemHdr:
         mh.w_s("mh_Free", self.free)
 
     def read_first(self, ctx):
-        mc = MemChunk()
-        mc.read(ctx, self.first)
-        return mc
+        if self.first == 0:
+            return None
+        else:
+            mc = MemChunk()
+            mc.read(ctx, self.first)
+            return mc
 
 
-def allocate(ctx, mh_addr, num_bytes):
+def validate(ctx, mh):
+    log_exec.debug("Header: %s", mh)
+    sum_free = 0
+    mc = mh.read_first(ctx)
+    num = 0
+    while mc:
+        log_exec.debug("#%d: chunk: %s", num, mc)
+        sum_free += mc.bytes
+        mc = mc.read_next(ctx)
+        num += 1
+    # check if free size in header matches sum of chunks
+    if sum_free != mh.free:
+        log_exec.error("sum_free=%d != mh.free=%d", sum_free, mh.free)
+        raise RuntimeError("MH Validation!")
+
+
+def allocate(ctx, mh_addr, num_bytes, check=False):
     # nothing to allocate
     if num_bytes == 0:
         return 0
@@ -87,6 +107,8 @@ def allocate(ctx, mh_addr, num_bytes):
     ex = num_bytes & 7
     if ex != 0:
         num_bytes += 8 - ex
+
+    log_exec.debug("ALLOC: mh_addr=%06x, num_bytes=%d", mh_addr, num_bytes)
 
     # read mem header
     mh = MemHdr()
@@ -99,6 +121,9 @@ def allocate(ctx, mh_addr, num_bytes):
     if mh.first == 0:
         return 0
 
+    if check:
+        validate(ctx, mh)
+
     # find chunk with enough free bytes
     mc_last = None
     mc = mh.read_first(ctx)
@@ -107,7 +132,7 @@ def allocate(ctx, mh_addr, num_bytes):
         mc_next = mc.read_next(ctx)
         log_exec.debug("read: %s", mc_next)
         if mc_next is None:
-#            log_exec.warning("invalid mem chunk list!")
+            # no memory found. chunks are too fragmented
             return 0
         mc_last = mc
         mc = mc_next
@@ -142,7 +167,7 @@ def allocate(ctx, mh_addr, num_bytes):
     return res_addr
 
 
-def deallocate(ctx, mh_addr, blk_addr, num_bytes):
+def deallocate(ctx, mh_addr, blk_addr, num_bytes, check=False):
     # nothing to allocate
     if num_bytes == 0 or blk_addr == 0:
         return 0
@@ -150,6 +175,13 @@ def deallocate(ctx, mh_addr, blk_addr, num_bytes):
     ex = num_bytes & 7
     if ex != 0:
         num_bytes += 8 - ex
+
+    log_exec.debug(
+        "DEALLOC: mh_addr=%06x, blk_addr=%06x, num_bytes=%d",
+        mh_addr,
+        blk_addr,
+        num_bytes,
+    )
 
     # read mem header
     mh = MemHdr()
@@ -159,6 +191,9 @@ def deallocate(ctx, mh_addr, blk_addr, num_bytes):
     # sanity check
     if blk_addr < mh.lower or (blk_addr + num_bytes - 1) > mh.upper:
         log_exec.error("deallocate: block outside of mem header!")
+
+    if check:
+        validate(ctx, mh)
 
     # no mem chunks?
     if mh.first == 0:
@@ -175,12 +210,12 @@ def deallocate(ctx, mh_addr, blk_addr, num_bytes):
         # find chunk right before/after the returned block
         mc_last = None
         mc = mh.read_first(ctx)
-        log_exec.debug("read: %s", mc)
+        log_exec.debug("read first: %s", mc)
         while mc and mc.addr < blk_addr:
             mc_last = mc
             mc = mc.read_next(ctx)
             if mc is not None:
-                log_exec.debug("read: %s", mc)
+                log_exec.debug("read next: %s", mc)
 
         # now we have either a mc_last and/or mc chunk
         # check if we can merge with one or both
@@ -212,6 +247,9 @@ def deallocate(ctx, mh_addr, blk_addr, num_bytes):
             if mc_last:
                 mc_last.next = blk_addr
                 mc_last.write(ctx)
+            else:
+                # update header
+                mh.first = mc.addr
             log_exec.debug("grow cur: %s", mc)
         # no merging possible -> create a new chunk between last and cur
         else:
@@ -231,3 +269,6 @@ def deallocate(ctx, mh_addr, blk_addr, num_bytes):
     mh.free += num_bytes
     mh.write(ctx)
     log_exec.debug("done: %s", mh)
+
+    if check:
+        validate(ctx, mh)

@@ -1,11 +1,10 @@
-import os
 import cProfile
 import io
 import pstats
 
 from .cfg import VamosMainParser
 from .machine import Machine, MemoryMap
-from .machine.regs import *
+from .machine.regs import REG_D0
 from .log import log_main, log_setup, log_help
 from .path import VamosPathManager
 from .trace import TraceManager
@@ -17,7 +16,7 @@ from .lib.dos.Process import Process
 RET_CODE_CONFIG_ERROR = 1000
 
 
-def main(cfg_files=None, args=None, cfg_dict=None):
+def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
     """vamos main entry point.
 
     setup a vamos session and run it.
@@ -29,11 +28,7 @@ def main(cfg_files=None, args=None, cfg_dict=None):
 
     if an internal error occurred then return:
       RET_CODE_CONFIG_ERROR (1000): config error
-  """
-    # retrieve vamos home and data dir
-    home_dir = os.path.dirname(__file__)
-    data_dir = os.path.join(home_dir, "data")
-
+    """
     # --- parse config ---
     mp = VamosMainParser()
     if not mp.parse(cfg_files, args, cfg_dict):
@@ -121,7 +116,8 @@ def main(cfg_files=None, args=None, cfg_dict=None):
                 exit_code = 1
             else:
                 ok = True
-                exit_code = run_state.regs[REG_D0]
+                # return code is limited to 0-255
+                exit_code = run_state.regs[REG_D0] & 0xFF
                 log_main.info("done. exit code=%d", exit_code)
                 log_main.info("total cycles: %d", run_state.cycles)
         else:
@@ -151,7 +147,7 @@ def main(cfg_files=None, args=None, cfg_dict=None):
     machine.cleanup()
 
     # exit
-    log_main.info("vamos is exiting")
+    log_main.info("vamos is exiting: code=%d", exit_code)
     return exit_code
 
 
@@ -160,8 +156,8 @@ def main_profile(
 ):
     """Run vamos main with profiling enabled.
 
-     Either dump profile after run or write a profile file.
-  """
+    Either dump profile after run or write a profile file.
+    """
     # profile run
     cpr = cProfile.Profile()
     cpr.enable()

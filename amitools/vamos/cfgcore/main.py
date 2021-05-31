@@ -49,15 +49,15 @@ class MainParser(object):
     def parse(self, paths=None, args=None, cfg_dict=None):
         """convenience function that combines all other calls.
 
-       add file and skip args.
-       pre-parse args.
-       either load given config.
-       if no skip args:
-         try given paths for configs. first match wins.
-       finally parse args.
+        add file and skip args.
+        pre-parse args.
+        either load given config.
+        if no skip args:
+          try given paths for configs. first match wins.
+        finally parse args.
 
-       return True if parsing was without errors else False
-    """
+        return True if parsing was without errors else False
+        """
         self.add_file_arg()
         self.add_skip_arg()
         self.add_config_debug()
@@ -169,8 +169,8 @@ class MainParser(object):
     def pre_parse_args(self, args=None):
         """parse args to get the values for file and skip arg.
 
-       Returns (cfg_file, skip_cfg) or (None, False)
-    """
+        Returns (cfg_file, skip_cfg) or (None, False)
+        """
         self.args = self.ap.parse_args(args)
         if self.ap_error:
             log_cfg.error("args: %s", self.ap_error)

@@ -2,7 +2,7 @@ from amitools.vamos.libcore import LibCtx
 
 
 class ExecLibCtx(LibCtx):
-    def __init__(self, machine, alloc, seg_loader, path_mgr):
+    def __init__(self, machine, alloc, seg_loader, path_mgr, lib_mgr):
         LibCtx.__init__(self, machine)
         self.machine = machine
         self.traps = machine.get_traps()
@@ -13,6 +13,7 @@ class ExecLibCtx(LibCtx):
         self.alloc = alloc
         self.seg_loader = seg_loader
         self.path_mgr = path_mgr
+        self.lib_mgr = lib_mgr
         self.process = None
 
     def set_process(self, process):

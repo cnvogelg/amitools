@@ -5,7 +5,7 @@ from amitools.vamos.libnative import ALibManager
 from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.machine import Machine
-from amitools.vamos.atypes import ExecLibrary, Library
+from amitools.vamos.libtypes import ExecLibrary, Library
 
 
 def setup():
@@ -14,13 +14,22 @@ def setup():
     alloc = MemoryAlloc.for_machine(machine)
     sp = machine.get_ram_begin() - 4
     # setup exec
-    exec_lib = ExecLibrary.alloc(alloc, "exec.library", "bla", 520 * 6)
-    exec_lib.setup()
+    exec_lib = ExecLibrary.alloc(
+        alloc, name="exec.library", id_string="bla", neg_size=520 * 6
+    )
+    exec_lib.new_lib()
     exec_lib.fill_funcs()
     exec_base = exec_lib.get_addr()
     mem.w32(4, exec_base)
     machine.set_zero_mem(0, exec_base)
     return machine, alloc, sp, mem, exec_lib
+
+
+def free_lib(mem, alloc, lib_base):
+    lib = Library(mem, lib_base)
+    mem_obj = alloc.get_memory(lib_base - lib.neg_size.val)
+    assert mem_obj
+    alloc.free_memory(mem_obj)
 
 
 def libnative_mgr_test(buildlibnix):
@@ -46,6 +55,7 @@ def libnative_mgr_test(buildlibnix):
     lib_info = mgr.get_lib_info_for_name("testnix.library")
     assert lib_info
     assert lib_info.is_base_addr(lib_base)
+    assert lib_info.get_lib_fd()
     # close lib
     seglist = mgr.close_lib(lib_base, run_sp=sp)
     assert seglist == 0
@@ -59,8 +69,7 @@ def libnative_mgr_test(buildlibnix):
     lib_info = mgr.get_lib_info_for_name("testnix.library")
     assert not lib_info
     # we have to manually clean the lib here (as Exec FreeMem() does not work)
-    lib = Library(mem, lib_base, alloc)
-    lib.free()
+    free_lib(mem, alloc, lib_base)
     # cleanup
     exec_lib.free()
     assert alloc.is_all_free()

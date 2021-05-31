@@ -62,7 +62,9 @@ DataFile = collections.namedtuple("DataFile", ["file_path", "file_name", "data"]
 
 TEST_TREES = {
     "simple": {"foo": {}, "bar": b"Hello, world!"},
-    "deep": {"foo": {"bar": {"baz": {"hello": b"Hello, world!"}}},},
+    "deep": {
+        "foo": {"bar": {"baz": {"hello": b"Hello, world!"}}},
+    },
     "data": {"bytes": DATA_bytes, "10k": DATA_10k, "100k": DATA_100k},
     "latin": {"H\u00e4ll\u00f6": DATA_bytes, "D\u00dcR": {}},
 }

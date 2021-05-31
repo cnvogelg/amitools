@@ -249,13 +249,13 @@ class AssignManager(object):
 
     def resolve_assigns(self, ami_path, recursive=True, as_list=False):
         """replace all assigns found in path until only a volume path exists.
-       do not touch relative paths or abs paths without assign prefix.
+        do not touch relative paths or abs paths without assign prefix.
 
-        return: original path if path is not absolute
-                or does not contain assign prefix
-        or: string if no multi assigns are involved
-        or: list of string if multi assigns were encountered
-    """
+         return: original path if path is not absolute
+                 or does not contain assign prefix
+         or: string if no multi assigns are involved
+         or: list of string if multi assigns were encountered
+        """
         log_path.info("resolve_assign: ami_path='%s'", ami_path)
         split = self._split_volume_remainder(ami_path)
         if split is None:

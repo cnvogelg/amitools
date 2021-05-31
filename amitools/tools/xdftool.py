@@ -837,7 +837,7 @@ class BlkDevCmd(Command):
 
 
 # ----- main -----
-def main(argv=None, defaults=None):
+def main(args=None, defaults=None):
     # call scanner and process all files with selected command
     cmd_map = {
         "open": OpenCmd,
@@ -891,7 +891,7 @@ def main(argv=None, defaults=None):
     )
     if defaults:
         parser.set_defaults(defaults)
-    args = parser.parse_args(argv)
+    args = parser.parse_args(args)
 
     cmd_list = args.command_list
     sep = args.seperator

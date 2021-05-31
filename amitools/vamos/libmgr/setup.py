@@ -38,8 +38,17 @@ class SetupLibManager(object):
         self.seg_loader = SegmentLoader(self.alloc, self.path_mgr)
         # setup contexts
         odg_base = self.mem_map.get_old_dos_guard_base()
+        # create lib mgr
+        self.lib_mgr = LibManager(
+            self.machine,
+            self.alloc,
+            self.seg_loader,
+            self.lib_mgr_cfg,
+            main_profiler=self.main_profiler,
+        )
+        # setup special lib contexts for exec and dos
         self.exec_ctx = ExecLibCtx(
-            self.machine, self.alloc, self.seg_loader, self.path_mgr
+            self.machine, self.alloc, self.seg_loader, self.path_mgr, self.lib_mgr
         )
         self.dos_ctx = DosLibCtx(
             self.machine,
@@ -48,14 +57,6 @@ class SetupLibManager(object):
             self.path_mgr,
             self.scheduler,
             odg_base,
-        )
-        # create lib mgr
-        self.lib_mgr = LibManager(
-            self.machine,
-            self.alloc,
-            self.seg_loader,
-            self.lib_mgr_cfg,
-            main_profiler=self.main_profiler,
         )
         self.lib_mgr.add_ctx("exec.library", self.exec_ctx)
         self.lib_mgr.add_ctx("dos.library", self.dos_ctx)

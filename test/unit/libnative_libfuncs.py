@@ -3,7 +3,8 @@ from amitools.vamos.machine.regs import *
 from amitools.vamos.machine.opcodes import op_jmp
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.libnative import LibFuncs
-from amitools.vamos.atypes import ExecLibrary, Library, LibFlags
+from amitools.vamos.libtypes import ExecLibrary, Library
+from amitools.vamos.libstructs import LibFlags
 from amitools.vamos.loader import SegList, SegmentLoader
 
 
@@ -12,23 +13,31 @@ def libnative_libfuncs_add_library_test():
     mem = machine.get_mem()
     alloc = MemoryAlloc.for_machine(machine)
     # setup exec lib
-    exec_lib = ExecLibrary.alloc(alloc, "exec.library", "bla", 36)
-    exec_lib.setup()
+    exec_lib = ExecLibrary.alloc(
+        alloc, name="exec.library", id_string="bla", neg_size=36
+    )
+    assert exec_lib.LibNode.neg_size.val == 36
+    assert exec_lib.LibNode.pos_size.val == ExecLibrary.get_size()
+    exec_lib.new_lib()
     mem.w32(4, exec_lib.get_addr())
     # new lib
-    lib = Library.alloc(alloc, "my.library", "bla", 36)
-    lib.setup()
+    lib = Library.alloc(alloc, name="my.library", id_string="bla", neg_size=36)
+    assert lib.neg_size.val == 36
+    lib.new_lib()
     mem.w32(lib.get_addr() - 36, 0xDEADBEEF)
-    # check lib sum
-    assert lib.sum == 0
+    # check initial lib sum
+    assert lib.sum.val == 0
+    assert lib.calc_sum() == 0xDEADBEEF
     # add lib
     lf = LibFuncs(machine, alloc)
-    lf.add_library(lib.get_addr())
+    lf.add_library(lib.addr)
     # check that lib was added
     assert len(exec_lib.lib_list) == 1
-    assert [a for a in exec_lib.lib_list] == [lib]
-    assert lib.sum == 0xDEADBEEF
-    assert lf.find_library("my.library") == lib.get_addr()
+    libs = [a for a in exec_lib.lib_list]
+    assert list(map(lambda x: x.addr, libs)) == [lib.addr]
+    # check that libsum was calced
+    assert lib.sum.val == 0xDEADBEEF
+    assert lf.find_library("my.library") == lib.addr
     # cleanup
     lib.free()
     exec_lib.free()
@@ -40,13 +49,13 @@ def libnative_libfuncs_sum_library_test():
     mem = machine.get_mem()
     alloc = MemoryAlloc.for_machine(machine)
     # new lib
-    lib = Library.alloc(alloc, "my.library", "bla", 36)
-    lib.setup()
+    lib = Library.alloc(alloc, name="my.library", id_string="bla", neg_size=36)
+    lib.new_lib()
     mem.w32(lib.get_addr() - 36, 0xDEADBEEF)
     # sum lib
     lf = LibFuncs(machine, alloc)
     lf.sum_library(lib.get_addr())
-    assert lib.sum == 0xDEADBEEF
+    assert lib.sum.val == 0xDEADBEEF
     # cleanup
     lib.free()
     assert alloc.is_all_free()
@@ -61,8 +70,8 @@ def libnative_libfuncs_rem_library_test():
     alloc = MemoryAlloc.for_machine(machine)
     segloader = SegmentLoader(alloc)
     # new lib
-    lib = Library.alloc(alloc, "my.library", "bla", 36)
-    lib.setup()
+    lib = Library.alloc(alloc, name="my.library", id_string="bla", neg_size=36)
+    lib.new_lib()
     # setup seglist
     seglist = SegList.alloc(alloc, [64])
     segloader.register_seglist(seglist.get_baddr())
@@ -94,8 +103,8 @@ def libnative_libfuncs_close_library_test():
     alloc = MemoryAlloc.for_machine(machine)
     segloader = SegmentLoader(alloc)
     # new lib
-    lib = Library.alloc(alloc, "my.library", "bla", 36)
-    lib.setup()
+    lib = Library.alloc(alloc, name="my.library", id_string="bla", neg_size=36)
+    lib.new_lib()
     # setup seglist
     seglist = SegList.alloc(alloc, [64])
     segloader.register_seglist(seglist.get_baddr())
@@ -126,8 +135,8 @@ def libnative_libfuncs_open_library_test():
     sp = machine.get_ram_begin() - 4
     alloc = MemoryAlloc.for_machine(machine)
     # new lib
-    lib = Library.alloc(alloc, "my.library", "bla", 36)
-    lib.setup()
+    lib = Library.alloc(alloc, name="my.library", id_string="bla", neg_size=36)
+    lib.new_lib()
     # setup open func
 
     def open_func(op, pc):
@@ -153,11 +162,11 @@ def libnative_libfuncs_set_function_test():
     sp = machine.get_ram_begin() - 4
     alloc = MemoryAlloc.for_machine(machine)
     # new lib
-    lib = Library.alloc(alloc, "my.library", "bla", 36)
+    lib = Library.alloc(alloc, name="my.library", id_string="bla", neg_size=36)
     lib_addr = lib.get_addr()
-    lib.setup()
+    lib.new_lib()
     lib.fill_funcs(op_jmp, 0xCAFEBABE)
-    assert lib.neg_size == 36
+    assert lib.neg_size.val == 36
     # patch function
     lvo = -30
     addr = lib.get_addr() + lvo

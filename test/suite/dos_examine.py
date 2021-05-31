@@ -15,14 +15,9 @@ def dos_examine_test(vamos, tmpdir):
     assert rc == 0
     assert stderr == []
     # allow any order of foo or bar
-    assert stdout == [
-        'Examine: bla',
-        '   14 foo',
-        '<DIR> bar',
-        'ok'
-    ] or stdout == [
-        'Examine: bla',
-        '<DIR> bar',
-        '   14 foo',
-        'ok'
+    assert stdout == ["Examine: bla", "   14 foo", "<DIR> bar", "ok"] or stdout == [
+        "Examine: bla",
+        "<DIR> bar",
+        "   14 foo",
+        "ok",
     ]

@@ -7,4 +7,5 @@ Add(a,b)(d0,d1)
 Swap(a,b)(d0,d1)
 Dummy(a,b)(d0,d1)
 RaiseError(str)(a0)
+ExecutePy(argc,argv)(d0,a0)
 ##end

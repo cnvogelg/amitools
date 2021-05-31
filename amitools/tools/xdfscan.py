@@ -157,7 +157,7 @@ def scan_file(path, args):
 
 
 # ----- main -----
-def main():
+def main(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "input", nargs="+", help="input image file or directory (to scan tree)"
@@ -196,7 +196,7 @@ def main():
         default=False,
         help="do not scan hard disk images",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(args=args)
 
     # main scan loop
     ret = 0

@@ -1,4 +1,3 @@
-from amitools.vamos.astructs import *
 from amitools.vamos.lib.dos.CSource import CSource
 from amitools.vamos.lib.dos.Args import *
 from amitools.vamos.lib.dos.Error import *

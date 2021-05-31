@@ -2,7 +2,7 @@ import collections
 from amitools.vamos.lib.ExecLibrary import ExecLibrary
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.lib.VamosTestDevice import VamosTestDevice
-from amitools.vamos.libcore import VLibManager, LibRegistry, LibCtxMap
+from amitools.vamos.libcore import VLibManager
 from amitools.vamos.machine import Machine
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
@@ -24,7 +24,7 @@ def setup(main_profiler=None, prof_names=None, prof_calls=False):
     mem = machine.get_mem()
     cpu_type = machine.get_cpu_type()
     segloader = SegmentLoader(alloc)
-    exec_ctx = ExecLibCtx(machine, alloc, segloader, None)
+    exec_ctx = ExecLibCtx(machine, alloc, segloader, None, None)
     mgr.add_ctx("exec.library", exec_ctx)
     mgr.add_impl_cls("exec.library", ExecLibrary)
     mgr.add_impl_cls("vamostest.library", VamosTestLibrary)
@@ -41,7 +41,7 @@ def libcore_mgr_bootstrap_shutdown_test():
     # make sure exec is in place
     assert mgr.get_vlib_by_name("exec.library") == exec_vlib
     assert mgr.get_vlib_by_addr(exec_base) == exec_vlib
-    assert exec_lib.open_cnt == 1
+    assert exec_lib.open_cnt.val == 1
     assert machine.get_mem().r32(4) == exec_base
     # we can't expunge exec
     assert not mgr.expunge_lib(exec_vlib)
@@ -65,7 +65,7 @@ def libcore_mgr_make_test():
     assert impl
     assert impl.get_cnt() == 0
     lib = test_vlib.get_library()
-    assert lib.version == impl.get_version()
+    assert lib.version.val == impl.get_version()
     # shutdown
     left = mgr.shutdown()
     assert left == 0
@@ -85,8 +85,8 @@ def libcore_mgr_make_version_revision_test():
     assert impl
     assert impl.get_cnt() == 0
     lib = test_vlib.get_library()
-    assert lib.version == 11
-    assert lib.revision == 23
+    assert lib.version.val == 11
+    assert lib.revision.val == 23
     # shutdown
     left = mgr.shutdown()
     assert left == 0
@@ -152,7 +152,7 @@ def libcore_mgr_make_fake_without_fd_test():
     impl = test_vlib.get_impl()
     assert impl is None
     assert test_vlib.get_fd().get_neg_size() == 30
-    assert test_vlib.get_library().neg_size == 32
+    assert test_vlib.get_library().neg_size.val == 32
     # shutdown
     left = mgr.shutdown()
     assert left == 0
@@ -176,7 +176,7 @@ def libcore_mgr_make_fake_without_fd_cfg_test():
     impl = test_vlib.get_impl()
     assert impl is None
     assert test_vlib.get_fd().get_neg_size() == 66
-    assert test_vlib.get_library().neg_size == 68
+    assert test_vlib.get_library().neg_size.val == 68
     # shutdown
     left = mgr.shutdown()
     assert left == 0
@@ -191,7 +191,7 @@ def libcore_mgr_make_open_test():
     test_base = test_vlib.get_addr()
     impl = test_vlib.get_impl()
     lib = test_vlib.get_library()
-    assert lib.version == impl.get_version()
+    assert lib.version.val == impl.get_version()
     assert impl.get_cnt() == 0
     assert mgr.open_lib_name("vamostest.library") == test_vlib
     assert impl.get_cnt() == 1
@@ -211,7 +211,7 @@ def libcore_mgr_open_test():
     test_vlib = mgr.open_lib_name("vamostest.library")
     impl = test_vlib.get_impl()
     lib = test_vlib.get_library()
-    assert lib.version == impl.get_version()
+    assert lib.version.val == impl.get_version()
     assert impl.get_cnt() == 1
     assert mgr.close_lib(test_vlib)
     assert impl.get_cnt() is None
@@ -230,7 +230,7 @@ def libcore_mgr_make_open_dev_test():
     impl = test_vlib.get_impl()
     lib = test_vlib.get_library()
     assert test_vlib.is_device()
-    assert lib.version == impl.get_version()
+    assert lib.version.val == impl.get_version()
     assert impl.get_cnt() == 0
     assert mgr.open_lib_name("vamostestdev.device") == test_vlib
     assert impl.get_cnt() == 1
@@ -251,7 +251,7 @@ def libcore_mgr_open_dev_test():
     impl = test_vlib.get_impl()
     lib = test_vlib.get_library()
     assert test_vlib.is_device()
-    assert lib.version == impl.get_version()
+    assert lib.version.val == impl.get_version()
     assert impl.get_cnt() == 1
     assert mgr.close_lib(test_vlib)
     assert impl.get_cnt() is None

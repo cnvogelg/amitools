@@ -1,7 +1,5 @@
-import datetime
-import logging
 from amitools.vamos.log import log_libmgr
-from amitools.vamos.atypes import Library
+from amitools.vamos.libtypes import Library
 from amitools.vamos.libcore import VLibManager
 from amitools.vamos.libnative import ALibManager, LibLoader
 from .cfg import LibCfg
@@ -13,13 +11,13 @@ class LibManager(object):
     def __init__(self, machine, alloc, segloader, cfg, main_profiler=None):
         self.mem = machine.get_mem()
         self.cfg = cfg
+        self.machine = machine
         self.vlib_mgr = VLibManager(machine, alloc, main_profiler=main_profiler)
         self.alib_mgr = ALibManager(machine, alloc, segloader)
         cfg.dump(log_libmgr.info)
 
     def add_ctx(self, name, ctx):
         """allow to add vlib contexts"""
-        ctx.lib_mgr = self
         self.vlib_mgr.add_ctx(name, ctx)
 
     def add_impl_cls(self, name, impl_cls):
@@ -34,6 +32,10 @@ class LibManager(object):
         """return associated vlib for a name"""
         return self.vlib_mgr.get_vlib_by_name(name)
 
+    def get_alib_info_by_addr(self, addr):
+        """return associated alib info for a base lib address"""
+        return self.alib_mgr.is_base_addr(addr)
+
     def bootstrap_exec(self, exec_info=None):
         """setup exec vlib as first and essential lib"""
         version = 0
@@ -47,8 +49,8 @@ class LibManager(object):
     def shutdown(self, run_sp=None):
         """cleanup libs
 
-    try to expunge all libs and report still open ones
-    """
+        try to expunge all libs and report still open ones
+        """
         log_libmgr.info("+shutdown")
         aleft = self.alib_mgr.shutdown(run_sp)
         if aleft > 0:
@@ -63,8 +65,8 @@ class LibManager(object):
     def expunge_libs(self, run_sp=None):
         """expunge all unused libs
 
-       return number of libs _not_ expunged
-    """
+        return number of libs _not_ expunged
+        """
         log_libmgr.info("+expunge_libs")
         aleft = self.alib_mgr.expunge_libs(run_sp)
         vleft = self.vlib_mgr.expunge_libs()
@@ -74,8 +76,8 @@ class LibManager(object):
     def expunge_devs(self, run_sp=None):
         """expunge all unused devs
 
-       return number of libs _not_ expunged
-    """
+        return number of libs _not_ expunged
+        """
         log_libmgr.info("+expunge_devs")
         aleft = 0  # TBD
         vleft = self.vlib_mgr.expunge_devs()
@@ -85,8 +87,8 @@ class LibManager(object):
     def expunge_lib(self, addr, run_sp=None):
         """expunge a library given by base address
 
-       return True if lib was expunged
-    """
+        return True if lib was expunged
+        """
         log_libmgr.info("expunge_lib: @%06x", addr)
         vlib = self.vlib_mgr.get_vlib_by_addr(addr)
         if vlib:
@@ -100,8 +102,8 @@ class LibManager(object):
     def close_lib(self, addr, run_sp=None):
         """close a library
 
-       return True if lib was expunged, too
-    """
+        return True if lib was expunged, too
+        """
         log_libmgr.info("close_lib: @%06x", addr)
         vlib = self.vlib_mgr.get_vlib_by_addr(addr)
         if vlib:
@@ -117,8 +119,8 @@ class LibManager(object):
     ):
         """open a library
 
-       return lib_base addr or 0
-    """
+        return lib_base addr or 0
+        """
         # get base name
         base_name = LibLoader.get_lib_base_name(full_name)
         log_libmgr.info(
@@ -196,7 +198,7 @@ class LibManager(object):
     def _check_version(self, name, addr, open_ver):
         # check version
         lib = Library(self.mem, addr)
-        lib_ver = lib.version
+        lib_ver = lib.version.val
         if lib_ver < open_ver:
             log_libmgr.warning(
                 "lib '%s' has too low version: %d < %d", name, lib_ver, open_ver

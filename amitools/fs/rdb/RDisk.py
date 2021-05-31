@@ -326,26 +326,28 @@ class RDisk:
         self.valid = True
 
     def resize(self, new_lo_cyl=None, new_hi_cyl=None, adjust_physical=False):
-        # if the rdb region has to be minimized then check if no partition 
+        # if the rdb region has to be minimized then check if no partition
         # is in the way
         if not new_lo_cyl:
             new_lo_cyl = self.rdb.log_drv.lo_cyl
         if not new_hi_cyl:
             new_hi_cyl = self.rdb.log_drv.hi_cyl
         # same range? silently ignore and return true
-        if new_lo_cyl == self.rdb.log_drv.lo_cyl and \
-           new_hi_cyl == self.rdb.log_drv.hi_cyl:
+        if (
+            new_lo_cyl == self.rdb.log_drv.lo_cyl
+            and new_hi_cyl == self.rdb.log_drv.hi_cyl
+        ):
             return
         # invalid range
         if new_lo_cyl > new_hi_cyl:
-            raise ValueError("Invalid cylinder range: %d > %d" %
-                             (new_lo_cyl, new_hi_cyl))
+            raise ValueError(
+                "Invalid cylinder range: %d > %d" % (new_lo_cyl, new_hi_cyl)
+            )
         # check partitions
         for p in self.parts:
             (lo, hi) = p.get_cyl_range()
             if lo < new_lo_cyl or hi > new_hi_cyl:
-                raise ValueError("Partition %d does not fit in new range!"
-                                 % p.num)
+                raise ValueError("Partition %d does not fit in new range!" % p.num)
         # need to adjust phyisical disc?
         if new_hi_cyl != self.rdb.phy_drv.cyls - 1:
             if adjust_physical:
@@ -368,8 +370,7 @@ class RDisk:
         if not new_secs:
             new_secs = old_secs
         # nothing to do?
-        if new_heads == old_heads and \
-           new_secs == old_secs:
+        if new_heads == old_heads and new_secs == old_secs:
             return
         # validate if remapping is possible
         old_cyl_blocks = old_heads * old_secs
@@ -385,6 +386,7 @@ class RDisk:
             # conversion op
             def op(x):
                 return x * factor
+
         else:
             # coarser resolution wanted
             # check that factor is integer multiple
@@ -394,6 +396,7 @@ class RDisk:
 
             def check(x):
                 return x % factor == 0
+
             # check physical drive range
             pd = self.rdb.phy_drv
             if not check(pd.cyls):
@@ -401,14 +404,16 @@ class RDisk:
             # check logical drive range
             ld = self.rdb.log_drv
             if not check(ld.lo_cyl) or not check(ld.hi_cyl):
-                raise ValueError("Logical Range [%d,%d] can't be remapped!"
-                                 % (ld.lo_cyl, ld.hi_cyl))
+                raise ValueError(
+                    "Logical Range [%d,%d] can't be remapped!" % (ld.lo_cyl, ld.hi_cyl)
+                )
             # check partition lo/hi cyls
             for p in self.parts:
                 lo, hi = p.get_cyl_range()
                 if not check(lo) or not check(hi):
-                    raise ValueError("Partition %d [%d,%d] can't be remapped!" 
-                                     % (p.num, lo, hi))
+                    raise ValueError(
+                        "Partition %d [%d,%d] can't be remapped!" % (p.num, lo, hi)
+                    )
 
             # conversion op
             def op(x):

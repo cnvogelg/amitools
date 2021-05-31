@@ -1,4 +1,4 @@
-from amitools.vamos.astructs import CSourceStruct
+from amitools.vamos.libstructs import CSourceStruct
 
 
 class CSource:

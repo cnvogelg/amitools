@@ -1,6 +1,6 @@
 from amitools.vamos.log import log_libmgr
 from .initresident import InitRes
-from amitools.vamos.atypes import Resident
+from amitools.vamos.libtypes import Resident
 from amitools.vamos.loader import SegmentLoader, SegList
 
 
@@ -14,7 +14,7 @@ class LibLoader(object):
 
     def load_sys_lib(self, sys_bin_file, run_sp=None):
         """try to load native lib from sys path
-       return (lib_base_addr, seglist_baddr) or (0,0)"""
+        return (lib_base_addr, seglist_baddr) or (0,0)"""
         # load seglist
         seglist_baddr = self.segloader.load_sys_seglist(sys_bin_file)
         if seglist_baddr:
@@ -45,7 +45,7 @@ class LibLoader(object):
 
     def load_ami_lib(self, lib_name, cwd_lock=None, run_sp=None, progdir_lock=None):
         """try to load native lib from ami path
-       return (lib_base_addr, seglist_baddr) or (0,0)"""
+        return (lib_base_addr, seglist_baddr) or (0,0)"""
         search_paths = self.get_lib_search_paths(lib_name)
         # now try search paths
         prog_dir = "PROGDIR:"

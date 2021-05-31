@@ -42,8 +42,8 @@ DOS_MASK_DIRCACHE = 4
 
 def parse_dos_type_str(string):
     """parse a dos type string
-     return None if its invalid or dostype value
-  """
+    return None if its invalid or dostype value
+    """
     comp = string.split("+")
     if "ffs" in comp:
         if "dc" in comp or "dircache" in comp:

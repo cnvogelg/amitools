@@ -2,9 +2,9 @@ import os.path
 import logging
 
 from amitools.vamos.log import log_lock
-from amitools.vamos.label import LabelRange
-from amitools.vamos.error import *
-from amitools.vamos.astructs import AccessStruct, DosListVolumeStruct
+from amitools.vamos.error import UnsupportedFeatureError, VamosInternalError
+from amitools.vamos.astructs import AccessStruct
+from amitools.vamos.libstructs import DosListVolumeStruct
 from .Error import *
 from .Lock import Lock
 
