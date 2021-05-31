@@ -25,6 +25,7 @@ cdef extern from "m68k.h":
   void m68k_end_timeslice()
 
   double m68k_get_fpreg(void* context, int reg)
+  int m68k_get_fpsr(void * context)
   unsigned int m68k_get_reg(void* context, m68k_register_t reg)
   void m68k_set_reg(m68k_register_t reg, unsigned int value)
 
@@ -110,6 +111,9 @@ cdef class CPU:
 
   def r_fpreg(self, int reg):
     return m68k_get_fpreg(NULL, reg)
+
+  def r_fpsr(self):
+    return m68k_get_fpsr(NULL)
 
   cdef unsigned int r_reg_internal(self, m68k_register_t reg):
     return m68k_get_reg(NULL, reg)

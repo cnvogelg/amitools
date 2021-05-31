@@ -46,6 +46,7 @@ class CPUState:
             self.fx = fx
             for i in range(8):
                 fx.append(cpu.r_fpreg(i))
+            self.fpsr = cpu.r_fpsr()
 
     def set(self, cpu):
         cpu.w_pc(self.pc)
@@ -89,5 +90,9 @@ class CPUState:
                 fx.append("F%d=%g" % (pos, f))
                 pos += 1
             if len(fx) > 0:
+                fx.append("N=%d" % ((self.fpsr >> 27) & 1))
+                fx.append("Z=%d" % ((self.fpsr >> 26) & 1))
+                fx.append("I=%d" % ((self.fpsr >> 25) & 1))
+                fx.append("NAN=%d" % ((self.fpsr >> 24) & 1))
                 res.append("  ".join(fx))
         return res

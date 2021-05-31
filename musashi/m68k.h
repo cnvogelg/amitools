@@ -374,6 +374,7 @@ void m68k_state_register(const char *type, int index);
 
 
 double m68k_get_fpreg(void* context, int reg);
+int m68k_get_fpsr(void* context);
 
 /* Peek at the internals of a CPU context.  This can either be a context
  * retrieved using m68k_get_context() or the currently running context.

@@ -748,6 +748,11 @@ double m68k_get_fpreg(void* context, int regnum)
 	return 0;
 }
 
+int m68k_get_fpsr(void*context)
+{
+	return REG_FPSR;
+}
+
 /* Set the callbacks */
 void m68k_set_int_ack_callback(int  (*callback)(int int_level))
 {
