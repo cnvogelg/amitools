@@ -3,6 +3,7 @@ from amitools.vamos.libtypes import Library
 from amitools.vamos.libcore import VLibManager
 from amitools.vamos.libnative import ALibManager, LibLoader
 from .cfg import LibCfg
+from .proxy import LibProxyManager
 
 
 class LibManager(object):
@@ -14,7 +15,14 @@ class LibManager(object):
         self.machine = machine
         self.vlib_mgr = VLibManager(machine, alloc, main_profiler=main_profiler)
         self.alib_mgr = ALibManager(machine, alloc, segloader)
+        self.proxy_mgr = LibProxyManager(self)
+        # inject proxy mgr into all ctx
+        self.vlib_mgr.set_ctx_extra_attr("proxies", self.proxy_mgr)
         cfg.dump(log_libmgr.info)
+
+    def get_lib_proxy_mgr(self):
+        """access the library proxy manager"""
+        return self.proxy_mgr
 
     def add_ctx(self, name, ctx):
         """allow to add vlib contexts"""
@@ -51,6 +59,7 @@ class LibManager(object):
 
         try to expunge all libs and report still open ones
         """
+        self.proxy_mgr.shutdown()
         log_libmgr.info("+shutdown")
         aleft = self.alib_mgr.shutdown(run_sp)
         if aleft > 0:

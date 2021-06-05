@@ -25,6 +25,8 @@ def setup(main_profiler=None, prof_names=None, prof_calls=False):
     cpu_type = machine.get_cpu_type()
     segloader = SegmentLoader(alloc)
     exec_ctx = ExecLibCtx(machine, alloc, segloader, None, None)
+    # add extra attr to ctx
+    mgr.set_ctx_extra_attr("foo", "bar")
     mgr.add_ctx("exec.library", exec_ctx)
     mgr.add_impl_cls("exec.library", ExecLibrary)
     mgr.add_impl_cls("vamostest.library", VamosTestLibrary)
@@ -43,6 +45,8 @@ def libcore_mgr_bootstrap_shutdown_test():
     assert mgr.get_vlib_by_addr(exec_base) == exec_vlib
     assert exec_lib.open_cnt.val == 1
     assert machine.get_mem().r32(4) == exec_base
+    # check extra ctx attr
+    assert exec_vlib.ctx.foo == "bar"
     # we can't expunge exec
     assert not mgr.expunge_lib(exec_vlib)
     # shutdown

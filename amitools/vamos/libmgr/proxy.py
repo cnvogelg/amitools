@@ -8,6 +8,35 @@ class LibProxyManager:
         self.lib_mgr = lib_mgr
         self.proxy_cache = {}
         self.proxy_gen = LibProxyGen()
+        # on demand convenience proxies
+        self.exec_lib_proxy = None
+        self.dos_lib_proxy = None
+
+    def get_exec_lib_proxy(self):
+        # auto open exec
+        exec = self.exec_lib_proxy
+        if not exec:
+            exec = self.open_lib_proxy("exec.library")
+            self.exec_lib_proxy = exec
+        return exec
+
+    def get_dos_lib_proxy(self):
+        # auto open dos
+        dos = self.dos_lib_proxy
+        if not dos:
+            dos = self.open_lib_proxy("dos.library")
+            self.dos_lib_proxy = dos
+        return dos
+
+    def shutdown(self):
+        # auto close exec
+        exec = self.exec_lib_proxy
+        if exec:
+            self.close_lib_proxy(exec)
+        # auto close dos
+        dos = self.dos_lib_proxy
+        if dos:
+            self.close_lib_proxy(dos)
 
     def open_lib_proxy(self, full_name, version=0, run_sp=None):
         """Try to open library (vlib or alib) and return a python call proxy"""
