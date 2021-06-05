@@ -1,5 +1,5 @@
 import code
-import os.path
+import importlib
 
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
@@ -71,6 +71,7 @@ class VamosTestLibrary(LibImpl):
 -x '<exec_string>'      # return value in 'rc' var
 -f '<exec_host_file>'   # return value in 'rc' var
 -c '<exec_host_file>' '<func>  # call function 'func(ctx)' and return value
+-i '<module>' '<func>'  # call function in module
 """
         )
 
@@ -117,11 +118,18 @@ class VamosTestLibrary(LibImpl):
                     exec(fh.read(), glob, loc)
                 func = loc[func_name]
                 rc = func(ctx)
+            elif op == "-i" and argc > 2:
+                func_name = args[2]
+                mod = importlib.import_module(val)
+                func = getattr(mod, func_name)
+                rc = func(ctx)
             else:
                 self._ExecutePyUsage()
                 rc = 2
         # check return value
-        if type(rc) is not int:
+        if rc is None:
+            rc = 0
+        elif type(rc) is not int:
             print("ExecutePy: invalid return value:", rc)
             rc = 3
         # fetch return code

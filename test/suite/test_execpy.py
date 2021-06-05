@@ -63,3 +63,11 @@ def test_execpy_vamos_ctx_func_test(vamos):
         "['cpu', 'machine', 'mem', 'vlib']",
     ]
     assert stderr == []
+
+
+def test_execpy_vamos_ctx_func_checked_test(vamos):
+    def test(ctx):
+        """the nested test ctx_func without return"""
+        assert sorted(ctx.__dict__) == ["cpu", "machine", "mem", "vlib"]
+
+    vamos.run_ctx_func_checked(test)

@@ -71,6 +71,11 @@ def run_func(func, args, stdin_str=None, raw_output=False):
     return returncode, stdout, stderr
 
 
+def ctx_callback(ctx):
+    # global func to execute via execpy -i command
+    return 23
+
+
 class VamosTestRunner:
     def __init__(
         self,
@@ -232,12 +237,21 @@ class VamosTestRunner:
 
     def run_ctx_func(self, ctx_func, **kw_args):
         """use test_execpy binary to run the given func in a lib context"""
-        func_name = ctx_func.__name__
-        # get source file
-        src_file = inspect.getfile(ctx_func)
+        global ctx_callback
+        ctx_callback = ctx_func
         # now run 'test_execpy'
-        prog_args = ["test_execpy", "-c", src_file, func_name]
+        prog_args = ["test_execpy", "-i", "helper.runner", "ctx_callback"]
         return self.run_prog(*prog_args, **kw_args)
+
+    def run_ctx_func_checked(
+        self, ctx_func, retcode=0, stdout=None, stderr=None, **kw_args
+    ):
+        got_retcode, got_stdout, got_stderr = self.run_ctx_func(ctx_func, **kw_args)
+        assert got_retcode == retcode
+        if stdout:
+            assert got_stdout == stdout
+        if stderr:
+            assert got_stderr == stderr
 
 
 class VamosRunner:
