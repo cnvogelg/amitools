@@ -1366,6 +1366,7 @@ static void fpgen_rm_reg(uint16 w2)
 
 	switch (opmode)
 	{
+		case 0x44:		// FDMOVED - maybe add rounding?
 		case 0x00:		// FMOVE
 		{
 			REG_FP[dst] = source;
@@ -1423,6 +1424,7 @@ static void fpgen_rm_reg(uint16 w2)
 			break;
 		}
   	    case 0x60:		// FSDIVS (JFF) (source has already been converted to floatx80)
+   		case 0x64:		// FDDIV - maybe add rounding?
 		case 0x20:		// FDIV
 		{
 			REG_FP[dst] = floatx80_div(REG_FP[dst], source);
@@ -1445,6 +1447,7 @@ static void fpgen_rm_reg(uint16 w2)
 			break;
 		}
    		case 0x63:		// FSMULS (JFF) (source has already been converted to floatx80)
+   		case 0x67:		// FDMUL - maybe add rounding?
 		case 0x23:		// FMUL
 		{
 			REG_FP[dst] = floatx80_mul(REG_FP[dst], source);
