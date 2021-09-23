@@ -1413,6 +1413,30 @@ static void fpgen_rm_reg(uint16 w2)
 			USE_CYCLES(3);
 			break;
 		}
+		case 0xe:		// SIN
+			REG_FP[dst] = double_to_fx80(sin(fx80_to_double(source)));
+	    	SET_CONDITION_CODES(REG_FP[dst]); // JFF
+			USE_CYCLES(400);
+			break;
+		case 0x1d:		// COS
+			REG_FP[dst] = double_to_fx80(cos(fx80_to_double(source)));
+	    	SET_CONDITION_CODES(REG_FP[dst]); // JFF
+			USE_CYCLES(400);
+			break;
+		case 0x30:		// SINCOS
+		case 0x31:		// SINCOS
+		case 0x32:		// SINCOS
+		case 0x33:		// SINCOS
+		case 0x34:		// SINCOS
+		case 0x35:		// SINCOS
+		case 0x36:		// SINCOS
+		case 0x37:		// SINCOS
+			double ds = fx80_to_double(source);
+			REG_FP[dst] = double_to_fx80(sin(ds));
+			REG_FP[opmode&7] = double_to_fx80(cos(ds));
+	    	SET_CONDITION_CODES(REG_FP[dst]); // JFF
+			USE_CYCLES(400);
+			break;
 		case 0x1e:		// FGETEXP
 		{
 			sint16 temp;
