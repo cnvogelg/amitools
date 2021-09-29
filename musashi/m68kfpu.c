@@ -570,12 +570,6 @@ static uint64 READ_EA_64(int ea)
 
 	switch (mode)
 	{
-		case 0:
-		{
-			h1 = REG_D[reg];
-			h2 = REG_D[reg + 1];
-			return  (uint64)(h1) << 32 | (uint64)(h2);
-		}
 		case 2:		// (An)
 		{
 			uint32 ea = REG_A[reg];
@@ -1369,7 +1363,7 @@ static void fpgen_rm_reg(uint16 w2)
 		source = REG_FP[src];
 	}
 
-	if (opmode & 0x44)
+	if ((opmode & 0x44) == 0x44)
 	{
 		round = 2;
 		opmode &= ~0x44;
@@ -1448,6 +1442,7 @@ static void fpgen_rm_reg(uint16 w2)
 		case 0x37:		// SINCOS
 		{
 			double ds = fx80_to_double(source);
+printf("sincos -> %d %d\n", dst, opmode&7);			
 			REG_FP[dst] = double_to_fx80(sin(ds));
 			REG_FP[opmode&7] = double_to_fx80(cos(ds));
 	    	SET_CONDITION_CODES(REG_FP[dst]); // JFF
