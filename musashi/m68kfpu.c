@@ -1183,6 +1183,7 @@ static void fpgen_rm_reg(uint16 w2)
 	int dst = (w2 >>  7) & 0x7;
 	int opmode = w2 & 0x7f;
 	floatx80 source;
+	int round;
 
 	// fmovecr #$f, fp0	f200 5c0f
 
@@ -1362,11 +1363,19 @@ static void fpgen_rm_reg(uint16 w2)
 		source = REG_FP[src];
 	}
 
-
+	if (opmode & 0x44)
+	{
+		round = 2;
+		opmode &= ~0x44;
+	} else if (opmode & 0x40)
+	{
+		round = 1;
+		opmode &= ~0x40;
+	} else
+		round = 0;
 
 	switch (opmode)
 	{
-		case 0x44:		// FDMOVED - maybe add rounding?
 		case 0x00:		// FMOVE
 		{
 			REG_FP[dst] = source;
@@ -1447,8 +1456,6 @@ static void fpgen_rm_reg(uint16 w2)
 			USE_CYCLES(6);
 			break;
 		}
-  	    case 0x60:		// FSDIVS (JFF) (source has already been converted to floatx80)
-   		case 0x64:		// FDDIV - maybe add rounding?
 		case 0x20:		// FDIV
 		{
 			REG_FP[dst] = floatx80_div(REG_FP[dst], source);
@@ -1470,8 +1477,6 @@ static void fpgen_rm_reg(uint16 w2)
 			USE_CYCLES(9);
 			break;
 		}
-   		case 0x63:		// FSMULS (JFF) (source has already been converted to floatx80)
-   		case 0x67:		// FDMUL - maybe add rounding?
 		case 0x23:		// FMUL
 		{
 			REG_FP[dst] = floatx80_mul(REG_FP[dst], source);
@@ -1541,6 +1546,16 @@ static void fpgen_rm_reg(uint16 w2)
 
 		default:	fatalerror("fpgen_rm_reg: unimplemented opmode %02X at %08X\n", opmode, REG_PC-4);
 	}
+	if (round == 1)
+	{
+		// round to single
+		REG_FP[dst] = double_to_fx80((float)fx80_to_double(REG_FP[dst]));
+	} else if (round == 2)
+	{
+		// round to double
+		REG_FP[dst] = double_to_fx80(fx80_to_double(REG_FP[dst]));
+	}
+
 }
 
 static void fmove_reg_mem(uint16 w2)
