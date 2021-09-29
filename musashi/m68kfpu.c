@@ -570,6 +570,12 @@ static uint64 READ_EA_64(int ea)
 
 	switch (mode)
 	{
+		case 0:
+		{
+			h1 = REG_D[reg];
+			h2 = REG_D[reg + 1];
+			return  (uint64)(h1) << 32 | (uint64)(h2);
+		}
 		case 2:		// (An)
 		{
 			uint32 ea = REG_A[reg];
