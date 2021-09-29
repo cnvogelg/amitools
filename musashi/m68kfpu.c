@@ -1442,7 +1442,6 @@ static void fpgen_rm_reg(uint16 w2)
 		case 0x37:		// SINCOS
 		{
 			double ds = fx80_to_double(source);
-printf("sincos -> %d %d\n", dst, opmode&7);			
 			REG_FP[dst] = double_to_fx80(sin(ds));
 			REG_FP[opmode&7] = double_to_fx80(cos(ds));
 	    	SET_CONDITION_CODES(REG_FP[dst]); // JFF
