@@ -1465,6 +1465,13 @@ static void fpgen_rm_reg(uint16 w2)
 			USE_CYCLES(43);
 			break;
 		}
+		case 0x21:		// FMOD
+		{
+			REG_FP[dst] = floatx80_rem(REG_FP[dst], source);
+		    	SET_CONDITION_CODES(REG_FP[dst]);
+			USE_CYCLES(43);
+			break;
+		}
 		case 0x24:		// FSGLDIV
 		{
 			REG_FP[dst] = double_to_fx80((float)fx80_to_double(floatx80_div(REG_FP[dst], source)));
