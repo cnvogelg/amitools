@@ -1,11 +1,10 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include "m68kcpu.h"
 
 extern void exit(int);
 
-static void fatalerror(char *format, ...) {
+static void fatalerror(const char *format, ...) {
       va_list ap;
       va_start(ap,format);
       vfprintf(stderr,format,ap);  // JFF: fixed. Was using fprintf and arguments were wrong
