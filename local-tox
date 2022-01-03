@@ -1,0 +1,7 @@
+#!/bin/bash
+export PYENV_ROOT=$HOME/.pyenv
+export PATH=$PYENV_ROOT/bin:$PATH
+eval "$(pyenv init -)"
+pyenv shell 3.10.1 3.9.9 3.8.12 3.7.12 3.6.15
+exec tox "$@"
+
