@@ -171,11 +171,11 @@ sourcefiles = [
     "gen/m68kops.c",
 ]
 depends = [
+    "machine/my_conf.h",
     "machine/pycpu.pyx",
     "machine/pymem.pyx",
     "machine/pytraps.pyx",
     "machine/musashi/m68k.h",
-    "machine/musashi/m68kconf.h",
     "machine/musashi/m68kcpu.h",
     "machine/mem.h",
     "machine/traps.h",
@@ -192,7 +192,9 @@ if is_msvc:
     inc_dirs.append("machine/win")
     defines = [("_CRT_SECURE_NO_WARNINGS", None), ("_USE_MATH_DEFINES", None)]
 else:
-    defines = None
+    defines = []
+# use own musashi config file
+defines.append(("MUSASHI_CNF", '"my_conf.h"'))
 
 extensions = [
     Extension(
