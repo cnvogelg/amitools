@@ -1,4 +1,4 @@
-# Makefile for musashi
+# Makefile for amitools
 
 BUILD_DIR = build
 DIST_DIR = dist
@@ -21,7 +21,7 @@ help:
 	@echo "format      format source code with black"
 	@echo
 	@echo "test        run tests"
-	@echo "docker-tox  build tox docker container"
+	@echo "docker-build  build tox docker container"
 	@echo
 	@echo "docs        generate docs"
 	@echo "show        show docs in browser"
@@ -30,6 +30,7 @@ help:
 	@echo "clean_all   clean dist"
 	@echo "clean_git   clean non-git files"
 	@echo "clean_py    remove compiled .pyc files"
+	@echo "clean_ext   remove native extension build"
 	@echo
 	@echo "install     install package"
 	@echo "sdist       build source dist"
@@ -70,7 +71,7 @@ show:
 clean:
 	rm -rf $(BUILD_DIR)
 
-clean_all: clean
+clean_all: clean clean_ext
 	rm -rf $(DIST_DIR)
 
 clean_git:
@@ -78,6 +79,10 @@ clean_git:
 
 clean_py:
 	find . -name *.pyc -exec rm {} \;
+
+clean_ext:
+	$(PYTHON) setup.py clean
+	rm -f machine/*.so machine/emu.c
 
 # install, distrib
 install:

@@ -41,7 +41,7 @@ if use_cython:
         sys.exit(1)
 
 # if generated file is missing cython is required
-ext_file = "musashi/emu.c"
+ext_file = "machine/emu.c"
 if not os.path.exists(ext_file) and not use_cython:
     print("generated cython file missing! cython is essential to proceed!")
     print("please install with: pip3 install cython")
@@ -51,9 +51,9 @@ if not os.path.exists(ext_file) and not use_cython:
 gen_src = ["m68kopac.c", "m68kopdm.c", "m68kopnz.c", "m68kops.c"]
 
 gen_tool = "build/m68kmake"
-gen_tool_src = "musashi/m68kmake.c"
-gen_tool_obj = "build/musashi/m68kmake.o"
-gen_input = "musashi/m68k_in.c"
+gen_tool_src = "machine/musashi/m68kmake.c"
+gen_tool_obj = "build/machine/musashi/m68kmake.o"
+gen_input = "machine/musashi/m68k_in.c"
 gen_dir = "gen"
 gen_src = list([os.path.join(gen_dir, x) for x in gen_src])
 build_dir = "build"
@@ -161,42 +161,42 @@ cmdclass = {
 command_options = {}
 
 
-cython_file = "musashi/emu.pyx"
+cython_file = "machine/emu.pyx"
 sourcefiles = [
-    "musashi/traps.c",
-    "musashi/mem.c",
-    "musashi/m68kcpu.c",
-    "musashi/m68kdasm.c",
-    "musashi/softfloat/softfloat.c",
+    "machine/traps.c",
+    "machine/mem.c",
+    "machine/musashi/m68kcpu.c",
+    "machine/musashi/m68kdasm.c",
+    "machine/musashi/softfloat/softfloat.c",
     "gen/m68kops.c",
 ]
 depends = [
-    "musashi/pycpu.pyx",
-    "musashi/pymem.pyx",
-    "musashi/pytraps.pyx",
-    "musashi/m68k.h",
-    "musashi/m68kconf.h",
-    "musashi/m68kcpu.h",
-    "musashi/mem.h",
-    "musashi/traps.h",
-    "musashi/softfloat/mamesf.h",
-    "musashi/softfloat/milieu.h",
-    "musashi/softfloat/softfloat.h",
-    "musashi/softfloat/softfloat-macros",
-    "musashi/softfloat/softfloat-specialize",
+    "machine/pycpu.pyx",
+    "machine/pymem.pyx",
+    "machine/pytraps.pyx",
+    "machine/musashi/m68k.h",
+    "machine/musashi/m68kconf.h",
+    "machine/musashi/m68kcpu.h",
+    "machine/mem.h",
+    "machine/traps.h",
+    "machine/musashi/softfloat/mamesf.h",
+    "machine/musashi/softfloat/milieu.h",
+    "machine/musashi/softfloat/softfloat.h",
+    "machine/musashi/softfloat/softfloat-macros",
+    "machine/musashi/softfloat/softfloat-specialize",
 ]
-inc_dirs = ["musashi", "gen"]
+inc_dirs = ["machine", "machine/musashi", "gen"]
 
 # add missing vc headers
 if is_msvc:
-    inc_dirs.append("musashi/win")
+    inc_dirs.append("machine/win")
     defines = [("_CRT_SECURE_NO_WARNINGS", None), ("_USE_MATH_DEFINES", None)]
 else:
     defines = None
 
 extensions = [
     Extension(
-        "musashi.emu",
+        "machine.emu",
         sourcefiles,
         depends=depends,
         include_dirs=inc_dirs,

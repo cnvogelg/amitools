@@ -1,7 +1,7 @@
 import time
 import sys
-from musashi import emu
-from musashi.m68k import *
+from machine import emu
+from machine.m68k import *
 from .regs import *
 from .opcodes import *
 from .error import ErrorReporter
