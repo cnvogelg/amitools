@@ -1,9 +1,9 @@
 import os
+import re
 import sys
 import pytest
 import subprocess
 import hashlib
-import inspect
 import io
 import importlib
 from .builder import BinBuilder
@@ -215,10 +215,16 @@ class VamosTestRunner:
             raise subprocess.CalledProcessError(retcode, cmd)
         return stdout, stderr
 
-    def _compare(self, got, ok):
-        for i in range(len(ok)):
-            assert got[i] == ok[i]
+    def _compare(self, got, ok, regex=False):
         assert len(got) == len(ok), "stdout line count differs"
+        if regex:
+            # line by line regex compare
+            for i in range(len(ok)):
+                assert re.fullmatch(ok[i], got[i])
+        else:
+            # equal check
+            for i in range(len(ok)):
+                assert got[i] == ok[i]
 
     def run_prog_check_data(self, *prog_args, **kw_args):
         """like run_prog_checked() but also verify the stdout
@@ -231,7 +237,12 @@ class VamosTestRunner:
         for l in f:
             ok_stdout.append(l.strip())
         f.close()
-        self._compare(stdout, ok_stdout)
+        # do regex compare?
+        if "regex" in kw_args:
+            regex = kw_args["regex"]
+        else:
+            regex = False
+        self._compare(stdout, ok_stdout, regex=regex)
         # asser stderr to be empty
         assert stderr == []
 
