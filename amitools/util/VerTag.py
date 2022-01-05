@@ -18,8 +18,8 @@ def find(data):
 
 
 def get_version(data):
-    m = re.search("\s(\d+)\.(\d+)\s", data.decode("latin-1"))
-    if m == None:
+    m = re.search(r"\s(\d+)\.(\d+)\s", data.decode("latin-1"))
+    if m is None:
         return None
     else:
         return (int(m.group(1)), int(m.group(2)))
