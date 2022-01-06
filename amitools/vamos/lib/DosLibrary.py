@@ -1059,7 +1059,7 @@ class DosLibrary(LibImpl):
             self.setioerr(ctx, 0)
             return self.DOSTRUE
         else:
-            self.setioerr(ctx, ERROR_NO_MORE_ENTRIES)
+            self.setioerr(ctx, err)
             return self.DOSFALSE
 
     def ParentDir(self, ctx):

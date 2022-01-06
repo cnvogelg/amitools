@@ -56,7 +56,7 @@ class Lock:
 
     # --- lock ops ---
 
-    def examine_file(self, fib_mem, name, sys_path):
+    def _examine_file(self, fib_mem, name, sys_path, key):
         # name
         name_addr = fib_mem.s_get_addr("fib_FileName")
         # clear 32 name bytes
@@ -67,7 +67,6 @@ class Lock:
         comment_addr = fib_mem.s_get_addr("fib_Comment")
         mem.w_cstr(comment_addr, "")
         # create the "inode" information
-        key = self.keygen(sys_path)
         fib_mem.w_s("fib_DiskKey", key)
         log_lock.debug("examine key: %08x", key)
         # type
@@ -121,46 +120,49 @@ class Lock:
         return NO_ERROR
 
     def examine_lock(self, fib_mem):
-        return self.examine_file(fib_mem, self.name, self.sys_path)
+        return self._examine_file(fib_mem, self.name, self.sys_path, self.key)
 
     def examine_next(self, fib_mem):
         # start scan
         if self.dirent is None:
-            dirEntryType = fib_mem.r_s("fib_DirEntryType")
+            # scan real dir
             if os.path.isdir(self.sys_path):
                 self.dirent = os.listdir(self.sys_path)
             else:
                 self.dirent = []
             # assume that key stored in given FIB is my own one
             # (otherwise no Examine() on my lock was done before..., aka broken code!)
-            fib_key = fib_mem.r_s("fib_DiskKey")
-            if fib_key != self.key:
-                self.dirent = self._handle_broken_scan(self.dirent, fib_key)
+            self._check_disk_key(fib_mem)
+            index = 0
+        else:
+            index = fib_mem.r_s("fib_DiskKey")
 
-        if len(self.dirent) > 0:
-            entry = self.dirent.pop(0)
+        if index < len(self.dirent):
+            entry = self.dirent[index]
             e_path = os.path.join(self.sys_path, entry)
-            return self.examine_file(fib_mem, entry, e_path)
+            return self._examine_file(fib_mem, entry, e_path, index + 1)
         else:
             self.dirent = None
             return ERROR_NO_MORE_ENTRIES
 
-    def _handle_broken_scan(self, entries, fib_key):
-        log_lock.warning(
-            "first ExNext() does not start at Examine()d lock! Broken Code!! lock_key=%08x fib_key=%08x (%s)",
-            self.key,
-            fib_key,
-            self.name,
-        )
-        # we shrink the dir list to start after the given key
-        # and simulate a continued scan as AmigaOS' FFS would do it
-        while len(entries) > 0:
-            entry = entries.pop(0)
-            e_path = os.path.join(self.sys_path, entry)
-            e_key = self.keygen(e_path)
-            if e_key == fib_key:
-                break
-        return entries
+    def _check_disk_key(self, fib_mem):
+        # make sure its a dir entry
+        dirEntryType = fib_mem.r_s("fib_DirEntryType")
+        if dirEntryType != 2:
+            log_lock.warning("fib type is not dir on first ExNext()!")
+        # make sure fib_key is mine
+        fib_key = fib_mem.r_s("fib_DiskKey")
+        if fib_key != self.key:
+            log_lock.warning(
+                "first ExNext() does not start at Examine()d lock!"
+                " Broken Code!! lock_key=%08x fib_key=%08x (%s)",
+                self.key,
+                fib_key,
+                self.name,
+            )
+            return False
+        else:
+            return True
 
     def find_volume_node(self, dos_list):
         return self.mem.r_s("fl_Volume")
