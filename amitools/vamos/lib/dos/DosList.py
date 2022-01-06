@@ -1,4 +1,3 @@
-import logging
 from amitools.vamos.log import log_doslist
 from amitools.vamos.astructs import AccessStruct
 from amitools.vamos.libstructs import (
@@ -6,8 +5,6 @@ from amitools.vamos.libstructs import (
     DosListAssignStruct,
     AssignListStruct,
 )
-from amitools.vamos.lib.dos.LockManager import LockManager
-from amitools.vamos.path import PathManager, AssignManager
 
 
 class DosListEntry:
