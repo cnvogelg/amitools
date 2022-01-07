@@ -49,7 +49,7 @@ class MatchFirstNext:
         # THOR: this is still screwed up. Some utililties
         # most notably "dir" depend on a correctly setup
         # anchor chain...
-        self.achain_dummy = ctx.alloc.alloc_struct("AChain_Dummy", AChainStruct)
+        self.achain_dummy = ctx.alloc.alloc_struct(AChainStruct, label="AChain_Dummy")
         self.anchor.w_s("ap_Last", self.achain_dummy.addr)
         self.anchor.w_s("ap_Base", self.achain_dummy.addr)
         if not self._fill_lock(abs_path):

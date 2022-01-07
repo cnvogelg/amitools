@@ -105,7 +105,7 @@ class SegList:
             seg_size = size + 8  # add next segment pointer and size field
 
             # alloc mem
-            seg_mem = alloc.alloc_memory(None, seg_size, False)
+            seg_mem = alloc.alloc_memory(seg_size)
             seg_addr = seg_mem.addr
 
             # create label

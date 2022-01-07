@@ -28,7 +28,7 @@ class LibPatcherMultiTrap(object):
         name = "%s(Traps)" % self.stub.name
         func_table = self.stub.get_func_tab()
         size = len(func_table) * 2
-        self.mem_obj = self.alloc.alloc_memory(name, size)
+        self.mem_obj = self.alloc.alloc_memory(size, label=name)
         addr = self.mem_obj.addr
         self.trap_base = addr
         mem = self.alloc.mem

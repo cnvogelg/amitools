@@ -137,7 +137,7 @@ class TypeBase:
 
     @classmethod
     def _alloc(cls, alloc, tag):
-        return alloc.alloc_memory(tag, cls._byte_size)
+        return alloc.alloc_memory(cls._byte_size, label=tag)
 
     @classmethod
     def _free(cls, alloc, mem_obj):

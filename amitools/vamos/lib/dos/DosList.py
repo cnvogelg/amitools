@@ -76,7 +76,7 @@ class DosList:
         # allocate amiga entry
         entry.locks = []
         entry.alist = []
-        entry.mem = self.alloc.alloc_struct(entry.name, entry.struct_def)
+        entry.mem = self.alloc.alloc_struct(entry.struct_def, label=entry.name)
         entry.baddr = entry.mem.addr >> 2
         entry.access = AccessStruct(self.mem, entry.struct_def, entry.mem.addr)
         entry.name_addr = self.alloc.alloc_bstr("DosListName", entry.name)
@@ -192,7 +192,7 @@ class DosList:
                         first = False
                     else:
                         assign_entry = self.alloc.alloc_struct(
-                            "AssignList", AssignListStruct
+                            AssignListStruct, label="AssignList"
                         )
                         entry.alist.append(assign_entry)
                         assign_entry.access.w_s("al_Next", 0)

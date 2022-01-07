@@ -346,7 +346,7 @@ class AmigaStruct(TypeBase):
     def _alloc(cls, alloc, tag, **kwargs):
         if tag is None:
             tag = cls.get_signature()
-        return alloc.alloc_struct(tag, cls)
+        return alloc.alloc_struct(cls, label=tag)
 
     @classmethod
     def _free(cls, alloc, mem_obj):

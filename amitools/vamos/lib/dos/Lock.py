@@ -43,7 +43,7 @@ class Lock:
     def alloc(self, alloc, vol_addr, key):
         name = "Lock: %s" % self
         self.key = key
-        self.mem = alloc.alloc_struct(name, FileLockStruct)
+        self.mem = alloc.alloc_struct(FileLockStruct, label=name)
         self.mem.access.w_s("fl_Key", key)
         self.mem.access.w_s("fl_Volume", vol_addr)
         self.b_addr = self.mem.addr >> 2

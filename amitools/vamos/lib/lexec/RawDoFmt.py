@@ -21,7 +21,7 @@ def _setup_fragment(ctx, fmt_str, put_proc):
     code_len = len(code_bin)
     assert code_len == 0x1A
     size = fmt_len + code_len
-    mem_obj = ctx.alloc.alloc_memory("RawDoFmtFrag", size)
+    mem_obj = ctx.alloc.alloc_memory(size, "RawDoFmtFrag")
     addr = mem_obj.addr
     fmt_addr = addr + 0x1A
     ctx.mem.w_block(addr, code_bin)
