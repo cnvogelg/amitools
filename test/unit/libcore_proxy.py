@@ -1,3 +1,5 @@
+import pytest
+
 from amitools.vamos.libcore import LibCtx, LibProxyGen
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.machine import MockMachine
@@ -104,6 +106,11 @@ def libcore_proxy_gen_stub_test():
     assert stub.string_kwargs == {"foo": "bar"}
     assert ctx.cpu.r_reg(REG_D0) == stub.string_count
     assert ctx.cpu.r_reg(REG_D1) == stub.string_count * 2
+    # ensure that positional arguments are here
+    with pytest.raises(AssertionError):
+        proxy.PrintString()
+    with pytest.raises(AssertionError):
+        proxy.PrintString(1, 2)
 
 
 def libcore_proxy_gen_libcall_test():
@@ -131,3 +138,8 @@ def libcore_proxy_gen_libcall_test():
     assert ret == (23, 42)
     assert machine.set_regs == {REG_A0: 0x10}
     assert machine.get_regs == [REG_D0, REG_D1]
+    # ensure that positional arguments are here
+    with pytest.raises(AssertionError):
+        proxy.PrintString()
+    with pytest.raises(AssertionError):
+        proxy.PrintString(1, 2)

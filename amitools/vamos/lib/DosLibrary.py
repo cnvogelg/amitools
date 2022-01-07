@@ -569,6 +569,8 @@ class DosLibrary(LibImpl):
             f_mode = "rwb+"
         else:
             mode_name = "?"
+            log_dos.warning("open: invalid mode=%d!", mode)
+            f_mode = "wb+"
 
         fh = self.file_mgr.open(self.get_current_dir(ctx), name, f_mode)
         log_dos.info(
