@@ -143,6 +143,8 @@ unsigned int  m68k_read_memory_8(unsigned int address)
 
 unsigned int  m68k_read_memory_16(unsigned int address)
 {
+  if (CPU_TYPE <= M68K_CPU_TYPE_68010 && (address & 1))
+	m68k_pulse_bus_error();
   uint page = address >> 16;
   if (page < NUM_PAGES) {
     uint val = r_func[page][1](address, r_ctx[page][1]);
@@ -158,6 +160,8 @@ unsigned int  m68k_read_memory_16(unsigned int address)
 
 unsigned int  m68k_read_memory_32(unsigned int address)
 {
+  if (CPU_TYPE <= M68K_CPU_TYPE_68010 && (address & 1))
+	m68k_pulse_bus_error();
   uint page = address >> 16;
   if (page < NUM_PAGES) {
     uint val = r_func[page][2](address, r_ctx[page][2]);
@@ -186,6 +190,8 @@ void m68k_write_memory_8(unsigned int address, unsigned int value)
 
 void m68k_write_memory_16(unsigned int address, unsigned int value)
 {
+  if (CPU_TYPE <= M68K_CPU_TYPE_68010 && (address & 1))
+	m68k_pulse_bus_error();
   uint page = address >> 16;
   if (page < NUM_PAGES) {
     w_func[page][1](address, value, w_ctx[page][1]);
@@ -199,6 +205,8 @@ void m68k_write_memory_16(unsigned int address, unsigned int value)
 
 void m68k_write_memory_32(unsigned int address, unsigned int value)
 {
+  if (CPU_TYPE <= M68K_CPU_TYPE_68010 && (address & 1))
+	m68k_pulse_bus_error();
   uint page = address >> 16;
   if (page < NUM_PAGES) {
     w_func[page][2](address, value, w_ctx[page][2]);
