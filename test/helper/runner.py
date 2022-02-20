@@ -87,6 +87,7 @@ class VamosTestRunner:
         dump_console=False,
         generate_data=False,
         auto_build=False,
+        no_rebuild=False,
         run_subproc=False,
     ):
         self.flavor = flavor
@@ -97,7 +98,7 @@ class VamosTestRunner:
         self.dump_console = dump_console
         self.generate_data = generate_data
         self.run_subproc = run_subproc
-        self.bin_builder = BinBuilder(flavor, use_debug_bins, auto_build)
+        self.bin_builder = BinBuilder(flavor, use_debug_bins, auto_build, no_rebuild)
 
     def _get_data_path(self, prog_name, kw_args):
         dat_path = ["data/" + prog_name]
