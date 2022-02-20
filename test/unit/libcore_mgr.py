@@ -9,7 +9,7 @@ from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.loader import SegmentLoader
 
 
-def setup(main_profiler=None, prof_names=None, prof_calls=False):
+def setup_env(main_profiler=None, prof_names=None, prof_calls=False):
     machine = Machine()
     alloc = MemoryAlloc(machine.get_mem(), machine.get_ram_begin())
     mgr = VLibManager(
@@ -35,7 +35,7 @@ def setup(main_profiler=None, prof_names=None, prof_calls=False):
 
 
 def libcore_mgr_bootstrap_shutdown_test():
-    machine, alloc, mgr = setup()
+    machine, alloc, mgr = setup_env()
     # bootstrap exec
     exec_vlib = mgr.bootstrap_exec()
     exec_base = exec_vlib.get_addr()
@@ -57,7 +57,7 @@ def libcore_mgr_bootstrap_shutdown_test():
 
 
 def libcore_mgr_make_test():
-    machine, alloc, mgr = setup()
+    machine, alloc, mgr = setup_env()
     exec_vlib = mgr.bootstrap_exec()
     # make vamos test lib
     test_vlib = mgr.make_lib_name("vamostest.library")
@@ -77,7 +77,7 @@ def libcore_mgr_make_test():
 
 
 def libcore_mgr_make_version_revision_test():
-    machine, alloc, mgr = setup()
+    machine, alloc, mgr = setup_env()
     exec_vlib = mgr.bootstrap_exec()
     # make vamos test lib
     test_vlib = mgr.make_lib_name("vamostest.library", version=11, revision=23)
@@ -98,7 +98,7 @@ def libcore_mgr_make_version_revision_test():
 
 
 def libcore_mgr_make_profile_test():
-    machine, alloc, mgr = setup(prof_names=["all"])
+    machine, alloc, mgr = setup_env(prof_names=["all"])
     profiler = mgr.get_profiler()
     assert profiler
     profiler.setup()
@@ -124,7 +124,7 @@ def libcore_mgr_make_profile_test():
 
 
 def libcore_mgr_make_fake_with_fd_test():
-    machine, alloc, mgr = setup()
+    machine, alloc, mgr = setup_env()
     exec_vlib = mgr.bootstrap_exec()
     # make vamos test lib
     test_vlib = mgr.make_lib_name("testnix.library")
@@ -143,7 +143,7 @@ def libcore_mgr_make_fake_with_fd_test():
 
 
 def libcore_mgr_make_fake_without_fd_test():
-    machine, alloc, mgr = setup()
+    machine, alloc, mgr = setup_env()
     exec_vlib = mgr.bootstrap_exec()
     # make vamos test lib
     test_vlib = mgr.make_lib_name("foo.library")
@@ -164,7 +164,7 @@ def libcore_mgr_make_fake_without_fd_test():
 
 
 def libcore_mgr_make_fake_without_fd_cfg_test():
-    machine, alloc, mgr = setup()
+    machine, alloc, mgr = setup_env()
     exec_vlib = mgr.bootstrap_exec()
     # lib_cfg
     Cfg = collections.namedtuple("Cfg", ["num_fake_funcs"])
@@ -188,7 +188,7 @@ def libcore_mgr_make_fake_without_fd_cfg_test():
 
 
 def libcore_mgr_make_open_test():
-    machine, alloc, mgr = setup()
+    machine, alloc, mgr = setup_env()
     exec_vlib = mgr.bootstrap_exec()
     # make vamos test lib
     test_vlib = mgr.make_lib_name("vamostest.library")
@@ -209,7 +209,7 @@ def libcore_mgr_make_open_test():
 
 
 def libcore_mgr_open_test():
-    machine, alloc, mgr = setup()
+    machine, alloc, mgr = setup_env()
     exec_vlib = mgr.bootstrap_exec()
     # make vamos test lib
     test_vlib = mgr.open_lib_name("vamostest.library")
@@ -226,7 +226,7 @@ def libcore_mgr_open_test():
 
 
 def libcore_mgr_make_open_dev_test():
-    machine, alloc, mgr = setup()
+    machine, alloc, mgr = setup_env()
     exec_vlib = mgr.bootstrap_exec()
     # make vamos test lib
     test_vlib = mgr.make_lib_name("vamostestdev.device")
@@ -248,7 +248,7 @@ def libcore_mgr_make_open_dev_test():
 
 
 def libcore_mgr_open_dev_test():
-    machine, alloc, mgr = setup()
+    machine, alloc, mgr = setup_env()
     exec_vlib = mgr.bootstrap_exec()
     # make vamos test lib
     test_vlib = mgr.open_lib_name("vamostestdev.device")
