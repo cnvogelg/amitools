@@ -22,7 +22,7 @@ class Puddle:
             self.mem_obj = None
 
     def AllocPooled(self, name, size):
-        return self.chunks.alloc_memory(size, label=name)
+        return self.chunks.alloc_memory(size, label=name, except_on_failure=False)
 
     def FreePooled(self, addr, size):
         mem = self.chunks.get_memory(addr)
