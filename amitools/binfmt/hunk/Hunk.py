@@ -60,6 +60,7 @@ loadseg_valid_begin_hunks = [HUNK_CODE, HUNK_DATA, HUNK_BSS, HUNK_PPC_CODE]
 loadseg_valid_extra_hunks = [
     HUNK_ABSRELOC32,
     HUNK_RELOC32SHORT,
+    HUNK_RELRELOC32,
     HUNK_DEBUG,
     HUNK_SYMBOL,
     HUNK_NAME,

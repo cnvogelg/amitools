@@ -136,7 +136,7 @@ class TraceManager(object):
         log.info(
             "%s(%d): %06x: %s  %6s  [%s] %s",
             mode,
-            2 ** width,
+            2**width,
             addr,
             val,
             text,

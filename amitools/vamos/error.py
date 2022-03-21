@@ -12,7 +12,7 @@ class InvalidMemoryAccessError(VamosError):
     def __str__(self):
         return "Invalid Memory Access %s(%d): %06x" % (
             self.access_type,
-            2 ** self.width,
+            2**self.width,
             self.addr,
         )
 

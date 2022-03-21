@@ -6,7 +6,7 @@ class HWAccessError(InvalidMemoryAccessError):
     def __str__(self):
         return "Invalid HW Access %s(%d): %06x" % (
             self.access_type,
-            2 ** self.width,
+            2**self.width,
             self.addr,
         )
 

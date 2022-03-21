@@ -91,13 +91,16 @@ class LibFuncProfileData(object):
         return self.tag
 
     def __repr__(self):
-        return "LibProfileFuncData(func_id=%r,add_samples=%r):num=%r,sum=%r,deltas=%r,tag=%r" % (
-            self.func_id,
-            self.add_samples,
-            self.num,
-            self.sum,
-            self.deltas,
-            self.tag,
+        return (
+            "LibProfileFuncData(func_id=%r,add_samples=%r):num=%r,sum=%r,deltas=%r,tag=%r"
+            % (
+                self.func_id,
+                self.add_samples,
+                self.num,
+                self.sum,
+                self.deltas,
+                self.tag,
+            )
         )
 
     def dump(self, name):
