@@ -88,7 +88,7 @@ class Block:
                 % (len(data), self.blkdev.block_bytes)
             )
         self._create_data()
-        self.data[:] = data
+        self.data.value = str(data)
 
     def _write_data(self):
         if self.data != None:

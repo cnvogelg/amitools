@@ -179,7 +179,7 @@ class ADFSBitmap:
 
         # create a modyfiable bitmap
         self.bitmap_data = ctypes.create_string_buffer(len(bitmap_data))
-        self.bitmap_data[:] = bitmap_data
+        self.bitmap_data.value = str(bitmap_data)
         self.valid = True
 
     def find_free(self, start=None):

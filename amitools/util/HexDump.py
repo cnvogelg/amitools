@@ -22,8 +22,10 @@ def get_hex_line(addr, line, indent=0, num=16):
         out += _get_vis_char(d)
     return out
 
+def print_wrapper(s):
+	print(s)
 
-def print_hex(data, indent=0, num=16, out=print, base_addr=0):
+def print_hex(data, indent=0, num=16, out=print_wrapper, base_addr=0):
     l = len(data)
     o = 0
     addr = base_addr
@@ -69,7 +71,7 @@ def get_hex_diff_line(addr, a_line, b_line, indent=0, num=16):
 
 
 def print_hex_diff(
-    a_data, b_data, indent=0, num=16, out=print, show_same=False, base_addr=0
+    a_data, b_data, indent=0, num=16, out=print_wrapper, show_same=False, base_addr=0
 ):
     na = len(a_data)
     nb = len(b_data)

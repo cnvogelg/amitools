@@ -76,7 +76,7 @@ class CommandQueue:
             return None
 
     def show_cmd_help(self, name):
-        print("INVALID COMMAND:", name)
+        print("INVALID COMMAND:" + name)
         print("valid commands are:")
         for a in sorted(self.cmd_map):
-            print("  ", a)
+            print("  " + a)

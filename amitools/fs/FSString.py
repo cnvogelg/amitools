@@ -12,9 +12,14 @@ class FSString:
         If the latter is given then the "encoding" flag determines the encoding.
         """
         if type(txt) is str:
-            self.txt = txt
+            if sys.version_info[0] == 2:
+                self.txt = txt.decode(encoding)
+            else:
+                self.txt = txt
         elif type(txt) is bytes:
             self.txt = txt.decode(encoding)
+        elif type(txt) is unicode:
+            self.txt = txt
         else:
             raise ValueError("FSString must be str or bytes!")
 
