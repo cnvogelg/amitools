@@ -870,7 +870,7 @@ def main(args=None, defaults=None):
         "command_list", nargs="+", help="command: " + ",".join(list(cmd_map.keys()))
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true", default=False, help="be more verbos"
+        "-v", "--verbose", action="store_true", default=False, help="be more verbose"
     )
     parser.add_argument(
         "-s", "--seperator", default="+", help="set the command separator char sequence"
