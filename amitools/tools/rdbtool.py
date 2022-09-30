@@ -761,18 +761,22 @@ class ExportCommand(Command):
 class ImportCommand(Command):
     def handle_rdisk(self, rdisk):
         if len(self.opts) < 2:
-            print("Usage: import <partition> <file>")
+            print("Usage: import <partition> <file> [pad]")
             return 1
         else:
             part = self.opts[0]
             file_name = self.opts[1]
+            if len(self.opts) > 2:
+                pad = "pad" == self.opts[2]
+            else:
+                pad = False
             p = rdisk.find_partition_by_string(part)
             if p:
                 print(
-                    "importing '%s' to '%s' (%d blocks)"
-                    % (file_name, p.get_drive_name(), p.get_num_blocks())
+                    "importing '%s' to '%s' (%d blocks) pad=%r"
+                    % (file_name, p.get_drive_name(), p.get_num_blocks(), pad)
                 )
-                p.import_data(file_name)
+                p.import_data(file_name, pad=pad)
                 return 0
             else:
                 print("Can't find partition: '%s'" % part)

@@ -506,10 +506,14 @@ as a RDB-less image in ``xdftool``.
 
 ::
 
-  import <partition> <file_name>
+  import <partition> <file_name> [pad]
 
 Read the raw partition data from a given file into an existing partition.
 You typically use a RDB-less file system image as input.
+
+The size of the input file has to match the partition size.
+If you give the ``pad`` option the input file may be smaller and overwrites
+only the beginning of the partition area.
 
 
 Working with File System Drivers

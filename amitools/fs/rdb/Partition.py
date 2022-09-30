@@ -112,6 +112,8 @@ class Partition:
         result.append("max_transfer=0x%x" % de.max_transfer)
         result.append("mask=0x%x" % de.mask)
         result.append("num_buffer=%d" % de.num_buffer)
+        result.append("pre_alloc=%d" % de.pre_alloc)
+        result.append("boot_blocks=%d" % de.boot_blocks)
         # add flags
         flags = p.flags
         if flags & PartitionBlock.FLAG_BOOTABLE == PartitionBlock.FLAG_BOOTABLE:
@@ -137,7 +139,7 @@ class Partition:
                 fh.write(data)
         blkdev.close()
 
-    def import_data(self, file_name):
+    def import_data(self, file_name, pad=False):
         """Import contents of partition from file"""
         part_dev = self.create_blkdev()
         part_dev.open()
@@ -147,20 +149,25 @@ class Partition:
         # open image
         file_size = os.path.getsize(file_name)
         file_blks = file_size // blk_size
-        if file_size % blk_size != 0:
-            raise ValueError("image file not block size aligned!")
-        # check sizes
+        if not pad:
+            if file_size % blk_size != 0:
+                raise ValueError("image file not block size aligned!")
+            # check sizes
+            if total > file_size:
+                raise ValueError(
+                    "import image too small: partition=%d != file=%d"
+                    % (total, file_size)
+                )
         if total < file_size:
             raise ValueError(
                 "import image too large: partition=%d != file=%d" % (total, file_size)
-            )
-        if total > file_size:
-            raise ValueError(
-                "import image too small: partition=%d != file=%d" % (total, file_size)
             )
         # copy image
         with open(file_name, "rb") as fh:
             for b in range(file_blks):
                 data = fh.read(blk_size)
+                n = len(data)
+                if n < blk_size:
+                    data += bytearray(blk_size - n)
                 part_dev.write_block(b, data)
         part_dev.close()
