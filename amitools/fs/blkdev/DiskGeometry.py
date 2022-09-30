@@ -20,6 +20,14 @@ class DiskGeometry:
             ByteSize.to_byte_size_str(size),
         )
 
+    def get_desc(self):
+        return {
+            "cylinders": self.cyls,
+            "heads": self.heads,
+            "sectors": self.secs,
+            "block_bytes": self.block_bytes,
+        }
+
     def get_num_blocks(self):
         """return the number of block allocated by geometry"""
         return self.cyls * self.heads * self.secs

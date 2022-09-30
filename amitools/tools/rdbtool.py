@@ -3,11 +3,12 @@
 # swiss army knife for rdb disk images or devices
 
 
-from amitools.util.HexDump import get_hex_line
 import sys
 import argparse
 import os.path
+import json
 
+from amitools.util.HexDump import get_hex_line
 from amitools.util.CommandQueue import CommandQueue
 from amitools.fs.FSError import FSError
 from amitools.fs.FSString import FSString
@@ -443,6 +444,23 @@ class ListCommand(Command):
         lines = rdisk.get_info(part_name)
         for l in lines:
             print(l)
+        return 0
+
+
+class JsonCommand(Command):
+    def handle_rdisk(self, rdisk):
+        geo = self.blkdev.geo
+        desc = {
+            "img_file": self.args.image_file,
+            "blkdev": geo.get_desc(),
+            "rdb": rdisk.get_desc(),
+        }
+        if len(self.opts) > 0:
+            json_file = self.opts[0]
+            with open(json_file, "w") as fh:
+                json.dump(desc, fh, sort_keys=True, indent=4)
+        else:
+            print(json.dumps(desc, sort_keys=True, indent=4))
         return 0
 
 
@@ -1021,6 +1039,7 @@ def main(args=None, defaults=None):
         "remap": RemapCommand,
         "info": InfoCommand,
         "list": ListCommand,
+        "json": JsonCommand,
         "show": ShowCommand,
         "free": FreeCommand,
         "add": AddCommand,

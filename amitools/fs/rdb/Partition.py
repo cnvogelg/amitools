@@ -134,6 +134,28 @@ class Partition:
             result.append("automount=1")
         return result
 
+    def get_desc(self):
+        """get a JSON-like python structure with all infos"""
+        p = self.part_blk
+        de = p.dos_env
+        dos_env = dict(de.__dict__)
+        dos_env["dos_type_str"] = DosType.num_to_tag_str(de.dos_type)
+        # decode some flags
+        flags = p.flags
+        bootable = flags & PartitionBlock.FLAG_BOOTABLE == PartitionBlock.FLAG_BOOTABLE
+        automount = (
+            flags & PartitionBlock.FLAG_NO_AUTOMOUNT != PartitionBlock.FLAG_NO_AUTOMOUNT
+        )
+        return {
+            "num": self.num,
+            "name": str(p.drv_name),
+            "flags": flags,
+            "dev_flags": p.dev_flags,
+            "dos_env": dos_env,
+            "bootable": bootable,
+            "automount": automount,
+        }
+
     # ----- Import/Export -----
 
     def export_data(self, file_name):

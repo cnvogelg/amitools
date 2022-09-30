@@ -165,6 +165,25 @@ class RDisk:
                 res.append(f.get_info())
         return res
 
+    def get_desc(self):
+        """get a JSON-like python structure with all infos"""
+        pd = self.rdb.phy_drv
+        phys_drv = dict(pd.__dict__)
+        ld = self.rdb.log_drv
+        logi_drv = dict(ld.__dict__)
+        parts = []
+        for p in self.parts:
+            parts.append(p.get_desc())
+        fsys = []
+        for fs in self.fs:
+            fsys.append(fs.get_desc())
+        return {
+            "physical_drive": phys_drv,
+            "logical_drive": logi_drv,
+            "partitions": parts,
+            "filesystems": fsys,
+        }
+
     def get_block_map(self):
         res = []
         for i in range(self.max_blks):

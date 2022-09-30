@@ -139,6 +139,20 @@ class FileSystem:
             flags,
         )
 
+    def get_desc(self):
+        """get a JSON-like python structure with all infos"""
+        dt = self.fshd.dos_type
+        dt_str = DosType.num_to_tag_str(dt)
+        dev_node = dict(self.fshd.get_dev_node().__dict__)
+        return {
+            "num": self.num,
+            "dostype": dt,
+            "dostype_str": dt_str,
+            "version": self.fshd.get_version_string(),
+            "size": len(self.data),
+            "dev_node": dev_node,
+        }
+
     # ----- edit -----
 
     def clear_flags(self):

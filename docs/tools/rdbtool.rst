@@ -227,6 +227,19 @@ dense and details are omitted. E.g. the DOS environment is not shown::
   Partition: #1 'swap'     6401    12800      204800  100Mi   20.97%  NBS1/0x4e425301  auto  boot(0)
   Partition: #2 'usr'     12801    30516      566912  276Mi   58.05%  NBU7/0x4e425507
 
+``json`` - Print the RDB data structures in JSON Format
+-------------------------------------------------------
+
+::
+
+  json [out.json]
+
+This command is very similar to the ``info`` command but dumps all 
+information in JSON format.
+
+If ``out.json`` is given then the JSON output is written to this file.
+Otherwise the JSON is dumped to stdout.
+
 ``show`` - Show internal block representation of the RDB data structures
 ------------------------------------------------------------------------
 
