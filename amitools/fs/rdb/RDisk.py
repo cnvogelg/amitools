@@ -98,7 +98,7 @@ class RDisk:
         for fs in self.fs:
             fs.dump(hex_dump)
 
-    def get_info(self, part_name=None):
+    def get_info(self, part_name=None, full=False):
         res = []
         part = None
         # only show single partition
@@ -111,9 +111,10 @@ class RDisk:
         if part:
             logic_blks = self.get_logical_blocks()
             res.append(part.get_info(logic_blks))
-            extra = part.get_extra_infos()
-            for e in extra:
-                res.append("%s%s" % (" " * 70, e))
+            if full:
+                extra = part.get_extra_infos()
+                for e in extra:
+                    res.append("%s%s" % (" " * 70, e))
         else:
             pd = self.rdb.phy_drv
             total_blks = self.get_total_blocks()
@@ -155,9 +156,10 @@ class RDisk:
             # add partitions
             for p in self.parts:
                 res.append(p.get_info(logic_blks))
-                extra = p.get_extra_infos()
-                for e in extra:
-                    res.append("%s%s" % (" " * 70, e))
+                if full:
+                    extra = p.get_extra_infos()
+                    for e in extra:
+                        res.append("%s%s" % (" " * 70, e))
             # add fileystems
             for f in self.fs:
                 res.append(f.get_info())

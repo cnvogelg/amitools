@@ -411,6 +411,35 @@ class InfoCommand(Command):
                     extra,
                 )
             )
+        lines = rdisk.get_info(part_name, full=True)
+        for l in lines:
+            print(l)
+        return 0
+
+
+class ListCommand(Command):
+    def handle_rdisk(self, rdisk):
+        part_name = None
+        if len(self.opts) > 0:
+            part_name = self.opts[0]
+        else:
+            # blkdev info
+            geo = self.blkdev.geo
+            extra = "heads=%d sectors=%d block_size=%d" % (
+                geo.heads,
+                geo.secs,
+                geo.block_bytes,
+            )
+            print(
+                "BlockDevice:         %8d %8d  %10d  %s  %s"
+                % (
+                    0,
+                    geo.cyls - 1,
+                    geo.get_num_blocks(),
+                    ByteSize.to_byte_size_str(geo.get_num_bytes()),
+                    extra,
+                )
+            )
         lines = rdisk.get_info(part_name)
         for l in lines:
             print(l)
@@ -991,6 +1020,7 @@ def main(args=None, defaults=None):
         "adjust": AdjustCommand,
         "remap": RemapCommand,
         "info": InfoCommand,
+        "list": ListCommand,
         "show": ShowCommand,
         "free": FreeCommand,
         "add": AddCommand,

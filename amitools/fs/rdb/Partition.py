@@ -88,6 +88,14 @@ class Partition:
         dos_type = de.dos_type
         extra += DosType.num_to_tag_str(dos_type)
         extra += "/0x%04x" % dos_type
+
+        # add info on flags and boot pri
+        flags = p.flags
+        if flags & PartitionBlock.FLAG_NO_AUTOMOUNT != PartitionBlock.FLAG_NO_AUTOMOUNT:
+            extra += "  auto"
+        if flags & PartitionBlock.FLAG_BOOTABLE == PartitionBlock.FLAG_BOOTABLE:
+            extra += "  boot(%d)" % de.boot_pri
+
         return "Partition: #%d %-06s %8d %8d  %10d  %s  %s" % (
             self.num,
             name,

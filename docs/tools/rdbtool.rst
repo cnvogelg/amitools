@@ -209,6 +209,24 @@ the information for a single partition is displayed::
   > rdbtool test.hdf info DH0
   Partition: #1 'DH0'       104      205      102816   50Mi    1.31%  DOS3
 
+``list`` - List information of the RDB data structures
+------------------------------------------------------
+
+::
+
+  list [partition]
+
+This command is very similar to the ``info`` command as it gives a
+complete overview of the RDB data structures. But the output is more
+dense and details are omitted. E.g. the DOS environment is not shown::
+
+  BlockDevice:                0    30516      976544  476Mi  heads=1 sectors=32 block_size=512
+  PhysicalDisk:               0    30516      976544  476Mi  heads=1 sectors=32 block_size=512
+  LogicalDisk:                1    30516      976512  476Mi  rdb_blks=[0:31,#32] used=[hi=3,#4] cyl_blks=32
+  Partition: #0 'root'        1     6400      204800  100Mi   20.97%  NBR7/0x4e425207
+  Partition: #1 'swap'     6401    12800      204800  100Mi   20.97%  NBS1/0x4e425301  auto  boot(0)
+  Partition: #2 'usr'     12801    30516      566912  276Mi   58.05%  NBU7/0x4e425507
+
 ``show`` - Show internal block representation of the RDB data structures
 ------------------------------------------------------------------------
 
