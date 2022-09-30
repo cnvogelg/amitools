@@ -218,7 +218,7 @@ The new Documentation of `amitools` is hosted on [readthedocs][8]
   files in various formats.
 
   You can load hunk-based binaries, libraries, and object files. Even
-  overlayed binary files are supporte.
+  overlayed binary files are supported.
 
 - typetool
 

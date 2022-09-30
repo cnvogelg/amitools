@@ -236,7 +236,7 @@ def main(args=None):
         help="dump the hunk structure",
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true", default=False, help="be more verbos"
+        "-v", "--verbose", action="store_true", default=False, help="be more verbose"
     )
     parser.add_argument(
         "-s", "--stop", action="store_true", default=False, help="stop on error"
