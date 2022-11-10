@@ -1,5 +1,4 @@
 import struct
-import ctypes
 
 from .block.BitmapBlock import BitmapBlock
 from .block.BitmapExtBlock import BitmapExtBlock
@@ -47,9 +46,7 @@ class ADFSBitmap:
         self.num_used = 0
 
         # create data and preset with 0xff
-        self.bitmap_data = ctypes.create_string_buffer(self.bitmap_all_blk_bytes)
-        for i in range(self.bitmap_all_blk_bytes):
-            self.bitmap_data[i] = 0xFF
+        self.bitmap_data = bytearray([0xFF] * self.bitmap_all_blk_bytes)
 
         # clear bit for root block
         blk_pos = self.root_blk.blk_num
@@ -177,9 +174,7 @@ class ADFSBitmap:
                 extra="got=%d want=%d" % (self.bitmap_num_blks, num_bm_blks),
             )
 
-        # create a modyfiable bitmap
-        self.bitmap_data = ctypes.create_string_buffer(len(bitmap_data))
-        self.bitmap_data[:] = bitmap_data
+        self.bitmap_data = bitmap_data
         self.valid = True
 
     def find_free(self, start=None):
@@ -305,9 +300,7 @@ class ADFSBitmap:
         print("total:   ", self.bitmap_bits)
 
     def create_draw_bitmap(self):
-        bm = ctypes.create_string_buffer(self.blkdev.num_blocks)
-        for i in range(self.blkdev.num_blocks):
-            bm[i] = chr(0)
+        bm = bytearray(self.blkdev.num_blocks)
         return bm
 
     def print_free(self, brief=False):
