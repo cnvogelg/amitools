@@ -1,5 +1,4 @@
 import struct
-import ctypes
 from ..TimeStamp import TimeStamp
 from ..FSString import FSString
 
@@ -99,7 +98,7 @@ class Block:
 
     def _create_data(self):
         num_bytes = self.blkdev.block_bytes
-        self.data = ctypes.create_string_buffer(num_bytes)
+        self.data = bytearray(num_bytes)
 
     def _put_long(self, num, val):
         if num < 0:
@@ -186,7 +185,7 @@ class Block:
         if loc < 0:
             loc = self.block_longs + loc
         loc = loc * 4
-        size = ord(self.data[loc])
+        size = self.data[loc]
         if size > max_size:
             return None
         if size == 0:
@@ -212,15 +211,14 @@ class Block:
 
     def _get_cstr(self, loc, max_size):
         n = 0
-        s = b""
         loc = loc * 4
         while n < max_size:
             c = self.data[loc + n]
-            if ord(c) == 0:
+            if c == 0:
                 break
-            s += c
             n += 1
-        return FSString(s)
+        cstr = self.data[loc : loc + n]
+        return FSString(cstr)
 
     def _put_cstr(self, loc, max_size, fs_str):
         if fs_str is None:

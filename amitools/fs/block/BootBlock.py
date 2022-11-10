@@ -89,7 +89,7 @@ class BootBlock(Block):
     def read_boot_code(self):
         boot_code = self.data[12:]
         for blk in self.extra_blks:
-            boot_code += blk.data.raw
+            boot_code += blk.data
         # remove nulls at end
         pos = len(boot_code) - 4
         while pos > 0:
