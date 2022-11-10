@@ -22,6 +22,11 @@ class ADFSBitmap:
         self.bitmap_bits = self.blkdev.num_blocks - self.blkdev.reserved
         self.bitmap_longs = (self.bitmap_bits + 31) // 32
         self.bitmap_bytes = (self.bitmap_bits + 7) // 8
+        # number of bits in last bitmap long
+        last_long_bits = self.bitmap_bits % 32
+        if last_long_bits == 0:
+            last_long_bits = 32
+        self.bitmap_last_long_bits = last_long_bits
         # number of blocks required for bitmap (and bytes consumed there)
         self.bitmap_num_blks = (
             self.bitmap_longs + self.bitmap_blk_longs - 1
@@ -34,8 +39,8 @@ class ADFSBitmap:
         self.num_ext = (
             self.bitmap_num_blks - self.num_blks_in_root + self.num_blks_in_ext - 1
         ) // (self.num_blks_in_ext)
-        # start a root block
-        self.find_start = root_blk.blk_num
+        # start position for free bitmap searches (as long offset in bitmap)
+        self.find_start_off = (root_blk.blk_num - self.blkdev.reserved) // 32
         # was bitmap modified?
         self.dirty = False
         # for DOS6/7 track used blocks
@@ -177,43 +182,45 @@ class ADFSBitmap:
         self.bitmap_data = bitmap_data
         self.valid = True
 
-    def find_free(self, start=None):
-        # give start of search
-        if start == None:
-            pos = self.find_start
-        else:
-            pos = start
-        # at most scan all bits
-        num = self.bitmap_bits
-        while num > 0:
-            # a free bit?
-            found = self.get_bit(pos)
-            old_pos = pos
-            pos += 1
-            if pos == self.bitmap_bits + self.blkdev.reserved:
-                pos = self.blkdev.reserved
-            if found:
-                # start a next position
-                self.find_start = pos
-                return old_pos
-            num -= 1
-        return None
+    def find_free(self):
+        result = self.find_n_free(1)
+        if result:
+            return result[0]
 
-    def find_n_free(self, num, start=None):
-        first_blk = self.find_free(start)
-        if first_blk == None:
-            return None
-        if num == 1:
-            return [first_blk]
-        result = [first_blk]
-        for i in range(num - 1):
-            blk_num = self.find_free()
-            if blk_num == None:
-                return None
-            if blk_num in result:
-                return None
-            result.append(blk_num)
-        return result
+    def find_n_free(self, num):
+        result = []
+        long_off = self.find_start_off
+        last_long = self.bitmap_longs - 1
+        # run through all longs of bitmap if needed
+        for n in range(self.bitmap_longs):
+            # read bitmap long
+            val = struct.unpack_from(">I", self.bitmap_data, long_off * 4)[0]
+            # some bits are free in here.. find em
+            if val != 0:
+                # last long has less bits
+                if long_off == last_long:
+                    max_bits = self.bitmap_last_long_bits
+                else:
+                    max_bits = 32
+
+                base_blk_num = self.blkdev.reserved + long_off * 32
+
+                # walk through bits and collect free ones
+                for bit in range(max_bits):
+                    mask = 1 << bit
+                    if (val & mask) == mask:
+                        blk_num = base_blk_num + bit
+                        result.append(blk_num)
+                        # got all free blocks?
+                        if len(result) == num:
+                            # keep as start offset for the next time
+                            self.find_start_off = long_off
+                            return result
+
+            # next long
+            long_off += 1
+            if long_off == self.bitmap_longs:
+                long_off = 0
 
     def get_num_free(self):
         num = 0
@@ -231,8 +238,8 @@ class ADFSBitmap:
                 num += 1
         return num
 
-    def alloc_n(self, num, start=None):
-        free_blks = self.find_n_free(num, start)
+    def alloc_n(self, num):
+        free_blks = self.find_n_free(num)
         if free_blks == None:
             return None
         for b in free_blks:
