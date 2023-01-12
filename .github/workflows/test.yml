@@ -21,7 +21,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install tox tox-gh-actions cython
+        python -m pip install tox tox-gh-actions cython wheel
     - name: Test with tox
       run: tox
       env:
