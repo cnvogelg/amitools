@@ -2,12 +2,12 @@ import os
 import sys
 import subprocess
 
-from setuptools import setup, find_packages
-from distutils.extension import Extension
+from setuptools import setup, Extension
+from pkg_resources import parse_version
 from distutils.command.build_ext import build_ext
 from distutils.command.clean import clean
-import distutils.ccompiler as ccompiler
 from distutils.core import Command
+from distutils import ccompiler
 from distutils.dir_util import remove_tree
 from distutils import log
 from pkg_resources import parse_version
@@ -213,49 +213,8 @@ if use_cython:
 else:
     sourcefiles.append(ext_file)
 
-scripts = {
-    "console_scripts": [
-        "fdtool = amitools.tools.fdtool:main",
-        "geotool = amitools.tools.geotool:main",
-        "hunktool = amitools.tools.hunktool:main",
-        "rdbtool = amitools.tools.rdbtool:main",
-        "romtool = amitools.tools.romtool:main",
-        "typetool = amitools.tools.typetool:main",
-        "vamos = amitools.tools.vamos:main",
-        "vamospath = amitools.tools.vamospath:main",
-        "vamostool = amitools.tools.vamostool:main",
-        "xdfscan = amitools.tools.xdfscan:main",
-        "xdftool = amitools.tools.xdftool:main",
-    ]
-}
-
 setup(
     cmdclass=cmdclass,
     command_options=command_options,
-    name="amitools",
-    description="A package to support development with classic Amiga m68k systems",
-    long_description=open("README.md").read(),
-    long_description_content_type="text/markdown",
-    version="0.6.0",
-    maintainer="Christian Vogelgsang",
-    maintainer_email="chris@vogelgsang.org",
-    url="http://github.com/cnvogelg/amitools",
-    classifiers=[
-        "Development Status :: 4 - Beta",
-        "Intended Audience :: Developers",
-        "Programming Language :: Python",
-        "Topic :: System :: Emulators",
-    ],
-    license="License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
-    packages=find_packages(),
-    zip_safe=False,
-    entry_points=scripts,
-    setup_requires=["pytest-runner"],
-    tests_require=["pytest"],
-    install_requires=["lhafile"],
     ext_modules=extensions,
-    # win problems:
-    #    use_scm_version=True,
-    include_package_data=True,
-    python_requires="~=3.6",
 )
