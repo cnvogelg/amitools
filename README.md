@@ -19,7 +19,7 @@ will be very helpful.
 
 ## Prerequisites
 
-- Python >= ```3.6```
+- Python >= ```3.7```
 - [pip3][1]
 
 ### Optional Packages

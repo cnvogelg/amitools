@@ -1,5 +1,52 @@
 # Change Log
 
+## [0.7.0][7] (2023-01-17)
+
+### global
+
+* Python 3.7 up to 3.11 supported and tested
+* simplified install docs in README (#173)
+* moved project to modern pyproject.toml setup
+* use git version for project and docs
+* typo fixes, cosmetics (#175) (#167) (#156) @reinauer
+
+### xdftool
+
+* improved bitmap allocation in writes significantly
+
+### rdbtool
+
+* added json output
+* added `list` command
+* in new rdbs: fixed the dos env size to honor the boot_blocks field
+
+### romtool
+
+* added padding when imported partition file is smaller than partition
+* ext rom images can be 512/1536/3584KiB (#163) @reinauer
+* Add support for 4MB ROMs (#160) @reinauer
+* Fix 1mb_rom patch on 3.1.4 A500 (#154) @reinauer
+* Update splitdata to ROMSplit 1.30 (23.12.2021) (#168) @reinauer
+* Update splitdata from ROMsplit 1.28 (#162) @reinauer
+* Update splitdata from Remus Datafiles Update 1.78u2 (#157) @reinauer
+
+### vamos
+
+* added RELRELOC32 support in hunk loader
+* fixed AllocPooled when allocating larger chunks (Frank Wille)
+
+### vamos internal
+
+* alloc: cleaned up labels in API
+* improved lock key handling
+* improved ExNext keys
+* updated musashi from upstream fc7a6fc6
+* added proxy mgr to libctx
+* do not expose lib_mgr to all lib ctx
+* allow to use atypes in libcalls
+* reworked vamos type system
+
+
 ## [0.6.0][6] (2021-04-13)
 
 ### global
@@ -167,3 +214,4 @@
 [4]: https://github.com/cnvogelg/amitools/tree/v0.4.0
 [5]: https://github.com/cnvogelg/amitools/tree/v0.5.0
 [6]: https://github.com/cnvogelg/amitools/tree/v0.6.0
+[7]: https://github.com/cnvogelg/amitools/tree/v0.7.0
