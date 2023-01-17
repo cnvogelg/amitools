@@ -7,8 +7,8 @@ project = "amitools"
 copyright = "2020-23, Christian Vogelgsang"
 author = "Christian Vogelgsang"
 
-release = version('amitools')
-version = '.'.join(release.split('.')[:2])
+release = version("amitools")
+version = ".".join(release.split(".")[:2])
 
 # -- General configuration ---------------------------------------------------
 extensions = [
