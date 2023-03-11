@@ -54,22 +54,13 @@ class FileManager:
         return FileHandle(sys.stdin.buffer, "<STDIN>", "/dev/stdin", need_close=False)
 
     def _create_stdout_fh(self):
-        fobj = sys.stdout.buffer
-        # try to get a fd from fobj
-        try:
-            fileno = fobj.fileno()
-            # create unbuffered raw stream if its a tty
-            if os.isatty(fileno):
-                fobj = open(fileno, "wb", buffering=0)
-                log_file.debug(
-                    "open no buffering: fileno=%s -> %s, fileno=%s",
-                    fileno,
-                    fobj,
-                    fobj.fileno(),
-                )
-        except Exception:
-            pass
-        return FileHandle(fobj, "<STDOUT>", "/dev/stdout", need_close=False)
+        return FileHandle(
+            sys.stdout.buffer,
+            "<STDOUT>",
+            "/dev/stdout",
+            need_close=False,
+            auto_flush=True,
+        )
 
     def get_fs_handler_port(self):
         return self.fs_handler_port
