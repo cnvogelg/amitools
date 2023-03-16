@@ -143,8 +143,10 @@ class ADFSNode:
 
     def change_mod_ts_by_string(self, tm_str):
         t = TimeStamp()
-        t.parse(tm_str)
+        if not t.parse(tm_str):
+            return False
         self.change_meta_info(MetaInfo(mod_ts=t))
+        return True
 
     def get_list_str(self, indent=0, all=False, detail=False):
         istr = "  " * indent

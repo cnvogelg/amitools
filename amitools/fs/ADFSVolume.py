@@ -292,17 +292,20 @@ class ADFSVolume:
 
     def change_create_ts_by_string(self, create_ts_str):
         t = TimeStamp()
-        t.parse(create_ts_str)
+        if not t.parse(create_ts_str):
+            return False
         return self.change_meta_info(RootMetaInfo(create_ts=t))
 
     def change_disk_ts_by_string(self, disk_ts_str):
         t = TimeStamp()
-        t.parse(disk_ts_str)
+        if not t.parse(disk_ts_str):
+            return False
         return self.change_meta_info(RootMetaInfo(disk_ts=t))
 
     def change_mod_ts_by_string(self, mod_ts_str):
         t = TimeStamp()
-        t.parse(mod_ts_str)
+        if not t.parse(mod_ts_str):
+            return False
         return self.change_meta_info(RootMetaInfo(mod_ts=t))
 
     def relabel(self, name):
