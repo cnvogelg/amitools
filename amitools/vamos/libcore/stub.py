@@ -74,8 +74,11 @@ class LibStubGen(object):
 
         # iterate all functions in fd
         for fd_func in fd.get_funcs():
-            stub_func = self.wrap_missing_func(fd_func, ctx, profile)
+            stub_func = self._wrap_missing_func(stub, fd_func, ctx, profile)
             self._set_method(fd_func, stub, stub_func)
+
+        # fill holes in func table
+        self._fill_hole_funcs(stub, ctx)
 
         return stub
 
@@ -90,15 +93,18 @@ class LibStubGen(object):
         valid_funcs = list(impl_scan.get_valid_funcs().values())
         for impl_func in valid_funcs:
             fd_func = impl_func.fd_func
-            stub_func = self.wrap_func(impl_func, ctx, profile)
+            stub_func = self._wrap_func(stub, impl_func, ctx, profile)
             self._set_method(fd_func, stub, stub_func)
 
         # generate missing funcs
         missing_funcs = list(impl_scan.get_missing_funcs().values())
         for impl_func in missing_funcs:
             fd_func = impl_func.fd_func
-            stub_func = self.wrap_missing_func(fd_func, ctx, profile)
+            stub_func = self._wrap_missing_func(stub, fd_func, ctx, profile)
             self._set_method(fd_func, stub, stub_func)
+
+        # fill holes in func table
+        self._fill_hole_funcs(stub, ctx)
 
         # return final stub
         return stub
@@ -112,7 +118,42 @@ class LibStubGen(object):
         index = fd_func.get_index()
         stub.func_tab[index] = stub_method
 
-    def wrap_missing_func(self, fd_func, ctx, profile):
+    def _fill_hole_funcs(self, stub, ctx):
+        """fill in entries in jump table that are skipped by fd file"""
+        for idx, func in enumerate(stub.func_tab):
+            if not func:
+                func = self._gen_hole_func(stub, idx, ctx)
+                name = "_hole_" + str(idx)
+                stub_method = MethodType(func, stub)
+                setattr(stub, name, stub_method)
+                stub.func_tab[idx] = stub_method
+
+    def _gen_hole_func(self, stub, idx, ctx):
+        """create a stub func for an empty slot in the jump table"""
+        bias = idx * 6 + 6
+        log = self.log_missing
+        if log is None:
+            # without tracing
+            def stub_func(this, *args, **kwargs):
+                # return d0=0
+                ctx.cpu.w_reg(REG_D0, 0)
+
+        else:
+            # with tracing
+            def stub_func(this, *args, **kwargs):
+                callee_pc = this._get_callee_pc(ctx)
+                call_info = "(%s) %4d UNKNOWN(#%d) from PC=%06x" % (
+                    stub.name,
+                    bias,
+                    idx,
+                    callee_pc,
+                )
+                log.warning("? CALL: %s -> d0=0 (default)", call_info)
+                ctx.cpu.w_reg(REG_D0, 0)
+
+        return stub_func
+
+    def _wrap_missing_func(self, stub, fd_func, ctx, profile):
         """create a stub func for a missing function in impl
         returns an unbound method for the stub instance
         """
@@ -131,7 +172,8 @@ class LibStubGen(object):
 
             def stub_func(this, *args, **kwargs):
                 callee_pc = this._get_callee_pc(ctx)
-                call_info = "%4d %s( %s ) from PC=%06x" % (
+                call_info = "(%s) %4d %s( %s ) from PC=%06x" % (
+                    stub.name,
                     bias,
                     name,
                     this._gen_arg_dump(func_args, ctx),
@@ -199,7 +241,7 @@ class LibStubGen(object):
 
         return base_func
 
-    def _gen_log_func(selgf, fd_func, base_func, ctx, log):
+    def _gen_log_func(selgf, stub, fd_func, base_func, ctx, log):
         """wrap the base function with logging."""
         name = fd_func.get_name()
         func_args = fd_func.get_args()
@@ -207,7 +249,8 @@ class LibStubGen(object):
 
         def log_func(this, *args, **kwargs):
             callee_pc = this._get_callee_pc(ctx)
-            call_info = "%4d %s( %s ) from PC=%06x" % (
+            call_info = "(%s) %4d %s( %s ) from PC=%06x" % (
+                stub.name,
                 bias,
                 name,
                 this._gen_arg_dump(func_args, ctx),
@@ -240,7 +283,7 @@ class LibStubGen(object):
 
         return profile_func
 
-    def wrap_func(self, impl_func, ctx, profile):
+    def _wrap_func(self, stub, impl_func, ctx, profile):
         """create a stub func for a valid impl func
         returns an unbound method for the stub instaance
         """
@@ -257,7 +300,7 @@ class LibStubGen(object):
         # wrap around logging method?
         log = self.log_valid
         if log:
-            func = self._gen_log_func(fd_func, func, ctx, log)
+            func = self._gen_log_func(stub, fd_func, func, ctx, log)
 
         # wrap profiling?
         if profile:
