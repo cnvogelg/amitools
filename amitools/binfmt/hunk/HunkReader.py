@@ -770,6 +770,7 @@ class HunkReader:
                     seek_begin = False
                     e["hunk_no"] = hunk_no
                     e["alloc_size"] = self.header["hunks"][hunk_no]["size"]
+                    e["alloc_type"] = self.header["hunks"][hunk_no]["memf"]
                     hunk_no += 1
                 # add an extra overlay "hunk"
                 elif hunk_type == HUNK_OVERLAY:
@@ -815,6 +816,7 @@ class HunkReader:
                     seek_begin = False
                     e["hunk_no"] = hunk_no
                     e["alloc_size"] = self.header["hunks"][hunk_no]["size"]
+                    e["alloc_type"] = self.header["hunks"][hunk_no]["memf"]
                     hunk_no += 1
                 # unecpected hunk?!
                 else:
