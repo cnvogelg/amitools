@@ -60,7 +60,7 @@ class FileHandle:
 
     def read(self, len):
         try:
-            d = self.obj.read(len)
+            d = self.obj.read1(len)
             return d
         except IOError:
             return -1
