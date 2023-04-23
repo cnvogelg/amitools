@@ -125,7 +125,7 @@ class FileHandle:
         if self.terminal:
             return self.terminal.read(len)
         try:
-            return self.obj.read(len)
+            return self.obj.read1(len)
         except IOError:
             return -1
 
