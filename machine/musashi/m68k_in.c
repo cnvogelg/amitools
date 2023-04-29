@@ -7443,14 +7443,16 @@ M68KMAKE_OP(muls, 16, ., d)
 {
 	uint* r_dst = &DX;
 	uint x = MAKE_INT_16(DY);
-	uint c = 0;
-	for (uint y = x, f = 0; y; y>>=1) {
-		if ((y&1) != f) {
-			c += 2;
-			f = 1 - f;
+	if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+		uint c = 0;
+		for (uint y = x, f = 0; y; y>>=1) {
+			if ((y&1) != f) {
+				c += 2;
+				f = 1 - f;
+			}
 		}
+		USE_CYCLES(c);
 	}
-	USE_CYCLES(c);
 
 	uint res = MASK_OUT_ABOVE_32(x * MAKE_INT_16(MASK_OUT_ABOVE_16(*r_dst)));
 
@@ -7467,15 +7469,16 @@ M68KMAKE_OP(muls, 16, ., .)
 {
 	uint* r_dst = &DX;
 	uint x = MAKE_INT_16(M68KMAKE_GET_OPER_AY_16);
-	uint c = 0;
-	for (uint y = x, f = 0; y; y>>=1) {
-		if ((y&1) != f) {
-			c += 2;
-			f = 1 - f;
+	if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+		uint c = 0;
+		for (uint y = x, f = 0; y; y>>=1) {
+			if ((y&1) != f) {
+				c += 2;
+				f = 1 - f;
+			}
 		}
+		USE_CYCLES(c);
 	}
-	USE_CYCLES(c);
-
 	uint res = MASK_OUT_ABOVE_32(x * MAKE_INT_16(MASK_OUT_ABOVE_16(*r_dst)));
 
 	*r_dst = res;
@@ -7491,13 +7494,15 @@ M68KMAKE_OP(mulu, 16, ., d)
 {
 	uint* r_dst = &DX;
 	uint x = MASK_OUT_ABOVE_16(DY);
-	uint c = 0;
-	for (uint y = x; y; y>>=1) {
-		if ((y&1)) {
-			c += 2;
+	if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+		uint c = 0;
+		for (uint y = x; y; y>>=1) {
+			if ((y&1)) {
+				c += 2;
+			}
 		}
+		USE_CYCLES(c);
 	}
-	USE_CYCLES(c);
 	uint res = x * MASK_OUT_ABOVE_16(*r_dst);
 
 	*r_dst = res;
@@ -7513,13 +7518,15 @@ M68KMAKE_OP(mulu, 16, ., .)
 {
 	uint* r_dst = &DX;
 	uint x = M68KMAKE_GET_OPER_AY_16;
-	uint c = 0;
-	for (uint y = x; y; y>>=1) {
-		if ((y&1)) {
-			c += 2;
+	if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+		uint c = 0;
+		for (uint y = x; y; y>>=1) {
+			if ((y&1)) {
+				c += 2;
+			}
 		}
+		USE_CYCLES(c);
 	}
-	USE_CYCLES(c);
 
 	uint res = x * MASK_OUT_ABOVE_16(*r_dst);
 
