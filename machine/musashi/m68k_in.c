@@ -721,10 +721,10 @@ moves      8  .     .     0000111000......  A+-DXWL...  . S S S S   .  14   5   
 moves     16  .     .     0000111001......  A+-DXWL...  . S S S S   .  14   5   5   5
 moves     32  .     .     0000111010......  A+-DXWL...  . S S S S   .  16   5   5   5
 move16    32  .     .     1111011000100...  ..........  . . . . U   .   .   .   .   4  TODO: correct timing
-muls      16  .     d     1100...111000...  ..........  U U U U U  54  32  27  27  27
-muls      16  .     .     1100...111......  A+-DXWLdxI  U U U U U  54  32  27  27  27
-mulu      16  .     d     1100...011000...  ..........  U U U U U  54  30  27  27  27
-mulu      16  .     .     1100...011......  A+-DXWLdxI  U U U U U  54  30  27  27  27
+muls      16  .     d     1100...111000...  ..........  U U U U U  38  32  27  27  27
+muls      16  .     .     1100...111......  A+-DXWLdxI  U U U U U  38  32  27  27  27
+mulu      16  .     d     1100...011000...  ..........  U U U U U  38  30  27  27  27
+mulu      16  .     .     1100...011......  A+-DXWLdxI  U U U U U  38  30  27  27  27
 mull      32  .     d     0100110000000...  ..........  . . U U U   .   .  43  43  43
 mull      32  .     .     0100110000......  A+-DXWLdxI  . . U U U   .   .  43  43  43
 nbcd       8  .     d     0100100000000...  ..........  U U U U U   6   6   6   6   6
@@ -7442,7 +7442,17 @@ M68KMAKE_OP(move16, 32, ., .)
 M68KMAKE_OP(muls, 16, ., d)
 {
 	uint* r_dst = &DX;
-	uint res = MASK_OUT_ABOVE_32(MAKE_INT_16(DY) * MAKE_INT_16(MASK_OUT_ABOVE_16(*r_dst)));
+	uint x = MAKE_INT_16(DY);
+	uint c = 0;
+	for (uint y = x, f = 0; y; y>>=1) {
+		if ((y&1) != f) {
+			c += 2;
+			f = 1 - f;
+		}
+	}
+	USE_CYCLES(c);
+
+	uint res = MASK_OUT_ABOVE_32(x * MAKE_INT_16(MASK_OUT_ABOVE_16(*r_dst)));
 
 	*r_dst = res;
 
@@ -7456,7 +7466,17 @@ M68KMAKE_OP(muls, 16, ., d)
 M68KMAKE_OP(muls, 16, ., .)
 {
 	uint* r_dst = &DX;
-	uint res = MASK_OUT_ABOVE_32(MAKE_INT_16(M68KMAKE_GET_OPER_AY_16) * MAKE_INT_16(MASK_OUT_ABOVE_16(*r_dst)));
+	uint x = MAKE_INT_16(M68KMAKE_GET_OPER_AY_16);
+	uint c = 0;
+	for (uint y = x, f = 0; y; y>>=1) {
+		if ((y&1) != f) {
+			c += 2;
+			f = 1 - f;
+		}
+	}
+	USE_CYCLES(c);
+
+	uint res = MASK_OUT_ABOVE_32(x * MAKE_INT_16(MASK_OUT_ABOVE_16(*r_dst)));
 
 	*r_dst = res;
 
@@ -7470,7 +7490,15 @@ M68KMAKE_OP(muls, 16, ., .)
 M68KMAKE_OP(mulu, 16, ., d)
 {
 	uint* r_dst = &DX;
-	uint res = MASK_OUT_ABOVE_16(DY) * MASK_OUT_ABOVE_16(*r_dst);
+	uint x = MASK_OUT_ABOVE_16(DY);
+	uint c = 0;
+	for (uint y = x; y; y>>=1) {
+		if ((y&1)) {
+			c += 2;
+		}
+	}
+	USE_CYCLES(c);
+	uint res = x * MASK_OUT_ABOVE_16(*r_dst);
 
 	*r_dst = res;
 
@@ -7484,7 +7512,16 @@ M68KMAKE_OP(mulu, 16, ., d)
 M68KMAKE_OP(mulu, 16, ., .)
 {
 	uint* r_dst = &DX;
-	uint res = M68KMAKE_GET_OPER_AY_16 * MASK_OUT_ABOVE_16(*r_dst);
+	uint x = M68KMAKE_GET_OPER_AY_16;
+	uint c = 0;
+	for (uint y = x; y; y>>=1) {
+		if ((y&1)) {
+			c += 2;
+		}
+	}
+	USE_CYCLES(c);
+
+	uint res = x * MASK_OUT_ABOVE_16(*r_dst);
 
 	*r_dst = res;
 
