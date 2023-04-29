@@ -98,7 +98,7 @@ class RDisk:
         for fs in self.fs:
             fs.dump(hex_dump)
 
-    def get_info(self, part_name=None):
+    def get_info(self, part_name=None, full=False):
         res = []
         part = None
         # only show single partition
@@ -111,9 +111,10 @@ class RDisk:
         if part:
             logic_blks = self.get_logical_blocks()
             res.append(part.get_info(logic_blks))
-            extra = part.get_extra_infos()
-            for e in extra:
-                res.append("%s%s" % (" " * 70, e))
+            if full:
+                extra = part.get_extra_infos()
+                for e in extra:
+                    res.append("%s%s" % (" " * 70, e))
         else:
             pd = self.rdb.phy_drv
             total_blks = self.get_total_blocks()
@@ -155,13 +156,33 @@ class RDisk:
             # add partitions
             for p in self.parts:
                 res.append(p.get_info(logic_blks))
-                extra = p.get_extra_infos()
-                for e in extra:
-                    res.append("%s%s" % (" " * 70, e))
+                if full:
+                    extra = p.get_extra_infos()
+                    for e in extra:
+                        res.append("%s%s" % (" " * 70, e))
             # add fileystems
             for f in self.fs:
                 res.append(f.get_info())
         return res
+
+    def get_desc(self):
+        """get a JSON-like python structure with all infos"""
+        pd = self.rdb.phy_drv
+        phys_drv = dict(pd.__dict__)
+        ld = self.rdb.log_drv
+        logi_drv = dict(ld.__dict__)
+        parts = []
+        for p in self.parts:
+            parts.append(p.get_desc())
+        fsys = []
+        for fs in self.fs:
+            fsys.append(fs.get_desc())
+        return {
+            "physical_drive": phys_drv,
+            "logical_drive": logi_drv,
+            "partitions": parts,
+            "filesystems": fsys,
+        }
 
     def get_block_map(self):
         res = []

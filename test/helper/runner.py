@@ -1,9 +1,9 @@
 import os
+import re
 import sys
 import pytest
 import subprocess
 import hashlib
-import inspect
 import io
 import importlib
 from .builder import BinBuilder
@@ -71,6 +71,11 @@ def run_func(func, args, stdin_str=None, raw_output=False):
     return returncode, stdout, stderr
 
 
+def ctx_callback(ctx):
+    # global func to execute via execpy -i command
+    return 23
+
+
 class VamosTestRunner:
     def __init__(
         self,
@@ -82,6 +87,7 @@ class VamosTestRunner:
         dump_console=False,
         generate_data=False,
         auto_build=False,
+        no_rebuild=False,
         run_subproc=False,
     ):
         self.flavor = flavor
@@ -92,7 +98,7 @@ class VamosTestRunner:
         self.dump_console = dump_console
         self.generate_data = generate_data
         self.run_subproc = run_subproc
-        self.bin_builder = BinBuilder(flavor, use_debug_bins, auto_build)
+        self.bin_builder = BinBuilder(flavor, use_debug_bins, auto_build, no_rebuild)
 
     def _get_data_path(self, prog_name, kw_args):
         dat_path = ["data/" + prog_name]
@@ -210,10 +216,16 @@ class VamosTestRunner:
             raise subprocess.CalledProcessError(retcode, cmd)
         return stdout, stderr
 
-    def _compare(self, got, ok):
-        for i in range(len(ok)):
-            assert got[i] == ok[i]
+    def _compare(self, got, ok, regex=False):
         assert len(got) == len(ok), "stdout line count differs"
+        if regex:
+            # line by line regex compare
+            for i in range(len(ok)):
+                assert re.fullmatch(ok[i], got[i])
+        else:
+            # equal check
+            for i in range(len(ok)):
+                assert got[i] == ok[i]
 
     def run_prog_check_data(self, *prog_args, **kw_args):
         """like run_prog_checked() but also verify the stdout
@@ -226,18 +238,32 @@ class VamosTestRunner:
         for l in f:
             ok_stdout.append(l.strip())
         f.close()
-        self._compare(stdout, ok_stdout)
+        # do regex compare?
+        if "regex" in kw_args:
+            regex = kw_args["regex"]
+        else:
+            regex = False
+        self._compare(stdout, ok_stdout, regex=regex)
         # asser stderr to be empty
         assert stderr == []
 
     def run_ctx_func(self, ctx_func, **kw_args):
         """use test_execpy binary to run the given func in a lib context"""
-        func_name = ctx_func.__name__
-        # get source file
-        src_file = inspect.getfile(ctx_func)
+        global ctx_callback
+        ctx_callback = ctx_func
         # now run 'test_execpy'
-        prog_args = ["test_execpy", "-c", src_file, func_name]
+        prog_args = ["test_execpy", "-i", "helper.runner", "ctx_callback"]
         return self.run_prog(*prog_args, **kw_args)
+
+    def run_ctx_func_checked(
+        self, ctx_func, retcode=0, stdout=None, stderr=None, **kw_args
+    ):
+        got_retcode, got_stdout, got_stderr = self.run_ctx_func(ctx_func, **kw_args)
+        assert got_retcode == retcode
+        if stdout:
+            assert got_stdout == stdout
+        if stderr:
+            assert got_stderr == stderr
 
 
 class VamosRunner:

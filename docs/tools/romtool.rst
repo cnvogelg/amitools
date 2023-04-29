@@ -349,5 +349,5 @@ Copy ``kick.rom`` to a new ``duplicate.rom`` file.
 Options:
 
 * ``-c``, ``--fix-checksum`` after the copy fix the checksum of the written
-image.  For example, if the source rom has been modified with a hex editor or
-a find/replace operation, then this option can be used to correct the checksum.
+  image.  For example, if the source rom has been modified with a hex editor or
+  a find/replace operation, then this option can be used to correct the checksum.

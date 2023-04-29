@@ -1,4 +1,4 @@
-# Makefile for musashi
+# Makefile for amitools
 
 BUILD_DIR = build
 DIST_DIR = dist
@@ -15,13 +15,12 @@ SHOW_CMD = open
 
 help:
 	@echo "init        initialize project"
-	@echo "init_user   initialize project (--user mode)"
 	@echo "build       build native extension"
 	@echo
 	@echo "format      format source code with black"
 	@echo
 	@echo "test        run tests"
-	@echo "docker-tox  build tox docker container"
+	@echo "docker-build  build tox docker container"
 	@echo
 	@echo "docs        generate docs"
 	@echo "show        show docs in browser"
@@ -30,23 +29,18 @@ help:
 	@echo "clean_all   clean dist"
 	@echo "clean_git   clean non-git files"
 	@echo "clean_py    remove compiled .pyc files"
+	@echo "clean_ext   remove native extension build"
 	@echo
 	@echo "install     install package"
 	@echo "sdist       build source dist"
 	@echo "bdist       build bin dist wheel"
-	@echo "upload      upload dist with twin to pypi"
+	@echo "upload      upload sdist with twine to pypi"
 
 init:
 	$(PIP) install --upgrade setuptools pip
 	$(PIP) install --upgrade -r requirements-dev.txt
 	$(PIP) install --upgrade -r requirements-test.txt
 	$(PIP) install --upgrade --editable .
-
-init_user:
-	$(PIP) install --user --upgrade setuptools pip
-	$(PIP) install --user --upgrade -r requirements-dev.txt
-	$(PIP) install --user --upgrade -r requirements-test.txt
-	$(PIP) install --user --upgrade --editable .
 
 build:
 	$(PYTHON) setup.py build_ext -i
@@ -56,7 +50,7 @@ format:
 
 # testing
 test:
-	$(PYTHON) setup.py test
+	./local-tox
 
 # doc
 docs:
@@ -70,7 +64,7 @@ show:
 clean:
 	rm -rf $(BUILD_DIR)
 
-clean_all: clean
+clean_all: clean clean_ext
 	rm -rf $(DIST_DIR)
 
 clean_git:
@@ -79,15 +73,19 @@ clean_git:
 clean_py:
 	find . -name *.pyc -exec rm {} \;
 
+clean_ext:
+	$(PYTHON) setup.py clean
+	rm -f machine/*.so machine/emu.c
+
 # install, distrib
 install:
-	$(PYTHON) setup.py install
+	$(PIP) install --upgrade --editable .
 
 sdist:
-	$(PYTHON) setup.py sdist --formats=zip
+	$(PYTHON) -m build -s
 
 bdist:
-	$(PYTHON) setup.py bdist_wheel
+	$(PYTHON) -m build -w
 
 upload: sdist
 	twine upload dist/*

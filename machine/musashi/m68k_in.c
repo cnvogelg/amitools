@@ -215,6 +215,7 @@ void m68ki_build_opcode_table(void)
 				m68ki_instruction_jump_table[instr] = ostruct->opcode_handler;
 				for(k=0;k<NUM_CPU_TYPES;k++)
 					m68ki_cycles[k][instr] = ostruct->cycles[k];
+/* SBF: don't add it here or the costs are added twice!
 				// For all shift operations with known shift distance (encoded in instruction word)
 				if((instr & 0xf000) == 0xe000 && (!(instr & 0x20)))
 				{
@@ -226,6 +227,7 @@ void m68ki_build_opcode_table(void)
 					// On the 68020 shift distance does not affect execution time
 					m68ki_cycles[2][instr] += 0;
 				}
+*/
 			}
 		}
 		ostruct++;
@@ -283,7 +285,7 @@ M68KMAKE_OPCODE_HANDLER_HEADER
 #include "m68kcpu.h"
 extern void m68040_fpu_op0(void);
 extern void m68040_fpu_op1(void);
-extern void m68881_mmu_ops();
+extern void m68881_mmu_ops(void);
 
 /* ======================================================================== */
 /* ========================= INSTRUCTION HANDLERS ========================= */

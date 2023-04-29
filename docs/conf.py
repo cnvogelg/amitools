@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 # sphinx config
 
+from importlib.metadata import version
+
 project = "amitools"
-copyright = "2020, Christian Vogelgsang"
+copyright = "2020-23, Christian Vogelgsang"
 author = "Christian Vogelgsang"
 
-version = "0.6"
-release = "0.6.0"
+release = version("amitools")
+version = ".".join(release.split(".")[:2])
 
 # -- General configuration ---------------------------------------------------
 extensions = [

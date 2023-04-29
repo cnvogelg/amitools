@@ -2,12 +2,12 @@ import os
 import sys
 import subprocess
 
-from setuptools import setup, find_packages
-from distutils.extension import Extension
+from setuptools import setup, Extension
+from pkg_resources import parse_version
 from distutils.command.build_ext import build_ext
 from distutils.command.clean import clean
-import distutils.ccompiler as ccompiler
 from distutils.core import Command
+from distutils import ccompiler
 from distutils.dir_util import remove_tree
 from distutils import log
 from pkg_resources import parse_version
@@ -41,7 +41,7 @@ if use_cython:
         sys.exit(1)
 
 # if generated file is missing cython is required
-ext_file = "musashi/emu.c"
+ext_file = "machine/emu.c"
 if not os.path.exists(ext_file) and not use_cython:
     print("generated cython file missing! cython is essential to proceed!")
     print("please install with: pip3 install cython")
@@ -51,9 +51,9 @@ if not os.path.exists(ext_file) and not use_cython:
 gen_src = ["m68kopac.c", "m68kopdm.c", "m68kopnz.c", "m68kops.c"]
 
 gen_tool = "build/m68kmake"
-gen_tool_src = "musashi/m68kmake.c"
-gen_tool_obj = "build/musashi/m68kmake.o"
-gen_input = "musashi/m68k_in.c"
+gen_tool_src = "machine/musashi/m68kmake.c"
+gen_tool_obj = "build/machine/musashi/m68kmake.o"
+gen_input = "machine/musashi/m68k_in.c"
 gen_dir = "gen"
 gen_src = list([os.path.join(gen_dir, x) for x in gen_src])
 build_dir = "build"
@@ -161,42 +161,44 @@ cmdclass = {
 command_options = {}
 
 
-cython_file = "musashi/emu.pyx"
+cython_file = "machine/emu.pyx"
 sourcefiles = [
-    "musashi/traps.c",
-    "musashi/mem.c",
-    "musashi/m68kcpu.c",
-    "musashi/m68kdasm.c",
-    "musashi/softfloat/softfloat.c",
+    "machine/traps.c",
+    "machine/mem.c",
+    "machine/musashi/m68kcpu.c",
+    "machine/musashi/m68kdasm.c",
+    "machine/musashi/softfloat/softfloat.c",
     "gen/m68kops.c",
 ]
 depends = [
-    "musashi/pycpu.pyx",
-    "musashi/pymem.pyx",
-    "musashi/pytraps.pyx",
-    "musashi/m68k.h",
-    "musashi/m68kconf.h",
-    "musashi/m68kcpu.h",
-    "musashi/mem.h",
-    "musashi/traps.h",
-    "musashi/softfloat/mamesf.h",
-    "musashi/softfloat/milieu.h",
-    "musashi/softfloat/softfloat.h",
-    "musashi/softfloat/softfloat-macros",
-    "musashi/softfloat/softfloat-specialize",
+    "machine/my_conf.h",
+    "machine/pycpu.pyx",
+    "machine/pymem.pyx",
+    "machine/pytraps.pyx",
+    "machine/musashi/m68k.h",
+    "machine/musashi/m68kcpu.h",
+    "machine/mem.h",
+    "machine/traps.h",
+    "machine/musashi/softfloat/mamesf.h",
+    "machine/musashi/softfloat/milieu.h",
+    "machine/musashi/softfloat/softfloat.h",
+    "machine/musashi/softfloat/softfloat-macros",
+    "machine/musashi/softfloat/softfloat-specialize",
 ]
-inc_dirs = ["musashi", "gen"]
+inc_dirs = ["machine", "machine/musashi", "gen"]
 
 # add missing vc headers
 if is_msvc:
-    inc_dirs.append("musashi/win")
+    inc_dirs.append("machine/win")
     defines = [("_CRT_SECURE_NO_WARNINGS", None), ("_USE_MATH_DEFINES", None)]
 else:
-    defines = None
+    defines = []
+# use own musashi config file
+defines.append(("MUSASHI_CNF", '"my_conf.h"'))
 
 extensions = [
     Extension(
-        "musashi.emu",
+        "machine.emu",
         sourcefiles,
         depends=depends,
         include_dirs=inc_dirs,
@@ -211,49 +213,8 @@ if use_cython:
 else:
     sourcefiles.append(ext_file)
 
-scripts = {
-    "console_scripts": [
-        "fdtool = amitools.tools.fdtool:main",
-        "geotool = amitools.tools.geotool:main",
-        "hunktool = amitools.tools.hunktool:main",
-        "rdbtool = amitools.tools.rdbtool:main",
-        "romtool = amitools.tools.romtool:main",
-        "typetool = amitools.tools.typetool:main",
-        "vamos = amitools.tools.vamos:main",
-        "vamospath = amitools.tools.vamospath:main",
-        "vamostool = amitools.tools.vamostool:main",
-        "xdfscan = amitools.tools.xdfscan:main",
-        "xdftool = amitools.tools.xdftool:main",
-    ]
-}
-
 setup(
     cmdclass=cmdclass,
     command_options=command_options,
-    name="amitools",
-    description="A package to support development with classic Amiga m68k systems",
-    long_description=open("README.md").read(),
-    long_description_content_type="text/markdown",
-    version="0.6.0",
-    maintainer="Christian Vogelgsang",
-    maintainer_email="chris@vogelgsang.org",
-    url="http://github.com/cnvogelg/amitools",
-    classifiers=[
-        "Development Status :: 4 - Beta",
-        "Intended Audience :: Developers",
-        "Programming Language :: Python",
-        "Topic :: System :: Emulators",
-    ],
-    license="License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
-    packages=find_packages(),
-    zip_safe=False,
-    entry_points=scripts,
-    setup_requires=["pytest-runner"],
-    tests_require=["pytest"],
-    install_requires=["lhafile"],
     ext_modules=extensions,
-    # win problems:
-    #    use_scm_version=True,
-    include_package_data=True,
-    python_requires="~=3.6",
 )

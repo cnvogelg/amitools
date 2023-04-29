@@ -1,7 +1,7 @@
                                     MUSASHI
                                     =======
 
-                                  Version 3.32
+                                  Version 4.10
 
              A portable Motorola M680x0 processor emulation engine.
             Copyright 1998-2002 Karl Stenerud.  All rights reserved.
@@ -11,9 +11,9 @@
 INTRODUCTION:
 ------------
 
-Musashi is a Motorola 68000, 68010, 68EC020, 68020 and 68040 emulator written
-in C.  This emulator was written with two goals in mind: portability and
-speed.
+Musashi is a Motorola 68000, 68010, 68EC020, 68020, 68EC030, 68030, 68EC040 and
+68040 emulator written in C.  This emulator was written with two goals in mind:
+portability and speed.
 
 The emulator is written to ANSI C89 specifications.  It also uses inline
 functions, which are C9X compliant.
@@ -26,7 +26,7 @@ and so has had time to mature.
 LICENSE AND COPYRIGHT:
 ---------------------
 
-Copyright © 1998-2019 Karl Stenerud
+Copyright © 1998-2001 Karl Stenerud
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -147,11 +147,23 @@ To enable separate immediate reads:
     unsigned int  m68k_read_immediate_16(unsigned int address);
     unsigned int  m68k_read_immediate_32(unsigned int address);
 
+    Now you also have the pcrelative stuff:
+    unsigned int  m68k_read_pcrelative_8(unsigned int address);
+    unsigned int  m68k_read_pcrelative_16(unsigned int address);
+    unsigned int  m68k_read_pcrelative_32(unsigned int address);
+
 - If you need to know the current PC (for banking and such), set
   M68K_MONITOR_PC to OPT_SPECIFY_HANDLER, and set M68K_SET_PC_CALLBACK(A) to
   your routine.
 
+- In the unlikely case where you need to emulate some PMMU in the immediate
+  reads and/or pcrealtive stuff, you'll need to explicitely call the
+  translation address mechanism from your user functions this way :
 
+    if (PMMU_ENABLED)
+        address = pmmu_translate_addr(address);
+
+  (this is handled automatically by normal memory accesses).
 
 ADDRESS SPACES:
 --------------
@@ -213,9 +225,12 @@ To set the CPU type you want to use:
     M68K_CPU_TYPE_68000,
     M68K_CPU_TYPE_68010,
     M68K_CPU_TYPE_68EC020,
-    M68K_CPU_TYPE_68020
-
-
+    M68K_CPU_TYPE_68020,
+    M68K_CPU_TYPE_68EC030,
+    M68K_CPU_TYPE_68030,
+    M68K_CPU_TYPE_68EC040,
+    M68K_CPU_TYPE_68040,
+    M68K_CPU_TYPE_SCC68070 (which is a 68010 with a 32 bit data bus).
 
 CLOCK FREQUENCY:
 ---------------

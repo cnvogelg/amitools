@@ -33,6 +33,9 @@ class LibProxyGen:
     def _gen_stub_call(self, arg_regs, stub_method):
         def stub_call(self, *args, **kwargs):
             """proxy function to call lib stub directly"""
+            # ensure that all positional args are given
+            assert len(args) == len(arg_regs)
+
             # fill registers with arg values
             for reg, val in zip(arg_regs, args):
                 self.ctx.cpu.w_reg(reg, val)
@@ -55,6 +58,9 @@ class LibProxyGen:
 
     def _gen_lib_call(self, arg_regs, bias, name=None):
         def lib_call(self, *args, **kwargs):
+            # ensure that all positional args are given
+            assert len(args) == len(arg_regs)
+
             reg_map = {}
             for reg, val in zip(arg_regs, args):
                 reg_map[reg] = val

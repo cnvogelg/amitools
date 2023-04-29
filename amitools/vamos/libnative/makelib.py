@@ -32,7 +32,7 @@ class MakeLib(object):
         # allocate lib mem
         if label_name is None:
             label_name = "MakeLibrary"
-        mobj = self.alloc.alloc_memory(label_name, size)
+        mobj = self.alloc.alloc_memory(size, label=label_name)
         addr = mobj.addr
         lib_base = addr + neg_size
 

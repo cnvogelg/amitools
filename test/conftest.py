@@ -71,6 +71,12 @@ def pytest_addoption(parser):
         help="automatically rebuild binaries if source is newer",
     )
     parser.addoption(
+        "--no-rebuild",
+        default=False,
+        action="store_true",
+        help="do not force rebuild of old binaries",
+    )
+    parser.addoption(
         "--profile",
         "-P",
         action="store_true",
@@ -154,13 +160,15 @@ def pytest_runtest_setup(item):
 @pytest.fixture(scope="module", params=["gcc", "gcc-res", "gcc-dbg", "gcc-res-dbg"])
 def buildlibnix(request):
     auto_build = request.config.getoption("--auto-build")
-    return BinBuilder(request.param, auto_build=auto_build)
+    no_rebuild = request.config.getoption("--no-rebuild")
+    return BinBuilder(request.param, auto_build=auto_build, no_rebuild=no_rebuild)
 
 
 @pytest.fixture(scope="module", params=["sc", "sc-res", "sc-dbg", "sc-res-dbg"])
 def buildlibsc(request):
     auto_build = request.config.getoption("--auto-build")
-    return BinBuilder(request.param, auto_build=auto_build)
+    no_rebuild = request.config.getoption("--no-rebuild")
+    return BinBuilder(request.param, auto_build=auto_build, no_rebuild=no_rebuild)
 
 
 @pytest.fixture(scope="module", params=["vc", "gcc", "agcc", "sc"])
@@ -171,6 +179,7 @@ def vamos(request):
     dump_console = request.config.getoption("--dump-console")
     gen = request.config.getoption("--gen-data")
     auto_build = request.config.getoption("--auto-build")
+    no_rebuild = request.config.getoption("--no-rebuild")
     run_subproc = request.config.getoption("--run-subproc")
     flavor = request.param
     return VamosTestRunner(
@@ -182,6 +191,7 @@ def vamos(request):
         vamos_bin=VAMOS_BIN,
         vamos_args=VAMOS_ARGS,
         auto_build=auto_build,
+        no_rebuild=no_rebuild,
         run_subproc=run_subproc,
     )
 

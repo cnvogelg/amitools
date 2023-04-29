@@ -47,6 +47,9 @@ class KickRomAccess(RomAccess):
         elif self.kib == 256:
             # Extended roms also have 0x11144ef9
             return (val == self.ROMHDR_256K) or (val == self.ROMHDR_EXT)
+        elif self.kib == 1536 or self.kib == 3584:
+            # Extended roms also have 0x11144ef9
+            return val == self.ROMHDR_EXT
         else:
             return False
 

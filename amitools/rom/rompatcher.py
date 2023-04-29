@@ -56,6 +56,7 @@ class OneMegRomPatch(RomPatch):
         logging.error("Exec Table not found!")
         return False
 
+
 class FourMegRomPatch(RomPatch):
     def __init__(self):
         RomPatch.__init__(
@@ -93,6 +94,7 @@ class FourMegRomPatch(RomPatch):
             off += 2
         logging.error("Exec Table not found!")
         return False
+
 
 class BootConRomPatch(RomPatch):
     def __init__(self):

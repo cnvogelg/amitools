@@ -77,10 +77,10 @@ class DosLibrary(LibImpl):
         self.local_vars = {}
         self.access = AccessStruct(ctx.mem, self.get_struct_def(), base_addr)
         # setup RootNode
-        self.root_struct = ctx.alloc.alloc_struct("RootNode", RootNodeStruct)
+        self.root_struct = ctx.alloc.alloc_struct(RootNodeStruct, label="RootNode")
         self.access.w_s("dl_Root", self.root_struct.addr)
         # setup DosInfo
-        self.dos_info = ctx.alloc.alloc_struct("DosInfo", DosInfoStruct)
+        self.dos_info = ctx.alloc.alloc_struct(DosInfoStruct, label="DosInfo")
         self.root_struct.access.w_s("rn_Info", self.dos_info.addr)
         # setup dos list
         self.dos_list = DosList(
@@ -333,7 +333,9 @@ class DosLibrary(LibImpl):
             "ShellVar(%s)" % name, LocalVarStruct.get_size() + len(name) + 1
         )
         name_addr = node_addr + LocalVarStruct.get_size()
-        node = ctx.alloc.map_struct("ShellVar(%s) % name", node_addr, LocalVarStruct)
+        node = ctx.alloc.map_struct(
+            node_addr, LocalVarStruct, label="ShellVar(%s) % name"
+        )
         ctx.mem.w_cstr(name_addr, name)
         node.access.w_s("lv_Node.ln_Name", name_addr)
         node.access.w_s("lv_Node.ln_Type", flags & 0xFF)
@@ -431,7 +433,7 @@ class DosLibrary(LibImpl):
         vtype = flags & 0xFF
         if buff_ptr == 0:
             if not flags & self.GVF_GLOBAL_ONLY:
-                node = self.find_var(ctx, name, flags & 0xff)
+                node = self.find_var(ctx, name, vtype)
                 if node != None:
                     self.delete_var(ctx, node)
                 return self.DOSTRUE
@@ -504,7 +506,7 @@ class DosLibrary(LibImpl):
         name = ctx.mem.r_cstr(name_ptr)
         seg_addr = self._alloc_mem("Segment", SegmentStruct.get_size() + len(name) + 1)
         name_addr = seg_addr + SegmentStruct.sdef.seg_Name.offset
-        segment = ctx.alloc.map_struct("Segment", seg_addr, SegmentStruct)
+        segment = ctx.alloc.map_struct(seg_addr, SegmentStruct, label="Segment")
         head_addr = self.dos_info.access.r_s("di_NetHand")
         segment.access.w_s("seg_Next", head_addr)
         segment.access.w_s("seg_UC", system)
@@ -569,6 +571,8 @@ class DosLibrary(LibImpl):
             f_mode = "rwb+"
         else:
             mode_name = "?"
+            log_dos.warning("open: invalid mode=%d!", mode)
+            f_mode = "wb+"
 
         fh = self.file_mgr.open(self.get_current_dir(ctx), name, f_mode)
         log_dos.info(
@@ -1059,7 +1063,7 @@ class DosLibrary(LibImpl):
             self.setioerr(ctx, 0)
             return self.DOSTRUE
         else:
-            self.setioerr(ctx, ERROR_NO_MORE_ENTRIES)
+            self.setioerr(ctx, err)
             return self.DOSFALSE
 
     def ParentDir(self, ctx):
@@ -1356,7 +1360,7 @@ class DosLibrary(LibImpl):
         csrc_buf_ptr = 0
         rdargs = None
         if rdargs_ptr != 0:
-            rdargs = ctx.alloc.map_struct("RDArgs", rdargs_ptr, RDArgsStruct)
+            rdargs = ctx.alloc.map_struct(rdargs_ptr, RDArgsStruct, label="RDArgs")
             csrc_buf_ptr = rdargs.access.r_s("RDA_Source.CS_Buffer")
         if csrc_buf_ptr != 0:
             # take given csrc and setup buffer
@@ -1435,7 +1439,7 @@ class DosLibrary(LibImpl):
 
             # 8. alloc custom rdargs if none is given
             if rdargs_ptr == 0:
-                rdargs = ctx.alloc.alloc_struct("RDArgs", RDArgsStruct)
+                rdargs = ctx.alloc.alloc_struct(RDArgsStruct, label="RDArgs")
                 rdargs_ptr = rdargs.addr
                 own = True
             else:
@@ -1749,7 +1753,7 @@ class DosLibrary(LibImpl):
             log_dos.warning("AllocDosObject: unsupported type=%d/%s", obj_type, name)
             return 0
         # allocate struct
-        dos_obj = ctx.alloc.alloc_struct(name, struct_def)
+        dos_obj = ctx.alloc.alloc_struct(struct_def, label=name)
         log_dos.info(
             "AllocDosObject: type=%d/%s tags_ptr=%08x -> dos_obj=%s",
             obj_type,
@@ -1825,7 +1829,7 @@ class DosLibrary(LibImpl):
             if p != "C:" and p != "c:":
                 lock = self.lock_mgr.create_lock(None, p, False)
                 if lock != None:
-                    path = ctx.alloc.alloc_struct("Path(%s)" % p, PathStruct)
+                    path = ctx.alloc.alloc_struct(PathStruct, label="Path(%s)" % p)
                     path.access.w_s("path_Lock", lock.mem.addr)
                     path.access.w_s("path_Next", cmd_dir_addr)
                     cmd_dir_addr = path.addr
@@ -1933,7 +1937,7 @@ class DosLibrary(LibImpl):
     # ----- Helpers -----
 
     def _alloc_mem(self, name, size):
-        mem = self.alloc.alloc_memory(name, size)
+        mem = self.alloc.alloc_memory(size, label=name)
         self.mem_allocs[mem.addr] = mem
         return mem.addr
 

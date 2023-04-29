@@ -279,7 +279,7 @@ class MemoryAlloc:
 
     def _dump_orphan(self, addr, size):
         log_mem_alloc.warning("orphan: [@%06x +%06x %06x]" % (addr, size, addr + size))
-        if self.label_mgr is not None:
+        if self.label_mgr:
             labels = self.label_mgr.get_intersecting_labels(addr, size)
             for l in labels:
                 log_mem_alloc.warning("-> %s", l)
@@ -314,16 +314,16 @@ class MemoryAlloc:
             return None
 
     # memory
-    def alloc_memory(self, name, size, add_label=True, except_on_failure=True):
+    def alloc_memory(self, size, label=None, except_on_failure=True):
         addr = self.alloc_mem(size, except_on_failure)
         if addr == 0:
             return None
-        if add_label and self.label_mgr is not None:
-            label = LabelRange(name, addr, size)
-            self.label_mgr.add_label(label)
+        if label and self.label_mgr:
+            label_obj = LabelRange(label, addr, size)
+            self.label_mgr.add_label(label_obj)
         else:
-            label = None
-        mem = Memory(addr, size, label, self.mem)
+            label_obj = None
+        mem = Memory(addr, size, label_obj, self.mem)
         log_mem_alloc.info("alloc memory: %s", mem)
         self.mem_objs[addr] = mem
         return mem
@@ -336,43 +336,42 @@ class MemoryAlloc:
         del self.mem_objs[mem.addr]
 
     # struct
-    def alloc_struct(self, name, struct, size=None, add_label=True):
+    def alloc_struct(self, struct, size=None, label=None):
         if size is None:
             size = struct.get_size()
         addr = self.alloc_mem(size)
-        if self.label_mgr is not None and add_label:
-            label = LabelStruct(name, addr, struct)
-            self.label_mgr.add_label(label)
+        if label and self.label_mgr:
+            label_obj = LabelStruct(label, addr, struct)
+            self.label_mgr.add_label(label_obj)
         else:
-            label = None
+            label_obj = None
         access = AccessStruct(self.mem, struct, addr)
-        mem = Memory(addr, size, label, access)
+        mem = Memory(addr, size, label_obj, access)
         log_mem_alloc.info("alloc struct: %s", mem)
         self.mem_objs[addr] = mem
         return mem
 
-    def map_struct(self, name, addr, struct):
+    def map_struct(self, addr, struct, label=None):
         size = struct.get_size()
         access = AccessStruct(self.mem, struct, addr)
-        if self.label_mgr is not None:
-            label = self.label_mgr.get_label(addr)
+        if label and self.label_mgr:
+            label_obj = LabelStruct(label, addr, struct)
+            self.label_mgr.add_label(label_obj)
         else:
-            label = None
-        mem = Memory(addr, size, label, access)
+            label_obj = None
+        mem = Memory(addr, size, label_obj, access)
         log_mem_alloc.info("map struct: %s", mem)
         return mem
 
     def free_struct(self, mem):
         log_mem_alloc.info("free struct: %s", mem)
-        if self.label_mgr is not None:
+        if self.label_mgr:
             self.label_mgr.remove_label(mem.label)
         self.free_mem(mem.addr, mem.size)
         del self.mem_objs[mem.addr]
 
     # library
-    def alloc_lib(
-        self, name, lib_struct, pos_size=0, neg_size=0, fd=None, add_label=True
-    ):
+    def alloc_lib(self, lib_struct, pos_size=0, neg_size=0, fd=None, label=None):
         if pos_size == 0:
             pos_size = lib_struct.get_size()
         # round neg_size to multiple of four
@@ -381,64 +380,64 @@ class MemoryAlloc:
         # alloc full size
         addr = self.alloc_mem(size)
         base_addr = addr + neg_size
-        if self.label_mgr is not None and add_label:
-            label = LabelLib(name, base_addr, neg_size, pos_size, lib_struct, fd)
-            self.label_mgr.add_label(label)
+        if label and self.label_mgr:
+            label_obj = LabelLib(label, base_addr, neg_size, pos_size, lib_struct, fd)
+            self.label_mgr.add_label(label_obj)
         else:
-            label = None
+            label_obj = None
         access = AccessStruct(self.mem, lib_struct, base_addr)
-        mem = Memory(addr, size, label, access)
+        mem = Memory(addr, size, label_obj, access)
         log_mem_alloc.info("alloc lib: %s", mem)
         self.mem_objs[addr] = mem
         return mem
 
     def free_lib(self, mem):
         log_mem_alloc.info("free lib: %s", mem)
-        if self.label_mgr is not None:
+        if self.label_mgr:
             self.label_mgr.remove_label(mem.label)
         self.free_mem(mem.addr, mem.size)
         del self.mem_objs[mem.addr]
 
     # cstr
-    def alloc_cstr(self, name, cstr):
+    def alloc_cstr(self, cstr, label=None):
         size = len(cstr) + 1
         addr = self.alloc_mem(size)
-        if self.label_mgr is not None:
-            label = LabelRange(name, addr, size)
-            self.label_mgr.add_label(label)
+        if label and self.label_mgr:
+            label_obj = LabelRange(label, addr, size)
+            self.label_mgr.add_label(label_obj)
         else:
-            label = None
+            label_obj = None
         self.mem.w_cstr(addr, cstr)
-        mem = Memory(addr, size, label, self.mem)
+        mem = Memory(addr, size, label_obj, self.mem)
         log_mem_alloc.info("alloc c_str: %s", mem)
         self.mem_objs[addr] = mem
         return mem
 
     def free_cstr(self, mem):
         log_mem_alloc.info("free c_str: %s", mem)
-        if self.label_mgr is not None:
+        if self.label_mgr:
             self.label_mgr.remove_label(mem.label)
         self.free_mem(mem.addr, mem.size)
         del self.mem_objs[mem.addr]
 
     # bstr
-    def alloc_bstr(self, name, bstr):
+    def alloc_bstr(self, bstr, label=None):
         size = len(bstr) + 2  # front: count, end: extra zero for safety
         addr = self.alloc_mem(size)
-        if self.label_mgr is not None:
-            label = LabelRange(name, addr, size)
-            self.label_mgr.add_label(label)
+        if label and self.label_mgr:
+            label_obj = LabelRange(label, addr, size)
+            self.label_mgr.add_label(label_obj)
         else:
-            label = None
+            label_obj = None
         self.mem.w_bstr(addr, bstr)
-        mem = Memory(addr, size, label, self.mem)
+        mem = Memory(addr, size, label_obj, self.mem)
         log_mem_alloc.info("alloc b_str: %s", mem)
         self.mem_objs[addr] = mem
         return mem
 
     def free_bstr(self, mem):
         log_mem_alloc.info("free b_str: %s", mem)
-        if self.label_mgr is not None:
+        if self.label_mgr:
             self.label_mgr.remove_label(mem.label)
         self.free_mem(mem.addr, mem.size)
         del self.mem_objs[mem.addr]

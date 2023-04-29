@@ -6,13 +6,16 @@ from amitools.vamos.libstructs import FileHandleStruct
 class FileHandle:
     """represent an AmigaOS file handle (FH) in vamos"""
 
-    def __init__(self, obj, ami_path, sys_path, need_close=True, is_nil=False):
+    def __init__(
+        self, obj, ami_path, sys_path, need_close=True, is_nil=False, auto_flush=False
+    ):
         self.obj = obj
         self.name = os.path.basename(sys_path)
         self.ami_path = ami_path
         self.sys_path = sys_path
         self.b_addr = 0
         self.need_close = need_close
+        self.auto_flush = auto_flush
         # buffering
         self.unch = bytearray()
         self.ch = -1
@@ -34,7 +37,7 @@ class FileHandle:
 
     def alloc_fh(self, alloc, fs_handler_port):
         name = "File:" + self.name
-        self.mem = alloc.alloc_struct(name, FileHandleStruct)
+        self.mem = alloc.alloc_struct(FileHandleStruct, label=name)
         self.b_addr = self.mem.addr >> 2
         # -- fill filehandle
         # use baddr of FH itself as identifier
@@ -54,6 +57,8 @@ class FileHandle:
         assert isinstance(data, (bytes, bytearray))
         try:
             self.obj.write(data)
+            if self.auto_flush:
+                self.obj.flush()
             return len(data)
         except IOError:
             return -1

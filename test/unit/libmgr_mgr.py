@@ -2,7 +2,7 @@ import logging
 import pytest
 from amitools.vamos.log import log_libmgr, log_exec
 from amitools.vamos.libcore import LibCtx
-from amitools.vamos.libmgr import LibManager, LibMgrCfg, LibCfg, LibProxyManager
+from amitools.vamos.libmgr import LibManager, LibMgrCfg, LibCfg
 from amitools.vamos.machine import Machine
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
@@ -54,6 +54,16 @@ def libmgr_mgr_bootstrap_shutdown_test():
     assert machine.get_mem().r32(4) == exec_base
     # we can't expunge exec
     assert not mgr.expunge_lib(exec_base)
+    # check proxy for exec
+    exec_proxy = mgr.get_lib_proxy_mgr().get_exec_lib_proxy()
+    mem_addr = exec_proxy.AllocMem(128, 0)
+    assert mem_addr
+    exec_proxy.FreeMem(mem_addr, 128)
+    # check proxy for exec in ctx
+    exec_proxy = exec_vlib.ctx.proxies.get_exec_lib_proxy()
+    mem_addr = exec_proxy.AllocMem(128, 0)
+    assert mem_addr
+    exec_proxy.FreeMem(mem_addr, 128)
     # shutdown
     left = mgr.shutdown()
     assert left == 0
@@ -98,7 +108,13 @@ def libmgr_mgr_open_vlib_test():
     mgr.close_lib(test_base)
     assert impl.get_cnt() is None
     # try to open a proxy
-    proxy_mgr = LibProxyManager(mgr)
+    proxy_mgr = mgr.get_lib_proxy_mgr()
+    proxy = proxy_mgr.open_lib_proxy("vamostest.library")
+    assert proxy
+    assert proxy.Add(2, 3) == 5
+    proxy_mgr.close_lib_proxy(proxy)
+    # try to open a proxy directly in ctx
+    proxy_mgr = test_vlib.ctx.proxies
     proxy = proxy_mgr.open_lib_proxy("vamostest.library")
     assert proxy
     assert proxy.Add(2, 3) == 5
@@ -128,7 +144,13 @@ def libmgr_mgr_open_vlib_dev_test():
     mgr.close_lib(test_base)
     assert impl.get_cnt() is None
     # try to open a proxy
-    proxy_mgr = LibProxyManager(mgr)
+    proxy_mgr = mgr.get_lib_proxy_mgr()
+    proxy = proxy_mgr.open_lib_proxy("vamostestdev.device")
+    assert proxy
+    assert proxy.Add(1, 2) == 3
+    proxy_mgr.close_lib_proxy(proxy)
+    # try to open a proxy directly in ctx
+    proxy_mgr = test_vlib.ctx.proxies
     proxy = proxy_mgr.open_lib_proxy("vamostestdev.device")
     assert proxy
     assert proxy.Add(1, 2) == 3
@@ -263,7 +285,7 @@ def open_alib(lib_file, lib_name, ok=True, version=0, mode=None):
     lib_info = amgr.get_lib_info_for_name(lib_name)
     assert not lib_info
     # proxy
-    proxy_mgr = LibProxyManager(mgr)
+    proxy_mgr = mgr.get_lib_proxy_mgr()
     proxy = proxy_mgr.open_lib_proxy(lib_name, run_sp=h.sp)
     assert proxy
     assert proxy.Add(3, 4) == 7

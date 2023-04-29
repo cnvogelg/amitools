@@ -118,7 +118,7 @@ class HunkSegment:
                     if self.debug_infos is None:
                         self.debug_infos = []
                     self.debug_infos.append(debug_info)
-            elif blk_id in (HUNK_ABSRELOC32, HUNK_RELOC32SHORT):
+            elif blk_id in (HUNK_ABSRELOC32, HUNK_RELOC32SHORT, HUNK_RELRELOC32):
                 if self.reloc_blks is None:
                     self.reloc_blks = []
                 self.reloc_blks.append(blk)

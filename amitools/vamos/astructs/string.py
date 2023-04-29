@@ -46,7 +46,7 @@ class CStringType(TypeBase):
     def _alloc(cls, alloc, tag, txt):
         if tag is None:
             tag = "CString('%s')" % txt
-        return alloc.alloc_cstr(tag, txt)
+        return alloc.alloc_cstr(txt, label=tag)
 
     @classmethod
     def _free(cls, alloc, mem_obj):
@@ -97,7 +97,7 @@ class BStringType(TypeBase):
     def _alloc(cls, alloc, tag, txt):
         if tag is None:
             tag = "BString('%s')" % txt
-        return alloc.alloc_bstr(tag, txt)
+        return alloc.alloc_bstr(txt, label=tag)
 
     @classmethod
     def _free(cls, alloc, mem_obj):

@@ -3,11 +3,12 @@
 # swiss army knife for rdb disk images or devices
 
 
-from amitools.util.HexDump import get_hex_line
 import sys
 import argparse
 import os.path
+import json
 
+from amitools.util.HexDump import get_hex_line
 from amitools.util.CommandQueue import CommandQueue
 from amitools.fs.FSError import FSError
 from amitools.fs.FSString import FSString
@@ -411,9 +412,55 @@ class InfoCommand(Command):
                     extra,
                 )
             )
+        lines = rdisk.get_info(part_name, full=True)
+        for l in lines:
+            print(l)
+        return 0
+
+
+class ListCommand(Command):
+    def handle_rdisk(self, rdisk):
+        part_name = None
+        if len(self.opts) > 0:
+            part_name = self.opts[0]
+        else:
+            # blkdev info
+            geo = self.blkdev.geo
+            extra = "heads=%d sectors=%d block_size=%d" % (
+                geo.heads,
+                geo.secs,
+                geo.block_bytes,
+            )
+            print(
+                "BlockDevice:         %8d %8d  %10d  %s  %s"
+                % (
+                    0,
+                    geo.cyls - 1,
+                    geo.get_num_blocks(),
+                    ByteSize.to_byte_size_str(geo.get_num_bytes()),
+                    extra,
+                )
+            )
         lines = rdisk.get_info(part_name)
         for l in lines:
             print(l)
+        return 0
+
+
+class JsonCommand(Command):
+    def handle_rdisk(self, rdisk):
+        geo = self.blkdev.geo
+        desc = {
+            "img_file": self.args.image_file,
+            "blkdev": geo.get_desc(),
+            "rdb": rdisk.get_desc(),
+        }
+        if len(self.opts) > 0:
+            json_file = self.opts[0]
+            with open(json_file, "w") as fh:
+                json.dump(desc, fh, sort_keys=True, indent=4)
+        else:
+            print(json.dumps(desc, sort_keys=True, indent=4))
         return 0
 
 
@@ -761,18 +808,22 @@ class ExportCommand(Command):
 class ImportCommand(Command):
     def handle_rdisk(self, rdisk):
         if len(self.opts) < 2:
-            print("Usage: import <partition> <file>")
+            print("Usage: import <partition> <file> [pad]")
             return 1
         else:
             part = self.opts[0]
             file_name = self.opts[1]
+            if len(self.opts) > 2:
+                pad = "pad" == self.opts[2]
+            else:
+                pad = False
             p = rdisk.find_partition_by_string(part)
             if p:
                 print(
-                    "importing '%s' to '%s' (%d blocks)"
-                    % (file_name, p.get_drive_name(), p.get_num_blocks())
+                    "importing '%s' to '%s' (%d blocks) pad=%r"
+                    % (file_name, p.get_drive_name(), p.get_num_blocks(), pad)
                 )
-                p.import_data(file_name)
+                p.import_data(file_name, pad=pad)
                 return 0
             else:
                 print("Can't find partition: '%s'" % part)
@@ -987,6 +1038,8 @@ def main(args=None, defaults=None):
         "adjust": AdjustCommand,
         "remap": RemapCommand,
         "info": InfoCommand,
+        "list": ListCommand,
+        "json": JsonCommand,
         "show": ShowCommand,
         "free": FreeCommand,
         "add": AddCommand,
@@ -1009,7 +1062,7 @@ def main(args=None, defaults=None):
         "command_list", nargs="+", help="command: " + ",".join(list(cmd_map.keys()))
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true", default=False, help="be more verbos"
+        "-v", "--verbose", action="store_true", default=False, help="be more verbose"
     )
     parser.add_argument(
         "-s", "--seperator", default="+", help="set the command separator char sequence"

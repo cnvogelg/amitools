@@ -186,9 +186,9 @@ class Relocate(HunkCommand):
             print("Sizes: ", " ".join(["%06x" % (x) for x in sizes]))
             print("Data:  ", " ".join(["%06x" % (len(x)) for x in datas]))
             print("Total: ", "%06x" % (rel.get_total_size()))
-            if args.hexdump:
-                for d in datas:
-                    print_hex(d)
+            if self.args.hexdump:
+                for d, a in zip(datas, addrs):
+                    print_hex(d, base_addr=a)
             return True
 
 
@@ -236,7 +236,7 @@ def main(args=None):
         help="dump the hunk structure",
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true", default=False, help="be more verbos"
+        "-v", "--verbose", action="store_true", default=False, help="be more verbose"
     )
     parser.add_argument(
         "-s", "--stop", action="store_true", default=False, help="stop on error"

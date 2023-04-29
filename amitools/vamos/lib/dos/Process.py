@@ -34,8 +34,8 @@ class Process:
         cwd_lock=None,
     ):
         """bin_file  Amiga path to binary for process
-       arg_str   Shell-style parameter string with trailing newline
-    """
+        arg_str   Shell-style parameter string with trailing newline
+        """
         self.ctx = ctx
         if input_fh == None:
             input_fh = self.ctx.dos_lib.file_mgr.get_input()
@@ -64,7 +64,7 @@ class Process:
         self.shell_message = None
         self.shell_packet = None
         self.shell_port = None
-        self.init_task_struct(input_fh, output_fh, self.stack)
+        self.init_task_struct(input_fh, output_fh)
         self.set_cwd()
         self._init_task()
 
@@ -160,9 +160,8 @@ class Process:
         fh.setbuf(arg_str)
         # alloc and fill arg buffer
         self.arg_len = len(arg_str)
-        self.arg = self.ctx.alloc.alloc_memory(
-            self.bin_basename + "_args", self.arg_len + 1
-        )
+        name = self.bin_basename + "_args"
+        self.arg = self.ctx.alloc.alloc_memory(self.arg_len + 1, label=name)
         self.arg_base = self.arg.addr
         self.ctx.mem.w_cstr(self.arg_base, arg_str)
         log_proc.info("args: '%s' (%d)", arg_str[:-1], self.arg_len)
@@ -207,7 +206,9 @@ class Process:
 
     # ----- cli struct -----
     def init_cli_struct(self, input_fh, output_fh, name):
-        self.cli = self.ctx.alloc.alloc_struct(self.bin_basename + "_CLI", CLIStruct)
+        self.cli = self.ctx.alloc.alloc_struct(
+            CLIStruct, label=self.bin_basename + "_CLI"
+        )
         self.cli.access.w_s("cli_DefaultStack", self.stack.get_size() // 4)  # in longs
         if input_fh != None:
             self.cli.access.w_s("cli_StandardInput", input_fh.b_addr << 2)
@@ -215,10 +216,10 @@ class Process:
         if output_fh != None:
             self.cli.access.w_s("cli_StandardOutput", output_fh.b_addr << 2)
             self.cli.access.w_s("cli_CurrentOutput", output_fh.b_addr << 2)
-        self.prompt = self.ctx.alloc.alloc_memory("cli_Prompt", 60)
-        self.cmdname = self.ctx.alloc.alloc_memory("cli_CommandName", 104)
-        self.cmdfile = self.ctx.alloc.alloc_memory("cli_CommandFile", 40)
-        self.setname = self.ctx.alloc.alloc_memory("cli_SetName", 80)
+        self.prompt = self.ctx.alloc.alloc_memory(60, label="cli_Prompt")
+        self.cmdname = self.ctx.alloc.alloc_memory(104, label="cli_CommandName")
+        self.cmdfile = self.ctx.alloc.alloc_memory(40, label="cli_CommandFile")
+        self.setname = self.ctx.alloc.alloc_memory(80, label="cli_SetName")
         self.cli.access.w_s("cli_Prompt", self.prompt.addr)
         self.cli.access.w_s("cli_CommandName", self.cmdname.addr)
         self.cli.access.w_s("cli_CommandFile", self.cmdfile.addr)
@@ -254,10 +255,10 @@ class Process:
         if self.shell_packet == None:
             # Ok, here we have to create a DosPacket for the shell startup
             self.shell_message = self.ctx.alloc.alloc_struct(
-                "Shell Startup Message", MessageStruct
+                MessageStruct, label="Shell Startup Message"
             )
             self.shell_packet = self.ctx.alloc.alloc_struct(
-                "Shell Startup Packet", DosPacketStruct
+                DosPacketStruct, label="Shell Startup Packet"
             )
             self.shell_port = self.ctx.exec_lib.port_mgr.create_port(
                 "Shell Startup Port", None
@@ -273,12 +274,12 @@ class Process:
         return self.shell_packet.addr
 
     # ----- task struct -----
-    def init_task_struct(self, input_fh, output_fh, stack):
+    def init_task_struct(self, input_fh, output_fh):
         # Inject arguments into input stream (Needed for C:Execute)
         self.this_task = self.ctx.alloc.alloc_struct(
-            self.bin_basename + "_ThisTask", ProcessStruct
+            ProcessStruct, label=self.bin_basename + "_ThisTask"
         )
-        self.seglist = self.ctx.alloc.alloc_memory("Process Seglist", 24)
+        self.seglist = self.ctx.alloc.alloc_memory(24, label="Process Seglist")
         self.this_task.access.w_s("pr_Task.tc_Node.ln_Type", NT_PROCESS)
         self.this_task.access.w_s("pr_SegList", self.seglist.addr)
         self.this_task.access.w_s("pr_CLI", self.cli.addr)
@@ -288,11 +289,6 @@ class Process:
         self.this_task.access.w_s(
             "pr_COS", output_fh.b_addr << 2
         )  # compensate BCPL auto-conversion
-        
-        # init stack
-        self.this_task.access.w_s("pr_Task.tc_SPUpper", stack.upper)
-        self.this_task.access.w_s("pr_Task.tc_SPLower", stack.lower)
-        
         # setup console task
         console_task = self.ctx.dos_lib.file_mgr.get_console_handler_port()
         self.this_task.access.w_s("pr_ConsoleTask", console_task)
@@ -315,7 +311,7 @@ class Process:
 
     def get_local_vars(self):
         localvars_addr = self.this_task.access.s_get_addr("pr_LocalVars")
-        return self.ctx.alloc.map_struct("MinList", localvars_addr, MinListStruct)
+        return self.ctx.alloc.map_struct(localvars_addr, MinListStruct, label="MinList")
 
     def get_input(self):
         fh_b = self.this_task.access.r_s("pr_CIS") >> 2

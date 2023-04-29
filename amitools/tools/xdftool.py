@@ -21,6 +21,7 @@ from amitools.fs.rdb.RDisk import RDisk
 from amitools.fs.FSString import FSString
 import amitools.fs.DosType as DosType
 
+
 # system encoding
 def make_fsstr(s):
     if sys.version_info[0] == 3:
@@ -322,6 +323,7 @@ class RepackCmd(Command):
 
 # ----- Query Image -----
 
+
 # list: list directory tree
 class ListCmd(Command):
     def handle_vol(self, vol):
@@ -529,12 +531,15 @@ class TimeCmd(Command):
         if n != 2:
             print("Usage: time <ami_file> <time>")
             return 1
-        name = self.opts[0]
+        name = make_fsstr(self.opts[0])
         tstr = self.opts[1]
         node = vol.get_path_name(name)
         if node != None:
-            node.change_mod_ts_by_string(tstr)
-            return 0
+            if node.change_mod_ts_by_string(tstr):
+                return 0
+            else:
+                print("invalid time:", tstr)
+                return 2
         else:
             print("Can't find node:", name)
             return 2
@@ -704,24 +709,33 @@ class RootCmd(Command):
                 print("create_time <time>")
                 return 1
             else:
-                volume.change_create_ts_by_string(self.opts[1])
-                return 0
+                if volume.change_create_ts_by_string(self.opts[1]):
+                    return 0
+                else:
+                    print("invalid time:", self.opts[1])
+                    return 2
         # disk_time <time>
         elif cmd == "disk_time":
             if n != 2:
                 print("disk_time <time>")
                 return 1
             else:
-                volume.change_disk_ts_by_string(self.opts[1])
-                return 0
+                if volume.change_disk_ts_by_string(self.opts[1]):
+                    return 0
+                else:
+                    print("invalid time:", self.opts[1])
+                    return 2
         # time <time>
         elif cmd == "time":
             if n != 2:
                 print("time <time>")
                 return 1
             else:
-                volume.change_mod_ts_by_string(self.opts[1])
-                return 0
+                if volume.change_mod_ts_by_string(self.opts[1]):
+                    return 0
+                else:
+                    print("invalid time:", self.opts[1])
+                    return 2
         # boot ?
         else:
             print("Unknown root command!")
@@ -870,7 +884,7 @@ def main(args=None, defaults=None):
         "command_list", nargs="+", help="command: " + ",".join(list(cmd_map.keys()))
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true", default=False, help="be more verbos"
+        "-v", "--verbose", action="store_true", default=False, help="be more verbose"
     )
     parser.add_argument(
         "-s", "--seperator", default="+", help="set the command separator char sequence"

@@ -31,6 +31,7 @@ class VLibManager(object):
         self.exec_lib = None
         self.addr_vlib = {}
         self.name_vlib = {}
+        self.ctx_extra_attr = {}
 
     def _setup_creator(self):
         # tools
@@ -48,11 +49,20 @@ class VLibManager(object):
             lib_profiler=self.lib_profiler,
         )
 
+    def set_ctx_extra_attr(self, key, val):
+        """set extra attributes automatically added to each context"""
+        self.ctx_extra_attr[key] = val
+
+    def _add_ctx_extra_attr(self, ctx):
+        for key, val in self.ctx_extra_attr.items():
+            setattr(ctx, key, val)
+
     def add_impl_cls(self, name, impl_cls):
         self.lib_reg.add_lib_impl(name, impl_cls)
 
     def add_ctx(self, name, ctx):
         self.ctx_map[name] = ctx
+        self._add_ctx_extra_attr(ctx)
 
     def bootstrap_exec(self, exec_info=None, version=0, revision=0):
         """setup exec library"""
@@ -185,6 +195,7 @@ class VLibManager(object):
         if not ctx:
             ctx = LibCtx(self.machine)
             self.ctx_map[name] = ctx
+            self._add_ctx_extra_attr(ctx)
         # get impl
         if fake:
             impl = None

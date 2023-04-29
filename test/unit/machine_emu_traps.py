@@ -1,11 +1,11 @@
 import pytest
 import traceback
 import sys
-from musashi import emu
-from musashi.m68k import *
+from machine import emu
+from machine.m68k import *
 
 
-def musashi_traps_trigger_test():
+def machine_emu_traps_trigger_test():
     traps = emu.Traps()
     a = []
 
@@ -20,7 +20,7 @@ def musashi_traps_trigger_test():
     traps.free(tid)
 
 
-def musashi_traps_raise_test():
+def machine_emu_traps_raise_test():
     traps = emu.Traps()
     a = []
     b = []

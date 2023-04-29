@@ -1,10 +1,10 @@
 import pytest
-from musashi import emu
-from musashi.m68k import *
+from machine import emu
+from machine.m68k import *
 from amitools.vamos.machine import *
 
 
-def musashi_cpustate_rw_test():
+def machine_emu_cpustate_rw_test():
     cpu = emu.CPU(M68K_CPU_TYPE_68000)
     cpu.w_pc(0)
     cpu.w_sr(0x2700)

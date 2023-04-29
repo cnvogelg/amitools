@@ -163,7 +163,7 @@ def main(args=None):
         "input", nargs="+", help="input image file or directory (to scan tree)"
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true", default=False, help="be more verbos"
+        "-v", "--verbose", action="store_true", default=False, help="be more verbose"
     )
     parser.add_argument(
         "-d", "--debug", action="store_true", default=False, help="show debug info"

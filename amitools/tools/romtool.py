@@ -370,7 +370,7 @@ def do_combine_cmd(args):
         logging.error("Not a Kick ROM image!")
         return 1
     if ka.get_size_kib() != 512:
-        logging.error("Not a 512 MiB Kick ROM image!")
+        logging.error("Not a 512 KiB Kick ROM image!")
         return 2
     if ka.get_base_addr() != 0xF80000:
         logging.error("Kick ROM base address is not 0xf80000!")
@@ -380,8 +380,12 @@ def do_combine_cmd(args):
     ka = rom.KickRomAccess(ext_rom)
     if not ka.check_header():
         logging.error("No ROM Header in Ext ROM image found!")
-    if ka.get_size_kib() != 512:
-        logging.error("Not a 512 MiB Ext ROM image!")
+    if (
+        ka.get_size_kib() != 512
+        and ka.get_size_kib() != 1536
+        and ka.get_size_kib() != 3584
+    ):
+        logging.error("Not a 512/1536/3584 KiB Ext ROM image!")
     # write rom
     rom_img = ext_rom + kick_rom
     output = args.output

@@ -40,7 +40,7 @@
 
 extern void m68040_fpu_op0(void);
 extern void m68040_fpu_op1(void);
-extern void m68881_mmu_ops();
+extern void m68881_mmu_ops(void);
 extern unsigned char m68ki_cycles[][0x10000];
 extern void (*m68ki_instruction_jump_table[0x10000])(void); /* opcode handler jump table */
 extern void m68ki_build_opcode_table(void);
@@ -66,12 +66,14 @@ const char *const m68ki_cpu_names[] =
 	"Invalid CPU",
 	"M68000",
 	"M68010",
-	"Invalid CPU",
-	"M68EC020"
-	"Invalid CPU",
-	"Invalid CPU",
-	"Invalid CPU",
-	"M68020"
+	"M68EC020",
+	"M68020",
+	"M68EC030",
+	"M68030",
+	"M68EC040",
+	"M68LC040",
+	"M68040",
+	"SCC68070",
 };
 #endif /* M68K_LOG_ENABLE */
 
@@ -752,7 +754,6 @@ int m68k_get_fpsr(void*context)
 {
 	return REG_FPSR;
 }
-
 /* Set the callbacks */
 void m68k_set_int_ack_callback(int  (*callback)(int int_level))
 {
@@ -1041,7 +1042,7 @@ int m68k_execute(int num_cycles)
 
 	/* return how many clocks we used */
 	if (num_cycles == m68ki_initial_cycles)
-		return m68ki_initial_cycles - GET_CYCLES();
+	return m68ki_initial_cycles - GET_CYCLES();
 
 	/* modified by end_timeslice. */
 	return num_cycles - m68ki_initial_cycles;

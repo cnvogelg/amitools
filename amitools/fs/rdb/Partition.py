@@ -88,6 +88,14 @@ class Partition:
         dos_type = de.dos_type
         extra += DosType.num_to_tag_str(dos_type)
         extra += "/0x%04x" % dos_type
+
+        # add info on flags and boot pri
+        flags = p.flags
+        if flags & PartitionBlock.FLAG_NO_AUTOMOUNT != PartitionBlock.FLAG_NO_AUTOMOUNT:
+            extra += "  auto"
+        if flags & PartitionBlock.FLAG_BOOTABLE == PartitionBlock.FLAG_BOOTABLE:
+            extra += "  boot(%d)" % de.boot_pri
+
         return "Partition: #%d %-06s %8d %8d  %10d  %s  %s" % (
             self.num,
             name,
@@ -112,6 +120,8 @@ class Partition:
         result.append("max_transfer=0x%x" % de.max_transfer)
         result.append("mask=0x%x" % de.mask)
         result.append("num_buffer=%d" % de.num_buffer)
+        result.append("pre_alloc=%d" % de.pre_alloc)
+        result.append("boot_blocks=%d" % de.boot_blocks)
         # add flags
         flags = p.flags
         if flags & PartitionBlock.FLAG_BOOTABLE == PartitionBlock.FLAG_BOOTABLE:
@@ -123,6 +133,28 @@ class Partition:
         else:
             result.append("automount=1")
         return result
+
+    def get_desc(self):
+        """get a JSON-like python structure with all infos"""
+        p = self.part_blk
+        de = p.dos_env
+        dos_env = dict(de.__dict__)
+        dos_env["dos_type_str"] = DosType.num_to_tag_str(de.dos_type)
+        # decode some flags
+        flags = p.flags
+        bootable = flags & PartitionBlock.FLAG_BOOTABLE == PartitionBlock.FLAG_BOOTABLE
+        automount = (
+            flags & PartitionBlock.FLAG_NO_AUTOMOUNT != PartitionBlock.FLAG_NO_AUTOMOUNT
+        )
+        return {
+            "num": self.num,
+            "name": str(p.drv_name),
+            "flags": flags,
+            "dev_flags": p.dev_flags,
+            "dos_env": dos_env,
+            "bootable": bootable,
+            "automount": automount,
+        }
 
     # ----- Import/Export -----
 
@@ -137,7 +169,7 @@ class Partition:
                 fh.write(data)
         blkdev.close()
 
-    def import_data(self, file_name):
+    def import_data(self, file_name, pad=False):
         """Import contents of partition from file"""
         part_dev = self.create_blkdev()
         part_dev.open()
@@ -147,20 +179,25 @@ class Partition:
         # open image
         file_size = os.path.getsize(file_name)
         file_blks = file_size // blk_size
-        if file_size % blk_size != 0:
-            raise ValueError("image file not block size aligned!")
-        # check sizes
+        if not pad:
+            if file_size % blk_size != 0:
+                raise ValueError("image file not block size aligned!")
+            # check sizes
+            if total > file_size:
+                raise ValueError(
+                    "import image too small: partition=%d != file=%d"
+                    % (total, file_size)
+                )
         if total < file_size:
             raise ValueError(
                 "import image too large: partition=%d != file=%d" % (total, file_size)
-            )
-        if total > file_size:
-            raise ValueError(
-                "import image too small: partition=%d != file=%d" % (total, file_size)
             )
         # copy image
         with open(file_name, "rb") as fh:
             for b in range(file_blks):
                 data = fh.read(blk_size)
+                n = len(data)
+                if n < blk_size:
+                    data += bytearray(blk_size - n)
                 part_dev.write_block(b, data)
         part_dev.close()

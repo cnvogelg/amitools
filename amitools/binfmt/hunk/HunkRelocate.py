@@ -65,21 +65,28 @@ class HunkRelocate:
                 if (
                     hunk["type"] == Hunk.HUNK_ABSRELOC32
                     or hunk["type"] == Hunk.HUNK_DREL32
+                    or hunk["type"] == Hunk.HUNK_RELRELOC32
                 ):
                     reloc = hunk["reloc"]
                     for hunk_num in reloc:
                         # get address of other hunk
                         hunk_addr = addr[hunk_num]
                         offsets = reloc[hunk_num]
+                        relative = hunk["type"] == Hunk.HUNK_RELRELOC32
+                        my_addr = addr[hunk_no]
                         for offset in offsets:
-                            self.relocate32(hunk_no, data, offset, hunk_addr)
+                            self.relocate32(
+                                hunk_no, data, offset, hunk_addr, my_addr, relative
+                            )
 
             datas.append(data.raw)
         return datas
 
-    def relocate32(self, hunk_no, data, offset, hunk_addr):
+    def relocate32(self, hunk_no, data, offset, hunk_addr, my_addr, relative):
         delta = self.read_long(data, offset)
         addr = hunk_addr + delta
+        if relative:
+            addr -= my_addr + offset
         self.write_long(data, offset, addr)
         if self.verbose:
             print(

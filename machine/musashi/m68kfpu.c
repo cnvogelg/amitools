@@ -5,7 +5,7 @@
 
 extern void exit(int);
 
-static void fatalerror(char *format, ...) {
+static void fatalerror(const char *format, ...) {
       va_list ap;
       va_start(ap,format);
       vfprintf(stderr,format,ap);  // JFF: fixed. Was using fprintf and arguments were wrong
@@ -673,7 +673,7 @@ static floatx80 READ_EA_FPE(int mode, int reg, uint32 di_mode_ea)
       case 5:		// (d16, An)  (added by JFF)
 		{
 		  fpr = load_extended_float80(di_mode_ea);
-		  break;
+	  	break;
 		}
 	  case 6:		// (An) + (Xn) + d8
 		{
@@ -681,7 +681,7 @@ static floatx80 READ_EA_FPE(int mode, int reg, uint32 di_mode_ea)
 		  fpr = load_extended_float80(ea);
 		  break;
 		}
-	  case 7:	// extended modes
+		case 7:	// extended modes
 		{
 			switch (reg)
 			{
@@ -1461,7 +1461,7 @@ static void fpgen_rm_reg(uint16 w2)
 		case 0x20:		// FDIV
 		{
 			REG_FP[dst] = floatx80_div(REG_FP[dst], source);
-		    	SET_CONDITION_CODES(REG_FP[dst]); // JFF
+		    SET_CONDITION_CODES(REG_FP[dst]); // JFF
 			USE_CYCLES(43);
 			break;
 		}
@@ -1538,8 +1538,8 @@ static void fpgen_rm_reg(uint16 w2)
 					REG_FPSR |= FPCC_N;
 
 			} else {
-				res = floatx80_sub(REG_FP[dst], source);
-				SET_CONDITION_CODES(res);
+			res = floatx80_sub(REG_FP[dst], source);
+			SET_CONDITION_CODES(res);
 			}
 			USE_CYCLES(7);
 			break;

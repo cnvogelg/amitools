@@ -3,7 +3,6 @@
 import os
 import struct
 import io
-from types import *
 from .Hunk import *
 
 
@@ -23,14 +22,14 @@ class HunkReader:
         self.units = None
 
     def get_struct_summary(self, obj):
-        if type(obj) == ListType:
+        if type(obj) is list:
             result = []
             for a in obj:
                 v = self.get_struct_summary(a)
                 if v != None:
                     result.append(v)
             return "[" + ",".join(result) + "]"
-        elif type(obj) == DictType:
+        elif type(obj) is dict:
             if "type_name" in obj:
                 type_name = obj["type_name"]
                 return type_name.replace("HUNK_", "")
@@ -658,8 +657,7 @@ class HunkReader:
                     result = self.parse_bss(f, hunk)
                 # ----- HUNK_<reloc> -----
                 elif (
-                    hunk_type == HUNK_RELRELOC32
-                    or hunk_type == HUNK_ABSRELOC16
+                    hunk_type == HUNK_ABSRELOC16
                     or hunk_type == HUNK_RELRELOC8
                     or hunk_type == HUNK_RELRELOC16
                     or hunk_type == HUNK_ABSRELOC32
@@ -670,7 +668,7 @@ class HunkReader:
                 ):
                     result = self.parse_reloc(f, hunk)
                 # ---- HUNK_<reloc short> -----
-                elif hunk_type == HUNK_RELOC32SHORT:
+                elif hunk_type == HUNK_RELOC32SHORT or hunk_type == HUNK_RELRELOC32:
                     result = self.parse_reloc_short(f, hunk)
                 # ----- HUNK_SYMBOL -----
                 elif hunk_type == HUNK_SYMBOL:

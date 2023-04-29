@@ -19,97 +19,21 @@ will be very helpful.
 
 ## Prerequisites
 
-- Python >= ```3.6```
-- pip
+- Python >= ```3.7```
+- [pip3][1]
 
 ### Optional Packages
 
-- [lhafile - FS Edition][1]: required to use ```.lha``` file scanner
-- [cython][7]: (version >= **0.25**) required to rebuild the native module
+- [lhafile - FS Edition][2]: required to use ```.lha``` file scanner
+- [cython][3]: (version >= **0.29**) required to rebuild the native module
 
-### Install pip
-
-First make sure to have the Python 3 package installer ```pip3```:
-
-#### macOS
-
-On macOS you have multiple ways of installing ```pip3```:
-
-#### System Python
-
-```bash
-sudo easy_install pip
-```
-
-#### Homebrew Package Manager
-
-With the [Homebrew][3] package manager (```pip3``` is included in the ```python3``` package):
-
-```bash
-brew install python3
-```
-
-#### Linux/Ubuntu
-
-On Linux Ubuntu use the provided packages ```python3-pip```
-
-```bash
-sudo apt-get install python3-pip
-```
-
-#### Centos
-
-To get pip run:
-
-```bash
-curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py"
-python3 get-pip.py
-```
-
-#### Windows with Visual Studio
-
-- Install the latest native Windows Python >= 3.6 from [python.org][6]
-- There is a special Edition for Visual Studio available that allows
-  to compile Python 3.x modules: Install [VCpython3][5]
-- Open the Command Shell of the Compiler and run
-
-```bash
-cd C:\Python3x\Scripts
-pip install amitools
-```
-
-#### Windows with MSYS2
-
-- (I use the mingw gcc compiler here to build the extension)
-- On Windows with [MSYS2][4] (use x86_64 version if possible):
-  - Install with exe installer
-  - Initial update is done with: (Open shell first)
-
-```bash
-pacman -Sy
-pacman --needed -S bash pacman msys2-runtime
-```
-
-- Now close shell and re-open a new dev shell (```MinGW-w64 Win64 Shell```)
-
-```bash
-pacman -Su
-pacman -S mingw-w64-x86_64-python2-pip mingw-w64-x86_64-gcc git make
-```
-
-[1]: https://github.com/FrodeSolheim/python-lhafile
-[2]: https://www.macports.org
-[3]: https://brew.sh
-[4]: https://github.com/msys2/msys2/wiki
-[5]: https://www.microsoft.com/en-gb/download/details.aspx?id=44266
-[6]: https://www.python.org
-[7]: https://cython.org
+[1]: https://pip.pypa.io/en/stable/installation/
+[2]: https://github.com/FrodeSolheim/python-lhafile
+[3]: https://cython.org
 
 ## Installation
 
-### The Easy Way for Users
-
-#### Release Version
+### Stable/Release Version
 
 ```bash
 pip3 install amitools
@@ -119,71 +43,52 @@ Note:
 
 - on Linux/macOS may use ``sudo`` to install for all users
 - requires a host C compiler to compile the extension.
+- the version may be a bit outdated. If you need recent changes use the
+  current version.
 
-#### Current Version from GitHub
+### Current Version from GitHub
+
+Ensure you have Cython installed:
 
 ```bash
-pip3 install -U  git+https://github.com/cnvogelg/amitools.git
+pip3 install cython
 ```
 
-This will install the latest version found in the github repository.
-You find the latest features but it may also be unstable from time to time.
+Then install `amitools` directly from the git repository:
+
+```bash
+pip3 install -U git+https://github.com/cnvogelg/amitools.git
+```
+
+Note:
+
+- This will install the latest version found in the github repository.
+- You find the latest features but it may also be unstable from time to time.
+- Repeat this command to update to the latest version.
 
 ### Developers
 
 - Follow this route if you want to hack around with the amitools codebase
 - Clone the Git repo: [amitools@git](https://github.com/cnvogelg/amitools)
-- Ensure to have Cython (version >= **0.25**) installed:
+- Ensure you have Cython installed:
 
 ```bash
-sudo pip3 install cython
+pip3 install cython
 ```
 
-You have multiple variants to install the tools with Python's `setuptools`:
-
-- **Global Install** is available for all users of your system and needs root privileges
+- Enter the directory of the cloned repo and install via pip:
 
 ```bash
-sudo python3 setup.py install
+pip3 install -U -e .
 ```
 
-- **User Install** is available for your user only but does not require special privileges
-
-```bash
-python3 setup.py install --user
-```
-
-- **Developer Setup** only links this code into your installation and allows
-   you to change/develop the code and test it immediately. (I prefer user install here)
-
-```bash
-python3 setup.py develop --user
-```
-
-- **Run In Place** allows you to run the binaries directly from the `bin` directory
-   without any installation. You need `make` only to build the native library
-   of vamos:
-
-```bash
-python3 setup.py build_ext -i
-```
-
-or if you have installed `GNU make` simply use:
-
-```bash
-make init       # global or virtualenv setup
-make init_user  # user setup
-```
-
-For more help on the `make` targets run:
-
-```bash
-make help
-```
+This install `amitools` in your current Python environment but takes the
+source files still from this repository. So you can change the code there
+and directly test the tools.
 
 ## Contents
 
-The new Documentation of `amitools` is hosted on [readthedocs][8]
+The new Documentation of `amitools` is hosted on [readthedocs][4]
 
 ### Tools
 
@@ -194,19 +99,19 @@ The new Documentation of `amitools` is hosted on [readthedocs][8]
   and dos calls with its own implementation and maps all file access to
   your local file system.
 
-- [xdftool][9]
+- [xdftool][5]
 
   Create and modify ADF or HDF disk image files.
 
-- [xdfscan][10]
+- [xdfscan][6]
 
   Scan directory trees for ADF or HDF disk image files and verify the contents.
 
-- [rdbtool][11]
+- [rdbtool][7]
 
   Create or modify disk images with Rigid Disk Block (RDB)
 
-- [romtool][12]
+- [romtool][8]
 
   A tool to inspect, dissect, and build Amiga Kickstart ROM images to be
   used with emulators, run with soft kickers or burned into flash ROMs.
@@ -218,7 +123,7 @@ The new Documentation of `amitools` is hosted on [readthedocs][8]
   files in various formats.
 
   You can load hunk-based binaries, libraries, and object files. Even
-  overlayed binary files are supporte.
+  overlayed binary files are supported.
 
 - typetool
 
@@ -233,11 +138,11 @@ The new Documentation of `amitools` is hosted on [readthedocs][8]
 
   You can query functions and find their jump table offset.
 
-[8]: https://amitools.readthedocs.io/
-[9]: https://amitools.readthedocs.io/en/latest/tools/xdftool.html
-[10]: https://amitools.readthedocs.io/en/latest/tools/xdfscan.html
-[11]: https://amitools.readthedocs.io/en/latest/tools/rdbtool.html
-[12]: https://amitools.readthedocs.io/en/latest/tools/romtool.html
+[4]: https://amitools.readthedocs.io/
+[5]: https://amitools.readthedocs.io/en/latest/tools/xdftool.html
+[6]: https://amitools.readthedocs.io/en/latest/tools/xdfscan.html
+[7]: https://amitools.readthedocs.io/en/latest/tools/rdbtool.html
+[8]: https://amitools.readthedocs.io/en/latest/tools/romtool.html
 
 ### Python Libraries
 

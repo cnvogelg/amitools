@@ -355,7 +355,7 @@ class ExecLibrary(LibImpl):
         # label alloc
         pc = self.get_callee_pc(ctx)
         name = "AllocMem(%06x)" % pc
-        mb = self.alloc.alloc_memory(name, size)
+        mb = self.alloc.alloc_memory(size, label=name)
         log_exec.info("AllocMem: %s -> 0x%06x %d bytes" % (mb, mb.addr, size))
         return mb.addr
 
@@ -377,8 +377,9 @@ class ExecLibrary(LibImpl):
     def AllocVec(self, ctx):
         size = ctx.cpu.r_reg(REG_D0)
         flags = ctx.cpu.r_reg(REG_D1)
-        mb = self.alloc.alloc_memory("AllocVec(@%06x)" % self.get_callee_pc(ctx), size)
-        log_exec.info("AllocVec: %s" % mb)
+        name = "AllocVec(@%06x)" % self.get_callee_pc(ctx)
+        mb = self.alloc.alloc_memory(size, label=name)
+        log_exec.info("AllocVec: %s, flags=%08x", name, flags)
         return mb.addr
 
     def FreeVec(self, ctx):
@@ -452,7 +453,7 @@ class ExecLibrary(LibImpl):
         # label alloc
         pc = self.get_callee_pc(ctx)
         name = "CreateIORequest(%06x)" % pc
-        mb = self.alloc.alloc_memory(name, size)
+        mb = self.alloc.alloc_memory(size, label=name)
         log_exec.info(
             "CreateIORequest: (%s,%s,%s) -> 0x%06x %d bytes"
             % (mb, port, size, mb.addr, size)

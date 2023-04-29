@@ -10,7 +10,7 @@ class Puddle:
         self.label_mgr = label_mgr
         self.mem = mem
         self.size = size
-        self.mem_obj = self.alloc.alloc_memory(name, size)
+        self.mem_obj = self.alloc.alloc_memory(size, label=name)
         self.chunks = MemoryAlloc(self.mem, self.mem_obj.addr, size, label_mgr)
 
     def __del__(self):
@@ -22,7 +22,7 @@ class Puddle:
             self.mem_obj = None
 
     def AllocPooled(self, name, size):
-        return self.chunks.alloc_memory(name, size, True, False)
+        return self.chunks.alloc_memory(size, label=name, except_on_failure=False)
 
     def FreePooled(self, addr, size):
         mem = self.chunks.get_memory(addr)

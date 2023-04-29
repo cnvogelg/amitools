@@ -60,6 +60,62 @@ def test_execpy_vamos_ctx_func_test(vamos):
     assert stdout == [
         "hello, world!",
         "<class 'amitools.vamos.libcore.ctx.LibCtx'>",
-        "['cpu', 'machine', 'mem', 'vlib']",
+        "['cpu', 'machine', 'mem', 'proxies', 'vlib']",
     ]
     assert stderr == []
+
+
+def test_execpy_vamos_ctx_func_checked_test(vamos):
+    def test(ctx):
+        """the nested test ctx_func without return"""
+        assert sorted(ctx.__dict__) == ["cpu", "machine", "mem", "proxies", "vlib"]
+
+    vamos.run_ctx_func_checked(test)
+
+
+def test_execpy_vamos_ctx_func_exec_test(vamos):
+    """call exec functions via proxy in ctx func"""
+
+    def test(ctx):
+        # get exec lib proxy
+        exec = ctx.proxies.get_exec_lib_proxy()
+        assert exec
+        # call exec functions
+        size = 1024
+        addr = exec.AllocMem(size, 0)
+        assert addr
+        exec.FreeMem(addr, size)
+
+    vamos.run_ctx_func_checked(test)
+
+
+def test_execpy_vamos_ctx_func_dos_test(vamos, tmpdir):
+    """call dos functions via proxy in ctx func"""
+    sys_file_name = str(tmpdir / "test_file")
+    ami_file_name = "root:" + sys_file_name[1:]
+    ami_file_len = len(ami_file_name)
+
+    def test(ctx):
+        # get dos, exec lib proxy
+        exec = ctx.proxies.get_exec_lib_proxy()
+        assert exec
+        dos = ctx.proxies.get_dos_lib_proxy()
+        assert dos
+        # allocate name
+        name_addr = exec.AllocMem(ami_file_len + 1, 0)
+        assert name_addr
+        ctx.mem.w_cstr(name_addr, ami_file_name)
+        # call dos functions
+        fh = dos.Open(name_addr, 1006)
+        assert fh
+        res = dos.Write(fh, name_addr, ami_file_len)
+        assert res == ami_file_len
+        # clean up
+        dos.Close(fh)
+        exec.FreeMem(name_addr, ami_file_len)
+
+    vamos.run_ctx_func_checked(test)
+    # check file
+    with open(sys_file_name, "r") as fobj:
+        data = fobj.read()
+        assert data == ami_file_name

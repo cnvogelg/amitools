@@ -44,7 +44,7 @@ class Stack(object):
     def alloc(cls, alloc, size, name=None):
         if name is None:
             name = "Stack(%db)" % size
-        mem_obj = alloc.alloc_memory(name, size)
+        mem_obj = alloc.alloc_memory(size, label=name)
         lower = mem_obj.addr
         upper = lower + size
         stack = Stack(lower, upper)

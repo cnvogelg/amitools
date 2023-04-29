@@ -13,7 +13,7 @@ class FSString:
         """
         if type(txt) is str:
             self.txt = txt
-        elif type(txt) is bytes:
+        elif type(txt) in (bytes, bytearray):
             self.txt = txt.decode(encoding)
         else:
             raise ValueError("FSString must be str or bytes!")

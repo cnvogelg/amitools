@@ -153,7 +153,11 @@ class BinFmtHunk:
     def _add_hunk_relocs(self, blks, seg, all_segs):
         """add relocations to a segment"""
         for blk in blks:
-            if blk.blk_id not in (Hunk.HUNK_ABSRELOC32, Hunk.HUNK_RELOC32SHORT):
+            if blk.blk_id not in (
+                Hunk.HUNK_ABSRELOC32,
+                Hunk.HUNK_RELOC32SHORT,
+                Hunk.HUNK_RELRELOC32,
+            ):
                 raise HunkParseError("Invalid Relocations for BinImage: %d" % blk_id)
             relocs = blk.relocs
             for r in relocs:
@@ -164,9 +168,14 @@ class BinFmtHunk:
                 rl = seg.get_reloc(to_seg)
                 if rl == None:
                     rl = Relocations(to_seg)
+                # type
+                if blk.blk_id == Hunk.HUNK_RELRELOC32:
+                    reloc_type = BIN_IMAGE_RELOC_PC32
+                else:
+                    reloc_type = BIN_IMAGE_RELOC_32
                 # add offsets
                 for o in offsets:
-                    r = Reloc(o, 1)
+                    r = Reloc(o, reloc_type)
                     rl.add_reloc(r)
                 seg.add_reloc(to_seg, rl)
 

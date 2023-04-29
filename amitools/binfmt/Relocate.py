@@ -56,12 +56,12 @@ class Relocate:
         for segment in segs:
             # allocate new buffer
             data = bytearray(segment.size)
-            self._copy_data(data, segment)
+            self._copy_data(data, segment, addrs)
             self._reloc_data(data, segment, addrs)
             datas.append(data)
         return datas
 
-    def _copy_data(self, data, segment, offset=0):
+    def _copy_data(self, data, segment, addrs, offset=0):
         # allocate segment data
         size = segment.size
         src_data = segment.data
@@ -98,8 +98,8 @@ class Relocate:
         self._write_long(data, offset, addr)
         if self.verbose:
             print(
-                "#%02d + %06x: %06x (delta) + @%06x (#%02d) -> %06x"
-                % (my_id, offset, delta, to_addr, to_id, addr)
+                "#%02d @%06x +%06x: %06x (delta) to @%06x (#%02d) -> %06x"
+                % (my_id, my_addr, offset, delta, to_addr, to_id, addr)
             )
 
     def _read_long(self, data, offset):

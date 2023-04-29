@@ -16,7 +16,7 @@ class PartitionDosEnv:
 
     def __init__(
         self,
-        size=16,
+        size=19,
         block_size=128,
         sec_org=0,
         surfaces=0,

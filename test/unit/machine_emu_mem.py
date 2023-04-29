@@ -1,8 +1,8 @@
 import pytest
-from musashi import emu
+from machine import emu
 
 
-def musashi_mem_rw_test():
+def machine_emu_mem_rw_test():
     mem = emu.Memory(16)
     assert mem.get_ram_size_kib() == 16
 
@@ -73,7 +73,7 @@ def musashi_mem_rw_test():
         mem.read(0, 0x10000)
 
 
-def musashi_mem_rws_test():
+def machine_emu_mem_rws_test():
     mem = emu.Memory(16)
 
     mem.w8s(0x100, 42)
@@ -165,7 +165,7 @@ class InvalidMemAccess(object):
         self.match = (mode, width, addr)
 
 
-def musashi_mem_cpu_rw_test():
+def machine_emu_mem_cpu_rw_test():
     mem = emu.Memory(16)
     assert mem.get_ram_size_kib() == 16
 
@@ -218,7 +218,7 @@ def musashi_mem_cpu_rw_test():
         mem.cpu_r32(0x10000)
 
 
-def musashi_mem_cpu_rws_test():
+def machine_emu_mem_cpu_rws_test():
     mem = emu.Memory(16)
 
     mem.cpu_w8s(0x100, 42)
@@ -276,7 +276,7 @@ def musashi_mem_cpu_rws_test():
         mem.cpu_r32s(0x10000)
 
 
-def musashi_mem_block_test():
+def machine_emu_mem_block_test():
     mem = emu.Memory(16)
     data = b"hello, world!"
     mem.w_block(0, data)
@@ -290,7 +290,7 @@ def musashi_mem_block_test():
     assert mem.r_block(0x300, 21) == bytes([42] * 20) + b"\0"
 
 
-def musashi_mem_cstr_test():
+def machine_emu_mem_cstr_test():
     mem = emu.Memory(16)
     data = "hello, world"
     mem.w_cstr(0, data)
@@ -300,7 +300,7 @@ def musashi_mem_cstr_test():
     assert mem.r_cstr(100) == empty
 
 
-def musashi_mem_bstr_test():
+def machine_emu_mem_bstr_test():
     mem = emu.Memory(16)
     data = "hello, world"
     mem.w_bstr(0, data)
@@ -330,7 +330,7 @@ class TraceAssert(object):
         self.match = (mode, width, addr, value)
 
 
-def musashi_mem_trace_test():
+def machine_emu_mem_trace_test():
     mem = emu.Memory(16)
     with TraceAssert(mem, "R", 0, 0x100, 0):
         mem.cpu_r8(0x100)
@@ -346,7 +346,7 @@ def musashi_mem_trace_test():
         mem.cpu_w32(0x100, 0xCAFEBABE)
 
 
-def musashi_mem_trace_error_test():
+def machine_emu_mem_trace_error_test():
     mem = emu.Memory(16)
 
     def trace_func(mode, width, addr, value):
@@ -362,7 +362,7 @@ def musashi_mem_trace_error_test():
     mem.set_trace_func(None)
 
 
-def musashi_mem_invalid_access_error_test():
+def machine_emu_mem_invalid_access_error_test():
     mem = emu.Memory(16)
 
     def invalid_func(mode, width, addr):
@@ -376,7 +376,7 @@ def musashi_mem_invalid_access_error_test():
     mem.set_invalid_func(None)
 
 
-def musashi_mem_special_rw_error_test():
+def machine_emu_mem_special_rw_error_test():
     mem = emu.Memory(16)
 
     def read(addr):

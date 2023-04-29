@@ -2,6 +2,9 @@ import time
 
 ts_empty_string = "--.--.---- --:--:--.--"
 ts_format = "%d.%m.%Y %H:%M:%S"
+ts_format_time = "%H:%M:%S"
+ts_format_date = "%d.%m.%Y"
+
 
 # Python time functions will provide seconds from 'epoch',
 # which is 1970, but Amiga specs say that 1978 is the base year.
@@ -60,15 +63,17 @@ class TimeStamp:
                 ticks = int(t[1:])
                 s = s[:-3]
         # parse normal time
-        try:
-            ts = time.strptime(s, ts_format)
-            secs = int(time.mktime(ts))
-            self.from_secs(secs)
-            self.sub_secs = ticks
-            self.ticks += ticks
-            return True
-        except ValueError:
-            return False
+        for fmt in (ts_format, ts_format_date, ts_format_time):
+            try:
+                ts = time.strptime(s, fmt)
+                secs = int(time.mktime(ts))
+                self.from_secs(secs)
+                self.sub_secs = ticks
+                self.ticks += ticks
+                return True
+            except ValueError:
+                pass
+        return False
 
 
 if __name__ == "__main__":

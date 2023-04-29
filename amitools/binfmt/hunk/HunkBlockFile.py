@@ -620,6 +620,7 @@ hunk_block_type_map = {
     HUNK_DATA: HunkSegmentBlock,
     HUNK_BSS: HunkSegmentBlock,
     HUNK_ABSRELOC32: HunkRelocLongBlock,
+    HUNK_RELRELOC32: HunkRelocWordBlock,
     HUNK_RELOC32SHORT: HunkRelocWordBlock,
     HUNK_END: HunkEndBlock,
     HUNK_DEBUG: HunkDebugBlock,

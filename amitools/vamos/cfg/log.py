@@ -28,7 +28,7 @@ class LogParser(Parser):
                     help="write all log messages to a file",
                 ),
                 "verbose": Argument(
-                    "-v", "--verbose", action="store_true", help="be more verbos"
+                    "-v", "--verbose", action="store_true", help="be more verbose"
                 ),
                 "quiet": Argument(
                     "-q",

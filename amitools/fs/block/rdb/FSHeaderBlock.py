@@ -226,6 +226,9 @@ class FSHeaderBlock(Block):
     def get_valid_flag_names(self):
         return self.dev_node.get_valid_flag_names()
 
+    def get_dev_node(self):
+        return self.dev_node
+
     def dump(self):
         Block.dump(self, "FSHeader")
 

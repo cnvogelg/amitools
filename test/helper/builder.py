@@ -8,12 +8,13 @@ LIB_SRC_DIR = "src/libs"
 
 
 class BinBuilder:
-    def __init__(self, flavor, debug=False, auto_build=False):
+    def __init__(self, flavor, debug=False, auto_build=False, no_rebuild=False):
         if flavor == "none":
             flavor = None
         self.flavor = flavor
         self.debug = debug
         self.auto_build = auto_build
+        self.no_rebuild = no_rebuild
 
     def make_prog(self, prog_name):
         return self.make_progs([prog_name])[0]
@@ -74,6 +75,6 @@ class BinBuilder:
                 args = ["make"]
                 args += rebuild_bins
                 subprocess.check_call(args, stdout=subprocess.PIPE)
-            else:
+            elif not no_rebuild:
                 raise RuntimeError("Rebuild needed for: " + info)
         return all_bins
