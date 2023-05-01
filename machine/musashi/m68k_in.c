@@ -1868,7 +1868,7 @@ M68KMAKE_OP(asr, 8, s, .)
 	uint src = MASK_OUT_ABOVE_8(*r_dst);
 	uint res = src >> shift;
 
-	if(shift != 0)
+	if(shift != 0 && CPU_TYPE_IS_010_LESS(CPU_TYPE))
 		USE_CYCLES(shift<<CYC_SHIFT);
 
 	if(GET_MSB_8(src))
@@ -1890,7 +1890,7 @@ M68KMAKE_OP(asr, 16, s, .)
 	uint src = MASK_OUT_ABOVE_16(*r_dst);
 	uint res = src >> shift;
 
-	if(shift != 0)
+	if(shift != 0 && CPU_TYPE_IS_010_LESS(CPU_TYPE))
 		USE_CYCLES(shift<<CYC_SHIFT);
 
 	if(GET_MSB_16(src))
@@ -1912,7 +1912,7 @@ M68KMAKE_OP(asr, 32, s, .)
 	uint src = *r_dst;
 	uint res = src >> shift;
 
-	if(shift != 0)
+	if(shift != 0 && CPU_TYPE_IS_010_LESS(CPU_TYPE))
 		USE_CYCLES(shift<<CYC_SHIFT);
 
 	if(GET_MSB_32(src))
@@ -1934,9 +1934,10 @@ M68KMAKE_OP(asr, 8, r, .)
 	uint src = MASK_OUT_ABOVE_8(*r_dst);
 	uint res = src >> shift;
 
-	if(shift != 0)
+	if(shift != 0 )
 	{
-		USE_CYCLES(shift<<CYC_SHIFT);
+		if (CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(shift<<CYC_SHIFT);
 
 		if(shift < 8)
 		{
@@ -1988,7 +1989,8 @@ M68KMAKE_OP(asr, 16, r, .)
 
 	if(shift != 0)
 	{
-		USE_CYCLES(shift<<CYC_SHIFT);
+		if (CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(shift<<CYC_SHIFT);
 
 		if(shift < 16)
 		{
@@ -2040,7 +2042,8 @@ M68KMAKE_OP(asr, 32, r, .)
 
 	if(shift != 0)
 	{
-		USE_CYCLES(shift<<CYC_SHIFT);
+		if (CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(shift<<CYC_SHIFT);
 
 		if(shift < 32)
 		{
@@ -2108,7 +2111,7 @@ M68KMAKE_OP(asl, 8, s, .)
 	uint src = MASK_OUT_ABOVE_8(*r_dst);
 	uint res = MASK_OUT_ABOVE_8(src << shift);
 
-	if(shift != 0)
+	if(shift != 0 && CPU_TYPE_IS_010_LESS(CPU_TYPE))
 		USE_CYCLES(shift<<CYC_SHIFT);
 
 	*r_dst = MASK_OUT_BELOW_8(*r_dst) | res;
@@ -2128,7 +2131,7 @@ M68KMAKE_OP(asl, 16, s, .)
 	uint src = MASK_OUT_ABOVE_16(*r_dst);
 	uint res = MASK_OUT_ABOVE_16(src << shift);
 
-	if(shift != 0)
+	if(shift != 0 && CPU_TYPE_IS_010_LESS(CPU_TYPE))
 		USE_CYCLES(shift<<CYC_SHIFT);
 
 	*r_dst = MASK_OUT_BELOW_16(*r_dst) | res;
@@ -2148,7 +2151,7 @@ M68KMAKE_OP(asl, 32, s, .)
 	uint src = *r_dst;
 	uint res = MASK_OUT_ABOVE_32(src << shift);
 
-	if(shift != 0)
+	if(shift != 0 && CPU_TYPE_IS_010_LESS(CPU_TYPE))
 		USE_CYCLES(shift<<CYC_SHIFT);
 
 	*r_dst = res;
@@ -2170,7 +2173,8 @@ M68KMAKE_OP(asl, 8, r, .)
 
 	if(shift != 0)
 	{
-		USE_CYCLES(shift<<CYC_SHIFT);
+		if (CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(shift<<CYC_SHIFT);
 
 		if(shift < 8)
 		{
@@ -2207,7 +2211,8 @@ M68KMAKE_OP(asl, 16, r, .)
 
 	if(shift != 0)
 	{
-		USE_CYCLES(shift<<CYC_SHIFT);
+		if (CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(shift<<CYC_SHIFT);
 
 		if(shift < 16)
 		{
@@ -2244,7 +2249,8 @@ M68KMAKE_OP(asl, 32, r, .)
 
 	if(shift != 0)
 	{
-		USE_CYCLES(shift<<CYC_SHIFT);
+		if (CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(shift<<CYC_SHIFT);
 
 		if(shift < 32)
 		{
@@ -5302,7 +5308,7 @@ M68KMAKE_OP(lsr, 8, s, .)
 	uint src = MASK_OUT_ABOVE_8(*r_dst);
 	uint res = src >> shift;
 
-	if(shift != 0)
+	if(shift != 0 && CPU_TYPE_IS_010_LESS(CPU_TYPE))
 		USE_CYCLES(shift<<CYC_SHIFT);
 
 	*r_dst = MASK_OUT_BELOW_8(*r_dst) | res;
@@ -5321,7 +5327,7 @@ M68KMAKE_OP(lsr, 16, s, .)
 	uint src = MASK_OUT_ABOVE_16(*r_dst);
 	uint res = src >> shift;
 
-	if(shift != 0)
+	if(shift != 0 && CPU_TYPE_IS_010_LESS(CPU_TYPE))
 		USE_CYCLES(shift<<CYC_SHIFT);
 
 	*r_dst = MASK_OUT_BELOW_16(*r_dst) | res;
@@ -5340,7 +5346,7 @@ M68KMAKE_OP(lsr, 32, s, .)
 	uint src = *r_dst;
 	uint res = src >> shift;
 
-	if(shift != 0)
+	if(shift != 0 && CPU_TYPE_IS_010_LESS(CPU_TYPE))
 		USE_CYCLES(shift<<CYC_SHIFT);
 
 	*r_dst = res;
@@ -5361,7 +5367,8 @@ M68KMAKE_OP(lsr, 8, r, .)
 
 	if(shift != 0)
 	{
-		USE_CYCLES(shift<<CYC_SHIFT);
+		if (CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(shift<<CYC_SHIFT);
 
 		if(shift <= 8)
 		{
@@ -5398,7 +5405,8 @@ M68KMAKE_OP(lsr, 16, r, .)
 
 	if(shift != 0)
 	{
-		USE_CYCLES(shift<<CYC_SHIFT);
+		if (CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(shift<<CYC_SHIFT);
 
 		if(shift <= 16)
 		{
@@ -5435,7 +5443,8 @@ M68KMAKE_OP(lsr, 32, r, .)
 
 	if(shift != 0)
 	{
-		USE_CYCLES(shift<<CYC_SHIFT);
+		if (CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(shift<<CYC_SHIFT);
 
 		if(shift < 32)
 		{
@@ -5484,7 +5493,7 @@ M68KMAKE_OP(lsl, 8, s, .)
 	uint src = MASK_OUT_ABOVE_8(*r_dst);
 	uint res = MASK_OUT_ABOVE_8(src << shift);
 
-	if(shift != 0)
+	if(shift != 0 && CPU_TYPE_IS_010_LESS(CPU_TYPE))
 		USE_CYCLES(shift<<CYC_SHIFT);
 
 	*r_dst = MASK_OUT_BELOW_8(*r_dst) | res;
@@ -5503,7 +5512,7 @@ M68KMAKE_OP(lsl, 16, s, .)
 	uint src = MASK_OUT_ABOVE_16(*r_dst);
 	uint res = MASK_OUT_ABOVE_16(src << shift);
 
-	if(shift != 0)
+	if(shift != 0 && CPU_TYPE_IS_010_LESS(CPU_TYPE))
 		USE_CYCLES(shift<<CYC_SHIFT);
 
 	*r_dst = MASK_OUT_BELOW_16(*r_dst) | res;
@@ -5522,7 +5531,7 @@ M68KMAKE_OP(lsl, 32, s, .)
 	uint src = *r_dst;
 	uint res = MASK_OUT_ABOVE_32(src << shift);
 
-	if(shift != 0)
+	if(shift != 0 && CPU_TYPE_IS_010_LESS(CPU_TYPE))
 		USE_CYCLES(shift<<CYC_SHIFT);
 
 	*r_dst = res;
@@ -5543,7 +5552,8 @@ M68KMAKE_OP(lsl, 8, r, .)
 
 	if(shift != 0)
 	{
-		USE_CYCLES(shift<<CYC_SHIFT);
+		if (CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(shift<<CYC_SHIFT);
 
 		if(shift <= 8)
 		{
@@ -5580,7 +5590,8 @@ M68KMAKE_OP(lsl, 16, r, .)
 
 	if(shift != 0)
 	{
-		USE_CYCLES(shift<<CYC_SHIFT);
+		if (CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(shift<<CYC_SHIFT);
 
 		if(shift <= 16)
 		{
@@ -5617,7 +5628,8 @@ M68KMAKE_OP(lsl, 32, r, .)
 
 	if(shift != 0)
 	{
-		USE_CYCLES(shift<<CYC_SHIFT);
+		if (CPU_TYPE_IS_010_LESS(CPU_TYPE))
+				USE_CYCLES(shift<<CYC_SHIFT);
 
 		if(shift < 32)
 		{
