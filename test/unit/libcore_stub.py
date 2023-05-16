@@ -28,23 +28,27 @@ def _check_profile(fd, profile):
 
 def _check_log(caplog):
     assert caplog.record_tuples == [
-        ("valid", logging.INFO, "{ CALL:   30 PrintHello(  ) from PC=000000"),
+        (
+            "valid",
+            logging.INFO,
+            "{ CALL: (vamostest.library)   30 PrintHello(  ) from PC=000000",
+        ),
         ("valid", logging.INFO, "} CALL: -> d0=00000000"),
         (
             "missing",
             logging.WARN,
-            "? CALL:   54 Dummy( a[d0]=00000000, b[d1]=00000000 ) from PC=000000 -> d0=0 (default)",
+            "? CALL: (vamostest.library)   54 Dummy( a[d0]=00000000, b[d1]=00000000 ) from PC=000000 -> d0=0 (default)",
         ),
         (
             "valid",
             logging.INFO,
-            "{ CALL:   48 Swap( a[d0]=00000000, b[d1]=00000000 ) from PC=000000",
+            "{ CALL: (vamostest.library)   48 Swap( a[d0]=00000000, b[d1]=00000000 ) from PC=000000",
         ),
         ("valid", logging.INFO, "} CALL: -> d0=00000000, d1=00000000"),
         (
             "valid",
             logging.INFO,
-            "{ CALL:   36 PrintString( str[a0]=00000010 ) from PC=000000",
+            "{ CALL: (vamostest.library)   36 PrintString( str[a0]=00000010 ) from PC=000000",
         ),
         ("valid", logging.INFO, "} CALL: -> d0=00000000"),
     ]
@@ -55,22 +59,22 @@ def _check_log_fake(caplog):
         (
             "missing",
             logging.WARN,
-            "? CALL:   30 PrintHello(  ) from PC=000000 -> d0=0 (default)",
+            "? CALL: (vamostest.library)   30 PrintHello(  ) from PC=000000 -> d0=0 (default)",
         ),
         (
             "missing",
             logging.WARN,
-            "? CALL:   54 Dummy( a[d0]=00000000, b[d1]=00000000 ) from PC=000000 -> d0=0 (default)",
+            "? CALL: (vamostest.library)   54 Dummy( a[d0]=00000000, b[d1]=00000000 ) from PC=000000 -> d0=0 (default)",
         ),
         (
             "missing",
             logging.WARN,
-            "? CALL:   48 Swap( a[d0]=00000000, b[d1]=00000000 ) from PC=000000 -> d0=0 (default)",
+            "? CALL: (vamostest.library)   48 Swap( a[d0]=00000000, b[d1]=00000000 ) from PC=000000 -> d0=0 (default)",
         ),
         (
             "missing",
             logging.WARN,
-            "? CALL:   36 PrintString( str[a0]=00000010 ) from PC=000000 -> d0=0 "
+            "? CALL: (vamostest.library)   36 PrintString( str[a0]=00000010 ) from PC=000000 -> d0=0 "
             "(default)",
         ),
     ]
