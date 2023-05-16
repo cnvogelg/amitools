@@ -14,9 +14,14 @@ class PartitionDosEnv:
         "boot_blocks",
     )
 
+    # size of full dos env (with baud, control, boot_blocks)
+    SIZE_FULL_ENV = 19
+    # size of default dos env (without baud, control, boot_blocks)
+    SIZE_DEFAULT_ENV = 16
+
     def __init__(
         self,
-        size=19,
+        size=0,
         block_size=128,
         sec_org=0,
         surfaces=0,
@@ -57,6 +62,13 @@ class PartitionDosEnv:
         self.baud = baud
         self.control = control
         self.boot_blocks = boot_blocks
+
+    def update_size(self):
+        # do we need the extended size?
+        if self.boot_blocks != 0 or self.control != 0 or self.baud != 0:
+            self.size = self.SIZE_FULL_ENV
+        else:
+            self.size = self.SIZE_DEFAULT_ENV
 
     def dump(self):
         print("DosEnv")
@@ -107,6 +119,7 @@ class PartitionDosEnv:
         self.boot_blocks = blk._get_long(51)
 
     def write(self, blk):
+        assert self.size != 0
         blk._put_long(32, self.size)
         blk._put_long(33, self.block_size)
         blk._put_long(34, self.sec_org)
@@ -158,6 +171,7 @@ class PartitionBlock(Block):
 
         if dos_env == None:
             dos_env = PartitionDosEnv()
+        dos_env.update_size()
         self.dos_env = dos_env
         self.valid = True
 
