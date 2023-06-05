@@ -92,6 +92,28 @@ class MemoryAlloc:
     def is_all_free(self):
         return self.size == self.free_bytes
 
+    def _find_abs_chunk(self, address, size):
+        """ scan chunks, see which one we can split
+        return: index of chunk in free list or -1 if none found + bytes left in chunk
+        """
+        chunk = self.free_first
+        while chunk != None:
+            # size matches, now check start address
+            delta_address = address - chunk.addr
+            if delta_address >= 0 and chunk.size - delta_address >= size:
+                # fits, but we can't return this chunk as 1) it doesn't start at the very address
+                # and 2) it may end way after the required end memory. So we need to split this
+                # chunk in 3
+
+                chunk_before = MemoryChunk(chunk.addr,address-chunk.addr)
+                self._replace_chunk(chunk,chunk_before)
+                chunk_after = MemoryChunk(address+size,chunk.size-size-delta_address)
+                self._insert_chunk(chunk_after)
+                return (chunk, 0)
+            chunk = chunk.next
+        # nothing found?
+        return (None, -1)
+
     def _find_best_chunk(self, size):
         """find best chunk that could take the given alloc
         return: index of chunk in free list or -1 if none found + bytes left in chunk
@@ -181,6 +203,39 @@ class MemoryAlloc:
             self.free_entries,
             num_allocs,
         )
+
+    def alloc_abs(self, addr, size, except_on_fail=True):
+        """allocate absolute memory and return addr or 0 if no more memory"""
+        # align size to 4 bytes
+        size = (size + 3) & ~3
+        # align address to 4 bytes, rounded down, that's what we will return
+        addr &= ~3
+        chunk, left = self._find_abs_chunk(addr,size)
+        # out of memory?
+        if chunk == None:
+            if except_on_fail:
+                self.dump_orphans()
+                log_mem_alloc.error("[alloc: NO MEMORY for %06x bytes at %08x]" % (size,addr))
+                raise VamosInternalError("[alloc: NO MEMORY for %06x bytes at %08x]" % (size,addr))
+            return 0
+
+        # add to valid allocs map
+        self.addrs[addr] = size
+        self.free_bytes -= size
+        # erase memory
+        self.mem.clear_block(addr, size, 0)
+        log_mem_alloc.info(
+            "[allocabs @%06x-%06x: %06x bytes] %s",
+            addr,
+            addr + size,
+            size,
+            self._stat_info(),
+        )
+        if addr % 4:
+            raise VamosInternalError(
+                "Memory pool is invalid, return address not aligned by a long word"
+            )
+        return addr
 
     def alloc_mem(self, size, except_on_fail=True):
         """allocate memory and return addr or 0 if no more memory"""
@@ -325,6 +380,21 @@ class MemoryAlloc:
             label_obj = None
         mem = Memory(addr, size, label_obj, self.mem)
         log_mem_alloc.info("alloc memory: %s", mem)
+        self.mem_objs[addr] = mem
+        return mem
+
+    # memory
+    def alloc_abs_memory(self, addr, size, label=None, except_on_failure=True):
+        addr = self.alloc_abs(addr, size, except_on_failure)
+        if addr == 0:
+            return None
+        if label and self.label_mgr:
+            label_obj = LabelRange(label, addr, size)
+            self.label_mgr.add_label(label_obj)
+        else:
+            label_obj = None
+        mem = Memory(addr, size, label_obj, self.mem)
+        log_mem_alloc.info("alloc abs memory: %s", mem)
         self.mem_objs[addr] = mem
         return mem
 
