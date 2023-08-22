@@ -33,8 +33,8 @@ if use_cython:
         from Cython import __version__ as cyver
 
         print("cython version:", cyver)
-        if parse_version(cyver) < parse_version("0.25"):
-            print("cython is too old < 0.25! please update first!")
+        if parse_version(cyver) < parse_version("3.0"):
+            print("cython is too old < 3.0! please update first!")
             sys.exit(1)
     except ImportError:
         print("cython is too old! please update first!")
@@ -209,7 +209,7 @@ extensions = [
 # use cython?
 if use_cython:
     sourcefiles.append(cython_file)
-    extensions = cythonize(extensions)
+    extensions = cythonize(extensions, language_level="3str")
 else:
     sourcefiles.append(ext_file)
 

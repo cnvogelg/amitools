@@ -25,7 +25,7 @@ will be very helpful.
 ### Optional Packages
 
 - [lhafile - FS Edition][2]: required to use ```.lha``` file scanner
-- [cython][3]: (version >= **0.29**) required to rebuild the native module
+- [cython][3]: (version >= **3.0.0**) required to rebuild the native module
 
 [1]: https://pip.pypa.io/en/stable/installation/
 [2]: https://github.com/FrodeSolheim/python-lhafile

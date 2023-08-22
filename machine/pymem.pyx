@@ -51,7 +51,7 @@ cdef check_mem_exc():
     mem_callback_exc = None
     raise exc[0], exc[1], exc[2]
 
-cdef void trace_func_wrapper(int mode, int width, uint addr, uint val, void *ctx):
+cdef void trace_func_wrapper(int mode, int width, uint addr, uint val, void *ctx) noexcept:
   cdef object py_func = <object>ctx
   try:
     py_func(chr(mode), width, addr, val)
@@ -60,7 +60,7 @@ cdef void trace_func_wrapper(int mode, int width, uint addr, uint val, void *ctx
     mem_callback_exc = sys.exc_info()
     m68k_end_timeslice()
 
-cdef void invalid_func_wrapper(int mode, int width, uint addr, void *ctx):
+cdef void invalid_func_wrapper(int mode, int width, uint addr, void *ctx) noexcept:
   cdef object py_func = <object>ctx
   try:
     py_func(chr(mode), width, addr)
@@ -69,7 +69,7 @@ cdef void invalid_func_wrapper(int mode, int width, uint addr, void *ctx):
     mem_callback_exc = sys.exc_info()
     m68k_end_timeslice()
 
-cdef uint special_read_func_wrapper(uint addr, void *ctx):
+cdef uint special_read_func_wrapper(uint addr, void *ctx) noexcept:
   cdef object py_func = <object>ctx
   try:
     return py_func(addr)
@@ -79,7 +79,7 @@ cdef uint special_read_func_wrapper(uint addr, void *ctx):
     m68k_end_timeslice()
     return 0
 
-cdef void special_write_func_wrapper(uint addr, uint value, void *ctx):
+cdef void special_write_func_wrapper(uint addr, uint value, void *ctx) noexcept:
   cdef object py_func = <object>ctx
   try:
     py_func(addr, value)

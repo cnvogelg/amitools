@@ -41,15 +41,15 @@ cdef extern from "m68k.h":
 
 # wrapper
 cdef object pc_changed_func
-cdef void pc_changed_func_wrapper(unsigned int new_pc):
+cdef void pc_changed_func_wrapper(unsigned int new_pc) noexcept:
   pc_changed_func(new_pc)
 
 cdef object reset_instr_func
-cdef void reset_instr_func_wrapper():
+cdef void reset_instr_func_wrapper() noexcept:
   reset_instr_func()
 
 cdef object instr_hook_func
-cdef void instr_hook_func_wrapper(unsigned int pc):
+cdef void instr_hook_func_wrapper(unsigned int pc) noexcept:
   instr_hook_func()
 
 # public CPUContext
