@@ -36,13 +36,13 @@ class DirCacheRecord:
         self.size = d[1]
         self.protect = d[2]
         self.mod_ts = TimeStamp(d[5], d[6], d[7])
-        self.type = ord(data[off + 22])
+        self.type = data[off + 22]
         # name
-        name_len = ord(data[off + 23])
+        name_len = data[off + 23]
         name_off = off + 24
         self.name = FSString(data[name_off : name_off + name_len])
         # comment
-        comment_len = ord(data[off + name_len + 24])
+        comment_len = data[off + name_len + 24]
         comment_off = off + 25 + name_len
         self.comment = FSString(data[comment_off : comment_off + comment_len])
         return off + self.get_size()
