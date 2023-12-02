@@ -10,7 +10,6 @@ from amitools.vamos.astructs import AmigaClassDef
 
 @AmigaClassDef
 class Resident(ResidentStruct):
-
     RTC_MATCHWORD = 0x4AFC
 
     @classmethod

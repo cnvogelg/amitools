@@ -46,7 +46,6 @@ FieldDefBase = collections.namedtuple(
 
 
 class FieldDef(FieldDefBase):
-
     _base_offset = 0
     _parent_def = None
 
@@ -322,7 +321,6 @@ class AmigaStructFields:
 
 
 class AmigaStruct(TypeBase):
-
     # overwrite in derived class!
     _format = None
     # top-level alias names for subfields

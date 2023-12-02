@@ -6,7 +6,6 @@ from amitools.vamos.machine.opcodes import op_jmp
 
 
 class LibFuncs(object):
-
     LVO_Open = 1
     LVO_Close = 2
     LVO_Expunge = 3

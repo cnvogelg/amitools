@@ -315,7 +315,7 @@ class ADFSBitmap:
         res = self.blkdev.reserved
         for i in range(self.blkdev.num_blocks):
             if i >= res and self.get_bit(i):
-                bm[i] = "F"
+                bm[i] = ord("F")
         self.print_draw_bitmap(bm, brief)
 
     def print_used(self, brief=False):
@@ -323,39 +323,39 @@ class ADFSBitmap:
         res = self.blkdev.reserved
         for i in range(self.blkdev.num_blocks):
             if i >= res and not self.get_bit(i):
-                bm[i] = "#"
+                bm[i] = ord("#")
         self.print_draw_bitmap(bm, brief)
 
     def draw_on_bitmap(self, bm):
         # show reserved blocks
         res = self.blkdev.reserved
-        bm[0:res] = "x" * res
+        bm[0:res] = b"x" * res
         # root block
-        bm[self.root_blk.blk_num] = "R"
+        bm[self.root_blk.blk_num] = ord("R")
         # bitmap blocks
         for bm_blk in self.bitmap_blks:
-            bm[bm_blk.blk_num] = "b"
+            bm[bm_blk.blk_num] = ord("b")
         # bitmap ext blocks
         for ext_blk in self.ext_blks:
-            bm[ext_blk.blk_num] = "B"
+            bm[ext_blk.blk_num] = ord("B")
 
     def print_draw_bitmap(self, bm, brief=False):
-        line = ""
+        line = bytearray()
         blk = 0
         blk_cyl = self.blkdev.sectors * self.blkdev.heads
         found = False
         for i in range(self.blkdev.num_blocks):
             c = bm[i]
-            if ord(c) == 0:
-                c = "."
+            if c == 0:
+                c = ord(".")
             else:
                 found = True
-            line += c
+            line.append(c)
             if i % self.blkdev.sectors == self.blkdev.sectors - 1:
-                line += " "
+                line.append(ord(" "))
             if i % blk_cyl == blk_cyl - 1:
                 if not brief or found:
-                    print("%8d: %s" % (blk, line))
+                    print("%8d: %s" % (blk, line.decode("utf-8")))
                 blk += blk_cyl
-                line = ""
+                line = bytearray()
                 found = False

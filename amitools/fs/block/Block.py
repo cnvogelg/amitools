@@ -62,6 +62,9 @@ class Block:
     def is_comment_block(self):
         return self.type == Block.T_COMMENT
 
+    def is_dir_cache_block(self):
+        return self.type == Block.T_DIR_CACHE
+
     def read(self):
         if self.data == None:
             self._read_data()

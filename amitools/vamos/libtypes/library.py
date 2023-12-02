@@ -40,7 +40,7 @@ class LibBase:
             tag=tag,
             pos_size=pos_size,
             neg_size=neg_size,
-            **kwargs
+            **kwargs,
         )
 
 

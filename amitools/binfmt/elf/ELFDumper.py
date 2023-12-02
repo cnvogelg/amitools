@@ -32,7 +32,6 @@ class ELFDumper:
         print("ELF Sections")
         print("id  name             size      rela  syms  type       flags")
         for sect in self.elf.sections:
-
             # determine number of relocations
             rela = sect.get_rela()
             num_rela = len(rela)

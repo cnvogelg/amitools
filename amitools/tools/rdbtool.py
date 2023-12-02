@@ -24,6 +24,7 @@ import amitools.util.KeyValue as KeyValue
 import amitools.util.ByteSize as ByteSize
 import amitools.util.VerTag as VerTag
 
+
 # ----- commands -----
 class Command:
     def __init__(self, args, opts, edit=False):

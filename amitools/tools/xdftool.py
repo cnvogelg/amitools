@@ -14,6 +14,8 @@ from amitools.fs.Imager import Imager
 from amitools.fs.Repacker import Repacker
 from amitools.fs.block.BootBlock import BootBlock
 from amitools.fs.block.RootBlock import RootBlock
+from amitools.fs.block.Block import Block
+from amitools.fs.block.BlockFactory import BlockFactory
 from amitools.util.CommandQueue import CommandQueue
 from amitools.util.HexDump import *
 import amitools.util.KeyValue as KeyValue
@@ -567,7 +569,7 @@ class BlockCmd(Command):
         n = len(self.opts)
         if n == 0:
             print(
-                "Usage: block ( boot | root | node <ami_file> [data] | dump <block_no> )"
+                "Usage: block ( boot | root | node <ami_file> [data] | dump <block_no> | decode <block_no> )"
             )
             return 1
         cmd = self.opts[0]
@@ -600,6 +602,24 @@ class BlockCmd(Command):
                 block_no = int(self.opts[1])
                 data = vol.blkdev.read_block(block_no)
                 print_hex(data)
+        elif cmd == "decode":
+            if n == 1:
+                print("No block number given!")
+                return 1
+            else:
+                block_no = int(self.opts[1])
+                # read block
+                blk = Block(vol.blkdev, block_no)
+                blk.read()
+                if blk.valid:
+                    dec_blk = BlockFactory.create_specific_block(blk)
+                    if dec_blk:
+                        dec_blk.read()
+                        dec_blk.dump()
+                    else:
+                        blk.dump("Unknown")
+                else:
+                    print("Error reading block!")
 
 
 # ----- Bitmap Tools -----

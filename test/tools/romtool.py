@@ -1,5 +1,6 @@
 import pytest
 
+
 # tag a parameter for full testing
 def tag_full(value):
     return pytest.param(value, marks=pytest.mark.full)

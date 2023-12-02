@@ -374,14 +374,14 @@ class ADFSDir(ADFSNode):
 
     def draw_on_bitmap(self, bm, show_all=False, first=True):
         blk_num = self.block.blk_num
-        bm[blk_num] = "D"
+        bm[blk_num] = ord("D")
         if show_all or first:
             self.ensure_entries()
             for e in self.entries:
                 e.draw_on_bitmap(bm, show_all, False)
         if self.dcache_blks != None:
             for dcb in self.dcache_blks:
-                bm[dcb.blk_num] = "C"
+                bm[dcb.blk_num] = ord("C")
 
     def get_block_nums(self):
         self.ensure_entries()

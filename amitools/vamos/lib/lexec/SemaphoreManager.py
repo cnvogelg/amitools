@@ -4,7 +4,6 @@ from amitools.vamos.error import *
 
 
 class SemaphoreManager:
-
     NT_SIGNALSEM = 15
 
     def __init__(self, alloc, mem):

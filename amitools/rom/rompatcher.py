@@ -137,7 +137,6 @@ class BootConRomPatch(RomPatch):
 
 
 class RomPatcher:
-
     # list of all available patch classes
     patches = [OneMegRomPatch(), FourMegRomPatch(), BootConRomPatch()]
 

@@ -10,7 +10,6 @@ from .Error import *
 
 
 class MatchFirstNext:
-
     DODIR = 4
     DIDDIR = 8
 

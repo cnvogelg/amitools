@@ -82,7 +82,6 @@ class InitStruct(object):
 
 
 class InitStructBuilder(object):
-
     SIZE_LONG = 0
     SIZE_WORD = 1
     SIZE_BYTE = 2
