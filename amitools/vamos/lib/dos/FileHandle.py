@@ -135,7 +135,10 @@ class FileHandle:
         return self.unch
 
     def tell(self):
-        return self.obj.tell()
+        try:
+            return self.obj.tell()
+        except IOError:
+            return -1
 
     def seek(self, pos, whence):
         try:
