@@ -201,7 +201,10 @@ class FileHandle:
         self.auto_flush = buf_type == 1
 
     def tell(self):
-        return self.obj.tell()
+        try:
+            return self.obj.tell()
+        except IOError:
+            return -1
 
     def seek(self, pos, whence):
         """set to position from whence
