@@ -731,6 +731,29 @@ void m68k_set_reg(m68k_register_t regnum, unsigned int value)
 	}
 }
 
+double m68k_get_fpreg(void* context, int regnum)
+{
+	m68ki_cpu_core* cpu = context != NULL ?(m68ki_cpu_core*)context : &m68ki_cpu;
+
+	switch(regnum)
+	{
+		case 0:
+		case 1:
+		case 2:
+		case 3:
+		case 4:
+		case 5:
+		case 6:
+		case 7:
+			return fx80_to_double(cpu->fpr[regnum]);
+	}
+	return 0;
+}
+
+int m68k_get_fpsr(void*context)
+{
+	return REG_FPSR;
+}
 /* Set the callbacks */
 void m68k_set_int_ack_callback(int  (*callback)(int int_level))
 {
@@ -1018,7 +1041,11 @@ int m68k_execute(int num_cycles)
 		SET_CYCLES(0);
 
 	/* return how many clocks we used */
+	if (num_cycles == m68ki_initial_cycles)
 	return m68ki_initial_cycles - GET_CYCLES();
+
+	/* modified by end_timeslice. */
+	return num_cycles - m68ki_initial_cycles;
 }
 
 
