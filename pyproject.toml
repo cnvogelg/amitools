@@ -19,10 +19,13 @@ classifiers = [
 ]
 dynamic = ["version", "readme"]
 
+[project.optional-dependencies]
+vamos = ["machine68k"]
+
 [tool.setuptools]
 zip-safe = false
 include-package-data = true
-packages = ["amitools", "machine"]
+packages = ["amitools"]
 
 [tool.setuptools.dynamic]
 readme = { file="README.md", content-type="text/markdown" }

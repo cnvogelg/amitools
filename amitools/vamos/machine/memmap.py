@@ -1,3 +1,4 @@
+from machine68k import CPUType
 from .hwaccess import HWAccess
 from amitools.vamos.log import log_mem_map
 from amitools.vamos.label import LabelRange
@@ -8,7 +9,7 @@ class MemoryMap(object):
     def __init__(self, machine):
         self.machine = machine
         self.label_mgr = machine.get_label_mgr()
-        self.addr_24_bit = machine.get_cpu_type() == machine.CPU_TYPE_68000
+        self.addr_24_bit = machine.get_cpu_type() == CPUType.M68000
         self.ram_total = machine.get_ram_total()
         # options
         self.hw_access = None
