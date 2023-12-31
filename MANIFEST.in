@@ -2,10 +2,5 @@ include MANIFEST.in
 include README.md
 include CHANGELOG.md
 include Makefile
-include machine/musashi/softfloat/softfloat-macros
-include machine/musashi/softfloat/softfloat-specialize
-include machine/musashi/*.txt
 recursive-include amitools/data *
 recursive-include amitools/fs/block/bootcode *
-recursive-include machine *.pyx *.c *.h
-recursive-include gen *.c *.h

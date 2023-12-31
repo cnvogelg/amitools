@@ -25,33 +25,42 @@ will be very helpful.
 ### Optional Packages
 
 - [lhafile - FS Edition][2]: required to use ```.lha``` file scanner
-- [cython][3]: (version >= **3.0.0**) required to rebuild the native module
+- [machine68k][3]: required to run `vamos`
 
 [1]: https://pip.pypa.io/en/stable/installation/
 [2]: https://github.com/FrodeSolheim/python-lhafile
-[3]: https://cython.org
+[3]: https://github.com/cnvogelg/machine68k/
 
 ## Installation
 
 ### Stable/Release Version
 
+If you only need the tools without `vamos` then you can install the pure
+Python version:
+
 ```bash
 pip3 install amitools
+```
+
+If you want to run `vamos` then you need the CPU emulator from the `machine68k`
+package and you can install this dependency with:
+
+```bash
+pip3 install 'amitools[vamos]'
 ```
 
 Note:
 
 - on Linux/macOS may use ``sudo`` to install for all users
-- requires a host C compiler to compile the extension.
 - the version may be a bit outdated. If you need recent changes use the
   current version.
 
 ### Current Version from GitHub
 
-Ensure you have Cython installed:
+If you wan to run `vamos` then first install the CPU emulator `machine68k`:
 
 ```bash
-pip3 install cython
+pip3 install -U git+https://github.com/cnvogelg/machine68k.git
 ```
 
 Then install `amitools` directly from the git repository:
@@ -70,10 +79,10 @@ Note:
 
 - Follow this route if you want to hack around with the amitools codebase
 - Clone the Git repo: [amitools@git](https://github.com/cnvogelg/amitools)
-- Ensure you have Cython installed:
+- Ensure you have Cython and `machine68k` installed:
 
 ```bash
-pip3 install cython
+pip3 install cython machine68k
 ```
 
 - Enter the directory of the cloned repo and install via pip:
@@ -98,6 +107,8 @@ The new Documentation of `amitools` is hosted on [readthedocs][4]
   Mac or PC. vamos is an API level Amiga OS Emulator that replaces exec
   and dos calls with its own implementation and maps all file access to
   your local file system.
+
+  Note: `vamos` requires the package `machine68k` installed first!
 
 - [xdftool][5]
 

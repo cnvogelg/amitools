@@ -75,7 +75,6 @@ clean_py:
 
 clean_ext:
 	$(PYTHON) setup.py clean
-	rm -f machine/*.so machine/emu.c
 
 # install, distrib
 install:
