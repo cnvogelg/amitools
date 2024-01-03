@@ -13,7 +13,6 @@ version = ".".join(release.split(".")[:2])
 # -- General configuration ---------------------------------------------------
 extensions = [
     "sphinx.ext.autodoc",
-    "sphinx.ext.intersphinx",
     "sphinx.ext.todo",
 ]
 templates_path = ["_templates"]
