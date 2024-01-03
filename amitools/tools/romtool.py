@@ -53,6 +53,7 @@ def do_split_cmd(args):
         # no output dir? end now
         out_path = args.output_dir
         if out_path is None:
+            logging.error("No -o output given. Can't split ROM!")
             return 0
         # get modules to export
         if args.modules is None:
@@ -210,6 +211,8 @@ def do_build_cmd(args):
         logging.info("saving ROM to '%s'", output)
         with open(output, "wb") as fh:
             fh.write(rom_data)
+    else:
+        logging.warn("No output -o given! ROM not saved!")
     return 0
 
 
@@ -341,6 +344,8 @@ def do_patch_cmd(args):
         logging.info("saving ROM to '%s'", output)
         with open(output, "wb") as fh:
             fh.write(rom_data)
+    else:
+        logging.warn("No output -o given! ROM not saved!")
     return 0
 
 
@@ -393,6 +398,8 @@ def do_combine_cmd(args):
         logging.info("saving ROM to '%s'", output)
         with open(output, "wb") as fh:
             fh.write(rom_img)
+    else:
+        logging.warn("No output -o given! ROM not saved!")
     return 0
 
 
