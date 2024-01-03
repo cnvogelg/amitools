@@ -48,6 +48,14 @@ SPLIT_ROM = (
     tag_full("amiga-os-3x0-a4000.rom"),
 )
 
+KICKETY_SPLIT_ROM = (
+    tag_full("amiga-os-204.rom"),
+    "amiga-os-310-a1200.rom",
+    "amiga-os-310-a3000.rom",
+    "amiga-os-310-a4000.rom",
+    "amiga-os-310-a500.rom",
+)
+
 SPLIT_EXT = (
     "amiga-crt-310-cd32-fmv.rom",
     "amiga-os-130-cdtv-ext.rom",
@@ -64,6 +72,13 @@ def rom_file(request, toolrun):
 
 @pytest.fixture(params=SPLIT_ROM)
 def split_rom_file(request, toolrun):
+    rom = "roms/" + request.param
+    toolrun.skip_if_data_file_not_available(rom)
+    return rom
+
+
+@pytest.fixture(params=KICKETY_SPLIT_ROM)
+def kickety_split_rom_file(request, toolrun):
     rom = "roms/" + request.param
     toolrun.skip_if_data_file_not_available(rom)
     return rom
@@ -87,6 +102,21 @@ def romtool_split_build_rom_test(toolrun, split_rom_file, tmpdir):
     index_txt = str(tmpdir / "index.txt")
     new_rom = str(tmpdir / "new.rom")
     toolrun.run_checked("romtool", "build", "-o", new_rom, index_txt)
+    toolrun.run_checked("romtool", "info", new_rom)
+
+
+def romtool_split_build_kickety_rom_test(toolrun, kickety_split_rom_file, tmpdir):
+    toolrun.run_checked(
+        "romtool",
+        "split",
+        "-o",
+        str(tmpdir),
+        "--no-version-dir",
+        kickety_split_rom_file,
+    )
+    index_txt = str(tmpdir / "index.txt")
+    new_rom = str(tmpdir / "new.rom")
+    toolrun.run_checked("romtool", "build", "-k", "-o", new_rom, index_txt)
     toolrun.run_checked("romtool", "info", new_rom)
 
 
