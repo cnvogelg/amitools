@@ -296,8 +296,8 @@ vamos allows you to control library loading in many ways. Please see
 
 #### 2.3.1 CPU Selection
 
-vamos can either emulate a 68000 (default) or a 68020 CPU. While the 68k
-can only address memory with 24 Bits, the 020 has a full 32 Bit address
+vamos can either emulate a 68000 (default) a 68020, or a 68040 CPU. While the
+68k can only address memory with 24 Bits, the 020 has a full 32 Bit address
 bus. Furthermore, the 020 has an extended instruction set.
 
 | CPU        | Alias       | Remarks  |
@@ -305,6 +305,7 @@ bus. Furthermore, the 020 has an extended instruction set.
 | 68000      | 00,000      | 24 Bit   |
 | 68020      | 20,020      | 32 Bit   |
 | 68030      | 30,030      | Fakes only AttnFlags in Exec, still a 020 |
+| 68040      | 40,040      | 32 Bit + FPU |
 
 On the command line use the `-C` switch:
 
