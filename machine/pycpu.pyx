@@ -2,6 +2,47 @@
 
 from libc.stdlib cimport malloc, free
 
+# cpu type constants
+cpdef enum CPUType:
+  INVALID = 0
+  M68000 = 1
+  M68010 = 2
+  M68EC020 = 3
+  M68020 = 4
+  M68EC030 = 5
+  M68030 = 6
+  M68EC040 = 7
+  M68LC040 = 8
+  M68040 = 9
+  SCC68070 = 10
+
+cpdef cpu_type_from_str(name):
+    try:
+      return CPUType[name]
+    except KeyError:
+      if name in ("68000", "000", "00"):
+        return CPUType.M68000
+      elif name in ("68020", "020", "20"):
+        return CPUType.M68020
+      elif name in ("68030", "030", "30"):
+        return CPUType.M68030
+      elif name in ("68040", "040", "40"):
+        return CPUType.M68040
+      else:
+        raise ValueError("Invalid CPUType: '%s'" % name)
+
+cpdef cpu_type_to_str(cpu_type):
+  if cpu_type == CPUType.M68000:
+    return "68000"
+  elif cpu_type == CPUType.M68020:
+    return "68020"
+  elif cpu_type == CPUType.M68030:
+    return "68030"
+  elif cpu_type == CPUType.M68040:
+    return "68040"
+  else:
+    return None
+
 # m68k.h
 cdef extern from "m68k.h":
   ctypedef enum m68k_register_t:
@@ -41,15 +82,15 @@ cdef extern from "m68k.h":
 
 # wrapper
 cdef object pc_changed_func
-cdef void pc_changed_func_wrapper(unsigned int new_pc):
+cdef void pc_changed_func_wrapper(unsigned int new_pc) noexcept:
   pc_changed_func(new_pc)
 
 cdef object reset_instr_func
-cdef void reset_instr_func_wrapper():
+cdef void reset_instr_func_wrapper() noexcept:
   reset_instr_func()
 
 cdef object instr_hook_func
-cdef void instr_hook_func_wrapper(unsigned int pc):
+cdef void instr_hook_func_wrapper(unsigned int pc) noexcept:
   instr_hook_func()
 
 # public CPUContext
@@ -89,10 +130,10 @@ cdef class CPUContext:
 
 # public CPU class
 cdef class CPU:
-  cdef unsigned int cpu_type
+  cdef readonly CPUType cpu_type
 
-  def __cinit__(self, cpu_type):
-    m68k_set_cpu_type(cpu_type)
+  def __cinit__(self, CPUType cpu_type):
+    m68k_set_cpu_type(<unsigned int>cpu_type)
     m68k_init()
     self.cpu_type = cpu_type
 
@@ -205,3 +246,40 @@ cdef class CPU:
 
   def set_cpu_context(self, CPUContext ctx):
     m68k_set_context(ctx.get_data())
+
+# register constants
+cpdef enum Register:
+  D0 = 0
+  D1 = 1
+  D2 = 2
+  D3 = 3
+  D4 = 4
+  D5 = 5
+  D6 = 6
+  D7 = 7
+
+  A0 = 8
+  A1 = 9
+  A2 = 10
+  A3 = 11
+  A4 = 12
+  A5 = 13
+  A6 = 14
+  A7 = 15
+
+  PC = 16
+  SR = 17
+  SP = 18
+  USP = 19
+  ISP = 20
+  MSP = 21
+  SFC = 22
+  DFC = 23
+  VBR = 24
+  CACR = 25
+  CAAR = 26
+  PREF_ADDR = 27
+  PREF_DATA = 28
+  PPC = 29
+  IR = 30
+  CPU_TYPE = 31

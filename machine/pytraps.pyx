@@ -13,7 +13,7 @@ cdef object trap_exc_func
 
 from cpython.exc cimport PyErr_Print
 
-cdef void trap_wrapper(uint opcode, uint pc, void *data):
+cdef void trap_wrapper(uint opcode, uint pc, void *data) noexcept:
   cdef object py_func = <object>data
   try:
     py_func(opcode, pc)
@@ -61,3 +61,15 @@ cdef class Traps:
     if tid in self.func_map:
       return self.func_map[tid]
 
+# constants
+# aline callback
+cpdef enum ALineMode:
+  NONE = 0
+  EXCEPT = 1
+  RTS = 2
+
+# traps
+cpdef enum TrapType:
+  DEFAULT = 0
+  ONE_SHOT = 1
+  AUTO_RTS = 2
