@@ -52,9 +52,9 @@ class BootBlock(Block):
         all_blks = [self] + self.extra_blks
         n = self.blkdev.block_longs
         chksum = 0
-        for blk in all_blks:
+        for b, blk in enumerate(all_blks):
             for i in range(n):
-                if i != 1:  # skip chksum
+                if not (b == 0 and i == 1):  # skip chksum
                     chksum += blk._get_long(i)
                     if chksum > 0xFFFFFFFF:
                         chksum += 1
