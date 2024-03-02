@@ -122,7 +122,7 @@ Example::
 
 ::
 
-  read <ami_path> [sys_path]
+  read <ami_path> [<sys_path>] [add]
 
 If ``<ami_path>`` is a file then the file contents will be read and copied to
 your hosts file system. If no ``<sys_path>`` is given then the Amiga file will
@@ -138,6 +138,11 @@ in host's current directory. If ``<sys_path>`` is available then the directory
 will be created in this path. Otherwise the directory will be named as
 ``<sys_path>``.
 
+If the ``add`` option is set and both the input and output parameters are
+directories then the contents of the source directory is directly added to
+the target directory. Otherwise the source directory is first created below
+the target directory.
+
 Example::
 
   > xdftool wb310.adf read c/dir     ; copy file 'dir' to host's current dir
@@ -146,6 +151,7 @@ Example::
   > xdftool wb310.adf read devs      ; copy 'devs' dir tree to current dir
   > xdftool wb310.adf read devs .    ; same command
   > xdftool wb310.adf read devs b    ; copy dir tree 'devs' to host dir 'b'
+  > xdftool wb310.add read c b add   ; copy the contents of 'c' also to 'b' dir
 
 
 ``blkdev`` - Show information on the underlying block device
@@ -331,7 +337,7 @@ Example::
 
 ::
 
-  write <sys_path> [ami_path]
+  write <sys_path> [<ami_path>] [add]
 
 If the given ``<sys_path>`` is a file then the contents of the file will be
 read and stored with the same name in the top-level directory of the image's
@@ -344,6 +350,11 @@ contained files will be transferred to the image. If ``<ami_path>`` is given
 and a directory then the host directory will be created there. Otherise the
 host directory will be renamed to the given name.
 
+If the ``add`` option is set and both the input and output parameters are
+directories then the contents of the source directory is directly added to
+the target directory. Otherwise the source directory is first created below
+the target directory.
+
 Example::
 
   > xdftool empty.adf write README      ; the host file 'README' is written to
@@ -352,6 +363,8 @@ Example::
   > xdftool empty.adf write README c    ; write to 'c' directory (if exists)
                                         ; or rename to file 'c'
   > xdftool empty.adf write mydir       ; the host directory 'mydir' is written
+  > xdftool empty.adf write dir1 d      ; write 'dir1' as 'd' to image
+  > xdftool empty.adf write dir2 d add  ; add contents of 'dir2' to existing 'd'
 
 
 ``delete`` - Delete a file or directory
