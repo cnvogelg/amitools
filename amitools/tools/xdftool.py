@@ -370,16 +370,22 @@ class ReadCmd(Command):
     def handle_vol(self, vol):
         p = self.opts
         n = len(p)
-        if n == 0 or n > 2:
-            print("Usage: read <ami_file|dir> [sys_file]")
+        if n == 0 or n > 3:
+            print("Usage: read <ami_file|dir> [<sys_file>] [add]")
             return 1
+
+        # 'add' flag allows to overwrite dir
+        add_flag = (n == 3) and (self.opts[2] == "add")
+
         # determine output name
         out_name = os.path.basename(p[0])
         if n == 2:
-            if os.path.isdir(p[1]):
+            # append input basename to a target dir if not adding
+            if os.path.isdir(p[1]) and not add_flag:
                 out_name = os.path.join(p[1], out_name)
             else:
                 out_name = p[1]
+
         # single file operation
         name = make_fsstr(p[0])
         node = vol.get_path_name(name)
@@ -432,9 +438,13 @@ class WriteCmd(Command):
 
     def handle_vol(self, vol):
         n = len(self.opts)
-        if n == 0 or n > 2:
-            print("Usage: write <sys_file|dir> [ami_path]")
+        if n == 0 or n > 3:
+            print("Usage: write <sys_file|dir> [<ami_path>] [add]")
             return 1
+
+        # 'add' flag allows to add to existing dirs
+        add_flag = (n == 3) and (self.opts[2] == "add")
+
         # get file_name and ami_path
         sys_file = self.opts[0]
         file_name = os.path.basename(sys_file)
@@ -442,6 +452,7 @@ class WriteCmd(Command):
             ami_path = self.opts[1]
         else:
             ami_path = os.path.basename(sys_file)
+
         # check sys path
         if not os.path.exists(sys_file):
             print("File not found:", sys_file)
@@ -461,7 +472,15 @@ class WriteCmd(Command):
             if parent_node == None:
                 print("Invalid path", ami_path)
                 return 2
-            node = parent_node.create_dir(dir_name)
+
+            # 'add' flag?
+            if add_flag:
+                # add to existing dir
+                node = parent_node
+            else:
+                # create new none
+                node = parent_node.create_dir(dir_name)
+
             img = Imager(meta_mode=Imager.META_MODE_NONE)
             img.pack_dir(sys_file, node)
 
