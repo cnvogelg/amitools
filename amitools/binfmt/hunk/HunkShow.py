@@ -95,6 +95,11 @@ class HunkShow:
         else:
             alloc_size = None
 
+        if "alloc_type" in main:
+            alloc_type = main["alloc_type"]
+        else:
+            alloc_type = None
+
         self.print_segment_header(
             hunk_no,
             type_name,
@@ -103,6 +108,7 @@ class HunkShow:
             data_file_offset,
             hunk_file_offset,
             alloc_size,
+            alloc_type,
         )
         if self.hexdump and "data" in main:
             print_hex(main["data"], indent=8)
@@ -239,10 +245,14 @@ class HunkShow:
         data_file_offset,
         hunk_file_offset,
         alloc_size,
+        alloc_type,
     ):
         extra = ""
         if alloc_size != None:
-            extra += "alloc size %08x  " % alloc_size
+            if alloc_type:
+                extra += "alloc size (%s) %08x " % (alloc_type, alloc_size)
+            else:
+                extra += "alloc size %08x  " % alloc_size
         extra += "file header @%08x" % hunk_file_offset
         if data_file_offset != None:
             extra += "  data @%08x" % data_file_offset
