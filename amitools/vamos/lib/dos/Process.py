@@ -304,6 +304,9 @@ class Process:
         varlist.access.w_s("mlh_TailPred", varlist.addr)
         # setup arg string
         self.set_arg_str_ptr(self.arg_base)
+        # init stack
+        self.this_task.access.w_s("pr_Task.tc_SPLower", self.stack.lower)
+        self.this_task.access.w_s("pr_Task.tc_SPUpper", self.stack.upper)
 
     def free_task_struct(self):
         self.ctx.alloc.free_struct(self.this_task)
