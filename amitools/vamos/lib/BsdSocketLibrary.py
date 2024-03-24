@@ -8,8 +8,6 @@ from amitools.vamos.astructs.astruct import AmigaStruct
 from amitools.vamos.astructs.string import CSTR
 from amitools.vamos.astructs.pointer import APTR_VOID
 from amitools.vamos.astructs.scalar import LONG, UBYTE, UWORD, ULONG
-from amitools.vamos.astructs.access import AccessStruct
-from sys import byteorder
 
 class BsdSocketLibrary(LibImpl):
 
@@ -28,6 +26,9 @@ class BsdSocketLibrary(LibImpl):
         self.cnt = open_cnt
 
     def close_lib(self, ctx, open_cnt):
+        if self.hostByName != None:
+            self.hostByName.free()
+            self.hostByName = None
         self.cnt = open_cnt
 
     def get_version(self):
