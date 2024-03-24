@@ -2,6 +2,7 @@ import time
 import ctypes
 import re
 import os
+import select
 
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
@@ -593,6 +594,22 @@ class DosLibrary(LibImpl):
             log_dos.info("Close: %s" % fh)
             self.setioerr(ctx, 0)
         return self.DOSTRUE
+
+    def WaitForChar(self, ctx):
+        # file,timeout)(d1/d2)
+        fh_b_addr = ctx.cpu.r_reg(REG_D1)
+        fh = self.file_mgr.get_by_b_addr(fh_b_addr, False)
+        if select.select([fh.obj], [], [], 0.)[0]:
+            return self.DOSTRUE
+        
+        ms = ctx.cpu.r_reg(REG_D2)
+        if ms > 0:
+            time.sleep(ms * 1e-3)
+
+            if select.select([fh.obj], [], [], 0.)[0]:
+                return self.DOSTRUE
+        
+        return self.DOSFALSE
 
     def Read(self, ctx):
         fh_b_addr = ctx.cpu.r_reg(REG_D1)
