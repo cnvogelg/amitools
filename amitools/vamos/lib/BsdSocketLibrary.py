@@ -26,6 +26,9 @@ class BsdSocketLibrary(LibImpl):
         self.cnt = open_cnt
 
     def close_lib(self, ctx, open_cnt):
+        if self.hostByName != None:
+            self.hostByName.free()
+            self.hostByName = None
         self.cnt = open_cnt
 
     def get_version(self):
