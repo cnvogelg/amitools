@@ -32,8 +32,8 @@ if use_cython:
         from Cython import __version__ as cyver
 
         print("cython version:", cyver)
-        if version.parse(cyver) < version.parse("3.0"):
-            print("cython is too old < 3.0! please update first!")
+        if version.parse(cyver) < version.parse("0.29"):
+            print("cython is too old < 0.29! please update first!", cyver)
             sys.exit(1)
     except ImportError:
         print("cython is too old! please update first!")
