@@ -12,6 +12,7 @@ from .TimerDevice import TimerDevice
 from .UtilityLibrary import UtilityLibrary
 from .VamosTestLibrary import VamosTestLibrary
 from .VamosTestDevice import VamosTestDevice
+from .BsdSocketLibrary import BsdSocketLibrary
 
 vamos_libs = {
     "dos.library": DosLibrary,
@@ -26,6 +27,7 @@ vamos_libs = {
     "mathtrans.library": MathTransLibrary,
     "timer.device": TimerDevice,
     "utility.library": UtilityLibrary,
+    "bsdsocket.library": BsdSocketLibrary,
     "vamostest.library": VamosTestLibrary,
     "vamostestdev.device": VamosTestDevice,
 }
