@@ -62,7 +62,7 @@ class HWAccess:
 
     def cc_r16(self, addr):
         if addr == 0xdff006:
-            r = time.time_ns() // 256 # fake vhpos with time 1 / (25 * 640 * 256) ~= 244ns -> use 256
+            r = 0xffff & (time.time_ns() // 256) # fake vhpos with time 1 / (25 * 640 * 256) ~= 244ns -> use 256
             log_hw.info("Custom Chip read vhposr @%06x -> %0x4", addr, r)
             return r
         log_hw.warning("Custom Chip read word @%06x", addr)
