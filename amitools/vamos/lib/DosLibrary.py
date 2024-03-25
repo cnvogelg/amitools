@@ -599,15 +599,9 @@ class DosLibrary(LibImpl):
         # file,timeout)(d1/d2)
         fh_b_addr = ctx.cpu.r_reg(REG_D1)
         fh = self.file_mgr.get_by_b_addr(fh_b_addr, False)
-        if select.select([fh.obj], [], [], 0.)[0]:
-            return self.DOSTRUE
-        
         ms = ctx.cpu.r_reg(REG_D2)
-        if ms > 0:
-            time.sleep(ms * 1e-3)
-
-            if select.select([fh.obj], [], [], 0.)[0]:
-                return self.DOSTRUE
+        if select.select([fh.obj], [], [], ms * 1e-3)[0]:
+            return self.DOSTRUE
         
         return self.DOSFALSE
 
