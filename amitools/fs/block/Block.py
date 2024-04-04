@@ -73,7 +73,7 @@ class Block:
             self._read_data()
         self._get_types()
         self._get_chksum()
-        self.valid = (self.valid_types and self.valid_chksum) or Block.ignore_errors
+        self.valid = self.valid_types and (self.valid_chksum or Block.ignore_errors)
 
     def write(self):
         if self.data == None:

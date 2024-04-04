@@ -1117,7 +1117,7 @@ def main(args=None, defaults=None):
         "--ignore-block-errors",
         action="store_true",
         default=False,
-        help="ignore block errors",
+        help="ignore block checksum errors",
     )
 
     if defaults:
