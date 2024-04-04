@@ -1,6 +1,7 @@
 from amitools.fs.block.rdb.RDBlock import *
 from .FileSystem import FileSystem
 from .Partition import Partition
+from .RDisk import RDisk
 
 class Recovery:
     def __init__(self, rawblk, block_bytes, cyl_blks, reserved_cyls):
@@ -11,13 +12,13 @@ class Recovery:
         self.pnum = 0
         self.fnum = 0
 
-    def get_block_map(self):
+    def read(self):
         res = []
         for i in range(self.max_blks):
             blk = self.try_block_read(i)
             if blk is not None:
                 res.append(blk)
-        return res
+        self.block_map = res
 
     def try_block_read(self, i):
         p = Partition(self.rawblk, i, self.pnum, self.cyl_blks, self.block_bytes)
@@ -32,3 +33,35 @@ class Recovery:
         if r.read():
             return r
         return None
+
+    def dump(self):
+        for i in self.block_map:
+            print(i.dump())
+
+    def build_rdisk(self):
+        blkdev = self.rawblk
+        rdb = None
+        parts = []
+        fs = []
+        for i in self.block_map:
+            t = type(i)
+            if t is RDBlock:
+                rdb = i
+            if t is Partition:
+                parts.append(i)
+            if t is FileSystem:
+                fs.append(i)
+            pass
+
+        if rdb == None:
+            rdb = RDBlock(blkdev)
+
+        rdisk = RDisk(blkdev)
+        rdisk.create(blkdev.geo, rdb_cyls=self.cyl_blks, blk_num=rdb.blk_num)
+
+        for i in parts:
+            rdisk.parts.append(i)
+        for i in fs:
+            rdisk.fs.append(i)
+
+        return rdisk

@@ -312,6 +312,7 @@ class InitCommand(OpenCommand):
             rdb_cyls = 1
         rdisk = RDisk(blkdev)
         rdisk.create(blkdev.geo, rdb_cyls=rdb_cyls)
+        rdisk.write()
         return rdisk
 
 
@@ -512,9 +513,11 @@ class DiscoverCommand(Command):
             reserved_cyls = 2
 
         recovery = Recovery(blkdev, block_bytes, cyl_blks, reserved_cyls)
-        bm = recovery.get_block_map()
-        for i in bm:
-            print(i.dump())
+        recovery.read()
+        recovery.dump()
+
+        self.rdisk = recovery.build_rdisk()
+
         return 0
 
 

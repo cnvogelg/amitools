@@ -290,7 +290,7 @@ class RDisk:
     # ----- edit -----
 
     def create(
-        self, disk_geo, rdb_cyls=1, hi_rdb_blk=0, disk_names=None, ctrl_names=None
+        self, disk_geo, rdb_cyls=1, hi_rdb_blk=0, disk_names=None, ctrl_names=None, blk_num=0
     ):
         cyls = disk_geo.cyls
         heads = disk_geo.heads
@@ -340,15 +340,16 @@ class RDisk:
             ctrl_revision,
         )
         self.block_bytes = self.rawblk.block_bytes
-        self.rdb = RDBlock(self.rawblk)
+        self.rdb = RDBlock(self.rawblk, blk_num)
         self.rdb.create(
             phy_drv, log_drv, drv_id, block_size=self.block_bytes, flags=flags
         )
-        self.rdb.write()
-
         self.used_blks = [self.rdb.blk_num]
         self.max_blks = self.rdb.log_drv.rdb_blk_hi + 1
         self.valid = True
+
+    def write():
+        self.rdb.write()
 
     def resize(self, new_lo_cyl=None, new_hi_cyl=None, adjust_physical=False):
         # if the rdb region has to be minimized then check if no partition
