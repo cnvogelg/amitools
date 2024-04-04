@@ -3,6 +3,7 @@ from amitools.fs.block.rdb.PartitionBlock import *
 from amitools.fs.blkdev.PartBlockDevice import PartBlockDevice
 import amitools.util.ByteSize as ByteSize
 import amitools.fs.DosType as DosType
+import logging
 
 
 class Partition:
@@ -155,6 +156,12 @@ class Partition:
             "bootable": bootable,
             "automount": automount,
         }
+
+    def log_errors(self):
+        if not self.valid:
+            for e in self.part_blk.errors:
+                logging.info(e)
+
 
     # ----- Import/Export -----
 

@@ -2,6 +2,7 @@ from amitools.fs.block.rdb.FSHeaderBlock import *
 from amitools.fs.block.rdb.LoadSegBlock import *
 from amitools.util.HexDump import *
 import amitools.fs.DosType as DosType
+import logging
 
 
 class FileSystem:
@@ -152,6 +153,13 @@ class FileSystem:
             "size": len(self.data),
             "dev_node": dev_node,
         }
+
+    def log_errors(self):
+        if not self.valid:
+            for i in self.lsegs:
+                for e in self.i.errors:
+                    logging.info(e)
+
 
     # ----- edit -----
 
