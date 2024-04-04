@@ -36,6 +36,7 @@ class Block:
         self.is_type = is_type
         self.is_sub_type = is_sub_type
         self.chk_loc = chk_loc
+        self.errors = []
 
     def __str__(self):
         return "%s:@%d" % (self.__class__.__name__, self.blk_num)
@@ -129,9 +130,11 @@ class Block:
         self.valid_types = True
         if self.is_type != 0:
             if self.type != self.is_type:
+                self.errors.append("Block #%d type mismatch (is %d but expected %d)" % (self.blk_num, self.type, self.is_type))
                 self.valid_types = False
         if self.is_sub_type != 0:
             if self.sub_type != self.is_sub_type:
+                self.errors.append("Block #%d subtype mismatch (is %d but expected %d)" % (self.blk_num, self.sub_type, self.is_sub_type))
                 self.valid_types = False
 
     def _put_types(self):
@@ -144,6 +147,8 @@ class Block:
         self.got_chksum = self._get_long(self.chk_loc)
         self.calc_chksum = self._calc_chksum()
         self.valid_chksum = self.got_chksum == self.calc_chksum
+        if not self.valid_chksum:
+            self.errors.append("Block #%d checksum is invalid" % (self.blk_num))
 
     def _put_chksum(self):
         self.calc_chksum = self._calc_chksum()

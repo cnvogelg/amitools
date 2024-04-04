@@ -49,7 +49,6 @@ class RDisk:
         num = 0
         while part_blk != Block.no_blk:
             p = Partition(self.rawblk, part_blk, num, self.rdb.log_drv.cyl_blks, self)
-            num += 1
             if not p.read():
                 self.valid = False
                 return False
@@ -58,6 +57,7 @@ class RDisk:
             self.used_blks.append(p.get_blk_num())
             # next partition
             part_blk = p.get_next_partition_blk()
+            num += 1
 
         # read filesystems
         fs_blk = self.rdb.fs_list
@@ -65,7 +65,6 @@ class RDisk:
         num = 0
         while fs_blk != PartitionBlock.no_blk:
             fs = FileSystem(self.rawblk, fs_blk, num)
-            num += 1
             if not fs.read():
                 self.valid = False
                 return False
@@ -74,6 +73,7 @@ class RDisk:
             self.used_blks += fs.get_blk_nums()
             # next partition
             fs_blk = fs.get_next_fs_blk()
+            num += 1
 
         # TODO: add bad block blocks
 
