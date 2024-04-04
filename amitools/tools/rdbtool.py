@@ -1082,11 +1082,21 @@ def main(args=None, defaults=None):
     parser.add_argument(
         "-t", "--dostype", default="ffs+intl", help="set default dos type"
     )
+    parser.add_argument(
+        "--ignore-block-errors",
+        action="store_true",
+        default=False,
+        help="ignore block errors",
+    )
+
     if defaults:
         parser.set_defaults(defaults)
     opts = parser.parse_args(args)
     opts.log_format = "%(message)s"
     setup_logging(opts)
+
+    if opts.ignore_block_errors:
+        Block.ignore_errors = True
 
     cmd_list = opts.command_list
     sep = opts.seperator

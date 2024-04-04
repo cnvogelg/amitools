@@ -49,8 +49,9 @@ class RDisk:
         num = 0
         while part_blk != Block.no_blk:
             p = Partition(self.rawblk, part_blk, num, self.rdb.log_drv.cyl_blks, self)
-            if not p.read():
-                p.log_errors()
+            ok = p.read()
+            p.log_errors()
+            if not ok:
                 self.valid = False
                 return False
             self.parts.append(p)
@@ -66,8 +67,9 @@ class RDisk:
         num = 0
         while fs_blk != PartitionBlock.no_blk:
             fs = FileSystem(self.rawblk, fs_blk, num)
-            if not fs.read():
-                fs.log_errors()
+            ok = fs.read()
+            fs.log_errors()
+            if not ok:
                 self.valid = False
                 return False
             self.fs.append(fs)

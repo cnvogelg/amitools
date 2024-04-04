@@ -25,6 +25,8 @@ class Block:
     ST_USERDIR = 2
     ST_FILE = -3 & 0xFFFFFFFF
 
+    ignore_errors = False
+
     def __init__(self, blkdev, blk_num, is_type=0, is_sub_type=0, chk_loc=5):
         self.valid = False
         self.blkdev = blkdev
@@ -71,7 +73,7 @@ class Block:
             self._read_data()
         self._get_types()
         self._get_chksum()
-        self.valid = self.valid_types and self.valid_chksum
+        self.valid = (self.valid_types and self.valid_chksum) or Block.ignore_errors
 
     def write(self):
         if self.data == None:

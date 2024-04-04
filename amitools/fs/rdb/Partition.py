@@ -158,9 +158,8 @@ class Partition:
         }
 
     def log_errors(self):
-        if not self.valid:
-            for e in self.part_blk.errors:
-                logging.info(e)
+        for e in self.part_blk.errors:
+            logging.warning(e)
 
 
     # ----- Import/Export -----

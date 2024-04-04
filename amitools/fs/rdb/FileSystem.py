@@ -155,10 +155,9 @@ class FileSystem:
         }
 
     def log_errors(self):
-        if not self.valid:
-            for i in self.lsegs:
-                for e in self.i.errors:
-                    logging.info(e)
+        for i in self.lsegs:
+            for e in i.errors:
+                logging.warning(e)
 
 
     # ----- edit -----
