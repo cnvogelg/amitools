@@ -25,6 +25,8 @@ from amitools.fs.block.BootBlock import BootBlock
 import amitools.util.KeyValue as KeyValue
 import amitools.util.ByteSize as ByteSize
 import amitools.util.VerTag as VerTag
+from amitools.fs.rdb.Recovery import Recovery
+from amitools.fs.block.Block import Block
 
 
 # ----- commands -----
@@ -485,6 +487,41 @@ class MapCommand(Command):
             if num == 16:
                 num = 0
                 print("")
+        return 0
+
+class DiscoverCommand(Command):
+    def need_rdisk(self):
+        return False
+
+    usage = "Usage: discover bpc=<blocks_per_cyl> [bs=<block_size>] [cyls=<max_cyls>]"
+
+    def handle_blkdev(self, blkdev):
+        self.popts = KeyValue.parse_key_value_strings(self.opts)
+        if "bs" in self.popts:
+            block_bytes = int(self.popts["bs"])
+        else:
+            block_bytes = 512
+        if "bpc" in self.popts:
+            cyl_blks = int(self.popts["bpc"])
+        else:
+            print(DiscoverCommand.usage)
+            return -1
+        if "cyls" in self.popts:
+            reserved_cyls = int(self.popts["cyls"])
+        else:
+            reserved_cyls = 2
+
+        recovery = Recovery(blkdev, block_bytes, cyl_blks, reserved_cyls)
+        bm = recovery.get_block_map()
+        off = 0
+        for i in bm:
+            print("%06d: " % off, end="")
+            # print("%s, " % i.blocks, end="")
+            # print("next = %d" % (i.next if i.next != Block.no_blk else -1), end="")
+            print("")
+            if i.block != None:
+                print(i.block.dump())
+            off += 1
         return 0
 
 
@@ -1048,6 +1085,7 @@ def main(args=None, defaults=None):
         "change": ChangeCommand,
         "export": ExportCommand,
         "import": ImportCommand,
+        "discover": DiscoverCommand,
     }
 
     parser = argparse.ArgumentParser()

@@ -48,7 +48,7 @@ class RDisk:
         self.parts = []
         num = 0
         while part_blk != Block.no_blk:
-            p = Partition(self.rawblk, part_blk, num, self.rdb.log_drv.cyl_blks, self)
+            p = Partition(self.rawblk, part_blk, num, self.rdb.log_drv.cyl_blks, self.block_bytes, self)
             ok = p.read()
             p.log_errors()
             if not ok:
@@ -634,7 +634,7 @@ class RDisk:
         self.rawblk.flush()
         # create partition object and add to partition list
         blk_per_cyl = blk_per_trk * heads
-        p = Partition(self.rawblk, blk_num, len(self.parts), blk_per_cyl, self)
+        p = Partition(self.rawblk, blk_num, len(self.parts), blk_per_cyl, self.block_bytes, self)
         p.read()
         self.parts.append(p)
         return p
