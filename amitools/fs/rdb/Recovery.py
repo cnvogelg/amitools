@@ -15,23 +15,20 @@ class Recovery:
         res = []
         for i in range(self.max_blks):
             blk = self.try_block_read(i)
-            res.append(blk)
+            if blk is not None:
+                res.append(blk)
         return res
 
     def try_block_read(self, i):
         p = Partition(self.rawblk, i, self.pnum, self.cyl_blks, self.block_bytes)
         if p.read():
-            return BlockRecord(p, [i], p.get_next_partition_blk())
+            self.pnum += 1
+            return p
         f = FileSystem(self.rawblk, i, self.fnum)
         if f.read():
-            return BlockRecord(f, f.get_blk_nums(), f.get_next_fs_blk())
+            self.fnum += 1
+            return f
         r = RDBlock(self.rawblk, i)
         if r.read():
-            return BlockRecord(r, [i], Block.no_blk)
-        return BlockRecord(None, [i], Block.no_blk)
-
-class BlockRecord:
-    def __init__(self, block, blocks, next):
-        self.block = block
-        self.blocks = blocks
-        self.next = next
+            return r
+        return None

@@ -513,15 +513,8 @@ class DiscoverCommand(Command):
 
         recovery = Recovery(blkdev, block_bytes, cyl_blks, reserved_cyls)
         bm = recovery.get_block_map()
-        off = 0
         for i in bm:
-            print("%06d: " % off, end="")
-            # print("%s, " % i.blocks, end="")
-            # print("next = %d" % (i.next if i.next != Block.no_blk else -1), end="")
-            print("")
-            if i.block != None:
-                print(i.block.dump())
-            off += 1
+            print(i.dump())
         return 0
 
 
