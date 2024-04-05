@@ -34,5 +34,8 @@ def setup_logging(opts):
             level = logging.INFO
         else:
             level = logging.DEBUG
+    format = FORMAT
+    if opts.log_format is not None:
+        format = opts.log_format
     # setup logging
-    logging.basicConfig(format=FORMAT, filename=opts.log_file, level=level)
+    logging.basicConfig(format=format, filename=opts.log_file, level=level)
