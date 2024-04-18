@@ -33,6 +33,7 @@ from amitools.vamos.libstructs import (
     ListStruct,
     TaskState,
     NodeType,
+    TimeRequestStruct,
 )
 from amitools.vamos.libtypes import TagList, DosTag, DosPacket
 from amitools.vamos.error import *
@@ -129,6 +130,12 @@ class DosLibrary(LibImpl):
         self.file_mgr = FileManager(
             ctx.path_mgr, ctx.exec_lib.port_mgr, ctx.alloc, ctx.mem
         )
+        self.timer_device = ctx.exec_lib.lib_mgr.open_lib("timer.device", 0)
+        self.timer_request = ctx.alloc.alloc_astruct(
+            TimeRequestStruct, label="DOS TimerRequest"
+        )
+        self.timer_request.tr_node.io_Device.aptr = self.timer_device
+        self.lib_struct.dl_TimeReq.aptr = self.timer_request.addr
         # processes made by CreateNewProc(), by their scheduler task
         self.child_procs = {}
         self.port_mgr = ctx.exec_lib.port_mgr
@@ -146,6 +153,8 @@ class DosLibrary(LibImpl):
         return 0
 
     def finish_lib(self, ctx):
+        ctx.exec_lib.lib_mgr.close_lib(self.timer_device)
+        self.timer_request.free()
         # free the child processes that still run
         for child in self.child_procs.values():
             child.free()
