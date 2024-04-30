@@ -97,7 +97,7 @@ class DosLibrary(LibImpl):
         self.file_mgr = FileManager(
             ctx.path_mgr, ctx.exec_lib.port_mgr, ctx.alloc, ctx.mem
         )
-        
+
         self.timerDevice = ctx.exec_lib.lib_mgr.open_lib("timer.device", 0)
         self.timeRequest = ctx.alloc.alloc_struct(TimeRequestStruct, label="TimeRequest")
         self.timeRequest.access.w_s("tr_node.io_Device", self.timerDevice)
@@ -1506,7 +1506,13 @@ class DosLibrary(LibImpl):
             csrc.read_s(ctx.alloc, csrc_ptr)
             input_fh = None
         else:
-            input_fh = ctx.process.get_input()
+            p = ctx.process
+            input_fh = p.get_input()
+            
+            if input_fh is not None and p.arg_str is not None:
+                input_fh.setbuf(p.arg_str)
+                p.arg_str = None
+            
             csrc = FileCSource(input_fh)
         # no pointer
         if buff_ptr == 0:
