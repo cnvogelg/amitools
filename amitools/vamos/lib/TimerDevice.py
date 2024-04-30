@@ -1,7 +1,7 @@
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.machine.regs import REG_A0
 from amitools.vamos.astructs import AccessStruct
-from amitools.vamos.libstructs import DateStampStruct
+from amitools.vamos.libstructs.dos import TimeValStruct
 
 from datetime import datetime
 
@@ -12,9 +12,11 @@ class TimerDevice(LibImpl):
 
         dt = datetime.now()
 
-        # abuse DateStampStruct
-        tv = AccessStruct(ctx.mem, DateStampStruct, struct_addr=eclockval)
-        tv.ds_Days = dt.microsecond / 1000000
-        tv.ds_Minute = dt.microsecond % 1000000
+        tv = AccessStruct(ctx.mem, TimeValStruct, struct_addr=eclockval)
+        tv.tv_secs = dt.microsecond / 1000000
+        tv.tv_micros = dt.microsecond % 1000000
 
         return 50
+
+    def GetSysTime(self, ctx):
+        self.ReadEClock(ctx)

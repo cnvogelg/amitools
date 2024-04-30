@@ -44,6 +44,7 @@ from .dos.FileManager import FileManager
 from .dos.CSource import *
 from .dos.Item import *
 from amitools.vamos.dos import run_command, run_sub_process
+from amitools.vamos.libstructs.dos import TimeRequestStruct
 
 
 class DosLibrary(LibImpl):
@@ -96,8 +97,18 @@ class DosLibrary(LibImpl):
         self.file_mgr = FileManager(
             ctx.path_mgr, ctx.exec_lib.port_mgr, ctx.alloc, ctx.mem
         )
+        
+        self.timerDevice = ctx.exec_lib.lib_mgr.open_lib("timer.device", 0)
+        self.timeRequest = ctx.alloc.alloc_struct(TimeRequestStruct, label="TimeRequest")
+        self.timeRequest.access.w_s("tr_node.io_Device", self.timerDevice)
+        self.access.w_s("dl_TimeReq", self.timeRequest.addr)
 
     def finish_lib(self, ctx):
+        
+        # close TimerDevice, free timeRequest
+        ctx.exec_lib.lib_mgr.close_lib(self.timerDevice)
+        ctx.alloc.free_struct(self.timeRequest)
+        
         # finish file manager
         self.file_mgr.finish()
         # free dos list
