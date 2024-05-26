@@ -1,5 +1,9 @@
 # Change Log
 
+## [0.8.1] (2024-05-26)
+
+* Small change to fix modern pip3 packaging change breakage
+
 ## [0.8.0][8] (2024-03-03)
 
 ### global
