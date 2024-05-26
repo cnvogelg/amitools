@@ -157,8 +157,7 @@ class Process:
     # ----- args -----
     def init_args(self, arg_str, fh):
         # Tripos makes the input line available as buffered input for ReadItem()
-        # fh.setbuf(arg_str) # NOOOOOO!!!!
-        self.arg_str = arg_str
+        fh.setbuf(arg_str)
         # alloc and fill arg buffer
         self.arg_len = len(arg_str)
         name = self.bin_basename + "_args"
