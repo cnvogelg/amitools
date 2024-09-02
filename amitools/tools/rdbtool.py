@@ -7,7 +7,9 @@ import sys
 import argparse
 import os.path
 import json
+import logging
 
+from amitools.util.Logging import setup_logging, add_logging_options
 from amitools.util.HexDump import get_hex_line
 from amitools.util.CommandQueue import CommandQueue
 from amitools.fs.FSError import FSError
@@ -23,6 +25,8 @@ from amitools.fs.block.BootBlock import BootBlock
 import amitools.util.KeyValue as KeyValue
 import amitools.util.ByteSize as ByteSize
 import amitools.util.VerTag as VerTag
+from amitools.fs.rdb.Recovery import Recovery
+from amitools.fs.block.Block import Block
 
 
 # ----- commands -----
@@ -100,13 +104,11 @@ class FSCommandQueue(CommandQueue):
             # close rdisk
             if self.rdisk != None:
                 self.rdisk.close()
-                if self.args.verbose:
-                    print("closing rdisk:", self.img)
+                logging.info("closing rdisk: %s", self.img)
             # close blkdev
             if self.blkdev != None:
                 self.blkdev.close()
-                if self.args.verbose:
-                    print("closing image:", self.img)
+                logging.info("closing image: %s", self.img)
         return exit_code
 
     def create_cmd(self, cclass, name, opts):
@@ -115,8 +117,7 @@ class FSCommandQueue(CommandQueue):
     def _open_rdisk(self):
         if self.rdisk == None:
             self.rdisk = RDisk(self.blkdev)
-            if self.args.verbose:
-                print("opening rdisk:", self.img)
+            logging.info("opening rdisk: %s", self.img)
             return self.rdisk.open()
         else:
             return True
@@ -128,11 +129,9 @@ class FSCommandQueue(CommandQueue):
         if not cmd.has_init_blkdev():
             # auto add 'open' command
             pre_cmd = OpenCommand(self.args, [])
-            if self.args.verbose:
-                print("auto open command:", self.cmd_line)
+            logging.info("auto open command: %s", self.cmd_line)
             exit_code = pre_cmd.run(self.blkdev, self.rdisk)
-            if self.args.verbose:
-                print("auto open exit_code:", exit_code)
+            logging.info("auto open exit_code: %d", exit_code)
             if exit_code != 0:
                 return exit_code
             self.blkdev = pre_cmd.blkdev
@@ -142,8 +141,7 @@ class FSCommandQueue(CommandQueue):
                     raise IOError("No RDB Disk?")
 
         # run first command
-        if self.args.verbose:
-            print("command:", self.cmd_line)
+        logging.info("command: %s", self.cmd_line)
         if cmd.edit and self.args.read_only:
             raise IOError("Edit commands not allowed in read-only mode")
 
@@ -159,14 +157,12 @@ class FSCommandQueue(CommandQueue):
             self.rdisk = cmd.rdisk
 
         # final exit code
-        if self.args.verbose:
-            print("exit_code:", exit_code)
+        logging.info("exit_code: %d", exit_code)
         return exit_code
 
     def run_next(self, cmd_line, cmd):
         self.cmd_line = cmd_line
-        if self.args.verbose:
-            print("command:", self.cmd_line)
+        logging.info("command: %s", self.cmd_line)
         # verify command
         if cmd.edit and self.args.read_only:
             raise IOError("Edit commands not allowed in read-only mode")
@@ -180,8 +176,7 @@ class FSCommandQueue(CommandQueue):
             self.blkdev = cmd.blkdev
         if cmd.rdisk != None:
             self.rdisk = cmd.rdisk
-        if self.args.verbose:
-            print("exit_code:", exit_code)
+        logging.info("exit_code: %d", exit_code)
         return exit_code
 
 
@@ -317,6 +312,7 @@ class InitCommand(OpenCommand):
             rdb_cyls = 1
         rdisk = RDisk(blkdev)
         rdisk.create(blkdev.geo, rdb_cyls=rdb_cyls)
+        rdisk.write()
         return rdisk
 
 
@@ -492,6 +488,36 @@ class MapCommand(Command):
             if num == 16:
                 num = 0
                 print("")
+        return 0
+
+class DiscoverCommand(Command):
+    def need_rdisk(self):
+        return False
+
+    usage = "Usage: discover bpc=<blocks_per_cyl> [bs=<block_size>] [cyls=<max_cyls>]"
+
+    def handle_blkdev(self, blkdev):
+        self.popts = KeyValue.parse_key_value_strings(self.opts)
+        if "bs" in self.popts:
+            block_bytes = int(self.popts["bs"])
+        else:
+            block_bytes = 512
+        if "bpc" in self.popts:
+            cyl_blks = int(self.popts["bpc"])
+        else:
+            print(DiscoverCommand.usage)
+            return -1
+        if "cyls" in self.popts:
+            reserved_cyls = int(self.popts["cyls"])
+        else:
+            reserved_cyls = 2
+
+        recovery = Recovery(blkdev, block_bytes, cyl_blks, reserved_cyls)
+        recovery.read()
+        recovery.dump()
+
+        self.rdisk = recovery.build_rdisk()
+
         return 0
 
 
@@ -1055,6 +1081,7 @@ def main(args=None, defaults=None):
         "change": ChangeCommand,
         "export": ExportCommand,
         "import": ImportCommand,
+        "discover": DiscoverCommand,
     }
 
     parser = argparse.ArgumentParser()
@@ -1062,9 +1089,7 @@ def main(args=None, defaults=None):
     parser.add_argument(
         "command_list", nargs="+", help="command: " + ",".join(list(cmd_map.keys()))
     )
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", default=False, help="be more verbose"
-    )
+    add_logging_options(parser)
     parser.add_argument(
         "-s", "--seperator", default="+", help="set the command separator char sequence"
     )
@@ -1091,13 +1116,25 @@ def main(args=None, defaults=None):
     parser.add_argument(
         "-t", "--dostype", default="ffs+intl", help="set default dos type"
     )
+    parser.add_argument(
+        "--ignore-block-errors",
+        action="store_true",
+        default=False,
+        help="ignore block checksum errors",
+    )
+
     if defaults:
         parser.set_defaults(defaults)
-    args = parser.parse_args(args)
+    opts = parser.parse_args(args)
+    opts.log_format = "%(message)s"
+    setup_logging(opts)
 
-    cmd_list = args.command_list
-    sep = args.seperator
-    queue = FSCommandQueue(args, cmd_list, sep, cmd_map)
+    if opts.ignore_block_errors:
+        Block.ignore_errors = True
+
+    cmd_list = opts.command_list
+    sep = opts.seperator
+    queue = FSCommandQueue(opts, cmd_list, sep, cmd_map)
     code = queue.run()
     return code
 

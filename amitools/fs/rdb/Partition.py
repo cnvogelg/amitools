@@ -3,16 +3,17 @@ from amitools.fs.block.rdb.PartitionBlock import *
 from amitools.fs.blkdev.PartBlockDevice import PartBlockDevice
 import amitools.util.ByteSize as ByteSize
 import amitools.fs.DosType as DosType
+import logging
 
 
 class Partition:
-    def __init__(self, blkdev, blk_num, num, cyl_blks, rdisk):
+    def __init__(self, blkdev, blk_num, num, cyl_blks, block_bytes, rdisk=None):
         self.blkdev = blkdev
         self.blk_num = blk_num
         self.num = num
         self.cyl_blks = cyl_blks
+        self.block_bytes = block_bytes
         self.rdisk = rdisk
-        self.block_bytes = rdisk.block_bytes
         self.part_blk = None
 
     def get_next_partition_blk(self):
@@ -155,6 +156,11 @@ class Partition:
             "bootable": bootable,
             "automount": automount,
         }
+
+    def log_errors(self):
+        for e in self.part_blk.errors:
+            logging.warning(e)
+
 
     # ----- Import/Export -----
 
