@@ -347,7 +347,29 @@ class ExecLibrary(LibImpl):
                 "DeletePooled: invalid memory pool: ptr=%06x" % poolid
             )
 
+    def SuperState(self, ctx):
+        # not complete with stack change and all but at least allows
+        # to run privileged instructions
+        ctx.cpu.w_sr(ctx.cpu.r_sr() | 0x2000)
+        #ctx.cpu.w_msp(ctx.cpu.r_usp()-0x400)
+
+    def UserState(self, ctx):
+        # not complete with stack change and all but at least allows
+        # to return to user state
+        ctx.cpu.w_sr(ctx.cpu.r_sr() & 0x7FF)
+        #ctx.cpu.w_msp(ctx.cpu.r_usp()-0x400)
+
     # ----- Memory Handling -----
+
+    def AllocAbs(self, ctx):
+        size = ctx.cpu.r_reg(REG_D0)
+        location = ctx.cpu.r_reg(REG_A1)
+        # label alloc
+        pc = self.get_callee_pc(ctx)
+        name = "AllocAbs(%06x)" % pc
+        mb = self.alloc.alloc_abs_memory(location, size, label=name)
+        log_exec.info("AllocAbs: %s -> 0x%06x %d bytes" % (mb, mb.addr, size))
+        return mb.addr
 
     def AllocMem(self, ctx):
         size = ctx.cpu.r_reg(REG_D0)
@@ -370,9 +392,10 @@ class ExecLibrary(LibImpl):
             log_exec.info("FreeMem: 0x%06x %d bytes -> %s" % (addr, size, mb))
             self.alloc.free_memory(mb)
         else:
-            raise VamosInternalError(
-                "FreeMem: Unknown memory to free: ptr=%06x size=%06x" % (addr, size)
-            )
+            pass
+             #raise VamosInternalError(
+             #   "FreeMem: Unknown memory to free: ptr=%06x size=%06x" % (addr, size)
+            #)
 
     def AllocVec(self, ctx):
         size = ctx.cpu.r_reg(REG_D0)
