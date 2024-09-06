@@ -12,6 +12,7 @@ from .regs import *
 from .opcodes import *
 from .error import ErrorReporter
 from .cpustate import CPUState
+from .traps import Traps
 from amitools.vamos.error import *
 from amitools.vamos.log import log_machine
 from amitools.vamos.label import LabelManager
@@ -28,6 +29,7 @@ class RunState(object):
         self.cycles = 0
         self.time_delta = 0
         self.regs = None
+        self.trap_call = None
 
     def __str__(self):
         return (
@@ -85,7 +87,7 @@ class Machine(object):
     ram_begin = 0x800
     scratch_begin = 0x600
     quick_trap_begin = 0x500
-    quick_trap_num = 128
+    quick_trap_num = 64
 
     def __init__(
         self,
@@ -105,7 +107,12 @@ class Machine(object):
         self.machine = machine68k.Machine(cpu_type, ram_size_kib)
         self.cpu = self.machine.cpu
         self.mem = self.machine.mem
-        self.traps = self.machine.traps
+
+        # traps
+        def store_trap_call(call):
+            self.get_cur_run_state().trap_call = call
+
+        self.traps = Traps(self.machine, store_trap_call)
         # internal state
         if use_labels:
             self.label_mgr = LabelManager()
@@ -224,14 +231,15 @@ class Machine(object):
         addr = self.quick_trap_begin
         for i in range(self.quick_trap_num):
             m.w16(addr, 0)
-            addr += 2
+            m.w16(addr + 2, op_rts)
+            addr += 4
 
     def _cleanup_quick_traps(self):
         m = self.mem
         addr = self.quick_trap_begin
         for i in range(self.quick_trap_num):
             v = m.r16(addr)
-            addr += 2
+            addr += 4
             if v != 0:
                 tid = v & 0xFFF
                 self.traps.free(tid)
@@ -242,11 +250,11 @@ class Machine(object):
         for i in range(self.quick_trap_num):
             v = m.r16(addr)
             if v == 0:
-                tid = self.traps.setup(func, auto_rts=True)
+                tid = self.traps.setup(func)
                 opc = 0xA000 | tid
                 m.w16(addr, opc)
                 return addr
-            addr += 2
+            addr += 4
 
     def free_quick_trap(self, addr):
         off = addr - self.quick_trap_begin
@@ -501,6 +509,14 @@ class Machine(object):
                 log_machine.debug("+ cpu.execute")
                 total_cycles += cpu.execute(cycles_per_run)
                 log_machine.debug("- cpu.execute")
+
+                # did a trap occur in cpu run?
+                if run_state.trap_call:
+                    log_machine.debug("+ trap %s", run_state.trap_call)
+                    run_state.trap_call.trigger()
+                    log_machine.debug("- trap")
+                    run_state.trap_call = None
+
                 # end after enough cycles
                 if max_cycles > 0 and total_cycles >= max_cycles:
                     break

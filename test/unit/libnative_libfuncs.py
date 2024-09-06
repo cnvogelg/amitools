@@ -81,9 +81,10 @@ def libnative_libfuncs_rem_library_test():
         # return my seglist
         cpu.w_reg(REG_D0, seglist.get_baddr())
 
-    trap_id = traps.setup(expunge_func, auto_rts=True)
+    trap_id = traps.setup(expunge_func)
     exp_addr = lib.get_addr() - 18
     mem.w16(exp_addr, trap_id | 0xA000)
+    mem.w16(exp_addr + 2, 0x4E75)  # rts
     # add lib
     lf = LibFuncs(machine, alloc)
     sl = lf.rem_library(lib.get_addr(), segloader, run_sp=sp)
@@ -114,9 +115,10 @@ def libnative_libfuncs_close_library_test():
         # return my seglist
         cpu.w_reg(REG_D0, seglist.get_baddr())
 
-    trap_id = traps.setup(close_func, auto_rts=True)
+    trap_id = traps.setup(close_func)
     exp_addr = lib.get_addr() - 12
     mem.w16(exp_addr, trap_id | 0xA000)
+    mem.w16(exp_addr + 2, 0x4E75)  # rts
     # add lib
     lf = LibFuncs(machine, alloc)
     sl = lf.close_library(lib.get_addr(), segloader, run_sp=sp)
@@ -143,9 +145,10 @@ def libnative_libfuncs_open_library_test():
         # return my seglist
         cpu.w_reg(REG_D0, 0xCAFEBABE)
 
-    trap_id = traps.setup(open_func, auto_rts=True)
+    trap_id = traps.setup(open_func)
     exp_addr = lib.get_addr() - 6
     mem.w16(exp_addr, trap_id | 0xA000)
+    mem.w16(exp_addr + 2, 0x4E75)  # rts
     # add lib
     lf = LibFuncs(machine, alloc)
     lib_base = lf.open_library(lib.get_addr(), run_sp=sp)

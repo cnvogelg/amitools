@@ -22,29 +22,31 @@ class LibPatcherMultiTrap(object):
         addr = self.trap_base
         for entry in jt:
             entry.set(addr)
-            addr += 2
+            addr += 4
 
     def _setup_trap_block(self):
         name = "%s(Traps)" % self.stub.name
         func_table = self.stub.get_func_tab()
-        size = len(func_table) * 2
+        size = len(func_table) * 4  # trap + rts
         self.mem_obj = self.alloc.alloc_memory(size, label=name)
         addr = self.mem_obj.addr
         self.trap_base = addr
         mem = self.alloc.mem
         for func in func_table:
             # setup new patch
-            tid = self.traps.setup(func, auto_rts=True)
+            tid = self.traps.setup(func)
             if tid < 0:
                 raise RuntimeError("no more traps available!")
             # generate opcode
             op = 0xA000 | tid
             # write trap
             mem.w16(addr, op)
+            # add rts
+            mem.w16(addr + 2, 0x4E75)
             # remember trap
             self.tids.append(tid)
             # next slot
-            addr += 2
+            addr += 4
 
     def cleanup(self):
         """remove traps"""

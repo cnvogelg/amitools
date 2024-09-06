@@ -36,8 +36,9 @@ def libnative_initres_init_test(buildlibnix):
         # return my lib_base
         cpu.w_reg(REG_D0, 0xCAFEBABE)
 
-    trap_id = traps.setup(init_func, auto_rts=True)
+    trap_id = traps.setup(init_func)
     mem.w16(init_addr, trap_id | 0xA000)
+    mem.w16(init_addr + 2, 0x4E75)  # rts
     # build fake resident
     res = Resident.alloc(alloc, name="bla.library", id_string="blub")
     res.new_resident(
@@ -69,8 +70,9 @@ def libnative_initres_autoinit_test(buildlibnix):
     def init_func(op, pc):
         assert cpu.r_reg(REG_A0) == seglist.get_baddr()
 
-    trap_id = traps.setup(init_func, auto_rts=True)
+    trap_id = traps.setup(init_func)
     mem.w16(init_addr, trap_id | 0xA000)
+    mem.w16(init_addr + 2, 0x4E75)  # rts
     # fake vectors
     vectors = 0x100
     mem.w32(vectors, 0x400)

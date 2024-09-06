@@ -88,7 +88,7 @@ class MockCPU(object):
         raise NotImplementedError()
 
     def end(self):
-        raise NotImplementedError()
+        pass
 
     def set_pc_changed_callback(self, py_func):
         raise NotImplementedError()

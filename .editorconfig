@@ -7,7 +7,7 @@ insert_final_newline = true
 [*.{py,pyx,pyd,c,h}]
 charset = utf-8
 indent_style = space
-indent_size = 2
+indent_size = 4 
 
 [Makefile]
 indent_style = tab

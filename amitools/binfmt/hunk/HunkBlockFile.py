@@ -1,6 +1,5 @@
 """The hunk block types defined as data classes"""
 
-
 import struct
 from .Hunk import *
 
