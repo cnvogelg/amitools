@@ -212,7 +212,8 @@ def toolrun(request):
 
 @pytest.fixture(scope="module", params=["mach", "mach-label", "mock", "mock-label"])
 def mem_alloc(request):
-    from amitools.vamos.machine import Machine, MockMemory
+    from amitools.vamos.machine import Machine
+    from amitools.vamos.machine.mock import MockMemory
     from amitools.vamos.mem import MemoryAlloc
     from amitools.vamos.label import LabelManager
 

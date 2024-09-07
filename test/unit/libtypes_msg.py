@@ -1,5 +1,5 @@
 import pytest
-from amitools.vamos.machine import MockMemory
+from amitools.vamos.machine.mock import MockMemory
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.libtypes import MsgPort, Message
 from amitools.vamos.libstructs import MsgPortFlags, NodeType

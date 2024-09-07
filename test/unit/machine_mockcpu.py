@@ -1,6 +1,6 @@
 import pytest
 from amitools.vamos.machine.regs import *
-from amitools.vamos.machine import MockCPU
+from amitools.vamos.machine.mock import MockCPU
 
 
 def machine_mockcpu_rw_reg_test():

@@ -1,6 +1,6 @@
 import pytest
 import struct
-from amitools.vamos.machine import MockMemory
+from amitools.vamos.machine.mock import MockMemory
 
 
 def machine_mem_rw_test():

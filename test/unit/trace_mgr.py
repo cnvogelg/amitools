@@ -2,6 +2,7 @@ import logging
 from amitools.vamos.trace import TraceManager
 from amitools.vamos.label import *
 from amitools.vamos.machine import *
+from amitools.vamos.machine.mock import MockMachine
 from amitools.vamos.libstructs import NodeStruct, LibraryStruct
 from amitools.vamos.cfgcore import ConfigDict
 from amitools.fd import read_lib_fd

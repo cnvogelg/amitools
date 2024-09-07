@@ -1,4 +1,5 @@
-from amitools.vamos.machine import MockMachine, Traps, TrapCall
+from amitools.vamos.machine.mock import MockMachine
+from amitools.vamos.machine import Traps, TrapCall
 
 
 def machine_trap_test():

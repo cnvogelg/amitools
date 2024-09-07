@@ -3,7 +3,7 @@ import pytest
 
 from amitools.vamos.libcore import LibStubGen, LibCtx, LibImplScanner
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
-from amitools.vamos.machine import MockMachine
+from amitools.vamos.machine.mock import MockMachine
 from amitools.vamos.libcore import LibProfileData
 from amitools.fd import read_lib_fd
 

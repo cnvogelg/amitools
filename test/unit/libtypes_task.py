@@ -1,5 +1,5 @@
 import pytest
-from amitools.vamos.machine import MockMemory
+from amitools.vamos.machine.mock import MockMemory
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.libtypes import Task
 from amitools.vamos.libstructs import TaskFlags, TaskState, NodeType

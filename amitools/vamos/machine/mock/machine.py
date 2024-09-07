@@ -1,6 +1,6 @@
-from .mockcpu import MockCPU
-from .mockmem import MockMemory
-from .mocktraps import MockTraps
+from .cpu import MockCPU
+from .mem import MockMemory
+from .traps import MockTraps
 from amitools.vamos.label import LabelManager
 
 

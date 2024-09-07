@@ -1,4 +1,4 @@
-from amitools.vamos.machine import MockTraps
+from amitools.vamos.machine.mock import MockTraps
 
 
 def mock_traps_base_test():

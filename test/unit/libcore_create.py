@@ -1,7 +1,7 @@
 import datetime
 import collections
 from amitools.vamos.libcore import LibCreator, LibInfo, LibCtx, LibProfiler
-from amitools.vamos.machine import MockMachine
+from amitools.vamos.machine.mock import MockMachine
 from amitools.vamos.label import LabelManager
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary

@@ -1,5 +1,5 @@
 from amitools.vamos.libcore import *
-from amitools.vamos.machine import *
+from amitools.vamos.machine.mock import *
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.mem import MemoryAlloc
 from amitools.fd import read_lib_fd

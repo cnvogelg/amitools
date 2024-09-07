@@ -1,6 +1,6 @@
 import pytest
 from amitools.vamos.libstructs import ClockDataStruct
-from amitools.vamos.machine import MockMemory
+from amitools.vamos.machine.mock import MockMemory
 
 
 def libstructs_util_clockdata_test():

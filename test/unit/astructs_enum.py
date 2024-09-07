@@ -1,6 +1,6 @@
 import pytest
 from amitools.vamos.astructs import EnumType, Enum, ULONG
-from amitools.vamos.machine import MockMemory
+from amitools.vamos.machine.mock import MockMemory
 
 
 @EnumType

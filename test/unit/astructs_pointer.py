@@ -9,7 +9,8 @@ from amitools.vamos.astructs.pointer import (
     APTR_VOID,
     BPTR_VOID,
 )
-from amitools.vamos.machine import MockMemory, MockCPU, REG_D0
+from amitools.vamos.machine.mock import MockMemory, MockCPU
+from amitools.vamos.machine import REG_D0
 from amitools.vamos.mem import MemoryAlloc
 
 cpu = MockCPU()

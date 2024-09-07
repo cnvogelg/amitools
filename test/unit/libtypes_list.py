@@ -1,4 +1,4 @@
-from amitools.vamos.machine import MockMemory
+from amitools.vamos.machine.mock import MockMemory
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.libtypes import List, MinList, Node, MinNode
 from amitools.vamos.libstructs import ListStruct, MinListStruct, NodeType

@@ -1,6 +1,6 @@
 import pytest
 from amitools.vamos.astructs import BitFieldType, BitField, ULONG, UWORD, UBYTE
-from amitools.vamos.machine import MockMemory
+from amitools.vamos.machine.mock import MockMemory
 
 
 @BitFieldType

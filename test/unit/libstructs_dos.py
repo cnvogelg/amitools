@@ -1,6 +1,6 @@
 import pytest
 from amitools.vamos.libstructs import DosLibraryStruct
-from amitools.vamos.machine import MockMemory
+from amitools.vamos.machine.mock import MockMemory
 
 
 def libstructs_dos_dosbase_test():
