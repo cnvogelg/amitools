@@ -1,31 +1,36 @@
+import pytest
+import logging
+
 from machine68k import CPUType
-from amitools.vamos.machine import Machine
+from amitools.vamos.machine import Machine, ExecutionStatus, TrapCall
 from amitools.vamos.machine.opcodes import *
 from amitools.vamos.error import *
 from amitools.vamos.log import log_machine
 from amitools.vamos.cfgcore import ConfigDict
-import logging
 
 
 log_machine.setLevel(logging.DEBUG)
 
 
 def create_machine(cpu_type=CPUType.M68000):
-    m = Machine(cpu_type, raise_on_main_run=False)
+    m = Machine(cpu_type)
     cpu = m.get_cpu()
     mem = m.get_mem()
     code = m.get_ram_begin()
     stack = m.get_scratch_top()
+    m.set_start(code, stack)
+    m.set_end()
     return m, cpu, mem, code, stack
 
 
-def machine_machine_run_rts_test():
+def machine_machine_execute_rts_test():
     m, cpu, mem, code, stack = create_machine()
     # single RTS to immediately return from run
     mem.w16(code, op_rts)
-    rs = m.run(code, stack)
-    assert rs.done
+    rs = m.execute()
+    assert rs.status == ExecutionStatus.EXIT_CODE
     assert rs.error is None
+    assert rs.trap is None
     m.cleanup()
 
 
@@ -41,14 +46,15 @@ def machine_machine_instr_hook_test():
     m.set_instr_hook(my_hook)
     # single RTS to immediately return from run
     mem.w16(code, op_rts)
-    rs = m.run(code, stack)
-    assert rs.done
+    rs = m.execute()
+    assert rs.status == ExecutionStatus.EXIT_CODE
     assert rs.error is None
+    assert rs.trap is None
     assert a == [0x800, 0x400]
     m.cleanup()
 
 
-def machine_machine_cpu_mem_trace_test():
+def machine_machine_execute_mem_trace_test():
     m, cpu, mem, code, stack = create_machine()
     a = []
     # set instr hook
@@ -59,173 +65,122 @@ def machine_machine_cpu_mem_trace_test():
     m.set_cpu_mem_trace_hook(my_trace)
     # single RTS to immediately return from run
     mem.w16(code, op_rts)
-    rs = m.run(code, stack)
-    assert rs.done
+    rs = m.execute()
+    assert rs.status == ExecutionStatus.EXIT_CODE
     assert rs.error is None
-    print(a)
+    assert rs.trap is None
     assert a[0] == ("R", 1, code, op_rts)
     m.cleanup()
 
 
-def machine_machine_cpu_mem_invalid_test(caplog):
+def machine_machine_execute_mem_invalid_test(caplog):
     m, cpu, mem, code, stack = create_machine()
     a = []
-    rs = m.run(0xF80000, stack)
-    assert rs.done
+    m.set_start(0xF80000, stack)
+    rs = m.execute()
+    assert rs.status == ExecutionStatus.ERROR
     assert type(rs.error) == InvalidMemoryAccessError
     m.cleanup()
     log = caplog.record_tuples
-    assert ("machine", logging.ERROR, "----- ERROR in CPU Run #1 -----") in log
     assert (
         "machine",
         logging.ERROR,
-        "InvalidMemoryAccessError: Invalid Memory Access R(2): f80000",
+        "invalid memory access: mode=R width=1 addr=f80000",
     ) in log
 
 
-def machine_machine_run_nested_ok_test():
+def machine_machine_execute_trap_test():
     m, cpu, mem, code, stack = create_machine()
+    error = ValueError("bla")
     a = []
-    res = []
 
-    def nested2(op, pc):
-        a.append(3)
+    def func(op, pc):
+        a.append("hello")
 
-    addr2 = m.setup_quick_trap(nested2)
-
-    def nested(op, pc):
-        a.append(1)
-        rs = m.run(addr2)
-        res.append(rs)
-        a.append(2)
-
-    addr = m.setup_quick_trap(nested)
-    rs = m.run(addr, stack)
-    assert rs.done
+    addr = m.setup_quick_trap(func)
+    m.set_start(addr, stack)
+    rs = m.execute()
+    assert rs.status == ExecutionStatus.TRAP
     assert rs.error is None
-    assert a == [1, 3, 2]
-    rs2 = res[0]
-    assert rs2.done
-    assert rs2.error is None
+    assert type(rs.trap) is TrapCall
+    assert rs.trap.func is func
+    # trigger exception
+    rs.trap.call()
+    assert a == ["hello"]
     m.cleanup()
 
 
-def machine_machine_run_raise_test():
+def machine_machine_execute_trap_exception_test():
     m, cpu, mem, code, stack = create_machine()
     error = ValueError("bla")
 
-    def nested(op, pc):
+    def func(op, pc):
         raise error
 
-    addr = m.setup_quick_trap(nested)
-    rs = m.run(addr, stack)
-    assert rs.done
-    assert rs.error == error
+    addr = m.setup_quick_trap(func)
+    m.set_start(addr, stack)
+    rs = m.execute()
+    assert rs.status == ExecutionStatus.TRAP
+    assert rs.error is None
+    assert type(rs.trap) is TrapCall
+    assert rs.trap.func is func
+    # exception triggers when the trap is executed later
+    with pytest.raises(ValueError):
+        rs.trap.call()
     m.cleanup()
 
 
-def machine_machine_run_raise2_test():
-    m, cpu, mem, code, stack = create_machine()
-    error = ValueError("bla")
-
-    def nested(op, pc):
-        raise error
-
-    addr = m.setup_quick_trap(nested)
-    mem.w16(code, op_jmp)
-    mem.w32(code + 2, addr)
-    mem.w16(code + 6, op_nop)
-    mem.w16(code + 8, op_rts)
-    rs = m.run(code, stack)
-    assert rs.done
-    assert rs.error == error
-    m.cleanup()
-
-
-def machine_machine_run_nested_raise_test():
-    m, cpu, mem, code, stack = create_machine()
-    a = []
-    res = []
-    error = ValueError("bla")
-
-    def nested2(op, pc):
-        raise error
-
-    ncode = code + 0x100
-    addr2 = m.setup_quick_trap(nested2)
-    mem.w16(ncode, op_jmp)
-    mem.w32(ncode + 2, addr2)
-    mem.w16(ncode + 6, op_nop)
-    mem.w16(ncode + 8, op_rts)
-
-    def nested(op, pc):
-        a.append(1)
-        rs = m.run(ncode)
-        res.append(rs)
-        a.append(2)
-
-    addr = m.setup_quick_trap(nested)
-    mem.w16(code, op_jmp)
-    mem.w32(code + 2, addr)
-    mem.w16(code + 6, op_nop)
-    mem.w16(code + 8, op_rts)
-
-    rs = m.run(code, stack)
-    assert rs.done
-    assert type(rs.error) is NestedCPURunError
-    assert rs.error.error == error
-    assert a == [1]
-    m.cleanup()
-
-
-def machine_machine_run_trap_unbound_test():
+def machine_machine_execute_trap_unbound_test():
     m, cpu, mem, code, stack = create_machine()
     # place an unbound trap -> raise ALINE exception
     mem.w16(code, 0xA100)
     # single RTS to immediately return from run
     mem.w16(code + 2, op_rts)
-    rs = m.run(code, stack)
-    assert rs.done
+    rs = m.execute()
+    assert rs.status == ExecutionStatus.ERROR
     assert type(rs.error) is InvalidCPUStateError
     assert rs.error.pc == code
     m.cleanup()
 
 
-def machine_machine_run_reset_test():
+def machine_machine_execute_reset_opcode_test():
     m, cpu, mem, code, stack = create_machine()
     # place a reset opcode
     mem.w16(code, op_reset)
     mem.w16(code + 2, op_rts)
-    rs = m.run(code, stack)
-    assert rs.done
+    rs = m.execute()
+    assert rs.status == ExecutionStatus.ERROR
     assert type(rs.error) is InvalidCPUStateError
     assert rs.error.pc == code
     m.cleanup()
 
 
-def machine_machine_run_addr_exc_test():
-    # check for address exception
-    # currently disabled in musashi!
+def machine_machine_execute_hw_exc_test():
     m, cpu, mem, code, stack = create_machine()
-    m.show_instr()
-    # move.l $1,d4
-    mem.w32(code, 0x28380001)
-    mem.w16(code + 4, op_rts)
-    rs = m.run(code, stack)
-    assert rs.done
+    # trigger a "real" trap #0
+    mem.w16(code, 0x4E40)
+    rs = m.execute()
+    assert rs.status == ExecutionStatus.ERROR
+    assert type(rs.error) is InvalidCPUStateError
+    assert rs.error.pc == code + 2
+    m.cleanup()
+
+
+def machine_machine_execute_max_cycles_test():
+    m, cpu, mem, code, stack = create_machine()
+    mem.w16(code, op_jmp)
+    mem.w32(code + 2, code)
+    rs = m.execute(200)
+    assert rs.status == ExecutionStatus.MAX_CYCLES
     assert rs.error is None
     m.cleanup()
 
 
 def machine_machine_cfg_test():
-    cfg = ConfigDict(
-        {"cpu": "68020", "ram_size": 2048, "max_cycles": 128, "cycles_per_run": 2000}
-    )
+    cfg = ConfigDict({"cpu": "68020", "ram_size": 2048})
     m = Machine.from_cfg(cfg, True)
     assert m
     assert m.get_cpu_type() == CPUType.M68020
     assert m.get_cpu_name() == "68020"
     assert m.get_ram_total_kib() == 2048
-    assert m.max_cycles == 128
-    assert m.cycles_per_run == 2000
     assert m.get_label_mgr()

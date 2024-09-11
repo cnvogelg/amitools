@@ -1,3 +1,6 @@
+from enum import Enum
+from dataclasses import dataclass
+from typing import Optional
 import time
 import sys
 import logging
@@ -10,43 +13,26 @@ except ImportError:
 
 from .regs import *
 from .opcodes import *
-from .error import ErrorReporter
 from .cpustate import CPUState
-from .traps import Traps
+from .traps import Traps, TrapCall
 from amitools.vamos.error import *
 from amitools.vamos.log import log_machine
 from amitools.vamos.label import LabelManager
 
 
-class RunState(object):
-    def __init__(self, name, pc, sp, ret_addr):
-        self.name = name
-        self.pc = pc
-        self.sp = sp
-        self.ret_addr = ret_addr
-        self.error = None
-        self.done = False
-        self.cycles = 0
-        self.time_delta = 0
-        self.regs = None
-        self.trap_call = None
+class ExecutionStatus(Enum):
+    EXIT_CODE = 0
+    MAX_CYCLES = 1
+    TRAP = 2
+    ERROR = 3
 
-    def __str__(self):
-        return (
-            "RunState('%s', pc=%06x,sp=%06x,ret_addr=%06x,error=%s,done=%s,"
-            "cycles=%s,time_delta=%s,regs=%s)"
-            % (
-                self.name,
-                self.pc,
-                self.sp,
-                self.ret_addr,
-                self.error,
-                self.done,
-                self.cycles,
-                self.time_delta,
-                self.regs,
-            )
-        )
+
+@dataclass
+class ExecutionResult:
+    status: ExecutionStatus
+    trap: Optional[TrapCall] = None
+    error: Optional[Exception] = None
+    cycles: int = 0
 
 
 class Machine(object):
@@ -94,39 +80,33 @@ class Machine(object):
         cpu_type=machine68k.CPUType.M68000,
         ram_size_kib=1024,
         use_labels=True,
-        raise_on_main_run=True,
-        cycles_per_run=1000,
-        max_cycles=0,
-        cpu_name=None,
     ):
-        if cpu_name is None:
-            cpu_name = machine68k.cpu_type_to_str(cpu_type)
         self.cpu_type = cpu_type
-        self.cpu_name = cpu_name
+        self.cpu_name = machine68k.cpu_type_to_str(cpu_type)
         # setup machine68k
         self.machine = machine68k.Machine(cpu_type, ram_size_kib)
         self.cpu = self.machine.cpu
         self.mem = self.machine.mem
+        # ram
+        self.ram_total = ram_size_kib * 1024
+        self.ram_bytes = self.ram_total - self.ram_begin
+
+        # execute state
+        self.result = None
 
         # traps
         def store_trap_call(call):
-            self.get_cur_run_state().trap_call = call
+            self.result = ExecutionResult(ExecutionStatus.TRAP, trap=call)
 
         self.traps = Traps(self.machine, store_trap_call)
-        # internal state
+
+        # labels
         if use_labels:
             self.label_mgr = LabelManager()
         else:
             self.label_mgr = None
-        self.raise_on_main_run = raise_on_main_run
-        self.ram_total = ram_size_kib * 1024
-        self.ram_bytes = self.ram_total - self.ram_begin
-        self.error_reporter = ErrorReporter(self)
-        self.run_states = []
+        # hooks
         self.instr_hook = None
-        self.cycles_per_run = cycles_per_run
-        self.max_cycles = max_cycles
-        self.bail_out = False
         # call init
         self._setup_handler()
         self._setup_quick_traps()
@@ -150,38 +130,23 @@ class Machine(object):
 
         return new Machine() or None on config error
         """
-        cpu = machine_cfg.cpu
-        cpu_type, cpu_name = cls.parse_cpu_type(cpu)
+        cpu_str = machine_cfg.cpu
+        cpu_type = machine68k.cpu_type_from_str(cpu_str)
         if cpu_type is None:
             log_machine.error("invalid CPU type given: %s", cpu)
             return None
         ram_size = machine_cfg.ram_size
-        cycles_per_run = machine_cfg.cycles_per_run
-        max_cycles = machine_cfg.max_cycles
         log_machine.info(
-            "cpu=%s(%d), ram_size=%d, labels=%s, " "cycles_per_run=%d, max_cycles=%d",
-            cpu_name,
+            "cpu=%s, ram_size=%d, labels=%s",
             cpu_type,
             ram_size,
             use_labels,
-            cycles_per_run,
-            max_cycles,
         )
         return cls(
             cpu_type,
             ram_size,
-            raise_on_main_run=False,
             use_labels=use_labels,
-            cycles_per_run=cycles_per_run,
-            max_cycles=max_cycles,
-            cpu_name=cpu_name,
         )
-
-    @classmethod
-    def parse_cpu_type(cls, cpu_str):
-        cpu_type = machine68k.cpu_type_from_str(cpu_str)
-        cpu_name = machine68k.cpu_type_to_str(cpu_type)
-        return cpu_type, cpu_name
 
     def _init_cpu(self):
         # sp and pc does not matter we will overwrite it anyway
@@ -212,15 +177,13 @@ class Machine(object):
         m.w16(addr, self.hw_exc_tid | 0xA000)
 
     def _setup_handler(self):
-        # reset opcode handler
+        # "reset" opcode handler
         self.cpu.set_reset_instr_callback(self._reset_opcode_handler)
         # set invalid access handler for memory
         self.mem.set_invalid_func(self._invalid_mem_access)
-        # set traps exception handler
-        self.traps.set_exc_func(self._trap_exc_handler)
         # allocate a trap for exit_run and hw_exception
-        self.run_exit_tid = self.traps.setup(self._run_exit_handler)
-        self.hw_exc_tid = self.traps.setup(self._hw_exc_handler)
+        self.run_exit_tid = self.machine.traps.setup(self._exit_code_handler)
+        self.hw_exc_tid = self.machine.traps.setup(self._hw_exc_handler)
 
     def _cleanup_handler(self):
         self.traps.free(self.hw_exc_tid)
@@ -316,80 +279,60 @@ class Machine(object):
         self.mem.w32(0, mem0)
         self.mem.w32(4, mem4)
 
+    def set_start(self, pc, sp):
+        """set pc to start address and stack pointer"""
+        self.cpu.w_pc(pc)
+        self.cpu.w_reg(REG_A7, sp)
+
+    def set_end(self):
+        """place end trap on stack"""
+        sp = self.cpu.r_reg(REG_A7)
+        ret_addr = self.run_exit_addr
+        sp -= 4
+        self.mem.w32(sp, ret_addr)
+        self.cpu.w_reg(REG_A7, sp)
+
     def set_mem(self, mem):
         """replace the memory instance with a wrapped one, e.g. for tracing"""
         self.mem = mem
 
-    def set_cycles_per_run(self, num):
-        self.cycles_per_run = num
-
     def set_instr_hook(self, func):
         self.cpu.set_instr_hook_callback(func)
 
-    def show_instr(self, show_regs=False):
-        if show_regs:
-            state = CPUState()
-
-            def instr_hook():
-                state.get(self.cpu)
-                res = state.dump()
-                for r in res:
-                    log_machine.info(r)
-                pc = self.cpu.r_pc()
-                _, txt = self.cpu.disassemble(pc)
-                log_machine.info("%06x: %s", pc, txt)
-
-        else:
-
-            def instr_hook():
-                pc = self.cpu.r_pc()
-                _, txt = self.cpu.disassemble(pc)
-                log_machine.info("%06x: %s", pc, txt)
-
-        self.set_instr_hook(instr_hook)
-
-    def hide_instr(self):
-        self.set_instr_hook(None)
-
     def set_cpu_mem_trace_hook(self, func):
-        self.mem.set_trace_mode(1)
-        self.mem.set_trace_func(func)
+        if func:
+            self.mem.set_trace_mode(1)
+            self.mem.set_trace_func(func)
+        else:
+            self.mem.set_trace_mode(0)
+            self.mem.set_trace_func(None)
 
-    def get_cur_run_state(self):
-        assert len(self.run_states) > 0
-        return self.run_states[-1]
-
-    def _run_exit_handler(self, opcode, pc):
+    def _exit_code_handler(self, opcode, pc):
         """regular end of a machine run"""
         sp = self.cpu.r_reg(REG_A7)
         callee_pc = self.mem.r32(sp)
         log_machine.debug(
-            "run exit: opcode=%04x, pc=%06x, sp=%06x, callee=%06x",
+            "exit code: opcode=%04x, pc=%06x, sp=%06x, callee=%06x",
             opcode,
             pc,
             sp,
             callee_pc,
         )
-        run_state = self.get_cur_run_state()
-        run_state.done = True
+        # ent time slice of cpu
         self.cpu.end()
+        # set done flag
+        self.result = ExecutionResult(ExecutionStatus.EXIT_CODE)
 
     def _terminate_run(self, error):
         """end a machine run with error state"""
-        run_state = self.get_cur_run_state()
-        # already a pending error?
-        if run_state.error:
-            return
-        run_state.error = error
-        run_state.done = True
         # end time slice of cpu
         self.cpu.end()
-        # report error
-        self.error_reporter.report_error(run_state.error)
+        # store error
+        self.result = ExecutionResult(ExecutionStatus.ERROR, error=error)
 
     def _invalid_mem_access(self, mode, width, addr):
         """triggered by invalid memory access"""
-        log_machine.debug(
+        log_machine.error(
             "invalid memory access: mode=%s width=%d addr=%06x", mode, width, addr
         )
         error = InvalidMemoryAccessError(mode, width, addr)
@@ -397,7 +340,7 @@ class Machine(object):
 
     def _trap_exc_handler(self, op, pc):
         """triggerd if Python code in a trap raised a Python exception"""
-        log_machine.debug("trap exception handler: op=%04x pc=%06x", op, pc)
+        log_machine.error("Python exception in trap: op=%04x pc=%06x", op, pc)
         # get pending exception
         exc_info = sys.exc_info()
         if exc_info:
@@ -412,12 +355,12 @@ class Machine(object):
         sp = self.cpu.r_reg(REG_A7)
         callee_pc = self.mem.r32(sp)
         log_machine.debug(
-            "hw exception: pc=%06x sp=%06x callee=%06x", pc, sp, callee_pc
+            "HW exception: pc=%06x sp=%06x callee=%06x", pc, sp, callee_pc
         )
         # m68k Exception Triggered
         sr = self.mem.r16(sp)
         pc = self.mem.r32(sp + 2)
-        txt = "m68k Exception: sr=%04x" % sr
+        txt = "m68k Exception: sr=%04x pc=%06x" % (sr, pc)
         error = InvalidCPUStateError(pc, txt)
         self._terminate_run(error)
 
@@ -428,138 +371,22 @@ class Machine(object):
         error = InvalidCPUStateError(pc, txt)
         self._terminate_run(error)
 
-    def get_run_nesting(self):
-        return len(self.run_states)
+    def execute(self, max_cycles=1000) -> ExecutionResult:
+        # reset result
+        self.result = None
 
-    def run(
-        self,
-        pc,
-        sp=None,
-        set_regs=None,
-        get_regs=None,
-        max_cycles=0,
-        cycles_per_run=0,
-        name=None,
-    ):
-        mem = self.mem
-        cpu = self.cpu
+        # perform run
+        log_machine.debug("+ cpu.execute. max_cycles=%d", max_cycles)
+        cycles = self.cpu.execute(max_cycles)
+        log_machine.debug("- cpu.execute. cycles=%d", cycles)
 
-        if name is None:
-            name = "default"
+        # check result
+        if not self.result:
+            # cycles exceeded
+            self.result = ExecutionResult(ExecutionStatus.MAX_CYCLES)
 
-        # current run nesting level
-        nesting = len(self.run_states)
+        # update cycles
+        self.result.cycles = cycles
 
-        # return address of a run is always run_end_addr
-        ret_addr = self.run_exit_addr
-
-        # get cpu context
-        if nesting > 0:
-            cpu_ctx = cpu.get_cpu_context()
-        else:
-            cpu_ctx = None
-
-        # share stack with last run if not specified
-        if sp is None:
-            if nesting == 0:
-                raise ValueError("stack must be specified!")
-            else:
-                sp = cpu.r_reg(REG_A7)
-                sp -= 4
-
-        log_machine.info(
-            "run#%d(%s): begin pc=%06x, sp=%06x, ret_addr=%06x",
-            nesting,
-            name,
-            pc,
-            sp,
-            ret_addr,
-        )
-
-        # store return address on stack
-        mem.w32(sp, ret_addr)
-
-        # setup pc, sp
-        cpu.w_pc(pc)
-        cpu.w_reg(REG_A7, sp)
-
-        # create run state for this run and push it
-        run_state = RunState(name, pc, sp, ret_addr)
-        self.run_states.append(run_state)
-
-        # setup regs
-        if set_regs:
-            set_regs_txt = self._print_regs(set_regs)
-            log_machine.info("run#%d: set_regs=%s", nesting, set_regs_txt)
-            for reg in set_regs:
-                val = set_regs[reg]
-                cpu.w_reg(reg, val)
-
-        # get cycle params either from this call or from default
-        if not cycles_per_run:
-            cycles_per_run = self.cycles_per_run
-        if not max_cycles:
-            max_cycles = self.max_cycles
-
-        # main execution loop of run
-        total_cycles = 0
-        start_time = time.perf_counter()
-        try:
-            while not run_state.done:
-                log_machine.debug("+ cpu.execute")
-                total_cycles += cpu.execute(cycles_per_run)
-                log_machine.debug("- cpu.execute")
-
-                # did a trap occur in cpu run?
-                if run_state.trap_call:
-                    log_machine.debug("+ trap %s", run_state.trap_call)
-                    run_state.trap_call.trigger()
-                    log_machine.debug("- trap")
-                    run_state.trap_call = None
-
-                # end after enough cycles
-                if max_cycles > 0 and total_cycles >= max_cycles:
-                    break
-        except Exception as e:
-            self.error_reporter.report_error(e)
-        end_time = time.perf_counter()
-
-        # retrieve regs
-        if get_regs:
-            regs = {}
-            for reg in get_regs:
-                val = cpu.r_reg(reg)
-                regs[reg] = val
-            regs_text = self._print_regs(regs)
-            log_machine.info("run #%d: get_regs=%s", nesting, regs_text)
-            run_state.regs = regs
-
-        # restore cpu context
-        if cpu_ctx:
-            cpu.set_cpu_context(cpu_ctx)
-
-        # update run state
-        run_state.time_delta = end_time - start_time
-        run_state.cycles = total_cycles
-        # pop
-        self.run_states.pop()
-
-        log_machine.info("run #%d(%s): end. state=%s", nesting, name, run_state)
-
-        # if run_state has error and we are not a top-level raise an error
-        # so the running trap code gets aborted and propagates the abort
-        if run_state.error:
-            if nesting > 0 or self.raise_on_main_run:
-                pc = cpu.r_pc()
-                raise NestedCPURunError(pc, run_state.error)
-
-        return run_state
-
-    def _print_regs(self, regs):
-        res = {}
-        for r in regs:
-            v = regs[r]
-            key = reg_to_str[r]
-            val = "%06x" % v
-            res[key] = val
-        return res
+        # return result
+        return self.result
