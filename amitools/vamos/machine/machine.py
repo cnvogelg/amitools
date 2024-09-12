@@ -1,7 +1,6 @@
 from enum import Enum
 from dataclasses import dataclass
 from typing import Optional
-import time
 import sys
 import logging
 
@@ -15,7 +14,7 @@ from .regs import *
 from .opcodes import *
 from .cpustate import CPUState
 from .traps import Traps, TrapCall
-from amitools.vamos.error import *
+from .error import InvalidMemoryAccessError, CPUHWExceptionError, ResetOpcodeError
 from amitools.vamos.log import log_machine
 from amitools.vamos.label import LabelManager
 
@@ -80,6 +79,7 @@ class Machine(object):
         cpu_type=machine68k.CPUType.M68000,
         ram_size_kib=1024,
         use_labels=True,
+        supervisor=False,
     ):
         self.cpu_type = cpu_type
         self.cpu_name = machine68k.cpu_type_to_str(cpu_type)
@@ -90,6 +90,8 @@ class Machine(object):
         # ram
         self.ram_total = ram_size_kib * 1024
         self.ram_bytes = self.ram_total - self.ram_begin
+        # start as supervisor
+        self.supervisor = supervisor
 
         # execute state
         self.result = None
@@ -131,14 +133,19 @@ class Machine(object):
         return new Machine() or None on config error
         """
         cpu_str = machine_cfg.cpu
+        ram_size = machine_cfg.ram_size
+        return cls.from_name(cpu_str, ram_size, use_labels)
+
+    @classmethod
+    def from_name(cls, cpu_str, ram_size=1024, use_labels=False):
         cpu_type = machine68k.cpu_type_from_str(cpu_str)
         if cpu_type is None:
             log_machine.error("invalid CPU type given: %s", cpu)
             return None
-        ram_size = machine_cfg.ram_size
         log_machine.info(
-            "cpu=%s, ram_size=%d, labels=%s",
+            "cpu=%s(%s), ram_size=%d, labels=%s",
             cpu_type,
+            cpu_str,
             ram_size,
             use_labels,
         )
@@ -158,9 +165,10 @@ class Machine(object):
         # trigger reset (read sp and init pc)
         self.cpu.pulse_reset()
         # drop supervisor
-        sr = self.cpu.r_sr()
-        sr &= ~0x2000
-        self.cpu.w_sr(sr)
+        if not self.supervisor:
+            sr = self.cpu.r_sr()
+            sr &= ~0x2000
+            self.cpu.w_sr(sr)
 
     def _init_base_mem(self):
         m = self.mem
@@ -279,18 +287,11 @@ class Machine(object):
         self.mem.w32(0, mem0)
         self.mem.w32(4, mem4)
 
-    def set_start(self, pc, sp):
-        """set pc to start address and stack pointer"""
-        self.cpu.w_pc(pc)
-        self.cpu.w_reg(REG_A7, sp)
+    def get_sp(self):
+        return self.cpu.r_reg(REG_A7)
 
-    def set_end(self):
-        """place end trap on stack"""
-        sp = self.cpu.r_reg(REG_A7)
-        ret_addr = self.run_exit_addr
-        sp -= 4
-        self.mem.w32(sp, ret_addr)
-        self.cpu.w_reg(REG_A7, sp)
+    def get_pc(self):
+        return self.cpu.r_pc()
 
     def set_mem(self, mem):
         """replace the memory instance with a wrapped one, e.g. for tracing"""
@@ -335,7 +336,9 @@ class Machine(object):
         log_machine.error(
             "invalid memory access: mode=%s width=%d addr=%06x", mode, width, addr
         )
-        error = InvalidMemoryAccessError(mode, width, addr)
+        pc = self.get_pc()
+        sp = self.get_sp()
+        error = InvalidMemoryAccessError(pc, sp, mode, width, addr)
         self._terminate_run(error)
 
     def _trap_exc_handler(self, op, pc):
@@ -352,24 +355,32 @@ class Machine(object):
     def _hw_exc_handler(self, opcode, pc):
         """an m68k Hardware Exception was triggered"""
         # get current pc
-        sp = self.cpu.r_reg(REG_A7)
-        callee_pc = self.mem.r32(sp)
-        log_machine.debug(
-            "HW exception: pc=%06x sp=%06x callee=%06x", pc, sp, callee_pc
-        )
+        sp = self.get_sp()
         # m68k Exception Triggered
         sr = self.mem.r16(sp)
         pc = self.mem.r32(sp + 2)
-        txt = "m68k Exception: sr=%04x pc=%06x" % (sr, pc)
-        error = InvalidCPUStateError(pc, txt)
+        log_machine.debug("HW exception: pc=%06x sp=%06x sr=%04x", pc, sp, sr)
+        error = CPUHWExceptionError(pc, sp, sr)
         self._terminate_run(error)
 
     def _reset_opcode_handler(self):
         """a reset opcode was encountered"""
         pc = self.cpu.r_pc() - 2
-        txt = "Unexpected RESET opcode"
-        error = InvalidCPUStateError(pc, txt)
+        sp = self.get_sp()
+        log_machine.debug("RESET opcode: pc=%06x sp=%06x", pc, sp)
+        error = ResetOpcodeError(pc, sp)
         self._terminate_run(error)
+
+    def prepare(self, pc, sp):
+        """set pc to start address and stack pointer and place end trap on stack"""
+        self.cpu.w_pc(pc)
+        self.cpu.w_reg(REG_A7, sp)
+        # place end trap on stack
+        sp = self.cpu.r_reg(REG_A7)
+        ret_addr = self.run_exit_addr
+        sp -= 4
+        self.mem.w32(sp, ret_addr)
+        self.cpu.w_reg(REG_A7, sp)
 
     def execute(self, max_cycles=1000) -> ExecutionResult:
         # reset result
@@ -389,4 +400,5 @@ class Machine(object):
         self.result.cycles = cycles
 
         # return result
+        log_machine.debug("-> result=%r", self.result)
         return self.result

@@ -2,9 +2,15 @@ import pytest
 import logging
 
 from machine68k import CPUType
-from amitools.vamos.machine import Machine, ExecutionStatus, TrapCall
-from amitools.vamos.machine.opcodes import *
-from amitools.vamos.error import *
+from amitools.vamos.machine import (
+    Machine,
+    ExecutionStatus,
+    TrapCall,
+    InvalidMemoryAccessError,
+    CPUHWExceptionError,
+    ResetOpcodeError,
+)
+from amitools.vamos.machine.opcodes import op_rts, op_reset, op_trap0, op_jmp
 from amitools.vamos.log import log_machine
 from amitools.vamos.cfgcore import ConfigDict
 
@@ -12,14 +18,13 @@ from amitools.vamos.cfgcore import ConfigDict
 log_machine.setLevel(logging.DEBUG)
 
 
-def create_machine(cpu_type=CPUType.M68000):
-    m = Machine(cpu_type)
+def create_machine(cpu_type=CPUType.M68000, supervisor=False):
+    m = Machine(cpu_type, supervisor=supervisor)
     cpu = m.get_cpu()
     mem = m.get_mem()
     code = m.get_ram_begin()
     stack = m.get_scratch_top()
-    m.set_start(code, stack)
-    m.set_end()
+    m.prepare(code, stack)
     return m, cpu, mem, code, stack
 
 
@@ -73,32 +78,29 @@ def machine_machine_execute_mem_trace_test():
     m.cleanup()
 
 
-def machine_machine_execute_mem_invalid_test(caplog):
+def machine_machine_execute_mem_invalid_test():
     m, cpu, mem, code, stack = create_machine()
     a = []
-    m.set_start(0xF80000, stack)
+    m.prepare(0xF80000, stack)
     rs = m.execute()
     assert rs.status == ExecutionStatus.ERROR
     assert type(rs.error) == InvalidMemoryAccessError
+    assert rs.error.pc == 0xF80004
+    assert rs.error.mode == "R"
+    assert rs.error.width == 1
+    assert rs.error.addr == 0xF80002
     m.cleanup()
-    log = caplog.record_tuples
-    assert (
-        "machine",
-        logging.ERROR,
-        "invalid memory access: mode=R width=1 addr=f80000",
-    ) in log
 
 
 def machine_machine_execute_trap_test():
     m, cpu, mem, code, stack = create_machine()
-    error = ValueError("bla")
     a = []
 
     def func(op, pc):
         a.append("hello")
 
     addr = m.setup_quick_trap(func)
-    m.set_start(addr, stack)
+    m.prepare(addr, stack)
     rs = m.execute()
     assert rs.status == ExecutionStatus.TRAP
     assert rs.error is None
@@ -118,7 +120,7 @@ def machine_machine_execute_trap_exception_test():
         raise error
 
     addr = m.setup_quick_trap(func)
-    m.set_start(addr, stack)
+    m.prepare(addr, stack)
     rs = m.execute()
     assert rs.status == ExecutionStatus.TRAP
     assert rs.error is None
@@ -138,19 +140,18 @@ def machine_machine_execute_trap_unbound_test():
     mem.w16(code + 2, op_rts)
     rs = m.execute()
     assert rs.status == ExecutionStatus.ERROR
-    assert type(rs.error) is InvalidCPUStateError
+    assert type(rs.error) is CPUHWExceptionError
     assert rs.error.pc == code
     m.cleanup()
 
 
 def machine_machine_execute_reset_opcode_test():
-    m, cpu, mem, code, stack = create_machine()
+    m, cpu, mem, code, stack = create_machine(supervisor=True)
     # place a reset opcode
     mem.w16(code, op_reset)
-    mem.w16(code + 2, op_rts)
     rs = m.execute()
     assert rs.status == ExecutionStatus.ERROR
-    assert type(rs.error) is InvalidCPUStateError
+    assert type(rs.error) is ResetOpcodeError
     assert rs.error.pc == code
     m.cleanup()
 
@@ -158,10 +159,10 @@ def machine_machine_execute_reset_opcode_test():
 def machine_machine_execute_hw_exc_test():
     m, cpu, mem, code, stack = create_machine()
     # trigger a "real" trap #0
-    mem.w16(code, 0x4E40)
+    mem.w16(code, op_trap0)
     rs = m.execute()
     assert rs.status == ExecutionStatus.ERROR
-    assert type(rs.error) is InvalidCPUStateError
+    assert type(rs.error) is CPUHWExceptionError
     assert rs.error.pc == code + 2
     m.cleanup()
 

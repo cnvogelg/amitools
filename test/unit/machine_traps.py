@@ -39,7 +39,7 @@ def machine_trap_test():
     assert trap_func.pc is None
 
     # now call trap delayed
-    setter.call.trigger()
+    setter.call.call()
 
     # trap func now was called
     assert trap_func.op == tid | 0xA000

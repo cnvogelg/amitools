@@ -1,5 +1,5 @@
 from amitools.vamos.log import log_hw
-from amitools.vamos.error import InvalidMemoryAccessError
+from .error import InvalidMemoryAccessError
 
 
 class HWAccessError(InvalidMemoryAccessError):
@@ -34,6 +34,7 @@ class HWAccess:
         # set mode
         self.mode = mode
         self.raw_mem = raw_mem
+        self.machine = machine
 
     @classmethod
     def from_mode_str(cls, machine, mode_str):
@@ -51,21 +52,26 @@ class HWAccess:
     def cia_r8(self, addr):
         log_hw.warning("CIA read byte @%06x", addr)
         if self.mode == self.MODE_ABORT:
-            raise HWAccessError("R", 0, addr)
+            self._raise("R", 0, addr)
         return 0
 
     def cia_w8(self, addr, val):
         log_hw.warning("CIA write byte @%06x: %02x", addr, val)
         if self.mode == self.MODE_ABORT:
-            raise HWAccessError("W", 0, addr)
+            self._raise("W", 0, addr)
 
     def cc_r16(self, addr):
         log_hw.warning("Custom Chip read word @%06x", addr)
         if self.mode == self.MODE_ABORT:
-            raise HWAccessError("R", 1, addr)
+            self._raise("R", 1, addr)
         return 0
 
     def cc_w16(self, addr, val):
         log_hw.warning("Custom Chip write word @%06x: %04x", addr, val)
         if self.mode == self.MODE_ABORT:
-            raise HWAccessError("W", 1, addr)
+            self._raise("W", 1, addr)
+
+    def _raise(self, mode, width, addr):
+        pc = self.machine.get_pc()
+        sp = self.machine.get_sp()
+        raise HWAccessError(pc, sp, mode, width, addr)
