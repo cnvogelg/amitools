@@ -1,7 +1,7 @@
 import pytest
 
 from machine68k import CPUType
-from amitools.vamos.machine import Machine, Runtime, ResetOpcodeError
+from amitools.vamos.machine import Machine, Runtime, ResetOpcodeError, REG_D1, REG_D0
 from amitools.vamos.machine.opcodes import op_rts, op_jsr, op_reset, op_nop
 from amitools.vamos.log import log_machine
 
@@ -41,6 +41,31 @@ def machine_runtime_trap_test():
     m.cleanup()
     # make sure trap was hit
     assert a == ["hello"]
+
+
+def machine_runtime_trap_set_get_regs_test():
+    r, m, cpu, mem, code, stack = create_runtime()
+
+    def func(op, pc):
+        d0 = cpu.r_reg(REG_D0)
+        d1 = cpu.r_reg(REG_D1)
+        assert d0 == 1234
+        assert d1 == 5678
+        cpu.w_reg(REG_D0, 0xCAFE)
+        cpu.w_reg(REG_D1, 0xBABE)
+
+    addr = m.setup_quick_trap(func)
+    # jump to trap
+    mem.w16(code, op_jsr)
+    mem.w32(code + 2, addr)
+    # return
+    mem.w16(code + 6, op_rts)
+    # setup regs
+    set_regs = {REG_D0: 1234, REG_D1: 5678}
+    get_regs = [REG_D0, REG_D1]
+    regs = r.start(code, stack, set_regs=set_regs, get_regs=get_regs)
+    m.cleanup()
+    assert regs == {REG_D0: 0xCAFE, REG_D1: 0xBABE}
 
 
 def machine_runtime_trap_exception_test():
@@ -125,6 +150,39 @@ def machine_runtime_nested_run_trap_test():
     r.start(code, stack)
     m.cleanup()
     assert a == ["foo"]
+
+
+def machine_runtime_nested_run_set_get_regs_test():
+    r, m, cpu, mem, code, stack = create_runtime()
+
+    def func2(op, pc):
+        d0 = cpu.r_reg(REG_D0)
+        d1 = cpu.r_reg(REG_D1)
+        assert d0 == 23
+        assert d1 == 42
+        cpu.w_reg(REG_D0, 11)
+        cpu.w_reg(REG_D1, 22)
+
+    def func(op, pc):
+        set_regs = {REG_D0: 23, REG_D1: 42}
+        get_regs = [REG_D0, REG_D1]
+        regs = r.nested_run(code + 10, set_regs=set_regs, get_regs=get_regs)
+        assert regs == {REG_D0: 11, REG_D1: 22}
+
+    addr = m.setup_quick_trap(func)
+    addr2 = m.setup_quick_trap(func2)
+    # jump to trap
+    mem.w16(code, op_jsr)
+    mem.w32(code + 2, addr)
+    # return
+    mem.w16(code + 6, op_rts)
+    # 2nd run
+    mem.w16(code + 10, op_jsr)
+    mem.w32(code + 12, addr2)
+    mem.w16(code + 16, op_rts)
+    # start
+    r.start(code, stack)
+    m.cleanup()
 
 
 def machine_runtime_nested_run_trap_exception_test():

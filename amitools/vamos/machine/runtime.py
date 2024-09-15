@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from .machine import ExecutionStatus, ExecutionResult
+from .regs import reg_to_str
 from amitools.vamos.log import log_machine
 
 
@@ -49,7 +50,7 @@ class Runtime:
     def set_max_cycle_hook(self, func):
         self.max_cycle_hook = func
 
-    def start(self, pc, sp, max_cycles=1000, name=None):
+    def start(self, pc, sp, set_regs=None, get_regs=None, max_cycles=1000, name=None):
         """start the main run at given pc with stack and return result"""
         if self.running:
             raise RuntimeError("start() only allowed inside idle runtime.")
@@ -63,7 +64,7 @@ class Runtime:
         self.total_cycles = 0
         log_machine.info("runtime start: %s", run_state)
 
-        self._run_loop(pc, sp, max_cycles)
+        regs = self._run_loop(pc, sp, set_regs, get_regs, max_cycles)
 
         self.running = False
         pc = self.machine.get_pc()
@@ -75,8 +76,11 @@ class Runtime:
             run_state.cycles,
             self.total_cycles,
         )
+        return regs
 
-    def nested_run(self, pc, sp=None, max_cycles=0, name=None):
+    def nested_run(
+        self, pc, sp=None, set_regs=None, get_regs=None, max_cycles=0, name=None
+    ):
         """in a PyTrap code run a nested piece of m68k code"""
         if not self.running:
             raise RuntimeError("nested_run() only allowed inside started runtime.")
@@ -97,7 +101,7 @@ class Runtime:
         log_machine.info("runtime nested_run: %s", run_state)
 
         # perform nested run
-        self._run_loop(pc, sp, max_cycles)
+        regs = self._run_loop(pc, sp, set_regs, get_regs, max_cycles)
 
         # pop run state
         self.run_states.pop()
@@ -112,14 +116,22 @@ class Runtime:
             run_state.cycles,
             self.total_cycles,
         )
+        return regs
 
     def get_current_run_state(self):
         if self.running:
             return self.run_states[-1]
 
-    def _run_loop(self, pc, sp, max_cycles):
+    def _run_loop(self, pc, sp, set_regs, get_regs, max_cycles):
         # setup pc and sp
         self.machine.prepare(pc, sp)
+
+        # setup regs
+        if set_regs:
+            set_regs_txt = self._print_regs(set_regs)
+            log_machine.debug("set_regs=%s", set_regs_txt)
+            for reg, val in set_regs.items():
+                self.machine.cpu.w_reg(reg, val)
 
         while True:
             # let m68k run
@@ -159,7 +171,26 @@ class Runtime:
             # done. main code ended
             elif rs.status == ExecutionStatus.EXIT_CODE:
                 log_machine.debug("exit code reached. (cycles %d)", cycles)
-                return
+                break
             # raise error
             elif rs.status == ExecutionStatus.ERROR:
                 raise rs.error
+
+        # return regs?
+        if get_regs:
+            regs = {}
+            for reg in get_regs:
+                val = self.machine.cpu.r_reg(reg)
+                regs[reg] = val
+            regs_text = self._print_regs(regs)
+            log_machine.debug("get_regs=%s", regs_text)
+            return regs
+
+    def _print_regs(self, regs):
+        res = {}
+        for r in regs:
+            v = regs[r]
+            key = reg_to_str[r]
+            val = "%06x" % v
+            res[key] = val
+        return res
