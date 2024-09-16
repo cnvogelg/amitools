@@ -1,3 +1,3 @@
 from .stack import Stack
-from .task import Task
+from .task import NativeTask, TaskState
 from .scheduler import Scheduler
