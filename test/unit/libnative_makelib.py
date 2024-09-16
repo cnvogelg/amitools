@@ -1,6 +1,6 @@
 from amitools.vamos.libnative import MakeLib, InitStructBuilder
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.machine import Machine
+from amitools.vamos.machine import Machine, Runtime
 from amitools.vamos.machine.opcodes import *
 from amitools.vamos.libstructs import LibraryStruct
 from amitools.vamos.libtypes import Library
@@ -8,6 +8,7 @@ from amitools.vamos.libtypes import Library
 
 def libnative_makelib_test():
     machine = Machine()
+    runtime = Runtime(machine)
     mem = machine.get_mem()
     sp = machine.get_ram_begin() - 4
     alloc = MemoryAlloc.for_machine(machine)
@@ -33,7 +34,7 @@ def libnative_makelib_test():
     pos_size = LibraryStruct.get_size()
 
     # make library
-    ml = MakeLib(machine, alloc)
+    ml = MakeLib(mem, alloc, runtime.run)
     lib_base, mem_obj = ml.make_library(
         vectors, init_tab, init_func, pos_size, 0, run_sp=sp
     )

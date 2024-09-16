@@ -4,12 +4,13 @@ from amitools.vamos.log import log_libmgr
 from amitools.vamos.libnative import ALibManager
 from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.machine import Machine
+from amitools.vamos.machine import Machine, Runtime
 from amitools.vamos.libtypes import ExecLibrary, Library
 
 
 def setup():
     machine = Machine()
+    runtime = Runtime(machine)
     mem = machine.get_mem()
     alloc = MemoryAlloc.for_machine(machine)
     sp = machine.get_ram_begin() - 4
@@ -22,7 +23,7 @@ def setup():
     exec_base = exec_lib.get_addr()
     mem.w32(4, exec_base)
     machine.set_zero_mem(0, exec_base)
-    return machine, alloc, sp, mem, exec_lib
+    return mem, alloc, runtime.run, sp, mem, exec_lib
 
 
 def free_lib(mem, alloc, lib_base):
@@ -36,7 +37,7 @@ def libnative_mgr_test(buildlibnix):
     if buildlibnix.flavor not in ("gcc", "gcc-dbg"):
         pytest.skip("only single base lib supported")
     log_libmgr.setLevel(logging.INFO)
-    machine, alloc, sp, mem, exec_lib = setup()
+    mem, alloc, runner, sp, mem, exec_lib = setup()
     # load
     lib_file = buildlibnix.make_lib("testnix")
 
@@ -47,7 +48,7 @@ def libnative_mgr_test(buildlibnix):
 
     pm = PathMgrMock()
     segload = SegmentLoader(alloc, pm)
-    mgr = ALibManager(machine, alloc, segload)
+    mgr = ALibManager(mem, alloc, runner, segload)
     # open_lib
     lib_base = mgr.open_lib("testnix.library", run_sp=sp)
     assert lib_base > 0
@@ -76,7 +77,7 @@ def libnative_mgr_test(buildlibnix):
 
 
 def libnative_mgr_fail_test():
-    machine, alloc, sp, mem, exec_lib = setup()
+    mem, alloc, runner, sp, mem, exec_lib = setup()
     # load
 
     class PathMgrMock:
@@ -85,7 +86,7 @@ def libnative_mgr_fail_test():
 
     pm = PathMgrMock()
     segload = SegmentLoader(alloc, pm)
-    mgr = ALibManager(machine, alloc, segload)
+    mgr = ALibManager(mem, alloc, runner, segload)
     # open_lib
     lib_base = mgr.open_lib("testnix.library", run_sp=sp)
     assert lib_base == 0

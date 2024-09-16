@@ -10,10 +10,10 @@ class LibFuncs(object):
     LVO_Close = 2
     LVO_Expunge = 3
 
-    def __init__(self, machine, alloc):
-        self.machine = machine
-        self.mem = machine.get_mem()
+    def __init__(self, mem, alloc, runner):
+        self.mem = mem
         self.alloc = alloc
+        self.runner = runner
 
     def find_library(self, lib_name, exec_lib=None):
         """find lib by name and return base addr or 0"""
@@ -94,7 +94,7 @@ class LibFuncs(object):
         set_regs = {REG_A6: lib_base}
         get_regs = [REG_D0]
         # run machine and share current sp if none is given
-        rs = self.machine.run(
-            func_addr, sp=run_sp, set_regs=set_regs, get_regs=get_regs, name=name
+        regs = self.runner(
+            pc=func_addr, sp=run_sp, set_regs=set_regs, get_regs=get_regs, name=name
         )
-        return rs.regs[REG_D0]
+        return regs[REG_D0]

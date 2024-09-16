@@ -50,6 +50,13 @@ class Runtime:
     def set_max_cycle_hook(self, func):
         self.max_cycle_hook = func
 
+    def run(self, pc, sp, set_regs=None, get_regs=None, max_cycles=1000, name=None):
+        """convenience method to dispatch either to start or nested_run"""
+        if not self.running:
+            return self.start(pc, sp, set_regs, get_regs, max_cycles, name)
+        else:
+            return self.nested_run(pc, sp, set_regs, get_regs, max_cycles, name)
+
     def start(self, pc, sp, set_regs=None, get_regs=None, max_cycles=1000, name=None):
         """start the main run at given pc with stack and return result"""
         if self.running:

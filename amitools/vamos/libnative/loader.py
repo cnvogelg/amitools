@@ -5,12 +5,11 @@ from amitools.vamos.loader import SegmentLoader, SegList
 
 
 class LibLoader(object):
-    def __init__(self, machine, alloc, segloader):
-        self.machine = machine
-        self.mem = machine.get_mem()
+    def __init__(self, mem, alloc, runner, segloader):
+        self.mem = mem
         self.alloc = alloc
         self.segloader = segloader
-        self.initres = InitRes(machine, alloc)
+        self.initres = InitRes(mem, alloc, runner)
 
     def load_sys_lib(self, sys_bin_file, run_sp=None):
         """try to load native lib from sys path

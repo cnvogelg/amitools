@@ -1,6 +1,6 @@
 from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.machine import Machine
+from amitools.vamos.machine import Machine, Runtime
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libtypes import Resident, ExecLibrary, Library
 from amitools.vamos.libstructs import ResidentFlags, NodeType, AutoInitStruct
@@ -21,6 +21,7 @@ def load_lib(alloc, buildlibnix):
 
 def libnative_initres_init_test(buildlibnix):
     machine = Machine()
+    runtime = Runtime(machine)
     mem = machine.get_mem()
     cpu = machine.get_cpu()
     traps = machine.get_traps()
@@ -45,7 +46,7 @@ def libnative_initres_init_test(buildlibnix):
         flags=0, version=42, type=NodeType.NT_LIBRARY, pri=-7, init=init_addr
     )
     # init resident
-    ir = InitRes(machine, alloc)
+    ir = InitRes(mem, alloc, runtime.run)
     lib_base, mem_obj = ir.init_resident(res.get_addr(), seglist.get_baddr(), run_sp=sp)
     assert lib_base == 0xCAFEBABE
     assert mem_obj is None
@@ -57,6 +58,7 @@ def libnative_initres_init_test(buildlibnix):
 
 def libnative_initres_autoinit_test(buildlibnix):
     machine = Machine()
+    runtime = Runtime(machine)
     mem = machine.get_mem()
     cpu = machine.get_cpu()
     traps = machine.get_traps()
@@ -93,7 +95,7 @@ def libnative_initres_autoinit_test(buildlibnix):
     exec_lib.new_lib()
     mem.w32(4, exec_lib.get_addr())
     # init resident
-    ir = InitRes(machine, alloc)
+    ir = InitRes(mem, alloc, runtime.run)
     lib_base, mem_obj = ir.init_resident(
         res.get_addr(), seglist.get_baddr(), run_sp=sp, exec_lib=exec_lib
     )

@@ -62,11 +62,11 @@ class ALibInfo(object):
 
 
 class ALibManager(object):
-    def __init__(self, machine, alloc, segloader):
+    def __init__(self, mem, alloc, runner, segloader):
         self.segloader = segloader
-        self.loader = LibLoader(machine, alloc, segloader)
-        self.funcs = LibFuncs(machine, alloc)
-        self.mem = machine.get_mem()
+        self.loader = LibLoader(mem, alloc, runner, segloader)
+        self.funcs = LibFuncs(mem, alloc, runner)
+        self.mem = mem
         # state
         self.lib_infos = []
 

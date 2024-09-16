@@ -1,4 +1,4 @@
-from amitools.vamos.machine import Machine
+from amitools.vamos.machine import Machine, Runtime
 from amitools.vamos.machine.regs import *
 from amitools.vamos.machine.opcodes import op_jmp
 from amitools.vamos.mem import MemoryAlloc
@@ -10,6 +10,7 @@ from amitools.vamos.loader import SegList, SegmentLoader
 
 def libnative_libfuncs_add_library_test():
     machine = Machine()
+    runtime = Runtime(machine)
     mem = machine.get_mem()
     alloc = MemoryAlloc.for_machine(machine)
     # setup exec lib
@@ -29,7 +30,7 @@ def libnative_libfuncs_add_library_test():
     assert lib.sum.val == 0
     assert lib.calc_sum() == 0xDEADBEEF
     # add lib
-    lf = LibFuncs(machine, alloc)
+    lf = LibFuncs(mem, alloc, runtime.run)
     lf.add_library(lib.addr)
     # check that lib was added
     assert len(exec_lib.lib_list) == 1
@@ -46,6 +47,7 @@ def libnative_libfuncs_add_library_test():
 
 def libnative_libfuncs_sum_library_test():
     machine = Machine()
+    runtime = Runtime(machine)
     mem = machine.get_mem()
     alloc = MemoryAlloc.for_machine(machine)
     # new lib
@@ -53,7 +55,7 @@ def libnative_libfuncs_sum_library_test():
     lib.new_lib()
     mem.w32(lib.get_addr() - 36, 0xDEADBEEF)
     # sum lib
-    lf = LibFuncs(machine, alloc)
+    lf = LibFuncs(mem, alloc, runtime.run)
     lf.sum_library(lib.get_addr())
     assert lib.sum.val == 0xDEADBEEF
     # cleanup
@@ -63,6 +65,7 @@ def libnative_libfuncs_sum_library_test():
 
 def libnative_libfuncs_rem_library_test():
     machine = Machine()
+    runtime = Runtime(machine)
     mem = machine.get_mem()
     cpu = machine.get_cpu()
     traps = machine.get_traps()
@@ -86,7 +89,7 @@ def libnative_libfuncs_rem_library_test():
     mem.w16(exp_addr, trap_id | 0xA000)
     mem.w16(exp_addr + 2, 0x4E75)  # rts
     # add lib
-    lf = LibFuncs(machine, alloc)
+    lf = LibFuncs(mem, alloc, runtime.run)
     sl = lf.rem_library(lib.get_addr(), segloader, run_sp=sp)
     assert seglist.get_baddr() == sl
     # cleanup
@@ -97,6 +100,7 @@ def libnative_libfuncs_rem_library_test():
 
 def libnative_libfuncs_close_library_test():
     machine = Machine()
+    runtime = Runtime(machine)
     mem = machine.get_mem()
     cpu = machine.get_cpu()
     traps = machine.get_traps()
@@ -120,7 +124,7 @@ def libnative_libfuncs_close_library_test():
     mem.w16(exp_addr, trap_id | 0xA000)
     mem.w16(exp_addr + 2, 0x4E75)  # rts
     # add lib
-    lf = LibFuncs(machine, alloc)
+    lf = LibFuncs(mem, alloc, runtime.run)
     sl = lf.close_library(lib.get_addr(), segloader, run_sp=sp)
     assert seglist.get_baddr() == sl
     # cleanup
@@ -131,6 +135,7 @@ def libnative_libfuncs_close_library_test():
 
 def libnative_libfuncs_open_library_test():
     machine = Machine()
+    runtime = Runtime(machine)
     mem = machine.get_mem()
     cpu = machine.get_cpu()
     traps = machine.get_traps()
@@ -150,7 +155,7 @@ def libnative_libfuncs_open_library_test():
     mem.w16(exp_addr, trap_id | 0xA000)
     mem.w16(exp_addr + 2, 0x4E75)  # rts
     # add lib
-    lf = LibFuncs(machine, alloc)
+    lf = LibFuncs(mem, alloc, runtime.run)
     lib_base = lf.open_library(lib.get_addr(), run_sp=sp)
     assert lib_base == 0xCAFEBABE
     # cleanup
@@ -160,6 +165,7 @@ def libnative_libfuncs_open_library_test():
 
 def libnative_libfuncs_set_function_test():
     machine = Machine()
+    runtime = Runtime(machine)
     mem = machine.get_mem()
     cpu = machine.get_cpu()
     sp = machine.get_ram_begin() - 4
@@ -175,7 +181,7 @@ def libnative_libfuncs_set_function_test():
     addr = lib.get_addr() + lvo
     assert mem.r16(addr) == op_jmp
     assert mem.r32(addr + 2) == 0xCAFEBABE
-    lf = LibFuncs(machine, alloc)
+    lf = LibFuncs(mem, alloc, runtime.run)
     old_addr = lf.set_function(lib_addr, lvo, 0xDEADBEEF)
     assert old_addr == 0xCAFEBABE
     assert mem.r16(addr) == op_jmp

@@ -5,10 +5,10 @@ from .libfuncs import LibFuncs
 
 
 class InitRes(object):
-    def __init__(self, machine, alloc):
-        self.machine = machine
+    def __init__(self, mem, alloc, runner):
+        self.mem = mem
         self.alloc = alloc
-        self.mem = machine.get_mem()
+        self.runner = runner
 
     def init_resident(
         self, resident_addr, seg_list_baddr, label_name=None, run_sp=None, exec_lib=None
@@ -28,7 +28,7 @@ class InitRes(object):
             ai = res.init.ref
 
             # create lib without calling init
-            ml = MakeLib(self.machine, self.alloc)
+            ml = MakeLib(self.mem, self.alloc, self.runner)
             lib_base, mem_obj = ml.make_library(
                 ai.functions.aptr,
                 ai.init_struct.aptr,
@@ -59,7 +59,7 @@ class InitRes(object):
             # add lib to exec list
             rtype = res.type.val
             if rtype == NodeType.NT_LIBRARY:
-                lf = LibFuncs(self.machine, self.alloc)
+                lf = LibFuncs(self.mem, self.alloc, self.runner)
                 lf.add_library(lib_base, exec_lib)
             elif rtype == NodeType.NT_DEVICE:
                 # TODO
@@ -77,7 +77,7 @@ class InitRes(object):
             # call init func
             init_func = res.init.aptr
             if init_func != 0:
-                ml = MakeLib(self.machine, self.alloc)
+                ml = MakeLib(self.mem, self.alloc, self.runner)
                 lib_base = ml.run_init(
                     init_func, lib_base, seg_list_baddr, label_name, run_sp
                 )
