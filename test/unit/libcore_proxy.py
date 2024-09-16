@@ -41,7 +41,7 @@ class MyStub:
         self.ctx.cpu.w_reg(REG_D1, 2 * self.string_count)
 
 
-class MyMachine:
+class MyRuntime:
     def __init__(self):
         self.pc = None
         self.sp = None
@@ -114,9 +114,9 @@ def libcore_proxy_gen_stub_test():
 
 
 def libcore_proxy_gen_libcall_test():
-    machine = MyMachine()
+    runtime = MyRuntime()
     ctx = _create_ctx()
-    ctx.machine = machine
+    ctx.runner = runtime.run
     lib_fd = _create_fd()
     gen = LibProxyGen()
     base_addr = 0x1000
@@ -131,13 +131,13 @@ def libcore_proxy_gen_libcall_test():
     # call hello
     ret = proxy.PrintHello()
     assert ret == 11
-    assert machine.set_regs == {}
-    assert machine.get_regs == [REG_D0]
+    assert runtime.set_regs == {}
+    assert runtime.get_regs == [REG_D0]
     # call string
     ret = proxy.PrintString(0x10, ret_d1=True)
     assert ret == (23, 42)
-    assert machine.set_regs == {REG_A0: 0x10}
-    assert machine.get_regs == [REG_D0, REG_D1]
+    assert runtime.set_regs == {REG_A0: 0x10}
+    assert runtime.get_regs == [REG_D0, REG_D1]
     # ensure that positional arguments are here
     with pytest.raises(AssertionError):
         proxy.PrintString()

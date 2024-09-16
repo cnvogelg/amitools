@@ -74,7 +74,7 @@ class LibProxyGen:
             jump_addr = self.base_addr - bias
 
             # perform native run
-            res = self.ctx.machine.run(
+            res = self.ctx.runner(
                 jump_addr,
                 sp=self.run_sp,
                 set_regs=reg_map,
