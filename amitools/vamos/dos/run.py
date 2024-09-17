@@ -1,17 +1,18 @@
 from amitools.vamos.log import log_proc
-from amitools.vamos.schedule import Stack, Task
+from amitools.vamos.schedule import Stack
 from amitools.vamos.machine.regs import *
 
 
-def run_sub_process(scheduler, proc):
+def run_sub_process(runner, proc):
     log_proc.info("start sub process: %s", proc)
 
+    # actually we need to add a new task and do multitasking
+    # for now we simply run it as a sub run in our task
     task = proc.get_task()
 
-    scheduler.add_task(task)
-
     # return value
-    run_state = task.get_run_state()
+    get_regs = [REG_D0]
+    run_state = runner(task.get_init_pc(), task.get_init_sp(), get_regs=get_regs)
     ret_code = run_state.regs[REG_D0]
     log_proc.info("return from sub process: ret_code=%d", ret_code)
 
@@ -21,7 +22,7 @@ def run_sub_process(scheduler, proc):
     return ret_code
 
 
-def run_command(scheduler, process, start_pc, args_ptr, args_len, stack_size, reg_d1=0):
+def run_command(process, start_pc, args_ptr, args_len, stack_size, reg_d1=0):
     ctx = process.ctx
     alloc = ctx.alloc
     new_stack = Stack.alloc(alloc, stack_size)
@@ -49,14 +50,12 @@ def run_command(scheduler, process, start_pc, args_ptr, args_len, stack_size, re
         REG_A6: ctx.odg_base,
     }
     get_regs = [REG_D0]
-    task = Task("RunCommand", start_pc, new_stack, set_regs, get_regs)
 
     # run sub task
-    scheduler.run_sub_task(task)
+    rs = ctx.runner(start_pc, sp, set_regs=set_regs, get_regs=get_regs)
 
     # return value
-    run_state = task.get_run_state()
-    ret_code = run_state.regs[REG_D0]
+    ret_code = rs.regs[REG_D0]
     log_proc.info("return from RunCommand: ret_code=%d", ret_code)
 
     # restore stack values

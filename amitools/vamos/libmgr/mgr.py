@@ -9,12 +9,13 @@ from .proxy import LibProxyManager
 class LibManager(object):
     """the library manager handles both native and vamos libs"""
 
-    def __init__(self, machine, alloc, segloader, cfg, main_profiler=None):
+    def __init__(self, machine, alloc, runner, segloader, cfg, main_profiler=None):
         self.mem = machine.get_mem()
         self.cfg = cfg
         self.machine = machine
-        self.vlib_mgr = VLibManager(machine, alloc, main_profiler=main_profiler)
-        self.alib_mgr = ALibManager(machine, alloc, segloader)
+        self.runner = runner
+        self.vlib_mgr = VLibManager(machine, alloc, runner, main_profiler=main_profiler)
+        self.alib_mgr = ALibManager(self.mem, alloc, runner, segloader)
         self.proxy_mgr = LibProxyManager(self)
         # inject proxy mgr into all ctx
         self.vlib_mgr.set_ctx_extra_attr("proxies", self.proxy_mgr)

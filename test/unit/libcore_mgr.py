@@ -3,7 +3,7 @@ from amitools.vamos.lib.ExecLibrary import ExecLibrary
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.lib.VamosTestDevice import VamosTestDevice
 from amitools.vamos.libcore import VLibManager
-from amitools.vamos.machine import Machine
+from amitools.vamos.machine import Machine, Runtime
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.loader import SegmentLoader
@@ -11,10 +11,12 @@ from amitools.vamos.loader import SegmentLoader
 
 def setup_env(main_profiler=None, prof_names=None, prof_calls=False):
     machine = Machine()
+    runtime = Runtime(machine)
     alloc = MemoryAlloc(machine.get_mem(), machine.get_ram_begin())
     mgr = VLibManager(
         machine,
         alloc,
+        runtime.run,
         main_profiler=main_profiler,
         prof_names=prof_names,
         prof_calls=prof_calls,
@@ -24,7 +26,7 @@ def setup_env(main_profiler=None, prof_names=None, prof_calls=False):
     mem = machine.get_mem()
     cpu_type = machine.get_cpu_type()
     segloader = SegmentLoader(alloc)
-    exec_ctx = ExecLibCtx(machine, alloc, segloader, None, None)
+    exec_ctx = ExecLibCtx(machine, alloc, runtime.run, segloader, None, None)
     # add extra attr to ctx
     mgr.set_ctx_extra_attr("foo", "bar")
     mgr.add_ctx("exec.library", exec_ctx)

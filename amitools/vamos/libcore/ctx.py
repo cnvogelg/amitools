@@ -1,8 +1,9 @@
 class LibCtx(object):
     """the default context a library receives"""
 
-    def __init__(self, machine):
+    def __init__(self, machine, runner):
         self.machine = machine
+        self.runner = runner
         self.cpu = machine.get_cpu()
         self.mem = machine.get_mem()
         # will be set on creation

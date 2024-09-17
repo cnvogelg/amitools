@@ -65,14 +65,14 @@ class MakeLib(object):
         set_regs = {REG_D0: lib_base, REG_A0: seglist_baddr, REG_A6: self.mem.r32(4)}
         get_regs = [REG_D0]
         # run machine and share current sp
-        regs = self.runner(
+        rs = self.runner(
             init_func_addr,
             sp=run_sp,
             set_regs=set_regs,
             get_regs=get_regs,
             name=label_name,
         )
-        lib_base = regs[REG_D0]
+        lib_base = rs.regs[REG_D0]
         return lib_base
 
     def _round_long(self, v):

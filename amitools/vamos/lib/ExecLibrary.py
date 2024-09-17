@@ -164,7 +164,7 @@ class ExecLibrary(LibImpl):
         init = ctx.cpu.r_reg(REG_A2)
         dsize = ctx.cpu.r_reg(REG_D0)
         seglist = ctx.cpu.r_reg(REG_D1)
-        ml = MakeLib(ctx.machine, ctx.alloc)
+        ml = MakeLib(ctx.machine.get_mem(), ctx.alloc, ctx.runner)
         lib_base, mobj = ml.make_library(vectors, struct, init, dsize, seglist)
         log_exec.info(
             "MakeLibrary: vectors=%06x, struct=%06x, init=%06x, "
@@ -182,7 +182,7 @@ class ExecLibrary(LibImpl):
     def InitResident(self, ctx):
         resident = ctx.cpu.r_reg(REG_A1)
         seglist = ctx.cpu.r_reg(REG_D1)
-        ir = InitRes(ctx.machine, ctx.alloc)
+        ir = InitRes(ctx.machine.get_mem(), ctx.alloc, ctx.runner)
         base, mobj = ir.init_resident(resident, seglist)
         log_exec.info(
             "InitResident: res=%06x, seglist=%06x -> base=%06x, mobj=%s",
@@ -196,12 +196,12 @@ class ExecLibrary(LibImpl):
     def AddLibrary(self, ctx):
         lib_addr = ctx.cpu.r_reg(REG_A1)
         log_exec.info("AddLibrary: lib=%06x", lib_addr)
-        lf = LibFuncs(ctx.machine, ctx.alloc)
+        lf = LibFuncs(ctx.machine.get_mem(), ctx.alloc, ctx.runner)
         lf.add_library(lib_addr, exec_lib=self.exec_lib)
 
     def SumLibrary(self, ctx):
         lib_addr = ctx.cpu.r_reg(REG_A1)
-        lf = LibFuncs(ctx.machine, ctx.alloc)
+        lf = LibFuncs(ctx.machine.get_mem(), ctx.alloc, ctx.runner)
         lib_sum = lf.sum_library(lib_addr)
         log_exec.info("SumLibrary: lib=%06x -> sum=%08x", lib_addr, lib_sum)
 
@@ -209,7 +209,7 @@ class ExecLibrary(LibImpl):
         lib_addr = ctx.cpu.r_reg(REG_A1)
         lvo = ctx.cpu.rs_reg(REG_A0)
         new_func = ctx.cpu.r_reg(REG_D0)
-        lf = LibFuncs(ctx.machine, ctx.alloc)
+        lf = LibFuncs(ctx.machine.get_mem(), ctx.alloc, ctx.runner)
         old_func = lf.set_function(lib_addr, lvo, new_func)
         log_exec.info(
             "SetFunction: lib=%06x, lvo=%d, new_func=%06x -> old_func=%06x",
@@ -222,7 +222,7 @@ class ExecLibrary(LibImpl):
 
     def RemLibrary(self, ctx):
         lib_addr = ctx.cpu.r_reg(REG_A1)
-        lf = LibFuncs(ctx.machine, ctx.alloc)
+        lf = LibFuncs(ctx.machine.get_mem(), ctx.alloc, ctx.runner)
         seglist = lf.rem_library(lib_addr, ctx.seg_loader)
         log_exec.info("RemLibrary: lib=%06x -> seglist=%06x", lib_addr, seglist)
 

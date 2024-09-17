@@ -3,13 +3,15 @@ import pytest
 from amitools.vamos.libcore import LibCtx, LibProxyGen
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.machine.mock import MockMachine
+from amitools.vamos.machine import Runtime
 from amitools.fd import read_lib_fd
 from amitools.vamos.machine.regs import *
 
 
 def _create_ctx():
     machine = MockMachine()
-    return LibCtx(machine)
+    runtime = Runtime(machine)
+    return LibCtx(machine, runtime.run)
 
 
 def _create_fd():

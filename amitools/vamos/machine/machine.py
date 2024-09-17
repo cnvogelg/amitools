@@ -71,6 +71,7 @@ class Machine(object):
     hw_exc_addr = 0x402
     ram_begin = 0x800
     scratch_begin = 0x600
+    scratch_end = 0x7FC
     quick_trap_begin = 0x500
     quick_trap_num = 64
 

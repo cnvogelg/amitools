@@ -26,7 +26,7 @@ class InvalidMemoryAccessError(MachineError):
         return "Invalid Memory Access (pc=%06x, sp=%06x) %s(%d) @%06x" % (
             self.pc,
             self.sp,
-            self.access_type,
+            self.mode,
             2**self.width,
             self.addr,
         )

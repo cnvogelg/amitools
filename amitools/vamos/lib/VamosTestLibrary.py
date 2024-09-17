@@ -3,7 +3,8 @@ import importlib
 
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.error import *
+from amitools.vamos.error import VamosInternalError
+from amitools.vamos.machine import InvalidMemoryAccessError
 from amitools.vamos.astructs import CSTR
 
 
@@ -57,7 +58,9 @@ class VamosTestLibrary(LibImpl):
         elif txt == "VamosInternalError":
             e = VamosInternalError("VamosTest")
         elif txt == "InvalidMemoryAccessError":
-            e = InvalidMemoryAccessError("R", 2, 0x200)
+            pc = ctx.machine.get_pc()
+            sp = ctx.machine.get_sp()
+            e = InvalidMemoryAccessError(pc, sp, "R", 2, 0x200)
         else:
             print("VamosTest: Invalid Error:", txt)
             return

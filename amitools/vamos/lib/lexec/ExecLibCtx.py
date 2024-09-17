@@ -2,8 +2,8 @@ from amitools.vamos.libcore import LibCtx
 
 
 class ExecLibCtx(LibCtx):
-    def __init__(self, machine, alloc, seg_loader, path_mgr, lib_mgr):
-        LibCtx.__init__(self, machine)
+    def __init__(self, machine, alloc, runner, seg_loader, path_mgr, lib_mgr):
+        LibCtx.__init__(self, machine, runner)
         self.machine = machine
         self.traps = machine.get_traps()
         self.cpu_type = machine.get_cpu_type()

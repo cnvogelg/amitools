@@ -55,6 +55,6 @@ def raw_do_fmt(ctx, fmtString, dataStream, putProc, putData):
         mem_obj = _setup_fragment(ctx, fmtstr, putProc)
         set_regs = {REG_A2: putProc, REG_A3: putData}
         addr = mem_obj.addr
-        ctx.machine.run(addr, set_regs=set_regs, name="RawDoFmt")
+        ctx.runner(addr, set_regs=set_regs, name="RawDoFmt")
         ctx.alloc.free_memory(mem_obj)
     return dataStream, fmt, resultstr, known

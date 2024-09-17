@@ -1,3 +1,9 @@
+import pytest
+
+from amitools.vamos.error import VamosInternalError
+from amitools.vamos.machine import InvalidMemoryAccessError
+
+
 def test_raise_invalid_test(vamos):
     retcode, stdout, stderr = vamos.run_prog("test_raise", "bla")
     assert retcode == 0
@@ -6,28 +12,15 @@ def test_raise_invalid_test(vamos):
 
 
 def test_raise_runtime_error_test(vamos):
-    retcode, stdout, stderr = vamos.run_prog("test_raise", "RuntimeError")
-    assert retcode == 1
-    assert stdout == ["VamosTest: raise RuntimeError"]
-    assert stderr[0] == "   machine:  ERROR:  ----- ERROR in CPU Run #1 -----"
-    assert stderr[-1] == "      main:  ERROR:  vamos failed!"
+    with pytest.raises(RuntimeError):
+        vamos.run_prog("test_raise", "RuntimeError")
 
 
 def test_raise_vamos_internal_error_test(vamos):
-    retcode, stdout, stderr = vamos.run_prog("test_raise", "VamosInternalError")
-    assert retcode == 1
-    assert stdout == ["VamosTest: raise VamosInternalError"]
-    assert stderr[0] == "   machine:  ERROR:  ----- ERROR in CPU Run #1 -----"
-    assert stderr[-1] == "      main:  ERROR:  vamos failed!"
-    assert "VamosInternalError: Internal Vamos Error: VamosTest" in "\n".join(stderr)
+    with pytest.raises(VamosInternalError):
+        vamos.run_prog("test_raise", "VamosInternalError")
 
 
 def test_raise_invalid_memory_access_error_test(vamos):
-    retcode, stdout, stderr = vamos.run_prog("test_raise", "InvalidMemoryAccessError")
-    assert retcode == 1
-    assert stdout == ["VamosTest: raise InvalidMemoryAccessError"]
-    assert stderr[0] == "   machine:  ERROR:  ----- ERROR in CPU Run #1 -----"
-    assert stderr[-1] == "      main:  ERROR:  vamos failed!"
-    assert "InvalidMemoryAccessError: Invalid Memory Access R(4): 000200" in "\n".join(
-        stderr
-    )
+    with pytest.raises(InvalidMemoryAccessError):
+        vamos.run_prog("test_raise", "InvalidMemoryAccessError")

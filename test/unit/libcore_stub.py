@@ -4,6 +4,7 @@ import pytest
 from amitools.vamos.libcore import LibStubGen, LibCtx, LibImplScanner
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.machine.mock import MockMachine
+from amitools.vamos.machine import Runtime
 from amitools.vamos.libcore import LibProfileData
 from amitools.fd import read_lib_fd
 from amitools.vamos.machine.regs import *
@@ -82,10 +83,11 @@ def _check_log_fake(caplog):
 
 def _create_ctx():
     machine = MockMachine()
+    runtime = Runtime(machine)
     # prepare PrintString()
     machine.mem.w_cstr(0x10, "hello, world!")
     machine.cpu.w_reg(REG_A0, 0x10)
-    return LibCtx(machine)
+    return LibCtx(machine, runtime.run)
 
 
 def _create_scan():

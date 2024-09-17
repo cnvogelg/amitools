@@ -94,7 +94,7 @@ class LibFuncs(object):
         set_regs = {REG_A6: lib_base}
         get_regs = [REG_D0]
         # run machine and share current sp if none is given
-        regs = self.runner(
+        rs = self.runner(
             pc=func_addr, sp=run_sp, set_regs=set_regs, get_regs=get_regs, name=name
         )
-        return regs[REG_D0]
+        return rs.regs[REG_D0]

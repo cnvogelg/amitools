@@ -11,7 +11,7 @@ from amitools.vamos.machine.regs import (
     REG_A5,
     REG_A6,
 )
-from amitools.vamos.schedule import Stack, Task
+from amitools.vamos.schedule import Stack, NativeTask
 import os
 
 from .SysArgs import sys_args_to_ami_arg_str
@@ -66,7 +66,7 @@ class Process:
         self.shell_port = None
         self.init_task_struct(input_fh, output_fh)
         self.set_cwd()
-        self._init_task()
+        self._init_task(ctx.machine)
 
     def free(self):
         if self.shell == False:
@@ -192,12 +192,14 @@ class Process:
         regs[REG_A6] = self.ctx.odg_base
         return regs
 
-    def _init_task(self):
+    def _init_task(self, machine):
         name = self.bin_basename
         init_pc = self.prog_start
         start_regs = self._get_start_regs()
         return_regs = [REG_D0]
-        self.task = Task(name, init_pc, self.stack, start_regs, return_regs)
+        self.task = NativeTask(
+            name, machine, init_pc, self.stack, start_regs, return_regs
+        )
         # store back ref to process
         self.task.process = self
 

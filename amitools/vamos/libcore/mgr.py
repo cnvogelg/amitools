@@ -15,9 +15,16 @@ class VLibManager(object):
     """handle a set of vlib instances"""
 
     def __init__(
-        self, machine, alloc, main_profiler=None, prof_names=None, prof_calls=False
+        self,
+        machine,
+        alloc,
+        runner,
+        main_profiler=None,
+        prof_names=None,
+        prof_calls=False,
     ):
         self.machine = machine
+        self.runner = runner
         self.mem = machine.get_mem()
         self.alloc = alloc
         self.lib_reg = LibRegistry()
@@ -193,7 +200,7 @@ class VLibManager(object):
         ctx = self.ctx_map.get(name, None)
         # create new context?
         if not ctx:
-            ctx = LibCtx(self.machine)
+            ctx = LibCtx(self.machine, self.runner)
             self.ctx_map[name] = ctx
             self._add_ctx_extra_attr(ctx)
         # get impl

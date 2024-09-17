@@ -97,7 +97,7 @@ class LibProxyManager:
             proxy_type = self.proxy_gen.gen_proxy_for_libcall(type_name, fd)
             self.proxy_cache[type_name] = proxy_type
         # create instance
-        ctx = LibCtx(self.lib_mgr.machine)
+        ctx = LibCtx(self.lib_mgr.machine, self.lib_mgr.runner)
         log_libmgr.info("proxy: create libcall proxy %s@%08x", type_name, base_addr)
         return proxy_type(ctx, base_addr, run_sp=run_sp)
 

@@ -3,7 +3,7 @@ import io
 import pstats
 
 from .cfg import VamosMainParser
-from .machine import Machine, MemoryMap
+from .machine import Machine, MemoryMap, Runtime
 from .machine.regs import REG_D0
 from .log import log_main, log_setup, log_help
 from .path import VamosPathManager
@@ -79,10 +79,26 @@ def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
         # setup scheduler
         scheduler = Scheduler(machine)
 
+        # a default runtime for m68k code execution after scheduling
+        default_runtime = Runtime(machine, machine.scratch_end)
+
+        # setup default runner
+        def runner(*args, **kw_args):
+            task = scheduler.get_cur_task()
+            if task:
+                return task.run(*args, **kw_args)
+            else:
+                return default_runtime.run(*args, **kw_args)
+
         # setup lib mgr
         lib_cfg = mp.get_libs_dict()
         slm = SetupLibManager(
-            machine, mem_map, scheduler, path_mgr, main_profiler=main_profiler
+            machine,
+            mem_map,
+            runner,
+            scheduler,
+            path_mgr,
+            main_profiler=main_profiler,
         )
         if not slm.parse_config(lib_cfg):
             log_main.error("lib manager setup failed!")
@@ -108,28 +124,17 @@ def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
         scheduler.schedule()
 
         # check proc result
-        ok = False
-        run_state = task.get_run_state()
-        if run_state.done:
-            if run_state.error:
-                log_main.error("vamos failed!")
-                exit_code = 1
-            else:
-                ok = True
-                # return code is limited to 0-255
-                exit_code = run_state.regs[REG_D0] & 0xFF
-                log_main.info("done. exit code=%d", exit_code)
-                log_main.info("total cycles: %d", run_state.cycles)
-        else:
-            log_main.info(
-                "vamos was stopped after %d cycles. ignoring result",
-                machine_cfg.max_cycles,
-            )
-            exit_code = 0
+        run_state = task.get_result()
+
+        # return code is limited to 0-255
+        exit_code = run_state.regs[REG_D0] & 0xFF
+        log_main.info("done. exit code=%d", exit_code)
+        log_main.info(
+            "cycles: main=%d total=%d", run_state.cycles, run_state.total_cycles
+        )
 
         # shutdown main proc
-        if ok:
-            main_proc.free()
+        main_proc.free()
 
         # libs shutdown
         slm.close_base_libs()
@@ -142,8 +147,7 @@ def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
         path_mgr.shutdown()
 
     # mem_map and machine shutdown
-    if ok:
-        mem_map.cleanup()
+    mem_map.cleanup()
     machine.cleanup()
 
     # exit

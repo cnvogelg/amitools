@@ -74,7 +74,7 @@ class LibProxyGen:
             jump_addr = self.base_addr - bias
 
             # perform native run
-            res = self.ctx.runner(
+            rs = self.ctx.runner(
                 jump_addr,
                 sp=self.run_sp,
                 set_regs=reg_map,
@@ -83,9 +83,9 @@ class LibProxyGen:
             )
 
             if ret_d1:
-                return res.regs[REG_D0], res.regs[REG_D1]
+                return rs.regs[REG_D0], rs.regs[REG_D1]
             else:
-                return res.regs[REG_D0]
+                return rs.regs[REG_D0]
 
         return lib_call
 

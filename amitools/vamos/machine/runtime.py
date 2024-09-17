@@ -38,12 +38,13 @@ class Runtime:
     MachineError or another Python exception.
     """
 
-    def __init__(self, machine):
+    def __init__(self, machine, default_sp=None):
         self.machine = machine
+        self.default_sp = default_sp
         self.max_cycle_hook = None
 
         self.running = False
-        self.run_states = None
+        self.run_states = []
 
         self.max_cycles = 0
         self.cur_cycles = 0
@@ -67,6 +68,13 @@ class Runtime:
         if self.running:
             raise RuntimeError("start() only allowed inside idle runtime.")
 
+        # use stack, default stack or fail
+        if not sp:
+            if self.default_sp:
+                sp = self.default_sp
+            else:
+                raise RuntimeError("start() has no valid stack!")
+
         # setup run state
         self.running = True
         run_state = RunState(pc, sp, max_cycles, 0, name)
@@ -83,7 +91,7 @@ class Runtime:
 
         # clean up run state
         self.running = False
-        self.run_states = None
+        self.run_states = []
 
         return run_state
 
@@ -100,6 +108,9 @@ class Runtime:
         if max_cycles == 0:
             max_cycles = self.max_cycles
 
+        # save CPU context
+        ctx = self.machine.cpu.get_cpu_context()
+
         # create new run state
         nesting = len(self.run_states)
         run_state = RunState(pc, sp, max_cycles, nesting, name)
@@ -113,15 +124,11 @@ class Runtime:
         # pop current run state
         self.run_states.pop()
 
-        # restore pc, sp from old run state
-        old_run_state = self.run_states[-1]
-        self.machine.set_pc(old_run_state.pc)
-        self.machine.set_sp(old_run_state.sp)
-        log_machine.debug(
-            "runtime restore pc=%06x sp=%06x", old_run_state.pc, old_run_state.sp
-        )
+        # restore CPU context
+        self.machine.cpu.set_cpu_context(ctx)
 
         # account cycles to old run state
+        old_run_state = self.run_states[-1]
         old_run_state.total_cycles += run_state.total_cycles
 
         return run_state
