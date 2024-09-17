@@ -287,11 +287,20 @@ class Machine(object):
         self.mem.w32(0, mem0)
         self.mem.w32(4, mem4)
 
+    def get_run_exit_addr(self):
+        return self.run_exit_addr
+
     def get_sp(self):
         return self.cpu.r_reg(REG_A7)
 
+    def set_sp(self, sp):
+        self.cpu.w_reg(REG_A7, sp)
+
     def get_pc(self):
         return self.cpu.r_pc()
+
+    def set_pc(self, pc):
+        self.cpu.w_pc(pc)
 
     def set_mem(self, mem):
         """replace the memory instance with a wrapped one, e.g. for tracing"""
@@ -381,15 +390,26 @@ class Machine(object):
         sp -= 4
         self.mem.w32(sp, ret_addr)
         self.cpu.w_reg(REG_A7, sp)
+        log_machine.debug("cpu.prepare pc=%06x sp=%06x", pc, sp)
 
     def execute(self, max_cycles=1000) -> ExecutionResult:
         # reset result
         self.result = None
 
+        # show state before
+        pc = self.cpu.r_pc()
+        sp = self.cpu.r_reg(REG_A7)
+        log_machine.debug(
+            "+ cpu.execute pc=%06x sp=%06x max_cycles=%d", pc, sp, max_cycles
+        )
+
         # perform run
-        log_machine.debug("+ cpu.execute. max_cycles=%d", max_cycles)
         cycles = self.cpu.execute(max_cycles)
-        log_machine.debug("- cpu.execute. cycles=%d", cycles)
+
+        # show state after
+        pc = self.cpu.r_pc()
+        sp = self.cpu.r_reg(REG_A7)
+        log_machine.debug("- cpu.execute pc=%06x sp=%06x cycles=%d", pc, sp, cycles)
 
         # check result
         if not self.result:

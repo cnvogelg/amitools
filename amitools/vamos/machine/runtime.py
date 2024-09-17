@@ -15,6 +15,8 @@ class RunState:
     nesting: int
     name: str
     cycles: int = 0
+    total_cycles: int = 0
+    regs: dict = None
 
 
 class Runtime:
@@ -45,49 +47,49 @@ class Runtime:
 
         self.max_cycles = 0
         self.cur_cycles = 0
-        self.total_cycles = 0
 
     def set_max_cycle_hook(self, func):
         self.max_cycle_hook = func
 
-    def run(self, pc, sp, set_regs=None, get_regs=None, max_cycles=1000, name=None):
+    def run(
+        self, pc, sp, set_regs=None, get_regs=None, max_cycles=1000, name=None
+    ) -> RunState:
         """convenience method to dispatch either to start or nested_run"""
         if not self.running:
             return self.start(pc, sp, set_regs, get_regs, max_cycles, name)
         else:
             return self.nested_run(pc, sp, set_regs, get_regs, max_cycles, name)
 
-    def start(self, pc, sp, set_regs=None, get_regs=None, max_cycles=1000, name=None):
+    def start(
+        self, pc, sp, set_regs=None, get_regs=None, max_cycles=1000, name=None
+    ) -> RunState:
         """start the main run at given pc with stack and return result"""
         if self.running:
             raise RuntimeError("start() only allowed inside idle runtime.")
 
+        # setup run state
         self.running = True
         run_state = RunState(pc, sp, max_cycles, 0, name)
         self.run_states = [run_state]
 
+        # init cycle counting
         self.max_cycles = max_cycles
         self.cur_cycles = 0
-        self.total_cycles = 0
+
+        # execute
         log_machine.info("runtime start: %s", run_state)
+        run_state.regs = self._run_loop(pc, sp, set_regs, get_regs, max_cycles)
+        log_machine.info("runtime end: %s", run_state)
 
-        regs = self._run_loop(pc, sp, set_regs, get_regs, max_cycles)
-
+        # clean up run state
         self.running = False
-        pc = self.machine.get_pc()
-        sp = self.machine.get_sp()
-        log_machine.info(
-            "runtime end: pc=%x sp=%x (cycles local=%d, total=%d)",
-            pc,
-            sp,
-            run_state.cycles,
-            self.total_cycles,
-        )
-        return regs
+        self.run_states = None
+
+        return run_state
 
     def nested_run(
         self, pc, sp=None, set_regs=None, get_regs=None, max_cycles=0, name=None
-    ):
+    ) -> RunState:
         """in a PyTrap code run a nested piece of m68k code"""
         if not self.running:
             raise RuntimeError("nested_run() only allowed inside started runtime.")
@@ -98,35 +100,34 @@ class Runtime:
         if max_cycles == 0:
             max_cycles = self.max_cycles
 
-        # reset local cycles
-
         # create new run state
         nesting = len(self.run_states)
         run_state = RunState(pc, sp, max_cycles, nesting, name)
         self.run_states.append(run_state)
 
-        log_machine.info("runtime nested_run: %s", run_state)
-
         # perform nested run
-        regs = self._run_loop(pc, sp, set_regs, get_regs, max_cycles)
+        log_machine.info("runtime nested start %s", run_state)
+        run_state.regs = self._run_loop(pc, sp, set_regs, get_regs, max_cycles)
+        log_machine.info("runtime nested end %s", run_state)
 
-        # pop run state
+        # pop current run state
         self.run_states.pop()
 
-        pc = self.machine.get_pc()
-        sp = self.machine.get_sp()
-        log_machine.info(
-            "runtime nested_run: #%d done pc=%x sp=%x (cycles local=%d, total=%d)",
-            len(self.run_states),
-            pc,
-            sp,
-            run_state.cycles,
-            self.total_cycles,
+        # restore pc, sp from old run state
+        old_run_state = self.run_states[-1]
+        self.machine.set_pc(old_run_state.pc)
+        self.machine.set_sp(old_run_state.sp)
+        log_machine.debug(
+            "runtime restore pc=%06x sp=%06x", old_run_state.pc, old_run_state.sp
         )
-        return regs
+
+        # account cycles to old run state
+        old_run_state.total_cycles += run_state.total_cycles
+
+        return run_state
 
     def get_current_run_state(self):
-        if self.running:
+        if len(self.run_states) > 0:
             return self.run_states[-1]
 
     def _run_loop(self, pc, sp, set_regs, get_regs, max_cycles):
@@ -146,19 +147,23 @@ class Runtime:
 
             # account cycles
             cycles = rs.cycles
-            self.total_cycles += cycles
             run_state = self.run_states[-1]
             run_state.cycles += cycles
+            run_state.total_cycles += cycles
+
+            # update run state pc, sp
+            run_state.pc = self.machine.get_pc()
+            run_state.sp = self.machine.get_sp()
 
             # report cycles?
             self.cur_cycles += cycles
             if self.cur_cycles > self.max_cycles:
                 log_machine.debug(
-                    "report max cycles: this=%d %d (local %d, total %d)",
+                    "report max cycles: last=%d sum=%d (local %d, total %d)",
                     cycles,
                     self.cur_cycles,
                     run_state.cycles,
-                    self.total_cycles,
+                    run_state.total_cycles,
                 )
                 # report that we reached max cycles
                 if self.max_cycle_hook:

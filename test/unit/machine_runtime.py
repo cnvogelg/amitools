@@ -37,7 +37,10 @@ def machine_runtime_trap_test():
     mem.w32(code + 2, addr)
     # return
     mem.w16(code + 6, op_rts)
-    r.start(code, stack)
+    rs = r.start(code, stack)
+    # check run state
+    assert rs.pc == m.get_run_exit_addr() + 2
+    # cleanup
     m.cleanup()
     # make sure trap was hit
     assert a == ["hello"]
@@ -63,9 +66,9 @@ def machine_runtime_trap_set_get_regs_test():
     # setup regs
     set_regs = {REG_D0: 1234, REG_D1: 5678}
     get_regs = [REG_D0, REG_D1]
-    regs = r.start(code, stack, set_regs=set_regs, get_regs=get_regs)
+    rs = r.start(code, stack, set_regs=set_regs, get_regs=get_regs)
     m.cleanup()
-    assert regs == {REG_D0: 0xCAFE, REG_D1: 0xBABE}
+    assert rs.regs == {REG_D0: 0xCAFE, REG_D1: 0xBABE}
 
 
 def machine_runtime_trap_exception_test():
@@ -91,7 +94,16 @@ def machine_runtime_nested_run_test():
     r, m, cpu, mem, code, stack = create_runtime()
 
     def func(op, pc):
+        # check current run state before
+        rs = r.get_current_run_state()
+        assert rs.pc == addr + 2
+        assert rs.nesting == 0
+        # issue nested run
         r.nested_run(code + 10)
+        # check current run state after
+        rs = r.get_current_run_state()
+        assert rs.pc == addr + 2
+        assert rs.nesting == 0
 
     addr = m.setup_quick_trap(func)
     # jump to trap
@@ -101,7 +113,8 @@ def machine_runtime_nested_run_test():
     mem.w16(code + 6, op_rts)
     # 2nd run
     mem.w16(code + 10, op_rts)
-    r.start(code, stack)
+    rs = r.start(code, stack)
+    assert rs.pc == m.get_run_exit_addr() + 2
     m.cleanup()
 
 
@@ -130,10 +143,28 @@ def machine_runtime_nested_run_trap_test():
     a = []
 
     def func2(op, pc):
+        # check current run state before
+        rs = r.get_current_run_state()
+        assert rs.pc == addr2 + 2
+        assert rs.nesting == 1
+        # do action
         a.append("foo")
+        # check current run state after
+        rs = r.get_current_run_state()
+        assert rs.pc == addr2 + 2
+        assert rs.nesting == 1
 
     def func(op, pc):
+        # check current run state before
+        rs = r.get_current_run_state()
+        assert rs.pc == addr + 2
+        assert rs.nesting == 0
+        # issue nested run
         r.nested_run(code + 10)
+        # check current run state after
+        rs = r.get_current_run_state()
+        assert rs.pc == addr + 2
+        assert rs.nesting == 0
 
     addr = m.setup_quick_trap(func)
     addr2 = m.setup_quick_trap(func2)
@@ -166,8 +197,8 @@ def machine_runtime_nested_run_set_get_regs_test():
     def func(op, pc):
         set_regs = {REG_D0: 23, REG_D1: 42}
         get_regs = [REG_D0, REG_D1]
-        regs = r.nested_run(code + 10, set_regs=set_regs, get_regs=get_regs)
-        assert regs == {REG_D0: 11, REG_D1: 22}
+        rs = r.nested_run(code + 10, set_regs=set_regs, get_regs=get_regs)
+        assert rs.regs == {REG_D0: 11, REG_D1: 22}
 
     addr = m.setup_quick_trap(func)
     addr2 = m.setup_quick_trap(func2)
