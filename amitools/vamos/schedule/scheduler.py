@@ -40,7 +40,7 @@ class Scheduler(object):
             self.cur_task_hook(task)
 
         # start task
-        result = task.start()
+        task.start()
 
         # cleanup task
         task.free()
@@ -49,9 +49,6 @@ class Scheduler(object):
         self.cur_task = None
         if self.cur_task_hook:
             self.cur_task_hook(None)
-
-        # return result of last task
-        return result
 
     def add_task(self, task):
         """add a new task and prepare for execution.

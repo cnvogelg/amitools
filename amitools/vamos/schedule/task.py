@@ -22,6 +22,7 @@ class TaskBase(abc.ABC):
         self.name = name
         self.runtime = Runtime(machine)
         self.scheduler = None
+        self.result = None
         # trigger reschedule on max cycles
         self.runtime.set_max_cycle_hook(self._max_cycles_hook)
 
@@ -36,12 +37,16 @@ class TaskBase(abc.ABC):
     def get_name(self):
         return self.name
 
-    def get_state(self):
-        return self.state
+    def get_run_state(self):
+        """if task is running then you can get the current run state"""
+        return self.runtime.get_current_run_state()
 
-    def get_runner(self):
-        """access runner to execute m68k code in your task"""
-        return self.runtime.nested_run
+    def get_result(self):
+        return self.result
+
+    def run(self, *args, **kw_args):
+        """execute m68k code in your task"""
+        return self.runtime.nested_run(*args, **kw_args)
 
     def reschedule(self):
         """give up this tasks execution and allow the scheduler to run another task"""
@@ -98,8 +103,9 @@ class NativeTask(TaskBase):
         sp = self.get_init_sp()
         set_regs = self.start_regs
         get_regs = self.return_regs
-        regs = self.runtime.start(pc, sp, set_regs=set_regs, get_regs=get_regs)
-        return regs[REG_D0]
+        run_state = self.runtime.start(pc, sp, set_regs=set_regs, get_regs=get_regs)
+        # native tasks return the run state as a result
+        self.result = run_state
 
     def get_init_pc(self):
         return self.init_pc

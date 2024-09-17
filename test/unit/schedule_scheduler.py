@@ -32,8 +32,9 @@ def schedule_scheduler_native_task_simple_test():
     task = create_native_task(machine, alloc, pc, {REG_D0: 42})
     assert sched.add_task(task)
     # run scheduler
-    result = sched.schedule()
-    assert result == 42
+    sched.schedule()
+    result = task.get_result()
+    assert result.regs == {REG_D0: 42}
     assert alloc.is_all_free()
     machine.cleanup()
 
@@ -57,8 +58,9 @@ def schedule_scheduler_native_task_cur_task_hook_test():
     assert sched.add_task(task)
     assert sched.get_cur_task() is None
     # run scheduler
-    result = sched.schedule()
-    assert result == 42
+    sched.schedule()
+    result = task.get_result()
+    assert result.regs == {REG_D0: 42}
     assert alloc.is_all_free()
     machine.cleanup()
     assert tasks == [task, None]
@@ -77,7 +79,7 @@ def schedule_scheduler_native_task_runner_test():
     pc = machine.get_scratch_begin()
 
     def trap(op, pc):
-        my_task.get_runner()(pc2)
+        my_task.run(pc2)
 
     addr = machine.setup_quick_trap(trap)
 
@@ -96,8 +98,9 @@ def schedule_scheduler_native_task_runner_test():
     # add task
     assert sched.add_task(task)
     # run scheduler
-    result = sched.schedule()
-    assert result == 42
+    sched.schedule()
+    result = task.get_result()
+    assert result.regs == {REG_D0: 42}
     assert alloc.is_all_free()
     machine.cleanup()
     assert tasks == [task, None]
