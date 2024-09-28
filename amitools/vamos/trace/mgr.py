@@ -49,21 +49,19 @@ class TraceManager(object):
         state = CPUState()
         if with_regs:
 
-            def instr_hook():
+            def instr_hook(pc):
                 # add register dump
                 state.get(cpu)
                 res = state.dump()
                 for r in res:
                     log_instr.info(r)
                 # disassemble line
-                pc = cpu.r_reg(REG_PC)
                 self.trace_code_line(pc)
 
         else:
 
-            def instr_hook():
+            def instr_hook(pc):
                 # disassemble line
-                pc = cpu.r_reg(REG_PC)
                 self.trace_code_line(pc)
 
         self.machine.set_instr_hook(instr_hook)

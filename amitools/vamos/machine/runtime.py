@@ -2,7 +2,6 @@ from enum import Enum
 from dataclasses import dataclass
 from typing import Optional
 
-from .machine import ExecutionStatus, ExecutionResult
 from .regs import reg_to_str
 from amitools.vamos.log import log_machine
 
@@ -137,6 +136,13 @@ class Runtime:
         if len(self.run_states) > 0:
             return self.run_states[-1]
 
+    def cycles_run(self):
+        rs = self.get_current_run_state()
+        if rs:
+            return rs.cycles + self.machine.cycles_run()
+        else:
+            return 0
+
     def _run_loop(self, pc, sp, set_regs, get_regs, max_cycles):
         # setup pc and sp
         self.machine.prepare(pc, sp)
@@ -150,24 +156,23 @@ class Runtime:
 
         while True:
             # let m68k run
-            rs = self.machine.execute(max_cycles)
+            er = self.machine.execute(max_cycles)
 
             # account cycles
-            cycles = rs.cycles
             run_state = self.run_states[-1]
-            run_state.cycles += cycles
-            run_state.total_cycles += cycles
+            run_state.cycles += er.cycles
+            run_state.total_cycles += er.cycles
 
             # update run state pc, sp
             run_state.pc = self.machine.get_pc()
             run_state.sp = self.machine.get_sp()
 
             # report cycles?
-            self.cur_cycles += cycles
+            self.cur_cycles += er.cycles
             if self.cur_cycles > self.max_cycles:
                 log_machine.debug(
                     "report max cycles: last=%d sum=%d (local %d, total %d)",
-                    cycles,
+                    er.cycles,
                     self.cur_cycles,
                     run_state.cycles,
                     run_state.total_cycles,
@@ -179,21 +184,16 @@ class Runtime:
                     )
                 self.cur_cycles = 0
 
+            # machine run has ended?
+            if er.user_end:
+                if run_state.pc == self.machine.get_run_exit_addr() + 2:
+                    log_machine.debug("exit code reached. (%s)", er)
+                    break
+                else:
+                    log_machine.debug("unknown user end. (%s)", er)
             # max cycles reached. report and continue
-            if rs.status == ExecutionStatus.MAX_CYCLES:
-                log_machine.debug("max cycles reached: %d", cycles)
-            # trap encountered. call and continue
-            elif rs.status == ExecutionStatus.TRAP:
-                log_machine.debug("calling trap: %r (cycles %d)", rs.trap, cycles)
-                rs.trap.call()
-                log_machine.debug("trap done")
-            # done. main code ended
-            elif rs.status == ExecutionStatus.EXIT_CODE:
-                log_machine.debug("exit code reached. (cycles %d)", cycles)
-                break
-            # raise error
-            elif rs.status == ExecutionStatus.ERROR:
-                raise rs.error
+            else:
+                log_machine.debug("max cycles reached: %s", er)
 
         # return regs?
         if get_regs:

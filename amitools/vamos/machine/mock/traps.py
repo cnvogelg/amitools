@@ -6,7 +6,7 @@ class MockTraps(object):
         self.traps = {}
         self.tids = []
 
-    def setup(self, py_func, auto_rts=False, one_shot=False):
+    def setup(self, py_func, auto_rts=False, one_shot=False, defer=False, old_pc=False):
         """setup trap and return trap id"""
         # too many traps
         if len(self.traps) == self.max_traps:

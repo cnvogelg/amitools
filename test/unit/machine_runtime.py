@@ -20,7 +20,10 @@ def machine_runtime_rts_test():
     r, m, cpu, mem, code, stack = create_runtime()
     # single RTS to immediately return from run
     mem.w16(code, op_rts)
-    r.start(code, stack)
+    rs = r.start(code, stack)
+    assert rs.pc == m.get_run_exit_addr() + 2
+    assert rs.nesting == 0
+    assert rs.cycles == 20
     m.cleanup()
 
 
@@ -96,13 +99,15 @@ def machine_runtime_nested_run_test():
     def func(op, pc):
         # check current run state before
         rs = r.get_current_run_state()
-        assert rs.pc == addr + 2
+        # pc is still the start of this run
+        assert rs.pc == code
         assert rs.nesting == 0
         # issue nested run
         r.nested_run(code + 10)
         # check current run state after
         rs = r.get_current_run_state()
-        assert rs.pc == addr + 2
+        # pc is still the start of this run
+        assert rs.pc == code
         assert rs.nesting == 0
 
     addr = m.setup_quick_trap(func)
@@ -145,25 +150,29 @@ def machine_runtime_nested_run_trap_test():
     def func2(op, pc):
         # check current run state before
         rs = r.get_current_run_state()
-        assert rs.pc == addr2 + 2
+        # pc is still the start of this run
+        assert rs.pc == code + 10
         assert rs.nesting == 1
         # do action
         a.append("foo")
         # check current run state after
         rs = r.get_current_run_state()
-        assert rs.pc == addr2 + 2
+        # pc is still the start of this run
+        assert rs.pc == code + 10
         assert rs.nesting == 1
 
     def func(op, pc):
         # check current run state before
         rs = r.get_current_run_state()
-        assert rs.pc == addr + 2
+        # pc is still the start of this run
+        assert rs.pc == code
         assert rs.nesting == 0
         # issue nested run
         r.nested_run(code + 10)
         # check current run state after
         rs = r.get_current_run_state()
-        assert rs.pc == addr + 2
+        # pc is still the start of this run
+        assert rs.pc == code
         assert rs.nesting == 0
 
     addr = m.setup_quick_trap(func)
@@ -239,8 +248,9 @@ def machine_runtime_nested_run_trap_exception_test():
     mem.w16(code + 16, op_rts)
     # start
     # exception triggers when the trap is executed directly in the run loop
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as ei:
         r.start(code, stack)
+    assert ei.value == error
     m.cleanup()
 
 
@@ -255,13 +265,25 @@ def machine_runtime_max_cycle_hook_test():
     r.set_max_cycle_hook(hook)
 
     def func2(op, pc):
+        # cycles is not updated yet
         rs = r.get_current_run_state()
-        assert rs.cycles > 0
+        assert rs.cycles == 400
+        # but cycles_run does account current cycles
+        assert r.cycles_run() == 404
 
     def func(op, pc):
         rs = r.get_current_run_state()
-        assert rs.cycles > 0
-        r.nested_run(code + 200, name="foo")
+        # cycles is not updated yet
+        assert rs.cycles == 200
+        # but cycles_run
+        assert r.cycles_run() == 224
+
+        rs = r.nested_run(code + 110, name="foo")
+
+        # sub run
+        assert rs.cycles == 440
+        assert rs.nesting == 1
+        assert rs.pc == m.get_run_exit_addr() + 2
 
     addr = m.setup_quick_trap(func)
     addr2 = m.setup_quick_trap(func2)
@@ -273,15 +295,21 @@ def machine_runtime_max_cycle_hook_test():
     mem.w32(code + 102, addr)
     mem.w16(code + 106, op_rts)
 
-    # first code
-    for i in range(110, 200, 2):
+    # second code
+    for i in range(110, 300, 2):
         mem.w16(code + i, op_nop)
-    mem.w16(code + 200, op_jsr)
-    mem.w32(code + 202, addr2)
-    mem.w16(code + 206, op_rts)
+    mem.w16(code + 300, op_jsr)
+    mem.w32(code + 302, addr2)
+    mem.w16(code + 306, op_rts)
 
     # start
-    r.start(code, stack, name="go", max_cycles=100)
+    rs = r.start(code, stack, name="go", max_cycles=100)
+
+    # main run results
+    assert rs.cycles == 260
+    assert rs.nesting == 0
+    assert rs.pc == m.get_run_exit_addr() + 2
+
     m.cleanup()
 
     # check cycle reports

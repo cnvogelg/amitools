@@ -11,27 +11,11 @@ except ImportError:
     sys.exit(1)
 
 from .regs import *
-from .opcodes import *
+from .opcodes import op_rts
 from .cpustate import CPUState
-from .traps import Traps, TrapCall
 from .error import InvalidMemoryAccessError, CPUHWExceptionError, ResetOpcodeError
 from amitools.vamos.log import log_machine
 from amitools.vamos.label import LabelManager
-
-
-class ExecutionStatus(Enum):
-    EXIT_CODE = 0
-    MAX_CYCLES = 1
-    TRAP = 2
-    ERROR = 3
-
-
-@dataclass
-class ExecutionResult:
-    status: ExecutionStatus
-    trap: Optional[TrapCall] = None
-    error: Optional[Exception] = None
-    cycles: int = 0
 
 
 class Machine(object):
@@ -88,21 +72,12 @@ class Machine(object):
         self.machine = machine68k.Machine(cpu_type, ram_size_kib)
         self.cpu = self.machine.cpu
         self.mem = self.machine.mem
+        self.traps = self.machine.traps
         # ram
         self.ram_total = ram_size_kib * 1024
         self.ram_bytes = self.ram_total - self.ram_begin
         # start as supervisor
         self.supervisor = supervisor
-
-        # execute state
-        self.result = None
-
-        # traps
-        def store_trap_call(call):
-            self.result = ExecutionResult(ExecutionStatus.TRAP, trap=call)
-
-        self.traps = Traps(self.machine, store_trap_call)
-
         # labels
         if use_labels:
             self.label_mgr = LabelManager()
@@ -222,7 +197,7 @@ class Machine(object):
         for i in range(self.quick_trap_num):
             v = m.r16(addr)
             if v == 0:
-                tid = self.traps.setup(func)
+                tid = self.traps.setup(func, defer=True, old_pc=True)
                 opc = 0xA000 | tid
                 m.w16(addr, opc)
                 return addr
@@ -292,10 +267,10 @@ class Machine(object):
         return self.run_exit_addr
 
     def get_sp(self):
-        return self.cpu.r_reg(REG_A7)
+        return self.cpu.r_sp()
 
     def set_sp(self, sp):
-        self.cpu.w_reg(REG_A7, sp)
+        self.cpu.w_sp(sp)
 
     def get_pc(self):
         return self.cpu.r_pc()
@@ -320,7 +295,7 @@ class Machine(object):
 
     def _exit_code_handler(self, opcode, pc):
         """regular end of a machine run"""
-        sp = self.cpu.r_reg(REG_A7)
+        sp = self.cpu.r_sp()
         callee_pc = self.mem.r32(sp)
         log_machine.debug(
             "exit code: opcode=%04x, pc=%06x, sp=%06x, callee=%06x",
@@ -331,15 +306,6 @@ class Machine(object):
         )
         # ent time slice of cpu
         self.cpu.end()
-        # set done flag
-        self.result = ExecutionResult(ExecutionStatus.EXIT_CODE)
-
-    def _terminate_run(self, error):
-        """end a machine run with error state"""
-        # end time slice of cpu
-        self.cpu.end()
-        # store error
-        self.result = ExecutionResult(ExecutionStatus.ERROR, error=error)
 
     def _invalid_mem_access(self, mode, width, addr):
         """triggered by invalid memory access"""
@@ -348,19 +314,7 @@ class Machine(object):
         )
         pc = self.get_pc()
         sp = self.get_sp()
-        error = InvalidMemoryAccessError(pc, sp, mode, width, addr)
-        self._terminate_run(error)
-
-    def _trap_exc_handler(self, op, pc):
-        """triggerd if Python code in a trap raised a Python exception"""
-        log_machine.error("Python exception in trap: op=%04x pc=%06x", op, pc)
-        # get pending exception
-        exc_info = sys.exc_info()
-        if exc_info:
-            error = exc_info[1]
-        else:
-            error = RuntimeError("No exception?!")
-        self._terminate_run(error)
+        raise InvalidMemoryAccessError(pc, sp, mode, width, addr)
 
     def _hw_exc_handler(self, opcode, pc):
         """an m68k Hardware Exception was triggered"""
@@ -370,56 +324,42 @@ class Machine(object):
         sr = self.mem.r16(sp)
         pc = self.mem.r32(sp + 2)
         log_machine.debug("HW exception: pc=%06x sp=%06x sr=%04x", pc, sp, sr)
-        error = CPUHWExceptionError(pc, sp, sr)
-        self._terminate_run(error)
+        raise CPUHWExceptionError(pc, sp, sr)
 
     def _reset_opcode_handler(self):
         """a reset opcode was encountered"""
         pc = self.cpu.r_pc() - 2
         sp = self.get_sp()
         log_machine.debug("RESET opcode: pc=%06x sp=%06x", pc, sp)
-        error = ResetOpcodeError(pc, sp)
-        self._terminate_run(error)
+        raise ResetOpcodeError(pc, sp)
 
     def prepare(self, pc, sp):
         """set pc to start address and stack pointer and place end trap on stack"""
         self.cpu.w_pc(pc)
-        self.cpu.w_reg(REG_A7, sp)
         # place end trap on stack
-        sp = self.cpu.r_reg(REG_A7)
         ret_addr = self.run_exit_addr
         sp -= 4
         self.mem.w32(sp, ret_addr)
-        self.cpu.w_reg(REG_A7, sp)
+        self.cpu.w_sp(sp)
         log_machine.debug("cpu.prepare pc=%06x sp=%06x", pc, sp)
 
-    def execute(self, max_cycles=1000) -> ExecutionResult:
-        # reset result
-        self.result = None
-
+    def execute(self, max_cycles=1000):
         # show state before
         pc = self.cpu.r_pc()
-        sp = self.cpu.r_reg(REG_A7)
+        sp = self.cpu.r_sp()
         log_machine.debug(
             "+ cpu.execute pc=%06x sp=%06x max_cycles=%d", pc, sp, max_cycles
         )
 
         # perform run
-        cycles = self.cpu.execute(max_cycles)
+        er = self.cpu.execute(max_cycles)
 
         # show state after
         pc = self.cpu.r_pc()
-        sp = self.cpu.r_reg(REG_A7)
-        log_machine.debug("- cpu.execute pc=%06x sp=%06x cycles=%d", pc, sp, cycles)
+        sp = self.cpu.r_sp()
+        log_machine.debug("- cpu.execute pc=%06x sp=%06x result=%s", pc, sp, er)
 
-        # check result
-        if not self.result:
-            # cycles exceeded
-            self.result = ExecutionResult(ExecutionStatus.MAX_CYCLES)
+        return er
 
-        # update cycles
-        self.result.cycles = cycles
-
-        # return result
-        log_machine.debug("-> result=%r", self.result)
-        return self.result
+    def cycles_run(self):
+        return self.cpu.cycles_run()
