@@ -3,21 +3,32 @@ from amitools.vamos.schedule import Stack
 from amitools.vamos.machine.regs import *
 
 
-def run_sub_process(runner, proc):
+def run_sub_process(scheduler, runner, proc):
     log_proc.info("start sub process: %s", proc)
 
     # actually we need to add a new task and do multitasking
     # for now we simply run it as a sub run in our task
     task = proc.get_task()
 
+    # hack cur task
+    cur_task = scheduler.cur_task
+    scheduler.cur_task_hook(task)
+
     # return value
-    get_regs = [REG_D0]
-    run_state = runner(task.get_init_pc(), task.get_init_sp(), get_regs=get_regs)
+    run_state = runner(
+        task.get_init_pc(),
+        task.get_init_sp(),
+        set_regs=task.get_start_regs(),
+        get_regs=task.get_return_regs(),
+    )
     ret_code = run_state.regs[REG_D0]
     log_proc.info("return from sub process: ret_code=%d", ret_code)
 
     # cleanup proc
     proc.free()
+
+    # restore cur task
+    scheduler.cur_task_hook(cur_task)
 
     return ret_code
 

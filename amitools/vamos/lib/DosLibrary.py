@@ -1612,7 +1612,7 @@ class DosLibrary(LibImpl):
                     arg_str,
                 )
                 return self.DOSTRUE
-            return run_sub_process(ctx.runner, proc)
+            return run_sub_process(ctx.scheduler, ctx.runner, proc)
 
     def LoadSeg(self, ctx):
         name_ptr = ctx.cpu.r_reg(REG_D1)
