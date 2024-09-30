@@ -139,7 +139,9 @@ class Machine(object):
         self.cpu.w_isp(0x700)
         self.cpu.w_msp(0x780)
         # trigger reset (read sp and init pc)
-        self.cpu.pulse_reset()
+        reset_cycles = self.cpu.pulse_reset()
+        # consume reset cycles
+        self.cpu.execute(reset_cycles)
         # drop supervisor
         if not self.supervisor:
             sr = self.cpu.r_sr()

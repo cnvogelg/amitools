@@ -6,18 +6,19 @@ from amitools.vamos.machine.opcodes import op_rts, op_jsr, op_reset, op_nop
 from amitools.vamos.log import log_machine
 
 
-def create_runtime(cpu_type=CPUType.M68000, supervisor=False):
+def create_runtime(cpu_type=CPUType.M68000, supervisor=False, run_cycles=1000):
     m = Machine(cpu_type, supervisor=supervisor)
     cpu = m.get_cpu()
     mem = m.get_mem()
     code = m.get_ram_begin()
     stack = m.get_scratch_top()
-    r = Runtime(m)
+    r = Runtime(m, run_cycles=run_cycles)
     return r, m, cpu, mem, code, stack
 
 
-def machine_runtime_rts_test():
-    r, m, cpu, mem, code, stack = create_runtime()
+@pytest.mark.parametrize("run_cycles", (10, 20, 40, 80, 100, 200, 500, 1000))
+def machine_runtime_rts_test(run_cycles):
+    r, m, cpu, mem, code, stack = create_runtime(run_cycles=run_cycles)
     # single RTS to immediately return from run
     mem.w16(code, op_rts)
     rs = r.start(code, stack)
@@ -254,28 +255,27 @@ def machine_runtime_nested_run_trap_exception_test():
     m.cleanup()
 
 
-def machine_runtime_max_cycle_hook_test():
+@pytest.mark.parametrize("slice_cycles", (10, 20, 40, 80, 100, 200))
+def machine_runtime_slice_hook_test(slice_cycles):
     r, m, cpu, mem, code, stack = create_runtime()
 
-    cycle_reports = []
+    slice_reports = []
 
-    def hook(*args):
-        cycle_reports.append(args)
+    def hook(rs):
+        slice_reports.append(rs)
 
-    r.set_max_cycle_hook(hook)
+    r.set_slice_hook(slice_cycles, hook)
 
     def func2(op, pc):
-        # cycles is not updated yet
         rs = r.get_current_run_state()
+        # cycles is not updated yet
         assert rs.cycles == 400
         # but cycles_run does account current cycles
         assert r.cycles_run() == 404
 
     def func(op, pc):
         rs = r.get_current_run_state()
-        # cycles is not updated yet
-        assert rs.cycles == 200
-        # but cycles_run
+        # check run cycles
         assert r.cycles_run() == 224
 
         rs = r.nested_run(code + 110, name="foo")
@@ -303,7 +303,7 @@ def machine_runtime_max_cycle_hook_test():
     mem.w16(code + 306, op_rts)
 
     # start
-    rs = r.start(code, stack, name="go", max_cycles=100)
+    rs = r.start(code, stack, name="go")
 
     # main run results
     assert rs.cycles == 260
@@ -313,6 +313,7 @@ def machine_runtime_max_cycle_hook_test():
     m.cleanup()
 
     # check cycle reports
-    assert len(cycle_reports) > 0
-    for report in cycle_reports:
-        assert report[0] > 100
+    assert len(slice_reports) > 0
+    for run_state in slice_reports:
+        if not run_state.user_end:
+            assert run_state.slice_cycles >= slice_cycles
