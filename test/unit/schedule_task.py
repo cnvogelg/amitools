@@ -28,6 +28,6 @@ def schedule_task_native_simple_test():
     task = create_native_task(machine, alloc, pc, {REG_D0: 42})
     result = task.start()
     task.free()
-    assert task.get_result().regs == {REG_D0: 42}
+    assert task.get_exit_code() == 42
     assert alloc.is_all_free()
     machine.cleanup()

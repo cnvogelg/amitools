@@ -77,7 +77,8 @@ def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
             return RET_CODE_CONFIG_ERROR
 
         # setup scheduler
-        scheduler = Scheduler(machine)
+        schedule_cfg = mp.get_schedule_dict().schedule
+        scheduler = Scheduler.from_cfg(machine, schedule_cfg)
 
         # a default runtime for m68k code execution after scheduling
         default_runtime = Runtime(machine, machine.scratch_end)
@@ -118,20 +119,18 @@ def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
             log_main.error("main proc setup failed!")
             return RET_CODE_CONFIG_ERROR
 
-        # main loop
+        # add main task
         task = main_proc.get_task()
         scheduler.add_task(task)
+
+        # main loop
         scheduler.schedule()
 
-        # check proc result
-        run_state = task.get_result()
-
         # return code is limited to 0-255
-        exit_code = run_state.regs[REG_D0] & 0xFF
+        exit_code = task.get_exit_code() & 0xFF
+        run_state = task.get_run_result()
         log_main.info("done. exit code=%d", exit_code)
-        log_main.info(
-            "cycles: main=%d total=%d", run_state.cycles, run_state.total_cycles
-        )
+        log_main.debug("run result: %r", run_state)
 
         # shutdown main proc
         main_proc.free()

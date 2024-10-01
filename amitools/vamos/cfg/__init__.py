@@ -5,4 +5,5 @@ from .trace import TraceParser
 from .machine import MachineParser
 from .proc import ProcessParser
 from .profile import ProfileParser
+from .schedule import ScheduleParser
 from .vamos import VamosMainParser

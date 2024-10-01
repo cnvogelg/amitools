@@ -33,8 +33,8 @@ def schedule_scheduler_native_task_simple_test():
     assert sched.add_task(task)
     # run scheduler
     sched.schedule()
-    result = task.get_result()
-    assert result.regs == {REG_D0: 42}
+    exit_code = task.get_exit_code()
+    assert exit_code == 42
     assert alloc.is_all_free()
     machine.cleanup()
 
@@ -59,8 +59,8 @@ def schedule_scheduler_native_task_cur_task_hook_test():
     assert sched.get_cur_task() is None
     # run scheduler
     sched.schedule()
-    result = task.get_result()
-    assert result.regs == {REG_D0: 42}
+    exit_code = task.get_exit_code()
+    assert exit_code == 42
     assert alloc.is_all_free()
     machine.cleanup()
     assert tasks == [task, None]
@@ -99,8 +99,8 @@ def schedule_scheduler_native_task_runner_test():
     assert sched.add_task(task)
     # run scheduler
     sched.schedule()
-    result = task.get_result()
-    assert result.regs == {REG_D0: 42}
+    exit_code = task.get_exit_code()
+    assert exit_code == 42
     assert alloc.is_all_free()
     machine.cleanup()
     assert tasks == [task, None]

@@ -7,8 +7,6 @@ def cfg_machine_dict_test():
     input_dict = {
         "machine": {
             "cpu": "68020",
-            "max_cycles": 23,
-            "cycles_per_run": 42,
             "ram_size": 512,
         },
         "memmap": {"hw_access": "abort", "old_dos_guard": True},
@@ -22,8 +20,6 @@ def cfg_machine_ini_test():
     ini_dict = {
         "vamos": {
             "cpu": "68020",
-            "max_cycles": 23,
-            "cycles_per_run": 42,
             "ram_size": 512,
             "hw_access": "abort",
             "old_dos_guard": True,
@@ -33,8 +29,6 @@ def cfg_machine_ini_test():
     assert lp.get_cfg_dict() == {
         "machine": {
             "cpu": "68020",
-            "max_cycles": 23,
-            "cycles_per_run": 42,
             "ram_size": 512,
         },
         "memmap": {"hw_access": "abort", "old_dos_guard": True},
@@ -49,10 +43,6 @@ def cfg_machine_args_test():
         [
             "-C",
             "68020",
-            "--max-cycles",
-            "23",
-            "--cycles-per-block",
-            "42",
             "--old-dos-guard",
             "-m",
             "512",
@@ -64,8 +54,6 @@ def cfg_machine_args_test():
     assert lp.get_cfg_dict() == {
         "machine": {
             "cpu": "68020",
-            "max_cycles": 23,
-            "cycles_per_run": 42,
             "ram_size": 512,
         },
         "memmap": {"hw_access": "abort", "old_dos_guard": True},

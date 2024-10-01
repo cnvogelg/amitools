@@ -21,8 +21,6 @@ class MachineParser(Parser):
         def_cfg = {
             "machine": {
                 "cpu": Value(str, "68000", enum=cpus),
-                "max_cycles": 0,
-                "cycles_per_run": 1000,
                 "ram_size": 1024,
             },
             "memmap": {
@@ -37,18 +35,6 @@ class MachineParser(Parser):
                     "--cpu",
                     action="store",
                     help="Set type of CPU to emulate (68000, 68020 or 68040)",
-                ),
-                "max_cycles": Argument(
-                    "--max-cycles",
-                    action="store",
-                    type=int,
-                    help="maximum number of cycles to execute",
-                ),
-                "cycles_per_run": Argument(
-                    "--cycles-per-block",
-                    action="store",
-                    type=int,
-                    help="cycles per block",
                 ),
                 "ram_size": Argument(
                     "-m",
@@ -75,8 +61,6 @@ class MachineParser(Parser):
         ini_trafo = {
             "machine": {
                 "cpu": "cpu",
-                "max_cycles": "max_cycles",
-                "cycles_per_run": "cycles_per_run",
                 "ram_size": "ram_size",
             },
             "memmap": {"hw_access": "hw_access", "old_dos_guard": "old_dos_guard"},

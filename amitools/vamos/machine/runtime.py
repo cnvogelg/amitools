@@ -60,14 +60,17 @@ class Runtime:
         """allow to reset slice reporting"""
         self.left_cycles = self.slice_cycles
 
-    def run(self, pc, sp, set_regs=None, get_regs=None, name=None) -> RunState:
+    def is_running(self):
+        return self.running
+
+    def run(self, pc, sp=None, set_regs=None, get_regs=None, name=None) -> RunState:
         """convenience method to dispatch either to start or nested_run"""
         if not self.running:
             return self.start(pc, sp, set_regs, get_regs, name)
         else:
             return self.nested_run(pc, sp, set_regs, get_regs, name)
 
-    def start(self, pc, sp, set_regs=None, get_regs=None, name=None) -> RunState:
+    def start(self, pc, sp=None, set_regs=None, get_regs=None, name=None) -> RunState:
         """start the main run at given pc with stack and return result"""
         if self.running:
             raise RuntimeError("start() only allowed inside idle runtime.")

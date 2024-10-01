@@ -26,6 +26,9 @@ class VamosMainParser(MainParser):
         # profile
         self.profile = ProfileParser()
         self.add_parser(self.profile)
+        # schedule
+        self.schedule = ScheduleParser()
+        self.add_parser(self.schedule)
 
     def get_log_dict(self):
         return self.log.get_cfg_dict()
@@ -47,3 +50,6 @@ class VamosMainParser(MainParser):
 
     def get_profile_dict(self):
         return self.profile.get_cfg_dict()
+
+    def get_schedule_dict(self):
+        return self.schedule.get_cfg_dict()

@@ -12,6 +12,7 @@ log_mem_alloc = logging.getLogger("mem_alloc")
 log_mem_int = logging.getLogger("mem_int")
 log_instr = logging.getLogger("instr")
 log_machine = logging.getLogger("machine")
+log_schedule = logging.getLogger("schedule")
 
 log_lib = logging.getLogger("lib")
 log_libmgr = logging.getLogger("libmgr")
@@ -56,6 +57,7 @@ loggers = [
     log_hw,
     log_math,
     log_machine,
+    log_schedule,
 ]
 
 preset = {log_prof: logging.INFO}
