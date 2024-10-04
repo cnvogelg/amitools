@@ -13,6 +13,7 @@ from .UtilityLibrary import UtilityLibrary
 from .VamosTestLibrary import VamosTestLibrary
 from .VamosTestDevice import VamosTestDevice
 from .BsdSocketLibrary import BsdSocketLibrary
+from .WorkbenchLibrary import WorkbenchLibrary
 
 vamos_libs = {
     "dos.library": DosLibrary,
@@ -30,4 +31,5 @@ vamos_libs = {
     "bsdsocket.library": BsdSocketLibrary,
     "vamostest.library": VamosTestLibrary,
     "vamostestdev.device": VamosTestDevice,
+    "workbench.library": WorkbenchLibrary,
 }
