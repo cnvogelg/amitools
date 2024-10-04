@@ -1,5 +1,5 @@
 from amitools.vamos.libcore.impl import LibImpl
-from amitools.vamos.machine.regs import REG_D0, REG_D1, REG_D2, REG_A0, REG_A1, REG_A2, REG_A3
+from amitools.vamos.machine.regs import REG_D0, REG_D1, REG_D2, REG_D3, REG_D4, REG_A0, REG_A1, REG_A2, REG_A3
 
 import select
 import socket as s
@@ -237,6 +237,57 @@ class BsdSocketLibrary(LibImpl):
         self.markFdSet(ctx.mem, r, rfds, sz)
         self.markFdSet(ctx.mem, w, wfds, sz)
         self.markFdSet(ctx.mem, x, xfds, sz)
+
+    def shutdown(self, ctx):
+        n = ctx.cpu.r_reg(REG_D0)  # Amiga socket descriptor
+        how = ctx.cpu.r_reg(REG_D1)  # Shutdown mode
+
+        # Validate socket descriptor
+        if n not in self.socks:
+            return -1
+
+        # Validate 'how' parameter
+        if how not in (0, 1, 2):
+            return -1
+
+        sock = self.socks[n]
+
+        try:
+            sock.shutdown(how)
+            return 0
+        except OSError as e:
+            return -1
+
+    def setsockopt(self, ctx):
+        fd = ctx.cpu.r_reg(REG_D0)
+        level = ctx.cpu.r_reg(REG_D1)
+        optname = ctx.cpu.r_reg(REG_D2)
+        optval_ptr = ctx.cpu.r_reg(REG_D3)
+        optlen = ctx.cpu.r_reg(REG_D4)
+
+        # Validate socket descriptor
+        if fd not in self.socks:
+            return -1
+
+        sock = self.socks[fd]
+
+        # Read option value from Amiga memory
+        try:
+            optval_bytes = ctx.mem.r_block(optval_ptr, optlen)
+        except Exception:
+            return -1
+
+        # Convert bytes to appropriate Python type
+        if optlen == 4:
+            optval = int.from_bytes(optval_bytes, byteorder='big')  # Amiga is big-endian
+        else:
+            optval = optval_bytes  # For raw byte options
+
+        try:
+            sock.setsockopt(level, optname, optval)
+            return 0
+        except OSError as e:
+            return -1
 
 @AmigaStructDef
 class ULongULongStruct(AmigaStruct):
