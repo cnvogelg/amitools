@@ -1,4 +1,5 @@
-from amitools.vamos.machine import Machine, CPUState
+from machine68k import CPUType
+from amitools.vamos.machine import Machine
 from amitools.vamos.machine.opcodes import *
 from amitools.vamos.error import *
 from amitools.vamos.log import log_machine
@@ -9,7 +10,7 @@ import logging
 log_machine.setLevel(logging.DEBUG)
 
 
-def create_machine(cpu_type=Machine.CPU_TYPE_68000):
+def create_machine(cpu_type=CPUType.M68000):
     m = Machine(cpu_type, raise_on_main_run=False)
     cpu = m.get_cpu()
     mem = m.get_mem()
@@ -222,7 +223,7 @@ def machine_machine_cfg_test():
     )
     m = Machine.from_cfg(cfg, True)
     assert m
-    assert m.get_cpu_type() == Machine.CPU_TYPE_68020
+    assert m.get_cpu_type() == CPUType.M68020
     assert m.get_cpu_name() == "68020"
     assert m.get_ram_total_kib() == 2048
     assert m.max_cycles == 128

@@ -241,7 +241,6 @@ class LibProfileData(object):
 
 
 class LibProfiler(Profiler):
-
     name = "libs"
 
     def __init__(self, names=None, add_calls=False, add_all=False):

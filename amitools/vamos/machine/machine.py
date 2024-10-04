@@ -1,7 +1,13 @@
 import time
 import sys
-from machine import emu
-from machine.m68k import *
+import logging
+
+try:
+    import machine68k
+except ImportError:
+    logging.error("package 'machine68k' missing! please install with pip.")
+    sys.exit(1)
+
 from .regs import *
 from .opcodes import *
 from .error import ErrorReporter
@@ -74,10 +80,6 @@ class Machine(object):
     000800    RAM begin. useable by applications
     """
 
-    CPU_TYPE_68000 = M68K_CPU_TYPE_68000
-    CPU_TYPE_68020 = M68K_CPU_TYPE_68020
-    CPU_TYPE_68040 = M68K_CPU_TYPE_68040
-
     run_exit_addr = 0x400
     hw_exc_addr = 0x402
     ram_begin = 0x800
@@ -87,7 +89,7 @@ class Machine(object):
 
     def __init__(
         self,
-        cpu_type=M68K_CPU_TYPE_68000,
+        cpu_type=machine68k.CPUType.M68000,
         ram_size_kib=1024,
         use_labels=True,
         raise_on_main_run=True,
@@ -96,13 +98,14 @@ class Machine(object):
         cpu_name=None,
     ):
         if cpu_name is None:
-            cpu_name = self._get_cpu_name(cpu_type)
-        # setup musashi components
+            cpu_name = machine68k.cpu_type_to_str(cpu_type)
         self.cpu_type = cpu_type
         self.cpu_name = cpu_name
-        self.cpu = emu.CPU(cpu_type)
-        self.mem = emu.Memory(ram_size_kib)
-        self.traps = emu.Traps()
+        # setup machine68k
+        self.machine = machine68k.Machine(cpu_type, ram_size_kib)
+        self.cpu = self.machine.cpu
+        self.mem = self.machine.mem
+        self.traps = self.machine.traps
         # internal state
         if use_labels:
             self.label_mgr = LabelManager()
@@ -169,27 +172,9 @@ class Machine(object):
 
     @classmethod
     def parse_cpu_type(cls, cpu_str):
-        if cpu_str in ("68000", "000", "00"):
-            return cls.CPU_TYPE_68000, "68000"
-        elif cpu_str in ("68020", "020", "20"):
-            return cls.CPU_TYPE_68020, "68020"
-        elif cpu_str in ("68030", "030", "30"):
-            # fake 030 CPU only to set AttnFlags accordingly
-            return cls.CPU_TYPE_68020, "68030(fake)"
-        elif cpu_str in ("68040", "040", "40"):
-            return cls.CPU_TYPE_68040, "68040"
-        else:
-            return None, None
-
-    def _get_cpu_name(self, cpu_type):
-        if cpu_type == self.CPU_TYPE_68000:
-            return "68000"
-        elif cpu_type == self.CPU_TYPE_68020:
-            return "68020"
-        elif cpu_type == self.CPU_TYPE_68040:
-            return "68040"
-        else:
-            return None
+        cpu_type = machine68k.cpu_type_from_str(cpu_str)
+        cpu_name = machine68k.cpu_type_to_str(cpu_type)
+        return cpu_type, cpu_name
 
     def _init_cpu(self):
         # sp and pc does not matter we will overwrite it anyway

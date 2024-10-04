@@ -2,7 +2,6 @@ from .BlockDevice import BlockDevice
 
 
 class ADFBlockDevice(BlockDevice):
-
     # number of total sectors for DD/HD disks
     DD_SECS = 80 * 2 * 11
     HD_SECS = 80 * 2 * 22

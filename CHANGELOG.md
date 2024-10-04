@@ -1,5 +1,40 @@
 # Change Log
 
+## [0.8.0][8] (2024-03-03)
+
+### global
+
+* moved native part with CPU emulation to own project: machine68k
+* moved to cython 3.x
+
+### xdftool
+
+* compute checksum correctly for large bootblocks (#199)
+* 'add' option for read and write commands
+* fixed bitmap dump
+* fixed reading ffs+dircache images
+* fixed 'time' command
+
+### rdbtool
+
+* only increase DosEnv size in PartitionBlock if needed
+
+### romtool
+
+* issue an error/warning if ROM was not written
+* fixed build with kickety split
+
+### hunktool
+
+* show hunk allocation size memory attributes (#182)
+
+### vamos
+
+* handle holes in fd tables of libraries and set a dummy func
+* added 68040 to doc
+* fixed output after running sub shells
+
+
 ## [0.7.0][7] (2023-01-17)
 
 ### global
@@ -215,3 +250,4 @@
 [5]: https://github.com/cnvogelg/amitools/tree/v0.5.0
 [6]: https://github.com/cnvogelg/amitools/tree/v0.6.0
 [7]: https://github.com/cnvogelg/amitools/tree/v0.7.0
+[8]: https://github.com/cnvogelg/amitools/tree/v0.8.0

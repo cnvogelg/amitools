@@ -29,6 +29,7 @@ def libnative_initres_init_test(buildlibnix):
     sp = init_addr - 4
     # load lib
     seglist, addr, size, end = load_lib(alloc, buildlibnix)
+
     # setup init func
     def init_func(op, pc):
         assert cpu.r_reg(REG_A0) == seglist.get_baddr()
@@ -63,6 +64,7 @@ def libnative_initres_autoinit_test(buildlibnix):
     sp = init_addr - 4
     # load lib
     seglist, addr, size, end = load_lib(alloc, buildlibnix)
+
     # setup init func
     def init_func(op, pc):
         assert cpu.r_reg(REG_A0) == seglist.get_baddr()

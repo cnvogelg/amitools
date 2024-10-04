@@ -17,7 +17,6 @@ from .MetaInfoFSUAE import MetaInfoFSUAE
 
 
 class Imager:
-
     META_MODE_NONE = 0
     META_MODE_DB = 1
     META_MODE_FSUAE = 2

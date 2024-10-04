@@ -14,6 +14,8 @@ from amitools.fs.Imager import Imager
 from amitools.fs.Repacker import Repacker
 from amitools.fs.block.BootBlock import BootBlock
 from amitools.fs.block.RootBlock import RootBlock
+from amitools.fs.block.Block import Block
+from amitools.fs.block.BlockFactory import BlockFactory
 from amitools.util.CommandQueue import CommandQueue
 from amitools.util.HexDump import *
 import amitools.util.KeyValue as KeyValue
@@ -368,16 +370,22 @@ class ReadCmd(Command):
     def handle_vol(self, vol):
         p = self.opts
         n = len(p)
-        if n == 0 or n > 2:
-            print("Usage: read <ami_file|dir> [sys_file]")
+        if n == 0 or n > 3:
+            print("Usage: read <ami_file|dir> [<sys_file>] [add]")
             return 1
+
+        # 'add' flag allows to overwrite dir
+        add_flag = (n == 3) and (self.opts[2] == "add")
+
         # determine output name
         out_name = os.path.basename(p[0])
         if n == 2:
-            if os.path.isdir(p[1]):
+            # append input basename to a target dir if not adding
+            if os.path.isdir(p[1]) and not add_flag:
                 out_name = os.path.join(p[1], out_name)
             else:
                 out_name = p[1]
+
         # single file operation
         name = make_fsstr(p[0])
         node = vol.get_path_name(name)
@@ -430,9 +438,13 @@ class WriteCmd(Command):
 
     def handle_vol(self, vol):
         n = len(self.opts)
-        if n == 0 or n > 2:
-            print("Usage: write <sys_file|dir> [ami_path]")
+        if n == 0 or n > 3:
+            print("Usage: write <sys_file|dir> [<ami_path>] [add]")
             return 1
+
+        # 'add' flag allows to add to existing dirs
+        add_flag = (n == 3) and (self.opts[2] == "add")
+
         # get file_name and ami_path
         sys_file = self.opts[0]
         file_name = os.path.basename(sys_file)
@@ -440,6 +452,7 @@ class WriteCmd(Command):
             ami_path = self.opts[1]
         else:
             ami_path = os.path.basename(sys_file)
+
         # check sys path
         if not os.path.exists(sys_file):
             print("File not found:", sys_file)
@@ -459,7 +472,15 @@ class WriteCmd(Command):
             if parent_node == None:
                 print("Invalid path", ami_path)
                 return 2
-            node = parent_node.create_dir(dir_name)
+
+            # 'add' flag?
+            if add_flag:
+                # add to existing dir
+                node = parent_node
+            else:
+                # create new none
+                node = parent_node.create_dir(dir_name)
+
             img = Imager(meta_mode=Imager.META_MODE_NONE)
             img.pack_dir(sys_file, node)
 
@@ -567,7 +588,7 @@ class BlockCmd(Command):
         n = len(self.opts)
         if n == 0:
             print(
-                "Usage: block ( boot | root | node <ami_file> [data] | dump <block_no> )"
+                "Usage: block ( boot | root | node <ami_file> [data] | dump <block_no> | decode <block_no> )"
             )
             return 1
         cmd = self.opts[0]
@@ -600,6 +621,24 @@ class BlockCmd(Command):
                 block_no = int(self.opts[1])
                 data = vol.blkdev.read_block(block_no)
                 print_hex(data)
+        elif cmd == "decode":
+            if n == 1:
+                print("No block number given!")
+                return 1
+            else:
+                block_no = int(self.opts[1])
+                # read block
+                blk = Block(vol.blkdev, block_no)
+                blk.read()
+                if blk.valid:
+                    dec_blk = BlockFactory.create_specific_block(blk)
+                    if dec_blk:
+                        dec_blk.read()
+                        dec_blk.dump()
+                    else:
+                        blk.dump("Unknown")
+                else:
+                    print("Error reading block!")
 
 
 # ----- Bitmap Tools -----

@@ -39,7 +39,6 @@ class AmigaStructDecorator(object):
 
         # run through fields
         for field_type, field_name in format:
-
             # replace self pointers
             if field_type is APTR_SELF:
                 field_type = APTR(cls)

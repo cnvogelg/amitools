@@ -4,3 +4,4 @@ twine
 tox
 black
 build
+machine68k

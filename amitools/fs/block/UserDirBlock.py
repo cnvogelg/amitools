@@ -6,7 +6,7 @@ from ..FSString import FSString
 
 
 class UserDirBlock(EntryBlock):
-    def __init__(self, blkdev, blk_num, is_longname):
+    def __init__(self, blkdev, blk_num, is_longname=False):
         EntryBlock.__init__(
             self,
             blkdev,

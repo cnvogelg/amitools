@@ -5,6 +5,7 @@ from amitools.vamos.astructs import (
     ULONG,
 )
 
+
 # TagItem
 @AmigaStructDef
 class TagItemStruct(AmigaStruct):

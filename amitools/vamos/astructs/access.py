@@ -3,7 +3,6 @@ from .pointer import BCPLPointerType
 
 
 class AccessStruct(object):
-
     _size_to_width = [None, 0, 1, None, 2]
 
     def __init__(self, mem, struct_def, struct_addr):
