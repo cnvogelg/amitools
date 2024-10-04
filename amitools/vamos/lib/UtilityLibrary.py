@@ -6,7 +6,6 @@ from amitools.vamos.log import *
 
 from math import trunc
 
-
 class UtilityLibrary(LibImpl):
     def UDivMod32(self, ctx):
         dividend = ctx.cpu.r_reg(REG_D0)
@@ -92,16 +91,15 @@ class UtilityLibrary(LibImpl):
             return 0
 
     # Tags
-
     def NextTagItem(self, ctx):
         ti_ptr_addr = ctx.cpu.r_reg(REG_A0)
-        ti_addr = ctx.mem.r32(tr_ptr_addr)
+        ti_addr = ctx.mem.r32(ti_ptr_addr)
         ti_addr = next_tag_item(ctx, ti_addr)
         if ti_addr is None:
             next_addr = 0
         else:
             next_addr = ti_addr + 8
-        ctx.mem.w32(tr_ptr_addr, next_addr)
+        ctx.mem.w32(ti_ptr_addr, next_addr)
         return ti_addr
 
     def FindTagItem(self, ctx):
@@ -157,3 +155,141 @@ class UtilityLibrary(LibImpl):
         seconds = seconds_since(t)
         log_utility.info("CheckDate: time=%s -> seconds=%u", t, seconds)
         return seconds
+
+
+    def PackBoolTags(self, ctx):
+        initialFlags = ctx.cpu.r_reg(REG_D0)
+        tagList_addr = ctx.cpu.r_reg(REG_A0)
+        boolMap_addr = ctx.cpu.r_reg(REG_A1)
+
+        boolflags = pack_bool_tags(ctx, initialFlags, tagList_addr, boolMap_addr)
+        log_utility.info(
+            "PackBoolTags(initialFlags=%08x, tagList=%08x, boolMap=%08x) => %08x",
+            initialFlags,
+            tagList_addr,
+            boolMap_addr,
+            boolflags,
+        )
+        return boolflags
+    
+
+def read_tag_list(ctx, tagList_addr):
+    """
+    Reads a tag list from the given address.
+    Returns a list of (tag, value) tuples.
+    """
+    tagList = []
+    ti_addr = tagList_addr
+    while True:
+        ti = next_tag_item(ctx, ti_addr)
+        if ti is None:
+            break
+        tag, value = get_tag(ctx, ti)
+        tagList.append((tag, value))
+        ti_addr += 8  # Assuming each TagItem is 8 bytes
+    return tagList
+
+def pack_bool_tags(ctx, initialFlags, tagList_addr, boolMap_addr):
+    """
+    Packs boolean tags from a tag list into a bit-flag representation.
+    """
+    boolflags = initialFlags
+    tagList = read_tag_list(ctx, tagList_addr)  # List of (tag, value)
+    boolMap = read_tag_list(ctx, boolMap_addr)  # List of (tag, flag)
+
+    # Convert boolMap to a dictionary for fast lookup
+    boolMapDict = {tag: flag for tag, flag in boolMap}
+
+    for tag, value in tagList:
+        if tag in boolMapDict:
+            flag_value = boolMapDict[tag]
+            if value:
+                boolflags |= flag_value
+            else:
+                boolflags &= ~flag_value
+
+    return boolflags
+
+"""
+NAME
+    PackBoolTags --  Builds a "Flag" word from a TagList. (V36)
+
+SYNOPSIS
+    boolflags = PackBoolTags( initialFlags, tagList, boolMap )
+    D0                        D0            A0       A1
+
+    ULONG PackBoolTags( ULONG initialFlags, struct TagItem *tagList,
+                        struct TagItem *boolMap );
+
+FUNCTION
+    Picks out the Boolean TagItems in a TagItem list and converts
+    them into bit-flag representations according to a correspondence
+    defined by the TagItem list 'BoolMap.'
+
+    A Boolean TagItem is one where only the logical value of
+    the ti_Data is relevant.  If this field is 0, the value is
+    FALSE, otherwise TRUE.
+
+
+INPUTS
+    initialFlags    - a starting set of bit-flags which will be changed
+                      by the processing of TRUE and FALSE Boolean tags
+                      in tagList.
+    tagList         - a TagItem list which may contain several TagItems
+                      defined to be "Boolean" by their presence in
+                      boolMap.  The logical value of ti_Data determines
+                      whether a TagItem causes the bit-flag value related
+                      by boolMap to set or cleared in the returned flag
+                      longword.
+    boolMap         - a TagItem list defining the Boolean Tags to be
+                      recognized, and the bit (or bits) in the returned
+                      longword that are to be set or cleared when a
+                      Boolean Tag is found to be TRUE or FALSE in
+                      tagList.
+
+RESULT
+    boolflags       - the accumulated longword of bit-flags, starting
+                      with InitialFlags and modified by each Boolean
+                      TagItem encountered.
+
+EXAMPLE
+
+    /* define some nice user tag values ... */
+    enum mytags { tag1 = TAG_USER+1, tag2, tag3, tag4, tag5 };
+
+    /* this TagItem list defines the correspondence between Boolean tags
+     * and bit-flag values.
+     */
+    struct TagItem       boolmap[] = {
+        { tag1,  0x0001 },
+        { tag2,  0x0002 },
+        { tag3,  0x0004 },
+        { tag4,  0x0008 },
+        { TAG_DONE }
+    };
+
+    /* You are probably passed these by some client, and you want
+     * to "collapse" the Boolean content into a single longword.
+     */
+
+    struct TagItem       boolexample[] = {
+        { tag1,  TRUE },
+        { tag2,  FALSE },
+        { tag5, Irrelevant },
+        { tag3,  TRUE },
+        { TAG_DONE }
+    };
+
+    /* Perhaps 'boolflags' already has a current value of 0x800002. */
+    boolflags = PackBoolTags( boolflags, boolexample, boolmap );
+
+    /* The resulting new value of 'boolflags' will be 0x80005. /*
+
+BUGS
+    There are some undefined cases if there is duplication of
+    a given Tag in either list.  It is probably safe to say that
+    the *last* of identical Tags in TagList will hold sway.
+
+SEE ALSO
+    utility/tagitem.h, GetTagData(), FindTagItem(), NextTagItem()
+"""

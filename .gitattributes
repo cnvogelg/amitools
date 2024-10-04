@@ -1,0 +1,38 @@
+# Normalize all text files to LF line endings
+* text=auto eol=lf
+
+# Treat shell scripts and tools as text with LF endings
+*.sh text eol=lf
+*.py text eol=lf
+*.c text eol=lf
+*.h text eol=lf
+*.cpp text eol=lf
+*.java text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.md text eol=lf
+
+# Windows-specific files can use CRLF if needed
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files — don't touch line endings
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.tar binary
+*.ttf binary
+*.otf binary
+*.dll binary
+*.exe binary
+
+# Prevent executable bit changes from being tracked
+bin/* -text
+bin/* linguist-generated=true

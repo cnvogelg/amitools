@@ -4,3 +4,4 @@ include CHANGELOG.md
 include Makefile
 recursive-include amitools/data *
 recursive-include amitools/fs/block/bootcode *
+recursive-include amitools/vamos/lib/fonts *.ttf

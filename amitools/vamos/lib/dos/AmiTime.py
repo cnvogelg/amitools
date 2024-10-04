@@ -15,15 +15,27 @@ class AmiTime:
 
 
 def sys_to_ami_time(t):
-    ts = int(t)  # entire seconds since epoch
-    tmil = t - ts  # milliseconds
-    tmin = ts // 60  # entire minutes
-    ts = ts % 60  # seconds
-    tday = tmin // (60 * 24)  # days
-    tmin = tmin % (60 * 24)  # minutes
-    ts += tmil  # seconds including milliseconds
-    tick = int(ts * 50)  # 1/50 sec (tsk,tsk,tsk, no, *200 is not right here!)
-    return AmiTime(tday - 2922, tmin, tick)
+    # UNIX epoch to Amiga epoch (Jan 1 1978)
+    AMIGA_EPOCH = 252460800
+
+    asec = t - AMIGA_EPOCH
+    whole = int(asec)
+    frac  = asec - whole
+    
+    # days since 1978
+    tday = whole // 86400
+    rem  = whole % 86400
+    
+    # minutes since midnight
+    tmin = rem // 60
+    
+    # seconds within the minute
+    sec_in_min = rem % 60
+    
+    # ticks since the start of the minute
+    tick = sec_in_min * 50 + int(frac * 50)
+
+    return AmiTime(tday, tmin, tick)
 
 
 def ami_to_sys_time(ami):

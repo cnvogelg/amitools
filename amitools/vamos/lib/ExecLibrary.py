@@ -1,7 +1,8 @@
-from amitools.vamos.machine.regs import *
-from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib, LibFuncs, InitRes
-from amitools.vamos.libcore import LibImpl
 from amitools.vamos.astructs import AccessStruct
+from amitools.vamos.error import VamosInternalError, UnsupportedFeatureError
+from amitools.vamos.lib.intuition import IntuiMessageStruct
+from amitools.vamos.libcore import LibImpl
+from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib, LibFuncs, InitRes
 from amitools.vamos.libstructs import (
     ExecLibraryStruct,
     StackSwapStruct,
@@ -10,17 +11,20 @@ from amitools.vamos.libstructs import (
     NodeStruct,
     NodeType,
     SignalSemaphoreStruct,
+    MsgPortStruct,
+    MessageStruct,
 )
 from amitools.vamos.libtypes import ExecLibrary as ExecLibraryType
 from amitools.vamos.libtypes import List
 from amitools.vamos.log import log_exec
-from amitools.vamos.error import VamosInternalError, UnsupportedFeatureError
-from .lexec.PortManager import PortManager
-from .lexec.SemaphoreManager import SemaphoreManager
-from .lexec.Pool import Pool
-from .lexec.RawDoFmt import raw_do_fmt
-from .lexec import Alloc
+from amitools.vamos.machine.regs import REG_A7, REG_A1, REG_D0, REG_D1, REG_A0, REG_A2, REG_D2, REG_A3
 
+from .lexec import Alloc
+from .lexec.Pool import Pool
+from .lexec.PortManager import PortManager
+from .lexec.RawDoFmt import raw_do_fmt
+from .lexec.SemaphoreManager import SemaphoreManager
+import threading
 
 class ExecLibrary(LibImpl):
     def get_struct_def(self):
@@ -50,6 +54,13 @@ class ExecLibrary(LibImpl):
         self.port_mgr = PortManager(ctx.alloc)
         self.semaphore_mgr = SemaphoreManager(ctx.alloc, ctx.mem)
         self.mem = ctx.mem
+        
+        self.signals = 0
+        self.intuition_lib = None
+        
+        self._msg_lock = threading.Lock()
+        
+        ctx.exec_lib = self
 
     def set_this_task(self, process):
         self.exec_lib.this_task.aptr = process.this_task.addr
@@ -88,14 +99,45 @@ class ExecLibrary(LibImpl):
             log_exec.info("Find Task: %s" % task_name)
             raise UnsupportedFeatureError("FindTask: other task!")
 
+    # ---------- 68k ABI entry points ----------
+
+    def Signal(self, ctx):
+        """
+        Amiga: Signal(task, signal_mask)
+        A1 = task address
+        D0 = signal_mask
+        Return value is undefined in AmigaOS.
+        """
+        task_addr   = ctx.cpu.r_reg(REG_A1)
+        signal_mask = ctx.cpu.r_reg(REG_D0)
+
+        self._signal_core(ctx, task_addr, signal_mask)
+        # No defined return; leave D0 as-is or set if you want
+
+    def Wait(self, ctx):
+        """
+        Amiga: received = Wait(mask)
+        D0 = mask
+        Returns received signal bits in D0.
+        """
+        mask = ctx.cpu.r_reg(REG_D0)
+        received = self._wait_core(ctx, mask)
+        ctx.cpu.w_reg(REG_D0, received)
+        return received
+
     def SetSignal(self, ctx):
+        """
+        Amiga: old = SetSignal(new, mask)
+        D0 = new signals
+        D1 = mask
+        Returns old signal state in D0.
+        """
         new_signals = ctx.cpu.r_reg(REG_D0)
         signal_mask = ctx.cpu.r_reg(REG_D1)
-        old_signals = 0
-        log_exec.info(
-            "SetSignals: new_signals=%08x signal_mask=%08x old_signals=%08x"
-            % (new_signals, signal_mask, old_signals)
-        )
+
+        old_signals = self._set_signal_core(ctx, new_signals, signal_mask)
+
+        ctx.cpu.w_reg(REG_D0, old_signals)
         return old_signals
 
     def StackSwap(self, ctx):
@@ -351,7 +393,7 @@ class ExecLibrary(LibImpl):
 
     def AllocMem(self, ctx):
         size = ctx.cpu.r_reg(REG_D0)
-        flags = ctx.cpu.r_reg(REG_D1)
+        #flags = ctx.cpu.r_reg(REG_D1) # always cleared
         # label alloc
         pc = self.get_callee_pc(ctx)
         name = "AllocMem(%06x)" % pc
@@ -408,33 +450,24 @@ class ExecLibrary(LibImpl):
             return self.alloc.available()
 
     # ----- Message Passing -----
+    # ----- 68k ABI entry points -----
 
     def PutMsg(self, ctx):
         port_addr = ctx.cpu.r_reg(REG_A0)
-        msg_addr = ctx.cpu.r_reg(REG_A1)
-        log_exec.info("PutMsg: port=%06x msg=%06x" % (port_addr, msg_addr))
-        has_port = self.port_mgr.has_port(port_addr)
-        if not has_port:
-            raise VamosInternalError(
-                "PutMsg: on invalid Port (%06x) called!" % port_addr
-            )
-        self.port_mgr.put_msg(port_addr, msg_addr)
+        msg_addr  = ctx.cpu.r_reg(REG_A1)
+        self._put_msg_core(ctx, port_addr, msg_addr)
 
     def GetMsg(self, ctx):
         port_addr = ctx.cpu.r_reg(REG_A0)
-        log_exec.info("GetMsg: port=%06x" % (port_addr))
-        has_port = self.port_mgr.has_port(port_addr)
-        if not has_port:
-            raise VamosInternalError(
-                "GetMsg: on invalid Port (%06x) called!" % port_addr
-            )
-        msg_addr = self.port_mgr.get_msg(port_addr)
-        if msg_addr != None:
-            log_exec.info("GetMsg: got message %06x" % (msg_addr))
-            return msg_addr
-        else:
-            log_exec.info("GetMsg: no message available!")
-            return 0
+        msg_addr  = self._get_msg_core(ctx, port_addr)
+        ctx.cpu.w_reg(REG_D0, msg_addr)
+        return msg_addr
+
+    def ReplyMsg(self, ctx):
+        msg_addr = ctx.cpu.r_reg(REG_A1)
+        result   = self._reply_msg_core(ctx, msg_addr)
+        ctx.cpu.w_reg(REG_D0, result)
+        return result
 
     def CreateMsgPort(self, ctx):
         port = self.port_mgr.create_port("exec_port", None)
@@ -511,9 +544,9 @@ class ExecLibrary(LibImpl):
             )
         has_msg = self.port_mgr.has_msg(port_addr)
         if not has_msg:
-            raise UnsupportedFeatureError(
-                "WaitPort on empty message queue called: Port (%06x)" % port_addr
-            )
+            mp = MsgPortStruct(ctx.mem, port_addr)            
+            self._wait_core(ctx, 1 << mp.mp_SigBit.get())
+            
         msg_addr = self.port_mgr.get_msg(port_addr)
         log_exec.info("WaitPort: got message %06x" % (msg_addr))
         return msg_addr
@@ -714,3 +747,147 @@ class ExecLibrary(LibImpl):
         num_bytes = ctx.cpu.r_reg(REG_D0)
         Alloc.deallocate(ctx, mh_addr, blk_addr, num_bytes)
         log_exec.info("Deallocate(%06x, %06x, %06x)" % (mh_addr, blk_addr, num_bytes))
+
+    # ---------- Core helpers (no register access) ----------
+
+    def _put_msg_core(self, ctx, port_addr, msg_addr):
+        """
+        Core PutMsg logic: assumes valid ctx, port_addr, msg_addr.
+        Does NOT touch CPU registers.
+        Thread-safe via _msg_lock.
+        """
+        log_exec.info("PutMsg(core): port=%06x msg=%06x", port_addr, msg_addr)
+
+        with self._msg_lock:
+            if not self.port_mgr.has_port(port_addr):
+                raise VamosInternalError(
+                    "PutMsg: on invalid Port (%06x) called!" % port_addr
+                )
+
+            self.port_mgr.put_msg(port_addr, msg_addr)
+
+            # Signal the task that owns the port
+            port = MsgPortStruct(ctx.mem, port_addr)
+            sigbit = port.mp_SigBit.get()
+            sigtask = port.mp_SigTask.get()
+
+            self._signal_core(ctx, sigtask, 1 << sigbit)
+
+    def _get_msg_core(self, ctx, port_addr):
+        """
+        Core GetMsg logic. Returns msg_addr or 0.
+        Does NOT touch CPU registers.
+        Thread-safe via _msg_lock.
+        """
+        log_exec.info("GetMsg(core): port=%06x", port_addr)
+
+        with self._msg_lock:
+            if not self.port_mgr.has_port(port_addr):
+                raise VamosInternalError(
+                    "GetMsg: on invalid Port (%06x) called!" % port_addr
+                )
+
+            msg_addr = self.port_mgr.get_msg(port_addr)
+            if msg_addr is None:
+                log_exec.info("GetMsg(core): no message available!")
+                return 0
+
+            log_exec.info("GetMsg(core): got message %06x", msg_addr)
+            return msg_addr
+
+    def _reply_msg_core(self, ctx, msg_addr):
+        """
+        Core ReplyMsg logic. Returns msg_addr or 0.
+        Does NOT touch CPU registers.
+        Thread-safe via _msg_lock (through _put_msg_core).
+        """
+        log_exec.info("ReplyMsg(core): msg=%06x", msg_addr)
+
+        if msg_addr == 0:
+            log_exec.warning("ReplyMsg(core): null message")
+            return 0
+
+        msg = MessageStruct(ctx.mem, msg_addr)
+        reply_port_addr = msg.mn_ReplyPort.get()
+
+        # internal IntuiMessageStruct
+        if reply_port_addr == 0xFFEDCB:
+            # Intuition-only message, free it and stop.
+            ctx.alloc.free_mem(msg_addr, IntuiMessageStruct.get_size())
+            return 0
+
+        if reply_port_addr == 0:
+            raise VamosInternalError("ReplyMsg: message has no ReplyPort")
+
+        # Use core PutMsg (no CPU register access)
+        self._put_msg_core(ctx, reply_port_addr, msg_addr)
+
+        return msg_addr
+
+    def _signal_core(self, ctx, task_addr, signal_mask):
+        """
+        Core signal logic.
+        Amiga: Signal(task, mask)
+        Here: task_addr is ignored (single-task scenario).
+        """
+        # In a multi-task world you'd look up the task and update its signal word.
+        # For now we just OR into the single global.
+        self.signals |= signal_mask
+        log_exec.info("Exec.Signal(core): task=%06x mask=%08x -> signals=0x%08X",
+                      task_addr, signal_mask, self.signals)
+
+    def _set_signal_core(self, ctx, new_signals, signal_mask):
+        """
+        Core SetSignal logic.
+        Amiga semantics: old = signals; signals = (signals & ~mask) | (new & mask)
+        Returns old_signals.
+        """
+        old_signals = self.signals
+        self.signals = (self.signals & ~signal_mask) | (new_signals & signal_mask)
+
+        log_exec.info(
+            "Exec.SetSignal(core): new=%08x mask=%08x old=%08x -> now=%08x",
+            new_signals, signal_mask, old_signals, self.signals
+        )
+        return old_signals
+
+    def _wait_core(self, ctx, mask):
+        """
+        Core Wait logic; does not touch CPU registers.
+        Blocks until (signals & mask) != 0.
+        SDL events are pumped here on the CPU thread.
+        """
+        log_exec.info("Exec.Wait(core): waiting for mask 0x%08X", mask)
+    
+        import sdl2
+        event = sdl2.SDL_Event()
+    
+        # Pump SDL events on this thread
+        if self.intuition_lib is not None:
+            
+            # peform pending refresh -> sdl2.render
+            self.intuition_lib.check_refresh(ctx)
+            
+            while True:
+                # Only bother if there’s at least one SDL window
+                if self.intuition_lib.sdl_window_id_2_sdl_window:
+                    while sdl2.SDL_PollEvent(event):
+                        had_sdl_event = True
+        
+                        # Turn SDL → pending Intuition events (thread-safe)
+                        one = self.intuition_lib.ingest_sdl_event(ctx, event)
+                        if one is not None:
+                            self.intuition_lib.drain_pending_intui_events(ctx, one)
+        
+        
+                # Check signals
+                received = self.signals & mask
+                if received:
+                    break
+    
+        received = self.signals & mask
+        self.signals &= ~mask
+    
+        log_exec.info("Exec.Wait(core): received signals 0x%08X", received)
+        return received
+

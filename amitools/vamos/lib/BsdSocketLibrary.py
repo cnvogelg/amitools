@@ -1,5 +1,5 @@
 from amitools.vamos.libcore.impl import LibImpl
-from amitools.vamos.machine.regs import REG_D0, REG_D1, REG_D2, REG_A0, REG_A1, REG_A2, REG_A3
+from amitools.vamos.machine.regs import REG_D0, REG_D1, REG_D2, REG_D3, REG_D4, REG_A0, REG_A1, REG_A2, REG_A3
 
 import select
 import socket as s
@@ -7,7 +7,7 @@ from amitools.vamos.astructs.astructdef import AmigaStructDef, AmigaClassDef
 from amitools.vamos.astructs.astruct import AmigaStruct
 from amitools.vamos.astructs.string import CSTR
 from amitools.vamos.astructs.pointer import APTR_VOID
-from amitools.vamos.astructs.scalar import LONG, UBYTE, UWORD, ULONG
+from amitools.vamos.astructs.scalar import UBYTE, UWORD, ULONG
 
 class BsdSocketLibrary(LibImpl):
 
@@ -70,25 +70,28 @@ class BsdSocketLibrary(LibImpl):
     def gethostbyname(self, ctx):
         name_ptr = ctx.cpu.r_reg(REG_A0)
         name = ctx.mem.r_cstr(name_ptr)
-        h = s.gethostbyname(name)
-        if h != None:
-            ip = 0
-            for x in h.split("."):
-                ip = ip << 8
-                ip += int(x)
-            # print(name, h, ip)
-
-            if self.hostByName == None:
-                self.hostByName = HostEntClass.alloc(self.alloc)
-                        
-            self.hostByName.h_name.set(name_ptr)            
-            self.hostByName.h_aliases.set(0)
-            self.hostByName.h_addrtype.set(0)
-            self.hostByName.h_length.set(1)
-            self.hostByName.h_addr_list.set(self.hostByName._addr + 20)
-            self.hostByName.h_addr.set(self.hostByName._addr + 24)
-            self.hostByName.h_addr_val.set(ip)
-            return self.hostByName._addr
+        try:
+            h = s.gethostbyname(name)
+            if h != None:
+                ip = 0
+                for x in h.split("."):
+                    ip = ip << 8
+                    ip += int(x)
+                # print(name, h, ip)
+    
+                if self.hostByName == None:
+                    self.hostByName = HostEntClass.alloc(self.alloc)
+                            
+                self.hostByName.h_name.set(name_ptr)            
+                self.hostByName.h_aliases.set(0)
+                self.hostByName.h_addrtype.set(0)
+                self.hostByName.h_length.set(1)
+                self.hostByName.h_addr_list.set(self.hostByName._addr + 20)
+                self.hostByName.h_addr.set(self.hostByName._addr + 24)
+                self.hostByName.h_addr_val.set(ip)
+                return self.hostByName._addr
+        except Exception:
+            pass
         
         return 0
 
@@ -136,7 +139,10 @@ class BsdSocketLibrary(LibImpl):
         ip = soa.sin_addr.get()
         s = self.ip2s(ip) 
         # print("connect to:", ip, s, soa.sin_port.get())
-        sock.connect((s, soa.sin_port.get()))
+        try:
+            sock.connect((s, soa.sin_port.get()))
+        except Exception:
+            return -1
         return 0
     
     def ip2s(self, ip):
@@ -153,7 +159,10 @@ class BsdSocketLibrary(LibImpl):
         data = ctx.mem.r_block(buf_ptr, size)
                 
         sock = self.socks[n]
-        return sock.send(data, flags)
+        try:
+            return sock.send(data, flags)
+        except Exception:
+            return -1
 
     def recv(self, ctx):
         n = ctx.cpu.r_reg(REG_D0)
@@ -165,10 +174,13 @@ class BsdSocketLibrary(LibImpl):
         flags = ctx.cpu.r_reg(REG_D2)
 
         sock = self.socks[n]
-        read = sock.recv(size, flags)
-        sz = len(read)
-        ctx.mem.w_block(buf_ptr, read)
-        return sz
+        try:
+            read = sock.recv(size, flags)
+            sz = len(read)
+            ctx.mem.w_block(buf_ptr, read)
+            return sz
+        except Exception:
+            return -1
 
     def listFromFdSet(self, mem, addr, sz):
         fdset = ULongULongClass(mem, addr)
@@ -226,6 +238,57 @@ class BsdSocketLibrary(LibImpl):
         self.markFdSet(ctx.mem, w, wfds, sz)
         self.markFdSet(ctx.mem, x, xfds, sz)
 
+    def shutdown(self, ctx):
+        n = ctx.cpu.r_reg(REG_D0)  # Amiga socket descriptor
+        how = ctx.cpu.r_reg(REG_D1)  # Shutdown mode
+
+        # Validate socket descriptor
+        if n not in self.socks:
+            return -1
+
+        # Validate 'how' parameter
+        if how not in (0, 1, 2):
+            return -1
+
+        sock = self.socks[n]
+
+        try:
+            sock.shutdown(how)
+            return 0
+        except OSError as e:
+            return -1
+
+    def setsockopt(self, ctx):
+        fd = ctx.cpu.r_reg(REG_D0)
+        level = ctx.cpu.r_reg(REG_D1)
+        optname = ctx.cpu.r_reg(REG_D2)
+        optval_ptr = ctx.cpu.r_reg(REG_D3)
+        optlen = ctx.cpu.r_reg(REG_D4)
+
+        # Validate socket descriptor
+        if fd not in self.socks:
+            return -1
+
+        sock = self.socks[fd]
+
+        # Read option value from Amiga memory
+        try:
+            optval_bytes = ctx.mem.r_block(optval_ptr, optlen)
+        except Exception:
+            return -1
+
+        # Convert bytes to appropriate Python type
+        if optlen == 4:
+            optval = int.from_bytes(optval_bytes, byteorder='big')  # Amiga is big-endian
+        else:
+            optval = optval_bytes  # For raw byte options
+
+        try:
+            sock.setsockopt(level, optname, optval)
+            return 0
+        except OSError as e:
+            return -1
+
 @AmigaStructDef
 class ULongULongStruct(AmigaStruct):
     _format = [
@@ -257,12 +320,12 @@ class HostEntStruct(AmigaStruct):
     _format = [
         (CSTR, "h_name"),
         (APTR_VOID, "h_aliases"),
-        (LONG, "h_addrtype"),
-        (LONG, "h_length"),
+        (ULONG, "h_addrtype"),
+        (ULONG, "h_length"),
         (APTR_VOID, "h_addr_list"),
         # internal
-        (LONG, "h_addr"),
-        (LONG, "h_addr_val"),
+        (ULONG, "h_addr"),
+        (ULONG, "h_addr_val"),
     ]
 
 @AmigaClassDef

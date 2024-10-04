@@ -177,3 +177,6 @@ def main_profile(
         for i in range(min(25, len(lines))):
             print((lines[i]))
     return ret_code
+
+if __name__ == "__main__":
+    main()

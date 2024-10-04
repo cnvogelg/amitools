@@ -27,6 +27,9 @@ log_exec = logging.getLogger("exec")
 log_utility = logging.getLogger("utility")
 log_math = logging.getLogger("math")
 
+log_intui = logging.getLogger("intuition")
+log_gfx = logging.getLogger("graphics")
+
 log_proc = logging.getLogger("proc")
 log_prof = logging.getLogger("prof")
 
@@ -55,6 +58,8 @@ loggers = [
     log_utility,
     log_hw,
     log_math,
+    log_intui,
+    log_gfx,
     log_machine,
 ]
 

@@ -3,6 +3,7 @@ import ctypes
 import re
 import os
 import select
+import sys
 
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
@@ -45,6 +46,7 @@ from .dos.CSource import *
 from .dos.Item import *
 from amitools.vamos.dos import run_command, run_sub_process
 from amitools.vamos.libstructs.dos import TimeRequestStruct
+from time import sleep
 
 
 class DosLibrary(LibImpl):
@@ -64,6 +66,7 @@ class DosLibrary(LibImpl):
 
     def setup_lib(self, ctx, base_addr):
         log_dos.info("setup dos.library")
+
         # init own state
         self.alloc = ctx.alloc
         self.path_mgr = ctx.path_mgr
@@ -758,6 +761,10 @@ class DosLibrary(LibImpl):
         fh_b_addr = ctx.cpu.r_reg(REG_D1)
         fh = self.file_mgr.get_by_b_addr(fh_b_addr, True)
         fh.flush()
+        # remove command line from stdin
+        if fh.obj.fileno() == sys.stdin.fileno():
+            fh.setbuf(bytearray())
+            
         return -1
 
     def VPrintf(self, ctx):
@@ -877,8 +884,16 @@ class DosLibrary(LibImpl):
         fh_end = fh_acc.r_s("fh_End")
         if fh_end == 0:
             return 0
-
+        
         fh = self.file_mgr.get_by_b_addr(fh_b_addr, False)
+        
+        # Block until input is available
+        if fh.obj.fileno() == sys.stdin.fileno():
+            while True:
+                ready, _, _ = select.select([fh.obj], [], [], None)
+                if ready:
+                    break
+        
         line = fh.gets(buflen)
         # Bummer! FIXME: There is currently no way this can communicate an I/O error
         self.setioerr(ctx, 0)
@@ -1955,6 +1970,22 @@ class DosLibrary(LibImpl):
     def SetFileSysTask(self, ctx):
         port = ctx.cpu.r_reg(REG_D1)
         ctx.process.this_task.access.w_s("pr_FileSystemTask", port)
+
+    # ----- Dummies -----
+    def SetMode(self, ctx):
+        fh = ctx.cpu.r_reg(REG_D1)
+        mode = ctx.cpu.r_reg(REG_D2)
+        # do nothing yet
+        return 0
+
+    def Delay(self, ctx):
+        ticks = ctx.cpu.r_reg(REG_D1)
+        log_dos.info("Delay: %d ticks" % ticks)
+    
+        time.sleep(ticks / 50.0)
+    
+        return 0
+
 
     # ----- Helpers -----
 

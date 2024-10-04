@@ -420,6 +420,19 @@ class MemoryAlloc:
         self.free_mem(mem.addr, mem.size)
         del self.mem_objs[mem.addr]
 
+    def free_cstr_by_addr(self, addr):
+        if addr == 0:
+            return  # nothing to free
+        """free cstr by address, no mem object needed"""
+        size = self.get_range_by_addr(addr)
+        if size is None:
+            raise VamosInternalError("Invalid Free'd CStr Memory at %06x" % addr)
+        log_mem_alloc.info("free c_str: [@%06x +%06x %06x]", addr, size, addr + size)
+        if self.label_mgr:
+            self.label_mgr.remove_label(addr)
+        self.free_mem(addr, size)
+        del self.mem_objs[addr]
+
     # bstr
     def alloc_bstr(self, bstr, label=None):
         size = len(bstr) + 2  # front: count, end: extra zero for safety
