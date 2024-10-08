@@ -58,18 +58,23 @@ class Scheduler(object):
             if self.get_num_tasks() == 0:
                 break
 
-            # find a task to run
-            task = self._find_run_task()
-            if task is None:
-                log_schedule.error("schedule(): no task to run?!")
-                return False
+            # has the current task forbid state?
+            if self.cur_task and self.cur_task.is_forbidden():
+                log_schedule.debug("run: keep current (forbid state)")
+                task = self.cur_task
+            else:
+                # find a task to run
+                task = self._find_run_task()
+                if task is None:
+                    log_schedule.error("schedule(): no task to run?!")
+                    return False
 
             # current tasks stays the same?
             # no context switch required. simply switch to it
             if task == self.cur_task:
                 self.num_switch_same += 1
                 log_schedule.debug("run: current %s", task.name)
-                task.switch()
+                task.keep_scheduled()
             else:
                 self.num_switch_other += 1
                 # switch out old
@@ -88,9 +93,13 @@ class Scheduler(object):
                 log_schedule.debug("run: switch in %s", task.name)
 
                 task.restore_ctx()
-                task.switch()
 
+            # enter greenlet of task and resume it
+            task.switch()
+
+        # end of scheduling
         self._make_current(None)
+
         log_schedule.info(
             "schedule(): done (switches: same=%d, other=%d)",
             self.num_switch_same,
@@ -121,6 +130,21 @@ class Scheduler(object):
         if self.cur_task_hook:
             self.cur_task_hook(task)
 
+    def wait_task(self, task):
+        """set the given task into wait state"""
+        log_schedule.debug("wait_task: task %s", task.name)
+        self.waiting_tasks.append(task)
+        self.reschedule(task)
+
+    def wake_up_task(self, task):
+        """take task from waiting list and allow him to schedule"""
+        log_schedule.debug("wake_up_task: task %s", task.name)
+        self.waiting_tasks.remove(task)
+        # add to front
+        self.ready_tasks.insert(0, task)
+        # directly reschedule
+        self.reschedule(task)
+
     def add_task(self, task):
         """add a new task and prepare for execution.
 
@@ -134,7 +158,7 @@ class Scheduler(object):
         return True
 
     def rem_task(self, task):
-        # find task: is it current?
+        # find task: is it current? removing myself...
         if self.cur_task == task:
             self.cur_task = None
         # in ready list?
@@ -148,7 +172,7 @@ class Scheduler(object):
             self.added_tasks.remove(task)
         # not found
         else:
-            log_schedule.warn("rem_task: unknown task %s", task.name)
+            log_schedule.warning("rem_task: unknown task %s", task.name)
             return False
         # mark as removed
         task.set_state(TaskState.TS_REMOVED)

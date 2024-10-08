@@ -20,7 +20,7 @@ classifiers = [
 dynamic = ["version", "readme"]
 
 [project.optional-dependencies]
-vamos = ["machine68k"]
+vamos = ["machine68k", "greenlet"]
 
 [tool.setuptools]
 zip-safe = false

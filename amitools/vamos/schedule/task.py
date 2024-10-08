@@ -28,6 +28,10 @@ class TaskBase:
         self.exit_code = None
         self.glet = None
         self.cpu_ctx = None
+        self.forbid_cnt = 0
+        self.forbid_reschedule = False
+        self.sigmask_wait = 0
+        self.sigmask_received = 0
 
     def __repr__(self):
         return "TaskBase(%r, %s)" % (self.name, self.state)
@@ -60,6 +64,65 @@ class TaskBase:
         """give up this tasks execution and allow the scheduler to run another task"""
         self.scheduler.reschedule(self)
 
+    def forbid(self):
+        """do not switch away from my task until permit() is called"""
+        self.forbid_cnt += 1
+
+    def permit(self):
+        """re-enable task switching"""
+        self.forbid_cnt -= 1
+        if self.forbid_cnt == 0:
+            # if a schedule was triggered during the forbid state then reschedule
+            if self.forbid_reschedule:
+                self.forbid_reschedule = 0
+                self.reschedule()
+
+    def is_forbidden(self):
+        return self.forbid_cnt > 0
+
+    def keep_scheduled(self):
+        """notified by scheduler that the task stays scheduled"""
+        if self.forbid_cnt > 0:
+            # set a flag that we scheduled and kept the task
+            self.forbid_reschedule = True
+
+    def wait(self, sigmask):
+        """suspend the task in wait state"""
+        # there are already matching signals set
+        # return without waiting
+        got_mask = self.sigmask_received & sigmask
+        if got_mask != 0:
+            return got_mask
+
+        # set our wait mask
+        self.sigmask_wait = sigmask
+
+        # go waiting. reschedule
+        self.scheduler.wait_task(self)
+
+        # we will return here if we were removed from waiting list
+        # and our got mask is not empty anymore
+        got_mask = self.sigmask_received & sigmask
+
+        # now reset wait mask
+        self.sigmask_wait = 0
+
+        return got_mask
+
+    def get_signal(self):
+        return self.sigmask_received
+
+    def set_signal(self, new_signals, sigmask):
+        """set some of our signals"""
+        self.sigmask_received = new_signals | (self.sigmask_received & ~sigmask)
+        # check if task is waiting for some of the signals
+        if self.sigmask_wait != 0:
+            got_mask = self.sigmask_received & self.sigmask_wait
+            if got_mask != 0:
+                self.scheduler.wake_up_task(self)
+        # return current mask
+        return self.sigmask_received
+
     def free(self):
         """clean up task resources, e.g. stack"""
         pass
@@ -78,12 +141,12 @@ class TaskBase:
     def save_ctx(self):
         if self.runtime.is_running():
             log_schedule.debug("%s: save cpu context", self)
-            self.cpu_ctx = self.machine.cpu.get_context()
+            self.cpu_ctx = self.machine.cpu.get_cpu_context()
 
     def restore_ctx(self):
         if self.runtime.is_running():
             log_schedule.debug("%s: restore cpu context", self)
-            self.machine.cpu.set_context(self.cpu_ctx)
+            self.machine.cpu.set_cpu_context(self.cpu_ctx)
 
 
 class NativeTask(TaskBase):
