@@ -54,6 +54,14 @@ class Scheduler(object):
 
         # main loop
         while True:
+            log_schedule.debug(
+                "schedule: current %s added %s ready %s waiting %s",
+                self.cur_task,
+                self.added_tasks,
+                self.ready_tasks,
+                self.waiting_tasks,
+            )
+
             # nothing to do anymore?
             if self.get_num_tasks() == 0:
                 break
@@ -81,8 +89,11 @@ class Scheduler(object):
                 old_task = self.cur_task
                 if old_task:
                     log_schedule.debug("run: switch out %s", old_task.name)
-                    old_task.set_state(TaskState.TS_READY)
-                    self.ready_tasks.append(old_task)
+                    # if cur task still running (not waiting)
+                    # then move it to ready list
+                    if old_task.get_state() == TaskState.TS_RUN:
+                        old_task.set_state(TaskState.TS_READY)
+                        self.ready_tasks.append(old_task)
 
                     old_task.save_ctx()
 
@@ -123,7 +134,8 @@ class Scheduler(object):
         # keep current task
         task = self.cur_task
         log_schedule.debug("take: current task %s", task.name)
-        return task
+        if task.get_state() == TaskState.TS_READY:
+            return task
 
     def _make_current(self, task):
         self.cur_task = task
@@ -134,7 +146,8 @@ class Scheduler(object):
         """set the given task into wait state"""
         log_schedule.debug("wait_task: task %s", task.name)
         self.waiting_tasks.append(task)
-        self.reschedule(task)
+        task.set_state(TaskState.TS_WAIT)
+        self.reschedule()
 
     def wake_up_task(self, task):
         """take task from waiting list and allow him to schedule"""
@@ -142,8 +155,9 @@ class Scheduler(object):
         self.waiting_tasks.remove(task)
         # add to front
         self.ready_tasks.insert(0, task)
+        task.set_state(TaskState.TS_READY)
         # directly reschedule
-        self.reschedule(task)
+        self.reschedule()
 
     def add_task(self, task):
         """add a new task and prepare for execution.
@@ -160,15 +174,19 @@ class Scheduler(object):
     def rem_task(self, task):
         # find task: is it current? removing myself...
         if self.cur_task == task:
+            log_schedule.debug("rem_task: cur_task %s", task.name)
             self.cur_task = None
         # in ready list?
         elif task in self.ready_tasks:
+            log_schedule.debug("rem_task: ready %s", task.name)
             self.ready_tasks.remove(task)
         # in waiting list?
         elif task in self.waiting_tasks:
+            log_schedule.debug("rem_task: waiting %s", task.name)
             self.waiting_tasks.remove(task)
         # in added list?
         elif task in self.added_tasks:
+            log_schedule.debug("rem_task: added %s", task.name)
             self.added_tasks.remove(task)
         # not found
         else:
@@ -181,6 +199,6 @@ class Scheduler(object):
         task.free()
         return True
 
-    def reschedule(self, task):
+    def reschedule(self):
         """callback from tasks to reschedule"""
         self.main_glet.switch()

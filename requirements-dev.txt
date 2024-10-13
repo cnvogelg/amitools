@@ -5,3 +5,4 @@ tox
 black
 build
 machine68k
+greenlet
