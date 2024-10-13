@@ -197,7 +197,7 @@ class NativeTask(TaskBase):
 
     def start(self):
         pc = self.init_pc
-        sp = self.get_init_sp()
+        sp = self.stack.get_initial_sp()
         set_regs = self.start_regs
         get_regs = self.return_regs
         log_schedule.debug("%s: start native code. pc=%06x sp=%06x", self.name, pc, sp)

@@ -87,7 +87,7 @@ def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
         def runner(*args, **kw_args):
             task = scheduler.get_cur_task()
             if task:
-                return task.run(*args, **kw_args)
+                return task.sub_run(*args, **kw_args)
             else:
                 return default_runtime.run(*args, **kw_args)
 

@@ -55,8 +55,11 @@ class Scheduler(object):
         # main loop
         while True:
             log_schedule.debug(
-                "schedule: current %s added %s ready %s waiting %s",
+                "schedule: current %s",
                 self.cur_task,
+            )
+            log_schedule.debug(
+                "schedule: added %s ready %s waiting %s",
                 self.added_tasks,
                 self.ready_tasks,
                 self.waiting_tasks,
@@ -134,7 +137,7 @@ class Scheduler(object):
         # keep current task
         task = self.cur_task
         log_schedule.debug("take: current task %s", task.name)
-        if task.get_state() == TaskState.TS_READY:
+        if task.get_state() in (TaskState.TS_READY, TaskState.TS_RUN):
             return task
 
     def _make_current(self, task):

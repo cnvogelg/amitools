@@ -198,7 +198,7 @@ class Process:
         start_regs = self._get_start_regs()
         return_regs = [REG_D0]
         self.task = NativeTask(
-            name, machine, init_pc, self.stack, start_regs, return_regs
+            name, machine, self.stack, init_pc, start_regs, return_regs
         )
         # store back ref to process
         self.task.process = self
