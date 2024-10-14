@@ -11,7 +11,6 @@ class Scheduler(object):
         self.machine = machine
         self.slice_cycles = slice_cycles
         # state
-        self.added_tasks = []
         self.ready_tasks = []
         self.waiting_tasks = []
         self.cur_task_hook = None
@@ -33,7 +32,7 @@ class Scheduler(object):
 
     def get_num_tasks(self):
         """count the active tasks"""
-        sum = len(self.ready_tasks) + len(self.waiting_tasks) + len(self.added_tasks)
+        sum = len(self.ready_tasks) + len(self.waiting_tasks)
         if self.cur_task:
             sum += 1
         return sum
@@ -49,7 +48,7 @@ class Scheduler(object):
         log_schedule.info("schedule(): start")
 
         # check that we have at least one task to run
-        if len(self.added_tasks) == 0:
+        if len(self.ready_tasks) == 0:
             raise RuntimeError("no tasks to schedule!")
 
         # main loop
@@ -59,8 +58,7 @@ class Scheduler(object):
                 self.cur_task,
             )
             log_schedule.debug(
-                "schedule: added %s ready %s waiting %s",
-                self.added_tasks,
+                "schedule: ready %s waiting %s",
                 self.ready_tasks,
                 self.waiting_tasks,
             )
@@ -122,12 +120,6 @@ class Scheduler(object):
         return True
 
     def _find_run_task(self):
-        # if added tasks are available take this one
-        if len(self.added_tasks) > 0:
-            task = self.added_tasks.pop(0)
-            log_schedule.debug("take: added task %s", task.name)
-            return task
-
         # if a ready task is available
         if len(self.ready_tasks):
             task = self.ready_tasks.pop(0)
@@ -167,7 +159,7 @@ class Scheduler(object):
 
         returns True if task was added
         """
-        self.added_tasks.append(task)
+        self.ready_tasks.append(task)
         task.set_state(TaskState.TS_ADDED)
         # configure task
         task.config(self, self.slice_cycles)
@@ -187,10 +179,6 @@ class Scheduler(object):
         elif task in self.waiting_tasks:
             log_schedule.debug("rem_task: waiting %s", task.name)
             self.waiting_tasks.remove(task)
-        # in added list?
-        elif task in self.added_tasks:
-            log_schedule.debug("rem_task: added %s", task.name)
-            self.added_tasks.remove(task)
         # not found
         else:
             log_schedule.warning("rem_task: unknown task %s", task.name)
