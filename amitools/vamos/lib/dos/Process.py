@@ -376,7 +376,7 @@ class Process:
     # create main proc
 
     @classmethod
-    def create_main_proc(cls, proc_cfg, path_mgr, dos_ctx):
+    def create_main_proc(cls, proc_cfg, dos_ctx):
         # a single Amiga-like raw arg was passed
         cmd_cfg = proc_cfg.command
         if cmd_cfg.raw_arg:
@@ -399,7 +399,7 @@ class Process:
                 # if path exists on host system then make an ami path
                 if os.path.exists(binary):
                     sys_binary = binary
-                    binary = path_mgr.from_sys_path(binary)
+                    binary = dos_ctx.path_mgr.from_sys_path(binary)
                     if not binary:
                         log_proc.error("can't map binary: %s", sys_binary)
                         return None
@@ -413,7 +413,7 @@ class Process:
         log_proc.info("args:   '%s'", arg_str[:-1])
         log_proc.info("stack:  %d", stack_size)
 
-        cwd = str(path_mgr.get_cwd())
+        cwd = str(dos_ctx.path_mgr.get_cwd())
         proc = cls(
             dos_ctx, binary, arg_str, stack_size=stack_size, shell=shell, cwd=cwd
         )

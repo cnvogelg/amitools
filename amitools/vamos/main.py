@@ -4,7 +4,6 @@ import pstats
 
 from .cfg import VamosMainParser
 from .machine import Machine, MemoryMap, Runtime
-from .machine.regs import REG_D0
 from .log import log_main, log_setup, log_help
 from .path import VamosPathManager
 from .trace import TraceManager
@@ -114,7 +113,7 @@ def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
 
         # setup main proc
         proc_cfg = mp.get_proc_dict().process
-        main_proc = Process.create_main_proc(proc_cfg, path_mgr, slm.dos_ctx)
+        main_proc = Process.create_main_proc(proc_cfg, slm.dos_ctx)
         if not main_proc:
             log_main.error("main proc setup failed!")
             return RET_CODE_CONFIG_ERROR
