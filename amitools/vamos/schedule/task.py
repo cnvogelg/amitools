@@ -3,6 +3,7 @@ import greenlet
 
 from amitools.vamos.log import log_schedule
 from amitools.vamos.machine import Runtime, REG_D0
+from .code import Code
 
 
 class TaskState(Enum):
@@ -170,36 +171,27 @@ class TaskBase:
 class NativeTask(TaskBase):
     """a task that runs native m68k code"""
 
-    def __init__(
-        self, name, machine, stack, init_pc, start_regs=None, return_regs=None
-    ):
+    def __init__(self, name, machine, stack, code):
         super().__init__(name, machine, stack)
-        self.init_pc = init_pc
-        if start_regs is None:
-            start_regs = {}
-        if return_regs is None:
-            return_regs = [REG_D0]
-        self.start_regs = start_regs
-        self.return_regs = return_regs
+        self.code = code
         self.run_state = None
 
     def __repr__(self):
-        return (
-            "NativeTask(%s, init_pc=%06x, stack=%r, start_regs=%r, return_regs=%r)"
-            % (
-                super().__repr__(),
-                self.init_pc,
-                self.stack,
-                self.start_regs,
-                self.return_regs,
-            )
+        return "NativeTask(%s, stack=%r, code=%r)" % (
+            super().__repr__(),
+            self.stack,
+            self.code,
         )
 
+    def free(self):
+        super().free()
+        self.code.free()
+
     def start(self):
-        pc = self.init_pc
+        pc = self.code.get_start_pc()
         sp = self.stack.get_initial_sp()
-        set_regs = self.start_regs
-        get_regs = self.return_regs
+        set_regs = self.code.get_start_regs()
+        get_regs = self.code.get_return_regs()
         log_schedule.debug("%s: start native code. pc=%06x sp=%06x", self.name, pc, sp)
         self.run_state = self.runtime.start(
             pc, sp, set_regs=set_regs, get_regs=get_regs
@@ -212,23 +204,26 @@ class NativeTask(TaskBase):
         if self.scheduler:
             self.scheduler.rem_task(self)
 
-    def get_init_pc(self):
-        return self.init_pc
+    def get_start_pc(self):
+        return self.code.get_start_pc()
 
     def get_init_sp(self):
         return self.stack.get_initial_sp()
 
-    def get_start_regs(self):
-        return self.start_regs
+    def get_code(self):
+        return self.code
 
-    def get_return_regs(self):
-        return self.return_regs
+    def get_stack(self):
+        return self.stack
 
     def get_run_result(self):
         return self.run_state
 
+    def get_return_regs(self):
+        return self.run_state.regs
 
-class VamosTask(TaskBase):
+
+class PythonTask(TaskBase):
     """a task running Python code that may use 68k code in sub runs"""
 
     def __init__(self, name, machine, stack, run_func=None):

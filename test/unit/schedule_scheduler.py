@@ -1,6 +1,6 @@
 from amitools.vamos.machine import Machine
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.schedule import Scheduler, NativeTask, VamosTask, Stack
+from amitools.vamos.schedule import Scheduler, NativeTask, PythonTask, Stack, Code
 from amitools.vamos.machine.opcodes import *
 from amitools.vamos.machine.regs import *
 
@@ -15,24 +15,25 @@ def setup(slice_cycles=1000):
 # ----- native tasks -----
 
 
-def create_native_task(
-    machine, alloc, pc, start_regs=None, return_regs=None, name=None
-):
+def create_native_task(machine, alloc, name=None, **kw_args):
     if name is None:
         name = "task"
     stack = Stack.alloc(alloc, 4096)
-    task = NativeTask(name, machine, stack, pc, start_regs, return_regs)
+    code = Code.alloc(alloc, 256, **kw_args)
+    task = NativeTask(name, machine, stack, code)
     return task
 
 
 def schedule_scheduler_native_task_simple_test():
     machine, sched, alloc = setup()
     mem = alloc.get_mem()
-    pc = machine.get_scratch_begin()
+    # add task
+    task = create_native_task(machine, alloc, start_regs={REG_D0: 42})
+
+    pc = task.get_start_pc()
     mem.w16(pc, op_nop)
     mem.w16(pc + 2, op_rts)
-    # add task
-    task = create_native_task(machine, alloc, pc, {REG_D0: 42})
+
     assert sched.add_task(task)
     # run scheduler
     sched.schedule()
@@ -52,12 +53,14 @@ def schedule_scheduler_native_task_cur_task_hook_test():
     # set cur task callback
     sched.set_cur_task_callback(cb)
 
+    task = create_native_task(machine, alloc, start_regs={REG_D0: 42})
+
     mem = alloc.get_mem()
-    pc = machine.get_scratch_begin()
+    pc = task.get_start_pc()
     mem.w16(pc, op_nop)
     mem.w16(pc + 2, op_rts)
+
     # add task
-    task = create_native_task(machine, alloc, pc, {REG_D0: 42})
     assert sched.add_task(task)
     assert sched.get_cur_task() is None
     # run scheduler
@@ -78,8 +81,12 @@ def schedule_scheduler_native_task_subrun_test():
 
     machine, sched, alloc = setup()
     sched.set_cur_task_callback(cb)
+
+    task = create_native_task(machine, alloc, start_regs={REG_D0: 42})
+    my_task = task
+
     mem = alloc.get_mem()
-    pc = machine.get_scratch_begin()
+    pc = task.get_start_pc()
 
     def trap(op, pc):
         my_task.sub_run(pc2)
@@ -90,11 +97,9 @@ def schedule_scheduler_native_task_subrun_test():
     mem.w16(pc, op_jmp)
     mem.w32(pc + 2, addr)
     mem.w16(pc + 6, op_rts)
-    task = create_native_task(machine, alloc, pc, {REG_D0: 42})
-    my_task = task
 
     # sub run
-    pc2 = pc + 100
+    pc2 = pc + 8
     mem.w16(pc2, op_nop)
     mem.w16(pc2 + 2, op_rts)
 
@@ -118,8 +123,12 @@ def schedule_scheduler_native_task_remove_test():
 
     machine, sched, alloc = setup()
     sched.set_cur_task_callback(cb)
+
+    task = create_native_task(machine, alloc, start_regs={REG_D0: 42})
+    my_task = task
+
     mem = alloc.get_mem()
-    pc = machine.get_scratch_begin()
+    pc = task.get_start_pc()
 
     def trap(op, pc):
         # remove my task to end execution
@@ -132,9 +141,6 @@ def schedule_scheduler_native_task_remove_test():
     mem.w32(pc + 2, addr)
     mem.w16(pc + 6, op_jmp)
     mem.w32(pc + 8, pc)
-
-    task = create_native_task(machine, alloc, pc, {REG_D0: 42})
-    my_task = task
 
     # add task
     assert sched.add_task(task)
@@ -156,8 +162,8 @@ def schedule_scheduler_native_task_multi_test():
 
     machine, sched, alloc = setup(slice_cycles=30)
     sched.set_cur_task_callback(cb)
+
     mem = alloc.get_mem()
-    pc = machine.get_scratch_begin()
 
     def trap1(op, pc):
         pass
@@ -167,6 +173,11 @@ def schedule_scheduler_native_task_multi_test():
 
     addr1 = machine.setup_quick_trap(trap1)
     addr2 = machine.setup_quick_trap(trap2)
+
+    task1 = create_native_task(machine, alloc, start_regs={REG_D0: 42}, name="task1")
+    my_task = task1
+
+    pc = task1.get_start_pc()
 
     # task1 setup
     mem.w16(pc, op_jmp)
@@ -179,14 +190,11 @@ def schedule_scheduler_native_task_multi_test():
     mem.w32(off + 2, addr2)
     mem.w16(off + 6, op_rts)
 
-    task1 = create_native_task(machine, alloc, pc, {REG_D0: 42}, name="task1")
-    my_task = task1
+    task2 = create_native_task(machine, alloc, start_regs={REG_D0: 23}, name="task2")
 
     # task2 setup
-    pc2 = off + 8
+    pc2 = task2.get_start_pc()
     mem.w16(pc2, op_rts)
-
-    task2 = create_native_task(machine, alloc, pc2, {REG_D0: 23}, name="task2")
 
     # add task
     assert sched.add_task(task1)
@@ -211,7 +219,6 @@ def schedule_scheduler_native_task_multi_forbid_test():
     machine, sched, alloc = setup(slice_cycles=30)
     sched.set_cur_task_callback(cb)
     mem = alloc.get_mem()
-    pc = machine.get_scratch_begin()
 
     def trap1(op, pc):
         my_task.forbid()
@@ -222,7 +229,11 @@ def schedule_scheduler_native_task_multi_forbid_test():
     addr1 = machine.setup_quick_trap(trap1)
     addr2 = machine.setup_quick_trap(trap2)
 
+    task1 = create_native_task(machine, alloc, start_regs={REG_D0: 42}, name="task1")
+    my_task = task1
+
     # task1 setup
+    pc = task1.get_start_pc()
     mem.w16(pc, op_jmp)
     mem.w32(pc + 2, addr1)
     off = pc + 6
@@ -233,14 +244,11 @@ def schedule_scheduler_native_task_multi_forbid_test():
     mem.w32(off + 2, addr2)
     mem.w16(off + 6, op_rts)
 
-    task1 = create_native_task(machine, alloc, pc, {REG_D0: 42}, name="task1")
-    my_task = task1
+    task2 = create_native_task(machine, alloc, start_regs={REG_D0: 23}, name="task2")
 
     # task2 setup
-    pc2 = off + 8
+    pc2 = task2.get_start_pc()
     mem.w16(pc2, op_rts)
-
-    task2 = create_native_task(machine, alloc, pc2, {REG_D0: 23}, name="task2")
 
     # add task
     assert sched.add_task(task1)
@@ -277,21 +285,22 @@ def schedule_scheduler_native_task_multi_wait_test():
     addr1 = machine.setup_quick_trap(trap1)
     addr2 = machine.setup_quick_trap(trap2)
 
+    task1 = create_native_task(machine, alloc, start_regs={REG_D0: 42}, name="task1")
+    my_task = task1
+
     # task1 setup
+    pc = task1.get_start_pc()
     mem.w16(pc, op_jmp)
     mem.w32(pc + 2, addr1)
     mem.w16(pc + 6, op_rts)
 
-    task1 = create_native_task(machine, alloc, pc, {REG_D0: 42}, name="task1")
-    my_task = task1
+    task2 = create_native_task(machine, alloc, start_regs={REG_D0: 23}, name="task2")
 
     # task2 setup
-    pc2 = pc + 8
+    pc2 = task2.get_start_pc()
     mem.w16(pc2, op_jmp)
     mem.w32(pc2 + 2, addr2)
     mem.w16(pc2 + 6, op_rts)
-
-    task2 = create_native_task(machine, alloc, pc2, {REG_D0: 23}, name="task2")
 
     # add task
     assert sched.add_task(task1)
@@ -306,25 +315,25 @@ def schedule_scheduler_native_task_multi_wait_test():
     assert tasks == [task1, task2, task1, task2, None]
 
 
-# ----- Vamos (Python) Tasks -----
+# ----- Python Tasks -----
 
 
-def create_vamos_task(machine, alloc, run, name=None):
+def create_python_task(machine, alloc, run, name=None):
     if name is None:
         name = "task"
     stack = Stack.alloc(alloc, 4096)
-    task = VamosTask(name, machine, stack, run)
+    task = PythonTask(name, machine, stack, run)
     return task
 
 
-def schedule_scheduler_vamos_task_simple_test():
+def schedule_scheduler_python_task_simple_test():
     machine, sched, alloc = setup()
 
     def my_func(task):
         return 42
 
     # add task
-    task = create_vamos_task(machine, alloc, my_func)
+    task = create_python_task(machine, alloc, my_func)
     assert sched.add_task(task)
     # run scheduler
     sched.schedule()
@@ -334,7 +343,7 @@ def schedule_scheduler_vamos_task_simple_test():
     machine.cleanup()
 
 
-def schedule_scheduler_vamos_task_cur_task_hook_test():
+def schedule_scheduler_python_task_cur_task_hook_test():
     tasks = []
 
     def cb(task):
@@ -348,7 +357,7 @@ def schedule_scheduler_vamos_task_cur_task_hook_test():
         return 42
 
     # add task
-    task = create_vamos_task(machine, alloc, my_func)
+    task = create_python_task(machine, alloc, my_func)
     assert sched.add_task(task)
     assert sched.get_cur_task() is None
     # run scheduler
@@ -360,7 +369,7 @@ def schedule_scheduler_vamos_task_cur_task_hook_test():
     assert tasks == [task, None]
 
 
-def schedule_scheduler_vamos_task_subrun_test():
+def schedule_scheduler_python_task_subrun_test():
     tasks = []
 
     def cb(task):
@@ -379,7 +388,7 @@ def schedule_scheduler_vamos_task_subrun_test():
         task.sub_run(pc)
         return 42
 
-    task = create_vamos_task(machine, alloc, my_func)
+    task = create_python_task(machine, alloc, my_func)
 
     # add task
     assert sched.add_task(task)
@@ -392,7 +401,7 @@ def schedule_scheduler_vamos_task_subrun_test():
     assert tasks == [task, None]
 
 
-def schedule_scheduler_vamos_task_multi_test():
+def schedule_scheduler_python_task_multi_test():
     tasks = []
 
     def cb(task):
@@ -411,8 +420,8 @@ def schedule_scheduler_vamos_task_multi_test():
         task.reschedule()
         return 23
 
-    task1 = create_vamos_task(machine, alloc, task1_run, name="task1")
-    task2 = create_vamos_task(machine, alloc, task2_run, name="task2")
+    task1 = create_python_task(machine, alloc, task1_run, name="task1")
+    task2 = create_python_task(machine, alloc, task2_run, name="task2")
 
     # add task
     assert sched.add_task(task1)
@@ -427,7 +436,7 @@ def schedule_scheduler_vamos_task_multi_test():
     assert tasks == [task1, task2, task1, task2, None]
 
 
-def schedule_scheduler_vamos_task_multi_forbid_test():
+def schedule_scheduler_python_task_multi_forbid_test():
     tasks = []
 
     def cb(task):
@@ -449,8 +458,8 @@ def schedule_scheduler_vamos_task_multi_forbid_test():
         task.reschedule()
         return 23
 
-    task1 = create_vamos_task(machine, alloc, task1_run, name="task1")
-    task2 = create_vamos_task(machine, alloc, task2_run, name="task2")
+    task1 = create_python_task(machine, alloc, task1_run, name="task1")
+    task2 = create_python_task(machine, alloc, task2_run, name="task2")
 
     # add task
     assert sched.add_task(task1)
@@ -465,7 +474,7 @@ def schedule_scheduler_vamos_task_multi_forbid_test():
     assert tasks == [task1, task2, task1, task2, None]
 
 
-def schedule_scheduler_vamos_task_multi_wait_test():
+def schedule_scheduler_python_task_multi_wait_test():
     tasks = []
 
     def cb(task):
@@ -483,8 +492,8 @@ def schedule_scheduler_vamos_task_multi_wait_test():
         task1.set_signal(1, 1)
         return 23
 
-    task1 = create_vamos_task(machine, alloc, task1_run, name="task1")
-    task2 = create_vamos_task(machine, alloc, task2_run, name="task2")
+    task1 = create_python_task(machine, alloc, task1_run, name="task1")
+    task2 = create_python_task(machine, alloc, task2_run, name="task2")
 
     # add task
     assert sched.add_task(task1)

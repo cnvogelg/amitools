@@ -1,5 +1,5 @@
 from amitools.vamos.machine import Machine, REG_D0, op_nop, op_rts
-from amitools.vamos.schedule import NativeTask, VamosTask, Stack
+from amitools.vamos.schedule import NativeTask, PythonTask, Stack, Code
 from amitools.vamos.mem import MemoryAlloc
 
 
@@ -9,31 +9,32 @@ def setup():
     return machine, alloc
 
 
-def create_native_task(
-    machine, alloc, pc, start_regs=None, return_regs=None, name=None
-):
+def create_native_task(machine, alloc, name=None, **kw_args):
     if name is None:
         name = "task"
     stack = Stack.alloc(alloc, 4096)
-    task = NativeTask(name, machine, stack, pc, start_regs, return_regs)
+    code = Code.alloc(alloc, 100, **kw_args)
+    task = NativeTask(name, machine, stack, code)
     return task
 
 
-def create_vamos_task(machine, alloc, run, name=None):
+def create_python_task(machine, alloc, func, name=None):
     if name is None:
         name = "task"
     stack = Stack.alloc(alloc, 4096)
-    task = VamosTask(name, machine, stack, run)
+    task = PythonTask(name, machine, stack, func)
     return task
 
 
 def schedule_task_native_simple_test():
     machine, alloc = setup()
     mem = alloc.get_mem()
-    pc = machine.get_scratch_begin()
+    task = create_native_task(machine, alloc, start_regs={REG_D0: 42})
+
+    pc = task.get_start_pc()
     mem.w16(pc, op_nop)
     mem.w16(pc + 2, op_rts)
-    task = create_native_task(machine, alloc, pc, {REG_D0: 42})
+
     result = task.start()
     task.free()
     assert task.get_exit_code() == 42
@@ -41,14 +42,14 @@ def schedule_task_native_simple_test():
     machine.cleanup()
 
 
-def schedule_task_vamos_simple_test():
+def schedule_task_python_simple_test():
     machine, alloc = setup()
     mem = alloc.get_mem()
 
     def my_func(task):
         return 42
 
-    task = create_vamos_task(machine, alloc, my_func)
+    task = create_python_task(machine, alloc, my_func)
     result = task.start()
     task.free()
     assert task.get_exit_code() == 42
