@@ -15,11 +15,12 @@ def run_sub_process(scheduler, runner, proc):
     scheduler.cur_task_hook(task)
 
     # return value
+    code = task.get_code()
     run_state = runner(
-        task.get_init_pc(),
+        code.get_start_pc(),
         task.get_init_sp(),
-        set_regs=task.get_start_regs(),
-        get_regs=task.get_return_regs(),
+        set_regs=code.get_start_regs(),
+        get_regs=code.get_return_regs(),
     )
     ret_code = run_state.regs[REG_D0]
     log_proc.info("return from sub process: ret_code=%d", ret_code)
