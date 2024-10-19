@@ -24,6 +24,8 @@ class TaskBase:
         self.machine = machine
         self.runtime = Runtime(machine)
         self.stack = stack
+        self.state_hook = None
+        self.sigmask_hook = None
         # state
         self.state = TaskState.TS_INVALID
         self.scheduler = None
@@ -48,9 +50,18 @@ class TaskBase:
 
         self.runtime.set_slice_hook(slice_cycles, slice_hook)
 
+    def set_state_callback(self, hook):
+        self.state_hook = hook
+
+    def set_sigmask_callback(self, hook):
+        self.sigmask_hook = hook
+
     def set_state(self, state):
         """the scheduler assigns a new state"""
         self.state = state
+        # call hook
+        if self.state_hook:
+            self.state_hook(self, state)
 
     def get_state(self):
         return self.state
@@ -106,6 +117,7 @@ class TaskBase:
 
         # set our wait mask
         self.sigmask_wait = sigmask
+        self._sync_sigmask()
 
         # go waiting. reschedule
         log_schedule.debug("%s: enter wait", self.name)
@@ -118,6 +130,7 @@ class TaskBase:
 
         # now reset wait mask
         self.sigmask_wait = 0
+        self._sync_sigmask()
 
         return got_mask
 
@@ -128,6 +141,7 @@ class TaskBase:
         """set some of our signals"""
         log_schedule.debug("%s: set_signal(%x, %x)", self.name, new_signals, sigmask)
         self.sigmask_received = new_signals | (self.sigmask_received & ~sigmask)
+        self._sync_sigmask()
         # check if task is waiting for some of the signals
         if self.sigmask_wait != 0:
             got_mask = self.sigmask_received & self.sigmask_wait
@@ -139,6 +153,10 @@ class TaskBase:
             "%s: set_signal -> sigmask=%x", self.name, self.sigmask_received
         )
         return self.sigmask_received
+
+    def _sync_sigmask(self):
+        if self.sigmask_hook:
+            self.sigmask_hook(self, self.sigmask_received, self.sigmask_wait)
 
     def free(self):
         self.stack.free()
