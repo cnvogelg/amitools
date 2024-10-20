@@ -202,7 +202,7 @@ class Process:
         # store back ref to process
         self.task.process = self
 
-    def get_task(self):
+    def get_sched_task(self):
         return self.task
 
     # ----- cli struct -----

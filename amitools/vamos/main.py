@@ -11,33 +11,56 @@ from .libmgr import SetupLibManager
 from .schedule import Scheduler
 from .profiler import MainProfiler
 from .lib.dos.Process import Process
+from .maptask import TaskCtx
 
 RET_CODE_CONFIG_ERROR = 1000
 
 
 def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
+    def gen_task_list(cfg, ctx):
+        # setup main proc
+        proc_cfg = cfg.get_proc_dict().process
+        main_proc = Process.create_main_proc(proc_cfg, ctx)
+        if not main_proc:
+            log_main.error("main proc setup failed!")
+            return None
+        return [main_proc]
+
+    exit_codes = main_run(gen_task_list, cfg_files, args, cfg_dict, profile)
+    if exit_codes is None:
+        return RET_CODE_CONFIG_ERROR
+
+    # exit
+    exit_code = exit_codes[0]
+    log_main.info("vamos is exiting: code=%d", exit_code)
+    return exit_code
+
+
+def main_run(task_list_gen, cfg_files=None, args=None, cfg_dict=None, profile=False):
     """vamos main entry point.
 
     setup a vamos session and run it.
     return the error code of the executed Amiga process.
 
+    task_list_gen: return list of tasks to run task_list_gen(cfg, task_ctx) -> [Task]
+
     cfg_files(opt): list/tuple of config files. first found will be read
     args(opt): None=read sys.argv, []=no args, list/tuple=args
     cfg_dict(opt): pass options directly as a dictionary
 
-    if an internal error occurred then return:
-      RET_CODE_CONFIG_ERROR (1000): config error
+    if an internal error occurred then return: None
+    otherwise and array with exit codes for each added task
     """
     # --- parse config ---
     mp = VamosMainParser()
     if not mp.parse(cfg_files, args, cfg_dict):
-        return RET_CODE_CONFIG_ERROR
+        return None
 
     # --- init logging ---
     log_cfg = mp.get_log_dict().logging
     if not log_setup(log_cfg):
         log_help()
-        return RET_CODE_CONFIG_ERROR
+        return None
 
     # setup main profiler
     main_profiler = MainProfiler()
@@ -49,31 +72,31 @@ def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
     use_labels = mp.get_trace_dict().trace.labels
     machine = Machine.from_cfg(machine_cfg, use_labels)
     if not machine:
-        return RET_CODE_CONFIG_ERROR
+        return None
 
     # setup memory map
     mem_map_cfg = mp.get_machine_dict().memmap
     mem_map = MemoryMap(machine)
     if not mem_map.parse_config(mem_map_cfg):
         log_main.error("memory map setup failed!")
-        return RET_CODE_CONFIG_ERROR
+        return None
 
     # setup trace manager
     trace_mgr_cfg = mp.get_trace_dict().trace
     trace_mgr = TraceManager(machine)
     if not trace_mgr.parse_config(trace_mgr_cfg):
         log_main.error("tracing setup failed!")
-        return RET_CODE_CONFIG_ERROR
+        return None
 
     # setup path manager
     path_mgr = VamosPathManager()
     try:
         if not path_mgr.parse_config(mp.get_path_dict()):
             log_main.error("path config failed!")
-            return RET_CODE_CONFIG_ERROR
+            return None
         if not path_mgr.setup():
             log_main.error("path setup failed!")
-            return RET_CODE_CONFIG_ERROR
+            return None
 
         # setup scheduler
         schedule_cfg = mp.get_schedule_dict().schedule
@@ -111,28 +134,41 @@ def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
         # open base libs
         slm.open_base_libs()
 
-        # setup main proc
-        proc_cfg = mp.get_proc_dict().process
-        main_proc = Process.create_main_proc(proc_cfg, slm.dos_ctx)
-        if not main_proc:
-            log_main.error("main proc setup failed!")
-            return RET_CODE_CONFIG_ERROR
+        # setup context for all tasks
+        # task_ctx = TaskCtx(machine, mem_map.get_alloc())
+        # for now we use dos context
 
-        # add main task
-        task = main_proc.get_task()
-        scheduler.add_task(task)
+        # generate tasks
+        task_list = task_list_gen(mp, slm.dos_ctx)
+        if task_list:
+            # add tasks to scheduler
+            for task in task_list:
+                sched_task = task.get_sched_task()
+                log_main.info("add task '%s'", sched_task.get_name())
+                scheduler.add_task(sched_task)
 
-        # main loop
-        scheduler.schedule()
+            # --- main loop ---
+            # schedule tasks...
+            scheduler.schedule()
 
-        # return code is limited to 0-255
-        exit_code = task.get_exit_code() & 0xFF
-        run_state = task.get_run_result()
-        log_main.info("done. exit code=%d", exit_code)
-        log_main.debug("run result: %r", run_state)
+            # pick up exit codes and free task
+            exit_codes = []
+            for task in task_list:
+                # return code is limited to 0-255
+                sched_task = task.get_sched_task()
+                exit_code = sched_task.get_exit_code() & 0xFF
+                log_main.info(
+                    "done task '%s''. exit code=%d", sched_task.get_name(), exit_code
+                )
+                exit_codes.append(exit_code)
 
-        # shutdown main proc
-        main_proc.free()
+                run_state = sched_task.get_run_result()
+                log_main.debug("run result: %r", run_state)
+
+                # free task
+                task.free()
+        else:
+            exit_codes = None
 
         # libs shutdown
         slm.close_base_libs()
@@ -148,9 +184,7 @@ def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
     mem_map.cleanup()
     machine.cleanup()
 
-    # exit
-    log_main.info("vamos is exiting: code=%d", exit_code)
-    return exit_code
+    return exit_codes
 
 
 def main_profile(

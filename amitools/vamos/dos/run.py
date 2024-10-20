@@ -8,7 +8,7 @@ def run_sub_process(scheduler, runner, proc):
 
     # actually we need to add a new task and do multitasking
     # for now we simply run it as a sub run in our task
-    task = proc.get_task()
+    task = proc.get_sched_task()
 
     # hack cur task
     cur_task = scheduler.cur_task
