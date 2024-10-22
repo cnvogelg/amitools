@@ -76,6 +76,9 @@ class TaskBase:
         """if task is running then you can get the current run state"""
         return self.runtime.get_current_run_state()
 
+    def get_run_result(self):
+        return None
+
     def get_exit_code(self):
         return self.exit_code
 

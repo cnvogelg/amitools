@@ -233,3 +233,8 @@ def mem_alloc(request):
         mem = MockMemory(fill=23)
         lm = LabelManager()
         return mem, MemoryAlloc(mem, label_mgr=lm)
+
+
+@pytest.fixture(scope="module")
+def vamos_task():
+    return VamosTask()

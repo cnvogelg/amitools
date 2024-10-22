@@ -19,9 +19,16 @@ class MappedTask:
         self.code = code
         self.stack = sched_task.get_stack()
 
+        # back refs
+        self.sched_task.map_task = self
+        self.ami_task.map_task = self
+
         self._setup_state_sync()
         self._setup_sigmask_sync()
         self._setup_stack_vals()
+
+    def __repr__(self):
+        return f"[MappedTask(sched_task={self.sched_task}, ami_task={self.ami_task})]"
 
     def _setup_state_sync(self):
         # install state hook to map state to mapped task value
@@ -64,6 +71,9 @@ class MappedTask:
 
     def get_code(self):
         return self.code
+
+    def get_stack(self):
+        return self.stack
 
     @classmethod
     def from_native_code(cls, task_ctx, name, code, stack_size=4096, **kw_args):

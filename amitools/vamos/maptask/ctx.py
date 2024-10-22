@@ -5,5 +5,5 @@ class TaskCtx:
         self.machine = machine
         self.alloc = alloc
 
-    def __str__(self):
+    def __repr__(self):
         return "[TaskCtx:machine=%s,alloc=%s]" % (self.machine, self.alloc)

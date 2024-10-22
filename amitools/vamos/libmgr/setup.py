@@ -116,10 +116,18 @@ class SetupLibManager(object):
         self.lib_mgr.close_lib(self.exec_addr)
         log_libmgr.info("closed exec")
 
-    def cur_task_callback(self, task):
-        log_libmgr.info("current task: %s", task)
-        if task:
-            proc = task.process
-            self.exec_ctx.set_process(proc)
-            self.exec_impl.set_this_task(proc)
-            self.dos_ctx.set_process(proc)
+    def cur_task_callback(self, sched_task):
+        if sched_task:
+            map_task = sched_task.map_task
+            log_libmgr.info("current task: %s", map_task)
+            ami_task = map_task.get_ami_task()
+            ami_proc = map_task.get_ami_process()
+            task_addr = ami_task.addr
+        else:
+            log_libmgr.info("current task: none")
+            ami_task = None
+            ami_proc = None
+            task_addr = 0
+        self.exec_ctx.set_cur_task_process(ami_task, ami_proc)
+        self.exec_impl.set_this_task_addr(task_addr)
+        self.dos_ctx.set_cur_process(ami_proc)

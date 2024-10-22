@@ -17,10 +17,10 @@ RET_CODE_CONFIG_ERROR = 1000
 
 
 def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
-    def gen_task_list(cfg, ctx):
+    def gen_task_list(cfg, task_ctx):
         # setup main proc
         proc_cfg = cfg.get_proc_dict().process
-        main_proc = Process.create_main_proc(proc_cfg, ctx)
+        main_proc = Process.create_main_proc(proc_cfg, task_ctx.dos_ctx)
         if not main_proc:
             log_main.error("main proc setup failed!")
             return None
@@ -135,11 +135,12 @@ def main_run(task_list_gen, cfg_files=None, args=None, cfg_dict=None, profile=Fa
         slm.open_base_libs()
 
         # setup context for all tasks
-        # task_ctx = TaskCtx(machine, mem_map.get_alloc())
-        # for now we use dos context
+        task_ctx = TaskCtx(machine, mem_map.get_alloc())
+        # hack for old Process
+        task_ctx.dos_ctx = slm.dos_ctx
 
         # generate tasks
-        task_list = task_list_gen(mp, slm.dos_ctx)
+        task_list = task_list_gen(mp, task_ctx)
         if task_list:
             # add tasks to scheduler
             for task in task_list:

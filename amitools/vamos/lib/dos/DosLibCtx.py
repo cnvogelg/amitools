@@ -22,5 +22,5 @@ class DosLibCtx(LibCtx):
     def set_dos_lib(self, dos_lib):
         self.dos_lib = dos_lib
 
-    def set_process(self, process):
+    def set_cur_process(self, process):
         self.process = process

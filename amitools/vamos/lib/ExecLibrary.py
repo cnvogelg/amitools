@@ -51,10 +51,8 @@ class ExecLibrary(LibImpl):
         self.semaphore_mgr = SemaphoreManager(ctx.alloc, ctx.mem)
         self.mem = ctx.mem
 
-    def set_this_task(self, process):
-        self.exec_lib.this_task.aptr = process.this_task.addr
-        self.stk_lower = process.get_stack().get_lower()
-        self.stk_upper = process.get_stack().get_upper()
+    def set_this_task_addr(self, task_addr):
+        self.exec_lib.this_task.aptr = task_addr
 
     # helper
 
@@ -106,8 +104,9 @@ class ExecLibrary(LibImpl):
         new_upper = stsw.r_s("stk_Upper")
         new_pointer = stsw.r_s("stk_Pointer")
         # retrieve current (old) stack
-        old_lower = self.stk_lower
-        old_upper = self.stk_upper
+        stack = ctx.task.get_stack()
+        old_lower = stack.get_lower()
+        old_upper = stack.get_upper()
         old_pointer = ctx.cpu.r_reg(REG_A7)  # addr of sys call return
         # get adress of callee
         callee = ctx.mem.r32(old_pointer)
@@ -125,8 +124,10 @@ class ExecLibrary(LibImpl):
         stsw.w_s("stk_Lower", old_lower)
         stsw.w_s("stk_Upper", old_upper)
         stsw.w_s("stk_Pointer", old_pointer)
-        self.stk_lower = new_lower
-        self.stk_upper = new_upper
+        # only owerwrite stack object but keep mem allocated (if any)
+        stack.lower = new_lower
+        stack.upper = new_upper
+        stack.initial_sp = new_pointer
         # put callee's address on new stack
         new_pointer -= 4
         ctx.mem.w32(new_pointer, callee)

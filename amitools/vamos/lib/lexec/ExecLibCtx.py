@@ -14,7 +14,9 @@ class ExecLibCtx(LibCtx):
         self.seg_loader = seg_loader
         self.path_mgr = path_mgr
         self.lib_mgr = lib_mgr
+        self.task = None
         self.process = None
 
-    def set_process(self, process):
+    def set_cur_task_process(self, task, process):
+        self.task = task
         self.process = process

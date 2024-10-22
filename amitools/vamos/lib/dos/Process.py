@@ -200,7 +200,13 @@ class Process:
         code = Code(init_pc, start_regs, return_regs)
         self.task = NativeTask(name, machine, self.stack, code)
         # store back ref to process
-        self.task.process = self
+        self.task.map_task = self
+
+    def get_ami_task(self):
+        return self
+
+    def get_ami_process(self):
+        return self
 
     def get_sched_task(self):
         return self.task
@@ -280,6 +286,7 @@ class Process:
         self.this_task = self.ctx.alloc.alloc_struct(
             ProcessStruct, label=self.bin_basename + "_ThisTask"
         )
+        self.addr = self.this_task.addr
         self.seglist = self.ctx.alloc.alloc_memory(24, label="Process Seglist")
         self.this_task.access.w_s("pr_Task.tc_Node.ln_Type", NT_PROCESS)
         self.this_task.access.w_s("pr_SegList", self.seglist.addr)
