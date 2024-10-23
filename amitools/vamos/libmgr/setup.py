@@ -116,6 +116,9 @@ class SetupLibManager(object):
         self.lib_mgr.close_lib(self.exec_addr)
         log_libmgr.info("closed exec")
 
+    def get_lib_proxy_mgr(self):
+        return self.lib_mgr.get_lib_proxy_mgr()
+
     def cur_task_callback(self, sched_task):
         if sched_task:
             map_task = sched_task.map_task

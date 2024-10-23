@@ -135,7 +135,8 @@ def main_run(task_list_gen, cfg_files=None, args=None, cfg_dict=None, profile=Fa
         slm.open_base_libs()
 
         # setup context for all tasks
-        task_ctx = TaskCtx(machine, mem_map.get_alloc())
+        proxy_mgr = slm.get_lib_proxy_mgr()
+        task_ctx = TaskCtx(machine, mem_map.get_alloc(), proxy_mgr)
         # hack for old Process
         task_ctx.dos_ctx = slm.dos_ctx
 
