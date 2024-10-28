@@ -9,7 +9,7 @@ class Stack(object):
             self.initial_sp = initial_sp
         else:
             # reserve last long for size by default
-            self.initial_sp = upper - 8
+            self.initial_sp = upper - 4
         # for alloc'ed stack
         self.mem_obj = None
         self.alloc = None

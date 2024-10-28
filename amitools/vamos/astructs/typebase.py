@@ -144,7 +144,7 @@ class TypeBase:
         alloc.free_memory(mem_obj)
 
     def free(self):
-        assert self._alloc and self._mem_obj
-        self._free(self._alloc, self._mem_obj)
-        self._alloc = None
-        self._mem_obj = None
+        if self._alloc and self._mem_obj:
+            self._free(self._alloc, self._mem_obj)
+            self._alloc = None
+            self._mem_obj = None

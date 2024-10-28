@@ -72,6 +72,9 @@ class TaskBase:
     def get_stack(self):
         return self.stack
 
+    def get_code(self):
+        return None
+
     def get_run_state(self):
         """if task is running then you can get the current run state"""
         return self.runtime.get_current_run_state()
