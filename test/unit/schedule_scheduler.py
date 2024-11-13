@@ -1,46 +1,72 @@
 from amitools.vamos.machine import Machine
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.schedule import Scheduler, NativeTask, PythonTask, Stack, Code
+from amitools.vamos.schedule import Scheduler, NativeTask, PythonTask, Code
 from amitools.vamos.machine.opcodes import *
 from amitools.vamos.machine.regs import *
+
+
+class Ctx:
+    def __init__(self, machine, sched, alloc):
+        self.machine = machine
+        self.sched = sched
+        self.alloc = alloc
+        self.mem = machine.get_mem()
 
 
 def setup(slice_cycles=1000):
     machine = Machine()
     sched = Scheduler(machine, slice_cycles=slice_cycles)
     alloc = MemoryAlloc.for_machine(machine)
-    return machine, sched, alloc
+    return Ctx(machine, sched, alloc)
+
+
+def cleanup(ctx):
+    assert ctx.alloc.is_all_free()
+    ctx.machine.cleanup()
 
 
 # ----- native tasks -----
 
 
-def create_native_task(machine, alloc, name=None, **kw_args):
-    if name is None:
-        name = "task"
-    stack = Stack.alloc(alloc, 4096)
-    code = Code.alloc(alloc, 256, **kw_args)
-    task = NativeTask(name, machine, stack, code)
-    return task
+class MyNativeTask:
+    def __init__(self, ctx, name=None, **code_kw_args):
+        if name is None:
+            name = "task"
+        self.ctx = ctx
+        self.name = name
+        self.stack = ctx.alloc.alloc_memory(4096, name + "_Stack")
+        self.prog = ctx.alloc.alloc_memory(1024, name + "_Code")
+        self.sp = self.stack.addr
+        self.pc = self.prog.addr
+        self.code = Code(self.pc, self.sp, **code_kw_args)
+        self.task = NativeTask(name, ctx.machine, self.code)
+
+    def free(self):
+        self.ctx.alloc.free_memory(self.stack)
+        self.ctx.alloc.free_memory(self.prog)
 
 
 def schedule_scheduler_native_task_simple_test():
-    machine, sched, alloc = setup()
-    mem = alloc.get_mem()
+    ctx = setup()
+
+    # prepare task
+    task_ctx = MyNativeTask(ctx, start_regs={REG_D0: 42})
+
+    pc = task_ctx.pc
+    ctx.mem.w16(pc, op_nop)
+    ctx.mem.w16(pc + 2, op_rts)
+
     # add task
-    task = create_native_task(machine, alloc, start_regs={REG_D0: 42})
+    task = task_ctx.task
+    assert ctx.sched.add_task(task)
 
-    pc = task.get_start_pc()
-    mem.w16(pc, op_nop)
-    mem.w16(pc + 2, op_rts)
-
-    assert sched.add_task(task)
-    # run scheduler
-    sched.schedule()
+    # run scheduler to run task
+    ctx.sched.schedule()
     exit_code = task.get_exit_code()
     assert exit_code == 42
-    assert alloc.is_all_free()
-    machine.cleanup()
+
+    task_ctx.free()
+    cleanup(ctx)
 
 
 def schedule_scheduler_native_task_cur_task_hook_test():
@@ -49,16 +75,17 @@ def schedule_scheduler_native_task_cur_task_hook_test():
     def cb(task):
         tasks.append(task)
 
-    machine, sched, alloc = setup()
+    ctx = setup()
     # set cur task callback
+    sched = ctx.sched
     sched.set_cur_task_callback(cb)
 
-    task = create_native_task(machine, alloc, start_regs={REG_D0: 42})
+    task_ctx = MyNativeTask(ctx, start_regs={REG_D0: 42})
+    task = task_ctx.task
 
-    mem = alloc.get_mem()
-    pc = task.get_start_pc()
-    mem.w16(pc, op_nop)
-    mem.w16(pc + 2, op_rts)
+    pc = task_ctx.pc
+    ctx.mem.w16(pc, op_nop)
+    ctx.mem.w16(pc + 2, op_rts)
 
     # add task
     assert sched.add_task(task)
@@ -67,9 +94,10 @@ def schedule_scheduler_native_task_cur_task_hook_test():
     sched.schedule()
     exit_code = task.get_exit_code()
     assert exit_code == 42
-    assert alloc.is_all_free()
-    machine.cleanup()
     assert tasks == [task, None]
+
+    task_ctx.free()
+    cleanup(ctx)
 
 
 def schedule_scheduler_native_task_subrun_test():
@@ -79,19 +107,21 @@ def schedule_scheduler_native_task_subrun_test():
     def cb(task):
         tasks.append(task)
 
-    machine, sched, alloc = setup()
+    ctx = setup()
+    sched = ctx.sched
     sched.set_cur_task_callback(cb)
 
-    task = create_native_task(machine, alloc, start_regs={REG_D0: 42})
+    task_ctx = MyNativeTask(ctx, start_regs={REG_D0: 42})
+    task = task_ctx.task
     my_task = task
 
-    mem = alloc.get_mem()
-    pc = task.get_start_pc()
+    mem = ctx.mem
+    pc = task_ctx.pc
 
     def trap(op, pc):
         my_task.sub_run(pc2)
 
-    addr = machine.setup_quick_trap(trap)
+    addr = ctx.machine.setup_quick_trap(trap)
 
     # task setup
     mem.w16(pc, op_jmp)
@@ -109,9 +139,10 @@ def schedule_scheduler_native_task_subrun_test():
     sched.schedule()
     exit_code = task.get_exit_code()
     assert exit_code == 42
-    assert alloc.is_all_free()
-    machine.cleanup()
     assert tasks == [task, None]
+
+    task_ctx.free()
+    cleanup(ctx)
 
 
 def schedule_scheduler_native_task_remove_test():
@@ -121,20 +152,22 @@ def schedule_scheduler_native_task_remove_test():
     def cb(task):
         tasks.append(task)
 
-    machine, sched, alloc = setup()
+    ctx = setup()
+    sched = ctx.sched
     sched.set_cur_task_callback(cb)
 
-    task = create_native_task(machine, alloc, start_regs={REG_D0: 42})
+    task_ctx = MyNativeTask(ctx, start_regs={REG_D0: 42})
+    task = task_ctx.task
     my_task = task
 
-    mem = alloc.get_mem()
-    pc = task.get_start_pc()
+    mem = ctx.mem
+    pc = task_ctx.pc
 
     def trap(op, pc):
         # remove my task to end execution
         sched.rem_task(my_task)
 
-    addr = machine.setup_quick_trap(trap)
+    addr = ctx.machine.setup_quick_trap(trap)
 
     # task setup
     mem.w16(pc, op_jmp)
@@ -148,9 +181,10 @@ def schedule_scheduler_native_task_remove_test():
     sched.schedule()
     exit_code = task.get_exit_code()
     assert exit_code == 42
-    assert alloc.is_all_free()
-    machine.cleanup()
     assert tasks == [task, None]
+
+    task_ctx.free()
+    cleanup(ctx)
 
 
 def schedule_scheduler_native_task_multi_test():
@@ -160,10 +194,11 @@ def schedule_scheduler_native_task_multi_test():
     def cb(task):
         tasks.append(task)
 
-    machine, sched, alloc = setup(slice_cycles=30)
+    ctx = setup(slice_cycles=30)
+    sched = ctx.sched
     sched.set_cur_task_callback(cb)
 
-    mem = alloc.get_mem()
+    mem = ctx.mem
 
     def trap1(op, pc):
         pass
@@ -171,13 +206,14 @@ def schedule_scheduler_native_task_multi_test():
     def trap2(op, pc):
         pass
 
-    addr1 = machine.setup_quick_trap(trap1)
-    addr2 = machine.setup_quick_trap(trap2)
+    addr1 = ctx.machine.setup_quick_trap(trap1)
+    addr2 = ctx.machine.setup_quick_trap(trap2)
 
-    task1 = create_native_task(machine, alloc, start_regs={REG_D0: 42}, name="task1")
+    task1_ctx = MyNativeTask(ctx, start_regs={REG_D0: 42}, name="task1")
+    task1 = task1_ctx.task
     my_task = task1
 
-    pc = task1.get_start_pc()
+    pc = task1_ctx.pc
 
     # task1 setup
     mem.w16(pc, op_jmp)
@@ -190,10 +226,11 @@ def schedule_scheduler_native_task_multi_test():
     mem.w32(off + 2, addr2)
     mem.w16(off + 6, op_rts)
 
-    task2 = create_native_task(machine, alloc, start_regs={REG_D0: 23}, name="task2")
+    task2_ctx = MyNativeTask(ctx, start_regs={REG_D0: 23}, name="task2")
+    task2 = task2_ctx.task
 
     # task2 setup
-    pc2 = task2.get_start_pc()
+    pc2 = task2_ctx.pc
     mem.w16(pc2, op_rts)
 
     # add task
@@ -203,10 +240,12 @@ def schedule_scheduler_native_task_multi_test():
     sched.schedule()
     assert task1.get_exit_code() == 42
     assert task2.get_exit_code() == 23
-    assert alloc.is_all_free()
-    machine.cleanup()
     # check that the tasks switched
     assert tasks == [task1, task2, task1, None]
+
+    task2_ctx.free()
+    task1_ctx.free()
+    cleanup(ctx)
 
 
 def schedule_scheduler_native_task_multi_forbid_test():
@@ -216,9 +255,10 @@ def schedule_scheduler_native_task_multi_forbid_test():
     def cb(task):
         tasks.append(task)
 
-    machine, sched, alloc = setup(slice_cycles=30)
+    ctx = setup(slice_cycles=30)
+    sched = ctx.sched
     sched.set_cur_task_callback(cb)
-    mem = alloc.get_mem()
+    mem = ctx.mem
 
     def trap1(op, pc):
         my_task.forbid()
@@ -226,14 +266,15 @@ def schedule_scheduler_native_task_multi_forbid_test():
     def trap2(op, pc):
         my_task.permit()
 
-    addr1 = machine.setup_quick_trap(trap1)
-    addr2 = machine.setup_quick_trap(trap2)
+    addr1 = ctx.machine.setup_quick_trap(trap1)
+    addr2 = ctx.machine.setup_quick_trap(trap2)
 
-    task1 = create_native_task(machine, alloc, start_regs={REG_D0: 42}, name="task1")
+    task1_ctx = MyNativeTask(ctx, start_regs={REG_D0: 42}, name="task1")
+    task1 = task1_ctx.task
     my_task = task1
 
     # task1 setup
-    pc = task1.get_start_pc()
+    pc = task1_ctx.pc
     mem.w16(pc, op_jmp)
     mem.w32(pc + 2, addr1)
     off = pc + 6
@@ -244,10 +285,11 @@ def schedule_scheduler_native_task_multi_forbid_test():
     mem.w32(off + 2, addr2)
     mem.w16(off + 6, op_rts)
 
-    task2 = create_native_task(machine, alloc, start_regs={REG_D0: 23}, name="task2")
+    task2_ctx = MyNativeTask(ctx, start_regs={REG_D0: 23}, name="task2")
+    task2 = task2_ctx.task
 
     # task2 setup
-    pc2 = task2.get_start_pc()
+    pc2 = task2_ctx.pc
     mem.w16(pc2, op_rts)
 
     # add task
@@ -257,10 +299,12 @@ def schedule_scheduler_native_task_multi_forbid_test():
     sched.schedule()
     assert task1.get_exit_code() == 42
     assert task2.get_exit_code() == 23
-    assert alloc.is_all_free()
-    machine.cleanup()
     # check that the tasks switched
     assert tasks == [task1, task2, None]
+
+    task2_ctx.free()
+    task1_ctx.free()
+    cleanup(ctx)
 
 
 def schedule_scheduler_native_task_multi_wait_test():
@@ -270,10 +314,10 @@ def schedule_scheduler_native_task_multi_wait_test():
     def cb(task):
         tasks.append(task)
 
-    machine, sched, alloc = setup()
+    ctx = setup()
+    sched = ctx.sched
     sched.set_cur_task_callback(cb)
-    mem = alloc.get_mem()
-    pc = machine.get_scratch_begin()
+    mem = ctx.mem
 
     def trap1(op, pc):
         got = my_task.wait(3)
@@ -282,22 +326,24 @@ def schedule_scheduler_native_task_multi_wait_test():
     def trap2(op, pc):
         my_task.set_signal(1, 1)
 
-    addr1 = machine.setup_quick_trap(trap1)
-    addr2 = machine.setup_quick_trap(trap2)
+    addr1 = ctx.machine.setup_quick_trap(trap1)
+    addr2 = ctx.machine.setup_quick_trap(trap2)
 
-    task1 = create_native_task(machine, alloc, start_regs={REG_D0: 42}, name="task1")
+    task1_ctx = MyNativeTask(ctx, start_regs={REG_D0: 42}, name="task1")
+    task1 = task1_ctx.task
     my_task = task1
 
     # task1 setup
-    pc = task1.get_start_pc()
+    pc = task1_ctx.pc
     mem.w16(pc, op_jmp)
     mem.w32(pc + 2, addr1)
     mem.w16(pc + 6, op_rts)
 
-    task2 = create_native_task(machine, alloc, start_regs={REG_D0: 23}, name="task2")
+    task2_ctx = MyNativeTask(ctx, start_regs={REG_D0: 23}, name="task2")
+    task2 = task2_ctx.task
 
     # task2 setup
-    pc2 = task2.get_start_pc()
+    pc2 = task2_ctx.pc
     mem.w16(pc2, op_jmp)
     mem.w32(pc2 + 2, addr2)
     mem.w16(pc2 + 6, op_rts)
@@ -309,38 +355,51 @@ def schedule_scheduler_native_task_multi_wait_test():
     sched.schedule()
     assert task1.get_exit_code() == 42
     assert task2.get_exit_code() == 23
-    assert alloc.is_all_free()
-    machine.cleanup()
     # check that the tasks switched
     assert tasks == [task1, task2, task1, task2, None]
+
+    task2_ctx.free()
+    task1_ctx.free()
+    cleanup(ctx)
 
 
 # ----- Python Tasks -----
 
 
-def create_python_task(machine, alloc, run, name=None):
-    if name is None:
-        name = "task"
-    stack = Stack.alloc(alloc, 4096)
-    task = PythonTask(name, machine, stack, run)
-    return task
+class MyPythonTask:
+    def __init__(self, ctx, func, name=None, **code_kw_args):
+        if name is None:
+            name = "task"
+        self.ctx = ctx
+        self.name = name
+        self.func = func
+        self.stack = ctx.alloc.alloc_memory(4096, name + "_Stack")
+        self.sp = self.stack.addr
+        self.task = PythonTask(name, ctx.machine, self.func, self.sp)
+
+    def free(self):
+        self.ctx.alloc.free_memory(self.stack)
 
 
 def schedule_scheduler_python_task_simple_test():
-    machine, sched, alloc = setup()
+    ctx = setup()
 
     def my_func(task):
         return 42
 
     # add task
-    task = create_python_task(machine, alloc, my_func)
+    task_ctx = MyPythonTask(ctx, my_func)
+    task = task_ctx.task
+
+    sched = ctx.sched
     assert sched.add_task(task)
     # run scheduler
     sched.schedule()
     exit_code = task.get_exit_code()
     assert exit_code == 42
-    assert alloc.is_all_free()
-    machine.cleanup()
+
+    task_ctx.free()
+    cleanup(ctx)
 
 
 def schedule_scheduler_python_task_cur_task_hook_test():
@@ -349,24 +408,28 @@ def schedule_scheduler_python_task_cur_task_hook_test():
     def cb(task):
         tasks.append(task)
 
-    machine, sched, alloc = setup()
+    ctx = setup()
     # set cur task callback
+    sched = ctx.sched
     sched.set_cur_task_callback(cb)
 
     def my_func(task):
         return 42
 
     # add task
-    task = create_python_task(machine, alloc, my_func)
+    task_ctx = MyPythonTask(ctx, my_func)
+    task = task_ctx.task
+
     assert sched.add_task(task)
     assert sched.get_cur_task() is None
     # run scheduler
     sched.schedule()
     exit_code = task.get_exit_code()
     assert exit_code == 42
-    assert alloc.is_all_free()
-    machine.cleanup()
     assert tasks == [task, None]
+
+    task_ctx.free()
+    cleanup(ctx)
 
 
 def schedule_scheduler_python_task_subrun_test():
@@ -375,10 +438,12 @@ def schedule_scheduler_python_task_subrun_test():
     def cb(task):
         tasks.append(task)
 
-    machine, sched, alloc = setup()
+    ctx = setup()
+    sched = ctx.sched
     sched.set_cur_task_callback(cb)
-    mem = alloc.get_mem()
-    pc = machine.get_scratch_begin()
+
+    mem = ctx.mem
+    pc = ctx.machine.get_scratch_begin()
 
     # sub run
     mem.w16(pc, op_nop)
@@ -388,7 +453,8 @@ def schedule_scheduler_python_task_subrun_test():
         task.sub_run(pc)
         return 42
 
-    task = create_python_task(machine, alloc, my_func)
+    task_ctx = MyPythonTask(ctx, my_func)
+    task = task_ctx.task
 
     # add task
     assert sched.add_task(task)
@@ -396,9 +462,10 @@ def schedule_scheduler_python_task_subrun_test():
     sched.schedule()
     exit_code = task.get_exit_code()
     assert exit_code == 42
-    assert alloc.is_all_free()
-    machine.cleanup()
     assert tasks == [task, None]
+
+    task_ctx.free()
+    cleanup(ctx)
 
 
 def schedule_scheduler_python_task_multi_test():
@@ -407,7 +474,8 @@ def schedule_scheduler_python_task_multi_test():
     def cb(task):
         tasks.append(task)
 
-    machine, sched, alloc = setup(slice_cycles=30)
+    ctx = setup(slice_cycles=30)
+    sched = ctx.sched
     sched.set_cur_task_callback(cb)
 
     def task1_run(task):
@@ -420,8 +488,10 @@ def schedule_scheduler_python_task_multi_test():
         task.reschedule()
         return 23
 
-    task1 = create_python_task(machine, alloc, task1_run, name="task1")
-    task2 = create_python_task(machine, alloc, task2_run, name="task2")
+    task1_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task1 = task1_ctx.task
+    task2_ctx = MyPythonTask(ctx, task2_run, name="task2")
+    task2 = task2_ctx.task
 
     # add task
     assert sched.add_task(task1)
@@ -430,10 +500,12 @@ def schedule_scheduler_python_task_multi_test():
     sched.schedule()
     assert task1.get_exit_code() == 42
     assert task2.get_exit_code() == 23
-    assert alloc.is_all_free()
-    machine.cleanup()
     # check that the tasks switched
     assert tasks == [task1, task2, task1, task2, None]
+
+    task2_ctx.free()
+    task1_ctx.free()
+    cleanup(ctx)
 
 
 def schedule_scheduler_python_task_multi_forbid_test():
@@ -442,7 +514,8 @@ def schedule_scheduler_python_task_multi_forbid_test():
     def cb(task):
         tasks.append(task)
 
-    machine, sched, alloc = setup(slice_cycles=30)
+    ctx = setup(slice_cycles=30)
+    sched = ctx.sched
     sched.set_cur_task_callback(cb)
 
     def task1_run(task):
@@ -458,8 +531,10 @@ def schedule_scheduler_python_task_multi_forbid_test():
         task.reschedule()
         return 23
 
-    task1 = create_python_task(machine, alloc, task1_run, name="task1")
-    task2 = create_python_task(machine, alloc, task2_run, name="task2")
+    task1_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task1 = task1_ctx.task
+    task2_ctx = MyPythonTask(ctx, task2_run, name="task2")
+    task2 = task2_ctx.task
 
     # add task
     assert sched.add_task(task1)
@@ -468,10 +543,12 @@ def schedule_scheduler_python_task_multi_forbid_test():
     sched.schedule()
     assert task1.get_exit_code() == 42
     assert task2.get_exit_code() == 23
-    assert alloc.is_all_free()
-    machine.cleanup()
     # check that the tasks switched
     assert tasks == [task1, task2, task1, task2, None]
+
+    task2_ctx.free()
+    task1_ctx.free()
+    cleanup(ctx)
 
 
 def schedule_scheduler_python_task_multi_wait_test():
@@ -480,7 +557,8 @@ def schedule_scheduler_python_task_multi_wait_test():
     def cb(task):
         tasks.append(task)
 
-    machine, sched, alloc = setup(slice_cycles=30)
+    ctx = setup(slice_cycles=30)
+    sched = ctx.sched
     sched.set_cur_task_callback(cb)
 
     def task1_run(task):
@@ -492,8 +570,10 @@ def schedule_scheduler_python_task_multi_wait_test():
         task1.set_signal(1, 1)
         return 23
 
-    task1 = create_python_task(machine, alloc, task1_run, name="task1")
-    task2 = create_python_task(machine, alloc, task2_run, name="task2")
+    task1_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task1 = task1_ctx.task
+    task2_ctx = MyPythonTask(ctx, task2_run, name="task2")
+    task2 = task2_ctx.task
 
     # add task
     assert sched.add_task(task1)
@@ -502,7 +582,9 @@ def schedule_scheduler_python_task_multi_wait_test():
     sched.schedule()
     assert task1.get_exit_code() == 42
     assert task2.get_exit_code() == 23
-    assert alloc.is_all_free()
-    machine.cleanup()
     # check that the tasks switched
     assert tasks == [task1, task2, task1, task2, None]
+
+    task2_ctx.free()
+    task1_ctx.free()
+    cleanup(ctx)

@@ -11,7 +11,8 @@ from amitools.vamos.machine.regs import (
     REG_A5,
     REG_A6,
 )
-from amitools.vamos.schedule import Stack, NativeTask, Code
+from amitools.vamos.schedule import NativeTask, Code
+from amitools.vamos.task import Stack
 import os
 
 from .SysArgs import sys_args_to_ami_arg_str
@@ -197,8 +198,9 @@ class Process:
         init_pc = self.prog_start
         start_regs = self._get_start_regs()
         return_regs = [REG_D0]
-        code = Code(init_pc, start_regs, return_regs)
-        self.task = NativeTask(name, machine, self.stack, code)
+        sp = self.stack.get_initial_sp()
+        code = Code(init_pc, sp, start_regs, return_regs)
+        self.task = NativeTask(name, machine, code)
         # store back ref to process
         self.task.map_task = self
 

@@ -1,4 +1,4 @@
-from amitools.vamos.schedule import Stack
+from amitools.vamos.task import Stack
 
 
 def schedule_stack_default_test(mem_alloc):

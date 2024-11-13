@@ -186,8 +186,6 @@ class Scheduler(object):
         # mark as removed
         task.set_state(TaskState.TS_REMOVED)
         log_schedule.info("rem_task: %s", task.name)
-        # finally free task
-        task.free()
         return True
 
     def reschedule(self):

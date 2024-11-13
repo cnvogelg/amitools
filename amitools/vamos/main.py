@@ -11,16 +11,15 @@ from .libmgr import SetupLibManager
 from .schedule import Scheduler
 from .profiler import MainProfiler
 from .lib.dos.Process import Process
-from .maptask import TaskCtx
 
 RET_CODE_CONFIG_ERROR = 1000
 
 
 def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
-    def gen_task_list(cfg, task_ctx):
+    def gen_task_list(cfg, dos_ctx, exec_ctx):
         # setup main proc
         proc_cfg = cfg.get_proc_dict().process
-        main_proc = Process.create_main_proc(proc_cfg, task_ctx.dos_ctx)
+        main_proc = Process.create_main_proc(proc_cfg, dos_ctx)
         if not main_proc:
             log_main.error("main proc setup failed!")
             return None
@@ -134,14 +133,8 @@ def main_run(task_list_gen, cfg_files=None, args=None, cfg_dict=None, profile=Fa
         # open base libs
         slm.open_base_libs()
 
-        # setup context for all tasks
-        proxy_mgr = slm.get_lib_proxy_mgr()
-        task_ctx = TaskCtx(machine, mem_map.get_alloc(), proxy_mgr)
-        # hack for old Process
-        task_ctx.dos_ctx = slm.dos_ctx
-
         # generate tasks
-        task_list = task_list_gen(mp, task_ctx)
+        task_list = task_list_gen(mp, slm.dos_ctx, slm.exec_ctx)
         if task_list:
             # add tasks to scheduler
             for task in task_list:

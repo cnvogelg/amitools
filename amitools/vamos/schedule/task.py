@@ -19,11 +19,10 @@ class TaskState(Enum):
 class TaskBase:
     """basic structure for both native and Pyhton tasks"""
 
-    def __init__(self, name, machine, stack):
+    def __init__(self, name, machine):
         self.name = name
         self.machine = machine
         self.runtime = Runtime(machine)
-        self.stack = stack
         self.state_hook = None
         self.sigmask_hook = None
         # state
@@ -69,8 +68,8 @@ class TaskBase:
     def get_name(self):
         return self.name
 
-    def get_stack(self):
-        return self.stack
+    def get_start_sp(self):
+        return None
 
     def get_code(self):
         return None
@@ -164,9 +163,6 @@ class TaskBase:
         if self.sigmask_hook:
             self.sigmask_hook(self, self.sigmask_received, self.sigmask_wait)
 
-    def free(self):
-        self.stack.free()
-
     def start(self):
         """run the task until it ends. it might be interrupted by reschedule() calls"""
         pass
@@ -175,7 +171,9 @@ class TaskBase:
         """execute m68k code in your task"""
         # inject own stack if needed
         if not self.runtime.is_running() and "sp" not in kw_args:
-            kw_args["sp"] = self.stack.get_initial_sp()
+            sp = self.get_start_sp()
+            assert sp is not None
+            kw_args["sp"] = sp
         return self.runtime.run(*args, **kw_args)
 
     def switch(self):
@@ -195,8 +193,8 @@ class TaskBase:
 class NativeTask(TaskBase):
     """a task that runs native m68k code"""
 
-    def __init__(self, name, machine, stack, code):
-        super().__init__(name, machine, stack)
+    def __init__(self, name, machine, code):
+        super().__init__(name, machine)
         self.code = code
         self.run_state = None
 
@@ -207,13 +205,9 @@ class NativeTask(TaskBase):
             self.code,
         )
 
-    def free(self):
-        super().free()
-        self.code.free()
-
     def start(self):
         pc = self.code.get_start_pc()
-        sp = self.stack.get_initial_sp()
+        sp = self.code.get_start_sp()
         set_regs = self.code.get_start_regs()
         get_regs = self.code.get_return_regs()
         log_schedule.debug("%s: start native code. pc=%06x sp=%06x", self.name, pc, sp)
@@ -227,18 +221,16 @@ class NativeTask(TaskBase):
         # at the end of execution remove myself
         if self.scheduler:
             self.scheduler.rem_task(self)
+        return self.exit_code
 
     def get_start_pc(self):
         return self.code.get_start_pc()
 
-    def get_init_sp(self):
-        return self.stack.get_initial_sp()
+    def get_start_sp(self):
+        return self.cod.get_start_sp()
 
     def get_code(self):
         return self.code
-
-    def get_stack(self):
-        return self.stack
 
     def get_run_result(self):
         return self.run_state
@@ -250,18 +242,26 @@ class NativeTask(TaskBase):
 class PythonTask(TaskBase):
     """a task running Python code that may use 68k code in sub runs"""
 
-    def __init__(self, name, machine, stack, run_func=None):
-        """either supply a run function and an optional own stack"""
-        super().__init__(name, machine, stack)
+    def __init__(self, name, machine, run_func=None, start_sp=None):
+        """either supply a run function and
+        an optional own stack ptr if you want to run m68k code"""
+        super().__init__(name, machine)
         self.run_func = run_func
-        self.stack = stack
+        self.start_sp = start_sp
 
     def __repr__(self):
-        return "VamosTask(%s, run_func=%r)" % (super().__repr__(), self.run_func)
+        return "VamosTask(%s, run_func=%r, start_sp=%r)" % (
+            super().__repr__(),
+            self.run_func,
+            self.start_sp,
+        )
 
     def run(self):
         """overload your own code here"""
         return 0
+
+    def get_start_sp(self):
+        return self.start_sp
 
     def start(self):
         # either run run() func or method
@@ -276,3 +276,4 @@ class PythonTask(TaskBase):
         # at the end of execution remove myself
         if self.scheduler:
             self.scheduler.rem_task(self)
+        return self.exit_code

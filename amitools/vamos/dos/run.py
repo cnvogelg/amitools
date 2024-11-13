@@ -1,5 +1,5 @@
 from amitools.vamos.log import log_proc
-from amitools.vamos.schedule import Stack
+from amitools.vamos.task import Stack
 from amitools.vamos.machine.regs import *
 
 
@@ -18,7 +18,7 @@ def run_sub_process(scheduler, runner, proc):
     code = task.get_code()
     run_state = runner(
         code.get_start_pc(),
-        task.get_init_sp(),
+        code.get_start_sp(),
         set_regs=code.get_start_regs(),
         get_regs=code.get_return_regs(),
     )

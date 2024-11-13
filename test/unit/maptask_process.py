@@ -1,93 +1,119 @@
 from amitools.vamos.machine import Machine
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.schedule import Scheduler, Code, TaskState, NativeTask
-from amitools.vamos.maptask import MappedProcess, TaskCtx
+from amitools.vamos.schedule import Scheduler, Code, TaskState, NativeTask, PythonTask
+from amitools.vamos.maptask import MappedProcess
+from amitools.vamos.libtypes import Process
 from amitools.vamos.machine.opcodes import *
 from amitools.vamos.machine.regs import *
 
 
-def setup(slice_cycles=1000):
-    machine = Machine()
-    alloc = MemoryAlloc.for_machine(machine)
-    task_ctx = TaskCtx(machine, alloc)
-    return task_ctx
+class Ctx:
+    def __init__(self):
+        self.machine = Machine()
+        self.alloc = MemoryAlloc.for_machine(self.machine)
+
+    def cleanup(self):
+        assert self.alloc.is_all_free()
+        self.machine.cleanup()
 
 
-def create_native_process(
-    task_ctx, code=None, start_regs=None, return_regs=None, name="foo"
-):
-    if name is None:
-        name = "proc"
-    if code is None:
-        code = Code.alloc(
-            task_ctx.alloc, 256, start_regs=start_regs, return_regs=return_regs
-        )
-    return MappedProcess.from_native_code(task_ctx, name, code)
+def setup():
+    return Ctx()
 
 
-def create_python_process(task_ctx, func=None, name="foo"):
-    if name is None:
-        name = "proc"
-    if func is None:
-
-        def func(ctx, task):
-            assert task_ctx == ctx
-
-    return MappedProcess.from_python_code(task_ctx, name, func)
+def cleanup(ctx):
+    ctx.cleanup()
 
 
-def create_both_processes(task_ctx):
+class MyNativeProcess:
+    def __init__(self, ctx, name=None, **code_kw_args):
+        if name is None:
+            name = "task"
+        self.ctx = ctx
+        self.name = name
+        self.stack = ctx.alloc.alloc_memory(4096, name + "_Stack")
+        self.prog = ctx.alloc.alloc_memory(1024, name + "_Code")
+        self.sp = self.stack.addr
+        self.pc = self.prog.addr
+        self.code = Code(self.pc, self.sp, **code_kw_args)
+        self.sched_task = NativeTask(name, ctx.machine, self.code)
+        self.ami_proc = Process.alloc(ctx.alloc, name=name)
+        self.map_proc = MappedProcess(self.sched_task, self.ami_proc)
+
+    def free(self):
+        self.ami_proc.free()
+        self.ctx.alloc.free_memory(self.stack)
+        self.ctx.alloc.free_memory(self.prog)
+
+
+class MyPythonProcess:
+    def __init__(self, ctx, func=None, name=None, **code_kw_args):
+        if name is None:
+            name = "task"
+        self.ctx = ctx
+        self.name = name
+        self.func = func
+        self.stack = ctx.alloc.alloc_memory(4096, name + "_Stack")
+        self.sp = self.stack.addr
+        self.sched_task = PythonTask(name, ctx.machine, self.func, self.sp)
+        self.ami_proc = Process.alloc(ctx.alloc, name=name)
+        self.map_proc = MappedProcess(self.sched_task, self.ami_proc)
+
+    def free(self):
+        self.ami_proc.free()
+        self.ctx.alloc.free_memory(self.stack)
+
+
+def create_both_processes(ctx, name=None):
     return [
-        create_native_process(task_ctx),
-        create_python_process(task_ctx),
+        MyNativeProcess(ctx, name=name),
+        MyPythonProcess(ctx, name=name),
     ]
 
 
-def check_process(task_ctx, proc):
+def check_process(proc, name):
     # check ami values
-    ami_process = proc.get_ami_process()
-    assert ami_process.name.str == "foo"
-    # check sched_process
+    ami_proc = proc.get_ami_process()
+    assert ami_proc.task.name.str == name
+    # check sched_task
     sched_task = proc.get_sched_task()
-    assert sched_task.get_name() == "foo"
+    assert sched_task.get_name() == name
 
 
 # test allocation of map task
 
 
 def maptask_process_alloc_test():
-    task_ctx = setup()
-    for proc in create_both_processes(task_ctx):
-        check_process(task_ctx, proc)
-        if type(proc.get_sched_task()) is NativeTask:
-            assert proc.get_code() is not None
-        else:
-            assert proc.get_code() is None
+    ctx = setup()
+    for proc_ctx in create_both_processes(ctx, name="foo"):
+        map_proc = proc_ctx.map_proc
+        check_process(map_proc, "foo")
         # clean up
-        proc.free()
-    assert task_ctx.alloc.is_all_free()
-    task_ctx.machine.cleanup()
+        proc_ctx.free()
+    cleanup(ctx)
 
 
 def maptask_process_state_test():
-    task_ctx = setup()
-    for proc in create_both_processes(task_ctx):
+    ctx = setup()
+    for proc_ctx in create_both_processes(ctx):
+        map_proc = proc_ctx.map_proc
         # set state and check if mapped state was updated
-        proc.get_sched_task().set_state(TaskState.TS_RUN)
-        assert str(proc.get_ami_task().tc_State) == TaskState.TS_RUN.name
+        map_proc.get_sched_task().set_state(TaskState.TS_RUN)
+        assert str(map_proc.get_ami_task().tc_State) == TaskState.TS_RUN.name
+        assert str(map_proc.get_ami_process().task.tc_State) == TaskState.TS_RUN.name
         # clean up
-        proc.free()
-    assert task_ctx.alloc.is_all_free()
-    task_ctx.machine.cleanup()
+        proc_ctx.free()
+    cleanup(ctx)
 
 
 def maptask_process_sigmask_test():
-    task_ctx = setup()
-    for proc in create_both_processes(task_ctx):
+    ctx = setup()
+    for proc_ctx in create_both_processes(ctx):
+        map_proc = proc_ctx.map_proc
         # set state and check if mapped state was updated
-        proc.get_sched_task().set_signal(2, 2)
-        assert proc.get_ami_task().tc_SigRecvd.val == 2
+        map_proc.get_sched_task().set_signal(2, 2)
+        assert map_proc.get_ami_task().tc_SigRecvd.val == 2
+        assert map_proc.get_ami_process().task.tc_SigRecvd.val == 2
         # clean up
-        proc.free()
-    assert task_ctx.alloc.is_all_free()
-    task_ctx.machine.cleanup()
+        proc_ctx.free()
+    cleanup(ctx)

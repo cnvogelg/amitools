@@ -35,7 +35,7 @@ class Stack(object):
 
     def free(self):
         if not self.mem_obj:
-            return
+            raise RuntimeError("free() without alloc()")
         self.alloc.free_memory(self.mem_obj)
         self.alloc = None
         self.mem_obj = None
