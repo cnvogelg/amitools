@@ -1,6 +1,7 @@
 from amitools.vamos.libtypes import Task
 from amitools.vamos.maptask import MappedTask
-from amitools.vamos.schedule import PythonTask, NativeTask, Code
+from amitools.vamos.machine import Code
+from amitools.vamos.schedule import PythonTask, NativeTask
 from .stack import Stack
 
 

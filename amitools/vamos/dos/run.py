@@ -1,5 +1,6 @@
 from amitools.vamos.log import log_proc
 from amitools.vamos.task import Stack
+from amitools.vamos.machine import Code
 from amitools.vamos.machine.regs import *
 
 
@@ -16,12 +17,7 @@ def run_sub_process(scheduler, runner, proc):
 
     # return value
     code = task.get_code()
-    run_state = runner(
-        code.get_start_pc(),
-        code.get_start_sp(),
-        set_regs=code.get_start_regs(),
-        get_regs=code.get_return_regs(),
-    )
+    run_state = runner(code)
     ret_code = run_state.regs[REG_D0]
     log_proc.info("return from sub process: ret_code=%d", ret_code)
 
@@ -62,9 +58,10 @@ def run_command(process, start_pc, args_ptr, args_len, stack_size, reg_d1=0):
         REG_A6: ctx.odg_base,
     }
     get_regs = [REG_D0]
+    code = Code(start_pc, sp, set_regs, get_regs)
 
     # run sub task
-    rs = ctx.runner(start_pc, sp, set_regs=set_regs, get_regs=get_regs)
+    rs = ctx.runner(code)
 
     # return value
     ret_code = rs.regs[REG_D0]

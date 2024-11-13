@@ -11,7 +11,8 @@ from amitools.vamos.machine.regs import (
     REG_A5,
     REG_A6,
 )
-from amitools.vamos.schedule import NativeTask, Code
+from amitools.vamos.machine import Code
+from amitools.vamos.schedule import NativeTask
 from amitools.vamos.task import Stack
 import os
 

@@ -2,8 +2,7 @@ from enum import Enum
 import greenlet
 
 from amitools.vamos.log import log_schedule
-from amitools.vamos.machine import Runtime, REG_D0
-from .code import Code
+from amitools.vamos.machine import Runtime, Code, REG_D0
 
 
 class TaskState(Enum):
@@ -167,14 +166,14 @@ class TaskBase:
         """run the task until it ends. it might be interrupted by reschedule() calls"""
         pass
 
-    def sub_run(self, *args, **kw_args):
+    def sub_run(self, code, name=None):
         """execute m68k code in your task"""
         # inject own stack if needed
-        if not self.runtime.is_running() and "sp" not in kw_args:
-            sp = self.get_start_sp()
-            assert sp is not None
-            kw_args["sp"] = sp
-        return self.runtime.run(*args, **kw_args)
+        if not self.runtime.is_running():
+            if not code.sp:
+                code.sp = self.get_start_sp()
+                assert code.sp is not None
+        return self.runtime.run(code, name=name)
 
     def switch(self):
         self.glet.switch()
@@ -206,14 +205,15 @@ class NativeTask(TaskBase):
         )
 
     def start(self):
-        pc = self.code.get_start_pc()
-        sp = self.code.get_start_sp()
-        set_regs = self.code.get_start_regs()
-        get_regs = self.code.get_return_regs()
-        log_schedule.debug("%s: start native code. pc=%06x sp=%06x", self.name, pc, sp)
-        self.run_state = self.runtime.start(
-            pc, sp, set_regs=set_regs, get_regs=get_regs
-        )
+        # ensure REG_D0 in result
+        get_regs = self.code.get_regs
+        if get_regs is None:
+            self.code.get_regs = [REG_D0]
+        elif REG_D0 not in get_regs:
+            self.code.get_regs.append(REG_D0)
+
+        log_schedule.debug("%s: start native code %r", self.name, self.code)
+        self.run_state = self.runtime.start(self.code)
         self.exit_code = self.run_state.regs[REG_D0]
         log_schedule.debug(
             "%s: done native code. exit_code=%d", self.name, self.exit_code
@@ -224,10 +224,10 @@ class NativeTask(TaskBase):
         return self.exit_code
 
     def get_start_pc(self):
-        return self.code.get_start_pc()
+        return self.code.pc
 
     def get_start_sp(self):
-        return self.cod.get_start_sp()
+        return self.cod.sp
 
     def get_code(self):
         return self.code

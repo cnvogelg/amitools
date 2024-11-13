@@ -105,12 +105,12 @@ def main_run(task_list_gen, cfg_files=None, args=None, cfg_dict=None, profile=Fa
         default_runtime = Runtime(machine, machine.scratch_end)
 
         # setup default runner
-        def runner(*args, **kw_args):
+        def runner(code, name=None):
             task = scheduler.get_cur_task()
             if task:
-                return task.sub_run(*args, **kw_args)
+                return task.sub_run(code, name=name)
             else:
-                return default_runtime.run(*args, **kw_args)
+                return default_runtime.run(code, name=name)
 
         # setup lib mgr
         lib_cfg = mp.get_libs_dict()

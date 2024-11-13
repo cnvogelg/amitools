@@ -5,7 +5,7 @@ from .opcodes import *
 from .hwaccess import HWAccess, HWAccessError
 from .memmap import MemoryMap
 from .disasm import DisAsm
-from .runtime import Runtime
+from .runtime import Runtime, Code
 from .error import (
     MachineError,
     InvalidMemoryAccessError,

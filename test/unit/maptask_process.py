@@ -1,6 +1,6 @@
-from amitools.vamos.machine import Machine
+from amitools.vamos.machine import Machine, Code
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.schedule import Scheduler, Code, TaskState, NativeTask, PythonTask
+from amitools.vamos.schedule import Scheduler, TaskState, NativeTask, PythonTask
 from amitools.vamos.maptask import MappedProcess
 from amitools.vamos.libtypes import Process
 from amitools.vamos.machine.opcodes import *

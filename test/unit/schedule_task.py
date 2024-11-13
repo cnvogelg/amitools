@@ -1,5 +1,5 @@
-from amitools.vamos.machine import Machine, REG_D0, op_nop, op_rts
-from amitools.vamos.schedule import NativeTask, PythonTask, Code
+from amitools.vamos.machine import Machine, Code, REG_D0, op_nop, op_rts
+from amitools.vamos.schedule import NativeTask, PythonTask
 
 
 def create_native_task(machine, pc, sp, name=None, **kw_args):
@@ -22,7 +22,7 @@ def schedule_task_native_simple_test():
 
     pc = machine.get_scratch_begin()
     sp = machine.get_scratch_top()
-    task = create_native_task(machine, pc, sp, start_regs={REG_D0: 42})
+    task = create_native_task(machine, pc, sp, set_regs={REG_D0: 42})
 
     mem = machine.get_mem()
     mem.w16(pc, op_nop)

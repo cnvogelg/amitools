@@ -19,6 +19,14 @@ class RunState:
     regs: dict = None
 
 
+@dataclass
+class Code:
+    pc: int
+    sp: int = None
+    set_regs: dict = None
+    get_regs: dict = None
+
+
 class Runtime:
     """The Runtime allows you to run m68k code with the machine.
     Code may use traps that trigger Python code. This code may while running
@@ -63,19 +71,20 @@ class Runtime:
     def is_running(self):
         return self.running
 
-    def run(self, pc, sp=None, set_regs=None, get_regs=None, name=None) -> RunState:
+    def run(self, code: Code, name: str = None) -> RunState:
         """convenience method to dispatch either to start or nested_run"""
         if not self.running:
-            return self.start(pc, sp, set_regs, get_regs, name)
+            return self.start(code, name)
         else:
-            return self.nested_run(pc, sp, set_regs, get_regs, name)
+            return self.nested_run(code, name)
 
-    def start(self, pc, sp=None, set_regs=None, get_regs=None, name=None) -> RunState:
+    def start(self, code: Code, name: str = None) -> RunState:
         """start the main run at given pc with stack and return result"""
         if self.running:
             raise RuntimeError("start() only allowed inside idle runtime.")
 
         # use stack, default stack or fail
+        sp = code.sp
         if not sp:
             if self.default_sp:
                 sp = self.default_sp
@@ -84,7 +93,7 @@ class Runtime:
 
         # setup run state
         self.running = True
-        run_state = RunState(pc, sp, 0, name)
+        run_state = RunState(code.pc, sp, 0, name)
         self.run_states = [run_state]
 
         # init cycle counting for slice hook
@@ -92,7 +101,7 @@ class Runtime:
 
         # execute
         log_machine.info("runtime start: %s", run_state)
-        run_state.regs = self._run_loop(run_state, set_regs, get_regs)
+        run_state.regs = self._run_loop(run_state, code.set_regs, code.get_regs)
         log_machine.info("runtime end: %s", run_state)
 
         # clean up run state
@@ -101,14 +110,13 @@ class Runtime:
 
         return run_state
 
-    def nested_run(
-        self, pc, sp=None, set_regs=None, get_regs=None, name=None
-    ) -> RunState:
+    def nested_run(self, code: Code, name=None) -> RunState:
         """in a PyTrap code run a nested piece of m68k code"""
         if not self.running:
             raise RuntimeError("nested_run() only allowed inside started runtime.")
 
         # if no own stack is given then re-use current stack
+        sp = code.sp
         if not sp:
             sp = self.machine.get_sp() - 4
 
@@ -125,13 +133,18 @@ class Runtime:
         # create new run state
         nesting = len(self.run_states)
         run_state = RunState(
-            pc, sp, nesting, name, total_cycles=old_total, slice_cycles=slice_cycles
+            code.pc,
+            sp,
+            nesting,
+            name,
+            total_cycles=old_total,
+            slice_cycles=slice_cycles,
         )
         self.run_states.append(run_state)
 
         # perform nested run
         log_machine.info("runtime nested start %s", run_state)
-        run_state.regs = self._run_loop(run_state, set_regs, get_regs)
+        run_state.regs = self._run_loop(run_state, code.set_regs, code.get_regs)
         log_machine.info("runtime nested end %s", run_state)
 
         # pop current run state

@@ -1,6 +1,6 @@
-from amitools.vamos.machine import Machine
+from amitools.vamos.machine import Machine, Code
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.schedule import Scheduler, NativeTask, PythonTask, Code
+from amitools.vamos.schedule import Scheduler, NativeTask, PythonTask
 from amitools.vamos.machine.opcodes import *
 from amitools.vamos.machine.regs import *
 
@@ -50,7 +50,7 @@ def schedule_scheduler_native_task_simple_test():
     ctx = setup()
 
     # prepare task
-    task_ctx = MyNativeTask(ctx, start_regs={REG_D0: 42})
+    task_ctx = MyNativeTask(ctx, set_regs={REG_D0: 42})
 
     pc = task_ctx.pc
     ctx.mem.w16(pc, op_nop)
@@ -80,7 +80,7 @@ def schedule_scheduler_native_task_cur_task_hook_test():
     sched = ctx.sched
     sched.set_cur_task_callback(cb)
 
-    task_ctx = MyNativeTask(ctx, start_regs={REG_D0: 42})
+    task_ctx = MyNativeTask(ctx, set_regs={REG_D0: 42})
     task = task_ctx.task
 
     pc = task_ctx.pc
@@ -111,7 +111,7 @@ def schedule_scheduler_native_task_subrun_test():
     sched = ctx.sched
     sched.set_cur_task_callback(cb)
 
-    task_ctx = MyNativeTask(ctx, start_regs={REG_D0: 42})
+    task_ctx = MyNativeTask(ctx, set_regs={REG_D0: 42})
     task = task_ctx.task
     my_task = task
 
@@ -119,7 +119,7 @@ def schedule_scheduler_native_task_subrun_test():
     pc = task_ctx.pc
 
     def trap(op, pc):
-        my_task.sub_run(pc2)
+        my_task.sub_run(Code(pc2))
 
     addr = ctx.machine.setup_quick_trap(trap)
 
@@ -156,7 +156,7 @@ def schedule_scheduler_native_task_remove_test():
     sched = ctx.sched
     sched.set_cur_task_callback(cb)
 
-    task_ctx = MyNativeTask(ctx, start_regs={REG_D0: 42})
+    task_ctx = MyNativeTask(ctx, set_regs={REG_D0: 42})
     task = task_ctx.task
     my_task = task
 
@@ -209,7 +209,7 @@ def schedule_scheduler_native_task_multi_test():
     addr1 = ctx.machine.setup_quick_trap(trap1)
     addr2 = ctx.machine.setup_quick_trap(trap2)
 
-    task1_ctx = MyNativeTask(ctx, start_regs={REG_D0: 42}, name="task1")
+    task1_ctx = MyNativeTask(ctx, set_regs={REG_D0: 42}, name="task1")
     task1 = task1_ctx.task
     my_task = task1
 
@@ -226,7 +226,7 @@ def schedule_scheduler_native_task_multi_test():
     mem.w32(off + 2, addr2)
     mem.w16(off + 6, op_rts)
 
-    task2_ctx = MyNativeTask(ctx, start_regs={REG_D0: 23}, name="task2")
+    task2_ctx = MyNativeTask(ctx, set_regs={REG_D0: 23}, name="task2")
     task2 = task2_ctx.task
 
     # task2 setup
@@ -269,7 +269,7 @@ def schedule_scheduler_native_task_multi_forbid_test():
     addr1 = ctx.machine.setup_quick_trap(trap1)
     addr2 = ctx.machine.setup_quick_trap(trap2)
 
-    task1_ctx = MyNativeTask(ctx, start_regs={REG_D0: 42}, name="task1")
+    task1_ctx = MyNativeTask(ctx, set_regs={REG_D0: 42}, name="task1")
     task1 = task1_ctx.task
     my_task = task1
 
@@ -285,7 +285,7 @@ def schedule_scheduler_native_task_multi_forbid_test():
     mem.w32(off + 2, addr2)
     mem.w16(off + 6, op_rts)
 
-    task2_ctx = MyNativeTask(ctx, start_regs={REG_D0: 23}, name="task2")
+    task2_ctx = MyNativeTask(ctx, set_regs={REG_D0: 23}, name="task2")
     task2 = task2_ctx.task
 
     # task2 setup
@@ -329,7 +329,7 @@ def schedule_scheduler_native_task_multi_wait_test():
     addr1 = ctx.machine.setup_quick_trap(trap1)
     addr2 = ctx.machine.setup_quick_trap(trap2)
 
-    task1_ctx = MyNativeTask(ctx, start_regs={REG_D0: 42}, name="task1")
+    task1_ctx = MyNativeTask(ctx, set_regs={REG_D0: 42}, name="task1")
     task1 = task1_ctx.task
     my_task = task1
 
@@ -339,7 +339,7 @@ def schedule_scheduler_native_task_multi_wait_test():
     mem.w32(pc + 2, addr1)
     mem.w16(pc + 6, op_rts)
 
-    task2_ctx = MyNativeTask(ctx, start_regs={REG_D0: 23}, name="task2")
+    task2_ctx = MyNativeTask(ctx, set_regs={REG_D0: 23}, name="task2")
     task2 = task2_ctx.task
 
     # task2 setup
@@ -450,7 +450,7 @@ def schedule_scheduler_python_task_subrun_test():
     mem.w16(pc + 2, op_rts)
 
     def my_func(task):
-        task.sub_run(pc)
+        task.sub_run(Code(pc))
         return 42
 
     task_ctx = MyPythonTask(ctx, my_func)

@@ -1,4 +1,4 @@
-from amitools.vamos.machine.regs import REG_D0, REG_D1
+from amitools.vamos.machine import Code, REG_D0, REG_D1
 
 
 class LibProxy:
@@ -74,13 +74,8 @@ class LibProxyGen:
             jump_addr = self.base_addr - bias
 
             # perform native run
-            rs = self.ctx.runner(
-                jump_addr,
-                sp=self.run_sp,
-                set_regs=reg_map,
-                get_regs=ret_regs,
-                name=name,
-            )
+            code = Code(jump_addr, self.run_sp, reg_map, ret_regs)
+            rs = self.ctx.runner(code, name=name)
 
             if ret_d1:
                 return rs.regs[REG_D0], rs.regs[REG_D1]

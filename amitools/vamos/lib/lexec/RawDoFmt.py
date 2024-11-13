@@ -1,5 +1,5 @@
 import struct
-from amitools.vamos.machine.regs import *
+from amitools.vamos.machine import Code, REG_A2, REG_A3
 from amitools.vamos.lib.dos.Printf import *
 
 # setup loop code fragment:
@@ -55,6 +55,7 @@ def raw_do_fmt(ctx, fmtString, dataStream, putProc, putData):
         mem_obj = _setup_fragment(ctx, fmtstr, putProc)
         set_regs = {REG_A2: putProc, REG_A3: putData}
         addr = mem_obj.addr
-        ctx.runner(addr, set_regs=set_regs, name="RawDoFmt")
+        code = Code(addr, set_regs=set_regs)
+        ctx.runner(code, name="RawDoFmt")
         ctx.alloc.free_memory(mem_obj)
     return dataStream, fmt, resultstr, known

@@ -1,7 +1,14 @@
 import pytest
 
 from machine68k import CPUType
-from amitools.vamos.machine import Machine, Runtime, ResetOpcodeError, REG_D1, REG_D0
+from amitools.vamos.machine import (
+    Machine,
+    Runtime,
+    Code,
+    ResetOpcodeError,
+    REG_D1,
+    REG_D0,
+)
 from amitools.vamos.machine.opcodes import op_rts, op_jsr, op_reset, op_nop
 from amitools.vamos.log import log_machine
 
@@ -21,7 +28,7 @@ def machine_runtime_rts_test(run_cycles):
     r, m, cpu, mem, code, stack = create_runtime(run_cycles=run_cycles)
     # single RTS to immediately return from run
     mem.w16(code, op_rts)
-    rs = r.start(code, stack)
+    rs = r.start(Code(code, stack))
     assert rs.pc == m.get_run_exit_addr() + 2
     assert rs.nesting == 0
     assert rs.cycles == 20
@@ -41,7 +48,7 @@ def machine_runtime_trap_test():
     mem.w32(code + 2, addr)
     # return
     mem.w16(code + 6, op_rts)
-    rs = r.start(code, stack)
+    rs = r.start(Code(code, stack))
     # check run state
     assert rs.pc == m.get_run_exit_addr() + 2
     # cleanup
@@ -70,7 +77,7 @@ def machine_runtime_trap_set_get_regs_test():
     # setup regs
     set_regs = {REG_D0: 1234, REG_D1: 5678}
     get_regs = [REG_D0, REG_D1]
-    rs = r.start(code, stack, set_regs=set_regs, get_regs=get_regs)
+    rs = r.start(Code(code, stack, set_regs=set_regs, get_regs=get_regs))
     m.cleanup()
     assert rs.regs == {REG_D0: 0xCAFE, REG_D1: 0xBABE}
 
@@ -90,7 +97,7 @@ def machine_runtime_trap_exception_test():
     mem.w16(code + 6, op_rts)
     # exception triggers when the trap is executed directly in the run loop
     with pytest.raises(ValueError):
-        r.start(code, stack)
+        r.start(Code(code, stack))
     m.cleanup()
 
 
@@ -104,7 +111,7 @@ def machine_runtime_nested_run_test():
         assert rs.pc == code
         assert rs.nesting == 0
         # issue nested run
-        r.nested_run(code + 10)
+        r.nested_run(Code(code + 10))
         # check current run state after
         rs = r.get_current_run_state()
         # pc is still the start of this run
@@ -119,7 +126,7 @@ def machine_runtime_nested_run_test():
     mem.w16(code + 6, op_rts)
     # 2nd run
     mem.w16(code + 10, op_rts)
-    rs = r.start(code, stack)
+    rs = r.start(Code(code, stack))
     assert rs.pc == m.get_run_exit_addr() + 2
     m.cleanup()
 
@@ -128,7 +135,7 @@ def machine_runtime_nested_run_error_test():
     r, m, cpu, mem, code, stack = create_runtime(supervisor=True)
 
     def func(op, pc):
-        r.nested_run(code + 10)
+        r.nested_run(Code(code + 10))
 
     addr = m.setup_quick_trap(func)
     # jump to trap
@@ -140,7 +147,7 @@ def machine_runtime_nested_run_error_test():
     mem.w16(code + 10, op_reset)
     # the reset opcode error is passed through
     with pytest.raises(ResetOpcodeError):
-        r.start(code, stack)
+        r.start(Code(code, stack))
     m.cleanup()
 
 
@@ -169,7 +176,7 @@ def machine_runtime_nested_run_trap_test():
         assert rs.pc == code
         assert rs.nesting == 0
         # issue nested run
-        r.nested_run(code + 10)
+        r.nested_run(Code(code + 10))
         # check current run state after
         rs = r.get_current_run_state()
         # pc is still the start of this run
@@ -188,7 +195,7 @@ def machine_runtime_nested_run_trap_test():
     mem.w32(code + 12, addr2)
     mem.w16(code + 16, op_rts)
     # start
-    r.start(code, stack)
+    r.start(Code(code, stack))
     m.cleanup()
     assert a == ["foo"]
 
@@ -207,7 +214,7 @@ def machine_runtime_nested_run_set_get_regs_test():
     def func(op, pc):
         set_regs = {REG_D0: 23, REG_D1: 42}
         get_regs = [REG_D0, REG_D1]
-        rs = r.nested_run(code + 10, set_regs=set_regs, get_regs=get_regs)
+        rs = r.nested_run(Code(code + 10, set_regs=set_regs, get_regs=get_regs))
         assert rs.regs == {REG_D0: 11, REG_D1: 22}
 
     addr = m.setup_quick_trap(func)
@@ -222,7 +229,7 @@ def machine_runtime_nested_run_set_get_regs_test():
     mem.w32(code + 12, addr2)
     mem.w16(code + 16, op_rts)
     # start
-    r.start(code, stack)
+    r.start(Code(code, stack))
     m.cleanup()
 
 
@@ -234,7 +241,7 @@ def machine_runtime_nested_run_trap_exception_test():
         raise error
 
     def func(op, pc):
-        r.nested_run(code + 10)
+        r.nested_run(Code(code + 10))
 
     addr = m.setup_quick_trap(func)
     addr2 = m.setup_quick_trap(func2)
@@ -250,7 +257,7 @@ def machine_runtime_nested_run_trap_exception_test():
     # start
     # exception triggers when the trap is executed directly in the run loop
     with pytest.raises(ValueError) as ei:
-        r.start(code, stack)
+        r.start(Code(code, stack))
     assert ei.value == error
     m.cleanup()
 
@@ -278,7 +285,7 @@ def machine_runtime_slice_hook_test(slice_cycles):
         # check run cycles
         assert r.cycles_run() == 224
 
-        rs = r.nested_run(code + 110, name="foo")
+        rs = r.nested_run(Code(code + 110), name="foo")
 
         # sub run
         assert rs.cycles == 440
@@ -303,7 +310,7 @@ def machine_runtime_slice_hook_test(slice_cycles):
     mem.w16(code + 306, op_rts)
 
     # start
-    rs = r.start(code, stack, name="go")
+    rs = r.start(Code(code, stack), name="go")
 
     # main run results
     assert rs.cycles == 260

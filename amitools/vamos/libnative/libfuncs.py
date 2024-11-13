@@ -1,8 +1,7 @@
 from amitools.vamos.libtypes import Library, ExecLibrary
 from amitools.vamos.libstructs import LibFlags, NodeType
 from amitools.vamos.loader import SegList
-from amitools.vamos.machine.regs import *
-from amitools.vamos.machine.opcodes import op_jmp
+from amitools.vamos.machine import Code, op_jmp, REG_A6, REG_D0
 
 
 class LibFuncs(object):
@@ -94,7 +93,6 @@ class LibFuncs(object):
         set_regs = {REG_A6: lib_base}
         get_regs = [REG_D0]
         # run machine and share current sp if none is given
-        rs = self.runner(
-            pc=func_addr, sp=run_sp, set_regs=set_regs, get_regs=get_regs, name=name
-        )
+        code = Code(func_addr, run_sp, set_regs, get_regs)
+        rs = self.runner(code)
         return rs.regs[REG_D0]

@@ -2,7 +2,13 @@ import pytest
 import logging
 
 from machine68k import CPUType
-from amitools.vamos.machine import Machine, Runtime, ResetOpcodeError, ErrorReporter
+from amitools.vamos.machine import (
+    Machine,
+    Runtime,
+    Code,
+    ResetOpcodeError,
+    ErrorReporter,
+)
 from amitools.vamos.machine.opcodes import op_reset
 
 
@@ -25,7 +31,7 @@ def machine_error_reporter_test(caplog):
     # reset opcode
     mem.w16(code, op_reset)
     try:
-        r.start(code, stack, name="foo")
+        r.start(Code(code, stack), name="foo")
     except ResetOpcodeError as e:
         er.report_error(e)
     m.cleanup()

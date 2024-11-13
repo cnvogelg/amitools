@@ -45,20 +45,14 @@ class MyStub:
 
 class MyRuntime:
     def __init__(self):
-        self.pc = None
-        self.sp = None
-        self.set_regs = None
-        self.get_regs = None
+        self.code = None
         self.name = None
         self.regs = None
 
-    def run(self, pc, sp=None, set_regs=None, get_regs=None, name=None):
-        self.pc = pc
-        self.sp = sp
-        self.set_regs = set_regs
-        self.get_regs = get_regs
+    def run(self, code, name=None):
+        self.code = code
         self.name = name
-        if len(get_regs) == 2:
+        if len(code.get_regs) == 2:
             self.regs = {REG_D0: 23, REG_D1: 42}
         else:
             self.regs = {REG_D0: 11}
@@ -133,13 +127,13 @@ def libcore_proxy_gen_libcall_test():
     # call hello
     ret = proxy.PrintHello()
     assert ret == 11
-    assert runtime.set_regs == {}
-    assert runtime.get_regs == [REG_D0]
+    assert runtime.code.set_regs == {}
+    assert runtime.code.get_regs == [REG_D0]
     # call string
     ret = proxy.PrintString(0x10, ret_d1=True)
     assert ret == (23, 42)
-    assert runtime.set_regs == {REG_A0: 0x10}
-    assert runtime.get_regs == [REG_D0, REG_D1]
+    assert runtime.code.set_regs == {REG_A0: 0x10}
+    assert runtime.code.get_regs == [REG_D0, REG_D1]
     # ensure that positional arguments are here
     with pytest.raises(AssertionError):
         proxy.PrintString()

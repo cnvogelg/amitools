@@ -1,7 +1,7 @@
 from .makefuncs import MakeFuncs
 from .initstruct import InitStruct
 from amitools.vamos.libtypes import Library
-from amitools.vamos.machine.regs import *
+from amitools.vamos.machine import Code, REG_D0, REG_A0, REG_A6
 
 
 class MakeLib(object):
@@ -64,14 +64,9 @@ class MakeLib(object):
     ):
         set_regs = {REG_D0: lib_base, REG_A0: seglist_baddr, REG_A6: self.mem.r32(4)}
         get_regs = [REG_D0]
+        code = Code(init_func_addr, run_sp, set_regs, get_regs)
         # run machine and share current sp
-        rs = self.runner(
-            init_func_addr,
-            sp=run_sp,
-            set_regs=set_regs,
-            get_regs=get_regs,
-            name=label_name,
-        )
+        rs = self.runner(code, name=label_name)
         lib_base = rs.regs[REG_D0]
         return lib_base
 
