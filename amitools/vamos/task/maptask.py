@@ -13,19 +13,22 @@ class MappedTask:
     like sigmask or task state.
     """
 
-    def __init__(self, sched_task, ami_task):
+    def __init__(self, sched_task, ami_task, ami_proc=None):
         self.sched_task = sched_task
         self.ami_task = ami_task
+        self.ami_proc = ami_proc
 
         # install back refs
         self.sched_task.map_task = self
         self.ami_task.map_task = self
+        if self.ami_proc:
+            self.ami_proc.map_task = self
 
         self._setup_state_sync()
         self._setup_sigmask_sync()
 
     def __repr__(self):
-        return f"[MappedTask(sched_task={self.sched_task}, ami_task={self.ami_task})]"
+        return f"[MappedTask(sched_task={self.sched_task}, ami_task={self.ami_task}, ami_proc={self.ami_proc})]"
 
     def _setup_state_sync(self):
         # install state hook to map state to mapped task value
@@ -42,13 +45,13 @@ class MappedTask:
         self.sched_task.set_sigmask_callback(map_sigmask)
 
     def is_process(self):
-        return False
+        return self.ami_proc is not None
 
     def get_ami_task(self):
         return self.ami_task
 
     def get_ami_process(self):
-        return None
+        return self.ami_proc
 
     def get_sched_task(self):
         return self.sched_task

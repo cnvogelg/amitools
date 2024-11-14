@@ -1,8 +1,8 @@
 from amitools.vamos.machine import Machine, Code
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.schedule import Scheduler, TaskState, NativeTask, PythonTask
-from amitools.vamos.maptask import MappedTask
-from amitools.vamos.libtypes import Task
+from amitools.vamos.task import MappedTask
+from amitools.vamos.libtypes import Task, Process
 from amitools.vamos.machine.opcodes import *
 from amitools.vamos.machine.regs import *
 
@@ -26,7 +26,7 @@ def cleanup(ctx):
 
 
 class MyNativeTask:
-    def __init__(self, ctx, name=None, **code_kw_args):
+    def __init__(self, ctx, name=None, proc=False, **code_kw_args):
         if name is None:
             name = "task"
         self.ctx = ctx
@@ -37,17 +37,25 @@ class MyNativeTask:
         self.pc = self.prog.addr
         self.code = Code(self.pc, self.sp, **code_kw_args)
         self.sched_task = NativeTask(name, ctx.machine, self.code)
-        self.ami_task = Task.alloc(ctx.alloc, name=name)
-        self.map_task = MappedTask(self.sched_task, self.ami_task)
+        if proc:
+            self.ami_proc = Process.alloc(ctx.alloc, name=name)
+            self.ami_task = self.ami_proc.task
+        else:
+            self.ami_task = Task.alloc(ctx.alloc, name=name)
+            self.ami_proc = None
+        self.map_task = MappedTask(self.sched_task, self.ami_task, self.ami_proc)
 
     def free(self):
-        self.ami_task.free()
+        if self.ami_proc:
+            self.ami_proc.free()
+        else:
+            self.ami_task.free()
         self.ctx.alloc.free_memory(self.stack)
         self.ctx.alloc.free_memory(self.prog)
 
 
 class MyPythonTask:
-    def __init__(self, ctx, func=None, name=None, **code_kw_args):
+    def __init__(self, ctx, func=None, proc=False, name=None, **code_kw_args):
         if name is None:
             name = "task"
         self.ctx = ctx
@@ -56,18 +64,28 @@ class MyPythonTask:
         self.stack = ctx.alloc.alloc_memory(4096, name + "_Stack")
         self.sp = self.stack.addr
         self.sched_task = PythonTask(name, ctx.machine, self.func, self.sp)
-        self.ami_task = Task.alloc(ctx.alloc, name=name)
-        self.map_task = MappedTask(self.sched_task, self.ami_task)
+        if proc:
+            self.ami_proc = Process.alloc(ctx.alloc, name=name)
+            self.ami_task = self.ami_proc.task
+        else:
+            self.ami_task = Task.alloc(ctx.alloc, name=name)
+            self.ami_proc = None
+        self.map_task = MappedTask(self.sched_task, self.ami_task, self.ami_proc)
 
     def free(self):
-        self.ami_task.free()
+        if self.ami_proc:
+            self.ami_proc.free()
+        else:
+            self.ami_task.free()
         self.ctx.alloc.free_memory(self.stack)
 
 
-def create_both_tasks(ctx, name=None):
+def create_all_tasks(ctx, name=None):
     return [
         MyNativeTask(ctx, name=name),
         MyPythonTask(ctx, name=name),
+        MyNativeTask(ctx, name=name, proc=True),
+        MyPythonTask(ctx, name=name, proc=True),
     ]
 
 
@@ -83,9 +101,9 @@ def check_task(task, name):
 # test allocation of map task
 
 
-def maptask_task_alloc_test():
+def task_maptask_alloc_test():
     ctx = setup()
-    for task_ctx in create_both_tasks(ctx, "foo"):
+    for task_ctx in create_all_tasks(ctx, "foo"):
         map_task = task_ctx.map_task
         check_task(map_task, "foo")
         # clean up
@@ -93,9 +111,9 @@ def maptask_task_alloc_test():
     cleanup(ctx)
 
 
-def maptask_task_state_test():
+def task_maptask_state_test():
     ctx = setup()
-    for task_ctx in create_both_tasks(ctx):
+    for task_ctx in create_all_tasks(ctx):
         map_task = task_ctx.map_task
         # set state and check if mapped state was updated
         map_task.get_sched_task().set_state(TaskState.TS_RUN)
@@ -105,9 +123,9 @@ def maptask_task_state_test():
     cleanup(ctx)
 
 
-def maptask_task_sigmask_test():
+def task_maptask_sigmask_test():
     ctx = setup()
-    for task_ctx in create_both_tasks(ctx):
+    for task_ctx in create_all_tasks(ctx):
         map_task = task_ctx.map_task
         # set state and check if mapped state was updated
         map_task.get_sched_task().set_signal(2, 2)
