@@ -163,14 +163,34 @@ RemMemHandler(memhand)(a1)
 *------ Function to attempt to obtain a Quick Interrupt Vector...
 ObtainQuickVector(interruptCode)(a0)
 ##private
-execPrivate10()()
-execPrivate11()()
-execPrivate12()()
+execPrivate14()()
+execPrivate15()()
+execPrivate16()()
 ##public
 *------- THOR: This is for the lazy ROM which does not like names...
 TaggedOpenLibrary(tag)(d0)
 ##private
-execPrivate14()()
-execPrivate15()()
+execPrivate18()()
+execPrivate19()()
 ##public
+*--- functions in V45 or higher (Release 3.9) ---
+*------ Finally the list functions are complete
+NewMinList(minlist)(a0)
+##private
+execPrivate20()()
+execPrivate21()()
+execPrivate22()()
+execPrivate23()()
+execPrivate24()()
+execPrivate25()()
+execPrivate26()()
+execPrivate27()()
+execPrivate28()()
+execPrivate29()()
+execPrivate30()()
+execPrivate31()()
+execPrivate32()()
+execPrivate33()()
+*--- (10 function slots reserved here) ---
+##bias 978
 ##end

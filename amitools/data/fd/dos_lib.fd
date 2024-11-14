@@ -197,10 +197,20 @@ SetOwner(name,owner_info)(d1/d2)
 ##private
 *--- (2 function slots reserved here) ---
 ##bias 1014
-*--- (2 function slots reserved here) ---
-##bias 1026
-*--- (2 function slots reserved here) ---
-##bias 1038
-*--- (2 function slots reserved here) ---
-##bias 1050
+##public
+* Added with dos 47.4
+VolumeRequestHook(vol)(d1)
+##private
+dosPrivate7()()
+##public
+GetCurrentDir()()
+*--- (16 function slots reserved here) ---
+##bias 1128
+PutErrStr(str)(d1)
+ErrorOutput()()
+SelectError(fh)(d1)
+*--- (1 function slot reserved here) ---
+##bias 1152
+DoShellMethodTagList(method,tags)(d0/a0)
+ScanStackToken(seg,defaultstack)(d1/d2)
 ##end
