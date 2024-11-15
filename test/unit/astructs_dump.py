@@ -15,6 +15,7 @@ from amitools.vamos.astructs import (
     Enum,
     EnumType,
 )
+from amitools.vamos.machine.mock import MockMemory
 
 
 @AmigaStructDef
@@ -80,9 +81,30 @@ def dump_fields(*fields):
     return result
 
 
+def dump_obj(obj):
+    result = []
+
+    def print_func(txt):
+        result.append(txt)
+
+    dumper = TypeDumper(print_func=print_func)
+    dumper.dump_obj(obj)
+    return result
+
+
 def astructs_dump_type_simple_test():
     assert dump_type(ULONG) == ["     @0000         ULONG"]
     assert dump_type(APTR_VOID) == ["     @0000         APTR_VOID"]
+
+
+def astructs_dump_type_obj_simple_test():
+    mem = MockMemory()
+    ulong = ULONG(mem=mem, addr=0x4)
+    ulong.val = 0x1234
+    aptr_void = APTR_VOID(mem=mem, addr=0x8)
+    aptr_void.aptr = 0xBABE
+    assert dump_obj(ulong) == ["     @0000         ULONG"]
+    assert dump_obj(aptr_void) == ["     @0000         APTR_VOID"]
 
 
 def astructs_dump_type_struct_test():

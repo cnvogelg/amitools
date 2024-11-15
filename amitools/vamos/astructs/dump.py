@@ -8,15 +8,18 @@ class TypeDumper:
     def _reset(self, base_addr=0):
         self._indent = 0
         self._num = 0
-        self._base_addr = 0
+        self._base_addr = base_addr
         self._offset = 0
 
-    def dump(self, type_cls, base_addr=0):
+    def dump_obj(self, obj):
+        self.dump(type(obj), base_addr=obj.addr, obj=obj)
+
+    def dump(self, type_cls, base_addr=0, obj=None):
         self._reset(base_addr)
         if issubclass(type_cls, AmigaStruct):
             self._dump_struct(type_cls)
         else:
-            self._print_type_line(type_cls.__name__)
+            self._print_type_line(type_cls.__name__, obj)
 
     def dump_fields(self, *field_defs, base_addr=0):
         self._reset(base_addr)
@@ -71,8 +74,13 @@ class TypeDumper:
             extra = " " * 5
         return "     @%04d %s %s" % (self._base_addr, extra, istr)
 
-    def _print_type_line(self, type_name):
-        self._print_func("%s  %s" % (self._get_prefix(), type_name))
+    def _print_type_line(self, type_name, obj):
+        if self._obj:
+            self._print_func(
+                "%s  %-20s  %s" % (self._get_prefix(), type_name, self._obj)
+            )
+        else:
+            self._print_func("%s  %-20s" % (self._get_prefix(), type_name))
 
     def _print_begin_struct(self, type_name, field_name=None):
         if field_name:
