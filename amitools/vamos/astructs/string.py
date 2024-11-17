@@ -40,7 +40,11 @@ class CStringType(TypeBase):
             return super(CStringType, self).__eq__(other)
 
     def __str__(self):
-        return str(self.get())
+        val = self.get()
+        if val:
+            return f"'{val}'({len(val)})"
+        else:
+            return "NONE"
 
     @classmethod
     def _alloc(cls, alloc, tag, txt):
@@ -91,7 +95,11 @@ class BStringType(TypeBase):
             super(BStringType, self).__eq__(other)
 
     def __str__(self):
-        return str(self.get())
+        val = self.get()
+        if val:
+            return f"#'{val}'({len(val)})"
+        else:
+            return "#NONE"
 
     @classmethod
     def _alloc(cls, alloc, tag, txt):

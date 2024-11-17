@@ -5,7 +5,10 @@ class VOID(TypeBase):
     """A VOID instance only holds the address where the void exists."""
 
     def __repr__(self):
-        return "VOID(addr={})".format(self._addr)
+        return f"VOID(addr={self._addr:08x})"
+
+    def __str__(self):
+        return "VOID"
 
 
 class PointerType(TypeBase):
@@ -106,6 +109,12 @@ class PointerType(TypeBase):
         )
 
     def __str__(self):
+        ref = self.get_ref()
+        addr = self.get_ref_addr()
+        if ref:
+            return f"@({addr:08x}):{ref}"
+        else:
+            return "@NULL"
         return str(self.get_ref())
 
     def __int__(self):
@@ -163,6 +172,16 @@ class BCPLPointerType(PointerType):
 
     def set(self, val):
         self.set_ref_baddr(val)
+
+    def __str__(self):
+        ref = self.get_ref()
+        addr = self.get_ref_addr()
+        baddr = self.get_ref_baddr()
+        if ref:
+            return f"#({baddr:08x}/{addr:08x}):{ref}"
+        else:
+            return "#ZERO"
+        return str(self.get_ref())
 
     def __int__(self):
         return self.get_ref_baddr()

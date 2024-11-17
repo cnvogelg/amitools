@@ -56,7 +56,7 @@ ARRAYTypes = {}
 
 
 def ARRAY(element_type, array_size):
-    """create a new array type class the references the given type"""
+    """create a new array type class that references the given type"""
     name = "ARRAY[" + str(array_size) + "]_" + element_type.__name__
     if name in ARRAYTypes:
         return ARRAYTypes[name]

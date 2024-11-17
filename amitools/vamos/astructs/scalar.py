@@ -54,6 +54,20 @@ class ScalarType(TypeBase):
             self.__class__.__name__, self.get(), self._addr
         )
 
+    def __str__(self):
+        w = self.get_mem_width()
+        if w == 2:
+            f = "%d/%08x"
+            m = 0xFFFFFFFF
+        elif w == 1:
+            f = "%d/%04x"
+            m = 0xFFFF
+        else:
+            f = "%d/%02x"
+            m = 0xFF
+        v = self.get()
+        return f % (v, v & m)
+
     def __int__(self):
         return self.get()
 

@@ -9,9 +9,11 @@ class Enum:
     _values = None
 
     @classmethod
-    def to_str(cls, val, check=True):
+    def to_str(cls, val, check=True, invalid=False):
         if val in cls._val_to_name:
             return cls._val_to_name[val]
+        if invalid:
+            return "INVALID"
         if check:
             raise ValueError("%s is an unknown Enum value" % val)
         else:
@@ -24,10 +26,12 @@ class Enum:
         raise ValueError("'%s' is an unknown Enum string" % name)
 
     def __str__(self):
-        return self.to_str(self.get(), False)
+        val = self.get()
+        name = self.to_str(val, invalid=True)
+        return f"{name}({val}/{val:x})"
 
     def __repr__(self):
-        return "%s('%s')" % (self.__class__.__name__, str(self))
+        return "%s(%s)" % (self.__class__.__name__, str(self))
 
     def set(self, val):
         # allow to set values

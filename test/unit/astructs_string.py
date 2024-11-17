@@ -19,18 +19,18 @@ def astructs_string_cstr_test():
     assert cstr.get_signature() == "CSTR"
     val = cstr.get_str()
     assert val == txt
-    assert str(cstr) == txt
+    assert str(cstr) == "@(00000040):'hello, world!'(13)"
     # modify cstr
     txt2 = "wow, str!"
     cstr.set_str(txt2)
     val = mem.r_cstr(0x40)
     assert val == txt2
-    assert str(cstr) == txt2
+    assert str(cstr) == "@(00000040):'wow, str!'(9)"
     # modify ptr
     mem.w_cstr(0x80, txt)
     cstr.set(0x80)
     assert cstr.get_str() == txt
-    assert str(cstr) == txt
+    assert str(cstr) == "@(00000080):'hello, world!'(13)"
     # access via 'str'
     cstr.str = "now!"
     assert cstr.str == "now!"
@@ -48,11 +48,11 @@ def astructs_string_cstr_null_test():
     mem.w32(0, 0)
     cstr = CSTR(mem=mem, addr=0)
     assert cstr.str is None
-    assert str(cstr) == "None"
+    assert str(cstr) == "@NULL"
     mem.w32(4, 0)
     cstr2 = CSTR(mem=mem, addr=4)
     assert cstr2.str is None
-    assert str(cstr2) == "None"
+    assert str(cstr2) == "@NULL"
     assert cstr != cstr2
 
 
@@ -98,18 +98,18 @@ def astructs_string_bstr_test():
     assert bstr.get_signature() == "BSTR"
     val = bstr.get_str()
     assert val == txt
-    assert str(bstr) == txt
+    assert str(bstr) == "#(00000010/00000040):#'hello, world!'(13)"
     # modify cstr
     txt2 = "wow, str!"
     bstr.set_str(txt2)
     val = mem.r_bstr(0x40)
     assert val == txt2
-    assert str(bstr) == txt2
+    assert str(bstr) == "#(00000010/00000040):#'wow, str!'(9)"
     # modify ptr
     mem.w_bstr(0x80, txt)
     bstr.set(0x20)  # 0x20 is baddr of 0x80
     assert bstr.get_str() == txt
-    assert str(bstr) == txt
+    assert str(bstr) == "#(00000020/00000080):#'hello, world!'(13)"
     # access via 'str'
     bstr.str = "now!"
     assert bstr.str == "now!"
@@ -127,11 +127,11 @@ def astructs_string_bstr_null_test():
     mem.w32(0, 0)
     bstr = BSTR(mem=mem, addr=0)
     assert bstr.str is None
-    assert str(bstr) == "None"
+    assert str(bstr) == "#ZERO"
     mem.w32(4, 0)
     bstr2 = BSTR(mem=mem, addr=4)
     assert bstr2.str is None
-    assert str(bstr2) == "None"
+    assert str(bstr2) == "#ZERO"
     assert bstr != bstr2
 
 

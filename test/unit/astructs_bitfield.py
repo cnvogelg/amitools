@@ -13,13 +13,13 @@ class MyBF(BitField, ULONG):
 def astructs_bitfield_type_test():
     # to_strs
     assert MyBF.to_strs(1) == ["a"]
-    assert MyBF.to_str(1) == "a"
+    assert MyBF.to_str(1) == "a (1/b1)"
     assert MyBF.to_strs(5) == ["a", "c"]
-    assert MyBF.to_str(5) == "a|c"
+    assert MyBF.to_str(5) == "a|c (5/b101)"
     with pytest.raises(ValueError):
         MyBF.to_strs(9)
     assert MyBF.to_strs(9, check=False) == ["a", "8"]
-    assert MyBF.to_str(9, check=False) == "a|8"
+    assert MyBF.to_str(9, check=False) == "a|8 (9/b1001)"
     # from_strs
     assert MyBF.from_strs("a") == 1
     assert MyBF.from_strs("a", "c") == 5
@@ -46,14 +46,14 @@ def astructs_bitfield_inst_test():
     mem.w32(4, 1)
     # instance
     bf = MyBF(mem=mem, addr=4)
-    assert str(bf) == "a"
-    assert repr(bf) == "MyBF('a')"
+    assert str(bf) == "a (1/b1)"
+    assert repr(bf) == "MyBF(a (1/b1))"
     assert int(bf) == MyBF.a
     assert bf.has_bits(MyBF.a)
     assert bf.has_bits("a")
     # set bit
     bf.set_bits(MyBF.c)
-    assert str(bf) == "a|c"
+    assert str(bf) == "a|c (5/b101)"
     assert int(bf) == MyBF.c | MyBF.a
     assert bf.has_bits("c")
     assert bf.has_bits(MyBF.c)
@@ -62,7 +62,7 @@ def astructs_bitfield_inst_test():
     assert mem.r32(4) == MyBF.c | MyBF.a
     # clr bit
     bf.clr_bits(MyBF.a)
-    assert str(bf) == "c"
+    assert str(bf) == "c (4/b100)"
     assert int(bf) == MyBF.c
     assert bf.has_bits("c")
     assert bf.has_bits(MyBF.c)
@@ -71,7 +71,7 @@ def astructs_bitfield_inst_test():
     assert mem.r32(4) == MyBF.c
     # set value
     bf.set(MyBF.a | MyBF.b)
-    assert str(bf) == "a|b"
+    assert str(bf) == "a|b (3/b11)"
     assert int(bf) == MyBF.b | MyBF.a
     assert bf.has_bits("b")
     assert bf.has_bits(MyBF.b)
