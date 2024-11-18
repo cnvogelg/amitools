@@ -13,7 +13,7 @@ class Enum:
         if val in cls._val_to_name:
             return cls._val_to_name[val]
         if invalid:
-            return "INVALID"
+            return "_INVALID_"
         if check:
             raise ValueError("%s is an unknown Enum value" % val)
         else:
@@ -28,7 +28,7 @@ class Enum:
     def __str__(self):
         val = self.get()
         name = self.to_str(val, invalid=True)
-        return f"{name}({val}/{val:x})"
+        return f"{name}({val:08x}/{val})"
 
     def __repr__(self):
         return "%s(%s)" % (self.__class__.__name__, str(self))

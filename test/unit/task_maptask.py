@@ -117,7 +117,7 @@ def task_maptask_state_test():
         map_task = task_ctx.map_task
         # set state and check if mapped state was updated
         map_task.get_sched_task().set_state(TaskState.TS_RUN)
-        assert str(map_task.get_ami_task().tc_State) == TaskState.TS_RUN.name
+        assert str(map_task.get_ami_task().tc_State) == "TS_RUN(00000002/2)"
         # clean up
         task_ctx.free()
     cleanup(ctx)

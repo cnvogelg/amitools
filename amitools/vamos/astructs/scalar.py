@@ -57,16 +57,16 @@ class ScalarType(TypeBase):
     def __str__(self):
         w = self.get_mem_width()
         if w == 2:
-            f = "%d/%08x"
+            f = "%08x/%d"
             m = 0xFFFFFFFF
         elif w == 1:
-            f = "%d/%04x"
+            f = "%04x/%d"
             m = 0xFFFF
         else:
-            f = "%d/%02x"
+            f = "%02x/%d"
             m = 0xFF
         v = self.get()
-        return f % (v, v & m)
+        return f % (v & m, v)
 
     def __int__(self):
         return self.get()

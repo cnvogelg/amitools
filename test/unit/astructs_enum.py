@@ -28,17 +28,17 @@ def astructs_enum_inst_test():
     # instance
     me = MyEnum(mem=mem, addr=4)
     assert me.get() == MyEnum.a
-    assert str(me) == "a(3/3)"
-    assert repr(me) == "MyEnum(a(3/3))"
+    assert str(me) == "a(00000003/3)"
+    assert repr(me) == "MyEnum(a(00000003/3))"
     assert int(me) == MyEnum.a
     # change
     me.set(MyEnum.c)
     assert me.get() == MyEnum.c
-    assert str(me) == "c(4294967295/ffffffff)"
+    assert str(me) == "c(ffffffff/4294967295)"
     assert int(me) == MyEnum.c
     assert mem.r32(4) == MyEnum.c
     me.set("b")
     assert me.get() == MyEnum.b
-    assert str(me) == "b(4/4)"
+    assert str(me) == "b(00000004/4)"
     assert int(me) == MyEnum.b
     assert mem.r32(4) == MyEnum.b

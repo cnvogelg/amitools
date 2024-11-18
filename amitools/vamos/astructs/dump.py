@@ -53,8 +53,14 @@ class TypeDumper:
     def __init__(self, print_func=print):
         self._print_func = print_func
 
-    def dump_obj(self, obj):
-        self.dump(type(obj), base_addr=obj.addr, obj=obj)
+    def dump_obj(self, obj, indent_size=2, show_offsets=False):
+        self.dump(
+            type(obj),
+            base_addr=obj.addr,
+            obj=obj,
+            indent_size=indent_size,
+            show_offsets=show_offsets,
+        )
 
     def dump_fields(
         self, *field_defs, base_addr=0, obj=None, indent_size=2, show_offsets=False
@@ -313,8 +319,11 @@ class TypeDumper:
                 line += f"  {field_name:{state.field_size}}"
             else:
                 line += f"  {field_name}"
+        elif state.field_size > 0 and obj:
+            # reserve field space
+            line += f"  " + " " * state.field_size
         # optional obj value
         if obj:
-            line += f" c{obj}"
+            line += f"  {obj}"
 
         self._print_func(line)

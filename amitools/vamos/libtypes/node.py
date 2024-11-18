@@ -32,7 +32,7 @@ class Node(NodeStruct, NodeBase):
     """wrap an Exec Node in memory an allow to operate on its values."""
 
     def __str__(self):
-        return "[Node:@%06x,p=%06x,s=%06x,%s,%d,'%s']" % (
+        return "[Node:@%06x,p=%06x,s=%06x,%s,%d,%s]" % (
             self.addr,
             self.pred.aptr,
             self.succ.aptr,

@@ -20,7 +20,7 @@ def new_min_list():
 
 def libtypes_list_new_test():
     l = new_list()
-    assert str(l) == "[List:@000040,h=000044,t=000000,tp=000040,NT_DEVICE]"
+    assert str(l) == "[List:@000040,h=000044,t=000000,tp=000040,NT_DEVICE(00000003/3)]"
     assert len(l) == 0
     assert [a for a in l] == []
 

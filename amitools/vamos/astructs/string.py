@@ -3,6 +3,10 @@ from .pointer import APTR, BPTR
 
 
 class CStringType(TypeBase):
+    @classmethod
+    def get_signature(cls):
+        return "CString"
+
     def __init__(self, mem, addr, **kwargs):
         super(CStringType, self).__init__(mem, addr, **kwargs)
 
@@ -58,6 +62,10 @@ class CStringType(TypeBase):
 
 
 class BStringType(TypeBase):
+    @classmethod
+    def get_signature(cls):
+        return "BString"
+
     def __init__(self, mem, addr, **kwargs):
         super(BStringType, self).__init__(mem, addr, **kwargs)
 
