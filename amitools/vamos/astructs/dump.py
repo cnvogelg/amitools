@@ -175,20 +175,26 @@ class TypeDumper:
         byte_size = type_cls.get_byte_size()
         if byte_size is None:
             byte_size = 0
+
+        # update addr and offsets
+        state.addr += byte_size
+        for i in range(state.depth):
+            state.offsets[i] += byte_size
+
         return byte_size
 
     def _dump_struct(self, type_cls, state, obj, index, field_name, show):
         type_name = type_cls.sdef.get_type_name()
-        byte_size = type_cls.get_byte_size()
+        total_size = type_cls.get_byte_size()
 
         # header
         self._print_line(state, show, type_name, index, field_name, type_extra=" {")
 
         state.depth += 1
         state.offsets.append(0)
-        offset = 0
 
         sub_show = show
+        sum_size = 0
         for field_def in type_cls.sdef.get_field_defs():
             field_type = field_def.type
             field_name = field_def.name
@@ -208,10 +214,9 @@ class TypeDumper:
                 field_type, state, sub_obj, field_name=field_name, show=sub_show
             )
 
-            # update addr
-            state.addr += byte_size
-            for i in range(state.depth):
-                state.offsets[i] += byte_size
+            sum_size += byte_size
+
+        assert sum_size == total_size
 
         state.depth -= 1
 
@@ -221,7 +226,7 @@ class TypeDumper:
         # pop offsets after footer so it will be shown
         state.offsets.pop()
 
-        return byte_size
+        return total_size
 
     def _dump_array(self, type_cls, state, obj, index, field_name, show):
         type_name = type_cls.get_signature()
@@ -232,10 +237,10 @@ class TypeDumper:
         # header
         self._print_line(state, show, type_name, index, field_name, type_extra=" {")
 
-        total_size = 0
         state.depth += 1
         state.offsets.append(0)
-        offset = 0
+
+        sum_size = 0
         for index in range(array_size):
             sub_obj = None
             if obj:
@@ -245,10 +250,9 @@ class TypeDumper:
                 element_type, state, sub_obj, index=index, show=show
             )
 
-            # update addr
-            state.addr += byte_size
-            for i in range(state.depth):
-                state.offsets[i] += byte_size
+            sum_size += byte_size
+
+        assert sum_size == total_size
 
         state.depth -= 1
 
