@@ -1,2 +1,2 @@
 from .asffile import ASFFile
-from .asfparser import ASFParser, MemChunk, MemType
+from .asfparser import ASFParser, MemChunk, MemType, ROMChunk

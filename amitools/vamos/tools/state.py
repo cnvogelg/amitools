@@ -36,7 +36,7 @@ class StateTool(Tool):
 
             # dump expansion
             if args.dump:
-                expansion = parser.get_expansion()
+                expansion = parser.get_expansion_ram()
                 if expansion:
                     print(expansion)
 
@@ -53,6 +53,14 @@ class StateTool(Tool):
                     file = ""
                 print(
                     f"@{ram.address:08x}  +{ram.size:08x}  {ram.type.name:6s}  {file}"
+                )
+
+            # show roms
+            print("ROM:")
+            roms = parser.get_roms()
+            for rom in roms:
+                print(
+                    f"@{rom.address:08x}  +{rom.size:08x}  {rom.crc32:08x}  {rom.name}  {rom.path}"
                 )
 
             return 0

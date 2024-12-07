@@ -1,5 +1,5 @@
 import pytest
-from amitools.state import ASFFile, ASFParser, MemChunk, MemType
+from amitools.state import ASFFile, ASFParser, MemChunk, MemType, ROMChunk
 
 ASF_LIST = (
     "a500.uss",
@@ -22,6 +22,10 @@ def asf_parser_test(asf_file):
     assert len(ram) > 0
     ram2 = parser.get_ram_layout(True)
     assert len(ram) == len(ram2)
+    roms = parser.get_roms()
+    assert len(roms) == 2
+    assert roms[0].address == 0xF80000
+    assert roms[1].address == 0xF00000
 
 
 def asf_parser_mem_layout_a500_test():

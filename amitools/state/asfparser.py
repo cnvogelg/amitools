@@ -22,7 +22,7 @@ class MemChunk:
 
 
 @dataclass
-class Expansion:
+class ExpansionRAM:
     z2ram_base: int
     z3ram_base: int
     gfx_base: int
@@ -30,17 +30,29 @@ class Expansion:
     z2ram_base2: int
 
 
+@dataclass
+class ROMChunk:
+    address: int
+    size: int
+    type: int
+    version: int
+    crc32: int
+    name: str
+    path: str
+    data: bytes = None
+
+
 class ASFParser:
     def __init__(self, asf_file):
         self.asf_file = asf_file
 
-    def get_expansion(self):
+    def get_expansion_ram(self):
         data = self.asf_file.load_chunk("EXPA")
         if not data:
             return None
         assert len(data) >= 5 * 4
         z2b, z3b, gfx, boro, z2b2 = struct.unpack(">IIIII", data)
-        return Expansion(z2b, z3b, gfx, boro, z2b2)
+        return ExpansionRAM(z2b, z3b, gfx, boro, z2b2)
 
     def get_ram_layout(self, load_ram=False):
         layout = []
@@ -62,7 +74,7 @@ class ASFParser:
         if a3khi:
             layout.append(a3khi)
         # z2ram/z3ram
-        expansion = self.get_expansion()
+        expansion = self.get_expansion_ram()
         if expansion:
             # z2ram
             z2rams = self._get_all_mem_chunks("FRAM", MemType.Z2RAM, load_ram)
@@ -75,6 +87,7 @@ class ASFParser:
                 z2ram = z2rams[1]
                 z2ram.address = expansion.z2ram_base2
                 layout.append(z2ram)
+            assert n < 3
             # z2ram
             z3rams = self._get_all_mem_chunks("ZRAM", MemType.Z3RAM, load_ram)
             n = len(z3rams)
@@ -82,7 +95,29 @@ class ASFParser:
                 z3ram = z3rams[0]
                 z3ram.address = expansion.z3ram_base
                 layout.append(z3ram)
+            assert n < 2
         return layout
+
+    def get_roms(self):
+        datas = self.asf_file.load_all_chunks("ROM ")
+        if datas:
+            return list(map(lambda x: self._parse_rom(x), datas))
+
+    def _parse_rom(self, data):
+        addr, size, type, ver, crc = struct.unpack_from(">IIIII", data)
+        offset = 5 * 4
+        name, offset = self.asf_file._read_string(data, offset)
+        path, offset = self.asf_file._read_string(data, offset)
+        chunk = ROMChunk(addr, size, type, ver, crc, name, path)
+
+        # hack for missing start addr
+        if chunk.address == 0 and chunk.type == 1:
+            chunk.address = 0xF00000
+
+        # in place ROM?
+        if len(data) > offset:
+            chunk.data = data[offset:]
+        return chunk
 
     def _get_all_mem_chunks(self, tag, type, load_ram):
         result = []
