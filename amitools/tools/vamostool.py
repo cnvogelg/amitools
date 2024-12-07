@@ -17,7 +17,7 @@ def main(args=None):
         # then in home dir
         os.path.expanduser("~/.vamosrc"),
     )
-    tools = [PathTool(), TypeTool(), LibProfilerTool()]
+    tools = [PathTool(), TypeTool(), LibProfilerTool(), StateTool()]
     return tools_main(tools, cfg_files, args)
 
 
