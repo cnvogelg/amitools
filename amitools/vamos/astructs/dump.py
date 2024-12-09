@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from .astruct import AmigaStruct
 from .array import ArrayType
+import pprint
 
 
 @dataclass
@@ -198,8 +199,8 @@ class TypeDumper:
         for field_def in type_cls.sdef.get_field_defs():
             field_type = field_def.type
             field_name = field_def.name
-            if obj:
-                sub_obj = obj.get(field_def.name)
+            if obj is not None:
+                sub_obj = obj.get(field_name)
             else:
                 sub_obj = None
 
@@ -243,7 +244,7 @@ class TypeDumper:
         sum_size = 0
         for index in range(array_size):
             sub_obj = None
-            if obj:
+            if obj is not None:
                 sub_obj = obj[index]
 
             byte_size = self._dump_any(
@@ -319,7 +320,7 @@ class TypeDumper:
             line += type_name
         # optional field name
         if field_name:
-            if obj:
+            if obj is not None:
                 line += f"  {field_name:{state.field_size}}"
             else:
                 line += f"  {field_name}"
@@ -327,7 +328,7 @@ class TypeDumper:
             # reserve field space
             line += f"  " + " " * state.field_size
         # optional obj value
-        if obj:
+        if obj is not None:
             line += f"  {obj}"
 
         self._print_func(line)
