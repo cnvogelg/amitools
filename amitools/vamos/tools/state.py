@@ -1,8 +1,11 @@
 import sys
 
 from .tool import Tool
-from amitools.vamos.astructs import AmigaStructTypes, TypeDumper
+from amitools.vamos.astructs import TypeDumper
+from amitools.vamos.libstructs import ExecLibraryStruct
+from amitools.vamos.machine.mock import MockMemory, MultiMockMemory, DummyMockMemory
 from amitools.state import ASFFile, ASFParser
+import amitools.rom
 
 
 class StateTool(Tool):
@@ -19,48 +22,90 @@ class StateTool(Tool):
         )
         parser.add_argument("-s", "--save", help="save RAM to files with prefix")
 
+        # show
+        parser = sub.add_parser("show", help="show data structures in RAM")
+        parser.add_argument("file", help="UAE state file (.uss)")
+        parser.add_argument("-r", "--rom", nargs="+", help="rom files", default=[])
+
     def run(self, args):
         type_cmd = args.type_cmd
         # info
         if type_cmd == "info":
-            asf = ASFFile(args.file)
-            chunks = asf.chunklist()
+            return self.info_cmd(args)
+        elif type_cmd == "show":
+            return self.show_cmd(args)
 
-            # dump state file?
-            if args.dump:
-                for chunk in chunks:
-                    print(chunk)
+    def info_cmd(self, args):
+        asf = ASFFile(args.file)
+        chunks = asf.chunklist()
 
-            # parse state file
-            parser = ASFParser(asf)
+        # dump state file?
+        if args.dump:
+            for chunk in chunks:
+                print(chunk)
 
-            # dump expansion
-            if args.dump:
-                expansion = parser.get_expansion_ram()
-                if expansion:
-                    print(expansion)
+        # parse state file
+        parser = ASFParser(asf)
 
-            # show ram layout
-            print("RAM:")
-            load_ram = args.save is not None
-            ram_layout = parser.get_ram_layout(load_ram)
-            for ram in ram_layout:
-                if args.save:
-                    file = args.save + f".{ram.type.name}.{ram.address:08x}.dump"
-                    with open(file, "wb") as fh:
-                        fh.write(ram.data)
-                else:
-                    file = ""
-                print(
-                    f"@{ram.address:08x}  +{ram.size:08x}  {ram.type.name:6s}  {file}"
-                )
+        # dump expansion
+        if args.dump:
+            expansion = parser.get_expansion_ram()
+            if expansion:
+                print(expansion)
 
-            # show roms
-            print("ROM:")
-            roms = parser.get_roms()
-            for rom in roms:
-                print(
-                    f"@{rom.address:08x}  +{rom.size:08x}  {rom.crc32:08x}  {rom.name}  {rom.path}"
-                )
+        # show ram layout
+        print("RAM:")
+        load_ram = args.save is not None
+        ram_layout = parser.get_ram_layout(load_ram)
+        for ram in ram_layout:
+            if args.save:
+                file = args.save + f".{ram.type.name}.{ram.address:08x}.dump"
+                with open(file, "wb") as fh:
+                    fh.write(ram.data)
+            else:
+                file = ""
+            print(f"@{ram.address:08x}  +{ram.size:08x}  {ram.type.name:6s}  {file}")
 
-            return 0
+        # show roms
+        print("ROM:")
+        roms = parser.get_roms()
+        for rom in roms:
+            print(
+                f"@{rom.address:08x}  +{rom.size:08x}  {rom.crc32:08x}  {rom.name}  {rom.path}"
+            )
+
+        return 0
+
+    def show_cmd(self, args):
+        asf = ASFFile(args.file)
+        parser = ASFParser(asf)
+
+        # setup memory
+        mem = MultiMockMemory()
+        ram_layout = parser.get_ram_layout(True)
+        for ram in ram_layout:
+            size_kib = ram.size // 1024
+            m = MockMemory(size_kib, base_addr=ram.address, data=ram.data)
+            mem.add(m)
+
+        # add roms
+        roms = parser.get_roms()
+        if len(roms) > len(args.rom):
+            print(f"Too few ROM files given! {len(roms)} needed.")
+            return 1
+        for i, rom in enumerate(roms):
+            rom_file = args.rom[i]
+            rom_img = amitools.rom.Loader.load(rom_file)
+            size_kib = len(rom_img) // 1024
+            assert len(rom_img) == rom.size
+            m = MockMemory(
+                size_kib, base_addr=rom.address, read_only=True, data=rom_img
+            )
+            mem.add(m)
+        mem.add(DummyMockMemory())
+
+        # dump exec library
+        exec_base = mem.r32(4)
+        exec_lib = ExecLibraryStruct(mem, exec_base)
+        dumper = TypeDumper()
+        dumper.dump_obj(exec_lib)
