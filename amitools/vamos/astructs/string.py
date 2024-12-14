@@ -1,3 +1,4 @@
+from amitools.util.strtool import to_string
 from .typebase import TypeBase
 from .pointer import APTR, BPTR
 
@@ -46,7 +47,7 @@ class CStringType(TypeBase):
     def __str__(self):
         val = self.get()
         if val:
-            return f"'{val}'({len(val)})"
+            return to_string(val, add_size=True)
         else:
             return "NONE"
 
@@ -105,7 +106,7 @@ class BStringType(TypeBase):
     def __str__(self):
         val = self.get()
         if val:
-            return f"#'{val}'({len(val)})"
+            return "#" + to_string(val, add_size=True)
         else:
             return "#NONE"
 
