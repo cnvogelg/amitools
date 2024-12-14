@@ -10,3 +10,6 @@ from .msg import MsgPort, Message
 # dos
 from .lock import FileLock, FileHandle
 from .process import CLI, Process, PathList
+
+# type promotion
+from .promote import promote_type
