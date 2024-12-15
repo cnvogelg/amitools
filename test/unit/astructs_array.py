@@ -27,6 +27,10 @@ def astructs_array_test():
     a[0].val = 23
     assert a[0].val == 23
     assert a.get(0).val == 23
+    # path
+    assert a.get_path("") is a
+    assert a.get_path("[0]") == a.get(0)
+    assert a.get_path("[9]") == a.get(9)
 
 
 def astructs_array_iter_test():

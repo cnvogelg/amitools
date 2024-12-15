@@ -1,6 +1,6 @@
 from amitools.vamos.machine.mock import MockMemory
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.libtypes import List, MinList, Node, MinNode
+from amitools.vamos.libtypes import List, MinList, Node, MinNode, Task, Process
 from amitools.vamos.libstructs import ListStruct, MinListStruct, NodeType
 
 
@@ -167,8 +167,9 @@ def libtypes_list_iter_at_test():
     assert [a for a in l.iter_at(n2)] == [n2]
 
 
-def add_node(alist, addr, name):
+def add_node(alist, addr, name, type=NodeType.NT_UNKNOWN):
     n = Node(alist.mem, addr)
+    n.type.set(type)
     addr += n.get_size()
     name_addr = addr
     alist.mem.w_cstr(addr, name)
@@ -198,6 +199,21 @@ def libtypes_list_find_name_test():
     n = l.find_name("hello")
     assert n == n1
     assert n.find_name("hello") == n3
+    # get path
+    assert l.get_path("") is l
+    assert l.get_path("[world]") == n2
+    assert l.get_path("[world].type") == n2.get("type")
+
+
+def libtypes_list_find_name_promote_test():
+    l = new_list()
+    addr = 0x60
+    n1, addr = add_node(l, addr, "hello", type=NodeType.NT_TASK)
+    n2, addr = add_node(l, addr, "world", type=NodeType.NT_PROCESS)
+    task = l.find_name("hello")
+    assert type(task) is Task
+    proc = l.find_name("world")
+    assert type(proc) is Process
 
 
 def libtypes_list_alloc_test():

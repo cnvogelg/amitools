@@ -101,6 +101,9 @@ def astructs_astruct_base_inst_test():
     # try to assign field directly -> forbidden!
     with pytest.raises(AttributeError):
         ms.ms_Word = 42
+    # path test
+    assert ms.get_path("") is ms
+    assert ms.get_path("ms_Word") is ms.get_path("ms_Word")
 
 
 def astructs_astruct_base_inst_reg_test():
@@ -206,6 +209,10 @@ def astructs_astruct_sub_struct_inst_test():
     # find sub field
     field = ss.ss_My2.ms_Pad
     assert ss.sfields.find_sub_field_by_def(SubStruct.sdef.ss_My2.ms_Pad) == field
+    # path test
+    assert ss.get_path("") is ss
+    assert ss.get_path("ss_My") is ms
+    assert ss.get_path("ss_My.ms_Word") is ms.get("ms_Word")
 
 
 def astructs_astruct_baddr_test():

@@ -4,9 +4,10 @@ from .node import Node, MinNode
 
 
 class ListIter(object):
-    def __init__(self, alist, start_node=None):
+    def __init__(self, alist, start_node=None, promote=False):
         self.alist = alist
         self.mem = self.alist._mem
+        self.promote = promote
         if start_node is None:
             self.node = alist._head.succ.ref
         else:
@@ -21,7 +22,10 @@ class ListIter(object):
             raise StopIteration()
         res = self.node
         self.node = succ
-        return res
+        if self.promote:
+            return res.promote_type()
+        else:
+            return res
 
 
 class ListBase:
@@ -114,6 +118,9 @@ class List(ListStruct, ListBase):
         self._head = Node(mem, self.addr)
         self._tail = Node(mem, self.addr + 4)
 
+    def __iter__(self):
+        return ListIter(self, promote=True)
+
     def __str__(self):
         return "[List:@%06x,h=%06x,t=%06x,tp=%06x,%s]" % (
             self.addr,
@@ -122,6 +129,18 @@ class List(ListStruct, ListBase):
             self.tail_pred.aptr,
             self.type,
         )
+
+    def get_path(self, path):
+        # allow to search list via arg
+        if len(path) == 0:
+            return self
+        # arg?
+        arg = self._get_path_arg(path)
+        if arg:
+            sub_obj = self.find_name(arg)
+            if sub_obj:
+                sub_path = self._skip_path_arg(path, arg)
+                return sub_obj.get_path(sub_path)
 
     # ----- list ops -----
 

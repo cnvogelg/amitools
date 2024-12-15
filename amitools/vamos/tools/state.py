@@ -3,6 +3,7 @@ import sys
 from .tool import Tool
 from amitools.vamos.astructs import TypeDumper
 from amitools.vamos.libstructs import ExecLibraryStruct
+from amitools.vamos.libtypes import List, MinList
 from amitools.vamos.machine.mock import MockMemory, MultiMockMemory, DummyMockMemory
 from amitools.state import ASFFile, ASFParser
 import amitools.rom
@@ -25,7 +26,10 @@ class StateTool(Tool):
         # show
         parser = sub.add_parser("show", help="show data structures in RAM")
         parser.add_argument("file", help="UAE state file (.uss)")
-        parser.add_argument("-r", "--rom", nargs="+", help="rom files", default=[])
+        parser.add_argument("what", nargs="?", help="what to show")
+        parser.add_argument(
+            "-r", "--rom", action="append", help="rom files", default=[]
+        )
 
     def run(self, args):
         type_cmd = args.type_cmd
@@ -104,8 +108,27 @@ class StateTool(Tool):
             mem.add(m)
         mem.add(DummyMockMemory())
 
-        # dump exec library
+        # get exec library
         exec_base = mem.r32(4)
         exec_lib = ExecLibraryStruct(mem, exec_base)
+
+        # find sub object
+        obj = exec_lib
+        if args.what:
+            obj = obj.get_path(args.what)
+            if obj is None:
+                print(f"can't resolve path '{args.what}'")
+                return 1
+
         dumper = TypeDumper()
-        dumper.dump_obj(exec_lib)
+        if type(obj) in (List, MinList):
+            # dump list
+            if len(obj) == 0:
+                print("Empty list")
+            else:
+                for elem in obj:
+                    dumper.dump_obj(elem)
+        else:
+            # dump object
+            dumper.dump_obj(obj)
+        return 0

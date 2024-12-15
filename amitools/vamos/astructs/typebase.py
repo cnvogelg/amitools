@@ -63,6 +63,11 @@ class TypeBase:
         if reg:
             assert cpu
 
+    def clone(self, cls):
+        """clone type into a new class"""
+        kw_args = {"alloc": self._cpu, "mem_obj": self._mem_obj}
+        return cls(self._mem, self._addr, **kw_args)
+
     def __eq__(self, other):
         if type(other) is int:
             return self._addr == other
@@ -70,6 +75,10 @@ class TypeBase:
             return self._addr == other._addr
         else:
             return NotImplemented
+
+    def __bool__(self):
+        # type objects are always true, so "if obj" works reliably
+        return True
 
     def get_addr(self):
         """if type is bound to memory then return address otherwise None."""
@@ -93,6 +102,54 @@ class TypeBase:
     def get_base_offset(self):
         """if type is embedded in a sub structure then return its global offset"""
         return self._base_offset
+
+    def get_path(self, path):
+        """find object along the given path"""
+        # by default the path has to be empty
+        assert len(path) == 0
+        return self
+
+    def _get_next_path_field(self, path):
+        """split next field from path
+
+        return field
+        """
+        # arguments in field are surrounded in '[' and ']'
+        pos = path.find("[")
+        if pos != -1:
+            path = path[:pos]
+        # fields are separated by '.'
+        pos = path.find(".")
+        if pos != -1:
+            path = path[:pos]
+        return path
+
+    def _skip_path_field(self, path, field):
+        n = len(field)
+        if path == field:
+            return ""
+        if path[n] == ".":
+            return path[n + 1 :]
+        else:
+            return path[n:]
+
+    def _get_path_arg(self, path):
+        """return arg or None"""
+        if len(path) == 0:
+            return path
+        if path[0] == "[":
+            pos = path.find("]")
+            if pos != -1:
+                return path[1:pos]
+            else:
+                # error: no closing bracket
+                return None
+        else:
+            return None
+
+    def _skip_path_arg(self, path, arg):
+        # skip '[...].'
+        return path[len(arg) + 3 :]
 
     def __getattr__(self, key):
         if key == "addr":

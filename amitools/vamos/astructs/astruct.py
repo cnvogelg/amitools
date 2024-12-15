@@ -401,3 +401,13 @@ class AmigaStruct(TypeBase):
                     "Field {} is read-only in {}".format(field_name, self)
                 )
         super().__setattr__(field_name, val)
+
+    def get_path(self, path):
+        if len(path) == 0:
+            return self
+        field = self._get_next_path_field(path)
+        if field:
+            sub_obj = self.get(field)
+            if sub_obj is not None:
+                sub_path = self._skip_path_field(path, field)
+                return sub_obj.get_path(sub_path)

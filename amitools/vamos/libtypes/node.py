@@ -1,5 +1,15 @@
-from amitools.vamos.libstructs import NodeStruct, MinNodeStruct
+from amitools.vamos.libstructs import NodeStruct, NodeType, MinNodeStruct, LibraryStruct
 from amitools.vamos.astructs import AmigaClassDef
+from amitools.vamos.libtypes.process import Process
+from amitools.vamos.libtypes.task import Task
+
+
+node_map = {
+    NodeType.NT_TASK: Task,
+    NodeType.NT_PROCESS: Process,
+    NodeType.NT_DEVICE: LibraryStruct,
+    NodeType.NT_LIBRARY: LibraryStruct,
+}
 
 
 class NodeBase:
@@ -42,6 +52,15 @@ class Node(NodeStruct, NodeBase):
         )
 
     # ----- node ops -----
+
+    def promote_type(self):
+        """convert objects according to Amiga rules"""
+        node_type = self.type.get()
+        if node_type in node_map:
+            node_cls = node_map[node_type]
+            return self.clone(node_cls)
+        else:
+            return self
 
     def find_name(self, name):
         """find name after this node"""

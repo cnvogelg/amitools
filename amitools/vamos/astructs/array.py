@@ -23,6 +23,8 @@ class ArrayType(TypeBase):
 
     def get(self, index):
         """Return n-th element in array"""
+        if type(index) is str:
+            index = int(index)
         entry_addr = self._get_entry_addr(index)
         cls_type = self._element_type.get_alias_type()
         return cls_type(self._mem, entry_addr)
@@ -33,6 +35,17 @@ class ArrayType(TypeBase):
 
     def __getitem__(self, key):
         return self.get(key)
+
+    def get_path(self, path):
+        if len(path) == 0:
+            return self
+        # allow and index '[num]'
+        arg = self._get_path_arg(path)
+        if arg:
+            index = int(arg)
+            sub_obj = self.get(index)
+            sub_path = self._skip_path_arg(path, arg)
+            return sub_obj.get_path(sub_path)
 
 
 class ArrayIter:
