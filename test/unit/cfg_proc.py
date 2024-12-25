@@ -7,11 +7,11 @@ def cfg_proc_dict_test():
     input_dict = {
         "process": {
             "command": {
-                "binary": "foo",
                 "args": ["a", "b", "c,d", "(e)", "*f"],
                 "shell": True,
                 "pure_ami_path": True,
                 "raw_arg": True,
+                "mode": "proc",
             },
             "stack": 4,
         }
@@ -34,11 +34,11 @@ def cfg_proc_ini_test():
     assert lp.get_cfg_dict() == {
         "process": {
             "command": {
-                "binary": None,
                 "args": None,
                 "shell": True,
                 "pure_ami_path": True,
                 "raw_arg": True,
+                "mode": "proc",
             },
             "stack": 4,
         }
@@ -56,11 +56,11 @@ def cfg_proc_args_test():
     assert lp.get_cfg_dict() == {
         "process": {
             "command": {
-                "binary": "foo",
-                "args": ["a", "b", "c,d", "(e)", "*f"],
+                "args": ["foo", "a", "b", "c,d", "(e)", "*f"],
                 "shell": True,
                 "pure_ami_path": True,
                 "raw_arg": True,
+                "mode": "proc",
             },
             "stack": 4,
         }

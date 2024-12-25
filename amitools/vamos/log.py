@@ -5,6 +5,7 @@ from .cfgcore import log_cfg
 # --- vamos loggers ---
 
 log_main = logging.getLogger("main")
+log_mode = logging.getLogger("mode")
 
 log_mem = logging.getLogger("mem")
 log_mem_map = logging.getLogger("mem_map")
@@ -36,6 +37,7 @@ log_hw = logging.getLogger("hw")
 
 loggers = [
     log_main,
+    log_mode,
     log_mem,
     log_mem_map,
     log_mem_alloc,

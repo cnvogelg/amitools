@@ -10,56 +10,46 @@ from .trace import TraceManager
 from .libmgr import SetupLibManager
 from .schedule import Scheduler
 from .profiler import MainProfiler
-from .lib.dos.Process import Process
+from .mode import ModeContext, ModeSetup
 
 RET_CODE_CONFIG_ERROR = 1000
 
 
-def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
-    def gen_task_list(cfg, dos_ctx, exec_ctx):
-        # setup main proc
-        proc_cfg = cfg.get_proc_dict().process
-        main_proc = Process.create_main_proc(proc_cfg, dos_ctx)
-        if not main_proc:
-            log_main.error("main proc setup failed!")
-            return None
-        return [main_proc]
-
-    exit_codes = main_run(gen_task_list, cfg_files, args, cfg_dict, profile)
-    if exit_codes is None:
-        return RET_CODE_CONFIG_ERROR
-
-    # exit
-    exit_code = exit_codes[0]
-    log_main.info("vamos is exiting: code=%d", exit_code)
-    return exit_code
-
-
-def main_run(task_list_gen, cfg_files=None, args=None, cfg_dict=None, profile=False):
+def main(
+    cfg_files=None,
+    args=None,
+    cfg_dict=None,
+    profile=False,
+    mode=None,
+    single_return_code=True,
+):
     """vamos main entry point.
 
     setup a vamos session and run it.
     return the error code of the executed Amiga process.
 
-    task_list_gen: return list of tasks to run task_list_gen(cfg, task_ctx) -> [Task]
-
     cfg_files(opt): list/tuple of config files. first found will be read
     args(opt): None=read sys.argv, []=no args, list/tuple=args
     cfg_dict(opt): pass options directly as a dictionary
 
+    mode: give the vamos run mode or auto select by config
+    single_return_code: if true then return only one int error code otherwise None or list
+
     if an internal error occurred then return: None
     otherwise and array with exit codes for each added task
     """
+    error_code = RET_CODE_CONFIG_ERROR if single_return_code else None
+
     # --- parse config ---
     mp = VamosMainParser()
     if not mp.parse(cfg_files, args, cfg_dict):
-        return None
+        return error_code
 
     # --- init logging ---
     log_cfg = mp.get_log_dict().logging
     if not log_setup(log_cfg):
         log_help()
-        return None
+        return error_code
 
     # setup main profiler
     main_profiler = MainProfiler()
@@ -71,31 +61,31 @@ def main_run(task_list_gen, cfg_files=None, args=None, cfg_dict=None, profile=Fa
     use_labels = mp.get_trace_dict().trace.labels
     machine = Machine.from_cfg(machine_cfg, use_labels)
     if not machine:
-        return None
+        return error_code
 
     # setup memory map
     mem_map_cfg = mp.get_machine_dict().memmap
     mem_map = MemoryMap(machine)
     if not mem_map.parse_config(mem_map_cfg):
         log_main.error("memory map setup failed!")
-        return None
+        return error_code
 
     # setup trace manager
     trace_mgr_cfg = mp.get_trace_dict().trace
     trace_mgr = TraceManager(machine)
     if not trace_mgr.parse_config(trace_mgr_cfg):
         log_main.error("tracing setup failed!")
-        return None
+        return error_code
 
     # setup path manager
     path_mgr = VamosPathManager()
     try:
         if not path_mgr.parse_config(mp.get_path_dict()):
             log_main.error("path config failed!")
-            return None
+            return error_code
         if not path_mgr.setup():
             log_main.error("path setup failed!")
-            return None
+            return error_code
 
         # setup scheduler
         schedule_cfg = mp.get_schedule_dict().schedule
@@ -124,7 +114,7 @@ def main_run(task_list_gen, cfg_files=None, args=None, cfg_dict=None, profile=Fa
         )
         if not slm.parse_config(lib_cfg):
             log_main.error("lib manager setup failed!")
-            return RET_CODE_CONFIG_ERROR
+            return error_code
         slm.setup()
 
         # setup profiler
@@ -133,37 +123,24 @@ def main_run(task_list_gen, cfg_files=None, args=None, cfg_dict=None, profile=Fa
         # open base libs
         slm.open_base_libs()
 
-        # generate tasks
-        task_list = task_list_gen(mp, slm.dos_ctx, slm.exec_ctx)
-        if task_list:
-            # add tasks to scheduler
-            for task in task_list:
-                sched_task = task.get_sched_task()
-                log_main.info("add task '%s'", sched_task.get_name())
-                scheduler.add_task(sched_task)
+        # prepare mode context
+        proc_cfg = mp.get_proc_dict().process
+        exec_ctx = slm.exec_ctx
+        dos_ctx = slm.dos_ctx
+        mode_ctx = ModeContext(proc_cfg, exec_ctx, dos_ctx, scheduler, default_runtime)
 
-            # --- main loop ---
-            # schedule tasks...
-            scheduler.schedule()
+        # select mode via ModeSetup
+        if mode is None:
+            cmd_cfg = proc_cfg.command
+            mode = ModeSetup.select(cmd_cfg)
 
-            # pick up exit codes and free task
-            exit_codes = []
-            for task in task_list:
-                # return code is limited to 0-255
-                sched_task = task.get_sched_task()
-                exit_code = sched_task.get_exit_code() & 0xFF
-                log_main.info(
-                    "done task '%s''. exit code=%d", sched_task.get_name(), exit_code
-                )
-                exit_codes.append(exit_code)
-
-                run_state = sched_task.get_run_result()
-                log_main.debug("run result: %r", run_state)
-
-                # free task
-                task.free()
+        # run mode
+        if mode is None:
+            exit_code = error_code
         else:
-            exit_codes = None
+            exit_code = mode.run(mode_ctx)
+            if single_return_code:
+                exit_code = exit_code[0]
 
         # libs shutdown
         slm.close_base_libs()
@@ -179,7 +156,9 @@ def main_run(task_list_gen, cfg_files=None, args=None, cfg_dict=None, profile=Fa
     mem_map.cleanup()
     machine.cleanup()
 
-    return exit_codes
+    # exit
+    log_main.info("vamos is exiting: code=%r", exit_code)
+    return exit_code
 
 
 def main_profile(

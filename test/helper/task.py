@@ -1,5 +1,6 @@
-from amitools.vamos.main import main_run
+from amitools.vamos.main import main
 from amitools.vamos.task import ExecTask, DosProcess
+from amitools.vamos.mode import BaseMode
 
 
 class VamosTask:
@@ -10,17 +11,19 @@ class VamosTask:
 
             return wrap_func
 
-        def task_gen(cfg, dos_ctx, exec_ctx):
+        def task_gen(mode_ctx):
             result = []
             for func in func_list:
                 name = str(func)
                 if process:
+                    dos_ctx = mode_ctx.dos_ctx
                     wrap_func = wrap(dos_ctx, func)
                     proc = DosProcess(
                         dos_ctx.machine, dos_ctx.alloc, name, func=wrap_func
                     )
                     result.append(proc)
                 else:
+                    exec_ctx = mode_ctx.exec_ctx
                     wrap_func = wrap(exec_ctx, func)
                     task = ExecTask(
                         exec_ctx.machine, exec_ctx.alloc, name, func=wrap_func
@@ -29,6 +32,7 @@ class VamosTask:
 
             return result
 
-        exit_codes = main_run(task_gen, args=["foo"])
+        mode = BaseMode("task", task_gen)
+        exit_codes = main(args=[], mode=mode, single_return_code=False)
         assert exit_codes is not None
         return exit_codes
