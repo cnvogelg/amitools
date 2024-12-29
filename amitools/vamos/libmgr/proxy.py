@@ -45,6 +45,9 @@ class LibProxyManager:
         if base_addr == 0:
             log_libmgr.warning("proxy: open_lib '%s' failed!", full_name)
             return None
+        return self.open_lib_proxy_addr(base_addr, run_sp=run_sp)
+
+    def open_lib_proxy_addr(self, base_addr, run_sp=None):
         # is a vlib?
         vlib = self.lib_mgr.get_vlib_by_addr(base_addr)
         if vlib:
@@ -59,10 +62,11 @@ class LibProxyManager:
                 if fd:
                     return self._setup_libcall_proxy(name, fd, base_addr, run_sp)
                 else:
-                    log_libmgr.warning("proxy: no FD for '%s'", full_name)
+                    log_libmgr.warning("proxy: no FD for '%s'", name)
                     return None
             else:
-                raise VamosInternalError("Neither vlib nor alib?!")
+                log_libmgr.error("proxy: no lib at %08x", base_addr)
+                return None
 
     def close_lib_proxy(self, proxy, run_sp=None):
         """Close the library assoicated with proxy and invalidate it."""

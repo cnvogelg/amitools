@@ -33,6 +33,8 @@ class VamosTask:
             return result
 
         mode = BaseMode("task", task_gen)
-        exit_codes = main(args=[], mode=mode, single_return_code=False)
+        exit_codes = main(
+            args=["-l", "libmgr:info,exec:info"], mode=mode, single_return_code=False
+        )
         assert exit_codes is not None
         return exit_codes

@@ -39,6 +39,7 @@ class MyStub:
         self.string_count += 1
         self.string_kwargs = kwargs
         self.string_reg_a0 = self.ctx.cpu.r_reg(REG_A0)
+        self.string_txt = self.ctx.mem.r_cstr(self.string_reg_a0)
         self.ctx.cpu.w_reg(REG_D0, self.string_count)
         self.ctx.cpu.w_reg(REG_D1, 2 * self.string_count)
 
@@ -86,19 +87,23 @@ def libcore_proxy_gen_stub_test():
     assert stub.hello_kwargs == {"what": "why"}
     assert ctx.cpu.r_reg(REG_D0) == stub.hello_count
     # call string
+    ctx.mem.w_cstr(0x10, "hello, world!")
     assert stub.string_count == 0
     ret = proxy.PrintString(0x10, ret_d1=True)
     assert ret == (1, 2)
     assert stub.string_count == 1
     assert stub.string_reg_a0 == 0x10
+    assert stub.string_txt == "hello, world!"
     assert ctx.cpu.r_reg(REG_D0) == stub.string_count
     assert ctx.cpu.r_reg(REG_D1) == stub.string_count * 2
     # call string with kwargs
+    ctx.mem.w_cstr(0x20, "hi!")
     assert stub.string_count == 1
     ret = proxy.PrintString(0x20, ret_d1=True, foo="bar")
     assert ret == (2, 4)
     assert stub.string_count == 2
     assert stub.string_reg_a0 == 0x20
+    assert stub.string_txt == "hi!"
     assert stub.string_kwargs == {"foo": "bar"}
     assert ctx.cpu.r_reg(REG_D0) == stub.string_count
     assert ctx.cpu.r_reg(REG_D1) == stub.string_count * 2

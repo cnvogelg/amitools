@@ -16,6 +16,44 @@ class LibProxy:
         self.run_sp = run_sp
 
 
+class LibProxyRegs:
+    def __init__(self, ctx, args, arg_regs, kwargs):
+        assert len(args) == len(arg_regs)
+        self.ctx = ctx
+        self.args = args
+        self.arg_regs = arg_regs
+        # shall we return d1 as well?
+        self.ret_d1 = kwargs.pop("ret_d1", False)
+        self.kw_args = kwargs
+        # auto strings
+        self.auto_strings = []
+
+    def input_reg_map(self):
+        reg_map = {}
+        for reg, val in zip(self.arg_regs, self.args):
+            # auto convert strings
+            if type(val) is str:
+                str_mem = self.ctx.alloc.alloc_cstr(val)
+                val = str_mem.addr
+                self.auto_strings.append(str_mem)
+
+            reg_map[reg] = val
+        return reg_map
+
+    def output_reg_list(self):
+        regs = [REG_D0]
+        if self.ret_d1:
+            regs.append(REG_D1)
+        return regs
+
+    def return_d1(self):
+        return self.ret_d1
+
+    def cleanup(self):
+        for mem in self.auto_strings:
+            self.ctx.alloc.free_cstr(mem)
+
+
 class LibProxyGen:
     """Generate a new type derived from LibProxy holding all functions"""
 
@@ -33,22 +71,22 @@ class LibProxyGen:
     def _gen_stub_call(self, arg_regs, stub_method):
         def stub_call(self, *args, **kwargs):
             """proxy function to call lib stub directly"""
-            # ensure that all positional args are given
-            assert len(args) == len(arg_regs)
+            regs = LibProxyRegs(self.ctx, args, arg_regs, kwargs)
 
             # fill registers with arg values
-            for reg, val in zip(arg_regs, args):
+            reg_map = regs.input_reg_map()
+            for reg, val in reg_map.items():
                 self.ctx.cpu.w_reg(reg, val)
-
-            # shall we return d1 as well?
-            ret_d1 = kwargs.pop("ret_d1", False)
 
             # perform call at stub
             stub_method(**kwargs)
 
+            # clean up auto strings
+            regs.cleanup()
+
             # prepare return value
             d0 = self.ctx.cpu.r_reg(REG_D0)
-            if ret_d1:
+            if regs.return_d1():
                 d1 = self.ctx.cpu.r_reg(REG_D1)
                 return (d0, d1)
             else:
@@ -59,17 +97,11 @@ class LibProxyGen:
     def _gen_lib_call(self, arg_regs, bias, name=None):
         def lib_call(self, *args, **kwargs):
             # ensure that all positional args are given
-            assert len(args) == len(arg_regs)
+            regs = LibProxyRegs(self.ctx, args, arg_regs, kwargs)
 
-            reg_map = {}
-            for reg, val in zip(arg_regs, args):
-                reg_map[reg] = val
-
-            ret_regs = [REG_D0]
-            # shall we return d1 as well?
-            ret_d1 = kwargs.pop("ret_d1", False)
-            if ret_d1:
-                ret_regs.append(REG_D1)
+            # get input/output reg map/list
+            reg_map = regs.input_reg_map()
+            ret_regs = regs.output_reg_list()
 
             jump_addr = self.base_addr - bias
 
@@ -77,7 +109,10 @@ class LibProxyGen:
             code = Code(jump_addr, self.run_sp, reg_map, ret_regs)
             rs = self.ctx.runner(code, name=name)
 
-            if ret_d1:
+            # cleanup regs
+            regs.cleanup()
+
+            if regs.return_d1():
                 return rs.regs[REG_D0], rs.regs[REG_D1]
             else:
                 return rs.regs[REG_D0]

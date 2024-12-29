@@ -1,3 +1,6 @@
+import pytest
+
+
 def pytask_self_simple_task_test(vamos_task):
     """check if pytask feature works"""
 
@@ -64,3 +67,12 @@ def pytask_self_vlib_proxy_test(vamos_task):
 
     exit_codes = vamos_task.run([task])
     assert exit_codes[0] == 42
+
+
+def pytask_self_assert_test(vamos_task):
+    def task(ctx, task):
+        # fail test
+        assert 0 == 1
+
+    with pytest.raises(AssertionError):
+        vamos_task.run([task])
