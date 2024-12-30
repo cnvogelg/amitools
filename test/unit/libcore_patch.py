@@ -13,14 +13,14 @@ def libcore_patch_multi_trap_test(capsys):
     fd = read_lib_fd(name)
     machine = MockMachine()
     runtime = Runtime(machine)
-    ctx = LibCtx(machine, runtime.run)
+    alloc = MemoryAlloc.for_machine(machine)
+    ctx = LibCtx(machine, runtime.run, alloc)
     # create stub
     scanner = LibImplScanner()
     scan = scanner.scan(name, impl, fd)
     gen = LibStubGen()
     stub = gen.gen_stub(scan, ctx)
     # now patcher
-    alloc = MemoryAlloc(ctx.mem)
     traps = machine.get_traps()
     p = LibPatcherMultiTrap(alloc, traps, stub)
     base_addr = 0x100

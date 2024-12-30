@@ -5,8 +5,7 @@ class DosLibCtx(LibCtx):
     def __init__(
         self, machine, alloc, runner, seg_loader, path_mgr, scheduler, odg_base
     ):
-        LibCtx.__init__(self, machine, runner)
-        self.alloc = alloc
+        LibCtx.__init__(self, machine, runner, alloc)
         self.path_mgr = path_mgr
         self.seg_loader = seg_loader
         self.scheduler = scheduler

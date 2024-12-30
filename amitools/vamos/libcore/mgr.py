@@ -200,7 +200,7 @@ class VLibManager(object):
         ctx = self.ctx_map.get(name, None)
         # create new context?
         if not ctx:
-            ctx = LibCtx(self.machine, self.runner)
+            ctx = LibCtx(self.machine, self.runner, self.alloc)
             self.ctx_map[name] = ctx
             self._add_ctx_extra_attr(ctx)
         # get impl

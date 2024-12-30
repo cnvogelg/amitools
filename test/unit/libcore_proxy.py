@@ -4,6 +4,7 @@ from amitools.vamos.libcore import LibCtx, LibProxyGen
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.machine.mock import MockMachine
 from amitools.vamos.machine import Runtime
+from amitools.vamos.mem import MemoryAlloc
 from amitools.fd import read_lib_fd
 from amitools.vamos.machine.regs import *
 
@@ -11,7 +12,8 @@ from amitools.vamos.machine.regs import *
 def _create_ctx():
     machine = MockMachine()
     runtime = Runtime(machine)
-    return LibCtx(machine, runtime.run)
+    alloc = MemoryAlloc.for_machine(machine)
+    return LibCtx(machine, runtime.run, alloc)
 
 
 def _create_fd():
@@ -105,6 +107,13 @@ def libcore_proxy_gen_stub_test():
     assert stub.string_reg_a0 == 0x20
     assert stub.string_txt == "hi!"
     assert stub.string_kwargs == {"foo": "bar"}
+    assert ctx.cpu.r_reg(REG_D0) == stub.string_count
+    assert ctx.cpu.r_reg(REG_D1) == stub.string_count * 2
+    # call string stub with auto allocated string
+    ret = proxy.PrintString("hoho!", ret_d1=True)
+    assert ret == (3, 6)
+    assert stub.string_count == 3
+    assert stub.string_txt == "hoho!"
     assert ctx.cpu.r_reg(REG_D0) == stub.string_count
     assert ctx.cpu.r_reg(REG_D1) == stub.string_count * 2
     # ensure that positional arguments are here

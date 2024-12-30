@@ -33,7 +33,7 @@ class LibProxyRegs:
         for reg, val in zip(self.arg_regs, self.args):
             # auto convert strings
             if type(val) is str:
-                str_mem = self.ctx.alloc.alloc_cstr(val)
+                str_mem = self.ctx.alloc.alloc_cstr(val, label="reg_auto_str")
                 val = str_mem.addr
                 self.auto_strings.append(str_mem)
 

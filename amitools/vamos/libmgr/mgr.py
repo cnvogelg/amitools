@@ -14,6 +14,7 @@ class LibManager(object):
         self.cfg = cfg
         self.machine = machine
         self.runner = runner
+        self.alloc = alloc
         self.vlib_mgr = VLibManager(machine, alloc, runner, main_profiler=main_profiler)
         self.alib_mgr = ALibManager(self.mem, alloc, runner, segloader)
         self.proxy_mgr = LibProxyManager(self)

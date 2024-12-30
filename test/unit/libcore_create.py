@@ -15,7 +15,7 @@ def setup():
     traps = machine.get_traps()
     cpu = machine.get_cpu()
     alloc = MemoryAlloc.for_machine(machine)
-    ctx = LibCtx(machine, runtime.run)
+    ctx = LibCtx(machine, runtime.run, alloc)
     return mem, traps, alloc, ctx
 
 
