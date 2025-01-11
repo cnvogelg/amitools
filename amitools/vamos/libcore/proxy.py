@@ -32,10 +32,24 @@ class LibProxyRegs:
         reg_map = {}
         for reg, val in zip(self.arg_regs, self.args):
             # auto convert strings
-            if type(val) is str:
+            if val is None:
+                val = 0
+            elif isinstance(val, int):
+                pass
+            elif isinstance(val, str):
                 str_mem = self.ctx.alloc.alloc_cstr(val, label="reg_auto_str")
                 val = str_mem.addr
                 self.auto_strings.append(str_mem)
+            # complex object? try to get its in memory address via "get_addr"
+            else:
+                # has 'addr'?
+                get_addr = getattr(val, "get_addr", None)
+                if get_addr is not None:
+                    val = get_addr()
+                else:
+                    raise ValueError(
+                        f"Invalid argument for proxy call reg={reg} val={val}"
+                    )
 
             reg_map[reg] = val
         return reg_map

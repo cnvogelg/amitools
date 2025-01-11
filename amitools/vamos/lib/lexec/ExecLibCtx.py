@@ -19,3 +19,11 @@ class ExecLibCtx(LibCtx):
     def set_cur_task_process(self, task, process):
         self.task = task
         self.process = process
+
+    def __str__(self):
+        return "[DosLibCtx:cpu=%s,mem=%s,task=%s,process=%s]" % (
+            self.cpu,
+            self.mem,
+            self.task,
+            self.process,
+        )

@@ -2,6 +2,7 @@ from types import MethodType
 import time
 import traceback
 
+from amitools.vamos.astructs import ScalarType, PointerType
 from amitools.vamos.machine.regs import REG_D0, REG_D1, REG_A7
 
 
@@ -198,6 +199,54 @@ class LibStubGen(object):
         # return created func
         return func
 
+    def _set_result(self, ctx, res):
+        """set result after execution of the lib stub method"""
+        if res is not None:
+            if type(res) in (list, tuple):
+                ctx.cpu.w_reg(REG_D0, res[0] & 0xFFFFFFFF)
+                ctx.cpu.w_reg(REG_D1, res[1] & 0xFFFFFFFF)
+            elif type(res) in (int, bool):
+                ctx.cpu.w_reg(REG_D0, int(res) & 0xFFFFFFFF)
+            else:
+                # is type object? then use its addr
+                get_addr = getattr(res, "get_addr", None)
+                if get_addr:
+                    addr = get_addr()
+                    ctx.cpu.w_reg(REG_D0, addr)
+                else:
+                    raise ValueError(f"Invalid result value '{res}'")
+
+        return res
+
+    def _gen_extra_args(self, ctx, extra_args):
+        """generate the extra arguments passed to a lib method"""
+        args = []
+
+        for arg in extra_args:
+            arg_val = ctx.cpu.r_reg(arg.reg)
+            arg_type = arg.type
+            # int: keep value
+            if issubclass(arg_type, int):
+                pass
+            # bool: convert to int
+            elif issubclass(arg_type, bool):
+                arg_val = int(arg_val)
+            # scalar values and pointers are bound to the register
+            elif issubclass(arg_type, ScalarType) or issubclass(arg_type, PointerType):
+                arg_val = arg_type(cpu=ctx.cpu, reg=arg.reg, mem=ctx.mem)
+            # all other types are bound to the address in memory
+            # (implicit APTR conversion)
+            else:
+                if arg_val != 0:
+                    arg_val = arg_type(mem=ctx.mem, addr=arg_val)
+                else:
+                    # NULL object is none
+                    arg_val = None
+
+            args.append(arg_val)
+
+        return args
+
     def _gen_base_func(self, method, ctx):
         """generate a function that calls the method with the ctx."""
 
@@ -205,13 +254,7 @@ class LibStubGen(object):
             """the base function to call the impl,
             set return vals, and catch exceptions"""
             res = method(ctx)
-            if res is not None:
-                if type(res) in (list, tuple):
-                    ctx.cpu.w_reg(REG_D0, res[0] & 0xFFFFFFFF)
-                    ctx.cpu.w_reg(REG_D1, res[1] & 0xFFFFFFFF)
-                else:
-                    ctx.cpu.w_reg(REG_D0, res & 0xFFFFFFFF)
-            return res
+            return self._set_result(ctx, res)
 
         return base_func
 
@@ -221,23 +264,11 @@ class LibStubGen(object):
         def base_func(this, *args, **kwargs):
             """the base function to call the impl,
             set return vals, and catch exceptions"""
-            args = []
-            for arg in extra_args:
-                arg_val = ctx.cpu.r_reg(arg.reg)
-                arg_type = arg.type
-                # int: keep value
-                if arg_type is not int:
-                    # bind to type
-                    arg_val = arg_type(cpu=ctx.cpu, reg=arg.reg, mem=ctx.mem)
-                args.append(arg_val)
+
+            args = self._gen_extra_args(ctx, extra_args)
+            # call function
             res = method(ctx, *args)
-            if res is not None:
-                if type(res) in (list, tuple):
-                    ctx.cpu.w_reg(REG_D0, res[0] & 0xFFFFFFFF)
-                    ctx.cpu.w_reg(REG_D1, res[1] & 0xFFFFFFFF)
-                else:
-                    ctx.cpu.w_reg(REG_D0, res & 0xFFFFFFFF)
-            return res
+            return self._set_result(ctx, res)
 
         return base_func
 

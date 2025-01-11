@@ -5,7 +5,7 @@ import os
 
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.astructs import AccessStruct
+from amitools.vamos.astructs import AccessStruct, CSTR
 from amitools.vamos.libstructs import (
     DosLibraryStruct,
     DosInfoStruct,
@@ -25,14 +25,13 @@ from amitools.vamos.libstructs import (
     DosPacketStruct,
     PathStruct,
 )
+from amitools.vamos.libtypes import TagList, DosTag
 from amitools.vamos.error import *
 from amitools.vamos.log import log_dos
 from .dos.Args import *
 from .dos.Error import *
 from .dos.AmiTime import *
-from .util.TagList import *
 from .dos import Printf, PathPart
-from .dos.DosTags import DosTags
 from .dos.PatternMatch import Pattern, pattern_parse, pattern_match
 from .dos.MatchFirstNext import MatchFirstNext
 from .dos.CommandLine import CommandLine
@@ -1510,12 +1509,9 @@ class DosLibrary(LibImpl):
 
     # ----- System/Execute -----
 
-    def SystemTagList(self, ctx):
-        cmd_ptr = ctx.cpu.r_reg(REG_D1)
-        tagitem_ptr = ctx.cpu.r_reg(REG_D2)
-        cmd = ctx.mem.r_cstr(cmd_ptr)
-        tag_list = taglist_parse_tagitem_ptr(ctx.mem, tagitem_ptr, DosTags)
-        log_dos.info("SystemTagList: cmd='%s' tags=%s", cmd, tag_list)
+    def SystemTagList(self, ctx, cmd: CSTR, tag_list: TagList):
+        cmd = cmd.get_str()
+        log_dos.info("SystemTagList: cmd=%s tags=%s ctx=%s", cmd, tag_list, ctx)
         # cmd is at this point a full string of commands to execute.
         # If we're running from the Amiga shell, forward this to the shell
         # anyhow.
@@ -1530,17 +1526,20 @@ class DosLibrary(LibImpl):
                 )
                 return 0xFFFFFFFF
             # Push-back the commands into the input buffer.
-            new_input.setbuf(cmd)
+            if cmd:
+                new_input.setbuf(cmd)
             new_stdin = self.file_mgr.open(None, "*", "rw")
-            outtag = tag_list.find_tag("SYS_Output")
+            outtag = tag_list.find_tag(DosTag.SYS_Output)
             # print "setting new input to %s" % new_input
             # and install this as current input. The shell will read from that
             # instead until it hits the EOF
             input_fhsi = cli.r_s("cli_StandardInput")
             input_fhci = cli.r_s("cli_CurrentInput")
-            if outtag != None and outtag.data != 0:
-                output_fhci = cli.r_s("cli_StandardOutput")
-                cli.w_s("cli_StandardOutput", outtag.data << 2)
+            if outtag:
+                data = outtag.get_data()
+                if data != 0:
+                    output_fhci = cli.r_s("cli_StandardOutput")
+                    cli.w_s("cli_StandardOutput", data << 2)
             else:
                 output_fhci = None
             cli.w_s("cli_CurrentInput", new_input.mem.addr)

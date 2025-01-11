@@ -15,6 +15,13 @@ class DosLibCtx(LibCtx):
         self.exec_lib = None
         self.dos_lib = None
 
+    def __str__(self):
+        return "[DosLibCtx:cpu=%s,mem=%s,process=%s]" % (
+            self.cpu,
+            self.mem,
+            self.process,
+        )
+
     def set_exec_lib(self, exec_lib):
         self.exec_lib = exec_lib
 

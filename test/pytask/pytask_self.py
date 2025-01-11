@@ -1,13 +1,17 @@
 import pytest
 
+from amitools.vamos.task import ExecTask, DosProcess
+
 
 def pytask_self_simple_task_test(vamos_task):
     """check if pytask feature works"""
 
     def task1(ctx, task):
+        assert type(task.map_task) is ExecTask
         return 11
 
     def task2(ctx, task):
+        assert type(task.map_task) is ExecTask
         return 22
 
     exit_codes = vamos_task.run([task1, task2])
@@ -18,9 +22,11 @@ def pytask_self_simple_process_test(vamos_task):
     """check if pytask feature works"""
 
     def proc1(ctx, task):
+        assert type(task.map_task) is DosProcess
         return 42
 
     def proc2(ctx, task):
+        assert type(task.map_task) is DosProcess
         return 23
 
     exit_codes = vamos_task.run([proc1, proc2], process=True)

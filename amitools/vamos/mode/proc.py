@@ -48,6 +48,8 @@ class ProcMode(BaseMode):
         proc = Process(
             dos_ctx, cmd, arg_str, stack_size=stack_size, shell=shell, cwd=cwd
         )
+        if not proc.ok:
+            return None
         return proc
 
     def get_cmd_args(self, cmd_cfg, args):

@@ -1,6 +1,7 @@
-from amitools.vamos.machine.regs import *
+from amitools.vamos.machine.regs import REG_D0, REG_D1, REG_A0, REG_A1
+from amitools.vamos.astructs import APTR
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.lib.util.TagList import *
+from amitools.vamos.libtypes import TagList, TagItem
 from amitools.vamos.lib.util.AmiDate import *
 from amitools.vamos.log import *
 
@@ -93,38 +94,92 @@ class UtilityLibrary(LibImpl):
 
     # Tags
 
-    def NextTagItem(self, ctx):
-        ti_ptr_addr = ctx.cpu.r_reg(REG_A0)
-        ti_addr = ctx.mem.r32(tr_ptr_addr)
-        ti_addr = next_tag_item(ctx, ti_addr)
-        if ti_addr is None:
-            next_addr = 0
-        else:
-            next_addr = ti_addr + 8
-        ctx.mem.w32(tr_ptr_addr, next_addr)
-        return ti_addr
-
-    def FindTagItem(self, ctx):
-        tagValue = ctx.cpu.r_reg(REG_D0)
-        ti_addr = ctx.cpu.r_reg(REG_A0)
-        if ti_addr == 0:
+    def FindTagItem(self, ctx, tag_val, tag_list: TagList) -> TagItem:
+        if not tag_list:
             return 0
-        while True:
-            ti_addr = next_tag_item(ctx, ti_addr)
-            if ti_addr is None:
-                return 0
-            tag, _ = get_tag(ctx, ti_addr)
-            if tag == tagValue:
-                return ti_addr
-            ti_addr += 8
-
-    def GetTagData(self, ctx):
-        defaultValue = ctx.cpu.r_reg(REG_D1)
-        ti_addr = self.FindTagItem(ctx)
-        if ti_addr != 0:
-            return get_tag(ctx, ti_addr)[1]
+        log_utility.info("FindTagItem(tag=%08x, list=%s)", tag_val, tag_list)
+        tag = tag_list.find_tag(tag_val)
+        if tag:
+            log_utility.info("found tag: %r", tag)
+            return tag
         else:
-            return defaultValue
+            log_utility.info("no tag!")
+            return 0
+
+    def GetTagData(self, ctx, tag_val, default_val, tag_list_addr):
+        if tag_list_addr == 0:
+            return default_val
+        log_utility.info(
+            "GetTagData(tag=%08x, def=%08x, list=%08x)",
+            tag_val,
+            default_val,
+            tag_list_addr,
+        )
+        tl = TagList(ctx.mem, tag_list_addr)
+        data = tl.get_tag_data(tag_val, default_val)
+        log_utility.info("result data=%08x", data)
+        return data
+
+    def PackBoolTags(self, ctx, init_flags, tag_list_addr, bool_map_addr):
+        if tag_list_addr == 0 or bool_map_addr == 0:
+            return 0
+        log_utility.info(
+            "PackBoolTags(flags=%08x, list=%08x, map=%08x)",
+            init_flags,
+            tag_list_addr,
+            bool_map_addr,
+        )
+        tag_list = TagList(ctx.mem, tag_list_addr)
+        bool_map = TagList(ctx.mem, bool_map_addr)
+        result = init_flags
+        for tag in tag_list:
+            on_flag = tag.get_data()
+            bool_tag = bool_map.find_tag(tag)
+            if bool_tag:
+                mask_val = bool_tag.get_data()
+                if on_flag:
+                    result |= mask_val
+                else:
+                    result &= ~mask_val
+        log_utility.info("result mask=%08x", result)
+        return result
+
+    def NextTagItem(self, ctx, ti_ptr: APTR(APTR(TagItem))):
+        if ti_ptr is None:
+            return 0
+        tag_ptr = ti_ptr.ref
+        log_utility.info("NextTagItem(ti_ptr=%s) -> tag=%s", ti_ptr, tag_ptr)
+        if tag_ptr is None:
+            return 0
+        tag = tag_ptr.ref
+        real_tag = tag.next_real_tag()
+        if real_tag is None:
+            log_utility.info("no real tag!")
+            tag_ptr.ref = None
+            return 0
+        else:
+            succ_tag = tag.succ_tag()
+            log_utility.info("real tag=%r, succ_tag=%r", tag, succ_tag)
+            tag_ptr.ref = succ_tag
+            return tag.get_addr()
+
+    def FilterTagChanges(self, ctx, change_list: TagList, orig_list: TagList, apply):
+        if change_list is None or orig_list is None:
+            return 0
+        log_utility.info(
+            "FilterTagChanges(change=%s, orig=%s, apply=%s)",
+            change_list,
+            orig_list,
+            apply,
+        )
+        for tag in change_list:
+            orig_tag = orig_list.find_tag(tag)
+            if orig_tag:
+                tag_data = tag.get_data()
+                if tag_data == orig_tag.get_data():
+                    tag.remove()
+                elif apply:
+                    orig_tag.set_data(tag_data)
 
     # ---- Date -----
 

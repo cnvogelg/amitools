@@ -13,7 +13,9 @@ class DosProcess(ExecTask):
         self.proc = Process.alloc(alloc, name=name)
         self.proc.new_proc()
 
-        super().__init__(machine, alloc, name, ami_task=self.proc.task, **kw_args)
+        super().__init__(
+            machine, alloc, name, ami_task=self.proc.task, ami_proc=self.proc, **kw_args
+        )
 
     def free(self):
         self.proc.free()

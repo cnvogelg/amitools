@@ -4,7 +4,7 @@ from amitools.vamos.mode import BaseMode
 
 
 class VamosTask:
-    def run(self, func_list, process=False):
+    def run(self, func_list, process=False, args=None):
         def wrap(ctx, func):
             def wrap_func(task):
                 return func(ctx, task)
@@ -33,8 +33,12 @@ class VamosTask:
             return result
 
         mode = BaseMode("task", task_gen)
+        if args is None:
+            args = []
         exit_codes = main(
-            args=["-l", "libmgr:info,exec:info"], mode=mode, single_return_code=False
+            args=args,
+            mode=mode,
+            single_return_code=False,
         )
         assert exit_codes is not None
         return exit_codes

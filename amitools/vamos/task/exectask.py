@@ -20,6 +20,7 @@ class ExecTask(MappedTask):
         start_regs=None,
         return_regs=None,
         ami_task=None,
+        ami_proc=None,
     ):
         # alloc stack, and task
         self.stack = Stack.alloc(alloc, stack_size, name=name + "_Stack")
@@ -44,7 +45,7 @@ class ExecTask(MappedTask):
             code = Code(start_pc, sp, start_regs, return_regs)
             sched_task = NativeTask(name, machine, code)
 
-        super().__init__(sched_task, self.task)
+        super().__init__(sched_task, self.task, ami_proc)
 
     def free(self):
         if self.own_task:

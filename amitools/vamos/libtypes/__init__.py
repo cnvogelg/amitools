@@ -10,3 +10,7 @@ from .msg import MsgPort, Message
 # dos
 from .lock import FileLock, FileHandle
 from .process import CLI, Process, PathList
+
+# util
+from .tag import CommonTag, TagItem, TagList
+from .dostag import DosTag

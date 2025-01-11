@@ -2,7 +2,7 @@ from enum import IntEnum
 from amitools.vamos.libstructs import TagItemStruct
 
 
-class CommonTags(IntEnum):
+class CommonTag(IntEnum):
     TAG_DONE = 0
     TAG_IGNORE = 1
     TAG_MORE = 2
@@ -11,16 +11,16 @@ class CommonTags(IntEnum):
 
 
 ControlTags = [
-    CommonTags.TAG_DONE,
-    CommonTags.TAG_IGNORE,
-    CommonTags.TAG_MORE,
-    CommonTags.TAG_SKIP,
+    CommonTag.TAG_DONE,
+    CommonTag.TAG_IGNORE,
+    CommonTag.TAG_MORE,
+    CommonTag.TAG_SKIP,
 ]
 
 
-class Tag(TagItemStruct):
+class TagItem(TagItemStruct):
     def __repr__(self):
-        return f"Tag(@{self.addr:08x})"
+        return f"TagItem(@{self.addr:08x})"
 
     def next_real_tag(self):
         """return this or the next 'real' tag.
@@ -39,26 +39,53 @@ class Tag(TagItemStruct):
         """successor tag after this one"""
         tag = self.tag.val
         data = self.data.val
-        if tag == CommonTags.TAG_DONE:
+        if tag == CommonTag.TAG_DONE:
             return None
-        elif tag == CommonTags.TAG_MORE:
+        elif tag == CommonTag.TAG_MORE:
             if data == 0:
                 return None
             else:
-                return Tag(self.mem, data)
-        elif tag == CommonTags.TAG_SKIP:
+                return TagItem(self.mem, data)
+        elif tag == CommonTag.TAG_SKIP:
             addr = self.addr + 8 * (1 + data)
-            return Tag(self.mem, addr)
+            return TagItem(self.mem, addr)
         else:
-            return Tag(self.mem, self.addr + 8)
+            return TagItem(self.mem, self.addr + 8)
 
     def succ_real_tag(self):
         succ = self.succ_tag()
         if succ:
             return succ.next_real_tag()
 
-    def get_tuple(self):
-        return (self.tag.val, self.data.val)
+    def get_tuple(self, map_enum=None, do_map=True):
+        tag = self.get_tag(map_enum=map_enum, do_map=do_map)
+        data = self.data.val
+        return (tag, data)
+
+    def get_tag(self, map_enum=None, do_map=True):
+        tag = self.tag.val
+        if do_map:
+            try:
+                tag = CommonTag(tag)
+            except ValueError:
+                if map_enum:
+                    try:
+                        tag = map_enum(tag)
+                    except ValueError:
+                        pass
+        return tag
+
+    def get_data(self):
+        return self.data.val
+
+    def set_tag(self, tag):
+        self.tag.val = tag
+
+    def set_data(self, data):
+        self.data.val = data
+
+    def remove(self):
+        self.tag.val = CommonTag.TAG_IGNORE
 
 
 class TagListIter:
@@ -78,9 +105,23 @@ class TagListIter:
 
 class TagList:
     def __init__(self, mem, addr):
-        self.tag = Tag(mem, addr)
+        self.tag = TagItem(mem, addr)
+        self._mem = mem
+        self._addr = addr
         self._alloc = None
         self._mem_obj = None
+
+    def get_addr(self):
+        return self._addr
+
+    def get_mem(self):
+        return self._mem
+
+    def get_first_tag(self):
+        return self.tag
+
+    def __repr__(self):
+        return f"[TagList,@{self._addr:08x}]"
 
     def __iter__(self):
         return TagListIter(self.tag)
@@ -93,20 +134,24 @@ class TagList:
             num += 1
         return num
 
-    def to_list(self):
+    def to_list(self, map_enum=None, do_map=True):
         """convert tag list to python list"""
         tag = self.tag.next_real_tag()
         result = []
         while tag:
-            result.append(tag.get_tuple())
+            result.append(tag.get_tuple(map_enum=map_enum, do_map=do_map))
             tag = tag.succ_real_tag()
         return result
 
-    def find_tag(self, tag):
-        """find tag in list and if found return Tag() or None"""
+    def find_tag(self, tag_val):
+        """find tag/tag item in list and if found return TagItem() or None"""
+        # auto convert tag item
+        if isinstance(tag_val, TagItem):
+            tag_val = tag_val.tag.val
+
         tag = self.tag.next_real_tag()
         while tag:
-            if tag.tag.val == tag:
+            if tag.tag.val == tag_val:
                 return tag
             tag = tag.succ_real_tag()
 
@@ -122,21 +167,28 @@ class TagList:
         """find tag and overwrite it with TAG_IGNORE"""
         tag = self.find_tag(tag)
         if tag:
-            tag.tag.val = CommonTags.TAG_IGNORE
+            tag.tag.val = CommonTag.TAG_IGNORE
             return True
         else:
             return False
+
+    def get_tag_data(self, tag_val, def_value=0):
+        tag = self.find_tag(tag_val)
+        if tag:
+            return tag.data.val
+        else:
+            return def_value
 
     @classmethod
     def alloc(cls, alloc, *tag_list, label=None):
         tag_list = list(tag_list)
         num_tags = len(tag_list)
         if num_tags == 0:
-            tag_list.append((CommonTags.TAG_DONE, 0))
+            tag_list.append((CommonTag.TAG_DONE, 0))
             num_tags == 1
         # auto add TAG DONE if missing
-        elif tag_list[-1][0] != CommonTags.TAG_DONE:
-            tag_list.append((CommonTags.TAG_DONE, 0))
+        elif tag_list[-1][0] != CommonTag.TAG_DONE:
+            tag_list.append((CommonTag.TAG_DONE, 0))
             num_tags += 1
         # size of tag list
         num_bytes = num_tags * 8

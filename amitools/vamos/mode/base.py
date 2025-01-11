@@ -14,7 +14,7 @@ class BaseMode:
         # generate tasks
         task_list = self.gen_task_list_func(ctx)
         if task_list is None:
-            return 0
+            return [255]
 
         # add tasks to scheduler
         for task in task_list:
