@@ -36,6 +36,7 @@ class MyStub:
         self.hello_count += 1
         self.hello_kwargs = kwargs
         self.ctx.cpu.w_reg(REG_D0, self.hello_count)
+        return self.hello_count
 
     def PrintString(self, **kwargs):
         self.string_count += 1
@@ -44,6 +45,7 @@ class MyStub:
         self.string_txt = self.ctx.mem.r_cstr(self.string_reg_a0)
         self.ctx.cpu.w_reg(REG_D0, self.string_count)
         self.ctx.cpu.w_reg(REG_D1, 2 * self.string_count)
+        return (self.string_count, 2 * self.string_count)
 
 
 class MyRuntime:

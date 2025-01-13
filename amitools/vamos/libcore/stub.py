@@ -138,6 +138,7 @@ class LibStubGen(object):
             def stub_func(this, *args, **kwargs):
                 # return d0=0
                 ctx.cpu.w_reg(REG_D0, 0)
+                return 0
 
         else:
             # with tracing
@@ -151,6 +152,7 @@ class LibStubGen(object):
                 )
                 log.warning("? CALL: %s -> d0=0 (default)", call_info)
                 ctx.cpu.w_reg(REG_D0, 0)
+                return 0
 
         return stub_func
 
@@ -164,6 +166,7 @@ class LibStubGen(object):
             def stub_func(this, *args, **kwargs):
                 # return d0=0
                 ctx.cpu.w_reg(REG_D0, 0)
+                return 0
 
         else:
             name = fd_func.get_name()
@@ -182,6 +185,7 @@ class LibStubGen(object):
                 )
                 log.warning("? CALL: %s -> d0=0 (default)", call_info)
                 ctx.cpu.w_reg(REG_D0, 0)
+                return 0
 
         func = stub_func
 
@@ -191,8 +195,9 @@ class LibStubGen(object):
             prof = profile.get_func_by_index(index)
 
             def profile_func(this, *args, **kwargs):
-                stub_func(this, *args, **kwargs)
+                res = stub_func(this, *args, **kwargs)
                 prof.count(0.0)
+                return res
 
             func = profile_func
 
@@ -216,7 +221,24 @@ class LibStubGen(object):
                 else:
                     raise ValueError(f"Invalid result value '{res}'")
 
-        return res
+    def _get_result_str(self, res):
+        """show result values"""
+        if res is not None:
+            if type(res) in (list, tuple):
+                res_str = "d0=%08x, d1=%08x" % tuple(map(int, res))
+            elif type(res) in (int, bool):
+                res_str = "d0=%08x" % int(res)
+            else:
+                # is type object? then use its addr
+                get_addr = getattr(res, "get_addr", None)
+                if get_addr:
+                    addr = get_addr()
+                    res_str = "d0=%08x (%s)" % (addr, res)
+                else:
+                    raise ValueError(f"Invalid result value '{res}'")
+        else:
+            res_str = "n/a"
+        return res_str
 
     def _gen_extra_args(self, ctx, extra_args):
         """generate the extra arguments passed to a lib method"""
@@ -254,7 +276,8 @@ class LibStubGen(object):
             """the base function to call the impl,
             set return vals, and catch exceptions"""
             res = method(ctx)
-            return self._set_result(ctx, res)
+            self._set_result(ctx, res)
+            return res
 
         return base_func
 
@@ -268,11 +291,12 @@ class LibStubGen(object):
             args = self._gen_extra_args(ctx, extra_args)
             # call function
             res = method(ctx, *args)
-            return self._set_result(ctx, res)
+            self._set_result(ctx, res)
+            return res
 
         return base_func
 
-    def _gen_log_func(selgf, stub, fd_func, base_func, ctx, log):
+    def _gen_log_func(self, stub, fd_func, base_func, ctx, log):
         """wrap the base function with logging."""
         name = fd_func.get_name()
         func_args = fd_func.get_args()
@@ -289,14 +313,9 @@ class LibStubGen(object):
             )
             log.info("{ CALL: %s" % call_info)
             res = base_func(this, *args, **kwargs)
-            if res is not None:
-                if type(res) in (list, tuple):
-                    res_str = "d0=%08x, d1=%08x" % tuple(map(int, res))
-                else:
-                    res_str = "d0=%08x" % int(res)
-            else:
-                res_str = "n/a"
+            res_str = self._get_result_str(res)
             log.info("} CALL: -> %s" % res_str)
+            return res
 
         return log_func
 
@@ -307,10 +326,11 @@ class LibStubGen(object):
 
         def profile_func(this, *args, **kwargs):
             start = time.perf_counter()
-            func(this, *args, **kwargs)
+            res = func(this, *args, **kwargs)
             end = time.perf_counter()
             delta = end - start
             prof.count(delta)
+            return res
 
         return profile_func
 

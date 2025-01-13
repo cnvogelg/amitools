@@ -30,11 +30,12 @@ def pytask_util_tag_find_tag_item_test(vamos_task):
         tl = TagList.alloc(ctx.alloc, (MyTag.FOO_TAG, 1), (MyTag.BAR_TAG, 2))
         assert tl is not None
         # test func
-        addr = lib.FindTagItem(MyTag.BAR_TAG, tl)
-        assert addr == tl.get_addr() + 8
-        assert TagItem(ctx.mem, addr).get_tag() == MyTag.BAR_TAG
-        addr = lib.FindTagItem(MyTag.BAZ_TAG, tl)
-        assert addr == 0
+        tag = lib.FindTagItem(MyTag.BAR_TAG, tl, wrap_res=TagItem)
+        assert type(tag) is TagItem
+        assert tag.get_addr() == tl.get_addr() + 8
+        assert tag.get_tag() == MyTag.BAR_TAG
+        tag = lib.FindTagItem(MyTag.BAZ_TAG, tl, wrap_res=TagItem)
+        assert tag is None
         # free tag list
         tl.free()
 

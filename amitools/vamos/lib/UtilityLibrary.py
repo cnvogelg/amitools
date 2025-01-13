@@ -96,7 +96,7 @@ class UtilityLibrary(LibImpl):
 
     def FindTagItem(self, ctx, tag_val, tag_list: TagList) -> TagItem:
         if not tag_list:
-            return 0
+            return None
         log_utility.info("FindTagItem(tag=%08x, list=%s)", tag_val, tag_list)
         tag = tag_list.find_tag(tag_val)
         if tag:
@@ -104,7 +104,7 @@ class UtilityLibrary(LibImpl):
             return tag
         else:
             log_utility.info("no tag!")
-            return 0
+            return None
 
     def GetTagData(self, ctx, tag_val, default_val, tag_list_addr):
         if tag_list_addr == 0:

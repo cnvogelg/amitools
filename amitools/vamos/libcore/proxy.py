@@ -24,6 +24,8 @@ class LibProxyRegs:
         self.arg_regs = arg_regs
         # shall we return d1 as well?
         self.ret_d1 = kwargs.pop("ret_d1", False)
+        # shall we wrap the return value into a type
+        self.wrap_res = kwargs.pop("wrap_res", None)
         self.kw_args = kwargs
         # auto strings
         self.auto_strings = []
@@ -63,6 +65,9 @@ class LibProxyRegs:
     def return_d1(self):
         return self.ret_d1
 
+    def wrap_result(self):
+        return self.wrap_res
+
     def cleanup(self):
         for mem in self.auto_strings:
             self.ctx.alloc.free_cstr(mem)
@@ -88,23 +93,32 @@ class LibProxyGen:
             regs = LibProxyRegs(self.ctx, args, arg_regs, kwargs)
 
             # fill registers with arg values
+            # (lib call may depend on it)
             reg_map = regs.input_reg_map()
             for reg, val in reg_map.items():
                 self.ctx.cpu.w_reg(reg, val)
 
             # perform call at stub
-            stub_method(**kwargs)
+            res = stub_method(**kwargs)
 
             # clean up auto strings
             regs.cleanup()
 
-            # prepare return value
-            d0 = self.ctx.cpu.r_reg(REG_D0)
-            if regs.return_d1():
-                d1 = self.ctx.cpu.r_reg(REG_D1)
-                return (d0, d1)
+            # if we have to wrap the result we could actually directly use
+            # the returned value from the stub call.
+            # just make sure its the same type
+            result_type = regs.wrap_result()
+            if result_type:
+                assert res is None or type(res) is result_type
+                return res
             else:
-                return d0
+                # classic return value from d0/d1
+                d0 = self.ctx.cpu.r_reg(REG_D0)
+                if regs.return_d1():
+                    d1 = self.ctx.cpu.r_reg(REG_D1)
+                    return (d0, d1)
+                else:
+                    return d0
 
         return stub_call
 
@@ -126,10 +140,16 @@ class LibProxyGen:
             # cleanup regs
             regs.cleanup()
 
-            if regs.return_d1():
-                return rs.regs[REG_D0], rs.regs[REG_D1]
+            # warp result into type?
+            d0 = rs.regs[REG_D0]
+            result_type = regs.wrap_result()
+            if result_type:
+                # wrap into given type located at address d0
+                return result_type(mem=self.ctx.mem, addr=d0)
+            elif regs.return_d1():
+                return d0, rs.regs[REG_D1]
             else:
-                return rs.regs[REG_D0]
+                return d0
 
         return lib_call
 
