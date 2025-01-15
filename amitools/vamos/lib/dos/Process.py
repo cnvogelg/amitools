@@ -43,6 +43,7 @@ class Process:
 
         self.ok = self.load_binary(self.cwd_lock, bin_file, shell)
         if not self.ok:
+            self.free_cwd()
             return
         # setup stack
         self.stack = Stack.alloc(self.ctx.alloc, stack_size)
@@ -73,8 +74,7 @@ class Process:
         self.free_shell_packet()
         self.free_cli_struct()
         self.free_args()
-        # stack is freed by scheduler
-        # self.stack.free()
+        self.stack.free()
         self.unload_binary()
 
     def __str__(self):

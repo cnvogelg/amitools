@@ -8,6 +8,9 @@
 #ifndef  EXEC_TYPES_H
 #include <exec/types.h>
 #endif
+#ifndef  UTILITY_TAGITEM_H
+#include <utility/tagitem.h>
+#endif
 
 #ifndef VAMOSTEST_BASE_NAME
 #define VAMOSTEST_BASE_NAME VamosTestBase
@@ -70,5 +73,23 @@
   ((ULONG (*)(char * __asm("a6"), ULONG __asm("d0"), STRPTR * __asm("a0"))) \
   (_ExecutePy__bn - 66))(_ExecutePy__bn, _ExecutePy_argc, _ExecutePy_argv); \
 });})
+
+#define MyFindTagData(tagVal, tagList) ({ \
+  ULONG _MyFindTagData_tagVal = (tagVal); \
+  CONST struct TagItem * _MyFindTagData_tagList = (tagList); \
+  ({ \
+  register char * _MyFindTagData__bn __asm("a6") = (char *) (VAMOSTEST_BASE_NAME);\
+  ((ULONG (*)(char * __asm("a6"), ULONG __asm("d0"), CONST struct TagItem * __asm("a0"))) \
+  (_MyFindTagData__bn - 72))(_MyFindTagData__bn, _MyFindTagData_tagVal, _MyFindTagData_tagList); \
+});})
+
+#ifndef NO_INLINE_STDARG
+static __inline__ ULONG ___MyFindTagDataTags(struct VamosTestBase * VamosTestBase, ULONG tagVal, ULONG tagList, ...)
+{
+  return MyFindTagData(tagVal, (CONST struct TagItem *) &tagList);
+}
+
+#define MyFindTagDataTags(tagVal...) ___MyFindTagDataTags(VAMOSTEST_BASE_NAME, tagVal)
+#endif
 
 #endif /*  _INLINE_VAMOSTEST_H  */

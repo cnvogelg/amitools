@@ -6,6 +6,7 @@ from amitools.vamos.libcore import LibImpl
 from amitools.vamos.error import VamosInternalError
 from amitools.vamos.machine import InvalidMemoryAccessError
 from amitools.vamos.astructs import CSTR
+from amitools.vamos.libtypes import TagList, TagItem
 
 
 class VamosTestLibrary(LibImpl):
@@ -50,6 +51,15 @@ class VamosTestLibrary(LibImpl):
     def Swap(self, ctx, a, b):
         """define input values directly as function arguments"""
         return b, a
+
+    def MyFindTagData(self, ctx, tag_val, tag_list: TagList):
+        if not tag_list:
+            return 0
+        tag = tag_list.find_tag(tag_val)
+        if tag:
+            return tag.get_data()
+        else:
+            return 0
 
     def RaiseError(self, ctx, txt_ptr: CSTR):
         txt = txt_ptr.str

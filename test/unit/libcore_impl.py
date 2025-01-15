@@ -31,7 +31,7 @@ def libcore_impl_scan_vamos_test():
     assert res.get_name() == name
     assert res.get_impl() == impl
     assert res.get_fd() == fd
-    assert res.get_num_valid_funcs() == 5
+    assert res.get_num_valid_funcs() == 6
     assert res.get_num_missing_funcs() == 1
     assert res.get_num_error_funcs() == 1
     assert res.get_num_invalid_funcs() == 1
@@ -78,9 +78,17 @@ def libcore_impl_scan_vamos_test():
         "Swap": res.get_func_by_name("Swap"),
         "RaiseError": res.get_func_by_name("RaiseError"),
         "ExecutePy": res.get_func_by_name("ExecutePy"),
+        "MyFindTagData": res.get_func_by_name("MyFindTagData"),
     }
     valid_names = res.get_valid_func_names()
-    assert valid_names == ["Add", "ExecutePy", "PrintString", "RaiseError", "Swap"]
+    assert valid_names == [
+        "Add",
+        "ExecutePy",
+        "MyFindTagData",
+        "PrintString",
+        "RaiseError",
+        "Swap",
+    ]
     valid_func = res.get_func_by_name("ExecutePy")
     assert valid_func.name == "ExecutePy"
     assert valid_func.fd_func == fd.get_func_by_name("ExecutePy")

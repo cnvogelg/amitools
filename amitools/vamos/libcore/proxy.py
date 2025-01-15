@@ -1,4 +1,5 @@
 from amitools.vamos.machine import Code, REG_D0, REG_D1
+from amitools.vamos.libtypes import TagList
 
 
 class LibProxy:
@@ -29,32 +30,46 @@ class LibProxyRegs:
         self.kw_args = kwargs
         # auto strings
         self.auto_strings = []
+        self.auto_tag_lists = []
 
     def input_reg_map(self):
         reg_map = {}
         for reg, val in zip(self.arg_regs, self.args):
-            # auto convert strings
-            if val is None:
-                val = 0
-            elif isinstance(val, int):
-                pass
-            elif isinstance(val, str):
-                str_mem = self.ctx.alloc.alloc_cstr(val, label="reg_auto_str")
-                val = str_mem.addr
-                self.auto_strings.append(str_mem)
-            # complex object? try to get its in memory address via "get_addr"
-            else:
-                # has 'addr'?
-                get_addr = getattr(val, "get_addr", None)
-                if get_addr is not None:
-                    val = get_addr()
-                else:
-                    raise ValueError(
-                        f"Invalid argument for proxy call reg={reg} val={val}"
-                    )
-
-            reg_map[reg] = val
+            reg_map[reg] = self._map_value(val)
         return reg_map
+
+    def _map_value(self, val):
+        if val is None:
+            val = 0
+        elif isinstance(val, int):
+            pass
+        # auto convert strings
+        elif isinstance(val, str):
+            str_mem = self.ctx.alloc.alloc_cstr(val, label="reg_auto_str")
+            val = str_mem.addr
+            self.auto_strings.append(str_mem)
+        # auto convert tag list: [(tag, data), (tag2, data2), ...]
+        elif isinstance(val, list):
+            map_list = self._map_tag_list(val)
+            tag_list = TagList.alloc(self.ctx.alloc, *map_list)
+            self.auto_tag_lists.append(tag_list)
+            val = tag_list.get_addr()
+        # complex object? try to get its in memory address via "get_addr"
+        else:
+            # has 'addr'?
+            get_addr = getattr(val, "get_addr", None)
+            if get_addr is not None:
+                val = get_addr()
+            else:
+                raise ValueError(f"Invalid argument for proxy call reg={reg} val={val}")
+        return val
+
+    def _map_tag_list(self, tag_list):
+        result = []
+        for tag, data in tag_list:
+            val = self._map_value(data)
+            result.append((tag, val))
+        return result
 
     def output_reg_list(self):
         regs = [REG_D0]
@@ -71,6 +86,8 @@ class LibProxyRegs:
     def cleanup(self):
         for mem in self.auto_strings:
             self.ctx.alloc.free_cstr(mem)
+        for tag_list in self.auto_tag_lists:
+            tag_list.free()
 
 
 class LibProxyGen:

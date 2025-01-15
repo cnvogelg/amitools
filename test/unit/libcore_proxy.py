@@ -7,6 +7,7 @@ from amitools.vamos.machine import Runtime
 from amitools.vamos.mem import MemoryAlloc
 from amitools.fd import read_lib_fd
 from amitools.vamos.machine.regs import *
+from amitools.vamos.libtypes import TagList
 
 
 def _create_ctx():
@@ -31,6 +32,9 @@ class MyStub:
         self.string_count = 0
         self.string_kwargs = None
         self.string_reg_a0 = None
+        self.tag_val = None
+        self.tag_list = None
+        self.tag_data = None
 
     def PrintHello(self, **kwargs):
         self.hello_count += 1
@@ -46,6 +50,19 @@ class MyStub:
         self.ctx.cpu.w_reg(REG_D0, self.string_count)
         self.ctx.cpu.w_reg(REG_D1, 2 * self.string_count)
         return (self.string_count, 2 * self.string_count)
+
+    def MyFindTagData(self, **kwwargs):
+        print("HALLO")
+        self.tag_val = self.ctx.cpu.r_reg(REG_D0)
+        self.tag_list = self.ctx.cpu.r_reg(REG_A0)
+        tag_list = TagList(mem=self.ctx.mem, addr=self.tag_list)
+        result = 0
+        for tag in tag_list:
+            if tag.get_tag() == self.tag_val:
+                result = tag.get_data()
+        self.tag_data = result
+        self.ctx.cpu.w_reg(REG_D0, result)
+        return result
 
 
 class MyRuntime:
@@ -123,6 +140,12 @@ def libcore_proxy_gen_stub_test():
         proxy.PrintString()
     with pytest.raises(AssertionError):
         proxy.PrintString(1, 2)
+
+    # call with in-place tag list
+    ret = proxy.MyFindTagData(101, [(100, 23), (101, 42), (102, "hello")])
+    assert ret == 42
+    assert stub.tag_val == 101
+    assert stub.tag_data == 42
 
 
 def libcore_proxy_gen_libcall_test():

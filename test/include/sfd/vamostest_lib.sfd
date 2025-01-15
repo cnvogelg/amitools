@@ -1,4 +1,4 @@
-==id $Id: vamostest_lib.sfd,v 1.0 2021/03/17 22:04:32 noname Exp $
+==id $Id: vamostest_lib.sfd,v 1.0 2025/01/15 12:44:51 noname Exp $
 * "vamostest.library"
 ==base _VamosTestBase
 ==basetype struct VamosTestBase *
@@ -6,6 +6,7 @@
 ==bias 30
 ==public
 ==include <exec/types.h>
+==include <utility/tagitem.h>
 VOID PrintHello() ()
 VOID PrintString(STRPTR str) (a0)
 ULONG Add(ULONG a, ULONG b) (d0,d1)
@@ -13,4 +14,7 @@ ULONG Swap(ULONG a, ULONG b) (d0,d1)
 ULONG Dummy(ULONG a, ULONG b) (d0,d1)
 VOID RaiseError(STRPTR str) (a0)
 ULONG ExecutePy(ULONG argc, STRPTR * argv) (d0,a0)
+ULONG MyFindTagData(ULONG tagVal, CONST struct TagItem * tagList) (d0,a0)
+==varargs
+ULONG MyFindTagDataTags(ULONG tagVal, ULONG tagList, ...) (d0,a0)
 ==end

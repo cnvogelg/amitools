@@ -26,7 +26,7 @@ class ProcMode(BaseMode):
             return None
 
         # split command into binary and args
-        cmd_arg = self.get_cmd_args(cmd_cfg, args)
+        cmd_arg = self.get_cmd_args(mode_ctx, cmd_cfg, args)
         if cmd_arg is None:
             return None
         cmd, arg_str = cmd_arg
@@ -52,7 +52,7 @@ class ProcMode(BaseMode):
             return None
         return proc
 
-    def get_cmd_args(self, cmd_cfg, args):
+    def get_cmd_args(self, mode_ctx, cmd_cfg, args):
         # a single Amiga-like raw arg was passed
         if cmd_cfg.raw_arg:
             # check args
@@ -75,6 +75,7 @@ class ProcMode(BaseMode):
                 # if path exists on host system then make an ami path
                 if os.path.exists(binary):
                     sys_binary = binary
+                    dos_ctx = mode_ctx.dos_ctx
                     binary = dos_ctx.path_mgr.from_sys_path(binary)
                     if not binary:
                         log_proc.error("can't map binary: %s", sys_binary)
