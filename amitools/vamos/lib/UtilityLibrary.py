@@ -1,11 +1,12 @@
+from math import trunc
 from amitools.vamos.machine.regs import REG_D0, REG_D1, REG_A0, REG_A1
 from amitools.vamos.astructs import APTR
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.libtypes import TagList, TagItem
+from amitools.vamos.libtypes import TagList, TagItem, CommonTag, TagArray, Tag
 from amitools.vamos.lib.util.AmiDate import *
+from amitools.vamos.lib.util.flags import MapTagsFlag, FilterTagItemsFlag
+from amitools.vamos.lib.lexec.flags import MemFlag
 from amitools.vamos.log import *
-
-from math import trunc
 
 
 class UtilityLibrary(LibImpl):
@@ -180,6 +181,86 @@ class UtilityLibrary(LibImpl):
                     tag.remove()
                 elif apply:
                     orig_tag.set_data(tag_data)
+
+    def MapTags(self, ctx, tag_list: TagList, map_list: TagList, map_type):
+        if tag_list is None or map_list is None:
+            return
+        log_utility.info(
+            "MapTags(tag_list=%s, map_list=%s, map_type=%s)",
+            tag_list,
+            map_list,
+            map_type,
+        )
+        for tag in tag_list:
+            map_tag = map_list.find_tag(tag)
+            if map_tag:
+                log_utility.debug("map tag %s -> %s", tag, map_tag)
+                tag.set_tag(map_tag.get_data())
+            elif map_type == MapTagsFlag.MAP_REMOVE_NOT_FOUND:
+                log_utility.debug("remove tag %s", tag)
+                tag.remove()
+
+    def AllocateTagItems(self, ctx, num_tags) -> TagList:
+        log_utility.info("AllocateTagItems(num_tags=%s)", num_tags)
+        exec_lib = ctx.proxies.get_exec_lib_proxy()
+        size = num_tags * 8
+        addr = exec_lib.AllocVec(size, MemFlag.MEMF_CLEAR | MemFlag.MEMF_PUBLIC)
+        log_utility.info("addr=%08x", addr)
+        return TagList(ctx.mem, addr)
+
+    def CloneTagItems(self, ctx, tag_list: TagList) -> TagList:
+        log_utility.info("CloneTagItems(tag_list=%s)", tag_list)
+        num_items = len(tag_list)
+        log_utility.debug("num_items=%d", num_items)
+        new_tag_list = self.AllocateTagItems(ctx, num_items)
+        if new_tag_list is None:
+            return None
+        log_utility.debug("new_list=%s", new_tag_list)
+        tag_list.clone_to(new_tag_list)
+        return new_tag_list
+
+    def FreeTagItems(self, ctx, tag_list):
+        log_utility.info("FreeTagItems(addr=%08x)", tag_list)
+        exec_lib = ctx.proxies.get_exec_lib_proxy()
+        exec_lib.FreeVec(tag_list)
+
+    def RefreshTagItemClones(self, ctx, clone_list: TagList, orig_list: TagList):
+        log_utility.info(
+            "RefreshTagItemClones(clone=%s, orig=%s)", clone_list, orig_list
+        )
+        if clone_list is None:
+            return
+        if orig_list is None:
+            # if orig list is not available then clear clone
+            clone_list.get_first_tag().remove()
+            return
+        orig_list.clone_to(clone_list)
+
+    def TagInArray(self, ctx, tag_value, tag_array: TagArray):
+        log_utility.info("TagInArray(val=%08x, array=%s)", tag_value, tag_array)
+        return tag_array.find_tag(tag_value)
+
+    def FilterTagItems(self, ctx, tag_list: TagList, filter_array: TagArray, logic):
+        log_utility.info(
+            "FilterTagItems(tag_list=%s, filter_array=%s, logic=%s)",
+            tag_list,
+            filter_array,
+            logic,
+        )
+        valid = 0
+        for tag in tag_list:
+            found = filter_array.find_tag(tag)
+            if logic == FilterTagItemsFlag.TAGFILTER_AND:
+                if found:
+                    valid += 1
+                else:
+                    tag.remove()
+            elif logic == FilterTagItemsFlag.TAGFILTER_NOT:
+                if found:
+                    tag.remove()
+                else:
+                    valid += 1
+        return valid
 
     # ---- Date -----
 

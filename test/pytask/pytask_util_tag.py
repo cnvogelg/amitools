@@ -1,6 +1,7 @@
 from enum import IntEnum
-from amitools.vamos.libtypes import TagList, TagItem
+from amitools.vamos.libtypes import TagList, TagItem, CommonTag, TagArray
 from amitools.vamos.astructs import APTR
+from amitools.vamos.lib.util.flags import MapTagsFlag, FilterTagItemsFlag
 
 
 class MyTag(IntEnum):
@@ -138,5 +139,121 @@ def pytask_util_tag_filter_tag_changes_test(vamos_task):
         # free tag list
         change_list.free()
         orig_list.free()
+
+    run_util_func(vamos_task, func)
+
+
+def pytask_util_map_tags_test(vamos_task):
+    def func(ctx, lib):
+        # build tag list
+        orig_list = TagList.alloc(ctx.alloc, (MyTag.FOO_TAG, 2), (MyTag.BAR_TAG, 4))
+        assert orig_list is not None
+        map_list = TagList.alloc(ctx.alloc, (MyTag.FOO_TAG, MyTag.BAZ_TAG))
+        assert map_list is not None
+
+        # MAP_KEEP_NOT_FOUND
+        lib.MapTags(orig_list, map_list, MapTagsFlag.MAP_KEEP_NOT_FOUND)
+        assert orig_list.to_list() == [
+            (MyTag.BAZ_TAG, 2),
+            (MyTag.BAR_TAG, 4),
+        ]
+
+        # restore list
+        orig_list.get_first_tag().set_tag(MyTag.FOO_TAG)
+
+        # MAP_REMOVE_NOT_FOUND
+        lib.MapTags(orig_list, map_list, MapTagsFlag.MAP_REMOVE_NOT_FOUND)
+        assert orig_list.to_list() == [
+            (MyTag.BAZ_TAG, 2),
+        ]
+
+        # free tag list
+        map_list.free()
+        orig_list.free()
+
+    run_util_func(vamos_task, func)
+
+
+def pytask_util_alloc_free_tag_items_test(vamos_task):
+    def func(ctx, lib):
+        tag_list = lib.AllocateTagItems(8, wrap_res=TagList)
+        assert tag_list is not None
+        lib.FreeTagItems(tag_list)
+
+    run_util_func(vamos_task, func)
+
+
+def pytask_util_clone_tag_items_test(vamos_task):
+    def func(ctx, lib):
+        tag_list = TagList.alloc(ctx.alloc, (MyTag.FOO_TAG, 2), (MyTag.BAR_TAG, 4))
+        assert tag_list is not None
+
+        # clone list
+        clone_list = lib.CloneTagItems(tag_list, wrap_res=TagList)
+        assert clone_list is not None
+
+        # check for equality
+        for tag1, tag2 in zip(tag_list, clone_list):
+            assert tag1.has_same_tag_data(tag2)
+
+        # clear list
+        clone_list.get_first_tag().end_list()
+        assert len(clone_list) == 0
+
+        # refresh
+        lib.RefreshTagItemClones(clone_list, tag_list)
+
+        # check for equality
+        for tag1, tag2 in zip(tag_list, clone_list):
+            assert tag1.has_same_tag_data(tag2)
+
+        # free cloned list
+        lib.FreeTagItems(clone_list)
+        tag_list.free()
+
+    run_util_func(vamos_task, func)
+
+
+def pytask_util_tag_in_array_test(vamos_task):
+    def func(ctx, lib):
+        # prepare tag array
+        tag_array = TagArray.alloc(ctx.alloc, MyTag.FOO_TAG, MyTag.BAR_TAG)
+        assert tag_array is not None
+
+        assert lib.TagInArray(MyTag.FOO_TAG, tag_array) == 1
+        assert lib.TagInArray(MyTag.BAZ_TAG, tag_array) == 0
+
+        tag_array.free()
+
+    run_util_func(vamos_task, func)
+
+
+def pytask_util_tag_filter_tag_items_test(vamos_task):
+    def func(ctx, lib):
+        # prepare tag array
+        tag_list = TagList.alloc(ctx.alloc, (MyTag.FOO_TAG, 2), (MyTag.BAR_TAG, 4))
+        assert tag_list is not None
+        tag_array = TagArray.alloc(ctx.alloc, MyTag.BAR_TAG)
+        assert tag_array is not None
+
+        # AND
+        valid = lib.FilterTagItems(
+            tag_list, tag_array, FilterTagItemsFlag.TAGFILTER_AND
+        )
+        assert valid == 1
+        assert tag_list.to_list() == [(MyTag.BAR_TAG, 4)]
+
+        # restore list
+        tag_list.get_first_tag().set_tag(MyTag.FOO_TAG)
+
+        # NOT
+        valid = lib.FilterTagItems(
+            tag_list, tag_array, FilterTagItemsFlag.TAGFILTER_NOT
+        )
+        assert valid == 1
+        assert tag_list.to_list() == [(MyTag.FOO_TAG, 2)]
+
+        tag_array.free()
+        tag_list.free()
 
     run_util_func(vamos_task, func)

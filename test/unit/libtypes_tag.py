@@ -1,5 +1,5 @@
 from enum import IntEnum
-from amitools.vamos.libtypes import TagItem, TagList, CommonTag
+from amitools.vamos.libtypes import Tag, TagArray, TagItem, TagList, CommonTag
 from amitools.vamos.machine.mock import MockMemory
 from amitools.vamos.mem import MemoryAlloc
 
@@ -16,6 +16,17 @@ def build_tag_list(*tag_list, base=0x10, mem=None):
     base = base
     addr = base
     for entry in tag_list:
+        mem.w32(addr, entry)
+        addr += 4
+    return mem, base
+
+
+def build_tag_array(*tag_array, base=0x10, mem=None):
+    if not mem:
+        mem = MockMemory()
+    base = base
+    addr = base
+    for entry in tag_array:
         mem.w32(addr, entry)
         addr += 4
     return mem, base
@@ -167,7 +178,7 @@ def libtypes_tag_skip_more_test():
 # --- alloc tag list ---
 
 
-def libtypes_tag_alloc_empty_test():
+def libtypes_tag_list_alloc_empty_test():
     mem = MockMemory()
     alloc = MemoryAlloc(mem)
     # empty list
@@ -177,7 +188,7 @@ def libtypes_tag_alloc_empty_test():
     assert alloc.is_all_free()
 
 
-def libtypes_tag_alloc_test():
+def libtypes_tag_list_alloc_test():
     mem = MockMemory()
     alloc = MemoryAlloc(mem)
     tl = TagList.alloc(alloc, (MyTag.FOO_TAG, 1), (MyTag.BAR_TAG, 2))
@@ -191,6 +202,17 @@ def libtypes_tag_alloc_test():
 
 
 def libtypes_tag_get_set_test():
+    mem = MockMemory()
+    tag = Tag(mem=mem, addr=0x10)
+    tag.set_tag(CommonTag.TAG_IGNORE)
+    assert tag.get_tag() is CommonTag.TAG_IGNORE
+    assert tag.get_tag(do_map=False) == CommonTag.TAG_IGNORE
+
+
+# --- tag item ops ---
+
+
+def libtypes_tag_item_get_set_test():
     mem, addr = build_tag_list(
         MyTag.FOO_TAG,
         12,
@@ -258,7 +280,7 @@ def libtypes_tag_list_delete_test():
     assert tl.to_list() == [(MyTag.BAR_TAG, 13)]
 
 
-def libtypes_tag_list_get_tag_data__test():
+def libtypes_tag_list_get_tag_data_test():
     mem, addr = build_tag_list(
         MyTag.FOO_TAG,
         12,
@@ -268,3 +290,56 @@ def libtypes_tag_list_get_tag_data__test():
     tl = TagList(mem, addr)
     assert tl.get_tag_data(MyTag.BAZ_TAG, 42) == 42
     assert tl.get_tag_data(MyTag.FOO_TAG, 42) == 12
+
+
+def libtypes_tag_list_clone_to_test():
+    mem, addr = build_tag_list(
+        MyTag.FOO_TAG,
+        12,
+        MyTag.BAR_TAG,
+        13,
+        CommonTag.TAG_DONE,
+        0,
+    )
+    tl = TagList(mem, addr)
+    build_tag_list(0, 0, 0, 0, 0, 0, mem=mem, base=0x040)
+    tl2 = TagList(mem, 0x40)
+    tl.clone_to(tl2)
+    assert tl2.to_list() == [(MyTag.FOO_TAG, 12), (MyTag.BAR_TAG, 13)]
+
+
+# --- tag array ops ---
+
+
+def libtypes_tag_array_find_test():
+    mem, addr = build_tag_array(
+        MyTag.FOO_TAG,
+        MyTag.BAR_TAG,
+    )
+    tl = TagArray(mem, addr)
+    assert tl.find_tag(MyTag.BAZ_TAG) is False
+    assert tl.find_tag(MyTag.FOO_TAG) is True
+    assert tl.to_list() == [MyTag.FOO_TAG, MyTag.BAR_TAG]
+
+
+# --- alloc tag array ---
+
+
+def libtypes_tag_array_alloc_empty_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    # empty list
+    tl = TagArray.alloc(alloc)
+    assert len(tl) == 0
+    tl.free()
+    assert alloc.is_all_free()
+
+
+def libtypes_tag_array_alloc_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    tl = TagArray.alloc(alloc, MyTag.FOO_TAG, MyTag.BAR_TAG)
+    assert len(tl) == 2
+    assert tl.to_list() == [MyTag.FOO_TAG, MyTag.BAR_TAG]
+    tl.free()
+    assert alloc.is_all_free()

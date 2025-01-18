@@ -1,4 +1,5 @@
 from enum import IntEnum
+from amitools.vamos.astructs import ULONG
 from amitools.vamos.libstructs import TagItemStruct
 
 
@@ -16,6 +17,33 @@ ControlTags = [
     CommonTag.TAG_MORE,
     CommonTag.TAG_SKIP,
 ]
+
+
+class Tag(ULONG):
+    def __repr__(self):
+        return f"TagItem(@{self.addr:08x})"
+
+    def get_tag(self, map_enum=None, do_map=True):
+        tag = self.get()
+        if do_map:
+            try:
+                tag = CommonTag(tag)
+            except ValueError:
+                if map_enum:
+                    try:
+                        tag = map_enum(tag)
+                    except ValueError:
+                        pass
+        return tag
+
+    def set_tag(self, tag):
+        self.set(tag)
+
+    def next_tag(self):
+        return Tag(self.mem, self.addr + 4)
+
+    def is_done(self):
+        return self.get() == CommonTag.TAG_DONE
 
 
 class TagItem(TagItemStruct):
@@ -57,23 +85,17 @@ class TagItem(TagItemStruct):
         if succ:
             return succ.next_real_tag()
 
+    def next_tag(self):
+        return TagItem(self.mem, self.addr + 8)
+
     def get_tuple(self, map_enum=None, do_map=True):
         tag = self.get_tag(map_enum=map_enum, do_map=do_map)
         data = self.data.val
         return (tag, data)
 
     def get_tag(self, map_enum=None, do_map=True):
-        tag = self.tag.val
-        if do_map:
-            try:
-                tag = CommonTag(tag)
-            except ValueError:
-                if map_enum:
-                    try:
-                        tag = map_enum(tag)
-                    except ValueError:
-                        pass
-        return tag
+        tag = Tag(mem=self.mem, addr=self.addr)
+        return tag.get_tag(map_enum=map_enum, do_map=do_map)
 
     def get_data(self):
         return self.data.val
@@ -86,6 +108,16 @@ class TagItem(TagItemStruct):
 
     def remove(self):
         self.tag.val = CommonTag.TAG_IGNORE
+
+    def end_list(self):
+        self.tag.val = CommonTag.TAG_DONE
+
+    def clone_to(self, tag):
+        tag.set_tag(self.get_tag())
+        tag.set_data(self.get_data())
+
+    def has_same_tag_data(self, tag):
+        return self.get_tag() == tag.get_tag() and self.get_data() == tag.get_data()
 
 
 class TagListIter:
@@ -179,6 +211,13 @@ class TagList:
         else:
             return def_value
 
+    def clone_to(self, tag_list):
+        new_tag = tag_list.get_first_tag()
+        for tag in self:
+            print(tag, new_tag, tag.get_tag())
+            tag.clone_to(new_tag)
+            new_tag = new_tag.next_tag()
+
     @classmethod
     def alloc(cls, alloc, *tag_list, label=None):
         tag_list = list(tag_list)
@@ -205,6 +244,98 @@ class TagList:
         tag_list._alloc = alloc
         tag_list._mem_obj = mem_obj
         return tag_list
+
+    def free(self):
+        if self._alloc and self._mem_obj:
+            self._alloc.free_memory(self._mem_obj)
+            self._alloc = None
+            self._mem_obj = None
+
+
+class TagArrayIter:
+    def __init__(self, tag):
+        self.tag = tag
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.tag.is_done():
+            raise StopIteration()
+        result = self.tag
+        self.tag = self.tag.next_tag()
+        return result
+
+
+class TagArray:
+    def __init__(self, mem, addr):
+        self._mem = mem
+        self._addr = addr
+        self._alloc = None
+        self._mem_obj = None
+
+    def get_addr(self):
+        return self._addr
+
+    def get_mem(self):
+        return self._mem
+
+    def __repr__(self):
+        return f"[TagArray,@{self._addr:08x}]"
+
+    def __iter__(self):
+        tag = Tag(self._mem, self._addr)
+        return TagArrayIter(tag)
+
+    def __len__(self):
+        num = 0
+        for tag in self:
+            num += 1
+        return num
+
+    def to_list(self, map_enum=None, do_map=True):
+        """convert tag list to python list"""
+        result = []
+        for tag in self:
+            val = tag.get_tag(map_enum=map_enum, do_map=do_map)
+            result.append(val)
+        return result
+
+    def find_tag(self, tag_val):
+        """find tag and return True/False"""
+        if isinstance(tag_val, TagItem):
+            tag_val = tag_val.tag.val
+
+        for tag in self:
+            if tag.get_tag() == tag_val:
+                return True
+        return False
+
+    @classmethod
+    def alloc(cls, alloc, *tag_array, label=None):
+        tag_array = list(tag_array)
+        num_tags = len(tag_array)
+        if num_tags == 0:
+            tag_array.append(CommonTag.TAG_DONE)
+            num_tags == 1
+        # auto add TAG DONE if missing
+        elif tag_array[-1] != CommonTag.TAG_DONE:
+            tag_array.append(CommonTag.TAG_DONE)
+            num_tags += 1
+        # size of tag list
+        num_bytes = num_tags * 4
+        mem_obj = alloc.alloc_memory(num_bytes, label=label)
+        mem = alloc.get_mem()
+        addr = mem_obj.addr
+        # fill list
+        for tag in tag_array:
+            mem.w32(addr, tag)
+            addr += 4
+
+        tag_array = cls(mem, mem_obj.addr)
+        tag_array._alloc = alloc
+        tag_array._mem_obj = mem_obj
+        return tag_array
 
     def free(self):
         if self._alloc and self._mem_obj:

@@ -12,5 +12,5 @@ from .lock import FileLock, FileHandle
 from .process import CLI, Process, PathList
 
 # util
-from .tag import CommonTag, TagItem, TagList
+from .tag import CommonTag, TagItem, TagList, Tag, TagArray
 from .dostag import DosTag
