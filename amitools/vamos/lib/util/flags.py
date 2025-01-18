@@ -1,4 +1,4 @@
-from enum import IntEnum
+from enum import IntEnum, IntFlag
 
 
 class MapTagsFlag(IntEnum):
@@ -9,3 +9,25 @@ class MapTagsFlag(IntEnum):
 class FilterTagItemsFlag(IntEnum):
     TAGFILTER_AND = 0
     TAGFILTER_NOT = 1
+
+
+class PackStructureTagsFlag(IntFlag):
+    PSTF_SIGNED = 1 << 31
+    PSTF_UNPACK = 1 << 30
+    PSTF_PACK = 1 << 29
+    PSTF_EXISTS = 1 << 26
+
+    PKCTRL_PACKUNPACK = 0x00000000
+    PKCTRL_PACKONLY = 0x40000000
+    PKCTRL_UNPACKONLY = 0x20000000
+
+    PKCTRL_BYTE = 0x80000000
+    PKCTRL_WORD = 0x88000000
+    PKCTRL_LONG = 0x90000000
+
+    PKCTRL_UBYTE = 0x00000000
+    PKCTRL_UWORD = 0x08000000
+    PKCTRL_ULONG = 0x10000000
+
+    PKCTRL_BIT = 0x18000000
+    PKCTRL_FLIPBIT = 0x98000000

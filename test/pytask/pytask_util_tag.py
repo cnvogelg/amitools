@@ -1,7 +1,11 @@
 from enum import IntEnum
 from amitools.vamos.libtypes import TagList, TagItem, CommonTag, TagArray
 from amitools.vamos.astructs import APTR
-from amitools.vamos.lib.util.flags import MapTagsFlag, FilterTagItemsFlag
+from amitools.vamos.lib.util.flags import (
+    MapTagsFlag,
+    FilterTagItemsFlag,
+    PackStructureTagsFlag,
+)
 
 
 class MyTag(IntEnum):
@@ -21,7 +25,7 @@ def run_util_func(vamos_task, func):
         ctx.proxies.close_lib_proxy(lib)
         return 0
 
-    exit_codes = vamos_task.run([task], args=["-l", "utility:info"])
+    exit_codes = vamos_task.run([task], args=["-l", "utility:debug"])
     assert exit_codes[0] == 0
 
 
@@ -254,6 +258,196 @@ def pytask_util_tag_filter_tag_items_test(vamos_task):
         assert tag_list.to_list() == [(MyTag.FOO_TAG, 2)]
 
         tag_array.free()
+        tag_list.free()
+
+    run_util_func(vamos_task, func)
+
+
+def pytask_util_tag_apply_tag_changes_test(vamos_task):
+    def func(ctx, lib):
+        tag_list = TagList.alloc(ctx.alloc, (MyTag.FOO_TAG, 2), (MyTag.BAR_TAG, 4))
+        assert tag_list is not None
+        change_list = TagList.alloc(ctx.alloc, (MyTag.BAR_TAG, MyTag.BAZ_TAG))
+        assert change_list is not None
+
+        lib.ApplyTagChanges(tag_list, change_list)
+
+        assert tag_list.to_list() == [(MyTag.FOO_TAG, 2), (MyTag.BAZ_TAG, 4)]
+
+        change_list.free()
+        tag_list.free()
+
+    run_util_func(vamos_task, func)
+
+
+def build_pack_table(ctx, pack_table):
+    size = len(pack_table) * 4
+    mem = ctx.alloc.alloc_memory(size)
+    addr = mem.addr
+    ptr = addr
+    for entry in pack_table:
+        ctx.mem.w32(ptr, entry & 0xFFFFFFFF)
+        ptr += 4
+    return mem, addr
+
+
+def pytask_util_tag_pack_structure_tags_test(vamos_task):
+    def func(ctx, lib):
+        tag_list = TagList.alloc(
+            ctx.alloc,
+            (MyTag.FOO_TAG, 0xDEADBEEF),
+            (MyTag.BAR_TAG, 0xBABE),
+            (MyTag.BAZ_TAG, 0xFE),
+        )
+        assert tag_list is not None
+
+        pack_table = [
+            MyTag.FOO_TAG,  # tag offset
+            PackStructureTagsFlag.PKCTRL_ULONG,  # tag offset=0, data offset=0
+            PackStructureTagsFlag.PKCTRL_UWORD
+            | (1 << 16)
+            | 4,  # tag_offset=1, data_offset=4
+            PackStructureTagsFlag.PKCTRL_UBYTE
+            | (2 << 16)
+            | 6,  # tag_offset=1, data_offset=6
+            0,  # end of table
+        ]
+        mem_obj, addr = build_pack_table(ctx, pack_table)
+
+        pack = 0x100
+
+        num = lib.PackStructureTags(pack, addr, tag_list)
+        assert num == 3
+
+        assert ctx.mem.r32(pack) == 0xDEADBEEF
+        assert ctx.mem.r16(pack + 4) == 0xBABE
+        assert ctx.mem.r8(pack + 6) == 0xFE
+
+        ctx.alloc.free_memory(mem_obj)
+        tag_list.free()
+
+    run_util_func(vamos_task, func)
+
+
+def pytask_util_tag_pack_structure_tags_signed_test(vamos_task):
+    def func(ctx, lib):
+        tag_list = TagList.alloc(
+            ctx.alloc,
+            (MyTag.FOO_TAG, -3),
+            (MyTag.BAR_TAG, -2),
+            (MyTag.BAZ_TAG, -1),
+        )
+        assert tag_list is not None
+
+        pack_table = [
+            MyTag.FOO_TAG,  # tag offset
+            PackStructureTagsFlag.PKCTRL_LONG,  # tag offset=0, data offset=0
+            PackStructureTagsFlag.PKCTRL_WORD
+            | (1 << 16)
+            | 4,  # tag_offset=1, data_offset=4
+            PackStructureTagsFlag.PKCTRL_BYTE
+            | (2 << 16)
+            | 6,  # tag_offset=1, data_offset=6
+            0,  # end of table
+        ]
+        mem_obj, addr = build_pack_table(ctx, pack_table)
+
+        pack = 0x100
+
+        num = lib.PackStructureTags(pack, addr, tag_list)
+        assert num == 3
+
+        assert ctx.mem.r32s(pack) == -3
+        assert ctx.mem.r16s(pack + 4) == -2
+        assert ctx.mem.r8s(pack + 6) == -1
+
+        ctx.alloc.free_memory(mem_obj)
+        tag_list.free()
+
+    run_util_func(vamos_task, func)
+
+
+def pytask_util_tag_unpack_structure_tags_test(vamos_task):
+    def func(ctx, lib):
+        tag_list = TagList.alloc(
+            ctx.alloc,
+            (MyTag.FOO_TAG, 0),
+            (MyTag.BAR_TAG, 0),
+            (MyTag.BAZ_TAG, 0),
+        )
+        assert tag_list is not None
+
+        pack_table = [
+            MyTag.FOO_TAG,  # tag offset
+            PackStructureTagsFlag.PKCTRL_ULONG,  # tag offset=0, data offset=0
+            PackStructureTagsFlag.PKCTRL_UWORD
+            | (1 << 16)
+            | 4,  # tag_offset=1, data_offset=4
+            PackStructureTagsFlag.PKCTRL_UBYTE
+            | (2 << 16)
+            | 6,  # tag_offset=1, data_offset=6
+            0,  # end of table
+        ]
+        mem_obj, addr = build_pack_table(ctx, pack_table)
+
+        pack = 0x100
+        ctx.mem.w32(pack, 0xDEADBEEF)
+        ctx.mem.w16(pack + 4, 0xBABE)
+        ctx.mem.w8(pack + 6, 0xFE)
+
+        num = lib.UnpackStructureTags(pack, addr, tag_list)
+        assert num == 3
+
+        assert tag_list.to_list() == [
+            (MyTag.FOO_TAG, 0xDEADBEEF),
+            (MyTag.BAR_TAG, 0xBABE),
+            (MyTag.BAZ_TAG, 0xFE),
+        ]
+
+        ctx.alloc.free_memory(mem_obj)
+        tag_list.free()
+
+    run_util_func(vamos_task, func)
+
+
+def pytask_util_tag_unpack_structure_tags_signed_test(vamos_task):
+    def func(ctx, lib):
+        tag_list = TagList.alloc(
+            ctx.alloc,
+            (MyTag.FOO_TAG, 0),
+            (MyTag.BAR_TAG, 0),
+            (MyTag.BAZ_TAG, 0),
+        )
+        assert tag_list is not None
+
+        pack_table = [
+            MyTag.FOO_TAG,  # tag offset
+            PackStructureTagsFlag.PKCTRL_LONG,  # tag offset=0, data offset=0
+            PackStructureTagsFlag.PKCTRL_WORD
+            | (1 << 16)
+            | 4,  # tag_offset=1, data_offset=4
+            PackStructureTagsFlag.PKCTRL_BYTE
+            | (2 << 16)
+            | 6,  # tag_offset=1, data_offset=6
+            0,  # end of table
+        ]
+        mem_obj, addr = build_pack_table(ctx, pack_table)
+
+        pack = 0x100
+        ctx.mem.w32s(pack, -1)
+        ctx.mem.w16s(pack + 4, -2)
+        ctx.mem.w8s(pack + 6, -3)
+
+        num = lib.UnpackStructureTags(pack, addr, tag_list)
+        assert num == 3
+
+        assert tag_list.to_list() == [
+            (MyTag.FOO_TAG, -1 & 0xFFFFFFFF),
+            (MyTag.BAR_TAG, -2 & 0xFFFFFFFF),
+            (MyTag.BAZ_TAG, -3 & 0xFFFFFFFF),
+        ]
+
+        ctx.alloc.free_memory(mem_obj)
         tag_list.free()
 
     run_util_func(vamos_task, func)

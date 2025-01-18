@@ -4,7 +4,11 @@ from amitools.vamos.astructs import APTR
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.libtypes import TagList, TagItem, CommonTag, TagArray, Tag
 from amitools.vamos.lib.util.AmiDate import *
-from amitools.vamos.lib.util.flags import MapTagsFlag, FilterTagItemsFlag
+from amitools.vamos.lib.util.flags import (
+    MapTagsFlag,
+    FilterTagItemsFlag,
+    PackStructureTagsFlag,
+)
 from amitools.vamos.lib.lexec.flags import MemFlag
 from amitools.vamos.log import *
 
@@ -261,6 +265,171 @@ class UtilityLibrary(LibImpl):
                 else:
                     valid += 1
         return valid
+
+    def ApplyTagChanges(self, ctx, tag_list: TagList, change_list: TagList):
+        log_utility.info(
+            "ApplyTagChanges(tag_list=%s, change_list=%s)", tag_list, change_list
+        )
+        for tag in tag_list:
+            change_tag = change_list.find_tag(tag)
+            if change_tag:
+                tag.set_tag(change_tag.get_data())
+
+    def PackStructureTags(self, ctx, pack, pack_table, tag_list: TagList):
+        log_utility.info(
+            "PackStructureTags(pack=%08x, pack_table=%08x, tag_list=%s)",
+            pack,
+            pack_table,
+            tag_list,
+        )
+        mem = ctx.mem
+        ptr = pack_table
+        count = 0
+
+        tag_base = mem.r32(ptr)
+        ptr += 4
+        log_utility.debug("tag_base=%d", tag_base)
+
+        while True:
+            pack_entry = mem.r32(ptr)
+            log_utility.debug("@%08x: entry=%08x", ptr, tag_base)
+            ptr += 4
+
+            if pack_entry == 0:
+                # done
+                break
+            elif pack_entry == 0xFFFFFFFF:
+                # new tag_base
+                tag_base = mem.r32(ptr)
+                ptr += 4
+                log_utility.debug("tag_base=%d", tag_base)
+            elif pack_entry & PackStructureTagsFlag.PSTF_PACK:
+                # no pack entry
+                log_utility.debug("no pack entry")
+                continue
+            else:
+                tag_off = (pack_entry >> 16) & 0x3FF
+                tag_val = tag_off + tag_base
+                log_utility.debug("tag_val=%08x", tag_val)
+                tag = tag_list.find_tag(tag_val)
+                if tag is None:
+                    continue
+                tag_data = tag.get_data()
+
+                mem_off = pack_entry & 0x1FFF
+                bit_off = (pack_entry & 0xE000) >> 13
+                mem_ptr = pack + mem_off
+                mode = pack_entry & 0x98000000
+
+                log_utility.debug(
+                    "mem_ptr=%08x, bit_off=%d, mode=%08x tag_data=%08x",
+                    mem_ptr,
+                    bit_off,
+                    mode,
+                    tag_data,
+                )
+
+                bit_flag = (
+                    PackStructureTagsFlag.PKCTRL_BIT | PackStructureTagsFlag.PSTF_EXISTS
+                )
+                if (pack_entry & bit_flag) == bit_flag:
+                    if pack_entry & PackStructureTagsFlag.PSTF_SIGNED:
+                        mem.w8(mem_ptr, mem.r8(mem_ptr) & ~(1 << bit_off))
+                    else:
+                        mem.w8(mem_ptr, mem.r8(mem_ptr) | (1 << bit_off))
+                    count += 1
+                    continue
+
+                if mode == PackStructureTagsFlag.PKCTRL_ULONG:
+                    mem.w32(mem_ptr, tag_data)
+                elif mode == PackStructureTagsFlag.PKCTRL_UWORD:
+                    mem.w16(mem_ptr, tag_data)
+                elif mode == PackStructureTagsFlag.PKCTRL_UBYTE:
+                    mem.w8(mem_ptr, tag_data)
+                elif mode == PackStructureTagsFlag.PKCTRL_LONG:
+                    mem.w32(mem_ptr, tag_data)
+                elif mode == PackStructureTagsFlag.PKCTRL_WORD:
+                    mem.w16(mem_ptr, tag_data & 0xFFFF)
+                elif mode == PackStructureTagsFlag.PKCTRL_BYTE:
+                    mem.w8(mem_ptr, tag_data & 0xFF)
+                else:
+                    count -= 1
+                count += 1
+        return count
+
+    def UnpackStructureTags(self, ctx, pack, pack_table, tag_list: TagList):
+        log_utility.info(
+            "UnpackStructureTags(pack=%08x, pack_table=%08x, tag_list=%s)",
+            pack,
+            pack_table,
+            tag_list,
+        )
+        mem = ctx.mem
+        ptr = pack_table
+        count = 0
+
+        tag_base = mem.r32(ptr)
+        ptr += 4
+        log_utility.debug("tag_base=%d", tag_base)
+
+        while True:
+            pack_entry = mem.r32(ptr)
+            log_utility.debug("@%08x: entry=%08x", ptr, tag_base)
+            ptr += 4
+
+            if pack_entry == 0:
+                # done
+                break
+            elif pack_entry == 0xFFFFFFFF:
+                # new tag_base
+                tag_base = mem.r32(ptr)
+                ptr += 4
+                log_utility.debug("tag_base=%d", tag_base)
+            elif pack_entry & PackStructureTagsFlag.PSTF_PACK:
+                # no pack entry
+                log_utility.debug("no pack entry")
+                continue
+            else:
+                tag_off = (pack_entry >> 16) & 0x3FF
+                tag_val = tag_off + tag_base
+                log_utility.debug("tag_val=%08x", tag_val)
+                tag = tag_list.find_tag(tag_val)
+                if tag is None:
+                    continue
+                tag_data = tag.get_data()
+
+                mem_off = pack_entry & 0x1FFF
+                bit_off = (pack_entry & 0xE000) >> 13
+                mem_ptr = pack + mem_off
+                mode = pack_entry & 0x98000000
+
+                log_utility.debug(
+                    "mem_ptr=%08x, bit_off=%d, mode=%08x tag_data=%08x",
+                    mem_ptr,
+                    bit_off,
+                    mode,
+                    tag_data,
+                )
+
+                if mode == PackStructureTagsFlag.PKCTRL_ULONG:
+                    tag_data = mem.r32(mem_ptr)
+                elif mode == PackStructureTagsFlag.PKCTRL_UWORD:
+                    tag_data = mem.r16(mem_ptr)
+                elif mode == PackStructureTagsFlag.PKCTRL_UBYTE:
+                    tag_data = mem.r8(mem_ptr)
+                elif mode == PackStructureTagsFlag.PKCTRL_LONG:
+                    tag_data = mem.r32s(mem_ptr)
+                elif mode == PackStructureTagsFlag.PKCTRL_WORD:
+                    tag_data = mem.r16s(mem_ptr)
+                elif mode == PackStructureTagsFlag.PKCTRL_BYTE:
+                    tag_data = mem.r8s(mem_ptr)
+                else:
+                    tag_data = 0
+                    count -= 1
+
+                tag.set_data(tag_data & 0xFFFFFFFF)
+                count += 1
+        return count
 
     # ---- Date -----
 

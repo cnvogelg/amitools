@@ -237,7 +237,7 @@ class TagList:
         # fill list
         for tag, data in tag_list:
             mem.w32(addr, tag)
-            mem.w32(addr + 4, data)
+            mem.w32(addr + 4, data & 0xFFFFFFFF)
             addr += 8
 
         tag_list = cls(mem, mem_obj.addr)
