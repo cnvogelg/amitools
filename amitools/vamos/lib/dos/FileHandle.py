@@ -20,13 +20,16 @@ class FileHandle:
         self.unch = bytearray()
         self.ch = -1
         self.is_nil = is_nil
+        self.interactive = self.obj.isatty()
 
     def __str__(self):
-        return "[FH:'%s'(ami='%s',sys='%s',nc=%s)@%06x=B@%06x]" % (
+        return "[FH:'%s'(ami='%s',sys='%s',nc=%s,af=%s,int=%s)@%06x=B@%06x]" % (
             self.name,
             self.ami_path,
             self.sys_path,
             self.need_close,
+            self.auto_flush,
+            self.interactive,
             self.mem.addr,
             self.b_addr,
         )
@@ -65,7 +68,10 @@ class FileHandle:
 
     def read(self, len):
         try:
-            d = self.obj.read(len)
+            if self.interactive:
+                d = self.obj.read1(len)
+            else:
+                d = self.obj.read(len)
             return d
         except IOError:
             return -1
@@ -147,13 +153,4 @@ class FileHandle:
         self.obj.flush()
 
     def is_interactive(self):
-        fd = self.obj.fileno()
-        if hasattr(os, "ttyname"):
-            try:
-                os.ttyname(fd)
-                return True
-            except OSError:
-                return False
-        else:
-            # Not perfect, but best you can do on non-posix to detect a terminal.
-            return sys.stdin.isatty() or sys.stdout.isatty()
+        return self.interactive
