@@ -76,8 +76,12 @@ class Volume(object):
 
     def _create_temp(self, path):
         if os.path.exists(path):
-            log_path.error("temp volume volume path already exists: '%s'", path)
-            return False
+            if os.path.isdir(path):
+                log_path.warning("temp volume path already exists: '%s'", path)
+                return True
+            else:
+                log_path.error("temp volume exists and is no directory: '%s'", path)
+                return False
         # create temp dir
         try:
             log_path.debug("creating temp dir: %s", path)
