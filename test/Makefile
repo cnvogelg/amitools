@@ -9,7 +9,7 @@ SOURCES_C += exec_makelib.c exec_libfuncs.c
 SOURCES_C += exec_initres.c exec_rawdofmt.c
 SOURCES_C += dos_readargs.c dos_readargs2.c dos_findarg.c
 SOURCES_C += dos_loadseg.c dos_runcmd.c
-SOURCES_C += dos_system.c dos_match.c
+SOURCES_C += dos_system.c dos_match.c dos_setmode.c
 SOURCES_C += dos_program.c dos_seek.c dos_examine.c
 SOURCES_C += vprintf.c dos_stdout.c
 SOURCES_C += util_muldiv.c util_date.c
@@ -21,15 +21,18 @@ SOURCES_C += test_devtimer.c test_execpy.c test_tags.c
 SOURCES_C += lib_testnix.c lib_testsc.c
 SOURCES_C += proc_args.c
 
-# compile a single source only?
-ifdef ONLY_SOURCE
-SOURCES_C := $(filter $(ONLY_SOURCE), $(SOURCES_C))
-endif
-export ONLY_SOURCE
-
 LIB_GCC_SOURCES_C = testnix.c
 LIB_SC_SOURCES_C = testsc.c
 LIB_SRC_DIR = libs
+
+# compile a single source only?
+ifdef ONLY_SOURCE
+SOURCES_C := $(filter $(ONLY_SOURCE), $(SOURCES_C))
+LIB_GCC_SOURCES_C := $(filter $(ONLY_SOURCE), $(LIB_GCC_SOURCES_C))
+LIB_SC_SOURCES_C := $(filter $(ONLY_SOURCE), $(LIB_SC_SOURCES_C))
+endif
+export ONLY_SOURCE
+
 
 VPATH = src
 

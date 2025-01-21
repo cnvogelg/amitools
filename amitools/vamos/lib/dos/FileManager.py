@@ -46,6 +46,9 @@ class FileManager:
     def finish(self):
         self._unregister_file(self.std_input)
         self._unregister_file(self.std_output)
+        # close stdin/out (cleanup TTY if needed)
+        self.std_input.close()
+        self.std_output.close()
         # free ports
         self.port_mgr.free_port(self.fs_handler_port)
         self.port_mgr.free_port(self.console_handler_port)

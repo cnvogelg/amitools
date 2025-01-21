@@ -553,6 +553,34 @@ class DosLibrary(LibImpl):
         ctx.process.set_output(fh)
         return cur_out
 
+    def SetMode(self, ctx, fh_b_addr, mode):
+        fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+        log_dos.info("SetMode(fh=%s,mode=%d)", fh, mode)
+        # check mode
+        if mode == 0:
+            cooked = True
+        elif mode == 1:
+            cooked = False
+        else:
+            log_dos.warning("SetMode() mode=%d not supported!", mode)
+            self.setioerr(ctx, ERROR_ACTION_NOT_KNOWN)
+            return self.DOSFALSE
+
+        if fh.is_interactive():
+            # try to use setmode in interactive
+            ok = fh.set_mode(cooked)
+            if ok:
+                self.setioerr(ctx, 0)  # no console window
+                return self.DOSTRUE
+            else:
+                log_dos.warning("SetMode() not supported on this platform!")
+                self.setioerr(ctx, ERROR_ACTION_NOT_KNOWN)
+                return self.DOSFALSE
+        else:
+            log_dos.info("SetMode() not available on non-interactive FH")
+            self.setioerr(ctx, ERROR_ACTION_NOT_KNOWN)
+            return self.DOSFALSE
+
     def Open(self, ctx):
         name_ptr = ctx.cpu.r_reg(REG_D1)
         name = ctx.mem.r_cstr(name_ptr)

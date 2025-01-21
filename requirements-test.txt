@@ -2,3 +2,4 @@ pytest
 pytest-benchmark
 machine68k
 greenlet
+ptyprocess

@@ -1,6 +1,8 @@
 import os
 import sys
+
 from amitools.vamos.libstructs import FileHandleStruct
+from .terminal import Terminal
 
 
 class FileHandle:
@@ -21,6 +23,12 @@ class FileHandle:
         self.ch = -1
         self.is_nil = is_nil
         self.interactive = self.obj.isatty()
+        # tty stuff
+        if self.interactive:
+            fd = self.obj.fileno()
+            self.terminal = Terminal(fd)
+        else:
+            self.terminal = None
 
     def __str__(self):
         return "[FH:'%s'(ami='%s',sys='%s',nc=%s,af=%s,int=%s)@%06x=B@%06x]" % (
@@ -37,6 +45,9 @@ class FileHandle:
     def close(self):
         if self.need_close:
             self.obj.close()
+        # restore tty
+        if self.terminal:
+            self.terminal.close()
 
     def alloc_fh(self, alloc, fs_handler_port):
         name = "File:" + self.name
@@ -55,6 +66,13 @@ class FileHandle:
         alloc.free_struct(self.mem)
 
     # --- file ops ---
+
+    def set_mode(self, cooked):
+        # no tty support on this platform
+        if not self.terminal:
+            return False
+        # set mode
+        return self.terminal.set_mode(cooked)
 
     def write(self, data):
         assert isinstance(data, (bytes, bytearray))
