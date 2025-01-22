@@ -15,16 +15,19 @@ int main(int argc, char *argv[])
 {
   BPTR fh = Input();
   long mode;
-  int result;
+  int result = DOSTRUE;
 
-  if(argc < 2) {
+  if(argc > 3) {
     PutStr("Usage: <mode> [out_str]\n");
     return 1;
   }
 
-  mode = argv[1][0] - '0';
-  Printf("mode=%ld\n", (LONG)mode);
-  result = SetMode(fh, mode);
+  if(argc > 1) {
+    mode = argv[1][0] - '0';
+    Printf("mode=%ld\n", (LONG)mode);
+    result = SetMode(fh, mode);
+  }
+
   if(result == DOSTRUE) {
     UBYTE buf[10];
     LONG len;
