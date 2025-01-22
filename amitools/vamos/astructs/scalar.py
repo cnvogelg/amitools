@@ -50,9 +50,14 @@ class ScalarType(TypeBase):
         raise RuntimeError
 
     def __repr__(self):
-        return "{}(value={}, addr={})".format(
-            self.__class__.__name__, self.get(), self._addr
-        )
+        if self._addr is not None:
+            return "{}(value={}, addr={})".format(
+                self.__class__.__name__, self.get(), self._addr
+            )
+        else:
+            return "{}(value={}, reg={})".format(
+                self.__class__.__name__, self.get(), self._reg
+            )
 
     def __str__(self):
         w = self.get_mem_width()
@@ -88,10 +93,20 @@ class SignedType(ScalarType):
     _signed = True
 
     def _read_reg(self):
-        return self._cpu.rs_reg(self._reg)
+        if self._byte_size == 4:
+            return self._cpu.r32s_reg(self._reg)
+        elif self._byte_size == 2:
+            return self._cpu.r16s_reg(self._reg)
+        elif self._byte_size == 1:
+            return self._cpu.r8s_reg(self._reg)
 
     def _write_reg(self, val):
-        self._cpu.ws_reg(self._reg, val)
+        if self._byte_size == 4:
+            self._cpu.w32s_reg(self._reg, val)
+        elif self._byte_size == 2:
+            self._cpu.w16s_reg(self._reg, val)
+        elif self._byte_size == 1:
+            self._cpu.w8s_reg(self._reg, val)
 
     def _read_mem(self):
         return self._mem.reads(self._mem_width, self._addr)
@@ -104,10 +119,20 @@ class UnsignedType(ScalarType):
     _signed = False
 
     def _read_reg(self):
-        return self._cpu.r_reg(self._reg)
+        if self._byte_size == 4:
+            return self._cpu.r32_reg(self._reg)
+        elif self._byte_size == 2:
+            return self._cpu.r16_reg(self._reg)
+        elif self._byte_size == 1:
+            return self._cpu.r8_reg(self._reg)
 
     def _write_reg(self, val):
-        self._cpu.w_reg(self._reg, val)
+        if self._byte_size == 4:
+            self._cpu.w32_reg(self._reg, val)
+        elif self._byte_size == 2:
+            self._cpu.w16_reg(self._reg, val)
+        elif self._byte_size == 1:
+            self._cpu.w8_reg(self._reg, val)
 
     def _read_mem(self):
         return self._mem.read(self._mem_width, self._addr)
