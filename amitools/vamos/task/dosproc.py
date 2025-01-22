@@ -11,6 +11,7 @@ class DosProcess(ExecTask):
     def __init__(self, machine, alloc, name, **kw_args):
         # alloc
         self.proc = Process.alloc(alloc, name=name)
+        self.proc.task.new_task()
         self.proc.new_proc()
 
         super().__init__(

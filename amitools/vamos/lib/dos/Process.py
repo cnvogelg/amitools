@@ -10,6 +10,7 @@ from amitools.vamos.machine.regs import (
     REG_A5,
     REG_A6,
 )
+from amitools.vamos.libtypes import Process as ProcessType
 from amitools.vamos.machine import Code
 from amitools.vamos.schedule import NativeTask
 from amitools.vamos.task import Stack
@@ -197,9 +198,25 @@ class Process:
         return_regs = [REG_D0]
         sp = self.stack.get_initial_sp()
         code = Code(init_pc, sp, start_regs, return_regs)
-        self.task = NativeTask(name, machine, code)
+        self.sched_task = NativeTask(name, machine, code)
         # store back ref to process
-        self.task.map_task = self
+        self.sched_task.map_task = self
+
+        # sync task state
+        def map_state(task, state):
+            self.ami_task.tc_State.val = state.name
+
+        self.sched_task.set_state_callback(map_state)
+
+        # sync sigmask
+        def map_sigmask(task, sigmask_received, sigmask_wait):
+            self.ami_task.tc_SigRecvd.val = sigmask_received
+            self.ami_task.tc_SigWait.val = sigmask_wait
+
+        self.sched_task.set_sigmask_callback(map_sigmask)
+
+        # hack to find map_task
+        self.map_task = self
 
     def get_ami_task(self):
         return self
@@ -208,7 +225,7 @@ class Process:
         return self
 
     def get_sched_task(self):
-        return self.task
+        return self.sched_task
 
     # ----- cli struct -----
     def init_cli_struct(self, input_fh, output_fh, name):
@@ -288,6 +305,7 @@ class Process:
         self.addr = self.this_task.addr
         self.seglist = self.ctx.alloc.alloc_memory(24, label="Process Seglist")
         self.this_task.access.w_s("pr_Task.tc_Node.ln_Type", NT_PROCESS)
+        self.this_task.access.w_s("pr_Task.tc_SigAlloc", 0xFFFF)
         self.this_task.access.w_s("pr_SegList", self.seglist.addr)
         self.this_task.access.w_s("pr_CLI", self.cli.addr)
         self.this_task.access.w_s(
@@ -311,6 +329,9 @@ class Process:
         varlist.access.w_s("mlh_TailPred", varlist.addr)
         # setup arg string
         self.set_arg_str_ptr(self.arg_base)
+        # wrap struct into a Process/Task type
+        self.ami_proc = ProcessType(self.ctx.mem, self.addr)
+        self.ami_task = self.ami_proc.task
 
     def free_task_struct(self):
         self.ctx.alloc.free_struct(self.this_task)

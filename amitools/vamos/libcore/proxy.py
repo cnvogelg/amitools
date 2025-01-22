@@ -42,7 +42,9 @@ class LibProxyRegs:
         if val is None:
             val = 0
         elif isinstance(val, int):
-            pass
+            # auto convert to unsigend
+            if val < 0:
+                val &= 0xFFFFFFFF
         # auto convert strings
         elif isinstance(val, str):
             str_mem = self.ctx.alloc.alloc_cstr(val, label="reg_auto_str")

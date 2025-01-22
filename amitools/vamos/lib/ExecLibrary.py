@@ -2,7 +2,7 @@ from enum import IntEnum
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib, LibFuncs, InitRes
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.astructs import AccessStruct
+from amitools.vamos.astructs import AccessStruct, BYTE
 from amitools.vamos.libstructs import (
     ExecLibraryStruct,
     StackSwapStruct,
@@ -13,7 +13,7 @@ from amitools.vamos.libstructs import (
     SignalSemaphoreStruct,
 )
 from amitools.vamos.libtypes import ExecLibrary as ExecLibraryType
-from amitools.vamos.libtypes import List
+from amitools.vamos.libtypes import Task, List
 from amitools.vamos.log import log_exec
 from amitools.vamos.error import VamosInternalError, UnsupportedFeatureError
 from .lexec.PortManager import PortManager
@@ -62,7 +62,97 @@ class ExecLibrary(LibImpl):
         sp = ctx.cpu.r_reg(REG_A7)
         return ctx.mem.r32(sp)
 
+    def get_my_task(self, ctx):
+        """return Amiga Task structure to access current task"""
+        ptr = self.exec_lib.this_task.aptr
+        return Task(ctx.mem, ptr)
+
+    def get_my_sched_task(self, ctx):
+        """return the scheduler task associated with current task
+
+        the scheduler task is needed for task/signals
+        """
+        return ctx.task.map_task.get_sched_task()
+
     # ----- System -----
+
+    def AllocSignal(self, ctx, signal_num: BYTE):
+        task = self.get_my_task(ctx)
+        old_mask = task.sig_alloc.val
+        new_signal = signal_num.val
+        log_exec.info(
+            "AllocSignal(%d, %s) for task %s", new_signal, type(signal_num), task
+        )
+        if new_signal == -1:
+            # find a free signal slot
+            for bit in range(32):
+                new_mask = 1 << bit
+                if (old_mask & new_mask) == 0:
+                    new_signal = bit
+                    break
+        else:
+            # is pre selected signal free?
+            new_mask = 1 << new_signal
+            if (old_mask & new_mask) != 0:
+                new_signal = -1
+        # signal is ok. set it
+        if new_signal != -1:
+            task.sig_alloc.val |= 1 << new_signal
+            final_mask = task.sig_alloc.val
+        else:
+            final_mask = old_mask
+        log_exec.info(
+            "AllocSignal(%d) for task %s -> %d (sig_mask %08x)",
+            new_signal,
+            task,
+            new_signal,
+            final_mask,
+        )
+        return new_signal
+
+    def FreeSignal(self, ctx, signal_num: BYTE):
+        task = self.get_my_task(ctx)
+        sig_num = signal_num.val
+        # invalid signal?
+        if sig_num == -1:
+            log_exec.warning("FreeSignal(%d) for task %s?!", sig_num, task)
+            return
+        # check if signal is really set?
+        old_mask = task.sig_alloc.val
+        sig_mask = 1 << sig_num
+        if (sig_mask & old_mask) == 0:
+            log_exec.warning(
+                "FreeSignal(%d) for task %s not set: sig_mask=%08x!",
+                sig_num,
+                task,
+                old_mask,
+            )
+            return
+        # ok, signal can be cleared
+        task.sig_alloc.val = old_mask & ~sig_mask
+        new_mask = task.sig_alloc.val
+        log_exec.info(
+            "FreeSignal(%d) for task %s -> sig_mask=%08x",
+            sig_num,
+            task,
+            new_mask,
+        )
+
+    def SetSignal(self, ctx, new_signals, signal_mask):
+        # set signals via the scheduler task
+        sched_task = self.get_my_sched_task(ctx)
+        old_signals = sched_task.set_signal(new_signals, signal_mask)
+        # just to be sure dump task val
+        task = self.get_my_task(ctx)
+        real_mask = task.sig_recvd.val
+        log_exec.info(
+            "SetSignals: new_signals=%08x signal_mask=%08x old_signals=%08x real_mask=%08x",
+            new_signals,
+            signal_mask,
+            old_signals,
+            real_mask,
+        )
+        return old_signals
 
     def Disable(self, ctx):
         log_exec.info("Disable")
@@ -86,16 +176,6 @@ class ExecLibrary(LibImpl):
             task_name = ctx.mem.r_cstr(task_ptr)
             log_exec.info("Find Task: %s" % task_name)
             raise UnsupportedFeatureError("FindTask: other task!")
-
-    def SetSignal(self, ctx):
-        new_signals = ctx.cpu.r_reg(REG_D0)
-        signal_mask = ctx.cpu.r_reg(REG_D1)
-        old_signals = 0
-        log_exec.info(
-            "SetSignals: new_signals=%08x signal_mask=%08x old_signals=%08x"
-            % (new_signals, signal_mask, old_signals)
-        )
-        return old_signals
 
     def StackSwap(self, ctx):
         stsw_ptr = ctx.cpu.r_reg(REG_A0)

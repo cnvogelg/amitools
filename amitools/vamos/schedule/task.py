@@ -144,6 +144,7 @@ class TaskBase:
     def set_signal(self, new_signals, sigmask):
         """set some of our signals"""
         log_schedule.debug("%s: set_signal(%x, %x)", self.name, new_signals, sigmask)
+        old_mask = self.sigmask_received
         self.sigmask_received = new_signals | (self.sigmask_received & ~sigmask)
         self._sync_sigmask()
         # check if task is waiting for some of the signals
@@ -154,9 +155,12 @@ class TaskBase:
                 self.scheduler.wake_up_task(self)
         # return current mask
         log_schedule.debug(
-            "%s: set_signal -> sigmask=%x", self.name, self.sigmask_received
+            "%s: set_signal old=%08x -> sigmask=%08x",
+            self.name,
+            old_mask,
+            self.sigmask_received,
         )
-        return self.sigmask_received
+        return old_mask
 
     def _sync_sigmask(self):
         if self.sigmask_hook:
