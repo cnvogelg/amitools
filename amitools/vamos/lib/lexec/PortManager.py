@@ -39,6 +39,12 @@ class Port:
         else:
             return None
 
+    def peek_msg(self):
+        if self.queue is not None and len(self.queue) > 0:
+            return self.queue[0]
+        else:
+            return None
+
 
 class PortManager:
     def __init__(self, alloc):
@@ -88,3 +94,7 @@ class PortManager:
     def get_msg(self, port_addr):
         port = self.ports[port_addr]
         return port.get_msg()
+
+    def peek_msg(self, port_addr):
+        port = self.ports[port_addr]
+        return port.peek_msg()

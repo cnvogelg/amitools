@@ -12,6 +12,7 @@ from amitools.vamos.libstructs import MessageStruct, DosPacketStruct
 from .Error import *
 from .DosProtection import DosProtection
 from .FileHandle import FileHandle
+from .action import DosAction
 
 
 class FileManager:
@@ -262,14 +263,15 @@ class FileManager:
         reply_port_addr = dos_pkt.r_s("dp_Port")
         pkt_type = dos_pkt.r_s("dp_Type")
         log_file.info(
-            "FS DosPacket: msg=%06x -> pkt=%06x: reply_port=%06x type=%06x",
+            "FS DosPacket: msg=%06x -> pkt=%06x: reply_port=%06x type=%06x (%s)",
             msg_addr,
             dos_pkt_addr,
             reply_port_addr,
             pkt_type,
+            DosAction(pkt_type).name,
         )
         # handle packet
-        if pkt_type == ord("R"):  # read
+        if pkt_type == DosAction.ACTION_READ:  # read
             fh_b_addr = dos_pkt.r_s("dp_Arg1")
             buf_ptr = dos_pkt.r_s("dp_Arg2")
             size = dos_pkt.r_s("dp_Arg3")
@@ -287,7 +289,7 @@ class FileManager:
                 fh,
             )
             dos_pkt.w_s("dp_Res1", got)
-        elif pkt_type == ord("W"):  # write
+        elif pkt_type == DosAction.ACTION_WRITE:  # write
             fh_b_addr = dos_pkt.r_s("dp_Arg1")
             buf_ptr = dos_pkt.r_s("dp_Arg2")
             size = dos_pkt.r_s("dp_Arg3")
@@ -305,7 +307,15 @@ class FileManager:
             )
             dos_pkt.w_s("dp_Res1", put)
         else:
-            raise UnsupportedFeatureError("Unsupported DosPacket: type=%d" % pkt_type)
+            log_file.warning(
+                "Unsupported Filesys Packet: %d (%s)",
+                pkt_type,
+                DosAction(pkt_type).name,
+            )
+            # return error
+            dos_pkt.w_s("dp_Res1", DOSFALSE)
+            dos_pkg.w_s("dp_Res2", ACTION_NOT_KNOWN)
+
         # do reply
         if not port_mgr.has_port(reply_port_addr):
             port_mgr.register_port(reply_port_addr)
@@ -319,14 +329,50 @@ class FileManager:
         reply_port_addr = dos_pkt.r_s("dp_Port")
         pkt_type = dos_pkt.r_s("dp_Type")
         log_file.info(
-            "Console DosPacket: msg=%06x -> pkt=%06x: reply_port=%06x type=%06x",
+            "Console DosPacket: msg=%06x -> pkt=%06x: reply_port=%06x type=%d (%s)",
             msg_addr,
             dos_pkt_addr,
             reply_port_addr,
             pkt_type,
+            DosAction(pkt_type).name,
         )
-        # fake result
-        dos_pkt.w_s("dp_Res1", 0)
+
+        if pkt_type == DosAction.ACTION_SCREEN_MODE:
+            mode = dos_pkt.r_s("dp_Arg1")
+            if mode == 0:
+                cooked = True
+            elif mode == 1 or mode == -1:
+                cooked = False
+            else:
+                log_file.warning("Unsupported Console Mode: %d", mode)
+                # return error
+                pkt_result = (DOSFALSE, ERROR_BAD_NUMBER)
+                cooked = None
+
+            res = False
+            if cooked is not None:
+                res = self.std_input.set_mode(cooked)
+                if res:
+                    log_file.info("Set Console Mode %d -> cooked=%s", mode, cooked)
+                    pkt_result = (DOSTRUE_S, 0)  # 0=no window
+                else:
+                    log_file.warning(
+                        "Can't set Console Mode %d -> cooked=%s", mode, cooked
+                    )
+                    # return error
+                    pkt_result = (DOSFALSE, ERROR_ACTION_NOT_IMPLEMENTED)
+        else:
+            log_file.warning(
+                "Unsupported Console Packet: %d (%s)",
+                pkt_type,
+                DosAction(pkt_type).name,
+            )
+            pkt_result = (DOSFALSE, ERROR_ACTION_NOT_KNOWN)
+
+        # return set result
+        dos_pkt.w_s("dp_Res1", pkt_result[0])
+        dos_pkt.w_s("dp_Res2", pkt_result[1])
+
         # do reply
         if not port_mgr.has_port(reply_port_addr):
             port_mgr.register_port(reply_port_addr)

@@ -5,7 +5,7 @@ import os
 
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.astructs import AccessStruct, CSTR
+from amitools.vamos.astructs import AccessStruct, CSTR, LONG
 from amitools.vamos.libstructs import (
     DosLibraryStruct,
     DosInfoStruct,
@@ -45,10 +45,6 @@ from amitools.vamos.dos import run_command, run_sub_process
 
 
 class DosLibrary(LibImpl):
-    DOSFALSE = 0
-    DOSTRUE = 0xFFFFFFFF
-    DOSTRUE_S = -1
-
     LV_VAR = 0  # an variable
     LV_ALIAS = 1  # an alias
     LVF_IGNORE = 0x80
@@ -170,7 +166,7 @@ class DosLibrary(LibImpl):
         else:
             txt = "%s" % err_str
         ctx.mem.w_cstr(buf_ptr, txt[: buf_len - 1])
-        return self.DOSTRUE
+        return DOSTRUE
 
     def PrintFault(self, ctx):
         self.io_err = ctx.cpu.r_reg(REG_D1)
@@ -199,7 +195,7 @@ class DosLibrary(LibImpl):
             txt = "%s\n" % err_str
         fh = ctx.process.get_output()
         fh.write(txt.encode("latin-1"))
-        return self.DOSTRUE
+        return DOSTRUE
 
     # ----- current dir
 
@@ -260,7 +256,7 @@ class DosLibrary(LibImpl):
             ctx.mem.w_cstr(str_date_ptr, date_str)
         if str_time_ptr != 0:
             ctx.mem.w_cstr(str_time_ptr, time_str)
-        return self.DOSTRUE
+        return DOSTRUE
 
     def SetFileDate(self, ctx):
         ds_ptr = ctx.cpu.r_reg(REG_D2)
@@ -278,15 +274,15 @@ class DosLibrary(LibImpl):
         if sys_path == None:
             log_dos.info("file not found: '%s' -> '%s'" % (name, sys_path))
             self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
-            return self.DOSFALSE
+            return DOSFALSE
         else:
             os.utime(sys_path, (seconds, seconds))
-            return self.DOSTRUE
+            return DOSTRUE
 
     def SetComment(self, ctx):
         # the typical unixoid file system does not implement this
         log_dos.warning("SetComment: not implemented")
-        return self.DOSTRUE
+        return DOSTRUE
 
     def GetProgramName(self, ctx):
         buf_ptr = ctx.cpu.r_reg(REG_D1)
@@ -296,10 +292,10 @@ class DosLibrary(LibImpl):
         # return error if name is too long, but copy buffer size
         if n > max_len - 1:
             self.setioerr(ctx, ERROR_LINE_TOO_LONG)
-            ret = self.DOSFALSE
+            ret = DOSFALSE
             prog_name = prog_name[0:max_len]
         else:
-            ret = self.DOSTRUE
+            ret = DOSTRUE
         ctx.mem.w_cstr(buf_ptr, prog_name)
         log_dos.info("GetProgramName() -> '%s' (%d)", prog_name, max_len)
         return ret
@@ -384,7 +380,7 @@ class DosLibrary(LibImpl):
         flags = ctx.cpu.r_reg(REG_D4)
         if size == 0:
             self.setioerr(ctx, ERROR_BAD_NUMBER)
-            return self.DOSFALSE
+            return DOSFALSE
         name = ctx.mem.r_cstr(name_ptr)
         if not flags & self.GVF_GLOBAL_ONLY:
             node = self.find_var(ctx, name, flags & 0xFF)
@@ -406,7 +402,7 @@ class DosLibrary(LibImpl):
                     log_dos.info('GetVar("%s", 0x%x) -> %s' % (name, flags, value))
                     self.setioerr(ctx, len(value))
                     return min(nodelen - 1, size - 1)
-        return self.DOSFALSE
+        return DOSFALSE
 
     def FindVar(self, ctx):
         name_ptr = ctx.cpu.r_reg(REG_D1)
@@ -435,7 +431,7 @@ class DosLibrary(LibImpl):
                 node = self.find_var(ctx, name, vtype)
                 if node != None:
                     self.delete_var(ctx, node)
-                return self.DOSTRUE
+                return DOSTRUE
         else:
             if flags & self.GVF_BINARY_VAR:
                 value = None
@@ -450,7 +446,7 @@ class DosLibrary(LibImpl):
                     node = self.create_var(ctx, name, flags)
                 if node != None:
                     self.set_var(ctx, node, buff_ptr, size, value, flags)
-                return self.DOSTRUE
+                return DOSTRUE
         return 0
 
     def DeleteVar(self, ctx):
@@ -462,7 +458,7 @@ class DosLibrary(LibImpl):
             log_dos.info('DeleteVar("%s")' % name)
             if node != None:
                 self.delete_var(ctx, node)
-            return self.DOSTRUE
+            return DOSTRUE
 
     # ----- Signals ----------------------
 
@@ -553,33 +549,34 @@ class DosLibrary(LibImpl):
         ctx.process.set_output(fh)
         return cur_out
 
-    def SetMode(self, ctx, fh_b_addr, mode):
+    def SetMode(self, ctx, fh_b_addr, mode: LONG):
         fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+        mode = mode.val
         log_dos.info("SetMode(fh=%s,mode=%d)", fh, mode)
         # check mode
         if mode == 0:
             cooked = True
-        elif mode == 1:
+        elif mode == 1 or mode == -1:
             cooked = False
         else:
             log_dos.warning("SetMode() mode=%d not supported!", mode)
             self.setioerr(ctx, ERROR_ACTION_NOT_KNOWN)
-            return self.DOSFALSE
+            return DOSFALSE
 
         if fh.is_interactive():
             # try to use setmode in interactive
             ok = fh.set_mode(cooked)
             if ok:
                 self.setioerr(ctx, 0)  # no console window
-                return self.DOSTRUE
+                return DOSTRUE
             else:
                 log_dos.warning("SetMode() not supported on this platform!")
                 self.setioerr(ctx, ERROR_ACTION_NOT_KNOWN)
-                return self.DOSFALSE
+                return DOSFALSE
         else:
             log_dos.info("SetMode() not available on non-interactive FH")
             self.setioerr(ctx, ERROR_ACTION_NOT_KNOWN)
-            return self.DOSFALSE
+            return DOSFALSE
 
     def Open(self, ctx):
         name_ptr = ctx.cpu.r_reg(REG_D1)
@@ -619,7 +616,7 @@ class DosLibrary(LibImpl):
             self.file_mgr.close(fh)
             log_dos.info("Close: %s" % fh)
             self.setioerr(ctx, 0)
-        return self.DOSTRUE
+        return DOSTRUE
 
     def Read(self, ctx):
         fh_b_addr = ctx.cpu.r_reg(REG_D1)
@@ -901,9 +898,9 @@ class DosLibrary(LibImpl):
         self.setioerr(ctx, self.file_mgr.delete(self.get_current_dir(ctx), name))
         log_dos.info("DeleteFile: '%s': err=%s" % (name, self.io_err))
         if self.io_err == NO_ERROR:
-            return self.DOSTRUE
+            return DOSTRUE
         else:
-            return self.DOSFALSE
+            return DOSFALSE
 
     def Rename(self, ctx):
         old_name_ptr = ctx.cpu.r_reg(REG_D1)
@@ -914,9 +911,9 @@ class DosLibrary(LibImpl):
         self.setioerr(ctx, self.file_mgr.rename(lock, old_name, new_name))
         log_dos.info("Rename: '%s' -> '%s': err=%s" % (old_name, new_name, self.io_err))
         if self.io_err == NO_ERROR:
-            return self.DOSTRUE
+            return DOSTRUE
         else:
-            return self.DOSFALSE
+            return DOSFALSE
 
     def SetProtection(self, ctx):
         name_ptr = ctx.cpu.r_reg(REG_D1)
@@ -926,22 +923,22 @@ class DosLibrary(LibImpl):
         self.setioerr(ctx, self.file_mgr.set_protection(lock, name, mask))
         log_dos.info("SetProtection: '%s' mask=%04x: err=%s", name, mask, self.io_err)
         if self.io_err == NO_ERROR:
-            return self.DOSTRUE
+            return DOSTRUE
         else:
-            return self.DOSFALSE
+            return DOSFALSE
 
     def IsInteractive(self, ctx):
         fh_b_addr = ctx.cpu.r_reg(REG_D1)
         log_dos.info("IsInteractive: @%06x" % fh_b_addr)
         if fh_b_addr == 0:
-            return self.DOSFALSE
+            return DOSFALSE
         fh = self.file_mgr.get_by_b_addr(fh_b_addr, False)
         res = fh.is_interactive()
         log_dos.info("IsInteractive(%s): %s" % (fh, res))
         if res:
-            return self.DOSTRUE
+            return DOSTRUE
         else:
-            return self.DOSFALSE
+            return DOSFALSE
 
     def IsFileSystem(self, ctx):
         name_ptr = ctx.cpu.r_reg(REG_D1)
@@ -951,9 +948,9 @@ class DosLibrary(LibImpl):
         res = self.file_mgr.is_file_system(lock, name)
         log_dos.info("IsFileSystem('%s'): %s" % (name, res))
         if res:
-            return self.DOSTRUE
+            return DOSTRUE
         else:
-            return self.DOSFALSE
+            return DOSFALSE
 
     # ----- Locks -----
 
@@ -1005,10 +1002,10 @@ class DosLibrary(LibImpl):
         lock1 = self.lock_mgr.get_by_b_addr(lock1_b_addr)
         lock2 = self.lock_mgr.get_by_b_addr(lock2_b_addr)
         if lock1 == lock2:
-            return self.DOSTRUE
+            return DOSTRUE
         if lock1 != None and lock2 != None:
             return lock1.key == lock2.key
-        return self.DOSFALSE
+        return DOSFALSE
 
     def Examine(self, ctx):
         lock_b_addr = ctx.cpu.r_reg(REG_D1)
@@ -1022,9 +1019,9 @@ class DosLibrary(LibImpl):
         log_dos.info("Examine: %s fib=%06x(%s) -> %s" % (lock, fib_ptr, name, err))
         self.setioerr(ctx, err)
         if err == NO_ERROR:
-            return self.DOSTRUE
+            return DOSTRUE
         else:
-            return self.DOSFALSE
+            return DOSFALSE
 
     def ExamineFH(self, ctx):
         fh_b_addr = ctx.cpu.r_reg(REG_D1)
@@ -1038,7 +1035,7 @@ class DosLibrary(LibImpl):
         )
         if lock == None:
             self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
-            return self.DOSFALSE
+            return DOSFALSE
 
         fib = AccessStruct(ctx.mem, FileInfoBlockStruct, struct_addr=fib_ptr)
         err = lock.examine_lock(fib)
@@ -1050,9 +1047,9 @@ class DosLibrary(LibImpl):
         log_dos.info("UnLock: %s" % (lock))
         self.lock_mgr.release_lock(lock)
         if err == NO_ERROR:
-            return self.DOSTRUE
+            return DOSTRUE
         else:
-            return self.DOSFALSE
+            return DOSFALSE
 
     def Info(self, ctx):
         lock_b_addr = ctx.cpu.r_reg(REG_D1)
@@ -1071,10 +1068,10 @@ class DosLibrary(LibImpl):
             info.w_s("id_VolumeNode", vol)
             info.w_s("id_InUse", 0)
             log_dos.info("Info: %s info=%06x -> true" % (lock, info_ptr))
-            return self.DOSTRUE
+            return DOSTRUE
         else:
             log_dos.info("Info: %s info=%06x -> false" % (lock, info_ptr))
-            return self.DOSFALSE
+            return DOSFALSE
 
     def ExNext(self, ctx):
         lock_b_addr = ctx.cpu.r_reg(REG_D1)
@@ -1088,10 +1085,10 @@ class DosLibrary(LibImpl):
         self.setioerr(ctx, err)
         if err == NO_ERROR:
             self.setioerr(ctx, 0)
-            return self.DOSTRUE
+            return DOSTRUE
         else:
             self.setioerr(ctx, err)
-            return self.DOSFALSE
+            return DOSFALSE
 
     def ParentDir(self, ctx):
         lock_b_addr = ctx.cpu.r_reg(REG_D1)
@@ -1130,10 +1127,10 @@ class DosLibrary(LibImpl):
         log_dos.info("NameFromLock(%x,%d): %s -> %s", buf, buf_len, lock, name)
         if len(name) >= buf_len:
             self.setioerr(ctx, ERROR_LINE_TOO_LONG)
-            return self.DOSFALSE
+            return DOSFALSE
         else:
             ctx.mem.w_cstr(buf, name)
-            return self.DOSTRUE
+            return DOSTRUE
 
     def CreateDir(self, ctx):
         name_ptr = ctx.cpu.r_reg(REG_D1)
@@ -1572,7 +1569,7 @@ class DosLibrary(LibImpl):
                 output_fhci = None
             cli.w_s("cli_CurrentInput", new_input.mem.addr)
             cli.w_s("cli_StandardInput", new_stdin.mem.addr)
-            cli.w_s("cli_Background", self.DOSTRUE_S)
+            cli.w_s("cli_Background", DOSTRUE_S)
             # Create the Packet for the background process.
             packet = ctx.process.run_system()
             stack_size = cli.r_s("cli_DefaultStack") << 2
@@ -1601,7 +1598,7 @@ class DosLibrary(LibImpl):
             # shutdown
             cli.w_s("cli_CurrentInput", input_fhci)
             cli.w_s("cli_StandardInput", input_fhsi)
-            cli.w_s("cli_Background", self.DOSFALSE)
+            cli.w_s("cli_Background", DOSFALSE)
             cli.w_s("cli_Module", cur_module)
             if output_fhci != None:
                 cli.w_s("cli_StandardOutput", output_fhci)
@@ -1638,7 +1635,7 @@ class DosLibrary(LibImpl):
                     binary,
                     arg_str,
                 )
-                return self.DOSTRUE
+                return DOSTRUE
             return run_sub_process(ctx.scheduler, ctx.runner, proc)
 
     def LoadSeg(self, ctx):
@@ -1742,9 +1739,9 @@ class DosLibrary(LibImpl):
         log_dos.info("AddPart: dn='%s' fn='%s' size=%d -> np='%s'", dn, fn, size, np)
         if np != None:
             ctx.mem.w_cstr(dn_addr, np)
-            return self.DOSTRUE
+            return DOSTRUE
         else:
-            return self.DOSFALSE
+            return DOSFALSE
 
     # ----- DosObjects -----
 
@@ -1922,7 +1919,7 @@ class DosLibrary(LibImpl):
         cli = AccessStruct(ctx.mem, CLIStruct, struct_addr=cli_addr)
         setaddr = cli.r_s("cli_SetName")
         ctx.mem.w_bstr(setaddr, string)
-        return self.DOSTRUE
+        return DOSTRUE
 
     def SetPrompt(self, ctx):
         str_addr = ctx.cpu.r_reg(REG_D1)
@@ -1931,7 +1928,7 @@ class DosLibrary(LibImpl):
         cli = AccessStruct(ctx.mem, CLIStruct, struct_addr=cli_addr)
         setaddr = cli.r_s("cli_Prompt")
         ctx.mem.w_bstr(setaddr, string)
-        return self.DOSTRUE
+        return DOSTRUE
 
     def DosGetString(self, ctx):
         errno = ctx.cpu.r_reg(REG_D1)

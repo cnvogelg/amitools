@@ -80,9 +80,6 @@ class ExecLibrary(LibImpl):
         task = self.get_my_task(ctx)
         old_mask = task.sig_alloc.val
         new_signal = signal_num.val
-        log_exec.info(
-            "AllocSignal(%d, %s) for task %s", new_signal, type(signal_num), task
-        )
         if new_signal == -1:
             # find a free signal slot
             for bit in range(32):
@@ -103,7 +100,7 @@ class ExecLibrary(LibImpl):
             final_mask = old_mask
         log_exec.info(
             "AllocSignal(%d) for task %s -> %d (sig_mask %08x)",
-            new_signal,
+            signal_num.val,
             task,
             new_signal,
             final_mask,
@@ -596,8 +593,8 @@ class ExecLibrary(LibImpl):
             raise UnsupportedFeatureError(
                 "WaitPort on empty message queue called: Port (%06x)" % port_addr
             )
-        msg_addr = self.port_mgr.get_msg(port_addr)
-        log_exec.info("WaitPort: got message %06x" % (msg_addr))
+        msg_addr = self.port_mgr.peek_msg(port_addr)
+        log_exec.info("WaitPort: peek message %06x" % (msg_addr))
         return msg_addr
 
     def AddTail(self, ctx):
