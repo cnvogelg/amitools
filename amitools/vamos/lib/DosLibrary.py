@@ -567,14 +567,44 @@ class DosLibrary(LibImpl):
             # try to use setmode in interactive
             ok = fh.set_mode(cooked)
             if ok:
+                log_dos.info("SetMode: cooked=%s", cooked)
                 self.setioerr(ctx, 0)  # no console window
                 return DOSTRUE
             else:
                 log_dos.warning("SetMode() not supported on this platform!")
-                self.setioerr(ctx, ERROR_ACTION_NOT_KNOWN)
+                self.setioerr(ctx, ERROR_NOT_IMPLEMENTED)
                 return DOSFALSE
         else:
-            log_dos.info("SetMode() not available on non-interactive FH")
+            log_dos.info("SetMode() not available on non-interactive FH!")
+            self.setioerr(ctx, ERROR_ACTION_NOT_KNOWN)
+            return DOSFALSE
+
+    def WaitForChar(self, ctx, fh_b_addr, timeout: LONG):
+        fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+        timeout = timeout.val
+        log_dos.info("WaitForChar(fh=%s,timeout=%d ms)", fh, timeout)
+
+        if fh.is_interactive():
+            # timeout is given in ms resolution so convert it
+            timeout = timeout / 1000
+            ok = fh.wait_for_char(timeout)
+            if ok:
+                # char is available
+                log_dos.info("WaitForChar: has char")
+                self.setioerr(ctx, 1)  # number of input lines
+                return DOSTRUE
+            elif ok is False:
+                # no char is available
+                log_dos.info("WaitForChar: no char available")
+                self.setioerr(ctx, 0)
+                return DOSFALSE
+            else:
+                # wait_for_char not supported
+                log_dos.warning("WaitForChar() not supported on this platform!")
+                self.setioerr(ctx, ERROR_NOT_IMPLEMENTED)
+                return DOSFALSE
+        else:
+            log_dos.warning("WaitForChar() not available on non-interactive FH!")
             self.setioerr(ctx, ERROR_ACTION_NOT_KNOWN)
             return DOSFALSE
 

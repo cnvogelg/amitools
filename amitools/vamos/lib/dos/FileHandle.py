@@ -74,6 +74,11 @@ class FileHandle:
         # set mode
         return self.terminal.set_mode(cooked)
 
+    def wait_for_char(self, timeout):
+        if not self.terminal:
+            return False
+        return self.terminal.wait_for_char(timeout)
+
     def write(self, data):
         assert isinstance(data, (bytes, bytearray))
         try:

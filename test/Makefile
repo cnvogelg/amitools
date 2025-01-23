@@ -12,6 +12,7 @@ SOURCES_C += dos_readargs.c dos_readargs2.c dos_findarg.c
 SOURCES_C += dos_loadseg.c dos_runcmd.c
 SOURCES_C += dos_system.c dos_match.c dos_setmode.c
 SOURCES_C += dos_program.c dos_seek.c dos_examine.c
+SOURCES_C += dos_waitforchar.c
 SOURCES_C += vprintf.c dos_stdout.c
 SOURCES_C += util_muldiv.c util_date.c
 SOURCES_C += math_double.c math_double_trans.c

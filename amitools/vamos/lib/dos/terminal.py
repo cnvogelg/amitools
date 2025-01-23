@@ -3,6 +3,11 @@ try:
 except ImportError:
     termios = None
 
+try:
+    import select
+except ImportError:
+    select = None
+
 
 class Terminal:
     def __init__(self, fd):
@@ -28,3 +33,11 @@ class Terminal:
             return True
         else:
             return False
+
+    def wait_for_char(self, timeout):
+        """return True for a char available, False no char, None not supported"""
+        if select:
+            rx, _, _ = select.select([self.fd], [], [], timeout)
+            return self.fd in rx
+        else:
+            return None
