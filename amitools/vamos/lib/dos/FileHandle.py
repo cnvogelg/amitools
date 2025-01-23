@@ -30,7 +30,7 @@ class FileHandle:
         else:
             self.terminal = None
 
-    def __str__(self):
+    def __repr__(self):
         return "[FH:'%s'(ami='%s',sys='%s',nc=%s,af=%s,int=%s)@%06x=B@%06x]" % (
             self.name,
             self.ami_path,
@@ -41,6 +41,9 @@ class FileHandle:
             self.mem.addr,
             self.b_addr,
         )
+
+    def __str__(self):
+        return "[FH:'%s'@%06x=B@%06x]" % (self.name, self.mem.addr, self.b_addr)
 
     def close(self):
         if self.need_close:

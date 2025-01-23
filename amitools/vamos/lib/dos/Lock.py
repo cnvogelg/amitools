@@ -29,13 +29,23 @@ class Lock:
         addr = 0
         if self.mem is not None:
             addr = self.mem.addr
-        return "Lock('%s'(ami='%s',sys='%s',key=%s,ex=%d, vol=%d)@%06x=b@%06x)" % (
+        return "Lock['%s'(ami='%s',sys='%s',key=%s,ex=%d, vol=%d)@%06x=b@%06x]" % (
             self.name,
             self.ami_path,
             self.sys_path,
             self.key,
             self.exclusive,
             self.vol_addr,
+            addr,
+            self.b_addr,
+        )
+
+    def __str__(self):
+        addr = 0
+        if self.mem is not None:
+            addr = self.mem.addr
+        return "Lock['%s'@%06x=b@%06x]" % (
+            self.name,
             addr,
             self.b_addr,
         )
