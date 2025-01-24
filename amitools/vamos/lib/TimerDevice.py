@@ -85,6 +85,13 @@ class TimerDevice(LibImpl):
         else:
             diff_micros = d_micros + self.MICRO_HZ - s_micros
             diff_secs -= 1
+
+        # limit values
+        if diff_secs < 0:
+            diff_secs = 0
+        if diff_micros < 0:
+            diff_micros = 0
+
         log_timer.info(
             "SubTime(dest=%s: (%d, %d), src=%s:(%d, %d) -> secs=%d micro=%d",
             dest,
