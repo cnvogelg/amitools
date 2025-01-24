@@ -204,22 +204,44 @@ class LibStubGen(object):
         # return created func
         return func
 
-    def _set_result(self, ctx, res):
-        """set result after execution of the lib stub method"""
-        if res is not None:
-            if type(res) in (list, tuple):
-                ctx.cpu.w_reg(REG_D0, res[0] & 0xFFFFFFFF)
-                ctx.cpu.w_reg(REG_D1, res[1] & 0xFFFFFFFF)
-            elif type(res) in (int, bool):
-                ctx.cpu.w_reg(REG_D0, int(res) & 0xFFFFFFFF)
+    def _set_result(self, ctx, result_value, result_type):
+        # if no result type is given then standard return rules apply
+        # either single value for d0 or tuple/list with (d0, d1)
+        if result_type is None or result_type is int:
+            if result_value is None:
+                # VOID functions return None
+                # we do not alter any regs in this case
+                pass
+            elif type(result_value) in (list, tuple):
+                ctx.cpu.w_reg(REG_D0, result_value[0] & 0xFFFFFFFF)
+                ctx.cpu.w_reg(REG_D1, result_value[1] & 0xFFFFFFFF)
+            elif type(result_value) in (int, bool):
+                ctx.cpu.w_reg(REG_D0, int(result_value) & 0xFFFFFFFF)
             else:
+                raise ValueError(
+                    f"Unknown result value '{result_value}' for type {result_type}"
+                )
+        else:
+            # if a return type is annotated then assume either
+            # object with memory address or None
+            if result_value is None:
+                d0 = 0
+            else:
+                # make sure value and type match
+                if not isinstance(result_value, result_type):
+                    raise ValueError(
+                        f"Invalid result value '{result_value}' for type {result_type}"
+                    )
                 # is type object? then use its addr
-                get_addr = getattr(res, "get_addr", None)
+                get_addr = getattr(result_value, "get_addr", None)
                 if get_addr:
-                    addr = get_addr()
-                    ctx.cpu.w_reg(REG_D0, addr)
+                    d0 = get_addr()
                 else:
-                    raise ValueError(f"Invalid result value '{res}'")
+                    raise ValueError(
+                        f"Unknown result value '{result_value}' for type {result_type}"
+                    )
+            # write d0 of type
+            ctx.cpu.w_reg(REG_D0, d0)
 
     def _get_result_str(self, res):
         """show result values"""
@@ -235,7 +257,9 @@ class LibStubGen(object):
                     addr = get_addr()
                     res_str = "d0=%08x (%s)" % (addr, res)
                 else:
-                    raise ValueError(f"Invalid result value '{res}'")
+                    raise ValueError(
+                        f"Invalid result value '{result_value}' for {result_type}"
+                    )
         else:
             res_str = "n/a"
         return res_str
@@ -269,19 +293,19 @@ class LibStubGen(object):
 
         return args
 
-    def _gen_base_func(self, method, ctx):
+    def _gen_base_func(self, method, ctx, result_type):
         """generate a function that calls the method with the ctx."""
 
         def base_func(this, *args, **kwargs):
             """the base function to call the impl,
             set return vals, and catch exceptions"""
-            res = method(ctx)
-            self._set_result(ctx, res)
-            return res
+            result_value = method(ctx)
+            self._set_result(ctx, result_value, result_type)
+            return result_value
 
         return base_func
 
-    def _gen_base_extra_args_func(self, method, ctx, extra_args):
+    def _gen_base_extra_args_func(self, method, ctx, extra_args, result_type):
         """generate a function that fills arguments from registers."""
 
         def base_func(this, *args, **kwargs):
@@ -290,9 +314,9 @@ class LibStubGen(object):
 
             args = self._gen_extra_args(ctx, extra_args)
             # call function
-            res = method(ctx, *args)
-            self._set_result(ctx, res)
-            return res
+            result_value = method(ctx, *args)
+            self._set_result(ctx, result_value, result_type)
+            return result_value
 
         return base_func
 
@@ -339,14 +363,22 @@ class LibStubGen(object):
         returns an unbound method for the stub instaance
         """
         fd_func = impl_func.fd_func
+        method = impl_func.method
 
         # do we need to read some registers into extra args?
-        method = impl_func.method
         extra_args = impl_func.extra_args
-        if extra_args:
-            func = self._gen_base_extra_args_func(method, ctx, extra_args)
+
+        # is a result type given?
+        result = impl_func.result
+        if result:
+            result_type = result.type
         else:
-            func = self._gen_base_func(method, ctx)
+            result_type = None
+
+        if extra_args:
+            func = self._gen_base_extra_args_func(method, ctx, extra_args, result_type)
+        else:
+            func = self._gen_base_func(method, ctx, result_type)
 
         # wrap around logging method?
         log = self.log_valid

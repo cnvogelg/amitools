@@ -1,9 +1,15 @@
 import pytest
 from amitools.fd import read_lib_fd
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
-from amitools.vamos.libcore import LibImplScanner, LibImplScan, LibImplFuncArg
+from amitools.vamos.libcore import (
+    LibImplScanner,
+    LibImplScan,
+    LibImplFuncArg,
+    LibImplFuncTag,
+)
 from amitools.vamos.error import VamosInternalError
 from amitools.vamos.machine.regs import *
+from amitools.vamos.libtypes import TagItem
 
 
 def libcore_impl_scan_checked_vamos_test():
@@ -31,7 +37,7 @@ def libcore_impl_scan_vamos_test():
     assert res.get_name() == name
     assert res.get_impl() == impl
     assert res.get_fd() == fd
-    assert res.get_num_valid_funcs() == 6
+    assert res.get_num_valid_funcs() == 7
     assert res.get_num_missing_funcs() == 1
     assert res.get_num_error_funcs() == 1
     assert res.get_num_invalid_funcs() == 1
@@ -43,7 +49,7 @@ def libcore_impl_scan_vamos_test():
     assert missing_func.name == "Dummy"
     assert missing_func.fd_func == fd.get_func_by_name("Dummy")
     assert missing_func.method is None
-    assert missing_func.tag == LibImplScan.TAG_MISSING
+    assert missing_func.tag == LibImplFuncTag.TAG_MISSING
     assert missing_funcs == {"Dummy": missing_func}
     missing_names = res.get_missing_func_names()
     assert missing_names == ["Dummy"]
@@ -55,7 +61,7 @@ def libcore_impl_scan_vamos_test():
     assert invalid_func.name == "InvalidFunc"
     assert invalid_func.fd_func == fd.get_func_by_name("InvalidFunc")
     assert invalid_func.method == impl.InvalidFunc
-    assert invalid_func.tag == LibImplScan.TAG_INVALID
+    assert invalid_func.tag == LibImplFuncTag.TAG_INVALID
     invalid_names = res.get_invalid_func_names()
     assert invalid_names == ["InvalidFunc"]
 
@@ -65,7 +71,7 @@ def libcore_impl_scan_vamos_test():
     assert error_func.name == "PrintHello"
     assert error_func.fd_func == fd.get_func_by_name("PrintHello")
     assert error_func.method == impl.PrintHello
-    assert error_func.tag == LibImplScan.TAG_ERROR
+    assert error_func.tag == LibImplFuncTag.TAG_ERROR
     assert error_funcs == {"PrintHello": error_func}
     error_names = res.get_error_func_names()
     assert error_names == ["PrintHello"]
@@ -78,12 +84,14 @@ def libcore_impl_scan_vamos_test():
         "Swap": res.get_func_by_name("Swap"),
         "RaiseError": res.get_func_by_name("RaiseError"),
         "ExecutePy": res.get_func_by_name("ExecutePy"),
+        "MyFindTag": res.get_func_by_name("MyFindTag"),
         "MyFindTagData": res.get_func_by_name("MyFindTagData"),
     }
     valid_names = res.get_valid_func_names()
     assert valid_names == [
         "Add",
         "ExecutePy",
+        "MyFindTag",
         "MyFindTagData",
         "PrintString",
         "RaiseError",
@@ -93,7 +101,13 @@ def libcore_impl_scan_vamos_test():
     assert valid_func.name == "ExecutePy"
     assert valid_func.fd_func == fd.get_func_by_name("ExecutePy")
     assert valid_func.method == impl.ExecutePy
-    assert valid_func.tag == LibImplScan.TAG_VALID
+    assert valid_func.tag == LibImplFuncTag.TAG_VALID
+
+    # check result
+    my_find_tag = res.get_func_by_name("MyFindTag")
+    result = my_find_tag.result
+    assert result is not None
+    assert result.type is TagItem
 
 
 def libcore_impl_scan_vamos_extra_args_test():
@@ -117,7 +131,7 @@ def libcore_impl_scan_vamos_extra_args_test():
     assert valid_func.name == "ExecutePy"
     assert valid_func.fd_func == fd.get_func_by_name("ExecutePy")
     assert valid_func.method == impl.ExecutePy
-    assert valid_func.tag == LibImplScan.TAG_VALID
+    assert valid_func.tag == LibImplFuncTag.TAG_VALID
     assert valid_func.extra_args == [
         LibImplFuncArg("argc", REG_D0, int),
         LibImplFuncArg("argv", REG_A0, int),
@@ -127,7 +141,7 @@ def libcore_impl_scan_vamos_extra_args_test():
     assert valid_func.name == "PrintString"
     assert valid_func.fd_func == fd.get_func_by_name("PrintString")
     assert valid_func.method == impl.PrintString
-    assert valid_func.tag == LibImplScan.TAG_VALID
+    assert valid_func.tag == LibImplFuncTag.TAG_VALID
     assert valid_func.extra_args == [
         LibImplFuncArg("str", REG_A0, str),
     ]

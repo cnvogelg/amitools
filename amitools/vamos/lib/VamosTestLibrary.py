@@ -61,6 +61,12 @@ class VamosTestLibrary(LibImpl):
         else:
             return 0
 
+    def MyFindTag(self, ctx, tag_val, tag_list: TagList) -> TagItem:
+        if not tag_list:
+            return None
+        tag = tag_list.find_tag(tag_val)
+        return tag
+
     def RaiseError(self, ctx, txt_ptr: CSTR):
         txt = txt_ptr.str
         if txt == "RuntimeError":

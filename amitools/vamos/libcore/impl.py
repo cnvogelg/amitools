@@ -1,8 +1,14 @@
 import inspect
-import collections
+from enum import StrEnum
+from dataclasses import dataclass
+import typing
+from typing import Optional, Any
+from types import MethodType
+
 from amitools.vamos.libstructs import LibraryStruct
 from amitools.vamos.error import VamosInternalError
 from amitools.vamos.machine import str_to_reg_map
+from amitools.fd import FuncDef
 
 
 class LibImpl(object):
@@ -28,24 +34,39 @@ class LibImpl(object):
         pass
 
 
-LibImplFunc = collections.namedtuple(
-    "LibImplFunc",
-    ("name", "fd_func", "tag", "method", "extra_args"),
-)
+class LibImplFuncTag(StrEnum):
+    TAG_VALID = "valid"
+    TAG_ERROR = "error"
+    TAG_INVALID = "invalid"
+    TAG_MISSING = "missing"
 
 
-LibImplFuncArg = collections.namedtuple("LibImplFuncArg", ("name", "reg", "type"))
+@dataclass
+class LibImplFuncArg:
+    name: str
+    reg: int
+    type: Optional[Any]
+
+
+@dataclass
+class LibImplFuncResult:
+    type: Optional[Any]
+
+
+@dataclass
+class LibImplFunc:
+    name: str
+    tag: LibImplFuncTag
+    method: Optional[MethodType] = None
+    fd_func: Optional[FuncDef] = None
+    result: Optional[LibImplFuncResult] = None
+    extra_args: Optional[list[LibImplFuncArg]] = None
 
 
 class LibImplScan(object):
     """scan result of a vamos library implementation
 
     it contains extracted function lists"""
-
-    TAG_VALID = "valid"
-    TAG_ERROR = "error"
-    TAG_INVALID = "invalid"
-    TAG_MISSING = "missing"
 
     def __init__(self, name, impl, fd):
         self.name = name
@@ -131,7 +152,7 @@ class LibImplScanner(object):
                 impl_func = self._gen_impl_func(fd_func, method)
                 res.all_funcs[name] = impl_func
                 found_names.append(name)
-                if impl_func.tag == LibImplScan.TAG_VALID:
+                if impl_func.tag == LibImplFuncTag.TAG_VALID:
                     res.valid_funcs[name] = impl_func
                 else:
                     res.error_funcs[name] = impl_func
@@ -140,11 +161,9 @@ class LibImplScanner(object):
                 # if name is camel case then it is invalid
                 if name[0].isupper():
                     impl_func = LibImplFunc(
-                        name,
-                        None,
-                        LibImplScan.TAG_INVALID,
-                        method,
-                        None,
+                        name=name,
+                        tag=LibImplFuncTag.TAG_INVALID,
+                        method=method,
                     )
                     res.invalid_funcs[name] = impl_func
                     res.all_funcs[name] = impl_func
@@ -157,7 +176,9 @@ class LibImplScanner(object):
                     name = fd_func.get_name()
                     if name not in found_names:
                         impl_func = LibImplFunc(
-                            name, fd_func, LibImplScan.TAG_MISSING, None, None
+                            name=name,
+                            tag=LibImplFuncTag.TAG_MISSING,
+                            fd_func=fd_func,
                         )
                         res.missing_funcs[name] = impl_func
                         res.all_funcs[name] = impl_func
@@ -183,7 +204,7 @@ class LibImplScanner(object):
                 "'%s' impl has %d error funcs: %s" % (name, num_error, txt)
             )
 
-    def _gen_extra_args(self, more_args, fd_func, anno):
+    def _gen_extra_args(self, more_args, fd_func, type_hints):
         """extract more args of func that are suitable to be mapped to regs"""
         extra_args = []
         fd_args = fd_func.get_args()
@@ -202,8 +223,8 @@ class LibImplScanner(object):
             reg = str_to_reg_map[reg_str]
             # find type
             py_type = int
-            if impl_arg_name in anno:
-                py_type = anno[impl_arg_name]
+            if impl_arg_name in type_hints:
+                py_type = type_hints[impl_arg_name]
             arg = LibImplFuncArg(fd_arg_name, reg, py_type)
             extra_args.append(arg)
         return extra_args
@@ -212,8 +233,15 @@ class LibImplScanner(object):
         """describe the impl func"""
         # prepare impl_func
         func_name = fd_func.get_name()
-        tag = LibImplScan.TAG_ERROR
-        impl_func = LibImplFunc(func_name, fd_func, tag, method, None)
+
+        # error func
+        impl_func = LibImplFunc(
+            name=func_name,
+            tag=LibImplFuncTag.TAG_ERROR,
+            method=method,
+            fd_func=fd_func,
+        )
+
         # inspect method
         fas = inspect.getfullargspec(method)
         if fas.varargs is not None:
@@ -222,21 +250,38 @@ class LibImplScanner(object):
             return impl_func
         if fas.defaults is not None:
             return impl_func
+
         # args must begin with "self" and "ctx"
         num_args = len(fas.args)
         if num_args < 2:
             return impl_func
         if fas.args[:2] != ["self", "ctx"]:
             return impl_func
+
+        # get type hints
+        type_hints = typing.get_type_hints(method)
+
+        # get return type if any
+        return_type = type_hints.pop("return", None)
+        if return_type:
+            result = LibImplFuncResult(return_type)
+        else:
+            result = None
+
         # extra args? must be function arguments
         if num_args > 2:
-            anno = fas.annotations
-            extra_args = self._gen_extra_args(fas.args[2:], fd_func, anno)
+            extra_args = self._gen_extra_args(fas.args[2:], fd_func, type_hints)
             if not extra_args:
                 return impl_func
         else:
             extra_args = None
+
         # impl_func is valid
         return LibImplFunc(
-            func_name, fd_func, LibImplScan.TAG_VALID, method, extra_args
+            name=func_name,
+            tag=LibImplFuncTag.TAG_VALID,
+            method=method,
+            fd_func=fd_func,
+            extra_args=extra_args,
+            result=result,
         )
