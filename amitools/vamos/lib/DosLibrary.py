@@ -585,8 +585,8 @@ class DosLibrary(LibImpl):
         log_dos.info("WaitForChar(fh=%s,timeout=%d ms)", fh, timeout)
 
         if fh.is_interactive():
-            # timeout is given in ms resolution so convert it
-            timeout = timeout / 1000
+            # timeout is given in us resolution so convert it
+            timeout = timeout / 1_000_000
             ok = fh.wait_for_char(timeout)
             if ok:
                 # char is available
@@ -785,7 +785,7 @@ class DosLibrary(LibImpl):
         ok = fh.write(str_dat)
 
         show_data = str_dat[: self.MAX_SHOW_DATA]
-        log_dos.info("FPuts(%s,'%s')", fh, show_data)
+        log_dos.info("FPuts(%s,#%d:%s)", fh, len(str_dat), show_data)
         return 0 if ok else -1
 
     def UnGetC(self, ctx, fh_b_addr, val):

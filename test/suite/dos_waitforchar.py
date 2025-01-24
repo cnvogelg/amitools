@@ -7,7 +7,7 @@ def dos_waitforchar_wait_test(vamos, tmpdir):
     # timeout detected
     assert rc == 1
     # expect to read all 6 bytes of input
-    assert stdout == ["timeout=100", "result=0"]
+    assert stdout == ["timeout=100000", "result=0"]
 
 
 def dos_waitforchar_char_test(vamos, tmpdir):
@@ -20,4 +20,4 @@ def dos_waitforchar_char_test(vamos, tmpdir):
     )
     assert rc == 0
     # even without newline it returns data
-    assert stdout == ["timeout=100", "result=-1"]
+    assert stdout == ["timeout=100000", "result=-1"]
