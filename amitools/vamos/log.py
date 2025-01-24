@@ -28,6 +28,8 @@ log_dos = logging.getLogger("dos")
 log_exec = logging.getLogger("exec")
 log_utility = logging.getLogger("utility")
 log_math = logging.getLogger("math")
+log_intuition = logging.getLogger("intuition")
+log_timer = logging.getLogger("timer")
 
 log_proc = logging.getLogger("proc")
 log_prof = logging.getLogger("prof")
@@ -60,6 +62,8 @@ loggers = [
     log_math,
     log_machine,
     log_schedule,
+    log_intuition,
+    log_timer,
 ]
 
 preset = {log_prof: logging.INFO}

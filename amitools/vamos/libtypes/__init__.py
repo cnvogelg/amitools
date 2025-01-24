@@ -14,3 +14,6 @@ from .process import CLI, Process, PathList
 # util
 from .tag import CommonTag, TagItem, TagList, Tag, TagArray
 from .dostag import DosTag
+
+# timer
+from .timer import TimeVal
