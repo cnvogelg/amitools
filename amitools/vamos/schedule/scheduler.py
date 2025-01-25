@@ -41,12 +41,13 @@ class Scheduler(object):
         # state
         self.ready_tasks = []
         self.waiting_tasks = []
-        self.event_hook = None
+        self.event_hooks = []
         self.cur_task = None
         self.num_tasks = 0
         self.main_glet = greenlet.getcurrent()
         self.num_switch_same = 0
         self.num_switch_other = 0
+        self.running = False
 
     @classmethod
     def from_cfg(cls, machine, schedule_cfg):
@@ -58,7 +59,7 @@ class Scheduler(object):
 
     def set_event_callback(self, func):
         """the function will receive ScheduleEvent"""
-        self.event_hook = func
+        self.event_hooks.append(func)
 
     def get_num_tasks(self):
         """count the active tasks"""
@@ -80,6 +81,13 @@ class Scheduler(object):
         # check that we have at least one task to run
         if len(self.ready_tasks) == 0:
             raise RuntimeError("no tasks to schedule!")
+
+        self.running = True
+
+        # report events for previously added tasks
+        if len(self.event_hooks) > 0:
+            for task in self.ready_tasks:
+                self._report_event(SchedulerEvent.Type.ADD_TASK, task)
 
         # main loop
         while True:
@@ -143,6 +151,7 @@ class Scheduler(object):
 
         # end of scheduling
         self._make_current(None)
+        self.running = False
 
         log_schedule.info(
             "schedule(): done (switches: same=%d, other=%d)",
@@ -200,8 +209,9 @@ class Scheduler(object):
         # configure task
         task.config(self, self.config.slice_cycles)
         log_schedule.info("add_task: %s", task.name)
-        # report via event
-        self._report_event(SchedulerEvent.Type.ADD_TASK, task)
+        # report via event if running or postpone it
+        if self.running:
+            self._report_event(SchedulerEvent.Type.ADD_TASK, task)
         return True
 
     def rem_task(self, task):
@@ -224,14 +234,16 @@ class Scheduler(object):
         # mark as removed
         task.set_state(TaskState.TS_REMOVED)
         log_schedule.info("rem_task: %s", task.name)
-        # report via event
-        self._report_event(SchedulerEvent.Type.REMOVE_TASK, task)
+        # report via event if running or suppress otherwise
+        if self.running:
+            self._report_event(SchedulerEvent.Type.REMOVE_TASK, task)
         return True
 
     def _report_event(self, event, task):
-        if self.event_hook:
+        if len(self.event_hooks) > 0:
             event = SchedulerEvent(event, task)
-            self.event_hook(event)
+            for hook in self.event_hooks:
+                hook(event)
 
     def reschedule(self):
         """callback from tasks to reschedule"""
