@@ -13,6 +13,8 @@ class SchedulerEvent:
         WAITING_TASK = 1
         ADD_TASK = 2
         REMOVE_TASK = 3
+        WAKE_UP_TASK = 4
+        READY_TASK = 5
 
     type: Type
     task: TaskBase
@@ -123,6 +125,8 @@ class Scheduler(object):
                     if old_task.get_state() == TaskState.TS_RUN:
                         old_task.set_state(TaskState.TS_READY)
                         self.ready_tasks.append(old_task)
+                        # report
+                        self._report_event(SchedulerEvent.Type.READY_TASK, old_task)
 
                     old_task.save_ctx()
 
@@ -163,9 +167,7 @@ class Scheduler(object):
     def _make_current(self, task):
         self.cur_task = task
         # report via event
-        if self.event_hook:
-            event = SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task)
-            self.event_hook(event)
+        self._report_event(SchedulerEvent.Type.ACTIVE_TASK, task)
 
     def wait_task(self, task):
         """set the given task into wait state"""
@@ -173,9 +175,7 @@ class Scheduler(object):
         self.waiting_tasks.append(task)
         task.set_state(TaskState.TS_WAIT)
         # report via event
-        if self.event_hook:
-            event = SchedulerEvent(SchedulerEvent.Type.WAITING_TASK, task)
-            self.event_hook(event)
+        self._report_event(SchedulerEvent.Type.WAITING_TASK, task)
         self.reschedule()
 
     def wake_up_task(self, task):
@@ -185,6 +185,8 @@ class Scheduler(object):
         # add to front
         self.ready_tasks.insert(0, task)
         task.set_state(TaskState.TS_READY)
+        # report via event
+        self._report_event(SchedulerEvent.Type.WAKE_UP_TASK, task)
         # directly reschedule
         self.reschedule()
 
@@ -199,9 +201,7 @@ class Scheduler(object):
         task.config(self, self.config.slice_cycles)
         log_schedule.info("add_task: %s", task.name)
         # report via event
-        if self.event_hook:
-            event = SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task)
-            self.event_hook(event)
+        self._report_event(SchedulerEvent.Type.ADD_TASK, task)
         return True
 
     def rem_task(self, task):
@@ -225,10 +225,13 @@ class Scheduler(object):
         task.set_state(TaskState.TS_REMOVED)
         log_schedule.info("rem_task: %s", task.name)
         # report via event
-        if self.event_hook:
-            event = SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task)
-            self.event_hook(event)
+        self._report_event(SchedulerEvent.Type.REMOVE_TASK, task)
         return True
+
+    def _report_event(self, event, task):
+        if self.event_hook:
+            event = SchedulerEvent(event, task)
+            self.event_hook(event)
 
     def reschedule(self):
         """callback from tasks to reschedule"""
