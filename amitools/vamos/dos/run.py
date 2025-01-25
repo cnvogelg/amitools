@@ -2,6 +2,7 @@ from amitools.vamos.log import log_proc
 from amitools.vamos.task import Stack
 from amitools.vamos.machine import Code
 from amitools.vamos.machine.regs import *
+from amitools.vamos.schedule import SchedulerEvent
 
 
 def run_sub_process(scheduler, runner, proc):
@@ -13,7 +14,8 @@ def run_sub_process(scheduler, runner, proc):
 
     # hack cur task
     cur_task = scheduler.cur_task
-    scheduler.cur_task_hook(task)
+    event = SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task)
+    scheduler.event_hook(event)
 
     # return value
     code = task.get_code()
@@ -25,7 +27,8 @@ def run_sub_process(scheduler, runner, proc):
     proc.free()
 
     # restore cur task
-    scheduler.cur_task_hook(cur_task)
+    event = SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, cur_task)
+    scheduler.event_hook(event)
 
     return ret_code
 

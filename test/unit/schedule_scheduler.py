@@ -1,23 +1,32 @@
 from amitools.vamos.machine import Machine, Code
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.schedule import Scheduler, NativeTask, PythonTask
+from amitools.vamos.schedule import Scheduler, NativeTask, PythonTask, SchedulerEvent
 from amitools.vamos.machine.opcodes import *
 from amitools.vamos.machine.regs import *
 
 
 class Ctx:
-    def __init__(self, machine, sched, alloc):
+    def __init__(self, machine, sched, alloc, events):
         self.machine = machine
         self.sched = sched
         self.alloc = alloc
         self.mem = machine.get_mem()
+        self.events = events
 
 
 def setup(slice_cycles=1000):
     machine = Machine()
     sched = Scheduler(machine, slice_cycles=slice_cycles)
     alloc = MemoryAlloc.for_machine(machine)
-    return Ctx(machine, sched, alloc)
+
+    events = []
+
+    def cb(event):
+        events.append(event)
+
+    sched.set_event_callback(cb)
+
+    return Ctx(machine, sched, alloc, events)
 
 
 def cleanup(ctx):
@@ -69,16 +78,10 @@ def schedule_scheduler_native_task_simple_test():
     cleanup(ctx)
 
 
-def schedule_scheduler_native_task_cur_task_hook_test():
-    tasks = []
-
-    def cb(task):
-        tasks.append(task)
-
+def schedule_scheduler_native_task_event_hook_test():
     ctx = setup()
     # set cur task callback
     sched = ctx.sched
-    sched.set_cur_task_callback(cb)
 
     task_ctx = MyNativeTask(ctx, set_regs={REG_D0: 42})
     task = task_ctx.task
@@ -94,22 +97,23 @@ def schedule_scheduler_native_task_cur_task_hook_test():
     sched.schedule()
     exit_code = task.get_exit_code()
     assert exit_code == 42
-    assert tasks == [task, None]
+
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
 
     task_ctx.free()
     cleanup(ctx)
 
 
 def schedule_scheduler_native_task_subrun_test():
-    tasks = []
     my_task = None
-
-    def cb(task):
-        tasks.append(task)
 
     ctx = setup()
     sched = ctx.sched
-    sched.set_cur_task_callback(cb)
 
     task_ctx = MyNativeTask(ctx, set_regs={REG_D0: 42})
     task = task_ctx.task
@@ -139,22 +143,23 @@ def schedule_scheduler_native_task_subrun_test():
     sched.schedule()
     exit_code = task.get_exit_code()
     assert exit_code == 42
-    assert tasks == [task, None]
+
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
 
     task_ctx.free()
     cleanup(ctx)
 
 
 def schedule_scheduler_native_task_remove_test():
-    tasks = []
     my_task = None
-
-    def cb(task):
-        tasks.append(task)
 
     ctx = setup()
     sched = ctx.sched
-    sched.set_cur_task_callback(cb)
 
     task_ctx = MyNativeTask(ctx, set_regs={REG_D0: 42})
     task = task_ctx.task
@@ -181,22 +186,23 @@ def schedule_scheduler_native_task_remove_test():
     sched.schedule()
     exit_code = task.get_exit_code()
     assert exit_code == 42
-    assert tasks == [task, None]
+
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
 
     task_ctx.free()
     cleanup(ctx)
 
 
 def schedule_scheduler_native_task_multi_test():
-    tasks = []
     my_task = None
-
-    def cb(task):
-        tasks.append(task)
 
     ctx = setup(slice_cycles=30)
     sched = ctx.sched
-    sched.set_cur_task_callback(cb)
 
     mem = ctx.mem
 
@@ -240,8 +246,18 @@ def schedule_scheduler_native_task_multi_test():
     sched.schedule()
     assert task1.get_exit_code() == 42
     assert task2.get_exit_code() == 23
+
     # check that the tasks switched
-    assert tasks == [task1, task2, task1, None]
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
 
     task2_ctx.free()
     task1_ctx.free()
@@ -249,15 +265,10 @@ def schedule_scheduler_native_task_multi_test():
 
 
 def schedule_scheduler_native_task_multi_forbid_test():
-    tasks = []
     my_task = None
-
-    def cb(task):
-        tasks.append(task)
 
     ctx = setup(slice_cycles=30)
     sched = ctx.sched
-    sched.set_cur_task_callback(cb)
     mem = ctx.mem
 
     def trap1(op, pc):
@@ -299,8 +310,17 @@ def schedule_scheduler_native_task_multi_forbid_test():
     sched.schedule()
     assert task1.get_exit_code() == 42
     assert task2.get_exit_code() == 23
+
     # check that the tasks switched
-    assert tasks == [task1, task2, None]
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
 
     task2_ctx.free()
     task1_ctx.free()
@@ -308,15 +328,10 @@ def schedule_scheduler_native_task_multi_forbid_test():
 
 
 def schedule_scheduler_native_task_multi_wait_test():
-    tasks = []
     my_task = None
-
-    def cb(task):
-        tasks.append(task)
 
     ctx = setup()
     sched = ctx.sched
-    sched.set_cur_task_callback(cb)
     mem = ctx.mem
 
     def trap1(op, pc):
@@ -355,8 +370,20 @@ def schedule_scheduler_native_task_multi_wait_test():
     sched.schedule()
     assert task1.get_exit_code() == 42
     assert task2.get_exit_code() == 23
+
     # check that the tasks switched
-    assert tasks == [task1, task2, task1, task2, None]
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.WAITING_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
 
     task2_ctx.free()
     task1_ctx.free()
@@ -402,16 +429,10 @@ def schedule_scheduler_python_task_simple_test():
     cleanup(ctx)
 
 
-def schedule_scheduler_python_task_cur_task_hook_test():
-    tasks = []
-
-    def cb(task):
-        tasks.append(task)
-
+def schedule_scheduler_python_task_event_hook_test():
     ctx = setup()
     # set cur task callback
     sched = ctx.sched
-    sched.set_cur_task_callback(cb)
 
     def my_func(task):
         return 42
@@ -426,21 +447,21 @@ def schedule_scheduler_python_task_cur_task_hook_test():
     sched.schedule()
     exit_code = task.get_exit_code()
     assert exit_code == 42
-    assert tasks == [task, None]
+
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
 
     task_ctx.free()
     cleanup(ctx)
 
 
 def schedule_scheduler_python_task_subrun_test():
-    tasks = []
-
-    def cb(task):
-        tasks.append(task)
-
     ctx = setup()
     sched = ctx.sched
-    sched.set_cur_task_callback(cb)
 
     mem = ctx.mem
     pc = ctx.machine.get_scratch_begin()
@@ -462,21 +483,21 @@ def schedule_scheduler_python_task_subrun_test():
     sched.schedule()
     exit_code = task.get_exit_code()
     assert exit_code == 42
-    assert tasks == [task, None]
+
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
 
     task_ctx.free()
     cleanup(ctx)
 
 
 def schedule_scheduler_python_task_multi_test():
-    tasks = []
-
-    def cb(task):
-        tasks.append(task)
-
     ctx = setup(slice_cycles=30)
     sched = ctx.sched
-    sched.set_cur_task_callback(cb)
 
     def task1_run(task):
         # coop multi tasking!
@@ -500,8 +521,19 @@ def schedule_scheduler_python_task_multi_test():
     sched.schedule()
     assert task1.get_exit_code() == 42
     assert task2.get_exit_code() == 23
+
     # check that the tasks switched
-    assert tasks == [task1, task2, task1, task2, None]
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
 
     task2_ctx.free()
     task1_ctx.free()
@@ -509,14 +541,8 @@ def schedule_scheduler_python_task_multi_test():
 
 
 def schedule_scheduler_python_task_multi_forbid_test():
-    tasks = []
-
-    def cb(task):
-        tasks.append(task)
-
     ctx = setup(slice_cycles=30)
     sched = ctx.sched
-    sched.set_cur_task_callback(cb)
 
     def task1_run(task):
         task.forbid()
@@ -543,8 +569,19 @@ def schedule_scheduler_python_task_multi_forbid_test():
     sched.schedule()
     assert task1.get_exit_code() == 42
     assert task2.get_exit_code() == 23
+
     # check that the tasks switched
-    assert tasks == [task1, task2, task1, task2, None]
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
 
     task2_ctx.free()
     task1_ctx.free()
@@ -552,14 +589,8 @@ def schedule_scheduler_python_task_multi_forbid_test():
 
 
 def schedule_scheduler_python_task_multi_wait_test():
-    tasks = []
-
-    def cb(task):
-        tasks.append(task)
-
     ctx = setup(slice_cycles=30)
     sched = ctx.sched
-    sched.set_cur_task_callback(cb)
 
     def task1_run(task):
         got = task.wait(3)
@@ -582,8 +613,20 @@ def schedule_scheduler_python_task_multi_wait_test():
     sched.schedule()
     assert task1.get_exit_code() == 42
     assert task2.get_exit_code() == 23
+
     # check that the tasks switched
-    assert tasks == [task1, task2, task1, task2, None]
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.WAITING_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
 
     task2_ctx.free()
     task1_ctx.free()

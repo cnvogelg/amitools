@@ -1,7 +1,21 @@
+from enum import IntEnum
+from dataclasses import dataclass
 import greenlet
 
 from amitools.vamos.log import log_schedule
-from amitools.vamos.schedule.task import TaskState
+from amitools.vamos.schedule.task import TaskState, TaskBase
+
+
+@dataclass
+class SchedulerEvent:
+    class Type(IntEnum):
+        ACTIVE_TASK = 0
+        WAITING_TASK = 1
+        ADD_TASK = 2
+        REMOVE_TASK = 3
+
+    type: Type
+    task: TaskBase
 
 
 class Scheduler(object):
@@ -13,7 +27,7 @@ class Scheduler(object):
         # state
         self.ready_tasks = []
         self.waiting_tasks = []
-        self.cur_task_hook = None
+        self.event_hook = None
         self.cur_task = None
         self.num_tasks = 0
         self.main_glet = greenlet.getcurrent()
@@ -27,8 +41,9 @@ class Scheduler(object):
     def get_machine(self):
         return self.machine
 
-    def set_cur_task_callback(self, func):
-        self.cur_task_hook = func
+    def set_event_callback(self, func):
+        """the function will receive ScheduleEvent"""
+        self.event_hook = func
 
     def get_num_tasks(self):
         """count the active tasks"""
@@ -134,14 +149,20 @@ class Scheduler(object):
 
     def _make_current(self, task):
         self.cur_task = task
-        if self.cur_task_hook:
-            self.cur_task_hook(task)
+        # report via event
+        if self.event_hook:
+            event = SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task)
+            self.event_hook(event)
 
     def wait_task(self, task):
         """set the given task into wait state"""
         log_schedule.debug("wait_task: task %s", task.name)
         self.waiting_tasks.append(task)
         task.set_state(TaskState.TS_WAIT)
+        # report via event
+        if self.event_hook:
+            event = SchedulerEvent(SchedulerEvent.Type.WAITING_TASK, task)
+            self.event_hook(event)
         self.reschedule()
 
     def wake_up_task(self, task):
@@ -164,6 +185,10 @@ class Scheduler(object):
         # configure task
         task.config(self, self.slice_cycles)
         log_schedule.info("add_task: %s", task.name)
+        # report via event
+        if self.event_hook:
+            event = SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task)
+            self.event_hook(event)
         return True
 
     def rem_task(self, task):
@@ -186,6 +211,10 @@ class Scheduler(object):
         # mark as removed
         task.set_state(TaskState.TS_REMOVED)
         log_schedule.info("rem_task: %s", task.name)
+        # report via event
+        if self.event_hook:
+            event = SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task)
+            self.event_hook(event)
         return True
 
     def reschedule(self):

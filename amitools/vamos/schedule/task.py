@@ -202,9 +202,8 @@ class NativeTask(TaskBase):
         self.run_state = None
 
     def __repr__(self):
-        return "NativeTask(%s, stack=%r, code=%r)" % (
+        return "NativeTask(%s, code=%r)" % (
             super().__repr__(),
-            self.stack,
             self.code,
         )
 
