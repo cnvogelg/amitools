@@ -37,6 +37,8 @@ class ExecLibrary(LibImpl):
         # init lib list
         self.exec_lib.lib_list.new_list(NodeType.NT_LIBRARY)
         self.exec_lib.device_list.new_list(NodeType.NT_DEVICE)
+        self.exec_lib.task_ready.new_list(NodeType.NT_TASK)
+        self.exec_lib.task_wait.new_list(NodeType.NT_TASK)
         # set some system contants
         attn_flags = 0
         if ctx.cpu_name == "68030(fake)":
@@ -51,9 +53,6 @@ class ExecLibrary(LibImpl):
         self.port_mgr = PortManager(ctx.alloc)
         self.semaphore_mgr = SemaphoreManager(ctx.alloc, ctx.mem)
         self.mem = ctx.mem
-
-    def set_this_task_addr(self, task_addr):
-        self.exec_lib.this_task.aptr = task_addr
 
     # helper
 

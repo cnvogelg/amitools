@@ -14,6 +14,8 @@ def run_sub_process(scheduler, runner, proc):
 
     # hack cur task
     cur_task = scheduler.cur_task
+    scheduler._report_event(SchedulerEvent.Type.ADD_TASK, task)
+    scheduler._report_event(SchedulerEvent.Type.READY_TASK, cur_task)
     scheduler._report_event(SchedulerEvent.Type.ACTIVE_TASK, task)
 
     # return value
@@ -26,7 +28,9 @@ def run_sub_process(scheduler, runner, proc):
     proc.free()
 
     # restore cur task
+    scheduler._report_event(SchedulerEvent.Type.READY_TASK, task)
     scheduler._report_event(SchedulerEvent.Type.ACTIVE_TASK, cur_task)
+    scheduler._report_event(SchedulerEvent.Type.REMOVE_TASK, task)
 
     return ret_code
 

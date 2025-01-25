@@ -2,6 +2,7 @@ from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
 from amitools.vamos.lib.LibList import vamos_libs
 from amitools.vamos.schedule import SchedulerEvent
+from amitools.vamos.task import ExecScheduler
 from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.log import log_libmgr
 from .cfg import LibMgrCfg
@@ -99,6 +100,8 @@ class SetupLibManager(object):
         self.exec_vlib = self.lib_mgr.get_vlib_by_addr(self.exec_addr)
         self.exec_impl = self.exec_vlib.get_impl()
         log_libmgr.info("open base lib: exec: @%06x", self.exec_addr)
+        # setup exec scheduler
+        self.exec_scheduler = ExecScheduler(self.scheduler, self.exec_impl.exec_lib)
         # link exec to dos
         self.dos_ctx.set_exec_lib(self.exec_impl)
         # open dos lib
@@ -136,5 +139,4 @@ class SetupLibManager(object):
             ami_proc = None
             task_addr = 0
         self.exec_ctx.set_cur_task_process(ami_task, ami_proc)
-        self.exec_impl.set_this_task_addr(task_addr)
         self.dos_ctx.set_cur_process(ami_proc)
