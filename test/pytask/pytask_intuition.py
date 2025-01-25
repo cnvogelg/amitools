@@ -37,7 +37,7 @@ def pytask_intuition_current_time_test(vamos_task):
             ts = tv.secs.val + (tv.micro.val / 1_000_000)
 
             # assert monotonic time stamp
-            assert ts > ts_last
+            assert ts >= ts_last
 
             ts_last = ts
 

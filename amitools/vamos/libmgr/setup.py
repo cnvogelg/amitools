@@ -1,6 +1,7 @@
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
 from amitools.vamos.lib.LibList import vamos_libs
+from amitools.vamos.schedule import SchedulerEvent
 from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.log import log_libmgr
 from .cfg import LibMgrCfg
@@ -80,7 +81,7 @@ class SetupLibManager(object):
             cls = vamos_libs[name]
             self.lib_mgr.add_impl_cls(name, cls)
         # setup scheduler call back
-        self.scheduler.set_cur_task_callback(self.cur_task_callback)
+        self.scheduler.set_event_callback(self.scheduler_event_callback)
         # return lib_mgr
         return self.lib_mgr
 
@@ -119,7 +120,10 @@ class SetupLibManager(object):
     def get_lib_proxy_mgr(self):
         return self.lib_mgr.get_lib_proxy_mgr()
 
-    def cur_task_callback(self, sched_task):
+    def scheduler_event_callback(self, event):
+        if event.type != SchedulerEvent.Type.ACTIVE_TASK:
+            return
+        sched_task = event.task
         if sched_task:
             map_task = sched_task.map_task
             log_libmgr.info("current task: %s", map_task)

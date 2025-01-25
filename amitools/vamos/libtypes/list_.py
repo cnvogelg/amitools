@@ -42,6 +42,9 @@ class ListBase:
             l += 1
         return l
 
+    def to_list(self):
+        return [a for a in self]
+
     def iter_at(self, node):
         return ListIter(self, node)
 

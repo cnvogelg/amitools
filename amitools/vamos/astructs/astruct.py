@@ -375,7 +375,7 @@ class AmigaStruct(TypeBase):
             free_ref.free_ref()
         super().free()
 
-    def __str__(self):
+    def __repr__(self):
         return "[AStruct:%s,@%06x+%06x]" % (
             self.sdef.get_type_name(),
             self._addr,
