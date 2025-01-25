@@ -1,6 +1,12 @@
 from amitools.vamos.machine import Machine, Code
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.schedule import Scheduler, NativeTask, PythonTask, SchedulerEvent
+from amitools.vamos.schedule import (
+    Scheduler,
+    NativeTask,
+    PythonTask,
+    SchedulerEvent,
+    SchedulerConfig,
+)
 from amitools.vamos.machine.opcodes import *
 from amitools.vamos.machine.regs import *
 
@@ -16,7 +22,8 @@ class Ctx:
 
 def setup(slice_cycles=1000):
     machine = Machine()
-    sched = Scheduler(machine, slice_cycles=slice_cycles)
+    cfg = SchedulerConfig(slice_cycles)
+    sched = Scheduler(machine, cfg)
     alloc = MemoryAlloc.for_machine(machine)
 
     events = []

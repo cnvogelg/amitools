@@ -1,2 +1,2 @@
 from .task import NativeTask, PythonTask, TaskState
-from .scheduler import Scheduler, SchedulerEvent
+from .scheduler import Scheduler, SchedulerEvent, SchedulerConfig

@@ -18,12 +18,24 @@ class SchedulerEvent:
     task: TaskBase
 
 
+@dataclass
+class SchedulerConfig:
+    slice_cycles: int = 1000
+
+    @classmethod
+    def from_cfg(cls, schedule_cfg):
+        return cls(schedule_cfg.slice_cycles)
+
+
 class Scheduler(object):
     """handle the execution of multiple tasks"""
 
-    def __init__(self, machine, slice_cycles=1000):
+    def __init__(self, machine, config=None):
+        if not config:
+            config = SchedulerConfig()
+
         self.machine = machine
-        self.slice_cycles = slice_cycles
+        self.config = config
         # state
         self.ready_tasks = []
         self.waiting_tasks = []
@@ -36,7 +48,8 @@ class Scheduler(object):
 
     @classmethod
     def from_cfg(cls, machine, schedule_cfg):
-        return cls(machine, schedule_cfg.slice_cycles)
+        cfg = SchedulerConfig.from_cfg(schedule_cfg)
+        return cls(machine, cfg)
 
     def get_machine(self):
         return self.machine
@@ -183,7 +196,7 @@ class Scheduler(object):
         self.ready_tasks.append(task)
         task.set_state(TaskState.TS_ADDED)
         # configure task
-        task.config(self, self.slice_cycles)
+        task.config(self, self.config.slice_cycles)
         log_schedule.info("add_task: %s", task.name)
         # report via event
         if self.event_hook:
