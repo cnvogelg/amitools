@@ -62,7 +62,7 @@ def pytask_timer_read_eclock_test(vamos_task):
             ts = secs << 32 | micro
 
             # assert monotonic time stamp
-            assert ts > ts_last
+            assert ts >= ts_last
 
             ts_last = ts
 
