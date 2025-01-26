@@ -16,4 +16,4 @@ class FuncBase:
 
         the scheduler task is needed for task/signals
         """
-        return ctx.task.map_task.get_sched_task()
+        return self.ctx.task.map_task.get_sched_task()

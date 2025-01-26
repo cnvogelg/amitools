@@ -16,6 +16,7 @@ from amitools.vamos.libtypes import ExecLibrary as ExecLibraryType
 from amitools.vamos.libtypes import Task, List
 from amitools.vamos.log import log_exec
 from amitools.vamos.error import VamosInternalError, UnsupportedFeatureError
+from amitools.vamos.lib.lexec.signalfunc import SignalFunc
 from amitools.vamos.lib.lexec.taskfunc import TaskFunc
 from .lexec.PortManager import PortManager
 from .lexec.SemaphoreManager import SemaphoreManager
@@ -54,6 +55,7 @@ class ExecLibrary(LibImpl):
         self.port_mgr = PortManager(ctx.alloc)
         self.semaphore_mgr = SemaphoreManager(ctx.alloc, ctx.mem)
         self.mem = ctx.mem
+        self.signal_func = SignalFunc(ctx, self.exec_lib)
         self.task_func = TaskFunc(ctx, self.exec_lib)
 
     # helper
@@ -78,79 +80,13 @@ class ExecLibrary(LibImpl):
     # ----- System -----
 
     def AllocSignal(self, ctx, signal_num: BYTE):
-        task = self.get_my_task(ctx)
-        old_mask = task.sig_alloc.val
-        new_signal = signal_num.val
-        if new_signal == -1:
-            # find a free signal slot
-            for bit in range(32):
-                new_mask = 1 << bit
-                if (old_mask & new_mask) == 0:
-                    new_signal = bit
-                    break
-        else:
-            # is pre selected signal free?
-            new_mask = 1 << new_signal
-            if (old_mask & new_mask) != 0:
-                new_signal = -1
-        # signal is ok. set it
-        if new_signal != -1:
-            task.sig_alloc.val |= 1 << new_signal
-            final_mask = task.sig_alloc.val
-        else:
-            final_mask = old_mask
-        log_exec.info(
-            "AllocSignal(%d) for task %s -> %d (sig_mask %08x)",
-            signal_num.val,
-            task,
-            new_signal,
-            final_mask,
-        )
-        return new_signal
+        return self.signal_func.alloc_signal(signal_num.val)
 
     def FreeSignal(self, ctx, signal_num: BYTE):
-        task = self.get_my_task(ctx)
-        sig_num = signal_num.val
-        # invalid signal?
-        if sig_num == -1:
-            log_exec.warning("FreeSignal(%d) for task %s?!", sig_num, task)
-            return
-        # check if signal is really set?
-        old_mask = task.sig_alloc.val
-        sig_mask = 1 << sig_num
-        if (sig_mask & old_mask) == 0:
-            log_exec.warning(
-                "FreeSignal(%d) for task %s not set: sig_mask=%08x!",
-                sig_num,
-                task,
-                old_mask,
-            )
-            return
-        # ok, signal can be cleared
-        task.sig_alloc.val = old_mask & ~sig_mask
-        new_mask = task.sig_alloc.val
-        log_exec.info(
-            "FreeSignal(%d) for task %s -> sig_mask=%08x",
-            sig_num,
-            task,
-            new_mask,
-        )
+        return self.signal_func.free_signal(signal_num.val)
 
     def SetSignal(self, ctx, new_signals, signal_mask):
-        # set signals via the scheduler task
-        sched_task = self.get_my_sched_task(ctx)
-        old_signals = sched_task.set_signal(new_signals, signal_mask)
-        # just to be sure dump task val
-        task = self.get_my_task(ctx)
-        real_mask = task.sig_recvd.val
-        log_exec.info(
-            "SetSignals: new_signals=%08x signal_mask=%08x old_signals=%08x real_mask=%08x",
-            new_signals,
-            signal_mask,
-            old_signals,
-            real_mask,
-        )
-        return old_signals
+        return self.signal_func.set_signal(new_signals, signal_mask)
 
     def Disable(self, ctx):
         log_exec.info("Disable")
