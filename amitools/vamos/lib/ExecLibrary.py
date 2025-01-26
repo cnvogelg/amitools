@@ -2,7 +2,7 @@ from enum import IntEnum
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib, LibFuncs, InitRes
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.astructs import AccessStruct, BYTE
+from amitools.vamos.astructs import AccessStruct, BYTE, CSTR
 from amitools.vamos.libstructs import (
     ExecLibraryStruct,
     StackSwapStruct,
@@ -16,6 +16,7 @@ from amitools.vamos.libtypes import ExecLibrary as ExecLibraryType
 from amitools.vamos.libtypes import Task, List
 from amitools.vamos.log import log_exec
 from amitools.vamos.error import VamosInternalError, UnsupportedFeatureError
+from amitools.vamos.lib.lexec.taskfunc import TaskFunc
 from .lexec.PortManager import PortManager
 from .lexec.SemaphoreManager import SemaphoreManager
 from .lexec.Pool import Pool
@@ -53,6 +54,7 @@ class ExecLibrary(LibImpl):
         self.port_mgr = PortManager(ctx.alloc)
         self.semaphore_mgr = SemaphoreManager(ctx.alloc, ctx.mem)
         self.mem = ctx.mem
+        self.task_func = TaskFunc(ctx, self.exec_lib)
 
     # helper
 
@@ -162,16 +164,8 @@ class ExecLibrary(LibImpl):
     def Permit(self, ctx):
         log_exec.info("Permit")
 
-    def FindTask(self, ctx):
-        task_ptr = ctx.cpu.r_reg(REG_A1)
-        if task_ptr == 0:
-            addr = self.exec_lib.this_task.aptr
-            log_exec.info("FindTask: me=%06x" % addr)
-            return addr
-        else:
-            task_name = ctx.mem.r_cstr(task_ptr)
-            log_exec.info("Find Task: %s" % task_name)
-            raise UnsupportedFeatureError("FindTask: other task!")
+    def FindTask(self, ctx, task_name: CSTR) -> Task:
+        return self.task_func.find_task(task_name.str)
 
     def StackSwap(self, ctx):
         stsw_ptr = ctx.cpu.r_reg(REG_A0)

@@ -248,3 +248,16 @@ class Scheduler(object):
     def reschedule(self):
         """callback from tasks to reschedule"""
         self.main_glet.switch()
+
+    def find_task(self, name):
+        # is it the current task?
+        if self.cur_task and self.cur_task.name == name:
+            return self.cur_task
+        # check ready list
+        for task in self.ready_tasks:
+            if task.name == name:
+                return task
+        # check wait list
+        for task in self.waiting_tasks:
+            if task.name == name:
+                return task

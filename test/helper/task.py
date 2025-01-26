@@ -14,7 +14,7 @@ class VamosTask:
         def task_gen(mode_ctx):
             result = []
             for func in func_list:
-                name = str(func)
+                name = func.__name__
                 if process:
                     dos_ctx = mode_ctx.dos_ctx
                     wrap_func = wrap(dos_ctx, func)

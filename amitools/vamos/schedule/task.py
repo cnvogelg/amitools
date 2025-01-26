@@ -192,6 +192,9 @@ class TaskBase:
             log_schedule.debug("%s: restore cpu context", self.name)
             self.machine.cpu.set_cpu_context(self.cpu_ctx)
 
+    def find_task(self, name):
+        return self.scheduler.find_task(name)
+
 
 class NativeTask(TaskBase):
     """a task that runs native m68k code"""

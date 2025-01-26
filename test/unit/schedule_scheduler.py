@@ -406,7 +406,7 @@ def schedule_scheduler_native_task_multi_wait_test():
 class MyPythonTask:
     def __init__(self, ctx, func, name=None, **code_kw_args):
         if name is None:
-            name = "task"
+            name = func.__name__
         self.ctx = ctx
         self.name = name
         self.func = func
@@ -422,6 +422,9 @@ def schedule_scheduler_python_task_simple_test():
     ctx = setup()
 
     def my_func(task):
+        # check find task
+        find_task = task.find_task("my_func")
+        assert find_task is task
         return 42
 
     # add task
@@ -510,11 +513,21 @@ def schedule_scheduler_python_task_multi_test():
     sched = ctx.sched
 
     def task1_run(task):
+        # check find task
+        find_task = task.find_task("task1")
+        assert find_task is task
+        find_task = task.find_task("task2")
+        assert find_task is task2
         # coop multi tasking!
         task.reschedule()
         return 42
 
     def task2_run(task):
+        # check find task
+        find_task = task.find_task("task2")
+        assert find_task is task
+        find_task = task.find_task("task1")
+        assert find_task is task1
         # coop multi tasking!
         task.reschedule()
         return 23
@@ -612,6 +625,8 @@ def schedule_scheduler_python_task_multi_wait_test():
         return 42
 
     def task2_run(task):
+        find_task = task.find_task("task1")
+        assert find_task is task1
         task1.set_signal(1, 1)
         return 23
 
