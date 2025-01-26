@@ -76,3 +76,39 @@ class SignalFunc(FuncBase):
             real_mask,
         )
         return old_signals
+
+    def signal(self, task_addr, signals):
+        def pred_func(task):
+            return task.map_task.get_ami_task().addr == task_addr
+
+        sched_task = self.get_my_sched_task()
+        other_task = sched_task.find_task_pred_func(pred_func)
+        if other_task:
+            log_exec.info(
+                "Signal(task=%08x, signals=%08x) -> task=%s",
+                task_addr,
+                signals,
+                other_task,
+            )
+            other_task.set_signal(signals, signals)
+        else:
+            log_exec.info(
+                "Signal(task=%08x, signals=%08x) -> not found!", task_addr, signals
+            )
+
+    def wait(self, signal_set):
+        sched_task = self.get_my_sched_task()
+        log_exec.info("Wait(%08x): enter", signal_set)
+        got_signals = sched_task.wait(signal_set)
+        log_exec.info("Wait(%08x): left -> %08x", signal_set, got_signals)
+        return got_signals
+
+    def forbid(self):
+        sched_task = self.get_my_sched_task()
+        cnt = sched_task.forbid()
+        log_exec_info("Forbid (cnt=%d)", cnt)
+
+    def permit(self):
+        sched_task = self.get_my_sched_task()
+        cnt = sched_task.permit()
+        log_exec_info("Permit (cnt=%d)", cnt)

@@ -38,3 +38,31 @@ def pytask_exec_signal_alloc_free_any_test(vamos_task, signal):
 
     exit_codes = vamos_task.run([task])
     assert exit_codes == [0]
+
+
+def pytask_exec_signal_wait_test(vamos_task):
+    def task1(ctx, task):
+        # get exec library
+        exec_lib = ctx.proxies.get_exec_lib_proxy()
+
+        # simply wait for signal
+        got_signals = exec_lib.Wait(3)
+        assert got_signals == 1
+
+        return 0
+
+    def task2(ctx, task):
+        # get exec library
+        exec_lib = ctx.proxies.get_exec_lib_proxy()
+
+        # find task by name
+        addr = exec_lib.FindTask("task1")
+        assert addr != 0
+
+        # set signal
+        exec_lib.Signal(addr, 1)
+
+        return 0
+
+    exit_codes = vamos_task.run([task1, task2])
+    assert exit_codes == [0, 0]

@@ -91,6 +91,7 @@ class TaskBase:
         """do not switch away from my task until permit() is called"""
         self.forbid_cnt += 1
         log_schedule.debug("%s: forbid (cnt=%d)", self.name, self.forbid_cnt)
+        return self.forbid_cnt
 
     def permit(self):
         """re-enable task switching"""
@@ -101,6 +102,7 @@ class TaskBase:
             if self.forbid_reschedule:
                 self.forbid_reschedule = 0
                 self.reschedule()
+        return self.forbid_cnt
 
     def is_forbidden(self):
         return self.forbid_cnt > 0
@@ -194,6 +196,9 @@ class TaskBase:
 
     def find_task(self, name):
         return self.scheduler.find_task(name)
+
+    def find_task_pred_func(self, pred_func):
+        return self.scheduler.find_task_pred_func(pred_func)
 
 
 class NativeTask(TaskBase):

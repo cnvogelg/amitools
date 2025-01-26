@@ -88,17 +88,29 @@ class ExecLibrary(LibImpl):
     def SetSignal(self, ctx, new_signals, signal_mask):
         return self.signal_func.set_signal(new_signals, signal_mask)
 
+    def Signal(self, ctx, task, signals):
+        self.signal_func.signal(task, signals)
+
+    def Wait(self, ctx, signal_set):
+        return self.signal_func.wait(signal_set)
+
     def Disable(self, ctx):
-        log_exec.info("Disable")
+        # map disable to forbid for now
+        # (since we do not deal with irqs right now)
+        log_exec.info("Disable -> Forbid")
+        self.signal_func.forbid()
 
     def Enable(self, ctx):
-        log_exec.info("Enable")
+        # map enable to permit for now
+        # (since we do not deal with irqs right now)
+        log_exec.info("Enable -> Permit")
+        self.signal_func.permit()
 
     def Forbid(self, ctx):
-        log_exec.info("Forbid")
+        self.signal_func.forbid()
 
     def Permit(self, ctx):
-        log_exec.info("Permit")
+        self.signal_func.permit()
 
     def FindTask(self, ctx, task_name: CSTR) -> Task:
         return self.task_func.find_task(task_name.str)

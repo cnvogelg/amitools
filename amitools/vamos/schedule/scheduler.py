@@ -250,14 +250,21 @@ class Scheduler(object):
         self.main_glet.switch()
 
     def find_task(self, name):
+        def pred_func(task):
+            return task.name == name
+
+        return self.find_task_pred_func(pred_func)
+
+    def find_task_pred_func(self, pred_func):
+        """apply predicate function to each task and return match"""
         # is it the current task?
-        if self.cur_task and self.cur_task.name == name:
+        if self.cur_task and pred_func(self.cur_task):
             return self.cur_task
         # check ready list
         for task in self.ready_tasks:
-            if task.name == name:
+            if pred_func(task):
                 return task
         # check wait list
         for task in self.waiting_tasks:
-            if task.name == name:
+            if pred_func(task):
                 return task
