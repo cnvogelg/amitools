@@ -106,9 +106,9 @@ class SignalFunc(FuncBase):
     def forbid(self):
         sched_task = self.get_my_sched_task()
         cnt = sched_task.forbid()
-        log_exec_info("Forbid (cnt=%d)", cnt)
+        log_exec.info("Forbid (cnt=%d)", cnt)
 
     def permit(self):
         sched_task = self.get_my_sched_task()
         cnt = sched_task.permit()
-        log_exec_info("Permit (cnt=%d)", cnt)
+        log_exec.info("Permit (cnt=%d)", cnt)
