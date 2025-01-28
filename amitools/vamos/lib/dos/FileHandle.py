@@ -83,95 +83,100 @@ class FileHandle:
         return self.terminal.wait_for_char(timeout)
 
     def write(self, data):
+        """write a byte array of data
+
+        return -1 on error, 0 on EOF or >0 for written data
+        """
         assert isinstance(data, (bytes, bytearray))
         try:
-            self.obj.write(data)
-            if self.auto_flush:
+            num = self.obj.write(data)
+            if num > 0 and self.auto_flush:
                 self.obj.flush()
-            return len(data)
+            return num
         except IOError:
             return -1
 
-    def read(self, len):
+    def read(self, size):
+        """read up to len bytes of data
+
+        return -1 on error, 0 on EOF, or data bytes on success
+        """
         try:
             if self.interactive:
-                d = self.obj.read1(len)
+                d = self.obj.read1(size)
             else:
-                d = self.obj.read(len)
+                d = self.obj.read(size)
             return d
         except IOError:
             return -1
 
     def getc(self):
+        """read one char
+
+        return -1 on error, -2 on EOF or char code 0-255 on success
+        """
         if len(self.unch) > 0:
-            self.ch = self.unch[0]
-            del self.unch[0]
+            # first unget char
+            self.ch = self.unch.pop(0)
         else:
             if self.is_nil:
                 return -1
-            try:
-                d = self.obj.read(1)
-                if d == b"":
-                    return -1
-                self.ch = d[0]
-            except IOError:
+            d = self.read(1)
+            # error
+            if d == -1:
                 return -1
+            # EOF
+            elif len(d) == 0:
+                return -2
+            # valid byte
+            self.ch = d[0]
         return self.ch
 
     def gets(self, len):
+        """read up to len bytes or line ending with newline
+
+        return <string>, error=True/False
+        """
         res = bytearray()
-        ch = -1
-        # print "fgets from %s" % self
-        while len > 0:
-            len -= 1
-            ch = self.getc()
-            if ch < 0:
-                return res.decode("latin-1")
-            res.append(ch)
-            if ch == 10:
-                return res.decode("latin-1")
-        # apparently, python-I/O does not keep the unread
-        # part of a line in a buffer, so we have to (bummer!)
-        # Do that now so that the next read gets the rest
-        # of the line.
-        remains = bytearray()
-        while ch != 10:
+        error = False
+        for a in range(len):
             ch = self.getc()
             if ch == -1:
+                error = True
                 break
-            remains.append(ch)
-        self.unch = remains + self.unch
-        return res.decode("latin-1")
+            elif ch == -2:
+                break
+            res.append(ch)
+            if ch == 10:
+                break
+        return res.decode("latin-1"), error
 
     def ungetc(self, var):
         if var == 0xFFFFFFFF:
             var = -1
+        # var == -1 -> unget last char
         if var < 0 and self.ch >= 0:
             var = self.ch
             self.ch = -1
-        if var >= 0:
+        elif var >= 0:
             self.unch.insert(0, var)
         return var
-
-    def ungets(self, s):
-        if isinstance(s, str):
-            s = s.encode("latin-1")
-        self.unch = self.unch + bytearray(s)
 
     def setbuf(self, s):
         if isinstance(s, str):
             s = s.encode("latin-1")
         self.unch = bytearray(s)
 
-    def getbuf(self):
-        return self.unch
-
     def tell(self):
         return self.obj.tell()
 
     def seek(self, pos, whence):
+        """set to position from whence
+
+        return -1 on error or new_pos
+        """
         try:
-            self.obj.seek(pos, whence)
+            return self.obj.seek(pos, whence)
         except IOError:
             return -1
 

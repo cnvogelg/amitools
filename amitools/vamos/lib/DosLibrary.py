@@ -767,8 +767,13 @@ class DosLibrary(LibImpl):
         fh = self.file_mgr.get_by_b_addr(fh_b_addr, False)
         ch = fh.getc()
         if ch == -1:
-            log_dos.info("FGetC(%s) -> EOF (%d)", fh, ch)
+            self.setioerr(ctx, 0)
+            log_dos.info("FGetC(%s) -> EOF", fh, ch)
+        elif ch == -2:
+            self.setioerr(ctx, ERROR_NO_FREE_STORE)
+            log_dos.info("FGetC(%s) -> Error", fh, ch)
         else:
+            self.setioerr(ctx, 0)
             log_dos.info("FGetC(%s) -> '%c' (%d)", fh, ch, ch)
         return ch
 
@@ -803,7 +808,7 @@ class DosLibrary(LibImpl):
         ok = fh.write(str_dat)
 
         show_data = str_dat[: self.MAX_SHOW_DATA]
-        log_dos.info("PutStr: '%s'", show_data)
+        log_dos.info("PutStr: %s", show_data)
         return 0  # ok
 
     def Flush(self, ctx):
@@ -931,10 +936,8 @@ class DosLibrary(LibImpl):
             return 0
 
         fh = self.file_mgr.get_by_b_addr(fh_b_addr, False)
-        line = fh.gets(buflen)
-        # Bummer! FIXME: There is currently no way this can communicate an I/O error
-        self.setioerr(ctx, 0)
-        log_dos.info("FGetS(%s,%d) -> '%s'", fh, buflen, line)
+        line, error = fh.gets(buflen)
+        log_dos.info("FGetS(%s,%d) -> '%s' error=%s", fh, buflen, line, error)
         ctx.mem.w_cstr(bufaddr, line)
         if line == "":
             return 0
