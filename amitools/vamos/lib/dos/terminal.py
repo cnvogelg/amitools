@@ -10,10 +10,11 @@ except ImportError:
 
 
 class Terminal:
-    def __init__(self, fd):
-        self.fd = fd
+    def __init__(self, obj):
+        self.fd = obj.fileno()
+        self.obj = obj
         if termios:
-            self.tty_state = termios.tcgetattr(fd)
+            self.tty_state = termios.tcgetattr(self.fd)
 
     def close(self):
         if termios:
@@ -54,3 +55,23 @@ class Terminal:
             return self.fd in rx
         else:
             return None
+
+    def read(self, size):
+        """read from terminal and do some covnersions.
+
+        return -1 on Error, or data bytes with len = 0: EOF
+        """
+        try:
+            return self.obj.read1(size)
+        except IOError:
+            return -1
+
+    def write(self, data):
+        """write to terminal and do some conversions.
+
+        return -1 on Error, 0 on EOF, and >0 written bytes
+        """
+        try:
+            return self.obj.write(data)
+        except IOError:
+            return -1

@@ -25,8 +25,7 @@ class FileHandle:
         self.interactive = self.obj.isatty()
         # tty stuff
         if self.interactive:
-            fd = self.obj.fileno()
-            self.terminal = Terminal(fd)
+            self.terminal = Terminal(obj)
         else:
             self.terminal = None
 
@@ -83,39 +82,64 @@ class FileHandle:
         return self.terminal.wait_for_char(timeout)
 
     def write(self, data):
+        """write data
+
+        return -1 on error, 0=EOF, >0 written bytes"""
         assert isinstance(data, (bytes, bytearray))
-        try:
-            self.obj.write(data)
-            if self.auto_flush:
-                self.obj.flush()
-            return len(data)
-        except IOError:
-            return -1
+
+        # read from terminal or direct
+        if self.terminal:
+            got = self.terminal.write(data)
+        else:
+            try:
+                got = self.obj.write(data)
+            except IOError:
+                got = -1
+
+        # do auto flush?
+        if got > 0 and self.auto_flush:
+            self.obj.flush()
+
+        # return got bytes
+        return got
 
     def read(self, len):
+        """read data
+
+        return -1 on error, 0=EOF, >0 written bytes"""
+        if self.terminal:
+            return self.terminal.read(len)
         try:
-            if self.interactive:
-                d = self.obj.read1(len)
-            else:
-                d = self.obj.read(len)
-            return d
+            return self.obj.read(len)
         except IOError:
             return -1
 
     def getc(self):
+        """read character
+
+        return char 0-255 or -1 on Error and -2 on EOF
+        """
         if len(self.unch) > 0:
             self.ch = self.unch[0]
             del self.unch[0]
         else:
+            # handle NIL:
             if self.is_nil:
                 return -1
-            try:
+
+            # read from terminal or direct
+            if self.terminal:
+                d = self.terminal.read(1)
+            else:
                 d = self.obj.read(1)
-                if d == b"":
-                    return -1
-                self.ch = d[0]
-            except IOError:
+
+            # -1 on Error
+            if d == -1:
                 return -1
+            # -2 on EOF
+            elif d == b"":
+                return -2
+            self.ch = d[0]
         return self.ch
 
     def gets(self, len):

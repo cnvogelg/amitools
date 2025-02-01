@@ -766,8 +766,12 @@ class DosLibrary(LibImpl):
     def FGetC(self, ctx, fh_b_addr):
         fh = self.file_mgr.get_by_b_addr(fh_b_addr, False)
         ch = fh.getc()
-        if ch == -1:
+        if ch == -2:
             log_dos.info("FGetC(%s) -> EOF (%d)", fh, ch)
+            # EOF is also -1
+            ch = -1
+        elif ch == -1:
+            log_dos.info("FGetC(%s) -> Error (%d)", fh, ch)
         else:
             log_dos.info("FGetC(%s) -> '%c' (%d)", fh, ch, ch)
         return ch
