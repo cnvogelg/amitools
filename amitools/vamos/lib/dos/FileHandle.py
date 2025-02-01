@@ -25,8 +25,7 @@ class FileHandle:
         self.interactive = self.obj.isatty()
         # tty stuff
         if self.interactive:
-            fd = self.obj.fileno()
-            self.terminal = Terminal(fd)
+            self.terminal = Terminal(obj)
         else:
             self.terminal = None
 
@@ -83,52 +82,63 @@ class FileHandle:
         return self.terminal.wait_for_char(timeout)
 
     def write(self, data):
-        """write a byte array of data
+        """write data
 
-        return -1 on error, 0 on EOF or >0 for written data
-        """
+        return -1 on error, 0=EOF, >0 written bytes"""
         assert isinstance(data, (bytes, bytearray))
-        try:
-            num = self.obj.write(data)
-            if num > 0 and self.auto_flush:
-                self.obj.flush()
-            return num
-        except IOError:
-            return -1
 
-    def read(self, size):
-        """read up to len bytes of data
+        # read from terminal or direct
+        if self.terminal:
+            got = self.terminal.write(data)
+        else:
+            try:
+                got = self.obj.write(data)
+            except IOError:
+                got = -1
 
-        return -1 on error, 0 on EOF, or data bytes on success
-        """
+        # do auto flush?
+        if got > 0 and self.auto_flush:
+            self.obj.flush()
+
+        # return got bytes
+        return got
+
+    def read(self, len):
+        """read data
+
+        return -1 on error, 0=EOF, >0 written bytes"""
+        if self.terminal:
+            return self.terminal.read(len)
         try:
-            if self.interactive:
-                d = self.obj.read1(size)
-            else:
-                d = self.obj.read(size)
-            return d
+            return self.obj.read(len)
         except IOError:
             return -1
 
     def getc(self):
-        """read one char
+        """read character
 
-        return -1 on error, -2 on EOF or char code 0-255 on success
+        return char 0-255 or -1 on Error and -2 on EOF
         """
         if len(self.unch) > 0:
             # first unget char
             self.ch = self.unch.pop(0)
         else:
+            # handle NIL:
             if self.is_nil:
                 return -1
-            d = self.read(1)
-            # error
+
+            # read from terminal or direct
+            if self.terminal:
+                d = self.terminal.read(1)
+            else:
+                d = self.obj.read(1)
+
+            # -1 on Error
             if d == -1:
                 return -1
-            # EOF
-            elif len(d) == 0:
+            # -2 on EOF
+            elif d == b"":
                 return -2
-            # valid byte
             self.ch = d[0]
         return self.ch
 
