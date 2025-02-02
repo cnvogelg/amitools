@@ -183,10 +183,23 @@ class FileHandle:
     def seek(self, pos, whence):
         """set to position from whence
 
-        return -1 on error or new_pos
+        return -1 on error, -2 on too far or new_pos
         """
         try:
-            return self.obj.seek(pos, whence)
+            new_pos = self.obj.seek(pos, whence)
+
+            # we have to limit seek to file size
+            stat = os.stat(self.obj.fileno())
+            file_size = stat.st_size
+
+            # if seek to far then limit to file size
+            if new_pos > file_size:
+                # seek to end
+                self.obj.seek(file_size, 0)
+                return -2
+
+            return new_pos
+
         except IOError:
             return -1
 

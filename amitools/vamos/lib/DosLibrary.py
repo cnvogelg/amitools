@@ -756,12 +756,20 @@ class DosLibrary(LibImpl):
 
         old_pos = fh.tell()
         new_pos = fh.seek(pos, whence)
-        log_dos.info("Seek(%s, %06x, %s) -> old_pos=%06x", fh, pos, mode_str, old_pos)
-        if new_pos == -1:
+        log_dos.info(
+            "Seek(%s, %d, %s) -> old_pos=%d new_pos=%d",
+            fh,
+            pos,
+            mode_str,
+            old_pos,
+            new_pos,
+        )
+        if new_pos < 0:
             self.setioerr(ctx, ERROR_SEEK_ERROR)
+            return -1
         else:
             self.setioerr(ctx, 0)
-        return old_pos
+            return old_pos
 
     def FGetC(self, ctx, fh_b_addr):
         fh = self.file_mgr.get_by_b_addr(fh_b_addr, False)
