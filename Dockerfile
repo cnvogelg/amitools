@@ -15,7 +15,7 @@ ENV PYENV_ROOT $HOME/.pyenv
 ENV PATH $PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH
 
 # setup python
-RUN for a in 3.8.16 3.9.16 3.10.9 3.11.4 3.12.5 ; do pyenv install $a ; done
+RUN for a in 3.9.16 3.10.9 3.11.4 3.12.5 ; do pyenv install $a ; done
 RUN pyenv global 3.11.4 && pip install tox
 
 # run-tox script
