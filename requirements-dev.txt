@@ -4,5 +4,5 @@ twine
 tox
 black
 build
-machine68k
+machine68k @ git+https://github.com/cnvogelg/machine68k@dev
 greenlet
