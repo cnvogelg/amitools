@@ -1,5 +1,5 @@
 import inspect
-from enum import StrEnum
+from enum import Enum
 from dataclasses import dataclass
 import typing
 from typing import Optional, Any
@@ -34,7 +34,7 @@ class LibImpl(object):
         pass
 
 
-class LibImplFuncTag(StrEnum):
+class LibImplFuncTag(Enum):
     TAG_VALID = "valid"
     TAG_ERROR = "error"
     TAG_INVALID = "invalid"
