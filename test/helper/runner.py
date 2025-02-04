@@ -6,6 +6,7 @@ import subprocess
 import hashlib
 import io
 import importlib
+import time
 
 try:
     import ptyprocess
@@ -16,7 +17,7 @@ from .builder import BinBuilder
 from amitools.vamos.main import main as vamos_main
 
 
-def run_proc(args, stdin_str=None, raw_output=False, use_pty=False, wait_str=None):
+def run_proc(args, stdin_str=None, raw_output=False, use_pty=False):
     if stdin_str:
         stdin_bytes = stdin_str.encode("latin-1")
         stdin_flag = subprocess.PIPE
@@ -24,35 +25,26 @@ def run_proc(args, stdin_str=None, raw_output=False, use_pty=False, wait_str=Non
         stdin_bytes = None
         stdin_flag = None
 
-    if wait_str:
-        wait_bytes = wait_str.encode("latin-1")
-    else:
-        wait_bytes = None
-
     if use_pty:
         p = ptyprocess.PtyProcess.spawn(args)
 
-        # do not wait and send stdin immediately
-        if stdin_bytes and not wait_bytes:
+        # expect a line
+        stdout = p.readline()
+
+        # write response
+        if stdin_bytes:
+            time.sleep(0.01)
             p.write(stdin_bytes)
 
-        stdout = b""
-        while p.isalive():
+        # read remaining lines
+        while True:
             try:
-                buf = p.read(1024)
-                stdout += buf
-
-                # wait and send stdin after wait_str
-                if wait_bytes and wait_bytes in buf:
-                    p.write(stdin_bytes)
-                    wait_bytes = None
-
+                stdout += p.readline()
             except EOFError:
                 break
 
         returncode = p.wait()
         stderr = None
-        p.close()
     else:
         p = subprocess.Popen(
             args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_flag
@@ -173,7 +165,6 @@ class VamosTestRunner:
 
         # stdin given?
         stdin = kw_args.get("stdin", None)
-        wait_str = kw_args.get("wait_str", None)
 
         # timestamps?
         no_ts = kw_args.get("no_ts", True)
@@ -209,7 +200,9 @@ class VamosTestRunner:
         print("running:", " ".join(args))
         if run_subproc:
             returncode, stdout, stderr = run_proc(
-                args, stdin, use_pty=use_pty, wait_str=wait_str
+                args,
+                stdin,
+                use_pty=use_pty,
             )
         else:
 
