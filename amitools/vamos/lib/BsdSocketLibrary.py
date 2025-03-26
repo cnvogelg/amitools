@@ -153,7 +153,10 @@ class BsdSocketLibrary(LibImpl):
         data = ctx.mem.r_block(buf_ptr, size)
                 
         sock = self.socks[n]
-        return sock.send(data, flags)
+        try:
+            return sock.send(data, flags)
+        except Exception:
+            return -1
 
     def recv(self, ctx):
         n = ctx.cpu.r_reg(REG_D0)
@@ -165,10 +168,13 @@ class BsdSocketLibrary(LibImpl):
         flags = ctx.cpu.r_reg(REG_D2)
 
         sock = self.socks[n]
-        read = sock.recv(size, flags)
-        sz = len(read)
-        ctx.mem.w_block(buf_ptr, read)
-        return sz
+        try:
+            read = sock.recv(size, flags)
+            sz = len(read)
+            ctx.mem.w_block(buf_ptr, read)
+            return sz
+        except Exception:
+            return -1
 
     def listFromFdSet(self, mem, addr, sz):
         fdset = ULongULongClass(mem, addr)
@@ -262,7 +268,7 @@ class HostEntStruct(AmigaStruct):
         (APTR_VOID, "h_addr_list"),
         # internal
         (LONG, "h_addr"),
-        (LONG, "h_addr_val"),
+        (ULONG, "h_addr_val"),
     ]
 
 @AmigaClassDef
