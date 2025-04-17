@@ -7,7 +7,7 @@ from amitools.vamos.astructs.astructdef import AmigaStructDef, AmigaClassDef
 from amitools.vamos.astructs.astruct import AmigaStruct
 from amitools.vamos.astructs.string import CSTR
 from amitools.vamos.astructs.pointer import APTR_VOID
-from amitools.vamos.astructs.scalar import LONG, UBYTE, UWORD, ULONG
+from amitools.vamos.astructs.scalar import UBYTE, UWORD, ULONG
 
 class BsdSocketLibrary(LibImpl):
 
@@ -70,25 +70,28 @@ class BsdSocketLibrary(LibImpl):
     def gethostbyname(self, ctx):
         name_ptr = ctx.cpu.r_reg(REG_A0)
         name = ctx.mem.r_cstr(name_ptr)
-        h = s.gethostbyname(name)
-        if h != None:
-            ip = 0
-            for x in h.split("."):
-                ip = ip << 8
-                ip += int(x)
-            # print(name, h, ip)
-
-            if self.hostByName == None:
-                self.hostByName = HostEntClass.alloc(self.alloc)
-                        
-            self.hostByName.h_name.set(name_ptr)            
-            self.hostByName.h_aliases.set(0)
-            self.hostByName.h_addrtype.set(0)
-            self.hostByName.h_length.set(1)
-            self.hostByName.h_addr_list.set(self.hostByName._addr + 20)
-            self.hostByName.h_addr.set(self.hostByName._addr + 24)
-            self.hostByName.h_addr_val.set(ip)
-            return self.hostByName._addr
+        try:
+            h = s.gethostbyname(name)
+            if h != None:
+                ip = 0
+                for x in h.split("."):
+                    ip = ip << 8
+                    ip += int(x)
+                # print(name, h, ip)
+    
+                if self.hostByName == None:
+                    self.hostByName = HostEntClass.alloc(self.alloc)
+                            
+                self.hostByName.h_name.set(name_ptr)            
+                self.hostByName.h_aliases.set(0)
+                self.hostByName.h_addrtype.set(0)
+                self.hostByName.h_length.set(1)
+                self.hostByName.h_addr_list.set(self.hostByName._addr + 20)
+                self.hostByName.h_addr.set(self.hostByName._addr + 24)
+                self.hostByName.h_addr_val.set(ip)
+                return self.hostByName._addr
+        except Exception:
+            pass
         
         return 0
 
@@ -136,7 +139,10 @@ class BsdSocketLibrary(LibImpl):
         ip = soa.sin_addr.get()
         s = self.ip2s(ip) 
         # print("connect to:", ip, s, soa.sin_port.get())
-        sock.connect((s, soa.sin_port.get()))
+        try:
+            sock.connect((s, soa.sin_port.get()))
+        except Exception:
+            return -1
         return 0
     
     def ip2s(self, ip):
@@ -263,11 +269,11 @@ class HostEntStruct(AmigaStruct):
     _format = [
         (CSTR, "h_name"),
         (APTR_VOID, "h_aliases"),
-        (LONG, "h_addrtype"),
-        (LONG, "h_length"),
+        (ULONG, "h_addrtype"),
+        (ULONG, "h_length"),
         (APTR_VOID, "h_addr_list"),
         # internal
-        (LONG, "h_addr"),
+        (ULONG, "h_addr"),
         (ULONG, "h_addr_val"),
     ]
 
