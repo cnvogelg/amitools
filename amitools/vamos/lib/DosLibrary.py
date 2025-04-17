@@ -2,6 +2,7 @@ import time
 import ctypes
 import re
 import os
+import select
 
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
@@ -43,6 +44,7 @@ from .dos.FileManager import FileManager
 from .dos.CSource import *
 from .dos.Item import *
 from amitools.vamos.dos import run_command, run_sub_process
+from amitools.vamos.libstructs.dos import TimeRequestStruct
 
 
 class DosLibrary(LibImpl):
@@ -95,8 +97,18 @@ class DosLibrary(LibImpl):
         self.file_mgr = FileManager(
             ctx.path_mgr, ctx.exec_lib.port_mgr, ctx.alloc, ctx.mem
         )
+        
+        self.timerDevice = ctx.exec_lib.lib_mgr.open_lib("timer.device", 0)
+        self.timeRequest = ctx.alloc.alloc_struct(TimeRequestStruct, label="TimeRequest")
+        self.timeRequest.access.w_s("tr_node.io_Device", self.timerDevice)
+        self.access.w_s("dl_TimeReq", self.timeRequest.addr)
 
     def finish_lib(self, ctx):
+        
+        # close TimerDevice, free timeRequest
+        ctx.exec_lib.lib_mgr.close_lib(self.timerDevice)
+        ctx.alloc.free_struct(self.timeRequest)
+        
         # finish file manager
         self.file_mgr.finish()
         # free dos list
@@ -593,6 +605,16 @@ class DosLibrary(LibImpl):
             log_dos.info("Close: %s" % fh)
             self.setioerr(ctx, 0)
         return self.DOSTRUE
+
+    def WaitForChar(self, ctx):
+        # file,timeout)(d1/d2)
+        fh_b_addr = ctx.cpu.r_reg(REG_D1)
+        fh = self.file_mgr.get_by_b_addr(fh_b_addr, False)
+        ms = ctx.cpu.r_reg(REG_D2)
+        if select.select([fh.obj], [], [], ms * 1e-3)[0]:
+            return self.DOSTRUE
+        
+        return self.DOSFALSE
 
     def Read(self, ctx):
         fh_b_addr = ctx.cpu.r_reg(REG_D1)

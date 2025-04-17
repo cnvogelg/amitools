@@ -65,7 +65,7 @@ class FileHandle:
 
     def read(self, len):
         try:
-            d = self.obj.read(len)
+            d = self.obj.read1(len)
             return d
         except IOError:
             return -1
@@ -135,7 +135,10 @@ class FileHandle:
         return self.unch
 
     def tell(self):
-        return self.obj.tell()
+        try:
+            return self.obj.tell()
+        except IOError:
+            return -1
 
     def seek(self, pos, whence):
         try:

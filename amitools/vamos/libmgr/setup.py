@@ -59,6 +59,7 @@ class SetupLibManager(object):
             odg_base,
         )
         self.lib_mgr.add_ctx("exec.library", self.exec_ctx)
+        self.lib_mgr.add_ctx("bsdsocket.library", self.exec_ctx)
         self.lib_mgr.add_ctx("dos.library", self.dos_ctx)
         # add all vamos libs
         for name in vamos_libs:

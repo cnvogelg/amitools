@@ -26,6 +26,7 @@ from .exec_ import (
     LibraryStruct,
     MessageStruct,
 )
+from amitools.vamos.libstructs.exec_ import IORequestStruct
 
 
 @AmigaStructDef
@@ -224,6 +225,21 @@ class DosLibraryStruct(AmigaStruct):
         (APTR_VOID, "dl_TimeReq"),
         (APTR_VOID, "dl_UtilityBase"),
         (APTR_VOID, "dl_IntuitionBase"),
+    ]
+
+@AmigaStructDef
+class TimeValStruct(AmigaStruct):
+    _format = [
+        (ULONG, "tv_secs"),
+        (ULONG, "tv_micro"),
+    ]
+
+
+@AmigaStructDef
+class TimeRequestStruct(AmigaStruct):
+    _format = [
+        (IORequestStruct, "tr_node"),
+        (TimeValStruct, "tr_time"),
     ]
 
 

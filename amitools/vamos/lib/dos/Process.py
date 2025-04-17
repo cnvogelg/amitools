@@ -298,6 +298,11 @@ class Process:
         # set home dir
         self.this_task.access.w_s("pr_HomeDir", self.home_lock.b_addr << 2)
         varlist = self.get_local_vars()
+        
+        # init stack
+        self.this_task.access.w_s("pr_Task.tc_SPLower", self.stack.lower)
+        self.this_task.access.w_s("pr_Task.tc_SPUpper", self.stack.upper)
+        
         # Initialize the list of local shell variables
         varlist.access.w_s("mlh_Head", varlist.addr + 4)
         varlist.access.w_s("mlh_Tail", 0)
