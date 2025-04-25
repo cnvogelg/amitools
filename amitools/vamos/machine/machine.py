@@ -11,7 +11,7 @@ except ImportError:
     sys.exit(1)
 
 from .regs import *
-from .opcodes import op_rts
+from .opcodes import op_rts, op_rte
 from .cpustate import CPUState
 from .error import InvalidMemoryAccessError, CPUHWExceptionError, ResetOpcodeError
 from amitools.vamos.log import log_machine
@@ -31,32 +31,40 @@ class Machine(object):
     000000    SP before Reset / Later mem0
     000004    PC before Reset / Later mem4
 
-    000008    BEGIN Exception Vectors
-    ......
-    0003FC    END Exception Vectors
+    000008    BEGIN CPU Exception Vectors
+    ...
+    0003FC    END CPU Exception Vectors
+
+    Trap Table for HW Exceptions
+
+    000400    run_exit_trap
+    000408    BEGIN CPU Exception Table: hwexc_trap + RTE
+    ...
+    0007FC    END CPU Exception Table
 
     Machine Area
 
-    000400    run_exit trap
-    000402    exception handling trap
-
-    000500    Quick Trap 0
-    000502    Quick Trap 1
+    000800    Quick Trap 0
+    000802    Quick Trap 1
     ...       ...
-    0005FC    Quick Trap 127
+    0008FC    Quick Trap 127
 
-    000600    BEGIN of scratch area
+    000900    BEGIN of scratch area
     ...       e.g. used for sys stack
-    0007FC    END of scratch area
-    000800    RAM begin. useable by applications
+    000FFC    END of scratch area
+
+    User Sapce
+
+    001000    RAM begin. useable by applications
+    ...
     """
 
     run_exit_addr = 0x400
-    hw_exc_addr = 0x402
-    ram_begin = 0x800
-    scratch_begin = 0x600
-    scratch_end = 0x7FC
-    quick_trap_begin = 0x500
+    hw_exc_table = 0x400
+    ram_begin = 0x1000
+    scratch_begin = 0x900
+    scratch_end = 0xFFC
+    quick_trap_begin = 0x800
     quick_trap_num = 64
 
     def __init__(
@@ -85,6 +93,9 @@ class Machine(object):
             self.label_mgr = None
         # hooks
         self.instr_hook = None
+        self.reset_hook = None
+        self.hw_exc_hook = None
+        self.addr_err_hook = None
         # call init
         self._setup_handler()
         self._setup_quick_traps()
@@ -151,16 +162,19 @@ class Machine(object):
     def _init_base_mem(self):
         m = self.mem
         # m68k exception vector table
-        addr = 8
+        # map all vectors to hw exc table
+        vbr_addr = 8
+        table_addr = self.hw_exc_table + 8
         for i in range(254):
-            m.w32(addr, self.hw_exc_addr)
-            addr += 4
+            m.w32(vbr_addr, table_addr)
+            # place a trap and an RTE in each table entry
+            m.w16(table_addr, self.hw_exc_tid | 0xA000)
+            m.w16(table_addr + 2, op_rte)
+            vbr_addr += 4
+            table_addr += 4
         # run_exit trap
         addr = self.run_exit_addr
         m.w16(addr, self.run_exit_tid | 0xA000)
-        # hw_exc trap
-        addr = self.hw_exc_addr
-        m.w16(addr, self.hw_exc_tid | 0xA000)
 
     def _setup_handler(self):
         # "reset" opcode handler
@@ -287,6 +301,24 @@ class Machine(object):
     def set_instr_hook(self, func):
         self.cpu.set_instr_hook_callback(func)
 
+    def set_reset_hook(self, func):
+        """on RESET opcode call func.
+
+        Return True to continue execution or False to raise Error"""
+        self.reset_hook = func
+
+    def set_hw_exc_hook(self, func):
+        """on CPU HW exception call func.
+
+        Return True to continue execution or False to raise Error"""
+        self.hw_exc_hook = func
+
+    def set_addr_err_hook(self, func):
+        """on address error call func.
+
+        Return True to continue execution or False to raise Error"""
+        self.addr_err_hook = func
+
     def set_cpu_mem_trace_hook(self, func):
         if func:
             self.mem.set_trace_mode(1)
@@ -316,7 +348,19 @@ class Machine(object):
         )
         pc = self.get_pc()
         sp = self.get_sp()
-        raise InvalidMemoryAccessError(pc, sp, mode, width, addr)
+        self._handle_error(
+            InvalidMemoryAccessError(pc, sp, mode, width, addr), self.addr_err_hook
+        )
+
+    def _handle_error(self, error, func):
+        if func:
+            log_machine.debug("handle_error: %s -> func", error)
+            handled = func(error)
+        else:
+            handled = False
+        if not handled:
+            log_machine.debug("handle_error: raise %s", error)
+            raise error
 
     def _hw_exc_handler(self, opcode, pc):
         """an m68k Hardware Exception was triggered"""
@@ -326,14 +370,16 @@ class Machine(object):
         sr = self.mem.r16(sp)
         pc = self.mem.r32(sp + 2)
         log_machine.debug("HW exception: pc=%06x sp=%06x sr=%04x", pc, sp, sr)
-        raise CPUHWExceptionError(pc, sp, sr)
+        cur_pc = self.get_pc()
+        exc_num = (cur_pc - self.hw_exc_table) // 4
+        self._handle_error(CPUHWExceptionError(pc, sp, sr, exc_num), self.hw_exc_hook)
 
     def _reset_opcode_handler(self):
         """a reset opcode was encountered"""
         pc = self.cpu.r_pc() - 2
         sp = self.get_sp()
         log_machine.debug("RESET opcode: pc=%06x sp=%06x", pc, sp)
-        raise ResetOpcodeError(pc, sp)
+        self._handle_error(ResetOpcodeError(pc, sp), self.reset_hook)
 
     def prepare(self, pc, sp):
         """set pc to start address and stack pointer and place end trap on stack"""

@@ -33,15 +33,17 @@ class InvalidMemoryAccessError(MachineError):
 
 
 class CPUHWExceptionError(MachineError):
-    def __init__(self, pc, sp, sr):
+    def __init__(self, pc, sp, sr, exc_num):
         super().__init__(pc, sp)
         self.sr = sr
+        self.exc_num = exc_num
 
     def __str__(self):
-        return "CPU HW (pc=%06x, sp=%06x) sr=%04x" % (
+        return "CPU HW (pc=%06x, sp=%06x) sr=%04x exc_num=%02x" % (
             self.pc,
             self.sp,
             self.sr,
+            self.exc_num,
         )
 
 

@@ -48,7 +48,7 @@ def machine_machine_instr_hook_test():
     mem.w16(code, op_rts)
     er = m.execute()
     assert er.cycles == 20
-    assert a == [0x800, 0x400]
+    assert a == [0x1000, 0x400]
     m.cleanup()
 
 
@@ -69,9 +69,8 @@ def machine_machine_execute_mem_trace_test():
     m.cleanup()
 
 
-def machine_machine_execute_mem_invalid_test():
+def machine_machine_execute_mem_addr_error_test():
     m, cpu, mem, code, stack = create_machine()
-    a = []
     m.prepare(0xF80000, stack)
     with pytest.raises(InvalidMemoryAccessError) as ei:
         er = m.execute()
@@ -80,6 +79,22 @@ def machine_machine_execute_mem_invalid_test():
     assert exc.mode == "R"
     assert exc.width == 1
     assert exc.addr == 0xF80002
+    m.cleanup()
+
+
+def machine_machine_execute_mem_addr_error_handle_test():
+    m, cpu, mem, code, stack = create_machine()
+    count = 0
+
+    def handle_addr_error(exc):
+        assert type(exc) is InvalidMemoryAccessError
+        return True
+
+    m.set_addr_err_hook(handle_addr_error)
+
+    m.prepare(0xF80000, stack)
+    er = m.execute(100)
+    assert er.cycles == 104
     m.cleanup()
 
 
@@ -136,7 +151,28 @@ def machine_machine_execute_reset_opcode_test():
     m.cleanup()
 
 
-def machine_machine_execute_hw_exc_test():
+def machine_machine_execute_reset_opcode_handle_test():
+    m, cpu, mem, code, stack = create_machine(supervisor=True)
+
+    def handle_reset_opcode(error):
+        assert type(error) is ResetOpcodeError
+        # True means accept error and continue execution
+        return True
+
+    # set handler to accept reset opcode
+    m.set_reset_hook(handle_reset_opcode)
+
+    # place a reset opcode
+    mem.w16(code, op_reset)
+    mem.w16(code + 2, op_rts)
+    er = m.execute()
+    # reached end trap?
+    assert m.get_pc() == m.run_exit_addr + 2
+
+    m.cleanup()
+
+
+def machine_machine_execute_hw_trap0_test():
     m, cpu, mem, code, stack = create_machine()
     # trigger a "real" trap #0
     mem.w16(code, op_trap0)
@@ -144,6 +180,30 @@ def machine_machine_execute_hw_exc_test():
         er = m.execute()
     exc = ei.value
     assert exc.pc == code + 2
+    assert exc.exc_num == 32  # trap0 exception number
+    m.cleanup()
+
+
+def machine_machine_execute_hw_trap0_handle_test():
+    m, cpu, mem, code, stack = create_machine()
+
+    def handle_trap(error):
+        assert type(error) is CPUHWExceptionError
+        assert error.pc == code + 2
+        assert error.exc_num == 32
+        return True
+
+    # allow to handle trap
+    m.set_hw_exc_hook(handle_trap)
+
+    # trigger a "real" trap #0
+    mem.w16(code, op_trap0)
+    mem.w16(code + 2, op_rts)
+
+    er = m.execute()
+    # reached end trap?
+    assert m.get_pc() == m.run_exit_addr + 2
+
     m.cleanup()
 
 
