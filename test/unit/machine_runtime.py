@@ -146,8 +146,8 @@ def machine_runtime_nested_run_error_test():
     # 2nd run
     mem.w16(code + 10, op_reset)
     # the reset opcode error is passed through
-    with pytest.raises(ResetOpcodeError):
-        r.start(Code(code, stack))
+    rs = r.start(Code(code, stack))
+    assert type(rs.mach_error) is ResetOpcodeError
     m.cleanup()
 
 

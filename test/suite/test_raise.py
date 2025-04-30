@@ -19,8 +19,3 @@ def test_raise_runtime_error_test(vamos):
 def test_raise_vamos_internal_error_test(vamos):
     with pytest.raises(VamosInternalError):
         vamos.run_prog("test_raise", "VamosInternalError")
-
-
-def test_raise_invalid_memory_access_error_test(vamos):
-    with pytest.raises(InvalidMemoryAccessError):
-        vamos.run_prog("test_raise", "InvalidMemoryAccessError")

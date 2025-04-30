@@ -56,23 +56,26 @@ class ResetOpcodeError(MachineError):
 
 
 class ErrorReporter:
-    def __init__(self, runtime):
-        self.runtime = runtime
-        self.machine = runtime.machine
+    def __init__(self, machine):
+        self.machine = machine
         self.cpu = self.machine.get_cpu()
         self.mem = self.machine.get_mem()
         self.label_mgr = self.machine.get_label_mgr()
 
-    def report_error(self, error):
-        run_state = self.runtime.get_current_run_state()
-        log_machine.error("----- ERROR in CPU Run #%d -----", run_state.nesting)
-        self._log_run_state(run_state)
+    def report_error(self, error, run_state=None):
+        log_machine.error("----- CPU HW Exception: %s -----", error)
+        if run_state:
+            log_machine.error(
+                "Run '%s' nesting #%d ", run_state.name, run_state.nesting
+            )
+            self._log_run_state(run_state)
         self._log_mem_info(error)
         self._log_cpu_state()
-        self._log_exc(error)
+        self._log_python_exc(error)
 
-    def _log_exc(self, error):
+    def _log_python_exc(self, error):
         # show traceback if exception is pending
+        log_machine.error("--- Python Traceback Begin ---")
         if sys.exc_info()[0]:
             lines = traceback.format_exc().split("\n")
             for line in lines:
@@ -81,6 +84,7 @@ class ErrorReporter:
         else:
             etype = error.__class__.__name__
             log_machine.error("%s: %s", etype, error)
+        log_machine.error("--- Python Traceback End ---")
 
     def _log_run_state(self, run_state):
         # get current run_state

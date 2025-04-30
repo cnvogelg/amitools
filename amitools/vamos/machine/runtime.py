@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from .regs import reg_to_str
+from .error import MachineError, ErrorReporter
 from amitools.vamos.log import log_machine
 
 
@@ -17,6 +18,8 @@ class RunState:
     slice_cycles: int = 0
     user_end: bool = False
     regs: dict = None
+    mach_error: MachineError = None
+    mach_error_run_state = None
 
 
 @dataclass
@@ -100,9 +103,15 @@ class Runtime:
         self.left_cycles = self.slice_cycles
 
         # execute
-        log_machine.info("runtime start: %s", run_state)
-        run_state.regs = self._run_loop(run_state, code.set_regs, code.get_regs)
-        log_machine.info("runtime end: %s", run_state)
+        try:
+            log_machine.info("runtime start: %s", run_state)
+            run_state.regs = self._run_loop(run_state, code.set_regs, code.get_regs)
+            log_machine.info("runtime end: %s", run_state)
+        except MachineError as me:
+            run_state.mach_error = me
+            run_state.mach_error_run_state = run_state
+            er = ErrorReporter(self.machine)
+            er.report_error(me)
 
         # clean up run state
         self.running = False
@@ -143,9 +152,15 @@ class Runtime:
         self.run_states.append(run_state)
 
         # perform nested run
-        log_machine.info("runtime nested start %s", run_state)
-        run_state.regs = self._run_loop(run_state, code.set_regs, code.get_regs)
-        log_machine.info("runtime nested end %s", run_state)
+        try:
+            log_machine.info("runtime nested start %s", run_state)
+            run_state.regs = self._run_loop(run_state, code.set_regs, code.get_regs)
+            log_machine.info("runtime nested end %s", run_state)
+        except MachineError as me:
+            run_state.mach_error = me
+            run_state.mach_error_run_state = run_state
+            er = ErrorReporter(self.machine)
+            er.report_error(me)
 
         # pop current run state
         self.run_states.pop()
@@ -155,6 +170,9 @@ class Runtime:
 
         # take over total cycles
         old_run_state.total_cycles = run_state.total_cycles
+
+        # propagate machine error
+        old_run_state.mach_error = run_state.mach_error
 
         return run_state
 

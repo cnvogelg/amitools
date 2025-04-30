@@ -26,14 +26,12 @@ def machine_error_reporter_test(caplog):
     caplog.set_level(logging.ERROR)
 
     r, m, cpu, mem, code, stack = create_runtime(supervisor=True)
-    er = ErrorReporter(r)
+    er = ErrorReporter(m)
 
     # reset opcode
     mem.w16(code, op_reset)
-    try:
-        r.start(Code(code, stack), name="foo")
-    except ResetOpcodeError as e:
-        er.report_error(e)
+    rs = r.start(Code(code, stack), name="foo")
+    assert type(rs.mach_error) is ResetOpcodeError
     m.cleanup()
 
     # check error report
