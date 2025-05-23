@@ -217,7 +217,7 @@ def machine_machine_execute_max_cycles_test():
 
 
 def machine_machine_cfg_test():
-    cfg = ConfigDict({"cpu": "68020", "ram_size": 2048})
+    cfg = ConfigDict({"cpu": "68020", "ram_size": 2048, "hw_exc": None})
     m = Machine.from_cfg(cfg, True)
     assert m
     assert m.get_cpu_type() == CPUType.M68020

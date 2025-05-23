@@ -43,10 +43,11 @@ class Runtime:
     code execution directly in the current context. I.e. any exception that
     may be raised will fall through.
 
-    Any problem in a machine run is raised as a MachineError.
+    Any problem (hw error) in a machine run is returned as a MachineError
+    in RunState.mach_error.
 
-    The runtime is started with start() and either returns or throws an
-    MachineError or another Python exception.
+    The runtime is started with start() and either returns a RunState
+    or another Python exception.
     """
 
     def __init__(self, machine, run_cycles=1000, default_sp=None):

@@ -28,6 +28,7 @@ class TaskBase:
         self.state = TaskState.TS_INVALID
         self.scheduler = None
         self.exit_code = None
+        self.error = None
         self.glet = None
         self.cpu_ctx = None
         self.forbid_cnt = 0
@@ -81,7 +82,12 @@ class TaskBase:
         return None
 
     def get_exit_code(self):
+        """if the task exited without error then return the error code"""
         return self.exit_code
+
+    def get_error(self):
+        """if task failed then return MachineError here"""
+        return self.error
 
     def reschedule(self):
         """give up this tasks execution and allow the scheduler to run another task"""
@@ -216,6 +222,11 @@ class NativeTask(TaskBase):
         )
 
     def start(self):
+        """start task
+
+        setup regs, exec native code via runtime, rem task
+        return exit code or MachineError if failed
+        """
         # ensure REG_D0 in result
         get_regs = self.code.get_regs
         if get_regs is None:
@@ -225,14 +236,26 @@ class NativeTask(TaskBase):
 
         log_schedule.debug("%s: start native code %r", self.name, self.code)
         self.run_state = self.runtime.start(self.code)
-        self.exit_code = self.run_state.regs[REG_D0]
-        log_schedule.debug(
-            "%s: done native code. exit_code=%d", self.name, self.exit_code
-        )
+
         # at the end of execution remove myself
         if self.scheduler:
             self.scheduler.rem_task(self)
-        return self.exit_code
+
+        # pick up potential machine error
+        mach_error = self.run_state.mach_error
+        if mach_error:
+            log_schedule.debug(
+                "%s: done native code. mach error=%s", self.name, mach_error
+            )
+            self.error = mach_error
+            return mach_error
+        else:
+            # regular termination of task -> error code in D0
+            self.exit_code = self.run_state.regs[REG_D0] & 0xFF
+            log_schedule.debug(
+                "%s: done native code. exit_code=%d", self.name, self.exit_code
+            )
+            return self.exit_code
 
     def get_start_pc(self):
         return self.code.pc

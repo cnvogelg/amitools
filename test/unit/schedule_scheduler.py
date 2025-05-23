@@ -1,4 +1,4 @@
-from amitools.vamos.machine import Machine, Code
+from amitools.vamos.machine import Machine, Code, CPUHWExceptionError
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.schedule import (
     Scheduler,
@@ -80,6 +80,31 @@ def schedule_scheduler_native_task_simple_test():
     ctx.sched.schedule()
     exit_code = task.get_exit_code()
     assert exit_code == 42
+
+    task_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_native_task_error_test():
+    ctx = setup()
+
+    # prepare task
+    task_ctx = MyNativeTask(ctx, set_regs={REG_D0: 42})
+
+    pc = task_ctx.pc
+    ctx.mem.w16(pc, op_nop)
+    ctx.mem.w16(pc + 2, op_reset)
+
+    # add task
+    task = task_ctx.task
+    assert ctx.sched.add_task(task)
+
+    # run scheduler to run task
+    ctx.sched.schedule()
+    exit_code = task.get_exit_code()
+    assert exit_code is None
+    error = task.get_error()
+    assert type(error) is CPUHWExceptionError
 
     task_ctx.free()
     cleanup(ctx)

@@ -363,6 +363,46 @@ Or in the config file:
     [vamos]
     hw_access=disable
 
+#### 2.3.4 CPU Exception Handling
+
+If the m68k CPU raises a HW Exception (e.g. a divide by zero) then the CPU
+emulation triggers exception handling. You can configure in Vamos how to react
+on a HW exception.
+
+First specify the kind of exception:
+
+| HW Exception | Description |
+|-----------|-------------|
+| bus       | Bus Error |
+| address   | Address Error |
+| illegal   | Illegal Instruction |
+| zero_div  | Zero Devide |
+| chk       | CHK Instruction |
+| trapv     | TRAPV Instruction |
+| priv      | Privilege Violation |
+| trace     | Trace Mode |
+| line_a    | Line 1010 Emulator |
+| line_f    | Line 1111 Emulator |
+| irqs      | Interrupt Level 1...7 |
+| traps     | TRAP #0...#f Instruction |
+
+Then choose the operation:
+
+| Mode | Description |
+|-----------|-------------|
+| ignore    | Silently ignore the HW exception and try to continue |
+| log       | Same as ignore but write a log message |
+| abort     | Abort the execution |
+
+Either use the command line switch:
+
+    vamos -e zero_div:abort,bus:ignore
+
+Or define the handling in the config file:
+
+    [vamos]
+    hw_exc=zero_div:abort,bus:ignore
+
 ### 2.4 Vamos Settings
 
 #### 2.4.1 Emulation Settings

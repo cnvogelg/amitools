@@ -18,10 +18,30 @@ class MachineParser(Parser):
             "40",
         )
         hw_access = ("emu", "ignore", "abort", "disable")
+        hw_exc_names = (
+            "bus",
+            "address",
+            "illegal",
+            "zero_div",
+            "chk",
+            "trapv",
+            "priv",
+            "trace",
+            "line_a",
+            "line_f",
+            "irqs",
+            "traps",
+        )
+        hw_exc_modes = ("ignore", "log", "abort")
         def_cfg = {
             "machine": {
                 "cpu": Value(str, "68000", enum=cpus),
                 "ram_size": 1024,
+                "hw_exc": ValueDict(
+                    str,
+                    valid_keys=hw_exc_names,
+                    enum=hw_exc_modes,
+                ),
             },
             "memmap": {
                 "hw_access": Value(str, "emu", enum=hw_access),
@@ -43,6 +63,12 @@ class MachineParser(Parser):
                     type=int,
                     help="set RAM size in KiB",
                 ),
+                "hw_exc": Argument(
+                    "-e",
+                    "--hw-exception",
+                    action="store",
+                    help="Set CPU HW Exception handling",
+                ),
             },
             "memmap": {
                 "hw_access": Argument(
@@ -62,6 +88,7 @@ class MachineParser(Parser):
             "machine": {
                 "cpu": "cpu",
                 "ram_size": "ram_size",
+                "hw_exc": "hw_exc",
             },
             "memmap": {"hw_access": "hw_access", "old_dos_guard": "old_dos_guard"},
         }

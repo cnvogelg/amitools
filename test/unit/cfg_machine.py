@@ -8,6 +8,7 @@ def cfg_machine_dict_test():
         "machine": {
             "cpu": "68020",
             "ram_size": 512,
+            "hw_exc": {},
         },
         "memmap": {"hw_access": "abort", "old_dos_guard": True},
     }
@@ -23,6 +24,7 @@ def cfg_machine_ini_test():
             "ram_size": 512,
             "hw_access": "abort",
             "old_dos_guard": True,
+            "hw_exc": "zero_div:abort,bus:ignore",
         }
     }
     lp.parse_config(ini_dict, "ini")
@@ -30,6 +32,7 @@ def cfg_machine_ini_test():
         "machine": {
             "cpu": "68020",
             "ram_size": 512,
+            "hw_exc": {"zero_div": "abort", "bus": "ignore"},
         },
         "memmap": {"hw_access": "abort", "old_dos_guard": True},
     }
@@ -48,13 +51,12 @@ def cfg_machine_args_test():
             "512",
             "-H",
             "abort",
+            "-e",
+            "bus:ignore",
         ]
     )
     lp.parse_args(args)
     assert lp.get_cfg_dict() == {
-        "machine": {
-            "cpu": "68020",
-            "ram_size": 512,
-        },
+        "machine": {"cpu": "68020", "ram_size": 512, "hw_exc": {"bus": "ignore"}},
         "memmap": {"hw_access": "abort", "old_dos_guard": True},
     }

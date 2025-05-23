@@ -3,6 +3,7 @@ from .cpustate import CPUState
 from .machine import Machine
 from .opcodes import *
 from .hwaccess import HWAccess, HWAccessError
+from .hwexc import CPUHWExceptionHandler
 from .memmap import MemoryMap
 from .disasm import DisAsm
 from .runtime import Runtime, Code

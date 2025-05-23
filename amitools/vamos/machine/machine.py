@@ -14,6 +14,7 @@ from .regs import *
 from .opcodes import op_rts, op_rte
 from .cpustate import CPUState
 from .error import InvalidMemoryAccessError, CPUHWExceptionError, ResetOpcodeError
+from .hwexc import CPUHWExceptionHandler
 from amitools.vamos.log import log_machine
 from amitools.vamos.label import LabelManager
 
@@ -121,10 +122,11 @@ class Machine(object):
         """
         cpu_str = machine_cfg.cpu
         ram_size = machine_cfg.ram_size
-        return cls.from_name(cpu_str, ram_size, use_labels)
+        hw_exc = machine_cfg.hw_exc
+        return cls.from_name(cpu_str, ram_size, use_labels, hw_exc)
 
     @classmethod
-    def from_name(cls, cpu_str, ram_size=1024, use_labels=False):
+    def from_name(cls, cpu_str, ram_size=1024, use_labels=False, hw_exc=None):
         cpu_type = machine68k.cpu_type_from_str(cpu_str)
         if cpu_type is None:
             log_machine.error("invalid CPU type given: %s", cpu)
@@ -136,11 +138,17 @@ class Machine(object):
             ram_size,
             use_labels,
         )
-        return cls(
+        machine = cls(
             cpu_type,
             ram_size,
             use_labels=use_labels,
         )
+        # setup CPU HW exception handler
+        if hw_exc:
+            handler = CPUHWExceptionHandler.from_cfg(hw_exc)
+            if handler:
+                machine.set_hw_exc_hook(handler.handle_error)
+        return machine
 
     def _init_cpu(self):
         # sp and pc does not matter we will overwrite it anyway
