@@ -135,12 +135,12 @@ class Machine(object):
         # get backend for machine creation
         backend = Backend.from_cfg(backend_cfg)
         if not backend:
-            log_machine_error("can't create backend for machine!")
+            log_machine.error("can't create backend for machine!")
             return None
         # create raw machine from backend
         raw_machine = backend.create_machine(cpu_name, ram_size)
         if not raw_machine:
-            log_machine_error(
+            log_machine.error(
                 "can't create raw machine for cpu=%s, ram=%d", cpu_name, ram_size
             )
             return None

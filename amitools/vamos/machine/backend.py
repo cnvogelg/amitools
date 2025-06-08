@@ -18,7 +18,7 @@ class Backend:
             return Machine68kBackend()
         elif name in ("rm68k", "rmachine68k"):
             host = cfg.get("host", "localhost")
-            port = int(cfg.get("port", "18861)"))
+            port = int(cfg.get("port", "18861"))
             return RMachine68kBackend(host, port)
         else:
             log_machine.error("invalid backend name '%s'!", name)
@@ -54,7 +54,16 @@ class RMachine68kBackend:
             log_machine.info(
                 "create rmachine68k client to host=%s port=%d", self.host, self.port
             )
-            client = rmachine68k.create_client(self.host, self.port)
+            try:
+                client = rmachine68k.create_client(self.host, self.port)
+            except OSError as e:
+                log_machine.error(
+                    "rmachine68k: host=%s port=%d: %s",
+                    self.host,
+                    self.port,
+                    e,
+                )
+                return None
             log_machine.info(
                 "create rmachine68k with cpu_type=%s ram_size=%d",
                 cpu_name,

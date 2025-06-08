@@ -105,6 +105,13 @@ def pytest_addoption(parser):
         default=False,
         help="run vamos binaries via subprocess and not directly inside pytest",
     )
+    parser.addoption(
+        "--backend",
+        "-B",
+        action="store",
+        default=None,
+        help="select machine backend. passed as --backend to vamos",
+    )
 
 
 def pytest_configure(config):
@@ -136,6 +143,10 @@ def pytest_configure(config):
             "--profile",
         ]
         VAMOS_ARGS += prof_opts
+    # add a vamos
+    backend = config.getoption("backend")
+    if backend:
+        VAMOS_ARGS += ["-b", backend]
     # show settings
     print("vamos:", VAMOS_BIN, " ".join(VAMOS_ARGS))
 
