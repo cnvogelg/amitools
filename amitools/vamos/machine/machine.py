@@ -4,17 +4,12 @@ from typing import Optional
 import sys
 import logging
 
-try:
-    import machine68k
-except ImportError:
-    logging.error("package 'machine68k' missing! please install with pip.")
-    sys.exit(1)
-
 from .regs import *
 from .opcodes import op_rts, op_rte
 from .cpustate import CPUState
 from .error import InvalidMemoryAccessError, CPUHWExceptionError, ResetOpcodeError
 from .hwexc import CPUHWExceptionHandler
+from .backend import Backend
 from amitools.vamos.log import log_machine
 from amitools.vamos.label import LabelManager
 
@@ -70,19 +65,20 @@ class Machine(object):
 
     def __init__(
         self,
-        cpu_type=machine68k.CPUType.M68000,
-        ram_size_kib=1024,
+        raw_machine=None,
         use_labels=True,
         supervisor=False,
     ):
-        self.cpu_type = cpu_type
-        self.cpu_name = machine68k.cpu_type_to_str(cpu_type)
-        # setup machine68k
-        self.machine = machine68k.Machine(cpu_type, ram_size_kib)
-        self.cpu = self.machine.cpu
-        self.mem = self.machine.mem
-        self.traps = self.machine.traps
+        if not raw_machine:
+            raw_machine = Backend.get_default().create_machine()
+            assert raw_machine
+
+        self.raw_machine = raw_machine
+        self.cpu = self.raw_machine.cpu
+        self.mem = self.raw_machine.mem
+        self.traps = self.raw_machine.traps
         # ram
+        ram_size_kib = self.mem.get_ram_size_kib()
         self.ram_total = ram_size_kib * 1024
         self.ram_bytes = self.ram_total - self.ram_begin
         # start as supervisor
@@ -120,27 +116,37 @@ class Machine(object):
 
         return new Machine() or None on config error
         """
-        cpu_str = machine_cfg.cpu
+        cpu_name = machine_cfg.cpu
         ram_size = machine_cfg.ram_size
         hw_exc = machine_cfg.hw_exc
-        return cls.from_name(cpu_str, ram_size, use_labels, hw_exc)
+        backend = machine_cfg.backend
+        return cls.from_name(cpu_name, ram_size, use_labels, hw_exc, backend)
 
     @classmethod
-    def from_name(cls, cpu_str, ram_size=1024, use_labels=False, hw_exc=None):
-        cpu_type = machine68k.cpu_type_from_str(cpu_str)
-        if cpu_type is None:
-            log_machine.error("invalid CPU type given: %s", cpu)
-            return None
+    def from_name(
+        cls, cpu_name, ram_size=1024, use_labels=False, hw_exc=None, backend_cfg=None
+    ):
         log_machine.info(
-            "cpu=%s(%s), ram_size=%d, labels=%s",
-            cpu_type,
-            cpu_str,
+            "cpu_name=%s, ram_size=%d, labels=%s",
+            cpu_name,
             ram_size,
             use_labels,
         )
+        # get backend for machine creation
+        backend = Backend.from_cfg(backend_cfg)
+        if not backend:
+            log_machine_error("can't create backend for machine!")
+            return None
+        # create raw machine from backend
+        raw_machine = backend.create_machine(cpu_name, ram_size)
+        if not raw_machine:
+            log_machine_error(
+                "can't create raw machine for cpu=%s, ram=%d", cpu_name, ram_size
+            )
+            return None
+        # finally create machine
         machine = cls(
-            cpu_type,
-            ram_size,
+            raw_machine,
             use_labels=use_labels,
         )
         # setup CPU HW exception handler
@@ -190,8 +196,8 @@ class Machine(object):
         # set invalid access handler for memory
         self.mem.set_invalid_func(self._invalid_mem_access)
         # allocate a trap for exit_run and hw_exception
-        self.run_exit_tid = self.machine.traps.setup(self._exit_code_handler)
-        self.hw_exc_tid = self.machine.traps.setup(self._hw_exc_handler)
+        self.run_exit_tid = self.traps.setup(self._exit_code_handler)
+        self.hw_exc_tid = self.traps.setup(self._hw_exc_handler)
 
     def _cleanup_handler(self):
         self.traps.free(self.hw_exc_tid)
@@ -241,10 +247,10 @@ class Machine(object):
         return self.cpu
 
     def get_cpu_type(self):
-        return self.cpu_type
+        return self.cpu.get_cpu_type()
 
     def get_cpu_name(self):
-        return self.cpu_name
+        return self.cpu.get_cpu_name()
 
     def get_mem(self):
         return self.mem

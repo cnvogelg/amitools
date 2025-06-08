@@ -6,6 +6,7 @@ def cfg_machine_dict_test():
     lp = MachineParser()
     input_dict = {
         "machine": {
+            "backend": {},
             "cpu": "68020",
             "ram_size": 512,
             "hw_exc": {},
@@ -20,6 +21,7 @@ def cfg_machine_ini_test():
     lp = MachineParser("vamos")
     ini_dict = {
         "vamos": {
+            "backend": "name:rmachine68k,host:localhost,port:1112",
             "cpu": "68020",
             "ram_size": 512,
             "hw_access": "abort",
@@ -30,6 +32,11 @@ def cfg_machine_ini_test():
     lp.parse_config(ini_dict, "ini")
     assert lp.get_cfg_dict() == {
         "machine": {
+            "backend": {
+                "name": "rmachine68k",
+                "host": "localhost",
+                "port": "1112",
+            },
             "cpu": "68020",
             "ram_size": 512,
             "hw_exc": {"zero_div": "abort", "bus": "ignore"},
@@ -53,10 +60,21 @@ def cfg_machine_args_test():
             "abort",
             "-e",
             "bus:ignore",
+            "-b",
+            "name:rmachine68k,host:localhost,port:1112",
         ]
     )
     lp.parse_args(args)
     assert lp.get_cfg_dict() == {
-        "machine": {"cpu": "68020", "ram_size": 512, "hw_exc": {"bus": "ignore"}},
+        "machine": {
+            "backend": {
+                "name": "rmachine68k",
+                "host": "localhost",
+                "port": "1112",
+            },
+            "cpu": "68020",
+            "ram_size": 512,
+            "hw_exc": {"bus": "ignore"},
+        },
         "memmap": {"hw_access": "abort", "old_dos_guard": True},
     }

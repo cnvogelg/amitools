@@ -1,7 +1,6 @@
 import pytest
 import logging
 
-from machine68k import CPUType
 from amitools.vamos.machine import (
     Machine,
     InvalidMemoryAccessError,
@@ -16,8 +15,8 @@ from amitools.vamos.cfgcore import ConfigDict
 log_machine.setLevel(logging.DEBUG)
 
 
-def create_machine(cpu_type=CPUType.M68000, supervisor=False):
-    m = Machine(cpu_type, supervisor=supervisor)
+def create_machine(supervisor=False):
+    m = Machine(supervisor=supervisor)
     cpu = m.get_cpu()
     mem = m.get_mem()
     code = m.get_ram_begin()
@@ -217,10 +216,11 @@ def machine_machine_execute_max_cycles_test():
 
 
 def machine_machine_cfg_test():
-    cfg = ConfigDict({"cpu": "68020", "ram_size": 2048, "hw_exc": None})
+    cfg = ConfigDict(
+        {"cpu": "68020", "ram_size": 2048, "hw_exc": None, "backend": None}
+    )
     m = Machine.from_cfg(cfg, True)
     assert m
-    assert m.get_cpu_type() == CPUType.M68020
     assert m.get_cpu_name() == "68020"
     assert m.get_ram_total_kib() == 2048
     assert m.get_label_mgr()

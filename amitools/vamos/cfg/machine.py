@@ -3,6 +3,11 @@ from amitools.vamos.cfgcore import *
 
 class MachineParser(Parser):
     def __init__(self, ini_prefix=None):
+        backend_keys = (
+            "name",
+            "host",
+            "port",
+        )
         cpus = (
             "68000",
             "68020",
@@ -35,6 +40,7 @@ class MachineParser(Parser):
         hw_exc_modes = ("ignore", "log", "abort")
         def_cfg = {
             "machine": {
+                "backend": ValueDict(str, valid_keys=backend_keys),
                 "cpu": Value(str, "68000", enum=cpus),
                 "ram_size": 1024,
                 "hw_exc": ValueDict(
@@ -50,6 +56,12 @@ class MachineParser(Parser):
         }
         arg_cfg = {
             "machine": {
+                "backend": Argument(
+                    "-b",
+                    "--backend",
+                    action="store",
+                    help="Set machine emulation backend",
+                ),
                 "cpu": Argument(
                     "-C",
                     "--cpu",
@@ -86,6 +98,7 @@ class MachineParser(Parser):
         }
         ini_trafo = {
             "machine": {
+                "backend": "backend",
                 "cpu": "cpu",
                 "ram_size": "ram_size",
                 "hw_exc": "hw_exc",

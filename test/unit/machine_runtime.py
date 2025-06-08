@@ -1,6 +1,5 @@
 import pytest
 
-from machine68k import CPUType
 from amitools.vamos.machine import (
     Machine,
     Runtime,
@@ -13,8 +12,8 @@ from amitools.vamos.machine.opcodes import op_rts, op_jsr, op_reset, op_nop
 from amitools.vamos.log import log_machine
 
 
-def create_runtime(cpu_type=CPUType.M68000, supervisor=False, run_cycles=1000):
-    m = Machine(cpu_type, supervisor=supervisor)
+def create_runtime(supervisor=False, run_cycles=1000):
+    m = Machine(supervisor=supervisor)
     cpu = m.get_cpu()
     mem = m.get_mem()
     code = m.get_ram_begin()
