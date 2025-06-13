@@ -103,9 +103,7 @@ class Machine(object):
         """clean up after use"""
         self._cleanup_handler()
         self._cleanup_quick_traps()
-        self.cpu.cleanup()
-        self.mem.cleanup()
-        self.traps.cleanup()
+        self.raw_machine.cleanup()
         self.cpu = None
         self.mem = None
         self.traps = None
