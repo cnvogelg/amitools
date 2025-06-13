@@ -151,7 +151,7 @@ class MockMemory(object):
         addr -= self.base_addr
         if (addr + size) > self.size_bytes:
             raise ValueError("block too large")
-        return bytearray(self.data[addr : addr + size])
+        return bytes(self.data[addr : addr + size])
 
     def w_block(self, addr, data):
         if self.read_only:
