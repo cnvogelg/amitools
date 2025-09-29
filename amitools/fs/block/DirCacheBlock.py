@@ -90,10 +90,30 @@ class DirCacheRecord:
         pf = ProtectFlags(self.protect)
         print("\tprotect:    0x%x 0b%s %s" % (self.protect, pf.bin_str(), pf))
         print("\tmod_ts:     %s" % self.mod_ts)
-        print("\tsub_type:   0x%x" % self.sub_type)
+        print("\tsub_type:   %s" % self._subtype_str())
         print("\tname:       %s" % self.name)
         print("\tcomment:    %s" % self.comment)
 
+    def _subtype_str(self):
+        """Return human-friendly subtype string (e.g. ST_FILE) with a safe fallback."""
+        v = self.sub_type
+        def eq(const):
+            # compare with Block constants regardless of signedness/width
+            return (v & 0xFFFFFFFF) == (const & 0xFFFFFFFF)
+        if eq(Block.ST_FILE) or v == -3:
+            return "ST_FILE"
+        if eq(Block.ST_LINKFILE) or v == -4:
+            return "ST_LINKFILE"
+        if eq(Block.ST_USERDIR) or v == 2:
+            return "ST_USERDIR"
+        if eq(Block.ST_LINKDIR) or v == 4:
+            return "ST_LINKDIR"
+        if eq(Block.ST_SOFTLINK) or v == 3:
+            return "ST_SOFTLINK"
+        if eq(Block.ST_ROOT) or v == 1:
+            return "ST_ROOT"
+        # fallback shows both hex (unsigned byte) and signed value
+        return "0x%02x (%d)" % (v & 0xFF, v)
 
 class DirCacheBlock(Block):
     def __init__(self, blkdev, blk_num):

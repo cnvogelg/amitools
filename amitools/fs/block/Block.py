@@ -23,7 +23,10 @@ class Block:
     # block sub types
     ST_ROOT = 1
     ST_USERDIR = 2
+    ST_SOFTLINK = 3
+    ST_LINKDIR = 4
     ST_FILE = -3 & 0xFFFFFFFF
+    ST_LINKFILE = -4 & 0xFFFFFFFF
 
     def __init__(self, blkdev, blk_num, is_type=0, is_sub_type=0, chk_loc=5):
         self.valid = False
