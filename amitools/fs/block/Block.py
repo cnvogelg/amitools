@@ -28,6 +28,15 @@ class Block:
     ST_FILE = -3 & 0xFFFFFFFF
     ST_LINKFILE = -4 & 0xFFFFFFFF
 
+    VALID_ST_TYPES = {
+      (ST_ROOT & 0xFFFFFFFF),
+      (ST_USERDIR & 0xFFFFFFFF),
+      (ST_SOFTLINK & 0xFFFFFFFF),
+      (ST_LINKDIR & 0xFFFFFFFF),
+      (ST_FILE & 0xFFFFFFFF),
+      (ST_LINKFILE & 0xFFFFFFFF),
+    }
+
     def __init__(self, blkdev, blk_num, is_type=0, is_sub_type=0, chk_loc=5):
         self.valid = False
         self.blkdev = blkdev
@@ -235,6 +244,9 @@ class Block:
         loc = loc * 4
         if n > 0:
             self.data[loc : loc + n] = cstr
+
+    def _is_valid_subtype(v: int) -> bool:
+        return (int(v) & 0xFFFFFFFF) in Block.VALID_ST_TYPES
 
     def _dump_ptr(self, ptr):
         if ptr == self.no_blk:

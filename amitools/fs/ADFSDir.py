@@ -418,6 +418,12 @@ class ADFSDir(ADFSNode):
     # ----- dir cache -----
 
     def _dircache_add_entry(self, name, meta_info, entry_blk, size, update_myself=True, sub_type=0):
+        if not Block._is_valid_subtype(sub_type):
+            raise FSError(
+                UNSUPPORTED_DIR_BLOCK,
+                block=entry_blk,
+                extra="Sub_Type: %08x" % sub_type,
+            )
         # create a new dircache record
         r = DirCacheRecord(
             entry=entry_blk,
