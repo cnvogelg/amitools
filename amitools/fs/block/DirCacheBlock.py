@@ -17,6 +17,7 @@ class DirCacheRecord:
         self.mod_ts = mod_ts
         self.sub_type = sub_type
         self.name = name
+        self.type = 0x21  # always directory cache entry
         if comment is None:
             self.comment = FSString()
         else:
@@ -36,7 +37,9 @@ class DirCacheRecord:
         self.size = d[1]
         self.protect = d[2]
         self.mod_ts = TimeStamp(d[5], d[6], d[7])
-        self.type = data[off + 22]
+        # sub-type as signed but store as unsigned byte
+        raw = data[off + 22]
+        self.sub_type = raw - 256 if raw >= 128 else raw
         # name
         name_len = data[off + 23]
         name_off = off + 24
@@ -64,6 +67,8 @@ class DirCacheRecord:
             ts.mins,
             ts.ticks,
         )
+        # signed sub_type as char/byte
+        data[off + 22] = self.sub_type & 0xFF
         # name
         name = self.name.get_ami_str()
         name_len = len(name)
