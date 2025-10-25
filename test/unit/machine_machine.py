@@ -107,7 +107,7 @@ def machine_machine_execute_trap_test():
     addr = m.setup_quick_trap(func)
     m.prepare(addr, stack)
     er = m.execute()
-    assert er.cycles == 24
+    assert er.cycles == 4
     assert a == ["hello"]
     m.cleanup()
 
@@ -199,7 +199,11 @@ def machine_machine_execute_hw_trap0_handle_test():
     mem.w16(code, op_trap0)
     mem.w16(code + 2, op_rts)
 
-    er = m.execute()
+    while True:
+        er = m.execute()
+        if er.exit:
+            break
+
     # reached end trap?
     assert m.get_pc() == m.run_exit_addr + 2
 

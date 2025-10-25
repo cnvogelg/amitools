@@ -16,7 +16,7 @@ class RunState:
     cycles: int = 0
     total_cycles: int = 0
     slice_cycles: int = 0
-    user_end: bool = False
+    exit: bool = False
     regs: dict = None
     mach_error: MachineError = None
     mach_error_run_state = None
@@ -181,13 +181,6 @@ class Runtime:
         if len(self.run_states) > 0:
             return self.run_states[-1]
 
-    def cycles_run(self):
-        rs = self.get_current_run_state()
-        if rs:
-            return rs.cycles + self.machine.cycles_run()
-        else:
-            return 0
-
     def _run_loop(self, run_state, set_regs, get_regs):
         # setup pc and sp
         self.machine.prepare(run_state.pc, run_state.sp)
@@ -231,13 +224,10 @@ class Runtime:
             run_state.sp = self.machine.get_sp()
 
             # machine run has ended?
-            if er.user_end:
-                run_state.user_end = True
-                if run_state.pc == self.machine.get_run_exit_addr() + 2:
-                    log_machine.debug("exit code reached. (%s)", er)
-                    break
-                else:
-                    log_machine.debug("unknown user end. (%s)", er)
+            if er.exit:
+                run_state.exit = True
+                log_machine.debug("exit code reached. (%s)", er)
+                break
             # run cycles reached. report and continue
             else:
                 log_machine.debug("run cycles reached: %s", er)

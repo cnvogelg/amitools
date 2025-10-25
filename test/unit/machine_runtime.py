@@ -276,14 +276,8 @@ def machine_runtime_slice_hook_test(slice_cycles):
         rs = r.get_current_run_state()
         # cycles is not updated yet
         assert rs.cycles == 400
-        # but cycles_run does account current cycles
-        assert r.cycles_run() == 404
 
     def func(op, pc):
-        rs = r.get_current_run_state()
-        # check run cycles
-        assert r.cycles_run() == 224
-
         rs = r.nested_run(Code(code + 110), name="foo")
 
         # sub run
@@ -321,5 +315,5 @@ def machine_runtime_slice_hook_test(slice_cycles):
     # check cycle reports
     assert len(slice_reports) > 0
     for run_state in slice_reports:
-        if not run_state.user_end:
+        if not run_state.exit:
             assert run_state.slice_cycles >= slice_cycles

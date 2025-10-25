@@ -14,6 +14,12 @@ from amitools.vamos.log import log_machine
 from amitools.vamos.label import LabelManager
 
 
+@dataclass
+class ExecutionResult:
+    cycles: int
+    exit: bool
+
+
 class Machine(object):
     """the main interface to the m68k emulation including CPU, memory,
     and traps. The machine does only a minimal setup of RAM and the CPU.
@@ -62,6 +68,16 @@ class Machine(object):
     scratch_end = 0xFFC
     quick_trap_begin = 0x800
     quick_trap_num = 64
+
+    # define a sentinel for exit
+    class Sentinel:
+        def __init__(self, name):
+            self.name = name
+
+        def __repr__(self):
+            return f"Sentinel({self.name})"
+    
+    exit_sentinel = Sentinel("exit")
 
     def __init__(
         self,
@@ -194,8 +210,8 @@ class Machine(object):
         # set invalid access handler for memory
         self.mem.set_invalid_func(self._invalid_mem_access)
         # allocate a trap for exit_run and hw_exception
-        self.run_exit_tid = self.traps.setup(self._exit_code_handler)
-        self.hw_exc_tid = self.traps.setup(self._hw_exc_handler)
+        self.run_exit_tid = self.traps.alloc(self._exit_code_handler)
+        self.hw_exc_tid = self.traps.alloc(self._hw_exc_handler)
 
     def _cleanup_handler(self):
         self.traps.free(self.hw_exc_tid)
@@ -225,7 +241,7 @@ class Machine(object):
         for i in range(self.quick_trap_num):
             v = m.r16(addr)
             if v == 0:
-                tid = self.traps.setup(func, defer=True, old_pc=True)
+                tid = self.traps.alloc(func, old_pc=True)
                 opc = 0xA000 | tid
                 m.w16(addr, opc)
                 return addr
@@ -350,8 +366,8 @@ class Machine(object):
             sp,
             callee_pc,
         )
-        # ent time slice of cpu
-        self.cpu.end()
+        # return sentinel for the run loop to exit
+        return self.exit_sentinel
 
     def _invalid_mem_access(self, mode, width, addr):
         """triggered by invalid memory access"""
@@ -414,12 +430,20 @@ class Machine(object):
         # perform run
         er = self.cpu.execute(max_cycles)
 
+        # need to trigger trap?
+        exit = False
+        if er.was_trap:
+            log_machine.debug("+ call trap")
+            res = self.traps.call()
+            log_machine.debug("- call trap: %s", res)
+
+            # exit?
+            if res is self.exit_sentinel:
+                exit = True
+
         # show state after
         pc = self.cpu.r_pc()
         sp = self.cpu.r_sp()
         log_machine.debug("- cpu.execute pc=%06x sp=%06x result=%s", pc, sp, er)
 
-        return er
-
-    def cycles_run(self):
-        return self.cpu.cycles_run()
+        return ExecutionResult(er.cycles, exit)
