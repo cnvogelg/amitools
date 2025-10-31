@@ -114,9 +114,12 @@ class Machine(object):
         self._setup_quick_traps()
         self._init_cpu()
         self._init_base_mem()
+        # prepare execute
+        self.raw_machine.init_execute(self.run_exit_addr)
 
     def cleanup(self):
         """clean up after use"""
+        self.raw_machine.exit_execute()
         self._cleanup_handler()
         self._cleanup_quick_traps()
         self.raw_machine.cleanup()
@@ -200,22 +203,17 @@ class Machine(object):
             m.w16(table_addr + 2, op_rte)
             vbr_addr += 4
             table_addr += 4
-        # run_exit trap
-        addr = self.run_exit_addr
-        m.w16(addr, self.run_exit_tid | 0xA000)
 
     def _setup_handler(self):
         # "reset" opcode handler
         self.cpu.set_reset_instr_callback(self._reset_opcode_handler)
         # set invalid access handler for memory
         self.mem.set_invalid_func(self._invalid_mem_access)
-        # allocate a trap for exit_run and hw_exception
-        self.run_exit_tid = self.traps.alloc(self._exit_code_handler)
+        # allocate a trap for hw_exception
         self.hw_exc_tid = self.traps.alloc(self._hw_exc_handler)
 
     def _cleanup_handler(self):
         self.traps.free(self.hw_exc_tid)
-        self.traps.free(self.run_exit_tid)
 
     def _setup_quick_traps(self):
         m = self.mem
@@ -410,40 +408,7 @@ class Machine(object):
         self._handle_error(ResetOpcodeError(pc, sp), self.reset_hook)
 
     def prepare(self, pc, sp):
-        """set pc to start address and stack pointer and place end trap on stack"""
-        self.cpu.w_pc(pc)
-        # place end trap on stack
-        ret_addr = self.run_exit_addr
-        sp -= 4
-        self.mem.w32(sp, ret_addr)
-        self.cpu.w_sp(sp)
-        log_machine.debug("cpu.prepare pc=%06x sp=%06x", pc, sp)
+        self.raw_machine.prepare_execute(pc, sp)
 
     def execute(self, max_cycles=1000):
-        # show state before
-        pc = self.cpu.r_pc()
-        sp = self.cpu.r_sp()
-        log_machine.debug(
-            "+ cpu.execute pc=%06x sp=%06x max_cycles=%d", pc, sp, max_cycles
-        )
-
-        # perform run
-        er = self.cpu.execute(max_cycles)
-
-        # need to trigger trap?
-        exit = False
-        if er.was_trap:
-            log_machine.debug("+ call trap")
-            res = self.traps.call()
-            log_machine.debug("- call trap: %s", res)
-
-            # exit?
-            if res is self.exit_sentinel:
-                exit = True
-
-        # show state after
-        pc = self.cpu.r_pc()
-        sp = self.cpu.r_sp()
-        log_machine.debug("- cpu.execute pc=%06x sp=%06x result=%s", pc, sp, er)
-
-        return ExecutionResult(er.cycles, exit)
+        return self.raw_machine.execute(max_cycles)
