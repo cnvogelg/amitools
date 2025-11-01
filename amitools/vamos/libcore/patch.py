@@ -34,7 +34,7 @@ class LibPatcherMultiTrap(object):
         mem = self.alloc.mem
         for func in func_table:
             # setup new patch
-            tid = self.traps.alloc(func, old_pc=True)
+            tid = self.traps.alloc(func)
             if tid < 0:
                 raise RuntimeError("no more traps available!")
             # generate opcode

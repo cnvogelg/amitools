@@ -239,7 +239,7 @@ class Machine(object):
         for i in range(self.quick_trap_num):
             v = m.r16(addr)
             if v == 0:
-                tid = self.traps.alloc(func, old_pc=True)
+                tid = self.traps.alloc(func)
                 opc = 0xA000 | tid
                 m.w16(addr, opc)
                 return addr

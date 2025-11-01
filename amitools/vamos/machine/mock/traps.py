@@ -6,7 +6,7 @@ class MockTraps(object):
         self.traps = {}
         self.tids = []
 
-    def alloc(self, py_func, old_pc=False):
+    def alloc(self, py_func):
         """setup trap and return trap id"""
         # too many traps
         if len(self.traps) == self.max_traps:
@@ -16,7 +16,7 @@ class MockTraps(object):
         while tid in self.tids:
             tid += 1
         self.tids.append(tid)
-        self.traps[tid] = (py_func, old_pc)
+        self.traps[tid] = py_func
         return tid
 
     def free(self, tid):
@@ -32,16 +32,12 @@ class MockTraps(object):
         return len(self.tids)
 
     def get_func(self, tid):
-        return self.traps[tid][0]
-
-    def is_old_pc(self, tid):
-        return self.traps[tid][1]
+        return self.traps[tid]
 
     def trigger(self, tid, pc=0):
         # mask opcode
         tid = tid & 0xFFF
-        t = self.traps[tid]
+        func = self.traps[tid]
         # call py function with (op, pc)
         op = 0xA000 | tid
-        func = t[0]
         func(op, pc)
