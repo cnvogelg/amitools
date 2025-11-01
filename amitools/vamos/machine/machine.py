@@ -76,7 +76,7 @@ class Machine(object):
 
         def __repr__(self):
             return f"Sentinel({self.name})"
-    
+
     exit_sentinel = Sentinel("exit")
 
     def __init__(
@@ -114,12 +114,9 @@ class Machine(object):
         self._setup_quick_traps()
         self._init_cpu()
         self._init_base_mem()
-        # prepare execute
-        self.raw_machine.init_execute(self.run_exit_addr)
 
     def cleanup(self):
         """clean up after use"""
-        self.raw_machine.exit_execute()
         self._cleanup_handler()
         self._cleanup_quick_traps()
         self.raw_machine.cleanup()
@@ -212,8 +209,19 @@ class Machine(object):
         # allocate a trap for hw_exception
         self.hw_exc_tid = self.traps.alloc(self._hw_exc_handler)
 
+        self.exit_obj = self.raw_machine.create_trap_res("exit")
+
+        def exit_handler(opcode, pc):
+            return self.exit_obj
+
+        self.run_exit_tid = self.traps.alloc(exit_handler)
+        # place trap
+        opc = 0xA000 | self.run_exit_tid
+        self.mem.w16(self.run_exit_addr, opc)
+
     def _cleanup_handler(self):
         self.traps.free(self.hw_exc_tid)
+        self.traps.free(self.run_exit_tid)
 
     def _setup_quick_traps(self):
         m = self.mem
@@ -408,7 +416,13 @@ class Machine(object):
         self._handle_error(ResetOpcodeError(pc, sp), self.reset_hook)
 
     def prepare(self, pc, sp):
-        self.raw_machine.prepare_execute(pc, sp)
+        self.cpu.w_pc(pc)
+        # place end trap on stack
+        sp -= 4
+        self.mem.w32(sp, self.run_exit_addr)
+        self.cpu.w_sp(sp)
 
     def execute(self, max_cycles=1000):
-        return self.raw_machine.execute(max_cycles)
+        er = self.raw_machine.execute(max_cycles)
+        exit = er.trap_res is self.exit_obj
+        return ExecutionResult(er.cycles, exit)
