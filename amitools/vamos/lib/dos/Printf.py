@@ -160,7 +160,10 @@ def printf_read_data(state, mem_access, data_ptr):
             else:
                 data = mem_access.r16(data_ptr)
                 data_ptr += 2
-            data = chr(data)
+            try:
+                data = chr(data)
+            except ValueError:
+                data = 0x20
         elif t == "%":
             data = ord("%")
         e.data = data
