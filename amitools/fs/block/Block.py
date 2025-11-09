@@ -29,12 +29,12 @@ class Block:
     ST_LINKFILE = -4 & 0xFFFFFFFF
 
     VALID_ST_TYPES = {
-      (ST_ROOT & 0xFFFFFFFF),
-      (ST_USERDIR & 0xFFFFFFFF),
-      (ST_SOFTLINK & 0xFFFFFFFF),
-      (ST_LINKDIR & 0xFFFFFFFF),
-      (ST_FILE & 0xFFFFFFFF),
-      (ST_LINKFILE & 0xFFFFFFFF),
+        (ST_ROOT & 0xFFFFFFFF),
+        (ST_USERDIR & 0xFFFFFFFF),
+        (ST_SOFTLINK & 0xFFFFFFFF),
+        (ST_LINKDIR & 0xFFFFFFFF),
+        (ST_FILE & 0xFFFFFFFF),
+        (ST_LINKFILE & 0xFFFFFFFF),
     }
 
     def __init__(self, blkdev, blk_num, is_type=0, is_sub_type=0, chk_loc=5):

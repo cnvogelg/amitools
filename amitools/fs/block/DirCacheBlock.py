@@ -97,9 +97,11 @@ class DirCacheRecord:
     def _subtype_str(self):
         """Return human-friendly subtype string (e.g. ST_FILE) with a safe fallback."""
         v = self.sub_type
+
         def eq(const):
             # compare with Block constants regardless of signedness/width
             return (v & 0xFFFFFFFF) == (const & 0xFFFFFFFF)
+
         if eq(Block.ST_FILE) or v == -3:
             return "ST_FILE"
         if eq(Block.ST_LINKFILE) or v == -4:
@@ -114,6 +116,7 @@ class DirCacheRecord:
             return "ST_ROOT"
         # fallback shows both hex (unsigned byte) and signed value
         return "0x%02x (%d)" % (v & 0xFF, v)
+
 
 class DirCacheBlock(Block):
     def __init__(self, blkdev, blk_num):
