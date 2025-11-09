@@ -48,9 +48,10 @@ class RDisk:
         self.parts = []
         num = 0
         while part_blk != Block.no_blk:
-            p = Partition(self.rawblk, part_blk, num, self.rdb.log_drv.cyl_blks, self)
-            num += 1
-            if not p.read():
+            p = Partition(self.rawblk, part_blk, num, self.rdb.log_drv.cyl_blks, self.block_bytes, self)
+            ok = p.read()
+            p.log_errors()
+            if not ok:
                 self.valid = False
                 return False
             self.parts.append(p)
@@ -58,6 +59,7 @@ class RDisk:
             self.used_blks.append(p.get_blk_num())
             # next partition
             part_blk = p.get_next_partition_blk()
+            num += 1
 
         # read filesystems
         fs_blk = self.rdb.fs_list
@@ -65,8 +67,9 @@ class RDisk:
         num = 0
         while fs_blk != PartitionBlock.no_blk:
             fs = FileSystem(self.rawblk, fs_blk, num)
-            num += 1
-            if not fs.read():
+            ok = fs.read()
+            fs.log_errors()
+            if not ok:
                 self.valid = False
                 return False
             self.fs.append(fs)
@@ -74,6 +77,7 @@ class RDisk:
             self.used_blks += fs.get_blk_nums()
             # next partition
             fs_blk = fs.get_next_fs_blk()
+            num += 1
 
         # TODO: add bad block blocks
 
@@ -286,7 +290,7 @@ class RDisk:
     # ----- edit -----
 
     def create(
-        self, disk_geo, rdb_cyls=1, hi_rdb_blk=0, disk_names=None, ctrl_names=None
+        self, disk_geo, rdb_cyls=1, hi_rdb_blk=0, disk_names=None, ctrl_names=None, blk_num=0
     ):
         cyls = disk_geo.cyls
         heads = disk_geo.heads
@@ -336,15 +340,16 @@ class RDisk:
             ctrl_revision,
         )
         self.block_bytes = self.rawblk.block_bytes
-        self.rdb = RDBlock(self.rawblk)
+        self.rdb = RDBlock(self.rawblk, blk_num)
         self.rdb.create(
             phy_drv, log_drv, drv_id, block_size=self.block_bytes, flags=flags
         )
-        self.rdb.write()
-
         self.used_blks = [self.rdb.blk_num]
         self.max_blks = self.rdb.log_drv.rdb_blk_hi + 1
         self.valid = True
+
+    def write():
+        self.rdb.write()
 
     def resize(self, new_lo_cyl=None, new_hi_cyl=None, adjust_physical=False):
         # if the rdb region has to be minimized then check if no partition
@@ -630,7 +635,7 @@ class RDisk:
         self.rawblk.flush()
         # create partition object and add to partition list
         blk_per_cyl = blk_per_trk * heads
-        p = Partition(self.rawblk, blk_num, len(self.parts), blk_per_cyl, self)
+        p = Partition(self.rawblk, blk_num, len(self.parts), blk_per_cyl, self.block_bytes, self)
         p.read()
         self.parts.append(p)
         return p
