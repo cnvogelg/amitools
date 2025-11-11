@@ -9,8 +9,8 @@ from amitools.vamos.schedule import (
     SchedulerEvent,
     SchedulerConfig,
 )
-from amitools.vamos.machine.opcodes import *
-from amitools.vamos.machine.regs import *
+from amitools.vamos.machine.opcodes import op_nop, op_rts, op_reset, op_jsr, op_jmp
+from amitools.vamos.machine.regs import REG_D0
 from amitools.vamos.log import log_schedule
 
 
@@ -238,8 +238,6 @@ def schedule_scheduler_native_task_remove_test():
 
 
 def schedule_scheduler_native_task_multi_test():
-    my_task = None
-
     ctx = setup(slice_cycles=30)
     sched = ctx.sched
 
@@ -256,7 +254,6 @@ def schedule_scheduler_native_task_multi_test():
 
     task1_ctx = MyNativeTask(ctx, set_regs={REG_D0: 42}, name="task1")
     task1 = task1_ctx.task
-    my_task = task1
 
     pc = task1_ctx.pc
 
