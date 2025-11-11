@@ -1,6 +1,4 @@
-from enum import Enum
 from dataclasses import dataclass
-from typing import Optional
 
 from .regs import reg_to_str
 from .error import MachineError, ErrorReporter
@@ -224,7 +222,7 @@ class Runtime:
             run_state.sp = self.machine.get_sp()
 
             # machine run has ended?
-            if er.exit:
+            if self.machine.was_exit(er):
                 run_state.exit = True
                 log_machine.debug("exit code reached. (%s)", er)
                 break

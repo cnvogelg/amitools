@@ -2,7 +2,11 @@ from enum import Enum
 import greenlet
 
 from amitools.vamos.log import log_schedule
-from amitools.vamos.machine import Runtime, Code, REG_D0
+from amitools.vamos.machine import Runtime, REG_D0
+
+
+class TaskStop(Exception):
+    pass
 
 
 class TaskState(Enum):
@@ -29,6 +33,7 @@ class TaskBase:
         self.scheduler = None
         self.exit_code = None
         self.error = None
+        self.stopped = False
         self.glet = None
         self.cpu_ctx = None
         self.forbid_cnt = 0
@@ -88,6 +93,10 @@ class TaskBase:
     def get_error(self):
         """if task failed then return MachineError here"""
         return self.error
+
+    def was_stopped(self):
+        """return True if task was stopped"""
+        return self.stopped
 
     def reschedule(self):
         """give up this tasks execution and allow the scheduler to run another task"""
@@ -178,6 +187,11 @@ class TaskBase:
         """run the task until it ends. it might be interrupted by reschedule() calls"""
         pass
 
+    def stop(self):
+        """stop a running task by throwing a TaskEnd exception"""
+        log_schedule.debug("%s: stop!", self.name)
+        self.glet.throw(TaskStop())
+
     def sub_run(self, code, name=None):
         """execute m68k code in your task"""
         # inject own stack if needed
@@ -235,27 +249,37 @@ class NativeTask(TaskBase):
             self.code.get_regs.append(REG_D0)
 
         log_schedule.debug("%s: start native code %r", self.name, self.code)
-        self.run_state = self.runtime.start(self.code)
+        try:
+            self.run_state = self.runtime.start(self.code)
+        except TaskStop:
+            log_schedule.debug("%s: task stop received!")
+            self.run_state = None
 
         # at the end of execution remove myself
         if self.scheduler:
-            self.scheduler.rem_task(self)
+            self.scheduler.terminate_task(self)
 
-        # pick up potential machine error
-        mach_error = self.run_state.mach_error
-        if mach_error:
-            log_schedule.debug(
-                "%s: done native code. mach error=%s", self.name, mach_error
-            )
-            self.error = mach_error
-            return mach_error
+        if self.run_state:
+            # pick up potential machine error
+            mach_error = self.run_state.mach_error
+            if mach_error:
+                log_schedule.debug(
+                    "%s: done native code. mach error=%s", self.name, mach_error
+                )
+                self.error = mach_error
+                return mach_error
+            else:
+                # regular termination of task -> error code in D0
+                self.exit_code = self.run_state.regs[REG_D0] & 0xFF
+                log_schedule.debug(
+                    "%s: done native code. exit_code=%d", self.name, self.exit_code
+                )
+                return self.exit_code
         else:
-            # regular termination of task -> error code in D0
-            self.exit_code = self.run_state.regs[REG_D0] & 0xFF
-            log_schedule.debug(
-                "%s: done native code. exit_code=%d", self.name, self.exit_code
-            )
-            return self.exit_code
+            # task was stopped
+            log_schedule.debug("%s: done native code. stopped!", self.name)
+            self.stopped = True
+            return None
 
     def get_start_pc(self):
         return self.code.pc
@@ -300,14 +324,19 @@ class PythonTask(TaskBase):
     def start(self):
         # either run run() func or method
         log_schedule.debug("%s: start Python code", self.name)
-        if self.run_func:
-            self.exit_code = self.run_func(self)
-        else:
-            self.exit_code = self.run()
+
+        try:
+            if self.run_func:
+                self.exit_code = self.run_func(self)
+            else:
+                self.exit_code = self.run()
+        except TaskStop:
+            log_schedule.debug("%s: Python task stop received!", self.name)
+
         log_schedule.debug(
             "%s: done Python code. exit_code=%d", self.name, self.exit_code
         )
         # at the end of execution remove myself
         if self.scheduler:
-            self.scheduler.rem_task(self)
+            self.scheduler.terminate_task(self)
         return self.exit_code

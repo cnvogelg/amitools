@@ -215,25 +215,36 @@ class Scheduler(object):
         return True
 
     def rem_task(self, task):
+        """remove task"""
+        # ask task to stop immediately
+        log_schedule.info("remove_task: %s", task.name)
+        task.stop()
+
+    def terminate_task(self, task):
+        """a task finally terminates
+
+        it will be removed from the scheduler from the scheduler.
+        only be called from the task!
+        """
         # find task: is it current? removing myself...
         if self.cur_task == task:
-            log_schedule.debug("rem_task: cur_task %s", task.name)
+            log_schedule.debug("terminate_task: cur_task %s", task.name)
             self.cur_task = None
         # in ready list?
         elif task in self.ready_tasks:
-            log_schedule.debug("rem_task: ready %s", task.name)
+            log_schedule.debug("terminate_task: ready %s", task.name)
             self.ready_tasks.remove(task)
         # in waiting list?
         elif task in self.waiting_tasks:
-            log_schedule.debug("rem_task: waiting %s", task.name)
+            log_schedule.debug("terminate_task: waiting %s", task.name)
             self.waiting_tasks.remove(task)
         # not found
         else:
-            log_schedule.warning("rem_task: unknown task %s", task.name)
+            log_schedule.warning("terminate_task: unknown task %s", task.name)
             return False
         # mark as removed
         task.set_state(TaskState.TS_REMOVED)
-        log_schedule.info("rem_task: %s", task.name)
+        log_schedule.info("terminate_task: %s", task.name)
         # report via event if running or suppress otherwise
         if self.running:
             self._report_event(SchedulerEvent.Type.REMOVE_TASK, task)
@@ -241,6 +252,7 @@ class Scheduler(object):
 
     def _report_event(self, event, task):
         if len(self.event_hooks) > 0:
+            log_schedule.debug("report event: %s -> %s", task, event.name)
             event = SchedulerEvent(event, task)
             for hook in self.event_hooks:
                 hook(event)

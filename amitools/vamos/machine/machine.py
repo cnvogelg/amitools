@@ -1,23 +1,9 @@
-from enum import Enum
-from dataclasses import dataclass
-from typing import Optional
-import sys
-import logging
-
-from .regs import *
 from .opcodes import op_rts, op_rte
-from .cpustate import CPUState
 from .error import InvalidMemoryAccessError, CPUHWExceptionError, ResetOpcodeError
 from .hwexc import CPUHWExceptionHandler
 from .backend import Backend
 from amitools.vamos.log import log_machine
 from amitools.vamos.label import LabelManager
-
-
-@dataclass
-class ExecutionResult:
-    cycles: int
-    exit: bool
 
 
 class Machine(object):
@@ -68,16 +54,6 @@ class Machine(object):
     scratch_end = 0xFFC
     quick_trap_begin = 0x800
     quick_trap_num = 64
-
-    # define a sentinel for exit
-    class Sentinel:
-        def __init__(self, name):
-            self.name = name
-
-        def __repr__(self):
-            return f"Sentinel({self.name})"
-
-    exit_sentinel = Sentinel("exit")
 
     def __init__(
         self,
@@ -208,14 +184,15 @@ class Machine(object):
         self.mem.set_invalid_func(self._invalid_mem_access)
         # allocate a trap for hw_exception
         self.hw_exc_tid = self.traps.alloc(self._hw_exc_handler)
-
-        self.exit_obj = self.raw_machine.create_trap_res("exit")
+        # create a trap result object that marks the end of execution
+        self.exit_obj = self.raw_machine.create_execute_end("exit")
 
         def exit_handler(opcode, pc):
+            log_machine.debug("exit handler reached")
             return self.exit_obj
 
         self.run_exit_tid = self.traps.alloc(exit_handler)
-        # place trap
+        # place trap to exit obj at run_exit_addr
         opc = 0xA000 | self.run_exit_tid
         self.mem.w16(self.run_exit_addr, opc)
 
@@ -415,14 +392,29 @@ class Machine(object):
         log_machine.debug("RESET opcode: pc=%06x sp=%06x", pc, sp)
         self._handle_error(ResetOpcodeError(pc, sp), self.reset_hook)
 
+    def was_exit(self, execute_result):
+        """check if a execute() result reached the exit trap"""
+        return execute_result.result is self.exit_obj
+
     def prepare(self, pc, sp):
         self.cpu.w_pc(pc)
         # place end trap on stack
         sp -= 4
         self.mem.w32(sp, self.run_exit_addr)
         self.cpu.w_sp(sp)
+        log_machine.debug("  cpu.prepare pc=%06x sp=%06x", pc, sp)
 
     def execute(self, max_cycles=1000):
+        pc = self.cpu.r_pc()
+        sp = self.cpu.r_sp()
+        log_machine.debug(
+            "+ cpu.execute pc=%06x sp=%06x max_cycles=%d", pc, sp, max_cycles
+        )
+
         er = self.raw_machine.execute(max_cycles)
-        exit = er.trap_res is self.exit_obj
-        return ExecutionResult(er.cycles, exit)
+
+        pc = self.cpu.r_pc()
+        sp = self.cpu.r_sp()
+        log_machine.debug("- cpu.execute pc=%06x sp=%06x result=%r", pc, sp, er)
+
+        return er

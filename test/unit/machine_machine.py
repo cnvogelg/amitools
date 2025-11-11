@@ -15,143 +15,171 @@ from amitools.vamos.cfgcore import ConfigDict
 log_machine.setLevel(logging.DEBUG)
 
 
-def create_machine(supervisor=False):
-    m = Machine(supervisor=supervisor)
-    cpu = m.get_cpu()
-    mem = m.get_mem()
-    code = m.get_ram_begin()
-    stack = m.get_scratch_top()
-    m.prepare(code, stack)
-    return m, cpu, mem, code, stack
+class Context:
+    def __init__(self, mach):
+        self.mach = mach
+        self.mem = self.mach.mem
+        self.cpu = self.mach.cpu
+        self.traps = self.mach.traps
+
+        self.code = mach.get_ram_begin()
+        self.stack = mach.get_scratch_top()
+        mach.prepare(self.code, self.stack)
+
+    def cleanup(self):
+        self.mach.cleanup()
 
 
-def machine_machine_execute_rts_test():
-    m, cpu, mem, code, stack = create_machine()
+@pytest.fixture
+def ctx():
+    mach = Machine()
+    return Context(mach)
+
+
+@pytest.fixture
+def ctx_super():
+    mach = Machine(supervisor=True)
+    return Context(mach)
+
+
+def machine_machine_execute_rts_test(ctx):
+    """simple minimal rts code to test machine execution"""
     # single RTS to immediately return from run
-    mem.w16(code, op_rts)
-    er = m.execute()
+    ctx.mem.w16(ctx.code, op_rts)
+    er = ctx.mach.execute()
     assert er.cycles == 20
-    m.cleanup()
+    assert ctx.mach.was_exit(er)
+    ctx.mach.cleanup()
 
 
-def machine_machine_instr_hook_test():
-    m, cpu, mem, code, stack = create_machine()
+def machine_machine_execute_instr_hook_test(ctx):
+    """test the instruction hook"""
     a = []
     # set instr hook
 
     def my_hook(pc):
         a.append(pc)
 
-    m.set_instr_hook(my_hook)
+    ctx.mach.set_instr_hook(my_hook)
     # single RTS to immediately return from run
-    mem.w16(code, op_rts)
-    er = m.execute()
+    ctx.mem.w16(ctx.code, op_rts)
+    er = ctx.mach.execute()
     assert er.cycles == 20
+    assert ctx.mach.was_exit(er)
     assert a == [0x1000, 0x400]
-    m.cleanup()
+    ctx.mach.cleanup()
 
 
-def machine_machine_execute_mem_trace_test():
-    m, cpu, mem, code, stack = create_machine()
+def machine_machine_execute_mem_trace_test(ctx):
+    """test memory tracing during execution"""
     a = []
     # set instr hook
 
     def my_trace(*args):
         a.append(args)
 
-    m.set_cpu_mem_trace_hook(my_trace)
+    ctx.mach.set_cpu_mem_trace_hook(my_trace)
     # single RTS to immediately return from run
-    mem.w16(code, op_rts)
-    er = m.execute()
+    ctx.mem.w16(ctx.code, op_rts)
+    er = ctx.mach.execute()
     assert er.cycles == 20
-    assert a[0] == ("R", 1, code, op_rts)
-    m.cleanup()
+    assert ctx.mach.was_exit(er)
+    assert a[0] == ("R", 1, ctx.code, op_rts)
+    ctx.mach.cleanup()
 
 
-def machine_machine_execute_mem_addr_error_test():
-    m, cpu, mem, code, stack = create_machine()
-    m.prepare(0xF80000, stack)
+def machine_machine_execute_mem_addr_error_test(ctx):
+    """trigger a memory address error"""
+    ctx.mach.prepare(0xF80000, ctx.stack)
     with pytest.raises(InvalidMemoryAccessError) as ei:
-        er = m.execute()
+        ctx.mach.execute()
     exc = ei.value
     assert exc.pc == 0xF80004
     assert exc.mode == "R"
     assert exc.width == 1
     assert exc.addr == 0xF80002
-    m.cleanup()
+    ctx.mach.cleanup()
 
 
-def machine_machine_execute_mem_addr_error_handle_test():
-    m, cpu, mem, code, stack = create_machine()
-    count = 0
+def machine_machine_execute_mem_addr_error_handle_test(ctx):
+    """handle a memory address error"""
 
     def handle_addr_error(exc):
         assert type(exc) is InvalidMemoryAccessError
         return True
 
-    m.set_addr_err_hook(handle_addr_error)
+    ctx.mach.set_addr_err_hook(handle_addr_error)
 
-    m.prepare(0xF80000, stack)
-    er = m.execute(100)
+    ctx.mach.prepare(0xF80000, ctx.stack)
+    er = ctx.mach.execute(100)
     assert er.cycles == 104
-    m.cleanup()
+    ctx.mach.cleanup()
 
 
-def machine_machine_execute_trap_test():
-    m, cpu, mem, code, stack = create_machine()
+# --- traps ---
+
+
+def machine_machine_execute_trap_simple_test(ctx):
+    """trigger a trap function"""
     a = []
 
     def func(op, pc):
         a.append("hello")
 
-    addr = m.setup_quick_trap(func)
-    m.prepare(addr, stack)
-    er = m.execute()
-    assert er.cycles == 4
+    addr = ctx.mach.setup_quick_trap(func)
+    ctx.mach.prepare(addr, ctx.stack)
+    er = ctx.mach.execute()
+    assert er.cycles == 24
     assert a == ["hello"]
-    m.cleanup()
+    ctx.mach.cleanup()
 
 
-def machine_machine_execute_trap_exception_test():
-    m, cpu, mem, code, stack = create_machine()
+def machine_machine_execute_trap_exception_test(ctx):
+    """raise exception inside trap function"""
     error = ValueError("bla")
 
     def func(op, pc):
         raise error
 
-    addr = m.setup_quick_trap(func)
-    m.prepare(addr, stack)
+    addr = ctx.mach.setup_quick_trap(func)
+    ctx.mach.prepare(addr, ctx.stack)
     with pytest.raises(ValueError):
-        er = m.execute()
-    m.cleanup()
+        # execute will propagate the exception
+        ctx.mach.execute()
+    ctx.mach.cleanup()
 
 
-def machine_machine_execute_trap_unbound_test():
-    m, cpu, mem, code, stack = create_machine()
+def machine_machine_execute_trap_unbound_test(ctx):
+    """unknown ALINE trap raises ALINE CPU HW exception"""
     # place an unbound trap -> raise ALINE exception
-    mem.w16(code, 0xA100)
+    ctx.mem.w16(ctx.code, 0xA100)
     # single RTS to immediately return from run
-    mem.w16(code + 2, op_rts)
+    ctx.mem.w16(ctx.code + 2, op_rts)
     with pytest.raises(CPUHWExceptionError) as ei:
-        er = m.execute()
+        ctx.mach.execute()
     exc = ei.value
-    assert exc.pc == code
-    m.cleanup()
+    assert exc.pc == ctx.code
+    ctx.mach.cleanup()
 
 
-def machine_machine_execute_reset_opcode_test():
-    m, cpu, mem, code, stack = create_machine(supervisor=True)
+# --- reset opcode ---
+
+
+def machine_machine_execute_reset_opcode_exception_test(ctx_super):
+    """RESET opcode test -> raise exception if unhandled"""
     # place a reset opcode
-    mem.w16(code, op_reset)
+    ctx = ctx_super
+    ctx.mem.w16(ctx.code, op_reset)
+    ctx.mem.w16(ctx.code + 2, op_rts)
     with pytest.raises(ResetOpcodeError) as ei:
-        er = m.execute()
+        ctx.mach.execute()
     exc = ei.value
-    assert exc.pc == code
-    m.cleanup()
+    assert exc.pc == ctx.code
+    ctx.mach.cleanup()
 
 
-def machine_machine_execute_reset_opcode_handle_test():
-    m, cpu, mem, code, stack = create_machine(supervisor=True)
+def machine_machine_execute_reset_opcode_handle_test(ctx_super):
+    """if RESET handler is set then trigger that"""
 
     def handle_reset_opcode(error):
         assert type(error) is ResetOpcodeError
@@ -159,64 +187,68 @@ def machine_machine_execute_reset_opcode_handle_test():
         return True
 
     # set handler to accept reset opcode
-    m.set_reset_hook(handle_reset_opcode)
+    ctx = ctx_super
+    ctx.mach.set_reset_hook(handle_reset_opcode)
 
     # place a reset opcode
-    mem.w16(code, op_reset)
-    mem.w16(code + 2, op_rts)
-    er = m.execute()
-    # reached end trap?
-    assert m.get_pc() == m.run_exit_addr + 2
+    ctx.mem.w16(ctx.code, op_reset)
+    ctx.mem.w16(ctx.code + 2, op_rts)
+    er = ctx.mach.execute()
+    assert ctx.mach.was_exit(er)
 
-    m.cleanup()
+    ctx.mach.cleanup()
 
 
-def machine_machine_execute_hw_trap0_test():
-    m, cpu, mem, code, stack = create_machine()
+# --- HW Trap #0 ---
+
+
+def machine_machine_execute_hw_trap0_raise_test(ctx):
     # trigger a "real" trap #0
-    mem.w16(code, op_trap0)
+    ctx.mem.w16(ctx.code, op_trap0)
     with pytest.raises(CPUHWExceptionError) as ei:
-        er = m.execute()
+        ctx.mach.execute()
     exc = ei.value
-    assert exc.pc == code + 2
+    assert exc.pc == ctx.code + 2
     assert exc.exc_num == 32  # trap0 exception number
-    m.cleanup()
+    ctx.mach.cleanup()
 
 
-def machine_machine_execute_hw_trap0_handle_test():
-    m, cpu, mem, code, stack = create_machine()
+def machine_machine_execute_hw_trap0_handle_test(ctx):
 
     def handle_trap(error):
         assert type(error) is CPUHWExceptionError
-        assert error.pc == code + 2
+        assert error.pc == ctx.code + 2
         assert error.exc_num == 32
         return True
 
     # allow to handle trap
-    m.set_hw_exc_hook(handle_trap)
+    ctx.mach.set_hw_exc_hook(handle_trap)
 
     # trigger a "real" trap #0
-    mem.w16(code, op_trap0)
-    mem.w16(code + 2, op_rts)
+    ctx.mem.w16(ctx.code, op_trap0)
+    ctx.mem.w16(ctx.code + 2, op_rts)
 
-    while True:
-        er = m.execute()
-        if er.exit:
-            break
+    er = ctx.mach.execute()
+    assert ctx.mach.was_exit(er)
 
-    # reached end trap?
-    assert m.get_pc() == m.run_exit_addr + 2
-
-    m.cleanup()
+    ctx.mach.cleanup()
 
 
-def machine_machine_execute_max_cycles_test():
-    m, cpu, mem, code, stack = create_machine()
-    mem.w16(code, op_jmp)
-    mem.w32(code + 2, code)
-    er = m.execute(200)
+# --- max cycles --
+
+
+def machine_machine_execute_max_cycles_test(ctx):
+    """check max cycles execution"""
+    ctx.mem.w16(ctx.code, op_jmp)
+    ctx.mem.w32(ctx.code + 2, ctx.code)
+    er = ctx.mach.execute(200)
+    assert not er.result
+    assert not ctx.mach.was_exit(er)
     assert er.cycles == 204
-    m.cleanup()
+    ctx.mach.cleanup()
+
+
+# --- config test ---
 
 
 def machine_machine_cfg_test():

@@ -1,3 +1,5 @@
+import logging
+
 from amitools.vamos.machine import Machine, Code, CPUHWExceptionError
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.schedule import (
@@ -9,6 +11,10 @@ from amitools.vamos.schedule import (
 )
 from amitools.vamos.machine.opcodes import *
 from amitools.vamos.machine.regs import *
+from amitools.vamos.log import log_schedule
+
+
+log_schedule.setLevel(logging.DEBUG)
 
 
 class Ctx:
@@ -160,7 +166,7 @@ def schedule_scheduler_native_task_subrun_test():
     addr = ctx.machine.setup_quick_trap(trap)
 
     # task setup
-    mem.w16(pc, op_jmp)
+    mem.w16(pc, op_jsr)
     mem.w32(pc + 2, addr)
     mem.w16(pc + 6, op_rts)
 
@@ -207,17 +213,18 @@ def schedule_scheduler_native_task_remove_test():
     addr = ctx.machine.setup_quick_trap(trap)
 
     # task setup
-    mem.w16(pc, op_jmp)
+    mem.w16(pc, op_jsr)
     mem.w32(pc + 2, addr)
+    # endless loop
     mem.w16(pc + 6, op_jmp)
-    mem.w32(pc + 8, pc)
+    mem.w32(pc + 8, pc + 6)
 
     # add task
     assert sched.add_task(task)
     # run scheduler
     sched.schedule()
-    exit_code = task.get_exit_code()
-    assert exit_code == 42
+    # assume that my task was stopped
+    assert task.was_stopped()
 
     assert ctx.events == [
         SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task),
@@ -254,13 +261,13 @@ def schedule_scheduler_native_task_multi_test():
     pc = task1_ctx.pc
 
     # task1 setup
-    mem.w16(pc, op_jmp)
+    mem.w16(pc, op_jsr)
     mem.w32(pc + 2, addr1)
     off = pc + 6
     for i in range(100):
         mem.w16(off, op_nop)
         off += 2
-    mem.w16(off, op_jmp)
+    mem.w16(off, op_jsr)
     mem.w32(off + 2, addr2)
     mem.w16(off + 6, op_rts)
 
@@ -319,13 +326,13 @@ def schedule_scheduler_native_task_multi_forbid_test():
 
     # task1 setup
     pc = task1_ctx.pc
-    mem.w16(pc, op_jmp)
+    mem.w16(pc, op_jsr)
     mem.w32(pc + 2, addr1)
     off = pc + 6
     for i in range(100):
         mem.w16(off, op_nop)
         off += 2
-    mem.w16(off, op_jmp)
+    mem.w16(off, op_jsr)
     mem.w32(off + 2, addr2)
     mem.w16(off + 6, op_rts)
 
@@ -349,9 +356,11 @@ def schedule_scheduler_native_task_multi_forbid_test():
         SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task1),
         SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task2),
         SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
-        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.READY_TASK, task1),
         SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task2),
         SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task1),
         SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
     ]
 
@@ -383,7 +392,7 @@ def schedule_scheduler_native_task_multi_wait_test():
 
     # task1 setup
     pc = task1_ctx.pc
-    mem.w16(pc, op_jmp)
+    mem.w16(pc, op_jsr)
     mem.w32(pc + 2, addr1)
     mem.w16(pc + 6, op_rts)
 
@@ -392,7 +401,7 @@ def schedule_scheduler_native_task_multi_wait_test():
 
     # task2 setup
     pc2 = task2_ctx.pc
-    mem.w16(pc2, op_jmp)
+    mem.w16(pc2, op_jsr)
     mem.w32(pc2 + 2, addr2)
     mem.w16(pc2 + 6, op_rts)
 
