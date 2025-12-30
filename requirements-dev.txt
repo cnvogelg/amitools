@@ -4,4 +4,5 @@ twine
 tox
 black
 build
-machine68k
+machine68k == 0.3.0
+

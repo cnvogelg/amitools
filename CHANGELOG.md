@@ -1,5 +1,12 @@
 # Change Log
 
+## [0.8.1][9] (2025-12-30)
+
+### global
+
+* pinned machine68k to 0.3.0
+  
+
 ## [0.8.0][8] (2024-03-03)
 
 ### global
