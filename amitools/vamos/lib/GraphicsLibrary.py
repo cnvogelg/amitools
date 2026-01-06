@@ -194,6 +194,8 @@ class GraphicsLibrary(LibImpl):
             if dl_addr:
                 ctx.cpu.w_reg(REG_A0, dl_addr)
                 self.DisposeRegion(ctx)
+            
+            ctx.alloc.free_mem(layer_addr, LayerStruct.get_size())
     
         # --- Free BitMap + planes ---
         bm_addr = rp.BitMap.get()
