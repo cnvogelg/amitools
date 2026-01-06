@@ -10,7 +10,7 @@ class ALibInfo(object):
         self.load_addr = load_addr
         self.seglist_baddr = seglist_baddr
         self.lib_fd = lib_fd
-        self.base_addrs = {}
+        self.base_addrs = { load_addr: 1 }  # base addr -> num of bases
 
     def __str__(self):
         info = []

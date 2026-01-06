@@ -4,6 +4,8 @@ from amitools.vamos.log import log_exec
 from amitools.vamos.libtypes import MsgPort, Message
 from amitools.vamos.libstructs import NodeType, MsgPortFlags
 from amitools.vamos.astructs import CSTR
+from amitools.vamos.libstructs.exec_ import MsgPortStruct
+from amitools.vamos.lib.intuition import IntuiMessageStruct
 
 
 class MessageFunc(FuncBase):
@@ -109,14 +111,10 @@ class MessageFunc(FuncBase):
         has_port = self.port_mgr.has_port(port.addr)
         if has_port:
             has_msg = self.port_mgr.has_msg(port.addr)
-            if not has_msg:
-                log_exec.error(
-                    "WaitPort: on empty message queue called: Port (%06x)", port.addr
-                )
-                return None
-            msg_addr = self.port_mgr.peek_msg(port.addr)
-            log_exec.info("WaitPort: peek message %06x", msg_addr)
-            return Message(self.ctx.mem, msg_addr)
+            if has_msg:
+                msg_addr = self.port_mgr.peek_msg(port.addr)
+                log_exec.info("WaitPort: peek message %06x", msg_addr)
+                return Message(self.ctx.mem, msg_addr)
 
         # get sig mask
         sig_bit = port.sig_bit.val
@@ -157,4 +155,9 @@ class MessageFunc(FuncBase):
         if port is None:
             msg.node.type.val = NodeType.NT_FREEMSG
         else:
+            if port.addr == 0xFFEDCB:
+                # Intuition-only message, free it and stop.
+                self.ctx.alloc.free_mem(msg.addr, IntuiMessageStruct.get_size())
+                return 0
+
             self.put_msg(port, msg, msg_type=NodeType.NT_REPLYMSG)

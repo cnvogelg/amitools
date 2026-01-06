@@ -48,6 +48,8 @@ class Scheduler(object):
         self.num_switch_same = 0
         self.num_switch_other = 0
         self.running = False
+        
+        self.message_pump = None
 
     @classmethod
     def from_cfg(cls, machine, schedule_cfg):
@@ -63,10 +65,15 @@ class Scheduler(object):
 
     def get_num_tasks(self):
         """count the active tasks"""
-        sum = len(self.ready_tasks) + len(self.waiting_tasks)
-        if self.cur_task:
-            sum += 1
-        return sum
+        total = len(self.ready_tasks) + len(self.waiting_tasks)
+    
+        if self.cur_task and \
+           self.cur_task not in self.ready_tasks and \
+           self.cur_task not in self.waiting_tasks:
+            total += 1
+    
+        return total
+
 
     def get_cur_task(self):
         return self.cur_task
@@ -101,10 +108,6 @@ class Scheduler(object):
                 self.waiting_tasks,
             )
 
-            # nothing to do anymore?
-            if self.get_num_tasks() == 0:
-                break
-
             # has the current task forbid state?
             if self.cur_task and self.cur_task.is_forbidden():
                 log_schedule.debug("run: keep current (forbid state)")
@@ -113,12 +116,21 @@ class Scheduler(object):
                 # find a task to run
                 task = self._find_run_task()
                 if task is None:
-                    log_schedule.error("schedule(): no task to run?!")
-                    return False
+                    if self.message_pump == None:
+                        log_schedule.error("schedule(): no task to run?!")
+                        return False
+                    if self.message_pump():
+                        task = self.cur_task
+                    else:
+                        log_schedule.info("message_pump ended")
+                        return False
 
             # current tasks stays the same?
             # no context switch required. simply switch to it
             if task == self.cur_task:
+                if self.message_pump and not self.message_pump():
+                    log_schedule.info("message_pump ended")
+                    return False
                 self.num_switch_same += 1
                 log_schedule.debug("run: current %s", task.name)
                 task.keep_scheduled()
@@ -189,6 +201,10 @@ class Scheduler(object):
 
     def wake_up_task(self, task):
         """take task from waiting list and allow him to schedule"""
+        
+        if task not in self.waiting_tasks:
+            return 
+        
         log_schedule.debug("wake_up_task: task %s", task.name)
         self.waiting_tasks.remove(task)
         # add to front

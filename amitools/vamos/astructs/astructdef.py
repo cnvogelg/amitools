@@ -88,7 +88,7 @@ class AmigaStructDecorator(object):
         # ensure that class ends with Struct
         name = cls.__name__
         if not name.endswith("Struct"):
-            raise RuntimeError("cls must be named *Struct")
+            raise RuntimeError("cls %s must be named *Struct" % name)
         base_name = name[: -len("Struct")]
         return base_name
 

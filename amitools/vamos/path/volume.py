@@ -76,6 +76,8 @@ class Volume(object):
 
     def _create_temp(self, path):
         if os.path.exists(path):
+            log_path.info("temp volume volume path already exists: '%s'", path)
+            return True
             if os.path.isdir(path):
                 log_path.warning("temp volume path already exists: '%s'", path)
                 return True
@@ -321,7 +323,7 @@ class VolumeManager(object):
         for volume in self.volumes:
             vol_sys_path = volume.get_path()
             cp = os.path.commonprefix([vol_sys_path, sys_path])
-            if cp == vol_sys_path:
+            if cp == vol_sys_path or cp + "\\" == vol_sys_path:
                 remainder = sys_path[len(vol_sys_path) :]
                 n = len(remainder)
                 if n > 0 and remainder[0] == "/":

@@ -12,10 +12,17 @@ from .TimerDevice import TimerDevice
 from .UtilityLibrary import UtilityLibrary
 from .VamosTestLibrary import VamosTestLibrary
 from .VamosTestDevice import VamosTestDevice
+from .BsdSocketLibrary import BsdSocketLibrary
+from .WorkbenchLibrary import WorkbenchLibrary
+from .GraphicsLibrary import GraphicsLibrary
+from amitools.vamos.lib.LayersLibrary import LayersLibrary
+from amitools.vamos.lib.GadToolsLibrary import GadToolsLibrary
+from amitools.vamos.lib.KeyMapLibrary import KeyMapLibrary
 
 vamos_libs = {
     "dos.library": DosLibrary,
     "exec.library": ExecLibrary,
+    "graphics.library": GraphicsLibrary,
     "intuition.library": IntuitionLibrary,
     "locale.library": LocaleLibrary,
     "mathffp.library": MathFFPLibrary,
@@ -26,6 +33,11 @@ vamos_libs = {
     "mathtrans.library": MathTransLibrary,
     "timer.device": TimerDevice,
     "utility.library": UtilityLibrary,
+    "bsdsocket.library": BsdSocketLibrary,
     "vamostest.library": VamosTestLibrary,
     "vamostestdev.device": VamosTestDevice,
+    "workbench.library": WorkbenchLibrary,
+    "layers.library": LayersLibrary,
+    "gadtools.library": GadToolsLibrary,
+    "keymap.library": KeyMapLibrary,
 }

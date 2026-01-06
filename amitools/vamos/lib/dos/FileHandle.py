@@ -110,7 +110,8 @@ class FileHandle:
         if self.terminal:
             return self.terminal.read(len)
         try:
-            return self.obj.read(len)
+            d = self.obj.read1(len)
+            return d
         except IOError:
             return -1
 
@@ -178,7 +179,10 @@ class FileHandle:
         self.unch = bytearray(s)
 
     def tell(self):
-        return self.obj.tell()
+        try:
+            return self.obj.tell()
+        except IOError:
+            return -1
 
     def seek(self, pos, whence):
         """set to position from whence

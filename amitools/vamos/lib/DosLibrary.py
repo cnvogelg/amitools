@@ -2,6 +2,8 @@ import time
 import ctypes
 import re
 import os
+import select
+import sys
 
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
@@ -41,9 +43,15 @@ from .dos.FileManager import FileManager
 from .dos.CSource import *
 from .dos.Item import *
 from amitools.vamos.dos import run_command, run_sub_process
+from amitools.vamos.libstructs.dos import TimeRequestStruct
+from time import sleep
 
 
 class DosLibrary(LibImpl):
+    DOSFALSE = 0
+    DOSTRUE = 0xFFFFFFFF
+    DOSTRUE_S = -1
+    
     LV_VAR = 0  # an variable
     LV_ALIAS = 1  # an alias
     LVF_IGNORE = 0x80
@@ -58,6 +66,7 @@ class DosLibrary(LibImpl):
 
     def setup_lib(self, ctx, base_addr):
         log_dos.info("setup dos.library")
+
         # init own state
         self.alloc = ctx.alloc
         self.path_mgr = ctx.path_mgr
@@ -90,6 +99,11 @@ class DosLibrary(LibImpl):
         self.file_mgr = FileManager(
             ctx.path_mgr, ctx.exec_lib.port_mgr, ctx.alloc, ctx.mem
         )
+        
+        self.timerDevice = ctx.exec_lib.lib_mgr.open_lib("timer.device", 0)
+        self.timeRequest = ctx.alloc.alloc_struct(TimeRequestStruct, label="TimeRequest")
+        self.timeRequest.access.w_s("tr_node.io_Device", self.timerDevice)
+        self.access.w_s("dl_TimeReq", self.timeRequest.addr)
 
     # --- Timing ---
 
@@ -102,6 +116,11 @@ class DosLibrary(LibImpl):
         return 0
 
     def finish_lib(self, ctx):
+        
+        # close TimerDevice, free timeRequest
+        ctx.exec_lib.lib_mgr.close_lib(self.timerDevice)
+        ctx.alloc.free_struct(self.timeRequest)
+        
         # finish file manager
         self.file_mgr.finish()
         # free dos list
@@ -656,9 +675,13 @@ class DosLibrary(LibImpl):
             self.file_mgr.close(fh)
             log_dos.info("Close: %s", fh)
             self.setioerr(ctx, 0)
-        return DOSTRUE
+        return self.DOSTRUE
 
-    def Read(self, ctx, fh_b_addr, buf_ptr, size):
+    def Read(self, ctx):
+        fh_b_addr = ctx.cpu.r_reg(REG_D1)
+        buf_ptr = ctx.cpu.r_reg(REG_D2)
+        size = ctx.cpu.r_reg(REG_D3)
+        
         fh = self.file_mgr.get_by_b_addr(fh_b_addr, False)
         data = fh.read(size)
         if data == -1:
@@ -836,6 +859,10 @@ class DosLibrary(LibImpl):
         fh_b_addr = ctx.cpu.r_reg(REG_D1)
         fh = self.file_mgr.get_by_b_addr(fh_b_addr, True)
         fh.flush()
+        # remove command line from stdin
+        if fh.obj.fileno() == sys.stdin.fileno():
+            fh.setbuf(bytearray())
+            
         return -1
 
     def VPrintf(self, ctx):
@@ -955,8 +982,16 @@ class DosLibrary(LibImpl):
         fh_end = fh_acc.r_s("fh_End")
         if fh_end == 0:
             return 0
-
+        
         fh = self.file_mgr.get_by_b_addr(fh_b_addr, False)
+        
+        # Block until input is available
+        if fh.obj.fileno() == sys.stdin.fileno():
+            while True:
+                ready, _, _ = select.select([fh.obj], [], [], None)
+                if ready:
+                    break
+        
         line, error = fh.gets(buflen)
         log_dos.info("FGetS(%s,%d) -> '%s' error=%s", fh, buflen, line, error)
         ctx.mem.w_cstr(bufaddr, line)

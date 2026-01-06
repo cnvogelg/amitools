@@ -147,7 +147,7 @@ class LibMgrCfg(object):
         if type(names) is str:
             names = [names]
         for name in names:
-            if name.endswith(".library"):
+            if name.endswith(".library") or name.endswith(".gadget"):
                 cfg = self.get_lib_cfg(name, False)
             elif name.endswith(".device"):
                 cfg = self.get_dev_cfg(name, False)

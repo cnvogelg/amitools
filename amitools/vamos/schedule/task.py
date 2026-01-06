@@ -134,6 +134,7 @@ class TaskBase:
         # return without waiting
         got_mask = self.sigmask_received & sigmask
         if got_mask != 0:
+            self.sigmask_received = 0
             return got_mask
 
         # set our wait mask

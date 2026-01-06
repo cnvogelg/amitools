@@ -1,8 +1,7 @@
-from enum import IntEnum
-from amitools.vamos.machine.regs import *
-from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib, LibFuncs, InitRes
-from amitools.vamos.libcore import LibImpl
 from amitools.vamos.astructs import AccessStruct, BYTE, CSTR
+from amitools.vamos.error import VamosInternalError
+from amitools.vamos.libcore import LibImpl
+from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib, LibFuncs, InitRes
 from amitools.vamos.libstructs import (
     ExecLibraryStruct,
     StackSwapStruct,
@@ -13,15 +12,17 @@ from amitools.vamos.libstructs import (
 from amitools.vamos.libtypes import ExecLibrary as ExecLibraryType, MsgPort, Message
 from amitools.vamos.libtypes import Task, List, Node
 from amitools.vamos.log import log_exec
-from amitools.vamos.error import VamosInternalError, UnsupportedFeatureError
+
+from amitools.vamos.lib.lexec.msgfunc import MessageFunc
 from amitools.vamos.lib.lexec.signalfunc import SignalFunc
 from amitools.vamos.lib.lexec.taskfunc import TaskFunc
-from amitools.vamos.lib.lexec.msgfunc import MessageFunc
-from .lexec.PortManager import PortManager
-from .lexec.SemaphoreManager import SemaphoreManager
-from .lexec.Pool import Pool
-from .lexec.RawDoFmt import raw_do_fmt
+
 from .lexec import Alloc
+from .lexec.Pool import Pool
+from .lexec.PortManager import PortManager
+from .lexec.RawDoFmt import raw_do_fmt
+from .lexec.SemaphoreManager import SemaphoreManager
+from amitools.vamos.machine.regs import REG_A0, REG_A1, REG_A2, REG_A3, REG_A7, REG_D0, REG_D1, REG_D2
 
 
 class ExecLibrary(LibImpl):
@@ -61,8 +62,15 @@ class ExecLibrary(LibImpl):
             ctx, self.exec_lib, self.signal_func, self.task_func, self.port_mgr
         )
 
-    # helper
+        self.intuition_lib = None
+        ctx.exec_lib = self
 
+    def set_this_task(self, process):
+        self.exec_lib.this_task.aptr = process.this_task.addr
+        self.stk_lower = process.get_stack().get_lower()
+        self.stk_upper = process.get_stack().get_upper()
+
+    # helper
     def get_callee_pc(self, ctx):
         """a call stub log helper to extract the callee's pc"""
         sp = ctx.cpu.r_reg(REG_A7)
@@ -366,7 +374,7 @@ class ExecLibrary(LibImpl):
 
     def AllocMem(self, ctx):
         size = ctx.cpu.r_reg(REG_D0)
-        flags = ctx.cpu.r_reg(REG_D1)
+        flags = ctx.cpu.r_reg(REG_D1) # always cleared
         # label alloc
         pc = self.get_callee_pc(ctx)
         name = "AllocMem(%06x)" % pc
@@ -429,6 +437,7 @@ class ExecLibrary(LibImpl):
             return self.alloc.available()
 
     # ----- Message Passing -----
+    # ----- 68k ABI entry points -----
 
     def PutMsg(self, ctx, port: MsgPort, msg: Message):
         return self.msg_func.put_msg(port, msg)
@@ -512,41 +521,41 @@ class ExecLibrary(LibImpl):
                 log_exec.info("CloseDevice: %06x", dev_addr)
                 self.lib_mgr.close_lib(dev_addr)
                 io.w_s("io_Device", 0)
-
+    
     # ----- Nodes/Lists -----
 
-    def AddTail(self, ctx, list: List, node: Node):
-        log_exec.info("AddTail(%s, %s)", list, node)
-        list.add_tail(node)
-        log_exec.debug("-> %s", list)
+    def AddTail(self, ctx, lst: List, node: Node):
+        log_exec.info("AddTail(%s, %s)", lst, node)
+        lst.add_tail(node)
+        log_exec.debug("-> %s", lst)
 
-    def AddHead(self, ctx, list: List, node: Node):
-        log_exec.info("AddHead(%s, %s)", list, node)
-        list.add_head(node)
-        log_exec.debug("-> %s", list)
+    def AddHead(self, ctx, lst: List, node: Node):
+        log_exec.info("AddHead(%s, %s)", lst, node)
+        lst.add_head(node)
+        log_exec.debug("-> %s", lst)
 
-    def RemHead(self, ctx, list: List) -> Node:
-        node = list.rem_head()
-        log_exec.info("RemHead(%s) -> %s", list, node)
+    def RemHead(self, ctx, lst: List) -> Node:
+        node = lst.rem_head()
+        log_exec.info("RemHead(%s) -> %s", lst, node)
         return node
 
-    def RemTail(self, ctx, list: List) -> Node:
-        node = list.rem_tail()
-        log_exec.info("RemTail(%s) -> %s", list, node)
+    def RemTail(self, ctx, lst: List) -> Node:
+        node = lst.rem_tail()
+        log_exec.info("RemTail(%s) -> %s", lst, node)
         return node
 
-    def FindName(self, ctx, list: List, name: CSTR) -> Node:
-        node = list.find_name(name.str)
-        log_exec.info("FindName(%s, %s) -> %s", list, name, node)
+    def FindName(self, ctx, lst: List, name: CSTR) -> Node:
+        node = lst.find_name(name.str)
+        log_exec.info("FindName(%s, %s) -> %s", lst, name, node)
         return node
 
-    def Insert(self, ctx, list: List, node: Node, list_node: Node):
-        list.insert(node, list_node)
-        log_exec.info("Insert(%s, %s, %s)", list, node, list_node)
+    def Insert(self, ctx, lst: List, node: Node, list_node: Node):
+        lst.insert(node, list_node)
+        log_exec.info("Insert(%s, %s, %s)", lst, node, list_node)
 
-    def Enqueue(self, ctx, list: List, node: Node):
-        list.enqueue(node)
-        log_exec.info("Enqueue(%s, %s)", list, node)
+    def Enqueue(self, ctx, lst: List, node: Node):
+        lst.enqueue(node)
+        log_exec.info("Enqueue(%s, %s)", lst, node)
 
     def Remove(self, ctx, node: Node):
         log_exec.info("Remove(%s)", node)
@@ -675,7 +684,47 @@ class ExecLibrary(LibImpl):
         Alloc.deallocate(ctx, mh_addr, blk_addr, num_bytes)
         log_exec.info("Deallocate(%06x, %06x, %06x)" % (mh_addr, blk_addr, num_bytes))
 
+    # ---------- Core helpers (no register access) ----------
+
+    def _wait_core(self, ctx):
+        """
+        Core Wait logic; does not touch CPU registers.
+        Blocks until (signals & mask) != 0.
+        SDL events are pumped here on the CPU thread.
+        """
+        
+        # Pump SDL events on this thread
+        if self.intuition_lib is None:
+            return
+        
+        if len(self.intuition_lib.sdl_window_id_2_sdl_window) == 0:
+            return False 
+        
+        import sdl2
+        event = sdl2.SDL_Event()
+        
+        # peform pending refresh -> sdl2.render
+        self.intuition_lib.check_refresh(ctx)
+        
+        while True:
+            # Only bother if there's at least one SDL window
+            if sdl2.SDL_PollEvent(event):
+                # Turn SDL event -> pending Intuition events (thread-safe)
+                one = self.intuition_lib.ingest_sdl_event(ctx, event)
+                if one is not None:
+                    self.intuition_lib.drain_pending_intui_events(ctx, one)
+                    break;
+                
+        return True
+
+    def register_SDL_poll(self, ctx):
+        sched_task = self.signal_func.get_my_sched_task()
+        scheduler = sched_task.scheduler
+    
+        scheduler.message_pump = lambda: self._wait_core(ctx)
+
     # ----- Misc -----
 
     def Alert(self, ctx, code):
         log_exec.error("ALERT: code=%08x", code)
+

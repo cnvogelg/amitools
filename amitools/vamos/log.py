@@ -31,6 +31,9 @@ log_math = logging.getLogger("math")
 log_intuition = logging.getLogger("intuition")
 log_timer = logging.getLogger("timer")
 
+log_intui = logging.getLogger("intuition")
+log_gfx = logging.getLogger("graphics")
+
 log_proc = logging.getLogger("proc")
 log_prof = logging.getLogger("prof")
 
@@ -60,6 +63,8 @@ loggers = [
     log_utility,
     log_hw,
     log_math,
+    log_intui,
+    log_gfx,
     log_machine,
     log_schedule,
     log_intuition,
