@@ -178,8 +178,6 @@ class IntuitionLibrary(LibImpl):
         window_id = self.find_sdl_window_by_amiga_addr(window_ptr)
         if window_id > 0:
             import sdl2
-            # Remove from window map
-            del self.sdl_window_id_2_window_addr_map[window_id]
     
             # Destroy SDL2 window
             sdl_win = self.sdl_window_id_2_sdl_window[window_id]
@@ -1147,9 +1145,12 @@ class IntuitionLibrary(LibImpl):
             self.refresh_pending.add(win_addr)
 
     def _perform_refresh(self, ctx, win_addr):
-        window_id = self.find_sdl_window_by_amiga_addr(win_addr)
-        sdl_win = self.sdl_window_id_2_sdl_window[window_id]
-        self.render(ctx, sdl_win, 0, 100) # not in the menu
+        try:
+            window_id = self.find_sdl_window_by_amiga_addr(win_addr)
+            sdl_win = self.sdl_window_id_2_sdl_window[window_id]
+            self.render(ctx, sdl_win, 0, 100) # not in the menu
+        except KeyError:
+            pass
     
     # --- intuition.library: BeginRefresh ---
     def BeginRefresh(self, ctx):
