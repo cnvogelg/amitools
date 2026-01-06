@@ -283,7 +283,9 @@ class ValueDict(object):
         for key in val:
             # check key
             if self.valid_keys and key not in self.valid_keys:
-                raise ValueError("invalid key %s in %s" % (key, self.valid_keys))
+                raise ValueError(
+                    "invalid key %s in %s" % (key, sorted(self.valid_keys))
+                )
             # convert value
             v = val[key]
             if self.is_sub_value:

@@ -1,6 +1,6 @@
 from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.machine import Machine
+from amitools.vamos.machine import Machine, Runtime
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libtypes import Resident, ExecLibrary, Library
 from amitools.vamos.libstructs import ResidentFlags, NodeType, AutoInitStruct
@@ -21,6 +21,7 @@ def load_lib(alloc, buildlibnix):
 
 def libnative_initres_init_test(buildlibnix):
     machine = Machine()
+    runtime = Runtime(machine)
     mem = machine.get_mem()
     cpu = machine.get_cpu()
     traps = machine.get_traps()
@@ -36,15 +37,16 @@ def libnative_initres_init_test(buildlibnix):
         # return my lib_base
         cpu.w_reg(REG_D0, 0xCAFEBABE)
 
-    trap_id = traps.setup(init_func, auto_rts=True)
+    trap_id = traps.alloc(init_func)
     mem.w16(init_addr, trap_id | 0xA000)
+    mem.w16(init_addr + 2, 0x4E75)  # rts
     # build fake resident
     res = Resident.alloc(alloc, name="bla.library", id_string="blub")
     res.new_resident(
         flags=0, version=42, type=NodeType.NT_LIBRARY, pri=-7, init=init_addr
     )
     # init resident
-    ir = InitRes(machine, alloc)
+    ir = InitRes(mem, alloc, runtime.run)
     lib_base, mem_obj = ir.init_resident(res.get_addr(), seglist.get_baddr(), run_sp=sp)
     assert lib_base == 0xCAFEBABE
     assert mem_obj is None
@@ -56,6 +58,7 @@ def libnative_initres_init_test(buildlibnix):
 
 def libnative_initres_autoinit_test(buildlibnix):
     machine = Machine()
+    runtime = Runtime(machine)
     mem = machine.get_mem()
     cpu = machine.get_cpu()
     traps = machine.get_traps()
@@ -69,8 +72,9 @@ def libnative_initres_autoinit_test(buildlibnix):
     def init_func(op, pc):
         assert cpu.r_reg(REG_A0) == seglist.get_baddr()
 
-    trap_id = traps.setup(init_func, auto_rts=True)
+    trap_id = traps.alloc(init_func)
     mem.w16(init_addr, trap_id | 0xA000)
+    mem.w16(init_addr + 2, 0x4E75)  # rts
     # fake vectors
     vectors = 0x100
     mem.w32(vectors, 0x400)
@@ -88,10 +92,10 @@ def libnative_initres_autoinit_test(buildlibnix):
     exec_lib = ExecLibrary.alloc(
         alloc, name="exec.library", id_string="bla", neg_size=36
     )
-    exec_lib.new_lib()
+    exec_lib.new()
     mem.w32(4, exec_lib.get_addr())
     # init resident
-    ir = InitRes(machine, alloc)
+    ir = InitRes(mem, alloc, runtime.run)
     lib_base, mem_obj = ir.init_resident(
         res.get_addr(), seglist.get_baddr(), run_sp=sp, exec_lib=exec_lib
     )

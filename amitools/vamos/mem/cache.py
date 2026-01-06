@@ -15,7 +15,7 @@ class MemoryCache(object):
     def read_cache(self, mem):
         """read cache memory from emulator memory"""
         self.data = mem.r_block(self.start_addr, self.size_bytes)
-        assert type(self.data) is bytearray
+        assert type(self.data) is bytes
 
     def write_cache(self, mem):
         """write cache memory back to emulator memory"""
@@ -135,7 +135,7 @@ class MemoryCache(object):
     def r_block(self, addr, size):
         self._check(addr, size)
         addr -= self.start_addr
-        return bytearray(self.data[addr : addr + size])
+        return bytes(self.data[addr : addr + size])
 
     def w_block(self, addr, data):
         size = len(data)

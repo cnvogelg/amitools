@@ -156,7 +156,7 @@ intuitionPrivate4()()
 *--- (6 function slots reserved here) ---
 ##bias 768
 ##public
-*--- functions in V39 or higher (Release 3) ---
+*--- functions in V39 or higher (Release 3.0) ---
 AllocScreenBuffer(sc,bm,flags)(a0/a1,d0)
 FreeScreenBuffer(sc,sb)(a0/a1)
 ChangeScreenBuffer(sc,sb)(a0/a1)
@@ -168,4 +168,11 @@ DoGadgetMethodA(gad,win,req,message)(a0/a1/a2/a3)
 SetWindowPointerA(win,taglist)(a0/a1)
 TimedDisplayAlert(alertNumber,string,height,time)(d0/a0,d1/a1)
 HelpControl(win,flags)(a0,d0)
+*--- functions in V46 or higher (Release 3.1.4) ---
+ShowWindow(window,other)(a0/a1)
+HideWindow(window)(a0)
+*--- functions in V47 or higher (Release 3.2) ---
+*--- (61 function slots reserved here) ---
+##bias 1212
+IntuitionControlA(object,taglist)(a0/a1)
 ##end

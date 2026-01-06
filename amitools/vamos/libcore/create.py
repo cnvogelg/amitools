@@ -45,7 +45,7 @@ class LibCreator(object):
         )
         version = info.get_version()
         revision = info.get_revision()
-        library.new_lib(version=version, revision=revision, type=ltype)
+        library.new(version=version, revision=revision, type=ltype)
         return library
 
     def _generate_fake_fd(self, name, lib_cfg):

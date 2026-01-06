@@ -926,7 +926,7 @@ def main(args=None, defaults=None):
         "-v", "--verbose", action="store_true", default=False, help="be more verbose"
     )
     parser.add_argument(
-        "-s", "--seperator", default="+", help="set the command separator char sequence"
+        "-s", "--separator", default="+", help="set the command separator char sequence"
     )
     parser.add_argument(
         "-r",
@@ -947,7 +947,7 @@ def main(args=None, defaults=None):
     args = parser.parse_args(args)
 
     cmd_list = args.command_list
-    sep = args.seperator
+    sep = args.separator
     queue = FSCommandQueue(args, cmd_list, sep, cmd_map)
     code = queue.run()
     return code

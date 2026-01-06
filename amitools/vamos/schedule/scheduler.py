@@ -1,102 +1,298 @@
-from .task import Task
+from enum import IntEnum
+from dataclasses import dataclass
+import greenlet
+
+from amitools.vamos.log import log_schedule
+from amitools.vamos.schedule.task import TaskState, TaskBase
+
+
+@dataclass
+class SchedulerEvent:
+    class Type(IntEnum):
+        ACTIVE_TASK = 0
+        WAITING_TASK = 1
+        ADD_TASK = 2
+        REMOVE_TASK = 3
+        WAKE_UP_TASK = 4
+        READY_TASK = 5
+
+    type: Type
+    task: TaskBase
+
+
+@dataclass
+class SchedulerConfig:
+    slice_cycles: int = 1000
+
+    @classmethod
+    def from_cfg(cls, schedule_cfg):
+        return cls(schedule_cfg.slice_cycles)
 
 
 class Scheduler(object):
     """handle the execution of multiple tasks"""
 
-    def __init__(self, machine):
+    def __init__(self, machine, config=None):
+        if not config:
+            config = SchedulerConfig()
+        log_schedule.info("setup scheduler with %d slice cycles", config.slice_cycles)
         self.machine = machine
-        self.tasks = []
-        self.cb = None
-        self.main_task = None
-        self.fail_task = None
+        self.config = config
+        # state
+        self.ready_tasks = []
+        self.waiting_tasks = []
+        self.event_hooks = []
+        self.cur_task = None
+        self.num_tasks = 0
+        self.main_glet = greenlet.getcurrent()
+        self.num_switch_same = 0
+        self.num_switch_other = 0
+        self.running = False
+        
+        self.message_pump = None
+
+    @classmethod
+    def from_cfg(cls, machine, schedule_cfg):
+        cfg = SchedulerConfig.from_cfg(schedule_cfg)
+        return cls(machine, cfg)
 
     def get_machine(self):
         return self.machine
 
-    def set_cur_task_callback(self, cb):
-        self.cb = cb
+    def set_event_callback(self, func):
+        """the function will receive ScheduleEvent"""
+        self.event_hooks.append(func)
 
     def get_num_tasks(self):
-        return len(self.tasks)
+        """count the active tasks"""
+        total = len(self.ready_tasks) + len(self.waiting_tasks)
+    
+        if self.cur_task and \
+           self.cur_task not in self.ready_tasks and \
+           self.cur_task not in self.waiting_tasks:
+            total += 1
+    
+        return total
+
+
+    def get_cur_task(self):
+        return self.cur_task
 
     def schedule(self):
         """main work call for scheduler. at least one task must be added.
         terminates if there are no more tasks to schedule or if a task
-        failed.
-
-        return None or failed task
+        fails and an uncaught exception is thrown.
         """
-        if self.last_task is None:
-            raise RuntimeError("no task was added!")
-        return self.fail_task
+        log_schedule.info("schedule(): start")
+
+        # check that we have at least one task to run
+        if len(self.ready_tasks) == 0:
+            raise RuntimeError("no tasks to schedule!")
+
+        self.running = True
+
+        # report events for previously added tasks
+        if len(self.event_hooks) > 0:
+            for task in self.ready_tasks:
+                self._report_event(SchedulerEvent.Type.ADD_TASK, task)
+
+        # main loop
+        while True:
+            log_schedule.debug(
+                "schedule: current %s",
+                self.cur_task,
+            )
+            log_schedule.debug(
+                "schedule: ready %s waiting %s",
+                self.ready_tasks,
+                self.waiting_tasks,
+            )
+
+            # has the current task forbid state?
+            if self.cur_task and self.cur_task.is_forbidden():
+                log_schedule.debug("run: keep current (forbid state)")
+                task = self.cur_task
+            else:
+                # find a task to run
+                task = self._find_run_task()
+                if task is None:
+                    if self.message_pump == None:
+                        log_schedule.error("schedule(): no task to run?!")
+                        return False
+                    if self.message_pump():
+                        task = self.cur_task
+                    else:
+                        log_schedule.info("message_pump ended")
+                        return False
+
+            # current tasks stays the same?
+            # no context switch required. simply switch to it
+            if task == self.cur_task:
+                if self.message_pump and not self.message_pump():
+                    log_schedule.info("message_pump ended")
+                    return False
+                self.num_switch_same += 1
+                log_schedule.debug("run: current %s", task.name)
+                task.keep_scheduled()
+            else:
+                self.num_switch_other += 1
+                # switch out old
+                old_task = self.cur_task
+                if old_task:
+                    log_schedule.debug("run: switch out %s", old_task.name)
+                    # if cur task still running (not waiting)
+                    # then move it to ready list
+                    if old_task.get_state() == TaskState.TS_RUN:
+                        old_task.set_state(TaskState.TS_READY)
+                        self.ready_tasks.append(old_task)
+                        # report
+                        self._report_event(SchedulerEvent.Type.READY_TASK, old_task)
+
+                    old_task.save_ctx()
+
+                # switch in new
+                self.cur_task = task
+                self._make_current(task)
+                task.set_state(TaskState.TS_RUN)
+                log_schedule.debug("run: switch in %s", task.name)
+
+                task.restore_ctx()
+
+            # enter greenlet of task and resume it
+            task.switch()
+
+        # end of scheduling
+        self._make_current(None)
+        self.running = False
+
+        log_schedule.info(
+            "schedule(): done (switches: same=%d, other=%d)",
+            self.num_switch_same,
+            self.num_switch_other,
+        )
+        return True
+
+    def _find_run_task(self):
+        # if a ready task is available
+        if len(self.ready_tasks):
+            task = self.ready_tasks.pop(0)
+            log_schedule.debug("take: ready task %s", task.name)
+            return task
+
+        # keep current task
+        task = self.cur_task
+        log_schedule.debug("take: current task %s", task.name)
+        if task.get_state() in (TaskState.TS_READY, TaskState.TS_RUN):
+            return task
+
+    def _make_current(self, task):
+        self.cur_task = task
+        # report via event
+        self._report_event(SchedulerEvent.Type.ACTIVE_TASK, task)
+
+    def wait_task(self, task):
+        """set the given task into wait state"""
+        log_schedule.debug("wait_task: task %s", task.name)
+        self.waiting_tasks.append(task)
+        task.set_state(TaskState.TS_WAIT)
+        # report via event
+        self._report_event(SchedulerEvent.Type.WAITING_TASK, task)
+        self.reschedule()
+
+    def wake_up_task(self, task):
+        """take task from waiting list and allow him to schedule"""
+        
+        if task not in self.waiting_tasks:
+            return 
+        
+        log_schedule.debug("wake_up_task: task %s", task.name)
+        self.waiting_tasks.remove(task)
+        # add to front
+        self.ready_tasks.insert(0, task)
+        task.set_state(TaskState.TS_READY)
+        # report via event
+        self._report_event(SchedulerEvent.Type.WAKE_UP_TASK, task)
+        # directly reschedule
+        self.reschedule()
 
     def add_task(self, task):
         """add a new task and prepare for execution.
 
-        currently the task is also executed in place here.
-
         returns True if task was added
         """
-        self.tasks.append(task)
-        self.last_task = task
-        # prepare to run task
-        task.prepare_run(self)
-        # notify about current task
-        if self.cb:
-            self.cb(task)
-        # let the task run
-        self._execute(task, task.get_init_sp())
-        # update task stack
-        self.tasks.pop()
-        # done run
-        task.done_run(self)
-        # notify about now current task
-        if self.cb:
-            if len(self.tasks) > 0:
-                cur_task = self.tasks[-1]
-            else:
-                cur_task = None
-            self.cb(cur_task)
-        # return regs
+        self.ready_tasks.append(task)
+        task.set_state(TaskState.TS_ADDED)
+        # configure task
+        task.config(self, self.config.slice_cycles)
+        log_schedule.info("add_task: %s", task.name)
+        # report via event if running or postpone it
+        if self.running:
+            self._report_event(SchedulerEvent.Type.ADD_TASK, task)
         return True
 
     def rem_task(self, task):
-        raise NotImplementedError
+        """remove task"""
+        # ask task to stop immediately
+        log_schedule.info("remove_task: %s", task.name)
+        task.stop()
 
-    def run_sub_task(self, sub_task):
-        """run a given sub task in the context of the current task
+    def terminate_task(self, task):
+        """a task finally terminates
 
-        for now the sub task directly runs in the current task
-        and returns when its finished
-
-        returns return regs of sub task
+        it will be removed from the scheduler from the scheduler.
+        only be called from the task!
         """
-        if len(self.tasks) == 0:
-            raise ValueError("no tasks are running!")
-        # prepare run of sub task
-        sub_task.prepare_run(self)
-        # pack everything in a sub task
-        stack = sub_task.stack
-        if stack is None:
-            init_sp = None
+        # find task: is it current? removing myself...
+        if self.cur_task == task:
+            log_schedule.debug("terminate_task: cur_task %s", task.name)
+            self.cur_task = None
+        # in ready list?
+        elif task in self.ready_tasks:
+            log_schedule.debug("terminate_task: ready %s", task.name)
+            self.ready_tasks.remove(task)
+        # in waiting list?
+        elif task in self.waiting_tasks:
+            log_schedule.debug("terminate_task: waiting %s", task.name)
+            self.waiting_tasks.remove(task)
+        # not found
         else:
-            init_sp = stack.get_initial_sp()
-        self._execute(sub_task, init_sp)
-        # done run
-        sub_task.done_run(self)
-        return sub_task.get_run_state().regs
+            log_schedule.warning("terminate_task: unknown task %s", task.name)
+            return False
+        # mark as removed
+        task.set_state(TaskState.TS_REMOVED)
+        log_schedule.info("terminate_task: %s", task.name)
+        # report via event if running or suppress otherwise
+        if self.running:
+            self._report_event(SchedulerEvent.Type.REMOVE_TASK, task)
+        return True
 
-    def _execute(self, task, sp):
-        pc = task.get_init_pc()
-        run_state = self.machine.run(
-            pc,
-            sp,
-            set_regs=task.get_start_regs(),
-            get_regs=task.get_return_regs(),
-            name=task.get_name(),
-        )
-        task.run_state = run_state
-        if run_state.error:
-            # report error in schedule
-            self.fail_task = task
+    def _report_event(self, event, task):
+        if len(self.event_hooks) > 0:
+            log_schedule.debug("report event: %s -> %s", task, event.name)
+            event = SchedulerEvent(event, task)
+            for hook in self.event_hooks:
+                hook(event)
+
+    def reschedule(self):
+        """callback from tasks to reschedule"""
+        self.main_glet.switch()
+
+    def find_task(self, name):
+        def pred_func(task):
+            return task.name == name
+
+        return self.find_task_pred_func(pred_func)
+
+    def find_task_pred_func(self, pred_func):
+        """apply predicate function to each task and return match"""
+        # is it the current task?
+        if self.cur_task and pred_func(self.cur_task):
+            return self.cur_task
+        # check ready list
+        for task in self.ready_tasks:
+            if pred_func(task):
+                return task
+        # check wait list
+        for task in self.waiting_tasks:
+            if pred_func(task):
+                return task

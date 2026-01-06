@@ -173,7 +173,7 @@ class HunkLoadSegFile:
         if hdr_blk.blk_id != HUNK_HEADER:
             raise HunkParseError("no HEADER block found!")
         self.hdr_blk = hdr_blk
-        # first round: split block list into sections seperated by END
+        # first round: split block list into sections separated by END
         first = []
         cur = None
         for blk in blks[1:]:

@@ -11,7 +11,7 @@ from amitools.vamos.astructs import (
     CSTR,
     BPTR_VOID,
 )
-from amitools.vamos.machine import MockMemory
+from amitools.vamos.machine.mock import MockMemory
 
 
 @AmigaStructDef

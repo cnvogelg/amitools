@@ -15,7 +15,7 @@ def machine_disasm_default_test():
     def bla(opcode, pc):
         pass
 
-    tid = traps.setup(bla)
+    tid = traps.alloc(bla)
     mem.w16(2, 0xA000 | tid)
     assert disasm.disassemble(2) == (2, "PyTrap  #$%03x ; bla" % tid)
     traps.free(tid)

@@ -1,4 +1,4 @@
-from amitools.vamos.machine import MockMemory
+from amitools.vamos.machine.mock import MockMemory
 from amitools.vamos.libnative import MakeFuncs
 from amitools.vamos.machine.opcodes import op_jmp
 

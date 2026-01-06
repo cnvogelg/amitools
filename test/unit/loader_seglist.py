@@ -1,5 +1,5 @@
 from amitools.vamos.loader import SegList
-from amitools.vamos.machine import MockMemory
+from amitools.vamos.machine.mock import MockMemory
 from amitools.vamos.mem import MemoryAlloc
 
 

@@ -1,4 +1,4 @@
-FROM debian:10 AS builder
+FROM debian:stable AS builder
 
 RUN apt-get update && \
   apt-get install -y build-essential wget lhasa
@@ -20,9 +20,8 @@ RUN cd vlink && make
 RUN cp vlink/vlink /opt/vbcc/bin/
 
 # vbcc
-RUN wget http://server.owl.de/~frank/tags/vbcc0_9g.tar.gz
-RUN tar xvfz vbcc0_9g.tar.gz
-RUN mkdir vbcc/bin
+RUN wget http://server.owl.de/~frank/tags/vbcc0_9hP3.tar.gz
+RUN tar xvfz vbcc0_9hP3.tar.gz
 RUN cd vbcc && printf 'y\ny\nsigned char\ny\nunsigned char\nn\ny\nsigned short\nn\ny\nunsigned short\nn\ny\nsigned int\nn\ny\nunsigned int\nn\ny\nsigned long long\nn\ny\nunsigned long long\nn\ny\nfloat\nn\ny\ndouble\n' | make TARGET=m68k
 RUN cd vbcc && printf 'y\ny\nsigned char\ny\nunsigned char\nn\ny\nsigned short\nn\ny\nunsigned short\nn\ny\nsigned int\nn\ny\nunsigned int\nn\ny\nsigned long long\nn\ny\nunsigned long long\nn\ny\nfloat\nn\ny\ndouble\n' | make TARGET=m68ks
 RUN rm vbcc/bin/dtgen
@@ -30,8 +29,8 @@ RUN cp vbcc/bin/* /opt/vbcc/bin/
 
 # vbcc targets
 RUN mkdir /opt/vbcc/targets
-RUN wget http://server.owl.de/~frank/vbcc/2017-08-14/vbcc_target_m68k-amigaos.lha
-RUN wget http://server.owl.de/~frank/vbcc/2017-08-14/vbcc_target_m68k-kick13.lha
+RUN wget http://phoenix.owl.de/vbcc/current/vbcc_target_m68k-amigaos.lha
+RUN wget http://phoenix.owl.de/vbcc/current/vbcc_target_m68k-kick13.lha
 RUN lha x vbcc_target_m68k-amigaos.lha
 RUN lha x vbcc_target_m68k-kick13.lha
 RUN cp -a vbcc_target_m68k-amigaos/targets/* /opt/vbcc/targets/
@@ -46,16 +45,16 @@ RUN cp config/aos* config/kick* /opt/vbcc/config/
 RUN find /opt/vbcc/config -type f -exec chmod 644 {} \;
 
 # ndk
-RUN wget http://www.haage-partner.de/download/AmigaOS/NDK39.lha
-RUN lha x NDK39.lha
+RUN wget https://aminet.net/dev/misc/NDK3.2.lha
+RUN lha x NDK3.2.lha
 RUN mkdir -p /opt/vbcc/ndk/include
-RUN cp -a NDK_3.9/Include/include_h/* /opt/vbcc/ndk/include/
+RUN cp -a Include_H/* /opt/vbcc/ndk/include/
 RUN find /opt/vbcc/ndk/include -type f -exec chmod 644 {} \;
 RUN cd /opt/vbcc/targets/m68k-amigaos/include && for a in /opt/vbcc/ndk/include/* ; do ln -s $a ; done
 RUN cd /opt/vbcc/targets/m68k-kick13/include && for a in /opt/vbcc/ndk/include/* ; do ln -s $a ; done
 
 # runtime
-FROM debian:10
+FROM debian:stable
 
 RUN apt-get update && \
   apt-get install -y make

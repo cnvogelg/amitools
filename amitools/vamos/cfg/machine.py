@@ -3,6 +3,11 @@ from amitools.vamos.cfgcore import *
 
 class MachineParser(Parser):
     def __init__(self, ini_prefix=None):
+        backend_keys = (
+            "name",
+            "host",
+            "port",
+        )
         cpus = (
             "68000",
             "68020",
@@ -18,12 +23,31 @@ class MachineParser(Parser):
             "40",
         )
         hw_access = ("emu", "ignore", "abort", "disable")
+        hw_exc_names = (
+            "bus",
+            "address",
+            "illegal",
+            "zero_div",
+            "chk",
+            "trapv",
+            "priv",
+            "trace",
+            "line_a",
+            "line_f",
+            "irqs",
+            "traps",
+        )
+        hw_exc_modes = ("ignore", "log", "abort")
         def_cfg = {
             "machine": {
+                "backend": ValueDict(str, valid_keys=backend_keys),
                 "cpu": Value(str, "68000", enum=cpus),
-                "max_cycles": 0,
-                "cycles_per_run": 1000,
                 "ram_size": 1024,
+                "hw_exc": ValueDict(
+                    str,
+                    valid_keys=hw_exc_names,
+                    enum=hw_exc_modes,
+                ),
             },
             "memmap": {
                 "hw_access": Value(str, "emu", enum=hw_access),
@@ -32,23 +56,17 @@ class MachineParser(Parser):
         }
         arg_cfg = {
             "machine": {
+                "backend": Argument(
+                    "-b",
+                    "--backend",
+                    action="store",
+                    help="Set machine emulation backend",
+                ),
                 "cpu": Argument(
                     "-C",
                     "--cpu",
                     action="store",
                     help="Set type of CPU to emulate (68000, 68020 or 68040)",
-                ),
-                "max_cycles": Argument(
-                    "--max-cycles",
-                    action="store",
-                    type=int,
-                    help="maximum number of cycles to execute",
-                ),
-                "cycles_per_run": Argument(
-                    "--cycles-per-block",
-                    action="store",
-                    type=int,
-                    help="cycles per block",
                 ),
                 "ram_size": Argument(
                     "-m",
@@ -56,6 +74,12 @@ class MachineParser(Parser):
                     action="store",
                     type=int,
                     help="set RAM size in KiB",
+                ),
+                "hw_exc": Argument(
+                    "-e",
+                    "--hw-exception",
+                    action="store",
+                    help="Set CPU HW Exception handling",
                 ),
             },
             "memmap": {
@@ -74,10 +98,10 @@ class MachineParser(Parser):
         }
         ini_trafo = {
             "machine": {
+                "backend": "backend",
                 "cpu": "cpu",
-                "max_cycles": "max_cycles",
-                "cycles_per_run": "cycles_per_run",
                 "ram_size": "ram_size",
+                "hw_exc": "hw_exc",
             },
             "memmap": {"hw_access": "hw_access", "old_dos_guard": "old_dos_guard"},
         }

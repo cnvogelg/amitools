@@ -1,8 +1,7 @@
 from amitools.vamos.libtypes import Library, ExecLibrary
 from amitools.vamos.libstructs import LibFlags, NodeType
 from amitools.vamos.loader import SegList
-from amitools.vamos.machine.regs import *
-from amitools.vamos.machine.opcodes import op_jmp
+from amitools.vamos.machine import Code, op_jmp, REG_A6, REG_D0
 
 
 class LibFuncs(object):
@@ -10,10 +9,10 @@ class LibFuncs(object):
     LVO_Close = 2
     LVO_Expunge = 3
 
-    def __init__(self, machine, alloc):
-        self.machine = machine
-        self.mem = machine.get_mem()
+    def __init__(self, mem, alloc, runner):
+        self.mem = mem
         self.alloc = alloc
+        self.runner = runner
 
     def find_library(self, lib_name, exec_lib=None):
         """find lib by name and return base addr or 0"""
@@ -94,7 +93,6 @@ class LibFuncs(object):
         set_regs = {REG_A6: lib_base}
         get_regs = [REG_D0]
         # run machine and share current sp if none is given
-        rs = self.machine.run(
-            func_addr, sp=run_sp, set_regs=set_regs, get_regs=get_regs, name=name
-        )
+        code = Code(func_addr, run_sp, set_regs, get_regs)
+        rs = self.runner(code)
         return rs.regs[REG_D0]

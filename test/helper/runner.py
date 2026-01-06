@@ -6,11 +6,18 @@ import subprocess
 import hashlib
 import io
 import importlib
+import time
+
+try:
+    import ptyprocess
+except ImportError:
+    ptyprocess = None
+
 from .builder import BinBuilder
 from amitools.vamos.main import main as vamos_main
 
 
-def run_proc(args, stdin_str=None, raw_output=False):
+def run_proc(args, stdin_str=None, raw_output=False, use_pty=False):
     if stdin_str:
         stdin_bytes = stdin_str.encode("latin-1")
         stdin_flag = subprocess.PIPE
@@ -18,16 +25,38 @@ def run_proc(args, stdin_str=None, raw_output=False):
         stdin_bytes = None
         stdin_flag = None
 
-    p = subprocess.Popen(
-        args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_flag
-    )
-    (stdout, stderr) = p.communicate(stdin_bytes)
+    if use_pty:
+        p = ptyprocess.PtyProcess.spawn(args)
+
+        # expect a line
+        stdout = p.readline()
+
+        # write response
+        if stdin_bytes:
+            time.sleep(0.01)
+            p.write(stdin_bytes)
+
+        # read remaining lines
+        while True:
+            try:
+                stdout += p.readline()
+            except EOFError:
+                break
+
+        returncode = p.wait()
+        stderr = None
+    else:
+        p = subprocess.Popen(
+            args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_flag
+        )
+        (stdout, stderr) = p.communicate(stdin_bytes)
+        returncode = p.returncode
 
     # process stdout
     if not raw_output:
         stdout = stdout.decode("latin-1").splitlines()
-        stderr = stderr.decode("latin-1").splitlines()
-    returncode = p.returncode
+        if stderr:
+            stderr = stderr.decode("latin-1").splitlines()
     return returncode, stdout, stderr
 
 
@@ -135,16 +164,10 @@ class VamosTestRunner:
         self.make_prog(prog_args[0])
 
         # stdin given?
-        if "stdin" in kw_args:
-            stdin = kw_args["stdin"]
-        else:
-            stdin = None
+        stdin = kw_args.get("stdin", None)
 
         # timestamps?
-        if "no_ts" in kw_args:
-            no_ts = kw_args["no_ts"]
-        else:
-            no_ts = True
+        no_ts = kw_args.get("no_ts", True)
 
         # run vamos with prog
         args = [self.vamos_bin] + self.vamos_args
@@ -152,6 +175,17 @@ class VamosTestRunner:
             args.append("--no-ts")
         if "vargs" in kw_args:
             args = args + kw_args["vargs"]
+
+        run_subproc = self.run_subproc
+
+        # pty?
+        use_pty = kw_args.get("use_pty", False)
+        if use_pty:
+            if not ptyprocess:
+                raise NotImplementedError(
+                    "No pty support since ptyprocess module is missing"
+                )
+            run_subproc = True
 
         # terminate args
         args.append("--")
@@ -164,8 +198,12 @@ class VamosTestRunner:
 
         # run and get stdout/stderr
         print("running:", " ".join(args))
-        if self.run_subproc:
-            returncode, stdout, stderr = run_proc(args, stdin)
+        if run_subproc:
+            returncode, stdout, stderr = run_proc(
+                args,
+                stdin,
+                use_pty=use_pty,
+            )
         else:
 
             def run(args):

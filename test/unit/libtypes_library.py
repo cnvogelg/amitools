@@ -25,7 +25,7 @@ def libtypes_library_base_test(mem_alloc):
     pri = -3
     ver = 1
     rev = 2
-    lib.new_lib(version=ver, revision=rev, pri=pri, flags=flags, type=ltype)
+    lib.new(version=ver, revision=rev, pri=pri, flags=flags, type=ltype)
     # check lib
     node = lib.node
     assert node.succ.ref is None

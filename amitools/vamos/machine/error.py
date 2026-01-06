@@ -2,28 +2,80 @@ import sys
 import traceback
 
 from amitools.vamos.log import log_machine
-from amitools.vamos.error import *
+from amitools.vamos.error import VamosError
 from .cpustate import CPUState
+
+
+class MachineError(VamosError):
+    def __init__(self, pc, sp):
+        self.pc = pc
+        self.sp = sp
+
+    def __str__(self):
+        return f"Machine Error (pc={self.pc}, sp={self.sp})"
+
+
+class InvalidMemoryAccessError(MachineError):
+    def __init__(self, pc, sp, mode, width, addr):
+        super().__init__(pc, sp)
+        self.mode = mode
+        self.width = width
+        self.addr = addr
+
+    def __str__(self):
+        return "Invalid Memory Access (pc=%06x, sp=%06x) %s(%d) @%06x" % (
+            self.pc,
+            self.sp,
+            self.mode,
+            2**self.width,
+            self.addr,
+        )
+
+
+class CPUHWExceptionError(MachineError):
+    def __init__(self, pc, sp, sr, exc_num):
+        super().__init__(pc, sp)
+        self.sr = sr
+        self.exc_num = exc_num
+
+    def __str__(self):
+        return "CPU HW (pc=%06x, sp=%06x) sr=%04x exc_num=%02x" % (
+            self.pc,
+            self.sp,
+            self.sr,
+            self.exc_num,
+        )
+
+
+class ResetOpcodeError(MachineError):
+    def __init__(self, pc, sp):
+        super().__init__(pc, sp)
+
+    def __str__(self):
+        return f"Reset Opcode (pc={self.pc}, sp={self.sp})"
 
 
 class ErrorReporter:
     def __init__(self, machine):
         self.machine = machine
-        self.cpu = machine.get_cpu()
-        self.mem = machine.get_mem()
-        self.label_mgr = machine.get_label_mgr()
+        self.cpu = self.machine.get_cpu()
+        self.mem = self.machine.get_mem()
+        self.label_mgr = self.machine.get_label_mgr()
 
-    def report_error(self, error):
-        # get run nesting
-        nesting = self.machine.get_run_nesting()
-        log_machine.error("----- ERROR in CPU Run #%d -----", nesting)
-        self._log_run_state()
+    def report_error(self, error, run_state=None):
+        log_machine.error("----- CPU HW Exception: %s -----", error)
+        if run_state:
+            log_machine.error(
+                "Run '%s' nesting #%d ", run_state.name, run_state.nesting
+            )
+            self._log_run_state(run_state)
         self._log_mem_info(error)
         self._log_cpu_state()
-        self._log_exc(error)
+        self._log_python_exc(error)
 
-    def _log_exc(self, error):
+    def _log_python_exc(self, error):
         # show traceback if exception is pending
+        log_machine.error("--- Python Traceback Begin ---")
         if sys.exc_info()[0]:
             lines = traceback.format_exc().split("\n")
             for line in lines:
@@ -32,10 +84,10 @@ class ErrorReporter:
         else:
             etype = error.__class__.__name__
             log_machine.error("%s: %s", etype, error)
+        log_machine.error("--- Python Traceback End ---")
 
-    def _log_run_state(self):
+    def _log_run_state(self, run_state):
         # get current run_state
-        run_state = self.machine.get_cur_run_state()
         log_machine.error(
             "Run: '%s': Initial PC=%06x, SP=%06x",
             run_state.name,

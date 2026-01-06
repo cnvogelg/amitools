@@ -2,6 +2,7 @@ import logging
 from amitools.vamos.trace import TraceManager
 from amitools.vamos.label import *
 from amitools.vamos.machine import *
+from amitools.vamos.machine.mock import MockMachine
 from amitools.vamos.libstructs import NodeStruct, LibraryStruct
 from amitools.vamos.cfgcore import ConfigDict
 from amitools.fd import read_lib_fd
@@ -61,12 +62,12 @@ def check_log(chn, records):
         (
             chn,
             lvl,
-            "R(2): 0003dc: 0000        JUMP  [@0003b8 +000024 vamostest.library] -36  [6]  PrintString( str/a0 )",
+            "R(2): 0003dc: 0000        JUMP  [@0003ac +000030 vamostest.library] -36  [6]  PrintString( str/a0 )",
         ),
         (
             chn,
             lvl,
-            "R(2): 000420: 0000      Struct  [@0003b8 +000068 vamostest.library] Library+32 = lib_OpenCnt(UWORD)+0",
+            "R(2): 000420: 0000      Struct  [@0003ac +000074 vamostest.library] Library+32 = lib_OpenCnt(UWORD)+0",
         ),
     ]
 
@@ -160,6 +161,6 @@ def trace_mgr_code_line_test(caplog):
         (
             "instr",
             lvl,
-            "@0003b8 +000024 vamostest.library(-36)    0003dc    nop                   ; PrintString",
+            "@0003ac +000030 vamostest.library(-36)    0003dc    nop                   ; PrintString",
         ),
     ]

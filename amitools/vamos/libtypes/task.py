@@ -1,5 +1,6 @@
 from amitools.vamos.libstructs import TaskStruct, NodeType, TaskState
 from amitools.vamos.astructs import AmigaClassDef
+from amitools.vamos.libtypes.process import Process
 
 
 @AmigaClassDef
@@ -11,4 +12,13 @@ class Task(TaskStruct):
 
         self.flags.val = flags
         self.state.val = TaskState.TS_INVALID
-        self.mem_entry.new_list(NodeType.NT_MEMORY)
+        self.mem_entry.new(NodeType.NT_MEMORY)
+        self.sig_alloc.val = 0xFFFF
+
+    def promote_type(self):
+        """promote task to process if type is set accordingly"""
+        node_type = self.node.type.get()
+        if node_type == NodeType.NT_PROCESS:
+            return self.clone(Process)
+        else:
+            return self

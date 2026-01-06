@@ -1,6 +1,6 @@
 import pytest
 from amitools.vamos.libcore import LibJumpTable, NoJumpTableEntryError
-from amitools.vamos.machine import MockMachine
+from amitools.vamos.machine.mock import MockMachine
 from amitools.fd import read_lib_fd
 
 

@@ -24,7 +24,11 @@ class BitField:
 
     @classmethod
     def to_str(cls, val, check=True):
-        return "|".join(cls.to_strs(val, check))
+        names = "|".join(cls.to_strs(val, check))
+        if len(names) > 0:
+            return f"{names} ({val}/b{val:b})"
+        else:
+            return f"({val}/b{val:b})"
 
     @classmethod
     def from_strs(cls, *args):
@@ -70,7 +74,7 @@ class BitField:
         return self.to_str(self.get(), False)
 
     def __repr__(self):
-        return "%s('%s')" % (self.__class__.__name__, str(self))
+        return "%s(%s)" % (self.__class__.__name__, str(self))
 
     def has_bits(self, what):
         bmask = self._get_bit_mask(what)

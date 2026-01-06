@@ -9,5 +9,5 @@ def dos_seek_test(vamos, tmpdir):
     assert stdout == [
         "old_pos=14, io_err=0, num_read=5, buf='Hello'",
         "old_pos=5, io_err=0, num_read=5, buf='rld!?'",
-        "old_pos=14, io_err=219",
+        "old_pos=-1, io_err=219",
     ]

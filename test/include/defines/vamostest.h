@@ -1,4 +1,4 @@
-/* Automatically generated header (sfdc 1.11)! Do not edit! */
+/* Automatically generated header (sfdc 1.12)! Do not edit! */
 
 #ifndef _INLINE_VAMOSTEST_H
 #define _INLINE_VAMOSTEST_H
@@ -57,5 +57,16 @@ typedef ULONG _sfdc_vararg;
  AROS_LCA(ULONG, (___argc), D0), \
  AROS_LCA(STRPTR *, (___argv), A0), \
      struct VamosTestBase *, VAMOSTEST_BASE_NAME, 11, Vamostest)
+
+#define MyFindTagData(___tagVal, ___tagList) \
+      AROS_LC2(ULONG, MyFindTagData, \
+ AROS_LCA(ULONG, (___tagVal), D0), \
+ AROS_LCA(CONST struct TagItem *, (___tagList), A0), \
+     struct VamosTestBase *, VAMOSTEST_BASE_NAME, 12, Vamostest)
+
+#ifndef NO_INLINE_STDARG
+#define MyFindTagDataTags(___tagVal, ___tagList, ...) \
+    ({_sfdc_vararg _tags[] = { ___tagList, __VA_ARGS__ }; MyFindTagData((___tagVal), (CONST struct TagItem *) _tags); })
+#endif /* !NO_INLINE_STDARG */
 
 #endif /* !_INLINE_VAMOSTEST_H */

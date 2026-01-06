@@ -3,29 +3,6 @@ class VamosError(Exception):
         return "VamosError"
 
 
-class InvalidMemoryAccessError(VamosError):
-    def __init__(self, access_type, width, addr):
-        self.access_type = access_type
-        self.width = width
-        self.addr = addr
-
-    def __str__(self):
-        return "Invalid Memory Access %s(%d): %06x" % (
-            self.access_type,
-            2**self.width,
-            self.addr,
-        )
-
-
-class InvalidCPUStateError(VamosError):
-    def __init__(self, pc, what):
-        self.pc = pc
-        self.what = what
-
-    def __str__(self):
-        return "Invalid CPU State: pc=%06x: %s" % (self.pc, self.what)
-
-
 class NestedCPURunError(VamosError):
     def __init__(self, pc, error):
         self.pc = pc

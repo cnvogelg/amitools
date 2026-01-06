@@ -2,14 +2,19 @@ import pytest
 
 from amitools.vamos.libcore import LibCtx, LibProxyGen
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
-from amitools.vamos.machine import MockMachine
+from amitools.vamos.machine.mock import MockMachine
+from amitools.vamos.machine import Runtime
+from amitools.vamos.mem import MemoryAlloc
 from amitools.fd import read_lib_fd
 from amitools.vamos.machine.regs import *
+from amitools.vamos.libtypes import TagList
 
 
 def _create_ctx():
     machine = MockMachine()
-    return LibCtx(machine)
+    runtime = Runtime(machine)
+    alloc = MemoryAlloc.for_machine(machine)
+    return LibCtx(machine, runtime.run, alloc)
 
 
 def _create_fd():
@@ -27,36 +32,49 @@ class MyStub:
         self.string_count = 0
         self.string_kwargs = None
         self.string_reg_a0 = None
+        self.tag_val = None
+        self.tag_list = None
+        self.tag_data = None
 
     def PrintHello(self, **kwargs):
         self.hello_count += 1
         self.hello_kwargs = kwargs
         self.ctx.cpu.w_reg(REG_D0, self.hello_count)
+        return self.hello_count
 
     def PrintString(self, **kwargs):
         self.string_count += 1
         self.string_kwargs = kwargs
         self.string_reg_a0 = self.ctx.cpu.r_reg(REG_A0)
+        self.string_txt = self.ctx.mem.r_cstr(self.string_reg_a0)
         self.ctx.cpu.w_reg(REG_D0, self.string_count)
         self.ctx.cpu.w_reg(REG_D1, 2 * self.string_count)
+        return (self.string_count, 2 * self.string_count)
+
+    def MyFindTagData(self, **kwwargs):
+        print("HALLO")
+        self.tag_val = self.ctx.cpu.r_reg(REG_D0)
+        self.tag_list = self.ctx.cpu.r_reg(REG_A0)
+        tag_list = TagList(mem=self.ctx.mem, addr=self.tag_list)
+        result = 0
+        for tag in tag_list:
+            if tag.get_tag() == self.tag_val:
+                result = tag.get_data()
+        self.tag_data = result
+        self.ctx.cpu.w_reg(REG_D0, result)
+        return result
 
 
-class MyMachine:
+class MyRuntime:
     def __init__(self):
-        self.pc = None
-        self.sp = None
-        self.set_regs = None
-        self.get_regs = None
+        self.code = None
         self.name = None
         self.regs = None
 
-    def run(self, pc, sp=None, set_regs=None, get_regs=None, name=None):
-        self.pc = pc
-        self.sp = sp
-        self.set_regs = set_regs
-        self.get_regs = get_regs
+    def run(self, code, name=None):
+        self.code = code
         self.name = name
-        if len(get_regs) == 2:
+        if len(code.get_regs) == 2:
             self.regs = {REG_D0: 23, REG_D1: 42}
         else:
             self.regs = {REG_D0: 11}
@@ -90,20 +108,31 @@ def libcore_proxy_gen_stub_test():
     assert stub.hello_kwargs == {"what": "why"}
     assert ctx.cpu.r_reg(REG_D0) == stub.hello_count
     # call string
+    ctx.mem.w_cstr(0x10, "hello, world!")
     assert stub.string_count == 0
     ret = proxy.PrintString(0x10, ret_d1=True)
     assert ret == (1, 2)
     assert stub.string_count == 1
     assert stub.string_reg_a0 == 0x10
+    assert stub.string_txt == "hello, world!"
     assert ctx.cpu.r_reg(REG_D0) == stub.string_count
     assert ctx.cpu.r_reg(REG_D1) == stub.string_count * 2
     # call string with kwargs
+    ctx.mem.w_cstr(0x20, "hi!")
     assert stub.string_count == 1
     ret = proxy.PrintString(0x20, ret_d1=True, foo="bar")
     assert ret == (2, 4)
     assert stub.string_count == 2
     assert stub.string_reg_a0 == 0x20
+    assert stub.string_txt == "hi!"
     assert stub.string_kwargs == {"foo": "bar"}
+    assert ctx.cpu.r_reg(REG_D0) == stub.string_count
+    assert ctx.cpu.r_reg(REG_D1) == stub.string_count * 2
+    # call string stub with auto allocated string
+    ret = proxy.PrintString("hoho!", ret_d1=True)
+    assert ret == (3, 6)
+    assert stub.string_count == 3
+    assert stub.string_txt == "hoho!"
     assert ctx.cpu.r_reg(REG_D0) == stub.string_count
     assert ctx.cpu.r_reg(REG_D1) == stub.string_count * 2
     # ensure that positional arguments are here
@@ -112,11 +141,17 @@ def libcore_proxy_gen_stub_test():
     with pytest.raises(AssertionError):
         proxy.PrintString(1, 2)
 
+    # call with in-place tag list
+    ret = proxy.MyFindTagData(101, [(100, 23), (101, 42), (102, "hello")])
+    assert ret == 42
+    assert stub.tag_val == 101
+    assert stub.tag_data == 42
+
 
 def libcore_proxy_gen_libcall_test():
-    machine = MyMachine()
+    runtime = MyRuntime()
     ctx = _create_ctx()
-    ctx.machine = machine
+    ctx.runner = runtime.run
     lib_fd = _create_fd()
     gen = LibProxyGen()
     base_addr = 0x1000
@@ -131,13 +166,13 @@ def libcore_proxy_gen_libcall_test():
     # call hello
     ret = proxy.PrintHello()
     assert ret == 11
-    assert machine.set_regs == {}
-    assert machine.get_regs == [REG_D0]
+    assert runtime.code.set_regs == {}
+    assert runtime.code.get_regs == [REG_D0]
     # call string
     ret = proxy.PrintString(0x10, ret_d1=True)
     assert ret == (23, 42)
-    assert machine.set_regs == {REG_A0: 0x10}
-    assert machine.get_regs == [REG_D0, REG_D1]
+    assert runtime.code.set_regs == {REG_A0: 0x10}
+    assert runtime.code.get_regs == [REG_D0, REG_D1]
     # ensure that positional arguments are here
     with pytest.raises(AssertionError):
         proxy.PrintString()

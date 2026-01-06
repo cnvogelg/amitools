@@ -209,7 +209,12 @@ class ADFSDir(ADFSNode):
         # dircache: create record for this node
         if self.volume.is_dircache:
             ok = self._dircache_add_entry(
-                name, meta_info, new_blk, node.get_size(), update_myself=False
+                name,
+                meta_info,
+                new_blk,
+                node.get_size(),
+                update_myself=False,
+                sub_type=Block.ST_USERDIR if node.is_dir() else Block.ST_FILE,
             )
             if not ok:
                 self.delete()
@@ -416,14 +421,22 @@ class ADFSDir(ADFSNode):
 
     # ----- dir cache -----
 
-    def _dircache_add_entry(self, name, meta_info, entry_blk, size, update_myself=True):
+    def _dircache_add_entry(
+        self, name, meta_info, entry_blk, size, update_myself=True, sub_type=0
+    ):
+        if not Block._is_valid_subtype(sub_type):
+            raise FSError(
+                UNSUPPORTED_DIR_BLOCK,
+                block=entry_blk,
+                extra="Sub_Type: %08x" % sub_type,
+            )
         # create a new dircache record
         r = DirCacheRecord(
             entry=entry_blk,
             size=size,
             protect=meta_info.get_protect(),
             mod_ts=meta_info.get_mod_ts(),
-            sub_type=0,
+            sub_type=sub_type,
             name=name,
             comment=meta_info.get_comment(),
         )

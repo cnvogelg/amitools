@@ -1,5 +1,5 @@
 import pytest
-from amitools.vamos.machine import MockMemory
+from amitools.vamos.machine.mock import MockMemory
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.libtypes import MsgPort, Message
 from amitools.vamos.libstructs import MsgPortFlags, NodeType
@@ -11,7 +11,7 @@ def libtypes_msg_msgport_test():
     # alloc msg port
     mp1 = MsgPort.alloc(alloc)
     assert mp1.name.aptr == 0
-    mp1.new_port(pri=-5, flags=MsgPortFlags.PA_SOFTINT, sig_bit=5)
+    mp1.new(pri=-5, flags=MsgPortFlags.PA_SOFTINT, sig_bit=5)
     assert mp1.node.pri.val == -5
     assert mp1.node.type.val == NodeType.NT_MSGPORT
     assert mp1.flags.val == MsgPortFlags.PA_SOFTINT
@@ -33,7 +33,7 @@ def libtypes_msg_msg_test():
     # alloc msg
     msg = Message.alloc(alloc)
     assert msg.name.aptr == 0
-    msg.new_msg(pri=-7, length=10)
+    msg.new(pri=-7, length=10)
     assert msg.pri.val == -7
     assert msg.type.val == NodeType.NT_MESSAGE
     assert msg.length.val == 10

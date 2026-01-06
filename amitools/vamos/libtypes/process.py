@@ -16,5 +16,5 @@ class CLI(CLIStruct):
 class Process(ProcessStruct):
     def new_proc(self):
         self.task.new_task(nt=NodeType.NT_PROCESS)
-        self.msg_port.new_port()
-        self.local_vars.new_list()
+        self.msg_port.new()
+        self.local_vars.new()

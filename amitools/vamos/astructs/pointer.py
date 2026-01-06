@@ -5,7 +5,10 @@ class VOID(TypeBase):
     """A VOID instance only holds the address where the void exists."""
 
     def __repr__(self):
-        return "VOID(addr={})".format(self._addr)
+        return f"VOID(addr={self._addr:08x})"
+
+    def __str__(self):
+        return "VOID"
 
 
 class PointerType(TypeBase):
@@ -20,11 +23,16 @@ class PointerType(TypeBase):
     def get_signature(cls):
         return "{}*".format(cls._ref_type.get_signature())
 
-    def __init__(self, mem=None, addr=None, cpu=None, reg=None, **kwargs):
+    def __init__(
+        self, mem=None, addr=None, cpu=None, reg=None, ref=None, ref_addr=0, **kwargs
+    ):
         """create pointer type with referenced object"""
         super(PointerType, self).__init__(mem, addr, cpu, reg, **kwargs)
-        self._ref = None
-        self._ref_addr = None
+        self._ref = ref
+        if ref:
+            self._ref_addr = ref.get_addr()
+        else:
+            self._ref_addr = ref_addr
 
     def setup(self, val, alloc=None, free_refs=None):
         if val is None:
@@ -67,7 +75,9 @@ class PointerType(TypeBase):
         if not ref:
             self._ref_addr = 0
         else:
-            assert isinstance(ref, self._ref_type)
+            # ignore VOID
+            if not issubclass(self._ref_type, VOID):
+                assert isinstance(ref, self._ref_type)
             self._ref_addr = ref.get_addr()
         self._write_pointer(self._ref_addr)
 
@@ -88,8 +98,11 @@ class PointerType(TypeBase):
     def _read_pointer(self):
         if self._addr is not None:
             store_addr = self._mem.r32(self._addr)
-        else:
+        elif self._reg is not None:
             store_addr = self._cpu.r_reg(self._reg)
+        else:
+            # fake read for unbound pointer (re-use value)
+            store_addr = self._ref_to_store_addr(self._ref_addr)
         ref_addr = self._store_to_ref_addr(store_addr)
         return ref_addr
 
@@ -97,8 +110,11 @@ class PointerType(TypeBase):
         store_addr = self._ref_to_store_addr(ref_addr)
         if self._addr is not None:
             self._mem.w32(self._addr, store_addr)
-        else:
+        elif self._reg is not None:
             self._cpu.w_reg(self._reg, store_addr)
+        else:
+            # fake write for unbound pointers (set value)
+            self._ref_addr = ref_addr
 
     def __repr__(self):
         return "{}(ref={}, addr={})".format(
@@ -106,7 +122,17 @@ class PointerType(TypeBase):
         )
 
     def __str__(self):
-        return str(self.get_ref())
+        ref = self.get_ref()
+        addr = self.get_ref_addr()
+        if ref:
+            # if ref is invalid then catch memory error
+            # e.g. CSTR in Node is used for non-string data
+            try:
+                return f"@({addr:08x}):{ref}"
+            except:
+                return f"@({addr:08x}):???"
+        else:
+            return "@NULL"
 
     def __int__(self):
         return self.get_ref_addr()
@@ -164,6 +190,16 @@ class BCPLPointerType(PointerType):
     def set(self, val):
         self.set_ref_baddr(val)
 
+    def __str__(self):
+        ref = self.get_ref()
+        addr = self.get_ref_addr()
+        baddr = self.get_ref_baddr()
+        if ref:
+            return f"#({baddr:08x}/{addr:08x}):{ref}"
+        else:
+            return "#ZERO"
+        return str(self.get_ref())
+
     def __int__(self):
         return self.get_ref_baddr()
 
@@ -195,6 +231,15 @@ def APTR(ref_type):
         return new_type
 
 
+def make_aptr(ref_obj, **kw_args):
+    """create a pointer instance in memory or as reg around given object"""
+    ref_type = type(ref_obj)
+    aptr_type = APTR(ref_type)
+    ptr_obj = aptr_type(**kw_args)
+    ptr_obj.ref = ref_obj
+    return ptr_obj
+
+
 # pointer type cache
 BPTRTypes = {}
 
@@ -208,6 +253,15 @@ def BPTR(ref_type):
         new_type = type(name, (BCPLPointerType,), dict(_ref_type=ref_type))
         BPTRTypes[name] = new_type
         return new_type
+
+
+def make_bptr(ref_obj, **kw_args):
+    """create a pointer instance in memory or as reg around given object"""
+    ref_type = type(ref_obj)
+    bptr_type = BPTR(ref_type)
+    ptr_obj = bptr_type(**kw_args)
+    ptr_obj.ref = ref_obj
+    return ptr_obj
 
 
 APTR_VOID = APTR(VOID)

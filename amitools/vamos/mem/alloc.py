@@ -286,6 +286,9 @@ class MemoryAlloc:
 
     def dump_orphans(self):
         last = self.free_first
+        if last is None:
+            log_mem_alloc.warning("orphan: free list is empty")
+            return
         # orphan at begin?
         if last.addr != self.addr:
             addr = self.addr

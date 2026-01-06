@@ -139,18 +139,16 @@ ReadPixelArray8(rp,xstart,ystart,xstop,ystop,array,temprp)(a0,d0/d1/d2/d3/a2,a1)
 WritePixelArray8(rp,xstart,ystart,xstop,ystop,array,temprp)(a0,d0/d1/d2/d3/a2,a1)
 GetVPModeID(vp)(a0)
 ModeNotAvailable(modeID)(d0)
-##private
-graphicsPrivate6()()
-##public
+WeighTAMatch(reqTextAttr,targetTextAttr,targetTags)(a0/a1/a2)
 EraseRect(rp,xMin,yMin,xMax,yMax)(a1,d0/d1/d2/d3)
 ExtendFont(font,fontTags)(a0/a1)
 StripFont(font)(a0)
-*--- functions in V39 or higher (Release 3) ---
+*--- functions in V39 or higher (Release 3.0) ---
 CalcIVG(v,vp)(a0/a1)
 AttachPalExtra(cm,vp)(a0/a1)
 ObtainBestPenA(cm,r,g,b,tags)(a0,d1/d2/d3/a1)
 ##private
-graphicsPrivate7()()
+graphicsPrivate6()()
 ##public
 SetRGB32(vp,n,r,g,b)(a0,d0/d1/d2/d3)
 GetAPen(rp)(a0)
@@ -162,8 +160,8 @@ SetChipRev(want)(d0)
 SetABPenDrMd(rp,apen,bpen,drawmode)(a1,d0/d1/d2)
 GetRGB32(cm,firstcolor,ncolors,table)(a0,d0/d1/a1)
 ##private
+graphicsPrivate7()()
 graphicsPrivate8()()
-graphicsPrivate9()()
 ##public
 AllocBitMap(sizex,sizey,depth,flags,friend_bitmap)(d0/d1/d2/d3/a0)
 FreeBitMap(bm)(a0)
@@ -182,7 +180,7 @@ SetRGB32CM(cm,n,r,g,b)(a0,d0/d1/d2/d3)
 ScrollRasterBF(rp,dx,dy,xMin,yMin,xMax,yMax)(a1,d0/d1/d2/d3/d4/d5)
 FindColor(cm,r,g,b,maxcolor)(a3,d1/d2/d3/d4)
 ##private
-graphicsPrivate10()()
+graphicsPrivate9()()
 ##public
 AllocSpriteDataA(bm,tags)(a2,a1)
 ChangeExtSpriteA(vp,oldsprite,newsprite,tags)(a0/a1/a2/a3)

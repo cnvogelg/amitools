@@ -3,8 +3,9 @@ import importlib
 
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.error import *
+from amitools.vamos.error import VamosInternalError
 from amitools.vamos.astructs import CSTR
+from amitools.vamos.libtypes import TagList, TagItem
 
 
 class VamosTestLibrary(LibImpl):
@@ -50,14 +51,27 @@ class VamosTestLibrary(LibImpl):
         """define input values directly as function arguments"""
         return b, a
 
+    def MyFindTagData(self, ctx, tag_val, tag_list: TagList):
+        if not tag_list:
+            return 0
+        tag = tag_list.find_tag(tag_val)
+        if tag:
+            return tag.get_data()
+        else:
+            return 0
+
+    def MyFindTag(self, ctx, tag_val, tag_list: TagList) -> TagItem:
+        if not tag_list:
+            return None
+        tag = tag_list.find_tag(tag_val)
+        return tag
+
     def RaiseError(self, ctx, txt_ptr: CSTR):
         txt = txt_ptr.str
         if txt == "RuntimeError":
             e = RuntimeError("VamosTest")
         elif txt == "VamosInternalError":
             e = VamosInternalError("VamosTest")
-        elif txt == "InvalidMemoryAccessError":
-            e = InvalidMemoryAccessError("R", 2, 0x200)
         else:
             print("VamosTest: Invalid Error:", txt)
             return

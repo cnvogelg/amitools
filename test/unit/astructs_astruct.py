@@ -1,5 +1,6 @@
 import pytest
-from amitools.vamos.machine import MockMemory, MockCPU, REG_D0
+from amitools.vamos.machine.mock import MockMemory, MockCPU
+from amitools.vamos.machine import REG_D0
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.astructs import (
     AmigaStruct,
@@ -35,6 +36,11 @@ class SubStruct(AmigaStruct):
         (MyStruct, "ss_My2"),
     ]  # 20 +12
     # = 32
+
+
+@AmigaStructDef
+class OtherStruct(AmigaStruct):
+    _format = [(WORD, "os_Word")]
 
 
 def astructs_astruct_base_class_test():
@@ -100,6 +106,9 @@ def astructs_astruct_base_inst_test():
     # try to assign field directly -> forbidden!
     with pytest.raises(AttributeError):
         ms.ms_Word = 42
+    # path test
+    assert ms.get_path("") is ms
+    assert ms.get_path("ms_Word") is ms.get_path("ms_Word")
 
 
 def astructs_astruct_base_inst_reg_test():
@@ -205,6 +214,24 @@ def astructs_astruct_sub_struct_inst_test():
     # find sub field
     field = ss.ss_My2.ms_Pad
     assert ss.sfields.find_sub_field_by_def(SubStruct.sdef.ss_My2.ms_Pad) == field
+    # path test
+    assert ss.get_path("") is ss
+    assert ss.get_path("ss_My") is ms
+    assert ss.get_path("ss_My.ms_Word") is ms.get("ms_Word")
+    # clone ss into MyStruct
+    ms = ss.clone(MyStruct)
+    # cast ms back to ss
+    ss2 = ms.cast(SubStruct)
+    assert ss == ss2
+    # cast not possible if not a struct
+    with pytest.raises(ValueError):
+        ms.cast(WORD)
+    # cast ss to ms (not needed but possible)
+    ms2 = ss.cast(MyStruct)
+    assert ms2 == ms
+    # case to other struct not possible
+    with pytest.raises(ValueError):
+        ms.cast(OtherStruct)
 
 
 def astructs_astruct_baddr_test():
@@ -243,6 +270,17 @@ def astructs_astruct_alloc_test():
     assert res.ms_Word.val == 21
     assert res.ms_Pad.val == 42
     res.free()
+    assert alloc.is_all_free()
+
+
+def astructs_astruct_alloc2_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    res = MyStruct.alloc(alloc, ms_Word=21, ms_Pad=42)
+    assert type(res) is MyStruct
+    assert res.ms_Word.val == 21
+    assert res.ms_Pad.val == 42
+    res.free(alloc)
     assert alloc.is_all_free()
 
 

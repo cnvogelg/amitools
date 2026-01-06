@@ -16,6 +16,13 @@ class TypeTool(Tool):
         # query
         parser = sub.add_parser("dump", help="dump a single type")
         parser.add_argument("type_name", help="name of type")
+        parser.add_argument(
+            "--show-offsets",
+            "-O",
+            action="store_true",
+            default=False,
+            help="show offsets",
+        )
         # lookup
         parser = sub.add_parser("lookup", help="lookup field in type")
         parser.add_argument("type_name", help="name of type")
@@ -42,7 +49,7 @@ class TypeTool(Tool):
                 return 1
             else:
                 td = TypeDumper()
-                td.dump(s)
+                td.dump(s, show_offsets=args.show_offsets)
                 return 0
         # lookup
         elif type_cmd == "lookup":

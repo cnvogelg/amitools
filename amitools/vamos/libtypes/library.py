@@ -46,7 +46,7 @@ class LibBase:
 
 @AmigaClassDef
 class Library(LibBase, LibraryStruct):
-    def new_lib(self, version=0, revision=0, type=NodeType.NT_LIBRARY, pri=0, flags=0):
+    def new(self, version=0, revision=0, type=NodeType.NT_LIBRARY, pri=0, flags=0):
         """set all lib values but name, id_str, pos_size, neg_size."""
         node = self.node
         node.succ.aptr = 0

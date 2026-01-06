@@ -1,8 +1,13 @@
+from amitools.util.strtool import to_string
 from .typebase import TypeBase
 from .pointer import APTR, BPTR
 
 
 class CStringType(TypeBase):
+    @classmethod
+    def get_signature(cls):
+        return "CString"
+
     def __init__(self, mem, addr, **kwargs):
         super(CStringType, self).__init__(mem, addr, **kwargs)
 
@@ -40,7 +45,11 @@ class CStringType(TypeBase):
             return super(CStringType, self).__eq__(other)
 
     def __str__(self):
-        return str(self.get())
+        val = self.get()
+        if val:
+            return to_string(val, add_size=True)
+        else:
+            return "NONE"
 
     @classmethod
     def _alloc(cls, alloc, tag, txt):
@@ -54,6 +63,10 @@ class CStringType(TypeBase):
 
 
 class BStringType(TypeBase):
+    @classmethod
+    def get_signature(cls):
+        return "BString"
+
     def __init__(self, mem, addr, **kwargs):
         super(BStringType, self).__init__(mem, addr, **kwargs)
 
@@ -91,7 +104,11 @@ class BStringType(TypeBase):
             super(BStringType, self).__eq__(other)
 
     def __str__(self):
-        return str(self.get())
+        val = self.get()
+        if val:
+            return "#" + to_string(val, add_size=True)
+        else:
+            return "#NONE"
 
     @classmethod
     def _alloc(cls, alloc, tag, txt):

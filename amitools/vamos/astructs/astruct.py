@@ -217,31 +217,47 @@ class AmigaStructFields:
     def __init__(self, astruct):
         self.astruct = astruct
         self.sdef = astruct.sdef
-        self._fields = []
-        self._name_to_field = {}
-        for field_def in self.sdef.get_field_defs():
-            field = self._create_field_type(field_def)
-            self._fields.append(field)
-            self._name_to_field[field_def.name] = field
+        self._field_defs = list(self.sdef.get_field_defs())
+        self._fields = [None] * len(self._field_defs)  # Lazy placeholders
+        self._name_to_field = {}  # Populated lazily
+
+    def _ensure_field(self, index):
+        """Create field at index if not already created."""
+        if self._fields[index] is None:
+            field_def = self._field_defs[index]
+            self._fields[index] = self._create_field_type(field_def)
+            self._name_to_field[field_def.name] = self._fields[index]
+        return self._fields[index]
 
     def get_fields(self):
         """return all field instances"""
+        # Force creation of all fields
+        for i in range(len(self._field_defs)):
+            self._ensure_field(i)
         return self._fields
 
     def get_field_by_index(self, index):
         """return the type instance associated with the field"""
-        return self._fields[index]
+        return self._ensure_field(index)
 
     def get_field_by_name(self, name):
-        return self._name_to_field.get(name)
+        # Check cache first
+        field = self._name_to_field.get(name)
+        if field is not None:
+            return field
+        # Find field def by name and create lazily
+        field_def = self.sdef.find_field_def_by_name(name)
+        if field_def is None:
+            return None
+        return self._ensure_field(field_def.index)
 
     def get_field_by_name_or_alias(self, name, subfield_aliases=None):
-        field = self._name_to_field.get(name)
+        field = self.get_field_by_name(name)
         if field is None:
             # alias name
             alias_name = self.sdef.get_alias_name(name)
             if alias_name:
-                field = self._name_to_field.get(alias_name)
+                field = self.get_field_by_name(alias_name)
             # subfield alias
             if field is None and subfield_aliases:
                 field_def_path = subfield_aliases.get(name)
@@ -254,7 +270,7 @@ class AmigaStructFields:
         field_def, delta = self.sdef.find_field_def_by_offset(offset)
         if not field_def:
             return None, 0
-        return self._fields[field_def.index], delta
+        return self._ensure_field(field_def.index), delta
 
     def find_sub_fields_by_offset(self, base_offset):
         """return [fields], delta or None, 0"""
@@ -370,12 +386,12 @@ class AmigaStruct(TypeBase):
             if field:
                 field.setup(val, alloc, free_refs)
 
-    def free(self):
+    def free(self, *args, **kw_args):
         for free_ref in self._free_refs:
             free_ref.free_ref()
-        super().free()
+        super().free(*args, **kw_args)
 
-    def __str__(self):
+    def __repr__(self):
         return "[AStruct:%s,@%06x+%06x]" % (
             self.sdef.get_type_name(),
             self._addr,
@@ -401,3 +417,34 @@ class AmigaStruct(TypeBase):
                     "Field {} is read-only in {}".format(field_name, self)
                 )
         super().__setattr__(field_name, val)
+
+    def get_path(self, path):
+        if len(path) == 0:
+            return self
+        field = self._get_next_path_field(path)
+        if field:
+            sub_obj = self.get(field)
+            if sub_obj is not None:
+                sub_path = self._skip_path_field(path, field)
+                return sub_obj.get_path(sub_path)
+
+    def cast(self, cls):
+        """cast is similar to clone but checks if structs match"""
+        # cast only to other structs
+        if not issubclass(cls, AmigaStruct):
+            raise ValueError("Cast only allowed to AmigaStruct")
+
+        # check for up cast
+        sub_fields, _ = cls.sdef.find_sub_field_defs_by_offset(0)
+        for field in sub_fields:
+            if issubclass(self.__class__, field.type):
+                return self.clone(cls)
+
+        # check for down cast
+        sub_fields, _ = self.__class__.sdef.find_sub_field_defs_by_offset(0)
+        for field in sub_fields:
+            if issubclass(cls, field.type):
+                return self.clone(cls)
+
+        # no compatible cast found
+        raise ValueError(f"Cast not possible: {self.__class__} -> {cls}")

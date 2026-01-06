@@ -1,28 +1,32 @@
-from amitools.vamos.machine import MockMemory
+from amitools.vamos.machine.mock import MockMemory
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.libtypes import List, MinList, Node, MinNode
+from amitools.vamos.libtypes import List, MinList, Node, MinNode, Task, Process
 from amitools.vamos.libstructs import ListStruct, MinListStruct, NodeType
 
 
 def new_list():
     mem = MockMemory()
     l = List(mem, 0x40)
-    l.new_list(NodeType.NT_DEVICE)
+    l.new(NodeType.NT_DEVICE)
     return l
 
 
 def new_min_list():
     mem = MockMemory()
     l = MinList(mem, 0x40)
-    l.new_list()
+    l.new()
     return l
 
 
 def libtypes_list_new_test():
     l = new_list()
-    assert str(l) == "[List:@000040,h=000044,t=000000,tp=000040,NT_DEVICE]"
+    assert str(l) == "[List:@000040,h=000044,t=000000,tp=000040,NT_DEVICE(00000003/3)]"
     assert len(l) == 0
     assert [a for a in l] == []
+    assert l.get_head() is None
+    assert l.get_tail() is None
+    assert l.rem_head() is None
+    assert l.rem_tail() is None
 
 
 def libtypes_list_min_new_test():
@@ -30,6 +34,10 @@ def libtypes_list_min_new_test():
     assert str(l) == "[MinList:@000040,h=000044,t=000000,tp=000040]"
     assert len(l) == 0
     assert [a for a in l] == []
+    assert l.get_head() is None
+    assert l.get_tail() is None
+    assert l.rem_head() is None
+    assert l.rem_tail() is None
 
 
 def libtypes_list_add_head_test():
@@ -37,10 +45,14 @@ def libtypes_list_add_head_test():
     n1 = Node(l.mem, 0x50)
     assert len(l) == 0
     l.add_head(n1)
+    assert l.get_head() == n1
+    assert l.get_tail() == n1
     assert len(l) == 1
     assert [a for a in l] == [n1]
     n2 = Node(l.mem, 0x60)
     l.add_head(n2)
+    assert l.get_head() == n2
+    assert l.get_tail() == n1
     assert len(l) == 2
     assert [a for a in l] == [n2, n1]
 
@@ -50,10 +62,14 @@ def libtypes_list_add_tail_test():
     n1 = Node(l.mem, 0x50)
     assert len(l) == 0
     l.add_tail(n1)
+    assert l.get_head() == n1
+    assert l.get_tail() == n1
     assert len(l) == 1
     assert [a for a in l] == [n1]
     n2 = Node(l.mem, 0x60)
     l.add_tail(n2)
+    assert l.get_head() == n1
+    assert l.get_tail() == n2
     assert len(l) == 2
     assert [a for a in l] == [n1, n2]
 
@@ -66,7 +82,9 @@ def libtypes_list_rem_head_test():
     l.add_tail(n2)
     assert len(l) == 2
     assert [a for a in l] == [n1, n2]
+    assert l.get_head() == n1
     r1 = l.rem_head()
+    assert l.get_head() == n2
     assert r1 == n1
     assert len(l) == 1
     assert [a for a in l] == [n2]
@@ -83,7 +101,9 @@ def libtypes_list_rem_tail_test():
     l.add_tail(n2)
     assert len(l) == 2
     assert [a for a in l] == [n1, n2]
+    assert l.get_tail() == n2
     r1 = l.rem_tail()
+    assert l.get_tail() == n1
     assert r1 == n2
     assert len(l) == 1
     assert [a for a in l] == [n1]
@@ -167,8 +187,9 @@ def libtypes_list_iter_at_test():
     assert [a for a in l.iter_at(n2)] == [n2]
 
 
-def add_node(alist, addr, name):
+def add_node(alist, addr, name, type=NodeType.NT_UNKNOWN):
     n = Node(alist.mem, addr)
+    n.type.set(type)
     addr += n.get_size()
     name_addr = addr
     alist.mem.w_cstr(addr, name)
@@ -198,6 +219,25 @@ def libtypes_list_find_name_test():
     n = l.find_name("hello")
     assert n == n1
     assert n.find_name("hello") == n3
+    # get path
+    assert l.get_path("") is l
+    assert l.get_path("[world]") == n2
+    assert l.get_path("[world].type") == n2.get("type")
+
+
+def libtypes_list_find_name_promote_test():
+    l = new_list()
+    addr = 0x60
+    n1, addr = add_node(l, addr, "hello", type=NodeType.NT_TASK)
+    n2, addr = add_node(l, addr, "world", type=NodeType.NT_PROCESS)
+    task = l.find_name("hello", promote=True)
+    assert type(task) is Task
+    proc = l.find_name("world", promote=True)
+    assert type(proc) is Process
+    task = l.get_head(promote=True)
+    assert type(task) is Task
+    proc = l.get_tail(promote=True)
+    assert type(proc) is Process
 
 
 def libtypes_list_alloc_test():

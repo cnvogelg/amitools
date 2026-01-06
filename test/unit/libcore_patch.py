@@ -1,5 +1,6 @@
 from amitools.vamos.libcore import *
-from amitools.vamos.machine import *
+from amitools.vamos.machine.mock import *
+from amitools.vamos.machine import Runtime
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.mem import MemoryAlloc
 from amitools.fd import read_lib_fd
@@ -11,14 +12,15 @@ def libcore_patch_multi_trap_test(capsys):
     impl = VamosTestLibrary()
     fd = read_lib_fd(name)
     machine = MockMachine()
-    ctx = LibCtx(machine)
+    runtime = Runtime(machine)
+    alloc = MemoryAlloc.for_machine(machine)
+    ctx = LibCtx(machine, runtime.run, alloc)
     # create stub
     scanner = LibImplScanner()
     scan = scanner.scan(name, impl, fd)
     gen = LibStubGen()
     stub = gen.gen_stub(scan, ctx)
     # now patcher
-    alloc = MemoryAlloc(ctx.mem)
     traps = machine.get_traps()
     p = LibPatcherMultiTrap(alloc, traps, stub)
     base_addr = 0x100

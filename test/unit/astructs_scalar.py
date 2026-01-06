@@ -1,7 +1,8 @@
 import pytest
 from amitools.vamos.astructs.typebase import TypeBase
 from amitools.vamos.astructs.scalar import ULONG, LONG, UWORD, WORD, UBYTE, BYTE
-from amitools.vamos.machine import MockMemory, MockCPU, REG_D0
+from amitools.vamos.machine.mock import MockMemory, MockCPU
+from amitools.vamos.machine import REG_D0
 
 cpu = MockCPU()
 mem = MockMemory()
@@ -54,6 +55,10 @@ def astructs_scalar_ulong_test():
     assert l.get() == 10
     assert repr(l) == "ULONG(value=10, addr=0)"
     assert l.get_signature() == "ULONG"
+    # cpu reg test
+    cpu.w_reg(REG_D0, 0xCAFEBABE)
+    l = ULONG(reg=REG_D0, cpu=cpu)
+    assert l.val == 0xCAFEBABE
 
 
 def astructs_scalar_long_test():
@@ -64,6 +69,14 @@ def astructs_scalar_long_test():
     l = LONG(mem=mem, addr=0)
     assert repr(l) == "LONG(value=-10, addr=0)"
     assert l.get_signature() == "LONG"
+    # cpu reg test
+    cpu.ws_reg(REG_D0, -21)
+    l = LONG(reg=REG_D0, cpu=cpu)
+    assert l.val == -21
+    # real long signed
+    cpu.w_reg(REG_D0, 0xFFFFFFFF)
+    l = LONG(reg=REG_D0, cpu=cpu)
+    assert l.val == -1
 
 
 def astructs_scalar_uword_test():
@@ -74,6 +87,14 @@ def astructs_scalar_uword_test():
     l = UWORD(mem=mem, addr=0)
     assert repr(l) == "UWORD(value=10, addr=0)"
     assert l.get_signature() == "UWORD"
+    # cpu reg test
+    cpu.w_reg(REG_D0, 0xBABE)
+    w = UWORD(reg=REG_D0, cpu=cpu)
+    assert w.val == 0xBABE
+    # only word value
+    cpu.w_reg(REG_D0, 0xFFBABE)
+    w = UWORD(reg=REG_D0, cpu=cpu)
+    assert w.val == 0xBABE
 
 
 def astructs_scalar_word_test():
@@ -84,6 +105,18 @@ def astructs_scalar_word_test():
     l = WORD(mem=mem, addr=0)
     assert repr(l) == "WORD(value=-10, addr=0)"
     assert l.get_signature() == "WORD"
+    # cpu reg test
+    cpu.ws_reg(REG_D0, -21)
+    w = WORD(reg=REG_D0, cpu=cpu)
+    assert w.val == -21
+    # real word signed
+    cpu.w_reg(REG_D0, 0xFFFF)
+    w = WORD(reg=REG_D0, cpu=cpu)
+    assert w.val == -1
+    # extended signed
+    cpu.w_reg(REG_D0, 0xFFFFFF)
+    w = WORD(reg=REG_D0, cpu=cpu)
+    assert w.val == -1
 
 
 def astructs_scalar_ubyte_test():
@@ -94,6 +127,14 @@ def astructs_scalar_ubyte_test():
     l = UBYTE(mem=mem, addr=0)
     assert repr(l) == "UBYTE(value=10, addr=0)"
     assert l.get_signature() == "UBYTE"
+    # cpu reg test
+    cpu.w_reg(REG_D0, 0xBA)
+    b = UBYTE(reg=REG_D0, cpu=cpu)
+    assert b.val == 0xBA
+    # only byte value
+    cpu.w_reg(REG_D0, 0xFFBA)
+    b = UBYTE(reg=REG_D0, cpu=cpu)
+    assert b.val == 0xBA
 
 
 def astructs_scalar_byte_test():
@@ -104,3 +145,15 @@ def astructs_scalar_byte_test():
     l = BYTE(mem=mem, addr=0)
     assert repr(l) == "BYTE(value=-10, addr=0)"
     assert l.get_signature() == "BYTE"
+    # cpu reg test
+    cpu.ws_reg(REG_D0, -21)
+    b = BYTE(reg=REG_D0, cpu=cpu)
+    assert b.val == -21
+    # real byte signed
+    cpu.w_reg(REG_D0, 0xFF)
+    b = BYTE(reg=REG_D0, cpu=cpu)
+    assert b.val == -1
+    # extended signed
+    cpu.w_reg(REG_D0, 0xFFFF)
+    b = BYTE(reg=REG_D0, cpu=cpu)
+    assert b.val == -1

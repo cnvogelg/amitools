@@ -1,23 +1,24 @@
 from amitools.vamos.libnative import LibLoader
 from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.machine import Machine
+from amitools.vamos.machine import Machine, Runtime
 from amitools.vamos.libtypes import ExecLibrary, Library
 
 
 def setup(path_mgr=None):
     machine = Machine()
+    runtime = Runtime(machine)
     mem = machine.get_mem()
     alloc = MemoryAlloc.for_machine(machine)
     segload = SegmentLoader(alloc, path_mgr=path_mgr)
-    loader = LibLoader(machine, alloc, segload)
+    loader = LibLoader(mem, alloc, runtime.run, segload)
     sp = machine.get_ram_begin() - 4
     # setup exec
     exec_lib = ExecLibrary.alloc(
         alloc, name="exec.library", id_string="bla", neg_size=520 * 6
     )
     assert exec_lib.LibNode.neg_size.val == 520 * 6
-    exec_lib.new_lib()
+    exec_lib.new()
     exec_lib.fill_funcs()
     exec_base = exec_lib.get_addr()
     mem.w32(4, exec_base)

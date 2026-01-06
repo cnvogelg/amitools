@@ -1,0 +1,37 @@
+import pytest
+import logging
+
+from amitools.vamos.machine import (
+    Machine,
+    Runtime,
+    Code,
+    ResetOpcodeError,
+    ErrorReporter,
+)
+from amitools.vamos.machine.opcodes import op_reset
+
+
+def create_runtime(supervisor=False):
+    m = Machine(supervisor=supervisor)
+    cpu = m.get_cpu()
+    mem = m.get_mem()
+    code = m.get_ram_begin()
+    stack = m.get_scratch_top()
+    r = Runtime(m)
+    return r, m, cpu, mem, code, stack
+
+
+def machine_error_reporter_test(caplog):
+    caplog.set_level(logging.ERROR)
+
+    r, m, cpu, mem, code, stack = create_runtime(supervisor=True)
+    er = ErrorReporter(m)
+
+    # reset opcode
+    mem.w16(code, op_reset)
+    rs = r.start(Code(code, stack), name="foo")
+    assert type(rs.mach_error) is ResetOpcodeError
+    m.cleanup()
+
+    # check error report
+    assert len(caplog.record_tuples) > 0

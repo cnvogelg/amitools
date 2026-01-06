@@ -6,11 +6,11 @@ class ProcessParser(Parser):
         def_cfg = {
             "process": {
                 "command": {
-                    "binary": Value(str),
                     "args": ValueList(str, allow_split=False),
                     "shell": False,
                     "pure_ami_path": False,
                     "raw_arg": False,
+                    "mode": Value(str, "proc"),
                 },
                 "stack": 8,
             }
@@ -18,7 +18,6 @@ class ProcessParser(Parser):
         arg_cfg = {
             "process": {
                 "command": {
-                    "binary": Argument("bin", help="AmigaOS binary to run", order=1),
                     "args": Argument(
                         "args", nargs="*", help="AmigaOS binary arguments", order=2
                     ),
@@ -39,6 +38,11 @@ class ProcessParser(Parser):
                         "--raw-arg",
                         action="store_true",
                         help="pass a single unmodified argument string",
+                    ),
+                    "mode": Argument(
+                        "-M",
+                        "--mode",
+                        help="run mode. use 'list' for list of modes",
                     ),
                 },
                 "stack": Argument(

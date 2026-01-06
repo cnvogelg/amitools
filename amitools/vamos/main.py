@@ -3,20 +3,26 @@ import io
 import pstats
 
 from .cfg import VamosMainParser
-from .machine import Machine, MemoryMap
-from .machine.regs import REG_D0
+from .machine import Machine, MemoryMap, Runtime
 from .log import log_main, log_setup, log_help
 from .path import VamosPathManager
 from .trace import TraceManager
 from .libmgr import SetupLibManager
 from .schedule import Scheduler
 from .profiler import MainProfiler
-from .lib.dos.Process import Process
+from .mode import ModeContext, ModeSetup
 
 RET_CODE_CONFIG_ERROR = 1000
 
 
-def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
+def main(
+    cfg_files=None,
+    args=None,
+    cfg_dict=None,
+    profile=False,
+    mode=None,
+    single_return_code=True,
+):
     """vamos main entry point.
 
     setup a vamos session and run it.
@@ -26,19 +32,24 @@ def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
     args(opt): None=read sys.argv, []=no args, list/tuple=args
     cfg_dict(opt): pass options directly as a dictionary
 
-    if an internal error occurred then return:
-      RET_CODE_CONFIG_ERROR (1000): config error
+    mode: give the vamos run mode or auto select by config
+    single_return_code: if true then return only one int error code otherwise None or list
+
+    if an internal error occurred then return: None
+    otherwise and array with exit codes for each added task
     """
+    error_code = RET_CODE_CONFIG_ERROR if single_return_code else None
+
     # --- parse config ---
     mp = VamosMainParser()
     if not mp.parse(cfg_files, args, cfg_dict):
-        return RET_CODE_CONFIG_ERROR
+        return error_code
 
     # --- init logging ---
     log_cfg = mp.get_log_dict().logging
     if not log_setup(log_cfg):
         log_help()
-        return RET_CODE_CONFIG_ERROR
+        return error_code
 
     # setup main profiler
     main_profiler = MainProfiler()
@@ -50,43 +61,60 @@ def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
     use_labels = mp.get_trace_dict().trace.labels
     machine = Machine.from_cfg(machine_cfg, use_labels)
     if not machine:
-        return RET_CODE_CONFIG_ERROR
+        return error_code
 
     # setup memory map
     mem_map_cfg = mp.get_machine_dict().memmap
     mem_map = MemoryMap(machine)
     if not mem_map.parse_config(mem_map_cfg):
         log_main.error("memory map setup failed!")
-        return RET_CODE_CONFIG_ERROR
+        return error_code
 
     # setup trace manager
     trace_mgr_cfg = mp.get_trace_dict().trace
     trace_mgr = TraceManager(machine)
     if not trace_mgr.parse_config(trace_mgr_cfg):
         log_main.error("tracing setup failed!")
-        return RET_CODE_CONFIG_ERROR
+        return error_code
 
     # setup path manager
     path_mgr = VamosPathManager()
     try:
         if not path_mgr.parse_config(mp.get_path_dict()):
             log_main.error("path config failed!")
-            return RET_CODE_CONFIG_ERROR
+            return error_code
         if not path_mgr.setup():
             log_main.error("path setup failed!")
-            return RET_CODE_CONFIG_ERROR
+            return error_code
 
         # setup scheduler
-        scheduler = Scheduler(machine)
+        schedule_cfg = mp.get_schedule_dict().schedule
+        scheduler = Scheduler.from_cfg(machine, schedule_cfg)
+
+        # a default runtime for m68k code execution after scheduling
+        default_runtime = Runtime(machine, machine.scratch_end)
+
+        # setup default runner
+        def runner(code, name=None):
+            task = scheduler.get_cur_task()
+            if task:
+                return task.sub_run(code, name=name)
+            else:
+                return default_runtime.run(code, name=name)
 
         # setup lib mgr
         lib_cfg = mp.get_libs_dict()
         slm = SetupLibManager(
-            machine, mem_map, scheduler, path_mgr, main_profiler=main_profiler
+            machine,
+            mem_map,
+            runner,
+            scheduler,
+            path_mgr,
+            main_profiler=main_profiler,
         )
         if not slm.parse_config(lib_cfg):
             log_main.error("lib manager setup failed!")
-            return RET_CODE_CONFIG_ERROR
+            return error_code
         slm.setup()
 
         # setup profiler
@@ -95,41 +123,24 @@ def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
         # open base libs
         slm.open_base_libs()
 
-        # setup main proc
+        # prepare mode context
         proc_cfg = mp.get_proc_dict().process
-        main_proc = Process.create_main_proc(proc_cfg, path_mgr, slm.dos_ctx)
-        if not main_proc:
-            log_main.error("main proc setup failed!")
-            return RET_CODE_CONFIG_ERROR
+        exec_ctx = slm.exec_ctx
+        dos_ctx = slm.dos_ctx
+        mode_ctx = ModeContext(proc_cfg, exec_ctx, dos_ctx, scheduler, default_runtime)
 
-        # main loop
-        task = main_proc.get_task()
-        scheduler.add_task(task)
-        scheduler.schedule()
+        # select mode via ModeSetup
+        if mode is None:
+            cmd_cfg = proc_cfg.command
+            mode = ModeSetup.select(cmd_cfg)
 
-        # check proc result
-        ok = False
-        run_state = task.get_run_state()
-        if run_state.done:
-            if run_state.error:
-                log_main.error("vamos failed!")
-                exit_code = 1
-            else:
-                ok = True
-                # return code is limited to 0-255
-                exit_code = run_state.regs[REG_D0] & 0xFF
-                log_main.info("done. exit code=%d", exit_code)
-                log_main.info("total cycles: %d", run_state.cycles)
+        # run mode
+        if mode is None:
+            exit_code = error_code
         else:
-            log_main.info(
-                "vamos was stopped after %d cycles. ignoring result",
-                machine_cfg.max_cycles,
-            )
-            exit_code = 0
-
-        # shutdown main proc
-        if ok:
-            main_proc.free()
+            exit_code = mode.run(mode_ctx)
+            if single_return_code:
+                exit_code = exit_code[0]
 
         # libs shutdown
         slm.close_base_libs()
@@ -142,12 +153,11 @@ def main(cfg_files=None, args=None, cfg_dict=None, profile=False):
         path_mgr.shutdown()
 
     # mem_map and machine shutdown
-    if ok:
-        mem_map.cleanup()
+    mem_map.cleanup()
     machine.cleanup()
 
     # exit
-    log_main.info("vamos is exiting: code=%d", exit_code)
+    log_main.info("vamos is exiting: code=%r", exit_code)
     return exit_code
 
 

@@ -1,10 +1,17 @@
-from amitools.vamos.machine.regs import *
+from math import trunc
+from amitools.vamos.machine.regs import REG_D0, REG_D1, REG_A0, REG_A1
+from amitools.vamos.astructs import APTR
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.lib.util.TagList import *
+from amitools.vamos.libtypes import TagList, TagItem, CommonTag, TagArray, Tag
 from amitools.vamos.lib.util.AmiDate import *
+from amitools.vamos.lib.util.flags import (
+    MapTagsFlag,
+    FilterTagItemsFlag,
+    PackStructureTagsFlag,
+)
+from amitools.vamos.lib.lexec.flags import MemFlag
 from amitools.vamos.log import *
 
-from math import trunc
 
 class UtilityLibrary(LibImpl):
     def UDivMod32(self, ctx):
@@ -91,38 +98,338 @@ class UtilityLibrary(LibImpl):
             return 0
 
     # Tags
-    def NextTagItem(self, ctx):
-        ti_ptr_addr = ctx.cpu.r_reg(REG_A0)
-        ti_addr = ctx.mem.r32(ti_ptr_addr)
-        ti_addr = next_tag_item(ctx, ti_addr)
-        if ti_addr is None:
-            next_addr = 0
-        else:
-            next_addr = ti_addr + 8
-        ctx.mem.w32(ti_ptr_addr, next_addr)
-        return ti_addr
 
-    def FindTagItem(self, ctx):
-        tagValue = ctx.cpu.r_reg(REG_D0)
-        ti_addr = ctx.cpu.r_reg(REG_A0)
-        if ti_addr == 0:
+    def FindTagItem(self, ctx, tag_val, tag_list: TagList) -> TagItem:
+        if not tag_list:
+            return None
+        log_utility.info("FindTagItem(tag=%08x, list=%s)", tag_val, tag_list)
+        tag = tag_list.find_tag(tag_val)
+        if tag:
+            log_utility.info("found tag: %r", tag)
+            return tag
+        else:
+            log_utility.info("no tag!")
+            return None
+
+    def GetTagData(self, ctx, tag_val, default_val, tag_list_addr):
+        if tag_list_addr == 0:
+            return default_val
+        log_utility.info(
+            "GetTagData(tag=%08x, def=%08x, list=%08x)",
+            tag_val,
+            default_val,
+            tag_list_addr,
+        )
+        tl = TagList(ctx.mem, tag_list_addr)
+        data = tl.get_tag_data(tag_val, default_val)
+        log_utility.info("result data=%08x", data)
+        return data
+
+    def PackBoolTags(self, ctx, init_flags, tag_list_addr, bool_map_addr):
+        if tag_list_addr == 0 or bool_map_addr == 0:
             return 0
-        while True:
-            ti_addr = next_tag_item(ctx, ti_addr)
-            if ti_addr is None:
-                return 0
-            tag, _ = get_tag(ctx, ti_addr)
-            if tag == tagValue:
-                return ti_addr
-            ti_addr += 8
+        log_utility.info(
+            "PackBoolTags(flags=%08x, list=%08x, map=%08x)",
+            init_flags,
+            tag_list_addr,
+            bool_map_addr,
+        )
+        tag_list = TagList(ctx.mem, tag_list_addr)
+        bool_map = TagList(ctx.mem, bool_map_addr)
+        result = init_flags
+        for tag in tag_list:
+            on_flag = tag.get_data()
+            bool_tag = bool_map.find_tag(tag)
+            if bool_tag:
+                mask_val = bool_tag.get_data()
+                if on_flag:
+                    result |= mask_val
+                else:
+                    result &= ~mask_val
+        log_utility.info("result mask=%08x", result)
+        return result
 
-    def GetTagData(self, ctx):
-        defaultValue = ctx.cpu.r_reg(REG_D1)
-        ti_addr = self.FindTagItem(ctx)
-        if ti_addr != 0:
-            return get_tag(ctx, ti_addr)[1]
+    def NextTagItem(self, ctx, ti_ptr: APTR(APTR(TagItem))):
+        if ti_ptr is None:
+            return 0
+        tag_ptr = ti_ptr.ref
+        log_utility.info("NextTagItem(ti_ptr=%s) -> tag=%s", ti_ptr, tag_ptr)
+        if tag_ptr is None:
+            return 0
+        tag = tag_ptr.ref
+        real_tag = tag.next_real_tag()
+        if real_tag is None:
+            log_utility.info("no real tag!")
+            tag_ptr.ref = None
+            return 0
         else:
-            return defaultValue
+            succ_tag = tag.succ_tag()
+            log_utility.info("real tag=%r, succ_tag=%r", tag, succ_tag)
+            tag_ptr.ref = succ_tag
+            return tag.get_addr()
+
+    def FilterTagChanges(self, ctx, change_list: TagList, orig_list: TagList, apply):
+        if change_list is None or orig_list is None:
+            return 0
+        log_utility.info(
+            "FilterTagChanges(change=%s, orig=%s, apply=%s)",
+            change_list,
+            orig_list,
+            apply,
+        )
+        for tag in change_list:
+            orig_tag = orig_list.find_tag(tag)
+            if orig_tag:
+                tag_data = tag.get_data()
+                if tag_data == orig_tag.get_data():
+                    tag.remove()
+                elif apply:
+                    orig_tag.set_data(tag_data)
+
+    def MapTags(self, ctx, tag_list: TagList, map_list: TagList, map_type):
+        if tag_list is None or map_list is None:
+            return
+        log_utility.info(
+            "MapTags(tag_list=%s, map_list=%s, map_type=%s)",
+            tag_list,
+            map_list,
+            map_type,
+        )
+        for tag in tag_list:
+            map_tag = map_list.find_tag(tag)
+            if map_tag:
+                log_utility.debug("map tag %s -> %s", tag, map_tag)
+                tag.set_tag(map_tag.get_data())
+            elif map_type == MapTagsFlag.MAP_REMOVE_NOT_FOUND:
+                log_utility.debug("remove tag %s", tag)
+                tag.remove()
+
+    def AllocateTagItems(self, ctx, num_tags) -> TagList:
+        log_utility.info("AllocateTagItems(num_tags=%s)", num_tags)
+        exec_lib = ctx.proxies.get_exec_lib_proxy()
+        size = num_tags * 8
+        addr = exec_lib.AllocVec(size, MemFlag.MEMF_CLEAR | MemFlag.MEMF_PUBLIC)
+        log_utility.info("addr=%08x", addr)
+        return TagList(ctx.mem, addr)
+
+    def CloneTagItems(self, ctx, tag_list: TagList) -> TagList:
+        log_utility.info("CloneTagItems(tag_list=%s)", tag_list)
+        num_items = len(tag_list)
+        log_utility.debug("num_items=%d", num_items)
+        new_tag_list = self.AllocateTagItems(ctx, num_items)
+        if new_tag_list is None:
+            return None
+        log_utility.debug("new_list=%s", new_tag_list)
+        tag_list.clone_to(new_tag_list)
+        return new_tag_list
+
+    def FreeTagItems(self, ctx, tag_list):
+        log_utility.info("FreeTagItems(addr=%08x)", tag_list)
+        exec_lib = ctx.proxies.get_exec_lib_proxy()
+        exec_lib.FreeVec(tag_list)
+
+    def RefreshTagItemClones(self, ctx, clone_list: TagList, orig_list: TagList):
+        log_utility.info(
+            "RefreshTagItemClones(clone=%s, orig=%s)", clone_list, orig_list
+        )
+        if clone_list is None:
+            return
+        if orig_list is None:
+            # if orig list is not available then clear clone
+            clone_list.get_first_tag().remove()
+            return
+        orig_list.clone_to(clone_list)
+
+    def TagInArray(self, ctx, tag_value, tag_array: TagArray):
+        log_utility.info("TagInArray(val=%08x, array=%s)", tag_value, tag_array)
+        return tag_array.find_tag(tag_value)
+
+    def FilterTagItems(self, ctx, tag_list: TagList, filter_array: TagArray, logic):
+        log_utility.info(
+            "FilterTagItems(tag_list=%s, filter_array=%s, logic=%s)",
+            tag_list,
+            filter_array,
+            logic,
+        )
+        valid = 0
+        for tag in tag_list:
+            found = filter_array.find_tag(tag)
+            if logic == FilterTagItemsFlag.TAGFILTER_AND:
+                if found:
+                    valid += 1
+                else:
+                    tag.remove()
+            elif logic == FilterTagItemsFlag.TAGFILTER_NOT:
+                if found:
+                    tag.remove()
+                else:
+                    valid += 1
+        return valid
+
+    def ApplyTagChanges(self, ctx, tag_list: TagList, change_list: TagList):
+        log_utility.info(
+            "ApplyTagChanges(tag_list=%s, change_list=%s)", tag_list, change_list
+        )
+        for tag in tag_list:
+            change_tag = change_list.find_tag(tag)
+            if change_tag:
+                tag.set_tag(change_tag.get_data())
+
+    def PackStructureTags(self, ctx, pack, pack_table, tag_list: TagList):
+        log_utility.info(
+            "PackStructureTags(pack=%08x, pack_table=%08x, tag_list=%s)",
+            pack,
+            pack_table,
+            tag_list,
+        )
+        mem = ctx.mem
+        ptr = pack_table
+        count = 0
+
+        tag_base = mem.r32(ptr)
+        ptr += 4
+        log_utility.debug("tag_base=%d", tag_base)
+
+        while True:
+            pack_entry = mem.r32(ptr)
+            log_utility.debug("@%08x: entry=%08x", ptr, tag_base)
+            ptr += 4
+
+            if pack_entry == 0:
+                # done
+                break
+            elif pack_entry == 0xFFFFFFFF:
+                # new tag_base
+                tag_base = mem.r32(ptr)
+                ptr += 4
+                log_utility.debug("tag_base=%d", tag_base)
+            elif pack_entry & PackStructureTagsFlag.PSTF_PACK:
+                # no pack entry
+                log_utility.debug("no pack entry")
+                continue
+            else:
+                tag_off = (pack_entry >> 16) & 0x3FF
+                tag_val = tag_off + tag_base
+                log_utility.debug("tag_val=%08x", tag_val)
+                tag = tag_list.find_tag(tag_val)
+                if tag is None:
+                    continue
+                tag_data = tag.get_data()
+
+                mem_off = pack_entry & 0x1FFF
+                bit_off = (pack_entry & 0xE000) >> 13
+                mem_ptr = pack + mem_off
+                mode = pack_entry & 0x98000000
+
+                log_utility.debug(
+                    "mem_ptr=%08x, bit_off=%d, mode=%08x tag_data=%08x",
+                    mem_ptr,
+                    bit_off,
+                    mode,
+                    tag_data,
+                )
+
+                bit_flag = (
+                    PackStructureTagsFlag.PKCTRL_BIT | PackStructureTagsFlag.PSTF_EXISTS
+                )
+                if (pack_entry & bit_flag) == bit_flag:
+                    if pack_entry & PackStructureTagsFlag.PSTF_SIGNED:
+                        mem.w8(mem_ptr, mem.r8(mem_ptr) & ~(1 << bit_off))
+                    else:
+                        mem.w8(mem_ptr, mem.r8(mem_ptr) | (1 << bit_off))
+                    count += 1
+                    continue
+
+                if mode == PackStructureTagsFlag.PKCTRL_ULONG:
+                    mem.w32(mem_ptr, tag_data)
+                elif mode == PackStructureTagsFlag.PKCTRL_UWORD:
+                    mem.w16(mem_ptr, tag_data)
+                elif mode == PackStructureTagsFlag.PKCTRL_UBYTE:
+                    mem.w8(mem_ptr, tag_data)
+                elif mode == PackStructureTagsFlag.PKCTRL_LONG:
+                    mem.w32(mem_ptr, tag_data)
+                elif mode == PackStructureTagsFlag.PKCTRL_WORD:
+                    mem.w16(mem_ptr, tag_data & 0xFFFF)
+                elif mode == PackStructureTagsFlag.PKCTRL_BYTE:
+                    mem.w8(mem_ptr, tag_data & 0xFF)
+                else:
+                    count -= 1
+                count += 1
+        return count
+
+    def UnpackStructureTags(self, ctx, pack, pack_table, tag_list: TagList):
+        log_utility.info(
+            "UnpackStructureTags(pack=%08x, pack_table=%08x, tag_list=%s)",
+            pack,
+            pack_table,
+            tag_list,
+        )
+        mem = ctx.mem
+        ptr = pack_table
+        count = 0
+
+        tag_base = mem.r32(ptr)
+        ptr += 4
+        log_utility.debug("tag_base=%d", tag_base)
+
+        while True:
+            pack_entry = mem.r32(ptr)
+            log_utility.debug("@%08x: entry=%08x", ptr, tag_base)
+            ptr += 4
+
+            if pack_entry == 0:
+                # done
+                break
+            elif pack_entry == 0xFFFFFFFF:
+                # new tag_base
+                tag_base = mem.r32(ptr)
+                ptr += 4
+                log_utility.debug("tag_base=%d", tag_base)
+            elif pack_entry & PackStructureTagsFlag.PSTF_PACK:
+                # no pack entry
+                log_utility.debug("no pack entry")
+                continue
+            else:
+                tag_off = (pack_entry >> 16) & 0x3FF
+                tag_val = tag_off + tag_base
+                log_utility.debug("tag_val=%08x", tag_val)
+                tag = tag_list.find_tag(tag_val)
+                if tag is None:
+                    continue
+                tag_data = tag.get_data()
+
+                mem_off = pack_entry & 0x1FFF
+                bit_off = (pack_entry & 0xE000) >> 13
+                mem_ptr = pack + mem_off
+                mode = pack_entry & 0x98000000
+
+                log_utility.debug(
+                    "mem_ptr=%08x, bit_off=%d, mode=%08x tag_data=%08x",
+                    mem_ptr,
+                    bit_off,
+                    mode,
+                    tag_data,
+                )
+
+                if mode == PackStructureTagsFlag.PKCTRL_ULONG:
+                    tag_data = mem.r32(mem_ptr)
+                elif mode == PackStructureTagsFlag.PKCTRL_UWORD:
+                    tag_data = mem.r16(mem_ptr)
+                elif mode == PackStructureTagsFlag.PKCTRL_UBYTE:
+                    tag_data = mem.r8(mem_ptr)
+                elif mode == PackStructureTagsFlag.PKCTRL_LONG:
+                    tag_data = mem.r32s(mem_ptr)
+                elif mode == PackStructureTagsFlag.PKCTRL_WORD:
+                    tag_data = mem.r16s(mem_ptr)
+                elif mode == PackStructureTagsFlag.PKCTRL_BYTE:
+                    tag_data = mem.r8s(mem_ptr)
+                else:
+                    tag_data = 0
+                    count -= 1
+
+                tag.set_data(tag_data & 0xFFFFFFFF)
+                count += 1
+        return count
 
     # ---- Date -----
 
@@ -155,141 +462,3 @@ class UtilityLibrary(LibImpl):
         seconds = seconds_since(t)
         log_utility.info("CheckDate: time=%s -> seconds=%u", t, seconds)
         return seconds
-
-
-    def PackBoolTags(self, ctx):
-        initialFlags = ctx.cpu.r_reg(REG_D0)
-        tagList_addr = ctx.cpu.r_reg(REG_A0)
-        boolMap_addr = ctx.cpu.r_reg(REG_A1)
-
-        boolflags = pack_bool_tags(ctx, initialFlags, tagList_addr, boolMap_addr)
-        log_utility.info(
-            "PackBoolTags(initialFlags=%08x, tagList=%08x, boolMap=%08x) => %08x",
-            initialFlags,
-            tagList_addr,
-            boolMap_addr,
-            boolflags,
-        )
-        return boolflags
-    
-
-def read_tag_list(ctx, tagList_addr):
-    """
-    Reads a tag list from the given address.
-    Returns a list of (tag, value) tuples.
-    """
-    tagList = []
-    ti_addr = tagList_addr
-    while True:
-        ti = next_tag_item(ctx, ti_addr)
-        if ti is None:
-            break
-        tag, value = get_tag(ctx, ti)
-        tagList.append((tag, value))
-        ti_addr += 8  # Assuming each TagItem is 8 bytes
-    return tagList
-
-def pack_bool_tags(ctx, initialFlags, tagList_addr, boolMap_addr):
-    """
-    Packs boolean tags from a tag list into a bit-flag representation.
-    """
-    boolflags = initialFlags
-    tagList = read_tag_list(ctx, tagList_addr)  # List of (tag, value)
-    boolMap = read_tag_list(ctx, boolMap_addr)  # List of (tag, flag)
-
-    # Convert boolMap to a dictionary for fast lookup
-    boolMapDict = {tag: flag for tag, flag in boolMap}
-
-    for tag, value in tagList:
-        if tag in boolMapDict:
-            flag_value = boolMapDict[tag]
-            if value:
-                boolflags |= flag_value
-            else:
-                boolflags &= ~flag_value
-
-    return boolflags
-
-"""
-NAME
-    PackBoolTags --  Builds a "Flag" word from a TagList. (V36)
-
-SYNOPSIS
-    boolflags = PackBoolTags( initialFlags, tagList, boolMap )
-    D0                        D0            A0       A1
-
-    ULONG PackBoolTags( ULONG initialFlags, struct TagItem *tagList,
-                        struct TagItem *boolMap );
-
-FUNCTION
-    Picks out the Boolean TagItems in a TagItem list and converts
-    them into bit-flag representations according to a correspondence
-    defined by the TagItem list 'BoolMap.'
-
-    A Boolean TagItem is one where only the logical value of
-    the ti_Data is relevant.  If this field is 0, the value is
-    FALSE, otherwise TRUE.
-
-
-INPUTS
-    initialFlags    - a starting set of bit-flags which will be changed
-                      by the processing of TRUE and FALSE Boolean tags
-                      in tagList.
-    tagList         - a TagItem list which may contain several TagItems
-                      defined to be "Boolean" by their presence in
-                      boolMap.  The logical value of ti_Data determines
-                      whether a TagItem causes the bit-flag value related
-                      by boolMap to set or cleared in the returned flag
-                      longword.
-    boolMap         - a TagItem list defining the Boolean Tags to be
-                      recognized, and the bit (or bits) in the returned
-                      longword that are to be set or cleared when a
-                      Boolean Tag is found to be TRUE or FALSE in
-                      tagList.
-
-RESULT
-    boolflags       - the accumulated longword of bit-flags, starting
-                      with InitialFlags and modified by each Boolean
-                      TagItem encountered.
-
-EXAMPLE
-
-    /* define some nice user tag values ... */
-    enum mytags { tag1 = TAG_USER+1, tag2, tag3, tag4, tag5 };
-
-    /* this TagItem list defines the correspondence between Boolean tags
-     * and bit-flag values.
-     */
-    struct TagItem       boolmap[] = {
-        { tag1,  0x0001 },
-        { tag2,  0x0002 },
-        { tag3,  0x0004 },
-        { tag4,  0x0008 },
-        { TAG_DONE }
-    };
-
-    /* You are probably passed these by some client, and you want
-     * to "collapse" the Boolean content into a single longword.
-     */
-
-    struct TagItem       boolexample[] = {
-        { tag1,  TRUE },
-        { tag2,  FALSE },
-        { tag5, Irrelevant },
-        { tag3,  TRUE },
-        { TAG_DONE }
-    };
-
-    /* Perhaps 'boolflags' already has a current value of 0x800002. */
-    boolflags = PackBoolTags( boolflags, boolexample, boolmap );
-
-    /* The resulting new value of 'boolflags' will be 0x80005. /*
-
-BUGS
-    There are some undefined cases if there is duplication of
-    a given Tag in either list.  It is probably safe to say that
-    the *last* of identical Tags in TagList will hold sway.
-
-SEE ALSO
-    utility/tagitem.h, GetTagData(), FindTagItem(), NextTagItem()
-"""

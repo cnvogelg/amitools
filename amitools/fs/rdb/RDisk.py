@@ -697,9 +697,9 @@ class RDisk:
         if pid == 0:
             self.rdb.part_list = next
         else:
-            last_pb = self.parts[-1]
-            last_pb.part_blk.next = next
-            last_pb.write()
+            prev_pb = self.parts[pid - 1]
+            prev_pb.part_blk.next = next
+            prev_pb.write()
         # free block
         p = self.parts[pid]
         blk_num = p.get_blk_num()

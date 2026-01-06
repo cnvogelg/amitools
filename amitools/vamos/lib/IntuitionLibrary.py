@@ -1,13 +1,14 @@
 import ctypes
+from amitools.vamos.libcore.impl import LibImpl
+from amitools.vamos.lib.TimerDevice import TimerDevice
 
 from amitools.vamos.lib.graphics import RastPortStruct, LayerStruct, RectangleStruct
 from amitools.vamos.lib.intuition import WA_Left, WA_Top, WA_Width, WA_Height, WA_Title, WA_MinWidth, WA_MinHeight, WA_MaxWidth, WA_MaxHeight, WindowStruct, IDCMP_MOUSEMOVE, \
     IDCMP_MOUSEBUTTONS, IDCMP_RAWKEY, IDCMP_CLOSEWINDOW, IDCMP_NEWSIZE, IDCMP_REFRESHWINDOW, IntuiMessageStruct, MenuStruct, MenuItemStruct, IntuiTextStruct, IDCMP_MENUPICK, \
     NewWindowStruct, WA_IDCMP, ScreenStruct, NewScreenStruct, WA_CustomScreen
-from amitools.vamos.libcore import LibImpl
 from amitools.vamos.log import log_intui
 from amitools.vamos.machine.regs import REG_D0, REG_A0, REG_A1, REG_D1, REG_D2, REG_D3, REG_D4, REG_D5
-import time
+from amitools.vamos.libstructs.exec_ import MsgPortStruct, MessageStruct
 
 SDL_USEREVENT_TIMER = 32768 + 11
 
@@ -113,11 +114,22 @@ class IntuitionLibrary(LibImpl):
         msg = ctx.mem.r_cstr(IText)
         log_intui.error("-----> AutoRequest '%s'", msg)
 
-    def EasyRequestArgs(self, ctx):
-        EasyStruct = ctx.cpu.r_reg(REG_A1)
-        es_TextFormat = ctx.mem.r32(EasyStruct + 12)  # EasyStruct.es_TextFormat
+    def EasyRequestArgs(self, ctx, easy_struct):
+        es_TextFormat = ctx.mem.r32(easy_struct + 12)  # EasyStruct.es_TextFormat
         msg = ctx.mem.r_cstr(es_TextFormat)
         log_intui.error("-----> EasyRequest '%s'", msg)
+
+    def CurrentTime(self, ctx, secs_ptr, micros_ptr):
+        secs, micros = TimerDevice.get_sys_time()
+        log_intui.info(
+            "CurrentTime(%08x, %08x) -> secs=%d micros=%d",
+            secs_ptr,
+            micros_ptr,
+            secs,
+            micros,
+        )
+        ctx.mem.w32(secs_ptr, secs)
+        ctx.mem.w32(micros_ptr, micros)
 
     def find_sdl_window_by_amiga_addr(self, addr):
         for sdl_win, amiga_addr in self.sdl_window_id_2_window_addr_map.items():
@@ -171,8 +183,8 @@ class IntuitionLibrary(LibImpl):
         # Delete UserPort
         user_port_addr = win.UserPort.get()
         if user_port_addr:
-            ctx.cpu.w_reg(REG_A0, user_port_addr)
-            ctx.exec_lib.DeleteMsgPort(ctx)
+            user_port = MsgPortStruct(ctx.mem, user_port_addr)
+            ctx.exec_lib.DeleteMsgPort(ctx, user_port)
     
         # SDL2 cleanup
         window_id = self.find_sdl_window_by_amiga_addr(window_ptr)
@@ -520,7 +532,7 @@ class IntuitionLibrary(LibImpl):
         win.Title.set(title_ptr.addr)
         win.LeftEdge.set(left)
         win.TopEdge.set(top)
-        win.UserPort.set(user_port)
+        win.UserPort.set(user_port.addr)
         
         win.WScreen.set(screen_addr or self.default_screen.addr)
         # Link window into screen's window list
@@ -550,6 +562,8 @@ class IntuitionLibrary(LibImpl):
 
         # start a timer
         sdl2.SDL_AddTimer(50, intuiticks_timer_callback, ctypes.c_void_p(window_id))
+
+        ctx.exec_lib.register_SDL_poll(ctx)
 
         return win.addr
 
@@ -787,7 +801,9 @@ class IntuitionLibrary(LibImpl):
         msg.IDCMPWindow.set(win_addr)
 
         # Post to message list
-        ctx.exec_lib._put_msg_core(ctx, user_port_addr, msg.addr)
+        port = MsgPortStruct(ctx.mem, user_port_addr)
+        emsg = msg.ExecMessage
+        ctx.exec_lib.msg_func.put_msg(port, emsg)
 
     def draw_menu(self, ctx, renderer, top_menu_addr, mouse_x=0, mouse_y=0):       
         self.mouse_x = mouse_x

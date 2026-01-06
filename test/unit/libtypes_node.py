@@ -1,7 +1,7 @@
 import pytest
-from amitools.vamos.machine import MockMemory
+from amitools.vamos.machine.mock import MockMemory
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.libtypes import Node, MinNode
+from amitools.vamos.libtypes import Node, MinNode, Task
 from amitools.vamos.libstructs import NodeStruct, MinNodeStruct, NodeType
 
 
@@ -69,7 +69,10 @@ def libtypes_node_str_test():
     node = Node(
         mem, 0x42, succ=0x1234, pred=0x5678, type=NodeType.NT_DEVICE, pri=-5, name=12
     )
-    assert str(node) == "[Node:@000042,p=005678,s=001234,NT_DEVICE,-5,'hello, world!']"
+    assert (
+        str(node)
+        == "[Node:@000042,p=005678,s=001234,NT_DEVICE(00000003/3),-5,@(0000000c):'hello, world!'(13)]"
+    )
 
 
 def libtypes_node_str_min_test():
@@ -120,3 +123,10 @@ def libtypes_node_alloc_min_test():
     assert node.get_size() == MinNodeStruct.get_size()
     node.free()
     assert alloc.is_all_free()
+
+
+def libtypes_node_promote_test():
+    mem = MockMemory()
+    node = Node(mem, 0x80, type=NodeType.NT_TASK)
+    task = node.promote_type()
+    assert type(task) is Task

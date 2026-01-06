@@ -46,7 +46,7 @@ def rdbtool(toolrun):
             else:
                 # single command
                 args.append(cmd)
-            # plus seperates commands
+            # plus separates commands
             args.append("+")
         cmd = ["rdbtool"] + list(opts) + [img_file] + args[:-1]
         return toolrun.run_checked(*cmd, raw_output=raw_output, return_code=return_code)

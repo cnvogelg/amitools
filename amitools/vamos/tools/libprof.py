@@ -77,7 +77,7 @@ class LibProfilerTool(Tool):
         for lib_name, lib_prof in p.get_all_libs():
             print(lib_name)
             for func_name, func_prof in lib_prof.get_all_funcs():
-                if func_prof.tag != LibImplScan.TAG_VALID:
+                if func_prof.tag != LibImplFuncTag.TAG_VALID:
                     print("    ", func_name)
 
     def _do_coverage(self, args):
@@ -94,7 +94,7 @@ class LibProfilerTool(Tool):
         num_covered = 0
         num_total = 0
         for _, func_prof in lib_prof.get_all_funcs():
-            if func_prof.tag == LibImplScan.TAG_VALID:
+            if func_prof.tag == LibImplFuncTag.TAG_VALID:
                 num_valid += 1
                 if func_prof.num > 0:
                     num_covered += 1
@@ -112,6 +112,6 @@ class LibProfilerTool(Tool):
 
     def _print_funcs(self, lib_prof):
         for name, func_prof in lib_prof.get_all_funcs():
-            if func_prof.tag == LibImplScan.TAG_VALID:
+            if func_prof.tag == LibImplFuncTag.TAG_VALID:
                 if func_prof.num == 0:
                     print("   ", name)

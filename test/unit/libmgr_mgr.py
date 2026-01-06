@@ -3,7 +3,7 @@ import pytest
 from amitools.vamos.log import log_libmgr, log_exec
 from amitools.vamos.libcore import LibCtx
 from amitools.vamos.libmgr import LibManager, LibMgrCfg, LibCfg
-from amitools.vamos.machine import Machine
+from amitools.vamos.machine import Machine, Runtime
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
@@ -12,26 +12,28 @@ from amitools.vamos.lib.DosLibrary import DosLibrary
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.lib.VamosTestDevice import VamosTestDevice
 from amitools.vamos.loader import SegmentLoader
+from amitools.vamos.trace import TraceManager
 
 
 def setup(path_mgr=None):
     log_libmgr.setLevel(logging.INFO)
     log_exec.setLevel(logging.INFO)
     machine = Machine()
+    runtime = Runtime(machine)
     # machine.show_instr(True)
     sp = machine.get_ram_begin() - 4
     alloc = MemoryAlloc.for_machine(machine)
     segloader = SegmentLoader(alloc, path_mgr)
     cfg = LibMgrCfg()
-    mgr = LibManager(machine, alloc, segloader, cfg)
+    mgr = LibManager(machine, alloc, runtime.run, segloader, cfg)
     # setup ctx map
     cpu = machine.get_cpu()
     mem = machine.get_mem()
     cpu_type = machine.get_cpu_type()
-    exec_ctx = ExecLibCtx(machine, alloc, segloader, path_mgr, mgr)
+    exec_ctx = ExecLibCtx(machine, alloc, runtime.run, segloader, path_mgr, mgr)
     mgr.add_ctx("exec.library", exec_ctx)
     mgr.add_impl_cls("exec.library", ExecLibrary)
-    dos_ctx = DosLibCtx(machine, alloc, segloader, path_mgr, None, None)
+    dos_ctx = DosLibCtx(machine, alloc, runtime.run, segloader, path_mgr, None, None)
     mgr.add_ctx("dos.library", dos_ctx)
     mgr.add_impl_cls("dos.library", DosLibrary)
     mgr.add_impl_cls("vamostest.library", VamosTestLibrary)
@@ -237,6 +239,8 @@ class ALibHelper(object):
 
         pm = PathMgrMock()
         self.machine, self.alloc, self.mgr, self.sp, self.cfg = setup(path_mgr=pm)
+        self.trace = TraceManager(self.machine)
+        self.trace.setup_cpu_instr_trace(False)
         self.mgr.bootstrap_exec()
         self.cfg.add_lib_cfg(
             "dos.library", LibCfg(create_mode=LibCfg.CREATE_MODE_FAKE, force_version=40)

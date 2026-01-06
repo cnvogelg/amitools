@@ -9,9 +9,7 @@ class DisAsm(object):
 
     @classmethod
     def create(cls, cpu_name="68000"):
-        cpu_type, cpu_name = Machine.parse_cpu_type(cpu_name)
-        assert cpu_type
-        machine = Machine(cpu_type=cpu_type)
+        machine = Machine.from_name(cpu_name)
         return cls(machine)
 
     def disassemble(self, pc):

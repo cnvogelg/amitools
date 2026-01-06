@@ -1,7 +1,8 @@
 from amitools.vamos.astructs.typebase import TypeBase
 from amitools.vamos.astructs.array import ARRAY, ArrayIter
 from amitools.vamos.astructs.scalar import ULONG
-from amitools.vamos.machine import MockMemory, MockCPU, REG_D0
+from amitools.vamos.machine.mock import MockMemory, MockCPU
+from amitools.vamos.machine import REG_D0
 
 cpu = MockCPU()
 mem = MockMemory()
@@ -26,6 +27,10 @@ def astructs_array_test():
     a[0].val = 23
     assert a[0].val == 23
     assert a.get(0).val == 23
+    # path
+    assert a.get_path("") is a
+    assert a.get_path("[0]") == a.get(0)
+    assert a.get_path("[9]") == a.get(9)
 
 
 def astructs_array_iter_test():

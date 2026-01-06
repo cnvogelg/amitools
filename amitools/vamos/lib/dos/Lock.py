@@ -1,5 +1,4 @@
 import os
-import stat
 import uuid
 
 from amitools.vamos.log import log_lock
@@ -29,13 +28,23 @@ class Lock:
         addr = 0
         if self.mem is not None:
             addr = self.mem.addr
-        return "Lock('%s'(ami='%s',sys='%s',key=%s,ex=%d, vol=%d)@%06x=b@%06x)" % (
+        return "Lock['%s'(ami='%s',sys='%s',key=%s,ex=%d, vol=%d)@%06x=b@%06x]" % (
             self.name,
             self.ami_path,
             self.sys_path,
             self.key,
             self.exclusive,
             self.vol_addr,
+            addr,
+            self.b_addr,
+        )
+
+    def __str__(self):
+        addr = 0
+        if self.mem is not None:
+            addr = self.mem.addr
+        return "Lock['%s'@%06x=b@%06x]" % (
+            self.name,
             addr,
             self.b_addr,
         )
@@ -75,16 +84,10 @@ class Lock:
         fib_mem.w_s("fib_DirEntryType", dirEntryType)
         fib_mem.w_s("fib_EntryType", dirEntryType)
         # protection
-        prot = DosProtection(0)
         try:
             os_stat = os.stat(sys_path)
             mode = os_stat.st_mode
-            if mode & stat.S_IXUSR == 0:
-                prot.clr(DosProtection.FIBF_EXECUTE)
-            if mode & stat.S_IRUSR == 0:
-                prot.clr(DosProtection.FIBF_READ)
-            if mode & stat.S_IWUSR == 0:
-                prot.clr(DosProtection.FIBF_WRITE)
+            prot = DosProtection.from_host_mode(mode)
             log_lock.debug("examine lock: '%s' mode=%03o: prot=%s", name, mode, prot)
         except OSError:
             return ERROR_OBJECT_IN_USE

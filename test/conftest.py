@@ -3,6 +3,10 @@
 
 import pytest
 import os
+import socket
+import threading
+import time
+
 from helper import *
 
 
@@ -77,14 +81,13 @@ def pytest_addoption(parser):
         help="do not force rebuild of old binaries",
     )
     parser.addoption(
-        "--profile",
-        "-P",
+        "--profile-libs",
         action="store_true",
         default=False,
         help="create a profile file",
     )
     parser.addoption(
-        "--profile-file",
+        "--profile-libs-file",
         action="store",
         default="vamos-prof.json",
         help="set the profile file name",
@@ -101,6 +104,13 @@ def pytest_addoption(parser):
         default=False,
         help="run vamos binaries via subprocess and not directly inside pytest",
     )
+    parser.addoption(
+        "--backend",
+        "-B",
+        action="store",
+        default=None,
+        help="select machine backend. passed as --backend to vamos",
+    )
 
 
 def pytest_configure(config):
@@ -115,8 +125,8 @@ def pytest_configure(config):
     if vamos_args:
         VAMOS_ARGS += vamos_args
     # enable profiling
-    if config.getoption("profile"):
-        file = config.getoption("profile_file")
+    if config.getoption("profile_libs"):
+        file = config.getoption("profile_libs_file")
         file = os.path.abspath(file)
         print("creating profile: %s" % file)
         # clear profile file if existing
@@ -132,6 +142,10 @@ def pytest_configure(config):
             "--profile",
         ]
         VAMOS_ARGS += prof_opts
+    # add a vamos
+    backend = config.getoption("backend")
+    if backend:
+        VAMOS_ARGS += ["-b", backend]
     # show settings
     print("vamos:", VAMOS_BIN, " ".join(VAMOS_ARGS))
 
@@ -212,7 +226,8 @@ def toolrun(request):
 
 @pytest.fixture(scope="module", params=["mach", "mach-label", "mock", "mock-label"])
 def mem_alloc(request):
-    from amitools.vamos.machine import Machine, MockMemory
+    from amitools.vamos.machine import Machine
+    from amitools.vamos.machine.mock import MockMemory
     from amitools.vamos.mem import MemoryAlloc
     from amitools.vamos.label import LabelManager
 
@@ -232,3 +247,33 @@ def mem_alloc(request):
         mem = MockMemory(fill=23)
         lm = LabelManager()
         return mem, MemoryAlloc(mem, label_mgr=lm)
+
+
+@pytest.fixture(scope="module")
+def vamos_task():
+    return VamosTask()
+
+
+# ----- rmachine -----
+
+
+def get_free_port():
+    s = socket.socket()
+    s.bind(("", 0))
+    addr, port = s.getsockname()
+    s.close()
+    return port
+
+
+@pytest.fixture(scope="module")
+def rmachine68k_server():
+    rmachine68k = pytest.importorskip("rmachine68k")
+    """run a threaded rpyc server with rmachine and return port of server"""
+    port = get_free_port()
+    server = rmachine68k.create_service(port=port, type="threaded")
+    thread = threading.Thread(target=server.start, daemon=True)
+    thread.start()
+    time.sleep(0.5)
+    yield port
+    server.close()
+    thread.join(timeout=2)

@@ -70,6 +70,9 @@ class SegList:
     def get_segment(self):
         return Segment(self)
 
+    def get_start_pc(self):
+        return self.addr + 4
+
     def get_all_segments(self):
         res = []
         seg = self.get_segment()

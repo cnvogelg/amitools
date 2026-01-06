@@ -1,6 +1,8 @@
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
 from amitools.vamos.lib.LibList import vamos_libs
+from amitools.vamos.schedule import SchedulerEvent
+from amitools.vamos.task import ExecScheduler
 from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.log import log_libmgr
 from .cfg import LibMgrCfg
@@ -9,10 +11,18 @@ from .mgr import LibManager
 
 class SetupLibManager(object):
     def __init__(
-        self, machine, mem_map, scheduler, path_mgr, lib_cfg=None, main_profiler=None
+        self,
+        machine,
+        mem_map,
+        runner,
+        scheduler,
+        path_mgr,
+        lib_cfg=None,
+        main_profiler=None,
     ):
         self.machine = machine
         self.mem_map = mem_map
+        self.runner = runner
         self.path_mgr = path_mgr
         self.scheduler = scheduler
         self.alloc = mem_map.get_alloc()
@@ -42,17 +52,24 @@ class SetupLibManager(object):
         self.lib_mgr = LibManager(
             self.machine,
             self.alloc,
+            self.runner,
             self.seg_loader,
             self.lib_mgr_cfg,
             main_profiler=self.main_profiler,
         )
         # setup special lib contexts for exec and dos
         self.exec_ctx = ExecLibCtx(
-            self.machine, self.alloc, self.seg_loader, self.path_mgr, self.lib_mgr
+            self.machine,
+            self.alloc,
+            self.runner,
+            self.seg_loader,
+            self.path_mgr,
+            self.lib_mgr,
         )
         self.dos_ctx = DosLibCtx(
             self.machine,
             self.alloc,
+            self.runner,
             self.seg_loader,
             self.path_mgr,
             self.scheduler,
@@ -71,7 +88,7 @@ class SetupLibManager(object):
             cls = vamos_libs[name]
             self.lib_mgr.add_impl_cls(name, cls)
         # setup scheduler call back
-        self.scheduler.set_cur_task_callback(self.cur_task_callback)
+        self.scheduler.set_event_callback(self.scheduler_event_callback)
         # return lib_mgr
         return self.lib_mgr
 
@@ -89,6 +106,8 @@ class SetupLibManager(object):
         self.exec_vlib = self.lib_mgr.get_vlib_by_addr(self.exec_addr)
         self.exec_impl = self.exec_vlib.get_impl()
         log_libmgr.info("open base lib: exec: @%06x", self.exec_addr)
+        # setup exec scheduler
+        self.exec_scheduler = ExecScheduler(self.scheduler, self.exec_impl.exec_lib)
         # link exec to dos
         self.dos_ctx.set_exec_lib(self.exec_impl)
         # open dos lib
@@ -107,10 +126,25 @@ class SetupLibManager(object):
         self.lib_mgr.close_lib(self.exec_addr)
         log_libmgr.info("closed exec")
 
-    def cur_task_callback(self, task):
-        log_libmgr.info("current task: %s", task)
-        if task:
-            proc = task.process
-            self.exec_ctx.set_process(proc)
-            self.exec_impl.set_this_task(proc)
-            self.dos_ctx.set_process(proc)
+    def get_lib_proxy_mgr(self):
+        return self.lib_mgr.get_lib_proxy_mgr()
+
+    def scheduler_event_callback(self, event):
+        if event.type != SchedulerEvent.Type.ACTIVE_TASK:
+            return
+        sched_task = event.task
+        if sched_task:
+            map_task = sched_task.map_task
+            log_libmgr.info("current task: %s", map_task)
+        else:
+            map_task = None
+            log_libmgr.info("current task: none")
+
+        # is the map task a process?
+        if map_task and map_task.ami_proc:
+            process = map_task
+        else:
+            process = None
+
+        self.exec_ctx.set_cur_task_process(map_task, process)
+        self.dos_ctx.set_cur_process(process)

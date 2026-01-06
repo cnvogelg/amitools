@@ -75,6 +75,6 @@ class BinBuilder:
                 args = ["make"]
                 args += rebuild_bins
                 subprocess.check_call(args, stdout=subprocess.PIPE)
-            elif not no_rebuild:
+            elif not self.no_rebuild:
                 raise RuntimeError("Rebuild needed for: " + info)
         return all_bins

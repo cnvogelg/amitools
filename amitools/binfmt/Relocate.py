@@ -42,7 +42,7 @@ class Relocate:
         offset = 0
         segs = self.bin_img.get_segments()
         for segment in segs:
-            self._copy_data(data, segment, offset)
+            self._copy_data(data, segment, addrs, offset)
             self._reloc_data(data, segment, addrs, offset)
             offset += segment.size + padding
         return data

@@ -73,7 +73,7 @@ ExamineFH(fh,fib)(d1/d2)
 SetFileDate(name,date)(d1/d2)
 NameFromLock(lock,buffer,len)(d1/d2/d3)
 NameFromFH(fh,buffer,len)(d1/d2/d3)
-SplitName(name,seperator,buf,oldpos,size)(d1/d2/d3/d4/d5)
+SplitName(name,separator,buf,oldpos,size)(d1/d2/d3/d4/d5)
 SameLock(lock1,lock2)(d1/d2)
 SetMode(fh,mode)(d1/d2)
 ExAll(lock,buffer,size,data,control)(d1/d2/d3/d4/d5)
@@ -178,6 +178,8 @@ CliInitRun(dp)(a0)
 WriteChars(buf,buflen)(d1/d2)
 PutStr(str)(d1)
 VPrintf(format,argarray)(d1/d2)
+* another shell private - see RKRM dos
+ExtendedCli()()
 *--- (1 function slot reserved here) ---
 ##bias 966
 * these were unimplemented until dos 36.147
@@ -197,10 +199,20 @@ SetOwner(name,owner_info)(d1/d2)
 ##private
 *--- (2 function slots reserved here) ---
 ##bias 1014
-*--- (2 function slots reserved here) ---
-##bias 1026
-*--- (2 function slots reserved here) ---
-##bias 1038
-*--- (2 function slots reserved here) ---
-##bias 1050
+##public
+* Added with dos 47.4
+VolumeRequestHook(vol)(d1)
+##private
+dosPrivate7()()
+##public
+GetCurrentDir()()
+*--- (16 function slots reserved here) ---
+##bias 1128
+PutErrStr(str)(d1)
+ErrorOutput()()
+SelectError(fh)(d1)
+*--- (1 function slot reserved here) ---
+##bias 1152
+DoShellMethodTagList(method,tags)(d0/a0)
+ScanStackToken(seg,defaultstack)(d1/d2)
 ##end

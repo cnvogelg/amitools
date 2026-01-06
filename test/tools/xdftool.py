@@ -117,7 +117,7 @@ def xdftool(toolrun):
             else:
                 # single command
                 args.append(cmd)
-            # plus seperates commands
+            # plus separates commands
             args.append("+")
         return toolrun.run_checked(
             "xdftool", xdf_file, *args[:-1], raw_output=raw_output
@@ -302,7 +302,7 @@ def rdbtool(toolrun):
             else:
                 # single command
                 args.append(cmd)
-            # plus seperates commands
+            # plus separates commands
             args.append("+")
         return toolrun.run_checked(
             "rdbtool", rdb_file, *args[:-1], raw_output=raw_output

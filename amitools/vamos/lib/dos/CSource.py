@@ -101,7 +101,7 @@ class FileCSource:
             return None
         else:
             self.last_ch = ch
-            return ch
+            return chr(ch)
 
     def ungetc(self):
         if self.last_ch is not None:

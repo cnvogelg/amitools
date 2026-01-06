@@ -5,6 +5,7 @@ from .cfgcore import log_cfg
 # --- vamos loggers ---
 
 log_main = logging.getLogger("main")
+log_mode = logging.getLogger("mode")
 
 log_mem = logging.getLogger("mem")
 log_mem_map = logging.getLogger("mem_map")
@@ -12,6 +13,7 @@ log_mem_alloc = logging.getLogger("mem_alloc")
 log_mem_int = logging.getLogger("mem_int")
 log_instr = logging.getLogger("instr")
 log_machine = logging.getLogger("machine")
+log_schedule = logging.getLogger("schedule")
 
 log_lib = logging.getLogger("lib")
 log_libmgr = logging.getLogger("libmgr")
@@ -26,6 +28,8 @@ log_dos = logging.getLogger("dos")
 log_exec = logging.getLogger("exec")
 log_utility = logging.getLogger("utility")
 log_math = logging.getLogger("math")
+log_intuition = logging.getLogger("intuition")
+log_timer = logging.getLogger("timer")
 
 log_intui = logging.getLogger("intuition")
 log_gfx = logging.getLogger("graphics")
@@ -38,6 +42,7 @@ log_hw = logging.getLogger("hw")
 
 loggers = [
     log_main,
+    log_mode,
     log_mem,
     log_mem_map,
     log_mem_alloc,
@@ -61,6 +66,9 @@ loggers = [
     log_intui,
     log_gfx,
     log_machine,
+    log_schedule,
+    log_intuition,
+    log_timer,
 ]
 
 preset = {log_prof: logging.INFO}

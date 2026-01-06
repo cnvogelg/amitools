@@ -371,7 +371,7 @@ class IORequestStruct(AmigaStruct):
     _format = [
         (MessageStruct, "io_Message"),
         (APTR(DeviceStruct), "io_Device"),
-        (UnitStruct, "io_Unit"),
+        (APTR(UnitStruct), "io_Unit"),
         (UWORD, "io_Command"),
         (UBYTE, "io_Flags"),
         (BYTE, "io_Error"),

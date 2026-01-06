@@ -1,3 +1,5 @@
 pytest
 pytest-benchmark
-machine68k
+machine68k @ git+https://github.com/cnvogelg/machine68k@main
+greenlet
+ptyprocess
