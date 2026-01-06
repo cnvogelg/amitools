@@ -53,6 +53,7 @@ KICKETY_SPLIT_ROM = (
     "amiga-os-310-a1200.rom",
     "amiga-os-310-a3000.rom",
     "amiga-os-310-a4000.rom",
+    "amiga-os-310-a4000t.rom",
     "amiga-os-310-a500.rom",
 )
 
@@ -117,7 +118,19 @@ def romtool_split_build_kickety_rom_test(toolrun, kickety_split_rom_file, tmpdir
     index_txt = str(tmpdir / "index.txt")
     new_rom = str(tmpdir / "new.rom")
     toolrun.run_checked("romtool", "build", "-k", "-o", new_rom, index_txt)
-    toolrun.run_checked("romtool", "info", new_rom)
+
+    # Compare info output for original and rebuilt ROM
+    ret_orig, stdout_orig, stderr_orig = toolrun.run("romtool", "info", kickety_split_rom_file)
+    assert ret_orig == 0
+    ret_new, stdout_new, stderr_new = toolrun.run("romtool", "info", new_rom)
+    assert ret_new == 0
+
+    # Filter out check_sum line from comparison
+    # amiga-os-204.rom has a suboptimal kickety-split placement where
+    # 'icon.library' was placed after the split; checksum mismatchs when recreated
+    stdout_orig_filtered = [line for line in stdout_orig if not line.startswith('check_sum')]
+    stdout_new_filtered = [line for line in stdout_new if not line.startswith('check_sum')]
+    assert stdout_orig_filtered == stdout_new_filtered
 
 
 def romtool_combine_test(toolrun, tmpdir):

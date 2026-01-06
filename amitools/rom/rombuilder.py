@@ -52,7 +52,7 @@ class RomEntryRomHdr:
         return self.skip + 8
 
     def get_data(self, addr):
-        data = b"\x0ff" * self.skip
+        data = b"\xff" * self.skip
         hdr = struct.pack(">II", 0x11114EF9, self.jmp_addr)
         return data + hdr
 
