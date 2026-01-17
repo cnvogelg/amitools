@@ -9,6 +9,7 @@ except ImportError:
     select = None
 
 import io
+import sys
 
 ESC = b"\x1b"
 ESC_CODE = 0x1B
@@ -20,6 +21,11 @@ CSI_ESC_SEQ = b"\x1b\x5b"
 class CsiEscConverter:
     def convert(self, buffer):
         return buffer.replace(CSI, CSI_ESC_SEQ)
+
+
+class Latin1ToUtf8Converter:
+    def convert(self, buffer):
+        return buffer.decode("latin-1").encode("utf-8")
 
 
 class EscCsiConverter:
@@ -124,6 +130,12 @@ class Terminal:
         else:
             self.in_conv = None
 
+        # convert Latin-1 to UTF-8 if stdout uses UTF-8 encoding
+        if sys.stdout.encoding and sys.stdout.encoding.lower().replace("-", "") == "utf8":
+            self.latin1_conv = Latin1ToUtf8Converter()
+        else:
+            self.latin1_conv = None
+
     def close(self):
         if termios:
             termios.tcsetattr(self.fd, termios.TCSAFLUSH, self.tty_state)
@@ -184,12 +196,18 @@ class Terminal:
 
         return -1 on Error, 0 on EOF, and >0 written bytes
         """
+        orig_len = len(data)
 
         # do CSI to ESC conversion
         if self.out_conv:
             data = self.out_conv.convert(data)
 
+        # do Latin-1 to UTF-8 conversion
+        if self.latin1_conv:
+            data = self.latin1_conv.convert(data)
+
         try:
-            return self.obj.write(data)
+            self.obj.write(data)
+            return orig_len
         except IOError:
             return -1
