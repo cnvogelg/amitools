@@ -1212,6 +1212,24 @@ class DosLibrary(LibImpl):
             ctx.mem.w_cstr(buf, name)
             return DOSTRUE
 
+    def NameFromFH(self, ctx):
+        fh_b_addr = ctx.cpu.r_reg(REG_D1)
+        buf = ctx.cpu.r_reg(REG_D2)
+        buf_len = ctx.cpu.r_reg(REG_D3)
+        fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+        if fh is None:
+            log_dos.warning("NameFromFH: invalid fh=%x", fh_b_addr)
+            self.setioerr(ctx, ERROR_INVALID_LOCK)
+            return DOSFALSE
+        name = fh.ami_path
+        log_dos.info("NameFromFH(%x,%d): %s -> %s", buf, buf_len, fh, name)
+        if len(name) >= buf_len:
+            self.setioerr(ctx, ERROR_LINE_TOO_LONG)
+            return DOSFALSE
+        else:
+            ctx.mem.w_cstr(buf, name)
+            return DOSTRUE
+
     def CreateDir(self, ctx):
         name_ptr = ctx.cpu.r_reg(REG_D1)
         name = ctx.mem.r_cstr(name_ptr)
