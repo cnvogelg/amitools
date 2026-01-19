@@ -8,6 +8,7 @@ from amitools.vamos.astructs import AccessStruct
 from amitools.vamos.libstructs import DosListVolumeStruct, FileLockStruct
 from .Error import *
 from .Lock import Lock
+from .PathPart import expand_progdir_path
 
 
 class LockKey:
@@ -107,13 +108,20 @@ class LockManager:
         lock.free(self.alloc)
         del lock
 
-    def create_lock(self, cur_dir, ami_path, exclusive):
+    def create_lock(self, cur_dir, ami_path, exclusive, home_dir=None):
+        log_lock.debug("create_lock: ami_path='%s' cur_dir=%s home_dir=%s",
+                       ami_path, cur_dir, home_dir)
         if ami_path == "":
             if cur_dir is None:
                 ami_path = "SYS:"
             else:
                 ami_path = cur_dir.ami_path
         else:
+            # Handle '*' prefix (PROGDIR: - program's home directory)
+            expanded = expand_progdir_path(ami_path, home_dir)
+            if expanded != ami_path:
+                log_lock.debug("expanded '*' path to: %s", expanded)
+                ami_path = expanded
             ami_path = self.path_mgr.ami_abs_path(cur_dir, ami_path)
         sys_path = self.path_mgr.ami_to_sys_path(cur_dir, ami_path, searchMulti=True)
         name = self.path_mgr.ami_name_of_path(cur_dir, ami_path)
