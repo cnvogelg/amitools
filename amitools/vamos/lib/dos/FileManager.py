@@ -12,6 +12,7 @@ from .Error import *
 from .DosProtection import DosProtection
 from .FileHandle import FileHandle
 from .action import DosAction
+from .PathPart import expand_progdir_path
 
 
 class FileManager:
@@ -93,7 +94,7 @@ class FileManager:
     def get_output(self):
         return self.std_output
 
-    def open(self, lock, ami_path, f_mode):
+    def open(self, lock, ami_path, f_mode, home_dir=None):
         try:
             # special names
             uname = ami_path.upper()
@@ -109,6 +110,11 @@ class FileManager:
                 sys_name = ""
                 fh = self._create_stdout_fh()
             else:
+                # Handle '*' prefix (PROGDIR: - program's home directory)
+                expanded = expand_progdir_path(ami_path, home_dir)
+                if expanded != ami_path:
+                    log_file.debug("expanded '*' path to: %s", expanded)
+                    ami_path = expanded
                 # map to system path
                 sys_path = self.path_mgr.ami_to_sys_path(
                     lock, ami_path, searchMulti=True

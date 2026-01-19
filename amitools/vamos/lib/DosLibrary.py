@@ -209,6 +209,11 @@ class DosLibrary(LibImpl):
         cur_dir = ctx.process.get_current_dir()
         return self.lock_mgr.get_by_b_addr(cur_dir >> 2)
 
+    def get_home_dir(self, ctx):
+        """Get the program's home directory lock (PROGDIR:)"""
+        home_dir = ctx.process.get_home_dir()
+        return self.lock_mgr.get_by_b_addr(home_dir >> 2)
+
     # ----- dos API -----
 
     def DateStamp(self, ctx):
@@ -639,7 +644,10 @@ class DosLibrary(LibImpl):
             log_dos.warning("open: invalid mode=%d!", mode)
             f_mode = "wb+"
 
-        fh = self.file_mgr.open(self.get_current_dir(ctx), name, f_mode)
+        fh = self.file_mgr.open(
+            self.get_current_dir(ctx), name, f_mode,
+            home_dir=self.get_home_dir(ctx)
+        )
         log_dos.info(
             "Open: name='%s' (%s/%d/%s) -> %s", name, mode_name, mode, f_mode, fh
         )
@@ -1040,12 +1048,15 @@ class DosLibrary(LibImpl):
         else:
             raise UnsupportedFeatureError("Lock: mode=%x" % mode)
 
+        cur_dir = self.get_current_dir(ctx)
+        home_dir = self.get_home_dir(ctx)
         lock = self.lock_mgr.create_lock(
-            self.get_current_dir(ctx), name, lock_exclusive
+            cur_dir, name, lock_exclusive, home_dir=home_dir
         )
         log_dos.info(
-            "Lock: (curdir=%s) '%s' exc=%s -> %s",
-            self.get_current_dir(ctx),
+            "Lock: (curdir=%s, homedir=%s) '%s' exc=%s -> %s",
+            cur_dir,
+            home_dir,
             name,
             lock_exclusive,
             lock,
