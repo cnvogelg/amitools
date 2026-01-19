@@ -1,5 +1,6 @@
 from .DosLibrary import DosLibrary
 from .ExecLibrary import ExecLibrary
+from .GraphicsLibrary import GraphicsLibrary
 from .IntuitionLibrary import IntuitionLibrary
 from .LocaleLibrary import LocaleLibrary
 from .MathFFPLibrary import MathFFPLibrary
@@ -16,6 +17,7 @@ from .VamosTestDevice import VamosTestDevice
 vamos_libs = {
     "dos.library": DosLibrary,
     "exec.library": ExecLibrary,
+    "graphics.library": GraphicsLibrary,
     "intuition.library": IntuitionLibrary,
     "locale.library": LocaleLibrary,
     "mathffp.library": MathFFPLibrary,
