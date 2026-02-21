@@ -14,6 +14,7 @@ from amitools.vamos.libstructs import (
     NodeType,
     SignalSemaphoreStruct,
 )
+from amitools.vamos.libstructs.exec_ import TaskStruct
 from amitools.vamos.libtypes import ExecLibrary as ExecLibraryType
 from amitools.vamos.libtypes import Task, List
 from amitools.vamos.log import log_exec
@@ -467,7 +468,17 @@ class ExecLibrary(LibImpl):
                 "GetMsg: on invalid Port (%06x) called!" % port_addr
             )
         msg_addr = self.port_mgr.get_msg(port_addr)
-        if msg_addr != None:
+        if msg_addr is not None:
+            # Also remove from m68k memory list (REMOVE operation)
+            # to keep Python queue and m68k list in sync.
+            try:
+                ln_succ = ctx.mem.r32(msg_addr + 0)
+                ln_pred = ctx.mem.r32(msg_addr + 4)
+                if ln_succ != 0 and ln_pred != 0:
+                    ctx.mem.w32(ln_pred + 0, ln_succ)  # pred.ln_Succ = succ
+                    ctx.mem.w32(ln_succ + 4, ln_pred)  # succ.ln_Pred = pred
+            except Exception:
+                pass
             log_exec.info("GetMsg: got message %06x" % (msg_addr))
             return msg_addr
         else:
@@ -719,6 +730,23 @@ class ExecLibrary(LibImpl):
         io_addr = ctx.cpu.r_reg(REG_A1)
         io = AccessStruct(ctx.mem, IORequestStruct, io_addr)
         log_exec.info("WaitIO(io=0x%06x)", io_addr)
+        # Remove IORequest from its reply port's message list and Python
+        # queue (like real WaitIO does after IO completes).
+        reply_port = io.r_s("io_Message.mn_ReplyPort")
+        if reply_port != 0 and self.port_mgr.has_port(reply_port):
+            # Remove from Python queue if present
+            port = self.port_mgr.ports[reply_port]
+            if port.queue is not None and io_addr in port.queue:
+                port.queue.remove(io_addr)
+            # Remove from m68k memory list (REMOVE operation)
+            try:
+                ln_succ = ctx.mem.r32(io_addr + 0)
+                ln_pred = ctx.mem.r32(io_addr + 4)
+                if ln_succ != 0 and ln_pred != 0:
+                    ctx.mem.w32(ln_pred + 0, ln_succ)
+                    ctx.mem.w32(ln_succ + 4, ln_pred)
+            except Exception:
+                pass
         return io.r_s("io_Error")
 
     # Class variables for tracking blocked WaitPort/Wait state (used by amifuse)
