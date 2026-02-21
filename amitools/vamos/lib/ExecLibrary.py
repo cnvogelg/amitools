@@ -643,11 +643,16 @@ class ExecLibrary(LibImpl):
         # ensure regs point at the IORequest
         ctx.cpu.w_reg(REG_A1, io_addr)
         if hasattr(impl, "BeginIO"):
-            impl.BeginIO(ctx)
-            # flag completion
+            # Set IOF_QUICK before BeginIO.  Devices that hold requests
+            # (e.g. TD_ADDCHANGEINT) clear this flag to indicate the IO
+            # is NOT completed yet and should not be replied.
             flags = io.r_s("io_Flags") | 1  # IOF_QUICK
             io.w_s("io_Flags", flags)
-            io.w_s("io_Message.mn_Node.ln_Type", NodeType.NT_REPLYMSG)
+            impl.BeginIO(ctx)
+            # Re-read flags - device may have cleared IOF_QUICK
+            flags = io.r_s("io_Flags")
+            if flags & 1:
+                io.w_s("io_Message.mn_Node.ln_Type", NodeType.NT_REPLYMSG)
             return io.r_s("io_Error")
         log_exec.warning("DoIO: device impl missing BeginIO for dev=0x%06x", dev_addr)
         return -1
@@ -662,19 +667,45 @@ class ExecLibrary(LibImpl):
         io_addr = ctx.cpu.r_reg(REG_A1)
         res = self._dispatch_begin_io(ctx, io_addr)
         log_exec.info("SendIO(io=0x%06x) -> %d", io_addr, res)
-        # SendIO is asynchronous - the caller expects a reply message when IO completes.
-        # Since we complete synchronously in _dispatch_begin_io, we simulate async
-        # completion by sending the IORequest as a reply message to the reply port.
+        # SendIO is asynchronous - the caller expects a reply message when IO
+        # completes.  We complete synchronously in _dispatch_begin_io, so we
+        # simulate async completion by queuing the IORequest as a reply.
+        # If the device cleared IOF_QUICK (e.g. TD_ADDCHANGEINT which holds
+        # the request), we do NOT queue a reply - the IO is pending.
         io = AccessStruct(ctx.mem, IORequestStruct, io_addr)
+        if not (io.r_s("io_Flags") & 1):
+            log_exec.info("SendIO: IO held (IOF_QUICK cleared), no reply queued")
+            return res
         reply_port = io.r_s("io_Message.mn_ReplyPort")
-        has_port = reply_port != 0 and self.port_mgr.has_port(reply_port)
-        if has_port:
+        if reply_port != 0:
+            # Auto-register ports that handlers created internally (e.g.
+            # PFS3's timer reply port) so we can queue messages to them.
+            if not self.port_mgr.has_port(reply_port):
+                self.port_mgr.register_port(reply_port)
+                log_exec.info(
+                    "SendIO: auto-registered reply_port=0x%06x", reply_port
+                )
             self.port_mgr.put_msg(reply_port, io_addr)
+            # Also add to the m68k memory list (ADDTAIL) so the handler
+            # can find the message via raw list access or WaitIO/Remove.
+            # Without this, only the Python queue has the message, and
+            # handlers that check the m68k list directly would see an
+            # empty list and skip processing.
+            try:
+                lst_off = MsgPortStruct.sdef.find_field_def_by_name("mp_MsgList").offset
+                list_addr = reply_port + lst_off
+                # lh_Tail is at offset 4 within ListStruct
+                lh_tail_field = list_addr + 4
+                # lh_TailPred is at offset 8 within ListStruct
+                old_tailpred = ctx.mem.r32(list_addr + 8)
+                # ADDTAIL: insert message node at end of list
+                ctx.mem.w32(io_addr + 0, lh_tail_field)  # ln_Succ -> &lh_Tail
+                ctx.mem.w32(io_addr + 4, old_tailpred)   # ln_Pred -> old last
+                ctx.mem.w32(old_tailpred + 0, io_addr)   # old_last.ln_Succ -> new
+                ctx.mem.w32(list_addr + 8, io_addr)      # lh_TailPred -> new
+            except Exception:
+                pass  # Port memory not accessible - Python queue is enough
             log_exec.info("SendIO: queued reply to port 0x%06x", reply_port)
-        else:
-            log_exec.warning(
-                "SendIO: reply_port=0x%06x not registered", reply_port
-            )
         return res
 
     def CheckIO(self, ctx):
