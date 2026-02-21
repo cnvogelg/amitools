@@ -125,11 +125,28 @@ class SignalFunc(FuncBase):
 
         sched_task = self.get_my_sched_task()
         if sched_task is None:
-            # Fallback: just log and return
+            # Fallback: set signals in the fallback tracker.
+            # In single-task handler mode, all Signal() calls target the
+            # current (only) task.  Without this, self-signaling (used by
+            # PFS3 for deferred validation scheduling) is silently lost
+            # and the handler stalls with ERROR_NOT_A_DOS_DISK.
+            SignalFunc._fallback_signals |= signals
+            # Also update tc_SigRecvd in m68k memory so Wait() and
+            # external code (e.g. _flush_pending_signals) see the signals.
+            try:
+                from amitools.vamos.libstructs.exec_ import TaskStruct
+                sigrecvd_off = TaskStruct.sdef.find_field_def_by_name(
+                    "tc_SigRecvd"
+                ).offset
+                current = self.ctx.mem.r32(task_addr + sigrecvd_off)
+                self.ctx.mem.w32(task_addr + sigrecvd_off, current | signals)
+            except Exception:
+                pass
             log_exec.info(
-                "Signal(task=%08x, signals=%08x) -> no scheduler (fallback)",
+                "Signal(task=%08x, signals=%08x) -> fallback set _fallback_signals=%08x",
                 task_addr,
                 signals,
+                SignalFunc._fallback_signals,
             )
             return
 
