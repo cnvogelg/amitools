@@ -52,7 +52,9 @@ class Partition:
 
     def get_num_blocks(self):
         """return total number of blocks in this partition"""
-        return self.get_num_cyls() * self.cyl_blks
+        de = self.part_blk.dos_env
+        part_cyl_blks = de.surfaces * de.blk_per_trk
+        return self.get_num_cyls() * part_cyl_blks
 
     def get_num_bytes(self):
         return self.get_num_blocks() * self.block_bytes
