@@ -716,6 +716,26 @@ class ExecLibrary(LibImpl):
                 ctx.mem.w32(list_addr + 8, io_addr)      # lh_TailPred -> new
             except Exception:
                 pass  # Port memory not accessible - Python queue is enough
+            # Signal the task like real AmigaOS ReplyMsg() does.
+            # Without this, handlers that call Wait() for IO completion
+            # (e.g. BFFS) never see the IO completion signal and take
+            # wrong code paths.
+            try:
+                sigbit = ctx.mem.r8(
+                    reply_port
+                    + MsgPortStruct.sdef.find_field_def_by_name(
+                        "mp_SigBit"
+                    ).offset
+                )
+                if 0 <= sigbit < 32:
+                    sig_task_off = MsgPortStruct.sdef.find_field_def_by_name(
+                        "mp_SigTask"
+                    ).offset
+                    sig_task = ctx.mem.r32(reply_port + sig_task_off)
+                    if sig_task != 0:
+                        self.signal_func.signal(sig_task, 1 << sigbit)
+            except Exception:
+                pass
             log_exec.info("SendIO: queued reply to port 0x%06x", reply_port)
         return res
 
