@@ -192,10 +192,21 @@ class DosLibrary(LibImpl):
             raise UnsupportedFeatureError(
                 "WaitPkt on empty message queue called: Port (%06x)" % port_addr
             )
-        # Have message - get it
+        # Have message - get it from Python queue
         msg_addr = ctx.exec_lib.port_mgr.get_msg(port_addr)
         if msg_addr == 0:
             return 0
+        # Also unlink from m68k memory list (REMOVE operation).
+        # Without this, handlers that read mp_MsgList directly see stale
+        # entries and try to process already-handled packets.
+        try:
+            ln_succ = ctx.mem.r32(msg_addr + 0)
+            ln_pred = ctx.mem.r32(msg_addr + 4)
+            if ln_succ != 0 and ln_pred != 0:
+                ctx.mem.w32(ln_pred + 0, ln_succ)
+                ctx.mem.w32(ln_succ + 4, ln_pred)
+        except Exception:
+            pass
         # DosPacket is at mn_Node.ln_Name (standard AmigaDOS convention)
         msg = AccessStruct(ctx.mem, MessageStruct, msg_addr)
         pkt_addr = msg.r_s("mn_Node.ln_Name")
