@@ -61,9 +61,10 @@ class TimerDevice(LibImpl):
             log_timer.info(
                 "BeginIO: TR_ADDREQUEST secs=%d micro=%d", tv_secs, tv_micro
             )
-            # Cap at 1 second max to avoid long hangs, but still provide real delay
-            if delay_secs > 0:
-                time.sleep(min(delay_secs, 1.0))
+            # Complete timer requests immediately. In our emulated environment,
+            # callers already observe async completion via SendIO queuing the
+            # reply message. Sleeping here turns timer scheduling into
+            # filesystem wall-clock latency.
         elif cmd == TR_GETSYSTIME:
             # Return current time
             secs, micros = self.get_sys_time()
