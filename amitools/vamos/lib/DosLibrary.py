@@ -2286,14 +2286,8 @@ class DosLibrary(LibImpl):
 
     def AttemptLockDosList(self, ctx):
         flags = ctx.cpu.r_reg(REG_D1)
-        if not getattr(self, "_attempt_lock_warned", False):
-            log_dos.info(
-                "AttemptLockDosList(flags=0x%x) stub -> dummy success", flags
-            )
-            self._attempt_lock_warned = True
-        dummy = 0x1000
-        # Return a non-zero dummy pointer (must be >1 for some callers)
-        return dummy
+        log_dos.info("AttemptLockDosList(flags=0x%x)", flags)
+        return self.dos_list.lock_dos_list(flags)
 
     def MakeDosEntry(self, ctx):
         name_bptr = ctx.cpu.r_reg(REG_D1)
