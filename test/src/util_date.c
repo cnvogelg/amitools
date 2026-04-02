@@ -2,21 +2,24 @@
 #include <exec/exec.h>
 #include <proto/exec.h>
 #include <proto/dos.h>
+#define __NOLIBBASE__
 #include <proto/utility.h>
 
-#ifdef __SASC
-typedef struct Library UtilType;
-#else
-typedef struct UtilityBase UtilType;
+#ifdef __VBCC__
+struct DosLibrary *DOSBase;
 #endif
-
-UtilType *UtilityBase;
+struct Library *UtilityBase;
 
 int main(int argc, char *argv[])
 {
   ULONG res;
 
-  if ((UtilityBase = (UtilType *)OpenLibrary("utility.library", 37)))
+#ifdef __VBCC__
+  DOSBase = (struct DosLibrary *)OpenLibrary("dos.library", 33L);
+  if (DOSBase && (UtilityBase = OpenLibrary("utility.library", 37)))
+#else
+  if ((UtilityBase = OpenLibrary("utility.library", 37)))
+#endif
   {
     struct ClockData cd;
     struct ClockData cf;
@@ -87,7 +90,13 @@ int main(int argc, char *argv[])
     res = CheckDate(&cf);
     Printf("f9: %lu\n", res);
 
-    CloseLibrary((struct Library *)UtilityBase);
+    CloseLibrary(UtilityBase);
   }
+#ifdef __VBCC__
+  if (DOSBase)
+  {
+    CloseLibrary(&DOSBase->dl_lib);
+  }
+#endif
   return 0;
 }
