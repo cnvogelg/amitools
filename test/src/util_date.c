@@ -82,8 +82,10 @@ int main(int argc, char *argv[])
 
     Amiga2Date(1000, &cf);
     cf.wday = 7;
-    res = CheckDate(&cf);
+    res = Date2Amiga(&cf);
     Printf("f8: %lu\n", res);
+    res = CheckDate(&cf);
+    Printf("f9: %lu\n", res);
 
     CloseLibrary((struct Library *)UtilityBase);
   }

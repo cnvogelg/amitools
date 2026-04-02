@@ -18,7 +18,8 @@ def write_clock_data(dt, mem, data_ptr):
     data.w_s("mday", dt.day)
     data.w_s("month", dt.month)
     data.w_s("year", dt.year)
-    data.w_s("wday", dt.weekday())
+    # Amiga weekdays are Sunday-based, while Python uses Monday=0.
+    data.w_s("wday", (dt.weekday() + 1) % 7)
 
 
 def read_clock_data(mem, data_ptr):
@@ -33,7 +34,6 @@ def read_clock_data(mem, data_ptr):
     mday = data.r_s("mday")
     month = data.r_s("month")
     year = data.r_s("year")
-    wday = data.r_s("wday")
 
     try:
         dt = datetime.datetime(year, month, mday, hour, minute, sec)
