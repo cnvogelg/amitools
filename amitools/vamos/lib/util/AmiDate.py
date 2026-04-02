@@ -39,8 +39,6 @@ def read_clock_data(mem, data_ptr):
         dt = datetime.datetime(year, month, mday, hour, minute, sec)
         if year < 1978:
             return None
-        if dt.weekday() != wday:
-            return None
         return dt
     except ValueError:
         return None
