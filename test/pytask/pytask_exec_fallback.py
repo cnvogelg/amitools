@@ -1,3 +1,5 @@
+import os
+import tempfile
 from amitools.vamos.lib.lexec.signalfunc import SignalFunc
 from amitools.vamos.libtypes import Message, MsgPort
 from amitools.vamos.main import main
@@ -22,8 +24,15 @@ def _run_fallback(check):
 
     _reset_fallback_signals()
     try:
-        exit_codes = main(args=["-c", TEST_VAMOSRC], mode=FallbackMode())
+        old_home = os.environ.get("HOME")
+        with tempfile.TemporaryDirectory() as tmp_home:
+            os.environ["HOME"] = tmp_home
+            exit_codes = main(args=["-c", TEST_VAMOSRC], mode=FallbackMode())
     finally:
+        if old_home is None:
+            os.environ.pop("HOME", None)
+        else:
+            os.environ["HOME"] = old_home
         _reset_fallback_signals()
     assert exit_codes == 0
 
