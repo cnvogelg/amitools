@@ -23,6 +23,9 @@ from amitools.vamos.libstructs import (
     RDArgsStruct,
     CLIStruct,
     DosPacketStruct,
+    ProcessStruct,
+    MessageStruct,
+    NodeType,
 )
 from amitools.vamos.libtypes import TagList, DosTag, DosPacket
 from amitools.vamos.error import *
@@ -52,6 +55,7 @@ class DosLibrary(LibImpl):
     GVF_BINARY_VAR = 0x400
 
     MAX_SHOW_DATA = 32
+    _waitpkt_blocked = False
 
     def get_struct_def(self):
         return DosLibraryStruct
@@ -145,6 +149,33 @@ class DosLibrary(LibImpl):
         self.setioerr(ctx, ctx.cpu.r_reg(REG_D1))
         log_dos.info("SetIoErr: IoErr=%d old IoErr=%d", self.io_err, old_io_err)
         return old_io_err
+
+    def WaitPkt(self, ctx):
+        from amitools.vamos.lib.ExecLibrary import ExecLibrary
+
+        proc_addr = ctx.exec_lib.exec_lib.this_task.aptr
+        if proc_addr == 0:
+            log_dos.warning("WaitPkt: ThisTask is NULL")
+            return 0
+        proc = AccessStruct(ctx.mem, ProcessStruct, proc_addr)
+        port_addr = proc.s_get_addr("pr_MsgPort")
+        log_dos.info("WaitPkt: proc=%06x port=%06x", proc_addr, port_addr)
+        if not ctx.exec_lib.port_mgr.has_port(port_addr):
+            log_dos.warning("WaitPkt: port %06x not registered", port_addr)
+            return 0
+        if not ctx.exec_lib.port_mgr.has_msg(port_addr):
+            sp = ctx.cpu.r_reg(REG_A7)
+            ExecLibrary._waitport_blocked_sp = sp
+            ExecLibrary._waitport_blocked_port = port_addr
+            ExecLibrary._waitport_blocked_ret = ctx.mem.r32(sp)
+            DosLibrary._waitpkt_blocked = True
+            raise UnsupportedFeatureError(
+                "WaitPkt on empty message queue called: Port (%06x)" % port_addr
+            )
+        msg_addr = ctx.exec_lib.port_mgr.get_msg(port_addr)
+        self._unlink_msg(ctx, msg_addr)
+        msg = AccessStruct(ctx.mem, MessageStruct, msg_addr)
+        return msg.r_s("mn_Node.ln_Name")
 
     def Fault(self, ctx):
         errcode = ctx.cpu.r_reg(REG_D1)
@@ -2026,12 +2057,47 @@ class DosLibrary(LibImpl):
 
     def ReplyPkt(self, ctx, dp: DosPacket, res1, res2):
         log_dos.info("ReplyPkt(%s, %d, %d)", dp, res1, res2)
+        if res1 > 0x7FFFFFFF:
+            res1 -= 0x100000000
+        if res2 > 0x7FFFFFFF:
+            res2 -= 0x100000000
         dp.res1.val = res1
         dp.res2.val = res2
-        log_dos.debug("ReplyPkt: port=%08x  msg=%08x", dp.port.aptr, dp.link.aptr)
-        ctx.proxies.get_exec_lib_proxy().PutMsg(dp.port.aptr, dp.link.aptr)
+        if dp.link.aptr == 0 or dp.port.aptr == 0:
+            return 0
+        reply_port = dp.port.aptr
+        proc_addr = ctx.exec_lib.exec_lib.this_task.aptr
+        if proc_addr != 0:
+            proc = AccessStruct(ctx.mem, ProcessStruct, proc_addr)
+            dp.port.setup(proc.s_get_addr("pr_MsgPort"))
+        msg = AccessStruct(ctx.mem, MessageStruct, dp.link.aptr)
+        msg.w_s("mn_Node.ln_Type", NodeType.NT_REPLYMSG)
+        msg.w_s("mn_Node.ln_Succ", 0)
+        msg.w_s("mn_Node.ln_Pred", 0)
+        try:
+            ctx.exec_lib.port_mgr.put_msg(reply_port, dp.link.aptr)
+        except Exception:
+            ctx.proxies.get_exec_lib_proxy().PutMsg(reply_port, dp.link.aptr)
+        log_dos.info(
+            "ReplyPkt: pkt=%06x res1=%d res2=%d -> port=%06x",
+            dp.addr,
+            res1,
+            res2,
+            reply_port,
+        )
+        return 0
 
     # ----- Helpers -----
+
+    def _unlink_msg(self, ctx, msg_addr):
+        try:
+            ln_succ = ctx.mem.r32(msg_addr + 0)
+            ln_pred = ctx.mem.r32(msg_addr + 4)
+            if ln_succ != 0 and ln_pred != 0:
+                ctx.mem.w32(ln_pred + 0, ln_succ)
+                ctx.mem.w32(ln_succ + 4, ln_pred)
+        except Exception:
+            pass
 
     def _alloc_mem(self, name, size):
         mem = self.alloc.alloc_memory(size, label=name)
