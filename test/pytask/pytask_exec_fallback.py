@@ -1,8 +1,10 @@
 import os
 import tempfile
+import pytest
 from amitools.vamos.lib.lexec.signalfunc import SignalFunc
 from amitools.vamos.libtypes import Message, MsgPort
 from amitools.vamos.main import main
+from amitools.vamos.error import UnsupportedFeatureError
 from pathlib import Path
 
 
@@ -86,5 +88,19 @@ def pytask_exec_msg_fallback_test():
 
         exec_lib.DeleteMsgPort(port)
         msg.free()
+
+    _run_fallback(check)
+
+
+def pytask_exec_wait_fallback_test():
+    def check(ctx):
+        exec_lib = ctx.proxies.get_exec_lib_proxy()
+
+        assert exec_lib.SetSignal(4, 4) == 0
+        assert exec_lib.Wait(4) == 4
+        assert exec_lib.SetSignal(0, 0) & 4 == 0
+
+        with pytest.raises(UnsupportedFeatureError):
+            exec_lib.Wait(8)
 
     _run_fallback(check)

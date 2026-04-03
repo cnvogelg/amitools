@@ -7,6 +7,7 @@ from amitools.vamos.libstructs import (
     ExecLibraryStruct,
     StackSwapStruct,
     IORequestStruct,
+    MsgPortStruct,
     NodeType,
     SignalSemaphoreStruct,
 )
@@ -25,6 +26,13 @@ from .lexec import Alloc
 
 
 class ExecLibrary(LibImpl):
+    _waitport_blocked_sp = None
+    _waitport_blocked_port = None
+    _waitport_blocked_ret = None
+    _wait_blocked_sp = None
+    _wait_blocked_ret = None
+    _wait_blocked_mask = None
+
     def get_struct_def(self):
         return ExecLibraryStruct
 
@@ -35,12 +43,19 @@ class ExecLibrary(LibImpl):
         self._pools = {}
         self._poolid = 0x1000
         self.exec_lib = ExecLibraryType(ctx.mem, base_addr)
-        # init lib list
-        self.exec_lib.lib_list.new(NodeType.NT_LIBRARY)
+        # Handlers exercise exec's global lists directly during startup
+        # (for example FileSystem.resource registration), so make sure the
+        # full set of list heads is initialized here.
+        self.exec_lib.mem_list.new(NodeType.NT_MEMORY)
+        self.exec_lib.resource_list.new(NodeType.NT_RESOURCE)
         self.exec_lib.device_list.new(NodeType.NT_DEVICE)
+        self.exec_lib.intr_list.new(NodeType.NT_INTERRUPT)
+        self.exec_lib.lib_list.new(NodeType.NT_LIBRARY)
+        self.exec_lib.port_list.new(NodeType.NT_MSGPORT)
         self.exec_lib.task_ready.new(NodeType.NT_TASK)
         self.exec_lib.task_wait.new(NodeType.NT_TASK)
-        self.exec_lib.port_list.new(NodeType.NT_MSGPORT)
+        self.exec_lib.semaphore_list.new(NodeType.NT_SEMAPHORE)
+        self.exec_lib.mem_handlers.new()
         # set some system contants
         attn_flags = 0
         if ctx.cpu_name == "68030(fake)":
@@ -83,6 +98,23 @@ class ExecLibrary(LibImpl):
         self.signal_func.signal(task, signals)
 
     def Wait(self, ctx, signal_set):
+        sched_task = self.signal_func.get_my_sched_task()
+        if sched_task is None:
+            got = SignalFunc._fallback_signals & signal_set
+            if got != 0:
+                SignalFunc._fallback_signals &= ~got
+                log_exec.info(
+                    "Wait(%08x): fallback immediate -> %08x", signal_set, got
+                )
+                return got
+            sp = ctx.cpu.r_reg(REG_A7)
+            ExecLibrary._wait_blocked_sp = sp
+            ExecLibrary._wait_blocked_mask = signal_set
+            ExecLibrary._wait_blocked_ret = ctx.mem.r32(sp)
+            log_exec.info("Wait(%08x): fallback blocking (sp=%08x)", signal_set, sp)
+            raise UnsupportedFeatureError(
+                "Wait on signal set %08x with no signals pending" % signal_set
+            )
         return self.signal_func.wait(signal_set)
 
     def Disable(self, ctx):
@@ -466,6 +498,12 @@ class ExecLibrary(LibImpl):
         pc = self.get_callee_pc(ctx)
         name = "CreateIORequest(%06x)" % pc
         mb = self.alloc.alloc_memory(size, label=name)
+        ctx.mem.w_block(mb.addr, b"\x00" * size)
+        io = AccessStruct(ctx.mem, IORequestStruct, mb.addr)
+        io.w_s("io_Message.mn_ReplyPort", port)
+        io.w_s("io_Message.mn_Length", size)
+        io.w_s("io_Flags", 0)
+        io.w_s("io_Error", 0)
         log_exec.info(
             "CreateIORequest: (%s,%s,%s) -> 0x%06x %d bytes"
             % (mb, port, size, mb.addr, size)
@@ -512,6 +550,105 @@ class ExecLibrary(LibImpl):
                 log_exec.info("CloseDevice: %06x", dev_addr)
                 self.lib_mgr.close_lib(dev_addr)
                 io.w_s("io_Device", 0)
+
+    def _dispatch_begin_io(self, ctx, io_addr):
+        io = AccessStruct(ctx.mem, IORequestStruct, io_addr)
+        dev_addr = io.r_s("io_Device")
+        vlib = self.lib_mgr.get_vlib_by_addr(dev_addr)
+        if vlib is None:
+            log_exec.warning(
+                "DoIO: missing device for io=0x%06x dev=0x%06x", io_addr, dev_addr
+            )
+            return -1
+        impl = vlib.get_impl()
+        ctx.cpu.w_reg(REG_A1, io_addr)
+        if hasattr(impl, "BeginIO"):
+            flags = io.r_s("io_Flags") | 1
+            io.w_s("io_Flags", flags)
+            impl.BeginIO(ctx)
+            flags = io.r_s("io_Flags")
+            if flags & 1:
+                io.w_s("io_Message.mn_Node.ln_Type", NodeType.NT_REPLYMSG)
+            return io.r_s("io_Error")
+        log_exec.warning("DoIO: device impl missing BeginIO for dev=0x%06x", dev_addr)
+        return -1
+
+    def DoIO(self, ctx):
+        io_addr = ctx.cpu.r_reg(REG_A1)
+        res = self._dispatch_begin_io(ctx, io_addr)
+        log_exec.info("DoIO(io=0x%06x) -> %d", io_addr, res)
+        return res
+
+    def SendIO(self, ctx):
+        io_addr = ctx.cpu.r_reg(REG_A1)
+        res = self._dispatch_begin_io(ctx, io_addr)
+        log_exec.info("SendIO(io=0x%06x) -> %d", io_addr, res)
+        io = AccessStruct(ctx.mem, IORequestStruct, io_addr)
+        if not (io.r_s("io_Flags") & 1):
+            log_exec.info("SendIO: IO held (IOF_QUICK cleared), no reply queued")
+            return res
+        reply_port = io.r_s("io_Message.mn_ReplyPort")
+        if reply_port != 0:
+            if not self.port_mgr.has_port(reply_port):
+                self.port_mgr.register_port(reply_port)
+                log_exec.info(
+                    "SendIO: auto-registered reply_port=0x%06x", reply_port
+                )
+            self.port_mgr.put_msg(reply_port, io_addr)
+            try:
+                lst_off = MsgPortStruct.sdef.find_field_def_by_name(
+                    "mp_MsgList"
+                ).offset
+                list_addr = reply_port + lst_off
+                lh_tail_field = list_addr + 4
+                old_tailpred = ctx.mem.r32(list_addr + 8)
+                ctx.mem.w32(io_addr + 0, lh_tail_field)
+                ctx.mem.w32(io_addr + 4, old_tailpred)
+                ctx.mem.w32(old_tailpred + 0, io_addr)
+                ctx.mem.w32(list_addr + 8, io_addr)
+            except Exception:
+                pass
+            try:
+                sigbit = ctx.mem.r8(
+                    reply_port
+                    + MsgPortStruct.sdef.find_field_def_by_name("mp_SigBit").offset
+                )
+                if 0 <= sigbit < 32:
+                    sig_task_off = MsgPortStruct.sdef.find_field_def_by_name(
+                        "mp_SigTask"
+                    ).offset
+                    sig_task = ctx.mem.r32(reply_port + sig_task_off)
+                    if sig_task != 0:
+                        self.signal_func.signal(sig_task, 1 << sigbit)
+            except Exception:
+                pass
+            log_exec.info("SendIO: queued reply to port 0x%06x", reply_port)
+        return res
+
+    def CheckIO(self, ctx):
+        io_addr = ctx.cpu.r_reg(REG_A1)
+        io = AccessStruct(ctx.mem, IORequestStruct, io_addr)
+        log_exec.info("CheckIO(io=0x%06x)", io_addr)
+        return io_addr if (io.r_s("io_Flags") & 1) else 0
+
+    def WaitIO(self, ctx):
+        io_addr = ctx.cpu.r_reg(REG_A1)
+        io = AccessStruct(ctx.mem, IORequestStruct, io_addr)
+        log_exec.info("WaitIO(io=0x%06x)", io_addr)
+        reply_port = io.r_s("io_Message.mn_ReplyPort")
+        if reply_port != 0 and self.port_mgr.has_port(reply_port):
+            port = self.port_mgr.ports[reply_port]
+            if port.queue is not None and io_addr in port.queue:
+                port.queue.remove(io_addr)
+            try:
+                ln_succ = ctx.mem.r32(io_addr + 0)
+                ln_pred = ctx.mem.r32(io_addr + 4)
+                if ln_succ != 0 and ln_pred != 0:
+                    ctx.mem.w32(ln_pred + 0, ln_succ)
+                    ctx.mem.w32(ln_succ + 4, ln_pred)
+            except Exception:
+                pass
+        return io.r_s("io_Error")
 
     # ----- Nodes/Lists -----
 
