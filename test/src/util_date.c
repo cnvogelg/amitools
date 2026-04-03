@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
 {
   ULONG res;
 
-  if ((UtilityBase = (UtilType *)OpenLibrary("utility.library", 37)))
+  if ((UtilityBase = OpenLibrary("utility.library", 37)))
   {
     struct ClockData cd;
     struct ClockData cf;
@@ -86,10 +86,10 @@ int main(int argc, char *argv[])
 
     Amiga2Date(1000, &cf);
     cf.wday = 7;
-    res = CheckDate(&cf);
+    res = Date2Amiga(&cf);
     Printf("f8: %lu\n", res);
 
-    CloseLibrary((struct Library *)UtilityBase);
+    CloseLibrary(UtilityBase);
   }
   return 0;
 }
