@@ -76,6 +76,29 @@ def pytask_exec_timer_io_test(vamos_task):
     assert exit_codes == [0]
 
 
+def pytask_exec_input_device_test(vamos_task):
+    def task(ctx, task):
+        exec_proxy = ctx.proxies.get_exec_lib_proxy()
+        port = exec_proxy.CreateMsgPort()
+        size = TimeRequestStruct.get_byte_size()
+        req_addr = exec_proxy.CreateIORequest(port, size)
+        req = AccessStruct(ctx.mem, IORequestStruct, req_addr)
+
+        assert exec_proxy.OpenDevice("input.device", 0, req_addr, 0) == 0
+        assert req.r_s("io_Device") != 0
+        assert exec_proxy.DoIO(req_addr) == 0
+        assert req.r_s("io_Error") == 0
+
+        exec_proxy.CloseDevice(req_addr)
+        assert req.r_s("io_Device") == 0
+        exec_proxy.DeleteIORequest(req_addr)
+        exec_proxy.DeleteMsgPort(port)
+        return 0
+
+    exit_codes = vamos_task.run([task])
+    assert exit_codes == [0]
+
+
 def pytask_exec_create_io_request_test(vamos_task):
     def task(ctx, task):
         exec_proxy = ctx.proxies.get_exec_lib_proxy()
