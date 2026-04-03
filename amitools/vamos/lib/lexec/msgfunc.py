@@ -4,6 +4,8 @@ from amitools.vamos.log import log_exec
 from amitools.vamos.libtypes import MsgPort, Message
 from amitools.vamos.libstructs import NodeType, MsgPortFlags
 from amitools.vamos.astructs import CSTR
+from amitools.vamos.error import UnsupportedFeatureError
+from amitools.vamos.machine.regs import REG_A7
 
 
 class MessageFunc(FuncBase):
@@ -15,14 +17,28 @@ class MessageFunc(FuncBase):
         self.port_mgr = port_mgr
 
     def create_msg_port(self) -> MsgPort:
+        # get my task
+        my_task = self.task_func.find_task(None)
+
+        # In amifuse's single-task fallback mode there is no scheduler-backed
+        # signal allocation. Handlers like CDFileSystem expect CreateMsgPort()
+        # to yield a port using signal bit 0, matching the historical
+        # port-handler-support behavior.
+        if self.signal_func.get_my_sched_task() is None:
+            msg_port = MsgPort.alloc(self.ctx.alloc, tag="exec_port")
+            msg_port.new(sig_bit=0, sig_task=my_task)
+            log_exec.info(
+                "CreateMsgPort: fallback signal=0 my_task=%s port=%s",
+                my_task,
+                msg_port,
+            )
+            return msg_port
+
         # alloc signal first
         signal = self.signal_func.alloc_signal(-1)
         if signal == -1:
             log_exec.error("CreateMsgPort: no signal!")
             return None
-
-        # get my task
-        my_task = self.task_func.find_task(None)
 
         # alloc port
         msg_port = MsgPort.alloc(self.ctx.alloc, tag="exec_port")
@@ -43,7 +59,10 @@ class MessageFunc(FuncBase):
         log_exec.info("DeleteMsgPort(%s) (signal %d)", msg_port, signal)
 
         # free signal
-        self.signal_func.free_signal(signal)
+        if not (
+            self.signal_func.get_my_sched_task() is None and 0 <= signal < 16
+        ):
+            self.signal_func.free_signal(signal)
 
         # free port
         msg_port.free(self.ctx.alloc)
@@ -53,7 +72,9 @@ class MessageFunc(FuncBase):
         has_port = self.port_mgr.has_port(port.addr)
         if has_port:
             log_exec.info("PutMsg(%s, %s) -> PortMgr", port, msg)
+            msg.node.type.val = msg_type
             self.port_mgr.put_msg(port.addr, msg.addr)
+            self._signal_port(port)
             return
 
         # set type
@@ -87,7 +108,11 @@ class MessageFunc(FuncBase):
         has_port = self.port_mgr.has_port(port.addr)
         if has_port:
             msg_addr = self.port_mgr.get_msg(port.addr)
+            if msg_addr is None:
+                log_exec.info("GetMsg(%s) -> PortMgr -> None", port)
+                return None
             msg = Message(self.ctx.mem, msg_addr)
+            self._unlink_msg(msg_addr)
             log_exec.info("GetMsg(%s) -> PortMgr -> %s", port, msg)
             return msg
 
@@ -110,10 +135,15 @@ class MessageFunc(FuncBase):
         if has_port:
             has_msg = self.port_mgr.has_msg(port.addr)
             if not has_msg:
-                log_exec.error(
-                    "WaitPort: on empty message queue called: Port (%06x)", port.addr
+                from amitools.vamos.lib.ExecLibrary import ExecLibrary
+
+                sp = self.ctx.cpu.r_reg(REG_A7)
+                ExecLibrary._waitport_blocked_sp = sp
+                ExecLibrary._waitport_blocked_port = port.addr
+                ExecLibrary._waitport_blocked_ret = self.ctx.mem.r32(sp)
+                raise UnsupportedFeatureError(
+                    "WaitPort on empty message queue called: Port (%06x)" % port.addr
                 )
-                return None
             msg_addr = self.port_mgr.peek_msg(port.addr)
             log_exec.info("WaitPort: peek message %06x", msg_addr)
             return Message(self.ctx.mem, msg_addr)
@@ -158,3 +188,24 @@ class MessageFunc(FuncBase):
             msg.node.type.val = NodeType.NT_FREEMSG
         else:
             self.put_msg(port, msg, msg_type=NodeType.NT_REPLYMSG)
+
+    def _signal_port(self, port: MsgPort):
+        try:
+            flags = port.flags.val
+            if flags == MsgPortFlags.PA_SIGNAL:
+                task = port.sig_task.aptr
+                if task is not None:
+                    sig_bit = port.sig_bit.val
+                    self.signal_func.signal(task, 1 << sig_bit)
+        except Exception:
+            pass
+
+    def _unlink_msg(self, msg_addr):
+        try:
+            ln_succ = self.ctx.mem.r32(msg_addr + 0)
+            ln_pred = self.ctx.mem.r32(msg_addr + 4)
+            if ln_succ != 0 and ln_pred != 0:
+                self.ctx.mem.w32(ln_pred + 0, ln_succ)
+                self.ctx.mem.w32(ln_succ + 4, ln_pred)
+        except Exception:
+            pass
