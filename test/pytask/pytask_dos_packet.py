@@ -1,6 +1,5 @@
 import pytest
 
-from amitools.vamos.astructs import AccessStruct
 from amitools.vamos.error import UnsupportedFeatureError
 from amitools.vamos.libstructs import DosPacketStruct, MessageStruct, ProcessStruct
 from amitools.vamos.libtypes import DosPacket, Message, MsgPort
@@ -12,8 +11,8 @@ def pytask_dos_waitpkt_replypkt_test(vamos_task):
         dos_proxy = ctx.proxies.get_dos_lib_proxy()
 
         proc_addr = ctx.process.proc.addr
-        proc_access = AccessStruct(ctx.mem, ProcessStruct, proc_addr)
-        proc_port_addr = proc_access.s_get_addr("pr_MsgPort")
+        proc_access = ProcessStruct(ctx.mem, proc_addr)
+        proc_port_addr = proc_access.msg_port.addr
         proc_port = MsgPort(ctx.mem, proc_port_addr)
         if not ctx.exec_lib.port_mgr.has_port(proc_port_addr):
             ctx.exec_lib.port_mgr.register_port(proc_port_addr)
@@ -31,8 +30,8 @@ def pytask_dos_waitpkt_replypkt_test(vamos_task):
 
         pkt.link.ref = msg
         pkt.port.ref = reply_port
-        msg_access = AccessStruct(ctx.mem, MessageStruct, msg.addr)
-        msg_access.w_s("mn_Node.ln_Name", pkt.addr)
+        msg_access = MessageStruct(ctx.mem, msg.addr)
+        msg_access.node.name.aptr = pkt.addr
 
         exec_proxy.PutMsg(proc_port, msg)
         assert dos_proxy.WaitPkt() == pkt.addr
