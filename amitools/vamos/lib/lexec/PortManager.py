@@ -83,18 +83,23 @@ class PortManager:
         else:
             raise VamosInternalError("Invalid Port remove: %06x" % addr)
 
+    def _ensure_port(self, port_addr):
+        if port_addr not in self.ports:
+            self.register_port(port_addr)
+        return self.ports[port_addr]
+
     def put_msg(self, port_addr, msg_addr):
-        port = self.ports[port_addr]
+        port = self._ensure_port(port_addr)
         port.put_msg(msg_addr)
 
     def has_msg(self, port_addr):
-        port = self.ports[port_addr]
+        port = self._ensure_port(port_addr)
         return port.has_msg()
 
     def get_msg(self, port_addr):
-        port = self.ports[port_addr]
+        port = self._ensure_port(port_addr)
         return port.get_msg()
 
     def peek_msg(self, port_addr):
-        port = self.ports[port_addr]
+        port = self._ensure_port(port_addr)
         return port.peek_msg()
