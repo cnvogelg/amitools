@@ -3,6 +3,9 @@ from amitools.vamos.libstructs import IORequestStruct, NodeType, TimeRequestStru
 from amitools.vamos.libtypes import ExecLibrary as ExecLibraryType
 
 
+TR_GETSYSTIME = 11
+
+
 def pytask_exec_base_lists_test(vamos_task):
     def task(ctx, task):
         exec_proxy = ctx.proxies.get_exec_lib_proxy()
@@ -25,6 +28,48 @@ def pytask_exec_base_lists_test(vamos_task):
         assert exec_base.semaphore_list.is_empty()
         assert exec_base.mem_handlers.is_empty()
 
+        return 0
+
+    exit_codes = vamos_task.run([task])
+    assert exit_codes == [0]
+
+
+def pytask_exec_timer_io_test(vamos_task):
+    def task(ctx, task):
+        exec_proxy = ctx.proxies.get_exec_lib_proxy()
+        port = exec_proxy.CreateMsgPort()
+        size = TimeRequestStruct.get_byte_size()
+        req_addr = exec_proxy.CreateIORequest(port, size)
+        io = AccessStruct(ctx.mem, IORequestStruct, req_addr)
+        req = TimeRequestStruct(ctx.mem, req_addr)
+
+        assert exec_proxy.OpenDevice("timer.device", 0, req_addr, 0) == 0
+
+        io.w_s("io_Command", TR_GETSYSTIME)
+        req.tr_time.tv_secs.val = 0
+        req.tr_time.tv_micro.val = 0
+
+        assert exec_proxy.DoIO(req_addr) == 0
+        assert exec_proxy.CheckIO(req_addr) == req_addr
+        assert io.r_s("io_Error") == 0
+        assert io.r_s("io_Message.mn_Node.ln_Type") == NodeType.NT_REPLYMSG
+        assert req.tr_time.tv_secs.val > 0
+
+        sig_mask = 1 << port.sig_bit.val
+        exec_proxy.SetSignal(0, sig_mask)
+        req.tr_time.tv_secs.val = 0
+        req.tr_time.tv_micro.val = 0
+
+        assert exec_proxy.SendIO(req_addr) == 0
+        assert exec_proxy.CheckIO(req_addr) == req_addr
+        assert exec_proxy.SetSignal(0, 0) & sig_mask == sig_mask
+        assert exec_proxy.WaitIO(req_addr) == 0
+        assert exec_proxy.GetMsg(port) is None
+        assert req.tr_time.tv_secs.val > 0
+
+        exec_proxy.CloseDevice(req_addr)
+        exec_proxy.DeleteIORequest(req_addr)
+        exec_proxy.DeleteMsgPort(port)
         return 0
 
     exit_codes = vamos_task.run([task])
