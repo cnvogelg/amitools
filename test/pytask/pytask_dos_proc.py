@@ -12,6 +12,7 @@ from amitools.vamos.libtypes import DosTag, TagList
 def pytask_dos_create_new_proc_entry_test(vamos_task):
     def proc(ctx, task):
         dos_proxy = ctx.proxies.get_dos_lib_proxy()
+        exec_proxy = ctx.proxies.get_exec_lib_proxy()
 
         parent = ProcessStruct(ctx.mem, ctx.process.proc.addr)
         name_mem = ctx.alloc.alloc_cstr("child_entry")
@@ -44,6 +45,7 @@ def pytask_dos_create_new_proc_entry_test(vamos_task):
         assert port.sig_task.aptr == proc_addr
         assert port.node.name.str == "child_entry"
         assert ctx.exec_lib.port_mgr.has_port(port_addr)
+        assert exec_proxy.FindPort("child_entry").addr == port_addr
         assert DosLibrary._child_processes[proc_addr]["entry_pc"] == 0x123456
 
         DosLibrary._child_processes.pop(proc_addr, None)

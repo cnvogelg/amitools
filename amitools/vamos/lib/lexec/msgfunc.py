@@ -164,6 +164,8 @@ class MessageFunc(FuncBase):
 
     def add_port(self, port: MsgPort):
         log_exec.info("AddPort(%s)", port)
+        if not self.port_mgr.has_port(port.addr):
+            self.port_mgr.register_port(port.addr)
         # set port type
         port.node.type.val = NodeType.NT_MSGPORT
         # enqueue
@@ -171,6 +173,8 @@ class MessageFunc(FuncBase):
 
     def rem_port(self, port: MsgPort):
         log_exec.info("RemPort(%s)", port)
+        if self.port_mgr.has_port(port.addr):
+            self.port_mgr.unregister_port(port.addr)
         # remove node
         port.node.remove()
 
@@ -178,6 +182,8 @@ class MessageFunc(FuncBase):
         # find port by name in port list
         port_name = name.str
         port = self.exec_lib.port_list.find_name(port_name, promote=True)
+        if port is None:
+            port = self._find_registered_port(port_name)
         log_exec.info("FindPort(%s) -> %s", port_name, port)
         return port
 
@@ -209,3 +215,16 @@ class MessageFunc(FuncBase):
                 self.ctx.mem.w32(ln_succ + 4, ln_pred)
         except Exception:
             pass
+
+    def _find_registered_port(self, port_name):
+        for port_addr in self.port_mgr.ports:
+            try:
+                port = MsgPort(self.ctx.mem, port_addr)
+                name_addr = port.node.name.aptr
+                if name_addr == 0:
+                    continue
+                if self.ctx.mem.r_cstr(name_addr) == port_name:
+                    return port
+            except Exception:
+                continue
+        return None
