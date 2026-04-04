@@ -155,7 +155,7 @@ class RDisk:
             )
             # add partitions
             for p in self.parts:
-                res.append(p.get_info(logic_blks))
+                res.append(p.get_info(total_blks))
                 if full:
                     extra = p.get_extra_infos()
                     for e in extra:
