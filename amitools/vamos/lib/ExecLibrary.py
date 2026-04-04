@@ -7,6 +7,7 @@ from amitools.vamos.libstructs import (
     ExecLibraryStruct,
     StackSwapStruct,
     IORequestStruct,
+    MinListStruct,
     MsgPortStruct,
     NodeType,
     SignalSemaphoreStruct,
@@ -651,6 +652,22 @@ class ExecLibrary(LibImpl):
         return io.r_s("io_Error")
 
     # ----- Nodes/Lists -----
+
+    def NewMinList(self, ctx):
+        minlist_addr = ctx.cpu.r_reg(REG_A0)
+        minlist = AccessStruct(ctx.mem, MinListStruct, minlist_addr)
+        head_off = MinListStruct.sdef.find_field_def_by_name("mlh_Head").offset
+        tail_off = MinListStruct.sdef.find_field_def_by_name("mlh_Tail").offset
+        tailpred_off = MinListStruct.sdef.find_field_def_by_name(
+            "mlh_TailPred"
+        ).offset
+        head_addr = minlist_addr + head_off
+        tail_addr = minlist_addr + tail_off
+        minlist.w_s("mlh_Head", tail_addr)
+        minlist.w_s("mlh_Tail", 0)
+        minlist.w_s("mlh_TailPred", head_addr)
+        log_exec.info("NewMinList(0x%06x)", minlist_addr)
+        return minlist_addr
 
     def AddTail(self, ctx, list: List, node: Node):
         log_exec.info("AddTail(%s, %s)", list, node)
