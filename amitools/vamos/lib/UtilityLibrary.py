@@ -2,6 +2,7 @@ from math import trunc
 from amitools.vamos.machine.regs import REG_D0, REG_D1, REG_A0, REG_A1
 from amitools.vamos.astructs import APTR
 from amitools.vamos.libcore import LibImpl
+from amitools.vamos.libstructs import ClockDataStruct
 from amitools.vamos.libtypes import TagList, TagItem, CommonTag, TagArray, Tag
 from amitools.vamos.lib.util.AmiDate import *
 from amitools.vamos.lib.util.flags import (
@@ -441,23 +442,25 @@ class UtilityLibrary(LibImpl):
         log_utility.info("Amiga2Date: seconds=%d -> time=%s", seconds, t)
         write_clock_data(t, ctx.mem, date_ptr)
 
-    def Date2Amiga(self, ctx):
-        date_ptr = ctx.cpu.r_reg(REG_A0)
-
-        t = read_clock_data(ctx.mem, date_ptr)
+    def Date2Amiga(self, ctx, date: ClockDataStruct):
+        if date is None:
+            log_utility.debug("Date2Amiga: invalid date @00000000")
+            return 0
+        t = read_clock_data(ctx.mem, date.addr)
         if t is None:
-            log_utility.warning("Date2Amiga: invalid date! @%08x", date_ptr)
+            log_utility.debug("Date2Amiga: invalid date @%08x", date.addr)
             return 0
         seconds = seconds_since(t)
         log_utility.info("Date2Amige: time=%s -> seconds=%u", t, seconds)
         return seconds
 
-    def CheckDate(self, ctx):
-        date_ptr = ctx.cpu.r_reg(REG_A0)
-
-        t = read_clock_data(ctx.mem, date_ptr)
+    def CheckDate(self, ctx, date: ClockDataStruct):
+        if date is None:
+            log_utility.debug("CheckDate: invalid date @00000000")
+            return 0
+        t = read_clock_data(ctx.mem, date.addr)
         if t is None:
-            log_utility.info("CheckDate: invalid date! @%08x", date_ptr)
+            log_utility.debug("CheckDate: invalid date @%08x", date.addr)
             return 0
         seconds = seconds_since(t)
         log_utility.info("CheckDate: time=%s -> seconds=%u", t, seconds)
