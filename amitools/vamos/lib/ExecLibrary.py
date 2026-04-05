@@ -1,4 +1,5 @@
 from enum import IntEnum
+import sys
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib, LibFuncs, InitRes
 from amitools.vamos.libcore import LibImpl
@@ -739,6 +740,24 @@ class ExecLibrary(LibImpl):
 
     def CacheClearU(self, ctx):
         return 0
+
+    def _raw_console_write(self, value):
+        if value == 0:
+            return
+        out = sys.stderr
+        if value == 10:
+            out.write("\r")
+        out.write(chr(value & 0xFF))
+        out.flush()
+
+    def RawMayGetChar(self, ctx):
+        log_exec.info("RawMayGetChar() -> no data")
+        return -1
+
+    def RawPutChar(self, ctx):
+        value = ctx.cpu.r_reg(REG_D0) & 0xFF
+        self._raw_console_write(value)
+        log_exec.info("RawPutChar(%02x)", value)
 
     def RawDoFmt(self, ctx):
         fmtString = ctx.cpu.r_reg(REG_A0)

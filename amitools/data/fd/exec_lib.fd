@@ -97,8 +97,8 @@ OpenResource(resName)(a1)
 *------ private diagnostic support -----------------------------------
 ##private
 execPrivate7()()
-execPrivate8()()
-execPrivate9()()
+RawMayGetChar()()
+RawPutChar(ch)(d0)
 ##public
 *------ misc ---------------------------------------------------------
 RawDoFmt(formatString,dataStream,putChProc,putChData)(a0/a1/a2/a3)
