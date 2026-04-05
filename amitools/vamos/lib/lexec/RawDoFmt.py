@@ -32,6 +32,23 @@ def _setup_fragment(ctx, fmt_str, put_proc):
     return mem_obj
 
 
+def _put_known_cstr(ctx, put_data, fmt_str):
+    ctx.mem.w_cstr(put_data, fmt_str)
+
+
+def _is_known_cstr_putproc(ctx, put_proc):
+    putcode = ctx.mem.r32(put_proc)
+    if putcode == 0x16C04E75:
+        return True
+    elif putcode == 0x4E55FFFC:  # link #-4,a5
+        putcode2 = ctx.mem.r32(put_proc + 4)
+        putcode3 = ctx.mem.r32(put_proc + 8)
+        putcode4 = ctx.mem.r16(put_proc + 12)
+        if putcode2 == 0x2B40FFFC and putcode3 == 0x16C04E5D and putcode4 == 0x4E75:
+            return True
+    return False
+
+
 def raw_do_fmt(ctx, fmtString, dataStream, putProc, putData):
     fmt = ctx.mem.r_cstr(fmtString)
     ps = printf_parse_string(fmt)
@@ -39,18 +56,9 @@ def raw_do_fmt(ctx, fmtString, dataStream, putProc, putData):
     resultstr = printf_generate_output(ps)
     fmtstr = resultstr + "\0"
     # Try to use a shortcut to avoid an unnecessary slow-down
-    known = False
-    putcode = ctx.mem.r32(putProc)
-    if putcode == 0x16C04E75:
-        known = True
-    elif putcode == 0x4E55FFFC:  # link #-4,a5
-        putcode2 = ctx.mem.r32(putProc + 4)
-        putcode3 = ctx.mem.r32(putProc + 8)
-        putcode4 = ctx.mem.r16(putProc + 12)
-        if putcode2 == 0x2B40FFFC and putcode3 == 0x16C04E5D and putcode4 == 0x4E75:
-            known = True
+    known = _is_known_cstr_putproc(ctx, putProc)
     if known:
-        ctx.mem.w_cstr(putData, fmtstr)
+        _put_known_cstr(ctx, putData, fmtstr)
     else:
         mem_obj = _setup_fragment(ctx, fmtstr, putProc)
         set_regs = {REG_A2: putProc, REG_A3: putData}
