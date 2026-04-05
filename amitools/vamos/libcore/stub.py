@@ -265,34 +265,33 @@ class LibStubGen(object):
             res_str = "n/a"
         return res_str
 
-    def _gen_extra_args(self, ctx, extra_args):
-        """generate the extra arguments passed to a lib method"""
-        args = []
-
+    def _gen_extra_arg_readers(self, extra_args):
+        """compile readers for extra register-mapped arguments once per stub."""
+        readers = []
         for arg in extra_args:
-            arg_val = ctx.cpu.r_reg(arg.reg)
+            reg = arg.reg
             arg_type = arg.type
-            # int: keep value
             if issubclass(arg_type, int):
-                pass
-            # bool: convert to int
+                readers.append(lambda ctx, reg=reg: ctx.cpu.r_reg(reg))
             elif issubclass(arg_type, bool):
-                arg_val = int(arg_val)
-            # scalar values and pointers are bound to the register
-            elif issubclass(arg_type, ScalarType) or issubclass(arg_type, PointerType):
-                arg_val = arg_type(cpu=ctx.cpu, reg=arg.reg, mem=ctx.mem)
-            # all other types are bound to the address in memory
-            # (implicit APTR conversion)
+                readers.append(lambda ctx, reg=reg: int(ctx.cpu.r_reg(reg)))
+            elif issubclass(arg_type, ScalarType) or issubclass(
+                arg_type, PointerType
+            ):
+                readers.append(
+                    lambda ctx, reg=reg, arg_type=arg_type: arg_type(
+                        cpu=ctx.cpu, reg=reg, mem=ctx.mem
+                    )
+                )
             else:
-                if arg_val != 0:
-                    arg_val = arg_type(mem=ctx.mem, addr=arg_val)
-                else:
-                    # NULL object is none
-                    arg_val = None
-
-            args.append(arg_val)
-
-        return args
+                readers.append(
+                    lambda ctx, reg=reg, arg_type=arg_type: (
+                        arg_type(mem=ctx.mem, addr=arg_val)
+                        if (arg_val := ctx.cpu.r_reg(reg)) != 0
+                        else None
+                    )
+                )
+        return readers
 
     def _gen_base_func(self, method, ctx, result_type):
         """generate a function that calls the method with the ctx."""
@@ -308,12 +307,13 @@ class LibStubGen(object):
 
     def _gen_base_extra_args_func(self, method, ctx, extra_args, result_type):
         """generate a function that fills arguments from registers."""
+        arg_readers = self._gen_extra_arg_readers(extra_args)
 
         def base_func(this, *args, **kwargs):
             """the base function to call the impl,
             set return vals, and catch exceptions"""
 
-            args = self._gen_extra_args(ctx, extra_args)
+            args = [reader(ctx) for reader in arg_readers]
             # call function
             result_value = method(ctx, *args)
             self._set_result(ctx, result_value, result_type)
