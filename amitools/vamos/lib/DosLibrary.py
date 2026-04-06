@@ -23,10 +23,20 @@ from amitools.vamos.libstructs import (
     RDArgsStruct,
     CLIStruct,
     DosPacketStruct,
+    DosListVolumeStruct,
+    DosListAssignStruct,
+    ProcessStruct,
+    MessageStruct,
+    MsgPortStruct,
+    MsgPortFlags,
+    ListStruct,
+    TaskState,
+    NodeType,
 )
 from amitools.vamos.libtypes import TagList, DosTag, DosPacket
 from amitools.vamos.error import *
 from amitools.vamos.log import log_dos
+from amitools.vamos.task import Stack
 from .dos.Args import *
 from .dos.Error import *
 from .dos.AmiTime import *
@@ -52,6 +62,8 @@ class DosLibrary(LibImpl):
     GVF_BINARY_VAR = 0x400
 
     MAX_SHOW_DATA = 32
+    _waitpkt_blocked = False
+    _child_processes = {}
 
     def get_struct_def(self):
         return DosLibraryStruct
@@ -67,6 +79,7 @@ class DosLibrary(LibImpl):
         self.matches = {}
         self.rdargs = {}
         self.dos_objs = {}
+        self.dos_entries = {}
         self.errstrings = {}
         self.resident = []
         self.local_vars = {}
@@ -145,6 +158,33 @@ class DosLibrary(LibImpl):
         self.setioerr(ctx, ctx.cpu.r_reg(REG_D1))
         log_dos.info("SetIoErr: IoErr=%d old IoErr=%d", self.io_err, old_io_err)
         return old_io_err
+
+    def WaitPkt(self, ctx):
+        from amitools.vamos.lib.ExecLibrary import ExecLibrary
+
+        proc_addr = ctx.exec_lib.exec_lib.this_task.aptr
+        if proc_addr == 0:
+            log_dos.warning("WaitPkt: ThisTask is NULL")
+            return 0
+        proc = AccessStruct(ctx.mem, ProcessStruct, proc_addr)
+        port_addr = proc.s_get_addr("pr_MsgPort")
+        log_dos.info("WaitPkt: proc=%06x port=%06x", proc_addr, port_addr)
+        if not ctx.exec_lib.port_mgr.has_port(port_addr):
+            log_dos.warning("WaitPkt: port %06x not registered", port_addr)
+            return 0
+        if not ctx.exec_lib.port_mgr.has_msg(port_addr):
+            sp = ctx.cpu.r_reg(REG_A7)
+            ExecLibrary._waitport_blocked_sp = sp
+            ExecLibrary._waitport_blocked_port = port_addr
+            ExecLibrary._waitport_blocked_ret = ctx.mem.r32(sp)
+            DosLibrary._waitpkt_blocked = True
+            raise UnsupportedFeatureError(
+                "WaitPkt on empty message queue called: Port (%06x)" % port_addr
+            )
+        msg_addr = ctx.exec_lib.port_mgr.get_msg(port_addr)
+        self._unlink_msg(ctx, msg_addr)
+        msg = AccessStruct(ctx.mem, MessageStruct, msg_addr)
+        return msg.r_s("mn_Node.ln_Name")
 
     def Fault(self, ctx):
         errcode = ctx.cpu.r_reg(REG_D1)
@@ -1952,6 +1992,205 @@ class DosLibrary(LibImpl):
         node = ctx.cpu.r_reg(REG_D1)
         return self.dos_list.next_dos_entry(flags, node)
 
+    def FindDosEntry(self, ctx):
+        dlist = ctx.cpu.r_reg(REG_D1)
+        name_ptr = ctx.cpu.r_reg(REG_D2)
+        flags = ctx.cpu.r_reg(REG_D3)
+        if name_ptr == 0:
+            log_dos.info(
+                "FindDosEntry(dlist=0x%x, name=NULL, flags=0x%x) -> 0",
+                dlist,
+                flags,
+            )
+            return 0
+        try:
+            name = ctx.mem.r_bstr(name_ptr)
+        except Exception:
+            log_dos.info("FindDosEntry: failed to read BSTR at 0x%x", name_ptr)
+            return 0
+        if name and name.endswith(":"):
+            name = name[:-1]
+        entry = self.dos_list.get_entry_by_name(name)
+        if entry is None:
+            log_dos.info("FindDosEntry('%s', flags=0x%x) -> 0 (not found)", name, flags)
+            return 0
+        entry_type = entry.access.r_s("dol_Type")
+        type_matches = False
+        if entry_type == 0 and (flags & 4):
+            type_matches = True
+        elif entry_type == 2 and (flags & 8):
+            type_matches = True
+        elif entry_type == 1 and (flags & 16):
+            type_matches = True
+        if not type_matches:
+            log_dos.info(
+                "FindDosEntry('%s', flags=0x%x) -> 0 (type %d doesn't match)",
+                name,
+                flags,
+                entry_type,
+            )
+            return 0
+        log_dos.info(
+            "FindDosEntry('%s', flags=0x%x) -> 0x%x",
+            name,
+            flags,
+            entry.mem.addr,
+        )
+        return entry.mem.addr
+
+    def AttemptLockDosList(self, ctx):
+        flags = ctx.cpu.r_reg(REG_D1)
+        log_dos.info("AttemptLockDosList(flags=0x%x)", flags)
+        return self.dos_list.lock_dos_list(flags)
+
+    def MakeDosEntry(self, ctx):
+        name_bptr = ctx.cpu.r_reg(REG_D1)
+        entry_type = ctx.cpu.r_reg(REG_D2)
+        try:
+            name = ctx.mem.r_bstr(name_bptr) if name_bptr else ""
+        except Exception:
+            name = ""
+        if not name:
+            name = f"vol_{entry_type:x}"
+        struct_def = DosListAssignStruct if entry_type == 1 else DosListVolumeStruct
+        mem = ctx.alloc.alloc_struct(struct_def, label=f"DosList({name})")
+        acc = mem.access
+        acc.w_s("dol_Next", 0)
+        acc.w_s("dol_Type", entry_type)
+        acc.w_s("dol_Task", 0)
+        acc.w_s("dol_Lock", 0)
+        if struct_def is DosListVolumeStruct:
+            acc.w_s("dol_LockList", 0)
+            acc.w_s("dol_DiskType", 0)
+        else:
+            acc.w_s("dol_List", 0)
+        name_mem = ctx.alloc.alloc_bstr(name, label="DosListName")
+        acc.w_s("dol_Name", name_mem.addr)
+        self.dos_entries[mem.addr] = {"mem": mem, "name": name_mem}
+        log_dos.info("MakeDosEntry('%s', type=%d) -> 0x%x", name, entry_type, mem.addr)
+        return mem.addr
+
+    def AddDosEntry(self, ctx):
+        dlist_ptr = ctx.cpu.r_reg(REG_D1)
+        ok = dlist_ptr != 0
+        log_dos.info("AddDosEntry(0x%x) -> %s", dlist_ptr, ok)
+        return DOSTRUE if ok else DOSFALSE
+
+    def RemDosEntry(self, ctx):
+        dlist_ptr = ctx.cpu.r_reg(REG_D1)
+        log_dos.info("RemDosEntry(0x%x)", dlist_ptr)
+        return DOSTRUE
+
+    def FreeDosEntry(self, ctx):
+        dlist_ptr = ctx.cpu.r_reg(REG_D1)
+        entry = self.dos_entries.pop(dlist_ptr, None)
+        if entry:
+            ctx.alloc.free_bstr(entry["name"])
+            ctx.alloc.free_struct(entry["mem"])
+        log_dos.info("FreeDosEntry(0x%x)", dlist_ptr)
+        return 0
+
+    def CreateNewProc(self, ctx, tags: TagList):
+        if tags is None:
+            log_dos.warning("CreateNewProc: NULL tags")
+            return 0
+
+        tag_list = tags.to_list(map_enum=DosTag, do_map=True)
+        log_dos.info("CreateNewProc: tags=%s", tag_list)
+
+        entry_pc = tags.get_tag_data(DosTag.NP_Entry, 0)
+        seglist_bptr = tags.get_tag_data(DosTag.NP_SegList, 0)
+        stack_size = tags.get_tag_data(DosTag.NP_StackSize, 4096)
+        name_ptr = tags.get_tag_data(DosTag.NP_Name, 0)
+        priority = tags.get_tag_data(DosTag.NP_Priority, 0)
+        current_dir = tags.get_tag_data(DosTag.NP_CurrentDir, 0)
+        home_dir = tags.get_tag_data(DosTag.NP_HomeDir, 0)
+        input_fh = tags.get_tag_data(DosTag.NP_Input, 0)
+        output_fh = tags.get_tag_data(DosTag.NP_Output, 0)
+
+        name = ctx.mem.r_cstr(name_ptr) if name_ptr != 0 else "child_process"
+        if entry_pc == 0 and seglist_bptr == 0:
+            log_dos.warning("CreateNewProc: no NP_Entry or NP_SegList")
+            return 0
+        if entry_pc == 0 and seglist_bptr != 0:
+            seg_addr = seglist_bptr << 2
+            entry_pc = seg_addr + 4
+
+        log_dos.info(
+            "CreateNewProc: name=%s entry=%06x stack=%d pri=%d",
+            name,
+            entry_pc,
+            stack_size,
+            priority,
+        )
+
+        stack = Stack.alloc(ctx.alloc, stack_size, name=name + "_Stack")
+        ctx.mem.w_block(stack.get_lower(), b"\x00" * stack.get_size())
+
+        proc = ProcessStruct.alloc(ctx.alloc, tag="ChildProcess_" + name)
+        ctx.mem.w_block(proc.addr, b"\x00" * ProcessStruct.get_size())
+
+        name_cstr = ctx.alloc.alloc_memory(len(name) + 1, label="ProcName_" + name)
+        ctx.mem.w_cstr(name_cstr.addr, name)
+        proc.task.node.type.val = NodeType.NT_PROCESS
+        proc.task.node.name.aptr = name_cstr.addr
+        proc.task.node.pri.val = priority
+        proc.task.state.val = TaskState.TS_READY
+        proc.task.flags.val = 0
+        proc.task.id_nest_cnt.val = 0
+        proc.task.td_nest_cnt.val = 0
+        proc.task.sp_reg.aptr = stack.get_initial_sp()
+        proc.task.sp_lower.aptr = stack.get_lower()
+        proc.task.sp_upper.aptr = stack.get_upper()
+        proc.stack_size.val = stack.get_size()
+        proc.stack_base.bptr = stack.get_lower() >> 2
+        proc.seg_list.bptr = seglist_bptr
+        proc.glob_vec.aptr = 0xFFFFFFFF
+        proc.current_dir.bptr = current_dir
+        proc.home_dir.bptr = home_dir
+        proc.window_ptr.aptr = 0xFFFFFFFF
+
+        if input_fh == 0 or output_fh == 0:
+            parent_proc = ctx.exec_lib.exec_lib.this_task.aptr
+            if parent_proc != 0:
+                parent = ProcessStruct(ctx.mem, parent_proc)
+                if input_fh == 0:
+                    input_fh = parent.cis.bptr
+                if output_fh == 0:
+                    output_fh = parent.cos.bptr
+        proc.cis.bptr = input_fh
+        proc.cos.bptr = output_fh
+
+        port_addr = proc.msg_port.addr
+        self._init_child_msgport(ctx, port_addr, proc.addr)
+        port = MsgPortStruct(ctx.mem, port_addr)
+        port.node.name.aptr = name_cstr.addr
+        sigbit = 8
+        proc.task.sig_alloc.val = 1 << sigbit
+        proc.task.sig_wait.val = 0
+        proc.task.sig_recvd.val = 0
+
+        if not ctx.exec_lib.port_mgr.has_port(port_addr):
+            ctx.exec_lib.port_mgr.register_port(port_addr)
+
+        proc_info = {
+            "proc_addr": proc.addr,
+            "entry_pc": entry_pc,
+            "stack": stack,
+            "port_addr": port_addr,
+            "name": name,
+            "seglist_bptr": seglist_bptr,
+        }
+        DosLibrary._child_processes[proc.addr] = proc_info
+
+        log_dos.info(
+            "CreateNewProc: created process %06x entry=%06x port=%06x",
+            proc.addr,
+            entry_pc,
+            port_addr,
+        )
+        return proc.addr
+
     def AssignLock(self, ctx):
         name_ptr = ctx.cpu.r_reg(REG_D1)
         lockbaddr = ctx.cpu.r_reg(REG_D2)
@@ -1984,8 +2223,8 @@ class DosLibrary(LibImpl):
         str_addr = ctx.cpu.r_reg(REG_D1)
         string = ctx.mem.r_cstr(str_addr)[:79]
         cli_addr = self.Cli(ctx)
-        cli = AccessStruct(ctx.mem, CLIStruct, struct_addr=cli_addr)
-        setaddr = cli.r_s("cli_SetName")
+        cli = CLIStruct(ctx.mem, cli_addr)
+        setaddr = cli.cli_SetName.aptr
         ctx.mem.w_bstr(setaddr, string)
         return DOSTRUE
 
@@ -1993,8 +2232,8 @@ class DosLibrary(LibImpl):
         str_addr = ctx.cpu.r_reg(REG_D1)
         string = ctx.mem.r_cstr(str_addr)[:59]
         cli_addr = self.Cli(ctx)
-        cli = AccessStruct(ctx.mem, CLIStruct, struct_addr=cli_addr)
-        setaddr = cli.r_s("cli_Prompt")
+        cli = CLIStruct(ctx.mem, cli_addr)
+        setaddr = cli.cli_Prompt.aptr
         ctx.mem.w_bstr(setaddr, string)
         return DOSTRUE
 
@@ -2026,12 +2265,56 @@ class DosLibrary(LibImpl):
 
     def ReplyPkt(self, ctx, dp: DosPacket, res1, res2):
         log_dos.info("ReplyPkt(%s, %d, %d)", dp, res1, res2)
+        if res1 > 0x7FFFFFFF:
+            res1 -= 0x100000000
+        if res2 > 0x7FFFFFFF:
+            res2 -= 0x100000000
         dp.res1.val = res1
         dp.res2.val = res2
-        log_dos.debug("ReplyPkt: port=%08x  msg=%08x", dp.port.aptr, dp.link.aptr)
-        ctx.proxies.get_exec_lib_proxy().PutMsg(dp.port.aptr, dp.link.aptr)
+        if dp.link.aptr == 0 or dp.port.aptr == 0:
+            return 0
+        reply_port = dp.port.aptr
+        proc_addr = ctx.exec_lib.exec_lib.this_task.aptr
+        if proc_addr != 0:
+            proc = ProcessStruct(ctx.mem, proc_addr)
+            dp.port.aptr = proc.msg_port.addr
+        msg = MessageStruct(ctx.mem, dp.link.aptr)
+        msg.node.type.val = NodeType.NT_REPLYMSG
+        msg.node.succ.aptr = 0
+        msg.node.pred.aptr = 0
+        try:
+            ctx.exec_lib.port_mgr.put_msg(reply_port, dp.link.aptr)
+        except Exception:
+            ctx.proxies.get_exec_lib_proxy().PutMsg(reply_port, dp.link.aptr)
+        log_dos.info(
+            "ReplyPkt: pkt=%06x res1=%d res2=%d -> port=%06x",
+            dp.addr,
+            res1,
+            res2,
+            reply_port,
+        )
+        return 0
 
     # ----- Helpers -----
+
+    def _init_child_msgport(self, ctx, port_addr, task_addr):
+        ctx.mem.w_block(port_addr, b"\x00" * MsgPortStruct.get_size())
+        mp = MsgPortStruct(ctx.mem, port_addr)
+        mp.node.type.val = NodeType.NT_MSGPORT
+        mp.flags.val = MsgPortFlags.PA_SIGNAL
+        mp.sig_bit.val = 8
+        mp.sig_task.aptr = task_addr
+        mp.msg_list.new(NodeType.NT_MESSAGE)
+
+    def _unlink_msg(self, ctx, msg_addr):
+        try:
+            ln_succ = ctx.mem.r32(msg_addr + 0)
+            ln_pred = ctx.mem.r32(msg_addr + 4)
+            if ln_succ != 0 and ln_pred != 0:
+                ctx.mem.w32(ln_pred + 0, ln_succ)
+                ctx.mem.w32(ln_succ + 4, ln_pred)
+        except Exception:
+            pass
 
     def _alloc_mem(self, name, size):
         mem = self.alloc.alloc_memory(size, label=name)

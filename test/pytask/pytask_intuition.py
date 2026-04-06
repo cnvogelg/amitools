@@ -47,3 +47,19 @@ def pytask_intuition_current_time_test(vamos_task):
     task = gen_intuition_task(intuition_func)
     exit_codes = vamos_task.run([task])
     assert exit_codes == [0]
+
+
+def pytask_intuition_easy_request_args_test(vamos_task):
+    def intuition_func(ctx, intuition_lib):
+        text = ctx.alloc.alloc_cstr("sfs startup")
+        easy = ctx.alloc.alloc_memory(16)
+        ctx.mem.w32(easy.addr + 12, text.addr)
+
+        assert intuition_lib.EasyRequestArgs(0, easy.addr, 0, 0) == 1
+
+        ctx.alloc.free_memory(easy)
+        ctx.alloc.free_cstr(text)
+
+    task = gen_intuition_task(intuition_func)
+    exit_codes = vamos_task.run([task])
+    assert exit_codes == [0]

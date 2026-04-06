@@ -4,9 +4,11 @@ from .pointer import BCPLPointerType
 
 class AccessStruct(object):
     _size_to_width = [None, 0, 1, None, 2]
+    _field_path_cache = {}
 
     def __init__(self, mem, struct_def, struct_addr):
         self.mem = mem
+        self._struct_def = struct_def
         self.struct = struct_def(mem, struct_addr)
 
     def w_s(self, name, val):
@@ -33,18 +35,36 @@ class AccessStruct(object):
     def get_size(self):
         return self.struct.get_byte_size()
 
+    @classmethod
+    def _get_cached_field_path(cls, struct_def, name):
+        cache = cls._field_path_cache.setdefault(struct_def, {})
+        path = cache.get(name)
+        if path is not None:
+            return path
+        sdef = struct_def.sdef
+        idx_path = []
+        field_def = None
+        for field_name in name.split("."):
+            field_def = sdef.find_field_def_by_name(field_name)
+            if not field_def:
+                raise KeyError(struct_def, name)
+            idx_path.append(field_def.index)
+            field_type = field_def.type.get_alias_type()
+            if issubclass(field_type, AmigaStruct):
+                sdef = field_type.sdef
+            else:
+                sdef = None
+        path = (tuple(idx_path), field_def)
+        cache[name] = path
+        return path
+
     def _get_field_for_name(self, name):
         struct = self.struct
-        field_def = None
         field = None
-        # walk along fields in name "bla.foo.bar"
-        for field_name in name.split("."):
+        idx_path, field_def = self._get_cached_field_path(self._struct_def, name)
+        for idx in idx_path:
             assert struct is not None
-            field_def = struct.sdef.find_field_def_by_name(field_name)
-            if not field_def:
-                raise KeyError(self, name)
-            field = struct.sfields.get_field_by_index(field_def.index)
-            # find potential next struct
+            field = struct.sfields.get_field_by_index(idx)
             if isinstance(field, AmigaStruct):
                 struct = field
             else:

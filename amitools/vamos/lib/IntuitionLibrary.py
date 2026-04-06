@@ -16,10 +16,11 @@ class IntuitionLibrary(LibImpl):
         msg = ctx.mem.r_cstr(itext)
         log_intuition.error("-----> AutoRequest '%s'", msg)
 
-    def EasyRequestArgs(self, ctx, easy_struct):
+    def EasyRequestArgs(self, ctx, window, easy_struct, idcmp_ptr, args):
         es_TextFormat = ctx.mem.r32(easy_struct + 12)  # EasyStruct.es_TextFormat
         msg = ctx.mem.r_cstr(es_TextFormat)
         log_intuition.error("-----> EasyRequest '%s'", msg)
+        return 1
 
     def CurrentTime(self, ctx, secs_ptr, micros_ptr):
         secs, micros = TimerDevice.get_sys_time()

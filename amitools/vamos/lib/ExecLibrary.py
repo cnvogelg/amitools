@@ -1,17 +1,20 @@
 from enum import IntEnum
+import sys
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib, LibFuncs, InitRes
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.astructs import AccessStruct, BYTE, CSTR
+from amitools.vamos.astructs import BYTE, CSTR
 from amitools.vamos.libstructs import (
     ExecLibraryStruct,
     StackSwapStruct,
     IORequestStruct,
+    MinListStruct,
+    MsgPortStruct,
     NodeType,
     SignalSemaphoreStruct,
 )
 from amitools.vamos.libtypes import ExecLibrary as ExecLibraryType, MsgPort, Message
-from amitools.vamos.libtypes import Task, List, Node
+from amitools.vamos.libtypes import Task, List, MinList, Node
 from amitools.vamos.log import log_exec
 from amitools.vamos.error import VamosInternalError, UnsupportedFeatureError
 from amitools.vamos.lib.lexec.signalfunc import SignalFunc
@@ -25,6 +28,13 @@ from .lexec import Alloc
 
 
 class ExecLibrary(LibImpl):
+    _waitport_blocked_sp = None
+    _waitport_blocked_port = None
+    _waitport_blocked_ret = None
+    _wait_blocked_sp = None
+    _wait_blocked_ret = None
+    _wait_blocked_mask = None
+
     def get_struct_def(self):
         return ExecLibraryStruct
 
@@ -35,12 +45,19 @@ class ExecLibrary(LibImpl):
         self._pools = {}
         self._poolid = 0x1000
         self.exec_lib = ExecLibraryType(ctx.mem, base_addr)
-        # init lib list
-        self.exec_lib.lib_list.new(NodeType.NT_LIBRARY)
+        # Handlers exercise exec's global lists directly during startup
+        # (for example FileSystem.resource registration), so make sure the
+        # full set of list heads is initialized here.
+        self.exec_lib.mem_list.new(NodeType.NT_MEMORY)
+        self.exec_lib.resource_list.new(NodeType.NT_RESOURCE)
         self.exec_lib.device_list.new(NodeType.NT_DEVICE)
+        self.exec_lib.intr_list.new(NodeType.NT_INTERRUPT)
+        self.exec_lib.lib_list.new(NodeType.NT_LIBRARY)
+        self.exec_lib.port_list.new(NodeType.NT_MSGPORT)
         self.exec_lib.task_ready.new(NodeType.NT_TASK)
         self.exec_lib.task_wait.new(NodeType.NT_TASK)
-        self.exec_lib.port_list.new(NodeType.NT_MSGPORT)
+        self.exec_lib.semaphore_list.new(NodeType.NT_SEMAPHORE)
+        self.exec_lib.mem_handlers.new()
         # set some system contants
         attn_flags = 0
         if ctx.cpu_name == "68030(fake)":
@@ -60,6 +77,32 @@ class ExecLibrary(LibImpl):
         self.msg_func = MessageFunc(
             ctx, self.exec_lib, self.signal_func, self.task_func, self.port_mgr
         )
+        io_sdef = IORequestStruct.sdef
+        msgport_sdef = MsgPortStruct.sdef
+        io_msg_off = io_sdef.find_field_def_by_name("io_Message").offset
+        io_msg_sdef = io_sdef.find_field_def_by_name("io_Message").type.sdef
+        io_msg_node_off = io_msg_sdef.find_field_def_by_name("mn_Node").offset
+        io_msg_node_sdef = io_msg_sdef.find_field_def_by_name("mn_Node").type.sdef
+        self._io_device_off = io_sdef.find_field_def_by_name("io_Device").offset
+        self._io_flags_off = io_sdef.find_field_def_by_name("io_Flags").offset
+        self._io_error_off = io_sdef.find_field_def_by_name("io_Error").offset
+        self._io_reply_port_off = (
+            io_msg_off + io_msg_sdef.find_field_def_by_name("mn_ReplyPort").offset
+        )
+        self._io_node_type_off = (
+            io_msg_off
+            + io_msg_node_off
+            + io_msg_node_sdef.find_field_def_by_name("ln_Type").offset
+        )
+        self._msg_port_list_off = msgport_sdef.find_field_def_by_name(
+            "mp_MsgList"
+        ).offset
+        self._msg_port_sigbit_off = msgport_sdef.find_field_def_by_name(
+            "mp_SigBit"
+        ).offset
+        self._msg_port_sigtask_off = msgport_sdef.find_field_def_by_name(
+            "mp_SigTask"
+        ).offset
 
     # helper
 
@@ -83,6 +126,21 @@ class ExecLibrary(LibImpl):
         self.signal_func.signal(task, signals)
 
     def Wait(self, ctx, signal_set):
+        sched_task = self.signal_func.get_my_sched_task()
+        if sched_task is None:
+            got = SignalFunc._fallback_signals & signal_set
+            if got != 0:
+                SignalFunc._fallback_signals &= ~got
+                log_exec.info("Wait(%08x): fallback immediate -> %08x", signal_set, got)
+                return got
+            sp = ctx.cpu.r_reg(REG_A7)
+            ExecLibrary._wait_blocked_sp = sp
+            ExecLibrary._wait_blocked_mask = signal_set
+            ExecLibrary._wait_blocked_ret = ctx.mem.r32(sp)
+            log_exec.info("Wait(%08x): fallback blocking (sp=%08x)", signal_set, sp)
+            raise UnsupportedFeatureError(
+                "Wait on signal set %08x with no signals pending" % signal_set
+            )
         return self.signal_func.wait(signal_set)
 
     def Disable(self, ctx):
@@ -108,13 +166,12 @@ class ExecLibrary(LibImpl):
     def FindTask(self, ctx, task_name: CSTR) -> Task:
         return self.task_func.find_task(task_name.str)
 
-    def StackSwap(self, ctx):
-        stsw_ptr = ctx.cpu.r_reg(REG_A0)
-        stsw = AccessStruct(ctx.mem, StackSwapStruct, struct_addr=stsw_ptr)
+    def StackSwap(self, ctx, new_stack: StackSwapStruct):
+        stsw = new_stack
         # get new stack values
-        new_lower = stsw.r_s("stk_Lower")
-        new_upper = stsw.r_s("stk_Upper")
-        new_pointer = stsw.r_s("stk_Pointer")
+        new_lower = stsw.stk_Lower.aptr
+        new_upper = stsw.stk_Upper.val
+        new_pointer = stsw.stk_Pointer.aptr
         # retrieve current (old) stack
         stack = ctx.task.get_stack()
         old_lower = stack.get_lower()
@@ -133,9 +190,9 @@ class ExecLibrary(LibImpl):
             "StackSwap: old(lower=%06x,upper=%06x,ptr=%06x) new(lower=%06x,upper=%06x,ptr=%06x)"
             % (old_lower, old_upper, old_pointer, new_lower, new_upper, new_pointer)
         )
-        stsw.w_s("stk_Lower", old_lower)
-        stsw.w_s("stk_Upper", old_upper)
-        stsw.w_s("stk_Pointer", old_pointer)
+        stsw.stk_Lower.aptr = old_lower
+        stsw.stk_Upper.val = old_upper
+        stsw.stk_Pointer.aptr = old_pointer
         # only owerwrite stack object but keep mem allocated (if any)
         stack.lower = new_lower
         stack.upper = new_upper
@@ -459,39 +516,38 @@ class ExecLibrary(LibImpl):
 
     # ----- IOReq/Devices -----
 
-    def CreateIORequest(self, ctx):
-        port = ctx.cpu.r_reg(REG_A0)
-        size = ctx.cpu.r_reg(REG_D0)
+    def CreateIORequest(self, ctx, port: MsgPort, size):
         # label alloc
         pc = self.get_callee_pc(ctx)
         name = "CreateIORequest(%06x)" % pc
         mb = self.alloc.alloc_memory(size, label=name)
+        ctx.mem.w_block(mb.addr, b"\x00" * size)
+        io = IORequestStruct(ctx.mem, mb.addr)
+        io.message.reply_port.aptr = port.addr if port else 0
+        io.message.length.val = size
+        io.flags.val = 0
+        io.error.val = 0
         log_exec.info(
             "CreateIORequest: (%s,%s,%s) -> 0x%06x %d bytes"
-            % (mb, port, size, mb.addr, size)
+            % (mb, port.addr if port else 0, size, mb.addr, size)
         )
         return mb.addr
 
-    def DeleteIORequest(self, ctx):
-        req = ctx.cpu.r_reg(REG_A0)
-        mb = self.alloc.get_memory(req)
-        if mb != None:
-            log_exec.info("DeleteIOREquest: 0x%06x -> %s" % (req, mb))
+    def DeleteIORequest(self, ctx, iorequest):
+        mb = self.alloc.get_memory(iorequest)
+        if mb is not None:
+            log_exec.info("DeleteIOREquest: 0x%06x -> %s" % (iorequest, mb))
             self.alloc.free_memory(mb)
         else:
             raise VamosInternalError(
-                "DeleteIORequest: Unknown IORequest to delete: ptr=%06x" % req
+                "DeleteIORequest: Unknown IORequest to delete: ptr=%06x" % iorequest
             )
 
-    def OpenDevice(self, ctx):
-        name_ptr = ctx.cpu.r_reg(REG_A0)
-        unit = ctx.cpu.r_reg(REG_D0)
-        io_addr = ctx.cpu.r_reg(REG_A1)
-        io = AccessStruct(ctx.mem, IORequestStruct, io_addr)
-        flags = ctx.cpu.r_reg(REG_D1)
-        name = ctx.mem.r_cstr(name_ptr)
+    def OpenDevice(self, ctx, dev_name: CSTR, unit, io_request, flags):
+        io = IORequestStruct(ctx.mem, io_request)
+        name = dev_name.str
         addr = self.lib_mgr.open_lib(name)
-        io.w_s("io_Device", addr)
+        io.device.aptr = addr
         if addr == 0:
             log_exec.info(
                 "OpenDevice: '%s' unit %d flags %d -> NULL", name, unit, flags
@@ -503,17 +559,105 @@ class ExecLibrary(LibImpl):
             )
             return 0
 
-    def CloseDevice(self, ctx):
-        io_addr = ctx.cpu.r_reg(REG_A1)
-        if io_addr != 0:
-            io = AccessStruct(ctx.mem, IORequestStruct, io_addr)
-            dev_addr = io.r_s("io_Device")
+    def CloseDevice(self, ctx, io_request):
+        if io_request != 0:
+            io = IORequestStruct(ctx.mem, io_request)
+            dev_addr = io.device.aptr
             if dev_addr != 0:
                 log_exec.info("CloseDevice: %06x", dev_addr)
                 self.lib_mgr.close_lib(dev_addr)
-                io.w_s("io_Device", 0)
+                io.device.aptr = 0
+
+    def _dispatch_begin_io(self, ctx, io_request):
+        mem = ctx.mem
+        dev_addr = mem.r32(io_request + self._io_device_off)
+        vlib = self.lib_mgr.get_vlib_by_addr(dev_addr)
+        if vlib is None:
+            log_exec.warning(
+                "DoIO: missing device for io=0x%06x dev=0x%06x",
+                io_request,
+                dev_addr,
+            )
+            return -1
+        impl = vlib.get_impl()
+        if hasattr(impl, "BeginIO"):
+            flags = mem.r8(io_request + self._io_flags_off) | 1
+            mem.w8(io_request + self._io_flags_off, flags)
+            impl.BeginIO(ctx, io_request)
+            flags = mem.r8(io_request + self._io_flags_off)
+            if flags & 1:
+                mem.w8(io_request + self._io_node_type_off, NodeType.NT_REPLYMSG)
+            return mem.r8s(io_request + self._io_error_off)
+        log_exec.warning("DoIO: device impl missing BeginIO for dev=0x%06x", dev_addr)
+        return -1
+
+    def DoIO(self, ctx, io_request):
+        res = self._dispatch_begin_io(ctx, io_request)
+        log_exec.info("DoIO(io=0x%06x) -> %d", io_request, res)
+        return res
+
+    def SendIO(self, ctx, io_request):
+        res = self._dispatch_begin_io(ctx, io_request)
+        log_exec.info("SendIO(io=0x%06x) -> %d", io_request, res)
+        mem = ctx.mem
+        if not (mem.r8(io_request + self._io_flags_off) & 1):
+            log_exec.info("SendIO: IO held (IOF_QUICK cleared), no reply queued")
+            return res
+        reply_port = mem.r32(io_request + self._io_reply_port_off)
+        if reply_port != 0:
+            if not self.port_mgr.has_port(reply_port):
+                self.port_mgr.register_port(reply_port)
+                log_exec.info("SendIO: auto-registered reply_port=0x%06x", reply_port)
+            self.port_mgr.put_msg(reply_port, io_request)
+            try:
+                list_addr = reply_port + self._msg_port_list_off
+                lh_tail_field = list_addr + 4
+                old_tailpred = mem.r32(list_addr + 8)
+                mem.w32(io_request + 0, lh_tail_field)
+                mem.w32(io_request + 4, old_tailpred)
+                mem.w32(old_tailpred + 0, io_request)
+                mem.w32(list_addr + 8, io_request)
+            except Exception:
+                pass
+            try:
+                sigbit = mem.r8(reply_port + self._msg_port_sigbit_off)
+                if 0 <= sigbit < 32:
+                    sig_task = mem.r32(reply_port + self._msg_port_sigtask_off)
+                    if sig_task != 0:
+                        self.signal_func.signal(sig_task, 1 << sigbit)
+            except Exception:
+                pass
+            log_exec.info("SendIO: queued reply to port 0x%06x", reply_port)
+        return res
+
+    def CheckIO(self, ctx, io_request):
+        log_exec.info("CheckIO(io=0x%06x)", io_request)
+        return io_request if (ctx.mem.r8(io_request + self._io_flags_off) & 1) else 0
+
+    def WaitIO(self, ctx, io_request):
+        log_exec.info("WaitIO(io=0x%06x)", io_request)
+        mem = ctx.mem
+        reply_port = mem.r32(io_request + self._io_reply_port_off)
+        if reply_port != 0 and self.port_mgr.has_port(reply_port):
+            port = self.port_mgr.ports[reply_port]
+            if port.queue is not None and io_request in port.queue:
+                port.queue.remove(io_request)
+            try:
+                ln_succ = mem.r32(io_request + 0)
+                ln_pred = mem.r32(io_request + 4)
+                if ln_succ != 0 and ln_pred != 0:
+                    mem.w32(ln_pred + 0, ln_succ)
+                    mem.w32(ln_succ + 4, ln_pred)
+            except Exception:
+                pass
+        return mem.r8s(io_request + self._io_error_off)
 
     # ----- Nodes/Lists -----
+
+    def NewMinList(self, ctx, minlist: MinList):
+        minlist.new()
+        log_exec.info("NewMinList(0x%06x)", minlist.addr)
+        return minlist.addr
 
     def AddTail(self, ctx, list: List, node: Node):
         log_exec.info("AddTail(%s, %s)", list, node)
@@ -586,6 +730,24 @@ class ExecLibrary(LibImpl):
     def CacheClearU(self, ctx):
         return 0
 
+    def _raw_console_write(self, value):
+        if value == 0:
+            return
+        out = sys.stderr
+        if value == 10:
+            out.write("\r")
+        out.write(chr(value & 0xFF))
+        out.flush()
+
+    def RawMayGetChar(self, ctx):
+        log_exec.info("RawMayGetChar() -> no data")
+        return -1
+
+    def RawPutChar(self, ctx, ch):
+        value = ch & 0xFF
+        self._raw_console_write(value)
+        log_exec.info("RawPutChar(%02x)", value)
+
     def RawDoFmt(self, ctx):
         fmtString = ctx.cpu.r_reg(REG_A0)
         dataStream = ctx.cpu.r_reg(REG_A1)
@@ -607,11 +769,9 @@ class ExecLibrary(LibImpl):
         self.semaphore_mgr.InitSemaphore(addr)
         log_exec.info("InitSemaphore(%06x)" % addr)
 
-    def AddSemaphore(self, ctx):
-        addr = ctx.cpu.r_reg(REG_A1)
-        sstruct = AccessStruct(ctx.mem, SignalSemaphoreStruct, addr)
-        name_ptr = sstruct.r_s("ss_Link.ln_Name")
-        name = ctx.mem.r_cstr(name_ptr)
+    def AddSemaphore(self, ctx, semaphore: SignalSemaphoreStruct):
+        addr = semaphore.addr
+        name = semaphore.ss_Link.ln_Name.str
         self.semaphore_mgr.AddSemaphore(addr, name)
         log_exec.info("AddSemaphore(%06x,%s)" % (addr, name))
 
