@@ -3,18 +3,27 @@ from amitools.vamos.log import log_mem_alloc
 from amitools.vamos.label import LabelRange, LabelStruct, LabelLib
 
 
-class Memory:
-    def __init__(self, addr, size, label, struct=None):
+class MemoryEntry:
+    __slots__ = ("addr", "size", "label")
+
+    def __init__(self, addr, size, label):
         self.addr = addr
         self.size = size
         self.label = label
-        self.struct = struct
 
     def __str__(self):
         if self.label != None:
             return str(self.label)
         else:
             return "[@%06x +%06x %06x]" % (self.addr, self.size, self.addr + self.size)
+
+
+class Memory(MemoryEntry):
+    __slots__ = ("struct",)
+
+    def __init__(self, addr, size, label, struct=None):
+        super().__init__(addr, size, label)
+        self.struct = struct
 
 
 class MemoryChunk:
@@ -330,20 +339,26 @@ class MemoryAlloc:
             **kwargs,
         )
 
-    def _alloc_struct_mem(self, struct, size=None, label=None, **kwargs):
+    def _alloc_struct_entry(self, struct, size=None, label=None):
         if size is None:
             size = struct.get_size()
         addr = self.alloc_mem(size)
         label_obj = self._alloc_struct_label(addr, struct, label)
-        mem = Memory(addr, size, label_obj)
+        entry = MemoryEntry(addr, size, label_obj)
+        self.mem_objs[addr] = entry
+        return entry
+
+    def _alloc_struct_mem(self, struct, size=None, label=None, **kwargs):
+        entry = self._alloc_struct_entry(struct, size=size, label=label)
+        mem = Memory(entry.addr, entry.size, entry.label)
         mem.struct = self._bind_struct(
-            struct, addr, alloc=self, mem_obj=mem, **kwargs
+            struct, entry.addr, alloc=self, mem_obj=entry, **kwargs
         )
-        self.mem_objs[addr] = mem
+        self.mem_objs[entry.addr] = mem
         return mem
 
     def _get_struct_mem(self, mem):
-        if isinstance(mem, Memory):
+        if isinstance(mem, MemoryEntry):
             return mem
         mem_obj = getattr(mem, "_mem_obj", None)
         if mem_obj is not None:
@@ -379,9 +394,12 @@ class MemoryAlloc:
         return mem
 
     def alloc_astruct(self, struct, size=None, label=None, **kwargs):
-        mem = self._alloc_struct_mem(struct, size=size, label=label, **kwargs)
-        log_mem_alloc.info("alloc astruct: %s", mem)
-        return mem.struct
+        entry = self._alloc_struct_entry(struct, size=size, label=label)
+        struct_obj = self._bind_struct(
+            struct, entry.addr, alloc=self, mem_obj=entry, **kwargs
+        )
+        log_mem_alloc.info("alloc astruct: %s", entry)
+        return struct_obj
 
     def map_struct(self, addr, struct, label=None):
         size = struct.get_size()
@@ -421,6 +439,34 @@ class MemoryAlloc:
         log_mem_alloc.info("alloc lib: %s", mem)
         self.mem_objs[addr] = mem
         return mem
+
+    def alloc_alib(
+        self, lib_struct, pos_size=0, neg_size=0, fd=None, label=None, **kwargs
+    ):
+        if pos_size == 0:
+            pos_size = lib_struct.get_size()
+        neg_size = (neg_size + 3) & ~3
+        size = neg_size + pos_size
+        addr = self.alloc_mem(size)
+        base_addr = addr + neg_size
+        if label and self.label_mgr:
+            label_obj = LabelLib(label, base_addr, neg_size, pos_size, lib_struct, fd)
+            self.label_mgr.add_label(label_obj)
+        else:
+            label_obj = None
+        entry = MemoryEntry(addr, size, label_obj)
+        self.mem_objs[addr] = entry
+        struct_obj = self._bind_struct(
+            lib_struct,
+            addr,
+            alloc=self,
+            mem_obj=entry,
+            pos_size=pos_size,
+            neg_size=neg_size,
+            **kwargs,
+        )
+        log_mem_alloc.info("alloc alib: %s", entry)
+        return struct_obj
 
     def free_lib(self, mem):
         mem = self._get_struct_mem(mem)
