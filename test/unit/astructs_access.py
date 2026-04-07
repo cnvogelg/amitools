@@ -1,6 +1,5 @@
 import pytest
 from amitools.vamos.astructs import (
-    AccessStruct,
     AmigaStruct,
     AmigaStructDef,
     APTR_SELF,
@@ -11,6 +10,7 @@ from amitools.vamos.astructs import (
     CSTR,
     BPTR_VOID,
 )
+from amitools.vamos.astructs.access import AccessStruct
 from amitools.vamos.machine.mock import MockMemory
 
 
