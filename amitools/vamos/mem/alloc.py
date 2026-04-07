@@ -1,16 +1,13 @@
 from amitools.vamos.error import *
 from amitools.vamos.log import log_mem_alloc
 from amitools.vamos.label import LabelRange, LabelStruct, LabelLib
-from amitools.vamos.astructs.astruct import AmigaStruct
-from amitools.vamos.astructs.pointer import BCPLPointerType
 
 
 class Memory:
-    def __init__(self, addr, size, label, access, struct=None):
+    def __init__(self, addr, size, label, struct=None):
         self.addr = addr
         self.size = size
         self.label = label
-        self.access = access
         self.struct = struct
 
     def __str__(self):
@@ -18,75 +15,6 @@ class Memory:
             return str(self.label)
         else:
             return "[@%06x +%06x %06x]" % (self.addr, self.size, self.addr + self.size)
-
-
-class _StructAccessCompat:
-    """Temporary compatibility adapter for Memory.access.
-
-    New code should use the typed ``Memory.struct`` object directly.
-    """
-
-    _field_path_cache = {}
-
-    def __init__(self, struct_def, struct):
-        self._struct_def = struct_def
-        self.struct = struct
-
-    def w_s(self, name, val):
-        field, field_def = self._get_field_for_name(name)
-        if issubclass(field_def.type, BCPLPointerType):
-            field.set_ref_addr(val)
-        else:
-            field.set(val)
-
-    def r_s(self, name):
-        field, field_def = self._get_field_for_name(name)
-        if issubclass(field_def.type, BCPLPointerType):
-            return field.get_ref_addr()
-        return field.get()
-
-    def s_get_addr(self, name):
-        field, _ = self._get_field_for_name(name)
-        return field.get_addr()
-
-    def get_size(self):
-        return self.struct.get_byte_size()
-
-    @classmethod
-    def _get_cached_field_path(cls, struct_def, name):
-        cache = cls._field_path_cache.setdefault(struct_def, {})
-        path = cache.get(name)
-        if path is not None:
-            return path
-        sdef = struct_def.sdef
-        idx_path = []
-        field_def = None
-        for field_name in name.split("."):
-            field_def = sdef.find_field_def_by_name(field_name)
-            if not field_def:
-                raise KeyError(struct_def, name)
-            idx_path.append(field_def.index)
-            field_type = field_def.type.get_alias_type()
-            if issubclass(field_type, AmigaStruct):
-                sdef = field_type.sdef
-            else:
-                sdef = None
-        path = (tuple(idx_path), field_def)
-        cache[name] = path
-        return path
-
-    def _get_field_for_name(self, name):
-        struct = self.struct
-        field = None
-        idx_path, field_def = self._get_cached_field_path(self._struct_def, name)
-        for idx in idx_path:
-            assert struct is not None
-            field = struct.sfields.get_field_by_index(idx)
-            if isinstance(field, AmigaStruct):
-                struct = field
-            else:
-                struct = None
-        return field, field_def
 
 
 class MemoryChunk:
@@ -126,8 +54,6 @@ class MemoryAlloc:
         self.addr = addr
         self.size = size
         self.label_mgr = label_mgr
-        # compat link
-        self.access = mem
 
         self.addrs = {}
         self.mem_objs = {}
@@ -397,7 +323,7 @@ class MemoryAlloc:
             self.label_mgr.add_label(label_obj)
         else:
             label_obj = None
-        mem = Memory(addr, size, label_obj, self.mem)
+        mem = Memory(addr, size, label_obj)
         log_mem_alloc.info("alloc memory: %s", mem)
         self.mem_objs[addr] = mem
         return mem
@@ -420,8 +346,7 @@ class MemoryAlloc:
         else:
             label_obj = None
         struct_obj = struct(self.mem, addr)
-        access = _StructAccessCompat(struct, struct_obj)
-        mem = Memory(addr, size, label_obj, access, struct_obj)
+        mem = Memory(addr, size, label_obj, struct_obj)
         log_mem_alloc.info("alloc struct: %s", mem)
         self.mem_objs[addr] = mem
         return mem
@@ -429,13 +354,12 @@ class MemoryAlloc:
     def map_struct(self, addr, struct, label=None):
         size = struct.get_size()
         struct_obj = struct(self.mem, addr)
-        access = _StructAccessCompat(struct, struct_obj)
         if label and self.label_mgr:
             label_obj = LabelStruct(label, addr, struct)
             self.label_mgr.add_label(label_obj)
         else:
             label_obj = None
-        mem = Memory(addr, size, label_obj, access, struct_obj)
+        mem = Memory(addr, size, label_obj, struct_obj)
         log_mem_alloc.info("map struct: %s", mem)
         return mem
 
@@ -462,8 +386,7 @@ class MemoryAlloc:
         else:
             label_obj = None
         struct_obj = lib_struct(self.mem, base_addr)
-        access = _StructAccessCompat(lib_struct, struct_obj)
-        mem = Memory(addr, size, label_obj, access, struct_obj)
+        mem = Memory(addr, size, label_obj, struct_obj)
         log_mem_alloc.info("alloc lib: %s", mem)
         self.mem_objs[addr] = mem
         return mem
@@ -485,7 +408,7 @@ class MemoryAlloc:
         else:
             label_obj = None
         self.mem.w_cstr(addr, cstr)
-        mem = Memory(addr, size, label_obj, self.mem)
+        mem = Memory(addr, size, label_obj)
         log_mem_alloc.info("alloc c_str: %s", mem)
         self.mem_objs[addr] = mem
         return mem
@@ -507,7 +430,7 @@ class MemoryAlloc:
         else:
             label_obj = None
         self.mem.w_bstr(addr, bstr)
-        mem = Memory(addr, size, label_obj, self.mem)
+        mem = Memory(addr, size, label_obj)
         log_mem_alloc.info("alloc b_str: %s", mem)
         self.mem_objs[addr] = mem
         return mem

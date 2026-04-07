@@ -22,22 +22,20 @@ def mem_alloc_nonbase4_test():
     assert alloc.is_all_free()
 
 
-def mem_alloc_struct_access_compat_test():
+def mem_alloc_struct_binding_test():
     mem = MockMemory()
     alloc = MemoryAlloc(mem)
     cli = alloc.alloc_struct(CLIStruct, label="CLI")
 
     assert isinstance(cli.struct, CLIStruct)
-    assert cli.access.struct is cli.struct
+    assert not hasattr(cli, "access")
 
-    cli.access.w_s("cli_DefaultStack", 42)
-    cli.access.w_s("cli_CurrentInput", 0x120)
+    cli.struct.cli_DefaultStack.val = 42
+    cli.struct.cli_CurrentInput.aptr = 0x120
 
-    assert cli.access.r_s("cli_DefaultStack") == 42
-    assert cli.access.r_s("cli_CurrentInput") == 0x120
     assert cli.struct.cli_DefaultStack.val == 42
     assert cli.struct.cli_CurrentInput.aptr == 0x120
-    assert mem.r32(cli.access.s_get_addr("cli_CurrentInput")) == 0x120 >> 2
+    assert mem.r32(cli.struct.cli_CurrentInput.addr) == 0x120 >> 2
 
 
 def mem_alloc_lib_struct_addr_test():
@@ -46,7 +44,8 @@ def mem_alloc_lib_struct_addr_test():
     lib = alloc.alloc_lib(LibraryStruct, neg_size=32, label="Library")
 
     assert isinstance(lib.struct, LibraryStruct)
+    assert not hasattr(lib, "access")
     assert lib.struct.addr == lib.addr + 32
 
-    lib.access.w_s("lib_Node.ln_Type", NodeType.NT_LIBRARY)
+    lib.struct.lib_Node.ln_Type.val = NodeType.NT_LIBRARY
     assert lib.struct.lib_Node.ln_Type.val == NodeType.NT_LIBRARY
