@@ -6,7 +6,6 @@ import errno
 
 from amitools.vamos.log import log_file
 from amitools.vamos.error import UnsupportedFeatureError
-from amitools.vamos.astructs import AccessStruct
 from amitools.vamos.libstructs import MessageStruct, DosPacketStruct
 from .Error import *
 from .DosProtection import DosProtection
@@ -249,11 +248,11 @@ class FileManager:
     # callback from port manager for fs handler port
     # -> Async I/O
     def fs_put_msg(self, port_mgr, msg_addr):
-        msg = AccessStruct(self.mem, MessageStruct, struct_addr=msg_addr)
-        dos_pkt_addr = msg.r_s("mn_Node.ln_Name")
-        dos_pkt = AccessStruct(self.mem, DosPacketStruct, struct_addr=dos_pkt_addr)
-        reply_port_addr = dos_pkt.r_s("dp_Port")
-        pkt_type = dos_pkt.r_s("dp_Type")
+        msg = MessageStruct(self.mem, msg_addr)
+        dos_pkt_addr = msg.node.name.aptr
+        dos_pkt = DosPacketStruct(self.mem, dos_pkt_addr)
+        reply_port_addr = dos_pkt.port.aptr
+        pkt_type = dos_pkt.type.val
         log_file.info(
             "FS DosPacket: msg=%06x -> pkt=%06x: reply_port=%06x type=%06x (%s)",
             msg_addr,
@@ -264,9 +263,9 @@ class FileManager:
         )
         # handle packet
         if pkt_type == DosAction.ACTION_READ:  # read
-            fh_b_addr = dos_pkt.r_s("dp_Arg1")
-            buf_ptr = dos_pkt.r_s("dp_Arg2")
-            size = dos_pkt.r_s("dp_Arg3")
+            fh_b_addr = dos_pkt.arg1.val
+            buf_ptr = dos_pkt.arg2.val
+            size = dos_pkt.arg3.val
             # get fh and read
             fh = self.get_by_b_addr(fh_b_addr)
             data = fh.read(size)
@@ -280,11 +279,11 @@ class FileManager:
                 got,
                 fh,
             )
-            dos_pkt.w_s("dp_Res1", got)
+            dos_pkt.res1.val = got
         elif pkt_type == DosAction.ACTION_WRITE:  # write
-            fh_b_addr = dos_pkt.r_s("dp_Arg1")
-            buf_ptr = dos_pkt.r_s("dp_Arg2")
-            size = dos_pkt.r_s("dp_Arg3")
+            fh_b_addr = dos_pkt.arg1.val
+            buf_ptr = dos_pkt.arg2.val
+            size = dos_pkt.arg3.val
             fh = self.get_by_b_addr(fh_b_addr)
             data = self.mem.r_block(buf_ptr, size)
             fh.write(data)
@@ -297,7 +296,7 @@ class FileManager:
                 put,
                 fh,
             )
-            dos_pkt.w_s("dp_Res1", put)
+            dos_pkt.res1.val = put
         else:
             log_file.warning(
                 "Unsupported Filesys Packet: %d (%s)",
@@ -305,8 +304,8 @@ class FileManager:
                 DosAction(pkt_type).name,
             )
             # return error
-            dos_pkt.w_s("dp_Res1", DOSFALSE)
-            dos_pkg.w_s("dp_Res2", ACTION_NOT_KNOWN)
+            dos_pkt.res1.val = DOSFALSE
+            dos_pkt.res2.val = ACTION_NOT_KNOWN
 
         # do reply
         if not port_mgr.has_port(reply_port_addr):
@@ -315,11 +314,11 @@ class FileManager:
 
     # handle console packet
     def console_put_msg(self, port_mgr, msg_addr):
-        msg = AccessStruct(self.mem, MessageStruct, struct_addr=msg_addr)
-        dos_pkt_addr = msg.r_s("mn_Node.ln_Name")
-        dos_pkt = AccessStruct(self.mem, DosPacketStruct, struct_addr=dos_pkt_addr)
-        reply_port_addr = dos_pkt.r_s("dp_Port")
-        pkt_type = dos_pkt.r_s("dp_Type")
+        msg = MessageStruct(self.mem, msg_addr)
+        dos_pkt_addr = msg.node.name.aptr
+        dos_pkt = DosPacketStruct(self.mem, dos_pkt_addr)
+        reply_port_addr = dos_pkt.port.aptr
+        pkt_type = dos_pkt.type.val
         log_file.info(
             "Console DosPacket: msg=%06x -> pkt=%06x: reply_port=%06x type=%d (%s)",
             msg_addr,
@@ -330,7 +329,7 @@ class FileManager:
         )
 
         if pkt_type == DosAction.ACTION_SCREEN_MODE:
-            mode = dos_pkt.r_s("dp_Arg1")
+            mode = dos_pkt.arg1.val
             if mode == 0:
                 cooked = True
             elif mode == 1 or mode == -1:
@@ -362,8 +361,8 @@ class FileManager:
             pkt_result = (DOSFALSE, ERROR_ACTION_NOT_KNOWN)
 
         # return set result
-        dos_pkt.w_s("dp_Res1", pkt_result[0])
-        dos_pkt.w_s("dp_Res2", pkt_result[1])
+        dos_pkt.res1.val = pkt_result[0]
+        dos_pkt.res2.val = pkt_result[1]
 
         # do reply
         if not port_mgr.has_port(reply_port_addr):

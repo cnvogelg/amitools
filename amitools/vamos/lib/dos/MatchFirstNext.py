@@ -1,4 +1,3 @@
-from amitools.vamos.astructs import AccessStruct
 from amitools.vamos.libstructs import (
     AnchorPathStruct,
     AChainStruct,
@@ -49,6 +48,7 @@ class MatchFirstNext:
         # most notably "dir" depend on a correctly setup
         # anchor chain...
         self.achain_dummy = ctx.alloc.alloc_struct(AChainStruct, label="AChain_Dummy")
+        self.achain_dummy_struct = AChainStruct(ctx.mem, self.achain_dummy.addr)
         self.anchor.w_s("ap_Last", self.achain_dummy.addr)
         self.anchor.w_s("ap_Base", self.achain_dummy.addr)
         if not self._fill_lock(abs_path):
@@ -68,7 +68,7 @@ class MatchFirstNext:
         if lock == None:
             return ERROR_OBJECT_NOT_FOUND
         fib_ptr = self.anchor.s_get_addr("ap_Info")
-        fib = AccessStruct(ctx.mem, FileInfoBlockStruct, struct_addr=fib_ptr)
+        fib = FileInfoBlockStruct(ctx.mem, fib_ptr)
         io_err = lock.examine_lock(fib)
         self.lock_mgr.release_lock(lock)
         # store path name of first name at end of structure
@@ -82,11 +82,9 @@ class MatchFirstNext:
         if lock == None:
             return False
         self.dir_lock = lock
-        oldlock = self.lock_mgr.get_by_b_addr(
-            self.achain_dummy.access.r_s("an_Lock") >> 2
-        )
+        oldlock = self.lock_mgr.get_by_b_addr(self.achain_dummy_struct.lock.bptr)
         self.lock_mgr.release_lock(oldlock)
-        self.achain_dummy.access.w_s("an_Lock", lock.mem.addr)
+        self.achain_dummy_struct.lock.aptr = lock.mem.addr
         return True
 
     def _fill_parent_lock(self, path):
@@ -168,8 +166,6 @@ class MatchFirstNext:
             ctx.label_mgr.add_label(self.old_label)
         # free last dir lock & achain
         if self.achain_dummy != None:
-            oldlock = self.lock_mgr.get_by_b_addr(
-                self.achain_dummy.access.r_s("an_Lock") >> 2
-            )
+            oldlock = self.lock_mgr.get_by_b_addr(self.achain_dummy_struct.lock.bptr)
             self.lock_mgr.release_lock(oldlock)
             ctx.alloc.free_struct(self.achain_dummy)
