@@ -5,7 +5,7 @@ import os
 
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.astructs import AccessStruct, CSTR, LONG
+from amitools.vamos.astructs import CSTR, LONG
 from amitools.vamos.libstructs import (
     DosLibraryStruct,
     DosInfoStruct,
@@ -83,13 +83,15 @@ class DosLibrary(LibImpl):
         self.errstrings = {}
         self.resident = []
         self.local_vars = {}
-        self.access = AccessStruct(ctx.mem, self.get_struct_def(), base_addr)
+        self.access = DosLibraryStruct(ctx.mem, base_addr)
         # setup RootNode
         self.root_struct = ctx.alloc.alloc_struct(RootNodeStruct, label="RootNode")
-        self.access.w_s("dl_Root", self.root_struct.addr)
+        self.root_node = RootNodeStruct(ctx.mem, self.root_struct.addr)
+        self.access.dl_Root.aptr = self.root_struct.addr
         # setup DosInfo
         self.dos_info = ctx.alloc.alloc_struct(DosInfoStruct, label="DosInfo")
-        self.root_struct.access.w_s("rn_Info", self.dos_info.addr >> 2)  # BPTR
+        self.dos_info_struct = DosInfoStruct(ctx.mem, self.dos_info.addr)
+        self.root_node.rn_Info.aptr = self.dos_info.addr
         # setup dos list
         self.dos_list = DosList(
             self.path_mgr, self.path_mgr.assign_mgr, ctx.mem, ctx.alloc
@@ -382,8 +384,8 @@ class DosLibrary(LibImpl):
         node.access.w_s("lv_Node.ln_Type", flags & 0xFF)
         node.access.w_s("lv_Value", 0)
         head_addr = varlist.access.r_s("mlh_Head")
-        head = AccessStruct(ctx.mem, NodeStruct, head_addr)
-        head.w_s("ln_Pred", node_addr)
+        head = NodeStruct(ctx.mem, head_addr)
+        head.ln_Pred.aptr = node_addr
         varlist.access.w_s("mlh_Head", node_addr)
         node.access.w_s("lv_Node.ln_Succ", head_addr)
         node.access.w_s("lv_Node.ln_Pred", varlist.access.s_get_addr("mlh_Head"))
@@ -412,8 +414,8 @@ class DosLibrary(LibImpl):
         node.w_s("lv_Value", 0)
         succ = node.r_s("lv_Node.ln_Succ")
         pred = node.r_s("lv_Node.ln_Pred")
-        AccessStruct(ctx.mem, NodeStruct, pred).w_s("ln_Succ", succ)
-        AccessStruct(ctx.mem, NodeStruct, succ).w_s("ln_Pred", pred)
+        NodeStruct(ctx.mem, pred).ln_Succ.aptr = succ
+        NodeStruct(ctx.mem, succ).ln_Pred.aptr = pred
         self._free_mem(node.struct._addr)
         for k in list(self.local_vars.keys()):
             if self.local_vars[k] == node:
@@ -522,22 +524,21 @@ class DosLibrary(LibImpl):
         start = ctx.cpu.r_reg(REG_D2)
         system = ctx.cpu.r_reg(REG_D3)
         if start == 0:
-            seg_addr = self.dos_info.access.r_s("di_NetHand")
+            seg_addr = self.dos_info_struct.di_NetHand.aptr
         else:
-            seg_addr = AccessStruct(ctx.mem, SegmentStruct, start).r_s("seg_Next")
+            seg_addr = SegmentStruct(ctx.mem, start).seg_Next.aptr
         log_dos.info("FindSegment(%s)", needle)
         while seg_addr != 0:
-            segment = AccessStruct(ctx.mem, SegmentStruct, seg_addr)
+            segment = SegmentStruct(ctx.mem, seg_addr)
             name_addr = seg_addr + SegmentStruct.sdef.seg_Name.offset
             name = ctx.mem.r_bstr(name_addr)
+            seg_uc = segment.seg_UC.val
             if name.lower() == needle.lower():
-                if (system and segment.r_s("seg_UC") < 0) or (
-                    not system and segment.r_s("seg_UC") > 0
-                ):
-                    seg = segment.r_s("seg_Seg")
+                if (system and seg_uc < 0) or (not system and seg_uc > 0):
+                    seg = segment.seg_Seg.aptr
                     log_dos.info("FindSegment(%s) -> %s", name, seg)
                     return seg_addr
-            seg_addr = segment.r_s("seg_Next")
+            seg_addr = segment.seg_Next.aptr
         return 0
 
     def AddSegment(self, ctx):
@@ -547,13 +548,14 @@ class DosLibrary(LibImpl):
         name = ctx.mem.r_cstr(name_ptr)
         seg_addr = self._alloc_mem("Segment", SegmentStruct.get_size() + len(name) + 1)
         name_addr = seg_addr + SegmentStruct.sdef.seg_Name.offset
-        segment = ctx.alloc.map_struct(seg_addr, SegmentStruct, label="Segment")
-        head_addr = self.dos_info.access.r_s("di_NetHand")
-        segment.access.w_s("seg_Next", head_addr)
-        segment.access.w_s("seg_UC", system)
-        segment.access.w_s("seg_Seg", seglist)
+        ctx.alloc.map_struct(seg_addr, SegmentStruct, label="Segment")
+        segment = SegmentStruct(ctx.mem, seg_addr)
+        head_addr = self.dos_info_struct.di_NetHand.aptr
+        segment.seg_Next.aptr = head_addr
+        segment.seg_UC.val = system
+        segment.seg_Seg.aptr = seglist
         ctx.mem.w_bstr(name_addr, name)
-        self.dos_info.access.w_s("di_NetHand", seg_addr)
+        self.dos_info_struct.di_NetHand.aptr = seg_addr
         log_dos.info("AddSegment(%s,%06x) -> %06x", name, seglist, seg_addr)
         self.resident.append(seg_addr)
         # Adding a resident command to the registered seglists.
@@ -991,8 +993,8 @@ class DosLibrary(LibImpl):
         buflen = ctx.cpu.r_reg(REG_D3)
 
         # Hack for 'endcli': check FH if fh_End was set to 0 (faked EOF)
-        fh_acc = AccessStruct(ctx.mem, FileHandleStruct, fh_b_addr << 2)
-        fh_end = fh_acc.r_s("fh_End")
+        fh_acc = FileHandleStruct(ctx.mem, fh_b_addr << 2)
+        fh_end = fh_acc.fh_End.val
         if fh_end == 0:
             return 0
 
@@ -1667,7 +1669,7 @@ class DosLibrary(LibImpl):
         # anyhow.
         if ctx.process.is_native_shell():
             cli_addr = ctx.process.get_cli_struct()
-            cli = AccessStruct(ctx.mem, CLIStruct, struct_addr=cli_addr)
+            cli = CLIStruct(ctx.mem, cli_addr)
             new_input = self.file_mgr.open(None, "NIL:", "r")
             if new_input == None:
                 log_dos.warning(
@@ -1683,28 +1685,28 @@ class DosLibrary(LibImpl):
             # print "setting new input to %s" % new_input
             # and install this as current input. The shell will read from that
             # instead until it hits the EOF
-            input_fhsi = cli.r_s("cli_StandardInput")
-            input_fhci = cli.r_s("cli_CurrentInput")
+            input_fhsi = cli.cli_StandardInput.aptr
+            input_fhci = cli.cli_CurrentInput.aptr
             if outtag:
                 data = outtag.get_data()
                 if data != 0:
-                    output_fhci = cli.r_s("cli_StandardOutput")
-                    cli.w_s("cli_StandardOutput", data << 2)
+                    output_fhci = cli.cli_StandardOutput.aptr
+                    cli.cli_StandardOutput.aptr = data << 2
             else:
                 output_fhci = None
-            cli.w_s("cli_CurrentInput", new_input.mem.addr)
-            cli.w_s("cli_StandardInput", new_stdin.mem.addr)
-            cli.w_s("cli_Background", DOSTRUE_S)
+            cli.cli_CurrentInput.aptr = new_input.mem.addr
+            cli.cli_StandardInput.aptr = new_stdin.mem.addr
+            cli.cli_Background.val = DOSTRUE_S
             # Create the Packet for the background process.
             packet = ctx.process.run_system()
-            stack_size = cli.r_s("cli_DefaultStack") << 2
+            stack_size = cli.cli_DefaultStack.val << 2
             current_dir = ctx.process.get_current_dir()
             cur_lock = self.lock_mgr.get_by_b_addr(current_dir >> 2)
             dup_lock = self.lock_mgr.dup_lock(self.get_current_dir(ctx))
-            cur_module = cli.r_s("cli_Module")
+            cur_module = cli.cli_Module.aptr
             cur_out = ctx.process.this_task.access.r_s("pr_COS")
-            cur_setname = ctx.mem.r_bstr(cli.r_s("cli_SetName"))
-            cli.w_s("cli_Module", 0)
+            cur_setname = ctx.mem.r_bstr(cli.cli_SetName.aptr)
+            cli.cli_Module.aptr = 0
             ctx.process.set_current_dir(dup_lock.mem.addr)
             self.cur_dir_lock = dup_lock
 
@@ -1721,14 +1723,14 @@ class DosLibrary(LibImpl):
             )
 
             # shutdown
-            cli.w_s("cli_CurrentInput", input_fhci)
-            cli.w_s("cli_StandardInput", input_fhsi)
-            cli.w_s("cli_Background", DOSFALSE)
-            cli.w_s("cli_Module", cur_module)
+            cli.cli_CurrentInput.aptr = input_fhci
+            cli.cli_StandardInput.aptr = input_fhsi
+            cli.cli_Background.val = DOSFALSE
+            cli.cli_Module.aptr = cur_module
             if output_fhci != None:
-                cli.w_s("cli_StandardOutput", output_fhci)
+                cli.cli_StandardOutput.aptr = output_fhci
             # Channels are closed by the dying shell
-            ctx.mem.w_bstr(cli.r_s("cli_SetName"), cur_setname)
+            ctx.mem.w_bstr(cli.cli_SetName.aptr, cur_setname)
             ctx.process.this_task.access.w_s("pr_CIS", input_fhci)
             ctx.process.this_task.access.w_s("pr_COS", cur_out)
             # infile = self.file_mgr.get_by_b_addr(input_fhci >> 2,False)
