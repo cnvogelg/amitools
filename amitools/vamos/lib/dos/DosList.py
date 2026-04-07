@@ -96,18 +96,19 @@ class DosList:
     def free_list(self):
         for entry in self.entries:
             self.alloc.free_bstr(entry.name_addr)
-            self.alloc.free_struct(entry.mem)
+            entry.mem.free()
             for lock in entry.locks:
                 self.lock_mgr.release_lock(lock)
             for alist in entry.alist:
-                self.alloc.free_struct(alist)
+                alist.free()
 
     def _add_entry(self, entry):
         # allocate amiga entry
         entry.locks = []
         entry.alist = []
-        entry.mem = self.alloc.alloc_struct(entry.struct_def, label=entry.name)
-        entry.struct = entry.struct_def(self.mem, entry.mem.addr)
+        entry.mem = entry.struct = self.alloc.alloc_astruct(
+            entry.struct_def, label=entry.name
+        )
         entry.baddr = entry.mem.addr >> 2
         entry.name_addr = self.alloc.alloc_bstr("DosListName", entry.name)
         _struct_write(entry.struct, "dol_Name", entry.name_addr.addr)
@@ -186,7 +187,7 @@ class DosList:
             del self.entries_by_name[name.lower()]
             del self.entries_by_b_addr[entry.baddr]
             self.entries.remove(entry)
-            self.alloc.free_struct(entry.mem)
+            entry.mem.free()
             self.assign_mgr.clear_assign(name.lower())
         return True
 
@@ -203,7 +204,7 @@ class DosList:
             nextaddr = alist.al_Next.aptr
             mem_obj = alist_mem_by_addr.get(alist_addr)
             if mem_obj is not None:
-                self.alloc.free_struct(mem_obj)
+                mem_obj.free()
             alist_addr = nextaddr
 
     # after creating the device list, the volume and assign
@@ -225,17 +226,16 @@ class DosList:
                         _struct_write(entry.struct, "dol_Lock", lock.mem.addr)
                         first = False
                     else:
-                        assign_entry_mem = self.alloc.alloc_struct(
+                        assign_entry = self.alloc.alloc_astruct(
                             AssignListStruct, label="AssignList"
                         )
-                        assign_entry = AssignListStruct(self.mem, assign_entry_mem.addr)
-                        entry.alist.append(assign_entry_mem)
+                        entry.alist.append(assign_entry)
                         assign_entry.al_Next.aptr = 0
                         assign_entry.al_Lock.aptr = lock.mem.addr
                         if assign_last != None:
-                            assign_last.al_Next.aptr = assign_entry_mem.addr
+                            assign_last.al_Next.aptr = assign_entry.addr
                         else:
-                            _struct_write(entry.struct, "dol_List", assign_entry_mem.addr)
+                            _struct_write(entry.struct, "dol_List", assign_entry.addr)
                         assign_last = assign_entry
 
     def get_entry_by_b_addr(self, baddr):

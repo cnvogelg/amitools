@@ -17,9 +17,9 @@ def dos_filehandle_alloc_test():
     fh = FileHandle(_DummyFile(), "SYS:test", "/tmp/test", need_close=False)
 
     assert fh.alloc_fh(alloc, 0x1234) == fh.b_addr
-    assert fh.mem.struct.fh_Args.val == fh.b_addr
-    assert fh.mem.struct.fh_Type.aptr == 0x1234
-    assert fh.mem.struct.fh_End.val == 1
+    assert fh.struct.fh_Args.val == fh.b_addr
+    assert fh.struct.fh_Type.aptr == 0x1234
+    assert fh.struct.fh_End.val == 1
 
     fh.free_fh(alloc)
     assert alloc.is_all_free()
