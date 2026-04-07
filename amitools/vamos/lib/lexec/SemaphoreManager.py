@@ -1,4 +1,3 @@
-from amitools.vamos.astructs import AccessStruct
 from amitools.vamos.libstructs import SignalSemaphoreStruct
 from amitools.vamos.error import *
 
@@ -13,18 +12,14 @@ class SemaphoreManager:
         self.semaphores_by_name = {}
 
     def InitSemaphore(self, addr):
-        semaphore = AccessStruct(self.mem, SignalSemaphoreStruct, struct_addr=addr)
-        semaphore.w_s("ss_Owner", 0)
-        semaphore.w_s("ss_NestCount", 0)
-        semaphore.w_s("ss_QueueCount", -1)
-        semaphore.w_s("ss_Link.ln_Type", self.NT_SIGNALSEM)
-        semaphore.w_s(
-            "ss_WaitQueue.mlh_Head", semaphore.s_get_addr("ss_WaitQueue.mlh_Tail")
-        )
-        semaphore.w_s("ss_WaitQueue.mlh_Tail", 0)
-        semaphore.w_s(
-            "ss_WaitQueue.mlh_TailPred", semaphore.s_get_addr("ss_WaitQueue.mlh_Head")
-        )
+        semaphore = SignalSemaphoreStruct(self.mem, addr)
+        semaphore.ss_Owner.aptr = 0
+        semaphore.ss_NestCount.val = 0
+        semaphore.ss_QueueCount.val = -1
+        semaphore.ss_Link.type.val = self.NT_SIGNALSEM
+        semaphore.ss_WaitQueue.mlh_Head.aptr = semaphore.ss_WaitQueue.mlh_Tail.addr
+        semaphore.ss_WaitQueue.mlh_Tail.aptr = 0
+        semaphore.ss_WaitQueue.mlh_TailPred.aptr = semaphore.ss_WaitQueue.mlh_Head.addr
         return self.register_semaphore(addr)
 
     def AddSemaphore(self, addr, name):
