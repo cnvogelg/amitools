@@ -198,8 +198,11 @@ class TypeBase:
         mem_obj = cls._alloc(alloc, tag, *alloc_args)
         if not mem_obj:
             return None
-        # create instance of this or alias type
+        struct_obj = getattr(mem_obj, "struct", None)
         cls_type = cls.get_alias_type()
+        if not kwargs and isinstance(struct_obj, cls_type):
+            return struct_obj
+        # create instance of this or alias type
         return cls_type(
             mem=alloc.get_mem(),
             addr=mem_obj.addr,
