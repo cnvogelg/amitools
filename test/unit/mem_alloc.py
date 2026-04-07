@@ -38,6 +38,31 @@ def mem_alloc_struct_binding_test():
     assert mem.r32(cli.struct.cli_CurrentInput.addr) == 0x120 >> 2
 
 
+def mem_alloc_astruct_binding_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    cli = alloc.alloc_astruct(CLIStruct, label="CLI")
+
+    assert isinstance(cli, CLIStruct)
+    assert alloc.get_memory(cli.addr).struct is cli
+
+    cli.cli_DefaultStack.val = 42
+    cli.cli_CurrentInput.aptr = 0x120
+
+    assert cli.cli_DefaultStack.val == 42
+    assert cli.cli_CurrentInput.aptr == 0x120
+    assert mem.r32(cli.cli_CurrentInput.addr) == 0x120 >> 2
+
+
+def mem_alloc_struct_alloc_fast_path_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    cli = CLIStruct.alloc(alloc, tag="CLI")
+
+    assert isinstance(cli, CLIStruct)
+    assert alloc.get_memory(cli.addr).struct is cli
+
+
 def mem_alloc_lib_struct_addr_test():
     mem = MockMemory()
     alloc = MemoryAlloc(mem)
