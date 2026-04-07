@@ -83,11 +83,11 @@ class DosLibrary(LibImpl):
         self.errstrings = {}
         self.resident = []
         self.local_vars = {}
-        self.access = DosLibraryStruct(ctx.mem, base_addr)
+        self.lib_struct = DosLibraryStruct(ctx.mem, base_addr)
         # setup RootNode
         self.root_struct = ctx.alloc.alloc_struct(RootNodeStruct, label="RootNode")
         self.root_node = RootNodeStruct(ctx.mem, self.root_struct.addr)
-        self.access.dl_Root.aptr = self.root_struct.addr
+        self.lib_struct.dl_Root.aptr = self.root_struct.addr
         # setup DosInfo
         self.dos_info = ctx.alloc.alloc_struct(DosInfoStruct, label="DosInfo")
         self.dos_info_struct = DosInfoStruct(ctx.mem, self.dos_info.addr)
@@ -153,7 +153,7 @@ class DosLibrary(LibImpl):
 
     def setioerr(self, ctx, err):
         self.io_err = err
-        ctx.process.this_task.access.w_s("pr_Result2", err)
+        ctx.process.this_task.struct.pr_Result2.val = err
 
     def SetIoErr(self, ctx):
         old_io_err = self.io_err
@@ -372,51 +372,53 @@ class DosLibrary(LibImpl):
 
     def create_var(self, ctx, name, flags):
         varlist = ctx.process.get_local_vars()
+        varlist_struct = varlist.struct
         node_addr = self._alloc_mem(
             "ShellVar(%s)" % name, LocalVarStruct.get_size() + len(name) + 1
         )
         name_addr = node_addr + LocalVarStruct.get_size()
-        node = ctx.alloc.map_struct(
+        node_mem = ctx.alloc.map_struct(
             node_addr, LocalVarStruct, label="ShellVar(%s) % name"
         )
+        node = node_mem.struct
         ctx.mem.w_cstr(name_addr, name)
-        node.access.w_s("lv_Node.ln_Name", name_addr)
-        node.access.w_s("lv_Node.ln_Type", flags & 0xFF)
-        node.access.w_s("lv_Value", 0)
-        head_addr = varlist.access.r_s("mlh_Head")
+        node.lv_Node.ln_Name.aptr = name_addr
+        node.lv_Node.ln_Type.val = flags & 0xFF
+        node.lv_Value.aptr = 0
+        head_addr = varlist_struct.mlh_Head.aptr
         head = NodeStruct(ctx.mem, head_addr)
         head.ln_Pred.aptr = node_addr
-        varlist.access.w_s("mlh_Head", node_addr)
-        node.access.w_s("lv_Node.ln_Succ", head_addr)
-        node.access.w_s("lv_Node.ln_Pred", varlist.access.s_get_addr("mlh_Head"))
-        self.local_vars[(name.lower(), flags & 0xFF)] = node.access
-        return node.access
+        varlist_struct.mlh_Head.aptr = node_addr
+        node.lv_Node.ln_Succ.aptr = head_addr
+        node.lv_Node.ln_Pred.aptr = varlist_struct.mlh_Head.addr
+        self.local_vars[(name.lower(), flags & 0xFF)] = node
+        return node
 
     def set_var(self, ctx, node, buff_ptr, size, value, flags):
-        if node.r_s("lv_Value") != 0:
-            self._free_mem(node.r_s("lv_Value"))
-            node.w_s("lv_Value", 0)
+        if node.lv_Value.aptr != 0:
+            self._free_mem(node.lv_Value.aptr)
+            node.lv_Value.aptr = 0
         buf_addr = self._alloc_mem("ShellVarBuffer", size)
-        node.w_s("lv_Value", buf_addr)
-        node.w_s("lv_Len", size)
+        node.lv_Value.aptr = buf_addr
+        node.lv_Len.val = size
         if flags & self.GVF_BINARY_VAR:
             ctx.mem.copy_block(buff_ptr, buf_addr, size)
         else:
             ctx.mem.w_cstr(buf_addr, value)
 
     def delete_var(self, ctx, node):
-        buf_addr = node.r_s("lv_Value")
-        buf_len = node.r_s("lv_Len")
-        name_addr = node.r_s("lv_Node.ln_Name")
+        buf_addr = node.lv_Value.aptr
+        buf_len = node.lv_Len.val
+        name_addr = node.lv_Node.ln_Name.aptr
         name = ctx.mem.r_cstr(name_addr)
         if buf_addr != 0:
             self._free_mem(buf_addr)
-        node.w_s("lv_Value", 0)
-        succ = node.r_s("lv_Node.ln_Succ")
-        pred = node.r_s("lv_Node.ln_Pred")
+        node.lv_Value.aptr = 0
+        succ = node.lv_Node.ln_Succ.aptr
+        pred = node.lv_Node.ln_Pred.aptr
         NodeStruct(ctx.mem, pred).ln_Succ.aptr = succ
         NodeStruct(ctx.mem, succ).ln_Pred.aptr = pred
-        self._free_mem(node.struct._addr)
+        self._free_mem(node.addr)
         for k in list(self.local_vars.keys()):
             if self.local_vars[k] == node:
                 del self.local_vars[k]
@@ -433,21 +435,19 @@ class DosLibrary(LibImpl):
         if not flags & self.GVF_GLOBAL_ONLY:
             node = self.find_var(ctx, name, flags & 0xFF)
             if node != None:
-                nodelen = node.r_s("lv_Len")
+                nodelen = node.lv_Len.val
                 if flags & self.GVF_BINARY_VAR:
-                    ctx.mem.copy_block(
-                        node.r_s("lv_Value"), buff_ptr, min(nodelen, size)
-                    )
+                    ctx.mem.copy_block(node.lv_Value.aptr, buff_ptr, min(nodelen, size))
                     log_dos.info(
                         'GetVar("%s", 0x%x) -> %0x06x',
                         name,
                         flags,
-                        node.r_s("lv_Value"),
+                        node.lv_Value.aptr,
                     )
                     self.setioerr(ctx, nodelen)
                     return min(nodelen, size)
                 else:
-                    value = ctx.mem.r_cstr(node.r_s("lv_Value"))
+                    value = ctx.mem.r_cstr(node.lv_Value.aptr)
                     ctx.mem.w_cstr(buff_ptr, value[: size - 1])
                     log_dos.info('GetVar("%s", 0x%x) -> %s', name, flags, value)
                     self.setioerr(ctx, len(value))
@@ -464,8 +464,8 @@ class DosLibrary(LibImpl):
             log_dos.info('FindVar("%s", 0x%x) -> NULL', name, vtype)
             return 0
         else:
-            log_dos.info('FindVar("%s", 0x%x) -> %06lx', name, vtype, node.struct.addr)
-            return node.struct.addr
+            log_dos.info('FindVar("%s", 0x%x) -> %06lx', name, vtype, node.addr)
+            return node.addr
 
     def SetVar(self, ctx):
         name_ptr = ctx.cpu.r_reg(REG_D1)
@@ -577,12 +577,12 @@ class DosLibrary(LibImpl):
         return 0
 
     def Input(self, ctx):
-        inp_bptr = ctx.process.this_task.access.r_s("pr_CIS") >> 2
+        inp_bptr = ctx.process.this_task.struct.pr_CIS.aptr >> 2
         log_dos.info("Input() -> b%06x", inp_bptr)
         return inp_bptr
 
     def Output(self, ctx):
-        out_bptr = ctx.process.this_task.access.r_s("pr_COS") >> 2
+        out_bptr = ctx.process.this_task.struct.pr_COS.aptr >> 2
         log_dos.info("Output() -> b%06x", out_bptr)
         return out_bptr
 
@@ -1508,9 +1508,11 @@ class DosLibrary(LibImpl):
         # use submitted csrc?
         csrc_buf_ptr = 0
         rdargs = None
+        rdargs_mem = None
         if rdargs_ptr != 0:
-            rdargs = ctx.alloc.map_struct(rdargs_ptr, RDArgsStruct, label="RDArgs")
-            csrc_buf_ptr = rdargs.access.r_s("RDA_Source.CS_Buffer")
+            rdargs_mem = ctx.alloc.map_struct(rdargs_ptr, RDArgsStruct, label="RDArgs")
+            rdargs = rdargs_mem.struct
+            csrc_buf_ptr = rdargs.RDA_Source.CS_Buffer.aptr
         if csrc_buf_ptr != 0:
             # take given csrc and setup buffer
             input_fh = None
@@ -1528,8 +1530,8 @@ class DosLibrary(LibImpl):
             flags = 0
             ext_help = None
         else:
-            flags = rdargs.access.r_s("RDA_Flags")
-            ext_help_ptr = rdargs.access.r_s("RDA_ExtHelp")
+            flags = rdargs.RDA_Flags.val
+            ext_help_ptr = rdargs.RDA_ExtHelp.aptr
             ext_help = ctx.mem.r_cstr(ext_help_ptr) if ext_help_ptr else None
         log_dos.info("ReadArgs: flags=%s ext_help=%s", flags, ext_help)
         RDAF_NOPROMPT = 4
@@ -1588,17 +1590,18 @@ class DosLibrary(LibImpl):
 
             # 8. alloc custom rdargs if none is given
             if rdargs_ptr == 0:
-                rdargs = ctx.alloc.alloc_struct(RDArgsStruct, label="RDArgs")
-                rdargs_ptr = rdargs.addr
+                rdargs_mem = ctx.alloc.alloc_struct(RDArgsStruct, label="RDArgs")
+                rdargs = rdargs_mem.struct
+                rdargs_ptr = rdargs_mem.addr
                 own = True
             else:
                 own = False
             # own house keeping
-            self.rdargs[rdargs.addr] = (rdargs, own)
+            self.rdargs[rdargs_ptr] = (rdargs_mem, own)
 
             # 9. store extra buffer
-            rdargs.access.w_s("RDA_Buffer", extra_ptr)
-            rdargs.access.w_s("RDA_BufSiz", total_bytes)
+            rdargs.RDA_Buffer.aptr = extra_ptr
+            rdargs.RDA_BufSiz.val = total_bytes
 
         # done
         self.setioerr(ctx, error)
@@ -1610,15 +1613,15 @@ class DosLibrary(LibImpl):
         # find rdargs
         if rdargs_ptr not in self.rdargs:
             raise VamosInternalError("Can't find RDArgs: %06x" % rdargs_ptr)
-        rdargs, own = self.rdargs[rdargs_ptr]
+        rdargs_mem, own = self.rdargs[rdargs_ptr]
         del self.rdargs[rdargs_ptr]
         # clean up rdargs
-        addr = rdargs.access.r_s("RDA_Buffer")
+        addr = rdargs_mem.struct.RDA_Buffer.aptr
         if addr != 0:
             self._free_mem(addr)
         # free our memory
         if own:
-            self.alloc.free_struct(rdargs)
+            self.alloc.free_struct(rdargs_mem)
 
     def ReadItem(self, ctx):
         buff_ptr = ctx.cpu.r_reg(REG_D1)
@@ -1704,7 +1707,7 @@ class DosLibrary(LibImpl):
             cur_lock = self.lock_mgr.get_by_b_addr(current_dir >> 2)
             dup_lock = self.lock_mgr.dup_lock(self.get_current_dir(ctx))
             cur_module = cli.cli_Module.aptr
-            cur_out = ctx.process.this_task.access.r_s("pr_COS")
+            cur_out = ctx.process.this_task.struct.pr_COS.aptr
             cur_setname = ctx.mem.r_bstr(cli.cli_SetName.aptr)
             cli.cli_Module.aptr = 0
             ctx.process.set_current_dir(dup_lock.mem.addr)
@@ -1731,8 +1734,8 @@ class DosLibrary(LibImpl):
                 cli.cli_StandardOutput.aptr = output_fhci
             # Channels are closed by the dying shell
             ctx.mem.w_bstr(cli.cli_SetName.aptr, cur_setname)
-            ctx.process.this_task.access.w_s("pr_CIS", input_fhci)
-            ctx.process.this_task.access.w_s("pr_COS", cur_out)
+            ctx.process.this_task.struct.pr_CIS.aptr = input_fhci
+            ctx.process.this_task.struct.pr_COS.aptr = cur_out
             # infile = self.file_mgr.get_by_b_addr(input_fhci >> 2,False)
             # infile.setbuf("")
             ctx.process.set_current_dir(current_dir)
@@ -1919,8 +1922,8 @@ class DosLibrary(LibImpl):
         self.dos_objs[ptr] = (dos_obj, obj_type)
         # pre fill struct
         if obj_type == 0:
-            dos_obj.access.w_s("fh_Pos", 0xFFFFFFFF)
-            dos_obj.access.w_s("fh_End", 0xFFFFFFFF)
+            dos_obj.struct.fh_Pos.val = 0xFFFFFFFF
+            dos_obj.struct.fh_End.val = 0xFFFFFFFF
         elif obj_type == 4:
             raise UnsupportedFeatureError("AllocDosObject: DOS_CLI fill TBD")
         return ptr
@@ -2055,18 +2058,18 @@ class DosLibrary(LibImpl):
             name = f"vol_{entry_type:x}"
         struct_def = DosListAssignStruct if entry_type == 1 else DosListVolumeStruct
         mem = ctx.alloc.alloc_struct(struct_def, label=f"DosList({name})")
-        acc = mem.access
-        acc.w_s("dol_Next", 0)
-        acc.w_s("dol_Type", entry_type)
-        acc.w_s("dol_Task", 0)
-        acc.w_s("dol_Lock", 0)
+        entry = mem.struct
+        entry.dol_Next.aptr = 0
+        entry.dol_Type.val = entry_type
+        entry.dol_Task.aptr = 0
+        entry.dol_Lock.aptr = 0
         if struct_def is DosListVolumeStruct:
-            acc.w_s("dol_LockList", 0)
-            acc.w_s("dol_DiskType", 0)
+            entry.dol_LockList.aptr = 0
+            entry.dol_DiskType.val = 0
         else:
-            acc.w_s("dol_List", 0)
+            entry.dol_List.aptr = 0
         name_mem = ctx.alloc.alloc_bstr(name, label="DosListName")
-        acc.w_s("dol_Name", name_mem.addr)
+        entry.dol_Name.aptr = name_mem.addr
         self.dos_entries[mem.addr] = {"mem": mem, "name": name_mem}
         log_dos.info("MakeDosEntry('%s', type=%d) -> 0x%x", name, entry_type, mem.addr)
         return mem.addr
@@ -2256,11 +2259,11 @@ class DosLibrary(LibImpl):
     # As we only have one file system (though with multiple assigns)
     # it does not really matter what we do here...
     def GetFileSysTask(self, ctx):
-        return ctx.process.this_task.access.r_s("pr_FileSystemTask")
+        return ctx.process.this_task.struct.pr_FileSystemTask.aptr
 
     def SetFileSysTask(self, ctx):
         port = ctx.cpu.r_reg(REG_D1)
-        ctx.process.this_task.access.w_s("pr_FileSystemTask", port)
+        ctx.process.this_task.struct.pr_FileSystemTask.aptr = port
 
     # ----- DosPackets -----
 
