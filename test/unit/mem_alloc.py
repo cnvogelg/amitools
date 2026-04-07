@@ -42,9 +42,11 @@ def mem_alloc_astruct_binding_test():
     mem = MockMemory()
     alloc = MemoryAlloc(mem)
     cli = alloc.alloc_astruct(CLIStruct, label="CLI")
+    mem_obj = alloc.get_memory(cli.addr)
 
     assert isinstance(cli, CLIStruct)
-    assert alloc.get_memory(cli.addr).struct is cli
+    assert mem_obj is cli._mem_obj
+    assert not hasattr(mem_obj, "struct")
 
     cli.cli_DefaultStack.val = 42
     cli.cli_CurrentInput.aptr = 0x120
@@ -58,9 +60,11 @@ def mem_alloc_struct_alloc_fast_path_test():
     mem = MockMemory()
     alloc = MemoryAlloc(mem)
     cli = CLIStruct.alloc(alloc, tag="CLI")
+    mem_obj = alloc.get_memory(cli.addr)
 
     assert isinstance(cli, CLIStruct)
-    assert alloc.get_memory(cli.addr).struct is cli
+    assert mem_obj is cli._mem_obj
+    assert not hasattr(mem_obj, "struct")
 
 
 def mem_alloc_lib_struct_addr_test():
@@ -74,3 +78,13 @@ def mem_alloc_lib_struct_addr_test():
 
     lib.struct.lib_Node.ln_Type.val = NodeType.NT_LIBRARY
     assert lib.struct.lib_Node.ln_Type.val == NodeType.NT_LIBRARY
+
+
+def mem_alloc_alib_fast_path_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    lib = LibraryStruct.alloc(alloc, neg_size=32)
+
+    assert isinstance(lib, LibraryStruct)
+    assert lib._mem_obj is alloc.get_memory(lib.addr - 32)
+    assert not hasattr(lib._mem_obj, "struct")
