@@ -53,8 +53,8 @@ class FileHandle:
 
     def alloc_fh(self, alloc, fs_handler_port):
         name = "File:" + self.name
-        self.mem = alloc.alloc_struct(FileHandleStruct, label=name)
-        fh = self.mem.struct
+        self.mem = self.struct = alloc.alloc_astruct(FileHandleStruct, label=name)
+        fh = self.struct
         self.b_addr = self.mem.addr >> 2
         # -- fill filehandle
         # use baddr of FH itself as identifier
@@ -66,7 +66,9 @@ class FileHandle:
         return self.b_addr
 
     def free_fh(self, alloc):
-        alloc.free_struct(self.mem)
+        self.struct.free()
+        self.mem = None
+        self.struct = None
 
     # --- file ops ---
 

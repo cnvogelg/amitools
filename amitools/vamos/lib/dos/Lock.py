@@ -93,15 +93,15 @@ class Lock:
     def alloc(self, alloc, vol_addr, key):
         name = "Lock: %s" % self
         self.key = key
-        self.mem = alloc.alloc_struct(FileLockStruct, label=name)
-        self.struct = FileLockStruct(alloc.get_mem(), self.mem.addr)
+        self.mem = self.struct = alloc.alloc_astruct(FileLockStruct, label=name)
         self.struct.key.val = key
         self.struct.volume.aptr = vol_addr
         self.b_addr = self.mem.addr >> 2
         self.vol_addr = vol_addr
 
     def free(self, alloc):
-        alloc.free_struct(self.mem)
+        self.struct.free()
+        self.mem = None
         self.struct = None
 
     # --- lock ops ---

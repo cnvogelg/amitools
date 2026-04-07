@@ -39,7 +39,7 @@ def run_command(process, start_pc, args_ptr, args_len, stack_size, reg_d1=0):
     ctx = process.ctx
     alloc = ctx.alloc
     new_stack = Stack.alloc(alloc, stack_size)
-    task = process.this_task.struct.pr_Task
+    task = process.this_task.pr_Task
     # save old stack
     oldstack_upper = task.tc_SPLower.aptr
     oldstack_lower = task.tc_SPUpper.aptr

@@ -206,12 +206,12 @@ class Process(DosProcess):
 
     # ----- cli struct -----
     def alloc_cli_struct(self):
-        self.cli = self.ctx.alloc.alloc_struct(
+        self.cli = self.ctx.alloc.alloc_astruct(
             CLIStruct, label=self.bin_basename + "_CLI"
         )
 
     def init_cli_struct(self, input_fh, output_fh, bin_name):
-        cli = self.cli.struct
+        cli = self.cli
         cli.cli_DefaultStack.val = self.stack.get_size() // 4  # in longs
         cli.cli_FailLevel.val = 10
         # set input/output
@@ -249,8 +249,8 @@ class Process(DosProcess):
             if p != "C:" and p != "c:":
                 lock = self.ctx.dos_lib.lock_mgr.create_lock(None, p, False)
                 if lock != None:
-                    path = self.ctx.alloc.alloc_struct(PathStruct, label="Path(%s)" % p)
-                    path_struct = path.struct
+                    path = self.ctx.alloc.alloc_astruct(PathStruct, label="Path(%s)" % p)
+                    path_struct = path
                     path_struct.path_Lock.aptr = lock.mem.addr
                     path_struct.path_Next.aptr = cmd_dir_addr
                     cmd_dir_addr = path.addr
@@ -264,10 +264,10 @@ class Process(DosProcess):
         self.ctx.alloc.free_memory(self.cmdname)
         self.ctx.alloc.free_memory(self.setname)
         self.ctx.alloc.free_memory(self.cmdfile)
-        self.ctx.alloc.free_struct(self.cli)
+        self.cli.free()
         # free path
         for path, lock in self.cli_paths:
-            self.ctx.alloc.free_struct(path)
+            path.free()
             self.ctx.dos_lib.lock_mgr.release_lock(lock)
 
     def get_cli_struct(self):
@@ -276,17 +276,17 @@ class Process(DosProcess):
     # ----- initialize for running a command in a shell -----
 
     def init_shell_packet(self):
-        self.shell_message = self.ctx.alloc.alloc_struct(
+        self.shell_message = self.ctx.alloc.alloc_astruct(
             MessageStruct, label="Shell Startup Message"
         )
-        self.shell_packet = self.ctx.alloc.alloc_struct(
+        self.shell_packet = self.ctx.alloc.alloc_astruct(
             DosPacketStruct, label="Shell Startup Packet"
         )
         self.shell_port = self.ctx.exec_lib.port_mgr.create_port(
             "Shell Startup Port", None
         )
-        shell_packet = self.shell_packet.struct
-        shell_message = self.shell_message.struct
+        shell_packet = self.shell_packet
+        shell_message = self.shell_message
         shell_packet.dp_Type.val = 1  # indicate RUN
         shell_packet.dp_Res2.val = 0  # indicate correct startup
         shell_packet.dp_Res1.val = 0  # indicate RUN
@@ -302,10 +302,10 @@ class Process(DosProcess):
 
     def free_shell_packet(self):
         if self.shell_message != None:
-            self.ctx.alloc.free_struct(self.shell_message)
+            self.shell_message.free()
             self.shell_message = None
         if self.shell_packet != None:
-            self.ctx.alloc.free_struct(self.shell_packet)
+            self.shell_packet.free()
             self.shell_packet = None
         if self.shell_port != None:
             self.ctx.exec_lib.port_mgr.free_port(self.shell_port)
@@ -320,9 +320,8 @@ class Process(DosProcess):
     def init_task_struct(self, input_fh, output_fh):
         # memory adress of proc
         self.addr = self.ami_proc.addr
-        # legacy: old struct mapping
-        self.this_task = self.ctx.alloc.map_struct(self.addr, ProcessStruct)
-        task = self.this_task.struct
+        self.this_task = ProcessStruct(self.ctx.mem, self.addr)
+        task = self.this_task
         # Inject arguments into input stream (Needed for C:Execute)
         self.seglist = self.ctx.alloc.alloc_memory(24, label="Process Seglist")
         task.pr_SegList.aptr = self.seglist.addr
@@ -338,7 +337,7 @@ class Process(DosProcess):
         # set home dir
         task.pr_HomeDir.aptr = self.home_lock.b_addr << 2
         varlist = self.get_local_vars()
-        varlist_struct = varlist.struct
+        varlist_struct = varlist
         # Initialize the list of local shell variables
         varlist_struct.mlh_Head.aptr = varlist.addr + 4
         varlist_struct.mlh_Tail.aptr = 0
@@ -350,44 +349,44 @@ class Process(DosProcess):
         self.ctx.alloc.free_memory(self.seglist)
 
     def get_local_vars(self):
-        localvars_addr = self.this_task.struct.pr_LocalVars.addr
-        return self.ctx.alloc.map_struct(localvars_addr, MinListStruct, label="MinList")
+        localvars_addr = self.this_task.pr_LocalVars.addr
+        return MinListStruct(self.ctx.mem, localvars_addr)
 
     def get_input(self):
-        fh_b = self.this_task.struct.pr_CIS.aptr >> 2
+        fh_b = self.this_task.pr_CIS.aptr >> 2
         return self.ctx.dos_lib.file_mgr.get_by_b_addr(fh_b)
 
     def set_input(self, input_fh):
         if input_fh is None:  # BNULL
-            self.this_task.struct.pr_CIS.aptr = 0
+            self.this_task.pr_CIS.aptr = 0
         else:
-            self.this_task.struct.pr_CIS.aptr = (
+            self.this_task.pr_CIS.aptr = (
                 input_fh.b_addr << 2
             )  # compensate BCPL auto-conversion
 
     def get_output(self):
-        fh_b = self.this_task.struct.pr_COS.aptr >> 2
+        fh_b = self.this_task.pr_COS.aptr >> 2
         return self.ctx.dos_lib.file_mgr.get_by_b_addr(fh_b)
 
     def set_output(self, output_fh):
         if output_fh is None:  # BNULL
-            self.this_task.struct.pr_COS.aptr = 0
+            self.this_task.pr_COS.aptr = 0
         else:
-            self.this_task.struct.pr_COS.aptr = (
+            self.this_task.pr_COS.aptr = (
                 output_fh.b_addr << 2
             )  # compensate BCPL auto-conversion
 
     def get_current_dir(self):
-        return self.this_task.struct.pr_CurrentDir.aptr
+        return self.this_task.pr_CurrentDir.aptr
 
     def set_current_dir(self, lock):
-        self.this_task.struct.pr_CurrentDir.aptr = lock
+        self.this_task.pr_CurrentDir.aptr = lock
 
     def get_home_dir(self):
-        return self.this_task.struct.pr_HomeDir.aptr
+        return self.this_task.pr_HomeDir.aptr
 
     def set_home_dir(self, lock_addr):
-        self.this_task.struct.pr_HomeDir.aptr = lock_addr
+        self.this_task.pr_HomeDir.aptr = lock_addr
 
     def is_native_shell(self):
         return self.shell
@@ -396,10 +395,10 @@ class Process(DosProcess):
         return self.bin_basename
 
     def get_arg_str_ptr(self):
-        return self.this_task.struct.pr_Arguments.aptr
+        return self.this_task.pr_Arguments.aptr
 
     def set_arg_str_ptr(self, ptr):
-        self.this_task.struct.pr_Arguments.aptr = ptr
+        self.this_task.pr_Arguments.aptr = ptr
 
     def get_current_dir_lock(self):
         lock_mgr = self.ctx.dos_lib.lock_mgr
