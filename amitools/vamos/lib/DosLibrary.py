@@ -166,8 +166,8 @@ class DosLibrary(LibImpl):
         if proc_addr == 0:
             log_dos.warning("WaitPkt: ThisTask is NULL")
             return 0
-        proc = AccessStruct(ctx.mem, ProcessStruct, proc_addr)
-        port_addr = proc.s_get_addr("pr_MsgPort")
+        proc = ProcessStruct(ctx.mem, proc_addr)
+        port_addr = proc.pr_MsgPort.addr
         log_dos.info("WaitPkt: proc=%06x port=%06x", proc_addr, port_addr)
         if not ctx.exec_lib.port_mgr.has_port(port_addr):
             log_dos.warning("WaitPkt: port %06x not registered", port_addr)
@@ -183,8 +183,8 @@ class DosLibrary(LibImpl):
             )
         msg_addr = ctx.exec_lib.port_mgr.get_msg(port_addr)
         self._unlink_msg(ctx, msg_addr)
-        msg = AccessStruct(ctx.mem, MessageStruct, msg_addr)
-        return msg.r_s("mn_Node.ln_Name")
+        msg = MessageStruct(ctx.mem, msg_addr)
+        return msg.mn_Node.ln_Name.aptr
 
     def Fault(self, ctx):
         errcode = ctx.cpu.r_reg(REG_D1)
@@ -253,26 +253,26 @@ class DosLibrary(LibImpl):
 
     def DateStamp(self, ctx):
         ds_ptr = ctx.cpu.r_reg(REG_D1)
-        ds = AccessStruct(ctx.mem, DateStampStruct, struct_addr=ds_ptr)
+        ds = DateStampStruct(ctx.mem, ds_ptr)
         t = time.time()
         at = sys_to_ami_time(t)
         log_dos.info("DateStamp: ptr=%06x sys_time=%d time=%s", ds_ptr, t, at)
-        ds.w_s("ds_Days", at.tday)
-        ds.w_s("ds_Minute", at.tmin)
-        ds.w_s("ds_Tick", at.tick)
+        ds.ds_Days.val = at.tday
+        ds.ds_Minute.val = at.tmin
+        ds.ds_Tick.val = at.tick
         return ds_ptr
 
     def DateToStr(self, ctx):
         dt_ptr = ctx.cpu.r_reg(REG_D1)
-        dt = AccessStruct(ctx.mem, DateTimeStruct, struct_addr=dt_ptr)
-        ds_day = dt.r_s("dat_Stamp.ds_Days")
-        ds_min = dt.r_s("dat_Stamp.ds_Minute")
-        ds_tick = dt.r_s("dat_Stamp.ds_Tick")
-        format = dt.r_s("dat_Format")
-        flags = dt.r_s("dat_Flags")
-        str_day_ptr = dt.r_s("dat_StrDay")
-        str_date_ptr = dt.r_s("dat_StrDate")
-        str_time_ptr = dt.r_s("dat_StrTime")
+        dt = DateTimeStruct(ctx.mem, dt_ptr)
+        ds_day = dt.dat_Stamp.ds_Days.val
+        ds_min = dt.dat_Stamp.ds_Minute.val
+        ds_tick = dt.dat_Stamp.ds_Tick.val
+        format = dt.dat_Format.val
+        flags = dt.dat_Flags.val
+        str_day_ptr = dt.dat_StrDay.aptr
+        str_date_ptr = dt.dat_StrDate.aptr
+        str_time_ptr = dt.dat_StrTime.aptr
         at = AmiTime(ds_day, ds_min, ds_tick)
         st = at.to_sys_time()
         log_dos.info(
@@ -306,12 +306,12 @@ class DosLibrary(LibImpl):
 
     def SetFileDate(self, ctx):
         ds_ptr = ctx.cpu.r_reg(REG_D2)
-        ds = AccessStruct(ctx.mem, DateStampStruct, struct_addr=ds_ptr)
+        ds = DateStampStruct(ctx.mem, ds_ptr)
         name_ptr = ctx.cpu.r_reg(REG_D1)
         name = ctx.mem.r_cstr(name_ptr)
-        ticks = ds.r_s("ds_Tick")
-        minutes = ds.r_s("ds_Minute")
-        days = ds.r_s("ds_Days")
+        ticks = ds.ds_Tick.val
+        minutes = ds.ds_Minute.val
+        days = ds.ds_Days.val
         seconds = ami_to_sys_time(AmiTime(days, minutes, ticks))
         log_dos.info("SetFileDate: file=%s date=%d", name, seconds)
         sys_path = self.path_mgr.ami_to_sys_path(
@@ -1129,9 +1129,9 @@ class DosLibrary(LibImpl):
         fib_ptr = ctx.cpu.r_reg(REG_D2)
 
         lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-        fib = AccessStruct(ctx.mem, FileInfoBlockStruct, struct_addr=fib_ptr)
+        fib = FileInfoBlockStruct(ctx.mem, fib_ptr)
         err = lock.examine_lock(fib)
-        name_addr = fib.s_get_addr("fib_FileName")
+        name_addr = fib.fib_FileName.addr
         name = ctx.mem.r_cstr(name_addr)
         log_dos.info("Examine: %s fib=%06x(%s) -> %s", lock, fib_ptr, name, err)
         self.setioerr(ctx, err)
@@ -1157,9 +1157,9 @@ class DosLibrary(LibImpl):
             self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
             return DOSFALSE
 
-        fib = AccessStruct(ctx.mem, FileInfoBlockStruct, struct_addr=fib_ptr)
+        fib = FileInfoBlockStruct(ctx.mem, fib_ptr)
         err = lock.examine_lock(fib)
-        name_addr = fib.s_get_addr("fib_FileName")
+        name_addr = fib.fib_FileName.addr
         name = ctx.mem.r_cstr(name_addr)
         log_dos.info("ExamineFH: %s fib=%06x(%s) -> %s", fh, fib_ptr, name, err)
         self.setioerr(ctx, err)
@@ -1175,18 +1175,18 @@ class DosLibrary(LibImpl):
         lock_b_addr = ctx.cpu.r_reg(REG_D1)
         info_ptr = ctx.cpu.r_reg(REG_D2)
         lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-        info = AccessStruct(ctx.mem, InfoDataStruct, struct_addr=info_ptr)
+        info = InfoDataStruct(ctx.mem, info_ptr)
         vol = lock.find_volume_node(self.dos_list)
         if vol != None:
-            info.w_s("id_NumSoftErrors", 0)
-            info.w_s("id_UnitNumber", 0)  # not that we really care...
-            info.w_s("id_DiskState", 0)  # disk is not write protected
-            info.w_s("id_NumBlocks", 0x7FFFFFFF)  # a really really big disk....
-            info.w_s("id_NumBlocksUsed", 0x0FFFFFFF)  # some...
-            info.w_s("id_BytesPerBlock", 512)  # let's take regular FFS blocks
-            info.w_s("id_DiskType", 0x444F5303)  # international FFS
-            info.w_s("id_VolumeNode", vol)
-            info.w_s("id_InUse", 0)
+            info.id_NumSoftErrors.val = 0
+            info.id_UnitNumber.val = 0  # not that we really care...
+            info.id_DiskState.val = 0  # disk is not write protected
+            info.id_NumBlocks.val = 0x7FFFFFFF  # a really really big disk....
+            info.id_NumBlocksUsed.val = 0x0FFFFFFF  # some...
+            info.id_BytesPerBlock.val = 512  # let's take regular FFS blocks
+            info.id_DiskType.val = 0x444F5303  # international FFS
+            info.id_VolumeNode.aptr = vol
+            info.id_InUse.val = 0
             log_dos.info("Info: %s info=%06x -> true", lock, info_ptr)
             return DOSTRUE
         else:
@@ -1197,9 +1197,9 @@ class DosLibrary(LibImpl):
         lock_b_addr = ctx.cpu.r_reg(REG_D1)
         fib_ptr = ctx.cpu.r_reg(REG_D2)
         lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-        fib = AccessStruct(ctx.mem, FileInfoBlockStruct, struct_addr=fib_ptr)
+        fib = FileInfoBlockStruct(ctx.mem, fib_ptr)
         err = lock.examine_next(fib)
-        name_addr = fib.s_get_addr("fib_FileName")
+        name_addr = fib.fib_FileName.addr
         name = ctx.mem.r_cstr(name_addr)
         log_dos.info("ExNext: %s fib=%06x (%s) -> %s", lock, fib_ptr, name, err)
         self.setioerr(ctx, err)
@@ -1280,7 +1280,8 @@ class DosLibrary(LibImpl):
         # First filter out "real" devices.
         if uname.startswith("NIL:") or uname == "*" or uname.startswith("CONSOLE:"):
             log_dos.info("GetDeviceProc: %s -> None", name)
-            vol_lock = 0
+            vol_lock = None
+            volume = None
         else:
             # Otherwise, create a lock for the path
             abs_name = ctx.path_mgr.ami_abs_path(self.get_current_dir(ctx), name)
@@ -1296,21 +1297,19 @@ class DosLibrary(LibImpl):
             addr,
             vol_lock,
         )
-        devproc = AccessStruct(ctx.mem, DevProcStruct, struct_addr=addr)
-        devproc.w_s("dvp_Port", fs_port)
+        devproc = DevProcStruct(ctx.mem, addr)
+        devproc.dvp_Port.aptr = fs_port
         if vol_lock == None:
-            devproc.w_s("dvp_Lock", 0)
+            devproc.dvp_Lock.aptr = 0
         else:
-            devproc.w_s(
-                "dvp_Lock", vol_lock.b_addr << 2
-            )  # THOR: Compensate for BADDR adjustment.
+            devproc.dvp_Lock.aptr = vol_lock.b_addr << 2
         self.setioerr(ctx, NO_ERROR)
         return addr
 
     def FreeDeviceProc(self, ctx):
         addr = ctx.cpu.r_reg(REG_D1)
-        devproc = AccessStruct(ctx.mem, DevProcStruct, struct_addr=addr)
-        vol_lock = devproc.r_s("dvp_Lock")
+        devproc = DevProcStruct(ctx.mem, addr)
+        vol_lock = devproc.dvp_Lock.aptr
         if vol_lock != 0:
             lock = self.lock_mgr.get_by_b_addr(vol_lock >> 2)
             self.lock_mgr.release_lock(lock)
@@ -1323,7 +1322,7 @@ class DosLibrary(LibImpl):
         pat_ptr = ctx.cpu.r_reg(REG_D1)
         pat = ctx.mem.r_cstr(pat_ptr)
         anchor_ptr = ctx.cpu.r_reg(REG_D2)
-        anchor = AccessStruct(ctx.mem, AnchorPathStruct, struct_addr=anchor_ptr)
+        anchor = AnchorPathStruct(ctx.mem, anchor_ptr)
 
         # create MatchFirstNext instance
         mfn = MatchFirstNext(
@@ -2014,7 +2013,7 @@ class DosLibrary(LibImpl):
         if entry is None:
             log_dos.info("FindDosEntry('%s', flags=0x%x) -> 0 (not found)", name, flags)
             return 0
-        entry_type = entry.access.r_s("dol_Type")
+        entry_type = entry.struct.dol_Type.val
         type_matches = False
         if entry_type == 0 and (flags & 4):
             type_matches = True
