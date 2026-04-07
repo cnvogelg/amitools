@@ -39,12 +39,13 @@ def run_command(process, start_pc, args_ptr, args_len, stack_size, reg_d1=0):
     ctx = process.ctx
     alloc = ctx.alloc
     new_stack = Stack.alloc(alloc, stack_size)
+    task = process.this_task.struct.pr_Task
     # save old stack
-    oldstack_upper = process.this_task.access.r_s("pr_Task.tc_SPLower")
-    oldstack_lower = process.this_task.access.r_s("pr_Task.tc_SPUpper")
+    oldstack_upper = task.tc_SPLower.aptr
+    oldstack_lower = task.tc_SPUpper.aptr
     # activate new stack
-    process.this_task.access.w_s("pr_Task.tc_SPLower", new_stack.get_upper())
-    process.this_task.access.w_s("pr_Task.tc_SPUpper", new_stack.get_lower())
+    task.tc_SPLower.aptr = new_stack.get_upper()
+    task.tc_SPUpper.aptr = new_stack.get_lower()
     # NOTE: the Manx fexec and BPCL mess is not (yet) setup here.
 
     # setup sub task
@@ -73,8 +74,8 @@ def run_command(process, start_pc, args_ptr, args_len, stack_size, reg_d1=0):
     log_proc.info("return from RunCommand: ret_code=%d", ret_code)
 
     # restore stack values
-    process.this_task.access.w_s("pr_Task.tc_SPLower", oldstack_lower)
-    process.this_task.access.w_s("pr_Task.tc_SPUpper", oldstack_upper)
+    task.tc_SPLower.aptr = oldstack_lower
+    task.tc_SPUpper.aptr = oldstack_upper
 
     # free stack
     new_stack.free()
