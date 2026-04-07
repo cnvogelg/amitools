@@ -3,11 +3,51 @@ import uuid
 
 from amitools.vamos.log import log_lock
 
-from amitools.vamos.astructs import AccessStruct
 from amitools.vamos.libstructs import FileLockStruct, DateStampStruct
 from .DosProtection import DosProtection
 from .AmiTime import *
 from .Error import *
+
+
+def _struct_field(struct, path):
+    field = struct.get_path(path)
+    if field is None:
+        raise AttributeError(f"{type(struct).__name__} has no field path {path!r}")
+    return field
+
+
+def _struct_addr(struct, path):
+    if hasattr(struct, "s_get_addr"):
+        return struct.s_get_addr(path)
+    return _struct_field(struct, path).addr
+
+
+def _struct_read(struct, path):
+    if hasattr(struct, "r_s"):
+        return struct.r_s(path)
+    field = _struct_field(struct, path)
+    if hasattr(field, "val"):
+        return field.val
+    if hasattr(field, "aptr"):
+        return field.aptr
+    if hasattr(field, "bptr"):
+        return field.bptr
+    return field.get()
+
+
+def _struct_write(struct, path, value):
+    if hasattr(struct, "w_s"):
+        struct.w_s(path, value)
+        return
+    field = _struct_field(struct, path)
+    if hasattr(field, "val"):
+        field.val = value
+    elif hasattr(field, "aptr"):
+        field.aptr = value
+    elif hasattr(field, "bptr"):
+        field.aptr = value
+    else:
+        field.set(value)
 
 
 class Lock:
@@ -23,6 +63,7 @@ class Lock:
         self.vol_addr = 0
         self.key = 0
         self.dirent = None
+        self.struct = None
 
     def __repr__(self):
         addr = 0
@@ -53,36 +94,38 @@ class Lock:
         name = "Lock: %s" % self
         self.key = key
         self.mem = alloc.alloc_struct(FileLockStruct, label=name)
-        self.mem.access.w_s("fl_Key", key)
-        self.mem.access.w_s("fl_Volume", vol_addr)
+        self.struct = FileLockStruct(alloc.get_mem(), self.mem.addr)
+        self.struct.key.val = key
+        self.struct.volume.aptr = vol_addr
         self.b_addr = self.mem.addr >> 2
         self.vol_addr = vol_addr
 
     def free(self, alloc):
         alloc.free_struct(self.mem)
+        self.struct = None
 
     # --- lock ops ---
 
     def _examine_file(self, fib_mem, name, sys_path, key):
         # name
-        name_addr = fib_mem.s_get_addr("fib_FileName")
+        name_addr = _struct_addr(fib_mem, "fib_FileName")
         # clear 32 name bytes
         mem = fib_mem.mem
         mem.clear_block(name_addr, 32, 0)
         mem.w_cstr(name_addr, name)
         # comment
-        comment_addr = fib_mem.s_get_addr("fib_Comment")
+        comment_addr = _struct_addr(fib_mem, "fib_Comment")
         mem.w_cstr(comment_addr, "")
         # create the "inode" information
-        fib_mem.w_s("fib_DiskKey", key)
+        _struct_write(fib_mem, "fib_DiskKey", key)
         log_lock.debug("examine key: %08x", key)
         # type
         if os.path.isdir(sys_path):
             dirEntryType = 2
         else:
             dirEntryType = -3
-        fib_mem.w_s("fib_DirEntryType", dirEntryType)
-        fib_mem.w_s("fib_EntryType", dirEntryType)
+        _struct_write(fib_mem, "fib_DirEntryType", dirEntryType)
+        _struct_write(fib_mem, "fib_EntryType", dirEntryType)
         # protection
         try:
             os_stat = os.stat(sys_path)
@@ -91,33 +134,33 @@ class Lock:
             log_lock.debug("examine lock: '%s' mode=%03o: prot=%s", name, mode, prot)
         except OSError:
             return ERROR_OBJECT_IN_USE
-        fib_mem.w_s("fib_Protection", prot.mask)
+        _struct_write(fib_mem, "fib_Protection", prot.mask)
         # size
         if os.path.isfile(sys_path):
             size = os.path.getsize(sys_path)
             # limit to 32bit
             if size > 0xFFFFFFFF:
                 size = 0xFFFFFFFF
-            fib_mem.w_s("fib_Size", size)
+            _struct_write(fib_mem, "fib_Size", size)
             blocks = (size + 511) // 512
-            fib_mem.w_s("fib_NumBlocks", blocks)
+            _struct_write(fib_mem, "fib_NumBlocks", blocks)
             log_lock.debug(
                 "examine lock: '%s' size=%d, blocks=%d", sys_path, size, blocks
             )
         else:
-            fib_mem.w_s("fib_NumBlocks", 1)
+            _struct_write(fib_mem, "fib_NumBlocks", 1)
             log_lock.debug("examine lock: '%s' no file", sys_path)
         # date (use mtime here)
-        date_addr = fib_mem.s_get_addr("fib_Date")
-        date = AccessStruct(fib_mem.mem, DateStampStruct, date_addr)
+        date_addr = _struct_addr(fib_mem, "fib_Date")
+        date = DateStampStruct(fib_mem.mem, date_addr)
         t = os.path.getmtime(sys_path)
         at = sys_to_ami_time(t)
-        date.w_s("ds_Days", at.tday)
-        date.w_s("ds_Minute", at.tmin)
-        date.w_s("ds_Tick", at.tick)
+        date.ds_Days.val = at.tday
+        date.ds_Minute.val = at.tmin
+        date.ds_Tick.val = at.tick
         # fill in UID/GID
-        fib_mem.w_s("fib_OwnerUID", 0)
-        fib_mem.w_s("fib_OwnerGID", 0)
+        _struct_write(fib_mem, "fib_OwnerUID", 0)
+        _struct_write(fib_mem, "fib_OwnerGID", 0)
         return NO_ERROR
 
     def examine_lock(self, fib_mem):
@@ -136,7 +179,7 @@ class Lock:
             self._check_disk_key(fib_mem)
             index = 0
         else:
-            index = fib_mem.r_s("fib_DiskKey")
+            index = _struct_read(fib_mem, "fib_DiskKey")
 
         if index < len(self.dirent):
             entry = self.dirent[index]
@@ -148,11 +191,11 @@ class Lock:
 
     def _check_disk_key(self, fib_mem):
         # make sure its a dir entry
-        dirEntryType = fib_mem.r_s("fib_DirEntryType")
+        dirEntryType = _struct_read(fib_mem, "fib_DirEntryType")
         if dirEntryType != 2:
             log_lock.warning("fib type is not dir on first ExNext()!")
         # make sure fib_key is mine
-        fib_key = fib_mem.r_s("fib_DiskKey")
+        fib_key = _struct_read(fib_mem, "fib_DiskKey")
         if fib_key != self.key:
             log_lock.warning(
                 "first ExNext() does not start at Examine()d lock!"
@@ -166,4 +209,6 @@ class Lock:
             return True
 
     def find_volume_node(self, dos_list):
-        return self.mem.r_s("fl_Volume")
+        if self.struct is None:
+            return 0
+        return self.struct.volume.aptr
