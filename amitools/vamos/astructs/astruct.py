@@ -40,6 +40,21 @@ class AmigaStructPool:
 AmigaStructTypes = AmigaStructPool()
 
 
+class _StructFieldDescriptor:
+    __slots__ = ("_field_path",)
+
+    def __init__(self, field_path):
+        self._field_path = field_path
+
+    def __get__(self, obj, owner=None):
+        if obj is None:
+            return self
+        return obj._get_field_by_index_path(self._field_path)
+
+    def __set__(self, obj, value):
+        raise AttributeError("Struct fields are read-only descriptors")
+
+
 FieldDefBase = collections.namedtuple(
     "FieldDefBase", ["index", "offset", "type", "name", "size", "struct"]
 )
@@ -342,6 +357,7 @@ class AmigaStruct(TypeBase):
     # top-level alias names for subfields
     _subfield_aliases = None
     _sfdp = None
+    _field_attr_paths = None
     # the structure definition is filled in by the decorator
     sdef = None
 
@@ -383,9 +399,9 @@ class AmigaStruct(TypeBase):
     def __init__(self, mem, addr, **kwargs):
         super(AmigaStruct, self).__init__(mem, addr, **kwargs)
         # create field instances
-        self.sfields = AmigaStructFields(self)
+        object.__setattr__(self, "sfields", AmigaStructFields(self))
         # refs to be freed automatically
-        self._free_refs = []
+        object.__setattr__(self, "_free_refs", [])
         # setup fields (if any)
         self.setup(kwargs, self._alloc, self._free_refs)
 
@@ -410,8 +426,19 @@ class AmigaStruct(TypeBase):
             self._byte_size,
         )
 
+    def _get_field_by_index_path(self, field_path):
+        field = self.sfields.get_field_by_index(field_path[0])
+        for idx in field_path[1:]:
+            field = field.sfields.get_field_by_index(idx)
+        return field
+
     def get(self, field_name):
         """return field instance by name"""
+        field_paths = self.__class__._field_attr_paths
+        if field_paths is not None:
+            field_path = field_paths.get(field_name)
+            if field_path is not None:
+                return self._get_field_by_index_path(field_path)
         return self.sfields.get_field_by_name_or_alias(field_name, self._sfdp)
 
     def __getattr__(self, field_name):
@@ -421,13 +448,12 @@ class AmigaStruct(TypeBase):
         return super().__getattr__(field_name)
 
     def __setattr__(self, field_name, val):
-        if field_name[0] != "_" and field_name != "sfields":
-            # check for field name and forbid access
-            field = self.get(field_name)
-            if field is not None:
-                raise AttributeError(
-                    "Field {} is read-only in {}".format(field_name, self)
-                )
+        if field_name[0] == "_" or field_name == "sfields":
+            object.__setattr__(self, field_name, val)
+            return
+        field_paths = self.__class__._field_attr_paths
+        if field_paths is not None and field_name in field_paths:
+            raise AttributeError("Field {} is read-only in {}".format(field_name, self))
         super().__setattr__(field_name, val)
 
     def get_path(self, path):

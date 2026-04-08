@@ -28,11 +28,11 @@ class PointerType(TypeBase):
     ):
         """create pointer type with referenced object"""
         super(PointerType, self).__init__(mem, addr, cpu, reg, **kwargs)
-        self._ref = ref
+        object.__setattr__(self, "_ref", ref)
         if ref:
-            self._ref_addr = ref.get_addr()
+            object.__setattr__(self, "_ref_addr", ref.get_addr())
         else:
-            self._ref_addr = ref_addr
+            object.__setattr__(self, "_ref_addr", ref_addr)
 
     def setup(self, val, alloc=None, free_refs=None):
         if val is None:
@@ -65,28 +65,28 @@ class PointerType(TypeBase):
         """return the referenced type instance"""
         ref_addr = self._read_pointer()
         if ref_addr != self._ref_addr:
-            self._ref = self._create_ref_at(ref_addr)
-            self._ref_addr = ref_addr
+            object.__setattr__(self, "_ref", self._create_ref_at(ref_addr))
+            object.__setattr__(self, "_ref_addr", ref_addr)
         return self._ref
 
     def set_ref(self, ref):
         """set a new type instance"""
-        self._ref = ref
+        object.__setattr__(self, "_ref", ref)
         if not ref:
-            self._ref_addr = 0
+            object.__setattr__(self, "_ref_addr", 0)
         else:
             # ignore VOID
             if not issubclass(self._ref_type, VOID):
                 assert isinstance(ref, self._ref_type)
-            self._ref_addr = ref.get_addr()
+            object.__setattr__(self, "_ref_addr", ref.get_addr())
         self._write_pointer(self._ref_addr)
 
     def get_ref_addr(self):
         return self._read_pointer()
 
     def set_ref_addr(self, ref_addr):
-        self._ref = None
-        self._ref_addr = None
+        object.__setattr__(self, "_ref", None)
+        object.__setattr__(self, "_ref_addr", None)
         self._write_pointer(ref_addr)
 
     def get(self):
@@ -114,7 +114,7 @@ class PointerType(TypeBase):
             self._cpu.w_reg(self._reg, store_addr)
         else:
             # fake write for unbound pointers (set value)
-            self._ref_addr = ref_addr
+            object.__setattr__(self, "_ref_addr", ref_addr)
 
     def __repr__(self):
         return "{}(ref={}, addr={})".format(
@@ -159,7 +159,9 @@ class PointerType(TypeBase):
             return super(PointerType, self).__getattr__(key)
 
     def __setattr__(self, key, val):
-        if key == "aptr":
+        if key and key[0] == "_":
+            object.__setattr__(self, key, val)
+        elif key == "aptr":
             self.set_ref_addr(val)
         elif key == "ref":
             self.set_ref(val)
