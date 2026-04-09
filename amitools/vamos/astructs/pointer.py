@@ -14,6 +14,7 @@ class VOID(TypeBase):
 class PointerType(TypeBase):
     _byte_size = 4
     _ref_type = None
+    __slots__ = ("_ref", "_ref_addr")
 
     @classmethod
     def get_ref_type(cls):
@@ -22,6 +23,14 @@ class PointerType(TypeBase):
     @classmethod
     def get_signature(cls):
         return "{}*".format(cls._ref_type.get_signature())
+
+    @classmethod
+    def _bind(cls, mem, addr, offset=0, base_offset=0):
+        obj = object.__new__(cls)
+        cls._bind_base(obj, mem, addr, offset, base_offset)
+        object.__setattr__(obj, "_ref", None)
+        object.__setattr__(obj, "_ref_addr", 0)
+        return obj
 
     def __init__(
         self, mem=None, addr=None, cpu=None, reg=None, ref=None, ref_addr=0, **kwargs
@@ -148,7 +157,7 @@ class PointerType(TypeBase):
         if ref_addr == 0:
             return None
         cls_type = self._ref_type.get_alias_type()
-        return cls_type(mem=self._mem, addr=ref_addr)
+        return cls_type._bind(self._mem, ref_addr)
 
     def __getattr__(self, key):
         if key == "aptr":
