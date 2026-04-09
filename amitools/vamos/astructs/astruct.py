@@ -38,6 +38,7 @@ class AmigaStructPool:
 
 # collect all types
 AmigaStructTypes = AmigaStructPool()
+_EMPTY_FREE_REFS = ()
 
 
 class _StructFieldDescriptor:
@@ -400,7 +401,7 @@ class AmigaStruct(TypeBase):
         obj = object.__new__(cls)
         cls._bind_base(obj, mem, addr, offset, base_offset)
         object.__setattr__(obj, "sfields", AmigaStructFields(obj))
-        object.__setattr__(obj, "_free_refs", [])
+        object.__setattr__(obj, "_free_refs", _EMPTY_FREE_REFS)
         obj._bind_setup()
         return obj
 
@@ -410,11 +411,13 @@ class AmigaStruct(TypeBase):
         super(AmigaStruct, self).__init__(mem, addr, **kwargs)
         # create field instances
         object.__setattr__(self, "sfields", AmigaStructFields(self))
-        # refs to be freed automatically
-        object.__setattr__(self, "_free_refs", [])
         self._bind_setup()
-        # setup fields (if any)
-        self.setup(kwargs, self._alloc, self._free_refs)
+        if kwargs:
+            free_refs = []
+            object.__setattr__(self, "_free_refs", free_refs)
+            self.setup(kwargs, self._alloc, free_refs)
+        else:
+            object.__setattr__(self, "_free_refs", _EMPTY_FREE_REFS)
 
     def _bind_setup(self):
         pass
@@ -422,7 +425,6 @@ class AmigaStruct(TypeBase):
     def setup(self, setup_dict, alloc=None, free_refs=None):
         """setup the fields of the struct"""
         assert type(setup_dict) is dict
-        all_refs = []
         for key, val in setup_dict.items():
             field = self.sfields.get_field_by_name_or_alias(key, self._sfdp)
             if field:
