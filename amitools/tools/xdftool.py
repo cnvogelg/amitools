@@ -889,6 +889,82 @@ class BlkDevCmd(Command):
         return 0
 
 
+# ----- Fsck Command -----
+
+
+class FsckCmd(Command):
+    """Filesystem check and repair command."""
+
+    def __init__(self, args, opts):
+        # Import here to avoid circular imports
+        from amitools.fs.fsck.FsckConfig import FsckConfig
+
+        # Parse options to determine if we're editing
+        self.config = FsckConfig.from_opts(opts)
+        edit_mode = self.config.repair or self.config.salvage
+        Command.__init__(self, args, opts, edit=edit_mode)
+
+    def handle_blkdev(self, blkdev):
+        from amitools.fs.fsck.Fsck import Fsck
+        from amitools.fs.fsck.FsckResult import Severity
+
+        # Handle --output mode: copy image first
+        if self.config.output_path:
+            import shutil
+
+            shutil.copy2(self.args.image_file, self.config.output_path)
+            # Reopen the copy for modifications
+            from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
+
+            factory = BlkDevFactory()
+            blkdev = factory.open(self.config.output_path, read_only=False)
+
+        # Run fsck
+        fsck = Fsck(blkdev, self.config)
+        result = fsck.run()
+
+        # Print results
+        self._print_results(result)
+
+        # Return appropriate exit code
+        if result.is_clean:
+            return 0
+        elif self.config.repair and result.fixed_count > 0:
+            return 0 if result.error_count == result.fixed_count else 1
+        else:
+            return 1
+
+    def _print_results(self, result):
+        from amitools.fs.fsck.FsckResult import Severity
+
+        # Determine minimum severity to show
+        if self.config.quiet:
+            min_sev = Severity.ERROR
+        elif self.config.verbose >= 1:
+            min_sev = Severity.INFO
+        elif self.config.verbose >= 2:
+            min_sev = Severity.DEBUG
+        else:
+            min_sev = Severity.WARN
+
+        # Print issues
+        for issue in result.issues:
+            if issue.severity.value >= min_sev.value:
+                print(issue)
+
+        # Print summary
+        print()
+        print(result.summary())
+
+        # Print repair summary if applicable
+        if self.config.repair:
+            if result.fixed_count > 0:
+                print(f"Repaired {result.fixed_count} issue(s)")
+            unfixed = result.unfixed_count
+            if unfixed > 0:
+                print(f"Could not repair {unfixed} issue(s)")
+
+
 # ----- main -----
 def main(args=None, defaults=None):
     # call scanner and process all files with selected command
@@ -915,6 +991,7 @@ def main(args=None, defaults=None):
         "root": RootCmd,
         "info": InfoCmd,
         "relabel": RelabelCmd,
+        "fsck": FsckCmd,
     }
 
     parser = argparse.ArgumentParser()
