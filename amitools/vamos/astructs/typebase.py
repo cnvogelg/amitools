@@ -30,6 +30,24 @@ class TypeBase:
         """return the type alias (amiga class instead of struct) or the struct"""
         return cls
 
+    @classmethod
+    def _bind_base(cls, obj, mem, addr, offset=0, base_offset=0):
+        set_attr = object.__setattr__
+        set_attr(obj, "_mem", mem)
+        set_attr(obj, "_addr", addr)
+        set_attr(obj, "_reg", None)
+        set_attr(obj, "_cpu", None)
+        set_attr(obj, "_offset", offset)
+        set_attr(obj, "_base_offset", base_offset)
+        set_attr(obj, "_mem_obj", None)
+        set_attr(obj, "_alloc", None)
+
+    @classmethod
+    def _bind(cls, mem, addr, offset=0, base_offset=0):
+        obj = object.__new__(cls)
+        cls._bind_base(obj, mem, addr, offset, base_offset)
+        return obj
+
     # --- instance ---
 
     def __init__(

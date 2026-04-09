@@ -27,7 +27,7 @@ class ArrayType(TypeBase):
             index = int(index)
         entry_addr = self._get_entry_addr(index)
         cls_type = self._element_type.get_alias_type()
-        return cls_type(self._mem, entry_addr)
+        return cls_type._bind(self._mem, entry_addr)
 
     def _get_entry_addr(self, index):
         assert index >= 0 and index < self._array_size

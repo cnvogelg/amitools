@@ -41,14 +41,21 @@ AmigaStructTypes = AmigaStructPool()
 
 
 class _StructFieldDescriptor:
-    __slots__ = ("_field_path",)
+    __slots__ = ("_field_path", "_index")
 
     def __init__(self, field_path):
-        self._field_path = field_path
+        if len(field_path) == 1:
+            self._index = field_path[0]
+            self._field_path = None
+        else:
+            self._index = None
+            self._field_path = field_path
 
     def __get__(self, obj, owner=None):
         if obj is None:
             return self
+        if self._field_path is None:
+            return obj.sfields._ensure_field(self._index)
         return obj._get_field_by_index_path(self._field_path)
 
     def __set__(self, obj, value):
@@ -229,20 +236,24 @@ class AmigaStructFieldDefs:
 
 
 class AmigaStructFields:
+    __slots__ = ("astruct", "sdef", "_field_defs", "_fields")
+
     def __init__(self, astruct):
-        self.astruct = astruct
-        self.sdef = astruct.sdef
-        self._field_defs = list(self.sdef.get_field_defs())
-        self._fields = [None] * len(self._field_defs)  # Lazy placeholders
-        self._name_to_field = {}  # Populated lazily
+        set_attr = object.__setattr__
+        sdef = astruct.sdef
+        field_defs = sdef.get_field_defs()
+        set_attr(self, "astruct", astruct)
+        set_attr(self, "sdef", sdef)
+        set_attr(self, "_field_defs", field_defs)
+        set_attr(self, "_fields", [None] * len(field_defs))
 
     def _ensure_field(self, index):
-        """Create field at index if not already created."""
-        if self._fields[index] is None:
-            field_def = self._field_defs[index]
-            self._fields[index] = self._create_field_type(field_def)
-            self._name_to_field[field_def.name] = self._fields[index]
-        return self._fields[index]
+        fields = self._fields
+        field = fields[index]
+        if field is None:
+            field = self._create_field_type(self._field_defs[index])
+            fields[index] = field
+        return field
 
     def get_fields(self):
         """return all field instances"""
@@ -256,11 +267,6 @@ class AmigaStructFields:
         return self._ensure_field(index)
 
     def get_field_by_name(self, name):
-        # Check cache first
-        field = self._name_to_field.get(name)
-        if field is not None:
-            return field
-        # Find field def by name and create lazily
         field_def = self.sdef.find_field_def_by_name(name)
         if field_def is None:
             return None
@@ -269,12 +275,7 @@ class AmigaStructFields:
     def get_field_by_name_or_alias(self, name, subfield_aliases=None):
         field = self.get_field_by_name(name)
         if field is None:
-            # alias name
-            alias_name = self.sdef.get_alias_name(name)
-            if alias_name:
-                field = self.get_field_by_name(alias_name)
-            # subfield alias
-            if field is None and subfield_aliases:
+            if subfield_aliases:
                 field_def_path = subfield_aliases.get(name)
                 if field_def_path:
                     return self.find_sub_field_by_def_path(field_def_path)
@@ -313,16 +314,16 @@ class AmigaStructFields:
     def find_sub_field_by_def_path(self, def_path):
         """return field or None"""
         field = None
-        astruct = self.astruct
+        sfields = self
         for field_def in def_path:
             idx = field_def.index
+            astruct = sfields.astruct
             assert isinstance(astruct, field_def.struct)
             assert field_def == astruct.sdef.get_field_def(idx)
-            field = astruct.sfields.get_field_by_index(idx)
+            field = sfields._ensure_field(idx)
             if not isinstance(field, AmigaStruct):
                 break
-            # next
-            astruct = field
+            sfields = field.sfields
         return field
 
     def find_field_def_by_addr(self, addr):
@@ -345,10 +346,9 @@ class AmigaStructFields:
         addr = astruct._addr + field_def.offset
         base_offset = astruct._base_offset + field_def.offset
         cls_type = field_def.type.get_alias_type()
-        field = cls_type(
+        return cls_type._bind(
             astruct._mem, addr, offset=field_def.offset, base_offset=base_offset
         )
-        return field
 
 
 class AmigaStruct(TypeBase):
@@ -360,6 +360,7 @@ class AmigaStruct(TypeBase):
     _field_attr_paths = None
     # the structure definition is filled in by the decorator
     sdef = None
+    __slots__ = ("sfields", "_free_refs")
 
     @classmethod
     def get_signature(cls):
@@ -394,6 +395,15 @@ class AmigaStruct(TypeBase):
     def _free(cls, alloc, mem_obj):
         alloc.free_struct(mem_obj)
 
+    @classmethod
+    def _bind(cls, mem, addr, offset=0, base_offset=0):
+        obj = object.__new__(cls)
+        cls._bind_base(obj, mem, addr, offset, base_offset)
+        object.__setattr__(obj, "sfields", AmigaStructFields(obj))
+        object.__setattr__(obj, "_free_refs", [])
+        obj._bind_setup()
+        return obj
+
     # ----- instance -----
 
     def __init__(self, mem, addr, **kwargs):
@@ -402,8 +412,12 @@ class AmigaStruct(TypeBase):
         object.__setattr__(self, "sfields", AmigaStructFields(self))
         # refs to be freed automatically
         object.__setattr__(self, "_free_refs", [])
+        self._bind_setup()
         # setup fields (if any)
         self.setup(kwargs, self._alloc, self._free_refs)
+
+    def _bind_setup(self):
+        pass
 
     def setup(self, setup_dict, alloc=None, free_refs=None):
         """setup the fields of the struct"""
@@ -427,9 +441,9 @@ class AmigaStruct(TypeBase):
         )
 
     def _get_field_by_index_path(self, field_path):
-        field = self.sfields.get_field_by_index(field_path[0])
+        field = self.sfields._ensure_field(field_path[0])
         for idx in field_path[1:]:
-            field = field.sfields.get_field_by_index(idx)
+            field = field.sfields._ensure_field(idx)
         return field
 
     def get(self, field_name):
@@ -438,6 +452,8 @@ class AmigaStruct(TypeBase):
         if field_paths is not None:
             field_path = field_paths.get(field_name)
             if field_path is not None:
+                if len(field_path) == 1:
+                    return self.sfields._ensure_field(field_path[0])
                 return self._get_field_by_index_path(field_path)
         return self.sfields.get_field_by_name_or_alias(field_name, self._sfdp)
 
