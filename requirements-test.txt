@@ -1,5 +1,5 @@
 pytest
 pytest-benchmark
-machine68k @ git+https://github.com/reinauer/machine68k@AmiFUSE
+machine68k-amifuse @ git+https://github.com/reinauer/machine68k@AmiFUSE
 greenlet
 ptyprocess
