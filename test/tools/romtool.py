@@ -170,6 +170,14 @@ def romtool_scan_test(toolrun, rom_file):
         assert stderr == []
 
 
+def romtool_scan_sizes_test(toolrun, rom_file):
+    ret, stdout, stderr = toolrun.run("romtool", "scan", "-s", "-S", rom_file)
+    assert ret == 0 or ret == 1
+    if ret == 0:
+        assert stderr == []
+        assert stdout[-1].startswith("total ")
+
+
 def romtool_copy_test(toolrun, tmpdir, rom_file):
     new_rom = str(tmpdir / "new.rom")
     toolrun.run_checked("romtool", "copy", rom_file, new_rom)
