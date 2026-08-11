@@ -554,6 +554,27 @@ class ExecLibrary(LibImpl):
             )
             return -1
         else:
+            vlib = self.lib_mgr.get_vlib_by_addr(addr)
+            impl = vlib.get_impl() if vlib is not None else None
+            open_dev = getattr(impl, "open_dev", None)
+            if open_dev is not None:
+                try:
+                    error = open_dev(ctx, io_request, unit, flags)
+                except Exception:
+                    io.device.aptr = 0
+                    self.lib_mgr.close_lib(addr)
+                    raise
+                if error:
+                    io.device.aptr = 0
+                    self.lib_mgr.close_lib(addr)
+                    log_exec.info(
+                        "OpenDevice: '%s' unit %d flags %d -> error %d",
+                        name,
+                        unit,
+                        flags,
+                        error,
+                    )
+                    return error
             log_exec.info(
                 "OpenDevice: '%s' unit %d flags %d -> %06x", name, unit, flags, addr
             )
@@ -565,8 +586,15 @@ class ExecLibrary(LibImpl):
             dev_addr = io.device.aptr
             if dev_addr != 0:
                 log_exec.info("CloseDevice: %06x", dev_addr)
-                self.lib_mgr.close_lib(dev_addr)
-                io.device.aptr = 0
+                vlib = self.lib_mgr.get_vlib_by_addr(dev_addr)
+                impl = vlib.get_impl() if vlib is not None else None
+                close_dev = getattr(impl, "close_dev", None)
+                try:
+                    if close_dev is not None:
+                        close_dev(ctx, io_request)
+                finally:
+                    self.lib_mgr.close_lib(dev_addr)
+                    io.device.aptr = 0
 
     def _dispatch_begin_io(self, ctx, io_request):
         mem = ctx.mem
@@ -595,6 +623,24 @@ class ExecLibrary(LibImpl):
         res = self._dispatch_begin_io(ctx, io_request)
         log_exec.info("DoIO(io=0x%06x) -> %d", io_request, res)
         return res
+
+    def AbortIO(self, ctx, io_request):
+        io = IORequestStruct(ctx.mem, io_request)
+        dev_addr = io.device.aptr
+        vlib = self.lib_mgr.get_vlib_by_addr(dev_addr)
+        impl = vlib.get_impl() if vlib is not None else None
+        abort_io = getattr(impl, "AbortIO", None)
+        if abort_io is None:
+            log_exec.warning(
+                "AbortIO: missing device for io=0x%06x dev=0x%06x",
+                io_request,
+                dev_addr,
+            )
+            return -1
+        result = abort_io(ctx, io_request)
+        result = 0 if result is None else result
+        log_exec.info("AbortIO(io=0x%06x) -> %d", io_request, result)
+        return result
 
     def SendIO(self, ctx, io_request):
         res = self._dispatch_begin_io(ctx, io_request)
