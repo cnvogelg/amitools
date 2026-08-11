@@ -23,6 +23,7 @@ from amitools.vamos.libstructs import (
     RDArgsStruct,
     CLIStruct,
     DosPacketStruct,
+    DosListDeviceStruct,
     DosListVolumeStruct,
     DosListAssignStruct,
     ProcessStruct,
@@ -96,7 +97,8 @@ class DosLibrary(LibImpl):
         self.dos_list = DosList(
             self.path_mgr, self.path_mgr.assign_mgr, ctx.mem, ctx.alloc
         )
-        baddr = self.dos_list.build_list(ctx.path_mgr)
+        self.dos_list.build_list(ctx.path_mgr)
+        self.update_dos_list_head()
         # create lock manager
         self.lock_mgr = LockManager(ctx.path_mgr, self.dos_list, ctx.alloc, ctx.mem)
         # equip the DosList with all the locks
@@ -134,6 +136,12 @@ class DosLibrary(LibImpl):
         # free DosInfo
         self.dos_info.free()
 
+    def update_dos_list_head(self):
+        """Publish the current DOS list head through DOSBase."""
+        head_addr = self.dos_list.get_head_addr()
+        self.dos_info.di_DevInfo.aptr = head_addr
+        return head_addr
+
     # helper
 
     def get_callee_pc(self, ctx):
@@ -153,7 +161,14 @@ class DosLibrary(LibImpl):
 
     def setioerr(self, ctx, err):
         self.io_err = err
-        ctx.process.this_task.pr_Result2.val = err
+        process = ctx.process
+        if process is None:
+            return
+        amiga_process = getattr(process, "this_task", None)
+        if amiga_process is None:
+            amiga_process = getattr(process, "ami_proc", None)
+        if amiga_process is not None:
+            amiga_process.pr_Result2.val = err
 
     def SetIoErr(self, ctx):
         old_io_err = self.io_err
@@ -2001,9 +2016,9 @@ class DosLibrary(LibImpl):
             )
             return 0
         try:
-            name = ctx.mem.r_bstr(name_ptr)
+            name = ctx.mem.r_cstr(name_ptr)
         except Exception:
-            log_dos.info("FindDosEntry: failed to read BSTR at 0x%x", name_ptr)
+            log_dos.info("FindDosEntry: failed to read CSTR at 0x%x", name_ptr)
             return 0
         if name and name.endswith(":"):
             name = name[:-1]
@@ -2040,29 +2055,68 @@ class DosLibrary(LibImpl):
         log_dos.info("AttemptLockDosList(flags=0x%x)", flags)
         return self.dos_list.lock_dos_list(flags)
 
+    def Inhibit(self, ctx, name: CSTR, onoff):
+        dev_name = name.str if name else ""
+        if dev_name.endswith(":"):
+            dev_name = dev_name[:-1]
+        entry = self.dos_list.get_entry_by_name(dev_name)
+        if (
+            entry is None
+            or entry.struct.dol_Type.val != 0
+            or not entry.exclusive
+            or entry.struct.dol_Task.aptr != 0
+        ):
+            self.setioerr(ctx, ERROR_DEVICE_NOT_MOUNTED)
+            log_dos.info("Inhibit('%s', %d) -> false", dev_name, onoff)
+            return DOSFALSE
+        entry.inhibited = bool(onoff)
+        self.setioerr(ctx, NO_ERROR)
+        log_dos.info("Inhibit('%s', %d) -> true", dev_name, onoff)
+        return DOSTRUE
+
     def MakeDosEntry(self, ctx):
-        name_bptr = ctx.cpu.r_reg(REG_D1)
+        name_ptr = ctx.cpu.r_reg(REG_D1)
         entry_type = ctx.cpu.r_reg(REG_D2)
         try:
-            name = ctx.mem.r_bstr(name_bptr) if name_bptr else ""
+            name = ctx.mem.r_cstr(name_ptr) if name_ptr else ""
         except Exception:
             name = ""
         if not name:
             name = f"vol_{entry_type:x}"
-        struct_def = DosListAssignStruct if entry_type == 1 else DosListVolumeStruct
+        struct_defs = {
+            0: DosListDeviceStruct,
+            1: DosListAssignStruct,
+            2: DosListVolumeStruct,
+        }
+        struct_def = struct_defs.get(entry_type)
+        if struct_def is None:
+            self.setioerr(ctx, ERROR_OBJECT_WRONG_TYPE)
+            return 0
         entry = ctx.alloc.alloc_astruct(struct_def, label=f"DosList({name})")
         entry.dol_Next.aptr = 0
         entry.dol_Type.val = entry_type
         entry.dol_Task.aptr = 0
         entry.dol_Lock.aptr = 0
-        if struct_def is DosListVolumeStruct:
+        if struct_def is DosListDeviceStruct:
+            entry.dol_Handler.aptr = 0
+            entry.dol_StackSize.val = 0
+            entry.dol_Priority.val = 0
+            entry.dol_Startup.val = 0
+            entry.dol_SegList.aptr = 0
+            entry.dol_GlobVec.aptr = 0
+        elif struct_def is DosListVolumeStruct:
             entry.dol_LockList.aptr = 0
             entry.dol_DiskType.val = 0
         else:
             entry.dol_List.aptr = 0
         name_mem = ctx.alloc.alloc_bstr(name, label="DosListName")
         entry.dol_Name.aptr = name_mem.addr
-        self.dos_entries[entry.addr] = {"mem": entry, "name": name_mem}
+        self.dos_entries[entry.addr] = {
+            "mem": entry,
+            "name": name_mem,
+            "name_text": name,
+            "dos_list_entry": None,
+        }
         log_dos.info(
             "MakeDosEntry('%s', type=%d) -> 0x%x", name, entry_type, entry.addr
         )
@@ -2070,19 +2124,39 @@ class DosLibrary(LibImpl):
 
     def AddDosEntry(self, ctx):
         dlist_ptr = ctx.cpu.r_reg(REG_D1)
-        ok = dlist_ptr != 0
+        record = self.dos_entries.get(dlist_ptr)
+        ok = record is not None and record["dos_list_entry"] is None
+        if ok:
+            try:
+                record["dos_list_entry"] = self.dos_list.add_existing_entry(
+                    record["name_text"], record["mem"], record["name"]
+                )
+            except ValueError:
+                ok = False
+            else:
+                self.update_dos_list_head()
         log_dos.info("AddDosEntry(0x%x) -> %s", dlist_ptr, ok)
         return DOSTRUE if ok else DOSFALSE
 
     def RemDosEntry(self, ctx):
         dlist_ptr = ctx.cpu.r_reg(REG_D1)
-        log_dos.info("RemDosEntry(0x%x)", dlist_ptr)
-        return DOSTRUE
+        record = self.dos_entries.get(dlist_ptr)
+        entry = record["dos_list_entry"] if record is not None else None
+        ok = entry is not None and self.dos_list.remove_entry(entry)
+        if ok:
+            record["dos_list_entry"] = None
+            self.update_dos_list_head()
+        log_dos.info("RemDosEntry(0x%x) -> %s", dlist_ptr, ok)
+        return DOSTRUE if ok else DOSFALSE
 
     def FreeDosEntry(self, ctx):
         dlist_ptr = ctx.cpu.r_reg(REG_D1)
         entry = self.dos_entries.pop(dlist_ptr, None)
         if entry:
+            linked_entry = entry["dos_list_entry"]
+            if linked_entry is not None:
+                self.dos_list.remove_entry(linked_entry)
+                self.update_dos_list_head()
             ctx.alloc.free_bstr(entry["name"])
             ctx.alloc.free_struct(entry["mem"])
         log_dos.info("FreeDosEntry(0x%x)", dlist_ptr)
@@ -2195,12 +2269,14 @@ class DosLibrary(LibImpl):
         name = ctx.mem.r_cstr(name_ptr)
         if lockbaddr == 0:
             log_dos.info("AssignLock (%s -> null)", name)
-            self.dos_list.remove_assign(name)
+            if self.dos_list.remove_assign(name):
+                self.update_dos_list_head()
             return -1
         else:
             lock = self.lock_mgr.get_by_b_addr(lockbaddr)
             log_dos.info("AssignLock (%s -> %s)", name, lock)
             if self.dos_list.create_assign(name, lock) != None:
+                self.update_dos_list_head()
                 return -1
             return 0
 
