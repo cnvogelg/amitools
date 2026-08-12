@@ -70,6 +70,7 @@ class DosLibrary(LibImpl):
         self.errstrings = {}
         self.resident = []
         self.local_vars = {}
+        self.global_vars = {}
         self.access = AccessStruct(ctx.mem, self.get_struct_def(), base_addr)
         # setup RootNode
         self.root_struct = ctx.alloc.alloc_struct(RootNodeStruct, label="RootNode")
@@ -386,7 +387,7 @@ class DosLibrary(LibImpl):
         flags = ctx.cpu.r_reg(REG_D4)
         if size == 0:
             self.setioerr(ctx, ERROR_BAD_NUMBER)
-            return DOSFALSE
+            return -1
         name = ctx.mem.r_cstr(name_ptr)
         if not flags & self.GVF_GLOBAL_ONLY:
             node = self.find_var(ctx, name, flags & 0xFF)
@@ -410,7 +411,22 @@ class DosLibrary(LibImpl):
                     log_dos.info('GetVar("%s", 0x%x) -> %s', name, flags, value)
                     self.setioerr(ctx, len(value))
                     return min(nodelen - 1, size - 1)
-        return DOSFALSE
+        # no local variable. unless we were asked for local only, fall back
+        # to the global ones, which is the order AmigaOS looks them up in
+        if not flags & self.GVF_LOCAL_ONLY:
+            value = self.global_vars.get((name.lower(), flags & 0xFF))
+            if value is not None:
+                if flags & self.GVF_BINARY_VAR:
+                    ctx.mem.write_data(buff_ptr, value[:size])
+                    log_dos.info('GetVar("%s", 0x%x) -> <global binary>', name, flags)
+                    self.setioerr(ctx, len(value))
+                    return min(len(value), size)
+                ctx.mem.w_cstr(buff_ptr, value[: size - 1])
+                log_dos.info('GetVar("%s", 0x%x) -> %s (global)', name, flags, value)
+                self.setioerr(ctx, len(value))
+                return min(len(value), size - 1)
+        self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
+        return -1
 
     def FindVar(self, ctx):
         name_ptr = ctx.cpu.r_reg(REG_D1)
@@ -433,11 +449,13 @@ class DosLibrary(LibImpl):
         name = ctx.mem.r_cstr(name_ptr)
         vtype = flags & 0xFF
         if buff_ptr == 0:
-            if not flags & self.GVF_GLOBAL_ONLY:
-                node = self.find_var(ctx, name, vtype)
-                if node != None:
-                    self.delete_var(ctx, node)
+            if flags & self.GVF_GLOBAL_ONLY:
+                self.global_vars.pop((name.lower(), vtype), None)
                 return DOSTRUE
+            node = self.find_var(ctx, name, vtype)
+            if node != None:
+                self.delete_var(ctx, node)
+            return DOSTRUE
         else:
             if flags & self.GVF_BINARY_VAR:
                 value = None
@@ -446,25 +464,32 @@ class DosLibrary(LibImpl):
                 value = ctx.mem.r_cstr(buff_ptr)
                 log_dos.info('SetVar("%s") to %s', name, value)
                 size = len(value) + 1
-            if not flags & self.GVF_GLOBAL_ONLY:
-                node = self.find_var(ctx, name, flags)
-                if node == None and buff_ptr != 0:
-                    node = self.create_var(ctx, name, flags)
-                if node != None:
-                    self.set_var(ctx, node, buff_ptr, size, value, flags)
+            if flags & self.GVF_GLOBAL_ONLY:
+                if flags & self.GVF_BINARY_VAR:
+                    value = ctx.mem.read_data(buff_ptr, size)
+                self.global_vars[(name.lower(), vtype)] = value
                 return DOSTRUE
+            node = self.find_var(ctx, name, flags)
+            if node == None and buff_ptr != 0:
+                node = self.create_var(ctx, name, flags)
+            if node != None:
+                self.set_var(ctx, node, buff_ptr, size, value, flags)
+            return DOSTRUE
         return 0
 
     def DeleteVar(self, ctx):
         name_ptr = ctx.cpu.r_reg(REG_D1)
         flags = ctx.cpu.r_reg(REG_D4)
         name = ctx.mem.r_cstr(name_ptr)
-        if not flags & self.GVF_GLOBAL_ONLY:
-            node = self.find_var(ctx, name, flags)
-            log_dos.info('DeleteVar("%s")', name)
-            if node != None:
-                self.delete_var(ctx, node)
-            return DOSTRUE
+        if flags & self.GVF_GLOBAL_ONLY:
+            found = self.global_vars.pop((name.lower(), flags & 0xFF), None)
+            log_dos.info('DeleteVar("%s") global', name)
+            return DOSTRUE if found is not None else DOSFALSE
+        node = self.find_var(ctx, name, flags)
+        log_dos.info('DeleteVar("%s")', name)
+        if node != None:
+            self.delete_var(ctx, node)
+        return DOSTRUE
 
     # ----- Signals ----------------------
 

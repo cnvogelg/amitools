@@ -50,7 +50,35 @@ class ProcMode(BaseMode):
         )
         if not proc.ok:
             return None
+        self.setup_vars(dos_ctx, proc, proc_cfg.vars)
         return proc
+
+    def setup_vars(self, dos_ctx, proc, var_specs):
+        """seed the process with AmigaDOS local variables.
+
+        The emulated program starts with an empty variable table, so a
+        program that expects one set by the shell, e.g. with "Set NAME
+        value", has no way of seeing it.  Variables named here are put in
+        place before the program runs, as that Set would have done.
+        """
+        if not var_specs:
+            return
+        dos_lib = dos_ctx.dos_lib
+        # create_var() works on the current process, which is only set
+        # once the task is scheduled, so point at ours for the duration
+        old_proc = dos_ctx.process
+        dos_ctx.set_cur_process(proc)
+        try:
+            for spec in var_specs:
+                if "=" in spec:
+                    name, value = spec.split("=", 1)
+                else:
+                    name, value = spec, ""
+                node = dos_lib.create_var(dos_ctx, name, 0)
+                dos_lib.set_var(dos_ctx, node, 0, len(value) + 1, value, 0)
+                log_proc.info("set var: %s='%s'", name, value)
+        finally:
+            dos_ctx.set_cur_process(old_proc)
 
     def get_cmd_args(self, mode_ctx, cmd_cfg, args):
         # a single Amiga-like raw arg was passed
