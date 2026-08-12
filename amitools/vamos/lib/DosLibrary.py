@@ -386,7 +386,7 @@ class DosLibrary(LibImpl):
         flags = ctx.cpu.r_reg(REG_D4)
         if size == 0:
             self.setioerr(ctx, ERROR_BAD_NUMBER)
-            return DOSFALSE
+            return -1
         name = ctx.mem.r_cstr(name_ptr)
         if not flags & self.GVF_GLOBAL_ONLY:
             node = self.find_var(ctx, name, flags & 0xFF)
@@ -410,7 +410,8 @@ class DosLibrary(LibImpl):
                     log_dos.info('GetVar("%s", 0x%x) -> %s', name, flags, value)
                     self.setioerr(ctx, len(value))
                     return min(nodelen - 1, size - 1)
-        return DOSFALSE
+        self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
+        return -1
 
     def FindVar(self, ctx):
         name_ptr = ctx.cpu.r_reg(REG_D1)
