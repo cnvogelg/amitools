@@ -893,31 +893,28 @@ class RPBatch:
 
 @dataclass
 class BFRectFill:
-    import sdl2
     x: int
     y: int
     w: int
     h: int
-    color: sdl2.SDL_Color
+    color: "sdl2.SDL_Color"
     draw_mode: int
 
 @dataclass
 class BFDraw:
-    import sdl2
     x1: int
     y1: int
     x2: int
     y2: int
-    color: sdl2.SDL_Color
+    color: "sdl2.SDL_Color"
     draw_mode: int
 
 @dataclass
 class BFText:
-    import sdl2
     x: int
     y: int
     string: str
     font: object
-    fg: sdl2.SDL_Color
-    bg: sdl2.SDL_Color
+    fg: "sdl2.SDL_Color"
+    bg: "sdl2.SDL_Color"
     draw_mode: int
