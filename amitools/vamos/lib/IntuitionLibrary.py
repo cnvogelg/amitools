@@ -68,7 +68,13 @@ class IntuitionLibrary(LibImpl):
         if self._lib_opened:
             return  # already initialized
 
-        import sdl2
+        # stay headless without sdl2: functions that really render
+        # import sdl2 themselves and fail only when actually used
+        try:
+            import sdl2
+        except ImportError:
+            log_intui.warning("pysdl2 not installed, no display available")
+            return
         sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO | sdl2.SDL_INIT_TIMER)
 
         # open graphics.library
@@ -90,7 +96,7 @@ class IntuitionLibrary(LibImpl):
         self._lib_opened = True
         
     def close_lib(self, ctx, open_cnt):
-        if open_cnt == 0:
+        if open_cnt == 0 and self._lib_opened:
             # close default screen
             title_addr = self.default_screen.DefaultTitle.get() 
             ctx.cpu.w_reg(REG_A0, self.default_screen.addr)
