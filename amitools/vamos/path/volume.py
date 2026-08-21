@@ -1,6 +1,7 @@
 import os
 import os.path
 import shutil
+import tempfile
 from amitools.vamos.log import log_path
 import logging
 from .spec import Spec
@@ -28,6 +29,7 @@ class Volume(object):
         self.lo_name = name.lower()
         self.cfg = cfg
         self.is_setup = False
+        self.temp_base = None
 
     def __str__(self):
         return "Volume(%s(%s):%s,cfg=%r,is_setup=%s)" % (
@@ -58,8 +60,14 @@ class Volume(object):
         path = self.path
         # temp dir?
         if "temp" in self.cfg:
-            if not self._create_temp(path):
+            temp_path = self._create_temp(path)
+            if not temp_path:
                 return False
+            # mount a unique dir below the configured path, so
+            # concurrent vamos instances do not clash on setup or
+            # teardown of a shared temp volume
+            self.temp_base = path
+            self.path = temp_path
         # does path exist?
         elif not os.path.isdir(path):
             if "create" in self.cfg:
@@ -74,29 +82,34 @@ class Volume(object):
         if "temp" in self.cfg:
             self._delete_temp(self.path)
 
-    def _create_temp(self, path):
-        if os.path.exists(path):
-            if os.path.isdir(path):
-                log_path.warning("temp volume path already exists: '%s'", path)
-                return True
-            else:
-                log_path.error("temp volume exists and is no directory: '%s'", path)
-                return False
-        # create temp dir
-        try:
-            log_path.debug("creating temp dir: %s", path)
-            os.makedirs(path)
-            return True
-        except OSError:
-            log_path.error("error creating temp dir: '%s'", path)
-            return False
+    def _create_temp(self, base):
+        """create a unique temp dir below the configured base path
+
+        return the created path or None on error"""
+        # retry: another instance may remove an empty base dir between
+        # our makedirs and mkdtemp
+        for _ in range(3):
+            try:
+                os.makedirs(base, exist_ok=True)
+                path = tempfile.mkdtemp(dir=base)
+                log_path.debug("created temp dir: %s", path)
+                return path
+            except OSError:
+                continue
+        log_path.error("error creating temp dir below: '%s'", base)
+        return None
 
     def _delete_temp(self, path):
         try:
             log_path.debug("removing temp dir: %s", path)
             shutil.rmtree(path)
-        except:
+        except OSError:
             log_path.error("error removing temp dir: '%s'", path)
+        # drop the base dir if we were its last user
+        try:
+            os.rmdir(self.temp_base)
+        except OSError:
+            pass
 
     def _create_path(self, path):
         # try to create path
