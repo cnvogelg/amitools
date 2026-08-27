@@ -115,7 +115,9 @@ class Volume(object):
         # try to create path
         try:
             log_path.info("creating volume dir: %s", path)
-            os.makedirs(path)
+            # exist_ok: a concurrent vamos may create the shared volume
+            # dir (e.g. the auto 'system:') between our check and here
+            os.makedirs(path, exist_ok=True)
             return path
         except OSError as e:
             log_path.error("error creating volume dir: %s -> %s", path, e)
@@ -140,7 +142,9 @@ class Volume(object):
                 rel_path,
                 dir_path,
             )
-            os.makedirs(dir_path)
+            # exist_ok: concurrent instances race to create the shared
+            # auto-assign dirs (c:, s:, libs:, ...) under 'system:'
+            os.makedirs(dir_path, exist_ok=True)
             return dir_path
         except OSError as e:
             log_path.error(
@@ -288,7 +292,9 @@ class VolumeManager(object):
         if not os.path.isdir(base_dir):
             try:
                 log_path.info("creating volume base dir: %s", base_dir)
-                os.makedirs(base_dir)
+                # exist_ok: concurrent vamos instances share this dir and
+                # race to create it on the first run of a fresh setup
+                os.makedirs(base_dir, exist_ok=True)
             except OSError as e:
                 log_path.error("error creating volume base dir: %s -> %s", base_dir, e)
                 return None
