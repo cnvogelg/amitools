@@ -247,9 +247,10 @@ class DiskSession:
         if dos_impl is None:
             dos_impl = self._dos_impl
         for resources in reversed(self._dos_resources):
-            removed = resources.dos_list.remove_entry(resources.entry)
-            if removed:
-                resources.dos_list.free_entry(resources.entry)
+            # The session owns these allocations even if another caller
+            # has already detached the node from the maintained DOS list.
+            resources.dos_list.remove_entry(resources.entry)
+            resources.dos_list.free_entry(resources.entry)
             resources.startup.free()
             resources.env.free()
             alloc = getattr(dos_impl, "alloc", None)

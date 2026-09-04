@@ -1,4 +1,6 @@
 from unittest.mock import MagicMock
+from types import SimpleNamespace
+import os
 
 import pytest
 
@@ -7,6 +9,10 @@ from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 from amitools.fs.blkdev.RawBlockDevice import RawBlockDevice
 from amitools.fs.rdb.RDisk import RDisk
 from amitools.vamos.disk import DiskImage, DiskSession
+from amitools.vamos.disk import backend as backend_module
+from amitools.vamos.lib.dos.DosList import DosList
+from amitools.vamos.machine.mock import MockMemory
+from amitools.vamos.mem import MemoryAlloc
 
 
 def _make_rdb(path):
@@ -89,15 +95,21 @@ def disk_image_finds_rdb_in_first_sixteen_blocks_test(tmp_path):
     image.close()
 
 
-def disk_image_holds_exclusive_host_lock_test(tmp_path):
+@pytest.mark.parametrize("read_only", [True, False])
+def disk_image_holds_exclusive_host_lock_test(tmp_path, read_only):
     image_path = tmp_path / "disk.hdf"
     _make_rdb(image_path)
-    first = DiskImage(image_path).open()
-    second = DiskImage(image_path)
+    first = DiskImage(image_path, read_only=read_only).open()
+    second = DiskImage(image_path, read_only=read_only)
 
     assert first.exclusive is True
     with pytest.raises(IOError, match="exclusively lock"):
         second.open()
+    assert first.read_blocks(0)[:4] == b"RDSK"
+    assert first.read_blocks(319) == b"\0" * 512
+    if not read_only:
+        first.write_blocks(319, b"\xa5" * 512)
+        assert first.read_blocks(319) == b"\xa5" * 512
 
     first.close()
     assert first.exclusive is False
@@ -155,3 +167,77 @@ def disk_session_closes_partial_open_on_failure_test():
     session.close()
     first.close.assert_called_once_with()
     second.close.assert_not_called()
+
+
+@pytest.mark.parametrize("detached", [False, True])
+def disk_session_releases_owned_dos_allocations_test(tmp_path, detached):
+    image_path = tmp_path / "disk.hdf"
+    _make_rdb(image_path)
+    mem = MockMemory(size_kib=64)
+    alloc = MemoryAlloc(mem)
+    dos_list = DosList(None, None, mem, alloc)
+    dos = SimpleNamespace(
+        alloc=alloc, dos_list=dos_list, update_dos_list_head=lambda: None
+    )
+    session = DiskSession([image_path]).open()
+    try:
+        free_before = alloc.get_free_bytes()
+        session.install_dos(dos)
+        entry = dos_list.get_entry_by_name("DH0")
+        assert entry is not None
+        if detached:
+            assert dos_list.remove_entry(entry)
+        session.release_dos(dos)
+        dos_list.free_list()
+        assert alloc.get_free_bytes() == free_before
+        session.release_dos(dos)
+    finally:
+        session.close()
+
+
+@pytest.mark.parametrize("read_only", [True, False])
+def disk_image_windows_lock_does_not_overlap_data_test(tmp_path, monkeypatch, read_only):
+    image_path = tmp_path / "disk.hdf"
+    _make_rdb(image_path)
+    image_size = image_path.stat().st_size
+    locks = {}
+
+    def locking(fd, operation, length):
+        offset = os.lseek(fd, 0, os.SEEK_CUR)
+        if operation == 1:
+            if locks:
+                raise PermissionError("already locked")
+            locks[fd] = (offset, length)
+        else:
+            assert locks.pop(fd) == (offset, length)
+
+    monkeypatch.setattr(backend_module, "fcntl", None)
+    monkeypatch.setattr(
+        backend_module, "msvcrt", SimpleNamespace(LK_NBLCK=1, LK_UNLCK=2, locking=locking)
+    )
+    read_block = RawBlockDevice.read_block
+
+    def read(self, block, num_blks=1):
+        start = block * self.block_bytes
+        end = start + num_blks * self.block_bytes
+        for offset, length in locks.values():
+            if start < offset + length and offset < end:
+                raise PermissionError("read overlaps mandatory lock")
+        return read_block(self, block, num_blks)
+
+    monkeypatch.setattr(RawBlockDevice, "read_block", read)
+    first = DiskImage(image_path, read_only=read_only).open()
+    second = DiskImage(image_path, read_only=read_only)
+    try:
+        assert first.read_blocks(0)[:4] == b"RDSK"
+        assert first.read_blocks(319) == b"\0" * 512
+        assert list(locks.values()) == [(image_size, 1)]
+        with pytest.raises(IOError, match="exclusively lock"):
+            second.open()
+    finally:
+        first.close()
+    assert locks == {}
+    second.open()
+    second.close()
+    assert locks == {}
+    assert image_path.stat().st_size == image_size
