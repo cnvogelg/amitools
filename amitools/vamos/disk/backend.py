@@ -27,6 +27,7 @@ class HostFileLock:
         self.read_only = read_only
         self._file = None
         self._kind = None
+        self._lock_offset = 0
 
     @property
     def is_locked(self):
@@ -45,7 +46,11 @@ class HostFileLock:
                 )
                 lock_kind = "flock"
             elif msvcrt is not None:  # pragma: no cover - Windows
-                lock_file.seek(0)
+                # Windows locks also deny reads through our other handle.
+                # Images have a fixed size, so all sessions can lock the
+                # byte just beyond EOF without overlapping any disk data.
+                lock_file.seek(0, 2)
+                self._lock_offset = lock_file.tell()
                 msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
                 lock_kind = "msvcrt"
             else:  # pragma: no cover - unsupported Python platform
@@ -70,7 +75,7 @@ class HostFileLock:
             if lock_kind == "flock":
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
             elif lock_kind == "msvcrt":  # pragma: no cover - Windows
-                lock_file.seek(0)
+                lock_file.seek(self._lock_offset)
                 msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
         finally:
             lock_file.close()

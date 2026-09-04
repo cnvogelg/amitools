@@ -5,6 +5,18 @@ on:
   - pull_request
 
 jobs:
+  windows-disk:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+    - name: Install disk test dependencies
+      run: python -m pip install pytest greenlet
+    - name: Test disk locking and device compatibility
+      run: python -m pytest test/unit/disk_session.py test/unit/lib_scsi_device.py
+
   build:
     runs-on: ${{ matrix.platform }}
     strategy:
