@@ -75,11 +75,14 @@ def main(
     base_libs_are_open = False
     profiler_is_setup = False
     exit_code = error_code
+    cleanup_errors = []
+    execution_error = None
 
     def cleanup_step(name, func):
         try:
             func()
         except Exception as exc:
+            cleanup_errors.append(exc)
             log_main.error("%s shutdown failed: %s", name, exc)
 
     try:
@@ -176,7 +179,12 @@ def main(
             if single_return_code:
                 exit_code = exit_code[0]
 
+    except BaseException as exc:
+        execution_error = exc
+        raise
     finally:
+        # Keep an execution exception as the primary failure, while still
+        # attempting every shutdown step and reporting cleanup failures.
         # Remove disk nodes before dos.library frees its maintained list.
         if base_libs_are_open:
             cleanup_step(
@@ -193,6 +201,8 @@ def main(
             cleanup_step("path manager", path_mgr.shutdown)
         cleanup_step("memory map", mem_map.cleanup)
         cleanup_step("machine", machine.cleanup)
+        if cleanup_errors and execution_error is None:
+            raise cleanup_errors[0]
 
     # exit
     log_main.info("vamos is exiting: code=%r", exit_code)
