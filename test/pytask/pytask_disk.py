@@ -11,7 +11,6 @@ from amitools.vamos.libstructs import (
     IORequestStruct,
 )
 
-
 LDF_DEVICES = 1 << 2
 
 
@@ -42,9 +41,7 @@ def pytask_disk_exposes_rdb_partition_and_raw_device_test(vamos_task, tmp_path):
         assert device.dol_Name.str == "DH0"
         assert ctx.dos_lib.dos_info.di_DevInfo.aptr != 0
 
-        startup = FileSysStartupMsgStruct(
-            ctx.mem, device.dol_Startup.val << 2
-        )
+        startup = FileSysStartupMsgStruct(ctx.mem, device.dol_Startup.val << 2)
         assert startup.fssm_Unit.val == 0
         assert startup.fssm_Device.str == "scsi.device"
         env = DosEnvecStruct(ctx.mem, startup.fssm_Environ.aptr)
@@ -60,15 +57,11 @@ def pytask_disk_exposes_rdb_partition_and_raw_device_test(vamos_task, tmp_path):
         assert dos_proxy.Inhibit(missing_name.addr, DOSTRUE) == DOSFALSE
 
         port = exec_proxy.CreateMsgPort()
-        request_addr = exec_proxy.CreateIORequest(
-            port, IORequestStruct.get_byte_size()
-        )
+        request_addr = exec_proxy.CreateIORequest(port, IORequestStruct.get_byte_size())
         request = IORequestStruct(ctx.mem, request_addr)
         data = ctx.alloc.alloc_memory(512, label="disk read")
 
-        assert exec_proxy.OpenDevice(
-            "scsi.device", 0, request_addr, 0
-        ) == 0
+        assert exec_proxy.OpenDevice("scsi.device", 0, request_addr, 0) == 0
         request.command.val = CMD_READ
         request.offset.val = 0
         request.length.val = 512

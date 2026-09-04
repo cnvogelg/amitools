@@ -58,8 +58,7 @@ class HostFileLock:
         except OSError as exc:
             lock_file.close()
             raise IOError(
-                "cannot exclusively lock disk image %s: %s"
-                % (self.image, exc)
+                "cannot exclusively lock disk image %s: %s" % (self.image, exc)
             ) from exc
         self._file = lock_file
         self._kind = lock_kind
@@ -96,9 +95,7 @@ class BlockBackend(Protocol):
     def read_blocks(self, blk_num: int, num_blks: int = 1) -> bytes:
         pass
 
-    def write_blocks(
-        self, blk_num: int, data: bytes, num_blks: int = 1
-    ) -> None:
+    def write_blocks(self, blk_num: int, data: bytes, num_blks: int = 1) -> None:
         pass
 
     def sync(self) -> None:
@@ -250,9 +247,7 @@ class DiskImage:
             return b""
         return self.blkdev.read_block(blk_num, num_blks)
 
-    def write_blocks(
-        self, blk_num: int, data: bytes, num_blks: int = 1
-    ) -> None:
+    def write_blocks(self, blk_num: int, data: bytes, num_blks: int = 1) -> None:
         if self.blkdev is None:
             raise RuntimeError("disk image is not open")
         if self.read_only:

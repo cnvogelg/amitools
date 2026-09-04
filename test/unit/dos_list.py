@@ -1,6 +1,5 @@
 from amitools.vamos.lib.dos.DosList import DosList
 
-
 LDF_DEVICES = 1 << 2
 LDF_VOLUMES = 1 << 3
 

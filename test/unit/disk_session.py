@@ -196,7 +196,9 @@ def disk_session_releases_owned_dos_allocations_test(tmp_path, detached):
 
 
 @pytest.mark.parametrize("read_only", [True, False])
-def disk_image_windows_lock_does_not_overlap_data_test(tmp_path, monkeypatch, read_only):
+def disk_image_windows_lock_does_not_overlap_data_test(
+    tmp_path, monkeypatch, read_only
+):
     image_path = tmp_path / "disk.hdf"
     _make_rdb(image_path)
     image_size = image_path.stat().st_size
@@ -213,7 +215,9 @@ def disk_image_windows_lock_does_not_overlap_data_test(tmp_path, monkeypatch, re
 
     monkeypatch.setattr(backend_module, "fcntl", None)
     monkeypatch.setattr(
-        backend_module, "msvcrt", SimpleNamespace(LK_NBLCK=1, LK_UNLCK=2, locking=locking)
+        backend_module,
+        "msvcrt",
+        SimpleNamespace(LK_NBLCK=1, LK_UNLCK=2, locking=locking),
     )
     read_block = RawBlockDevice.read_block
 
