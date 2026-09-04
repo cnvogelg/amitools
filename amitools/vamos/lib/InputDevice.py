@@ -12,5 +12,5 @@ class InputDevice(LibImpl):
         io.error.val = 0
         return 0
 
-    def AbortIO(self, ctx, io_request=None):
+    def AbortIO(self, ctx, io_request):
         return 0
