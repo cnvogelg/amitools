@@ -27,9 +27,7 @@ def cfg_disk_args_test():
         ]
     )
     dp.parse_args(args)
-    assert dp.get_cfg_dict() == {
-        "disks": ["disk0.hdf", "/tmp/disk,with,commas.hdf"]
-    }
+    assert dp.get_cfg_dict() == {"disks": ["disk0.hdf", "/tmp/disk,with,commas.hdf"]}
 
 
 def cfg_disk_dict_args_test():

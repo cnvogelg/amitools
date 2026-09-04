@@ -51,9 +51,7 @@ class DiskSession:
         self.default_read_only = read_only
         self.debug = debug
         self.acknowledge_read_only_writes = acknowledge_read_only_writes
-        self.acknowledge_unsupported_commands = (
-            acknowledge_unsupported_commands
-        )
+        self.acknowledge_unsupported_commands = acknowledge_unsupported_commands
         self._units = {}
         self._dos_resources = []
         self._dos_impl = None
@@ -107,12 +105,7 @@ class DiskSession:
 
     def set_backend(self, unit, backend, *, owned=False):
         old = self._units.get(unit)
-        if (
-            old is not None
-            and old.owned
-            and old.is_open
-            and old.backend is not backend
-        ):
+        if old is not None and old.owned and old.is_open and old.backend is not backend:
             old.backend.close()
         self._units[unit] = _DiskUnit(unit, backend, owned)
 
@@ -221,9 +214,7 @@ class DiskSession:
                             name,
                             startup.addr >> 2,
                             task=0,
-                            exclusive=bool(
-                                getattr(backend, "exclusive", False)
-                            ),
+                            exclusive=bool(getattr(backend, "exclusive", False)),
                             unit=unit,
                         )
                     except Exception:
@@ -234,9 +225,7 @@ class DiskSession:
                             alloc.free_bstr(device_name)
                         raise
                     self._dos_resources.append(
-                        _DosDeviceResources(
-                            dos_list, entry, env, startup, device_name
-                        )
+                        _DosDeviceResources(dos_list, entry, env, startup, device_name)
                     )
             dos_impl.update_dos_list_head()
         except Exception:

@@ -35,7 +35,6 @@ from amitools.vamos.libstructs.exec_ import IORequestStruct
 from amitools.vamos.machine.mock import MockMemory
 from amitools.vamos.mem import MemoryAlloc
 
-
 IOR_ADDR = 0x1000
 DATA_ADDR = 0x2000
 SCSI_ADDR = 0x3000
@@ -344,9 +343,7 @@ def scsi_device_rejects_unknown_commands_by_default_test():
     ior = _run_io(ScsiDevice(Backend()), ctx, 0x1234)
     assert ior.error.val == IOERR_NOCMD
 
-    compatible = ScsiDevice(
-        Backend(), acknowledge_unsupported_commands=True
-    )
+    compatible = ScsiDevice(Backend(), acknowledge_unsupported_commands=True)
     ior = _run_io(compatible, ctx, 0x1234)
     assert ior.error.val == 0
 
@@ -394,9 +391,7 @@ def scsi_device_supports_explicit_read_only_acknowledgement_test():
 
 def scsi_device_honors_provider_read_only_compatibility_policy_test():
     backend = Backend(read_only=True)
-    provider = BackendProvider(
-        {0: backend}, acknowledge_read_only_writes=True
-    )
+    provider = BackendProvider({0: backend}, acknowledge_read_only_writes=True)
     dev = ScsiDevice(provider)
     ctx = _make_ctx()
     ctx.mem.w_block(DATA_ADDR, b"\xa5" * 512)
@@ -505,16 +500,19 @@ def scsi_device_copied_request_keeps_open_binding_test(unit):
     dev = ScsiDevice(BackendProvider(backends))
     exec_impl = ExecLibrary()
     exec_impl.lib_mgr = FakeLibManager(dev)
-    assert exec_impl.OpenDevice(
-        ctx, SimpleNamespace(str="scsi.device"), unit, IOR_ADDR, 0
-    ) == 0
+    assert (
+        exec_impl.OpenDevice(ctx, SimpleNamespace(str="scsi.device"), unit, IOR_ADDR, 0)
+        == 0
+    )
     original = IORequestStruct(ctx.mem, IOR_ADDR)
     assert original.unit.aptr != 0
     original.command.val = CMD_READ
     original.length.val = 512
     original.data.val = DATA_ADDR
     copy_addr = IOR_ADDR + 0x100
-    ctx.mem.w_block(copy_addr, ctx.mem.r_block(IOR_ADDR, IORequestStruct.get_byte_size()))
+    ctx.mem.w_block(
+        copy_addr, ctx.mem.r_block(IOR_ADDR, IORequestStruct.get_byte_size())
+    )
     copied = IORequestStruct(ctx.mem, copy_addr)
     copied.message.reply_port.aptr = 0x7000
     for address in (IOR_ADDR, copy_addr):
@@ -593,9 +591,10 @@ def exec_open_missing_device_sets_error_field_test():
     exec_impl.lib_mgr.open_lib = lambda name: 0
     request = IORequestStruct(ctx.mem, IOR_ADDR)
     request.unit.aptr = 0x1234
-    assert exec_impl.OpenDevice(
-        ctx, SimpleNamespace(str="missing.device"), 0, IOR_ADDR, 0
-    ) == -1
+    assert (
+        exec_impl.OpenDevice(ctx, SimpleNamespace(str="missing.device"), 0, IOR_ADDR, 0)
+        == -1
+    )
     assert request.error.val == -1
     assert request.device.aptr == request.unit.aptr == 0
 
@@ -607,6 +606,10 @@ def scsi_device_descriptor_has_standard_vectors_test():
     assert fd.is_device
     assert fd.get_neg_size() == 42
     assert [(func.get_name(), func.get_bias()) for func in fd.get_funcs()] == [
-        ("_OpenDev", 6), ("_CloseDev", 12), ("_ExpungeDev", 18),
-        ("_Empty", 24), ("BeginIO", 30), ("AbortIO", 36),
+        ("_OpenDev", 6),
+        ("_CloseDev", 12),
+        ("_ExpungeDev", 18),
+        ("_Empty", 24),
+        ("BeginIO", 30),
+        ("AbortIO", 36),
     ]

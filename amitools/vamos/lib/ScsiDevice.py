@@ -10,7 +10,6 @@ implementation can route separate IORequests to separate units.
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.libstructs import IORequestStruct, SCSICmdStruct, UnitStruct
 
-
 IOF_QUICK = 0x01
 
 CMD_READ = 2
@@ -125,9 +124,7 @@ class ScsiDevice(LibImpl):
             self.backend = backend
         self.debug = debug
         self.acknowledge_read_only_writes = acknowledge_read_only_writes
-        self.acknowledge_unsupported_commands = (
-            acknowledge_unsupported_commands
-        )
+        self.acknowledge_unsupported_commands = acknowledge_unsupported_commands
         self._unit_backends = {}
         self._nsd_cmd_mem = None
         self._nsd_cmd_alloc = None
@@ -237,11 +234,7 @@ class ScsiDevice(LibImpl):
 
     def _get_transfer(self, backend, offset, length):
         block_size = getattr(backend, "block_size", 0)
-        if (
-            block_size <= 0
-            or offset % block_size
-            or length % block_size
-        ):
+        if block_size <= 0 or offset % block_size or length % block_size:
             return None
         block_num = offset // block_size
         num_blocks = length // block_size
@@ -348,9 +341,7 @@ class ScsiDevice(LibImpl):
 
         if opcode is None or cdb_len < required_cdb_len:
             status = 2
-            sense_actual = self._write_sense(
-                mem, sense_ptr, sense_len, 0x05, 0x24
-            )
+            sense_actual = self._write_sense(mem, sense_ptr, sense_len, 0x05, 0x24)
         elif opcode == 0x00:  # TEST UNIT READY
             pass
         elif opcode == 0x03:  # REQUEST SENSE
@@ -358,9 +349,7 @@ class ScsiDevice(LibImpl):
             if actual and not data_ptr:
                 status = 2
                 actual = 0
-                sense_actual = self._write_sense(
-                    mem, sense_ptr, sense_len, 0x05, 0x24
-                )
+                sense_actual = self._write_sense(mem, sense_ptr, sense_len, 0x05, 0x24)
             elif actual:
                 mem.w_block(data_ptr, b"\x00" * actual)
         elif opcode == 0x12:  # INQUIRY
@@ -375,9 +364,7 @@ class ScsiDevice(LibImpl):
             response[4] = len(response) - 5
             if alloc_len and not data_ptr:
                 status = 2
-                sense_actual = self._write_sense(
-                    mem, sense_ptr, sense_len, 0x05, 0x24
-                )
+                sense_actual = self._write_sense(mem, sense_ptr, sense_len, 0x05, 0x24)
             elif alloc_len:
                 mem.w_block(data_ptr, bytes(response[:alloc_len]))
                 actual = alloc_len
@@ -388,9 +375,7 @@ class ScsiDevice(LibImpl):
             if actual and not data_ptr:
                 status = 2
                 actual = 0
-                sense_actual = self._write_sense(
-                    mem, sense_ptr, sense_len, 0x05, 0x24
-                )
+                sense_actual = self._write_sense(mem, sense_ptr, sense_len, 0x05, 0x24)
             elif actual:
                 mem.w_block(data_ptr, bytes(response[:actual]))
         elif opcode == 0x25:  # READ CAPACITY(10)
@@ -401,9 +386,7 @@ class ScsiDevice(LibImpl):
             if actual and not data_ptr:
                 status = 2
                 actual = 0
-                sense_actual = self._write_sense(
-                    mem, sense_ptr, sense_len, 0x05, 0x24
-                )
+                sense_actual = self._write_sense(mem, sense_ptr, sense_len, 0x05, 0x24)
             elif actual:
                 mem.w_block(data_ptr, response[:actual])
         elif opcode in (0x08, 0x28):  # READ(6), READ(10)
@@ -424,9 +407,7 @@ class ScsiDevice(LibImpl):
                 or (expected and not data_ptr)
             ):
                 status = 2
-                sense_actual = self._write_sense(
-                    mem, sense_ptr, sense_len, 0x05, 0x24
-                )
+                sense_actual = self._write_sense(mem, sense_ptr, sense_len, 0x05, 0x24)
             else:
                 if expected:
                     try:
@@ -462,9 +443,7 @@ class ScsiDevice(LibImpl):
                 or (expected and not data_ptr)
             ):
                 status = 2
-                sense_actual = self._write_sense(
-                    mem, sense_ptr, sense_len, 0x05, 0x24
-                )
+                sense_actual = self._write_sense(mem, sense_ptr, sense_len, 0x05, 0x24)
             else:
                 data = mem.r_block(data_ptr, expected) if expected else b""
                 if expected:
@@ -484,9 +463,7 @@ class ScsiDevice(LibImpl):
                         actual = expected
         else:
             status = 2
-            sense_actual = self._write_sense(
-                mem, sense_ptr, sense_len, 0x05, 0x20
-            )
+            sense_actual = self._write_sense(mem, sense_ptr, sense_len, 0x05, 0x20)
 
         scsi.scsi_CmdActual.val = cdb_len
         scsi.scsi_Status.val = status
@@ -528,8 +505,7 @@ class ScsiDevice(LibImpl):
                 f"heads={backend.heads} secs={backend.secs}"
             )
         print(
-            f"[SCSI] {name} offset={offset} len={length} "
-            f"buf=0x{buf_ptr:x}{extra}",
+            f"[SCSI] {name} offset={offset} len={length} " f"buf=0x{buf_ptr:x}{extra}",
             flush=True,
         )
 

@@ -38,8 +38,10 @@ def main_cleanup_reports_failure_and_finishes_test(
 
     with pytest.raises((ValueError, RuntimeError)) as caught:
         main.main(
-            cfg_files=[], args=["--vols-base-dir", str(tmp_path / "volumes")],
-            mode=SimpleNamespace(run=run), single_return_code=single_return_code,
+            cfg_files=[],
+            args=["--vols-base-dir", str(tmp_path / "volumes")],
+            mode=SimpleNamespace(run=run),
+            single_return_code=single_return_code,
         )
     assert caught.value is (execution_error if execution_fails else cleanup_error)
     assert calls == ["close_base_libs", "shutdown", "close", "cleanup"]
@@ -73,6 +75,7 @@ def main_cleanup_is_not_hidden_by_callers_exception_test(monkeypatch, tmp_path):
     except ValueError:
         with pytest.raises(RuntimeError, match="machine cleanup failed"):
             main.main(
-                cfg_files=[], args=["--vols-base-dir", str(tmp_path / "volumes")],
+                cfg_files=[],
+                args=["--vols-base-dir", str(tmp_path / "volumes")],
                 mode=SimpleNamespace(run=lambda ctx: [0]),
             )

@@ -11,7 +11,6 @@ from amitools.vamos.lib.dos.Error import (
     ERROR_DEVICE_NOT_MOUNTED,
 )
 
-
 LDF_DEVICES = 1 << 2
 LDF_VOLUMES = 1 << 3
 LDF_ASSIGNS = 1 << 4
@@ -86,9 +85,7 @@ def pytask_dos_make_add_rem_free_entry_test(vamos_task):
         assert dos_proxy.RemDosEntry(assign_addr) == DOSTRUE
         assert dos_proxy.FindDosEntry(0, assign_name.addr, LDF_ASSIGNS) == 0
         assert dos_proxy.AddDosEntry(device_addr) == DOSTRUE
-        assert (
-            dos_proxy.FindDosEntry(0, device_name.addr, LDF_DEVICES) == device_addr
-        )
+        assert dos_proxy.FindDosEntry(0, device_name.addr, LDF_DEVICES) == device_addr
         assert dos_proxy.AddDosEntry(device_addr) == DOSFALSE
         assert dos_proxy.RemDosEntry(device_addr) == DOSTRUE
         assert dos_proxy.FindDosEntry(0, device_name.addr, LDF_DEVICES) == 0
