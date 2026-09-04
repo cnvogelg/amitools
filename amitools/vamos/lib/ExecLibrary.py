@@ -545,6 +545,8 @@ class ExecLibrary(LibImpl):
 
     def OpenDevice(self, ctx, dev_name: CSTR, unit, io_request, flags):
         io = IORequestStruct(ctx.mem, io_request)
+        io.error.val = -1
+        io.unit.aptr = 0
         name = dev_name.str
         addr = self.lib_mgr.open_lib(name)
         io.device.aptr = addr
@@ -562,10 +564,13 @@ class ExecLibrary(LibImpl):
                     error = open_dev(ctx, io_request, unit, flags)
                 except Exception:
                     io.device.aptr = 0
+                    io.unit.aptr = 0
                     self.lib_mgr.close_lib(addr)
                     raise
                 if error:
+                    io.error.val = error
                     io.device.aptr = 0
+                    io.unit.aptr = 0
                     self.lib_mgr.close_lib(addr)
                     log_exec.info(
                         "OpenDevice: '%s' unit %d flags %d -> error %d",
@@ -574,7 +579,8 @@ class ExecLibrary(LibImpl):
                         flags,
                         error,
                     )
-                    return error
+                    return io.error.val
+            io.error.val = 0
             log_exec.info(
                 "OpenDevice: '%s' unit %d flags %d -> %06x", name, unit, flags, addr
             )

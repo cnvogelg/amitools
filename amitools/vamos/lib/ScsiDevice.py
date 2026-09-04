@@ -7,10 +7,8 @@ constructor also accepts a provider with ``get_backend(unit)`` so one device
 implementation can route separate IORequests to separate units.
 """
 
-from amitools.vamos.astructs import AmigaStruct, AmigaStructDef
-from amitools.vamos.astructs.scalar import UBYTE, ULONG, UWORD
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.libstructs.exec_ import IORequestStruct
+from amitools.vamos.libstructs import IORequestStruct, SCSICmdStruct, UnitStruct
 
 
 IOF_QUICK = 0x01
@@ -102,23 +100,6 @@ SUPPORTED_COMMANDS = (
 )
 
 
-@AmigaStructDef
-class SCSICmdStruct(AmigaStruct):
-    _format = [
-        (ULONG, "scsi_Data"),
-        (ULONG, "scsi_Length"),
-        (ULONG, "scsi_Actual"),
-        (ULONG, "scsi_Command"),
-        (UWORD, "scsi_CmdLength"),
-        (UWORD, "scsi_CmdActual"),
-        (UBYTE, "scsi_Flags"),
-        (UBYTE, "scsi_Status"),
-        (ULONG, "scsi_SenseData"),
-        (UWORD, "scsi_SenseLength"),
-        (UWORD, "scsi_SenseActual"),
-    ]
-
-
 class ScsiDevice(LibImpl):
     """Expose one backend, or a per-unit backend provider, as scsi.device."""
 
@@ -147,7 +128,7 @@ class ScsiDevice(LibImpl):
         self.acknowledge_unsupported_commands = (
             acknowledge_unsupported_commands
         )
-        self._io_backends = {}
+        self._unit_backends = {}
         self._nsd_cmd_mem = None
         self._nsd_cmd_alloc = None
 
@@ -165,7 +146,9 @@ class ScsiDevice(LibImpl):
             self._nsd_cmd_alloc.free_memory(self._nsd_cmd_mem)
             self._nsd_cmd_mem = None
             self._nsd_cmd_alloc = None
-        self._io_backends.clear()
+        for _, unit in self._unit_backends.values():
+            unit.free()
+        self._unit_backends.clear()
 
     def _provide_backend(self, unit):
         if self.backend_provider is not None:
@@ -181,16 +164,25 @@ class ScsiDevice(LibImpl):
             return TDERR_BAD_UNIT_NUM
         if unit == 0:
             self.backend = backend
-        self._io_backends[io_request] = backend
+        # io_Unit belongs to the device and survives copies of the request.
+        # Each open owns a binding until CloseDevice, including any copies
+        # the caller uses for additional transfers during that open.
+        unit_mem = ctx.alloc.alloc_astruct(UnitStruct, label="scsi.device unit")
+        self._unit_backends[unit_mem.addr] = (backend, unit_mem)
+        IORequestStruct(ctx.mem, io_request).unit.aptr = unit_mem.addr
         return 0
 
     def close_dev(self, ctx, io_request):
-        self._io_backends.pop(io_request, None)
+        io = IORequestStruct(ctx.mem, io_request)
+        binding = self._unit_backends.pop(io.unit.aptr, None)
+        if binding is not None:
+            binding[1].free()
+        io.unit.aptr = 0
 
-    def _get_backend(self, io_request):
-        backend = self._io_backends.get(io_request)
-        if backend is not None:
-            return backend
+    def _get_backend(self, ior):
+        binding = self._unit_backends.get(ior.unit.aptr)
+        if binding is not None:
+            return binding[0]
         # Preserve direct use by AmiFUSE and existing tests that invoke
         # BeginIO without routing through ExecLibrary.OpenDevice().
         if self.backend_provider is not None:
@@ -549,7 +541,7 @@ class ScsiDevice(LibImpl):
         offset = ior.offset.val
         buf_ptr = ior.data.val
         io_actual = ior.actual.val
-        backend = self._get_backend(io_request)
+        backend = self._get_backend(ior)
 
         ior.error.val = 0
         ior.flags.val |= IOF_QUICK
@@ -645,7 +637,7 @@ class ScsiDevice(LibImpl):
                 self._set_io_error(ior, IOERR_NOCMD)
         return 0
 
-    def AbortIO(self, ctx, io_request=None):
+    def AbortIO(self, ctx, io_request):
         if io_request:
             ior = IORequestStruct(ctx.mem, io_request)
             ior.error.val = IOERR_ABORTED

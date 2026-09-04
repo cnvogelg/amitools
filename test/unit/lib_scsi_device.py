@@ -1,5 +1,12 @@
 from types import SimpleNamespace
 
+import pytest
+
+from amitools.fd import generate_fd, read_lib_fd
+from amitools.vamos.lib.InputDevice import InputDevice
+from amitools.vamos.libcore import LibCtx, LibImplScanner, LibStubGen
+from amitools.vamos.machine import REG_A1, Runtime
+from amitools.vamos.machine.mock import MockMachine
 from amitools.vamos.lib.ExecLibrary import ExecLibrary
 from amitools.vamos.lib.ScsiDevice import (
     CMD_READ,
@@ -488,3 +495,118 @@ def exec_open_device_rolls_back_failed_hook_test():
     assert result == TDERR_BAD_UNIT_NUM
     assert lib_mgr.closed == [0x6000]
     assert IORequestStruct(ctx.mem, IOR_ADDR).device.aptr == 0
+
+
+@pytest.mark.parametrize("unit", [0, 2])
+def scsi_device_copied_request_keeps_open_binding_test(unit):
+    ctx = _make_ctx()
+    free_before = ctx.alloc.get_free_bytes()
+    backends = {0: Backend(), 2: Backend()}
+    dev = ScsiDevice(BackendProvider(backends))
+    exec_impl = ExecLibrary()
+    exec_impl.lib_mgr = FakeLibManager(dev)
+    assert exec_impl.OpenDevice(
+        ctx, SimpleNamespace(str="scsi.device"), unit, IOR_ADDR, 0
+    ) == 0
+    original = IORequestStruct(ctx.mem, IOR_ADDR)
+    assert original.unit.aptr != 0
+    original.command.val = CMD_READ
+    original.length.val = 512
+    original.data.val = DATA_ADDR
+    copy_addr = IOR_ADDR + 0x100
+    ctx.mem.w_block(copy_addr, ctx.mem.r_block(IOR_ADDR, IORequestStruct.get_byte_size()))
+    copied = IORequestStruct(ctx.mem, copy_addr)
+    copied.message.reply_port.aptr = 0x7000
+    for address in (IOR_ADDR, copy_addr):
+        dev.BeginIO(ctx, address)
+        request = IORequestStruct(ctx.mem, address)
+        assert request.error.val == 0
+        assert request.actual.val == 512
+    assert backends[unit].read_calls == [(0, 1), (0, 1)]
+    assert backends[2 if unit == 0 else 0].read_calls == []
+    exec_impl.CloseDevice(ctx, IOR_ADDR)
+    assert original.unit.aptr == 0
+    assert ctx.alloc.get_free_bytes() == free_before
+    dev.BeginIO(ctx, copy_addr)
+    assert copied.error.val == TDERR_BAD_UNIT_NUM
+
+
+def scsi_device_finish_releases_unclosed_bindings_test():
+    ctx = _make_ctx()
+    free_before = ctx.alloc.get_free_bytes()
+    dev = ScsiDevice(BackendProvider({0: Backend()}))
+    for address in (IOR_ADDR, IOR_ADDR + 0x100):
+        assert dev.open_dev(ctx, address, 0, 0) == 0
+    assert ctx.alloc.get_free_bytes() < free_before
+    dev.finish_lib(ctx)
+    assert ctx.alloc.get_free_bytes() == free_before
+    dev.finish_lib(ctx)
+
+
+@pytest.mark.parametrize("device_name", ["input.device", "scsi.device"])
+def device_abort_vector_calls_implementation_test(device_name):
+    machine = MockMachine()
+    alloc = MemoryAlloc.for_machine(machine)
+    ctx = LibCtx(machine, Runtime(machine).run, alloc)
+    dev = InputDevice() if device_name == "input.device" else ScsiDevice(Backend())
+    fd = read_lib_fd(device_name) or generate_fd(device_name)
+    scan = LibImplScanner().scan(device_name, dev, fd)
+    assert scan.get_error_func_names() == []
+    assert "AbortIO" in scan.get_valid_func_names()
+    calls = []
+    original = dev.AbortIO
+
+    def record(ctx, io_request):
+        calls.append(io_request)
+        return original(ctx, io_request)
+
+    # Spy on the scanned method to verify vector dispatch and A1 decoding.
+    scan.get_func_by_name("AbortIO").method = record
+    stub = LibStubGen().gen_stub(scan, ctx)
+    ctx.cpu.w_reg(REG_A1, IOR_ADDR)
+    stub.get_func_tab()[5]()
+    assert calls == [IOR_ADDR]
+    if device_name == "scsi.device":
+        assert IORequestStruct(ctx.mem, IOR_ADDR).error.val == IOERR_ABORTED
+
+
+@pytest.mark.parametrize("open_error,initial_error", [(0, 20), (32, 0), (-1, 20)])
+def exec_open_device_sets_error_field_test(open_error, initial_error):
+    ctx = _make_ctx()
+    request = IORequestStruct(ctx.mem, IOR_ADDR)
+    request.error.val = initial_error
+    request.unit.aptr = 0x1234
+    exec_impl = ExecLibrary()
+    exec_impl.lib_mgr = FakeLibManager(HookDevice(open_error=open_error))
+    result = exec_impl.OpenDevice(
+        ctx, SimpleNamespace(str="scsi.device"), 2, IOR_ADDR, 0
+    )
+    assert result == request.error.val == open_error
+    assert request.unit.aptr == 0
+    assert request.device.aptr == (0 if open_error else 0x6000)
+
+
+def exec_open_missing_device_sets_error_field_test():
+    ctx = _make_ctx()
+    exec_impl = ExecLibrary()
+    exec_impl.lib_mgr = FakeLibManager(HookDevice())
+    exec_impl.lib_mgr.open_lib = lambda name: 0
+    request = IORequestStruct(ctx.mem, IOR_ADDR)
+    request.unit.aptr = 0x1234
+    assert exec_impl.OpenDevice(
+        ctx, SimpleNamespace(str="missing.device"), 0, IOR_ADDR, 0
+    ) == -1
+    assert request.error.val == -1
+    assert request.device.aptr == request.unit.aptr == 0
+
+
+def scsi_device_descriptor_has_standard_vectors_test():
+    fd = read_lib_fd("scsi.device")
+    assert fd is not None
+    assert fd.get_base_name() == "_ScsiBase"
+    assert fd.is_device
+    assert fd.get_neg_size() == 42
+    assert [(func.get_name(), func.get_bias()) for func in fd.get_funcs()] == [
+        ("_OpenDev", 6), ("_CloseDev", 12), ("_ExpungeDev", 18),
+        ("_Empty", 24), ("BeginIO", 30), ("AbortIO", 36),
+    ]
