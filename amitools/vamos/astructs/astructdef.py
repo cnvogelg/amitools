@@ -2,6 +2,7 @@ from .astruct import (
     AmigaStruct,
     AmigaStructTypes,
     AmigaStructFieldDefs,
+    _StructFieldDescriptor,
     APTR_SELF,
     BPTR_SELF,
     TypeBase,
@@ -20,6 +21,7 @@ class AmigaStructDecorator(object):
         # any sub field aliases?
         if cls._subfield_aliases:
             self._setup_subfield_aliases(cls, cls._subfield_aliases)
+        self._install_field_descriptors(cls)
         cls._byte_size = struct_def.get_total_size()
         # add to pool
         AmigaStructTypes.add_struct(cls)
@@ -33,6 +35,35 @@ class AmigaStructDecorator(object):
             assert def_path
             alias_map[alias] = def_path
         cls._sfdp = alias_map
+
+    def _install_field_descriptors(self, cls):
+        field_attr_paths = {}
+
+        for field_def in cls.sdef.get_field_defs():
+            field_attr_paths.setdefault(field_def.name, (field_def.index,))
+
+        for alias_name, field_name in cls.sdef._alias_names.items():
+            field_def = cls.sdef.find_field_def_by_name(field_name)
+            if field_def is not None:
+                field_attr_paths.setdefault(alias_name, (field_def.index,))
+
+        if cls._sfdp:
+            for alias_name, def_path in cls._sfdp.items():
+                field_attr_paths.setdefault(
+                    alias_name, tuple(field_def.index for field_def in def_path)
+                )
+
+        cls._field_attr_paths = field_attr_paths
+
+        existing_names = set()
+        for base in cls.mro():
+            existing_names.update(base.__dict__.keys())
+
+        for field_name, field_path in field_attr_paths.items():
+            if field_name in existing_names:
+                continue
+            setattr(cls, field_name, _StructFieldDescriptor(field_path))
+            existing_names.add(field_name)
 
     def _setup_fields(self, cls, format, type_name):
         struct_def = AmigaStructFieldDefs(type_name)

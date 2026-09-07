@@ -11,6 +11,7 @@ from .libmgr import SetupLibManager
 from .schedule import Scheduler
 from .profiler import MainProfiler
 from .mode import ModeContext, ModeSetup
+from .disk import DiskSession
 
 RET_CODE_CONFIG_ERROR = 1000
 
@@ -51,6 +52,10 @@ def main(
         log_help()
         return error_code
 
+    # A disk session is a separate resource from host-directory volumes.
+    # It stays empty unless at least one --disk option was supplied.
+    disk_session = DiskSession.from_config(mp.get_disk_dict())
+
     # setup main profiler
     main_profiler = MainProfiler()
     prof_cfg = mp.get_profile_dict().profile
@@ -63,23 +68,39 @@ def main(
     if not machine:
         return error_code
 
-    # setup memory map
-    mem_map_cfg = mp.get_machine_dict().memmap
     mem_map = MemoryMap(machine)
-    if not mem_map.parse_config(mem_map_cfg):
-        log_main.error("memory map setup failed!")
-        return error_code
+    path_mgr = None
+    slm = None
+    slm_is_setup = False
+    base_libs_are_open = False
+    profiler_is_setup = False
+    exit_code = error_code
+    cleanup_errors = []
+    execution_error = None
 
-    # setup trace manager
-    trace_mgr_cfg = mp.get_trace_dict().trace
-    trace_mgr = TraceManager(machine)
-    if not trace_mgr.parse_config(trace_mgr_cfg):
-        log_main.error("tracing setup failed!")
-        return error_code
+    def cleanup_step(name, func):
+        try:
+            func()
+        except Exception as exc:
+            cleanup_errors.append(exc)
+            log_main.error("%s shutdown failed: %s", name, exc)
 
-    # setup path manager
-    path_mgr = VamosPathManager()
     try:
+        # setup memory map
+        mem_map_cfg = mp.get_machine_dict().memmap
+        if not mem_map.parse_config(mem_map_cfg):
+            log_main.error("memory map setup failed!")
+            return error_code
+
+        # setup trace manager
+        trace_mgr_cfg = mp.get_trace_dict().trace
+        trace_mgr = TraceManager(machine)
+        if not trace_mgr.parse_config(trace_mgr_cfg):
+            log_main.error("tracing setup failed!")
+            return error_code
+
+        # setup path manager
+        path_mgr = VamosPathManager()
         if not path_mgr.parse_config(mp.get_path_dict()):
             log_main.error("path config failed!")
             return error_code
@@ -104,6 +125,11 @@ def main(
 
         # setup lib mgr
         lib_cfg = mp.get_libs_dict()
+        try:
+            disk_session.open()
+        except (IOError, OSError, ValueError) as exc:
+            log_main.error("disk setup failed: %s", exc)
+            return error_code
         slm = SetupLibManager(
             machine,
             mem_map,
@@ -116,12 +142,23 @@ def main(
             log_main.error("lib manager setup failed!")
             return error_code
         slm.setup()
+        slm_is_setup = True
+        if disk_session.get_units():
+            disk_session.install_devices(slm)
 
         # setup profiler
         main_profiler.setup()
+        profiler_is_setup = True
 
         # open base libs
         slm.open_base_libs()
+        base_libs_are_open = True
+        if disk_session.get_units():
+            try:
+                disk_session.install_dos(slm.dos_impl)
+            except (RuntimeError, ValueError) as exc:
+                log_main.error("DOS disk setup failed: %s", exc)
+                return error_code
 
         # prepare mode context
         proc_cfg = mp.get_proc_dict().process
@@ -142,19 +179,30 @@ def main(
             if single_return_code:
                 exit_code = exit_code[0]
 
-        # libs shutdown
-        slm.close_base_libs()
-        main_profiler.shutdown()
-        slm.cleanup()
-
+    except BaseException as exc:
+        execution_error = exc
+        raise
     finally:
-        # always shutdown path manager to ensure that
-        # external resources are cleaned up properly
-        path_mgr.shutdown()
-
-    # mem_map and machine shutdown
-    mem_map.cleanup()
-    machine.cleanup()
+        # Keep an execution exception as the primary failure, while still
+        # attempting every shutdown step and reporting cleanup failures.
+        # Remove disk nodes before dos.library frees its maintained list.
+        if base_libs_are_open:
+            cleanup_step(
+                "DOS disk",
+                lambda: disk_session.release_dos(slm.dos_impl),
+            )
+            cleanup_step("base library", slm.close_base_libs)
+        if profiler_is_setup:
+            cleanup_step("profiler", main_profiler.shutdown)
+        if slm_is_setup:
+            cleanup_step("library manager", slm.cleanup)
+        cleanup_step("disk", disk_session.close)
+        if path_mgr is not None:
+            cleanup_step("path manager", path_mgr.shutdown)
+        cleanup_step("memory map", mem_map.cleanup)
+        cleanup_step("machine", machine.cleanup)
+        if cleanup_errors and execution_error is None:
+            raise cleanup_errors[0]
 
     # exit
     log_main.info("vamos is exiting: code=%r", exit_code)

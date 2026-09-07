@@ -269,6 +269,26 @@ or in the config file:
     [vamos]
     pure_ami_paths=True
 
+#### 2.1.7 Disk Images
+
+The `--disk` option exposes a standard RDB disk image through
+`scsi.device`. The option can be repeated; images are assigned device units
+in command-line order, starting at unit 0. Each RDB partition is also
+published in the AmigaDOS device list under its drive name.
+
+Disk images opened this way are read-only. vamos takes an exclusive host-file
+lock for the lifetime of the process and refuses to open an image that is
+already in use by another cooperating process.
+
+For example, an Amiga diagnostic program can inspect the `DH0` partition in
+`disk.hdf` with normal Exec and DOS APIs:
+
+    vamos --disk disk.hdf pfsdoctor DH0 CHECK NONINTERACTIVE
+
+The initial implementation supports direct RDB images whose RDB is in one of
+the standard first 16 blocks. Container formats and writable command-line
+images are not supported.
+
 ### 2.2 Exec Setup
 
 #### 2.2.1 Stack Size

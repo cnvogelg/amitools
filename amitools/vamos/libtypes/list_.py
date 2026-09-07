@@ -123,10 +123,9 @@ class ListBase:
 
 @AmigaClassDef
 class MinList(MinListStruct, ListBase):
-    def __init__(self, mem, addr, **kwargs):
-        super().__init__(mem, addr, **kwargs)
-        self._head = MinNode(mem, self.addr)
-        self._tail = MinNode(mem, self.addr + 4)
+    def _bind_setup(self):
+        self._head = MinNode._bind(self._mem, self.addr)
+        self._tail = MinNode._bind(self._mem, self.addr + 4)
 
     def __str__(self):
         return "[MinList:@%06x,h=%06x,t=%06x,tp=%06x]" % (
@@ -144,10 +143,9 @@ class MinList(MinListStruct, ListBase):
 
 @AmigaClassDef
 class List(ListStruct, ListBase):
-    def __init__(self, mem, addr, **kwargs):
-        super().__init__(mem, addr, **kwargs)
-        self._head = Node(mem, self.addr)
-        self._tail = Node(mem, self.addr + 4)
+    def _bind_setup(self):
+        self._head = Node._bind(self._mem, self.addr)
+        self._tail = Node._bind(self._mem, self.addr + 4)
 
     def __iter__(self):
         """default Python iter is returning Nodes and does not promote"""

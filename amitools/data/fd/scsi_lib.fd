@@ -1,0 +1,4 @@
+##base _ScsiBase
+##bias 42
+##public
+##end

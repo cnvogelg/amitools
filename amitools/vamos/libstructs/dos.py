@@ -127,6 +127,42 @@ class DateStampStruct(AmigaStruct):
     _format = [(LONG, "ds_Days"), (LONG, "ds_Minute"), (LONG, "ds_Tick")]
 
 
+@AmigaStructDef
+class DosEnvecStruct(AmigaStruct):
+    _format = [
+        (ULONG, "de_TableSize"),
+        (ULONG, "de_SizeBlock"),
+        (ULONG, "de_SecOrg"),
+        (ULONG, "de_Surfaces"),
+        (ULONG, "de_SectorPerBlock"),
+        (ULONG, "de_BlocksPerTrack"),
+        (ULONG, "de_Reserved"),
+        (ULONG, "de_PreAlloc"),
+        (ULONG, "de_Interleave"),
+        (ULONG, "de_LowCyl"),
+        (ULONG, "de_HighCyl"),
+        (ULONG, "de_NumBuffers"),
+        (ULONG, "de_BufMemType"),
+        (ULONG, "de_MaxTransfer"),
+        (ULONG, "de_Mask"),
+        (LONG, "de_BootPri"),
+        (ULONG, "de_DosType"),
+        (ULONG, "de_Baud"),
+        (ULONG, "de_Control"),
+        (ULONG, "de_BootBlocks"),
+    ]
+
+
+@AmigaStructDef
+class FileSysStartupMsgStruct(AmigaStruct):
+    _format = [
+        (ULONG, "fssm_Unit"),
+        (BSTR, "fssm_Device"),
+        (BPTR(DosEnvecStruct), "fssm_Environ"),
+        (ULONG, "fssm_Flags"),
+    ]
+
+
 # the union in DosList is splitted up into own types
 
 

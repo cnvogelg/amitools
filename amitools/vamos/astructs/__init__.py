@@ -1,4 +1,3 @@
-from .access import AccessStruct
 from .astruct import AmigaStruct, AmigaStructTypes, APTR_SELF, BPTR_SELF
 from .astructdef import AmigaStructDef, AmigaClassDef
 from .scalar import ULONG, LONG, UWORD, WORD, UBYTE, BYTE, ScalarType

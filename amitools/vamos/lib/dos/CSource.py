@@ -43,16 +43,15 @@ class CSource:
 
     def read_s(self, alloc, ptr):
         """read structure from Amiga memory"""
-        c = alloc.map_struct(ptr, CSourceStruct, label="CSource")
-        buf_ptr = c.access.r_s("CS_Buffer")
-        self.len = c.access.r_s("CS_Length")
+        csrc = CSourceStruct(alloc.get_mem(), ptr)
+        buf_ptr = csrc.CS_Buffer.aptr
+        self.len = csrc.CS_Length.val
         self.buf = bytes(alloc.mem.r_block(buf_ptr, self.len))
-        self.pos = c.access.r_s("CS_CurChr")
+        self.pos = csrc.CS_CurChr.val
 
     def update_s(self, alloc, ptr):
         """update current pointer only"""
-        c = alloc.map_struct(ptr, CSourceStruct, label="CSource")
-        c.access.w_s("CS_CurChr", self.pos)
+        CSourceStruct(alloc.get_mem(), ptr).CS_CurChr.val = self.pos
 
     def append_line(self):
         pass

@@ -1,5 +1,6 @@
 from amitools.vamos.lib.dos.CSource import CSource
 from amitools.vamos.lib.dos.Item import ItemParser
+from amitools.vamos.libstructs import CSourceStruct
 
 
 def item_parser1_test():
@@ -51,3 +52,25 @@ def item_parser_eol_bug_test():
     assert ip.read_item(maxbuf) == (ItemParser.ITEM_UNQUOTED, "hello")
     assert ip.read_item(maxbuf) == (ItemParser.ITEM_UNQUOTED, "world")
     assert ip.read_item(maxbuf) == (ItemParser.ITEM_NOTHING, None)
+
+
+def csource_struct_roundtrip_test(mem_alloc):
+    mem, alloc = mem_alloc
+    data = b"hello world"
+    buf = alloc.alloc_memory(len(data), label="csrc_buf")
+    mem.w_block(buf.addr, data)
+    csrc_mem = alloc.alloc_struct(CSourceStruct, label="csrc")
+    csrc = csrc_mem.struct
+    csrc.CS_Buffer.aptr = buf.addr
+    csrc.CS_Length.val = len(data)
+    csrc.CS_CurChr.val = 3
+
+    src = CSource()
+    src.read_s(alloc, csrc_mem.addr)
+    assert src.buf == data
+    assert src.len == len(data)
+    assert src.pos == 3
+
+    src.pos = 7
+    src.update_s(alloc, csrc_mem.addr)
+    assert csrc.CS_CurChr.val == 7
