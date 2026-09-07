@@ -1,5 +1,6 @@
 import os
 import stat
+import sys
 import amitools.util.BlkDevTools as BlkDevTools
 
 
@@ -49,7 +50,12 @@ class ImageFile:
                 flags = "rb"
             else:
                 flags = "r+b"
-            self.fobj = open(self.file_name, flags)
+            # Windows byte-range locks are mandatory even through another
+            # handle in this process. Buffered reads of the final block can
+            # reach a session's lock byte beyond EOF; keep I/O within the
+            # requested range for every image-file user.
+            buffering = 0 if sys.platform == "win32" else -1
+            self.fobj = open(self.file_name, flags, buffering=buffering)
 
     def read_blk(self, blk_num, num_blks=1):
         if blk_num >= self.num_blocks:

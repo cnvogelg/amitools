@@ -153,25 +153,12 @@ class DiskImage:
         return self.host_lock.is_locked
 
     def _open_raw(self, block_size):
-        fobj = None
-        if fcntl is None and msvcrt is not None:
-            # Buffered reads of the last sector can extend past EOF and
-            # hit the Windows lock byte. Keep reads within their exact
-            # requested range, including when reopening for an RDB size.
-            mode = "rb" if self.read_only else "r+b"
-            fobj = open(self.image, mode, buffering=0)
         blkdev = RawBlockDevice(
             str(self.image),
             read_only=self.read_only,
             block_bytes=block_size,
-            fobj=fobj,
         )
-        try:
-            blkdev.open()
-        except Exception:
-            if fobj is not None:
-                fobj.close()
-            raise
+        blkdev.open()
         return blkdev
 
     @staticmethod
