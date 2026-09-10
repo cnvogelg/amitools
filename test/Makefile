@@ -22,6 +22,7 @@ SOURCES_C += test_hello.c test_raise.c
 SOURCES_C += test_devtimer.c test_execpy.c test_tags.c
 SOURCES_C += lib_testnix.c lib_testsc.c
 SOURCES_C += proc_args.c
+SOURCES_C += dos_unixpath.c
 
 LIB_GCC_SOURCES_C = testnix.c
 LIB_SC_SOURCES_C = testsc.c
