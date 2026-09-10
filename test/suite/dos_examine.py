@@ -10,14 +10,15 @@ def dos_examine_test(vamos, tmpdir):
     fh.write("hello, world!\n")
     fh.close()
     os.mkdir(str(test_dir / "bar"))
-    # show dir
+    # show dir with Examine()/ExNext(), then again with ExAll()
     rc, stdout, stderr = vamos.run_prog("dos_examine", "root:" + str(test_dir)[1:])
     assert rc == 0
     assert stderr == []
-    # allow any order of foo or bar
-    assert stdout == ["Examine: bla", "   14 foo", "<DIR> bar", "ok"] or stdout == [
-        "Examine: bla",
-        "<DIR> bar",
-        "   14 foo",
-        "ok",
-    ]
+    assert len(stdout) == 7
+    assert stdout[0] == "Examine: bla"
+    assert stdout[3] == "ExAll:"
+    assert stdout[6] == "ok"
+    # allow any order of foo or bar in both listings
+    entries = {"   14 foo", "<DIR> bar"}
+    assert set(stdout[1:3]) == entries
+    assert set(stdout[4:6]) == entries

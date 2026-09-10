@@ -17,6 +17,8 @@ from amitools.vamos.libstructs import (
     SegmentStruct,
     FileHandleStruct,
     FileInfoBlockStruct,
+    ExAllControlStruct,
+    ExAllDataStruct,
     InfoDataStruct,
     DevProcStruct,
     AnchorPathStruct,
@@ -1323,6 +1325,134 @@ class DosLibrary(LibImpl):
             self.setioerr(ctx, err)
             return DOSFALSE
 
+    # bytes of struct ExAllData used by each ED_* type: ED_NAME .. ED_OWNER
+    ex_all_data_sizes = (0, 8, 12, 16, 20, 32, 36, 40)
+
+    def ExAll(self, ctx, lock_b_addr, buffer, size, data_type, control_ptr):
+        """fill buffer with a chain of ExAllData entries for the directory.
+
+        The scan state between calls lives in eac_LastKey and in the
+        lock's ExNext() state, so the entries are produced with the same
+        examine_lock()/examine_next() code path as Examine()/ExNext().
+
+        TODO: skip the FileInfoBlock round trip and produce the entries
+        directly from the host directory listing.
+        """
+        lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
+        control = ExAllControlStruct(ctx.mem, control_ptr)
+        last_key = control.eac_LastKey.val
+        match_ptr = control.eac_MatchString.aptr
+        match_pat = None
+        if match_ptr != 0:
+            match_pat = Pattern(None, ctx.mem.r_cstr(match_ptr), True, True)
+        if control.eac_MatchFunc.aptr != 0:
+            log_dos.warning("ExAll: eac_MatchFunc is not supported, ignored")
+        if data_type < 1 or data_type >= len(self.ex_all_data_sizes):
+            log_dos.warning("ExAll: %s type=%d not supported", lock, data_type)
+            control.eac_Entries.val = 0
+            self.setioerr(ctx, ERROR_BAD_NUMBER)
+            return DOSFALSE
+        entry_size = self.ex_all_data_sizes[data_type]
+
+        # scan with a scratch FileInfoBlock: examine_next() keeps its
+        # position in fib_DiskKey, which we carry over in eac_LastKey
+        fib_addr = self._alloc_mem("ExAll_FIB", FileInfoBlockStruct.get_size())
+        fib = FileInfoBlockStruct(ctx.mem, fib_addr)
+        if last_key == 0:
+            err = lock.examine_lock(fib)
+            if err == NO_ERROR and fib.fib_DirEntryType.val < 0:
+                err = ERROR_OBJECT_WRONG_TYPE
+            if err != NO_ERROR:
+                self._free_mem(fib_addr)
+                log_dos.info("ExAll: %s examine failed: %d", lock, err)
+                control.eac_Entries.val = 0
+                self.setioerr(ctx, err)
+                return DOSFALSE
+        else:
+            fib.fib_DiskKey.val = last_key
+
+        entries = 0
+        prev = None
+        pos = buffer
+        end = buffer + size
+        err = NO_ERROR
+        while True:
+            key_before = fib.fib_DiskKey.val
+            err = lock.examine_next(fib)
+            if err != NO_ERROR:
+                break
+            name = ctx.mem.r_cstr(fib.fib_FileName.addr)
+            if match_pat is not None and not pattern_match(match_pat, name):
+                continue
+            comment = ""
+            if data_type >= 6:
+                comment = ctx.mem.r_cstr(fib.fib_Comment.addr)
+            # entry, name and comment, next entry longword aligned
+            need = entry_size + len(name) + 1
+            if data_type >= 6:
+                need += len(comment) + 1
+            need = (need + 3) & ~3
+            if pos + need > end:
+                # does not fit: rewind so the next call re-reads it, unless
+                # the buffer cannot hold even one entry
+                fib.fib_DiskKey.val = key_before
+                if entries == 0:
+                    err = ERROR_NO_FREE_STORE
+                break
+            ead = ExAllDataStruct(ctx.mem, pos)
+            str_addr = pos + entry_size
+            ead.ed_Next.aptr = 0
+            ead.ed_Name.aptr = str_addr
+            ctx.mem.w_cstr(str_addr, name)
+            str_addr += len(name) + 1
+            if data_type >= 2:
+                ead.ed_Type.val = fib.fib_DirEntryType.val
+            if data_type >= 3:
+                ead.ed_Size.val = fib.fib_Size.val
+            if data_type >= 4:
+                ead.ed_Prot.val = fib.fib_Protection.val
+            if data_type >= 5:
+                ead.ed_Days.val = fib.fib_Date.ds_Days.val
+                ead.ed_Mins.val = fib.fib_Date.ds_Minute.val
+                ead.ed_Ticks.val = fib.fib_Date.ds_Tick.val
+            if data_type >= 6:
+                ead.ed_Comment.aptr = str_addr
+                ctx.mem.w_cstr(str_addr, comment)
+            if data_type >= 7:
+                ead.ed_OwnerUID.val = fib.fib_OwnerUID.val
+                ead.ed_OwnerGID.val = fib.fib_OwnerGID.val
+            if prev is not None:
+                prev.ed_Next.aptr = pos
+            prev = ead
+            pos += need
+            entries += 1
+
+        control.eac_Entries.val = entries
+        control.eac_LastKey.val = fib.fib_DiskKey.val
+        self._free_mem(fib_addr)
+        log_dos.info(
+            "ExAll: %s buf=%06x size=%d type=%d -> entries=%d err=%d",
+            lock,
+            buffer,
+            size,
+            data_type,
+            entries,
+            err,
+        )
+        self.setioerr(ctx, err)
+        if err == NO_ERROR:
+            return DOSTRUE
+        else:
+            return DOSFALSE
+
+    def ExAllEnd(self, ctx, lock_b_addr, buffer, size, data_type, control_ptr):
+        lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
+        log_dos.info("ExAllEnd: %s", lock)
+        lock.dirent = None
+        control = ExAllControlStruct(ctx.mem, control_ptr)
+        control.eac_Entries.val = 0
+        control.eac_LastKey.val = 0
+
     def ParentDir(self, ctx):
         lock_b_addr = ctx.cpu.r_reg(REG_D1)
         lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
@@ -2015,7 +2145,7 @@ class DosLibrary(LibImpl):
             struct_def = FileHandleStruct
         elif obj_type == 1:  # DOS_EXALLCONTROL
             name = "DOS_EXALLCONTROL"
-            struct_def = None
+            struct_def = ExAllControlStruct
         elif obj_type == 2:  # DOS_FIB
             name = "DOS_FIB"
             struct_def = FileInfoBlockStruct
