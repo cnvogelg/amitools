@@ -16,7 +16,9 @@ import threading
 
 
 def physical_drive_number(path):
-    match = re.fullmatch(r"\\\\[.?]\\PhysicalDrive([0-9]+)", os.fspath(path), re.I)
+    # Python <= 3.11 treats this as a UNC root and appends a backslash.
+    name = os.fspath(path).rstrip("\\")
+    match = re.fullmatch(r"\\\\[.?]\\PhysicalDrive([0-9]+)", name, re.I)
     return int(match[1]) if match else None
 
 
