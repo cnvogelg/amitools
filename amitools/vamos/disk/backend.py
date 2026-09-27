@@ -17,6 +17,7 @@ except ImportError:  # pragma: no cover - POSIX
 from amitools.fs.blkdev.RawBlockDevice import RawBlockDevice
 from amitools.fs.block.rdb.RDBlock import RDBlock
 from amitools.fs.rdb.RDisk import RDisk
+from amitools.util.Win32Disk import DiskLock, is_windows_disk
 
 
 class HostFileLock:
@@ -35,6 +36,13 @@ class HostFileLock:
 
     def acquire(self):
         if self.is_locked:
+            return
+        if is_windows_disk(self.image):
+            try:
+                self._file = DiskLock(self.image, read_only=self.read_only)
+            except OSError as exc:
+                raise IOError("cannot exclusively lock disk %s: %s" % (self.image, exc)) from exc
+            self._kind = "physical_disk"
             return
         mode = "rb" if self.read_only else "r+b"
         lock_file = open(self.image, mode)
