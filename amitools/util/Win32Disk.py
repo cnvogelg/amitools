@@ -214,11 +214,12 @@ class _Disk:
             try:
                 query = self.api.open(volume, 0)
                 disks = self.api.volume_disks(query)
-            except OSError as exc:
-                # Optical drives/empty removable drives have no disk extents.
-                if getattr(exc, "winerror", None) in (1, 21, 50):
-                    continue
-                raise
+            except OSError:
+                # Unrelated, inaccessible or disappearing volumes must not
+                # prevent opening the target disk. Once a volume is identified
+                # as belonging to it, locking errors below remain fatal. Windows
+                # also enforces its volume-lock requirements on raw writes.
+                continue
             finally:
                 if query is not None:
                     self.api.close(query)
