@@ -4,6 +4,7 @@ import ctypes
 import os
 import subprocess
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -37,9 +38,10 @@ def native_disk_lock_process_test():
     api = _Win32()
     handle = api.lock_disk(number)
     code = "from amitools.util.Win32Disk import _Win32; a=_Win32(); a.close(a.lock_disk(%d))" % number
+    root = Path(__file__).resolve().parents[2]
     try:
         result = subprocess.run([sys.executable, "-c", code], capture_output=True,
-                                text=True, timeout=10)
+                                text=True, timeout=10, cwd=root)
         assert result.returncode != 0
         assert "already in use" in result.stderr
     finally:
@@ -48,4 +50,4 @@ def native_disk_lock_process_test():
         closer = threading.Thread(target=api.close, args=(handle,))
         closer.start()
         closer.join()
-    subprocess.run([sys.executable, "-c", code], check=True, timeout=10)
+    subprocess.run([sys.executable, "-c", code], check=True, timeout=10, cwd=root)
