@@ -1,7 +1,7 @@
 """Windows physical disks, exposed as seekable binary streams.
 
 No pywin32 dependency. Win32 is loaded only when a device is actually opened.
-Mount sessions hold an exclusive physical-drive handle; temporary readers in
+Mount sessions hold a named process lock and physical-drive handle; readers in
 the same process borrow it, each with their own cursor. Ordinary files never
 enter this path.
 """
@@ -42,6 +42,7 @@ class _Win32:
         ptr = ctypes.c_void_p
         signatures = {
             "CreateFileW": (handle, [ctypes.c_wchar_p, dword, dword, ptr, dword, dword, handle]),
+            "CreateMutexW": (handle, [ptr, boolean, ctypes.c_wchar_p]),
             "CloseHandle": (boolean, [handle]),
             "DeviceIoControl": (boolean, [handle, dword, ptr, dword, ptr, dword, ptr, ptr]),
             "SetFilePointerEx": (boolean, [handle, ctypes.c_int64, ptr, dword]),
@@ -77,6 +78,19 @@ class _Win32:
     def close(self, handle):
         if not self.dll.CloseHandle(handle):
             raise self.error("cannot close disk handle")
+
+    def lock_disk(self, number):
+        # Use the named object's lifetime, not thread-affine mutex ownership.
+        # Disk handles can be closed by a different FUSE thread. The global
+        # namespace coordinates processes in different Windows login sessions.
+        name = r"Global\amitools-PhysicalDrive%d" % number
+        handle = self.dll.CreateMutexW(None, False, name)
+        if not handle:
+            raise self.error("cannot lock %s" % name)
+        if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS
+            self.close(handle)
+            raise IOError("cannot exclusively lock disk: already in use")
+        return handle
 
     def ioctl(self, handle, code, size=0):
         buf = ctypes.create_string_buffer(size) if size else None
@@ -157,11 +171,15 @@ class _Disk:
         self.api = _Win32()
         self.read_only = read_only
         self.handle = None
+        self.process_lock = None
         self.volume_handles = []
         self.lock = threading.RLock()
         self.refs = 0
         number = physical_drive_number(path)
         try:
+            # Do not depend on device drivers enforcing CreateFile share modes.
+            # Probes also take this lock unless borrowing an existing session.
+            self.process_lock = self.api.lock_disk(number)
             # Lock/dismount filesystems before obtaining the raw disk handle.
             # Keep their handles alive until all disk writes have been flushed.
             if not read_only:
@@ -235,6 +253,12 @@ class _Disk:
             except OSError as exc:
                 error = error or exc
         self.volume_handles.clear()
+        if self.process_lock is not None:
+            try:
+                self.api.close(self.process_lock)
+            except OSError as exc:
+                error = error or exc
+            self.process_lock = None
         if error is not None:
             raise error
 
