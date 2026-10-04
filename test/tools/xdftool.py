@@ -337,6 +337,32 @@ def xdftool_list_test(xdftool, adf_file):
     xdftool(adf_file, "list")
 
 
+@pytest.mark.parametrize("dos_format", ["DOS0", "DOS3"])
+def xdftool_latin1_names_test(xdftool, tmp_path, dos_format):
+    image = str(tmp_path / "latin1.adf")
+    source = tmp_path / "source"
+    xdftool(image, ("format", "Latin1", dos_format), ("makedir", "Catalogs"))
+    # Include the byte sequence seen in a UTF-8-named directory on an Amiga
+    # volume, plus distinct names that compatibility normalization aliases.
+    names = [
+        "türkçe".encode("utf-8").decode("latin-1"),
+        "µ",
+        "a²",
+        "a2",
+        "a\xa0b",
+        "a b",
+    ]
+    for index, name in enumerate(names):
+        source.write_bytes(bytes([index]))
+        xdftool(image, ("write", str(source), "Catalogs/" + name))
+    listing = xdftool(image, "list", raw_output=True).decode("utf-8")
+    for index, name in enumerate(names):
+        assert name in listing
+        assert xdftool(image, ("type", "Catalogs/" + name), raw_output=True) == bytes(
+            [index]
+        )
+
+
 def xdftool_create_test(xdftool, xdfs):
     """create an empty disk image"""
     xdftool(xdfs.file_name, ("create", xdfs.size))
