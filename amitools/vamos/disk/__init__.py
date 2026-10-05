@@ -2,6 +2,7 @@
 
 from .backend import BlockBackend, DiskImage, DiskPartition, HostFileLock
 from .session import DiskSession
+from .locking import PartitionFileLock
 
 __all__ = [
     "BlockBackend",
@@ -9,4 +10,5 @@ __all__ = [
     "DiskPartition",
     "DiskSession",
     "HostFileLock",
+    "PartitionFileLock",
 ]

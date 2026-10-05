@@ -15,7 +15,7 @@ jobs:
     - name: Install disk test dependencies
       run: python -m pip install pytest greenlet
     - name: Test disk locking and device compatibility
-      run: python -m pytest test/unit/fs_imagefile.py test/unit/disk_session.py test/unit/lib_scsi_device.py test/unit/util_win32disk.py test/unit/util_win32disk_volumes.py
+      run: python -m pytest test/unit/fs_imagefile.py test/unit/disk_session.py test/unit/disk_partition_lock.py test/unit/lib_scsi_device.py test/unit/util_win32disk.py test/unit/util_win32disk_volumes.py
 
   build:
     runs-on: ${{ matrix.platform }}
