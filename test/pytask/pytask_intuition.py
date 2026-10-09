@@ -52,13 +52,44 @@ def pytask_intuition_current_time_test(vamos_task):
 def pytask_intuition_easy_request_args_test(vamos_task):
     def intuition_func(ctx, intuition_lib):
         text = ctx.alloc.alloc_cstr("sfs startup")
-        easy = ctx.alloc.alloc_memory(16)
+        easy = ctx.alloc.alloc_memory(20)
         ctx.mem.w32(easy.addr + 12, text.addr)
+        ctx.mem.w32(easy.addr + 16, 0)
 
         assert intuition_lib.EasyRequestArgs(0, easy.addr, 0, 0) == 1
 
         ctx.alloc.free_memory(easy)
         ctx.alloc.free_cstr(text)
+
+    task = gen_intuition_task(intuition_func)
+    exit_codes = vamos_task.run([task])
+    assert exit_codes == [0]
+
+
+def pytask_intuition_easy_request_retry_does_not_loop_test(vamos_task):
+    def intuition_func(ctx, intuition_lib):
+        retry = ctx.alloc.alloc_cstr("Read %ld Error %lu on block %lu + %lu%s")
+        other = ctx.alloc.alloc_cstr("Disk is full")
+        gadgets = ctx.alloc.alloc_cstr("RETRY|CANCEL")
+        easy = ctx.alloc.alloc_memory(20)
+        ctx.mem.w32(easy.addr + 16, gadgets.addr)
+
+        # The first requester selects RETRY, a repeat of it CANCEL.
+        ctx.mem.w32(easy.addr + 12, retry.addr)
+        assert intuition_lib.EasyRequestArgs(0, easy.addr, 0, 0) == 1
+        assert intuition_lib.EasyRequestArgs(0, easy.addr, 0, 0) == 0
+        assert intuition_lib.EasyRequestArgs(0, easy.addr, 0, 0) == 0
+
+        # A different requester gets its first gadget once again.
+        ctx.mem.w32(easy.addr + 12, other.addr)
+        assert intuition_lib.EasyRequestArgs(0, easy.addr, 0, 0) == 1
+        ctx.mem.w32(easy.addr + 12, retry.addr)
+        assert intuition_lib.EasyRequestArgs(0, easy.addr, 0, 0) == 1
+
+        ctx.alloc.free_memory(easy)
+        ctx.alloc.free_cstr(gadgets)
+        ctx.alloc.free_cstr(other)
+        ctx.alloc.free_cstr(retry)
 
     task = gen_intuition_task(intuition_func)
     exit_codes = vamos_task.run([task])
