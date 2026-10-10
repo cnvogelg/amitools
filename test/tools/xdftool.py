@@ -2,6 +2,10 @@ import pytest
 import collections
 import os
 
+from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
+from amitools.fs.ADFSVolume import ADFSVolume
+from amitools.fs import DosType
+
 
 # tag a parameter for full testing
 def tag_full(value):
@@ -485,3 +489,231 @@ def xdftool_rdb_open_format_test(xdftool, rdb_files):
     # list again
     for part in part_list:
         xdftool(rdb_file, ("open", "part=" + part), ("list",))
+
+
+# ----- FileListBlock interleave tests -----
+
+
+def _open_file_node(img_file, ami_path):
+    """open image read-only and return (blkdev, volume, file node, ppb)."""
+    factory = BlkDevFactory()
+    blkdev = factory.open(img_file, read_only=True)
+    vol = ADFSVolume(blkdev)
+    vol.open()
+    from amitools.fs.FSString import FSString
+
+    node = vol.get_path_name(FSString(ami_path))
+    assert node is not None and node.is_file()
+    ppb = blkdev.block_longs - 56
+    return blkdev, vol, node, ppb
+
+
+def _assert_interleaved(node, ppb, max_gap=8):
+    """each FLB must sit right next to the data chunk it describes.
+
+    read order is hdr, data[0:ppb], ext0, data[ppb:2*ppb], ext1, ...
+    so ext[i] must be adjacent to data[ppb+i*ppb] (first block of its
+    chunk). the old clustered layout puts all ext blocks up front with
+    gaps of 90+ blocks, the interleaved layout has gaps of 1 (up to a
+    few blocks when straddling root/bitmap holes). also the header must
+    be adjacent to the first data block.
+    """
+    data = node.data_blk_nums
+    ext = node.ext_blk_nums
+    assert len(data) == node.num_data_blks
+    assert len(ext) == node.num_ext_blks
+    if not data:
+        return
+    hdr = node.block.blk_num
+    assert abs(data[0] - hdr) <= max_gap
+    for i, ex in enumerate(ext):
+        idx = ppb + i * ppb
+        assert idx < len(data)
+        assert abs(data[idx] - ex) <= max_gap
+
+
+def _write_sized_file(xdftool, img_file, tmpdir, name, num_blocks):
+    """write a file occupying num_blocks data blocks; return its bytes."""
+    factory = BlkDevFactory()
+    blkdev = factory.open(img_file, read_only=True)
+    vol = ADFSVolume(blkdev)
+    vol.open()
+    if vol.is_ffs:
+        payload = blkdev.block_bytes
+    else:
+        payload = blkdev.block_bytes - 24
+    blkdev.close()
+    size = num_blocks * payload
+    data = bytes([x % 256 for x in range(size)])
+    src = os.path.join(str(tmpdir), name)
+    with open(src, "wb") as fh:
+        fh.write(data)
+    xdftool(img_file, ("write", src, name))
+    return data
+
+
+def xdftool_file_ext_interleave_test(xdftool, xdf_img, tmpdir):
+    """FLBs of a multi-ext file must be interleaved with data (DOS0-7)."""
+    img = xdf_img.file_name
+    # determine ppb/payload of this image so the file needs 2 ext blocks
+    # on any block size (512..4096) and any fs (OFS payload is bs-24)
+    factory = BlkDevFactory()
+    blkdev = factory.open(img, read_only=True)
+    ppb = blkdev.block_longs - 56
+    blkdev.close()
+    data = _write_sized_file(xdftool, img, tmpdir, "big", 2 * ppb + 10)
+    # data must round-trip
+    out = xdftool(img, ("type", "big"), raw_output=True)
+    assert out == data
+    # layout must be interleaved
+    blkdev, vol, node, ppb = _open_file_node(img, "big")
+    try:
+        assert node.num_ext_blks == 2
+        _assert_interleaved(node, ppb)
+    finally:
+        blkdev.close()
+
+
+def xdftool_file_ext_interleave_boundary_test(xdftool, xdf_img, tmpdir):
+    """exact header-capacity boundaries: ppb blocks need no FLB."""
+    img = xdf_img.file_name
+    factory = BlkDevFactory()
+    blkdev = factory.open(img, read_only=True)
+    ppb = blkdev.block_longs - 56
+    blkdev.close()
+    # exactly fits the header: no ext block
+    data0 = _write_sized_file(xdftool, img, tmpdir, "edge0", ppb)
+    blkdev, vol, node0, ppb = _open_file_node(img, "edge0")
+    try:
+        assert node0.num_ext_blks == 0
+        _assert_interleaved(node0, ppb)
+    finally:
+        blkdev.close()
+    out0 = xdftool(img, ("type", "edge0"), raw_output=True)
+    assert out0 == data0
+    # one block more: exactly one ext block, adjacent to its chunk
+    data1 = _write_sized_file(xdftool, img, tmpdir, "edge1", ppb + 1)
+    blkdev, vol, node1, ppb = _open_file_node(img, "edge1")
+    try:
+        assert node1.num_ext_blks == 1
+        _assert_interleaved(node1, ppb)
+    finally:
+        blkdev.close()
+    out1 = xdftool(img, ("type", "edge1"), raw_output=True)
+    assert out1 == data1
+
+
+# ----- defrag tests -----
+
+
+def _data_gaps(data):
+    """forward data jumps > 4 (ext interruptions are 2, holes are 3)."""
+    return sum(1 for i in range(len(data) - 1) if data[i + 1] - data[i] > 4)
+
+
+def xdftool_defrag_test(xdftool, xdf_img, tmpdir):
+    """defrag keeps all data and leaves FLBs interleaved with a summary."""
+    img = xdf_img.file_name
+    factory = BlkDevFactory()
+    blkdev = factory.open(img, read_only=True)
+    ppb = blkdev.block_longs - 56
+    vol = ADFSVolume(blkdev)
+    vol.open()
+    dos_before = vol.get_dos_type()
+    name_before = vol.get_volume_name().get_unicode()
+    blkdev.close()
+    data_a = _write_sized_file(xdftool, img, tmpdir, "a", ppb + 10)
+    data_b = _write_sized_file(xdftool, img, tmpdir, "b", 10)
+    blkdev = factory.open(img, read_only=True)
+    vol = ADFSVolume(blkdev)
+    vol.open()
+    used_before = vol.get_used_blocks()
+    blkdev.close()
+    # defrag prints a summary with volume name, fs type and stats
+    # (volume name itself is not matched: non-ascii names are decoded
+    # as latin-1 by the test runner)
+    out = xdftool(img, "defrag")
+    assert any(line.startswith("defrag '") for line in out)
+    assert any(DosType.get_dos_type_str(dos_before) in line for line in out)
+    assert any("2 nodes defragmented (2 files, 0 dirs)" in line for line in out)
+    # data must round-trip
+    assert xdftool(img, ("type", "a"), raw_output=True) == data_a
+    assert xdftool(img, ("type", "b"), raw_output=True) == data_b
+    # layout must be interleaved and block usage unchanged
+    blkdev, vol, node, ppb = _open_file_node(img, "a")
+    try:
+        _assert_interleaved(node, ppb)
+        assert vol.get_used_blocks() == used_before
+        assert vol.get_dos_type() == dos_before
+        assert vol.get_volume_name().get_unicode() == name_before
+    finally:
+        blkdev.close()
+
+
+def xdftool_defrag_fragmented_test(xdftool, xdf_img, tmpdir):
+    """defrag removes fragmentation from delete/write cycles."""
+    img = xdf_img.file_name
+    factory = BlkDevFactory()
+    blkdev = factory.open(img, read_only=True)
+    ppb = blkdev.block_longs - 56
+    blkdev.close()
+    d1 = _write_sized_file(xdftool, img, tmpdir, "f1", ppb + 10)
+    _write_sized_file(xdftool, img, tmpdir, "f2", ppb + 10)
+    d3 = _write_sized_file(xdftool, img, tmpdir, "f3", 10)
+    xdftool(img, ("delete", "f2"))
+    d_big = _write_sized_file(xdftool, img, tmpdir, "big", 2 * ppb + 10)
+    # big file must be split across the freed hole + elsewhere
+    blkdev, vol, node, ppb = _open_file_node(img, "big")
+    try:
+        assert _data_gaps(node.data_blk_nums) >= 1
+    finally:
+        blkdev.close()
+    out = xdftool(img, "defrag")
+    assert any("3 nodes defragmented (3 files, 0 dirs)" in line for line in out)
+    # all data intact, no big gaps left, FLBs interleaved
+    assert xdftool(img, ("type", "f1"), raw_output=True) == d1
+    assert xdftool(img, ("type", "f3"), raw_output=True) == d3
+    assert xdftool(img, ("type", "big"), raw_output=True) == d_big
+    for name in ("f1", "f3", "big"):
+        blkdev, vol, node, ppb = _open_file_node(img, name)
+        try:
+            assert _data_gaps(node.data_blk_nums) == 0
+            _assert_interleaved(node, ppb)
+        finally:
+            blkdev.close()
+
+
+def xdftool_defrag_invalid_test(toolrun, tmpdir):
+    """defrag refuses an image with an invalid filesystem."""
+    img = str(tmpdir / "corrupt.adf")
+    toolrun.run_checked("xdftool", img, "format", "x", "DOS0")
+    ret, _, _ = toolrun.run("xdftool", img, "defrag", "extra")
+    assert ret == 1
+    with open(img, "r+b") as fh:
+        fh.write(b"\x00\x00\x00\x00")
+    ret, _, _ = toolrun.run("xdftool", img, "defrag")
+    assert ret != 0
+
+
+def xdftool_defrag_rollback_test(xdftool, toolrun, xdf_img, tmpdir):
+    """a failed defrag restore must leave the original image intact."""
+    if toolrun.run_subproc:
+        pytest.skip("needs in-process tool run")
+    from unittest import mock
+    from amitools.fs.ADFSDir import ADFSDir
+    from amitools.fs.FSError import FSError, NO_FREE_BLOCKS
+
+    img = xdf_img.file_name
+    data = _write_sized_file(xdftool, img, tmpdir, "f", 10)
+    with open(img, "rb") as fh:
+        before = fh.read()
+
+    def boom(self, *a, **k):
+        raise FSError(NO_FREE_BLOCKS, node=self)
+
+    with mock.patch.object(ADFSDir, "create_file", boom):
+        ret, _, _ = toolrun.run("xdftool", img, "defrag")
+        assert ret == 3
+    with open(img, "rb") as fh:
+        assert fh.read() == before
+    assert xdftool(img, ("type", "f"), raw_output=True) == data

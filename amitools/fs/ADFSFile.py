@@ -179,20 +179,33 @@ class ADFSFile(ADFSNode):
         return 1 + self.num_data_blks + self.num_ext_blks
 
     def blocks_create_new(self, free_blks, name, hash_chain_blk, parent_blk, meta_info):
-        # assign block numbers
-        fhb_num = free_blks[0]
-        # ... for ext
-        self.ext_blk_nums = []
-        for i in range(self.num_ext_blks):
-            self.ext_blk_nums.append(free_blks[1 + i])
-        # ... for data
-        off = 1 + self.num_ext_blks
-        self.data_blk_nums = []
-        for i in range(self.num_data_blks):
-            self.data_blk_nums.append(free_blks[off])
-            off += 1
-
         ppb = self.volume.blkdev.block_longs - 56  # data pointer per block
+        # assign block numbers interleaved to avoid seeks:
+        # header, 1st data chunk, ext0, 2nd data chunk, ext1, ...
+        # so each FileListBlock sits right between the data it follows
+        # and the data it describes. A sequential read then only steps
+        # to the neighbour block instead of seeking back to a cluster
+        # of extension blocks at the start of the file.
+        fhb_num = free_blks[0]
+        self.ext_blk_nums = []
+        self.data_blk_nums = []
+        pos = 1
+        remaining = self.num_data_blks
+        # first data chunk (described by header)
+        chunk = min(ppb, remaining)
+        for i in range(chunk):
+            self.data_blk_nums.append(free_blks[pos])
+            pos += 1
+        remaining -= chunk
+        # further chunks (each described by one ext block)
+        for i in range(self.num_ext_blks):
+            self.ext_blk_nums.append(free_blks[pos])
+            pos += 1
+            chunk = min(ppb, remaining)
+            for j in range(chunk):
+                self.data_blk_nums.append(free_blks[pos])
+                pos += 1
+            remaining -= chunk
 
         # create file header block
         fhb = FileHeaderBlock(self.blkdev, fhb_num, self.volume.is_longname)
