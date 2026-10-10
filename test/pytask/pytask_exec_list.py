@@ -92,6 +92,33 @@ def pytask_exec_list_add_rem_tail_test(vamos_task):
     assert exit_codes == [0]
 
 
+def pytask_exec_list_add_tail_uninit_test(vamos_task):
+    def task(ctx, task):
+        # get exec library
+        exec_lib = ctx.proxies.get_exec_lib_proxy()
+
+        # a zeroed list that was never initialized with NewList
+        lst = List.alloc(ctx.alloc)
+        node = Node.alloc(ctx.alloc)
+        node.name.alloc_str(ctx.alloc, "node1")
+
+        # must not crash but emulate NULL pointer write of exec AddTail
+        exec_lib.AddTail(lst, node)
+        assert ctx.mem.r32(0) == node.addr
+
+        # a real m68k traversal finds the node via ln_Succ at addr 0
+        assert exec_lib.FindName(lst, "node1") == node
+
+        node.name.free_str()
+        lst.free()
+        node.free()
+
+        return 0
+
+    exit_codes = vamos_task.run([task])
+    assert exit_codes == [0]
+
+
 def pytask_exec_list_find_name_test(vamos_task):
     def task(ctx, task):
         # get exec library
