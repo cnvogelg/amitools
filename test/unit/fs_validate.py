@@ -1,14 +1,18 @@
+import struct
+
 import pytest
 
 from amitools.fs.ADFSVolume import ADFSVolume
 from amitools.fs.FSString import FSString
 from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
+from amitools.fs.block.Block import Block
 from amitools.fs.block.DirCacheBlock import DirCacheBlock
 from amitools.fs.validate.Log import Log
 from amitools.fs.validate.Validator import Validator
 import amitools.fs.DosType as DosType
 
 DOS_TYPES = [DosType.DOS0 + n for n in range(8)]
+FFS_DOS_TYPES = [DosType.DOS1, DosType.DOS3, DosType.DOS5, DosType.DOS7]
 DIRCACHE_DOS_TYPES = [DosType.DOS4, DosType.DOS5]
 LONGNAME_DOS_TYPES = [DosType.DOS6, DosType.DOS7]
 
@@ -109,6 +113,54 @@ def fs_validate_dircache_parent_test(tmp_path, dos_type):
     assert len(errors) == 1
     assert "@%06d:ERROR" % dcb_num in errors[0]
     assert "parent" in errors[0]
+
+
+@pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
+def fs_validate_dircache_record_overrun_test(tmp_path, dos_type):
+    # A record count that runs past the end of the block makes the block
+    # invalid; neither the validator nor reading the directory may crash.
+    image = tmp_path / "test.adf"
+    dcb_num = make_dircache_volume(image, dos_type)[-1]
+
+    def overrun(dcb):
+        dcb.num_records = 0xFFFFFFFF
+        dcb.write()
+
+    rewrite_dircache_block(image, dcb_num, overrun)
+    errors = validate(image)
+    assert len(errors) == 1
+    assert "@%06d:ERROR" % dcb_num in errors[0]
+    assert "dircache" in errors[0]
+
+    blkdev = ADFBlockDevice(str(image))
+    blkdev.open()
+    volume = ADFSVolume(blkdev)
+    volume.open()
+    node = volume.get_path_name(FSString("dir"))
+    node.read()
+    assert not node.valid
+    close_volume(blkdev, volume)
+
+
+def dircache_like_data(blkdev):
+    """file data that passes for a dircache block whose record count runs
+    past its end"""
+    data = bytearray(blkdev.block_bytes)
+    struct.pack_into(">I", data, 0, Block.T_DIR_CACHE)
+    struct.pack_into(">I", data, 12, 0xFFFFFFFF)
+    longs = struct.unpack(">%dI" % blkdev.block_longs, data)
+    struct.pack_into(">I", data, 20, -sum(longs) & 0xFFFFFFFF)
+    return bytes(data)
+
+
+@pytest.mark.parametrize("dos_type", FFS_DOS_TYPES, ids=dos_id)
+def fs_validate_file_data_like_dircache_test(tmp_path, dos_type):
+    # FFS data blocks hold raw file data, which may look like any block.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    volume.write_file(dircache_like_data(blkdev), FSString("file"))
+    close_volume(blkdev, volume)
+    assert validate(image) == []
 
 
 @pytest.mark.parametrize("dos_type", LONGNAME_DOS_TYPES, ids=dos_id)
