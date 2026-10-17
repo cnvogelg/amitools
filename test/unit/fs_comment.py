@@ -5,6 +5,9 @@ from amitools.fs.FSString import FSString
 from amitools.fs.MetaInfo import MetaInfo
 from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
 from amitools.fs.block.CommentBlock import CommentBlock
+from amitools.fs.block.FileHeaderBlock import FileHeaderBlock
+from amitools.fs.validate.Log import Log
+from amitools.fs.validate.Validator import Validator
 import amitools.fs.DosType as DosType
 
 DOS_TYPES = [DosType.DOS0 + n for n in range(8)]
@@ -35,6 +38,19 @@ def open_volume(path):
 def close_volume(blkdev, volume):
     volume.close()
     blkdev.close()
+
+
+def validate(path):
+    blkdev = ADFBlockDevice(str(path), read_only=True)
+    blkdev.open()
+    validator = Validator(blkdev, Log.WARN)
+    assert validator.scan_boot()[0]
+    assert validator.scan_root()
+    validator.scan_dir_tree()
+    validator.scan_files()
+    validator.scan_bitmap()
+    blkdev.close()
+    return [str(e) for e in validator.log.entries]
 
 
 def get_comment(volume, path):
@@ -276,6 +292,87 @@ def fs_comment_longname_block_delete_test(tmp_path, dos_type):
         volume.delete(FSString(name))
     assert volume.get_free_blocks() == free
     close_volume(blkdev, volume)
+
+
+KEEPER = "k" * 60
+VICTIM = "v" * 60
+
+
+def make_foreign_comment_pointer(image, dos_type, kind):
+    """a long name volume whose VICTIM points to a comment block that is
+    not its own; returns the block number it points to"""
+    blkdev, volume = create_volume(image, dos_type)
+    volume.write_file(b"keep", FSString(KEEPER))
+    keeper = volume.get_path_name(FSString(KEEPER))
+    keeper.change_comment(FSString("k" * 79))
+    volume.write_file(b"data", FSString(VICTIM))
+    victim = volume.get_path_name(FSString(VICTIM))
+    if kind == "bad_checksum":
+        victim.change_comment(FSString("v" * 79))
+    target = {
+        "other_entry": keeper.block.comment_block_id,
+        "file_header": keeper.block.blk_num,
+        "bad_checksum": victim.block.comment_block_id,
+        "out_of_range": blkdev.num_blocks + 1,
+    }[kind]
+    victim_num = victim.block.blk_num
+    close_volume(blkdev, volume)
+
+    blkdev = ADFBlockDevice(str(image))
+    blkdev.open()
+    if kind == "bad_checksum":
+        data = bytearray(blkdev.read_block(target))
+        data[30] ^= 0xFF
+        blkdev.write_block(target, data)
+    else:
+        hdr = FileHeaderBlock(blkdev, victim_num, is_longname=True)
+        hdr.read()
+        hdr.comment_block_id = target
+        hdr.write()
+    blkdev.close()
+    return target
+
+
+@pytest.mark.parametrize("op", ["delete", "shrink", "grow"])
+@pytest.mark.parametrize(
+    "kind", ["other_entry", "file_header", "bad_checksum", "out_of_range"]
+)
+@pytest.mark.parametrize("dos_type", LONGNAME_DOS_TYPES, ids=dos_id)
+def fs_comment_block_not_owned_test(tmp_path, dos_type, kind, op):
+    # An entry frees or rewrites only a comment block that is valid and names
+    # the entry as its header. Any other pointer counts as no comment block.
+    image = tmp_path / "test.adf"
+    target = make_foreign_comment_pointer(image, dos_type, kind)
+    blkdev, volume = open_volume(image)
+    in_range = target < blkdev.num_blocks
+    if in_range:
+        before = (volume.bitmap.get_bit(target), bytes(blkdev.read_block(target)))
+    assert get_comment(volume, VICTIM) == FSString()
+    node = volume.get_path_name(FSString(VICTIM))
+    if op == "delete":
+        volume.delete(FSString(VICTIM))
+    elif op == "shrink":
+        node.change_comment(FSString("short"))
+    else:
+        node.change_comment(FSString("g" * 79))
+        assert node.block.comment_block_id not in (0, target)
+    if in_range:
+        after = (volume.bitmap.get_bit(target), bytes(blkdev.read_block(target)))
+        assert after == before
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    assert get_comment(volume, KEEPER) == FSString("k" * 79)
+    assert volume.read_file(FSString(KEEPER)) == b"keep"
+    if op == "delete":
+        assert volume.get_path_name(FSString(VICTIM)) is None
+    else:
+        want = "short" if op == "shrink" else "g" * 79
+        assert get_comment(volume, VICTIM) == FSString(want)
+    close_volume(blkdev, volume)
+    # a comment block with a bad checksum stays allocated: it may be anyone's
+    if kind != "bad_checksum":
+        assert validate(image) == []
 
 
 @pytest.mark.parametrize("dos_type", [DosType.DOS0, DosType.DOS1], ids=dos_id)

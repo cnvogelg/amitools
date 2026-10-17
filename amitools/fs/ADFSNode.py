@@ -38,13 +38,29 @@ class ADFSNode:
         self.create_meta_info()
 
     def create_meta_info(self):
+        comment = self.block.comment
         if self.block.comment_block_id != 0:
-            comment_block = CommentBlock(self.blkdev, self.block.comment_block_id)
-            comment_block.read()
-            comment = comment_block.comment
-        else:
-            comment = self.block.comment
+            comment_block = self._read_comment_block()
+            if comment_block:
+                comment = comment_block.comment
+            else:
+                # never free or rewrite a block that is not ours
+                self.block.comment_block_id = 0
         self.meta_info = MetaInfo(self.block.protect, self.block.mod_ts, comment)
+
+    def _read_comment_block(self):
+        """return the comment block the header points to, or None unless it
+        is a valid comment block that belongs to this entry"""
+        blk_num = self.block.comment_block_id
+        if blk_num < self.blkdev.reserved or blk_num >= self.blkdev.num_blocks:
+            return None
+        comment_block = CommentBlock(self.blkdev, blk_num)
+        comment_block.read()
+        if not comment_block.valid or comment_block.comment is None:
+            return None
+        if comment_block.header_key != self.block.blk_num:
+            return None
+        return comment_block
 
     def get_file_name(self):
         return self.name
