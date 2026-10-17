@@ -184,9 +184,12 @@ class ADFSDir(ADFSNode):
         # does already exist an entry in this dir with this name?
         if self.has_name(fn):
             raise FSError(NAME_ALREADY_EXISTS, file_name=name, node=self)
+        # check comment
+        extra_comment = meta_info.get_comment()
+        if extra_comment is not None:
+            self._check_comment(extra_comment, file_name=name)
         # a long name comment that does not fit beside the name in the header
         # needs a comment block: create the node without it and add it later
-        extra_comment = meta_info.get_comment()
         if (
             self.volume.is_longname
             and extra_comment is not None
