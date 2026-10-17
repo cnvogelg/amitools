@@ -103,6 +103,8 @@ class ADFSNode:
         comment = meta_info.get_comment()
         if comment and hasattr(self.block, "comment"):
             self._check_comment(comment)
+        else:
+            comment = None
 
         # dircache?
         rebuild_dircache = False
@@ -110,8 +112,31 @@ class ADFSNode:
             record = self.parent.get_dircache_record(self.name.get_name())
             if not record:
                 raise FSError(INTERNAL_ERROR, node=self, extra="dc not found!")
+            # a longer comment may no longer fit into its dircache block:
+            # make room for the record before anything changes
+            if comment and len(comment.get_ami_str()) > len(
+                record.comment.get_ami_str()
+            ):
+                self.parent.make_dircache_room(record, comment)
+                rebuild_dircache = True
         else:
             record = None
+
+        # a long name comment that does not fit beside the name goes into a
+        # comment block: write it before the header points to it
+        comment_blk_num = None
+        if (
+            comment
+            and self.volume.is_longname
+            and EntryBlock.needs_extra_comment_block(self.name.get_name(), comment)
+        ):
+            comment_blk_num = self.block.comment_block_id
+            if comment_blk_num == 0:
+                blks = self.volume.bitmap.alloc_n(1)
+                if blks is None:
+                    raise FSError(NO_FREE_BLOCKS, node=self)
+                comment_blk_num = blks[0]
+            self._write_comment_block(comment_blk_num, comment)
 
         # alter protect flags
         protect = meta_info.get_protect()
@@ -132,24 +157,9 @@ class ADFSNode:
                 record.mod_ts = mod_ts
 
         # alter comment
-        if comment and hasattr(self.block, "comment"):
-            if self.volume.is_longname and EntryBlock.needs_extra_comment_block(
-                self.name.get_name(), comment
-            ):
-                if self.block.comment_block_id == 0:
-                    # Allocate and initialize extra block for comment
-                    blks = self.volume.bitmap.alloc_n(1)
-                    if blks is not None:
-                        cblk = CommentBlock(self.blkdev, blks[0])
-                        cblk.create(self.block.blk_num)
-                        self.block.comment_block_id = cblk.blk_num
-                    else:
-                        raise FSError(NO_FREE_BLOCKS, node=self)
-                else:
-                    cblk = CommentBlock(self.blkdev, self.block.comment_block_id)
-                    cblk.read()
-                cblk.comment = comment
-                cblk.write()
+        if comment:
+            if comment_blk_num is not None:
+                self.block.comment_block_id = comment_blk_num
             else:
                 self.block.comment = comment
                 if self.block.comment_block_id != 0:
@@ -159,10 +169,6 @@ class ADFSNode:
             self.meta_info.set_comment(comment)
             dirty = True
             if record:
-                # a longer comment may no longer fit into its dircache block
-                rebuild_dircache = len(comment.get_ami_str()) > len(
-                    record.comment.get_ami_str()
-                )
                 record.comment = comment
 
         # really need update?
@@ -171,6 +177,12 @@ class ADFSNode:
             # dirache update
             if record:
                 self.parent.update_dircache_record(record, rebuild_dircache)
+
+    def _write_comment_block(self, blk_num, comment):
+        """write comment into comment block blk_num of this entry"""
+        comment_block = CommentBlock(self.blkdev, blk_num)
+        comment_block.create(self.block.blk_num, comment)
+        comment_block.write()
 
     def change_comment(self, comment):
         self.change_meta_info(MetaInfo(comment=comment))
