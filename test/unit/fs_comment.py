@@ -345,6 +345,29 @@ def fs_comment_longname_block_delete_test(tmp_path, dos_type):
     close_volume(blkdev, volume)
 
 
+@pytest.mark.parametrize("dos_type", LONGNAME_DOS_TYPES, ids=dos_id)
+def fs_comment_longname_block_usage_test(tmp_path, dos_type):
+    # Block usage, block lists and the bitmap drawing include comment blocks.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    volume.write_file(b"data", FSString("f" * 60))
+    volume.create_dir(FSString("d" * 60))
+    root = volume.get_root_dir()
+    root_usage = root.get_block_usage(all=True)
+    for name in ("f" * 60, "d" * 60):
+        node = volume.get_path_name(FSString(name))
+        data, fs = node.get_block_usage()
+        node.change_comment(FSString("c" * 79))
+        blk_num = node.block.comment_block_id
+        assert node.get_block_usage() == (data, fs + 1)
+        assert blk_num in [b.blk_num for b in node.get_blocks()]
+        bm = volume.bitmap.create_draw_bitmap()
+        node.draw_on_bitmap(bm)
+        assert bm[blk_num] == ord("c")
+    assert root.get_block_usage(all=True) == (root_usage[0], root_usage[1] + 2)
+    close_volume(blkdev, volume)
+
+
 @pytest.mark.parametrize("keep", [2, 3], ids=["no_room", "room"])
 @pytest.mark.parametrize("dos_type", LONGNAME_DOS_TYPES, ids=dos_id)
 def fs_comment_longname_create_disk_full_test(tmp_path, dos_type, keep):
