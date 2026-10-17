@@ -226,13 +226,17 @@ class BlockScan:
                     bi.own_key = cblk.own_key
                 # --- dir cache block (DOS4/5) ---
                 elif blk.is_dir_cache_block():
-                    bi.blk_type = self.BT_DIR_CACHE
-                    bi.blk_status = self.BS_TYPE
                     dcb = DirCacheBlock(self.blkdev, blk_num)
                     dcb.set(data)
-                    bi.own_key = dcb.own_key
-                    bi.parent_blk = dcb.parent
-                    bi.next_blk = dcb.next_cache
+                    if dcb.valid:
+                        bi.blk_type = self.BT_DIR_CACHE
+                        bi.blk_status = self.BS_TYPE
+                        bi.own_key = dcb.own_key
+                        bi.parent_blk = dcb.parent
+                        bi.next_blk = dcb.next_cache
+                    else:
+                        # its records run past the end of the block
+                        bi.blk_status = self.BS_INVALID
 
         except IOError as e:
             self.log.msg(Log.ERROR, "Can't read block", blk_num)
