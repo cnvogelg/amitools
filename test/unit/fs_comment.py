@@ -1,7 +1,7 @@
 import pytest
 
 from amitools.fs.ADFSVolume import ADFSVolume
-from amitools.fs.FSError import FSError, INVALID_COMMENT
+from amitools.fs.FSError import FSError, INVALID_COMMENT, NO_FREE_BLOCKS
 from amitools.fs.FSString import FSString
 from amitools.fs.MetaInfo import MetaInfo
 from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
@@ -175,6 +175,56 @@ def fs_dircache_delete_then_create_test(tmp_path, dos_type):
     close_volume(blkdev, volume)
 
 
+def fill_disk(volume, keep=0):
+    """use up all free blocks of a volume but keep of them"""
+    # a file takes a header, its data blocks and a file list block for
+    # every further ptrs data blocks; the largest one that fits leaves at
+    # most one block over, which an empty file takes
+    avail = volume.get_free_blocks() - keep
+    ptrs = volume.blkdev.block_longs - 56
+    num = avail - 1
+    while 1 + num + (num - 1) // ptrs > avail:
+        num -= 1
+    data_bytes = volume.blkdev.block_bytes
+    if not volume.is_ffs:
+        data_bytes -= 24
+    volume.write_file(bytes(num * data_bytes), FSString("filler"))
+    if volume.get_free_blocks() > keep:
+        volume.write_file(b"", FSString("empty"))
+    assert volume.get_free_blocks() == keep
+
+
+@pytest.mark.parametrize("disk_full", [False, True], ids=["room", "full"])
+@pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
+def fs_comment_grow_dircache_disk_full_test(tmp_path, dos_type, disk_full):
+    # 17 records fill a dircache block, so a record that grows moves to a
+    # new one. Without a free block the change has to fail as a whole and
+    # keep the record: FastFileSystem lists only the entries it caches.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    volume.create_dir(FSString("dir"))
+    fill_dir(volume, 17)
+    assert len(volume.get_path_name(FSString("dir")).dcache_blks) == 1
+    fill_disk(volume, keep=0 if disk_full else 1)
+    node = volume.get_path_name(FSString("dir/f00"))
+    comment = "c" * 79
+    if disk_full:
+        with pytest.raises(FSError) as error:
+            node.change_comment(FSString(comment))
+        assert error.value.code == NO_FREE_BLOCKS
+        comment = ""
+    else:
+        node.change_comment(FSString(comment))
+    assert node.get_meta_info().get_comment() == FSString(comment)
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    assert get_comment(volume, "dir/f00") == FSString(comment)
+    check_dircache(volume, "dir", {"f00": comment})
+    close_volume(blkdev, volume)
+    assert validate(image) == []
+
+
 @pytest.mark.parametrize("dos_type", LONGNAME_DOS_TYPES, ids=dos_id)
 def fs_comment_longname_empty_test(tmp_path, dos_type):
     image = tmp_path / "test.adf"
@@ -292,6 +342,64 @@ def fs_comment_longname_block_delete_test(tmp_path, dos_type):
     for name in ("f" * 60, "d" * 60):
         volume.delete(FSString(name))
     assert volume.get_free_blocks() == free
+    close_volume(blkdev, volume)
+
+
+@pytest.mark.parametrize("keep", [2, 3], ids=["no_room", "room"])
+@pytest.mark.parametrize("dos_type", LONGNAME_DOS_TYPES, ids=dos_id)
+def fs_comment_longname_create_disk_full_test(tmp_path, dos_type, keep):
+    # A one block file whose comment needs a comment block takes three
+    # blocks. With only two left, nothing may be created.
+    image = tmp_path / "test.adf"
+    name = "n" * 60
+    comment = "c" * 79
+    blkdev, volume = create_volume(image, dos_type)
+    fill_disk(volume, keep)
+    meta_info = MetaInfo(protect=0, comment=FSString(comment))
+    meta_info.set_current_as_mod_time()
+    root = volume.get_root_dir()
+    if keep == 2:
+        with pytest.raises(FSError) as error:
+            root.create_file(FSString(name), b"data", meta_info)
+        assert error.value.code == NO_FREE_BLOCKS
+        assert volume.get_free_blocks() == 2
+    else:
+        root.create_file(FSString(name), b"data", meta_info)
+        assert volume.get_free_blocks() == 0
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    if keep == 2:
+        assert volume.get_path_name(FSString(name)) is None
+    else:
+        assert get_comment(volume, name) == FSString(comment)
+    close_volume(blkdev, volume)
+    assert validate(image) == []
+
+
+@pytest.mark.parametrize("dos_type", LONGNAME_DOS_TYPES, ids=dos_id)
+def fs_comment_block_write_fails_test(tmp_path, dos_type, monkeypatch):
+    # The header may point to a comment block only once that is written.
+    image = tmp_path / "test.adf"
+    name = "n" * 60
+    blkdev, volume = create_volume(image, dos_type)
+    volume.write_file(b"data", FSString(name))
+    node = volume.get_path_name(FSString(name))
+
+    def fail(self):
+        raise IOError("write failed")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(CommentBlock, "write", fail)
+        with pytest.raises(IOError):
+            node.change_comment(FSString("c" * 79))
+    assert node.block.comment_block_id == 0
+    assert node.get_meta_info().get_comment() == FSString()
+    node.change_protect(0x0F)
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    assert get_comment(volume, name) == FSString()
     close_volume(blkdev, volume)
 
 

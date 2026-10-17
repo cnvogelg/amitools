@@ -189,7 +189,7 @@ class ADFSDir(ADFSNode):
         if extra_comment is not None:
             self._check_comment(extra_comment, file_name=name)
         # a long name comment that does not fit beside the name in the header
-        # needs a comment block: create the node without it and add it later
+        # goes into a comment block, allocated along with the node's blocks
         if (
             self.volume.is_longname
             and extra_comment is not None
@@ -208,6 +208,8 @@ class ADFSDir(ADFSNode):
 
         # return the number of blocks required to create this node
         num_blks = node.blocks_get_create_num()
+        if extra_comment is not None:
+            num_blks += 1
 
         # try to find free blocks
         free_blks = self.volume.bitmap.alloc_n(num_blks)
@@ -215,11 +217,19 @@ class ADFSDir(ADFSNode):
             raise FSError(
                 NO_FREE_BLOCKS, node=self, file_name=name, extra="want %d" % num_blks
             )
+        if extra_comment is not None:
+            comment_blk_num = free_blks.pop()
 
         # now create the blocks for this node
         new_blk = node.blocks_create_new(
             free_blks, name, hash_chain_blk, self.block.blk_num, meta_info
         )
+        # write the comment block, then point the header to it
+        if extra_comment is not None:
+            node._write_comment_block(comment_blk_num, extra_comment)
+            node.block.comment_block_id = comment_blk_num
+            node.block.write()
+            node.meta_info.set_comment(extra_comment)
 
         # dircache: create record for this node
         if self.volume.is_dircache:
@@ -244,9 +254,6 @@ class ADFSDir(ADFSNode):
         # add node
         self.name_hash[fn_hash].insert(0, node)
         self.entries.append(node)
-
-        if extra_comment is not None:
-            node.change_comment(extra_comment)
 
         # update time stamps
         if update_ts:
@@ -554,13 +561,30 @@ class ADFSDir(ADFSNode):
                     return record
         return None
 
+    def make_dircache_room(self, record, comment):
+        """make sure that record, grown by its new comment, finds room in
+        the dircache once it leaves its block: link a new block if needed"""
+        size = DirCacheRecord(name=record.name, comment=comment).get_size()
+        for dcb in self.dcache_blks:
+            free_bytes = dcb.get_free_record_size()
+            if dcb.has_record(record):
+                free_bytes += record.get_size()
+            if size < free_bytes:
+                return
+        dcb = self._dircache_add_block(True)
+        if dcb == None:
+            raise FSError(NO_FREE_BLOCKS, node=self, extra="want dcache")
+        dcb.write()
+
     def update_dircache_record(self, record, rebuild):
         if self.dcache_blks == None:
             return
         # update record
         if rebuild:
             self._dircache_remove_entry(record.name)
-            self._dircache_add_entry_int(record)
+            # make_dircache_room() made sure that this finds room
+            if not self._dircache_add_entry_int(record):
+                raise FSError(INTERNAL_ERROR, node=self, extra="dc record lost!")
         else:
             # simply re-write the dircache block
             for dcb in self.dcache_blks:
