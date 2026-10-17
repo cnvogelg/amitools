@@ -1,6 +1,7 @@
 import pytest
 
 from amitools.fs.ADFSVolume import ADFSVolume
+from amitools.fs.FSError import FSError, INVALID_COMMENT
 from amitools.fs.FSString import FSString
 from amitools.fs.MetaInfo import MetaInfo
 from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
@@ -375,20 +376,65 @@ def fs_comment_block_not_owned_test(tmp_path, dos_type, kind, op):
         assert validate(image) == []
 
 
-@pytest.mark.parametrize("dos_type", [DosType.DOS0, DosType.DOS1], ids=dos_id)
-def fs_comment_no_block_without_longname_test(tmp_path, dos_type):
-    # Classic headers have a fixed 79 character comment field; never allocate
-    # a long-name comment block for them, even for an oversized comment.
+@pytest.mark.parametrize("length", [80, 256])
+@pytest.mark.parametrize("dos_type", DOS_TYPES, ids=dos_id)
+def fs_comment_too_long_test(tmp_path, dos_type, length):
+    # AmigaDOS keeps at most 79 bytes of comment on every DOS type, and
+    # FastFileSystem refuses longer ones. Refuse them before anything
+    # changes, both when changing a comment and when creating an entry.
     image = tmp_path / "test.adf"
-    name = "n" * 30
-    comment = "c" * 81
+    name = "n" * (60 if dos_type in LONGNAME_DOS_TYPES else 30)
     blkdev, volume = create_volume(image, dos_type)
     volume.write_file(b"data", FSString(name))
+    node = volume.get_path_name(FSString(name))
+    node.change_comment(FSString("c" * 79))
     free = volume.get_free_blocks()
-    volume.get_path_name(FSString(name)).change_comment(FSString(comment))
+    too_long = FSString("x" * length)
+    with pytest.raises(FSError) as error:
+        node.change_comment(too_long)
+    assert error.value.code == INVALID_COMMENT
+    meta_info = MetaInfo(protect=0, comment=too_long)
+    meta_info.set_current_as_mod_time()
+    with pytest.raises(FSError) as error:
+        volume.get_root_dir().create_file(FSString("new"), b"data", meta_info)
+    assert error.value.code == INVALID_COMMENT
     assert volume.get_free_blocks() == free
     close_volume(blkdev, volume)
 
     blkdev, volume = open_volume(image)
-    assert get_comment(volume, name) == FSString(comment[:79])
+    assert get_comment(volume, name) == FSString("c" * 79)
+    assert volume.get_path_name(FSString("new")) is None
     close_volume(blkdev, volume)
+    assert validate(image) == []
+
+
+@pytest.mark.parametrize("dos_type", DOS_TYPES, ids=dos_id)
+def fs_comment_not_latin1_test(tmp_path, dos_type):
+    # The disk holds Latin-1 only. A comment it cannot encode is refused
+    # before it changes the node, so that later writes still succeed.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    volume.write_file(b"data", FSString("file"))
+    node = volume.get_path_name(FSString("file"))
+    node.change_comment(FSString("old"))
+    euro = FSString("5 €")
+    with pytest.raises(FSError) as error:
+        node.change_meta_info(MetaInfo(protect=0x0F, comment=euro))
+    assert error.value.code == INVALID_COMMENT
+    assert node.get_meta_info().get_comment() == FSString("old")
+    assert node.get_meta_info().get_protect() == 0
+    meta_info = MetaInfo(protect=0, comment=euro)
+    meta_info.set_current_as_mod_time()
+    with pytest.raises(FSError) as error:
+        volume.get_root_dir().create_file(FSString("new"), b"data", meta_info)
+    assert error.value.code == INVALID_COMMENT
+    node.change_protect(0x0F)
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    node = volume.get_path_name(FSString("file"))
+    assert node.get_meta_info().get_comment() == FSString("old")
+    assert node.get_meta_info().get_protect() == 0x0F
+    assert volume.get_path_name(FSString("new")) is None
+    close_volume(blkdev, volume)
+    assert validate(image) == []

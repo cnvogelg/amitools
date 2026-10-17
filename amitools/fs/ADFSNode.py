@@ -8,6 +8,9 @@ from .FSError import *
 from .FSString import FSString
 import amitools.util.ByteSize as ByteSize
 
+# AmigaDOS keeps at most 79 bytes of comment, whatever the DOS type
+MAX_COMMENT_BYTES = 79
+
 
 class ADFSNode:
     def __init__(self, volume, parent):
@@ -76,8 +79,30 @@ class ADFSNode:
     def get_meta_info(self):
         return self.meta_info
 
+    def _check_comment(self, comment, file_name=None):
+        """refuse a comment the disk cannot hold: FastFileSystem rejects more
+        than 79 bytes, and the disk stores Latin-1 only"""
+        try:
+            size = len(comment.get_ami_str())
+        except UnicodeEncodeError:
+            raise FSError(
+                INVALID_COMMENT, node=self, file_name=file_name, extra="not Latin-1"
+            ) from None
+        if size > MAX_COMMENT_BYTES:
+            raise FSError(
+                INVALID_COMMENT,
+                node=self,
+                file_name=file_name,
+                extra="%d bytes, max %d" % (size, MAX_COMMENT_BYTES),
+            )
+
     def change_meta_info(self, meta_info):
         dirty = False
+
+        # check the comment before anything changes
+        comment = meta_info.get_comment()
+        if comment and hasattr(self.block, "comment"):
+            self._check_comment(comment)
 
         # dircache?
         rebuild_dircache = False
@@ -107,7 +132,6 @@ class ADFSNode:
                 record.mod_ts = mod_ts
 
         # alter comment
-        comment = meta_info.get_comment()
         if comment and hasattr(self.block, "comment"):
             if self.volume.is_longname and EntryBlock.needs_extra_comment_block(
                 self.name.get_name(), comment
