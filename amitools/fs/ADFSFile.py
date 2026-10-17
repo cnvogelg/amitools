@@ -283,6 +283,8 @@ class ADFSFile(ADFSNode):
 
     def get_block_nums(self):
         result = [self.block.blk_num]
+        if self.block.comment_block_id != 0:
+            result.append(self.block.comment_block_id)
         result += self.ext_blk_nums
         result += self.data_blk_nums
         return result
