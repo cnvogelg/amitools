@@ -177,6 +177,7 @@ class BlockScan:
                     bi.hash_table = user.hash_table
                     bi.own_key = user.own_key
                     bi.extension = user.extension
+                    bi.comment = user.comment
                     bi.comment_blk = user.comment_block_id
                     self.log.msg(Log.DEBUG, "Found Dir : '%s'" % bi.name, blk_num)
                 # --- filter header block ---
@@ -194,6 +195,7 @@ class BlockScan:
                     bi.byte_size = fh.byte_size
                     bi.data_blocks = fh.data_blocks
                     bi.extension = fh.extension
+                    bi.comment = fh.comment
                     bi.comment_blk = fh.comment_block_id
                     self.log.msg(Log.DEBUG, "Found File: '%s'" % bi.name, blk_num)
                 # --- file list block ---
@@ -234,6 +236,7 @@ class BlockScan:
                         bi.own_key = dcb.own_key
                         bi.parent_blk = dcb.parent
                         bi.next_blk = dcb.next_cache
+                        bi.records = dcb.records
                     else:
                         # its records run past the end of the block
                         bi.blk_status = self.BS_INVALID
