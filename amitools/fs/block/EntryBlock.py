@@ -44,7 +44,7 @@ class EntryBlock(Block):
             if self.comment_block_id != 0:
                 nac.append(0)
             else:
-                comment = self.name.get_ami_str()
+                comment = self.comment.get_ami_str()
                 comment_len = len(comment)
                 nac.append(comment_len)
                 nac += comment
@@ -59,4 +59,4 @@ class EntryBlock(Block):
     @staticmethod
     def needs_extra_comment_block(name, comment):
         """Returns whether the given name/comment pair requires an extra comment block"""
-        return len(name) + len(comment) > 110
+        return len(name.get_ami_str()) + len(comment.get_ami_str()) > 110

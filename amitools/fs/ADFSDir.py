@@ -1,6 +1,7 @@
 import struct
 from .block.Block import Block
 from .block.UserDirBlock import UserDirBlock
+from .block.EntryBlock import EntryBlock
 from .block.DirCacheBlock import *
 from .ADFSFile import ADFSFile
 from .ADFSNode import ADFSNode
@@ -183,6 +184,17 @@ class ADFSDir(ADFSNode):
         # does already exist an entry in this dir with this name?
         if self.has_name(fn):
             raise FSError(NAME_ALREADY_EXISTS, file_name=name, node=self)
+        # a long name comment that does not fit beside the name in the header
+        # needs a comment block: create the node without it and add it later
+        extra_comment = meta_info.get_comment()
+        if (
+            self.volume.is_longname
+            and extra_comment is not None
+            and EntryBlock.needs_extra_comment_block(name, extra_comment)
+        ):
+            meta_info = MetaInfo(meta_info.get_protect(), meta_info.get_mod_ts())
+        else:
+            extra_comment = None
         # calc hash index of name
         fn_hash = fn.hash(hash_size=self.hash_size)
         hash_chain = self.name_hash[fn_hash]
@@ -229,6 +241,9 @@ class ADFSDir(ADFSNode):
         # add node
         self.name_hash[fn_hash].insert(0, node)
         self.entries.append(node)
+
+        if extra_comment is not None:
+            node.change_comment(extra_comment)
 
         # update time stamps
         if update_ts:
@@ -391,6 +406,8 @@ class ADFSDir(ADFSNode):
     def get_block_nums(self):
         self.ensure_entries()
         result = [self.block.blk_num]
+        if self.block.comment_block_id != 0:
+            result.append(self.block.comment_block_id)
         if self.volume.is_dircache:
             for dcb in self.dcache_blks:
                 result.append(dcb.blk_num)
@@ -519,6 +536,7 @@ class ADFSDir(ADFSNode):
             # free cache block in bitmap
             blk_num = dcb.blk_num
             self.volume.bitmap.dealloc_n([blk_num])
+            del self.dcache_blks[pos]
             return blk_num  # return number of just deleted block
         else:
             # update cache block with reduced set of records
@@ -538,8 +556,8 @@ class ADFSDir(ADFSNode):
             return
         # update record
         if rebuild:
-            self._dircache_remove_entry(record.name, update_myself=False)
-            self._dircache_add_entry_int(record, update_myself=True)
+            self._dircache_remove_entry(record.name)
+            self._dircache_add_entry_int(record)
         else:
             # simply re-write the dircache block
             for dcb in self.dcache_blks:

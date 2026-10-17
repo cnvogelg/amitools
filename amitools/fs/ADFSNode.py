@@ -93,7 +93,9 @@ class ADFSNode:
         # alter comment
         comment = meta_info.get_comment()
         if comment and hasattr(self.block, "comment"):
-            if EntryBlock.needs_extra_comment_block(self.name, comment):
+            if self.volume.is_longname and EntryBlock.needs_extra_comment_block(
+                self.name.get_name(), comment
+            ):
                 if self.block.comment_block_id == 0:
                     # Allocate and initialize extra block for comment
                     blks = self.volume.bitmap.alloc_n(1)
@@ -117,7 +119,10 @@ class ADFSNode:
             self.meta_info.set_comment(comment)
             dirty = True
             if record:
-                rebuild_dircache = len(record.comment) < comment
+                # a longer comment may no longer fit into its dircache block
+                rebuild_dircache = len(comment.get_ami_str()) > len(
+                    record.comment.get_ami_str()
+                )
                 record.comment = comment
 
         # really need update?
