@@ -6,7 +6,8 @@ from amitools.fs.ADFSVolume import ADFSVolume
 from amitools.fs.FSString import FSString
 from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
 from amitools.fs.block.Block import Block
-from amitools.fs.block.DirCacheBlock import DirCacheBlock
+from amitools.fs.block.CommentBlock import CommentBlock
+from amitools.fs.block.DirCacheBlock import DirCacheBlock, DirCacheRecord
 from amitools.fs.validate.Log import Log
 from amitools.fs.validate.Validator import Validator
 import amitools.fs.DosType as DosType
@@ -116,6 +117,71 @@ def fs_validate_dircache_parent_test(tmp_path, dos_type):
 
 
 @pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
+def fs_validate_dircache_own_key_test(tmp_path, dos_type):
+    image = tmp_path / "test.adf"
+    dcb_num = make_dircache_volume(image, dos_type)[0]
+
+    def rekey(dcb):
+        dcb.own_key += 1
+        dcb.write()
+
+    rewrite_dircache_block(image, dcb_num, rekey)
+    errors = validate(image)
+    assert len(errors) == 1
+    assert "@%06d:ERROR" % dcb_num in errors[0]
+    assert "own key" in errors[0]
+
+
+@pytest.mark.parametrize(
+    "change", ["name", "size", "comment", "entry", "missing", "duplicate"]
+)
+@pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
+def fs_validate_dircache_record_test(tmp_path, dos_type, change):
+    # Each entry of a directory has exactly one dircache record, and that
+    # record matches the entry's name, block, size and comment.
+    image = tmp_path / "test.adf"
+    # the last dircache block of 'dir' has room for another record
+    dcb_num = make_dircache_volume(image, dos_type)[-1]
+    entry = []
+
+    def alter(dcb):
+        r = dcb.records[0]
+        entry.append(r.entry)
+        if change == "name":
+            r.name = FSString("x" + r.name.get_unicode()[1:])
+        elif change == "size":
+            r.size += 1
+        elif change == "comment":
+            r.comment = FSString("x")
+        elif change == "entry":
+            r.entry = dcb.parent
+        elif change == "missing":
+            dcb.remove_record(r)
+        else:
+            dcb.add_record(
+                DirCacheRecord(
+                    r.entry, r.size, r.protect, r.mod_ts, r.sub_type, r.name, r.comment
+                )
+            )
+        dcb.write()
+
+    rewrite_dircache_block(image, dcb_num, alter)
+    want = {
+        "name": [(dcb_num, "name")],
+        "size": [(dcb_num, "size")],
+        "comment": [(dcb_num, "comment")],
+        "entry": [(dcb_num, "no entry"), (entry[0], "no dircache record")],
+        "missing": [(entry[0], "no dircache record")],
+        "duplicate": [(dcb_num, "duplicate")],
+    }[change]
+    errors = validate(image)
+    assert len(errors) == len(want)
+    for error, (blk_num, words) in zip(errors, want):
+        assert "@%06d:ERROR" % blk_num in error
+        assert words in error
+
+
+@pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
 def fs_validate_dircache_record_overrun_test(tmp_path, dos_type):
     # A record count that runs past the end of the block makes the block
     # invalid; neither the validator nor reading the directory may crash.
@@ -174,3 +240,27 @@ def fs_validate_comment_block_test(tmp_path, dos_type):
     volume.get_path_name(FSString("d" * 60)).change_comment(FSString("c" * 79))
     close_volume(blkdev, volume)
     assert validate(image) == []
+
+
+@pytest.mark.parametrize("dos_type", LONGNAME_DOS_TYPES, ids=dos_id)
+def fs_validate_comment_block_own_key_test(tmp_path, dos_type):
+    image = tmp_path / "test.adf"
+    name = FSString("n" * 60)
+    blkdev, volume = create_volume(image, dos_type)
+    volume.write_file(b"data", name)
+    node = volume.get_path_name(name)
+    node.change_comment(FSString("c" * 79))
+    cblk_num = node.block.comment_block_id
+    close_volume(blkdev, volume)
+
+    blkdev = ADFBlockDevice(str(image))
+    blkdev.open()
+    cblk = CommentBlock(blkdev, cblk_num)
+    cblk.read()
+    cblk.own_key += 1
+    cblk.write()
+    blkdev.close()
+    errors = validate(image)
+    assert len(errors) == 1
+    assert "@%06d:ERROR" % cblk_num in errors[0]
+    assert "own key" in errors[0]
