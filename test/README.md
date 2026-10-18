@@ -33,12 +33,41 @@ AmigaOS binaries:
 
 ### 3.1 amiga-gcc
 
-Use Bebbo's GCC 6.5 port for Amiga: [amiga-gcc](https://github.com/bebbo/amiga-gcc)
+Use Bebbo's GCC 6.5 port for Amiga: [amiga-gcc](https://codeberg.org/bebbo/amiga-gcc)
 
   - see build instructions there
+  - make sure to add gcc in macOS
+```
+brew install gcc@12
+```
+  - my env script `cv-env` is:
+```
+export GCC_VERSION=12
+export SHELL=$(brew --prefix)/bin/bash
+export CC=gcc-${GCC_VERSION}
+export CXX=g++-${GCC_VERSION}
+export PREFIX=$PWD/install
+export PATH=$(brew --prefix bison)/bin:$PATH
+export BREW_PREFIX=$(brew --prefix)
+export CFLAGS=-I${BREW_PREFIX}/include
+export LDFLAGS=-L${BREW_PREFIX}/lib
+```
+  - my build script `cv-build` is:
+```
+source env
+gmake branch mod=binutils branch=amiga-2.46
+gmake branch mod=gcc branch=amiga16.2
+gmake update
+gmake clean
+gmake drop-prefix
+time ( gmake min -j3 | tee b.log )
+```
+
   - add the bin directory to your PATH (also add to your shell startup)
 
-      > export PATH=/opt/m68k-amigaos/bin:$PATH
+```
+> export PATH=/opt/m68k-amigaos/bin:$PATH
+```
 
 ### 3.2 vbcc
 
@@ -46,9 +75,11 @@ Install `vbcc` from your favorite package source
 
   - MacOS
     - Use [Homebrew](http://brew.sh)
-
-      > brew tap tditlu/amiga
-      > brew install vbcc vasm vlink
+  
+```
+> brew tap tditlu/amiga
+> brew install vbcc vasm vlink
+```
 
 ### 3.3 AROS
 
@@ -77,16 +108,40 @@ to build m68k binaries
   - run build and install
 
 ```
+# prepare Python
+> export PYTHON=$(pyenv which python) # if you use pyenv
+> pip install mako meson pyyaml
+
 > git clone http://repo.or.cz/AROS.git
-> mkdir AROS-build
-> cd AROS-build
-> ../AROS/configure --target=amiga-m68k --with-aros-toolchain-install=/opt/m68k-aros
-> make crosstools
+
+> ../AROS/configure --target=amiga-m68k --with-aros-toolchain-install=$PWD/install
+
+# on macOS use Homebrew's gmake as it is version 4.x
+> gmake crosstools
 ```
+
+If the host binutils build fails in bundled zlib with an `expected ')'` error
+in macOS `stdio.h`, its old `zutil.h` may define `fdopen(fd,mode)` as `NULL`
+when `TARGET_OS_MAC` is set. This macro then interferes with the system
+`fdopen` declaration. In the generated host binutils source under
+`AROS-build/bin/darwin-aarch64/Ports/host/binutils/binutils-*/zlib/zutil.h`,
+find the `#if defined(MACOS) || defined(TARGET_OS_MAC)` block and change the
+`#else` immediately before the `#ifndef fdopen` fallback to:
+
+```c
+#elif !defined(__APPLE__)
+```
+
+This keeps the fallback for non-Apple targets while allowing macOS to use its
+system `fdopen`. Re-run `gmake crosstools` after the edit. Since this file is
+generated in the build tree, apply the same change to the binutils source or
+patch used by your AROS build if you need it to survive a clean/reconfigure.
 
   - add the bin directory to your PATH (also add to your shell startup)
 
-      > export PATH=/opt/m68k-aros:$PATH
+```
+> export PATH=$PWD/install/bin:$PATH
+```
 
 ### 3.4 SAS C 6.52
 

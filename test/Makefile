@@ -147,7 +147,7 @@ sasc: $(PROGS_SASC) $(PROGS_SASC_DBG) $(LIBS_SC) $(LIBS_SC_DBG)
 build-docker: check gcc-docker aros-docker vbcc-docker sasc-docker
 
 gcc-docker:
-	docker/drun amiga-gcc6 /usr/bin/make gcc ONLY_SOURCE=$(ONLY_SOURCE)
+	docker/drun amiga-gcc /usr/bin/make gcc ONLY_SOURCE=$(ONLY_SOURCE)
 
 aros-docker:
 	docker/drun m68k-aros /usr/bin/make aros ONLY_SOURCE=$(ONLY_SOURCE)
@@ -176,6 +176,18 @@ $(LIBS): $(LIB_BUILD_DIRS)
 
 clean:
 	rm -rf $(BUILD_DIR)
+
+clean-gcc:
+	rm -f $(PROGS_GCC) $(PROGS_GCC_DBG) $(LIBS_GCC) $(LIBS_GCC_DBG)
+
+clean-vbcc:
+	rm -f $(PROGS_VBCC) $(PROGS_VBCC_DBG)
+
+clean-aros:
+	rm -f $(PROGS_AROS) $(PROGS_AROS_DBG)
+
+clean-sasc:
+	rm -f $(PROGS_SASC) $(PROGS_SASC_DBG) $(LIBS_SC) $(LIBS_SC_DBG)
 
 # dir rules
 $(BUILD_DIR):
@@ -260,6 +272,10 @@ $(LIB_BUILD_DIR)-sc-res-dbg/testsc.library: FD_FILE=../amitools/data/fd/testsc_l
 
 
 # special flags
+# vbcc 0.9hP3 emits invalid register-pair moves when optimizing double constants.
+$(BUILD_DIR)/math_double_vc: VBCC_OPTI =
+$(BUILD_DIR)/math_double_trans_vc: VBCC_OPTI =
+
 $(BUILD_DIR)/math_double_sc: SASC_OPTS += Math=i
 $(BUILD_DIR)/math_double_sc$(DBG_EXT): SASC_OPTS += Math=i
 $(BUILD_DIR)/math_double_trans_sc: SASC_OPTS += Math=i

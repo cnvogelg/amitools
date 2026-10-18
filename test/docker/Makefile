@@ -1,4 +1,4 @@
-CONTAINERS = m68k-aros amiga-gcc6 amiga-vbcc amitools
+CONTAINERS = m68k-aros amiga-vbcc amitools
 
 all:
 	@for a in $(CONTAINERS) ; do \

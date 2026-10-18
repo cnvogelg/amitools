@@ -2,7 +2,7 @@ FROM debian:stable AS builder
 
 RUN apt-get update && \
   apt-get install -y build-essential netpbm git automake make bison flex \
-    python3 python3-mako libpng-dev wget texinfo autoconf automake libtool curl \
+    python3 python3-mako python3-yaml libpng-dev wget texinfo autoconf automake libtool curl \
     unzip
 RUN mkdir -p /opt/m68k-aros
 RUN git clone https://github.com/aros-development-team/AROS.git && \

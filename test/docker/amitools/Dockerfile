@@ -8,7 +8,7 @@ RUN python3 -m venv /venv
 ENV PATH="/venv/bin:$PATH"
 
 # update tools
-RUN pip3 install --upgrade pip setuptools cython
+RUN pip3 install --upgrade pip setuptools cython greenlet
 
 RUN git clone https://github.com/cnvogelg/machine68k.git
 RUN cd machine68k && pip3 install .
