@@ -32,15 +32,12 @@ def pytask_exec_list_new_min_list_test(vamos_task):
 
         head_off = MinListStruct.sdef.find_field_def_by_name("mlh_Head").offset
         tail_off = MinListStruct.sdef.find_field_def_by_name("mlh_Tail").offset
-        tailpred_off = MinListStruct.sdef.find_field_def_by_name(
-            "mlh_TailPred"
-        ).offset
+        tailpred_off = MinListStruct.sdef.find_field_def_by_name("mlh_TailPred").offset
 
         assert ctx.mem.r32(minlist_mem.addr + head_off) == minlist_mem.addr + tail_off
         assert ctx.mem.r32(minlist_mem.addr + tail_off) == 0
         assert (
-            ctx.mem.r32(minlist_mem.addr + tailpred_off)
-            == minlist_mem.addr + head_off
+            ctx.mem.r32(minlist_mem.addr + tailpred_off) == minlist_mem.addr + head_off
         )
 
         ctx.alloc.free_struct(minlist_mem)

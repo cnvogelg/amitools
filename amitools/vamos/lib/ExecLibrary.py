@@ -521,9 +521,7 @@ class ExecLibrary(LibImpl):
         minlist = AccessStruct(ctx.mem, MinListStruct, minlist_addr)
         head_off = MinListStruct.sdef.find_field_def_by_name("mlh_Head").offset
         tail_off = MinListStruct.sdef.find_field_def_by_name("mlh_Tail").offset
-        tailpred_off = MinListStruct.sdef.find_field_def_by_name(
-            "mlh_TailPred"
-        ).offset
+        tailpred_off = MinListStruct.sdef.find_field_def_by_name("mlh_TailPred").offset
         head_addr = minlist_addr + head_off
         tail_addr = minlist_addr + tail_off
         minlist.w_s("mlh_Head", tail_addr)

@@ -13,7 +13,7 @@ def fs_rdb_partition_uses_partition_geometry_test():
             high_cyl=3,
             surfaces=256,
             blk_per_trk=1,
-            dos_type=0x444f5301,
+            dos_type=0x444F5301,
             boot_pri=0,
         ),
         drv_name="DH0",
