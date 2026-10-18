@@ -275,9 +275,7 @@ class LibStubGen(object):
                 readers.append(lambda ctx, reg=reg: ctx.cpu.r_reg(reg))
             elif issubclass(arg_type, bool):
                 readers.append(lambda ctx, reg=reg: int(ctx.cpu.r_reg(reg)))
-            elif issubclass(arg_type, ScalarType) or issubclass(
-                arg_type, PointerType
-            ):
+            elif issubclass(arg_type, ScalarType) or issubclass(arg_type, PointerType):
                 readers.append(
                     lambda ctx, reg=reg, arg_type=arg_type: arg_type(
                         cpu=ctx.cpu, reg=reg, mem=ctx.mem
