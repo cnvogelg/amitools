@@ -547,7 +547,9 @@ class ExecLibrary(LibImpl):
                 io.w_s("io_Message.mn_Node.ln_Type", NodeType.NT_REPLYMSG)
             return io.r_s("io_Error")
         else:
-            log_exec.warning("DoIO: device impl missing BeginIO for dev=0x%06x", dev_addr)
+            log_exec.warning(
+                "DoIO: device impl missing BeginIO for dev=0x%06x", dev_addr
+            )
             return -1
 
     def DoIO(self, ctx):
@@ -568,14 +570,10 @@ class ExecLibrary(LibImpl):
         if reply_port != 0:
             if not self.port_mgr.has_port(reply_port):
                 self.port_mgr.register_port(reply_port)
-                log_exec.info(
-                    "SendIO: auto-registered reply_port=0x%06x", reply_port
-                )
+                log_exec.info("SendIO: auto-registered reply_port=0x%06x", reply_port)
             self.port_mgr.put_msg(reply_port, io_addr)
             try:
-                lst_off = MsgPortStruct.sdef.find_field_def_by_name(
-                    "mp_MsgList"
-                ).offset
+                lst_off = MsgPortStruct.sdef.find_field_def_by_name("mp_MsgList").offset
                 list_addr = reply_port + lst_off
                 lh_tail_field = list_addr + 4
                 old_tailpred = ctx.mem.r32(list_addr + 8)
