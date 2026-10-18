@@ -541,7 +541,7 @@ class ExecLibrary(LibImpl):
         if hasattr(impl, "BeginIO"):
             flags = io.r_s("io_Flags") | 1
             io.w_s("io_Flags", flags)
-            impl.BeginIO(ctx)
+            impl.BeginIO(ctx, io_addr)
             flags = io.r_s("io_Flags")
             if flags & 1:
                 io.w_s("io_Message.mn_Node.ln_Type", NodeType.NT_REPLYMSG)
