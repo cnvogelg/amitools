@@ -400,30 +400,68 @@ def fs_comment_longname_create_disk_full_test(tmp_path, dos_type, keep):
     assert validate(image) == []
 
 
+def fail_write(self):
+    raise IOError("write failed")
+
+
+@pytest.mark.parametrize("old_comment", ["", "o" * 79], ids=["new_block", "own_block"])
 @pytest.mark.parametrize("dos_type", LONGNAME_DOS_TYPES, ids=dos_id)
-def fs_comment_block_write_fails_test(tmp_path, dos_type, monkeypatch):
-    # The header may point to a comment block only once that is written.
+def fs_comment_block_write_fails_test(tmp_path, dos_type, old_comment, monkeypatch):
+    # The header may point to a comment block only once that is written. A
+    # block allocated for the comment is released again when the write
+    # fails, while a comment block the entry already has stays its own.
     image = tmp_path / "test.adf"
     name = "n" * 60
     blkdev, volume = create_volume(image, dos_type)
     volume.write_file(b"data", FSString(name))
     node = volume.get_path_name(FSString(name))
-
-    def fail(self):
-        raise IOError("write failed")
+    if old_comment:
+        node.change_comment(FSString(old_comment))
+    blk_num = node.block.comment_block_id
+    free = volume.get_free_blocks()
 
     with monkeypatch.context() as patch:
-        patch.setattr(CommentBlock, "write", fail)
+        patch.setattr(CommentBlock, "write", fail_write)
         with pytest.raises(IOError):
             node.change_comment(FSString("c" * 79))
-    assert node.block.comment_block_id == 0
-    assert node.get_meta_info().get_comment() == FSString()
+    assert node.block.comment_block_id == blk_num
+    assert node.get_meta_info().get_comment() == FSString(old_comment)
+    assert volume.get_free_blocks() == free
     node.change_protect(0x0F)
     close_volume(blkdev, volume)
 
     blkdev, volume = open_volume(image)
-    assert get_comment(volume, name) == FSString()
+    assert get_comment(volume, name) == FSString(old_comment)
     close_volume(blkdev, volume)
+    assert validate(image) == []
+
+
+@pytest.mark.parametrize("dos_type", LONGNAME_DOS_TYPES, ids=dos_id)
+def fs_comment_block_create_write_fails_test(tmp_path, dos_type, monkeypatch):
+    # An entry whose comment block cannot be written is not created, and
+    # the blocks allocated for it are released again.
+    image = tmp_path / "test.adf"
+    name = "n" * 60
+    blkdev, volume = create_volume(image, dos_type)
+    free = volume.get_free_blocks()
+    meta_info = MetaInfo(protect=0, comment=FSString("c" * 79))
+    meta_info.set_current_as_mod_time()
+    root = volume.get_root_dir()
+
+    with monkeypatch.context() as patch:
+        patch.setattr(CommentBlock, "write", fail_write)
+        with pytest.raises(IOError):
+            root.create_file(FSString(name), b"data", meta_info)
+        with pytest.raises(IOError):
+            root.create_dir(FSString(name + "_dir"), meta_info)
+    assert volume.get_free_blocks() == free
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    assert volume.get_path_name(FSString(name)) is None
+    assert volume.get_path_name(FSString(name + "_dir")) is None
+    close_volume(blkdev, volume)
+    assert validate(image) == []
 
 
 KEEPER = "k" * 60
