@@ -131,12 +131,19 @@ class ADFSNode:
             and EntryBlock.needs_extra_comment_block(self.name.get_name(), comment)
         ):
             comment_blk_num = self.block.comment_block_id
-            if comment_blk_num == 0:
+            new_blk = comment_blk_num == 0
+            if new_blk:
                 blks = self.volume.bitmap.alloc_n(1)
                 if blks is None:
                     raise FSError(NO_FREE_BLOCKS, node=self)
                 comment_blk_num = blks[0]
-            self._write_comment_block(comment_blk_num, comment)
+            try:
+                self._write_comment_block(comment_blk_num, comment)
+            except Exception:
+                # release a block allocated here, never the entry's own one
+                if new_blk:
+                    self.volume.bitmap.dealloc_n([comment_blk_num])
+                raise
 
         # alter protect flags
         protect = meta_info.get_protect()

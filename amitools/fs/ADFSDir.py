@@ -226,9 +226,14 @@ class ADFSDir(ADFSNode):
         )
         # write the comment block, then point the header to it
         if extra_comment is not None:
-            node._write_comment_block(comment_blk_num, extra_comment)
-            node.block.comment_block_id = comment_blk_num
-            node.block.write()
+            try:
+                node._write_comment_block(comment_blk_num, extra_comment)
+                node.block.comment_block_id = comment_blk_num
+                node.block.write()
+            except Exception:
+                # nothing links the new node yet: release all of its blocks
+                self.volume.bitmap.dealloc_n(free_blks + [comment_blk_num])
+                raise
             node.meta_info.set_comment(extra_comment)
 
         # dircache: create record for this node
