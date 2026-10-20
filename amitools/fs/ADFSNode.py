@@ -144,8 +144,25 @@ class ADFSNode:
         return self.name
 
     def delete(self, wipe=False, all=False, update_ts=True):
-        if all:
+        if not self.parent:
+            # the root has no parent to unlink it from: it stays, and only
+            # its entries go
+            if not all:
+                raise FSError(DELETE_NOT_ALLOWED, node=self)
             self.delete_children(wipe, all, update_ts)
+            return
+        if all:
+            # refuse before the first entry goes, not after: the tree is
+            # checked once, here, and not again for each entry
+            self.parent.check_delete(self, all, update_ts)
+        self._delete_tree(wipe, all, update_ts)
+
+    def _delete_tree(self, wipe, all, update_ts):
+        """delete me, and first, with all set, my entries, through this,
+        too: the tree is checked already"""
+        if all and self.is_dir():
+            for entry in self.get_entries()[:]:
+                entry._delete_tree(wipe, all, update_ts)
         self.parent._delete(self, wipe, update_ts)
 
     def delete_children(self, wipe, all, update_ts):
@@ -179,6 +196,7 @@ class ADFSNode:
         # dircache: change a copy of the record, swapped in once written
         record = None
         if self.volume.is_dircache and self.parent:
+            self.parent.check_dircache()
             record = self.parent.get_dircache_record(self.name.get_name())
             if not record:
                 raise FSError(INTERNAL_ERROR, node=self, extra="dc not found!")

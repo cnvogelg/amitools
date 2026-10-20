@@ -41,6 +41,12 @@ class ADFSFile(ADFSNode):
         # scan for extension blocks
         next_ext = self.block.extension
         while next_ext != 0:
+            if not self.blkdev.reserved <= next_ext < self.blkdev.num_blocks:
+                raise FSError(
+                    INVALID_FILE_LIST_BLOCK,
+                    node=self,
+                    extra="off the disk: %d" % next_ext,
+                )
             ext_blk = FileListBlock(self.block.blkdev, next_ext)
             ext_blk.read()
             if not ext_blk.valid:
