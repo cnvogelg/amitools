@@ -1,3 +1,4 @@
+from .ADFSNode import check_comment
 from .ADFSVolume import ADFSVolume
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 
@@ -30,7 +31,19 @@ class Repacker:
             return False
         if self.create_in_volume() == None:
             return False
+        self.check_comments(self.in_volume.get_root_dir())
         return True
+
+    def check_comments(self, in_dir):
+        """refuse a comment the new image cannot hold, as one over 79 bytes
+        that a long name header keeps beside a short name, before the image
+        is created"""
+        for e in in_dir.get_entries():
+            comment = e.get_meta_info().get_comment()
+            if comment is not None:
+                check_comment(comment, node=e)
+            if e.is_dir():
+                self.check_comments(e)
 
     def create_out_blkdev(self, image_file, force=True, options=None):
         if self.in_blkdev == None:

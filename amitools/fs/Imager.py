@@ -5,6 +5,7 @@ import unicodedata
 
 from .ADFSDir import ADFSDir
 from .ADFSFile import ADFSFile
+from .ADFSNode import check_comment
 from .ADFSVolume import ADFSVolume
 from .MetaDB import MetaDB
 from . import DosType
@@ -137,6 +138,42 @@ class Imager:
         if os.path.exists(meta_path):
             self.meta_db = MetaDB()
             self.meta_db.load(meta_path)
+        if os.path.isdir(in_path):
+            self.pack_check_comments(in_path, "")
+
+    def pack_check_comments(self, in_path, ami_path):
+        """refuse a comment the image cannot hold before anything is
+        written: walk the tree as pack_entry() does, with its meta info"""
+        for name in os.listdir(in_path):
+            sub_path = os.path.join(in_path, name)
+            if self.meta_fsuae.is_meta_file(sub_path):
+                continue
+            sub_ami_path = self.pack_ami_path(ami_path, name)
+            is_dir = os.path.isdir(sub_path)
+            if is_dir or os.path.isfile(sub_path):
+                meta_info = self.pack_meta_info(sub_path, sub_ami_path)
+                if meta_info != None and meta_info.get_comment() != None:
+                    check_comment(
+                        meta_info.get_comment(), file_name=FSString(sub_ami_path)
+                    )
+            if is_dir:
+                self.pack_check_comments(sub_path, sub_ami_path)
+
+    def pack_ami_path(self, parent_ami_path, name):
+        ami_name = FSString(name).get_unicode()
+        if parent_ami_path != "":
+            return parent_ami_path + "/" + ami_name
+        return ami_name
+
+    def pack_meta_info(self, in_path, ami_path):
+        """the meta info for the entry at in_path: from its .uaem file, or
+        else from the meta DB by its Amiga path"""
+        meta_path = in_path + self.meta_fsuae.get_suffix()
+        if os.path.isfile(meta_path):
+            return self.meta_fsuae.load_meta(meta_path)
+        if self.meta_db != None:
+            return self.meta_db.get_meta_info(ami_path)
+        return None
 
     def pack_end(self, in_path, volume):
         boot_code_path = in_path + ".bootcode"
@@ -212,20 +249,10 @@ class Imager:
             return
         # convert amiga name
         ami_name = FSString(os.path.basename(in_path)).get_unicode()
-        # check for meta file
-        meta_path = in_path + self.meta_fsuae.get_suffix()
-        if os.path.isfile(meta_path):
-            meta_info = self.meta_fsuae.load_meta(meta_path)
-        # retrieve meta info for path from DB
-        elif self.meta_db != None:
-            ami_path = parent_node.get_node_path_name().get_unicode()
-            if ami_path != "":
-                ami_path += "/" + ami_name
-            else:
-                ami_path = ami_name
-            meta_info = self.meta_db.get_meta_info(ami_path)
-        else:
-            meta_info = None
+        # meta info from a meta file or the DB
+        parent_ami_path = parent_node.get_node_path_name().get_unicode()
+        ami_path = self.pack_ami_path(parent_ami_path, ami_name)
+        meta_info = self.pack_meta_info(in_path, ami_path)
 
         # pack directory
         if os.path.isdir(in_path):

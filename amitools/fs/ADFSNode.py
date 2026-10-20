@@ -12,6 +12,24 @@ import amitools.util.ByteSize as ByteSize
 MAX_COMMENT_BYTES = 79
 
 
+def check_comment(comment, node=None, file_name=None):
+    """refuse a comment the disk cannot hold: FastFileSystem rejects more
+    than 79 bytes, and the disk stores Latin-1 only"""
+    try:
+        size = len(comment.get_ami_str())
+    except UnicodeEncodeError:
+        raise FSError(
+            INVALID_COMMENT, node=node, file_name=file_name, extra="not Latin-1"
+        ) from None
+    if size > MAX_COMMENT_BYTES:
+        raise FSError(
+            INVALID_COMMENT,
+            node=node,
+            file_name=file_name,
+            extra="%d bytes, max %d" % (size, MAX_COMMENT_BYTES),
+        )
+
+
 class ADFSNode:
     def __init__(self, volume, parent):
         self.volume = volume
@@ -80,21 +98,7 @@ class ADFSNode:
         return self.meta_info
 
     def _check_comment(self, comment, file_name=None):
-        """refuse a comment the disk cannot hold: FastFileSystem rejects more
-        than 79 bytes, and the disk stores Latin-1 only"""
-        try:
-            size = len(comment.get_ami_str())
-        except UnicodeEncodeError:
-            raise FSError(
-                INVALID_COMMENT, node=self, file_name=file_name, extra="not Latin-1"
-            ) from None
-        if size > MAX_COMMENT_BYTES:
-            raise FSError(
-                INVALID_COMMENT,
-                node=self,
-                file_name=file_name,
-                extra="%d bytes, max %d" % (size, MAX_COMMENT_BYTES),
-            )
+        check_comment(comment, node=self, file_name=file_name)
 
     def change_meta_info(self, meta_info):
         dirty = False
