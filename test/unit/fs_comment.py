@@ -11,6 +11,7 @@ from amitools.fs.MetaInfo import MetaInfo
 from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
 from amitools.fs.block.Block import Block
 from amitools.fs.block.CommentBlock import CommentBlock
+from amitools.fs.block.DirCacheBlock import DirCacheBlock
 from amitools.fs.block.FileHeaderBlock import FileHeaderBlock
 from amitools.fs.block.RootBlock import RootBlock
 from amitools.fs.block.UserDirBlock import UserDirBlock
@@ -424,6 +425,50 @@ def fs_comment_longname_create_disk_full_test(tmp_path, dos_type, keep):
 
 def fail_write(self):
     raise IOError("write failed")
+
+
+def fail_nth_write(monkeypatch, cls, nth):
+    """make the nth write of a cls block fail, and only that one"""
+    write = cls.write
+    calls = []
+
+    def failing_write(self):
+        calls.append(self)
+        if len(calls) == nth:
+            raise IOError("write failed")
+        write(self)
+
+    monkeypatch.setattr(cls, "write", failing_write)
+
+
+@pytest.mark.parametrize("nth", [1, 2], ids=["block", "link"])
+@pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
+def fs_dircache_add_block_write_fails_test(tmp_path, dos_type, nth, monkeypatch):
+    # A grown record that leaves a full dircache block needs a new one. That
+    # is written before the last block links to it; if either write fails,
+    # the new block is released and nothing links to it.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    volume.create_dir(FSString("dir"))
+    fill_dir(volume, 17)
+    node = volume.get_path_name(FSString("dir/f00"))
+    free = volume.get_free_blocks()
+
+    with monkeypatch.context() as patch:
+        fail_nth_write(patch, DirCacheBlock, nth)
+        with pytest.raises(IOError):
+            node.change_comment(FSString("c" * 79))
+    assert volume.get_free_blocks() == free
+    dcache_blks = volume.get_path_name(FSString("dir")).dcache_blks
+    assert len(dcache_blks) == 1
+    assert dcache_blks[0].next_cache == 0
+    volume.get_path_name(FSString("dir/f01")).change_protect(0x0F)
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    check_dircache(volume, "dir", {})
+    close_volume(blkdev, volume)
+    assert validate(image) == []
 
 
 @pytest.mark.parametrize("old_comment", ["", "o" * 79], ids=["new_block", "own_block"])

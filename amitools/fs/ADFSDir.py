@@ -35,8 +35,8 @@ class ADFSDir(ADFSNode):
         # create a single empty dir cache block
         if self.volume.is_dircache:
             self.dcache_blks = []
-            dcb = self._dircache_add_block(True)
-            dcb.write()
+            if self._dircache_add_block(True) == None:
+                raise FSError(NO_FREE_BLOCKS, node=self, extra="want dcache")
 
     def blocks_create_old(self, anon_blk):
         ud = UserDirBlock(self.blkdev, anon_blk.blk_num, self.volume.is_longname)
@@ -484,40 +484,48 @@ class ADFSDir(ADFSNode):
     def _dircache_add_entry_int(self, r, update_myself=True):
         r_bytes = r.get_size()
         # find a dircache block with enough space
-        found_blk = None
         for dcb in self.dcache_blks:
             free_bytes = dcb.get_free_record_size()
             if r_bytes < free_bytes:
-                found_blk = dcb
-                break
-        # need to create a new one?
-        if found_blk == None:
-            found_blk = self._dircache_add_block(update_myself)
-            if found_blk == None:
-                return False
-        # add record to block and update it
-        found_blk.add_record(r)
-        found_blk.write()
-        return True
+                # add record to block and update it
+                dcb.add_record(r)
+                try:
+                    dcb.write()
+                except Exception:
+                    dcb.remove_record(r)
+                    raise
+                return True
+        # need to create a new one
+        return self._dircache_add_block(update_myself, [r]) != None
 
-    def _dircache_add_block(self, update_myself):
+    def _dircache_add_block(self, update_myself, records=None):
         # allocate block
         blk_nums = self.volume.bitmap.alloc_n(1)
         if blk_nums == None:
             return None
-        # setup dir cache block
+        # setup dir cache block and write it before anything links to it
         dcb_num = blk_nums[0]
         dcb = DirCacheBlock(self.blkdev, dcb_num)
-        dcb.create(parent=self.block.blk_num)
-        # link new cache block
-        if len(self.dcache_blks) == 0:
-            self.block.extension = dcb_num
-            if update_myself:
-                self.block.write()
-        else:
-            last_dcb = self.dcache_blks[-1]
-            last_dcb.next_cache = dcb_num
-            last_dcb.write()
+        dcb.create(parent=self.block.blk_num, records=records)
+        try:
+            dcb.write()
+            # link new cache block
+            if len(self.dcache_blks) == 0:
+                self.block.extension = dcb_num
+                if update_myself:
+                    self.block.write()
+            else:
+                last_dcb = self.dcache_blks[-1]
+                last_dcb.next_cache = dcb_num
+                last_dcb.write()
+        except Exception:
+            # nothing on disk links to the block: release it
+            if len(self.dcache_blks) == 0:
+                self.block.extension = 0
+            else:
+                self.dcache_blks[-1].next_cache = 0
+            self.volume.bitmap.dealloc_n([dcb_num])
+            raise
         self.dcache_blks.append(dcb)
         return dcb
 
@@ -583,10 +591,8 @@ class ADFSDir(ADFSNode):
                 free_bytes += record.get_size()
             if size < free_bytes:
                 return
-        dcb = self._dircache_add_block(True)
-        if dcb == None:
+        if self._dircache_add_block(True) == None:
             raise FSError(NO_FREE_BLOCKS, node=self, extra="want dcache")
-        dcb.write()
 
     def update_dircache_record(self, record, rebuild):
         if self.dcache_blks == None:
