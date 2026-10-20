@@ -244,7 +244,7 @@ class BlockScan:
         except IOError as e:
             self.log.msg(Log.ERROR, "Can't read block", blk_num)
             bi = BlockInfo(blk_num)
-            bi.blk_status = BS_READ_ERROR
+            bi.blk_status = self.BS_READ_ERROR
 
         # sort block info into map and arrays assigned by status/type
         self.block_map[blk_num] = bi

@@ -5,6 +5,7 @@ import pytest
 from amitools.fs.ADFSVolume import ADFSVolume
 from amitools.fs.FSString import FSString
 from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
+from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 from amitools.fs.block.Block import Block
 from amitools.fs.block.CommentBlock import CommentBlock
 from amitools.fs.block.DirCacheBlock import DirCacheBlock, DirCacheRecord
@@ -264,3 +265,68 @@ def fs_validate_comment_block_own_key_test(tmp_path, dos_type):
     assert len(errors) == 1
     assert "@%06d:ERROR" % cblk_num in errors[0]
     assert "own key" in errors[0]
+
+
+def fs_validate_read_error_test(tmp_path, monkeypatch):
+    # A block that cannot be read is reported; the validator goes on.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, DosType.DOS0)
+    volume.write_file(b"data", FSString("file"))
+    blk_num = volume.get_path_name(FSString("file")).block.blk_num
+    close_volume(blkdev, volume)
+    read_block = ADFBlockDevice.read_block
+
+    def failing_read_block(self, num):
+        if num == blk_num:
+            raise IOError("read failed")
+        return read_block(self, num)
+
+    monkeypatch.setattr(ADFBlockDevice, "read_block", failing_read_block)
+    errors = validate(image)
+    assert "@%06d:ERROR:Can't read block" % blk_num in errors
+
+
+def validate_hdf(path, options, fail_blk_num=None):
+    """validate an HDF image, with reads of block fail_blk_num failing"""
+    blkdev = BlkDevFactory().open(str(path), read_only=True, options=options)
+    if fail_blk_num is not None:
+        read_block = blkdev.read_block
+
+        def failing_read_block(num):
+            if num == fail_blk_num:
+                raise IOError("read failed")
+            return read_block(num)
+
+        blkdev.read_block = failing_read_block
+    validator = Validator(blkdev, Log.WARN)
+    assert validator.scan_boot()[0]
+    assert validator.scan_root()
+    validator.scan_dir_tree()
+    validator.scan_files()
+    validator.scan_bitmap()
+    blkdev.close()
+    return [str(e) for e in validator.log.entries]
+
+
+@pytest.mark.parametrize("kind", ["bitmap", "bitmap_ext"])
+def fs_validate_bitmap_read_error_test(tmp_path, kind):
+    # A bitmap block or bitmap extension block that cannot be read is
+    # reported, as are the bitmap blocks missing then; the validator goes
+    # on. 60 MB of 512 byte blocks need more bitmap blocks than the 25
+    # that the root block points to, so an extension block holds the rest.
+    image = tmp_path / "test.hdf"
+    options = {"size": "60M"}
+    blkdev = BlkDevFactory().create(str(image), options=options)
+    volume = ADFSVolume(blkdev)
+    volume.create(FSString("Test"), dos_type=DosType.DOS0)
+    bitmap = volume.bitmap
+    assert len(bitmap.ext_blks) == 1
+    if kind == "bitmap":
+        blk_num = bitmap.bitmap_blks[0].blk_num
+    else:
+        blk_num = bitmap.ext_blks[0].blk_num
+    close_volume(blkdev, volume)
+    assert validate_hdf(image, options) == []
+    errors = validate_hdf(image, options, fail_blk_num=blk_num)
+    assert "@%06d:ERROR:Can't read block" % blk_num in errors
+    assert any("Invalid number of Bitmap Blocks" in e for e in errors)
