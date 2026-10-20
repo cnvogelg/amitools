@@ -4,7 +4,7 @@ from .block.UserDirBlock import UserDirBlock
 from .block.EntryBlock import EntryBlock
 from .block.DirCacheBlock import *
 from .ADFSFile import ADFSFile
-from .ADFSNode import ADFSNode
+from .ADFSNode import ADFSNode, MAX_COMMENT_BYTES
 from .FileName import FileName
 from .FSError import *
 from .FSString import FSString
@@ -159,6 +159,17 @@ class ADFSDir(ADFSNode):
         if entry_bad_blk != None:
             self.valid = False
 
+        # a header whose comment cannot be read, as one longer than 79
+        # bytes, takes that of its dircache record if it fits, so that each
+        # write of the header keeps the comment
+        for node in entries:
+            if dcache_blks and node.block.comment is None:
+                record = self.get_dircache_record(node)
+                comment = record.comment if record else None
+                if comment and len(comment.get_ami_str()) <= MAX_COMMENT_BYTES:
+                    node.block.comment = comment
+                    node.meta_info.set_comment(comment)
+
     def _read_dircache_block(self, dcb, dcb_nums):
         """read the next block of my dircache chain, after the blocks
         numbered in dcb_nums. It must lie on the disk, not be in the chain
@@ -260,7 +271,7 @@ class ADFSDir(ADFSNode):
         if extra_comment is not None:
             self._check_comment(extra_comment, file_name=name)
         # a long name comment that does not fit beside the name in the header
-        # goes into a comment block, allocated along with the node's blocks
+        # goes into a comment block, added once the node's blocks are written
         if (
             self.volume.is_longname
             and extra_comment is not None
@@ -279,8 +290,6 @@ class ADFSDir(ADFSNode):
 
         # return the number of blocks required to create this node
         num_blks = node.blocks_get_create_num()
-        if extra_comment is not None:
-            num_blks += 1
 
         # try to find free blocks
         free_blks = self.volume.bitmap.alloc_n(num_blks)
@@ -288,45 +297,63 @@ class ADFSDir(ADFSNode):
             raise FSError(
                 NO_FREE_BLOCKS, node=self, file_name=name, extra="want %d" % num_blks
             )
-        if extra_comment is not None:
-            comment_blk_num = free_blks.pop()
 
-        # now create the blocks for this node
-        new_blk = node.blocks_create_new(
-            free_blks, name, hash_chain_blk, self.block.blk_num, meta_info
-        )
-        # write the comment block, then point the header to it
-        if extra_comment is not None:
-            try:
-                node._write_comment_block(comment_blk_num, extra_comment)
-                node.block.comment_block_id = comment_blk_num
-                node.block.write()
-            except Exception:
-                # nothing links the new node yet: release all of its blocks
-                self.volume.bitmap.dealloc_n(free_blks + [comment_blk_num])
-                raise
-            node.comment_blk_num = comment_blk_num
-            node.meta_info.set_comment(extra_comment)
-
-        # dircache: create record for this node
-        if self.volume.is_dircache:
-            ok = self._dircache_add_entry(
-                name,
-                meta_info,
-                new_blk,
-                node.get_size(),
-                update_myself=False,
-                sub_type=Block.ST_USERDIR if node.is_dir() else Block.ST_FILE,
+        # nothing links the node until my hash table is written: up to then,
+        # a failure takes its dircache record out again and then releases
+        # all blocks taken for it
+        old_hash_blk = self.block.hash_table[fn_hash]
+        old_extension = self.block.extension
+        record = None
+        try:
+            # now create the blocks for this node
+            new_blk = node.blocks_create_new(
+                free_blks, name, hash_chain_blk, self.block.blk_num, meta_info
             )
-            if not ok:
-                self.delete()
-                raise FSError(
-                    NO_FREE_BLOCKS, node=self, file_name=name, extra="want dcache"
-                )
+            if extra_comment is not None:
+                node.change_comment(extra_comment)
 
-        # update my dir
-        self.block.hash_table[fn_hash] = new_blk
-        self.block.write()
+            # dircache: create record for this node. A record that an
+            # older tool left for a deleted entry may name the node's block:
+            # it goes first. If my first dircache block goes with it, my
+            # header is written with the link to the next, which stays
+            if self.volume.is_dircache:
+                for dcb, stale in self._dircache_records(new_blk):
+                    self._dircache_remove_record(dcb, stale)
+                    old_extension = self.block.extension
+                record = self._dircache_add_entry(
+                    name,
+                    meta_info,
+                    new_blk,
+                    node.get_size(),
+                    update_myself=False,
+                    sub_type=Block.ST_USERDIR if node.is_dir() else Block.ST_FILE,
+                )
+                if record == None:
+                    raise FSError(
+                        NO_FREE_BLOCKS, node=self, file_name=name, extra="want dcache"
+                    )
+
+            # update my dir
+            self.block.hash_table[fn_hash] = new_blk
+            self.block.write()
+        except Exception:
+            # my block on disk is as it was
+            self.block.hash_table[fn_hash] = old_hash_blk
+            blk_nums = free_blks[:]
+            if node.comment_blk_num != 0:
+                blk_nums.append(node.comment_blk_num)
+            if node.is_dir() and node.dcache_blks:
+                blk_nums += [dcb.blk_num for dcb in node.dcache_blks]
+            if self.block.extension != old_extension:
+                # the record's dircache block was my first, linked from my
+                # block in memory only
+                self.block.extension = old_extension
+                blk_nums.append(self.dcache_blks.pop().blk_num)
+            elif record != None and not self._dircache_take_back(record):
+                # the record still points to the node: keep its blocks
+                raise
+            self.volume.bitmap.dealloc_n(blk_nums)
+            raise
 
         # add node
         self.name_hash[fn_hash].insert(0, node)
@@ -416,35 +443,52 @@ class ADFSDir(ADFSNode):
         # checks that the comment block is still the node's
         blk_nums = node.get_block_nums()
 
-        # remove node from the hash chain
+        # dircache: the record goes first, so that a failed write leaves
+        # the entry as it was
+        record = None
+        free_dcb_nums = []
+        if self.volume.is_dircache:
+            record = self.get_dircache_record(node)
+            free_dcb_nums = self._dircache_remove_entry(node)
+
+        # remove node from the hash chain. If that fails, the node is still
+        # linked on disk: link it here again and give it back its record
         if prev == None:
+            link_blk = self.block
             self.block.hash_table[hash_key] = next_blk
-            self.block.write()
         else:
+            link_blk = prev.block
             prev.block.hash_chain = next_blk
-            prev.block.write()
+        try:
+            link_blk.write()
+        except Exception:
+            if prev == None:
+                self.block.hash_table[hash_key] = node.block.blk_num
+            else:
+                prev.block.hash_chain = node.block.blk_num
+            if record != None:
+                try:
+                    self._dircache_add_entry_int(record)
+                except Exception:
+                    # the entry stays, without a record
+                    pass
+            raise
 
         # remove from my lists
         self.entries.remove(node)
         names.remove(node)
 
-        # remove blocks of node in bitmap
+        # nothing links the node any more: release its blocks
         self.volume.bitmap.dealloc_n(blk_nums)
-
-        # dircache?
-        if self.volume.is_dircache:
-            free_blk_num = self._dircache_remove_entry(node.name.name)
-        else:
-            free_blk_num = None
 
         # (optional) wipe blocks
         if wipe:
             clr_blk = b"\0" * self.blkdev.block_bytes
             for blk_num in blk_nums:
                 self.blkdev.write_block(blk_num, clr_blk)
-            # wipe a potentially free'ed dircache block, too
-            if free_blk_num != None:
-                self.blkdev.write_block(free_blk_num, clr_blk)
+            # wipe free'ed dircache blocks, too
+            for blk_num in free_dcb_nums:
+                self.blkdev.write_block(blk_num, clr_blk)
 
         # update time stamps
         if update_ts:
@@ -581,7 +625,9 @@ class ADFSDir(ADFSNode):
             name=name,
             comment=meta_info.get_comment(),
         )
-        return self._dircache_add_entry_int(r, update_myself)
+        if not self._dircache_add_entry_int(r, update_myself):
+            return None
+        return r
 
     def _dircache_add_entry_int(self, r, update_myself=True):
         self._dircache_check_read()
@@ -632,13 +678,29 @@ class ADFSDir(ADFSNode):
         self.dcache_blks.append(dcb)
         return dcb
 
-    def _dircache_remove_entry(self, name, update_myself=True):
-        # first find entry
-        for dcb in self.dcache_blks:
-            record = dcb.get_record_by_name(name)
-            if record != None:
-                return self._dircache_remove_record(dcb, record, update_myself)
-        raise FSError(INTERNAL_ERROR, node=self, extra="no dc record!")
+    def _dircache_records(self, entry_blk):
+        """the dircache records of the entry in block entry_blk, with their
+        dircache blocks: one, or more if a failed write left a copy"""
+        result = []
+        for dcb in self.dcache_blks or []:
+            for record in dcb.records:
+                if record.entry == entry_blk:
+                    result.append((dcb, record))
+        return result
+
+    def _dircache_remove_entry(self, node, update_myself=True):
+        """remove all dircache records of node, if any, its own last, so
+        that a write that fails leaves the entry its own record; returns
+        the numbers of the dircache blocks freed"""
+        own = self.get_dircache_record(node)
+        records = self._dircache_records(node.block.blk_num)
+        records.sort(key=lambda dcb_record: dcb_record[1] is own)
+        freed = []
+        for dcb, record in records:
+            blk_num = self._dircache_remove_record(dcb, record, update_myself)
+            if blk_num != None:
+                freed.append(blk_num)
+        return freed
 
     def _dircache_remove_record(self, dcb, record, update_myself=True):
         self._dircache_check_read()
@@ -684,12 +746,16 @@ class ADFSDir(ADFSNode):
         del self.dcache_blks[pos]
         return blk_num  # return number of just deleted block
 
-    def get_dircache_record(self, name):
-        if self.dcache_blks:
-            for dcb in self.dcache_blks:
-                record = dcb.get_record_by_name(name)
-                if record:
-                    return record
+    def get_dircache_record(self, node):
+        """the dircache record of node, or None. Of the records for its
+        block, the one with its name: a stale record that an older tool left
+        for a deleted entry may name the block that node took"""
+        records = [r for dcb, r in self._dircache_records(node.block.blk_num)]
+        for record in records:
+            if record.name == node.name.get_name():
+                return record
+        if records:
+            return records[0]
         return None
 
     def _dircache_fits(self, dcb, new_record, record):
@@ -716,8 +782,19 @@ class ADFSDir(ADFSNode):
         """replace record by new_record, in its block if it fits there. Else
         new_record is written to another block before record leaves its
         own, and taken out again if that fails: only if that fails, too,
-        are both on disk, and the records here as on disk"""
+        are both on disk, and the records here as on disk. With record
+        None, new_record is added"""
         self._dircache_check_read()
+        # drop any other record of the entry: a copy that a failed write
+        # left behind, or a stale one
+        for dcb, other in self._dircache_records(new_record.entry):
+            if other is not record:
+                self._dircache_remove_record(dcb, other)
+        if record is None:
+            # a failed write lost the record
+            if not self._dircache_add_entry_int(new_record):
+                raise FSError(INTERNAL_ERROR, node=self, extra="dc record lost!")
+            return
         for dcb in self.dcache_blks:
             if dcb.has_record(record):
                 break

@@ -9,9 +9,12 @@ from amitools.fs.FileName import FileName
 from amitools.fs.Imager import Imager
 from amitools.fs.MetaInfo import MetaInfo
 from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
+from amitools.fs.blkdev.DiskGeometry import DiskGeometry
+from amitools.fs.blkdev.HDFBlockDevice import HDFBlockDevice
 from amitools.fs.block.Block import Block
 from amitools.fs.block.CommentBlock import CommentBlock
-from amitools.fs.block.DirCacheBlock import DirCacheBlock
+from amitools.fs.block.DirCacheBlock import DirCacheBlock, DirCacheRecord
+from amitools.fs.block.FileDataBlock import FileDataBlock
 from amitools.fs.block.FileHeaderBlock import FileHeaderBlock
 from amitools.fs.block.RootBlock import RootBlock
 from amitools.fs.block.UserDirBlock import UserDirBlock
@@ -184,8 +187,9 @@ def fs_dircache_delete_then_create_test(tmp_path, dos_type):
     close_volume(blkdev, volume)
 
 
-def fill_disk(volume, keep=0):
-    """use up all free blocks of a volume but keep of them"""
+def fill_disk(volume, keep=0, where=""):
+    """use up all free blocks of a volume but keep of them, with files in
+    the directory where"""
     # a file takes a header, its data blocks and a file list block for
     # every further ptrs data blocks; the largest one that fits leaves at
     # most one block over, which an empty file takes
@@ -197,9 +201,9 @@ def fill_disk(volume, keep=0):
     data_bytes = volume.blkdev.block_bytes
     if not volume.is_ffs:
         data_bytes -= 24
-    volume.write_file(bytes(num * data_bytes), FSString("filler"))
+    volume.write_file(bytes(num * data_bytes), FSString(where + "filler"))
     if volume.get_free_blocks() > keep:
-        volume.write_file(b"", FSString("empty"))
+        volume.write_file(b"", FSString(where + "empty"))
     assert volume.get_free_blocks() == keep
 
 
@@ -428,7 +432,8 @@ def fail_write(self):
 
 
 def fail_nth_write(monkeypatch, cls, nth):
-    """make the nth write of a cls block fail, and only that one"""
+    """make the nth write of a cls block fail, and only that one, or none
+    for nth 0; returns the blocks whose write was tried"""
     write = cls.write
     calls = []
 
@@ -439,6 +444,7 @@ def fail_nth_write(monkeypatch, cls, nth):
         write(self)
 
     monkeypatch.setattr(cls, "write", failing_write)
+    return calls
 
 
 @pytest.mark.parametrize("nth", [1, 2, 3], ids=["block", "link", "leave"])
@@ -573,7 +579,7 @@ def fs_comment_dircache_write_fails_test(
             node.change_comment(FSString(new))
     assert volume.get_free_blocks() == free
     assert node.get_meta_info().get_comment() == FSString(old)
-    assert parent.get_dircache_record(FSString("e")).comment == FSString(old)
+    assert parent.get_dircache_record(node).comment == FSString(old)
     node.change_protect(0x0F)
     close_volume(blkdev, volume)
 
@@ -701,10 +707,477 @@ def fs_comment_dircache_move_write_fails_test(tmp_path, dos_type, nth, monkeypat
     assert validate(image) == []
 
 
-@pytest.mark.parametrize("dos_type", LONGNAME_DOS_TYPES, ids=dos_id)
-def fs_comment_block_create_write_fails_test(tmp_path, dos_type, monkeypatch):
-    # An entry whose comment block cannot be written is not created, and
-    # the blocks allocated for it are released again.
+@pytest.mark.parametrize("op", ["protect", "delete"])
+@pytest.mark.parametrize("where", ["before", "after"])
+@pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
+def fs_dircache_duplicate_record_test(tmp_path, dos_type, where, op):
+    # Failed writes can leave a second record of an entry, before or after
+    # its own, with the values of a change that failed. The next change of
+    # the entry keeps one record, with the values of its header, and
+    # deleting the entry removes every record of it.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    volume.create_dir(FSString("dir"))
+    # f00 to f16 fill the first dircache block, f17 is in the second
+    fill_dir(volume, 18)
+    volume.delete(FSString("dir/f01"))
+    parent = volume.get_path_name(FSString("dir"))
+    first, last = parent.dcache_blks
+    name, dcb = ("f17", first) if where == "before" else ("f00", last)
+    (r,) = [r for r in first.records + last.records if r.name == FSString(name)]
+    dcb.add_record(
+        DirCacheRecord(
+            r.entry, r.size, 0x0F, r.mod_ts, r.sub_type, r.name, FSString("failed")
+        )
+    )
+    dcb.write()
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    path = "dir/" + name
+    if op == "protect":
+        volume.get_path_name(FSString(path)).change_protect(0x03)
+    else:
+        volume.delete(FSString(path))
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    records = [r for r in dircache_records(volume, "dir") if r.name == FSString(name)]
+    if op == "protect":
+        assert [(r.protect, r.comment) for r in records] == [(0x03, FSString())]
+    else:
+        assert records == []
+    close_volume(blkdev, volume)
+    assert validate(image) == []
+
+
+@pytest.mark.parametrize("op", ["protect", "comment", "delete"])
+@pytest.mark.parametrize("stale", ["block", "block_only", "name"])
+@pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
+def fs_dircache_stale_record_test(tmp_path, dos_type, stale, op):
+    # An older tool may leave the record of a deleted entry, here of a
+    # directory, when a new entry takes its block, beside the new entry's
+    # own record or, once a failed write lost that, alone; or a record of
+    # a deleted entry may have the new entry's name. A change of the new
+    # entry finds its record by its block, and there by its name, and
+    # writes the entry's name, size and type with the change. Any other
+    # record for its block goes; a record for another block stays.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    volume.create_dir(FSString("dir"))
+    fill_dir(volume, 4)
+    volume.write_file(b"n" * 20, FSString("dir/new"))
+    new_blk = volume.get_path_name(FSString("dir/new")).block.blk_num
+    if stale == "name":
+        # a free block
+        entry, name = blkdev.num_blocks - 1, "new"
+    else:
+        entry, name = new_blk, "gone"
+    dcb = volume.get_path_name(FSString("dir")).dcache_blks[0]
+    if stale == "block_only":
+        (own,) = [r for r in dcb.records if r.entry == new_blk]
+        dcb.remove_record(own)
+    mod_ts = dcb.records[0].mod_ts
+    dcb.records.insert(
+        0,
+        DirCacheRecord(
+            entry, 10, 0, mod_ts, Block.ST_USERDIR, FSString(name), FSString()
+        ),
+    )
+    dcb.num_records = len(dcb.records)
+    dcb.write()
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    node = volume.get_path_name(FSString("dir/new"))
+    if op == "protect":
+        node.change_protect(0x05)
+    elif op == "comment":
+        node.change_comment(FSString("hello"))
+    else:
+        volume.delete(FSString("dir/new"))
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    records = dircache_records(volume, "dir")
+    close_volume(blkdev, volume)
+    mine = [
+        (r.name, r.size, r.sub_type & 0xFF, r.protect, r.comment)
+        for r in records
+        if r.entry == new_blk
+    ]
+    if op == "delete":
+        assert mine == []
+    else:
+        protect = 0x05 if op == "protect" else 0
+        comment = FSString("hello" if op == "comment" else "")
+        file_type = Block.ST_FILE & 0xFF
+        assert mine == [(FSString("new"), 20, file_type, protect, comment)]
+    errors = validate(image)
+    if stale == "name":
+        assert [(r.name, r.protect) for r in records if r.entry == entry] == [
+            (FSString("new"), 0)
+        ]
+        assert len(errors) == 1 and "refers to no entry" in errors[0]
+    else:
+        assert errors == []
+
+
+def add_stale_record(volume, entry, first=True):
+    """add the record of a deleted entry "gone" in block entry to the first
+    dircache block of "dir", in front of its records, or after them"""
+    node = volume.get_path_name(FSString("dir"))
+    dcb = node.dcache_blks[0]
+    record = DirCacheRecord(
+        entry,
+        10,
+        0,
+        node.block.mod_ts,
+        Block.ST_FILE,
+        FSString("gone"),
+        FSString(),
+    )
+    dcb.records.insert(0 if first else len(dcb.records), record)
+    dcb.num_records = len(dcb.records)
+    dcb.write()
+
+
+@pytest.mark.parametrize("kind", ["file", "dir"])
+@pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
+def fs_dircache_stale_record_create_test(tmp_path, dos_type, kind):
+    # A new entry may take the block that a stale record names. The create
+    # drops that record and leaves the entry's own.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    volume.create_dir(FSString("dir"))
+    fill_dir(volume, 4)
+    entry = volume.bitmap.find_n_free(1)[0]
+    add_stale_record(volume, entry)
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    create_entry(volume.get_path_name(FSString("dir")), "new", kind, None)
+    assert volume.get_path_name(FSString("dir/new")).block.blk_num == entry
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    check_dircache(volume, "dir", {})
+    close_volume(blkdev, volume)
+    assert validate(image) == []
+
+
+def make_dir_with_lone_stale_record(volume):
+    """a DOS4/5 "dir" whose first dircache block holds only a stale record,
+    for the block that a new entry takes, and links a second block that
+    holds the records of its files; returns the block of the stale record"""
+    volume.create_dir(FSString("dir"))
+    fill_dir(volume, 3)
+    node = volume.get_path_name(FSString("dir"))
+    first = node.dcache_blks[0]
+    (second_num,) = volume.bitmap.alloc_n(1)
+    second = DirCacheBlock(volume.blkdev, second_num)
+    second.create(parent=node.block.blk_num, records=first.records[:])
+    second.write()
+    entry = volume.bitmap.find_n_free(1)[0]
+    first.records = []
+    first.next_cache = second_num
+    add_stale_record(volume, entry)
+    node.dcache_blks.append(second)
+    return entry
+
+
+@pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
+def fs_dircache_stale_record_create_write_fails_test(tmp_path, dos_type, monkeypatch):
+    # The stale record may be alone in the directory's first dircache
+    # block, which then goes with it, and the directory links the next one
+    # instead. Make each block write of the create fail in turn: the entry
+    # is either created, or not and all blocks taken for it are free again;
+    # the stale record, and its block with it, may have gone already.
+    blkdev, volume = create_volume(tmp_path / "ref.adf", dos_type)
+    make_dir_with_lone_stale_record(volume)
+    with monkeypatch.context() as patch:
+        writes = fail_nth_write(patch, Block, 0)
+        volume.write_file(b"data", FSString("dir/new"))
+    close_volume(blkdev, volume)
+
+    for nth in range(1, len(writes) + 1):
+        image = tmp_path / ("test%d.adf" % nth)
+        blkdev, volume = create_volume(image, dos_type)
+        entry = make_dir_with_lone_stale_record(volume)
+        free = volume.get_free_blocks()
+        with monkeypatch.context() as patch:
+            fail_nth_write(patch, Block, nth)
+            with pytest.raises(IOError):
+                volume.write_file(b"data", FSString("dir/new"))
+        node = volume.get_path_name(FSString("dir/new"))
+        if node is None:
+            # the first dircache block is free again if it went
+            dcache_blks = volume.get_path_name(FSString("dir")).dcache_blks
+            assert volume.get_free_blocks() == free + 2 - len(dcache_blks)
+        else:
+            assert node.block.blk_num == entry
+        volume.write_file(b"next", FSString("dir/next"))
+        close_volume(blkdev, volume)
+
+        blkdev, volume = open_volume(image)
+        assert (volume.get_path_name(FSString("dir/new")) is not None) == (
+            node is not None
+        )
+        close_volume(blkdev, volume)
+        assert validate(image) == [], "write %d" % nth
+
+
+@pytest.mark.parametrize("fail", ["record", "unlink"])
+@pytest.mark.parametrize("where", ["before", "after"])
+@pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
+def fs_dircache_stale_record_delete_fails_test(
+    tmp_path, dos_type, where, fail, monkeypatch
+):
+    # A delete removes the stale record for the entry's block, in front of
+    # its own record or after it, and its own record last. If the write
+    # that removes the second record fails, or the unlink, the entry stays
+    # with its own record: the unlink gives back the one with its name.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    volume.create_dir(FSString("dir"))
+    fill_dir(volume, 4)
+    volume.write_file(b"n" * 20, FSString("dir/new"))
+    new_blk = volume.get_path_name(FSString("dir/new")).block.blk_num
+    add_stale_record(volume, new_blk, first=where == "before")
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    write = Block.write
+    dcb_writes = []
+
+    def failing_write(self):
+        if isinstance(self, DirCacheBlock):
+            dcb_writes.append(self)
+            if fail == "record" and len(dcb_writes) == 2:
+                raise IOError("write failed")
+        elif fail == "unlink":
+            raise IOError("write failed")
+        write(self)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Block, "write", failing_write)
+        with pytest.raises(IOError):
+            volume.delete(FSString("dir/new"))
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    assert volume.read_file(FSString("dir/new")) == b"n" * 20
+    records = [r.name for r in dircache_records(volume, "dir") if r.entry == new_blk]
+    assert records == [FSString("new")]
+    close_volume(blkdev, volume)
+    assert validate(image) == []
+
+
+def set_header_comment_bytes(image, blk_nums, size):
+    """put a comment of size bytes into the headers, beyond the 79 that
+    AmigaDOS keeps: their comment field holds 91"""
+    blkdev = ADFBlockDevice(str(image))
+    blkdev.open()
+    for blk_num in blk_nums:
+        blk = Block(blkdev, blk_num)
+        blk.read()
+        loc = (blk.block_longs - 46) * 4
+        blk.data[loc] = size
+        blk.data[loc + 1 : loc + 1 + size] = b"c" * size
+        blk._put_chksum()
+        blk._write_data()
+    blkdev.close()
+
+
+UNREADABLE_HEADER_OPS = [
+    "protect",
+    "protect_fails",
+    "create_in",
+    "delete_in",
+    "delete_next",
+]
+
+
+@pytest.mark.parametrize("op", UNREADABLE_HEADER_OPS)
+@pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
+def fs_dircache_unreadable_header_comment_test(tmp_path, dos_type, op, monkeypatch):
+    # A header comment longer than 79 bytes reads as no comment. The entry
+    # takes the comment of its record when the directory is read, and each
+    # write of its header keeps it: a change of the entry, also one whose
+    # dircache write fails and that writes the header back, a change of a
+    # directory's time stamp when an entry is created in it or deleted from
+    # it, and the unlink of the entry behind it in its hash chain.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    mate = hash_mate(volume, "f", "t")
+    volume.write_file(b"t", FSString(mate))
+    volume.write_file(b"x", FSString("f"))
+    volume.create_dir(FSString("D"))
+    volume.write_file(b"x", FSString("D/old"))
+    path = "D" if op in ("create_in", "delete_in") else "f"
+    node = volume.get_path_name(FSString(path))
+    node.change_comment(FSString("kept"))
+    blk_num = node.block.blk_num
+    close_volume(blkdev, volume)
+    set_header_comment_bytes(image, [blk_num], 85)
+
+    blkdev, volume = open_volume(image)
+    assert get_comment(volume, path) == FSString("kept")
+    if op == "protect":
+        volume.get_path_name(FSString("f")).change_protect(0x0F)
+    elif op == "protect_fails":
+        with monkeypatch.context() as patch:
+            patch.setattr(DirCacheBlock, "write", fail_write)
+            with pytest.raises(IOError):
+                volume.get_path_name(FSString("f")).change_protect(0x0F)
+    elif op == "create_in":
+        volume.write_file(b"x", FSString("D/new"))
+    elif op == "delete_in":
+        volume.delete(FSString("D/old"))
+    else:
+        volume.delete(FSString(mate))
+    assert get_comment(volume, path) == FSString("kept")
+    close_volume(blkdev, volume)
+    assert validate(image) == []
+
+    blkdev, volume = open_volume(image)
+    if op == "protect":
+        assert volume.get_path_name(FSString("f")).get_meta_info().get_protect() == 0x0F
+    want = {"create_in": ["new", "old"], "delete_in": []}.get(op, ["old"])
+    assert entry_names(volume, "D") == want
+    assert get_comment(volume, path) == FSString("kept")
+    check_dircache(volume, "", {path: "kept"})
+    volume.get_path_name(FSString(path)).change_protect(0x05)
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    assert get_comment(volume, path) == FSString("kept")
+    close_volume(blkdev, volume)
+    assert validate(image) == []
+
+
+@pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
+def fs_dircache_unreadable_header_long_record_test(tmp_path, dos_type):
+    # A record comment longer than 79 bytes, beside a header comment that
+    # is, too, does not fit into the header: the entry reads as having no
+    # comment, the header written by its next change holds none, and the
+    # record keeps its comment.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    volume.write_file(b"x", FSString("f"))
+    node = volume.get_path_name(FSString("f"))
+    node.change_comment(FSString("kept"))
+    blk_num = node.block.blk_num
+    dcb_num = volume.get_root_dir().dcache_blks[0].blk_num
+    close_volume(blkdev, volume)
+    set_header_comment_bytes(image, [blk_num], 85)
+    blkdev = ADFBlockDevice(str(image))
+    blkdev.open()
+    dcb = DirCacheBlock(blkdev, dcb_num)
+    dcb.read()
+    (record,) = dcb.records
+    record.comment = FSString("r" * 85)
+    dcb.write()
+    blkdev.close()
+
+    blkdev, volume = open_volume(image)
+    assert get_comment(volume, "f") is None
+    volume.get_path_name(FSString("f")).change_protect(0x0F)
+    assert get_comment(volume, "f") is None
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    assert get_comment(volume, "f") == FSString()
+    (record,) = dircache_records(volume, "")
+    assert record.comment == FSString("r" * 85)
+    close_volume(blkdev, volume)
+
+
+@pytest.mark.parametrize("op", ["protect", "create_in", "delete"])
+@pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
+def fs_dircache_lost_record_test(tmp_path, dos_type, op, monkeypatch):
+    # A delete that can neither unlink the entry nor give it back the
+    # record it took out leaves the entry without a record. The next change
+    # of the entry, as when an entry is created in it, adds the record again.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    volume.create_dir(FSString("D"))
+    volume.write_file(b"x", FSString("keep"))
+    root = volume.get_root_dir()
+    write = Block.write
+    dcb_writes = []
+
+    def failing_write(self):
+        if self.blk_num == root.block.blk_num:
+            raise IOError("write failed")
+        if isinstance(self, DirCacheBlock):
+            # the first takes the record out, the second gives it back
+            dcb_writes.append(self)
+            if len(dcb_writes) == 2:
+                raise IOError("write failed")
+        write(self)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Block, "write", failing_write)
+        with pytest.raises(IOError):
+            volume.delete(FSString("D"))
+    assert len(dcb_writes) == 2
+    node = volume.get_path_name(FSString("D"))
+    assert root.get_dircache_record(node) is None
+    if op == "protect":
+        node.change_protect(0x0F)
+    elif op == "create_in":
+        volume.write_file(b"x", FSString("D/new"))
+    else:
+        volume.delete(FSString("D"))
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    assert (volume.get_path_name(FSString("D")) is None) == (op == "delete")
+    check_dircache(volume, "", {})
+    close_volume(blkdev, volume)
+    assert validate(image) == []
+
+
+FAILING_WRITES = {
+    "comment": CommentBlock,
+    "data": FileDataBlock,
+    "parent": RootBlock,
+    "dircache": DirCacheBlock,
+}
+
+
+def create_entry(parent, name, kind, meta_info, data=b"data"):
+    if kind == "file":
+        parent.create_file(FSString(name), data, meta_info)
+    else:
+        parent.create_dir(FSString(name), meta_info)
+
+
+def failing_class(fail, kind):
+    if fail == "header":
+        return FileHeaderBlock if kind == "file" else UserDirBlock
+    return FAILING_WRITES[fail]
+
+
+@pytest.mark.parametrize(
+    "dos_type,kind,fail",
+    [
+        (dos_type, kind, fail)
+        for dos_type in LONGNAME_DOS_TYPES
+        for kind in ("file", "dir")
+        for fail in ("comment", "header", "data", "parent")
+        # only OFS files have data blocks with a header
+        if fail != "data" or (kind == "file" and dos_type == DosType.DOS6)
+    ],
+    ids=lambda v: dos_id(v) if isinstance(v, int) else v,
+)
+def fs_comment_block_create_write_fails_test(
+    tmp_path, dos_type, kind, fail, monkeypatch
+):
+    # An entry whose comment block, header, data or link in its parent
+    # cannot be written is not created, and the blocks taken for it are
+    # released again.
     image = tmp_path / "test.adf"
     name = "n" * 60
     blkdev, volume = create_volume(image, dos_type)
@@ -714,19 +1187,315 @@ def fs_comment_block_create_write_fails_test(tmp_path, dos_type, monkeypatch):
     root = volume.get_root_dir()
 
     with monkeypatch.context() as patch:
-        patch.setattr(CommentBlock, "write", fail_write)
+        patch.setattr(failing_class(fail, kind), "write", fail_write)
         with pytest.raises(IOError):
-            root.create_file(FSString(name), b"data", meta_info)
-        with pytest.raises(IOError):
-            root.create_dir(FSString(name + "_dir"), meta_info)
+            create_entry(root, name, kind, meta_info)
     assert volume.get_free_blocks() == free
+    assert volume.get_path_name(FSString(name)) is None
+    volume.write_file(b"next", FSString("next"))
     close_volume(blkdev, volume)
 
     blkdev, volume = open_volume(image)
     assert volume.get_path_name(FSString(name)) is None
-    assert volume.get_path_name(FSString(name + "_dir")) is None
+    assert volume.read_file(FSString("next")) == b"next"
     close_volume(blkdev, volume)
     assert validate(image) == []
+
+
+@pytest.mark.parametrize(
+    "dos_type,fail",
+    [(dos_type, "parent") for dos_type in DOS_TYPES]
+    + [(dos_type, "dircache") for dos_type in DIRCACHE_DOS_TYPES],
+    ids=lambda v: dos_id(v) if isinstance(v, int) else v,
+)
+@pytest.mark.parametrize("kind", ["file", "dir"])
+def fs_create_write_fails_test(tmp_path, dos_type, fail, kind, monkeypatch):
+    # The same for an entry whose link in its parent, or on DOS4/5 whose
+    # dircache record, cannot be written. The 17 records in "dir" fill its
+    # dircache block, so that a new record needs a new block.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    volume.create_dir(FSString("dir"))
+    fill_dir(volume, 17)
+    parent = volume.get_path_name(FSString("dir" if fail == "dircache" else ""))
+    path = "dir/new" if fail == "dircache" else "new"
+    free = volume.get_free_blocks()
+
+    with monkeypatch.context() as patch:
+        patch.setattr(failing_class(fail, kind), "write", fail_write)
+        with pytest.raises(IOError):
+            create_entry(parent, "new", kind, None)
+    assert volume.get_free_blocks() == free
+    assert volume.get_path_name(FSString(path)) is None
+    volume.write_file(b"next", FSString("next"))
+    volume.write_file(b"next", FSString("dir/next"))
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    assert volume.get_path_name(FSString(path)) is None
+    if volume.is_dircache:
+        check_dircache(volume, "", {})
+        check_dircache(volume, "dir", {})
+    close_volume(blkdev, volume)
+    assert validate(image) == []
+
+
+@pytest.mark.parametrize("kind", ["file", "dir"])
+@pytest.mark.parametrize("where", ["dir", "root"])
+@pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
+def fs_create_dircache_disk_full_test(tmp_path, dos_type, where, kind):
+    # 17 records fill a dircache block, so the record of a new entry needs a
+    # new block, and a new directory needs one, too. With the last free
+    # block taken by the header, the entry is not created, and its parent
+    # stays as it was.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    if where == "dir":
+        volume.create_dir(FSString("dir"))
+        fill_dir(volume, 17)
+        fill_disk(volume, keep=1)
+        parent, path = "dir", "dir/new"
+    else:
+        # the root holds 17 records: "big" and 16 files; "big" the filler
+        volume.create_dir(FSString("big"))
+        for n in range(16):
+            volume.write_file(b"x", FSString("f%02d" % n))
+        fill_disk(volume, keep=1, where="big/")
+        parent, path = "", "new"
+    names = entry_names(volume, parent)
+
+    with pytest.raises(FSError) as error:
+        # an empty file takes just its header block
+        create_entry(volume.get_path_name(FSString(parent)), "new", kind, None, b"")
+    assert error.value.code == NO_FREE_BLOCKS
+    assert volume.get_free_blocks() == 1
+    assert entry_names(volume, parent) == names
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    assert volume.get_path_name(FSString(path)) is None
+    check_dircache(volume, parent, {})
+    close_volume(blkdev, volume)
+    assert validate(image) == []
+
+
+def make_dir_without_dircache_block(volume):
+    """a DOS4/5 "dir" without a dircache block, as the validator accepts"""
+    volume.create_dir(FSString("dir"))
+    node = volume.get_path_name(FSString("dir"))
+    dcb_num = node.block.extension
+    node.block.extension = 0
+    node.block.write()
+    volume.bitmap.dealloc_n([dcb_num])
+    node.dcache_blks = []
+    return node
+
+
+@pytest.mark.parametrize("kind", ["file", "dir"])
+@pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
+def fs_create_no_dircache_block_write_fails_test(tmp_path, dos_type, kind, monkeypatch):
+    # The first entry of a directory without a dircache block brings the
+    # first one, which the directory links when it links the entry. Make
+    # each block write of that create fail in turn: the entry is either
+    # created, or not and all blocks taken for it are free again.
+    blkdev, volume = create_volume(tmp_path / "ref.adf", dos_type)
+    node = make_dir_without_dircache_block(volume)
+    with monkeypatch.context() as patch:
+        writes = fail_nth_write(patch, Block, 0)
+        create_entry(node, "new", kind, None)
+    close_volume(blkdev, volume)
+
+    for nth in range(1, len(writes) + 1):
+        image = tmp_path / ("test%d.adf" % nth)
+        blkdev, volume = create_volume(image, dos_type)
+        node = make_dir_without_dircache_block(volume)
+        free = volume.get_free_blocks()
+        with monkeypatch.context() as patch:
+            fail_nth_write(patch, Block, nth)
+            with pytest.raises(IOError):
+                create_entry(node, "new", kind, None)
+        created = volume.get_path_name(FSString("dir/new")) is not None
+        if not created:
+            assert volume.get_free_blocks() == free
+            assert node.block.extension == 0 and node.dcache_blks == []
+        volume.write_file(b"next", FSString("dir/next"))
+        close_volume(blkdev, volume)
+
+        blkdev, volume = open_volume(image)
+        assert (volume.get_path_name(FSString("dir/new")) is not None) == created
+        close_volume(blkdev, volume)
+        assert validate(image) == [], "write %d" % nth
+
+
+@pytest.mark.parametrize("kind", ["file", "dir"])
+@pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
+def fs_create_write_fails_twice_test(tmp_path, dos_type, kind, monkeypatch):
+    # If the parent's write fails and then the write that takes the new
+    # record out again, the record still points to the new header: its
+    # blocks stay allocated, and later entries do not take them.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    volume.create_dir(FSString("dir"))
+    parent = volume.get_path_name(FSString("dir"))
+    parent_num = parent.block.blk_num
+    dcb_num = parent.block.extension
+    free = volume.get_free_blocks()
+    write = Block.write
+    dcb_writes = []
+
+    def failing_write(self):
+        if self.blk_num == parent_num:
+            raise IOError("write failed")
+        if self.blk_num == dcb_num:
+            # the first adds the record, the second takes it out
+            dcb_writes.append(self)
+            if len(dcb_writes) == 2:
+                raise IOError("write failed")
+        write(self)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Block, "write", failing_write)
+        with pytest.raises(IOError):
+            create_entry(parent, "new", kind, None)
+    assert len(dcb_writes) == 2
+    (record,) = dircache_records(volume, "dir")
+    assert not volume.bitmap.get_bit(record.entry)
+    # the header and a data or dircache block
+    assert free - volume.get_free_blocks() == 2
+    volume.write_file(b"x" * 3000, FSString("other"))
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    assert volume.get_path_name(FSString("dir/new")) is None
+    assert not volume.bitmap.get_bit(record.entry)
+    blk = Block(blkdev, record.entry)
+    blk.read()
+    assert blk.valid and blk.sub_type == record.sub_type & 0xFFFFFFFF
+    close_volume(blkdev, volume)
+
+
+def same_hash_name(volume, name):
+    """a name in the same hash chain as name"""
+
+    def hash_of(n):
+        fn = FileName(FSString(n), volume.is_intl, volume.is_longname)
+        return fn.hash()
+
+    n = 0
+    while hash_of("g%d" % n) != hash_of(name):
+        n += 1
+    return "g%d" % n
+
+
+def make_delete_target(volume, target):
+    """fill "dir" with 17 files, which fill a dircache block, and add the
+    entry to delete; returns its path"""
+    volume.create_dir(FSString("dir"))
+    fill_dir(volume, 17)
+    if target == "dir":
+        volume.create_dir(FSString("dir/sub"))
+        return "dir/sub"
+    if target == "lone":
+        # alone in the second dircache block
+        volume.write_file(b"x", FSString("dir/f17"))
+        return "dir/f17"
+    # two files in one hash chain: the one created last is its head
+    other = FSString("dir/" + same_hash_name(volume, "tgt"))
+    if target == "head":
+        volume.write_file(b"o" * 600, other)
+    volume.write_file(b"t" * 600, FSString("dir/tgt"))
+    if target == "tail":
+        volume.write_file(b"o" * 600, other)
+    return "dir/tgt"
+
+
+@pytest.mark.parametrize("target", ["head", "tail", "dir", "lone"])
+@pytest.mark.parametrize("dos_type", DOS_TYPES, ids=dos_id)
+def fs_delete_write_fails_test(tmp_path, dos_type, target, monkeypatch):
+    # Make each block write of a delete fail in turn: the removal of the
+    # dircache record, the unlink from the directory or from the entry
+    # before it in its hash chain, and the new time stamps. The entry is
+    # then either kept, with all its blocks, or gone, with all of them
+    # free, in memory as on disk. The image stays valid when the next file
+    # takes the free blocks and all headers of the directory are written.
+    blkdev, volume = create_volume(tmp_path / "ref.adf", dos_type)
+    path = make_delete_target(volume, target)
+    free = volume.get_free_blocks()
+    with monkeypatch.context() as patch:
+        writes = fail_nth_write(patch, Block, 0)
+        volume.delete(FSString(path))
+    freed = volume.get_free_blocks() - free
+    close_volume(blkdev, volume)
+
+    for nth in range(1, len(writes) + 1):
+        image = tmp_path / ("test%d.adf" % nth)
+        blkdev, volume = create_volume(image, dos_type)
+        make_delete_target(volume, target)
+        with monkeypatch.context() as patch:
+            fail_nth_write(patch, Block, nth)
+            with pytest.raises(IOError):
+                volume.delete(FSString(path))
+        gone = volume.get_path_name(FSString(path)) is None
+        assert volume.get_free_blocks() == free + (freed if gone else 0)
+        volume.write_file(b"n" * 600, FSString("dir/next"))
+        for node in volume.get_path_name(FSString("dir")).get_entries():
+            node.change_protect(0x0F)
+        close_volume(blkdev, volume)
+
+        blkdev, volume = open_volume(image)
+        assert (volume.get_path_name(FSString(path)) is None) == gone
+        close_volume(blkdev, volume)
+        assert validate(image) == [], "write %d" % nth
+
+
+@pytest.mark.parametrize("block_bytes", [512, 1024, 4096])
+@pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
+def fs_delete_dir_read_fails_test(tmp_path, dos_type, block_bytes, monkeypatch):
+    # Deleting an empty directory reads its dircache to find the blocks to
+    # release. It does so before the first write: a read that failed once
+    # the directory is unlinked would leave its blocks allocated.
+    path = str(tmp_path / "test.hdf")
+    geo = DiskGeometry(1, 1, 400)
+    blkdev = HDFBlockDevice(path, block_size=block_bytes)
+    blkdev.create(geo)
+    volume = ADFSVolume(blkdev)
+    volume.create(FSString("Test"), dos_type=dos_type)
+    volume.create_dir(FSString("dir"))
+    volume.write_file(b"x", FSString("dir/f"))
+    volume.create_dir(FSString("dir/sub"))
+    free = volume.get_free_blocks()
+    read_block = HDFBlockDevice.read_block
+    write_block = HDFBlockDevice.write_block
+    writes = []
+
+    def failing_read_block(self, blk_num):
+        if writes:
+            raise IOError("read failed")
+        return read_block(self, blk_num)
+
+    def counting_write_block(self, blk_num, data):
+        writes.append(blk_num)
+        return write_block(self, blk_num, data)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(HDFBlockDevice, "read_block", failing_read_block)
+        patch.setattr(HDFBlockDevice, "write_block", counting_write_block)
+        volume.delete(FSString("dir/sub"))
+    assert writes
+    # the header and the dircache block of "sub"
+    assert volume.get_free_blocks() == free + 2
+    volume.close()
+    blkdev.close()
+
+    blkdev = HDFBlockDevice(path, block_size=block_bytes)
+    blkdev.open(geo)
+    volume = ADFSVolume(blkdev)
+    volume.open()
+    assert entry_names(volume, "dir") == ["f"]
+    assert volume.get_free_blocks() == free + 2
+    check_dircache(volume, "dir", {})
+    volume.close()
+    blkdev.close()
 
 
 KEEPER = "k" * 60
@@ -1242,6 +2011,39 @@ def fs_comment_block_free_delete_fails_test(tmp_path, dos_type, monkeypatch):
     close_volume(blkdev, volume)
     assert header_comment_block_id(image, victim_num) == target
     assert validate(image) == stale
+
+
+@pytest.mark.parametrize("dos_type", LONGNAME_DOS_TYPES, ids=dos_id)
+def fs_comment_block_free_create_fails_test(tmp_path, dos_type, monkeypatch):
+    # A create in a directory whose comment block the bitmap marks free,
+    # and the next file took, writes nothing for the comment: when the
+    # write that links the new entry fails, the free block count is
+    # unchanged, and so is the directory with its comment.
+    image = tmp_path / "test.adf"
+    mate, victim_num, target = make_free_comment_block(image, dos_type, "dir")
+    blkdev, volume = open_volume(image)
+    volume.write_file(b"n" * 2000, FSString("new"))
+    assert target in volume.get_path_name(FSString("new")).get_block_nums()
+    free = volume.get_free_blocks()
+    node = volume.get_path_name(FSString(VICTIM))
+    e_num = volume.get_path_name(FSString(VICTIM + "/e")).block.blk_num
+    write = UserDirBlock.write
+
+    def failing_write(self):
+        if self.blk_num == victim_num and set(self.hash_table) - {0, e_num}:
+            raise IOError("link failed")
+        write(self)
+
+    monkeypatch.setattr(UserDirBlock, "write", failing_write)
+    with pytest.raises(IOError):
+        node.create_file(FSString("x"), b"x")
+    monkeypatch.undo()
+    assert volume.get_free_blocks() == free
+    assert [e.name.get_unicode_name() for e in node.get_entries()] == ["e"]
+    assert get_comment(volume, VICTIM) == FSString("v" * 79)
+    close_volume(blkdev, volume)
+    assert header_comment_block_id(image, victim_num) == target
+    check_comment_pointer_dropped(image, victim_num, b"n" * 2000)
 
 
 @pytest.mark.parametrize("dos_type", LONGNAME_DOS_TYPES, ids=dos_id)

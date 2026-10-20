@@ -1,7 +1,6 @@
-import copy
-
 from .block.Block import Block
 from .block.CommentBlock import CommentBlock
+from .block.DirCacheBlock import DirCacheRecord
 from .block.EntryBlock import EntryBlock
 from .FileName import FileName
 from .MetaInfo import MetaInfo
@@ -34,6 +33,23 @@ def check_comment(comment, node=None, file_name=None):
 
 
 class ADFSNode:
+    """an entry of a directory, or the root directory.
+
+    A block write that fails leaves the entry as it was, in memory as on
+    disk: a create or delete takes effect with the one write that links or
+    unlinks the entry, a meta info change with the write of its header,
+    which is written back as it was if a later write fails. If a write
+    that undoes a change fails too, blocks may stay allocated with nothing
+    using them, but no write makes a header or a dircache record point to
+    a block that the change frees, or to a free block that it did not
+    point to when it was read. A copy of a dircache record that is left
+    behind goes with the entry's next change or delete, a record that is
+    lost comes back with its next change, and a create that cannot take
+    its record out again leaves that record, and the blocks it points to,
+    with no entry. A meta info change whose header cannot be written back
+    leaves the change in the header on disk, but not in memory or in the
+    dircache record, until the entry's next change."""
+
     def __init__(self, volume, parent):
         self.volume = volume
         self.blkdev = volume.blkdev
@@ -193,20 +209,30 @@ class ADFSNode:
         if comment and self._own_comment_block() is not None:
             own_blk_num = self.comment_blk_num
 
-        # dircache: change a copy of the record, swapped in once written
+        # dircache: a new record, swapped in once written, takes the values
+        # of the header, not of the record: a record left behind by a failed
+        # write may hold those of that change, a stale one another entry's
+        # name. A record that a failed write lost is added again
         record = None
+        new_record = None
         if self.volume.is_dircache and self.parent:
             self.parent.check_dircache()
-            record = self.parent.get_dircache_record(self.name.get_name())
-            if not record:
-                raise FSError(INTERNAL_ERROR, node=self, extra="dc not found!")
-            new_record = copy.copy(record)
-            if protect:
-                new_record.protect = protect
-            if mod_ts:
-                new_record.mod_ts = mod_ts
-            if comment:
-                new_record.comment = comment
+            record = self.parent.get_dircache_record(self)
+            new_comment = comment or self.meta_info.get_comment()
+            if new_comment is None and record:
+                # the header's comment cannot be read, and the record's,
+                # longer than 79 bytes, did not fit into it when the
+                # directory was read: keep the record's
+                new_comment = record.comment
+            new_record = DirCacheRecord(
+                entry=self.block.blk_num,
+                size=self.get_size(),
+                protect=protect or self.meta_info.get_protect(),
+                mod_ts=mod_ts or self.meta_info.get_mod_ts(),
+                sub_type=self.block.sub_type,
+                name=self.name.get_name(),
+                comment=new_comment,
+            )
             # a grown record may need a new dircache block: make sure that
             # there is one before anything changes
             self.parent.check_dircache_room(record, new_record)
@@ -252,7 +278,7 @@ class ADFSNode:
             header_written = True
             if comment_blk_num != 0 and new_blk_num == 0:
                 self._write_comment_block(comment_blk_num, comment)
-            if record:
+            if new_record:
                 self.parent.update_dircache_record(record, new_record)
         except Exception:
             # a new comment block is released once no header points to it
