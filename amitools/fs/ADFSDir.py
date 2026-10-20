@@ -423,7 +423,8 @@ class ADFSDir(ADFSNode):
     def get_block_nums(self):
         self.ensure_entries()
         result = [self.block.blk_num]
-        if self.block.comment_block_id != 0:
+        # the root block has no comment block
+        if getattr(self.block, "comment_block_id", 0) != 0:
             result.append(self.block.comment_block_id)
         if self.volume.is_dircache:
             for dcb in self.dcache_blks:
