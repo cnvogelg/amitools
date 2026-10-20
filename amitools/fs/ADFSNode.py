@@ -1,3 +1,5 @@
+import copy
+
 from .block.Block import Block
 from .block.CommentBlock import CommentBlock
 from .block.EntryBlock import EntryBlock
@@ -156,99 +158,109 @@ class ADFSNode:
         check_comment(comment, node=self, file_name=file_name)
 
     def change_meta_info(self, meta_info):
-        dirty = False
-
         # check the comment before anything changes
         comment = meta_info.get_comment()
         if comment and hasattr(self.block, "comment"):
             self._check_comment(comment)
         else:
             comment = None
+        protect = meta_info.get_protect()
+        if not hasattr(self.block, "protect"):
+            protect = None
+        mod_ts = meta_info.get_mod_ts()
+        if not (protect or mod_ts or comment):
+            return
         # a comment change rewrites or frees only a comment block that is
         # still mine
         own_blk_num = 0
         if comment and self._own_comment_block() is not None:
             own_blk_num = self.comment_blk_num
 
-        # dircache?
-        rebuild_dircache = False
+        # dircache: change a copy of the record, swapped in once written
+        record = None
         if self.volume.is_dircache and self.parent:
             record = self.parent.get_dircache_record(self.name.get_name())
             if not record:
                 raise FSError(INTERNAL_ERROR, node=self, extra="dc not found!")
-            # a longer comment may no longer fit into its dircache block:
-            # make room for the record before anything changes
-            if comment and len(comment.get_ami_str()) > len(
-                record.comment.get_ami_str()
-            ):
-                self.parent.make_dircache_room(record, comment)
-                rebuild_dircache = True
-        else:
-            record = None
+            new_record = copy.copy(record)
+            if protect:
+                new_record.protect = protect
+            if mod_ts:
+                new_record.mod_ts = mod_ts
+            if comment:
+                new_record.comment = comment
+            # a grown record may need a new dircache block: make sure that
+            # there is one before anything changes
+            self.parent.check_dircache_room(record, new_record)
 
-        # a long name comment that does not fit beside the name goes into a
-        # comment block: write it before the header points to it
-        comment_blk_num = None
+        # a long name comment that does not fit beside the name goes into
+        # the entry's own comment block, or else into a new one
+        comment_blk_num = 0
+        new_blk_num = 0
         if (
             comment
             and self.volume.is_longname
             and EntryBlock.needs_extra_comment_block(self.name.get_name(), comment)
         ):
             comment_blk_num = own_blk_num
-            new_blk = comment_blk_num == 0
-            if new_blk:
+            if comment_blk_num == 0:
                 blks = self.volume.bitmap.alloc_n(1)
                 if blks is None:
                     raise FSError(NO_FREE_BLOCKS, node=self)
-                comment_blk_num = blks[0]
-            try:
-                self._write_comment_block(comment_blk_num, comment)
-            except Exception:
-                # release a block allocated here, never the entry's own one
-                if new_blk:
-                    self.volume.bitmap.dealloc_n([comment_blk_num])
-                raise
+                comment_blk_num = new_blk_num = blks[0]
 
-        # alter protect flags
-        protect = meta_info.get_protect()
-        if protect and hasattr(self.block, "protect"):
+        # change the header, and put it back as it was if a write fails
+        saved = {
+            name: getattr(self.block, name)
+            for name in ("protect", "mod_ts", "comment", "comment_block_id")
+            if hasattr(self.block, name)
+        }
+        if protect:
             self.block.protect = protect
-            self.meta_info.set_protect(protect)
-            dirty = True
-            if record:
-                record.protect = protect
-
-        # alter mod time
-        mod_ts = meta_info.get_mod_ts()
         if mod_ts:
             self.block.mod_ts = mod_ts
-            self.meta_info.set_mod_ts(mod_ts)
-            dirty = True
-            if record:
-                record.mod_ts = mod_ts
-
-        # alter comment
         if comment:
-            if comment_blk_num is not None:
-                self.block.comment_block_id = comment_blk_num
-            else:
+            self.block.comment_block_id = comment_blk_num
+            if comment_blk_num == 0:
                 self.block.comment = comment
-                self.block.comment_block_id = 0
-                if own_blk_num != 0:
-                    self.volume.bitmap.dealloc_n([own_blk_num])
-            self.comment_blk_num = self.block.comment_block_id
-
-            self.meta_info.set_comment(comment)
-            dirty = True
-            if record:
-                record.comment = comment
-
-        # really need update?
-        if dirty:
+        header_written = False
+        try:
+            # a new comment block is written before the header points to it,
+            # the entry's own one after the header, so that a header write
+            # that fails leaves the old comment
+            if new_blk_num != 0:
+                self._write_comment_block(new_blk_num, comment)
             self.block.write()
-            # dirache update
+            header_written = True
+            if comment_blk_num != 0 and new_blk_num == 0:
+                self._write_comment_block(comment_blk_num, comment)
             if record:
-                self.parent.update_dircache_record(record, rebuild_dircache)
+                self.parent.update_dircache_record(record, new_record)
+        except Exception:
+            # a new comment block is released once no header points to it
+            for name, value in saved.items():
+                setattr(self.block, name, value)
+            try:
+                if header_written:
+                    self.block.write()
+                if new_blk_num != 0:
+                    self.volume.bitmap.dealloc_n([new_blk_num])
+            except Exception:
+                # the header on disk keeps the change until the entry's next
+                # change: raise the first error
+                pass
+            raise
+
+        # all is written: release a comment block the entry no longer uses
+        if comment:
+            if own_blk_num not in (0, comment_blk_num):
+                self.volume.bitmap.dealloc_n([own_blk_num])
+            self.comment_blk_num = comment_blk_num
+            self.meta_info.set_comment(comment)
+        if protect:
+            self.meta_info.set_protect(protect)
+        if mod_ts:
+            self.meta_info.set_mod_ts(mod_ts)
 
     def _write_comment_block(self, blk_num, comment):
         """write comment into comment block blk_num of this entry"""

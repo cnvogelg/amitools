@@ -531,47 +531,54 @@ class ADFSDir(ADFSNode):
 
     def _dircache_remove_entry(self, name, update_myself=True):
         # first find entry
-        pos = None
-        dcb = None
-        record = None
-        n = len(self.dcache_blks)
-        for i in range(n):
-            dcb = self.dcache_blks[i]
+        for dcb in self.dcache_blks:
             record = dcb.get_record_by_name(name)
             if record != None:
-                pos = i
-                break
-        if record == None:
-            raise FSError(INTERNAL_ERROR, node=self, extra="no dc record!")
+                return self._dircache_remove_record(dcb, record, update_myself)
+        raise FSError(INTERNAL_ERROR, node=self, extra="no dc record!")
+
+    def _dircache_remove_record(self, dcb, record, update_myself=True):
+        pos = self.dcache_blks.index(dcb)
+        idx = dcb.records.index(record)
         # remove entry from this block
         dcb.remove_record(record)
-        # remove whole block? (but keep at least one)
-        if dcb.is_empty() and len(self.dcache_blks) > 1:
-            # next block following me
-            if pos == n - 1:
-                next = 0
+        try:
+            # remove whole block? (but keep at least one)
+            if dcb.is_empty() and len(self.dcache_blks) > 1:
+                # next block following me
+                if pos == len(self.dcache_blks) - 1:
+                    next = 0
+                else:
+                    next = self.dcache_blks[pos + 1].blk_num
+                # update block links
+                if pos == 0:
+                    # adjust extension link in this dir node
+                    self.block.extension = next
+                    if update_myself:
+                        self.block.write()
+                else:
+                    # adjust dircache block in front of me
+                    prev_blk = self.dcache_blks[pos - 1]
+                    prev_blk.next_cache = next
+                    prev_blk.write()
             else:
-                next = self.dcache_blks[pos + 1].blk_num
-            # update block links
+                # update cache block with reduced set of records
+                dcb.write()
+                return None
+        except Exception:
+            # the record is still on disk: keep it here, too
             if pos == 0:
-                # adjust extension link in this dir node
-                self.block.extension = next
-                if update_myself:
-                    self.block.write()
+                self.block.extension = dcb.blk_num
             else:
-                # adjust dircache block in front of me
-                prev_blk = self.dcache_blks[pos - 1]
-                prev_blk.next_cache = next
-                prev_blk.write()
-            # free cache block in bitmap
-            blk_num = dcb.blk_num
-            self.volume.bitmap.dealloc_n([blk_num])
-            del self.dcache_blks[pos]
-            return blk_num  # return number of just deleted block
-        else:
-            # update cache block with reduced set of records
-            dcb.write()
-            return None
+                self.dcache_blks[pos - 1].next_cache = dcb.blk_num
+            dcb.records.insert(idx, record)
+            dcb.num_records = len(dcb.records)
+            raise
+        # free cache block in bitmap
+        blk_num = dcb.blk_num
+        self.volume.bitmap.dealloc_n([blk_num])
+        del self.dcache_blks[pos]
+        return blk_num  # return number of just deleted block
 
     def get_dircache_record(self, name):
         if self.dcache_blks:
@@ -581,34 +588,68 @@ class ADFSDir(ADFSNode):
                     return record
         return None
 
-    def make_dircache_room(self, record, comment):
-        """make sure that record, grown by its new comment, finds room in
-        the dircache once it leaves its block: link a new block if needed"""
-        size = DirCacheRecord(name=record.name, comment=comment).get_size()
+    def _dircache_fits(self, dcb, new_record, record):
+        """does new_record fit into dcb once record leaves it?"""
+        size = new_record.get_size()
+        free_bytes = dcb.get_free_record_size()
+        if dcb.has_record(record):
+            # a record that does not grow always fits in its place
+            if size <= record.get_size():
+                return True
+            free_bytes += record.get_size()
+        return size < free_bytes
+
+    def check_dircache_room(self, record, new_record):
+        """make sure that new_record, replacing record, finds room in the
+        dircache: in a block, or else in a free block for a new one"""
         for dcb in self.dcache_blks:
-            free_bytes = dcb.get_free_record_size()
-            if dcb.has_record(record):
-                free_bytes += record.get_size()
-            if size < free_bytes:
+            if self._dircache_fits(dcb, new_record, record):
                 return
-        if self._dircache_add_block(True) == None:
+        if self.volume.bitmap.find_n_free(1) == None:
             raise FSError(NO_FREE_BLOCKS, node=self, extra="want dcache")
 
-    def update_dircache_record(self, record, rebuild):
+    def update_dircache_record(self, record, new_record):
+        """replace record by new_record, in its block if it fits there. Else
+        new_record is written to another block before record leaves its
+        own, and taken out again if that fails: only if that fails, too,
+        are both on disk, and the records here as on disk"""
         if self.dcache_blks == None:
             return
-        # update record
-        if rebuild:
-            self._dircache_remove_entry(record.name)
-            # make_dircache_room() made sure that this finds room
-            if not self._dircache_add_entry_int(record):
-                raise FSError(INTERNAL_ERROR, node=self, extra="dc record lost!")
+        for dcb in self.dcache_blks:
+            if dcb.has_record(record):
+                break
         else:
-            # simply re-write the dircache block
-            for dcb in self.dcache_blks:
-                if dcb.has_record(record):
-                    dcb.write()
-                    break
+            raise FSError(INTERNAL_ERROR, node=self, extra="no dc record!")
+        if self._dircache_fits(dcb, new_record, record):
+            idx = dcb.records.index(record)
+            dcb.records[idx] = new_record
+            try:
+                dcb.write()
+            except Exception:
+                dcb.records[idx] = record
+                raise
+        else:
+            # check_dircache_room() made sure that this finds room
+            if not self._dircache_add_entry_int(new_record):
+                raise FSError(INTERNAL_ERROR, node=self, extra="dc record lost!")
+            try:
+                self._dircache_remove_record(dcb, record)
+            except Exception:
+                self._dircache_take_back(new_record)
+                raise
+
+    def _dircache_take_back(self, record):
+        """remove a record added just before, and a block added for it,
+        after a later write failed. Returns False if that fails, too: the
+        record then stays, here as on disk"""
+        for dcb in self.dcache_blks:
+            if dcb.has_record(record):
+                try:
+                    self._dircache_remove_record(dcb, record)
+                except Exception:
+                    return False
+                break
+        return True
 
     def get_block_usage(self, all=False, first=True):
         num_non_data = 1
