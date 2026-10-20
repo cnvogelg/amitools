@@ -368,6 +368,17 @@ def fs_comment_longname_block_usage_test(tmp_path, dos_type):
     close_volume(blkdev, volume)
 
 
+@pytest.mark.parametrize("dos_type", DOS_TYPES, ids=dos_id)
+def fs_root_dir_block_nums_test(tmp_path, dos_type):
+    # The root block has no comment block. The root directory lists its own
+    # block and, on DOS4/5, its dircache block.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    want = [880, 866] if dos_type in DIRCACHE_DOS_TYPES else [880]
+    assert volume.get_root_dir().get_block_nums() == want
+    close_volume(blkdev, volume)
+
+
 @pytest.mark.parametrize("keep", [2, 3], ids=["no_room", "room"])
 @pytest.mark.parametrize("dos_type", LONGNAME_DOS_TYPES, ids=dos_id)
 def fs_comment_longname_create_disk_full_test(tmp_path, dos_type, keep):
