@@ -30,7 +30,11 @@ class DirCacheRecord:
         return align_len
 
     def get(self, data, off):
+        """decode the record at off; return the offset of the next record,
+        or -1 if this one does not lie within the block"""
         self.offset = off
+        if off + 25 > len(data):
+            return -1
         # header
         d = struct.unpack_from(">IIIHHHHH", data, offset=off)
         self.entry = d[0]
@@ -43,10 +47,14 @@ class DirCacheRecord:
         # name
         name_len = data[off + 23]
         name_off = off + 24
+        if name_off + name_len + 1 > len(data):
+            return -1
         self.name = FSString(data[name_off : name_off + name_len])
         # comment
         comment_len = data[off + name_len + 24]
         comment_off = off + 25 + name_len
+        if comment_off + comment_len > len(data):
+            return -1
         self.comment = FSString(data[comment_off : comment_off + comment_len])
         return off + self.get_size()
 
@@ -148,6 +156,7 @@ class DirCacheBlock(Block):
             r = DirCacheRecord()
             off = r.get(self.data, off)
             if off == -1:
+                self.valid = False
                 return False
             self.records.append(r)
 

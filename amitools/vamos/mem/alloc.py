@@ -1,21 +1,29 @@
 from amitools.vamos.error import *
 from amitools.vamos.log import log_mem_alloc
 from amitools.vamos.label import LabelRange, LabelStruct, LabelLib
-from amitools.vamos.astructs import AccessStruct
 
 
-class Memory:
-    def __init__(self, addr, size, label, access):
+class MemoryEntry:
+    __slots__ = ("addr", "size", "label")
+
+    def __init__(self, addr, size, label):
         self.addr = addr
         self.size = size
         self.label = label
-        self.access = access
 
     def __str__(self):
         if self.label != None:
             return str(self.label)
         else:
             return "[@%06x +%06x %06x]" % (self.addr, self.size, self.addr + self.size)
+
+
+class Memory(MemoryEntry):
+    __slots__ = ("struct",)
+
+    def __init__(self, addr, size, label, struct=None):
+        super().__init__(addr, size, label)
+        self.struct = struct
 
 
 class MemoryChunk:
@@ -55,8 +63,6 @@ class MemoryAlloc:
         self.addr = addr
         self.size = size
         self.label_mgr = label_mgr
-        # compat link
-        self.access = mem
 
         self.addrs = {}
         self.mem_objs = {}
@@ -316,6 +322,49 @@ class MemoryAlloc:
         else:
             return None
 
+    def _alloc_struct_label(self, addr, struct, label):
+        if label and self.label_mgr:
+            label_obj = LabelStruct(label, addr, struct)
+            self.label_mgr.add_label(label_obj)
+            return label_obj
+        return None
+
+    def _bind_struct(self, struct, addr, alloc=None, mem_obj=None, **kwargs):
+        struct_type = struct.get_alias_type()
+        return struct_type(
+            mem=self.mem,
+            addr=addr,
+            alloc=alloc,
+            mem_obj=mem_obj,
+            **kwargs,
+        )
+
+    def _alloc_struct_entry(self, struct, size=None, label=None):
+        if size is None:
+            size = struct.get_size()
+        addr = self.alloc_mem(size)
+        label_obj = self._alloc_struct_label(addr, struct, label)
+        entry = MemoryEntry(addr, size, label_obj)
+        self.mem_objs[addr] = entry
+        return entry
+
+    def _alloc_struct_mem(self, struct, size=None, label=None, **kwargs):
+        entry = self._alloc_struct_entry(struct, size=size, label=label)
+        mem = Memory(entry.addr, entry.size, entry.label)
+        mem.struct = self._bind_struct(
+            struct, entry.addr, alloc=self, mem_obj=entry, **kwargs
+        )
+        self.mem_objs[entry.addr] = mem
+        return mem
+
+    def _get_struct_mem(self, mem):
+        if isinstance(mem, MemoryEntry):
+            return mem
+        mem_obj = getattr(mem, "_mem_obj", None)
+        if mem_obj is not None:
+            return mem_obj
+        raise VamosInternalError("Invalid struct free: %r" % (mem,))
+
     # memory
     def alloc_memory(self, size, label=None, except_on_failure=True):
         addr = self.alloc_mem(size, except_on_failure)
@@ -326,7 +375,7 @@ class MemoryAlloc:
             self.label_mgr.add_label(label_obj)
         else:
             label_obj = None
-        mem = Memory(addr, size, label_obj, self.mem)
+        mem = Memory(addr, size, label_obj)
         log_mem_alloc.info("alloc memory: %s", mem)
         self.mem_objs[addr] = mem
         return mem
@@ -340,35 +389,30 @@ class MemoryAlloc:
 
     # struct
     def alloc_struct(self, struct, size=None, label=None):
-        if size is None:
-            size = struct.get_size()
-        addr = self.alloc_mem(size)
-        if label and self.label_mgr:
-            label_obj = LabelStruct(label, addr, struct)
-            self.label_mgr.add_label(label_obj)
-        else:
-            label_obj = None
-        access = AccessStruct(self.mem, struct, addr)
-        mem = Memory(addr, size, label_obj, access)
+        mem = self._alloc_struct_mem(struct, size=size, label=label)
         log_mem_alloc.info("alloc struct: %s", mem)
-        self.mem_objs[addr] = mem
         return mem
+
+    def alloc_astruct(self, struct, size=None, label=None, **kwargs):
+        entry = self._alloc_struct_entry(struct, size=size, label=label)
+        struct_obj = self._bind_struct(
+            struct, entry.addr, alloc=self, mem_obj=entry, **kwargs
+        )
+        log_mem_alloc.info("alloc astruct: %s", entry)
+        return struct_obj
 
     def map_struct(self, addr, struct, label=None):
         size = struct.get_size()
-        access = AccessStruct(self.mem, struct, addr)
-        if label and self.label_mgr:
-            label_obj = LabelStruct(label, addr, struct)
-            self.label_mgr.add_label(label_obj)
-        else:
-            label_obj = None
-        mem = Memory(addr, size, label_obj, access)
+        label_obj = self._alloc_struct_label(addr, struct, label)
+        struct_obj = self._bind_struct(struct, addr)
+        mem = Memory(addr, size, label_obj, struct_obj)
         log_mem_alloc.info("map struct: %s", mem)
         return mem
 
     def free_struct(self, mem):
+        mem = self._get_struct_mem(mem)
         log_mem_alloc.info("free struct: %s", mem)
-        if self.label_mgr:
+        if self.label_mgr and mem.label is not None:
             self.label_mgr.remove_label(mem.label)
         self.free_mem(mem.addr, mem.size)
         del self.mem_objs[mem.addr]
@@ -388,15 +432,46 @@ class MemoryAlloc:
             self.label_mgr.add_label(label_obj)
         else:
             label_obj = None
-        access = AccessStruct(self.mem, lib_struct, base_addr)
-        mem = Memory(addr, size, label_obj, access)
+        mem = Memory(addr, size, label_obj)
+        mem.struct = self._bind_struct(
+            lib_struct, addr, alloc=self, mem_obj=mem, neg_size=neg_size
+        )
         log_mem_alloc.info("alloc lib: %s", mem)
         self.mem_objs[addr] = mem
         return mem
 
+    def alloc_alib(
+        self, lib_struct, pos_size=0, neg_size=0, fd=None, label=None, **kwargs
+    ):
+        if pos_size == 0:
+            pos_size = lib_struct.get_size()
+        neg_size = (neg_size + 3) & ~3
+        size = neg_size + pos_size
+        addr = self.alloc_mem(size)
+        base_addr = addr + neg_size
+        if label and self.label_mgr:
+            label_obj = LabelLib(label, base_addr, neg_size, pos_size, lib_struct, fd)
+            self.label_mgr.add_label(label_obj)
+        else:
+            label_obj = None
+        entry = MemoryEntry(addr, size, label_obj)
+        self.mem_objs[addr] = entry
+        struct_obj = self._bind_struct(
+            lib_struct,
+            addr,
+            alloc=self,
+            mem_obj=entry,
+            pos_size=pos_size,
+            neg_size=neg_size,
+            **kwargs,
+        )
+        log_mem_alloc.info("alloc alib: %s", entry)
+        return struct_obj
+
     def free_lib(self, mem):
+        mem = self._get_struct_mem(mem)
         log_mem_alloc.info("free lib: %s", mem)
-        if self.label_mgr:
+        if self.label_mgr and mem.label is not None:
             self.label_mgr.remove_label(mem.label)
         self.free_mem(mem.addr, mem.size)
         del self.mem_objs[mem.addr]
@@ -411,7 +486,7 @@ class MemoryAlloc:
         else:
             label_obj = None
         self.mem.w_cstr(addr, cstr)
-        mem = Memory(addr, size, label_obj, self.mem)
+        mem = Memory(addr, size, label_obj)
         log_mem_alloc.info("alloc c_str: %s", mem)
         self.mem_objs[addr] = mem
         return mem
@@ -433,7 +508,7 @@ class MemoryAlloc:
         else:
             label_obj = None
         self.mem.w_bstr(addr, bstr)
-        mem = Memory(addr, size, label_obj, self.mem)
+        mem = Memory(addr, size, label_obj)
         log_mem_alloc.info("alloc b_str: %s", mem)
         self.mem_objs[addr] = mem
         return mem

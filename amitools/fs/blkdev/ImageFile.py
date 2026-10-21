@@ -1,6 +1,8 @@
 import os
 import stat
+import sys
 import amitools.util.BlkDevTools as BlkDevTools
+from amitools.util.Win32Disk import is_windows_disk, open_disk
 
 
 class ImageFile:
@@ -14,6 +16,9 @@ class ImageFile:
 
     @staticmethod
     def get_image_size(file_name):
+        if is_windows_disk(file_name):
+            with open_disk(file_name) as stream:
+                return stream.size
         # is it a block/char device?
         st = os.stat(file_name)
         mode = st.st_mode
@@ -24,6 +29,11 @@ class ImageFile:
             return os.path.getsize(file_name)
 
     def open(self):
+        if self.fobj is None and is_windows_disk(self.file_name):
+            self.fobj = open_disk(self.file_name, read_only=self.read_only)
+            self.size = self.fobj.size
+            self.num_blocks = self.size // self.block_bytes
+            return
         # file obj?
         if self.fobj:
             # get size via seek
@@ -49,7 +59,12 @@ class ImageFile:
                 flags = "rb"
             else:
                 flags = "r+b"
-            self.fobj = open(self.file_name, flags)
+            # Windows byte-range locks are mandatory even through another
+            # handle in this process. Buffered reads of the final block can
+            # reach a session's lock byte beyond EOF; keep I/O within the
+            # requested range for every image-file user.
+            buffering = 0 if sys.platform == "win32" else -1
+            self.fobj = open(self.file_name, flags, buffering=buffering)
 
     def read_blk(self, blk_num, num_blks=1):
         if blk_num >= self.num_blocks:
@@ -90,6 +105,8 @@ class ImageFile:
         self.fobj = None
 
     def create(self, num_blocks):
+        if is_windows_disk(self.file_name):
+            raise IOError("cannot create or truncate a physical disk")
         if self.read_only:
             raise IOError("Can't create image file in read only mode")
         total_size = num_blocks * self.block_bytes
@@ -102,6 +119,8 @@ class ImageFile:
             fh.close()
 
     def resize(self, new_blocks):
+        if is_windows_disk(self.file_name):
+            raise IOError("cannot resize a physical disk")
         if self.read_only:
             raise IOError("Can't grow image file in read only mode")
         total_size = new_blocks * self.block_bytes

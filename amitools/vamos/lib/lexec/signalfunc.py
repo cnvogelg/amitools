@@ -3,8 +3,28 @@ from amitools.vamos.log import log_exec
 
 
 class SignalFunc(FuncBase):
+    _fallback_signals = 0
+    _fallback_sig_alloc = 0x0000FFFF
+
     def alloc_signal(self, sig_num):
         task = self.get_my_ami_task()
+        if task is None:
+            old_mask = SignalFunc._fallback_sig_alloc
+            new_signal = sig_num
+            if new_signal == -1:
+                for bit in range(32):
+                    new_mask = 1 << bit
+                    if (old_mask & new_mask) == 0:
+                        new_signal = bit
+                        break
+            else:
+                new_mask = 1 << new_signal
+                if (old_mask & new_mask) != 0:
+                    new_signal = -1
+            if new_signal != -1:
+                SignalFunc._fallback_sig_alloc |= 1 << new_signal
+            log_exec.info("AllocSignal(%d) -> %d (fallback)", sig_num, new_signal)
+            return new_signal
         old_mask = task.sig_alloc.val
         new_signal = sig_num
         if new_signal == -1:
@@ -38,7 +58,13 @@ class SignalFunc(FuncBase):
         task = self.get_my_ami_task()
         # invalid signal?
         if sig_num == -1:
-            log_exec.warning("FreeSignal(%d) for task %s?!", sig_num, task)
+            if task is not None:
+                log_exec.warning("FreeSignal(%d) for task %s?!", sig_num, task)
+            return
+        if task is None:
+            if 0 <= sig_num < 32:
+                SignalFunc._fallback_sig_alloc &= ~(1 << sig_num)
+            log_exec.info("FreeSignal(%d) (fallback)", sig_num)
             return
         # check if signal is really set?
         old_mask = task.sig_alloc.val
@@ -64,10 +90,22 @@ class SignalFunc(FuncBase):
     def set_signal(self, new_signals, signal_mask):
         # set signals via the scheduler task
         sched_task = self.get_my_sched_task()
+        if sched_task is None:
+            old_signals = SignalFunc._fallback_signals
+            SignalFunc._fallback_signals = new_signals | (
+                old_signals & ~signal_mask
+            )
+            log_exec.info(
+                "SetSignals: new_signals=%08x signal_mask=%08x old_signals=%08x (fallback)",
+                new_signals,
+                signal_mask,
+                old_signals,
+            )
+            return old_signals
         old_signals = sched_task.set_signal(new_signals, signal_mask)
         # just to be sure dump task val
         task = self.get_my_ami_task()
-        real_mask = task.sig_recvd.val
+        real_mask = task.sig_recvd.val if task else 0
         log_exec.info(
             "SetSignals: new_signals=%08x signal_mask=%08x old_signals=%08x real_mask=%08x",
             new_signals,
@@ -82,6 +120,25 @@ class SignalFunc(FuncBase):
             return task.map_task.get_ami_task().addr == task_addr
 
         sched_task = self.get_my_sched_task()
+        if sched_task is None:
+            SignalFunc._fallback_signals |= signals
+            try:
+                from amitools.vamos.libstructs.exec_ import TaskStruct
+
+                sigrecvd_off = TaskStruct.sdef.find_field_def_by_name(
+                    "tc_SigRecvd"
+                ).offset
+                current = self.ctx.mem.r32(task_addr + sigrecvd_off)
+                self.ctx.mem.w32(task_addr + sigrecvd_off, current | signals)
+            except Exception:
+                pass
+            log_exec.info(
+                "Signal(task=%08x, signals=%08x) -> fallback set _fallback_signals=%08x",
+                task_addr,
+                signals,
+                SignalFunc._fallback_signals,
+            )
+            return
         other_task = sched_task.find_task_pred_func(pred_func)
         if other_task:
             log_exec.info(
@@ -98,6 +155,10 @@ class SignalFunc(FuncBase):
 
     def wait(self, signal_set):
         sched_task = self.get_my_sched_task()
+        if sched_task is None:
+            got = SignalFunc._fallback_signals & signal_set
+            log_exec.info("Wait(%08x): fallback -> %08x", signal_set, got)
+            return got
         log_exec.info("Wait(%08x): enter", signal_set)
         got_signals = sched_task.wait(signal_set)
         log_exec.info("Wait(%08x): left -> %08x", signal_set, got_signals)
@@ -105,10 +166,16 @@ class SignalFunc(FuncBase):
 
     def forbid(self):
         sched_task = self.get_my_sched_task()
+        if sched_task is None:
+            log_exec.info("Forbid (no scheduler)")
+            return 1
         cnt = sched_task.forbid()
         log_exec.info("Forbid (cnt=%d)", cnt)
 
     def permit(self):
         sched_task = self.get_my_sched_task()
+        if sched_task is None:
+            log_exec.info("Permit (no scheduler)")
+            return 0
         cnt = sched_task.permit()
         log_exec.info("Permit (cnt=%d)", cnt)

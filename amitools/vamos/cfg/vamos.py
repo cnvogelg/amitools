@@ -11,6 +11,9 @@ class VamosMainParser(MainParser):
         # path
         self.path = PathParser()
         self.add_parser(self.path)
+        # disks
+        self.disk = DiskParser()
+        self.add_parser(self.disk)
         # libs
         self.libs = LibsParser()
         self.add_parser(self.libs)
@@ -35,6 +38,9 @@ class VamosMainParser(MainParser):
 
     def get_path_dict(self):
         return self.path.get_cfg_dict()
+
+    def get_disk_dict(self):
+        return self.disk.get_cfg_dict()
 
     def get_libs_dict(self):
         return self.libs.get_cfg_dict()

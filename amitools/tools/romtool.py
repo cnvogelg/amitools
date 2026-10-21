@@ -430,6 +430,22 @@ def do_scan_cmd(args):
     rs = rom.ResidentScan(rom_img, base_addr)
     offs = rs.get_all_resident_pos()
     info = args.show_info
+
+    def resident_size(r, off):
+        """Bytes from a resident's romtag to where the next one starts.
+
+        skip_off can point backwards, for a romtag sitting inside another
+        module's span rather than starting one of its own, and the size of
+        such an entry is not a thing this can tell.
+        """
+        n = r.skip_off - off
+        return n if n > 0 else None
+
+    if args.sizes and args.sort_size and not info:
+        offs = sorted(offs, key=lambda o: resident_size(rs.get_resident(o), o) or -1,
+                      reverse=True)
+
+    total = 0
     for off in offs:
         r = rs.get_resident(off)
         nt = r.get_node_type_str()
@@ -451,11 +467,26 @@ def do_scan_cmd(args):
             print(spc, "priority:   %d" % r.pri)
             print(spc, "init off:   %08x" % r.init_off)
             print(spc, "skip off:   %08x" % r.skip_off)
+            if args.sizes:
+                n = resident_size(r, off)
+                print(spc, "size:       %s" % ("%u" % n if n else "?"))
         else:
-            print(
-                "@%08x  +%08x  %-12s  %+4d  %s  %s"
-                % (off, r.skip_off, nt, r.pri, name, id_string)
-            )
+            if args.sizes:
+                n = resident_size(r, off)
+                if n:
+                    total += n
+                print(
+                    "@%08x  +%08x  %8s  %-12s  %+4d  %s  %s"
+                    % (off, r.skip_off, "%u" % n if n else "?", nt, r.pri, name,
+                       id_string)
+                )
+            else:
+                print(
+                    "@%08x  +%08x  %-12s  %+4d  %s  %s"
+                    % (off, r.skip_off, nt, r.pri, name, id_string)
+                )
+    if args.sizes and not info:
+        print("total %u bytes in %u residents" % (total, len(offs)))
     return 0
 
 
@@ -651,6 +682,20 @@ def setup_scan_parser(parser):
         default=False,
         action="store_true",
         help="show more details on resident",
+    )
+    parser.add_argument(
+        "-s",
+        "--sizes",
+        default=False,
+        action="store_true",
+        help="show the bytes each resident spans, and a total",
+    )
+    parser.add_argument(
+        "-S",
+        "--sort-size",
+        default=False,
+        action="store_true",
+        help="with --sizes, list the largest residents first",
     )
     parser.set_defaults(cmd=do_scan_cmd)
 

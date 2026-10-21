@@ -98,6 +98,7 @@ class DirScan:
         self.block_scan = block_scan
         self.root_di = None
         self.intl = DosType.is_intl(block_scan.dos_type)
+        self.dircache = DosType.is_dircache(block_scan.dos_type)
         self.files = []
         self.dirs = []
 
@@ -135,7 +136,126 @@ class DirScan:
                 di.add(chain)
             hash_val += 1
 
+        if self.dircache:
+            records = self.scan_dircache(dir_bi)
+            if records != None:
+                self.check_dircache_records(di, records)
+
         return di
+
+    def scan_dircache(self, dir_bi):
+        """follow the chain of dircache blocks linked from a directory.
+        Returns its records as (block number, record) pairs, or None if the
+        chain is broken"""
+        dir_blk_num = dir_bi.blk_num
+        dir_name = dir_bi.name
+        blk_num = dir_bi.extension
+        num = 0
+        records = []
+        while blk_num != 0:
+            info = "dircache block #%d of dir '%s' (%d)" % (num, dir_name, dir_blk_num)
+            if self.block_scan.is_block_available(blk_num):
+                self.log.msg(Log.ERROR, "%s already used" % info, blk_num)
+                return None
+            dc_bi = self.block_scan.get_block(blk_num)
+            if dc_bi == None:
+                self.log.msg(Log.ERROR, "out-of-range %s" % info, blk_num)
+                return None
+            if dc_bi.blk_type != BlockScan.BT_DIR_CACHE:
+                self.log.msg(Log.ERROR, "invalid %s" % info, blk_num)
+                return None
+            if dc_bi.own_key != blk_num:
+                self.log.msg(
+                    Log.ERROR,
+                    "%s has invalid own key: got %d" % (info, dc_bi.own_key),
+                    blk_num,
+                )
+            if dc_bi.parent_blk != dir_blk_num:
+                self.log.msg(
+                    Log.ERROR,
+                    "%s has invalid parent: got %d" % (info, dc_bi.parent_blk),
+                    blk_num,
+                )
+            records += [(blk_num, r) for r in dc_bi.records]
+            blk_num = dc_bi.next_blk
+            num += 1
+        return records
+
+    def check_dircache_records(self, di, records):
+        """check that the dircache of a directory holds exactly one record
+        for each entry, with the entry's name, size and comment"""
+        dir_bi = di.blk_info
+        dir_info = "dir '%s' (%d)" % (dir_bi.name, dir_bi.blk_num)
+        entries = {}
+        for chain in di.get_chains().values():
+            for dce in chain.get_entries():
+                if dce.valid:
+                    entries[dce.blk_info.blk_num] = dce.blk_info
+        found = set()
+        for blk_num, r in records:
+            info = "dircache record '%s' of %s" % (r.name, dir_info)
+            bi = entries.get(r.entry)
+            if bi == None:
+                self.log.msg(
+                    Log.ERROR, "%s refers to no entry: %d" % (info, r.entry), blk_num
+                )
+                continue
+            if r.entry in found:
+                self.log.msg(Log.ERROR, "duplicate %s" % info, blk_num)
+                continue
+            found.add(r.entry)
+            if r.name != bi.name:
+                self.log.msg(
+                    Log.ERROR,
+                    "%s has invalid name: expect '%s'" % (info, bi.name),
+                    blk_num,
+                )
+            if bi.blk_type == BlockScan.BT_FILE_HDR:
+                size = bi.byte_size
+            else:
+                size = 0
+            if r.size != size:
+                self.log.msg(
+                    Log.ERROR,
+                    "%s has invalid size: got %d expect %d" % (info, r.size, size),
+                    blk_num,
+                )
+            if r.comment != bi.comment:
+                self.log.msg(Log.ERROR, "%s has invalid comment" % info, blk_num)
+        for blk_num, bi in entries.items():
+            if blk_num not in found:
+                self.log.msg(
+                    Log.ERROR,
+                    "'%s' in %s has no dircache record" % (bi.name, dir_info),
+                    blk_num,
+                )
+
+    def scan_comment_block(self, entry_bi):
+        """check the comment block of a long name entry"""
+        blk_num = entry_bi.comment_blk
+        info = "comment block of '%s' (%d)" % (entry_bi.name, entry_bi.blk_num)
+        if self.block_scan.is_block_available(blk_num):
+            self.log.msg(Log.ERROR, "%s already used" % info, blk_num)
+            return
+        c_bi = self.block_scan.get_block(blk_num)
+        if c_bi == None:
+            self.log.msg(Log.ERROR, "out-of-range %s" % info, blk_num)
+            return
+        if c_bi.blk_type != BlockScan.BT_COMMENT:
+            self.log.msg(Log.ERROR, "invalid %s" % info, blk_num)
+            return
+        if c_bi.own_key != blk_num:
+            self.log.msg(
+                Log.ERROR,
+                "%s has invalid own key: got %d" % (info, c_bi.own_key),
+                blk_num,
+            )
+        if c_bi.hdr_key != entry_bi.blk_num:
+            self.log.msg(
+                Log.ERROR,
+                "%s has invalid header: got %d" % (info, c_bi.hdr_key),
+                blk_num,
+            )
 
     def build_chain(self, chain, dir_blk_info, blk_num, progress):
         """build a block chain"""
@@ -243,6 +363,10 @@ class DirScan:
                 % (name, hash_val, dir_name, dir_blk_num),
                 blk_num,
             )
+
+        # long name entries keep a comment that does not fit in an extra block
+        if blk_info.comment_blk != 0:
+            self.scan_comment_block(blk_info)
 
         # recurse into dir?
         if blk_type == BlockScan.BT_DIR:

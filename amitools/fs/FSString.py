@@ -40,6 +40,8 @@ class FSString:
         return self.txt
 
     def get_ami_str(self):
-        # make sure to normalize utf-8
-        nrm = unicodedata.normalize("NFKC", self.txt)
+        # Compose decomposed Unicode input without changing Latin-1 bytes.
+        # Compatibility normalization expands characters such as fractions
+        # and can produce text that is no longer representable in Latin-1.
+        nrm = unicodedata.normalize("NFC", self.txt)
         return nrm.encode("Latin-1")

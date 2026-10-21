@@ -30,6 +30,24 @@ class TypeBase:
         """return the type alias (amiga class instead of struct) or the struct"""
         return cls
 
+    @classmethod
+    def _bind_base(cls, obj, mem, addr, offset=0, base_offset=0):
+        set_attr = object.__setattr__
+        set_attr(obj, "_mem", mem)
+        set_attr(obj, "_addr", addr)
+        set_attr(obj, "_reg", None)
+        set_attr(obj, "_cpu", None)
+        set_attr(obj, "_offset", offset)
+        set_attr(obj, "_base_offset", base_offset)
+        set_attr(obj, "_mem_obj", None)
+        set_attr(obj, "_alloc", None)
+
+    @classmethod
+    def _bind(cls, mem, addr, offset=0, base_offset=0):
+        obj = object.__new__(cls)
+        cls._bind_base(obj, mem, addr, offset, base_offset)
+        return obj
+
     # --- instance ---
 
     def __init__(
@@ -49,15 +67,16 @@ class TypeBase:
         If you pass mem and addr than the type is bound to a memory location.
         If you pass a register then the value is bound to the CPU register.
         """
-        self._mem = mem
-        self._addr = addr
-        self._reg = reg
-        self._cpu = cpu
-        self._offset = offset
-        self._base_offset = base_offset
+        set_attr = object.__setattr__
+        set_attr(self, "_mem", mem)
+        set_attr(self, "_addr", addr)
+        set_attr(self, "_reg", reg)
+        set_attr(self, "_cpu", cpu)
+        set_attr(self, "_offset", offset)
+        set_attr(self, "_base_offset", base_offset)
         # optional allocation
-        self._mem_obj = mem_obj
-        self._alloc = alloc
+        set_attr(self, "_mem_obj", mem_obj)
+        set_attr(self, "_alloc", alloc)
         # both addr and reg are not allowed
         assert not (reg and addr)
         if reg:
@@ -187,7 +206,7 @@ class TypeBase:
         # check for invalid keys
         if key in ("val", "aptr", "bptr", "ref"):
             raise AttributeError("Invalid set key '{}' in {}".format(key, repr(self)))
-        super().__setattr__(key, val)
+        object.__setattr__(self, key, val)
 
     # allocation
 
@@ -198,8 +217,11 @@ class TypeBase:
         mem_obj = cls._alloc(alloc, tag, *alloc_args)
         if not mem_obj:
             return None
-        # create instance of this or alias type
+        struct_obj = getattr(mem_obj, "struct", None)
         cls_type = cls.get_alias_type()
+        if not kwargs and isinstance(struct_obj, cls_type):
+            return struct_obj
+        # create instance of this or alias type
         return cls_type(
             mem=alloc.get_mem(),
             addr=mem_obj.addr,
@@ -219,10 +241,10 @@ class TypeBase:
     def free(self, alloc=None):
         # rebind object if it was bound somewhere else
         if alloc:
-            self._alloc = alloc
-            self._mem_obj = alloc.get_memory(self._addr)
+            object.__setattr__(self, "_alloc", alloc)
+            object.__setattr__(self, "_mem_obj", alloc.get_memory(self._addr))
 
         if self._alloc and self._mem_obj:
             self._free(self._alloc, self._mem_obj)
-            self._alloc = None
-            self._mem_obj = None
+            object.__setattr__(self, "_alloc", None)
+            object.__setattr__(self, "_mem_obj", None)

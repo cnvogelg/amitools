@@ -4,7 +4,6 @@ import logging
 from amitools.util import SlotArray
 from amitools.vamos.log import log_lock
 from amitools.vamos.error import VamosInternalError
-from amitools.vamos.astructs import AccessStruct
 from amitools.vamos.libstructs import DosListVolumeStruct, FileLockStruct
 from .Error import *
 from .Lock import Lock
@@ -150,8 +149,8 @@ class LockManager:
         if b_addr == 0:
             return None
         else:
-            raw_lock = AccessStruct(self.mem, FileLockStruct, b_addr << 2)
-            key = raw_lock.r_s("fl_Key")
+            raw_lock = FileLockStruct(self.mem, b_addr << 2)
+            key = raw_lock.key.val
             lock_key = self.keys[key]
             log_lock.debug(
                 "lookup key in baddr=%08x: %s -> lock_key=%r", b_addr, key, lock_key
@@ -170,8 +169,8 @@ class LockManager:
         if lock is None:
             return "SYS:"
         else:
-            vol_addr = lock.mem.access.r_s("fl_Volume")
-            volnode = AccessStruct(self.mem, DosListVolumeStruct, vol_addr)
-            name_addr = volnode.r_s("dol_Name")
-            name = self.mem.access.r_bstr(name_addr) + ":"
+            vol_addr = lock.struct.volume.aptr
+            volnode = DosListVolumeStruct(self.mem, vol_addr)
+            name_addr = volnode.name.aptr
+            name = self.mem.r_bstr(name_addr) + ":"
             return name

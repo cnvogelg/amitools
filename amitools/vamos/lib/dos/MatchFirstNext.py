@@ -1,4 +1,3 @@
-from amitools.vamos.astructs import AccessStruct
 from amitools.vamos.libstructs import (
     AnchorPathStruct,
     AChainStruct,
@@ -20,9 +19,9 @@ class MatchFirstNext:
         self.lock = lock
         self.anchor = anchor
         # get total size of struct
-        self.str_len = anchor.r_s("ap_Strlen")
+        self.str_len = anchor.ap_Strlen.val
         self.total_size = AnchorPathStruct.get_size() + self.str_len
-        self.flags = anchor.r_s("ap_Flags")
+        self.flags = anchor.ap_Flags.val
         # setup matcher
         self.matcher = PathMatch(self.path_mgr, self.lock)
         self.ok = self.matcher.parse(self.pattern)
@@ -48,9 +47,10 @@ class MatchFirstNext:
         # THOR: this is still screwed up. Some utililties
         # most notably "dir" depend on a correctly setup
         # anchor chain...
-        self.achain_dummy = ctx.alloc.alloc_struct(AChainStruct, label="AChain_Dummy")
-        self.anchor.w_s("ap_Last", self.achain_dummy.addr)
-        self.anchor.w_s("ap_Base", self.achain_dummy.addr)
+        self.achain_dummy = ctx.alloc.alloc_astruct(AChainStruct, label="AChain_Dummy")
+        self.achain_dummy_struct = self.achain_dummy
+        self.anchor.ap_Last.aptr = self.achain_dummy.addr
+        self.anchor.ap_Base.aptr = self.achain_dummy.addr
         if not self._fill_lock(abs_path):
             return ERROR_OBJECT_NOT_FOUND
 
@@ -67,13 +67,13 @@ class MatchFirstNext:
         lock = self.lock_mgr.create_lock(self.lock, path, False)
         if lock == None:
             return ERROR_OBJECT_NOT_FOUND
-        fib_ptr = self.anchor.s_get_addr("ap_Info")
-        fib = AccessStruct(ctx.mem, FileInfoBlockStruct, struct_addr=fib_ptr)
+        fib_ptr = self.anchor.ap_Info.addr
+        fib = FileInfoBlockStruct(ctx.mem, fib_ptr)
         io_err = lock.examine_lock(fib)
         self.lock_mgr.release_lock(lock)
         # store path name of first name at end of structure
         if self.str_len > 0:
-            path_ptr = self.anchor.s_get_addr("ap_Buf")
+            path_ptr = self.anchor.ap_Buf.addr
             self.anchor.mem.w_cstr(path_ptr, path)
         return io_err
 
@@ -82,11 +82,9 @@ class MatchFirstNext:
         if lock == None:
             return False
         self.dir_lock = lock
-        oldlock = self.lock_mgr.get_by_b_addr(
-            self.achain_dummy.access.r_s("an_Lock") >> 2
-        )
+        oldlock = self.lock_mgr.get_by_b_addr(self.achain_dummy_struct.lock.bptr)
         self.lock_mgr.release_lock(oldlock)
-        self.achain_dummy.access.w_s("an_Lock", lock.mem.addr)
+        self.achain_dummy_struct.lock.aptr = lock.mem.addr
         return True
 
     def _fill_parent_lock(self, path):
@@ -128,19 +126,19 @@ class MatchFirstNext:
             return None, None, flags
 
     def next(self, ctx):
-        flags = self.anchor.r_s("ap_Flags")
+        flags = self.anchor.ap_Flags.val
         org_flags = flags
 
         # check DODIR flag and add first level of dir entries
         if flags & self.DODIR == self.DODIR:
             # Note that FindNext *CLEARS* DODIR after testing!
-            self.anchor.w_s("ap_Flags", flags & ~self.DODIR)
+            self.anchor.ap_Flags.val = flags & ~self.DODIR
             self._push_dodir(self.name, self.path)
 
         # are there dirs to do?
         name, path, flags = self._get_dodir(flags)
         if flags != org_flags:
-            self.anchor.w_s("ap_Flags", flags)
+            self.anchor.ap_Flags.val = flags
 
         # no dodir -> use matcher
         if path == None:
@@ -168,8 +166,6 @@ class MatchFirstNext:
             ctx.label_mgr.add_label(self.old_label)
         # free last dir lock & achain
         if self.achain_dummy != None:
-            oldlock = self.lock_mgr.get_by_b_addr(
-                self.achain_dummy.access.r_s("an_Lock") >> 2
-            )
+            oldlock = self.lock_mgr.get_by_b_addr(self.achain_dummy_struct.lock.bptr)
             self.lock_mgr.release_lock(oldlock)
-            ctx.alloc.free_struct(self.achain_dummy)
+            self.achain_dummy.free()

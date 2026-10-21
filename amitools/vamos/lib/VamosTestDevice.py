@@ -22,10 +22,10 @@ class VamosTestDevice(LibImpl):
     def get_cnt(self):
         return self.cnt
 
-    def BeginIO(self, ctx):
+    def BeginIO(self, ctx, io_request):
         print("VamosTest: BeginIO")
 
-    def AbortIO(self, ctx):
+    def AbortIO(self, ctx, io_request):
         print("VamosTest: AbortIO")
 
     def Add(self, ctx):

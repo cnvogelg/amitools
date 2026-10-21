@@ -9,6 +9,7 @@ from amitools.fs.block.FileDataBlock import FileDataBlock
 from amitools.fs.block.BitmapBlock import BitmapBlock
 from amitools.fs.block.BitmapExtBlock import BitmapExtBlock
 from amitools.fs.block.CommentBlock import CommentBlock
+from amitools.fs.block.DirCacheBlock import DirCacheBlock
 from amitools.fs.FSString import FSString
 import amitools.fs.DosType as DosType
 
@@ -50,7 +51,8 @@ class BlockScan:
     BT_BITMAP = 6
     BT_BITMAP_EXT = 7
     BT_COMMENT = 8
-    NUM_BT = 9
+    BT_DIR_CACHE = 9
+    NUM_BT = 10
 
     def __init__(self, blkdev, log, dos_type):
         self.blkdev = blkdev
@@ -145,6 +147,7 @@ class BlockScan:
                     bi.name = root.name
                     bi.hash_table = root.hash_table
                     bi.parent_blk = 0
+                    bi.extension = root.extension
                     self.log.msg(Log.DEBUG, "Found Root: '%s'" % bi.name, blk_num)
                     # chech hash size
                     nht = len(root.hash_table)
@@ -173,6 +176,9 @@ class BlockScan:
                     bi.next_blk = user.hash_chain
                     bi.hash_table = user.hash_table
                     bi.own_key = user.own_key
+                    bi.extension = user.extension
+                    bi.comment = user.comment
+                    bi.comment_blk = user.comment_block_id
                     self.log.msg(Log.DEBUG, "Found Dir : '%s'" % bi.name, blk_num)
                 # --- filter header block ---
                 elif blk.is_file_header_block():
@@ -189,6 +195,8 @@ class BlockScan:
                     bi.byte_size = fh.byte_size
                     bi.data_blocks = fh.data_blocks
                     bi.extension = fh.extension
+                    bi.comment = fh.comment
+                    bi.comment_blk = fh.comment_block_id
                     self.log.msg(Log.DEBUG, "Found File: '%s'" % bi.name, blk_num)
                 # --- file list block ---
                 elif blk.is_file_list_block():
@@ -215,8 +223,23 @@ class BlockScan:
                     bi.blk_type = self.BT_COMMENT
                     bi.blk_status = self.BS_TYPE
                     cblk = CommentBlock(self.blkdev, blk_num)
-                    bi.hdr_key = cblk.hdr_key
+                    cblk.set(data)
+                    bi.hdr_key = cblk.header_key
                     bi.own_key = cblk.own_key
+                # --- dir cache block (DOS4/5) ---
+                elif blk.is_dir_cache_block():
+                    dcb = DirCacheBlock(self.blkdev, blk_num)
+                    dcb.set(data)
+                    if dcb.valid:
+                        bi.blk_type = self.BT_DIR_CACHE
+                        bi.blk_status = self.BS_TYPE
+                        bi.own_key = dcb.own_key
+                        bi.parent_blk = dcb.parent
+                        bi.next_blk = dcb.next_cache
+                        bi.records = dcb.records
+                    else:
+                        # its records run past the end of the block
+                        bi.blk_status = self.BS_INVALID
 
         except IOError as e:
             self.log.msg(Log.ERROR, "Can't read block", blk_num)

@@ -31,15 +31,14 @@ class LibBase:
             pos_size = cls.get_byte_size()
         # round size
         neg_size = (neg_size + 3) & ~3
-        # alloc lib
-        return super().alloc(
-            alloc,
-            pos_size,
-            neg_size,
-            fd,
-            tag=tag,
+        if tag is None:
+            tag = cls.get_signature()
+        return alloc.alloc_alib(
+            cls,
             pos_size=pos_size,
             neg_size=neg_size,
+            fd=fd,
+            label=tag,
             **kwargs,
         )
 

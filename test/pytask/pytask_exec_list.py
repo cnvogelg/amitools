@@ -1,6 +1,6 @@
 import pytest
 from amitools.vamos.libtypes import List, Node
-from amitools.vamos.libstructs import NodeType
+from amitools.vamos.libstructs import MinListStruct, NodeType
 
 
 def pytask_exec_list_alloc_free_test(vamos_task):
@@ -17,6 +17,33 @@ def pytask_exec_list_alloc_free_test(vamos_task):
         # free list
         list.free()
 
+        return 0
+
+    exit_codes = vamos_task.run([task])
+    assert exit_codes == [0]
+
+
+def pytask_exec_list_new_min_list_test(vamos_task):
+    def task(ctx, task):
+        exec_lib = ctx.proxies.get_exec_lib_proxy()
+
+        minlist_mem = ctx.alloc.alloc_struct(MinListStruct)
+        exec_lib.NewMinList(minlist_mem.addr)
+
+        head_off = MinListStruct.sdef.find_field_def_by_name("mlh_Head").offset
+        tail_off = MinListStruct.sdef.find_field_def_by_name("mlh_Tail").offset
+        tailpred_off = MinListStruct.sdef.find_field_def_by_name(
+            "mlh_TailPred"
+        ).offset
+
+        assert ctx.mem.r32(minlist_mem.addr + head_off) == minlist_mem.addr + tail_off
+        assert ctx.mem.r32(minlist_mem.addr + tail_off) == 0
+        assert (
+            ctx.mem.r32(minlist_mem.addr + tailpred_off)
+            == minlist_mem.addr + head_off
+        )
+
+        ctx.alloc.free_struct(minlist_mem)
         return 0
 
     exit_codes = vamos_task.run([task])

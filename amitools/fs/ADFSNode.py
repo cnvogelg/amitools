@@ -8,6 +8,9 @@ from .FSError import *
 from .FSString import FSString
 import amitools.util.ByteSize as ByteSize
 
+# AmigaDOS keeps at most 79 bytes of comment, whatever the DOS type
+MAX_COMMENT_BYTES = 79
+
 
 class ADFSNode:
     def __init__(self, volume, parent):
@@ -38,13 +41,29 @@ class ADFSNode:
         self.create_meta_info()
 
     def create_meta_info(self):
+        comment = self.block.comment
         if self.block.comment_block_id != 0:
-            comment_block = CommentBlock(self.blkdev, self.block.comment_block_id)
-            comment_block.read()
-            comment = comment_block.comment
-        else:
-            comment = self.block.comment
+            comment_block = self._read_comment_block()
+            if comment_block:
+                comment = comment_block.comment
+            else:
+                # never free or rewrite a block that is not ours
+                self.block.comment_block_id = 0
         self.meta_info = MetaInfo(self.block.protect, self.block.mod_ts, comment)
+
+    def _read_comment_block(self):
+        """return the comment block the header points to, or None unless it
+        is a valid comment block that belongs to this entry"""
+        blk_num = self.block.comment_block_id
+        if blk_num < self.blkdev.reserved or blk_num >= self.blkdev.num_blocks:
+            return None
+        comment_block = CommentBlock(self.blkdev, blk_num)
+        comment_block.read()
+        if not comment_block.valid or comment_block.comment is None:
+            return None
+        if comment_block.header_key != self.block.blk_num:
+            return None
+        return comment_block
 
     def get_file_name(self):
         return self.name
@@ -60,8 +79,32 @@ class ADFSNode:
     def get_meta_info(self):
         return self.meta_info
 
+    def _check_comment(self, comment, file_name=None):
+        """refuse a comment the disk cannot hold: FastFileSystem rejects more
+        than 79 bytes, and the disk stores Latin-1 only"""
+        try:
+            size = len(comment.get_ami_str())
+        except UnicodeEncodeError:
+            raise FSError(
+                INVALID_COMMENT, node=self, file_name=file_name, extra="not Latin-1"
+            ) from None
+        if size > MAX_COMMENT_BYTES:
+            raise FSError(
+                INVALID_COMMENT,
+                node=self,
+                file_name=file_name,
+                extra="%d bytes, max %d" % (size, MAX_COMMENT_BYTES),
+            )
+
     def change_meta_info(self, meta_info):
         dirty = False
+
+        # check the comment before anything changes
+        comment = meta_info.get_comment()
+        if comment and hasattr(self.block, "comment"):
+            self._check_comment(comment)
+        else:
+            comment = None
 
         # dircache?
         rebuild_dircache = False
@@ -69,8 +112,38 @@ class ADFSNode:
             record = self.parent.get_dircache_record(self.name.get_name())
             if not record:
                 raise FSError(INTERNAL_ERROR, node=self, extra="dc not found!")
+            # a longer comment may no longer fit into its dircache block:
+            # make room for the record before anything changes
+            if comment and len(comment.get_ami_str()) > len(
+                record.comment.get_ami_str()
+            ):
+                self.parent.make_dircache_room(record, comment)
+                rebuild_dircache = True
         else:
             record = None
+
+        # a long name comment that does not fit beside the name goes into a
+        # comment block: write it before the header points to it
+        comment_blk_num = None
+        if (
+            comment
+            and self.volume.is_longname
+            and EntryBlock.needs_extra_comment_block(self.name.get_name(), comment)
+        ):
+            comment_blk_num = self.block.comment_block_id
+            new_blk = comment_blk_num == 0
+            if new_blk:
+                blks = self.volume.bitmap.alloc_n(1)
+                if blks is None:
+                    raise FSError(NO_FREE_BLOCKS, node=self)
+                comment_blk_num = blks[0]
+            try:
+                self._write_comment_block(comment_blk_num, comment)
+            except Exception:
+                # release a block allocated here, never the entry's own one
+                if new_blk:
+                    self.volume.bitmap.dealloc_n([comment_blk_num])
+                raise
 
         # alter protect flags
         protect = meta_info.get_protect()
@@ -91,23 +164,9 @@ class ADFSNode:
                 record.mod_ts = mod_ts
 
         # alter comment
-        comment = meta_info.get_comment()
-        if comment and hasattr(self.block, "comment"):
-            if EntryBlock.needs_extra_comment_block(self.name, comment):
-                if self.block.comment_block_id == 0:
-                    # Allocate and initialize extra block for comment
-                    blks = self.volume.bitmap.alloc_n(1)
-                    if blks is not None:
-                        cblk = CommentBlock(self.blkdev, blks[0])
-                        cblk.create(self.block.blk_num)
-                        self.block.comment_block_id = cblk.blk_num
-                    else:
-                        raise FSError(NO_FREE_BLOCKS, node=self)
-                else:
-                    cblk = CommentBlock(self.blkdev, self.block.comment_block_id)
-                    cblk.read()
-                cblk.comment = comment
-                cblk.write()
+        if comment:
+            if comment_blk_num is not None:
+                self.block.comment_block_id = comment_blk_num
             else:
                 self.block.comment = comment
                 if self.block.comment_block_id != 0:
@@ -117,7 +176,6 @@ class ADFSNode:
             self.meta_info.set_comment(comment)
             dirty = True
             if record:
-                rebuild_dircache = len(record.comment) < comment
                 record.comment = comment
 
         # really need update?
@@ -126,6 +184,12 @@ class ADFSNode:
             # dirache update
             if record:
                 self.parent.update_dircache_record(record, rebuild_dircache)
+
+    def _write_comment_block(self, blk_num, comment):
+        """write comment into comment block blk_num of this entry"""
+        comment_block = CommentBlock(self.blkdev, blk_num)
+        comment_block.create(self.block.blk_num, comment)
+        comment_block.write()
 
     def change_comment(self, comment):
         self.change_meta_info(MetaInfo(comment=comment))
