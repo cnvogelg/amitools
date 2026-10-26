@@ -775,6 +775,9 @@ class ADFSDir(ADFSNode):
     def check_dircache_room(self, record, new_record):
         """make sure that new_record, replacing record, finds room in the
         dircache: in a block, or else in a free block for a new one"""
+        if record is not None and new_record.get_size() <= record.get_size():
+            # a record that does not grow always fits in its place
+            return
         for dcb in self.dcache_blks:
             if self._dircache_fits(dcb, new_record, record):
                 return

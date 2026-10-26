@@ -2526,3 +2526,37 @@ def fs_protect_zero_xdftool_test(tmp_path, capsys):
     node = volume.get_path_name(FSString("file"))
     assert node.get_meta_info().get_protect_str() == "----rwed"
     close_volume(blkdev, volume)
+
+
+@pytest.mark.parametrize("dos_type", DIRCACHE_DOS_TYPES, ids=dos_id)
+def fs_dircache_change_no_scan_test(tmp_path, dos_type, monkeypatch):
+    # A change whose dircache record does not grow, as a protection change,
+    # looks for no room in the other dircache blocks of a directory: it
+    # stays in its own.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    volume.create_dir(FSString("dir"))
+    fill_dir(volume, 60)
+    parent = volume.get_path_name(FSString("dir"))
+    node = volume.get_path_name(FSString("dir/f59"))
+    record = parent.get_dircache_record(node)
+    own = [dcb for dcb in parent.dcache_blks if dcb.has_record(record)]
+    assert len(parent.dcache_blks) > 2 and own == [parent.dcache_blks[-1]]
+    measured = []
+    get_free_record_size = DirCacheBlock.get_free_record_size
+
+    def measuring(self):
+        measured.append(self.blk_num)
+        return get_free_record_size(self)
+
+    monkeypatch.setattr(DirCacheBlock, "get_free_record_size", measuring)
+    node.change_protect(0x0F)
+    monkeypatch.undo()
+    assert set(measured) <= {own[0].blk_num}
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    node = volume.get_path_name(FSString("dir/f59"))
+    assert node.get_meta_info().get_protect() == 0x0F
+    close_volume(blkdev, volume)
+    assert validate(image) == []
