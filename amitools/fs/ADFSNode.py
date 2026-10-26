@@ -201,7 +201,8 @@ class ADFSNode:
         if not hasattr(self.block, "protect"):
             protect = None
         mod_ts = meta_info.get_mod_ts()
-        if not (protect or mod_ts or comment):
+        # a protection of 0, ----rwed, is a change, too
+        if protect is None and not (mod_ts or comment):
             return
         # a comment change rewrites or frees only a comment block that is
         # still mine
@@ -227,7 +228,9 @@ class ADFSNode:
             new_record = DirCacheRecord(
                 entry=self.block.blk_num,
                 size=self.get_size(),
-                protect=protect or self.meta_info.get_protect(),
+                protect=(
+                    protect if protect is not None else self.meta_info.get_protect()
+                ),
                 mod_ts=mod_ts or self.meta_info.get_mod_ts(),
                 sub_type=self.block.sub_type,
                 name=self.name.get_name(),
@@ -259,7 +262,7 @@ class ADFSNode:
             for name in ("protect", "mod_ts", "comment", "comment_block_id")
             if hasattr(self.block, name)
         }
-        if protect:
+        if protect is not None:
             self.block.protect = protect
         if mod_ts:
             self.block.mod_ts = mod_ts
@@ -301,7 +304,7 @@ class ADFSNode:
                 self.volume.bitmap.dealloc_n([own_blk_num])
             self.comment_blk_num = comment_blk_num
             self.meta_info.set_comment(comment)
-        if protect:
+        if protect is not None:
             self.meta_info.set_protect(protect)
         if mod_ts:
             self.meta_info.set_mod_ts(mod_ts)

@@ -2484,3 +2484,45 @@ def fs_comment_not_latin1_test(tmp_path, dos_type):
     assert volume.get_path_name(FSString("new")) is None
     close_volume(blkdev, volume)
     assert validate(image) == []
+
+
+@pytest.mark.parametrize("kind", ["file", "dir"])
+@pytest.mark.parametrize("dos_type", DOS_TYPES, ids=dos_id)
+def fs_protect_zero_test(tmp_path, dos_type, kind):
+    # A protection of 0, ----rwed, is set like any other, in the header,
+    # the meta info and, on DOS4/5, the dircache record.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    if kind == "file":
+        volume.write_file(b"data", FSString("entry"))
+    else:
+        volume.create_dir(FSString("entry"))
+    node = volume.get_path_name(FSString("entry"))
+    node.change_protect(0x0F)
+    node.change_protect(0)
+    assert node.block.protect == 0
+    assert node.get_meta_info().get_protect() == 0
+    close_volume(blkdev, volume)
+
+    blkdev, volume = open_volume(image)
+    node = volume.get_path_name(FSString("entry"))
+    assert node.get_meta_info().get_protect() == 0
+    if dos_type in DIRCACHE_DOS_TYPES:
+        records = dircache_records(volume, "")
+        assert [r.protect for r in records] == [0]
+    close_volume(blkdev, volume)
+    assert validate(image) == []
+
+
+def fs_protect_zero_xdftool_test(tmp_path, capsys):
+    # xdftool protect sets ----rwed back.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, DosType.DOS0)
+    volume.write_file(b"data", FSString("file"))
+    close_volume(blkdev, volume)
+    assert xdftool_main([str(image), "protect", "file", "r"]) == 0
+    assert xdftool_main([str(image), "protect", "file", "rwed"]) == 0
+    blkdev, volume = open_volume(image)
+    node = volume.get_path_name(FSString("file"))
+    assert node.get_meta_info().get_protect_str() == "----rwed"
+    close_volume(blkdev, volume)
