@@ -1,7 +1,12 @@
+import os
+
 import pytest
 
 from amitools.fs.ADFSVolume import ADFSVolume
+from amitools.fs.FSError import FSError, INVALID_COMMENT
 from amitools.fs.FSString import FSString
+from amitools.fs.Imager import Imager
+from amitools.fs.Repacker import Repacker
 from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
 import amitools.fs.DosType as DosType
 from amitools.tools.xdftool import main as xdftool_main
@@ -166,3 +171,48 @@ def fs_repack_comments_test(tmp_path, dos_type):
         assert get_comment(volume, path) == FSString(comment)
     assert volume.read_file(FSString("sub/b.txt")) == b"data b"
     close_volume(blkdev, volume)
+
+
+@pytest.mark.parametrize("comment", ["short", "x" * 80], ids=["ok", "too_long"])
+def fs_pack_symlink_loop_test(tmp_path, comment, monkeypatch):
+    # The comment check walks a directory once on each path: two symlinks
+    # back to the top of the tree do not make it walk on and on.
+    tree = make_pack_tree(tmp_path, uaem={"a.txt": comment})
+    for name in ("l0", "l1"):
+        try:
+            os.symlink(str(tree), str(tree / name), target_is_directory=True)
+        except (OSError, NotImplementedError):
+            pytest.skip("cannot create directory symlinks here")
+    calls = []
+    listdir = os.listdir
+
+    def counting_listdir(path):
+        calls.append(path)
+        assert len(calls) <= 50, "walked the symlink loop"
+        return listdir(path)
+
+    monkeypatch.setattr(os, "listdir", counting_listdir)
+    imager = Imager()
+    if comment == "short":
+        imager.pack_begin(str(tree))
+    else:
+        with pytest.raises(FSError) as error:
+            imager.pack_begin(str(tree))
+        assert error.value.code == INVALID_COMMENT
+    # the tree and sub, at most
+    assert len(calls) <= 2
+
+
+def fs_repack_check_flushes_test(tmp_path):
+    # The comment check holds one path of the input volume at a time, as
+    # repack does: a directory is flushed once it is checked.
+    src = tmp_path / "src.adf"
+    make_repack_image(src, DosType.DOS0, {"sub/b.txt": "b"})
+    repacker = Repacker(str(src))
+    assert repacker.create_in()
+    repacker.check_comments()
+    root = repacker.in_volume.get_root_dir()
+    subs = [e for e in root.get_entries() if e.is_dir()]
+    assert [e.entries for e in subs] == [None]
+    # and repack reads it again
+    assert [str(e.get_file_name().get_name()) for e in subs[0].get_entries()]

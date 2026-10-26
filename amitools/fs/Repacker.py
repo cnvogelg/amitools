@@ -31,19 +31,22 @@ class Repacker:
             return False
         if self.create_in_volume() == None:
             return False
-        self.check_comments(self.in_volume.get_root_dir())
         return True
 
-    def check_comments(self, in_dir):
+    def check_comments(self, in_dir=None):
         """refuse a comment the new image cannot hold, as one over 79 bytes
         that a long name header keeps beside a short name, before the image
-        is created"""
+        is created. Walks the input volume from in_dir, or its root"""
+        if in_dir is None:
+            in_dir = self.in_volume.get_root_dir()
         for e in in_dir.get_entries():
             comment = e.get_meta_info().get_comment()
             if comment is not None:
                 check_comment(comment, node=e)
             if e.is_dir():
                 self.check_comments(e)
+                # repack reads it again: hold only one path, as repack does
+                e.flush()
 
     def create_out_blkdev(self, image_file, force=True, options=None):
         if self.in_blkdev == None:

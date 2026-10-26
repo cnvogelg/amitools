@@ -311,6 +311,8 @@ class RepackCmd(Command):
         self.repacker = Repacker(in_img, in_opts)
         if not self.repacker.create_in():
             self.exit_code = 2
+        else:
+            self.repacker.check_comments()
 
     def init_blkdev(self, image_file):
         return self.repacker.create_out_blkdev(image_file)

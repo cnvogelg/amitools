@@ -141,9 +141,12 @@ class Imager:
         if os.path.isdir(in_path):
             self.pack_check_comments(in_path, "")
 
-    def pack_check_comments(self, in_path, ami_path):
+    def pack_check_comments(self, in_path, ami_path, parents=()):
         """refuse a comment the image cannot hold before anything is
-        written: walk the tree as pack_entry() does, with its meta info"""
+        written: walk the tree as pack_entry() does, with its meta info. A
+        directory already on the path, as a symlink to a parent leads to, is
+        not walked again"""
+        parents = parents + (os.path.realpath(in_path),)
         for name in os.listdir(in_path):
             sub_path = os.path.join(in_path, name)
             if self.meta_fsuae.is_meta_file(sub_path):
@@ -156,8 +159,8 @@ class Imager:
                     check_comment(
                         meta_info.get_comment(), file_name=FSString(sub_ami_path)
                     )
-            if is_dir:
-                self.pack_check_comments(sub_path, sub_ami_path)
+            if is_dir and os.path.realpath(sub_path) not in parents:
+                self.pack_check_comments(sub_path, sub_ami_path, parents)
 
     def pack_ami_path(self, parent_ami_path, name):
         ami_name = FSString(name).get_unicode()
