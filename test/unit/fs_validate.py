@@ -1049,6 +1049,28 @@ def fs_validate_delete_all_root_ok_test(tmp_path, dos_type):
 
 
 @pytest.mark.parametrize("dos_type", DOS_TYPES, ids=dos_id)
+def fs_validate_delete_all_root_unread_test(tmp_path, dos_type):
+    # Deleting the root with all its entries is refused, and changes
+    # nothing, when an entry of the root could not be read, also when it is
+    # the only one, which would stay behind.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    volume.write_file(b"x", FSString("only"))
+    bad = volume.get_path_name(FSString("only")).block.blk_num
+    close_volume(blkdev, volume)
+    flip_checksum(image, bad)
+    before = image.read_bytes()
+
+    blkdev, volume = open_volume(image)
+    assert volume.root_dir.get_entries() == []
+    with pytest.raises(FSError) as error:
+        volume.delete(FSString("/"), all=True)
+    assert error.value.code == INVALID_ENTRY_BLOCK
+    close_volume(blkdev, volume)
+    assert image.read_bytes() == before
+
+
+@pytest.mark.parametrize("dos_type", DOS_TYPES, ids=dos_id)
 def fs_validate_delete_all_deep_test(tmp_path, dos_type):
     # Deleting a directory with all its entries checks the whole tree
     # before the first entry goes: an invalid header two levels below

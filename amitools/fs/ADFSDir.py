@@ -503,7 +503,10 @@ class ADFSDir(ADFSNode):
         self.ensure_entries()
         if all:
             # refuse before the first entry goes, not after: the tree of
-            # each entry is checked once, here
+            # each entry is checked once, here, and my own entries and
+            # dircache first, as an entry not read would stay behind
+            self.check_entries()
+            self.check_dircache()
             for e in self.entries:
                 self.check_delete(e, all, update_ts)
         for e in self.entries[:]:
