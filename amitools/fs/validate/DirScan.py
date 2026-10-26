@@ -269,6 +269,16 @@ class DirScan:
         # get entry block
         blk_info = self.block_scan.read_block(blk_num)
 
+        # not a block in range
+        if blk_info == None:
+            self.log.msg(
+                Log.ERROR,
+                "out-of-range block terminates chain #%d of dir '%s' (%d)"
+                % (hash_val, dir_name, dir_blk_num),
+                blk_num,
+            )
+            return
+
         # create dir chain entry
         dce = DirChainEntry(blk_info)
         chain.add(dce)
@@ -293,17 +303,6 @@ class DirScan:
             self.log.msg(
                 Log.ERROR,
                 "dir block in its own chain #%d of dir '%s' (%d)"
-                % (hash_val, dir_name, dir_blk_num),
-                blk_num,
-            )
-            dce.end = True
-            return
-
-        # not a block in range
-        if blk_info == None:
-            self.log.msg(
-                Log.ERROR,
-                "out-of-range block terminates chain #%d of dir '%s' (%d)"
                 % (hash_val, dir_name, dir_blk_num),
                 blk_num,
             )

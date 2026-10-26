@@ -110,7 +110,10 @@ class BlockScan:
                 self.log.msg(Log.INFO, "%d invalid blocks found" % num_invalid_blocks)
 
     def read_block(self, blk_num, is_bm=False, is_bm_ext=False):
-        """read block from device, decode it, and return block info instance"""
+        """read block from device, decode it, and return block info instance,
+        or None if the block is not on the device"""
+        if blk_num < 0 or blk_num >= len(self.block_map):
+            return None
         try:
             # read block from device
             if is_bm:

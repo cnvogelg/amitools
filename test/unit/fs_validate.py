@@ -377,3 +377,55 @@ def fs_validate_root_hash_size_field_test(tmp_path, dos_type):
     errors = validate(image)
     assert any("does not have normal hash size: 71 != 72" in e for e in errors)
     assert not any("invalid name hash" in e for e in errors)
+
+
+@pytest.mark.parametrize("kind", ["adf", "hdf"])
+@pytest.mark.parametrize(
+    "where, message",
+    [
+        ("hash_slot", "out-of-range block terminates chain"),
+        ("bitmap", "Error reading bitmap block"),
+        ("bitmap_ext", "Error reading bitmap ext block"),
+    ],
+)
+def fs_validate_block_off_disk_test(tmp_path, kind, where, message):
+    # A pointer of the root block past the end of the volume, in a hash
+    # table slot, the list of bitmap blocks or the link to a bitmap
+    # extension block, is reported; the validator goes on. Reading such a
+    # block raises ValueError on an ADF and IOError on an HDF.
+    if kind == "adf":
+        image = tmp_path / "test.adf"
+        blkdev, volume = create_volume(image, DosType.DOS0)
+    else:
+        image = tmp_path / "test.hdf"
+        options = {"size": "4M"}
+        blkdev = BlkDevFactory().create(str(image), options=options)
+        volume = ADFSVolume(blkdev)
+        volume.create(FSString("Test"), dos_type=DosType.DOS0)
+    volume.write_file(b"data", FSString("file"))
+    root = volume.root
+    if where == "hash_slot":
+        index = 6 + [i for i, b in enumerate(root.hash_table) if b][0]
+    elif where == "bitmap":
+        index = -49
+    else:
+        index = -24
+    root_num = root.blk_num
+    off_disk = blkdev.num_blocks + 10
+    close_volume(blkdev, volume)
+    if kind == "adf":
+        blkdev = ADFBlockDevice(str(image))
+        blkdev.open()
+    else:
+        blkdev = BlkDevFactory().open(str(image), options=options)
+    blk = Block(blkdev, root_num)
+    blk._set_data(bytearray(blkdev.read_block(root_num)))
+    blk._put_long(index, off_disk)
+    blk._put_chksum()
+    blk._write_data()
+    blkdev.close()
+    if kind == "adf":
+        errors = validate(image)
+    else:
+        errors = validate_hdf(image, options)
+    assert any(message in e for e in errors)
