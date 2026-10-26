@@ -276,8 +276,8 @@ class ADFSFile(ADFSNode):
 
     def draw_on_bitmap(self, bm, show_all=False, first=False):
         bm[self.block.blk_num] = ord("H")
-        if self.block.comment_block_id != 0:
-            bm[self.block.comment_block_id] = ord("c")
+        if self._own_comment_block() is not None:
+            bm[self.comment_blk_num] = ord("c")
         for b in self.ext_blk_nums:
             bm[b] = ord("E")
         for b in self.data_blk_nums:
@@ -285,16 +285,15 @@ class ADFSFile(ADFSNode):
 
     def get_block_nums(self):
         result = [self.block.blk_num]
-        if self.block.comment_block_id != 0:
-            result.append(self.block.comment_block_id)
+        if self._own_comment_block() is not None:
+            result.append(self.comment_blk_num)
         result += self.ext_blk_nums
         result += self.data_blk_nums
         return result
 
     def get_blocks(self, with_data=True):
         result = [self.block]
-        if self.block.comment_block_id != 0:
-            result.append(self._read_comment_block())
+        result += self._get_comment_blocks()
         result += self.ext_blks
         if with_data:
             self.ensure_data()
@@ -315,7 +314,7 @@ class ADFSFile(ADFSNode):
 
     def get_block_usage(self, all=False, first=True):
         num_non_data = len(self.ext_blk_nums) + 1
-        if self.block.comment_block_id != 0:
+        if self._own_comment_block() is not None:
             num_non_data += 1
         return (len(self.data_blk_nums), num_non_data)
 

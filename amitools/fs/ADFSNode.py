@@ -1,3 +1,4 @@
+from .block.Block import Block
 from .block.CommentBlock import CommentBlock
 from .block.EntryBlock import EntryBlock
 from .FileName import FileName
@@ -40,6 +41,8 @@ class ADFSNode:
         self.name = None
         self.valid = False
         self.meta_info = None
+        # the comment block that belongs to this entry, if any
+        self.comment_blk_num = 0
 
     def __str__(self):
         return "%s:'%s'(@%d)" % (
@@ -59,29 +62,81 @@ class ADFSNode:
         self.create_meta_info()
 
     def create_meta_info(self):
-        comment = self.block.comment
-        if self.block.comment_block_id != 0:
-            comment_block = self._read_comment_block()
-            if comment_block:
-                comment = comment_block.comment
-            else:
-                # never free or rewrite a block that is not ours
-                self.block.comment_block_id = 0
-        self.meta_info = MetaInfo(self.block.protect, self.block.mod_ts, comment)
-
-    def _read_comment_block(self):
-        """return the comment block the header points to, or None unless it
-        is a valid comment block that belongs to this entry"""
+        """take protection, date and comment from my header. My header keeps
+        its pointer to a block that reads as my comment block, and I keep
+        the comment read from it, also if the bitmap marks the block free,
+        as when the bitmap was not written after a change. Such a block is
+        mine to free, rewrite and count only if the bitmap has it
+        allocated"""
+        self.meta_info = MetaInfo(
+            self.block.protect, self.block.mod_ts, self.block.comment
+        )
         blk_num = self.block.comment_block_id
+        comment_block = self._read_comment_block(blk_num)
+        if comment_block is None:
+            # any other block is, or may become, another entry's: it is
+            # never freed or rewritten, and the next header write drops the
+            # pointer
+            self.block.comment_block_id = 0
+            return
+        if comment_block.valid:
+            self.meta_info.set_comment(comment_block.comment)
+        if not self.volume.bitmap.get_bit(blk_num):
+            self.comment_blk_num = blk_num
+
+    def _read_comment_block(self, blk_num):
+        """read block blk_num if it reads as my comment block: its type, own
+        key, header key and a comment of at most 79 bytes, whatever its
+        checksum, so that a damaged one holds the comment again once
+        repaired. A block off the disk or a boot block never does, nor a
+        bitmap block, which is always allocated and whose first long is its
+        checksum. Returns the block, or None"""
         if blk_num < self.blkdev.reserved or blk_num >= self.blkdev.num_blocks:
+            return None
+        bitmap = self.volume.bitmap
+        if blk_num in [blk.blk_num for blk in bitmap.bitmap_blks + bitmap.ext_blks]:
             return None
         comment_block = CommentBlock(self.blkdev, blk_num)
         comment_block.read()
-        if not comment_block.valid or comment_block.comment is None:
-            return None
-        if comment_block.header_key != self.block.blk_num:
-            return None
+        if (
+            comment_block.type == Block.T_COMMENT
+            and comment_block._get_long(1) == blk_num
+            and comment_block._get_long(2) == self.block.blk_num
+            and comment_block._get_bytes(6, 1)[0] <= MAX_COMMENT_BYTES
+        ):
+            return comment_block
+        return None
+
+    def _own_comment_block(self):
+        """my comment block, read, or None: the block that my header pointed
+        to when it was read, or that a comment change of mine wrote, while
+        the bitmap has it allocated and it reads as mine. A block can be
+        freed and taken by another entry while the volume is open, as when
+        it holds data of a file that is deleted, so this is checked each
+        time before the block is freed, rewritten or counted, and once the
+        check fails the block is not mine again.
+
+        Only a comment change of mine writes a comment block: the one I own,
+        or a new one from the bitmap, which it writes before my header
+        points to it. Every other write of my header keeps the pointer as it
+        was read. So no write makes my header point to a block that the
+        write frees, or to a free block that it did not point to when it was
+        read"""
+        blk_num = self.comment_blk_num
+        comment_block = None
+        if blk_num != 0 and not self.volume.bitmap.get_bit(blk_num):
+            comment_block = self._read_comment_block(blk_num)
+        if comment_block is None:
+            self.comment_blk_num = 0
         return comment_block
+
+    def _get_comment_blocks(self):
+        """my comment block, as a list for get_blocks(): empty if I have
+        none, or one too damaged to decode"""
+        comment_block = self._own_comment_block()
+        if comment_block is not None and comment_block.valid:
+            return [comment_block]
+        return []
 
     def get_file_name(self):
         return self.name
@@ -109,6 +164,11 @@ class ADFSNode:
             self._check_comment(comment)
         else:
             comment = None
+        # a comment change rewrites or frees only a comment block that is
+        # still mine
+        own_blk_num = 0
+        if comment and self._own_comment_block() is not None:
+            own_blk_num = self.comment_blk_num
 
         # dircache?
         rebuild_dircache = False
@@ -134,7 +194,7 @@ class ADFSNode:
             and self.volume.is_longname
             and EntryBlock.needs_extra_comment_block(self.name.get_name(), comment)
         ):
-            comment_blk_num = self.block.comment_block_id
+            comment_blk_num = own_blk_num
             new_blk = comment_blk_num == 0
             if new_blk:
                 blks = self.volume.bitmap.alloc_n(1)
@@ -173,9 +233,10 @@ class ADFSNode:
                 self.block.comment_block_id = comment_blk_num
             else:
                 self.block.comment = comment
-                if self.block.comment_block_id != 0:
-                    self.volume.bitmap.dealloc_n([self.block.comment_block_id])
-                    self.block.comment_block_id = 0
+                self.block.comment_block_id = 0
+                if own_blk_num != 0:
+                    self.volume.bitmap.dealloc_n([own_blk_num])
+            self.comment_blk_num = self.block.comment_block_id
 
             self.meta_info.set_comment(comment)
             dirty = True

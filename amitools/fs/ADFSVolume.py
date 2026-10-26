@@ -49,12 +49,13 @@ class ADFSVolume:
                 self.meta_info = RootMetaInfo(
                     self.root.create_ts, self.root.disk_ts, self.root.mod_ts
                 )
+                # create bitmap: an entry owns a comment block only if the
+                # bitmap has it allocated
+                self.bitmap = ADFSBitmap(self.root)
+                self.bitmap.read()
                 # create root dir
                 self.root_dir = ADFSVolDir(self, self.root)
                 self.root_dir.read()
-                # create bitmap
-                self.bitmap = ADFSBitmap(self.root)
-                self.bitmap.read()
                 self.valid = True
             else:
                 raise FSError(INVALID_ROOT_BLOCK, block=self.root)
