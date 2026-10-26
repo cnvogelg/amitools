@@ -322,6 +322,10 @@ class ADFSNode:
         self.change_meta_info(MetaInfo(protect=protect))
 
     def change_protect_by_string(self, pr_str):
+        # no flags given: nothing changes, where a protection of 0 would
+        # set ----rwed
+        if not pr_str:
+            return
         p = ProtectFlags()
         p.parse(pr_str)
         self.change_protect(p.mask)

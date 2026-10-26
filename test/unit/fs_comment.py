@@ -2560,3 +2560,15 @@ def fs_dircache_change_no_scan_test(tmp_path, dos_type, monkeypatch):
     assert node.get_meta_info().get_protect() == 0x0F
     close_volume(blkdev, volume)
     assert validate(image) == []
+
+
+def fs_protect_empty_string_test(tmp_path):
+    # An empty protection string changes nothing: it does not set ----rwed.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, DosType.DOS0)
+    volume.write_file(b"data", FSString("file"))
+    node = volume.get_path_name(FSString("file"))
+    node.change_protect(0x0F)
+    node.change_protect_by_string("")
+    assert node.get_meta_info().get_protect() == 0x0F
+    close_volume(blkdev, volume)
