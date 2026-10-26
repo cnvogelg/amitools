@@ -27,6 +27,8 @@ class Imager:
         self.meta_db = None
         self.meta_fsuae = MetaInfoFSUAE()
         self.total_bytes = 0
+        # the first directory unpacked whose entries were not all read
+        self.unread_dir = None
         self.path_encoding = path_encoding
         # get path name encoding for host file system
         if self.path_encoding == None:
@@ -79,6 +81,18 @@ class Imager:
         )
         f.write(msg)
         f.close()
+        self.check_unread()
+
+    def check_unread(self):
+        """once all that could be read is unpacked, refuse to pass for a
+        full copy if a directory held an entry that could not be read:
+        it is missing"""
+        if self.unread_dir is not None:
+            self.unread_dir.check_entries()
+
+    def _note_unread(self, dir):
+        if self.unread_dir is None and dir.entry_bad_blk is not None:
+            self.unread_dir = dir
 
     def unpack_root(self, volume, vol_path):
         self.unpack_dir(volume.get_root_dir(), vol_path)
@@ -88,6 +102,7 @@ class Imager:
             os.mkdir(path)
         for e in dir.get_entries():
             self.unpack_node(e, path)
+        self._note_unread(dir)
 
     def unpack_node(self, node, path):
         name = node.name.get_unicode_name()
@@ -107,6 +122,7 @@ class Imager:
             os.mkdir(sub_dir)
             for sub_node in node.get_entries():
                 self.unpack_node(sub_node, sub_dir)
+            self._note_unread(node)
             node.flush()
         # file
         elif node.is_file():

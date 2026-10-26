@@ -405,6 +405,7 @@ class ReadCmd(Command):
         elif node.is_dir():
             img = Imager(meta_mode=Imager.META_MODE_NONE)
             img.unpack_dir(node, out_name)
+            img.check_unread()
         node.flush()
         return 0
 

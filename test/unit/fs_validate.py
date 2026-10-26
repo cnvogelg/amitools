@@ -501,9 +501,10 @@ def fs_validate_entry_invalid_change_test(tmp_path, dos_type, bad, op):
 @pytest.mark.parametrize("dos_type", DOS_TYPES, ids=dos_id)
 def fs_validate_entry_invalid_chain_test(tmp_path, dos_type, capsys):
     # An invalid header ends its own hash chain only: of 30 files, each in
-    # a hash chain of its own, 29 list and unpack when the header in the
-    # first slot of the root's hash table is invalid. Creating an entry in
-    # the root is refused.
+    # a hash chain of its own, 29 list, unpack and repack when the header
+    # in the first slot of the root's hash table is invalid. Unpack and
+    # repack copy them and then fail, as one is missing. Creating an entry
+    # in the root is refused.
     image = tmp_path / "test.adf"
     blkdev, volume = create_volume(image, dos_type)
     for n in range(30):
@@ -528,12 +529,21 @@ def fs_validate_entry_invalid_chain_test(tmp_path, dos_type, capsys):
     out = capsys.readouterr().out
     assert all(name in out for name in names)
     unpacked = tmp_path / "unpacked"
-    assert xdftool_main([str(image), "unpack", str(unpacked)]) == 0
+    assert xdftool_main([str(image), "unpack", str(unpacked)]) == 3
+    assert "Invalid Entry Block" in capsys.readouterr().out
     files = sorted(p.name for p in unpacked.iterdir() if p.suffix != ".uaem")
     assert files == names
     for name in names:
         data = (unpacked / name).read_bytes()
         assert data == b"file %d" % int(name[1:])
+    repacked = tmp_path / "repacked.adf"
+    assert xdftool_main([str(repacked), "repack", str(image)]) == 3
+    assert "Invalid Entry Block" in capsys.readouterr().out
+    blkdev, volume = open_volume(repacked)
+    root = volume.get_root_dir()
+    assert sorted(e.name.get_unicode_name() for e in root.get_entries()) == names
+    assert volume.read_file(FSString(names[0])) == b"file %d" % int(names[0][1:])
+    close_volume(blkdev, volume)
 
 
 @pytest.mark.parametrize("target", ["dir", "dir/sub"])

@@ -11,6 +11,8 @@ class Repacker:
         self.out_blkdev = None
         self.in_volume = None
         self.out_volume = None
+        # the first input directory whose entries were not all read
+        self.unread_dir = None
 
     def create_in_blkdev(self):
         f = BlkDevFactory()
@@ -81,11 +83,20 @@ class Repacker:
         self.repack_node_dir(
             self.in_volume.get_root_dir(), self.out_volume.get_root_dir()
         )
+        # all that could be read is copied: an entry that could not be
+        # read is missing, so do not pass for a full copy
+        if self.unread_dir is not None:
+            self.unread_dir.check_entries()
+
+    def _note_unread(self, dir):
+        if self.unread_dir is None and dir.entry_bad_blk is not None:
+            self.unread_dir = dir
 
     def repack_node_dir(self, in_root, out_root):
         entries = in_root.get_entries()
         for e in entries:
             self.repack_node(e, out_root)
+        self._note_unread(in_root)
 
     def repack_node(self, in_node, out_dir):
         name = in_node.get_file_name().get_name()
@@ -95,6 +106,7 @@ class Repacker:
             sub_dir = out_dir.create_dir(name, meta_info, False)
             for child in in_node.get_entries():
                 self.repack_node(child, sub_dir)
+            self._note_unread(in_node)
             sub_dir.flush()
         # file
         elif in_node.is_file():
