@@ -330,3 +330,25 @@ def fs_validate_bitmap_read_error_test(tmp_path, kind):
     errors = validate_hdf(image, options, fail_blk_num=blk_num)
     assert "@%06d:ERROR:Can't read block" % blk_num in errors
     assert any("Invalid number of Bitmap Blocks" in e for e in errors)
+
+
+@pytest.mark.parametrize("block_bytes", [1024, 4096])
+@pytest.mark.parametrize("dos_type", DOS_TYPES, ids=dos_id)
+def fs_validate_hash_size_test(tmp_path, dos_type, block_bytes):
+    # A directory has 200 hash slots with 1024 byte blocks and 968 with
+    # 4096, not 72. Entries in the chain that their name hashes to are
+    # valid, also those in the slots past the first 72.
+    image = tmp_path / "test.hdf"
+    options = {"size": "4M", "bs": str(block_bytes)}
+    blkdev = BlkDevFactory().create(str(image), options=options)
+    volume = ADFSVolume(blkdev)
+    volume.create(FSString("Test"), dos_type=dos_type)
+    volume.create_dir(FSString("dir"))
+    for n in range(20):
+        volume.write_file(b"data", FSString("file%d" % n))
+        volume.write_file(b"data", FSString("dir/file%d" % n))
+    for node in (volume.get_root_dir(), volume.get_path_name(FSString("dir"))):
+        slots = [i for i, blk_num in enumerate(node.block.hash_table) if blk_num]
+        assert max(slots) >= 72
+    close_volume(blkdev, volume)
+    assert validate_hdf(image, options) == []
