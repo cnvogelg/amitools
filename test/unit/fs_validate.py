@@ -352,3 +352,28 @@ def fs_validate_hash_size_test(tmp_path, dos_type, block_bytes):
         assert max(slots) >= 72
     close_volume(blkdev, volume)
     assert validate_hdf(image, options) == []
+
+
+@pytest.mark.parametrize("dos_type", DOS_TYPES, ids=dos_id)
+def fs_validate_root_hash_size_field_test(tmp_path, dos_type):
+    # A root block whose hash size field is not the normal one for its
+    # block size is reported once, by itself. Its entries are hashed with
+    # the normal slot count, as they were written, so none of them is
+    # reported, too.
+    image = tmp_path / "test.adf"
+    blkdev, volume = create_volume(image, dos_type)
+    for n in range(20):
+        volume.write_file(b"data", FSString("file%d" % n))
+    root_num = volume.root.blk_num
+    close_volume(blkdev, volume)
+    blkdev = ADFBlockDevice(str(image))
+    blkdev.open()
+    blk = Block(blkdev, root_num)
+    blk._set_data(bytearray(blkdev.read_block(root_num)))
+    blk._put_long(3, 71)
+    blk._put_chksum()
+    blk._write_data()
+    blkdev.close()
+    errors = validate(image)
+    assert any("does not have normal hash size: 71 != 72" in e for e in errors)
+    assert not any("invalid name hash" in e for e in errors)

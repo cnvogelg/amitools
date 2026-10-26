@@ -352,9 +352,11 @@ class DirScan:
                 blk_num,
             )
 
-        # check name hash: the directory has more slots with larger blocks
+        # check name hash: the directory has more slots with larger blocks.
+        # Take the normal count for the block size, not a root's hash size
+        # field, which the block scan checks on its own
         fn = FileName(name, self.intl)
-        fn_hash = fn.hash(hash_size=len(dir_blk_info.hash_table))
+        fn_hash = fn.hash(hash_size=self.block_scan.blkdev.block_longs - 56)
         dce.fn_hash_ok = fn_hash == hash_val
         if not dce.fn_hash_ok:
             self.log.msg(
