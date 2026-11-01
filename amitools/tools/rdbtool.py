@@ -316,7 +316,31 @@ class InitCommand(OpenCommand):
         else:
             rdb_cyls = 1
         rdisk = RDisk(blkdev)
-        rdisk.create(blkdev.geo, rdb_cyls=rdb_cyls)
+        disk_names = None
+        image_file = self.args.image_file
+        is_hdf = os.path.splitext(image_file)[1].lower() == ".hdf"
+        if (
+            is_hdf
+            or self.args.disk_vendor is not None
+            or self.args.disk_product is not None
+            or self.args.disk_revision is not None
+        ):
+            disk_product = self.args.disk_product
+            if disk_product is None:
+                if is_hdf:
+                    disk_product = os.path.basename(image_file)[:15]
+                else:
+                    disk_product = "IMAGE"
+            disk_names = (
+                self.args.disk_vendor
+                if self.args.disk_vendor is not None
+                else "RDBTOOL",
+                disk_product,
+                self.args.disk_revision
+                if self.args.disk_revision is not None
+                else "2012",
+            )
+        rdisk.create(blkdev.geo, rdb_cyls=rdb_cyls, disk_names=disk_names)
         return rdisk
 
 
@@ -1091,6 +1115,9 @@ def main(args=None, defaults=None):
     parser.add_argument(
         "-t", "--dostype", default="ffs+intl", help="set default dos type"
     )
+    parser.add_argument("--disk-vendor", help="set the RDB disk vendor string")
+    parser.add_argument("--disk-product", help="set the RDB disk product string")
+    parser.add_argument("--disk-revision", help="set the RDB disk revision string")
     if defaults:
         parser.set_defaults(defaults)
     args = parser.parse_args(args)
