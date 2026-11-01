@@ -31,7 +31,7 @@ class printf_element:
             self.length,
         )
 
-    def gen_sys_printf_format(self):
+    def gen_sys_printf_format(self, rawdofmt=False):
         t = self.etype
         if t == "b":
             t = "s"
@@ -45,17 +45,15 @@ class printf_element:
         flags = self.flags or ""
         wl = self.width_limit
         if wl is not None and len(wl) > 0:
-            # RawDoFmt width fields can include a dot for precision/limit-like
-            # specs, but the actual padding is controlled by the leading width
-            # and not by precision. Strip the precision part and treat a leading
-            # zero in the width as the zero-fill flag.
-            if "." in wl:
-                wl = wl.split(".", 1)[0]
-            if flags == "" and wl.startswith("0"):
-                flags = "0"
-                wl = wl[1:]
-            if t == "s" and wl.endswith("."):
-                # trailing dot seems to fail on python: e.g. %10.s -> %10s
+            if rawdofmt:
+                # RawDoFmt treats the part after a dot as non-formatting data.
+                if "." in wl:
+                    wl = wl.split(".", 1)[0]
+                if flags == "" and wl.startswith("0"):
+                    flags = "0"
+                    wl = wl[1:]
+            elif t == "s" and wl.endswith("."):
+                # A trailing dot is ignored by DOS Printf, e.g. %10.s.
                 wl = wl[:-1]
 
         result.append(flags)
@@ -65,8 +63,8 @@ class printf_element:
         result.append(t)
         return "".join(result)
 
-    def gen_value(self):
-        fmt = self.gen_sys_printf_format()
+    def gen_value(self, rawdofmt=False):
+        fmt = self.gen_sys_printf_format(rawdofmt)
         val = self.data
 
         # handle negative values in '%d'
@@ -179,7 +177,7 @@ def printf_read_data(state, mem_access, data_ptr):
     return data_ptr
 
 
-def printf_generate_output(state):
+def printf_generate_output(state, rawdofmt=False):
     result = []
     pos = 0
     f = state.fragments
@@ -187,7 +185,7 @@ def printf_generate_output(state):
         begin = e.begin
         if pos < begin:
             result.append(f.pop(0))
-        val = e.gen_value()
+        val = e.gen_value(rawdofmt)
         result.append(val)
         pos = e.end
     if len(f) > 0:

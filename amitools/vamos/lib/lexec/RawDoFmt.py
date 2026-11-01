@@ -53,7 +53,7 @@ def raw_do_fmt(ctx, fmtString, dataStream, putProc, putData):
     fmt = ctx.mem.r_cstr(fmtString)
     ps = printf_parse_string(fmt)
     dataStream = printf_read_data(ps, ctx.mem, dataStream)
-    resultstr = printf_generate_output(ps)
+    resultstr = printf_generate_output(ps, rawdofmt=True)
     fmtstr = resultstr + "\0"
     # Try to use a shortcut to avoid an unnecessary slow-down
     known = _is_known_cstr_putproc(ctx, putProc)
