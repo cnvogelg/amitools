@@ -10,6 +10,9 @@ amitools Documentation
     tools/rdbtool
     tools/romtool
     tools/icontool
+    vamos
+    vamos-ref
+    vamos-lib
     libs/icontool
 
 The ``amitools`` are an extensive set of command line tools and Python
@@ -24,6 +27,13 @@ Tools
 * :doc:`tools/rdbtool` - disk partition tool
 * :doc:`tools/romtool` - scan and edit Kickstart ROM files
 * :doc:`tools/icontool` - inspect and edit Amiga icon files
+
+Vamos
+-----
+
+* :doc:`vamos` - virtual AmigaOS runtime
+* :doc:`vamos-ref` - command-line options, configuration files, and environment variables
+* :doc:`vamos-lib` - library configuration and loading
 
 Libraries
 ---------
