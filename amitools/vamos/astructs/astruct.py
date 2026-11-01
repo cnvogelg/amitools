@@ -378,9 +378,7 @@ class AmigaStruct(TypeBase):
     def alloc(cls, alloc, *alloc_args, tag=None, **kwargs):
         if alloc_args:
             raise TypeError(
-                "{}.alloc() does not support positional alloc args".format(
-                    cls.__name__
-                )
+                "{}.alloc() does not support positional alloc args".format(cls.__name__)
             )
         if tag is None:
             tag = cls.get_signature()

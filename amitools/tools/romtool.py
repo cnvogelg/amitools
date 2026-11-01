@@ -442,8 +442,9 @@ def do_scan_cmd(args):
         return n if n > 0 else None
 
     if args.sizes and args.sort_size and not info:
-        offs = sorted(offs, key=lambda o: resident_size(rs.get_resident(o), o) or -1,
-                      reverse=True)
+        offs = sorted(
+            offs, key=lambda o: resident_size(rs.get_resident(o), o) or -1, reverse=True
+        )
 
     total = 0
     for off in offs:
@@ -477,8 +478,15 @@ def do_scan_cmd(args):
                     total += n
                 print(
                     "@%08x  +%08x  %8s  %-12s  %+4d  %s  %s"
-                    % (off, r.skip_off, "%u" % n if n else "?", nt, r.pri, name,
-                       id_string)
+                    % (
+                        off,
+                        r.skip_off,
+                        "%u" % n if n else "?",
+                        nt,
+                        r.pri,
+                        name,
+                        id_string,
+                    )
                 )
             else:
                 print(

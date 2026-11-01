@@ -249,7 +249,9 @@ class Process(DosProcess):
             if p != "C:" and p != "c:":
                 lock = self.ctx.dos_lib.lock_mgr.create_lock(None, p, False)
                 if lock != None:
-                    path = self.ctx.alloc.alloc_astruct(PathStruct, label="Path(%s)" % p)
+                    path = self.ctx.alloc.alloc_astruct(
+                        PathStruct, label="Path(%s)" % p
+                    )
                     path_struct = path
                     path_struct.path_Lock.aptr = lock.mem.addr
                     path_struct.path_Next.aptr = cmd_dir_addr

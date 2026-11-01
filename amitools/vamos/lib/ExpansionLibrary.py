@@ -21,12 +21,12 @@ DEMO_PRODUCT = 0x19
 # struct ConfigDev is ~0x44 bytes. We only need enough to look like a board.
 CONFIGDEV_SIZE = 0x44
 # offsets inside struct ConfigDev
-CD_ROM = 0x10              # struct ExpansionRom cd_Rom
-ER_TYPE = CD_ROM + 0x00    # er_Type (UBYTE)
+CD_ROM = 0x10  # struct ExpansionRom cd_Rom
+ER_TYPE = CD_ROM + 0x00  # er_Type (UBYTE)
 ER_PRODUCT = CD_ROM + 0x01  # er_Product (UBYTE)
 ER_MANUFACTURER = CD_ROM + 0x04  # er_Manufacturer (UWORD)
-CD_BOARDADDR = 0x20        # cd_BoardAddr (APTR)
-CD_BOARDSIZE = 0x24        # cd_BoardSize (ULONG)
+CD_BOARDADDR = 0x20  # cd_BoardAddr (APTR)
+CD_BOARDSIZE = 0x24  # cd_BoardSize (ULONG)
 
 # er_Type bits: ERTF_ZORROII (0xC0 = board present, Zorro II)
 ERT_ZORROII = 0xC0
