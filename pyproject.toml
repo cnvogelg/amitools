@@ -36,6 +36,7 @@ readme = { file="README.md", content-type="text/markdown" }
 fdtool = "amitools.tools.fdtool:main"
 geotool = "amitools.tools.geotool:main"
 hunktool = "amitools.tools.hunktool:main"
+icontool = "amitools.tools.icontool:main"
 rdbtool = "amitools.tools.rdbtool:main"
 romtool = "amitools.tools.romtool:main"
 typetool = "amitools.tools.typetool:main"
