@@ -60,6 +60,8 @@ class Runtime:
 
         self.run_cycles = run_cycles
         self.left_cycles = 0
+        # the cycles every run of this runtime executed, nested runs included
+        self.cycles_run = 0
 
     def set_slice_hook(self, slice_cycles, func):
         """setup slice hook to get a callback after slice cycles"""
@@ -211,6 +213,7 @@ class Runtime:
             er = self.machine.execute(run_cycles)
 
             # account cycles
+            self.cycles_run += er.cycles
             run_state.cycles += er.cycles
             run_state.total_cycles += er.cycles
             if self.left_cycles > 0:

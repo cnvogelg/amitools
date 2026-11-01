@@ -867,10 +867,19 @@ def schedule_scheduler_schedule_all_waiting_test():
 def schedule_scheduler_run_until_idle_budget_python_test():
     ctx = setup(slice_cycles=10)
     sched = ctx.sched
+    mem = ctx.mem
+
+    # a sub run of two nops and an rts: a few cycles each
+    code = ctx.alloc.alloc_memory(16, "code")
+    pc = code.addr
+    mem.w16(pc, op_nop)
+    mem.w16(pc + 2, op_nop)
+    mem.w16(pc + 4, op_rts)
 
     def task1_run(task):
-        # each reschedule ends one entry into the task
+        # each sub run executes a few cycles, each reschedule none
         for _ in range(10):
+            task.sub_run(Code(pc))
             task.reschedule()
         return 42
 
@@ -878,10 +887,11 @@ def schedule_scheduler_run_until_idle_budget_python_test():
     task = task_ctx.task
     assert sched.add_task(task)
 
-    # three slices of ten cycles stop it while it still runs
+    # a budget of thirty cycles stops it while it still runs
     assert sched.run_until_idle(max_cycles=30) == RunResult.BUSY
     assert task.get_state() == TaskState.TS_RUN
     assert task.get_exit_code() is None
+    assert 30 <= task.get_cycles_run() < 60
     assert ctx.events == [
         SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task),
         SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task),
@@ -894,6 +904,113 @@ def schedule_scheduler_run_until_idle_budget_python_test():
         SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task),
         SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
     ]
+
+    ctx.alloc.free_memory(code)
+    task_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_budget_counts_cycles_not_switches_test():
+    ctx = setup(slice_cycles=10)
+    sched = ctx.sched
+
+    def task1_run(task):
+        # a hundred switches, no m68k code: no budget is spent
+        for _ in range(100):
+            task.reschedule()
+        return 42
+
+    task_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task = task_ctx.task
+    assert sched.add_task(task)
+    assert sched.run_until_idle(max_cycles=30) == RunResult.DONE
+    assert task.get_exit_code() == 42
+    assert task.get_cycles_run() == 0
+
+    task_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_budget_signalling_tasks_test():
+    ctx = setup(slice_cycles=10)
+    sched = ctx.sched
+
+    def ping_run(task):
+        # the tasks wake each other up a hundred times without m68k code
+        for _ in range(100):
+            pong.set_signal(1, 1)
+            assert task.wait(1) == 1
+        pong.set_signal(2, 2)
+        return 1
+
+    def pong_run(task):
+        while True:
+            got = task.wait(3)
+            if got & 2:
+                return 2
+            ping.set_signal(1, 1)
+
+    ping_ctx = MyPythonTask(ctx, ping_run, name="ping")
+    ping = ping_ctx.task
+    pong_ctx = MyPythonTask(ctx, pong_run, name="pong")
+    pong = pong_ctx.task
+    assert sched.add_task(ping)
+    assert sched.add_task(pong)
+    assert sched.run_until_idle(max_cycles=30) == RunResult.DONE
+    assert ping.get_exit_code() == 1
+    assert pong.get_exit_code() == 2
+
+    pong_ctx.free()
+    ping_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_rem_task_waiting_current_task_test():
+    ctx = setup()
+    sched = ctx.sched
+
+    def task1_run(task):
+        task.wait(1)
+        return 42
+
+    task_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task = task_ctx.task
+    assert sched.add_task(task)
+    assert sched.run_until_idle() == RunResult.IDLE
+    # the current task waits: it is in the waiting list as well
+    assert sched.get_cur_task() is task
+    assert task in sched.waiting_tasks
+
+    # removing it takes it out of both
+    sched.rem_task(task)
+    assert task.get_state() == TaskState.TS_REMOVED
+    assert sched.get_cur_task() is None
+    assert sched.waiting_tasks == []
+    assert sched.get_num_tasks() == 0
+    assert task.get_exit_code() is None
+    assert sched.run_until_idle() == RunResult.DONE
+
+    task_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_budget_waiting_task_is_idle_test():
+    ctx = setup(slice_cycles=10)
+    sched = ctx.sched
+
+    def task1_run(task):
+        assert task.wait(1) == 1
+        return 42
+
+    task_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task = task_ctx.task
+    assert sched.add_task(task)
+    # a budget this small is spent at once, yet the task waits: not busy
+    assert sched.run_until_idle(max_cycles=1) == RunResult.IDLE
+    assert task.get_state() == TaskState.TS_WAIT
+    task.set_signal(1, 1)
+    assert sched.run_until_idle(max_cycles=1) == RunResult.DONE
+    assert task.get_exit_code() == 42
 
     task_ctx.free()
     cleanup(ctx)
@@ -913,9 +1030,11 @@ def schedule_scheduler_run_until_idle_budget_native_test():
     mem.w32(pc + 2, pc)
 
     assert sched.add_task(task)
-    # a budget of ten slices stops it busy, and so does the next
+    # a budget of 300 cycles stops it busy, and so does the next
     assert sched.run_until_idle(max_cycles=300) == RunResult.BUSY
+    assert 300 <= task.get_cycles_run() < 330
     assert sched.run_until_idle(max_cycles=300) == RunResult.BUSY
+    assert 600 <= task.get_cycles_run() < 660
     assert task.get_state() == TaskState.TS_RUN
 
     # the caller can then take it out

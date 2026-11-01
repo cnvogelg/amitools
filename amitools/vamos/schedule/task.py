@@ -88,6 +88,10 @@ class TaskBase:
     def get_run_result(self):
         return None
 
+    def get_cycles_run(self):
+        """the cycles the task's m68k code executed so far"""
+        return self.runtime.cycles_run
+
     def get_exit_code(self):
         """if the task exited without error then return the error code"""
         return self.exit_code
@@ -336,8 +340,9 @@ class PythonTask(TaskBase):
         except TaskStop:
             log_schedule.debug("%s: Python task stop received!", self.name)
 
+        # a stopped task has no exit code
         log_schedule.debug(
-            "%s: done Python code. exit_code=%d", self.name, self.exit_code
+            "%s: done Python code. exit_code=%s", self.name, self.exit_code
         )
         # at the end of execution remove myself
         if self.scheduler:
