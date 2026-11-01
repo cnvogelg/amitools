@@ -41,10 +41,16 @@ class _Win32:
         handle, dword, boolean = ctypes.c_void_p, ctypes.c_uint32, ctypes.c_int32
         ptr = ctypes.c_void_p
         signatures = {
-            "CreateFileW": (handle, [ctypes.c_wchar_p, dword, dword, ptr, dword, dword, handle]),
+            "CreateFileW": (
+                handle,
+                [ctypes.c_wchar_p, dword, dword, ptr, dword, dword, handle],
+            ),
             "CreateMutexW": (handle, [ptr, boolean, ctypes.c_wchar_p]),
             "CloseHandle": (boolean, [handle]),
-            "DeviceIoControl": (boolean, [handle, dword, ptr, dword, ptr, dword, ptr, ptr]),
+            "DeviceIoControl": (
+                boolean,
+                [handle, dword, ptr, dword, ptr, dword, ptr, ptr],
+            ),
             "SetFilePointerEx": (boolean, [handle, ctypes.c_int64, ptr, dword]),
             "ReadFile": (boolean, [handle, ptr, dword, ptr, ptr]),
             "WriteFile": (boolean, [handle, ptr, dword, ptr, ptr]),
@@ -95,10 +101,11 @@ class _Win32:
     def ioctl(self, handle, code, size=0):
         buf = ctypes.create_string_buffer(size) if size else None
         count = ctypes.c_uint32()
-        if not self.dll.DeviceIoControl(handle, code, None, 0, buf, size,
-                                        ctypes.byref(count), None):
+        if not self.dll.DeviceIoControl(
+            handle, code, None, 0, buf, size, ctypes.byref(count), None
+        ):
             raise self.error("disk control 0x%x failed" % code)
-        return buf.raw[:count.value] if buf is not None else b""
+        return buf.raw[: count.value] if buf is not None else b""
 
     def volumes(self):
         buf = ctypes.create_unicode_buffer(1024)
@@ -145,7 +152,9 @@ class _Win32:
         if not self.dll.ReadFile(handle, buf, size, ctypes.byref(count), None):
             raise self.error("physical disk read failed")
         if count.value != size:
-            raise IOError("short physical disk read: %d of %d bytes" % (count.value, size))
+            raise IOError(
+                "short physical disk read: %d of %d bytes" % (count.value, size)
+            )
         return buf.raw
 
     def write(self, handle, offset, data):
@@ -155,7 +164,9 @@ class _Win32:
         if not self.dll.WriteFile(handle, buf, len(data), ctypes.byref(count), None):
             raise self.error("physical disk write failed")
         if count.value != len(data):
-            raise IOError("short physical disk write: %d of %d bytes" % (count.value, len(data)))
+            raise IOError(
+                "short physical disk write: %d of %d bytes" % (count.value, len(data))
+            )
 
     def _seek(self, handle, offset):
         if not self.dll.SetFilePointerEx(handle, offset, None, 0):
@@ -187,17 +198,21 @@ class _Disk:
             access = self.api.GENERIC_READ
             if not read_only:
                 access |= self.api.GENERIC_WRITE
-            self.handle = self.api.open(r"\\.\PhysicalDrive%d" % number, access,
-                                        share=0 if exclusive else 3)
+            self.handle = self.api.open(
+                r"\\.\PhysicalDrive%d" % number, access, share=0 if exclusive else 3
+            )
             length = self.api.ioctl(self.handle, self.api.GET_LENGTH, 8)
             geometry = self.api.ioctl(self.handle, self.api.GET_GEOMETRY, 24)
             if len(length) != 8 or len(geometry) < 24:
                 raise IOError("incomplete physical disk geometry")
             self.size = struct.unpack("<q", length)[0]
             self.sector_size = struct.unpack_from("<I", geometry, 20)[0]
-            if (self.size <= 0 or self.sector_size < 512
-                    or self.sector_size & (self.sector_size - 1)
-                    or self.size % self.sector_size):
+            if (
+                self.size <= 0
+                or self.sector_size < 512
+                or self.sector_size & (self.sector_size - 1)
+                or self.size % self.sector_size
+            ):
                 raise IOError("invalid physical disk size or sector size")
         except BaseException:
             try:
@@ -225,14 +240,18 @@ class _Disk:
                     self.api.close(query)
             if number not in disks:
                 continue
-            handle = self.api.open(volume, self.api.GENERIC_READ | self.api.GENERIC_WRITE)
+            handle = self.api.open(
+                volume, self.api.GENERIC_READ | self.api.GENERIC_WRITE
+            )
             self.volume_handles.append(handle)
             try:
                 self.api.ioctl(handle, self.api.LOCK_VOLUME)
                 self.api.ioctl(handle, self.api.DISMOUNT_VOLUME)
             except OSError as exc:
-                raise IOError("cannot lock Windows volume %s; close applications "
-                              "using the disk: %s" % (volume, exc)) from exc
+                raise IOError(
+                    "cannot lock Windows volume %s; close applications "
+                    "using the disk: %s" % (volume, exc)
+                ) from exc
 
     def close(self, flush=True):
         error = None
@@ -311,15 +330,18 @@ class DiskStream(io.RawIOBase):
 
     def read(self, size=-1):
         self._checkClosed()
-        size = max(0, self.size - self.position) if size is None or size < 0 else min(
-            size, max(0, self.size - self.position))
+        size = (
+            max(0, self.size - self.position)
+            if size is None or size < 0
+            else min(size, max(0, self.size - self.position))
+        )
         if not size:
             return b""
         start, end, offset = self._range(size)
         with self.disk.lock:
             data = self.disk.api.read(self.disk.handle, start, end - start)
         self.position += size
-        return data[offset:offset + size]
+        return data[offset : offset + size]
 
     def write(self, data):
         self._checkClosed()
@@ -335,7 +357,7 @@ class DiskStream(io.RawIOBase):
             if offset or end - start != len(data):
                 # Amiga blocks can be smaller than a 4K host sector.
                 original = self.disk.api.read(self.disk.handle, start, end - start)
-                payload = original[:offset] + data + original[offset + len(data):]
+                payload = original[:offset] + data + original[offset + len(data) :]
             else:
                 payload = data
             self.disk.api.write(self.disk.handle, start, payload)

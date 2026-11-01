@@ -41,7 +41,9 @@ class HostFileLock:
             try:
                 self._file = DiskLock(self.image, read_only=self.read_only)
             except OSError as exc:
-                raise IOError("cannot exclusively lock disk %s: %s" % (self.image, exc)) from exc
+                raise IOError(
+                    "cannot exclusively lock disk %s: %s" % (self.image, exc)
+                ) from exc
             self._kind = "physical_disk"
             return
         mode = "rb" if self.read_only else "r+b"

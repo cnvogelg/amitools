@@ -36,9 +36,21 @@ finally:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(Path(__file__).resolve().parents[2])
     result = subprocess.run(
-        [sys.executable, "-c", script, str(image), str(offset), str(length),
-         str(read_only), str(whole)], env=env, capture_output=True,
-        text=True, timeout=15)
+        [
+            sys.executable,
+            "-c",
+            script,
+            str(image),
+            str(offset),
+            str(length),
+            str(read_only),
+            str(whole),
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
     assert result.returncode in (0, 23), result.stderr
     return result.returncode == 0
 
@@ -116,7 +128,8 @@ os._exit(0)
 """
     env = os.environ.copy()
     env["PYTHONPATH"] = str(Path(__file__).resolve().parents[2])
-    subprocess.run([sys.executable, "-c", script, str(image)],
-                   env=env, check=True, timeout=15)
+    subprocess.run(
+        [sys.executable, "-c", script, str(image)], env=env, check=True, timeout=15
+    )
     assert probe(image)
     assert probe(image, whole=True)

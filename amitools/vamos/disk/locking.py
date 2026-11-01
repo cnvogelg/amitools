@@ -63,7 +63,9 @@ class PartitionFileLock:
         try:
             self._lock(start, length, shared=self.read_only)
         except OSError as exc:
-            raise OSError("cannot lock partition in %s: %s" % (self.image, exc)) from exc
+            raise OSError(
+                "cannot lock partition in %s: %s" % (self.image, exc)
+            ) from exc
         self._range = (offset, length)
 
     def _lock(self, start, length, *, shared):
@@ -73,16 +75,28 @@ class PartitionFileLock:
         import fcntl
 
         if sys.platform == "darwin":
+
             class Flock(ctypes.Structure):
-                _fields_ = [("start", ctypes.c_int64), ("length", ctypes.c_int64),
-                            ("pid", ctypes.c_int), ("type", ctypes.c_short),
-                            ("whence", ctypes.c_short)]
+                _fields_ = [
+                    ("start", ctypes.c_int64),
+                    ("length", ctypes.c_int64),
+                    ("pid", ctypes.c_int),
+                    ("type", ctypes.c_short),
+                    ("whence", ctypes.c_short),
+                ]
+
             command = getattr(fcntl, "F_OFD_SETLK", 90)
         elif sys.platform.startswith("linux") and ctypes.sizeof(ctypes.c_void_p) == 8:
+
             class Flock(ctypes.Structure):
-                _fields_ = [("type", ctypes.c_short), ("whence", ctypes.c_short),
-                            ("start", ctypes.c_int64), ("length", ctypes.c_int64),
-                            ("pid", ctypes.c_int)]
+                _fields_ = [
+                    ("type", ctypes.c_short),
+                    ("whence", ctypes.c_short),
+                    ("start", ctypes.c_int64),
+                    ("length", ctypes.c_int64),
+                    ("pid", ctypes.c_int),
+                ]
+
             command = getattr(fcntl, "F_OFD_SETLK", 37)
         else:
             raise OSError("session-owned partition locks unavailable on this platform")
@@ -99,25 +113,38 @@ class PartitionFileLock:
         from ctypes import wintypes
 
         class Overlapped(ctypes.Structure):
-            _fields_ = [("internal", ctypes.c_size_t),
-                        ("internal_high", ctypes.c_size_t),
-                        ("offset", wintypes.DWORD),
-                        ("offset_high", wintypes.DWORD),
-                        ("event", wintypes.HANDLE)]
+            _fields_ = [
+                ("internal", ctypes.c_size_t),
+                ("internal_high", ctypes.c_size_t),
+                ("offset", wintypes.DWORD),
+                ("offset_high", wintypes.DWORD),
+                ("event", wintypes.HANDLE),
+            ]
 
         kernel = ctypes.WinDLL("kernel32", use_last_error=True)
         lock_file = kernel.LockFileEx
-        lock_file.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.DWORD,
-                             wintypes.DWORD, wintypes.DWORD,
-                             ctypes.POINTER(Overlapped)]
+        lock_file.argtypes = [
+            wintypes.HANDLE,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            ctypes.POINTER(Overlapped),
+        ]
         lock_file.restype = wintypes.BOOL
         overlapped = Overlapped()
-        overlapped.offset = start & 0xffffffff
+        overlapped.offset = start & 0xFFFFFFFF
         overlapped.offset_high = start >> 32
         flags = 1 if shared else 3  # FAIL_IMMEDIATELY, optionally EXCLUSIVE
         handle = msvcrt.get_osfhandle(self._file.fileno())
-        if not lock_file(handle, flags, 0, length & 0xffffffff,
-                         length >> 32, ctypes.byref(overlapped)):
+        if not lock_file(
+            handle,
+            flags,
+            0,
+            length & 0xFFFFFFFF,
+            length >> 32,
+            ctypes.byref(overlapped),
+        ):
             raise ctypes.WinError(ctypes.get_last_error())
 
     def release(self):
