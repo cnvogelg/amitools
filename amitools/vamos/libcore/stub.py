@@ -5,6 +5,7 @@ import traceback
 
 from amitools.vamos.astructs import ScalarType, PointerType
 from amitools.vamos.machine.regs import REG_D0, REG_D1, REG_A7
+from .util import set_sr_from_d0
 
 
 class LibStub(object):
@@ -243,6 +244,9 @@ class LibStubGen(object):
                     )
             # write d0 of type
             ctx.cpu.w_reg(REG_D0, d0)
+
+        if result_value is not None:
+            set_sr_from_d0(ctx)
 
     def _get_result_str(self, res):
         """show result values"""

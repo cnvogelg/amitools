@@ -2,6 +2,7 @@ import logging
 import pytest
 
 from amitools.vamos.libcore import LibStubGen, LibCtx, LibImplScanner
+from amitools.vamos.libcore.util import SR_NEGATIVE, SR_ZERO
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.machine.mock import MockMachine
 from amitools.vamos.machine import Runtime
@@ -124,6 +125,23 @@ def libcore_stub_gen_base_test(capsys):
     stub.PrintString()
     cap = capsys.readouterr()
     assert cap.out.strip() == "VamosTest: PrintString('hello, world!')"
+
+
+def libcore_stub_result_sets_cc_test():
+    scan = _create_scan()
+    ctx = _create_ctx()
+    gen = LibStubGen()
+    stub = gen.gen_stub(scan, ctx)
+
+    ctx.cpu.w_reg(REG_D0, 0)
+    gen._set_result(ctx, 0, int)
+    assert ctx.cpu.r_sr() & SR_ZERO == SR_ZERO
+    assert ctx.cpu.r_sr() & SR_NEGATIVE == 0x0000
+
+    ctx.cpu.w_reg(REG_D0, 0xFFFFFFFF)
+    gen._set_result(ctx, -1, int)
+    assert ctx.cpu.r_sr() & SR_ZERO == 0x0000
+    assert ctx.cpu.r_sr() & SR_NEGATIVE == SR_NEGATIVE
 
 
 def libcore_stub_gen_profile_test():

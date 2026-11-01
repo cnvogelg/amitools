@@ -9,6 +9,7 @@ from .impl import (
 )
 from .registry import LibRegistry
 from .ctx import LibCtx
+from .util import set_sr_from_d0
 from .stub import LibStub, LibStubGen
 from .proxy import LibProxy, LibProxyGen
 from .profile import LibFuncProfileData, LibProfileData, LibProfiler
