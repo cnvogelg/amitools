@@ -2,6 +2,7 @@ from typing import get_type_hints
 
 from amitools.vamos.machine import Code, REG_D0, REG_D1
 from amitools.vamos.libtypes import TagList
+from .util import set_sr_from_d0
 
 
 class LibProxy:
@@ -129,6 +130,8 @@ class LibProxyGen:
 
             # perform call at stub
             res = stub_method(**kwargs)
+            if res is not None:
+                set_sr_from_d0(self.ctx)
 
             # clean up auto strings
             regs.cleanup()

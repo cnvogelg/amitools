@@ -1,6 +1,7 @@
 import pytest
 
 from amitools.vamos.libcore import LibCtx, LibProxyGen
+from amitools.vamos.libcore.util import SR_NEGATIVE, SR_ZERO, set_sr_from_d0
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.machine.mock import MockMachine
 from amitools.vamos.machine import Runtime
@@ -146,6 +147,29 @@ def libcore_proxy_gen_stub_test():
     assert ret == 42
     assert stub.tag_val == 101
     assert stub.tag_data == 42
+
+
+def libcore_proxy_gen_stub_cc_test():
+    ctx = _create_ctx()
+    lib_fd = _create_fd()
+    gen = LibProxyGen()
+    stub = MyStub(ctx)
+    VamosTestProxy = gen.gen_proxy_for_stub("VamosTestProxy", lib_fd, stub)
+    proxy = VamosTestProxy(ctx)
+
+    assert proxy.PrintHello() == 1
+    assert ctx.cpu.r_sr() & SR_ZERO == 0x0000
+    assert ctx.cpu.r_sr() & SR_NEGATIVE == 0x0000
+
+    ctx.cpu.w_reg(REG_D0, 0)
+    set_sr_from_d0(ctx)
+    assert ctx.cpu.r_sr() & SR_ZERO == SR_ZERO
+    assert ctx.cpu.r_sr() & SR_NEGATIVE == 0x0000
+
+    ctx.cpu.w_reg(REG_D0, 0xFFFFFFFF)
+    set_sr_from_d0(ctx)
+    assert ctx.cpu.r_sr() & SR_ZERO == 0x0000
+    assert ctx.cpu.r_sr() & SR_NEGATIVE == SR_NEGATIVE
 
 
 def libcore_proxy_gen_libcall_test():
