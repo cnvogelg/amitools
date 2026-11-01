@@ -9,6 +9,7 @@ from amitools.vamos.schedule import (
     SchedulerEvent,
     SchedulerConfig,
     TaskState,
+    RunResult,
 )
 from amitools.vamos.machine.opcodes import op_nop, op_rts, op_reset, op_jsr, op_jmp
 from amitools.vamos.machine.regs import REG_D0
@@ -860,4 +861,67 @@ def schedule_scheduler_schedule_all_waiting_test():
 
     task2_ctx.free()
     task1_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_budget_python_test():
+    ctx = setup(slice_cycles=10)
+    sched = ctx.sched
+
+    def task1_run(task):
+        # each reschedule ends one entry into the task
+        for _ in range(10):
+            task.reschedule()
+        return 42
+
+    task_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task = task_ctx.task
+    assert sched.add_task(task)
+
+    # three slices of ten cycles stop it while it still runs
+    assert sched.run_until_idle(max_cycles=30) == RunResult.BUSY
+    assert task.get_state() == TaskState.TS_RUN
+    assert task.get_exit_code() is None
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task),
+    ]
+
+    # without a budget it runs to its end
+    assert sched.run_until_idle() == RunResult.DONE
+    assert task.get_exit_code() == 42
+    assert ctx.events[2:] == [
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
+
+    task_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_budget_native_test():
+    ctx = setup(slice_cycles=30)
+    sched = ctx.sched
+    mem = ctx.mem
+
+    task_ctx = MyNativeTask(ctx, set_regs={REG_D0: 42}, name="task1")
+    task = task_ctx.task
+
+    # task setup: an endless loop
+    pc = task_ctx.pc
+    mem.w16(pc, op_jmp)
+    mem.w32(pc + 2, pc)
+
+    assert sched.add_task(task)
+    # a budget of ten slices stops it busy, and so does the next
+    assert sched.run_until_idle(max_cycles=300) == RunResult.BUSY
+    assert sched.run_until_idle(max_cycles=300) == RunResult.BUSY
+    assert task.get_state() == TaskState.TS_RUN
+
+    # the caller can then take it out
+    sched.rem_task(task)
+    assert sched.run_until_idle() == RunResult.DONE
+    assert task.was_stopped()
+
+    task_ctx.free()
     cleanup(ctx)
