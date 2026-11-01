@@ -1,6 +1,7 @@
 import time
 
 from .Block import Block
+from ..DosType import rootblock_tracks_used_blocks
 from ..TimeStamp import *
 from ..DosType import rootblock_tracks_used_blocks
 
@@ -36,7 +37,9 @@ class RootBlock(Block):
             self.bitmap_ptrs.append(0)
         self.bitmap_ext_blk = 0
 
-        # new stuff for DOS6 and DOS7
+        # new stuff for DOS6 and DOS7 (0 in others)
+        if not rootblock_tracks_used_blocks(fstype):
+            fstype = 0
         self.fstype = fstype
         self.blocks_used = 0
 
@@ -117,10 +120,15 @@ class RootBlock(Block):
         self.name = self._get_bstr(-20, 30)
         self.extension = self._get_long(-2)
 
-        # Number of used blocks (new in DOS6 and DOS7)
-        self.blocks_used = self._get_long(-11)
-        # filesystem type (new in DOS6 and DOS7, 0 in others)
-        self.fstype = self._get_long(-4)
+        # filesystem type and number of used blocks (new in DOS6 and DOS7,
+        # 0 in others)
+        fstype = self._get_long(-4)
+        if rootblock_tracks_used_blocks(fstype):
+            self.fstype = fstype
+            self.blocks_used = self._get_long(-11)
+        else:
+            self.fstype = 0
+            self.blocks_used = 0
 
         # check validity
         self.valid = True
