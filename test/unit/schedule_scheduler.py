@@ -8,6 +8,7 @@ from amitools.vamos.schedule import (
     PythonTask,
     SchedulerEvent,
     SchedulerConfig,
+    TaskState,
 )
 from amitools.vamos.machine.opcodes import op_nop, op_rts, op_reset, op_jsr, op_jmp
 from amitools.vamos.machine.regs import REG_D0
@@ -689,6 +690,173 @@ def schedule_scheduler_python_task_multi_wait_test():
         SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task2),
         SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
     ]
+
+    task2_ctx.free()
+    task1_ctx.free()
+    cleanup(ctx)
+
+
+# ----- run until idle -----
+
+
+def schedule_scheduler_run_until_idle_no_task_test():
+    ctx = setup()
+
+    # nothing to run is not idle but done
+    assert not ctx.sched.run_until_idle()
+    assert ctx.events == []
+
+    cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_wake_from_outside_test():
+    ctx = setup()
+    sched = ctx.sched
+
+    def task1_run(task):
+        got = task.wait(3)
+        assert got == 1
+        return 42
+
+    task_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task = task_ctx.task
+    assert sched.add_task(task)
+
+    # the task waits and no other task could wake it up: idle
+    assert sched.run_until_idle()
+    assert task.get_state() == TaskState.TS_WAIT
+    assert sched.get_cur_task() is task
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.WAITING_TASK, task),
+    ]
+
+    # wake it up from outside the scheduler and carry on
+    task.set_signal(1, 1)
+    assert not sched.run_until_idle()
+    assert task.get_exit_code() == 42
+    assert ctx.events[3:] == [
+        SchedulerEvent(SchedulerEvent.Type.WAKE_UP_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
+
+    task_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_native_task_test():
+    my_task = None
+
+    ctx = setup()
+    sched = ctx.sched
+    mem = ctx.mem
+
+    def trap1(op, pc):
+        got = my_task.wait(1)
+        assert got == 1
+
+    addr1 = ctx.machine.setup_quick_trap(trap1)
+
+    task_ctx = MyNativeTask(ctx, set_regs={REG_D0: 42}, name="task1")
+    task = task_ctx.task
+    my_task = task
+
+    # task setup: wait in a trap, then return
+    pc = task_ctx.pc
+    mem.w16(pc, op_jsr)
+    mem.w32(pc + 2, addr1)
+    mem.w16(pc + 6, op_rts)
+
+    assert sched.add_task(task)
+    assert sched.run_until_idle()
+    assert task.get_state() == TaskState.TS_WAIT
+
+    # wake it up from outside and let it return from the trap
+    task.set_signal(1, 1)
+    assert not sched.run_until_idle()
+    assert task.get_exit_code() == 42
+
+    task_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_add_task_test():
+    ctx = setup()
+    sched = ctx.sched
+
+    def task1_run(task):
+        got = task.wait(1)
+        assert got == 1
+        return 42
+
+    def task2_run(task):
+        return 23
+
+    task1_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task1 = task1_ctx.task
+    task2_ctx = MyPythonTask(ctx, task2_run, name="task2")
+    task2 = task2_ctx.task
+
+    assert sched.add_task(task1)
+    assert sched.run_until_idle()
+
+    # a task added in between runs on the next call
+    assert sched.add_task(task2)
+    assert sched.run_until_idle()
+    assert task2.get_exit_code() == 23
+    assert task1.get_state() == TaskState.TS_WAIT
+
+    # and each task is added once
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.WAITING_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task2),
+    ]
+
+    task1.set_signal(1, 1)
+    assert not sched.run_until_idle()
+    assert task1.get_exit_code() == 42
+    assert ctx.events[6:] == [
+        SchedulerEvent(SchedulerEvent.Type.WAKE_UP_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
+
+    task2_ctx.free()
+    task1_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_schedule_all_waiting_test():
+    ctx = setup()
+    sched = ctx.sched
+
+    def task1_run(task):
+        task.wait(1)
+        return 42
+
+    def task2_run(task):
+        return 23
+
+    task1_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task1 = task1_ctx.task
+    task2_ctx = MyPythonTask(ctx, task2_run, name="task2")
+    task2 = task2_ctx.task
+
+    assert sched.add_task(task1)
+    assert sched.add_task(task2)
+
+    # the last running task ends while task1 still waits: a dead lock,
+    # which schedule() reports instead of raising
+    assert sched.schedule() is False
+    assert task2.get_exit_code() == 23
+    assert task1.get_state() == TaskState.TS_WAIT
 
     task2_ctx.free()
     task1_ctx.free()

@@ -48,6 +48,8 @@ class Scheduler(object):
         self.num_switch_same = 0
         self.num_switch_other = 0
         self.running = False
+        # tasks added while not running: their ADD_TASK is reported on the next run
+        self.new_tasks = []
 
     @classmethod
     def from_cfg(cls, machine, schedule_cfg):
@@ -82,14 +84,46 @@ class Scheduler(object):
         if len(self.ready_tasks) == 0:
             raise RuntimeError("no tasks to schedule!")
 
+        if self._run_tasks():
+            # every task left waits and no task is there to wake it up
+            log_schedule.error("schedule(): no task to run?!")
+            return False
+        return True
+
+    def run_until_idle(self):
+        """run the ready tasks until every task left waits, or none is left.
+
+        unlike schedule() an all-waiting state is no error here: the caller
+        may wake a task up from outside the scheduler, e.g. with set_signal(),
+        and call again to carry on. the current task keeps its CPU context in
+        between, so a wake up of that task needs no context switch.
+
+        returns True while waiting tasks remain and False once the last task
+        has terminated (or none was added).
+        """
+        log_schedule.info("run_until_idle(): start")
+        return self._run_tasks()
+
+    def _run_tasks(self):
+        """the scheduling loop shared by schedule() and run_until_idle().
+
+        returns True if it stopped because all tasks wait (idle) and False
+        if no task is left.
+        """
+        # nothing to do at all
+        if self.get_num_tasks() == 0:
+            return False
+
         self.running = True
 
-        # report events for previously added tasks
-        if len(self.event_hooks) > 0:
-            for task in self.ready_tasks:
-                self._report_event(SchedulerEvent.Type.ADD_TASK, task)
+        # report tasks added while the scheduler did not run
+        new_tasks = self.new_tasks
+        self.new_tasks = []
+        for task in new_tasks:
+            self._report_event(SchedulerEvent.Type.ADD_TASK, task)
 
         # main loop
+        idle = False
         while True:
             log_schedule.debug(
                 "schedule: current %s",
@@ -113,8 +147,8 @@ class Scheduler(object):
                 # find a task to run
                 task = self._find_run_task()
                 if task is None:
-                    log_schedule.error("schedule(): no task to run?!")
-                    return False
+                    idle = True
+                    break
 
             # current tasks stays the same?
             # no context switch required. simply switch to it
@@ -149,16 +183,27 @@ class Scheduler(object):
             # enter greenlet of task and resume it
             task.switch()
 
-        # end of scheduling
-        self._make_current(None)
         self.running = False
 
+        # all tasks wait: stop here, but keep the current task in place
+        if idle:
+            log_schedule.info(
+                "idle: %d task(s) waiting (switches: same=%d, other=%d)",
+                len(self.waiting_tasks),
+                self.num_switch_same,
+                self.num_switch_other,
+            )
+            return True
+
+        # end of scheduling
+        self._make_current(None)
+
         log_schedule.info(
-            "schedule(): done (switches: same=%d, other=%d)",
+            "done (switches: same=%d, other=%d)",
             self.num_switch_same,
             self.num_switch_other,
         )
-        return True
+        return False
 
     def _find_run_task(self):
         # if a ready task is available
@@ -169,6 +214,9 @@ class Scheduler(object):
 
         # keep current task
         task = self.cur_task
+        # the current task terminated and the others wait
+        if task is None:
+            return None
         log_schedule.debug("take: current task %s", task.name)
         if task.get_state() in (TaskState.TS_READY, TaskState.TS_RUN):
             return task
@@ -209,9 +257,11 @@ class Scheduler(object):
         # configure task
         task.config(self, self.config.slice_cycles)
         log_schedule.info("add_task: %s", task.name)
-        # report via event if running or postpone it
+        # report via event if running or postpone it to the next run
         if self.running:
             self._report_event(SchedulerEvent.Type.ADD_TASK, task)
+        else:
+            self.new_tasks.append(task)
         return True
 
     def rem_task(self, task):
