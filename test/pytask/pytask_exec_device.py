@@ -1,7 +1,5 @@
-from amitools.vamos.astructs import AccessStruct
 from amitools.vamos.libstructs import IORequestStruct, NodeType, TimeRequestStruct
 from amitools.vamos.libtypes import ExecLibrary as ExecLibraryType
-
 
 TR_GETSYSTIME = 11
 
@@ -40,19 +38,19 @@ def pytask_exec_timer_io_test(vamos_task):
         port = exec_proxy.CreateMsgPort()
         size = TimeRequestStruct.get_byte_size()
         req_addr = exec_proxy.CreateIORequest(port, size)
-        io = AccessStruct(ctx.mem, IORequestStruct, req_addr)
+        io = IORequestStruct(ctx.mem, req_addr)
         req = TimeRequestStruct(ctx.mem, req_addr)
 
         assert exec_proxy.OpenDevice("timer.device", 0, req_addr, 0) == 0
 
-        io.w_s("io_Command", TR_GETSYSTIME)
+        io.command.val = TR_GETSYSTIME
         req.tr_time.tv_secs.val = 0
         req.tr_time.tv_micro.val = 0
 
         assert exec_proxy.DoIO(req_addr) == 0
         assert exec_proxy.CheckIO(req_addr) == req_addr
-        assert io.r_s("io_Error") == 0
-        assert io.r_s("io_Message.mn_Node.ln_Type") == NodeType.NT_REPLYMSG
+        assert io.error.val == 0
+        assert io.message.node.type.val == NodeType.NT_REPLYMSG
         assert req.tr_time.tv_secs.val > 0
 
         sig_mask = 1 << port.sig_bit.val
@@ -82,15 +80,15 @@ def pytask_exec_input_device_test(vamos_task):
         port = exec_proxy.CreateMsgPort()
         size = TimeRequestStruct.get_byte_size()
         req_addr = exec_proxy.CreateIORequest(port, size)
-        req = AccessStruct(ctx.mem, IORequestStruct, req_addr)
+        req = IORequestStruct(ctx.mem, req_addr)
 
         assert exec_proxy.OpenDevice("input.device", 0, req_addr, 0) == 0
-        assert req.r_s("io_Device") != 0
+        assert req.device.aptr != 0
         assert exec_proxy.DoIO(req_addr) == 0
-        assert req.r_s("io_Error") == 0
+        assert req.error.val == 0
 
         exec_proxy.CloseDevice(req_addr)
-        assert req.r_s("io_Device") == 0
+        assert req.device.aptr == 0
         exec_proxy.DeleteIORequest(req_addr)
         exec_proxy.DeleteMsgPort(port)
         return 0
@@ -105,12 +103,12 @@ def pytask_exec_create_io_request_test(vamos_task):
         port = exec_proxy.CreateMsgPort()
         size = TimeRequestStruct.get_byte_size()
         req_addr = exec_proxy.CreateIORequest(port, size)
-        req = AccessStruct(ctx.mem, IORequestStruct, req_addr)
+        req = IORequestStruct(ctx.mem, req_addr)
 
-        assert req.r_s("io_Message.mn_ReplyPort") == port.addr
-        assert req.r_s("io_Message.mn_Length") == size
-        assert req.r_s("io_Flags") == 0
-        assert req.r_s("io_Error") == 0
+        assert req.message.reply_port.aptr == port.addr
+        assert req.message.length.val == size
+        assert req.flags.val == 0
+        assert req.error.val == 0
 
         exec_proxy.DeleteIORequest(req_addr)
         exec_proxy.DeleteMsgPort(port)
