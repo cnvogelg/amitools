@@ -28,7 +28,7 @@ Features
 Installation
 ============
 
-``icontool`` requires Python 3.7 or newer. No additional dependencies are
+``icontool`` requires Python 3.9 or newer. No additional dependencies are
 required for basic operations.
 
 For PNG import/export support install ``pypng``::
@@ -44,6 +44,34 @@ Usage
   icontool [options] <file.info> [file2.info ...]
 
 Files can be given either with or without the ``.info`` extension.
+
+Python Library
+==============
+
+Icon parsing and editing are also available through the ``amitools.icon``
+package. The command line tool is a thin interface over this API.
+
+Open an icon from a path or a byte string, inspect typed data, modify fields or
+ToolTypes, and serialize it again::
+
+  from amitools.icon import IconFile
+
+  icon = IconFile.open("MyIcon.info")
+  print(icon.disk_object.icon_type)
+  print(icon.disk_object.position)
+  print(icon.tool_types.get("PUBSCREEN"))
+
+  icon.disk_object.position = (100, 200)
+  icon.tool_types.set("PUBSCREEN", "Workbench")
+  icon.write("Modified.info")
+
+Use ``IconFile.from_bytes(data)`` and ``icon.to_bytes()`` to work entirely with
+in-memory data. The API also provides ``get_field(path)`` and
+``set_field(path, value)`` for structure fields, ``icon.images`` for image
+dimensions, mutable ``drawer_data`` and ``drawer_data2`` views for drawer
+icons, and ``icon.validate()`` for strict structural validation. ToolType
+operations are available through ``icon.tool_types``.
+Library failures raise ``IconError`` subclasses rather than printing messages.
 
 Inspecting Icons
 ================
