@@ -961,6 +961,25 @@ class DosLibrary(LibImpl):
         fh.flush()
         return -1
 
+    def SetVBuf(self, ctx):
+        fh_b_addr = ctx.cpu.r_reg(REG_D1)
+        buf_ptr = ctx.cpu.r_reg(REG_D2)
+        buf_type = ctx.cpu.r_reg(REG_D3)
+        size = ctx.cpu.r_reg(REG_D4)
+        fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+        if fh is None:
+            log_dos.warning("SetVBuf: invalid fh=%x", fh_b_addr)
+            return 0
+        fh.setvbuf(buf_ptr, buf_type, size)
+        log_dos.info(
+            "SetVBuf(%s, buff=%06x, type=%d, size=%d) -> ok",
+            fh,
+            buf_ptr,
+            buf_type,
+            size,
+        )
+        return 0
+
     def VPrintf(self, ctx):
         format_ptr = ctx.cpu.r_reg(REG_D1)
         argv_ptr = ctx.cpu.r_reg(REG_D2)
