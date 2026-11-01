@@ -2,6 +2,7 @@ import time
 
 from .Block import Block
 from ..TimeStamp import *
+from ..DosType import rootblock_tracks_used_blocks
 
 
 class RootBlock(Block):
@@ -64,9 +65,13 @@ class RootBlock(Block):
         self._put_bstr(-20, 30, self.name)
         self._put_long(-2, self.extension)
 
-        # DOS6 and DOS7 stuff
-        self._put_long(-11, self.blocks_used)
-        self._put_long(-4, self.fstype)
+        # These fields are only defined for DOS6 and DOS7.
+        if rootblock_tracks_used_blocks(self.fstype):
+            self._put_long(-11, self.blocks_used)
+            self._put_long(-4, self.fstype)
+        else:
+            self._put_long(-11, 0)
+            self._put_long(-4, 0)
 
         Block.write(self)
 

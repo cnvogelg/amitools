@@ -2,6 +2,7 @@ import pytest
 
 from amitools.fs.ADFSBitmap import ADFSBitmap
 from amitools.fs.ADFSVolume import ADFSVolume
+from amitools.fs import DosType
 from amitools.fs.FSString import FSString
 from amitools.fs.TimeStamp import TimeStamp
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
@@ -36,6 +37,22 @@ def fs_rootblock_format_location_test(root_disk):
     boot = BootBlock(disk)
     boot.read()
     assert boot.got_root_blk == root_num
+
+
+@pytest.mark.parametrize("dos_type", range(DosType.DOS0, DosType.DOS7 + 1))
+def fs_rootblock_dos_type_extension_fields_test(root_disk, dos_type):
+    disk, root_num = root_disk
+    root = RootBlock(disk, root_num)
+    root.create(FSString("Test"), fstype=dos_type)
+    root.blocks_used = 123
+    root.write()
+
+    data = disk.read_block(root_num)
+    expected = dos_type if DosType.rootblock_tracks_used_blocks(dos_type) else 0
+    assert int.from_bytes(data[-16:-12], "big") == expected
+    assert int.from_bytes(data[-44:-40], "big") == (
+        123 if DosType.rootblock_tracks_used_blocks(dos_type) else 0
+    )
 
 
 @pytest.mark.parametrize("scan_boot", [True, False])
