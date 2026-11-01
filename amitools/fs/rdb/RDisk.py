@@ -47,7 +47,13 @@ class RDisk:
         part_blk = self.rdb.part_list
         self.parts = []
         num = 0
+        seen = set()
         while part_blk != Block.no_blk:
+            # a list that links back to a block read before never ends
+            if part_blk in seen:
+                self.valid = False
+                return False
+            seen.add(part_blk)
             p = Partition(self.rawblk, part_blk, num, self.rdb.log_drv.cyl_blks, self)
             num += 1
             if not p.read():
@@ -63,7 +69,12 @@ class RDisk:
         fs_blk = self.rdb.fs_list
         self.fs = []
         num = 0
+        seen = set()
         while fs_blk != PartitionBlock.no_blk:
+            if fs_blk in seen:
+                self.valid = False
+                return False
+            seen.add(fs_blk)
             fs = FileSystem(self.rawblk, fs_blk, num)
             num += 1
             if not fs.read():
@@ -430,7 +441,7 @@ class RDisk:
                 )
             # check partition lo/hi cyls
             for p in self.parts:
-                lo, hi = p.get_cyl_range()
+                (lo, hi) = p.get_cyl_range()
                 if not check(lo) or not check(hi):
                     raise ValueError(
                         "Partition %d [%d,%d] can't be remapped!" % (p.num, lo, hi)
