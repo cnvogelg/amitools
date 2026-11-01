@@ -31,7 +31,9 @@ class Repairer:
         self.dos_type = validator.dos_type
         self.root = validator.root
         self.is_intl = DosType.is_intl(self.dos_type) if self.dos_type else False
-        self.is_longname = DosType.is_longname(self.dos_type) if self.dos_type else False
+        self.is_longname = (
+            DosType.is_longname(self.dos_type) if self.dos_type else False
+        )
 
         # Cache of modified blocks pending write
         self.modified_blocks: Dict[int, Block] = {}
@@ -138,8 +140,9 @@ class Repairer:
 
         return None
 
-    def fix_hash_chain(self, dir_blk_num: int, hash_val: int,
-                       entries: List[int]) -> bool:
+    def fix_hash_chain(
+        self, dir_blk_num: int, hash_val: int, entries: List[int]
+    ) -> bool:
         """Fix a hash chain in a directory.
 
         Args:
@@ -172,9 +175,13 @@ class Repairer:
 
                 # Read the entry block
                 if bi.blk_type == BlockScan.BT_DIR:
-                    entry_blk = UserDirBlock(self.blkdev, entry_blk_num, self.is_longname)
+                    entry_blk = UserDirBlock(
+                        self.blkdev, entry_blk_num, self.is_longname
+                    )
                 elif bi.blk_type == BlockScan.BT_FILE_HDR:
-                    entry_blk = FileHeaderBlock(self.blkdev, entry_blk_num, self.is_longname)
+                    entry_blk = FileHeaderBlock(
+                        self.blkdev, entry_blk_num, self.is_longname
+                    )
                 else:
                     continue
                 entry_blk.read()
@@ -299,7 +306,7 @@ class Repairer:
         # Write to each bitmap block
         offset = 0
         for i, bm_blk_num in enumerate(bm_ptrs[:num_bm_blocks]):
-            chunk = bitmap_data[offset:offset + bm_block_bytes]
+            chunk = bitmap_data[offset : offset + bm_block_bytes]
             if len(chunk) < bm_block_bytes:
                 chunk = chunk + bytes([0xFF] * (bm_block_bytes - len(chunk)))
 
@@ -409,8 +416,7 @@ class Repairer:
         except Exception:
             return None
 
-    def link_orphan_to_lost_found(self, orphan_blk_num: int,
-                                   orphan_name: str) -> bool:
+    def link_orphan_to_lost_found(self, orphan_blk_num: int, orphan_name: str) -> bool:
         """Link an orphaned file or directory to lost+found.
 
         Args:
@@ -445,7 +451,9 @@ class Repairer:
             if bi.blk_type == BlockScan.BT_DIR:
                 orphan_blk = UserDirBlock(self.blkdev, orphan_blk_num, self.is_longname)
             elif bi.blk_type == BlockScan.BT_FILE_HDR:
-                orphan_blk = FileHeaderBlock(self.blkdev, orphan_blk_num, self.is_longname)
+                orphan_blk = FileHeaderBlock(
+                    self.blkdev, orphan_blk_num, self.is_longname
+                )
             else:
                 return False
 

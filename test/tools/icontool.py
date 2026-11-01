@@ -6,9 +6,7 @@ from amitools.icon import IconFile, IconOperationError, ImageImportInfo
 from amitools.tools.icontool import main
 
 
-def make_icon(
-    icon_type=3, tool_types=(), drawer_data=False, image_count=1
-) -> bytes:
+def make_icon(icon_type=3, tool_types=(), drawer_data=False, image_count=1) -> bytes:
     data = bytearray(78)
     struct.pack_into(">H", data, 0, 0xE310)
     struct.pack_into(">H", data, 2, 1)
@@ -74,24 +72,25 @@ def icontool_get_tooltypes_and_case_matching_test(tmp_path, capsys):
 
 def icontool_tooltype_operations_and_normalize_test(tmp_path):
     icon_path = tmp_path / "Tool.info"
-    icon_path.write_bytes(
-        make_icon(tool_types=("MODE=old", "OTHER=1", "MODE=new", ""))
-    )
+    icon_path.write_bytes(make_icon(tool_types=("MODE=old", "OTHER=1", "MODE=new", "")))
 
-    assert main(
-        [
-            "--set",
-            "PUBSCREEN=Workbench",
-            "--set-flag",
-            "DONOTWAIT",
-            "--unset",
-            "QUIET",
-            "--delete",
-            "OTHER",
-            "--normalize",
-            str(icon_path),
-        ]
-    ) == 0
+    assert (
+        main(
+            [
+                "--set",
+                "PUBSCREEN=Workbench",
+                "--set-flag",
+                "DONOTWAIT",
+                "--unset",
+                "QUIET",
+                "--delete",
+                "OTHER",
+                "--normalize",
+                str(icon_path),
+            ]
+        )
+        == 0
+    )
 
     icon = IconFile.open(icon_path, strict=True)
     assert [entry.raw for entry in icon.tool_types.entries] == [
@@ -107,16 +106,19 @@ def icontool_position_field_and_drawer_options_test(tmp_path):
     drawer_path = tmp_path / "Drawer.info"
     drawer_path.write_bytes(make_icon(icon_type=2, drawer_data=True))
 
-    assert main(
-        [
-            "--pos=-5,0x20",
-            "--winsize",
-            "800,600",
-            "--edit",
-            "DiskObject:StackSize=8192",
-            str(path_without_extension),
-        ]
-    ) == 0
+    assert (
+        main(
+            [
+                "--pos=-5,0x20",
+                "--winsize",
+                "800,600",
+                "--edit",
+                "DiskObject:StackSize=8192",
+                str(path_without_extension),
+            ]
+        )
+        == 0
+    )
 
     icon = IconFile.open(drawer_path, strict=True)
     assert icon.disk_object.position == (-5, 32)
@@ -177,7 +179,9 @@ def icontool_png_options_are_forwarded_test(tmp_path, capsys, monkeypatch):
     export_calls = []
     import_calls = []
 
-    def export_png(_self, path, selected=False, transparency="edge", force_planar=False):
+    def export_png(
+        _self, path, selected=False, transparency="edge", force_planar=False
+    ):
         export_calls.append((path, selected, transparency, force_planar))
         return "glowicons" if not selected else "planar"
 
@@ -188,37 +192,41 @@ def icontool_png_options_are_forwarded_test(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(IconFile, "export_png", export_png)
     monkeypatch.setattr(IconFile, "import_png", import_png)
 
-    assert main(
-        [
-            "--export-icon",
-            "main.png",
-            "--export-select-icon",
-            "selected.png",
-            "--import-icon",
-            "replacement.png",
-            "--import-select-icon",
-            "replacement-selected.png",
-            "--transparency",
-            "all",
-            "--planar",
-            str(icon_path),
-        ]
-    ) == 0
+    assert (
+        main(
+            [
+                "--export-icon",
+                "main.png",
+                "--export-select-icon",
+                "selected.png",
+                "--import-icon",
+                "replacement.png",
+                "--import-select-icon",
+                "replacement-selected.png",
+                "--transparency",
+                "all",
+                "--planar",
+                str(icon_path),
+            ]
+        )
+        == 0
+    )
 
     assert export_calls == [
         ("main.png", False, "all", True),
         ("selected.png", True, "all", True),
     ]
-    assert import_calls == [("replacement.png", False), ("replacement-selected.png", True)]
+    assert import_calls == [
+        ("replacement.png", False),
+        ("replacement-selected.png", True),
+    ]
     output = capsys.readouterr().out
     assert "exported from GlowIcons" in output
     assert "Mapping to WB2.0 palette" in output
     assert "Transparent pixels mapped to color 0" in output
 
 
-def icontool_png_failures_set_partial_exit_code_test(
-    tmp_path, capsys, monkeypatch
-):
+def icontool_png_failures_set_partial_exit_code_test(tmp_path, capsys, monkeypatch):
     icon_path = tmp_path / "Icon.info"
     icon_path.write_bytes(make_icon())
 

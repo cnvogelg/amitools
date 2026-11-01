@@ -368,7 +368,9 @@ class IconFile:
         try:
             return _format.read_field(buffer, field_at_offset)
         except (IndexError, struct.error) as error:
-            raise IconFieldError("Field is outside the available data: %s" % path) from error
+            raise IconFieldError(
+                "Field is outside the available data: %s" % path
+            ) from error
 
     def set_field(self, path: str, value: int) -> None:
         field, structure, base_offset = _format.find_field_by_path(path)
@@ -450,7 +452,9 @@ class IconFile:
     def to_bytes(self, compact: bool = False) -> bytes:
         try:
             new_tooltypes = (
-                self._parsed.tooltypes_raw_entries if self._tool_types_modified else None
+                self._parsed.tooltypes_raw_entries
+                if self._tool_types_modified
+                else None
             )
             return _format.rebuild_file(
                 self._parsed, new_tooltypes=new_tooltypes, compact=compact
@@ -488,8 +492,7 @@ class IconFile:
         for field in _format.DISKOBJECT_FIELDS:
             value = _format.read_field(parsed.data, field)
             lines.append(
-                "DiskObject:%s=%s"
-                % (field.name, _format.format_field(field, value))
+                "DiskObject:%s=%s" % (field.name, _format.format_field(field, value))
             )
 
         append_fields(
@@ -498,14 +501,18 @@ class IconFile:
             _format.GADGET_FIELDS,
         )
         if parsed.has_drawerdata and parsed.drawerdata:
-            append_fields("DrawerData:NewWindow", parsed.drawerdata, _format.NEWWINDOW_FIELDS)
+            append_fields(
+                "DrawerData:NewWindow", parsed.drawerdata, _format.NEWWINDOW_FIELDS
+            )
             append_fields("DrawerData", parsed.drawerdata, _format.DRAWERDATA_FIELDS)
 
         offset = 0
         for index in range(parsed.num_main_icons):
             if offset + 20 <= len(parsed.main_icons_blob):
                 name = "Icon" if index == 0 else "IconSelect"
-                append_fields(name, parsed.main_icons_blob[offset:], _format.IMAGE_FIELDS)
+                append_fields(
+                    name, parsed.main_icons_blob[offset:], _format.IMAGE_FIELDS
+                )
                 offset += _format.get_main_icon_size(
                     parsed.main_icons_blob, offset, strict=False
                 )

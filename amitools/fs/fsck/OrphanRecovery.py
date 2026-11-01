@@ -62,7 +62,7 @@ class OrphanRecovery:
                         self.linked_blocks.add(entry.blk_info.blk_num)
 
         # All file data and extension blocks from file scan
-        if hasattr(self.validator, 'file_scan') and self.validator.file_scan:
+        if hasattr(self.validator, "file_scan") and self.validator.file_scan:
             # File extension blocks and data blocks are tracked during file scan
             pass  # These are already marked as used in block_scan
 
@@ -105,8 +105,8 @@ class OrphanRecovery:
             orphan = OrphanInfo(
                 blk_num=blk_num,
                 blk_type=bi.blk_type,
-                name=getattr(bi, 'name', None),
-                byte_size=getattr(bi, 'byte_size', 0),
+                name=getattr(bi, "name", None),
+                byte_size=getattr(bi, "byte_size", 0),
             )
 
             # Generate recovery name if needed
@@ -124,8 +124,9 @@ class OrphanRecovery:
 
         return orphans
 
-    def recover_orphan(self, orphan: OrphanInfo, lost_found_blk: int,
-                       repairer: "Repairer") -> bool:
+    def recover_orphan(
+        self, orphan: OrphanInfo, lost_found_blk: int, repairer: "Repairer"
+    ) -> bool:
         """Recover an orphan by linking it into lost+found.
 
         Args:
@@ -139,10 +140,7 @@ class OrphanRecovery:
         if orphan.recovery_name is None:
             return False
 
-        return repairer.link_orphan_to_lost_found(
-            orphan.blk_num,
-            orphan.recovery_name
-        )
+        return repairer.link_orphan_to_lost_found(orphan.blk_num, orphan.recovery_name)
 
     def get_orphan_summary(self, orphans: List[OrphanInfo]) -> str:
         """Get a summary of found orphans.

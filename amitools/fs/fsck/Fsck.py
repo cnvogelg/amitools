@@ -228,11 +228,22 @@ class Fsck:
         # 3. Hash chains
         # 4. Bitmap (must be last)
 
-        checksum_issues = [i for i in repairable if i.issue_type == IssueType.BAD_CHECKSUM]
-        parent_issues = [i for i in repairable if i.issue_type == IssueType.INVALID_PARENT_PTR]
-        bitmap_issues = [i for i in repairable if i.issue_type in (
-            IssueType.BITMAP_MISMATCH, IssueType.BITMAP_INVALID_FLAG, IssueType.BITMAP_BLOCK_ERROR
-        )]
+        checksum_issues = [
+            i for i in repairable if i.issue_type == IssueType.BAD_CHECKSUM
+        ]
+        parent_issues = [
+            i for i in repairable if i.issue_type == IssueType.INVALID_PARENT_PTR
+        ]
+        bitmap_issues = [
+            i
+            for i in repairable
+            if i.issue_type
+            in (
+                IssueType.BITMAP_MISMATCH,
+                IssueType.BITMAP_INVALID_FLAG,
+                IssueType.BITMAP_BLOCK_ERROR,
+            )
+        ]
 
         # Fix checksums
         for issue in checksum_issues:

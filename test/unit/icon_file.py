@@ -91,7 +91,9 @@ def icon_file_writes_and_manages_tooltypes_test(tmp_path):
 
     icon.write(output_path)
     assert source_path.read_bytes() == make_icon()
-    assert IconFile.open(output_path, strict=True).tool_types.get("DONOTWAIT") == "false"
+    assert (
+        IconFile.open(output_path, strict=True).tool_types.get("DONOTWAIT") == "false"
+    )
 
 
 def icon_file_drawer_data_models_test():
@@ -107,4 +109,3 @@ def icon_file_drawer_data_models_test():
     assert reopened.drawer_data.window_size == (800, 600)
     assert reopened.drawer_data.position == (50, 60)
     assert reopened.drawer_data2.view_modes == 2
-

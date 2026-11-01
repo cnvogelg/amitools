@@ -130,7 +130,7 @@ def create_orphan_block(path: str):
     name = b"orphan.txt"
     name_offset = len(data) - 80
     data[name_offset] = len(name)
-    data[name_offset + 1:name_offset + 1 + len(name)] = name
+    data[name_offset + 1 : name_offset + 1 + len(name)] = name
 
     # Calculate and set checksum
     chksum = 0

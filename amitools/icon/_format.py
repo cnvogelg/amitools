@@ -9,6 +9,7 @@ from typing import List, Optional, Tuple, Callable, Dict
 # Optional PNG support - gracefully disabled if pypng not installed
 try:
     import png
+
     HAS_PNG = True
 except ImportError:
     HAS_PNG = False
@@ -97,6 +98,7 @@ DRAWERDATA2_LEN = 6
 # Format: (offset, size, signed, name, formatter)
 # Sizes: 1=byte, 2=word, 4=long
 
+
 @dataclass
 class FieldDef:
     offset: int
@@ -105,13 +107,24 @@ class FieldDef:
     name: str
     fmt: Optional[Callable[[int], str]] = None
 
+
 def _fmt_hex(v: int) -> str:
     return f"0x{v:X}"
 
+
 def _fmt_icon_type(v: int) -> str:
-    names = {1: "WBDISK", 2: "WBDRAWER", 3: "WBTOOL", 4: "WBPROJECT",
-             5: "WBGARBAGE", 6: "WBDEVICE", 7: "WBKICK", 8: "WBAPPICON"}
+    names = {
+        1: "WBDISK",
+        2: "WBDRAWER",
+        3: "WBTOOL",
+        4: "WBPROJECT",
+        5: "WBGARBAGE",
+        6: "WBDEVICE",
+        7: "WBKICK",
+        8: "WBAPPICON",
+    }
     return f"{v} ({names.get(v, '?')})"
+
 
 def _fmt_wb_version(v: int) -> str:
     # UserData low byte is the "revision" field
@@ -123,21 +136,24 @@ def _fmt_wb_version(v: int) -> str:
     else:
         return f"0x{v:X} (OS2.x/v36+, has DrawerData2)"
 
+
 def _fmt_position(v: int) -> str:
     if v == 0x80000000:
         return f"0x{v:X} (NO_ICON_POSITION)"
     return str(v)
 
+
 def _fmt_magic(v: int) -> str:
     valid = "valid" if v == WB_DISKMAGIC else "INVALID"
     return f"0x{v:X} ({valid})"
 
+
 # Gadget structure (embedded in DiskObject at offset 4)
 GADGET_FIELDS = [
-    FieldDef(0,  4, False, "NextGadget", _fmt_hex),
-    FieldDef(4,  2, False, "LeftEdge"),
-    FieldDef(6,  2, False, "TopEdge"),
-    FieldDef(8,  2, False, "Width"),
+    FieldDef(0, 4, False, "NextGadget", _fmt_hex),
+    FieldDef(4, 2, False, "LeftEdge"),
+    FieldDef(6, 2, False, "TopEdge"),
+    FieldDef(8, 2, False, "Width"),
     FieldDef(10, 2, False, "Height"),
     FieldDef(12, 2, False, "Flags", _fmt_hex),
     FieldDef(14, 2, False, "Activation", _fmt_hex),
@@ -153,15 +169,15 @@ GADGET_FIELDS = [
 
 # DiskObject structure (78 bytes header)
 DISKOBJECT_FIELDS = [
-    FieldDef(0,  2, False, "Magic", _fmt_magic),
-    FieldDef(2,  2, False, "Version"),
+    FieldDef(0, 2, False, "Magic", _fmt_magic),
+    FieldDef(2, 2, False, "Version"),
     # Gadget is at offset 4, 44 bytes - handled separately
     FieldDef(48, 1, False, "Type", _fmt_icon_type),
     FieldDef(49, 1, False, "Padding"),
     FieldDef(50, 4, False, "DefaultTool", _fmt_hex),
     FieldDef(54, 4, False, "ToolTypes", _fmt_hex),
-    FieldDef(58, 4, True,  "CurrentX", _fmt_position),
-    FieldDef(62, 4, True,  "CurrentY", _fmt_position),
+    FieldDef(58, 4, True, "CurrentX", _fmt_position),
+    FieldDef(62, 4, True, "CurrentY", _fmt_position),
     FieldDef(66, 4, False, "DrawerData", _fmt_hex),
     FieldDef(70, 4, False, "ToolWindow", _fmt_hex),
     FieldDef(74, 4, False, "StackSize"),
@@ -169,25 +185,25 @@ DISKOBJECT_FIELDS = [
 
 # Image structure (20 bytes header per icon)
 IMAGE_FIELDS = [
-    FieldDef(0,  2, False, "LeftEdge"),
-    FieldDef(2,  2, False, "TopEdge"),
-    FieldDef(4,  2, False, "Width"),
-    FieldDef(6,  2, False, "Height"),
-    FieldDef(8,  2, False, "Depth"),
+    FieldDef(0, 2, False, "LeftEdge"),
+    FieldDef(2, 2, False, "TopEdge"),
+    FieldDef(4, 2, False, "Width"),
+    FieldDef(6, 2, False, "Height"),
+    FieldDef(8, 2, False, "Depth"),
     FieldDef(10, 4, False, "ImageData", _fmt_hex),
-    FieldDef(14, 1, True,  "PlanePick"),
-    FieldDef(15, 1, True,  "PlaneOnOff"),
+    FieldDef(14, 1, True, "PlanePick"),
+    FieldDef(15, 1, True, "PlaneOnOff"),
     FieldDef(16, 4, False, "NextImage", _fmt_hex),
 ]
 
 # NewWindow structure (embedded in DrawerData, 48 bytes)
 NEWWINDOW_FIELDS = [
-    FieldDef(0,  2, True,  "LeftEdge"),
-    FieldDef(2,  2, True,  "TopEdge"),
-    FieldDef(4,  2, True,  "Width"),
-    FieldDef(6,  2, True,  "Height"),
-    FieldDef(8,  1, False, "DetailPen"),
-    FieldDef(9,  1, False, "BlockPen"),
+    FieldDef(0, 2, True, "LeftEdge"),
+    FieldDef(2, 2, True, "TopEdge"),
+    FieldDef(4, 2, True, "Width"),
+    FieldDef(6, 2, True, "Height"),
+    FieldDef(8, 1, False, "DetailPen"),
+    FieldDef(9, 1, False, "BlockPen"),
     FieldDef(10, 4, False, "IDCMPFlags", _fmt_hex),
     FieldDef(14, 4, False, "Flags", _fmt_hex),
     FieldDef(18, 4, False, "FirstGadget", _fmt_hex),
@@ -195,8 +211,8 @@ NEWWINDOW_FIELDS = [
     FieldDef(26, 4, False, "Title", _fmt_hex),
     FieldDef(30, 4, False, "Screen", _fmt_hex),
     FieldDef(34, 4, False, "BitMap", _fmt_hex),
-    FieldDef(38, 2, True,  "MinWidth"),
-    FieldDef(40, 2, True,  "MinHeight"),
+    FieldDef(38, 2, True, "MinWidth"),
+    FieldDef(40, 2, True, "MinHeight"),
     FieldDef(42, 2, False, "MaxWidth"),
     FieldDef(44, 2, False, "MaxHeight"),
     FieldDef(46, 2, False, "Type"),
@@ -223,22 +239,28 @@ MAX_TLEN = 10000
 
 _tt_paren_re = re.compile(r"^\((.*)\)$")
 
+
 def be_u16(b: bytes, off: int) -> int:
     return struct.unpack_from(">H", b, off)[0]
+
 
 def be_u32(b: bytes, off: int) -> int:
     return struct.unpack_from(">I", b, off)[0]
 
+
 def be_i32(b: bytes, off: int) -> int:
     return struct.unpack_from(">i", b, off)[0]
 
+
 def put_be_i32(buf: bytearray, off: int, v: int) -> None:
     struct.pack_into(">i", buf, off, int(v))
+
 
 def put_be_u16(buf: bytearray, off: int, v: int) -> None:
     if not (0 <= v <= 0xFFFF):
         raise ValueError("UWORD out of range")
     struct.pack_into(">H", buf, off, int(v))
+
 
 def u32_at(buf: bytes, pos: int, strict: bool) -> Tuple[int, int]:
     if pos + 4 > len(buf):
@@ -247,8 +269,10 @@ def u32_at(buf: bytes, pos: int, strict: bool) -> Tuple[int, int]:
         return 0, pos
     return be_u32(buf, pos), pos + 4
 
+
 def is_diskobject(buf: bytes) -> bool:
     return len(buf) >= 4 and be_u16(buf, 0) == WB_DISKMAGIC
+
 
 def icon_type_name(t: int) -> str:
     return {
@@ -262,14 +286,17 @@ def icon_type_name(t: int) -> str:
         8: "appicon",
     }.get(t, "?")
 
+
 def bytes_to_tt_str(raw: bytes) -> str:
     # ToolTypes often include a trailing NUL; strip NULs for display/logic.
     s = raw.rstrip(b"\0")
     return s.decode("latin-1", errors="replace")
 
+
 def tt_str_to_bytes(s: str, keep_nul: bool) -> bytes:
     b = s.encode("latin-1", errors="strict")
     return b + (b"\0" if keep_nul else b"")
+
 
 def split_kv(s: str) -> Tuple[str, Optional[str]]:
     if "=" not in s:
@@ -277,8 +304,10 @@ def split_kv(s: str) -> Tuple[str, Optional[str]]:
     k, v = s.split("=", 1)
     return k, v
 
+
 def key_eq(a: str, b: str, ignore_case: bool) -> bool:
     return a.lower() == b.lower() if ignore_case else a == b
+
 
 def canon_key(user_key: str) -> str:
     s = user_key.strip()
@@ -287,13 +316,15 @@ def canon_key(user_key: str) -> str:
         return m.group(1).strip()
     return s
 
+
 @dataclass
 class TTItem:
-    raw: str              # normalized display string (no trailing NUL)
-    key: str              # canonical key (no parens)
-    kind: str             # "kv" | "bool"
+    raw: str  # normalized display string (no trailing NUL)
+    key: str  # canonical key (no parens)
+    kind: str  # "kv" | "bool"
     value: Optional[str]  # for kv: string; for bool: "true"/"false"
-    negated: bool         # True if (KEY)
+    negated: bool  # True if (KEY)
+
 
 def parse_tt_item(line: str) -> TTItem:
     s = line.strip()
@@ -305,9 +336,8 @@ def parse_tt_item(line: str) -> TTItem:
         k, v = s.split("=", 1)
         return TTItem(raw=s, key=k.strip(), kind="kv", value=v, negated=False)
     # boolean true
-    return TTItem(raw=s, key=s, kind="bool", value="true", negated=False
+    return TTItem(raw=s, key=s, kind="bool", value="true", negated=False)
 
-    )
 
 @dataclass
 class ParsedIcon:
@@ -331,6 +361,7 @@ class ParsedIcon:
 
     tooltypes_pos: Optional[int]
 
+
 def get_main_icon_size(buf: bytes, pos: int, strict: bool) -> int:
     if pos + 20 > len(buf):
         if strict:
@@ -351,7 +382,10 @@ def get_main_icon_size(buf: bytes, pos: int, strict: bool) -> int:
             raise ValueError("Main icon bitmap out of range")
     return int(bytesused)
 
-def parse_tooltypes_table(buf: bytes, pos: int, strict: bool) -> Tuple[List[bytes], int]:
+
+def parse_tooltypes_table(
+    buf: bytes, pos: int, strict: bool
+) -> Tuple[List[bytes], int]:
     pos0 = pos
     num_entries_raw, pos = u32_at(buf, pos, strict=strict)
     if num_entries_raw == 0:
@@ -369,9 +403,10 @@ def parse_tooltypes_table(buf: bytes, pos: int, strict: bool) -> Tuple[List[byte
             raise ValueError("ToolType entry too large")
         if pos + tlen > len(buf):
             raise ValueError("ToolType entry out of range")
-        entries.append(bytes(buf[pos:pos + tlen]))
+        entries.append(bytes(buf[pos : pos + tlen]))
         pos += tlen
     return entries, pos - pos0
+
 
 def build_tooltypes_table(entries: List[bytes]) -> bytes:
     num_entries_raw = 4 * (len(entries) + 1)
@@ -381,6 +416,7 @@ def build_tooltypes_table(entries: List[bytes]) -> bytes:
         out += struct.pack(">I", len(e))
         out += e
     return bytes(out)
+
 
 def find_glowicons_form(buf: bytes, start_pos: int) -> int:
     """
@@ -402,7 +438,7 @@ def find_glowicons_form(buf: bytes, start_pos: int) -> int:
             return -1
 
         # Verify this is FORM ICON (not just "FORMAT" or other text)
-        form_type = buf[form_pos + 8:form_pos + 12]
+        form_type = buf[form_pos + 8 : form_pos + 12]
         if form_type == b"ICON":
             return form_pos
 
@@ -432,6 +468,7 @@ def detect_glowicons_tail(buf: bytes, pos: int) -> Optional[bytes]:
 
 # --- GlowIcons parsing ---
 
+
 def unpack_rle_8bit(data: bytes, expected_size: int) -> bytes:
     """
     Decompress 8-bit RLE data (icon.library format for colormap).
@@ -451,7 +488,7 @@ def unpack_rle_8bit(data: bytes, expected_size: int) -> bytes:
         if n < 128:
             # Literal run: copy n+1 bytes
             count = n + 1
-            result.extend(data[i:i + count])
+            result.extend(data[i : i + count])
             i += count
         else:
             # Replicate run: repeat next byte (256-n)+1 times
@@ -546,9 +583,9 @@ def parse_glowicons(data: bytes) -> Optional[Dict]:
         if pos + 8 > len(data):
             break
 
-        chunk_id = data[pos:pos + 4]
-        chunk_size = struct.unpack(">I", data[pos + 4:pos + 8])[0]
-        chunk_data = data[pos + 8:pos + 8 + chunk_size]
+        chunk_id = data[pos : pos + 4]
+        chunk_size = struct.unpack(">I", data[pos + 4 : pos + 8])[0]
+        chunk_data = data[pos + 8 : pos + 8 + chunk_size]
 
         if chunk_id == b"FACE":
             # FACE chunk: width-1, height-1, flags, aspect
@@ -629,7 +666,7 @@ def parse_imag_chunk(data: bytes, face_info: Optional[Dict]) -> Optional[Dict]:
     # Data order: IMAGE first, then COLORMAP
     # Read image data
     if image_size > 1 and pos + image_size <= len(data):
-        raw_image_data = data[pos:pos + image_size]
+        raw_image_data = data[pos : pos + image_size]
         pos += image_size
     else:
         raw_image_data = data[pos:]
@@ -638,7 +675,7 @@ def parse_imag_chunk(data: bytes, face_info: Optional[Dict]) -> Optional[Dict]:
     # Read colormap data
     palette = None
     if colormap_size > 1 and pos + colormap_size <= len(data):
-        raw_colormap_data = data[pos:pos + colormap_size]
+        raw_colormap_data = data[pos : pos + colormap_size]
 
         # Decompress colormap (8-bit RLE)
         if colormap_compressed:
@@ -650,7 +687,9 @@ def parse_imag_chunk(data: bytes, face_info: Optional[Dict]) -> Optional[Dict]:
         palette = []
         for i in range(0, min(len(colormap_data), num_colors * 3), 3):
             if i + 2 < len(colormap_data):
-                palette.append((colormap_data[i], colormap_data[i + 1], colormap_data[i + 2]))
+                palette.append(
+                    (colormap_data[i], colormap_data[i + 1], colormap_data[i + 2])
+                )
 
     # Decompress image data
     if image_compressed:
@@ -724,6 +763,7 @@ def parse_argb_chunk(data: bytes) -> Optional[Dict]:
 
     return {"width": width, "height": height, "rgba": bytes(rgba)}
 
+
 def parse_icon_data(raw_data: bytes, strict: bool = False) -> ParsedIcon:
     data = bytearray(raw_data)
     if not is_diskobject(data):
@@ -735,10 +775,10 @@ def parse_icon_data(raw_data: bytes, strict: bool = False) -> ParsedIcon:
     revision = be_u32(data, OFF_ICON_REVISION) & 0xFF
     itype = data[OFF_ICON_TYPE]
 
-    has_defaulttool = (be_u32(data, OFF_DEFAULTTOOL_PRESENCE) != 0)
-    has_tooltypes = (be_u32(data, OFF_TOOLTYPES_PRESENCE) != 0)
-    has_drawerdata = (be_u32(data, OFF_DRAWERDATA_PRESENCE) != 0)
-    has_toolwindow = (be_u32(data, OFF_TOOLWINDOW_PRESENCE) != 0)
+    has_defaulttool = be_u32(data, OFF_DEFAULTTOOL_PRESENCE) != 0
+    has_tooltypes = be_u32(data, OFF_TOOLTYPES_PRESENCE) != 0
+    has_drawerdata = be_u32(data, OFF_DRAWERDATA_PRESENCE) != 0
+    has_toolwindow = be_u32(data, OFF_TOOLWINDOW_PRESENCE) != 0
 
     selectrender_ptr = be_u32(data, OFF_SELECTRENDER_PTR)
     num_main_icons = 1 if selectrender_ptr == 0 else 2
@@ -749,7 +789,7 @@ def parse_icon_data(raw_data: bytes, strict: bool = False) -> ParsedIcon:
     if has_drawerdata:
         if strict and pos + DRAWERDATA_LEN > len(data):
             raise ValueError("DrawerData out of range")
-        drawerdata = bytes(data[pos:pos + DRAWERDATA_LEN])
+        drawerdata = bytes(data[pos : pos + DRAWERDATA_LEN])
         pos += DRAWERDATA_LEN
 
     main_start = pos
@@ -768,7 +808,7 @@ def parse_icon_data(raw_data: bytes, strict: bool = False) -> ParsedIcon:
         pos += 4
         if strict and pos + dlen > len(data):
             raise ValueError("DefaultTool data out of range")
-        defaulttool = bytes(data[pos-4:pos + dlen])  # include length field
+        defaulttool = bytes(data[pos - 4 : pos + dlen])  # include length field
         pos += dlen
 
     tooltypes_pos = None
@@ -786,7 +826,7 @@ def parse_icon_data(raw_data: bytes, strict: bool = False) -> ParsedIcon:
         wlen = be_u32(data, pos)
         if strict and pos + 4 + wlen > len(data):
             raise ValueError("ToolWindow data out of range")
-        toolwindow = bytes(data[pos:pos + 4 + wlen])
+        toolwindow = bytes(data[pos : pos + 4 + wlen])
         pos += 4 + wlen
 
     drawerdata2 = None
@@ -799,12 +839,14 @@ def parse_icon_data(raw_data: bytes, strict: bool = False) -> ParsedIcon:
             remaining = len(data) - pos
             if remaining > 0:
                 # Pad with zeros if truncated
-                drawerdata2 = bytes(data[pos:pos + DRAWERDATA2_LEN])
+                drawerdata2 = bytes(data[pos : pos + DRAWERDATA2_LEN])
                 if len(drawerdata2) < DRAWERDATA2_LEN:
-                    drawerdata2 = drawerdata2 + bytes(DRAWERDATA2_LEN - len(drawerdata2))
+                    drawerdata2 = drawerdata2 + bytes(
+                        DRAWERDATA2_LEN - len(drawerdata2)
+                    )
                 pos = len(data)  # We've consumed everything
         else:
-            drawerdata2 = bytes(data[pos:pos + DRAWERDATA2_LEN])
+            drawerdata2 = bytes(data[pos : pos + DRAWERDATA2_LEN])
             pos += DRAWERDATA2_LEN
 
     glowicons = detect_glowicons_tail(data, pos)
@@ -842,6 +884,7 @@ def set_current_xy(icon: ParsedIcon, x: int, y: int) -> None:
     else:
         raise ValueError("Icon too small to have CurrentX/CurrentY")
 
+
 def set_drawer_winsize(icon: ParsedIcon, w: int, h: int) -> bool:
     if not icon.has_drawerdata or icon.drawerdata is None:
         return False
@@ -851,6 +894,7 @@ def set_drawer_winsize(icon: ParsedIcon, w: int, h: int) -> bool:
     icon.drawerdata = bytes(dd)
     return True
 
+
 def apply_tooltypes_ops(
     entries_raw: List[bytes],
     op_set_kv: Optional[Tuple[str, str]],
@@ -858,7 +902,7 @@ def apply_tooltypes_ops(
     op_unset_flag: Optional[str],
     op_del: Optional[str],
     op_norm: bool,
-    ignore_case: bool
+    ignore_case: bool,
 ) -> List[bytes]:
     entries = [bytes_to_tt_str(e) for e in entries_raw]
 
@@ -930,7 +974,10 @@ def apply_tooltypes_ops(
         new_raw.append(tt_str_to_bytes(s, keep_nul=keep_nul))
     return new_raw
 
-def rebuild_file(icon: ParsedIcon, new_tooltypes: Optional[List[bytes]], compact: bool) -> bytes:
+
+def rebuild_file(
+    icon: ParsedIcon, new_tooltypes: Optional[List[bytes]], compact: bool
+) -> bytes:
     out = bytearray()
 
     # DiskObject header (78 bytes) with any in-place edits already applied
@@ -957,9 +1004,13 @@ def rebuild_file(icon: ParsedIcon, new_tooltypes: Optional[List[bytes]], compact
             if icon.tooltypes_pos is None:
                 raise ValueError("ToolTypes flagged but position unknown")
             _, used = parse_tooltypes_table(icon.data, icon.tooltypes_pos, strict=False)
-            out += icon.data[icon.tooltypes_pos:icon.tooltypes_pos + used]
+            out += icon.data[icon.tooltypes_pos : icon.tooltypes_pos + used]
         else:
-            tt_entries = new_tooltypes if new_tooltypes is not None else icon.tooltypes_raw_entries
+            tt_entries = (
+                new_tooltypes
+                if new_tooltypes is not None
+                else icon.tooltypes_raw_entries
+            )
             out += build_tooltypes_table(tt_entries)
 
     # ToolWindow
@@ -990,6 +1041,7 @@ def rebuild_file(icon: ParsedIcon, new_tooltypes: Optional[List[bytes]], compact
 
 # --- Field access helpers for verbose dump and editing ---
 
+
 def read_field(buf: bytes, field: FieldDef) -> int:
     """Read a field value from buffer at the field's offset."""
     off = field.offset
@@ -1010,7 +1062,9 @@ def read_field(buf: bytes, field: FieldDef) -> int:
     return val
 
 
-def write_field(buf: bytearray, offset: int, size: int, signed: bool, value: int) -> None:
+def write_field(
+    buf: bytearray, offset: int, size: int, signed: bool, value: int
+) -> None:
     """Write a field value to buffer at the given offset."""
     # Convert signed to unsigned for packing
     if signed and value < 0:
@@ -1041,6 +1095,7 @@ def format_field(field: FieldDef, value: int) -> str:
 
 
 # --- Structured editing ---
+
 
 def find_field_by_path(path: str) -> Tuple[Optional[FieldDef], str, int]:
     """
@@ -1098,7 +1153,10 @@ def find_field_by_path(path: str) -> Tuple[Optional[FieldDef], str, int]:
 
 # --- PNG export/import ---
 
-def find_edge_background(pixels: List[List[int]], width: int, height: int) -> List[List[bool]]:
+
+def find_edge_background(
+    pixels: List[List[int]], width: int, height: int
+) -> List[List[bool]]:
     """Find color 0 pixels connected to the image edge using flood fill.
 
     Returns a 2D array of booleans - True for pixels that should be transparent
@@ -1173,7 +1231,9 @@ def get_icon_image_info(blob: bytes, icon_index: int) -> Tuple[int, int, int, in
     return pos, width, height, depth, data_size
 
 
-def decode_planar_to_chunky(blob: bytes, pos: int, width: int, height: int, depth: int) -> List[List[int]]:
+def decode_planar_to_chunky(
+    blob: bytes, pos: int, width: int, height: int, depth: int
+) -> List[List[int]]:
     """
     Decode Amiga planar bitmap to chunky pixel array.
     Returns 2D array of pixel indices [y][x].
@@ -1193,12 +1253,14 @@ def decode_planar_to_chunky(blob: bytes, pos: int, width: int, height: int, dept
                 bit_idx = 7 - (x % 8)
                 if byte_idx < len(blob):
                     if blob[byte_idx] & (1 << bit_idx):
-                        pixels[y][x] |= (1 << plane)
+                        pixels[y][x] |= 1 << plane
 
     return pixels
 
 
-def encode_chunky_to_planar(pixels: List[List[int]], width: int, height: int, depth: int) -> bytes:
+def encode_chunky_to_planar(
+    pixels: List[List[int]], width: int, height: int, depth: int
+) -> bytes:
     """
     Encode chunky pixel array to Amiga planar bitmap.
     Returns raw bitmap data (no header).
@@ -1215,13 +1277,18 @@ def encode_chunky_to_planar(pixels: List[List[int]], width: int, height: int, de
                 if pixels[y][x] & (1 << plane):
                     byte_idx = row_offset + (x // 8)
                     bit_idx = 7 - (x % 8)
-                    data[byte_idx] |= (1 << bit_idx)
+                    data[byte_idx] |= 1 << bit_idx
 
     return bytes(data)
 
 
-def export_icon_to_png(icon: ParsedIcon, icon_index: int, output_path: str,
-                       transparency: str = "edge", force_planar: bool = False) -> str:
+def export_icon_to_png(
+    icon: ParsedIcon,
+    icon_index: int,
+    output_path: str,
+    transparency: str = "edge",
+    force_planar: bool = False,
+) -> str:
     """
     Export an icon image to PNG file with configurable transparency.
     icon_index: 0 for main icon, 1 for select icon.
@@ -1233,7 +1300,9 @@ def export_icon_to_png(icon: ParsedIcon, icon_index: int, output_path: str,
     Falls back to traditional planar images otherwise.
     """
     if not HAS_PNG:
-        raise RuntimeError("PNG export requires pypng. Install it with: pip install pypng")
+        raise RuntimeError(
+            "PNG export requires pypng. Install it with: pip install pypng"
+        )
     if transparency not in ("edge", "all", "none"):
         raise ValueError("transparency must be 'edge', 'all', or 'none'")
 
@@ -1261,11 +1330,20 @@ def export_icon_to_png(icon: ParsedIcon, icon_index: int, output_path: str,
                     row = []
                     for x in range(width):
                         offset = (y * width + x) * 4
-                        row.extend([rgba[offset], rgba[offset+1], rgba[offset+2], rgba[offset+3]])
+                        row.extend(
+                            [
+                                rgba[offset],
+                                rgba[offset + 1],
+                                rgba[offset + 2],
+                                rgba[offset + 3],
+                            ]
+                        )
                     rgba_rows.append(row)
 
-                with open(output_path, 'wb') as f:
-                    writer = png.Writer(width=width, height=height, greyscale=False, alpha=True)
+                with open(output_path, "wb") as f:
+                    writer = png.Writer(
+                        width=width, height=height, greyscale=False, alpha=True
+                    )
                     writer.write(f, rgba_rows)
 
                 return "glowicons"
@@ -1278,7 +1356,9 @@ def export_icon_to_png(icon: ParsedIcon, icon_index: int, output_path: str,
         raise ValueError("Requested icon not present in file")
 
     try:
-        pos, width, height, depth, _ = get_icon_image_info(icon.main_icons_blob, icon_index)
+        pos, width, height, depth, _ = get_icon_image_info(
+            icon.main_icons_blob, icon_index
+        )
     except ValueError as error:
         raise ValueError("Error reading icon: %s" % error) from error
 
@@ -1316,14 +1396,16 @@ def export_icon_to_png(icon: ParsedIcon, icon_index: int, output_path: str,
             row.extend([r, g, b, a])
         rgba_rows.append(row)
 
-    with open(output_path, 'wb') as f:
+    with open(output_path, "wb") as f:
         writer = png.Writer(width=width, height=height, greyscale=False, alpha=True)
         writer.write(f, rgba_rows)
 
     return "planar"
 
 
-def quantize_to_palette(r: int, g: int, b: int, palette: List[Tuple[int, int, int]]) -> Tuple[int, int]:
+def quantize_to_palette(
+    r: int, g: int, b: int, palette: List[Tuple[int, int, int]]
+) -> Tuple[int, int]:
     """
     Find closest palette color using Euclidean distance.
     Returns (palette_index, squared_distance).
@@ -1338,7 +1420,9 @@ def quantize_to_palette(r: int, g: int, b: int, palette: List[Tuple[int, int, in
     return best_idx, best_dist
 
 
-def import_png_to_icon(icon: ParsedIcon, icon_index: int, png_path: str) -> Tuple[str, int, int, bool]:
+def import_png_to_icon(
+    icon: ParsedIcon, icon_index: int, png_path: str
+) -> Tuple[str, int, int, bool]:
     """
     Import a PNG file into an icon image slot.
     icon_index: 0 for main icon, 1 for select icon.
@@ -1348,7 +1432,9 @@ def import_png_to_icon(icon: ParsedIcon, icon_index: int, png_path: str) -> Tupl
     Automatically selects best palette (WB1.3, WB2.0, or 16-color MagicWB).
     """
     if not HAS_PNG:
-        raise RuntimeError("PNG import requires pypng. Install it with: pip install pypng")
+        raise RuntimeError(
+            "PNG import requires pypng. Install it with: pip install pypng"
+        )
 
     if icon_index == 1 and icon.num_main_icons < 2:
         raise ValueError("This icon has no select image slot")
@@ -1364,7 +1450,7 @@ def import_png_to_icon(icon: ParsedIcon, icon_index: int, png_path: str) -> Tupl
     if width <= 0 or height <= 0:
         raise ValueError("PNG must have nonzero dimensions")
 
-    has_alpha = metadata.get('alpha', False)
+    has_alpha = metadata.get("alpha", False)
     pixel_size = 4 if has_alpha else 3
 
     # Check for transparency
@@ -1387,7 +1473,7 @@ def import_png_to_icon(icon: ParsedIcon, icon_index: int, png_path: str) -> Tupl
     ]
 
     best_result = None
-    best_max_dist = float('inf')
+    best_max_dist = float("inf")
     best_palette_name = ""
     best_depth = 3
 
@@ -1435,15 +1521,15 @@ def import_png_to_icon(icon: ParsedIcon, icon_index: int, png_path: str) -> Tupl
 
     # Build new IMAGE header (20 bytes)
     header = bytearray(20)
-    write_field(header, 0, 2, False, 0)       # LeftEdge
-    write_field(header, 2, 2, False, 0)       # TopEdge
-    write_field(header, 4, 2, False, width)   # Width
+    write_field(header, 0, 2, False, 0)  # LeftEdge
+    write_field(header, 2, 2, False, 0)  # TopEdge
+    write_field(header, 4, 2, False, width)  # Width
     write_field(header, 6, 2, False, height)  # Height
-    write_field(header, 8, 2, False, depth)   # Depth
+    write_field(header, 8, 2, False, depth)  # Depth
     write_field(header, 10, 4, False, 0x12345678)  # ImageData placeholder (non-zero)
-    header[14] = (1 << depth) - 1             # PlanePick
-    header[15] = 0                            # PlaneOnOff
-    write_field(header, 16, 4, False, 0)      # NextImage
+    header[14] = (1 << depth) - 1  # PlanePick
+    header[15] = 0  # PlaneOnOff
+    write_field(header, 16, 4, False, 0)  # NextImage
 
     new_icon_data = bytes(header) + bitmap_data
 

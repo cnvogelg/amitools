@@ -29,20 +29,29 @@ def _make_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "paths", nargs="+", help="Paths to .info files (or base names without .info)"
     )
-    parser.add_argument("--list", action="store_true", help="List metadata and ToolTypes")
     parser.add_argument(
-        "-v", "--verbose", action="store_true", help="With --list: dump all structure fields"
+        "--list", action="store_true", help="List metadata and ToolTypes"
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="With --list: dump all structure fields",
     )
     parser.add_argument("--get", metavar="KEY", help="Get a ToolType value")
     parser.add_argument("--set", metavar="KEY=VAL", help="Set or replace a ToolType")
     parser.add_argument("--set-flag", metavar="KEY", help="Set a boolean ToolType")
     parser.add_argument("--unset", metavar="KEY", help="Disable a boolean ToolType")
-    parser.add_argument("--delete", metavar="KEY", help="Delete all forms of a ToolType")
+    parser.add_argument(
+        "--delete", metavar="KEY", help="Delete all forms of a ToolType"
+    )
     parser.add_argument(
         "--normalize", action="store_true", help="Remove duplicate and empty ToolTypes"
     )
     parser.add_argument(
-        "--ignore-case", action="store_true", help="Match ToolType keys case-insensitively"
+        "--ignore-case",
+        action="store_true",
+        help="Match ToolType keys case-insensitively",
     )
     parser.add_argument("--pos", metavar="X,Y", help="Set icon placement")
     parser.add_argument("--winsize", metavar="W,H", help="Set drawer window size")
@@ -73,7 +82,9 @@ def _make_parser() -> argparse.ArgumentParser:
         "-o", "--output", metavar="PATH", help="Write to a separate output file"
     )
     parser.add_argument(
-        "--compact", action="store_true", help="Rebuild the file to compact its segments"
+        "--compact",
+        action="store_true",
+        help="Rebuild the file to compact its segments",
     )
     parser.add_argument(
         "--strict", action="store_true", help="Fail on suspicious lengths or bounds"
@@ -82,7 +93,9 @@ def _make_parser() -> argparse.ArgumentParser:
         "--dry-run", action="store_true", help="Show changes without writing the file"
     )
     parser.add_argument(
-        "--backup", action="store_true", help="Create a .bak backup before an in-place write"
+        "--backup",
+        action="store_true",
+        help="Create a .bak backup before an in-place write",
     )
     return parser
 
@@ -125,8 +138,10 @@ def _get_tool_type(path: str, key: str, icon: IconFile, ignore_case: bool) -> No
     if entry is None:
         print("%s: %s not set" % (path, key))
     else:
-        value = entry.value if entry.value is not None else (
-            "false" if not entry.enabled else "true"
+        value = (
+            entry.value
+            if entry.value is not None
+            else ("false" if not entry.enabled else "true")
         )
         print("%s: %s=%s" % (path, key.strip("()"), value))
 
@@ -276,7 +291,9 @@ def main(argv: Optional[list] = None) -> int:
                 if set_pair:
                     icon.tool_types.set(*set_pair, ignore_case=args.ignore_case)
                 if args.set_flag:
-                    icon.tool_types.set_flag(args.set_flag, ignore_case=args.ignore_case)
+                    icon.tool_types.set_flag(
+                        args.set_flag, ignore_case=args.ignore_case
+                    )
                 if args.unset:
                     icon.tool_types.unset(args.unset, ignore_case=args.ignore_case)
                 if args.delete:
