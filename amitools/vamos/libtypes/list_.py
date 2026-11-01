@@ -9,7 +9,7 @@ class ListIter(object):
         self.mem = self.alist._mem
         self.promote = promote
         if start_node is None:
-            self.node = alist._head.succ.ref
+            self.node = alist._iter_start_node()
         else:
             self.node = start_node
 
@@ -17,6 +17,9 @@ class ListIter(object):
         return self
 
     def __next__(self):
+        # an uninitialized list may start with a NULL node
+        if self.node is None:
+            raise StopIteration()
         succ = self.node.succ.ref
         if succ is None:
             raise StopIteration()
@@ -29,13 +32,25 @@ class ListIter(object):
 
 
 class ListBase:
+    def _iter_start_node(self):
+        """return the first node to iterate over"""
+        node = self._head.succ.ref
+        if node is None:
+            # uninitialized list with a NULL lh_Head: real m68k code
+            # would dereference it and read ln_Succ at addr 0.
+            # AddTail/AddHead on such a list store the node there.
+            addr = self._mem.r32(0)
+            if addr != 0:
+                node = type(self._head)(self._mem, addr)
+        return node
+
     def __iter__(self):
         return ListIter(self)
 
     def __len__(self):
         l = 0
-        node = self._head.succ.ref
-        while True:
+        node = self._iter_start_node()
+        while node is not None:
             node = node.succ.ref
             if node is None:
                 break
@@ -43,8 +58,8 @@ class ListBase:
         return l
 
     def is_empty(self):
-        node = self._head.succ.ref
-        return node.succ.ref is None
+        node = self._iter_start_node()
+        return node is None or node.succ.ref is None
 
     def to_list(self, promote=False):
         return [a for a in ListIter(self, promote=promote)]
@@ -57,18 +72,28 @@ class ListBase:
         node.pred.ref = self._head
         node.succ.ref = n
         self._head.succ.ref = node
-        n.pred.ref = node
+        if n is not None:
+            n.pred.ref = node
+        else:
+            # uninitialized list: emulate NULL pointer write of exec AddHead
+            # h->ln_Pred = node -> write at addr 0 + offset of ln_Pred
+            self._mem.w32(4, node.addr)
 
     def add_tail(self, node):
         tp = self.tail_pred.ref
         node.succ.ref = self._tail
         self._tail.pred.ref = node
         node.pred.ref = tp
-        tp.succ.ref = node
+        if tp is not None:
+            tp.succ.ref = node
+        else:
+            # uninitialized list: emulate NULL pointer write of exec AddTail
+            # tp->ln_Succ = node -> write at addr 0 + offset of ln_Succ
+            self._mem.w32(0, node.addr)
 
     def rem_head(self, promote=False):
         node = self._head.succ.ref
-        if node.succ.ref is None:
+        if node is None or node.succ.ref is None:
             return None
         node.remove()
         if promote:
@@ -78,7 +103,7 @@ class ListBase:
 
     def rem_tail(self, promote=False):
         node = self.tail_pred.ref
-        if node.pred.ref is None:
+        if node is None or node.pred.ref is None:
             return None
         node.remove()
         if promote:
@@ -88,7 +113,7 @@ class ListBase:
 
     def get_head(self, promote=False):
         node = self._head.succ.ref
-        if node.succ.ref is None:
+        if node is None or node.succ.ref is None:
             return None
         if promote:
             return node.promote_type()
@@ -97,7 +122,7 @@ class ListBase:
 
     def get_tail(self, promote=False):
         node = self.tail_pred.ref
-        if node.pred.ref is None:
+        if node is None or node.pred.ref is None:
             return None
         if promote:
             return node.promote_type()

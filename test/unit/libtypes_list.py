@@ -18,6 +18,12 @@ def new_min_list():
     return l
 
 
+def new_uninit_list():
+    # a zeroed list that was never initialized with new()
+    mem = MockMemory()
+    return List(mem, 0x40)
+
+
 def libtypes_list_new_test():
     l = new_list()
     assert str(l) == "[List:@000040,h=000044,t=000000,tp=000040,NT_DEVICE(00000003/3)]"
@@ -238,6 +244,53 @@ def libtypes_list_find_name_promote_test():
     assert type(task) is Task
     proc = l.get_tail(promote=True)
     assert type(proc) is Process
+
+
+def libtypes_list_uninit_add_tail_test():
+    # exec AddTail on a zeroed list writes through the NULL lh_TailPred
+    # like real Amiga hardware: tp->ln_Succ = node -> mem[0] = node
+    l = new_uninit_list()
+    n1 = Node(l.mem, 0x50)
+    l.add_tail(n1)
+    assert l.mem.r32(0) == 0x50
+    assert n1.pred.aptr == 0
+    assert n1.succ.aptr == 0x44
+    assert l.tail_pred.aptr == 0x50
+    # a real m68k traversal starts at lh_Head=NULL and follows ln_Succ
+    # at addr 0, so it finds the node. Python iteration does the same.
+    assert len(l) == 1
+    assert not l.is_empty()
+    assert [a for a in l] == [n1]
+    assert l.find_name("bla") is None
+
+
+def libtypes_list_uninit_add_head_test():
+    # exec AddHead on a zeroed list writes through the NULL lh_Head
+    # like real Amiga hardware: h->ln_Pred = node -> mem[4] = node
+    l = new_uninit_list()
+    n1 = Node(l.mem, 0x50)
+    l.add_head(n1)
+    assert l.mem.r32(4) == 0x50
+    assert n1.succ.aptr == 0
+    assert n1.pred.aptr == 0x40
+    assert l.head.aptr == 0x50
+    # traversal reads ln_Succ at addr 0 which was never written
+    assert len(l) == 0
+    assert l.is_empty()
+    assert [a for a in l] == []
+
+
+def libtypes_list_uninit_read_ops_test():
+    l = new_uninit_list()
+    assert len(l) == 0
+    assert l.is_empty()
+    assert [a for a in l] == []
+    assert l.get_head() is None
+    assert l.get_tail() is None
+    assert l.rem_head() is None
+    assert l.rem_tail() is None
+    assert l.find_name("bla") is None
+    assert l.to_list() == []
 
 
 def libtypes_list_alloc_test():
