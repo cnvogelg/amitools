@@ -173,7 +173,7 @@ class Block:
                 num_longs = summed_longs
         for i in range(num_longs):
             if i != self.chk_loc:
-                chksum += self._get_long(i)
+                chksum = (chksum + self._get_long(i)) & 0xFFFFFFFF
         return (-chksum) & 0xFFFFFFFF
 
     def _get_timestamp(self, loc):
