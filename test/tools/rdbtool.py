@@ -1,5 +1,6 @@
 import pytest
 import collections
+import os.path
 
 
 DISK_SIZES = ("1M", "10M", "50M")
@@ -83,6 +84,31 @@ def rdbtool_create_force_test(rdbtool, img_file):
 
 def rdbtool_init_test(rdbtool, img_file):
     rdbtool(img_file.file_name, ("create", img_file.size), ("init",))
+
+
+def rdbtool_init_disk_id_test(rdbtool, img_file):
+    out = rdbtool(
+        img_file.file_name, ("create", img_file.size), ("init",), "show"
+    )
+    res = "\n".join(out)
+    assert "disk_vendor:    'RDBTOOL'" in res
+    assert "disk_product:   '%s'" % os.path.basename(img_file.file_name)[:15] in res
+    assert "disk_revision:  '2012'" in res
+
+    out = rdbtool(
+        img_file.file_name,
+        ("init",),
+        "show",
+        opts=(
+            "--disk-vendor=ACME",
+            "--disk-product=MY DISK",
+            "--disk-revision=1.0",
+        ),
+    )
+    res = "\n".join(out)
+    assert "disk_vendor:    'ACME'" in res
+    assert "disk_product:   'MY DISK'" in res
+    assert "disk_revision:  '1.0'" in res
 
 
 # test file systems

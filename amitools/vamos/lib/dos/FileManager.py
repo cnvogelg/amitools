@@ -311,7 +311,7 @@ class FileManager:
             )
             # return error
             dos_pkt.res1.val = DOSFALSE
-            dos_pkt.res2.val = ACTION_NOT_KNOWN
+            dos_pkt.res2.val = ERROR_ACTION_NOT_KNOWN
 
         # do reply
         if not port_mgr.has_port(reply_port_addr):

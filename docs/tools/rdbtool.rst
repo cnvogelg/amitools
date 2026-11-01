@@ -47,6 +47,7 @@ The available global options are:
 * ``-f`` / ``--force``: overwrite or recreate an image when necessary
 * ``-p`` / ``--drive-prefix``: set the default drive name prefix (default: ``DH``)
 * ``-t`` / ``--dostype``: set the default DOS type for new partitions (default: ``ffs+intl``)
+* ``--disk-vendor``, ``--disk-product``, ``--disk-revision``: set the disk identification strings written by ``init``
 
 For example::
 
@@ -286,6 +287,14 @@ Call this command first to start building a new RDB structure on a disk or
 disk image::
 
   > rdbtool test.img create size=10Mi + init
+
+The disk identification strings can be set with the global ``--disk-vendor``,
+``--disk-product``, and ``--disk-revision`` options. For ``.hdf`` images, the
+default disk product is the first 15 characters of the image file name;
+otherwise it remains ``IMAGE``. The default vendor and revision are
+``RDBTOOL`` and ``2012``::
+
+  > rdbtool --disk-vendor=ACME --disk-product=MYDISK --disk-revision=1.0 test.hdf create size=10Mi + init
 
 The default RDB occupies all the sectors of the first cylinder. If you have
 chosen a geometry with small cylinders then a single cylinder might not be

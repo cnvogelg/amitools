@@ -54,6 +54,29 @@ from .dos.Item import *
 from amitools.vamos.dos import run_command, run_sub_process
 
 
+FORMAT_DOS = 0
+FORMAT_INT = 1
+FORMAT_USA = 2
+FORMAT_CDN = 3
+FORMAT_DEF = 4
+DTF_SUBST = 1
+DOS_MONTH_NAMES = (
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+)
+SUBSTITUTED_DATES = ("Future", "Tomorrow", "Today", "Yesterday")
+
+
 class DosLibrary(LibImpl):
     LV_VAR = 0  # an variable
     LV_ALIAS = 1  # an alias
@@ -282,7 +305,7 @@ class DosLibrary(LibImpl):
         ds_day = dt.dat_Stamp.ds_Days.val
         ds_min = dt.dat_Stamp.ds_Minute.val
         ds_tick = dt.dat_Stamp.ds_Tick.val
-        format = dt.dat_Format.val
+        date_format = dt.dat_Format.val
         flags = dt.dat_Flags.val
         str_day_ptr = dt.dat_StrDay.aptr
         str_date_ptr = dt.dat_StrDate.aptr
@@ -302,7 +325,30 @@ class DosLibrary(LibImpl):
         )
         t = time.gmtime(st)
         day_str = time.strftime("%A", t)
-        date_str = time.strftime("%d-%m-%y", t)
+        year = t.tm_year % 100
+        if date_format == FORMAT_INT:
+            date_str = "%02d-%02d-%02d" % (year, t.tm_mon, t.tm_mday)
+        elif date_format == FORMAT_USA:
+            date_str = "%02d-%02d-%02d" % (t.tm_mon, t.tm_mday, year)
+        elif date_format == FORMAT_CDN:
+            date_str = "%02d-%02d-%02d" % (t.tm_mday, t.tm_mon, year)
+        elif date_format == FORMAT_DEF:
+            date_str = time.strftime("%x", t)
+        else:
+            date_str = "%02d-%s-%02d" % (
+                t.tm_mday,
+                DOS_MONTH_NAMES[t.tm_mon - 1],
+                year,
+            )
+        if flags & DTF_SUBST:
+            days_since = sys_to_ami_time(time.time()).tday - ds_day
+            if days_since <= 7:
+                if -1 <= days_since <= 1:
+                    date_str = SUBSTITUTED_DATES[days_since + 2]
+                elif days_since < -1:
+                    date_str = "Future"
+                else:
+                    date_str = day_str
         time_str = time.strftime("%H:%M:%S", t)
         log_dos.info(
             "DateToStr: result day='%s' date='%s' time='%s'",
