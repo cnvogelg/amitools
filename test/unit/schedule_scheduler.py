@@ -1003,13 +1003,14 @@ def schedule_scheduler_run_until_idle_woken_current_task_signals_test():
     sched = ctx.sched
 
     def task1_run(task):
-        assert task.wait(2) == 2
-        # woken up from outside, task1 wakes task2 up and must run on after it
-        task2.set_signal(1, 1)
+        assert task.wait(1) == 1
         return 42
 
     def task2_run(task):
-        assert task.wait(1) == 1
+        assert task.wait(2) == 2
+        # woken up from outside as the current task, task2 wakes task1 up
+        # and must run on after it
+        task1.set_signal(1, 1)
         return 23
 
     task1_ctx = MyPythonTask(ctx, task1_run, name="task1")
@@ -1020,12 +1021,10 @@ def schedule_scheduler_run_until_idle_woken_current_task_signals_test():
     assert sched.add_task(task1)
     assert sched.add_task(task2)
     assert sched.run_until_idle() == RunResult.IDLE
+    # the last task to wait stays the current one
     assert sched.get_cur_task() is task2
 
-    # wake task2 first, so that task1 is the current task when it is woken
-    task2.set_signal(1, 1)
-    task2.set_signal(0, 1)
-    task1.set_signal(2, 2)
+    task2.set_signal(2, 2)
     assert sched.run_until_idle() == RunResult.DONE
     assert task1.get_exit_code() == 42
     assert task2.get_exit_code() == 23
