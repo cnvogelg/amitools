@@ -1,11 +1,15 @@
+import struct
+
 import pytest
 
+from amitools.fs import DosType
 from amitools.fs.ADFSBitmap import ADFSBitmap
 from amitools.fs.ADFSVolume import ADFSVolume
 from amitools.fs.FSString import FSString
 from amitools.fs.TimeStamp import TimeStamp
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 from amitools.fs.blkdev.HDFBlockDevice import HDFBlockDevice
+from amitools.fs.block.Block import Block
 from amitools.fs.block.BootBlock import BootBlock
 from amitools.fs.block.RootBlock import RootBlock
 from amitools.fs.validate.Log import Log
@@ -65,3 +69,62 @@ def fs_rootblock_open_external_layout_test(root_disk, scan_boot):
         assert validator.scan_boot()[0]
     assert validator.scan_root()
     assert validator.root.blk_num == root_num
+
+
+def root_long(disk, root_num, idx):
+    data = disk.read_block(root_num)
+    return struct.unpack_from(">I", data, disk.block_bytes + idx * 4)[0]
+
+
+@pytest.mark.parametrize(
+    "dos_type", [DosType.DOS0 + i for i in range(6)], ids=lambda d: "DOS%d" % (d & 7)
+)
+def fs_rootblock_format_no_dos_type_test(root_disk, dos_type):
+    disk, root_num = root_disk
+    volume = ADFSVolume(disk)
+    volume.create(FSString("Test"), dos_type=dos_type)
+    volume.close()
+    # DOS0-5: next hash link (-4) and unused long (-11) stay 0
+    assert root_long(disk, root_num, -4) == 0
+    assert root_long(disk, root_num, -11) == 0
+    root = RootBlock(disk, root_num)
+    root.read()
+    assert root.fstype == 0
+    assert root.blocks_used == 0
+
+
+@pytest.mark.parametrize(
+    "dos_type", [DosType.DOS6, DosType.DOS7], ids=lambda d: "DOS%d" % (d & 7)
+)
+def fs_rootblock_format_dos_type_test(root_disk, dos_type):
+    disk, root_num = root_disk
+    volume = ADFSVolume(disk)
+    volume.create(FSString("Test"), dos_type=dos_type)
+    num_used = volume.bitmap.get_num_used()
+    volume.close()
+    # DOS6/7: root block keeps dos type (-4) and used blocks (-11)
+    assert root_long(disk, root_num, -4) == dos_type
+    assert root_long(disk, root_num, -11) == num_used
+    assert num_used > 0
+    root = RootBlock(disk, root_num)
+    root.read()
+    assert root.fstype == dos_type
+    assert root.blocks_used == num_used
+
+
+def fs_rootblock_clear_stale_dos_type_test(root_disk):
+    disk, root_num = root_disk
+    volume = ADFSVolume(disk)
+    volume.create(FSString("Test"), dos_type=DosType.DOS1)
+    volume.close()
+    # older images carry the dos type in the next hash link
+    root = RootBlock(disk, root_num)
+    root.read()
+    root._put_long(-4, DosType.DOS1)
+    Block.write(root)
+    assert root_long(disk, root_num, -4) == DosType.DOS1
+    root = RootBlock(disk, root_num)
+    root.read()
+    assert root.fstype == 0
+    root.write()
+    assert root_long(disk, root_num, -4) == 0
