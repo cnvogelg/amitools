@@ -2299,9 +2299,8 @@ class DosLibrary(LibImpl):
 
         # the child is a process of its own: the scheduler runs it beside
         # its parent, and it is freed once its task ends (_child_proc_event)
-        child = DosProcess(
-            ctx.machine,
-            ctx.alloc,
+        child = self.create_child_process(
+            ctx,
             name,
             stack_size=stack_size,
             start_pc=entry_pc,
@@ -2462,6 +2461,14 @@ class DosLibrary(LibImpl):
         return 0
 
     # ----- Helpers -----
+
+    def create_child_process(self, ctx, name, **kw_args):
+        """the process CreateNewProc() makes: a DosProcess by default.
+
+        an embedder may return a subclass that serves the DOS calls of a
+        process vamos did not load as a program.
+        """
+        return DosProcess(ctx.machine, ctx.alloc, name, **kw_args)
 
     def _child_proc_event(self, event):
         """free a process made by CreateNewProc() once its task has ended"""
