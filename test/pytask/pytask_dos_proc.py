@@ -77,9 +77,9 @@ def pytask_dos_create_new_proc_entry_test(vamos_task):
         assert port.flags.val == MsgPortFlags.PA_SIGNAL
         assert port.sig_bit.val == 8
         assert port.sig_task.aptr == proc_addr
-        assert port.node.name.str == "child_entry"
         assert ctx.exec_lib.port_mgr.has_port(port_addr)
-        assert exec_proxy.FindPort("child_entry").addr == port_addr
+        # the process port is no public port
+        assert exec_proxy.FindPort("child_entry") is None
 
         # the child runs beside us, signals us and ends. then it is freed
         wait_for_child(task, exec_proxy, sig_mask, "child_entry")

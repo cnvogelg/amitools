@@ -54,7 +54,6 @@ from .dos.CSource import *
 from .dos.Item import *
 from amitools.vamos.dos import run_command, run_sub_process
 
-
 FORMAT_DOS = 0
 FORMAT_INT = 1
 FORMAT_USA = 2
@@ -770,8 +769,7 @@ class DosLibrary(LibImpl):
             f_mode = "wb+"
 
         fh = self.file_mgr.open(
-            self.get_current_dir(ctx), name, f_mode,
-            home_dir=self.get_home_dir(ctx)
+            self.get_current_dir(ctx), name, f_mode, home_dir=self.get_home_dir(ctx)
         )
         log_dos.info(
             "Open: name='%s' (%s/%d/%s) -> %s", name, mode_name, mode, f_mode, fh
@@ -2332,10 +2330,10 @@ class DosLibrary(LibImpl):
         proc.cis.bptr = input_fh
         proc.cos.bptr = output_fh
 
-        # the process port is signalled with SIGB_DOS and carries the name
+        # the process port is signalled with SIGB_DOS. it is no public port:
+        # FindPort() does not find it, a child that wants one adds its own
         port = proc.msg_port
         port.new(flags=MsgPortFlags.PA_SIGNAL, sig_bit=8, sig_task=task)
-        port.node.name.aptr = task.node.name.aptr
         port_addr = port.addr
         if not ctx.exec_lib.port_mgr.has_port(port_addr):
             ctx.exec_lib.port_mgr.register_port(port_addr)
