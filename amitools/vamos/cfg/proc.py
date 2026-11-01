@@ -13,6 +13,7 @@ class ProcessParser(Parser):
                     "mode": Value(str, "proc"),
                 },
                 "stack": 8,
+                "vars": ValueList(str, allow_split=False),
             }
         }
         arg_cfg = {
@@ -52,6 +53,11 @@ class ProcessParser(Parser):
                     type=int,
                     help="set stack size in KiB",
                 ),
+                "vars": Argument(
+                    "--set-var",
+                    action="append",
+                    help="set an AmigaDOS local variable: name=value",
+                ),
             }
         }
         ini_trafo = {
@@ -62,6 +68,7 @@ class ProcessParser(Parser):
                     "raw_arg": "raw_arg",
                 },
                 "stack": "stack_size",
+                "vars": "vars",
             }
         }
         Parser.__init__(

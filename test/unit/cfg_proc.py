@@ -14,6 +14,7 @@ def cfg_proc_dict_test():
                 "mode": "proc",
             },
             "stack": 4,
+            "vars": [],
         }
     }
     lp.parse_config(input_dict, "dict")
@@ -41,6 +42,7 @@ def cfg_proc_ini_test():
                 "mode": "proc",
             },
             "stack": 4,
+            "vars": None,
         }
     }
 
@@ -50,7 +52,7 @@ def cfg_proc_args_test():
     ap = argparse.ArgumentParser()
     lp.setup_args(ap)
     args = ap.parse_args(
-        ["-x", "-P", "-R", "-s", "4", "foo", "a", "b", "c,d", "(e)", "*f"]
+        ["-x", "-P", "-R", "-s", "4", "foo", "a", "b", "c,d", "(e)", "*f", "--set-var", "FOO=BAR", "--set-var", "BAZ=QUX"]
     )
     lp.parse_args(args)
     assert lp.get_cfg_dict() == {
@@ -63,5 +65,6 @@ def cfg_proc_args_test():
                 "mode": "proc",
             },
             "stack": 4,
+            "vars": ["FOO=BAR", "BAZ=QUX"],
         }
     }
