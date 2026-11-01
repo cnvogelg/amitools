@@ -996,3 +996,40 @@ def schedule_scheduler_run_until_idle_signal_twice_test():
 
     task_ctx.free()
     cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_woken_current_task_signals_test():
+    ctx = setup()
+    sched = ctx.sched
+
+    def task1_run(task):
+        assert task.wait(2) == 2
+        # woken up from outside, task1 wakes task2 up and must run on after it
+        task2.set_signal(1, 1)
+        return 42
+
+    def task2_run(task):
+        assert task.wait(1) == 1
+        return 23
+
+    task1_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task1 = task1_ctx.task
+    task2_ctx = MyPythonTask(ctx, task2_run, name="task2")
+    task2 = task2_ctx.task
+
+    assert sched.add_task(task1)
+    assert sched.add_task(task2)
+    assert sched.run_until_idle() == RunResult.IDLE
+    assert sched.get_cur_task() is task2
+
+    # wake task2 first, so that task1 is the current task when it is woken
+    task2.set_signal(1, 1)
+    task2.set_signal(0, 1)
+    task1.set_signal(2, 2)
+    assert sched.run_until_idle() == RunResult.DONE
+    assert task1.get_exit_code() == 42
+    assert task2.get_exit_code() == 23
+
+    task2_ctx.free()
+    task1_ctx.free()
+    cleanup(ctx)

@@ -181,6 +181,9 @@ class Scheduler(object):
             if task == self.cur_task:
                 self.num_switch_same += 1
                 log_schedule.debug("run: current %s", task.name)
+                # a current task woken up from a wait is ready, not running
+                if task.get_state() != TaskState.TS_RUN:
+                    task.set_state(TaskState.TS_RUN)
                 task.keep_scheduled()
             else:
                 self.num_switch_other += 1
