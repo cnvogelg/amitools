@@ -41,13 +41,25 @@ class printf_element:
             t = "X"
         result = []
         result.append("%")
-        result.append(self.flags)
 
+        flags = self.flags or ""
         wl = self.width_limit
         if wl is not None and len(wl) > 0:
-            if t == "s" and wl[-1] == ".":
+            # RawDoFmt width fields can include a dot for precision/limit-like
+            # specs, but the actual padding is controlled by the leading width
+            # and not by precision. Strip the precision part and treat a leading
+            # zero in the width as the zero-fill flag.
+            if "." in wl:
+                wl = wl.split(".", 1)[0]
+            if flags == "" and wl.startswith("0"):
+                flags = "0"
+                wl = wl[1:]
+            if t == "s" and wl.endswith("."):
                 # trailing dot seems to fail on python: e.g. %10.s -> %10s
                 wl = wl[:-1]
+
+        result.append(flags)
+        if wl is not None and len(wl) > 0:
             result.append(wl)
 
         result.append(t)
@@ -83,7 +95,7 @@ class printf_state:
         )
 
 
-printf_re_format = r"%([-]?)([0-9]*\.?[0-9]*)?([l])?([bduxsc%])"
+printf_re_format = r"%([-0]?)([0-9]*\.?[0-9]*)?([l])?([bduxsc%])"
 
 
 def printf_parse_string(string):
