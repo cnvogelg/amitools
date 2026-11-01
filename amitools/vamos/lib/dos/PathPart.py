@@ -12,7 +12,7 @@ def expand_progdir_path(ami_path, home_dir):
         The expanded path if ami_path starts with '*' and home_dir is set,
         otherwise returns ami_path unchanged.
     """
-    if not ami_path.startswith("*") or home_dir is None:
+    if not str(ami_path).startswith("*") or home_dir is None:
         return ami_path
 
     home_path = home_dir.ami_path

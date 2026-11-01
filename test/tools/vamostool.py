@@ -15,11 +15,12 @@ def vamostool_path_ami2sys_cwd_test(toolrun, tmpdir):
     assert out == [cwd]
 
 
-def vamostool_path_ami2sys_error_test(toolrun, tmpdir):
+def vamostool_path_ami2sys_top_parent_test(toolrun, tmpdir):
+    cwd = os.getcwd()
     status, out, err = run(toolrun, tmpdir, "-Vcwd:.", "path", "ami2sys", "/")
-    assert status == 1
-    assert err == ["path='cwd:': can't join parent relative path"]
-    assert out == []
+    assert status == 0
+    assert err == []
+    assert out == [cwd]
 
 
 def vamostool_path_sys2ami_cwd_test(toolrun, tmpdir):
