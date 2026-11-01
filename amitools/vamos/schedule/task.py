@@ -166,8 +166,9 @@ class TaskBase:
         old_mask = self.sigmask_received
         self.sigmask_received = new_signals | (self.sigmask_received & ~sigmask)
         self._sync_sigmask()
-        # check if task is waiting for some of the signals
-        if self.sigmask_wait != 0:
+        # check if task is waiting for some of the signals. a task woken up
+        # before, but not yet run, still has its wait mask set and is ready
+        if self.sigmask_wait != 0 and self.state == TaskState.TS_WAIT:
             got_mask = self.sigmask_received & self.sigmask_wait
             if got_mask != 0:
                 log_schedule.debug("%s: set_signal -> wake me up", self.name)

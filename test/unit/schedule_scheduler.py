@@ -966,3 +966,33 @@ def schedule_scheduler_python_task_adds_task_test():
     task2_ctx.free()
     task1_ctx.free()
     cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_signal_twice_test():
+    ctx = setup()
+    sched = ctx.sched
+
+    def task1_run(task):
+        got = task.wait(3)
+        assert got == 3
+        return 42
+
+    task_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task = task_ctx.task
+    assert sched.add_task(task)
+    assert sched.run_until_idle() == RunResult.IDLE
+
+    # two signals before the task runs again wake it up once
+    task.set_signal(1, 1)
+    task.set_signal(2, 2)
+    assert task.get_state() == TaskState.TS_READY
+    assert sched.run_until_idle() == RunResult.DONE
+    assert task.get_exit_code() == 42
+    assert ctx.events[3:] == [
+        SchedulerEvent(SchedulerEvent.Type.WAKE_UP_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
+
+    task_ctx.free()
+    cleanup(ctx)
