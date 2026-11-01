@@ -49,6 +49,13 @@ def pytask_exec_signal_wait_test(vamos_task):
         got_signals = exec_lib.Wait(3)
         assert got_signals == 1
 
+        # Wait() took the signal it returned and left the other one
+        assert exec_lib.SetSignal(0, 0) == 4
+
+        # a signal already set returns at once, and is taken as well
+        assert exec_lib.Wait(4) == 4
+        assert exec_lib.SetSignal(0, 0) == 0
+
         return 0
 
     def task2(ctx, task):
@@ -59,8 +66,8 @@ def pytask_exec_signal_wait_test(vamos_task):
         addr = exec_lib.FindTask("task1")
         assert addr != 0
 
-        # set signal
-        exec_lib.Signal(addr, 1)
+        # set signals: one task1 waits for, one it does not
+        exec_lib.Signal(addr, 5)
 
         return 0
 
