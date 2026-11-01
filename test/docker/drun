@@ -12,6 +12,14 @@ fi
 
 # expect container name
 CONTAINER="$1"
+
+# use official containers
+if [ "$CONTAINER" == "amiga-gcc" ]; then
+    CONTAINER="docker.io/amigadev/crosstools:m68k-amigaos"
+elif [ "$CONTAINER" == "amiga-gcc10" ]; then
+    CONTAINER="docker.io/amigadev/crosstools:m68k-amigaos-gcc10"
+fi
+
 if [ "$CONTAINER" == "" ]; then
     echo "Usage: $0 <container> <prog> [options]"
     exit 1

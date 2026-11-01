@@ -7,7 +7,11 @@
 #ifdef __SASC
 typedef struct Library UtilType;
 #else
+#ifdef amigaos
+typedef struct Library UtilType;
+#else
 typedef struct UtilityBase UtilType;
+#endif
 #endif
 
 UtilType *UtilityBase;

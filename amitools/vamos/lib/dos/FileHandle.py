@@ -2,7 +2,7 @@ import os
 import sys
 
 from amitools.vamos.libstructs import FileHandleStruct
-from .terminal import Terminal
+from .terminal import Terminal, Latin1ToUtf8Converter
 
 
 class FileHandle:
@@ -28,6 +28,13 @@ class FileHandle:
             self.terminal = Terminal(obj)
         else:
             self.terminal = None
+        # Latin-1 to UTF-8 conversion for non-terminal stdout
+        enc = sys.stdout.encoding
+        is_utf8 = enc and enc.lower().replace("-", "") == "utf8"
+        if not self.interactive and obj == sys.stdout.buffer and is_utf8:
+            self.latin1_conv = Latin1ToUtf8Converter()
+        else:
+            self.latin1_conv = None
 
     def __repr__(self):
         return "[FH:'%s'(ami='%s',sys='%s',nc=%s,af=%s,int=%s)@%06x=B@%06x]" % (
@@ -53,19 +60,22 @@ class FileHandle:
 
     def alloc_fh(self, alloc, fs_handler_port):
         name = "File:" + self.name
-        self.mem = alloc.alloc_struct(FileHandleStruct, label=name)
+        self.mem = self.struct = alloc.alloc_astruct(FileHandleStruct, label=name)
+        fh = self.struct
         self.b_addr = self.mem.addr >> 2
         # -- fill filehandle
         # use baddr of FH itself as identifier
-        self.mem.access.w_s("fh_Args", self.b_addr)
+        fh.fh_Args.val = self.b_addr
         # set port
-        self.mem.access.w_s("fh_Type", fs_handler_port)
+        fh.fh_Type.aptr = fs_handler_port
         # buffer handling: set fh_End != 0 (to prepare for EOF hack in FGetS)
-        self.mem.access.w_s("fh_End", 1)
+        fh.fh_End.val = 1
         return self.b_addr
 
     def free_fh(self, alloc):
-        alloc.free_struct(self.mem)
+        self.struct.free()
+        self.mem = None
+        self.struct = None
 
     # --- file ops ---
 
@@ -86,13 +96,18 @@ class FileHandle:
 
         return -1 on error, 0=EOF, >0 written bytes"""
         assert isinstance(data, (bytes, bytearray))
+        orig_len = len(data)
 
         # read from terminal or direct
         if self.terminal:
             got = self.terminal.write(data)
         else:
+            # do Latin-1 to UTF-8 conversion if needed
+            if self.latin1_conv:
+                data = self.latin1_conv.convert(data)
             try:
-                got = self.obj.write(data)
+                self.obj.write(data)
+                got = orig_len
             except IOError:
                 got = -1
 

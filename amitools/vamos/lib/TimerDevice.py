@@ -3,7 +3,11 @@ from amitools.vamos.libcore import LibImpl
 from amitools.vamos.machine.regs import REG_A0
 from amitools.vamos.astructs import LONG
 from amitools.vamos.libtypes import TimeVal
+from amitools.vamos.libstructs import TimeRequestStruct
 from amitools.vamos.log import log_timer
+
+TR_ADDREQUEST = 9
+TR_GETSYSTIME = 11
 
 
 class TimerDevice(LibImpl):
@@ -36,6 +40,24 @@ class TimerDevice(LibImpl):
         eclk_lo = eclk & 0xFFFFFFFF
         eclk_hi = eclk >> 32
         return eclk_lo, eclk_hi
+
+    def BeginIO(self, ctx, io_request):
+        timer_req = TimeRequestStruct(ctx.mem, io_request)
+        io = timer_req.node
+        cmd = io.command.val
+        io.error.val = 0
+        if cmd == TR_ADDREQUEST:
+            tv_secs = timer_req.time.secs.val
+            tv_micro = timer_req.time.micro.val
+            log_timer.info("BeginIO: TR_ADDREQUEST secs=%d micro=%d", tv_secs, tv_micro)
+        elif cmd == TR_GETSYSTIME:
+            secs, micros = self.get_sys_time()
+            log_timer.info("BeginIO: TR_GETSYSTIME -> secs=%d micro=%d", secs, micros)
+            timer_req.time.secs.val = secs
+            timer_req.time.micro.val = micros
+        else:
+            log_timer.info("BeginIO: unknown command %d", cmd)
+        return 0
 
     def ReadEClock(self, ctx, tv: TimeVal):
         lo, hi = self.get_eclock_lo_hi()

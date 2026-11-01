@@ -1,4 +1,4 @@
-pytest
+pytest<9.2
 pytest-benchmark
 machine68k @ git+https://github.com/cnvogelg/machine68k@main
 greenlet

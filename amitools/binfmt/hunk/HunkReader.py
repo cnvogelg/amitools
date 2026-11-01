@@ -791,8 +791,12 @@ class HunkReader:
                     # assume hunk to be empty
                     in_header = True
                 # broken hunk: multiple END or other hunks
-                elif hunk_type in [HUNK_END, HUNK_NAME, HUNK_DEBUG]:
+                elif hunk_type in [HUNK_END, HUNK_NAME]:
                     pass
+                elif hunk_type == HUNK_DEBUG and segment_list:
+                    segment = segment_list[-1]
+                    segment.append(e)
+                    seek_begin = False
                 else:
                     self.error_string = "Expected hunk start in loadseg: %s %d/%x" % (
                         e["type_name"],

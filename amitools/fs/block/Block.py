@@ -165,7 +165,13 @@ class Block:
 
     def _calc_chksum(self):
         chksum = 0
-        for i in range(self.block_longs):
+        num_longs = self.block_longs
+        # RDB blocks: checksum only covers the first SummedLongs (stored at long 1)
+        if self.chk_loc == 2:
+            summed_longs = self._get_long(1)
+            if 0 < summed_longs < num_longs:
+                num_longs = summed_longs
+        for i in range(num_longs):
             if i != self.chk_loc:
                 chksum += self._get_long(i)
         return (-chksum) & 0xFFFFFFFF

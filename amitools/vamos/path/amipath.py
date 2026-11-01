@@ -321,7 +321,10 @@ class AmiPath(object):
                     postfix = my_post
                 return self.rebuild(prefix, postfix)
             else:
-                raise AmiPathError(self, "can't join parent relative path")
+                # At volume root - can't go higher, stay at root (like Unix /../ = /)
+                prefix = self.prefix()
+                o_post = opath.postfix(True)
+                return self.rebuild(prefix, o_post)
         # other is prefix local: ':bla'
         elif opath.is_prefix_local():
             prefix = self.prefix()

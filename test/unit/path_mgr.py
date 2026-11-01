@@ -197,10 +197,9 @@ def path_mgr_abspath_test(tmpdir):
     assert ap("") == cur_dir
     assert ap("baz") == cur_dir.join(AmiPath("baz"))
     assert ap("/baz") == cur_dir.join(AmiPath("/baz"))
-    # invalid rel
-    with pytest.raises(AmiPathError):
-        env = AmiPathEnv(cwd="foo:")
-        ap("/", env=env)
+    # allow parent of root
+    env = AmiPathEnv(cwd="foo:")
+    assert ap("/", env=env) == AmiPath("foo:")
     # assign
     env = AmiPathEnv(cwd="blub:")
     assert ap(AmiPath("rel"), env=env) == env.get_cwd().join(AmiPath("rel"))
@@ -224,10 +223,9 @@ def path_mgr_volpath_test(tmpdir):
     env = AmiPathEnv(cwd=cwd)
     assert vp(AmiPath(), env=env) == cwd
     assert vp(AmiPath("foo"), env=env) == cwd.join(AmiPath("foo"))
-    # invalid relpath
-    with pytest.raises(AmiPathError):
-        env = AmiPathEnv(cwd="foo:")
-        assert vp("/", env=env) == cwd
+    # allow parent of root
+    env = AmiPathEnv(cwd="foo:")
+    assert vp("/", env=env) == AmiPath("foo:")
     # volpath
     assert vp(AmiPath("work:bla")) == AmiPath("work:bla")
     # multi assign
@@ -257,10 +255,9 @@ def path_mgr_volpaths_test(tmpdir):
     env = AmiPathEnv(cwd=cwd)
     assert vp(AmiPath(), env=env) == [cwd]
     assert vp(AmiPath("foo"), env=env) == [cwd.join(AmiPath("foo"))]
-    # invalid relpath
-    with pytest.raises(AmiPathError):
-        env = AmiPathEnv(cwd="foo:")
-        assert vp("/", env=env) == cwd
+    # allow parent of root
+    env = AmiPathEnv(cwd="foo:")
+    assert vp("/", env=env) == [AmiPath("foo:")]
     # volpath
     assert vp(AmiPath("work:bla")) == [AmiPath("work:bla")]
     # multi assign
@@ -371,8 +368,7 @@ def path_mgr_to_sys_path_test(tmpdir):
     assert tsp("", env=env) == os.path.join(sys_sys_path)
     assert tsp("foo/bar", env=env) == os.path.join(sys_sys_path, "foo", "bar")
     # invalid relpath
-    with pytest.raises(AmiPathError):
-        tsp("/", env=env)
+    assert tsp("/", env=env) == os.path.join(sys_sys_path)
     # unknown prefix
     assert tsp("unknown:") is None
     with pytest.raises(AmiPathError):

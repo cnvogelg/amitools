@@ -36,6 +36,17 @@ a plus character::
 
   > xdftool <image.[ah]df> <command1> [options1] + <command2> [options2] ...
 
+Global options are available before the command list::
+
+  > xdftool [options] <image> <command> [args]
+
+The available global options are:
+
+* ``-v`` / ``--verbose``: print more diagnostic output while processing
+* ``-s`` / ``--separator``: change the command separator string (default: ``+``)
+* ``-r`` / ``--read-only``: refuse any command that would modify the image
+* ``-f`` / ``--force``: overwrite an existing image when creating one
+
 For Example:::
 
   > xdftool test.adf format ``My Image`` + makedir c + write myfile c
@@ -637,6 +648,31 @@ Example::
   > xdftool new.hdf repack old.hdf chs=10,2,32; repack 'old.hdf' with given geo
   > xdftool new.hdf create size=10M + repack old.hdf ; repack to larger disk
   > xdftool new.hdf repack old.rdisk part=dh0 ; repack one partition of a disk
+
+
+``defrag`` - Defragment the contents of an image in place
+-----------------------------------------------------------
+
+::
+
+  defrag
+
+This command rebuilds the file system directly on the current image without
+changing the volume contents. It snapshots the directory tree, recreates the
+volume on the same block device and restores files and directories in a sorted,
+compact order to reduce fragmentation after many create/delete cycles.
+
+The image is rewritten in place. If you want to keep the original layout as a
+backup, make a copy of the image before running this command. The command
+accepts no options and only works on valid file systems.
+
+After a successful rebuild the command prints a short summary including the
+volume name, DOS type and the number of files and directories that were
+defragmented.
+
+Example::
+
+  > xdftool mydisk.adf defrag
 
 
 Low-Level Commands

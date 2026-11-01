@@ -1,3 +1,4 @@
+from .ADFSNode import check_comment
 from .ADFSVolume import ADFSVolume
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 
@@ -10,6 +11,8 @@ class Repacker:
         self.out_blkdev = None
         self.in_volume = None
         self.out_volume = None
+        # the first input directory whose entries were not all read
+        self.unread_dir = None
 
     def create_in_blkdev(self):
         f = BlkDevFactory()
@@ -31,6 +34,21 @@ class Repacker:
         if self.create_in_volume() == None:
             return False
         return True
+
+    def check_comments(self, in_dir=None):
+        """refuse a comment the new image cannot hold, as one over 79 bytes
+        that a long name header keeps beside a short name, before the image
+        is created. Walks the input volume from in_dir, or its root"""
+        if in_dir is None:
+            in_dir = self.in_volume.get_root_dir()
+        for e in in_dir.get_entries():
+            comment = e.get_meta_info().get_comment()
+            if comment is not None:
+                check_comment(comment, node=e)
+            if e.is_dir():
+                self.check_comments(e)
+                # repack reads it again: hold only one path, as repack does
+                e.flush()
 
     def create_out_blkdev(self, image_file, force=True, options=None):
         if self.in_blkdev == None:
@@ -65,11 +83,20 @@ class Repacker:
         self.repack_node_dir(
             self.in_volume.get_root_dir(), self.out_volume.get_root_dir()
         )
+        # all that could be read is copied: an entry that could not be
+        # read is missing, so do not pass for a full copy
+        if self.unread_dir is not None:
+            self.unread_dir.check_entries()
+
+    def _note_unread(self, dir):
+        if self.unread_dir is None and dir.entry_bad_blk is not None:
+            self.unread_dir = dir
 
     def repack_node_dir(self, in_root, out_root):
         entries = in_root.get_entries()
         for e in entries:
             self.repack_node(e, out_root)
+        self._note_unread(in_root)
 
     def repack_node(self, in_node, out_dir):
         name = in_node.get_file_name().get_name()
@@ -79,6 +106,7 @@ class Repacker:
             sub_dir = out_dir.create_dir(name, meta_info, False)
             for child in in_node.get_entries():
                 self.repack_node(child, sub_dir)
+            self._note_unread(in_node)
             sub_dir.flush()
         # file
         elif in_node.is_file():

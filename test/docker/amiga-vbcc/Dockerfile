@@ -6,16 +6,16 @@ RUN apt-get update && \
 RUN mkdir -p /opt/vbcc/bin
 
 # vasm
-RUN wget http://sun.hasenbraten.de/vasm/release/vasm.tar.gz
-RUN tar xvfz vasm.tar.gz
+RUN wget http://server.owl.de/~frank/tags/vasm2_0f.tar.gz
+RUN tar xvfz vasm2_0f.tar.gz
 RUN cd vasm && make CPU=m68k SYNTAX=mot vasmm68k_mot
 RUN cd vasm && make vobjdump
 RUN cp vasm/vasmm68k_mot /opt/vbcc/bin/
 RUN cp vasm/vobjdump /opt/vbcc/bin/
 
 # vlink
-RUN wget http://sun.hasenbraten.de/vlink/release/vlink.tar.gz
-RUN tar xvfz vlink.tar.gz
+RUN wget http://server.owl.de/~frank/tags/vlink0_18a.tar.gz
+RUN tar xvfz vlink0_18a.tar.gz
 RUN cd vlink && make
 RUN cp vlink/vlink /opt/vbcc/bin/
 

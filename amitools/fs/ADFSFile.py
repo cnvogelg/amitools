@@ -41,6 +41,12 @@ class ADFSFile(ADFSNode):
         # scan for extension blocks
         next_ext = self.block.extension
         while next_ext != 0:
+            if not self.blkdev.reserved <= next_ext < self.blkdev.num_blocks:
+                raise FSError(
+                    INVALID_FILE_LIST_BLOCK,
+                    node=self,
+                    extra="off the disk: %d" % next_ext,
+                )
             ext_blk = FileListBlock(self.block.blkdev, next_ext)
             ext_blk.read()
             if not ext_blk.valid:
@@ -179,20 +185,33 @@ class ADFSFile(ADFSNode):
         return 1 + self.num_data_blks + self.num_ext_blks
 
     def blocks_create_new(self, free_blks, name, hash_chain_blk, parent_blk, meta_info):
-        # assign block numbers
-        fhb_num = free_blks[0]
-        # ... for ext
-        self.ext_blk_nums = []
-        for i in range(self.num_ext_blks):
-            self.ext_blk_nums.append(free_blks[1 + i])
-        # ... for data
-        off = 1 + self.num_ext_blks
-        self.data_blk_nums = []
-        for i in range(self.num_data_blks):
-            self.data_blk_nums.append(free_blks[off])
-            off += 1
-
         ppb = self.volume.blkdev.block_longs - 56  # data pointer per block
+        # assign block numbers interleaved to avoid seeks:
+        # header, 1st data chunk, ext0, 2nd data chunk, ext1, ...
+        # so each FileListBlock sits right between the data it follows
+        # and the data it describes. A sequential read then only steps
+        # to the neighbour block instead of seeking back to a cluster
+        # of extension blocks at the start of the file.
+        fhb_num = free_blks[0]
+        self.ext_blk_nums = []
+        self.data_blk_nums = []
+        pos = 1
+        remaining = self.num_data_blks
+        # first data chunk (described by header)
+        chunk = min(ppb, remaining)
+        for i in range(chunk):
+            self.data_blk_nums.append(free_blks[pos])
+            pos += 1
+        remaining -= chunk
+        # further chunks (each described by one ext block)
+        for i in range(self.num_ext_blks):
+            self.ext_blk_nums.append(free_blks[pos])
+            pos += 1
+            chunk = min(ppb, remaining)
+            for j in range(chunk):
+                self.data_blk_nums.append(free_blks[pos])
+                pos += 1
+            remaining -= chunk
 
         # create file header block
         fhb = FileHeaderBlock(self.blkdev, fhb_num, self.volume.is_longname)
@@ -276,6 +295,8 @@ class ADFSFile(ADFSNode):
 
     def draw_on_bitmap(self, bm, show_all=False, first=False):
         bm[self.block.blk_num] = ord("H")
+        if self._own_comment_block() is not None:
+            bm[self.comment_blk_num] = ord("c")
         for b in self.ext_blk_nums:
             bm[b] = ord("E")
         for b in self.data_blk_nums:
@@ -283,12 +304,15 @@ class ADFSFile(ADFSNode):
 
     def get_block_nums(self):
         result = [self.block.blk_num]
+        if self._own_comment_block() is not None:
+            result.append(self.comment_blk_num)
         result += self.ext_blk_nums
         result += self.data_blk_nums
         return result
 
     def get_blocks(self, with_data=True):
         result = [self.block]
+        result += self._get_comment_blocks()
         result += self.ext_blks
         if with_data:
             self.ensure_data()
@@ -308,7 +332,10 @@ class ADFSFile(ADFSNode):
         return "data=%d ext=%d" % (len(self.data_blk_nums), len(self.ext_blk_nums))
 
     def get_block_usage(self, all=False, first=True):
-        return (len(self.data_blk_nums), len(self.ext_blk_nums) + 1)
+        num_non_data = len(self.ext_blk_nums) + 1
+        if self._own_comment_block() is not None:
+            num_non_data += 1
+        return (len(self.data_blk_nums), num_non_data)
 
     def get_file_bytes(self, all=False, first=True):
         return self.data_size

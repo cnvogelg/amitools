@@ -55,7 +55,7 @@ class Validator:
             # retrieve root block number from boot block
             root_blk_num = self.boot.got_root_blk
             # guessed root
-            new_root = self.blkdev.num_blocks // 2
+            new_root = self.blkdev.get_root_block_num()
             # check root block number
             if root_blk_num == 0:
                 self.log.msg(
@@ -85,7 +85,7 @@ class Validator:
                 root_blk_num = new_root
         else:
             # guess root block number
-            root_blk_num = self.blkdev.num_blocks // 2
+            root_blk_num = self.blkdev.get_root_block_num()
             self.log.msg(Log.INFO, "Guessed root block number", root_blk_num)
         # read root block
         root = RootBlock(self.blkdev, root_blk_num)

@@ -311,6 +311,8 @@ class RepackCmd(Command):
         self.repacker = Repacker(in_img, in_opts)
         if not self.repacker.create_in():
             self.exit_code = 2
+        else:
+            self.repacker.check_comments()
 
     def init_blkdev(self, image_file):
         return self.repacker.create_out_blkdev(image_file)
@@ -321,6 +323,118 @@ class RepackCmd(Command):
     def handle_vol(self, vol):
         self.repacker.repack()
         return 0
+
+
+class DefragCmd(Command):
+    def __init__(self, args, opts):
+        Command.__init__(self, args, opts, edit=True)
+        if len(self.opts) != 0:
+            print("Usage: defrag")
+            self.exit_code = 1
+
+    def handle_vol(self, vol):
+        if not vol.valid:
+            print("defrag: invalid filesystem")
+            return 3
+        # 1. snapshot + validate: fully read every file, like
+        # Repacker.repack_node does. any FSError means the fs is invalid
+        try:
+            entries = self._snapshot_dir(vol.get_root_dir())
+        except FSError as e:
+            print("defrag: invalid filesystem:", e)
+            return 3
+        num_files, num_dirs = self._count_entries(entries)
+        name = vol.get_volume_name()
+        dos_type = vol.get_dos_type()
+        root_meta = vol.get_meta_info()
+        boot_code = vol.get_boot_code()
+        if boot_code is not None:
+            boot_code = bytes(boot_code)
+        # back up all raw blocks so a failed restore can be rolled back.
+        # defrag rewrites the image in place: keep a backup copy yourself
+        # if the contents are irreplaceable
+        blkdev = vol.blkdev
+        backup = bytearray()
+        for i in range(blkdev.num_blocks):
+            backup += blkdev.read_block(i)
+        # 2. recreate the volume in place on the same block device.
+        # this reuses the same vol object so the command queue stays valid
+        vol.create(name, meta_info=root_meta, dos_type=dos_type, boot_code=boot_code)
+        # 3. restore sorted by name for a deterministic, contiguous layout.
+        # per-file FLB interleave is handled by ADFSFile.blocks_create_new.
+        # note: directory hash-chain order after defrag follows the sorted
+        # restore order and may differ from the original order
+        try:
+            self._restore_dir(vol.get_root_dir(), entries)
+        except (FSError, IOError) as e:
+            bs = blkdev.block_bytes
+            off = 0
+            for i in range(blkdev.num_blocks):
+                blkdev.write_block(i, bytes(backup[off : off + bs]))
+                off += bs
+            vol.open()
+            print("defrag: failed, image restored:", e)
+            return 3
+        file_word = "file" if num_files == 1 else "files"
+        dir_word = "dir" if num_dirs == 1 else "dirs"
+        print(
+            "defrag '%s' [%s]: %d nodes defragmented "
+            "(%d %s, %d %s), %d/%d blocks used"
+            % (
+                name.get_unicode(),
+                DosType.get_dos_type_str(dos_type),
+                num_files + num_dirs,
+                num_files,
+                file_word,
+                num_dirs,
+                dir_word,
+                vol.get_used_blocks(),
+                vol.get_total_blocks(),
+            )
+        )
+        return 0
+
+    def _count_entries(self, entries):
+        files = 0
+        dirs = 0
+        for fname, meta, is_dir, payload in entries:
+            if is_dir:
+                dirs += 1
+                sub_files, sub_dirs = self._count_entries(payload)
+                files += sub_files
+                dirs += sub_dirs
+            else:
+                files += 1
+        return (files, dirs)
+
+    def _snapshot_dir(self, dir_node):
+        dir_node.ensure_entries()
+        if not dir_node.valid:
+            raise FSError(INVALID_USER_DIR_BLOCK, node=dir_node)
+        result = []
+        for e in dir_node.get_entries():
+            fname = e.get_file_name().get_name()
+            meta = e.get_meta_info()
+            if e.is_dir():
+                result.append((fname, meta, True, self._snapshot_dir(e)))
+            elif e.is_file():
+                result.append((fname, meta, False, bytes(e.get_file_data())))
+            else:
+                raise FSError(UNSUPPORTED_DIR_BLOCK, node=e)
+            e.flush()
+        return result
+
+    def _restore_dir(self, out_dir, entries):
+        for fname, meta, is_dir, payload in sorted(
+            entries, key=lambda t: t[0].get_unicode()
+        ):
+            if is_dir:
+                sub = out_dir.create_dir(fname, meta, False)
+                self._restore_dir(sub, payload)
+                sub.flush()
+            else:
+                f = out_dir.create_file(fname, payload, meta, False)
+                f.flush()
 
 
 # ----- Query Image -----
@@ -403,6 +517,7 @@ class ReadCmd(Command):
         elif node.is_dir():
             img = Imager(meta_mode=Imager.META_MODE_NONE)
             img.unpack_dir(node, out_name)
+            img.check_unread()
         node.flush()
         return 0
 
@@ -889,6 +1004,82 @@ class BlkDevCmd(Command):
         return 0
 
 
+# ----- Fsck Command -----
+
+
+class FsckCmd(Command):
+    """Filesystem check and repair command."""
+
+    def __init__(self, args, opts):
+        # Import here to avoid circular imports
+        from amitools.fs.fsck.FsckConfig import FsckConfig
+
+        # Parse options to determine if we're editing
+        self.config = FsckConfig.from_opts(opts)
+        edit_mode = self.config.repair or self.config.salvage
+        Command.__init__(self, args, opts, edit=edit_mode)
+
+    def handle_blkdev(self, blkdev):
+        from amitools.fs.fsck.Fsck import Fsck
+        from amitools.fs.fsck.FsckResult import Severity
+
+        # Handle --output mode: copy image first
+        if self.config.output_path:
+            import shutil
+
+            shutil.copy2(self.args.image_file, self.config.output_path)
+            # Reopen the copy for modifications
+            from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
+
+            factory = BlkDevFactory()
+            blkdev = factory.open(self.config.output_path, read_only=False)
+
+        # Run fsck
+        fsck = Fsck(blkdev, self.config)
+        result = fsck.run()
+
+        # Print results
+        self._print_results(result)
+
+        # Return appropriate exit code
+        if result.is_clean:
+            return 0
+        elif self.config.repair and result.fixed_count > 0:
+            return 0 if result.error_count == result.fixed_count else 1
+        else:
+            return 1
+
+    def _print_results(self, result):
+        from amitools.fs.fsck.FsckResult import Severity
+
+        # Determine minimum severity to show
+        if self.config.quiet:
+            min_sev = Severity.ERROR
+        elif self.config.verbose >= 1:
+            min_sev = Severity.INFO
+        elif self.config.verbose >= 2:
+            min_sev = Severity.DEBUG
+        else:
+            min_sev = Severity.WARN
+
+        # Print issues
+        for issue in result.issues:
+            if issue.severity.value >= min_sev.value:
+                print(issue)
+
+        # Print summary
+        print()
+        print(result.summary())
+
+        # Print repair summary if applicable
+        if self.config.repair:
+            if result.fixed_count > 0:
+                print(f"Repaired {result.fixed_count} issue(s)")
+            unfixed = result.unfixed_count
+            if unfixed > 0:
+                print(f"Could not repair {unfixed} issue(s)")
+
+
 # ----- main -----
 def main(args=None, defaults=None):
     # call scanner and process all files with selected command
@@ -911,10 +1102,12 @@ def main(args=None, defaults=None):
         "pack": PackCmd,
         "unpack": UnpackCmd,
         "repack": RepackCmd,
+        "defrag": DefragCmd,
         "boot": BootCmd,
         "root": RootCmd,
         "info": InfoCmd,
         "relabel": RelabelCmd,
+        "fsck": FsckCmd,
     }
 
     parser = argparse.ArgumentParser()

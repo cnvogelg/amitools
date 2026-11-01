@@ -52,6 +52,11 @@ class BlockDevice:
     def get_geometry(self):
         return DiskGeometry(self.cyls, self.heads, self.sectors)
 
+    def get_root_block_num(self):
+        # AmigaDOS places the root midway between the first usable block
+        # and the last block, rounding down.
+        return (self.reserved + self.num_blocks - 1) // 2
+
     def get_chs_str(self):
         return "chs=%d,%d,%d" % (self.cyls, self.heads, self.sectors)
 

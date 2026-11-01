@@ -127,7 +127,9 @@ class BitmapScan:
                 )
             else:
                 bi = self.block_scan.read_block(bm_ext, is_bm_ext=True)
-                if bi == None:
+                # a block off the disk, one that cannot be read or an
+                # invalid one has no pointers
+                if bi is None or bi.blk_type != self.block_scan.BT_BITMAP_EXT:
                     self.log.msg(
                         Log.ERROR,
                         "Error reading bitmap ext block @%d" % bm_ext,
@@ -156,7 +158,9 @@ class BitmapScan:
                     else:
                         # read bitmap block
                         bi = self.block_scan.read_block(bm_block, is_bm=True)
-                        if bi == None:
+                        # a block off the disk, one that cannot be read or
+                        # an invalid one has no bitmap
+                        if bi is None or bi.blk_type != self.block_scan.BT_BITMAP:
                             self.log.msg(
                                 Log.ERROR,
                                 "Error reading bitmap block @%d" % bm_block,
