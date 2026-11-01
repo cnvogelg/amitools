@@ -639,6 +639,31 @@ Example::
   > xdftool new.hdf repack old.rdisk part=dh0 ; repack one partition of a disk
 
 
+``defrag`` - Defragment the contents of an image in place
+-----------------------------------------------------------
+
+::
+
+  defrag
+
+This command rebuilds the file system directly on the current image without
+changing the volume contents. It snapshots the directory tree, recreates the
+volume on the same block device and restores files and directories in a sorted,
+compact order to reduce fragmentation after many create/delete cycles.
+
+The image is rewritten in place. If you want to keep the original layout as a
+backup, make a copy of the image before running this command. The command
+accepts no options and only works on valid file systems.
+
+After a successful rebuild the command prints a short summary including the
+volume name, DOS type and the number of files and directories that were
+defragmented.
+
+Example::
+
+  > xdftool mydisk.adf defrag
+
+
 Low-Level Commands
 ==================
 
