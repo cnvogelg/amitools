@@ -36,6 +36,17 @@ a plus character::
 
   > xdftool <image.[ah]df> <command1> [options1] + <command2> [options2] ...
 
+Global options are available before the command list::
+
+  > xdftool [options] <image> <command> [args]
+
+The available global options are:
+
+* ``-v`` / ``--verbose``: print more diagnostic output while processing
+* ``-s`` / ``--separator``: change the command separator string (default: ``+``)
+* ``-r`` / ``--read-only``: refuse any command that would modify the image
+* ``-f`` / ``--force``: overwrite an existing image when creating one
+
 For Example:::
 
   > xdftool test.adf format ``My Image`` + makedir c + write myfile c

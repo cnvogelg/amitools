@@ -35,6 +35,19 @@ a plus character::
 
   > rdbtool <image.rdb> <command1> [options1] + <command2> [options2] ...
 
+Global options can be used before the command list::
+
+  > rdbtool [options] <image> <command> [args]
+
+The available global options are:
+
+* ``-v`` / ``--verbose``: print additional diagnostic output
+* ``-s`` / ``--separator``: change the command separator string (default: ``+``)
+* ``-r`` / ``--read-only``: refuse commands that would modify the image
+* ``-f`` / ``--force``: overwrite or recreate an image when necessary
+* ``-p`` / ``--drive-prefix``: set the default drive name prefix (default: ``DH``)
+* ``-t`` / ``--dostype``: set the default DOS type for new partitions (default: ``ffs+intl``)
+
 For example::
 
   > rdbtool myimg.rdb create size=10Mi + init + fill

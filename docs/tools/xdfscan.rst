@@ -41,6 +41,13 @@ disk images only by using -D (skip disks) or -H (skip hard disks)::
   > xdfscan -H my_disks       # only disk images and no hard disk images
   > xdfscan -D my_hdfs        # only hard disk images and no disk images
 
+The scanner supports a few global options:
+
+* ``-v`` / ``--verbose``: print warnings and errors in more detail
+* ``-d`` / ``--debug``: show internal debug output while scanning
+* ``-q`` / ``--quick``: skip files that are obviously invalid and scan faster
+* ``-l`` / ``--level``: set the message level (0=debug, 1=info, 2=warn, 3=error)
+
 Normal output uses single lines and only reports the number of errors and
 warnings that were found. If you enable verbose mode (-v) then the warnings
 and errors are printed::
