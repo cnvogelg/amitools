@@ -47,7 +47,9 @@ class TaskBase:
     def config(self, scheduler, slice_cycles):
         """the scheduler configs the task"""
         self.scheduler = scheduler
-        self.glet = greenlet.greenlet(self.start)
+        # the scheduler's greenlet is the parent: a task that ends returns
+        # there, also when another task added it while it ran
+        self.glet = greenlet.greenlet(self.start, parent=scheduler.main_glet)
 
         def slice_hook(run_state):
             self.scheduler.reschedule()

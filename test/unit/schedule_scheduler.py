@@ -925,3 +925,44 @@ def schedule_scheduler_run_until_idle_budget_native_test():
 
     task_ctx.free()
     cleanup(ctx)
+
+
+def schedule_scheduler_python_task_adds_task_test():
+    ctx = setup()
+    sched = ctx.sched
+
+    def task1_run(task):
+        # a task added while another runs ends in the scheduler, not here
+        assert sched.add_task(task2)
+        task.reschedule()
+        return 42
+
+    def task2_run(task):
+        return 23
+
+    task1_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task1 = task1_ctx.task
+    task2_ctx = MyPythonTask(ctx, task2_run, name="task2")
+    task2 = task2_ctx.task
+
+    assert sched.add_task(task1)
+    sched.schedule()
+    assert task1.get_exit_code() == 42
+    assert task2.get_exit_code() == 23
+
+    # task2's end goes through the scheduler, which switches task1 back in
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.READY_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
+
+    task2_ctx.free()
+    task1_ctx.free()
+    cleanup(ctx)
