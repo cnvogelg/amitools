@@ -693,3 +693,37 @@ def schedule_scheduler_python_task_multi_wait_test():
     task2_ctx.free()
     task1_ctx.free()
     cleanup(ctx)
+
+
+def schedule_scheduler_python_task_wait_takes_signals_test():
+    ctx = setup(slice_cycles=30)
+    sched = ctx.sched
+
+    def task1_run(task):
+        # the signal waited for is taken, the other one stays
+        got = task.wait(3)
+        assert got == 1
+        assert task.get_signal() == 4
+        # a signal already set returns at once, and is taken as well
+        assert task.wait(4) == 4
+        assert task.get_signal() == 0
+        return 42
+
+    def task2_run(task):
+        task1.set_signal(5, 5)
+        return 23
+
+    task1_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task1 = task1_ctx.task
+    task2_ctx = MyPythonTask(ctx, task2_run, name="task2")
+    task2 = task2_ctx.task
+
+    assert sched.add_task(task1)
+    assert sched.add_task(task2)
+    sched.schedule()
+    assert task1.get_exit_code() == 42
+    assert task2.get_exit_code() == 23
+
+    task2_ctx.free()
+    task1_ctx.free()
+    cleanup(ctx)
