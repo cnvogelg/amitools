@@ -87,9 +87,7 @@ def rdbtool_init_test(rdbtool, img_file):
 
 
 def rdbtool_init_disk_id_test(rdbtool, img_file):
-    out = rdbtool(
-        img_file.file_name, ("create", img_file.size), ("init",), "show"
-    )
+    out = rdbtool(img_file.file_name, ("create", img_file.size), ("init",), "show")
     res = "\n".join(out)
     assert "disk_vendor:    'RDBTOOL'" in res
     assert "disk_product:   '%s'" % os.path.basename(img_file.file_name)[:15] in res

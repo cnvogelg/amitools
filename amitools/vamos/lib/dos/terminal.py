@@ -131,7 +131,10 @@ class Terminal:
             self.in_conv = None
 
         # convert Latin-1 to UTF-8 if stdout uses UTF-8 encoding
-        if sys.stdout.encoding and sys.stdout.encoding.lower().replace("-", "") == "utf8":
+        if (
+            sys.stdout.encoding
+            and sys.stdout.encoding.lower().replace("-", "") == "utf8"
+        ):
             self.latin1_conv = Latin1ToUtf8Converter()
         else:
             self.latin1_conv = None

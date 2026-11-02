@@ -31,9 +31,7 @@ def dos_filehandle_setvbuf_test():
     fh = FileHandle(file_obj, "SYS:test", "/tmp/test")
     fh_b_addr = fh.alloc_fh(alloc, 0x1234)
     lib = DosLibrary()
-    lib.file_mgr = SimpleNamespace(
-        get_by_b_addr=lambda b_addr, for_writing=None: fh
-    )
+    lib.file_mgr = SimpleNamespace(get_by_b_addr=lambda b_addr, for_writing=None: fh)
 
     cpu.w_reg(REG_D1, fh_b_addr)
     cpu.w_reg(REG_D2, 0x5678)
