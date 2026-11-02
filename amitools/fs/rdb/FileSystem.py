@@ -36,7 +36,13 @@ class FileSystem:
         lseg_blk = self.fshd.dev_node.seg_list_blk
         self.lsegs = []
         data = b""
+        seen = set()
         while lseg_blk != 0xFFFFFFFF:
+            # a chain that links back to a block read before never ends
+            if lseg_blk in seen:
+                self.valid = False
+                return False
+            seen.add(lseg_blk)
             ls = LoadSegBlock(self.blkdev, lseg_blk)
             if not ls.read():
                 self.valid = False
