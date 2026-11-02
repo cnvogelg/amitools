@@ -37,7 +37,8 @@ from amitools.vamos.libstructs import (
 from amitools.vamos.libtypes import TagList, DosTag, DosPacket
 from amitools.vamos.error import *
 from amitools.vamos.log import log_dos
-from amitools.vamos.task import Stack
+from amitools.vamos.task import DosProcess
+from amitools.vamos.schedule import SchedulerEvent
 from .dos.Args import *
 from .dos.Error import *
 from .dos.AmiTime import *
@@ -52,7 +53,6 @@ from .dos.FileManager import FileManager
 from .dos.CSource import *
 from .dos.Item import *
 from amitools.vamos.dos import run_command, run_sub_process
-
 
 FORMAT_DOS = 0
 FORMAT_INT = 1
@@ -129,6 +129,11 @@ class DosLibrary(LibImpl):
         self.file_mgr = FileManager(
             ctx.path_mgr, ctx.exec_lib.port_mgr, ctx.alloc, ctx.mem
         )
+        # processes made by CreateNewProc(), by their scheduler task
+        self.child_procs = {}
+        self.port_mgr = ctx.exec_lib.port_mgr
+        if ctx.scheduler is not None:
+            ctx.scheduler.set_event_callback(self._child_proc_event)
 
     # --- Timing ---
 
@@ -141,6 +146,10 @@ class DosLibrary(LibImpl):
         return 0
 
     def finish_lib(self, ctx):
+        # free the child processes that still run
+        for child in self.child_procs.values():
+            child.free()
+        self.child_procs = {}
         # finish file manager
         self.file_mgr.finish()
         # free dos list
@@ -760,8 +769,7 @@ class DosLibrary(LibImpl):
             f_mode = "wb+"
 
         fh = self.file_mgr.open(
-            self.get_current_dir(ctx), name, f_mode,
-            home_dir=self.get_home_dir(ctx)
+            self.get_current_dir(ctx), name, f_mode, home_dir=self.get_home_dir(ctx)
         )
         log_dos.info(
             "Open: name='%s' (%s/%d/%s) -> %s", name, mode_name, mode, f_mode, fh
@@ -2306,24 +2314,22 @@ class DosLibrary(LibImpl):
             priority,
         )
 
-        stack = Stack.alloc(ctx.alloc, stack_size, name=name + "_Stack")
-        ctx.mem.w_block(stack.get_lower(), b"\x00" * stack.get_size())
-
-        proc = ProcessStruct.alloc(ctx.alloc, tag="ChildProcess_" + name)
-        ctx.mem.w_block(proc.addr, b"\x00" * ProcessStruct.get_size())
-
-        name_cstr = ctx.alloc.alloc_memory(len(name) + 1, label="ProcName_" + name)
-        ctx.mem.w_cstr(name_cstr.addr, name)
-        proc.task.node.type.val = NodeType.NT_PROCESS
-        proc.task.node.name.aptr = name_cstr.addr
-        proc.task.node.pri.val = priority
-        proc.task.state.val = TaskState.TS_READY
-        proc.task.flags.val = 0
-        proc.task.id_nest_cnt.val = 0
-        proc.task.td_nest_cnt.val = 0
-        proc.task.sp_reg.aptr = stack.get_initial_sp()
-        proc.task.sp_lower.aptr = stack.get_lower()
-        proc.task.sp_upper.aptr = stack.get_upper()
+        # the child is a process of its own: the scheduler runs it beside
+        # its parent, and it is freed once its task ends (_child_proc_event)
+        child = self.create_child_process(
+            ctx,
+            name,
+            stack_size=stack_size,
+            start_pc=entry_pc,
+            start_regs={REG_D0: 0, REG_A0: 0},
+        )
+        proc = child.proc
+        task = proc.task
+        stack = child.get_stack()
+        task.node.pri.val = priority
+        task.sp_reg.aptr = stack.get_initial_sp()
+        task.sp_lower.aptr = stack.get_lower()
+        task.sp_upper.aptr = stack.get_upper()
         proc.stack_size.val = stack.get_size()
         proc.stack_base.bptr = stack.get_lower() >> 2
         proc.seg_list.bptr = seglist_bptr
@@ -2343,26 +2349,19 @@ class DosLibrary(LibImpl):
         proc.cis.bptr = input_fh
         proc.cos.bptr = output_fh
 
-        port_addr = proc.msg_port.addr
-        self._init_child_msgport(ctx, port_addr, proc.addr)
-        port = MsgPortStruct(ctx.mem, port_addr)
-        port.node.name.aptr = name_cstr.addr
-        sigbit = 8
-        proc.task.sig_alloc.val = 1 << sigbit
-        proc.task.sig_wait.val = 0
-        proc.task.sig_recvd.val = 0
-
+        # the process port is signalled with SIGB_DOS. it is no public port:
+        # FindPort() does not find it, a child that wants one adds its own
+        port = proc.msg_port
+        port.new(flags=MsgPortFlags.PA_SIGNAL, sig_bit=8, sig_task=task)
+        port_addr = port.addr
         if not ctx.exec_lib.port_mgr.has_port(port_addr):
             ctx.exec_lib.port_mgr.register_port(port_addr)
 
-        proc_info = {
-            "proc_addr": proc.addr,
-            "entry_pc": entry_pc,
-            "stack": stack,
-            "port_addr": port_addr,
-            "name": name,
-            "seglist_bptr": seglist_bptr,
-        }
+        sched_task = child.get_sched_task()
+        self.child_procs[sched_task] = child
+        ctx.scheduler.add_task(sched_task)
+        # add_task() marks the task TS_ADDED. a new process is ready on the Amiga
+        task.state.val = TaskState.TS_READY
 
         log_dos.info(
             "CreateNewProc: created process %06x entry=%06x port=%06x",
@@ -2480,14 +2479,26 @@ class DosLibrary(LibImpl):
 
     # ----- Helpers -----
 
-    def _init_child_msgport(self, ctx, port_addr, task_addr):
-        ctx.mem.w_block(port_addr, b"\x00" * MsgPortStruct.get_size())
-        mp = MsgPortStruct(ctx.mem, port_addr)
-        mp.node.type.val = NodeType.NT_MSGPORT
-        mp.flags.val = MsgPortFlags.PA_SIGNAL
-        mp.sig_bit.val = 8
-        mp.sig_task.aptr = task_addr
-        mp.msg_list.new(NodeType.NT_MESSAGE)
+    def create_child_process(self, ctx, name, **kw_args):
+        """the process CreateNewProc() makes: a DosProcess by default.
+
+        an embedder may return a subclass that serves the DOS calls of a
+        process vamos did not load as a program.
+        """
+        return DosProcess(ctx.machine, ctx.alloc, name, **kw_args)
+
+    def _child_proc_event(self, event):
+        """free a process made by CreateNewProc() once its task has ended"""
+        if event.type != SchedulerEvent.Type.REMOVE_TASK:
+            return
+        child = self.child_procs.pop(event.task, None)
+        if child is None:
+            return
+        port_addr = child.proc.msg_port.addr
+        if self.port_mgr.has_port(port_addr):
+            self.port_mgr.unregister_port(port_addr)
+        log_dos.info("CreateNewProc: process %06x ended", child.proc.addr)
+        child.free()
 
     def _unlink_msg(self, ctx, msg_addr):
         try:
