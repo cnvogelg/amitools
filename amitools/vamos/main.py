@@ -222,7 +222,8 @@ def main_profile(
     ret_code = main(cfg_files, args, cfg_dict)
     cpr.disable()
     # write file
-    cpr.dump_stats(profile_file)
+    if profile_file is not None:
+        cpr.dump_stats(profile_file)
     # show profile?
     if dump_profile:
         sio = io.StringIO()

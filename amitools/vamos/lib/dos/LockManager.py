@@ -108,8 +108,12 @@ class LockManager:
         del lock
 
     def create_lock(self, cur_dir, ami_path, exclusive, home_dir=None):
-        log_lock.debug("create_lock: ami_path='%s' cur_dir=%s home_dir=%s",
-                       ami_path, cur_dir, home_dir)
+        log_lock.debug(
+            "create_lock: ami_path='%s' cur_dir=%s home_dir=%s",
+            ami_path,
+            cur_dir,
+            home_dir,
+        )
         if ami_path == "":
             if cur_dir is None:
                 ami_path = "SYS:"

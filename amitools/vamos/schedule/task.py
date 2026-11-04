@@ -140,6 +140,9 @@ class TaskBase:
         # return without waiting
         got_mask = self.sigmask_received & sigmask
         if got_mask != 0:
+            # the signals returned are taken, as Wait() does
+            self.sigmask_received &= ~got_mask
+            self._sync_sigmask()
             return got_mask
 
         # set our wait mask
@@ -155,7 +158,8 @@ class TaskBase:
         got_mask = self.sigmask_received & sigmask
         log_schedule.debug("%s: leave wait. got_mask=%x", self.name, got_mask)
 
-        # now reset wait mask
+        # now reset wait mask and take the signals returned
+        self.sigmask_received &= ~got_mask
         self.sigmask_wait = 0
         self._sync_sigmask()
 

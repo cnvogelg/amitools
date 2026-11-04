@@ -2,6 +2,7 @@ import os
 
 from .base import BaseMode
 from amitools.vamos.lib.dos.Process import Process
+from amitools.vamos.lib.dos.CommandLine import CommandLine
 from amitools.vamos.log import log_proc
 from amitools.vamos.lib.dos.SysArgs import sys_args_to_ami_arg_str
 
@@ -89,7 +90,7 @@ class ProcMode(BaseMode):
                 return None
             # parse raw arg
             cl = CommandLine()
-            res = cl.parse_line(cmd_cfg.binary)
+            res = cl.parse_line(args[0])
             if res != cl.LINE_OK:
                 log_proc.error("raw arg is invalid! (error %d)", res)
                 return None

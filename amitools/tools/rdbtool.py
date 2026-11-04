@@ -332,13 +332,17 @@ class InitCommand(OpenCommand):
                 else:
                     disk_product = "IMAGE"
             disk_names = (
-                self.args.disk_vendor
-                if self.args.disk_vendor is not None
-                else "RDBTOOL",
+                (
+                    self.args.disk_vendor
+                    if self.args.disk_vendor is not None
+                    else "RDBTOOL"
+                ),
                 disk_product,
-                self.args.disk_revision
-                if self.args.disk_revision is not None
-                else "2012",
+                (
+                    self.args.disk_revision
+                    if self.args.disk_revision is not None
+                    else "2012"
+                ),
             )
         rdisk.create(blkdev.geo, rdb_cyls=rdb_cyls, disk_names=disk_names)
         return rdisk

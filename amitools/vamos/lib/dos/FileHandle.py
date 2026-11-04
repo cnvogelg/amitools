@@ -192,6 +192,14 @@ class FileHandle:
             s = s.encode("latin-1")
         self.unch = bytearray(s)
 
+    def setvbuf(self, buf, buf_type, size):
+        self.buf = buf
+        self.buf_type = buf_type
+        self.buf_size = size
+        if hasattr(self, "struct") and self.struct is not None:
+            self.struct.fh_Buf.val = buf
+        self.auto_flush = buf_type == 1
+
     def tell(self):
         return self.obj.tell()
 
