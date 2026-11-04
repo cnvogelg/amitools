@@ -100,6 +100,7 @@ def path_volume_sys_to_ami_test(tmpdir):
     s2a = v.sys_to_ami_path
     assert s2a(my_path) == "My:"
     assert s2a(str(mp.join("foo"))) == "My:foo"
+    assert s2a(my_path + "-other/foo") is None
     # expect nested path
     assert s2a(my_path2) == "nested:"
     assert s2a(str(mp2.join("bla/blub"))) == "nested:bla/blub"

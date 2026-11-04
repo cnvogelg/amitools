@@ -320,13 +320,17 @@ class VolumeManager(object):
         result = None
         for volume in self.volumes:
             vol_sys_path = volume.get_path()
-            cp = os.path.commonprefix([vol_sys_path, sys_path])
-            if cp == vol_sys_path:
-                remainder = sys_path[len(vol_sys_path) :]
+            try:
+                common_path = os.path.commonpath([vol_sys_path, sys_path])
+            except ValueError:
+                continue
+            if os.path.normcase(common_path) == os.path.normcase(
+                os.path.normpath(vol_sys_path)
+            ):
+                remainder = os.path.relpath(sys_path, vol_sys_path)
+                if remainder == os.curdir:
+                    remainder = ""
                 n = len(remainder)
-                if n > 0 and remainder[0] == "/":
-                    remainder = remainder[1:]
-                    n -= 1
                 # get volume name and build amiga path
                 vol_name = volume.get_name()
                 ami_path = vol_name + ":" + remainder
