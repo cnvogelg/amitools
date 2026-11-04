@@ -20,7 +20,7 @@ written for developers, so a background in Amiga programming helps.
 
 ## Installation
 
-`amitools` needs Python 3.9 or newer and `pip`.
+`amitools` supports Python 3.11 through 3.15 and needs `pip`.
 
 ### Tools only
 

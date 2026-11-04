@@ -28,7 +28,7 @@ Features
 Installation
 ============
 
-``icontool`` requires Python 3.9 or newer. No additional dependencies are
+``icontool`` requires Python 3.11 or newer. No additional dependencies are
 required for basic operations.
 
 For PNG import/export support install ``pypng``::

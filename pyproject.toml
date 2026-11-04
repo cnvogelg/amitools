@@ -8,13 +8,18 @@ authors = [
     {name = "Christian Vogelgsang", email = "chris@vogelgsang.org"},
 ]
 description = "A package to support development with classic Amiga m68k systems"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 keywords = ["AmigaOS", "vamos"]
 license = "GPL-2.0-or-later"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Topic :: System :: Emulators",
 ]
 dynamic = ["version", "readme"]
