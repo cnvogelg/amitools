@@ -47,7 +47,9 @@ class TaskBase:
     def config(self, scheduler, slice_cycles):
         """the scheduler configs the task"""
         self.scheduler = scheduler
-        self.glet = greenlet.greenlet(self.start)
+        # the scheduler's greenlet is the parent: a task that ends returns
+        # there, also when another task added it while it ran
+        self.glet = greenlet.greenlet(self.start, parent=scheduler.main_glet)
 
         def slice_hook(run_state):
             self.scheduler.reschedule()
@@ -85,6 +87,10 @@ class TaskBase:
 
     def get_run_result(self):
         return None
+
+    def get_cycles_run(self):
+        """the cycles the task's m68k code executed so far"""
+        return self.runtime.cycles_run
 
     def get_exit_code(self):
         """if the task exited without error then return the error code"""
@@ -168,8 +174,9 @@ class TaskBase:
         old_mask = self.sigmask_received
         self.sigmask_received = new_signals | (self.sigmask_received & ~sigmask)
         self._sync_sigmask()
-        # check if task is waiting for some of the signals
-        if self.sigmask_wait != 0:
+        # check if task is waiting for some of the signals. a task woken up
+        # before, but not yet run, still has its wait mask set and is ready
+        if self.sigmask_wait != 0 and self.state == TaskState.TS_WAIT:
             got_mask = self.sigmask_received & self.sigmask_wait
             if got_mask != 0:
                 log_schedule.debug("%s: set_signal -> wake me up", self.name)
@@ -337,8 +344,9 @@ class PythonTask(TaskBase):
         except TaskStop:
             log_schedule.debug("%s: Python task stop received!", self.name)
 
+        # a stopped task has no exit code
         log_schedule.debug(
-            "%s: done Python code. exit_code=%d", self.name, self.exit_code
+            "%s: done Python code. exit_code=%s", self.name, self.exit_code
         )
         # at the end of execution remove myself
         if self.scheduler:

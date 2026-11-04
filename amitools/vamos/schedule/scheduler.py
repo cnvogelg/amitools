@@ -20,6 +20,17 @@ class SchedulerEvent:
     task: TaskBase
 
 
+class RunResult(IntEnum):
+    """what stopped Scheduler.run_until_idle()"""
+
+    # no task is left
+    DONE = 0
+    # every task left waits
+    IDLE = 1
+    # the cycle budget ran out while a task was still runnable
+    BUSY = 2
+
+
 @dataclass
 class SchedulerConfig:
     slice_cycles: int = 1000
@@ -48,6 +59,8 @@ class Scheduler(object):
         self.num_switch_same = 0
         self.num_switch_other = 0
         self.running = False
+        # tasks added while not running: their ADD_TASK is reported on the next run
+        self.new_tasks = []
 
     @classmethod
     def from_cfg(cls, machine, schedule_cfg):
@@ -82,14 +95,55 @@ class Scheduler(object):
         if len(self.ready_tasks) == 0:
             raise RuntimeError("no tasks to schedule!")
 
+        if self._run_tasks() == RunResult.IDLE:
+            # every task left waits and no task is there to wake it up
+            log_schedule.error("schedule(): no task to run?!")
+            return False
+        return True
+
+    def run_until_idle(self, max_cycles=None):
+        """run the ready tasks until every task left waits, or none is left.
+
+        unlike schedule() an all-waiting state is no error here: the caller
+        may wake a task up from outside the scheduler, e.g. with set_signal(),
+        and call again to carry on. the current task keeps its CPU context in
+        between, so a wake up of that task needs no context switch.
+
+        with max_cycles the run also stops once the tasks have executed
+        that many cycles of m68k code while a task is still runnable; the
+        last slice may run past the budget. the caller may call again to
+        run it on, or remove it with rem_task(). switches between tasks
+        cost no budget, nor does Python code that runs no m68k code.
+
+        returns RunResult.IDLE while waiting tasks remain, RunResult.BUSY if
+        the cycle budget ran out, and RunResult.DONE once the last task has
+        terminated (or none was added). IDLE and BUSY are true, DONE is false.
+        """
+        log_schedule.info("run_until_idle(): start")
+        return self._run_tasks(max_cycles)
+
+    def _run_tasks(self, max_cycles=None):
+        """the scheduling loop shared by schedule() and run_until_idle().
+
+        returns the RunResult that stopped it. with max_cycles the loop
+        stops BUSY once the tasks executed that many cycles and one of them
+        is still runnable.
+        """
+        # nothing to do at all
+        if self.get_num_tasks() == 0:
+            return RunResult.DONE
+
         self.running = True
 
-        # report events for previously added tasks
-        if len(self.event_hooks) > 0:
-            for task in self.ready_tasks:
-                self._report_event(SchedulerEvent.Type.ADD_TASK, task)
+        # report tasks added while the scheduler did not run
+        new_tasks = self.new_tasks
+        self.new_tasks = []
+        for task in new_tasks:
+            self._report_event(SchedulerEvent.Type.ADD_TASK, task)
 
         # main loop
+        result = RunResult.DONE
+        cycles = 0
         while True:
             log_schedule.debug(
                 "schedule: current %s",
@@ -113,14 +167,25 @@ class Scheduler(object):
                 # find a task to run
                 task = self._find_run_task()
                 if task is None:
-                    log_schedule.error("schedule(): no task to run?!")
-                    return False
+                    result = RunResult.IDLE
+                    break
+
+            # budget spent while a task is still runnable?
+            if max_cycles is not None and cycles >= max_cycles:
+                # a task taken from the ready list goes back to its front
+                if task is not self.cur_task:
+                    self.ready_tasks.insert(0, task)
+                result = RunResult.BUSY
+                break
 
             # current tasks stays the same?
             # no context switch required. simply switch to it
             if task == self.cur_task:
                 self.num_switch_same += 1
                 log_schedule.debug("run: current %s", task.name)
+                # a current task woken up from a wait is ready, not running
+                if task.get_state() != TaskState.TS_RUN:
+                    task.set_state(TaskState.TS_RUN)
                 task.keep_scheduled()
             else:
                 self.num_switch_other += 1
@@ -147,18 +212,33 @@ class Scheduler(object):
                 task.restore_ctx()
 
             # enter greenlet of task and resume it
+            cycles_before = task.get_cycles_run()
             task.switch()
+            cycles += task.get_cycles_run() - cycles_before
+
+        self.running = False
+
+        # all tasks wait, or the budget is spent: stop here, but keep the
+        # current task in place
+        if result != RunResult.DONE:
+            log_schedule.info(
+                "%s: %d task(s) waiting (switches: same=%d, other=%d)",
+                result.name.lower(),
+                len(self.waiting_tasks),
+                self.num_switch_same,
+                self.num_switch_other,
+            )
+            return result
 
         # end of scheduling
         self._make_current(None)
-        self.running = False
 
         log_schedule.info(
-            "schedule(): done (switches: same=%d, other=%d)",
+            "done (switches: same=%d, other=%d)",
             self.num_switch_same,
             self.num_switch_other,
         )
-        return True
+        return result
 
     def _find_run_task(self):
         # if a ready task is available
@@ -169,6 +249,9 @@ class Scheduler(object):
 
         # keep current task
         task = self.cur_task
+        # the current task terminated and the others wait
+        if task is None:
+            return None
         log_schedule.debug("take: current task %s", task.name)
         if task.get_state() in (TaskState.TS_READY, TaskState.TS_RUN):
             return task
@@ -209,9 +292,11 @@ class Scheduler(object):
         # configure task
         task.config(self, self.config.slice_cycles)
         log_schedule.info("add_task: %s", task.name)
-        # report via event if running or postpone it
+        # report via event if running or postpone it to the next run
         if self.running:
             self._report_event(SchedulerEvent.Type.ADD_TASK, task)
+        else:
+            self.new_tasks.append(task)
         return True
 
     def rem_task(self, task):
@@ -227,19 +312,23 @@ class Scheduler(object):
         only be called from the task!
         """
         # find task: is it current? removing myself...
+        found = False
         if self.cur_task == task:
             log_schedule.debug("terminate_task: cur_task %s", task.name)
             self.cur_task = None
+            found = True
         # in ready list?
-        elif task in self.ready_tasks:
+        if task in self.ready_tasks:
             log_schedule.debug("terminate_task: ready %s", task.name)
             self.ready_tasks.remove(task)
-        # in waiting list?
-        elif task in self.waiting_tasks:
+            found = True
+        # in waiting list? the current task is also here while it waits
+        if task in self.waiting_tasks:
             log_schedule.debug("terminate_task: waiting %s", task.name)
             self.waiting_tasks.remove(task)
+            found = True
         # not found
-        else:
+        if not found:
             log_schedule.warning("terminate_task: unknown task %s", task.name)
             return False
         # mark as removed

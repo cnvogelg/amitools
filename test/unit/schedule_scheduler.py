@@ -8,6 +8,8 @@ from amitools.vamos.schedule import (
     PythonTask,
     SchedulerEvent,
     SchedulerConfig,
+    TaskState,
+    RunResult,
 )
 from amitools.vamos.machine.opcodes import op_nop, op_rts, op_reset, op_jsr, op_jmp
 from amitools.vamos.machine.regs import REG_D0
@@ -695,22 +697,152 @@ def schedule_scheduler_python_task_multi_wait_test():
     cleanup(ctx)
 
 
-def schedule_scheduler_python_task_wait_takes_signals_test():
-    ctx = setup(slice_cycles=30)
+# ----- run until idle -----
+
+
+def schedule_scheduler_run_until_idle_no_task_test():
+    ctx = setup()
+
+    # nothing to run is not idle but done
+    assert not ctx.sched.run_until_idle()
+    assert ctx.events == []
+
+    cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_wake_from_outside_test():
+    ctx = setup()
     sched = ctx.sched
 
     def task1_run(task):
-        # the signal waited for is taken, the other one stays
         got = task.wait(3)
         assert got == 1
-        assert task.get_signal() == 4
-        # a signal already set returns at once, and is taken as well
-        assert task.wait(4) == 4
-        assert task.get_signal() == 0
+        return 42
+
+    task_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task = task_ctx.task
+    assert sched.add_task(task)
+
+    # the task waits and no other task could wake it up: idle
+    assert sched.run_until_idle()
+    assert task.get_state() == TaskState.TS_WAIT
+    assert sched.get_cur_task() is task
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.WAITING_TASK, task),
+    ]
+
+    # wake it up from outside the scheduler and carry on
+    task.set_signal(1, 1)
+    assert not sched.run_until_idle()
+    assert task.get_exit_code() == 42
+    assert ctx.events[3:] == [
+        SchedulerEvent(SchedulerEvent.Type.WAKE_UP_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
+
+    task_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_native_task_test():
+    my_task = None
+
+    ctx = setup()
+    sched = ctx.sched
+    mem = ctx.mem
+
+    def trap1(op, pc):
+        got = my_task.wait(1)
+        assert got == 1
+
+    addr1 = ctx.machine.setup_quick_trap(trap1)
+
+    task_ctx = MyNativeTask(ctx, set_regs={REG_D0: 42}, name="task1")
+    task = task_ctx.task
+    my_task = task
+
+    # task setup: wait in a trap, then return
+    pc = task_ctx.pc
+    mem.w16(pc, op_jsr)
+    mem.w32(pc + 2, addr1)
+    mem.w16(pc + 6, op_rts)
+
+    assert sched.add_task(task)
+    assert sched.run_until_idle()
+    assert task.get_state() == TaskState.TS_WAIT
+
+    # wake it up from outside and let it return from the trap
+    task.set_signal(1, 1)
+    assert not sched.run_until_idle()
+    assert task.get_exit_code() == 42
+
+    task_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_add_task_test():
+    ctx = setup()
+    sched = ctx.sched
+
+    def task1_run(task):
+        got = task.wait(1)
+        assert got == 1
         return 42
 
     def task2_run(task):
-        task1.set_signal(5, 5)
+        return 23
+
+    task1_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task1 = task1_ctx.task
+    task2_ctx = MyPythonTask(ctx, task2_run, name="task2")
+    task2 = task2_ctx.task
+
+    assert sched.add_task(task1)
+    assert sched.run_until_idle()
+
+    # a task added in between runs on the next call
+    assert sched.add_task(task2)
+    assert sched.run_until_idle()
+    assert task2.get_exit_code() == 23
+    assert task1.get_state() == TaskState.TS_WAIT
+
+    # and each task is added once
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.WAITING_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task2),
+    ]
+
+    task1.set_signal(1, 1)
+    assert not sched.run_until_idle()
+    assert task1.get_exit_code() == 42
+    assert ctx.events[6:] == [
+        SchedulerEvent(SchedulerEvent.Type.WAKE_UP_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
+
+    task2_ctx.free()
+    task1_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_schedule_all_waiting_test():
+    ctx = setup()
+    sched = ctx.sched
+
+    def task1_run(task):
+        task.wait(1)
+        return 42
+
+    def task2_run(task):
         return 23
 
     task1_ctx = MyPythonTask(ctx, task1_run, name="task1")
@@ -720,7 +852,299 @@ def schedule_scheduler_python_task_wait_takes_signals_test():
 
     assert sched.add_task(task1)
     assert sched.add_task(task2)
+
+    # the last running task ends while task1 still waits: a dead lock,
+    # which schedule() reports instead of raising
+    assert sched.schedule() is False
+    assert task2.get_exit_code() == 23
+    assert task1.get_state() == TaskState.TS_WAIT
+
+    task2_ctx.free()
+    task1_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_budget_python_test():
+    ctx = setup(slice_cycles=10)
+    sched = ctx.sched
+    mem = ctx.mem
+
+    # a sub run of two nops and an rts: a few cycles each
+    code = ctx.alloc.alloc_memory(16, "code")
+    pc = code.addr
+    mem.w16(pc, op_nop)
+    mem.w16(pc + 2, op_nop)
+    mem.w16(pc + 4, op_rts)
+
+    def task1_run(task):
+        # each sub run executes a few cycles, each reschedule none
+        for _ in range(10):
+            task.sub_run(Code(pc))
+            task.reschedule()
+        return 42
+
+    task_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task = task_ctx.task
+    assert sched.add_task(task)
+
+    # a budget of thirty cycles stops it while it still runs
+    assert sched.run_until_idle(max_cycles=30) == RunResult.BUSY
+    assert task.get_state() == TaskState.TS_RUN
+    assert task.get_exit_code() is None
+    assert 30 <= task.get_cycles_run() < 60
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task),
+    ]
+
+    # without a budget it runs to its end
+    assert sched.run_until_idle() == RunResult.DONE
+    assert task.get_exit_code() == 42
+    assert ctx.events[2:] == [
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
+
+    ctx.alloc.free_memory(code)
+    task_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_budget_counts_cycles_not_switches_test():
+    ctx = setup(slice_cycles=10)
+    sched = ctx.sched
+
+    def task1_run(task):
+        # a hundred switches, no m68k code: no budget is spent
+        for _ in range(100):
+            task.reschedule()
+        return 42
+
+    task_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task = task_ctx.task
+    assert sched.add_task(task)
+    assert sched.run_until_idle(max_cycles=30) == RunResult.DONE
+    assert task.get_exit_code() == 42
+    assert task.get_cycles_run() == 0
+
+    task_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_budget_signalling_tasks_test():
+    ctx = setup(slice_cycles=10)
+    sched = ctx.sched
+
+    def ping_run(task):
+        # the tasks wake each other up a hundred times without m68k code
+        for _ in range(100):
+            pong.set_signal(1, 1)
+            assert task.wait(1) == 1
+        pong.set_signal(2, 2)
+        return 1
+
+    def pong_run(task):
+        while True:
+            got = task.wait(3)
+            if got & 2:
+                return 2
+            ping.set_signal(1, 1)
+
+    ping_ctx = MyPythonTask(ctx, ping_run, name="ping")
+    ping = ping_ctx.task
+    pong_ctx = MyPythonTask(ctx, pong_run, name="pong")
+    pong = pong_ctx.task
+    assert sched.add_task(ping)
+    assert sched.add_task(pong)
+    assert sched.run_until_idle(max_cycles=30) == RunResult.DONE
+    assert ping.get_exit_code() == 1
+    assert pong.get_exit_code() == 2
+
+    pong_ctx.free()
+    ping_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_rem_task_waiting_current_task_test():
+    ctx = setup()
+    sched = ctx.sched
+
+    def task1_run(task):
+        task.wait(1)
+        return 42
+
+    task_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task = task_ctx.task
+    assert sched.add_task(task)
+    assert sched.run_until_idle() == RunResult.IDLE
+    # the current task waits: it is in the waiting list as well
+    assert sched.get_cur_task() is task
+    assert task in sched.waiting_tasks
+
+    # removing it takes it out of both
+    sched.rem_task(task)
+    assert task.get_state() == TaskState.TS_REMOVED
+    assert sched.get_cur_task() is None
+    assert sched.waiting_tasks == []
+    assert sched.get_num_tasks() == 0
+    assert task.get_exit_code() is None
+    assert sched.run_until_idle() == RunResult.DONE
+
+    task_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_budget_waiting_task_is_idle_test():
+    ctx = setup(slice_cycles=10)
+    sched = ctx.sched
+
+    def task1_run(task):
+        assert task.wait(1) == 1
+        return 42
+
+    task_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task = task_ctx.task
+    assert sched.add_task(task)
+    # a budget this small is spent at once, yet the task waits: not busy
+    assert sched.run_until_idle(max_cycles=1) == RunResult.IDLE
+    assert task.get_state() == TaskState.TS_WAIT
+    task.set_signal(1, 1)
+    assert sched.run_until_idle(max_cycles=1) == RunResult.DONE
+    assert task.get_exit_code() == 42
+
+    task_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_budget_native_test():
+    ctx = setup(slice_cycles=30)
+    sched = ctx.sched
+    mem = ctx.mem
+
+    task_ctx = MyNativeTask(ctx, set_regs={REG_D0: 42}, name="task1")
+    task = task_ctx.task
+
+    # task setup: an endless loop
+    pc = task_ctx.pc
+    mem.w16(pc, op_jmp)
+    mem.w32(pc + 2, pc)
+
+    assert sched.add_task(task)
+    # a budget of 300 cycles stops it busy, and so does the next
+    assert sched.run_until_idle(max_cycles=300) == RunResult.BUSY
+    assert 300 <= task.get_cycles_run() < 330
+    assert sched.run_until_idle(max_cycles=300) == RunResult.BUSY
+    assert 600 <= task.get_cycles_run() < 660
+    assert task.get_state() == TaskState.TS_RUN
+
+    # the caller can then take it out
+    sched.rem_task(task)
+    assert sched.run_until_idle() == RunResult.DONE
+    assert task.was_stopped()
+
+    task_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_python_task_adds_task_test():
+    ctx = setup()
+    sched = ctx.sched
+
+    def task1_run(task):
+        # a task added while another runs ends in the scheduler, not here
+        assert sched.add_task(task2)
+        task.reschedule()
+        return 42
+
+    def task2_run(task):
+        return 23
+
+    task1_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task1 = task1_ctx.task
+    task2_ctx = MyPythonTask(ctx, task2_run, name="task2")
+    task2 = task2_ctx.task
+
+    assert sched.add_task(task1)
     sched.schedule()
+    assert task1.get_exit_code() == 42
+    assert task2.get_exit_code() == 23
+
+    # task2's end goes through the scheduler, which switches task1 back in
+    assert ctx.events == [
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ADD_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.READY_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task2),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task1),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
+
+    task2_ctx.free()
+    task1_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_signal_twice_test():
+    ctx = setup()
+    sched = ctx.sched
+
+    def task1_run(task):
+        got = task.wait(3)
+        assert got == 3
+        return 42
+
+    task_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task = task_ctx.task
+    assert sched.add_task(task)
+    assert sched.run_until_idle() == RunResult.IDLE
+
+    # two signals before the task runs again wake it up once
+    task.set_signal(1, 1)
+    task.set_signal(2, 2)
+    assert task.get_state() == TaskState.TS_READY
+    assert sched.run_until_idle() == RunResult.DONE
+    assert task.get_exit_code() == 42
+    assert ctx.events[3:] == [
+        SchedulerEvent(SchedulerEvent.Type.WAKE_UP_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.REMOVE_TASK, task),
+        SchedulerEvent(SchedulerEvent.Type.ACTIVE_TASK, None),
+    ]
+
+    task_ctx.free()
+    cleanup(ctx)
+
+
+def schedule_scheduler_run_until_idle_woken_current_task_signals_test():
+    ctx = setup()
+    sched = ctx.sched
+
+    def task1_run(task):
+        assert task.wait(1) == 1
+        return 42
+
+    def task2_run(task):
+        assert task.wait(2) == 2
+        # woken up from outside as the current task, task2 wakes task1 up
+        # and must run on after it
+        task1.set_signal(1, 1)
+        return 23
+
+    task1_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task1 = task1_ctx.task
+    task2_ctx = MyPythonTask(ctx, task2_run, name="task2")
+    task2 = task2_ctx.task
+
+    assert sched.add_task(task1)
+    assert sched.add_task(task2)
+    assert sched.run_until_idle() == RunResult.IDLE
+    # the last task to wait stays the current one
+    assert sched.get_cur_task() is task2
+
+    task2.set_signal(2, 2)
+    assert sched.run_until_idle() == RunResult.DONE
     assert task1.get_exit_code() == 42
     assert task2.get_exit_code() == 23
 
