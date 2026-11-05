@@ -1,5 +1,58 @@
 # Change Log
 
+## [0.9.0][9] (2026-11-05)
+
+### global
+
+* Support Python 3.11 through 3.15
+* Require machine68k 0.5.0 or newer for vamos
+
+### xdftool
+
+* Added in-place defragmentation and interleaved file list blocks with file data (#252)
+
+### rdbtool
+
+* Added configurable RDB disk identification strings
+
+### filesystem
+
+* Added fsck repair and salvage modes (#243)
+* Hardened directory cache, comments, and metadata updates, including DOS type and used-block handling (#223, #254)
+* Fixed RDB checksums, partition deletion, and circular block lists (#230, #244, #251, #258)
+
+### romtool
+
+* Fixed relocation across multiple segments (#217)
+* Fixed kickety split ROM rebuilding (#235)
+* Show resident sizes in ROM scans
+
+### icontool
+
+* Added icon file support, including GlowIcons and transparency (#226)
+
+### vamos
+
+* Added scheduler support for tasks, including CreateNewProc children and cycle-budgeted run_until_idle() (#255, #256, #257)
+* Added DOS variable support (#247) and Latin-1 console output (#237)
+* Added PROGDIR: path handling, NameFromFH(), SetVBuf(), and additional Exec, DOS, timer, and utility functions
+* Added RDB disk exposure, backend-routed scsi.device, expansion.library, and a minimal graphics.library
+* Fixed Exec list operations on uninitialized lists (#253)
+
+### Contributors
+
+* Adrian Matoga
+* Bernie Innocenti
+* Erik Hemming
+* Irmen de Jong
+* Jaroslav Pulchart
+* Jusii
+* Matt Harlum
+* metaneutrons
+* Richard Downer
+* Stefan Reinauer
+* Thomas Dye
+
 ## [0.8.0][8] (2024-03-03)
 
 ### global
@@ -251,3 +304,4 @@
 [6]: https://github.com/cnvogelg/amitools/tree/v0.6.0
 [7]: https://github.com/cnvogelg/amitools/tree/v0.7.0
 [8]: https://github.com/cnvogelg/amitools/tree/v0.8.0
+[9]: https://github.com/cnvogelg/amitools/releases/tag/v0.9.0
