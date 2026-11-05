@@ -20,7 +20,8 @@ written for developers, so a background in Amiga programming helps.
 
 ## Installation
 
-`amitools` supports Python 3.11 through 3.15 and needs `pip`.
+`amitools` supports Python 3.11 through 3.15 and can be installed with `pip`
+or [uv](https://docs.astral.sh/uv/).
 
 ### Tools only
 
@@ -44,6 +45,18 @@ pip install 'amitools[vamos]'
 `machine68k` is a C extension published as a source package, so a C compiler
 has to be available (Xcode command line tools on macOS, `gcc` on Linux,
 Visual Studio Build Tools on Windows).
+
+With uv, install the command-line tools in an isolated environment:
+
+```bash
+uv tool install amitools
+```
+
+To include `vamos` and its emulator dependency:
+
+```bash
+uv tool install 'amitools[vamos]'
+```
 
 ### Latest development version
 
@@ -135,6 +148,18 @@ make init
 `make init` installs `machine68k` from its git repository, the test and
 documentation tools, and `amitools` itself in editable mode, so edits in the
 tree take effect immediately.
+
+To set up the same environment with uv, create and activate a virtual
+environment, then install the existing development and test requirements:
+
+```bash
+uv venv
+# macOS/Linux
+source .venv/bin/activate
+# Windows
+.venv\Scripts\activate
+uv pip install -r requirements-dev.txt -r requirements-test.txt -e .
+```
 
 ### Tests
 
