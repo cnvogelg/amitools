@@ -185,8 +185,8 @@ class HunkReader:
         while num_relocs != 0:
             num_relocs = self.read_long(f)
             if num_relocs < 0:
-                self.error_string = "%s has invalid number of relocations" % (
-                    hunk["type_name"]
+                self.error_string = (
+                    "%s has invalid number of relocations" % (hunk["type_name"])
                 )
                 return RESULT_INVALID_HUNK_FILE
             elif num_relocs == 0:
@@ -220,8 +220,8 @@ class HunkReader:
         while num_relocs != 0:
             num_relocs = self.read_word(f)
             if num_relocs < 0:
-                self.error_string = "%s has invalid number of relocations" % (
-                    hunk["type_name"]
+                self.error_string = (
+                    "%s has invalid number of relocations" % (hunk["type_name"])
                 )
                 return RESULT_INVALID_HUNK_FILE
             elif num_relocs == 0:

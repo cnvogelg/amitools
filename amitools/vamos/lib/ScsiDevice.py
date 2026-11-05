@@ -505,7 +505,7 @@ class ScsiDevice(LibImpl):
                 f"heads={backend.heads} secs={backend.secs}"
             )
         print(
-            f"[SCSI] {name} offset={offset} len={length} " f"buf=0x{buf_ptr:x}{extra}",
+            f"[SCSI] {name} offset={offset} len={length} buf=0x{buf_ptr:x}{extra}",
             flush=True,
         )
 

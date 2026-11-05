@@ -178,7 +178,7 @@ the test programs needs the cross compilers described in
 
 ### Code style and docs
 
-The code is formatted with [black](https://github.com/psf/black):
+The code is formatted with [Ruff](https://docs.astral.sh/ruff/formatter/):
 `make format`. The documentation is Sphinx; `make docs` builds it into
 `build/docs/html`.
 
@@ -186,7 +186,7 @@ The code is formatted with [black](https://github.com/psf/black):
 
 Bug reports and pull requests are welcome on
 [GitHub](https://github.com/cnvogelg/amitools). Please add a unit test for a
-fix where possible and run `black` before submitting.
+fix where possible and run `ruff format .` before submitting.
 
 ## License and authors
 
