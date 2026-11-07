@@ -1,6 +1,7 @@
 import ctypes
 from contextlib import ExitStack
 from amitools.vamos.libtypes import TagList, MsgPort, Message
+from amitools.vamos.lib.GraphicsLibrary import BFText, BFDraw
 from amitools.vamos.libcore.impl import LibImpl
 from amitools.vamos.lib.TimerDevice import TimerDevice
 
@@ -445,68 +446,65 @@ class IntuitionLibrary(LibImpl):
 
         
     def CloseScreen(self, ctx):
-        target_ptr = ctx.cpu.r_reg(REG_A0)
-    
-        prev = None
-        current_ptr = self.default_screen.addr
-    
-        while current_ptr:
-            current = ScreenStruct(ctx.mem, current_ptr)
-            if current_ptr == target_ptr:
-                # Unlink from list
-                if prev != None:
-                    prev.NextScreen.set(current.NextScreen.get())
-    
-                self._free_screen(ctx, current)
-                log_intui.info(f"CloseScreen: screen at 0x{current_ptr:X} removed and freed")
+        target = ctx.cpu.r_reg(REG_A0)
+        previous = self.default_screen
+        ctx.cpu.w_reg(REG_D0, 0)
+        # The default public screen belongs to the library. A custom
+        # screen with live windows is still in use and cannot be closed.
+        if previous is None or target == previous.addr:
+            return
+        current = previous.NextScreen.val
+        while current:
+            screen = ScreenStruct(ctx.mem, current)
+            if current == target:
+                if screen.FirstWindow.val:
+                    return
+                previous.NextScreen.val = screen.NextScreen.val
+                self._free_screen(ctx, screen)
+                ctx.cpu.w_reg(REG_D0, 1)
                 return
-    
-            prev = current
-            current_ptr = current.NextScreen.get()
-    
-        log_intui.warning(f"CloseScreen: screen at 0x{target_ptr:X} not found in list")
+            previous, current = screen, screen.NextScreen.val
+
+    @staticmethod
+    def _signed_word(value):
+        return ((value + 0x8000) & 0xFFFF) - 0x8000
 
     def PrintIText(self, ctx):
         rastport_addr = ctx.cpu.r_reg(REG_A0)
+        text_addr = ctx.cpu.r_reg(REG_A1)
+        left = self._signed_word(ctx.cpu.r_reg(REG_D0))
+        top = self._signed_word(ctx.cpu.r_reg(REG_D1))
         rp = RastPortStruct(ctx.mem, rastport_addr)
-    
-        left = ctx.cpu.r_reg(REG_D0)
-        top = ctx.cpu.r_reg(REG_D1)
-    
-        intui_text_ptr = ctx.cpu.r_reg(REG_A1)
-    
-        while intui_text_ptr:
-            itext = IntuiTextStruct(ctx.mem, intui_text_ptr)
-    
-            # Sign-extend LeftEdge and TopEdge
-            x = itext.LeftEdge.get()
-            y = itext.TopEdge.get()
-            if x & 0x8000:
-                x -= 0x10000
-            if y & 0x8000:
-                y -= 0x10000
-    
-            # Move pen to (x, y)
-            rp.cp_x.set(x + left)
-            rp.cp_y.set(y + top)
-    
-            # Set pens
-            rp.FgPen.set(itext.FrontPen.get())
-            rp.BgPen.set(itext.BackPen.get())
-    
-            # Set draw mode
-            rp.DrawMode.set(itext.DrawMode.get())
-    
-            # Set up registers for Text()
-            ctx.cpu.w_reg(REG_A1, rastport_addr)
-            ctx.cpu.w_reg(REG_A0, itext.IText.get())
-    
-            # Call Text() directly
-            log_intui.debug("Printing IntuiText at (%d, %d): '%s'", x + left, y + top, ctx.mem.r_cstr(itext.IText.get()))
-            self.graphics_lib.Text(ctx)
-            
-            # Move to next IntuiTextStruct
-            intui_text_ptr = itext.NextText.get()
+        saved = ctx.mem.r_block(rastport_addr, rp.get_size())
+        try:
+            while text_addr:
+                itext = IntuiTextStruct(ctx.mem, text_addr)
+                next_addr = itext.NextText.val
+                font_addr = 0
+                try:
+                    if itext.ITextFont.val:
+                        font_addr = self.graphics_lib._open_font(ctx, itext.ITextFont.val)
+                        if font_addr:
+                            self.graphics_lib._set_font(ctx, rastport_addr, font_addr)
+                    rp.cp_x.val = self._signed_word(left + itext.LeftEdge.val)
+                    rp.cp_y.val = self._signed_word(top + itext.TopEdge.val + rp.TxBaseline.val)
+                    rp.FgPen.val = ((itext.FrontPen.val + 128) & 255) - 128
+                    rp.BgPen.val = ((itext.BackPen.val + 128) & 255) - 128
+                    rp.DrawMode.val = itext.DrawMode.val
+                    string_addr = itext.IText.get()
+                    if string_addr:
+                        count = len(ctx.mem.r_cstr(string_addr))
+                        ctx.cpu.w_reg(REG_A0, string_addr)
+                        ctx.cpu.w_reg(REG_A1, rastport_addr)
+                        ctx.cpu.w_reg(REG_D0, count)
+                        self.graphics_lib.Text(ctx)
+                finally:
+                    if font_addr:
+                        self.graphics_lib._close_font(ctx, font_addr)
+                    ctx.mem.w_block(rastport_addr, saved)
+                text_addr = next_addr
+        finally:
+            ctx.mem.w_block(rastport_addr, saved)
 
     def ItemAddress(self, ctx):    
         # Read input registers
@@ -682,6 +680,7 @@ class IntuitionLibrary(LibImpl):
         renderer = rp_graphics.renderer
         sdl2.SDL_SetRenderTarget(renderer, None)
         
+        self._flush_batch(rp_graphics)
         result = sdl2.SDL_RenderCopy(renderer, rp_graphics.texture, src_rect, dst_rect)
         if result != 0:
             log_intui.error("Failed to render cropped texture for rastport address %08x", rastport_addr)
@@ -1335,10 +1334,10 @@ class IntuitionLibrary(LibImpl):
     
         # --- Create a temporary rectangle for the damaged area ---
         rect = RectangleStruct.alloc(ctx.alloc)
-        rect.MinX.set(0x7fff & ctx.cpu.r_reg(REG_D2))
-        rect.MinY.set(0x7fff & ctx.cpu.r_reg(REG_D3))
-        rect.MaxX.set(0x7fff & ctx.cpu.r_reg(REG_D4))
-        rect.MaxY.set(0x7fff & ctx.cpu.r_reg(REG_D5))
+        rect.MinX.set(self._signed_word(ctx.cpu.r_reg(REG_D2)))
+        rect.MinY.set(self._signed_word(ctx.cpu.r_reg(REG_D3)))
+        rect.MaxX.set(self._signed_word(ctx.cpu.r_reg(REG_D4)))
+        rect.MaxY.set(self._signed_word(ctx.cpu.r_reg(REG_D5)))
     
         # --- Add to DamageList ---
         dl_addr = layer.DamageList.get()
@@ -1346,7 +1345,7 @@ class IntuitionLibrary(LibImpl):
             self.graphics_lib._or_rect_region(ctx, dl_addr, rect.addr)
     
         # Free temporary rectangle
-        ctx.alloc.free_mem(rect.addr, RectangleStruct.get_size())
+        rect.free(ctx.alloc)
     
         if win_addr not in self.refresh_pending:
             rastport_addr = win.RPort.get()
@@ -1389,7 +1388,7 @@ class IntuitionLibrary(LibImpl):
         
         rastport_addr = win.RPort.get()
         rp_graphics = self.graphics_lib.get_rp_graphics(rastport_addr)
-        rp_graphics.batch.clear()
+        self._flush_batch(rp_graphics)
 
     # Set clipping once
         clip_rect = self.graphics_lib._get_damage_clip_rect_for_rp(ctx, rastport_addr)
@@ -1413,6 +1412,8 @@ class IntuitionLibrary(LibImpl):
         renderer = rp_graphics.renderer
         texture = rp_graphics.texture
     
+        self._flush_batch(rp_graphics)
+
         # Set target once
         sdl2.SDL_SetRenderTarget(renderer, texture)
     
@@ -1420,15 +1421,14 @@ class IntuitionLibrary(LibImpl):
         if rp_graphics.clip_rect is not None:
             sdl2.SDL_RenderSetClipRect(renderer, rp_graphics.clip_rect)
     
-        # Execute batched primitives
-        self._execute_rectfills(renderer, batch.rectfills)
-        self._execute_draws(renderer, batch.draws)
-        self._execute_texts(renderer, batch.texts)
-    
-        # Reset
-        sdl2.SDL_RenderSetClipRect(renderer, None)
-        sdl2.SDL_SetRenderTarget(renderer, None)
-    
+        try:
+            self._execute_batch(renderer, batch)
+            batch.clear()
+        finally:
+            sdl2.SDL_RenderSetClipRect(renderer, None)
+            sdl2.SDL_SetRenderTarget(renderer, None)
+            rp_graphics.clip_rect = None
+
         # Invalidate once
         self.refresh(ctx, rastport_addr)
 
@@ -1463,6 +1463,29 @@ class IntuitionLibrary(LibImpl):
         cpu.w_reg(REG_D0, rc)
 
 
+    def _execute_batch(self, renderer, batch):
+        for command in batch.commands:
+            if isinstance(command, BFText):
+                self._execute_texts(renderer, [command])
+            elif isinstance(command, BFDraw):
+                self._execute_draws(renderer, [command])
+            else:
+                self._execute_rectfills(renderer, [command])
+
+    def _flush_batch(self, graphics):
+        if not graphics.batch.commands:
+            return
+        import sdl2
+        renderer = graphics.renderer
+        sdl2.SDL_SetRenderTarget(renderer, graphics.texture)
+        try:
+            sdl2.SDL_RenderSetClipRect(renderer, graphics.clip_rect)
+            self._execute_batch(renderer, graphics.batch)
+            graphics.batch.clear()
+        finally:
+            sdl2.SDL_RenderSetClipRect(renderer, None)
+            sdl2.SDL_SetRenderTarget(renderer, None)
+
     def _execute_rectfills(self, renderer, rectfills):
         import sdl2
 
@@ -1490,17 +1513,31 @@ class IntuitionLibrary(LibImpl):
             sdl2.SDL_RenderDrawLine(renderer, d.x1, d.y1, d.x2, d.y2)
 
     def _execute_texts(self, renderer, texts):
-        import sdl2, sdl2.sdlttf as sdlttf
-        for t in texts:
-            # TODO: glyph cache here
-            surface = sdlttf.TTF_RenderUTF8_Solid(t.font, t.string.encode(), t.fg)
-            texture = sdl2.SDL_CreateTextureFromSurface(renderer, surface)
-    
-            rect = sdl2.SDL_Rect(t.x, t.y, surface.contents.w, surface.contents.h)
-            sdl2.SDL_RenderCopy(renderer, texture, None, rect)
-    
-            sdl2.SDL_DestroyTexture(texture)
-            sdl2.SDL_FreeSurface(surface)
+        import sdl2
+        from sdl2 import sdlttf
+        for text in texts:
+            mode = text.draw_mode & 3
+            foreground, background = text.fg, text.bg
+            if text.draw_mode & 4:  # INVERSVID swaps the two pens.
+                foreground, background = background, foreground
+            if mode == 1:  # JAM2 fills the text background as well.
+                surface = sdlttf.TTF_RenderUTF8_Shaded(
+                    text.font, text.string.encode("utf-8"), foreground, background
+                )
+            else:
+                surface = sdlttf.TTF_RenderUTF8_Solid(
+                    text.font, text.string.encode("utf-8"), foreground
+                )
+            if not surface:
+                continue
+            with ExitStack() as cleanup:
+                cleanup.callback(sdl2.SDL_FreeSurface, surface)
+                texture = sdl2.SDL_CreateTextureFromSurface(renderer, surface)
+                if not texture:
+                    continue
+                cleanup.callback(sdl2.SDL_DestroyTexture, texture)
+                rect = sdl2.SDL_Rect(text.x, text.y, surface.contents.w, surface.contents.h)
+                sdl2.SDL_RenderCopy(renderer, texture, None, rect)
 
 @ctypes.CFUNCTYPE(ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p)
 def intuiticks_timer_callback(interval, param):

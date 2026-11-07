@@ -328,3 +328,27 @@ def intuition_screen_font_native_test(native_ctx, custom):
     finally:
         ctx.alloc.free_memory(code)
     ctx.close_screen(screen)
+
+
+def intuition_close_screen_rejects_live_windows_test(ctx):
+    from amitools.vamos.lib.intuition import WindowStruct
+    default = ctx.screen()
+    custom = ctx.screen()
+    default.NextScreen.val = custom.addr
+    ctx.intuition.default_screen = default
+    win = WindowStruct.alloc(ctx.alloc)
+    try:
+        for addr in (default.addr, custom.addr, 0):
+            custom.FirstWindow.val = win.addr
+            ctx.cpu.w_reg(REG_A0, addr)
+            ctx.intuition.CloseScreen(ctx)
+            assert ctx.cpu.r_reg(REG_D0) == 0
+            assert default.NextScreen.val == custom.addr
+        custom.FirstWindow.val = 0
+        ctx.cpu.w_reg(REG_A0, custom.addr)
+        ctx.intuition.CloseScreen(ctx)
+        assert ctx.cpu.r_reg(REG_D0) == 1
+        ctx.screens.pop(custom.addr)
+        assert default.NextScreen.val == 0
+    finally:
+        win.free()
