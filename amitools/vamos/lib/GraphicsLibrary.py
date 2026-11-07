@@ -589,8 +589,7 @@ class GraphicsLibrary(LibImpl):
             ctx.cpu.w_reg(REG_D0, 0)
             return
     
-        self._or_rect_region(ctx, region_addr, rect_addr)
-        ctx.cpu.w_reg(REG_D0, 1)
+        ctx.cpu.w_reg(REG_D0, self._or_rect_region(ctx, region_addr, rect_addr))
 
     def OrRegionRegion(self, ctx):
         cpu = ctx.cpu
@@ -657,168 +656,111 @@ class GraphicsLibrary(LibImpl):
         reg.bounds.MaxX.set(-1)
         reg.bounds.MaxY.set(-1)
 
+    @staticmethod
+    def _bounds(rect):
+        return rect.MinX.val, rect.MinY.val, rect.MaxX.val, rect.MaxY.val
+
+    @staticmethod
+    def _write_bounds(rect, bounds):
+        for name, value in zip(("MinX", "MinY", "MaxX", "MaxY"), bounds):
+            rect.get(name).val = value
+
+    def _region_rects(self, ctx, region_addr):
+        region = RegionStruct(ctx.mem, region_addr)
+        x, y = region.bounds.MinX.val, region.bounds.MinY.val
+        result = []
+        addr = region.RegionRectangle.val
+        while addr:
+            node = RegionRectangleStruct(ctx.mem, addr)
+            left, top, right, bottom = self._bounds(node.bounds)
+            result.append((x + left, y + top, x + right, y + bottom))
+            addr = node.Next.val
+        return result
+
+    @staticmethod
+    def _region_union(rects):
+        """Create disjoint, sorted horizontal bands without pixel expansion."""
+        rects = [r for r in rects if r[0] <= r[2] and r[1] <= r[3]]
+        levels = sorted({v for r in rects for v in (r[1], r[3] + 1)})
+        result = []
+        previous = None
+        for top, end in zip(levels, levels[1:]):
+            intervals = sorted((a, c) for a, b, c, d in rects if b <= top <= d)
+            merged = []
+            for left, right in intervals:
+                if merged and left <= merged[-1][1] + 1:
+                    merged[-1] = (merged[-1][0], max(right, merged[-1][1]))
+                else:
+                    merged.append((left, right))
+            if merged and previous == merged:
+                for index in range(len(result) - len(merged), len(result)):
+                    a, b, c, _ = result[index]
+                    result[index] = (a, b, c, end - 1)
+            else:
+                result.extend((a, top, c, end - 1) for a, c in merged)
+            previous = merged
+        return result
+
+    def _replace_region(self, ctx, region_addr, rects):
+        rects = self._region_union(rects)
+        if not rects:
+            self._clear_region(ctx, region_addr)
+            return 1
+        bounds = (min(r[0] for r in rects), min(r[1] for r in rects),
+                  max(r[2] for r in rects), max(r[3] for r in rects))
+        with ExitStack() as rollback:
+            nodes = []
+            for left, top, right, bottom in rects:
+                memory = ctx.alloc.alloc_memory(
+                    RegionRectangleStruct.get_size(), label="Region rectangle",
+                    except_on_failure=False,
+                )
+                if memory is None:
+                    return 0
+                rollback.callback(ctx.alloc.free_memory, memory)
+                ctx.mem.clear_block(memory.addr, memory.size, 0)
+                node = RegionRectangleStruct(ctx.mem, memory.addr)
+                self._write_bounds(node.bounds, (
+                    left - bounds[0], top - bounds[1],
+                    right - bounds[0], bottom - bounds[1],
+                ))
+                if nodes:
+                    nodes[-1].Next.val = node.addr
+                    node.Prev.val = nodes[-1].addr
+                nodes.append(node)
+            # Keep the old region untouched until every replacement exists.
+            self._clear_region(ctx, region_addr)
+            region = RegionStruct(ctx.mem, region_addr)
+            self._write_bounds(region.bounds, bounds)
+            region.RegionRectangle.val = nodes[0].addr
+            rollback.pop_all()
+        return 1
+
     def _or_rect_region(self, ctx, region_addr, rect_addr):
-        """
-        Add a rectangle to a Region (union).
-        No merging — each rect becomes a RegionRectangle node.
-        """
-        reg = RegionStruct(ctx.mem, region_addr)
-        rect = RectangleStruct(ctx.mem, rect_addr)
-    
-        # Allocate new RegionRectangle
-        rr = self.alloc_region_rectangle(ctx, rect)
-        rr_addr = rr.addr
-    
-        # Insert at head of list
-        old_head = reg.RegionRectangle.get()
-        if old_head != 0:
-            old = RegionRectangleStruct(ctx.mem, old_head)
-            old.Prev.set(rr_addr)
-            rr.Next.set(old_head)
-    
-        reg.RegionRectangle.set(rr_addr)
-    
-        # Expand region bounds
-        b = reg.bounds
-    
-        if b.MaxX.get() < b.MinX.get():  
-            # Region was empty
-            b.MinX.set(rect.MinX.get())
-            b.MinY.set(rect.MinY.get())
-            b.MaxX.set(rect.MaxX.get())
-            b.MaxY.set(rect.MaxY.get())
-        else:
-            b.MinX.set(min(b.MinX.get(), rect.MinX.get()))
-            b.MinY.set(min(b.MinY.get(), rect.MinY.get()))
-            b.MaxX.set(max(b.MaxX.get(), rect.MaxX.get()))
-            b.MaxY.set(max(b.MaxY.get(), rect.MaxY.get()))
+        rect = self._bounds(RectangleStruct(ctx.mem, rect_addr))
+        return self._replace_region(ctx, region_addr,
+                                    self._region_rects(ctx, region_addr) + [rect])
 
     def _or_region_region(self, ctx, src_region_addr, dest_region_addr):
-        """
-        graphics.library OrRegionRegion(srcRegion, destRegion)
-
-        Returns:
-            d0 = 0 on failure, non-zero on success.
-        """
-        mem = ctx.mem
-
-        if src_region_addr == 0 or dest_region_addr == 0:
+        if not src_region_addr or not dest_region_addr:
             return 0
-
-        src = RegionStruct(mem, src_region_addr)
-
-        # Pseudocode: iterate all rectangles in src and OR them into dest.
-        node_addr = src.RegionRectangle.get()
-        while node_addr != 0:
-            rect = RegionRectangleStruct(mem, node_addr)
-
-            self._or_rect_region(ctx, dest_region_addr, rect.bounds.addr)
-
-            node_addr = rect.Next.get()
-
-        return 1
+        if src_region_addr == dest_region_addr:
+            return 1
+        return self._replace_region(
+            ctx, dest_region_addr, self._region_rects(ctx, dest_region_addr)
+            + self._region_rects(ctx, src_region_addr),
+        )
 
     def _and_region_region(self, ctx, src_region_addr, dest_region_addr):
-        """
-        graphics.library AndRegionRegion(srcRegion, destRegion)
-    
-        Computes intersection of srcRegion and destRegion,
-        storing the result in destRegion.
-    
-        Returns:
-            0 on failure, non-zero on success.
-        """
-        mem = ctx.mem
-    
-        if src_region_addr == 0 or dest_region_addr == 0:
+        if not src_region_addr or not dest_region_addr:
             return 0
-    
-        src  = RegionStruct(mem, src_region_addr)
-        dest = RegionStruct(mem, dest_region_addr)
-    
-        # If either region is empty → result is empty
-        if src.bounds.MaxX.get() < src.bounds.MinX.get() or \
-           dest.bounds.MaxX.get() < dest.bounds.MinX.get():
-            self._clear_region(ctx, dest_region_addr)
+        if src_region_addr == dest_region_addr:
             return 1
-    
-        # Temporary region to accumulate intersections
-        tmp_region_addr = self._new_region(ctx)
-        tmp = RegionStruct(mem, tmp_region_addr)
-    
-        # Iterate all rectangles in dest
-        dnode_addr = dest.RegionRectangle.get()
-        while dnode_addr != 0:
-            drr = RegionRectangleStruct(mem, dnode_addr)
-    
-            d_minx = drr.bounds.MinX.get()
-            d_miny = drr.bounds.MinY.get()
-            d_maxx = drr.bounds.MaxX.get()
-            d_maxy = drr.bounds.MaxY.get()
-    
-            # Iterate all rectangles in src
-            snode_addr = src.RegionRectangle.get()
-            while snode_addr != 0:
-                srr = RegionRectangleStruct(mem, snode_addr)
-    
-                s_minx = srr.bounds.MinX.get()
-                s_miny = srr.bounds.MinY.get()
-                s_maxx = srr.bounds.MaxX.get()
-                s_maxy = srr.bounds.MaxY.get()
-    
-                # Compute intersection
-                ix1 = max(d_minx, s_minx)
-                iy1 = max(d_miny, s_miny)
-                ix2 = min(d_maxx, s_maxx)
-                iy2 = min(d_maxy, s_maxy)
-    
-                if ix2 >= ix1 and iy2 >= iy1:
-                    # Valid intersection → add to tmp region
-                    rect = RectangleStruct.alloc(ctx.alloc)
-                    rect.MinX.set(ix1)
-                    rect.MinY.set(iy1)
-                    rect.MaxX.set(ix2)
-                    rect.MaxY.set(iy2)
-    
-                    self._or_rect_region(ctx, tmp_region_addr, rect.addr)
-    
-                    # Free temporary rect struct
-                    ctx.alloc.free_mem(rect.addr, RectangleStruct.get_size())
-    
-                snode_addr = srr.Next.get()
-    
-            dnode_addr = drr.Next.get()
-    
-        # Replace destRegion with tmpRegion
-        self._clear_region(ctx, dest_region_addr)
-    
-        # Copy tmp → dest
-        tnode_addr = tmp.RegionRectangle.get()
-        while tnode_addr != 0:
-            trr = RegionRectangleStruct(mem, tnode_addr)
-            self._or_rect_region(ctx, dest_region_addr, trr.bounds.addr)
-            tnode_addr = trr.Next.get()
-    
-        # Free tmp region
-        self._dispose_region(ctx, tmp_region_addr)
-    
-        return 1
-
-
-    def alloc_region_rectangle(self, ctx, rect):
-        """Allocate a RegionRectangleStruct and copy bounds."""
-        rr = RegionRectangleStruct.alloc(ctx.alloc)
-        #rr.Next.set(0)
-        #rr.Prev.set(0)
-    
-        b = rr.bounds
-        b.MinX.set(rect.MinX.get())
-        b.MinY.set(rect.MinY.get())
-        b.MaxX.set(rect.MaxX.get())
-        b.MaxY.set(rect.MaxY.get())
-    
-        return rr
-        
+        intersections = []
+        for a, b, c, d in self._region_rects(ctx, src_region_addr):
+            for e, f, g, h in self._region_rects(ctx, dest_region_addr):
+                intersections.append((max(a, e), max(b, f), min(c, g), min(d, h)))
+        return self._replace_region(ctx, dest_region_addr, intersections)
 
     def _get_damage_clip_rect_for_rp(self, ctx, rastport_addr):
         """
