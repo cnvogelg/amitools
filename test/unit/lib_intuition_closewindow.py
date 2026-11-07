@@ -76,7 +76,8 @@ class WindowContext:
             SDL_RenderClear=Mock(),
         )
         monkeypatch.setitem(sys.modules, "sdl2", self.sdl)
-        signal = SimpleNamespace(get_my_sched_task=lambda: None, signal=Mock())
+        signal = SimpleNamespace(get_my_sched_task=lambda: None, signal=Mock(),
+                                 alloc_signal=lambda bit: 16, free_signal=Mock())
         task = SimpleNamespace(find_task=lambda name: None)
         self.messages = MessageFunc(self, None, signal, task, PortManager(self.alloc))
         self.exec_lib = SimpleNamespace(
@@ -496,3 +497,57 @@ def intuition_open_window_taglist_test(ctx, custom, control):
     finally:
         ctx.alloc.free_memory(tags)
         ctx.close_all()
+
+
+def intuition_idcmp_reply_frees_allocation_test(ctx):
+    from amitools.vamos.libtypes import MsgPort
+    target = ctx.open()
+    port = MsgPort(ctx.mem, WindowStruct(ctx.mem, target).UserPort.val)
+    before = ctx.alloc.get_free_bytes()
+    ctx.intuition.queue_idcmp(ctx, target, IDCMP_NEWSIZE, code=123)
+    msg = ctx.messages.get_msg(port)
+    assert msg is not None
+    assert msg.length.val > 20
+    assert msg.reply_port.aptr != 0xffedcb
+    assert ctx.alloc.get_memory(msg.addr)
+    ctx.messages.reply_msg(msg)
+    assert ctx.alloc.get_memory(msg.addr) is None
+    ctx.close(target)
+    ctx.close_all()
+
+
+@pytest.mark.parametrize('delivered', [False, True])
+def intuition_idcmp_close_message_lifetime_test(ctx, delivered):
+    from amitools.vamos.libtypes import MsgPort
+    target = ctx.open()
+    port = MsgPort(ctx.mem, WindowStruct(ctx.mem, target).UserPort.val)
+    ctx.intuition.queue_idcmp(ctx, target, IDCMP_NEWSIZE)
+    msg = ctx.messages.get_msg(port) if delivered else None
+    ctx.close(target)
+    if delivered:
+        # A later window may reuse the old window address. Returning this
+        # message must release its original owner without touching that window.
+        other = ctx.open()
+        assert ctx.alloc.get_memory(msg.addr)
+        ctx.messages.reply_msg(msg)
+        assert ctx.alloc.get_memory(msg.addr) is None
+        ctx.close(other)
+    assert not ctx.messages.port_mgr.ports
+    ctx.close_all()
+
+
+@pytest.mark.parametrize('stage', ['exec_port', 'Intuition reply port', 'Intuition message'])
+def intuition_idcmp_allocation_failure_test(ctx, monkeypatch, stage):
+    allocate = ctx.alloc.alloc_memory
+    if stage == 'exec_port':
+        monkeypatch.setattr(ctx.alloc, 'alloc_memory', lambda size, **kwargs:
+            None if kwargs.get('label') == stage else allocate(size, **kwargs))
+        assert not ctx.open()
+    else:
+        target = ctx.open()
+        monkeypatch.setattr(ctx.alloc, 'alloc_memory', lambda size, **kwargs:
+            None if kwargs.get('label') == stage else allocate(size, **kwargs))
+        ctx.intuition.queue_idcmp(ctx, target, IDCMP_NEWSIZE)
+        ctx.close(target)
+    assert not ctx.messages.port_mgr.ports
+    ctx.close_all()

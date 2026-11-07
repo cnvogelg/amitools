@@ -26,7 +26,13 @@ class MessageFunc(FuncBase):
         my_task = self.task_func.find_task(None)
 
         # alloc port
-        msg_port = MsgPort.alloc(self.ctx.alloc, tag="exec_port")
+        memory = self.ctx.alloc.alloc_memory(
+            MsgPort.get_size(), label="exec_port", except_on_failure=False
+        )
+        if memory is None:
+            self.signal_func.free_signal(signal)
+            return None
+        msg_port = MsgPort(self.ctx.mem, memory.addr)
         msg_port.new(sig_bit=signal, sig_task=my_task)
         log_exec.info(
             "CreateMsgPort: -> signal=%d my_task=%s port=%s", signal, my_task, msg_port
@@ -57,7 +63,8 @@ class MessageFunc(FuncBase):
             log_exec.info("PutMsg(%s, %s) -> PortMgr", port, msg)
             msg.node.type.val = msg_type
             self.port_mgr.put_msg(port.addr, msg.addr)
-            self._signal_port(port)
+            if self.port_mgr.has_port(port.addr):
+                self._signal_port(port)
             return
 
         # set type

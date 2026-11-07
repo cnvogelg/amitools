@@ -1,6 +1,6 @@
 import ctypes
 from contextlib import ExitStack
-from amitools.vamos.libtypes import TagList
+from amitools.vamos.libtypes import TagList, MsgPort, Message
 from amitools.vamos.libcore.impl import LibImpl
 from amitools.vamos.lib.TimerDevice import TimerDevice
 
@@ -57,6 +57,9 @@ class IntuitionLibrary(LibImpl):
         self._default_title_memory = None
         self._sdl_flags = 0
         self._screen_fonts = {}
+        self._idcmp_owners = {}
+        self._reply_owners = {}
+        self._window_ports = {}
         
         self.rp_2_win_addr = {}
         self.refresh_pending = set()
@@ -148,6 +151,16 @@ class IntuitionLibrary(LibImpl):
         finally:
             self.graphics_lib = None
 
+    def finish_lib(self, ctx):
+        # No guest can return an outstanding message after library teardown.
+        for owner in tuple(self._reply_owners.values()):
+            owner["closed"] = True
+            for memory, _ in owner["messages"].values():
+                ctx.alloc.free_memory(memory)
+            owner["messages"].clear()
+            self._release_idcmp_port(ctx, owner)
+        self._idcmp_owners.clear()
+
     def _close_window_addr(self, ctx, addr):
         ctx.cpu.w_reg(REG_A0, addr)
         self.CloseWindow(ctx)
@@ -203,7 +216,7 @@ class IntuitionLibrary(LibImpl):
         title_addr = win.Title.get()
         title_memory = ctx.alloc.get_memory(title_addr) if title_addr else None
         rastport_addr = win.RPort.get()
-        user_port_addr = win.UserPort.get()
+        user_port_addr = self._window_ports.pop(window_ptr, win.UserPort.get())
 
         # A removed timer can already have queued an event. Invalidate its
         # window ID before stopping it or releasing any guest resources.
@@ -234,6 +247,8 @@ class IntuitionLibrary(LibImpl):
         
             prev_ptr = current_ptr
             current_ptr = next_ptr
+
+        self._close_idcmp(ctx, window_ptr)
 
         # Release the port and renderer before the structures and host
         # window they belong to. Attempt all releases if one raises.
@@ -623,6 +638,7 @@ class IntuitionLibrary(LibImpl):
             # Only complete windows are visible to events and screen lists.
             win.NextWindow.val = screen.FirstWindow.val
             screen.FirstWindow.val = win.addr
+            self._window_ports[win.addr] = user_port.addr
             self.rp_2_win_addr[rp_addr] = win.addr
             self.sdl_window_id_2_window_addr_map[window_id] = win.addr
             self.sdl_window_id_2_sdl_window[window_id] = sdl_win
@@ -853,20 +869,84 @@ class IntuitionLibrary(LibImpl):
         if idcmp_flag != IDCMP_MOUSEMOVE:
             log_intui.debug("Queue IDCMP: %d at (%d, %d) code=%d win=%08x -> port=%08x", idcmp_flag, mouse_x, mouse_y, code, win_addr, user_port_addr)
         
-        # Allocate and fill IntuiMessage
-        msg_addr = ctx.alloc.alloc_struct(IntuiMessageStruct)
-        msg = IntuiMessageStruct(ctx.mem, msg_addr.addr)
-        msg.ExecMessage.mn_ReplyPort.set(0XFFEDCB)
-        msg.Class.set(idcmp_flag)        
-        msg.MouseX.set(mouse_x)
-        msg.MouseY.set(mouse_y)
-        msg.Code.set(code & 0xffff)  # Ensure code is a UWORD
-        msg.IDCMPWindow.set(win_addr)
+        if not user_port_addr:
+            return
+        owner = self._idcmp_owners.get(win_addr)
+        if owner is None:
+            memory = ctx.alloc.alloc_memory(
+                MsgPortStruct.get_size(), label="Intuition reply port",
+                except_on_failure=False,
+            )
+            if memory is None:
+                return
+            port = MsgPort(ctx.mem, memory.addr)
+            port.new(sig_bit=0)
+            port.flags.val = 2  # PA_IGNORE; replies are handled synchronously.
+            owner = {"port": memory, "messages": {}, "closed": False}
+            manager = ctx.exec_lib.msg_func.port_mgr
+            manager.register_port(memory.addr)
+            manager.ports[memory.addr].handler = (
+                lambda manager, addr: self._reply_idcmp(ctx, owner, addr)
+            )
+            self._idcmp_owners[win_addr] = owner
+            self._reply_owners[memory.addr] = owner
+        memory = ctx.alloc.alloc_memory(
+            IntuiMessageStruct.get_size(), label="Intuition message",
+            except_on_failure=False,
+        )
+        if memory is None:
+            return
+        ctx.mem.clear_block(memory.addr, memory.size, 0)
+        msg = IntuiMessageStruct(ctx.mem, memory.addr)
+        msg.ExecMessage.mn_ReplyPort.set(owner["port"].addr)
+        msg.ExecMessage.mn_Length.val = IntuiMessageStruct.get_size()
+        msg.Class.val = idcmp_flag
+        msg.MouseX.val, msg.MouseY.val = mouse_x, mouse_y
+        msg.Code.val = code & 0xFFFF
+        msg.IDCMPWindow.val = win_addr
+        owner["messages"][memory.addr] = (memory, user_port_addr)
+        try:
+            ctx.exec_lib.msg_func.put_msg(MsgPort(ctx.mem, user_port_addr),
+                                          Message(ctx.mem, memory.addr))
+        except Exception:
+            owner["messages"].pop(memory.addr)
+            ctx.alloc.free_memory(memory)
+            raise
 
-        # Post to message list
-        port = MsgPortStruct(ctx.mem, user_port_addr)
-        emsg = msg.ExecMessage
-        ctx.exec_lib.msg_func.put_msg(port, emsg)
+    def _release_idcmp_port(self, ctx, owner):
+        if owner["closed"] and not owner["messages"]:
+            manager = ctx.exec_lib.msg_func.port_mgr
+            self._reply_owners.pop(owner["port"].addr, None)
+            manager.unregister_port(owner["port"].addr)
+            ctx.alloc.free_memory(owner["port"])
+
+    def _reply_idcmp(self, ctx, owner, addr):
+        value = owner["messages"].pop(addr, None)
+        if value is not None:
+            ctx.alloc.free_memory(value[0])
+        self._release_idcmp_port(ctx, owner)
+
+    def _close_idcmp(self, ctx, win_addr):
+        owner = self._idcmp_owners.pop(win_addr, None)
+        if owner is None:
+            return
+        owner["closed"] = True
+        manager = ctx.exec_lib.msg_func.port_mgr
+        for addr, (memory, port_addr) in tuple(owner["messages"].items()):
+            queued = False
+            port = manager.ports.get(port_addr)
+            if port is not None and port.queue is not None:
+                if addr in port.queue:
+                    port.queue.remove(addr)
+                    queued = True
+            else:
+                msg = Message(ctx.mem, addr)
+                queued = msg.node.remove()
+            if queued:
+                owner["messages"].pop(addr)
+                ctx.alloc.free_memory(memory)
+        # Delivered messages remain valid until their owner calls ReplyMsg.
+        self._release_idcmp_port(ctx, owner)
 
     def draw_menu(self, ctx, renderer, top_menu_addr, mouse_x=0, mouse_y=0):       
         self.mouse_x = mouse_x
