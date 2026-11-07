@@ -3,7 +3,7 @@ from contextlib import ExitStack
 from amitools.vamos.libcore.impl import LibImpl
 from amitools.vamos.lib.TimerDevice import TimerDevice
 
-from amitools.vamos.lib.graphics import RastPortStruct, LayerStruct, RectangleStruct
+from amitools.vamos.lib.graphics import RastPortStruct, LayerStruct, RectangleStruct, TextAttrStruct
 from amitools.vamos.lib.intuition import WA_Left, WA_Top, WA_Width, WA_Height, WA_Title, WA_MinWidth, WA_MinHeight, WA_MaxWidth, WA_MaxHeight, WindowStruct, IDCMP_MOUSEMOVE, \
     IDCMP_MOUSEBUTTONS, IDCMP_RAWKEY, IDCMP_CLOSEWINDOW, IDCMP_NEWSIZE, IDCMP_REFRESHWINDOW, IntuiMessageStruct, MenuStruct, MenuItemStruct, IntuiTextStruct, IDCMP_MENUPICK, \
     NewWindowStruct, WA_IDCMP, ScreenStruct, NewScreenStruct, WA_CustomScreen
@@ -55,6 +55,7 @@ class IntuitionLibrary(LibImpl):
         self._lib_opened = False   # guard flag
         self._default_title_memory = None
         self._sdl_flags = 0
+        self._screen_fonts = {}
         
         self.rp_2_win_addr = {}
         self.refresh_pending = set()
@@ -103,7 +104,8 @@ class IntuitionLibrary(LibImpl):
             rollback.callback(ctx.alloc.free_memory, title)
             ctx.mem.w_cstr(title.addr, "Workbench")
             screen = self.create_screen(
-                ctx, 800, 600, 3, graphics.text_attr.addr, title.addr, 1, 0
+                ctx, 800, 600, 3, graphics.text_attr.addr, title.addr, 1, 0,
+                graphics=graphics,
             )
             if screen is None:
                 return
@@ -1093,13 +1095,17 @@ class IntuitionLibrary(LibImpl):
         if len(self.submenu_rects) == 0 or self.submenu_rects[-1] != r:
             self.submenu_rects.append(r)
 
-    def create_screen(self, ctx, width, height, depth, text_attr_addr, title_ptr, detail_pen, block_pen):
+    def create_screen(self, ctx, width, height, depth, text_attr_addr, title_ptr, detail_pen, block_pen, graphics=None):
+        if graphics is None:
+            graphics = self.graphics_lib
         if width <= 0 or not 1 <= depth <= 8:
             return None
         if height <= 0:
             height = 200
-        if not text_attr_addr and self.graphics_lib is None:
+        if graphics is None:
             return None
+        if not text_attr_addr:
+            text_attr_addr = graphics.text_attr.addr
         with ExitStack() as rollback:
             memory = self.alloc.alloc_memory(
                 ScreenStruct.get_size(), label="Intuition screen",
@@ -1113,7 +1119,6 @@ class IntuitionLibrary(LibImpl):
             screen.Width.set(width)
             screen.Height.set(height)
 
-            screen.Font.set(text_attr_addr if text_attr_addr else self.graphics_lib.text_attr.addr)
             screen.Title.set(title_ptr)
             screen.DefaultTitle.set(title_ptr)
 
@@ -1150,6 +1155,37 @@ class IntuitionLibrary(LibImpl):
             for i in range(depth, 8):
                 bm.Planes[i].set(0)
 
+            # The screen exposes TextAttr, while its RastPort needs an
+            # opened TextFont. Keep both alive independently of caller
+            # descriptors and mutable public RastPort fields.
+            attr_memory = self.alloc.alloc_memory(
+                TextAttrStruct.get_size(), label="Screen font attributes",
+                except_on_failure=False,
+            )
+            if attr_memory is None:
+                return None
+            rollback.callback(self.alloc.free_memory, attr_memory)
+            ctx.mem.w_block(
+                attr_memory.addr, ctx.mem.r_block(text_attr_addr, TextAttrStruct.get_size())
+            )
+            attr = TextAttrStruct(ctx.mem, attr_memory.addr)
+            name_memory = None
+            if attr.ta_Name.val:
+                name = ctx.mem.r_cstr(attr.ta_Name.val)
+                name_memory = self.alloc.alloc_memory(
+                    len(name) + 1, label="Screen font name", except_on_failure=False
+                )
+                if name_memory is None:
+                    return None
+                rollback.callback(self.alloc.free_memory, name_memory)
+                ctx.mem.w_cstr(name_memory.addr, name)
+                attr.ta_Name.val = name_memory.addr
+            font_addr = graphics._open_font(ctx, attr_memory.addr)
+            if not font_addr:
+                return None
+            rollback.callback(graphics._close_font, ctx, font_addr)
+            screen.Font.val = attr_memory.addr
+
             # RastPort
             rp = screen.RastPort
             rp.Layer.set(0)
@@ -1161,8 +1197,12 @@ class IntuitionLibrary(LibImpl):
             rp.cp_y.set(0)
             rp.Mask.set(0xFF)
             rp.LinePtrn.set(0xFFFF)
-            rp.Font.set(screen.Font.get())
+            graphics._set_font(ctx, rp.get_addr(), font_addr)
+            rp.TxSpacing.val = 0
 
+            self._screen_fonts[screen.get_addr()] = (
+                graphics, font_addr, attr_memory, name_memory
+            )
             rollback.pop_all()
             return screen
 
@@ -1170,8 +1210,15 @@ class IntuitionLibrary(LibImpl):
         bm = screen.BitMap
         plane_size = bm.BytesPerRow.val * bm.Rows.val
         planes = [bm.Planes[i].val for i in range(bm.Depth.val)]
+        owned_font = self._screen_fonts.pop(screen.get_addr(), None)
         with ExitStack() as cleanup:
             cleanup.callback(screen.free, ctx.alloc)
+            if owned_font is not None:
+                graphics, font_addr, attr_memory, name_memory = owned_font
+                cleanup.callback(ctx.alloc.free_memory, attr_memory)
+                if name_memory is not None:
+                    cleanup.callback(ctx.alloc.free_memory, name_memory)
+                cleanup.callback(graphics._close_font, ctx, font_addr)
             for plane in planes:
                 if plane:
                     cleanup.callback(ctx.alloc.free_mem, plane, plane_size)
