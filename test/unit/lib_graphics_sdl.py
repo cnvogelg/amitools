@@ -104,14 +104,36 @@ def graphics_native_sdl_window_and_render_test(monkeypatch):
             sdl2.SDL_SetRenderTarget(backing.renderer,None)
         assert pixels[9*64+2] == pixels[9*64+8] == 0x000000ff
         assert pixels[9*64+5] == 0xffffffff
+        ctx.cpu.w_reg(REG_A1,rp.addr)
+        ctx.cpu.w_reg(REG_D0,2)
+        graphics.SetAPen(ctx)
+        for reg,value in zip((REG_D0,REG_D1,REG_D2,REG_D3),(20,20,21,21)):
+            ctx.cpu.w_reg(reg,value)
+        graphics.RectFill(ctx)
+        rp.Mask.val = 3
+        ctx.cpu.w_reg(REG_D0,2)
+        graphics.SetDrMd(ctx)
+        for reg,value in zip((REG_D0,REG_D1,REG_D2,REG_D3),(20,20,21,21)):
+            ctx.cpu.w_reg(reg,value)
+        graphics.RectFill(ctx)
+        intuition._flush_batch(backing)
+        assert backing.surface.pixels[20*64+20] == 1  # white pen 2 XOR mask 3
+        state = graphics._raster_state(ctx,rp)
+        offset,bit = 20*state.stride+20//8, 0x80 >> (20&7)
+        assert [bool(ctx.mem.r8(addr+offset)&bit) for addr in state.planes] == [True,False,False]
+        ctx.cpu.w_reg(REG_D0,1)
+        graphics.SetDrMd(ctx)
+        rp.Mask.val = 7
         from amitools.vamos.machine import REG_D4, REG_D5
         for dx, dy in [(2,0),(-2,0),(0,2),(0,-2),(100,0),(0,0)]:
-            sdl2.SDL_SetRenderTarget(backing.renderer, backing.texture)
-            sdl2.SDL_SetRenderDrawColor(backing.renderer,168,168,168,255)
-            sdl2.SDL_RenderClear(backing.renderer)
-            sdl2.SDL_SetRenderDrawColor(backing.renderer,255,255,255,255)
-            sdl2.SDL_RenderFillRect(backing.renderer,sdl2.SDL_Rect(4,4,5,5))
-            sdl2.SDL_SetRenderTarget(backing.renderer,None)
+            ctx.cpu.w_reg(REG_A1,rp.addr)
+            for pen,rect in [(0,(0,0,63,31)),(2,(4,4,8,8))]:
+                ctx.cpu.w_reg(REG_D0,pen)
+                graphics.SetAPen(ctx)
+                for reg,value in zip((REG_D0,REG_D1,REG_D2,REG_D3),rect):
+                    ctx.cpu.w_reg(reg,value)
+                graphics.RectFill(ctx)
+            intuition._flush_batch(backing)
             for reg, value in ((REG_A1,window),(REG_D0,dx & 0xffff),
                 (REG_D1,dy & 0xffff),(REG_D2,0),(REG_D3,0),(REG_D4,63),(REG_D5,31)):
                 ctx.cpu.w_reg(reg,value)

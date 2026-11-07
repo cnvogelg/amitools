@@ -88,3 +88,29 @@ def graphics_batch_restores_target_after_exception_test(renderer):
         r.lib._flush_batch(r.graphics)
     assert r.sdl.SDL_SetRenderTarget.call_args.args == (3, None)
     assert r.sdl.SDL_RenderSetClipRect.call_args.args == (3, None)
+
+
+def graphics_failed_upload_does_not_replay_complement_test(renderer):
+    from amitools.vamos.lib.graphics_surface import RasterSurface
+    r = renderer
+    r.lib.graphics_lib = SimpleNamespace(palette={i:SimpleNamespace(r=i,g=i,b=i) for i in range(256)})
+    r.graphics.width = r.graphics.height = 1
+    r.graphics.surface = RasterSurface(1,1)
+    r.graphics.surface.load = Mock()
+    r.text.state = object()
+    r.batch.add(r.text)
+    calls = []
+    def paint(graphics, command, clip):
+        calls.append(1)
+        graphics.surface.pixels[0] ^= 1
+        graphics.surface.dirty = True
+    r.lib._execute_indexed = paint
+    r.sdl.SDL_UpdateTexture = Mock(side_effect=[-1,0])
+    with pytest.raises(RuntimeError,match='texture update'):
+        r.lib._flush_batch(r.graphics)
+    assert not r.batch.commands
+    assert r.graphics.surface.dirty
+    r.lib._flush_batch(r.graphics)
+    assert calls == [1]
+    assert r.graphics.surface.pixels[0] == 1
+    assert not r.graphics.surface.dirty

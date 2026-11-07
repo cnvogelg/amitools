@@ -1342,30 +1342,36 @@ class IntuitionLibrary(LibImpl):
             return
         self._flush_batch(graphics)
         renderer = graphics.renderer
-        temporary = sdl2.SDL_CreateTexture(
-            renderer, sdl2.SDL_PIXELFORMAT_RGBA8888, sdl2.SDL_TEXTUREACCESS_TARGET,
-            graphics.width, graphics.height,
-        )
-        if not temporary:
-            return
-        try:
-            sdl2.SDL_SetRenderTarget(renderer, temporary)
-            sdl2.SDL_RenderCopy(renderer, graphics.texture, None, None)
-            sdl2.SDL_SetRenderTarget(renderer, graphics.texture)
+        if hasattr(graphics, "surface"):
             rp = RastPortStruct(ctx.mem, win.RPort.val)
-            color = self.graphics_lib._pen_color(ctx, rp, rp.BgPen.val)
-            sdl2.SDL_SetRenderDrawBlendMode(renderer, sdl2.SDL_BLENDMODE_NONE)
-            sdl2.SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255)
-            sdl2.SDL_RenderFillRect(renderer,
-                sdl2.SDL_Rect(left, top, right-left+1, bottom-top+1))
-            width, height = right-left+1-abs(dx), bottom-top+1-abs(dy)
-            if width > 0 and height > 0:
-                source = sdl2.SDL_Rect(left+max(dx,0), top+max(dy,0), width, height)
-                target = sdl2.SDL_Rect(left+max(-dx,0), top+max(-dy,0), width, height)
-                sdl2.SDL_RenderCopy(renderer, temporary, source, target)
-        finally:
-            sdl2.SDL_SetRenderTarget(renderer, None)
-            sdl2.SDL_DestroyTexture(temporary)
+            state = self.graphics_lib._raster_state(ctx, rp)
+            graphics.surface.scroll(state, left, top, right, bottom, dx, dy)
+            self._upload_surface(graphics)
+        else:
+            temporary = sdl2.SDL_CreateTexture(
+                renderer, sdl2.SDL_PIXELFORMAT_RGBA8888, sdl2.SDL_TEXTUREACCESS_TARGET,
+                graphics.width, graphics.height,
+            )
+            if not temporary:
+                return
+            try:
+                sdl2.SDL_SetRenderTarget(renderer, temporary)
+                sdl2.SDL_RenderCopy(renderer, graphics.texture, None, None)
+                sdl2.SDL_SetRenderTarget(renderer, graphics.texture)
+                rp = RastPortStruct(ctx.mem, win.RPort.val)
+                color = self.graphics_lib._pen_color(ctx, rp, rp.BgPen.val)
+                sdl2.SDL_SetRenderDrawBlendMode(renderer, sdl2.SDL_BLENDMODE_NONE)
+                sdl2.SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255)
+                sdl2.SDL_RenderFillRect(renderer,
+                    sdl2.SDL_Rect(left, top, right-left+1, bottom-top+1))
+                width, height = right-left+1-abs(dx), bottom-top+1-abs(dy)
+                if width > 0 and height > 0:
+                    source = sdl2.SDL_Rect(left+max(dx,0), top+max(dy,0), width, height)
+                    target = sdl2.SDL_Rect(left+max(-dx,0), top+max(-dy,0), width, height)
+                    sdl2.SDL_RenderCopy(renderer, temporary, source, target)
+            finally:
+                sdl2.SDL_SetRenderTarget(renderer, None)
+                sdl2.SDL_DestroyTexture(temporary)
         if win.WLayer.val:
             layer = LayerStruct(ctx.mem, win.WLayer.val)
             damage = layer.DamageList.val
@@ -1478,8 +1484,54 @@ class IntuitionLibrary(LibImpl):
             else:
                 self._execute_rectfills(renderer, [command])
 
+    def _upload_surface(self, graphics):
+        import sdl2
+        colors = self.graphics_lib.palette
+        values = [(color.r << 24) | (color.g << 16) | (color.b << 8) | 255
+                  for color in (colors[i] for i in range(256))]
+        pixels = (ctypes.c_uint32 * len(graphics.surface.pixels))(
+            *(values[index] for index in graphics.surface.pixels)
+        )
+        sdl2.SDL_SetRenderTarget(graphics.renderer, None)
+        if sdl2.SDL_UpdateTexture(graphics.texture, None, pixels, graphics.width * 4) != 0:
+            raise RuntimeError("SDL texture update failed")
+        graphics.surface.dirty = False
+
+    def _execute_indexed(self, graphics, command, clip):
+        import sdl2
+        from sdl2 import sdlttf
+        surface, state = graphics.surface, command.state
+        if isinstance(command, BFDraw):
+            surface.line(state, command.x1, command.y1, command.x2, command.y2, clip)
+        elif not isinstance(command, BFText):
+            surface.fill(state, command.x, command.y, command.w, command.h, clip)
+        else:
+            glyphs = sdlttf.TTF_RenderUTF8_Solid(command.font,
+                command.string.encode("utf-8"), sdl2.SDL_Color(255,255,255,255))
+            if not glyphs:
+                return
+            with ExitStack() as cleanup:
+                cleanup.callback(sdl2.SDL_FreeSurface, glyphs)
+                rgba = sdl2.SDL_ConvertSurfaceFormat(glyphs, sdl2.SDL_PIXELFORMAT_RGBA8888, 0)
+                if not rgba:
+                    return
+                cleanup.callback(sdl2.SDL_FreeSurface, rgba)
+                image = rgba.contents
+                if sdl2.SDL_LockSurface(rgba) != 0:
+                    return
+                cleanup.callback(sdl2.SDL_UnlockSurface, rgba)
+                width = image.w + max(0, state.spacing)
+                for y in range(image.h):
+                    row = ctypes.cast(image.pixels + y * image.pitch,
+                                      ctypes.POINTER(ctypes.c_uint32))
+                    for x in range(width):
+                        opaque = x < image.w and (row[x] & 255) != 0
+                        surface.paint(state, command.x + x, command.y + y, opaque, clip)
+
     def _flush_batch(self, graphics):
         if not graphics.batch.commands:
+            if getattr(getattr(graphics, "surface", None), "dirty", False):
+                self._upload_surface(graphics)
             return
         import sdl2
         renderer = graphics.renderer
@@ -1488,10 +1540,26 @@ class IntuitionLibrary(LibImpl):
             clips = getattr(graphics, "clip_rects", None)
             if clips is None:
                 clips = [graphics.clip_rect]
+            indexed = hasattr(graphics, "surface") and all(
+                command.state is not None for command in graphics.batch.commands)
+            if indexed:
+                graphics.surface.load(graphics.batch.commands[0].state)
             for clip in clips:
-                sdl2.SDL_RenderSetClipRect(renderer, clip)
-                self._execute_batch(renderer, graphics.batch)
-            graphics.batch.clear()
+                if indexed:
+                    for command in graphics.batch.commands:
+                        self._execute_indexed(graphics, command, clip)
+                else:
+                    sdl2.SDL_RenderSetClipRect(renderer, clip)
+                    self._execute_batch(renderer, graphics.batch)
+            if indexed:
+                try:
+                    self._upload_surface(graphics)
+                finally:
+                    # Guest pixels already changed. A failed presentation
+                    # must retry the upload, not replay XOR operations.
+                    graphics.batch.clear()
+            else:
+                graphics.batch.clear()
         finally:
             sdl2.SDL_RenderSetClipRect(renderer, None)
             sdl2.SDL_SetRenderTarget(renderer, None)

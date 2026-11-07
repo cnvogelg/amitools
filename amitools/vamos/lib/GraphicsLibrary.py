@@ -9,6 +9,7 @@ from amitools.vamos.lib.graphics import TextAttrStruct, BitMapStruct, RastPortSt
 from amitools.vamos.lib.intuition import TextFontStruct, WindowStruct
 from amitools.vamos.log import log_main, log_gfx
 from dataclasses import dataclass
+from amitools.vamos.lib.graphics_surface import RasterState, RasterSurface
 
 class GraphicsLibrary(LibImpl):
     def __init__(self):
@@ -456,6 +457,18 @@ class GraphicsLibrary(LibImpl):
             advance += width.value + (spacing if spacing else 0)
         return font, runs, advance
 
+    def _raster_state(self, ctx, rp):
+        if not rp.BitMap.val:
+            return None
+        bitmap = BitMapStruct(ctx.mem, rp.BitMap.val)
+        depth = min(bitmap.Depth.val, 8)
+        return RasterState(
+            ctx.mem, tuple(bitmap.Planes[i].val for i in range(depth)),
+            bitmap.BytesPerRow.val, rp.Mask.val & ((1 << depth) - 1),
+            rp.FgPen.val & 255, rp.BgPen.val & 255,
+            rp.DrawMode.val, rp.LinePtrn.val, rp.TxSpacing.val,
+        )
+
     def TextLength(self, ctx):
         count = ctx.cpu.r_reg(REG_D0) & 0xFFFF
         if not count:
@@ -483,7 +496,8 @@ class GraphicsLibrary(LibImpl):
                 rp_graphics.batch.add(
                     BFText(rp.cp_x.val + offset, rp.cp_y.val - rp.TxBaseline.val,
                            string, font, fg, bg, rp.DrawMode.val,
-                           self._retain_host_font(rp.Font.val or self.topaz_font))
+                           self._retain_host_font(rp.Font.val or self.topaz_font),
+                           self._raster_state(ctx, rp))
                 )
         # The public position is a signed WORD and keeps the same baseline.
         rp.cp_x.val = ((rp.cp_x.val + advance + 0x8000) & 0xFFFF) - 0x8000
@@ -522,7 +536,7 @@ class GraphicsLibrary(LibImpl):
         draw_mode = rp.DrawMode.get()
     
         rp_graphics.batch.add(
-            BFDraw(start_x, start_y, x, y, color, draw_mode)
+            BFDraw(start_x, start_y, x, y, color, draw_mode, self._raster_state(ctx, rp))
         )
     
         rp.cp_x.set(x)
@@ -556,7 +570,7 @@ class GraphicsLibrary(LibImpl):
         draw_mode = rp.DrawMode.get()
     
         rp_graphics.batch.add(
-            BFRectFill(left, top, w, h, color, draw_mode)
+            BFRectFill(left, top, w, h, color, draw_mode, self._raster_state(ctx, rp))
         )
 
 
@@ -848,6 +862,7 @@ class RastPortGraphics:
         self.batch = RPBatch()
         self.clip_rect = None
         self.clip_rects = None
+        self.surface = RasterSurface(width, height)
 
 
 def create_amiga_palette():
@@ -922,6 +937,7 @@ class BFRectFill:
     h: int
     color: "sdl2.SDL_Color"
     draw_mode: int
+    state: object = None
 
 @dataclass
 class BFDraw:
@@ -931,6 +947,7 @@ class BFDraw:
     y2: int
     color: "sdl2.SDL_Color"
     draw_mode: int
+    state: object = None
 
 @dataclass
 class BFText:
@@ -942,3 +959,4 @@ class BFText:
     bg: "sdl2.SDL_Color"
     draw_mode: int
     release: object = None
+    state: object = None
