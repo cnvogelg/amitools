@@ -22,6 +22,7 @@ class GraphicsLibrary(LibImpl):
         self._rastport_resources = {}
         self.palette = None
         self._lib_opened = False
+        self._setup_resources = None
 
     # ---------------------------------------------------------------------
     # Library setup / teardown
@@ -32,76 +33,73 @@ class GraphicsLibrary(LibImpl):
         ctx.exec_lib.graphics_lib = self
 
     def open_lib(self, ctx, open_cnt):
-        """Initialize SDL-related subsystems and fonts (only once)."""
-        if open_cnt > 1:
+        if self._lib_opened:
             return
-
-        from sdl2 import sdlttf
-
+        try:
+            from sdl2 import sdlttf
+        except ImportError:
+            return
         if sdlttf.TTF_Init() != 0:
-            log_main.error("TTF_Init failed: %s", sdlttf.TTF_GetError().decode("utf-8"))
+            log_main.error("TTF_Init failed")
             return
-
-        self.fontsPath = ctx.path_mgr.ami_to_sys_path(None, "FONTS:")
-        if self.fontsPath is None:
-            self.fontsPath = os.path.join(os.path.dirname(__file__), "fonts")
-
-        self.text_attr = TextAttrStruct.alloc(ctx.alloc)
-        font_name = "Topaz_a1200_v1.0.ttf"
-        self.text_attr.ta_Name.set(ctx.alloc.alloc_cstr(font_name).addr)
-        self.text_attr.ta_YSize.set(8)
-        self.text_attr.ta_Style.set(0)
-
-        ctx.cpu.w_reg(REG_A0, self.text_attr.addr)
-        self.OpenFont(ctx)
-        self.topaz_font = ctx.cpu.r_reg(REG_D0)
-
-        if not self.topaz_font:
-            log_main.error("Failed to load font %s", font_name)
-
-        self.palette = create_amiga_palette()
-        self._lib_opened = True
-        log_main.debug("graphics.library opened")
+        try:
+            with ExitStack() as rollback:
+                rollback.callback(sdlttf.TTF_Quit)
+                self.fontsPath = ctx.path_mgr.ami_to_sys_path(None, "FONTS:")
+                if self.fontsPath is None:
+                    self.fontsPath = os.path.join(os.path.dirname(__file__), "fonts")
+                attr_memory = ctx.alloc.alloc_memory(
+                    TextAttrStruct.get_size(), label="Graphics default TextAttr",
+                    except_on_failure=False,
+                )
+                if attr_memory is None:
+                    return
+                rollback.callback(ctx.alloc.free_memory, attr_memory)
+                ctx.mem.clear_block(attr_memory.addr, attr_memory.size, 0)
+                attr = TextAttrStruct(ctx.mem, attr_memory.addr)
+                name = "Topaz_a1200_v1.0.ttf"
+                name_memory = ctx.alloc.alloc_memory(
+                    len(name) + 1, label="Graphics default name",
+                    except_on_failure=False,
+                )
+                if name_memory is None:
+                    return
+                rollback.callback(ctx.alloc.free_memory, name_memory)
+                ctx.mem.w_cstr(name_memory.addr, name)
+                attr.ta_Name.set(name_memory.addr)
+                attr.ta_YSize.val = 8
+                font_addr = self._open_font(ctx, attr.addr)
+                if not font_addr:
+                    return
+                rollback.callback(self._close_font, ctx, font_addr)
+                palette = create_amiga_palette()
+                self.text_attr, self.topaz_font = attr, font_addr
+                self.palette = palette
+                self._setup_resources = rollback.pop_all()
+                self._lib_opened = True
+        finally:
+            if not self._lib_opened:
+                self.fontsPath = None
 
     def close_lib(self, ctx, open_cnt):
-        """Free all resources owned by graphics.library itself."""
-        if open_cnt > 0:
+        if open_cnt or not self._lib_opened:
             return
-
-        import sdl2
-        from sdl2 import sdlttf
-
-        # Default font
-        if self.topaz_font:
-            ctx.cpu.w_reg(REG_A1, self.topaz_font)
-            self.CloseFont(ctx)
-            self.topaz_font = None
-
-        # Other fonts
-        for font_addr in list(self.font_registry.keys()):
-            ctx.cpu.w_reg(REG_A1, font_addr)
-            self.CloseFont(ctx)
-        self.font_registry.clear()
-
-        # TextAttr + name
-        if self.text_attr:
-            name_addr = self.text_attr.ta_Name.get()
-            if name_addr:
-                ctx.alloc.free_cstr_by_addr(name_addr)
-            self.alloc.free_mem(self.text_attr.addr, TextAttrStruct.get_size())
-            self.text_attr = None
-
-        # Remaining SDL renderers/textures (paranoia cleanup)
-        for _, rp_graphics in list(self.rp_graphics_map.items()):
-            sdl2.SDL_DestroyTexture(rp_graphics.texture)
-            sdl2.SDL_DestroyRenderer(rp_graphics.renderer)
-        self.rp_graphics_map.clear()
-
-        sdlttf.TTF_Quit()
-
-        self.palette = None
+        resources = self._setup_resources
+        default_font = self.topaz_font
+        self._setup_resources = None
+        self.text_attr = self.topaz_font = self.palette = None
+        self.fontsPath = None
         self._lib_opened = False
-        log_main.debug("graphics.library closed and resources freed")
+        with ExitStack() as cleanup:
+            cleanup.callback(resources.close)
+            for font_addr in tuple(self.font_registry):
+                if font_addr != default_font:
+                    cleanup.callback(self._close_font, ctx, font_addr)
+            for rp_addr in tuple(self.rp_graphics_map):
+                if rp_addr not in self._rastport_resources:
+                    cleanup.callback(self.free_rast_port_graphics, ctx, rp_addr)
+            for rp_addr in tuple(self._rastport_resources):
+                cleanup.callback(self.free_RastPortStruct, ctx, rp_addr)
 
     # ---------------------------------------------------------------------
     # Canonical initializers
@@ -897,13 +895,21 @@ def create_amiga_palette():
 
     for i in range(8):
         r, g, b = wb2_colors[i]
-        palette[i] = sdl2.SDL_Color(r, g, b)
+        palette[i] = sdl2.SDL_Color(r, g, b, 255)
 
     for i in range(8, 32):
         r = ((i >> 0) & 0x03) * 85
         g = ((i >> 2) & 0x03) * 85
         b = ((i >> 4) & 0x03) * 85
-        palette[i] = sdl2.SDL_Color(r, g, b)
+        palette[i] = sdl2.SDL_Color(r, g, b, 255)
+
+    # Eight-plane bitmaps may address every byte-valued pen.
+    for i in range(32, 256):
+        palette[i] = sdl2.SDL_Color(
+            ((i >> 5) & 7) * 255 // 7,
+            ((i >> 2) & 7) * 255 // 7,
+            (i & 3) * 85, 255,
+        )
 
     return palette
 
