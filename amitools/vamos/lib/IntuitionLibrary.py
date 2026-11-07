@@ -228,7 +228,7 @@ class IntuitionLibrary(LibImpl):
         title_addr = win.Title.get()
         title_memory = ctx.alloc.get_memory(title_addr) if title_addr else None
         rastport_addr = win.RPort.get()
-        user_port_addr = self._window_ports.pop(window_ptr, win.UserPort.get())
+        user_port_addr = self._window_ports.pop(window_ptr, 0)
 
         # A removed timer can already have queued an event. Invalidate its
         # window ID before stopping it or releasing any guest resources.
@@ -418,15 +418,24 @@ class IntuitionLibrary(LibImpl):
 
     def ModifyIDCMP(self, ctx):
         win_addr = ctx.cpu.r_reg(REG_A0)
-        idcmp_flags = ctx.cpu.r_reg(REG_D0)
-
+        flags = ctx.cpu.r_reg(REG_D0)
         win = WindowStruct(ctx.mem, win_addr)
-        current_flags = win.IDCMPFlags.get()
-        win.IDCMPFlags.set(idcmp_flags)
-
-        log_intui.info("ModifyIDCMP: window 0x%08X, new IDCMP flags: 0x%08X", win_addr, current_flags)
-
-        ctx.cpu.w_reg(REG_D0, current_flags)  # Return old flags
+        if flags and not win.UserPort.val:
+            port = ctx.exec_lib.CreateMsgPort(ctx)
+            if port is None:
+                ctx.cpu.w_reg(REG_D0, 0)
+                return
+            self._window_ports[win_addr] = port.addr
+            win.UserPort.val = port.addr
+        elif not flags:
+            self._close_idcmp(ctx, win_addr)
+            owned = self._window_ports.pop(win_addr, 0)
+            if owned:
+                if win.UserPort.val == owned:
+                    win.UserPort.val = 0
+                ctx.exec_lib.DeleteMsgPort(ctx, MsgPort(ctx.mem, owned))
+        win.IDCMPFlags.val = flags
+        ctx.cpu.w_reg(REG_D0, 1)
 
     def OpenScreen(self, ctx):
         if self.default_screen is None:
@@ -609,10 +618,12 @@ class IntuitionLibrary(LibImpl):
                 return 0
             rollback.callback(self.alloc.free_memory, title_memory)
             ctx.mem.w_cstr(title_memory.addr, title)
-            user_port = ctx.exec_lib.CreateMsgPort(ctx)
-            if user_port is None:
-                return 0
-            rollback.callback(ctx.exec_lib.DeleteMsgPort, ctx, user_port)
+            user_port = None
+            if idcmp_flags:
+                user_port = ctx.exec_lib.CreateMsgPort(ctx)
+                if user_port is None:
+                    return 0
+                rollback.callback(ctx.exec_lib.DeleteMsgPort, ctx, user_port)
             memory = ctx.alloc.alloc_memory(
                 WindowStruct.get_size(), label="Intuition window",
                 except_on_failure=False,
@@ -626,7 +637,7 @@ class IntuitionLibrary(LibImpl):
             win.LeftEdge.val, win.TopEdge.val = left, top
             win.IDCMPFlags.val = idcmp_flags
             win.Title.set(title_memory.addr)
-            win.UserPort.val = user_port.addr
+            win.UserPort.val = user_port.addr if user_port is not None else 0
             win.WScreen.val = screen_addr or self.default_screen.addr
             screen = ScreenStruct(ctx.mem, win.WScreen.val)
             rp_addr, layer_addr, _ = self.graphics_lib.create_window_rastport(
@@ -647,7 +658,8 @@ class IntuitionLibrary(LibImpl):
             # Only complete windows are visible to events and screen lists.
             win.NextWindow.val = screen.FirstWindow.val
             screen.FirstWindow.val = win.addr
-            self._window_ports[win.addr] = user_port.addr
+            if user_port is not None:
+                self._window_ports[win.addr] = user_port.addr
             self.rp_2_win_addr[rp_addr] = win.addr
             self.sdl_window_id_2_window_addr_map[window_id] = win.addr
             self.sdl_window_id_2_sdl_window[window_id] = sdl_win
@@ -1314,59 +1326,56 @@ class IntuitionLibrary(LibImpl):
                     cleanup.callback(ctx.alloc.free_mem, plane, plane_size)
 
     def ScrollWindowRaster(self, ctx):
-        """
-        Intuition's ScrollWindowRaster()
-        A1 = struct Window*
-        D0 = dx
-        D1 = dy
-        D2 = xmin
-        D3 = ymin
-        D4 = xmax
-        D5 = ymax
-    
-        Dummy implementation:
-        - does NOT scroll pixels
-        - marks the window as damaged
-        - triggers IDCMP_REFRESHWINDOW
-        """
-    
+        import sdl2
         win_addr = ctx.cpu.r_reg(REG_A1)
-        if win_addr == 0:
+        if not win_addr:
             return
-    
         win = WindowStruct(ctx.mem, win_addr)
-    
-        # Get the layer
-        layer_addr = win.WLayer.get()
-        if layer_addr == 0:
+        graphics = self.graphics_lib.get_rp_graphics(win.RPort.val)
+        if graphics is None:
             return
-    
-        layer = LayerStruct(ctx.mem, layer_addr)
-    
-        # --- Create a temporary rectangle for the damaged area ---
-        rect = RectangleStruct.alloc(ctx.alloc)
-        rect.MinX.set(self._signed_word(ctx.cpu.r_reg(REG_D2)))
-        rect.MinY.set(self._signed_word(ctx.cpu.r_reg(REG_D3)))
-        rect.MaxX.set(self._signed_word(ctx.cpu.r_reg(REG_D4)))
-        rect.MaxY.set(self._signed_word(ctx.cpu.r_reg(REG_D5)))
-    
-        # --- Add to DamageList ---
-        dl_addr = layer.DamageList.get()
-        if dl_addr:
-            self.graphics_lib._or_rect_region(ctx, dl_addr, rect.addr)
-    
-        # Free temporary rectangle
-        rect.free(ctx.alloc)
-    
-        if win_addr not in self.refresh_pending:
-            rastport_addr = win.RPort.get()
-            self.refresh(ctx, rastport_addr)
-            window_id = self.find_sdl_window_by_amiga_addr(win_addr)
-            event = PendingIntuiEvent(win_addr, IDCMP_REFRESHWINDOW, 0, 0, 0, window_id)
-            self.drain_pending_intui_events(ctx, event)
-    
-        # Intuition's ScrollWindowRaster() returns void
-        return
+        dx, dy, left, top, right, bottom = [self._signed_word(ctx.cpu.r_reg(reg))
+            for reg in (REG_D0, REG_D1, REG_D2, REG_D3, REG_D4, REG_D5)]
+        left, top = max(0, left), max(0, top)
+        right, bottom = min(graphics.width - 1, right), min(graphics.height - 1, bottom)
+        if (not dx and not dy) or left > right or top > bottom:
+            return
+        self._flush_batch(graphics)
+        renderer = graphics.renderer
+        temporary = sdl2.SDL_CreateTexture(
+            renderer, sdl2.SDL_PIXELFORMAT_RGBA8888, sdl2.SDL_TEXTUREACCESS_TARGET,
+            graphics.width, graphics.height,
+        )
+        if not temporary:
+            return
+        try:
+            sdl2.SDL_SetRenderTarget(renderer, temporary)
+            sdl2.SDL_RenderCopy(renderer, graphics.texture, None, None)
+            sdl2.SDL_SetRenderTarget(renderer, graphics.texture)
+            rp = RastPortStruct(ctx.mem, win.RPort.val)
+            color = self.graphics_lib._pen_color(ctx, rp, rp.BgPen.val)
+            sdl2.SDL_SetRenderDrawBlendMode(renderer, sdl2.SDL_BLENDMODE_NONE)
+            sdl2.SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255)
+            sdl2.SDL_RenderFillRect(renderer,
+                sdl2.SDL_Rect(left, top, right-left+1, bottom-top+1))
+            width, height = right-left+1-abs(dx), bottom-top+1-abs(dy)
+            if width > 0 and height > 0:
+                source = sdl2.SDL_Rect(left+max(dx,0), top+max(dy,0), width, height)
+                target = sdl2.SDL_Rect(left+max(-dx,0), top+max(-dy,0), width, height)
+                sdl2.SDL_RenderCopy(renderer, temporary, source, target)
+        finally:
+            sdl2.SDL_SetRenderTarget(renderer, None)
+            sdl2.SDL_DestroyTexture(temporary)
+        if win.WLayer.val:
+            layer = LayerStruct(ctx.mem, win.WLayer.val)
+            damage = layer.DamageList.val
+            if damage:
+                self.graphics_lib._replace_region(ctx, damage,
+                    self.graphics_lib._region_rects(ctx, damage) + [(left,top,right,bottom)])
+        self.refresh(ctx, win.RPort.val)
+        window_id = self.find_sdl_window_by_amiga_addr(win_addr)
+        self.drain_pending_intui_events(ctx, PendingIntuiEvent(
+            win_addr, IDCMP_REFRESHWINDOW, 0, 0, 0, window_id))
 
     def check_refresh(self, ctx):
         for win_addr in self.refresh_pending:

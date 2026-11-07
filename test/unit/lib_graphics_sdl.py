@@ -104,6 +104,28 @@ def graphics_native_sdl_window_and_render_test(monkeypatch):
             sdl2.SDL_SetRenderTarget(backing.renderer,None)
         assert pixels[9*64+2] == pixels[9*64+8] == 0x000000ff
         assert pixels[9*64+5] == 0xffffffff
+        from amitools.vamos.machine import REG_D4, REG_D5
+        for dx, dy in [(2,0),(-2,0),(0,2),(0,-2),(100,0),(0,0)]:
+            sdl2.SDL_SetRenderTarget(backing.renderer, backing.texture)
+            sdl2.SDL_SetRenderDrawColor(backing.renderer,168,168,168,255)
+            sdl2.SDL_RenderClear(backing.renderer)
+            sdl2.SDL_SetRenderDrawColor(backing.renderer,255,255,255,255)
+            sdl2.SDL_RenderFillRect(backing.renderer,sdl2.SDL_Rect(4,4,5,5))
+            sdl2.SDL_SetRenderTarget(backing.renderer,None)
+            for reg, value in ((REG_A1,window),(REG_D0,dx & 0xffff),
+                (REG_D1,dy & 0xffff),(REG_D2,0),(REG_D3,0),(REG_D4,63),(REG_D5,31)):
+                ctx.cpu.w_reg(reg,value)
+            intuition.ScrollWindowRaster(ctx)
+            sdl2.SDL_SetRenderTarget(backing.renderer,backing.texture)
+            try:
+                assert sdl2.SDL_RenderReadPixels(backing.renderer,None,
+                    sdl2.SDL_PIXELFORMAT_RGBA8888,pixels,64*4) == 0
+            finally:
+                sdl2.SDL_SetRenderTarget(backing.renderer,None)
+            if dx == 100:
+                assert all(pixel == 0xa8a8a8ff for pixel in pixels)
+            else:
+                assert pixels[(6-dy)*64+6-dx] == 0xffffffff
         ctx.cpu.w_reg(REG_A0,window)
         intuition.CloseWindow(ctx)
         window=0

@@ -551,3 +551,53 @@ def intuition_idcmp_allocation_failure_test(ctx, monkeypatch, stage):
         ctx.close(target)
     assert not ctx.messages.port_mgr.ports
     ctx.close_all()
+
+
+def intuition_modify_idcmp_creates_and_releases_ports_test(ctx):
+    from amitools.vamos.machine import REG_D0
+    from amitools.vamos.libtypes import MsgPort
+    target = ctx.open()
+    ctx.cpu.w_reg(REG_A0, target)
+    ctx.cpu.w_reg(REG_D0, 0)
+    ctx.intuition.ModifyIDCMP(ctx)
+    win = WindowStruct(ctx.mem, target)
+    assert ctx.cpu.r_reg(REG_D0) == 1
+    assert win.IDCMPFlags.val == win.UserPort.val == 0
+    ctx.cpu.w_reg(REG_D0, IDCMP_NEWSIZE)
+    ctx.intuition.ModifyIDCMP(ctx)
+    assert ctx.cpu.r_reg(REG_D0) == 1
+    assert win.UserPort.val
+    ctx.intuition.queue_idcmp(ctx, target, IDCMP_NEWSIZE)
+    assert ctx.messages.get_msg(MsgPort(ctx.mem, win.UserPort.val)) is not None
+    # Final teardown also owns delivered messages that cannot be replied.
+    ctx.close(target)
+    ctx.intuition.finish_lib(ctx)
+    ctx.close_all()
+
+
+def intuition_modify_idcmp_allocation_failure_test(ctx):
+    from amitools.vamos.machine import REG_D0
+    target = ctx.open()
+    ctx.cpu.w_reg(REG_A0, target)
+    ctx.cpu.w_reg(REG_D0, 0)
+    ctx.intuition.ModifyIDCMP(ctx)
+    ctx.exec_lib.CreateMsgPort = lambda ctx: None
+    ctx.cpu.w_reg(REG_D0, IDCMP_NEWSIZE)
+    ctx.intuition.ModifyIDCMP(ctx)
+    assert ctx.cpu.r_reg(REG_D0) == 0
+    win = WindowStruct(ctx.mem, target)
+    assert win.IDCMPFlags.val == win.UserPort.val == 0
+    ctx.close_all()
+
+
+def intuition_close_window_preserves_borrowed_user_port_test(ctx):
+    from amitools.vamos.libtypes import MsgPort
+    borrowed = ctx.messages.create_msg_port()
+    target = ctx.open()
+    WindowStruct(ctx.mem,target).UserPort.val = borrowed.addr
+    ctx.intuition.queue_idcmp(ctx,target,IDCMP_NEWSIZE)
+    ctx.close(target)
+    assert ctx.alloc.get_memory(borrowed.addr)
+    assert ctx.messages.get_msg(borrowed) is None
+    ctx.messages.delete_msg_port(borrowed)
+    ctx.close_all()
