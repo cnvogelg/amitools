@@ -17,6 +17,7 @@ class GraphicsLibrary(LibImpl):
         self.fontsPath = None
         self.text_attr = None
         self.font_registry = {}
+        self._font_owners = {}
         self.topaz_font = None
         self.rp_graphics_map = {}
         self._rastport_resources = {}
@@ -230,6 +231,8 @@ class GraphicsLibrary(LibImpl):
             sdl2.SDL_RENDERER_ACCELERATED | sdl2.SDL_RENDERER_PRESENTVSYNC,
         )
         if not renderer:
+            renderer = sdl2.SDL_CreateRenderer(sdl_win, -1, 0)
+        if not renderer:
             return False
         with ExitStack() as rollback:
             rollback.callback(sdl2.SDL_DestroyRenderer, renderer)
@@ -256,16 +259,12 @@ class GraphicsLibrary(LibImpl):
 
     def free_rast_port_graphics(self, ctx, rastport_addr):
         import sdl2
-
-        rp_graphics = self.rp_graphics_map.pop(rastport_addr, None)
-        if rp_graphics:
-            sdl2.SDL_DestroyTexture(rp_graphics.texture)
-            sdl2.SDL_DestroyRenderer(rp_graphics.renderer)
-        else:
-            log_gfx.error(
-                "free_rast_port_graphics: unknown rastport address 0x%08X",
-                rastport_addr,
-            )
+        graphics = self.rp_graphics_map.pop(rastport_addr, None)
+        if graphics is not None:
+            with ExitStack() as cleanup:
+                cleanup.callback(sdl2.SDL_DestroyRenderer, graphics.renderer)
+                cleanup.callback(sdl2.SDL_DestroyTexture, graphics.texture)
+                cleanup.callback(graphics.batch.clear)
 
     def get_rp_graphics(self, rastport_addr):
         rp_graphics = self.rp_graphics_map.get(rastport_addr, None)
@@ -322,6 +321,7 @@ class GraphicsLibrary(LibImpl):
             tf.tf_LoChar.set(32)
             tf.tf_HiChar.set(127)
             self.font_registry[font_addr] = font
+            self._font_owners[font_addr] = {"font": font, "refs": 1}
             rollback.pop_all()
         log_main.debug(
             "Loaded font '%s' size=%d height=%d ascent=%d avg_width=%d",
@@ -370,18 +370,29 @@ class GraphicsLibrary(LibImpl):
     def CloseFont(self, ctx):
         self._close_font(ctx, ctx.cpu.r_reg(REG_A1))
 
+    @staticmethod
+    def _release_host_font(owner):
+        owner["refs"] -= 1
+        if owner["refs"] == 0:
+            from sdl2 import sdlttf
+            sdlttf.TTF_CloseFont(owner["font"])
+
+    def _retain_host_font(self, font_addr):
+        owner = self._font_owners.get(font_addr)
+        if owner is None:
+            return None
+        owner["refs"] += 1
+        return lambda: self._release_host_font(owner)
+
     def _close_font(self, ctx, font_addr):
-        from sdl2 import sdlttf
-
         font = self.font_registry.pop(font_addr, None)
-
-        if font:
-            try:
-                sdlttf.TTF_CloseFont(font)
-            finally:
-                self.alloc.free_memory(self.alloc.get_memory(font_addr))
-        else:
-            log_main.warn("CloseFont: unknown font address 0x%X", font_addr)
+        if font is None:
+            return
+        owner = self._font_owners.pop(font_addr)
+        try:
+            self._release_host_font(owner)
+        finally:
+            self.alloc.free_memory(self.alloc.get_memory(font_addr))
 
     def SetFont(self, ctx):
         self._set_font(ctx, ctx.cpu.r_reg(REG_A1), ctx.cpu.r_reg(REG_A0))
@@ -471,7 +482,8 @@ class GraphicsLibrary(LibImpl):
             for offset, string in runs:
                 rp_graphics.batch.add(
                     BFText(rp.cp_x.val + offset, rp.cp_y.val - rp.TxBaseline.val,
-                           string, font, fg, bg, rp.DrawMode.val)
+                           string, font, fg, bg, rp.DrawMode.val,
+                           self._retain_host_font(rp.Font.val or self.topaz_font))
                 )
         # The public position is a signed WORD and keeps the same baseline.
         rp.cp_x.val = ((rp.cp_x.val + advance + 0x8000) & 0xFFFF) - 0x8000
@@ -764,6 +776,21 @@ class GraphicsLibrary(LibImpl):
                 intersections.append((max(a, e), max(b, f), min(c, g), min(d, h)))
         return self._replace_region(ctx, dest_region_addr, intersections)
 
+    def _get_damage_clip_rects_for_rp(self, ctx, rastport_addr):
+        import sdl2
+        intuition = ctx.exec_lib.intuition_lib
+        window_addr = intuition.rp_2_win_addr.get(rastport_addr)
+        if window_addr is None:
+            return None
+        layer_addr = WindowStruct(ctx.mem, window_addr).WLayer.val
+        if not layer_addr:
+            return None
+        damage = LayerStruct(ctx.mem, layer_addr).DamageList.val
+        if not damage:
+            return None
+        return [sdl2.SDL_Rect(a, b, c - a + 1, d - b + 1)
+                for a, b, c, d in self._region_rects(ctx, damage)]
+
     def _get_damage_clip_rect_for_rp(self, ctx, rastport_addr):
         """
         Resolve the DamageList Region for this RastPort and
@@ -820,6 +847,7 @@ class RastPortGraphics:
         self.height = height
         self.batch = RPBatch()
         self.clip_rect = None
+        self.clip_rects = None
 
 
 def create_amiga_palette():
@@ -879,7 +907,12 @@ class RPBatch:
         self.rectfills.clear()
         self.draws.clear()
         self.texts.clear()
-        self.commands.clear()
+        commands, self.commands = self.commands, []
+        with ExitStack() as cleanup:
+            for command in commands:
+                release = getattr(command, "release", None)
+                if release is not None:
+                    cleanup.callback(release)
 
 @dataclass
 class BFRectFill:
@@ -908,3 +941,4 @@ class BFText:
     fg: "sdl2.SDL_Color"
     bg: "sdl2.SDL_Color"
     draw_mode: int
+    release: object = None

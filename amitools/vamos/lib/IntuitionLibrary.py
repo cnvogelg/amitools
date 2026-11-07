@@ -1402,8 +1402,8 @@ class IntuitionLibrary(LibImpl):
         self._flush_batch(rp_graphics)
 
     # Set clipping once
-        clip_rect = self.graphics_lib._get_damage_clip_rect_for_rp(ctx, rastport_addr)
-        rp_graphics.clip_rect = clip_rect
+        clip_rects = self.graphics_lib._get_damage_clip_rects_for_rp(ctx, rastport_addr)
+        rp_graphics.clip_rects = clip_rects
         
         rc = 0
         cpu.w_reg(REG_D0, rc)
@@ -1424,21 +1424,7 @@ class IntuitionLibrary(LibImpl):
         texture = rp_graphics.texture
     
         self._flush_batch(rp_graphics)
-
-        # Set target once
-        sdl2.SDL_SetRenderTarget(renderer, texture)
-    
-        # Set clip once
-        if rp_graphics.clip_rect is not None:
-            sdl2.SDL_RenderSetClipRect(renderer, rp_graphics.clip_rect)
-    
-        try:
-            self._execute_batch(renderer, batch)
-            batch.clear()
-        finally:
-            sdl2.SDL_RenderSetClipRect(renderer, None)
-            sdl2.SDL_SetRenderTarget(renderer, None)
-            rp_graphics.clip_rect = None
+        rp_graphics.clip_rects = None
 
         # Invalidate once
         self.refresh(ctx, rastport_addr)
@@ -1490,8 +1476,12 @@ class IntuitionLibrary(LibImpl):
         renderer = graphics.renderer
         sdl2.SDL_SetRenderTarget(renderer, graphics.texture)
         try:
-            sdl2.SDL_RenderSetClipRect(renderer, graphics.clip_rect)
-            self._execute_batch(renderer, graphics.batch)
+            clips = getattr(graphics, "clip_rects", None)
+            if clips is None:
+                clips = [graphics.clip_rect]
+            for clip in clips:
+                sdl2.SDL_RenderSetClipRect(renderer, clip)
+                self._execute_batch(renderer, graphics.batch)
             graphics.batch.clear()
         finally:
             sdl2.SDL_RenderSetClipRect(renderer, None)

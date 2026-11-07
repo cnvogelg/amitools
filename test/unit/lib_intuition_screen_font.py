@@ -352,3 +352,41 @@ def intuition_close_screen_rejects_live_windows_test(ctx):
         assert default.NextScreen.val == 0
     finally:
         win.free()
+
+
+def graphics_queued_text_keeps_closed_host_font_alive_test(ctx):
+    from amitools.vamos.lib.GraphicsLibrary import RPBatch
+    from amitools.vamos.lib.graphics import RastPortStruct
+    attr = ctx.attribute('custom.ttf', 10)
+    addr = ctx.open_font(attr)
+    old_handle = ctx.graphics.font_registry[addr]
+    rp = RastPortStruct.alloc(ctx.alloc)
+    text = ctx.alloc.alloc_cstr('Hi')
+    batch = RPBatch()
+    replacement = 0
+    try:
+        ctx.graphics.init_rastport_canonical(ctx, rp.addr)
+        ctx.graphics._set_font(ctx, rp.addr, addr)
+        ctx.graphics.palette = {0: object(), 255: object()}
+        ctx.graphics.rp_graphics_map[rp.addr] = SimpleNamespace(batch=batch)
+        ctx.cpu.w_reg(REG_A0, text.addr)
+        ctx.cpu.w_reg(REG_A1, rp.addr)
+        ctx.cpu.w_reg(REG_D0, 2)
+        ctx.graphics.Text(ctx)
+        assert batch.commands
+        ctx.close_font(addr)
+        assert ctx.alloc.get_memory(addr) is None
+        assert old_handle in ctx.handles
+        replacement = ctx.open_font(attr)
+        replacement_handle = ctx.graphics.font_registry[replacement]
+        batch.clear()
+        assert old_handle not in ctx.handles
+        assert replacement_handle in ctx.handles
+        batch.clear()  # A consumed batch cannot close a handle twice.
+    finally:
+        batch.clear()
+        ctx.graphics.rp_graphics_map.pop(rp.addr, None)
+        if replacement:
+            ctx.close_font(replacement)
+        ctx.alloc.free_memory(text)
+        rp.free()
