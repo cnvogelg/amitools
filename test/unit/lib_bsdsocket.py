@@ -442,7 +442,7 @@ def bsdsocket_udp_loopback_test(ctx):
         peer.close()
 
 
-@pytest.mark.parametrize("operation", ["setsockopt", "WaitSelect"])
+@pytest.mark.parametrize("operation", ["setsockopt", "WaitSelect", "WaitSelect_empty"])
 def bsdsocket_native_library_entry_test(operation):
     from amitools.fd import read_lib_fd
     from amitools.vamos.libmgr import SetupLibManager
@@ -469,7 +469,7 @@ def bsdsocket_native_library_entry_test(operation):
     sock = Mock()
     impl.socks[0] = sock
     try:
-        bias = read_lib_fd("bsdsocket.library").get_func_by_name(operation).get_bias()
+        bias = read_lib_fd("bsdsocket.library").get_func_by_name(operation.split("_")[0]).get_bias()
         # JSR -bias(A6); RTS, using the actual registered library stub.
         mem.w16(code.addr, 0x4EAE)
         mem.w16(code.addr + 2, (-bias) & 0xFFFF)
@@ -478,6 +478,9 @@ def bsdsocket_native_library_entry_test(operation):
         if operation == "setsockopt":
             mem.w32(block.addr, 1)
             regs.update({REG_D1: 0xFFFF, REG_D2: 4, REG_A0: block.addr, REG_D3: 4})
+        elif operation == "WaitSelect_empty":
+            regs.update({REG_A0: 0, REG_A1: 0, REG_A2: 0,
+                         REG_A3: block.addr, REG_D1: 0})
         else:
             pending = 1 << 21
             task = SimpleNamespace(set_signal=lambda new, mask: pending)
@@ -498,7 +501,7 @@ def bsdsocket_native_library_entry_test(operation):
             sock.setsockopt.assert_called_once_with(
                 socket.SOL_SOCKET, socket.SO_REUSEADDR, 1
             )
-        else:
+        elif operation == "WaitSelect":
             assert mem.r32(block.addr) == pending
     finally:
         manager.exec_ctx.task = None
