@@ -332,6 +332,7 @@ def intuition_screen_font_native_test(native_ctx, custom):
 
 def intuition_close_screen_rejects_live_windows_test(ctx):
     from amitools.vamos.lib.intuition import WindowStruct
+
     default = ctx.screen()
     custom = ctx.screen()
     default.NextScreen.val = custom.addr
@@ -357,11 +358,12 @@ def intuition_close_screen_rejects_live_windows_test(ctx):
 def graphics_queued_text_keeps_closed_host_font_alive_test(ctx):
     from amitools.vamos.lib.GraphicsLibrary import RPBatch
     from amitools.vamos.lib.graphics import RastPortStruct
-    attr = ctx.attribute('custom.ttf', 10)
+
+    attr = ctx.attribute("custom.ttf", 10)
     addr = ctx.open_font(attr)
     old_handle = ctx.graphics.font_registry[addr]
     rp = RastPortStruct.alloc(ctx.alloc)
-    text = ctx.alloc.alloc_cstr('Hi')
+    text = ctx.alloc.alloc_cstr("Hi")
     batch = RPBatch()
     replacement = 0
     try:
