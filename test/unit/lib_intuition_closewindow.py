@@ -407,3 +407,92 @@ def graphics_window_rastport_initialization_test(ctx):
     assert raster.cp_y.val == raster.TxBaseline.val == 6
     assert raster.DrawMode.val == 1
     ctx.close_all()
+
+
+@pytest.mark.parametrize('stage', [
+    'Window title', 'Intuition window', 'BitMapStruct', 'LayerStruct',
+    'RastPortStruct', 'Graphics region', 'port', 'plane', 'renderer',
+    'texture', 'target', 'clear', 'timer', 'poll',
+])
+def intuition_open_window_rollback_test(ctx, monkeypatch, stage):
+    allocate = ctx.alloc.alloc_memory
+    if stage in {'Window title', 'Intuition window', 'BitMapStruct',
+                 'LayerStruct', 'RastPortStruct', 'Graphics region'}:
+        def fail(size, **kwargs):
+            return None if kwargs.get('label') == stage else allocate(size, **kwargs)
+        monkeypatch.setattr(ctx.alloc, 'alloc_memory', fail)
+    elif stage == 'port':
+        ctx.exec_lib.CreateMsgPort = lambda ctx: None
+    elif stage == 'plane':
+        alloc_mem = ctx.alloc.alloc_mem
+        planes = []
+        def fail(size, *args, **kwargs):
+            if size == 256:
+                planes.append(size)
+                if len(planes) == 2:
+                    return 0
+            return alloc_mem(size, *args, **kwargs)
+        monkeypatch.setattr(ctx.alloc, 'alloc_mem', fail)
+    elif stage in ('renderer', 'texture', 'timer'):
+        entry = {'renderer': 'SDL_CreateRenderer', 'texture': 'SDL_CreateTexture',
+                 'timer': 'SDL_AddTimer'}[stage]
+        setattr(ctx.sdl, entry, lambda *args: 0)
+    elif stage in ('target', 'clear'):
+        entry = 'SDL_SetRenderTarget' if stage == 'target' else 'SDL_RenderClear'
+        setattr(ctx.sdl, entry, lambda *args: -1)
+    else:
+        ctx.exec_lib.register_SDL_poll = Mock(side_effect=RuntimeError('poll'))
+    if stage == 'poll':
+        with pytest.raises(RuntimeError, match='poll'):
+            ctx.open()
+    else:
+        assert ctx.open() == 0
+    assert not ctx.graphics.rp_graphics_map
+    assert not ctx.graphics._rastport_resources
+    ctx.close_all()
+
+
+def graphics_window_cleanup_tracks_owned_objects_test(ctx):
+    target = ctx.open()
+    win = WindowStruct(ctx.mem, target)
+    # Public reset discards its links, but cannot change the owner's records.
+    ctx.graphics.init_rastport_canonical(ctx, win.RPort.val)
+    ctx.close(target)
+    ctx.close_all()
+
+
+@pytest.mark.parametrize('custom', [False, True])
+@pytest.mark.parametrize('control', [False, True])
+def intuition_open_window_taglist_test(ctx, custom, control):
+    from amitools.vamos.lib.intuition import WA_Width, WA_Height, WA_CustomScreen
+    from amitools.vamos.machine import REG_A1, REG_D0
+    ctx.sdl.SDL_WINDOW_SHOWN = 1
+    ctx.sdl.SDL_WINDOW_RESIZABLE = 2
+    tags = ctx.alloc.alloc_memory(64)
+    try:
+        items = [(WA_Width, 53), (WA_Height, 29)]
+        if custom:
+            items.append((WA_CustomScreen, ctx.screen.get_addr()))
+        if control:
+            # Ignore and skip misleading widths, then follow TAG_MORE.
+            prefix = [(1, 99), (3, 1), (WA_Width, 999), (2, tags.addr + 32)]
+        else:
+            prefix = []
+        for index, (tag, data) in enumerate(prefix + items + [(0, 0)]):
+            ctx.mem.w32(tags.addr + index * 8, tag)
+            ctx.mem.w32(tags.addr + index * 8 + 4, data)
+        ctx.cpu.w_reg(REG_A0, 0)
+        ctx.cpu.w_reg(REG_A1, tags.addr)
+        ctx.intuition.OpenWindowTagList(ctx)
+        addr = ctx.cpu.r_reg(REG_D0)
+        assert addr
+        win = WindowStruct(ctx.mem, addr)
+        assert (win.Width.val, win.Height.val) == (53, 29)
+        assert win.WScreen.val == ctx.screen.get_addr()
+        assert win.IDCMPFlags.val == 0
+        raster = RastPortStruct(ctx.mem, win.RPort.val)
+        layer = LayerStruct(ctx.mem, raster.Layer.val)
+        assert (layer.Width.val, layer.Height.val) == (53, 29)
+    finally:
+        ctx.alloc.free_memory(tags)
+        ctx.close_all()

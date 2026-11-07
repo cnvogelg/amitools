@@ -1,5 +1,6 @@
 import ctypes
 from contextlib import ExitStack
+from amitools.vamos.libtypes import TagList
 from amitools.vamos.libcore.impl import LibImpl
 from amitools.vamos.lib.TimerDevice import TimerDevice
 
@@ -271,7 +272,7 @@ class IntuitionLibrary(LibImpl):
         idcmp_flags = new_win.IDCMPFlags.get()
 
         title_ptr = new_win.Title.get()
-        title = ctx.mem.r_cstr(title_ptr)
+        title = ctx.mem.r_cstr(title_ptr) if title_ptr else ""
 
         min_width = new_win.MinWidth.get()
         min_height = new_win.MinHeight.get()
@@ -307,7 +308,8 @@ class IntuitionLibrary(LibImpl):
         min_width = min_height = 0
         max_width = max_height = 0xFFFF  # Large default max
         
-        screen = self.default_screen
+        screen = self.default_screen.addr
+        idcmp_flags = 0
 
         new_window_ptr = ctx.cpu.r_reg(REG_A0)
         if new_window_ptr != 0:
@@ -320,7 +322,7 @@ class IntuitionLibrary(LibImpl):
             idcmp_flags = new_win.IDCMPFlags.get()
 
             title_ptr = new_win.Title.get()
-            title = ctx.mem.r_cstr(title_ptr)
+            title = ctx.mem.r_cstr(title_ptr) if title_ptr else ""
     
             min_width = new_win.MinWidth.get()
             min_height = new_win.MinHeight.get()
@@ -329,14 +331,9 @@ class IntuitionLibrary(LibImpl):
             
             screen = new_win.Screen.get()
 
-        # Parse tag list
-        while True:
-            tag = ctx.mem.r32(taglist_ptr)
-            data = ctx.mem.r32(taglist_ptr + 4)
-            taglist_ptr += 8
-
-            if tag == 0:  # TAG_END
-                break
+        # Reuse Utility's typed iterator for MORE, SKIP and IGNORE tags.
+        for item in TagList(ctx.mem, taglist_ptr):
+            tag, data = item.get_tag(), item.get_data()
 
             if tag == WA_Left:
                 left = data
@@ -347,7 +344,7 @@ class IntuitionLibrary(LibImpl):
             elif tag == WA_Height:
                 height = data
             elif tag == WA_Title:
-                title = ctx.mem.r_cstr(data)
+                title = ctx.mem.r_cstr(data) if data else ""
             elif tag == WA_MinWidth:
                 min_width = data
             elif tag == WA_MinHeight:
@@ -372,7 +369,7 @@ class IntuitionLibrary(LibImpl):
             flags |= sdl2.SDL_WINDOW_RESIZABLE        
 
         # Return fake Amiga window pointer
-        amiga_win_addr = self.create_window_struct(ctx, left, top, width, height, idcmp_flags, title, screen.addr, flags)
+        amiga_win_addr = self.create_window_struct(ctx, left, top, width, height, idcmp_flags, title, screen, flags)
         ctx.cpu.w_reg(REG_D0, amiga_win_addr)
 
     def SetMenuStrip(self, ctx):
@@ -556,6 +553,8 @@ class IntuitionLibrary(LibImpl):
 # ----- Helper -----
 
     def create_window_struct(self, ctx, left, top, width, height, idcmp_flags, title, screen_addr, flags):
+        if not (0 < width <= 32767 and 0 < height <= 32767):
+            return 0
         if self.graphics_lib is None or (not screen_addr and self.default_screen is None):
             return 0
         import sdl2
@@ -576,58 +575,59 @@ class IntuitionLibrary(LibImpl):
             log_intui.error("Failed to create SDL2 window")
             return 0
 
-        # Allocate title string in Amiga memory
-        title_ptr = self.alloc.alloc_cstr(title)
-    
-        user_port = ctx.exec_lib.CreateMsgPort(ctx)
-    
-        # Create WindowStruct instance
-        win = WindowStruct.alloc(ctx.alloc)
-        ctx.mem.clear_block(win.addr, win.get_size(), 0)
-        
-        win.Width.set(width)
-        win.Height.set(height)
-        win.IDCMPFlags.set(idcmp_flags)
-        win.Title.set(title_ptr.addr)
-        win.LeftEdge.set(left)
-        win.TopEdge.set(top)
-        win.UserPort.set(user_port.addr)
-        
-        win.WScreen.set(screen_addr or self.default_screen.addr)
-        # Link window into screen's window list
-        screen = ScreenStruct(ctx.mem, win.WScreen.get())
-        win.NextWindow.set(screen.FirstWindow.get())
-        screen.FirstWindow.set(win.addr)
-        
-        log_intui.debug("WindowStruct created at 0x%08X: %s", win.addr, win)
-        
-        # Allocate BitMap + Layer + RastPort with SDL2 backing
-        rp_addr, layer_addr, _ = self.graphics_lib.create_window_rastport(
-            ctx,
-            sdl_win,
-            screen.Width.get(),
-            screen.Height.get()
-        )
-        
-        self.rp_2_win_addr[rp_addr] = win.addr;
-        
-        # Attach to Intuition Window
-        win.RPort.set(rp_addr)
-        win.WLayer.set(layer_addr)
-        
-        window_id = sdl2.SDL_GetWindowID(sdl_win)
-        self.sdl_window_id_2_window_addr_map[window_id] = win.addr
-        self.sdl_window_id_2_sdl_window[window_id] = sdl_win
-
-        # start a timer
-        timer_id = sdl2.SDL_AddTimer(
-            50, intuiticks_timer_callback, ctypes.c_void_p(window_id)
-        )
-        if timer_id:
+        with ExitStack() as rollback:
+            rollback.callback(sdl2.SDL_DestroyWindow, sdl_win)
+            title_memory = self.alloc.alloc_memory(
+                len(title.encode("latin-1")) + 1, label="Window title",
+                except_on_failure=False,
+            )
+            if title_memory is None:
+                return 0
+            rollback.callback(self.alloc.free_memory, title_memory)
+            ctx.mem.w_cstr(title_memory.addr, title)
+            user_port = ctx.exec_lib.CreateMsgPort(ctx)
+            if user_port is None:
+                return 0
+            rollback.callback(ctx.exec_lib.DeleteMsgPort, ctx, user_port)
+            memory = ctx.alloc.alloc_memory(
+                WindowStruct.get_size(), label="Intuition window",
+                except_on_failure=False,
+            )
+            if memory is None:
+                return 0
+            rollback.callback(ctx.alloc.free_memory, memory)
+            ctx.mem.clear_block(memory.addr, memory.size, 0)
+            win = WindowStruct(ctx.mem, memory.addr)
+            win.Width.val, win.Height.val = width, height
+            win.LeftEdge.val, win.TopEdge.val = left, top
+            win.IDCMPFlags.val = idcmp_flags
+            win.Title.set(title_memory.addr)
+            win.UserPort.val = user_port.addr
+            win.WScreen.val = screen_addr or self.default_screen.addr
+            screen = ScreenStruct(ctx.mem, win.WScreen.val)
+            rp_addr, layer_addr, _ = self.graphics_lib.create_window_rastport(
+                ctx, sdl_win, width, height, screen.BitMap.Depth.val or 2
+            )
+            if not rp_addr:
+                return 0
+            rollback.callback(self.graphics_lib.free_RastPortStruct, ctx, rp_addr)
+            win.RPort.val, win.WLayer.val = rp_addr, layer_addr
+            window_id = sdl2.SDL_GetWindowID(sdl_win)
+            timer_id = sdl2.SDL_AddTimer(
+                50, intuiticks_timer_callback, ctypes.c_void_p(window_id)
+            )
+            if not timer_id:
+                return 0
+            rollback.callback(sdl2.SDL_RemoveTimer, timer_id)
+            ctx.exec_lib.register_SDL_poll(ctx)
+            # Only complete windows are visible to events and screen lists.
+            win.NextWindow.val = screen.FirstWindow.val
+            screen.FirstWindow.val = win.addr
+            self.rp_2_win_addr[rp_addr] = win.addr
+            self.sdl_window_id_2_window_addr_map[window_id] = win.addr
+            self.sdl_window_id_2_sdl_window[window_id] = sdl_win
             self.sdl_window_id_2_timer[window_id] = timer_id
-
-        ctx.exec_lib.register_SDL_poll(ctx)
-
+            rollback.pop_all()
         return win.addr
 
     def render(self, ctx, sdl_win, mouse_x = 0, mouse_y = 0):
