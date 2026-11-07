@@ -270,61 +270,86 @@ class BsdSocketLibrary(LibImpl):
             ctx.mem.w_block(ptr, data)
         return len(data)
 
-    def listFromFdSet(self, mem, addr, sz):
-        fdset = ULongULongClass(mem, addr)
-        l = fdset.l0.get() + (fdset.l1.get() << 32)
-        r = [] 
-        for i in range (0, sz):
-            if l & (1 << i) != 0 and i in self.socks:
-                r.append(self.socks[i])
-        return r
+    def listFromFdSet(self, mem, addr, count):
+        result = []
+        for base in range(0, count, 32):
+            word = mem.r32(addr + (base // 32) * 4)
+            for bit in range(min(32, count - base)):
+                if word & (1 << bit):
+                    number = base + bit
+                    if number not in self.socks:
+                        raise OSError(errno.EBADF, "unallocated guest socket")
+                    result.append(self.socks[number])
+        return result
 
-    def markFdSet(self, mem, lst, addr, sz):
-        if addr != 0:
-            s = set(lst)
-            fdset = ULongULongClass(mem, addr)
-            l = 0
-            for i in range (0, sz):
-                if i in self.socks and self.socks[i] in s:
-                    l = l | (1 << i)
-            #print("set ULongULong", l)
-            fdset.l0.set(l)
-            fdset.l1.set(l >> 32)
+    def markFdSet(self, mem, ready, addr, count):
+        if not addr:
+            return
+        ready = set(ready)
+        for base in range(0, count, 32):
+            requested = mem.r32(addr + (base // 32) * 4)
+            word = 0
+            for bit in range(min(32, count - base)):
+                if requested & (1 << bit) and self.socks.get(base + bit) in ready:
+                    word |= 1 << bit
+            mem.w32(addr + (base // 32) * 4, word)
 
     def WaitSelect(self, ctx):
-        sz = ctx.cpu.r_reg(REG_D0)
-        rfds = ctx.cpu.r_reg(REG_A0)
-        wfds = ctx.cpu.r_reg(REG_A1)
-        xfds = ctx.cpu.r_reg(REG_A2)
-        timevalp = ctx.cpu.r_reg(REG_A3)
-        signals = ctx.cpu.r_reg(REG_D1)
-        
-        # clear signals
-        if signals != 0:
-            sig = ULongULongStruct(ctx.mem, signals)
-            sig.l0.set(0)
-        
-        rlist, wlist, xlist = [], [], []
-        if rfds != 0:
-            rlist = self.listFromFdSet(ctx.mem, rfds, sz)
-        if wfds != 0:
-            wlist = self.listFromFdSet(ctx.mem, wfds, sz)
-        if xfds != 0:
-            xlist = self.listFromFdSet(ctx.mem, xfds, sz)
-
-        r, w, x = None, None, None        
-        if timevalp != 0:
-            timeval = ULongULongClass(ctx.mem, timevalp)
-            timeout = timeval.l0.get() + timeval.l1.get() * 1e-6
-            #print("WaitSelect timeout", timeout, rlist, wlist, xlist)
-            r,w,x = select.select(rlist, wlist, xlist, timeout)
-        else:
-            #print("WaitSelect no timeout", rlist, wlist, xlist)
-            r,w,x = select.select(rlist, wlist, xlist)
-        
-        self.markFdSet(ctx.mem, r, rfds, sz)
-        self.markFdSet(ctx.mem, w, wfds, sz)
-        self.markFdSet(ctx.mem, x, xfds, sz)
+        count = ctx.cpu.r_reg(REG_D0)
+        pointers = [ctx.cpu.r_reg(reg) for reg in (REG_A0, REG_A1, REG_A2)]
+        timeout_addr, signal_addr = ctx.cpu.r_reg(REG_A3), ctx.cpu.r_reg(REG_D1)
+        if count > FD_SETSIZE:
+            return self._fail(ctx, "EINVAL")
+        timeout = None
+        if timeout_addr:
+            seconds, micros = ctx.mem.r32(timeout_addr), ctx.mem.r32(timeout_addr + 4)
+            if seconds > 0x7FFFFFFF or micros >= 1000000:
+                return self._fail(ctx, "EINVAL")
+            timeout = seconds + micros / 1000000.0
+        signal_mask = ctx.mem.r32(signal_addr) if signal_addr else 0
+        if signal_addr:
+            ctx.mem.w32(signal_addr, 0)
+        try:
+            lists = [self.listFromFdSet(ctx.mem, ptr, count) if ptr else []
+                     for ptr in pointers]
+        except OSError as error:
+            return self._fail(ctx, error)
+        signal_func = getattr(getattr(ctx, "exec_lib", None), "signal_func", None)
+        task = signal_func.get_my_sched_task() if signal_func else None
+        deadline = time.monotonic() + timeout if timeout is not None else None
+        ready = ([], [], [])
+        while True:
+            # Only consume signals requested by this call or the configured
+            # interrupt mask. Other pending signals belong to their callers.
+            got = signal_func.set_signal(0, signal_mask | self.int_mask) if signal_func else 0
+            got &= signal_mask | self.int_mask
+            if got:
+                if signal_addr:
+                    ctx.mem.w32(signal_addr, got & signal_mask)
+                for ptr in pointers:
+                    self.markFdSet(ctx.mem, [], ptr, count)
+                if got & self.int_mask:
+                    return self._fail(ctx, "EINTR")
+                return 0
+            remaining = max(0.0, deadline - time.monotonic()) if deadline is not None else None
+            # A bounded host wait lets other guest tasks and signals run.
+            delay = min(remaining, 0.01) if remaining is not None else 0.01
+            try:
+                if any(lists):
+                    ready = select.select(*lists, delay)
+                elif delay:
+                    time.sleep(delay)
+            except OSError as error:
+                return self._fail(ctx, error)
+            except ValueError:
+                return self._fail(ctx, "EBADF")
+            if any(ready) or (deadline is not None and time.monotonic() >= deadline):
+                break
+            if task is not None:
+                task.reschedule()
+        for ptr, values in zip(pointers, ready):
+            self.markFdSet(ctx.mem, values, ptr, count)
+        return sum(map(len, ready))
 
     def shutdown(self, ctx):
         sock = self.socks.get(ctx.cpu.r_reg(REG_D0))
@@ -409,7 +434,7 @@ class BsdSocketLibrary(LibImpl):
 class ULongULongStruct(AmigaStruct):
     _format = [
         (ULONG, "l0"),
-        (UBYTE, "l1"),
+        (ULONG, "l1"),
     ]
 
 @AmigaClassDef

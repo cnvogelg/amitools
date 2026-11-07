@@ -225,3 +225,147 @@ def bsdsocket_option_error_test(ctx, failure, expected):
         ctx.socket.setsockopt.side_effect = OSError(errno.EACCES, 'denied')
     assert ctx.lib.setsockopt(ctx) == -1
     assert ctx.lib.Errno(ctx) == expected
+
+
+def select_args(ctx, nfds, read=0, write=0, exceptional=0, timeout=0, signals=0):
+    for reg, value in ((REG_D0,nfds), (REG_A0,read),(REG_A1,write),
+                       (REG_A2,exceptional),(REG_A3,timeout),(REG_D1,signals)):
+        ctx.cpu.w_reg(reg, value)
+
+
+@pytest.mark.parametrize('fd', [0, 31, 32, 42, 63, 64, 255])
+def bsdsocket_select_all_descriptor_words_test(ctx, monkeypatch, fd):
+    import select
+    ctx.lib.socks[fd] = ctx.socket
+    word = ctx.buffer.addr + (fd // 32) * 4
+    ctx.mem.w32(word, 1 << (fd % 32))
+    timeout = ctx.buffer.addr + 40
+    select_args(ctx, fd + 1, read=ctx.buffer.addr, timeout=timeout)
+    call = Mock(return_value=([ctx.socket], [], []))
+    monkeypatch.setattr(select, 'select', call)
+    assert ctx.lib.WaitSelect(ctx) == 1
+    assert call.call_args.args[:3] == ([ctx.socket], [], [])
+    assert ctx.mem.r32(word) == 1 << (fd % 32)
+    # Guard immediately after the counted set must remain intact.
+    assert ctx.mem.r32(ctx.buffer.addr + 32) == 0
+
+
+def bsdsocket_select_counts_ready_bits_test(ctx, monkeypatch):
+    import select
+    read, write, timeout = ctx.buffer.addr, ctx.buffer.addr + 4, ctx.buffer.addr + 8
+    ctx.mem.w32(read, 1)
+    ctx.mem.w32(write, 1)
+    select_args(ctx, 1, read, write, timeout=timeout)
+    monkeypatch.setattr(select, 'select', lambda *args: ([ctx.socket], [ctx.socket], []))
+    assert ctx.lib.WaitSelect(ctx) == 2
+    assert ctx.mem.r32(read) == ctx.mem.r32(write) == 1
+
+
+@pytest.mark.parametrize('failure,expected', [('fd',9),('count',22),('micros',22),('seconds',22),('host',54)])
+def bsdsocket_select_error_test(ctx, monkeypatch, failure, expected):
+    import select
+    read, timeout = ctx.buffer.addr, ctx.buffer.addr + 8
+    ctx.mem.w32(read, 2 if failure == 'fd' else 1)
+    ctx.mem.w32(timeout, 0xffffffff if failure == 'seconds' else 0)
+    ctx.mem.w32(timeout + 4, 1000000 if failure == 'micros' else 0)
+    select_args(ctx, 257 if failure == 'count' else 2, read, timeout=timeout)
+    monkeypatch.setattr(select, 'select', Mock(side_effect=OSError(errno.ECONNRESET,'reset')))
+    assert ctx.lib.WaitSelect(ctx) == -1
+    assert ctx.lib.Errno(ctx) == expected
+
+
+def bsdsocket_select_full_microseconds_and_timeout_test(ctx, monkeypatch):
+    import select
+    import time
+    read, timeout = ctx.buffer.addr, ctx.buffer.addr + 8
+    ctx.mem.w32(read, 1)
+    ctx.mem.w32(timeout, 1)
+    ctx.mem.w32(timeout + 4, 500123)
+    clock = [0.0]
+    delays = []
+    monkeypatch.setattr(time, 'monotonic', lambda: clock[0])
+    def poll(reads, writes, errors, delay):
+        delays.append(delay)
+        clock[0] += delay
+        return [], [], []
+    monkeypatch.setattr(select, 'select', poll)
+    select_args(ctx, 1, read, timeout=timeout)
+    assert ctx.lib.WaitSelect(ctx) == 0
+    assert sum(delays) == pytest.approx(1.500123)
+    assert max(delays) <= 0.01
+    assert ctx.mem.r32(read) == 0
+    assert ctx.mem.r32(timeout + 4) == 500123
+
+
+@pytest.mark.parametrize('interrupt', [False, True])
+@pytest.mark.parametrize('pending', [False, True])
+def bsdsocket_select_signals_and_cooperative_yield_test(ctx, monkeypatch, interrupt, pending):
+    import select
+    read, signals = ctx.buffer.addr, ctx.buffer.addr + 8
+    mask = (1 << 12) if interrupt else (1 << 21)
+    ctx.mem.w32(read, 1)
+    ctx.mem.w32(signals, 1 << 21)
+    ctx.mem.w32(signals + 4, 0xdeadbeef)
+    bits = [mask if pending else 0]
+    yielded = []
+    def consume(new, clear):
+        old = bits[0]
+        bits[0] &= ~clear
+        return old
+    def schedule():
+        yielded.append(1)
+        bits[0] |= mask
+    task = SimpleNamespace(reschedule=schedule)
+    ctx.exec_lib = SimpleNamespace(signal_func=SimpleNamespace(
+        get_my_sched_task=lambda: task, set_signal=consume))
+    monkeypatch.setattr(select, 'select', lambda *args: ([], [], []))
+    select_args(ctx, 1, read, signals=signals)
+    assert ctx.lib.WaitSelect(ctx) == (-1 if interrupt else 0)
+    assert bool(yielded) == (not pending)
+    assert ctx.mem.r32(signals) == (0 if interrupt else mask)
+    assert ctx.mem.r32(signals + 4) == 0xdeadbeef
+    assert ctx.mem.r32(read) == 0
+    if interrupt:
+        assert ctx.lib.Errno(ctx) == 4
+
+
+def bsdsocket_udp_loopback_test(ctx):
+    ctx.lib.socks.pop(0)
+    peer = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    peer.settimeout(2)
+    try:
+        peer.bind(('127.0.0.1', 0))
+        ctx.cpu.w_reg(REG_D0, 2)
+        ctx.cpu.w_reg(REG_D1, 2)
+        ctx.cpu.w_reg(REG_D2, 0)
+        assert ctx.lib.socket(ctx) == 0
+        ctx.cpu.w_reg(REG_D0, 0)
+        ctx.cpu.w_reg(REG_D1, 16)
+        ctx.cpu.w_reg(REG_A0, ctx.address.get_addr())
+        assert ctx.lib.bind(ctx) == 0
+        address = ctx.lib.socks[0].getsockname()
+        assert address[0] == '127.0.0.1' and address[1] != 0
+        peer.sendto(b'hello', address)
+        read, timeout = ctx.buffer.addr, ctx.buffer.addr + 16
+        ctx.mem.w32(read, 1)
+        ctx.mem.w32(timeout, 1)
+        select_args(ctx, 1, read, timeout=timeout)
+        assert ctx.lib.WaitSelect(ctx) == 1
+        ctx.cpu.w_reg(REG_D0, 0)
+        ctx.cpu.w_reg(REG_A0, ctx.buffer.addr)
+        ctx.cpu.w_reg(REG_D1, 5)
+        ctx.cpu.w_reg(REG_D2, 0)
+        assert ctx.lib.recv(ctx) == 5
+        assert ctx.mem.r_block(ctx.buffer.addr, 5) == b'hello'
+        ctx.address.sin_port.val = peer.getsockname()[1]
+        ctx.cpu.w_reg(REG_A0, ctx.address.get_addr())
+        ctx.cpu.w_reg(REG_D1, 16)
+        assert ctx.lib.connect(ctx) == 0
+        ctx.mem.w_block(ctx.buffer.addr, b'reply')
+        ctx.cpu.w_reg(REG_A0, ctx.buffer.addr)
+        ctx.cpu.w_reg(REG_D1, 5)
+        assert ctx.lib.send(ctx) == 5
+        assert peer.recv(10) == b'reply'
+        assert ctx.lib.CloseSocket(ctx) == 0
+    finally:
+        peer.close()
