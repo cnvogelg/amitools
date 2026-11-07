@@ -2,6 +2,7 @@ import time
 import ctypes
 import re
 import os
+from contextlib import ExitStack
 
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
@@ -130,12 +131,7 @@ class DosLibrary(LibImpl):
         self.file_mgr = FileManager(
             ctx.path_mgr, ctx.exec_lib.port_mgr, ctx.alloc, ctx.mem
         )
-        self.timer_device = ctx.exec_lib.lib_mgr.open_lib("timer.device", 0)
-        self.timer_request = ctx.alloc.alloc_astruct(
-            TimeRequestStruct, label="DOS TimerRequest"
-        )
-        self.timer_request.tr_node.io_Device.aptr = self.timer_device
-        self.lib_struct.dl_TimeReq.aptr = self.timer_request.addr
+        self._setup_timer_request(ctx)
         # processes made by CreateNewProc(), by their scheduler task
         self.child_procs = {}
         self.port_mgr = ctx.exec_lib.port_mgr
@@ -153,8 +149,7 @@ class DosLibrary(LibImpl):
         return 0
 
     def finish_lib(self, ctx):
-        ctx.exec_lib.lib_mgr.close_lib(self.timer_device)
-        self.timer_request.free()
+        self._finish_timer_request(ctx)
         # free the child processes that still run
         for child in self.child_procs.values():
             child.free()
@@ -175,6 +170,48 @@ class DosLibrary(LibImpl):
         self.root_struct.free()
         # free DosInfo
         self.dos_info.free()
+
+    def _setup_timer_request(self, ctx):
+        self.timer_device = 0
+        self.timer_request = None
+        self.timer_request_mem = None
+        self.lib_struct.dl_TimeReq.aptr = 0
+        with ExitStack() as rollback:
+            device = ctx.exec_lib.lib_mgr.open_lib("timer.device", 0)
+            if device == 0:
+                return
+            rollback.callback(ctx.exec_lib.lib_mgr.close_lib, device)
+            # The typed allocator raises an internal error on exhaustion.
+            # Allocate fallibly, then use a typed view of the owned memory.
+            memory = ctx.alloc.alloc_memory(
+                TimeRequestStruct.get_size(),
+                label="DOS TimerRequest",
+                except_on_failure=False,
+            )
+            if memory is None:
+                return
+            rollback.callback(ctx.alloc.free_memory, memory)
+            request = TimeRequestStruct(ctx.mem, memory.addr)
+            request.tr_node.io_Device.aptr = device
+            self.timer_device = device
+            self.timer_request = request
+            self.timer_request_mem = memory
+            self.lib_struct.dl_TimeReq.aptr = request.addr
+            rollback.pop_all()
+
+    def _finish_timer_request(self, ctx):
+        memory = self.timer_request_mem
+        device = self.timer_device
+        self.timer_device = 0
+        self.timer_request = None
+        self.timer_request_mem = None
+        self.lib_struct.dl_TimeReq.aptr = 0
+        try:
+            if memory is not None:
+                ctx.alloc.free_memory(memory)
+        finally:
+            if device != 0:
+                ctx.exec_lib.lib_mgr.close_lib(device)
 
     def update_dos_list_head(self):
         """Publish the current DOS list head through DOSBase."""

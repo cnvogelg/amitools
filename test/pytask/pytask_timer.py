@@ -20,17 +20,22 @@ def gen_timer_task(timer_func):
 
         # get proxy for device
         base_addr = req.node.device.aptr
+        vlib = ctx.lib_mgr.get_vlib_by_addr(base_addr)
+        open_count = vlib.get_library().open_cnt.val
         tdev = ctx.proxies.open_lib_proxy_addr(base_addr)
         assert tdev is not None
+        assert vlib.get_library().open_cnt.val == open_count
 
         # now run func using timer
         timer_func(ctx, tdev, req)
 
-        # free proxy
-        ctx.proxies.close_lib_proxy(tdev)
-
-        # close device
+        # The address-based proxy borrows the OpenDevice reference. Only
+        # CloseDevice releases it; closing the proxy too would close twice.
         exec_proxy.CloseDevice(req.addr)
+        if open_count > 1:
+            remaining = ctx.lib_mgr.get_vlib_by_addr(base_addr)
+            assert remaining is not None
+            assert remaining.get_library().open_cnt.val == open_count - 1
 
         # free req
         req.free()
