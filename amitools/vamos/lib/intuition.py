@@ -153,7 +153,7 @@ IDCMP_MENUHELP         = 0x01000000  # new for V36
 IDCMP_CHANGEWINDOW     = 0x02000000  # new for V36
 IDCMP_GADGETHELP       = 0x04000000  # new for V39
 IDCMP_EXTENDEDMOUSE    = 0x08000000  # new for V47 & V51
-    
+
 @AmigaStructDef
 class IntuiMessageStruct(AmigaStruct):
     _format = [
@@ -164,8 +164,8 @@ class IntuiMessageStruct(AmigaStruct):
         (ULONG, "IAddress"),     # optional pointer to source
         (WORD,  "MouseX"),
         (WORD,  "MouseY"),
-        (ULONG, "Seconds"),      # 
-        (ULONG, "Micros"),       # 
+        (ULONG, "Seconds"),      #
+        (ULONG, "Micros"),       #
         (ULONG, "IDCMPWindow"),  # pointer to WindowStruct
         (ULONG, "SpecialLink"),  # pointer to WindowStruct
     ]
@@ -244,7 +244,7 @@ class TextFontStruct(AmigaStruct):
         (ULONG, "tf_CharSpace"),         # pointer to spacing data
         (ULONG, "tf_CharKern"),          # pointer to kerning data
     ]
-    
+
 @AmigaStructDef
 class ScreenStruct(AmigaStruct):
     _format = [

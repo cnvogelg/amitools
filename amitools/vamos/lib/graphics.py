@@ -95,6 +95,9 @@ class RastPortStruct(AmigaStruct):
         (WORD, "TxSpacing"),
 
         (ULONG, "RP_User"),         # APTR*
+        (ARRAY(ULONG, 2), "longreserved"),
+        (ARRAY(UWORD, 7), "wordreserved"),
+        (ARRAY(UBYTE, 8), "reserved"),
     ]
 
 @AmigaStructDef
@@ -209,4 +212,3 @@ class LayerStruct(AmigaStruct):
         # ⭐ Correct: pointer to Region, not embedded RegionStruct
         (ULONG, "DamageList"),
     ]
-
