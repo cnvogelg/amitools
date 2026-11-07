@@ -53,6 +53,8 @@ class IntuitionLibrary(LibImpl):
         self.graphics_lib = None
         self.default_screen = None
         self._lib_opened = False   # guard flag
+        self._default_title_memory = None
+        self._sdl_flags = 0
         
         self.rp_2_win_addr = {}
         self.refresh_pending = set()
@@ -78,35 +80,74 @@ class IntuitionLibrary(LibImpl):
         except ImportError:
             log_intui.warning("pysdl2 not installed, no display available")
             return
-        sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO | sdl2.SDL_INIT_TIMER)
-
-        # open graphics.library
-        self.graphics_lib_addr = ctx.lib_mgr.open_lib("graphics.library")
-        self.graphics_lib = ctx.exec_lib.graphics_lib
-
-        # create default screen
-        self.default_screen = self.create_screen(
-            ctx,
-            width=800,
-            height=600,
-            depth=3,
-            text_attr_addr=self.graphics_lib.text_attr.addr,
-            title_ptr=ctx.alloc.alloc_cstr("Workbench").addr,
-            detail_pen=1,
-            block_pen=0
-        )
-
-        self._lib_opened = True
+        flags = sdl2.SDL_INIT_VIDEO | sdl2.SDL_INIT_TIMER
+        if sdl2.SDL_Init(flags) != 0:
+            log_intui.warning("SDL initialization failed; no display available")
+            return
+        with ExitStack() as rollback:
+            rollback.callback(sdl2.SDL_QuitSubSystem, flags)
+            graphics_addr = ctx.lib_mgr.open_lib("graphics.library")
+            if not graphics_addr:
+                return
+            rollback.callback(ctx.lib_mgr.close_lib, graphics_addr)
+            graphics = ctx.exec_lib.graphics_lib
+            if graphics is None or graphics.text_attr is None:
+                return
+            title = ctx.alloc.alloc_memory(
+                len("Workbench") + 1,
+                label="Intuition default title",
+                except_on_failure=False,
+            )
+            if title is None:
+                return
+            rollback.callback(ctx.alloc.free_memory, title)
+            ctx.mem.w_cstr(title.addr, "Workbench")
+            screen = self.create_screen(
+                ctx, 800, 600, 3, graphics.text_attr.addr, title.addr, 1, 0
+            )
+            if screen is None:
+                return
+            self.default_screen = screen
+            self._default_title_memory = title
+            self.graphics_lib_addr = graphics_addr
+            self.graphics_lib = graphics
+            self._sdl_flags = flags
+            self._lib_opened = True
+            rollback.pop_all()
         
     def close_lib(self, ctx, open_cnt):
-        if open_cnt == 0 and self._lib_opened:
-            # close default screen
-            title_addr = self.default_screen.DefaultTitle.get() 
-            ctx.cpu.w_reg(REG_A0, self.default_screen.addr)
-            self.CloseScreen(ctx)
-            self.alloc.free_cstr_by_addr(title_addr)
-            
-            ctx.lib_mgr.close_lib(self.graphics_lib_addr)
+        if open_cnt != 0 or not self._lib_opened:
+            return
+        screens = []
+        screen = self.default_screen
+        while screen is not None:
+            screens.append(screen)
+            addr = screen.NextScreen.val
+            screen = ScreenStruct(ctx.mem, addr) if addr else None
+        title = self._default_title_memory
+        graphics_addr = self.graphics_lib_addr
+        flags = self._sdl_flags
+        self._lib_opened = False
+        self.default_screen = None
+        self._default_title_memory = None
+        self.graphics_lib_addr = None
+        self._sdl_flags = 0
+        try:
+            with ExitStack() as cleanup:
+                import sdl2
+                cleanup.callback(sdl2.SDL_QuitSubSystem, flags)
+                cleanup.callback(ctx.lib_mgr.close_lib, graphics_addr)
+                cleanup.callback(ctx.alloc.free_memory, title)
+                for screen in screens:
+                    cleanup.callback(self._free_screen, ctx, screen)
+                for window in tuple(self.sdl_window_id_2_window_addr_map.values()):
+                    cleanup.callback(self._close_window_addr, ctx, window)
+        finally:
+            self.graphics_lib = None
+
+    def _close_window_addr(self, ctx, addr):
+        ctx.cpu.w_reg(REG_A0, addr)
+        self.CloseWindow(ctx)
 
     def DisplayAlert(self, ctx):
         alert_num = ctx.cpu.r_reg(REG_D0)
@@ -212,6 +253,9 @@ class IntuitionLibrary(LibImpl):
                 sdl2.SDL_RemoveTimer(timer_id)
 
     def OpenWindow(self, ctx):
+        if self.default_screen is None:
+            ctx.cpu.w_reg(REG_D0, 0)
+            return
         import sdl2
 
         new_window_ptr = ctx.cpu.r_reg(REG_A0)
@@ -245,6 +289,9 @@ class IntuitionLibrary(LibImpl):
         ctx.cpu.w_reg(REG_D0, amiga_win_addr)
 
     def OpenWindowTagList(self, ctx):
+        if self.default_screen is None:
+            ctx.cpu.w_reg(REG_D0, 0)
+            return
         import sdl2
 
         taglist_ptr = ctx.cpu.r_reg(REG_A1)
@@ -356,6 +403,9 @@ class IntuitionLibrary(LibImpl):
         ctx.cpu.w_reg(REG_D0, current_flags)  # Return old flags
 
     def OpenScreen(self, ctx):
+        if self.default_screen is None:
+            ctx.cpu.w_reg(REG_D0, 0)
+            return
         ns_ptr = ctx.cpu.r_reg(REG_A0)
         ns = NewScreenStruct(ctx.mem, ns_ptr)
     
@@ -368,6 +418,9 @@ class IntuitionLibrary(LibImpl):
         block_pen = ns.BlockPen.get()
     
         screen = self.create_screen(ctx, width, height, depth, font_ptr, title_ptr, detail_pen, block_pen)
+        if screen is None:
+            ctx.cpu.w_reg(REG_D0, 0)
+            return
     
         # Link into screen list
         screen.NextScreen.set(self.default_screen.NextScreen.get())
@@ -390,19 +443,7 @@ class IntuitionLibrary(LibImpl):
                 if prev != None:
                     prev.NextScreen.set(current.NextScreen.get())
     
-                # Free bitmap planes
-                bm = current.BitMap
-                bytes_per_row = bm.BytesPerRow.get()
-                rows = bm.Rows.get()
-                depth = bm.Depth.get()
-    
-                for i in range(depth):
-                    plane_addr = bm.Planes[i].get()
-                    if plane_addr:
-                        self.alloc.free_mem(plane_addr, bytes_per_row * rows)
-        
-                # Free screen struct
-                self.alloc.free_mem(current_ptr, current.get_size())
+                self._free_screen(ctx, current)
                 log_intui.info(f"CloseScreen: screen at 0x{current_ptr:X} removed and freed")
                 return
     
@@ -513,6 +554,8 @@ class IntuitionLibrary(LibImpl):
 # ----- Helper -----
 
     def create_window_struct(self, ctx, left, top, width, height, idcmp_flags, title, screen_addr, flags):
+        if self.graphics_lib is None or (not screen_addr and self.default_screen is None):
+            return 0
         import sdl2
         
         log_intui.info("Opening SDL2 window: '%s' at (%d, %d) size (%d x %d)",
@@ -1051,63 +1094,87 @@ class IntuitionLibrary(LibImpl):
             self.submenu_rects.append(r)
 
     def create_screen(self, ctx, width, height, depth, text_attr_addr, title_ptr, detail_pen, block_pen):
-        screen = ScreenStruct.alloc(self.alloc)
-        ctx.mem.clear_block(screen.addr, screen.get_size(), 0)
-    
+        if width <= 0 or not 1 <= depth <= 8:
+            return None
         if height <= 0:
             height = 200
-    
-        screen.Width.set(width)
-        screen.Height.set(height)
-    
-        screen.Font.set(text_attr_addr if text_attr_addr else self.graphics_lib.text_attr.addr)
-        screen.Title.set(title_ptr)
-        screen.DefaultTitle.set(title_ptr)
-    
-        screen.DetailPen.set(detail_pen)
-        screen.BlockPen.set(block_pen)
-    
-        screen.BarHeight.set(9)
-        screen.BarVBorder.set(1)
-        screen.BarHBorder.set(1)
-        screen.MenuVBorder.set(1)
-        screen.MenuHBorder.set(1)
-        screen.WBorTop.set(10)
-        screen.WBorLeft.set(4)
-        screen.WBorRight.set(4)
-        screen.WBorBottom.set(4)
-    
-    
-        # BitMap
+        if not text_attr_addr and self.graphics_lib is None:
+            return None
+        with ExitStack() as rollback:
+            memory = self.alloc.alloc_memory(
+                ScreenStruct.get_size(), label="Intuition screen",
+                except_on_failure=False,
+            )
+            if memory is None:
+                return None
+            rollback.callback(self.alloc.free_memory, memory)
+            screen = ScreenStruct(ctx.mem, memory.addr)
+            ctx.mem.clear_block(memory.addr, memory.size, 0)
+            screen.Width.set(width)
+            screen.Height.set(height)
+
+            screen.Font.set(text_attr_addr if text_attr_addr else self.graphics_lib.text_attr.addr)
+            screen.Title.set(title_ptr)
+            screen.DefaultTitle.set(title_ptr)
+
+            screen.DetailPen.set(detail_pen)
+            screen.BlockPen.set(block_pen)
+
+            screen.BarHeight.set(9)
+            screen.BarVBorder.set(1)
+            screen.BarHBorder.set(1)
+            screen.MenuVBorder.set(1)
+            screen.MenuHBorder.set(1)
+            screen.WBorTop.set(10)
+            screen.WBorLeft.set(4)
+            screen.WBorRight.set(4)
+            screen.WBorBottom.set(4)
+
+
+            # BitMap
+            bm = screen.BitMap
+            bytes_per_row = (width + 15) // 16 * 2
+            bm.BytesPerRow.set(bytes_per_row)
+            bm.Rows.set(height)
+            bm.Depth.set(depth)
+            bm.Flags.set(0)
+            bm.pad.set(0)
+
+            for i in range(depth):
+                plane_size = bytes_per_row * height
+                plane_ptr = self.alloc.alloc_mem(plane_size, except_on_fail=False)
+                if not plane_ptr:
+                    return None
+                rollback.callback(self.alloc.free_mem, plane_ptr, plane_size)
+                bm.Planes[i].set(plane_ptr)
+            for i in range(depth, 8):
+                bm.Planes[i].set(0)
+
+            # RastPort
+            rp = screen.RastPort
+            rp.Layer.set(0)
+            rp.BitMap.set(screen.BitMap.get_addr())
+            rp.FgPen.set(detail_pen)
+            rp.BgPen.set(block_pen)
+            rp.DrawMode.set(2)
+            rp.cp_x.set(0)
+            rp.cp_y.set(0)
+            rp.Mask.set(0xFF)
+            rp.LinePtrn.set(0xFFFF)
+            rp.Font.set(screen.Font.get())
+
+            rollback.pop_all()
+            return screen
+
+    def _free_screen(self, ctx, screen):
         bm = screen.BitMap
-        bytes_per_row = (width + 15) // 16 * 2
-        bm.BytesPerRow.set(bytes_per_row)
-        bm.Rows.set(height)
-        bm.Depth.set(depth)
-        bm.Flags.set(0)
-        bm.pad.set(0)
-    
-        for i in range(depth):
-            plane_size = bytes_per_row * height
-            plane_ptr = self.alloc.alloc_mem(plane_size)
-            bm.Planes[i].set(plane_ptr)
-        for i in range(depth, 8):
-            bm.Planes[i].set(0)
-    
-        # RastPort
-        rp = screen.RastPort
-        rp.Layer.set(0)
-        rp.BitMap.set(screen.BitMap.get_addr())
-        rp.FgPen.set(detail_pen)
-        rp.BgPen.set(block_pen)
-        rp.DrawMode.set(2)
-        rp.cp_x.set(0)
-        rp.cp_y.set(0)
-        rp.Mask.set(0xFF)
-        rp.LinePtrn.set(0xFFFF)
-        rp.Font.set(screen.Font.get())    
-    
-        return screen
+        plane_size = bm.BytesPerRow.val * bm.Rows.val
+        planes = [bm.Planes[i].val for i in range(bm.Depth.val)]
+        with ExitStack() as cleanup:
+            cleanup.callback(screen.free, ctx.alloc)
+            for plane in planes:
+                if plane:
+                    cleanup.callback(ctx.alloc.free_mem, plane, plane_size)
 
     def ScrollWindowRaster(self, ctx):
         """

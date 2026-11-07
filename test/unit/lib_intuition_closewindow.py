@@ -361,3 +361,33 @@ def intuition_window_global_quit_test(ctx):
         windows
     )
     ctx.close_all()
+
+
+def intuition_close_library_with_live_windows_test(ctx):
+    ctx.open()
+    ctx.open()
+    lib = ctx.intuition
+    lib._lib_opened = True
+    lib._default_title_memory = ctx.alloc.alloc_memory(10)
+    lib._sdl_flags = 3
+    lib.graphics_lib_addr = 0x1234
+    ctx.sdl.SDL_QuitSubSystem = Mock()
+
+    def close_graphics(addr):
+        assert addr == 0x1234
+        assert not ctx.windows
+        assert not ctx.renderers
+        assert ctx.alloc.get_memory(ctx.screen.get_addr()) is None
+        ctx.font.free()
+
+    ctx.lib_mgr = SimpleNamespace(close_lib=close_graphics)
+    lib.close_lib(ctx, 0)
+    assert not lib._lib_opened
+    assert not ctx.windows
+    assert not ctx.timers
+    assert not ctx.textures
+    assert not ctx.alloc.mem_objs
+    assert ctx.alloc.is_all_free()
+    ctx.sdl.SDL_QuitSubSystem.assert_called_once_with(3)
+    if ctx.labels:
+        assert not ctx.labels.get_all_labels()
