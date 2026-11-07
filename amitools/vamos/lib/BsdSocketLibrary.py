@@ -35,6 +35,7 @@ class BsdSocketLibrary(LibImpl):
         self.cnt = 0
         self.socks = {}
         self.hostByName = None
+        self._hostent_memory = None
         self.errno = 0
         self.errno_ptr = 0
         self.errno_size = 4
@@ -90,9 +91,10 @@ class BsdSocketLibrary(LibImpl):
             self._free_hostent(ctx)
 
     def _free_hostent(self, ctx):
-        if self.hostByName is not None:
-            self.hostByName.free()
-            self.hostByName = None
+        memory, self._hostent_memory = self._hostent_memory, None
+        self.hostByName = None
+        if memory is not None:
+            self.alloc.free_memory(memory)
 
     def get_version(self):
         return 4
@@ -135,32 +137,45 @@ class BsdSocketLibrary(LibImpl):
         return 0
 
     def gethostbyname(self, ctx):
-        name_ptr = ctx.cpu.r_reg(REG_A0)
-        name = ctx.mem.r_cstr(name_ptr)
+        name_addr = ctx.cpu.r_reg(REG_A0)
+        if not name_addr:
+            self._fail(ctx, "EFAULT")
+            return 0
+        name = ctx.mem.r_cstr(name_addr)
         try:
-            h = s.gethostbyname(name)
-            if h != None:
-                ip = 0
-                for x in h.split("."):
-                    ip = ip << 8
-                    ip += int(x)
-                # print(name, h, ip)
-    
-                if self.hostByName == None:
-                    self.hostByName = HostEntClass.alloc(self.alloc)
-                            
-                self.hostByName.h_name.set(name_ptr)            
-                self.hostByName.h_aliases.set(0)
-                self.hostByName.h_addrtype.set(0)
-                self.hostByName.h_length.set(1)
-                self.hostByName.h_addr_list.set(self.hostByName._addr + 20)
-                self.hostByName.h_addr.set(self.hostByName._addr + 24)
-                self.hostByName.h_addr_val.set(ip)
-                return self.hostByName._addr
+            address = s.inet_aton(s.gethostbyname(name))
+        except OSError:
+            return 0
+        # Keep the canonical public hostent prefix followed by owned,
+        # NULL-terminated address and alias lists and a copied name.
+        encoded_name = name.encode("latin-1") + b"\0"
+        size = HostEntStruct.get_size() + 4 + len(encoded_name)
+        memory = self.alloc.alloc_memory(
+            size, label="bsdsocket hostent", except_on_failure=False
+        )
+        if memory is None:
+            self._fail(ctx, "ENOMEM")
+            return 0
+        try:
+            ctx.mem.clear_block(memory.addr, memory.size, 0)
+            host = HostEntClass(ctx.mem, memory.addr)
+            aliases_addr = memory.addr + HostEntStruct.get_size()
+            copy_addr = aliases_addr + 4
+            ctx.mem.w_block(copy_addr, encoded_name)
+            host.h_name.set(copy_addr)
+            host.h_aliases.set(aliases_addr)
+            host.h_addrtype.val = 2  # AF_INET in the guest ABI
+            host.h_length.val = 4
+            host.h_addr_list.set(host.h_addr.get_addr())
+            host.h_addr.val = host.h_addr_val.get_addr()
+            ctx.mem.w_block(host.h_addr_val.get_addr(), address)
         except Exception:
-            pass
-        
-        return 0
+            self.alloc.free_memory(memory)
+            raise
+        self._free_hostent(ctx)
+        self._hostent_memory = memory
+        self.hostByName = host
+        return memory.addr
 
     def _address(self, ctx):
         if ctx.cpu.r_reg(REG_D1) < SockAddrStruct.get_size():
@@ -390,6 +405,7 @@ class HostEntStruct(AmigaStruct):
         (APTR_VOID, "h_addr_list"),
         # internal
         (ULONG, "h_addr"),
+        (ULONG, "h_addr_end"),
         (ULONG, "h_addr_val"),
     ]
 

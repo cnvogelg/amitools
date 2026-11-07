@@ -144,3 +144,44 @@ def bsdsocket_shutdown_test(ctx, how):
         ctx.socket.shutdown.assert_called_once_with((socket.SHUT_RD, socket.SHUT_WR, socket.SHUT_RDWR)[how])
     else:
         assert ctx.lib.Errno(ctx) == 22
+
+
+def bsdsocket_hostent_layout_and_ownership_test(ctx, monkeypatch):
+    monkeypatch.setattr(socket, 'gethostbyname', lambda name: '192.0.2.7')
+    name = ctx.alloc.alloc_cstr('example.invalid')
+    try:
+        ctx.cpu.w_reg(REG_A0, name.addr)
+        addr = ctx.lib.gethostbyname(ctx)
+        assert addr
+        # Inspect ABI offsets independently of the structure definition.
+        assert ctx.mem.r32(addr + 8) == 2
+        assert ctx.mem.r32(addr + 12) == 4
+        assert ctx.mem.r_cstr(ctx.mem.r32(addr)) == 'example.invalid'
+        aliases = ctx.mem.r32(addr + 4)
+        assert aliases and ctx.mem.r32(aliases) == 0
+        addresses = ctx.mem.r32(addr + 16)
+        assert ctx.mem.r_block(ctx.mem.r32(addresses), 4) == b'\xc0\0\2\7'
+        assert ctx.mem.r32(addresses + 4) == 0
+        ctx.mem.w_cstr(name.addr, 'overwritten')
+        assert ctx.mem.r_cstr(ctx.mem.r32(addr)) == 'example.invalid'
+        ctx.mem.w_cstr(name.addr, 'next.invalid')
+        assert ctx.lib.gethostbyname(ctx)
+        assert ctx.alloc.get_memory(addr) is None
+    finally:
+        ctx.alloc.free_memory(name)
+
+
+@pytest.mark.parametrize('failure', ['dns', 'allocation'])
+def bsdsocket_hostent_failure_keeps_previous_test(ctx, monkeypatch, failure):
+    monkeypatch.setattr(socket, 'gethostbyname', lambda name: '192.0.2.7')
+    ctx.mem.w_cstr(ctx.buffer.addr, 'example.invalid')
+    ctx.cpu.w_reg(REG_A0, ctx.buffer.addr)
+    previous = ctx.lib.gethostbyname(ctx)
+    before = ctx.alloc.get_free_bytes(), set(ctx.alloc.mem_objs)
+    if failure == 'dns':
+        monkeypatch.setattr(socket, 'gethostbyname', Mock(side_effect=socket.gaierror('dns')))
+    else:
+        monkeypatch.setattr(ctx.alloc, 'alloc_memory', lambda *args, **kwargs: None)
+    assert ctx.lib.gethostbyname(ctx) == 0
+    assert ctx.lib.hostByName.get_addr() == previous
+    assert (ctx.alloc.get_free_bytes(), set(ctx.alloc.mem_objs)) == before
