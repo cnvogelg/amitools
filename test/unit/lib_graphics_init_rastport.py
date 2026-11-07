@@ -1,3 +1,5 @@
+import ctypes
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -152,7 +154,13 @@ def graphics_init_rastport_native_entry_test(labels):
 
 @pytest.mark.parametrize("depth", [2, 8])
 @pytest.mark.parametrize("operation", ["Text", "Draw", "RectFill"])
-def graphics_init_rastport_default_pen_rendering_test(ctx, depth, operation):
+def graphics_init_rastport_default_pen_rendering_test(ctx, monkeypatch, depth, operation):
+    def size(font, text, width, height):
+        ctypes.cast(width, ctypes.POINTER(ctypes.c_int))[0] = len(text) * 8
+        return 0
+
+    monkeypatch.setitem(sys.modules, "sdl2", SimpleNamespace(
+        sdlttf=SimpleNamespace(TTF_SizeUTF8=size)))
     ctx.initialize()
     bitmap = BitMapStruct.alloc(ctx.alloc)
     text = ctx.alloc.alloc_cstr("Hi")
