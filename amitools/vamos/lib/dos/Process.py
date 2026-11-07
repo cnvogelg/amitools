@@ -339,8 +339,6 @@ class Process(DosProcess):
         # set home dir
         task.pr_HomeDir.aptr = self.home_lock.b_addr << 2
         varlist = self.get_local_vars()
-        task.pr_Task.tc_SPLower.aptr = self.stack.get_lower()
-        task.pr_Task.tc_SPUpper.aptr = self.stack.get_upper()
         varlist_struct = varlist
         # Initialize the list of local shell variables
         varlist_struct.mlh_Head.aptr = varlist.addr + 4
