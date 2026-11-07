@@ -469,7 +469,11 @@ def bsdsocket_native_library_entry_test(operation):
     sock = Mock()
     impl.socks[0] = sock
     try:
-        bias = read_lib_fd("bsdsocket.library").get_func_by_name(operation.split("_")[0]).get_bias()
+        bias = (
+            read_lib_fd("bsdsocket.library")
+            .get_func_by_name(operation.split("_")[0])
+            .get_bias()
+        )
         # JSR -bias(A6); RTS, using the actual registered library stub.
         mem.w16(code.addr, 0x4EAE)
         mem.w16(code.addr + 2, (-bias) & 0xFFFF)
@@ -479,8 +483,9 @@ def bsdsocket_native_library_entry_test(operation):
             mem.w32(block.addr, 1)
             regs.update({REG_D1: 0xFFFF, REG_D2: 4, REG_A0: block.addr, REG_D3: 4})
         elif operation == "WaitSelect_empty":
-            regs.update({REG_A0: 0, REG_A1: 0, REG_A2: 0,
-                         REG_A3: block.addr, REG_D1: 0})
+            regs.update(
+                {REG_A0: 0, REG_A1: 0, REG_A2: 0, REG_A3: block.addr, REG_D1: 0}
+            )
         else:
             pending = 1 << 21
             task = SimpleNamespace(set_signal=lambda new, mask: pending)
@@ -512,3 +517,11 @@ def bsdsocket_native_library_entry_test(operation):
         manager.cleanup()
         assert alloc.is_all_free()
         machine.cleanup()
+
+
+@pytest.mark.parametrize("code,expected", [(10035, 35), (10048, 48), (10061, 61)])
+def bsdsocket_winsock_errno_translation_test(ctx, code, expected):
+    error = OSError(code, "Winsock error")
+    error.winerror = code
+    assert ctx.lib._fail(ctx, error) == -1
+    assert ctx.lib.Errno(ctx) == expected

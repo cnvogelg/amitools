@@ -83,8 +83,13 @@ class BsdSocketLibrary(LibImpl):
 
     def _fail(self, ctx, error):
         if isinstance(error, OSError):
-            name = errno.errorcode.get(error.errno, "EIO")
-            value = AMIGA_ERRNO.get(name, 5)
+            code = getattr(error, "winerror", None) or error.errno
+            if code is not None and 10000 < code < 10100:
+                candidate = code - 10000  # Winsock retains BSD's socket numbers.
+                value = candidate if candidate in AMIGA_ERRNO.values() else 5
+            else:
+                name = errno.errorcode.get(code, "EIO")
+                value = AMIGA_ERRNO.get(name, 5)
         else:
             value = AMIGA_ERRNO[error]
         self.errno = value
