@@ -2,6 +2,7 @@ from amitools.vamos.libcore.impl import LibImpl
 from amitools.vamos.machine.regs import REG_D0, REG_D1, REG_D2, REG_D3, REG_D4, REG_A0, REG_A1, REG_A2, REG_A3
 
 import errno
+import os
 import select
 import struct
 import time
@@ -339,35 +340,70 @@ class BsdSocketLibrary(LibImpl):
         return 0
 
     def setsockopt(self, ctx):
-        fd = ctx.cpu.r_reg(REG_D0)
-        level = ctx.cpu.r_reg(REG_D1)
-        optname = ctx.cpu.r_reg(REG_D2)
-        optval_ptr = ctx.cpu.r_reg(REG_D3)
-        optlen = ctx.cpu.r_reg(REG_D4)
-
-        # Validate socket descriptor
-        if fd not in self.socks:
-            return -1
-
-        sock = self.socks[fd]
-
-        # Read option value from Amiga memory
-        try:
-            optval_bytes = ctx.mem.r_block(optval_ptr, optlen)
-        except Exception:
-            return -1
-
-        # Convert bytes to appropriate Python type
-        if optlen == 4:
-            optval = int.from_bytes(optval_bytes, byteorder='big')  # Amiga is big-endian
+        sock = self.socks.get(ctx.cpu.r_reg(REG_D0))
+        if sock is None:
+            return self._fail(ctx, "EBADF")
+        level, option = ctx.cpu.r_reg(REG_D1), ctx.cpu.r_reg(REG_D2)
+        address, size = ctx.cpu.r_reg(REG_A0), ctx.cpu.r_reg(REG_D3)
+        socket_options = {
+            0x0001: ("SO_DEBUG", "int"), 0x0004: ("SO_REUSEADDR", "int"),
+            0x0008: ("SO_KEEPALIVE", "int"), 0x0010: ("SO_DONTROUTE", "int"),
+            0x0020: ("SO_BROADCAST", "int"), 0x0040: ("SO_USELOOPBACK", "int"),
+            0x0080: ("SO_LINGER", "linger"), 0x0100: ("SO_OOBINLINE", "int"),
+            0x0200: ("SO_REUSEPORT", "int"), 0x1001: ("SO_SNDBUF", "int"),
+            0x1002: ("SO_RCVBUF", "int"), 0x1003: ("SO_SNDLOWAT", "int"),
+            0x1004: ("SO_RCVLOWAT", "int"), 0x1005: ("SO_SNDTIMEO", "timeval"),
+            0x1006: ("SO_RCVTIMEO", "timeval"),
+        }
+        ip_options = {
+            1: ("IP_OPTIONS", "raw"), 2: ("IP_HDRINCL", "int"),
+            3: ("IP_TOS", "int"), 4: ("IP_TTL", "int"),
+            5: ("IP_RECVOPTS", "int"), 6: ("IP_RECVRETOPTS", "int"),
+            7: ("IP_RECVDSTADDR", "int"), 8: ("IP_RETOPTS", "raw"),
+            9: ("IP_MULTICAST_IF", "address"), 10: ("IP_MULTICAST_TTL", "byte"),
+            11: ("IP_MULTICAST_LOOP", "byte"),
+            12: ("IP_ADD_MEMBERSHIP", "membership"),
+            13: ("IP_DROP_MEMBERSHIP", "membership"),
+        }
+        if level == 0xFFFF:
+            host_level, table = s.SOL_SOCKET, socket_options
+        elif level == 6:
+            host_level, table = s.IPPROTO_TCP, {1: ("TCP_NODELAY", "int"),
+                                              2: ("TCP_MAXSEG", "int")}
+        elif level == 0:
+            host_level, table = s.IPPROTO_IP, ip_options
         else:
-            optval = optval_bytes  # For raw byte options
-
+            return self._fail(ctx, "ENOPROTOOPT")
+        name, kind = table.get(option, (None, None))
+        host_option = getattr(s, name, None) if name else None
+        if host_option is None:
+            return self._fail(ctx, "ENOPROTOOPT")
+        expected = {"int": (4,), "linger": (8,), "timeval": (8,),
+                    "address": (4,), "membership": (8,), "byte": (1, 4)}
+        if size > 0x7fffffff or (kind in expected and size not in expected[kind]):
+            return self._fail(ctx, "EINVAL")
+        if size and not address:
+            return self._fail(ctx, "EFAULT")
+        data = bytes(ctx.mem.r_block(address, size)) if size else b""
+        value = data
+        if kind in ("int", "byte"):
+            value = int.from_bytes(data, "big", signed=kind == "int")
+        elif kind == "linger":
+            enabled, seconds = struct.unpack(">ii", data)
+            if enabled < 0 or seconds < 0 or (os.name == "nt" and max(enabled, seconds) > 65535):
+                return self._fail(ctx, "EINVAL")
+            value = struct.pack("HH" if os.name == "nt" else "ii", enabled, seconds)
+        elif kind == "timeval":
+            seconds, micros = struct.unpack(">ii", data)
+            if seconds < 0 or not 0 <= micros < 1000000:
+                return self._fail(ctx, "EINVAL")
+            value = ((seconds * 1000 + (micros + 999) // 1000) if os.name == "nt"
+                     else struct.pack("ll", seconds, micros))
         try:
-            sock.setsockopt(level, optname, optval)
-            return 0
-        except OSError as e:
-            return -1
+            sock.setsockopt(host_level, host_option, value)
+        except OSError as error:
+            return self._fail(ctx, error)
+        return 0
 
 @AmigaStructDef
 class ULongULongStruct(AmigaStruct):

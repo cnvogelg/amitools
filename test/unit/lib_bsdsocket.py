@@ -185,3 +185,43 @@ def bsdsocket_hostent_failure_keeps_previous_test(ctx, monkeypatch, failure):
     assert ctx.lib.gethostbyname(ctx) == 0
     assert ctx.lib.hostByName.get_addr() == previous
     assert (ctx.alloc.get_free_bytes(), set(ctx.alloc.mem_objs)) == before
+
+
+@pytest.mark.parametrize('kind', ['int', 'linger', 'timeval', 'ip', 'tcp', 'byte'])
+def bsdsocket_option_registers_and_translation_test(ctx, monkeypatch, kind):
+    import os
+    import struct
+    options = {
+        'int': (0xffff, 4, 'SOL_SOCKET', 'SO_REUSEADDR', (1).to_bytes(4, 'big'), 1),
+        'linger': (0xffff, 128, 'SOL_SOCKET', 'SO_LINGER', struct.pack('>ii', 1, 9), struct.pack('HH' if os.name == 'nt' else 'ii', 1, 9)),
+        'timeval': (0xffff, 0x1006, 'SOL_SOCKET', 'SO_RCVTIMEO', struct.pack('>ii', 2, 500123), 2501 if os.name == 'nt' else struct.pack('ll', 2, 500123)),
+        'ip': (0, 4, 'IPPROTO_IP', 'IP_TTL', struct.pack('>i', 20), 20),
+        'tcp': (6, 1, 'IPPROTO_TCP', 'TCP_NODELAY', struct.pack('>i', 1), 1),
+        'byte': (0, 10, 'IPPROTO_IP', 'IP_MULTICAST_TTL', b'\x02', 2),
+    }
+    level, option, level_name, option_name, data, value = options[kind]
+    # Deliberately differ from Amiga constants, including BSD-like hosts.
+    monkeypatch.setattr(socket, level_name, 123)
+    monkeypatch.setattr(socket, option_name, 456, raising=False)
+    ctx.mem.w_block(ctx.buffer.addr, data)
+    ctx.cpu.w_reg(REG_D0, 0)
+    ctx.cpu.w_reg(REG_D1, level)
+    ctx.cpu.w_reg(REG_D2, option)
+    ctx.cpu.w_reg(REG_A0, ctx.buffer.addr)
+    ctx.cpu.w_reg(REG_D3, len(data))
+    assert ctx.lib.setsockopt(ctx) == 0
+    ctx.socket.setsockopt.assert_called_once_with(123, 456, value)
+
+
+@pytest.mark.parametrize('failure,expected', [('fd',9), ('option',42),('level',42),('size',22),('null',14),('host',13)])
+def bsdsocket_option_error_test(ctx, failure, expected):
+    ctx.mem.w32(ctx.buffer.addr, 1)
+    ctx.cpu.w_reg(REG_D0, 99 if failure == 'fd' else 0)
+    ctx.cpu.w_reg(REG_D1, 99 if failure == 'level' else 0xffff)
+    ctx.cpu.w_reg(REG_D2, 0x2001 if failure == 'option' else 4)
+    ctx.cpu.w_reg(REG_A0, 0 if failure == 'null' else ctx.buffer.addr)
+    ctx.cpu.w_reg(REG_D3, 1 if failure == 'size' else 4)
+    if failure == 'host':
+        ctx.socket.setsockopt.side_effect = OSError(errno.EACCES, 'denied')
+    assert ctx.lib.setsockopt(ctx) == -1
+    assert ctx.lib.Errno(ctx) == expected
