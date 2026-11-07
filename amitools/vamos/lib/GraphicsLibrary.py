@@ -19,6 +19,7 @@ class GraphicsLibrary(LibImpl):
         self.font_registry = {}
         self.topaz_font = None
         self.rp_graphics_map = {}
+        self._rastport_resources = {}
         self.palette = None
         self._lib_opened = False
 
@@ -107,22 +108,26 @@ class GraphicsLibrary(LibImpl):
     # ---------------------------------------------------------------------
 
     def init_bitmap_canonical(self, ctx, bm_addr, width, height, depth=2):
-        """Canonical BitMap initialization."""
+        """Initialize a bitmap, rolling back partially allocated planes."""
+        if not (0 < width <= 32767 and 0 < height <= 32767 and 1 <= depth <= 8):
+            return False
         bm = BitMapStruct(ctx.mem, bm_addr)
-
-        bytes_per_row = ((width + 15) // 16) * 2
-        bm.BytesPerRow.set(bytes_per_row)
-        bm.Rows.set(height)
-        bm.Depth.set(depth)
-        bm.Flags.set(0)
-        bm.pad.set(0)
-
-        plane_size = bytes_per_row * height
-        for i in range(depth):
-            plane_ptr = ctx.alloc.alloc_mem(plane_size)
-            bm.Planes[i].set(plane_ptr)
-        for i in range(depth, 8):
-            bm.Planes[i].set(0)
+        ctx.mem.clear_block(bm_addr, BitMapStruct.get_size(), 0)
+        bm.BytesPerRow.val = ((width + 15) // 16) * 2
+        bm.Rows.val = height
+        bm.Depth.val = depth
+        plane_size = bm.BytesPerRow.val * height
+        with ExitStack() as rollback:
+            for i in range(depth):
+                addr = ctx.alloc.alloc_mem(plane_size, except_on_fail=False)
+                if not addr:
+                    ctx.mem.clear_block(bm_addr, BitMapStruct.get_size(), 0)
+                    return False
+                rollback.callback(ctx.alloc.free_mem, addr, plane_size)
+                ctx.mem.clear_block(addr, plane_size, 0)
+                bm.Planes[i].val = addr
+            rollback.pop_all()
+        return True
 
     def init_rastport_canonical(self, ctx, rp_addr):
         """Reset the complete public RastPort, then apply system defaults."""
@@ -143,42 +148,45 @@ class GraphicsLibrary(LibImpl):
     # ---------------------------------------------------------------------
 
     def create_window_rastport(self, ctx, sdl_win, width, height, depth=2):
-        # --- BitMap ---
-        bm = BitMapStruct.alloc(ctx.alloc)
-        self.init_bitmap_canonical(ctx, bm.addr, width, height, depth)
-    
-        # --- Layer ---
-        layer = LayerStruct.alloc(ctx.alloc)
-        layer.Width.set(width)
-        layer.Height.set(height)
-    
-        # Allocate DamageList region
-        damage_region_addr = self._new_region(ctx)
-        layer.DamageList.set(damage_region_addr)
-    
-        # --- RastPort ---
-        rp = RastPortStruct.alloc(ctx.alloc)
-        self.init_rastport_canonical(ctx, rp.addr)
-        # Host-backed windows retain their initial UI pen and baseline.
-        # Attach owned objects only after the public reset has completed.
-        rp.FgPen.val = 1
-        rp.AOlPen.val = 0
-        rp.cp_y.val = rp.TxBaseline.val
-    
-        rp.BitMap.set(bm.addr)
-        rp.Layer.set(layer.addr)
-        layer.rp.set(rp.addr)
-    
-        # --- SDL backing ---
-        self.alloc_rast_port_graphics(ctx, rp.addr, sdl_win, width, height)
-    
+        with ExitStack() as rollback:
+            objects = []
+            for struct in (BitMapStruct, LayerStruct, RastPortStruct):
+                memory = ctx.alloc.alloc_memory(
+                    struct.get_size(), label=struct.__name__, except_on_failure=False
+                )
+                if memory is None:
+                    return 0, 0, 0
+                rollback.callback(ctx.alloc.free_memory, memory)
+                ctx.mem.clear_block(memory.addr, memory.size, 0)
+                objects.append(struct(ctx.mem, memory.addr))
+            bm, layer, rp = objects
+            if not self.init_bitmap_canonical(ctx, bm.addr, width, height, depth):
+                return 0, 0, 0
+            plane_size = bm.BytesPerRow.val * bm.Rows.val
+            for i in range(depth):
+                rollback.callback(ctx.alloc.free_mem, bm.Planes[i].val, plane_size)
+            damage = self._new_region(ctx)
+            if not damage:
+                return 0, 0, 0
+            rollback.callback(self._dispose_region, ctx, damage)
+            layer.Width.val, layer.Height.val = width, height
+            layer.DamageList.val = damage
+            self.init_rastport_canonical(ctx, rp.addr)
+            rp.FgPen.val, rp.AOlPen.val = 1, 0
+            rp.cp_y.val = rp.TxBaseline.val
+            rp.BitMap.val, rp.Layer.val = bm.addr, layer.addr
+            layer.rp.val = rp.addr
+            if not self.alloc_rast_port_graphics(ctx, rp.addr, sdl_win, width, height):
+                return 0, 0, 0
+            rollback.callback(self.free_rast_port_graphics, ctx, rp.addr)
+            self._rastport_resources[rp.addr] = rollback.pop_all()
         return rp.addr, layer.addr, bm.addr
-    
-    # ---------------------------------------------------------------------
-    # Raster / graphics context management
-    # ---------------------------------------------------------------------
 
     def free_RastPortStruct(self, ctx, rp_addr):
+        owned = self._rastport_resources.pop(rp_addr, None)
+        if owned is not None:
+            owned.close()
+            return
         rp = RastPortStruct(ctx.mem, rp_addr)
     
         # --- Free Layer ---
@@ -223,25 +231,30 @@ class GraphicsLibrary(LibImpl):
             -1,
             sdl2.SDL_RENDERER_ACCELERATED | sdl2.SDL_RENDERER_PRESENTVSYNC,
         )
-        texture = sdl2.SDL_CreateTexture(
-            renderer,
-            sdl2.SDL_PIXELFORMAT_RGBA8888,
-            sdl2.SDL_TEXTUREACCESS_TARGET,
-            width,
-            height,
-        )
-        if not texture:
-            log_gfx.error(f"Failed to create texture for RastPort {rastport_addr:08x}")
-            return
-
-        sdl2.SDL_SetRenderTarget(renderer, texture)
-        sdl2.SDL_SetRenderDrawColor(renderer, 168, 168, 168, 255)
-        sdl2.SDL_RenderClear(renderer)
-        sdl2.SDL_SetRenderTarget(renderer, None)
-
-        self.rp_graphics_map[rastport_addr] = RastPortGraphics(
-            sdl_win, renderer, texture, width, height
-        )
+        if not renderer:
+            return False
+        with ExitStack() as rollback:
+            rollback.callback(sdl2.SDL_DestroyRenderer, renderer)
+            texture = sdl2.SDL_CreateTexture(
+                renderer, sdl2.SDL_PIXELFORMAT_RGBA8888,
+                sdl2.SDL_TEXTUREACCESS_TARGET, width, height,
+            )
+            if not texture:
+                return False
+            rollback.callback(sdl2.SDL_DestroyTexture, texture)
+            if sdl2.SDL_SetRenderTarget(renderer, texture) == -1:
+                return False
+            if sdl2.SDL_SetRenderDrawColor(renderer, 168, 168, 168, 255) == -1:
+                return False
+            if sdl2.SDL_RenderClear(renderer) == -1:
+                return False
+            if sdl2.SDL_SetRenderTarget(renderer, None) == -1:
+                return False
+            self.rp_graphics_map[rastport_addr] = RastPortGraphics(
+                sdl_win, renderer, texture, width, height
+            )
+            rollback.pop_all()
+        return True
 
     def free_rast_port_graphics(self, ctx, rastport_addr):
         import sdl2
@@ -600,16 +613,14 @@ class GraphicsLibrary(LibImpl):
 
     def _new_region(self, ctx):
         """Allocate an empty Region."""
-        reg = RegionStruct.alloc(ctx.alloc)
-    
-        # Empty bounds
-        #reg.bounds.MinX.set(0)
-        #reg.bounds.MinY.set(0)
-        reg.bounds.MaxX.set(-1)
-        reg.bounds.MaxY.set(-1)
-    
-        #reg.RegionRectangle.set(0)
-    
+        memory = ctx.alloc.alloc_memory(
+            RegionStruct.get_size(), label="Graphics region", except_on_failure=False
+        )
+        if memory is None:
+            return 0
+        ctx.mem.clear_block(memory.addr, memory.size, 0)
+        reg = RegionStruct(ctx.mem, memory.addr)
+        reg.bounds.MaxX.val = reg.bounds.MaxY.val = -1
         return reg.addr
 
     def _dispose_region(self, ctx, region_addr):
