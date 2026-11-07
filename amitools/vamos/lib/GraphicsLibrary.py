@@ -57,7 +57,7 @@ class GraphicsLibrary(LibImpl):
                 rollback.callback(ctx.alloc.free_memory, attr_memory)
                 ctx.mem.clear_block(attr_memory.addr, attr_memory.size, 0)
                 attr = TextAttrStruct(ctx.mem, attr_memory.addr)
-                name = "Topaz_a1200_v1.0.ttf"
+                name = "Cousine-Regular.ttf"
                 name_memory = ctx.alloc.alloc_memory(
                     len(name) + 1, label="Graphics default name",
                     except_on_failure=False,
@@ -284,6 +284,8 @@ class GraphicsLibrary(LibImpl):
         from sdl2 import sdlttf
 
         font_path = os.path.join(self.fontsPath, name)
+        if name == "Cousine-Regular.ttf" and not os.path.isfile(font_path):
+            font_path = os.path.join(os.path.dirname(__file__), "fonts", name)
         font = sdlttf.TTF_OpenFont(font_path.encode("utf-8"), size)
         if not font:
             log_main.error(
@@ -342,7 +344,7 @@ class GraphicsLibrary(LibImpl):
             font_name = ctx.mem.r_cstr(name_ptr)
 
         if font_name is None or font_name == "topaz.font":
-            font_name = "Topaz_a1200_v1.0.ttf"
+            font_name = "Cousine-Regular.ttf"
 
         font_size = text_attr.ta_YSize.get()
         style_flags = text_attr.ta_Style.get()
