@@ -1,6 +1,7 @@
 import os
 import ctypes
 import time
+from contextlib import ExitStack
 
 from amitools.vamos.libcore.impl import LibImpl
 from amitools.vamos.machine.regs import REG_A0, REG_D0, REG_A1, REG_D1, REG_D2, REG_D3
@@ -135,17 +136,11 @@ class GraphicsLibrary(LibImpl):
         rp.DrawMode.set(2)        # JAM2
         rp.LinePtrn.set(0xFFFF)
 
-        rp.Font.set(self.topaz_font)
-
-        tf = TextFontStruct(ctx.mem, self.topaz_font)
-        rp.TxFlags.set(tf.tf_Flags.get())
-        rp.TxHeight.set(tf.tf_YSize.get())
-        rp.TxWidth.set(tf.tf_XSize.get())
-        rp.TxBaseline.set(tf.tf_Baseline.get())
-        rp.TxSpacing.set(tf.tf_CharSpace.get())
+        self._set_font(ctx, rp_addr, self.topaz_font)
+        rp.TxSpacing.set(0)
 
         rp.cp_x.set(0)
-        rp.cp_y.set(tf.tf_Baseline.get())
+        rp.cp_y.set(rp.TxBaseline.get())
 
     # ---------------------------------------------------------------------
     # Unified RastPort + BitMap creation helpers
@@ -286,33 +281,34 @@ class GraphicsLibrary(LibImpl):
             )
             return None, None
 
-        height = sdlttf.TTF_FontHeight(font)
-        ascent = sdlttf.TTF_FontAscent(font)
-
-        avg_width = ctypes.c_int()
-        dummy = ctypes.c_int()
-        sdlttf.TTF_SizeUTF8(font, b"M", ctypes.byref(avg_width), ctypes.byref(dummy))
-
-        font_mem = self.alloc.alloc_struct(TextFontStruct)
-        font_addr = font_mem.addr
-        tf = TextFontStruct(ctx.mem, font_addr)
-
-        tf.tf_YSize.set(height)
-        #tf.tf_Style.set(0)
-        #tf.tf_Flags.set(0)
-        tf.tf_XSize.set(avg_width.value)
-        tf.tf_Baseline.set(ascent)
-        #tf.tf_BoldSmear.set(0)
-        tf.tf_Accessors.set(1)
-        tf.tf_LoChar.set(32)
-        tf.tf_HiChar.set(127)
-        #tf.tf_CharData.set(0)
-        #tf.tf_Modulo.set(0)
-        #tf.tf_CharLoc.set(0)
-        #tf.tf_CharSpace.set(0)
-        #tf.tf_CharKern.set(0)
-
-        self.font_registry[font_addr] = font
+        with ExitStack() as rollback:
+            rollback.callback(sdlttf.TTF_CloseFont, font)
+            height = sdlttf.TTF_FontHeight(font)
+            ascent = sdlttf.TTF_FontAscent(font)
+            avg_width = ctypes.c_int()
+            dummy = ctypes.c_int()
+            if sdlttf.TTF_SizeUTF8(
+                font, b"M", ctypes.byref(avg_width), ctypes.byref(dummy)
+            ) != 0:
+                return None, None
+            font_mem = self.alloc.alloc_memory(
+                TextFontStruct.get_size(), label="Graphics TextFont",
+                except_on_failure=False,
+            )
+            if font_mem is None:
+                return None, None
+            rollback.callback(self.alloc.free_memory, font_mem)
+            font_addr = font_mem.addr
+            ctx.mem.clear_block(font_addr, font_mem.size, 0)
+            tf = TextFontStruct(ctx.mem, font_addr)
+            tf.tf_YSize.set(height)
+            tf.tf_XSize.set(avg_width.value)
+            tf.tf_Baseline.set(ascent)
+            tf.tf_Accessors.set(1)
+            tf.tf_LoChar.set(32)
+            tf.tf_HiChar.set(127)
+            self.font_registry[font_addr] = font
+            rollback.pop_all()
         log_main.debug(
             "Loaded font '%s' size=%d height=%d ascent=%d avg_width=%d",
             name, size, height, ascent, avg_width.value,
@@ -320,9 +316,12 @@ class GraphicsLibrary(LibImpl):
         return font, font_addr
 
     def OpenFont(self, ctx):
+        font_addr = self._open_font(ctx, ctx.cpu.r_reg(REG_A0))
+        ctx.cpu.w_reg(REG_D0, font_addr)
+
+    def _open_font(self, ctx, text_attr_addr):
         from sdl2 import sdlttf
 
-        text_attr_addr = ctx.cpu.r_reg(REG_A0)
         text_attr = TextAttrStruct(ctx.mem, text_attr_addr)
 
         font_name = None
@@ -338,8 +337,7 @@ class GraphicsLibrary(LibImpl):
 
         font, font_addr = self.open_font_file(ctx, font_name, font_size)
         if not font:
-            ctx.cpu.w_reg(REG_D0, 0)
-            return
+            return 0
 
         sdl_style = 0
         if style_flags & 0x01:
@@ -349,25 +347,32 @@ class GraphicsLibrary(LibImpl):
         if style_flags & 0x04:
             sdl_style |= sdlttf.TTF_STYLE_ITALIC
 
-        sdlttf.TTF_SetFontStyle(font, sdl_style)
-        ctx.cpu.w_reg(REG_D0, font_addr)
+        with ExitStack() as rollback:
+            rollback.callback(self._close_font, ctx, font_addr)
+            sdlttf.TTF_SetFontStyle(font, sdl_style)
+            rollback.pop_all()
+        return font_addr
 
     def CloseFont(self, ctx):
+        self._close_font(ctx, ctx.cpu.r_reg(REG_A1))
+
+    def _close_font(self, ctx, font_addr):
         from sdl2 import sdlttf
 
-        font_addr = ctx.cpu.r_reg(REG_A1)
         font = self.font_registry.pop(font_addr, None)
 
         if font:
-            sdlttf.TTF_CloseFont(font)
-            self.alloc.free_mem(font_addr, TextFontStruct.get_size())
+            try:
+                sdlttf.TTF_CloseFont(font)
+            finally:
+                self.alloc.free_memory(self.alloc.get_memory(font_addr))
         else:
             log_main.warn("CloseFont: unknown font address 0x%X", font_addr)
 
     def SetFont(self, ctx):
-        rastport_addr = ctx.cpu.r_reg(REG_A1)
-        font_ptr = ctx.cpu.r_reg(REG_A0)
+        self._set_font(ctx, ctx.cpu.r_reg(REG_A1), ctx.cpu.r_reg(REG_A0))
 
+    def _set_font(self, ctx, rastport_addr, font_ptr):
         rp = RastPortStruct(ctx.mem, rastport_addr)
         rp.Font.set(font_ptr)
 
@@ -379,7 +384,7 @@ class GraphicsLibrary(LibImpl):
         rp.TxHeight.set(tf.tf_YSize.get())
         rp.TxWidth.set(tf.tf_XSize.get())
         rp.TxBaseline.set(tf.tf_Baseline.get())
-        rp.TxSpacing.set(tf.tf_CharSpace.get())
+        rp.AlgoStyle.set(0)
 
     # ---------------------------------------------------------------------
     # RastPort API

@@ -6,6 +6,7 @@ import pytest
 
 from amitools.vamos.label import LabelManager
 from amitools.vamos.lib.IntuitionLibrary import IntuitionLibrary
+from amitools.vamos.lib.GraphicsLibrary import GraphicsLibrary
 from amitools.vamos.lib.graphics import TextAttrStruct
 from amitools.vamos.lib.intuition import NewScreenStruct, TextFontStruct
 from amitools.vamos.machine import REG_A0, REG_D0
@@ -21,6 +22,7 @@ class Context:
         self.alloc = MemoryAlloc(self.mem, label_mgr=self.labels)
         self.graphics = None
         self.references = 0
+        self.font_refs = 0
         self.available = True
         self.events = []
         self.exec_lib = SimpleNamespace(graphics_lib=None)
@@ -49,8 +51,16 @@ class Context:
         font = TextFontStruct.alloc(self.alloc)
         attr.ta_YSize.val = font.tf_YSize.val = 8
         self.graphics = SimpleNamespace(
-            text_attr=attr, font=font, topaz_font=font.get_addr()
+            text_attr=attr,
+            font=font,
+            topaz_font=font.get_addr(),
+            _open_font=self.acquire_font,
+            _close_font=self.release_font,
+            _set_font=lambda ctx, rp, font: GraphicsLibrary._set_font(
+                self.graphics, ctx, rp, font
+            ),
         )
+        self.font_refs = 1
         self.exec_lib.graphics_lib = self.graphics
         return 0x1234
 
@@ -58,11 +68,22 @@ class Context:
         assert addr == 0x1234
         self.events.append("close")
         self.references -= 1
+        assert self.font_refs == 1
+        self.font_refs = 0
         self.graphics.font.free()
         self.graphics.text_attr.free()
 
+    def acquire_font(self, ctx, attr_addr):
+        self.font_refs += 1
+        return self.graphics.topaz_font
+
+    def release_font(self, ctx, font_addr):
+        assert font_addr == self.graphics.topaz_font
+        self.font_refs -= 1
+
     def all_free(self):
         assert self.references == 0
+        assert self.font_refs == 0
         assert self.alloc.is_all_free()
         assert not self.alloc.mem_objs
         if self.labels:
@@ -71,6 +92,7 @@ class Context:
         assert self.lib.default_screen is None
         assert self.lib.graphics_lib is None
         assert self.lib.graphics_lib_addr is None
+        assert not self.lib._screen_fonts
 
 
 @pytest.fixture(params=[False, True], ids=["unlabelled", "labelled"])
@@ -158,8 +180,8 @@ def intuition_lifetime_partial_bitmap_failure_test(ctx, monkeypatch):
     # A later attempt may succeed once a smaller display is requested.
     create = small.lib.create_screen
 
-    def smaller(ctx_arg, width, height, depth, *args):
-        return create(ctx_arg, 64, 32, 2, *args)
+    def smaller(ctx_arg, width, height, depth, *args, **kwargs):
+        return create(ctx_arg, 64, 32, 2, *args, **kwargs)
 
     monkeypatch.setattr(small.lib, "create_screen", smaller)
     small.lib.open_lib(small, 1)
