@@ -5,7 +5,7 @@ from contextlib import ExitStack
 
 from amitools.vamos.libcore.impl import LibImpl
 from amitools.vamos.machine.regs import REG_A0, REG_D0, REG_A1, REG_D1, REG_D2, REG_D3
-from amitools.vamos.lib.graphics import TextAttrStruct, BitMapStruct, RastPortStruct, RegionRectangleStruct, RegionStruct, RectangleStruct, LayerStruct
+from amitools.vamos.lib.graphics import TextAttrStruct, BitMapStruct, RastPortStruct, RegionRectangleStruct, RegionStruct, RectangleStruct, LayerStruct, JAM2
 from amitools.vamos.lib.intuition import TextFontStruct, WindowStruct
 from amitools.vamos.log import log_main, log_gfx
 from dataclasses import dataclass
@@ -125,22 +125,18 @@ class GraphicsLibrary(LibImpl):
             bm.Planes[i].set(0)
 
     def init_rastport_canonical(self, ctx, rp_addr):
-        """Canonical RastPort initialization, Amiga-like defaults."""
+        """Reset the complete public RastPort, then apply system defaults."""
+        ctx.mem.clear_block(rp_addr, RastPortStruct.get_size(), 0)
         rp = RastPortStruct(ctx.mem, rp_addr)
 
-        rp.FgPen.set(1)   # white
-        rp.BgPen.set(0)   # black
-        rp.AOlPen.set(0)
+        rp.FgPen.set(-1)
+        rp.AOlPen.set(-1)
         rp.Mask.set(0xFF)
 
-        rp.DrawMode.set(2)        # JAM2
+        rp.DrawMode.set(JAM2)
         rp.LinePtrn.set(0xFFFF)
 
         self._set_font(ctx, rp_addr, self.topaz_font)
-        rp.TxSpacing.set(0)
-
-        rp.cp_x.set(0)
-        rp.cp_y.set(rp.TxBaseline.get())
 
     # ---------------------------------------------------------------------
     # Unified RastPort + BitMap creation helpers
@@ -163,6 +159,11 @@ class GraphicsLibrary(LibImpl):
         # --- RastPort ---
         rp = RastPortStruct.alloc(ctx.alloc)
         self.init_rastport_canonical(ctx, rp.addr)
+        # Host-backed windows retain their initial UI pen and baseline.
+        # Attach owned objects only after the public reset has completed.
+        rp.FgPen.val = 1
+        rp.AOlPen.val = 0
+        rp.cp_y.val = rp.TxBaseline.val
     
         rp.BitMap.set(bm.addr)
         rp.Layer.set(layer.addr)
@@ -394,6 +395,16 @@ class GraphicsLibrary(LibImpl):
         rp_addr = ctx.cpu.r_reg(REG_A1)
         self.init_rastport_canonical(ctx, rp_addr)
 
+    def _pen_color(self, ctx, rp, pen):
+        # Pen fields are BYTEs, but their bits select an unsigned palette
+        # index. Only the attached bitmap's planes participate in a color.
+        index = pen & 0xFF
+        if rp.BitMap.val:
+            depth = BitMapStruct(ctx.mem, rp.BitMap.val).Depth.val
+            if 1 <= depth <= 8:
+                index &= (1 << depth) - 1
+        return self.palette.get(index)
+
     def TextLength(self, ctx):
         from sdl2 import sdlttf
 
@@ -439,8 +450,8 @@ class GraphicsLibrary(LibImpl):
         font_ptr = rp.Font.get()
         font = self.font_registry.get(font_ptr or self.topaz_font)
     
-        fg = self.palette.get(rp.FgPen.get())
-        bg = self.palette.get(rp.BgPen.get())
+        fg = self._pen_color(ctx, rp, rp.FgPen.get())
+        bg = self._pen_color(ctx, rp, rp.BgPen.get())
         draw_mode = rp.DrawMode.get()
     
         x = rp.cp_x.get()
@@ -483,7 +494,7 @@ class GraphicsLibrary(LibImpl):
         start_x = rp.cp_x.get()
         start_y = rp.cp_y.get()
     
-        color = self.palette.get(rp.FgPen.get())
+        color = self._pen_color(ctx, rp, rp.FgPen.get())
         draw_mode = rp.DrawMode.get()
     
         rp_graphics.batch.draws.append(
@@ -517,7 +528,7 @@ class GraphicsLibrary(LibImpl):
         w = abs(x2 - x1) + 1
         h = abs(y2 - y1) + 1
     
-        color = self.palette.get(rp.FgPen.get())
+        color = self._pen_color(ctx, rp, rp.FgPen.get())
         draw_mode = rp.DrawMode.get()
     
         rp_graphics.batch.rectfills.append(
@@ -528,6 +539,8 @@ class GraphicsLibrary(LibImpl):
     def SetAPen(self, ctx):
         rastport_addr = ctx.cpu.r_reg(REG_A1)
         pen = ctx.cpu.r_reg(REG_D0) & 0xFF
+        if pen >= 0x80:
+            pen -= 0x100
 
         rp = RastPortStruct(ctx.mem, rastport_addr)
         rp.FgPen.set(pen)

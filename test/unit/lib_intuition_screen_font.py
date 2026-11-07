@@ -171,6 +171,7 @@ def intuition_screen_font_metrics_test(ctx, custom):
     assert font.tf_XSize.val == raster.TxWidth.val == size // 2
     assert font.tf_Baseline.val == raster.TxBaseline.val == size - 2
     assert raster.TxSpacing.val == 0
+    assert raster.DrawMode.val == 1
     ctx.close_screen(screen)
 
 

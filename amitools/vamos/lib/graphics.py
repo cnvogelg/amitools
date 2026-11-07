@@ -4,6 +4,12 @@ from amitools.vamos.astructs.scalar import ULONG, UWORD, UBYTE, WORD, BYTE
 from amitools.vamos.astructs.array import ARRAY
 from amitools.vamos.libstructs.exec_ import SignalSemaphoreStruct, MinListStruct
 
+# Drawing modes from graphics/rastport.h.
+JAM1 = 0
+JAM2 = 1
+COMPLEMENT = 2
+INVERSVID = 4
+
 #------ Font Styles (bit flags) -------
 FSF_UNDERLINED = 0x01
 FSF_BOLD       = 0x02
