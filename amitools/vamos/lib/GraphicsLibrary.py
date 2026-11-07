@@ -405,65 +405,64 @@ class GraphicsLibrary(LibImpl):
                 index &= (1 << depth) - 1
         return self.palette.get(index)
 
-    def TextLength(self, ctx):
+    def _text_layout(self, ctx, rp, string_ptr, count):
+        """Read a counted Amiga byte string and measure the queued text."""
         from sdl2 import sdlttf
 
-        rastport_addr = ctx.cpu.r_reg(REG_A1)
-        string_ptr = ctx.cpu.r_reg(REG_A0)
-        count = ctx.cpu.r_reg(REG_D0) & 0xFFFF
-
-        if count == 0:
-            ctx.cpu.w_reg(REG_D0, 0)
-            return
-
-        string = ctx.mem.r_cstr(string_ptr)
-        string = string[:count] if string else ""
-        rp = RastPortStruct(ctx.mem, rastport_addr)
-
-        font_ptr = rp.Font.get()
-        font = self.font_registry.get(font_ptr if font_ptr != 0 else self.topaz_font)
+        font = self.font_registry.get(rp.Font.val or self.topaz_font)
         if not font:
-            log_gfx.error("TextLength: no usable font available")
+            log_gfx.error("Text: no usable font available")
+            return None
+        # Amiga strings are bytes, not UTF-8. A counted NUL is a glyph,
+        # rather than SDL_ttf's string terminator; use its missing glyph.
+        string = bytes(ctx.mem.r_block(string_ptr, count)).decode("latin-1")
+        string = string.replace("\0", "\ufffd")
+        spacing = rp.TxSpacing.val
+        parts = list(string) if spacing else [string]
+        runs = []
+        advance = 0
+        for part in parts:
+            width, height = ctypes.c_int(), ctypes.c_int()
+            if sdlttf.TTF_SizeUTF8(
+                font, part.encode("utf-8"), ctypes.byref(width), ctypes.byref(height)
+            ) != 0:
+                log_gfx.error("Text: TTF_SizeUTF8 failed")
+                return None
+            runs.append((advance, part))
+            advance += width.value + (spacing if spacing else 0)
+        return font, runs, advance
+
+    def TextLength(self, ctx):
+        count = ctx.cpu.r_reg(REG_D0) & 0xFFFF
+        if not count:
             ctx.cpu.w_reg(REG_D0, 0)
             return
-
-        w = ctypes.c_int()
-        h = ctypes.c_int()
-
-        if sdlttf.TTF_SizeUTF8(font, string.encode("utf-8"), ctypes.byref(w), ctypes.byref(h)) != 0:
-            log_gfx.error("TextLength: TTF_SizeUTF8 failed")
-            ctx.cpu.w_reg(REG_D0, 0)
-            return
-
-        ctx.cpu.w_reg(REG_D0, w.value & 0xFFFF)
+        rp = RastPortStruct(ctx.mem, ctx.cpu.r_reg(REG_A1))
+        layout = self._text_layout(ctx, rp, ctx.cpu.r_reg(REG_A0), count)
+        ctx.cpu.w_reg(REG_D0, (layout[2] & 0xFFFF) if layout else 0)
 
     def Text(self, ctx):
+        count = ctx.cpu.r_reg(REG_D0) & 0xFFFF
+        if not count:
+            return
         rastport_addr = ctx.cpu.r_reg(REG_A1)
         rp = RastPortStruct(ctx.mem, rastport_addr)
-        rp_graphics = self.get_rp_graphics(rastport_addr)
-    
-        string_ptr = ctx.cpu.r_reg(REG_A0)
-        string = ctx.mem.r_cstr(string_ptr)
-        if not string:
+        layout = self._text_layout(ctx, rp, ctx.cpu.r_reg(REG_A0), count)
+        if layout is None:
             return
-    
-        font_ptr = rp.Font.get()
-        font = self.font_registry.get(font_ptr or self.topaz_font)
-    
-        fg = self._pen_color(ctx, rp, rp.FgPen.get())
-        bg = self._pen_color(ctx, rp, rp.BgPen.get())
-        draw_mode = rp.DrawMode.get()
-    
-        x = rp.cp_x.get()
-        baseline = rp.cp_y.get()
-        draw_y = baseline - rp.TxBaseline.get()
-    
-        rp_graphics.batch.texts.append(
-            BFText(x, draw_y, string, font, fg, bg, draw_mode)
-        )
-    
-        rp.cp_y.set(baseline + rp.TxHeight.get() + rp.TxSpacing.get())
-    
+        font, runs, advance = layout
+        rp_graphics = self.get_rp_graphics(rastport_addr)
+        if rp_graphics is not None:
+            fg = self._pen_color(ctx, rp, rp.FgPen.val)
+            bg = self._pen_color(ctx, rp, rp.BgPen.val)
+            for offset, string in runs:
+                rp_graphics.batch.texts.append(
+                    BFText(rp.cp_x.val + offset, rp.cp_y.val - rp.TxBaseline.val,
+                           string, font, fg, bg, rp.DrawMode.val)
+                )
+        # The public position is a signed WORD and keeps the same baseline.
+        rp.cp_x.val = ((rp.cp_x.val + advance + 0x8000) & 0xFFFF) - 0x8000
+
     def Move(self, ctx):
         rastport_addr = ctx.cpu.r_reg(REG_A1)
         x = ctx.cpu.r_reg(REG_D0) & 0xFFFF
