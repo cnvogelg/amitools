@@ -15,7 +15,7 @@ def graphics_lifetime_setup_rollback_test(monkeypatch, labels, failure):
     ctx.finish()
     graphics = ctx.graphics
     graphics.text_attr = graphics.topaz_font = None
-    ctx.path_mgr = SimpleNamespace(ami_to_sys_path=lambda *args: None)
+    ctx.path_mgr = SimpleNamespace(to_sys_path=lambda *args: None)
     ttf = ctx.ttf
     ttf.TTF_Init = Mock(return_value=-1 if failure == 'init' else 0)
     ttf.TTF_Quit = Mock()

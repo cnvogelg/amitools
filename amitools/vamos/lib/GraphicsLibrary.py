@@ -45,7 +45,7 @@ class GraphicsLibrary(LibImpl):
         try:
             with ExitStack() as rollback:
                 rollback.callback(sdlttf.TTF_Quit)
-                self.fontsPath = ctx.path_mgr.ami_to_sys_path(None, "FONTS:")
+                self.fontsPath = ctx.path_mgr.to_sys_path("FONTS:")
                 if self.fontsPath is None:
                     self.fontsPath = os.path.join(os.path.dirname(__file__), "fonts")
                 attr_memory = ctx.alloc.alloc_memory(

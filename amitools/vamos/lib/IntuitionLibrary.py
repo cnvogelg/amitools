@@ -41,6 +41,7 @@ class IntuitionLibrary(LibImpl):
     def __init__(self):
         super().__init__()
         # default init stuff
+        self._easy_last = None
         self.alloc = None
         self.sdl_window_id_2_window_addr_map = {}  # SDL_Window id -> Amiga window address
         self.sdl_window_id_2_sdl_window = {}
@@ -181,9 +182,19 @@ class IntuitionLibrary(LibImpl):
         log_intui.error("-----> AutoRequest '%s'", msg)
 
     def EasyRequestArgs(self, ctx, window, easy_struct, idcmp_ptr, args):
-        es_TextFormat = ctx.mem.r32(easy_struct + 12)  # EasyStruct.es_TextFormat
-        msg = ctx.mem.r_cstr(es_TextFormat)
-        log_intui.error("-----> EasyRequest '%s'", msg)
+        mem = ctx.mem
+        msg = mem.r_cstr(mem.r32(easy_struct + 12))  # EasyStruct.es_TextFormat
+        gad_ptr = mem.r32(easy_struct + 16)  # EasyStruct.es_GadgetFormat
+        gadgets = mem.r_cstr(gad_ptr) if gad_ptr else ""
+        key = (msg, gadgets)
+        # No user can answer. Take the first gadget once, so that e.g. SFS
+        # startup can continue, then the rightmost (0, e.g. CANCEL) while
+        # the same requester repeats, so RETRY|CANCEL requesters cannot loop.
+        if self._easy_last == key:
+            log_intui.debug("EasyRequest '%s' [%s] repeated -> 0", msg, gadgets)
+            return 0
+        self._easy_last = key
+        log_intui.error("-----> EasyRequest '%s' [%s] -> 1", msg, gadgets)
         return 1
 
     def CurrentTime(self, ctx, secs_ptr, micros_ptr):
