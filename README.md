@@ -151,6 +151,32 @@ runs everything through `tox` for all supported Python versions. Rebuilding
 the test programs needs the cross compilers described in
 [test/README.md](test/README.md).
 
+### Publishing releases
+
+The `Build and publish Python distributions` workflow builds a source
+archive and a pure Python wheel, checks their metadata, runs the test suite,
+and smoke-tests the installed command line tools. Pull requests and manual
+runs retain the packages as workflow artifacts without publishing them.
+
+To enable publishing, create the `pypi` and `testpypi` environments in the
+GitHub repository. Configure a trusted publisher for the `amitools` project
+on each index using owner `cnvogelg`, repository `amitools`, workflow
+`publish-to-pypi.yml`, and the matching environment name. PyPI and TestPyPI
+require separate publisher registrations; no API tokens are needed. See
+the [PyPA setup guide](https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/)
+for registration details.
+
+After setup, pushes to upstream `main` publish development builds to
+TestPyPI. Pushing a `v*` release tag publishes the source archive and wheel
+to both PyPI and TestPyPI after the build and tests pass. The two uploads
+are independent, so a TestPyPI outage does not block a PyPI release.
+Publishing is disabled in forks.
+
+Versions come from Git tags via `setuptools-scm`. Development builds omit
+the local Git hash suffix so package indexes accept them. TestPyPI skips
+files that are already present, allowing a workflow to be rerun. PyPI
+releases require a new version if that version has already been uploaded.
+
 ### Code style and docs
 
 The code is formatted with [black](https://github.com/psf/black):
