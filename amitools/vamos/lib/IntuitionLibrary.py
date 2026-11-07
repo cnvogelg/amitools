@@ -1,4 +1,5 @@
 import ctypes
+from contextlib import ExitStack
 from amitools.vamos.libcore.impl import LibImpl
 from amitools.vamos.lib.TimerDevice import TimerDevice
 
@@ -41,6 +42,7 @@ class IntuitionLibrary(LibImpl):
         self.alloc = None
         self.sdl_window_id_2_window_addr_map = {}  # SDL_Window id -> Amiga window address
         self.sdl_window_id_2_sdl_window = {}
+        self.sdl_window_id_2_timer = {}
         self.menu_active = False
         self.mouse_x = 0
         self.mouse_y = 0
@@ -147,11 +149,27 @@ class IntuitionLibrary(LibImpl):
     def CloseWindow(self, ctx):
         window_ptr = ctx.cpu.r_reg(REG_A0)
         log_intui.info("Closing window @%08x", window_ptr)
-    
-        # Load WindowStruct
+        if window_ptr == 0:
+            return
+
+        # Capture resources while the public structure is still alive.
         win = WindowStruct(ctx.mem, window_ptr)
     
         screen_ptr = win.WScreen.get()
+        title_addr = win.Title.get()
+        title_memory = ctx.alloc.get_memory(title_addr) if title_addr else None
+        rastport_addr = win.RPort.get()
+        user_port_addr = win.UserPort.get()
+
+        # A removed timer can already have queued an event. Invalidate its
+        # window ID before stopping it or releasing any guest resources.
+        window_id = self.find_sdl_window_by_amiga_addr(window_ptr)
+        sdl_win = self.sdl_window_id_2_sdl_window.pop(window_id, None)
+        timer_id = self.sdl_window_id_2_timer.pop(window_id, 0)
+        self.sdl_window_id_2_window_addr_map.pop(window_id, None)
+        self.refresh_pending.discard(window_ptr)
+        self.rp_2_win_addr.pop(rastport_addr, None)
+
         screen = ScreenStruct(ctx.mem, screen_ptr)
         
         prev_ptr = 0
@@ -172,37 +190,26 @@ class IntuitionLibrary(LibImpl):
         
             prev_ptr = current_ptr
             current_ptr = next_ptr
-    
-        # Free title string
-        title_addr = win.Title.get()
-        if title_addr:
-            self.alloc.free_cstr_by_addr(title_addr)
-    
-        # Free RastPortStruct and BitMapStruct
-        rastPortStruct_addr = win.RPort.get()
-        if rastPortStruct_addr:
-            self.graphics_lib.free_RastPortStruct(ctx, rastPortStruct_addr)
-            self.rp_2_win_addr.pop(rastPortStruct_addr, None)
-                
-        # Free WindowStruct itself
-        ctx.alloc.free_mem(window_ptr, WindowStruct.get_size())
-    
-        # Delete UserPort
-        user_port_addr = win.UserPort.get()
-        if user_port_addr:
-            user_port = MsgPortStruct(ctx.mem, user_port_addr)
-            ctx.exec_lib.DeleteMsgPort(ctx, user_port)
-    
-        # SDL2 cleanup
-        window_id = self.find_sdl_window_by_amiga_addr(window_ptr)
-        if window_id > 0:
-            import sdl2
-    
-            # Destroy SDL2 window
-            sdl_win = self.sdl_window_id_2_sdl_window[window_id]
-            sdl2.SDL_DestroyWindow(sdl_win)
-            del self.sdl_window_id_2_sdl_window[window_id]
-    
+
+        # Release the port and renderer before the structures and host
+        # window they belong to. Attempt all releases if one raises.
+        with ExitStack() as cleanup:
+            if sdl_win is not None or timer_id:
+                import sdl2
+            if sdl_win is not None:
+                cleanup.callback(sdl2.SDL_DestroyWindow, sdl_win)
+            cleanup.callback(win.free, ctx.alloc)
+            if title_memory is not None:
+                cleanup.callback(ctx.alloc.free_memory, title_memory)
+            if rastport_addr:
+                cleanup.callback(
+                    self.graphics_lib.free_RastPortStruct, ctx, rastport_addr
+                )
+            if user_port_addr:
+                user_port = MsgPortStruct(ctx.mem, user_port_addr)
+                cleanup.callback(ctx.exec_lib.DeleteMsgPort, ctx, user_port)
+            if timer_id:
+                sdl2.SDL_RemoveTimer(timer_id)
 
     def OpenWindow(self, ctx):
         import sdl2
@@ -568,7 +575,11 @@ class IntuitionLibrary(LibImpl):
         self.sdl_window_id_2_sdl_window[window_id] = sdl_win
 
         # start a timer
-        sdl2.SDL_AddTimer(50, intuiticks_timer_callback, ctypes.c_void_p(window_id))
+        timer_id = sdl2.SDL_AddTimer(
+            50, intuiticks_timer_callback, ctypes.c_void_p(window_id)
+        )
+        if timer_id:
+            self.sdl_window_id_2_timer[window_id] = timer_id
 
         ctx.exec_lib.register_SDL_poll(ctx)
 
@@ -639,19 +650,18 @@ class IntuitionLibrary(LibImpl):
 
     def ingest_sdl_event(self, ctx, event):
         import sdl2
-    
-        # Determine window ID
-        window_id = getattr(event, "window", None)
-        if window_id:
-            window_id = event.window.windowID
-        if not window_id:
-            window_id = 1
-    
-        try:
-            win_addr = self.sdl_window_id_2_window_addr_map[window_id]
-        except KeyError:
+
+        # Quit is global and has no window ID. Other events must belong
+        # to a currently live window; never redirect an unknown ID to 1.
+        if event.type == sdl2.SDL_QUIT:
+            for win_addr in tuple(self.sdl_window_id_2_window_addr_map.values()):
+                self.queue_idcmp(ctx, win_addr, IDCMP_CLOSEWINDOW)
             return None
-    
+        window_id = getattr(getattr(event, "window", None), "windowID", 0)
+        win_addr = self.sdl_window_id_2_window_addr_map.get(window_id)
+        if win_addr is None:
+            return None
+
         # ---------- MOUSE MOTION ----------
         if event.type == sdl2.SDL_MOUSEMOTION:
             mx, my = event.motion.x, event.motion.y
@@ -660,9 +670,9 @@ class IntuitionLibrary(LibImpl):
             if self.menu_active:
                 sdl_win = sdl2.SDL_GetWindowFromID(window_id)
                 self.render(ctx, sdl_win, mx, my)
-    
-            return PendingIntuiEvent(win_addr, IDCMP_MOUSEMOVE, mx, my, 0)
-    
+
+            return PendingIntuiEvent(win_addr, IDCMP_MOUSEMOVE, mx, my, 0, window_id)
+
         # ---------- MOUSE BUTTON DOWN ----------
         elif event.type == sdl2.SDL_MOUSEBUTTONDOWN:
             mx, my = event.button.x, event.button.y
@@ -686,9 +696,11 @@ class IntuitionLibrary(LibImpl):
                 self.submenu_rects = []
                 sdl_win = sdl2.SDL_GetWindowFromID(window_id)
                 self.render(ctx, sdl_win, mx, my)
-    
-            return PendingIntuiEvent(win_addr, IDCMP_MOUSEBUTTONS, mx, my, code)
-    
+
+            return PendingIntuiEvent(
+                win_addr, IDCMP_MOUSEBUTTONS, mx, my, code, window_id
+            )
+
         # ---------- MOUSE BUTTON UP ----------
         elif event.type == sdl2.SDL_MOUSEBUTTONUP:
             mx, my = event.button.x, event.button.y
@@ -736,18 +748,16 @@ class IntuitionLibrary(LibImpl):
                 self.submenu_rects = []
                 sdl_win = sdl2.SDL_GetWindowFromID(window_id)
                 self.render(ctx, sdl_win)
-    
-            return PendingIntuiEvent(win_addr, IDCMP_MOUSEBUTTONS, mx, my, code)
-    
+
+            return PendingIntuiEvent(
+                win_addr, IDCMP_MOUSEBUTTONS, mx, my, code, window_id
+            )
+
         # ---------- KEY DOWN ----------
         elif event.type == sdl2.SDL_KEYDOWN:
             keycode = event.key.keysym.sym
-            return PendingIntuiEvent(win_addr, IDCMP_RAWKEY, 0, 0, keycode)
-    
-        # ---------- SDL QUIT ----------
-        elif event.type == sdl2.SDL_QUIT:
-            return PendingIntuiEvent(win_addr, IDCMP_CLOSEWINDOW, 0, 0, 0)
-    
+            return PendingIntuiEvent(win_addr, IDCMP_RAWKEY, 0, 0, keycode, window_id)
+
         # ---------- WINDOW EVENTS ----------
         elif event.type == sdl2.SDL_WINDOWEVENT:
             we = event.window.event
@@ -759,32 +769,33 @@ class IntuitionLibrary(LibImpl):
                 win = WindowStruct(ctx.mem, win_addr)
                 win.Width.set(new_w)
                 win.Height.set(new_h)
-    
-                return PendingIntuiEvent(win_addr, IDCMP_NEWSIZE, 0, 0, 0)
-    
+
+                return PendingIntuiEvent(win_addr, IDCMP_NEWSIZE, 0, 0, 0, window_id)
+
             elif we == sdl2.SDL_WINDOWEVENT_EXPOSED:
                 # Only one refresh per expose
                 win = WindowStruct(ctx.mem, win_addr)
                 rastport_addr = win.RPort.get()
                 self.refresh(ctx, rastport_addr)
-                return PendingIntuiEvent(win_addr, IDCMP_REFRESHWINDOW, 0, 0, 0)
-    
+                return PendingIntuiEvent(
+                    win_addr, IDCMP_REFRESHWINDOW, 0, 0, 0, window_id
+                )
+
             elif we == sdl2.SDL_WINDOWEVENT_CLOSE:
-                return PendingIntuiEvent(win_addr, IDCMP_CLOSEWINDOW, 0, 0, 0)
-        
+                return PendingIntuiEvent(
+                    win_addr, IDCMP_CLOSEWINDOW, 0, 0, 0, window_id
+                )
+
         return None
     
     def drain_pending_intui_events(self, ctx, e):
-        self.queue_idcmp(
-            ctx,
-            e.win_addr,
-            e.idcmp_flag,
-            e.mouse_x,
-            e.mouse_y,
-            e.code
-        )
+        if self.sdl_window_id_2_window_addr_map.get(e.window_id) != e.win_addr:
+            return
+        self.queue_idcmp(ctx, e.win_addr, e.idcmp_flag, e.mouse_x, e.mouse_y, e.code)
 
     def queue_idcmp(self, ctx, win_addr, idcmp_flag, mouse_x=0, mouse_y=0, code=0):
+        if self.find_sdl_window_by_amiga_addr(win_addr) is None:
+            return
         win = WindowStruct(ctx.mem, win_addr)
         
         if (win.IDCMPFlags.get() & idcmp_flag) == 0:
@@ -1146,7 +1157,8 @@ class IntuitionLibrary(LibImpl):
         if win_addr not in self.refresh_pending:
             rastport_addr = win.RPort.get()
             self.refresh(ctx, rastport_addr)
-            event = PendingIntuiEvent(win_addr, IDCMP_REFRESHWINDOW, 0, 0, 0)
+            window_id = self.find_sdl_window_by_amiga_addr(win_addr)
+            event = PendingIntuiEvent(win_addr, IDCMP_REFRESHWINDOW, 0, 0, 0, window_id)
             self.drain_pending_intui_events(ctx, event)
     
         # Intuition's ScrollWindowRaster() returns void
@@ -1311,11 +1323,12 @@ def intuiticks_timer_callback(interval, param):
     return interval
 
 class PendingIntuiEvent:
-    __slots__ = ("win_addr", "idcmp_flag", "mouse_x", "mouse_y", "code")
+    __slots__ = ("win_addr", "idcmp_flag", "mouse_x", "mouse_y", "code", "window_id")
 
-    def __init__(self, win_addr, idcmp_flag, mouse_x, mouse_y, code):
+    def __init__(self, win_addr, idcmp_flag, mouse_x, mouse_y, code, window_id):
         self.win_addr = win_addr
         self.idcmp_flag = idcmp_flag
         self.mouse_x = mouse_x
         self.mouse_y = mouse_y
         self.code = code
+        self.window_id = window_id
