@@ -76,8 +76,12 @@ class WindowContext:
             SDL_RenderClear=Mock(),
         )
         monkeypatch.setitem(sys.modules, "sdl2", self.sdl)
-        signal = SimpleNamespace(get_my_sched_task=lambda: None, signal=Mock(),
-                                 alloc_signal=lambda bit: 16, free_signal=Mock())
+        signal = SimpleNamespace(
+            get_my_sched_task=lambda: None,
+            signal=Mock(),
+            alloc_signal=lambda bit: 16,
+            free_signal=Mock(),
+        )
         task = SimpleNamespace(find_task=lambda name: None)
         self.messages = MessageFunc(self, None, signal, task, PortManager(self.alloc))
         self.exec_lib = SimpleNamespace(
@@ -410,41 +414,68 @@ def graphics_window_rastport_initialization_test(ctx):
     ctx.close_all()
 
 
-@pytest.mark.parametrize('stage', [
-    'Window title', 'Intuition window', 'BitMapStruct', 'LayerStruct',
-    'RastPortStruct', 'Graphics region', 'port', 'plane', 'renderer',
-    'texture', 'target', 'clear', 'timer', 'poll',
-])
+@pytest.mark.parametrize(
+    "stage",
+    [
+        "Window title",
+        "Intuition window",
+        "BitMapStruct",
+        "LayerStruct",
+        "RastPortStruct",
+        "Graphics region",
+        "port",
+        "plane",
+        "renderer",
+        "texture",
+        "target",
+        "clear",
+        "timer",
+        "poll",
+    ],
+)
 def intuition_open_window_rollback_test(ctx, monkeypatch, stage):
     allocate = ctx.alloc.alloc_memory
-    if stage in {'Window title', 'Intuition window', 'BitMapStruct',
-                 'LayerStruct', 'RastPortStruct', 'Graphics region'}:
+    if stage in {
+        "Window title",
+        "Intuition window",
+        "BitMapStruct",
+        "LayerStruct",
+        "RastPortStruct",
+        "Graphics region",
+    }:
+
         def fail(size, **kwargs):
-            return None if kwargs.get('label') == stage else allocate(size, **kwargs)
-        monkeypatch.setattr(ctx.alloc, 'alloc_memory', fail)
-    elif stage == 'port':
+            return None if kwargs.get("label") == stage else allocate(size, **kwargs)
+
+        monkeypatch.setattr(ctx.alloc, "alloc_memory", fail)
+    elif stage == "port":
         ctx.exec_lib.CreateMsgPort = lambda ctx: None
-    elif stage == 'plane':
+    elif stage == "plane":
         alloc_mem = ctx.alloc.alloc_mem
         planes = []
+
         def fail(size, *args, **kwargs):
             if size == 256:
                 planes.append(size)
                 if len(planes) == 2:
                     return 0
             return alloc_mem(size, *args, **kwargs)
-        monkeypatch.setattr(ctx.alloc, 'alloc_mem', fail)
-    elif stage in ('renderer', 'texture', 'timer'):
-        entry = {'renderer': 'SDL_CreateRenderer', 'texture': 'SDL_CreateTexture',
-                 'timer': 'SDL_AddTimer'}[stage]
+
+        monkeypatch.setattr(ctx.alloc, "alloc_mem", fail)
+    elif stage in ("renderer", "texture", "timer"):
+        entry = {
+            "renderer": "SDL_CreateRenderer",
+            "texture": "SDL_CreateTexture",
+            "timer": "SDL_AddTimer",
+        }[stage]
         setattr(ctx.sdl, entry, lambda *args: 0)
-    elif stage in ('target', 'clear'):
-        entry = 'SDL_SetRenderTarget' if stage == 'target' else 'SDL_RenderClear'
+    elif stage in ("target", "clear"):
+        entry = "SDL_SetRenderTarget" if stage == "target" else "SDL_RenderClear"
         setattr(ctx.sdl, entry, lambda *args: -1)
     else:
-        ctx.exec_lib.register_SDL_poll = Mock(side_effect=RuntimeError('poll'))
-    if stage == 'poll':
-        with pytest.raises(RuntimeError, match='poll'):
+        ctx.exec_lib.register_SDL_poll = Mock(side_effect=RuntimeError("poll"))
+    if stage == "poll":
+        with pytest.raises(RuntimeError, match="poll"):
             ctx.open()
     else:
         assert ctx.open() == 0
@@ -462,11 +493,12 @@ def graphics_window_cleanup_tracks_owned_objects_test(ctx):
     ctx.close_all()
 
 
-@pytest.mark.parametrize('custom', [False, True])
-@pytest.mark.parametrize('control', [False, True])
+@pytest.mark.parametrize("custom", [False, True])
+@pytest.mark.parametrize("control", [False, True])
 def intuition_open_window_taglist_test(ctx, custom, control):
     from amitools.vamos.lib.intuition import WA_Width, WA_Height, WA_CustomScreen
     from amitools.vamos.machine import REG_A1, REG_D0
+
     ctx.sdl.SDL_WINDOW_SHOWN = 1
     ctx.sdl.SDL_WINDOW_RESIZABLE = 2
     tags = ctx.alloc.alloc_memory(64)
@@ -501,6 +533,7 @@ def intuition_open_window_taglist_test(ctx, custom, control):
 
 def intuition_idcmp_reply_frees_allocation_test(ctx):
     from amitools.vamos.libtypes import MsgPort
+
     target = ctx.open()
     port = MsgPort(ctx.mem, WindowStruct(ctx.mem, target).UserPort.val)
     before = ctx.alloc.get_free_bytes()
@@ -508,7 +541,7 @@ def intuition_idcmp_reply_frees_allocation_test(ctx):
     msg = ctx.messages.get_msg(port)
     assert msg is not None
     assert msg.length.val > 20
-    assert msg.reply_port.aptr != 0xffedcb
+    assert msg.reply_port.aptr != 0xFFEDCB
     assert ctx.alloc.get_memory(msg.addr)
     ctx.messages.reply_msg(msg)
     assert ctx.alloc.get_memory(msg.addr) is None
@@ -516,9 +549,10 @@ def intuition_idcmp_reply_frees_allocation_test(ctx):
     ctx.close_all()
 
 
-@pytest.mark.parametrize('delivered', [False, True])
+@pytest.mark.parametrize("delivered", [False, True])
 def intuition_idcmp_close_message_lifetime_test(ctx, delivered):
     from amitools.vamos.libtypes import MsgPort
+
     target = ctx.open()
     port = MsgPort(ctx.mem, WindowStruct(ctx.mem, target).UserPort.val)
     ctx.intuition.queue_idcmp(ctx, target, IDCMP_NEWSIZE)
@@ -536,17 +570,29 @@ def intuition_idcmp_close_message_lifetime_test(ctx, delivered):
     ctx.close_all()
 
 
-@pytest.mark.parametrize('stage', ['exec_port', 'Intuition reply port', 'Intuition message'])
+@pytest.mark.parametrize(
+    "stage", ["exec_port", "Intuition reply port", "Intuition message"]
+)
 def intuition_idcmp_allocation_failure_test(ctx, monkeypatch, stage):
     allocate = ctx.alloc.alloc_memory
-    if stage == 'exec_port':
-        monkeypatch.setattr(ctx.alloc, 'alloc_memory', lambda size, **kwargs:
-            None if kwargs.get('label') == stage else allocate(size, **kwargs))
+    if stage == "exec_port":
+        monkeypatch.setattr(
+            ctx.alloc,
+            "alloc_memory",
+            lambda size, **kwargs: (
+                None if kwargs.get("label") == stage else allocate(size, **kwargs)
+            ),
+        )
         assert not ctx.open()
     else:
         target = ctx.open()
-        monkeypatch.setattr(ctx.alloc, 'alloc_memory', lambda size, **kwargs:
-            None if kwargs.get('label') == stage else allocate(size, **kwargs))
+        monkeypatch.setattr(
+            ctx.alloc,
+            "alloc_memory",
+            lambda size, **kwargs: (
+                None if kwargs.get("label") == stage else allocate(size, **kwargs)
+            ),
+        )
         ctx.intuition.queue_idcmp(ctx, target, IDCMP_NEWSIZE)
         ctx.close(target)
     assert not ctx.messages.port_mgr.ports
@@ -556,6 +602,7 @@ def intuition_idcmp_allocation_failure_test(ctx, monkeypatch, stage):
 def intuition_modify_idcmp_creates_and_releases_ports_test(ctx):
     from amitools.vamos.machine import REG_D0
     from amitools.vamos.libtypes import MsgPort
+
     target = ctx.open()
     ctx.cpu.w_reg(REG_A0, target)
     ctx.cpu.w_reg(REG_D0, 0)
@@ -577,6 +624,7 @@ def intuition_modify_idcmp_creates_and_releases_ports_test(ctx):
 
 def intuition_modify_idcmp_allocation_failure_test(ctx):
     from amitools.vamos.machine import REG_D0
+
     target = ctx.open()
     ctx.cpu.w_reg(REG_A0, target)
     ctx.cpu.w_reg(REG_D0, 0)
@@ -592,10 +640,11 @@ def intuition_modify_idcmp_allocation_failure_test(ctx):
 
 def intuition_close_window_preserves_borrowed_user_port_test(ctx):
     from amitools.vamos.libtypes import MsgPort
+
     borrowed = ctx.messages.create_msg_port()
     target = ctx.open()
-    WindowStruct(ctx.mem,target).UserPort.val = borrowed.addr
-    ctx.intuition.queue_idcmp(ctx,target,IDCMP_NEWSIZE)
+    WindowStruct(ctx.mem, target).UserPort.val = borrowed.addr
+    ctx.intuition.queue_idcmp(ctx, target, IDCMP_NEWSIZE)
     ctx.close(target)
     assert ctx.alloc.get_memory(borrowed.addr)
     assert ctx.messages.get_msg(borrowed) is None

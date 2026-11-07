@@ -18,16 +18,21 @@ def renderer(monkeypatch):
     )
     result.sdl = SimpleNamespace(
         sdlttf=result.ttf,
-        SDL_SetRenderTarget=Mock(), SDL_RenderSetClipRect=Mock(),
+        SDL_SetRenderTarget=Mock(),
+        SDL_RenderSetClipRect=Mock(),
         SDL_CreateTextureFromSurface=Mock(return_value=12),
-        SDL_DestroyTexture=Mock(), SDL_FreeSurface=Mock(),
-        SDL_Rect=lambda *args: args, SDL_RenderCopy=Mock(),
+        SDL_DestroyTexture=Mock(),
+        SDL_FreeSurface=Mock(),
+        SDL_Rect=lambda *args: args,
+        SDL_RenderCopy=Mock(),
     )
-    monkeypatch.setitem(sys.modules, 'sdl2', result.sdl)
+    monkeypatch.setitem(sys.modules, "sdl2", result.sdl)
     result.lib = IntuitionLibrary()
     result.batch = RPBatch()
-    result.graphics = SimpleNamespace(batch=result.batch, renderer=3, texture=4, clip_rect=None)
-    result.text = BFText(1, 2, 'A', object(), object(), object(), 1)
+    result.graphics = SimpleNamespace(
+        batch=result.batch, renderer=3, texture=4, clip_rect=None
+    )
+    result.text = BFText(1, 2, "A", object(), object(), object(), 1)
     result.draw = BFDraw(1, 2, 3, 4, object(), 1)
     result.fill = BFRectFill(1, 2, 3, 4, object(), 1)
     return result
@@ -50,25 +55,27 @@ def graphics_batch_preserves_call_order_test(renderer):
     assert r.sdl.SDL_RenderSetClipRect.call_args.args == (3, None)
 
 
-@pytest.mark.parametrize('failure', ['surface', 'texture', 'copy', None])
+@pytest.mark.parametrize("failure", ["surface", "texture", "copy", None])
 def graphics_text_render_cleanup_test(renderer, failure):
     r = renderer
-    if failure == 'surface':
+    if failure == "surface":
         r.ttf.TTF_RenderUTF8_Shaded.return_value = None
-    elif failure == 'texture':
+    elif failure == "texture":
         r.sdl.SDL_CreateTextureFromSurface.return_value = None
-    elif failure == 'copy':
-        r.sdl.SDL_RenderCopy.side_effect = RuntimeError('copy')
-    if failure == 'copy':
-        with pytest.raises(RuntimeError, match='copy'):
+    elif failure == "copy":
+        r.sdl.SDL_RenderCopy.side_effect = RuntimeError("copy")
+    if failure == "copy":
+        with pytest.raises(RuntimeError, match="copy"):
             r.lib._execute_texts(3, [r.text])
     else:
         r.lib._execute_texts(3, [r.text])
-    assert r.sdl.SDL_FreeSurface.call_count == (failure != 'surface')
-    assert r.sdl.SDL_DestroyTexture.call_count == (failure not in ('surface', 'texture'))
+    assert r.sdl.SDL_FreeSurface.call_count == (failure != "surface")
+    assert r.sdl.SDL_DestroyTexture.call_count == (
+        failure not in ("surface", "texture")
+    )
 
 
-@pytest.mark.parametrize('mode', [0, 1, 4, 5])
+@pytest.mark.parametrize("mode", [0, 1, 4, 5])
 def graphics_text_draw_mode_test(renderer, mode):
     r = renderer
     r.text.draw_mode = mode
@@ -83,8 +90,8 @@ def graphics_text_draw_mode_test(renderer, mode):
 def graphics_batch_restores_target_after_exception_test(renderer):
     r = renderer
     r.batch.add(r.text)
-    r.lib._execute_texts = Mock(side_effect=RuntimeError('render'))
-    with pytest.raises(RuntimeError, match='render'):
+    r.lib._execute_texts = Mock(side_effect=RuntimeError("render"))
+    with pytest.raises(RuntimeError, match="render"):
         r.lib._flush_batch(r.graphics)
     assert r.sdl.SDL_SetRenderTarget.call_args.args == (3, None)
     assert r.sdl.SDL_RenderSetClipRect.call_args.args == (3, None)
@@ -92,21 +99,26 @@ def graphics_batch_restores_target_after_exception_test(renderer):
 
 def graphics_failed_upload_does_not_replay_complement_test(renderer):
     from amitools.vamos.lib.graphics_surface import RasterSurface
+
     r = renderer
-    r.lib.graphics_lib = SimpleNamespace(palette={i:SimpleNamespace(r=i,g=i,b=i) for i in range(256)})
+    r.lib.graphics_lib = SimpleNamespace(
+        palette={i: SimpleNamespace(r=i, g=i, b=i) for i in range(256)}
+    )
     r.graphics.width = r.graphics.height = 1
-    r.graphics.surface = RasterSurface(1,1)
+    r.graphics.surface = RasterSurface(1, 1)
     r.graphics.surface.load = Mock()
     r.text.state = object()
     r.batch.add(r.text)
     calls = []
+
     def paint(graphics, command, clip):
         calls.append(1)
         graphics.surface.pixels[0] ^= 1
         graphics.surface.dirty = True
+
     r.lib._execute_indexed = paint
-    r.sdl.SDL_UpdateTexture = Mock(side_effect=[-1,0])
-    with pytest.raises(RuntimeError,match='texture update'):
+    r.sdl.SDL_UpdateTexture = Mock(side_effect=[-1, 0])
+    with pytest.raises(RuntimeError, match="texture update"):
         r.lib._flush_batch(r.graphics)
     assert not r.batch.commands
     assert r.graphics.surface.dirty

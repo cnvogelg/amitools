@@ -245,13 +245,16 @@ def schedule_sdl_native_progress_test(context, pump):
 
 def schedule_sdl_run_until_idle_never_waits_test(context):
     from amitools.vamos.schedule import RunResult
+
     scheduler = context.scheduler
+
     def run(task):
         assert task.wait(1) == 1
         return 42
-    task = context.python('external-wakeup', run)
+
+    task = context.python("external-wakeup", run)
     scheduler.message_pump = Mock(return_value=True)
-    scheduler.message_wait = Mock(side_effect=AssertionError('blocking idle API'))
+    scheduler.message_wait = Mock(side_effect=AssertionError("blocking idle API"))
     assert scheduler.run_until_idle() == RunResult.IDLE
     assert not scheduler.running
     scheduler.message_wait.assert_not_called()
@@ -262,17 +265,21 @@ def schedule_sdl_run_until_idle_never_waits_test(context):
 
 def schedule_sdl_cycle_budget_still_limits_native_task_test(context):
     from amitools.vamos.schedule import RunResult
+
     memory = context.machine.get_mem()
-    program = bytes.fromhex('4e71') * 200 + bytes.fromhex('702a4e75')
+    program = bytes.fromhex("4e71") * 200 + bytes.fromhex("702a4e75")
     code = context.alloc.alloc_memory(len(program))
     stack = context.alloc.alloc_memory(4096)
     context.owned.extend([code, stack])
     memory.w_block(code.addr, program)
-    task = NativeTask('budgeted', context.machine,
-                      Code(code.addr, stack.addr + stack.size, get_regs=[REG_D0]))
+    task = NativeTask(
+        "budgeted",
+        context.machine,
+        Code(code.addr, stack.addr + stack.size, get_regs=[REG_D0]),
+    )
     context.scheduler.add_task(task)
     context.scheduler.message_pump = Mock(return_value=True)
-    context.scheduler.message_wait = Mock(side_effect=AssertionError('budget API wait'))
+    context.scheduler.message_wait = Mock(side_effect=AssertionError("budget API wait"))
     outcomes = []
     for _ in range(100):
         result = context.scheduler.run_until_idle(max_cycles=40)

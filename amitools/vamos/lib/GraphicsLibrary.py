@@ -5,11 +5,21 @@ from contextlib import ExitStack
 
 from amitools.vamos.libcore.impl import LibImpl
 from amitools.vamos.machine.regs import REG_A0, REG_D0, REG_A1, REG_D1, REG_D2, REG_D3
-from amitools.vamos.lib.graphics import TextAttrStruct, BitMapStruct, RastPortStruct, RegionRectangleStruct, RegionStruct, RectangleStruct, LayerStruct, JAM2
+from amitools.vamos.lib.graphics import (
+    TextAttrStruct,
+    BitMapStruct,
+    RastPortStruct,
+    RegionRectangleStruct,
+    RegionStruct,
+    RectangleStruct,
+    LayerStruct,
+    JAM2,
+)
 from amitools.vamos.lib.intuition import TextFontStruct, WindowStruct
 from amitools.vamos.log import log_main, log_gfx
 from dataclasses import dataclass
 from amitools.vamos.lib.graphics_surface import RasterState, RasterSurface
+
 
 class GraphicsLibrary(LibImpl):
     def __init__(self):
@@ -51,7 +61,8 @@ class GraphicsLibrary(LibImpl):
                 if self.fontsPath is None:
                     self.fontsPath = os.path.join(os.path.dirname(__file__), "fonts")
                 attr_memory = ctx.alloc.alloc_memory(
-                    TextAttrStruct.get_size(), label="Graphics default TextAttr",
+                    TextAttrStruct.get_size(),
+                    label="Graphics default TextAttr",
                     except_on_failure=False,
                 )
                 if attr_memory is None:
@@ -61,7 +72,8 @@ class GraphicsLibrary(LibImpl):
                 attr = TextAttrStruct(ctx.mem, attr_memory.addr)
                 name = "Cousine-Regular.ttf"
                 name_memory = ctx.alloc.alloc_memory(
-                    len(name) + 1, label="Graphics default name",
+                    len(name) + 1,
+                    label="Graphics default name",
                     except_on_failure=False,
                 )
                 if name_memory is None:
@@ -188,19 +200,19 @@ class GraphicsLibrary(LibImpl):
             owned.close()
             return
         rp = RastPortStruct(ctx.mem, rp_addr)
-    
+
         # --- Free Layer ---
         layer_addr = rp.Layer.get()
         if layer_addr:
             layer = LayerStruct(ctx.mem, layer_addr)
-    
+
             dl_addr = layer.DamageList.get()
             if dl_addr:
                 ctx.cpu.w_reg(REG_A0, dl_addr)
                 self.DisposeRegion(ctx)
-            
+
             layer.free(ctx.alloc)
-    
+
         # --- Free BitMap + planes ---
         bm_addr = rp.BitMap.get()
         if bm_addr:
@@ -209,17 +221,17 @@ class GraphicsLibrary(LibImpl):
             rows = bm.Rows.get()
             depth = bm.Depth.get()
             plane_size = bytes_per_row * rows
-    
+
             for i in range(depth):
                 plane_addr = bm.Planes[i].get()
                 if plane_addr:
                     ctx.alloc.free_mem(plane_addr, plane_size)
-    
+
             bm.free(ctx.alloc)
-    
+
         # --- Free RastPort ---
         rp.free(ctx.alloc)
-    
+
         # --- Free SDL renderer + texture ---
         self.free_rast_port_graphics(ctx, rp_addr)
 
@@ -238,8 +250,11 @@ class GraphicsLibrary(LibImpl):
         with ExitStack() as rollback:
             rollback.callback(sdl2.SDL_DestroyRenderer, renderer)
             texture = sdl2.SDL_CreateTexture(
-                renderer, sdl2.SDL_PIXELFORMAT_RGBA8888,
-                sdl2.SDL_TEXTUREACCESS_TARGET, width, height,
+                renderer,
+                sdl2.SDL_PIXELFORMAT_RGBA8888,
+                sdl2.SDL_TEXTUREACCESS_TARGET,
+                width,
+                height,
             )
             if not texture:
                 return False
@@ -260,6 +275,7 @@ class GraphicsLibrary(LibImpl):
 
     def free_rast_port_graphics(self, ctx, rastport_addr):
         import sdl2
+
         graphics = self.rp_graphics_map.pop(rastport_addr, None)
         if graphics is not None:
             with ExitStack() as cleanup:
@@ -301,12 +317,16 @@ class GraphicsLibrary(LibImpl):
             ascent = sdlttf.TTF_FontAscent(font)
             avg_width = ctypes.c_int()
             dummy = ctypes.c_int()
-            if sdlttf.TTF_SizeUTF8(
-                font, b"M", ctypes.byref(avg_width), ctypes.byref(dummy)
-            ) != 0:
+            if (
+                sdlttf.TTF_SizeUTF8(
+                    font, b"M", ctypes.byref(avg_width), ctypes.byref(dummy)
+                )
+                != 0
+            ):
                 return None, None
             font_mem = self.alloc.alloc_memory(
-                TextFontStruct.get_size(), label="Graphics TextFont",
+                TextFontStruct.get_size(),
+                label="Graphics TextFont",
                 except_on_failure=False,
             )
             if font_mem is None:
@@ -326,7 +346,11 @@ class GraphicsLibrary(LibImpl):
             rollback.pop_all()
         log_main.debug(
             "Loaded font '%s' size=%d height=%d ascent=%d avg_width=%d",
-            name, size, height, ascent, avg_width.value,
+            name,
+            size,
+            height,
+            ascent,
+            avg_width.value,
         )
         return font, font_addr
 
@@ -376,6 +400,7 @@ class GraphicsLibrary(LibImpl):
         owner["refs"] -= 1
         if owner["refs"] == 0:
             from sdl2 import sdlttf
+
             sdlttf.TTF_CloseFont(owner["font"])
 
     def _retain_host_font(self, font_addr):
@@ -448,9 +473,15 @@ class GraphicsLibrary(LibImpl):
         advance = 0
         for part in parts:
             width, height = ctypes.c_int(), ctypes.c_int()
-            if sdlttf.TTF_SizeUTF8(
-                font, part.encode("utf-8"), ctypes.byref(width), ctypes.byref(height)
-            ) != 0:
+            if (
+                sdlttf.TTF_SizeUTF8(
+                    font,
+                    part.encode("utf-8"),
+                    ctypes.byref(width),
+                    ctypes.byref(height),
+                )
+                != 0
+            ):
                 log_gfx.error("Text: TTF_SizeUTF8 failed")
                 return None
             runs.append((advance, part))
@@ -463,10 +494,15 @@ class GraphicsLibrary(LibImpl):
         bitmap = BitMapStruct(ctx.mem, rp.BitMap.val)
         depth = min(bitmap.Depth.val, 8)
         return RasterState(
-            ctx.mem, tuple(bitmap.Planes[i].val for i in range(depth)),
-            bitmap.BytesPerRow.val, rp.Mask.val & ((1 << depth) - 1),
-            rp.FgPen.val & 255, rp.BgPen.val & 255,
-            rp.DrawMode.val, rp.LinePtrn.val, rp.TxSpacing.val,
+            ctx.mem,
+            tuple(bitmap.Planes[i].val for i in range(depth)),
+            bitmap.BytesPerRow.val,
+            rp.Mask.val & ((1 << depth) - 1),
+            rp.FgPen.val & 255,
+            rp.BgPen.val & 255,
+            rp.DrawMode.val,
+            rp.LinePtrn.val,
+            rp.TxSpacing.val,
         )
 
     def TextLength(self, ctx):
@@ -494,10 +530,17 @@ class GraphicsLibrary(LibImpl):
             bg = self._pen_color(ctx, rp, rp.BgPen.val)
             for offset, string in runs:
                 rp_graphics.batch.add(
-                    BFText(rp.cp_x.val + offset, rp.cp_y.val - rp.TxBaseline.val,
-                           string, font, fg, bg, rp.DrawMode.val,
-                           self._retain_host_font(rp.Font.val or self.topaz_font),
-                           self._raster_state(ctx, rp))
+                    BFText(
+                        rp.cp_x.val + offset,
+                        rp.cp_y.val - rp.TxBaseline.val,
+                        string,
+                        font,
+                        fg,
+                        bg,
+                        rp.DrawMode.val,
+                        self._retain_host_font(rp.Font.val or self.topaz_font),
+                        self._raster_state(ctx, rp),
+                    )
                 )
         # The public position is a signed WORD and keeps the same baseline.
         rp.cp_x.val = ((rp.cp_x.val + advance + 0x8000) & 0xFFFF) - 0x8000
@@ -520,25 +563,27 @@ class GraphicsLibrary(LibImpl):
         rastport_addr = ctx.cpu.r_reg(REG_A1)
         rp = RastPortStruct(ctx.mem, rastport_addr)
         rp_graphics = self.get_rp_graphics(rastport_addr)
-    
-        x = ctx.cpu.r_reg(REG_D0) & 0xffff
-        y = ctx.cpu.r_reg(REG_D1) & 0xffff
+
+        x = ctx.cpu.r_reg(REG_D0) & 0xFFFF
+        y = ctx.cpu.r_reg(REG_D1) & 0xFFFF
 
         if x & 0x8000:
             x -= 0x10000
         if y & 0x8000:
             y -= 0x10000
-    
+
         start_x = rp.cp_x.get()
         start_y = rp.cp_y.get()
-    
+
         color = self._pen_color(ctx, rp, rp.FgPen.get())
         draw_mode = rp.DrawMode.get()
-    
+
         rp_graphics.batch.add(
-            BFDraw(start_x, start_y, x, y, color, draw_mode, self._raster_state(ctx, rp))
+            BFDraw(
+                start_x, start_y, x, y, color, draw_mode, self._raster_state(ctx, rp)
+            )
         )
-    
+
         rp.cp_x.set(x)
         rp.cp_y.set(y)
 
@@ -546,12 +591,12 @@ class GraphicsLibrary(LibImpl):
         rastport_addr = ctx.cpu.r_reg(REG_A1)
         rp = RastPortStruct(ctx.mem, rastport_addr)
         rp_graphics = self.get_rp_graphics(rastport_addr)
-    
-        x1 = ctx.cpu.r_reg(REG_D0) & 0xffff
-        y1 = ctx.cpu.r_reg(REG_D1) & 0xffff
-        x2 = ctx.cpu.r_reg(REG_D2) & 0xffff
-        y2 = ctx.cpu.r_reg(REG_D3) & 0xffff
-    
+
+        x1 = ctx.cpu.r_reg(REG_D0) & 0xFFFF
+        y1 = ctx.cpu.r_reg(REG_D1) & 0xFFFF
+        x2 = ctx.cpu.r_reg(REG_D2) & 0xFFFF
+        y2 = ctx.cpu.r_reg(REG_D3) & 0xFFFF
+
         if x1 & 0x8000:
             x1 -= 0x10000
         if y1 & 0x8000:
@@ -560,19 +605,18 @@ class GraphicsLibrary(LibImpl):
             x2 -= 0x10000
         if y2 & 0x8000:
             y2 -= 0x10000
-    
+
         left = min(x1, x2)
         top = min(y1, y2)
         w = abs(x2 - x1) + 1
         h = abs(y2 - y1) + 1
-    
+
         color = self._pen_color(ctx, rp, rp.FgPen.get())
         draw_mode = rp.DrawMode.get()
-    
+
         rp_graphics.batch.add(
             BFRectFill(left, top, w, h, color, draw_mode, self._raster_state(ctx, rp))
         )
-
 
     def SetAPen(self, ctx):
         rastport_addr = ctx.cpu.r_reg(REG_A1)
@@ -611,12 +655,12 @@ class GraphicsLibrary(LibImpl):
 
     def OrRectRegion(self, ctx):
         region_addr = ctx.cpu.r_reg(REG_A0)
-        rect_addr   = ctx.cpu.r_reg(REG_A1)
-    
+        rect_addr = ctx.cpu.r_reg(REG_A1)
+
         if region_addr == 0 or rect_addr == 0:
             ctx.cpu.w_reg(REG_D0, 0)
             return
-    
+
         ctx.cpu.w_reg(REG_D0, self._or_rect_region(ctx, region_addr, rect_addr))
 
     def OrRegionRegion(self, ctx):
@@ -626,15 +670,14 @@ class GraphicsLibrary(LibImpl):
 
         rc = self._or_region_region(ctx, src_region_addr, dest_region_addr)
         cpu.w_reg(REG_D0, rc)
-        
+
     def AndRegionRegion(self, ctx):
         cpu = ctx.cpu
-        src_region_addr  = cpu.r_reg(REG_A0)
+        src_region_addr = cpu.r_reg(REG_A0)
         dest_region_addr = cpu.r_reg(REG_A1)
-    
+
         rc = self._and_region_region(ctx, src_region_addr, dest_region_addr)
         cpu.w_reg(REG_D0, rc)
-
 
     def _new_region(self, ctx):
         """Allocate an empty Region."""
@@ -655,28 +698,27 @@ class GraphicsLibrary(LibImpl):
         """
         if region_addr == 0:
             return
-    
+
         # Clear all rectangles (frees RegionRectangle nodes)
         self._clear_region(ctx, region_addr)
-    
+
         # Free the RegionStruct itself
         RegionStruct(ctx.mem, region_addr).free(ctx.alloc)
-
 
     def _clear_region(self, ctx, region_addr):
         """Remove all rectangles from a Region."""
         reg = RegionStruct(ctx.mem, region_addr)
-    
+
         rr_addr = reg.RegionRectangle.get()
         while rr_addr != 0:
             rr = RegionRectangleStruct(ctx.mem, rr_addr)
             next_rr = rr.Next.get()
-    
+
             # Free this node
             rr.free(ctx.alloc)
-    
+
             rr_addr = next_rr
-    
+
         # Reset region to empty
         reg.RegionRectangle.set(0)
         reg.bounds.MinX.set(0)
@@ -734,13 +776,18 @@ class GraphicsLibrary(LibImpl):
         if not rects:
             self._clear_region(ctx, region_addr)
             return 1
-        bounds = (min(r[0] for r in rects), min(r[1] for r in rects),
-                  max(r[2] for r in rects), max(r[3] for r in rects))
+        bounds = (
+            min(r[0] for r in rects),
+            min(r[1] for r in rects),
+            max(r[2] for r in rects),
+            max(r[3] for r in rects),
+        )
         with ExitStack() as rollback:
             nodes = []
             for left, top, right, bottom in rects:
                 memory = ctx.alloc.alloc_memory(
-                    RegionRectangleStruct.get_size(), label="Region rectangle",
+                    RegionRectangleStruct.get_size(),
+                    label="Region rectangle",
                     except_on_failure=False,
                 )
                 if memory is None:
@@ -748,10 +795,15 @@ class GraphicsLibrary(LibImpl):
                 rollback.callback(ctx.alloc.free_memory, memory)
                 ctx.mem.clear_block(memory.addr, memory.size, 0)
                 node = RegionRectangleStruct(ctx.mem, memory.addr)
-                self._write_bounds(node.bounds, (
-                    left - bounds[0], top - bounds[1],
-                    right - bounds[0], bottom - bounds[1],
-                ))
+                self._write_bounds(
+                    node.bounds,
+                    (
+                        left - bounds[0],
+                        top - bounds[1],
+                        right - bounds[0],
+                        bottom - bounds[1],
+                    ),
+                )
                 if nodes:
                     nodes[-1].Next.val = node.addr
                     node.Prev.val = nodes[-1].addr
@@ -766,8 +818,9 @@ class GraphicsLibrary(LibImpl):
 
     def _or_rect_region(self, ctx, region_addr, rect_addr):
         rect = self._bounds(RectangleStruct(ctx.mem, rect_addr))
-        return self._replace_region(ctx, region_addr,
-                                    self._region_rects(ctx, region_addr) + [rect])
+        return self._replace_region(
+            ctx, region_addr, self._region_rects(ctx, region_addr) + [rect]
+        )
 
     def _or_region_region(self, ctx, src_region_addr, dest_region_addr):
         if not src_region_addr or not dest_region_addr:
@@ -775,7 +828,9 @@ class GraphicsLibrary(LibImpl):
         if src_region_addr == dest_region_addr:
             return 1
         return self._replace_region(
-            ctx, dest_region_addr, self._region_rects(ctx, dest_region_addr)
+            ctx,
+            dest_region_addr,
+            self._region_rects(ctx, dest_region_addr)
             + self._region_rects(ctx, src_region_addr),
         )
 
@@ -792,6 +847,7 @@ class GraphicsLibrary(LibImpl):
 
     def _get_damage_clip_rects_for_rp(self, ctx, rastport_addr):
         import sdl2
+
         intuition = ctx.exec_lib.intuition_lib
         window_addr = intuition.rp_2_win_addr.get(rastport_addr)
         if window_addr is None:
@@ -802,8 +858,10 @@ class GraphicsLibrary(LibImpl):
         damage = LayerStruct(ctx.mem, layer_addr).DamageList.val
         if not damage:
             return None
-        return [sdl2.SDL_Rect(a, b, c - a + 1, d - b + 1)
-                for a, b, c, d in self._region_rects(ctx, damage)]
+        return [
+            sdl2.SDL_Rect(a, b, c - a + 1, d - b + 1)
+            for a, b, c, d in self._region_rects(ctx, damage)
+        ]
 
     def _get_damage_clip_rect_for_rp(self, ctx, rastport_addr):
         """
@@ -811,49 +869,52 @@ class GraphicsLibrary(LibImpl):
         return an SDL_Rect (or None if no clipping).
         """
         import sdl2
+
         # 1) Map RastPort -> Window
         # You already have rp_2_win_addr for refresh, so reuse it.
         try:
             win_addr = ctx.exec_lib.intuition_lib.rp_2_win_addr[rastport_addr]
         except KeyError:
             return None
-    
+
         window = WindowStruct(ctx.mem, win_addr)
         layer_addr = window.WLayer.get()
         if layer_addr == 0:
             return None
-    
+
         layer = LayerStruct(ctx.mem, layer_addr)
         region_addr = layer.DamageList.get()
         if region_addr == 0:
             return None
-    
+
         reg = RegionStruct(ctx.mem, region_addr)
-    
+
         # Empty region?
         maxx = reg.bounds.MaxX.get()
         minx = reg.bounds.MinX.get()
         if maxx < minx:
             # Region empty → no clipping
             return None
-    
+
         minx = reg.bounds.MinX.get()
         miny = reg.bounds.MinY.get()
         maxx = reg.bounds.MaxX.get()
         maxy = reg.bounds.MaxY.get()
-    
+
         w = (maxx - minx) + 1
         h = (maxy - miny) + 1
-    
+
         # Clamp to non-negative; SDL doesn't like negative sizes
         if w <= 0 or h <= 0:
             return None
-    
+
         return sdl2.SDL_Rect(minx, miny, w, h)
-    
+
+
 class RastPortGraphics:
     def __init__(self, sdl_win, renderer, texture, width, height):
         import sdl2
+
         self.sdl_window_id = sdl2.SDL_GetWindowID(sdl_win)
         self.renderer = renderer
         self.texture = texture
@@ -871,14 +932,14 @@ def create_amiga_palette():
     palette = {}
 
     wb2_colors = [
-        (168, 168, 168),      # 4: Amiga Gray (our default bg)
-        (0x00, 0x00, 0x00),   # 0: Black
-        (0xFF, 0xFF, 0xFF),   # 1: White
-        (0x88, 0xAA, 0xFF),   # 2: Light Blue
-        (0x00, 0x66, 0xAA),   # 3: Dark Blue
-        (0x66, 0x66, 0x66),   # 5: Dark Gray
-        (0xFF, 0xAA, 0x00),   # 6: Orange
-        (0xAA, 0x00, 0x00),   # 7: Red
+        (168, 168, 168),  # 4: Amiga Gray (our default bg)
+        (0x00, 0x00, 0x00),  # 0: Black
+        (0xFF, 0xFF, 0xFF),  # 1: White
+        (0x88, 0xAA, 0xFF),  # 2: Light Blue
+        (0x00, 0x66, 0xAA),  # 3: Dark Blue
+        (0x66, 0x66, 0x66),  # 5: Dark Gray
+        (0xFF, 0xAA, 0x00),  # 6: Orange
+        (0xAA, 0x00, 0x00),  # 7: Red
     ]
 
     for i in range(8):
@@ -896,7 +957,8 @@ def create_amiga_palette():
         palette[i] = sdl2.SDL_Color(
             ((i >> 5) & 7) * 255 // 7,
             ((i >> 2) & 7) * 255 // 7,
-            (i & 3) * 85, 255,
+            (i & 3) * 85,
+            255,
         )
 
     return palette
@@ -929,6 +991,7 @@ class RPBatch:
                 if release is not None:
                     cleanup.callback(release)
 
+
 @dataclass
 class BFRectFill:
     x: int
@@ -939,6 +1002,7 @@ class BFRectFill:
     draw_mode: int
     state: object = None
 
+
 @dataclass
 class BFDraw:
     x1: int
@@ -948,6 +1012,7 @@ class BFDraw:
     color: "sdl2.SDL_Color"
     draw_mode: int
     state: object = None
+
 
 @dataclass
 class BFText:
