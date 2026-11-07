@@ -26,6 +26,7 @@ dynamic = ["version", "readme"]
 
 [project.optional-dependencies]
 vamos = ["machine68k >= 0.5.0", "greenlet"]
+graphics = ["pysdl2 >= 0.9.16"]
 
 [tool.setuptools]
 zip-safe = false
