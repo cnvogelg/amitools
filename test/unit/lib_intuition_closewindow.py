@@ -391,3 +391,19 @@ def intuition_close_library_with_live_windows_test(ctx):
     ctx.sdl.SDL_QuitSubSystem.assert_called_once_with(3)
     if ctx.labels:
         assert not ctx.labels.get_all_labels()
+
+
+def graphics_window_rastport_initialization_test(ctx):
+    target = ctx.open()
+    window = WindowStruct(ctx.mem, target)
+    raster = RastPortStruct(ctx.mem, window.RPort.val)
+    assert raster.BitMap.val != 0
+    assert raster.Layer.val == window.WLayer.val != 0
+    layer = LayerStruct(ctx.mem, raster.Layer.val)
+    assert layer.rp.val == raster.get_addr()
+    assert raster.Font.val == ctx.font.get_addr()
+    assert raster.FgPen.val == 1
+    assert raster.AOlPen.val == 0
+    assert raster.cp_y.val == raster.TxBaseline.val == 6
+    assert raster.DrawMode.val == 1
+    ctx.close_all()

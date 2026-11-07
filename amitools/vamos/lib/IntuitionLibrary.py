@@ -3,7 +3,7 @@ from contextlib import ExitStack
 from amitools.vamos.libcore.impl import LibImpl
 from amitools.vamos.lib.TimerDevice import TimerDevice
 
-from amitools.vamos.lib.graphics import RastPortStruct, LayerStruct, RectangleStruct, TextAttrStruct
+from amitools.vamos.lib.graphics import RastPortStruct, LayerStruct, RectangleStruct, TextAttrStruct, JAM2
 from amitools.vamos.lib.intuition import WA_Left, WA_Top, WA_Width, WA_Height, WA_Title, WA_MinWidth, WA_MinHeight, WA_MaxWidth, WA_MaxHeight, WindowStruct, IDCMP_MOUSEMOVE, \
     IDCMP_MOUSEBUTTONS, IDCMP_RAWKEY, IDCMP_CLOSEWINDOW, IDCMP_NEWSIZE, IDCMP_REFRESHWINDOW, IntuiMessageStruct, MenuStruct, MenuItemStruct, IntuiTextStruct, IDCMP_MENUPICK, \
     NewWindowStruct, WA_IDCMP, ScreenStruct, NewScreenStruct, WA_CustomScreen
@@ -1192,7 +1192,7 @@ class IntuitionLibrary(LibImpl):
             rp.BitMap.set(screen.BitMap.get_addr())
             rp.FgPen.set(detail_pen)
             rp.BgPen.set(block_pen)
-            rp.DrawMode.set(2)
+            rp.DrawMode.set(JAM2)
             rp.cp_x.set(0)
             rp.cp_y.set(0)
             rp.Mask.set(0xFF)
