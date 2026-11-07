@@ -467,7 +467,7 @@ class GraphicsLibrary(LibImpl):
             fg = self._pen_color(ctx, rp, rp.FgPen.val)
             bg = self._pen_color(ctx, rp, rp.BgPen.val)
             for offset, string in runs:
-                rp_graphics.batch.texts.append(
+                rp_graphics.batch.add(
                     BFText(rp.cp_x.val + offset, rp.cp_y.val - rp.TxBaseline.val,
                            string, font, fg, bg, rp.DrawMode.val)
                 )
@@ -507,7 +507,7 @@ class GraphicsLibrary(LibImpl):
         color = self._pen_color(ctx, rp, rp.FgPen.get())
         draw_mode = rp.DrawMode.get()
     
-        rp_graphics.batch.draws.append(
+        rp_graphics.batch.add(
             BFDraw(start_x, start_y, x, y, color, draw_mode)
         )
     
@@ -541,7 +541,7 @@ class GraphicsLibrary(LibImpl):
         color = self._pen_color(ctx, rp, rp.FgPen.get())
         draw_mode = rp.DrawMode.get()
     
-        rp_graphics.batch.rectfills.append(
+        rp_graphics.batch.add(
             BFRectFill(left, top, w, h, color, draw_mode)
         )
 
@@ -817,6 +817,7 @@ class RastPortGraphics:
         self.width = width
         self.height = height
         self.batch = RPBatch()
+        self.clip_rect = None
 
 
 def create_amiga_palette():
@@ -861,11 +862,22 @@ class RPBatch:
         self.rectfills = []
         self.draws = []
         self.texts = []
+        self.commands = []
+
+    def add(self, command):
+        self.commands.append(command)
+        if isinstance(command, BFText):
+            self.texts.append(command)
+        elif isinstance(command, BFDraw):
+            self.draws.append(command)
+        else:
+            self.rectfills.append(command)
 
     def clear(self):
         self.rectfills.clear()
         self.draws.clear()
         self.texts.clear()
+        self.commands.clear()
 
 @dataclass
 class BFRectFill:

@@ -130,3 +130,34 @@ def graphics_text_word_position_wrap_test(ctx):
     ctx.graphics.Text(ctx)
     assert ctx.rp.cp_x.val == -32762
     assert ctx.rp.cp_y.val == 12
+
+
+def intuition_print_itext_count_and_state_test(ctx):
+    from amitools.vamos.lib.IntuitionLibrary import IntuitionLibrary
+    from amitools.vamos.lib.intuition import IntuiTextStruct
+    from amitools.vamos.machine import REG_D1
+    lib = IntuitionLibrary()
+    lib.graphics_lib = ctx.graphics
+    items = [IntuiTextStruct.alloc(ctx.alloc) for _ in range(2)]
+    try:
+        ctx.mem.w_cstr(ctx.text.addr, 'Wi')
+        for index, item in enumerate(items):
+            item.LeftEdge.val = -2
+            item.TopEdge.val = 3 + index * 9
+            item.IText.set(ctx.text.addr)
+            item.FrontPen.val = 255
+            item.BackPen.val = 0
+            item.DrawMode.val = 1
+        items[0].NextText.val = items[1].addr
+        before = ctx.mem.r_block(ctx.rp.addr, ctx.rp.get_size())
+        ctx.cpu.w_reg(REG_A0, ctx.rp.addr)
+        ctx.cpu.w_reg(REG_A1, items[0].addr)
+        ctx.cpu.w_reg(REG_D0, 0xffff)
+        ctx.cpu.w_reg(REG_D1, 5)
+        lib.PrintIText(ctx)
+        assert [t.string for t in ctx.batch.texts] == ['Wi', 'Wi']
+        assert [(t.x, t.y) for t in ctx.batch.texts] == [(-3, 8), (-3, 17)]
+        assert ctx.mem.r_block(ctx.rp.addr, ctx.rp.get_size()) == before
+    finally:
+        for item in items:
+            item.free()
