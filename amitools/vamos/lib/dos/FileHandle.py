@@ -119,13 +119,14 @@ class FileHandle:
         return got
 
     def read(self, len):
-        """read data
-
-        return -1 on error, 0=EOF, >0 written bytes"""
+        """Return bytes, an empty byte string at EOF, or -1 on error."""
         if self.terminal:
             return self.terminal.read(len)
         try:
-            return self.obj.read1(len)
+            read = getattr(self.obj, "read1", None)
+            if read is None:
+                read = self.obj.read
+            return read(len)
         except IOError:
             return -1
 
