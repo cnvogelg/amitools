@@ -195,7 +195,7 @@ class GraphicsLibrary(LibImpl):
                 ctx.cpu.w_reg(REG_A0, dl_addr)
                 self.DisposeRegion(ctx)
             
-            ctx.alloc.free_mem(layer_addr, LayerStruct.get_size())
+            layer.free(ctx.alloc)
     
         # --- Free BitMap + planes ---
         bm_addr = rp.BitMap.get()
@@ -211,10 +211,10 @@ class GraphicsLibrary(LibImpl):
                 if plane_addr:
                     ctx.alloc.free_mem(plane_addr, plane_size)
     
-            ctx.alloc.free_mem(bm_addr, BitMapStruct.get_size())
+            bm.free(ctx.alloc)
     
         # --- Free RastPort ---
-        ctx.alloc.free_mem(rp_addr, RastPortStruct.get_size())
+        rp.free(ctx.alloc)
     
         # --- Free SDL renderer + texture ---
         self.free_rast_port_graphics(ctx, rp_addr)
@@ -607,7 +607,7 @@ class GraphicsLibrary(LibImpl):
         self._clear_region(ctx, region_addr)
     
         # Free the RegionStruct itself
-        ctx.alloc.free_mem(region_addr, RegionStruct.get_size())
+        RegionStruct(ctx.mem, region_addr).free(ctx.alloc)
 
 
     def _clear_region(self, ctx, region_addr):
@@ -620,7 +620,7 @@ class GraphicsLibrary(LibImpl):
             next_rr = rr.Next.get()
     
             # Free this node
-            ctx.alloc.free_mem(rr_addr, RegionRectangleStruct.get_size())
+            rr.free(ctx.alloc)
     
             rr_addr = next_rr
     
