@@ -35,6 +35,9 @@ class ExecLibrary(LibImpl):
         log_exec.info("setup exec.library")
         self.lib_mgr = ctx.lib_mgr
         self.alloc = ctx.alloc
+        self.intuition_lib = None
+        self.graphics_lib = None
+        ctx.exec_lib = self
         self._pools = {}
         self._poolid = 0x1000
         self.exec_lib = ExecLibraryType(ctx.mem, base_addr)
@@ -862,6 +865,43 @@ class ExecLibrary(LibImpl):
         num_bytes = ctx.cpu.r_reg(REG_D0)
         Alloc.deallocate(ctx, mh_addr, blk_addr, num_bytes)
         log_exec.info("Deallocate(%06x, %06x, %06x)" % (mh_addr, blk_addr, num_bytes))
+
+    def _wait_core(self, ctx, wait=False):
+        """Pump a bounded batch on the CPU thread; wait only when idle."""
+        intuition = self.intuition_lib
+        if intuition is None or not intuition.sdl_window_id_2_sdl_window:
+            return False
+
+        import sdl2
+        event = sdl2.SDL_Event()
+        intuition.check_refresh(ctx)
+
+        def dispatch():
+            one = intuition.ingest_sdl_event(ctx, event)
+            if one is not None:
+                intuition.drain_pending_intui_events(ctx, one)
+
+        if wait and sdl2.SDL_WaitEventTimeout(event, 20):
+            dispatch()
+        # Empty queues and floods of ignored events must both yield to
+        # runnable guest tasks. A following slice can drain more events.
+        for _ in range(64):
+            if not intuition.sdl_window_id_2_sdl_window:
+                break
+            if not sdl2.SDL_PollEvent(event):
+                break
+            dispatch()
+        return bool(intuition.sdl_window_id_2_sdl_window)
+
+    def register_SDL_poll(self, ctx):
+        if ctx is not None and getattr(ctx, "task", None) is None:
+            return
+        sched_task = self.signal_func.get_my_sched_task()
+        if sched_task is None:
+            return
+        scheduler = sched_task.scheduler
+        scheduler.message_pump = lambda: self._wait_core(ctx)
+        scheduler.message_wait = lambda: self._wait_core(ctx, wait=True)
 
     # ----- Misc -----
 

@@ -61,6 +61,8 @@ class Scheduler(object):
         self.running = False
         # tasks added while not running: their ADD_TASK is reported on the next run
         self.new_tasks = []
+        self.message_pump = None
+        self.message_wait = None
 
     @classmethod
     def from_cfg(cls, machine, schedule_cfg):
@@ -95,7 +97,7 @@ class Scheduler(object):
         if len(self.ready_tasks) == 0:
             raise RuntimeError("no tasks to schedule!")
 
-        if self._run_tasks() == RunResult.IDLE:
+        if self._run_tasks(wait_for_events=True) == RunResult.IDLE:
             # every task left waits and no task is there to wake it up
             log_schedule.error("schedule(): no task to run?!")
             return False
@@ -122,7 +124,13 @@ class Scheduler(object):
         log_schedule.info("run_until_idle(): start")
         return self._run_tasks(max_cycles)
 
-    def _run_tasks(self, max_cycles=None):
+    def _run_tasks(self, max_cycles=None, wait_for_events=False):
+        try:
+            return self._run_tasks_impl(max_cycles, wait_for_events)
+        finally:
+            self.running = False
+
+    def _run_tasks_impl(self, max_cycles=None, wait_for_events=False):
         """the scheduling loop shared by schedule() and run_until_idle().
 
         returns the RunResult that stopped it. with max_cycles the loop
@@ -155,6 +163,9 @@ class Scheduler(object):
                 self.waiting_tasks,
             )
 
+            if self.message_pump is not None:
+                self.message_pump()
+
             # nothing to do anymore?
             if self.get_num_tasks() == 0:
                 break
@@ -167,8 +178,14 @@ class Scheduler(object):
                 # find a task to run
                 task = self._find_run_task()
                 if task is None:
-                    result = RunResult.IDLE
-                    break
+                    if wait_for_events and self.message_wait is not None:
+                        active = self.message_wait()
+                        task = self._find_run_task()
+                        if task is None and active:
+                            continue
+                    if task is None:
+                        result = RunResult.IDLE
+                        break
 
             # budget spent while a task is still runnable?
             if max_cycles is not None and cycles >= max_cycles:

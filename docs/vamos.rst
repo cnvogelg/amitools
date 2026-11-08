@@ -730,3 +730,34 @@ does not impose a maximum execution-cycle limit.
 That's it for now! Have fun playing with vamos!
 
 EOF
+
+SDL display backend
+-------------------
+
+The optional SDL backend provides host-backed Intuition windows, indexed
+bitmap planes, text, lines, filled rectangles, regions, refresh clipping
+and IDCMP messages. Install the Python bindings with::
+
+    pip install 'amitools[vamos,graphics]'
+
+SDL2 and SDL2_ttf must also be available as native libraries. PySDL2's
+``PYSDL2_DLL_PATH`` can name their directories when they are outside the
+system library search path. Without these optional libraries, Intuition's
+nonvisual functions remain available in headless mode.
+
+The bundled fallback is Cousine, a monospaced TrueType font under the SIL
+Open Font License. Its license and source reference are included alongside
+the font. ``topaz.font`` selects this fallback; it uses Cousine glyphs.
+Other TrueType fonts can be loaded from the configured ``FONTS:`` path.
+
+API coverage is partial. This backend supports SDL windows and the
+implemented graphics vectors; applications requiring other vectors still
+use vamos's normal missing-function behavior. It is not a chipset or
+Workbench replacement.
+
+The optional native regression uses SDL's dummy video driver, exercises a
+68k window-library call, checks rendered pixels and guest bitmap planes,
+and verifies library close and reopen. With the native libraries and
+PySDL2 available, run it from the source checkout with::
+
+    AMITOOLS_TEST_SDL=1 python -m pytest -q test/unit/lib_graphics_sdl.py
