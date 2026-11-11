@@ -23,9 +23,10 @@ def dos_filehandle_alloc_test():
 
     fh.free_fh(alloc)
     assert alloc.is_all_free()
+
+
 import io
 import os
-
 
 
 def dos_filehandle_tell_pipe_test():
