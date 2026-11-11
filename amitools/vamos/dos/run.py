@@ -41,44 +41,34 @@ def run_command(process, start_pc, args_ptr, args_len, stack_size, reg_d1=0):
     new_stack = Stack.alloc(alloc, stack_size)
     task = process.this_task.pr_Task
     # save old stack
-    oldstack_upper = task.tc_SPLower.aptr
-    oldstack_lower = task.tc_SPUpper.aptr
+    oldstack_lower = task.tc_SPLower.aptr
+    oldstack_upper = task.tc_SPUpper.aptr
     # activate new stack
-    task.tc_SPLower.aptr = new_stack.get_upper()
-    task.tc_SPUpper.aptr = new_stack.get_lower()
+    task.tc_SPLower.aptr = new_stack.get_lower()
+    task.tc_SPUpper.aptr = new_stack.get_upper()
     # NOTE: the Manx fexec and BPCL mess is not (yet) setup here.
 
-    # setup sub task
-    sp = new_stack.get_initial_sp()
+    try:
+        # new proc registers: d0=arg_len a0=arg_cptr
+        # d2=stack_size. This value is also in 4(sp), but various C
+        # programs rely on it being present (1.3-3.1 at least have it).
+        set_regs = {
+            REG_D0: args_len,
+            REG_D1: reg_d1,
+            REG_A0: args_ptr,
+            REG_D2: stack_size,
+            REG_A2: ctx.odg_base,
+            REG_A5: ctx.odg_base,
+            REG_A6: ctx.odg_base,
+        }
+        get_regs = [REG_D0]
+        code = Code(start_pc, new_stack.get_initial_sp(), set_regs, get_regs)
 
-    # new proc registers: d0=arg_len a0=arg_cptr
-    # d2=stack_size.  this value is also in 4(sp) (see Process.init_stack), but
-    # various C programs rely on it being present (1.3-3.1 at least have it).
-    set_regs = {
-        REG_D0: args_len,
-        REG_D1: reg_d1,
-        REG_A0: args_ptr,
-        REG_D2: stack_size,
-        REG_A2: ctx.odg_base,
-        REG_A5: ctx.odg_base,
-        REG_A6: ctx.odg_base,
-    }
-    get_regs = [REG_D0]
-    code = Code(start_pc, sp, set_regs, get_regs)
-
-    # run sub task
-    rs = ctx.runner(code)
-
-    # return value
-    ret_code = rs.regs[REG_D0]
-    log_proc.info("return from RunCommand: ret_code=%d", ret_code)
-
-    # restore stack values
-    task.tc_SPLower.aptr = oldstack_lower
-    task.tc_SPUpper.aptr = oldstack_upper
-
-    # free stack
-    new_stack.free()
-
-    # result code
-    return ret_code
+        rs = ctx.runner(code)
+        ret_code = rs.regs[REG_D0]
+        log_proc.info("return from RunCommand: ret_code=%d", ret_code)
+        return ret_code
+    finally:
+        task.tc_SPLower.aptr = oldstack_lower
+        task.tc_SPUpper.aptr = oldstack_upper
+        new_stack.free()
