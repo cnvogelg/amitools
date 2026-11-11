@@ -349,10 +349,11 @@ class PathManager:
         """
         if type(ami_path) is str:
             ami_path = AmiPath(ami_path)
-        # already absolute?
+        # already absolute? (with AmigaDOS parent steps 'a//b' collapsed,
+        # so a lock's name is canonical like NameFromLock() reports it)
         if ami_path.is_absolute():
             log_path.debug("abspath: is_absolute: '%s'", ami_path)
-            return ami_path
+            return ami_path.collapse_parent_steps()
         # get current directory and join cur dir with my path
         if env is None:
             env = self.default_env
@@ -364,7 +365,7 @@ class PathManager:
         log_path.debug(
             "abspath: relpath='%s' cwd='%s' -> join '%s'", ami_path, cwd, res_path
         )
-        return res_path
+        return res_path.collapse_parent_steps()
 
     def volpath(self, ami_path, env=None, strict=False):
         """return a volume path.

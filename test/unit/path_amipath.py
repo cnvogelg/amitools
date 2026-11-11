@@ -120,8 +120,10 @@ def path_amipath_valid_syntax_test():
     assert AmiPath("foo/bar/").is_syntax_valid()
     assert AmiPath(":bla").is_syntax_valid()
     assert AmiPath("/bla").is_syntax_valid()
+    # an empty name is the AmigaDOS parent step
+    assert AmiPath("//").is_syntax_valid()
+    assert AmiPath("foo:bar//baz").is_syntax_valid()
     # invalid
-    assert not AmiPath("//").is_syntax_valid()
     assert not AmiPath(":/").is_syntax_valid()
     assert not AmiPath("bla/foo:").is_syntax_valid()
     assert not AmiPath("bla:foo:").is_syntax_valid()
@@ -275,3 +277,26 @@ def path_amipath_join_prefix_local_test():
     assert AmiPath(":").join(AmiPath("bar")) == AmiPath(":bar")
     assert AmiPath(":baz").join(AmiPath("bar")) == AmiPath(":baz/bar")
     assert AmiPath(":foo/baz").join(AmiPath("bar")) == AmiPath(":foo/baz/bar")
+
+
+def path_amipath_collapse_parent_steps_test():
+    # an empty name is the AmigaDOS parent step; a trailing slash is not
+    assert str(AmiPath("foo:a/b//c").collapse_parent_steps()) == "foo:a/c"
+    assert str(AmiPath("foo:a/b///c").collapse_parent_steps()) == "foo:c"
+    assert str(AmiPath("foo:a/b//").collapse_parent_steps()) == "foo:a"
+    assert str(AmiPath("foo:a//").collapse_parent_steps()) == "foo:"
+    assert str(AmiPath("foo:a/b/").collapse_parent_steps()) == "foo:a/b/"
+    # nothing to do: the same object comes back
+    p = AmiPath("foo:a/b")
+    assert p.collapse_parent_steps() is p
+    # relative paths are collapsed once joined to their directory
+    p = AmiPath("a//b")
+    assert p.collapse_parent_steps() is p
+    # above the volume root: left for the file system to reject
+    p = AmiPath("foo:a///")
+    assert p.collapse_parent_steps() is p
+    # join keeps a trailing parent step, so 'src//' resolves to the parent
+    assert AmiPath("foo:x").join(AmiPath("src//")) == AmiPath("foo:x/src//")
+    assert str(AmiPath("foo:x").join(AmiPath("src//")).collapse_parent_steps()) == "foo:x"
+    assert AmiPath("foo:x/y").join(AmiPath("/a//")) == AmiPath("foo:x/a//")
+    assert AmiPath("foo:x").join(AmiPath(":a//")) == AmiPath("foo:a//")

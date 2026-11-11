@@ -5,6 +5,7 @@ import tempfile
 from amitools.vamos.log import log_path
 import logging
 from .spec import Spec
+from .amipath import collapse_parent_steps
 
 
 def resolve_sys_path(sys_path):
@@ -407,7 +408,12 @@ class VolumeManager(object):
                 return None
 
             # follow ami path along in sys world
-            dirs = remainder.split("/")
+            dirs = collapse_parent_steps(remainder.split("/"))
+            if dirs is None:
+                log_path.error(
+                    "vol: ami_to_sys_path: parent step above volume: %s", ami_path
+                )
+                return None
             sys_path = self._follow_path_no_case(vol_sys_path, dirs, fast)
             log_path.info(
                 "vol: ami_to_sys_path: ami='%s' -> sys='%s'", ami_path, sys_path

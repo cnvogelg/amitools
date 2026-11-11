@@ -4,6 +4,7 @@ import re
 import os
 from contextlib import ExitStack
 
+from amitools.vamos.machine import Code
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.astructs import CSTR, LONG
@@ -18,6 +19,8 @@ from amitools.vamos.libstructs import (
     SegmentStruct,
     FileHandleStruct,
     FileInfoBlockStruct,
+    ExAllControlStruct,
+    ExAllDataStruct,
     InfoDataStruct,
     DevProcStruct,
     AnchorPathStruct,
@@ -50,6 +53,7 @@ from .dos.MatchFirstNext import MatchFirstNext
 from .dos.CommandLine import CommandLine
 from .dos.Process import Process
 from .dos.DosList import DosList
+from .dos.Lock import Lock
 from .dos.LockManager import LockManager
 from .dos.FileManager import FileManager
 from .dos.CSource import *
@@ -103,6 +107,7 @@ class DosLibrary(LibImpl):
         self.matches = {}
         self.rdargs = {}
         self.dos_objs = {}
+        self.exall_scans = {}
         self.dos_entries = {}
         self.errstrings = {}
         self.resident = []
@@ -149,6 +154,7 @@ class DosLibrary(LibImpl):
         return 0
 
     def finish_lib(self, ctx):
+        self.exall_scans.clear()
         self._finish_timer_request(ctx)
         # free the child processes that still run
         for child in self.child_procs.values():
@@ -1369,6 +1375,174 @@ class DosLibrary(LibImpl):
             self.setioerr(ctx, err)
             return DOSFALSE
 
+    # bytes of struct ExAllData used by each ED_* type: ED_NAME .. ED_OWNER
+    ex_all_data_sizes = (0, 8, 12, 16, 20, 32, 36, 40)
+
+    def ExAll(self, ctx, lock_b_addr, buffer, size, data_type, control_ptr):
+        """Fill a bounded entry chain using a cursor private to this control."""
+        control = ExAllControlStruct(ctx.mem, control_ptr)
+        control.eac_Entries.val = 0
+        if data_type < 1 or data_type >= len(self.ex_all_data_sizes):
+            self.exall_scans.pop(control_ptr, None)
+            self.setioerr(ctx, ERROR_BAD_NUMBER)
+            return DOSFALSE
+        if size < 0 or size > 0x7FFFFFFF:
+            self.exall_scans.pop(control_ptr, None)
+            self.setioerr(ctx, ERROR_NO_FREE_STORE)
+            return DOSFALSE
+        lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
+        if lock is None:
+            self.exall_scans.pop(control_ptr, None)
+            self.setioerr(ctx, ERROR_INVALID_LOCK)
+            return DOSFALSE
+        last_key = control.eac_LastKey.val
+        if last_key == 0:
+            # An unallocated Lock reuses the metadata/enumeration helpers,
+            # but owns its ExNext cache independently of the caller's lock.
+            scan = Lock(lock.name, lock.ami_path, lock.sys_path)
+            self.exall_scans[control_ptr] = (lock, scan)
+        else:
+            state = self.exall_scans.get(control_ptr)
+            if state is None or state[0] is not lock:
+                self.exall_scans.pop(control_ptr, None)
+                self.setioerr(ctx, ERROR_INVALID_LOCK)
+                return DOSFALSE
+            scan = state[1]
+
+        fib_size = FileInfoBlockStruct.get_size()
+        scratch = self.alloc.alloc_memory(
+            fib_size + 4, label="ExAll_FIB", except_on_failure=False
+        )
+        if scratch is None:
+            self.exall_scans.pop(control_ptr, None)
+            self.setioerr(ctx, ERROR_NO_FREE_STORE)
+            return DOSFALSE
+        keep_scan = False
+        try:
+            fib = FileInfoBlockStruct(ctx.mem, scratch.addr)
+            if last_key == 0:
+                err = scan.examine_lock(fib)
+                if err == NO_ERROR and fib.fib_DirEntryType.val < 0:
+                    err = ERROR_OBJECT_WRONG_TYPE
+            else:
+                fib.fib_DiskKey.val = last_key
+                err = NO_ERROR
+            if err == NO_ERROR:
+                err = self._exall_fill(
+                    ctx,
+                    scan,
+                    fib,
+                    buffer,
+                    size,
+                    data_type,
+                    control,
+                    scratch.addr + fib_size,
+                )
+            control.eac_LastKey.val = fib.fib_DiskKey.val
+            keep_scan = err == NO_ERROR
+        except FileNotFoundError:
+            err = ERROR_OBJECT_NOT_FOUND
+        except NotADirectoryError:
+            err = ERROR_OBJECT_WRONG_TYPE
+        except PermissionError:
+            err = ERROR_READ_PROTECTED
+        except OSError:
+            err = ERROR_OBJECT_IN_USE
+        finally:
+            self.alloc.free_memory(scratch)
+            if not keep_scan:
+                self.exall_scans.pop(control_ptr, None)
+        log_dos.info(
+            "ExAll: %s buf=%06x size=%d type=%d -> entries=%d err=%d",
+            lock,
+            buffer,
+            size,
+            data_type,
+            control.eac_Entries.val,
+            err,
+        )
+        self.setioerr(ctx, err)
+        return DOSTRUE if err == NO_ERROR else DOSFALSE
+
+    def _exall_fill(self, ctx, scan, fib, buffer, size, data_type, control, type_ptr):
+        match_ptr = control.eac_MatchString.aptr
+        match_pat = None
+        if match_ptr:
+            match_pat = Pattern(None, ctx.mem.r_cstr(match_ptr), True, True)
+        hook_ptr = control.eac_MatchFunc.aptr
+        entry_size = self.ex_all_data_sizes[data_type]
+        prev = None
+        pos = buffer
+        end = buffer + size
+        while True:
+            key_before = fib.fib_DiskKey.val
+            # The Examine helper leaves fib_Size unchanged for directories.
+            fib.fib_Size.val = 0
+            err = scan.examine_next(fib)
+            if err != NO_ERROR:
+                return err
+            name = ctx.mem.r_cstr(fib.fib_FileName.addr)
+            if match_pat is not None and not pattern_match(match_pat, name):
+                continue
+            comment = ""
+            if data_type >= 6:
+                comment = ctx.mem.r_cstr(fib.fib_Comment.addr)
+            need = entry_size + len(name) + 1
+            if comment:
+                need += len(comment) + 1
+            need = (need + 3) & ~3
+            if pos + need > end:
+                fib.fib_DiskKey.val = key_before
+                if control.eac_Entries.val == 0:
+                    return ERROR_NO_FREE_STORE
+                return NO_ERROR
+            ead = ExAllDataStruct(ctx.mem, pos)
+            str_addr = pos + entry_size
+            ead.ed_Next.aptr = 0
+            ead.ed_Name.aptr = str_addr
+            ctx.mem.w_cstr(str_addr, name)
+            str_addr += len(name) + 1
+            if data_type >= 2:
+                ead.ed_Type.val = fib.fib_DirEntryType.val
+            if data_type >= 3:
+                ead.ed_Size.val = fib.fib_Size.val
+            if data_type >= 4:
+                ead.ed_Prot.val = fib.fib_Protection.val
+            if data_type >= 5:
+                ead.ed_Days.val = fib.fib_Date.ds_Days.val
+                ead.ed_Mins.val = fib.fib_Date.ds_Minute.val
+                ead.ed_Ticks.val = fib.fib_Date.ds_Tick.val
+            if data_type >= 6:
+                ead.ed_Comment.aptr = str_addr if comment else 0
+                if comment:
+                    ctx.mem.w_cstr(str_addr, comment)
+            if data_type >= 7:
+                ead.ed_OwnerUID.val = fib.fib_OwnerUID.val
+                ead.ed_OwnerGID.val = fib.fib_OwnerGID.val
+            if hook_ptr:
+                # h_Entry follows the Hook's two-pointer MinNode header.
+                entry = ctx.mem.r32(hook_ptr + 8)
+                ctx.mem.w32(type_ptr, data_type)
+                code = Code(
+                    entry,
+                    set_regs={REG_A0: hook_ptr, REG_A1: pos, REG_A2: type_ptr},
+                    get_regs=[REG_D0],
+                )
+                result = ctx.runner(code, name="ExAllMatch")
+                if result.regs[REG_D0] == 0:
+                    continue
+            if prev is not None:
+                prev.ed_Next.aptr = pos
+            prev = ead
+            pos += need
+            control.eac_Entries.val += 1
+
+    def ExAllEnd(self, ctx, lock_b_addr, buffer, size, data_type, control_ptr):
+        self.exall_scans.pop(control_ptr, None)
+        control = ExAllControlStruct(ctx.mem, control_ptr)
+        control.eac_Entries.val = 0
+        control.eac_LastKey.val = 0
+
     def ParentDir(self, ctx):
         lock_b_addr = ctx.cpu.r_reg(REG_D1)
         lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
@@ -2061,7 +2235,7 @@ class DosLibrary(LibImpl):
             struct_def = FileHandleStruct
         elif obj_type == 1:  # DOS_EXALLCONTROL
             name = "DOS_EXALLCONTROL"
-            struct_def = None
+            struct_def = ExAllControlStruct
         elif obj_type == 2:  # DOS_FIB
             name = "DOS_FIB"
             struct_def = FileInfoBlockStruct
@@ -2112,6 +2286,9 @@ class DosLibrary(LibImpl):
                 log_dos.warning(
                     "FreeDosObject: type mismatch %d != %d", obj_type, entry[1]
                 )
+            # Freeing a control also releases an unfinished scan.
+            if entry[1] == 1:
+                self.exall_scans.pop(ptr, None)
             # free struct
             ctx.alloc.free_struct(entry[0])
         else:
