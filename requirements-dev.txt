@@ -2,7 +2,7 @@ cython
 sphinx
 twine
 tox
-black
+ruff
 build
 machine68k @ git+https://github.com/cnvogelg/machine68k@main
 greenlet

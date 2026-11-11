@@ -1,3 +1,5 @@
+import time
+
 from amitools.vamos.log import log_hw
 from .error import InvalidMemoryAccessError
 
@@ -61,6 +63,11 @@ class HWAccess:
             self._raise("W", 0, addr)
 
     def cc_r16(self, addr):
+        if self.mode == self.MODE_EMU and addr == 0xDFF006:
+            # Synthetic beam counter: one step every 256 ns, wrapping at 16 bits.
+            r = 0xFFFF & (time.time_ns() // 256)
+            log_hw.info("Custom Chip read vhposr @%06x -> %04x", addr, r)
+            return r
         log_hw.warning("Custom Chip read word @%06x", addr)
         if self.mode == self.MODE_ABORT:
             self._raise("R", 1, addr)
