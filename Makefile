@@ -9,15 +9,16 @@ PIP ?= $(PYTHON) -m pip
 SHOW_CMD = open
 #PYTHON = python-dbg
 
-.PHONY: help init build test docker-tox docs show
-.PHONY: clean clean_all clean_git clean_py
-.PHONY: init sdist bdist upload
+.PHONY: help init format check fix fix-unsafe test docs show
+.PHONY: clean clean_all clean_git clean_py install sdist bdist upload docker-build
 
 help:
 	@echo "init        initialize project"
-	@echo "build       build native extension"
 	@echo
-	@echo "format      format source code with black"
+	@echo "format      format source code with ruff"
+	@echo "check       lint and check formatting with ruff"
+	@echo "fix         apply safe ruff check fixes"
+	@echo "fix-unsafe  apply safe and unsafe ruff check fixes"
 	@echo
 	@echo "test        run tests"
 	@echo "docker-build  build tox docker container"
@@ -29,7 +30,6 @@ help:
 	@echo "clean_all   clean dist"
 	@echo "clean_git   clean non-git files"
 	@echo "clean_py    remove compiled .pyc files"
-	@echo "clean_ext   remove native extension build"
 	@echo
 	@echo "install     install package"
 	@echo "sdist       build source dist"
@@ -42,11 +42,18 @@ init:
 	$(PIP) install --upgrade -r requirements-test.txt
 	$(PIP) install --upgrade --editable .
 
-build:
-	$(PYTHON) setup.py build_ext -i
-
 format:
-	black .
+	ruff format .
+
+check:
+	ruff check .
+	ruff format --check .
+
+fix:
+	ruff check --fix .
+
+fix-unsafe:
+	ruff check --fix --unsafe-fixes .
 
 # testing
 test:
@@ -64,17 +71,14 @@ show:
 clean:
 	rm -rf $(BUILD_DIR)
 
-clean_all: clean clean_ext
+clean_all: clean
 	rm -rf $(DIST_DIR)
 
 clean_git:
 	git clean -fxd
 
 clean_py:
-	find . -name *.pyc -exec rm {} \;
-
-clean_ext:
-	$(PYTHON) setup.py clean
+	find . -type f -name '*.pyc' -exec rm -f {} +
 
 # install, distrib
 install:
@@ -87,7 +91,7 @@ bdist:
 	$(PYTHON) -m build -w
 
 upload: sdist
-	twine upload dist/*
+	twine upload dist/*.tar.gz
 
 # container
 docker-build:

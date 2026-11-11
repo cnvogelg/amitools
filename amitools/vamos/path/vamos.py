@@ -66,7 +66,7 @@ class VamosPathManager(PathManager):
         if sys_path is None and not mustExist:
             sys_path = self.to_sys_path(str(paths[0]))
         log_path.info(
-            "ami_to_sys_path: ami_path='%s'" " -> volpaths=%s -> sys_path='%s'",
+            "ami_to_sys_path: ami_path='%s' -> volpaths=%s -> sys_path='%s'",
             ami_path,
             ",".join(map(str, paths)),
             sys_path,
@@ -76,7 +76,7 @@ class VamosPathManager(PathManager):
     def sys_to_ami_path(self, sys_path):
         ami_path = self.from_sys_path(sys_path)
         log_path.info(
-            "sys_to_ami_path: sys_path='%s' -> abs_path='%s' " "-> ami_path='%s'",
+            "sys_to_ami_path: sys_path='%s' -> abs_path='%s' -> ami_path='%s'",
             sys_path,
             ami_path,
         )
