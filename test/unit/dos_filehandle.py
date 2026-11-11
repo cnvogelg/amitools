@@ -23,3 +23,22 @@ def dos_filehandle_alloc_test():
 
     fh.free_fh(alloc)
     assert alloc.is_all_free()
+import io
+import os
+
+
+
+def dos_filehandle_tell_pipe_test():
+    read_fd, write_fd = os.pipe()
+    os.close(write_fd)
+    with os.fdopen(read_fd, "rb") as stream:
+        fh = FileHandle(stream, "<STDIN>", "/dev/stdin", need_close=False)
+        assert fh.tell() == -1
+        assert fh.seek(0, 1) == -1
+
+
+def dos_filehandle_tell_position_test():
+    with io.BytesIO(b"abcdef") as stream:
+        stream.seek(3)
+        fh = FileHandle(stream, "SYS:test", "/tmp/test", need_close=False)
+        assert fh.tell() == 3
