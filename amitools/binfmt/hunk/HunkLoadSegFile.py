@@ -155,6 +155,9 @@ class HunkLoadSegFile:
     def __init__(self):
         self.hdr_blk = None
         self.segments = []
+        self.overlay_blk = None
+        self.overlay_headers = []
+        self.overlay_segments = []
 
     def get_segments(self):
         return self.segments
@@ -164,6 +167,11 @@ class HunkLoadSegFile:
 
     def parse_block_file(self, bf):
         """assign hunk blocks into segments"""
+        self.hdr_blk = None
+        self.segments = []
+        self.overlay_blk = None
+        self.overlay_headers = []
+        self.overlay_segments = []
         # get file blocks
         blks = bf.get_blocks()
         if blks is None or len(blks) == 0:
@@ -173,65 +181,91 @@ class HunkLoadSegFile:
         if hdr_blk.blk_id != HUNK_HEADER:
             raise HunkParseError("no HEADER block found!")
         self.hdr_blk = hdr_blk
-        # first round: split block list into sections separated by END
+
+        # Main executable segments precede the overlay table.
+        main_blocks = []
+        overlay_pos = None
+        for pos, blk in enumerate(blks[1:], start=1):
+            if blk.blk_id == HUNK_OVERLAY:
+                overlay_pos = pos
+                self.overlay_blk = blk
+                break
+            main_blocks.append(blk)
+        self.segments = self._parse_segments(main_blocks, hdr_blk)
+
+        if self.overlay_blk is None:
+            return
+
+        pos = overlay_pos + 1
+        while pos < len(blks):
+            if blks[pos].blk_id != HUNK_HEADER:
+                raise HunkParseError("expected HUNK_HEADER after HUNK_OVERLAY")
+            overlay_header = blks[pos]
+            pos += 1
+            group_blocks = []
+            while pos < len(blks) and blks[pos].blk_id != HUNK_BREAK:
+                if blks[pos].blk_id == HUNK_HEADER:
+                    raise HunkParseError("expected HUNK_BREAK before overlay header")
+                group_blocks.append(blks[pos])
+                pos += 1
+            self.overlay_headers.append(overlay_header)
+            self.overlay_segments.append(
+                self._parse_segments(group_blocks, overlay_header)
+            )
+            if pos < len(blks):
+                pos += 1
+                if pos == len(blks):
+                    break
+
+    def _parse_segments(self, blocks, header):
+        """Parse the segments described by a LoadSeg header."""
         first = []
         cur = None
-        for blk in blks[1:]:
+        for blk in blocks:
             blk_id = blk.blk_id
-            # split by END block
             if blk_id == HUNK_END:
                 cur = None
-            # add non end block to list
-            else:
-                # check validity of block
-                if (
-                    blk_id not in loadseg_valid_begin_hunks
-                    and blk_id not in loadseg_valid_extra_hunks
-                ):
-                    raise HunkParseError("invalid block found: %d" % blk_id)
-                if cur is None:
-                    cur = []
-                    first.append(cur)
-                cur.append(blk)
-        # second round: split list if two segments are found in a single list
-        # this is only necessary for broken files that lack END blocks
+                continue
+            if (
+                blk_id not in loadseg_valid_begin_hunks
+                and blk_id not in loadseg_valid_extra_hunks
+            ):
+                raise HunkParseError("invalid block found: %d" % blk_id)
+            if cur is None:
+                cur = []
+                first.append(cur)
+            cur.append(blk)
+
+        # Also handle legacy files that omit END between consecutive segments.
         second = []
-        for l in first:
-            pos_seg = []
-            off = 0
-            for blk in l:
-                if blk.blk_id in loadseg_valid_begin_hunks:
-                    pos_seg.append(off)
-                off += 1
-            n = len(pos_seg)
-            if n == 1:
-                # list is ok
-                second.append(l)
-            elif n > 1:
-                # list needs split
-                # we can only split if no extra block is before next segment block
-                new_list = None
-                for blk in l:
+        for section in first:
+            num_segments = sum(
+                blk.blk_id in loadseg_valid_begin_hunks for blk in section
+            )
+            if num_segments == 1:
+                second.append(section)
+            elif num_segments > 1:
+                new_section = None
+                for blk in section:
                     if blk.blk_id in loadseg_valid_begin_hunks:
-                        new_list = [blk]
-                        second.append(new_list)
-                    elif new_list is not None:
-                        new_list.append(blk)
+                        new_section = [blk]
+                        second.append(new_section)
+                    elif new_section is not None:
+                        new_section.append(blk)
                     else:
                         raise HunkParseError("can't split block list")
-        # check size of hunk table
-        if len(hdr_blk.hunk_table) != len(second):
+
+        if len(header.hunk_table) != len(second):
             raise HunkParseError("can't match hunks to header")
-        # convert block lists into segments
-        for l in second:
+
+        segments = []
+        for i, section in enumerate(second):
             seg = HunkSegment()
-            seg.parse(l)
-            self.segments.append(seg)
-        # set size in segments
-        n = len(second)
-        for i in range(n):
-            self.segments[i].size_longs = hdr_blk.hunk_table[i]
-            self.segments[i].size = self.segments[i].size_longs * 4
+            seg.parse(section)
+            seg.size_longs = header.hunk_table[i]
+            seg.size = seg.size_longs * 4
+            segments.append(seg)
+        return segments
 
     def create_block_file(self):
         """create a HunkBlockFile from the segments given"""
@@ -246,6 +280,22 @@ class HunkLoadSegFile:
             blks.append(HunkEndBlock())
         # finally setup header
         self.hdr_blk.setup(sizes)
+
+        if self.overlay_blk is not None:
+            blks.append(self.overlay_blk)
+            for group_no, segments in enumerate(self.overlay_segments):
+                if group_no < len(self.overlay_headers):
+                    overlay_header = self.overlay_headers[group_no]
+                else:
+                    overlay_header = HunkHeaderBlock()
+                blks.append(overlay_header)
+                overlay_sizes = []
+                for seg in segments:
+                    overlay_sizes.append(seg.create(blks))
+                    blks.append(HunkEndBlock())
+                overlay_header.setup(overlay_sizes)
+                if group_no < len(self.overlay_segments) - 1:
+                    blks.append(HunkBreakBlock())
         # create HunkBlockFile
         return HunkBlockFile(blks)
 

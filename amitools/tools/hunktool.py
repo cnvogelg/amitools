@@ -313,6 +313,8 @@ def main(args=None):
     # execute command
     cmd = cmd_cls(args)
     res = cmd.run()
+    if isinstance(res, bool):
+        return int(not res)
     return res
 
 

@@ -264,10 +264,14 @@ class HunkOverlayBlock(HunkBlock):
 
     def parse(self, f):
         num_longs = self._read_long(f)
-        self.data = f.read(num_longs * 4)
+        self.data = f.read((num_longs + 1) * 4)
+        if len(self.data) != (num_longs + 1) * 4:
+            raise HunkParseError("HUNK_OVERLAY data too short")
 
     def write(self, f):
-        self._write_long(f, int(self.data / 4))
+        if self.data is None or len(self.data) < 4 or len(self.data) % 4 != 0:
+            raise HunkParseError("Invalid HUNK_OVERLAY data size")
+        self._write_long(f, len(self.data) // 4 - 1)
         f.write(self.data)
 
 
