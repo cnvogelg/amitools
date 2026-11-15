@@ -20,3 +20,19 @@ class HostFileOpener(FileOpener):
         fobj = StreamFileObj(stream)
         self.opened.append(fobj)
         return fobj
+
+
+def load_sys_lib(loader, segload, sys_bin_file, run_sp=None):
+    """test helper: load a native lib from a host path"""
+    try:
+        stream = open(sys_bin_file, "rb")
+    except OSError:
+        return 0, 0
+    fobj = StreamFileObj(stream)
+    try:
+        seglist_baddr = segload.load_seglist(fobj, name=str(sys_bin_file))
+    finally:
+        fobj.close()
+    if seglist_baddr:
+        return loader.init_lib(seglist_baddr, str(sys_bin_file), run_sp=run_sp)
+    return 0, 0

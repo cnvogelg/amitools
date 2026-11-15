@@ -3,7 +3,7 @@ from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.machine import Machine, Runtime
 from amitools.vamos.libtypes import ExecLibrary, Library
-from helper import HostFileOpener
+from helper import HostFileOpener, load_sys_lib
 
 
 def setup(file_opener=None):
@@ -38,7 +38,7 @@ def libnative_loader_load_sys_lib_test(buildlibnix):
     loader, segload, alloc, mem, sp, exec_lib = setup()
     # load
     lib_file = buildlibnix.make_lib("testnix")
-    lib_base, seglist_baddr = loader.load_sys_lib(lib_file, run_sp=sp)
+    lib_base, seglist_baddr = load_sys_lib(loader, segload, lib_file, run_sp=sp)
     assert lib_base > 0
     assert seglist_baddr > 0
     # we have to manually clean the lib here (as Exec FreeMem() does not work)
@@ -54,7 +54,7 @@ def libnative_loader_load_sys_lib_fail_test():
     loader, segload, alloc, mem, sp, exec_lib = setup()
     # load
     lib_file = "bla.library"
-    lib_base, seglist_baddr = loader.load_sys_lib(lib_file, run_sp=sp)
+    lib_base, seglist_baddr = load_sys_lib(loader, segload, lib_file, run_sp=sp)
     assert lib_base == 0
     assert seglist_baddr == 0
     # cleanup

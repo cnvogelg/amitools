@@ -1,7 +1,7 @@
 from amitools.vamos.log import log_libmgr
 from .initresident import InitRes
 from amitools.vamos.libtypes import Resident
-from amitools.vamos.loader import SegList, StreamFileObj
+from amitools.vamos.loader import SegList
 
 
 class LibLoader(object):
@@ -11,28 +11,11 @@ class LibLoader(object):
         self.segloader = segloader
         self.initres = InitRes(mem, alloc, runner)
 
-    def load_sys_lib(self, sys_bin_file, run_sp=None):
-        """try to load native lib from a host path
+    def init_lib(self, seglist_baddr, lib_name, run_sp=None):
+        """init a native lib from an already loaded seglist
 
-        This is a convenience for host side callers. All other file access
-        goes through the AmigaDOS file opener installed on the segment
-        loader. return (lib_base_addr, seglist_baddr) or (0,0)"""
-        try:
-            stream = open(sys_bin_file, "rb")
-        except OSError:
-            log_libmgr.debug("load_sys_lib: can't open '%s'", sys_bin_file)
-            return 0, 0
-        fobj = StreamFileObj(stream)
-        try:
-            seglist_baddr = self.segloader.load_seglist(fobj, name=str(sys_bin_file))
-        finally:
-            fobj.close()
-        if seglist_baddr:
-            return self._load_common(sys_bin_file, seglist_baddr, run_sp)
-        else:
-            return 0, 0
-
-    def _load_common(self, lib_name, seglist_baddr, run_sp):
+        The seglist must already be registered with the segment loader.
+        return (lib_base_addr, seglist_baddr) or (0,0)"""
         # find resident in first hunk
         seglist = SegList(self.alloc, seglist_baddr)
         seg = seglist.get_segment()
@@ -75,7 +58,7 @@ class LibLoader(object):
                 seglist_baddr,
             )
             if seglist_baddr > 0:
-                return self._load_common(lib_name, seglist_baddr, run_sp)
+                return self.init_lib(seglist_baddr, lib_name, run_sp)
         return 0, 0
 
     @staticmethod
