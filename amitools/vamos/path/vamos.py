@@ -1,5 +1,3 @@
-import os.path
-import os
 from amitools.vamos.log import log_path
 from .mgr import PathManager
 from .amipath import AmiPath, AmiPathError
@@ -32,9 +30,10 @@ class VamosPathManager(PathManager):
             ",".join(map(str, cmd_paths)),
         )
         # check if ami path exists as sys path
+        fs = self.sys_path.file_system
         for cmd_path in cmd_paths:
             sys_path = self.to_sys_path(str(cmd_path))
-            if os.path.isfile(sys_path):
+            if fs.is_file(sys_path):
                 log_path.info(
                     "ami_command_to_sys_path: ami_path=%s -> sys_path=%s, ami_path=%s",
                     ami_path,
@@ -55,11 +54,12 @@ class VamosPathManager(PathManager):
         # now we have paths with volume:abs/path
         sys_path = None
         # search for existing multi assign
+        fs = self.sys_path.file_system
         if searchMulti or mustExist:
             for npath in paths:
                 # first try to find existing path in all locations
                 spath = self.to_sys_path(str(npath))
-                if spath and os.path.exists(spath):
+                if spath and fs.exists(spath):
                     sys_path = spath
                     break
         # nothing found -> try first path
@@ -139,9 +139,10 @@ class VamosPathManager(PathManager):
         sys_path = self.ami_to_sys_path(cwd_lock, ami_path, mustExist=True)
         if sys_path is None:
             return None
-        if not os.path.isdir(str(sys_path)):
+        fs = self.sys_path.file_system
+        if not fs.is_dir(str(sys_path)):
             return None
-        files = os.listdir(str(sys_path))
+        files = fs.list_dir(str(sys_path))
         log_path.info(
             "ami_list_dir: path='%s' -> sys_path='%s' -> files=%s",
             ami_path,
@@ -152,7 +153,7 @@ class VamosPathManager(PathManager):
 
     def ami_path_exists(self, cwd_lock, ami_path):
         sys_path = self.ami_to_sys_path(cwd_lock, ami_path, mustExist=True)
-        exists = os.path.exists(str(sys_path))
+        exists = self.sys_path.file_system.exists(str(sys_path))
         log_path.info(
             "ami_path_exists: path='%s' -> sys_path='%s' -> exists=%s",
             ami_path,

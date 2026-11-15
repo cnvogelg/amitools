@@ -3,15 +3,7 @@ from .amipath import AmiPath, AmiPathError
 from .env import AmiPathEnv
 from .volume import VolumeManager
 from .assign import AssignManager
-
-
-class SysPathError(Exception):
-    def __init__(self, path, reason):
-        self.path = path
-        self.reason = reason
-
-    def __str__(self):
-        return "path='%s': %s" % (self.path, self.reason)
+from .syspath import SysPathResolver
 
 
 class PathManagerEnv(AmiPathEnv):
@@ -58,6 +50,7 @@ class PathManager:
         auto_assigns=None,
         auto_assigns_mkdir=True,
         sys_vol=None,
+        file_system=None,
     ):
         # set defaults
         if not cwd:
@@ -76,8 +69,10 @@ class PathManager:
         self.auto_assigns_mkdir = auto_assigns_mkdir
         self.sys_vol = sys_vol
         # setup sub mgr
-        self.vol_mgr = VolumeManager(vols_base_dir)
+        self.vol_mgr = VolumeManager(vols_base_dir, file_system)
         self.assign_mgr = AssignManager(self.vol_mgr)
+        # sys path handling (host file system boundary)
+        self.sys_path = SysPathResolver(self, self.vol_mgr)
         self.default_env = PathManagerEnv(self, cwd, cmd_paths)
 
     def get_vol_mgr(self):
@@ -85,6 +80,12 @@ class PathManager:
 
     def get_assign_mgr(self):
         return self.assign_mgr
+
+    def get_sys_path_resolver(self):
+        return self.sys_path
+
+    def get_host_file_system(self):
+        return self.sys_path.file_system
 
     def get_default_env(self):
         return self.default_env
@@ -502,14 +503,7 @@ class PathManager:
         If path is not a volume path it will be converted with volpath()
         first.
         """
-        if type(ami_path) is str:
-            ami_path = AmiPath(ami_path)
-        if ami_path.is_local() or not self.is_volume_path(ami_path):
-            ami_path = self.volpath(ami_path, env=env, strict=strict)
-            if ami_path is None:
-                return None
-        res = self.vol_mgr.ami_to_sys_path(str(ami_path))
-        return res
+        return self.sys_path.to_sys_path(ami_path, env=env, strict=strict)
 
     def from_sys_path(self, sys_path, strict=False):
         """Convert sys path to AmiPath
@@ -519,13 +513,7 @@ class PathManager:
         If path is not mappable return None or
         if strict mode is True then raise an SysPathError
         """
-        ami_path = self.vol_mgr.sys_to_ami_path(sys_path)
-        if ami_path:
-            return AmiPath(ami_path)
-        elif strict:
-            raise SysPathError(sys_path, "can't map to ami path!")
-        else:
-            return None
+        return self.sys_path.from_sys_path(sys_path, strict=strict)
 
     def resolve_esc_sys_path(self, ami_path, strict=False):
         """resolve an escaped sys path inside an ami path
@@ -541,13 +529,4 @@ class PathManager:
 
         An empty sys path raises an AmiPathError
         """
-        if type(ami_path) is str:
-            ami_path = AmiPath(ami_path)
-        ap = str(ami_path)
-        if ap.startswith("::"):
-            sys_path = ap[2:]
-            if len(sys_path) == 0:
-                raise AmiPathError(ami_path, "empty esc sys path!")
-            return self.from_sys_path(sys_path, strict)
-        else:
-            return ami_path
+        return self.sys_path.resolve_esc_sys_path(ami_path, strict=strict)
