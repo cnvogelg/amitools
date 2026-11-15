@@ -33,32 +33,6 @@ class VamosPathManager(PathManager):
         )
         return cmd_paths
 
-    def ami_command_to_sys_path(self, cwd_lock, ami_path):
-        """lookup a command on path if it does not contain a relative or
-        absolute path. otherwise perform normal 'ami_to_sys_path' conversion"""
-        env = self._get_lock_env(cwd_lock)
-        cmd_paths = self.cmdpaths(ami_path, env=env)
-        log_path.info(
-            "ami_command_to_sys_path: ami_path=%s -> cmd_paths=%s",
-            ami_path,
-            ",".join(map(str, cmd_paths)),
-        )
-        # check if ami path exists as sys path
-        fs = self.sys_path.file_system
-        for cmd_path in cmd_paths:
-            sys_path = self.to_sys_path(str(cmd_path))
-            if fs.is_file(sys_path):
-                log_path.info(
-                    "ami_command_to_sys_path: ami_path=%s -> sys_path=%s, ami_path=%s",
-                    ami_path,
-                    sys_path,
-                    cmd_path,
-                )
-                return sys_path, cmd_path
-        # nothing found
-        log_path.info("ami_command_to_sys_path: ami_path='%s' not found!", ami_path)
-        return None, None
-
     def ami_to_sys_path(self, cwd_lock, ami_path, searchMulti=False, mustExist=False):
         env = self._get_lock_env(cwd_lock)
         paths = self.volpaths(ami_path, env=env)
