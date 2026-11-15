@@ -123,14 +123,20 @@ class DosLibrary(LibImpl):
         )
         self.dos_list.build_list(ctx.path_mgr)
         self.update_dos_list_head()
-        # create lock manager
-        self.lock_mgr = LockManager(ctx.path_mgr, self.dos_list, ctx.alloc, ctx.mem)
-        # equip the DosList with all the locks
-        self.dos_list.add_locks(self.lock_mgr)
         # create file manager
         self.file_mgr = FileManager(
             ctx.path_mgr, ctx.exec_lib.port_mgr, ctx.alloc, ctx.mem
         )
+        # create lock manager
+        self.lock_mgr = LockManager(
+            ctx.path_mgr,
+            self.dos_list,
+            ctx.alloc,
+            ctx.mem,
+            fs_handler_port=self.file_mgr.get_fs_handler_port(),
+        )
+        # equip the DosList with all the locks
+        self.dos_list.add_locks(self.lock_mgr)
         self._setup_timer_request(ctx)
         # processes made by CreateNewProc(), by their scheduler task
         self.child_procs = {}
@@ -1946,7 +1952,16 @@ class DosLibrary(LibImpl):
         lock = self.get_current_dir(ctx)
         sys_path = self.path_mgr.ami_to_sys_path(lock, name, searchMulti=True)
         if sys_path and os.path.exists(sys_path):
-            b_addr = ctx.seg_loader.load_sys_seglist(sys_path)
+            b_addr = ctx.seg_loader.load_sys_seglist(
+                sys_path, file_mgr=self.file_mgr, ami_file=name, lock=lock
+            )
+            if b_addr == 0:
+                log_dos.info("LoadSeg: '%s' -> 000000", name)
+                return 0
+            # overlay seglists are returned as negative BPTR
+            info = ctx.seg_loader.get_info(b_addr)
+            if info.has_overlay():
+                b_addr = -b_addr
             log_dos.info("LoadSeg: '%s' -> %06x", name, b_addr)
             self.seg_lists[b_addr] = name
             return b_addr
@@ -1956,6 +1971,8 @@ class DosLibrary(LibImpl):
 
     def UnLoadSeg(self, ctx):
         b_addr = ctx.cpu.r_reg(REG_D1)
+        if b_addr >= 0x80000000:
+            b_addr -= 0x100000000
         if b_addr != 0:
             if b_addr not in self.seg_lists:
                 raise VamosInternalError(
@@ -1963,7 +1980,7 @@ class DosLibrary(LibImpl):
                 )
             else:
                 del self.seg_lists[b_addr]
-                ctx.seg_loader.unload_seglist(b_addr)
+                ctx.seg_loader.unload_seglist(abs(b_addr))
                 log_dos.info("UnLoadSeg: %06x", b_addr)
         else:
             log_dos.info("UnLoadSeg:  NULL")
@@ -1986,6 +2003,8 @@ class DosLibrary(LibImpl):
 
     def RunCommand(self, ctx):
         b_addr = ctx.cpu.r_reg(REG_D1)
+        if b_addr >= 0x80000000:
+            b_addr -= 0x100000000
         if not b_addr in self.seg_lists:
             raise VamosInternalError(
                 "Trying to run unknown LoadSeg seg_list: b_addr=%06x" % b_addr
@@ -2009,7 +2028,7 @@ class DosLibrary(LibImpl):
         )
         # round up the stack
         stack = (stack + 3) & -4
-        prog_start = (b_addr << 2) + 4
+        prog_start = (abs(b_addr) << 2) + 4
         ret_code = run_command(ctx.process, prog_start, args, length, stack)
         # clear input
         input_fh.setbuf("")

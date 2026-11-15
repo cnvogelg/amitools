@@ -261,6 +261,7 @@ class HunkOverlayBlock(HunkBlock):
 
     def __init__(self):
         self.data = None
+        self.custom_data = None
 
     def parse(self, f):
         num_longs = self._read_long(f)
@@ -273,6 +274,8 @@ class HunkOverlayBlock(HunkBlock):
             raise HunkParseError("Invalid HUNK_OVERLAY data size")
         self._write_long(f, len(self.data) // 4 - 1)
         f.write(self.data)
+        if self.custom_data:
+            f.write(self.custom_data)
 
 
 class HunkBreakBlock(HunkBlock):
@@ -691,7 +694,23 @@ class HunkBlockFile:
                 block.blk_id = blk_id
                 block.parse(f)
                 self.blocks.append(block)
+                # custom overlay: remaining data is not structured hunk blocks
+                if isLoadSeg and blk_id == HUNK_OVERLAY:
+                    pos = f.tell()
+                    tag = f.read(4)
+                    if len(tag) == 0:
+                        break
+                    if len(tag) == 4:
+                        next_id = struct.unpack(">I", tag)[0] & HUNK_TYPE_MASK
+                        if next_id not in hunk_block_type_map:
+                            block.custom_data = tag + f.read()
+                            break
+                    f.seek(pos, 0)
             else:
+                # custom overlay data may follow after HUNK_OVERLAY
+                if isLoadSeg and self.blocks and self.blocks[-1].blk_id == HUNK_OVERLAY:
+                    self.blocks[-1].custom_data = tag + f.read()
+                    break
                 raise HunkParseError("Unsupported hunk type: %04d" % blk_id)
 
     def write_path(self, path_name):

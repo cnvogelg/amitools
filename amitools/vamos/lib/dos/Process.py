@@ -131,7 +131,12 @@ class Process(DosProcess):
             log_proc.error("failed loading binary: %s -> %s", ami_bin_file, sys_path)
             return False
 
-        self.bin_seg_list = self.ctx.seg_loader.load_sys_seglist(sys_path)
+        self.bin_seg_list = self.ctx.seg_loader.load_sys_seglist(
+            sys_path,
+            file_mgr=self.ctx.dos_lib.file_mgr,
+            ami_file=ami_bin_file,
+            lock=lock,
+        )
         if self.bin_seg_list == 0:
             log_proc.error("failed loading seglist: %s", sys_path)
             return False

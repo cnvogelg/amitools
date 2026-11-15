@@ -1,5 +1,8 @@
 import io
 
+from amitools.vamos.lib.DosLibrary import DosLibrary
+from amitools.vamos.loader import SegmentLoader
+from amitools.vamos.machine.regs import REG_D1
 from amitools.binfmt.hunk.Hunk import (
     HUNK_BREAK,
     HUNK_CODE,
@@ -51,7 +54,9 @@ def make_overlay_file(standard_manager=True):
         ]
     )
     overlay_table = [2, 0, 0x234, 0, 0, 1, 2, 157, 158, 0x24]
-    blocks.blocks[3].data = b"".join(value.to_bytes(4, "big") for value in overlay_table)
+    blocks.blocks[3].data = b"".join(
+        value.to_bytes(4, "big") for value in overlay_table
+    )
     stream = io.BytesIO()
     blocks.write(stream, isLoadSeg=True)
     return stream.getvalue()
@@ -145,3 +150,138 @@ def hunk_show_dumps_custom_overlay_table_test(capsys):
     assert "Overlay: custom manager, table size=40 bytes" in output
     assert "Reference records decoded by their 8-longword layout" in output
     assert "initial hunk=157, symbol hunk=158" in output
+
+
+def dos_loadseg_overlay_test(tmp_path, mem_alloc):
+    mem, alloc = mem_alloc
+    path = tmp_path / "overlay"
+    path.write_bytes(make_overlay_file())
+    loader = SegmentLoader(alloc)
+
+    class PathManager:
+        def ami_to_sys_path(self, lock, name, searchMulti=False):
+            return str(path)
+
+    class FileHandle:
+        b_addr = 0x1234
+
+        def __init__(self, path):
+            self.obj = open(path, "rb")
+
+        def seek(self, pos, whence):
+            self.obj.seek(pos, whence)
+            return self.obj.tell()
+
+        def tell(self):
+            return self.obj.tell()
+
+        def close(self):
+            self.obj.close()
+
+    class FileManager:
+        def open(self, lock, name, mode):
+            self.fh = FileHandle(path)
+            return self.fh
+
+        def close(self, fh):
+            fh.close()
+
+    class CPU:
+        def __init__(self):
+            self.regs = {REG_D1: 0x100}
+
+        def r_reg(self, reg):
+            return self.regs[reg]
+
+    class Memory:
+        def __init__(self, mem):
+            self.mem = mem
+
+        def r_cstr(self, addr):
+            return "overlay"
+
+        def __getattr__(self, name):
+            return getattr(self.mem, name)
+
+    class Context:
+        pass
+
+    ctx = Context()
+    ctx.cpu = CPU()
+    ctx.mem = Memory(mem)
+    ctx.seg_loader = loader
+    dos = DosLibrary.__new__(DosLibrary)
+    dos.alloc = alloc
+    dos.path_mgr = PathManager()
+    dos.file_mgr = FileManager()
+    dos.seg_lists = {}
+    dos.get_current_dir = lambda ctx: None
+
+    result = dos.LoadSeg(ctx)
+    assert result < 0
+    b_addr = -result
+    info = loader.get_info(b_addr)
+    manager_addr = info.seglist.get_all_addrs()[0]
+    assert mem.r32(manager_addr + 8) == dos.file_mgr.fh.b_addr
+
+    reader = HunkReader()
+    assert reader.read_file(str(path)) == 0
+    overlay = next(hunk for hunk in reader.hunks if hunk["type"] == HUNK_OVERLAY)
+    overlay_file_pos = overlay["hunk_file_offset"] + 8 + len(overlay["ov_data"])
+    assert dos.file_mgr.fh.tell() == overlay_file_pos
+
+    overlay_table_addr = mem.r32(manager_addr + 12)
+    hunk_table_baddr = mem.r32(manager_addr + 16)
+    assert mem.r32(overlay_table_addr) == int.from_bytes(overlay["ov_data"][:4], "big")
+    assert mem.r32(hunk_table_baddr << 2) == b_addr
+
+    ctx.cpu.regs[REG_D1] = result & 0xFFFFFFFF
+    dos.UnLoadSeg(ctx)
+    assert dos.file_mgr.fh.obj.closed
+    assert loader.get_info(b_addr) is None
+    assert alloc.is_all_free()
+
+
+def loader_segload_overlay_test(tmp_path, mem_alloc):
+    mem, alloc = mem_alloc
+    path = tmp_path / "overlay"
+    path.write_bytes(make_overlay_file())
+    loader = SegmentLoader(alloc)
+
+    class FileHandle:
+        b_addr = 0x1234
+
+        def __init__(self):
+            self.obj = open(path, "rb")
+
+        def seek(self, pos, whence):
+            self.obj.seek(pos, whence)
+            return self.obj.tell()
+
+    class FileManager:
+        def open(self, lock, name, mode):
+            self.fh = FileHandle()
+            return self.fh
+
+        def close(self, fh):
+            fh.obj.close()
+
+    file_mgr = FileManager()
+
+    # without file manager no overlay setup is done
+    b_addr = loader.load_sys_seglist(str(path))
+    assert not loader.get_info(b_addr).has_overlay()
+    assert loader.unload_seglist(b_addr)
+
+    b_addr = loader.load_sys_seglist(str(path), file_mgr=file_mgr, ami_file="overlay")
+    assert b_addr > 0
+    info = loader.get_info(b_addr)
+    assert info.has_overlay()
+    manager_addr = info.seglist.get_all_addrs()[0]
+    assert mem.r32(manager_addr + 8) == file_mgr.fh.b_addr
+    assert mem.r32(mem.r32(manager_addr + 16) << 2) == b_addr
+
+    assert loader.unload_seglist(b_addr)
+    assert file_mgr.fh.obj.closed
+    assert loader.shutdown() == 0
+    assert alloc.is_all_free()
