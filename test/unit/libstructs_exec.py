@@ -26,4 +26,9 @@ def libstructs_exec_task_test():
 def libstructs_exec_execbase_test():
     mem = MockMemory()
     execbase = ExecLibraryStruct(mem, 0x100)
-    assert execbase.get_byte_size() == 634
+    assert execbase.get_byte_size() == 632
+    # NDK exec/execbase.h: ex_Pad0 is a UWORD, not a ULONG.
+    assert execbase.VBlankFrequency.addr == 0x100 + 530
+    assert execbase.PowerSupplyFrequency.addr == 0x100 + 531
+    assert execbase.ex_EClockFrequency.addr == 0x100 + 568
+    assert execbase.ex_MemHandlers.addr == 0x100 + 616

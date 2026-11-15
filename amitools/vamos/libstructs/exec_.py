@@ -297,7 +297,7 @@ class ExecLibraryStruct(AmigaStruct):
         (APTR_VOID, "KickTagPtr"),
         (APTR_VOID, "KickCheckSum"),
         # V36 Additions
-        (ULONG, "ex_Pad0"),
+        (UWORD, "ex_Pad0"),
         (ULONG, "ex_LaunchPoint"),
         (APTR_VOID, "ex_RamLibPrivate"),
         (ULONG, "ex_EClockFrequency"),

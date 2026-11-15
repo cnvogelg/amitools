@@ -188,6 +188,11 @@ Machine and hardware
 * ``--old-dos-guard``: Reserve memory used to detect access to BCPL addresses:
   ``vamos --old-dos-guard myprog``.
 
+The synthetic system reports PAL timing with 50 Hz vertical and supply
+frequencies. The E-clock frequency is 709,379 Hz, matching the counter
+returned by ``timer.device/ReadEClock``. The counter advances from host
+monotonic time; vamos does not emulate the CIA oscillator.
+
 Exception names accepted by ``--hw-exception`` are ``bus``, ``address``,
 ``illegal``, ``zero_div``, ``chk``, ``trapv``, ``priv``, ``trace``, ``line_a``,
 ``line_f``, ``irqs``, and ``traps``.
