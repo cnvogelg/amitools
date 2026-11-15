@@ -185,6 +185,10 @@ Machine and hardware
 * ``-H MODE``, ``--hw-access MODE``: Handle direct hardware-address access
   with ``emu``, ``ignore``, ``abort``, or ``disable``:
   ``vamos -H abort myprog``.
+  In ``emu`` mode, absent motherboard devices at $DA0000-$DEFFFF read as
+  all ones and ignore writes. The absent Kickstart image at
+  $F80000-$FFFFFF reads as zero. These are probe defaults, not chipset
+  emulation. ``abort`` rejects these accesses and ``ignore`` reads zero.
 * ``--old-dos-guard``: Reserve memory used to detect access to BCPL addresses:
   ``vamos --old-dos-guard myprog``.
 
