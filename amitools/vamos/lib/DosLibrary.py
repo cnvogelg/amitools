@@ -2,6 +2,7 @@ import time
 import ctypes
 import re
 import os
+import shutil
 from contextlib import ExitStack
 
 from amitools.vamos.machine import Code
@@ -132,6 +133,7 @@ class DosLibrary(LibImpl):
         self.file_mgr = FileManager(
             ctx.path_mgr, ctx.exec_lib.port_mgr, ctx.alloc, ctx.mem
         )
+        self.dos_list.add_host_devices(self.file_mgr, ctx.exec_lib.port_mgr)
         # create lock manager
         self.lock_mgr = LockManager(
             ctx.path_mgr,
@@ -1347,17 +1349,43 @@ class DosLibrary(LibImpl):
         info_ptr = ctx.cpu.r_reg(REG_D2)
         lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
         info = InfoDataStruct(ctx.mem, info_ptr)
+        if lock is None:
+            self.setioerr(ctx, ERROR_INVALID_LOCK)
+            return DOSFALSE
         vol = lock.find_volume_node(self.dos_list)
-        if vol != None:
+        if vol:
+            try:
+                if hasattr(os, "statvfs"):
+                    stat = os.statvfs(lock.sys_path)
+                    disk_state = 80 if stat.f_flag & os.ST_RDONLY else 82
+                    block_size = stat.f_frsize or stat.f_bsize
+                    total = stat.f_blocks
+                    used = stat.f_blocks - stat.f_bfree
+                else:
+                    usage = shutil.disk_usage(lock.sys_path)
+                    disk_state = 82
+                    block_size = 512
+                    total = (usage.total + block_size - 1) // block_size
+                    used = (usage.used + block_size - 1) // block_size
+            except OSError:
+                self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
+                return DOSFALSE
             info.id_NumSoftErrors.val = 0
             info.id_UnitNumber.val = 0  # not that we really care...
-            info.id_DiskState.val = 0  # disk is not write protected
-            info.id_NumBlocks.val = 0x7FFFFFFF  # a really really big disk....
-            info.id_NumBlocksUsed.val = 0x0FFFFFFF  # some...
-            info.id_BytesPerBlock.val = 512  # let's take regular FFS blocks
+            info.id_DiskState.val = disk_state
+            # InfoData has signed 32-bit block counts. Preserve capacity
+            # on large host filesystems by increasing the reporting unit.
+            while total > 0x7FFFFFFF:
+                total = (total + 1) // 2
+                used = (used + 1) // 2
+                block_size *= 2
+            info.id_NumBlocks.val = total
+            info.id_NumBlocksUsed.val = used
+            info.id_BytesPerBlock.val = block_size
             info.id_DiskType.val = 0x444F5303  # international FFS
             info.id_VolumeNode.aptr = vol
             info.id_InUse.val = 0
+            self.setioerr(ctx, 0)
             log_dos.info("Info: %s info=%06x -> true", lock, info_ptr)
             return DOSTRUE
         else:
@@ -2382,7 +2410,7 @@ class DosLibrary(LibImpl):
             return 0
         if name and name.endswith(":"):
             name = name[:-1]
-        entry = self.dos_list.get_entry_by_name(name)
+        entry = self.dos_list.get_entry_by_name(name, flags)
         if entry is None:
             log_dos.info("FindDosEntry('%s', flags=0x%x) -> 0 (not found)", name, flags)
             return 0

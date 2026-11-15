@@ -53,3 +53,32 @@ def dos_list_remove_head_test(mem_alloc):
     assert dh0.struct.dol_Next.aptr == 0
     dos_list.free_entry(dh0)
     dos_list.free_list()
+
+
+def dos_list_host_device_volume_pairs_test(mem_alloc):
+    from types import SimpleNamespace
+    from amitools.vamos.lib.lexec.PortManager import PortManager
+
+    mem, alloc = mem_alloc
+    listing = DosList(None, None, mem, alloc)
+    first = listing.add_volume("system")
+    second = listing.add_volume("ram")
+    ports = PortManager(alloc)
+    listing.add_host_devices(SimpleNamespace(fs_put_msg=lambda *args: None), ports)
+    cursor = listing.lock_dos_list(LDF_DEVICES)
+    found = []
+    while cursor:
+        cursor = listing.next_dos_entry(LDF_DEVICES, cursor)
+        if cursor:
+            found.append(listing.get_entry_by_b_addr(cursor >> 2))
+    assert [entry.name for entry in found] == ["system", "ram"]
+    for volume, device in zip((first, second), found):
+        assert volume.struct.dol_Task.aptr == device.struct.dol_Task.aptr
+        assert ports.has_port(device.struct.dol_Task.aptr)
+        assert listing.get_entry_by_name(device.name) is volume
+        assert listing.get_entry_by_name(device.name, LDF_DEVICES) is device
+        assert device.struct.dol_Startup.val == 0
+    assert first.struct.dol_Task.aptr != second.struct.dol_Task.aptr
+    listing.free_list()
+    assert not ports.ports
+    assert alloc.is_all_free()
