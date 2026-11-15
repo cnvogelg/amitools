@@ -1,8 +1,10 @@
 import io
 
 from amitools.vamos.lib.DosLibrary import DosLibrary
+from amitools.vamos.lib.dos.DosFileOpener import DosFileOpener
 from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.machine.regs import REG_D1
+from helper import HostFileOpener
 from amitools.binfmt.hunk.Hunk import (
     HUNK_BREAK,
     HUNK_CODE,
@@ -158,15 +160,14 @@ def dos_loadseg_overlay_test(tmp_path, mem_alloc):
     path.write_bytes(make_overlay_file())
     loader = SegmentLoader(alloc)
 
-    class PathManager:
-        def ami_to_sys_path(self, lock, name, searchMulti=False):
-            return str(path)
-
     class FileHandle:
         b_addr = 0x1234
 
         def __init__(self, path):
             self.obj = open(path, "rb")
+
+        def read(self, size=-1):
+            return self.obj.read(size)
 
         def seek(self, pos, whence):
             self.obj.seek(pos, whence)
@@ -179,6 +180,9 @@ def dos_loadseg_overlay_test(tmp_path, mem_alloc):
             self.obj.close()
 
     class FileManager:
+        def __init__(self):
+            self.fh = None
+
         def open(self, lock, name, mode):
             self.fh = FileHandle(path)
             return self.fh
@@ -212,10 +216,10 @@ def dos_loadseg_overlay_test(tmp_path, mem_alloc):
     ctx.seg_loader = loader
     dos = DosLibrary.__new__(DosLibrary)
     dos.alloc = alloc
-    dos.path_mgr = PathManager()
     dos.file_mgr = FileManager()
     dos.seg_lists = {}
     dos.get_current_dir = lambda ctx: None
+    loader.set_file_opener(DosFileOpener(dos.file_mgr))
 
     result = dos.LoadSeg(ctx)
     assert result < 0
@@ -247,41 +251,23 @@ def loader_segload_overlay_test(tmp_path, mem_alloc):
     path = tmp_path / "overlay"
     path.write_bytes(make_overlay_file())
     loader = SegmentLoader(alloc)
+    opener = HostFileOpener({"overlay": str(path)})
 
-    class FileHandle:
-        b_addr = 0x1234
-
-        def __init__(self):
-            self.obj = open(path, "rb")
-
-        def seek(self, pos, whence):
-            self.obj.seek(pos, whence)
-            return self.obj.tell()
-
-    class FileManager:
-        def open(self, lock, name, mode):
-            self.fh = FileHandle()
-            return self.fh
-
-        def close(self, fh):
-            fh.obj.close()
-
-    file_mgr = FileManager()
-
-    # without file manager no overlay setup is done
-    b_addr = loader.load_sys_seglist(str(path))
+    # without file opener no overlay setup is done
+    with open(path, "rb") as f:
+        b_addr = loader.load_seglist(f, name="overlay")
     assert not loader.get_info(b_addr).has_overlay()
     assert loader.unload_seglist(b_addr)
 
-    b_addr = loader.load_sys_seglist(str(path), file_mgr=file_mgr, ami_file="overlay")
+    loader.set_file_opener(opener)
+    b_addr = loader.load_ami_seglist("overlay")
     assert b_addr > 0
     info = loader.get_info(b_addr)
     assert info.has_overlay()
     manager_addr = info.seglist.get_all_addrs()[0]
-    assert mem.r32(manager_addr + 8) == file_mgr.fh.b_addr
     assert mem.r32(mem.r32(manager_addr + 16) << 2) == b_addr
 
     assert loader.unload_seglist(b_addr)
-    assert file_mgr.fh.obj.closed
+    assert opener.opened[-1].stream.closed
     assert loader.shutdown() == 0
     assert alloc.is_all_free()

@@ -124,21 +124,18 @@ class Process(DosProcess):
     # ----- binary -----
     def load_binary(self, lock, ami_bin_file, shell=False):
         self.bin_basename = self.ctx.path_mgr.ami_name_of_path(lock, ami_bin_file)
-        sys_path, ami_path = self.ctx.path_mgr.ami_command_to_sys_path(
-            lock, ami_bin_file
-        )
-        if not sys_path:
-            log_proc.error("failed loading binary: %s -> %s", ami_bin_file, sys_path)
-            return False
-
-        self.bin_seg_list = self.ctx.seg_loader.load_sys_seglist(
-            sys_path,
-            file_mgr=self.ctx.dos_lib.file_mgr,
-            ami_file=ami_bin_file,
-            lock=lock,
-        )
-        if self.bin_seg_list == 0:
-            log_proc.error("failed loading seglist: %s", sys_path)
+        # search the command on the command path and try each candidate
+        cmd_paths = self.ctx.path_mgr.ami_command_paths(lock, ami_bin_file)
+        ami_path = None
+        self.bin_seg_list = 0
+        for path in cmd_paths:
+            baddr = self.ctx.seg_loader.load_ami_seglist(path, lock)
+            if baddr:
+                ami_path = path
+                self.bin_seg_list = baddr
+                break
+        if ami_path is None:
+            log_proc.error("failed loading binary: %s", ami_bin_file)
             return False
 
         self.bin_seg_info = self.ctx.seg_loader.get_info(self.bin_seg_list)

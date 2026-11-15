@@ -3,14 +3,15 @@ from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.machine import Machine, Runtime
 from amitools.vamos.libtypes import ExecLibrary, Library
+from helper import HostFileOpener
 
 
-def setup(path_mgr=None):
+def setup(file_opener=None):
     machine = Machine()
     runtime = Runtime(machine)
     mem = machine.get_mem()
     alloc = MemoryAlloc.for_machine(machine)
-    segload = SegmentLoader(alloc, path_mgr=path_mgr)
+    segload = SegmentLoader(alloc, file_opener=file_opener)
     loader = LibLoader(mem, alloc, runtime.run, segload)
     sp = machine.get_ram_begin() - 4
     # setup exec
@@ -62,16 +63,10 @@ def libnative_loader_load_sys_lib_fail_test():
 
 
 def libnative_loader_load_ami_lib_test(buildlibnix):
-    # path mgr mock
+    # file opener mock
     lib_file = buildlibnix.make_lib("testnix")
-
-    class PathMgrMock:
-        def ami_to_sys_path(self, lock, ami_path, mustExist=True):
-            if ami_path == "LIBS:testnix.library":
-                return lib_file
-
-    pm = PathMgrMock()
-    loader, segload, alloc, mem, sp, exec_lib = setup(pm)
+    opener = HostFileOpener({"LIBS:testnix.library": lib_file})
+    loader, segload, alloc, mem, sp, exec_lib = setup(opener)
     # load
     lib_base, seglist_baddr = loader.load_ami_lib("testnix.library", run_sp=sp)
     assert lib_base > 0
@@ -79,7 +74,7 @@ def libnative_loader_load_ami_lib_test(buildlibnix):
     info = segload.get_info(seglist_baddr)
     assert info
     assert info.ami_file == "LIBS:testnix.library"
-    assert info.sys_file == lib_file
+    assert info.name == "LIBS:testnix.library"
     # we have to manually clean the lib here (as Exec FreeMem() does not work)
     free_lib(mem, alloc, lib_base)
     # cleanup
@@ -90,15 +85,9 @@ def libnative_loader_load_ami_lib_test(buildlibnix):
 
 
 def libnative_loader_load_ami_lib_fail_test():
-    # path mgr mock
-    lib_file = "bla.library"
-
-    class PathMgrMock:
-        def ami_to_sys_path(self, lock, ami_path, mustExist=True):
-            return None
-
-    pm = PathMgrMock()
-    loader, segload, alloc, mem, sp, exec_lib = setup(pm)
+    # file opener mock
+    opener = HostFileOpener()
+    loader, segload, alloc, mem, sp, exec_lib = setup(opener)
     # load
     lib_base, seglist_baddr = loader.load_ami_lib("testnix.library", run_sp=sp)
     assert lib_base == 0

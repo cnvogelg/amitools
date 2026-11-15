@@ -19,6 +19,20 @@ class VamosPathManager(PathManager):
 
     # ----- API -----
 
+    def ami_command_paths(self, cwd_lock, ami_path):
+        """return the list of Amiga paths to try for a command.
+
+        If the path contains a relative or absolute component it is used
+        directly, otherwise the command path is searched."""
+        env = self._get_lock_env(cwd_lock)
+        cmd_paths = self.cmdpaths(ami_path, env=env)
+        log_path.info(
+            "ami_command_paths: ami_path=%s -> cmd_paths=%s",
+            ami_path,
+            ",".join(map(str, cmd_paths)),
+        )
+        return cmd_paths
+
     def ami_command_to_sys_path(self, cwd_lock, ami_path):
         """lookup a command on path if it does not contain a relative or
         absolute path. otherwise perform normal 'ami_to_sys_path' conversion"""

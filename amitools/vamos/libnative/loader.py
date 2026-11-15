@@ -1,7 +1,7 @@
 from amitools.vamos.log import log_libmgr
 from .initresident import InitRes
 from amitools.vamos.libtypes import Resident
-from amitools.vamos.loader import SegmentLoader, SegList
+from amitools.vamos.loader import SegList, StreamFileObj
 
 
 class LibLoader(object):
@@ -12,10 +12,21 @@ class LibLoader(object):
         self.initres = InitRes(mem, alloc, runner)
 
     def load_sys_lib(self, sys_bin_file, run_sp=None):
-        """try to load native lib from sys path
-        return (lib_base_addr, seglist_baddr) or (0,0)"""
-        # load seglist
-        seglist_baddr = self.segloader.load_sys_seglist(sys_bin_file)
+        """try to load native lib from a host path
+
+        This is a convenience for host side callers. All other file access
+        goes through the AmigaDOS file opener installed on the segment
+        loader. return (lib_base_addr, seglist_baddr) or (0,0)"""
+        try:
+            stream = open(sys_bin_file, "rb")
+        except OSError:
+            log_libmgr.debug("load_sys_lib: can't open '%s'", sys_bin_file)
+            return 0, 0
+        fobj = StreamFileObj(stream)
+        try:
+            seglist_baddr = self.segloader.load_seglist(fobj, name=str(sys_bin_file))
+        finally:
+            fobj.close()
         if seglist_baddr:
             return self._load_common(sys_bin_file, seglist_baddr, run_sp)
         else:

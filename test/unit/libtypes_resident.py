@@ -9,7 +9,8 @@ def load_lib(mem, buildlibnix):
     lib_file = buildlibnix.make_lib("testnix")
     alloc = MemoryAlloc(mem)
     loader = SegmentLoader(alloc)
-    info = loader.int_load_sys_seglist(lib_file)
+    with open(lib_file, "rb") as f:
+        info = loader.int_load_seglist(f, name=lib_file)
     seg_list = info.seglist
     seg = seg_list.get_segment()
     addr = seg.get_addr()

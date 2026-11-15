@@ -57,6 +57,7 @@ from .dos.DosList import DosList
 from .dos.Lock import Lock
 from .dos.LockManager import LockManager
 from .dos.FileManager import FileManager
+from .dos.DosFileOpener import DosFileOpener
 from .dos.CSource import *
 from .dos.Item import *
 from amitools.vamos.dos import run_command, run_sub_process
@@ -134,6 +135,9 @@ class DosLibrary(LibImpl):
             ctx.path_mgr, ctx.exec_lib.port_mgr, ctx.alloc, ctx.mem
         )
         self.dos_list.add_host_devices(self.file_mgr, ctx.exec_lib.port_mgr)
+        # let the segment loader open files through DOS
+        if ctx.seg_loader is not None:
+            ctx.seg_loader.set_file_opener(DosFileOpener(self.file_mgr))
         # create lock manager
         self.lock_mgr = LockManager(
             ctx.path_mgr,
@@ -2147,24 +2151,17 @@ class DosLibrary(LibImpl):
         name_ptr = ctx.cpu.r_reg(REG_D1)
         name = ctx.mem.r_cstr(name_ptr)
         lock = self.get_current_dir(ctx)
-        sys_path = self.path_mgr.ami_to_sys_path(lock, name, searchMulti=True)
-        if sys_path and os.path.exists(sys_path):
-            b_addr = ctx.seg_loader.load_sys_seglist(
-                sys_path, file_mgr=self.file_mgr, ami_file=name, lock=lock
-            )
-            if b_addr == 0:
-                log_dos.info("LoadSeg: '%s' -> 000000", name)
-                return 0
-            # overlay seglists are returned as negative BPTR
-            info = ctx.seg_loader.get_info(b_addr)
-            if info.has_overlay():
-                b_addr = -b_addr
-            log_dos.info("LoadSeg: '%s' -> %06x", name, b_addr)
-            self.seg_lists[b_addr] = name
-            return b_addr
-        else:
+        b_addr = ctx.seg_loader.load_ami_seglist(name, lock)
+        if b_addr == 0:
             log_dos.warning("LoadSeg: '%s' -> not found!", name)
             return 0
+        # overlay seglists are returned as negative BPTR
+        info = ctx.seg_loader.get_info(b_addr)
+        if info.has_overlay():
+            b_addr = -b_addr
+        log_dos.info("LoadSeg: '%s' -> %06x", name, b_addr)
+        self.seg_lists[b_addr] = name
+        return b_addr
 
     def UnLoadSeg(self, ctx):
         b_addr = ctx.cpu.r_reg(REG_D1)

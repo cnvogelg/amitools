@@ -46,7 +46,7 @@ class SetupLibManager(object):
         if self.lib_mgr_cfg is None:
             self.lib_mgr_cfg = LibMgrCfg()
         # create segment loader
-        self.seg_loader = SegmentLoader(self.alloc, self.path_mgr)
+        self.seg_loader = SegmentLoader(self.alloc)
         # setup contexts
         odg_base = self.mem_map.get_old_dos_guard_base()
         # create lib mgr

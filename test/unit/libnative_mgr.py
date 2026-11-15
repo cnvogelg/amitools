@@ -6,6 +6,7 @@ from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.machine import Machine, Runtime
 from amitools.vamos.libtypes import ExecLibrary, Library
+from helper import HostFileOpener
 
 
 def setup():
@@ -40,14 +41,8 @@ def libnative_mgr_test(buildlibnix):
     mem, alloc, runner, sp, mem, exec_lib = setup()
     # load
     lib_file = buildlibnix.make_lib("testnix")
-
-    class PathMgrMock:
-        def ami_to_sys_path(self, lock, ami_path, mustExist=True):
-            if ami_path == "LIBS:testnix.library":
-                return lib_file
-
-    pm = PathMgrMock()
-    segload = SegmentLoader(alloc, pm)
+    opener = HostFileOpener({"LIBS:testnix.library": lib_file})
+    segload = SegmentLoader(alloc, file_opener=opener)
     mgr = ALibManager(mem, alloc, runner, segload)
     # open_lib
     lib_base = mgr.open_lib("testnix.library", run_sp=sp)
@@ -79,13 +74,7 @@ def libnative_mgr_test(buildlibnix):
 def libnative_mgr_fail_test():
     mem, alloc, runner, sp, mem, exec_lib = setup()
     # load
-
-    class PathMgrMock:
-        def ami_to_sys_path(self, lock, ami_path, mustExist=True):
-            return None
-
-    pm = PathMgrMock()
-    segload = SegmentLoader(alloc, pm)
+    segload = SegmentLoader(alloc, file_opener=HostFileOpener())
     mgr = ALibManager(mem, alloc, runner, segload)
     # open_lib
     lib_base = mgr.open_lib("testnix.library", run_sp=sp)
