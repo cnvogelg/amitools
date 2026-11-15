@@ -4,14 +4,18 @@ from amitools.binfmt.BinFmt import BinFmt
 from amitools.binfmt.Relocate import Relocate
 from amitools.vamos.log import log_segload
 from .seglist import SegList
+from .overlay import OverlayInfo
 
 
 class SegLoadInfo(object):
-    def __init__(self, seglist, bin_img=None, sys_file=None, ami_file=None):
+    def __init__(
+        self, seglist, bin_img=None, sys_file=None, ami_file=None, overlay=None
+    ):
         self.seglist = seglist
         self.bin_img = bin_img
         self.sys_file = sys_file
         self.ami_file = ami_file
+        self.overlay = overlay
 
     def __str__(self):
         return "[SegLoad:%s,sys=%s,ami=%s]" % (
@@ -19,6 +23,9 @@ class SegLoadInfo(object):
             self.sys_file,
             self.ami_file,
         )
+
+    def has_overlay(self):
+        return self.overlay is not None
 
 
 class SegmentLoader(object):
@@ -30,9 +37,29 @@ class SegmentLoader(object):
         # map seglist baddr to bin_img
         self.infos = {}
 
-    def load_sys_seglist(self, sys_bin_file):
-        """load seglist, register it, and return seglist baddr or 0"""
+    def load_sys_seglist(self, sys_bin_file, file_mgr=None, ami_file=None, lock=None):
+        """load seglist, register it, and return seglist baddr or 0.
+
+        If a file_mgr is given, binaries with an overlay table get their
+        overlay manager data set up. ami_file and lock are used to reopen the
+        binary for the overlay manager. Without a file_mgr overlay tables are
+        not set up."""
         info = self.int_load_sys_seglist(sys_bin_file)
+        if info and file_mgr is not None and OverlayInfo.has_overlay(info.bin_img):
+            try:
+                info.overlay = OverlayInfo.create(
+                    self.alloc,
+                    file_mgr,
+                    info.seglist,
+                    sys_bin_file,
+                    ami_file or sys_bin_file,
+                    lock,
+                )
+            except ValueError as e:
+                log_segload.warning("overlay setup failed: %s", e)
+                info.seglist.free()
+                info = None
+            # None means no supported setup needed (e.g. custom manager) - keep seglist
         if info:
             baddr = info.seglist.get_baddr()
             self.infos[baddr] = info
@@ -63,6 +90,8 @@ class SegmentLoader(object):
         info = self.infos[seglist_baddr]
         log_segload.info("unload seglist: %s", info)
         del self.infos[seglist_baddr]
+        if info.overlay:
+            info.overlay.free()
         info.seglist.free()
         return True
 
@@ -90,6 +119,8 @@ class SegmentLoader(object):
             info = self.infos[baddr]
             log_segload.warning("orphaned seglist: %s", info)
             # try to free list
+            if info.overlay:
+                info.overlay.free()
             info.seglist.free()
         return len(self.infos)
 

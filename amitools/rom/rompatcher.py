@@ -102,7 +102,7 @@ class BootConRomPatch(RomPatch):
             self,
             "boot_con",
             "Set the boot console",
-            {"name": "name of the new console," " e.g. 'CON:MyConsole'"},
+            {"name": "name of the new console, e.g. 'CON:MyConsole'"},
         )
 
     def apply_patch(self, access, args):

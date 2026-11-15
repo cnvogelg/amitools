@@ -730,7 +730,7 @@ def parse_args(args=None):
         "-k",
         "--rom-key",
         default="rom.key",
-        help="the path of a rom.key file if you want to " "process crypted ROMs",
+        help="the path of a rom.key file if you want to process crypted ROMs",
     )
     add_logging_options(parser)
 

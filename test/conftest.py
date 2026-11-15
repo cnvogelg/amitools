@@ -53,7 +53,7 @@ def pytest_addoption(parser):
         "-G",
         action="store_true",
         default=False,
-        help="generate data files by using the output of " "the test program",
+        help="generate data files by using the output of the test program",
     )
     parser.addoption(
         "--vamos-args",

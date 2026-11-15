@@ -214,7 +214,6 @@ def machine_machine_execute_hw_trap0_raise_test(ctx):
 
 
 def machine_machine_execute_hw_trap0_handle_test(ctx):
-
     def handle_trap(error):
         assert type(error) is CPUHWExceptionError
         assert error.pc == ctx.code + 2

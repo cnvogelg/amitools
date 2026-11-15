@@ -185,8 +185,8 @@ class HunkReader:
         while num_relocs != 0:
             num_relocs = self.read_long(f)
             if num_relocs < 0:
-                self.error_string = "%s has invalid number of relocations" % (
-                    hunk["type_name"]
+                self.error_string = (
+                    "%s has invalid number of relocations" % (hunk["type_name"])
                 )
                 return RESULT_INVALID_HUNK_FILE
             elif num_relocs == 0:
@@ -220,8 +220,8 @@ class HunkReader:
         while num_relocs != 0:
             num_relocs = self.read_word(f)
             if num_relocs < 0:
-                self.error_string = "%s has invalid number of relocations" % (
-                    hunk["type_name"]
+                self.error_string = (
+                    "%s has invalid number of relocations" % (hunk["type_name"])
                 )
                 return RESULT_INVALID_HUNK_FILE
             elif num_relocs == 0:
@@ -316,10 +316,14 @@ class HunkReader:
         if ov_size < 0:
             self.error_string = "%s has invalid size" % (hunk["type_name"])
             return RESULT_INVALID_HUNK_FILE
+        hunk["ov_size"] = ov_size
 
         # read data of overlay
         byte_size = (ov_size + 1) * 4
         ov_data = f.read(byte_size)
+        if len(ov_data) != byte_size:
+            self.error_string = "%s has invalid data size" % (hunk["type_name"])
+            return RESULT_INVALID_HUNK_FILE
         hunk["ov_data"] = ov_data
 
         # check: first get header hunk
@@ -336,6 +340,9 @@ class HunkReader:
 
         # check overlay manager
         overlay_mgr_data = overlay_mgr_hunk["data"]
+        if len(overlay_mgr_data) < 36:
+            self.error_string = "overlay manager hunk is too short"
+            return RESULT_INVALID_HUNK_FILE
         magic = self.get_long(overlay_mgr_data[4:8])
         if magic != 0xABCD:
             self.error_string = "no valid overlay manager magic found"
@@ -349,8 +356,50 @@ class HunkReader:
             (magic2 == 0x5BA0) and (magic3 == 0x074F7665) and (magic4 == 0x726C6179)
         )
         hunk["ov_std"] = std_overlay
+        hunk["ov_table"] = self.parse_overlay_table(ov_data)
 
         return RESULT_OK
+
+    def parse_overlay_table(self, data):
+        """Decode the standard overlay manager's tree and reference table."""
+        num_longs = len(data) // 4
+        if num_longs == 0:
+            return {"error": "missing tree size"}
+
+        tree_size = self.get_long(data[:4])
+        table = {"tree_size": tree_size, "tree_slots": [], "references": []}
+        if tree_size < 2 or tree_size > num_longs:
+            table["error"] = "tree size exceeds overlay table"
+            return table
+
+        ref_size = (num_longs - tree_size) * 4
+        if ref_size % 32 != 0:
+            table["error"] = "overlay reference table has incomplete entry"
+
+        tree_slots = [
+            self.get_long(data[offset : offset + 4])
+            for offset in range(4, tree_size * 4, 4)
+        ]
+        table["tree_slots"] = tree_slots
+
+        ref_data = data[tree_size * 4 :]
+        for offset in range(0, len(ref_data) - len(ref_data) % 32, 32):
+            values = [
+                self.get_long(ref_data[offset + i : offset + i + 4])
+                for i in range(0, 32, 4)
+            ]
+            table["references"].append(
+                {
+                    "file_position": values[0],
+                    "reserved": values[1:3],
+                    "level": values[3],
+                    "ordinate": values[4],
+                    "initial_hunk": values[5],
+                    "symbol_hunk": values[6],
+                    "symbol_offset": values[7],
+                }
+            )
+        return table
 
     def parse_lib(self, f, hunk):
         lib_size = self.read_long(f)
@@ -553,6 +602,14 @@ class HunkReader:
 
     def read_file_obj(self, hfile, f):
         self.hunks = []
+        self.type = None
+        self.header = None
+        self.segments = []
+        self.overlay = None
+        self.overlay_headers = None
+        self.overlay_segments = None
+        self.libs = None
+        self.units = None
         is_first_hunk = True
         is_exe = False
         was_end = False
@@ -720,11 +777,22 @@ class HunkReader:
 
     # ---------- Build Segments from Hunks ----------
 
+    def set_loadseg_segment_info(self, hunk, header, hunk_no):
+        size_index = hunk_no - header["first_hunk"]
+        if size_index < 0 or size_index >= len(header["hunks"]):
+            self.error_string = "HUNK_HEADER has no size for hunk %d" % hunk_no
+            return False
+        hunk["hunk_no"] = hunk_no
+        hunk["alloc_size"] = header["hunks"][size_index]["size"]
+        hunk["alloc_type"] = header["hunks"][size_index]["memf"]
+        return True
+
     def build_loadseg(self):
         in_header = True
         seek_begin = False
         segment = None
         segment_list = self.segments
+        segment_header = None
         for e in self.hunks:
             hunk_type = e["type"]
 
@@ -740,9 +808,11 @@ class HunkReader:
                         segment_list = []
                         self.overlay_segments.append(segment_list)
                         self.overlay_headers.append(e)
+                        segment_header = e
                     else:
                         # set load_seg() header
                         self.header = e
+                        segment_header = e
 
                     # start a new segment
                     segment = []
@@ -768,9 +838,8 @@ class HunkReader:
                     segment_list.append(segment)
                     seek_header = False
                     seek_begin = False
-                    e["hunk_no"] = hunk_no
-                    e["alloc_size"] = self.header["hunks"][hunk_no]["size"]
-                    e["alloc_type"] = self.header["hunks"][hunk_no]["memf"]
+                    if not self.set_loadseg_segment_info(e, segment_header, hunk_no):
+                        return False
                     hunk_no += 1
                 # add an extra overlay "hunk"
                 elif hunk_type == HUNK_OVERLAY:
@@ -818,9 +887,8 @@ class HunkReader:
                     segment_list.append(segment)
                     seek_header = False
                     seek_begin = False
-                    e["hunk_no"] = hunk_no
-                    e["alloc_size"] = self.header["hunks"][hunk_no]["size"]
-                    e["alloc_type"] = self.header["hunks"][hunk_no]["memf"]
+                    if not self.set_loadseg_segment_info(e, segment_header, hunk_no):
+                        return False
                     hunk_no += 1
                 # unecpected hunk?!
                 else:

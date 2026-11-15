@@ -88,7 +88,9 @@ class MatchFirstNext:
         return True
 
     def _fill_parent_lock(self, path):
-        parent = self.path_mgr.ami_abs_parent_path(path)
+        parent = self.path_mgr.ami_dir_of_path(self.lock, path)
+        if not parent:
+            parent = ""
         return self._fill_lock(parent)
 
     def _push_dodir(self, name, path):

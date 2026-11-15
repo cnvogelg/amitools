@@ -3,6 +3,7 @@ from .KeyMapLibrary import KeyMapLibrary
 from .GadToolsLibrary import GadToolsLibrary
 from .LayersLibrary import LayersLibrary
 from .DosLibrary import DosLibrary
+from .BsdSocketLibrary import BsdSocketLibrary
 from .ExecLibrary import ExecLibrary
 from .ExpansionLibrary import ExpansionLibrary
 from .InputDevice import InputDevice
@@ -25,6 +26,7 @@ vamos_libs = {
     "keymap.library": KeyMapLibrary,
     "gadtools.library": GadToolsLibrary,
     "layers.library": LayersLibrary,
+    "bsdsocket.library": BsdSocketLibrary,
     "dos.library": DosLibrary,
     "exec.library": ExecLibrary,
     "expansion.library": ExpansionLibrary,

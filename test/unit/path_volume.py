@@ -125,6 +125,15 @@ def path_volume_ami_to_sys_test(tmpdir):
     assert a2s("my:unkown/PATH") == os.path.join(my_path, "unkown", "PATH")
     # follow along case of path in sys fs
     assert a2s("my:foo/bar/baz") == sub_path
+    # an empty component is the AmigaDOS parent step, a trailing slash is not
+    assert a2s("my:foo/bar/") == os.path.join(my_path, "Foo", "BAR")
+    assert a2s("my:foo/bar//") == os.path.join(my_path, "Foo")
+    assert a2s("my:foo/bar//baz") == os.path.join(my_path, "Foo", "baz")
+    assert a2s("my:foo/bar/baz///bar") == os.path.join(my_path, "Foo", "BAR")
+    assert a2s("my:foo//bar/baz") == os.path.join(my_path, "bar", "baz")
+    assert a2s("my:foo//") == my_path
+    # above the volume root
+    assert a2s("my:foo///") is None
     # fast mode on case insensitive fs does not adjust ami path
     if ci_fs:
         assert a2s("my:foo", True) == os.path.join(my_path, "foo")

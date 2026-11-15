@@ -14,7 +14,8 @@ def pytask_exec_base_lists_test(vamos_task):
         assert exec_base.resource_list.type.val == NodeType.NT_RESOURCE
         assert exec_base.resource_list.is_empty()
         assert exec_base.device_list.type.val == NodeType.NT_DEVICE
-        assert exec_base.device_list.is_empty()
+        # dos.library opens timer.device at startup for DOSBase->dl_TimeReq
+        assert exec_base.device_list.find_name("timer.device") is not None
         assert exec_base.intr_list.type.val == NodeType.NT_INTERRUPT
         assert exec_base.intr_list.is_empty()
         assert exec_base.lib_list.type.val == NodeType.NT_LIBRARY

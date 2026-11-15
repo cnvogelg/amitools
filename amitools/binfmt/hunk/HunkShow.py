@@ -66,13 +66,55 @@ class HunkShow:
 
         # overlay
         if self.overlay != None:
-            print("Overlay")
+            self.show_overlay_info()
             num_ov = len(self.overlay_headers)
             for o in range(num_ov):
+                print("Overlay node #%d" % o)
                 if not self.brief:
                     self.print_header(self.overlay_headers[o])
                 for segment in self.overlay_segments[o]:
                     self.show_segment(segment, self.overlay_segments[o])
+
+    def show_overlay_info(self):
+        overlay_type = "standard" if self.overlay.get("ov_std") else "custom"
+        size = (self.overlay.get("ov_size", 0) + 1) * 4
+        print("Overlay: %s manager, table size=%d bytes" % (overlay_type, size))
+
+        table = self.overlay.get("ov_table")
+        if table is None:
+            print("\tOverlay table format is manager-specific")
+            return
+
+        if "tree_size" in table:
+            print(
+                "\tOverlay table: tree size=%d, references=%d"
+                % (table["tree_size"], len(table["references"]))
+            )
+            for slot, value in enumerate(table["tree_slots"]):
+                is_terminator = slot == len(table["tree_slots"]) - 1
+                label = "terminator" if is_terminator else "tree pointer #%d" % slot
+                print("\t\t%-18s %08x" % (label, value))
+            if not self.overlay.get("ov_std"):
+                print("\t\tReference records decoded by their 8-longword layout")
+        for ref_no, ref in enumerate(table["references"]):
+            print(
+                "\tReference #%d: file offset=%08x, reserved=%08x/%08x, "
+                "level=%d, ordinate=%d, initial hunk=%d, symbol hunk=%d, "
+                "symbol offset=%08x"
+                % (
+                    ref_no,
+                    ref["file_position"],
+                    ref["reserved"][0],
+                    ref["reserved"][1],
+                    ref["level"],
+                    ref["ordinate"],
+                    ref["initial_hunk"],
+                    ref["symbol_hunk"],
+                    ref["symbol_offset"],
+                )
+            )
+        if "error" in table:
+            print("\tOverlay table parse warning: %s" % table["error"])
 
     def show_segment(self, hunk, seg_list):
         main = hunk[0]

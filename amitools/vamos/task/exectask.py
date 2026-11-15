@@ -34,6 +34,9 @@ class ExecTask(MappedTask):
             self.task = ami_task
             self.own_task = False
 
+        self.task.tc_SPLower.aptr = self.stack.get_lower()
+        self.task.tc_SPUpper.aptr = self.stack.get_upper()
+
         sp = self.stack.get_initial_sp()
         # python task?
         if func:

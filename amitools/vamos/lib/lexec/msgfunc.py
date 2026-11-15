@@ -57,6 +57,11 @@ class MessageFunc(FuncBase):
         msg_port.free(self.ctx.alloc)
 
     def put_msg(self, port: MsgPort, msg: Message, msg_type=NodeType.NT_MESSAGE):
+        # NULL port: can't queue message
+        if port is None or port.addr == 0:
+            log_exec.warning("PutMsg: port is NULL, msg=%s", msg)
+            return
+
         # check legacy port manager first
         has_port = self.port_mgr.has_port(port.addr)
         if has_port:

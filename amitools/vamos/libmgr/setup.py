@@ -81,6 +81,7 @@ class SetupLibManager(object):
         self.lib_mgr.add_ctx("layers.library", self.exec_ctx)
         self.lib_mgr.add_ctx("intuition.library", self.exec_ctx)
         self.lib_mgr.add_ctx("graphics.library", self.exec_ctx)
+        self.lib_mgr.add_ctx("bsdsocket.library", self.exec_ctx)
         self.lib_mgr.add_ctx("dos.library", self.dos_ctx)
         # add all vamos libs
         for name in vamos_libs:

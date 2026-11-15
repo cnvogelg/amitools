@@ -109,7 +109,6 @@ def machine_runtime_trap_exception_test(ctx):
 
 
 def machine_runtime_nested_run_test(ctx):
-
     def func(op, pc):
         # check current run state before
         rs = ctx.rt.get_current_run_state()
@@ -140,7 +139,6 @@ def machine_runtime_nested_run_test(ctx):
 
 
 def machine_runtime_nested_run_error_test():
-
     ctx = Context(supervisor=True)
 
     def func(op, pc):
@@ -211,7 +209,6 @@ def machine_runtime_nested_run_trap_test(ctx):
 
 
 def machine_runtime_nested_run_set_get_regs_test(ctx):
-
     def func2(op, pc):
         d0 = ctx.cpu.r_reg(REG_D0)
         d1 = ctx.cpu.r_reg(REG_D1)
@@ -276,7 +273,6 @@ def machine_runtime_nested_run_trap_exception_test(ctx):
 
 @pytest.mark.parametrize("slice_cycles", (10, 20, 40, 80, 100, 200))
 def machine_runtime_slice_hook_test(slice_cycles, ctx):
-
     slice_reports = []
 
     def hook(rs):

@@ -17,7 +17,7 @@ from .builder import BinBuilder
 from amitools.vamos.main import main as vamos_main
 
 
-def run_proc(args, stdin_str=None, raw_output=False, use_pty=False):
+def run_proc(args, stdin_str=None, raw_output=False, use_pty=False, stdin_delay=0.01):
     if stdin_str:
         stdin_bytes = stdin_str.encode("latin-1")
         stdin_flag = subprocess.PIPE
@@ -33,7 +33,7 @@ def run_proc(args, stdin_str=None, raw_output=False, use_pty=False):
 
         # write response
         if stdin_bytes:
-            time.sleep(0.01)
+            time.sleep(stdin_delay)
             p.write(stdin_bytes)
 
         # read remaining lines
@@ -203,6 +203,7 @@ class VamosTestRunner:
                 args,
                 stdin,
                 use_pty=use_pty,
+                stdin_delay=kw_args.get("stdin_delay", 0.01),
             )
         else:
 
