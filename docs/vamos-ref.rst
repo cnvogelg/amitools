@@ -179,6 +179,9 @@ Machine and hardware
   also accepted): ``vamos -C 68020 myprog``.
 * ``-m KIB``, ``--ram-size KIB``: Set emulated RAM in KiB (default: 1024):
   ``vamos -m 8192 myprog``.
+  Exec publishes this allocator as Fast RAM through its memory list, with
+  live free chunks. Allocations are rounded to eight bytes; this is not
+  chipset DMA memory.
 * ``-e EXCEPTION:MODE,...``, ``--hw-exception EXCEPTION:MODE,...``: Choose
   ``ignore``, ``log``, or ``abort`` handling for CPU exceptions. For example:
   ``vamos -e zero_div:abort,bus:log myprog``.

@@ -25,6 +25,7 @@ from .lexec.SemaphoreManager import SemaphoreManager
 from .lexec.Pool import Pool
 from .lexec.RawDoFmt import raw_do_fmt
 from .lexec import Alloc
+from .lexec.memheader import AllocatorMemHeader
 
 
 class ExecLibrary(LibImpl):
@@ -63,6 +64,7 @@ class ExecLibrary(LibImpl):
         self.port_mgr = PortManager(ctx.alloc)
         self.semaphore_mgr = SemaphoreManager(ctx.alloc, ctx.mem)
         self.mem = ctx.mem
+        self.memory_header = AllocatorMemHeader(ctx.alloc, self.exec_lib.mem_list)
         self.signal_func = SignalFunc(ctx, self.exec_lib)
         self.task_func = TaskFunc(ctx, self.exec_lib)
         self.msg_func = MessageFunc(
@@ -94,6 +96,9 @@ class ExecLibrary(LibImpl):
         self._msg_port_sigtask_off = msgport_sdef.find_field_def_by_name(
             "mp_SigTask"
         ).offset
+
+    def finish_lib(self, ctx):
+        self.memory_header.free()
 
     # helper
 
@@ -752,7 +757,7 @@ class ExecLibrary(LibImpl):
             "TypeOfMem: source=%06x -> %s" % (addr, self.alloc.is_valid_address(addr))
         )
         if self.alloc.is_valid_address(addr):
-            return 1  # MEMF_PUBLIC
+            return AllocatorMemHeader.ATTRIBUTES
         return 0
 
     def CacheClearU(self, ctx):

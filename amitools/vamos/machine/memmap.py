@@ -77,7 +77,7 @@ class MemoryMap(object):
         mem_begin = 0x1000
         mem_size = self.ram_total - mem_begin
         log_mem_map.info("setup ram allocator: @%06x +%06x", mem_begin, mem_size)
-        self.alloc = MemoryAlloc(mem, mem_begin, mem_size, self.label_mgr)
+        self.alloc = MemoryAlloc(mem, mem_begin, mem_size, self.label_mgr, alignment=8)
 
     def get_old_dos_guard_base(self):
         return self.dos_guard_base

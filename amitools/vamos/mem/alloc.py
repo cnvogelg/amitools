@@ -45,7 +45,7 @@ class MemoryChunk:
 
 
 class MemoryAlloc:
-    def __init__(self, mem, addr=0, size=0, label_mgr=None):
+    def __init__(self, mem, addr=0, size=0, label_mgr=None, alignment=4):
         """mem is a interface.
         setup allocator starting at addr with size bytes.
         if label_mgr is set then labels are created for allocations.
@@ -63,6 +63,8 @@ class MemoryAlloc:
         self.addr = addr
         self.size = size
         self.label_mgr = label_mgr
+        self.alignment = alignment
+        self.change_callback = None
 
         self.addrs = {}
         self.mem_objs = {}
@@ -191,7 +193,7 @@ class MemoryAlloc:
     def alloc_mem(self, size, except_on_fail=True):
         """allocate memory and return addr or 0 if no more memory"""
         # align size to 4 bytes
-        size = (size + 3) & ~3
+        size = (size + self.alignment - 1) & ~(self.alignment - 1)
         # find best free chunk
         chunk, left = self._find_best_chunk(size)
         # out of memory?
@@ -225,6 +227,8 @@ class MemoryAlloc:
             raise VamosInternalError(
                 "Memory pool is invalid, return address not aligned by a long word"
             )
+        if self.change_callback is not None:
+            self.change_callback()
         return addr
 
     def free_mem(self, addr, size):
@@ -232,7 +236,7 @@ class MemoryAlloc:
         if addr not in self.addrs:
             raise VamosInternalError("Invalid Free'd Memory at %06x" % addr)
         # align size to 4 bytes
-        size = (size + 3) & ~3
+        size = (size + self.alignment - 1) & ~(self.alignment - 1)
         real_size = self.addrs[addr]
         assert size == real_size
         # remove from valid allocs
@@ -260,6 +264,8 @@ class MemoryAlloc:
 
         # correct free bytes
         self.free_bytes += size
+        if self.change_callback is not None:
+            self.change_callback()
         num_allocs = len(self.addrs)
         log_mem_alloc.info(
             "[free  @%06x-%06x: %06x bytes] %s",
