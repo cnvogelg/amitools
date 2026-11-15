@@ -51,6 +51,8 @@ class Context:
         font = TextFontStruct.alloc(self.alloc)
         attr.ta_YSize.val = font.tf_YSize.val = 8
         self.graphics = SimpleNamespace(
+            palette=None,
+            screen_palettes={},
             text_attr=attr,
             font=font,
             topaz_font=font.get_addr(),
@@ -162,14 +164,14 @@ def intuition_lifetime_headless_failure_test(ctx, monkeypatch, failure):
 
 
 def intuition_lifetime_partial_bitmap_failure_test(ctx, monkeypatch):
-    # A default plane needs 60,000 bytes. One fits; the second does not.
-    small = Context(monkeypatch, ctx.labels is not None, size_kib=70)
+    # A default plane needs 20,480 bytes. One fits; the second does not.
+    small = Context(monkeypatch, ctx.labels is not None, size_kib=30)
     allocate = small.alloc.alloc_mem
     planes = []
 
     def record(size, *args, **kwargs):
         addr = allocate(size, *args, **kwargs)
-        if size == 60000 and addr:
+        if size == 20480 and addr:
             planes.append(addr)
         return addr
 

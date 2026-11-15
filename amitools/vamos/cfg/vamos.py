@@ -32,6 +32,8 @@ class VamosMainParser(MainParser):
         # schedule
         self.schedule = ScheduleParser()
         self.add_parser(self.schedule)
+        self.display = DisplayParser()
+        self.add_parser(self.display)
 
     def get_log_dict(self):
         return self.log.get_cfg_dict()
@@ -59,3 +61,6 @@ class VamosMainParser(MainParser):
 
     def get_schedule_dict(self):
         return self.schedule.get_cfg_dict()
+
+    def get_display_dict(self):
+        return self.display.get_cfg_dict()

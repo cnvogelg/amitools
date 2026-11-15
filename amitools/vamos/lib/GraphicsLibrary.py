@@ -1,10 +1,20 @@
 import os
 import ctypes
 import time
+import struct
 from contextlib import ExitStack
 
 from amitools.vamos.libcore.impl import LibImpl
-from amitools.vamos.machine.regs import REG_A0, REG_D0, REG_A1, REG_D1, REG_D2, REG_D3
+from amitools.vamos.machine.regs import (
+    REG_A0,
+    REG_D0,
+    REG_A1,
+    REG_D1,
+    REG_D2,
+    REG_D3,
+    REG_D4,
+    REG_D5,
+)
 from amitools.vamos.lib.graphics import (
     TextAttrStruct,
     BitMapStruct,
@@ -19,9 +29,21 @@ from amitools.vamos.lib.intuition import TextFontStruct, WindowStruct
 from amitools.vamos.log import log_main, log_gfx
 from dataclasses import dataclass
 from amitools.vamos.lib.graphics_surface import RasterState, RasterSurface
+from amitools.vamos.lib.graphics_base import GfxBaseStruct
+from amitools.vamos.libtypes import List
+from amitools.vamos.libstructs import NodeType
+from amitools.vamos.lib.graphics_font import (
+    BitmapFont,
+    load_topaz_font,
+    open_pixel_font,
+    read_font_strike,
+)
 
 
 class GraphicsLibrary(LibImpl):
+    def get_struct_def(self):
+        return GfxBaseStruct
+
     def __init__(self):
         super().__init__()
         self.alloc = None
@@ -33,6 +55,7 @@ class GraphicsLibrary(LibImpl):
         self.rp_graphics_map = {}
         self._rastport_resources = {}
         self.palette = None
+        self.screen_palettes = {}
         self._lib_opened = False
         self._setup_resources = None
 
@@ -43,6 +66,12 @@ class GraphicsLibrary(LibImpl):
     def setup_lib(self, ctx, base_addr):
         self.alloc = ctx.alloc
         ctx.exec_lib.graphics_lib = self
+        self.gfx_base = GfxBaseStruct(ctx.mem, base_addr)
+        List(ctx.mem, self.gfx_base.TextFonts.addr).new(NodeType.NT_FONT)
+        self.gfx_base.DisplayFlags.val = 4  # PAL
+        self.gfx_base.NormalDisplayRows.val = 256
+        self.gfx_base.NormalDisplayColumns.val = 320
+        self.gfx_base.MicrosPerLine.val = 64 << 8
 
     def open_lib(self, ctx, open_cnt):
         if self._lib_opened:
@@ -70,7 +99,7 @@ class GraphicsLibrary(LibImpl):
                 rollback.callback(ctx.alloc.free_memory, attr_memory)
                 ctx.mem.clear_block(attr_memory.addr, attr_memory.size, 0)
                 attr = TextAttrStruct(ctx.mem, attr_memory.addr)
-                name = "Cousine-Regular.ttf"
+                name = "topaz.font"
                 name_memory = ctx.alloc.alloc_memory(
                     len(name) + 1,
                     label="Graphics default name",
@@ -88,6 +117,8 @@ class GraphicsLibrary(LibImpl):
                 rollback.callback(self._close_font, ctx, font_addr)
                 palette = create_amiga_palette()
                 self.text_attr, self.topaz_font = attr, font_addr
+                if hasattr(self, "gfx_base"):
+                    self.gfx_base.DefaultFont.val = font_addr
                 self.palette = palette
                 self._setup_resources = rollback.pop_all()
                 self._lib_opened = True
@@ -102,6 +133,8 @@ class GraphicsLibrary(LibImpl):
         default_font = self.topaz_font
         self._setup_resources = None
         self.text_attr = self.topaz_font = self.palette = None
+        if hasattr(self, "gfx_base"):
+            self.gfx_base.DefaultFont.val = 0
         self.fontsPath = None
         self._lib_opened = False
         with ExitStack() as cleanup:
@@ -296,13 +329,13 @@ class GraphicsLibrary(LibImpl):
     # Font handling
     # ---------------------------------------------------------------------
 
-    def open_font_file(self, ctx, name: str, size: int):
+    def open_font_file(self, ctx, name: str, size: int, style=0, amiga_name=None):
         from sdl2 import sdlttf
 
         font_path = os.path.join(self.fontsPath, name)
         if name == "Cousine-Regular.ttf" and not os.path.isfile(font_path):
             font_path = os.path.join(os.path.dirname(__file__), "fonts", name)
-        font = sdlttf.TTF_OpenFont(font_path.encode("utf-8"), size)
+        font = open_pixel_font(font_path, size, style)
         if not font:
             log_main.error(
                 "TTF_OpenFont failed for '%s': %s",
@@ -324,25 +357,14 @@ class GraphicsLibrary(LibImpl):
                 != 0
             ):
                 return None, None
-            font_mem = self.alloc.alloc_memory(
-                TextFontStruct.get_size(),
-                label="Graphics TextFont",
-                except_on_failure=False,
-            )
-            if font_mem is None:
+            strike = read_font_strike(font, height)
+            if strike is None:
                 return None, None
-            rollback.callback(self.alloc.free_memory, font_mem)
-            font_addr = font_mem.addr
-            ctx.mem.clear_block(font_addr, font_mem.size, 0)
-            tf = TextFontStruct(ctx.mem, font_addr)
-            tf.tf_YSize.set(height)
-            tf.tf_XSize.set(avg_width.value)
-            tf.tf_Baseline.set(ascent)
-            tf.tf_Accessors.set(1)
-            tf.tf_LoChar.set(32)
-            tf.tf_HiChar.set(127)
-            self.font_registry[font_addr] = font
-            self._font_owners[font_addr] = {"font": font, "refs": 1}
+            font_addr = self._store_font(
+                ctx, font, amiga_name or name, height, ascent, avg_width.value, strike
+            )
+            if not font_addr:
+                return None, None
             rollback.pop_all()
         log_main.debug(
             "Loaded font '%s' size=%d height=%d ascent=%d avg_width=%d",
@@ -353,6 +375,50 @@ class GraphicsLibrary(LibImpl):
             avg_width.value,
         )
         return font, font_addr
+
+    def _store_font(self, ctx, font, name, height, ascent, width, strike):
+        with ExitStack() as rollback:
+            name_bytes = name.encode("latin-1") + b"\0"
+            if len(name_bytes) & 1:
+                name_bytes += b"\0"
+            count = len(strike.locations)
+            locations = struct.pack(">" + "I" * count, *strike.locations)
+            spaces = struct.pack(">" + "h" * count, *strike.spaces)
+            kerns = struct.pack(">" + "h" * count, *strike.kerns)
+            payload = name_bytes + locations + spaces + kerns + strike.data
+            font_mem = self.alloc.alloc_memory(
+                TextFontStruct.get_size() + len(payload),
+                label="Graphics TextFont",
+                except_on_failure=False,
+            )
+            if font_mem is None:
+                return 0
+            rollback.callback(self.alloc.free_memory, font_mem)
+            font_addr = font_mem.addr
+            ctx.mem.clear_block(font_addr, font_mem.size, 0)
+            tf = TextFontStruct(ctx.mem, font_addr)
+            tf.tf_YSize.set(height)
+            tf.tf_XSize.set(width)
+            tf.tf_Baseline.set(ascent)
+            tf.tf_Accessors.set(1)
+            tf.tf_LoChar.set(32)
+            tf.tf_HiChar.set(255)
+            tf.tf_Flags.val = 0x20  # FPF_PROPORTIONAL: use spacing/kerning tables
+            tf.tf_BoldSmear.val = 1
+            # Keep all public tables in the font allocation. CloseFont and
+            # rollback release them even if the caller edits public pointers.
+            data_addr = font_addr + TextFontStruct.get_size()
+            ctx.mem.w_block(data_addr, payload)
+            tf.tf_Message.mn_Node.ln_Name.aptr = data_addr
+            tf.tf_CharLoc.val = data_addr + len(name_bytes)
+            tf.tf_CharSpace.val = tf.tf_CharLoc.val + len(locations)
+            tf.tf_CharKern.val = tf.tf_CharSpace.val + len(spaces)
+            tf.tf_CharData.val = tf.tf_CharKern.val + len(kerns)
+            tf.tf_Modulo.val = strike.modulo
+            self.font_registry[font_addr] = font
+            self._font_owners[font_addr] = {"font": font, "refs": 1}
+            rollback.pop_all()
+        return font_addr
 
     def OpenFont(self, ctx):
         font_addr = self._open_font(ctx, ctx.cpu.r_reg(REG_A0))
@@ -368,15 +434,29 @@ class GraphicsLibrary(LibImpl):
         if name_ptr != 0:
             font_name = ctx.mem.r_cstr(name_ptr)
 
-        if font_name is None or font_name == "topaz.font":
+        amiga_name = font_name or "topaz.font"
+        if font_name is None or font_name.lower() == "topaz.font":
             font_name = "Cousine-Regular.ttf"
 
         font_size = text_attr.ta_YSize.get()
         style_flags = text_attr.ta_Style.get()
-
-        font, font_addr = self.open_font_file(ctx, font_name, font_size)
-        if not font:
-            return 0
+        if amiga_name.lower() == "topaz.font" and font_size == 8 and not style_flags:
+            bitmap = load_topaz_font()
+            if bitmap is not None:
+                addr = self._store_font(
+                    ctx,
+                    bitmap,
+                    amiga_name,
+                    bitmap.height,
+                    bitmap.baseline,
+                    bitmap.width,
+                    bitmap.strike,
+                )
+                if addr:
+                    TextFontStruct(
+                        ctx.mem, addr
+                    ).tf_Flags.val = 0x41  # designed ROM font
+                return addr
 
         sdl_style = 0
         if style_flags & 0x01:
@@ -386,10 +466,12 @@ class GraphicsLibrary(LibImpl):
         if style_flags & 0x04:
             sdl_style |= sdlttf.TTF_STYLE_ITALIC
 
-        with ExitStack() as rollback:
-            rollback.callback(self._close_font, ctx, font_addr)
-            sdlttf.TTF_SetFontStyle(font, sdl_style)
-            rollback.pop_all()
+        font, font_addr = self.open_font_file(
+            ctx, font_name, font_size, sdl_style, amiga_name
+        )
+        if not font:
+            return 0
+        TextFontStruct(ctx.mem, font_addr).tf_Style.val = style_flags
         return font_addr
 
     def CloseFont(self, ctx):
@@ -398,7 +480,7 @@ class GraphicsLibrary(LibImpl):
     @staticmethod
     def _release_host_font(owner):
         owner["refs"] -= 1
-        if owner["refs"] == 0:
+        if owner["refs"] == 0 and not isinstance(owner["font"], BitmapFont):
             from sdl2 import sdlttf
 
             sdlttf.TTF_CloseFont(owner["font"])
@@ -453,7 +535,9 @@ class GraphicsLibrary(LibImpl):
             depth = BitMapStruct(ctx.mem, rp.BitMap.val).Depth.val
             if 1 <= depth <= 8:
                 index &= (1 << depth) - 1
-        return self.palette.get(index)
+        backing = self.rp_graphics_map.get(rp.addr)
+        palette = getattr(backing, "palette", None) or self.palette
+        return palette.get(index)
 
     def _text_layout(self, ctx, rp, string_ptr, count):
         """Read a counted Amiga byte string and measure the queued text."""
@@ -511,6 +595,10 @@ class GraphicsLibrary(LibImpl):
             ctx.cpu.w_reg(REG_D0, 0)
             return
         rp = RastPortStruct(ctx.mem, ctx.cpu.r_reg(REG_A1))
+        guest = self._guest_text(ctx, rp, ctx.cpu.r_reg(REG_A0), count, False)
+        if guest is not None:
+            ctx.cpu.w_reg(REG_D0, guest & 0xFFFF)
+            return
         layout = self._text_layout(ctx, rp, ctx.cpu.r_reg(REG_A0), count)
         ctx.cpu.w_reg(REG_D0, (layout[2] & 0xFFFF) if layout else 0)
 
@@ -520,6 +608,10 @@ class GraphicsLibrary(LibImpl):
             return
         rastport_addr = ctx.cpu.r_reg(REG_A1)
         rp = RastPortStruct(ctx.mem, rastport_addr)
+        guest = self._guest_text(ctx, rp, ctx.cpu.r_reg(REG_A0), count, True)
+        if guest is not None:
+            rp.cp_x.val = ((rp.cp_x.val + guest + 0x8000) & 0xFFFF) - 0x8000
+            return
         layout = self._text_layout(ctx, rp, ctx.cpu.r_reg(REG_A0), count)
         if layout is None:
             return
@@ -544,6 +636,123 @@ class GraphicsLibrary(LibImpl):
                 )
         # The public position is a signed WORD and keeps the same baseline.
         rp.cp_x.val = ((rp.cp_x.val + advance + 0x8000) & 0xFFFF) - 0x8000
+
+    @staticmethod
+    def _word(value):
+        return ((value + 0x8000) & 0xFFFF) - 0x8000
+
+    @staticmethod
+    def _template_bits(mem, address, bit_offset, stride, width, height):
+        # Copy at call time: clients reuse and free templates before repaint.
+        result = bytearray(width * height)
+        first_byte, first_bit = divmod(bit_offset, 8)
+        byte_count = (first_bit + width + 7) // 8
+        for y in range(height):
+            row = mem.r_block(address + y * stride + first_byte, byte_count)
+            for x in range(width):
+                bit = first_bit + x
+                result[y * width + x] = bool(row[bit // 8] & (0x80 >> (bit & 7)))
+        return bytes(result)
+
+    def _queue_template(self, ctx, rp, x, y, width, height, pixels):
+        if not width or not height:
+            return
+        state = self._raster_state(ctx, rp)
+        if state is None:
+            return
+        command = BFTemplate(x, y, width, height, pixels, state)
+        backing = self.rp_graphics_map.get(rp.addr)
+        if backing is not None:
+            backing.batch.add(command)
+        else:
+            # Offscreen RastPorts are guest-owned and need no SDL renderer.
+            bitmap = BitMapStruct(ctx.mem, rp.BitMap.val)
+            surface = RasterSurface(bitmap.BytesPerRow.val * 8, bitmap.Rows.val)
+            surface.load(state)
+            surface.template(state, x, y, width, height, pixels)
+
+    def _guest_text(self, ctx, rp, string_ptr, count, draw):
+        if not rp.Font.val:
+            return None
+        font = TextFontStruct(ctx.mem, rp.Font.val)
+        if not font.tf_CharLoc.val or not font.tf_CharData.val:
+            return None
+        if font.tf_HiChar.val < font.tf_LoChar.val:
+            return 0
+        position = 0
+        proportional = font.tf_Flags.val & 0x20
+        for char in ctx.mem.r_block(string_ptr, count):
+            index = char - font.tf_LoChar.val
+            if not 0 <= index <= font.tf_HiChar.val - font.tf_LoChar.val:
+                index = font.tf_HiChar.val - font.tf_LoChar.val + 1
+            kern = (
+                self._word(ctx.mem.r16(font.tf_CharKern.val + index * 2))
+                if proportional and font.tf_CharKern.val
+                else 0
+            )
+            space = (
+                self._word(ctx.mem.r16(font.tf_CharSpace.val + index * 2))
+                if proportional and font.tf_CharSpace.val
+                else font.tf_XSize.val
+            )
+            advance = kern + space + rp.TxSpacing.val
+            if draw:
+                location = ctx.mem.r32(font.tf_CharLoc.val + index * 4)
+                ink_width, height = location & 0xFFFF, font.tf_YSize.val
+                left = min(0, kern)
+                width = max(0, advance, kern + ink_width) - left
+                ink = self._template_bits(
+                    ctx.mem,
+                    font.tf_CharData.val,
+                    location >> 16,
+                    font.tf_Modulo.val,
+                    ink_width,
+                    height,
+                )
+                pixels = bytearray(width * height)
+                for row in range(height):
+                    start = row * width + kern - left
+                    pixels[start : start + ink_width] = ink[
+                        row * ink_width : (row + 1) * ink_width
+                    ]
+                self._queue_template(
+                    ctx,
+                    rp,
+                    rp.cp_x.val + position + left,
+                    rp.cp_y.val - font.tf_Baseline.val,
+                    width,
+                    height,
+                    bytes(pixels),
+                )
+            position += advance
+        return position
+
+    def BltTemplate(self, ctx):
+        rp = RastPortStruct(ctx.mem, ctx.cpu.r_reg(REG_A1))
+        width, height = ctx.cpu.r_reg(REG_D4) & 0xFFFF, ctx.cpu.r_reg(REG_D5) & 0xFFFF
+        if not width or not height:
+            return
+        pixels = self._template_bits(
+            ctx.mem,
+            ctx.cpu.r_reg(REG_A0),
+            ctx.cpu.r_reg(REG_D0) & 0xFFFF,
+            self._word(ctx.cpu.r_reg(REG_D1)),
+            width,
+            height,
+        )
+        self._queue_template(
+            ctx,
+            rp,
+            self._word(ctx.cpu.r_reg(REG_D2)),
+            self._word(ctx.cpu.r_reg(REG_D3)),
+            width,
+            height,
+            pixels,
+        )
+
+    def WaitBlit(self, ctx):
+        for backing in self.rp_graphics_map.values():
+            ctx.exec_lib.intuition_lib._flush_batch(backing)
 
     def Move(self, ctx):
         rastport_addr = ctx.cpu.r_reg(REG_A1)
@@ -626,6 +835,30 @@ class GraphicsLibrary(LibImpl):
 
         rp = RastPortStruct(ctx.mem, rastport_addr)
         rp.FgPen.set(pen)
+
+    def SetBPen(self, ctx):
+        rp = RastPortStruct(ctx.mem, ctx.cpu.r_reg(REG_A1))
+        rp.BgPen.val = ((ctx.cpu.r_reg(REG_D0) + 128) & 255) - 128
+
+    def SetRGB4(self, ctx):
+        import sdl2
+
+        palette = self.screen_palettes.get(ctx.cpu.r_reg(REG_A0))
+        if palette is None:
+            return
+        index = ctx.cpu.r_reg(REG_D0) & 0xFFFF
+        if index >= len(palette):
+            return
+        palette[index] = sdl2.SDL_Color(
+            (ctx.cpu.r_reg(REG_D1) & 15) * 17,
+            (ctx.cpu.r_reg(REG_D2) & 15) * 17,
+            (ctx.cpu.r_reg(REG_D3) & 15) * 17,
+            255,
+        )
+        for rp_addr, backing in self.rp_graphics_map.items():
+            if getattr(backing, "palette", None) is palette:
+                backing.surface.dirty = True
+                self.invalidate(ctx, rp_addr)
 
     def SetDrMd(self, ctx):
         rastport_addr = ctx.cpu.r_reg(REG_A1)
@@ -1001,6 +1234,16 @@ class BFRectFill:
     color: "sdl2.SDL_Color"
     draw_mode: int
     state: object = None
+
+
+@dataclass
+class BFTemplate:
+    x: int
+    y: int
+    w: int
+    h: int
+    pixels: bytes
+    state: object
 
 
 @dataclass

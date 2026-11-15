@@ -10,6 +10,7 @@ from amitools.vamos.lib.GraphicsLibrary import GraphicsLibrary
 from amitools.vamos.lib.IntuitionLibrary import IntuitionLibrary
 from amitools.vamos.lib.graphics import RastPortStruct, TextAttrStruct
 from amitools.vamos.lib.intuition import TextFontStruct
+from amitools.vamos.lib.graphics_font import FontStrike
 from amitools.vamos.machine import (
     Machine,
     Runtime,
@@ -54,6 +55,17 @@ class Context:
             TTF_GetError=lambda: b"missing font",
         )
         monkeypatch.setitem(sys.modules, "sdl2", SimpleNamespace(sdlttf=self.ttf))
+        # These tests inject SDL lifetime failures; bundled bitmap fonts are
+        # covered separately by the native and guest-font tests.
+        monkeypatch.setattr(
+            "amitools.vamos.lib.GraphicsLibrary.load_topaz_font", lambda: None
+        )
+        monkeypatch.setattr(
+            "amitools.vamos.lib.GraphicsLibrary.read_font_strike",
+            lambda font, height: FontStrike(
+                [0] * 225, [height // 2] * 225, [0] * 225, 2, bytes(2 * height)
+            ),
+        )
         self.graphics = GraphicsLibrary()
         self.graphics.alloc = self.alloc
         self.graphics.fontsPath = "/fonts"
@@ -361,6 +373,8 @@ def graphics_queued_text_keeps_closed_host_font_alive_test(ctx):
 
     attr = ctx.attribute("custom.ttf", 10)
     addr = ctx.open_font(attr)
+    # Exercise the legacy host-rendered path without guest bitmap tables.
+    TextFontStruct(ctx.mem, addr).tf_CharData.val = 0
     old_handle = ctx.graphics.font_registry[addr]
     rp = RastPortStruct.alloc(ctx.alloc)
     text = ctx.alloc.alloc_cstr("Hi")
