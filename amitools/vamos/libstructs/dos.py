@@ -282,6 +282,36 @@ class FileInfoBlockStruct(AmigaStruct):
 
 
 @AmigaStructDef
+class ExAllControlStruct(AmigaStruct):
+    _format = [
+        (ULONG, "eac_Entries"),
+        (ULONG, "eac_LastKey"),
+        (APTR_VOID, "eac_MatchString"),
+        (APTR_VOID, "eac_MatchFunc"),
+    ]
+
+
+@AmigaStructDef
+class ExAllDataStruct(AmigaStruct):
+    """largest (ED_OWNER) layout; ExAll() fills only the fields up to the
+    requested type and stores that many bytes per entry"""
+
+    _format = [
+        (APTR_SELF, "ed_Next"),
+        (CSTR, "ed_Name"),
+        (LONG, "ed_Type"),
+        (ULONG, "ed_Size"),
+        (ULONG, "ed_Prot"),
+        (ULONG, "ed_Days"),
+        (ULONG, "ed_Mins"),
+        (ULONG, "ed_Ticks"),
+        (CSTR, "ed_Comment"),
+        (UWORD, "ed_OwnerUID"),
+        (UWORD, "ed_OwnerGID"),
+    ]
+
+
+@AmigaStructDef
 class DosPacketStruct(AmigaStruct):
     _format = [
         (APTR(MessageStruct), "dp_Link"),

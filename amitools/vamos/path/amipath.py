@@ -1,3 +1,22 @@
+def collapse_parent_steps(names):
+    """AmigaDOS spells a parent step as an empty path component: 'a//b' is
+    b in the parent of a, 'a///b' two levels up. A trailing slash ('a/')
+    names a itself. Return the collapsed list of names, or None if a step
+    climbs above the start of the list."""
+    result = []
+    last = len(names) - 1
+    for i, name in enumerate(names):
+        if name != "":
+            result.append(name)
+        elif i == last:
+            pass
+        elif result:
+            result.pop()
+        else:
+            return None
+    return result
+
+
 class AmiPathError(Exception):
     def __init__(self, path, reason):
         self.path = path
@@ -32,7 +51,7 @@ class AmiPath(object):
     prefix: all but '/:', may be empty
     name: all but '/:', non-empty
 
-    ':/', '//' is invalid
+    ':/' is invalid; an empty name ('a//b') is the AmigaDOS parent step
     """
 
     def __init__(self, pstr=""):
@@ -162,6 +181,20 @@ class AmiPath(object):
         else:
             return True
 
+    def collapse_parent_steps(self):
+        """return the path with the AmigaDOS parent steps ('a//b') of an
+        absolute path collapsed, or self if it has none. A step above the
+        volume root is left alone for the file system to reject."""
+        if not self.is_absolute():
+            return self
+        post = self.postfix(skip_trailing=False)
+        if "//" not in post:
+            return self
+        names = collapse_parent_steps(post.split("/"))
+        if names is None:
+            return self
+        return self.rebuild(self.prefix(), "/".join(names))
+
     def is_syntax_valid(self):
         """check if a path has valid syntax.
 
@@ -171,9 +204,6 @@ class AmiPath(object):
         s = self.pstr
         if s in (":", "", "/"):
             return True
-        # invalid cases
-        if s.find("//") != -1:
-            return False
         # colon/slash check
         colon_pos = self.pstr.find(":")
         slash_pos = self.pstr.find("/")
@@ -310,7 +340,8 @@ class AmiPath(object):
             if my is not None:
                 prefix = self.prefix()
                 my_post = my.postfix()
-                o_post = opath.postfix(True)
+                # keep trailing slashes: 'a//' is the parent of a
+                o_post = opath.postfix(True, skip_trailing=False)
                 if my_post == "":
                     postfix = o_post
                 elif my_post == ":":
@@ -329,13 +360,14 @@ class AmiPath(object):
         elif opath.is_prefix_local():
             prefix = self.prefix()
             skip = False if prefix is None else True
-            postfix = opath.postfix(skip)
+            postfix = opath.postfix(skip, skip_trailing=False)
             return self.rebuild(prefix, postfix)
         # other is local
         else:
             prefix = self.prefix()
             my_post = self.postfix()
-            o_post = opath.postfix()
+            # keep trailing slashes: 'a//' is the parent of a
+            o_post = opath.postfix(skip_trailing=False)
             if my_post == "":
                 postfix = o_post
             elif my_post in ("/", ":"):
