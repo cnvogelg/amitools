@@ -10,7 +10,7 @@ from .trace import TraceManager
 from .libmgr import SetupLibManager
 from .schedule import Scheduler
 from .profiler import MainProfiler
-from .mode import ModeContext, ModeSetup
+from .mode import ModeContext, ModeSetup, ProcArgs
 from .disk import DiskSession
 
 RET_CODE_CONFIG_ERROR = 1000
@@ -164,7 +164,10 @@ def main(
         proc_cfg = mp.get_proc_dict().process
         exec_ctx = slm.exec_ctx
         dos_ctx = slm.dos_ctx
-        mode_ctx = ModeContext(proc_cfg, exec_ctx, dos_ctx, scheduler, default_runtime)
+        proc_args = ProcArgs(path_mgr.get_host_file_system(), path_mgr.from_sys_path)
+        mode_ctx = ModeContext(
+            proc_cfg, exec_ctx, dos_ctx, scheduler, default_runtime, proc_args
+        )
 
         # select mode via ModeSetup
         if mode is None:
