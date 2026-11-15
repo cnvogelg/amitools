@@ -192,6 +192,16 @@ Exception names accepted by ``--hw-exception`` are ``bus``, ``address``,
 ``illegal``, ``zero_div``, ``chk``, ``trapv``, ``priv``, ``trace``, ``line_a``,
 ``line_f``, ``irqs``, and ``traps``.
 
+SDL display
+-----------
+
+* ``--display-scale N`` or ``--display-scale XxY``: Scale host windows by
+  integer factors from 1 to 8 (default: 1). Guest dimensions are unchanged.
+* ``--display-aspect square`` or ``--display-aspect 4:3``: Use independent
+  axis scales, or present the entire window at 4:3 using its scaled width.
+  The default is ``square``. For example:
+  ``vamos --display-scale 2 --display-aspect 4:3 myprog``.
+
 Disks, libraries, and devices
 -----------------------------
 

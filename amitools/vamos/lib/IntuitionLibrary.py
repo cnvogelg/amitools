@@ -1,7 +1,9 @@
 import ctypes
 from contextlib import ExitStack
-from amitools.vamos.libtypes import TagList, MsgPort, Message
-from amitools.vamos.lib.GraphicsLibrary import BFText, BFDraw
+from amitools.vamos.libtypes import TagList, MsgPort, Message, List, Node
+from amitools.vamos.lib.GraphicsLibrary import BFText, BFDraw, BFTemplate
+from amitools.vamos.lib.graphics_font import render_font_surface
+from amitools.vamos.lib.intuition_input import translate_key
 from amitools.vamos.libcore.impl import LibImpl
 from amitools.vamos.lib.TimerDevice import TimerDevice
 
@@ -17,6 +19,11 @@ from amitools.vamos.lib.intuition import (
     WA_Top,
     WA_Width,
     WA_Height,
+    WA_InnerWidth,
+    WA_InnerHeight,
+    WA_PubScreenName,
+    SA_Dummy,
+    PubScreenNodeStruct,
     WA_Title,
     WA_MinWidth,
     WA_MinHeight,
@@ -26,6 +33,7 @@ from amitools.vamos.lib.intuition import (
     IDCMP_MOUSEMOVE,
     IDCMP_MOUSEBUTTONS,
     IDCMP_RAWKEY,
+    IDCMP_VANILLAKEY,
     IDCMP_CLOSEWINDOW,
     IDCMP_NEWSIZE,
     IDCMP_REFRESHWINDOW,
@@ -51,7 +59,7 @@ from amitools.vamos.machine.regs import (
     REG_D4,
     REG_D5,
 )
-from amitools.vamos.libstructs.exec_ import MsgPortStruct, MessageStruct
+from amitools.vamos.libstructs.exec_ import MsgPortStruct, MessageStruct, ListStruct
 
 SDL_USEREVENT_TIMER = 32768 + 11
 
@@ -84,9 +92,7 @@ class IntuitionLibrary(LibImpl):
         # default init stuff
         self._easy_last = None
         self.alloc = None
-        self.sdl_window_id_2_window_addr_map = (
-            {}
-        )  # SDL_Window id -> Amiga window address
+        self.sdl_window_id_2_window_addr_map = {}  # SDL_Window id -> Amiga window address
         self.sdl_window_id_2_sdl_window = {}
         self.sdl_window_id_2_timer = {}
         self.menu_active = False
@@ -108,10 +114,17 @@ class IntuitionLibrary(LibImpl):
 
         self.rp_2_win_addr = {}
         self.refresh_pending = set()
+        self.display_scale = (1, 1)
+        self.display_aspect = "square"
+        self._window_scales = {}
+        self._pub_list_memory = None
+        self._pub_screen_locks = 0
 
     def setup_lib(self, ctx, base_addr):
         # log_dos.info("setup intuition.library")
         self.alloc = ctx.alloc
+        self.display_scale = getattr(ctx, "display_scale", (1, 1))
+        self.display_aspect = getattr(ctx, "display_aspect", "square")
 
         # Register with ExecLibrary
         ctx.exec_lib.intuition_lib = self
@@ -154,8 +167,8 @@ class IntuitionLibrary(LibImpl):
             ctx.mem.w_cstr(title.addr, "Workbench")
             screen = self.create_screen(
                 ctx,
-                800,
-                600,
+                640,
+                256,
                 3,
                 graphics.text_attr.addr,
                 title.addr,
@@ -197,6 +210,10 @@ class IntuitionLibrary(LibImpl):
                 cleanup.callback(sdl2.SDL_QuitSubSystem, flags)
                 cleanup.callback(ctx.lib_mgr.close_lib, graphics_addr)
                 cleanup.callback(ctx.alloc.free_memory, title)
+                if self._pub_list_memory is not None:
+                    cleanup.callback(ctx.alloc.free_memory, self._pub_list_memory)
+                    self._pub_list_memory = None
+                self._pub_screen_locks = 0
                 for screen in screens:
                     cleanup.callback(self._free_screen, ctx, screen)
                 for window in tuple(self.sdl_window_id_2_window_addr_map.values()):
@@ -287,6 +304,7 @@ class IntuitionLibrary(LibImpl):
         sdl_win = self.sdl_window_id_2_sdl_window.pop(window_id, None)
         timer_id = self.sdl_window_id_2_timer.pop(window_id, 0)
         self.sdl_window_id_2_window_addr_map.pop(window_id, None)
+        self._window_scales.pop(window_id, None)
         self.refresh_pending.discard(window_ptr)
         self.rp_2_win_addr.pop(rastport_addr, None)
 
@@ -425,12 +443,17 @@ class IntuitionLibrary(LibImpl):
                 left = data
             elif tag == WA_Top:
                 top = data
-            elif tag == WA_Width:
+            elif tag in (WA_Width, WA_InnerWidth):
                 width = data
-            elif tag == WA_Height:
+            elif tag in (WA_Height, WA_InnerHeight):
                 height = data
             elif tag == WA_Title:
                 title = ctx.mem.r_cstr(data) if data else ""
+            elif tag == WA_PubScreenName:
+                if data and ctx.mem.r_cstr(data) != "Workbench":
+                    ctx.cpu.w_reg(REG_D0, 0)
+                    return
+                screen = self.default_screen.addr
             elif tag == WA_MinWidth:
                 min_width = data
             elif tag == WA_MinHeight:
@@ -542,6 +565,76 @@ class IntuitionLibrary(LibImpl):
 
         ctx.cpu.w_reg(REG_D0, screen.addr)
         log_intui.info(f"OpenScreen: created and linked screen at 0x{screen.addr:X}")
+
+    def OpenScreenTagList(self, ctx):
+        if self.default_screen is None:
+            return 0
+        ptr = ctx.cpu.r_reg(REG_A0)
+        values = dict(Width=640, Height=256, Depth=3, Font=0,
+                      DefaultTitle=0, DetailPen=1, BlockPen=0)
+        if ptr:
+            ns = NewScreenStruct(ctx.mem, ptr)
+            values.update((name, getattr(ns, name).val) for name in values)
+        fields = {3: "Width", 4: "Height", 5: "Depth", 6: "DetailPen",
+                  7: "BlockPen", 8: "DefaultTitle", 11: "Font"}
+        for item in TagList(ctx.mem, ctx.cpu.r_reg(REG_A1)):
+            field = fields.get(item.get_tag() - SA_Dummy)
+            if field is not None:
+                values[field] = item.get_data()
+        screen = self.create_screen(
+            ctx, values["Width"], values["Height"], values["Depth"],
+            values["Font"], values["DefaultTitle"],
+            values["DetailPen"], values["BlockPen"]
+        )
+        if screen is None:
+            return 0
+        screen.NextScreen.val = self.default_screen.NextScreen.val
+        self.default_screen.NextScreen.val = screen.addr
+        return screen.addr
+
+    def GetDefaultPubScreen(self, ctx):
+        buffer = ctx.cpu.r_reg(REG_A0)
+        if buffer:
+            ctx.mem.w_cstr(buffer, "Workbench" if self.default_screen else "")
+
+    def LockPubScreen(self, ctx):
+        name = ctx.cpu.r_reg(REG_A0)
+        if self.default_screen is None or (name and ctx.mem.r_cstr(name) != "Workbench"):
+            return 0
+        self._pub_screen_locks += 1
+        return self.default_screen.addr
+
+    def UnlockPubScreen(self, ctx):
+        # The library owns the default screen for its entire open lifetime.
+        if self._pub_screen_locks:
+            self._pub_screen_locks -= 1
+
+    def LockPubScreenList(self, ctx):
+        if self.default_screen is None:
+            return 0
+        if self._pub_list_memory is None:
+            memory = ctx.alloc.alloc_memory(
+                ListStruct.get_size() + PubScreenNodeStruct.get_size() + 10,
+                label="Intuition public screens", except_on_failure=False
+            )
+            if memory is None:
+                return 0
+            public = List(ctx.mem, memory.addr)
+            public.new(0)
+            node = PubScreenNodeStruct(ctx.mem, memory.addr + ListStruct.get_size())
+            name = node.addr + PubScreenNodeStruct.get_size()
+            ctx.mem.w_cstr(name, "Workbench")
+            node.psn_Node.ln_Name.aptr = name
+            node.psn_Screen.val = self.default_screen.addr
+            node.psn_Size.val = PubScreenNodeStruct.get_size() + 10
+            public.add_tail(Node(ctx.mem, node.addr))
+            self._pub_list_memory = memory
+        # Only the default screen is public; the list never changes while
+        # this library is open, so readers need no scheduler lock.
+        return self._pub_list_memory.addr
+
+    def UnlockPubScreenList(self, ctx):
+        pass
 
     def CloseScreen(self, ctx):
         target = ctx.cpu.r_reg(REG_A0)
@@ -687,12 +780,13 @@ class IntuitionLibrary(LibImpl):
             height,
         )
         # Create SDL2 window
+        host_width, host_height = self._display_size(width, height)
         sdl_win = sdl2.SDL_CreateWindow(
             title.encode("utf-8"),
             sdl2.SDL_WINDOWPOS_CENTERED,  # SDL2 doesn't support exact positioning cross-platform
             sdl2.SDL_WINDOWPOS_CENTERED,
-            width,
-            height,
+            host_width,
+            host_height,
             flags,
         )
 
@@ -741,6 +835,11 @@ class IntuitionLibrary(LibImpl):
                 return 0
             rollback.callback(self.graphics_lib.free_RastPortStruct, ctx, rp_addr)
             win.RPort.val, win.WLayer.val = rp_addr, layer_addr
+            backing = self.graphics_lib.rp_graphics_map.get(rp_addr)
+            if backing is not None:
+                backing.palette = self.graphics_lib.screen_palettes.get(
+                    screen.ViewPort.addr, self.graphics_lib.palette
+                )
             window_id = sdl2.SDL_GetWindowID(sdl_win)
             timer_id = sdl2.SDL_AddTimer(
                 50, intuiticks_timer_callback, ctypes.c_void_p(window_id)
@@ -758,6 +857,7 @@ class IntuitionLibrary(LibImpl):
             self.sdl_window_id_2_window_addr_map[window_id] = win.addr
             self.sdl_window_id_2_sdl_window[window_id] = sdl_win
             self.sdl_window_id_2_timer[window_id] = timer_id
+            self._window_scales[window_id] = (host_width / width, host_height / height)
             rollback.pop_all()
         return win.addr
 
@@ -792,10 +892,16 @@ class IntuitionLibrary(LibImpl):
         )
 
         # Clip src_rect to texture bounds
+        scale_x, scale_y = self._window_scales.get(window_id, self.display_scale)
         src_rect = sdl2.SDL_Rect(
-            0, 0, min(win_w.value, tex_w.value), min(win_h.value, tex_h.value)
+            0,
+            0,
+            min(int(win_w.value / scale_x), tex_w.value),
+            min(int(win_h.value / scale_y), tex_h.value),
         )
-        dst_rect = sdl2.SDL_Rect(0, 0, src_rect.w, src_rect.h)
+        dst_rect = sdl2.SDL_Rect(
+            0, 0, round(src_rect.w * scale_x), round(src_rect.h * scale_y)
+        )
 
         # Render cropped texture
         renderer = rp_graphics.renderer
@@ -813,7 +919,11 @@ class IntuitionLibrary(LibImpl):
         if self.menu_active:
             menu_addr = window.MenuStrip.get()
             if menu_addr:
-                self.draw_menu(ctx, renderer, menu_addr, mouse_x, mouse_y)
+                sdl2.SDL_RenderSetScale(renderer, scale_x, scale_y)
+                try:
+                    self.draw_menu(ctx, renderer, menu_addr, mouse_x, mouse_y)
+                finally:
+                    sdl2.SDL_RenderSetScale(renderer, 1, 1)
 
         # # Fill with a random color each time
         # r = random.randint(0, 255)
@@ -831,6 +941,19 @@ class IntuitionLibrary(LibImpl):
             return (idx[0] & 0x1F) | ((idx[1] << 5) & 0x3F) | (idx[2] << 11)
         return idx[0] & 0x1F
 
+    def _display_size(self, width, height):
+        host_width = width * self.display_scale[0]
+        host_height = (
+            round(host_width * 3 / 4)
+            if self.display_aspect == "4:3"
+            else height * self.display_scale[1]
+        )
+        return host_width, host_height
+
+    def _guest_mouse(self, x, y, window_id=None):
+        scale = self._window_scales.get(window_id, self.display_scale)
+        return int(x // scale[0]), int(y // scale[1])
+
     def ingest_sdl_event(self, ctx, event):
         import sdl2
 
@@ -847,7 +970,7 @@ class IntuitionLibrary(LibImpl):
 
         # ---------- MOUSE MOTION ----------
         if event.type == sdl2.SDL_MOUSEMOTION:
-            mx, my = event.motion.x, event.motion.y
+            mx, my = self._guest_mouse(event.motion.x, event.motion.y, window_id)
 
             # Menu hover redraw
             if self.menu_active:
@@ -858,7 +981,7 @@ class IntuitionLibrary(LibImpl):
 
         # ---------- MOUSE BUTTON DOWN ----------
         elif event.type == sdl2.SDL_MOUSEBUTTONDOWN:
-            mx, my = event.button.x, event.button.y
+            mx, my = self._guest_mouse(event.button.x, event.button.y, window_id)
             btn = event.button.button
 
             # IECODE mapping
@@ -886,7 +1009,7 @@ class IntuitionLibrary(LibImpl):
 
         # ---------- MOUSE BUTTON UP ----------
         elif event.type == sdl2.SDL_MOUSEBUTTONUP:
-            mx, my = event.button.x, event.button.y
+            mx, my = self._guest_mouse(event.button.x, event.button.y, window_id)
             btn = event.button.button
 
             # IECODE mapping
@@ -941,18 +1064,35 @@ class IntuitionLibrary(LibImpl):
                 win_addr, IDCMP_MOUSEBUTTONS, mx, my, code, window_id
             )
 
-        # ---------- KEY DOWN ----------
-        elif event.type == sdl2.SDL_KEYDOWN:
-            keycode = event.key.keysym.sym
-            return PendingIntuiEvent(win_addr, IDCMP_RAWKEY, 0, 0, keycode, window_id)
+        # ---------- KEYBOARD ----------
+        elif event.type in (sdl2.SDL_KEYDOWN, sdl2.SDL_KEYUP):
+            win = WindowStruct(ctx.mem, win_addr)
+            key = translate_key(
+                event.key.keysym,
+                released=event.type == sdl2.SDL_KEYUP,
+                repeat=bool(event.key.repeat),
+                vanilla=bool(win.IDCMPFlags.val & IDCMP_VANILLAKEY),
+            )
+            if key is not None:
+                vanilla, code, qualifier = key
+                return PendingIntuiEvent(
+                    win_addr,
+                    IDCMP_VANILLAKEY if vanilla else IDCMP_RAWKEY,
+                    win.MouseX.val,
+                    win.MouseY.val,
+                    code,
+                    window_id,
+                    qualifier,
+                )
 
         # ---------- WINDOW EVENTS ----------
         elif event.type == sdl2.SDL_WINDOWEVENT:
             we = event.window.event
 
             if we == sdl2.SDL_WINDOWEVENT_RESIZED:
-                new_w = event.window.data1
-                new_h = event.window.data2
+                scale = self._window_scales.get(window_id, self.display_scale)
+                new_w = max(1, int(event.window.data1 / scale[0]))
+                new_h = max(1, int(event.window.data2 / scale[1]))
 
                 win = WindowStruct(ctx.mem, win_addr)
                 win.Width.set(new_w)
@@ -979,12 +1119,18 @@ class IntuitionLibrary(LibImpl):
     def drain_pending_intui_events(self, ctx, e):
         if self.sdl_window_id_2_window_addr_map.get(e.window_id) != e.win_addr:
             return
-        self.queue_idcmp(ctx, e.win_addr, e.idcmp_flag, e.mouse_x, e.mouse_y, e.code)
+        self.queue_idcmp(
+            ctx, e.win_addr, e.idcmp_flag, e.mouse_x, e.mouse_y, e.code, e.qualifier
+        )
 
-    def queue_idcmp(self, ctx, win_addr, idcmp_flag, mouse_x=0, mouse_y=0, code=0):
+    def queue_idcmp(
+        self, ctx, win_addr, idcmp_flag, mouse_x=0, mouse_y=0, code=0, qualifier=0
+    ):
         if self.find_sdl_window_by_amiga_addr(win_addr) is None:
             return
         win = WindowStruct(ctx.mem, win_addr)
+        if idcmp_flag in (IDCMP_MOUSEMOVE, IDCMP_MOUSEBUTTONS):
+            win.MouseX.val, win.MouseY.val = mouse_x, mouse_y
 
         if (win.IDCMPFlags.get() & idcmp_flag) == 0:
             # if idcmp_flag != IDCMP_INTUITICKS:
@@ -1021,8 +1167,8 @@ class IntuitionLibrary(LibImpl):
             owner = {"port": memory, "messages": {}, "closed": False}
             manager = ctx.exec_lib.msg_func.port_mgr
             manager.register_port(memory.addr)
-            manager.ports[memory.addr].handler = (
-                lambda manager, addr: self._reply_idcmp(ctx, owner, addr)
+            manager.ports[memory.addr].handler = lambda manager, addr: (
+                self._reply_idcmp(ctx, owner, addr)
             )
             self._idcmp_owners[win_addr] = owner
             self._reply_owners[memory.addr] = owner
@@ -1040,6 +1186,7 @@ class IntuitionLibrary(LibImpl):
         msg.Class.val = idcmp_flag
         msg.MouseX.val, msg.MouseY.val = mouse_x, mouse_y
         msg.Code.val = code & 0xFFFF
+        msg.Qualifier.val = qualifier
         msg.IDCMPWindow.val = win_addr
         owner["messages"][memory.addr] = (memory, user_port_addr)
         try:
@@ -1202,9 +1349,7 @@ class IntuitionLibrary(LibImpl):
 
         # Text
         if text:
-            text_surface = sdl2.sdlttf.TTF_RenderUTF8_Solid(
-                font, text.encode("utf-8"), text_color
-            )
+            text_surface = render_font_surface(font, text, text_color)
             if text_surface:
                 text_texture = sdl2.SDL_CreateTextureFromSurface(renderer, text_surface)
                 text_rect = sdl2.SDL_Rect(
@@ -1216,9 +1361,7 @@ class IntuitionLibrary(LibImpl):
 
         # Shortcut rechts
         if shortcut:
-            sc_surface = sdl2.sdlttf.TTF_RenderUTF8_Solid(
-                font, shortcut.encode("utf-8"), text_color
-            )
+            sc_surface = render_font_surface(font, shortcut, text_color)
             if sc_surface:
                 sc_texture = sdl2.SDL_CreateTextureFromSurface(renderer, sc_surface)
                 sc_rect = sdl2.SDL_Rect(
@@ -1486,10 +1629,13 @@ class IntuitionLibrary(LibImpl):
                 attr_memory,
                 name_memory,
             )
+            if graphics.palette is not None:
+                graphics.screen_palettes[screen.ViewPort.addr] = graphics.palette.copy()
             rollback.pop_all()
             return screen
 
     def _free_screen(self, ctx, screen):
+        self.graphics_lib.screen_palettes.pop(screen.ViewPort.addr, None)
         bm = screen.BitMap
         plane_size = bm.BytesPerRow.val * bm.Rows.val
         planes = [bm.Planes[i].val for i in range(bm.Depth.val)]
@@ -1582,6 +1728,17 @@ class IntuitionLibrary(LibImpl):
         )
 
     def check_refresh(self, ctx):
+        # Applications draw in response to input without Begin/EndRefresh.
+        # Present queued drawing once per scheduler pump, without generating
+        # another IDCMP_REFRESHWINDOW (which would ask the guest to redraw).
+        if self.graphics_lib is not None:
+            for rp_addr, backing in self.graphics_lib.rp_graphics_map.items():
+                if backing.batch.commands or getattr(
+                    getattr(backing, "surface", None), "dirty", False
+                ):
+                    win_addr = self.rp_2_win_addr.get(rp_addr)
+                    if win_addr is not None:
+                        self.refresh_pending.add(win_addr)
         for win_addr in self.refresh_pending:
             self._perform_refresh(ctx, win_addr)
 
@@ -1684,7 +1841,7 @@ class IntuitionLibrary(LibImpl):
     def _upload_surface(self, graphics):
         import sdl2
 
-        colors = self.graphics_lib.palette
+        colors = getattr(graphics, "palette", self.graphics_lib.palette)
         values = [
             (color.r << 24) | (color.g << 16) | (color.b << 8) | 255
             for color in (colors[i] for i in range(256))
@@ -1707,6 +1864,10 @@ class IntuitionLibrary(LibImpl):
         surface, state = graphics.surface, command.state
         if isinstance(command, BFDraw):
             surface.line(state, command.x1, command.y1, command.x2, command.y2, clip)
+        elif isinstance(command, BFTemplate):
+            surface.template(
+                state, command.x, command.y, command.w, command.h, command.pixels, clip
+            )
         elif not isinstance(command, BFText):
             surface.fill(state, command.x, command.y, command.w, command.h, clip)
         else:
@@ -1856,12 +2017,23 @@ def intuiticks_timer_callback(interval, param):
 
 
 class PendingIntuiEvent:
-    __slots__ = ("win_addr", "idcmp_flag", "mouse_x", "mouse_y", "code", "window_id")
+    __slots__ = (
+        "win_addr",
+        "idcmp_flag",
+        "mouse_x",
+        "mouse_y",
+        "code",
+        "window_id",
+        "qualifier",
+    )
 
-    def __init__(self, win_addr, idcmp_flag, mouse_x, mouse_y, code, window_id):
+    def __init__(
+        self, win_addr, idcmp_flag, mouse_x, mouse_y, code, window_id, qualifier=0
+    ):
         self.win_addr = win_addr
         self.idcmp_flag = idcmp_flag
         self.mouse_x = mouse_x
         self.mouse_y = mouse_y
         self.code = code
         self.window_id = window_id
+        self.qualifier = qualifier

@@ -2,7 +2,7 @@ from amitools.vamos.astructs.astruct import AmigaStruct
 from amitools.vamos.astructs.astructdef import AmigaStructDef
 from amitools.vamos.astructs.scalar import ULONG, WORD, UWORD, BYTE, UBYTE, LONG
 from amitools.vamos.astructs.string import CSTR
-from amitools.vamos.libstructs.exec_ import MessageStruct
+from amitools.vamos.libstructs.exec_ import MessageStruct, NodeStruct
 from amitools.vamos.lib.graphics import RastPortStruct, BitMapStruct, LayerInfoStruct, ViewPortStruct
 
 
@@ -28,6 +28,24 @@ WA_MinWidth    = WA_Dummy + 0x0F
 WA_MinHeight   = WA_Dummy + 0x10
 WA_MaxWidth    = WA_Dummy + 0x11
 WA_MaxHeight   = WA_Dummy + 0x12
+WA_InnerWidth = WA_Dummy + 0x13
+WA_InnerHeight = WA_Dummy + 0x14
+WA_PubScreenName = WA_Dummy + 0x15
+
+SA_Dummy = 0x80000020
+
+
+@AmigaStructDef
+class PubScreenNodeStruct(AmigaStruct):
+    _format = [
+        (NodeStruct, "psn_Node"),
+        (ULONG, "psn_Screen"),
+        (UWORD, "psn_Flags"),
+        (WORD, "psn_Size"),
+        (WORD, "psn_VisitorCount"),
+        (ULONG, "psn_SigTask"),
+        (UBYTE, "psn_SigBit"),
+    ]
 
 @AmigaStructDef
 class NewWindowStruct(AmigaStruct):

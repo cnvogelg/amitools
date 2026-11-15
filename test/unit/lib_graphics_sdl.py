@@ -53,6 +53,44 @@ def graphics_native_sdl_window_and_render_test(monkeypatch):
         intuition = manager.lib_mgr.get_vlib_by_addr(library).get_impl()
         assert intuition._lib_opened
         graphics = intuition.graphics_lib
+        # Check the guest ABI directly, not only the Python field names.
+        from amitools.vamos.lib.intuition import PubScreenNodeStruct, SA_Dummy
+        from amitools.vamos.libtypes import List
+
+        gfx_base = graphics.gfx_base
+        assert gfx_base.get_size() == 552
+        assert ctx.mem.r16(gfx_base.addr + 206) == 4
+        assert ctx.mem.r16(gfx_base.addr + 216) == 256
+        assert ctx.mem.r32(gfx_base.addr + 154) == graphics.topaz_font
+        ctx.cpu.w_reg(REG_A0, block.addr)
+        intuition.GetDefaultPubScreen(ctx)
+        assert ctx.mem.r_cstr(block.addr) == "Workbench"
+        assert intuition.LockPubScreen(ctx) == intuition.default_screen.addr
+        intuition.UnlockPubScreen(ctx)
+        public = List(ctx.mem, intuition.LockPubScreenList(ctx))
+        nodes = list(public)
+        assert len(nodes) == 1
+        node = PubScreenNodeStruct(ctx.mem, nodes[0].addr)
+        assert node.psn_Screen.val == intuition.default_screen.addr
+        assert ctx.mem.r_cstr(node.psn_Node.ln_Name.aptr) == "Workbench"
+        assert intuition.default_screen.Width.val == 640
+        assert intuition.default_screen.Height.val == 256
+        for index, (tag, data) in enumerate(
+            [(SA_Dummy + 3, 128), (SA_Dummy + 4, 64), (0, 0)]
+        ):
+            ctx.mem.w32(block.addr + 8 * index, tag)
+            ctx.mem.w32(block.addr + 8 * index + 4, data)
+        ctx.cpu.w_reg(REG_A0, 0)
+        ctx.cpu.w_reg(REG_A1, block.addr)
+        screen = intuition.OpenScreenTagList(ctx)
+        assert screen
+        from amitools.vamos.lib.intuition import ScreenStruct
+
+        assert ScreenStruct(ctx.mem, screen).Width.val == 128
+        assert ScreenStruct(ctx.mem, screen).Height.val == 64
+        ctx.cpu.w_reg(REG_A0, screen)
+        intuition.CloseScreen(ctx)
+        assert ctx.cpu.r_reg(REG_D0) == 1
         for index, (tag, data) in enumerate([(WA_Width, 64), (WA_Height, 32), (0, 0)]):
             ctx.mem.w32(block.addr + 8 * index, tag)
             ctx.mem.w32(block.addr + 8 * index + 4, data)
@@ -93,9 +131,16 @@ def graphics_native_sdl_window_and_render_test(monkeypatch):
         ctx.cpu.w_reg(REG_A0, block.addr)
         ctx.cpu.w_reg(REG_D0, 2)
         graphics.Text(ctx)
-        assert backing.batch.texts[0].string == "Hi"
+        from amitools.vamos.lib.GraphicsLibrary import BFTemplate
+
+        assert (
+            len([cmd for cmd in backing.batch.commands if isinstance(cmd, BFTemplate)])
+            == 2
+        )
         assert rp.cp_y.val == 5 and rp.cp_x.val > 10
-        intuition._flush_batch(backing)
+        intuition.refresh_pending.clear()
+        intuition.check_refresh(ctx)
+        assert not backing.batch.commands
         pixels = (ctypes.c_uint32 * (64 * 32))()
         assert sdl2.SDL_SetRenderTarget(backing.renderer, backing.texture) == 0
         try:
@@ -208,6 +253,129 @@ def graphics_native_sdl_window_and_render_test(monkeypatch):
                 assert all(pixel == 0xA8A8A8FF for pixel in pixels)
             else:
                 assert pixels[(6 - dy) * 64 + 6 - dx] == 0xFFFFFFFF
+        # Palette changes recolor pixels already drawn, without modifying
+        # their pen indices or the defaults used by another screen.
+        from amitools.vamos.lib.intuition import ScreenStruct
+
+        screen = ScreenStruct(ctx.mem, WindowStruct(ctx.mem, window).WScreen.val)
+        ctx.cpu.w_reg(REG_A0, screen.ViewPort.addr)
+        for reg, value in ((REG_D0, 2), (REG_D1, 0), (REG_D2, 6), (REG_D3, 8)):
+            ctx.cpu.w_reg(reg, value)
+        graphics.SetRGB4(ctx)
+        assert backing.surface.dirty
+        assert graphics.palette[2].r == 255
+        intuition._flush_batch(backing)
+        sdl2.SDL_SetRenderTarget(backing.renderer, backing.texture)
+        try:
+            assert (
+                sdl2.SDL_RenderReadPixels(
+                    backing.renderer,
+                    None,
+                    sdl2.SDL_PIXELFORMAT_RGBA8888,
+                    pixels,
+                    64 * 4,
+                )
+                == 0
+            )
+        finally:
+            sdl2.SDL_SetRenderTarget(backing.renderer, None)
+        assert backing.surface.pixels[6 * 64 + 6] == 2
+        assert pixels[6 * 64 + 6] == 0x006688FF
+        # Translate real SDL event structures, then verify the messages
+        # exposed through Exec's public port API, including ReplyMsg cleanup.
+        from amitools.vamos.lib.intuition import (
+            IDCMP_MOUSEBUTTONS,
+            IDCMP_RAWKEY,
+            IDCMP_VANILLAKEY,
+            IntuiMessageStruct,
+        )
+        from amitools.vamos.libtypes import MsgPort
+
+        ctx.cpu.w_reg(REG_A0, window)
+        ctx.cpu.w_reg(REG_D0, IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY | IDCMP_VANILLAKEY)
+        intuition.ModifyIDCMP(ctx)
+        win = WindowStruct(ctx.mem, window)
+        port = MsgPort(ctx.mem, win.UserPort.val)
+        window_id = intuition.find_sdl_window_by_amiga_addr(window)
+        intuition._window_scales[window_id] = (2, 3.75)
+
+        def receive(event, expected):
+            pending = intuition.ingest_sdl_event(ctx, event)
+            if expected is None:
+                assert pending is None
+                return
+            intuition.drain_pending_intui_events(ctx, pending)
+            message = ctx.exec_lib.msg_func.get_msg(port)
+            assert message is not None
+            result = IntuiMessageStruct(ctx.mem, message.addr)
+            assert (
+                result.Class.val,
+                result.Code.val,
+                result.Qualifier.val,
+                result.MouseX.val,
+                result.MouseY.val,
+            ) == expected
+            ctx.exec_lib.msg_func.reply_msg(message)
+            assert ctx.exec_lib.msg_func.get_msg(port) is None
+
+        event = sdl2.SDL_Event()
+        for event_type, button_code in (
+            (sdl2.SDL_MOUSEBUTTONDOWN, 0x68),
+            (sdl2.SDL_MOUSEBUTTONUP, 0xE8),
+        ):
+            event.type = event_type
+            event.button.windowID = window_id
+            event.button.button = sdl2.SDL_BUTTON_LEFT
+            event.button.x, event.button.y = 40, 45
+            receive(event, (IDCMP_MOUSEBUTTONS, button_code, 0, 20, 12))
+        assert (win.MouseX.val, win.MouseY.val) == (20, 12)
+        for sym, scan, mod, repeat, down, expected in [
+            (
+                sdl2.SDLK_m,
+                sdl2.SDL_SCANCODE_M,
+                0,
+                0,
+                True,
+                (IDCMP_VANILLAKEY, ord("m"), 0, 20, 12),
+            ),
+            (
+                sdl2.SDLK_m,
+                sdl2.SDL_SCANCODE_M,
+                sdl2.KMOD_LSHIFT,
+                1,
+                True,
+                (IDCMP_VANILLAKEY, ord("M"), 0x201, 20, 12),
+            ),
+            (sdl2.SDLK_m, sdl2.SDL_SCANCODE_M, 0, 0, False, None),
+            (
+                sdl2.SDLK_DOWN,
+                sdl2.SDL_SCANCODE_DOWN,
+                0,
+                0,
+                True,
+                (IDCMP_RAWKEY, 0x4D, 0, 20, 12),
+            ),
+            (
+                sdl2.SDLK_DOWN,
+                sdl2.SDL_SCANCODE_DOWN,
+                0,
+                0,
+                False,
+                (IDCMP_RAWKEY, 0xCD, 0, 20, 12),
+            ),
+        ]:
+            event.type = sdl2.SDL_KEYDOWN if down else sdl2.SDL_KEYUP
+            event.key.windowID = window_id
+            event.key.keysym.sym, event.key.keysym.scancode = sym, scan
+            event.key.keysym.mod, event.key.repeat = mod, repeat
+            receive(event, expected)
+        win.IDCMPFlags.val = IDCMP_RAWKEY
+        event.type = sdl2.SDL_KEYDOWN
+        event.key.keysym.sym, event.key.keysym.scancode = (
+            sdl2.SDLK_m,
+            sdl2.SDL_SCANCODE_M,
+        )
+        receive(event, (IDCMP_RAWKEY, 0x37, 0, 20, 12))
         ctx.cpu.w_reg(REG_A0, window)
         intuition.CloseWindow(ctx)
         window = 0

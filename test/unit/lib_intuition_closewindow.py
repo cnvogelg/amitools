@@ -57,6 +57,7 @@ class WindowContext:
             SDL_MOUSEBUTTONDOWN=2,
             SDL_MOUSEBUTTONUP=3,
             SDL_KEYDOWN=4,
+            SDL_KEYUP=7,
             SDL_QUIT=5,
             SDL_WINDOWEVENT=6,
             SDL_WINDOWEVENT_RESIZED=10,

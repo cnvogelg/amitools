@@ -745,10 +745,30 @@ SDL2 and SDL2_ttf must also be available as native libraries. PySDL2's
 system library search path. Without these optional libraries, Intuition's
 nonvisual functions remain available in headless mode.
 
-The bundled fallback is Cousine, a monospaced TrueType font under the SIL
-Open Font License. Its license and source reference are included alongside
-the font. ``topaz.font`` selects this fallback; it uses Cousine glyphs.
-Other TrueType fonts can be loaded from the configured ``FONTS:`` path.
+The plain 8-pixel ``topaz.font`` uses an MIT-licensed bitmap derived from
+Alex Limi's TopazDouble Sans recreation. The original diskfont, license,
+source reference and reproducible conversion script are bundled with the
+8-pixel strike. This is a recreation, not a Commodore ROM font. Other
+sizes and styles use Cousine under the SIL Open Font License. Other
+TrueType fonts can be loaded from the configured ``FONTS:`` path.
+
+Fonts expose guest-readable ``tf_CharLoc``, ``tf_CharData``, ``tf_CharSpace``
+and ``tf_CharKern`` tables. Text rendering also accepts application-owned
+copies of these structures. ``BltTemplate`` supports programs which draw
+glyphs directly, and ``SetRGB4`` changes each screen's indexed palette.
+
+Use ``--display-scale 2`` for a larger window with square pixels. For a
+classic screen presented at a nominal 4:3 monitor aspect, use::
+
+    vamos --display-scale 2 --display-aspect 4:3 myprog
+
+A 640x256 screen then occupies 1280x960 host pixels. This sets the whole
+window's aspect, not exact CRT timings or overscan geometry. The guest
+resolution stays unchanged and mouse coordinates are translated back to
+guest pixels. ``--display-scale 1x2`` permits independent integer axis
+scales with the default ``--display-aspect square``; in 4:3 mode only the
+horizontal scale determines the window size. The corresponding INI
+settings are ``scale`` and ``aspect`` in a ``[display]`` section.
 
 API coverage is partial. This backend supports SDL windows and the
 implemented graphics vectors; applications requiring other vectors still

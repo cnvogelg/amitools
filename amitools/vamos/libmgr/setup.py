@@ -19,6 +19,8 @@ class SetupLibManager(object):
         path_mgr,
         lib_cfg=None,
         main_profiler=None,
+        display_scale=(1, 1),
+        display_aspect="square",
     ):
         self.machine = machine
         self.mem_map = mem_map
@@ -28,6 +30,8 @@ class SetupLibManager(object):
         self.alloc = mem_map.get_alloc()
         self.lib_mgr_cfg = lib_cfg
         self.main_profiler = main_profiler
+        self.display_scale = display_scale
+        self.display_aspect = display_aspect
         # state
         self.seg_loader = None
         self.exec_ctx = None
@@ -75,13 +79,15 @@ class SetupLibManager(object):
             self.scheduler,
             odg_base,
         )
+        self.exec_ctx.display_scale = self.display_scale
+        self.exec_ctx.display_aspect = self.display_aspect
         self.lib_mgr.add_ctx("exec.library", self.exec_ctx)
+        self.lib_mgr.add_ctx("bsdsocket.library", self.exec_ctx)
         self.lib_mgr.add_ctx("keymap.library", self.exec_ctx)
         self.lib_mgr.add_ctx("gadtools.library", self.exec_ctx)
         self.lib_mgr.add_ctx("layers.library", self.exec_ctx)
         self.lib_mgr.add_ctx("intuition.library", self.exec_ctx)
         self.lib_mgr.add_ctx("graphics.library", self.exec_ctx)
-        self.lib_mgr.add_ctx("bsdsocket.library", self.exec_ctx)
         self.lib_mgr.add_ctx("dos.library", self.dos_ctx)
         # add all vamos libs
         for name in vamos_libs:
