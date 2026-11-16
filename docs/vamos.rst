@@ -792,7 +792,7 @@ the user clip with refresh clipping. Layer-info locks are serialized no-ops;
 overlapping Amiga layers and general layer management remain unsupported.
 Masked bitmap copy/invert blits preserve transparent pixels and the destination
 write mask. Window resizing updates guest dimensions, bitmap planes and the SDL
-texture, and delivers size/refresh notifications. These graphics operations support category images and changing page sizes in
+texture, and delivers size/refresh notifications. These graphics operations
+support category images and changing page sizes in
 native toolkits. Native GUI libraries still need additional BOOPSI and OS
 services; this backend alone does not make ZunePrefs fully operational.
-
