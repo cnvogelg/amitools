@@ -632,9 +632,44 @@ def xdftool_file_ext_interleave_boundary_test(xdftool, xdf_img, tmpdir):
 # ----- defrag tests -----
 
 
-def _data_gaps(data):
-    """forward data jumps > 4 (ext interruptions are 2, holes are 3)."""
-    return sum(1 for i in range(len(data) - 1) if data[i + 1] - data[i] > 4)
+def _data_gaps(data, metadata=()):
+    """Count non-forward jumps and holes not occupied by known metadata."""
+    metadata = set(metadata)
+    return sum(
+        1
+        for previous, current in zip(data, data[1:])
+        if current <= previous
+        or any(block not in metadata for block in range(previous + 1, current))
+    )
+
+
+def _data_metadata(vol, node):
+    # The root and bitmap blocks stay in place when defrag recreates the
+    # volume. File-list blocks are deliberately interleaved with file data.
+    return (
+        {vol.root.blk_num}
+        | {block.blk_num for block in vol.bitmap.bitmap_blks}
+        | {block.blk_num for block in vol.bitmap.ext_blks}
+        | set(node.ext_blk_nums)
+    )
+
+
+@pytest.mark.parametrize(
+    "data, metadata, gaps",
+    [
+        ([], [], 0),
+        ([10], [], 0),
+        ([10, 11, 12], [], 0),
+        ([10, 12], [], 1),  # even a single unexplained block is a hole
+        ([10, 12], [11], 0),  # an interleaved file-list block
+        ([9759, 9766], range(9760, 9766), 0),  # root and five bitmap blocks
+        ([9759, 9767], range(9760, 9766), 1),  # metadata plus a real hole
+        ([12, 10], [], 1),  # backwards seeks are fragmentation too
+        ([10, 10], [], 1),  # repeated blocks cannot be a contiguous run
+    ],
+)
+def xdftool_defrag_data_gaps_test(data, metadata, gaps):
+    assert _data_gaps(data, metadata) == gaps
 
 
 def xdftool_defrag_test(xdftool, xdf_img, tmpdir):
@@ -678,6 +713,28 @@ def xdftool_defrag_test(xdftool, xdf_img, tmpdir):
 
 def xdftool_defrag_fragmented_test(xdftool, xdf_img, tmpdir):
     """defrag removes fragmentation from delete/write cycles."""
+    _check_defrag_fragmented(xdftool, xdf_img, tmpdir)
+
+
+@pytest.mark.parametrize("xdfs", ["10M"], indirect=True)
+@pytest.mark.parametrize("dos_format", ["DOS0", "DOS1"], indirect=True)
+def xdftool_defrag_metadata_gap_test(xdftool, xdf_img, tmpdir):
+    """Exercise multi-bitmap holes in the normal suite, not only --full-suite."""
+    _check_defrag_fragmented(xdftool, xdf_img, tmpdir)
+    blkdev, vol, node, _ = _open_file_node(xdf_img.file_name, "big")
+    try:
+        # Confirm this layout actually crosses a gap the old >4 heuristic
+        # misclassified, rather than passing without exercising the case.
+        assert any(
+            b - a > 4 for a, b in zip(node.data_blk_nums, node.data_blk_nums[1:])
+        )
+        assert len(vol.bitmap.bitmap_blks) > 1
+        assert _data_gaps(node.data_blk_nums, _data_metadata(vol, node)) == 0
+    finally:
+        blkdev.close()
+
+
+def _check_defrag_fragmented(xdftool, xdf_img, tmpdir):
     img = xdf_img.file_name
     factory = BlkDevFactory()
     blkdev = factory.open(img, read_only=True)
@@ -691,19 +748,19 @@ def xdftool_defrag_fragmented_test(xdftool, xdf_img, tmpdir):
     # big file must be split across the freed hole + elsewhere
     blkdev, vol, node, ppb = _open_file_node(img, "big")
     try:
-        assert _data_gaps(node.data_blk_nums) >= 1
+        assert _data_gaps(node.data_blk_nums, _data_metadata(vol, node)) >= 1
     finally:
         blkdev.close()
     out = xdftool(img, "defrag")
     assert any("3 nodes defragmented (3 files, 0 dirs)" in line for line in out)
-    # all data intact, no big gaps left, FLBs interleaved
+    # All data intact; only known metadata may interrupt each data run.
     assert xdftool(img, ("type", "f1"), raw_output=True) == d1
     assert xdftool(img, ("type", "f3"), raw_output=True) == d3
     assert xdftool(img, ("type", "big"), raw_output=True) == d_big
     for name in ("f1", "f3", "big"):
         blkdev, vol, node, ppb = _open_file_node(img, name)
         try:
-            assert _data_gaps(node.data_blk_nums) == 0
+            assert _data_gaps(node.data_blk_nums, _data_metadata(vol, node)) == 0
             _assert_interleaved(node, ppb)
         finally:
             blkdev.close()
