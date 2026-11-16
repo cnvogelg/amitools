@@ -170,6 +170,16 @@ A typical example:
 As you see, tilde is allowed as a synonym for your home directory for system
 paths. Also host environment variables can be expanded with a dollar sign.
 
+A volume definition can carry options after a question mark. The ``handler``
+option selects the handler that backs the volume. By default a volume uses the
+``hostfs`` handler, which maps it to the given host directory:
+
+    [volumes]
+    work=~/amiga/work?handler=hostfs
+
+Additional handler types (such as an in-memory ``ram`` volume, or the ``nil``
+and ``console`` devices) are planned and will use the same option.
+
 2.1.2 Assigns
 ^^^^^^^^^^^^^
 

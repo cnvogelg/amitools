@@ -66,6 +66,21 @@ def handler_mgr_resolve_test(tmp_path):
     assert mgr.resolve("nope:file") == []
 
 
+def handler_mgr_resolve_device_test(tmp_path):
+    pm, mgr, root, work = setup_mgr(tmp_path)
+    # a device name is a handler but neither a volume nor an assign, so the
+    # path manager does not resolve it and the manager falls back to a direct
+    # lookup by prefix
+    dev = HostFileSysHandler("nil", str(root))
+    mgr.register("nil", dev)
+    assert mgr.resolve("nil:") == [(dev, "")]
+    assert mgr.resolve("nil:sub/file") == [(dev, "sub/file")]
+    # the device name lookup is case-insensitive too
+    assert mgr.resolve("NIL:foo") == [(dev, "foo")]
+    # an unregistered prefix still yields no candidates
+    assert mgr.resolve("nope:file") == []
+
+
 def handler_mgr_dispatch_test(tmp_path):
     pm, mgr, root, work = setup_mgr(tmp_path)
     (work / "sub").mkdir()

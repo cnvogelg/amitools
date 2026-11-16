@@ -101,10 +101,28 @@ class HandlerManager:
             return None
         return handler, rel_path
 
+    def _device_candidate(self, ami_path):
+        """direct handler lookup for a bare device prefix
+
+        Device names like ``NIL:`` or ``CONSOLE:`` are handlers but neither a
+        volume nor an assign, so the path manager does not resolve them. Fall
+        back to a direct lookup by the prefix before the first colon.
+        """
+        path_str = str(ami_path)
+        pos = path_str.find(":")
+        if pos <= 0:
+            return None
+        handler = self.get_handler(path_str[:pos])
+        if handler is None:
+            return None
+        return handler, path_str[pos + 1 :]
+
     def resolve(self, ami_path, env=None, cwd=None):
         """resolve an Amiga path to a list of (handler, rel_path) candidates
 
         Multi assigns yield one candidate per resolved volume path, in order.
+        A bare device name that the path manager cannot resolve is looked up
+        directly in the handler registry.
         """
         env = self._env(env, cwd)
         vol_paths = self.path_mgr.volpaths(ami_path, env=env)
@@ -120,6 +138,10 @@ class HandlerManager:
                 continue
             seen.add(key)
             candidates.append((handler, rel_path))
+        if not candidates:
+            device = self._device_candidate(ami_path)
+            if device is not None:
+                candidates.append(device)
         return candidates
 
     def _dispatch(self, ami_path, func, env=None, cwd=None):

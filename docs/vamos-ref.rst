@@ -128,6 +128,11 @@ comma-separated values.
 
       vamos -V sys:$HOME/amiga/system -V work:$HOME/amiga/work myprog
 
+  A volume spec may carry options after ``?``, such as ``?create`` (create the
+  host directory) or ``?temp`` (use a temporary directory). The ``handler``
+  option selects the handler that backs the volume; the default is ``hostfs``,
+  a host directory: ``vamos -V work:/abs/path?handler=hostfs myprog``.
+
 * ``-a NAME:AMIGA-PATH``, ``--assign NAME:AMIGA-PATH``: Define an Amiga
   assign. Use ``+`` to add paths to a multi-assign::
 
