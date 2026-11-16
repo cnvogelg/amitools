@@ -85,3 +85,25 @@ def graphics_indexed_load_guest_planes_test(raster):
     assert surface.dirty
     surface.paint(replace(state, mode=2, mask=3), 3, 4)
     assert planar_pixel(state, 3, 4) == surface.pixels[4 * 8 + 3] == 6
+
+
+@pytest.mark.parametrize("mode", [0, 1, 2, 4, 5, 6])
+def graphics_area_stipple_modes_and_origin_test(raster, mode):
+    surface, state = raster
+    surface.fill(state, 0, 0, 8, 8)
+    patterned = replace(state, foreground=3, background=6, mode=mode,
+                        area_pattern=(0xaaaa, 0x5555))
+    surface.fill(patterned, 1, 1, 6, 6)
+    for y in range(8):
+        for x in range(8):
+            expected = 5
+            if 1 <= x < 7 and 1 <= y < 7:
+                on = ((x + y) % 2 == 0) ^ bool(mode & 4)
+                if mode & 3 == 2:
+                    expected = 5 ^ state.mask if on else 5
+                elif mode & 3 == 0 and not on:
+                    expected = 5
+                else:
+                    expected = 3 if on else 6
+            assert surface.pixels[y * 8 + x] == expected
+            assert planar_pixel(state, x, y) == expected

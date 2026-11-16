@@ -874,3 +874,16 @@ may perform bounded waits and report whether their event source remains
 alive. Only ``schedule()`` uses those waits; ``run_until_idle()`` always
 returns without waiting for external events and retains its cycle budget.
 Exec has no display polling or renderer-specific main-loop integration.
+
+
+Input and patterned fills
+-------------------------
+
+``ReportMouse`` and ``WFLG_REPORTMOUSE`` control application mouse-motion
+messages; menus continue to track the pointer independently. Raw-key messages
+carry an owned, zero-initialized previous-key buffer through ``IAddress`` until
+``ReplyMsg``. Dead-key composition and key history are not yet implemented.
+
+Monochrome ``RastPort.AreaPtrn`` fills honor JAM1, JAM2, complement, inverse
+video, plane masks and clipping. Patterns are anchored at the raster origin
+and copied when drawing is queued. Multi-plane area patterns are unsupported.

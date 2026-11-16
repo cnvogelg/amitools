@@ -709,3 +709,41 @@ def intuition_close_window_preserves_borrowed_user_port_test(ctx):
     assert ctx.messages.get_msg(borrowed) is None
     ctx.messages.delete_msg_port(borrowed)
     ctx.close_all()
+
+
+def intuition_mouse_requires_reporting_test(ctx):
+    target = ctx.open()
+    host = ctx.intuition.find_window_id(target)
+    event = Event("motion", host, 20, 30)
+    assert ctx.intuition.ingest_event(ctx, event) is None
+    ctx.intuition.ReportMouse(ctx, 1, target)
+    assert ctx.intuition.ingest_event(ctx, event).idcmp_flag == 0x10
+    ctx.intuition.ReportMouse(ctx, 0, target)
+    assert ctx.intuition.ingest_event(ctx, event) is None
+    # Menus still track the host pointer when application motion is disabled.
+    ctx.intuition.menu_active = True
+    ctx.intuition.render = Mock()
+    assert ctx.intuition.ingest_event(ctx, event) is None
+    ctx.intuition.render.assert_called_once()
+    ctx.close_all()
+
+
+def intuition_rawkey_history_lifetime_test(ctx):
+    from amitools.vamos.lib.intuition import IDCMP_RAWKEY, IntuiMessageStruct
+    target = ctx.open()
+    win = WindowStruct(ctx.mem, target)
+    win.IDCMPFlags.val |= IDCMP_RAWKEY
+    port = MsgPort(ctx.mem, win.UserPort.val)
+    ctx.intuition.queue_idcmp(ctx, target, IDCMP_RAWKEY, code=0x20)
+    message = ctx.messages.get_msg(port)
+    raw = IntuiMessageStruct(ctx.mem, message.addr)
+    pointer = raw.IAddress.val
+    memory = ctx.alloc.get_memory(message.addr)
+    assert message.addr <= pointer < pointer + 4 <= memory.addr + memory.size
+    assert bytes(ctx.mem.r_block(pointer, 4)) == bytes(4)
+    ctx.close(target)
+    assert ctx.alloc.get_memory(message.addr) is memory
+    assert bytes(ctx.mem.r_block(pointer, 4)) == bytes(4)
+    ctx.messages.reply_msg(message)
+    assert ctx.alloc.get_memory(message.addr) is None
+    ctx.close_all()

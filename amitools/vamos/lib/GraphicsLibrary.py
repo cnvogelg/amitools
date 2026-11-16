@@ -549,6 +549,10 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
             rp.DrawMode.val,
             rp.LinePtrn.val,
             rp.TxSpacing.val,
+            tuple(
+                ctx.mem.r16(rp.AreaPtrn.val + n * 2)
+                for n in range(1 << rp.AreaPtSz.val)
+            ) if rp.AreaPtrn.val and 0 <= rp.AreaPtSz.val <= 8 else (),
         )
 
     def TextLength(self, ctx):
