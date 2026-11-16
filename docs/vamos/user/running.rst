@@ -148,3 +148,19 @@ going on or going wrong. See :doc:`debugging` for the full set of tracing,
 label and profiling features.
 
 That's it for now! Have fun playing with vamos!
+
+
+Console key conversion
+----------------------
+
+``console.device`` supports opening unit -1 for ``RawKeyConvert`` without
+creating a console window. Its built-in US subset converts letters, digits,
+common punctuation, whitespace, Backspace, Return, Escape and Delete, with
+Shift, Caps Lock and Control qualifiers. It follows InputEvent chains, skips
+key releases and non-key events, and returns -1 on insufficient buffer space
+without writing beyond the supplied buffer. Output is not NUL-terminated.
+
+Window console units, console I/O, explicit KeyMap structures, Alt/dead-key
+composition, keypad digits and function/cursor escape sequences are not
+implemented. Unsupported maps and keys produce no converted bytes. This
+service is independent of SDL, graphics and Intuition.
