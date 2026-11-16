@@ -80,6 +80,9 @@ class SetupLibManager(object):
             self.scheduler,
             odg_base,
         )
+        self.dos_ctx.lib_mgr = self.lib_mgr
+        for name in ("asl", "diskfont", "iffparse", "icon", "datatypes"):
+            self.lib_mgr.add_ctx(name + ".library", self.dos_ctx)
         self.exec_ctx.display_scale = self.display_scale
         self.exec_ctx.display_aspect = self.display_aspect
         self.lib_mgr.add_ctx("exec.library", self.exec_ctx)

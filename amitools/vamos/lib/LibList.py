@@ -1,3 +1,8 @@
+from .AslLibrary import AslLibrary
+from .DiskfontLibrary import DiskfontLibrary
+from .IFFParseLibrary import IFFParseLibrary
+from .IconLibrary import IconLibrary
+from .DatatypesLibrary import DatatypesLibrary
 from .WorkbenchLibrary import WorkbenchLibrary
 from .KeyMapLibrary import KeyMapLibrary
 from .GadToolsLibrary import GadToolsLibrary
@@ -22,6 +27,12 @@ from .VamosTestLibrary import VamosTestLibrary
 from .VamosTestDevice import VamosTestDevice
 
 vamos_libs = {
+    "asl.library": AslLibrary,
+    "diskfont.library": DiskfontLibrary,
+    "iffparse.library": IFFParseLibrary,
+    "icon.library": IconLibrary,
+    "datatypes.library": DatatypesLibrary,
+
     "workbench.library": WorkbenchLibrary,
     "keymap.library": KeyMapLibrary,
     "gadtools.library": GadToolsLibrary,
