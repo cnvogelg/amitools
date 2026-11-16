@@ -173,7 +173,7 @@ class DosLibrary(LibImpl):
         return 0
 
     def finish_lib(self, ctx):
-        self.exall_scans.clear()
+        self._drop_all_exall_scans()
         self._finish_timer_request(ctx)
         # free the child processes that still run
         for child in self.child_procs.values():
@@ -1421,21 +1421,39 @@ class DosLibrary(LibImpl):
     # bytes of struct ExAllData used by each ED_* type: ED_NAME .. ED_OWNER
     ex_all_data_sizes = (0, 8, 12, 16, 20, 32, 36, 40)
 
+    @staticmethod
+    def _free_scan_lock(scan):
+        """release the handler lock of an ExAll scan (ACTION_FREE_LOCK)"""
+        if scan.handler is not None and scan.handler_lock is not None:
+            scan.handler.free_lock(scan.handler_lock)
+
+    def _drop_exall_scan(self, control_ptr):
+        """drop a control's scan state and release its cloned handler lock"""
+        state = self.exall_scans.pop(control_ptr, None)
+        if state is not None:
+            self._free_scan_lock(state[1])
+        return state
+
+    def _drop_all_exall_scans(self):
+        for state in self.exall_scans.values():
+            self._free_scan_lock(state[1])
+        self.exall_scans.clear()
+
     def ExAll(self, ctx, lock_b_addr, buffer, size, data_type, control_ptr):
         """Fill a bounded entry chain using a cursor private to this control."""
         control = ExAllControlStruct(ctx.mem, control_ptr)
         control.eac_Entries.val = 0
         if data_type < 1 or data_type >= len(self.ex_all_data_sizes):
-            self.exall_scans.pop(control_ptr, None)
+            self._drop_exall_scan(control_ptr)
             self.setioerr(ctx, ERROR_BAD_NUMBER)
             return DOSFALSE
         if size < 0 or size > 0x7FFFFFFF:
-            self.exall_scans.pop(control_ptr, None)
+            self._drop_exall_scan(control_ptr)
             self.setioerr(ctx, ERROR_NO_FREE_STORE)
             return DOSFALSE
         lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
         if lock is None:
-            self.exall_scans.pop(control_ptr, None)
+            self._drop_exall_scan(control_ptr)
             self.setioerr(ctx, ERROR_INVALID_LOCK)
             return DOSFALSE
         last_key = control.eac_LastKey.val
@@ -1443,17 +1461,17 @@ class DosLibrary(LibImpl):
             # A cloned lock owns its ExNext cache independently of the
             # caller's lock. clone_for_scan also checks that the lock is a
             # directory.
+            self._drop_exall_scan(control_ptr)
             try:
                 scan = lock.clone_for_scan()
             except HandlerError as e:
-                self.exall_scans.pop(control_ptr, None)
                 self.setioerr(ctx, e.code)
                 return DOSFALSE
             self.exall_scans[control_ptr] = (lock, scan)
         else:
             state = self.exall_scans.get(control_ptr)
             if state is None or state[0] is not lock:
-                self.exall_scans.pop(control_ptr, None)
+                self._drop_exall_scan(control_ptr)
                 self.setioerr(ctx, ERROR_INVALID_LOCK)
                 return DOSFALSE
             scan = state[1]
@@ -1490,7 +1508,7 @@ class DosLibrary(LibImpl):
         finally:
             self.alloc.free_memory(scratch)
             if not keep_scan:
-                self.exall_scans.pop(control_ptr, None)
+                self._drop_exall_scan(control_ptr)
         log_dos.info(
             "ExAll: %s buf=%06x size=%d type=%d -> entries=%d err=%d",
             lock,
@@ -1577,7 +1595,7 @@ class DosLibrary(LibImpl):
             control.eac_Entries.val += 1
 
     def ExAllEnd(self, ctx, lock_b_addr, buffer, size, data_type, control_ptr):
-        self.exall_scans.pop(control_ptr, None)
+        self._drop_exall_scan(control_ptr)
         control = ExAllControlStruct(ctx.mem, control_ptr)
         control.eac_Entries.val = 0
         control.eac_LastKey.val = 0
@@ -2353,7 +2371,7 @@ class DosLibrary(LibImpl):
                 )
             # Freeing a control also releases an unfinished scan.
             if entry[1] == 1:
-                self.exall_scans.pop(ptr, None)
+                self._drop_exall_scan(ptr)
             # free struct
             ctx.alloc.free_struct(entry[0])
         else:

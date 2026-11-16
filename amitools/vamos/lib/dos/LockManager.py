@@ -122,6 +122,10 @@ class LockManager:
             del self.lock_key_map[lock_key.key]
             self.keys.free(slot_id)
 
+        # release the handler-side lock object (ACTION_FREE_LOCK)
+        if lock.handler is not None and lock.handler_lock is not None:
+            lock.handler.free_lock(lock.handler_lock)
+
         # free lock itself
         lock.free(self.alloc)
         del lock

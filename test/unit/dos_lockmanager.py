@@ -6,7 +6,13 @@ from amitools.vamos.lib.dos.LockManager import LockManager
 
 
 class _Handler:
-    """opaque handler stand-in; only its identity matters here"""
+    """opaque handler stand-in; records the handler locks it frees"""
+
+    def __init__(self):
+        self.freed = []
+
+    def free_lock(self, lock):
+        self.freed.append(lock)
 
 
 def _make_mgr(mem_alloc):
@@ -39,15 +45,18 @@ def dos_lockmanager_same_object_shares_key_test(mem_alloc):
     assert mgr.get_by_b_addr(first.b_addr) is first
     assert mgr.get_by_b_addr(second.b_addr) is second
 
-    # releasing one lock keeps the shared slot alive
+    # releasing one lock keeps the shared slot alive and frees its handler lock
+    first_handler_lock = first.handler_lock
     mgr.release_lock(first)
     assert mgr.get_by_b_addr(second.b_addr) is second
     assert len(mgr.lock_key_map) == 1
+    assert handler.freed == [first_handler_lock]
 
     # releasing the last lock frees the slot and drops the mapping
     mgr.release_lock(second)
     assert not mgr.lock_key_map
     assert mgr.keys.num_free() == 1024
+    assert handler.freed == [first_handler_lock, second.handler_lock]
     assert alloc.is_all_free()
 
 

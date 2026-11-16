@@ -166,15 +166,22 @@ class HandlerManager:
             raise HandlerError(ERROR_OBJECT_NOT_FOUND)
         return candidates[0]
 
+    @staticmethod
+    def _exists(handler, rel_path):
+        """probe existence, releasing the probe lock again"""
+        try:
+            lock = handler.locate_object(rel_path)
+        except HandlerError:
+            return False
+        handler.free_lock(lock)
+        return True
+
     def _first_existing(self, ami_path, env=None, cwd=None):
         """return the first candidate whose object exists"""
         candidates = self.resolve(ami_path, env=env, cwd=cwd)
         for handler, rel_path in candidates:
-            try:
-                handler.locate_object(rel_path)
+            if self._exists(handler, rel_path):
                 return handler, rel_path
-            except HandlerError:
-                continue
         if candidates:
             return candidates[0]
         raise HandlerError(ERROR_OBJECT_NOT_FOUND)
@@ -200,11 +207,8 @@ class HandlerManager:
         if not candidates:
             raise HandlerError(ERROR_OBJECT_NOT_FOUND)
         for handler, rel_path in candidates:
-            try:
-                handler.locate_object(rel_path)
-            except HandlerError:
-                continue
-            return handler, handler.find_output(rel_path, mode)
+            if self._exists(handler, rel_path):
+                return handler, handler.find_output(rel_path, mode)
         handler, rel_path = candidates[0]
         return handler, handler.find_output(rel_path, mode)
 
@@ -255,6 +259,9 @@ class HandlerManager:
         for handler, rel_path in candidates:
             try:
                 lock = handler.locate_object(rel_path)
+            except HandlerError:
+                continue
+            try:
                 if not handler.examine_object(lock).is_dir:
                     return None
                 names = []
@@ -271,16 +278,15 @@ class HandlerManager:
                 return names
             except HandlerError:
                 continue
+            finally:
+                handler.free_lock(lock)
         return None
 
     def path_exists(self, ami_path, env=None, cwd=None):
         """return True if the path exists on any responsible handler"""
         for handler, rel_path in self.resolve(ami_path, env=env, cwd=cwd):
-            try:
-                handler.locate_object(rel_path)
+            if self._exists(handler, rel_path):
                 return True
-            except HandlerError:
-                continue
         return False
 
     # ----- deferred assign dirs -----

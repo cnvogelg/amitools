@@ -317,6 +317,58 @@ def handler_mgr_deferred_assign_dirs_test(tmp_path):
     pm.shutdown()
 
 
+class _RecordingHostFsHandler(HostFileSysHandler):
+    """host handler that tracks handler locks so probe leaks show up"""
+
+    def __init__(self, name, root_path):
+        super().__init__(name, root_path)
+        self.created = 0
+        self.freed = 0
+
+    def locate_object(self, ami_path, exclusive=False):
+        lock = super().locate_object(ami_path, exclusive)
+        self.created += 1
+        return lock
+
+    def copy_dir(self, lock):
+        new_lock = super().copy_dir(lock)
+        self.created += 1
+        return new_lock
+
+    def free_lock(self, lock):
+        self.freed += 1
+        super().free_lock(lock)
+
+    @property
+    def balanced(self):
+        return self.created == self.freed
+
+
+def handler_mgr_probe_locks_are_freed_test(tmp_path):
+    root = tmp_path / "work"
+    root.mkdir()
+    (root / "file.txt").write_bytes(b"x")
+    (root / "sub").mkdir()
+    pm = PathManager(vols_base_dir=str(tmp_path), auto_volumes=[], auto_assigns=[])
+    assert pm.get_vol_mgr().add_volume("work:" + str(root))
+    assert pm.setup()
+    mgr = HandlerManager(pm)
+    handler = _RecordingHostFsHandler("work", str(root))
+    mgr.register("work", handler)
+
+    # each of these probes an object with a temporary handler lock
+    assert mgr.path_exists("work:file.txt")
+    assert set(mgr.list_dir("work:")) == {"file.txt", "sub"}
+    _, fh = mgr.find_output("work:new.txt", MODE_NEWFILE)
+    handler.end(fh)
+    mgr.rename_object("work:file.txt", "work:renamed.txt")
+
+    # the probe locks must all have been released again
+    assert handler.created > 0
+    assert handler.balanced
+    pm.shutdown()
+
+
 def handler_mgr_shutdown_test(tmp_path):
     pm, mgr, root, work = setup_mgr(tmp_path)
     calls = []
