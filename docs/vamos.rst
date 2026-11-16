@@ -781,3 +781,18 @@ and verifies library close and reopen. With the native libraries and
 PySDL2 available, run it from the source checkout with::
 
     AMITOOLS_TEST_SDL=1 python -m pytest -q test/unit/lib_graphics_sdl.py
+
+The indexed graphics backend exposes screen ColorMaps, RGB queries, nearest
+shared pens, planar bitmap allocation and attributes, pixel writes, and text
+extent/fitting. Color matching currently uses the fixed screen palette; a
+``FailIfBad`` request conservatively requires an exact RGB match. It does not
+allocate additional colors. Layer clip-region installation flushes pending
+drawing before changing the clip, preserves the previous region, and intersects
+the user clip with refresh clipping. Layer-info locks are serialized no-ops;
+overlapping Amiga layers and general layer management remain unsupported.
+Masked bitmap copy/invert blits preserve transparent pixels and the destination
+write mask. Window resizing updates guest dimensions, bitmap planes and the SDL
+texture, and delivers size/refresh notifications. These graphics operations support category images and changing page sizes in
+native toolkits. Native GUI libraries still need additional BOOPSI and OS
+services; this backend alone does not make ZunePrefs fully operational.
+
