@@ -122,20 +122,25 @@ class DosLibrary(LibImpl):
         self.dos_info = ctx.alloc.alloc_astruct(DosInfoStruct, label="DosInfo")
         self.dos_info_struct = self.dos_info
         self.root_node.rn_Info.aptr = self.dos_info.addr
-        # setup dos list
-        self.dos_list = DosList(
-            self.path_mgr, self.path_mgr.assign_mgr, ctx.mem, ctx.alloc
-        )
-        self.dos_list.build_list(ctx.path_mgr)
-        self.update_dos_list_head()
         # file system handlers are built by the caller (main) and passed in
         # via the context; dos.library only consumes them
         self.handler_mgr = ctx.handler_mgr
+        # setup dos list
+        self.dos_list = DosList(
+            self.path_mgr,
+            self.path_mgr.assign_mgr,
+            ctx.mem,
+            ctx.alloc,
+            handler_mgr=self.handler_mgr,
+        )
+        self.dos_list.build_list(ctx.path_mgr)
+        self.update_dos_list_head()
         # create file manager
         self.file_mgr = FileManager(
             self.handler_mgr, ctx.exec_lib.port_mgr, ctx.alloc, ctx.mem
         )
         self.dos_list.add_host_devices(self.file_mgr, ctx.exec_lib.port_mgr)
+        self.update_dos_list_head()
         # let the segment loader open files through DOS
         if ctx.seg_loader is not None:
             ctx.seg_loader.set_file_opener(DosFileOpener(self.file_mgr))

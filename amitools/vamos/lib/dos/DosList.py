@@ -58,11 +58,12 @@ class DosListEntry:
 
 
 class DosList:
-    def __init__(self, path_mgr, assign_mgr, mem, alloc):
+    def __init__(self, path_mgr, assign_mgr, mem, alloc, handler_mgr=None):
         self.mem = mem
         self.alloc = alloc
         self.path_mgr = path_mgr
         self.assign_mgr = assign_mgr
+        self.handler_mgr = handler_mgr
         self.entries_by_b_addr = {}
         self.entries_by_name = {}
         self.devices_by_name = {}
@@ -86,12 +87,20 @@ class DosList:
         # fill dos list
         volumes = path_mgr.get_all_volume_names()
         for vol in volumes:
-            self.add_volume(vol)
+            # non-filesystem handlers are devices, added in add_host_devices
+            if self._is_filesystem(vol):
+                self.add_volume(vol)
         assigns = path_mgr.get_all_assign_names()
         for assign in assigns:
             alist = path_mgr.get_assign(assign).get_assigns()
             self.add_assign(assign, alist)
         return self.get_head_addr()
+
+    def _is_filesystem(self, name):
+        """is the handler behind this volume/device a file system?"""
+        if self.handler_mgr is None:
+            return True
+        return self.handler_mgr.is_filesystem(name)
 
     def get_head_addr(self):
         if self.first_entry is None:
@@ -108,7 +117,12 @@ class DosList:
         self.host_ports.clear()
 
     def add_host_devices(self, file_mgr, port_mgr):
-        """Publish host-directory mounts as paired DOS devices and volumes."""
+        """Publish mounted volumes and devices in the DOS list.
+
+        Filesystem handlers get a paired device entry backed by a handler
+        port; non-filesystem handlers (``NIL:``, ``CONSOLE:``, ...) get a
+        device entry only, with no host port and no startup message.
+        """
         self.host_port_mgr = port_mgr
         for volume in tuple(self.entries):
             if volume.struct_def is not DosListVolumeStruct:
@@ -117,6 +131,15 @@ class DosList:
             self.host_ports.append(port)
             self.add_device(volume.name, startup_bptr=0, task=port)
             _struct_write(volume.struct, "dol_Task", port)
+        # device handlers have no host port; publish them as plain devices
+        handler_mgr = getattr(file_mgr, "handler_mgr", None)
+        if handler_mgr is not None:
+            for name in handler_mgr.get_all_names():
+                if handler_mgr.is_filesystem(name):
+                    continue
+                if self.get_entry_by_name(name) is not None:
+                    continue
+                self.add_device(name, startup_bptr=0)
 
     def free_entry(self, entry):
         """Free a detached entry and its DOS-list-owned allocations."""

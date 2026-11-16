@@ -15,8 +15,10 @@ from .base import (
     HandlerInfoData,
     HandlerLock,
 )
+from .console import ConsoleHandler
 from .filesys import HostFileSysHandler
 from .mgr import HandlerManager, build_handler_manager
+from .nil import NilHandler
 from .protection import DosProtection
 from .registry import HandlerRegistry, default_registry
 
@@ -24,6 +26,7 @@ __all__ = [
     "MODE_NEWFILE",
     "MODE_OLDFILE",
     "MODE_READWRITE",
+    "ConsoleHandler",
     "DosProtection",
     "Handler",
     "HandlerError",
@@ -34,6 +37,7 @@ __all__ = [
     "HandlerManager",
     "HandlerRegistry",
     "HostFileSysHandler",
+    "NilHandler",
     "build_handler_manager",
     "default_registry",
 ]

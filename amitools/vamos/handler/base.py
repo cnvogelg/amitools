@@ -72,7 +72,17 @@ class HandlerLock:
 
 
 class HandlerFile:
-    """Opaque open-file reference handed out by a handler."""
+    """Opaque open-file reference handed out by a handler.
+
+    Subclasses expose the underlying stream as ``fobj``. The flags tell the
+    DOS layer how to wrap the handle: ``is_nil`` marks the ``NIL:`` sink,
+    ``need_close`` says whether closing the handle closes the stream, and
+    ``auto_flush`` flushes after every write (used for consoles).
+    """
+
+    is_nil = False
+    need_close = True
+    auto_flush = False
 
     def __init__(self, key=None):
         self.key = key

@@ -249,6 +249,10 @@ def build_handler_manager(path_mgr, file_system=None, registry=None):
     This is the top-level entry point that turns the configured volumes into
     registered handlers. ``file_system`` defaults to the volume manager's
     shared host file system so handlers and the path layer stay consistent.
+
+    The ``NIL:`` and ``CONSOLE:`` devices always exist in AmigaDOS, so they
+    are registered as built-in device handlers unless a volume already
+    provides a handler under that name.
     """
     vol_mgr = path_mgr.get_vol_mgr()
     if file_system is None:
@@ -256,4 +260,10 @@ def build_handler_manager(path_mgr, file_system=None, registry=None):
     mgr = HandlerManager(path_mgr, file_system=file_system, registry=registry)
     for volume in vol_mgr.get_all_volumes():
         mgr.bind_volume(volume)
+    # built-in AmigaDOS devices
+    for dev_name in ("nil", "console"):
+        if mgr.get_handler(dev_name) is None:
+            handler = mgr.registry.create(dev_name, dev_name, None, {}, file_system)
+            if handler is not None:
+                mgr.register(dev_name, handler)
     return mgr

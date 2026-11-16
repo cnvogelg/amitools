@@ -82,3 +82,41 @@ def dos_list_host_device_volume_pairs_test(mem_alloc):
     listing.free_list()
     assert not ports.ports
     assert alloc.is_all_free()
+
+
+def dos_list_device_handler_test(mem_alloc):
+    from types import SimpleNamespace
+    from amitools.vamos.lib.lexec.PortManager import PortManager
+    from amitools.vamos.libstructs import DosListVolumeStruct
+
+    mem, alloc = mem_alloc
+
+    def is_filesystem(name):
+        return name != "nil"
+
+    handler_mgr = SimpleNamespace(
+        is_filesystem=is_filesystem,
+        get_all_names=lambda: ["work", "nil"],
+    )
+    listing = DosList(None, None, mem, alloc, handler_mgr=handler_mgr)
+    path_mgr = SimpleNamespace(
+        get_all_volume_names=lambda: ["work", "nil"],
+        get_all_assign_names=lambda: [],
+    )
+    listing.build_list(path_mgr)
+    # a filesystem volume becomes a volume entry ...
+    work = listing.get_entry_by_name("work")
+    assert work.struct_def is DosListVolumeStruct
+    # ... while a device handler is not a volume
+    assert listing.get_entry_by_name("nil", LDF_VOLUMES) is None
+    # add_host_devices publishes the device with no host port
+    ports = PortManager(alloc)
+    file_mgr = SimpleNamespace(fs_put_msg=lambda *args: None, handler_mgr=handler_mgr)
+    listing.add_host_devices(file_mgr, ports)
+    nil = listing.get_entry_by_name("nil", LDF_DEVICES)
+    assert nil is not None
+    assert nil.struct.dol_Type.val == 0
+    assert nil.struct.dol_Task.aptr == 0
+    assert listing.get_entry_by_name("nil") is nil
+    listing.free_list()
+    assert alloc.is_all_free()

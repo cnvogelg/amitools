@@ -249,6 +249,9 @@ class SysVolume(object):
 
     def setup(self):
         path = self.path
+        # a non-host handler (nil:, console:, ...) has no host directory
+        if path is None:
+            return True
         # temp dir?
         if "temp" in self.cfg:
             temp_path = self.file_system.make_temp_dir(path)
@@ -271,6 +274,8 @@ class SysVolume(object):
         return True
 
     def shutdown(self):
+        if self.path is None:
+            return
         if "temp" in self.cfg:
             if self.path:
                 self.file_system.remove_tree(self.path)
@@ -279,6 +284,9 @@ class SysVolume(object):
                 self.file_system.remove_dir(self.temp_base)
 
     def create_rel_sys_path(self, rel_path):
+        if self.path is None:
+            # a non-host handler has no host directory to create
+            return None
         path = self.file_system.join_path(self.path, rel_path)
         if self.file_system.is_dir(path):
             log_path.debug(
@@ -333,6 +341,9 @@ class SysPathMapper(object):
         result = None
         for volume in self.vol_provider.get_all_volumes():
             vol_sys_path = volume.get_path()
+            # a non-host handler (nil:, console:, ...) has no host path
+            if vol_sys_path is None:
+                continue
             try:
                 common_path = os.path.commonpath([vol_sys_path, sys_path])
             except ValueError:
@@ -386,6 +397,9 @@ class SysPathMapper(object):
         volume = self.vol_provider.get_volume(vol_name)
         if volume is not None:
             vol_sys_path = volume.get_path()
+            # a non-host handler (nil:, console:, ...) has no host path
+            if vol_sys_path is None:
+                return None
             remainder = ami_path[pos + 1 :]
 
             # only volume name given

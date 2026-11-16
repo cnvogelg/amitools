@@ -170,13 +170,20 @@ class VolumeManager(object):
         name = spec.get_name()
         src_list = spec.get_src_list()
         cfg = spec.get_cfg()
+        handler_type = cfg.get("handler", "hostfs")
         n = len(src_list)
         if n == 0:
-            # local path
-            path = self._get_local_vol_path(name)
-            log_path.debug("local path='%s'", path)
-            if path is None:
-                return None
+            if handler_type != "hostfs":
+                # a non-host handler (nil:, console:, ...) has no host
+                # directory of its own
+                path = None
+                log_path.debug("non-host handler '%s': no host path", handler_type)
+            else:
+                # local path
+                path = self._get_local_vol_path(name)
+                log_path.debug("local path='%s'", path)
+                if path is None:
+                    return None
         elif n == 1:
             path = resolve_sys_path(src_list[0])
             log_path.debug("resolved path='%s'", path)

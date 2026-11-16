@@ -177,3 +177,16 @@ def path_volume_temp_test(tmpdir):
     v.shutdown()
     # now temp is gone
     assert not tmpdir.join("bla").check()
+
+
+def path_volume_non_host_handler_test(tmpdir):
+    # a non-host handler needs no host directory (and no base dir)
+    v = VolumeManager()
+    assert v.setup()
+    vol = v.add_volume("nil:?handler=nil")
+    assert vol
+    assert vol.get_path() is None
+    assert vol.cfg["handler"] == "nil"
+    # setup/shutdown are no-ops for a volume without a host path
+    assert v.setup()
+    v.shutdown()

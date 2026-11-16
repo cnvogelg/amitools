@@ -59,7 +59,12 @@ def _make_handler():
 
 
 def _make_handler_file(data=b"data"):
-    return SimpleNamespace(fobj=io.BytesIO(data))
+    return SimpleNamespace(
+        fobj=io.BytesIO(data),
+        is_nil=False,
+        need_close=True,
+        auto_flush=False,
+    )
 
 
 def dos_filemanager_open_input_test():
@@ -172,9 +177,12 @@ def dos_filemanager_create_protect_test():
 
 
 def dos_filemanager_is_file_system_test():
-    handler_mgr = SimpleNamespace(
-        is_filesystem=lambda name: name != "notfs",
-    )
+    devices = ("nil", "console", "notfs")
+
+    def is_filesystem(name):
+        return name.lower() not in devices
+
+    handler_mgr = SimpleNamespace(is_filesystem=is_filesystem)
     file_mgr = _make_file_mgr(handler_mgr)
 
     assert file_mgr.is_file_system(None, "NIL:") is False
@@ -182,3 +190,44 @@ def dos_filemanager_is_file_system_test():
     assert file_mgr.is_file_system(None, "*") is False
     assert file_mgr.is_file_system(None, "notfs:") is False
     assert file_mgr.is_file_system(None, "work:") is True
+
+
+def dos_filemanager_open_nil_test():
+    from amitools.vamos.handler import NilHandler
+
+    nil = NilHandler("nil")
+    handler_mgr = SimpleNamespace(
+        find_input=lambda path, cwd=None: (nil, nil.find_input(path)),
+    )
+    file_mgr = _make_file_mgr(handler_mgr)
+
+    fh = file_mgr.open(None, "NIL:", "r")
+
+    assert fh.is_nil is True
+    assert fh.handler is nil
+    assert fh.read(10) == b""
+
+
+def dos_filemanager_open_console_test():
+    import sys
+
+    from amitools.vamos.handler import ConsoleHandler
+
+    console = ConsoleHandler("console")
+    calls = []
+
+    def find_output(path, mode=MODE_NEWFILE, cwd=None):
+        calls.append((path, mode))
+        return console, console.find_output(path, mode)
+
+    handler_mgr = SimpleNamespace(find_output=find_output)
+    file_mgr = _make_file_mgr(handler_mgr)
+
+    # '*' is an alias for the console device
+    fh = file_mgr.open(None, "*", "rw")
+
+    assert calls == [("console:", MODE_READWRITE)]
+    assert fh.obj is sys.stdout.buffer
+    assert fh.need_close is False
+    assert fh.auto_flush is True
+    assert fh.is_nil is False

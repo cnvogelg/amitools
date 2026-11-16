@@ -109,16 +109,6 @@ class FileManager:
         name = AmiPath(str(ami_path)).filename()
         return name if name else str(ami_path)
 
-    def _open_nil(self, ami_path, f_mode):
-        # NIL: is a device, not a volume: read gives EOF, write is discarded
-        if f_mode == "rwb+":
-            f_mode = "rb+"
-        try:
-            fobj = self.handler_mgr.file_system.open("/dev/null", f_mode)
-        except OSError:
-            return None
-        return FileHandle(fobj, ami_path, self._ami_name(ami_path), is_nil=True)
-
     def _open_via_handler(self, ami_path, f_mode, cwd):
         try:
             if f_mode in _READ_MODES:
@@ -137,25 +127,23 @@ class FileManager:
             self._ami_name(ami_path),
             handler=handler,
             handler_file=handler_file,
+            need_close=handler_file.need_close,
+            auto_flush=handler_file.auto_flush,
+            is_nil=handler_file.is_nil,
         )
 
     def open(self, lock, ami_path, f_mode, home_dir=None):
         cwd = lock.ami_path if lock is not None else None
-        # special names
-        uname = str(ami_path).upper()
-        # thor: NIL: and CONSOLE: also work as device names
-        # and the file names behind are ignored.
-        if uname.startswith("NIL:"):
-            fh = self._open_nil(ami_path, f_mode)
-        elif uname == "*" or uname.startswith("CONSOLE:"):
-            fh = self._create_stdout_fh()
+        # '*' is the AmigaDOS console device
+        if str(ami_path) == "*":
+            ami_path = "console:"
         else:
             # Handle '*' prefix (PROGDIR: - program's home directory)
             expanded = expand_progdir_path(ami_path, home_dir)
             if expanded != ami_path:
                 log_file.debug("expanded '*' path to: %s", expanded)
                 ami_path = expanded
-            fh = self._open_via_handler(ami_path, f_mode, cwd)
+        fh = self._open_via_handler(ami_path, f_mode, cwd)
         if fh is None:
             return None
         self._register_file(fh)
@@ -204,11 +192,9 @@ class FileManager:
             return e.code
 
     def is_file_system(self, lock, name):
-        uname = name.upper()
-        if uname.startswith("NIL:"):
-            return False
-        elif uname == "*" or uname.startswith("CONSOLE:"):
-            return False
+        # '*' is an alias for the console device
+        if str(name) == "*":
+            name = "console:"
         # look up a registered handler by device/volume name
         vol_name = name.split(":")[0] if ":" in name else name
         return self.handler_mgr.is_filesystem(vol_name)

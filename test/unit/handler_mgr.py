@@ -4,11 +4,13 @@ import pytest
 
 from amitools.vamos.handler import (
     MODE_NEWFILE,
+    ConsoleHandler,
     Handler,
     HandlerError,
     HandlerManager,
     HandlerRegistry,
     HostFileSysHandler,
+    NilHandler,
     build_handler_manager,
     default_registry,
 )
@@ -226,6 +228,49 @@ def handler_build_manager_test(tmp_path):
     assert built.file_system is pm.get_vol_mgr().file_system
     built.shutdown()
     assert built.get_all_names() == []
+
+
+def handler_build_manager_devices_test(tmp_path):
+    pm, mgr, root, work = setup_mgr(tmp_path)
+    built = build_handler_manager(pm)
+    # NIL: and CONSOLE: are built-in devices, not file systems
+    assert isinstance(built.get_handler("nil"), NilHandler)
+    assert isinstance(built.get_handler("console"), ConsoleHandler)
+    assert built.is_filesystem("nil") is False
+    assert built.is_filesystem("console") is False
+    assert built.is_filesystem("work") is True
+    built.shutdown()
+
+
+def handler_mgr_device_open_test(tmp_path):
+    pm, mgr, root, work = setup_mgr(tmp_path)
+    built = build_handler_manager(pm)
+    # NIL: reads EOF and discards writes
+    handler, fh = built.find_input("NIL:")
+    assert isinstance(handler, NilHandler)
+    assert fh.is_nil is True
+    handler, fh = built.find_output("NIL:", MODE_NEWFILE)
+    assert isinstance(handler, NilHandler)
+    assert fh.is_nil is True
+    # CONSOLE: resolves to the console device
+    handler, fh = built.find_output("CONSOLE:", MODE_NEWFILE)
+    assert isinstance(handler, ConsoleHandler)
+    assert fh.need_close is False
+    built.shutdown()
+
+
+def handler_mgr_nil_volume_test(tmp_path):
+    # a non-host volume needs no host directory and still resolves
+    pm = PathManager(vols_base_dir=str(tmp_path), auto_volumes=[], auto_assigns=[])
+    assert pm.get_vol_mgr().add_volume("nil:?handler=nil")
+    assert pm.setup()
+    built = build_handler_manager(pm)
+    assert isinstance(built.get_handler("nil"), NilHandler)
+    handler, fh = built.find_input("NIL:foo")
+    assert isinstance(handler, NilHandler)
+    assert fh.is_nil is True
+    built.shutdown()
+    pm.shutdown()
 
 
 def handler_mgr_shutdown_test(tmp_path):
