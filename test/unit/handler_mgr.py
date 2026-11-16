@@ -9,6 +9,7 @@ from amitools.vamos.handler import (
     HandlerManager,
     HandlerRegistry,
     HostFileSysHandler,
+    build_handler_manager,
     default_registry,
 )
 from amitools.vamos.path import PathManager
@@ -199,3 +200,29 @@ def handler_mgr_bind_volume_unknown_type_test(tmp_path):
     # ERROR_ACTION_NOT_KNOWN
     expect_error(209, mgr2.bind_volume, volume)
     assert mgr2.get_handler("work") is None
+
+
+def handler_build_manager_test(tmp_path):
+    pm, mgr, root, work = setup_mgr(tmp_path)
+    built = build_handler_manager(pm)
+    # every configured volume is bound and shares the volume manager's fs
+    assert isinstance(built.get_handler("work"), HostFileSysHandler)
+    assert built.get_handler("work").root_path == str(work)
+    assert built.file_system is pm.get_vol_mgr().file_system
+    built.shutdown()
+    assert built.get_all_names() == []
+
+
+def handler_mgr_shutdown_test(tmp_path):
+    pm, mgr, root, work = setup_mgr(tmp_path)
+    calls = []
+
+    class ClosingHandler(Handler):
+        def shutdown(self):
+            calls.append(self.name)
+
+    mgr.register("closing", ClosingHandler("closing"))
+    mgr.shutdown()
+    # a handler exposing shutdown() is released and all handlers are dropped
+    assert calls == ["closing"]
+    assert mgr.get_all_names() == []

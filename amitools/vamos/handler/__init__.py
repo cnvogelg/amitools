@@ -16,7 +16,7 @@ from .base import (
     HandlerLock,
 )
 from .filesys import HostFileSysHandler
-from .mgr import HandlerManager
+from .mgr import HandlerManager, build_handler_manager
 from .protection import DosProtection
 from .registry import HandlerRegistry, default_registry
 
@@ -34,5 +34,6 @@ __all__ = [
     "HandlerManager",
     "HandlerRegistry",
     "HostFileSysHandler",
+    "build_handler_manager",
     "default_registry",
 ]

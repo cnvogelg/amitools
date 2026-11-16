@@ -1,3 +1,4 @@
+from amitools.vamos.handler import build_handler_manager
 from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.lib.LibList import vamos_libs
@@ -20,6 +21,7 @@ class SetupLibManager(object):
         path_mgr,
         lib_cfg=None,
         main_profiler=None,
+        handler_mgr=None,
     ):
         self.machine = machine
         self.mem_map = mem_map
@@ -29,6 +31,10 @@ class SetupLibManager(object):
         self.alloc = mem_map.get_alloc()
         self.lib_mgr_cfg = lib_cfg
         self.main_profiler = main_profiler
+        # if no handler manager is passed in, build one from the path manager
+        # and take ownership of it
+        self.handler_mgr = handler_mgr
+        self._own_handler_mgr = handler_mgr is None
         # state
         self.seg_loader = None
         self.exec_ctx = None
@@ -47,6 +53,9 @@ class SetupLibManager(object):
             self.lib_mgr_cfg = LibMgrCfg()
         # create segment loader
         self.seg_loader = SegmentLoader(self.alloc)
+        # build handlers for the configured volumes if the caller did not
+        if self.handler_mgr is None:
+            self.handler_mgr = build_handler_manager(self.path_mgr)
         # setup contexts
         odg_base = self.mem_map.get_old_dos_guard_base()
         # create lib mgr
@@ -75,6 +84,7 @@ class SetupLibManager(object):
             self.path_mgr,
             self.scheduler,
             odg_base,
+            handler_mgr=self.handler_mgr,
         )
         self.lib_mgr.add_ctx("exec.library", self.exec_ctx)
         self.lib_mgr.add_ctx("bsdsocket.library", self.exec_ctx)
@@ -95,6 +105,10 @@ class SetupLibManager(object):
         if self.scheduler.get_num_tasks():
             native_shutdown = self._shutdown_native_with_tasks
         self.lib_mgr.shutdown(run_sp=sp, native_shutdown=native_shutdown)
+        # only release handlers we built ourselves
+        if self._own_handler_mgr and self.handler_mgr is not None:
+            self.handler_mgr.shutdown()
+            self.handler_mgr = None
 
     def _shutdown_native_with_tasks(self):
         """Let native expunge functions exchange messages with helper tasks."""

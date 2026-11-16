@@ -41,7 +41,7 @@ from amitools.vamos.libstructs import (
 from amitools.vamos.libtypes import TagList, DosTag, DosPacket
 from amitools.vamos.error import *
 from amitools.vamos.log import log_dos
-from amitools.vamos.handler import HandlerError, HandlerManager, HostFileSysHandler
+from amitools.vamos.handler import HandlerError
 from amitools.vamos.task import DosProcess
 from amitools.vamos.schedule import SchedulerEvent
 from .dos.Args import *
@@ -128,19 +128,9 @@ class DosLibrary(LibImpl):
         )
         self.dos_list.build_list(ctx.path_mgr)
         self.update_dos_list_head()
-        # set up one file system handler per host volume
-        vol_mgr = ctx.path_mgr.get_vol_mgr()
-        self.handler_mgr = HandlerManager(ctx.path_mgr, file_system=vol_mgr.file_system)
-        for volume in vol_mgr.get_all_volumes():
-            self.handler_mgr.register(
-                volume.get_name(),
-                HostFileSysHandler(
-                    volume.get_name(),
-                    volume.get_path(),
-                    file_system=volume.get_sys_volume().file_system,
-                ),
-            )
-        ctx.handler_mgr = self.handler_mgr
+        # file system handlers are built by the caller (main) and passed in
+        # via the context; dos.library only consumes them
+        self.handler_mgr = ctx.handler_mgr
         # create file manager
         self.file_mgr = FileManager(
             self.handler_mgr, ctx.exec_lib.port_mgr, ctx.alloc, ctx.mem

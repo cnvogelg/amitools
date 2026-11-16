@@ -67,6 +67,16 @@ class HandlerManager:
             log_handler.info("unregister handler '%s'", name)
         return handler
 
+    def shutdown(self):
+        """release all registered handlers"""
+        for name in list(self.handlers):
+            handler = self.handlers[name]
+            handler_shutdown = getattr(handler, "shutdown", None)
+            if handler_shutdown is not None:
+                handler_shutdown()
+        self.handlers.clear()
+        log_handler.info("handler manager shut down")
+
     def get_handler(self, name):
         return self.handlers.get(str(name).lower())
 
@@ -209,3 +219,19 @@ class HandlerManager:
         if handler is None:
             return True
         return handler.is_filesystem
+
+
+def build_handler_manager(path_mgr, file_system=None, registry=None):
+    """create a HandlerManager and bind every volume of the path manager
+
+    This is the top-level entry point that turns the configured volumes into
+    registered handlers. ``file_system`` defaults to the volume manager's
+    shared host file system so handlers and the path layer stay consistent.
+    """
+    vol_mgr = path_mgr.get_vol_mgr()
+    if file_system is None:
+        file_system = vol_mgr.file_system
+    mgr = HandlerManager(path_mgr, file_system=file_system, registry=registry)
+    for volume in vol_mgr.get_all_volumes():
+        mgr.bind_volume(volume)
+    return mgr
