@@ -1,10 +1,9 @@
-import ctypes
+from amitools.vamos.display import get_display
+from amitools.vamos.display.base import Rect
 from contextlib import ExitStack
 from amitools.vamos.libtypes import TagList, MsgPort, Message, List, Node
 from amitools.vamos.lib.GraphicsLibrary import BFText, BFDraw, BFTemplate
-from amitools.vamos.lib.graphics_font import render_font_surface
 from amitools.vamos.lib.graphics_support import BitmapBlit
-from amitools.vamos.lib.intuition_input import translate_key
 from amitools.vamos.libcore.impl import LibImpl
 from amitools.vamos.lib.TimerDevice import TimerDevice
 
@@ -63,8 +62,6 @@ from amitools.vamos.machine.regs import (
 )
 from amitools.vamos.libstructs.exec_ import MsgPortStruct, MessageStruct, ListStruct
 
-SDL_USEREVENT_TIMER = 32768 + 11
-
 MENUNULL = 0xFFFF
 
 MENUENABLED = 0x0001
@@ -78,7 +75,6 @@ ITEMENABLED = 0x0010  # Item is enabled/active
 CHECKED = 0x0100
 SUBMENU = 0x0200  # Show standard submenu indicator (V47)
 
-
 IECODE_UP_PREFIX = 0x80
 
 IECODE_LBUTTON = 0x68
@@ -87,16 +83,14 @@ IECODE_MBUTTON = 0x6A
 
 # def ts(label): print(f"{time.perf_counter():.6f} {label}")
 
-
 class IntuitionLibrary(LibImpl):
     def __init__(self):
         super().__init__()
         # default init stuff
         self._easy_last = None
         self.alloc = None
-        self.sdl_window_id_2_window_addr_map = {}  # SDL_Window id -> Amiga window address
-        self.sdl_window_id_2_sdl_window = {}
-        self.sdl_window_id_2_timer = {}
+        self.window_addresses = {}  # Host window ID -> Amiga window address
+        self.host_windows = {}
         self.menu_active = False
         self.mouse_x = 0
         self.mouse_y = 0
@@ -108,7 +102,6 @@ class IntuitionLibrary(LibImpl):
         self.default_screen = None
         self._lib_opened = False  # guard flag
         self._default_title_memory = None
-        self._sdl_flags = 0
         self._screen_fonts = {}
         self._idcmp_owners = {}
         self._reply_owners = {}
@@ -126,6 +119,11 @@ class IntuitionLibrary(LibImpl):
     def setup_lib(self, ctx, base_addr):
         # log_dos.info("setup intuition.library")
         self.alloc = ctx.alloc
+        self.display = get_display(ctx)
+        self._scheduler = getattr(ctx, "scheduler", None)
+        self._pump_callback = lambda: self._pump_display(ctx)
+        self._idle_callback = lambda: self._pump_display(ctx, wait=True)
+        self._display_registered = False
         self.display_scale = getattr(ctx, "display_scale", (1, 1))
         self.display_aspect = getattr(ctx, "display_aspect", "square")
 
@@ -139,19 +137,11 @@ class IntuitionLibrary(LibImpl):
         if self._lib_opened:
             return  # already initialized
 
-        # stay headless without sdl2: functions that really render
-        # import sdl2 themselves and fail only when actually used
-        try:
-            import sdl2
-        except ImportError:
-            log_intui.warning("pysdl2 not installed, no display available")
-            return
-        flags = sdl2.SDL_INIT_VIDEO | sdl2.SDL_INIT_TIMER
-        if sdl2.SDL_Init(flags) != 0:
-            log_intui.warning("SDL initialization failed; no display available")
+        if not self.display.open():
+            log_intui.warning("No host display available")
             return
         with ExitStack() as rollback:
-            rollback.callback(sdl2.SDL_QuitSubSystem, flags)
+            rollback.callback(self.display.close)
             graphics_addr = ctx.lib_mgr.open_lib("graphics.library")
             if not graphics_addr:
                 return
@@ -185,7 +175,6 @@ class IntuitionLibrary(LibImpl):
             self._default_title_memory = title
             self.graphics_lib_addr = graphics_addr
             self.graphics_lib = graphics
-            self._sdl_flags = flags
             self._lib_opened = True
             rollback.pop_all()
 
@@ -200,17 +189,13 @@ class IntuitionLibrary(LibImpl):
             screen = ScreenStruct(ctx.mem, addr) if addr else None
         title = self._default_title_memory
         graphics_addr = self.graphics_lib_addr
-        flags = self._sdl_flags
         self._lib_opened = False
         self.default_screen = None
         self._default_title_memory = None
         self.graphics_lib_addr = None
-        self._sdl_flags = 0
         try:
             with ExitStack() as cleanup:
-                import sdl2
-
-                cleanup.callback(sdl2.SDL_QuitSubSystem, flags)
+                cleanup.callback(self.display.close)
                 cleanup.callback(ctx.lib_mgr.close_lib, graphics_addr)
                 cleanup.callback(ctx.alloc.free_memory, title)
                 if self._pub_list_memory is not None:
@@ -219,7 +204,7 @@ class IntuitionLibrary(LibImpl):
                 self._pub_screen_locks = 0
                 for screen in screens:
                     cleanup.callback(self._free_screen, ctx, screen)
-                for window in tuple(self.sdl_window_id_2_window_addr_map.values()):
+                for window in tuple(self.window_addresses.values()):
                     cleanup.callback(self._close_window_addr, ctx, window)
         finally:
             self.graphics_lib = None
@@ -233,6 +218,7 @@ class IntuitionLibrary(LibImpl):
             owner["messages"].clear()
             self._release_idcmp_port(ctx, owner)
         self._idcmp_owners.clear()
+        self._unregister_display()
 
     def _close_window_addr(self, ctx, addr):
         ctx.cpu.w_reg(REG_A0, addr)
@@ -280,10 +266,10 @@ class IntuitionLibrary(LibImpl):
         ctx.mem.w32(secs_ptr, secs)
         ctx.mem.w32(micros_ptr, micros)
 
-    def find_sdl_window_by_amiga_addr(self, addr):
-        for sdl_win, amiga_addr in self.sdl_window_id_2_window_addr_map.items():
+    def find_window_id(self, addr):
+        for host_window, amiga_addr in self.window_addresses.items():
             if amiga_addr == addr:
-                return sdl_win
+                return host_window
         return None
 
     def CloseWindow(self, ctx):
@@ -301,12 +287,11 @@ class IntuitionLibrary(LibImpl):
         rastport_addr = win.RPort.get()
         user_port_addr = self._window_ports.pop(window_ptr, 0)
 
-        # A removed timer can already have queued an event. Invalidate its
-        # window ID before stopping it or releasing any guest resources.
-        window_id = self.find_sdl_window_by_amiga_addr(window_ptr)
-        sdl_win = self.sdl_window_id_2_sdl_window.pop(window_id, None)
-        timer_id = self.sdl_window_id_2_timer.pop(window_id, 0)
-        self.sdl_window_id_2_window_addr_map.pop(window_id, None)
+        # Invalidate the host ID before releasing guest resources so late
+        # events cannot target a closed window.
+        window_id = self.find_window_id(window_ptr)
+        host_window = self.host_windows.pop(window_id, None)
+        self.window_addresses.pop(window_id, None)
         self._window_scales.pop(window_id, None)
         self.refresh_pending.discard(window_ptr)
         self._pending_window_sizes.pop(window_ptr, None)
@@ -340,10 +325,10 @@ class IntuitionLibrary(LibImpl):
         # Release the port and renderer before the structures and host
         # window they belong to. Attempt all releases if one raises.
         with ExitStack() as cleanup:
-            if sdl_win is not None or timer_id:
-                import sdl2
-            if sdl_win is not None:
-                cleanup.callback(sdl2.SDL_DestroyWindow, sdl_win)
+            if not self.host_windows:
+                cleanup.callback(self._unregister_display)
+            if host_window is not None:
+                cleanup.callback(self.display.close_window, host_window)
             cleanup.callback(win.free, ctx.alloc)
             if title_memory is not None:
                 cleanup.callback(ctx.alloc.free_memory, title_memory)
@@ -354,14 +339,20 @@ class IntuitionLibrary(LibImpl):
             if user_port_addr:
                 user_port = MsgPortStruct(ctx.mem, user_port_addr)
                 cleanup.callback(ctx.exec_lib.DeleteMsgPort, ctx, user_port)
-            if timer_id:
-                sdl2.SDL_RemoveTimer(timer_id)
+            # Capture pending drawing even when a guest opens, draws and
+            # closes without yielding to the scheduler. Cleanup still runs
+            # when the backend cannot write or present its final frame.
+            graphics = self.graphics_lib.get_rp_graphics(rastport_addr)
+            if host_window is not None and graphics is not None:
+                self._flush_batch(graphics)
+                if graphics.present_pending:
+                    graphics.frame.begin()
+                    graphics.frame.finish()
 
     def OpenWindow(self, ctx):
         if self.default_screen is None:
             ctx.cpu.w_reg(REG_D0, 0)
             return
-        import sdl2
 
         new_window_ptr = ctx.cpu.r_reg(REG_A0)
 
@@ -383,7 +374,7 @@ class IntuitionLibrary(LibImpl):
 
         screen = new_win.Screen.get()
 
-        flags = sdl2.SDL_WINDOW_SHOWN
+        flags = False
         # Determine if window should be resizable
         if (
             width > min_width
@@ -391,7 +382,7 @@ class IntuitionLibrary(LibImpl):
             or width < max_width
             or height < max_height
         ):
-            flags |= sdl2.SDL_WINDOW_RESIZABLE
+            flags = True
 
         amiga_win_addr = self.create_window_struct(
             ctx, left, top, width, height, idcmp_flags, title, screen, flags,
@@ -404,7 +395,6 @@ class IntuitionLibrary(LibImpl):
         if self.default_screen is None:
             ctx.cpu.w_reg(REG_D0, 0)
             return
-        import sdl2
 
         taglist_ptr = ctx.cpu.r_reg(REG_A1)
 
@@ -489,14 +479,14 @@ class IntuitionLibrary(LibImpl):
             height,
         )
 
-        flags = sdl2.SDL_WINDOW_SHOWN
+        flags = False
         if (
             width > min_width
             or height > min_height
             or width < max_width
             or height < max_height
         ):
-            flags |= sdl2.SDL_WINDOW_RESIZABLE
+            flags = True
 
         # Return fake Amiga window pointer
         amiga_win_addr = self.create_window_struct(
@@ -780,33 +770,25 @@ class IntuitionLibrary(LibImpl):
             not screen_addr and self.default_screen is None
         ):
             return 0
-        import sdl2
 
         log_intui.info(
-            "Opening SDL2 window: '%s' at (%d, %d) size (%d x %d)",
+            "Opening host window: '%s' at (%d, %d) size (%d x %d)",
             title,
             left,
             top,
             width,
             height,
         )
-        # Create SDL2 window
+        # Create host window
         host_width, host_height = self._display_size(width, height)
-        sdl_win = sdl2.SDL_CreateWindow(
-            title.encode("utf-8"),
-            sdl2.SDL_WINDOWPOS_CENTERED,  # SDL2 doesn't support exact positioning cross-platform
-            sdl2.SDL_WINDOWPOS_CENTERED,
-            host_width,
-            host_height,
-            flags,
-        )
+        host_window = self.display.create_window(title, host_width, host_height, bool(flags))
 
-        if not sdl_win:
-            log_intui.error("Failed to create SDL2 window")
+        if not host_window:
+            log_intui.error("Failed to create host window")
             return 0
 
         with ExitStack() as rollback:
-            rollback.callback(sdl2.SDL_DestroyWindow, sdl_win)
+            rollback.callback(self.display.close_window, host_window)
             title_memory = self.alloc.alloc_memory(
                 len(title.encode("latin-1")) + 1,
                 label="Window title",
@@ -837,7 +819,7 @@ class IntuitionLibrary(LibImpl):
             win.MinWidth.val = win.MinHeight.val = 1
             win.MaxWidth.val = win.MaxHeight.val = 0xFFFF
             # Native toolkits use these fields even for non-GimmeZeroZero
-            # windows. SDL owns the host decorations, so the client has no
+            # windows. The backend owns the host decorations, so the client has no
             # emulated borders and its inner size equals the raster size.
             win.GZZWidth.val, win.GZZHeight.val = width, height
             win.LeftEdge.val, win.TopEdge.val = left, top
@@ -847,7 +829,7 @@ class IntuitionLibrary(LibImpl):
             win.WScreen.val = screen_addr or self.default_screen.addr
             screen = ScreenStruct(ctx.mem, win.WScreen.val)
             rp_addr, layer_addr, _ = self.graphics_lib.create_window_rastport(
-                ctx, sdl_win, width, height, screen.BitMap.Depth.val or 2
+                ctx, host_window, width, height, screen.BitMap.Depth.val or 2
             )
             if not rp_addr:
                 return 0
@@ -864,99 +846,57 @@ class IntuitionLibrary(LibImpl):
                 backing.palette = self.graphics_lib.screen_palettes.get(
                     screen.ViewPort.addr, self.graphics_lib.palette
                 )
-            window_id = sdl2.SDL_GetWindowID(sdl_win)
-            timer_id = sdl2.SDL_AddTimer(
-                50, intuiticks_timer_callback, ctypes.c_void_p(window_id)
-            )
-            if not timer_id:
-                return 0
-            rollback.callback(sdl2.SDL_RemoveTimer, timer_id)
-            ctx.exec_lib.register_SDL_poll(ctx)
+            window_id = host_window.id
             # Only complete windows are visible to events and screen lists.
             win.NextWindow.val = screen.FirstWindow.val
             screen.FirstWindow.val = win.addr
             if user_port is not None:
                 self._window_ports[win.addr] = user_port.addr
             self.rp_2_win_addr[rp_addr] = win.addr
-            self.sdl_window_id_2_window_addr_map[window_id] = win.addr
-            self.sdl_window_id_2_sdl_window[window_id] = sdl_win
-            self.sdl_window_id_2_timer[window_id] = timer_id
+            self.window_addresses[window_id] = win.addr
+            self.host_windows[window_id] = host_window
             self._window_scales[window_id] = (host_width / width, host_height / height)
+            self._register_display()
+            self.refresh(ctx, rp_addr)
             rollback.pop_all()
         return win.addr
 
-    def render(self, ctx, sdl_win, mouse_x=0, mouse_y=0):
-        import sdl2
-
-        window_id = sdl2.SDL_GetWindowID(sdl_win)
-        log_intui.info("render for window %d", window_id)
-
-        try:
-            window_ptr = self.sdl_window_id_2_window_addr_map[window_id]
-        except KeyError:
+    def render(self, ctx, window, mouse_x=0, mouse_y=0):
+        window_ptr = self.window_addresses.get(window.id)
+        if window_ptr is None:
             return
-
-        window = WindowStruct(ctx.mem, window_ptr)
-        rastport_addr = window.RPort.get()
-        rp_graphics = self.graphics_lib.get_rp_graphics(rastport_addr)
-        if not rp_graphics:
-            log_intui.error("No RastPort found for window %08x", window_ptr)
+        win = WindowStruct(ctx.mem, window_ptr)
+        graphics = self.graphics_lib.get_rp_graphics(win.RPort.val)
+        if graphics is None:
             return
+        self._flush_batch(graphics)
+        graphics.frame.begin()
+        if self.menu_active and win.MenuStrip.val:
+            self.draw_menu(ctx, graphics.frame, win.MenuStrip.val, mouse_x, mouse_y)
+        graphics.frame.present(self._window_scales.get(window.id, self.display_scale))
+        graphics.present_pending = False
 
-        # Get window size
-        win_w = ctypes.c_int()
-        win_h = ctypes.c_int()
-        sdl2.SDL_GetWindowSize(sdl_win, ctypes.byref(win_w), ctypes.byref(win_h))
+    def _register_display(self):
+        if self._scheduler is not None and not self._display_registered:
+            self._scheduler.add_after_schedule_callback(self._pump_callback)
+            self._scheduler.add_idle_callback(self._idle_callback)
+            self._display_registered = True
 
-        # Get texture size
-        tex_w = ctypes.c_int()
-        tex_h = ctypes.c_int()
-        sdl2.SDL_QueryTexture(
-            rp_graphics.texture, None, None, ctypes.byref(tex_w), ctypes.byref(tex_h)
-        )
+    def _unregister_display(self):
+        if self._display_registered:
+            self._scheduler.remove_after_schedule_callback(self._pump_callback)
+            self._scheduler.remove_idle_callback(self._idle_callback)
+            self._display_registered = False
 
-        # Clip src_rect to texture bounds
-        scale_x, scale_y = self._window_scales.get(window_id, self.display_scale)
-        src_rect = sdl2.SDL_Rect(
-            0,
-            0,
-            min(int(win_w.value / scale_x), tex_w.value),
-            min(int(win_h.value / scale_y), tex_h.value),
-        )
-        dst_rect = sdl2.SDL_Rect(
-            0, 0, round(src_rect.w * scale_x), round(src_rect.h * scale_y)
-        )
-
-        # Render cropped texture
-        renderer = rp_graphics.renderer
-        sdl2.SDL_SetRenderTarget(renderer, None)
-
-        self._flush_batch(rp_graphics)
-        result = sdl2.SDL_RenderCopy(renderer, rp_graphics.texture, src_rect, dst_rect)
-        if result != 0:
-            log_intui.error(
-                "Failed to render cropped texture for rastport address %08x",
-                rastport_addr,
-            )
-
-        # Draw menu overlay if active
-        if self.menu_active:
-            menu_addr = window.MenuStrip.get()
-            if menu_addr:
-                sdl2.SDL_RenderSetScale(renderer, scale_x, scale_y)
-                try:
-                    self.draw_menu(ctx, renderer, menu_addr, mouse_x, mouse_y)
-                finally:
-                    sdl2.SDL_RenderSetScale(renderer, 1, 1)
-
-        # # Fill with a random color each time
-        # r = random.randint(0, 255)
-        # g = random.randint(0, 255)
-        # b = random.randint(0, 255)
-        # sdl2.SDL_SetRenderDrawColor(renderer, r, g, b, 255)
-        # sdl2.SDL_RenderClear(renderer)
-
-        sdl2.SDL_RenderPresent(renderer)
+    def _pump_display(self, ctx, wait=False):
+        if not self.host_windows:
+            return False
+        self.check_refresh(ctx)
+        for event in self.display.poll(wait_ms=20 if wait else 0):
+            pending = self.ingest_event(ctx, event)
+            if pending is not None:
+                self.drain_pending_intui_events(ctx, pending)
+        return self.display.interactive and bool(self.host_windows)
 
     def encode_selection(self, idx):
         if len(idx) == 2:
@@ -978,70 +918,69 @@ class IntuitionLibrary(LibImpl):
         scale = self._window_scales.get(window_id, self.display_scale)
         return int(x // scale[0]), int(y // scale[1])
 
-    def ingest_sdl_event(self, ctx, event):
-        import sdl2
+    def ingest_event(self, ctx, event):
 
         # Quit is global and has no window ID. Other events must belong
         # to a currently live window; never redirect an unknown ID to 1.
-        if event.type == sdl2.SDL_QUIT:
-            for win_addr in tuple(self.sdl_window_id_2_window_addr_map.values()):
+        if event.kind == "quit":
+            for win_addr in tuple(self.window_addresses.values()):
                 self.queue_idcmp(ctx, win_addr, IDCMP_CLOSEWINDOW)
             return None
-        window_id = getattr(getattr(event, "window", None), "windowID", 0)
-        win_addr = self.sdl_window_id_2_window_addr_map.get(window_id)
+        window_id = event.window_id
+        win_addr = self.window_addresses.get(window_id)
         if win_addr is None:
             return None
 
         # ---------- MOUSE MOTION ----------
-        if event.type == sdl2.SDL_MOUSEMOTION:
-            mx, my = self._guest_mouse(event.motion.x, event.motion.y, window_id)
+        if event.kind == "motion":
+            mx, my = self._guest_mouse(event.x, event.y, window_id)
 
             # Menu hover redraw
             if self.menu_active:
-                sdl_win = sdl2.SDL_GetWindowFromID(window_id)
-                self.render(ctx, sdl_win, mx, my)
+                host_window = self.host_windows[window_id]
+                self.render(ctx, host_window, mx, my)
 
             return PendingIntuiEvent(win_addr, IDCMP_MOUSEMOVE, mx, my, 0, window_id)
 
         # ---------- MOUSE BUTTON DOWN ----------
-        elif event.type == sdl2.SDL_MOUSEBUTTONDOWN:
-            mx, my = self._guest_mouse(event.button.x, event.button.y, window_id)
-            btn = event.button.button
+        elif event.kind == "button_down":
+            mx, my = self._guest_mouse(event.x, event.y, window_id)
+            btn = event.button
 
             # IECODE mapping
-            if btn == sdl2.SDL_BUTTON_LEFT:
+            if btn == 1:
                 code = 0x68
-            elif btn == sdl2.SDL_BUTTON_RIGHT:
+            elif btn == 3:
                 code = 0x69
-            elif btn == sdl2.SDL_BUTTON_MIDDLE:
+            elif btn == 2:
                 code = 0x6A
             else:
                 code = 0
 
             # Menu activation
-            if btn == sdl2.SDL_BUTTON_RIGHT and not self.menu_active:
+            if btn == 3 and not self.menu_active:
                 self.menu_active = True
                 self.hovered_item = None
                 self.hovered_item_index = []
                 self.submenu_rects = []
-                sdl_win = sdl2.SDL_GetWindowFromID(window_id)
-                self.render(ctx, sdl_win, mx, my)
+                host_window = self.host_windows[window_id]
+                self.render(ctx, host_window, mx, my)
 
             return PendingIntuiEvent(
                 win_addr, IDCMP_MOUSEBUTTONS, mx, my, code, window_id
             )
 
         # ---------- MOUSE BUTTON UP ----------
-        elif event.type == sdl2.SDL_MOUSEBUTTONUP:
-            mx, my = self._guest_mouse(event.button.x, event.button.y, window_id)
-            btn = event.button.button
+        elif event.kind == "button_up":
+            mx, my = self._guest_mouse(event.x, event.y, window_id)
+            btn = event.button
 
             # IECODE mapping
-            if btn == sdl2.SDL_BUTTON_LEFT:
+            if btn == 1:
                 code = 0xE8
-            elif btn == sdl2.SDL_BUTTON_RIGHT:
+            elif btn == 3:
                 code = 0xE9
-            elif btn == sdl2.SDL_BUTTON_MIDDLE:
+            elif btn == 2:
                 code = 0xEA
             else:
                 code = 0
@@ -1065,8 +1004,8 @@ class IntuitionLibrary(LibImpl):
                 self.hovered_item_index = []
                 self.submenu_rects = []
 
-                sdl_win = sdl2.SDL_GetWindowFromID(window_id)
-                self.render(ctx, sdl_win)
+                host_window = self.host_windows[window_id]
+                self.render(ctx, host_window)
 
                 # Deliver MENUPICK immediately
                 self.queue_idcmp(ctx, win_addr, IDCMP_MENUPICK, mx, my, code=selection)
@@ -1074,29 +1013,24 @@ class IntuitionLibrary(LibImpl):
 
             # Normal button-up
             if self.menu_active and btn in (
-                sdl2.SDL_BUTTON_LEFT,
-                sdl2.SDL_BUTTON_RIGHT,
+                1,
+                3,
             ):
                 self.menu_active = False
                 self.hovered_item = None
                 self.hovered_item_index = []
                 self.submenu_rects = []
-                sdl_win = sdl2.SDL_GetWindowFromID(window_id)
-                self.render(ctx, sdl_win)
+                host_window = self.host_windows[window_id]
+                self.render(ctx, host_window)
 
             return PendingIntuiEvent(
                 win_addr, IDCMP_MOUSEBUTTONS, mx, my, code, window_id
             )
 
         # ---------- KEYBOARD ----------
-        elif event.type in (sdl2.SDL_KEYDOWN, sdl2.SDL_KEYUP):
+        elif event.kind == "key":
             win = WindowStruct(ctx.mem, win_addr)
-            key = translate_key(
-                event.key.keysym,
-                released=event.type == sdl2.SDL_KEYUP,
-                repeat=bool(event.key.repeat),
-                vanilla=bool(win.IDCMPFlags.val & IDCMP_VANILLAKEY),
-            )
+            key = event.text_key if win.IDCMPFlags.val & IDCMP_VANILLAKEY else event.raw_key
             if key is not None:
                 vanilla, code, qualifier = key
                 return PendingIntuiEvent(
@@ -1109,36 +1043,21 @@ class IntuitionLibrary(LibImpl):
                     qualifier,
                 )
 
-        # ---------- WINDOW EVENTS ----------
-        elif event.type == sdl2.SDL_WINDOWEVENT:
-            we = event.window.event
-
-            if we == sdl2.SDL_WINDOWEVENT_RESIZED:
-                scale = self._window_scales.get(window_id, self.display_scale)
-                new_w = max(1, int(event.window.data1 / scale[0]))
-                new_h = max(1, int(event.window.data2 / scale[1]))
-
-                if self._resize_window(ctx, win_addr, new_w, new_h):
-                    return PendingIntuiEvent(win_addr, IDCMP_NEWSIZE, 0, 0, 0, window_id)
-
-            elif we == sdl2.SDL_WINDOWEVENT_EXPOSED:
-                # Only one refresh per expose
-                win = WindowStruct(ctx.mem, win_addr)
-                rastport_addr = win.RPort.get()
-                self.refresh(ctx, rastport_addr)
-                return PendingIntuiEvent(
-                    win_addr, IDCMP_REFRESHWINDOW, 0, 0, 0, window_id
-                )
-
-            elif we == sdl2.SDL_WINDOWEVENT_CLOSE:
-                return PendingIntuiEvent(
-                    win_addr, IDCMP_CLOSEWINDOW, 0, 0, 0, window_id
-                )
-
+        elif event.kind == "resize":
+            scale = self._window_scales.get(window_id, self.display_scale)
+            width, height = max(1, int(event.x / scale[0])), max(1, int(event.y / scale[1]))
+            if self._resize_window(ctx, win_addr, width, height):
+                return PendingIntuiEvent(win_addr, IDCMP_NEWSIZE, 0, 0, 0, window_id)
+        elif event.kind == "expose":
+            win = WindowStruct(ctx.mem, win_addr)
+            self.refresh(ctx, win.RPort.val)
+            return PendingIntuiEvent(win_addr, IDCMP_REFRESHWINDOW, 0, 0, 0, window_id)
+        elif event.kind == "close":
+            return PendingIntuiEvent(win_addr, IDCMP_CLOSEWINDOW, 0, 0, 0, window_id)
         return None
 
     def drain_pending_intui_events(self, ctx, e):
-        if self.sdl_window_id_2_window_addr_map.get(e.window_id) != e.win_addr:
+        if self.window_addresses.get(e.window_id) != e.win_addr:
             return
         self.queue_idcmp(
             ctx, e.win_addr, e.idcmp_flag, e.mouse_x, e.mouse_y, e.code, e.qualifier
@@ -1147,7 +1066,7 @@ class IntuitionLibrary(LibImpl):
     def queue_idcmp(
         self, ctx, win_addr, idcmp_flag, mouse_x=0, mouse_y=0, code=0, qualifier=0
     ):
-        if self.find_sdl_window_by_amiga_addr(win_addr) is None:
+        if self.find_window_id(win_addr) is None:
             return
         win = WindowStruct(ctx.mem, win_addr)
         if idcmp_flag in (IDCMP_MOUSEMOVE, IDCMP_MOUSEBUTTONS):
@@ -1316,84 +1235,11 @@ class IntuitionLibrary(LibImpl):
             "Menu selection handled: %s", ctx.mem.r_cstr(item.ItemFill.get())
         )
 
-    def render_menu_item(
-        self,
-        ctx,
-        renderer,
-        text,
-        x,
-        y,
-        w,
-        h,
-        enabled=True,
-        hovered=False,
-        checked=False,
-        shortcut=None,
-    ):
-        import sdl2
-
-        amiga_font = self.graphics_lib.topaz_font
-        font = self.graphics_lib.font_registry.get(amiga_font)
-        if not font:
-            return
-
-        # Farben
-        if not enabled:
-            bg_color = (96, 96, 96)
-            text_color = sdl2.SDL_Color(160, 160, 160)
-        else:
-            bg_color = (255, 255, 255) if hovered else (32, 32, 32)
-            text_color = (
-                sdl2.SDL_Color(0, 0, 0) if hovered else sdl2.SDL_Color(222, 222, 222)
-            )
-
-        # Hintergrund
-        sdl2.SDL_SetRenderDrawColor(renderer, *bg_color, 255)
-        sdl2.SDL_RenderFillRect(renderer, sdl2.SDL_Rect(x, y, w, h))
-
-        # Checkmark
-        if checked:
-            # Coordinates relative to the menu item box
-            # Adjust offsets and lengths to taste
-            start_x = x + 4
-            start_y = y + 8
-            mid_x = x + 8
-            mid_y = y + 12
-            end_x = x + 14
-            end_y = y + 4
-
-            sdl2.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255)
-
-            # Draw the "tick" shape: short down-left stroke, then long up-right stroke
-            sdl2.SDL_RenderDrawLine(renderer, start_x, start_y, mid_x, mid_y)
-            sdl2.SDL_RenderDrawLine(renderer, mid_x, mid_y, end_x, end_y)
-
-        # Text
-        if text:
-            text_surface = render_font_surface(font, text, text_color)
-            if text_surface:
-                text_texture = sdl2.SDL_CreateTextureFromSurface(renderer, text_surface)
-                text_rect = sdl2.SDL_Rect(
-                    x + 16, y + 2, text_surface.contents.w, text_surface.contents.h
-                )
-                sdl2.SDL_RenderCopy(renderer, text_texture, None, text_rect)
-                sdl2.SDL_FreeSurface(text_surface)
-                sdl2.SDL_DestroyTexture(text_texture)
-
-        # Shortcut rechts
-        if shortcut:
-            sc_surface = render_font_surface(font, shortcut, text_color)
-            if sc_surface:
-                sc_texture = sdl2.SDL_CreateTextureFromSurface(renderer, sc_surface)
-                sc_rect = sdl2.SDL_Rect(
-                    x + w - sc_surface.contents.w - 4,
-                    y + 2,
-                    sc_surface.contents.w,
-                    sc_surface.contents.h,
-                )
-                sdl2.SDL_RenderCopy(renderer, sc_texture, None, sc_rect)
-                sdl2.SDL_FreeSurface(sc_surface)
-                sdl2.SDL_DestroyTexture(sc_texture)
+    def render_menu_item(self, ctx, frame, text, x, y, w, h, enabled=True,
+                         hovered=False, checked=False, shortcut=None):
+        font = self.graphics_lib.font_registry.get(self.graphics_lib.topaz_font)
+        if font is not None:
+            frame.menu_item(font, text, x, y, w, h, enabled, hovered, checked, shortcut)
 
     def draw_menus(self, ctx, renderer, top_menu_addr):
         item_addr = top_menu_addr
@@ -1693,7 +1539,6 @@ class IntuitionLibrary(LibImpl):
                     cleanup.callback(ctx.alloc.free_mem, plane, plane_size)
 
     def ScrollWindowRaster(self, ctx):
-        import sdl2
 
         win_addr = ctx.cpu.r_reg(REG_A1)
         if not win_addr:
@@ -1711,46 +1556,12 @@ class IntuitionLibrary(LibImpl):
         if (not dx and not dy) or left > right or top > bottom:
             return
         self._flush_batch(graphics)
-        renderer = graphics.renderer
-        if hasattr(graphics, "surface"):
-            rp = RastPortStruct(ctx.mem, win.RPort.val)
-            state = self.graphics_lib._raster_state(ctx, rp)
-            graphics.surface.scroll(state, left, top, right, bottom, dx, dy)
-            self._upload_surface(graphics)
-        else:
-            temporary = sdl2.SDL_CreateTexture(
-                renderer,
-                sdl2.SDL_PIXELFORMAT_RGBA8888,
-                sdl2.SDL_TEXTUREACCESS_TARGET,
-                graphics.width,
-                graphics.height,
-            )
-            if not temporary:
-                return
-            try:
-                sdl2.SDL_SetRenderTarget(renderer, temporary)
-                sdl2.SDL_RenderCopy(renderer, graphics.texture, None, None)
-                sdl2.SDL_SetRenderTarget(renderer, graphics.texture)
-                rp = RastPortStruct(ctx.mem, win.RPort.val)
-                color = self.graphics_lib._pen_color(ctx, rp, rp.BgPen.val)
-                sdl2.SDL_SetRenderDrawBlendMode(renderer, sdl2.SDL_BLENDMODE_NONE)
-                sdl2.SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255)
-                sdl2.SDL_RenderFillRect(
-                    renderer,
-                    sdl2.SDL_Rect(left, top, right - left + 1, bottom - top + 1),
-                )
-                width, height = right - left + 1 - abs(dx), bottom - top + 1 - abs(dy)
-                if width > 0 and height > 0:
-                    source = sdl2.SDL_Rect(
-                        left + max(dx, 0), top + max(dy, 0), width, height
-                    )
-                    target = sdl2.SDL_Rect(
-                        left + max(-dx, 0), top + max(-dy, 0), width, height
-                    )
-                    sdl2.SDL_RenderCopy(renderer, temporary, source, target)
-            finally:
-                sdl2.SDL_SetRenderTarget(renderer, None)
-                sdl2.SDL_DestroyTexture(temporary)
+        rp = RastPortStruct(ctx.mem, win.RPort.val)
+        state = self.graphics_lib._raster_state(ctx, rp)
+        if state is None:
+            return
+        graphics.surface.scroll(state, left, top, right, bottom, dx, dy)
+        self._upload_surface(graphics)
         if win.WLayer.val:
             layer = LayerStruct(ctx.mem, win.WLayer.val)
             damage = layer.DamageList.val
@@ -1762,13 +1573,13 @@ class IntuitionLibrary(LibImpl):
                     + [(left, top, right, bottom)],
                 )
         self.refresh(ctx, win.RPort.val)
-        window_id = self.find_sdl_window_by_amiga_addr(win_addr)
+        window_id = self.find_window_id(win_addr)
         self.drain_pending_intui_events(
             ctx, PendingIntuiEvent(win_addr, IDCMP_REFRESHWINDOW, 0, 0, 0, window_id)
         )
 
     def WindowLimits(self, ctx, window, widthMin, heightMin, widthMax, heightMax):
-        if self.find_sdl_window_by_amiga_addr(window) is None:
+        if self.find_window_id(window) is None:
             return 0
         win = WindowStruct(ctx.mem, window)
         success = 1
@@ -1787,7 +1598,7 @@ class IntuitionLibrary(LibImpl):
         return success
 
     def SizeWindow(self, ctx, window, dx, dy):
-        if self.find_sdl_window_by_amiga_addr(window) is None:
+        if self.find_window_id(window) is None:
             return
         win = WindowStruct(ctx.mem, window)
         width, height = self._pending_window_sizes.get(window, (win.Width.val, win.Height.val))
@@ -1812,13 +1623,12 @@ class IntuitionLibrary(LibImpl):
         return True
 
     def check_refresh(self, ctx):
-        import sdl2
         pending, self._pending_window_sizes = self._pending_window_sizes, {}
         for window, (width, height) in pending.items():
-            window_id = self.find_sdl_window_by_amiga_addr(window)
+            window_id = self.find_window_id(window)
             if window_id is not None and self._resize_window(ctx, window, width, height):
                 scale = self._window_scales.get(window_id, self.display_scale)
-                sdl2.SDL_SetWindowSize(self.sdl_window_id_2_sdl_window[window_id],
+                self.display.resize_window(self.host_windows[window_id],
                                      round(width * scale[0]), round(height * scale[1]))
                 self.queue_idcmp(ctx, window, IDCMP_NEWSIZE)
                 self.queue_idcmp(ctx, window, IDCMP_REFRESHWINDOW)
@@ -1827,7 +1637,7 @@ class IntuitionLibrary(LibImpl):
         # another IDCMP_REFRESHWINDOW (which would ask the guest to redraw).
         if self.graphics_lib is not None:
             for rp_addr, backing in self.graphics_lib.rp_graphics_map.items():
-                if backing.batch.commands or getattr(
+                if backing.batch.commands or getattr(backing, "present_pending", False) or getattr(
                     getattr(backing, "surface", None), "dirty", False
                 ):
                     win_addr = self.rp_2_win_addr.get(rp_addr)
@@ -1848,9 +1658,9 @@ class IntuitionLibrary(LibImpl):
 
     def _perform_refresh(self, ctx, win_addr):
         try:
-            window_id = self.find_sdl_window_by_amiga_addr(win_addr)
-            sdl_win = self.sdl_window_id_2_sdl_window[window_id]
-            self.render(ctx, sdl_win, 0, 100)  # not in the menu
+            window_id = self.find_window_id(win_addr)
+            host_window = self.host_windows[window_id]
+            self.render(ctx, host_window, 0, 100)  # not in the menu
         except KeyError:
             pass
 
@@ -1873,7 +1683,6 @@ class IntuitionLibrary(LibImpl):
 
     # --- intuition.library: EndRefresh ---
     def EndRefresh(self, ctx):
-        import sdl2
 
         cpu = ctx.cpu
         win_addr = cpu.r_reg(REG_A0)
@@ -1883,9 +1692,6 @@ class IntuitionLibrary(LibImpl):
         rastport_addr = win.RPort.get()
         rp_graphics = self.graphics_lib.get_rp_graphics(rastport_addr)
         batch = rp_graphics.batch
-
-        renderer = rp_graphics.renderer
-        texture = rp_graphics.texture
 
         self._flush_batch(rp_graphics)
         rp_graphics.clip_rects = None
@@ -1923,37 +1729,14 @@ class IntuitionLibrary(LibImpl):
         rc = 0
         cpu.w_reg(REG_D0, rc)
 
-    def _execute_batch(self, renderer, batch):
-        for command in batch.commands:
-            if isinstance(command, BFText):
-                self._execute_texts(renderer, [command])
-            elif isinstance(command, BFDraw):
-                self._execute_draws(renderer, [command])
-            else:
-                self._execute_rectfills(renderer, [command])
 
     def _upload_surface(self, graphics):
-        import sdl2
-
-        colors = getattr(graphics, "palette", self.graphics_lib.palette)
-        values = [
-            (color.r << 24) | (color.g << 16) | (color.b << 8) | 255
-            for color in (colors[i] for i in range(256))
-        ]
-        pixels = (ctypes.c_uint32 * len(graphics.surface.pixels))(
-            *(values[index] for index in graphics.surface.pixels)
-        )
-        sdl2.SDL_SetRenderTarget(graphics.renderer, None)
-        if (
-            sdl2.SDL_UpdateTexture(graphics.texture, None, pixels, graphics.width * 4)
-            != 0
-        ):
-            raise RuntimeError("SDL texture update failed")
+        palette = getattr(graphics, "palette", self.graphics_lib.palette)
+        graphics.frame.upload(graphics.surface.pixels, palette)
         graphics.surface.dirty = False
+        graphics.present_pending = True
 
     def _execute_indexed(self, graphics, command, clip):
-        import sdl2
-        from sdl2 import sdlttf
 
         surface, state = graphics.surface, command.state
         if isinstance(command, BFDraw):
@@ -1968,163 +1751,50 @@ class IntuitionLibrary(LibImpl):
         elif not isinstance(command, BFText):
             surface.fill(state, command.x, command.y, command.w, command.h, clip)
         else:
-            glyphs = sdlttf.TTF_RenderUTF8_Solid(
-                command.font,
-                command.string.encode("utf-8"),
-                sdl2.SDL_Color(255, 255, 255, 255),
-            )
-            if not glyphs:
-                return
-            with ExitStack() as cleanup:
-                cleanup.callback(sdl2.SDL_FreeSurface, glyphs)
-                rgba = sdl2.SDL_ConvertSurfaceFormat(
-                    glyphs, sdl2.SDL_PIXELFORMAT_RGBA8888, 0
-                )
-                if not rgba:
-                    return
-                cleanup.callback(sdl2.SDL_FreeSurface, rgba)
-                image = rgba.contents
-                if sdl2.SDL_LockSurface(rgba) != 0:
-                    return
-                cleanup.callback(sdl2.SDL_UnlockSurface, rgba)
-                width = image.w + max(0, state.spacing)
-                for y in range(image.h):
-                    row = ctypes.cast(
-                        image.pixels + y * image.pitch, ctypes.POINTER(ctypes.c_uint32)
-                    )
-                    for x in range(width):
-                        opaque = x < image.w and (row[x] & 255) != 0
-                        surface.paint(state, command.x + x, command.y + y, opaque, clip)
+            width, height, pixels = self.display.font_mask(command.font, command.string)
+            surface.template(state, command.x, command.y, width, height, pixels, clip)
 
     def _flush_batch(self, graphics):
         if not graphics.batch.commands:
             if getattr(getattr(graphics, "surface", None), "dirty", False):
                 self._upload_surface(graphics)
             return
-        import sdl2
-
-        renderer = graphics.renderer
-        sdl2.SDL_SetRenderTarget(renderer, graphics.texture)
-        try:
-            clips = getattr(graphics, "clip_rects", None)
-            if clips is None:
-                clips = [graphics.clip_rect]
-            user_clips = getattr(graphics, "user_clip_rects", None)
-            if user_clips is not None:
-                combined = []
-                for clip in clips:
-                    for user in user_clips:
-                        if clip is None:
-                            combined.append(user)
-                        else:
-                            x, y = max(clip.x, user.x), max(clip.y, user.y)
-                            right = min(clip.x + clip.w, user.x + user.w)
-                            bottom = min(clip.y + clip.h, user.y + user.h)
-                            if right > x and bottom > y:
-                                combined.append(sdl2.SDL_Rect(x, y, right - x, bottom - y))
-                clips = combined
-            indexed = hasattr(graphics, "surface") and all(
-                command.state is not None for command in graphics.batch.commands
-            )
-            if indexed:
-                graphics.surface.load(graphics.batch.commands[0].state)
+        clips = graphics.clip_rects
+        if clips is None:
+            clips = [graphics.clip_rect]
+        user_clips = getattr(graphics, "user_clip_rects", None)
+        if user_clips is not None:
+            combined = []
             for clip in clips:
-                if indexed:
-                    for command in graphics.batch.commands:
-                        self._execute_indexed(graphics, command, clip)
-                else:
-                    sdl2.SDL_RenderSetClipRect(renderer, clip)
-                    self._execute_batch(renderer, graphics.batch)
-            if indexed:
-                try:
-                    self._upload_surface(graphics)
-                finally:
-                    # Guest pixels already changed. A failed presentation
-                    # must retry the upload, not replay XOR operations.
-                    graphics.batch.clear()
-            else:
+                for user in user_clips:
+                    if clip is None:
+                        combined.append(user)
+                    else:
+                        x, y = max(clip.x, user.x), max(clip.y, user.y)
+                        right = min(clip.x + clip.w, user.x + user.w)
+                        bottom = min(clip.y + clip.h, user.y + user.h)
+                        if right > x and bottom > y:
+                            combined.append(Rect(x, y, right - x, bottom - y))
+            clips = combined
+        commands = graphics.batch.commands
+        # All normal drawing commands carry guest raster state. Invalid,
+        # bitmap-less RastPorts cannot be drawn into a host framebuffer.
+        if all(command.state is not None for command in commands):
+            graphics.surface.load(commands[0].state)
+            for clip in clips:
+                for command in commands:
+                    self._execute_indexed(graphics, command, clip)
+            try:
+                self._upload_surface(graphics)
+            finally:
+                # Guest pixels already changed; never replay XOR after failure.
                 graphics.batch.clear()
-        finally:
-            sdl2.SDL_RenderSetClipRect(renderer, None)
-            sdl2.SDL_SetRenderTarget(renderer, None)
-
-    def _execute_rectfills(self, renderer, rectfills):
-        import sdl2
-
-        for rf in rectfills:
-            sdl2.SDL_SetRenderDrawBlendMode(
-                renderer,
-                (
-                    sdl2.SDL_BLENDMODE_NONE
-                    if rf.draw_mode in (0, 1)
-                    else sdl2.SDL_BLENDMODE_MOD
-                ),
-            )
-            sdl2.SDL_SetRenderDrawColor(
-                renderer, rf.color.r, rf.color.g, rf.color.b, 255
-            )
-            rect = sdl2.SDL_Rect(rf.x, rf.y, rf.w, rf.h)
-            sdl2.SDL_RenderFillRect(renderer, rect)
-
-    def _execute_draws(self, renderer, draws):
-        import sdl2
-
-        for d in draws:
-            sdl2.SDL_SetRenderDrawBlendMode(
-                renderer,
-                (
-                    sdl2.SDL_BLENDMODE_NONE
-                    if d.draw_mode in (0, 1)
-                    else sdl2.SDL_BLENDMODE_MOD
-                ),
-            )
-            sdl2.SDL_SetRenderDrawColor(renderer, d.color.r, d.color.g, d.color.b, 255)
-            sdl2.SDL_RenderDrawLine(renderer, d.x1, d.y1, d.x2, d.y2)
-
-    def _execute_texts(self, renderer, texts):
-        import sdl2
-        from sdl2 import sdlttf
-
-        for text in texts:
-            mode = text.draw_mode & 3
-            foreground, background = text.fg, text.bg
-            if text.draw_mode & 4:  # INVERSVID swaps the two pens.
-                foreground, background = background, foreground
-            if mode == 1:  # JAM2 fills the text background as well.
-                surface = sdlttf.TTF_RenderUTF8_Shaded(
-                    text.font, text.string.encode("utf-8"), foreground, background
-                )
-            else:
-                surface = sdlttf.TTF_RenderUTF8_Solid(
-                    text.font, text.string.encode("utf-8"), foreground
-                )
-            if not surface:
-                continue
-            with ExitStack() as cleanup:
-                cleanup.callback(sdl2.SDL_FreeSurface, surface)
-                texture = sdl2.SDL_CreateTextureFromSurface(renderer, surface)
-                if not texture:
-                    continue
-                cleanup.callback(sdl2.SDL_DestroyTexture, texture)
-                rect = sdl2.SDL_Rect(
-                    text.x, text.y, surface.contents.w, surface.contents.h
-                )
-                sdl2.SDL_RenderCopy(renderer, texture, None, rect)
+        else:
+            graphics.batch.clear()
 
 
-@ctypes.CFUNCTYPE(ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p)
-def intuiticks_timer_callback(interval, param):
-    import sdl2
 
-    window_id = ctypes.cast(param, ctypes.c_void_p).value
 
-    event = sdl2.SDL_Event()
-    event.type = SDL_USEREVENT_TIMER
-    event.window.windowID = window_id  # Embed window ID here
-    event.user.data1 = None
-    event.user.data2 = None
-    sdl2.SDL_PushEvent(ctypes.byref(event))
-    return interval
 
 
 class PendingIntuiEvent:

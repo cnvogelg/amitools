@@ -1,4 +1,4 @@
-"""Indexed raster operations shared by the SDL backing and guest planes."""
+"""Indexed raster operations shared by the host framebuffer and guest planes."""
 
 from dataclasses import dataclass, replace
 

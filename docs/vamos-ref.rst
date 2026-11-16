@@ -192,8 +192,8 @@ Exception names accepted by ``--hw-exception`` are ``bus``, ``address``,
 ``illegal``, ``zero_div``, ``chk``, ``trapv``, ``priv``, ``trace``, ``line_a``,
 ``line_f``, ``irqs``, and ``traps``.
 
-SDL display
------------
+Display backends
+----------------
 
 * ``--display-scale N`` or ``--display-scale XxY``: Scale host windows by
   integer factors from 1 to 8 (default: 1). Guest dimensions are unchanged.
@@ -201,6 +201,13 @@ SDL display
   axis scales, or present the entire window at 4:3 using its scaled width.
   The default is ``square``. For example:
   ``vamos --display-scale 2 --display-aspect 4:3 myprog``.
+
+* ``--display-backend sdl|png``: Select interactive SDL windows (default) or
+  offline PNG frames without SDL.
+* ``--display-output PATH``: PNG output directory (default ``vamos-frames``).
+  Files are named ``window-0001.png`` and contain the latest guest-resolution
+  frame for each window. The PNG backend requests normal guest window closure
+  at idle. INI settings are ``backend`` and ``output`` in ``[display]``.
 
 Disks, libraries, and devices
 -----------------------------

@@ -20,15 +20,19 @@ class DisplayParser(Parser):
             {
                 "display": {
                     "scale": "1",
+                    "backend": Value(str, "sdl", enum=("sdl", "png")),
+                    "output": "vamos-frames",
                     "aspect": Value(str, "square", enum=("square", "4:3")),
                 }
             },
             {
                 "display": {
+                    "backend": Argument("--display-backend", help="display backend: sdl or png"),
+                    "output": Argument("--display-output", help="PNG output directory"),
                     "scale": Argument(
                         "--display-scale",
                         action="store",
-                        help="SDL window scale: N or XxY (1..8)",
+                        help="Window scale: N or XxY (1..8)",
                     ),
                     "aspect": Argument(
                         "--display-aspect",
@@ -39,6 +43,6 @@ class DisplayParser(Parser):
             },
             "display",
             "host display options",
-            {"display": {"scale": "scale", "aspect": "aspect"}},
+            {"display": {"scale": "scale", "aspect": "aspect", "backend": "backend", "output": "output"}},
             "display",
         )

@@ -1,5 +1,4 @@
 import os
-import ctypes
 import time
 import struct
 from contextlib import ExitStack
@@ -28,6 +27,8 @@ from amitools.vamos.lib.graphics import (
 from amitools.vamos.lib.intuition import TextFontStruct, WindowStruct
 from amitools.vamos.log import log_main, log_gfx
 from dataclasses import dataclass
+from amitools.vamos.display import get_display
+from amitools.vamos.display.base import Rect, Color
 from amitools.vamos.lib.graphics_surface import RasterState, RasterSurface
 from amitools.vamos.lib.graphics_support import GraphicsSupport
 from amitools.vamos.lib.graphics_base import GfxBaseStruct
@@ -36,8 +37,6 @@ from amitools.vamos.libstructs import NodeType
 from amitools.vamos.lib.graphics_font import (
     BitmapFont,
     load_topaz_font,
-    open_pixel_font,
-    read_font_strike,
 )
 
 
@@ -72,6 +71,7 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
     def setup_lib(self, ctx, base_addr):
         self.alloc = ctx.alloc
         ctx.exec_lib.graphics_lib = self
+        self.display = get_display(ctx)
         self.gfx_base = GfxBaseStruct(ctx.mem, base_addr)
         List(ctx.mem, self.gfx_base.TextFonts.addr).new(NodeType.NT_FONT)
         self.gfx_base.DisplayFlags.val = 4  # PAL
@@ -82,16 +82,11 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
     def open_lib(self, ctx, open_cnt):
         if self._lib_opened:
             return
-        try:
-            from sdl2 import sdlttf
-        except ImportError:
-            return
-        if sdlttf.TTF_Init() != 0:
-            log_main.error("TTF_Init failed")
-            return
+        self.display = get_display(ctx)
+        self.display.open_fonts()
         try:
             with ExitStack() as rollback:
-                rollback.callback(sdlttf.TTF_Quit)
+                rollback.callback(self.display.close_fonts)
                 self.fontsPath = ctx.path_mgr.to_sys_path("FONTS:")
                 if self.fontsPath is None:
                     self.fontsPath = os.path.join(os.path.dirname(__file__), "fonts")
@@ -198,7 +193,7 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
     # Unified RastPort + BitMap creation helpers
     # ---------------------------------------------------------------------
 
-    def create_window_rastport(self, ctx, sdl_win, width, height, depth=2):
+    def create_window_rastport(self, ctx, window, width, height, depth=2):
         with ExitStack() as rollback:
             objects = []
             for struct in (BitMapStruct, LayerStruct, RastPortStruct):
@@ -230,7 +225,7 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
             rp.cp_y.val = rp.TxBaseline.val
             rp.BitMap.val, rp.Layer.val = bm.addr, layer.addr
             layer.rp.val = rp.addr
-            if not self.alloc_rast_port_graphics(ctx, rp.addr, sdl_win, width, height):
+            if not self.alloc_rast_port_graphics(ctx, rp.addr, window, width, height):
                 return 0, 0, 0
             rollback.callback(self.free_rast_port_graphics, ctx, rp.addr)
             self._rastport_resources[rp.addr] = rollback.pop_all()
@@ -243,7 +238,6 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
 
     def resize_window_rastport(self, ctx, rp_addr, width, height):
         """Replace pixels and texture atomically, keeping guest pointers stable."""
-        import sdl2
 
         backing = self.rp_graphics_map.get(rp_addr)
         if backing is None or not (0 < width <= 32767 and 0 < height <= 32767):
@@ -259,12 +253,10 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
                 return False
             rollback.callback(self.FreeBitMap, ctx, addr)
             new = BitMapStruct(ctx.mem, addr)
-            texture = sdl2.SDL_CreateTexture(
-                backing.renderer, sdl2.SDL_PIXELFORMAT_RGBA8888,
-                sdl2.SDL_TEXTUREACCESS_TARGET, width, height)
-            if not texture:
+            frame = backing.frame.replacement(width, height)
+            if frame is None:
                 return False
-            rollback.callback(sdl2.SDL_DestroyTexture, texture)
+            rollback.callback(frame.close)
             stride = min(old.BytesPerRow.val, new.BytesPerRow.val)
             for plane in range(old.Depth.val):
                 for y in range(min(old.Rows.val, height)):
@@ -276,8 +268,8 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
             ctx.mem.w_block(old.addr, ctx.mem.r_block(addr, BitMapStruct.get_size()))
             self._free_window_planes(old.addr)
             self._window_planes[old.addr] = self._bitmaps.pop(addr)
-            sdl2.SDL_DestroyTexture(backing.texture)
-            backing.texture, backing.surface = texture, surface
+            backing.frame.close()
+            backing.frame, backing.surface = frame, surface
             backing.width, backing.height = width, height
             surface.load(self._raster_state(ctx, rp))
             surface.dirty = True
@@ -328,56 +320,25 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
         # --- Free RastPort ---
         rp.free(ctx.alloc)
 
-        # --- Free SDL renderer + texture ---
+        # Release the host framebuffer.
         self.free_rast_port_graphics(ctx, rp_addr)
 
-    def alloc_rast_port_graphics(self, ctx, rastport_addr, sdl_win, width, height):
-        import sdl2
-
-        renderer = sdl2.SDL_CreateRenderer(
-            sdl_win,
-            -1,
-            sdl2.SDL_RENDERER_ACCELERATED | sdl2.SDL_RENDERER_PRESENTVSYNC,
-        )
-        if not renderer:
-            renderer = sdl2.SDL_CreateRenderer(sdl_win, -1, 0)
-        if not renderer:
+    def alloc_rast_port_graphics(self, ctx, rastport_addr, window, width, height):
+        self.display = get_display(ctx)
+        frame = self.display.create_frame(window, width, height)
+        if frame is None:
             return False
-        with ExitStack() as rollback:
-            rollback.callback(sdl2.SDL_DestroyRenderer, renderer)
-            texture = sdl2.SDL_CreateTexture(
-                renderer,
-                sdl2.SDL_PIXELFORMAT_RGBA8888,
-                sdl2.SDL_TEXTUREACCESS_TARGET,
-                width,
-                height,
-            )
-            if not texture:
-                return False
-            rollback.callback(sdl2.SDL_DestroyTexture, texture)
-            if sdl2.SDL_SetRenderTarget(renderer, texture) == -1:
-                return False
-            if sdl2.SDL_SetRenderDrawColor(renderer, 168, 168, 168, 255) == -1:
-                return False
-            if sdl2.SDL_RenderClear(renderer) == -1:
-                return False
-            if sdl2.SDL_SetRenderTarget(renderer, None) == -1:
-                return False
-            self.rp_graphics_map[rastport_addr] = RastPortGraphics(
-                sdl_win, renderer, texture, width, height
-            )
-            rollback.pop_all()
+        self.rp_graphics_map[rastport_addr] = RastPortGraphics(window, frame, width, height)
         return True
 
-    def free_rast_port_graphics(self, ctx, rastport_addr):
-        import sdl2
 
+    def free_rast_port_graphics(self, ctx, rastport_addr):
         graphics = self.rp_graphics_map.pop(rastport_addr, None)
         if graphics is not None:
             with ExitStack() as cleanup:
-                cleanup.callback(sdl2.SDL_DestroyRenderer, graphics.renderer)
-                cleanup.callback(sdl2.SDL_DestroyTexture, graphics.texture)
+                cleanup.callback(graphics.frame.close)
                 cleanup.callback(graphics.batch.clear)
+
 
     def get_rp_graphics(self, rastport_addr):
         rp_graphics = self.rp_graphics_map.get(rastport_addr, None)
@@ -392,52 +353,17 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
     # Font handling
     # ---------------------------------------------------------------------
 
-    def open_font_file(self, ctx, name: str, size: int, style=0, amiga_name=None):
-        from sdl2 import sdlttf
-
-        font_path = os.path.join(self.fontsPath, name)
-        if name == "Cousine-Regular.ttf" and not os.path.isfile(font_path):
-            font_path = os.path.join(os.path.dirname(__file__), "fonts", name)
-        font = open_pixel_font(font_path, size, style)
-        if not font:
-            log_main.error(
-                "TTF_OpenFont failed for '%s': %s",
-                name,
-                sdlttf.TTF_GetError().decode("utf-8"),
-            )
+    def open_font_file(self, ctx, name, size, style=0, amiga_name=None):
+        path = os.path.join(self.fontsPath, name)
+        if name == "Cousine-Regular.ttf" and not os.path.isfile(path):
+            path = os.path.join(os.path.dirname(__file__), "fonts", name)
+        font = get_display(ctx).open_font(path, size, style)
+        if font is None:
             return None, None
+        addr = self._store_font(ctx, font, amiga_name or name, font.height,
+                                font.baseline, font.width, font.strike)
+        return (font, addr) if addr else (None, None)
 
-        with ExitStack() as rollback:
-            rollback.callback(sdlttf.TTF_CloseFont, font)
-            height = sdlttf.TTF_FontHeight(font)
-            ascent = sdlttf.TTF_FontAscent(font)
-            avg_width = ctypes.c_int()
-            dummy = ctypes.c_int()
-            if (
-                sdlttf.TTF_SizeUTF8(
-                    font, b"M", ctypes.byref(avg_width), ctypes.byref(dummy)
-                )
-                != 0
-            ):
-                return None, None
-            strike = read_font_strike(font, height)
-            if strike is None:
-                return None, None
-            font_addr = self._store_font(
-                ctx, font, amiga_name or name, height, ascent, avg_width.value, strike
-            )
-            if not font_addr:
-                return None, None
-            rollback.pop_all()
-        log_main.debug(
-            "Loaded font '%s' size=%d height=%d ascent=%d avg_width=%d",
-            name,
-            size,
-            height,
-            ascent,
-            avg_width.value,
-        )
-        return font, font_addr
 
     def _store_font(self, ctx, font, name, height, ascent, width, strike):
         with ExitStack() as rollback:
@@ -488,7 +414,6 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
         ctx.cpu.w_reg(REG_D0, font_addr)
 
     def _open_font(self, ctx, text_attr_addr):
-        from sdl2 import sdlttf
 
         text_attr = TextAttrStruct(ctx.mem, text_attr_addr)
 
@@ -521,16 +446,8 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
                     ).tf_Flags.val = 0x41  # designed ROM font
                 return addr
 
-        sdl_style = 0
-        if style_flags & 0x01:
-            sdl_style |= sdlttf.TTF_STYLE_UNDERLINE
-        if style_flags & 0x02:
-            sdl_style |= sdlttf.TTF_STYLE_BOLD
-        if style_flags & 0x04:
-            sdl_style |= sdlttf.TTF_STYLE_ITALIC
-
         font, font_addr = self.open_font_file(
-            ctx, font_name, font_size, sdl_style, amiga_name
+            ctx, font_name, font_size, style_flags, amiga_name
         )
         if not font:
             return 0
@@ -543,10 +460,7 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
     @staticmethod
     def _release_host_font(owner):
         owner["refs"] -= 1
-        if owner["refs"] == 0 and not isinstance(owner["font"], BitmapFont):
-            from sdl2 import sdlttf
 
-            sdlttf.TTF_CloseFont(owner["font"])
 
     def _retain_host_font(self, font_addr):
         owner = self._font_owners.get(font_addr)
@@ -603,37 +517,22 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
         return palette.get(index)
 
     def _text_layout(self, ctx, rp, string_ptr, count):
-        """Read a counted Amiga byte string and measure the queued text."""
-        from sdl2 import sdlttf
-
         font = self.font_registry.get(rp.Font.val or self.topaz_font)
-        if not font:
-            log_gfx.error("Text: no usable font available")
+        if font is None:
             return None
-        # Amiga strings are bytes, not UTF-8. A counted NUL is a glyph,
-        # rather than SDL_ttf's string terminator; use its missing glyph.
-        string = bytes(ctx.mem.r_block(string_ptr, count)).decode("latin-1")
-        string = string.replace("\0", "\ufffd")
+        string = bytes(ctx.mem.r_block(string_ptr, count)).decode("latin-1").replace("\0", "\ufffd")
         spacing = rp.TxSpacing.val
         parts = list(string) if spacing else [string]
-        runs = []
-        advance = 0
+        runs, advance = [], 0
         for part in parts:
-            width, height = ctypes.c_int(), ctypes.c_int()
-            if (
-                sdlttf.TTF_SizeUTF8(
-                    font,
-                    part.encode("utf-8"),
-                    ctypes.byref(width),
-                    ctypes.byref(height),
-                )
-                != 0
-            ):
-                log_gfx.error("Text: TTF_SizeUTF8 failed")
+            metrics = get_display(ctx).text_size(font, part)
+            if metrics is None:
                 return None
+            width, height = metrics
             runs.append((advance, part))
-            advance += width.value + (spacing if spacing else 0)
+            advance += width + (spacing if spacing else 0)
         return font, runs, advance
+
 
     def _raster_state(self, ctx, rp):
         if not rp.BitMap.val:
@@ -728,7 +627,7 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
         if backing is not None:
             backing.batch.add(command)
         else:
-            # Offscreen RastPorts are guest-owned and need no SDL renderer.
+            # Offscreen RastPorts are guest-owned and need no host framebuffer.
             bitmap = BitMapStruct(ctx.mem, rp.BitMap.val)
             surface = RasterSurface(bitmap.BytesPerRow.val * 8, bitmap.Rows.val)
             surface.load(state)
@@ -904,7 +803,6 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
         rp.BgPen.val = ((ctx.cpu.r_reg(REG_D0) + 128) & 255) - 128
 
     def SetRGB4(self, ctx):
-        import sdl2
 
         vp = ctx.cpu.r_reg(REG_A0)
         palette = self.screen_palettes.get(vp)
@@ -919,7 +817,7 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
                            *((ctx.cpu.r_reg(reg) & 15) * 0x11111111
                              for reg in (REG_D1, REG_D2, REG_D3)))
             return
-        palette[index] = sdl2.SDL_Color(
+        palette[index] = Color(
             (ctx.cpu.r_reg(REG_D1) & 15) * 17,
             (ctx.cpu.r_reg(REG_D2) & 15) * 17,
             (ctx.cpu.r_reg(REG_D3) & 15) * 17,
@@ -938,7 +836,7 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
         rp.DrawMode.set(mode)
 
     # ---------------------------------------------------------------------
-    # Helper: invalidate → SDL_USEREVENT_REPAINT
+    # Helper: queue a refresh
     # ---------------------------------------------------------------------
 
     def invalidate(self, ctx, rastport_addr):
@@ -1149,7 +1047,6 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
         return self._replace_region(ctx, dest_region_addr, intersections)
 
     def _get_damage_clip_rects_for_rp(self, ctx, rastport_addr):
-        import sdl2
 
         intuition = ctx.exec_lib.intuition_lib
         window_addr = intuition.rp_2_win_addr.get(rastport_addr)
@@ -1162,16 +1059,15 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
         if not damage:
             return None
         return [
-            sdl2.SDL_Rect(a, b, c - a + 1, d - b + 1)
+            Rect(a, b, c - a + 1, d - b + 1)
             for a, b, c, d in self._region_rects(ctx, damage)
         ]
 
     def _get_damage_clip_rect_for_rp(self, ctx, rastport_addr):
         """
         Resolve the DamageList Region for this RastPort and
-        return an SDL_Rect (or None if no clipping).
+        return an Rect (or None if no clipping).
         """
-        import sdl2
 
         # 1) Map RastPort -> Window
         # You already have rp_2_win_addr for refresh, so reuse it.
@@ -1207,30 +1103,27 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
         w = (maxx - minx) + 1
         h = (maxy - miny) + 1
 
-        # Clamp to non-negative; SDL doesn't like negative sizes
+        # Clamp to non-negative dimensions
         if w <= 0 or h <= 0:
             return None
 
-        return sdl2.SDL_Rect(minx, miny, w, h)
+        return Rect(minx, miny, w, h)
 
 
 class RastPortGraphics:
-    def __init__(self, sdl_win, renderer, texture, width, height):
-        import sdl2
-
-        self.sdl_window_id = sdl2.SDL_GetWindowID(sdl_win)
-        self.renderer = renderer
-        self.texture = texture
+    def __init__(self, window, frame, width, height):
+        self.window_id = window.id
+        self.frame = frame
         self.width = width
         self.height = height
         self.batch = RPBatch()
         self.clip_rect = None
         self.clip_rects = None
         self.surface = RasterSurface(width, height)
+        self.present_pending = True
 
 
 def create_amiga_palette():
-    import sdl2
 
     palette = {}
 
@@ -1247,17 +1140,17 @@ def create_amiga_palette():
 
     for i in range(8):
         r, g, b = wb2_colors[i]
-        palette[i] = sdl2.SDL_Color(r, g, b, 255)
+        palette[i] = Color(r, g, b, 255)
 
     for i in range(8, 32):
         r = ((i >> 0) & 0x03) * 85
         g = ((i >> 2) & 0x03) * 85
         b = ((i >> 4) & 0x03) * 85
-        palette[i] = sdl2.SDL_Color(r, g, b, 255)
+        palette[i] = Color(r, g, b, 255)
 
     # Eight-plane bitmaps may address every byte-valued pen.
     for i in range(32, 256):
-        palette[i] = sdl2.SDL_Color(
+        palette[i] = Color(
             ((i >> 5) & 7) * 255 // 7,
             ((i >> 2) & 7) * 255 // 7,
             (i & 3) * 85,
@@ -1301,7 +1194,7 @@ class BFRectFill:
     y: int
     w: int
     h: int
-    color: "sdl2.SDL_Color"
+    color: "Color"
     draw_mode: int
     state: object = None
 
@@ -1322,7 +1215,7 @@ class BFDraw:
     y1: int
     x2: int
     y2: int
-    color: "sdl2.SDL_Color"
+    color: "Color"
     draw_mode: int
     state: object = None
 
@@ -1333,8 +1226,8 @@ class BFText:
     y: int
     string: str
     font: object
-    fg: "sdl2.SDL_Color"
-    bg: "sdl2.SDL_Color"
+    fg: "Color"
+    bg: "Color"
     draw_mode: int
     release: object = None
     state: object = None
