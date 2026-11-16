@@ -269,7 +269,14 @@ class HostFileSysHandler(Handler):
 
     def seek(self, fh, offset, whence):
         try:
-            return fh.fobj.seek(offset, whence)
+            new_pos = fh.fobj.seek(offset, whence)
+            # AmigaDOS limits a seek to the file size: a position beyond the
+            # end is clamped back to EOF and reported as an error (-2).
+            file_size = self.fs.stat(fh.sys_path).st_size
+            if new_pos > file_size:
+                fh.fobj.seek(file_size, 0)
+                return -2
+            return new_pos
         except OSError:
             raise HandlerError(ERROR_SEEK_ERROR)
 
@@ -298,11 +305,7 @@ class HostFileSysHandler(Handler):
         except OSError:
             raise HandlerError(ERROR_WRITE_PROTECTED)
 
-    def end(self, fh):
-        try:
-            fh.fobj.close()
-        except OSError:
-            pass
+    # ``end`` is inherited from the base handler: it closes ``fh.fobj``
 
     # ----- names -----
 

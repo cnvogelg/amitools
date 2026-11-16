@@ -1,10 +1,16 @@
-import os
-
+from amitools.vamos.handler import HandlerError
 from amitools.vamos.libstructs import FileHandleStruct
 
 
 class FileHandle:
-    """represent an AmigaOS file handle (FH) in vamos"""
+    """represent an AmigaOS file handle (FH) in vamos
+
+    The handle is a thin DOS-level adapter. Every operation that maps to an
+    AmigaDOS handler packet is delegated to the handler the handle was opened
+    with; the raw stream (``obj``) is only used as a fallback for handler-less
+    handles (bare test managers, the console fallback) and for the few
+    operations that have no packet (``tell``, ``is_interactive``).
+    """
 
     def __init__(
         self,
@@ -48,6 +54,13 @@ class FileHandle:
         return "[FH:'%s'@%06x=B@%06x]" % (self.name, self.mem.addr, self.b_addr)
 
     def close(self):
+        """ACTION_END: close the file via the handler"""
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                self.handler.end(self.handler_file)
+            except HandlerError:
+                pass
+            return
         if self.need_close:
             self.obj.close()
 
@@ -73,40 +86,71 @@ class FileHandle:
     # --- file ops ---
 
     def set_mode(self, cooked):
-        # console streams provide tty mode handling; plain files do not
+        """ACTION_SCREEN_MODE: set the console buffer mode
+
+        Returns True on success, False if the handler/stream does not support
+        mode switching.
+        """
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                return self.handler.set_mode(self.handler_file, cooked)
+            except HandlerError:
+                return False
+        # handler-less fallback: the stream may provide tty mode handling
         fn = getattr(self.obj, "set_mode", None)
         if fn is None:
             return False
         return fn(cooked)
 
     def wait_for_char(self, timeout):
+        """ACTION_WAIT_CHAR: wait for input becoming available
+
+        Returns True if a char is available, False on timeout, None if the
+        handler/stream does not support waiting.
+        """
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                return self.handler.wait_for_char(self.handler_file, timeout)
+            except HandlerError:
+                return None
         fn = getattr(self.obj, "wait_for_char", None)
         if fn is None:
             return False
         return fn(timeout)
 
     def write(self, data):
-        """write data
+        """ACTION_WRITE: write data
 
         return -1 on error, 0=EOF, >0 written bytes"""
         assert isinstance(data, (bytes, bytearray))
         orig_len = len(data)
 
-        try:
-            self.obj.write(data)
-            got = orig_len
-        except IOError:
-            got = -1
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                got = self.handler.write(self.handler_file, data)
+            except HandlerError:
+                return -1
+        else:
+            try:
+                self.obj.write(data)
+                got = orig_len
+            except IOError:
+                got = -1
 
         # do auto flush?
         if got > 0 and self.auto_flush:
-            self.obj.flush()
+            self.flush()
 
         # return got bytes
         return got
 
     def read(self, len):
-        """Return bytes, an empty byte string at EOF, or -1 on error."""
+        """ACTION_READ: return bytes, an empty byte string at EOF, or -1."""
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                return self.handler.read(self.handler_file, len)
+            except HandlerError:
+                return -1
         try:
             read = getattr(self.obj, "read1", None)
             if read is None:
@@ -128,7 +172,7 @@ class FileHandle:
             if self.is_nil:
                 return -1
 
-            d = self.obj.read(1)
+            d = self.read(1)
 
             # -1 on Error
             if d == -1:
@@ -189,29 +233,28 @@ class FileHandle:
             return -1
 
     def seek(self, pos, whence):
-        """set to position from whence
+        """ACTION_SEEK: set to position from whence
 
         return -1 on error, -2 on too far or new_pos
         """
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                return self.handler.seek(self.handler_file, pos, whence)
+            except HandlerError:
+                return -1
         try:
-            new_pos = self.obj.seek(pos, whence)
-
-            # we have to limit seek to file size
-            stat = os.stat(self.obj.fileno())
-            file_size = stat.st_size
-
-            # if seek to far then limit to file size
-            if new_pos > file_size:
-                # seek to end
-                self.obj.seek(file_size, 0)
-                return -2
-
-            return new_pos
-
+            return self.obj.seek(pos, whence)
         except IOError:
             return -1
 
     def flush(self):
+        """ACTION_FLUSH: flush the handler's buffers"""
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                self.handler.flush(self.handler_file)
+            except HandlerError:
+                pass
+            return
         self.obj.flush()
 
     def is_interactive(self):

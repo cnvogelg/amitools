@@ -60,6 +60,30 @@ def handler_console_test():
     assert h._in is None and h._out is None
 
 
+def handler_console_file_ops_test():
+    from amitools.vamos.handler.console import ConsoleFile
+
+    h = ConsoleHandler("console")
+    # input: read via the stream's read1 (short reads, no blocking)
+    in_buf = io.BytesIO(b"hello")
+    in_file = ConsoleFile(ConsoleStream(in_buf, "in"), "<TEST>")
+    assert h.read(in_file, 3) == b"hel"
+    assert h.read(in_file, 10) == b"lo"
+    # end never closes the shared host stream
+    h.end(in_file)
+    assert in_buf.closed is False
+    # output: write/flush go to the stream
+    out_buf = io.BytesIO()
+    out_file = ConsoleFile(ConsoleStream(out_buf, "out"), "<TEST>", auto_flush=True)
+    assert h.write(out_file, b"abc") == 3
+    h.flush(out_file)
+    assert out_buf.getvalue() == b"abc"
+    # mode switching and waiting are delegated to the stream; on a plain
+    # (non-tty) stream they report "unsupported"
+    assert h.set_mode(in_file, True) is False
+    assert h.wait_for_char(in_file, 0) is None
+
+
 def handler_console_stream_test():
     # non-interactive stream: plain byte pass-through
     buf = io.BytesIO(b"hello")

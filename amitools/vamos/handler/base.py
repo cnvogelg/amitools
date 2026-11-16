@@ -9,6 +9,8 @@ code so the DOS layer can map them to ``IoErr``. A future ``PacketHandler``
 can turn these back into real DOS packets.
 """
 
+from amitools.vamos.lib.dos.action import DosAction
+
 # --- DOS-compatible error codes -------------------------------------------
 # The values match AmigaDOS so a future PacketHandler can map them directly
 # to dp_Res2 without importing dos.library code.
@@ -152,6 +154,49 @@ class HandlerInfoData:
         self.unit_number = unit_number
 
 
+# --- method -> AmigaDOS packet map ----------------------------------------
+# Every public action method of :class:`Handler` models exactly one AmigaDOS
+# handler packet (``ACTION_*``). The map keeps the API a 1:1 model of the
+# packets so a future ``PacketHandler`` can translate a method call into the
+# matching ``DosPacket``. Methods without a packet (``tell``, ``is_interactive``)
+# are deliberately not part of the handler API; lifecycle methods such as
+# ``shutdown`` are not actions and are exempt.
+ACTION_METHODS = {
+    # locks
+    "locate_object": DosAction.ACTION_LOCATE_OBJECT,
+    "free_lock": DosAction.ACTION_FREE_LOCK,
+    "copy_dir": DosAction.ACTION_COPY_DIR,
+    "parent": DosAction.ACTION_PARENT,
+    "same_lock": DosAction.ACTION_SAME_LOCK,
+    "examine_object": DosAction.ACTION_EXAMINE_OBJECT,
+    "examine_next": DosAction.ACTION_EXAMINE_NEXT,
+    "info": DosAction.ACTION_INFO,
+    "disk_info": DosAction.ACTION_DISK_INFO,
+    "fh_from_lock": DosAction.ACTION_FH_FROM_LOCK,
+    "parent_fh": DosAction.ACTION_PARENT_FH,
+    "copy_dir_fh": DosAction.ACTION_COPY_DIR_FH,
+    # files
+    "find_input": DosAction.ACTION_FINDINPUT,
+    "find_output": DosAction.ACTION_FINDOUTPUT,
+    "find_update": DosAction.ACTION_FINDUPDATE,
+    "read": DosAction.ACTION_READ,
+    "write": DosAction.ACTION_WRITE,
+    "seek": DosAction.ACTION_SEEK,
+    "set_file_size": DosAction.ACTION_SET_FILE_SIZE,
+    "flush": DosAction.ACTION_FLUSH,
+    "end": DosAction.ACTION_END,
+    "set_mode": DosAction.ACTION_SCREEN_MODE,
+    "wait_for_char": DosAction.ACTION_WAIT_CHAR,
+    # names
+    "delete_object": DosAction.ACTION_DELETE_OBJECT,
+    "rename_object": DosAction.ACTION_RENAME_OBJECT,
+    "set_protect": DosAction.ACTION_SET_PROTECT,
+    "set_comment": DosAction.ACTION_SET_COMMENT,
+    "set_date": DosAction.ACTION_SET_DATE,
+    "create_dir": DosAction.ACTION_CREATE_DIR,
+}
+
+
 class Handler:
     """Base class for file system handlers.
 
@@ -232,7 +277,34 @@ class Handler:
         self._unsupported("flush")
 
     def end(self, fh):
-        self._unsupported("end")
+        """close an open file (ACTION_END)
+
+        The underlying stream is only closed when the handle owns it; console
+        handles share the host stream and must not close it.
+        """
+        if not fh.need_close:
+            return
+        try:
+            fh.fobj.close()
+        except OSError:
+            pass
+
+    def set_mode(self, fh, cooked):
+        """set the console buffer mode (ACTION_SCREEN_MODE)
+
+        ``cooked`` is True for line-buffered (cooked) input and False for raw
+        input. Only interactive handlers (consoles) implement this.
+        """
+        self._unsupported("set_mode")
+
+    def wait_for_char(self, fh, timeout):
+        """wait for input becoming available (ACTION_WAIT_CHAR)
+
+        Returns True if a character is available, False on timeout and None if
+        the handler does not support waiting. Only interactive handlers
+        (consoles) implement this.
+        """
+        self._unsupported("wait_for_char")
 
     # --- names ---
 

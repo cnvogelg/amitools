@@ -138,6 +138,29 @@ class ConsoleHandler(Handler):
     def find_update(self, ami_path):
         return ConsoleFile(self._output_stream(), "<STDOUT>", auto_flush=True)
 
+    # ----- file ops (packet-backed) -----
+
+    def read(self, fh, size):
+        # read1 returns whatever is available without waiting to fill the
+        # whole request, matching the console/pipe semantics
+        return fh.fobj.read1(size)
+
+    def write(self, fh, data):
+        return fh.fobj.write(data)
+
+    def flush(self, fh):
+        fh.fobj.flush()
+
+    def end(self, fh):
+        # never close the shared host stream (ConsoleFile.need_close is False)
+        pass
+
+    def set_mode(self, fh, cooked):
+        return fh.fobj.set_mode(cooked)
+
+    def wait_for_char(self, fh, timeout):
+        return fh.fobj.wait_for_char(timeout)
+
     def shutdown(self):
         for stream in (self._in, self._out):
             if stream is not None:

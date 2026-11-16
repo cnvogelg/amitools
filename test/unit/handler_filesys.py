@@ -185,6 +185,21 @@ def handler_filesys_file_io_test(tmp_path):
     assert (root / "up.txt").read_bytes() == b"abc"
 
 
+def handler_filesys_seek_limit_test(tmp_path):
+    h, root = make_handler(tmp_path)
+    fh = h.find_output("f", MODE_NEWFILE)
+    h.write(fh, b"0123456789")
+    h.flush(fh)
+    # a seek beyond EOF is clamped back to EOF and reported as -2
+    assert h.seek(fh, 100, 0) == -2
+    # ...and the file pointer now sits at the end of the file
+    assert h.seek(fh, 0, 1) == 10
+    # a normal seek returns the new position
+    assert h.seek(fh, 2, 0) == 2
+    h.end(fh)
+    assert (root / "f").read_bytes() == b"0123456789"
+
+
 def handler_filesys_readwrite_mode_test(tmp_path):
     h, root = make_handler(tmp_path)
     fh = h.find_output("f", MODE_READWRITE)
