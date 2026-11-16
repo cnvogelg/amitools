@@ -7,6 +7,8 @@ from .syspath import (
     SysPathResolver,
     SysVolume,
     HostFileSystem,
+    DiskUsage,
+    follow_path_no_case,
     resolve_sys_path,
 )
 from .volume import VolumeManager, Volume

@@ -14,9 +14,13 @@ import os
 import os.path
 import shutil
 import tempfile
+from collections import namedtuple
 
 from amitools.vamos.log import log_path
 from .amipath import AmiPath, AmiPathError, collapse_parent_steps
+
+
+DiskUsage = namedtuple("DiskUsage", "total used free block_size")
 
 
 class SysPathError(Exception):
@@ -129,6 +133,94 @@ class HostFileSystem(object):
             return True
         except OSError:
             return False
+
+    # ----- file operations -----
+
+    def open(self, sys_path, mode):
+        return open(sys_path, mode)
+
+    def stat(self, sys_path):
+        return os.stat(sys_path)
+
+    def access(self, sys_path, mode):
+        return os.access(sys_path, mode)
+
+    def remove(self, sys_path):
+        os.remove(sys_path)
+
+    def rmdir(self, sys_path):
+        os.rmdir(sys_path)
+
+    def rename(self, old_path, new_path):
+        os.rename(old_path, new_path)
+
+    def chmod(self, sys_path, mode):
+        os.chmod(sys_path, mode)
+
+    def mkdir(self, sys_path):
+        os.mkdir(sys_path)
+
+    def utime(self, sys_path, times):
+        os.utime(sys_path, times)
+
+    def disk_usage(self, sys_path):
+        """return a :class:`DiskUsage` with block counts and block size"""
+        if hasattr(os, "statvfs"):
+            st = os.statvfs(sys_path)
+            block_size = st.f_frsize or st.f_bsize
+            return DiskUsage(
+                st.f_blocks,
+                st.f_blocks - st.f_bfree,
+                st.f_bfree,
+                block_size,
+            )
+        usage = shutil.disk_usage(sys_path)
+        block_size = 512
+        return DiskUsage(
+            usage.total // block_size,
+            usage.used // block_size,
+            usage.free // block_size,
+            block_size,
+        )
+
+    def get_umask(self):
+        um = os.umask(0)
+        os.umask(um)
+        return um
+
+
+def follow_path_no_case(file_system, base, dirs, fast=False):
+    """follow the path components in ``dirs`` below ``base``, correcting the
+    case of each existing component to match the host file system.
+
+    Components that are not found are appended as given, so a new path can
+    be built for creation. Return the resulting host path.
+    """
+    # base is the name (no more dirs)
+    if len(dirs) == 0:
+        return base
+    # make sure base is a dir
+    if not file_system.is_dir(base):
+        # assume remainder is new
+        return os.path.join(base, os.path.join(*dirs))
+    # dir component to search
+    d = dirs[0]
+    # check for direct match first
+    if fast:
+        dp = os.path.join(base, d)
+        if file_system.exists(dp):
+            return follow_path_no_case(file_system, dp, dirs[1:], fast)
+    # read dir and check for no case variant
+    dlow = d.lower()
+    dl = len(d)
+    for f in file_system.list_dir(base):
+        if len(f) == dl:
+            flow = f.lower()
+            if flow == dlow:
+                res = os.path.join(base, f)
+                return follow_path_no_case(file_system, res, dirs[1:], fast)
+    # can't find it -> we assume rest of path is new
+    return os.path.join(base, os.path.join(*dirs))
 
 
 class SysVolume(object):
@@ -325,32 +417,7 @@ class SysPathMapper(object):
             return None
 
     def _follow_path_no_case(self, base, dirs, fast):
-        # base is the name (no more dirs)
-        if len(dirs) == 0:
-            return base
-        # make sure base is a dir
-        if not self.file_system.is_dir(base):
-            # assume remainder is new
-            return os.path.join(base, os.path.join(*dirs))
-        # dir component to search
-        d = dirs[0]
-        # check for direct match first
-        if fast:
-            dp = os.path.join(base, d)
-            if self.file_system.exists(dp):
-                return self._follow_path_no_case(dp, dirs[1:], fast)
-        # read dir and check for no case variant
-        dlow = d.lower()
-        files = self.file_system.list_dir(base)
-        dl = len(d)
-        for f in files:
-            if len(f) == dl:
-                flow = f.lower()
-                if flow == dlow:
-                    res = os.path.join(base, f)
-                    return self._follow_path_no_case(res, dirs[1:], fast)
-        # can't find it -> we assume rest of path is new
-        return os.path.join(base, os.path.join(*dirs))
+        return follow_path_no_case(self.file_system, base, dirs, fast)
 
 
 class SysPathResolver(object):
