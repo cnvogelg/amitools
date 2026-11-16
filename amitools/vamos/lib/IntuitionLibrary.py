@@ -7,6 +7,7 @@ from amitools.vamos.lib.graphics_support import BitmapBlit
 from amitools.vamos.lib.intuition_input import translate_key
 from amitools.vamos.libcore.impl import LibImpl
 from amitools.vamos.lib.TimerDevice import TimerDevice
+from amitools.vamos.lib.boopsi import Boopsi
 
 from amitools.vamos.lib.graphics import (
     RastPortStruct,
@@ -94,6 +95,7 @@ class IntuitionLibrary(LibImpl):
         # default init stuff
         self._easy_last = None
         self.alloc = None
+        self._boopsi = None
         self.sdl_window_id_2_window_addr_map = {}  # SDL_Window id -> Amiga window address
         self.sdl_window_id_2_sdl_window = {}
         self.sdl_window_id_2_timer = {}
@@ -122,10 +124,12 @@ class IntuitionLibrary(LibImpl):
         self._window_scales = {}
         self._pub_list_memory = None
         self._pub_screen_locks = 0
+        self._draw_infos = {}
 
     def setup_lib(self, ctx, base_addr):
         # log_dos.info("setup intuition.library")
         self.alloc = ctx.alloc
+        self._boopsi_ctx = ctx
         self.display_scale = getattr(ctx, "display_scale", (1, 1))
         self.display_aspect = getattr(ctx, "display_aspect", "square")
 
@@ -225,6 +229,12 @@ class IntuitionLibrary(LibImpl):
             self.graphics_lib = None
 
     def finish_lib(self, ctx):
+        if self._boopsi is not None:
+            self._boopsi.cleanup()
+            self._boopsi = None
+        for block in self._draw_infos.values():
+            ctx.alloc.free_memory(block)
+        self._draw_infos.clear()
         # No guest can return an outstanding message after library teardown.
         for owner in tuple(self._reply_owners.values()):
             owner["closed"] = True
@@ -447,9 +457,9 @@ class IntuitionLibrary(LibImpl):
             tag, data = item.get_tag(), item.get_data()
 
             if tag == WA_Left:
-                left = data
+                left = (data & 0x7fff) - (data & 0x8000)
             elif tag == WA_Top:
-                top = data
+                top = (data & 0x7fff) - (data & 0x8000)
             elif tag in (WA_Width, WA_InnerWidth):
                 width = data
             elif tag in (WA_Height, WA_InnerHeight):
@@ -2110,6 +2120,107 @@ class IntuitionLibrary(LibImpl):
                     text.x, text.y, surface.contents.w, surface.contents.h
                 )
                 sdl2.SDL_RenderCopy(renderer, texture, None, rect)
+
+    def GetScreenDrawInfo(self, ctx, screen):
+        if not screen:
+            return 0
+        sc = ScreenStruct(ctx.mem, screen)
+        block = ctx.alloc.alloc_memory(76, label="Screen DrawInfo", except_on_failure=False)
+        if block is None:
+            return 0
+        addr = block.addr
+        self._draw_infos[addr] = block
+        ctx.mem.w16(addr, 3)
+        ctx.mem.w16(addr + 2, 13)
+        ctx.mem.w32(addr + 4, addr + 50)
+        ctx.mem.w32(addr + 8, sc.RastPort.Font.val)
+        ctx.mem.w16(addr + 12, sc.BitMap.Depth.val)
+        ctx.mem.w16(addr + 14, 22)
+        ctx.mem.w16(addr + 16, 44)
+        ctx.mem.w32(addr + 18, 1)
+        ctx.mem.w32(addr + 30, screen)
+        for index, pen in enumerate((1, 0, 1, 2, 1, 3, 2, 0, 3, 1, 0, 1, 2)):
+            ctx.mem.w16(addr + 50 + 2 * index, pen)
+        return addr
+
+    def FreeScreenDrawInfo(self, ctx, screen, info):
+        block = self._draw_infos.pop(info, None)
+        if block:
+            ctx.alloc.free_memory(block)
+
+    @property
+    def boopsi(self):
+        if self._boopsi is None:
+            self._boopsi = Boopsi(self._boopsi_ctx)
+        return self._boopsi
+
+    def MakeClass(self, ctx, class_id, super_id, super_ptr, size, flags):
+        name = ctx.mem.r_cstr(class_id) if class_id else None
+        if not super_ptr:
+            if not super_id:
+                return 0
+            super_name = ctx.mem.r_cstr(super_id)
+            super_ptr = self.boopsi.public.get(super_name, 0)
+        if not super_ptr:
+            return 0
+        return self.boopsi.make_class(name, super_ptr, size)
+
+    def AddClass(self, ctx, cls):
+        self.boopsi.add_class(cls)
+
+    def RemoveClass(self, ctx, cls):
+        self.boopsi.remove_class(cls)
+
+    def FreeClass(self, ctx, cls):
+        return self.boopsi.free_class(cls)
+
+    def NewObjectA(self, ctx, cls, class_id, tags):
+        if not cls and class_id:
+            cls = self.boopsi.public.get(ctx.mem.r_cstr(class_id), 0)
+        return self.boopsi.new_object(cls, tags)
+
+    def DisposeObject(self, ctx, obj):
+        self.boopsi.method(obj, 0x102)
+
+    def SetAttrsA(self, ctx, obj, tags):
+        return self.boopsi.method(obj, 0x103, tags, 0)
+
+    def GetAttr(self, ctx, attr, obj, storage):
+        return self.boopsi.method(obj, 0x104, attr, storage)
+
+    def SetGadgetAttrsA(self, ctx, obj, window, requester, tags):
+        if not window:
+            return self.boopsi.method(obj, 0x103, tags, 0)
+        if requester:
+            return 0  # Requester-relative gadget domains are not supported.
+        win = WindowStruct(ctx.mem, window)
+        info = ctx.alloc.alloc_memory(58, label="BOOPSI GadgetInfo", except_on_failure=False)
+        if info is None:
+            return 0
+        draw = 0
+        try:
+            draw = self.GetScreenDrawInfo(ctx, win.WScreen.val)
+            if not draw:
+                return 0
+            for offset, value in ((0, win.WScreen.val), (4, window),
+                                  (12, win.RPort.val), (16, win.WLayer.val), (30, draw)):
+                ctx.mem.w32(info.addr + offset, value)
+            ctx.mem.w16(info.addr + 24, win.Width.val & 0xffff)
+            ctx.mem.w16(info.addr + 26, win.Height.val & 0xffff)
+            ctx.mem.w8(info.addr + 28, win.DetailPen.val)
+            ctx.mem.w8(info.addr + 29, win.BlockPen.val)
+            return self.boopsi.method(obj, 0x103, tags, info.addr)
+        finally:
+            if draw:
+                self.FreeScreenDrawInfo(ctx, win.WScreen.val, draw)
+            ctx.alloc.free_memory(info)
+
+    def NextObject(self, ctx, state):
+        node = ctx.mem.r32(state)
+        if not node or not ctx.mem.r32(node):
+            return 0
+        ctx.mem.w32(state, ctx.mem.r32(node))
+        return node + 12
 
 
 @ctypes.CFUNCTYPE(ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p)
