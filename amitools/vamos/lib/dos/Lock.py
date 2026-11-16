@@ -1,10 +1,7 @@
-import os
-import uuid
-
+from amitools.vamos.handler import HandlerError
 from amitools.vamos.log import log_lock
 
 from amitools.vamos.libstructs import FileLockStruct, DateStampStruct
-from .DosProtection import DosProtection
 from .AmiTime import *
 from .Error import *
 
@@ -51,19 +48,22 @@ def _struct_write(struct, path, value):
 
 
 class Lock:
-    """represent an AmigaOS Lock in vamos"""
+    """represent an AmigaOS Lock in vamos
+
+    The lock is bound to the handler that created it and to an opaque
+    handler lock. It never touches host paths itself; all metadata and
+    directory scans go through the handler.
+    """
 
     def __init__(
         self,
         name,
         ami_path,
-        sys_path=None,
         exclusive=False,
         handler=None,
         handler_lock=None,
     ):
         self.ami_path = ami_path
-        self.sys_path = sys_path
         self.name = name
         self.exclusive = exclusive
         self.handler = handler
@@ -72,17 +72,15 @@ class Lock:
         self.b_addr = 0
         self.vol_addr = 0
         self.key = 0
-        self.dirent = None
         self.struct = None
 
     def __repr__(self):
         addr = 0
         if self.mem is not None:
             addr = self.mem.addr
-        return "Lock['%s'(ami='%s',sys='%s',key=%s,ex=%d, vol=%d)@%06x=b@%06x]" % (
+        return "Lock['%s'(ami='%s',key=%s,ex=%d, vol=%d)@%06x=b@%06x]" % (
             self.name,
             self.ami_path,
-            self.sys_path,
             self.key,
             self.exclusive,
             self.vol_addr,
@@ -116,107 +114,85 @@ class Lock:
 
     # --- lock ops ---
 
-    def _examine_file(self, fib_mem, name, sys_path, key):
-        # name
-        name_addr = _struct_addr(fib_mem, "fib_FileName")
-        # clear 32 name bytes
+    def _fill_fib(self, fib_mem, info, name=None):
+        """write a :class:`HandlerFileInfo` into a FileInfoBlock"""
+        if name is None:
+            name = info.name
         mem = fib_mem.mem
-        mem.clear_block(name_addr, 32, 0)
+        # name (fib_FileName is a 108 byte field)
+        name_addr = _struct_addr(fib_mem, "fib_FileName")
+        mem.clear_block(name_addr, 108, 0)
         mem.w_cstr(name_addr, name)
-        # comment
+        # comment (fib_Comment is a 80 byte field)
         comment_addr = _struct_addr(fib_mem, "fib_Comment")
-        mem.w_cstr(comment_addr, "")
-        # create the "inode" information
-        _struct_write(fib_mem, "fib_DiskKey", key)
-        log_lock.debug("examine key: %08x", key)
+        mem.clear_block(comment_addr, 80, 0)
+        if info.comment:
+            mem.w_cstr(comment_addr, info.comment)
+        # key / "inode" information
+        _struct_write(fib_mem, "fib_DiskKey", info.key)
         # type
-        if os.path.isdir(sys_path):
-            dirEntryType = 2
-        else:
-            dirEntryType = -3
-        _struct_write(fib_mem, "fib_DirEntryType", dirEntryType)
-        _struct_write(fib_mem, "fib_EntryType", dirEntryType)
+        _struct_write(fib_mem, "fib_DirEntryType", info.entry_type)
+        _struct_write(fib_mem, "fib_EntryType", info.entry_type)
         # protection
-        try:
-            os_stat = os.stat(sys_path)
-            mode = os_stat.st_mode
-            prot = DosProtection.from_host_mode(mode)
-            log_lock.debug("examine lock: '%s' mode=%03o: prot=%s", name, mode, prot)
-        except OSError:
-            return ERROR_OBJECT_IN_USE
-        _struct_write(fib_mem, "fib_Protection", prot.mask)
-        # size
-        if os.path.isfile(sys_path):
-            size = os.path.getsize(sys_path)
-            # limit to 32bit
-            if size > 0xFFFFFFFF:
-                size = 0xFFFFFFFF
-            _struct_write(fib_mem, "fib_Size", size)
-            blocks = (size + 511) // 512
-            _struct_write(fib_mem, "fib_NumBlocks", blocks)
-            log_lock.debug(
-                "examine lock: '%s' size=%d, blocks=%d", sys_path, size, blocks
-            )
-        else:
-            _struct_write(fib_mem, "fib_NumBlocks", 1)
-            log_lock.debug("examine lock: '%s' no file", sys_path)
-        # date (use mtime here)
+        _struct_write(fib_mem, "fib_Protection", info.protection)
+        # size / blocks
+        _struct_write(fib_mem, "fib_Size", info.size)
+        _struct_write(fib_mem, "fib_NumBlocks", info.blocks)
+        # date
         date_addr = _struct_addr(fib_mem, "fib_Date")
         date = DateStampStruct(fib_mem.mem, date_addr)
-        t = os.path.getmtime(sys_path)
-        at = sys_to_ami_time(t)
+        at = sys_to_ami_time(info.date)
         date.ds_Days.val = at.tday
         date.ds_Minute.val = at.tmin
         date.ds_Tick.val = at.tick
-        # fill in UID/GID
-        _struct_write(fib_mem, "fib_OwnerUID", 0)
-        _struct_write(fib_mem, "fib_OwnerGID", 0)
-        return NO_ERROR
+        # owner
+        _struct_write(fib_mem, "fib_OwnerUID", info.owner_uid)
+        _struct_write(fib_mem, "fib_OwnerGID", info.owner_gid)
+        log_lock.debug(
+            "examine: '%s' type=%d prot=%03o size=%d blocks=%d key=%d",
+            name,
+            info.entry_type,
+            info.protection,
+            info.size,
+            info.blocks,
+            info.key,
+        )
 
     def examine_lock(self, fib_mem):
-        return self._examine_file(fib_mem, self.name, self.sys_path, self.key)
+        try:
+            info = self.handler.examine_object(self.handler_lock)
+        except HandlerError as e:
+            return e.code
+        # the DOS name of the examined object is the lock's own name; this
+        # matters for the volume root, whose host basename is not the
+        # volume name
+        self._fill_fib(fib_mem, info, name=self.name)
+        return NO_ERROR
 
     def examine_next(self, fib_mem):
-        # start scan
-        if self.dirent is None:
-            # scan real dir
-            if os.path.isdir(self.sys_path):
-                self.dirent = os.listdir(self.sys_path)
-            else:
-                self.dirent = []
-            # assume that key stored in given FIB is my own one
-            # (otherwise no Examine() on my lock was done before..., aka broken code!)
-            self._check_disk_key(fib_mem)
-            index = 0
-        else:
-            index = _struct_read(fib_mem, "fib_DiskKey")
+        # fib_DiskKey holds the index of the next entry to return
+        key = _struct_read(fib_mem, "fib_DiskKey")
+        try:
+            info = self.handler.examine_next(self.handler_lock, key)
+        except HandlerError as e:
+            return e.code
+        self._fill_fib(fib_mem, info)
+        return NO_ERROR
 
-        if index < len(self.dirent):
-            entry = self.dirent[index]
-            e_path = os.path.join(self.sys_path, entry)
-            return self._examine_file(fib_mem, entry, e_path, index + 1)
-        else:
-            self.dirent = None
-            return ERROR_NO_MORE_ENTRIES
+    def clone_for_scan(self):
+        """return a fresh, unallocated lock on the same object
 
-    def _check_disk_key(self, fib_mem):
-        # make sure its a dir entry
-        dirEntryType = _struct_read(fib_mem, "fib_DirEntryType")
-        if dirEntryType != 2:
-            log_lock.warning("fib type is not dir on first ExNext()!")
-        # make sure fib_key is mine
-        fib_key = _struct_read(fib_mem, "fib_DiskKey")
-        if fib_key != self.key:
-            log_lock.warning(
-                "first ExNext() does not start at Examine()d lock!"
-                " Broken Code!! lock_key=%08x fib_key=%08x (%s)",
-                self.key,
-                fib_key,
-                self.name,
-            )
-            return False
-        else:
-            return True
+        Used by ExAll so its ExNext cursor is independent of the caller's
+        lock. Raises HandlerError if the object can not be enumerated (e.g.
+        it is not a directory).
+        """
+        handler_lock = self.handler.copy_dir(self.handler_lock)
+        return Lock(
+            self.name,
+            self.ami_path,
+            handler=self.handler,
+            handler_lock=handler_lock,
+        )
 
     def find_volume_node(self, dos_list):
         if self.struct is None:

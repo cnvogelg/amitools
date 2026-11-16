@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from amitools.vamos.handler import HostFileSysHandler
 from amitools.vamos.lib.DosLibrary import DosLibrary
 from amitools.vamos.lib.dos.Error import (
     DOSFALSE,
@@ -50,8 +51,13 @@ class ExAllEnv:
         self.lib.mem_allocs = {}
         self.lib.dos_objs = {}
         self.lib.exall_scans = {}
-        self.lock = Lock(path.name, "SYS:dir", str(path))
-        self.lock.key = 7
+        self.handler = HostFileSysHandler("SYS", str(path))
+        self.lock = Lock(
+            "dir",
+            "SYS:dir",
+            handler=self.handler,
+            handler_lock=self.handler.locate_object(""),
+        )
         self.lib.lock_mgr = SimpleNamespace(
             get_by_b_addr=lambda addr: self.lock if addr else None
         )
@@ -227,7 +233,7 @@ def dos_exall_buffer_too_small_test(env):
 
 
 def dos_exall_not_directory_test(env):
-    env.lock.sys_path = str(env.path / "alpha")
+    env.lock.handler_lock = env.handler.locate_object("alpha")
     assert env.run() == (DOSFALSE, ERROR_OBJECT_WRONG_TYPE, [])
     assert not env.lib.exall_scans
 
@@ -327,7 +333,12 @@ def dos_exall_host_error_cleanup_test(env, monkeypatch):
 
 def dos_exall_wrong_resume_lock_test(env):
     env.run(size=24)
-    env.lock = Lock("other", "SYS:other", str(env.path))
+    env.lock = Lock(
+        "other",
+        "SYS:other",
+        handler=env.handler,
+        handler_lock=env.handler.locate_object(""),
+    )
     assert env.run() == (DOSFALSE, ERROR_INVALID_LOCK, [])
     assert not env.lib.exall_scans
 

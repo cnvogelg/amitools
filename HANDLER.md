@@ -129,32 +129,44 @@ No DOS wiring in 5a.
 
 ### 5c. Remove `sys_path` from `Lock`/`FileHandle`
 
-- [ ] `Lock` stores handler + handler lock + Amiga path (no `sys_path`).
-- [ ] `FileHandle` stores handler + handler file + Amiga path (no `sys_path`).
-- [ ] `LockManager` keys locks by an opaque identity from the handler.
-- [ ] `DosLibrary.ExAll` uses a `lock.clone_for_scan()` helper.
-- [ ] `DosLibrary.Info` uses the lock's handler for disk usage.
-- [ ] Retire DOS use of `ami_to_sys_path`.
-- [ ] Fix the two latent `LockManager` bugs (`no_locks()` inversion and
-      `self.locks` -> `self.keys`), with a lock release test.
-- [ ] Update `test/unit/dos_exall.py`, `dos_filehandle*`, `dos_filemanager`.
-- [ ] Multi-assign writes: `open`/`find_output` now creates in the first
-      candidate; the old code preferred an existing later candidate
-      (`searchMulti`). Decide and pin the intended behavior with a test.
-- [ ] Test and commit 5c.
+- [x] `Lock` stores handler + handler lock + Amiga path (no `sys_path`);
+      `examine_lock`/`examine_next` go through the handler and fill the FIB
+      from `HandlerFileInfo`; `find_volume_node` stays.
+- [x] `FileHandle` stores handler + handler file + Amiga path (no `sys_path`).
+- [x] `LockManager` keys locks by `(handler identity, handler lock key)`
+      (Amiga path fallback for handler-less locks).
+- [x] `DosLibrary.ExAll` uses `lock.clone_for_scan()` (a fresh handler lock
+      with its own ExNext cache; maps non-directory to
+      `ERROR_OBJECT_WRONG_TYPE`).
+- [x] `DosLibrary.Info` uses the lock's handler for disk usage.
+- [x] Retire DOS use of `ami_to_sys_path` (the direct calls are gone;
+      `PathMatch`/`MatchFirstNext` still list dirs via the legacy
+      `ami_list_dir`/`ami_path_exists` path-manager helpers, see Later).
+- [x] Fix the three latent `LockManager` bugs (`no_locks()` inversion,
+      `self.locks` -> `self.keys`, and the never-populated key map), with a
+      lock release test (`test/unit/dos_lockmanager.py`).
+- [x] Update `test/unit/dos_exall.py` (build a `HostFileSysHandler`) and
+      add the multi-assign pin.
+- [x] Multi-assign writes: keep the previous DOS `searchMulti` behavior in
+      `HandlerManager.find_output` (prefer an existing candidate, else
+      create in the first), pinned by a test.
+- [x] Test and commit 5c.
 
 ### Later
 
 - [ ] `PacketHandler` bridge (real `DosPacketStruct` to a native handler port).
 - [ ] `RamHandler` replacing the temp-dir `RAM:`.
 - [ ] `NilHandler` / `ConsoleHandler` replacing `FileManager` special cases.
+- [ ] Route `PathMatch`/`MatchFirstNext` directory listing through handlers.
+- [ ] Call `handler.free_lock` on lock release once a handler needs it.
 
 ## Verification
 
 - `test/unit` (notably `dos_filehandle*`, `dos_filemanager`, `dos_exall`,
-  `lib_dos_info`)
+  `dos_lockmanager`, `handler_mgr`, `lib_dos_info`)
 - `test/suite`
-- Manual host-path and Amiga-path binary runs
+- Manual host-path and Amiga-path binary runs, plus `dos_examine` and
+  `dos_match`
 
 ## Progress log
 

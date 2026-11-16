@@ -10,8 +10,9 @@ from .PathPart import expand_progdir_path
 class LockKey:
     """manage a set of lock objects that belong to the same key
 
-    key is typically a unique identifier of the file object in the volume.
-    we use the absolute system path here.
+    key identifies the file object within its volume. We use the identity
+    of the handler that owns the object plus the handler lock key, so two
+    locks on the same object share a key (and thus a DOS fl_Key).
     """
 
     def __init__(self, key):
@@ -33,8 +34,8 @@ class LockKey:
     def find_lock_by_baddr(self, b_addr):
         return self.locks_by_baddr.get(b_addr)
 
-    def no_locks(self):
-        return bool(self.locks_by_baddr)
+    def is_empty(self):
+        return not self.locks_by_baddr
 
 
 class LockManager:
@@ -54,11 +55,21 @@ class LockManager:
         self.mem = mem
         self.handler_mgr = handler_mgr
         self.fs_handler_port = fs_handler_port
-        # we manage keys per sys_path
-        # each individual sys_path gets a unique slot = key
+        # we manage keys per file object
+        # each individual file object gets a unique slot = key
         self.keys = SlotArray(max_locks)
-        # map each sys_path name to a lock_key
-        self.sys_path_to_key_map = {}
+        # map each file object identity to a lock_key
+        self.lock_key_map = {}
+
+    def _lock_identity(self, lock):
+        """identity of the object a lock points at
+
+        Prefer the handler lock key so locks on the same object share a DOS
+        key. Fall back to the Amiga path for locks without a handler.
+        """
+        if lock.handler is not None and lock.handler_lock is not None:
+            return (id(lock.handler), lock.handler_lock.key)
+        return (None, str(lock.ami_path).lower())
 
     def _register_lock(self, lock):
         # look up volume
@@ -71,24 +82,22 @@ class LockManager:
         else:
             vol_baddr = volume.mem.addr
 
-        # is key already assigned to sys_path?
-        lock_key = self.sys_path_to_key_map.get(lock.sys_path)
+        # is a key already assigned to this object?
+        identity = self._lock_identity(lock)
+        lock_key = self.lock_key_map.get(identity)
         if not lock_key:
             # allocate new slot id
-            lock_key = LockKey(lock.sys_path)
+            lock_key = LockKey(identity)
             slot_id = self.keys.alloc(lock_key)
-            log_lock.debug(
-                "allocate log key slot %s for sys_path '%s'", slot_id, lock.sys_path
-            )
+            log_lock.debug("allocate lock key slot %s for %s", slot_id, identity)
             if slot_id is None:
                 log_lock.error("no more lock slots! max=%d", len(self.keys))
                 return None
             lock_key.slot_id = slot_id
+            self.lock_key_map[identity] = lock_key
         else:
             slot_id = lock_key.slot_id
-            log_lock.debug(
-                "found log key slot %s for sys_path '%s'", slot_id, lock.sys_path
-            )
+            log_lock.debug("found lock key slot %s for %s", slot_id, identity)
 
         # allocate lock struct and use slot_id for key
         lock.alloc(self.alloc, vol_baddr, slot_id)
@@ -109,9 +118,9 @@ class LockManager:
         # remove lock in key
         lock_key.del_lock(lock)
         # last lock in key?
-        if lock_key.no_locks():
-            del self.sys_path_to_key_map[lock.sys_path]
-            self.locks.free(slot_id)
+        if lock_key.is_empty():
+            del self.lock_key_map[lock_key.key]
+            self.keys.free(slot_id)
 
         # free lock itself
         lock.free(self.alloc)
@@ -145,11 +154,9 @@ class LockManager:
         except HandlerError as e:
             log_lock.info("lock '%s' invalid: '%s' (%s)", name, ami_path, e)
             return None
-        sys_path = getattr(handler_lock, "sys_path", None)
         lock = Lock(
             name,
             ami_path,
-            sys_path,
             exclusive,
             handler=handler,
             handler_lock=handler_lock,

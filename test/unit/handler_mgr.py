@@ -7,6 +7,7 @@ from amitools.vamos.handler import (
     HandlerError,
     HandlerManager,
     HostFileSysHandler,
+    MODE_NEWFILE,
 )
 
 
@@ -82,6 +83,22 @@ def handler_mgr_find_output_test(tmp_path):
     assert (work / "new.txt").read_bytes() == b"hi"
     # an unknown volume cannot be created
     expect_error(205, mgr.find_output, "nope:new.txt")
+
+
+def handler_mgr_find_output_multi_assign_test(tmp_path):
+    pm, mgr, root, work = setup_mgr(tmp_path)
+    pm.get_assign_mgr().add_assign("m:work:+root:")
+    # an existing object in a later candidate is preferred for output
+    (root / "f").write_bytes(b"root")
+    handler, fh = mgr.find_output("m:f", MODE_NEWFILE)
+    assert handler.name == "root"
+    handler.end(fh)
+    # a new object is created in the first candidate
+    handler, fh = mgr.find_output("m:new", MODE_NEWFILE)
+    assert handler.name == "work"
+    handler.end(fh)
+    assert (work / "new").exists()
+    assert not (root / "new").exists()
 
 
 def handler_mgr_create_delete_test(tmp_path):

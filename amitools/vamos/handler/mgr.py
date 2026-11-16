@@ -132,9 +132,20 @@ class HandlerManager:
         return self._dispatch(ami_path, lambda h, p: h.find_update(p), env=env, cwd=cwd)
 
     def find_output(self, ami_path, mode=MODE_NEWFILE, env=None, cwd=None):
-        return self._dispatch(
-            ami_path, lambda h, p: h.find_output(p, mode), env=env, cwd=cwd
-        )
+        # Match the previous DOS "searchMulti" behavior: prefer an existing
+        # object in any candidate and only create a new object in the first
+        # candidate. (AmigaDOS itself writes to the first assign dir.)
+        candidates = self.resolve(ami_path, env=env, cwd=cwd)
+        if not candidates:
+            raise HandlerError(ERROR_OBJECT_NOT_FOUND)
+        for handler, rel_path in candidates:
+            try:
+                handler.locate_object(rel_path)
+            except HandlerError:
+                continue
+            return handler, handler.find_output(rel_path, mode)
+        handler, rel_path = candidates[0]
+        return handler, handler.find_output(rel_path, mode)
 
     def delete_object(self, ami_path, env=None, cwd=None):
         return self._dispatch(

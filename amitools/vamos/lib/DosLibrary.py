@@ -53,7 +53,6 @@ from .dos.MatchFirstNext import MatchFirstNext
 from .dos.CommandLine import CommandLine
 from .dos.Process import Process
 from .dos.DosList import DosList
-from .dos.Lock import Lock
 from .dos.LockManager import LockManager
 from .dos.FileManager import FileManager
 from .dos.DosFileOpener import DosFileOpener
@@ -1446,9 +1445,15 @@ class DosLibrary(LibImpl):
             return DOSFALSE
         last_key = control.eac_LastKey.val
         if last_key == 0:
-            # An unallocated Lock reuses the metadata/enumeration helpers,
-            # but owns its ExNext cache independently of the caller's lock.
-            scan = Lock(lock.name, lock.ami_path, lock.sys_path)
+            # A cloned lock owns its ExNext cache independently of the
+            # caller's lock. clone_for_scan also checks that the lock is a
+            # directory.
+            try:
+                scan = lock.clone_for_scan()
+            except HandlerError as e:
+                self.exall_scans.pop(control_ptr, None)
+                self.setioerr(ctx, e.code)
+                return DOSFALSE
             self.exall_scans[control_ptr] = (lock, scan)
         else:
             state = self.exall_scans.get(control_ptr)
@@ -1471,8 +1476,6 @@ class DosLibrary(LibImpl):
             fib = FileInfoBlockStruct(ctx.mem, scratch.addr)
             if last_key == 0:
                 err = scan.examine_lock(fib)
-                if err == NO_ERROR and fib.fib_DirEntryType.val < 0:
-                    err = ERROR_OBJECT_WRONG_TYPE
             else:
                 fib.fib_DiskKey.val = last_key
                 err = NO_ERROR
@@ -1489,14 +1492,6 @@ class DosLibrary(LibImpl):
                 )
             control.eac_LastKey.val = fib.fib_DiskKey.val
             keep_scan = err == NO_ERROR
-        except FileNotFoundError:
-            err = ERROR_OBJECT_NOT_FOUND
-        except NotADirectoryError:
-            err = ERROR_OBJECT_WRONG_TYPE
-        except PermissionError:
-            err = ERROR_READ_PROTECTED
-        except OSError:
-            err = ERROR_OBJECT_IN_USE
         finally:
             self.alloc.free_memory(scratch)
             if not keep_scan:
