@@ -2,6 +2,12 @@ from .funcbase import FuncBase
 from amitools.vamos.log import log_exec
 
 
+# private ExecBase->SysFlags bits, see exec/execbase.inc
+SFF_QuantumOver = 1 << 14
+SFF_AttnSwitch = 1 << 15
+SFF_RESCHEDULE = SFF_QuantumOver | SFF_AttnSwitch
+
+
 class SignalFunc(FuncBase):
     def alloc_signal(self, sig_num):
         task = self.get_my_ami_task()
@@ -110,5 +116,12 @@ class SignalFunc(FuncBase):
 
     def permit(self):
         sched_task = self.get_my_sched_task()
+        # a reschedule request in ExecBase->SysFlags, e.g. from sched_yield(),
+        # is honored when the forbidden state ends, like an expired time slice
+        if sched_task.forbid_cnt == 1:
+            sys_flags = self.exec_lib.sys_flags.val
+            if sys_flags & SFF_AttnSwitch:
+                self.exec_lib.sys_flags.val = sys_flags & ~SFF_RESCHEDULE
+                sched_task.request_reschedule()
         cnt = sched_task.permit()
         log_exec.info("Permit (cnt=%d)", cnt)

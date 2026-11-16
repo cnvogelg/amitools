@@ -108,6 +108,13 @@ class TaskBase:
         """give up this tasks execution and allow the scheduler to run another task"""
         self.scheduler.reschedule()
 
+    def request_reschedule(self):
+        """request a reschedule, deferring it while in forbid state"""
+        if self.forbid_cnt > 0:
+            self.forbid_reschedule = True
+        else:
+            self.reschedule()
+
     def forbid(self):
         """do not switch away from my task until permit() is called"""
         self.forbid_cnt += 1
