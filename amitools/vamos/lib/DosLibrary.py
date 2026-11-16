@@ -1561,17 +1561,12 @@ class DosLibrary(LibImpl):
 
     def CurrentDir(self, ctx):
         lock_b_addr = ctx.cpu.r_reg(REG_D1)
-        old_lock = self.get_current_dir(ctx)
-        new_lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-        log_dos.info("CurrentDir(b@%x): %s -> %s", lock_b_addr, old_lock, new_lock)
-        if new_lock == None:
-            ctx.process.set_current_dir(0)
-        else:
-            ctx.process.set_current_dir(new_lock.b_addr << 2)
-        if old_lock == None:
-            return 0
-        else:
-            return old_lock.b_addr
+        # CurrentDir exchanges a BPTR. The old lock may already have been
+        # released (e.g. FreeDeviceProc followed by restoring the old cwd).
+        proc = ctx.process.get_ami_process()
+        old = proc.current_dir.bptr
+        proc.current_dir.bptr = lock_b_addr
+        return old
 
     def NameFromLock(self, ctx):
         lock_b_addr = ctx.cpu.r_reg(REG_D1)

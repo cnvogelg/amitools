@@ -21,3 +21,15 @@ class DosProcess(ExecTask):
     def free(self):
         self.proc.free()
         super().free()
+
+    def get_current_dir(self):
+        return self.proc.current_dir.aptr
+
+    def set_current_dir(self, addr):
+        self.proc.current_dir.aptr = addr
+
+    def get_home_dir(self):
+        return self.proc.home_dir.aptr
+
+    def set_home_dir(self, addr):
+        self.proc.home_dir.aptr = addr
