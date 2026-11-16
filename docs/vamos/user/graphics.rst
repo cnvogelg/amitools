@@ -124,3 +124,61 @@ carry an owned, zero-initialized previous-key buffer through ``IAddress`` until
 Monochrome ``RastPort.AreaPtrn`` fills honor JAM1, JAM2, complement, inverse
 video, plane masks and clipping. Patterns are anchored at the raster origin
 and copied when drawing is queued. Multi-plane area patterns are unsupported.
+
+Native classes and OS services
+------------------------------
+
+The library loader accepts ``.mui``, ``.mcc`` and ``.mcp`` filenames in
+addition to ``.library`` and ``.device``. Class libraries use normal library
+loading and configuration; their code runs on the emulated CPU. For example::
+
+    vamos -O 'Example.mcc=mode:amiga' myprogram
+
+There is no Python implementation of MUI widgets. The initial BOOPSI support
+provides ``rootclass``, class registration and lifetime management, object
+allocation/disposal, attribute messages, and object-list operations. Public
+``Class``, ``Hook`` and hidden object headers use the classic 32-bit ABI, so
+native ``DoMethodA`` and ``DoSuperMethodA`` can call guest dispatchers directly.
+Intuition's object entry points and Utility's ``CallHookPkt`` also call guest
+hooks, including nested calls back into vamos. ``SetGadgetAttrsA`` supplies
+window GadgetInfo; requester-relative gadget domains and built-in gadget/image
+classes are not yet implemented.
+
+The following optional GUI-related libraries have initial implementations:
+
+* ``asl.library`` allocates file and font requesters, copies initial strings,
+  preserves selections between requests, and offers a modal SDL text selector.
+  Use Tab or click a field, Backspace to edit, Enter to accept, and Escape to
+  cancel. Ctrl+A clears the current field. Headless operation cancels. Screen
+  mode selection, multi-selection and callback/pattern filtering are unsupported.
+* ``diskfont.library`` opens classic bitmap font contents files and relocated
+  font hunks from ``FONTS:``, publishes guest character tables, and enumerates
+  bitmap font entries. The bundled Topaz recreation is available at 8 and 16
+  pixels. Outline engines, color fonts and scaling are unsupported.
+* ``iffparse.library`` reads and writes nested IFF chunks using DOS handles or
+  guest stream hooks. It provides byte/record I/O, context traversal, scan/step
+  parsing, stop handlers and scoped stored properties. Writing supports unknown
+  sizes with backpatching and odd-byte padding. Clipboard streams, collections,
+  client entry/exit handlers and general local context items are unsupported.
+* ``icon.library`` loads, saves, duplicates and frees classic DiskObjects,
+  including relocated planar images, drawer data, default tools and ToolTypes.
+  It provides default icons, ToolType lookup and value matching. Existing
+  extended icon data is preserved on file round trips; extended icon rendering
+  and Workbench launch/message handling are separate, unimplemented features.
+* ``datatypes.library`` creates BOOPSI picture objects from palette ILBM files
+  or memory buffers, including ByteRun1 and masks. Bitmap/header/color attributes,
+  frame sizing and synchronous layout without palette remapping are supported.
+  Other formats, palette remapping, embedded datatype gadgets, printing and
+  asynchronous layout are unsupported.
+
+These are API subsets, not complete replacements for the corresponding AmigaOS
+libraries. Other vectors retain vamos' missing-function behavior. Commodities
+and ARexx functionality is deferred, and neither library is automatically
+replaced with a fake implementation. Native Zune still depends on additional
+layers/graphics functionality; loading its classes does not imply that
+ZunePrefs is fully operational.
+
+Run the focused tests with::
+
+    python -m pytest -q test/unit/lib_boopsi.py test/unit/lib_os_support.py
+    AMITOOLS_TEST_SDL=1 python -m pytest -q test/unit/lib_os_native.py
