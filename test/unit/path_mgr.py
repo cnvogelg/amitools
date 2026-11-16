@@ -1,4 +1,3 @@
-import os
 import pytest
 from amitools.vamos.path import *
 from amitools.vamos.cfgcore import ConfigDict
@@ -349,81 +348,6 @@ def path_mgr_cmdpaths_test(tmpdir):
 def get_volume_sys_path(pm, vol_name):
     vol = pm.get_volume(vol_name)
     return vol.get_path()
-
-
-def path_mgr_to_sys_path_test(tmpdir):
-    pm = setup_pm(tmpdir)
-    tsp = pm.to_sys_path
-    sys_sys_path = get_volume_sys_path(pm, "sys")
-    sys_root_path = get_volume_sys_path(pm, "root")
-    # vol path
-    assert tsp("sys:") == sys_sys_path
-    # assign path
-    assert tsp("c:") == os.path.join(sys_sys_path, "c")
-    # relpath
-    assert tsp("") == os.path.join(sys_root_path, "baz")
-    assert tsp("what/next") == os.path.join(sys_root_path, "baz", "what", "next")
-    # relpath env
-    env = AmiPathEnv(cwd="sys:")
-    assert tsp("", env=env) == os.path.join(sys_sys_path)
-    assert tsp("foo/bar", env=env) == os.path.join(sys_sys_path, "foo", "bar")
-    # invalid relpath
-    assert tsp("/", env=env) == os.path.join(sys_sys_path)
-    # unknown prefix
-    assert tsp("unknown:") is None
-    with pytest.raises(AmiPathError):
-        tsp("unknown:", strict=True)
-    # shutdown
-    pm.shutdown()
-
-
-def path_mgr_from_sys_path_test(tmpdir):
-    pm = setup_pm(tmpdir)
-    fsp = pm.from_sys_path
-    sys_sys_path = get_volume_sys_path(pm, "sys")
-    sys_root_path = get_volume_sys_path(pm, "root")
-    assert pm.get_vol_mgr().add_volume("cwd:.")
-    sys_cwd_path = get_volume_sys_path(pm, "cwd")
-    # abs sys path
-    assert fsp(sys_sys_path) == "sys:"
-    assert fsp(sys_root_path) == "root:"
-    assert fsp(sys_cwd_path) == "cwd:"
-    assert fsp(os.path.join(sys_sys_path, "my", "Path")) == "sys:my/Path"
-    # rel sys path
-    assert fsp(".") == "cwd:"
-    assert fsp("my/Path") == "cwd:my/Path"
-    # can't map
-    assert fsp("..") is None
-    with pytest.raises(SysPathError):
-        fsp("..", strict=True)
-    # shutdown
-    pm.shutdown()
-
-
-def path_mgr_resolve_esc_sys_path_test(tmpdir):
-    pm = setup_pm(tmpdir)
-    sys_sys_path = get_volume_sys_path(pm, "sys")
-    assert pm.get_vol_mgr().add_volume("cwd:.")
-    sys_cwd_path = get_volume_sys_path(pm, "cwd")
-    resp = pm.resolve_esc_sys_path
-    # ami path
-    assert resp("bla:") == AmiPath("bla:")
-    assert resp("rel") == AmiPath("rel")
-    assert resp("") == AmiPath()
-    # esc sys path
-    # invalid empty
-    with pytest.raises(AmiPathError):
-        resp("::")
-    # valid abs
-    assert resp("::" + sys_sys_path) == "sys:"
-    # valid rel
-    assert resp("::.") == "cwd:"
-    # invalid sys
-    assert resp("::..") is None
-    with pytest.raises(SysPathError):
-        resp("::..", strict=True)
-    # shutdown
-    pm.shutdown()
 
 
 def path_mgr_create_env_test(tmpdir):

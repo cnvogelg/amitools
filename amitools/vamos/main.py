@@ -5,7 +5,7 @@ import pstats
 from .cfg import VamosMainParser
 from .machine import Machine, MemoryMap, Runtime
 from .log import log_main, log_setup, log_help
-from .path import VamosPathManager
+from .path import VamosPathManager, SysPathResolver
 from .trace import TraceManager
 from .libmgr import SetupLibManager
 from .schedule import Scheduler
@@ -164,7 +164,8 @@ def main(
         proc_cfg = mp.get_proc_dict().process
         exec_ctx = slm.exec_ctx
         dos_ctx = slm.dos_ctx
-        proc_args = ProcArgs(path_mgr.get_host_file_system(), path_mgr.from_sys_path)
+        sys_path = SysPathResolver(path_mgr)
+        proc_args = ProcArgs(sys_path.file_system, sys_path.from_sys_path)
         mode_ctx = ModeContext(
             proc_cfg, exec_ctx, dos_ctx, scheduler, default_runtime, proc_args
         )

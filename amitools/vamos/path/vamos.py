@@ -42,17 +42,17 @@ class VamosPathManager(PathManager):
         # now we have paths with volume:abs/path
         sys_path = None
         # search for existing multi assign
-        fs = self.sys_path.file_system
+        fs = self._sys_path.file_system
         if searchMulti or mustExist:
             for npath in paths:
                 # first try to find existing path in all locations
-                spath = self.to_sys_path(str(npath))
+                spath = self._sys_path.to_sys_path(str(npath))
                 if spath and fs.exists(spath):
                     sys_path = spath
                     break
         # nothing found -> try first path
         if sys_path is None and not mustExist:
-            sys_path = self.to_sys_path(str(paths[0]))
+            sys_path = self._sys_path.to_sys_path(str(paths[0]))
         log_path.info(
             "ami_to_sys_path: ami_path='%s' -> volpaths=%s -> sys_path='%s'",
             ami_path,
@@ -62,7 +62,7 @@ class VamosPathManager(PathManager):
         return sys_path
 
     def sys_to_ami_path(self, sys_path):
-        ami_path = self.from_sys_path(sys_path)
+        ami_path = self._sys_path.from_sys_path(sys_path)
         log_path.info(
             "sys_to_ami_path: sys_path='%s' -> abs_path='%s' -> ami_path='%s'",
             sys_path,
@@ -127,7 +127,7 @@ class VamosPathManager(PathManager):
         sys_path = self.ami_to_sys_path(cwd_lock, ami_path, mustExist=True)
         if sys_path is None:
             return None
-        fs = self.sys_path.file_system
+        fs = self._sys_path.file_system
         if not fs.is_dir(str(sys_path)):
             return None
         files = fs.list_dir(str(sys_path))
@@ -141,7 +141,7 @@ class VamosPathManager(PathManager):
 
     def ami_path_exists(self, cwd_lock, ami_path):
         sys_path = self.ami_to_sys_path(cwd_lock, ami_path, mustExist=True)
-        exists = self.sys_path.file_system.exists(str(sys_path))
+        exists = self._sys_path.file_system.exists(str(sys_path))
         log_path.info(
             "ami_path_exists: path='%s' -> sys_path='%s' -> exists=%s",
             ami_path,
