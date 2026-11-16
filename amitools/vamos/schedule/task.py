@@ -281,10 +281,12 @@ class NativeTask(TaskBase):
         except TaskStop:
             log_schedule.debug("%s: task stop received!")
             self.run_state = None
-
-        # at the end of execution remove myself
-        if self.scheduler:
-            self.scheduler.terminate_task(self)
+        finally:
+            # A Python library trap may raise before Runtime returns a
+            # RunState. Do not leave its dead greenlet in the scheduler.
+            scheduler = getattr(self, "scheduler", None)
+            if scheduler:
+                scheduler.terminate_task(self)
 
         if self.run_state:
             # pick up potential machine error
@@ -359,12 +361,16 @@ class PythonTask(TaskBase):
                 self.exit_code = self.run()
         except TaskStop:
             log_schedule.debug("%s: Python task stop received!", self.name)
+        finally:
+            # Uncaught Python exceptions leave a dead greenlet. Remove it
+            # before propagating the error so later cleanup can schedule
+            # library expunge and any remaining helper tasks.
+            scheduler = getattr(self, "scheduler", None)
+            if scheduler:
+                scheduler.terminate_task(self)
 
         # a stopped task has no exit code
         log_schedule.debug(
             "%s: done Python code. exit_code=%s", self.name, self.exit_code
         )
-        # at the end of execution remove myself
-        if self.scheduler:
-            self.scheduler.terminate_task(self)
         return self.exit_code

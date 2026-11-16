@@ -56,14 +56,18 @@ class LibManager(object):
             log_libmgr.info("exec: force version: %s", version)
         return self.vlib_mgr.bootstrap_exec(exec_info, version)
 
-    def shutdown(self, run_sp=None):
+    def shutdown(self, run_sp=None, native_shutdown=None):
         """cleanup libs
 
         try to expunge all libs and report still open ones
         """
         self.proxy_mgr.shutdown()
         log_libmgr.info("+shutdown")
-        aleft = self.alib_mgr.shutdown(run_sp)
+        aleft = (
+            native_shutdown()
+            if native_shutdown is not None
+            else self.alib_mgr.shutdown(run_sp)
+        )
         if aleft > 0:
             log_libmgr.warning("shutdown: can't expunge %d amiga libs/devs!", aleft)
         vleft = self.vlib_mgr.shutdown()
