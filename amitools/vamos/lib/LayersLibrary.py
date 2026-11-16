@@ -1,3 +1,4 @@
+from amitools.vamos.display.base import Color, Rect
 from amitools.vamos.lib.graphics import LayerStruct
 from amitools.vamos.libcore.impl import LibImpl
 
@@ -20,7 +21,6 @@ class LayersLibrary(LibImpl):
     def InstallClipRegion(self, ctx, layer, region):
         if not layer:
             return 0
-        import sdl2
 
         value = LayerStruct(ctx.mem, layer)
         previous = value.ClipRegion.val
@@ -30,7 +30,7 @@ class LayersLibrary(LibImpl):
             ctx.exec_lib.intuition_lib._flush_batch(backing)
             backing.user_clip_rects = (
                 [
-                    sdl2.SDL_Rect(a, b, c - a + 1, d - b + 1)
+                    Rect(a, b, c - a + 1, d - b + 1)
                     for a, b, c, d in graphics._region_rects(ctx, region)
                 ]
                 if region

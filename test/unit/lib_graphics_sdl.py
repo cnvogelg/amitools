@@ -142,11 +142,11 @@ def graphics_native_sdl_window_and_render_test(monkeypatch):
         intuition.check_refresh(ctx)
         assert not backing.batch.commands
         pixels = (ctypes.c_uint32 * (64 * 32))()
-        assert sdl2.SDL_SetRenderTarget(backing.renderer, backing.texture) == 0
+        assert sdl2.SDL_SetRenderTarget(backing.frame.window.renderer, backing.frame.texture) == 0
         try:
             assert (
                 sdl2.SDL_RenderReadPixels(
-                    backing.renderer,
+                    backing.frame.window.renderer,
                     None,
                     sdl2.SDL_PIXELFORMAT_RGBA8888,
                     pixels,
@@ -155,7 +155,7 @@ def graphics_native_sdl_window_and_render_test(monkeypatch):
                 == 0
             )
         finally:
-            sdl2.SDL_SetRenderTarget(backing.renderer, None)
+            sdl2.SDL_SetRenderTarget(backing.frame.window.renderer, None)
         assert pixels[9 * 64 + 5] == 0xFFFFFFFF
         assert pixels[5 * 64 + 5] == 0x000000FF
         from amitools.vamos.lib.graphics import LayerStruct
@@ -173,11 +173,12 @@ def graphics_native_sdl_window_and_render_test(monkeypatch):
         ctx.cpu.w_reg(REG_A0, window)
         ctx.cpu.w_reg(REG_D0, 1)
         intuition.EndRefresh(ctx)
-        sdl2.SDL_SetRenderTarget(backing.renderer, backing.texture)
+        intuition.check_refresh(ctx)
+        sdl2.SDL_SetRenderTarget(backing.frame.window.renderer, backing.frame.texture)
         try:
             assert (
                 sdl2.SDL_RenderReadPixels(
-                    backing.renderer,
+                    backing.frame.window.renderer,
                     None,
                     sdl2.SDL_PIXELFORMAT_RGBA8888,
                     pixels,
@@ -186,7 +187,7 @@ def graphics_native_sdl_window_and_render_test(monkeypatch):
                 == 0
             )
         finally:
-            sdl2.SDL_SetRenderTarget(backing.renderer, None)
+            sdl2.SDL_SetRenderTarget(backing.frame.window.renderer, None)
         assert pixels[9 * 64 + 2] == pixels[9 * 64 + 8] == 0x000000FF
         assert pixels[9 * 64 + 5] == 0xFFFFFFFF
         ctx.cpu.w_reg(REG_A1, rp.addr)
@@ -235,11 +236,12 @@ def graphics_native_sdl_window_and_render_test(monkeypatch):
             ):
                 ctx.cpu.w_reg(reg, value)
             intuition.ScrollWindowRaster(ctx)
-            sdl2.SDL_SetRenderTarget(backing.renderer, backing.texture)
+            intuition.check_refresh(ctx)
+            sdl2.SDL_SetRenderTarget(backing.frame.window.renderer, backing.frame.texture)
             try:
                 assert (
                     sdl2.SDL_RenderReadPixels(
-                        backing.renderer,
+                        backing.frame.window.renderer,
                         None,
                         sdl2.SDL_PIXELFORMAT_RGBA8888,
                         pixels,
@@ -248,7 +250,7 @@ def graphics_native_sdl_window_and_render_test(monkeypatch):
                     == 0
                 )
             finally:
-                sdl2.SDL_SetRenderTarget(backing.renderer, None)
+                sdl2.SDL_SetRenderTarget(backing.frame.window.renderer, None)
             if dx == 100:
                 assert all(pixel == 0xA8A8A8FF for pixel in pixels)
             else:
@@ -265,11 +267,12 @@ def graphics_native_sdl_window_and_render_test(monkeypatch):
         assert backing.surface.dirty
         assert graphics.palette[2].r == 255
         intuition._flush_batch(backing)
-        sdl2.SDL_SetRenderTarget(backing.renderer, backing.texture)
+        intuition.check_refresh(ctx)
+        sdl2.SDL_SetRenderTarget(backing.frame.window.renderer, backing.frame.texture)
         try:
             assert (
                 sdl2.SDL_RenderReadPixels(
-                    backing.renderer,
+                    backing.frame.window.renderer,
                     None,
                     sdl2.SDL_PIXELFORMAT_RGBA8888,
                     pixels,
@@ -278,7 +281,7 @@ def graphics_native_sdl_window_and_render_test(monkeypatch):
                 == 0
             )
         finally:
-            sdl2.SDL_SetRenderTarget(backing.renderer, None)
+            sdl2.SDL_SetRenderTarget(backing.frame.window.renderer, None)
         assert backing.surface.pixels[6 * 64 + 6] == 2
         assert pixels[6 * 64 + 6] == 0x006688FF
         # Translate real SDL event structures, then verify the messages
@@ -296,11 +299,11 @@ def graphics_native_sdl_window_and_render_test(monkeypatch):
         intuition.ModifyIDCMP(ctx)
         win = WindowStruct(ctx.mem, window)
         port = MsgPort(ctx.mem, win.UserPort.val)
-        window_id = intuition.find_sdl_window_by_amiga_addr(window)
+        window_id = intuition.find_window_id(window)
         intuition._window_scales[window_id] = (2, 3.75)
 
         def receive(event, expected):
-            pending = intuition.ingest_sdl_event(ctx, event)
+            pending = intuition.ingest_event(ctx, ctx.display.convert_event(event))
             if expected is None:
                 assert pending is None
                 return

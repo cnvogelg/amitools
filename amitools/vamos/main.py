@@ -194,6 +194,8 @@ def main(
             handler_mgr=handler_mgr,
             display_scale=display_scale,
             display_aspect=mp.get_display_dict().display.aspect,
+            display_backend=mp.get_display_dict().display.backend,
+            display_output=mp.get_display_dict().display.output,
         )
         if not slm.parse_config(lib_cfg):
             log_main.error("lib manager setup failed!")

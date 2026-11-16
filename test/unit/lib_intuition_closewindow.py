@@ -1,3 +1,4 @@
+from amitools.vamos.display.base import Event
 import sys
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -50,6 +51,8 @@ class WindowContext:
         self.next_texture = 2000
         self.sdl = SimpleNamespace(
             SDL_WINDOWPOS_CENTERED=0,
+            SDL_WINDOW_SHOWN=0,
+            SDL_WINDOW_RESIZABLE=1,
             SDL_RENDERER_ACCELERATED=1,
             SDL_RENDERER_PRESENTVSYNC=2,
             SDL_PIXELFORMAT_RGBA8888=0,
@@ -90,12 +93,14 @@ class WindowContext:
             CreateMsgPort=lambda ctx: self.messages.create_msg_port(),
             DeleteMsgPort=self.delete_port,
             msg_func=self.messages,
-            register_SDL_poll=Mock(),
         )
         self.graphics = GraphicsLibrary()
+        from amitools.vamos.display.base import Color
+        self.graphics.palette = {n: Color(n, n, n) for n in range(256)}
         self.graphics.alloc = self.alloc
         self.graphics.topaz_font = self.font.get_addr()
         self.intuition = IntuitionLibrary()
+        self.intuition.setup_lib(self, 0)
         self.exec_lib.intuition_lib = self.intuition
         self.intuition.alloc = self.alloc
         self.intuition.graphics_lib = self.graphics
@@ -162,18 +167,10 @@ class WindowContext:
         self.intuition.CloseWindow(self)
 
     def resize(self, window_id, width=123, height=45):
-        return SimpleNamespace(
-            type=self.sdl.SDL_WINDOWEVENT,
-            window=SimpleNamespace(
-                windowID=window_id,
-                event=self.sdl.SDL_WINDOWEVENT_RESIZED,
-                data1=width,
-                data2=height,
-            ),
-        )
+        return Event("resize", window_id, width, height)
 
     def close_all(self):
-        for addr in tuple(self.intuition.sdl_window_id_2_window_addr_map.values()):
+        for addr in tuple(self.intuition.window_addresses.values()):
             self.close(addr)
         assert self.screen.FirstWindow.val == 0
         assert self.alloc.get_free_bytes() == self.base_free
@@ -186,7 +183,7 @@ class WindowContext:
         assert not self.textures
         assert not self.intuition.rp_2_win_addr
         assert not self.intuition.refresh_pending
-        assert not self.intuition.sdl_window_id_2_sdl_window
+        assert not self.intuition.host_windows
         self.screen.free()
         self.font.free()
         assert self.alloc.is_all_free()
@@ -204,10 +201,10 @@ def ctx(monkeypatch, request):
 def intuition_close_window_resources_test(ctx, index):
     windows = [ctx.open() for _ in range(3)]
     target = windows[index]
-    window_id = ctx.intuition.find_sdl_window_by_amiga_addr(target)
+    window_id = ctx.intuition.find_window_id(target)
     ctx.intuition.refresh_pending.update(windows)
     ctx.close(target)
-    assert window_id not in ctx.intuition.sdl_window_id_2_window_addr_map
+    assert window_id not in ctx.intuition.window_addresses
     assert target not in ctx.intuition.refresh_pending
     assert ctx.intuition.refresh_pending == set(windows) - {target}
     assert ctx.alloc.get_memory(target) is None
@@ -221,7 +218,7 @@ def intuition_close_window_resources_test(ctx, index):
     assert linked == [addr for addr in reversed(windows) if addr != target]
     assert len(ctx.windows) == 2
     kinds = [kind for kind, _ in ctx.events]
-    assert kinds[0] == "timer"
+    assert "timer" not in kinds
     assert kinds[-1] == "window"
     assert kinds.index("texture") < kinds.index("renderer") < kinds.index("window")
     ctx.close_all()
@@ -230,16 +227,16 @@ def intuition_close_window_resources_test(ctx, index):
 def intuition_close_window_queued_resize_test(ctx):
     target = ctx.open()
     other = ctx.open()
-    window_id = ctx.intuition.find_sdl_window_by_amiga_addr(target)
+    window_id = ctx.intuition.find_window_id(target)
     ctx.close(target)
     replacement = ctx.alloc.alloc_memory(WindowStruct.get_size())
     marker = bytes([0xA5]) * replacement.size
     ctx.mem.w_block(replacement.addr, marker)
-    assert ctx.intuition.ingest_sdl_event(ctx, ctx.resize(window_id)) is None
+    assert ctx.intuition.ingest_event(ctx, ctx.resize(window_id)) is None
     assert ctx.mem.r_block(replacement.addr, replacement.size) == marker
     # The live window must continue to receive its own events.
-    other_id = ctx.intuition.find_sdl_window_by_amiga_addr(other)
-    event = ctx.intuition.ingest_sdl_event(ctx, ctx.resize(other_id))
+    other_id = ctx.intuition.find_window_id(other)
+    event = ctx.intuition.ingest_event(ctx, ctx.resize(other_id))
     assert event.win_addr == other
     assert WindowStruct(ctx.mem, other).Width.val == 123
     ctx.alloc.free_memory(replacement)
@@ -255,7 +252,7 @@ def intuition_window_resize_storage_test(ctx, monkeypatch, fail):
     backing = ctx.graphics.rp_graphics_map[rp.addr]
     ctx.mem.w8(bm.Planes[0].val + bm.BytesPerRow.val, 0x80)
     original = bytes(ctx.mem.r_block(bm.addr, bm.get_size()))
-    old_texture = backing.texture
+    old_texture = backing.frame.texture
     old_free = ctx.alloc.get_free_bytes()
     if fail == "texture":
         monkeypatch.setattr(ctx.sdl, "SDL_CreateTexture", lambda *args: 0)
@@ -265,7 +262,7 @@ def intuition_window_resize_storage_test(ctx, monkeypatch, fail):
     assert success == (fail is None)
     if fail:
         assert bytes(ctx.mem.r_block(bm.addr, bm.get_size())) == original
-        assert backing.texture == old_texture
+        assert backing.frame.texture == old_texture
         assert (window.Width.val, window.Height.val) == (64, 32)
         assert ctx.alloc.get_free_bytes() == old_free
     else:
@@ -276,7 +273,7 @@ def intuition_window_resize_storage_test(ctx, monkeypatch, fail):
         assert ctx.mem.r8(bm.Planes[0].val + 12 * 40) == 0
         assert backing.surface.pixels[96] == 1
         assert old_texture not in ctx.textures
-        assert backing.texture in ctx.textures
+        assert backing.frame.texture in ctx.textures
         assert rp.BitMap.val == bm.addr
     ctx.close_all()
 
@@ -296,7 +293,7 @@ def intuition_window_programmatic_resize_test(ctx):
     ctx.intuition.check_refresh(ctx)
     assert (window.Width.val, window.Height.val) == (100, 52)
     ctx.sdl.SDL_SetWindowSize.assert_called_once_with(
-        ctx.intuition.find_sdl_window_by_amiga_addr(target), 100, 52)
+        ctx.intuition.find_window_id(target), 100, 52)
     message = ctx.messages.get_msg(MsgPort(ctx.mem, window.UserPort.val))
     assert message is not None
     assert ctx.mem.r32(message.addr + 20) == IDCMP_NEWSIZE
@@ -309,12 +306,12 @@ def intuition_window_programmatic_resize_test(ctx):
 
 def intuition_close_window_translated_event_reused_address_test(ctx):
     target = ctx.open()
-    window_id = ctx.intuition.find_sdl_window_by_amiga_addr(target)
-    pending = ctx.intuition.ingest_sdl_event(ctx, ctx.resize(window_id))
+    window_id = ctx.intuition.find_window_id(target)
+    pending = ctx.intuition.ingest_event(ctx, ctx.resize(window_id))
     ctx.close(target)
     replacement = ctx.open()
     assert replacement == target
-    assert ctx.intuition.find_sdl_window_by_amiga_addr(replacement) != window_id
+    assert ctx.intuition.find_window_id(replacement) != window_id
     ctx.intuition.queue_idcmp = Mock()
     ctx.intuition.drain_pending_intui_events(ctx, pending)
     ctx.intuition.queue_idcmp.assert_not_called()
@@ -352,16 +349,16 @@ def intuition_close_window_direct_late_message_test(ctx, monkeypatch):
     ctx.close_all()
 
 
-def intuition_close_window_timer_race_test(ctx):
+def intuition_close_window_queued_event_during_host_close_test(ctx):
     target = ctx.open()
-    window_id = ctx.intuition.find_sdl_window_by_amiga_addr(target)
+    window_id = ctx.intuition.find_window_id(target)
+    close = ctx.display.close_window
 
-    def remove(timer):
-        # An event queued by a timer already in progress must be harmless.
-        assert ctx.intuition.ingest_sdl_event(ctx, ctx.resize(window_id)) is None
-        return ctx.remove_timer(timer)
+    def close_with_event(window):
+        assert ctx.intuition.ingest_event(ctx, ctx.resize(window_id)) is None
+        close(window)
 
-    ctx.sdl.SDL_RemoveTimer = remove
+    ctx.display.close_window = close_with_event
     ctx.close(target)
     ctx.close_all()
 
@@ -393,18 +390,18 @@ def intuition_close_window_cleanup_exception_test(ctx):
     ctx.close_all()
 
 
-def intuition_close_window_timer_failure_test(ctx):
-    ctx.sdl.SDL_AddTimer = Mock(return_value=0)
-    ctx.open()
+def intuition_close_window_needs_no_host_timer_test(ctx):
+    ctx.sdl.SDL_AddTimer = Mock(side_effect=AssertionError("unexpected timer"))
+    assert ctx.open()
     ctx.close_all()
-    assert not any(kind == "timer" for kind, _ in ctx.events)
+    ctx.sdl.SDL_AddTimer.assert_not_called()
 
 
 def intuition_close_window_missing_host_test(ctx):
     target = ctx.open()
-    window_id = ctx.intuition.find_sdl_window_by_amiga_addr(target)
-    ctx.intuition.sdl_window_id_2_sdl_window.pop(window_id)
-    ctx.destroy_host_window(window_id)
+    window_id = ctx.intuition.find_window_id(target)
+    ctx.intuition.host_windows.pop(window_id)
+    ctx.display.close_window(ctx.display.windows[window_id])
     ctx.close(target)
     assert [event for event in ctx.events if event == ("window", window_id)] == [
         ("window", window_id)
@@ -416,7 +413,7 @@ def intuition_window_unknown_id_test(ctx):
     ctx.next_window_id = 1
     target = ctx.open()
     before = ctx.mem.r_block(target, WindowStruct.get_size())
-    assert ctx.intuition.ingest_sdl_event(ctx, ctx.resize(0)) is None
+    assert ctx.intuition.ingest_event(ctx, ctx.resize(0)) is None
     assert ctx.mem.r_block(target, WindowStruct.get_size()) == before
     ctx.close_all()
 
@@ -424,8 +421,8 @@ def intuition_window_unknown_id_test(ctx):
 def intuition_window_global_quit_test(ctx):
     windows = [ctx.open(), ctx.open()]
     ctx.intuition.queue_idcmp = Mock()
-    event = SimpleNamespace(type=ctx.sdl.SDL_QUIT)
-    assert ctx.intuition.ingest_sdl_event(ctx, event) is None
+    event = Event("quit")
+    assert ctx.intuition.ingest_event(ctx, event) is None
     assert {call.args[1] for call in ctx.intuition.queue_idcmp.call_args_list} == set(
         windows
     )
@@ -438,7 +435,9 @@ def intuition_close_library_with_live_windows_test(ctx):
     lib = ctx.intuition
     lib._lib_opened = True
     lib._default_title_memory = ctx.alloc.alloc_memory(10)
-    lib._sdl_flags = 3
+    lib.display.opened = True
+    ctx.sdl.SDL_INIT_VIDEO = 2
+    ctx.sdl.SDL_INIT_TIMER = 1
     lib.graphics_lib_addr = 0x1234
     ctx.sdl.SDL_QuitSubSystem = Mock()
 
@@ -491,10 +490,6 @@ def graphics_window_rastport_initialization_test(ctx):
         "plane",
         "renderer",
         "texture",
-        "target",
-        "clear",
-        "timer",
-        "poll",
     ],
 )
 def intuition_open_window_rollback_test(ctx, monkeypatch, stage):
