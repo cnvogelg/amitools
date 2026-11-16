@@ -7,10 +7,9 @@ host path.
 """
 
 from .base import (
+    MODE_NEWFILE,
     Handler,
     HandlerFile,
-    MODE_NEWFILE,
-    MODE_READWRITE,
 )
 
 

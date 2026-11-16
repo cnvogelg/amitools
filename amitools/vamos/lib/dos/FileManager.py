@@ -65,17 +65,41 @@ class FileManager:
         self.port_mgr.free_port(self.fs_handler_port)
         self.port_mgr.free_port(self.console_handler_port)
 
+    def _create_console_fh(self, read):
+        """wrap the console device's input/output as the default DOS handle
+
+        The console handler owns the tty and encoding conversions, so the
+        default stdin/stdout handles go through it too.
+        """
+        name = "<STDIN>" if read else "<STDOUT>"
+        if self.handler_mgr is not None:
+            try:
+                if read:
+                    handler, handler_file = self.handler_mgr.find_input("console:")
+                else:
+                    handler, handler_file = self.handler_mgr.find_output("console:")
+            except (HandlerError, AttributeError):
+                pass
+            else:
+                return FileHandle(
+                    handler_file.fobj,
+                    name,
+                    name,
+                    handler=handler,
+                    handler_file=handler_file,
+                    need_close=handler_file.need_close,
+                    auto_flush=handler_file.auto_flush,
+                    is_nil=handler_file.is_nil,
+                )
+        # fall back to the raw host streams (e.g. bare test managers)
+        obj = sys.stdin.buffer if read else sys.stdout.buffer
+        return FileHandle(obj, name, name, need_close=False, auto_flush=not read)
+
     def _create_stdin_fh(self):
-        return FileHandle(sys.stdin.buffer, "<STDIN>", "<STDIN>", need_close=False)
+        return self._create_console_fh(read=True)
 
     def _create_stdout_fh(self):
-        return FileHandle(
-            sys.stdout.buffer,
-            "<STDOUT>",
-            "<STDOUT>",
-            need_close=False,
-            auto_flush=True,
-        )
+        return self._create_console_fh(read=False)
 
     def get_fs_handler_port(self):
         return self.fs_handler_port
@@ -160,11 +184,13 @@ class FileManager:
             return None
         if b_addr in self.files_by_b_addr:
             fh = self.files_by_b_addr[b_addr]
-            # AmigaDos has no problem reading from an output console handle
-            # or writing to the input handle for the console.
-            if for_writing == True and fh.obj == sys.stdin:
+            # AmigaDOS has no problem reading from an output console handle
+            # or writing to the input handle for the console. The console
+            # streams know their direction, so redirect between the two.
+            direction = getattr(fh.obj, "direction", None)
+            if for_writing == True and direction == "in":
                 return self.std_output
-            elif for_writing == False and fh.obj == sys.stdout:
+            elif for_writing == False and direction == "out":
                 return self.std_input
             return fh
         else:

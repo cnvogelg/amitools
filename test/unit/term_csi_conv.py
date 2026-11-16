@@ -1,4 +1,4 @@
-from amitools.vamos.lib.dos.terminal import (
+from amitools.vamos.handler.terminal import (
     CsiEscConverter,
     EscCsiConverter,
     ESC,

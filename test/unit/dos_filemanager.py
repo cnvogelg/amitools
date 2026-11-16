@@ -227,7 +227,37 @@ def dos_filemanager_open_console_test():
     fh = file_mgr.open(None, "*", "rw")
 
     assert calls == [("console:", MODE_READWRITE)]
-    assert fh.obj is sys.stdout.buffer
+    assert fh.obj.obj is sys.stdout.buffer
+    assert fh.obj.direction == "out"
     assert fh.need_close is False
     assert fh.auto_flush is True
     assert fh.is_nil is False
+
+
+def dos_filemanager_console_redirect_test():
+    from amitools.vamos.handler import ConsoleHandler
+
+    console = ConsoleHandler("console")
+
+    def find_input(path, cwd=None):
+        return console, console.find_input(path)
+
+    def find_output(path, mode=MODE_NEWFILE, cwd=None):
+        return console, console.find_output(path, mode)
+
+    handler_mgr = SimpleNamespace(find_input=find_input, find_output=find_output)
+    file_mgr = _make_file_mgr(handler_mgr)
+    # build the default console handles and register them manually
+    file_mgr.std_input = file_mgr._create_stdin_fh()
+    file_mgr.std_output = file_mgr._create_stdout_fh()
+    file_mgr.std_input.b_addr = 1
+    file_mgr.std_output.b_addr = 2
+    file_mgr.files_by_b_addr = {1: file_mgr.std_input, 2: file_mgr.std_output}
+
+    # writing to the console input handle is redirected to the output handle
+    assert file_mgr.get_by_b_addr(1, True) is file_mgr.std_output
+    # reading from the console output handle is redirected to the input handle
+    assert file_mgr.get_by_b_addr(2, False) is file_mgr.std_input
+    # matching directions are not redirected
+    assert file_mgr.get_by_b_addr(2, True) is file_mgr.std_output
+    assert file_mgr.get_by_b_addr(1, False) is file_mgr.std_input

@@ -1,8 +1,6 @@
 import os
-import sys
 
 from amitools.vamos.libstructs import FileHandleStruct
-from .terminal import Terminal, Latin1ToUtf8Converter
 
 
 class FileHandle:
@@ -31,19 +29,9 @@ class FileHandle:
         self.unch = bytearray()
         self.ch = -1
         self.is_nil = is_nil
+        # console conversions (tty, latin1->utf8) live in the handler's
+        # stream; the DOS layer only sees a plain byte stream
         self.interactive = self.obj.isatty()
-        # tty stuff
-        if self.interactive:
-            self.terminal = Terminal(obj)
-        else:
-            self.terminal = None
-        # Latin-1 to UTF-8 conversion for non-terminal stdout
-        enc = sys.stdout.encoding
-        is_utf8 = enc and enc.lower().replace("-", "") == "utf8"
-        if not self.interactive and obj == sys.stdout.buffer and is_utf8:
-            self.latin1_conv = Latin1ToUtf8Converter()
-        else:
-            self.latin1_conv = None
 
     def __repr__(self):
         return "[FH:'%s'(ami='%s',nc=%s,af=%s,int=%s)@%06x=B@%06x]" % (
@@ -62,9 +50,6 @@ class FileHandle:
     def close(self):
         if self.need_close:
             self.obj.close()
-        # restore tty
-        if self.terminal:
-            self.terminal.close()
 
     def alloc_fh(self, alloc, fs_handler_port):
         name = "File:" + self.name
@@ -88,16 +73,17 @@ class FileHandle:
     # --- file ops ---
 
     def set_mode(self, cooked):
-        # no tty support on this platform
-        if not self.terminal:
+        # console streams provide tty mode handling; plain files do not
+        fn = getattr(self.obj, "set_mode", None)
+        if fn is None:
             return False
-        # set mode
-        return self.terminal.set_mode(cooked)
+        return fn(cooked)
 
     def wait_for_char(self, timeout):
-        if not self.terminal:
+        fn = getattr(self.obj, "wait_for_char", None)
+        if fn is None:
             return False
-        return self.terminal.wait_for_char(timeout)
+        return fn(timeout)
 
     def write(self, data):
         """write data
@@ -106,18 +92,11 @@ class FileHandle:
         assert isinstance(data, (bytes, bytearray))
         orig_len = len(data)
 
-        # read from terminal or direct
-        if self.terminal:
-            got = self.terminal.write(data)
-        else:
-            # do Latin-1 to UTF-8 conversion if needed
-            if self.latin1_conv:
-                data = self.latin1_conv.convert(data)
-            try:
-                self.obj.write(data)
-                got = orig_len
-            except IOError:
-                got = -1
+        try:
+            self.obj.write(data)
+            got = orig_len
+        except IOError:
+            got = -1
 
         # do auto flush?
         if got > 0 and self.auto_flush:
@@ -128,8 +107,6 @@ class FileHandle:
 
     def read(self, len):
         """Return bytes, an empty byte string at EOF, or -1 on error."""
-        if self.terminal:
-            return self.terminal.read(len)
         try:
             read = getattr(self.obj, "read1", None)
             if read is None:
@@ -151,11 +128,7 @@ class FileHandle:
             if self.is_nil:
                 return -1
 
-            # read from terminal or direct
-            if self.terminal:
-                d = self.terminal.read(1)
-            else:
-                d = self.obj.read(1)
+            d = self.obj.read(1)
 
             # -1 on Error
             if d == -1:
