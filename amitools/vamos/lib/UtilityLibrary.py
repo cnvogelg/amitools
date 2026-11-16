@@ -1,4 +1,5 @@
 from math import trunc
+from amitools.vamos.lib.boopsi import call_hook
 from amitools.vamos.machine.regs import REG_D0, REG_D1, REG_A0, REG_A1
 from amitools.vamos.astructs import APTR
 from amitools.vamos.libcore import LibImpl
@@ -159,6 +160,8 @@ class UtilityLibrary(LibImpl):
         if tag_ptr is None:
             return 0
         tag = tag_ptr.ref
+        if tag is None:
+            return 0
         real_tag = tag.next_real_tag()
         if real_tag is None:
             log_utility.info("no real tag!")
@@ -468,3 +471,6 @@ class UtilityLibrary(LibImpl):
         seconds = seconds_since(t)
         log_utility.info("CheckDate: time=%s -> seconds=%u", t, seconds)
         return seconds
+
+    def CallHookPkt(self, ctx, hook, obj, message):
+        return call_hook(ctx, hook, obj, message)
