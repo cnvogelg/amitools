@@ -7,7 +7,8 @@ from amitools.vamos.machine import (
     op_reset,
     CPUHWExceptionError,
 )
-from amitools.vamos.schedule import NativeTask, PythonTask
+from amitools.vamos.schedule import NativeTask, PythonTask, Scheduler, TaskState
+import pytest
 
 
 def create_native_task(machine, pc, sp, name=None, **kw_args):
@@ -76,4 +77,32 @@ def schedule_task_python_simple_test():
     assert exit_code == 42
     assert task.get_exit_code() == 42
 
+    machine.cleanup()
+
+
+@pytest.mark.parametrize("native", [False, True])
+def schedule_task_exception_removal_test(native, monkeypatch):
+    machine = Machine()
+    scheduler = Scheduler(machine)
+
+    def fail(*args):
+        raise RuntimeError("task failed")
+
+    if native:
+        task = create_native_task(
+            machine, machine.get_scratch_begin(), machine.get_scratch_top()
+        )
+        monkeypatch.setattr(task.runtime, "start", fail)
+    else:
+        task = create_python_task(machine, fail, machine.get_scratch_top())
+    scheduler.add_task(task)
+    with pytest.raises(RuntimeError, match="task failed"):
+        scheduler.run_until_idle()
+    assert task.get_state() == TaskState.TS_REMOVED
+    assert scheduler.get_num_tasks() == 0
+    # Shutdown can enter the scheduler again without reviving the failed task.
+    cleanup = PythonTask("cleanup", machine, lambda task: 7)
+    scheduler.add_task(cleanup)
+    scheduler.run_until_idle()
+    assert cleanup.get_exit_code() == 7
     machine.cleanup()

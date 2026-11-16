@@ -281,8 +281,10 @@ class ExecLibrary(LibImpl):
         name = ctx.mem.r_cstr(name_ptr)
         proc = ctx.process
         if proc:
-            cwd = proc.get_current_dir_lock()
-            pd = proc.get_home_dir_lock()
+            dos = self.lib_mgr.get_vlib_by_name("dos.library").get_impl()
+            ami_proc = proc.get_ami_process()
+            cwd = dos.lock_mgr.get_by_b_addr(ami_proc.current_dir.bptr)
+            pd = dos.lock_mgr.get_by_b_addr(ami_proc.home_dir.bptr)
         else:
             cwd, pd = None, None
         addr = self.lib_mgr.open_lib(name, ver, cwd_lock=cwd, progdir_lock=pd)
@@ -317,8 +319,10 @@ class ExecLibrary(LibImpl):
         name = ctx.mem.r_cstr(name_ptr)
         proc = ctx.process
         if proc:
-            cwd = proc.get_current_dir_lock()
-            pd = proc.get_home_dir_lock()
+            dos = self.lib_mgr.get_vlib_by_name("dos.library").get_impl()
+            ami_proc = proc.get_ami_process()
+            cwd = dos.lock_mgr.get_by_b_addr(ami_proc.current_dir.bptr)
+            pd = dos.lock_mgr.get_by_b_addr(ami_proc.home_dir.bptr)
         else:
             cwd, pd = None, None
         addr = self.lib_mgr.open_lib(name, 0, cwd_lock=cwd, progdir_lock=pd)

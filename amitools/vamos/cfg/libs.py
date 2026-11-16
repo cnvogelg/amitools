@@ -44,7 +44,7 @@ class LibsParser(Parser):
         self.vd = ValueDict(ValueDict(str), kv_sep="=", sep="+")
 
     def _is_valid_lib_name(self, name):
-        return name.endswith(".library")
+        return name.endswith((".library", ".mui", ".mcc", ".mcp"))
 
     def _is_valid_dev_name(self, name):
         return name.endswith(".device")
@@ -77,7 +77,7 @@ class LibsParser(Parser):
                     default = self.dev_default
                     lib_dict = self._ensure_name_dict("devs", lib_name, default)
                 else:
-                    raise ValueError("invalid lib/dev name: " + lib)
+                    raise ValueError("invalid lib/dev name: " + lib_name)
                 # merge values
                 val = libs[lib_name]
                 self.def_dict.merge_cfg(lib_dict, val, default)
