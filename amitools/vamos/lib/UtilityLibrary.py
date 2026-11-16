@@ -68,6 +68,12 @@ class UtilityLibrary(LibImpl):
         a = ctx.cpu.r_reg(REG_D0) & 0xFF
         return ord(chr(a).upper())
 
+    def ToLower(self, ctx):
+        value = ctx.cpu.r_reg(REG_D0) & 0xFF
+        if 65 <= value <= 90 or 192 <= value <= 222 and value != 215:
+            return value + 32
+        return value
+
     def Stricmp(self, ctx):
         str1_addr = ctx.cpu.r_reg(REG_A0)
         str2_addr = ctx.cpu.r_reg(REG_A1)
