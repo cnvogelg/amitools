@@ -67,6 +67,16 @@ class Assign(object):
 
     def _create_dir(self, volume, rel_dir):
         log_path.debug("%s: create assign dir: rel_dir='%s'", self.name, rel_dir)
+        # a non-host volume (ram:, nil:, ...) has no host directory; the
+        # responsible handler creates it once it is bound, see
+        # build_handler_manager()
+        if volume.get_path() is None:
+            log_path.debug(
+                "assign '%s': defer dir creation for handler volume '%s'",
+                self.name,
+                volume.get_name(),
+            )
+            return True
         path = volume.create_rel_sys_path(rel_dir)
         if not path:
             log_path.error(

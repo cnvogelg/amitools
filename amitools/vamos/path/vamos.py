@@ -125,30 +125,50 @@ class VamosPathManager(PathManager):
 
     def ami_list_dir(self, cwd_lock, ami_path):
         sys_path = self.ami_to_sys_path(cwd_lock, ami_path, mustExist=True)
-        if sys_path is None:
-            return None
-        fs = self._sys_path.file_system
-        if not fs.is_dir(str(sys_path)):
-            return None
-        files = fs.list_dir(str(sys_path))
-        log_path.info(
-            "ami_list_dir: path='%s' -> sys_path='%s' -> files=%s",
-            ami_path,
-            sys_path,
-            files,
-        )
-        return files
+        if sys_path is not None:
+            fs = self._sys_path.file_system
+            if not fs.is_dir(str(sys_path)):
+                return None
+            files = fs.list_dir(str(sys_path))
+            log_path.info(
+                "ami_list_dir: path='%s' -> sys_path='%s' -> files=%s",
+                ami_path,
+                sys_path,
+                files,
+            )
+            return files
+        # a non-host volume (ram:, ...) has no sys path: list via its handler
+        if self.handler_mgr is not None:
+            abs_path = self.ami_abs_path(cwd_lock, ami_path)
+            files = self.handler_mgr.list_dir(abs_path)
+            log_path.info(
+                "ami_list_dir: path='%s' -> handler -> files=%s", ami_path, files
+            )
+            return files
+        return None
 
     def ami_path_exists(self, cwd_lock, ami_path):
         sys_path = self.ami_to_sys_path(cwd_lock, ami_path, mustExist=True)
-        exists = self._sys_path.file_system.exists(str(sys_path))
-        log_path.info(
-            "ami_path_exists: path='%s' -> sys_path='%s' -> exists=%s",
-            ami_path,
-            sys_path,
-            exists,
-        )
-        return exists
+        if sys_path is not None:
+            exists = self._sys_path.file_system.exists(str(sys_path))
+            log_path.info(
+                "ami_path_exists: path='%s' -> sys_path='%s' -> exists=%s",
+                ami_path,
+                sys_path,
+                exists,
+            )
+            return exists
+        # a non-host volume (ram:, ...) has no sys path: ask its handler
+        if self.handler_mgr is not None:
+            abs_path = self.ami_abs_path(cwd_lock, ami_path)
+            exists = self.handler_mgr.path_exists(abs_path)
+            log_path.info(
+                "ami_path_exists: path='%s' -> handler -> exists=%s",
+                ami_path,
+                exists,
+            )
+            return exists
+        return False
 
     def ami_path_join(self, a, b):
         return AmiPath(a).join(AmiPath(b))

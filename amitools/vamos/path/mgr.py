@@ -80,6 +80,11 @@ class PathManager:
         # sys path handling (host file system boundary)
         self._sys_path = SysPathResolver(self, self.vol_mgr)
         self.default_env = PathManagerEnv(self, cwd, cmd_paths)
+        # set by build_handler_manager() once the handlers are bound
+        self.handler_mgr = None
+
+    def set_handler_mgr(self, handler_mgr):
+        self.handler_mgr = handler_mgr
 
     def get_vol_mgr(self):
         return self.vol_mgr
@@ -167,7 +172,8 @@ class PathManager:
                 if av == "root":
                     spec = "root:/"
                 elif av == "ram":
-                    spec = "ram:?temp"
+                    # an in-memory file system handler, not a host temp dir
+                    spec = "ram:?handler=ram"
                 else:
                     log_path.error("invalid auto volume: '%s'", av)
                     return False

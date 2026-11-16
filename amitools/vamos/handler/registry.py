@@ -5,14 +5,15 @@ factory is called with the volume name, its host path (may be empty for
 non-host handlers), the parsed volume config, and the shared host file
 system, and returns a ready :class:`~amitools.vamos.handler.base.Handler`.
 
-The default registry knows the ``hostfs``, ``nil`` and ``console`` types.
-Later ``ram`` and ``packet`` types register here as well, so the DOS layer can
+The default registry knows the ``hostfs``, ``nil``, ``console`` and ``ram``
+types. Later ``packet`` types register here as well, so the DOS layer can
 stay unaware of how a volume is implemented.
 """
 
 from .console import ConsoleHandler
 from .filesys import HostFileSysHandler
 from .nil import NilHandler
+from .ram import RamHandler
 
 
 class HandlerRegistry:
@@ -55,10 +56,16 @@ def console_factory(name, path, cfg, file_system):
     return ConsoleHandler(name)
 
 
+def ram_factory(name, path, cfg, file_system):
+    """factory for an in-memory ``RAM:`` file system"""
+    return RamHandler(name, cfg)
+
+
 def default_registry():
     """build the registry with the built-in handler types"""
     registry = HandlerRegistry()
     registry.add_type("hostfs", hostfs_factory)
     registry.add_type("nil", nil_factory)
     registry.add_type("console", console_factory)
+    registry.add_type("ram", ram_factory)
     return registry

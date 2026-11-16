@@ -13,6 +13,8 @@ from amitools.vamos.path.amipath import AmiPath
 
 from .base import (
     ERROR_ACTION_NOT_KNOWN,
+    ERROR_NO_MORE_ENTRIES,
+    ERROR_OBJECT_EXISTS,
     ERROR_OBJECT_NOT_FOUND,
     ERROR_RENAME_ACROSS_DEVICES,
     MODE_NEWFILE,
@@ -242,6 +244,90 @@ class HandlerManager:
             return True
         return handler.is_filesystem
 
+    # ----- directory listing -----
+
+    def list_dir(self, ami_path, env=None, cwd=None):
+        """return the entry names of a directory via its handler
+
+        Returns None if the object does not exist or is not a directory.
+        """
+        candidates = self.resolve(ami_path, env=env, cwd=cwd)
+        for handler, rel_path in candidates:
+            try:
+                lock = handler.locate_object(rel_path)
+                if not handler.examine_object(lock).is_dir:
+                    return None
+                names = []
+                key = 0
+                while True:
+                    try:
+                        entry = handler.examine_next(lock, key)
+                    except HandlerError as e:
+                        if e.code == ERROR_NO_MORE_ENTRIES:
+                            break
+                        raise
+                    names.append(entry.name)
+                    key = entry.key
+                return names
+            except HandlerError:
+                continue
+        return None
+
+    def path_exists(self, ami_path, env=None, cwd=None):
+        """return True if the path exists on any responsible handler"""
+        for handler, rel_path in self.resolve(ami_path, env=env, cwd=cwd):
+            try:
+                handler.locate_object(rel_path)
+                return True
+            except HandlerError:
+                continue
+        return False
+
+    # ----- deferred assign dirs -----
+
+    def _create_deferred_assign_dirs(self):
+        """create ``?create`` assign dirs that live on a non-host volume
+
+        A non-host volume (``ram:``, ...) has no host directory, so
+        ``Assign.setup()`` cannot create the assign dirs while the path
+        manager is set up. Once the handlers are bound we create them in the
+        handler's file system instead.
+        """
+        path_mgr = self.path_mgr
+        assign_mgr = path_mgr.get_assign_mgr()
+        vol_mgr = path_mgr.get_vol_mgr()
+        for assign in assign_mgr.assigns:
+            if "create" not in assign.get_cfg():
+                continue
+            for a in assign.get_assigns():
+                volpaths = assign_mgr.resolve_assigns(a, as_list=True)
+                for volpath in volpaths:
+                    split = assign_mgr._split_volume_remainder(volpath)
+                    if split is None:
+                        continue
+                    vol_name, rel_dir = split
+                    volume = vol_mgr.get_volume(vol_name)
+                    if volume is None or volume.get_path() is not None:
+                        continue
+                    if not rel_dir:
+                        continue
+                    handler = self.get_handler(volume.get_name())
+                    if handler is None:
+                        continue
+                    self._create_dir_path(handler, rel_dir)
+
+    @staticmethod
+    def _create_dir_path(handler, rel_dir):
+        """create ``rel_dir`` (and its parents) via ``handler.create_dir``"""
+        parts = [p for p in str(rel_dir).split("/") if p]
+        for i in range(1, len(parts) + 1):
+            try:
+                handler.create_dir("/".join(parts[:i]))
+            except HandlerError as e:
+                if e.code != ERROR_OBJECT_EXISTS:
+                    log_handler.warning("can't create assign dir '%s': %s", rel_dir, e)
+                    return
+
 
 def build_handler_manager(path_mgr, file_system=None, registry=None):
     """create a HandlerManager and bind every volume of the path manager
@@ -260,10 +346,14 @@ def build_handler_manager(path_mgr, file_system=None, registry=None):
     mgr = HandlerManager(path_mgr, file_system=file_system, registry=registry)
     for volume in vol_mgr.get_all_volumes():
         mgr.bind_volume(volume)
+    # a non-host volume has no host path, so its assign dirs are created here
+    mgr._create_deferred_assign_dirs()
     # built-in AmigaDOS devices
     for dev_name in ("nil", "console"):
         if mgr.get_handler(dev_name) is None:
             handler = mgr.registry.create(dev_name, dev_name, None, {}, file_system)
             if handler is not None:
                 mgr.register(dev_name, handler)
+    # let the path layer reach the handlers for path-less volumes
+    path_mgr.set_handler_mgr(mgr)
     return mgr

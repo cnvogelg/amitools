@@ -11,6 +11,7 @@ from amitools.vamos.handler import (
     HandlerRegistry,
     HostFileSysHandler,
     NilHandler,
+    RamHandler,
     build_handler_manager,
     default_registry,
 )
@@ -269,6 +270,49 @@ def handler_mgr_nil_volume_test(tmp_path):
     handler, fh = built.find_input("NIL:foo")
     assert isinstance(handler, NilHandler)
     assert fh.is_nil is True
+    built.shutdown()
+    pm.shutdown()
+
+
+def handler_mgr_ram_volume_test(tmp_path):
+    # a 'ram' handler volume keeps its files in memory
+    pm = PathManager(vols_base_dir=str(tmp_path), auto_volumes=[], auto_assigns=[])
+    assert pm.get_vol_mgr().add_volume("ram:?handler=ram")
+    assert pm.setup()
+    built = build_handler_manager(pm)
+    assert isinstance(built.get_handler("ram"), RamHandler)
+    assert built.is_filesystem("ram") is True
+    # write a file and read it back
+    handler, fh = built.find_output("ram:hello.txt", MODE_NEWFILE)
+    handler.write(fh, b"hi")
+    handler.end(fh)
+    handler, fh = built.find_input("ram:hello.txt")
+    assert handler.read(fh, 10) == b"hi"
+    handler.end(fh)
+    # directory listing and existence checks go through the handler
+    built.create_dir("ram:sub")
+    assert {"hello.txt", "sub"} <= set(built.list_dir("ram:"))
+    assert built.path_exists("ram:sub")
+    assert not built.path_exists("ram:nope")
+    assert built.list_dir("ram:nope") is None
+    built.shutdown()
+    pm.shutdown()
+
+
+def handler_mgr_deferred_assign_dirs_test(tmp_path):
+    # ?create assign dirs on a non-host volume are created once the handlers
+    # are bound (Assign.setup() itself cannot create them)
+    pm = PathManager(vols_base_dir=str(tmp_path), auto_volumes=[], auto_assigns=[])
+    assert pm.get_vol_mgr().add_volume("ram:?handler=ram")
+    am = pm.get_assign_mgr()
+    assert am.add_assign("c:ram:c?create")
+    assert am.add_assign("deep:ram:a/b?create")
+    assert pm.setup()
+    built = build_handler_manager(pm)
+    # the assign dirs now exist on the ram handler
+    assert built.path_exists("ram:c")
+    assert built.path_exists("ram:a/b")
+    assert {"c", "a"} <= set(built.list_dir("ram:"))
     built.shutdown()
     pm.shutdown()
 
