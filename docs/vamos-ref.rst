@@ -203,6 +203,11 @@ Exception names accepted by ``--hw-exception`` are ``bus``, ``address``,
 Disks, libraries, and devices
 -----------------------------
 
+Host directory volumes also have DOS device entries with matching handler
+ports. Their capacity comes from the host filesystem, so mounts on the same
+filesystem report overlapping space. These entries do not represent physical
+block devices and have no filesystem startup message or block geometry.
+
 * ``--disk IMAGE``: Expose an RDB disk image through ``scsi.device``; repeat
   to add units in order: ``vamos --disk work.hdf myprog``. The command-line
   disk image is read-only.

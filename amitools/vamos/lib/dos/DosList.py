@@ -65,6 +65,9 @@ class DosList:
         self.assign_mgr = assign_mgr
         self.entries_by_b_addr = {}
         self.entries_by_name = {}
+        self.devices_by_name = {}
+        self.host_ports = []
+        self.host_port_mgr = None
         self.entries = []
         self.first_entry = None
         self.LDF_DEVICES = 1 << 2
@@ -99,6 +102,21 @@ class DosList:
         for entry in list(self.entries):
             self.remove_entry(entry)
             self.free_entry(entry)
+        for port in self.host_ports:
+            self.host_port_mgr.free_port(port)
+            self.host_port_mgr.unregister_port(port)
+        self.host_ports.clear()
+
+    def add_host_devices(self, file_mgr, port_mgr):
+        """Publish host-directory mounts as paired DOS devices and volumes."""
+        self.host_port_mgr = port_mgr
+        for volume in tuple(self.entries):
+            if volume.struct_def is not DosListVolumeStruct:
+                continue
+            port = port_mgr.create_port(volume.name + " handler", file_mgr.fs_put_msg)
+            self.host_ports.append(port)
+            self.add_device(volume.name, startup_bptr=0, task=port)
+            _struct_write(volume.struct, "dol_Task", port)
 
     def free_entry(self, entry):
         """Free a detached entry and its DOS-list-owned allocations."""
@@ -136,10 +154,11 @@ class DosList:
 
     def _register_entry(self, entry):
         key = entry.name.lower()
-        if key in self.entries_by_name:
+        index = self.devices_by_name if entry.struct_def is DosListDeviceStruct else self.entries_by_name
+        if key in index:
             raise ValueError("DOS list entry already exists: %s" % entry.name)
         self.entries_by_b_addr[entry.baddr] = entry
-        self.entries_by_name[key] = entry
+        index[key] = entry
         self.entries.append(entry)
         log_doslist.info("add entry: %s", entry)
 
@@ -235,7 +254,8 @@ class DosList:
         _struct_write(entry.struct, "dol_Next", 0)
         self.entries.remove(entry)
         self.entries_by_b_addr.pop(entry.baddr, None)
-        self.entries_by_name.pop(entry.name.lower(), None)
+        index = self.devices_by_name if entry.struct_def is DosListDeviceStruct else self.entries_by_name
+        index.pop(entry.name.lower(), None)
         return True
 
     # This call is used by the dos.library to create an
@@ -333,11 +353,16 @@ class DosList:
         else:
             return self.entries_by_b_addr[baddr]
 
-    def get_entry_by_name(self, name):
-        if name.lower() not in self.entries_by_name:
-            return None
-        else:
-            return self.entries_by_name[name.lower()]
+    def get_entry_by_name(self, name, flags=None):
+        key = name.lower()
+        if flags is not None and flags & self.LDF_DEVICES:
+            device = self.devices_by_name.get(key)
+            if device is not None:
+                return device
+        entry = self.entries_by_name.get(key)
+        if entry is not None:
+            return entry
+        return self.devices_by_name.get(key)
 
     def _next_dos_entry(self, entry, flags):
         while entry != None:
