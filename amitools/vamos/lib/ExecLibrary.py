@@ -24,6 +24,7 @@ from amitools.vamos.lib.lexec.msgfunc import MessageFunc
 from .lexec.PortManager import PortManager
 from .lexec.SemaphoreManager import SemaphoreManager
 from .lexec.Pool import Pool
+from .lexec.supervisor import run_supervisor
 from .lexec.RawDoFmt import raw_do_fmt
 from .lexec import Alloc
 from .lexec.memheader import AllocatorMemHeader
@@ -113,6 +114,9 @@ class ExecLibrary(LibImpl):
         return ctx.mem.r32(sp)
 
     # ----- Signals -----
+
+    def Supervisor(self, ctx):
+        return run_supervisor(ctx)
 
     def AllocSignal(self, ctx, signal_num: BYTE):
         return self.signal_func.alloc_signal(signal_num.val)
