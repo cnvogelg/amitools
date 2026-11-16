@@ -38,6 +38,9 @@ class ExecLibrary(LibImpl):
         log_exec.info("setup exec.library")
         self.lib_mgr = ctx.lib_mgr
         self.alloc = ctx.alloc
+        self.intuition_lib = None
+        self.graphics_lib = None
+        ctx.exec_lib = self
         self._pools = {}
         self._poolid = 0x1000
         self.exec_lib = ExecLibraryType(ctx.mem, base_addr)
