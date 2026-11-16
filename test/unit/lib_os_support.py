@@ -318,3 +318,23 @@ def library_allocation_failure_test(os_ctx):
     for lib in (asl, iff, icons):
         lib.finish_lib(ctx)
     ctx.alloc.free_memory(filler)
+
+
+def asl_png_cancels_without_sdl_test(os_ctx, tmp_path, monkeypatch):
+    import builtins
+    from amitools.vamos.display.png import PNGDisplay
+
+    original = builtins.__import__
+    def no_sdl(name, *args, **kwargs):
+        if name == "sdl2" or name.startswith("sdl2."):
+            raise AssertionError("offline requester imported SDL")
+        return original(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", no_sdl)
+    os_ctx.display = PNGDisplay(tmp_path)
+    lib = AslLibrary()
+    lib.setup_lib(os_ctx, 0)
+    req = lib.AllocAslRequest(os_ctx, 0, 0)
+    assert lib.AslRequest(os_ctx, req, 0) == 0
+    lib.FreeAslRequest(os_ctx, req)
+    assert not os_ctx.display.windows
