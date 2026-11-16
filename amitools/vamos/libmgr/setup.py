@@ -21,6 +21,8 @@ class SetupLibManager(object):
         main_profiler=None,
         display_scale=(1, 1),
         display_aspect="square",
+        display_backend="sdl",
+        display_output="vamos-frames",
     ):
         self.machine = machine
         self.mem_map = mem_map
@@ -32,6 +34,8 @@ class SetupLibManager(object):
         self.main_profiler = main_profiler
         self.display_scale = display_scale
         self.display_aspect = display_aspect
+        from amitools.vamos.display import create_display
+        self.display = create_display(display_backend, display_output)
         # state
         self.seg_loader = None
         self.exec_ctx = None
@@ -61,6 +65,8 @@ class SetupLibManager(object):
             self.lib_mgr_cfg,
             main_profiler=self.main_profiler,
         )
+        self.lib_mgr.vlib_mgr.set_ctx_extra_attr("scheduler", self.scheduler)
+        self.lib_mgr.vlib_mgr.set_ctx_extra_attr("display", self.display)
         # setup special lib contexts for exec and dos
         self.exec_ctx = ExecLibCtx(
             self.machine,

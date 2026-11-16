@@ -796,3 +796,48 @@ texture, and delivers size/refresh notifications. These graphics operations
 support category images and changing page sizes in
 native toolkits. Native GUI libraries still need additional BOOPSI and OS
 services; this backend alone does not make ZunePrefs fully operational.
+
+Offline PNG backend
+-------------------
+
+Use the same graphics and Intuition implementation without SDL or a display
+server by selecting the PNG backend::
+
+    vamos --display-backend png --display-output captures myprog
+
+Each window writes its latest completed frame to ``captures/window-0001.png``,
+``window-0002.png``, etc. Files are replaced atomically after drawing changes,
+including pending drawing when the guest closes a window. Reusing the output
+directory replaces files with matching names; unrelated files remain intact.
+The images contain exact guest-resolution RGBA pixels; display scale and
+aspect options do not resample them. The backend uses only Python's standard
+library. Bundled Topaz and guest bitmap fonts work without SDL_ttf; host
+TrueType font conversion remains an SDL-backend facility.
+
+When all guest tasks wait, the PNG backend sends one normal close-window
+request per window. Programs which handle that IDCMP message can exit and
+release their own resources. This is a snapshot mode, not scripted interaction
+or a forced process exit: programs which ignore close requests can remain
+waiting, and programs which never yield or finish need the usual runtime
+limits. A capture reflects the first idle state, not necessarily completion
+of an application's asynchronous startup.
+
+Display and scheduler integration
+---------------------------------
+
+``amitools.vamos.display`` defines a small RTG-style boundary: windows,
+framebuffers, palette uploads, normalized input events and font masks. Guest
+raster operations and Amiga bitmap/IDCMP structures belong to graphics and
+Intuition. Host windows, textures, event translation and SDL_ttf conversion
+belong exclusively to the SDL backend. The PNG backend consumes the same
+framebuffers. This is an internal host interface, not an emulated RTG library.
+
+Library contexts expose ``ctx.scheduler`` and ``ctx.display``. Intuition
+registers a nonblocking ``add_after_schedule_callback`` on its first window
+and removes it after the last closes. The scheduler invokes callbacks at run
+entry and after each task slice, outside guest execution. Multiple sources
+can register, and callbacks can unregister themselves safely. Idle callbacks
+may perform bounded waits and report whether their event source remains
+alive. Only ``schedule()`` uses those waits; ``run_until_idle()`` always
+returns without waiting for external events and retains its cycle budget.
+Exec has no display polling or renderer-specific main-loop integration.

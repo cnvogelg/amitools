@@ -61,11 +61,14 @@ class Context:
             "amitools.vamos.lib.GraphicsLibrary.load_topaz_font", lambda: None
         )
         monkeypatch.setattr(
-            "amitools.vamos.lib.GraphicsLibrary.read_font_strike",
+            "amitools.vamos.display.sdl_font.read_font_strike",
             lambda font, height: FontStrike(
                 [0] * 225, [height // 2] * 225, [0] * 225, 2, bytes(2 * height)
             ),
         )
+        from amitools.vamos.display.sdl import SDLDisplay
+        self.display = SDLDisplay()
+        self.display.fonts_opened = True
         self.graphics = GraphicsLibrary()
         self.graphics.alloc = self.alloc
         self.graphics.fontsPath = "/fonts"
@@ -281,7 +284,7 @@ def intuition_screen_font_real_exhaustion_test(ctx, remaining):
 
 
 def intuition_screen_font_close_exception_test(ctx):
-    screen = ctx.screen()
+    before = ctx.snapshot()
     close = ctx.ttf.TTF_CloseFont
 
     def fail(handle):
@@ -290,9 +293,9 @@ def intuition_screen_font_close_exception_test(ctx):
 
     ctx.ttf.TTF_CloseFont = fail
     with pytest.raises(RuntimeError, match="host close"):
-        ctx.close_screen(screen)
+        ctx.screen()
     ctx.ttf.TTF_CloseFont = close
-    assert set(ctx.graphics.font_registry) == {ctx.base_font}
+    assert ctx.snapshot() == before
     assert not ctx.intuition._screen_fonts
 
 
@@ -377,6 +380,7 @@ def graphics_queued_text_keeps_closed_host_font_alive_test(ctx):
     # Exercise the legacy host-rendered path without guest bitmap tables.
     TextFontStruct(ctx.mem, addr).tf_CharData.val = 0
     old_handle = ctx.graphics.font_registry[addr]
+    owner = ctx.graphics._font_owners[addr]
     rp = RastPortStruct.alloc(ctx.alloc)
     text = ctx.alloc.alloc_cstr("Hi")
     batch = RPBatch()
@@ -393,12 +397,15 @@ def graphics_queued_text_keeps_closed_host_font_alive_test(ctx):
         assert batch.commands
         ctx.close_font(addr)
         assert ctx.alloc.get_memory(addr) is None
-        assert old_handle in ctx.handles
+        assert owner["refs"] == 1
+        assert batch.commands[0].font is old_handle
+        assert not ctx.handles
         replacement = ctx.open_font(attr)
         replacement_handle = ctx.graphics.font_registry[replacement]
         batch.clear()
-        assert old_handle not in ctx.handles
-        assert replacement_handle in ctx.handles
+        assert owner["refs"] == 0
+        assert replacement_handle is not old_handle
+        assert not ctx.handles
         batch.clear()  # A consumed batch cannot close a handle twice.
     finally:
         batch.clear()

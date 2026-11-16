@@ -1,3 +1,4 @@
+from amitools.vamos.display.base import Rect
 from types import SimpleNamespace
 
 import pytest
@@ -249,9 +250,9 @@ def graphics_support_install_clip_test(ctx, monkeypatch):
     layers = LayersLibrary()
     assert layers.InstallClipRegion(ctx, layer.addr, region) == 0
     assert layer.ClipRegion.val == region
-    assert backing.user_clip_rects == [(2, 3, 8, 5)]
+    assert backing.user_clip_rects == [Rect(2, 3, 8, 5)]
     assert layers.InstallClipRegion(ctx, layer.addr, 0) == region
-    assert flushed == [None, [(2, 3, 8, 5)]]
+    assert flushed == [None, [Rect(2, 3, 8, 5)]]
     assert backing.user_clip_rects is None
     lib._dispose_region(ctx, region)
     layer.free()

@@ -24,7 +24,8 @@ def graphics_lifetime_setup_rollback_test(monkeypatch, labels, failure):
     sdl = sys.modules["sdl2"]
     sdl.SDL_Color = lambda *args: args
     if failure == "palette":
-        sdl.SDL_Color = Mock(side_effect=RuntimeError("palette"))
+        monkeypatch.setattr("amitools.vamos.lib.GraphicsLibrary.create_amiga_palette",
+                            Mock(side_effect=RuntimeError("palette")))
     allocate = ctx.alloc.alloc_memory
     label = {
         "attr": "Graphics default TextAttr",
@@ -47,7 +48,7 @@ def graphics_lifetime_setup_rollback_test(monkeypatch, labels, failure):
     if failure is None:
         assert graphics._lib_opened
         assert len(graphics.palette) == 256
-        assert all(color[3] == 255 for color in graphics.palette.values())
+        assert all(color.a == 255 for color in graphics.palette.values())
         graphics.open_lib(ctx, 2)
         graphics.close_lib(ctx, 1)
         assert graphics._lib_opened
