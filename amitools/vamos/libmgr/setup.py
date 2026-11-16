@@ -1,10 +1,11 @@
-from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
+from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.lib.LibList import vamos_libs
-from amitools.vamos.schedule import SchedulerEvent
-from amitools.vamos.task import ExecScheduler
 from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.log import log_libmgr
+from amitools.vamos.schedule import SchedulerEvent, TaskState
+from amitools.vamos.task import ExecScheduler, ExecTask
+
 from .cfg import LibMgrCfg
 from .mgr import LibManager
 
@@ -90,7 +91,39 @@ class SetupLibManager(object):
     def cleanup(self):
         # shutdown of libmgr needs temp stack
         sp = self.machine.get_ram_begin() - 4
-        self.lib_mgr.shutdown(run_sp=sp)
+        native_shutdown = None
+        if self.scheduler.get_num_tasks():
+            native_shutdown = self._shutdown_native_with_tasks
+        self.lib_mgr.shutdown(run_sp=sp, native_shutdown=native_shutdown)
+
+    def _shutdown_native_with_tasks(self):
+        """Let native expunge functions exchange messages with helper tasks."""
+        # Expunging in a standalone Runtime cannot yield at WaitPort().
+        # Native class libraries commonly stop a clipboard/helper process
+        # by sending it a message and waiting for its acknowledgement.
+        cleanup = ExecTask(
+            self.machine,
+            self.alloc,
+            "Library cleanup",
+            stack_size=65536,
+            func=lambda task: self.lib_mgr.alib_mgr.shutdown(),
+        )
+        task = cleanup.get_sched_task()
+        self.scheduler.add_task(task)
+        try:
+            self.scheduler.run_until_idle()
+            error = task.get_error()
+            if error:
+                raise error
+            if task.get_state() != TaskState.TS_REMOVED:
+                raise RuntimeError(
+                    "native library cleanup is waiting without a runnable helper"
+                )
+            return task.get_exit_code()
+        finally:
+            if task.get_state() != TaskState.TS_REMOVED:
+                self.scheduler.rem_task(task)
+            cleanup.free()
 
     def open_base_libs(self):
         log_libmgr.info("opening base libs...")
