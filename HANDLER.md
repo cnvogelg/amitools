@@ -114,11 +114,18 @@ No DOS wiring in 5a.
 
 ### 5b. Wire DOS to handlers
 
-- [ ] Register volume handlers at `DosLibrary.setup_lib`.
-- [ ] `LockManager`/`FileManager`/`DosLibrary` delegate to `HandlerManager`.
-- [ ] Keep existing DOS BPTR/struct behavior.
-- [ ] `Lock`/`FileHandle` still keep their fields for now.
-- [ ] Test and commit 5b.
+- [x] Register volume handlers at `DosLibrary.setup_lib` (one
+      `HostFileSysHandler` per host volume, shared `HostFileSystem`).
+- [x] `LockManager`/`FileManager`/`DosLibrary` delegate to `HandlerManager`
+      (`open`, `delete`, `rename`, `set_protection`, `create_dir`,
+      `is_file_system`, `SetFileDate`, `Info`).
+- [x] Keep existing DOS BPTR/struct behavior.
+- [x] `Lock`/`FileHandle` still keep their fields (`sys_path` etc.) for now;
+      `Lock` gained optional `handler`/`handler_lock`.
+- [x] `HostFileSystem.disk_usage` reports `read_only`; the handler maps it to
+      the DOS disk state. `find_output` matches the old DOS mode handling
+      (truncate on `MODE_NEWFILE`, read-only fallback for unwritable files).
+- [x] Test and commit 5b.
 
 ### 5c. Remove `sys_path` from `Lock`/`FileHandle`
 
@@ -131,6 +138,9 @@ No DOS wiring in 5a.
 - [ ] Fix the two latent `LockManager` bugs (`no_locks()` inversion and
       `self.locks` -> `self.keys`), with a lock release test.
 - [ ] Update `test/unit/dos_exall.py`, `dos_filehandle*`, `dos_filemanager`.
+- [ ] Multi-assign writes: `open`/`find_output` now creates in the first
+      candidate; the old code preferred an existing later candidate
+      (`searchMulti`). Decide and pin the intended behavior with a test.
 - [ ] Test and commit 5c.
 
 ### Later

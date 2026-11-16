@@ -11,6 +11,8 @@ class DosLibCtx(LibCtx):
         self.seg_loader = seg_loader
         self.scheduler = scheduler
         self.odg_base = odg_base
+        # file system handler registry (filled in by DosLibrary.setup_lib)
+        self.handler_mgr = None
         # compat for process
         self.process = None
         self.exec_lib = None

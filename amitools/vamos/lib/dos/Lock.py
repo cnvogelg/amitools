@@ -53,11 +53,21 @@ def _struct_write(struct, path, value):
 class Lock:
     """represent an AmigaOS Lock in vamos"""
 
-    def __init__(self, name, ami_path, sys_path, exclusive=False):
+    def __init__(
+        self,
+        name,
+        ami_path,
+        sys_path=None,
+        exclusive=False,
+        handler=None,
+        handler_lock=None,
+    ):
         self.ami_path = ami_path
         self.sys_path = sys_path
         self.name = name
         self.exclusive = exclusive
+        self.handler = handler
+        self.handler_lock = handler_lock
         self.mem = None
         self.b_addr = 0
         self.vol_addr = 0

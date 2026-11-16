@@ -1,8 +1,6 @@
 import time
 import ctypes
 import re
-import os
-import shutil
 from contextlib import ExitStack
 
 from amitools.vamos.machine import Code
@@ -43,6 +41,7 @@ from amitools.vamos.libstructs import (
 from amitools.vamos.libtypes import TagList, DosTag, DosPacket
 from amitools.vamos.error import *
 from amitools.vamos.log import log_dos
+from amitools.vamos.handler import HandlerError, HandlerManager, HostFileSysHandler
 from amitools.vamos.task import DosProcess
 from amitools.vamos.schedule import SchedulerEvent
 from .dos.Args import *
@@ -130,9 +129,22 @@ class DosLibrary(LibImpl):
         )
         self.dos_list.build_list(ctx.path_mgr)
         self.update_dos_list_head()
+        # set up one file system handler per host volume
+        vol_mgr = ctx.path_mgr.get_vol_mgr()
+        self.handler_mgr = HandlerManager(ctx.path_mgr, file_system=vol_mgr.file_system)
+        for volume in vol_mgr.get_all_volumes():
+            self.handler_mgr.register(
+                volume.get_name(),
+                HostFileSysHandler(
+                    volume.get_name(),
+                    volume.get_path(),
+                    file_system=volume.get_sys_volume().file_system,
+                ),
+            )
+        ctx.handler_mgr = self.handler_mgr
         # create file manager
         self.file_mgr = FileManager(
-            ctx.path_mgr, ctx.exec_lib.port_mgr, ctx.alloc, ctx.mem
+            self.handler_mgr, ctx.exec_lib.port_mgr, ctx.alloc, ctx.mem
         )
         self.dos_list.add_host_devices(self.file_mgr, ctx.exec_lib.port_mgr)
         # let the segment loader open files through DOS
@@ -144,6 +156,7 @@ class DosLibrary(LibImpl):
             self.dos_list,
             ctx.alloc,
             ctx.mem,
+            handler_mgr=self.handler_mgr,
             fs_handler_port=self.file_mgr.get_fs_handler_port(),
         )
         # equip the DosList with all the locks
@@ -359,6 +372,11 @@ class DosLibrary(LibImpl):
         home_dir = ctx.process.get_home_dir()
         return self.lock_mgr.get_by_b_addr(home_dir >> 2)
 
+    def get_cwd_path(self, ctx):
+        """Amiga path of the current directory lock (or None)"""
+        cur_dir = self.get_current_dir(ctx)
+        return cur_dir.ami_path if cur_dir is not None else None
+
     # ----- dos API -----
 
     def DateStamp(self, ctx):
@@ -447,16 +465,13 @@ class DosLibrary(LibImpl):
         days = ds.ds_Days.val
         seconds = ami_to_sys_time(AmiTime(days, minutes, ticks))
         log_dos.info("SetFileDate: file=%s date=%d", name, seconds)
-        sys_path = self.path_mgr.ami_to_sys_path(
-            self.get_current_dir(ctx), name, searchMulti=True
-        )
-        if sys_path == None:
-            log_dos.info("file not found: '%s' -> '%s'", name, sys_path)
-            self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
-            return DOSFALSE
-        else:
-            os.utime(sys_path, (seconds, seconds))
+        try:
+            self.handler_mgr.set_date(name, seconds, cwd=self.get_cwd_path(ctx))
             return DOSTRUE
+        except HandlerError as e:
+            log_dos.info("SetFileDate: '%s' failed: %s", name, e)
+            self.setioerr(ctx, e.code)
+            return DOSFALSE
 
     def SetComment(self, ctx):
         # the typical unixoid file system does not implement this
@@ -1358,22 +1373,18 @@ class DosLibrary(LibImpl):
             return DOSFALSE
         vol = lock.find_volume_node(self.dos_list)
         if vol:
-            try:
-                if hasattr(os, "statvfs"):
-                    stat = os.statvfs(lock.sys_path)
-                    disk_state = 80 if stat.f_flag & os.ST_RDONLY else 82
-                    block_size = stat.f_frsize or stat.f_bsize
-                    total = stat.f_blocks
-                    used = stat.f_blocks - stat.f_bfree
-                else:
-                    usage = shutil.disk_usage(lock.sys_path)
-                    disk_state = 82
-                    block_size = 512
-                    total = (usage.total + block_size - 1) // block_size
-                    used = (usage.used + block_size - 1) // block_size
-            except OSError:
+            if lock.handler is None:
                 self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
                 return DOSFALSE
+            try:
+                disk = lock.handler.info(lock.handler_lock)
+            except HandlerError as e:
+                self.setioerr(ctx, e.code)
+                return DOSFALSE
+            disk_state = disk.disk_state
+            block_size = disk.bytes_per_block
+            total = disk.num_blocks
+            used = disk.num_blocks_used
             info.id_NumSoftErrors.val = 0
             info.id_UnitNumber.val = 0  # not that we really care...
             info.id_DiskState.val = disk_state

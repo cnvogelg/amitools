@@ -3,65 +3,53 @@ from unittest.mock import Mock
 
 import pytest
 
+from amitools.vamos.handler import HandlerError, HandlerInfoData
 from amitools.vamos.lib.DosLibrary import DosLibrary
 from amitools.vamos.libstructs import InfoDataStruct
 from amitools.vamos.machine.mock import MockCPU, MockMemory
 from amitools.vamos.machine.regs import REG_D1, REG_D2
 
 
-@pytest.mark.parametrize("portable", [False, True])
-@pytest.mark.parametrize("blocks", [1000, 1 << 33])
-def dos_info_host_capacity_test(monkeypatch, portable, blocks):
-    import os
-    import shutil
-
+def _make_lib(info):
     ctx = SimpleNamespace(mem=MockMemory(), cpu=MockCPU())
     ctx.cpu.w_reg(REG_D1, 64)
     ctx.cpu.w_reg(REG_D2, 512)
-    lock = SimpleNamespace(sys_path="/host", find_volume_node=lambda dl: 1024)
+    handler = SimpleNamespace(info=info)
+    lock = SimpleNamespace(
+        handler=handler,
+        handler_lock=object(),
+        find_volume_node=lambda dl: 1024,
+    )
     lib = DosLibrary()
     lib.lock_mgr = SimpleNamespace(get_by_b_addr=lambda addr: lock)
     lib.dos_list = None
     lib.setioerr = Mock()
-    if portable:
-        monkeypatch.delattr(os, "statvfs", raising=False)
-        monkeypatch.setattr(
-            shutil,
-            "disk_usage",
-            lambda path: SimpleNamespace(total=blocks * 4096, used=blocks * 2048),
+    return lib, ctx
+
+
+@pytest.mark.parametrize("blocks", [1000, 1 << 33])
+def dos_info_host_capacity_test(blocks):
+    def info(lock):
+        return HandlerInfoData(
+            num_blocks=blocks,
+            num_blocks_used=blocks // 2,
+            bytes_per_block=4096,
         )
-    else:
-        monkeypatch.setattr(
-            os,
-            "statvfs",
-            lambda path: SimpleNamespace(
-                f_flag=0,
-                f_frsize=4096,
-                f_bsize=4096,
-                f_blocks=blocks,
-                f_bfree=blocks // 2,
-            ),
-            raising=False,
-        )
+
+    lib, ctx = _make_lib(info)
     assert lib.Info(ctx) != 0
-    info = InfoDataStruct(ctx.mem, 512)
-    assert info.id_NumBlocks.val <= 0x7FFFFFFF
-    assert info.id_NumBlocks.val * info.id_BytesPerBlock.val == blocks * 4096
-    assert info.id_NumBlocksUsed.val * info.id_BytesPerBlock.val == blocks * 2048
-    assert info.id_VolumeNode.aptr == 1024
+    data = InfoDataStruct(ctx.mem, 512)
+    assert data.id_NumBlocks.val <= 0x7FFFFFFF
+    assert data.id_NumBlocks.val * data.id_BytesPerBlock.val == blocks * 4096
+    assert data.id_NumBlocksUsed.val * data.id_BytesPerBlock.val == blocks * 2048
+    assert data.id_VolumeNode.aptr == 1024
     lib.setioerr.assert_called_once_with(ctx, 0)
 
 
-def dos_info_missing_host_path_test(monkeypatch):
-    import os
+def dos_info_missing_host_path_test():
+    def info(lock):
+        raise HandlerError(205)
 
-    ctx = SimpleNamespace(mem=MockMemory(), cpu=MockCPU())
-    ctx.cpu.w_reg(REG_D2, 512)
-    lock = SimpleNamespace(sys_path="/missing", find_volume_node=lambda dl: 1024)
-    lib = DosLibrary()
-    lib.lock_mgr = SimpleNamespace(get_by_b_addr=lambda addr: lock)
-    lib.dos_list = None
-    lib.setioerr = Mock()
-    monkeypatch.setattr(os, "statvfs", Mock(side_effect=OSError), raising=False)
+    lib, ctx = _make_lib(info)
     assert lib.Info(ctx) == 0
     assert lib.setioerr.call_args.args[1] != 0

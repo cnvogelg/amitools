@@ -1,31 +1,43 @@
 import sys
-import os.path
-import os
-import logging
-import errno
 
 from amitools.vamos.log import log_file
-from amitools.vamos.error import UnsupportedFeatureError
+from amitools.vamos.handler import (
+    HandlerError,
+    MODE_NEWFILE,
+    MODE_OLDFILE,
+    MODE_READWRITE,
+)
 from amitools.vamos.libstructs import MessageStruct, DosPacketStruct
+from amitools.vamos.path.amipath import AmiPath
 from .Error import *
-from .DosProtection import DosProtection
 from .FileHandle import FileHandle
 from .action import DosAction
 from .PathPart import expand_progdir_path
 
+# map the Python-ish modes used by the DOS layer to AmigaDOS open modes
+_DOS_MODES = {
+    "w": MODE_NEWFILE,
+    "wb": MODE_NEWFILE,
+    "wb+": MODE_NEWFILE,
+    "rw": MODE_READWRITE,
+    "rwb+": MODE_READWRITE,
+    "r": MODE_OLDFILE,
+    "rb": MODE_OLDFILE,
+    "rb+": MODE_OLDFILE,
+}
+
+# modes that only need read access
+_READ_MODES = ("r", "rb")
+
 
 class FileManager:
-    def __init__(self, path_mgr, port_mgr, alloc, mem):
-        self.path_mgr = path_mgr
+    def __init__(self, handler_mgr, port_mgr, alloc, mem):
+        self.handler_mgr = handler_mgr
         self.port_mgr = port_mgr
         self.alloc = alloc
         self.mem = mem
 
         self.files_by_b_addr = {}
-
-        # get current umask
-        self.umask = os.umask(0)
-        os.umask(self.umask)
 
         # setup ports
         # currently we use a single fake port for all devices
@@ -54,13 +66,13 @@ class FileManager:
         self.port_mgr.free_port(self.console_handler_port)
 
     def _create_stdin_fh(self):
-        return FileHandle(sys.stdin.buffer, "<STDIN>", "/dev/stdin", need_close=False)
+        return FileHandle(sys.stdin.buffer, "<STDIN>", "<STDIN>", need_close=False)
 
     def _create_stdout_fh(self):
         return FileHandle(
             sys.stdout.buffer,
             "<STDOUT>",
-            "/dev/stdout",
+            "<STDOUT>",
             need_close=False,
             auto_flush=True,
         )
@@ -93,63 +105,61 @@ class FileManager:
     def get_output(self):
         return self.std_output
 
-    def open(self, lock, ami_path, f_mode, home_dir=None):
+    def _ami_name(self, ami_path):
+        name = AmiPath(str(ami_path)).filename()
+        return name if name else str(ami_path)
+
+    def _open_nil(self, ami_path, f_mode):
+        # NIL: is a device, not a volume: read gives EOF, write is discarded
+        if f_mode == "rwb+":
+            f_mode = "rb+"
         try:
-            # special names
-            uname = ami_path.upper()
-            # thor: NIL: and CONSOLE: also work as device names
-            # and the file names behind are ignored.
-            if uname.startswith("NIL:"):
-                sys_name = "/dev/null"
-                if f_mode == "rwb+":
-                    f_mode = "rb+"
-                fobj = open(sys_name, f_mode)
-                fh = FileHandle(fobj, ami_path, sys_name, is_nil=True)
-            elif uname == "*" or uname.startswith("CONSOLE:"):
-                sys_name = ""
-                fh = self._create_stdout_fh()
-            else:
-                # Handle '*' prefix (PROGDIR: - program's home directory)
-                expanded = expand_progdir_path(ami_path, home_dir)
-                if expanded != ami_path:
-                    log_file.debug("expanded '*' path to: %s", expanded)
-                    ami_path = expanded
-                # map to system path
-                sys_path = self.path_mgr.ami_to_sys_path(
-                    lock, ami_path, searchMulti=True
-                )
-                if sys_path == None:
-                    log_file.info("file not found: '%s' -> '%s'" % (ami_path, sys_path))
-                    return None
-
-                # make some checks on existing file
-                if os.path.exists(sys_path):
-                    # if not writeable -> no append mode
-                    if f_mode == "rwb+":
-                        f_mode = "rb+"
-                    if not os.access(sys_path, os.W_OK):
-                        if f_mode[-1] == "+":
-                            f_mode = f_mode[:-1]
-                else:
-                    # if the file does not exist, but the mode is MODE_READWRITE, create it.
-                    if f_mode == "rwb+":
-                        f_mode = "wb+"
-
-                log_file.debug(
-                    "opening file: '%s' -> '%s' f_mode=%s"
-                    % (ami_path, sys_path, f_mode)
-                )
-                fobj = open(sys_path, f_mode)
-                fh = FileHandle(fobj, ami_path, sys_path)
-
-            self._register_file(fh)
-            return fh
-        except IOError as e:
-            log_file.info(
-                "error opening: '%s' -> '%s' f_mode=%s -> %s"
-                % (ami_path, sys_path, f_mode, e)
-            )
+            fobj = self.handler_mgr.file_system.open("/dev/null", f_mode)
+        except OSError:
             return None
+        return FileHandle(fobj, ami_path, self._ami_name(ami_path), is_nil=True)
+
+    def _open_via_handler(self, ami_path, f_mode, cwd):
+        try:
+            if f_mode in _READ_MODES:
+                handler, handler_file = self.handler_mgr.find_input(ami_path, cwd=cwd)
+            else:
+                mode = _DOS_MODES.get(f_mode, MODE_OLDFILE)
+                handler, handler_file = self.handler_mgr.find_output(
+                    ami_path, mode, cwd=cwd
+                )
+        except HandlerError as e:
+            log_file.info("error opening: '%s' f_mode=%s -> %s", ami_path, f_mode, e)
+            return None
+        return FileHandle(
+            handler_file.fobj,
+            ami_path,
+            self._ami_name(ami_path),
+            handler=handler,
+            handler_file=handler_file,
+        )
+
+    def open(self, lock, ami_path, f_mode, home_dir=None):
+        cwd = lock.ami_path if lock is not None else None
+        # special names
+        uname = str(ami_path).upper()
+        # thor: NIL: and CONSOLE: also work as device names
+        # and the file names behind are ignored.
+        if uname.startswith("NIL:"):
+            fh = self._open_nil(ami_path, f_mode)
+        elif uname == "*" or uname.startswith("CONSOLE:"):
+            fh = self._create_stdout_fh()
+        else:
+            # Handle '*' prefix (PROGDIR: - program's home directory)
+            expanded = expand_progdir_path(ami_path, home_dir)
+            if expanded != ami_path:
+                log_file.debug("expanded '*' path to: %s", expanded)
+                ami_path = expanded
+            fh = self._open_via_handler(ami_path, f_mode, cwd)
+        if fh is None:
+            return None
+        self._register_file(fh)
+        return fh
 
     def close(self, fh):
         fh.close()
@@ -174,41 +184,24 @@ class FileManager:
             raise ValueError("Invalid File Handle at b@%06x = %06x" % (b_addr, addr))
 
     def delete(self, lock, ami_path):
-        sys_path = self.path_mgr.ami_to_sys_path(lock, ami_path)
-        if sys_path == None or not os.path.exists(sys_path):
-            log_file.info("file to delete not found: '%s'" % (ami_path))
-            return ERROR_OBJECT_NOT_FOUND
+        cwd = lock.ami_path if lock is not None else None
         try:
-            if os.path.isdir(sys_path):
-                os.rmdir(sys_path)
-            else:
-                os.remove(sys_path)
-            return 0
-        except OSError as e:
-            if e.errno == errno.ENOTEMPTY:  # Directory not empty
-                log_file.info("can't delete directory: '%s' -> not empty!" % (ami_path))
-                return ERROR_DIRECTORY_NOT_EMPTY
-            else:
-                log_file.info("can't delete file: '%s' -> %s" % (ami_path, e))
-                return ERROR_OBJECT_IN_USE
+            self.handler_mgr.delete_object(ami_path, cwd=cwd)
+            return NO_ERROR
+        except HandlerError as e:
+            log_file.info("can't delete '%s': %s", ami_path, e)
+            return e.code
 
     def rename(self, lock, old_ami_path, new_ami_path):
-        old_sys_path = self.path_mgr.ami_to_sys_path(lock, old_ami_path)
-        new_sys_path = self.path_mgr.ami_to_sys_path(lock, new_ami_path)
-        if old_sys_path == None or not os.path.exists(old_sys_path):
-            log_file.info("old file to rename not found: '%s'" % old_ami_path)
-            return ERROR_OBJECT_NOT_FOUND
-        if new_sys_path == None:
-            log_file.info("new file to rename not found: '%s'" % new_ami_path)
-            return ERROR_OBJECT_NOT_FOUND
+        cwd = lock.ami_path if lock is not None else None
         try:
-            os.rename(old_sys_path, new_sys_path)
-            return 0
-        except OSError as e:
+            self.handler_mgr.rename_object(old_ami_path, new_ami_path, cwd=cwd)
+            return NO_ERROR
+        except HandlerError as e:
             log_file.info(
-                "can't rename file: '%s','%s' -> %s" % (old_ami_path, new_ami_path, e)
+                "can't rename '%s' -> '%s': %s", old_ami_path, new_ami_path, e
             )
-            return ERROR_OBJECT_IN_USE
+            return e.code
 
     def is_file_system(self, lock, name):
         uname = name.upper()
@@ -216,38 +209,27 @@ class FileManager:
             return False
         elif uname == "*" or uname.startswith("CONSOLE:"):
             return False
-        # Everything else is a file system here, we don't support any
-        # other devices.
-        return True
+        # look up a registered handler by device/volume name
+        vol_name = name.split(":")[0] if ":" in name else name
+        return self.handler_mgr.is_filesystem(vol_name)
 
     def set_protection(self, lock, ami_path, mask):
-        sys_path = self.path_mgr.ami_to_sys_path(lock, ami_path)
-        if sys_path == None or not os.path.exists(sys_path):
-            log_file.info("file to set proteciton not found: '%s'", ami_path)
-            return ERROR_OBJECT_NOT_FOUND
-        prot = DosProtection(mask)
-        posix_mask = prot.to_host_mode() & ~self.umask
-        log_file.info(
-            "set protection: '%s': %s -> '%s': posix_mask=%03o umask=%03o",
-            ami_path,
-            prot,
-            sys_path,
-            posix_mask,
-            self.umask,
-        )
+        cwd = lock.ami_path if lock is not None else None
         try:
-            os.chmod(sys_path, posix_mask)
+            self.handler_mgr.set_protect(ami_path, mask, cwd=cwd)
             return NO_ERROR
-        except OSError:
-            return ERROR_OBJECT_WRONG_TYPE
+        except HandlerError as e:
+            log_file.info("can't set protection '%s': %s", ami_path, e)
+            return e.code
 
     def create_dir(self, lock, ami_path):
-        sys_path = self.path_mgr.ami_to_sys_path(lock, ami_path)
+        cwd = lock.ami_path if lock is not None else None
         try:
-            os.mkdir(sys_path)
+            self.handler_mgr.create_dir(ami_path, cwd=cwd)
             return NO_ERROR
-        except OSError:
-            return ERROR_OBJECT_EXISTS
+        except HandlerError as e:
+            log_file.info("can't create dir '%s': %s", ami_path, e)
+            return e.code
 
     # ----- Direct Handler Access -----
 

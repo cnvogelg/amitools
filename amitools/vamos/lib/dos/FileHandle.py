@@ -9,12 +9,21 @@ class FileHandle:
     """represent an AmigaOS file handle (FH) in vamos"""
 
     def __init__(
-        self, obj, ami_path, sys_path, need_close=True, is_nil=False, auto_flush=False
+        self,
+        obj,
+        ami_path,
+        name,
+        handler=None,
+        handler_file=None,
+        need_close=True,
+        is_nil=False,
+        auto_flush=False,
     ):
         self.obj = obj
-        self.name = os.path.basename(sys_path)
+        self.name = name
         self.ami_path = ami_path
-        self.sys_path = sys_path
+        self.handler = handler
+        self.handler_file = handler_file
         self.b_addr = 0
         self.need_close = need_close
         self.auto_flush = auto_flush
@@ -37,10 +46,9 @@ class FileHandle:
             self.latin1_conv = None
 
     def __repr__(self):
-        return "[FH:'%s'(ami='%s',sys='%s',nc=%s,af=%s,int=%s)@%06x=B@%06x]" % (
+        return "[FH:'%s'(ami='%s',nc=%s,af=%s,int=%s)@%06x=B@%06x]" % (
             self.name,
             self.ami_path,
-            self.sys_path,
             self.need_close,
             self.auto_flush,
             self.interactive,

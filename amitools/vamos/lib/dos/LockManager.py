@@ -1,11 +1,8 @@
-import os.path
-import logging
-
 from amitools.util import SlotArray
+from amitools.vamos.handler import HandlerError
 from amitools.vamos.log import log_lock
 from amitools.vamos.error import VamosInternalError
 from amitools.vamos.libstructs import DosListVolumeStruct, FileLockStruct
-from .Error import *
 from .Lock import Lock
 from .PathPart import expand_progdir_path
 
@@ -42,12 +39,20 @@ class LockKey:
 
 class LockManager:
     def __init__(
-        self, path_mgr, dos_list, alloc, mem, max_locks=1024, fs_handler_port=0
+        self,
+        path_mgr,
+        dos_list,
+        alloc,
+        mem,
+        handler_mgr=None,
+        max_locks=1024,
+        fs_handler_port=0,
     ):
         self.path_mgr = path_mgr
         self.dos_list = dos_list
         self.alloc = alloc
         self.mem = mem
+        self.handler_mgr = handler_mgr
         self.fs_handler_port = fs_handler_port
         # we manage keys per sys_path
         # each individual sys_path gets a unique slot = key
@@ -131,21 +136,24 @@ class LockManager:
                 log_lock.debug("expanded '*' path to: %s", expanded)
                 ami_path = expanded
             ami_path = self.path_mgr.ami_abs_path(cur_dir, ami_path)
-        sys_path = self.path_mgr.ami_to_sys_path(cur_dir, ami_path, searchMulti=True)
         name = self.path_mgr.ami_name_of_path(cur_dir, ami_path)
-        if sys_path is None:
-            log_lock.info("lock '%s' invalid: no sys path found: '%s'", name, ami_path)
-            return None
-        exists = os.path.exists(sys_path)
-        if not exists:
-            log_lock.info(
-                "lock '%s' invalid: sys path does not exist: '%s' -> '%s'",
-                name,
-                ami_path,
-                sys_path,
+        cwd = cur_dir.ami_path if cur_dir is not None else None
+        try:
+            handler, handler_lock = self.handler_mgr.locate_object(
+                ami_path, exclusive=exclusive, cwd=cwd
             )
+        except HandlerError as e:
+            log_lock.info("lock '%s' invalid: '%s' (%s)", name, ami_path, e)
             return None
-        lock = Lock(name, ami_path, sys_path, exclusive)
+        sys_path = getattr(handler_lock, "sys_path", None)
+        lock = Lock(
+            name,
+            ami_path,
+            sys_path,
+            exclusive,
+            handler=handler,
+            handler_lock=handler_lock,
+        )
         return self._register_lock(lock)
 
     def dup_lock(self, lock):

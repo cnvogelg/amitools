@@ -9,6 +9,7 @@ file are done on the handler stored with that handle.
 
 from amitools.vamos.log import log_handler
 from amitools.vamos.path import HostFileSystem
+from amitools.vamos.path.amipath import AmiPath
 
 from .base import (
     ERROR_OBJECT_NOT_FOUND,
@@ -47,6 +48,11 @@ class HandlerManager:
 
     # ----- path resolution -----
 
+    def _env(self, env, cwd):
+        if env is not None or cwd is None:
+            return env
+        return self.path_mgr.create_env(cwd=AmiPath(cwd))
+
     def _split(self, vol_path):
         pos = vol_path.find(":")
         if pos <= 0:
@@ -58,11 +64,12 @@ class HandlerManager:
             return None
         return handler, rel_path
 
-    def resolve(self, ami_path, env=None):
+    def resolve(self, ami_path, env=None, cwd=None):
         """resolve an Amiga path to a list of (handler, rel_path) candidates
 
         Multi assigns yield one candidate per resolved volume path, in order.
         """
+        env = self._env(env, cwd)
         vol_paths = self.path_mgr.volpaths(ami_path, env=env)
         candidates = []
         seen = set()
@@ -78,9 +85,9 @@ class HandlerManager:
             candidates.append((handler, rel_path))
         return candidates
 
-    def _dispatch(self, ami_path, env, func):
+    def _dispatch(self, ami_path, func, env=None, cwd=None):
         """try each candidate until a handler call succeeds"""
-        candidates = self.resolve(ami_path, env=env)
+        candidates = self.resolve(ami_path, env=env, cwd=cwd)
         last_error = None
         for handler, rel_path in candidates:
             try:
@@ -91,16 +98,16 @@ class HandlerManager:
             raise last_error
         raise HandlerError(ERROR_OBJECT_NOT_FOUND)
 
-    def _first(self, ami_path, env):
+    def _first(self, ami_path, env=None, cwd=None):
         """return the first candidate (for creating new objects)"""
-        candidates = self.resolve(ami_path, env=env)
+        candidates = self.resolve(ami_path, env=env, cwd=cwd)
         if not candidates:
             raise HandlerError(ERROR_OBJECT_NOT_FOUND)
         return candidates[0]
 
-    def _first_existing(self, ami_path, env):
+    def _first_existing(self, ami_path, env=None, cwd=None):
         """return the first candidate whose object exists"""
-        candidates = self.resolve(ami_path, env=env)
+        candidates = self.resolve(ami_path, env=env, cwd=cwd)
         for handler, rel_path in candidates:
             try:
                 handler.locate_object(rel_path)
@@ -113,36 +120,48 @@ class HandlerManager:
 
     # ----- path based dispatch -----
 
-    def locate_object(self, ami_path, exclusive=False, env=None):
-        return self._dispatch(ami_path, env, lambda h, p: h.locate_object(p, exclusive))
+    def locate_object(self, ami_path, exclusive=False, env=None, cwd=None):
+        return self._dispatch(
+            ami_path, lambda h, p: h.locate_object(p, exclusive), env=env, cwd=cwd
+        )
 
-    def find_input(self, ami_path, env=None):
-        return self._dispatch(ami_path, env, lambda h, p: h.find_input(p))
+    def find_input(self, ami_path, env=None, cwd=None):
+        return self._dispatch(ami_path, lambda h, p: h.find_input(p), env=env, cwd=cwd)
 
-    def find_update(self, ami_path, env=None):
-        return self._dispatch(ami_path, env, lambda h, p: h.find_update(p))
+    def find_update(self, ami_path, env=None, cwd=None):
+        return self._dispatch(ami_path, lambda h, p: h.find_update(p), env=env, cwd=cwd)
 
-    def find_output(self, ami_path, mode=MODE_NEWFILE, env=None):
-        return self._dispatch(ami_path, env, lambda h, p: h.find_output(p, mode))
+    def find_output(self, ami_path, mode=MODE_NEWFILE, env=None, cwd=None):
+        return self._dispatch(
+            ami_path, lambda h, p: h.find_output(p, mode), env=env, cwd=cwd
+        )
 
-    def delete_object(self, ami_path, env=None):
-        return self._dispatch(ami_path, env, lambda h, p: h.delete_object(p))
+    def delete_object(self, ami_path, env=None, cwd=None):
+        return self._dispatch(
+            ami_path, lambda h, p: h.delete_object(p), env=env, cwd=cwd
+        )
 
-    def set_protect(self, ami_path, mask, env=None):
-        return self._dispatch(ami_path, env, lambda h, p: h.set_protect(p, mask))
+    def set_protect(self, ami_path, mask, env=None, cwd=None):
+        return self._dispatch(
+            ami_path, lambda h, p: h.set_protect(p, mask), env=env, cwd=cwd
+        )
 
-    def set_comment(self, ami_path, comment, env=None):
-        return self._dispatch(ami_path, env, lambda h, p: h.set_comment(p, comment))
+    def set_comment(self, ami_path, comment, env=None, cwd=None):
+        return self._dispatch(
+            ami_path, lambda h, p: h.set_comment(p, comment), env=env, cwd=cwd
+        )
 
-    def set_date(self, ami_path, date, env=None):
-        return self._dispatch(ami_path, env, lambda h, p: h.set_date(p, date))
+    def set_date(self, ami_path, date, env=None, cwd=None):
+        return self._dispatch(
+            ami_path, lambda h, p: h.set_date(p, date), env=env, cwd=cwd
+        )
 
-    def create_dir(self, ami_path, env=None):
-        return self._dispatch(ami_path, env, lambda h, p: h.create_dir(p))
+    def create_dir(self, ami_path, env=None, cwd=None):
+        return self._dispatch(ami_path, lambda h, p: h.create_dir(p), env=env, cwd=cwd)
 
-    def rename_object(self, old_path, new_path, env=None):
-        old_handler, old_rel = self._first_existing(old_path, env)
-        new_handler, new_rel = self._first(new_path, env)
+    def rename_object(self, old_path, new_path, env=None, cwd=None):
+        old_handler, old_rel = self._first_existing(old_path, env=env, cwd=cwd)
+        new_handler, new_rel = self._first(new_path, env=env, cwd=cwd)
         if old_handler is not new_handler:
             raise HandlerError(ERROR_RENAME_ACROSS_DEVICES)
         return old_handler, old_handler.rename_object(old_rel, new_rel)

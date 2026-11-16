@@ -133,10 +133,15 @@ class HostFileSysHandler(Handler):
 
     def _info_data(self, sys_path):
         usage = self.fs.disk_usage(sys_path)
+        if usage.read_only:
+            disk_state = HandlerInfoData.DISK_STATE_WRITE_PROTECTED
+        else:
+            disk_state = HandlerInfoData.DISK_STATE_VALIDATED
         return HandlerInfoData(
             num_blocks=usage.total,
             num_blocks_used=usage.used,
             bytes_per_block=usage.block_size,
+            disk_state=disk_state,
         )
 
     # ----- locks -----
@@ -230,13 +235,16 @@ class HostFileSysHandler(Handler):
         sys_path = self._sys_path(ami_path)
         exists = self.fs.exists(sys_path)
         if mode == MODE_NEWFILE:
-            py_mode = "wb"
+            py_mode = "wb+"
         elif mode == MODE_READWRITE:
-            py_mode = "rb+" if exists else "wb+"
+            if exists:
+                py_mode = "rb+" if self.fs.access(sys_path, os.W_OK) else "rb"
+            else:
+                py_mode = "wb+"
         else:  # MODE_OLDFILE
             if not exists:
                 raise HandlerError(ERROR_OBJECT_NOT_FOUND)
-            py_mode = "rb+"
+            py_mode = "rb+" if self.fs.access(sys_path, os.W_OK) else "rb"
         try:
             fobj = self.fs.open(sys_path, py_mode)
         except OSError:

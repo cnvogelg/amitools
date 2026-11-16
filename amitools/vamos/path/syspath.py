@@ -20,7 +20,7 @@ from amitools.vamos.log import log_path
 from .amipath import AmiPath, AmiPathError, collapse_parent_steps
 
 
-DiskUsage = namedtuple("DiskUsage", "total used free block_size")
+DiskUsage = namedtuple("DiskUsage", "total used free block_size read_only")
 
 
 class SysPathError(Exception):
@@ -173,6 +173,7 @@ class HostFileSystem(object):
                 st.f_blocks - st.f_bfree,
                 st.f_bfree,
                 block_size,
+                bool(st.f_flag & os.ST_RDONLY),
             )
         usage = shutil.disk_usage(sys_path)
         block_size = 512
@@ -181,6 +182,7 @@ class HostFileSystem(object):
             usage.used // block_size,
             usage.free // block_size,
             block_size,
+            False,
         )
 
     def get_umask(self):
