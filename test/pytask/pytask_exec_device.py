@@ -10,7 +10,7 @@ def pytask_exec_base_lists_test(vamos_task):
         exec_base = ExecLibraryType(ctx.mem, exec_proxy.base_addr)
 
         assert exec_base.mem_list.type.val == NodeType.NT_MEMORY
-        assert exec_base.mem_list.is_empty()
+        assert exec_base.mem_list.find_name("vamos RAM") is not None
         assert exec_base.resource_list.type.val == NodeType.NT_RESOURCE
         assert exec_base.resource_list.is_empty()
         assert exec_base.device_list.type.val == NodeType.NT_DEVICE
