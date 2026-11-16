@@ -159,8 +159,13 @@ class Scheduler(object):
             if self.get_num_tasks() == 0:
                 break
 
-            # has the current task forbid state?
-            if self.cur_task and self.cur_task.is_forbidden():
+            # has the current task forbid state? a task that just went to
+            # sleep is not kept, even if it entered Wait() in Forbid()
+            if (
+                self.cur_task
+                and self.cur_task.is_forbidden()
+                and self.cur_task.get_state() != TaskState.TS_WAIT
+            ):
                 log_schedule.debug("run: keep current (forbid state)")
                 task = self.cur_task
             else:

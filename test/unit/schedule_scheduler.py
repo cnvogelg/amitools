@@ -697,6 +697,47 @@ def schedule_scheduler_python_task_multi_wait_test():
     cleanup(ctx)
 
 
+def schedule_scheduler_python_task_forbid_wait_test():
+    ctx = setup(slice_cycles=30)
+    sched = ctx.sched
+    order = []
+
+    def task1_run(task):
+        # Exec keeps a task that calls Wait() in Forbid() asleep until one
+        # of its signals arrives: let the other tasks run meanwhile
+        task.forbid()
+        got = task.wait(3)
+        assert got == 1
+        # the forbid state is restored when the task runs again
+        assert task.is_forbidden()
+        order.append(1)
+        task.permit()
+        assert not task.is_forbidden()
+        return 42
+
+    def task2_run(task):
+        # task1 sleeps in Forbid() so we get to run and wake it up
+        order.append(2)
+        task1.set_signal(1, 1)
+        return 23
+
+    task1_ctx = MyPythonTask(ctx, task1_run, name="task1")
+    task1 = task1_ctx.task
+    task2_ctx = MyPythonTask(ctx, task2_run, name="task2")
+    task2 = task2_ctx.task
+
+    assert sched.add_task(task1)
+    assert sched.add_task(task2)
+    sched.schedule()
+    assert task1.get_exit_code() == 42
+    assert task2.get_exit_code() == 23
+    assert order == [2, 1]
+
+    task2_ctx.free()
+    task1_ctx.free()
+    cleanup(ctx)
+
+
 def schedule_scheduler_python_task_wait_takes_signals_test():
     ctx = setup(slice_cycles=30)
     sched = ctx.sched

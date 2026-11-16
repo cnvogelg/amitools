@@ -156,9 +156,18 @@ class TaskBase:
         self.sigmask_wait = sigmask
         self._sync_sigmask()
 
+        # Exec lets a task still sleep in Forbid(): the forbid state is set
+        # aside while the task waits and restored once it runs again, so
+        # the other tasks can run and provide the signals we wait for
+        forbid_cnt = self.forbid_cnt
+        self.forbid_cnt = 0
+
         # go waiting. reschedule
         log_schedule.debug("%s: enter wait", self.name)
         self.scheduler.wait_task(self)
+
+        # restore the forbid state we had before the wait
+        self.forbid_cnt = forbid_cnt
 
         # we will return here if we were removed from waiting list
         # and our got mask is not empty anymore

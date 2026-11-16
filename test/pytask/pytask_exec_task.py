@@ -58,6 +58,37 @@ def pytask_exec_task_yield_sysflags_nested_forbid_test(vamos_task):
     assert order == [2, 1]
 
 
+def pytask_exec_task_forbid_wait_test(vamos_task):
+    order = []
+
+    def task1(ctx, task):
+        exec_lib = ctx.proxies.get_exec_lib_proxy()
+
+        # sleeping on a signal in Forbid() must let task2 run and wake us
+        exec_lib.Forbid()
+        got = exec_lib.Wait(1)
+        assert got == 1
+        # the forbid state is restored when the task runs again
+        assert task.is_forbidden()
+        order.append(1)
+        exec_lib.Permit()
+        assert not task.is_forbidden()
+        return 0
+
+    def task2(ctx, task):
+        exec_lib = ctx.proxies.get_exec_lib_proxy()
+
+        addr = exec_lib.FindTask("task1")
+        assert addr != 0
+        order.append(2)
+        exec_lib.Signal(addr, 1)
+        return 0
+
+    exit_codes = vamos_task.run([task1, task2])
+    assert exit_codes == [0, 0]
+    assert order == [2, 1]
+
+
 def pytask_exec_task_find_task_test(vamos_task):
     def task(ctx, task):
         ami_task = task.map_task.get_ami_task()
