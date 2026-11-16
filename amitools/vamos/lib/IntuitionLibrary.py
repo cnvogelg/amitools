@@ -3,6 +3,7 @@ from contextlib import ExitStack
 from amitools.vamos.libtypes import TagList, MsgPort, Message, List, Node
 from amitools.vamos.lib.GraphicsLibrary import BFText, BFDraw, BFTemplate
 from amitools.vamos.lib.graphics_font import render_font_surface
+from amitools.vamos.lib.graphics_support import BitmapBlit
 from amitools.vamos.lib.intuition_input import translate_key
 from amitools.vamos.libcore.impl import LibImpl
 from amitools.vamos.lib.TimerDevice import TimerDevice
@@ -21,6 +22,7 @@ from amitools.vamos.lib.intuition import (
     WA_Height,
     WA_InnerWidth,
     WA_InnerHeight,
+    WA_Flags,
     WA_PubScreenName,
     SA_Dummy,
     PubScreenNodeStruct,
@@ -114,6 +116,7 @@ class IntuitionLibrary(LibImpl):
 
         self.rp_2_win_addr = {}
         self.refresh_pending = set()
+        self._pending_window_sizes = {}
         self.display_scale = (1, 1)
         self.display_aspect = "square"
         self._window_scales = {}
@@ -306,6 +309,7 @@ class IntuitionLibrary(LibImpl):
         self.sdl_window_id_2_window_addr_map.pop(window_id, None)
         self._window_scales.pop(window_id, None)
         self.refresh_pending.discard(window_ptr)
+        self._pending_window_sizes.pop(window_ptr, None)
         self.rp_2_win_addr.pop(rastport_addr, None)
 
         screen = ScreenStruct(ctx.mem, screen_ptr)
@@ -390,7 +394,8 @@ class IntuitionLibrary(LibImpl):
             flags |= sdl2.SDL_WINDOW_RESIZABLE
 
         amiga_win_addr = self.create_window_struct(
-            ctx, left, top, width, height, idcmp_flags, title, screen, flags
+            ctx, left, top, width, height, idcmp_flags, title, screen, flags,
+            new_win.Flags.val,
         )
 
         ctx.cpu.w_reg(REG_D0, amiga_win_addr)
@@ -414,6 +419,7 @@ class IntuitionLibrary(LibImpl):
 
         screen = self.default_screen.addr
         idcmp_flags = 0
+        amiga_flags = 0
 
         new_window_ptr = ctx.cpu.r_reg(REG_A0)
         if new_window_ptr != 0:
@@ -424,6 +430,7 @@ class IntuitionLibrary(LibImpl):
             height = new_win.Height.get()
 
             idcmp_flags = new_win.IDCMPFlags.get()
+            amiga_flags = new_win.Flags.val
 
             title_ptr = new_win.Title.get()
             title = ctx.mem.r_cstr(title_ptr) if title_ptr else ""
@@ -464,6 +471,8 @@ class IntuitionLibrary(LibImpl):
                 max_height = data
             elif tag == WA_IDCMP:
                 idcmp_flags = data
+            elif tag == WA_Flags:
+                amiga_flags = data
             elif tag == WA_CustomScreen:
                 screen = data
             else:
@@ -491,7 +500,8 @@ class IntuitionLibrary(LibImpl):
 
         # Return fake Amiga window pointer
         amiga_win_addr = self.create_window_struct(
-            ctx, left, top, width, height, idcmp_flags, title, screen, flags
+            ctx, left, top, width, height, idcmp_flags, title, screen, flags,
+            amiga_flags,
         )
         ctx.cpu.w_reg(REG_D0, amiga_win_addr)
 
@@ -761,7 +771,8 @@ class IntuitionLibrary(LibImpl):
     # ----- Helper -----
 
     def create_window_struct(
-        self, ctx, left, top, width, height, idcmp_flags, title, screen_addr, flags
+        self, ctx, left, top, width, height, idcmp_flags, title, screen_addr, flags,
+        amiga_flags=0,
     ):
         if not (0 < width <= 32767 and 0 < height <= 32767):
             return 0
@@ -822,6 +833,13 @@ class IntuitionLibrary(LibImpl):
             ctx.mem.clear_block(memory.addr, memory.size, 0)
             win = WindowStruct(ctx.mem, memory.addr)
             win.Width.val, win.Height.val = width, height
+            win.Flags.val = amiga_flags
+            win.MinWidth.val = win.MinHeight.val = 1
+            win.MaxWidth.val = win.MaxHeight.val = 0xFFFF
+            # Native toolkits use these fields even for non-GimmeZeroZero
+            # windows. SDL owns the host decorations, so the client has no
+            # emulated borders and its inner size equals the raster size.
+            win.GZZWidth.val, win.GZZHeight.val = width, height
             win.LeftEdge.val, win.TopEdge.val = left, top
             win.IDCMPFlags.val = idcmp_flags
             win.Title.set(title_memory.addr)
@@ -835,6 +853,12 @@ class IntuitionLibrary(LibImpl):
                 return 0
             rollback.callback(self.graphics_lib.free_RastPortStruct, ctx, rp_addr)
             win.RPort.val, win.WLayer.val = rp_addr, layer_addr
+            layer = LayerStruct(ctx.mem, layer_addr)
+            layer.Window.val = win.addr
+            layer.LayerInfo.val = screen.LayerInfo.addr
+            layer.bounds.MinX.val, layer.bounds.MinY.val = left, top
+            layer.bounds.MaxX.val = left + width - 1
+            layer.bounds.MaxY.val = top + height - 1
             backing = self.graphics_lib.rp_graphics_map.get(rp_addr)
             if backing is not None:
                 backing.palette = self.graphics_lib.screen_palettes.get(
@@ -1094,11 +1118,8 @@ class IntuitionLibrary(LibImpl):
                 new_w = max(1, int(event.window.data1 / scale[0]))
                 new_h = max(1, int(event.window.data2 / scale[1]))
 
-                win = WindowStruct(ctx.mem, win_addr)
-                win.Width.set(new_w)
-                win.Height.set(new_h)
-
-                return PendingIntuiEvent(win_addr, IDCMP_NEWSIZE, 0, 0, 0, window_id)
+                if self._resize_window(ctx, win_addr, new_w, new_h):
+                    return PendingIntuiEvent(win_addr, IDCMP_NEWSIZE, 0, 0, 0, window_id)
 
             elif we == sdl2.SDL_WINDOWEVENT_EXPOSED:
                 # Only one refresh per expose
@@ -1557,6 +1578,21 @@ class IntuitionLibrary(LibImpl):
             screen.WBorRight.set(4)
             screen.WBorBottom.set(4)
 
+            color_map = graphics.GetColorMap(ctx, 1 << depth)
+            if not color_map:
+                return None
+            rollback.callback(graphics.FreeColorMap, ctx, color_map)
+            screen.ViewPort.ColorMap.val = color_map
+            screen.ViewPort.DWidth.val = width
+            screen.ViewPort.DHeight.val = height
+            ctx.mem.w32(color_map + 20, screen.ViewPort.addr)
+            if graphics.palette is not None:
+                for n in range(1 << depth):
+                    color = graphics.palette[n]
+                    rgb = (color.r, color.g, color.b) if hasattr(color, "r") else color[:3]
+                    graphics.SetRGB32CM(ctx, color_map, n,
+                                        *(c * 0x01010101 for c in rgb))
+
             # BitMap
             bm = screen.BitMap
             bytes_per_row = (width + 15) // 16 * 2
@@ -1631,11 +1667,15 @@ class IntuitionLibrary(LibImpl):
             )
             if graphics.palette is not None:
                 graphics.screen_palettes[screen.ViewPort.addr] = graphics.palette.copy()
+                graphics._color_palettes[color_map] = graphics.screen_palettes[screen.ViewPort.addr]
             rollback.pop_all()
             return screen
 
     def _free_screen(self, ctx, screen):
         self.graphics_lib.screen_palettes.pop(screen.ViewPort.addr, None)
+        color_map = screen.ViewPort.ColorMap.val
+        self.graphics_lib._color_palettes.pop(color_map, None)
+        self.graphics_lib.FreeColorMap(ctx, color_map)
         bm = screen.BitMap
         plane_size = bm.BytesPerRow.val * bm.Rows.val
         planes = [bm.Planes[i].val for i in range(bm.Depth.val)]
@@ -1727,7 +1767,61 @@ class IntuitionLibrary(LibImpl):
             ctx, PendingIntuiEvent(win_addr, IDCMP_REFRESHWINDOW, 0, 0, 0, window_id)
         )
 
+    def WindowLimits(self, ctx, window, widthMin, heightMin, widthMax, heightMax):
+        if self.find_sdl_window_by_amiga_addr(window) is None:
+            return 0
+        win = WindowStruct(ctx.mem, window)
+        success = 1
+        for field, value, current, minimum in (
+            (win.MinWidth, widthMin, win.Width.val, True),
+            (win.MinHeight, heightMin, win.Height.val, True),
+            (win.MaxWidth, widthMax, win.Width.val, False),
+            (win.MaxHeight, heightMax, win.Height.val, False),
+        ):
+            value &= 0xFFFF
+            if value:
+                if (minimum and not 0 < value <= current) or (not minimum and value < current):
+                    success = 0
+                else:
+                    field.val = value
+        return success
+
+    def SizeWindow(self, ctx, window, dx, dy):
+        if self.find_sdl_window_by_amiga_addr(window) is None:
+            return
+        win = WindowStruct(ctx.mem, window)
+        width, height = self._pending_window_sizes.get(window, (win.Width.val, win.Height.val))
+        width += self._signed_word(dx)
+        height += self._signed_word(dy)
+        if win.Flags.val & 1:  # WFLG_SIZEGADGET
+            width = max(win.MinWidth.val, min(width, win.MaxWidth.val))
+            height = max(win.MinHeight.val, min(height, win.MaxHeight.val))
+        if 0 < width <= 32767 and 0 < height <= 32767:
+            self._pending_window_sizes[window] = (width, height)
+
+    def _resize_window(self, ctx, window, width, height):
+        win = WindowStruct(ctx.mem, window)
+        if (win.Width.val, win.Height.val) == (width, height):
+            return False
+        if not self.graphics_lib.resize_window_rastport(ctx, win.RPort.val, width, height):
+            return False
+        win.Width.val, win.Height.val = width, height
+        win.GZZWidth.val = width - win.BorderLeft.val - win.BorderRight.val
+        win.GZZHeight.val = height - win.BorderTop.val - win.BorderBottom.val
+        self.refresh(ctx, win.RPort.val)
+        return True
+
     def check_refresh(self, ctx):
+        import sdl2
+        pending, self._pending_window_sizes = self._pending_window_sizes, {}
+        for window, (width, height) in pending.items():
+            window_id = self.find_sdl_window_by_amiga_addr(window)
+            if window_id is not None and self._resize_window(ctx, window, width, height):
+                scale = self._window_scales.get(window_id, self.display_scale)
+                sdl2.SDL_SetWindowSize(self.sdl_window_id_2_sdl_window[window_id],
+                                     round(width * scale[0]), round(height * scale[1]))
+                self.queue_idcmp(ctx, window, IDCMP_NEWSIZE)
+                self.queue_idcmp(ctx, window, IDCMP_REFRESHWINDOW)
         # Applications draw in response to input without Begin/EndRefresh.
         # Present queued drawing once per scheduler pump, without generating
         # another IDCMP_REFRESHWINDOW (which would ask the guest to redraw).
@@ -1864,6 +1958,9 @@ class IntuitionLibrary(LibImpl):
         surface, state = graphics.surface, command.state
         if isinstance(command, BFDraw):
             surface.line(state, command.x1, command.y1, command.x2, command.y2, clip)
+        elif isinstance(command, BitmapBlit):
+            surface.bitmap_blit(state, command.x, command.y, command.w, command.h,
+                                command.pixels, command.mask, clip)
         elif isinstance(command, BFTemplate):
             surface.template(
                 state, command.x, command.y, command.w, command.h, command.pixels, clip
@@ -1912,6 +2009,20 @@ class IntuitionLibrary(LibImpl):
             clips = getattr(graphics, "clip_rects", None)
             if clips is None:
                 clips = [graphics.clip_rect]
+            user_clips = getattr(graphics, "user_clip_rects", None)
+            if user_clips is not None:
+                combined = []
+                for clip in clips:
+                    for user in user_clips:
+                        if clip is None:
+                            combined.append(user)
+                        else:
+                            x, y = max(clip.x, user.x), max(clip.y, user.y)
+                            right = min(clip.x + clip.w, user.x + user.w)
+                            bottom = min(clip.y + clip.h, user.y + user.h)
+                            if right > x and bottom > y:
+                                combined.append(sdl2.SDL_Rect(x, y, right - x, bottom - y))
+                clips = combined
             indexed = hasattr(graphics, "surface") and all(
                 command.state is not None for command in graphics.batch.commands
             )

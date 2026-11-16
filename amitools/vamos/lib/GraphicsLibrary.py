@@ -29,6 +29,7 @@ from amitools.vamos.lib.intuition import TextFontStruct, WindowStruct
 from amitools.vamos.log import log_main, log_gfx
 from dataclasses import dataclass
 from amitools.vamos.lib.graphics_surface import RasterState, RasterSurface
+from amitools.vamos.lib.graphics_support import GraphicsSupport
 from amitools.vamos.lib.graphics_base import GfxBaseStruct
 from amitools.vamos.libtypes import List
 from amitools.vamos.libstructs import NodeType
@@ -40,7 +41,7 @@ from amitools.vamos.lib.graphics_font import (
 )
 
 
-class GraphicsLibrary(LibImpl):
+class GraphicsLibrary(GraphicsSupport, LibImpl):
     def get_struct_def(self):
         return GfxBaseStruct
 
@@ -54,8 +55,13 @@ class GraphicsLibrary(LibImpl):
         self.topaz_font = None
         self.rp_graphics_map = {}
         self._rastport_resources = {}
+        self._window_planes = {}
         self.palette = None
         self.screen_palettes = {}
+        self._color_maps = {}
+        self._color_palettes = {}
+        self._pen_refs = {}
+        self._bitmaps = {}
         self._lib_opened = False
         self._setup_resources = None
 
@@ -208,8 +214,11 @@ class GraphicsLibrary(LibImpl):
             if not self.init_bitmap_canonical(ctx, bm.addr, width, height, depth):
                 return 0, 0, 0
             plane_size = bm.BytesPerRow.val * bm.Rows.val
+            planes = ExitStack()
             for i in range(depth):
-                rollback.callback(ctx.alloc.free_mem, bm.Planes[i].val, plane_size)
+                planes.callback(ctx.alloc.free_mem, bm.Planes[i].val, plane_size)
+            self._window_planes[bm.addr] = planes
+            rollback.callback(self._free_window_planes, bm.addr)
             damage = self._new_region(ctx)
             if not damage:
                 return 0, 0, 0
@@ -226,6 +235,60 @@ class GraphicsLibrary(LibImpl):
             rollback.callback(self.free_rast_port_graphics, ctx, rp.addr)
             self._rastport_resources[rp.addr] = rollback.pop_all()
         return rp.addr, layer.addr, bm.addr
+
+    def _free_window_planes(self, bitmap):
+        owner = self._window_planes.pop(bitmap, None)
+        if owner is not None:
+            owner.close()
+
+    def resize_window_rastport(self, ctx, rp_addr, width, height):
+        """Replace pixels and texture atomically, keeping guest pointers stable."""
+        import sdl2
+
+        backing = self.rp_graphics_map.get(rp_addr)
+        if backing is None or not (0 < width <= 32767 and 0 < height <= 32767):
+            return False
+        if (backing.width, backing.height) == (width, height):
+            return True
+        ctx.exec_lib.intuition_lib._flush_batch(backing)
+        rp = RastPortStruct(ctx.mem, rp_addr)
+        old = BitMapStruct(ctx.mem, rp.BitMap.val)
+        with ExitStack() as rollback:
+            addr = self.AllocBitMap(ctx, width, height, old.Depth.val, 1, 0)
+            if not addr:
+                return False
+            rollback.callback(self.FreeBitMap, ctx, addr)
+            new = BitMapStruct(ctx.mem, addr)
+            texture = sdl2.SDL_CreateTexture(
+                backing.renderer, sdl2.SDL_PIXELFORMAT_RGBA8888,
+                sdl2.SDL_TEXTUREACCESS_TARGET, width, height)
+            if not texture:
+                return False
+            rollback.callback(sdl2.SDL_DestroyTexture, texture)
+            stride = min(old.BytesPerRow.val, new.BytesPerRow.val)
+            for plane in range(old.Depth.val):
+                for y in range(min(old.Rows.val, height)):
+                    ctx.mem.w_block(new.Planes[plane].val + y * new.BytesPerRow.val,
+                                    ctx.mem.r_block(old.Planes[plane].val + y * old.BytesPerRow.val, stride))
+            surface = RasterSurface(width, height)
+            # The scratch descriptor remains owned with its planes. The
+            # original public descriptor and RastPort never move.
+            ctx.mem.w_block(old.addr, ctx.mem.r_block(addr, BitMapStruct.get_size()))
+            self._free_window_planes(old.addr)
+            self._window_planes[old.addr] = self._bitmaps.pop(addr)
+            sdl2.SDL_DestroyTexture(backing.texture)
+            backing.texture, backing.surface = texture, surface
+            backing.width, backing.height = width, height
+            surface.load(self._raster_state(ctx, rp))
+            surface.dirty = True
+            if rp.Layer.val:
+                layer = LayerStruct(ctx.mem, rp.Layer.val)
+                layer.Width.val, layer.Height.val = width, height
+                layer.bounds.MaxX.val = layer.bounds.MinX.val + width - 1
+                layer.bounds.MaxY.val = layer.bounds.MinY.val + height - 1
+                self._replace_region(ctx, layer.DamageList.val, [(0, 0, width - 1, height - 1)])
+            rollback.pop_all()
+        return True
 
     def free_RastPortStruct(self, ctx, rp_addr):
         owned = self._rastport_resources.pop(rp_addr, None)
@@ -843,11 +906,18 @@ class GraphicsLibrary(LibImpl):
     def SetRGB4(self, ctx):
         import sdl2
 
-        palette = self.screen_palettes.get(ctx.cpu.r_reg(REG_A0))
+        vp = ctx.cpu.r_reg(REG_A0)
+        palette = self.screen_palettes.get(vp)
         if palette is None:
             return
         index = ctx.cpu.r_reg(REG_D0) & 0xFFFF
         if index >= len(palette):
+            return
+        color_map = ctx.mem.r32(vp + 4) if vp else 0
+        if color_map in self._color_maps:
+            self.SetRGB32CM(ctx, color_map, index,
+                           *((ctx.cpu.r_reg(reg) & 15) * 0x11111111
+                             for reg in (REG_D1, REG_D2, REG_D3)))
             return
         palette[index] = sdl2.SDL_Color(
             (ctx.cpu.r_reg(REG_D1) & 15) * 17,

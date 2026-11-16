@@ -269,7 +269,8 @@ def intuition_screen_font_failure_test(ctx, monkeypatch, failure):
 def intuition_screen_font_real_exhaustion_test(ctx, remaining):
     # Exhaust the allocator at the copied attributes, copied name, or
     # final 52-byte TextFont, after the tiny screen and planes fit.
-    reserve = ctx.alloc.alloc_memory(ctx.alloc.get_free_bytes() - remaining)
+    # The two-plane screen also owns a 52-byte map and two WORD tables.
+    reserve = ctx.alloc.alloc_memory(ctx.alloc.get_free_bytes() - remaining - 68)
     before = ctx.snapshot()
     handles_issued = ctx.next_handle
     assert ctx.screen(width=1, height=1) is None

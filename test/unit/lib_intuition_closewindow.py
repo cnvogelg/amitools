@@ -7,7 +7,7 @@ import pytest
 from amitools.vamos.label import LabelManager
 from amitools.vamos.lib.GraphicsLibrary import GraphicsLibrary
 from amitools.vamos.lib.IntuitionLibrary import IntuitionLibrary
-from amitools.vamos.lib.graphics import RastPortStruct, LayerStruct, RectangleStruct
+from amitools.vamos.lib.graphics import RastPortStruct, LayerStruct, RectangleStruct, BitMapStruct
 from amitools.vamos.lib.intuition import (
     IDCMP_NEWSIZE,
     IDCMP_CLOSEWINDOW,
@@ -17,6 +17,7 @@ from amitools.vamos.lib.intuition import (
 )
 from amitools.vamos.lib.lexec.msgfunc import MessageFunc
 from amitools.vamos.lib.lexec.PortManager import PortManager
+from amitools.vamos.libtypes import MsgPort
 from amitools.vamos.machine import REG_A0
 from amitools.vamos.machine.mock import MockCPU, MockMemory
 from amitools.vamos.mem import MemoryAlloc
@@ -95,6 +96,7 @@ class WindowContext:
         self.graphics.alloc = self.alloc
         self.graphics.topaz_font = self.font.get_addr()
         self.intuition = IntuitionLibrary()
+        self.exec_lib.intuition_lib = self.intuition
         self.intuition.alloc = self.alloc
         self.intuition.graphics_lib = self.graphics
         self.intuition.default_screen = self.screen
@@ -242,6 +244,67 @@ def intuition_close_window_queued_resize_test(ctx):
     assert WindowStruct(ctx.mem, other).Width.val == 123
     ctx.alloc.free_memory(replacement)
     ctx.close_all()
+
+
+@pytest.mark.parametrize("fail", [None, "texture", "planes"])
+def intuition_window_resize_storage_test(ctx, monkeypatch, fail):
+    target = ctx.open()
+    window = WindowStruct(ctx.mem, target)
+    rp = RastPortStruct(ctx.mem, window.RPort.val)
+    bm = BitMapStruct(ctx.mem, rp.BitMap.val)
+    backing = ctx.graphics.rp_graphics_map[rp.addr]
+    ctx.mem.w8(bm.Planes[0].val + bm.BytesPerRow.val, 0x80)
+    original = bytes(ctx.mem.r_block(bm.addr, bm.get_size()))
+    old_texture = backing.texture
+    old_free = ctx.alloc.get_free_bytes()
+    if fail == "texture":
+        monkeypatch.setattr(ctx.sdl, "SDL_CreateTexture", lambda *args: 0)
+    elif fail == "planes":
+        monkeypatch.setattr(ctx.graphics, "init_bitmap_canonical", lambda *args: False)
+    success = ctx.intuition._resize_window(ctx, target, 96, 48)
+    assert success == (fail is None)
+    if fail:
+        assert bytes(ctx.mem.r_block(bm.addr, bm.get_size())) == original
+        assert backing.texture == old_texture
+        assert (window.Width.val, window.Height.val) == (64, 32)
+        assert ctx.alloc.get_free_bytes() == old_free
+    else:
+        assert (window.Width.val, window.Height.val) == (96, 48)
+        assert (window.GZZWidth.val, window.GZZHeight.val) == (96, 48)
+        assert (bm.BytesPerRow.val, bm.Rows.val) == (12, 48)
+        assert ctx.mem.r8(bm.Planes[0].val + 12) == 0x80
+        assert ctx.mem.r8(bm.Planes[0].val + 12 * 40) == 0
+        assert backing.surface.pixels[96] == 1
+        assert old_texture not in ctx.textures
+        assert backing.texture in ctx.textures
+        assert rp.BitMap.val == bm.addr
+    ctx.close_all()
+
+
+def intuition_window_programmatic_resize_test(ctx):
+    target = ctx.open()
+    window = WindowStruct(ctx.mem, target)
+    window.Flags.val = 1  # size gadget: honor limits
+    assert ctx.intuition.WindowLimits(ctx, target, 20, 10, 100, 60) == 1
+    assert ctx.intuition.WindowLimits(ctx, target, 70, 0, 0, 30) == 0
+    assert (window.MinWidth.val, window.MaxHeight.val) == (20, 60)
+    ctx.intuition.SizeWindow(ctx, target, 80, 20)
+    assert ctx.intuition._pending_window_sizes[target] == (100, 52)
+    assert window.Width.val == 64  # waits for input servicing
+    ctx.sdl.SDL_SetWindowSize = Mock()
+    ctx.intuition._perform_refresh = Mock()
+    ctx.intuition.check_refresh(ctx)
+    assert (window.Width.val, window.Height.val) == (100, 52)
+    ctx.sdl.SDL_SetWindowSize.assert_called_once_with(
+        ctx.intuition.find_sdl_window_by_amiga_addr(target), 100, 52)
+    message = ctx.messages.get_msg(MsgPort(ctx.mem, window.UserPort.val))
+    assert message is not None
+    assert ctx.mem.r32(message.addr + 20) == IDCMP_NEWSIZE
+    ctx.messages.reply_msg(message)
+    # Closing also cancels requests that have not yet reached the host.
+    ctx.intuition.SizeWindow(ctx, target, 0, 5)
+    ctx.close_all()
+    assert not ctx.intuition._pending_window_sizes
 
 
 def intuition_close_window_translated_event_reused_address_test(ctx):

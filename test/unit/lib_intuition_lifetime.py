@@ -62,6 +62,10 @@ class Context:
                 self.graphics, ctx, rp, font
             ),
         )
+        storage = GraphicsLibrary()
+        self.graphics.GetColorMap = storage.GetColorMap
+        self.graphics.FreeColorMap = storage.FreeColorMap
+        self.graphics._color_palettes = storage._color_palettes
         self.font_refs = 1
         self.exec_lib.graphics_lib = self.graphics
         return 0x1234

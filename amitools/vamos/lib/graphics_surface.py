@@ -79,6 +79,16 @@ class RasterSurface:
             for x in range(max(0, left), min(self.width, left + width)):
                 self.paint(state, x, y, pixels[(y - top) * width + x - left], clip)
 
+    def bitmap_blit(self, state, left, top, width, height, pixels, mask, clip=None):
+        # Bitmap blits ignore the RastPort text drawing mode and pens.
+        for y in range(max(0, top), min(self.height, top + height)):
+            for x in range(max(0, left), min(self.width, left + width)):
+                i = (y - top) * width + x - left
+                if mask[i]:
+                    self.paint(
+                        replace(state, foreground=pixels[i], mode=0), x, y, clip=clip
+                    )
+
     def line(self, state, x, y, end_x, end_y, clip=None):
         dx, dy = abs(end_x - x), -abs(end_y - y)
         step_x, step_y = 1 if x < end_x else -1, 1 if y < end_y else -1
