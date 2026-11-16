@@ -7,7 +7,7 @@ from contextlib import ExitStack
 from amitools.vamos.machine import Code
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.astructs import CSTR, LONG
+from amitools.vamos.astructs import CSTR, LONG, UBYTE, APTR_VOID
 from amitools.vamos.libstructs import (
     DosLibraryStruct,
     DosInfoStruct,
@@ -2243,6 +2243,31 @@ class DosLibrary(LibImpl):
             return DOSTRUE
         else:
             return DOSFALSE
+
+    def SplitName(
+        self,
+        ctx,
+        name: CSTR,
+        separator: UBYTE,
+        buf: APTR_VOID,
+        oldpos: LONG,
+        size: LONG,
+    ):
+        name_str = name.str if name is not None else ""
+        pos, part = PathPart.split_name(
+            name_str, int(separator), int(oldpos), int(size)
+        )
+        ctx.mem.w_cstr(buf.aptr, part)
+        log_dos.info(
+            "SplitName: name='%s' sep=%d oldpos=%d size=%d -> pos=%d part='%s'",
+            name_str,
+            int(separator),
+            int(oldpos),
+            int(size),
+            pos,
+            part,
+        )
+        return pos
 
     # ----- DosObjects -----
 

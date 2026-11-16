@@ -71,6 +71,28 @@ def path_part(path):
     return pos
 
 
+def split_name(name, separator, oldpos, size):
+    """split off one part of a name at the given separator.
+
+    Returns a tuple (next_pos, part). next_pos is the position after the
+    separator to continue with the next part or -1 if the part was the
+    last one. At most size - 1 characters are returned in part.
+    """
+    n = len(name)
+    max_len = max(size - 1, 0)
+    pos = oldpos
+    part = []
+    while pos < n and len(part) < max_len and ord(name[pos]) != separator:
+        part.append(name[pos])
+        pos += 1
+    if pos < n and ord(name[pos]) == separator:
+        return pos + 1, "".join(part)
+    # a NUL separator matches the terminator at the end of the name
+    if pos >= n and separator == 0:
+        return pos + 1, "".join(part)
+    return -1, "".join(part)
+
+
 def add_part(dirname, filename, size):
     if len(dirname) == 0:
         return filename

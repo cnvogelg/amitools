@@ -89,6 +89,34 @@ def pytask_exec_task_forbid_wait_test(vamos_task):
     assert order == [2, 1]
 
 
+def pytask_exec_task_set_task_pri_test(vamos_task):
+    def task(ctx, task):
+        ami_task = task.map_task.get_ami_task()
+
+        # get exec library
+        exec_lib = ctx.proxies.get_exec_lib_proxy()
+
+        # changing the priority returns the old value
+        assert ami_task.pri.val == 0
+        old = exec_lib.SetTaskPri(ami_task, -5)
+        assert old == 0
+        assert ami_task.pri.val == -5
+
+        # only the low byte is stored and returned sign-extended
+        old = exec_lib.SetTaskPri(ami_task, 200)
+        assert old == 0xFFFFFFFB
+        assert ami_task.pri.val == -56
+
+        old = exec_lib.SetTaskPri(ami_task, 0)
+        assert old == 0xFFFFFFC8
+        assert ami_task.pri.val == 0
+
+        return 0
+
+    exit_codes = vamos_task.run([task])
+    assert exit_codes == [0]
+
+
 def pytask_exec_task_find_task_test(vamos_task):
     def task(ctx, task):
         ami_task = task.map_task.get_ami_task()

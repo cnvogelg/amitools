@@ -3,7 +3,7 @@ import sys
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib, LibFuncs, InitRes
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.astructs import BYTE, CSTR
+from amitools.vamos.astructs import BYTE, CSTR, LONG
 from amitools.vamos.libstructs import (
     ExecLibraryStruct,
     StackSwapStruct,
@@ -141,6 +141,9 @@ class ExecLibrary(LibImpl):
 
     def FindTask(self, ctx, task_name: CSTR) -> Task:
         return self.task_func.find_task(task_name.str)
+
+    def SetTaskPri(self, ctx, task: Task, priority: LONG):
+        return self.task_func.set_task_pri(task, int(priority))
 
     def StackSwap(self, ctx, new_stack: StackSwapStruct):
         stsw = new_stack
