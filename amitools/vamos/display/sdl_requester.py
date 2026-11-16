@@ -2,7 +2,8 @@
 
 import ctypes
 
-from .graphics_font import load_topaz_font, render_font_surface
+from ..lib.graphics_font import load_topaz_font
+from .sdl_font import render_font_surface
 
 
 def request_fields(title, fields):

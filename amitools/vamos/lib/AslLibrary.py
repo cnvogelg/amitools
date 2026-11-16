@@ -3,7 +3,7 @@
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.libtypes import TagList
 
-from .asl_requester import request_fields
+from amitools.vamos.display import get_display
 
 TB = 0x80080000
 
@@ -11,7 +11,7 @@ TB = 0x80080000
 class AslLibrary(LibImpl):
     def setup_lib(self, ctx, base_addr):
         self.requests = {}
-        self.backend = request_fields
+        self.backend = None
 
     def finish_lib(self, ctx):
         for addr in list(self.requests):
@@ -122,7 +122,8 @@ class AslLibrary(LibImpl):
                 ("Drawer", ctx.mem.r_cstr(ctx.mem.r32(addr + 8))),
                 ("File", ctx.mem.r_cstr(ctx.mem.r32(addr + 4))),
             ]
-        values = self.backend(title, fields)
+        backend = self.backend or get_display(ctx).request_fields
+        values = backend(title, fields)
         if values is None:
             return 0
         try:
