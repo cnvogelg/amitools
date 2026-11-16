@@ -940,6 +940,8 @@ class IntuitionLibrary(LibImpl):
                 host_window = self.host_windows[window_id]
                 self.render(ctx, host_window, mx, my)
 
+            if not self._reports_mouse(ctx, win_addr):
+                return None
             return PendingIntuiEvent(win_addr, IDCMP_MOUSEMOVE, mx, my, 0, window_id)
 
         # ---------- MOUSE BUTTON DOWN ----------
@@ -1063,6 +1065,16 @@ class IntuitionLibrary(LibImpl):
             ctx, e.win_addr, e.idcmp_flag, e.mouse_x, e.mouse_y, e.code, e.qualifier
         )
 
+    def ReportMouse(self, ctx, flag, window):
+        win = WindowStruct(ctx.mem, window)
+        if flag:
+            win.Flags.val |= 0x200  # WFLG_REPORTMOUSE
+        else:
+            win.Flags.val &= ~0x200
+
+    def _reports_mouse(self, ctx, window):
+        return bool(WindowStruct(ctx.mem, window).Flags.val & 0x200)
+
     def queue_idcmp(
         self, ctx, win_addr, idcmp_flag, mouse_x=0, mouse_y=0, code=0, qualifier=0
     ):
@@ -1112,8 +1124,11 @@ class IntuitionLibrary(LibImpl):
             )
             self._idcmp_owners[win_addr] = owner
             self._reply_owners[memory.addr] = owner
+        # RAWKEY IAddress points to two previous code/qualifier pairs.
+        # Keep the empty history alive until ReplyMsg, just like the message.
+        rawkey_extra = 4 if idcmp_flag == IDCMP_RAWKEY else 0
         memory = ctx.alloc.alloc_memory(
-            IntuiMessageStruct.get_size(),
+            IntuiMessageStruct.get_size() + rawkey_extra,
             label="Intuition message",
             except_on_failure=False,
         )
@@ -1123,6 +1138,8 @@ class IntuitionLibrary(LibImpl):
         msg = IntuiMessageStruct(ctx.mem, memory.addr)
         msg.ExecMessage.mn_ReplyPort.set(owner["port"].addr)
         msg.ExecMessage.mn_Length.val = IntuiMessageStruct.get_size()
+        if rawkey_extra:
+            msg.IAddress.val = memory.addr + IntuiMessageStruct.get_size()
         msg.Class.val = idcmp_flag
         msg.MouseX.val, msg.MouseY.val = mouse_x, mouse_y
         msg.Code.val = code & 0xFFFF

@@ -14,6 +14,7 @@ class RasterState:
     mode: int
     pattern: int
     spacing: int
+    area_pattern: tuple = ()
 
 
 class RasterSurface:
@@ -72,7 +73,9 @@ class RasterSurface:
     def fill(self, state, left, top, width, height, clip=None):
         for y in range(max(0, top), min(self.height, top + height)):
             for x in range(max(0, left), min(self.width, left + width)):
-                self.paint(state, x, y, clip=clip)
+                pattern = state.area_pattern
+                bit = not pattern or pattern[y % len(pattern)] & (0x8000 >> (x & 15))
+                self.paint(state, x, y, bit, clip=clip)
 
     def template(self, state, left, top, width, height, pixels, clip=None):
         for y in range(max(0, top), min(self.height, top + height)):
