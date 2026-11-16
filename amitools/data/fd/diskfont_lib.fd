@@ -1,0 +1,21 @@
+##base _DiskfontBase
+##bias 30
+##public
+OpenDiskFont(textAttr)(a0)
+AvailFonts(buffer,bufBytes,flags)(a0,d0/d1)
+NewFontContents(fontsLock,fontName)(a0/a1)
+DisposeFontContents(fontContentsHeader)(a1)
+NewScaledDiskFont(sourceFont,destTextAttr)(a0/a1)
+GetDiskFontCtrl(tagid)(d0)
+SetDiskFontCtrlA(taglist)(a0)
+EOpenEngine(eEngine)(a0)
+ECloseEngine(eEngine)(a0)
+ESetInfoA(eEngine,taglist)(a0/a1)
+EObtainInfoA(eEngine,taglist)(a0/a1)
+EReleaseInfoA(eEngine,taglist)(a0/a1)
+OpenOutlineFont(name,list,flags)(a0/a1,d0)
+CloseOutlineFont(olf,list)(a0/a1)
+WriteFontContents(fontsLock,fontName,fontContentsHeader)(a0/a1/a2)
+WriteDiskFontHeaderA(font,fileName,tagList)(a0/a1/a2)
+ObtainCharsetInfo(knownTag,knownValue,wantedTag)(d0/d1/d2)
+##end

@@ -61,6 +61,43 @@ class Scheduler(object):
         self.running = False
         # tasks added while not running: their ADD_TASK is reported on the next run
         self.new_tasks = []
+        self.after_schedule_callbacks = []
+        self.idle_callbacks = []
+
+    def add_after_schedule_callback(self, callback):
+        """Register a nonblocking callback at entry and after each task slice.
+
+        Callbacks run on the scheduler thread, outside guest execution. They
+        may signal tasks and remove callbacks. Duplicate registration is ignored.
+        """
+        if callback not in self.after_schedule_callbacks:
+            self.after_schedule_callbacks.append(callback)
+
+    def remove_after_schedule_callback(self, callback):
+        if callback in self.after_schedule_callbacks:
+            self.after_schedule_callbacks.remove(callback)
+
+    def add_idle_callback(self, callback):
+        """Register a bounded event wait, returning whether a source is alive.
+
+        Only schedule() waits for external events. run_until_idle() never
+        invokes these callbacks, including when its cycle budget is exhausted.
+        """
+        if callback not in self.idle_callbacks:
+            self.idle_callbacks.append(callback)
+
+    def remove_idle_callback(self, callback):
+        if callback in self.idle_callbacks:
+            self.idle_callbacks.remove(callback)
+
+    @staticmethod
+    def _call_callbacks(callbacks):
+        # Snapshot iteration lets a window close unregister its own source.
+        results = []
+        for callback in tuple(callbacks):
+            if callback in callbacks:
+                results.append(callback())
+        return any(results)
 
     @classmethod
     def from_cfg(cls, machine, schedule_cfg):
@@ -95,7 +132,7 @@ class Scheduler(object):
         if len(self.ready_tasks) == 0:
             raise RuntimeError("no tasks to schedule!")
 
-        if self._run_tasks() == RunResult.IDLE:
+        if self._run_tasks(wait_for_events=True) == RunResult.IDLE:
             # every task left waits and no task is there to wake it up
             log_schedule.error("schedule(): no task to run?!")
             return False
@@ -122,7 +159,13 @@ class Scheduler(object):
         log_schedule.info("run_until_idle(): start")
         return self._run_tasks(max_cycles)
 
-    def _run_tasks(self, max_cycles=None):
+    def _run_tasks(self, max_cycles=None, wait_for_events=False):
+        try:
+            return self._run_tasks_impl(max_cycles, wait_for_events)
+        finally:
+            self.running = False
+
+    def _run_tasks_impl(self, max_cycles=None, wait_for_events=False):
         """the scheduling loop shared by schedule() and run_until_idle().
 
         returns the RunResult that stopped it. with max_cycles the loop
@@ -140,6 +183,8 @@ class Scheduler(object):
         self.new_tasks = []
         for task in new_tasks:
             self._report_event(SchedulerEvent.Type.ADD_TASK, task)
+
+        self._call_callbacks(self.after_schedule_callbacks)
 
         # main loop
         result = RunResult.DONE
@@ -172,8 +217,14 @@ class Scheduler(object):
                 # find a task to run
                 task = self._find_run_task()
                 if task is None:
-                    result = RunResult.IDLE
-                    break
+                    if wait_for_events and self.idle_callbacks:
+                        active = self._call_callbacks(self.idle_callbacks)
+                        task = self._find_run_task()
+                        if task is None and active:
+                            continue
+                    if task is None:
+                        result = RunResult.IDLE
+                        break
 
             # budget spent while a task is still runnable?
             if max_cycles is not None and cycles >= max_cycles:
@@ -220,6 +271,7 @@ class Scheduler(object):
             cycles_before = task.get_cycles_run()
             task.switch()
             cycles += task.get_cycles_run() - cycles_before
+            self._call_callbacks(self.after_schedule_callbacks)
 
         self.running = False
 

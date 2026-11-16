@@ -130,6 +130,13 @@ def main(
         except (IOError, OSError, ValueError) as exc:
             log_main.error("disk setup failed: %s", exc)
             return error_code
+        from .cfg.display import parse_display_scale
+
+        try:
+            display_scale = parse_display_scale(mp.get_display_dict().display.scale)
+        except ValueError as exc:
+            log_main.error("display setup failed: %s", exc)
+            return error_code
         slm = SetupLibManager(
             machine,
             mem_map,
@@ -137,6 +144,10 @@ def main(
             scheduler,
             path_mgr,
             main_profiler=main_profiler,
+            display_scale=display_scale,
+            display_aspect=mp.get_display_dict().display.aspect,
+            display_backend=mp.get_display_dict().display.backend,
+            display_output=mp.get_display_dict().display.output,
         )
         if not slm.parse_config(lib_cfg):
             log_main.error("lib manager setup failed!")
