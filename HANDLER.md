@@ -161,5 +161,5 @@ No DOS wiring in 5a.
 | Step | Commit | State |
 |---|---|---|
 | 5a | `c2a9df45` handler API + host FS handler | done |
-| 5b | — | pending |
+| 5b | `0650744a` route DOS file/lock ops through handlers | done |
 | 5c | — | pending |
