@@ -1,4 +1,5 @@
 from enum import IntEnum
+from .TimerDevice import TimerDevice
 import sys
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib, LibFuncs, InitRes
@@ -59,6 +60,10 @@ class ExecLibrary(LibImpl):
             attn_flags = 127
         self.exec_lib.attn_flags.val = attn_flags
         self.exec_lib.max_loc_mem.val = ctx.ram_size
+        # Nominal PAL timing; the E-clock counter uses host monotonic time.
+        self.exec_lib.VBlankFrequency.val = 50
+        self.exec_lib.PowerSupplyFrequency.val = 50
+        self.exec_lib.ex_EClockFrequency.val = TimerDevice.ECLOCK_HZ
         # create the port manager
         self.port_mgr = PortManager(ctx.alloc)
         self.semaphore_mgr = SemaphoreManager(ctx.alloc, ctx.mem)

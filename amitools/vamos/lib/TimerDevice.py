@@ -11,11 +11,8 @@ TR_GETSYSTIME = 11
 
 
 class TimerDevice(LibImpl):
-    # our simulated EClock freq: 10 MHz
-    # its around the real EClock (3 MHz)
-    ECLOCK_HZ = 10_000_000
-    # how to convert ns time stamp to eclock
-    ECLOCK_NS_FACTOR = 100
+    # Match the nominal PAL system timing published in ExecBase.
+    ECLOCK_HZ = 709_379
     # micros per second
     MICRO_HZ = 1_000_000
 
@@ -36,7 +33,7 @@ class TimerDevice(LibImpl):
     def get_eclock_lo_hi(cls):
         # use the monotonic time here to have a suitable clock for benchmarks
         ts_ns = time.monotonic_ns()
-        eclk = ts_ns // cls.ECLOCK_NS_FACTOR
+        eclk = ts_ns * cls.ECLOCK_HZ // 1_000_000_000
         eclk_lo = eclk & 0xFFFFFFFF
         eclk_hi = eclk >> 32
         return eclk_lo, eclk_hi
