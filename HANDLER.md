@@ -150,6 +150,6 @@ No DOS wiring in 5a.
 
 | Step | Commit | State |
 |---|---|---|
-| 5a | `handler: add AmigaDOS-style handler API and host FS handler` | done |
+| 5a | `c2a9df45` handler API + host FS handler | done |
 | 5b | — | pending |
 | 5c | — | pending |
