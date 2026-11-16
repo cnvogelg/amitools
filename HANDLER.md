@@ -174,4 +174,4 @@ No DOS wiring in 5a.
 |---|---|---|
 | 5a | `c2a9df45` handler API + host FS handler | done |
 | 5b | `0650744a` route DOS file/lock ops through handlers | done |
-| 5c | — | pending |
+| 5c | `2f8ec12c` handler-based locks, no sys_path | done |
