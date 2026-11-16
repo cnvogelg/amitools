@@ -17,6 +17,27 @@ from amitools.vamos.machine.mock import MockCPU, MockMemory
 from amitools.vamos.mem import MemoryAlloc
 
 
+@pytest.mark.parametrize(
+    "source,result",
+    [
+        (65, 97),
+        (90, 122),
+        (192, 224),
+        (222, 254),
+        (215, 215),
+        (223, 223),
+        (255, 255),
+        (0x141, 97),
+    ],
+)
+def utility_lower_latin1_test(os_ctx, source, result):
+    from amitools.vamos.lib.UtilityLibrary import UtilityLibrary
+    from amitools.vamos.machine import REG_D0
+
+    os_ctx.cpu.w_reg(REG_D0, source)
+    assert UtilityLibrary().ToLower(os_ctx) == result
+
+
 @pytest.fixture
 def os_ctx():
     mem = MockMemory(size_kib=512)
