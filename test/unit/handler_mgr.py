@@ -2,13 +2,16 @@ import os
 
 import pytest
 
-from amitools.vamos.path import PathManager
 from amitools.vamos.handler import (
+    MODE_NEWFILE,
+    Handler,
     HandlerError,
     HandlerManager,
+    HandlerRegistry,
     HostFileSysHandler,
-    MODE_NEWFILE,
+    default_registry,
 )
+from amitools.vamos.path import PathManager
 
 
 def setup_mgr(tmp_path):
@@ -139,3 +142,60 @@ def handler_mgr_registry_test(tmp_path):
     assert mgr.is_filesystem("unknown")
     assert mgr.unregister("work") is not None
     assert mgr.get_handler("work") is None
+
+
+def handler_registry_default_test():
+    reg = default_registry()
+    assert "hostfs" in reg.get_all_types()
+    # type names are case-insensitive
+    assert reg.get("HOSTFS") is not None
+    # unknown types are not registered
+    assert reg.get("nope") is None
+    assert reg.create("nope", "x", "/tmp", {}, None) is None
+
+
+def handler_mgr_bind_volume_test(tmp_path):
+    pm, mgr, root, work = setup_mgr(tmp_path)
+    # a fresh manager binds the volumes via their config; default is hostfs
+    mgr2 = HandlerManager(pm)
+    for volume in pm.get_vol_mgr().get_all_volumes():
+        mgr2.bind_volume(volume)
+    # the explicitly added volumes are bound (auto volumes are present too)
+    assert {"root", "work"} <= set(mgr2.get_all_names())
+    handler = mgr2.get_handler("work")
+    assert isinstance(handler, HostFileSysHandler)
+    assert handler.name == "work"
+    assert handler.root_path == str(work)
+
+
+def handler_mgr_bind_volume_type_test(tmp_path):
+    pm, mgr, root, work = setup_mgr(tmp_path)
+
+    class DummyHandler(Handler):
+        def __init__(self, name):
+            super().__init__(name, is_filesystem=False)
+
+    def dummy_factory(name, path, cfg, file_system):
+        assert cfg.get("extra") == "42"
+        return DummyHandler(name)
+
+    reg = HandlerRegistry()
+    reg.add_type("dummy", dummy_factory)
+    mgr2 = HandlerManager(pm, registry=reg)
+    volume = pm.get_vol_mgr().get_volume("work")
+    volume.cfg["handler"] = "dummy"
+    volume.cfg["extra"] = "42"
+    handler = mgr2.bind_volume(volume)
+    assert isinstance(handler, DummyHandler)
+    assert mgr2.get_handler("work") is handler
+    assert not mgr2.is_filesystem("work")
+
+
+def handler_mgr_bind_volume_unknown_type_test(tmp_path):
+    pm, mgr, root, work = setup_mgr(tmp_path)
+    mgr2 = HandlerManager(pm)
+    volume = pm.get_vol_mgr().get_volume("work")
+    volume.cfg["handler"] = "nope"
+    # ERROR_ACTION_NOT_KNOWN
+    expect_error(209, mgr2.bind_volume, volume)
+    assert mgr2.get_handler("work") is None

@@ -12,17 +12,20 @@ from amitools.vamos.path import HostFileSystem
 from amitools.vamos.path.amipath import AmiPath
 
 from .base import (
+    ERROR_ACTION_NOT_KNOWN,
     ERROR_OBJECT_NOT_FOUND,
     ERROR_RENAME_ACROSS_DEVICES,
-    HandlerError,
     MODE_NEWFILE,
+    HandlerError,
 )
+from .registry import default_registry
 
 
 class HandlerManager:
-    def __init__(self, path_mgr, file_system=None):
+    def __init__(self, path_mgr, file_system=None, registry=None):
         self.path_mgr = path_mgr
         self.file_system = file_system or HostFileSystem()
+        self.registry = registry if registry is not None else default_registry()
         self.handlers = {}
 
     # ----- registration -----
@@ -33,6 +36,30 @@ class HandlerManager:
         self.handlers[lo_name] = handler
         log_handler.info("register handler '%s': %s", name, handler)
         return handler
+
+    def bind_volume(self, volume):
+        """create and register the handler selected by a volume's config
+
+        The handler type is read from the volume's ``handler`` config option
+        (default ``hostfs``) and looked up in the registry. An unknown type
+        raises :class:`HandlerError` with ``ERROR_ACTION_NOT_KNOWN``.
+        """
+        cfg = volume.get_cfg() or {}
+        type_name = cfg.get("handler", "hostfs")
+        handler = self.registry.create(
+            type_name,
+            volume.get_name(),
+            volume.get_path(),
+            cfg,
+            self.file_system,
+        )
+        if handler is None:
+            raise HandlerError(
+                ERROR_ACTION_NOT_KNOWN,
+                "unknown handler type '%s' for volume '%s'"
+                % (type_name, volume.get_name()),
+            )
+        return self.register(volume.get_name(), handler)
 
     def unregister(self, name):
         handler = self.handlers.pop(name.lower(), None)
