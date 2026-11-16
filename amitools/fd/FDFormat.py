@@ -11,6 +11,8 @@ def get_fd_name(lib_name):
         fd_name = lib_name.replace(".device", "_lib.fd")
     elif lib_name.endswith(".library"):
         fd_name = lib_name.replace(".library", "_lib.fd")
+    elif lib_name.endswith((".mui", ".mcc", ".mcp")):
+        fd_name = lib_name.rsplit(".", 1)[0] + "_lib.fd"
     else:
         raise ValueError("can't find fd name for '%s'" % lib_name)
     return fd_name
@@ -21,6 +23,8 @@ def get_base_name(lib_name):
         base_name = lib_name.replace(".device", "Base")
     elif lib_name.endswith(".library"):
         base_name = lib_name.replace(".library", "Base")
+    elif lib_name.endswith((".mui", ".mcc", ".mcp")):
+        base_name = lib_name.rsplit(".", 1)[0] + "Base"
     else:
         raise ValueError("can't find base name for '%s'" % lib_name)
     return "_" + base_name[0].upper() + base_name[1:]
