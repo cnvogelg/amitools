@@ -381,7 +381,12 @@ class HandlerManager:
                         continue
                     vol_name, rel_dir = split
                     volume = vol_mgr.get_volume(vol_name)
-                    if volume is None or volume.get_path() is not None:
+                    if volume is None:
+                        continue
+                    # a host volume creates its dirs during path setup; only
+                    # handler-backed volumes (no host path) and image-backed
+                    # volumes are created here
+                    if volume.get_path() is not None and not volume.is_image:
                         continue
                     if not rel_dir:
                         continue

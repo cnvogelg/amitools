@@ -170,9 +170,9 @@ HandlerRegistry
 
 ``HandlerRegistry`` maps a lower-cased type name to a factory
 ``(name, path, cfg, file_system) -> Handler``. ``default_registry()`` returns a
-registry with the built-in types ``hostfs``, ``ram``, ``nil``, ``console``, and
-``packet``. ``get_all_types()`` lists them and ``create(...)`` builds one (or
-returns ``None`` for an unknown type).
+registry with the built-in types ``hostfs``, ``adfs``, ``ram``, ``nil``,
+``console``, and ``packet``. ``get_all_types()`` lists them and ``create(...)``
+builds one (or returns ``None`` for an unknown type).
 
 
 Packet decoder
@@ -237,6 +237,15 @@ Built-in handlers
     The default. Backs a volume with a host directory tree; every path is
     resolved relative to the volume root and mapped to the host file system
     case-insensitively.
+
+``adfs`` -- ``AdfsHandler``
+    An AmigaDOS file system (OFS/FFS) inside an image file, through the
+    ``amitools.fs`` package. The volume path is the image: a raw floppy image
+    (``.adf``), a hardfile (``.hdf``) or one RDB partition (``.rdb``, selected
+    with ``?part=``). The image type is auto-detected from the contents and the
+    file extension; ``?img=`` forces it (``adf``/``adf_hd``/``hdf``/``rdb``, or
+    ``xdf`` for "raw image, detect"). It is the default handler for a volume
+    whose source is a file rather than a directory.
 
 ``ram`` -- ``RamHandler``
     An in-memory AmigaDOS file system. It keeps a tree of files in shared
@@ -320,6 +329,12 @@ option it uses ``hostfs`` and maps to a host directory::
 
     vamos -V work:/abs/path?handler=hostfs myprog
     vamos -V scratch:?handler=ram myprog
+
+A volume whose source is a *file* is an image-backed ADFS volume: the handler
+defaults to ``adfs`` and the file is not mapped to the host file system::
+
+    vamos -V work:disk.adf myprog
+    vamos -V work:disk.rdb?part=1 myprog
 
 The auto ``ram:`` volume uses the ``ram`` handler and the auto ``root:`` volume
 uses ``hostfs``. ``NIL:`` and ``CONSOLE:`` always exist as built-in devices,

@@ -197,7 +197,7 @@ class SysVolume(object):
     name and asks this object for its current host path.
     """
 
-    def __init__(self, name, path, cfg=None, file_system=None):
+    def __init__(self, name, path, cfg=None, file_system=None, is_image=False):
         if cfg is None:
             cfg = {}
         if file_system is None:
@@ -206,11 +206,16 @@ class SysVolume(object):
         self.path = path
         self.cfg = cfg
         self.file_system = file_system
+        self.is_image = is_image
 
     def get_path(self):
         return self.path
 
     def setup(self):
+        # an image-backed volume is a file system inside an image file: the
+        # handler opens the block device, there is no host directory to check
+        if self.is_image:
+            return True
         path = self.path
         # a non-host handler (nil:, console:, ...) has no host directory
         if path is None:
@@ -231,8 +236,9 @@ class SysVolume(object):
         pass
 
     def create_rel_sys_path(self, rel_path):
-        if self.path is None:
-            # a non-host handler has no host directory to create
+        if self.path is None or self.is_image:
+            # a non-host handler has no host directory to create; an
+            # image-backed volume has no host directory either
             return None
         path = self.file_system.join_path(self.path, rel_path)
         if self.file_system.is_dir(path):
@@ -288,8 +294,9 @@ class SysPathMapper(object):
         result = None
         for volume in self.vol_provider.get_all_volumes():
             vol_sys_path = volume.get_path()
-            # a non-host handler (nil:, console:, ...) has no host path
-            if vol_sys_path is None:
+            # a non-host handler (nil:, console:, ...) has no host path and an
+            # image-backed volume's path is an image file, not a directory
+            if vol_sys_path is None or volume.is_image:
                 continue
             try:
                 common_path = os.path.commonpath([vol_sys_path, sys_path])
@@ -344,8 +351,9 @@ class SysPathMapper(object):
         volume = self.vol_provider.get_volume(vol_name)
         if volume is not None:
             vol_sys_path = volume.get_path()
-            # a non-host handler (nil:, console:, ...) has no host path
-            if vol_sys_path is None:
+            # a non-host handler (nil:, console:, ...) has no host path and an
+            # image-backed volume has no host directory to map to
+            if vol_sys_path is None or volume.is_image:
                 return None
             remainder = ami_path[pos + 1 :]
 

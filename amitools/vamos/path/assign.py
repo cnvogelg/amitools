@@ -69,8 +69,9 @@ class Assign(object):
         log_path.debug("%s: create assign dir: rel_dir='%s'", self.name, rel_dir)
         # a non-host volume (ram:, nil:, ...) has no host directory; the
         # responsible handler creates it once it is bound, see
-        # build_handler_manager()
-        if volume.get_path() is None:
+        # build_handler_manager(). An image-backed volume has no host
+        # directory either, so it is deferred the same way.
+        if volume.get_path() is None or volume.is_image:
             log_path.debug(
                 "assign '%s': defer dir creation for handler volume '%s'",
                 self.name,

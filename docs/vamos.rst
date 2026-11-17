@@ -57,7 +57,8 @@ Features
 * Supports native library loading for application libs (e.g. SAS sc1.library)
 * Dos Library supports: Locks, Files (Open, Read, Write, Seek, Close)
 * A handler-based file system layer: host directories, an in-memory volume,
-  and the ``NIL:``/``CONSOLE:`` devices (see :doc:`vamos-handler`)
+  AmigaDOS file systems in image files (ADF/HDF/RDB), and the
+  ``NIL:``/``CONSOLE:`` devices (see :doc:`vamos-handler`)
 * Exec Library supports: AllocMem/Vec, LoadLibrary
 * Many useful tracing and logging features
 
@@ -181,13 +182,22 @@ option selects the handler that backs the volume. By default a volume uses the
     [volumes]
     work=~/amiga/work?handler=hostfs
 
-Besides ``hostfs`` vamos ships an in-memory ``ram`` file system and the ``nil``
-and ``console`` devices. A non-host volume needs no host path, so its source
-may be empty. The ``ram`` handler takes an optional nominal capacity in KiB:
+Besides ``hostfs`` vamos ships an in-memory ``ram`` file system, an ``adfs``
+handler for AmigaDOS file systems in image files, and the ``nil`` and
+``console`` devices. A non-host volume needs no host path, so its source may be
+empty. The ``ram`` handler takes an optional nominal capacity in KiB:
 
     [volumes]
     scratch=?handler=ram
     tmp=?handler=ram,size=2048
+
+A volume whose source is a *file* is an ADFS image volume and defaults to the
+``adfs`` handler; the image type is auto-detected, ``img`` forces it and
+``part`` selects an RDB partition:
+
+    [volumes]
+    work=~/amiga/disks/work.adf
+    data=~/amiga/disks/disk.rdb?part=1
 
 The in-memory ``ram:`` volume is also created automatically (see
 ``--auto-volumes`` below); it is not a host temp directory. The ``NIL:`` and

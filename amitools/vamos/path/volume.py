@@ -9,14 +9,19 @@ class Volume(object):
     The host file system handling is delegated to a :class:`SysVolume`.
     """
 
-    def __init__(self, name, path, cfg=None, file_system=None):
+    def __init__(self, name, path, cfg=None, file_system=None, is_image=False):
         if cfg is None:
             cfg = {}
         self.name = name
         self.lo_name = name.lower()
         self.cfg = cfg
         self.is_setup = False
-        self.sys_volume = SysVolume(name, path, cfg, file_system)
+        # an image-backed volume is a file system inside an image file
+        # (ADF/HDF/RDB) rather than a host directory
+        self.is_image = is_image
+        self.sys_volume = SysVolume(
+            name, path, cfg, file_system, is_image=is_image
+        )
 
     def __str__(self):
         return "Volume(%s(%s):%s,cfg=%r,is_setup=%s)" % (
@@ -170,10 +175,11 @@ class VolumeManager(object):
         name = spec.get_name()
         src_list = spec.get_src_list()
         cfg = spec.get_cfg()
-        handler_type = cfg.get("handler", "hostfs")
+        handler_type = cfg.get("handler")
+        is_image = False
         n = len(src_list)
         if n == 0:
-            if handler_type != "hostfs":
+            if handler_type is not None and handler_type != "hostfs":
                 # a non-host handler (nil:, console:, ...) has no host
                 # directory of its own
                 path = None
@@ -187,12 +193,22 @@ class VolumeManager(object):
         elif n == 1:
             path = resolve_sys_path(src_list[0])
             log_path.debug("resolved path='%s'", path)
+            # a file source (not a directory) is an image-backed volume: an
+            # AmigaDOS file system inside an ADF/HDF/RDB image. It defaults to
+            # the adfs handler unless the spec asks for another one.
+            if self.file_system.is_file(path) and handler_type in (None, "adfs"):
+                is_image = True
+                handler_type = "adfs"
         if n > 1:
             log_path.error("only one source in volume spec allowed!")
             return None
+        if handler_type is None:
+            handler_type = "hostfs"
+        if is_image:
+            cfg["handler"] = handler_type
         log_path.debug("name='%s', path='%s'", name, path)
         # create volume
-        return Volume(name, path, cfg, self.file_system)
+        return Volume(name, path, cfg, self.file_system, is_image=is_image)
 
     def _get_local_vol_path(self, name):
         base_dir = self._setup_base_dir()

@@ -131,10 +131,21 @@ comma-separated values.
   A volume spec may carry options after ``?``, such as ``?create`` (create the
   host directory). The ``handler`` option selects the handler that backs the
   volume: ``hostfs`` (a host directory, the default), ``ram`` (an in-memory
-  file system), or the ``nil``/``console`` devices. A non-host volume needs no
-  host path, and ``ram`` accepts a nominal size in KiB::
+  file system), ``adfs`` (an AmigaDOS file system inside an image file), or the
+  ``nil``/``console`` devices. A non-host volume needs no host path, and ``ram``
+  accepts a nominal size in KiB::
 
       vamos -V work:/abs/path?handler=hostfs -V scratch:?handler=ram,size=2048 myprog
+
+  A volume whose source is a *file* is an ADFS image volume: the handler
+  defaults to ``adfs`` and the file is not mapped to the host file system. The
+  image is a raw floppy image (``.adf``), a hardfile (``.hdf``) or one RDB
+  partition (``.rdb``); the type is auto-detected, ``?img=`` forces it
+  (``adf``/``adf_hd``/``hdf``/``rdb``, or ``xdf`` for "raw image, detect") and
+  ``?part=`` selects the RDB partition::
+
+      vamos -V work:disk.adf myprog
+      vamos -V work:disk.rdb?part=1 myprog
 
   See :doc:`vamos-handler` for the handler layer and how to write your own.
 

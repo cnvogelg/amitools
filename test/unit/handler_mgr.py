@@ -2,8 +2,12 @@ import os
 
 import pytest
 
+from amitools.fs.ADFSVolume import ADFSVolume
+from amitools.fs.FSString import FSString
+from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
 from amitools.vamos.handler import (
     MODE_NEWFILE,
+    AdfsHandler,
     ConsoleHandler,
     Handler,
     HandlerError,
@@ -166,6 +170,7 @@ def handler_mgr_registry_test(tmp_path):
 def handler_registry_default_test():
     reg = default_registry()
     assert "hostfs" in reg.get_all_types()
+    assert "adfs" in reg.get_all_types()
     # type names are case-insensitive
     assert reg.get("HOSTFS") is not None
     # unknown types are not registered
@@ -295,6 +300,52 @@ def handler_mgr_ram_volume_test(tmp_path):
     assert built.path_exists("ram:sub")
     assert not built.path_exists("ram:nope")
     assert built.list_dir("ram:nope") is None
+    built.shutdown()
+    pm.shutdown()
+
+
+def handler_mgr_adfs_volume_test(tmp_path):
+    # an image file source is bound to the adfs handler
+    image = tmp_path / "disk.adf"
+    blkdev = ADFBlockDevice(str(image))
+    blkdev.create()
+    volume = ADFSVolume(blkdev)
+    volume.create(FSString("work"))
+    volume.close()
+    blkdev.close()
+    pm = PathManager(vols_base_dir=str(tmp_path), auto_volumes=[], auto_assigns=[])
+    assert pm.get_vol_mgr().add_volume("work:" + str(image))
+    assert pm.setup()
+    built = build_handler_manager(pm)
+    assert isinstance(built.get_handler("work"), AdfsHandler)
+    assert built.is_filesystem("work") is True
+    # a file written through the manager lands in the image file system
+    handler, fh = built.find_output("work:hello.txt", MODE_NEWFILE)
+    handler.write(fh, b"hi")
+    handler.end(fh)
+    handler, fh = built.find_input("work:hello.txt")
+    assert handler.read(fh, 10) == b"hi"
+    handler.end(fh)
+    built.shutdown()
+    pm.shutdown()
+
+
+def handler_mgr_adfs_deferred_assign_dir_test(tmp_path):
+    # a ?create assign dir on an image volume is created once the handler is
+    # bound (Assign.setup() cannot create it in the host file system)
+    image = tmp_path / "disk.adf"
+    blkdev = ADFBlockDevice(str(image))
+    blkdev.create()
+    volume = ADFSVolume(blkdev)
+    volume.create(FSString("work"))
+    volume.close()
+    blkdev.close()
+    pm = PathManager(vols_base_dir=str(tmp_path), auto_volumes=[], auto_assigns=[])
+    assert pm.get_vol_mgr().add_volume("work:" + str(image))
+    assert pm.get_assign_mgr().add_assign("c:work:c?create")
+    assert pm.setup()
+    built = build_handler_manager(pm)
+    assert built.path_exists("work:c")
     built.shutdown()
     pm.shutdown()
 

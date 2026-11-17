@@ -10,6 +10,7 @@ The default registry knows the ``hostfs``, ``nil``, ``console``, ``ram`` and
 can stay unaware of how a volume is implemented.
 """
 
+from .adfs import AdfsHandler, open_adfs_blkdev
 from .console import ConsoleHandler
 from .dospkt import packet_factory
 from .filesys import HostFileSysHandler
@@ -62,6 +63,17 @@ def ram_factory(name, path, cfg, file_system):
     return RamHandler(name, cfg)
 
 
+def adfs_factory(name, path, cfg, file_system):
+    """factory for a handler backed by an ADFS image file
+
+    The volume path is the image file (ADF/HDF/RDB). ``?img=`` forces the
+    image type and ``?part=`` selects an RDB partition; without ``img`` the
+    type is auto-detected from the contents and the file extension.
+    """
+    blkdev = open_adfs_blkdev(path, img=cfg.get("img"), part=cfg.get("part"))
+    return AdfsHandler(name, blkdev)
+
+
 def default_registry():
     """build the registry with the built-in handler types"""
     registry = HandlerRegistry()
@@ -69,5 +81,6 @@ def default_registry():
     registry.add_type("nil", nil_factory)
     registry.add_type("console", console_factory)
     registry.add_type("ram", ram_factory)
+    registry.add_type("adfs", adfs_factory)
     registry.add_type("packet", packet_factory)
     return registry
