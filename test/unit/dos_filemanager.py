@@ -1,6 +1,8 @@
 import io
 from types import SimpleNamespace
 
+import pytest
+
 from amitools.vamos.handler import (
     HandlerError,
     MODE_NEWFILE,
@@ -12,6 +14,7 @@ from amitools.vamos.lib.dos.FileManager import FileManager
 from amitools.vamos.lib.dos.action import DosAction
 from amitools.vamos.libstructs import DosPacketStruct, MessageStruct
 from amitools.vamos.machine.mock import MockMemory
+from amitools.vamos.mem import MemoryAlloc
 
 
 def dos_filemanager_unsupported_filesys_packet_test():
@@ -261,3 +264,118 @@ def dos_filemanager_console_redirect_test():
     # matching directions are not redirected
     assert file_mgr.get_by_b_addr(2, True) is file_mgr.std_output
     assert file_mgr.get_by_b_addr(1, False) is file_mgr.std_input
+
+
+# ----- handler-file wrapping / OpenFromLock (step 12d) -----
+
+
+def _make_real_file_mgr(handler_mgr=None):
+    """A FileManager with a real allocator, so files register for real."""
+    mem = MockMemory(size_kib=64)
+    alloc = MemoryAlloc(mem)
+    file_mgr = FileManager.__new__(FileManager)
+    file_mgr.handler_mgr = handler_mgr
+    file_mgr.alloc = alloc
+    file_mgr.mem = mem
+    file_mgr.fs_handler_port = 0
+    file_mgr.files_by_b_addr = {}
+    file_mgr.std_input = None
+    file_mgr.std_output = None
+    return file_mgr
+
+
+def _make_lock(handler, handler_lock, ami_path="work:file.txt", name="file.txt"):
+    return SimpleNamespace(
+        handler=handler,
+        handler_lock=handler_lock,
+        ami_path=ami_path,
+        name=name,
+    )
+
+
+def dos_filemanager_wrap_handler_file_test():
+    handler = _make_handler()
+    handler_file = _make_handler_file()
+    file_mgr = _make_real_file_mgr()
+
+    fh = file_mgr.wrap_handler_file(handler, handler_file, "work:file.txt")
+
+    # the handle is registered under its own b_addr and reachable again
+    assert fh.b_addr != 0
+    assert file_mgr.get_by_b_addr(fh.b_addr) is fh
+    assert fh.name == "file.txt"
+    assert fh.ami_path == "work:file.txt"
+    assert fh.handler is handler
+    assert fh.handler_file is handler_file
+    assert fh.obj is handler_file.fobj
+    assert fh.need_close is handler_file.need_close
+
+
+def dos_filemanager_wrap_handler_file_explicit_name_test():
+    file_mgr = _make_real_file_mgr()
+
+    fh = file_mgr.wrap_handler_file(
+        _make_handler(), _make_handler_file(), "work:d/x", name="x"
+    )
+
+    assert fh.name == "x"
+    assert fh.ami_path == "work:d/x"
+
+
+def dos_filemanager_open_from_lock_test():
+    handler_file = _make_handler_file()
+    calls = []
+
+    def fh_from_lock(handler_lock, mode=MODE_OLDFILE):
+        calls.append((handler_lock, mode))
+        return handler_file
+
+    handler = SimpleNamespace(fh_from_lock=fh_from_lock)
+    file_mgr = _make_real_file_mgr()
+    handler_lock = object()
+    lock = _make_lock(handler, handler_lock, "work:file.txt", "file.txt")
+
+    fh = file_mgr.open_from_lock(lock)
+
+    assert calls == [(handler_lock, MODE_OLDFILE)]
+    assert fh.handler is handler
+    assert fh.handler_file is handler_file
+    assert fh.name == "file.txt"
+    assert fh.ami_path == "work:file.txt"
+    assert file_mgr.get_by_b_addr(fh.b_addr) is fh
+
+
+def dos_filemanager_open_from_lock_mode_test():
+    modes = []
+    handler = SimpleNamespace(
+        fh_from_lock=lambda handler_lock, mode: (
+            modes.append(mode) or _make_handler_file()
+        )
+    )
+    file_mgr = _make_real_file_mgr()
+
+    file_mgr.open_from_lock(_make_lock(handler, object()), MODE_READWRITE)
+
+    assert modes == [MODE_READWRITE]
+
+
+def dos_filemanager_open_from_lock_error_test():
+    def fh_from_lock(handler_lock, mode=MODE_OLDFILE):
+        raise HandlerError(212)
+
+    handler = SimpleNamespace(fh_from_lock=fh_from_lock)
+    file_mgr = _make_real_file_mgr()
+    lock = _make_lock(handler, object())
+
+    with pytest.raises(HandlerError) as exc:
+        file_mgr.open_from_lock(lock)
+    assert exc.value.code == 212
+
+
+def dos_filemanager_open_from_lock_no_handler_test():
+    file_mgr = _make_real_file_mgr()
+    lock = SimpleNamespace(handler=None, handler_lock=None, ami_path="work:f", name="f")
+
+    with pytest.raises(HandlerError) as exc:
+        file_mgr.open_from_lock(lock)
+    assert exc.value.code == 205

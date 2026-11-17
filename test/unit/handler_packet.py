@@ -15,9 +15,6 @@ import pytest
 from handler_contract import (
     HandlerContract,
     expect_error,
-    make_dir,
-    make_file,
-    read_all,
 )
 
 from amitools.vamos.handler import (
@@ -287,18 +284,7 @@ def env(tmp_path):
 
 
 class TestPacketContract(HandlerContract):
-    def parent_copy_fh_test(self, env):
-        # ``copy_dir_fh`` in the shared contract is called with a *lock*; that
-        # is a step-12 fix (it must take a real file handle). The packet
-        # transport can only carry a real handle, so only ``parent_fh`` is
-        # checked here; the COPY_DIR_FH marshalling is pinned by the recording
-        # test below.
-        h = env.h
-        make_dir(h, "d")
-        make_file(h, "d/x", b"q")
-        fh = h.find_input("d/x")
-        assert h.same_lock(h.parent_fh(fh), h.locate_object("d"))
-        h.end(fh)
+    pass
 
 
 # --------------------------------------------------------------------------

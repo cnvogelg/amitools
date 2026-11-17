@@ -167,11 +167,58 @@ class LockManager:
         )
         return self._register_lock(lock)
 
+    def register_handler_lock(
+        self, handler, handler_lock, ami_path, name=None, exclusive=False
+    ):
+        """build and register a DOS lock from a handler lock + Amiga path
+
+        Used by the handler-backed lock operations (``dup_lock``,
+        ``create_parent_lock``, ``DupLockFromFH``, ``ParentOfFH``) that already
+        hold a handler lock and only need a DOS ``Lock`` around it.
+        """
+        if name is None:
+            name = self.path_mgr.ami_name_of_path(None, ami_path)
+        lock = Lock(
+            name,
+            ami_path,
+            exclusive,
+            handler=handler,
+            handler_lock=handler_lock,
+        )
+        return self._register_lock(lock)
+
     def dup_lock(self, lock):
+        # handler-backed: ACTION_COPY_DIR replicates the object
+        if lock.handler is not None and lock.handler_lock is not None:
+            try:
+                handler_lock = lock.handler.copy_dir(lock.handler_lock)
+            except HandlerError as e:
+                log_lock.info("dup_lock '%s' failed: %s", lock, e)
+                return None
+            return self.register_handler_lock(
+                lock.handler,
+                handler_lock,
+                lock.ami_path,
+                name=lock.name,
+                exclusive=lock.exclusive,
+            )
+        # path-based fallback for handler-less locks (bare test managers)
         return self.create_lock(lock, "", False)
 
     def create_parent_lock(self, lock):
-        # top level
+        # handler-backed: ACTION_PARENT resolves the parent on the handler
+        if lock.handler is not None and lock.handler_lock is not None:
+            try:
+                handler_lock = lock.handler.parent(lock.handler_lock)
+            except HandlerError as e:
+                log_lock.info("parent of '%s' failed: %s", lock, e)
+                return None
+            ami_parent_path = self.path_mgr.ami_abs_parent_path(lock.ami_path)
+            name = self.path_mgr.ami_name_of_path(None, ami_parent_path)
+            return self.register_handler_lock(
+                lock.handler, handler_lock, ami_parent_path, name=name
+            )
+        # path-based fallback for handler-less locks (bare test managers)
         if lock.ami_path[-1] == ":":
             return None
         ami_path = lock.ami_path

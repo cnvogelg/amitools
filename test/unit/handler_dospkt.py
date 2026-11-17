@@ -14,8 +14,6 @@ import pytest
 from handler_contract import (
     HandlerContract,
     expect_error,
-    make_dir,
-    make_file,
 )
 from handler_packet import LoopbackTransport
 
@@ -79,16 +77,7 @@ def env(tmp_path):
 
 
 class TestDosPktContract(HandlerContract):
-    def parent_copy_fh_test(self, env):
-        # the shared contract passes a *lock* to ``copy_dir_fh`` (a step-12
-        # fix); a real DOS packet can only carry an open file handle, so only
-        # ``parent_fh`` is checked here
-        h = env.h
-        make_dir(h, "d")
-        make_file(h, "d/x", b"q")
-        fh = h.find_input("d/x")
-        assert h.same_lock(h.parent_fh(fh), h.locate_object("d"))
-        h.end(fh)
+    pass
 
 
 # --------------------------------------------------------------------------

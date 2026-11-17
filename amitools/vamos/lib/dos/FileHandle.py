@@ -249,6 +249,37 @@ class FileHandle:
         except IOError:
             return -1
 
+    def set_file_size(self, size, mode):
+        """ACTION_SET_FILE_SIZE: return the new size or -1 on error
+
+        ``mode`` is the raw AmigaDOS mode: ``-1`` (OFFSET_BEGINNING),
+        ``0`` (OFFSET_CURRENT) or ``1`` (OFFSET_END).
+        """
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                return self.handler.set_file_size(self.handler_file, size, mode)
+            except HandlerError:
+                return -1
+        # handler-less fallback: truncate the raw stream
+        obj = self.obj
+        if obj is None:
+            return -1
+        try:
+            if mode == -1:
+                new_size = size
+            elif mode == 0:
+                new_size = obj.tell() + size
+            elif mode == 1:
+                new_size = obj.seek(0, 2) + size
+            else:
+                return -1
+            if new_size < 0:
+                return -1
+            obj.truncate(new_size)
+            return new_size
+        except (OSError, ValueError, AttributeError):
+            return -1
+
     def flush(self):
         """ACTION_FLUSH: flush the handler's buffers"""
         if self.handler is not None and self.handler_file is not None:

@@ -114,9 +114,10 @@ class HandlerContract:
         lock = h.locate_object("a/b")
         copy = h.copy_dir(lock)
         assert h.same_lock(lock, copy)
-        # copy_dir only works on directories
+        # copy_dir replicates any lock, including a file lock
         make_file(h, "f", b"x")
-        expect_error(212, h.copy_dir, h.locate_object("f"))
+        file_lock = h.locate_object("f")
+        assert h.same_lock(h.copy_dir(file_lock), file_lock)
 
     def parent_test(self, env):
         h = env.h
@@ -303,9 +304,9 @@ class HandlerContract:
         # parent_fh operates on an open file handle
         fh = h.find_input("d/x")
         assert h.same_lock(h.parent_fh(fh), h.locate_object("d"))
+        # copy_dir_fh locks the file opened by the handle
+        assert h.same_lock(h.copy_dir_fh(fh), h.locate_object("d/x"))
         h.end(fh)
-        # copy_dir_fh returns a lock on the same directory object
-        assert h.same_lock(h.copy_dir_fh(h.locate_object("d")), h.locate_object("d"))
 
     # ----- names -----
 

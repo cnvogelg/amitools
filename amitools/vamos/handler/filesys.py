@@ -157,8 +157,8 @@ class HostFileSysHandler(Handler):
         pass
 
     def copy_dir(self, lock):
-        if not self.fs.is_dir(lock.sys_path):
-            raise HandlerError(ERROR_OBJECT_WRONG_TYPE)
+        # ACTION_COPY_DIR replicates any lock (it is LOCATE_OBJECT with an
+        # empty name), so it must not require a directory here
         return self._make_lock(lock.sys_path)
 
     def parent(self, lock):
@@ -201,7 +201,9 @@ class HostFileSysHandler(Handler):
         return self._info_data(lock.sys_path)
 
     def disk_info(self, lock):
-        return self._info_data(lock.sys_path)
+        # a lock-less volume query (ACTION_DISK_INFO) reports the root volume
+        sys_path = self.root_path if lock is None else lock.sys_path
+        return self._info_data(sys_path)
 
     def fh_from_lock(self, lock, mode=MODE_OLDFILE):
         if self.fs.is_dir(lock.sys_path):
@@ -217,7 +219,8 @@ class HostFileSysHandler(Handler):
         return self.parent(fh)
 
     def copy_dir_fh(self, fh):
-        return self.copy_dir(fh)
+        # ACTION_COPY_DIR_FH locks the file opened by the handle
+        return self._make_lock(fh.sys_path)
 
     # ----- files -----
 

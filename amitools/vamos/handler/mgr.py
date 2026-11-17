@@ -82,6 +82,23 @@ class HandlerManager:
     def get_handler(self, name):
         return self.handlers.get(str(name).lower())
 
+    def disk_info(self, volume_name):
+        """lock-less volume query (ACTION_DISK_INFO)
+
+        Resolve the handler by volume/device name and ask it for its disk
+        info. Raises :class:`HandlerError` with ``ERROR_OBJECT_NOT_FOUND``
+        for an unknown volume.
+        """
+        name = str(volume_name)
+        if name.endswith(":"):
+            name = name[:-1]
+        handler = self.get_handler(name)
+        if handler is None:
+            raise HandlerError(
+                ERROR_OBJECT_NOT_FOUND, "unknown volume '%s'" % volume_name
+            )
+        return handler.disk_info(None)
+
     def attach_packet_transport(self, alloc, port_mgr, mem, find_port=None, pump=None):
         """attach the live machine to every detached packet handler
 

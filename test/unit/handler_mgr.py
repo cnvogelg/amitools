@@ -382,3 +382,17 @@ def handler_mgr_shutdown_test(tmp_path):
     # a handler exposing shutdown() is released and all handlers are dropped
     assert calls == ["closing"]
     assert mgr.get_all_names() == []
+
+
+def handler_mgr_disk_info_test(tmp_path):
+    pm, mgr, root, work = setup_mgr(tmp_path)
+    # a lock-less volume query resolves the handler by volume name
+    info = mgr.disk_info("work:")
+    assert info.num_blocks > 0
+    # the trailing colon is optional
+    assert mgr.disk_info("work").num_blocks == info.num_blocks
+    # names are case-insensitive
+    assert mgr.disk_info("WORK:").num_blocks == info.num_blocks
+    # an unknown volume cannot be resolved
+    expect_error(205, mgr.disk_info, "nope:")
+    pm.shutdown()

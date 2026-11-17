@@ -268,8 +268,8 @@ class RamHandler(Handler):
         pass
 
     def copy_dir(self, lock):
-        if not lock.node.is_dir:
-            raise HandlerError(ERROR_OBJECT_WRONG_TYPE)
+        # ACTION_COPY_DIR replicates any lock (it is LOCATE_OBJECT with an
+        # empty name), so it must not require a directory here
         return self._make_lock(lock.rel_path, lock.node)
 
     def parent(self, lock):
@@ -316,7 +316,8 @@ class RamHandler(Handler):
         return self.parent(fh)
 
     def copy_dir_fh(self, fh):
-        return self.copy_dir(fh)
+        # ACTION_COPY_DIR_FH locks the file opened by the handle
+        return self._make_lock(fh.rel_path, fh.node)
 
     # ----- files -----
 

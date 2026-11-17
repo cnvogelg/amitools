@@ -133,6 +133,40 @@ class FileManager:
         name = AmiPath(str(ami_path)).filename()
         return name if name else str(ami_path)
 
+    def wrap_handler_file(self, handler, handler_file, ami_path, name=None):
+        """wrap a handler file into a registered DOS :class:`FileHandle`
+
+        Shared by the path-based open and ``OpenFromLock`` (which already has
+        a handler file).
+        """
+        if name is None:
+            name = self._ami_name(ami_path)
+        fh = FileHandle(
+            handler_file.fobj,
+            ami_path,
+            name,
+            handler=handler,
+            handler_file=handler_file,
+            need_close=handler_file.need_close,
+            auto_flush=handler_file.auto_flush,
+            is_nil=handler_file.is_nil,
+        )
+        self._register_file(fh)
+        return fh
+
+    def open_from_lock(self, lock, mode=MODE_OLDFILE):
+        """open a file from a lock (ACTION_FH_FROM_LOCK)
+
+        The returned handle owns the file; the caller releases the DOS lock.
+        Raises :class:`HandlerError` if the object can not be opened.
+        """
+        if lock.handler is None or lock.handler_lock is None:
+            raise HandlerError(ERROR_OBJECT_NOT_FOUND)
+        handler_file = lock.handler.fh_from_lock(lock.handler_lock, mode)
+        return self.wrap_handler_file(
+            lock.handler, handler_file, lock.ami_path, name=lock.name
+        )
+
     def _open_via_handler(self, ami_path, f_mode, cwd):
         try:
             if f_mode in _READ_MODES:
@@ -145,16 +179,7 @@ class FileManager:
         except HandlerError as e:
             log_file.info("error opening: '%s' f_mode=%s -> %s", ami_path, f_mode, e)
             return None
-        return FileHandle(
-            handler_file.fobj,
-            ami_path,
-            self._ami_name(ami_path),
-            handler=handler,
-            handler_file=handler_file,
-            need_close=handler_file.need_close,
-            auto_flush=handler_file.auto_flush,
-            is_nil=handler_file.is_nil,
-        )
+        return self.wrap_handler_file(handler, handler_file, ami_path)
 
     def open(self, lock, ami_path, f_mode, home_dir=None):
         cwd = lock.ami_path if lock is not None else None

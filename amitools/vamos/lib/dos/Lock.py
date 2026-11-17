@@ -186,6 +186,11 @@ class Lock:
         lock. Raises HandlerError if the object can not be enumerated (e.g.
         it is not a directory).
         """
+        # ACTION_COPY_DIR replicates any object, so the "must be a directory"
+        # check that used to live there is done explicitly here
+        info = self.handler.examine_object(self.handler_lock)
+        if not info.is_dir:
+            raise HandlerError(ERROR_OBJECT_WRONG_TYPE)
         handler_lock = self.handler.copy_dir(self.handler_lock)
         return Lock(
             self.name,

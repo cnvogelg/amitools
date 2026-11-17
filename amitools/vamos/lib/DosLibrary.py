@@ -41,7 +41,7 @@ from amitools.vamos.libstructs import (
 from amitools.vamos.libtypes import TagList, DosTag, DosPacket
 from amitools.vamos.error import *
 from amitools.vamos.log import log_dos
-from amitools.vamos.handler import HandlerError
+from amitools.vamos.handler import HandlerError, MODE_OLDFILE
 from amitools.vamos.task import DosProcess
 from amitools.vamos.schedule import SchedulerEvent
 from .dos.Args import *
@@ -988,6 +988,24 @@ class DosLibrary(LibImpl):
             self.setioerr(ctx, 0)
             return old_pos
 
+    def SetFileSize(self, ctx, fh_b_addr, pos, mode):
+        # normalize the register values to signed 32-bit
+        if pos >= 0x80000000:
+            pos -= 0x100000000
+        if mode >= 0x80000000:
+            mode -= 0x100000000
+        fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+        if fh is None:
+            self.setioerr(ctx, ERROR_INVALID_LOCK)
+            return -1
+        new_size = fh.set_file_size(pos, mode)
+        log_dos.info("SetFileSize(%s, %d, %d) -> %d", fh, pos, mode, new_size)
+        if new_size < 0:
+            self.setioerr(ctx, ERROR_OBJECT_WRONG_TYPE)
+            return -1
+        self.setioerr(ctx, NO_ERROR)
+        return new_size
+
     def FGetC(self, ctx, fh_b_addr):
         fh = self.file_mgr.get_by_b_addr(fh_b_addr, False)
         ch = fh.getc()
@@ -1296,19 +1314,89 @@ class DosLibrary(LibImpl):
         lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
         dup_lock = self.lock_mgr.dup_lock(lock)
         log_dos.info("DupLock: %s -> %s", lock, dup_lock)
+        if dup_lock is None:
+            self.setioerr(ctx, ERROR_INVALID_LOCK)
+            return 0
         self.setioerr(ctx, NO_ERROR)
         return dup_lock.b_addr
 
     def SameLock(self, ctx):
         lock1_b_addr = ctx.cpu.r_reg(REG_D1)
-        lock2_b_addr = ctx.cpu.r_reg(REG_D1)
+        lock2_b_addr = ctx.cpu.r_reg(REG_D2)
         lock1 = self.lock_mgr.get_by_b_addr(lock1_b_addr)
         lock2 = self.lock_mgr.get_by_b_addr(lock2_b_addr)
-        if lock1 == lock2:
+        if lock1 is None or lock2 is None:
+            return DOSFALSE
+        if lock1 is lock2:
             return DOSTRUE
-        if lock1 != None and lock2 != None:
-            return lock1.key == lock2.key
+        # two locks on the same handler are compared by the handler; locks
+        # from different handlers are never the same object
+        if (
+            lock1.handler is not None
+            and lock1.handler is lock2.handler
+            and lock1.handler_lock is not None
+            and lock2.handler_lock is not None
+        ):
+            same = lock1.handler.same_lock(lock1.handler_lock, lock2.handler_lock)
+            return DOSTRUE if same else DOSFALSE
+        if lock1.handler is None and lock2.handler is None:
+            return DOSTRUE if lock1.key == lock2.key else DOSFALSE
         return DOSFALSE
+
+    def OpenFromLock(self, ctx):
+        lock_b_addr = ctx.cpu.r_reg(REG_D1)
+        lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
+        if lock is None:
+            self.setioerr(ctx, ERROR_INVALID_LOCK)
+            return 0
+        try:
+            fh = self.file_mgr.open_from_lock(lock, MODE_OLDFILE)
+        except HandlerError as e:
+            self.setioerr(ctx, e.code)
+            return 0
+        # the handle absorbs the lock
+        self.lock_mgr.release_lock(lock)
+        log_dos.info("OpenFromLock: %s -> %s", lock, fh)
+        self.setioerr(ctx, NO_ERROR)
+        return fh.b_addr
+
+    def DupLockFromFH(self, ctx):
+        fh_b_addr = ctx.cpu.r_reg(REG_D1)
+        fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+        if fh is None or fh.handler is None or fh.handler_file is None:
+            self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
+            return 0
+        try:
+            handler_lock = fh.handler.copy_dir_fh(fh.handler_file)
+        except HandlerError as e:
+            self.setioerr(ctx, e.code)
+            return 0
+        lock = self.lock_mgr.register_handler_lock(
+            fh.handler, handler_lock, fh.ami_path, name=fh.name
+        )
+        log_dos.info("DupLockFromFH: %s -> %s", fh, lock)
+        self.setioerr(ctx, NO_ERROR)
+        return lock.b_addr
+
+    def ParentOfFH(self, ctx):
+        fh_b_addr = ctx.cpu.r_reg(REG_D1)
+        fh = self.file_mgr.get_by_b_addr(fh_b_addr)
+        if fh is None or fh.handler is None or fh.handler_file is None:
+            self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
+            return 0
+        try:
+            handler_lock = fh.handler.parent_fh(fh.handler_file)
+        except HandlerError as e:
+            self.setioerr(ctx, e.code)
+            return 0
+        ami_parent_path = self.path_mgr.ami_abs_parent_path(fh.ami_path)
+        name = self.path_mgr.ami_name_of_path(None, ami_parent_path)
+        lock = self.lock_mgr.register_handler_lock(
+            fh.handler, handler_lock, ami_parent_path, name=name
+        )
+        log_dos.info("ParentOfFH: %s -> %s", fh, lock)
+        self.setioerr(ctx, NO_ERROR)
+        return lock.b_addr
 
     def Examine(self, ctx):
         lock_b_addr = ctx.cpu.r_reg(REG_D1)
@@ -1371,7 +1459,15 @@ class DosLibrary(LibImpl):
                 self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
                 return DOSFALSE
             try:
-                disk = lock.handler.info(lock.handler_lock)
+                if lock.handler_lock is not None:
+                    disk = lock.handler.info(lock.handler_lock)
+                elif self.handler_mgr is not None:
+                    # a lock without a handler lock: a lock-less volume query
+                    # (ACTION_DISK_INFO) resolved through the handler manager
+                    volume_name = self.lock_mgr.volume_name_of_lock(lock)
+                    disk = self.handler_mgr.disk_info(volume_name)
+                else:
+                    disk = lock.handler.disk_info(None)
             except HandlerError as e:
                 self.setioerr(ctx, e.code)
                 return DOSFALSE
