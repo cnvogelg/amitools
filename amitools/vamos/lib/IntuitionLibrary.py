@@ -1,3 +1,4 @@
+from .intuition_gadgets import ClassicGadgets
 from amitools.vamos.display import get_display
 from amitools.vamos.display.base import Rect
 from contextlib import ExitStack
@@ -85,7 +86,7 @@ IECODE_MBUTTON = 0x6A
 # def ts(label): print(f"{time.perf_counter():.6f} {label}")
 
 
-class IntuitionLibrary(LibImpl):
+class IntuitionLibrary(ClassicGadgets, LibImpl):
     def __init__(self):
         super().__init__()
         # default init stuff
@@ -119,6 +120,7 @@ class IntuitionLibrary(LibImpl):
         self._pub_list_memory = None
         self._pub_screen_locks = 0
         self._draw_infos = {}
+        self._gadget_rports = {}
 
     def setup_lib(self, ctx, base_addr):
         # log_dos.info("setup intuition.library")
@@ -215,6 +217,7 @@ class IntuitionLibrary(LibImpl):
             self.graphics_lib = None
 
     def finish_lib(self, ctx):
+        self._release_gadget_rports(ctx)
         if self._boopsi is not None:
             self._boopsi.cleanup()
             self._boopsi = None
@@ -288,6 +291,11 @@ class IntuitionLibrary(LibImpl):
         log_intui.info("Closing window @%08x", window_ptr)
         if window_ptr == 0:
             return
+
+        if getattr(self, "_active_gadget", (None, None))[0] == window_ptr:
+            self._deactivate_gadget(ctx, abort=True)
+
+        self._release_gadget_rports(ctx, window_ptr)
 
         # Capture resources while the public structure is still alive.
         win = WindowStruct(ctx.mem, window_ptr)
@@ -949,6 +957,14 @@ class IntuitionLibrary(LibImpl):
             self._display_registered = False
 
     def _pump_display(self, ctx, wait=False):
+        # Event handling can enter native gadget hooks between CPU slices.
+        saved = ctx.cpu.get_cpu_context()
+        try:
+            return self._pump_display_events(ctx, wait)
+        finally:
+            ctx.cpu.set_cpu_context(saved)
+
+    def _pump_display_events(self, ctx, wait=False):
         if not self.host_windows:
             return False
         self.check_refresh(ctx)
@@ -989,6 +1005,9 @@ class IntuitionLibrary(LibImpl):
         window_id = event.window_id
         win_addr = self.window_addresses.get(window_id)
         if win_addr is None:
+            return None
+
+        if self._gadget_event(ctx, event, win_addr):
             return None
 
         # ---------- MOUSE MOTION ----------
@@ -1140,10 +1159,24 @@ class IntuitionLibrary(LibImpl):
             win.Flags.val &= ~0x200
 
     def _reports_mouse(self, ctx, window):
-        return bool(WindowStruct(ctx.mem, window).Flags.val & 0x200)
+        active_window, gadget = getattr(self, "_active_gadget", (None, None))
+        follow = (
+            active_window == window
+            and gadget
+            and ctx.mem.r16(gadget + 14) & 8  # GACT_FOLLOWMOUSE
+        )
+        return bool(WindowStruct(ctx.mem, window).Flags.val & 0x200 or follow)
 
     def queue_idcmp(
-        self, ctx, win_addr, idcmp_flag, mouse_x=0, mouse_y=0, code=0, qualifier=0
+        self,
+        ctx,
+        win_addr,
+        idcmp_flag,
+        mouse_x=0,
+        mouse_y=0,
+        code=0,
+        qualifier=0,
+        iaddress=0,
     ):
         if self.find_window_id(win_addr) is None:
             return
@@ -1205,8 +1238,9 @@ class IntuitionLibrary(LibImpl):
         msg = IntuiMessageStruct(ctx.mem, memory.addr)
         msg.ExecMessage.mn_ReplyPort.set(owner["port"].addr)
         msg.ExecMessage.mn_Length.val = IntuiMessageStruct.get_size()
-        if rawkey_extra:
-            msg.IAddress.val = memory.addr + IntuiMessageStruct.get_size()
+        msg.IAddress.val = (
+            memory.addr + IntuiMessageStruct.get_size() if rawkey_extra else iaddress
+        )
         msg.Class.val = idcmp_flag
         msg.MouseX.val, msg.MouseY.val = mouse_x, mouse_y
         msg.Code.val = code & 0xFFFF

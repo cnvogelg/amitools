@@ -42,10 +42,14 @@ def schedule_sdl_bounded_poll_test(pump, queued):
         return queued
 
     sdl.SDL_PollEvent = poll
-    assert lib._pump_display(None)
+    ctx = SimpleNamespace(cpu=Mock())
+    assert lib._pump_display(ctx)
     assert 0 < calls < 1000
     sdl.SDL_WaitEventTimeout.assert_not_called()
-    lib.check_refresh.assert_called_once_with(None)
+    lib.check_refresh.assert_called_once_with(ctx)
+    ctx.cpu.set_cpu_context.assert_called_once_with(
+        ctx.cpu.get_cpu_context.return_value
+    )
 
 
 def schedule_sdl_dispatch_batch_test(pump):
@@ -53,7 +57,8 @@ def schedule_sdl_dispatch_batch_test(pump):
     first, second = object(), object()
     sdl.SDL_PollEvent.side_effect = [1, 1, 1, 1, 0]
     lib.ingest_event.side_effect = [None, first, None, second]
-    assert lib._pump_display(None)
+    ctx = SimpleNamespace(cpu=Mock())
+    assert lib._pump_display(ctx)
     assert [call.args[1] for call in lib.drain_pending_intui_events.call_args_list] == [
         first,
         second,
@@ -66,15 +71,17 @@ def schedule_sdl_idle_wait_test(pump):
     pending = object()
     sdl.SDL_WaitEventTimeout.return_value = 1
     lib.ingest_event.return_value = pending
-    assert lib._pump_display(None, wait=True)
+    ctx = SimpleNamespace(cpu=Mock())
+    assert lib._pump_display(ctx, wait=True)
     assert sdl.SDL_WaitEventTimeout.call_args.args[1] > 0
-    lib.drain_pending_intui_events.assert_called_once_with(None, pending)
+    lib.drain_pending_intui_events.assert_called_once_with(ctx, pending)
 
 
 def schedule_display_no_source_test(pump):
     lib, sdl = pump
     lib.host_windows.clear()
-    assert lib._pump_display(None) is False
+    ctx = SimpleNamespace(cpu=Mock())
+    assert lib._pump_display(ctx) is False
     sdl.SDL_PollEvent.assert_not_called()
     sdl.SDL_WaitEventTimeout.assert_not_called()
 
@@ -227,7 +234,7 @@ def schedule_sdl_native_progress_test(context, pump):
             return 1
 
         sdl.SDL_PollEvent = ignored
-        return lib._pump_display(None)
+        return lib._pump_display(SimpleNamespace(cpu=Mock()))
 
     scheduler.add_after_schedule_callback(pump_batch)
     idle_wait = Mock(side_effect=AssertionError("native task is runnable"))
@@ -330,3 +337,13 @@ def schedule_idle_calls_all_sources_test(context):
     scheduler.remove_idle_callback(a)
     scheduler.remove_idle_callback(b)
     assert not scheduler.idle_callbacks
+
+
+def schedule_gadget_callback_restores_cpu_on_failure_test(pump):
+    lib, _ = pump
+    ctx = SimpleNamespace(cpu=Mock())
+    saved = ctx.cpu.get_cpu_context.return_value
+    lib._pump_display_events = Mock(side_effect=ValueError("guest hook failed"))
+    with pytest.raises(ValueError, match="guest hook failed"):
+        lib._pump_display(ctx)
+    ctx.cpu.set_cpu_context.assert_called_once_with(saved)
