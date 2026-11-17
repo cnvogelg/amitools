@@ -1,46 +1,28 @@
 """Packet handler (``handler/packet.py``) tests.
 
-Two layers are exercised:
-
-* a recording transport asserts the exact ``dp_Type``/``dp_Arg*`` a method
-  builds and that ``dp_Res1``/``dp_Res2`` are translated back correctly;
-* a loopback transport drives a real :class:`HostFileSysHandler`, so the
-  shared :class:`handler_contract.HandlerContract` mixin runs through the
-  packet boundary (``TestPacketContract``).
+The client builds one packet per handler method call; a recording transport
+asserts the exact ``dp_Type``/``dp_Arg*`` a method builds and that
+``dp_Res1``/``dp_Res2`` are translated back correctly. The matching server
+side -- a real handler driven by packets through the decoder -- is covered in
+``handler_decode.py`` (``TestDecoderContract``).
 """
 
-from types import SimpleNamespace
-
 import pytest
-from handler_contract import (
-    HandlerContract,
-    expect_error,
-)
+from handler_contract import expect_error
 
 from amitools.vamos.handler import (
     MODE_NEWFILE,
     MODE_OLDFILE,
     MODE_READWRITE,
-    HandlerError,
-    HostFileSysHandler,
     PacketFile,
     PacketHandler,
 )
 from amitools.vamos.handler.packet import EXCLUSIVE_LOCK, SHARED_LOCK
-from amitools.vamos.lib.dos.AmiTime import AmiTime, ami_to_sys_time, sys_to_ami_time
+from amitools.vamos.lib.dos.AmiTime import AmiTime, ami_to_sys_time
 from amitools.vamos.lib.dos.action import DosAction
-from amitools.vamos.libstructs import (
-    DateStampStruct,
-    FileHandleStruct,
-    FileInfoBlockStruct,
-    InfoDataStruct,
-)
+from amitools.vamos.libstructs import DateStampStruct, FileHandleStruct
 from amitools.vamos.machine.mock import MockMemory
 from amitools.vamos.mem import MemoryAlloc
-
-DOSFALSE = 0
-DOSTRUE = -1
-ERROR_INVALID_LOCK = 211
 
 _FIND_ACTIONS = (
     DosAction.ACTION_FINDINPUT,
@@ -48,243 +30,6 @@ _FIND_ACTIONS = (
     DosAction.ACTION_FINDUPDATE,
     DosAction.ACTION_FH_FROM_LOCK,
 )
-
-
-# --------------------------------------------------------------------------
-# loopback transport: a test-only ``_dopkt`` that dispatches to a real handler
-# --------------------------------------------------------------------------
-
-
-class LoopbackTransport:
-    """Drive a real handler from packets, in process.
-
-    This is the minimal server side needed to run the handler contract through
-    the packet boundary. It owns the bptr tables that a real handler port
-    would keep in its process.
-    """
-
-    def __init__(self, handler, mem):
-        self.handler = handler
-        self.mem = mem
-        self.locks = {}
-        self.files = {}
-        self._next_bptr = 0x100
-        self._root = None
-
-    # ----- bptr tables -----
-
-    def _new_bptr(self):
-        bptr = self._next_bptr
-        self._next_bptr += 1
-        return bptr
-
-    def _add_lock(self, lock):
-        bptr = self._new_bptr()
-        self.locks[bptr] = lock
-        return bptr
-
-    def _add_file(self, fh_bptr, handler_file):
-        fh_arg1 = self._new_bptr()
-        self.files[fh_arg1] = handler_file
-        fh = FileHandleStruct(self.mem, fh_bptr << 2)
-        fh.fh_Args.val = fh_arg1
-        return DOSTRUE
-
-    def _lock(self, bptr):
-        try:
-            return self.locks[bptr]
-        except KeyError:
-            raise HandlerError(ERROR_INVALID_LOCK)
-
-    def _file(self, fh_arg1):
-        try:
-            return self.files[fh_arg1]
-        except KeyError:
-            raise HandlerError(ERROR_INVALID_LOCK)
-
-    def _bstr(self, bptr):
-        return self.mem.r_bstr(bptr << 2)
-
-    def _root_lock(self):
-        if self._root is None:
-            self._root = self.handler.locate_object("")
-        return self._root
-
-    def _read_date(self, bptr):
-        ds = DateStampStruct(self.mem, bptr << 2)
-        return ami_to_sys_time(
-            AmiTime(ds.ds_Days.val, ds.ds_Minute.val, ds.ds_Tick.val)
-        )
-
-    # ----- struct filling -----
-
-    def _fill_fib(self, fib, info):
-        mem = self.mem
-        name_addr = fib.fib_FileName.addr
-        mem.clear_block(name_addr, 108, 0)
-        mem.w_cstr(name_addr, info.name)
-        comment_addr = fib.fib_Comment.addr
-        mem.clear_block(comment_addr, 80, 0)
-        if info.comment:
-            mem.w_cstr(comment_addr, info.comment)
-        fib.fib_DiskKey.val = info.key
-        fib.fib_DirEntryType.val = info.entry_type
-        fib.fib_EntryType.val = info.entry_type
-        fib.fib_Protection.val = info.protection
-        fib.fib_Size.val = info.size
-        fib.fib_NumBlocks.val = info.blocks
-        at = sys_to_ami_time(info.date)
-        fib.fib_Date.ds_Days.val = at.tday
-        fib.fib_Date.ds_Minute.val = at.tmin
-        fib.fib_Date.ds_Tick.val = at.tick
-        fib.fib_OwnerUID.val = info.owner_uid
-        fib.fib_OwnerGID.val = info.owner_gid
-
-    def _fill_info(self, info, data):
-        info.id_NumSoftErrors.val = data.num_soft_errors
-        info.id_UnitNumber.val = data.unit_number
-        info.id_DiskState.val = data.disk_state
-        info.id_NumBlocks.val = data.num_blocks
-        info.id_NumBlocksUsed.val = data.num_blocks_used
-        info.id_BytesPerBlock.val = data.bytes_per_block
-        info.id_DiskType.val = data.disk_type
-
-    # ----- transport -----
-
-    def __call__(self, pkt):
-        try:
-            res1 = self._dispatch(pkt)
-            res2 = 0
-        except HandlerError as e:
-            res1 = DOSFALSE
-            res2 = e.code
-        pkt.res1.val = res1
-        pkt.res2.val = res2
-
-    def _dispatch(self, pkt):
-        h = self.handler
-        action = DosAction(pkt.type.val)
-        if action == DosAction.ACTION_LOCATE_OBJECT:
-            rel = self._bstr(pkt.arg2.val)
-            exclusive = pkt.arg3.val == EXCLUSIVE_LOCK
-            return self._add_lock(h.locate_object(rel, exclusive))
-        if action == DosAction.ACTION_FREE_LOCK:
-            lock = self.locks.pop(pkt.arg1.val, None)
-            if lock is not None:
-                h.free_lock(lock)
-            return 0
-        if action == DosAction.ACTION_COPY_DIR:
-            return self._add_lock(h.copy_dir(self._lock(pkt.arg1.val)))
-        if action == DosAction.ACTION_PARENT:
-            try:
-                return self._add_lock(h.parent(self._lock(pkt.arg1.val)))
-            except HandlerError:
-                # the volume root has no parent: res1=0, res2=0
-                return 0
-        if action == DosAction.ACTION_SAME_LOCK:
-            same = h.same_lock(self._lock(pkt.arg1.val), self._lock(pkt.arg2.val))
-            return DOSTRUE if same else DOSFALSE
-        if action == DosAction.ACTION_EXAMINE_OBJECT:
-            fib = FileInfoBlockStruct(self.mem, pkt.arg2.val)
-            self._fill_fib(fib, h.examine_object(self._lock(pkt.arg1.val)))
-            return DOSTRUE
-        if action == DosAction.ACTION_EXAMINE_NEXT:
-            fib = FileInfoBlockStruct(self.mem, pkt.arg2.val)
-            info = h.examine_next(self._lock(pkt.arg1.val), fib.fib_DiskKey.val)
-            self._fill_fib(fib, info)
-            return DOSTRUE
-        if action == DosAction.ACTION_INFO:
-            info = InfoDataStruct(self.mem, pkt.arg2.val)
-            self._fill_info(info, h.info(self._lock(pkt.arg1.val)))
-            return DOSTRUE
-        if action == DosAction.ACTION_DISK_INFO:
-            info = InfoDataStruct(self.mem, pkt.arg1.val)
-            self._fill_info(info, h.disk_info(self._root_lock()))
-            return DOSTRUE
-        if action == DosAction.ACTION_FH_FROM_LOCK:
-            return self._add_file(
-                pkt.arg1.val, h.fh_from_lock(self._lock(pkt.arg2.val))
-            )
-        if action == DosAction.ACTION_PARENT_FH:
-            return self._add_lock(h.parent_fh(self._file(pkt.arg1.val)))
-        if action == DosAction.ACTION_COPY_DIR_FH:
-            return self._add_lock(h.copy_dir_fh(self._file(pkt.arg1.val)))
-        if action in _FIND_ACTIONS:
-            rel = self._bstr(pkt.arg3.val)
-            if action == DosAction.ACTION_FINDINPUT:
-                handler_file = h.find_input(rel)
-            elif action == DosAction.ACTION_FINDOUTPUT:
-                handler_file = h.find_output(rel, MODE_NEWFILE)
-            else:
-                handler_file = h.find_update(rel)
-            return self._add_file(pkt.arg1.val, handler_file)
-        if action == DosAction.ACTION_READ:
-            data = h.read(self._file(pkt.arg1.val), pkt.arg3.val)
-            self.mem.w_block(pkt.arg2.val, data)
-            return len(data)
-        if action == DosAction.ACTION_WRITE:
-            data = self.mem.r_block(pkt.arg2.val, pkt.arg3.val)
-            return h.write(self._file(pkt.arg1.val), data)
-        if action == DosAction.ACTION_SEEK:
-            return h.seek(self._file(pkt.arg1.val), pkt.arg2.val, pkt.arg3.val)
-        if action == DosAction.ACTION_SET_FILE_SIZE:
-            return h.set_file_size(self._file(pkt.arg1.val), pkt.arg2.val, pkt.arg3.val)
-        if action == DosAction.ACTION_FLUSH:
-            h.flush(self._file(pkt.arg1.val))
-            return 0
-        if action == DosAction.ACTION_END:
-            handler_file = self.files.pop(pkt.arg1.val, None)
-            if handler_file is not None:
-                h.end(handler_file)
-            return 0
-        if action == DosAction.ACTION_SCREEN_MODE:
-            return DOSTRUE if h.set_mode(None, pkt.arg1.val == 0) else DOSFALSE
-        if action == DosAction.ACTION_WAIT_CHAR:
-            return DOSTRUE if h.wait_for_char(None, pkt.arg1.val) else DOSFALSE
-        if action == DosAction.ACTION_DELETE_OBJECT:
-            h.delete_object(self._bstr(pkt.arg2.val))
-            return 0
-        if action == DosAction.ACTION_RENAME_OBJECT:
-            h.rename_object(self._bstr(pkt.arg2.val), self._bstr(pkt.arg4.val))
-            return 0
-        if action == DosAction.ACTION_SET_PROTECT:
-            h.set_protect(self._bstr(pkt.arg2.val), pkt.arg3.val)
-            return 0
-        if action == DosAction.ACTION_SET_COMMENT:
-            h.set_comment(self._bstr(pkt.arg2.val), self._bstr(pkt.arg3.val))
-            return 0
-        if action == DosAction.ACTION_SET_DATE:
-            h.set_date(self._bstr(pkt.arg2.val), self._read_date(pkt.arg3.val))
-            return 0
-        if action == DosAction.ACTION_CREATE_DIR:
-            rel = self._bstr(pkt.arg2.val)
-            h.create_dir(rel)
-            return self._add_lock(h.locate_object(rel))
-        raise HandlerError(209)
-
-
-def _make_loopback_handler(name, alloc, mem, root_path):
-    handler = HostFileSysHandler(name, root_path)
-    pkt_handler = PacketHandler(name, alloc)
-    pkt_handler._dopkt = LoopbackTransport(handler, mem)
-    return pkt_handler
-
-
-@pytest.fixture
-def env(tmp_path):
-    mem = MockMemory(size_kib=256)
-    alloc = MemoryAlloc(mem)
-    root = tmp_path / "work"
-    root.mkdir()
-
-    def make(name):
-        return _make_loopback_handler(name, alloc, mem, str(root))
-
-    return SimpleNamespace(kind="packet", h=make("work"), new_handler=make)
-
-
-class TestPacketContract(HandlerContract):
-    pass
 
 
 # --------------------------------------------------------------------------

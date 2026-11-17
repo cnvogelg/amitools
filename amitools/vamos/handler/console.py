@@ -156,10 +156,12 @@ class ConsoleHandler(Handler):
         pass
 
     def set_mode(self, fh, cooked):
-        return fh.fobj.set_mode(cooked)
+        stream = fh.fobj if fh is not None else self._input_stream()
+        return stream.set_mode(cooked)
 
     def wait_for_char(self, fh, timeout):
-        return fh.fobj.wait_for_char(timeout)
+        stream = fh.fobj if fh is not None else self._input_stream()
+        return stream.wait_for_char(timeout)
 
     def shutdown(self):
         for stream in (self._in, self._out):

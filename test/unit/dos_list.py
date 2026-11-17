@@ -64,7 +64,11 @@ def dos_list_host_device_volume_pairs_test(mem_alloc):
     first = listing.add_volume("system")
     second = listing.add_volume("ram")
     ports = PortManager(alloc)
-    listing.add_host_devices(SimpleNamespace(fs_put_msg=lambda *args: None), ports)
+    file_mgr = SimpleNamespace(
+        fs_put_msg=lambda *args: None,
+        make_volume_put_msg=lambda handler: lambda *args: None,
+    )
+    listing.add_host_devices(file_mgr, ports)
     cursor = listing.lock_dos_list(LDF_DEVICES)
     found = []
     while cursor:
@@ -97,6 +101,7 @@ def dos_list_device_handler_test(mem_alloc):
     handler_mgr = SimpleNamespace(
         is_filesystem=is_filesystem,
         get_all_names=lambda: ["work", "nil"],
+        get_handler=lambda name: None,
     )
     listing = DosList(None, None, mem, alloc, handler_mgr=handler_mgr)
     path_mgr = SimpleNamespace(
@@ -111,7 +116,11 @@ def dos_list_device_handler_test(mem_alloc):
     assert listing.get_entry_by_name("nil", LDF_VOLUMES) is None
     # add_host_devices publishes the device with no host port
     ports = PortManager(alloc)
-    file_mgr = SimpleNamespace(fs_put_msg=lambda *args: None, handler_mgr=handler_mgr)
+    file_mgr = SimpleNamespace(
+        fs_put_msg=lambda *args: None,
+        make_volume_put_msg=lambda handler: lambda *args: None,
+        handler_mgr=handler_mgr,
+    )
     listing.add_host_devices(file_mgr, ports)
     nil = listing.get_entry_by_name("nil", LDF_DEVICES)
     assert nil is not None

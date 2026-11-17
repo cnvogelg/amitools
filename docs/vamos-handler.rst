@@ -175,6 +175,39 @@ registry with the built-in types ``hostfs``, ``ram``, ``nil``, ``console``, and
 returns ``None`` for an unknown type).
 
 
+Packet decoder
+~~~~~~~~~~~~~~
+
+The packet bridge described above is the *client* direction: it turns a handler
+call into a ``DosPacket``. ``PacketDecoder`` (in
+:mod:`amitools.vamos.handler.decode`) is the *server* direction: it reads an
+incoming ``DosPacket``, resolves the packet's target, calls the matching
+handler method, and writes ``dp_Res1``/``dp_Res2``. It is what lets a handler
+port answer m68k code that speaks DOS packets directly (``DoPkt``/``SendPkt``)
+exactly like a real AmigaDOS handler.
+
+The decoder is kept free of DOS-layer imports: the DOS layer injects small
+resolver callbacks that translate the opaque handles carried in a packet
+(lock BPTRs, file-handle ids) into handler objects and register the result of an
+action back as a DOS handle:
+
+- ``resolve_fh(fh_id)`` -> ``(handler, handler_file, ami_path)``
+- ``resolve_lock(lock_id)`` -> ``(handler, handler_lock, ami_path)``
+- ``volume_handler()`` -> the handler bound to the receiving port (for
+  ZERO-lock, volume-relative path packets)
+- ``register_lock(handler, handler_lock, ami_path)`` -> ``lock_id``
+- ``register_file(handler, handler_file, ami_path)`` -> ``fh_id``
+- ``release_lock(lock_id)`` / ``release_file(fh_id)`` (optional) release a DOS
+  handle on ``FREE_LOCK`` / ``END``
+
+``decode(pkt)`` returns ``dp_Res1``. A ``HandlerError`` becomes
+``res1=DOSFALSE`` with ``res2=code``; an unknown action becomes
+``ERROR_ACTION_NOT_KNOWN``; and ``PARENT`` of the volume root answers
+``res1=0, res2=0``. The DOS layer wires one decoder to the shared file-system
+port (fh/lock packets) and one to the console port, and gives each volume its
+own port bound to that volume's handler.
+
+
 Built-in handlers
 -----------------
 

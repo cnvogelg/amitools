@@ -127,7 +127,14 @@ class DosList:
         for volume in tuple(self.entries):
             if volume.struct_def is not DosListVolumeStruct:
                 continue
-            port = port_mgr.create_port(volume.name + " handler", file_mgr.fs_put_msg)
+            # ZERO-lock path packets are volume-relative, so each volume gets
+            # its own port bound to that volume's handler
+            handler = None
+            if self.handler_mgr is not None:
+                handler = self.handler_mgr.get_handler(volume.name)
+            port = port_mgr.create_port(
+                volume.name + " handler", file_mgr.make_volume_put_msg(handler)
+            )
             self.host_ports.append(port)
             self.add_device(volume.name, startup_bptr=0, task=port)
             _struct_write(volume.struct, "dol_Task", port)
@@ -177,7 +184,11 @@ class DosList:
 
     def _register_entry(self, entry):
         key = entry.name.lower()
-        index = self.devices_by_name if entry.struct_def is DosListDeviceStruct else self.entries_by_name
+        index = (
+            self.devices_by_name
+            if entry.struct_def is DosListDeviceStruct
+            else self.entries_by_name
+        )
         if key in index:
             raise ValueError("DOS list entry already exists: %s" % entry.name)
         self.entries_by_b_addr[entry.baddr] = entry
@@ -277,7 +288,11 @@ class DosList:
         _struct_write(entry.struct, "dol_Next", 0)
         self.entries.remove(entry)
         self.entries_by_b_addr.pop(entry.baddr, None)
-        index = self.devices_by_name if entry.struct_def is DosListDeviceStruct else self.entries_by_name
+        index = (
+            self.devices_by_name
+            if entry.struct_def is DosListDeviceStruct
+            else self.entries_by_name
+        )
         index.pop(entry.name.lower(), None)
         return True
 

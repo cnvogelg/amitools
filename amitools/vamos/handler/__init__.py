@@ -16,6 +16,7 @@ from .base import (
     HandlerLock,
 )
 from .console import ConsoleHandler
+from .decode import PacketDecoder
 from .dospkt import DosPktHandler
 from .filesys import HostFileSysHandler
 from .mgr import HandlerManager, build_handler_manager
@@ -42,6 +43,7 @@ __all__ = [
     "HandlerRegistry",
     "HostFileSysHandler",
     "NilHandler",
+    "PacketDecoder",
     "PacketFile",
     "PacketHandler",
     "PacketLock",

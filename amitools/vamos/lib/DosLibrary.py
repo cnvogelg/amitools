@@ -153,6 +153,8 @@ class DosLibrary(LibImpl):
             handler_mgr=self.handler_mgr,
             fs_handler_port=self.file_mgr.get_fs_handler_port(),
         )
+        # the packet decoder resolves locks through the lock manager
+        self.file_mgr.lock_mgr = self.lock_mgr
         # equip the DosList with all the locks
         self.dos_list.add_locks(self.lock_mgr)
         self._setup_timer_request(ctx)
@@ -2878,6 +2880,93 @@ class DosLibrary(LibImpl):
             reply_port,
         )
         return 0
+
+    def _proc_reply_port(self, ctx):
+        """the current process's message port (DoPkt's reply port)"""
+        proc_addr = ctx.exec_lib.exec_lib.this_task.aptr
+        if proc_addr == 0:
+            return 0
+        return ProcessStruct(ctx.mem, proc_addr).pr_MsgPort.addr
+
+    def _send_pkt(self, ctx, dp_addr, port_addr, reply_addr):
+        """fill ``dp_Port``/``dp_Link`` and put the packet on the handler port"""
+        dp = DosPacketStruct(ctx.mem, dp_addr)
+        msg_addr = dp.link.aptr
+        if msg_addr == 0:
+            # a StandardPacket: the message immediately precedes the packet
+            msg_addr = dp_addr - MessageStruct.get_size()
+        dp.port.aptr = reply_addr
+        dp.link.aptr = msg_addr
+        # vamos locates the packet through the message's ln_Name
+        MessageStruct(ctx.mem, msg_addr).node.name.aptr = dp_addr
+        log_dos.info(
+            "SendPkt: pkt=%06x port=%06x reply=%06x msg=%06x",
+            dp_addr,
+            port_addr,
+            reply_addr,
+            msg_addr,
+        )
+        ctx.exec_lib.port_mgr.put_msg(port_addr, msg_addr)
+        return msg_addr
+
+    def SendPkt(self, ctx):
+        dp_addr = ctx.cpu.r_reg(REG_D1)
+        port_addr = ctx.cpu.r_reg(REG_D2)
+        reply_addr = ctx.cpu.r_reg(REG_D3)
+        self._send_pkt(ctx, dp_addr, port_addr, reply_addr)
+        return 0
+
+    def DoPkt(self, ctx):
+        port_addr = ctx.cpu.r_reg(REG_D1)
+        action = ctx.cpu.r_reg(REG_D2)
+        args = (
+            ctx.cpu.rs_reg(REG_D3),
+            ctx.cpu.rs_reg(REG_D4),
+            ctx.cpu.rs_reg(REG_D5),
+            ctx.cpu.rs_reg(REG_D6),
+            ctx.cpu.rs_reg(REG_D7),
+        )
+        # one block holds the StandardPacket: message followed by packet
+        mem = ctx.alloc.alloc_memory(
+            MessageStruct.get_size() + DosPacketStruct.get_size(), label="DoPkt"
+        )
+        try:
+            msg_addr = mem.addr
+            pkt_addr = msg_addr + MessageStruct.get_size()
+            MessageStruct(ctx.mem, msg_addr).node.name.aptr = pkt_addr
+            pkt = DosPacketStruct(ctx.mem, pkt_addr)
+            pkt.link.aptr = msg_addr
+            pkt.type.val = action
+            pkt.arg1.val = args[0]
+            pkt.arg2.val = args[1]
+            pkt.arg3.val = args[2]
+            pkt.arg4.val = args[3]
+            pkt.arg5.val = args[4]
+            reply_port = self._proc_reply_port(ctx)
+            self._send_pkt(ctx, pkt_addr, port_addr, reply_port)
+            # the handler replies synchronously while put_msg runs
+            reply = self.WaitPkt(ctx)
+            res1 = pkt.res1.val
+            res2 = pkt.res2.val
+            log_dos.info(
+                "DoPkt: port=%06x action=%d args=%s -> res1=%d res2=%d (reply=%06x)",
+                port_addr,
+                action,
+                args,
+                res1,
+                res2,
+                reply,
+            )
+            self.setioerr(ctx, res2)
+            return res1
+        finally:
+            ctx.alloc.free_memory(mem)
+
+    def AbortPkt(self, ctx):
+        port_addr = ctx.cpu.r_reg(REG_D1)
+        pkt_addr = ctx.cpu.r_reg(REG_D2)
+        log_dos.info("AbortPkt: port=%06x pkt=%06x -> DOSFALSE", port_addr, pkt_addr)
+        return DOSFALSE
 
     # ----- Helpers -----
 

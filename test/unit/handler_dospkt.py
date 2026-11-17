@@ -2,10 +2,10 @@
 
 The transport under test is real: packets are put on a ``MsgPort`` and the
 reply is taken off a reply port, both managed by the exec ``PortManager``. The
-handler on the other end is a :class:`~handler_packet.LoopbackTransport`
-wrapped as a port callback, so the whole shared
-:class:`handler_contract.HandlerContract` runs through the packet/port
-boundary (``TestDosPktContract``).
+handler on the other end is a real :class:`HostFileSysHandler` driven by the
+:class:`~handler_decode.DecoderHarness`, wrapped as a port callback, so the
+whole shared :class:`handler_contract.HandlerContract` runs through the
+packet/port boundary (``TestDosPktContract``).
 """
 
 from types import SimpleNamespace
@@ -15,7 +15,7 @@ from handler_contract import (
     HandlerContract,
     expect_error,
 )
-from handler_packet import LoopbackTransport
+from handler_decode import DecoderHarness
 
 from amitools.vamos.handler import (
     DosPktHandler,
@@ -37,8 +37,8 @@ ERROR_OBJECT_NOT_FOUND = 205
 ERROR_NOT_IMPLEMENTED = 236
 
 
-def _make_server(mem, transport):
-    """turn a LoopbackTransport into a PortManager message callback
+def _make_server(mem, decode):
+    """turn a packet decoder into a PortManager message callback
 
     Reads the DosPacket named by the message and replies on the packet's
     ``dp_Port``, exactly like a real handler's ``ReplyPkt``.
@@ -47,7 +47,7 @@ def _make_server(mem, transport):
     def server(port_mgr, msg_addr):
         msg = MessageStruct(mem, msg_addr)
         pkt = DosPacketStruct(mem, msg.node.name.aptr)
-        transport(pkt)
+        decode(pkt)
         port_mgr.put_msg(pkt.port.aptr, msg_addr)
 
     return server
@@ -55,8 +55,8 @@ def _make_server(mem, transport):
 
 def _make_handler(name, alloc, mem, port_mgr, root_path, pump=None):
     server_handler = HostFileSysHandler(name, root_path)
-    transport = LoopbackTransport(server_handler, mem)
-    port = port_mgr.create_port(name + "Handler", _make_server(mem, transport))
+    harness = DecoderHarness(server_handler, mem)
+    port = port_mgr.create_port(name + "Handler", _make_server(mem, harness.decode))
     handler = DosPktHandler(name, alloc, port=port)
     handler.attach_transport(alloc, port_mgr, mem, pump=pump)
     return handler
@@ -117,8 +117,8 @@ def dospkt_attach_by_name_test(tmp_path):
     alloc = MemoryAlloc(mem)
     port_mgr = PortManager(alloc)
     server_handler = HostFileSysHandler("work", str(tmp_path))
-    transport = LoopbackTransport(server_handler, mem)
-    port = port_mgr.create_port("MyHandler", _make_server(mem, transport))
+    harness = DecoderHarness(server_handler, mem)
+    port = port_mgr.create_port("MyHandler", _make_server(mem, harness.decode))
 
     handler = packet_factory("work", None, {"port": "MyHandler"}, None)
     handler.attach_transport(
@@ -148,8 +148,8 @@ def dospkt_manager_attach_test(tmp_path):
     alloc = MemoryAlloc(mem)
     port_mgr = PortManager(alloc)
     server_handler = HostFileSysHandler("work", str(tmp_path))
-    transport = LoopbackTransport(server_handler, mem)
-    port = port_mgr.create_port("H", _make_server(mem, transport))
+    harness = DecoderHarness(server_handler, mem)
+    port = port_mgr.create_port("H", _make_server(mem, harness.decode))
 
     mgr = HandlerManager(None)
     handler = DosPktHandler("work", port=port)
