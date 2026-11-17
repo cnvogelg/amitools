@@ -73,6 +73,19 @@ class HandlerLock:
         self.handler = None
 
 
+class DeviceLock(HandlerLock):
+    """lock on the root of a device handler (``NIL:``, ``CONSOLE:``, ...)
+
+    A device has no objects to lock, but AmigaDOS still hands out a lock on
+    the device root (``GetDeviceProc``'s ``dvp_Lock``). This lock is just an
+    identity: the handler is stored so the DOS layer can report the device's
+    packet port.
+    """
+
+    def __init__(self, name):
+        super().__init__(key=name.lower())
+
+
 class HandlerFile:
     """Opaque open-file reference handed out by a handler.
 

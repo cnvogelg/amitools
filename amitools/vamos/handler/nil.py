@@ -7,8 +7,11 @@ host path.
 """
 
 from .base import (
+    ERROR_OBJECT_NOT_FOUND,
     MODE_NEWFILE,
+    DeviceLock,
     Handler,
+    HandlerError,
     HandlerFile,
 )
 
@@ -59,6 +62,20 @@ class NilHandler(Handler):
 
     def __init__(self, name):
         super().__init__(name, is_filesystem=False)
+
+    # --- device root lock ---
+
+    def locate_object(self, ami_path, exclusive=False):
+        # only the device root exists; ``NIL:foo`` is still openable but has
+        # no object to lock
+        if ami_path:
+            raise HandlerError(ERROR_OBJECT_NOT_FOUND)
+        lock = DeviceLock(self.name)
+        lock.handler = self
+        return lock
+
+    def free_lock(self, lock):
+        pass
 
     def find_input(self, ami_path):
         return NilFile()

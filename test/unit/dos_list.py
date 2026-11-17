@@ -2,6 +2,30 @@ from amitools.vamos.lib.dos.DosList import DosList
 
 LDF_DEVICES = 1 << 2
 LDF_VOLUMES = 1 << 3
+LDF_ASSIGNS = 1 << 4
+
+
+def dos_list_get_first_next_entry_test(mem_alloc):
+    mem, alloc = mem_alloc
+    dos_list = DosList(None, None, mem, alloc)
+    vol = dos_list.add_volume("root")
+    dh0 = dos_list.add_device("DH0", startup_bptr=1)
+    assign = dos_list.add_assign("a", ["root:"])
+
+    # devices only
+    assert dos_list.get_first_entry(LDF_DEVICES) is dh0
+    assert dos_list.get_next_entry(dh0, LDF_DEVICES) is None
+    # volumes only
+    assert dos_list.get_first_entry(LDF_VOLUMES) is vol
+    assert dos_list.get_next_entry(vol, LDF_VOLUMES) is None
+    # several types: link order is volume -> device -> assign
+    all_types = LDF_DEVICES | LDF_VOLUMES | LDF_ASSIGNS
+    assert dos_list.get_first_entry(all_types) is vol
+    assert dos_list.get_next_entry(vol, all_types) is dh0
+    assert dos_list.get_next_entry(dh0, all_types) is assign
+    assert dos_list.get_next_entry(assign, all_types) is None
+    assert dos_list.get_next_entry(None, LDF_DEVICES) is None
+    dos_list.free_list()
 
 
 def dos_list_device_link_test(mem_alloc):

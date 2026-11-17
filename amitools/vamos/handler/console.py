@@ -9,8 +9,11 @@ UTF-8 conversions. The DOS layer only ever sees a plain byte stream.
 import sys
 
 from .base import (
+    ERROR_OBJECT_NOT_FOUND,
     MODE_NEWFILE,
+    DeviceLock,
     Handler,
+    HandlerError,
     HandlerFile,
 )
 from .terminal import Latin1ToUtf8Converter, Terminal
@@ -128,6 +131,20 @@ class ConsoleHandler(Handler):
         if self._out is None:
             self._out = ConsoleStream(sys.stdout.buffer, "out")
         return self._out
+
+    # --- device root lock ---
+
+    def locate_object(self, ami_path, exclusive=False):
+        # only the device root exists; ``CONSOLE:foo`` is still openable but
+        # has no object to lock
+        if ami_path:
+            raise HandlerError(ERROR_OBJECT_NOT_FOUND)
+        lock = DeviceLock(self.name)
+        lock.handler = self
+        return lock
+
+    def free_lock(self, lock):
+        pass
 
     def find_input(self, ami_path):
         return ConsoleFile(self._input_stream(), "<STDIN>")

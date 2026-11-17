@@ -220,6 +220,15 @@ and what ``fh_Type``/``fl_Task`` name for a file or lock, so guest code can send
 packets straight to the owning handler. The dispatchers are created when
 ``dos.library`` opens and freed when it closes.
 
+``GetDeviceProc`` fills the rest of the ``DevProc`` from the DOS list:
+``dvp_Lock`` is a lock on the device/volume/assign root and ``dvp_DevNode`` the
+matching entry. A multi-directory assign sets ``DVPF_ASSIGN`` and returns each
+directory on repeated calls (the passed ``DevProc`` is reused in place). With
+the name ``"*"`` it walks the whole DOS device list instead, one device per
+call, ending with ``ERROR_NO_MORE_ENTRIES``; a ``DevProc`` that owns a temporary
+root lock (a plain device) sets ``DVPF_UNLOCK`` so ``FreeDeviceProc`` releases
+it.
+
 
 Built-in handlers
 -----------------
@@ -237,12 +246,14 @@ Built-in handlers
 
 ``nil`` -- ``NilHandler``
     The ``NIL:`` sink: every read returns EOF and every write is discarded. It
-    is a device, not a file system.
+    is a device, not a file system; ``locate_object`` only resolves the device
+    root (for ``Lock("NIL:")``/``GetDeviceProc``).
 
 ``console`` -- ``ConsoleHandler``
     ``CONSOLE:`` (and its alias ``*``) on the host standard input/output. It
     owns the tty (termios) handling and the ESC/CSI and Latin-1 to UTF-8
-    conversions; the DOS layer only sees a plain byte stream.
+    conversions; the DOS layer only sees a plain byte stream. Like ``NIL:`` it
+    is a device and only exposes a lock on the device root.
 
 ``packet`` -- ``DosPktHandler``
     A bridge that sends handler calls to a real AmigaDOS handler port

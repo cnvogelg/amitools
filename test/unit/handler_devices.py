@@ -1,13 +1,18 @@
 import io
 import sys
 
+import pytest
+
 from amitools.vamos.handler import (
     MODE_NEWFILE,
     MODE_OLDFILE,
     MODE_READWRITE,
     ConsoleHandler,
+    DeviceLock,
+    HandlerError,
     NilHandler,
 )
+from amitools.vamos.handler.base import ERROR_OBJECT_NOT_FOUND
 from amitools.vamos.handler.console import ConsoleStream
 from amitools.vamos.handler.terminal import Latin1ToUtf8Converter
 
@@ -33,6 +38,18 @@ def handler_nil_test():
     assert fh.fobj.write(b"x") == 1
     assert fh.fobj.isatty() is False
     assert fh.fobj.tell() == 0
+
+
+def handler_device_root_lock_test():
+    # device handlers expose a lock on the device root only
+    for handler in (NilHandler("nil"), ConsoleHandler("console")):
+        lock = handler.locate_object("")
+        assert isinstance(lock, DeviceLock)
+        assert lock.handler is handler
+        handler.free_lock(lock)
+        with pytest.raises(HandlerError) as exc:
+            handler.locate_object("foo")
+        assert exc.value.code == ERROR_OBJECT_NOT_FOUND
 
 
 def handler_console_test():

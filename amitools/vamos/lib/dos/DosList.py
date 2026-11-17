@@ -408,6 +408,16 @@ class DosList:
             entry = entry.next
         return None
 
+    def get_first_entry(self, flags):
+        """the first entry matching the DOS list type flags"""
+        return self._next_dos_entry(self.first_entry, flags)
+
+    def get_next_entry(self, entry, flags):
+        """the entry after ``entry`` matching the DOS list type flags"""
+        if entry is None:
+            return None
+        return self._next_dos_entry(entry.next, flags)
+
     def lock_dos_list(self, flags):
         # Yes, this algorithm is really the one in the
         # dos.library.

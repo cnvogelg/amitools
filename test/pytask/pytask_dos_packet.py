@@ -1,7 +1,11 @@
 import pytest
 
 from amitools.vamos.error import UnsupportedFeatureError
-from amitools.vamos.lib.dos.Error import DOSFALSE, DOSTRUE
+from amitools.vamos.lib.dos.Error import (
+    DOSFALSE,
+    DOSTRUE,
+    ERROR_NO_MORE_ENTRIES,
+)
 from amitools.vamos.lib.dos.action import DosAction
 from amitools.vamos.libstructs import (
     DevProcStruct,
@@ -166,6 +170,113 @@ def pytask_dos_getdevproc_test(vamos_task):
         ctx.alloc.free_struct(fh_mem)
         ctx.alloc.free_bstr(path)
         ctx.alloc.free_cstr(name)
+        return 0
+
+    exit_codes = vamos_task.run([proc], process=True)
+    assert exit_codes == [0]
+
+
+def pytask_dos_getdevproc_enum_test(vamos_task):
+    """GetDeviceProc("*") walks the DOS device list and fills each DevProc"""
+
+    def proc(ctx, task):
+        dos_proxy = ctx.proxies.get_dos_lib_proxy()
+        dos_list = ctx.dos_lib.dos_list
+        star = ctx.alloc.alloc_cstr("*")
+
+        names = []
+        devproc = 0
+        while True:
+            devproc = dos_proxy.GetDeviceProc(star.addr, devproc)
+            if devproc == 0:
+                break
+            dp = DevProcStruct(ctx.mem, devproc)
+            # every device is reachable and owns a root lock
+            assert dp.dvp_Port.aptr != 0
+            assert dp.dvp_Lock.aptr != 0
+            assert dp.dvp_Flags.val & ctx.dos_lib.DVPF_UNLOCK
+            entry = dos_list.get_entry_by_b_addr(dp.dvp_DevNode.aptr >> 2)
+            assert entry is not None
+            names.append(entry.name)
+
+        # the walk ends with ERROR_NO_MORE_ENTRIES
+        assert dos_proxy.IoErr() == ERROR_NO_MORE_ENTRIES
+        assert "nil" in names
+        assert "console" in names
+        assert "ram" in names
+
+        ctx.alloc.free_cstr(star)
+        return 0
+
+    exit_codes = vamos_task.run([proc], process=True)
+    assert exit_codes == [0]
+
+
+def pytask_dos_getdevproc_lock_test(vamos_task):
+    """GetDeviceProc fills dvp_Lock/dvp_Flags for devices and volumes"""
+
+    def proc(ctx, task):
+        dos_proxy = ctx.proxies.get_dos_lib_proxy()
+        unlock = ctx.dos_lib.DVPF_UNLOCK
+
+        # NIL:/CONSOLE: are devices without a DOS list lock, so the DevProc
+        # owns a temporary root lock it has to unlock again; a volume hands
+        # out its persistent DOS list root lock (no DVPF_UNLOCK)
+        for name, owned in (("NIL:", True), ("CONSOLE:", True), ("ram:", False)):
+            cname = ctx.alloc.alloc_cstr(name)
+            devproc = dos_proxy.GetDeviceProc(cname.addr, 0)
+            assert devproc != 0
+            dp = DevProcStruct(ctx.mem, devproc)
+            assert dp.dvp_Port.aptr != 0
+            assert dp.dvp_Lock.aptr != 0
+            assert dp.dvp_DevNode.aptr != 0
+            assert bool(dp.dvp_Flags.val & unlock) is owned
+            dos_proxy.FreeDeviceProc(devproc)
+            ctx.alloc.free_cstr(cname)
+        return 0
+
+    exit_codes = vamos_task.run([proc], process=True)
+    assert exit_codes == [0]
+
+
+def pytask_dos_getdevproc_multi_assign_test(vamos_task):
+    """a multi-directory assign sets DVPF_ASSIGN and iterates its dirs"""
+
+    def proc(ctx, task):
+        dos_proxy = ctx.proxies.get_dos_lib_proxy()
+        dos_list = ctx.dos_lib.dos_list
+        lock_mgr = ctx.dos_lib.lock_mgr
+
+        # make ``multi:`` a two-directory assign (AssignLock is single-dir)
+        assign_name = ctx.alloc.alloc_cstr("multi")
+        first_lock = lock_mgr.create_lock(None, "ram:", False)
+        assert dos_proxy.AssignLock(assign_name.addr, first_lock.b_addr) == DOSTRUE
+        entry = dos_list.get_entry_by_name("multi")
+        second_lock = lock_mgr.create_lock(None, "root:", False)
+        entry.locks.append(second_lock)
+        entry.assigns.append("root:")
+
+        name = ctx.alloc.alloc_cstr("multi:")
+        ports = []
+        devproc = dos_proxy.GetDeviceProc(name.addr, 0)
+        assert devproc != 0
+        # first directory: DVPF_ASSIGN asks the caller to loop
+        dp = DevProcStruct(ctx.mem, devproc)
+        assert dp.dvp_Flags.val & ctx.dos_lib.DVPF_ASSIGN
+        ports.append(dp.dvp_Port.aptr)
+        # second directory (same DevProc, advanced in place)
+        assert dos_proxy.GetDeviceProc(name.addr, devproc) == devproc
+        dp = DevProcStruct(ctx.mem, devproc)
+        assert dp.dvp_Flags.val & ctx.dos_lib.DVPF_ASSIGN
+        ports.append(dp.dvp_Port.aptr)
+        assert len(set(ports)) == 2
+        # exhausted: NULL + ERROR_NO_MORE_ENTRIES (the DevProc is freed)
+        assert dos_proxy.GetDeviceProc(name.addr, devproc) == 0
+        assert dos_proxy.IoErr() == ERROR_NO_MORE_ENTRIES
+
+        assert dos_proxy.AssignLock(assign_name.addr, 0) == DOSTRUE
+        ctx.alloc.free_cstr(name)
+        ctx.alloc.free_cstr(assign_name)
         return 0
 
     exit_codes = vamos_task.run([proc], process=True)
