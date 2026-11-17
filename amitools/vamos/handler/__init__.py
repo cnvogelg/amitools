@@ -16,6 +16,7 @@ from .base import (
     HandlerInfoData,
     HandlerLock,
 )
+from .adfs import AdfsHandler, open_adfs_blkdev
 from .console import ConsoleHandler
 from .decode import PacketDecoder
 from .dispatch import HandlerDispatcher
@@ -32,6 +33,7 @@ __all__ = [
     "MODE_NEWFILE",
     "MODE_OLDFILE",
     "MODE_READWRITE",
+    "AdfsHandler",
     "ConsoleHandler",
     "DeviceLock",
     "DosProtection",
@@ -54,4 +56,5 @@ __all__ = [
     "RamHandler",
     "build_handler_manager",
     "default_registry",
+    "open_adfs_blkdev",
 ]

@@ -325,6 +325,28 @@ class ADFSVolume:
         self.name = name
         self.root_dir.name = name
 
+    def rename(self, old_ami_path, new_ami_path):
+        """Rename a file or directory to a new path"""
+        # make sure both are FSStrings
+        if not isinstance(old_ami_path, FSString):
+            raise ValueError("rename's old_ami_path must be a FSString")
+        if not isinstance(new_ami_path, FSString):
+            raise ValueError("rename's new_ami_path must be a FSString")
+        # find the source node
+        node = self.get_path_name(old_ami_path)
+        if node == None:
+            raise FSError(FILE_NOT_FOUND, file_name=old_ami_path)
+        # the root cannot be renamed
+        if node.parent == None:
+            raise FSError(DELETE_NOT_ALLOWED, node=node)
+        # find the target parent and base name
+        parent_node, new_name = self.get_create_path_name(new_ami_path)
+        if parent_node == None:
+            raise FSError(INVALID_PARENT_DIRECTORY, file_name=new_ami_path)
+        if new_name == None:
+            raise FSError(NAME_ALREADY_EXISTS, file_name=new_ami_path)
+        parent_node.rename_node(node, new_name)
+
     def create_dir(self, ami_path):
         """Create a new directory"""
         # make sure its a FSString
@@ -348,7 +370,7 @@ class ADFSVolume:
                 raise FSError(
                     INVALID_PARENT_DIRECTORY,
                     file_name=ami_path,
-                    extra="not found: " + dir_name,
+                    extra="not found: " + dir_name.get_unicode(),
                 )
         node.create_dir(base_name)
 

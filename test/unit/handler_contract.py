@@ -154,7 +154,8 @@ class HandlerContract:
         assert not file_info.is_dir
         assert file_info.name == "file.txt"
         assert file_info.size == 5
-        assert file_info.blocks == 1
+        # the exact block accounting (header/fs blocks) is handler-specific
+        assert file_info.blocks >= 1
 
     def examine_next_test(self, env):
         h = env.h
@@ -353,8 +354,9 @@ class HandlerContract:
     def set_date_test(self, env):
         h = env.h
         make_file(h, "f", b"x")
-        h.set_date("f", 1000000)
-        assert h.examine_object(h.locate_object("f")).date == 1000000
+        # a date after the Amiga epoch (1978), so every handler can store it
+        h.set_date("f", 1000000000)
+        assert h.examine_object(h.locate_object("f")).date == 1000000000
         expect_error(205, h.set_date, "gone", 0)
 
     def create_dir_test(self, env):

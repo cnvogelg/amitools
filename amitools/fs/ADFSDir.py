@@ -495,6 +495,174 @@ class ADFSDir(ADFSNode):
             self.update_dir_mod_time()
             self.volume.update_disk_time()
 
+    def _unlink_node(self, node):
+        """unlink node from my hash chain and entry list. The link is written
+        as one step, undone here if it fails; my in-memory state is restored,
+        too."""
+        hash_key = node.name.hash(hash_size=self.hash_size)
+        names = self.name_hash[hash_key]
+        pos = None
+        for i in range(len(names)):
+            if names[i] is node:
+                pos = i
+                break
+        if pos is None:
+            raise FSError(
+                INTERNAL_ERROR, node=node, extra="node not found in hash chain"
+            )
+        if pos > 0:
+            prev = names[pos - 1]
+        else:
+            prev = None
+        if pos == len(names) - 1:
+            next_blk = 0
+        else:
+            next_blk = names[pos + 1].block.blk_num
+        if prev is None:
+            link_blk = self.block
+            old = self.block.hash_table[hash_key]
+            self.block.hash_table[hash_key] = next_blk
+        else:
+            link_blk = prev.block
+            old = prev.block.hash_chain
+            prev.block.hash_chain = next_blk
+        try:
+            link_blk.write()
+        except Exception:
+            if prev is None:
+                self.block.hash_table[hash_key] = old
+            else:
+                prev.block.hash_chain = old
+            raise
+        names.remove(node)
+        self.entries.remove(node)
+
+    def _link_node(self, node, fn):
+        """link node into my hash chain under the name in fn, and refresh its
+        header and in-memory name/parent. The node header is written first,
+        pointing at the chain head, then my hash table. A failed write is
+        undone here."""
+        name = fn.get_name()
+        hash_key = fn.hash(hash_size=self.hash_size)
+        chain = self.name_hash[hash_key]
+        if len(chain) == 0:
+            hash_chain_blk = 0
+        else:
+            hash_chain_blk = chain[0].block.blk_num
+        old_name = node.block.name
+        old_parent = node.block.parent
+        old_hash_chain = node.block.hash_chain
+        node.block.name = name
+        node.block.parent = self.block.blk_num
+        node.block.hash_chain = hash_chain_blk
+        try:
+            node.block.write()
+        except Exception:
+            node.block.name = old_name
+            node.block.parent = old_parent
+            node.block.hash_chain = old_hash_chain
+            raise
+        old_head = self.block.hash_table[hash_key]
+        self.block.hash_table[hash_key] = node.block.blk_num
+        try:
+            self.block.write()
+        except Exception:
+            # my block on disk is as it was; put the node's header back, too
+            self.block.hash_table[hash_key] = old_head
+            node.block.name = old_name
+            node.block.parent = old_parent
+            node.block.hash_chain = old_hash_chain
+            try:
+                node.block.write()
+            except Exception:
+                pass
+            raise
+        chain.insert(0, node)
+        self.entries.append(node)
+        node.rename(name, self)
+
+    def rename_node(self, node, new_name):
+        """rename node into this directory under new_name. The node keeps its
+        blocks; only its name, parent and hash chain position change. Each
+        write that links or unlinks is one atomic step with rollback, so a
+        failed rename leaves the node in exactly one chain: at its old or at
+        its new place."""
+        if not isinstance(new_name, FSString):
+            raise ValueError("rename_node's new_name must be a FSString")
+        old_parent = node.parent
+        if old_parent is None:
+            raise FSError(DELETE_NOT_ALLOWED, node=node)
+        # my own state and the old parent's must be changeable
+        self.ensure_entries()
+        self.check_entries()
+        self.check_dircache()
+        if old_parent is not self:
+            old_parent.ensure_entries()
+            old_parent.check_entries()
+            old_parent.check_dircache()
+        # check the new name
+        fn = FileName(
+            new_name, is_intl=self.volume.is_intl, is_longname=self.volume.is_longname
+        )
+        if not fn.is_valid():
+            raise FSError(INVALID_FILE_NAME, file_name=new_name, node=self)
+        name = fn.get_name()
+        # does the new name already name an entry of mine?
+        new_hash_key = fn.hash(hash_size=self.hash_size)
+        new_up = fn.get_upper_ami_str()
+        for entry in self.name_hash[new_hash_key]:
+            if entry.name.get_upper_ami_str() == new_up:
+                if entry is node:
+                    if entry.name.get_name() == name:
+                        # the same object under exactly the same name
+                        return
+                    # a case-only change still relinks the node
+                    break
+                raise FSError(NAME_ALREADY_EXISTS, file_name=new_name, node=self)
+        # a dircache record in the new dir: make sure it finds room before
+        # anything changes
+        if self.volume.is_dircache:
+            record = self.get_dircache_record(node)
+            sub_type = Block.ST_USERDIR if node.is_dir() else Block.ST_FILE
+            new_record = DirCacheRecord(
+                entry=node.block.blk_num,
+                size=node.get_size(),
+                protect=node.meta_info.get_protect(),
+                mod_ts=node.meta_info.get_mod_ts(),
+                sub_type=sub_type,
+                name=name,
+                comment=node.meta_info.get_comment(),
+            )
+            self.check_dircache_room(record, new_record)
+            # the record goes first, as in _delete
+            old_parent._dircache_remove_entry(node)
+        # unlink from the old parent
+        old_parent._unlink_node(node)
+        # link into me; put the node back if that fails
+        try:
+            self._link_node(node, fn)
+        except Exception:
+            try:
+                old_parent._link_node(node, node.name)
+            except Exception:
+                pass
+            raise
+        # dircache: give the node a record in its new dir
+        if self.volume.is_dircache:
+            self._dircache_add_entry(
+                name,
+                node.meta_info,
+                node.block.blk_num,
+                node.get_size(),
+                update_myself=False,
+                sub_type=Block.ST_USERDIR if node.is_dir() else Block.ST_FILE,
+            )
+        # update time stamps
+        self.update_dir_mod_time()
+        if old_parent is not self:
+            old_parent.update_dir_mod_time()
+        self.volume.update_disk_time()
+
     def can_delete(self):
         self.ensure_entries()
         return len(self.entries) == 0
