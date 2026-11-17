@@ -37,7 +37,7 @@ class FileHandle:
         self.is_nil = is_nil
         # console conversions (tty, latin1->utf8) live in the handler's
         # stream; the DOS layer only sees a plain byte stream
-        self.interactive = self.obj.isatty()
+        self.interactive = self.obj.isatty() if self.obj is not None else False
 
     def __repr__(self):
         return "[FH:'%s'(ami='%s',nc=%s,af=%s,int=%s)@%06x=B@%06x]" % (
@@ -227,6 +227,8 @@ class FileHandle:
         self.auto_flush = buf_type == 1
 
     def tell(self):
+        if self.obj is None:
+            return -1
         try:
             return self.obj.tell()
         except IOError:

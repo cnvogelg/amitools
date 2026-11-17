@@ -73,14 +73,13 @@ class HandlerContract:
         make_dir(h, "dir")
         make_file(h, "file.txt", b"hello")
         lock = h.locate_object("dir")
-        assert lock.rel_path == "dir"
-        assert lock.key == "dir"
+        # a lock is opaque; its object is observed by examining it
+        assert h.examine_object(lock).name == "dir"
         assert lock.handler is h
-        assert h.locate_object("file.txt").key == "file.txt"
-        # the volume root
+        assert h.examine_object(h.locate_object("file.txt")).name == "file.txt"
+        # the volume root is named after the handler
         root = h.locate_object("")
-        assert root.key == ""
-        assert root.rel_path == ""
+        assert h.examine_object(root).name == h.name
         # missing object
         expect_error(205, h.locate_object, "missing")
 
@@ -88,8 +87,8 @@ class HandlerContract:
         h = env.h
         make_file(h, "MixedCase", b"x")
         lock = h.locate_object("mixedcase")
-        assert lock.rel_path == "MixedCase"
-        assert lock.key == "mixedcase"
+        # the lock is found case-insensitively but names the real object
+        assert h.examine_object(lock).name == "MixedCase"
 
     def parent_steps_test(self, env):
         h = env.h
@@ -98,8 +97,7 @@ class HandlerContract:
         make_file(h, "a/c", b"x")
         # 'a/b//c' is c in the parent of b
         lock = h.locate_object("a/b//c")
-        assert lock.rel_path == "a/c"
-        assert lock.key == "a/c"
+        assert h.same_lock(lock, h.locate_object("a/c"))
         # climbing above the volume root fails
         expect_error(205, h.locate_object, "//x")
 
@@ -115,7 +113,6 @@ class HandlerContract:
         make_dir(h, "a/b")
         lock = h.locate_object("a/b")
         copy = h.copy_dir(lock)
-        assert copy.key == "a/b"
         assert h.same_lock(lock, copy)
         # copy_dir only works on directories
         make_file(h, "f", b"x")
@@ -126,9 +123,9 @@ class HandlerContract:
         make_dir(h, "a")
         make_dir(h, "a/b")
         parent = h.parent(h.locate_object("a/b"))
-        assert parent.key == "a"
+        assert h.same_lock(parent, h.locate_object("a"))
         grand = h.parent(parent)
-        assert grand.key == ""
+        assert h.same_lock(grand, h.locate_object(""))
         # the volume root has no parent
         expect_error(205, h.parent, grand)
 
@@ -150,7 +147,7 @@ class HandlerContract:
         assert info.entry_type == HandlerFileInfo.DIR
         assert info.is_dir
         assert info.key == 0
-        assert info.name == "work"
+        assert info.name == h.name
         file_info = h.examine_object(h.locate_object("file.txt"))
         assert file_info.entry_type == HandlerFileInfo.FILE
         assert not file_info.is_dir
@@ -305,10 +302,10 @@ class HandlerContract:
         make_file(h, "d/x", b"q")
         # parent_fh operates on an open file handle
         fh = h.find_input("d/x")
-        assert h.parent_fh(fh).key == "d"
+        assert h.same_lock(h.parent_fh(fh), h.locate_object("d"))
         h.end(fh)
         # copy_dir_fh returns a lock on the same directory object
-        assert h.copy_dir_fh(h.locate_object("d")).key == "d"
+        assert h.same_lock(h.copy_dir_fh(h.locate_object("d")), h.locate_object("d"))
 
     # ----- names -----
 
@@ -330,7 +327,7 @@ class HandlerContract:
         h = env.h
         make_file(h, "a", b"x")
         h.rename_object("a", "b")
-        assert h.locate_object("b").key == "b"
+        assert h.examine_object(h.locate_object("b")).name == "b"
         expect_error(205, h.locate_object, "a")
         expect_error(205, h.rename_object, "a", "c")
         # rename across directories
@@ -362,11 +359,11 @@ class HandlerContract:
     def create_dir_test(self, env):
         h = env.h
         h.create_dir("newdir")
-        assert h.locate_object("newdir").key == "newdir"
+        assert h.examine_object(h.locate_object("newdir")).name == "newdir"
         expect_error(203, h.create_dir, "newdir")
         # nested dirs need their parent to exist first
         h.create_dir("newdir/sub")
-        assert h.locate_object("newdir/sub").key == "newdir/sub"
+        assert h.examine_object(h.locate_object("newdir/sub")).name == "sub"
 
     # ----- interactive ops are unsupported on a file system -----
 

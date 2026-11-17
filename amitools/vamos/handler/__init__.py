@@ -19,6 +19,7 @@ from .console import ConsoleHandler
 from .filesys import HostFileSysHandler
 from .mgr import HandlerManager, build_handler_manager
 from .nil import NilHandler
+from .packet import PacketFile, PacketHandler, PacketLock
 from .protection import DosProtection
 from .ram import RamHandler
 from .registry import HandlerRegistry, default_registry
@@ -39,6 +40,9 @@ __all__ = [
     "HandlerRegistry",
     "HostFileSysHandler",
     "NilHandler",
+    "PacketFile",
+    "PacketHandler",
+    "PacketLock",
     "RamHandler",
     "build_handler_manager",
     "default_registry",
