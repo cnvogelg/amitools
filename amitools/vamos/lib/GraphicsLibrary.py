@@ -68,6 +68,24 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
     # Library setup / teardown
     # ---------------------------------------------------------------------
 
+    def EraseRect(self, ctx, rp, xMin, yMin, xMax, yMax):
+        port = RastPortStruct(ctx.mem, rp)
+        state = self._raster_state(ctx, port)
+        if state is None:
+            return
+        state.foreground, state.mode = port.BgPen.val & 255, 0
+        state.area_pattern = ()
+        xMin, yMin, xMax, yMax = [
+            ((v + 32768) & 65535) - 32768
+            for v in (xMin, yMin, xMax, yMax)
+        ]
+        backing = self.get_rp_graphics(rp)
+        if backing:
+            backing.batch.add(
+                BFRectFill(xMin, yMin, xMax - xMin + 1, yMax - yMin + 1,
+                           None, 0, state)
+            )
+
     def setup_lib(self, ctx, base_addr):
         self.alloc = ctx.alloc
         ctx.exec_lib.graphics_lib = self

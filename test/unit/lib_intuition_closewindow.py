@@ -747,3 +747,46 @@ def intuition_rawkey_history_lifetime_test(ctx):
     ctx.messages.reply_msg(message)
     assert ctx.alloc.get_memory(message.addr) is None
     ctx.close_all()
+
+
+def intuition_close_deactivates_gadget_before_free_test(ctx):
+    target = ctx.open()
+    ctx.intuition._active_gadget = (target, 0x100)
+    calls = []
+    def deactivate(context, abort):
+        assert abort
+        assert ctx.alloc.get_memory(target) is not None
+        calls.append(target)
+        ctx.intuition._active_gadget = (None, None)
+    ctx.intuition._deactivate_gadget = deactivate
+    ctx.close(target)
+    assert calls == [target]
+    ctx.close_all()
+
+
+@pytest.mark.parametrize("release", [False, True])
+def intuition_gadget_rastport_clone_lifetime_test(ctx, release):
+    target = ctx.open()
+    win = WindowStruct(ctx.mem, target)
+    info = ctx.alloc.alloc_memory(58)
+    try:
+        ctx.mem.w32(info.addr + 4, target)
+        ctx.mem.w32(info.addr + 12, win.RPort.val)
+        original = RastPortStruct(ctx.mem, win.RPort.val)
+        copied = ctx.intuition.ObtainGIRPort(ctx, info.addr)
+        assert copied and copied != win.RPort.val
+        port = RastPortStruct(ctx.mem, copied)
+        assert port.BitMap.val == original.BitMap.val
+        assert ctx.graphics.get_rp_graphics(copied) is ctx.graphics.get_rp_graphics(win.RPort.val)
+        port.FgPen.val = original.FgPen.val ^ 1
+        assert port.FgPen.val != original.FgPen.val
+        if release:
+            ctx.intuition.ReleaseGIRPort(ctx, copied)
+            ctx.intuition.ReleaseGIRPort(ctx, copied)
+        ctx.close(target)
+        assert ctx.alloc.get_memory(copied) is None
+        assert copied not in ctx.graphics.rp_graphics_map
+        assert copied not in ctx.intuition.rp_2_win_addr
+    finally:
+        ctx.alloc.free_memory(info)
+        ctx.close_all()
