@@ -547,6 +547,21 @@ class MakeDirCmd(Command):
             return 0
 
 
+class RenameCmd(Command):
+    def __init__(self, args, opts):
+        Command.__init__(self, args, opts, edit=True)
+
+    def handle_vol(self, vol):
+        n = len(self.opts)
+        if n != 2:
+            print("Usage: rename <old_ami_path> <new_ami_path>")
+            return 1
+        old_path = make_fsstr(self.opts[0])
+        new_path = make_fsstr(self.opts[1])
+        vol.rename(old_path, new_path)
+        return 0
+
+
 class WriteCmd(Command):
     def __init__(self, args, opts):
         Command.__init__(self, args, opts, edit=True)
@@ -1092,6 +1107,7 @@ def main(args=None, defaults=None):
         "makedir": MakeDirCmd,
         "write": WriteCmd,
         "delete": DeleteCmd,
+        "rename": RenameCmd,
         "format": FormatCmd,
         "bitmap": BitmapCmd,
         "blkdev": BlkDevCmd,

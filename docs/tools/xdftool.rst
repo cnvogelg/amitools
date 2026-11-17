@@ -343,6 +343,30 @@ Example::
   > xdftool empty.adf makedir c      ; create a new directory called 'c'
 
 
+``rename`` - Rename or move a file or directory
+-----------------------------------------------
+
+::
+
+  rename <old_ami_path> <new_ami_path>
+
+This command renames the file or directory given with ``<old_ami_path>`` to
+``<new_ami_path>``. The entry keeps its data, protection flags, comment and
+modification time; only its name and its directory entry change, so no blocks
+are copied.
+
+The new path is the full target path: its last component becomes the new name
+and the preceding components select the target directory. Use ``rename a b``
+to rename an entry in place, or ``rename a d/a`` to move it into the directory
+``d``. The target must not exist yet otherwise the command fails.
+
+Example::
+
+  > xdftool mydisk.adf rename README README.txt   ; rename a file in place
+  > xdftool mydisk.adf rename c/dir d/dir         ; move a file to another dir
+  > xdftool mydisk.adf rename c c_old             ; rename a directory
+
+
 ``write`` - Write a host file or a host directory tree to the image
 -------------------------------------------------------------------
 
