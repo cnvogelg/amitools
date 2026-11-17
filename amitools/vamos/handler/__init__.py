@@ -17,6 +17,7 @@ from .base import (
 )
 from .console import ConsoleHandler
 from .decode import PacketDecoder
+from .dispatch import HandlerDispatcher
 from .dospkt import DosPktHandler
 from .filesys import HostFileSysHandler
 from .mgr import HandlerManager, build_handler_manager
@@ -34,6 +35,7 @@ __all__ = [
     "DosProtection",
     "DosPktHandler",
     "Handler",
+    "HandlerDispatcher",
     "HandlerError",
     "HandlerFile",
     "HandlerFileInfo",

@@ -9,91 +9,9 @@ from amitools.vamos.handler import (
     MODE_OLDFILE,
     MODE_READWRITE,
 )
-from amitools.vamos.lib.dos.Error import (
-    DOSFALSE,
-    DOSTRUE_S,
-    ERROR_ACTION_NOT_KNOWN,
-)
 from amitools.vamos.lib.dos.FileManager import FileManager
-from amitools.vamos.lib.dos.action import DosAction
-from amitools.vamos.libstructs import (
-    DosPacketStruct,
-    InfoDataStruct,
-    MessageStruct,
-)
 from amitools.vamos.machine.mock import MockMemory
 from amitools.vamos.mem import MemoryAlloc
-
-
-def _make_packet_mem(mem, msg_addr=0x100, pkt_addr=0x200, reply_port_addr=0x300):
-    msg = MessageStruct(mem, msg_addr)
-    msg.node.name.aptr = pkt_addr
-    dos_pkt = DosPacketStruct(mem, pkt_addr)
-    dos_pkt.port.aptr = reply_port_addr
-    return msg, dos_pkt
-
-
-def _make_port_mgr():
-    registered_ports = []
-    replies = []
-    port_mgr = SimpleNamespace(
-        has_port=lambda addr: False,
-        register_port=registered_ports.append,
-        put_msg=lambda port_addr, addr: replies.append((port_addr, addr)),
-    )
-    return port_mgr, registered_ports, replies
-
-
-def dos_filemanager_disk_info_packet_test():
-    from amitools.vamos.handler import HandlerInfoData
-
-    mem = MockMemory()
-    msg, dos_pkt = _make_packet_mem(mem)
-    dos_pkt.type.val = DosAction.ACTION_DISK_INFO
-    info_ptr = 0x400
-    dos_pkt.arg1.val = info_ptr
-
-    calls = []
-
-    def disk_info(lock):
-        calls.append(lock)
-        return HandlerInfoData(num_blocks=100, num_blocks_used=10)
-
-    handler = SimpleNamespace(disk_info=disk_info)
-    port_mgr, registered_ports, replies = _make_port_mgr()
-    file_mgr = FileManager.__new__(FileManager)
-    file_mgr.mem = mem
-
-    file_mgr.make_volume_put_msg(handler)(port_mgr, msg.addr)
-
-    assert dos_pkt.res1.val == DOSTRUE_S
-    assert dos_pkt.res2.val == 0
-    # DISK_INFO is a lock-less volume query
-    assert calls == [None]
-    info = InfoDataStruct(mem, info_ptr)
-    assert info.id_NumBlocks.val == 100
-    assert info.id_NumBlocksUsed.val == 10
-    assert registered_ports == [0x300]
-    assert replies == [(0x300, msg.addr)]
-
-
-def dos_filemanager_unsupported_filesys_packet_test():
-    mem = MockMemory()
-    msg, dos_pkt = _make_packet_mem(mem)
-    # MAKE_LINK has no handler action, so the decoder reports it unknown
-    dos_pkt.type.val = DosAction.ACTION_MAKE_LINK
-
-    handler = SimpleNamespace()
-    port_mgr, registered_ports, replies = _make_port_mgr()
-    file_mgr = FileManager.__new__(FileManager)
-    file_mgr.mem = mem
-
-    file_mgr.make_volume_put_msg(handler)(port_mgr, msg.addr)
-
-    assert dos_pkt.res1.val == DOSFALSE
-    assert dos_pkt.res2.val == ERROR_ACTION_NOT_KNOWN
-    assert registered_ports == [0x300]
-    assert replies == [(0x300, msg.addr)]
 
 
 def _make_file_mgr(handler_mgr):
@@ -327,7 +245,6 @@ def _make_real_file_mgr(handler_mgr=None):
     file_mgr.handler_mgr = handler_mgr
     file_mgr.alloc = alloc
     file_mgr.mem = mem
-    file_mgr.fs_handler_port = 0
     file_mgr.files_by_b_addr = {}
     file_mgr.std_input = None
     file_mgr.std_output = None

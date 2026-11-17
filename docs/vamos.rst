@@ -663,7 +663,6 @@ switch:
 
     > ./vamos -l dos:info,exec:info a68k
     19:18:10.840       exec:   INFO:  open exec.library V39
-    19:18:10.840        dos:   INFO:  dos fs handler port: fd0000
     19:18:10.843       exec:   INFO:  SetSignals: new_signals=00000000 signal_mask=00003000 old_signals=00000000
     19:18:10.845        dos:   INFO:  open dos.library V39
     19:18:10.845       exec:   INFO:  OpenLibrary: 'dos.library' V0 -> [Lib:'dos.library',V0]

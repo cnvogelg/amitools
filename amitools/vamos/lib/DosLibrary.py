@@ -139,7 +139,7 @@ class DosLibrary(LibImpl):
         self.file_mgr = FileManager(
             self.handler_mgr, ctx.exec_lib.port_mgr, ctx.alloc, ctx.mem
         )
-        self.dos_list.add_host_devices(self.file_mgr, ctx.exec_lib.port_mgr)
+        self.dos_list.add_host_devices()
         self.update_dos_list_head()
         # let the segment loader open files through DOS
         if ctx.seg_loader is not None:
@@ -151,7 +151,6 @@ class DosLibrary(LibImpl):
             ctx.alloc,
             ctx.mem,
             handler_mgr=self.handler_mgr,
-            fs_handler_port=self.file_mgr.get_fs_handler_port(),
         )
         # the packet decoder resolves locks through the lock manager
         self.file_mgr.lock_mgr = self.lock_mgr
@@ -1772,6 +1771,16 @@ class DosLibrary(LibImpl):
 
     # ----- DevProc -----
 
+    def _handler_port(self, name):
+        """the packet port of the handler serving ``name`` (0 if none)"""
+        if self.handler_mgr is None:
+            return 0
+        get_dispatcher = getattr(self.handler_mgr, "get_dispatcher", None)
+        if get_dispatcher is None:
+            return 0
+        dispatcher = get_dispatcher(name)
+        return dispatcher.port if dispatcher is not None else 0
+
     def GetDeviceProc(self, ctx):
         name_ptr = ctx.cpu.r_reg(REG_D1)
         last_devproc = ctx.cpu.r_reg(REG_D2)
@@ -1788,7 +1797,9 @@ class DosLibrary(LibImpl):
             abs_name = ctx.path_mgr.ami_abs_path(self.get_current_dir(ctx), name)
             volume = ctx.path_mgr.ami_volume_of_path(abs_name)
             vol_lock = self.lock_mgr.create_lock(None, volume + ":", False)
-        fs_port = self.file_mgr.get_fs_handler_port()
+        # the DevProc reports the handler's own packet port (like AmigaDOS)
+        lookup = volume if volume is not None else uname.split(":")[0]
+        port = self._handler_port(lookup)
         addr = self._alloc_mem("DevProc:%s" % name, DevProcStruct.get_size())
         log_dos.info(
             "GetDeviceProc: name='%s' devproc=%06x -> volume=%s devproc=%06x lock=%s",
@@ -1799,7 +1810,7 @@ class DosLibrary(LibImpl):
             vol_lock,
         )
         devproc = DevProcStruct(ctx.mem, addr)
-        devproc.dvp_Port.aptr = fs_port
+        devproc.dvp_Port.aptr = port
         if vol_lock == None:
             devproc.dvp_Lock.aptr = 0
         else:

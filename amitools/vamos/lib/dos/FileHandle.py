@@ -64,7 +64,12 @@ class FileHandle:
         if self.need_close:
             self.obj.close()
 
-    def alloc_fh(self, alloc, fs_handler_port):
+    def _handler_port(self):
+        """the packet port of the handler that owns this file (0 if none)"""
+        dispatcher = getattr(self.handler, "dispatcher", None)
+        return dispatcher.port if dispatcher is not None else 0
+
+    def alloc_fh(self, alloc):
         name = "File:" + self.name
         self.mem = self.struct = alloc.alloc_astruct(FileHandleStruct, label=name)
         fh = self.struct
@@ -72,8 +77,8 @@ class FileHandle:
         # -- fill filehandle
         # use baddr of FH itself as identifier
         fh.fh_Args.val = self.b_addr
-        # set port
-        fh.fh_Type.aptr = fs_handler_port
+        # fh_Type is the packet port of the handler owning this file
+        fh.fh_Type.aptr = self._handler_port()
         # buffer handling: set fh_End != 0 (to prepare for EOF hack in FGetS)
         fh.fh_End.val = 1
         return self.b_addr

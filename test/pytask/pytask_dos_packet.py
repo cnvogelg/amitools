@@ -4,6 +4,7 @@ from amitools.vamos.error import UnsupportedFeatureError
 from amitools.vamos.lib.dos.Error import DOSFALSE, DOSTRUE
 from amitools.vamos.lib.dos.action import DosAction
 from amitools.vamos.libstructs import (
+    DevProcStruct,
     DosPacketStruct,
     FileHandleStruct,
     InfoDataStruct,
@@ -120,6 +121,51 @@ def pytask_dos_dopkt_disk_info_test(vamos_task):
         assert info.id_NumBlocks.val > 0
 
         ctx.alloc.free_struct(info_mem)
+        return 0
+
+    exit_codes = vamos_task.run([proc], process=True)
+    assert exit_codes == [0]
+
+
+def pytask_dos_getdevproc_test(vamos_task):
+    """GetDeviceProc reports the volume's own handler port (like AmigaDOS)"""
+
+    def proc(ctx, task):
+        dos_proxy = ctx.proxies.get_dos_lib_proxy()
+        ram_port = _volume_handler_port(ctx, "ram")
+
+        # the DevProc's packet port is the ram handler's port
+        # (GetDeviceProc takes a C string, not a BSTR)
+        name = ctx.alloc.alloc_cstr("ram:")
+        devproc = dos_proxy.GetDeviceProc(name.addr, 0)
+        assert devproc != 0
+        assert DevProcStruct(ctx.mem, devproc).dvp_Port.aptr == ram_port
+        dos_proxy.FreeDeviceProc(devproc)
+
+        # a file opened on ram: carries the same handler port in fh_Type
+        path = ctx.alloc.alloc_bstr("ram:devproc.txt")
+        fh_mem = ctx.alloc.alloc_astruct(FileHandleStruct, label="FH")
+        fh = FileHandleStruct(ctx.mem, fh_mem.addr)
+        assert (
+            dos_proxy.DoPkt(
+                ram_port,
+                DosAction.ACTION_FINDOUTPUT,
+                fh_mem.addr >> 2,
+                0,
+                path.addr >> 2,
+                MODE_NEWFILE,
+                0,
+            )
+            == DOSTRUE
+        )
+        fh_b = fh.fh_Args.val
+        dos_fh = ctx.dos_lib.file_mgr.get_by_b_addr(fh_b)
+        assert dos_fh.struct.fh_Type.aptr == ram_port
+        assert dos_proxy.DoPkt(ram_port, DosAction.ACTION_END, fh_b, 0, 0, 0, 0) == 0
+
+        ctx.alloc.free_struct(fh_mem)
+        ctx.alloc.free_bstr(path)
+        ctx.alloc.free_cstr(name)
         return 0
 
     exit_codes = vamos_task.run([proc], process=True)

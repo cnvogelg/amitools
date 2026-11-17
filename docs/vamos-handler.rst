@@ -193,8 +193,8 @@ action back as a DOS handle:
 
 - ``resolve_fh(fh_id)`` -> ``(handler, handler_file, ami_path)``
 - ``resolve_lock(lock_id)`` -> ``(handler, handler_lock, ami_path)``
-- ``volume_handler()`` -> the handler bound to the receiving port (for
-  ZERO-lock, volume-relative path packets)
+- ``volume_handler()`` -> the handler this decoder serves (its port's handler);
+  it names the handler for ZERO-lock, volume-relative path packets
 - ``register_lock(handler, handler_lock, ami_path)`` -> ``lock_id``
 - ``register_file(handler, handler_file, ami_path)`` -> ``fh_id``
 - ``release_lock(lock_id)`` / ``release_file(fh_id)`` (optional) release a DOS
@@ -203,9 +203,22 @@ action back as a DOS handle:
 ``decode(pkt)`` returns ``dp_Res1``. A ``HandlerError`` becomes
 ``res1=DOSFALSE`` with ``res2=code``; an unknown action becomes
 ``ERROR_ACTION_NOT_KNOWN``; and ``PARENT`` of the volume root answers
-``res1=0, res2=0``. The DOS layer wires one decoder to the shared file-system
-port (fh/lock packets) and one to the console port, and gives each volume its
-own port bound to that volume's handler.
+``res1=0, res2=0``. A decoder is scoped to one handler: an fh/lock packet whose
+handle belongs to a *different* handler is rejected with ``ERROR_INVALID_LOCK``,
+so only the owning handler's port can resolve its handles, like a real handler
+process.
+
+Handler dispatcher
+~~~~~~~~~~~~~~~~~~
+
+``HandlerDispatcher`` (in :mod:`amitools.vamos.handler.dispatch`) bundles a
+handler's own message port with the decoder that serves it. The DOS layer gives
+every registered handler a dispatcher (``handler.dispatcher``): a message put on
+the port is decoded onto that handler and the reply is posted back to the
+packet's ``dp_Port``. The port is what ``GetDeviceProc`` reports as ``dvp_Port``
+and what ``fh_Type``/``fl_Task`` name for a file or lock, so guest code can send
+packets straight to the owning handler. The dispatchers are created when
+``dos.library`` opens and freed when it closes.
 
 
 Built-in handlers

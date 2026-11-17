@@ -89,23 +89,23 @@ class DecoderHarness:
     def _resolve_fh(self, fh_id):
         if fh_id not in self.files:
             raise HandlerError(ERROR_INVALID_LOCK)
-        handler_file, ami_path = self.files[fh_id]
-        return self.handler, handler_file, ami_path
+        handler, handler_file, ami_path = self.files[fh_id]
+        return handler, handler_file, ami_path
 
     def _resolve_lock(self, lock_id):
         if lock_id not in self.locks:
             raise HandlerError(ERROR_INVALID_LOCK)
-        handler_lock, ami_path = self.locks[lock_id]
-        return self.handler, handler_lock, ami_path
+        handler, handler_lock, ami_path = self.locks[lock_id]
+        return handler, handler_lock, ami_path
 
     def _register_lock(self, handler, handler_lock, ami_path):
         lock_id = self._new_id()
-        self.locks[lock_id] = (handler_lock, ami_path)
+        self.locks[lock_id] = (handler, handler_lock, ami_path)
         return lock_id
 
     def _register_file(self, handler, handler_file, ami_path):
         fh_id = self._new_id()
-        self.files[fh_id] = (handler_file, ami_path)
+        self.files[fh_id] = (handler, handler_file, ami_path)
         return fh_id
 
     def _release_lock(self, lock_id):
@@ -302,7 +302,7 @@ def handler_decode_locate_object_test(dec):
     lock_id = dec.harness.decode(pkt)
     assert h.calls[-1] == ("locate_object", "sub/dir", True)
     assert pkt.res2.val == 0
-    assert dec.harness.locks[lock_id] == (h.lock, "work:sub/dir")
+    assert dec.harness.locks[lock_id] == (h, h.lock, "work:sub/dir")
     # shared is the default
     dec.harness.decode(
         _pkt(
@@ -332,7 +332,7 @@ def handler_decode_copy_dir_test(dec):
     )
     new = dec.harness.decode(_pkt(mem, DosAction.ACTION_COPY_DIR, arg1=src))
     assert h.calls[-1] == ("copy_dir", h.lock)
-    assert dec.harness.locks[new] == (h.lock, "work:d")
+    assert dec.harness.locks[new] == (h, h.lock, "work:d")
 
 
 def handler_decode_parent_test(dec):
@@ -342,7 +342,7 @@ def handler_decode_parent_test(dec):
     )
     parent = dec.harness.decode(_pkt(mem, DosAction.ACTION_PARENT, arg1=src))
     assert h.calls[-1] == ("parent", h.lock)
-    assert dec.harness.locks[parent] == (h.lock, "work:a")
+    assert dec.harness.locks[parent] == (h, h.lock, "work:a")
 
 
 def handler_decode_parent_root_test(dec):
@@ -439,10 +439,10 @@ def handler_decode_parent_copy_fh_test(dec):
     file_id = dec.harness._register_file(h, h.file, "work:f")
     parent = dec.harness.decode(_pkt(mem, DosAction.ACTION_PARENT_FH, arg1=file_id))
     assert h.calls[-1] == ("parent_fh", h.file)
-    assert dec.harness.locks[parent] == (h.lock, "work:")
+    assert dec.harness.locks[parent] == (h, h.lock, "work:")
     copy = dec.harness.decode(_pkt(mem, DosAction.ACTION_COPY_DIR_FH, arg1=file_id))
     assert h.calls[-1] == ("copy_dir_fh", h.file)
-    assert dec.harness.locks[copy] == (h.lock, "work:f")
+    assert dec.harness.locks[copy] == (h, h.lock, "work:f")
 
 
 # --------------------------------------------------------------------------
@@ -462,7 +462,7 @@ def handler_decode_find_actions_test(dec):
         assert h.calls[-1] == expected
         fh_id = mem.r32(_FH_ADDR + 36)
         assert fh_id in dec.harness.files
-        assert dec.harness.files[fh_id] == (h.file, "work:f")
+        assert dec.harness.files[fh_id] == (h, h.file, "work:f")
 
 
 def handler_decode_read_test(dec):
@@ -599,7 +599,7 @@ def handler_decode_create_dir_test(dec):
     lock_id = dec.harness.decode(pkt)
     assert h.calls[0] == ("create_dir", "new")
     assert h.calls[1] == ("locate_object", "new", False)
-    assert dec.harness.locks[lock_id] == (h.lock, "work:new")
+    assert dec.harness.locks[lock_id] == (h, h.lock, "work:new")
 
 
 # --------------------------------------------------------------------------

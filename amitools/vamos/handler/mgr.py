@@ -20,6 +20,7 @@ from .base import (
     MODE_NEWFILE,
     HandlerError,
 )
+from .dispatch import HandlerDispatcher
 from .registry import default_registry
 
 
@@ -81,6 +82,42 @@ class HandlerManager:
 
     def get_handler(self, name):
         return self.handlers.get(str(name).lower())
+
+    # ----- packet ports (dispatchers) -----
+
+    def attach_dispatchers(self, port_mgr, mem, make_decoder):
+        """give every registered handler its own packet port
+
+        ``make_decoder(handler)`` builds the :class:`PacketDecoder` that serves
+        that handler; it is wrapped in a :class:`HandlerDispatcher` and injected
+        as ``handler.dispatcher``. Idempotent: handlers that already have a
+        dispatcher are left alone.
+        """
+        for name, handler in self.handlers.items():
+            if getattr(handler, "dispatcher", None) is not None:
+                continue
+            decoder = make_decoder(handler)
+            handler.dispatcher = HandlerDispatcher(
+                port_mgr, mem, "%s handler" % name, decoder
+            )
+            log_handler.info(
+                "attach dispatcher '%s': port=%06x", name, handler.dispatcher.port
+            )
+
+    def detach_dispatchers(self):
+        """free every handler's packet port"""
+        for handler in self.handlers.values():
+            dispatcher = getattr(handler, "dispatcher", None)
+            if dispatcher is not None:
+                dispatcher.free()
+                handler.dispatcher = None
+
+    def get_dispatcher(self, name):
+        """the packet-port dispatcher of the handler registered as ``name``"""
+        handler = self.get_handler(name)
+        if handler is None:
+            return None
+        return getattr(handler, "dispatcher", None)
 
     def disk_info(self, volume_name):
         """lock-less volume query (ACTION_DISK_INFO)

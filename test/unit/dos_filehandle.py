@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from amitools.vamos.handler import (
     MODE_NEWFILE,
     Handler,
@@ -21,12 +23,29 @@ class _DummyFile:
 def dos_filehandle_alloc_test():
     mem = MockMemory()
     alloc = MemoryAlloc(mem)
-    fh = FileHandle(_DummyFile(), "SYS:test", "/tmp/test", need_close=False)
+    # fh_Type is the packet port of the handler that owns the file
+    handler = SimpleNamespace(dispatcher=SimpleNamespace(port=0x1234))
+    fh = FileHandle(
+        _DummyFile(), "SYS:test", "/tmp/test", handler=handler, need_close=False
+    )
 
-    assert fh.alloc_fh(alloc, 0x1234) == fh.b_addr
+    assert fh.alloc_fh(alloc) == fh.b_addr
     assert fh.struct.fh_Args.val == fh.b_addr
     assert fh.struct.fh_Type.aptr == 0x1234
     assert fh.struct.fh_End.val == 1
+
+    fh.free_fh(alloc)
+    assert alloc.is_all_free()
+
+
+def dos_filehandle_alloc_no_handler_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    # a handler-less file reports no packet port
+    fh = FileHandle(_DummyFile(), "SYS:test", "/tmp/test", need_close=False)
+
+    assert fh.alloc_fh(alloc) == fh.b_addr
+    assert fh.struct.fh_Type.aptr == 0
 
     fh.free_fh(alloc)
     assert alloc.is_all_free()

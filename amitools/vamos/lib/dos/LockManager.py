@@ -47,14 +47,12 @@ class LockManager:
         mem,
         handler_mgr=None,
         max_locks=1024,
-        fs_handler_port=0,
     ):
         self.path_mgr = path_mgr
         self.dos_list = dos_list
         self.alloc = alloc
         self.mem = mem
         self.handler_mgr = handler_mgr
-        self.fs_handler_port = fs_handler_port
         # we manage keys per file object
         # each individual file object gets a unique slot = key
         self.keys = SlotArray(max_locks)
@@ -101,8 +99,10 @@ class LockManager:
 
         # allocate lock struct and use slot_id for key
         lock.alloc(self.alloc, vol_baddr, slot_id)
-        if self.fs_handler_port:
-            lock.struct.fl_Task.aptr = self.fs_handler_port
+        # fl_Task is the packet port of the handler that owns the lock
+        dispatcher = getattr(lock.handler, "dispatcher", None)
+        if dispatcher is not None:
+            lock.struct.fl_Task.aptr = dispatcher.port
 
         # register lock in key (with baddr allocated above)
         lock_key.add_lock(lock)

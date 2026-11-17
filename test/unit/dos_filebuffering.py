@@ -29,7 +29,7 @@ def dos_filehandle_setvbuf_test():
     alloc = MemoryAlloc(mem)
     file_obj = _DummyFile()
     fh = FileHandle(file_obj, "SYS:test", "/tmp/test")
-    fh_b_addr = fh.alloc_fh(alloc, 0x1234)
+    fh_b_addr = fh.alloc_fh(alloc)
     lib = DosLibrary()
     lib.file_mgr = SimpleNamespace(get_by_b_addr=lambda b_addr, for_writing=None: fh)
 

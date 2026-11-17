@@ -57,18 +57,23 @@ def dos_list_remove_head_test(mem_alloc):
 
 def dos_list_host_device_volume_pairs_test(mem_alloc):
     from types import SimpleNamespace
-    from amitools.vamos.lib.lexec.PortManager import PortManager
 
     mem, alloc = mem_alloc
-    listing = DosList(None, None, mem, alloc)
+    ports = {"system": 0x111, "ram": 0x222}
+
+    def get_handler(name):
+        return SimpleNamespace(dispatcher=SimpleNamespace(port=ports[name]))
+
+    handler_mgr = SimpleNamespace(
+        is_filesystem=lambda name: True,
+        get_all_names=lambda: ["system", "ram"],
+        get_handler=get_handler,
+    )
+    listing = DosList(None, None, mem, alloc, handler_mgr=handler_mgr)
     first = listing.add_volume("system")
     second = listing.add_volume("ram")
-    ports = PortManager(alloc)
-    file_mgr = SimpleNamespace(
-        fs_put_msg=lambda *args: None,
-        make_volume_put_msg=lambda handler: lambda *args: None,
-    )
-    listing.add_host_devices(file_mgr, ports)
+    # each volume's device entry reports that handler's own packet port
+    listing.add_host_devices()
     cursor = listing.lock_dos_list(LDF_DEVICES)
     found = []
     while cursor:
@@ -78,19 +83,17 @@ def dos_list_host_device_volume_pairs_test(mem_alloc):
     assert [entry.name for entry in found] == ["system", "ram"]
     for volume, device in zip((first, second), found):
         assert volume.struct.dol_Task.aptr == device.struct.dol_Task.aptr
-        assert ports.has_port(device.struct.dol_Task.aptr)
         assert listing.get_entry_by_name(device.name) is volume
         assert listing.get_entry_by_name(device.name, LDF_DEVICES) is device
         assert device.struct.dol_Startup.val == 0
-    assert first.struct.dol_Task.aptr != second.struct.dol_Task.aptr
+    assert first.struct.dol_Task.aptr == ports["system"]
+    assert second.struct.dol_Task.aptr == ports["ram"]
     listing.free_list()
-    assert not ports.ports
     assert alloc.is_all_free()
 
 
 def dos_list_device_handler_test(mem_alloc):
     from types import SimpleNamespace
-    from amitools.vamos.lib.lexec.PortManager import PortManager
     from amitools.vamos.libstructs import DosListVolumeStruct
 
     mem, alloc = mem_alloc
@@ -114,14 +117,8 @@ def dos_list_device_handler_test(mem_alloc):
     assert work.struct_def is DosListVolumeStruct
     # ... while a device handler is not a volume
     assert listing.get_entry_by_name("nil", LDF_VOLUMES) is None
-    # add_host_devices publishes the device with no host port
-    ports = PortManager(alloc)
-    file_mgr = SimpleNamespace(
-        fs_put_msg=lambda *args: None,
-        make_volume_put_msg=lambda handler: lambda *args: None,
-        handler_mgr=handler_mgr,
-    )
-    listing.add_host_devices(file_mgr, ports)
+    # a handler without a dispatcher yields a device entry with no port
+    listing.add_host_devices()
     nil = listing.get_entry_by_name("nil", LDF_DEVICES)
     assert nil is not None
     assert nil.struct.dol_Type.val == 0

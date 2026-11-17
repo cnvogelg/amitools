@@ -16,11 +16,15 @@ an action back as a DOS handle:
 
 * ``resolve_fh(fh_id)`` -> ``(handler, handler_file, ami_path)``
 * ``resolve_lock(lock_id)`` -> ``(handler, handler_lock, ami_path)``
-* ``volume_handler()`` -> the handler bound to the receiving port
+* ``volume_handler()`` -> the handler this decoder serves (its port's handler)
 * ``register_lock(handler, handler_lock, ami_path)`` -> ``lock_id``
 * ``register_file(handler, handler_file, ami_path)`` -> ``fh_id``
 * ``release_lock(lock_id)`` / ``release_file(fh_id)`` (optional) release a DOS
   handle when the packet does (``FREE_LOCK`` / ``END``)
+
+A decoder is scoped to one handler: an fh/lock packet whose handle is owned by
+a *different* handler is rejected with ``ERROR_INVALID_LOCK``, so only the
+handler's own port can resolve its handles (like a real handler process).
 
 The marshalling is the server direction of the table in ``HANDLER.md``:
 path packets use the ZERO lock and a BSTR path, fh/lock packets carry the DOS
@@ -125,17 +129,25 @@ class PacketDecoder:
             raise HandlerError(ERROR_ACTION_NOT_KNOWN)
         return handler
 
-    def _fh(self, fh_id):
-        result = self.resolve_fh(fh_id)
+    def _owned(self, result):
+        """check that a resolved handle belongs to this decoder's handler
+
+        A dispatcher only serves the handler whose port it owns, so a packet
+        that carries a handle owned by another handler is rejected like a real
+        handler would (``ERROR_INVALID_LOCK``).
+        """
         if result is None:
+            raise HandlerError(ERROR_INVALID_LOCK)
+        handler = self.volume_handler()
+        if handler is None or result[0] is not handler:
             raise HandlerError(ERROR_INVALID_LOCK)
         return result
 
+    def _fh(self, fh_id):
+        return self._owned(self.resolve_fh(fh_id))
+
     def _lock(self, lock_id):
-        result = self.resolve_lock(lock_id)
-        if result is None:
-            raise HandlerError(ERROR_INVALID_LOCK)
-        return result
+        return self._owned(self.resolve_lock(lock_id))
 
     def _register_lock(self, handler, handler_lock, ami_path):
         return self.register_lock(handler, handler_lock, ami_path)
@@ -362,15 +374,16 @@ class PacketDecoder:
     # ----- release hooks -----
 
     def _release_lock(self, lock_id):
+        # resolve first: the handle must belong to this handler's port
+        handler, handler_lock, _ = self._lock(lock_id)
         if self.release_lock is not None:
             self.release_lock(lock_id)
             return
-        handler, handler_lock, _ = self._lock(lock_id)
         handler.free_lock(handler_lock)
 
     def _release_file(self, fh_id):
+        handler, handler_file, _ = self._fh(fh_id)
         if self.release_file is not None:
             self.release_file(fh_id)
             return
-        handler, handler_file, _ = self._fh(fh_id)
         handler.end(handler_file)

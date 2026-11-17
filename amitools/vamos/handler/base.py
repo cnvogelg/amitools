@@ -208,6 +208,9 @@ class Handler:
     def __init__(self, name, is_filesystem=True):
         self.name = name
         self.is_filesystem = is_filesystem
+        # the handler's own packet port, injected by
+        # HandlerManager.attach_dispatchers() once the machine exists
+        self.dispatcher = None
 
     def _unsupported(self, action):
         raise HandlerError(ERROR_ACTION_NOT_KNOWN, "unsupported: %s" % action)

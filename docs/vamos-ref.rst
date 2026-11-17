@@ -218,13 +218,14 @@ Exception names accepted by ``--hw-exception`` are ``bus``, ``address``,
 Disks, libraries, and devices
 -----------------------------
 
-Every file system volume -- a host directory or an in-memory ``ram`` volume --
-has a DOS device entry with a matching handler port. Their capacity comes from
-the backing file system (the host filesystem, or the ``ram`` handler's nominal
-size), so host mounts on the same filesystem report overlapping space. The
-``NIL:`` and ``CONSOLE:`` devices get a device entry only, with no handler port
-and no startup message. None of these entries represent physical block devices
-and they have no block geometry.
+Every handler is reachable through its own packet port, so every file system
+volume -- a host directory or an in-memory ``ram`` volume -- has a DOS device
+entry with a matching handler port. Their capacity comes from the backing file
+system (the host filesystem, or the ``ram`` handler's nominal size), so host
+mounts on the same filesystem report overlapping space. The ``NIL:`` and
+``CONSOLE:`` devices get a device entry backed by their own handler port too
+(the ``NIL:`` sink and the console), with no startup message. None of these
+entries represent physical block devices and they have no block geometry.
 
 * ``--disk IMAGE``: Expose an RDB disk image through ``scsi.device``; repeat
   to add units in order: ``vamos --disk work.hdf myprog``. The command-line

@@ -77,7 +77,6 @@ class _Env:
         self.file_mgr = FileManager.__new__(FileManager)
         self.file_mgr.alloc = self.alloc
         self.file_mgr.mem = self.mem
-        self.file_mgr.fs_handler_port = 0
         self.file_mgr.files_by_b_addr = {}
         self.file_mgr.handler_mgr = None
         self.file_mgr.std_input = None

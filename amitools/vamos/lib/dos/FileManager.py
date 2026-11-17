@@ -9,11 +9,9 @@ from amitools.vamos.handler import (
     MODE_OLDFILE,
     MODE_READWRITE,
 )
-from amitools.vamos.libstructs import MessageStruct, DosPacketStruct
 from amitools.vamos.path.amipath import AmiPath
 from .Error import *
 from .FileHandle import FileHandle
-from .action import DosAction
 from .PathPart import expand_progdir_path
 
 # map the Python-ish modes used by the DOS layer to AmigaDOS open modes
@@ -38,28 +36,15 @@ class FileManager:
         self.port_mgr = port_mgr
         self.alloc = alloc
         self.mem = mem
-        # the lock manager is created after the file manager (it needs the fs
-        # handler port), so dos.library assigns it later; the packet resolvers
-        # read it lazily
+        # the lock manager is created after the file manager, so dos.library
+        # assigns it later; the packet resolvers read it lazily
         self.lock_mgr = None
 
         self.files_by_b_addr = {}
 
-        # the shared FS port serves fh/lock packets: the packet itself carries
-        # the target handle, so no volume handler is bound to it
-        self.fs_decoder = self._make_decoder(lambda: None)
-        # the console port decodes to the console device handler
-        self.console_decoder = self._make_decoder(self._console_handler)
-
-        # setup ports
-        # currently we use a single fake port for all devices
-        self.fs_handler_port = port_mgr.create_port("FakeFSPort", self.fs_put_msg)
-        log_file.info("dos fs handler port: %06x" % self.fs_handler_port)
-        # create console handler
-        self.console_handler_port = port_mgr.create_port(
-            "ConsolePort", self.console_put_msg
-        )
-        log_file.info("dos console port: %06x" % self.console_handler_port)
+        # every handler gets its own packet port (a dispatcher bundling the
+        # port with the decoder that serves that handler)
+        self._bind_dispatchers()
 
         # setup std input/output
         self.std_input = self._create_stdin_fh()
@@ -73,9 +58,8 @@ class FileManager:
         # close stdin/out (cleanup TTY if needed)
         self.std_input.close()
         self.std_output.close()
-        # free ports
-        self.port_mgr.free_port(self.fs_handler_port)
-        self.port_mgr.free_port(self.console_handler_port)
+        # free the handlers' packet ports
+        self._detach_dispatchers()
 
     def _create_console_fh(self, read):
         """wrap the console device's input/output as the default DOS handle
@@ -113,14 +97,8 @@ class FileManager:
     def _create_stdout_fh(self):
         return self._create_console_fh(read=False)
 
-    def get_fs_handler_port(self):
-        return self.fs_handler_port
-
-    def get_console_handler_port(self):
-        return self.console_handler_port
-
     def _register_file(self, fh):
-        baddr = fh.alloc_fh(self.alloc, self.fs_handler_port)
+        baddr = fh.alloc_fh(self.alloc)
         self.files_by_b_addr[baddr] = fh
         log_file.info("registered: %s" % fh)
 
@@ -282,32 +260,34 @@ class FileManager:
 
     # ----- Packet decoding -----
 
-    def _make_decoder(self, volume_handler):
-        """build a :class:`PacketDecoder` wired to this file manager"""
+    def _make_decoder(self, handler):
+        """build the :class:`PacketDecoder` that serves ``handler``
+
+        The decoder is scoped to the handler: ``volume_handler`` names it (for
+        ZERO-lock path packets) and the decoder rejects fh/lock packets whose
+        handle belongs to a different handler.
+        """
         return PacketDecoder(
             self.mem,
             resolve_fh=self._resolve_fh,
             resolve_lock=self._resolve_lock,
-            volume_handler=volume_handler,
+            volume_handler=lambda: handler,
             register_lock=self._register_handler_lock,
             register_file=self._register_handler_file,
             release_lock=self._release_lock,
             release_file=self._release_file,
         )
 
-    def make_volume_put_msg(self, handler):
-        """build the port callback that decodes packets for one volume
+    def _bind_dispatchers(self):
+        """give every handler its own packet port (see HandlerManager)"""
+        attach = getattr(self.handler_mgr, "attach_dispatchers", None)
+        if attach is not None:
+            attach(self.port_mgr, self.mem, self._make_decoder)
 
-        ZERO-lock path packets (LOCATE_OBJECT, FIND*, DELETE, ...) are
-        volume-relative, so the receiving port must know its volume's handler.
-        """
-        decoder = self._make_decoder(lambda: handler)
-        return lambda port_mgr, msg_addr: self._put_msg(decoder, port_mgr, msg_addr)
-
-    def _console_handler(self):
-        if self.handler_mgr is None:
-            return None
-        return self.handler_mgr.get_handler("console")
+    def _detach_dispatchers(self):
+        detach = getattr(self.handler_mgr, "detach_dispatchers", None)
+        if detach is not None:
+            detach()
 
     # ----- packet resolvers (injected into the decoder) -----
 
@@ -362,39 +342,3 @@ class FileManager:
         if fh is None:
             raise HandlerError(ERROR_INVALID_LOCK)
         self.close(fh)
-
-    # ----- Direct Handler Access -----
-
-    def _put_msg(self, decoder, port_mgr, msg_addr):
-        """decode one packet and post the reply to the sender's reply port"""
-        msg = MessageStruct(self.mem, msg_addr)
-        dos_pkt_addr = msg.node.name.aptr
-        dos_pkt = DosPacketStruct(self.mem, dos_pkt_addr)
-        reply_port_addr = dos_pkt.port.aptr
-        pkt_type = dos_pkt.type.val
-        try:
-            pkt_name = DosAction(pkt_type).name
-        except ValueError:
-            pkt_name = "?"
-        log_file.info(
-            "DosPacket: msg=%06x -> pkt=%06x: reply_port=%06x type=%06x (%s)",
-            msg_addr,
-            dos_pkt_addr,
-            reply_port_addr,
-            pkt_type,
-            pkt_name,
-        )
-        decoder.decode(dos_pkt)
-        # do reply
-        if not port_mgr.has_port(reply_port_addr):
-            port_mgr.register_port(reply_port_addr)
-        port_mgr.put_msg(reply_port_addr, msg_addr)
-
-    # callback from port manager for fs handler port
-    # -> Async I/O
-    def fs_put_msg(self, port_mgr, msg_addr):
-        self._put_msg(self.fs_decoder, port_mgr, msg_addr)
-
-    # handle console packet
-    def console_put_msg(self, port_mgr, msg_addr):
-        self._put_msg(self.console_decoder, port_mgr, msg_addr)
