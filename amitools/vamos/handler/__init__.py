@@ -16,6 +16,7 @@ from .base import (
     HandlerLock,
 )
 from .console import ConsoleHandler
+from .dospkt import DosPktHandler
 from .filesys import HostFileSysHandler
 from .mgr import HandlerManager, build_handler_manager
 from .nil import NilHandler
@@ -30,6 +31,7 @@ __all__ = [
     "MODE_READWRITE",
     "ConsoleHandler",
     "DosProtection",
+    "DosPktHandler",
     "Handler",
     "HandlerError",
     "HandlerFile",

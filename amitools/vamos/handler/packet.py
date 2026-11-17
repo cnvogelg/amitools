@@ -175,10 +175,12 @@ class PacketHandler(Handler):
     ``dp_Res1``/``dp_Res2``; it may also raise :class:`HandlerError` directly.
     """
 
-    def __init__(self, name, alloc, is_filesystem=True):
+    def __init__(self, name, alloc=None, is_filesystem=True):
         super().__init__(name, is_filesystem=is_filesystem)
+        # ``alloc`` may be None for a handler that is created before the
+        # emulated machine exists and attached later (see DosPktHandler)
         self.alloc = alloc
-        self.mem = alloc.mem
+        self.mem = alloc.mem if alloc is not None else None
 
     # ----- transport hook -----
 

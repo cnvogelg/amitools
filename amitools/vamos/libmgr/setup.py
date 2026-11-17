@@ -158,6 +158,21 @@ class SetupLibManager(object):
         self.dos_impl = self.dos_vlib.get_impl()
         self.dos_ctx.set_dos_lib(self.dos_impl)
         log_libmgr.info("open base lib: dos:  @%06x", self.dos_addr)
+        # now that exec/dos (and the port manager) exist, hand the live machine
+        # to any detached packet handler (``?handler=packet``)
+        self._attach_packet_handlers()
+
+    def _attach_packet_handlers(self):
+        if self.handler_mgr is None:
+            return
+        exec_impl = self.exec_impl
+        port_list = exec_impl.exec_lib.port_list
+        self.handler_mgr.attach_packet_transport(
+            self.alloc,
+            exec_impl.port_mgr,
+            exec_impl.mem,
+            find_port=lambda name: port_list.find_name(name, promote=True),
+        )
 
     def close_base_libs(self):
         log_libmgr.info("closing base libs...")
