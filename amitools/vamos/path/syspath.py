@@ -13,7 +13,6 @@ while an "ami path" is an AmigaDOS path (e.g. ``work:foo``).
 import os
 import os.path
 import shutil
-import tempfile
 from collections import namedtuple
 
 from amitools.vamos.log import log_path
@@ -97,41 +96,6 @@ class HostFileSystem(object):
             return True
         except OSError as e:
             log_path.error("error creating dir: %s -> %s", sys_path, e)
-            return False
-
-    def make_temp_dir(self, base):
-        """create a unique temp dir below the given base path
-
-        return the created path or None on error
-        """
-        # retry: another instance may remove an empty base dir between
-        # our makedirs and mkdtemp
-        for _ in range(3):
-            try:
-                os.makedirs(base, exist_ok=True)
-                path = tempfile.mkdtemp(dir=base)
-                log_path.debug("created temp dir: %s", path)
-                return path
-            except OSError:
-                continue
-        log_path.error("error creating temp dir below: '%s'", base)
-        return None
-
-    def remove_tree(self, sys_path):
-        try:
-            log_path.debug("removing dir tree: %s", sys_path)
-            shutil.rmtree(sys_path)
-            return True
-        except OSError:
-            log_path.error("error removing dir tree: '%s'", sys_path)
-            return False
-
-    def remove_dir(self, sys_path):
-        """remove an empty directory, ignore errors"""
-        try:
-            os.rmdir(sys_path)
-            return True
-        except OSError:
             return False
 
     # ----- file operations -----
@@ -242,7 +206,6 @@ class SysVolume(object):
         self.path = path
         self.cfg = cfg
         self.file_system = file_system
-        self.temp_base = None
 
     def get_path(self):
         return self.path
@@ -252,18 +215,8 @@ class SysVolume(object):
         # a non-host handler (nil:, console:, ...) has no host directory
         if path is None:
             return True
-        # temp dir?
-        if "temp" in self.cfg:
-            temp_path = self.file_system.make_temp_dir(path)
-            if not temp_path:
-                return False
-            # mount a unique dir below the configured path, so
-            # concurrent vamos instances do not clash on setup or
-            # teardown of a shared temp volume
-            self.temp_base = path
-            self.path = temp_path
         # does path exist?
-        elif not self.file_system.is_dir(path):
+        if not self.file_system.is_dir(path):
             if "create" in self.cfg:
                 log_path.info("creating volume dir: %s", path)
                 if not self.file_system.make_dir(path):
@@ -274,14 +227,8 @@ class SysVolume(object):
         return True
 
     def shutdown(self):
-        if self.path is None:
-            return
-        if "temp" in self.cfg:
-            if self.path:
-                self.file_system.remove_tree(self.path)
-            # drop the base dir if we were its last user
-            if self.temp_base:
-                self.file_system.remove_dir(self.temp_base)
+        # a volume no longer owns host state to release
+        pass
 
     def create_rel_sys_path(self, rel_path):
         if self.path is None:

@@ -164,21 +164,6 @@ def path_volume_create_test(tmpdir):
     v.shutdown()
 
 
-def path_volume_temp_test(tmpdir):
-    v = VolumeManager(str(tmpdir))
-    assert v.setup()
-    spec = "my:" + str(tmpdir)
-    # create temp
-    spec += "/bla"
-    assert v.add_volume(spec + "?temp")
-    # check that temp dir exists
-    assert tmpdir.join("bla").check(dir=1)
-    # shutdown
-    v.shutdown()
-    # now temp is gone
-    assert not tmpdir.join("bla").check()
-
-
 def path_volume_non_host_handler_test(tmpdir):
     # a non-host handler needs no host directory (and no base dir)
     v = VolumeManager()
