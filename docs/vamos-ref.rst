@@ -130,8 +130,13 @@ comma-separated values.
 
   A volume spec may carry options after ``?``, such as ``?create`` (create the
   host directory). The ``handler`` option selects the handler that backs the
-  volume; the default is ``hostfs``, a host directory:
-  ``vamos -V work:/abs/path?handler=hostfs myprog``.
+  volume: ``hostfs`` (a host directory, the default), ``ram`` (an in-memory
+  file system), or the ``nil``/``console`` devices. A non-host volume needs no
+  host path, and ``ram`` accepts a nominal size in KiB::
+
+      vamos -V work:/abs/path?handler=hostfs -V scratch:?handler=ram,size=2048 myprog
+
+  See :doc:`vamos-handler` for the handler layer and how to write your own.
 
 * ``-a NAME:AMIGA-PATH``, ``--assign NAME:AMIGA-PATH``: Define an Amiga
   assign. Use ``+`` to add paths to a multi-assign::
@@ -147,7 +152,8 @@ comma-separated values.
   volumes: ``vamos --vols-base-dir ./vamos-volumes myprog``.
 * ``--auto-volumes NAME,...``: Select automatically created volumes (``root``
   and ``ram`` by default); use ``off`` to disable them:
-  ``vamos --auto-volumes root,ram myprog``.
+  ``vamos --auto-volumes root,ram myprog``. ``root`` is a host directory (the
+  host ``/``) and ``ram`` is the in-memory ``ram`` handler.
 * ``-A NAME,...``, ``--auto-assigns NAME,...``: Select automatically created
   assigns (``c``, ``s``, ``libs``, ``devs``, and ``t`` by default); use
   ``off`` to disable them: ``vamos -A c,libs myprog``.
@@ -212,10 +218,13 @@ Exception names accepted by ``--hw-exception`` are ``bus``, ``address``,
 Disks, libraries, and devices
 -----------------------------
 
-Host directory volumes also have DOS device entries with matching handler
-ports. Their capacity comes from the host filesystem, so mounts on the same
-filesystem report overlapping space. These entries do not represent physical
-block devices and have no filesystem startup message or block geometry.
+Every file system volume -- a host directory or an in-memory ``ram`` volume --
+has a DOS device entry with a matching handler port. Their capacity comes from
+the backing file system (the host filesystem, or the ``ram`` handler's nominal
+size), so host mounts on the same filesystem report overlapping space. The
+``NIL:`` and ``CONSOLE:`` devices get a device entry only, with no handler port
+and no startup message. None of these entries represent physical block devices
+and they have no block geometry.
 
 * ``--disk IMAGE``: Expose an RDB disk image through ``scsi.device``; repeat
   to add units in order: ``vamos --disk work.hdf myprog``. The command-line

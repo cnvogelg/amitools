@@ -56,6 +56,8 @@ Features
 * Fast m68k CPU emulation with Musashi CPU Emulator
 * Supports native library loading for application libs (e.g. SAS sc1.library)
 * Dos Library supports: Locks, Files (Open, Read, Write, Seek, Close)
+* A handler-based file system layer: host directories, an in-memory volume,
+  and the ``NIL:``/``CONSOLE:`` devices (see :doc:`vamos-handler`)
 * Exec Library supports: AllocMem/Vec, LoadLibrary
 * Many useful tracing and logging features
 
@@ -123,8 +125,10 @@ In the source archive see *config/sample_vamosrc* for an example config file.
 
 
 AmigaOS uses **Volumes** to name(:) and identify the different file systems
-found on an Amiga system. In vamos a Volume is defined as a part of the host
-(i.e. Mac or PC) file system that will be exposed to the Amiga emulation.
+found on an Amiga system. In vamos a Volume is backed by a *handler*: by
+default a host (i.e. Mac or PC) directory that will be exposed to the Amiga
+emulation, but also an in-memory file system or a device. The handler layer is
+described in :doc:`vamos-handler`.
 
 You specify a volume by giving a **host directory path**. All files below this
 path are considered to be part of the volume.
@@ -177,8 +181,18 @@ option selects the handler that backs the volume. By default a volume uses the
     [volumes]
     work=~/amiga/work?handler=hostfs
 
-Additional handler types (such as an in-memory ``ram`` volume, or the ``nil``
-and ``console`` devices) are planned and will use the same option.
+Besides ``hostfs`` vamos ships an in-memory ``ram`` file system and the ``nil``
+and ``console`` devices. A non-host volume needs no host path, so its source
+may be empty. The ``ram`` handler takes an optional nominal capacity in KiB:
+
+    [volumes]
+    scratch=?handler=ram
+    tmp=?handler=ram,size=2048
+
+The in-memory ``ram:`` volume is also created automatically (see
+``--auto-volumes`` below); it is not a host temp directory. The ``NIL:`` and
+``CONSOLE:`` devices always exist and need no volume definition. See
+:doc:`vamos-handler` for the available handlers and how to write your own.
 
 2.1.2 Assigns
 ^^^^^^^^^^^^^
