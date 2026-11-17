@@ -1,0 +1,16 @@
+##base _AslBase
+##bias 30
+##public
+AllocFileRequest()()
+FreeFileRequest(fileReq)(a0)
+RequestFile(fileReq)(a0)
+AllocAslRequest(reqType,tagList)(d0/a0)
+FreeAslRequest(requester)(a0)
+AslRequest(requester,tagList)(a0/a1)
+##private
+aslPrivate1()()
+aslPrivate2()()
+##public
+AbortAslRequest(requester)(a0)
+ActivateAslRequest(requester)(a0)
+##end

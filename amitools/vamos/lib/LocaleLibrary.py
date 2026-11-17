@@ -7,6 +7,9 @@ import string
 
 
 class LocaleLibrary(LibImpl):
+    def GetCatalogStr(self, ctx, catalog, number, default):
+        return default
+
     def OpenLocale(self, ctx):
         name = ctx.cpu.r_reg(REG_A0)
         # dummy
