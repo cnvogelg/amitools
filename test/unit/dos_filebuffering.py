@@ -38,7 +38,7 @@ def dos_filehandle_setvbuf_test():
     cpu.w_reg(REG_D3, 1)
     cpu.w_reg(REG_D4, 0x1000)
 
-    assert lib.SetVBuf(ctx) == 0
+    assert lib.SetVBuf(ctx, fh_b_addr, 0x5678, 1, 0x1000) == 0
     assert fh.struct.fh_Buf.val == 0x5678
     assert fh.buf_type == 1
     assert fh.buf_size == 0x1000

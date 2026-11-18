@@ -12,6 +12,26 @@ from amitools.vamos.log import log_dos
 from .Error import DOSFALSE, ERROR_NOT_IMPLEMENTED
 
 
+def put_str(dos, ctx, str_ptr):
+    """write a C string to the process's current output (RKRM ``PutStr``)"""
+    str_dat = ctx.mem.r_cbytes(str_ptr)
+    # write to stdout
+    fh = ctx.process.get_output()
+    ok = fh.write(str_dat)
+
+    show_data = str_dat[: dos.MAX_SHOW_DATA]
+    log_dos.info("PutStr: %s", show_data)
+    return 0  # ok
+
+
+def write_chars(dos, ctx, buf_ptr, size):
+    """write ``size`` bytes to the process's current output (``WriteChars``)"""
+    fh = ctx.process.get_output()
+    buf = ctx.mem.r_cbytes(buf_ptr)[:size]
+    fh.write(buf)
+    return len(buf)
+
+
 def error_output_bptr(ctx):
     """the BPTR ErrorOutput() returns (stderr, fallback stdout)"""
     proc = ctx.process.get_ami_process()
