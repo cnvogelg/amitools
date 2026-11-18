@@ -43,10 +43,10 @@ class BlockDevice:
     def flush(self):
         pass
 
-    def read_block(self, blk_num):
+    def read_block(self, blk_num, num_blks=1):
         pass
 
-    def write_block(self, blk_num, data):
+    def write_block(self, blk_num, data, num_blks=1):
         pass
 
     def get_geometry(self):
