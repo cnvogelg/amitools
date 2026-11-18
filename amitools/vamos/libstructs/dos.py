@@ -421,6 +421,16 @@ class RecordLockStruct(AmigaStruct):
 
 
 @AmigaStructDef
+class NotifyRequestStruct(AmigaStruct):
+    _format = [
+        (BSTR, "nr_Name"),
+        (BSTR, "nr_FullName"),
+        (APTR_VOID, "nr_User"),
+        (LONG, "nr_Flags"),
+    ]
+
+
+@AmigaStructDef
 class SegmentStruct(AmigaStruct):
     _format = [
         (BPTR_VOID, "seg_Next"),

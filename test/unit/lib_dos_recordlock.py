@@ -1,10 +1,18 @@
-"""dos.library record locking (Step 18)."""
+"""dos.library record locking routed through the handler (Step 20).
 
+The handler owns the record locks of an open file (``HandlerFile.record_locks``
+via ACTION_LOCK_RECORD / ACTION_FREE_RECORD); ``dos/RecordLock.py`` only
+resolves the DOS file handle and walks the ``LockRecords`` array. A
+handler-less handle keeps a per-handle fallback list.
+"""
+
+import io
 from types import SimpleNamespace
-import pytest
 
 from amitools.vamos.astructs import LONG
+from amitools.vamos.handler import FileSystemHandler, HandlerFile
 from amitools.vamos.lib.DosLibrary import DosLibrary
+from amitools.vamos.lib.dos.FileHandle import FileHandle
 from amitools.vamos.libstructs import RecordLockStruct
 from amitools.vamos.machine.mock import MockCPU, MockMemory
 from amitools.vamos.machine.regs import REG_D1, REG_D2, REG_D3, REG_D4, REG_D5
@@ -12,9 +20,9 @@ from amitools.vamos.machine.regs import REG_D1, REG_D2, REG_D3, REG_D4, REG_D5
 from amitools.vamos.lib.dos.Error import (
     DOSFALSE,
     DOSTRUE,
+    ERROR_BAD_NUMBER,
     ERROR_INVALID_LOCK,
     ERROR_LOCK_COLLISION,
-    ERROR_LOCK_TIMEOUT,
     ERROR_RECORD_NOT_LOCKED,
 )
 
@@ -38,6 +46,24 @@ class _FileMgr:
 
     def close(self, fh):
         self.closed.append(fh)
+        fh.close()
+
+
+def _handler_fh(handler, key="f"):
+    """a handler-backed file handle (its locks live on the handler file)"""
+    hf = HandlerFile(key=key)
+    return FileHandle(
+        io.BytesIO(b"0123456789"),
+        "test:" + key,
+        key,
+        handler=handler,
+        handler_file=hf,
+    )
+
+
+def _bare_fh(key="f"):
+    """a handler-less file handle (its locks live on the handle)"""
+    return FileHandle(io.BytesIO(b"0123456789"), "test:" + key, key)
 
 
 def _long(mem, cpu, reg, value):
@@ -45,11 +71,11 @@ def _long(mem, cpu, reg, value):
     return LONG(cpu=cpu, reg=reg, mem=mem)
 
 
-def _make_lib(handles=(10, 11)):
+def _make_lib(handles):
     mem = MockMemory()
     cpu = MockCPU()
     lib = DosLibrary()
-    lib.file_mgr = _FileMgr({b: object() for b in handles})
+    lib.file_mgr = _FileMgr(handles)
     ctx = SimpleNamespace(mem=mem, cpu=cpu, process=None)
     return lib, ctx, mem, cpu
 
@@ -74,63 +100,73 @@ def _unlock(lib, ctx, mem, cpu, fh, offset, length):
     )
 
 
-def lib_dos_recordlock_lock_unlock_test():
-    lib, ctx, mem, cpu = _make_lib()
+def lib_dos_recordlock_handler_lock_unlock_test():
+    handler = FileSystemHandler("test")
+    fh = _handler_fh(handler)
+    lib, ctx, mem, cpu = _make_lib({10: fh})
 
     assert _lock(lib, ctx, mem, cpu, 10, 0, 100, REC_EXCLUSIVE) == DOSTRUE
     assert lib.io_err == 0
+    # the lock lives on the handler file
+    assert fh.handler_file.record_locks == [(0, 100, REC_EXCLUSIVE)]
 
-    # a handle may overlap its own locks
-    assert _lock(lib, ctx, mem, cpu, 10, 50, 100, REC_EXCLUSIVE) == DOSTRUE
+    # an overlapping lock collides (the handler does not special-case the
+    # same handle)
+    assert _lock(lib, ctx, mem, cpu, 10, 50, 100, REC_EXCLUSIVE) == DOSFALSE
+    assert lib.io_err == ERROR_LOCK_COLLISION
+
+    # a disjoint lock is fine
+    assert _lock(lib, ctx, mem, cpu, 10, 100, 100, REC_EXCLUSIVE) == DOSTRUE
 
     assert _unlock(lib, ctx, mem, cpu, 10, 0, 100) == DOSTRUE
-    assert _unlock(lib, ctx, mem, cpu, 10, 50, 100) == DOSTRUE
+    assert _unlock(lib, ctx, mem, cpu, 10, 100, 100) == DOSTRUE
     # unlocking an unlocked region fails
     assert _unlock(lib, ctx, mem, cpu, 10, 0, 100) == DOSFALSE
     assert lib.io_err == ERROR_RECORD_NOT_LOCKED
 
 
+def lib_dos_recordlock_fallback_lock_unlock_test():
+    # a handler-less handle keeps the per-handle fallback list
+    fh = _bare_fh()
+    lib, ctx, mem, cpu = _make_lib({10: fh})
+
+    assert _lock(lib, ctx, mem, cpu, 10, 0, 100, REC_EXCLUSIVE) == DOSTRUE
+    assert fh.record_locks == [(0, 100, REC_EXCLUSIVE)]
+    assert _lock(lib, ctx, mem, cpu, 10, 50, 100, REC_EXCLUSIVE) == DOSFALSE
+    assert lib.io_err == ERROR_LOCK_COLLISION
+    assert _unlock(lib, ctx, mem, cpu, 10, 0, 100) == DOSTRUE
+    assert _unlock(lib, ctx, mem, cpu, 10, 0, 100) == DOSFALSE
+    assert lib.io_err == ERROR_RECORD_NOT_LOCKED
+
+
+def lib_dos_recordlock_shared_test():
+    # two shared locks may overlap (neither is exclusive)
+    handler = FileSystemHandler("test")
+    fh = _handler_fh(handler)
+    lib, ctx, mem, cpu = _make_lib({10: fh})
+    assert _lock(lib, ctx, mem, cpu, 10, 0, 100, REC_SHARED) == DOSTRUE
+    assert _lock(lib, ctx, mem, cpu, 10, 50, 100, REC_SHARED_IMMED) == DOSTRUE
+
+    # an exclusive lock blocks an overlapping shared lock
+    handler = FileSystemHandler("test")
+    fh = _handler_fh(handler)
+    lib, ctx, mem, cpu = _make_lib({10: fh})
+    assert _lock(lib, ctx, mem, cpu, 10, 0, 100, REC_EXCLUSIVE_IMMED) == DOSTRUE
+    assert _lock(lib, ctx, mem, cpu, 10, 50, 100, REC_SHARED_IMMED) == DOSFALSE
+    assert lib.io_err == ERROR_LOCK_COLLISION
+
+
 def lib_dos_recordlock_invalid_test():
-    lib, ctx, mem, cpu = _make_lib()
+    handler = FileSystemHandler("test")
+    fh = _handler_fh(handler)
+    lib, ctx, mem, cpu = _make_lib({10: fh})
 
     assert _lock(lib, ctx, mem, cpu, 99, 0, 1, REC_EXCLUSIVE) == DOSFALSE
     assert lib.io_err == ERROR_INVALID_LOCK
     assert _lock(lib, ctx, mem, cpu, 10, 0, 1, 99) == DOSFALSE
-    assert lib.io_err != 0
+    assert lib.io_err == ERROR_BAD_NUMBER
     assert _unlock(lib, ctx, mem, cpu, 99, 0, 1) == DOSFALSE
     assert lib.io_err == ERROR_INVALID_LOCK
-
-
-def lib_dos_recordlock_shared_test():
-    lib, ctx, mem, cpu = _make_lib()
-
-    assert _lock(lib, ctx, mem, cpu, 10, 0, 100, REC_SHARED) == DOSTRUE
-    # shared locks do not block each other
-    assert _lock(lib, ctx, mem, cpu, 11, 0, 100, REC_SHARED_IMMED) == DOSTRUE
-
-    lib, ctx, mem, cpu = _make_lib()
-    assert _lock(lib, ctx, mem, cpu, 10, 0, 100, REC_EXCLUSIVE_IMMED) == DOSTRUE
-    assert _lock(lib, ctx, mem, cpu, 11, 0, 100, REC_SHARED_IMMED) == DOSFALSE
-    assert lib.io_err == ERROR_LOCK_COLLISION
-
-
-@pytest.mark.parametrize("mode", [REC_EXCLUSIVE, REC_SHARED, REC_EXCLUSIVE_IMMED])
-def lib_dos_recordlock_conflict_test(mode):
-    lib, ctx, mem, cpu = _make_lib()
-    assert _lock(lib, ctx, mem, cpu, 10, 100, 50, REC_EXCLUSIVE) == DOSTRUE
-    assert _lock(lib, ctx, mem, cpu, 11, 120, 10, mode) == DOSFALSE
-    if mode == REC_EXCLUSIVE:
-        assert lib.io_err == ERROR_LOCK_TIMEOUT
-    elif mode == REC_EXCLUSIVE_IMMED:
-        assert lib.io_err == ERROR_LOCK_COLLISION
-    else:
-        assert lib.io_err == ERROR_LOCK_TIMEOUT
-
-
-def lib_dos_recordlock_non_overlap_test():
-    lib, ctx, mem, cpu = _make_lib()
-    assert _lock(lib, ctx, mem, cpu, 10, 0, 100, REC_EXCLUSIVE_IMMED) == DOSTRUE
-    assert _lock(lib, ctx, mem, cpu, 11, 100, 100, REC_EXCLUSIVE_IMMED) == DOSTRUE
 
 
 def _write_record(mem, index, fh, offset, length, mode):
@@ -142,25 +178,28 @@ def _write_record(mem, index, fh, offset, length, mode):
 
 
 def lib_dos_recordlock_records_rollback_test():
-    lib, ctx, mem, cpu = _make_lib()
+    handler = FileSystemHandler("test")
+    fh = _handler_fh(handler)
+    lib, ctx, mem, cpu = _make_lib({10: fh})
     _write_record(mem, 0, 10, 0, 100, REC_EXCLUSIVE)
-    _write_record(mem, 1, 11, 50, 100, REC_EXCLUSIVE)
+    # an invalid mode fails the second entry and rolls back the first
+    _write_record(mem, 1, 10, 200, 100, 99)
     _write_record(mem, 2, 0, 0, 0, 0)
 
     rec_array = _long(mem, cpu, REG_D1, ARRAY_ADDR)
     timeout = _long(mem, cpu, REG_D2, 0)
     assert lib.LockRecords(ctx, rec_array, timeout) == DOSFALSE
-    assert lib.io_err == ERROR_LOCK_TIMEOUT
-
-    # the first record was rolled back: the other handle can take it
-    assert _lock(lib, ctx, mem, cpu, 11, 0, 100, REC_EXCLUSIVE_IMMED) == DOSTRUE
+    assert lib.io_err == ERROR_BAD_NUMBER
+    # the first record was rolled back
+    assert fh.handler_file.record_locks == []
 
 
 def lib_dos_recordlock_records_unlock_test():
-    lib, ctx, mem, cpu = _make_lib()
-    # the same handle may lock overlapping regions
+    handler = FileSystemHandler("test")
+    fh = _handler_fh(handler)
+    lib, ctx, mem, cpu = _make_lib({10: fh})
     _write_record(mem, 0, 10, 0, 100, REC_EXCLUSIVE)
-    _write_record(mem, 1, 10, 0, 100, REC_EXCLUSIVE)
+    _write_record(mem, 1, 10, 200, 100, REC_EXCLUSIVE)
     _write_record(mem, 2, 0, 0, 0, 0)
 
     rec_array = _long(mem, cpu, REG_D1, ARRAY_ADDR)
@@ -176,11 +215,22 @@ def lib_dos_recordlock_records_unlock_test():
     assert lib.io_err == ERROR_RECORD_NOT_LOCKED
 
 
-def lib_dos_recordlock_close_releases_test():
-    lib, ctx, mem, cpu = _make_lib()
-    assert _lock(lib, ctx, mem, cpu, 10, 0, 100, REC_EXCLUSIVE_IMMED) == DOSTRUE
-    assert _lock(lib, ctx, mem, cpu, 11, 0, 100, REC_EXCLUSIVE_IMMED) == DOSFALSE
+def lib_dos_recordlock_close_owns_locks_test():
+    # the locks live on the handler file: DOS Close ends the file but keeps no
+    # separate record-lock list to release
+    ended = []
+
+    class _H(FileSystemHandler):
+        def end(self, fh):
+            ended.append(fh)
+
+    handler = _H("test")
+    fh = _handler_fh(handler)
+    lib, ctx, mem, cpu = _make_lib({10: fh})
+    assert _lock(lib, ctx, mem, cpu, 10, 0, 100, REC_EXCLUSIVE) == DOSTRUE
+    assert fh.handler_file.record_locks == [(0, 100, REC_EXCLUSIVE)]
 
     assert lib.Close(ctx, 10) == DOSTRUE
-    assert lib.file_mgr.closed  # the handle was closed
-    assert _lock(lib, ctx, mem, cpu, 11, 0, 100, REC_EXCLUSIVE_IMMED) == DOSTRUE
+    assert lib.file_mgr.closed == [fh]
+    # Close ended the handler file that owns the locks
+    assert ended == [fh.handler_file]

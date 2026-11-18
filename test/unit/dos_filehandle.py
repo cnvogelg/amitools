@@ -7,6 +7,11 @@ from amitools.vamos.handler import (
     HandlerFile,
     NilHandler,
 )
+from amitools.vamos.handler.base import (
+    ERROR_LOCK_COLLISION,
+    ERROR_RECORD_NOT_LOCKED,
+    REC_EXCLUSIVE,
+)
 from amitools.vamos.lib.dos.FileHandle import FileHandle
 from amitools.vamos.machine.mock import MockMemory
 from amitools.vamos.mem import MemoryAlloc
@@ -168,3 +173,58 @@ def dos_filehandle_set_file_size_raw_test():
         # an unknown mode fails without touching the stream
         assert fh.set_file_size(0, 7) == -1
         assert stream.getvalue() == b"012"
+
+
+# ----- record locks (ACTION_LOCK_RECORD / ACTION_FREE_RECORD) -----
+
+
+class _RecordHandler:
+    def __init__(self):
+        self.calls = []
+
+    def lock_record(self, handler_file, offset, length, mode, timeout):
+        self.calls.append(("lock", handler_file, offset, length, mode, timeout))
+
+    def free_record(self, handler_file, offset, length):
+        self.calls.append(("free", handler_file, offset, length))
+
+
+def dos_filehandle_lock_record_handler_test():
+    # a handler-backed handle delegates to the handler (which owns the locks)
+    handler = _RecordHandler()
+    hf = HandlerFile()
+    fh = FileHandle(io.BytesIO(b"x"), "X:f", "f", handler=handler, handler_file=hf)
+
+    assert fh.lock_record(0, 10, REC_EXCLUSIVE, 5) == (True, 0)
+    assert fh.free_record(0, 10) == (True, 0)
+    assert handler.calls == [
+        ("lock", hf, 0, 10, REC_EXCLUSIVE, 5),
+        ("free", hf, 0, 10),
+    ]
+
+
+def dos_filehandle_lock_record_handler_error_test():
+    # the handler's error code becomes the adapter's error
+    class _H:
+        def lock_record(self, handler_file, offset, length, mode, timeout):
+            raise HandlerError(241)
+
+        def free_record(self, handler_file, offset, length):
+            raise HandlerError(240)
+
+    hf = HandlerFile()
+    fh = FileHandle(io.BytesIO(b"x"), "X:f", "f", handler=_H(), handler_file=hf)
+    assert fh.lock_record(0, 10, REC_EXCLUSIVE, 5) == (False, 241)
+    assert fh.free_record(0, 10) == (False, 240)
+
+
+def dos_filehandle_lock_record_fallback_test():
+    # a handler-less handle keeps the record locks on the handle
+    fh = FileHandle(io.BytesIO(b"x"), "X:f", "f", need_close=False)
+    assert fh.lock_record(0, 10, REC_EXCLUSIVE, 0) == (True, 0)
+    assert fh.record_locks == [(0, 10, REC_EXCLUSIVE)]
+    # an overlapping lock collides, a disjoint one is fine
+    assert fh.lock_record(5, 10, REC_EXCLUSIVE, 0) == (False, ERROR_LOCK_COLLISION)
+    assert fh.lock_record(10, 10, REC_EXCLUSIVE, 0) == (True, 0)
+    assert fh.free_record(0, 10) == (True, 0)
+    assert fh.free_record(0, 10) == (False, ERROR_RECORD_NOT_LOCKED)

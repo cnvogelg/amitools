@@ -47,6 +47,55 @@ def _struct_write(struct, path, value):
         field.set(value)
 
 
+def fill_fib(fib_mem, info, name=None):
+    """write a :class:`HandlerFileInfo` into a FileInfoBlock
+
+    Shared by ``Lock.examine_lock``/``examine_next`` and
+    ``DosLibrary.ExamineFH`` (ACTION_EXAMINE_FH).
+    """
+    if name is None:
+        name = info.name
+    mem = fib_mem.mem
+    # name (fib_FileName is a 108 byte field)
+    name_addr = _struct_addr(fib_mem, "fib_FileName")
+    mem.clear_block(name_addr, 108, 0)
+    mem.w_cstr(name_addr, name)
+    # comment (fib_Comment is a 80 byte field)
+    comment_addr = _struct_addr(fib_mem, "fib_Comment")
+    mem.clear_block(comment_addr, 80, 0)
+    if info.comment:
+        mem.w_cstr(comment_addr, info.comment)
+    # key / "inode" information
+    _struct_write(fib_mem, "fib_DiskKey", info.key)
+    # type
+    _struct_write(fib_mem, "fib_DirEntryType", info.entry_type)
+    _struct_write(fib_mem, "fib_EntryType", info.entry_type)
+    # protection
+    _struct_write(fib_mem, "fib_Protection", info.protection)
+    # size / blocks
+    _struct_write(fib_mem, "fib_Size", info.size)
+    _struct_write(fib_mem, "fib_NumBlocks", info.blocks)
+    # date
+    date_addr = _struct_addr(fib_mem, "fib_Date")
+    date = DateStampStruct(fib_mem.mem, date_addr)
+    at = sys_to_ami_time(info.date)
+    date.ds_Days.val = at.tday
+    date.ds_Minute.val = at.tmin
+    date.ds_Tick.val = at.tick
+    # owner
+    _struct_write(fib_mem, "fib_OwnerUID", info.owner_uid)
+    _struct_write(fib_mem, "fib_OwnerGID", info.owner_gid)
+    log_lock.debug(
+        "examine: '%s' type=%d prot=%03o size=%d blocks=%d key=%d",
+        name,
+        info.entry_type,
+        info.protection,
+        info.size,
+        info.blocks,
+        info.key,
+    )
+
+
 class Lock:
     """represent an AmigaOS Lock in vamos
 
@@ -114,50 +163,6 @@ class Lock:
 
     # --- lock ops ---
 
-    def _fill_fib(self, fib_mem, info, name=None):
-        """write a :class:`HandlerFileInfo` into a FileInfoBlock"""
-        if name is None:
-            name = info.name
-        mem = fib_mem.mem
-        # name (fib_FileName is a 108 byte field)
-        name_addr = _struct_addr(fib_mem, "fib_FileName")
-        mem.clear_block(name_addr, 108, 0)
-        mem.w_cstr(name_addr, name)
-        # comment (fib_Comment is a 80 byte field)
-        comment_addr = _struct_addr(fib_mem, "fib_Comment")
-        mem.clear_block(comment_addr, 80, 0)
-        if info.comment:
-            mem.w_cstr(comment_addr, info.comment)
-        # key / "inode" information
-        _struct_write(fib_mem, "fib_DiskKey", info.key)
-        # type
-        _struct_write(fib_mem, "fib_DirEntryType", info.entry_type)
-        _struct_write(fib_mem, "fib_EntryType", info.entry_type)
-        # protection
-        _struct_write(fib_mem, "fib_Protection", info.protection)
-        # size / blocks
-        _struct_write(fib_mem, "fib_Size", info.size)
-        _struct_write(fib_mem, "fib_NumBlocks", info.blocks)
-        # date
-        date_addr = _struct_addr(fib_mem, "fib_Date")
-        date = DateStampStruct(fib_mem.mem, date_addr)
-        at = sys_to_ami_time(info.date)
-        date.ds_Days.val = at.tday
-        date.ds_Minute.val = at.tmin
-        date.ds_Tick.val = at.tick
-        # owner
-        _struct_write(fib_mem, "fib_OwnerUID", info.owner_uid)
-        _struct_write(fib_mem, "fib_OwnerGID", info.owner_gid)
-        log_lock.debug(
-            "examine: '%s' type=%d prot=%03o size=%d blocks=%d key=%d",
-            name,
-            info.entry_type,
-            info.protection,
-            info.size,
-            info.blocks,
-            info.key,
-        )
-
     def examine_lock(self, fib_mem):
         try:
             info = self.handler.examine_object(self.handler_lock)
@@ -166,7 +171,7 @@ class Lock:
         # the DOS name of the examined object is the lock's own name; this
         # matters for the volume root, whose host basename is not the
         # volume name
-        self._fill_fib(fib_mem, info, name=self.name)
+        fill_fib(fib_mem, info, name=self.name)
         return NO_ERROR
 
     def examine_next(self, fib_mem):
@@ -176,7 +181,7 @@ class Lock:
             info = self.handler.examine_next(self.handler_lock, key)
         except HandlerError as e:
             return e.code
-        self._fill_fib(fib_mem, info)
+        fill_fib(fib_mem, info)
         return NO_ERROR
 
     def clone_for_scan(self):

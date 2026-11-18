@@ -19,15 +19,17 @@ from amitools.vamos.handler import (
     build_handler_manager,
     default_registry,
 )
-from amitools.vamos.path import PathManager
+from amitools.vamos.path import PathManager, VamosPathManager
 
 
-def setup_mgr(tmp_path):
+def setup_mgr(tmp_path, vamos=False):
     root = tmp_path / "root"
     root.mkdir()
     work = tmp_path / "work"
     work.mkdir()
-    pm = PathManager(vols_base_dir=str(tmp_path), auto_volumes=[], auto_assigns=[])
+    # the link helpers use the VamosPathManager path-component API
+    cls = VamosPathManager if vamos else PathManager
+    pm = cls(vols_base_dir=str(tmp_path), auto_volumes=[], auto_assigns=[])
     vm = pm.get_vol_mgr()
     am = pm.get_assign_mgr()
     vm.add_volume("root:" + str(root))
@@ -446,4 +448,77 @@ def handler_mgr_disk_info_test(tmp_path):
     assert mgr.disk_info("WORK:").num_blocks == info.num_blocks
     # an unknown volume cannot be resolved
     expect_error(205, mgr.disk_info, "nope:")
+    pm.shutdown()
+
+
+def handler_mgr_rename_disk_test(tmp_path):
+    pm, mgr, root, work = setup_mgr(tmp_path)
+    # the handler resolves by volume/device name (trailing colon optional)
+    mgr.rename_disk("work:", "NewWork")
+    assert mgr.get_handler("work").name == "NewWork"
+    # an unknown volume cannot be resolved
+    expect_error(205, mgr.rename_disk, "nope:", "x")
+    pm.shutdown()
+
+
+def handler_mgr_format_test(tmp_path):
+    pm, mgr, root, work = setup_mgr(tmp_path)
+    # a host file system cannot be formatted
+    expect_error(236, mgr.format, "work:", "NewVol", 0)
+    expect_error(205, mgr.format, "nope:", "NewVol", 0)
+    pm.shutdown()
+
+
+def handler_mgr_more_cache_test(tmp_path):
+    pm, mgr, root, work = setup_mgr(tmp_path)
+    # adding cache buffers is a no-op success on every handler
+    assert mgr.more_cache("work:", 10) == 0
+    expect_error(205, mgr.more_cache, "nope:", 10)
+    pm.shutdown()
+
+
+def handler_mgr_make_link_test(tmp_path):
+    pm, mgr, root, work = setup_mgr(tmp_path, vamos=True)
+    (work / "target").write_bytes(b"x")
+    # a soft link stores the target path string
+    mgr.make_link("work:link", "work:target", soft=True)
+    assert (work / "link").is_symlink()
+    # a hard link needs a target lock on the same handler; hostfs cannot
+    # express one
+    _, dest_lock = mgr.locate_object("work:target")
+    expect_error(236, mgr.make_link, "work:hard", dest_lock, False)
+    # a lock from another handler is a cross-device rename
+    (root / "r").write_bytes(b"x")
+    _, other_lock = mgr.locate_object("root:r")
+    expect_error(215, mgr.make_link, "work:hard", other_lock, False)
+    pm.shutdown()
+
+
+def handler_mgr_read_link_test(tmp_path):
+    pm, mgr, root, work = setup_mgr(tmp_path, vamos=True)
+    (work / "target").write_bytes(b"x")
+    mgr.make_link("work:link", "work:target", soft=True)
+    assert mgr.read_link("work:", "link", 64) == "work:target"
+    # a plain object is not a link
+    expect_error(212, mgr.read_link, "work:", "target", 64)
+    pm.shutdown()
+
+
+def handler_mgr_set_owner_test(tmp_path):
+    pm, mgr, root, work = setup_mgr(tmp_path)
+    (work / "f").write_bytes(b"x")
+    # no handler stores owner information
+    expect_error(236, mgr.set_owner, "work:f", 0x1234)
+    expect_error(205, mgr.set_owner, "nope:f", 0x1234)
+    pm.shutdown()
+
+
+def handler_mgr_notify_test(tmp_path):
+    pm, mgr, root, work = setup_mgr(tmp_path)
+    (work / "f").write_bytes(b"x")
+    # notifications are accepted as a no-op on a file system handler
+    mgr.add_notify("work:f", 0x1234)
+    mgr.remove_notify("work:f", 0x1234)
+    # an unresolvable object raises, the DOS front end keeps the no-op
+    expect_error(205, mgr.add_notify, "nope:f", 0x1234)
     pm.shutdown()

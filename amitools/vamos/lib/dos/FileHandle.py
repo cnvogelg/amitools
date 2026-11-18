@@ -1,4 +1,10 @@
 from amitools.vamos.handler import HandlerError
+from amitools.vamos.handler.base import (
+    ERROR_LOCK_COLLISION,
+    ERROR_RECORD_NOT_LOCKED,
+    REC_EXCLUSIVE,
+    REC_EXCLUSIVE_IMMED,
+)
 from amitools.vamos.libstructs import FileHandleStruct
 
 
@@ -35,6 +41,9 @@ class FileHandle:
         self.unch = bytearray()
         self.ch = -1
         self.is_nil = is_nil
+        # handler-less record locks (offset, length, mode); a handler-backed
+        # handle keeps its locks on the handler file instead
+        self.record_locks = []
         # console conversions (tty, latin1->utf8) live in the handler's
         # stream; the DOS layer only sees a plain byte stream
         self.interactive = self.obj.isatty() if self.obj is not None else False
@@ -294,6 +303,48 @@ class FileHandle:
                 pass
             return
         self.obj.flush()
+
+    # --- record locks (ACTION_LOCK_RECORD / ACTION_FREE_RECORD) ---
+
+    def lock_record(self, offset, length, mode, timeout):
+        """lock a byte range of the file: return (success, error_code)
+
+        A handler-backed handle delegates to the handler (which owns the file's
+        record locks); a handler-less handle keeps a per-handle list.
+        """
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                self.handler.lock_record(
+                    self.handler_file, offset, length, mode, timeout
+                )
+                return True, 0
+            except HandlerError as e:
+                return False, e.code
+        # handler-less fallback: a per-handle list
+        end = offset + length
+        exclusive = mode in (REC_EXCLUSIVE, REC_EXCLUSIVE_IMMED)
+        for other_offset, other_length, other_mode in self.record_locks:
+            if offset < other_offset + other_length and other_offset < end:
+                other_exclusive = other_mode in (REC_EXCLUSIVE, REC_EXCLUSIVE_IMMED)
+                if exclusive or other_exclusive:
+                    # match the handler contract: an overlapping lock collides
+                    return False, ERROR_LOCK_COLLISION
+        self.record_locks.append((offset, length, mode))
+        return True, 0
+
+    def free_record(self, offset, length):
+        """release a record lock: return (success, error_code)"""
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                self.handler.free_record(self.handler_file, offset, length)
+                return True, 0
+            except HandlerError as e:
+                return False, e.code
+        for i, (o, l, _m) in enumerate(self.record_locks):
+            if o == offset and l == length:
+                del self.record_locks[i]
+                return True, 0
+        return False, ERROR_RECORD_NOT_LOCKED
 
     def is_interactive(self):
         return self.interactive

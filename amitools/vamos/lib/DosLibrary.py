@@ -54,6 +54,7 @@ from .dos.CommandLine import CommandLine
 from .dos.Process import Process
 from .dos.DosList import DosList
 from .dos.LockManager import LockManager
+from .dos.Lock import fill_fib
 from .dos.FileManager import FileManager
 from .dos.DosFileOpener import DosFileOpener
 from .dos import Assign, Cli, Date, Link, Notify, RecordLock, Segments, Stdio, Volume
@@ -99,7 +100,7 @@ class DosLibrary(LibImpl):
         # these helpers keep state only in the Python process and may be
         # used before setup_lib() (e.g. by tests or a bare LibProxy)
         self.record_locks = RecordLock.RecordLockManager(self)
-        self.notify = Notify.NotifyHelper()
+        self.handler_mgr = None
 
     def get_struct_def(self):
         return DosLibraryStruct
@@ -122,7 +123,6 @@ class DosLibrary(LibImpl):
         self.local_vars = {}
         self.global_vars = {}
         self.record_locks = RecordLock.RecordLockManager(self)
-        self.notify = Notify.NotifyHelper()
         self.lib_struct = DosLibraryStruct(ctx.mem, base_addr)
         # setup RootNode
         self.root_struct = ctx.alloc.alloc_astruct(RootNodeStruct, label="RootNode")
@@ -869,8 +869,6 @@ class DosLibrary(LibImpl):
         if fh_b_addr != 0:
             fh = self.file_mgr.get_by_b_addr(fh_b_addr)
             self.file_mgr.close(fh)
-            # closing a handle also drops its record locks
-            self.record_locks.release_handle(fh_b_addr)
             log_dos.info("Close: %s", fh)
             self.setioerr(ctx, 0)
         return DOSTRUE
@@ -1432,6 +1430,20 @@ class DosLibrary(LibImpl):
         fib_ptr = ctx.cpu.r_reg(REG_D2)
 
         fh = self.file_mgr.get_by_b_addr(fh_b_addr, False)
+        fib = FileInfoBlockStruct(ctx.mem, fib_ptr)
+        # handler-backed: ACTION_EXAMINE_FH examines the object the handle
+        # points at directly
+        if fh.handler is not None and fh.handler_file is not None:
+            try:
+                info = fh.handler.examine_fh(fh.handler_file)
+            except HandlerError as e:
+                self.setioerr(ctx, e.code)
+                return DOSFALSE
+            fill_fib(fib, info, name=fh.name)
+            log_dos.info("ExamineFH: %s fib=%06x -> ok", fh, fib_ptr)
+            self.setioerr(ctx, 0)
+            return DOSTRUE
+        # handler-less fallback: examine via a temporary lock
         lock = self.lock_mgr.create_lock(self.get_current_dir(ctx), fh.ami_path, False)
         log_dos.info(
             "Lock: (%s) '%s' exc=%s -> %s",
@@ -1444,7 +1456,6 @@ class DosLibrary(LibImpl):
             self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
             return DOSFALSE
 
-        fib = FileInfoBlockStruct(ctx.mem, fib_ptr)
         err = lock.examine_lock(fib)
         name_addr = fib.fib_FileName.addr
         name = ctx.mem.r_cstr(name_addr)
@@ -3272,20 +3283,58 @@ class DosLibrary(LibImpl):
 
     # ----- Assist tags -----
 
+    # ACTION_CHANGE_MODE object type (dos/dos.h)
+    CHANGE_LOCK = 0
+    CHANGE_FH = 1
+
     def ChangeMode(self, ctx, type: LONG, fh: LONG, newmode: LONG):
-        log_dos.warning(
-            "ChangeMode(type=%d, fh=%s, mode=%s): not implemented",
-            type.val,
-            fh.val,
-            newmode.val,
-        )
-        self.setioerr(ctx, ERROR_NOT_IMPLEMENTED)
-        return DOSFALSE
+        if type.val == self.CHANGE_LOCK:
+            try:
+                obj = self.lock_mgr.get_by_b_addr(fh.val) if fh.val else None
+            except Exception:
+                obj = None
+            if obj is None or obj.handler is None or obj.handler_lock is None:
+                self.setioerr(ctx, ERROR_INVALID_LOCK)
+                return DOSFALSE
+            handler, handler_obj = obj.handler, obj.handler_lock
+        elif type.val == self.CHANGE_FH:
+            try:
+                file_handle = (
+                    self.file_mgr.get_by_b_addr(fh.val, False) if fh.val else None
+                )
+            except Exception:
+                file_handle = None
+            if (
+                file_handle is None
+                or file_handle.handler is None
+                or file_handle.handler_file is None
+            ):
+                self.setioerr(ctx, ERROR_INVALID_LOCK)
+                return DOSFALSE
+            handler, handler_obj = file_handle.handler, file_handle.handler_file
+        else:
+            self.setioerr(ctx, ERROR_BAD_NUMBER)
+            return DOSFALSE
+        try:
+            handler.change_mode(handler_obj, newmode.val)
+        except HandlerError as e:
+            self.setioerr(ctx, e.code)
+            return DOSFALSE
+        log_dos.info("ChangeMode(type=%d, mode=%d): ok", type.val, newmode.val)
+        return self._bool_result(ctx, True, 0)
 
     def SetOwner(self, ctx, name: CSTR, owner_info: LONG):
-        log_dos.warning("SetOwner(%r): not implemented", name.get_str())
-        self.setioerr(ctx, ERROR_NOT_IMPLEMENTED)
-        return DOSFALSE
+        if self.handler_mgr is None:
+            self.setioerr(ctx, ERROR_NOT_IMPLEMENTED)
+            return DOSFALSE
+        try:
+            self.handler_mgr.set_owner(
+                name.get_str(), owner_info.val, cwd=self.get_cwd_path(ctx)
+            )
+        except HandlerError as e:
+            self.setioerr(ctx, e.code)
+            return DOSFALSE
+        return self._bool_result(ctx, True, 0)
 
     # ----- Stdio -----
 
@@ -3374,11 +3423,11 @@ class DosLibrary(LibImpl):
     # ----- Notify -----
 
     def StartNotify(self, ctx, notify: LONG):
-        ok, err = self.notify.start_notify(ctx, notify.val)
+        ok, err = Notify.start_notify(self, ctx, notify.val)
         return self._bool_result(ctx, ok, err)
 
     def EndNotify(self, ctx, notify: LONG):
-        ok, err = self.notify.end_notify(ctx, notify.val)
+        ok, err = Notify.end_notify(self, ctx, notify.val)
         return self._bool_result(ctx, ok, err)
 
     # ----- Misc -----

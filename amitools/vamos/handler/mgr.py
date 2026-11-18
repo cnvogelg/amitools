@@ -119,12 +119,11 @@ class HandlerManager:
             return None
         return getattr(handler, "dispatcher", None)
 
-    def disk_info(self, volume_name):
-        """lock-less volume query (ACTION_DISK_INFO)
+    def _volume_handler(self, volume_name):
+        """resolve a handler by volume/device name (strip a trailing colon)
 
-        Resolve the handler by volume/device name and ask it for its disk
-        info. Raises :class:`HandlerError` with ``ERROR_OBJECT_NOT_FOUND``
-        for an unknown volume.
+        Raises :class:`HandlerError` with ``ERROR_OBJECT_NOT_FOUND`` for an
+        unknown volume.
         """
         name = str(volume_name)
         if name.endswith(":"):
@@ -134,7 +133,44 @@ class HandlerManager:
             raise HandlerError(
                 ERROR_OBJECT_NOT_FOUND, "unknown volume '%s'" % volume_name
             )
-        return handler.disk_info(None)
+        return handler
+
+    def disk_info(self, volume_name):
+        """lock-less volume query (ACTION_DISK_INFO)
+
+        Resolve the handler by volume/device name and ask it for its disk
+        info. Raises :class:`HandlerError` with ``ERROR_OBJECT_NOT_FOUND``
+        for an unknown volume.
+        """
+        return self._volume_handler(volume_name).disk_info(None)
+
+    def rename_disk(self, volume_name, new_name):
+        """relabel a volume (ACTION_RENAME_DISK)"""
+        return self._volume_handler(volume_name).rename_disk(new_name)
+
+    def format(self, volume_name, new_vol_name, dos_type):
+        """format a volume (ACTION_FORMAT)
+
+        ``volume_name`` selects the handler (e.g. ``DF0:``); ``new_vol_name``
+        is the name of the new volume.
+        """
+        return self._volume_handler(volume_name).format(new_vol_name, dos_type)
+
+    def more_cache(self, volume_name, count):
+        """add cache buffers to a volume (ACTION_MORE_CACHE)"""
+        return self._volume_handler(volume_name).more_cache(count)
+
+    def get_handler_by_port(self, port):
+        """the handler that owns a packet port (or ``None``)
+
+        The reverse of :meth:`get_dispatcher`: used by ``ReadLink`` to resolve
+        a handler from a bare ``port`` argument.
+        """
+        for handler in self.handlers.values():
+            dispatcher = getattr(handler, "dispatcher", None)
+            if dispatcher is not None and dispatcher.port == port:
+                return handler
+        return None
 
     def attach_packet_transport(self, alloc, port_mgr, mem, find_port=None, pump=None):
         """attach the live machine to every detached packet handler
@@ -310,11 +346,62 @@ class HandlerManager:
             raise HandlerError(ERROR_RENAME_ACROSS_DEVICES)
         return old_handler, old_handler.rename_object(old_rel, new_rel)
 
+    def _abs_path(self, ami_path, env=None, cwd=None):
+        env = self._env(env, cwd)
+        return str(self.path_mgr.abspath(ami_path, env=env))
+
+    def make_link(self, ami_path, dest, soft, env=None, cwd=None):
+        """create a link (ACTION_MAKE_LINK)
+
+        ``dest`` is the target path string (soft link) or a handler lock on
+        the target (hard link). The link's parent directory is resolved to a
+        handler lock which is released again after the handler call.
+        """
+        abs_path = self._abs_path(ami_path, env=env, cwd=cwd)
+        parent_path = self.path_mgr.ami_abs_parent_path(abs_path)
+        name = self.path_mgr.ami_name_of_path(None, abs_path)
+        handler, lock = self.locate_object(parent_path, env=env, cwd=cwd)
+        try:
+            if not soft and getattr(dest, "handler", None) is not handler:
+                raise HandlerError(ERROR_RENAME_ACROSS_DEVICES)
+            handler.make_link(lock, name, dest, soft)
+        finally:
+            handler.free_lock(lock)
+
+    def read_link(self, dir_ami_path, path, size, env=None, cwd=None):
+        """resolve a soft link relative to a directory (ACTION_READ_LINK)"""
+        handler, lock = self.locate_object(dir_ami_path, env=env, cwd=cwd)
+        try:
+            return handler.read_link(lock, path, size)
+        finally:
+            handler.free_lock(lock)
+
+    def set_owner(self, ami_path, owner, env=None, cwd=None):
+        """set the owner of an object (ACTION_SET_OWNER)"""
+        return self._dispatch(
+            ami_path,
+            lambda h, p: h.set_owner(None, p, owner),
+            env=env,
+            cwd=cwd,
+        )
+
+    def add_notify(self, ami_path, notify, env=None, cwd=None):
+        """start monitoring an object (ACTION_ADD_NOTIFY)"""
+        return self._dispatch(
+            ami_path, lambda h, p: h.add_notify(notify), env=env, cwd=cwd
+        )
+
+    def remove_notify(self, ami_path, notify, env=None, cwd=None):
+        """stop monitoring an object (ACTION_REMOVE_NOTIFY)"""
+        return self._dispatch(
+            ami_path, lambda h, p: h.remove_notify(notify), env=env, cwd=cwd
+        )
+
     def is_filesystem(self, name):
         handler = self.get_handler(name)
         if handler is None:
             return True
-        return handler.is_fs
+        return handler.is_filesystem()
 
     # ----- directory listing -----
 
