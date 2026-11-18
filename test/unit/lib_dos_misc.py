@@ -5,23 +5,30 @@ dispatches to the handler. These tests use a recording manager so the packet
 path is asserted without a real file system.
 """
 
-from types import SimpleNamespace
+from types import MethodType, SimpleNamespace
 
 from amitools.vamos.astructs import CSTR, LONG
 from amitools.vamos.handler import HandlerError
-from amitools.vamos.lib.DosLibrary import DosLibrary
-from amitools.vamos.libstructs import NotifyRequestStruct
-from amitools.vamos.machine.mock import MockCPU, MockMemory
-from amitools.vamos.machine.regs import REG_D1, REG_D2, REG_D3, REG_D4, REG_D5
-
+from amitools.vamos.lib.dos.DosList import DosList
 from amitools.vamos.lib.dos.Error import (
     DOSFALSE,
     DOSTRUE,
+    ERROR_DEVICE_NOT_MOUNTED,
     ERROR_INVALID_LOCK,
     ERROR_LINE_TOO_LONG,
     ERROR_NOT_IMPLEMENTED,
     ERROR_REQUIRED_ARG_MISSING,
+    NO_ERROR,
 )
+from amitools.vamos.lib.dos.FileManager import FileManager
+from amitools.vamos.lib.DosLibrary import DosLibrary
+from amitools.vamos.libstructs import NotifyRequestStruct
+from amitools.vamos.machine.mock import MockCPU, MockMemory
+from amitools.vamos.machine.regs import REG_D1, REG_D2, REG_D3, REG_D4, REG_D5
+from amitools.vamos.mem import MemoryAlloc
+
+LDF_DEVICES = 1 << 2
+LDF_VOLUMES = 1 << 3
 
 
 def _long(mem, cpu, reg, value):
@@ -421,6 +428,105 @@ def lib_dos_assist_test():
     assert lib.io_err == ERROR_NOT_IMPLEMENTED
 
 
+def _dos_list_lib(ctx):
+    """a DosLibrary with a real (in-memory) DOS list attached"""
+    lib = _make_lib()
+    alloc = MemoryAlloc(ctx.mem)
+    lib.dos_list = DosList(None, None, ctx.mem, alloc)
+    lib.alloc = alloc
+    return lib, alloc
+
+
+def _fs_file_mgr(handler_mgr):
+    """a FileManager stand-in exposing the real is_file_system() logic"""
+    stub = SimpleNamespace(handler_mgr=handler_mgr)
+    stub.is_file_system = MethodType(FileManager.is_file_system, stub)
+    return stub
+
+
+def lib_dos_next_dos_entry_test():
+    ctx, mem, _cpu = _ctx()
+    lib, alloc = _dos_list_lib(ctx)
+    dh0 = lib.dos_list.add_device("DH0", startup_bptr=1)
+    dh1 = lib.dos_list.add_device("DH1", startup_bptr=2)
+    vol = lib.dos_list.add_volume("root")
+
+    # LockDosList returns the first matching entry as an odd lock token
+    lock = lib.LockDosList(ctx, LDF_DEVICES)
+    assert lock == dh0.mem.addr + 1
+    # NextDosEntry on the lock token itself yields the first entry
+    assert lib.NextDosEntry(ctx, lock, LDF_DEVICES) == dh0.mem.addr
+    # FindDosEntry returns the entry, NextDosEntry walks to the following one
+    mem.w_cstr(0x400, "DH0")
+    found = lib.FindDosEntry(ctx, lock, 0x400, LDF_DEVICES)
+    assert found == dh0.mem.addr
+    nxt = lib.NextDosEntry(ctx, found, LDF_DEVICES)
+    assert nxt == dh1.mem.addr
+    # the volume is skipped when only devices are requested ...
+    assert lib.NextDosEntry(ctx, nxt, LDF_DEVICES) == 0
+    # ... but is returned once volumes are included, then the list ends
+    both = LDF_DEVICES | LDF_VOLUMES
+    assert lib.NextDosEntry(ctx, nxt, both) == vol.mem.addr
+    assert lib.NextDosEntry(ctx, vol.mem.addr, both) == 0
+    # a NULL node stays NULL
+    assert lib.NextDosEntry(ctx, 0, LDF_DEVICES) == 0
+
+    lib.dos_list.free_list()
+    assert alloc.is_all_free()
+
+
+def lib_dos_is_file_system_test():
+    fs_names = {"work", "dh0"}
+    handler_mgr = SimpleNamespace(is_filesystem=lambda name: name.lower() in fs_names)
+    lib = _make_lib(handler_mgr)
+    lib.file_mgr = _fs_file_mgr(handler_mgr)
+    ctx, mem, _cpu = _ctx()
+
+    # a real file system device/volume answers DOSTRUE (with or without colon)
+    mem.w_cstr(0x400, "work")
+    assert lib.IsFileSystem(ctx, 0x400) == DOSTRUE
+    mem.w_cstr(0x400, "dh0:")
+    assert lib.IsFileSystem(ctx, 0x400) == DOSTRUE
+    # NIL: and CONSOLE: are not file systems
+    mem.w_cstr(0x400, "NIL:")
+    assert lib.IsFileSystem(ctx, 0x400) == DOSFALSE
+    mem.w_cstr(0x400, "CONSOLE:")
+    assert lib.IsFileSystem(ctx, 0x400) == DOSFALSE
+    # an unknown name is not a file system either
+    mem.w_cstr(0x400, "MISSING:")
+    assert lib.IsFileSystem(ctx, 0x400) == DOSFALSE
+
+
+def lib_dos_inhibit_test():
+    ctx, mem, cpu = _ctx()
+    lib, alloc = _dos_list_lib(ctx)
+    dh0 = lib.dos_list.add_device("DH0", startup_bptr=1, exclusive=True, unit=0)
+    lib.dos_list.add_volume("root")
+
+    # inhibit on then off the exclusively mounted device
+    mem.w_cstr(0x400, "DH0:")
+    name = _cstr(mem, cpu, REG_D1, 0x400)
+    assert lib.Inhibit(ctx, name, DOSTRUE) == DOSTRUE
+    assert dh0.inhibited is True
+    assert lib.io_err == NO_ERROR
+    assert lib.Inhibit(ctx, name, DOSFALSE) == DOSTRUE
+    assert dh0.inhibited is False
+    assert lib.io_err == NO_ERROR
+
+    # a volume (not an exclusive device) can not be inhibited
+    mem.w_cstr(0x480, "root:")
+    assert lib.Inhibit(ctx, _cstr(mem, cpu, REG_D1, 0x480), DOSTRUE) == DOSFALSE
+    assert lib.io_err == ERROR_DEVICE_NOT_MOUNTED
+
+    # an unknown device reports ERROR_DEVICE_NOT_MOUNTED
+    mem.w_cstr(0x4C0, "MISSING:")
+    assert lib.Inhibit(ctx, _cstr(mem, cpu, REG_D1, 0x4C0), DOSTRUE) == DOSFALSE
+    assert lib.io_err == ERROR_DEVICE_NOT_MOUNTED
+
+    lib.dos_list.free_list()
+    assert alloc.is_all_free()
+
+
 def lib_dos_same_device_test():
     lib = DosLibrary()
     ctx, mem, cpu = _ctx()
@@ -450,4 +556,52 @@ def lib_dos_same_device_test():
             _long(mem, cpu, REG_D2, 12),
         )
         == DOSFALSE
+    )
+
+
+# ----- inline remainder: Delay and the tag-list stubs -----
+
+
+def lib_dos_delay_test():
+    lib = DosLibrary()
+    ctx = SimpleNamespace(mem=MockMemory(), cpu=MockCPU())
+    # a zero/negative timeout does not sleep and succeeds
+    assert lib.Delay(ctx, 0) == 0
+    assert lib.Delay(ctx, -5) == 0
+    # a positive timeout is slept (1 tick = 20 ms)
+    assert lib.Delay(ctx, 1) == 0
+
+
+def lib_dos_volume_request_hook_test():
+    lib = DosLibrary()
+    mem = MockMemory()
+    cpu = MockCPU()
+    ctx = SimpleNamespace(mem=mem, cpu=cpu)
+    assert lib.VolumeRequestHook(ctx, _long(mem, cpu, REG_D1, 0x20)) == 0
+
+
+def lib_dos_shell_method_tag_list_test():
+    from amitools.vamos.libtypes import TagList
+
+    lib = DosLibrary()
+    mem = MockMemory()
+    cpu = MockCPU()
+    ctx = SimpleNamespace(mem=mem, cpu=cpu)
+    mem.w32(0x3900, 0)  # TAG_DONE
+    tags = TagList(mem, 0x3900)
+    assert lib.DoShellMethodTagList(ctx, _long(mem, cpu, REG_D1, 1), tags) == 0
+
+
+def lib_dos_scan_stack_token_test():
+    lib = DosLibrary()
+    mem = MockMemory()
+    cpu = MockCPU()
+    ctx = SimpleNamespace(mem=mem, cpu=cpu)
+    assert (
+        lib.ScanStackToken(
+            ctx,
+            _long(mem, cpu, REG_D1, 0x10),
+            _long(mem, cpu, REG_D2, 4096),
+        )
+        == 4096
     )

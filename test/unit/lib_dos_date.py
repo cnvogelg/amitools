@@ -3,16 +3,19 @@ from types import SimpleNamespace
 
 import pytest
 
-from amitools.vamos.lib.DosLibrary import DosLibrary
 from amitools.vamos.astructs import LONG
+from amitools.vamos.lib.dos import Date as DateModule
+from amitools.vamos.lib.dos.AmiTime import sys_to_ami_time
+from amitools.vamos.lib.dos.Error import (
+    DOSFALSE,
+    DOSTRUE,
+    ERROR_OBJECT_NOT_FOUND,
+)
+from amitools.vamos.lib.DosLibrary import DosLibrary
 from amitools.vamos.libstructs import DateStampStruct, DateTimeStruct
 from amitools.vamos.machine.mock import MockCPU, MockMemory
 from amitools.vamos.machine.regs import REG_D1, REG_D2
-
-from amitools.vamos.lib.dos import Date as DateModule
-from amitools.vamos.lib.dos.AmiTime import sys_to_ami_time
-from amitools.vamos.lib.dos.Error import DOSFALSE, DOSTRUE
-
+from amitools.vamos.mem import MemoryAlloc
 
 FORMAT_DOS = 0
 FORMAT_INT = 1
@@ -168,7 +171,7 @@ def lib_dos_str_to_date_relative_test(monkeypatch):
     # a weekday always refers to the past occurrence
     weekday = (today + DateModule._EPOCH_WEEKDAY) % 7
     target = (weekday + 1) % 7
-    name = [k for k, v in DateModule._WEEKDAYS.items() if v == target][0]
+    name = next(k for k, v in DateModule._WEEKDAYS.items() if v == target)
     delta = (target - weekday) % 7
     if delta:
         delta -= 7
@@ -224,3 +227,142 @@ def lib_dos_compare_dates_test():
     date2.ds_Tick.val = 0
     # date1 is later -> negative
     assert compare() < 0
+
+
+# ----- DateStamp (Step 22i) -----
+
+
+def lib_dos_date_stamp_test(monkeypatch):
+    fixed_time = 252460800
+    monkeypatch.setattr("amitools.vamos.lib.dos.Date.time.time", lambda: fixed_time)
+    mem = MockMemory()
+    lib = DosLibrary()
+    ctx = SimpleNamespace(mem=mem, cpu=MockCPU())
+
+    ds_ptr = 0x400
+    assert lib.DateStamp(ctx, ds_ptr) == ds_ptr
+    ds = DateStampStruct(mem, ds_ptr)
+    at = sys_to_ami_time(fixed_time)
+    assert ds.ds_Days.val == at.tday
+    assert ds.ds_Minute.val == at.tmin
+    assert ds.ds_Tick.val == at.tick
+
+
+# ----- IoErr / Fault / PrintFault (Step 22i) -----
+
+
+class _Out:
+    def __init__(self):
+        self.data = []
+
+    def write(self, data):
+        self.data.append(bytes(data))
+
+
+def lib_dos_set_io_err_test():
+    lib = DosLibrary()
+    lib.io_err = 5
+    ctx = SimpleNamespace(mem=MockMemory(), cpu=MockCPU(), process=None)
+    assert lib.SetIoErr(ctx, 7) == 5
+    assert lib.io_err == 7
+
+
+def lib_dos_fault_test():
+    mem = MockMemory()
+    lib = DosLibrary()
+    lib.io_err = 0
+    ctx = SimpleNamespace(mem=mem, cpu=MockCPU())
+
+    mem.w_cstr(0x400, "HEADER")
+    assert lib.Fault(ctx, ERROR_OBJECT_NOT_FOUND, 0x400, 0x500, 64) == DOSTRUE
+    assert mem.r_cstr(0x500) == "HEADER: ERROR_OBJECT_NOT_FOUND"
+
+    # without a header only the error string is written
+    assert lib.Fault(ctx, ERROR_OBJECT_NOT_FOUND, 0, 0x500, 64) == DOSTRUE
+    assert mem.r_cstr(0x500) == "ERROR_OBJECT_NOT_FOUND"
+
+    # an unsigned 32-bit error code is decoded to its signed index
+    assert lib.Fault(ctx, 0x100000000 - 160, 0, 0x500, 64) == DOSTRUE
+    assert mem.r_cstr(0x500) == "%TH USE COUNT\n\n"
+
+
+def lib_dos_print_fault_test():
+    mem = MockMemory()
+    out = _Out()
+    lib = DosLibrary()
+    ctx = SimpleNamespace(
+        mem=mem, cpu=MockCPU(), process=SimpleNamespace(get_output=lambda: out)
+    )
+
+    mem.w_cstr(0x400, "HEADER")
+    assert lib.PrintFault(ctx, ERROR_OBJECT_NOT_FOUND, 0x400) == DOSTRUE
+    assert lib.io_err == ERROR_OBJECT_NOT_FOUND
+    assert out.data == [b"HEADER: ERROR_OBJECT_NOT_FOUND\n"]
+
+    # without a header
+    assert lib.PrintFault(ctx, ERROR_OBJECT_NOT_FOUND, 0) == DOSTRUE
+    assert out.data[-1] == b"ERROR_OBJECT_NOT_FOUND\n"
+
+
+# ----- DosGetString (Step 22i) -----
+
+
+def lib_dos_get_string_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    lib = DosLibrary()
+    lib.alloc = alloc
+    lib.mem_allocs = {}
+    lib.errstrings = {}
+    ctx = SimpleNamespace(mem=mem, cpu=MockCPU())
+
+    addr = lib.DosGetString(ctx, ERROR_OBJECT_NOT_FOUND)
+    assert addr != 0
+    assert mem.r_cstr(addr) == "ERROR_OBJECT_NOT_FOUND"
+    # the string is cached and returned again
+    assert lib.DosGetString(ctx, ERROR_OBJECT_NOT_FOUND) == addr
+    # an unknown error has no string
+    assert lib.DosGetString(ctx, 12345) == 0
+
+
+# ----- FilePart / PathPart / AddPart (Step 22i) -----
+
+
+def lib_dos_file_part_test():
+    mem = MockMemory()
+    lib = DosLibrary()
+    ctx = SimpleNamespace(mem=mem, cpu=MockCPU())
+
+    mem.w_cstr(0x400, "work:dir/file.txt")
+    assert lib.FilePart(ctx, 0x400) == 0x400 + len("work:dir/")
+    # a path without a separator points at the whole string
+    mem.w_cstr(0x500, "file.txt")
+    assert lib.FilePart(ctx, 0x500) == 0x500
+
+
+def lib_dos_path_part_test():
+    mem = MockMemory()
+    lib = DosLibrary()
+    ctx = SimpleNamespace(mem=mem, cpu=MockCPU())
+
+    mem.w_cstr(0x400, "work:dir/file.txt")
+    assert lib.PathPart(ctx, 0x400) == 0x400 + len("work:dir")
+    mem.w_cstr(0x500, "file.txt")
+    assert lib.PathPart(ctx, 0x500) == 0x500
+
+
+def lib_dos_add_part_test():
+    mem = MockMemory()
+    lib = DosLibrary()
+    ctx = SimpleNamespace(mem=mem, cpu=MockCPU())
+
+    mem.w_cstr(0x400, "work:")
+    mem.w_cstr(0x480, "file.txt")
+    assert lib.AddPart(ctx, 0x400, 0x480, 64) == DOSTRUE
+    assert mem.r_cstr(0x400) == "work:file.txt"
+
+    # a filename with its own device replaces the directory name
+    mem.w_cstr(0x400, "work:")
+    mem.w_cstr(0x480, "ram:x")
+    assert lib.AddPart(ctx, 0x400, 0x480, 64) == DOSTRUE
+    assert mem.r_cstr(0x400) == "ram:x"
