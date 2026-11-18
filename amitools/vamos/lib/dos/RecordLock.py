@@ -13,6 +13,7 @@ fallback; the locks live on the handle and disappear with it.
 from amitools.vamos.libstructs import RecordLockStruct
 from amitools.vamos.log import log_dos
 
+from . import Helper
 from .Error import (
     ERROR_BAD_NUMBER,
     ERROR_INVALID_LOCK,
@@ -101,3 +102,26 @@ class RecordLockManager:
                 ok = False
                 error = err
         return ok, error
+
+
+# ----- fd functions -----
+
+
+def lock_record(dos, ctx, fh, offset, length, mode, timeout):
+    ok, err = dos.record_locks.lock_record(ctx, fh, offset, length, mode, timeout)
+    return Helper.bool_result(dos, ctx, ok, err)
+
+
+def lock_records(dos, ctx, rec_array, timeout):
+    ok, err = dos.record_locks.lock_records(ctx, rec_array, timeout)
+    return Helper.bool_result(dos, ctx, ok, err)
+
+
+def unlock_record(dos, ctx, fh, offset, length):
+    ok, err = dos.record_locks.unlock_record(fh, offset, length)
+    return Helper.bool_result(dos, ctx, ok, err)
+
+
+def unlock_records(dos, ctx, rec_array):
+    ok, err = dos.record_locks.unlock_records(ctx, rec_array)
+    return Helper.bool_result(dos, ctx, ok, err)

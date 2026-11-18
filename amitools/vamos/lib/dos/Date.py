@@ -242,6 +242,19 @@ def compare_dates(date1_ptr, date2_ptr, mem):
 # ----- fd functions -----
 
 
+def str_to_date_ptr(dos, ctx, date_time_ptr):
+    """StrToDate(): build the DateTime view and convert its strings"""
+    dt = DateTimeStruct(ctx.mem, date_time_ptr)
+    return str_to_date(ctx, dt)
+
+
+def compare_dates_values(dos, ctx, date1, date2):
+    """CompareDates(): compare two DateStamp BPTRs"""
+    result = compare_dates(date1, date2, ctx.mem)
+    log_dos.info("CompareDates(%06x, %06x) -> %d", date1, date2, result)
+    return result
+
+
 def date_stamp(dos, ctx, ds_ptr):
     ds = DateStampStruct(ctx.mem, ds_ptr)
     t = time.time()

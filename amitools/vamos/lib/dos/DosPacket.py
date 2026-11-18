@@ -8,6 +8,7 @@ allocates one block holding a StandardPacket (message followed by packet),
 sends it and waits for the synchronous reply.
 """
 
+from amitools.vamos.error import UnsupportedFeatureError
 from amitools.vamos.libstructs import (
     DosPacketStruct,
     MessageStruct,
@@ -17,7 +18,30 @@ from amitools.vamos.libstructs import (
 from amitools.vamos.libtypes import DosPacket
 from amitools.vamos.log import log_dos
 
+from . import Helper
 from .Error import DOSFALSE
+
+
+def wait_pkt(dos, ctx):
+    """WaitPkt(): wait for a packet on the current process's message port"""
+    proc_addr = ctx.exec_lib.exec_lib.this_task.aptr
+    if proc_addr == 0:
+        log_dos.warning("WaitPkt: ThisTask is NULL")
+        return 0
+    proc = ProcessStruct(ctx.mem, proc_addr)
+    port_addr = proc.pr_MsgPort.addr
+    log_dos.info("WaitPkt: proc=%06x port=%06x", proc_addr, port_addr)
+    if not ctx.exec_lib.port_mgr.has_port(port_addr):
+        log_dos.warning("WaitPkt: port %06x not registered", port_addr)
+        return 0
+    if not ctx.exec_lib.port_mgr.has_msg(port_addr):
+        raise UnsupportedFeatureError(
+            f"WaitPkt on empty message queue called: Port ({port_addr:06x})"
+        )
+    msg_addr = ctx.exec_lib.port_mgr.get_msg(port_addr)
+    Helper.unlink_msg(dos, ctx, msg_addr)
+    msg = MessageStruct(ctx.mem, msg_addr)
+    return msg.mn_Node.ln_Name.aptr
 
 
 def reply_pkt(dos, ctx, dp: DosPacket, res1, res2):

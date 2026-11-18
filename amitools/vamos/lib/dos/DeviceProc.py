@@ -18,6 +18,10 @@ from .Error import (
     NO_ERROR,
 )
 
+# dvp_Flags (see dos/dosextens.h)
+DVPF_UNLOCK = 1
+DVPF_ASSIGN = 2
+
 
 def _handler_port(dos, name):
     """the packet port of the handler serving ``name`` (0 if none)"""
@@ -46,7 +50,7 @@ def _new_devproc(dos, ctx, name, port, lock, flags, devnode=0):
     devproc.dvp_Port.aptr = port
     devproc.dvp_Lock.aptr = (lock.b_addr << 2) if lock is not None else 0
     # a lock only needs unlocking if the DevProc owns it
-    devproc.dvp_Flags.val = flags if lock is not None else flags & ~dos.DVPF_UNLOCK
+    devproc.dvp_Flags.val = flags if lock is not None else flags & ~DVPF_UNLOCK
     devproc.dvp_DevNode.aptr = devnode
     return addr
 
@@ -78,7 +82,7 @@ def get_device_proc(dos, ctx, name_ptr, last_devproc):
     if entry is not None and entry.struct_def is DosListAssignStruct and entry.locks:
         # an assign: hand out its primary directory lock. A
         # multi-directory assign asks the caller to loop (DVPF_ASSIGN)
-        flags = dos.DVPF_ASSIGN if len(entry.locks) > 1 else 0
+        flags = DVPF_ASSIGN if len(entry.locks) > 1 else 0
         lock = entry.locks[0]
         port = _port_of_lock(dos, lock, volume)
         addr = _new_devproc(dos, ctx, name, port, lock, flags, entry.mem.addr)
@@ -94,7 +98,7 @@ def get_device_proc(dos, ctx, name_ptr, last_devproc):
         lock = (
             dos.lock_mgr.create_lock(None, vol_name + ":", False) if vol_name else None
         )
-        flags = dos.DVPF_UNLOCK if lock is not None else 0
+        flags = DVPF_UNLOCK if lock is not None else 0
         port = _port_of_lock(dos, lock, vol_name or name)
         devnode = entry.mem.addr if entry is not None else 0
         addr = _new_devproc(dos, ctx, name, port, lock, flags, devnode)
@@ -135,7 +139,7 @@ def _enumerate_devproc(dos, ctx, last_devproc):
         _release_devproc_lock(dos, prev)
     # each step hands out a temporary root lock owned by the DevProc
     lock = dos.lock_mgr.create_lock(None, entry.name + ":", False)
-    dev_flags = dos.DVPF_UNLOCK if lock is not None else 0
+    dev_flags = DVPF_UNLOCK if lock is not None else 0
     port = _port_of_lock(dos, lock, entry.name)
     if prev is not None:
         prev.dvp_Port.aptr = port
@@ -159,7 +163,7 @@ def _advance_assign_devproc(dos, ctx, addr):
     when the assign has no further directory.
     """
     devproc = DevProcStruct(ctx.mem, addr)
-    if not (devproc.dvp_Flags.val & dos.DVPF_ASSIGN):
+    if not (devproc.dvp_Flags.val & DVPF_ASSIGN):
         return False
     entry = dos.dos_list.get_entry_by_b_addr(devproc.dvp_DevNode.aptr >> 2)
     if entry is None:
@@ -181,11 +185,11 @@ def _advance_assign_devproc(dos, ctx, addr):
 
 def _release_devproc_lock(dos, devproc):
     """release the temporary lock a DevProc owns (DVPF_UNLOCK)"""
-    if (devproc.dvp_Flags.val & dos.DVPF_UNLOCK) and devproc.dvp_Lock.aptr != 0:
+    if (devproc.dvp_Flags.val & DVPF_UNLOCK) and devproc.dvp_Lock.aptr != 0:
         lock = dos.lock_mgr.get_by_b_addr(devproc.dvp_Lock.aptr >> 2)
         dos.lock_mgr.release_lock(lock)
     devproc.dvp_Lock.aptr = 0
-    devproc.dvp_Flags.val &= ~dos.DVPF_UNLOCK
+    devproc.dvp_Flags.val &= ~DVPF_UNLOCK
 
 
 def free_device_proc(dos, ctx, addr):

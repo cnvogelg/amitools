@@ -289,13 +289,15 @@ def get_arg_str(dos, ctx):
     return arg_ptr
 
 
-def get_current_dir_name(ctx, buf, max_len):
+def get_current_dir_name(dos, ctx, buf, max_len):
     cli = _cli(ctx)
     if cli is None:
-        return DOSFALSE, ERROR_OBJECT_WRONG_TYPE
+        dos.setioerr(ctx, ERROR_OBJECT_WRONG_TYPE)
+        return DOSFALSE
     name = ctx.mem.r_bstr(cli.cli_SetName.aptr)
     # the shell path always reports success, even if it was truncated
-    return DOSTRUE, _copy_out(ctx, buf, max_len, name)
+    dos.setioerr(ctx, _copy_out(ctx, buf, max_len, name))
+    return DOSTRUE
 
 
 def set_current_dir_name(dos, ctx, str_addr):
@@ -307,21 +309,25 @@ def set_current_dir_name(dos, ctx, str_addr):
     return DOSTRUE
 
 
-def set_program_name(ctx, name):
+def set_program_name(dos, ctx, name):
     cli = _cli(ctx)
     if cli is None:
-        return DOSFALSE, ERROR_OBJECT_WRONG_TYPE
+        dos.setioerr(ctx, ERROR_OBJECT_WRONG_TYPE)
+        return DOSFALSE
     # cli_CommandName has a fixed 104 byte buffer
     ctx.mem.w_bstr(cli.cli_CommandName.aptr, (name or "")[:103])
-    return DOSTRUE, 0
+    dos.setioerr(ctx, 0)
+    return DOSTRUE
 
 
-def get_prompt(ctx, buf, max_len):
+def get_prompt(dos, ctx, buf, max_len):
     cli = _cli(ctx)
     if cli is None:
-        return DOSFALSE, ERROR_OBJECT_WRONG_TYPE
+        dos.setioerr(ctx, ERROR_OBJECT_WRONG_TYPE)
+        return DOSFALSE
     prompt = ctx.mem.r_bstr(cli.cli_Prompt.aptr)
-    return DOSTRUE, _copy_out(ctx, buf, max_len, prompt)
+    dos.setioerr(ctx, _copy_out(ctx, buf, max_len, prompt))
+    return DOSTRUE
 
 
 def set_prompt(dos, ctx, str_addr):
@@ -513,12 +519,12 @@ def run_command(dos, ctx, b_addr, stack, args, length):
     return ret_code
 
 
-def execute(dos, ctx, cmd, file, file2, run):
+def execute(dos, ctx, cmd, file, file2):
     """Execute(): run a command, temporarily redirecting input/output
 
     ``file``/``file2`` are BPTRs to the input/output file handles to use while
-    the command runs (zero keeps the current handle). ``run`` is the
-    ``SystemTagList`` command runner.
+    the command runs (zero keeps the current handle). The command is run
+    through ``_system_tag_list`` (so a test can replace it on the DOS lib).
     """
     if not cmd:
         return DOSFALSE
@@ -533,11 +539,20 @@ def execute(dos, ctx, cmd, file, file2, run):
             proc.pr_COS.bptr = file2
     try:
         log_dos.info("Execute(%s, in=%s, out=%s)", cmd, file, file2)
-        return run(ctx, cmd)
+        return dos._system_tag_list(ctx, cmd, None)
     finally:
         if proc is not None:
             proc.pr_CIS.bptr = old_cis
             proc.pr_COS.bptr = old_cos
+
+
+def do_shell_method_tag_list(dos, ctx, method, tags):
+    log_dos.warning(
+        "DoShellMethodTagList(method=%d, tags=%s): not implemented",
+        method,
+        tags,
+    )
+    return 0
 
 
 # ----- CliInit support -----
@@ -584,6 +599,7 @@ __all__ = [
     "cli_init_run",
     "create_new_proc",
     "create_proc",
+    "do_shell_method_tag_list",
     "execute",
     "exit_process",
     "find_cli_proc",

@@ -14,6 +14,7 @@ from .Error import (
     DOSFALSE,
     DOSTRUE,
     NO_ERROR,
+    ERROR_BAD_NUMBER,
     ERROR_OBJECT_NOT_FOUND,
     ERROR_SEEK_ERROR,
     ERROR_INVALID_LOCK,
@@ -22,7 +23,11 @@ from .Error import (
     ERROR_NOT_IMPLEMENTED,
 )
 from .AmiTime import AmiTime, ami_to_sys_time
-from . import Printf
+from . import Helper, Printf
+
+# ACTION_CHANGE_MODE object type (dos/dos.h)
+CHANGE_LOCK = 0
+CHANGE_FH = 1
 
 
 # ----- open/close -----
@@ -80,7 +85,7 @@ def read_file(dos, ctx, fh_b_addr, buf_ptr, size):
     got = len(data)
     if got > 0:
         ctx.mem.w_block(buf_ptr, data)
-        show_data = data[: dos.MAX_SHOW_DATA]
+        show_data = data[: Helper.MAX_SHOW_DATA]
     else:
         show_data = "n/a"
 
@@ -100,7 +105,7 @@ def write_file(dos, ctx, fh_b_addr, buf_ptr, size):
 
     got = len(data)
     if got > 0:
-        show_len = min(got, dos.MAX_SHOW_DATA)
+        show_len = min(got, Helper.MAX_SHOW_DATA)
         show_data = data[:show_len]
     else:
         show_data = "n/a"
@@ -122,7 +127,7 @@ def fwrite(dos, ctx, fh_b_addr, buf_ptr, size, number):
         return 0
 
     got = len(data) // size
-    show_data = data[: dos.MAX_SHOW_DATA]
+    show_data = data[: Helper.MAX_SHOW_DATA]
     log_dos.info(
         "FWrite(%s, %06x, %d, %d) -> %d  data=%s",
         fh,
@@ -148,7 +153,7 @@ def fread(dos, ctx, fh_b_addr, buf_ptr, size, number):
 
     got = len(data) // size
     ctx.mem.w_block(buf_ptr, data)
-    show_data = data[: dos.MAX_SHOW_DATA]
+    show_data = data[: Helper.MAX_SHOW_DATA]
     log_dos.info(
         "FRead(%s, %06x, %d, %d) -> %d  data=%s",
         fh,
@@ -249,7 +254,7 @@ def fputs(dos, ctx, fh_b_addr, str_ptr):
     fh = dos.file_mgr.get_by_b_addr(fh_b_addr, True)
     ok = fh.write(str_dat)
 
-    show_data = str_dat[: dos.MAX_SHOW_DATA]
+    show_data = str_dat[: Helper.MAX_SHOW_DATA]
     log_dos.info("FPuts(%s,#%d:%s)", fh, len(str_dat), show_data)
     return 0 if ok else -1
 
@@ -570,3 +575,55 @@ def set_file_date(dos, ctx, name, date_ptr):
         log_dos.info("SetFileDate: '%s' failed: %s", name, e)
         dos.setioerr(ctx, e.code)
         return DOSFALSE
+
+
+# ----- object mode/owner (ACTION_CHANGE_MODE / ACTION_SET_OWNER) -----
+
+
+def change_mode(dos, ctx, change_type, fh, newmode):
+    """ChangeMode(): set the mode of a lock (CHANGE_LOCK) or file (CHANGE_FH)"""
+    if change_type == CHANGE_LOCK:
+        try:
+            obj = dos.lock_mgr.get_by_b_addr(fh) if fh else None
+        except Exception:
+            obj = None
+        if obj is None or obj.handler is None or obj.handler_lock is None:
+            dos.setioerr(ctx, ERROR_INVALID_LOCK)
+            return DOSFALSE
+        handler, handler_obj = obj.handler, obj.handler_lock
+    elif change_type == CHANGE_FH:
+        try:
+            file_handle = dos.file_mgr.get_by_b_addr(fh, False) if fh else None
+        except Exception:
+            file_handle = None
+        if (
+            file_handle is None
+            or file_handle.handler is None
+            or file_handle.handler_file is None
+        ):
+            dos.setioerr(ctx, ERROR_INVALID_LOCK)
+            return DOSFALSE
+        handler, handler_obj = file_handle.handler, file_handle.handler_file
+    else:
+        dos.setioerr(ctx, ERROR_BAD_NUMBER)
+        return DOSFALSE
+    try:
+        handler.change_mode(handler_obj, newmode)
+    except HandlerError as e:
+        dos.setioerr(ctx, e.code)
+        return DOSFALSE
+    log_dos.info("ChangeMode(type=%d, mode=%d): ok", change_type, newmode)
+    return Helper.bool_result(dos, ctx, True, 0)
+
+
+def set_owner(dos, ctx, name, owner_info):
+    """SetOwner(): pass the new owner info to the handler of ``name``"""
+    if dos.handler_mgr is None:
+        dos.setioerr(ctx, ERROR_NOT_IMPLEMENTED)
+        return DOSFALSE
+    try:
+        dos.handler_mgr.set_owner(name, owner_info, cwd=dos.get_cwd_path(ctx))
+    except HandlerError as e:
+        dos.setioerr(ctx, e.code)
+        return DOSFALSE
+    return Helper.bool_result(dos, ctx, True, 0)

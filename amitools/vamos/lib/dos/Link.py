@@ -90,3 +90,10 @@ def read_link(dos, ctx, port, lock, path, buffer, size):
     ctx.mem.w_cstr(buffer, target)
     log_dos.info("ReadLink('%s') -> '%s'", path, target)
     return len(target), 0
+
+
+def read_link_fd(dos, ctx, port, lock, path, buffer, size):
+    """ReadLink(): run ``read_link`` and map the error into IoErr"""
+    res, err = read_link(dos, ctx, port, lock, path, buffer, size)
+    dos.setioerr(ctx, err)
+    return res

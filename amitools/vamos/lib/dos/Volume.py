@@ -55,3 +55,8 @@ def add_buffers(dos, ctx, name, number):
         return False, e.code
     log_dos.info("AddBuffers('%s', %d): ok", name, number)
     return True, 0
+
+
+def volume_request_hook(dos, ctx, vol):
+    log_dos.warning("VolumeRequestHook(%s): not implemented", vol)
+    return 0

@@ -7,6 +7,7 @@ load tags, so only the file is used), ``InternalUnLoadSeg`` shares the
 by ``AddSegment``.
 """
 
+from amitools.vamos.error import VamosInternalError
 from amitools.vamos.libstructs import SegmentStruct
 from amitools.vamos.log import log_dos
 
@@ -79,6 +80,32 @@ def load_seg(dos, ctx, name_ptr):
 
 def unload_seg(dos, ctx, b_addr):
     dos._unload_seg_list(ctx, b_addr)
+
+
+def unload_seg_list(dos, ctx, b_addr):
+    """unload a seglist booked by LoadSeg/NewLoadSeg"""
+    if b_addr >= 0x80000000:
+        b_addr -= 0x100000000
+    if b_addr != 0:
+        if b_addr not in dos.seg_lists:
+            raise VamosInternalError(
+                f"Trying to unload unknown LoadSeg seg_list: b_addr={b_addr:06x}"
+            )
+        else:
+            del dos.seg_lists[b_addr]
+            ctx.seg_loader.unload_seglist(abs(b_addr))
+            log_dos.info("UnLoadSeg: %06x", b_addr)
+    else:
+        log_dos.info("UnLoadSeg:  NULL")
+
+
+def scan_stack_token(dos, ctx, seg, default_stack):
+    log_dos.info(
+        "ScanStackToken(%s, %d): returning the default",
+        seg,
+        default_stack,
+    )
+    return default_stack
 
 
 def internal_load_seg(dos, ctx, fh_baddr, table_ptr, func_ptr, stack_ptr):

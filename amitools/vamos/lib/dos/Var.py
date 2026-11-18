@@ -16,6 +16,13 @@ GVF_GLOBAL_ONLY = 0x100
 GVF_LOCAL_ONLY = 0x200
 GVF_BINARY_VAR = 0x400
 
+# dos/var.h: the lv_Type of a variable
+LV_VAR = 0  # an variable
+LV_ALIAS = 1  # an alias
+
+# an lv_Node.ln_Type flag bit
+LVF_IGNORE = 0x80
+
 
 # ----- local variable list helpers -----
 
