@@ -160,6 +160,12 @@ class AdfsFile(HandlerFile):
     def close(self):
         pass
 
+    def isatty(self):
+        return False
+
+    def fileno(self):
+        raise OSError("ADFS: has no file descriptor")
+
 
 class AdfsHandler(Handler):
     """file system handler backed by an :class:`ADFSVolume`"""
