@@ -29,16 +29,9 @@ _PENDING = {
     "DosGetString",
     "Fault",
     "FilePart",
-    "FreeDeviceProc",
-    "GetDeviceProc",
-    "GetProgramName",
     "PathPart",
     "PrintFault",
-    "RunCommand",
-    "SetCurrentDirName",
-    "SetFileSysTask",
     "SetIoErr",
-    "SetPrompt",
 }
 
 

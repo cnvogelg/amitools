@@ -10,18 +10,13 @@ from amitools.vamos.libstructs import (
     RootNodeStruct,
     DateStampStruct,
     DateTimeStruct,
-    DevProcStruct,
-    CLIStruct,
-    DosListAssignStruct,
     ProcessStruct,
     MessageStruct,
     MsgPortStruct,
-    MsgPortFlags,
     ListStruct,
-    TaskState,
     TimeRequestStruct,
 )
-from amitools.vamos.libtypes import TagList, DosTag, DosPacket
+from amitools.vamos.libtypes import TagList, DosPacket
 from amitools.vamos.error import *
 from amitools.vamos.log import log_dos
 from amitools.vamos.handler import HandlerError
@@ -31,8 +26,6 @@ from .dos.Args import *
 from .dos.Error import *
 from .dos.AmiTime import *
 from .dos import PathPart
-from .dos.CommandLine import CommandLine
-from .dos.Process import Process
 from .dos.DosList import DosList
 from .dos.LockManager import LockManager
 from .dos.FileManager import FileManager
@@ -42,6 +35,7 @@ from .dos import (
     Assign,
     Cli,
     Date,
+    DeviceProc as DeviceProcMod,
     DosList as DosListMod,
     DosPacket as DosPacketMod,
     FileIO,
@@ -58,7 +52,6 @@ from .dos import (
 )
 from .dos.CSource import *
 from .dos.Item import *
-from amitools.vamos.dos import run_command, run_sub_process
 
 FORMAT_DOS = 0
 FORMAT_INT = 1
@@ -460,35 +453,14 @@ class DosLibrary(LibImpl):
     def SetComment(self, ctx, name: CSTR, comment: CSTR):
         return FileIO.set_comment(self, ctx, name.get_str(), comment.get_str())
 
-    def GetProgramName(self, ctx):
-        buf_ptr = ctx.cpu.r_reg(REG_D1)
-        max_len = ctx.cpu.r_reg(REG_D2)
-        prog_name = ctx.process.get_program_name()
-        n = len(prog_name)
-        # return error if name is too long, but copy buffer size
-        if n > max_len - 1:
-            self.setioerr(ctx, ERROR_LINE_TOO_LONG)
-            ret = DOSFALSE
-            prog_name = prog_name[0:max_len]
-        else:
-            ret = DOSTRUE
-        ctx.mem.w_cstr(buf_ptr, prog_name)
-        log_dos.info("GetProgramName() -> '%s' (%d)", prog_name, max_len)
-        return ret
+    def GetProgramName(self, ctx, buf_ptr, max_len):
+        return Cli.get_program_name(self, ctx, buf_ptr, max_len)
 
     def GetProgramDir(self, ctx):
-        prog_dir_addr = ctx.process.get_home_dir()
-        prog_dir_lock = self.lock_mgr.get_by_b_addr(prog_dir_addr >> 2)
-        log_dos.info("GetProgramDir() -> %s", prog_dir_lock)
-        if prog_dir_lock:
-            return prog_dir_lock.b_addr
-        else:
-            return 0
+        return Cli.get_program_dir(self, ctx)
 
     def GetArgStr(self, ctx):
-        arg_ptr = ctx.process.get_arg_str_ptr()
-        log_dos.info("GetArgStr() -> %08x", arg_ptr)
-        return arg_ptr
+        return Cli.get_arg_str(self, ctx)
 
     # ----- Variables -----
 
@@ -686,190 +658,15 @@ class DosLibrary(LibImpl):
 
     # ----- DevProc -----
 
-    def _handler_port(self, name):
-        """the packet port of the handler serving ``name`` (0 if none)"""
-        if self.handler_mgr is None:
-            return 0
-        get_dispatcher = getattr(self.handler_mgr, "get_dispatcher", None)
-        if get_dispatcher is None:
-            return 0
-        dispatcher = get_dispatcher(name)
-        return dispatcher.port if dispatcher is not None else 0
-
     # dvp_Flags (see dos/dosextens.h)
     DVPF_UNLOCK = 1
     DVPF_ASSIGN = 2
 
-    def _port_of_lock(self, lock, name):
-        """the packet port of the handler behind ``lock`` (fallback ``name``)"""
-        if lock is not None and lock.handler is not None:
-            dispatcher = getattr(lock.handler, "dispatcher", None)
-            if dispatcher is not None:
-                return dispatcher.port
-        return self._handler_port(name)
+    def GetDeviceProc(self, ctx, name_ptr, last_devproc):
+        return DeviceProcMod.get_device_proc(self, ctx, name_ptr, last_devproc)
 
-    def _new_devproc(self, ctx, name, port, lock, flags, devnode=0):
-        """allocate a DevProc for a handler/lock/device node"""
-        addr = self._alloc_mem("DevProc:%s" % name, DevProcStruct.get_size())
-        devproc = DevProcStruct(ctx.mem, addr)
-        devproc.dvp_Port.aptr = port
-        devproc.dvp_Lock.aptr = (lock.b_addr << 2) if lock is not None else 0
-        # a lock only needs unlocking if the DevProc owns it
-        devproc.dvp_Flags.val = flags if lock is not None else flags & ~self.DVPF_UNLOCK
-        devproc.dvp_DevNode.aptr = devnode
-        return addr
-
-    def GetDeviceProc(self, ctx):
-        name_ptr = ctx.cpu.r_reg(REG_D1)
-        last_devproc = ctx.cpu.r_reg(REG_D2)
-        name = ctx.mem.r_cstr(name_ptr)
-        uname = name.upper()
-
-        # "*" enumerates every entry of the DOS device list, returning the
-        # next device on each call (AmigaDOS listing extension)
-        if uname == "*":
-            return self._enumerate_devproc(ctx, last_devproc)
-
-        # a repeated call only continues a multi-directory assign
-        if last_devproc != 0:
-            if self._advance_assign_devproc(ctx, last_devproc):
-                return last_devproc
-            # AmigaDOS frees the DevProc and returns NULL at the end
-            self._release_devproc_lock(DevProcStruct(ctx.mem, last_devproc))
-            self._free_mem(last_devproc)
-            self.setioerr(ctx, ERROR_NO_MORE_ENTRIES)
-            return 0
-
-        # initial named lookup
-        abs_name = ctx.path_mgr.ami_abs_path(self.get_current_dir(ctx), name)
-        volume = ctx.path_mgr.ami_volume_of_path(abs_name)
-        entry = self.dos_list.get_entry_by_name(volume) if volume else None
-
-        if (
-            entry is not None
-            and entry.struct_def is DosListAssignStruct
-            and entry.locks
-        ):
-            # an assign: hand out its primary directory lock. A
-            # multi-directory assign asks the caller to loop (DVPF_ASSIGN)
-            flags = self.DVPF_ASSIGN if len(entry.locks) > 1 else 0
-            lock = entry.locks[0]
-            port = self._port_of_lock(lock, volume)
-            addr = self._new_devproc(ctx, name, port, lock, flags, entry.mem.addr)
-        elif entry is not None and entry.locks:
-            # a volume: use its DOS list root lock
-            lock = entry.locks[0]
-            port = self._port_of_lock(lock, volume)
-            addr = self._new_devproc(ctx, name, port, lock, 0, entry.mem.addr)
-        else:
-            # a device (NIL:, CONSOLE:, ...) or an unknown volume: the DevProc
-            # owns a temporary root lock that FreeDeviceProc releases
-            vol_name = entry.name if entry is not None else volume
-            lock = (
-                self.lock_mgr.create_lock(None, vol_name + ":", False)
-                if vol_name
-                else None
-            )
-            flags = self.DVPF_UNLOCK if lock is not None else 0
-            port = self._port_of_lock(lock, vol_name or name)
-            devnode = entry.mem.addr if entry is not None else 0
-            addr = self._new_devproc(ctx, name, port, lock, flags, devnode)
-
-        log_dos.info(
-            "GetDeviceProc: name='%s' devproc=%06x -> volume=%s devproc=%06x",
-            name,
-            last_devproc,
-            volume,
-            addr,
-        )
-        self.setioerr(ctx, NO_ERROR)
-        return addr
-
-    def _enumerate_devproc(self, ctx, last_devproc):
-        """one device entry of a ``GetDeviceProc("*")`` enumeration
-
-        Like AmigaDOS the DevProc handed in is reused in place; it is only
-        freed once the device list is exhausted.
-        """
-        flags = self.dos_list.LDF_DEVICES
-        prev = None
-        if last_devproc == 0:
-            entry = self.dos_list.get_first_entry(flags)
-        else:
-            prev = DevProcStruct(ctx.mem, last_devproc)
-            node = prev.dvp_DevNode.aptr
-            cur = self.dos_list.get_entry_by_b_addr(node >> 2) if node else None
-            entry = self.dos_list.get_next_entry(cur, flags)
-        if entry is None:
-            if prev is not None:
-                self._release_devproc_lock(prev)
-                self._free_mem(last_devproc)
-            self.setioerr(ctx, ERROR_NO_MORE_ENTRIES)
-            return 0
-        if prev is not None:
-            self._release_devproc_lock(prev)
-        # each step hands out a temporary root lock owned by the DevProc
-        lock = self.lock_mgr.create_lock(None, entry.name + ":", False)
-        dev_flags = self.DVPF_UNLOCK if lock is not None else 0
-        port = self._port_of_lock(lock, entry.name)
-        if prev is not None:
-            prev.dvp_Port.aptr = port
-            prev.dvp_Lock.aptr = (lock.b_addr << 2) if lock is not None else 0
-            prev.dvp_Flags.val = dev_flags
-            prev.dvp_DevNode.aptr = entry.mem.addr
-            addr = last_devproc
-        else:
-            addr = self._new_devproc(
-                ctx, entry.name, port, lock, dev_flags, entry.mem.addr
-            )
-        log_dos.info(
-            "GetDeviceProc('*'): devproc=%06x -> device=%s", last_devproc, entry.name
-        )
-        self.setioerr(ctx, NO_ERROR)
-        return addr
-
-    def _advance_assign_devproc(self, ctx, addr):
-        """advance an in-place multi-directory assign DevProc
-
-        Returns True if the DevProc now points at the next directory, False
-        when the assign has no further directory.
-        """
-        devproc = DevProcStruct(ctx.mem, addr)
-        if not (devproc.dvp_Flags.val & self.DVPF_ASSIGN):
-            return False
-        entry = self.dos_list.get_entry_by_b_addr(devproc.dvp_DevNode.aptr >> 2)
-        if entry is None:
-            return False
-        locks = entry.locks
-        cur = devproc.dvp_Lock.aptr
-        index = None
-        for i, lock in enumerate(locks):
-            if (lock.b_addr << 2) == cur:
-                index = i
-                break
-        if index is None or index + 1 >= len(locks):
-            return False
-        lock = locks[index + 1]
-        devproc.dvp_Lock.aptr = lock.b_addr << 2
-        devproc.dvp_Port.aptr = self._port_of_lock(lock, entry.name)
-        return True
-
-    def _release_devproc_lock(self, devproc):
-        """release the temporary lock a DevProc owns (DVPF_UNLOCK)"""
-        if (devproc.dvp_Flags.val & self.DVPF_UNLOCK) and devproc.dvp_Lock.aptr != 0:
-            lock = self.lock_mgr.get_by_b_addr(devproc.dvp_Lock.aptr >> 2)
-            self.lock_mgr.release_lock(lock)
-        devproc.dvp_Lock.aptr = 0
-        devproc.dvp_Flags.val &= ~self.DVPF_UNLOCK
-
-    def FreeDeviceProc(self, ctx):
-        addr = ctx.cpu.r_reg(REG_D1)
-        if addr == 0:
-            return
-        devproc = DevProcStruct(ctx.mem, addr)
-        self._release_devproc_lock(devproc)
-        self._free_mem(addr)
-        log_dos.info("FreeDeviceProc: devproc=%06x", addr)
+    def FreeDeviceProc(self, ctx, addr):
+        return DeviceProcMod.free_device_proc(self, ctx, addr)
 
     # ----- Matcher -----
 
@@ -917,123 +714,10 @@ class DosLibrary(LibImpl):
         return self._system_tag_list(ctx, cmd, tag_list)
 
     def _system_tag_list(self, ctx, cmd, tag_list):
-        log_dos.info("SystemTagList: cmd=%s tags=%s ctx=%s", cmd, tag_list, ctx)
-        # cmd is at this point a full string of commands to execute.
-        # If we're running from the Amiga shell, forward this to the shell
-        # anyhow.
-        if ctx.process.is_native_shell():
-            cli_addr = ctx.process.get_cli_struct()
-            cli = CLIStruct(ctx.mem, cli_addr)
-            new_input = self.file_mgr.open(None, "NIL:", "r")
-            if new_input == None:
-                log_dos.warning(
-                    "SystemTagList: can't create new input file handle for SystemTagList('%s')",
-                    cmd,
-                )
-                return 0xFFFFFFFF
-            # Push-back the commands into the input buffer.
-            if cmd:
-                new_input.setbuf(cmd)
-            new_stdin = self.file_mgr.open(None, "*", "rw")
-            outtag = (
-                tag_list.find_tag(DosTag.SYS_Output) if tag_list is not None else None
-            )
-            # print "setting new input to %s" % new_input
-            # and install this as current input. The shell will read from that
-            # instead until it hits the EOF
-            input_fhsi = cli.cli_StandardInput.aptr
-            input_fhci = cli.cli_CurrentInput.aptr
-            if outtag:
-                data = outtag.get_data()
-                if data != 0:
-                    output_fhci = cli.cli_StandardOutput.aptr
-                    cli.cli_StandardOutput.aptr = data << 2
-            else:
-                output_fhci = None
-            cli.cli_CurrentInput.aptr = new_input.mem.addr
-            cli.cli_StandardInput.aptr = new_stdin.mem.addr
-            cli.cli_Background.val = DOSTRUE_S
-            # Create the Packet for the background process.
-            packet = ctx.process.run_system()
-            stack_size = cli.cli_DefaultStack.val << 2
-            current_dir = ctx.process.get_current_dir()
-            cur_lock = self.lock_mgr.get_by_b_addr(current_dir >> 2)
-            dup_lock = self.lock_mgr.dup_lock(self.get_current_dir(ctx))
-            cur_module = cli.cli_Module.aptr
-            cur_out = ctx.process.this_task.pr_COS.aptr
-            cur_setname = ctx.mem.r_bstr(cli.cli_SetName.aptr)
-            cli.cli_Module.aptr = 0
-            ctx.process.set_current_dir(dup_lock.mem.addr)
-            self.cur_dir_lock = dup_lock
-
-            # run command
-            reg_d1 = packet >> 2
-            code_start = ctx.process.shell_start
-            log_dos.info("(Shell)SystemTagList: pc=%06x", code_start)
-            ret_code = run_command(ctx.process, code_start, 0, 0, stack_size, reg_d1)
-            log_dos.info(
-                "(Shell)SystemTagList returned: cmd='%s' tags=%s: ret_code=%d",
-                cmd,
-                tag_list,
-                ret_code,
-            )
-
-            # shutdown
-            cli.cli_CurrentInput.aptr = input_fhci
-            cli.cli_StandardInput.aptr = input_fhsi
-            cli.cli_Background.val = DOSFALSE
-            cli.cli_Module.aptr = cur_module
-            if output_fhci != None:
-                cli.cli_StandardOutput.aptr = output_fhci
-            # Channels are closed by the dying shell
-            ctx.mem.w_bstr(cli.cli_SetName.aptr, cur_setname)
-            ctx.process.this_task.pr_CIS.aptr = input_fhci
-            ctx.process.this_task.pr_COS.aptr = cur_out
-            # infile = self.file_mgr.get_by_b_addr(input_fhci >> 2,False)
-            # infile.setbuf("")
-            ctx.process.set_current_dir(current_dir)
-            self.cur_dir_lock = self.lock_mgr.get_by_b_addr(current_dir >> 2)
-            self.setioerr(ctx, ret_code)
-            return 0
-        else:
-            # parse "command line"
-            cl = CommandLine()
-            res = cl.parse_line(cmd)
-            if res != cl.LINE_OK:
-                log_dos.info("SystemTagList: error parsing command: '%s' -> %d", res)
-                return 10  # RETURN_ERROR
-            # TODO: redirs
-            binary = cl.get_cmd()
-            arg_str = cl.get_arg_str()
-            log_dos.info("SystemTagList: bin='%s' arg_str='%s'", binary, arg_str[:-1])
-            # fetch current dir for current process
-            cur_proc = ctx.process
-            cwd_lock = cur_proc.cwd_lock
-            cwd = cur_proc.cwd
-            # create a process and run it...
-            proc = Process(ctx, binary, arg_str, cwd=cwd, cwd_lock=cwd_lock)
-            if not proc.ok:
-                log_dos.warning(
-                    "SystemTagList: can't create process for '%s' args=%s",
-                    binary,
-                    arg_str,
-                )
-                return DOSTRUE
-            return run_sub_process(ctx.scheduler, ctx.runner, proc)
+        return Cli.system_tag_list(self, ctx, cmd, tag_list)
 
     def _load_seg_list(self, ctx, name, lock):
-        """load a seglist by Amiga path and register it for UnLoadSeg"""
-        b_addr = ctx.seg_loader.load_ami_seglist(name, lock)
-        if b_addr == 0:
-            log_dos.warning("LoadSeg: '%s' -> not found!", name)
-            return 0
-        # overlay seglists are returned as negative BPTR
-        info = ctx.seg_loader.get_info(b_addr)
-        if info.has_overlay():
-            b_addr = -b_addr
-        log_dos.info("LoadSeg: '%s' -> %06x", name, b_addr)
-        self.seg_lists[b_addr] = name
-        return b_addr
+        return Cli.load_seg_list(self, ctx, name, lock)
 
     def _unload_seg_list(self, ctx, b_addr):
         """unload a seglist booked by LoadSeg/NewLoadSeg"""
@@ -1062,38 +746,8 @@ class DosLibrary(LibImpl):
             self, ctx, fh_baddr, table_ptr, func_ptr, stack_ptr
         )
 
-    def RunCommand(self, ctx):
-        b_addr = ctx.cpu.r_reg(REG_D1)
-        if b_addr >= 0x80000000:
-            b_addr -= 0x100000000
-        if not b_addr in self.seg_lists:
-            raise VamosInternalError(
-                "Trying to run unknown LoadSeg seg_list: b_addr=%06x" % b_addr
-            )
-        else:
-            name = self.seg_lists[b_addr]
-        stack = ctx.cpu.r_reg(REG_D2)
-        args = ctx.cpu.r_reg(REG_D3)
-        length = ctx.cpu.r_reg(REG_D4)
-        fh = ctx.process.get_input()
-        cmdline = ctx.mem.r_cstr(args)
-        # push command line into input buffer
-        input_fh = ctx.process.get_input()
-        input_fh.setbuf(cmdline)
-        log_dos.info(
-            "RunCommand: seglist=%06x(%s) stack=%d args=%s",
-            b_addr,
-            name,
-            stack,
-            cmdline,
-        )
-        # round up the stack
-        stack = (stack + 3) & -4
-        prog_start = (abs(b_addr) << 2) + 4
-        ret_code = run_command(ctx.process, prog_start, args, length, stack)
-        # clear input
-        input_fh.setbuf("")
-        return ret_code
+    def RunCommand(self, ctx, b_addr, stack, args, length):
+        return Cli.run_command(self, ctx, b_addr, stack, args, length)
 
     # ----- Path Helper -----
 
@@ -1167,35 +821,13 @@ class DosLibrary(LibImpl):
     # ----- Cli support ---
 
     def CliInit(self, ctx, dp: DosPacket):
-        # Init style shells are not needed anymore
-        log_dos.error("CliInit: not supported/needed!")
-        return 0
+        return Cli.cli_init(self, ctx, dp)
 
     def CliInitNewcli(self, ctx, dp: DosPacket):
-        # NewCLI style shells are not supported
-        log_dos.error("CliInitNewcli: not supported/needed!")
-        return 0
+        return Cli.cli_init_newcli(self, ctx, dp)
 
     def CliInitRun(self, ctx, dp: DosPacket):
-        # check dos packet
-        type = dp.type.val
-        res1 = dp.res1.val
-        res2 = dp.res2.val
-        log_dos.info(
-            "CliInitRun pkt@%08x type=%d res1=%d res2=%d", dp.addr, type, res1, res2
-        )
-        # run style
-        if type != 0 and res1 == 0 and res2 == 0:
-            # setup CLI with legacy CliInit
-            return 0x80000008  # valid, and a async Run call.
-        else:
-            log_dos.warning(
-                "CliInitRun: unsupported mode: type=%d res1=%d res2=%d",
-                type,
-                res1,
-                res2,
-            )
-            return 0
+        return Cli.cli_init_run(self, ctx, dp)
 
     # ----- DosList -------------
 
@@ -1230,95 +862,7 @@ class DosLibrary(LibImpl):
         return DosListMod.free_dos_entry(self, ctx, dlist_ptr)
 
     def CreateNewProc(self, ctx, tags: TagList):
-        if tags is None:
-            log_dos.warning("CreateNewProc: NULL tags")
-            return 0
-
-        tag_list = tags.to_list(map_enum=DosTag, do_map=True)
-        log_dos.info("CreateNewProc: tags=%s", tag_list)
-
-        entry_pc = tags.get_tag_data(DosTag.NP_Entry, 0)
-        seglist_bptr = tags.get_tag_data(DosTag.NP_SegList, 0)
-        stack_size = tags.get_tag_data(DosTag.NP_StackSize, 4096)
-        name_ptr = tags.get_tag_data(DosTag.NP_Name, 0)
-        priority = tags.get_tag_data(DosTag.NP_Priority, 0)
-        current_dir = tags.get_tag_data(DosTag.NP_CurrentDir, 0)
-        home_dir = tags.get_tag_data(DosTag.NP_HomeDir, 0)
-        input_fh = tags.get_tag_data(DosTag.NP_Input, 0)
-        output_fh = tags.get_tag_data(DosTag.NP_Output, 0)
-
-        name = ctx.mem.r_cstr(name_ptr) if name_ptr != 0 else "child_process"
-        if entry_pc == 0 and seglist_bptr == 0:
-            log_dos.warning("CreateNewProc: no NP_Entry or NP_SegList")
-            return 0
-        if entry_pc == 0 and seglist_bptr != 0:
-            seg_addr = seglist_bptr << 2
-            entry_pc = seg_addr + 4
-
-        log_dos.info(
-            "CreateNewProc: name=%s entry=%06x stack=%d pri=%d",
-            name,
-            entry_pc,
-            stack_size,
-            priority,
-        )
-
-        # the child is a process of its own: the scheduler runs it beside
-        # its parent, and it is freed once its task ends (_child_proc_event)
-        child = self.create_child_process(
-            ctx,
-            name,
-            stack_size=stack_size,
-            start_pc=entry_pc,
-            start_regs={REG_D0: 0, REG_A0: 0},
-        )
-        proc = child.proc
-        task = proc.task
-        stack = child.get_stack()
-        task.node.pri.val = priority
-        task.sp_reg.aptr = stack.get_initial_sp()
-        task.sp_lower.aptr = stack.get_lower()
-        task.sp_upper.aptr = stack.get_upper()
-        proc.stack_size.val = stack.get_size()
-        proc.stack_base.bptr = stack.get_lower() >> 2
-        proc.seg_list.bptr = seglist_bptr
-        proc.glob_vec.aptr = 0xFFFFFFFF
-        proc.current_dir.bptr = current_dir
-        proc.home_dir.bptr = home_dir
-        proc.window_ptr.aptr = 0xFFFFFFFF
-
-        if input_fh == 0 or output_fh == 0:
-            parent_proc = ctx.exec_lib.exec_lib.this_task.aptr
-            if parent_proc != 0:
-                parent = ProcessStruct(ctx.mem, parent_proc)
-                if input_fh == 0:
-                    input_fh = parent.cis.bptr
-                if output_fh == 0:
-                    output_fh = parent.cos.bptr
-        proc.cis.bptr = input_fh
-        proc.cos.bptr = output_fh
-
-        # the process port is signalled with SIGB_DOS. it is no public port:
-        # FindPort() does not find it, a child that wants one adds its own
-        port = proc.msg_port
-        port.new(flags=MsgPortFlags.PA_SIGNAL, sig_bit=8, sig_task=task)
-        port_addr = port.addr
-        if not ctx.exec_lib.port_mgr.has_port(port_addr):
-            ctx.exec_lib.port_mgr.register_port(port_addr)
-
-        sched_task = child.get_sched_task()
-        self.child_procs[sched_task] = child
-        ctx.scheduler.add_task(sched_task)
-        # add_task() marks the task TS_ADDED. a new process is ready on the Amiga
-        task.state.val = TaskState.TS_READY
-
-        log_dos.info(
-            "CreateNewProc: created process %06x entry=%06x port=%06x",
-            proc.addr,
-            entry_pc,
-            port_addr,
-        )
-        return proc.addr
+        return Cli.create_new_proc(self, ctx, tags)
 
     def AssignLock(self, ctx, name: CSTR, lock: LONG):
         return Assign.assign_lock(self, ctx, name.get_str(), lock.val)
@@ -1328,23 +872,11 @@ class DosLibrary(LibImpl):
     def StrToLong(self, ctx, str_addr, val_addr):
         return Args.str_to_long(self, ctx, str_addr, val_addr)
 
-    def SetCurrentDirName(self, ctx):
-        str_addr = ctx.cpu.r_reg(REG_D1)
-        string = ctx.mem.r_cstr(str_addr)[:79]
-        cli_addr = self.Cli(ctx)
-        cli = CLIStruct(ctx.mem, cli_addr)
-        setaddr = cli.cli_SetName.aptr
-        ctx.mem.w_bstr(setaddr, string)
-        return DOSTRUE
+    def SetCurrentDirName(self, ctx, str_addr):
+        return Cli.set_current_dir_name(self, ctx, str_addr)
 
-    def SetPrompt(self, ctx):
-        str_addr = ctx.cpu.r_reg(REG_D1)
-        string = ctx.mem.r_cstr(str_addr)[:59]
-        cli_addr = self.Cli(ctx)
-        cli = CLIStruct(ctx.mem, cli_addr)
-        setaddr = cli.cli_Prompt.aptr
-        ctx.mem.w_bstr(setaddr, string)
-        return DOSTRUE
+    def SetPrompt(self, ctx, str_addr):
+        return Cli.set_prompt(self, ctx, str_addr)
 
     def DosGetString(self, ctx):
         errno = ctx.cpu.r_reg(REG_D1)
@@ -1364,11 +896,10 @@ class DosLibrary(LibImpl):
     # As we only have one file system (though with multiple assigns)
     # it does not really matter what we do here...
     def GetFileSysTask(self, ctx):
-        return ctx.process.this_task.pr_FileSystemTask.aptr
+        return Cli.get_file_sys_task(self, ctx)
 
-    def SetFileSysTask(self, ctx):
-        port = ctx.cpu.r_reg(REG_D1)
-        ctx.process.this_task.pr_FileSystemTask.aptr = port
+    def SetFileSysTask(self, ctx, port):
+        return Cli.set_file_sys_task(self, ctx, port)
 
     # ----- DosPackets -----
 
@@ -1403,24 +934,7 @@ class DosLibrary(LibImpl):
         return Cli.exit_process(self, ctx, returnCode.val)
 
     def DeviceProc(self, ctx, name: CSTR):
-        dev_name = name.get_str()
-        if not dev_name:
-            self.setioerr(ctx, ERROR_REQUIRED_ARG_MISSING)
-            return 0
-        abs_name = self.path_mgr.ami_abs_path(self.get_current_dir(ctx), dev_name)
-        volume = str(self.path_mgr.ami_volume_of_path(abs_name) or dev_name)
-        volume = volume.rstrip(":")
-        dispatcher = (
-            self.handler_mgr.get_dispatcher(volume)
-            if self.handler_mgr is not None
-            else None
-        )
-        if dispatcher is None:
-            log_dos.warning("DeviceProc('%s'): no handler", dev_name)
-            self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
-            return 0
-        log_dos.info("DeviceProc('%s') -> port %06x", dev_name, dispatcher.port)
-        return dispatcher.port
+        return DeviceProcMod.device_proc(self, ctx, name.get_str())
 
     def Execute(self, ctx, string: CSTR, file: LONG, file2: LONG):
         cmd = string.get_str()
