@@ -367,6 +367,42 @@ Example::
   > xdftool mydisk.adf rename c c_old             ; rename a directory
 
 
+``makelink`` - Create a soft link
+---------------------------------
+
+::
+
+  makelink <ami_path> <target>
+
+This creates a soft link (``ST_SOFTLINK``) at ``<ami_path>`` whose target is
+the AmigaDOS path string ``<target>``. The target is resolved relative to the
+directory the link lives in, or from the volume root if it starts with ``/``
+or ``:``. A lookup of the link transparently resolves to the target, so the
+link can be read, listed and used as a directory component like the object it
+names. Only soft links are supported; a hard link cannot be expressed on an
+ADFS volume.
+
+Example::
+
+  > xdftool mydisk.adf makelink c/link c/target   ; link in 'c' to 'c/target'
+  > xdftool mydisk.adf makelink link README       ; link to a root entry
+
+
+``readlink`` - Show the target of a soft link
+---------------------------------------------
+
+::
+
+  readlink <ami_path>
+
+This prints the target path stored in the soft link at ``<ami_path>``. It
+fails if the path is not a soft link.
+
+Example::
+
+  > xdftool mydisk.adf readlink link     ; print the link's target
+
+
 ``write`` - Write a host file or a host directory tree to the image
 -------------------------------------------------------------------
 

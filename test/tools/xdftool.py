@@ -489,6 +489,55 @@ def xdftool_rename_conflict_test(xdftool, toolrun, xdf_img, test_files):
     )
 
 
+def xdftool_makelink_readlink_test(xdftool, xdf_img, test_files):
+    """create a soft link, read its target back and resolve through it"""
+    xdftool(xdf_img.file_name, ("write", test_files.file_path))
+    xdftool(xdf_img.file_name, ("makelink", "link", test_files.file_name))
+    # readlink prints the stored target
+    assert xdftool(xdf_img.file_name, ("readlink", "link")) == [test_files.file_name]
+    # a lookup of the link resolves to the target file
+    assert (
+        xdftool(xdf_img.file_name, ("type", "link"), raw_output=True) == test_files.data
+    )
+
+
+def xdftool_makelink_dir_test(xdftool, xdf_img, test_files):
+    """a link to a directory resolves to the directory"""
+    xdftool(
+        xdf_img.file_name,
+        ("makedir", "d"),
+        ("write", test_files.file_path, "d/" + test_files.file_name),
+        ("makelink", "dlink", "d"),
+    )
+    assert xdftool(xdf_img.file_name, ("readlink", "dlink")) == ["d"]
+    assert (
+        xdftool(
+            xdf_img.file_name,
+            ("type", "dlink/" + test_files.file_name),
+            raw_output=True,
+        )
+        == test_files.data
+    )
+
+
+def xdftool_readlink_not_a_link_test(xdftool, toolrun, xdf_img, test_files):
+    """readlink on a plain file fails"""
+    xdftool(xdf_img.file_name, ("write", test_files.file_path))
+    ret, _, _ = toolrun.run(
+        "xdftool", xdf_img.file_name, "readlink", test_files.file_name
+    )
+    assert ret != 0
+
+
+def xdftool_makelink_conflict_test(xdftool, toolrun, xdf_img, test_files):
+    """makelink onto an existing entry fails"""
+    xdftool(xdf_img.file_name, ("write", test_files.file_path))
+    ret, _, _ = toolrun.run(
+        "xdftool", xdf_img.file_name, "makelink", test_files.file_name, "target"
+    )
+    assert ret != 0
+
+
 def xdftool_create_tree_test(xdftool, xdf_file_tree):
     """create various file/dir trees"""
     file_tree = xdf_file_tree.get_file_tree()

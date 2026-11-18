@@ -8,6 +8,7 @@ import argparse
 import os.path
 
 from amitools.fs.ADFSVolume import ADFSVolume
+from amitools.fs.ADFSSoftLink import ADFSSoftLink
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 from amitools.fs.FSError import *
 from amitools.fs.Imager import Imager
@@ -562,6 +563,39 @@ class RenameCmd(Command):
         return 0
 
 
+class MakeLinkCmd(Command):
+    def __init__(self, args, opts):
+        Command.__init__(self, args, opts, edit=True)
+
+    def handle_vol(self, vol):
+        n = len(self.opts)
+        if n != 2:
+            print("Usage: makelink <ami_path> <target>")
+            return 1
+        link_path = make_fsstr(self.opts[0])
+        target = make_fsstr(self.opts[1])
+        vol.create_soft_link(link_path, target)
+        return 0
+
+
+class ReadLinkCmd(Command):
+    def handle_vol(self, vol):
+        n = len(self.opts)
+        if n != 1:
+            print("Usage: readlink <ami_path>")
+            return 1
+        link_path = make_fsstr(self.opts[0])
+        node = vol.get_link_path_name(link_path)
+        if node is None:
+            print("Link not found:", self.opts[0])
+            return 2
+        if not isinstance(node, ADFSSoftLink):
+            print("Not a link:", self.opts[0])
+            return 2
+        print(node.get_target().get_unicode())
+        return 0
+
+
 class WriteCmd(Command):
     def __init__(self, args, opts):
         Command.__init__(self, args, opts, edit=True)
@@ -1108,6 +1142,8 @@ def main(args=None, defaults=None):
         "write": WriteCmd,
         "delete": DeleteCmd,
         "rename": RenameCmd,
+        "makelink": MakeLinkCmd,
+        "readlink": ReadLinkCmd,
         "format": FormatCmd,
         "bitmap": BitmapCmd,
         "blkdev": BlkDevCmd,
