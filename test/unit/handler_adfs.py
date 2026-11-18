@@ -176,11 +176,46 @@ def handler_adfs_format_test(tmp_path):
     assert h.examine_object(h.locate_object("")).name == "fresh"
 
 
-def handler_adfs_link_not_implemented_test(tmp_path):
+def handler_adfs_link_test(tmp_path):
+    from amitools.fs.block.Block import Block
+
     h = make_handler(tmp_path / "work.adf")
+    write_file(h, "target", b"data")
     lock = h.locate_object("")
-    expect_error(236, h.make_link, lock, "link", "target", True)
-    expect_error(236, h.read_link, lock, "link", 32)
+    # a soft link is created and read back
+    h.make_link(lock, "link", "target", True)
+    assert h.read_link(lock, "link", 32) == "target"
+    # a normal lookup follows the link to its target
+    assert read_file(h, "link") == b"data"
+    # on disk it is a file header with sec_type ST_SOFTLINK and the target
+    node = h.volume.get_link_path_name(FSString("link"))
+    assert node.block.sub_type == Block.ST_SOFTLINK
+    assert node.block.symbolic_name.get_unicode() == "target"
+    # a hard link cannot be expressed on an ADFS volume
+    expect_error(236, h.make_link, lock, "hard", lock, False)
+    # a plain file is not a link
+    write_file(h, "plain", b"x")
+    expect_error(212, h.read_link, lock, "plain", 32)
+    # a missing object is not found
+    expect_error(205, h.read_link, lock, "gone", 32)
+    # the name must be free
+    expect_error(203, h.make_link, lock, "target", "x", True)
+
+
+def handler_adfs_link_into_dir_test(tmp_path):
+    h = make_handler(tmp_path / "work.adf")
+    h.create_dir("d")
+    write_file(h, "d/target", b"data")
+    lock = h.locate_object("d")
+    # a link is created relative to the lock's directory
+    h.make_link(lock, "link", "target", True)
+    assert h.read_link(lock, "link", 32) == "target"
+    assert read_file(h, "d/link") == b"data"
+    # a link to a directory resolves to the directory
+    h.make_link(h.locate_object(""), "dlink", "d", True)
+    assert read_file(h, "dlink/target") == b"data"
+    # a missing parent directory is not found
+    expect_error(205, h.make_link, lock, "missing/x", "t", True)
 
 
 def handler_adfs_write_protect_test(tmp_path):

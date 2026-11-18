@@ -14,10 +14,11 @@ from amitools.fs import DosType
 from amitools.fs.ADFSVolume import ADFSVolume
 from amitools.fs.FSString import FSString
 from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
+from amitools.vamos.astructs import CSTR, LONG
 from amitools.vamos.handler import MODE_NEWFILE, AdfsHandler
 from amitools.vamos.lib.dos.Error import DOSTRUE
 from amitools.vamos.libstructs import FileInfoBlockStruct
-from amitools.vamos.machine.regs import REG_D1, REG_D2
+from amitools.vamos.machine.regs import REG_D1, REG_D2, REG_D3, REG_D4, REG_D5
 from amitools.vamos.main import main
 from amitools.vamos.mode import BaseMode
 from amitools.vamos.task import DosProcess
@@ -79,6 +80,69 @@ def dos_adfs_volume_e2e_test(tmp_path):
         alloc.free_memory(buf)
         assert dos_lib.Close(ctx, fh_b) == DOSTRUE
 
+        # MakeLink() creates a soft link through the handler; ReadLink()
+        # returns the stored target through a directory lock
+        link_name = alloc.alloc_cstr("work:link.txt")
+        target_name = alloc.alloc_cstr("hello.txt")
+        cpu.w_reg(REG_D1, link_name.addr)
+        cpu.w_reg(REG_D2, target_name.addr)
+        cpu.w_reg(REG_D3, 1)  # LINK_SOFT
+        assert (
+            dos_lib.MakeLink(
+                ctx,
+                CSTR(cpu=cpu, reg=REG_D1, mem=mem),
+                LONG(cpu=cpu, reg=REG_D2, mem=mem),
+                LONG(cpu=cpu, reg=REG_D3, mem=mem),
+            )
+            == DOSTRUE
+        )
+        alloc.free_cstr(link_name)
+        alloc.free_cstr(target_name)
+
+        # a Lock() on the link resolves to the target file
+        name = alloc.alloc_cstr("work:link.txt")
+        cpu.w_reg(REG_D1, name.addr)
+        cpu.w_reg(REG_D2, 0xFFFFFFFF)
+        link_b = dos_lib.Lock(ctx)
+        alloc.free_cstr(name)
+        assert link_b != 0
+        cpu.w_reg(REG_D1, link_b)
+        fh_b = dos_lib.OpenFromLock(ctx)
+        assert fh_b != 0
+        buf = alloc.alloc_memory(len(DATA), label="buf")
+        assert dos_lib.Read(ctx, fh_b, buf.addr, len(DATA)) == len(DATA)
+        assert bytes(mem.r_block(buf.addr, len(DATA))) == DATA
+        alloc.free_memory(buf)
+        assert dos_lib.Close(ctx, fh_b) == DOSTRUE
+
+        # ReadLink() with a lock on the link's directory returns the target
+        root_name = alloc.alloc_cstr("work:")
+        cpu.w_reg(REG_D1, root_name.addr)
+        cpu.w_reg(REG_D2, 0xFFFFFFFF)
+        root_b = dos_lib.Lock(ctx)
+        alloc.free_cstr(root_name)
+        assert root_b != 0
+        link_path = alloc.alloc_cstr("link.txt")
+        buf = alloc.alloc_memory(64, label="linkbuf")
+        cpu.w_reg(REG_D1, 0)  # port
+        cpu.w_reg(REG_D2, root_b)
+        cpu.w_reg(REG_D3, link_path.addr)
+        cpu.w_reg(REG_D4, buf.addr)
+        cpu.w_reg(REG_D5, 64)
+        assert dos_lib.ReadLink(
+            ctx,
+            LONG(cpu=cpu, reg=REG_D1, mem=mem),
+            LONG(cpu=cpu, reg=REG_D2, mem=mem),
+            CSTR(cpu=cpu, reg=REG_D3, mem=mem),
+            LONG(cpu=cpu, reg=REG_D4, mem=mem),
+            LONG(cpu=cpu, reg=REG_D5, mem=mem),
+        ) == len("hello.txt")
+        assert mem.r_cstr(buf.addr) == "hello.txt"
+        alloc.free_cstr(link_path)
+        alloc.free_memory(buf)
+        cpu.w_reg(REG_D1, root_b)
+        dos_lib.UnLock(ctx)
+
         # Open() + Write() + Close() create a new file through the handler;
         # the handler buffers it and writes it back to the image on shutdown
         name = alloc.alloc_cstr("work:new.txt")
@@ -120,5 +184,10 @@ def dos_adfs_volume_e2e_test(tmp_path):
     node = volume.get_path_name(FSString("new.txt"))
     assert node is not None
     assert node.get_file_data() == NEW_DATA
+    # the soft link is persisted and still resolves to its target
+    link = volume.get_link_path_name(FSString("link.txt"))
+    assert link is not None
+    assert link.get_target().get_unicode() == "hello.txt"
+    assert volume.read_file(FSString("link.txt")) == DATA
     volume.close()
     blkdev.close()

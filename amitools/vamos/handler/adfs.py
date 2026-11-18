@@ -11,6 +11,7 @@ Resolution is case-insensitive and collapses AmigaDOS parent steps.
 """
 
 from amitools.fs import DosType
+from amitools.fs.ADFSSoftLink import ADFSSoftLink
 from amitools.fs.ADFSVolume import ADFSVolume
 from amitools.fs.FSError import (
     DELETE_NOT_ALLOWED,
@@ -21,7 +22,9 @@ from amitools.fs.FSError import (
     INVALID_VOLUME_NAME,
     NAME_ALREADY_EXISTS,
     NO_FREE_BLOCKS,
+    TOO_MANY_LEVELS,
 )
+from amitools.fs.FileName import FileName
 from amitools.fs.FSString import FSString
 from amitools.fs.TimeStamp import TimeStamp, amiga_epoch
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
@@ -39,6 +42,7 @@ from .base import (
     ERROR_OBJECT_NOT_FOUND,
     ERROR_OBJECT_WRONG_TYPE,
     ERROR_SEEK_ERROR,
+    ERROR_TOO_MANY_LEVELS,
     ERROR_WRITE_PROTECTED,
     MODE_NEWFILE,
     MODE_OLDFILE,
@@ -61,6 +65,7 @@ _ADFS_ERROR_MAP = {
     INVALID_VOLUME_NAME: ERROR_INVALID_COMPONENT_NAME,
     DELETE_NOT_ALLOWED: ERROR_DIRECTORY_NOT_EMPTY,
     INVALID_COMMENT: ERROR_BAD_NUMBER,
+    TOO_MANY_LEVELS: ERROR_TOO_MANY_LEVELS,
 }
 
 
@@ -506,6 +511,61 @@ class AdfsHandler(FileSystemHandler):
             self.volume.create_dir(FSString(rel))
         except Exception as e:
             raise HandlerError(_adfs_error(getattr(e, "code", None))) from None
+
+    # ----- links -----
+
+    def _rel_in_lock(self, lock, name):
+        """a path relative to lock, as a volume-relative path"""
+        rel = str(name)
+        if lock.rel_path:
+            rel = lock.rel_path + "/" + rel
+        return self._rel(rel)
+
+    def make_link(self, lock, name, dest, soft):
+        self._check_writable()
+        if not soft:
+            # an ADFS volume can only express a soft link
+            raise HandlerError(ERROR_NOT_IMPLEMENTED, "hard links are not supported")
+        rel = self._rel_in_lock(lock, name)
+        fn = FileName(
+            FSString(rel),
+            is_intl=self.volume.is_intl,
+            is_longname=self.volume.is_longname,
+        )
+        if not fn.is_valid():
+            raise HandlerError(ERROR_INVALID_COMPONENT_NAME)
+        dir_name, base_name = fn.get_dir_and_base_name()
+        if base_name is None:
+            raise HandlerError(ERROR_INVALID_COMPONENT_NAME)
+        if dir_name is None:
+            parent = lock.node
+        else:
+            try:
+                parent = self.volume.get_dir_path_name(dir_name)
+            except Exception as e:
+                raise HandlerError(_adfs_error(getattr(e, "code", None))) from None
+            if parent is None:
+                raise HandlerError(ERROR_OBJECT_NOT_FOUND)
+        if not parent.is_dir():
+            raise HandlerError(ERROR_OBJECT_WRONG_TYPE)
+        if not isinstance(dest, FSString):
+            dest = FSString(dest)
+        try:
+            parent.create_soft_link(base_name, dest)
+        except Exception as e:
+            raise HandlerError(_adfs_error(getattr(e, "code", None))) from None
+
+    def read_link(self, lock, path, size):
+        rel = self._rel_in_lock(lock, path)
+        try:
+            node = self.volume.get_link_path_name(FSString(rel))
+        except Exception as e:
+            raise HandlerError(_adfs_error(getattr(e, "code", None))) from None
+        if node is None:
+            raise HandlerError(ERROR_OBJECT_NOT_FOUND)
+        if not isinstance(node, ADFSSoftLink):
+            raise HandlerError(ERROR_OBJECT_WRONG_TYPE)
+        return node.get_target().get_unicode()
 
     # ----- volume maintenance -----
 

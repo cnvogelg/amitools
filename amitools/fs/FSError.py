@@ -23,6 +23,7 @@ INVALID_VOLUME_NAME = 22
 INVALID_COMMENT = 23
 INVALID_DIR_CACHE_BLOCK = 24
 INVALID_ENTRY_BLOCK = 25
+TOO_MANY_LEVELS = 26
 
 error_names = {
     INVALID_BOOT_BLOCK: "Invalid Boot Block",
@@ -50,6 +51,7 @@ error_names = {
     INVALID_COMMENT: "Invalid comment",
     INVALID_DIR_CACHE_BLOCK: "Invalid DirCache Block",
     INVALID_ENTRY_BLOCK: "Invalid Entry Block",
+    TOO_MANY_LEVELS: "Too many levels",
 }
 
 

@@ -848,12 +848,12 @@ def fs_validate_entry_off_disk_test(tmp_path, dos_type, where, target, capsys):
     check_entries_read(image, want, capsys)
 
 
-@pytest.mark.parametrize("kind", ["hard_link", "soft_link", "root"])
+@pytest.mark.parametrize("kind", ["hard_link", "root"])
 @pytest.mark.parametrize("dos_type", DOS_TYPES, ids=dos_id)
 def fs_validate_entry_other_type_test(tmp_path, dos_type, kind, capsys):
-    # A header of a type that is not read, as a link, or a hash chain that
-    # leads to the root block, gives no entry, as an invalid header does:
-    # the directory lists and its files read, where
+    # A header of a type that is not read, as a hard link, or a hash chain
+    # that leads to the root block, gives no entry, as an invalid header
+    # does: the directory lists and its files read, where
     # it raised UNSUPPORTED_DIR_BLOCK and could not be read at all.
     image = tmp_path / "test.adf"
     blkdev, volume = create_volume(image, dos_type)
@@ -867,17 +867,15 @@ def fs_validate_entry_other_type_test(tmp_path, dos_type, kind, capsys):
         rewrite_long(image, hdr_num, -4, root_num)
         want = names
     else:
-        sub_type = Block.ST_LINKFILE if kind == "hard_link" else Block.ST_SOFTLINK
-        rewrite_long(image, hdr_num, -1, sub_type)
+        rewrite_long(image, hdr_num, -1, Block.ST_LINKFILE)
         want = [name for name in names if name != names[2]]
     check_entries_read(image, want, capsys)
 
 
-@pytest.mark.parametrize("kind", ["hard_link", "soft_link"])
 @pytest.mark.parametrize("dos_type", DOS_TYPES, ids=dos_id)
-def fs_validate_entry_link_chain_test(tmp_path, dos_type, kind, capsys):
-    # A link, valid but of a type that is not read, leads on along its hash
-    # chain: the entry behind it in its chain lists and reads, too.
+def fs_validate_entry_link_chain_test(tmp_path, dos_type, capsys):
+    # A hard link, valid but of a type that is not read, leads on along its
+    # hash chain: the entry behind it in its chain lists and reads, too.
     image = tmp_path / "test.adf"
     blkdev, volume = create_volume(image, dos_type)
     names = names_in_rising_slots(volume, 3)
@@ -887,8 +885,7 @@ def fs_validate_entry_link_chain_test(tmp_path, dos_type, kind, capsys):
     link = volume.get_path_name(FSString(names[1])).block
     assert link.hash_chain == volume.get_path_name(FSString(mate)).block.blk_num
     close_volume(blkdev, volume)
-    sub_type = Block.ST_LINKFILE if kind == "hard_link" else Block.ST_SOFTLINK
-    rewrite_long(image, link.blk_num, -1, sub_type)
+    rewrite_long(image, link.blk_num, -1, Block.ST_LINKFILE)
     check_entries_read(image, [names[0], mate, names[2]], capsys)
 
 

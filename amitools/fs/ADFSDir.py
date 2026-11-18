@@ -4,11 +4,16 @@ from .block.UserDirBlock import UserDirBlock
 from .block.EntryBlock import EntryBlock
 from .block.DirCacheBlock import *
 from .ADFSFile import ADFSFile
+from .ADFSSoftLink import ADFSSoftLink
 from .ADFSNode import ADFSNode, MAX_COMMENT_BYTES
 from .FileName import FileName
 from .FSError import *
 from .FSString import FSString
 from .MetaInfo import *
+
+# AmigaDOS follows at most this many soft links before a path lookup fails
+# with ERROR_TOO_MANY_LEVELS (dos.library's cap)
+MAX_LINK_DEPTH = 15
 
 
 class ADFSDir(ADFSNode):
@@ -51,9 +56,9 @@ class ADFSDir(ADFSNode):
     def _read_add_node(self, blk, recursive):
         """the hash chain link and node of entry block blk. The node is None
         if blk gives none: it is no header, the header is invalid or of a
-        type that is not read, as a link or the root block, or the blocks of
-        its file cannot all be found. The link is 0 unless the header is
-        valid"""
+        type that is not read, as a hard link or the root block, or the
+        blocks of its file cannot all be found. The link is 0 unless the
+        header is valid"""
         node = None
         is_header = blk.valid_chksum and blk.type == Block.T_SHORT
         if is_header:
@@ -63,9 +68,12 @@ class ADFSDir(ADFSNode):
             # its a file
             elif blk.sub_type == Block.ST_FILE:
                 node = ADFSFile(self.volume, self)
+            # its a soft link
+            elif blk.sub_type == Block.ST_SOFTLINK:
+                node = ADFSSoftLink(self.volume, self)
         if node == None:
-            # a valid header of a type that is not read, as a link, leads on
-            # along its hash chain; the root block is in none
+            # a valid header of a type that is not read, as a hard link,
+            # leads on along its hash chain; the root block is in none
             if is_header and blk.sub_type != Block.ST_ROOT:
                 return blk._get_long(-4), None
             return 0, None
@@ -326,7 +334,7 @@ class ADFSDir(ADFSNode):
                     new_blk,
                     node.get_size(),
                     update_myself=False,
-                    sub_type=Block.ST_USERDIR if node.is_dir() else Block.ST_FILE,
+                    sub_type=node.block.sub_type,
                 )
                 if record == None:
                     raise FSError(
@@ -381,6 +389,16 @@ class ADFSDir(ADFSNode):
             raise ValueError("create_file's name must be a FSString")
         node = ADFSFile(self.volume, self)
         node.set_file_data(data)
+        self._create_node(node, name, meta_info, update_ts)
+        return node
+
+    def create_soft_link(self, name, target, meta_info=None, update_ts=True):
+        if not isinstance(name, FSString):
+            raise ValueError("create_soft_link's name must be a FSString")
+        if not isinstance(target, FSString):
+            raise ValueError("create_soft_link's target must be a FSString")
+        node = ADFSSoftLink(self.volume, self)
+        node.set_target(target)
         self._create_node(node, name, meta_info, update_ts)
         return node
 
@@ -623,7 +641,7 @@ class ADFSDir(ADFSNode):
         # anything changes
         if self.volume.is_dircache:
             record = self.get_dircache_record(node)
-            sub_type = Block.ST_USERDIR if node.is_dir() else Block.ST_FILE
+            sub_type = node.block.sub_type
             new_record = DirCacheRecord(
                 entry=node.block.blk_num,
                 size=node.get_size(),
@@ -655,7 +673,7 @@ class ADFSDir(ADFSNode):
                 node.block.blk_num,
                 node.get_size(),
                 update_myself=False,
-                sub_type=Block.ST_USERDIR if node.is_dir() else Block.ST_FILE,
+                sub_type=node.block.sub_type,
             )
         # update time stamps
         self.update_dir_mod_time()
@@ -693,7 +711,7 @@ class ADFSDir(ADFSNode):
         for e in es:
             e.list(indent=indent + 1, all=all, detail=detail, encoding=encoding)
 
-    def get_path(self, pc, allow_file=True, allow_dir=True):
+    def get_path(self, pc, allow_file=True, allow_dir=True, follow_last=True, depth=0):
         if len(pc) == 0:
             return self
         self.ensure_entries()
@@ -701,9 +719,20 @@ class ADFSDir(ADFSNode):
             if not isinstance(pc[0], FileName):
                 raise ValueError("get_path's pc must be a FileName array")
             if e.name.get_upper_ami_str() == pc[0].get_upper_ami_str():
+                if isinstance(e, ADFSSoftLink):
+                    # a link in the middle of a path is always followed; in
+                    # the last position only if follow_last is set
+                    if len(pc) > 1 or follow_last:
+                        return self._follow_link(
+                            e, pc[1:], allow_file, allow_dir, depth
+                        )
+                    else:
+                        return e
                 if len(pc) > 1:
                     if isinstance(e, ADFSDir):
-                        return e.get_path(pc[1:], allow_file, allow_dir)
+                        return e.get_path(
+                            pc[1:], allow_file, allow_dir, follow_last, depth
+                        )
                     else:
                         return None
                 else:
@@ -720,6 +749,45 @@ class ADFSDir(ADFSNode):
                     else:
                         return None
         return None
+
+    def _follow_link(self, link, rest_pc, allow_file, allow_dir, depth):
+        """resolve soft link link, then the remaining path components rest_pc.
+
+        The link's target is resolved relative to the directory the link
+        lives in, or from the volume root if it starts with ``/`` or ``:``.
+        depth counts the links followed so far"""
+        if depth >= MAX_LINK_DEPTH:
+            raise FSError(TOO_MANY_LEVELS, node=link)
+        target = link.get_target().get_unicode()
+        if target[:1] in ("/", ":"):
+            base = []
+        else:
+            # the components of the link's own path, without its name
+            base = link.get_node_path()[:-1]
+        # rebuild the target's component list, dropping . and .. steps
+        for comp in target.split("/"):
+            if comp == "" or comp == ".":
+                continue
+            if comp == "..":
+                if not base:
+                    raise FSError(FILE_NOT_FOUND, node=link)
+                base.pop()
+            else:
+                base.append(comp)
+        # append the components that follow the link in the looked-up path
+        for comp in rest_pc:
+            base.append(comp.get_unicode_name())
+        pc = [
+            FileName(
+                FSString(c),
+                is_intl=self.volume.is_intl,
+                is_longname=self.volume.is_longname,
+            )
+            for c in base
+        ]
+        return self.volume.get_root_dir().get_path(
+            pc, allow_file, allow_dir, follow_last=True, depth=depth + 1
+        )
 
     def draw_on_bitmap(self, bm, show_all=False, first=True):
         blk_num = self.block.blk_num

@@ -413,8 +413,8 @@ class HandlerContract:
 
     def make_read_link_test(self, env):
         h = env.h
-        if env.kind not in ("hostfs", "decoder", "dospkt"):
-            # only the host file system can express a link
+        if env.kind not in ("hostfs", "decoder", "dospkt", "adfs"):
+            # only the host file system and ADFS can express a link
             lock = h.locate_object("")
             expect_error(236, h.make_link, lock, "link", "target", True)
             expect_error(236, h.read_link, lock, "link", 32)

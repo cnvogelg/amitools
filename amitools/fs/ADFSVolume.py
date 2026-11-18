@@ -158,7 +158,9 @@ class ADFSVolume:
 
     # ----- Path Queries -----
 
-    def get_path_name(self, path_name, allow_file=True, allow_dir=True):
+    def get_path_name(
+        self, path_name, allow_file=True, allow_dir=True, follow_last=True
+    ):
         """get node for given path"""
         # make sure path name is a FSString
         if not isinstance(path_name, FSString):
@@ -174,15 +176,19 @@ class ADFSVolume:
         else:
             # find a sub node
             path = fn.split_path()
-            return self.root_dir.get_path(path, allow_file, allow_dir)
+            return self.root_dir.get_path(path, allow_file, allow_dir, follow_last)
 
-    def get_dir_path_name(self, path_name):
+    def get_dir_path_name(self, path_name, follow_last=True):
         """get node for given path and ensure its a directory"""
-        return self.get_path_name(path_name, allow_file=False)
+        return self.get_path_name(path_name, allow_file=False, follow_last=follow_last)
 
-    def get_file_path_name(self, path_name):
+    def get_file_path_name(self, path_name, follow_last=True):
         """get node for given path and ensure its a file"""
-        return self.get_path_name(path_name, allow_dir=False)
+        return self.get_path_name(path_name, allow_dir=False, follow_last=follow_last)
+
+    def get_link_path_name(self, path_name):
+        """get the soft link node for the given path, not the object it names"""
+        return self.get_path_name(path_name, follow_last=False)
 
     def get_create_path_name(self, path_name, suggest_name=None):
         """get a parent node and path name for creation
@@ -373,6 +379,35 @@ class ADFSVolume:
                     extra="not found: " + dir_name.get_unicode(),
                 )
         node.create_dir(base_name)
+
+    def create_soft_link(self, ami_path, target):
+        """Create a soft link at ami_path pointing to target"""
+        # make sure both are FSStrings
+        if not isinstance(ami_path, FSString):
+            raise ValueError("create_soft_link's ami_path must be a FSString")
+        if not isinstance(target, FSString):
+            raise ValueError("create_soft_link's target must be a FSString")
+        # check link path
+        fn = FileName(ami_path, is_intl=self.is_intl, is_longname=self.is_longname)
+        if not fn.is_valid():
+            raise FSError(INVALID_FILE_NAME, file_name=ami_path)
+        # split into dir and base name
+        dir_name, base_name = fn.get_dir_and_base_name()
+        if base_name == None:
+            raise FSError(INVALID_FILE_NAME, file_name=ami_path)
+        # find parent of link
+        if dir_name == None:
+            node = self.root_dir
+        else:
+            # no parent dir found
+            node = self.get_dir_path_name(dir_name)
+            if node == None:
+                raise FSError(
+                    INVALID_PARENT_DIRECTORY,
+                    file_name=ami_path,
+                    extra="not found: " + dir_name.get_unicode(),
+                )
+        node.create_soft_link(base_name, target)
 
     def write_file(self, data, ami_path, suggest_name=None, cache=False):
         """Write given data as a file"""
