@@ -154,3 +154,22 @@ def do_pkt(dos, ctx, port_addr, action, arg1, arg2, arg3, arg4, arg5):
 def abort_pkt(dos, ctx, port_addr, pkt_addr):
     log_dos.info("AbortPkt: port=%06x pkt=%06x -> DOSFALSE", port_addr, pkt_addr)
     return DOSFALSE
+
+
+class DosPacketMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def WaitPkt(self, ctx):
+        return wait_pkt(self, ctx)
+
+    def ReplyPkt(self, ctx, dp: DosPacket, res1, res2):
+        return reply_pkt(self, ctx, dp, res1, res2)
+
+    def SendPkt(self, ctx, dp_addr, port_addr, reply_addr):
+        return send_pkt(self, ctx, dp_addr, port_addr, reply_addr)
+
+    def DoPkt(self, ctx, port_addr, action, arg1, arg2, arg3, arg4, arg5):
+        return do_pkt(self, ctx, port_addr, action, arg1, arg2, arg3, arg4, arg5)
+
+    def AbortPkt(self, ctx, port_addr, pkt_addr):
+        return abort_pkt(self, ctx, port_addr, pkt_addr)

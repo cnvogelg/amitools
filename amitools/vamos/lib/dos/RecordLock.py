@@ -10,6 +10,7 @@ A handler-less file handle (a bare test manager) keeps a per-handle list as a
 fallback; the locks live on the handle and disappear with it.
 """
 
+from amitools.vamos.astructs import LONG
 from amitools.vamos.libstructs import RecordLockStruct
 from amitools.vamos.log import log_dos
 
@@ -125,3 +126,29 @@ def unlock_record(dos, ctx, fh, offset, length):
 def unlock_records(dos, ctx, rec_array):
     ok, err = dos.record_locks.unlock_records(ctx, rec_array)
     return Helper.bool_result(dos, ctx, ok, err)
+
+
+class RecordLockMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def LockRecord(
+        self,
+        ctx,
+        fh: LONG,
+        offset: LONG,
+        length: LONG,
+        mode: LONG,
+        timeout: LONG,
+    ):
+        return lock_record(
+            self, ctx, fh.val, offset.val, length.val, mode.val, timeout.val
+        )
+
+    def LockRecords(self, ctx, recArray: LONG, timeout: LONG):
+        return lock_records(self, ctx, recArray.val, timeout.val)
+
+    def UnLockRecord(self, ctx, fh: LONG, offset: LONG, length: LONG):
+        return unlock_record(self, ctx, fh.val, offset.val, length.val)
+
+    def UnLockRecords(self, ctx, recArray: LONG):
+        return unlock_records(self, ctx, recArray.val)

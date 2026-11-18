@@ -8,11 +8,12 @@ machine's normal exit trap. ``Execute`` reuses the ``SystemTagList`` command
 runner.
 """
 
+from amitools.vamos.astructs import CSTR, LONG
 from amitools.vamos.dos import run_command as ami_run_command
 from amitools.vamos.dos import run_sub_process
 from amitools.vamos.error import VamosInternalError
 from amitools.vamos.libstructs import CLIStruct, MsgPortFlags, ProcessStruct, TaskState
-from amitools.vamos.libtypes import DosTag, TagList
+from amitools.vamos.libtypes import DosPacket, DosTag, TagList
 from amitools.vamos.log import log_dos
 from amitools.vamos.machine.regs import REG_A0, REG_D0
 
@@ -623,3 +624,96 @@ __all__ = [
     "set_prompt",
     "system_tag_list",
 ]
+
+
+class CliMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def GetProgramName(self, ctx, buf_ptr, max_len):
+        return get_program_name(self, ctx, buf_ptr, max_len)
+
+    def GetProgramDir(self, ctx):
+        return get_program_dir(self, ctx)
+
+    def GetArgStr(self, ctx):
+        return get_arg_str(self, ctx)
+
+    def SystemTagList(self, ctx, cmd: CSTR, tag_list: TagList):
+        return self._system_tag_list(ctx, cmd.get_str(), tag_list)
+
+    def _system_tag_list(self, ctx, cmd, tag_list):
+        return system_tag_list(self, ctx, cmd, tag_list)
+
+    def _load_seg_list(self, ctx, name, lock):
+        return load_seg_list(self, ctx, name, lock)
+
+    def RunCommand(self, ctx, b_addr, stack, args, length):
+        return run_command(self, ctx, b_addr, stack, args, length)
+
+    def CliInit(self, ctx, dp: DosPacket):
+        return cli_init(self, ctx, dp)
+
+    def CliInitNewcli(self, ctx, dp: DosPacket):
+        return cli_init_newcli(self, ctx, dp)
+
+    def CliInitRun(self, ctx, dp: DosPacket):
+        return cli_init_run(self, ctx, dp)
+
+    def CreateNewProc(self, ctx, tags: TagList):
+        return create_new_proc(self, ctx, tags)
+
+    def SetCurrentDirName(self, ctx, str_addr):
+        return set_current_dir_name(self, ctx, str_addr)
+
+    def SetPrompt(self, ctx, str_addr):
+        return set_prompt(self, ctx, str_addr)
+
+    def GetFileSysTask(self, ctx):
+        return get_file_sys_task(self, ctx)
+
+    def SetFileSysTask(self, ctx, port):
+        return set_file_sys_task(self, ctx, port)
+
+    def CreateProc(self, ctx, name: CSTR, pri: LONG, segList: LONG, stackSize: LONG):
+        return create_proc(
+            self, ctx, name.get_str(), pri.val, segList.val, stackSize.val
+        )
+
+    def Exit(self, ctx, returnCode: LONG):
+        return exit_process(self, ctx, returnCode.val)
+
+    def Execute(self, ctx, string: CSTR, file: LONG, file2: LONG):
+        return execute(self, ctx, string.get_str(), file.val, file2.val)
+
+    def GetConsoleTask(self, ctx):
+        return get_console_task(ctx)
+
+    def SetConsoleTask(self, ctx, task: LONG):
+        return set_console_task(ctx, task.val)
+
+    def SetArgStr(self, ctx, string: CSTR):
+        return set_arg_str(ctx, string.aptr)
+
+    def FindCliProc(self, ctx, num: LONG):
+        return find_cli_proc(ctx, num.val)
+
+    def MaxCli(self, ctx):
+        return max_cli(ctx)
+
+    def GetCurrentDirName(self, ctx, buf: LONG, length: LONG):
+        return get_current_dir_name(self, ctx, buf.val, length.val)
+
+    def SetProgramName(self, ctx, name: CSTR):
+        return set_program_name(self, ctx, name.get_str())
+
+    def GetPrompt(self, ctx, buf: LONG, length: LONG):
+        return get_prompt(self, ctx, buf.val, length.val)
+
+    def SetProgramDir(self, ctx, lock: LONG):
+        return set_program_dir(ctx, lock.val)
+
+    def GetCurrentDir(self, ctx):
+        return get_current_dir(ctx)
+
+    def DoShellMethodTagList(self, ctx, method: LONG, tags: TagList):
+        return do_shell_method_tag_list(self, ctx, method.val, tags)

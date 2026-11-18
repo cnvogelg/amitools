@@ -8,8 +8,10 @@ maintain the DOS list's directory lock list and mirror it into the path
 manager.
 """
 
+from amitools.vamos.astructs import CSTR, LONG
 from amitools.vamos.log import log_dos
 
+from . import Helper
 from .Error import (
     ERROR_INVALID_COMPONENT_NAME,
     ERROR_INVALID_LOCK,
@@ -117,3 +119,26 @@ def rem_assign_list(dos, name, lock_bptr):
         return False, ERROR_OBJECT_NOT_FOUND
     log_dos.info("assign remove %s -> %s", name, lock.ami_path)
     return True, 0
+
+
+class AssignMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def AssignLock(self, ctx, name: CSTR, lock: LONG):
+        return assign_lock(self, ctx, name.get_str(), lock.val)
+
+    def AssignLate(self, ctx, name: CSTR, path: CSTR):
+        ok, err = assign_path(self, ctx, name.get_str(), path.get_str())
+        return Helper.bool_result(self, ctx, ok, err)
+
+    def AssignPath(self, ctx, name: CSTR, path: CSTR):
+        ok, err = assign_path(self, ctx, name.get_str(), path.get_str())
+        return Helper.bool_result(self, ctx, ok, err)
+
+    def AssignAdd(self, ctx, name: CSTR, lock: LONG):
+        ok, err = assign_add(self, name.get_str(), lock.val)
+        return Helper.bool_result(self, ctx, ok, err)
+
+    def RemAssignList(self, ctx, name: CSTR, lock: LONG):
+        ok, err = rem_assign_list(self, name.get_str(), lock.val)
+        return Helper.bool_result(self, ctx, ok, err)

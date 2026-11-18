@@ -6,9 +6,11 @@ map errors; the handler owns the behaviour (``format``, ``rename_disk``,
 ``more_cache`` -> ACTION_FORMAT / ACTION_RENAME_DISK / ACTION_MORE_CACHE).
 """
 
+from amitools.vamos.astructs import CSTR, LONG
 from amitools.vamos.handler import HandlerError
 from amitools.vamos.log import log_dos
 
+from . import Helper
 from .Error import ERROR_NOT_IMPLEMENTED, ERROR_REQUIRED_ARG_MISSING
 
 
@@ -60,3 +62,34 @@ def add_buffers(dos, ctx, name, number):
 def volume_request_hook(dos, ctx, vol):
     log_dos.warning("VolumeRequestHook(%s): not implemented", vol)
     return 0
+
+
+class VolumeMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def Format(
+        self,
+        ctx,
+        filesystem: CSTR,
+        volumename: CSTR,
+        dostype: LONG,
+    ):
+        ok, err = format_volume(
+            self,
+            ctx,
+            filesystem.get_str(),
+            volumename.get_str(),
+            dostype.val,
+        )
+        return Helper.bool_result(self, ctx, ok, err)
+
+    def Relabel(self, ctx, drive: CSTR, newname: CSTR):
+        ok, err = relabel(self, ctx, drive.get_str(), newname.get_str())
+        return Helper.bool_result(self, ctx, ok, err)
+
+    def AddBuffers(self, ctx, name: CSTR, number: LONG):
+        ok, err = add_buffers(self, ctx, name.get_str(), number.val)
+        return Helper.bool_result(self, ctx, ok, err)
+
+    def VolumeRequestHook(self, ctx, vol: LONG):
+        return volume_request_hook(self, ctx, vol.val)

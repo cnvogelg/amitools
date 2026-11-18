@@ -10,8 +10,9 @@ missing string leaves the corresponding part of ``dat_Stamp`` untouched.
 import re
 import time
 
-from amitools.vamos.log import log_dos
+from amitools.vamos.astructs import LONG
 from amitools.vamos.libstructs import DateStampStruct, DateTimeStruct
+from amitools.vamos.log import log_dos
 
 from .AmiTime import AmiTime, sys_to_ami_time
 from .Error import DOSFALSE, DOSTRUE, dos_error_strings
@@ -350,3 +351,22 @@ def dos_get_string(dos, ctx, errno):
         return dos.errstrings[errno]
     else:
         return 0
+
+
+class DateMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def DateStamp(self, ctx, ds_ptr):
+        return date_stamp(self, ctx, ds_ptr)
+
+    def DateToStr(self, ctx, dt_ptr):
+        return date_to_str(self, ctx, dt_ptr)
+
+    def DosGetString(self, ctx, errno):
+        return dos_get_string(self, ctx, errno)
+
+    def CompareDates(self, ctx, date1: LONG, date2: LONG):
+        return compare_dates_values(self, ctx, date1.val, date2.val)
+
+    def StrToDate(self, ctx, datetime: LONG):
+        return str_to_date_ptr(self, ctx, datetime.val)

@@ -7,6 +7,7 @@ requester exists in Vamos, so ``ErrorReport()`` reports the error through the
 log and fails honestly.
 """
 
+from amitools.vamos.astructs import CSTR, LONG
 from amitools.vamos.log import log_dos
 
 from . import Helper
@@ -152,3 +153,38 @@ def error_report(dos, ctx, code, report_type, arg1, device):
         device,
     )
     return DOSFALSE, ERROR_NOT_IMPLEMENTED
+
+
+class StdioMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def IoErr(self, ctx):
+        return io_err(self, ctx)
+
+    def SetIoErr(self, ctx, err):
+        return set_io_err(self, ctx, err)
+
+    def Fault(self, ctx, errcode, hdr_ptr, buf_ptr, buf_len):
+        return fault(self, ctx, errcode, hdr_ptr, buf_ptr, buf_len)
+
+    def PrintFault(self, ctx, errcode, hdr_ptr):
+        return print_fault(self, ctx, errcode, hdr_ptr)
+
+    def PutStr(self, ctx, str_ptr):
+        return put_str(self, ctx, str_ptr)
+
+    def WriteChars(self, ctx, buf_ptr, size):
+        return write_chars(self, ctx, buf_ptr, size)
+
+    def ErrorOutput(self, ctx):
+        return error_output(ctx)
+
+    def SelectError(self, ctx, fh: LONG):
+        return select_error(ctx, fh.val)
+
+    def PutErrStr(self, ctx, string: CSTR):
+        return put_err_str(self, ctx, string.aptr)
+
+    def ErrorReport(self, ctx, code: LONG, type: LONG, arg1: LONG, device: LONG):
+        ok, err = error_report(self, ctx, code.val, type.val, arg1.val, device.val)
+        return Helper.bool_result(self, ctx, ok, err)

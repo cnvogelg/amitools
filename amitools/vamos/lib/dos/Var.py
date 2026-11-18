@@ -180,3 +180,19 @@ def delete_var(dos, ctx, name_ptr, flags):
     if node is not None:
         delete_var_node(dos, ctx, node)
     return DOSTRUE
+
+
+class VarMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def GetVar(self, ctx, name_ptr, buff_ptr, size, flags):
+        return get_var(self, ctx, name_ptr, buff_ptr, size, flags)
+
+    def FindVar(self, ctx, name_ptr, vtype):
+        return find_var(self, ctx, name_ptr, vtype)
+
+    def SetVar(self, ctx, name_ptr, buff_ptr, size, flags):
+        return set_var(self, ctx, name_ptr, buff_ptr, size, flags)
+
+    def DeleteVar(self, ctx, name_ptr, flags):
+        return delete_var(self, ctx, name_ptr, flags)

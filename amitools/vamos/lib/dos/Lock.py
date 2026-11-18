@@ -1,3 +1,4 @@
+from amitools.vamos.astructs import CSTR, LONG
 from amitools.vamos.handler import HandlerError, MODE_OLDFILE
 from amitools.vamos.log import log_lock, log_dos
 from amitools.vamos.machine import Code
@@ -713,3 +714,61 @@ def same_device(dos, ctx, lock1_b_addr, lock2_b_addr):
     same = name1.lower() == name2.lower()
     log_dos.info("SameDevice(%s, %s) -> %s", name1, name2, same)
     return DOSTRUE if same else DOSFALSE
+
+
+class LockMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def Lock(self, ctx, name: CSTR, mode):
+        return lock(self, ctx, name.get_str(), mode)
+
+    def UnLock(self, ctx, lock_b_addr):
+        return unlock(self, ctx, lock_b_addr)
+
+    def DupLock(self, ctx, lock_b_addr):
+        return dup_lock(self, ctx, lock_b_addr)
+
+    def SameLock(self, ctx, lock1_b_addr, lock2_b_addr):
+        return same_lock(self, ctx, lock1_b_addr, lock2_b_addr)
+
+    def OpenFromLock(self, ctx, lock_b_addr):
+        return open_from_lock(self, ctx, lock_b_addr)
+
+    def DupLockFromFH(self, ctx, fh_b_addr):
+        return dup_lock_from_fh(self, ctx, fh_b_addr)
+
+    def ParentOfFH(self, ctx, fh_b_addr):
+        return parent_of_fh(self, ctx, fh_b_addr)
+
+    def Examine(self, ctx, lock_b_addr, fib_ptr):
+        return examine(self, ctx, lock_b_addr, fib_ptr)
+
+    def ExamineFH(self, ctx, fh_b_addr, fib_ptr):
+        return examine_fh(self, ctx, fh_b_addr, fib_ptr)
+
+    def Info(self, ctx, lock_b_addr, info_ptr):
+        return info(self, ctx, lock_b_addr, info_ptr)
+
+    def ExNext(self, ctx, lock_b_addr, fib_ptr):
+        return exnext(self, ctx, lock_b_addr, fib_ptr)
+
+    def ExAll(self, ctx, lock_b_addr, buffer, size, data_type, control_ptr):
+        return exall(self, ctx, lock_b_addr, buffer, size, data_type, control_ptr)
+
+    def ExAllEnd(self, ctx, lock_b_addr, buffer, size, data_type, control_ptr):
+        return exall_end(self, ctx, lock_b_addr, buffer, size, data_type, control_ptr)
+
+    def ParentDir(self, ctx, lock_b_addr):
+        return parent_dir(self, ctx, lock_b_addr)
+
+    def CurrentDir(self, ctx, lock_b_addr):
+        return current_dir(self, ctx, lock_b_addr)
+
+    def NameFromLock(self, ctx, lock_b_addr, buf, buf_len):
+        return name_from_lock(self, ctx, lock_b_addr, buf, buf_len)
+
+    def NameFromFH(self, ctx, fh_b_addr, buf, buf_len):
+        return name_from_fh(self, ctx, fh_b_addr, buf, buf_len)
+
+    def SameDevice(self, ctx, lock1: LONG, lock2: LONG):
+        return same_device(self, ctx, lock1.val, lock2.val)

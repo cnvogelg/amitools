@@ -6,6 +6,7 @@ the ``DosLibrary`` methods are thin typed wrappers over these functions. The
 stdout-only helpers (``PutStr``/``WriteChars``) live in :mod:`Stdio`.
 """
 
+from amitools.vamos.astructs import CSTR, LONG
 from amitools.vamos.libstructs import FileHandleStruct, DateStampStruct
 from amitools.vamos.log import log_dos
 from amitools.vamos.handler import HandlerError
@@ -627,3 +628,114 @@ def set_owner(dos, ctx, name, owner_info):
         dos.setioerr(ctx, e.code)
         return DOSFALSE
     return Helper.bool_result(dos, ctx, True, 0)
+
+
+class FileIOMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def SetFileDate(self, ctx, name: CSTR, date):
+        return set_file_date(self, ctx, name.get_str(), date)
+
+    def SetComment(self, ctx, name: CSTR, comment: CSTR):
+        return set_comment(self, ctx, name.get_str(), comment.get_str())
+
+    def Cli(self, ctx):
+        return cli(self, ctx)
+
+    def ExtendedCli(self, ctx):
+        return extended_cli(self, ctx)
+
+    def Input(self, ctx):
+        return input(self, ctx)
+
+    def Output(self, ctx):
+        return output(self, ctx)
+
+    def SelectInput(self, ctx, fh_b_addr):
+        return select_input(self, ctx, fh_b_addr)
+
+    def SelectOutput(self, ctx, fh_b_addr):
+        return select_output(self, ctx, fh_b_addr)
+
+    def SetMode(self, ctx, fh_b_addr, mode: LONG):
+        return set_mode(self, ctx, fh_b_addr, mode.val)
+
+    def WaitForChar(self, ctx, fh_b_addr, timeout: LONG):
+        return wait_for_char(self, ctx, fh_b_addr, timeout.val)
+
+    def Open(self, ctx, name_ptr, mode):
+        return open_file(self, ctx, name_ptr, mode)
+
+    def Close(self, ctx, fh_b_addr):
+        return close_file(self, ctx, fh_b_addr)
+
+    def Read(self, ctx, fh_b_addr, buf_ptr, size):
+        return read_file(self, ctx, fh_b_addr, buf_ptr, size)
+
+    def Write(self, ctx, fh_b_addr, buf_ptr, size):
+        return write_file(self, ctx, fh_b_addr, buf_ptr, size)
+
+    def FWrite(self, ctx, fh_b_addr, buf_ptr, size, number):
+        return fwrite(self, ctx, fh_b_addr, buf_ptr, size, number)
+
+    def FRead(self, ctx, fh_b_addr, buf_ptr, size, number):
+        return fread(self, ctx, fh_b_addr, buf_ptr, size, number)
+
+    def Seek(self, ctx, fh_b_addr, pos, mode):
+        return seek(self, ctx, fh_b_addr, pos, mode)
+
+    def SetFileSize(self, ctx, fh_b_addr, pos, mode):
+        return set_file_size(self, ctx, fh_b_addr, pos, mode)
+
+    def FGetC(self, ctx, fh_b_addr):
+        return fgetc(self, ctx, fh_b_addr)
+
+    def FPutC(self, ctx, fh_b_addr, val):
+        return fputc(self, ctx, fh_b_addr, val)
+
+    def FPuts(self, ctx, fh_b_addr, str_ptr):
+        return fputs(self, ctx, fh_b_addr, str_ptr)
+
+    def UnGetC(self, ctx, fh_b_addr, val):
+        return ungetc(self, ctx, fh_b_addr, val)
+
+    def Flush(self, ctx, fh_b_addr):
+        return flush_file(self, ctx, fh_b_addr)
+
+    def SetVBuf(self, ctx, fh_b_addr, buf_ptr, buf_type, size):
+        return set_vbuf(self, ctx, fh_b_addr, buf_ptr, buf_type, size)
+
+    def VPrintf(self, ctx, format: CSTR, argv_ptr):
+        return printf_to_handle(
+            self, ctx, ctx.process.get_output(), format.get_str(), argv_ptr
+        )
+
+    def VFPrintf(self, ctx, fh_b_addr, format: CSTR, argv_ptr):
+        return vfprintf(self, ctx, fh_b_addr, format.get_str(), argv_ptr)
+
+    def VFWritef(self, ctx, fh_b_addr, format: CSTR, args_ptr):
+        return vfwritef(self, ctx, fh_b_addr, format.get_str(), args_ptr)
+
+    def FGets(self, ctx, fh_b_addr, buf_addr, buflen):
+        return fgets(self, ctx, fh_b_addr, buf_addr, buflen)
+
+    def DeleteFile(self, ctx, name: CSTR):
+        return delete_file(self, ctx, name.get_str())
+
+    def Rename(self, ctx, oldName: CSTR, newName: CSTR):
+        return rename(self, ctx, oldName.get_str(), newName.get_str())
+
+    def SetProtection(self, ctx, name: CSTR, protect):
+        return set_protection(self, ctx, name.get_str(), protect)
+
+    def IsInteractive(self, ctx, fh_b_addr):
+        return is_interactive(self, ctx, fh_b_addr)
+
+    def CreateDir(self, ctx, name: CSTR):
+        return create_dir(self, ctx, name.get_str())
+
+    def ChangeMode(self, ctx, type: LONG, fh: LONG, newmode: LONG):
+        return change_mode(self, ctx, type.val, fh.val, newmode.val)
+
+    def SetOwner(self, ctx, name: CSTR, owner_info: LONG):
+        return set_owner(self, ctx, name.get_str(), owner_info.val)

@@ -7,9 +7,11 @@ ACTION_READ_LINK). A hard link's target is a lock on the same volume; a soft
 link's target is a path string.
 """
 
+from amitools.vamos.astructs import CSTR, LONG
 from amitools.vamos.handler import HandlerError
 from amitools.vamos.log import log_dos
 
+from . import Helper
 from .Error import (
     ERROR_INVALID_LOCK,
     ERROR_LINE_TOO_LONG,
@@ -97,3 +99,30 @@ def read_link_fd(dos, ctx, port, lock, path, buffer, size):
     res, err = read_link(dos, ctx, port, lock, path, buffer, size)
     dos.setioerr(ctx, err)
     return res
+
+
+class LinkMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def ReadLink(
+        self,
+        ctx,
+        port: LONG,
+        lock: LONG,
+        path: CSTR,
+        buffer: LONG,
+        size: LONG,
+    ):
+        return read_link_fd(
+            self,
+            ctx,
+            port.val,
+            lock.val,
+            path.get_str(),
+            buffer.val,
+            size.val,
+        )
+
+    def MakeLink(self, ctx, name: CSTR, dest: LONG, soft: LONG):
+        ok, err = make_link(self, ctx, name.get_str(), dest.val, soft.val)
+        return Helper.bool_result(self, ctx, ok, err)

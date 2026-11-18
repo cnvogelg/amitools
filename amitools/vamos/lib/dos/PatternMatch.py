@@ -632,3 +632,19 @@ if __name__ == "__main__":
                 for a in sys.argv[2:]:
                     match = pattern_match(pat, a, debug=True)
                     print("'%s' -> %s" % (a, match))
+
+
+class PatternMatchMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def ParsePattern(self, ctx, src_ptr, dst_ptr, dst_len):
+        return parse_pattern(self, ctx, src_ptr, dst_ptr, dst_len)
+
+    def ParsePatternNoCase(self, ctx, src_ptr, dst_ptr, dst_len):
+        return parse_pattern(self, ctx, src_ptr, dst_ptr, dst_len, True)
+
+    def MatchPattern(self, ctx, pat_ptr, txt_ptr):
+        return match_pattern(self, ctx, pat_ptr, txt_ptr)
+
+    def MatchPatternNoCase(self, ctx, pat_ptr, txt_ptr):
+        return match_pattern(self, ctx, pat_ptr, txt_ptr, ignore_case=True)

@@ -118,3 +118,46 @@ def child_proc_event(dos, event):
         dos.port_mgr.unregister_port(port_addr)
     log_dos.info("CreateNewProc: process %06x ended", child.proc.addr)
     child.free()
+
+
+class HelperMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def update_dos_list_head(self):
+        return update_dos_list_head(self)
+
+    def get_callee_pc(self, ctx):
+        """a call stub log helper to extract the callee's pc"""
+        return get_callee_pc(self, ctx)
+
+    def get_current_dir(self, ctx):
+        return get_current_dir(self, ctx)
+
+    def get_home_dir(self, ctx):
+        """Get the program's home directory lock (PROGDIR:)"""
+        return get_home_dir(self, ctx)
+
+    def get_cwd_path(self, ctx):
+        """Amiga path of the current directory lock (or None)"""
+        return get_cwd_path(self, ctx)
+
+    def setioerr(self, ctx, err):
+        return set_io_err(self, ctx, err)
+
+    def _alloc_mem(self, name, size):
+        return alloc_mem(self, name, size)
+
+    def _free_mem(self, addr):
+        return free_mem(self, addr)
+
+    def create_child_process(self, ctx, name, **kw_args):
+        """the process CreateNewProc() makes: a DosProcess by default.
+
+        an embedder may return a subclass that serves the DOS calls of a
+        process vamos did not load as a program.
+        """
+        return create_child_process(self, ctx, name, **kw_args)
+
+    def _child_proc_event(self, event):
+        """free a process made by CreateNewProc() once its task has ended"""
+        return child_proc_event(self, event)

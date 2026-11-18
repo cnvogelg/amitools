@@ -676,3 +676,22 @@ def str_to_long(dos, ctx, str_addr, val_addr):
         ctx.mem.w32(val_addr, int(match.group(0)))
         return len(match.group(0))
     return 0
+
+
+class ArgsMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def FindArg(self, ctx, template_ptr, keyword_ptr):
+        return find_arg(self, ctx, template_ptr, keyword_ptr)
+
+    def ReadArgs(self, ctx, template_ptr, array_ptr, rdargs_ptr):
+        return read_args(self, ctx, template_ptr, array_ptr, rdargs_ptr)
+
+    def FreeArgs(self, ctx, rdargs_ptr):
+        return free_args(self, ctx, rdargs_ptr)
+
+    def ReadItem(self, ctx, buff_ptr, maxchars, csrc_ptr):
+        return read_item(self, ctx, buff_ptr, maxchars, csrc_ptr)
+
+    def StrToLong(self, ctx, str_addr, val_addr):
+        return str_to_long(self, ctx, str_addr, val_addr)

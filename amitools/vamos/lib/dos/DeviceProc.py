@@ -8,6 +8,7 @@ lock owned by the ``DevProc`` (``DVPF_UNLOCK``); a multi-directory assign sets
 enumerates the DOS device list.
 """
 
+from amitools.vamos.astructs import CSTR
 from amitools.vamos.libstructs import DevProcStruct, DosListAssignStruct
 from amitools.vamos.log import log_dos
 
@@ -217,3 +218,16 @@ def device_proc(dos, ctx, dev_name):
         return 0
     log_dos.info("DeviceProc('%s') -> port %06x", dev_name, dispatcher.port)
     return dispatcher.port
+
+
+class DeviceProcMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def GetDeviceProc(self, ctx, name_ptr, last_devproc):
+        return get_device_proc(self, ctx, name_ptr, last_devproc)
+
+    def FreeDeviceProc(self, ctx, addr):
+        return free_device_proc(self, ctx, addr)
+
+    def DeviceProc(self, ctx, name: CSTR):
+        return device_proc(self, ctx, name.get_str())

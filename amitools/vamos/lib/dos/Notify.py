@@ -8,10 +8,12 @@ behaviour is unchanged; a request whose name does not resolve also keeps the
 previous no-op success (AmigaDOS only notifies an existing object).
 """
 
+from amitools.vamos.astructs import LONG
 from amitools.vamos.handler import HandlerError
 from amitools.vamos.libstructs import NotifyRequestStruct
 from amitools.vamos.log import log_dos
 
+from . import Helper
 from .Error import DOSFALSE, DOSTRUE, ERROR_REQUIRED_ARG_MISSING
 
 
@@ -54,3 +56,15 @@ def end_notify(dos, ctx, notify):
     if notify == 0:
         return DOSFALSE, ERROR_REQUIRED_ARG_MISSING
     return _notify(dos, ctx, notify, False)
+
+
+class NotifyMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def StartNotify(self, ctx, notify: LONG):
+        ok, err = start_notify(self, ctx, notify.val)
+        return Helper.bool_result(self, ctx, ok, err)
+
+    def EndNotify(self, ctx, notify: LONG):
+        ok, err = end_notify(self, ctx, notify.val)
+        return Helper.bool_result(self, ctx, ok, err)

@@ -256,3 +256,16 @@ def match_end(dos, ctx, anchor_ptr):
     del dos.matches[anchor_ptr]
     if mfn != None:
         mfn.end(ctx)
+
+
+class MatchFirstNextMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def MatchFirst(self, ctx, pat_ptr, anchor_ptr):
+        return match_first(self, ctx, pat_ptr, anchor_ptr)
+
+    def MatchNext(self, ctx, anchor_ptr):
+        return match_next(self, ctx, anchor_ptr)
+
+    def MatchEnd(self, ctx, anchor_ptr):
+        return match_end(self, ctx, anchor_ptr)

@@ -7,10 +7,13 @@ load tags, so only the file is used), ``InternalUnLoadSeg`` shares the
 by ``AddSegment``.
 """
 
+from amitools.vamos.astructs import CSTR, LONG
 from amitools.vamos.error import VamosInternalError
 from amitools.vamos.libstructs import SegmentStruct
+from amitools.vamos.libtypes import TagList
 from amitools.vamos.log import log_dos
 
+from . import Helper
 from .Error import (
     DOSFALSE,
     DOSTRUE,
@@ -168,3 +171,42 @@ def check_signal(dos, ctx, sigmask):
     # THOR: Fixme. We really need to get the signal
     # mask from the tty here.
     return 0
+
+
+class SegmentsMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def CheckSignal(self, ctx, sigmask):
+        return check_signal(self, ctx, sigmask)
+
+    def FindSegment(self, ctx, name_ptr, start, system):
+        return find_segment(self, ctx, name_ptr, start, system)
+
+    def AddSegment(self, ctx, name_ptr, seglist, system):
+        return add_segment(self, ctx, name_ptr, seglist, system)
+
+    def _unload_seg_list(self, ctx, b_addr):
+        """unload a seglist booked by LoadSeg/NewLoadSeg"""
+        return unload_seg_list(self, ctx, b_addr)
+
+    def LoadSeg(self, ctx, name_ptr):
+        return load_seg(self, ctx, name_ptr)
+
+    def UnLoadSeg(self, ctx, b_addr):
+        return unload_seg(self, ctx, b_addr)
+
+    def InternalLoadSeg(self, ctx, fh_baddr, table_ptr, func_ptr, stack_ptr):
+        return internal_load_seg(self, ctx, fh_baddr, table_ptr, func_ptr, stack_ptr)
+
+    def InternalUnLoadSeg(self, ctx, seglist: LONG, freefunc: LONG):
+        internal_unload_seg(self, ctx, seglist.val, freefunc.val)
+
+    def NewLoadSeg(self, ctx, file: CSTR, tags: TagList):
+        return new_load_seg(self, ctx, file.get_str(), tags)
+
+    def RemSegment(self, ctx, seg: LONG):
+        ok, err = rem_segment(self, ctx, seg.val)
+        return Helper.bool_result(self, ctx, ok, err)
+
+    def ScanStackToken(self, ctx, seg: LONG, defaultstack: LONG):
+        return scan_stack_token(self, ctx, seg.val, defaultstack.val)

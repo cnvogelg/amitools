@@ -1,5 +1,6 @@
 """helpers for path operations"""
 
+from amitools.vamos.astructs import APTR_VOID, CSTR, LONG, UBYTE
 from amitools.vamos.log import log_dos
 
 from .Error import DOSFALSE, DOSTRUE
@@ -169,3 +170,29 @@ def split_name(dos, ctx, name, separator, buf_ptr, oldpos, size):
         part,
     )
     return pos
+
+
+class PathPartMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def FilePart(self, ctx, addr):
+        return file_part(self, ctx, addr)
+
+    def PathPart(self, ctx, addr):
+        return path_part(self, ctx, addr)
+
+    def AddPart(self, ctx, dn_addr, fn_addr, size):
+        return add_part(self, ctx, dn_addr, fn_addr, size)
+
+    def SplitName(
+        self,
+        ctx,
+        name: CSTR,
+        separator: UBYTE,
+        buf: APTR_VOID,
+        oldpos: LONG,
+        size: LONG,
+    ):
+        return split_name(
+            self, ctx, name.str, int(separator), buf.aptr, int(oldpos), int(size)
+        )

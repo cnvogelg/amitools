@@ -62,3 +62,16 @@ def finish_timer_request(dos, ctx):
     finally:
         if device != 0:
             ctx.exec_lib.lib_mgr.close_lib(device)
+
+
+class TimerMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def Delay(self, ctx, timeout):
+        return delay(self, ctx, timeout)
+
+    def _setup_timer_request(self, ctx):
+        return setup_timer_request(self, ctx)
+
+    def _finish_timer_request(self, ctx):
+        return finish_timer_request(self, ctx)

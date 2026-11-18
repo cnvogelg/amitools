@@ -1,3 +1,4 @@
+from amitools.vamos.astructs import CSTR
 from amitools.vamos.log import log_doslist, log_dos
 from amitools.vamos.libstructs import (
     DosListDeviceStruct,
@@ -799,3 +800,46 @@ def free_dos_object(dos, ctx, obj_type, ptr):
         ctx.alloc.free_struct(entry[0])
     else:
         log_dos.error("FreeDosObject: type=%d ptr=%08x -> NOT FOUND!", obj_type, ptr)
+
+
+class DosListMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def IsFileSystem(self, ctx, name_ptr):
+        return is_file_system(self, ctx, name_ptr)
+
+    def AllocDosObject(self, ctx, obj_type, tags_ptr):
+        return alloc_dos_object(self, ctx, obj_type, tags_ptr)
+
+    def FreeDosObject(self, ctx, obj_type, ptr):
+        return free_dos_object(self, ctx, obj_type, ptr)
+
+    def LockDosList(self, ctx, flags):
+        return lock_dos_list(self, ctx, flags)
+
+    def UnLockDosList(self, ctx, flags):
+        return unlock_dos_list(self, ctx, flags)
+
+    def NextDosEntry(self, ctx, node, flags):
+        return next_dos_entry(self, ctx, node, flags)
+
+    def FindDosEntry(self, ctx, dlist, name_ptr, flags):
+        return find_dos_entry(self, ctx, dlist, name_ptr, flags)
+
+    def AttemptLockDosList(self, ctx, flags):
+        return attempt_lock_dos_list(self, ctx, flags)
+
+    def Inhibit(self, ctx, name: CSTR, onoff):
+        return inhibit(self, ctx, name.get_str(), onoff)
+
+    def MakeDosEntry(self, ctx, name_ptr, entry_type):
+        return make_dos_entry(self, ctx, name_ptr, entry_type)
+
+    def AddDosEntry(self, ctx, dlist_ptr):
+        return add_dos_entry(self, ctx, dlist_ptr)
+
+    def RemDosEntry(self, ctx, dlist_ptr):
+        return rem_dos_entry(self, ctx, dlist_ptr)
+
+    def FreeDosEntry(self, ctx, dlist_ptr):
+        return free_dos_entry(self, ctx, dlist_ptr)
