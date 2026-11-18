@@ -1,5 +1,4 @@
 import time
-import re
 from contextlib import ExitStack
 
 from amitools.vamos.machine.regs import *
@@ -11,10 +10,7 @@ from amitools.vamos.libstructs import (
     RootNodeStruct,
     DateStampStruct,
     DateTimeStruct,
-    SegmentStruct,
     DevProcStruct,
-    AnchorPathStruct,
-    RDArgsStruct,
     CLIStruct,
     DosPacketStruct,
     DosListAssignStruct,
@@ -37,8 +33,6 @@ from .dos.Args import *
 from .dos.Error import *
 from .dos.AmiTime import *
 from .dos import PathPart
-from .dos.PatternMatch import Pattern, pattern_parse, pattern_match
-from .dos.MatchFirstNext import MatchFirstNext
 from .dos.CommandLine import CommandLine
 from .dos.Process import Process
 from .dos.DosList import DosList
@@ -46,6 +40,7 @@ from .dos.LockManager import LockManager
 from .dos.FileManager import FileManager
 from .dos.DosFileOpener import DosFileOpener
 from .dos import (
+    Args,
     Assign,
     Cli,
     Date,
@@ -53,7 +48,9 @@ from .dos import (
     FileIO,
     Link,
     Lock,
+    MatchFirstNext,
     Notify,
+    PatternMatch,
     RecordLock,
     Segments,
     Stdio,
@@ -510,58 +507,16 @@ class DosLibrary(LibImpl):
 
     # ----- Signals ----------------------
 
-    def CheckSignal(self, ctx):
-        sigmask = ctx.cpu.r_reg(REG_D1)
-        # THOR: Fixme. We really need to get the signal
-        # mask from the tty here.
-        return 0
+    def CheckSignal(self, ctx, sigmask):
+        return Segments.check_signal(self, ctx, sigmask)
 
     # ----- Resident commands support ----
 
-    def FindSegment(self, ctx):
-        name_ptr = ctx.cpu.r_reg(REG_D1)
-        needle = ctx.mem.r_cstr(name_ptr)
-        start = ctx.cpu.r_reg(REG_D2)
-        system = ctx.cpu.r_reg(REG_D3)
-        if start == 0:
-            seg_addr = self.dos_info_struct.di_NetHand.aptr
-        else:
-            seg_addr = SegmentStruct(ctx.mem, start).seg_Next.aptr
-        log_dos.info("FindSegment(%s)", needle)
-        while seg_addr != 0:
-            segment = SegmentStruct(ctx.mem, seg_addr)
-            name_addr = seg_addr + SegmentStruct.sdef.seg_Name.offset
-            name = ctx.mem.r_bstr(name_addr)
-            seg_uc = segment.seg_UC.val
-            if name.lower() == needle.lower():
-                if (system and seg_uc < 0) or (not system and seg_uc > 0):
-                    seg = segment.seg_Seg.aptr
-                    log_dos.info("FindSegment(%s) -> %s", name, seg)
-                    return seg_addr
-            seg_addr = segment.seg_Next.aptr
-        return 0
+    def FindSegment(self, ctx, name_ptr, start, system):
+        return Segments.find_segment(self, ctx, name_ptr, start, system)
 
-    def AddSegment(self, ctx):
-        name_ptr = ctx.cpu.r_reg(REG_D1)
-        seglist = ctx.cpu.r_reg(REG_D2) << 2
-        system = ctx.cpu.r_reg(REG_D3)
-        name = ctx.mem.r_cstr(name_ptr)
-        seg_addr = self._alloc_mem("Segment", SegmentStruct.get_size() + len(name) + 1)
-        name_addr = seg_addr + SegmentStruct.sdef.seg_Name.offset
-        segment = SegmentStruct(ctx.mem, seg_addr)
-        head_addr = self.dos_info_struct.di_NetHand.aptr
-        segment.seg_Next.aptr = head_addr
-        segment.seg_UC.val = system
-        segment.seg_Seg.aptr = seglist
-        ctx.mem.w_bstr(name_addr, name)
-        self.dos_info_struct.di_NetHand.aptr = seg_addr
-        log_dos.info("AddSegment(%s,%06x) -> %06x", name, seglist, seg_addr)
-        self.resident.append(seg_addr)
-        # Adding a resident command to the registered seglists.
-        b_addr = seglist >> 2
-        if b_addr not in self.seg_lists:
-            self.seg_lists[b_addr] = name
-        return -1
+    def AddSegment(self, ctx, name_ptr, seglist, system):
+        return Segments.add_segment(self, ctx, name_ptr, seglist, system)
 
     # ----- File Ops -----
 
@@ -919,344 +874,42 @@ class DosLibrary(LibImpl):
 
     # ----- Matcher -----
 
-    def MatchFirst(self, ctx):
-        pat_ptr = ctx.cpu.r_reg(REG_D1)
-        pat = ctx.mem.r_cstr(pat_ptr)
-        anchor_ptr = ctx.cpu.r_reg(REG_D2)
-        anchor = AnchorPathStruct(ctx.mem, anchor_ptr)
+    def MatchFirst(self, ctx, pat_ptr, anchor_ptr):
+        return MatchFirstNext.match_first(self, ctx, pat_ptr, anchor_ptr)
 
-        # create MatchFirstNext instance
-        mfn = MatchFirstNext(
-            ctx.path_mgr, self.lock_mgr, self.get_current_dir(ctx), pat, anchor
-        )
-        log_dos.info(
-            "MatchFirst: pat='%s' anchor=%06x strlen=%d flags=%02x-> ok=%s",
-            pat,
-            anchor_ptr,
-            mfn.str_len,
-            mfn.flags,
-            mfn.ok,
-        )
-        if not mfn.ok:
-            self.matches[anchor_ptr] = mfn
-            self.setioerr(ctx, ERROR_BAD_TEMPLATE)
-            return self.io_err
-        log_dos.debug("MatchFirst: %s", mfn.matcher)
+    def MatchNext(self, ctx, anchor_ptr):
+        return MatchFirstNext.match_next(self, ctx, anchor_ptr)
 
-        # try first match
-        err = mfn.first(ctx)
-        self.setioerr(ctx, err)
-        if self.io_err == NO_ERROR:
-            log_dos.info(
-                "MatchFirst: found name='%s' path='%s' -> parent lock %s, io_err=%d",
-                mfn.name,
-                mfn.path,
-                mfn.dir_lock,
-                self.io_err,
-            )
-            self.matches[anchor_ptr] = mfn
-        # no entry found or error
-        elif self.io_err == ERROR_OBJECT_NOT_FOUND:
-            log_dos.info("MatchFirst: none found")
-            self.matches[anchor_ptr] = mfn
-        else:
-            # Dos also creates a matcher on failure...
-            self.matches[anchor_ptr] = mfn
-            log_dos.info("MatchFirst: error: %d", self.io_err)
-        return self.io_err
-
-    def MatchNext(self, ctx):
-        anchor_ptr = ctx.cpu.r_reg(REG_D1)
-        log_dos.info("MatchNext: anchor=%06x", anchor_ptr)
-        # retrieve match
-        if anchor_ptr not in self.matches:
-            raise VamosInternalError(
-                "MatchNext: No matcher found for %06x" % anchor_ptr
-            )
-        mfn = self.matches[anchor_ptr]
-        # has matches?
-        if mfn != None:
-            self.setioerr(ctx, mfn.next(ctx))
-            if self.io_err == NO_ERROR:
-                log_dos.info(
-                    "MatchNext: found name='%s' path=%s -> parent lock %s, io_err=%d",
-                    mfn.name,
-                    mfn.path,
-                    mfn.dir_lock,
-                    self.io_err,
-                )
-            elif self.io_err == ERROR_NO_MORE_ENTRIES:
-                log_dos.info("MatchNext: no more entries!")
-            else:
-                log_dos.info("MatchNext: error: %d", self.io_err)
-            return self.io_err
-
-    def MatchEnd(self, ctx):
-        anchor_ptr = ctx.cpu.r_reg(REG_D1)
-        log_dos.info("MatchEnd: anchor=%06x ", anchor_ptr)
-        # retrieve match
-        if anchor_ptr not in self.matches:
-            raise VamosInternalError("MatchEnd: No matcher found for %06x" % anchor_ptr)
-        mfn = self.matches[anchor_ptr]
-        del self.matches[anchor_ptr]
-        if mfn != None:
-            mfn.end(ctx)
+    def MatchEnd(self, ctx, anchor_ptr):
+        return MatchFirstNext.match_end(self, ctx, anchor_ptr)
 
     # ----- Pattern Parsing and Matching -----
 
-    def parsePattern(self, ctx, ignore_case=False):
-        src_ptr = ctx.cpu.r_reg(REG_D1)
-        dst_ptr = ctx.cpu.r_reg(REG_D2)
-        dst_len = ctx.cpu.r_reg(REG_D3)
-        src = ctx.mem.r_cstr(src_ptr)
-        pat = pattern_parse(src, ignore_case=ignore_case)
-        log_dos.info(
-            "ParsePattern: src=%s ignore_case=%s -> pat=%s", src, ignore_case, pat
-        )
-        if pat == None:
-            self.setioerr(ctx, ERROR_BAD_TEMPLATE)
-            return -1
-        else:
-            self.setioerr(ctx, NO_ERROR)
-            pat_str = pat.pat_str
-            if len(pat_str) >= dst_len:
-                return -1
-            else:
-                ctx.mem.w_cstr(dst_ptr, pat_str)
-                if pat.has_wildcard:
-                    return 1
-                else:
-                    return 0
+    def ParsePattern(self, ctx, src_ptr, dst_ptr, dst_len):
+        return PatternMatch.parse_pattern(self, ctx, src_ptr, dst_ptr, dst_len)
 
-    def ParsePattern(self, ctx):
-        return self.parsePattern(ctx, False)
+    def ParsePatternNoCase(self, ctx, src_ptr, dst_ptr, dst_len):
+        return PatternMatch.parse_pattern(self, ctx, src_ptr, dst_ptr, dst_len, True)
 
-    def ParsePatternNoCase(self, ctx):
-        return self.parsePattern(ctx, True)
+    def MatchPattern(self, ctx, pat_ptr, txt_ptr):
+        return PatternMatch.match_pattern(self, ctx, pat_ptr, txt_ptr)
 
-    def matchPattern(self, ctx, ignore_case=False):
-        pat_ptr = ctx.cpu.r_reg(REG_D1)
-        txt_ptr = ctx.cpu.r_reg(REG_D2)
-        pat = ctx.mem.r_cstr(pat_ptr)
-        txt = ctx.mem.r_cstr(txt_ptr)
-        pattern = Pattern(None, pat, ignore_case, True)
-        match = pattern_match(pattern, txt)
-        log_dos.info(
-            "MatchPattern: pat=%s txt=%s ignore_case=%s -> match=%s",
-            pat,
-            txt,
-            ignore_case,
-            match,
-        )
-        if match:
-            return -1
-        else:
-            return 0
-
-    def MatchPattern(self, ctx):
-        return self.matchPattern(ctx)
-
-    def MatchPatternNoCase(self, ctx):
-        return self.matchPattern(ctx, ignore_case=True)
+    def MatchPatternNoCase(self, ctx, pat_ptr, txt_ptr):
+        return PatternMatch.match_pattern(self, ctx, pat_ptr, txt_ptr, ignore_case=True)
 
     # ----- Args -----
 
-    def FindArg(self, ctx):
-        template_ptr = ctx.cpu.r_reg(REG_D1)
-        keyword_ptr = ctx.cpu.r_reg(REG_D2)
-        template = ctx.mem.r_cstr(template_ptr)
-        keyword = ctx.mem.r_cstr(keyword_ptr)
-        # parse template
-        tal = TemplateArgList.parse_string(template)
-        if tal is None:
-            # template parse error
-            log_dos.warning("FindArgs: invalid template=%s", template)
-            return -1
-        # find keyword
-        arg = tal.find_arg(keyword)
-        if arg is None:
-            pos = -1
-        else:
-            pos = arg.pos
-        log_dos.info(
-            "FindArgs: template=%s keyword=%s -> %s,%d", tal, keyword, arg, pos
-        )
-        return pos
+    def FindArg(self, ctx, template_ptr, keyword_ptr):
+        return Args.find_arg(self, ctx, template_ptr, keyword_ptr)
 
-    def ReadArgs(self, ctx):
-        template_ptr = ctx.cpu.r_reg(REG_D1)
-        template = ctx.mem.r_cstr(template_ptr)
-        array_ptr = ctx.cpu.r_reg(REG_D2)
-        rdargs_ptr = ctx.cpu.r_reg(REG_D3)
+    def ReadArgs(self, ctx, template_ptr, array_ptr, rdargs_ptr):
+        return Args.read_args(self, ctx, template_ptr, array_ptr, rdargs_ptr)
 
-        # 1. Check Template
-        log_dos.info(
-            "ReadArgs: template='%s' array_ptr=%08x rdargs_ptr=%08x",
-            template,
-            array_ptr,
-            rdargs_ptr,
-        )
-        tal = TemplateArgList.parse_string(template)
-        log_dos.info("ReadArgs: tal=%s", tal)
-        if tal is None:
-            log_dos.warning("ReadArgs: bad template '%s'", template)
-            self.setioerr(ctx, ERROR_BAD_TEMPLATE)
-            return 0
+    def FreeArgs(self, ctx, rdargs_ptr):
+        return Args.free_args(self, ctx, rdargs_ptr)
 
-        # 2. setup CSource for input
-        # use submitted csrc?
-        csrc_buf_ptr = 0
-        rdargs = None
-        if rdargs_ptr != 0:
-            rdargs = RDArgsStruct(ctx.mem, rdargs_ptr)
-            csrc_buf_ptr = rdargs.RDA_Source.CS_Buffer.aptr
-        if csrc_buf_ptr != 0:
-            # take given csrc and setup buffer
-            input_fh = None
-            csrc = CSource()
-            csrc.read_s(ctx.alloc, rdargs_ptr)
-        else:
-            # setup file based csrc and read first line
-            input_fh = ctx.process.get_input()
-            csrc = FileLineCSource(input_fh)
-            csrc.append_line()
-        log_dos.info("ReadArgs: input=%s csrc=%s", input_fh, csrc)
-
-        # 3. was help requested with '?'
-        if rdargs is None:
-            flags = 0
-            ext_help = None
-        else:
-            flags = rdargs.RDA_Flags.val
-            ext_help_ptr = rdargs.RDA_ExtHelp.aptr
-            ext_help = ctx.mem.r_cstr(ext_help_ptr) if ext_help_ptr else None
-        log_dos.info("ReadArgs: flags=%s ext_help=%s", flags, ext_help)
-        RDAF_NOPROMPT = 4
-        # prompting is allowed?
-        if flags & RDAF_NOPROMPT == 0:
-            ah = ArgsHelp(csrc)
-            # user entered '?'
-            if ah.want_help():
-                ctx.process.get_output().write(template.encode("latin1") + b": ")
-                csrc.append_line()
-                msg = ext_help if ext_help else template
-                # ext help is shown on second '?'
-                while ah.want_help():
-                    ctx.process.get_output().write(template.encode("latin1") + b": ")
-                    csrc.append_line()
-            csrc.rewind(ah.get_num_bytes())
-
-        # 4. parse csrc with given template
-        log_dos.info("ReadArgs: parse input: %s @%d", repr(csrc.buf), csrc.pos)
-        p = ArgsParser(tal)
-        error = p.parse(csrc)
-        result_list = p.get_result_list()
-        log_dos.info(
-            "ReadArgs: parse error=%d list=%s", error, result_list.get_results()
-        )
-
-        # 5. always sync back csrc position
-        if input_fh is None:
-            csrc.update_s(ctx.alloc, rdargs_ptr)
-
-        # parse failed
-        if error != 0:
-            rdargs_ptr = 0
-        # parse ok
-        else:
-            # 6. calc and allocate extra memory
-            total_bytes, num_longs = result_list.calc_extra_result_size()
-            log_dos.info(
-                "ReadArgs: extra memory: total_bytes=%d num_longs=%d",
-                total_bytes,
-                num_longs,
-            )
-            if total_bytes > 0:
-                extra_ptr = self._alloc_mem(
-                    "ReadArgs(@%06x)" % self.get_callee_pc(ctx), total_bytes
-                )
-                if extra_ptr == 0:
-                    log_dos.warning("ReadArgs: no memory for extra")
-                    self.setioerr(ctx, ERROR_NO_FREE_STORE)
-                    return 0
-            else:
-                extra_ptr = 0
-
-            # 7. write array and extra memory from result list
-            result_list.generate_result(ctx.mem, array_ptr, extra_ptr, num_longs)
-
-            # 8. alloc custom rdargs if none is given
-            if rdargs_ptr == 0:
-                rdargs = ctx.alloc.alloc_astruct(RDArgsStruct, label="RDArgs")
-                rdargs_ptr = rdargs.addr
-                own = True
-            else:
-                own = False
-            # own house keeping
-            self.rdargs[rdargs_ptr] = (rdargs, own)
-
-            # 9. store extra buffer
-            rdargs.RDA_Buffer.aptr = extra_ptr
-            rdargs.RDA_BufSiz.val = total_bytes
-
-        # done
-        self.setioerr(ctx, error)
-        return rdargs_ptr
-
-    def FreeArgs(self, ctx):
-        rdargs_ptr = ctx.cpu.r_reg(REG_D1)
-        log_dos.info("FreeArgs: %06x", rdargs_ptr)
-        # find rdargs
-        if rdargs_ptr not in self.rdargs:
-            raise VamosInternalError("Can't find RDArgs: %06x" % rdargs_ptr)
-        rdargs, own = self.rdargs[rdargs_ptr]
-        del self.rdargs[rdargs_ptr]
-        # clean up rdargs
-        addr = rdargs.RDA_Buffer.aptr
-        if addr != 0:
-            self._free_mem(addr)
-        # free our memory
-        if own:
-            rdargs.free()
-
-    def ReadItem(self, ctx):
-        buff_ptr = ctx.cpu.r_reg(REG_D1)
-        maxchars = ctx.cpu.r_reg(REG_D2)
-        csrc_ptr = ctx.cpu.r_reg(REG_D3)
-        log_dos.info(
-            "ReadItem: buff_ptr=%06x maxchars=%d csource_ptr=%06x",
-            buff_ptr,
-            maxchars,
-            csrc_ptr,
-        )
-        if csrc_ptr:
-            csrc = CSource()
-            csrc.read_s(ctx.alloc, csrc_ptr)
-            input_fh = None
-        else:
-            input_fh = ctx.process.get_input()
-            csrc = FileCSource(input_fh)
-        # no pointer
-        if buff_ptr == 0:
-            return 0  # ITEM_NOTHING
-        # Well Known Bug: buff[0] = 0, even if maxchars == 0
-        ctx.mem.w8(buff_ptr, 0)
-        if maxchars <= 0:
-            return 0
-        # reset IOErr if not BNULL nor NIL:
-        if input_fh is not None and not input_fh.is_nil:
-            self.setioerr(ctx, 0)
-        # get item
-        parser = ItemParser(csrc)
-        res, data = parser.read_item(maxchars)
-        log_dos.info("ReadItem: res=%d data=%s", res, data)
-        # Write back the updated csource ptr if we have one
-        if csrc_ptr:
-            csrc.update_s(ctx.alloc, csrc_ptr)
-        # write string
-        if data is not None:
-            ctx.mem.w_cstr(buff_ptr, data)
-        return res
+    def ReadItem(self, ctx, buff_ptr, maxchars, csrc_ptr):
+        return Args.read_item(self, ctx, buff_ptr, maxchars, csrc_ptr)
 
     # ----- System/Execute -----
 
@@ -1399,31 +1052,16 @@ class DosLibrary(LibImpl):
         else:
             log_dos.info("UnLoadSeg:  NULL")
 
-    def LoadSeg(self, ctx):
-        name_ptr = ctx.cpu.r_reg(REG_D1)
-        name = ctx.mem.r_cstr(name_ptr)
-        lock = self.get_current_dir(ctx)
-        return self._load_seg_list(ctx, name, lock)
+    def LoadSeg(self, ctx, name_ptr):
+        return Segments.load_seg(self, ctx, name_ptr)
 
-    def UnLoadSeg(self, ctx):
-        b_addr = ctx.cpu.r_reg(REG_D1)
-        self._unload_seg_list(ctx, b_addr)
+    def UnLoadSeg(self, ctx, b_addr):
+        return Segments.unload_seg(self, ctx, b_addr)
 
-    def InternalLoadSeg(self, ctx):
-        fh_baddr = ctx.cpu.r_reg(REG_D0)
-        table_ptr = ctx.cpu.r_reg(REG_A0)
-        func_ptr = ctx.cpu.r_reg(REG_A1)
-        stack_ptr = ctx.cpu.r_reg(REG_A2)
-        # FIXME: For now, just fail
-        log_dos.warning(
-            "InternalLoadSeg: fh=%06x table=%06x funcptr=%06x stack_ptr=%06x -> not implemented!",
-            fh_baddr,
-            table_ptr,
-            func_ptr,
-            stack_ptr,
+    def InternalLoadSeg(self, ctx, fh_baddr, table_ptr, func_ptr, stack_ptr):
+        return Segments.internal_load_seg(
+            self, ctx, fh_baddr, table_ptr, func_ptr, stack_ptr
         )
-        self.setioerr(ctx, ERROR_OBJECT_WRONG_TYPE)
-        return 0
 
     def RunCommand(self, ctx):
         b_addr = ctx.cpu.r_reg(REG_D1)
@@ -1688,16 +1326,8 @@ class DosLibrary(LibImpl):
 
     # ----- misc --------
 
-    def StrToLong(self, ctx):
-        str_addr = ctx.cpu.r_reg(REG_D1)
-        val_addr = ctx.cpu.r_reg(REG_D2)
-        string = ctx.mem.r_cstr(str_addr)
-        match = re.search(r"(\+|\-|)[0-9]*", string)
-        if len(match.group(0)) > 0:
-            ctx.mem.w32(val_addr, int(match.group(0)))
-            return len(match.group(0))
-        else:
-            return 0
+    def StrToLong(self, ctx, str_addr, val_addr):
+        return Args.str_to_long(self, ctx, str_addr, val_addr)
 
     def SetCurrentDirName(self, ctx):
         str_addr = ctx.cpu.r_reg(REG_D1)

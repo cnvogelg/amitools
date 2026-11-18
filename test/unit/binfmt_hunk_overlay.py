@@ -221,7 +221,7 @@ def dos_loadseg_overlay_test(tmp_path, mem_alloc):
     dos.get_current_dir = lambda ctx: None
     loader.set_file_opener(DosFileOpener(dos.file_mgr))
 
-    result = dos.LoadSeg(ctx)
+    result = dos.LoadSeg(ctx, ctx.cpu.r_reg(REG_D1))
     assert result < 0
     b_addr = -result
     info = loader.get_info(b_addr)
@@ -240,7 +240,7 @@ def dos_loadseg_overlay_test(tmp_path, mem_alloc):
     assert mem.r32(hunk_table_baddr << 2) == b_addr
 
     ctx.cpu.regs[REG_D1] = result & 0xFFFFFFFF
-    dos.UnLoadSeg(ctx)
+    dos.UnLoadSeg(ctx, ctx.cpu.r_reg(REG_D1))
     assert dos.file_mgr.fh.obj.closed
     assert loader.get_info(b_addr) is None
     assert alloc.is_all_free()

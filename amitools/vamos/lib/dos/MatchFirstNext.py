@@ -5,6 +5,8 @@ from amitools.vamos.libstructs import (
 )
 from .PathMatch import PathMatch
 from amitools.vamos.label import LabelStruct
+from amitools.vamos.error import VamosInternalError
+from amitools.vamos.log import log_dos
 from .Error import *
 
 
@@ -171,3 +173,86 @@ class MatchFirstNext:
             oldlock = self.lock_mgr.get_by_b_addr(self.achain_dummy_struct.lock.bptr)
             self.lock_mgr.release_lock(oldlock)
             self.achain_dummy.free()
+
+
+# ----- fd functions -----
+
+
+def match_first(dos, ctx, pat_ptr, anchor_ptr):
+    pat = ctx.mem.r_cstr(pat_ptr)
+    anchor = AnchorPathStruct(ctx.mem, anchor_ptr)
+
+    # create MatchFirstNext instance
+    mfn = MatchFirstNext(
+        dos.path_mgr, dos.lock_mgr, dos.get_current_dir(ctx), pat, anchor
+    )
+    log_dos.info(
+        "MatchFirst: pat='%s' anchor=%06x strlen=%d flags=%02x-> ok=%s",
+        pat,
+        anchor_ptr,
+        mfn.str_len,
+        mfn.flags,
+        mfn.ok,
+    )
+    if not mfn.ok:
+        dos.matches[anchor_ptr] = mfn
+        dos.setioerr(ctx, ERROR_BAD_TEMPLATE)
+        return dos.io_err
+    log_dos.debug("MatchFirst: %s", mfn.matcher)
+
+    # try first match
+    err = mfn.first(ctx)
+    dos.setioerr(ctx, err)
+    if dos.io_err == NO_ERROR:
+        log_dos.info(
+            "MatchFirst: found name='%s' path='%s' -> parent lock %s, io_err=%d",
+            mfn.name,
+            mfn.path,
+            mfn.dir_lock,
+            dos.io_err,
+        )
+        dos.matches[anchor_ptr] = mfn
+    # no entry found or error
+    elif dos.io_err == ERROR_OBJECT_NOT_FOUND:
+        log_dos.info("MatchFirst: none found")
+        dos.matches[anchor_ptr] = mfn
+    else:
+        # Dos also creates a matcher on failure...
+        dos.matches[anchor_ptr] = mfn
+        log_dos.info("MatchFirst: error: %d", dos.io_err)
+    return dos.io_err
+
+
+def match_next(dos, ctx, anchor_ptr):
+    log_dos.info("MatchNext: anchor=%06x", anchor_ptr)
+    # retrieve match
+    if anchor_ptr not in dos.matches:
+        raise VamosInternalError("MatchNext: No matcher found for %06x" % anchor_ptr)
+    mfn = dos.matches[anchor_ptr]
+    # has matches?
+    if mfn != None:
+        dos.setioerr(ctx, mfn.next(ctx))
+        if dos.io_err == NO_ERROR:
+            log_dos.info(
+                "MatchNext: found name='%s' path=%s -> parent lock %s, io_err=%d",
+                mfn.name,
+                mfn.path,
+                mfn.dir_lock,
+                dos.io_err,
+            )
+        elif dos.io_err == ERROR_NO_MORE_ENTRIES:
+            log_dos.info("MatchNext: no more entries!")
+        else:
+            log_dos.info("MatchNext: error: %d", dos.io_err)
+        return dos.io_err
+
+
+def match_end(dos, ctx, anchor_ptr):
+    log_dos.info("MatchEnd: anchor=%06x ", anchor_ptr)
+    # retrieve match
+    if anchor_ptr not in dos.matches:
+        raise VamosInternalError("MatchEnd: No matcher found for %06x" % anchor_ptr)
+    mfn = dos.matches[anchor_ptr]
+    del dos.matches[anchor_ptr]
+    if mfn != None:
+        mfn.end(ctx)

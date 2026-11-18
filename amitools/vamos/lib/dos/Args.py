@@ -1,4 +1,10 @@
-import types
+import re
+
+from amitools.vamos.error import VamosInternalError
+from amitools.vamos.libstructs import RDArgsStruct
+from amitools.vamos.log import log_dos
+
+from .CSource import CSource, FileCSource, FileLineCSource
 from .Error import *
 from .Item import ItemParser
 
@@ -470,3 +476,203 @@ class ArgsHelp:
 
     def get_num_bytes(self):
         return self.num
+
+
+# ----- fd functions -----
+
+
+def find_arg(dos, ctx, template_ptr, keyword_ptr):
+    template = ctx.mem.r_cstr(template_ptr)
+    keyword = ctx.mem.r_cstr(keyword_ptr)
+    # parse template
+    tal = TemplateArgList.parse_string(template)
+    if tal is None:
+        # template parse error
+        log_dos.warning("FindArgs: invalid template=%s", template)
+        return -1
+    # find keyword
+    arg = tal.find_arg(keyword)
+    if arg is None:
+        pos = -1
+    else:
+        pos = arg.pos
+    log_dos.info("FindArgs: template=%s keyword=%s -> %s,%d", tal, keyword, arg, pos)
+    return pos
+
+
+def read_args(dos, ctx, template_ptr, array_ptr, rdargs_ptr):
+    template = ctx.mem.r_cstr(template_ptr)
+
+    # 1. Check Template
+    log_dos.info(
+        "ReadArgs: template='%s' array_ptr=%08x rdargs_ptr=%08x",
+        template,
+        array_ptr,
+        rdargs_ptr,
+    )
+    tal = TemplateArgList.parse_string(template)
+    log_dos.info("ReadArgs: tal=%s", tal)
+    if tal is None:
+        log_dos.warning("ReadArgs: bad template '%s'", template)
+        dos.setioerr(ctx, ERROR_BAD_TEMPLATE)
+        return 0
+
+    # 2. setup CSource for input
+    # use submitted csrc?
+    csrc_buf_ptr = 0
+    rdargs = None
+    if rdargs_ptr != 0:
+        rdargs = RDArgsStruct(ctx.mem, rdargs_ptr)
+        csrc_buf_ptr = rdargs.RDA_Source.CS_Buffer.aptr
+    if csrc_buf_ptr != 0:
+        # take given csrc and setup buffer
+        input_fh = None
+        csrc = CSource()
+        csrc.read_s(ctx.alloc, rdargs_ptr)
+    else:
+        # setup file based csrc and read first line
+        input_fh = ctx.process.get_input()
+        csrc = FileLineCSource(input_fh)
+        csrc.append_line()
+    log_dos.info("ReadArgs: input=%s csrc=%s", input_fh, csrc)
+
+    # 3. was help requested with '?'
+    if rdargs is None:
+        flags = 0
+        ext_help = None
+    else:
+        flags = rdargs.RDA_Flags.val
+        ext_help_ptr = rdargs.RDA_ExtHelp.aptr
+        ext_help = ctx.mem.r_cstr(ext_help_ptr) if ext_help_ptr else None
+    log_dos.info("ReadArgs: flags=%s ext_help=%s", flags, ext_help)
+    RDAF_NOPROMPT = 4
+    # prompting is allowed?
+    if flags & RDAF_NOPROMPT == 0:
+        ah = ArgsHelp(csrc)
+        # user entered '?'
+        if ah.want_help():
+            ctx.process.get_output().write(template.encode("latin1") + b": ")
+            csrc.append_line()
+            msg = ext_help if ext_help else template
+            # ext help is shown on second '?'
+            while ah.want_help():
+                ctx.process.get_output().write(template.encode("latin1") + b": ")
+                csrc.append_line()
+        csrc.rewind(ah.get_num_bytes())
+
+    # 4. parse csrc with given template
+    log_dos.info("ReadArgs: parse input: %s @%d", repr(csrc.buf), csrc.pos)
+    p = ArgsParser(tal)
+    error = p.parse(csrc)
+    result_list = p.get_result_list()
+    log_dos.info("ReadArgs: parse error=%d list=%s", error, result_list.get_results())
+
+    # 5. always sync back csrc position
+    if input_fh is None:
+        csrc.update_s(ctx.alloc, rdargs_ptr)
+
+    # parse failed
+    if error != 0:
+        rdargs_ptr = 0
+    # parse ok
+    else:
+        # 6. calc and allocate extra memory
+        total_bytes, num_longs = result_list.calc_extra_result_size()
+        log_dos.info(
+            "ReadArgs: extra memory: total_bytes=%d num_longs=%d",
+            total_bytes,
+            num_longs,
+        )
+        if total_bytes > 0:
+            extra_ptr = dos._alloc_mem(
+                "ReadArgs(@%06x)" % dos.get_callee_pc(ctx), total_bytes
+            )
+            if extra_ptr == 0:
+                log_dos.warning("ReadArgs: no memory for extra")
+                dos.setioerr(ctx, ERROR_NO_FREE_STORE)
+                return 0
+        else:
+            extra_ptr = 0
+
+        # 7. write array and extra memory from result list
+        result_list.generate_result(ctx.mem, array_ptr, extra_ptr, num_longs)
+
+        # 8. alloc custom rdargs if none is given
+        if rdargs_ptr == 0:
+            rdargs = ctx.alloc.alloc_astruct(RDArgsStruct, label="RDArgs")
+            rdargs_ptr = rdargs.addr
+            own = True
+        else:
+            own = False
+        # own house keeping
+        dos.rdargs[rdargs_ptr] = (rdargs, own)
+
+        # 9. store extra buffer
+        rdargs.RDA_Buffer.aptr = extra_ptr
+        rdargs.RDA_BufSiz.val = total_bytes
+
+    # done
+    dos.setioerr(ctx, error)
+    return rdargs_ptr
+
+
+def free_args(dos, ctx, rdargs_ptr):
+    log_dos.info("FreeArgs: %06x", rdargs_ptr)
+    # find rdargs
+    if rdargs_ptr not in dos.rdargs:
+        raise VamosInternalError("Can't find RDArgs: %06x" % rdargs_ptr)
+    rdargs, own = dos.rdargs[rdargs_ptr]
+    del dos.rdargs[rdargs_ptr]
+    # clean up rdargs
+    addr = rdargs.RDA_Buffer.aptr
+    if addr != 0:
+        dos._free_mem(addr)
+    # free our memory
+    if own:
+        rdargs.free()
+
+
+def read_item(dos, ctx, buff_ptr, maxchars, csrc_ptr):
+    log_dos.info(
+        "ReadItem: buff_ptr=%06x maxchars=%d csource_ptr=%06x",
+        buff_ptr,
+        maxchars,
+        csrc_ptr,
+    )
+    if csrc_ptr:
+        csrc = CSource()
+        csrc.read_s(ctx.alloc, csrc_ptr)
+        input_fh = None
+    else:
+        input_fh = ctx.process.get_input()
+        csrc = FileCSource(input_fh)
+    # no pointer
+    if buff_ptr == 0:
+        return 0  # ITEM_NOTHING
+    # Well Known Bug: buff[0] = 0, even if maxchars == 0
+    ctx.mem.w8(buff_ptr, 0)
+    if maxchars <= 0:
+        return 0
+    # reset IOErr if not BNULL nor NIL:
+    if input_fh is not None and not input_fh.is_nil:
+        dos.setioerr(ctx, 0)
+    # get item
+    parser = ItemParser(csrc)
+    res, data = parser.read_item(maxchars)
+    log_dos.info("ReadItem: res=%d data=%s", res, data)
+    # Write back the updated csource ptr if we have one
+    if csrc_ptr:
+        csrc.update_s(ctx.alloc, csrc_ptr)
+    # write string
+    if data is not None:
+        ctx.mem.w_cstr(buff_ptr, data)
+    return res
+
+
+def str_to_long(dos, ctx, str_addr, val_addr):
+    string = ctx.mem.r_cstr(str_addr)
+    match = re.search(r"(\+|\-|)[0-9]*", string)
+    if len(match.group(0)) > 0:
+        ctx.mem.w32(val_addr, int(match.group(0)))
+        return len(match.group(0))
+    return 0
