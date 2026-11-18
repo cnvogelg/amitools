@@ -8,7 +8,6 @@ from amitools.vamos.libstructs import (
     DosLibraryStruct,
     DosInfoStruct,
     RootNodeStruct,
-    DateStampStruct,
     DateTimeStruct,
     ProcessStruct,
     MessageStruct,
@@ -24,7 +23,6 @@ from amitools.vamos.task import DosProcess
 from amitools.vamos.schedule import SchedulerEvent
 from .dos.Args import *
 from .dos.Error import *
-from .dos.AmiTime import *
 from .dos import PathPart
 from .dos.DosList import DosList
 from .dos.LockManager import LockManager
@@ -52,28 +50,6 @@ from .dos import (
 )
 from .dos.CSource import *
 from .dos.Item import *
-
-FORMAT_DOS = 0
-FORMAT_INT = 1
-FORMAT_USA = 2
-FORMAT_CDN = 3
-FORMAT_DEF = 4
-DTF_SUBST = 1
-DOS_MONTH_NAMES = (
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-)
-SUBSTITUTED_DATES = ("Future", "Tomorrow", "Today", "Yesterday")
 
 
 class DosLibrary(LibImpl):
@@ -252,12 +228,7 @@ class DosLibrary(LibImpl):
     # ----- IoErr -----
 
     def IoErr(self, ctx):
-        if self.io_err in dos_error_strings:
-            errstring = dos_error_strings[self.io_err]
-        else:
-            errstring = "%d" % self.io_err
-        log_dos.info("IoErr: %d (%s)", self.io_err, errstring)
-        return self.io_err
+        return Stdio.io_err(self, ctx)
 
     def setioerr(self, ctx, err):
         self.io_err = err
@@ -270,11 +241,8 @@ class DosLibrary(LibImpl):
         if amiga_process is not None:
             amiga_process.pr_Result2.val = err
 
-    def SetIoErr(self, ctx):
-        old_io_err = self.io_err
-        self.setioerr(ctx, ctx.cpu.r_reg(REG_D1))
-        log_dos.info("SetIoErr: IoErr=%d old IoErr=%d", self.io_err, old_io_err)
-        return old_io_err
+    def SetIoErr(self, ctx, err):
+        return Stdio.set_io_err(self, ctx, err)
 
     def WaitPkt(self, ctx):
         proc_addr = ctx.exec_lib.exec_lib.this_task.aptr
@@ -296,62 +264,11 @@ class DosLibrary(LibImpl):
         msg = MessageStruct(ctx.mem, msg_addr)
         return msg.mn_Node.ln_Name.aptr
 
-    def Fault(self, ctx):
-        errcode = ctx.cpu.r_reg(REG_D1)
-        hdr_ptr = ctx.cpu.r_reg(REG_D2)
-        buf_ptr = ctx.cpu.r_reg(REG_D3)
-        buf_len = ctx.cpu.r_reg(REG_D4)
-        if errcode >= 0x80000000:
-            idx = errcode - 0x100000000
-        else:
-            idx = errcode
-        if hdr_ptr != 0:
-            hdr = ctx.mem.r_cstr(hdr_ptr)
-        else:
-            hdr = ""
-        if idx in dos_error_strings:
-            err_str = dos_error_strings[idx]
-        else:
-            err_str = "%d ERROR" % self.io_err
-        log_dos.info(
-            "Fault: code=%d header='%s' err_str='%s'", self.io_err, hdr, err_str
-        )
-        # write to stdout
-        if hdr_ptr != 0:
-            txt = "%s: %s" % (hdr, err_str)
-        else:
-            txt = "%s" % err_str
-        ctx.mem.w_cstr(buf_ptr, txt[: buf_len - 1])
-        return DOSTRUE
+    def Fault(self, ctx, errcode, hdr_ptr, buf_ptr, buf_len):
+        return Stdio.fault(self, ctx, errcode, hdr_ptr, buf_ptr, buf_len)
 
-    def PrintFault(self, ctx):
-        self.io_err = ctx.cpu.r_reg(REG_D1)
-        hdr_ptr = ctx.cpu.r_reg(REG_D2)
-        if self.io_err >= 0x80000000:
-            idx = self.io_err - 0x100000000
-        else:
-            idx = self.io_err
-        # get header string
-        if hdr_ptr != 0:
-            hdr = ctx.mem.r_cstr(hdr_ptr)
-        else:
-            hdr = ""
-        # get error string
-        if idx in dos_error_strings:
-            err_str = dos_error_strings[idx]
-        else:
-            err_str = "%d ERROR" % self.io_err
-        log_dos.info(
-            "PrintFault: code=%d header='%s' err_str='%s'", self.io_err, hdr, err_str
-        )
-        # write to stdout
-        if hdr_ptr != 0:
-            txt = "%s: %s\n" % (hdr, err_str)
-        else:
-            txt = "%s\n" % err_str
-        fh = ctx.process.get_output()
-        fh.write(txt.encode("latin-1"))
-        return DOSTRUE
+    def PrintFault(self, ctx, errcode, hdr_ptr):
+        return Stdio.print_fault(self, ctx, errcode, hdr_ptr)
 
     # ----- current dir
 
@@ -371,81 +288,11 @@ class DosLibrary(LibImpl):
 
     # ----- dos API -----
 
-    def DateStamp(self, ctx):
-        ds_ptr = ctx.cpu.r_reg(REG_D1)
-        ds = DateStampStruct(ctx.mem, ds_ptr)
-        t = time.time()
-        at = sys_to_ami_time(t)
-        log_dos.info("DateStamp: ptr=%06x sys_time=%d time=%s", ds_ptr, t, at)
-        ds.ds_Days.val = at.tday
-        ds.ds_Minute.val = at.tmin
-        ds.ds_Tick.val = at.tick
-        return ds_ptr
+    def DateStamp(self, ctx, ds_ptr):
+        return Date.date_stamp(self, ctx, ds_ptr)
 
-    def DateToStr(self, ctx):
-        dt_ptr = ctx.cpu.r_reg(REG_D1)
-        dt = DateTimeStruct(ctx.mem, dt_ptr)
-        ds_day = dt.dat_Stamp.ds_Days.val
-        ds_min = dt.dat_Stamp.ds_Minute.val
-        ds_tick = dt.dat_Stamp.ds_Tick.val
-        date_format = dt.dat_Format.val
-        flags = dt.dat_Flags.val
-        str_day_ptr = dt.dat_StrDay.aptr
-        str_date_ptr = dt.dat_StrDate.aptr
-        str_time_ptr = dt.dat_StrTime.aptr
-        at = AmiTime(ds_day, ds_min, ds_tick)
-        st = at.to_sys_time()
-        log_dos.info(
-            "DateToStr: ptr=%06x format=%x flags=%x day_ptr=%06x date_ptr=%06x time_ptr=%06x %s => sys_time=%d",
-            dt_ptr,
-            format,
-            flags,
-            str_day_ptr,
-            str_date_ptr,
-            str_time_ptr,
-            at,
-            st,
-        )
-        t = time.gmtime(st)
-        day_str = time.strftime("%A", t)
-        year = t.tm_year % 100
-        if date_format == FORMAT_INT:
-            date_str = "%02d-%02d-%02d" % (year, t.tm_mon, t.tm_mday)
-        elif date_format == FORMAT_USA:
-            date_str = "%02d-%02d-%02d" % (t.tm_mon, t.tm_mday, year)
-        elif date_format == FORMAT_CDN:
-            date_str = "%02d-%02d-%02d" % (t.tm_mday, t.tm_mon, year)
-        elif date_format == FORMAT_DEF:
-            date_str = time.strftime("%x", t)
-        else:
-            date_str = "%02d-%s-%02d" % (
-                t.tm_mday,
-                DOS_MONTH_NAMES[t.tm_mon - 1],
-                year,
-            )
-        if flags & DTF_SUBST:
-            days_since = sys_to_ami_time(time.time()).tday - ds_day
-            if days_since <= 7:
-                if -1 <= days_since <= 1:
-                    date_str = SUBSTITUTED_DATES[days_since + 2]
-                elif days_since < -1:
-                    date_str = "Future"
-                else:
-                    date_str = day_str
-        time_str = time.strftime("%H:%M:%S", t)
-        log_dos.info(
-            "DateToStr: result day='%s' date='%s' time='%s'",
-            day_str,
-            date_str,
-            time_str,
-        )
-        if str_day_ptr != 0:
-            ctx.mem.w_cstr(str_day_ptr, day_str)
-        if str_date_ptr != 0:
-            ctx.mem.w_cstr(str_date_ptr, date_str)
-        if str_time_ptr != 0:
-            ctx.mem.w_cstr(str_time_ptr, time_str)
-        return DOSTRUE
+    def DateToStr(self, ctx, dt_ptr):
+        return Date.date_to_str(self, ctx, dt_ptr)
 
     def SetFileDate(self, ctx, name: CSTR, date):
         return FileIO.set_file_date(self, ctx, name.get_str(), date)
@@ -751,39 +598,14 @@ class DosLibrary(LibImpl):
 
     # ----- Path Helper -----
 
-    def FilePart(self, ctx):
-        addr = ctx.cpu.r_reg(REG_D1)
-        path = ctx.mem.r_cstr(addr)
-        pos = PathPart.file_part(path)
-        if pos < len(path):
-            log_dos.info("FilePart: path='%s' -> result='%s'", path, path[pos:])
-        else:
-            log_dos.info("FilePart: path='%s' -> pos=NULL", path)
-        return addr + pos
+    def FilePart(self, ctx, addr):
+        return PathPart.file_part(self, ctx, addr)
 
-    def PathPart(self, ctx):
-        addr = ctx.cpu.r_reg(REG_D1)
-        path = ctx.mem.r_cstr(addr)
-        pos = PathPart.path_part(path)
-        if pos < len(path):
-            log_dos.info("PathPart: path='%s' -> result='%s'", path, path[:pos])
-        else:
-            log_dos.info("PathPart: path='%s' -> pos=NULL", path)
-        return addr + pos
+    def PathPart(self, ctx, addr):
+        return PathPart.path_part(self, ctx, addr)
 
-    def AddPart(self, ctx):
-        dn_addr = ctx.cpu.r_reg(REG_D1)
-        fn_addr = ctx.cpu.r_reg(REG_D2)
-        size = ctx.cpu.r_reg(REG_D3)
-        dn = ctx.mem.r_cstr(dn_addr)
-        fn = ctx.mem.r_cstr(fn_addr)
-        np = PathPart.add_part(dn, fn, size)
-        log_dos.info("AddPart: dn='%s' fn='%s' size=%d -> np='%s'", dn, fn, size, np)
-        if np != None:
-            ctx.mem.w_cstr(dn_addr, np)
-            return DOSTRUE
-        else:
-            return DOSFALSE
+    def AddPart(self, ctx, dn_addr, fn_addr, size):
+        return PathPart.add_part(self, ctx, dn_addr, fn_addr, size)
 
     def SplitName(
         self,
@@ -794,21 +616,9 @@ class DosLibrary(LibImpl):
         oldpos: LONG,
         size: LONG,
     ):
-        name_str = name.str if name is not None else ""
-        pos, part = PathPart.split_name(
-            name_str, int(separator), int(oldpos), int(size)
+        return PathPart.split_name(
+            self, ctx, name.str, int(separator), buf.aptr, int(oldpos), int(size)
         )
-        ctx.mem.w_cstr(buf.aptr, part)
-        log_dos.info(
-            "SplitName: name='%s' sep=%d oldpos=%d size=%d -> pos=%d part='%s'",
-            name_str,
-            int(separator),
-            int(oldpos),
-            int(size),
-            pos,
-            part,
-        )
-        return pos
 
     # ----- DosObjects -----
 
@@ -878,20 +688,8 @@ class DosLibrary(LibImpl):
     def SetPrompt(self, ctx, str_addr):
         return Cli.set_prompt(self, ctx, str_addr)
 
-    def DosGetString(self, ctx):
-        errno = ctx.cpu.r_reg(REG_D1)
-        if errno >= 0x80000000:
-            errno = errno - 0x100000000
-        if errno in dos_error_strings:
-            if errno in self.errstrings:
-                return self.errstrings[errno]
-            self.errstrings[errno] = self._alloc_mem(
-                "Error %d" % errno, len(dos_error_strings[errno]) + 1
-            )
-            ctx.mem.w_cstr(self.errstrings[errno], dos_error_strings[errno])
-            return self.errstrings[errno]
-        else:
-            return 0
+    def DosGetString(self, ctx, errno):
+        return Date.dos_get_string(self, ctx, errno)
 
     # As we only have one file system (though with multiple assigns)
     # it does not really matter what we do here...

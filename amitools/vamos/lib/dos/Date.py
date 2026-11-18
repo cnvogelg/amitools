@@ -11,10 +11,10 @@ import re
 import time
 
 from amitools.vamos.log import log_dos
-from amitools.vamos.libstructs import DateStampStruct
+from amitools.vamos.libstructs import DateStampStruct, DateTimeStruct
 
-from .AmiTime import sys_to_ami_time
-from .Error import DOSFALSE, DOSTRUE
+from .AmiTime import AmiTime, sys_to_ami_time
+from .Error import DOSFALSE, DOSTRUE, dos_error_strings
 
 FORMAT_DOS = 0
 FORMAT_INT = 1
@@ -24,6 +24,22 @@ FORMAT_DEF = 4
 
 DTF_SUBST = 1
 DTF_FUTURE = 2
+
+DOS_MONTH_NAMES = (
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+)
+SUBSTITUTED_DATES = ("Future", "Tomorrow", "Today", "Yesterday")
 
 _MONTHS = {
     "jan": 1,
@@ -221,3 +237,103 @@ def compare_dates(date1_ptr, date2_ptr, mem):
     if stamp1 < stamp2:
         return 1
     return 0
+
+
+# ----- fd functions -----
+
+
+def date_stamp(dos, ctx, ds_ptr):
+    ds = DateStampStruct(ctx.mem, ds_ptr)
+    t = time.time()
+    at = sys_to_ami_time(t)
+    log_dos.info("DateStamp: ptr=%06x sys_time=%d time=%s", ds_ptr, t, at)
+    ds.ds_Days.val = at.tday
+    ds.ds_Minute.val = at.tmin
+    ds.ds_Tick.val = at.tick
+    return ds_ptr
+
+
+def _date_to_str(ctx, dt):
+    """format the date/time in ``dt`` into its day/date/time strings"""
+    dt_ptr = dt.addr
+    ds_day = dt.dat_Stamp.ds_Days.val
+    ds_min = dt.dat_Stamp.ds_Minute.val
+    ds_tick = dt.dat_Stamp.ds_Tick.val
+    date_format = dt.dat_Format.val
+    flags = dt.dat_Flags.val
+    str_day_ptr = dt.dat_StrDay.aptr
+    str_date_ptr = dt.dat_StrDate.aptr
+    str_time_ptr = dt.dat_StrTime.aptr
+    at = AmiTime(ds_day, ds_min, ds_tick)
+    st = at.to_sys_time()
+    log_dos.info(
+        "DateToStr: ptr=%06x format=%x flags=%x day_ptr=%06x date_ptr=%06x time_ptr=%06x %s => sys_time=%d",
+        dt_ptr,
+        format,
+        flags,
+        str_day_ptr,
+        str_date_ptr,
+        str_time_ptr,
+        at,
+        st,
+    )
+    t = time.gmtime(st)
+    day_str = time.strftime("%A", t)
+    year = t.tm_year % 100
+    if date_format == FORMAT_INT:
+        date_str = "%02d-%02d-%02d" % (year, t.tm_mon, t.tm_mday)
+    elif date_format == FORMAT_USA:
+        date_str = "%02d-%02d-%02d" % (t.tm_mon, t.tm_mday, year)
+    elif date_format == FORMAT_CDN:
+        date_str = "%02d-%02d-%02d" % (t.tm_mday, t.tm_mon, year)
+    elif date_format == FORMAT_DEF:
+        date_str = time.strftime("%x", t)
+    else:
+        date_str = "%02d-%s-%02d" % (
+            t.tm_mday,
+            DOS_MONTH_NAMES[t.tm_mon - 1],
+            year,
+        )
+    if flags & DTF_SUBST:
+        days_since = sys_to_ami_time(time.time()).tday - ds_day
+        if days_since <= 7:
+            if -1 <= days_since <= 1:
+                date_str = SUBSTITUTED_DATES[days_since + 2]
+            elif days_since < -1:
+                date_str = "Future"
+            else:
+                date_str = day_str
+    time_str = time.strftime("%H:%M:%S", t)
+    log_dos.info(
+        "DateToStr: result day='%s' date='%s' time='%s'",
+        day_str,
+        date_str,
+        time_str,
+    )
+    if str_day_ptr != 0:
+        ctx.mem.w_cstr(str_day_ptr, day_str)
+    if str_date_ptr != 0:
+        ctx.mem.w_cstr(str_date_ptr, date_str)
+    if str_time_ptr != 0:
+        ctx.mem.w_cstr(str_time_ptr, time_str)
+    return DOSTRUE
+
+
+def date_to_str(dos, ctx, dt_ptr):
+    dt = DateTimeStruct(ctx.mem, dt_ptr)
+    return _date_to_str(ctx, dt)
+
+
+def dos_get_string(dos, ctx, errno):
+    if errno >= 0x80000000:
+        errno = errno - 0x100000000
+    if errno in dos_error_strings:
+        if errno in dos.errstrings:
+            return dos.errstrings[errno]
+        dos.errstrings[errno] = dos._alloc_mem(
+            "Error %d" % errno, len(dos_error_strings[errno]) + 1
+        )
+        ctx.mem.w_cstr(dos.errstrings[errno], dos_error_strings[errno])
+        return dos.errstrings[errno]
+    else:
+        return 0

@@ -1,5 +1,9 @@
 """helpers for path operations"""
 
+from amitools.vamos.log import log_dos
+
+from .Error import DOSFALSE, DOSTRUE
+
 
 def expand_progdir_path(ami_path, home_dir):
     """Expand '*' prefix (PROGDIR:) to the program's home directory.
@@ -39,7 +43,7 @@ def expand_progdir_path(ami_path, home_dir):
             return base_path + "/" + rest
 
 
-def file_part(path):
+def _file_part(path):
     pos = path.rfind("/")
     if pos != -1:
         pos += 1
@@ -55,7 +59,7 @@ def file_part(path):
     return pos
 
 
-def path_part(path):
+def _path_part(path):
     pos = path.rfind("/")
     if pos != -1:
         return pos
@@ -71,7 +75,7 @@ def path_part(path):
     return pos
 
 
-def split_name(name, separator, oldpos, size):
+def _split_name(name, separator, oldpos, size):
     """split off one part of a name at the given separator.
 
     Returns a tuple (next_pos, part). next_pos is the position after the
@@ -93,7 +97,7 @@ def split_name(name, separator, oldpos, size):
     return -1, "".join(part)
 
 
-def add_part(dirname, filename, size):
+def _add_part(dirname, filename, size):
     if len(dirname) == 0:
         return filename
     if len(filename) == 0:
@@ -115,3 +119,53 @@ def add_part(dirname, filename, size):
             return dirname + filename
         else:
             return dirname + "/" + filename
+
+
+# ----- fd functions -----
+
+
+def file_part(dos, ctx, addr):
+    path = ctx.mem.r_cstr(addr)
+    pos = _file_part(path)
+    if pos < len(path):
+        log_dos.info("FilePart: path='%s' -> result='%s'", path, path[pos:])
+    else:
+        log_dos.info("FilePart: path='%s' -> pos=NULL", path)
+    return addr + pos
+
+
+def path_part(dos, ctx, addr):
+    path = ctx.mem.r_cstr(addr)
+    pos = _path_part(path)
+    if pos < len(path):
+        log_dos.info("PathPart: path='%s' -> result='%s'", path, path[:pos])
+    else:
+        log_dos.info("PathPart: path='%s' -> pos=NULL", path)
+    return addr + pos
+
+
+def add_part(dos, ctx, dn_addr, fn_addr, size):
+    dn = ctx.mem.r_cstr(dn_addr)
+    fn = ctx.mem.r_cstr(fn_addr)
+    np = _add_part(dn, fn, size)
+    log_dos.info("AddPart: dn='%s' fn='%s' size=%d -> np='%s'", dn, fn, size, np)
+    if np != None:
+        ctx.mem.w_cstr(dn_addr, np)
+        return DOSTRUE
+    else:
+        return DOSFALSE
+
+
+def split_name(dos, ctx, name, separator, buf_ptr, oldpos, size):
+    pos, part = _split_name(name, separator, oldpos, size)
+    ctx.mem.w_cstr(buf_ptr, part)
+    log_dos.info(
+        "SplitName: name='%s' sep=%d oldpos=%d size=%d -> pos=%d part='%s'",
+        name,
+        separator,
+        oldpos,
+        size,
+        pos,
+        part,
+    )
+    return pos

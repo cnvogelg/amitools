@@ -22,16 +22,7 @@ from amitools.vamos.libcore.impl import LibImplScanner
 # scheme (it declares no fd args or delegates to a helper that reads ctx.cpu).
 # Emptied batch by batch in steps 22b..22j.
 _PENDING = {
-    "AddPart",
-    "DateStamp",
-    "DateToStr",
     "Delay",
-    "DosGetString",
-    "Fault",
-    "FilePart",
-    "PathPart",
-    "PrintFault",
-    "SetIoErr",
 }
 
 

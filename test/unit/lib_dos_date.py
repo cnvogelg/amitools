@@ -38,7 +38,7 @@ def _date_to_str(date_format, flags=0, day=336):
     date.dat_StrTime.aptr = 0x240
     cpu.w_reg(REG_D1, date_ptr)
 
-    assert DosLibrary().DateToStr(ctx) != 0
+    assert DosLibrary().DateToStr(ctx, date_ptr) != 0
     return mem.r_cstr(0x200), mem.r_cstr(0x220), mem.r_cstr(0x240)
 
 
@@ -65,7 +65,7 @@ def lib_dos_date_to_str_default_format_test():
 def lib_dos_date_to_str_substitution_flags_test(monkeypatch):
     amiga_epoch = 252460800
     monkeypatch.setattr(
-        "amitools.vamos.lib.DosLibrary.time.time",
+        "amitools.vamos.lib.dos.Date.time.time",
         lambda: amiga_epoch + 100 * 24 * 60 * 60,
     )
 
@@ -78,7 +78,7 @@ def lib_dos_date_to_str_substitution_flags_test(monkeypatch):
 def lib_dos_date_to_str_without_substitution_test(monkeypatch):
     amiga_epoch = 252460800
     monkeypatch.setattr(
-        "amitools.vamos.lib.DosLibrary.time.time",
+        "amitools.vamos.lib.dos.Date.time.time",
         lambda: amiga_epoch + 100 * 24 * 60 * 60,
     )
     assert _date_to_str(FORMAT_DOS, day=100)[1] == "11-Apr-78"
