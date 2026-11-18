@@ -104,6 +104,21 @@ def handler_ram_create_dir_missing_parent_test():
     expect_error(205, h.create_dir, "missing/sub")
 
 
+def handler_ram_rename_disk_test():
+    h = make_handler()
+    h.rename_disk("newvol")
+    assert h.name == "newvol"
+    # the root node is renamed too, so examining it reports the new name
+    assert h.examine_object(h.locate_object("")).name == "newvol"
+
+
+def handler_ram_link_not_implemented_test():
+    h = make_handler()
+    lock = h.locate_object("")
+    expect_error(236, h.make_link, lock, "link", "target", True)
+    expect_error(236, h.read_link, lock, "link", 32)
+
+
 def handler_ram_set_file_size_grow_test():
     h = make_handler()
     write_file(h, "f", b"0123")

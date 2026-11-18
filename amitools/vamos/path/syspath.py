@@ -118,6 +118,15 @@ class HostFileSystem(object):
     def rename(self, old_path, new_path):
         os.rename(old_path, new_path)
 
+    def symlink(self, target, link_path):
+        os.symlink(target, link_path)
+
+    def readlink(self, sys_path):
+        return os.readlink(sys_path)
+
+    def islink(self, sys_path):
+        return os.path.islink(sys_path)
+
     def chmod(self, sys_path, mode):
         os.chmod(sys_path, mode)
 

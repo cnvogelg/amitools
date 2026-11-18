@@ -368,6 +368,120 @@ class HandlerContract:
         h.create_dir("newdir/sub")
         assert h.examine_object(h.locate_object("newdir/sub")).name == "sub"
 
+    # ----- volume maintenance -----
+
+    def rename_disk_test(self, env):
+        h = env.h
+        # every file system can relabel its volume
+        h.rename_disk("newvol")
+        assert h.name == "newvol"
+
+    def more_cache_test(self, env):
+        h = env.h
+        # a handler that does not cache reports the unchanged buffer count
+        assert h.more_cache(10) == 0
+
+    def inhibit_test(self, env):
+        h = env.h
+        # inhibit/uninhibit is a no-op for these file systems
+        h.inhibit(True)
+        h.inhibit(False)
+
+    def format_test(self, env):
+        h = env.h
+        if env.kind == "adfs":
+            # only ADFS formats a real volume
+            h.format("fresh", 0)
+            assert h.name == "fresh"
+        else:
+            # the other handlers cannot format: not implemented
+            expect_error(236, h.format, "fresh", 0)
+
+    def write_protect_test(self, env):
+        h = env.h
+        h.write_protect(True)
+        assert h.write_protected is True
+        h.write_protect(False)
+        assert h.write_protected is False
+
+    def is_filesystem_test(self, env):
+        h = env.h
+        # the shared contract only runs against file systems
+        assert h.is_filesystem() is True
+
+    # ----- links -----
+
+    def make_read_link_test(self, env):
+        h = env.h
+        if env.kind not in ("hostfs", "decoder", "dospkt"):
+            # only the host file system can express a link
+            lock = h.locate_object("")
+            expect_error(236, h.make_link, lock, "link", "target", True)
+            expect_error(236, h.read_link, lock, "link", 32)
+            return
+        make_file(h, "target", b"data")
+        lock = h.locate_object("")
+        h.make_link(lock, "link", "target", True)
+        assert h.read_link(lock, "link", 32) == "target"
+        # the soft link resolves to the target file
+        assert read_all(h, "link") == b"data"
+        # the host file system cannot express a hard link
+        expect_error(236, h.make_link, lock, "hard", lock, False)
+        # a plain file is not a link
+        make_file(h, "plain", b"x")
+        expect_error(212, h.read_link, lock, "plain", 32)
+
+    # ----- objects / metadata -----
+
+    def change_mode_test(self, env):
+        h = env.h
+        make_file(h, "f", b"x")
+        # a sharing-mode change is accepted (and a no-op) on these file systems
+        h.change_mode(h.locate_object("f"), -2)
+        fh = h.find_input("f")
+        h.change_mode(fh, -1)
+        h.end(fh)
+
+    def examine_fh_test(self, env):
+        h = env.h
+        make_file(h, "f", b"hello")
+        fh = h.find_input("f")
+        info = h.examine_fh(fh)
+        assert info.name == "f"
+        assert info.entry_type == HandlerFileInfo.FILE
+        assert info.size == 5
+        h.end(fh)
+
+    def set_owner_test(self, env):
+        h = env.h
+        # owner information is not stored by any handler here
+        expect_error(236, h.set_owner, h.locate_object(""), "f", 0x1234)
+
+    # ----- record locks -----
+
+    def lock_record_test(self, env):
+        h = env.h
+        make_file(h, "f", b"0123456789")
+        fh = h.find_update("f")
+        h.lock_record(fh, 0, 5, 0, 0)  # REC_EXCLUSIVE
+        # an overlapping exclusive lock collides
+        expect_error(241, h.lock_record, fh, 3, 5, 0, 0)
+        # a disjoint lock is fine
+        h.lock_record(fh, 5, 5, 0, 0)
+        h.free_record(fh, 0, 5)
+        h.free_record(fh, 5, 5)
+        # releasing a record that is not locked fails
+        expect_error(240, h.free_record, fh, 0, 5)
+        h.end(fh)
+
+    # ----- notification -----
+
+    def add_remove_notify_test(self, env):
+        h = env.h
+        # notifications are accepted as a no-op
+        h.add_notify(0x1234)
+        h.remove_notify(0x1234)
+
     # ----- interactive ops are unsupported on a file system -----
 
     def set_mode_unsupported_test(self, env):
@@ -399,6 +513,35 @@ def base_handler_unsupported_test():
     assert exc.value.code == 209
 
 
+def base_handler_new_action_defaults_test():
+    from amitools.vamos.handler import Handler
+
+    handler = Handler("dummy", is_filesystem=False)
+    # the maintenance/metadata/link/record/notify actions have no default
+    # implementation: they report "not implemented" (not "unknown action")
+    for func, args in (
+        (handler.rename_disk, ("x",)),
+        (handler.inhibit, (True,)),
+        (handler.format, ("x", 0)),
+        (handler.write_protect, (True,)),
+        (handler.change_mode, (None, 0)),
+        (handler.examine_fh, (None,)),
+        (handler.set_owner, (None, "f", 0)),
+        (handler.lock_record, (None, 0, 1, 0, 0)),
+        (handler.free_record, (None, 0, 1)),
+        (handler.add_notify, (0,)),
+        (handler.remove_notify, (0,)),
+        (handler.make_link, (None, "l", "t", True)),
+        (handler.read_link, (None, "l", 32)),
+    ):
+        with pytest.raises(HandlerError) as exc:
+            func(*args)
+        assert exc.value.code == 236
+    # the two actions with a benign default
+    assert handler.more_cache(5) == 0
+    assert handler.is_filesystem() is False
+
+
 def every_action_is_exercised_test():
     """guard: this module calls every packet-backed handler method
 
@@ -416,3 +559,22 @@ def every_action_is_exercised_test():
         if not re.search(rf"\.{re.escape(name)}\b", source)
     ]
     assert not missing, f"handler methods not exercised: {missing}"
+
+
+def every_dos_action_is_covered_test():
+    """guard: every ``DosAction`` is either mapped or explicitly internal
+
+    The handler API is a 1:1 model of the AmigaDOS packets, so a new action
+    must either gain an ``ACTION_METHODS`` entry (and a test above) or be
+    listed in ``INTERNAL_ACTIONS`` with the reason it is not exposed.
+    """
+    from amitools.vamos.handler.base import INTERNAL_ACTIONS
+    from amitools.vamos.lib.dos.action import DosAction
+
+    mapped = set(ACTION_METHODS.values())
+    missing = [
+        action.name
+        for action in DosAction
+        if action not in mapped and action not in INTERNAL_ACTIONS
+    ]
+    assert not missing, f"DosActions neither mapped nor internal: {missing}"

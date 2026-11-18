@@ -9,7 +9,7 @@ import os
 from types import SimpleNamespace
 
 import pytest
-from handler_contract import HandlerContract, expect_error
+from handler_contract import HandlerContract, expect_error, read_all
 
 from amitools.vamos.handler import HostFileSysHandler
 
@@ -76,3 +76,33 @@ def handler_filesys_create_dir_missing_parent_test(tmp_path):
     h, _ = make_handler(tmp_path)
     # the host reports a missing parent as "object not found"
     expect_error(203, h.create_dir, "missing/sub")
+
+
+def handler_filesys_soft_link_test(tmp_path):
+    h, root = make_handler(tmp_path)
+    (root / "target").write_bytes(b"data")
+    lock = h.locate_object("")
+    h.make_link(lock, "link", "target", True)
+    # the link is a real host symlink
+    assert os.path.islink(root / "link")
+    assert os.readlink(root / "link") == "target"
+    assert h.read_link(lock, "link", 32) == "target"
+    # the link resolves to the target file
+    assert read_all(h, "link") == b"data"
+    # a hard link is not supported
+    expect_error(236, h.make_link, lock, "hard", lock, False)
+    # read_link on a plain file fails
+    expect_error(212, h.read_link, lock, "target", 32)
+    # make_link onto an existing object fails
+    expect_error(203, h.make_link, lock, "link", "other", True)
+    # a link created through a subdirectory lock keeps the given target
+    os.mkdir(root / "d")
+    h.make_link(h.locate_object("d"), "sub", "../target", True)
+    assert h.read_link(h.locate_object("d"), "sub", 32) == "../target"
+
+
+def handler_filesys_rename_disk_test(tmp_path):
+    h, _ = make_handler(tmp_path)
+    h.rename_disk("newvol")
+    # a host directory has no stored volume name: only the handler changes
+    assert h.name == "newvol"

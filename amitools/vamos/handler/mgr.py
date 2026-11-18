@@ -314,7 +314,7 @@ class HandlerManager:
         handler = self.get_handler(name)
         if handler is None:
             return True
-        return handler.is_filesystem
+        return handler.is_fs
 
     # ----- directory listing -----
 

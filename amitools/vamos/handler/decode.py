@@ -45,6 +45,7 @@ from amitools.vamos.path.amipath import AmiPath
 from .base import (
     ERROR_ACTION_NOT_KNOWN,
     ERROR_INVALID_LOCK,
+    ERROR_LINE_TOO_LONG,
     MODE_NEWFILE,
     HandlerError,
 )
@@ -55,6 +56,14 @@ DOSTRUE = -1
 
 # AmigaDOS lock modes (ACTION_LOCATE_OBJECT dp_Arg3)
 EXCLUSIVE_LOCK = -1
+
+# ACTION_CHANGE_MODE object type (dos/dos.h)
+CHANGE_LOCK = 0
+CHANGE_FH = 1
+
+# ACTION_MAKE_LINK link type (dos/dos.h)
+LINK_HARD = 0
+LINK_SOFT = 1
 
 # the FIND* packets that open a file: the handler fills in the caller's FH
 _FIND_ACTIONS = (
@@ -217,6 +226,7 @@ class PacketDecoder:
         a2 = pkt.arg2.val
         a3 = pkt.arg3.val
         a4 = pkt.arg4.val
+        a5 = pkt.arg5.val
 
         # --- locks ---
 
@@ -368,6 +378,92 @@ class PacketDecoder:
             handler.create_dir(rel)
             lock = handler.locate_object(rel)
             return self._register_lock(handler, lock, self._abs_path(handler, rel))
+
+        # --- volume maintenance ---
+
+        if action == DosAction.ACTION_RENAME_DISK:
+            self._handler().rename_disk(mem.r_bstr(a1 << 2))
+            return DOSTRUE
+
+        if action == DosAction.ACTION_MORE_CACHE:
+            return self._handler().more_cache(a1)
+
+        if action == DosAction.ACTION_INHIBIT:
+            self._handler().inhibit(a1 != 0)
+            return DOSTRUE
+
+        if action == DosAction.ACTION_FORMAT:
+            self._handler().format(mem.r_bstr(a1 << 2), a2)
+            return DOSTRUE
+
+        if action == DosAction.ACTION_WRITE_PROTECT:
+            self._handler().write_protect(a1 != 0)
+            return DOSTRUE
+
+        if action == DosAction.ACTION_IS_FILESYSTEM:
+            return DOSTRUE if self._handler().is_filesystem() else DOSFALSE
+
+        # --- links ---
+
+        if action == DosAction.ACTION_MAKE_LINK:
+            handler, lock, _ = self._lock(a1)
+            name = mem.r_bstr(a2 << 2)
+            if a4 == LINK_SOFT:
+                dest = mem.r_cstr(a3)
+            else:
+                _h, dest, _ = self._lock(a3)
+            handler.make_link(lock, name, dest, a4 == LINK_SOFT)
+            return DOSTRUE
+
+        if action == DosAction.ACTION_READ_LINK:
+            handler, lock, _ = self._lock(a1)
+            target = handler.read_link(lock, mem.r_cstr(a2), a4)
+            if len(target) >= a4:
+                raise HandlerError(ERROR_LINE_TOO_LONG)
+            mem.w_cstr(a3, target)
+            return len(target)
+
+        # --- objects / metadata ---
+
+        if action == DosAction.ACTION_CHANGE_MODE:
+            if a1 == CHANGE_FH:
+                handler, obj, _ = self._fh(a2)
+            else:
+                handler, obj, _ = self._lock(a2)
+            handler.change_mode(obj, a3)
+            return DOSTRUE
+
+        if action == DosAction.ACTION_EXAMINE_FH:
+            handler, fh, _ = self._fh(a1)
+            self._fill_fib(FileInfoBlockStruct(mem, a2), handler.examine_fh(fh))
+            return DOSTRUE
+
+        if action == DosAction.ACTION_SET_OWNER:
+            handler, lock, _ = self._lock(a2)
+            handler.set_owner(lock, mem.r_bstr(a3 << 2), a4)
+            return DOSTRUE
+
+        # --- record locks ---
+
+        if action == DosAction.ACTION_LOCK_RECORD:
+            handler, fh, _ = self._fh(a1)
+            handler.lock_record(fh, a2, a3, a4, a5)
+            return DOSTRUE
+
+        if action == DosAction.ACTION_FREE_RECORD:
+            handler, fh, _ = self._fh(a1)
+            handler.free_record(fh, a2, a3)
+            return DOSTRUE
+
+        # --- notification ---
+
+        if action == DosAction.ACTION_ADD_NOTIFY:
+            self._handler().add_notify(a1)
+            return DOSTRUE
+
+        if action == DosAction.ACTION_REMOVE_NOTIFY:
+            self._handler().remove_notify(a1)
+            return DOSTRUE
 
         raise HandlerError(ERROR_ACTION_NOT_KNOWN, "unsupported: %s" % action.name)
 

@@ -47,6 +47,14 @@ from .base import (
 EXCLUSIVE_LOCK = -1
 SHARED_LOCK = -2
 
+# ACTION_CHANGE_MODE object type (dos/dos.h)
+CHANGE_LOCK = 0
+CHANGE_FH = 1
+
+# ACTION_MAKE_LINK link type (dos/dos.h)
+LINK_HARD = 0
+LINK_SOFT = 1
+
 # the three open modes are the matching FIND* packet numbers, so a
 # ``find_output(mode)`` maps directly onto the packet to send
 _FIND_ACTIONS = {
@@ -128,6 +136,19 @@ class _PacketCall:
         handler.mem.w_bstr(mem.addr, str(text))
         self._mems.append(mem)
         return mem.addr >> 2
+
+    def cstr(self, text):
+        """allocate a NUL-terminated C string and return its address
+
+        Some packets (``MAKE_LINK``/``READ_LINK``) carry plain C strings
+        instead of BSTRs.
+        """
+        handler = self.handler
+        data = str(text).encode("latin-1") + b"\x00"
+        mem = handler.alloc.alloc_memory(len(data), label="CSTR")
+        handler.mem.w_cstr(mem.addr, str(text))
+        self._mems.append(mem)
+        return mem.addr
 
     def buffer(self, size):
         """allocate a byte buffer and return its address"""
@@ -488,3 +509,128 @@ class PacketHandler(Handler):
         if bptr == 0:
             raise HandlerError(ERROR_OBJECT_NOT_FOUND)
         return self._make_lock(bptr)
+
+    # ----- volume maintenance -----
+
+    def rename_disk(self, new_name):
+        with self._call(DosAction.ACTION_RENAME_DISK) as call:
+            call.arg(1, call.bstr(new_name))
+            call.send()
+        # mirror the relabel locally: the handler now represents the new name
+        self.name = new_name
+
+    def more_cache(self, count):
+        with self._call(DosAction.ACTION_MORE_CACHE) as call:
+            call.arg(1, count)
+            return call.send()
+
+    def inhibit(self, onoff):
+        with self._call(DosAction.ACTION_INHIBIT) as call:
+            call.arg(1, 1 if onoff else 0)
+            call.send()
+
+    def format(self, vol_name, dos_type):
+        with self._call(DosAction.ACTION_FORMAT) as call:
+            call.arg(1, call.bstr(vol_name))
+            call.arg(2, dos_type)
+            call.send()
+        self.name = vol_name
+
+    def write_protect(self, enable):
+        with self._call(DosAction.ACTION_WRITE_PROTECT) as call:
+            call.arg(1, 1 if enable else 0)
+            call.send()
+        # mirror the state locally (like rename_disk/format): the client now
+        # represents the write-protected volume
+        self.write_protected = bool(enable)
+
+    def is_filesystem(self):
+        with self._call(DosAction.ACTION_IS_FILESYSTEM) as call:
+            return bool(call.send())
+
+    # ----- links -----
+
+    def make_link(self, lock, name, dest, soft):
+        with self._call(DosAction.ACTION_MAKE_LINK) as call:
+            call.arg(1, lock.bptr)
+            call.arg(2, call.bstr(name))
+            if soft:
+                call.arg(3, call.cstr(dest))
+            else:
+                call.arg(3, dest.bptr)
+            call.arg(4, LINK_SOFT if soft else LINK_HARD)
+            call.send()
+
+    def read_link(self, lock, path, size):
+        with self._call(DosAction.ACTION_READ_LINK) as call:
+            buf = call.buffer(size)
+            call.arg(1, lock.bptr)
+            call.arg(2, call.cstr(path))
+            call.arg(3, buf)
+            call.arg(4, size)
+            length = call.send()
+            if length < 0:
+                return ""
+            return self.mem.r_cstr(buf)
+
+    # ----- objects / metadata -----
+
+    def change_mode(self, lock, mode):
+        with self._call(DosAction.ACTION_CHANGE_MODE) as call:
+            if isinstance(lock, HandlerFile):
+                call.arg(1, CHANGE_FH)
+                call.arg(2, lock.fh_arg1)
+            else:
+                call.arg(1, CHANGE_LOCK)
+                call.arg(2, lock.bptr)
+            call.arg(3, mode)
+            call.send()
+
+    def examine_fh(self, fh):
+        with self._call(DosAction.ACTION_EXAMINE_FH) as call:
+            fib = self.alloc.alloc_astruct(FileInfoBlockStruct, label="FIB")
+            try:
+                call.arg(1, fh.fh_arg1)
+                call.arg(2, fib.addr)
+                call.send()
+                return self._parse_fib(fib)
+            finally:
+                fib.free()
+
+    def set_owner(self, lock, path, owner):
+        with self._call(DosAction.ACTION_SET_OWNER) as call:
+            call.arg(1, 0)
+            call.arg(2, lock.bptr)
+            call.arg(3, call.bstr(path))
+            call.arg(4, owner)
+            call.send()
+
+    # ----- record locks -----
+
+    def lock_record(self, fh, offset, length, mode, timeout):
+        with self._call(DosAction.ACTION_LOCK_RECORD) as call:
+            call.arg(1, fh.fh_arg1)
+            call.arg(2, offset)
+            call.arg(3, length)
+            call.arg(4, mode)
+            call.arg(5, timeout)
+            call.send()
+
+    def free_record(self, fh, offset, length):
+        with self._call(DosAction.ACTION_FREE_RECORD) as call:
+            call.arg(1, fh.fh_arg1)
+            call.arg(2, offset)
+            call.arg(3, length)
+            call.send()
+
+    # ----- notification -----
+
+    def add_notify(self, notify):
+        with self._call(DosAction.ACTION_ADD_NOTIFY) as call:
+            call.arg(1, notify)
+            call.send()
+
+    def remove_notify(self, notify):
+        with self._call(DosAction.ACTION_REMOVE_NOTIFY) as call:
+            call.arg(1, notify)
+            call.send()

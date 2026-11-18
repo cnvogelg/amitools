@@ -10,6 +10,7 @@ All paths it receives are volume-relative and use AmigaDOS ``/`` separators.
 Resolution is case-insensitive and collapses AmigaDOS parent steps.
 """
 
+from amitools.fs import DosType
 from amitools.fs.ADFSVolume import ADFSVolume
 from amitools.fs.FSError import (
     DELETE_NOT_ALLOWED,
@@ -17,6 +18,7 @@ from amitools.fs.FSError import (
     INVALID_COMMENT,
     INVALID_FILE_NAME,
     INVALID_PARENT_DIRECTORY,
+    INVALID_VOLUME_NAME,
     NAME_ALREADY_EXISTS,
     NO_FREE_BLOCKS,
 )
@@ -41,7 +43,7 @@ from .base import (
     MODE_NEWFILE,
     MODE_OLDFILE,
     MODE_READWRITE,
-    Handler,
+    FileSystemHandler,
     HandlerError,
     HandlerFile,
     HandlerFileInfo,
@@ -56,6 +58,7 @@ _ADFS_ERROR_MAP = {
     NAME_ALREADY_EXISTS: ERROR_OBJECT_EXISTS,
     NO_FREE_BLOCKS: ERROR_DISK_FULL,
     INVALID_FILE_NAME: ERROR_INVALID_COMPONENT_NAME,
+    INVALID_VOLUME_NAME: ERROR_INVALID_COMPONENT_NAME,
     DELETE_NOT_ALLOWED: ERROR_DIRECTORY_NOT_EMPTY,
     INVALID_COMMENT: ERROR_BAD_NUMBER,
 }
@@ -167,7 +170,7 @@ class AdfsFile(HandlerFile):
         raise OSError("ADFS: has no file descriptor")
 
 
-class AdfsHandler(Handler):
+class AdfsHandler(FileSystemHandler):
     """file system handler backed by an :class:`ADFSVolume`"""
 
     def __init__(self, name, blkdev, read_only=False):
@@ -503,6 +506,36 @@ class AdfsHandler(Handler):
             self.volume.create_dir(FSString(rel))
         except Exception as e:
             raise HandlerError(_adfs_error(getattr(e, "code", None))) from None
+
+    # ----- volume maintenance -----
+
+    def rename_disk(self, new_name):
+        self._check_writable()
+        try:
+            self.volume.relabel(FSString(new_name))
+        except Exception as e:
+            raise HandlerError(_adfs_error(getattr(e, "code", None))) from None
+        self.name = new_name
+
+    def format(self, vol_name, dos_type):
+        self._check_writable()
+        if not dos_type:
+            dos_type = DosType.DOS0
+        try:
+            self.volume.create(FSString(vol_name), dos_type=dos_type)
+        except Exception as e:
+            raise HandlerError(_adfs_error(getattr(e, "code", None))) from None
+        self.name = vol_name
+
+    def write_protect(self, enable):
+        # a write protected ADFS volume refuses all write access
+        super().write_protect(enable)
+        self.read_only = bool(enable)
+
+    # ----- objects / metadata -----
+
+    def examine_fh(self, fh):
+        return self._file_info(fh.node, 0)
 
 
 def open_adfs_blkdev(image, *, img=None, part=None, read_only=False):

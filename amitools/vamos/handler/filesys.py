@@ -18,6 +18,7 @@ from .base import (
     ERROR_BAD_NUMBER,
     ERROR_DIRECTORY_NOT_EMPTY,
     ERROR_NO_MORE_ENTRIES,
+    ERROR_NOT_IMPLEMENTED,
     ERROR_OBJECT_EXISTS,
     ERROR_OBJECT_IN_USE,
     ERROR_OBJECT_NOT_FOUND,
@@ -25,7 +26,7 @@ from .base import (
     ERROR_READ_PROTECTED,
     ERROR_SEEK_ERROR,
     ERROR_WRITE_PROTECTED,
-    Handler,
+    FileSystemHandler,
     HandlerError,
     HandlerFile,
     HandlerFileInfo,
@@ -67,7 +68,7 @@ class HostFileSysFile(HandlerFile):
         self.rel_path = rel_path
 
 
-class HostFileSysHandler(Handler):
+class HostFileSysHandler(FileSystemHandler):
     """file system handler backed by a host directory tree"""
 
     def __init__(self, name, root_path, file_system=None):
@@ -369,3 +370,51 @@ class HostFileSysHandler(Handler):
             self.fs.mkdir(sys_path)
         except OSError:
             raise HandlerError(ERROR_OBJECT_EXISTS)
+
+    # ----- volume maintenance -----
+
+    def rename_disk(self, new_name):
+        # a host directory has no stored volume name: only the handler's
+        # volume name changes
+        log_handler.info("rename_disk: '%s' -> '%s'", self.name, new_name)
+        self.name = new_name
+
+    # ----- links -----
+
+    def make_link(self, lock, name, dest, soft):
+        if not soft:
+            # a host file system cannot express a hard link as a distinct
+            # AmigaDOS link object
+            raise HandlerError(ERROR_NOT_IMPLEMENTED, "hard links are not supported")
+        rel = str(name)
+        dirs = collapse_parent_steps(rel.split("/"))
+        if dirs is None:
+            raise HandlerError(ERROR_OBJECT_NOT_FOUND)
+        link_path = follow_path_no_case(self.fs, lock.sys_path, dirs)
+        try:
+            self.fs.symlink(str(dest), link_path)
+        except FileExistsError:
+            raise HandlerError(ERROR_OBJECT_EXISTS)
+        except FileNotFoundError:
+            raise HandlerError(ERROR_OBJECT_NOT_FOUND)
+        except OSError:
+            raise HandlerError(ERROR_OBJECT_IN_USE)
+
+    def read_link(self, lock, path, size):
+        rel = str(path)
+        dirs = collapse_parent_steps(rel.split("/"))
+        if dirs is None:
+            raise HandlerError(ERROR_OBJECT_NOT_FOUND)
+        sys_path = follow_path_no_case(self.fs, lock.sys_path, dirs)
+        if not self.fs.islink(sys_path):
+            raise HandlerError(ERROR_OBJECT_WRONG_TYPE)
+        try:
+            return self.fs.readlink(sys_path)
+        except OSError:
+            raise HandlerError(ERROR_OBJECT_NOT_FOUND)
+
+    # ----- objects / metadata -----
+
+    def examine_fh(self, fh):
+        name = os.path.basename(fh.sys_path)
+        return self._file_info(fh.sys_path, name, 0)

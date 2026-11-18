@@ -19,7 +19,7 @@ from amitools.vamos.handler.terminal import Latin1ToUtf8Converter
 
 def handler_nil_test():
     h = NilHandler("nil")
-    assert h.is_filesystem is False
+    assert h.is_fs is False
     assert h.name == "nil"
     for mode in (MODE_OLDFILE, MODE_NEWFILE, MODE_READWRITE):
         fh = h.find_output("", mode)
@@ -52,9 +52,37 @@ def handler_device_root_lock_test():
         assert exc.value.code == ERROR_OBJECT_NOT_FOUND
 
 
+def handler_device_volume_actions_unsupported_test():
+    # a device is not a file system: the file-system actions are not
+    # implemented (as opposed to "unknown action")
+    for h in (NilHandler("nil"), ConsoleHandler("console")):
+        assert h.is_filesystem() is False
+        # a device caches nothing
+        assert h.more_cache(1) == 0
+        calls = [
+            (h.rename_disk, ("x",)),
+            (h.inhibit, (True,)),
+            (h.format, ("x", 0)),
+            (h.write_protect, (True,)),
+            (h.change_mode, (None, 0)),
+            (h.examine_fh, (None,)),
+            (h.set_owner, (None, "f", 0)),
+            (h.lock_record, (None, 0, 1, 0, 0)),
+            (h.free_record, (None, 0, 1)),
+            (h.add_notify, (0,)),
+            (h.remove_notify, (0,)),
+            (h.make_link, (None, "l", "t", True)),
+            (h.read_link, (None, "l", 32)),
+        ]
+        for func, args in calls:
+            with pytest.raises(HandlerError) as exc:
+                func(*args)
+            assert exc.value.code == 236
+
+
 def handler_console_test():
     h = ConsoleHandler("console")
-    assert h.is_filesystem is False
+    assert h.is_fs is False
     # output opens wrap the standard output stream and auto-flush
     out = h.find_output("", MODE_NEWFILE)
     assert out.fobj.obj is sys.stdout.buffer

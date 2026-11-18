@@ -249,6 +249,60 @@ class RecordingHandler(Handler):
     def create_dir(self, ami_path):
         self._call("create_dir", ami_path)
 
+    # volume maintenance
+    def rename_disk(self, new_name):
+        self._call("rename_disk", new_name)
+
+    def more_cache(self, count):
+        self._call("more_cache", count)
+        return 7
+
+    def inhibit(self, onoff):
+        self._call("inhibit", onoff)
+
+    def format(self, vol_name, dos_type):
+        self._call("format", vol_name, dos_type)
+
+    def write_protect(self, enable):
+        self._call("write_protect", enable)
+
+    def is_filesystem(self):
+        self._call("is_filesystem")
+        return True
+
+    # links
+    def make_link(self, lock, name, dest, soft):
+        self._call("make_link", lock, name, dest, soft)
+
+    def read_link(self, lock, path, size):
+        self._call("read_link", lock, path, size)
+        return "target"
+
+    # objects / metadata
+    def change_mode(self, lock, mode):
+        self._call("change_mode", lock, mode)
+
+    def examine_fh(self, fh):
+        self._call("examine_fh", fh)
+        return self.fib_info
+
+    def set_owner(self, lock, path, owner):
+        self._call("set_owner", lock, path, owner)
+
+    # record locks
+    def lock_record(self, fh, offset, length, mode, timeout):
+        self._call("lock_record", fh, offset, length, mode, timeout)
+
+    def free_record(self, fh, offset, length):
+        self._call("free_record", fh, offset, length)
+
+    # notification
+    def add_notify(self, notify):
+        self._call("add_notify", notify)
+
+    def remove_notify(self, notify):
+        self._call("remove_notify", notify)
+
 
 # --------------------------------------------------------------------------
 # packet helpers
@@ -262,6 +316,7 @@ _FIB_ADDR = 0xC00
 _INFO_ADDR = 0xD00
 _DATE_ADDR = 0xE00
 _FH_ADDR = 0x700
+_CSTR_ADDR = 0xF00
 
 
 def _bstr(mem, text, addr):
@@ -603,6 +658,174 @@ def handler_decode_create_dir_test(dec):
 
 
 # --------------------------------------------------------------------------
+# volume maintenance, links, metadata
+# --------------------------------------------------------------------------
+
+
+def handler_decode_volume_actions_test(dec):
+    mem, h = dec.mem, dec.h
+    dec.harness.decode(
+        _pkt(mem, DosAction.ACTION_RENAME_DISK, arg1=_bstr(mem, "new", _PATH_ADDR))
+    )
+    assert h.calls[-1] == ("rename_disk", "new")
+
+    pkt = _pkt(mem, DosAction.ACTION_MORE_CACHE, arg1=5)
+    assert dec.harness.decode(pkt) == 7
+    assert h.calls[-1] == ("more_cache", 5)
+
+    dec.harness.decode(_pkt(mem, DosAction.ACTION_INHIBIT, arg1=1))
+    assert h.calls[-1] == ("inhibit", True)
+    dec.harness.decode(_pkt(mem, DosAction.ACTION_INHIBIT, arg1=0))
+    assert h.calls[-1] == ("inhibit", False)
+
+    dec.harness.decode(
+        _pkt(
+            mem,
+            DosAction.ACTION_FORMAT,
+            arg1=_bstr(mem, "vol", _PATH_ADDR),
+            arg2=0x444F5300,
+        )
+    )
+    assert h.calls[-1] == ("format", "vol", 0x444F5300)
+
+    dec.harness.decode(_pkt(mem, DosAction.ACTION_WRITE_PROTECT, arg1=1))
+    assert h.calls[-1] == ("write_protect", True)
+
+    assert dec.harness.decode(_pkt(mem, DosAction.ACTION_IS_FILESYSTEM)) == DOSTRUE
+    assert h.calls[-1] == ("is_filesystem",)
+
+
+def handler_decode_make_link_test(dec):
+    mem, h = dec.mem, dec.h
+    dir_lock = dec.harness.decode(
+        _pkt(mem, DosAction.ACTION_LOCATE_OBJECT, arg2=_bstr(mem, "d", _PATH_ADDR))
+    )
+    # soft link: dp_Arg3 is a C-string
+    mem.w_cstr(_CSTR_ADDR, "target")
+    dec.harness.decode(
+        _pkt(
+            mem,
+            DosAction.ACTION_MAKE_LINK,
+            arg1=dir_lock,
+            arg2=_bstr(mem, "link", _PATH2_ADDR),
+            arg3=_CSTR_ADDR,
+            arg4=1,
+        )
+    )
+    assert h.calls[-1] == ("make_link", h.lock, "link", "target", True)
+    # hard link: dp_Arg3 is a BPTR to a lock on the target
+    target_lock = dec.harness.decode(
+        _pkt(mem, DosAction.ACTION_LOCATE_OBJECT, arg2=_bstr(mem, "t", _PATH_ADDR))
+    )
+    dec.harness.decode(
+        _pkt(
+            mem,
+            DosAction.ACTION_MAKE_LINK,
+            arg1=dir_lock,
+            arg2=_bstr(mem, "hard", _PATH2_ADDR),
+            arg3=target_lock,
+            arg4=0,
+        )
+    )
+    assert h.calls[-1] == ("make_link", h.lock, "hard", h.lock, False)
+
+
+def handler_decode_read_link_test(dec):
+    mem, h = dec.mem, dec.h
+    lock = dec.harness.decode(
+        _pkt(mem, DosAction.ACTION_LOCATE_OBJECT, arg2=_bstr(mem, "", _PATH_ADDR))
+    )
+    mem.w_cstr(_CSTR_ADDR, "some/link")
+    pkt = _pkt(
+        mem,
+        DosAction.ACTION_READ_LINK,
+        arg1=lock,
+        arg2=_CSTR_ADDR,
+        arg3=_BUF_ADDR,
+        arg4=64,
+    )
+    assert dec.harness.decode(pkt) == len("target")
+    assert h.calls[-1] == ("read_link", h.lock, "some/link", 64)
+    assert mem.r_cstr(_BUF_ADDR) == "target"
+    # a buffer too small reports ERROR_LINE_TOO_LONG
+    pkt = _pkt(
+        mem,
+        DosAction.ACTION_READ_LINK,
+        arg1=lock,
+        arg2=_CSTR_ADDR,
+        arg3=_BUF_ADDR,
+        arg4=3,
+    )
+    assert dec.harness.decode(pkt) == DOSFALSE
+    assert pkt.res2.val == 120
+
+
+def handler_decode_change_mode_test(dec):
+    mem, h = dec.mem, dec.h
+    lock = dec.harness.decode(
+        _pkt(mem, DosAction.ACTION_LOCATE_OBJECT, arg2=_bstr(mem, "f", _PATH_ADDR))
+    )
+    dec.harness.decode(
+        _pkt(mem, DosAction.ACTION_CHANGE_MODE, arg1=0, arg2=lock, arg3=-2)
+    )
+    assert h.calls[-1] == ("change_mode", h.lock, -2)
+    # CHANGE_FH resolves the file handle instead of the lock
+    fh_id = dec.harness._register_file(h, h.file, "work:f")
+    dec.harness.decode(
+        _pkt(mem, DosAction.ACTION_CHANGE_MODE, arg1=1, arg2=fh_id, arg3=-1)
+    )
+    assert h.calls[-1] == ("change_mode", h.file, -1)
+
+
+def handler_decode_examine_fh_test(dec):
+    mem, h = dec.mem, dec.h
+    fh_id = dec.harness._register_file(h, h.file, "work:f")
+    h.fib_info = HandlerFileInfo("f", HandlerFileInfo.FILE, size=3)
+    pkt = _pkt(mem, DosAction.ACTION_EXAMINE_FH, arg1=fh_id, arg2=_FIB_ADDR)
+    assert dec.harness.decode(pkt) == DOSTRUE
+    assert h.calls[-1] == ("examine_fh", h.file)
+    assert FileInfoBlockStruct(mem, _FIB_ADDR).fib_Size.val == 3
+
+
+def handler_decode_set_owner_test(dec):
+    mem, h = dec.mem, dec.h
+    lock = dec.harness.decode(
+        _pkt(mem, DosAction.ACTION_LOCATE_OBJECT, arg2=_bstr(mem, "", _PATH_ADDR))
+    )
+    dec.harness.decode(
+        _pkt(
+            mem,
+            DosAction.ACTION_SET_OWNER,
+            arg2=lock,
+            arg3=_bstr(mem, "f", _PATH_ADDR),
+            arg4=0x1234,
+        )
+    )
+    assert h.calls[-1] == ("set_owner", h.lock, "f", 0x1234)
+
+
+def handler_decode_record_locks_test(dec):
+    mem, h = dec.mem, dec.h
+    fh_id = dec.harness._register_file(h, h.file, "work:f")
+    pkt = _pkt(mem, DosAction.ACTION_LOCK_RECORD, arg1=fh_id, arg2=0, arg3=10, arg4=0)
+    pkt.arg5.val = 50
+    assert dec.harness.decode(pkt) == DOSTRUE
+    assert h.calls[-1] == ("lock_record", h.file, 0, 10, 0, 50)
+    dec.harness.decode(
+        _pkt(mem, DosAction.ACTION_FREE_RECORD, arg1=fh_id, arg2=0, arg3=10)
+    )
+    assert h.calls[-1] == ("free_record", h.file, 0, 10)
+
+
+def handler_decode_notify_test(dec):
+    mem, h = dec.mem, dec.h
+    dec.harness.decode(_pkt(mem, DosAction.ACTION_ADD_NOTIFY, arg1=0x1234))
+    assert h.calls[-1] == ("add_notify", 0x1234)
+    dec.harness.decode(_pkt(mem, DosAction.ACTION_REMOVE_NOTIFY, arg1=0x1234))
+    assert h.calls[-1] == ("remove_notify", 0x1234)
+
+
+# --------------------------------------------------------------------------
 # errors
 # --------------------------------------------------------------------------
 
@@ -620,7 +843,7 @@ def handler_decode_error_mapping_test(dec):
 
 def handler_decode_unknown_action_test(dec):
     mem = dec.mem
-    pkt = _pkt(mem, DosAction.ACTION_MAKE_LINK)
+    pkt = _pkt(mem, DosAction.ACTION_SERIALIZE_DISK)
     assert dec.harness.decode(pkt) == DOSFALSE
     assert pkt.res2.val == 209
 

@@ -23,7 +23,7 @@ from .base import (
     MODE_NEWFILE,
     MODE_OLDFILE,
     MODE_READWRITE,
-    Handler,
+    FileSystemHandler,
     HandlerError,
     HandlerFile,
     HandlerFileInfo,
@@ -150,7 +150,7 @@ class RamFile(HandlerFile):
         self.node = stream.node
 
 
-class RamHandler(Handler):
+class RamHandler(FileSystemHandler):
     """file system handler backed by an in-memory tree"""
 
     def __init__(self, name, cfg=None):
@@ -442,3 +442,14 @@ class RamHandler(Handler):
         if name.lower() in parent.children:
             raise HandlerError(ERROR_OBJECT_EXISTS)
         parent.children[name.lower()] = RamNode(name, is_dir=True)
+
+    # ----- volume maintenance -----
+
+    def rename_disk(self, new_name):
+        self.name = new_name
+        self.root.name = new_name
+
+    # ----- objects / metadata -----
+
+    def examine_fh(self, fh):
+        return self._child_info(fh.node, 0)

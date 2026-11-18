@@ -157,6 +157,45 @@ def handler_adfs_fh_from_lock_readwrite_test(tmp_path):
     assert read_file(h, "f") == b"XYZ"
 
 
+def handler_adfs_rename_disk_test(tmp_path):
+    h = make_handler(tmp_path / "work.adf")
+    h.rename_disk("newvol")
+    assert h.name == "newvol"
+    # the volume itself is relabeled
+    assert h.volume.get_volume_name().get_unicode() == "newvol"
+    assert h.examine_object(h.locate_object("")).name == "newvol"
+
+
+def handler_adfs_format_test(tmp_path):
+    h = make_handler(tmp_path / "work.adf")
+    write_file(h, "f", b"x")
+    h.format("fresh", 0)
+    assert h.name == "fresh"
+    # formatting wiped the old contents
+    expect_error(205, h.locate_object, "f")
+    assert h.examine_object(h.locate_object("")).name == "fresh"
+
+
+def handler_adfs_link_not_implemented_test(tmp_path):
+    h = make_handler(tmp_path / "work.adf")
+    lock = h.locate_object("")
+    expect_error(236, h.make_link, lock, "link", "target", True)
+    expect_error(236, h.read_link, lock, "link", 32)
+
+
+def handler_adfs_write_protect_test(tmp_path):
+    h = make_handler(tmp_path / "work.adf")
+    h.write_protect(True)
+    assert h.write_protected is True
+    assert h.read_only is True
+    # a write protected volume refuses writes
+    expect_error(223, h.find_output, "f")
+    h.write_protect(False)
+    assert h.write_protected is False
+    assert h.read_only is False
+    write_file(h, "f", b"x")
+
+
 # ----- block device construction -----
 
 

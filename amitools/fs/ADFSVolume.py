@@ -323,7 +323,7 @@ class ADFSVolume:
         self.root.write()
         # store internally
         self.name = name
-        self.root_dir.name = name
+        self.root_dir.name = fn
 
     def rename(self, old_ami_path, new_ami_path):
         """Rename a file or directory to a new path"""
