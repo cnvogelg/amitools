@@ -319,17 +319,121 @@ class DosList:
 
     def remove_assign(self, name):
         entry = self.get_entry_by_name(name)
-        if entry is None or _struct_read(entry.struct, "dol_Type") != 1:
+        if not self.is_assign_entry(entry):
             return None
-        oldlock_addr = _struct_read(entry.struct, "dol_Lock")
-        oldlock = self.lock_mgr.get_by_b_addr(oldlock_addr >> 2)
-        if oldlock is not None:
-            self.lock_mgr.release_lock(oldlock)
-        self._release_locklist(entry)
         self.remove_entry(entry)
-        self.alloc.free_bstr(entry.name_addr)
-        entry.mem.free()
+        # free_entry releases dol_Lock and every AssignList lock and frees
+        # the AssignList nodes; releasing them here again would double-free
+        self.free_entry(entry)
         self.assign_mgr.del_assign(name)
+        return True
+
+    def is_assign_entry(self, entry):
+        """is a DOS list entry a directory assign?"""
+        return entry is not None and _struct_read(entry.struct, "dol_Type") == 1
+
+    def _rebuild_assign_list(self, entry):
+        """rewrite dol_Lock/dol_List from ``entry.locks`` (first is primary)"""
+        for alist in entry.alist:
+            alist.free()
+        entry.alist = []
+        _struct_write(entry.struct, "dol_Lock", 0)
+        _struct_write(entry.struct, "dol_List", 0)
+        first = True
+        last = None
+        for lock in entry.locks:
+            if first:
+                _struct_write(entry.struct, "dol_Lock", lock.mem.addr)
+                first = False
+                continue
+            alist = self.alloc.alloc_astruct(AssignListStruct, label="AssignList")
+            alist.al_Next.aptr = 0
+            alist.al_Lock.aptr = lock.mem.addr
+            entry.alist.append(alist)
+            if last is not None:
+                last.al_Next.aptr = alist.addr
+            else:
+                _struct_write(entry.struct, "dol_List", alist.addr)
+            last = alist
+
+    def _sync_assign_mgr(self, entry):
+        """mirror an assign's directory list into the path manager
+
+        ``entry.assigns`` is the canonical list of Amiga paths: it also keeps
+        paths of a late assign that does not exist (and thus has no lock).
+        """
+        paths = list(entry.assigns)
+        if not paths:
+            paths = [str(lock.ami_path) for lock in entry.locks]
+        self.assign_mgr.set_assign(entry.name, paths)
+
+    def set_assign_paths(self, name, paths):
+        """create/conver an assign pointing at the given Amiga paths.
+
+        AssignLate()/AssignPath() delegate here. An existing assign is
+        replaced; a volume/device of the same name is left alone and None is
+        returned.
+        """
+        entry = self.get_entry_by_name(name)
+        if entry is not None and not self.is_assign_entry(entry):
+            return None
+        if entry is not None:
+            self.remove_assign(name)
+        entry = self.add_assign(name, list(paths), append=False)
+        entry.locks = []
+        _struct_write(entry.struct, "dol_List", 0)
+        for path in paths:
+            lock = self.lock_mgr.create_lock(None, path, False)
+            if lock is None:
+                log_doslist.warning("assign %s: path does not exist: %s", name, path)
+            else:
+                entry.locks.append(lock)
+        self._rebuild_assign_list(entry)
+        self._link_head(entry)
+        self._sync_assign_mgr(entry)
+        return entry
+
+    def add_assign_lock(self, name, lock):
+        """AssignAdd(): append a directory lock to an existing assign"""
+        entry = self.get_entry_by_name(name)
+        if not self.is_assign_entry(entry):
+            return False
+        entry.locks.append(lock)
+        path = str(lock.ami_path)
+        if path not in entry.assigns:
+            entry.assigns.append(path)
+        self._rebuild_assign_list(entry)
+        self._sync_assign_mgr(entry)
+        return True
+
+    def remove_assign_lock(self, name, lock):
+        """RemAssignList(): remove a directory lock from an assign"""
+        entry = self.get_entry_by_name(name)
+        if not self.is_assign_entry(entry):
+            return False
+        index = None
+        for i, cur in enumerate(entry.locks):
+            if self.lock_mgr.same_lock(cur, lock):
+                index = i
+                break
+        if index is None:
+            return False
+        stored = entry.locks.pop(index)
+        path = str(stored.ami_path)
+        if path in entry.assigns:
+            entry.assigns.remove(path)
+        # drop the DOS list's view first, then unlink the entry if empty
+        self._rebuild_assign_list(entry)
+        if entry.locks:
+            self._sync_assign_mgr(entry)
+            # like AmigaDOS the stored lock is released, but a lock handed in
+            # by the caller stays usable (it is not the assign's lock then)
+            if stored is not lock:
+                self.lock_mgr.release_lock(stored)
+        else:
+            self.remove_assign(name)
+            # the destroyed assign releases its last resource too
+            self.lock_mgr.release_lock(stored)
         return True
 
     def _release_locklist(self, entry):

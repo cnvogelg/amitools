@@ -257,3 +257,9 @@ class LockManager:
             name_addr = volnode.name.aptr
             name = self.mem.r_bstr(name_addr) + ":"
             return name
+
+    def same_lock(self, lock1, lock2):
+        """do two locks refer to the same file system object?"""
+        if lock1 is None or lock2 is None:
+            return lock1 is lock2
+        return self._lock_identity(lock1) == self._lock_identity(lock2)

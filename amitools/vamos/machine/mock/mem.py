@@ -194,6 +194,19 @@ class MockMemory(object):
             addr += 1
         return bytes(res).decode("latin-1")
 
+    def r_cbytes(self, addr):
+        addr -= self.base_addr
+        if addr > self.size_bytes:
+            raise ValueError(f"no RAM @{addr:08x}")
+        res = []
+        while True:
+            ch = self.data[addr]
+            if ch == 0:
+                break
+            res.append(ch)
+            addr += 1
+        return bytes(res)
+
     def w_cstr(self, addr, string):
         if self.read_only:
             raise ValueError(f"write to ROM @{addr:08x}")

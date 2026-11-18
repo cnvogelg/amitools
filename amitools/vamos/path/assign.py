@@ -205,6 +205,27 @@ class AssignManager(object):
         log_path.info("delete assign: %s", a)
         return True
 
+    def set_assign(self, name, paths):
+        """install/replace an assign with the given source paths
+
+        Used by dos.library runtime assign calls (AssignLate, AssignPath,
+        AssignAdd, RemAssignList). Unlike :meth:`add_assign` this accepts a
+        replacement after setup and a path whose volume is not mounted yet
+        (late binding assigns may refer to such a path). Returns the Assign.
+        """
+        self.del_assign(name)
+        assign = Assign(name, list(paths))
+        if not assign.setup(self):
+            log_path.warning(
+                "assign '%s': setup incomplete, keeping it for later access", name
+            )
+        assign.is_setup = True
+        lo_name = name.lower()
+        self.assigns_by_name[lo_name] = assign
+        self.assigns.append(assign)
+        log_path.info("set assign: %s", assign)
+        return assign
+
     def _parse_spec(self, spec):
         # auto convert spec string
         if type(spec) is str:

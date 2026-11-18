@@ -56,6 +56,7 @@ from .dos.DosList import DosList
 from .dos.LockManager import LockManager
 from .dos.FileManager import FileManager
 from .dos.DosFileOpener import DosFileOpener
+from .dos import Assign, Cli, Date, Link, Notify, RecordLock, Segments, Stdio, Volume
 from .dos.CSource import *
 from .dos.Item import *
 from amitools.vamos.dos import run_command, run_sub_process
@@ -93,6 +94,13 @@ class DosLibrary(LibImpl):
 
     MAX_SHOW_DATA = 32
 
+    def __init__(self):
+        super().__init__()
+        # these helpers keep state only in the Python process and may be
+        # used before setup_lib() (e.g. by tests or a bare LibProxy)
+        self.record_locks = RecordLock.RecordLockManager(self)
+        self.notify = Notify.NotifyHelper()
+
     def get_struct_def(self):
         return DosLibraryStruct
 
@@ -113,6 +121,8 @@ class DosLibrary(LibImpl):
         self.resident = []
         self.local_vars = {}
         self.global_vars = {}
+        self.record_locks = RecordLock.RecordLockManager(self)
+        self.notify = Notify.NotifyHelper()
         self.lib_struct = DosLibraryStruct(ctx.mem, base_addr)
         # setup RootNode
         self.root_struct = ctx.alloc.alloc_astruct(RootNodeStruct, label="RootNode")
@@ -859,6 +869,8 @@ class DosLibrary(LibImpl):
         if fh_b_addr != 0:
             fh = self.file_mgr.get_by_b_addr(fh_b_addr)
             self.file_mgr.close(fh)
+            # closing a handle also drops its record locks
+            self.record_locks.release_handle(fh_b_addr)
             log_dos.info("Close: %s", fh)
             self.setioerr(ctx, 0)
         return DOSTRUE
@@ -2301,6 +2313,9 @@ class DosLibrary(LibImpl):
 
     def SystemTagList(self, ctx, cmd: CSTR, tag_list: TagList):
         cmd = cmd.get_str()
+        return self._system_tag_list(ctx, cmd, tag_list)
+
+    def _system_tag_list(self, ctx, cmd, tag_list):
         log_dos.info("SystemTagList: cmd=%s tags=%s ctx=%s", cmd, tag_list, ctx)
         # cmd is at this point a full string of commands to execute.
         # If we're running from the Amiga shell, forward this to the shell
@@ -2319,7 +2334,9 @@ class DosLibrary(LibImpl):
             if cmd:
                 new_input.setbuf(cmd)
             new_stdin = self.file_mgr.open(None, "*", "rw")
-            outtag = tag_list.find_tag(DosTag.SYS_Output)
+            outtag = (
+                tag_list.find_tag(DosTag.SYS_Output) if tag_list is not None else None
+            )
             # print "setting new input to %s" % new_input
             # and install this as current input. The shell will read from that
             # instead until it hits the EOF
@@ -2403,10 +2420,8 @@ class DosLibrary(LibImpl):
                 return DOSTRUE
             return run_sub_process(ctx.scheduler, ctx.runner, proc)
 
-    def LoadSeg(self, ctx):
-        name_ptr = ctx.cpu.r_reg(REG_D1)
-        name = ctx.mem.r_cstr(name_ptr)
-        lock = self.get_current_dir(ctx)
+    def _load_seg_list(self, ctx, name, lock):
+        """load a seglist by Amiga path and register it for UnLoadSeg"""
         b_addr = ctx.seg_loader.load_ami_seglist(name, lock)
         if b_addr == 0:
             log_dos.warning("LoadSeg: '%s' -> not found!", name)
@@ -2419,8 +2434,8 @@ class DosLibrary(LibImpl):
         self.seg_lists[b_addr] = name
         return b_addr
 
-    def UnLoadSeg(self, ctx):
-        b_addr = ctx.cpu.r_reg(REG_D1)
+    def _unload_seg_list(self, ctx, b_addr):
+        """unload a seglist booked by LoadSeg/NewLoadSeg"""
         if b_addr >= 0x80000000:
             b_addr -= 0x100000000
         if b_addr != 0:
@@ -2434,6 +2449,16 @@ class DosLibrary(LibImpl):
                 log_dos.info("UnLoadSeg: %06x", b_addr)
         else:
             log_dos.info("UnLoadSeg:  NULL")
+
+    def LoadSeg(self, ctx):
+        name_ptr = ctx.cpu.r_reg(REG_D1)
+        name = ctx.mem.r_cstr(name_ptr)
+        lock = self.get_current_dir(ctx)
+        return self._load_seg_list(ctx, name, lock)
+
+    def UnLoadSeg(self, ctx):
+        b_addr = ctx.cpu.r_reg(REG_D1)
+        self._unload_seg_list(ctx, b_addr)
 
     def InternalLoadSeg(self, ctx):
         fh_baddr = ctx.cpu.r_reg(REG_D0)
@@ -3108,6 +3133,288 @@ class DosLibrary(LibImpl):
         return DOSFALSE
 
     # ----- Helpers -----
+
+    # ----- Process/CLI (RKRM AmigaDOS 3: process properties) -----
+
+    def _bool_result(self, ctx, ok, err):
+        self.setioerr(ctx, 0 if ok else err)
+        return DOSTRUE if ok else DOSFALSE
+
+    def CreateProc(self, ctx, name: CSTR, pri: LONG, segList: LONG, stackSize: LONG):
+        return Cli.create_proc(
+            self, ctx, name.get_str(), pri.val, segList.val, stackSize.val
+        )
+
+    def Exit(self, ctx, returnCode: LONG):
+        return Cli.exit_process(self, ctx, returnCode.val)
+
+    def DeviceProc(self, ctx, name: CSTR):
+        dev_name = name.get_str()
+        if not dev_name:
+            self.setioerr(ctx, ERROR_REQUIRED_ARG_MISSING)
+            return 0
+        abs_name = self.path_mgr.ami_abs_path(self.get_current_dir(ctx), dev_name)
+        volume = str(self.path_mgr.ami_volume_of_path(abs_name) or dev_name)
+        volume = volume.rstrip(":")
+        dispatcher = (
+            self.handler_mgr.get_dispatcher(volume)
+            if self.handler_mgr is not None
+            else None
+        )
+        if dispatcher is None:
+            log_dos.warning("DeviceProc('%s'): no handler", dev_name)
+            self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
+            return 0
+        log_dos.info("DeviceProc('%s') -> port %06x", dev_name, dispatcher.port)
+        return dispatcher.port
+
+    def Execute(self, ctx, string: CSTR, file: LONG, file2: LONG):
+        cmd = string.get_str()
+        return Cli.execute(
+            self,
+            ctx,
+            cmd,
+            file.val,
+            file2.val,
+            lambda call_ctx, call_cmd: self._system_tag_list(call_ctx, call_cmd, None),
+        )
+
+    def GetConsoleTask(self, ctx):
+        return Cli.get_console_task(ctx)
+
+    def SetConsoleTask(self, ctx, task: LONG):
+        return Cli.set_console_task(ctx, task.val)
+
+    def SetArgStr(self, ctx, string: CSTR):
+        return Cli.set_arg_str(ctx, string.aptr)
+
+    def FindCliProc(self, ctx, num: LONG):
+        return Cli.find_cli_proc(ctx, num.val)
+
+    def MaxCli(self, ctx):
+        return Cli.max_cli(ctx)
+
+    def GetCurrentDirName(self, ctx, buf: LONG, length: LONG):
+        ok, err = Cli.get_current_dir_name(ctx, buf.val, length.val)
+        self.setioerr(ctx, err)
+        return ok
+
+    def SetProgramName(self, ctx, name: CSTR):
+        ok, err = Cli.set_program_name(ctx, name.get_str())
+        self.setioerr(ctx, err)
+        return ok
+
+    def GetPrompt(self, ctx, buf: LONG, length: LONG):
+        ok, err = Cli.get_prompt(ctx, buf.val, length.val)
+        self.setioerr(ctx, err)
+        return ok
+
+    def SetProgramDir(self, ctx, lock: LONG):
+        return Cli.set_program_dir(ctx, lock.val)
+
+    def GetCurrentDir(self, ctx):
+        return Cli.get_current_dir(ctx)
+
+    # ----- Record locks (RKRM AmigaDOS 3: record locking) -----
+
+    def LockRecord(
+        self,
+        ctx,
+        fh: LONG,
+        offset: LONG,
+        length: LONG,
+        mode: LONG,
+        timeout: LONG,
+    ):
+        ok, err = self.record_locks.lock_record(
+            ctx, fh.val, offset.val, length.val, mode.val, timeout.val
+        )
+        return self._bool_result(ctx, ok, err)
+
+    def LockRecords(self, ctx, recArray: LONG, timeout: LONG):
+        ok, err = self.record_locks.lock_records(ctx, recArray.val, timeout.val)
+        return self._bool_result(ctx, ok, err)
+
+    def UnLockRecord(self, ctx, fh: LONG, offset: LONG, length: LONG):
+        ok, err = self.record_locks.unlock_record(fh.val, offset.val, length.val)
+        return self._bool_result(ctx, ok, err)
+
+    def UnLockRecords(self, ctx, recArray: LONG):
+        ok, err = self.record_locks.unlock_records(ctx, recArray.val)
+        return self._bool_result(ctx, ok, err)
+
+    # ----- Links (RKRM AmigaDOS 3: links and soft links) -----
+
+    def ReadLink(
+        self,
+        ctx,
+        port: LONG,
+        lock: LONG,
+        path: CSTR,
+        buffer: LONG,
+        size: LONG,
+    ):
+        ok, err = Link.read_link(
+            self,
+            ctx,
+            port.val,
+            lock.val,
+            path.get_str(),
+            buffer.val,
+            size.val,
+        )
+        self.setioerr(ctx, err)
+        return ok
+
+    def MakeLink(self, ctx, name: CSTR, dest: LONG, soft: LONG):
+        ok, err = Link.make_link(self, ctx, name.get_str(), dest.val, soft.val)
+        return self._bool_result(ctx, ok, err)
+
+    # ----- Assist tags -----
+
+    def ChangeMode(self, ctx, type: LONG, fh: LONG, newmode: LONG):
+        log_dos.warning(
+            "ChangeMode(type=%d, fh=%s, mode=%s): not implemented",
+            type.val,
+            fh.val,
+            newmode.val,
+        )
+        self.setioerr(ctx, ERROR_NOT_IMPLEMENTED)
+        return DOSFALSE
+
+    def SetOwner(self, ctx, name: CSTR, owner_info: LONG):
+        log_dos.warning("SetOwner(%r): not implemented", name.get_str())
+        self.setioerr(ctx, ERROR_NOT_IMPLEMENTED)
+        return DOSFALSE
+
+    # ----- Stdio -----
+
+    def ErrorOutput(self, ctx):
+        return Stdio.error_output(ctx)
+
+    def SelectError(self, ctx, fh: LONG):
+        return Stdio.select_error(ctx, fh.val)
+
+    def PutErrStr(self, ctx, string: CSTR):
+        return Stdio.put_err_str(self, ctx, string.aptr)
+
+    def ErrorReport(self, ctx, code: LONG, type: LONG, arg1: LONG, device: LONG):
+        ok, err = Stdio.error_report(
+            self, ctx, code.val, type.val, arg1.val, device.val
+        )
+        return self._bool_result(ctx, ok, err)
+
+    # ----- Assigns (RKRM AmigaDOS 3: creating and updating assigns) -----
+
+    def AssignLate(self, ctx, name: CSTR, path: CSTR):
+        ok, err = Assign.assign_path(self, ctx, name.get_str(), path.get_str())
+        return self._bool_result(ctx, ok, err)
+
+    def AssignPath(self, ctx, name: CSTR, path: CSTR):
+        ok, err = Assign.assign_path(self, ctx, name.get_str(), path.get_str())
+        return self._bool_result(ctx, ok, err)
+
+    def AssignAdd(self, ctx, name: CSTR, lock: LONG):
+        ok, err = Assign.assign_add(self, name.get_str(), lock.val)
+        return self._bool_result(ctx, ok, err)
+
+    def RemAssignList(self, ctx, name: CSTR, lock: LONG):
+        ok, err = Assign.rem_assign_list(self, name.get_str(), lock.val)
+        return self._bool_result(ctx, ok, err)
+
+    # ----- Volumes (RKRM AmigaDOS 3: Format/Relabel/AddBuffers) -----
+
+    def Format(
+        self,
+        ctx,
+        filesystem: CSTR,
+        volumename: CSTR,
+        dostype: LONG,
+    ):
+        ok, err = Volume.format_volume(
+            self,
+            ctx,
+            filesystem.get_str(),
+            volumename.get_str(),
+            dostype.val,
+        )
+        return self._bool_result(ctx, ok, err)
+
+    def Relabel(self, ctx, drive: CSTR, newname: CSTR):
+        ok, err = Volume.relabel(self, ctx, drive.get_str(), newname.get_str())
+        return self._bool_result(ctx, ok, err)
+
+    def AddBuffers(self, ctx, name: CSTR, number: LONG):
+        ok, err = Volume.add_buffers(self, ctx, name.get_str(), number.val)
+        return self._bool_result(ctx, ok, err)
+
+    # ----- Dates -----
+
+    def CompareDates(self, ctx, date1: LONG, date2: LONG):
+        result = Date.compare_dates(date1.val, date2.val, ctx.mem)
+        log_dos.info("CompareDates(%06x, %06x) -> %d", date1.val, date2.val, result)
+        return result
+
+    def StrToDate(self, ctx, datetime: LONG):
+        dt = DateTimeStruct(ctx.mem, datetime.val)
+        return Date.str_to_date(ctx, dt)
+
+    # ----- Segments (RKRM AmigaDOS 3: LoadSeg and resident segments) -----
+
+    def InternalUnLoadSeg(self, ctx, seglist: LONG, freefunc: LONG):
+        Segments.internal_unload_seg(self, ctx, seglist.val, freefunc.val)
+
+    def NewLoadSeg(self, ctx, file: CSTR, tags: TagList):
+        return Segments.new_load_seg(self, ctx, file.get_str(), tags)
+
+    def RemSegment(self, ctx, seg: LONG):
+        ok, err = Segments.rem_segment(self, ctx, seg.val)
+        return self._bool_result(ctx, ok, err)
+
+    # ----- Notify -----
+
+    def StartNotify(self, ctx, notify: LONG):
+        ok, err = self.notify.start_notify(ctx, notify.val)
+        return self._bool_result(ctx, ok, err)
+
+    def EndNotify(self, ctx, notify: LONG):
+        ok, err = self.notify.end_notify(ctx, notify.val)
+        return self._bool_result(ctx, ok, err)
+
+    # ----- Misc -----
+
+    def SameDevice(self, ctx, lock1: LONG, lock2: LONG):
+        try:
+            l1 = self.lock_mgr.get_by_b_addr(lock1.val) if lock1.val else None
+            l2 = self.lock_mgr.get_by_b_addr(lock2.val) if lock2.val else None
+        except Exception:
+            self.setioerr(ctx, ERROR_INVALID_LOCK)
+            return DOSFALSE
+        name1 = self.lock_mgr.volume_name_of_lock(l1)
+        name2 = self.lock_mgr.volume_name_of_lock(l2)
+        same = name1.lower() == name2.lower()
+        log_dos.info("SameDevice(%s, %s) -> %s", name1, name2, same)
+        return DOSTRUE if same else DOSFALSE
+
+    def VolumeRequestHook(self, ctx, vol: LONG):
+        log_dos.warning("VolumeRequestHook(%s): not implemented", vol.val)
+        return 0
+
+    def DoShellMethodTagList(self, ctx, method: LONG, tags: TagList):
+        log_dos.warning(
+            "DoShellMethodTagList(method=%d, tags=%s): not implemented",
+            method.val,
+            tags,
+        )
+        return 0
+
+    def ScanStackToken(self, ctx, seg: LONG, defaultstack: LONG):
+        log_dos.info(
+            "ScanStackToken(%s, %d): returning the default",
+            seg.val,
+            defaultstack.val,
+        )
+        return defaultstack.val
 
     def create_child_process(self, ctx, name, **kw_args):
         """the process CreateNewProc() makes: a DosProcess by default.

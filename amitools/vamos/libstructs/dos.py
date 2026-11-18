@@ -411,6 +411,16 @@ class InfoDataStruct(AmigaStruct):
 
 
 @AmigaStructDef
+class RecordLockStruct(AmigaStruct):
+    _format = [
+        (BPTR(FileHandleStruct), "rec_FH"),
+        (ULONG, "rec_Offset"),
+        (ULONG, "rec_Length"),
+        (ULONG, "rec_Mode"),
+    ]
+
+
+@AmigaStructDef
 class SegmentStruct(AmigaStruct):
     _format = [
         (BPTR_VOID, "seg_Next"),
