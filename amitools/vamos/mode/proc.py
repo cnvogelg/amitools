@@ -1,4 +1,5 @@
 from .base import BaseMode
+from amitools.vamos.lib.dos import Var
 from amitools.vamos.lib.dos.Process import Process
 from amitools.vamos.log import log_proc
 
@@ -70,8 +71,8 @@ class ProcMode(BaseMode):
                     name, value = spec.split("=", 1)
                 else:
                     name, value = spec, ""
-                node = dos_lib.create_var(dos_ctx, name, 0)
-                dos_lib.set_var(dos_ctx, node, 0, len(value) + 1, value, 0)
+                node = Var.create_var_node(dos_lib, dos_ctx, name, 0)
+                Var.set_var_node(dos_lib, dos_ctx, node, 0, len(value) + 1, value, 0)
                 log_proc.info("set var: %s='%s'", name, value)
         finally:
             dos_ctx.set_cur_process(old_proc)

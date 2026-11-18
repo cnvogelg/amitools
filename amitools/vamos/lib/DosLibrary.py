@@ -11,8 +11,6 @@ from amitools.vamos.libstructs import (
     RootNodeStruct,
     DateStampStruct,
     DateTimeStruct,
-    LocalVarStruct,
-    NodeStruct,
     SegmentStruct,
     FileHandleStruct,
     FileInfoBlockStruct,
@@ -63,6 +61,7 @@ from .dos import (
     RecordLock,
     Segments,
     Stdio,
+    Var,
     Volume,
 )
 from .dos.CSource import *
@@ -96,9 +95,6 @@ class DosLibrary(LibImpl):
     LV_VAR = 0  # an variable
     LV_ALIAS = 1  # an alias
     LVF_IGNORE = 0x80
-    GVF_GLOBAL_ONLY = 0x100
-    GVF_LOCAL_ONLY = 0x200
-    GVF_BINARY_VAR = 0x400
 
     MAX_SHOW_DATA = 32
 
@@ -207,8 +203,7 @@ class DosLibrary(LibImpl):
         # free shell variables
         while len(self.local_vars) > 0:
             var = list(self.local_vars.values())[0]
-            self.delete_var(ctx, var)
-        # self.delete_var(ctx,var)
+            Var.delete_var_node(self, ctx, var)
         # free RootNode
         self.root_struct.free()
         # free DosInfo
@@ -505,170 +500,17 @@ class DosLibrary(LibImpl):
 
     # ----- Variables -----
 
-    def find_var(self, ctx, name, flags):
-        if (name.lower(), flags & 0xFF) in self.local_vars:
-            return self.local_vars[(name.lower(), flags & 0xFF)]
-        else:
-            return None
+    def GetVar(self, ctx, name_ptr, buff_ptr, size, flags):
+        return Var.get_var(self, ctx, name_ptr, buff_ptr, size, flags)
 
-    def create_var(self, ctx, name, flags):
-        varlist = ctx.process.get_local_vars()
-        varlist_struct = varlist
-        node_addr = self._alloc_mem(
-            "ShellVar(%s)" % name, LocalVarStruct.get_size() + len(name) + 1
-        )
-        name_addr = node_addr + LocalVarStruct.get_size()
-        node = LocalVarStruct(ctx.mem, node_addr)
-        ctx.mem.w_cstr(name_addr, name)
-        node.lv_Node.ln_Name.aptr = name_addr
-        node.lv_Node.ln_Type.val = flags & 0xFF
-        node.lv_Value.aptr = 0
-        head_addr = varlist_struct.mlh_Head.aptr
-        head = NodeStruct(ctx.mem, head_addr)
-        head.ln_Pred.aptr = node_addr
-        varlist_struct.mlh_Head.aptr = node_addr
-        node.lv_Node.ln_Succ.aptr = head_addr
-        node.lv_Node.ln_Pred.aptr = varlist_struct.mlh_Head.addr
-        self.local_vars[(name.lower(), flags & 0xFF)] = node
-        return node
+    def FindVar(self, ctx, name_ptr, vtype):
+        return Var.find_var(self, ctx, name_ptr, vtype)
 
-    def set_var(self, ctx, node, buff_ptr, size, value, flags):
-        if node.lv_Value.aptr != 0:
-            self._free_mem(node.lv_Value.aptr)
-            node.lv_Value.aptr = 0
-        buf_addr = self._alloc_mem("ShellVarBuffer", size)
-        node.lv_Value.aptr = buf_addr
-        node.lv_Len.val = size
-        if flags & self.GVF_BINARY_VAR:
-            ctx.mem.copy_block(buff_ptr, buf_addr, size)
-        else:
-            ctx.mem.w_cstr(buf_addr, value)
+    def SetVar(self, ctx, name_ptr, buff_ptr, size, flags):
+        return Var.set_var(self, ctx, name_ptr, buff_ptr, size, flags)
 
-    def delete_var(self, ctx, node):
-        buf_addr = node.lv_Value.aptr
-        buf_len = node.lv_Len.val
-        name_addr = node.lv_Node.ln_Name.aptr
-        name = ctx.mem.r_cstr(name_addr)
-        if buf_addr != 0:
-            self._free_mem(buf_addr)
-        node.lv_Value.aptr = 0
-        succ = node.lv_Node.ln_Succ.aptr
-        pred = node.lv_Node.ln_Pred.aptr
-        NodeStruct(ctx.mem, pred).ln_Succ.aptr = succ
-        NodeStruct(ctx.mem, succ).ln_Pred.aptr = pred
-        self._free_mem(node.addr)
-        for k in list(self.local_vars.keys()):
-            if self.local_vars[k] == node:
-                del self.local_vars[k]
-
-    def GetVar(self, ctx):
-        name_ptr = ctx.cpu.r_reg(REG_D1)
-        buff_ptr = ctx.cpu.r_reg(REG_D2)
-        size = ctx.cpu.r_reg(REG_D3)
-        flags = ctx.cpu.r_reg(REG_D4)
-        if size == 0:
-            self.setioerr(ctx, ERROR_BAD_NUMBER)
-            return -1
-        name = ctx.mem.r_cstr(name_ptr)
-        if not flags & self.GVF_GLOBAL_ONLY:
-            node = self.find_var(ctx, name, flags & 0xFF)
-            if node != None:
-                nodelen = node.lv_Len.val
-                if flags & self.GVF_BINARY_VAR:
-                    ctx.mem.copy_block(node.lv_Value.aptr, buff_ptr, min(nodelen, size))
-                    log_dos.info(
-                        'GetVar("%s", 0x%x) -> %0x06x',
-                        name,
-                        flags,
-                        node.lv_Value.aptr,
-                    )
-                    self.setioerr(ctx, nodelen)
-                    return min(nodelen, size)
-                else:
-                    value = ctx.mem.r_cstr(node.lv_Value.aptr)
-                    ctx.mem.w_cstr(buff_ptr, value[: size - 1])
-                    log_dos.info('GetVar("%s", 0x%x) -> %s', name, flags, value)
-                    self.setioerr(ctx, len(value))
-                    return min(nodelen - 1, size - 1)
-        # no local variable. unless we were asked for local only, fall back
-        # to the global ones, which is the order AmigaOS looks them up in
-        if not flags & self.GVF_LOCAL_ONLY:
-            value = self.global_vars.get((name.lower(), flags & 0xFF))
-            if value is not None:
-                if flags & self.GVF_BINARY_VAR:
-                    ctx.mem.write_data(buff_ptr, value[:size])
-                    log_dos.info('GetVar("%s", 0x%x) -> <global binary>', name, flags)
-                    self.setioerr(ctx, len(value))
-                    return min(len(value), size)
-                ctx.mem.w_cstr(buff_ptr, value[: size - 1])
-                log_dos.info('GetVar("%s", 0x%x) -> %s (global)', name, flags, value)
-                self.setioerr(ctx, len(value))
-                return min(len(value), size - 1)
-        self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
-        return -1
-
-    def FindVar(self, ctx):
-        name_ptr = ctx.cpu.r_reg(REG_D1)
-        vtype = ctx.cpu.r_reg(REG_D2)
-        name = ctx.mem.r_cstr(name_ptr)
-        node = self.find_var(ctx, name, vtype)
-        if node == None:
-            self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
-            log_dos.info('FindVar("%s", 0x%x) -> NULL', name, vtype)
-            return 0
-        else:
-            log_dos.info('FindVar("%s", 0x%x) -> %06lx', name, vtype, node.addr)
-            return node.addr
-
-    def SetVar(self, ctx):
-        name_ptr = ctx.cpu.r_reg(REG_D1)
-        buff_ptr = ctx.cpu.r_reg(REG_D2)
-        size = ctx.cpu.r_reg(REG_D3)
-        flags = ctx.cpu.r_reg(REG_D4)
-        name = ctx.mem.r_cstr(name_ptr)
-        vtype = flags & 0xFF
-        if buff_ptr == 0:
-            if flags & self.GVF_GLOBAL_ONLY:
-                self.global_vars.pop((name.lower(), vtype), None)
-                return DOSTRUE
-            node = self.find_var(ctx, name, vtype)
-            if node != None:
-                self.delete_var(ctx, node)
-            return DOSTRUE
-        else:
-            if flags & self.GVF_BINARY_VAR:
-                value = None
-                log_dos.info('SetVar("%s") to %0x6x', name, buff_ptr)
-            else:
-                value = ctx.mem.r_cstr(buff_ptr)
-                log_dos.info('SetVar("%s") to %s', name, value)
-                size = len(value) + 1
-            if flags & self.GVF_GLOBAL_ONLY:
-                if flags & self.GVF_BINARY_VAR:
-                    value = ctx.mem.read_data(buff_ptr, size)
-                self.global_vars[(name.lower(), vtype)] = value
-                return DOSTRUE
-            node = self.find_var(ctx, name, flags)
-            if node == None and buff_ptr != 0:
-                node = self.create_var(ctx, name, flags)
-            if node != None:
-                self.set_var(ctx, node, buff_ptr, size, value, flags)
-            return DOSTRUE
-        return 0
-
-    def DeleteVar(self, ctx):
-        name_ptr = ctx.cpu.r_reg(REG_D1)
-        flags = ctx.cpu.r_reg(REG_D2)
-        name = ctx.mem.r_cstr(name_ptr)
-        if flags & self.GVF_GLOBAL_ONLY:
-            found = self.global_vars.pop((name.lower(), flags & 0xFF), None)
-            log_dos.info('DeleteVar("%s") global', name)
-            return DOSTRUE if found is not None else DOSFALSE
-        node = self.find_var(ctx, name, flags)
-        log_dos.info('DeleteVar("%s")', name)
-        if node != None:
-            self.delete_var(ctx, node)
-        return DOSTRUE
+    def DeleteVar(self, ctx, name_ptr, flags):
+        return Var.delete_var(self, ctx, name_ptr, flags)
 
     # ----- Signals ----------------------
 
