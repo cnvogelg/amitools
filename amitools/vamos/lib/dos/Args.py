@@ -5,7 +5,16 @@ from amitools.vamos.libstructs import RDArgsStruct
 from amitools.vamos.log import log_dos
 
 from .CSource import CSource, FileCSource, FileLineCSource
-from .Error import *
+from .Error import (
+    ERROR_BAD_NUMBER,
+    ERROR_BAD_TEMPLATE,
+    ERROR_KEY_NEEDS_ARG,
+    ERROR_LINE_TOO_LONG,
+    ERROR_NO_FREE_STORE,
+    ERROR_REQUIRED_ARG_MISSING,
+    ERROR_TOO_MANY_ARGS,
+    NO_ERROR,
+)
 from .Item import ItemParser
 
 

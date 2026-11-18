@@ -1,16 +1,21 @@
 import sys
 
 from amitools.vamos.error import VamosInternalError
-from amitools.vamos.log import log_file
 from amitools.vamos.handler import (
-    PacketDecoder,
-    HandlerError,
     MODE_NEWFILE,
     MODE_OLDFILE,
     MODE_READWRITE,
+    HandlerError,
+    PacketDecoder,
 )
+from amitools.vamos.log import log_file
 from amitools.vamos.path.amipath import AmiPath
-from .Error import *
+
+from .Error import (
+    ERROR_INVALID_LOCK,
+    ERROR_OBJECT_NOT_FOUND,
+    NO_ERROR,
+)
 from .FileHandle import FileHandle
 from .PathPart import expand_progdir_path
 

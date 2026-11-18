@@ -1,20 +1,30 @@
 from amitools.vamos.astructs import CSTR, LONG
-from amitools.vamos.handler import HandlerError, MODE_OLDFILE
-from amitools.vamos.log import log_lock, log_dos
-from amitools.vamos.machine import Code
-from amitools.vamos.machine.regs import REG_A0, REG_A1, REG_A2, REG_D0
 from amitools.vamos.error import UnsupportedFeatureError
-
+from amitools.vamos.handler import MODE_OLDFILE, HandlerError
 from amitools.vamos.libstructs import (
-    FileLockStruct,
     DateStampStruct,
-    FileInfoBlockStruct,
-    InfoDataStruct,
     ExAllControlStruct,
     ExAllDataStruct,
+    FileInfoBlockStruct,
+    FileLockStruct,
+    InfoDataStruct,
 )
-from .AmiTime import *
-from .Error import *
+from amitools.vamos.log import log_dos, log_lock
+from amitools.vamos.machine import Code
+from amitools.vamos.machine.regs import REG_A0, REG_A1, REG_A2, REG_D0
+
+from .AmiTime import sys_to_ami_time
+from .Error import (
+    DOSFALSE,
+    DOSTRUE,
+    ERROR_BAD_NUMBER,
+    ERROR_INVALID_LOCK,
+    ERROR_LINE_TOO_LONG,
+    ERROR_NO_FREE_STORE,
+    ERROR_OBJECT_NOT_FOUND,
+    ERROR_OBJECT_WRONG_TYPE,
+    NO_ERROR,
+)
 from .PatternMatch import Pattern, pattern_match
 
 

@@ -1,13 +1,18 @@
+from amitools.vamos.error import VamosInternalError
 from amitools.vamos.libstructs import (
-    AnchorPathStruct,
     AChainStruct,
+    AnchorPathStruct,
     FileInfoBlockStruct,
 )
-from .PathMatch import PathMatch
-from amitools.vamos.label import LabelStruct
-from amitools.vamos.error import VamosInternalError
 from amitools.vamos.log import log_dos
-from .Error import *
+
+from .Error import (
+    ERROR_BAD_TEMPLATE,
+    ERROR_NO_MORE_ENTRIES,
+    ERROR_OBJECT_NOT_FOUND,
+    NO_ERROR,
+)
+from .PathMatch import PathMatch
 
 
 class MatchFirstNext:
