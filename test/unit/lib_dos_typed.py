@@ -20,10 +20,9 @@ from amitools.vamos.libcore.impl import LibImplScanner
 
 # fd functions whose DosLibrary method is still on the manual ``(self, ctx)``
 # scheme (it declares no fd args or delegates to a helper that reads ctx.cpu).
-# Emptied batch by batch in steps 22b..22j.
-_PENDING = {
-    "Delay",
-}
+# Emptied batch by batch in steps 22b..22j; now strict: no raw fd method may
+# remain.
+_PENDING = set()
 
 
 def _scan():
@@ -54,7 +53,7 @@ def lib_dos_typed_extra_args_count_test():
 
 
 def lib_dos_typed_pending_set_test():
-    """the set of still-raw fd methods equals ``_PENDING`` exactly"""
+    """no fd method is raw anymore: the still-raw set is empty"""
     _, scan = _scan()
     raw = _raw_names(scan)
     assert raw == _PENDING, "raw=%s\npending=%s" % (

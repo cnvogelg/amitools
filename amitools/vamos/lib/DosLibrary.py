@@ -139,12 +139,11 @@ class DosLibrary(LibImpl):
 
     # --- Timing ---
 
-    def Delay(self, ctx):
+    def Delay(self, ctx, timeout):
         # DOS Delay waits d1 ticks (1/50s = 20ms per tick)
-        ticks = ctx.cpu.r_reg(REG_D1)
-        log_dos.info("Delay(%d)", ticks)
-        if ticks > 0:
-            time.sleep(ticks / 50.0)
+        log_dos.info("Delay(%d)", timeout)
+        if timeout > 0:
+            time.sleep(timeout / 50.0)
         return 0
 
     def finish_lib(self, ctx):
