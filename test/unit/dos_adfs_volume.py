@@ -55,7 +55,9 @@ def dos_adfs_volume_e2e_test(tmp_path):
         name = alloc.alloc_cstr("work:hello.txt")
         cpu.w_reg(REG_D1, name.addr)
         cpu.w_reg(REG_D2, 0xFFFFFFFF)  # exclusive
-        lock_b = dos_lib.Lock(ctx)
+        lock_b = dos_lib.Lock(
+            ctx, CSTR(cpu=cpu, reg=REG_D1, mem=mem), cpu.r_reg(REG_D2)
+        )
         alloc.free_cstr(name)
         assert lock_b != 0
 
@@ -63,7 +65,7 @@ def dos_adfs_volume_e2e_test(tmp_path):
         fib_mem = alloc.alloc_astruct(FileInfoBlockStruct, label="FIB")
         cpu.w_reg(REG_D1, lock_b)
         cpu.w_reg(REG_D2, fib_mem.addr)
-        assert dos_lib.Examine(ctx) == DOSTRUE
+        assert dos_lib.Examine(ctx, cpu.r_reg(REG_D1), cpu.r_reg(REG_D2)) == DOSTRUE
         fib = FileInfoBlockStruct(mem, fib_mem.addr)
         assert mem.r_cstr(fib.fib_FileName.addr) == "hello.txt"
         assert fib.fib_Size.val == len(DATA)
@@ -72,7 +74,7 @@ def dos_adfs_volume_e2e_test(tmp_path):
         # OpenFromLock() + Read() read the data back through the handler; the
         # handle absorbs the lock, so no UnLock is needed
         cpu.w_reg(REG_D1, lock_b)
-        fh_b = dos_lib.OpenFromLock(ctx)
+        fh_b = dos_lib.OpenFromLock(ctx, cpu.r_reg(REG_D1))
         assert fh_b != 0
         buf = alloc.alloc_memory(len(DATA), label="buf")
         assert dos_lib.Read(ctx, fh_b, buf.addr, len(DATA)) == len(DATA)
@@ -103,11 +105,13 @@ def dos_adfs_volume_e2e_test(tmp_path):
         name = alloc.alloc_cstr("work:link.txt")
         cpu.w_reg(REG_D1, name.addr)
         cpu.w_reg(REG_D2, 0xFFFFFFFF)
-        link_b = dos_lib.Lock(ctx)
+        link_b = dos_lib.Lock(
+            ctx, CSTR(cpu=cpu, reg=REG_D1, mem=mem), cpu.r_reg(REG_D2)
+        )
         alloc.free_cstr(name)
         assert link_b != 0
         cpu.w_reg(REG_D1, link_b)
-        fh_b = dos_lib.OpenFromLock(ctx)
+        fh_b = dos_lib.OpenFromLock(ctx, cpu.r_reg(REG_D1))
         assert fh_b != 0
         buf = alloc.alloc_memory(len(DATA), label="buf")
         assert dos_lib.Read(ctx, fh_b, buf.addr, len(DATA)) == len(DATA)
@@ -119,7 +123,9 @@ def dos_adfs_volume_e2e_test(tmp_path):
         root_name = alloc.alloc_cstr("work:")
         cpu.w_reg(REG_D1, root_name.addr)
         cpu.w_reg(REG_D2, 0xFFFFFFFF)
-        root_b = dos_lib.Lock(ctx)
+        root_b = dos_lib.Lock(
+            ctx, CSTR(cpu=cpu, reg=REG_D1, mem=mem), cpu.r_reg(REG_D2)
+        )
         alloc.free_cstr(root_name)
         assert root_b != 0
         link_path = alloc.alloc_cstr("link.txt")
@@ -141,7 +147,7 @@ def dos_adfs_volume_e2e_test(tmp_path):
         alloc.free_cstr(link_path)
         alloc.free_memory(buf)
         cpu.w_reg(REG_D1, root_b)
-        dos_lib.UnLock(ctx)
+        dos_lib.UnLock(ctx, cpu.r_reg(REG_D1))
 
         # Open() + Write() + Close() create a new file through the handler;
         # the handler buffers it and writes it back to the image on shutdown

@@ -54,10 +54,10 @@ def process_current_dir_released_lock_test():
     # Even a released lock must be returned verbatim, without resolving it.
     proc.proc.current_dir.bptr = 0x1234
     machine.cpu.w_reg(REG_D1, 0x5678)
-    assert DosLibrary().CurrentDir(ctx) == 0x1234
+    assert DosLibrary().CurrentDir(ctx, machine.cpu.r_reg(REG_D1)) == 0x1234
     assert proc.proc.current_dir.bptr == 0x5678
     machine.cpu.w_reg(REG_D1, 0)
-    assert DosLibrary().CurrentDir(ctx) == 0x5678
+    assert DosLibrary().CurrentDir(ctx, machine.cpu.r_reg(REG_D1)) == 0x5678
     assert proc.get_current_dir() == 0
     proc.free()
     assert alloc.is_all_free()

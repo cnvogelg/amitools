@@ -46,7 +46,7 @@ def dos_info_host_capacity_test(blocks):
         )
 
     lib, ctx = _make_lib(info)
-    assert lib.Info(ctx) != 0
+    assert lib.Info(ctx, ctx.cpu.r_reg(REG_D1), ctx.cpu.r_reg(REG_D2)) != 0
     data = InfoDataStruct(ctx.mem, 512)
     assert data.id_NumBlocks.val <= 0x7FFFFFFF
     assert data.id_NumBlocks.val * data.id_BytesPerBlock.val == blocks * 4096
@@ -60,7 +60,7 @@ def dos_info_missing_host_path_test():
         raise HandlerError(205)
 
     lib, ctx = _make_lib(info)
-    assert lib.Info(ctx) == 0
+    assert lib.Info(ctx, ctx.cpu.r_reg(REG_D1), ctx.cpu.r_reg(REG_D2)) == 0
     assert lib.setioerr.call_args.args[1] != 0
 
 
@@ -80,7 +80,7 @@ def dos_info_lockless_volume_fallback_test():
         handler_mgr=handler_mgr,
     )
 
-    assert lib.Info(ctx) != 0
+    assert lib.Info(ctx, ctx.cpu.r_reg(REG_D1), ctx.cpu.r_reg(REG_D2)) != 0
     handler_mgr.disk_info.assert_called_once_with("work:")
     data = InfoDataStruct(ctx.mem, 512)
     assert data.id_NumBlocks.val == 100
@@ -99,7 +99,7 @@ def dos_info_lockless_volume_unknown_test():
         info=lambda lock: None, handler_lock=None, handler_mgr=handler_mgr
     )
 
-    assert lib.Info(ctx) == 0
+    assert lib.Info(ctx, ctx.cpu.r_reg(REG_D1), ctx.cpu.r_reg(REG_D2)) == 0
     assert lib.setioerr.call_args.args[1] == 205
 
 
@@ -142,7 +142,7 @@ def dos_info_examine_fh_handler_test():
     fh = SimpleNamespace(handler=handler, handler_file=handler_file, name="f")
     lib, ctx = _make_fh_lib(fh)
 
-    assert lib.ExamineFH(ctx) == DOSTRUE
+    assert lib.ExamineFH(ctx, ctx.cpu.r_reg(REG_D1), ctx.cpu.r_reg(REG_D2)) == DOSTRUE
     fib = FileInfoBlockStruct(ctx.mem, 512)
     assert ctx.mem.r_cstr(fib.fib_FileName.addr) == "f"
     assert fib.fib_Size.val == 42
@@ -162,7 +162,7 @@ def dos_info_examine_fh_handler_error_test():
     )
     lib, ctx = _make_fh_lib(fh)
 
-    assert lib.ExamineFH(ctx) == DOSFALSE
+    assert lib.ExamineFH(ctx, ctx.cpu.r_reg(REG_D1), ctx.cpu.r_reg(REG_D2)) == DOSFALSE
     assert lib.setioerr.call_args.args[1] == 205
 
 
@@ -173,7 +173,7 @@ def dos_info_examine_fh_fallback_test():
     fh = SimpleNamespace(handler=None, handler_file=None, ami_path="work:f", name="f")
     lib, ctx = _make_fh_lib(fh, lock=lock)
 
-    assert lib.ExamineFH(ctx) == DOSTRUE
+    assert lib.ExamineFH(ctx, ctx.cpu.r_reg(REG_D1), ctx.cpu.r_reg(REG_D2)) == DOSTRUE
     fib = FileInfoBlockStruct(ctx.mem, 512)
     assert ctx.mem.r_cstr(fib.fib_FileName.addr) == "f"
     assert fib.fib_Size.val == 42

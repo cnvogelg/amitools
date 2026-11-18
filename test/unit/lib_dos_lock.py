@@ -109,12 +109,12 @@ class _Env:
 
     def call1(self, func, arg):
         self.cpu.w_reg(REG_D1, arg)
-        return func(self.ctx)
+        return func(self.ctx, self.cpu.r_reg(REG_D1))
 
     def call2(self, func, a, b):
         self.cpu.w_reg(REG_D1, a)
         self.cpu.w_reg(REG_D2, b)
-        return func(self.ctx)
+        return func(self.ctx, self.cpu.r_reg(REG_D1), self.cpu.r_reg(REG_D2))
 
 
 @pytest.fixture

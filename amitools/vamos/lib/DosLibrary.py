@@ -2,7 +2,6 @@ import time
 import re
 from contextlib import ExitStack
 
-from amitools.vamos.machine import Code
 from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.astructs import CSTR, LONG, UBYTE, APTR_VOID
@@ -18,8 +17,6 @@ from amitools.vamos.libstructs import (
     FileHandleStruct,
     FileInfoBlockStruct,
     ExAllControlStruct,
-    ExAllDataStruct,
-    InfoDataStruct,
     DevProcStruct,
     AnchorPathStruct,
     RDArgsStruct,
@@ -40,7 +37,7 @@ from amitools.vamos.libstructs import (
 from amitools.vamos.libtypes import TagList, DosTag, DosPacket
 from amitools.vamos.error import *
 from amitools.vamos.log import log_dos
-from amitools.vamos.handler import HandlerError, MODE_OLDFILE
+from amitools.vamos.handler import HandlerError
 from amitools.vamos.task import DosProcess
 from amitools.vamos.schedule import SchedulerEvent
 from .dos.Args import *
@@ -53,7 +50,6 @@ from .dos.CommandLine import CommandLine
 from .dos.Process import Process
 from .dos.DosList import DosList
 from .dos.LockManager import LockManager
-from .dos.Lock import fill_fib
 from .dos.FileManager import FileManager
 from .dos.DosFileOpener import DosFileOpener
 from .dos import (
@@ -62,6 +58,7 @@ from .dos import (
     Date,
     FileIO,
     Link,
+    Lock,
     Notify,
     RecordLock,
     Segments,
@@ -194,7 +191,7 @@ class DosLibrary(LibImpl):
         return 0
 
     def finish_lib(self, ctx):
-        self._drop_all_exall_scans()
+        Lock.drop_all_exall_scans(self)
         self._finish_timer_request(ctx)
         # free the child processes that still run
         for child in self.child_procs.values():
@@ -848,500 +845,58 @@ class DosLibrary(LibImpl):
 
     # ----- Locks -----
 
-    def Lock(self, ctx):
-        name_ptr = ctx.cpu.r_reg(REG_D1)
-        name = ctx.mem.r_cstr(name_ptr)
-        mode = ctx.cpu.r_reg(REG_D2)
+    def Lock(self, ctx, name: CSTR, mode):
+        return Lock.lock(self, ctx, name.get_str(), mode)
 
-        if mode == 0xFFFFFFFF:
-            lock_exclusive = True
-        elif mode == 0xFFFFFFFE:
-            lock_exclusive = False
-        else:
-            raise UnsupportedFeatureError("Lock: mode=%x" % mode)
+    def UnLock(self, ctx, lock_b_addr):
+        return Lock.unlock(self, ctx, lock_b_addr)
 
-        cur_dir = self.get_current_dir(ctx)
-        home_dir = self.get_home_dir(ctx)
-        lock = self.lock_mgr.create_lock(
-            cur_dir, name, lock_exclusive, home_dir=home_dir
-        )
-        log_dos.info(
-            "Lock: (curdir=%s, homedir=%s) '%s' exc=%s -> %s",
-            cur_dir,
-            home_dir,
-            name,
-            lock_exclusive,
-            lock,
-        )
-        if lock == None:
-            self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
-            return 0
-        else:
-            return lock.b_addr
+    def DupLock(self, ctx, lock_b_addr):
+        return Lock.dup_lock(self, ctx, lock_b_addr)
 
-    def UnLock(self, ctx):
-        lock_b_addr = ctx.cpu.r_reg(REG_D1)
-        if lock_b_addr == 0:
-            log_dos.info("UnLock: NULL")
-        else:
-            lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-            log_dos.info("UnLock: %s", lock)
-            self.lock_mgr.release_lock(lock)
+    def SameLock(self, ctx, lock1_b_addr, lock2_b_addr):
+        return Lock.same_lock(self, ctx, lock1_b_addr, lock2_b_addr)
 
-    def DupLock(self, ctx):
-        lock_b_addr = ctx.cpu.r_reg(REG_D1)
-        lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-        dup_lock = self.lock_mgr.dup_lock(lock)
-        log_dos.info("DupLock: %s -> %s", lock, dup_lock)
-        if dup_lock is None:
-            self.setioerr(ctx, ERROR_INVALID_LOCK)
-            return 0
-        self.setioerr(ctx, NO_ERROR)
-        return dup_lock.b_addr
+    def OpenFromLock(self, ctx, lock_b_addr):
+        return Lock.open_from_lock(self, ctx, lock_b_addr)
 
-    def SameLock(self, ctx):
-        lock1_b_addr = ctx.cpu.r_reg(REG_D1)
-        lock2_b_addr = ctx.cpu.r_reg(REG_D2)
-        lock1 = self.lock_mgr.get_by_b_addr(lock1_b_addr)
-        lock2 = self.lock_mgr.get_by_b_addr(lock2_b_addr)
-        if lock1 is None or lock2 is None:
-            return DOSFALSE
-        if lock1 is lock2:
-            return DOSTRUE
-        # two locks on the same handler are compared by the handler; locks
-        # from different handlers are never the same object
-        if (
-            lock1.handler is not None
-            and lock1.handler is lock2.handler
-            and lock1.handler_lock is not None
-            and lock2.handler_lock is not None
-        ):
-            same = lock1.handler.same_lock(lock1.handler_lock, lock2.handler_lock)
-            return DOSTRUE if same else DOSFALSE
-        if lock1.handler is None and lock2.handler is None:
-            return DOSTRUE if lock1.key == lock2.key else DOSFALSE
-        return DOSFALSE
+    def DupLockFromFH(self, ctx, fh_b_addr):
+        return Lock.dup_lock_from_fh(self, ctx, fh_b_addr)
 
-    def OpenFromLock(self, ctx):
-        lock_b_addr = ctx.cpu.r_reg(REG_D1)
-        lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-        if lock is None:
-            self.setioerr(ctx, ERROR_INVALID_LOCK)
-            return 0
-        try:
-            fh = self.file_mgr.open_from_lock(lock, MODE_OLDFILE)
-        except HandlerError as e:
-            self.setioerr(ctx, e.code)
-            return 0
-        # the handle absorbs the lock
-        self.lock_mgr.release_lock(lock)
-        log_dos.info("OpenFromLock: %s -> %s", lock, fh)
-        self.setioerr(ctx, NO_ERROR)
-        return fh.b_addr
+    def ParentOfFH(self, ctx, fh_b_addr):
+        return Lock.parent_of_fh(self, ctx, fh_b_addr)
 
-    def DupLockFromFH(self, ctx):
-        fh_b_addr = ctx.cpu.r_reg(REG_D1)
-        fh = self.file_mgr.get_by_b_addr(fh_b_addr)
-        if fh is None or fh.handler is None or fh.handler_file is None:
-            self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
-            return 0
-        try:
-            handler_lock = fh.handler.copy_dir_fh(fh.handler_file)
-        except HandlerError as e:
-            self.setioerr(ctx, e.code)
-            return 0
-        lock = self.lock_mgr.register_handler_lock(
-            fh.handler, handler_lock, fh.ami_path, name=fh.name
-        )
-        log_dos.info("DupLockFromFH: %s -> %s", fh, lock)
-        self.setioerr(ctx, NO_ERROR)
-        return lock.b_addr
+    def Examine(self, ctx, lock_b_addr, fib_ptr):
+        return Lock.examine(self, ctx, lock_b_addr, fib_ptr)
 
-    def ParentOfFH(self, ctx):
-        fh_b_addr = ctx.cpu.r_reg(REG_D1)
-        fh = self.file_mgr.get_by_b_addr(fh_b_addr)
-        if fh is None or fh.handler is None or fh.handler_file is None:
-            self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
-            return 0
-        try:
-            handler_lock = fh.handler.parent_fh(fh.handler_file)
-        except HandlerError as e:
-            self.setioerr(ctx, e.code)
-            return 0
-        ami_parent_path = self.path_mgr.ami_abs_parent_path(fh.ami_path)
-        name = self.path_mgr.ami_name_of_path(None, ami_parent_path)
-        lock = self.lock_mgr.register_handler_lock(
-            fh.handler, handler_lock, ami_parent_path, name=name
-        )
-        log_dos.info("ParentOfFH: %s -> %s", fh, lock)
-        self.setioerr(ctx, NO_ERROR)
-        return lock.b_addr
+    def ExamineFH(self, ctx, fh_b_addr, fib_ptr):
+        return Lock.examine_fh(self, ctx, fh_b_addr, fib_ptr)
 
-    def Examine(self, ctx):
-        lock_b_addr = ctx.cpu.r_reg(REG_D1)
-        fib_ptr = ctx.cpu.r_reg(REG_D2)
+    def Info(self, ctx, lock_b_addr, info_ptr):
+        return Lock.info(self, ctx, lock_b_addr, info_ptr)
 
-        lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-        fib = FileInfoBlockStruct(ctx.mem, fib_ptr)
-        err = lock.examine_lock(fib)
-        name_addr = fib.fib_FileName.addr
-        name = ctx.mem.r_cstr(name_addr)
-        log_dos.info("Examine: %s fib=%06x(%s) -> %s", lock, fib_ptr, name, err)
-        self.setioerr(ctx, err)
-        if err == NO_ERROR:
-            return DOSTRUE
-        else:
-            return DOSFALSE
-
-    def ExamineFH(self, ctx):
-        fh_b_addr = ctx.cpu.r_reg(REG_D1)
-        fib_ptr = ctx.cpu.r_reg(REG_D2)
-
-        fh = self.file_mgr.get_by_b_addr(fh_b_addr, False)
-        fib = FileInfoBlockStruct(ctx.mem, fib_ptr)
-        # handler-backed: ACTION_EXAMINE_FH examines the object the handle
-        # points at directly
-        if fh.handler is not None and fh.handler_file is not None:
-            try:
-                info = fh.handler.examine_fh(fh.handler_file)
-            except HandlerError as e:
-                self.setioerr(ctx, e.code)
-                return DOSFALSE
-            fill_fib(fib, info, name=fh.name)
-            log_dos.info("ExamineFH: %s fib=%06x -> ok", fh, fib_ptr)
-            self.setioerr(ctx, 0)
-            return DOSTRUE
-        # handler-less fallback: examine via a temporary lock
-        lock = self.lock_mgr.create_lock(self.get_current_dir(ctx), fh.ami_path, False)
-        log_dos.info(
-            "Lock: (%s) '%s' exc=%s -> %s",
-            self.get_current_dir(ctx),
-            fh.ami_path,
-            False,
-            lock,
-        )
-        if lock == None:
-            self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
-            return DOSFALSE
-
-        err = lock.examine_lock(fib)
-        name_addr = fib.fib_FileName.addr
-        name = ctx.mem.r_cstr(name_addr)
-        log_dos.info("ExamineFH: %s fib=%06x(%s) -> %s", fh, fib_ptr, name, err)
-        self.setioerr(ctx, err)
-
-        log_dos.info("UnLock: %s", lock)
-        self.lock_mgr.release_lock(lock)
-        if err == NO_ERROR:
-            return DOSTRUE
-        else:
-            return DOSFALSE
-
-    def Info(self, ctx):
-        lock_b_addr = ctx.cpu.r_reg(REG_D1)
-        info_ptr = ctx.cpu.r_reg(REG_D2)
-        lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-        info = InfoDataStruct(ctx.mem, info_ptr)
-        if lock is None:
-            self.setioerr(ctx, ERROR_INVALID_LOCK)
-            return DOSFALSE
-        vol = lock.find_volume_node(self.dos_list)
-        if vol:
-            if lock.handler is None:
-                self.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
-                return DOSFALSE
-            try:
-                if lock.handler_lock is not None:
-                    disk = lock.handler.info(lock.handler_lock)
-                elif self.handler_mgr is not None:
-                    # a lock without a handler lock: a lock-less volume query
-                    # (ACTION_DISK_INFO) resolved through the handler manager
-                    volume_name = self.lock_mgr.volume_name_of_lock(lock)
-                    disk = self.handler_mgr.disk_info(volume_name)
-                else:
-                    disk = lock.handler.disk_info(None)
-            except HandlerError as e:
-                self.setioerr(ctx, e.code)
-                return DOSFALSE
-            disk_state = disk.disk_state
-            block_size = disk.bytes_per_block
-            total = disk.num_blocks
-            used = disk.num_blocks_used
-            info.id_NumSoftErrors.val = 0
-            info.id_UnitNumber.val = 0  # not that we really care...
-            info.id_DiskState.val = disk_state
-            # InfoData has signed 32-bit block counts. Preserve capacity
-            # on large host filesystems by increasing the reporting unit.
-            while total > 0x7FFFFFFF:
-                total = (total + 1) // 2
-                used = (used + 1) // 2
-                block_size *= 2
-            info.id_NumBlocks.val = total
-            info.id_NumBlocksUsed.val = used
-            info.id_BytesPerBlock.val = block_size
-            info.id_DiskType.val = 0x444F5303  # international FFS
-            info.id_VolumeNode.aptr = vol
-            info.id_InUse.val = 0
-            self.setioerr(ctx, 0)
-            log_dos.info("Info: %s info=%06x -> true", lock, info_ptr)
-            return DOSTRUE
-        else:
-            log_dos.info("Info: %s info=%06x -> false", lock, info_ptr)
-            return DOSFALSE
-
-    def ExNext(self, ctx):
-        lock_b_addr = ctx.cpu.r_reg(REG_D1)
-        fib_ptr = ctx.cpu.r_reg(REG_D2)
-        lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-        fib = FileInfoBlockStruct(ctx.mem, fib_ptr)
-        err = lock.examine_next(fib)
-        name_addr = fib.fib_FileName.addr
-        name = ctx.mem.r_cstr(name_addr)
-        log_dos.info("ExNext: %s fib=%06x (%s) -> %s", lock, fib_ptr, name, err)
-        self.setioerr(ctx, err)
-        if err == NO_ERROR:
-            self.setioerr(ctx, 0)
-            return DOSTRUE
-        else:
-            self.setioerr(ctx, err)
-            return DOSFALSE
-
-    # bytes of struct ExAllData used by each ED_* type: ED_NAME .. ED_OWNER
-    ex_all_data_sizes = (0, 8, 12, 16, 20, 32, 36, 40)
-
-    @staticmethod
-    def _free_scan_lock(scan):
-        """release the handler lock of an ExAll scan (ACTION_FREE_LOCK)"""
-        if scan.handler is not None and scan.handler_lock is not None:
-            scan.handler.free_lock(scan.handler_lock)
-
-    def _drop_exall_scan(self, control_ptr):
-        """drop a control's scan state and release its cloned handler lock"""
-        state = self.exall_scans.pop(control_ptr, None)
-        if state is not None:
-            self._free_scan_lock(state[1])
-        return state
-
-    def _drop_all_exall_scans(self):
-        for state in self.exall_scans.values():
-            self._free_scan_lock(state[1])
-        self.exall_scans.clear()
+    def ExNext(self, ctx, lock_b_addr, fib_ptr):
+        return Lock.exnext(self, ctx, lock_b_addr, fib_ptr)
 
     def ExAll(self, ctx, lock_b_addr, buffer, size, data_type, control_ptr):
-        """Fill a bounded entry chain using a cursor private to this control."""
-        control = ExAllControlStruct(ctx.mem, control_ptr)
-        control.eac_Entries.val = 0
-        if data_type < 1 or data_type >= len(self.ex_all_data_sizes):
-            self._drop_exall_scan(control_ptr)
-            self.setioerr(ctx, ERROR_BAD_NUMBER)
-            return DOSFALSE
-        if size < 0 or size > 0x7FFFFFFF:
-            self._drop_exall_scan(control_ptr)
-            self.setioerr(ctx, ERROR_NO_FREE_STORE)
-            return DOSFALSE
-        lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-        if lock is None:
-            self._drop_exall_scan(control_ptr)
-            self.setioerr(ctx, ERROR_INVALID_LOCK)
-            return DOSFALSE
-        last_key = control.eac_LastKey.val
-        if last_key == 0:
-            # A cloned lock owns its ExNext cache independently of the
-            # caller's lock. clone_for_scan also checks that the lock is a
-            # directory.
-            self._drop_exall_scan(control_ptr)
-            try:
-                scan = lock.clone_for_scan()
-            except HandlerError as e:
-                self.setioerr(ctx, e.code)
-                return DOSFALSE
-            self.exall_scans[control_ptr] = (lock, scan)
-        else:
-            state = self.exall_scans.get(control_ptr)
-            if state is None or state[0] is not lock:
-                self._drop_exall_scan(control_ptr)
-                self.setioerr(ctx, ERROR_INVALID_LOCK)
-                return DOSFALSE
-            scan = state[1]
-
-        fib_size = FileInfoBlockStruct.get_size()
-        scratch = self.alloc.alloc_memory(
-            fib_size + 4, label="ExAll_FIB", except_on_failure=False
-        )
-        if scratch is None:
-            self.exall_scans.pop(control_ptr, None)
-            self.setioerr(ctx, ERROR_NO_FREE_STORE)
-            return DOSFALSE
-        keep_scan = False
-        try:
-            fib = FileInfoBlockStruct(ctx.mem, scratch.addr)
-            if last_key == 0:
-                err = scan.examine_lock(fib)
-            else:
-                fib.fib_DiskKey.val = last_key
-                err = NO_ERROR
-            if err == NO_ERROR:
-                err = self._exall_fill(
-                    ctx,
-                    scan,
-                    fib,
-                    buffer,
-                    size,
-                    data_type,
-                    control,
-                    scratch.addr + fib_size,
-                )
-            control.eac_LastKey.val = fib.fib_DiskKey.val
-            keep_scan = err == NO_ERROR
-        finally:
-            self.alloc.free_memory(scratch)
-            if not keep_scan:
-                self._drop_exall_scan(control_ptr)
-        log_dos.info(
-            "ExAll: %s buf=%06x size=%d type=%d -> entries=%d err=%d",
-            lock,
-            buffer,
-            size,
-            data_type,
-            control.eac_Entries.val,
-            err,
-        )
-        self.setioerr(ctx, err)
-        return DOSTRUE if err == NO_ERROR else DOSFALSE
-
-    def _exall_fill(self, ctx, scan, fib, buffer, size, data_type, control, type_ptr):
-        match_ptr = control.eac_MatchString.aptr
-        match_pat = None
-        if match_ptr:
-            match_pat = Pattern(None, ctx.mem.r_cstr(match_ptr), True, True)
-        hook_ptr = control.eac_MatchFunc.aptr
-        entry_size = self.ex_all_data_sizes[data_type]
-        prev = None
-        pos = buffer
-        end = buffer + size
-        while True:
-            key_before = fib.fib_DiskKey.val
-            # The Examine helper leaves fib_Size unchanged for directories.
-            fib.fib_Size.val = 0
-            err = scan.examine_next(fib)
-            if err != NO_ERROR:
-                return err
-            name = ctx.mem.r_cstr(fib.fib_FileName.addr)
-            if match_pat is not None and not pattern_match(match_pat, name):
-                continue
-            comment = ""
-            if data_type >= 6:
-                comment = ctx.mem.r_cstr(fib.fib_Comment.addr)
-            need = entry_size + len(name) + 1
-            if comment:
-                need += len(comment) + 1
-            need = (need + 3) & ~3
-            if pos + need > end:
-                fib.fib_DiskKey.val = key_before
-                if control.eac_Entries.val == 0:
-                    return ERROR_NO_FREE_STORE
-                return NO_ERROR
-            ead = ExAllDataStruct(ctx.mem, pos)
-            str_addr = pos + entry_size
-            ead.ed_Next.aptr = 0
-            ead.ed_Name.aptr = str_addr
-            ctx.mem.w_cstr(str_addr, name)
-            str_addr += len(name) + 1
-            if data_type >= 2:
-                ead.ed_Type.val = fib.fib_DirEntryType.val
-            if data_type >= 3:
-                ead.ed_Size.val = fib.fib_Size.val
-            if data_type >= 4:
-                ead.ed_Prot.val = fib.fib_Protection.val
-            if data_type >= 5:
-                ead.ed_Days.val = fib.fib_Date.ds_Days.val
-                ead.ed_Mins.val = fib.fib_Date.ds_Minute.val
-                ead.ed_Ticks.val = fib.fib_Date.ds_Tick.val
-            if data_type >= 6:
-                ead.ed_Comment.aptr = str_addr if comment else 0
-                if comment:
-                    ctx.mem.w_cstr(str_addr, comment)
-            if data_type >= 7:
-                ead.ed_OwnerUID.val = fib.fib_OwnerUID.val
-                ead.ed_OwnerGID.val = fib.fib_OwnerGID.val
-            if hook_ptr:
-                # h_Entry follows the Hook's two-pointer MinNode header.
-                entry = ctx.mem.r32(hook_ptr + 8)
-                ctx.mem.w32(type_ptr, data_type)
-                code = Code(
-                    entry,
-                    set_regs={REG_A0: hook_ptr, REG_A1: pos, REG_A2: type_ptr},
-                    get_regs=[REG_D0],
-                )
-                result = ctx.runner(code, name="ExAllMatch")
-                if result.regs[REG_D0] == 0:
-                    continue
-            if prev is not None:
-                prev.ed_Next.aptr = pos
-            prev = ead
-            pos += need
-            control.eac_Entries.val += 1
+        return Lock.exall(self, ctx, lock_b_addr, buffer, size, data_type, control_ptr)
 
     def ExAllEnd(self, ctx, lock_b_addr, buffer, size, data_type, control_ptr):
-        self._drop_exall_scan(control_ptr)
-        control = ExAllControlStruct(ctx.mem, control_ptr)
-        control.eac_Entries.val = 0
-        control.eac_LastKey.val = 0
+        return Lock.exall_end(
+            self, ctx, lock_b_addr, buffer, size, data_type, control_ptr
+        )
 
-    def ParentDir(self, ctx):
-        lock_b_addr = ctx.cpu.r_reg(REG_D1)
-        lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-        parent_lock = self.lock_mgr.create_parent_lock(lock)
-        log_dos.info("ParentDir: %s -> %s", lock, parent_lock)
-        if parent_lock != None:
-            return parent_lock.b_addr
-        else:
-            return 0
+    def ParentDir(self, ctx, lock_b_addr):
+        return Lock.parent_dir(self, ctx, lock_b_addr)
 
-    def CurrentDir(self, ctx):
-        lock_b_addr = ctx.cpu.r_reg(REG_D1)
-        # CurrentDir exchanges a BPTR. The old lock may already have been
-        # released (e.g. FreeDeviceProc followed by restoring the old cwd).
-        proc = ctx.process.get_ami_process()
-        old = proc.current_dir.bptr
-        proc.current_dir.bptr = lock_b_addr
-        return old
+    def CurrentDir(self, ctx, lock_b_addr):
+        return Lock.current_dir(self, ctx, lock_b_addr)
 
-    def NameFromLock(self, ctx):
-        lock_b_addr = ctx.cpu.r_reg(REG_D1)
-        buf = ctx.cpu.r_reg(REG_D2)
-        buf_len = ctx.cpu.r_reg(REG_D3)
-        if lock_b_addr == 0:
-            name = "SYS:"
-            lock = None
-        else:
-            lock = self.lock_mgr.get_by_b_addr(lock_b_addr)
-            name = lock.ami_path
-        log_dos.info("NameFromLock(%x,%d): %s -> %s", buf, buf_len, lock, name)
-        if len(name) >= buf_len:
-            self.setioerr(ctx, ERROR_LINE_TOO_LONG)
-            return DOSFALSE
-        else:
-            ctx.mem.w_cstr(buf, name)
-            return DOSTRUE
+    def NameFromLock(self, ctx, lock_b_addr, buf, buf_len):
+        return Lock.name_from_lock(self, ctx, lock_b_addr, buf, buf_len)
 
-    def NameFromFH(self, ctx):
-        fh_b_addr = ctx.cpu.r_reg(REG_D1)
-        buf = ctx.cpu.r_reg(REG_D2)
-        buf_len = ctx.cpu.r_reg(REG_D3)
-        fh = self.file_mgr.get_by_b_addr(fh_b_addr)
-        if fh is None:
-            log_dos.warning("NameFromFH: invalid fh=%x", fh_b_addr)
-            self.setioerr(ctx, ERROR_INVALID_LOCK)
-            return DOSFALSE
-        name = fh.ami_path
-        log_dos.info("NameFromFH(%x,%d): %s -> %s", buf, buf_len, fh, name)
-        if len(name) >= buf_len:
-            self.setioerr(ctx, ERROR_LINE_TOO_LONG)
-            return DOSFALSE
-        else:
-            ctx.mem.w_cstr(buf, name)
-            return DOSTRUE
+    def NameFromFH(self, ctx, fh_b_addr, buf, buf_len):
+        return Lock.name_from_fh(self, ctx, fh_b_addr, buf, buf_len)
 
     def CreateDir(self, ctx, name: CSTR):
         return FileIO.create_dir(self, ctx, name.get_str())
@@ -2198,7 +1753,7 @@ class DosLibrary(LibImpl):
                 )
             # Freeing a control also releases an unfinished scan.
             if entry[1] == 1:
-                self._drop_exall_scan(ptr)
+                Lock.drop_exall_scan(self, ptr)
             # free struct
             ctx.alloc.free_struct(entry[0])
         else:
@@ -2987,17 +2542,7 @@ class DosLibrary(LibImpl):
     # ----- Misc -----
 
     def SameDevice(self, ctx, lock1: LONG, lock2: LONG):
-        try:
-            l1 = self.lock_mgr.get_by_b_addr(lock1.val) if lock1.val else None
-            l2 = self.lock_mgr.get_by_b_addr(lock2.val) if lock2.val else None
-        except Exception:
-            self.setioerr(ctx, ERROR_INVALID_LOCK)
-            return DOSFALSE
-        name1 = self.lock_mgr.volume_name_of_lock(l1)
-        name2 = self.lock_mgr.volume_name_of_lock(l2)
-        same = name1.lower() == name2.lower()
-        log_dos.info("SameDevice(%s, %s) -> %s", name1, name2, same)
-        return DOSTRUE if same else DOSFALSE
+        return Lock.same_device(self, ctx, lock1.val, lock2.val)
 
     def VolumeRequestHook(self, ctx, vol: LONG):
         log_dos.warning("VolumeRequestHook(%s): not implemented", vol.val)
