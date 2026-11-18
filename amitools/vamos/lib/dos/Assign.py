@@ -66,6 +66,21 @@ def assign_path(dos, ctx, name, path):
     return True, 0
 
 
+def assign_lock(dos, ctx, name, lockbaddr):
+    """AssignLock(): bind an assign to a lock (or remove it with a NULL lock)"""
+    if lockbaddr == 0:
+        log_dos.info("AssignLock (%s -> null)", name)
+        if dos.dos_list.remove_assign(name):
+            dos.update_dos_list_head()
+        return -1
+    lock = dos.lock_mgr.get_by_b_addr(lockbaddr)
+    log_dos.info("AssignLock (%s -> %s)", name, lock)
+    if dos.dos_list.create_assign(name, lock) is not None:
+        dos.update_dos_list_head()
+        return -1
+    return 0
+
+
 def assign_add(dos, name, lock_bptr):
     """AssignAdd(): add a directory lock to a multi-assign"""
     name = _assign_name(name)

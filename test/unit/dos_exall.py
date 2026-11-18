@@ -28,8 +28,6 @@ from amitools.vamos.machine import (
     Machine,
     Runtime,
     REG_D0,
-    REG_D1,
-    REG_D2,
     REG_A0,
     REG_A1,
     REG_A2,
@@ -100,9 +98,7 @@ class ExAllEnv:
         self.buf = self.buffer.addr + 4
 
     def new_control(self):
-        self.cpu.w_reg(REG_D1, 1)
-        self.cpu.w_reg(REG_D2, 0)
-        ptr = self.lib.AllocDosObject(self.ctx)
+        ptr = self.lib.AllocDosObject(self.ctx, 1, 0)
         control = ExAllControlStruct(self.mem, ptr)
         assert control.eac_LastKey.val == 0
         assert control.eac_MatchFunc.aptr == 0
@@ -110,9 +106,7 @@ class ExAllEnv:
         return control
 
     def free_control(self, control):
-        self.cpu.w_reg(REG_D1, 1)
-        self.cpu.w_reg(REG_D2, control.addr)
-        self.lib.FreeDosObject(self.ctx)
+        self.lib.FreeDosObject(self.ctx, 1, control.addr)
         self.controls.remove(control)
 
     def run(self, size=4096, data_type=3, control=None):
