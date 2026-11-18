@@ -668,7 +668,7 @@ class DosLibrary(LibImpl):
 
     def DeleteVar(self, ctx):
         name_ptr = ctx.cpu.r_reg(REG_D1)
-        flags = ctx.cpu.r_reg(REG_D4)
+        flags = ctx.cpu.r_reg(REG_D2)
         name = ctx.mem.r_cstr(name_ptr)
         if flags & self.GVF_GLOBAL_ONLY:
             found = self.global_vars.pop((name.lower(), flags & 0xFF), None)
