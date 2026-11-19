@@ -434,11 +434,11 @@ def handler_decode_examine_object_test(dec):
     h.fib_info = HandlerFileInfo(
         "f", HandlerFileInfo.FILE, size=5, blocks=1, comment="c"
     )
-    pkt = _pkt(mem, DosAction.ACTION_EXAMINE_OBJECT, arg1=src, arg2=_FIB_ADDR)
+    pkt = _pkt(mem, DosAction.ACTION_EXAMINE_OBJECT, arg1=src, arg2=_FIB_ADDR >> 2)
     assert dec.harness.decode(pkt) == DOSTRUE
     assert h.calls[-1] == ("examine_object", h.lock)
     fib = FileInfoBlockStruct(mem, _FIB_ADDR)
-    assert mem.r_cstr(fib.fib_FileName.addr) == "f"
+    assert mem.r_bstr(fib.fib_FileName.addr) == "f"
     assert fib.fib_Size.val == 5
     assert fib.fib_DirEntryType.val == HandlerFileInfo.FILE
 
@@ -451,7 +451,7 @@ def handler_decode_examine_next_test(dec):
     fib = FileInfoBlockStruct(mem, _FIB_ADDR)
     fib.fib_DiskKey.val = 3
     h.fib_info = HandlerFileInfo("n", HandlerFileInfo.FILE, key=4)
-    pkt = _pkt(mem, DosAction.ACTION_EXAMINE_NEXT, arg1=src, arg2=_FIB_ADDR)
+    pkt = _pkt(mem, DosAction.ACTION_EXAMINE_NEXT, arg1=src, arg2=_FIB_ADDR >> 2)
     assert dec.harness.decode(pkt) == DOSTRUE
     assert h.calls[-1] == ("examine_next", h.lock, 3)
     assert fib.fib_DiskKey.val == 4
@@ -462,7 +462,7 @@ def handler_decode_info_test(dec):
     src = dec.harness.decode(
         _pkt(mem, DosAction.ACTION_LOCATE_OBJECT, arg2=_bstr(mem, "", _PATH_ADDR))
     )
-    pkt = _pkt(mem, DosAction.ACTION_INFO, arg1=src, arg2=_INFO_ADDR)
+    pkt = _pkt(mem, DosAction.ACTION_INFO, arg1=src, arg2=_INFO_ADDR >> 2)
     assert dec.harness.decode(pkt) == DOSTRUE
     info = InfoDataStruct(mem, _INFO_ADDR)
     assert info.id_NumBlocks.val == 42
@@ -471,7 +471,7 @@ def handler_decode_info_test(dec):
 
 def handler_decode_disk_info_test(dec):
     mem, h = dec.mem, dec.h
-    pkt = _pkt(mem, DosAction.ACTION_DISK_INFO, arg1=_INFO_ADDR)
+    pkt = _pkt(mem, DosAction.ACTION_DISK_INFO, arg1=_INFO_ADDR >> 2)
     assert dec.harness.decode(pkt) == DOSTRUE
     assert h.calls[-1] == ("disk_info", None)
     assert InfoDataStruct(mem, _INFO_ADDR).id_NumBlocks.val == 42
@@ -781,7 +781,7 @@ def handler_decode_examine_fh_test(dec):
     mem, h = dec.mem, dec.h
     fh_id = dec.harness._register_file(h, h.file, "work:f")
     h.fib_info = HandlerFileInfo("f", HandlerFileInfo.FILE, size=3)
-    pkt = _pkt(mem, DosAction.ACTION_EXAMINE_FH, arg1=fh_id, arg2=_FIB_ADDR)
+    pkt = _pkt(mem, DosAction.ACTION_EXAMINE_FH, arg1=fh_id, arg2=_FIB_ADDR >> 2)
     assert dec.harness.decode(pkt) == DOSTRUE
     assert h.calls[-1] == ("examine_fh", h.file)
     assert FileInfoBlockStruct(mem, _FIB_ADDR).fib_Size.val == 3

@@ -29,7 +29,6 @@ from amitools.vamos.libstructs import (
 from amitools.vamos.libtypes import DosPacket
 
 from .base import (
-    ERROR_ACTION_NOT_KNOWN,
     ERROR_BAD_NUMBER,
     ERROR_OBJECT_NOT_FOUND,
     MODE_NEWFILE,
@@ -238,14 +237,14 @@ class PacketHandler(Handler):
             fib.fib_Date.ds_Tick.val,
         )
         return HandlerFileInfo(
-            name=mem.r_cstr(fib.fib_FileName.addr),
+            name=mem.r_bstr(fib.fib_FileName.addr),
             entry_type=fib.fib_DirEntryType.val,
             protection=fib.fib_Protection.val,
             size=fib.fib_Size.val,
             blocks=fib.fib_NumBlocks.val,
             date=ami_to_sys_time(date),
             key=fib.fib_DiskKey.val,
-            comment=mem.r_cstr(fib.fib_Comment.addr),
+            comment=mem.r_bstr(fib.fib_Comment.addr),
             owner_uid=fib.fib_OwnerUID.val,
             owner_gid=fib.fib_OwnerGID.val,
         )
@@ -322,7 +321,7 @@ class PacketHandler(Handler):
         fib = self._fib_for(lock)
         with self._call(DosAction.ACTION_EXAMINE_OBJECT) as call:
             call.arg(1, lock.bptr)
-            call.arg(2, fib.addr)
+            call.arg(2, fib.addr >> 2)
             call.send()
         return self._parse_fib(fib)
 
@@ -334,7 +333,7 @@ class PacketHandler(Handler):
             self.examine_object(lock)
         with self._call(DosAction.ACTION_EXAMINE_NEXT) as call:
             call.arg(1, lock.bptr)
-            call.arg(2, fib.addr)
+            call.arg(2, fib.addr >> 2)
             call.send()
         return self._parse_fib(fib)
 
@@ -343,7 +342,7 @@ class PacketHandler(Handler):
             info_data = self.alloc.alloc_astruct(InfoDataStruct, label="InfoData")
             try:
                 call.arg(1, lock.bptr)
-                call.arg(2, info_data.addr)
+                call.arg(2, info_data.addr >> 2)
                 call.send()
                 return self._parse_info(info_data)
             finally:
@@ -353,7 +352,7 @@ class PacketHandler(Handler):
         with self._call(DosAction.ACTION_DISK_INFO) as call:
             info_data = self.alloc.alloc_astruct(InfoDataStruct, label="InfoData")
             try:
-                call.arg(1, info_data.addr)
+                call.arg(1, info_data.addr >> 2)
                 call.send()
                 return self._parse_info(info_data)
             finally:
@@ -591,7 +590,7 @@ class PacketHandler(Handler):
             fib = self.alloc.alloc_astruct(FileInfoBlockStruct, label="FIB")
             try:
                 call.arg(1, fh.fh_arg1)
-                call.arg(2, fib.addr)
+                call.arg(2, fib.addr >> 2)
                 call.send()
                 return self._parse_fib(fib)
             finally:

@@ -254,8 +254,18 @@ class DosList:
         task=0,
         exclusive=False,
         unit=None,
+        seg_list=0,
+        glob_vec=0,
+        handler=0,
     ):
-        """Append a DLT_DEVICE backed by a FileSysStartupMsg BPTR."""
+        """Append a DLT_DEVICE backed by a FileSysStartupMsg BPTR.
+
+        ``seg_list`` is the BPTR of an already loaded handler seglist and
+        ``handler`` the BPTR of the handler binary name (a BSTR) used by
+        ``LoadSeg`` when ``seg_list`` is 0. Both default to 0 for the Python
+        handlers whose code runs in-process. ``glob_vec`` is the handler's
+        global vector (``-1``/``-2`` for C/asm handlers).
+        """
         entry = DosListEntry(name, DosListDeviceStruct)
         entry.exclusive = exclusive
         entry.unit = unit
@@ -263,12 +273,12 @@ class DosList:
         _struct_write(entry.struct, "dol_Type", 0)
         _struct_write(entry.struct, "dol_Task", task)
         _struct_write(entry.struct, "dol_Lock", 0)
-        _struct_write(entry.struct, "dol_Handler", 0)
+        _struct_write(entry.struct, "dol_Handler", handler)
         _struct_write(entry.struct, "dol_StackSize", 0)
         _struct_write(entry.struct, "dol_Priority", 0)
         _struct_write(entry.struct, "dol_Startup", startup_bptr)
-        _struct_write(entry.struct, "dol_SegList", 0)
-        _struct_write(entry.struct, "dol_GlobVec", 0)
+        _struct_write(entry.struct, "dol_SegList", seg_list)
+        _struct_write(entry.struct, "dol_GlobVec", glob_vec)
         return entry
 
     def remove_entry(self, entry):
@@ -669,7 +679,7 @@ def make_dos_entry(dos, ctx, name_ptr, entry_type):
         entry.dol_Priority.val = 0
         entry.dol_Startup.val = 0
         entry.dol_SegList.aptr = 0
-        entry.dol_GlobVec.aptr = 0
+        entry.dol_GlobVec.val = 0
     elif struct_def is DosListVolumeStruct:
         entry.dol_LockList.aptr = 0
         entry.dol_DiskType.val = 0

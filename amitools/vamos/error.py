@@ -58,3 +58,23 @@ class VamosInternalError(VamosError):
 
     def __str__(self):
         return "Internal Vamos Error: %s" % self._what
+
+
+class MissingLibFuncError(VamosError):
+    """an unimplemented library function was called in strict-LVO mode
+
+    Raised by the lib stub generator when a function has no implementation and
+    the strict-LVO audit is enabled, instead of silently returning ``d0=0``.
+    """
+
+    def __init__(self, lib_name, func_name, bias):
+        self.lib_name = lib_name
+        self.func_name = func_name
+        self.bias = bias
+
+    def __str__(self):
+        return "Missing LVO: %s/%s (bias %d)" % (
+            self.lib_name,
+            self.func_name,
+            self.bias,
+        )

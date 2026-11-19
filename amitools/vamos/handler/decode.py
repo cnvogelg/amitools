@@ -189,13 +189,15 @@ class PacketDecoder:
     def _fill_fib(self, fib, info):
         """write a :class:`HandlerFileInfo` into a FileInfoBlock"""
         mem = self.mem
+        # the handler writes fib_FileName/fib_Comment as BSTRs; dos.library
+        # converts them to C strings (fixfib) before a program sees them
         name_addr = fib.fib_FileName.addr
         mem.clear_block(name_addr, 108, 0)
-        mem.w_cstr(name_addr, info.name)
+        mem.w_bstr(name_addr, info.name)
         comment_addr = fib.fib_Comment.addr
         mem.clear_block(comment_addr, 80, 0)
         if info.comment:
-            mem.w_cstr(comment_addr, info.comment)
+            mem.w_bstr(comment_addr, info.comment)
         fib.fib_DiskKey.val = info.key
         fib.fib_DirEntryType.val = info.entry_type
         fib.fib_EntryType.val = info.entry_type
@@ -262,24 +264,26 @@ class PacketDecoder:
 
         if action == DosAction.ACTION_EXAMINE_OBJECT:
             handler, lock, _ = self._lock(a1)
-            self._fill_fib(FileInfoBlockStruct(mem, a2), handler.examine_object(lock))
+            self._fill_fib(
+                FileInfoBlockStruct(mem, a2 << 2), handler.examine_object(lock)
+            )
             return DOSTRUE
 
         if action == DosAction.ACTION_EXAMINE_NEXT:
             handler, lock, _ = self._lock(a1)
-            fib = FileInfoBlockStruct(mem, a2)
+            fib = FileInfoBlockStruct(mem, a2 << 2)
             info = handler.examine_next(lock, fib.fib_DiskKey.val)
             self._fill_fib(fib, info)
             return DOSTRUE
 
         if action == DosAction.ACTION_INFO:
             handler, lock, _ = self._lock(a1)
-            self._fill_info(InfoDataStruct(mem, a2), handler.info(lock))
+            self._fill_info(InfoDataStruct(mem, a2 << 2), handler.info(lock))
             return DOSTRUE
 
         if action == DosAction.ACTION_DISK_INFO:
             handler = self._handler()
-            self._fill_info(InfoDataStruct(mem, a1), handler.disk_info(None))
+            self._fill_info(InfoDataStruct(mem, a1 << 2), handler.disk_info(None))
             return DOSTRUE
 
         if action == DosAction.ACTION_FH_FROM_LOCK:
@@ -435,7 +439,7 @@ class PacketDecoder:
 
         if action == DosAction.ACTION_EXAMINE_FH:
             handler, fh, _ = self._fh(a1)
-            self._fill_fib(FileInfoBlockStruct(mem, a2), handler.examine_fh(fh))
+            self._fill_fib(FileInfoBlockStruct(mem, a2 << 2), handler.examine_fh(fh))
             return DOSTRUE
 
         if action == DosAction.ACTION_SET_OWNER:

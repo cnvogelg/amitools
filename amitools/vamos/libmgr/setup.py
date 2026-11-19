@@ -40,12 +40,50 @@ class SetupLibManager(object):
         self.exec_ctx = None
         self.dos_ctx = None
         self.lib_mgr = None
+        # the disk session backing native handlers (set by ``main`` before the
+        # base libraries are opened)
+        self.disk_session = None
+        # strict-LVO audit (step 23h); must be set before the libs are opened
+        self._strict_lvo = False
+        # optional lifecycle hooks; the top-level wiring uses them to attach
+        # and detach resources (e.g. the handler transports) that need the open
+        # base libraries, without the lib manager having to know about them
+        self._post_setup_callbacks = []
+        self._pre_shutdown_callbacks = []
 
     def parse_config(self, cfg):
         if not cfg:
             return True
         self.lib_mgr_cfg = LibMgrCfg.from_dict(cfg)
         return True
+
+    def set_strict_lvo(self, flag):
+        """enable the strict-LVO audit (call before :meth:`setup`)"""
+        self._strict_lvo = bool(flag)
+        if self.lib_mgr is not None:
+            self.lib_mgr.set_strict_lvo(self._strict_lvo)
+
+    def add_post_setup_callback(self, callback):
+        """register a callback run once the base libraries are open
+
+        The callback is invoked with this setup manager at the end of
+        :meth:`open_base_libs`, when exec/dos and their helpers are live.
+        """
+        self._post_setup_callbacks.append(callback)
+
+    def add_pre_shutdown_callback(self, callback):
+        """register a callback run before the base libraries close
+
+        The callback is invoked with this setup manager at the start of
+        :meth:`close_base_libs` (and again from :meth:`cleanup` if the base
+        libraries were not closed), while exec/dos are still alive. It must be
+        idempotent.
+        """
+        self._pre_shutdown_callbacks.append(callback)
+
+    def _run_callbacks(self, callbacks):
+        for callback in callbacks:
+            callback(self)
 
     def setup(self):
         # create def cfg
@@ -67,6 +105,7 @@ class SetupLibManager(object):
             self.lib_mgr_cfg,
             main_profiler=self.main_profiler,
         )
+        self.lib_mgr.set_strict_lvo(self._strict_lvo)
         # setup special lib contexts for exec and dos
         self.exec_ctx = ExecLibCtx(
             self.machine,
@@ -76,6 +115,7 @@ class SetupLibManager(object):
             self.path_mgr,
             self.lib_mgr,
         )
+        self.exec_ctx.scheduler = self.scheduler
         self.dos_ctx = DosLibCtx(
             self.machine,
             self.alloc,
@@ -99,6 +139,9 @@ class SetupLibManager(object):
         return self.lib_mgr
 
     def cleanup(self):
+        # detach any resource that was not detached by close_base_libs here,
+        # before the base libraries are torn down (the hooks are idempotent)
+        self._run_callbacks(self._pre_shutdown_callbacks)
         # shutdown of libmgr needs temp stack
         sp = self.machine.get_ram_begin() - 4
         native_shutdown = None
@@ -158,24 +201,15 @@ class SetupLibManager(object):
         self.dos_impl = self.dos_vlib.get_impl()
         self.dos_ctx.set_dos_lib(self.dos_impl)
         log_libmgr.info("open base lib: dos:  @%06x", self.dos_addr)
-        # now that exec/dos (and the port manager) exist, hand the live machine
-        # to any detached packet handler (``?handler=packet``)
-        self._attach_packet_handlers()
-
-    def _attach_packet_handlers(self):
-        if self.handler_mgr is None:
-            return
-        exec_impl = self.exec_impl
-        port_list = exec_impl.exec_lib.port_list
-        self.handler_mgr.attach_packet_transport(
-            self.alloc,
-            exec_impl.port_mgr,
-            exec_impl.mem,
-            find_port=lambda name: port_list.find_name(name, promote=True),
-        )
+        # the base libraries are live now: run the post-setup hooks. The
+        # top-level wiring attaches the handler transports here.
+        self._run_callbacks(self._post_setup_callbacks)
 
     def close_base_libs(self):
         log_libmgr.info("closing base libs...")
+        # run the pre-shutdown hooks (the top-level wiring detaches the handler
+        # transports here) while exec/dos are still alive
+        self._run_callbacks(self._pre_shutdown_callbacks)
         # close dos
         self.lib_mgr.close_lib(self.dos_addr)
         log_libmgr.info("closed dos")
