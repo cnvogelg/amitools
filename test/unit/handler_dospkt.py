@@ -463,9 +463,14 @@ def dospkt_do_packet_returns_raw_results_test():
         0,
         ERROR_OBJECT_NOT_FOUND,
     )
+    after_first = env.alloc.available()
     env.h._pump = lambda: env.server.answer(res1=-1)
     assert env.h.do_packet(DosAction.ACTION_SEEK, 0x10, 0xFFFFFFFF, 0) == (-1, 0)
-    assert env.alloc.available() == env.baseline
+    # one StandardPacket carries packet after packet
+    assert env.alloc.available() == after_first
+    # and goes with the reply port at shutdown
+    env.h.shutdown()
+    assert env.alloc.available() > env.baseline
 
 
 def dospkt_holds_names_abandoned_buffers_test():

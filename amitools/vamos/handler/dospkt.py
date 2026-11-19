@@ -96,6 +96,44 @@ _OPEN_ACTIONS = frozenset(
 _NUM_ARGS = 7
 
 
+def _field(struct, name):
+    return struct.sdef.find_field_def_by_name(name)
+
+
+# a packet goes out once per handler call, so the transport reads and writes
+# its fields directly instead of through struct wrappers
+_MN_NODE = _field(MessageStruct, "mn_Node")
+_LN_SUCC = _MN_NODE.offset + _field(_MN_NODE.type, "ln_Succ").offset
+_LN_PRED = _MN_NODE.offset + _field(_MN_NODE.type, "ln_Pred").offset
+_LN_TYPE = _MN_NODE.offset + _field(_MN_NODE.type, "ln_Type").offset
+_LN_NAME = _MN_NODE.offset + _field(_MN_NODE.type, "ln_Name").offset
+_MN_REPLYPORT = _field(MessageStruct, "mn_ReplyPort").offset
+_MN_LENGTH = _field(MessageStruct, "mn_Length").offset
+_DP_LINK = _field(DosPacketStruct, "dp_Link").offset
+_DP_PORT = _field(DosPacketStruct, "dp_Port").offset
+_DP_TYPE = _field(DosPacketStruct, "dp_Type").offset
+_DP_RES1 = _field(DosPacketStruct, "dp_Res1").offset
+_DP_RES2 = _field(DosPacketStruct, "dp_Res2").offset
+_DP_ARG1 = _field(DosPacketStruct, "dp_Arg1").offset
+_MSG_SIZE = MessageStruct.get_size()
+# a StandardPacket: the Message, then the DosPacket
+_STDPKT_SIZE = _MSG_SIZE + DosPacketStruct.get_size()
+
+
+class _StdPacket:
+    """a StandardPacket of :meth:`DosPktHandler.do_packet`, kept for reuse"""
+
+    __slots__ = ("mem_obj", "pool")
+
+    def __init__(self, mem_obj, pool):
+        self.mem_obj = mem_obj
+        self.pool = pool
+
+    def free(self):
+        """the packet is answered: it can carry the next one"""
+        self.pool.append(self)
+
+
 class PacketTimeout(HandlerError):
     """the handler did not answer a packet in time
 
@@ -170,6 +208,8 @@ class DosPktHandler(PacketHandler):
         self._in_flight = {}
         # structs kept while an abandoned packet points to them
         self._deferred = []
+        # StandardPackets of do_packet() that no packet in flight uses
+        self._stdpkts = []
         self._lock = threading.RLock()
 
     # ----- attaching the transport -----
@@ -230,6 +270,9 @@ class DosPktHandler(PacketHandler):
             for struct in self._deferred:
                 struct.free()
             self._deferred = []
+            for stdpkt in self._stdpkts:
+                self.alloc.free_memory(stdpkt.mem_obj)
+            self._stdpkts = []
             if (
                 self._own_reply_port
                 and self.port_mgr is not None
@@ -257,12 +300,36 @@ class DosPktHandler(PacketHandler):
         """
         if len(args) > _NUM_ARGS:
             raise ValueError("a DosPacket has %d arguments" % _NUM_ARGS)
-        with self._call(action) as call:
-            for index, value in enumerate(args, 1):
-                value &= 0xFFFFFFFF
-                call.arg(index, value - 0x100000000 if value & 0x80000000 else value)
-            self._dopkt(call.pkt)
-            return call.pkt.res1.val, call.pkt.res2.val
+        words = tuple(value & 0xFFFFFFFF for value in args)
+        words += (0,) * (_NUM_ARGS - len(words))
+        with self._lock:
+            self._check_attached()
+            stdpkt = self._stdpkts.pop() if self._stdpkts else None
+            if stdpkt is None:
+                mem_obj = self.alloc.alloc_memory(_STDPKT_SIZE, label="DosPkt")
+                stdpkt = _StdPacket(mem_obj, self._stdpkts)
+            msg_addr = stdpkt.mem_obj.addr
+            pkt_addr = msg_addr + _MSG_SIZE
+            mem = self.mem
+            mem.clear_block(msg_addr, _STDPKT_SIZE, 0)
+            mem.w32(pkt_addr + _DP_TYPE, int(action) & 0xFFFFFFFF)
+            for index, value in enumerate(words):
+                mem.w32(pkt_addr + _DP_ARG1 + 4 * index, value)
+            try:
+                entry = self._post(pkt_addr, msg_addr, int(action), words, None)
+            except BaseException:
+                stdpkt.free()
+                raise
+            try:
+                self._wait(entry)
+            except BaseException:
+                if entry.replied:
+                    stdpkt.free()
+                else:
+                    self._abandon(entry, stdpkt)
+                raise
+            stdpkt.free()
+            return entry.res1, entry.res2
 
     def holds(self, addr):
         """does an abandoned packet still name memory at ``addr``?
@@ -338,23 +405,36 @@ class DosPktHandler(PacketHandler):
 
     def _dopkt(self, pkt):
         with self._lock:
-            entry = self._send(pkt.addr, pkt.type.val, self._packet_args(pkt))
+            self._check_attached()
+            msg = self.alloc.alloc_astruct(MessageStruct, label="DosPkt")
+            try:
+                entry = self._post(
+                    pkt.addr, msg.addr, pkt.type.val, self._read_args(pkt.addr), msg
+                )
+            except BaseException:
+                msg.free()
+                raise
             try:
                 self._wait(entry)
             except BaseException:
                 if not entry.replied:
-                    entry.abandoned = True
-                    log_dos.warning(
-                        "%s: packet %06x (action %d) abandoned without a reply",
-                        self.name,
-                        entry.pkt_addr,
-                        entry.action,
-                    )
+                    # _end_call keeps the packet and its buffers
+                    self._abandon(entry, None)
                 raise
             pkt.res1.val = entry.res1
             pkt.res2.val = entry.res2
 
-    def _send(self, pkt_addr, action, args):
+    def _abandon(self, entry, owned):
+        entry.abandoned = True
+        entry.owned = owned
+        log_dos.warning(
+            "%s: packet %06x (action %d) abandoned without a reply",
+            self.name,
+            entry.pkt_addr,
+            entry.action,
+        )
+
+    def _check_attached(self):
         if self.port_mgr is None or self.alloc is None or self.handler_port == 0:
             raise HandlerError(ERROR_NOT_IMPLEMENTED, "packet transport not attached")
         if self._put_msg is None and not self.port_mgr.has_port(self.handler_port):
@@ -362,35 +442,54 @@ class DosPktHandler(PacketHandler):
                 ERROR_OBJECT_NOT_FOUND,
                 "handler port %06x not found" % self.handler_port,
             )
-        # a StandardPacket: the message's ln_Name names the DosPacket
-        msg = self.alloc.alloc_astruct(MessageStruct, label="DosPkt")
+
+    def _post(self, pkt_addr, msg_addr, action, args, msg):
+        """link the message and the packet and put them on the handler port
+
+        ``msg`` is the message's struct, freed with the reply, or ``None``
+        when the caller owns the memory.
+        """
+        mem = self.mem
+        reply_port = self.reply_port
+        # the message's ln_Name names the DosPacket
+        mem.w32(msg_addr + _LN_SUCC, 0)
+        mem.w32(msg_addr + _LN_PRED, 0)
         # as PutMsg() sets it: a handler that tells its I/O replies
         # (NT_REPLYMSG) from packets by the type would skip the packet
-        msg.node.type.val = NodeType.NT_MESSAGE
-        msg.node.name.aptr = pkt_addr
+        mem.w8(msg_addr + _LN_TYPE, NodeType.NT_MESSAGE)
+        mem.w32(msg_addr + _LN_NAME, pkt_addr)
         # for a handler that answers with ReplyMsg()
-        msg.reply_port.aptr = self.reply_port
-        msg.length.val = MessageStruct.get_size() + DosPacketStruct.get_size()
-        pkt = DosPacketStruct(self.mem, pkt_addr)
-        pkt.link.aptr = msg.addr
-        pkt.port.aptr = self.reply_port
+        mem.w32(msg_addr + _MN_REPLYPORT, reply_port)
+        mem.w16(msg_addr + _MN_LENGTH, _STDPKT_SIZE)
+        mem.w32(pkt_addr + _DP_LINK, msg_addr)
+        mem.w32(pkt_addr + _DP_PORT, reply_port)
         entry = _InFlight(pkt_addr, action, args, msg)
         self._in_flight[pkt_addr] = entry
         # a synchronous handler queues its reply while put_msg runs
-        if self._put_msg is not None:
-            self._put_msg(self.handler_port, msg.addr)
-        else:
-            self.port_mgr.put_msg(self.handler_port, msg.addr)
+        try:
+            if self._put_msg is not None:
+                self._put_msg(self.handler_port, msg_addr)
+            else:
+                self.port_mgr.put_msg(self.handler_port, msg_addr)
+        except BaseException:
+            if not entry.replied:
+                del self._in_flight[pkt_addr]
+            raise
         return entry
 
     def _send_unwaited(self, action, arg1):
         """send a packet whose reply nobody waits for: it releases itself"""
+        self._check_attached()
         pkt = self.alloc.alloc_astruct(DosPacketStruct, label="DosPkt")
         pkt.type.val = int(action)
         pkt.arg1.val = arg1
+        msg = self.alloc.alloc_astruct(MessageStruct, label="DosPkt")
         try:
-            entry = self._send(pkt.addr, int(action), self._packet_args(pkt))
-        except HandlerError:
+            entry = self._post(
+                pkt.addr, msg.addr, int(action), self._read_args(pkt.addr), msg
+            )
+        except BaseException:
+            msg.free()
             pkt.free()
             raise
         entry.owned = pkt
@@ -433,7 +532,7 @@ class DosPktHandler(PacketHandler):
                 continue
             # a handler replies with the StandardPacket it got, but read the
             # packet through the message in case it replied with another one
-            pkt_addr = MessageStruct(self.mem, msg_addr).node.name.aptr
+            pkt_addr = self.mem.r32(msg_addr + _LN_NAME)
             entry = self._in_flight.get(pkt_addr)
             if entry is None:
                 log_dos.warning(
@@ -443,9 +542,8 @@ class DosPktHandler(PacketHandler):
                     pkt_addr,
                 )
                 continue
-            reply = DosPacketStruct(self.mem, pkt_addr)
-            entry.res1 = reply.res1.val
-            entry.res2 = reply.res2.val
+            entry.res1 = self.mem.r32s(pkt_addr + _DP_RES1)
+            entry.res2 = self.mem.r32s(pkt_addr + _DP_RES2)
             entry.replied = True
             if entry.abandoned:
                 self._late_reply(entry)
@@ -500,12 +598,10 @@ class DosPktHandler(PacketHandler):
     def _is_held(self, addr):
         return any(e.abandoned and e.holds(addr) for e in self._in_flight.values())
 
-    @staticmethod
-    def _packet_args(pkt):
-        return tuple(
-            getattr(pkt, "arg%d" % index).val & 0xFFFFFFFF
-            for index in range(1, _NUM_ARGS + 1)
-        )
+    def _read_args(self, pkt_addr):
+        r32 = self.mem.r32
+        base = pkt_addr + _DP_ARG1
+        return tuple(r32(base + 4 * index) for index in range(_NUM_ARGS))
 
 
 def packet_factory(name, path, cfg, file_system):
