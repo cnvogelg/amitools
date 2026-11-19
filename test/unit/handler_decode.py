@@ -434,7 +434,7 @@ def handler_decode_examine_object_test(dec):
     h.fib_info = HandlerFileInfo(
         "f", HandlerFileInfo.FILE, size=5, blocks=1, comment="c"
     )
-    pkt = _pkt(mem, DosAction.ACTION_EXAMINE_OBJECT, arg1=src, arg2=_FIB_ADDR)
+    pkt = _pkt(mem, DosAction.ACTION_EXAMINE_OBJECT, arg1=src, arg2=_FIB_ADDR >> 2)
     assert dec.harness.decode(pkt) == DOSTRUE
     assert h.calls[-1] == ("examine_object", h.lock)
     fib = FileInfoBlockStruct(mem, _FIB_ADDR)
@@ -451,7 +451,7 @@ def handler_decode_examine_next_test(dec):
     fib = FileInfoBlockStruct(mem, _FIB_ADDR)
     fib.fib_DiskKey.val = 3
     h.fib_info = HandlerFileInfo("n", HandlerFileInfo.FILE, key=4)
-    pkt = _pkt(mem, DosAction.ACTION_EXAMINE_NEXT, arg1=src, arg2=_FIB_ADDR)
+    pkt = _pkt(mem, DosAction.ACTION_EXAMINE_NEXT, arg1=src, arg2=_FIB_ADDR >> 2)
     assert dec.harness.decode(pkt) == DOSTRUE
     assert h.calls[-1] == ("examine_next", h.lock, 3)
     assert fib.fib_DiskKey.val == 4
@@ -462,7 +462,7 @@ def handler_decode_info_test(dec):
     src = dec.harness.decode(
         _pkt(mem, DosAction.ACTION_LOCATE_OBJECT, arg2=_bstr(mem, "", _PATH_ADDR))
     )
-    pkt = _pkt(mem, DosAction.ACTION_INFO, arg1=src, arg2=_INFO_ADDR)
+    pkt = _pkt(mem, DosAction.ACTION_INFO, arg1=src, arg2=_INFO_ADDR >> 2)
     assert dec.harness.decode(pkt) == DOSTRUE
     info = InfoDataStruct(mem, _INFO_ADDR)
     assert info.id_NumBlocks.val == 42
@@ -471,7 +471,7 @@ def handler_decode_info_test(dec):
 
 def handler_decode_disk_info_test(dec):
     mem, h = dec.mem, dec.h
-    pkt = _pkt(mem, DosAction.ACTION_DISK_INFO, arg1=_INFO_ADDR)
+    pkt = _pkt(mem, DosAction.ACTION_DISK_INFO, arg1=_INFO_ADDR >> 2)
     assert dec.harness.decode(pkt) == DOSTRUE
     assert h.calls[-1] == ("disk_info", None)
     assert InfoDataStruct(mem, _INFO_ADDR).id_NumBlocks.val == 42
@@ -612,8 +612,8 @@ def handler_decode_set_protect_comment_test(dec):
         _pkt(
             mem,
             DosAction.ACTION_SET_PROTECT,
-            arg2=_bstr(mem, "x", _PATH_ADDR),
-            arg3=0x1F,
+            arg3=_bstr(mem, "x", _PATH_ADDR),
+            arg4=0x1F,
         )
     )
     assert h.calls[-1] == ("set_protect", "x", 0x1F)
@@ -621,8 +621,8 @@ def handler_decode_set_protect_comment_test(dec):
         _pkt(
             mem,
             DosAction.ACTION_SET_COMMENT,
-            arg2=_bstr(mem, "x", _PATH_ADDR),
-            arg3=_bstr(mem, "hi", _PATH2_ADDR),
+            arg3=_bstr(mem, "x", _PATH_ADDR),
+            arg4=_bstr(mem, "hi", _PATH2_ADDR),
         )
     )
     assert h.calls[-1] == ("set_comment", "x", "hi")
@@ -638,8 +638,9 @@ def handler_decode_set_date_test(dec):
         _pkt(
             mem,
             DosAction.ACTION_SET_DATE,
-            arg2=_bstr(mem, "x", _PATH_ADDR),
-            arg3=_DATE_ADDR >> 2,
+            arg3=_bstr(mem, "x", _PATH_ADDR),
+            # a plain pointer, not a BPTR
+            arg4=_DATE_ADDR,
         )
     )
     name, date = h.calls[-1][1], h.calls[-1][2]
@@ -781,7 +782,7 @@ def handler_decode_examine_fh_test(dec):
     mem, h = dec.mem, dec.h
     fh_id = dec.harness._register_file(h, h.file, "work:f")
     h.fib_info = HandlerFileInfo("f", HandlerFileInfo.FILE, size=3)
-    pkt = _pkt(mem, DosAction.ACTION_EXAMINE_FH, arg1=fh_id, arg2=_FIB_ADDR)
+    pkt = _pkt(mem, DosAction.ACTION_EXAMINE_FH, arg1=fh_id, arg2=_FIB_ADDR >> 2)
     assert dec.harness.decode(pkt) == DOSTRUE
     assert h.calls[-1] == ("examine_fh", h.file)
     assert FileInfoBlockStruct(mem, _FIB_ADDR).fib_Size.val == 3
@@ -836,7 +837,7 @@ def handler_decode_error_mapping_test(dec):
         _pkt(mem, DosAction.ACTION_LOCATE_OBJECT, arg2=_bstr(mem, "f", _PATH_ADDR))
     )
     h.error = ERROR_OBJECT_NOT_FOUND
-    pkt = _pkt(mem, DosAction.ACTION_EXAMINE_OBJECT, arg1=src, arg2=_FIB_ADDR)
+    pkt = _pkt(mem, DosAction.ACTION_EXAMINE_OBJECT, arg1=src, arg2=_FIB_ADDR >> 2)
     assert dec.harness.decode(pkt) == DOSFALSE
     assert pkt.res2.val == ERROR_OBJECT_NOT_FOUND
 

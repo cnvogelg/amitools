@@ -180,8 +180,8 @@ class PacketDecoder:
         parent = AmiPath(ami_path).parent()
         return str(parent) if parent is not None else ami_path
 
-    def _read_date(self, bptr):
-        ds = DateStampStruct(self.mem, bptr << 2)
+    def _read_date(self, addr):
+        ds = DateStampStruct(self.mem, addr)
         return ami_to_sys_time(
             AmiTime(ds.ds_Days.val, ds.ds_Minute.val, ds.ds_Tick.val)
         )
@@ -262,24 +262,26 @@ class PacketDecoder:
 
         if action == DosAction.ACTION_EXAMINE_OBJECT:
             handler, lock, _ = self._lock(a1)
-            self._fill_fib(FileInfoBlockStruct(mem, a2), handler.examine_object(lock))
+            self._fill_fib(
+                FileInfoBlockStruct(mem, a2 << 2), handler.examine_object(lock)
+            )
             return DOSTRUE
 
         if action == DosAction.ACTION_EXAMINE_NEXT:
             handler, lock, _ = self._lock(a1)
-            fib = FileInfoBlockStruct(mem, a2)
+            fib = FileInfoBlockStruct(mem, a2 << 2)
             info = handler.examine_next(lock, fib.fib_DiskKey.val)
             self._fill_fib(fib, info)
             return DOSTRUE
 
         if action == DosAction.ACTION_INFO:
             handler, lock, _ = self._lock(a1)
-            self._fill_info(InfoDataStruct(mem, a2), handler.info(lock))
+            self._fill_info(InfoDataStruct(mem, a2 << 2), handler.info(lock))
             return DOSTRUE
 
         if action == DosAction.ACTION_DISK_INFO:
             handler = self._handler()
-            self._fill_info(InfoDataStruct(mem, a1), handler.disk_info(None))
+            self._fill_info(InfoDataStruct(mem, a1 << 2), handler.disk_info(None))
             return DOSTRUE
 
         if action == DosAction.ACTION_FH_FROM_LOCK:
@@ -361,15 +363,15 @@ class PacketDecoder:
             return 0
 
         if action == DosAction.ACTION_SET_PROTECT:
-            self._handler().set_protect(mem.r_bstr(a2 << 2), a3)
+            self._handler().set_protect(mem.r_bstr(a3 << 2), a4)
             return 0
 
         if action == DosAction.ACTION_SET_COMMENT:
-            self._handler().set_comment(mem.r_bstr(a2 << 2), mem.r_bstr(a3 << 2))
+            self._handler().set_comment(mem.r_bstr(a3 << 2), mem.r_bstr(a4 << 2))
             return 0
 
         if action == DosAction.ACTION_SET_DATE:
-            self._handler().set_date(mem.r_bstr(a2 << 2), self._read_date(a3))
+            self._handler().set_date(mem.r_bstr(a3 << 2), self._read_date(a4))
             return 0
 
         if action == DosAction.ACTION_CREATE_DIR:
@@ -435,7 +437,7 @@ class PacketDecoder:
 
         if action == DosAction.ACTION_EXAMINE_FH:
             handler, fh, _ = self._fh(a1)
-            self._fill_fib(FileInfoBlockStruct(mem, a2), handler.examine_fh(fh))
+            self._fill_fib(FileInfoBlockStruct(mem, a2 << 2), handler.examine_fh(fh))
             return DOSTRUE
 
         if action == DosAction.ACTION_SET_OWNER:
