@@ -84,6 +84,18 @@ class Scheduler(object):
     def get_cur_task(self):
         return self.cur_task
 
+    def get_running_task(self):
+        """the task whose greenlet is executing right now, or None
+
+        Unlike :meth:`get_cur_task` this is not the task the scheduler kept
+        in place after going idle: it is None while the main greenlet runs,
+        e.g. when a handler is driven from Python.
+        """
+        task = self.cur_task
+        if task is not None and task.glet is greenlet.getcurrent():
+            return task
+        return None
+
     def schedule(self):
         """main work call for scheduler. at least one task must be added.
         terminates if there are no more tasks to schedule or if a task

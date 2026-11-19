@@ -147,6 +147,8 @@ def main(
         if not slm.parse_config(lib_cfg):
             log_main.error("lib manager setup failed!")
             return error_code
+        # native handlers resolve their block device through the disk session
+        slm.disk_session = disk_session
         slm.setup()
         slm_is_setup = True
         if disk_session.get_units():

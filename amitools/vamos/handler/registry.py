@@ -5,15 +5,17 @@ factory is called with the volume name, its host path (may be empty for
 non-host handlers), the parsed volume config, and the shared host file
 system, and returns a ready :class:`~amitools.vamos.handler.base.Handler`.
 
-The default registry knows the ``hostfs``, ``nil``, ``console``, ``ram`` and
-``packet`` types. Later ``packet`` types register here as well, so the DOS layer
-can stay unaware of how a volume is implemented.
+The default registry knows the ``hostfs``, ``nil``, ``console``, ``ram``,
+``adfs``, ``packet`` and ``native`` types. Later ``packet``/``native`` types
+register here as well, so the DOS layer can stay unaware of how a volume is
+implemented.
 """
 
 from .adfs import AdfsHandler, open_adfs_blkdev
 from .console import ConsoleHandler
 from .dospkt import packet_factory
 from .filesys import HostFileSysHandler
+from .native import native_factory
 from .nil import NilHandler
 from .ram import RamHandler
 
@@ -83,4 +85,5 @@ def default_registry():
     registry.add_type("ram", ram_factory)
     registry.add_type("adfs", adfs_factory)
     registry.add_type("packet", packet_factory)
+    registry.add_type("native", native_factory)
     return registry

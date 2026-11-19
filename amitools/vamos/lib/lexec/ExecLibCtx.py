@@ -16,6 +16,9 @@ class ExecLibCtx(LibCtx):
         self.lib_mgr = lib_mgr
         self.task = None
         self.process = None
+        # the scheduler is set once the setup manager knows it; it lets the
+        # signal functions find a task when no task is currently running
+        self.scheduler = None
 
     def set_cur_task_process(self, task, process):
         if task:

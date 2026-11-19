@@ -26,6 +26,10 @@ class LibManager(object):
         """access the library proxy manager"""
         return self.proxy_mgr
 
+    def set_strict_lvo(self, flag):
+        """enable the strict-LVO audit (must be set before libraries open)"""
+        self.vlib_mgr.set_strict_lvo(flag)
+
     def add_ctx(self, name, ctx):
         """allow to add vlib contexts"""
         self.vlib_mgr.add_ctx(name, ctx)

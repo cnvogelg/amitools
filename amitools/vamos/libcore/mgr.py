@@ -32,6 +32,8 @@ class VLibManager(object):
         self.lib_profiler = LibProfiler(prof_names, prof_calls)
         if main_profiler:
             main_profiler.add_profiler(self.lib_profiler)
+        # strict-LVO audit (off by default; see HANDLER.md step 23h)
+        self.strict_lvo = False
         # tools
         self._setup_creator()
         # state
@@ -54,7 +56,13 @@ class VLibManager(object):
             log_missing=log_missing,
             log_valid=log_valid,
             lib_profiler=self.lib_profiler,
+            strict_missing=self.strict_lvo,
         )
+
+    def set_strict_lvo(self, flag):
+        """enable/disable the strict-LVO audit (must be set before libs open)"""
+        self.strict_lvo = bool(flag)
+        self._setup_creator()
 
     def set_ctx_extra_attr(self, key, val):
         """set extra attributes automatically added to each context"""

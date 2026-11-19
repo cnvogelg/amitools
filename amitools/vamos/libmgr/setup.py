@@ -40,12 +40,25 @@ class SetupLibManager(object):
         self.exec_ctx = None
         self.dos_ctx = None
         self.lib_mgr = None
+        # the disk session backing native handlers (set by ``main`` before the
+        # base libraries are opened)
+        self.disk_session = None
+        # the manager that owns the started 68k handler tasks (step 23)
+        self.native_mgr = None
+        # strict-LVO audit (step 23h); must be set before the libs are opened
+        self._strict_lvo = False
 
     def parse_config(self, cfg):
         if not cfg:
             return True
         self.lib_mgr_cfg = LibMgrCfg.from_dict(cfg)
         return True
+
+    def set_strict_lvo(self, flag):
+        """enable the strict-LVO audit (call before :meth:`setup`)"""
+        self._strict_lvo = bool(flag)
+        if self.lib_mgr is not None:
+            self.lib_mgr.set_strict_lvo(self._strict_lvo)
 
     def setup(self):
         # create def cfg
@@ -67,6 +80,7 @@ class SetupLibManager(object):
             self.lib_mgr_cfg,
             main_profiler=self.main_profiler,
         )
+        self.lib_mgr.set_strict_lvo(self._strict_lvo)
         # setup special lib contexts for exec and dos
         self.exec_ctx = ExecLibCtx(
             self.machine,
@@ -76,6 +90,7 @@ class SetupLibManager(object):
             self.path_mgr,
             self.lib_mgr,
         )
+        self.exec_ctx.scheduler = self.scheduler
         self.dos_ctx = DosLibCtx(
             self.machine,
             self.alloc,
@@ -99,6 +114,9 @@ class SetupLibManager(object):
         return self.lib_mgr
 
     def cleanup(self):
+        # a native handler that was not stopped by close_base_libs is stopped
+        # here, before the base libraries are torn down
+        self._stop_native_handlers()
         # shutdown of libmgr needs temp stack
         sp = self.machine.get_ram_begin() - 4
         native_shutdown = None
@@ -161,6 +179,28 @@ class SetupLibManager(object):
         # now that exec/dos (and the port manager) exist, hand the live machine
         # to any detached packet handler (``?handler=packet``)
         self._attach_packet_handlers()
+        # and start the 68k handler tasks of the native handler volumes
+        self._start_native_handlers()
+
+    def _start_native_handlers(self):
+        from amitools.vamos.handler.native import NativeHandler, build_native_manager
+
+        if self.handler_mgr is None:
+            return
+        native_handlers = [
+            h
+            for h in self.handler_mgr.get_all_handlers()
+            if isinstance(h, NativeHandler)
+        ]
+        if not native_handlers:
+            return
+        self.native_mgr = build_native_manager(self, disk_session=self.disk_session)
+        self.native_mgr.start_all()
+
+    def _stop_native_handlers(self):
+        if self.native_mgr is not None:
+            self.native_mgr.shutdown()
+            self.native_mgr = None
 
     def _attach_packet_handlers(self):
         if self.handler_mgr is None:
@@ -176,6 +216,8 @@ class SetupLibManager(object):
 
     def close_base_libs(self):
         log_libmgr.info("closing base libs...")
+        # stop the native handler tasks while exec/dos are still alive
+        self._stop_native_handlers()
         # close dos
         self.lib_mgr.close_lib(self.dos_addr)
         log_libmgr.info("closed dos")

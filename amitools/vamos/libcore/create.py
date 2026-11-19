@@ -18,13 +18,18 @@ class LibCreator(object):
         log_missing=None,
         log_valid=None,
         lib_profiler=None,
+        strict_missing=False,
     ):
         self.alloc = alloc
         self.traps = traps
         # options
         self.fd_dir = fd_dir
         self.profiler = lib_profiler
-        self.stub_gen = LibStubGen(log_missing=log_missing, log_valid=log_valid)
+        self.stub_gen = LibStubGen(
+            log_missing=log_missing,
+            log_valid=log_valid,
+            strict_missing=strict_missing,
+        )
 
     def _create_library(self, info, is_dev, fd):
         if is_dev:

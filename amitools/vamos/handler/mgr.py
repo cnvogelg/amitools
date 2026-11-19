@@ -94,6 +94,10 @@ class HandlerManager:
         dispatcher are left alone.
         """
         for name, handler in self.handlers.items():
+            # a native handler is served by its own 68k task: its dispatcher
+            # shim already reports the real packet port
+            if getattr(handler, "is_native", False):
+                continue
             if getattr(handler, "dispatcher", None) is not None:
                 continue
             decoder = make_decoder(handler)
@@ -188,6 +192,10 @@ class HandlerManager:
 
     def get_all_names(self):
         return list(self.handlers.keys())
+
+    def get_all_handlers(self):
+        """every registered handler, in registration order"""
+        return list(self.handlers.values())
 
     # ----- path resolution -----
 
@@ -401,6 +409,12 @@ class HandlerManager:
         handler = self.get_handler(name)
         if handler is None:
             return True
+        # the local flag describes the handler; a transport handler's
+        # ``is_filesystem()`` is the remote packet query and is not available
+        # until its transport is attached (and would be a needless round trip)
+        is_fs = getattr(handler, "is_fs", None)
+        if is_fs is not None:
+            return is_fs
         return handler.is_filesystem()
 
     # ----- directory listing -----
