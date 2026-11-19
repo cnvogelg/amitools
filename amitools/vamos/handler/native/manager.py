@@ -333,19 +333,29 @@ class _ProcessOwner:
             self.seglist_baddr = 0
 
 
-def build_native_manager(slm, disk_session=None, task_factory=None):
-    """create a :class:`NativeHandlerManager` for an initialized ``SetupLibManager``
+def build_native_manager(
+    machine,
+    alloc,
+    scheduler,
+    seg_loader,
+    exec_impl,
+    dos_impl,
+    handler_mgr=None,
+    disk_session=None,
+    task_factory=None,
+):
+    """create a :class:`NativeHandlerManager` from live exec/dos resources
 
-    ``slm`` must have its base libraries open (``exec_impl``/``dos_impl``).
+    The caller must have the base libraries open (``exec_impl``/``dos_impl``).
     """
     return NativeHandlerManager(
-        slm.machine,
-        slm.alloc,
-        slm.scheduler,
-        slm.seg_loader,
-        slm.exec_impl,
-        slm.dos_impl,
-        handler_mgr=slm.handler_mgr,
+        machine,
+        alloc,
+        scheduler,
+        seg_loader,
+        exec_impl,
+        dos_impl,
+        handler_mgr=handler_mgr,
         disk_session=disk_session,
         task_factory=task_factory,
     )

@@ -43,8 +43,6 @@ class SetupLibManager(object):
         # the disk session backing native handlers (set by ``main`` before the
         # base libraries are opened)
         self.disk_session = None
-        # the manager that owns the started 68k handler tasks (step 23)
-        self.native_mgr = None
         # strict-LVO audit (step 23h); must be set before the libs are opened
         self._strict_lvo = False
 
@@ -183,24 +181,23 @@ class SetupLibManager(object):
         self._start_native_handlers()
 
     def _start_native_handlers(self):
-        from amitools.vamos.handler.native import NativeHandler, build_native_manager
-
         if self.handler_mgr is None:
             return
-        native_handlers = [
-            h
-            for h in self.handler_mgr.get_all_handlers()
-            if isinstance(h, NativeHandler)
-        ]
-        if not native_handlers:
-            return
-        self.native_mgr = build_native_manager(self, disk_session=self.disk_session)
-        self.native_mgr.start_all()
+        # the handler manager owns the 68k task host (step 23); it is a no-op
+        # when no ``?handler=native`` volume is bound
+        self.handler_mgr.attach_native_transport(
+            self.machine,
+            self.alloc,
+            self.scheduler,
+            self.seg_loader,
+            self.exec_impl,
+            self.dos_impl,
+            disk_session=self.disk_session,
+        )
 
     def _stop_native_handlers(self):
-        if self.native_mgr is not None:
-            self.native_mgr.shutdown()
-            self.native_mgr = None
+        if self.handler_mgr is not None:
+            self.handler_mgr.stop_native_transport()
 
     def _attach_packet_handlers(self):
         if self.handler_mgr is None:

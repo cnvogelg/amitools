@@ -163,9 +163,10 @@ def handler_native_real_binary_wiring_test():
     _register(slm, handler)
 
     slm.open_base_libs()
-    # the setup manager built and ran the native manager
-    assert slm.native_mgr is not None
-    assert slm.native_mgr.started != []
+    # the setup manager handed the live machine to the handler manager, which
+    # now owns and runs the native task host
+    assert slm.handler_mgr.native_mgr is not None
+    assert slm.handler_mgr.native_mgr.started != []
     assert handler.handler_port != 0
 
     # the device node is a real DLT_DEVICE entry and the handler answers

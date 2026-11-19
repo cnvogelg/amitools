@@ -161,9 +161,13 @@ them. It is built once at startup and passed to the DOS layer.
   ``disk_info(volume_name)`` (a lock-less ``ACTION_DISK_INFO`` query, used by
   ``Info()`` when a lock has no handler lock).
 - ``attach_packet_transport(...)`` hands the live machine to handlers that need
-  a packet transport. ``build_handler_manager(...)`` is the top-level entry
-  point: it binds every volume and creates the ``?create`` assign directories
-  that live on a non-host volume (which has no host path to create them in).
+  a packet transport. ``attach_native_transport(...)`` does the same for
+  ``?handler=native`` volumes: it builds the 68k task host
+  (``NativeHandlerManager``) that runs the handler binaries and keeps it as
+  ``native_mgr``; ``stop_native_transport()`` stops it. ``build_handler_manager(...)``
+  is the top-level entry point: it binds every volume and creates the
+  ``?create`` assign directories that live on a non-host volume (which has no
+  host path to create them in).
 
 HandlerRegistry
 ~~~~~~~~~~~~~~~
@@ -171,8 +175,8 @@ HandlerRegistry
 ``HandlerRegistry`` maps a lower-cased type name to a factory
 ``(name, path, cfg, file_system) -> Handler``. ``default_registry()`` returns a
 registry with the built-in types ``hostfs``, ``adfs``, ``ram``, ``nil``,
-``console``, and ``packet``. ``get_all_types()`` lists them and ``create(...)``
-builds one (or returns ``None`` for an unknown type).
+``console``, ``packet`` and ``native``. ``get_all_types()`` lists them and
+``create(...)`` builds one (or returns ``None`` for an unknown type).
 
 
 Packet decoder
