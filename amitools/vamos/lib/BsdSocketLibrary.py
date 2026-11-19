@@ -69,7 +69,6 @@ FD_SETSIZE = 256
 
 
 class BsdSocketLibrary(LibImpl):
-
     def setup_lib(self, ctx, base_addr):
         self.alloc = ctx.alloc
         self.cnt = 0
@@ -470,10 +469,13 @@ class BsdSocketLibrary(LibImpl):
         if level == 0xFFFF:
             host_level, table = s.SOL_SOCKET, socket_options
         elif level == 6:
-            host_level, table = s.IPPROTO_TCP, {
-                1: ("TCP_NODELAY", "int"),
-                2: ("TCP_MAXSEG", "int"),
-            }
+            host_level, table = (
+                s.IPPROTO_TCP,
+                {
+                    1: ("TCP_NODELAY", "int"),
+                    2: ("TCP_MAXSEG", "int"),
+                },
+            )
         elif level == 0:
             host_level, table = s.IPPROTO_IP, ip_options
         else:
