@@ -57,6 +57,11 @@ class MemoryMap(object):
 
     def cleanup(self):
         if self.alloc:
+            # exec.library mirrors the free list into guest memory until its
+            # finish_lib() runs. An embedder that never expunges exec leaves
+            # that hook set, and memory freed after the machine is gone (by a
+            # Pool finalizer, for one) would then write into freed memory.
+            self.alloc.change_callback = None
             self.alloc.dump_orphans()
 
     def setup_hw_access(self, mode_str):
