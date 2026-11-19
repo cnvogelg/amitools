@@ -15,6 +15,7 @@ from native_task import TaskHandler
 from amitools.vamos.handler.base import ERROR_OBJECT_IN_USE, HandlerError
 from amitools.vamos.handler.native import NativeHandler, NativeHandlerManager
 from amitools.vamos.libmgr import SetupLibManager
+from amitools.vamos.main import wire_handler_transports
 from amitools.vamos.machine import Machine, MemoryMap, Runtime
 from amitools.vamos.path import PathManager
 from amitools.vamos.schedule import Scheduler
@@ -53,6 +54,11 @@ def _register(slm, handler):
 def _finish(slm):
     slm.close_base_libs()
     slm.cleanup()
+
+
+def _wire(slm, machine, scheduler):
+    """connect the handler transports as the vamos wiring does"""
+    wire_handler_transports(slm, slm.handler_mgr, machine, scheduler)
 
 
 def handler_native_manager_task_factory_test():
@@ -161,6 +167,7 @@ def handler_native_real_binary_wiring_test():
     machine, scheduler, slm = _make_slm()
     handler = NativeHandler("work", {"binary": HUNK})
     _register(slm, handler)
+    _wire(slm, machine, scheduler)
 
     slm.open_base_libs()
     # the setup manager handed the live machine to the handler manager, which
@@ -198,6 +205,7 @@ def handler_native_strict_lvo_clean_test():
     slm.setup()
     handler = NativeHandler("work", {"binary": HUNK})
     _register(slm, handler)
+    _wire(slm, machine, scheduler)
     # a missing LVO would raise MissingLibFuncError out of the handler task
     slm.open_base_libs()
     lock = handler.locate_object("foo")

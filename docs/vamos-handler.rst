@@ -168,6 +168,12 @@ them. It is built once at startup and passed to the DOS layer.
   is the top-level entry point: it binds every volume and creates the
   ``?create`` assign directories that live on a non-host volume (which has no
   host path to create them in).
+- The transports cannot be attached while the handlers are bound (they need
+  exec/dos), so the top-level wiring connects them to the lib manager
+  lifecycle: ``SetupLibManager`` exposes ``add_post_setup_callback``/
+  ``add_pre_shutdown_callback`` hooks and ``main.wire_handler_transports(...)``
+  registers the attach/detach steps on them. The lib manager itself stays
+  handler-agnostic.
 
 HandlerRegistry
 ~~~~~~~~~~~~~~~
