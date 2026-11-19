@@ -55,6 +55,8 @@ def handler_native_blkdev_device_name_test():
     assert spec.device == DEFAULT_DEVICE
     assert spec.unit == 0
     assert spec.geometry is env
+    # the resolved partition name lets the manager reuse its startup (24c)
+    assert spec.partition_name == "DH0"
 
 
 def handler_native_blkdev_part_selector_test():
@@ -106,6 +108,7 @@ def handler_native_blkdev_synthetic_fallback_test():
     assert spec.device == DEFAULT_DEVICE
     assert spec.unit == 0
     assert isinstance(spec.geometry, BlkDevGeometry)
+    assert spec.partition_name is None
 
 
 def handler_native_blkdev_empty_session_test():

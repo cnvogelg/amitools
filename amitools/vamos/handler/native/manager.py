@@ -3,8 +3,9 @@
 One manager drives every ``?handler=native`` volume. It loads the handler
 binary as a seglist, creates a process for it, wires up the handler's
 ``pr_MsgPort`` as a real Exec signal port, publishes the device node in the DOS
-list and performs the startup handshake. On shutdown it sends ``ACTION_DIE``
-and frees everything it allocated.
+list (adopting the ``--disk`` partition node when the mount name matches) and
+performs the startup handshake. On shutdown it sends ``ACTION_DIE`` and frees
+everything it allocated.
 
 The manager is created in :meth:`SetupLibManager.open_base_libs` once exec and
 dos exist (HANDLER.md step 23g) and stopped again before the base libraries are
@@ -67,13 +68,26 @@ class HandlerProgram:
 
 
 class _StartedHandler:
-    def __init__(self, handler, program, resources, entry, port, bstr_mem):
+    def __init__(
+        self,
+        handler,
+        program,
+        resources,
+        entry,
+        port,
+        bstr_mem,
+        adopted=False,
+    ):
         self.handler = handler
         self.program = program
+        # ``resources`` is None when the manager adopted an existing node (the
+        # startup message belongs to the DiskSession then)
         self.resources = resources
         self.entry = entry
         self.port = port
         self.bstr_mem = bstr_mem
+        # an adopted node is owned by the DiskSession, not by the manager
+        self.adopted = adopted
 
 
 class NativeHandlerManager:
@@ -126,18 +140,47 @@ class NativeHandlerManager:
         configure_handler_port(port, SIGB_DOS, program.ami_task.addr)
         self.exec_impl.exec_lib.port_list.enqueue(port.node)
 
-        resources = build_startup(self.alloc, spec.unit, spec.device, spec.geometry)
         bstr_mem = self._alloc_bstr(handler.binary or handler.name)
-        entry = add_device_node(
-            self.dos_impl.dos_list,
-            handler.name,
-            resources.startup.addr >> 2,
-            task=port.addr,
-            seg_list=program.seg_list_baddr,
-            glob_vec=program.glob_vec,
-            # dol_Handler is a BSTR (a byte address), not a BPTR
-            handler=bstr_mem.addr if bstr_mem is not None else 0,
-        )
+        # dol_Handler is a BSTR (a byte address), not a BPTR
+        handler_addr = bstr_mem.addr if bstr_mem is not None else 0
+        dos_list = self.dos_impl.dos_list
+        entry = dos_list.get_device_by_name(handler.name)
+        if entry is not None:
+            # adopt the ``--disk`` partition node the DiskSession published
+            # (step 24c): fill in the handler fields and leave ``dol_Startup``
+            # (and the node's lifetime) with the DiskSession
+            dos_list.fill_device(
+                entry,
+                task=port.addr,
+                seg_list=program.seg_list_baddr,
+                glob_vec=program.glob_vec,
+                handler=handler_addr,
+            )
+            resources = None
+            adopted = True
+        else:
+            # a mount name differing from the partition gets its own node. It
+            # reuses the referenced partition's FileSysStartupMsg when the
+            # session published one (the DiskSession keeps ownership); only a
+            # volume without a partition node builds its own startup.
+            startup_bptr = self._partition_startup_bptr(dos_list, spec)
+            if startup_bptr:
+                resources = None
+            else:
+                resources = build_startup(
+                    self.alloc, spec.unit, spec.device, spec.geometry
+                )
+                startup_bptr = resources.startup.addr >> 2
+            entry = add_device_node(
+                dos_list,
+                handler.name,
+                startup_bptr,
+                task=port.addr,
+                seg_list=program.seg_list_baddr,
+                glob_vec=program.glob_vec,
+                handler=handler_addr,
+            )
+            adopted = False
         self.dos_impl.update_dos_list_head()
 
         handler.attach_native(
@@ -151,14 +194,20 @@ class NativeHandlerManager:
             port.addr,
             max_cycles=self.max_cycles,
         )
-        started = _StartedHandler(handler, program, resources, entry, port, bstr_mem)
+        started = _StartedHandler(
+            handler, program, resources, entry, port, bstr_mem, adopted=adopted
+        )
         self.started.append(started)
         self.scheduler.add_task(program.sched_task)
         try:
             bptr = (bstr_mem.addr >> 2) if bstr_mem is not None else 0
-            alt_port = handler.send_startup(
-                bptr, resources.startup.addr >> 2, entry.baddr
-            )
+            # an adopted node (and a created one that reused the partition
+            # startup) keeps the DiskSession's FileSysStartupMsg
+            if resources is not None:
+                startup_bptr = resources.startup.addr >> 2
+            else:
+                startup_bptr = entry.struct.dol_Startup.val
+            alt_port = handler.send_startup(bptr, startup_bptr, entry.baddr)
             if alt_port:
                 handler.handler_port = alt_port
         except Exception:
@@ -227,14 +276,22 @@ class NativeHandlerManager:
                 node.remove()
         except Exception:
             pass
-        # remove + free the device node
+        # the device node: an adopted ``--disk`` node is owned by the
+        # DiskSession, so only the handler fields are cleared; a node the
+        # manager created is removed and freed here (step 24c)
         try:
-            self.dos_impl.dos_list.remove_entry(started.entry)
-            self.dos_impl.dos_list.free_entry(started.entry)
+            dos_list = self.dos_impl.dos_list
+            if started.adopted:
+                dos_list.fill_device(started.entry)
+            else:
+                dos_list.remove_entry(started.entry)
+                dos_list.free_entry(started.entry)
             self.dos_impl.update_dos_list_head()
         except Exception as e:  # noqa: BLE001
             log_handler.warning("native handler '%s' device node: %s", handler.name, e)
-        started.resources.free()
+        if started.resources is not None:
+            started.resources.free()
+            started.resources = None
         if started.bstr_mem is not None:
             self.alloc.free_bstr(started.bstr_mem)
             started.bstr_mem = None
@@ -317,6 +374,22 @@ class NativeHandlerManager:
         if not text:
             return None
         return self.alloc.alloc_bstr(str(text), label="NativeHandlerName")
+
+    @staticmethod
+    def _partition_startup_bptr(dos_list, spec):
+        """the ``dol_Startup`` BPTR of the partition's DOS device node (or 0)
+
+        A ``--disk`` partition the ``DiskSession`` published carries the
+        ``FileSysStartupMsg`` the handler needs, so a node created for a
+        differing mount name reuses it instead of duplicating the ``DosEnvec``
+        (step 24c).
+        """
+        if not spec.partition_name:
+            return 0
+        node = dos_list.get_device_by_name(spec.partition_name)
+        if node is None:
+            return 0
+        return node.struct.dol_Startup.val
 
 
 class _ProcessOwner:

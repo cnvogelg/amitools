@@ -201,7 +201,9 @@ class DiskSession:
                 backend = self.get_backend(unit)
                 for partition in getattr(backend, "partitions", ()):
                     name = partition.name.rstrip(":")
-                    if dos_list.get_entry_by_name(name) is not None:
+                    # only an existing *device* node is a duplicate; a volume
+                    # entry of the same name (a native handler's volume) is not
+                    if dos_list.get_device_by_name(name) is not None:
                         raise ValueError("duplicate DOS device name: %s" % name)
                     env = self._alloc_dos_env(alloc, partition.dos_env)
                     startup = None

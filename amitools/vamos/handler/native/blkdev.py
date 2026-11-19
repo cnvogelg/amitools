@@ -60,10 +60,13 @@ class BlkDevGeometry:
 class BlkDevSpec:
     """the block device a native handler is bound to"""
 
-    def __init__(self, device, unit, geometry):
+    def __init__(self, device, unit, geometry, partition_name=None):
         self.device = device
         self.unit = unit
         self.geometry = geometry
+        # the RDB partition's DOS device name (e.g. ``DH0``), when resolved;
+        # lets the manager reuse that node's ``FileSysStartupMsg`` (step 24c)
+        self.partition_name = partition_name
 
     def __repr__(self):
         return "BlkDevSpec(device=%s, unit=%s, geometry=%s)" % (
@@ -76,7 +79,7 @@ class BlkDevSpec:
 def _find_partition(disk_session, selector):
     """find a partition by DOS device name or RDB index across the units
 
-    Returns ``(unit, dos_env)`` or ``None``.
+    Returns ``(unit, partition)`` or ``None``.
     """
     if selector is None:
         return None
@@ -85,7 +88,7 @@ def _find_partition(disk_session, selector):
         for partition in getattr(backend, "partitions", ()):
             name = partition.name.rstrip(":")
             if selector == name or str(selector) == str(partition.index):
-                return unit, partition.dos_env
+                return unit, partition
     return None
 
 
@@ -94,7 +97,7 @@ def _first_partition(disk_session):
     for unit in disk_session.get_units():
         backend = disk_session.get_backend(unit)
         for partition in getattr(backend, "partitions", ()):
-            return unit, partition.dos_env
+            return unit, partition
     return None
 
 
@@ -103,11 +106,13 @@ def resolve_blkdev(disk_session, config, name=None):
 
     ``config.device`` names the DOS device node of a partition, ``config.part``
     the RDB partition directly; ``name`` is the mount name used when neither is
-    set. A partition that can be resolved in the disk session supplies both the
-    unit and the geometry; otherwise a synthetic geometry is used.
+    set. A partition that can be resolved in the disk session supplies the unit,
+    the geometry and its DOS device name; otherwise a synthetic geometry is
+    used.
     """
     unit = config.unit
     geometry = None
+    partition_name = None
 
     if disk_session is not None:
         selector = config.part
@@ -121,7 +126,9 @@ def resolve_blkdev(disk_session, config, name=None):
             # partition so a single-disk setup still mounts
             found = _first_partition(disk_session)
         if found is not None:
-            found_unit, geometry = found
+            found_unit, partition = found
+            geometry = partition.dos_env
+            partition_name = partition.name.rstrip(":")
             if unit is None:
                 unit = found_unit
 
@@ -130,4 +137,4 @@ def resolve_blkdev(disk_session, config, name=None):
         geometry = BlkDevGeometry()
     if unit is None:
         unit = 0
-    return BlkDevSpec(DEFAULT_DEVICE, unit, geometry)
+    return BlkDevSpec(DEFAULT_DEVICE, unit, geometry, partition_name)
