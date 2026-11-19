@@ -23,7 +23,6 @@ from ..base import (
     ERROR_OBJECT_NOT_FOUND,
     HandlerError,
 )
-from . import startup
 from .blkdev import resolve_blkdev
 from .handler import NativeHandler
 from .startup import (
@@ -119,7 +118,7 @@ class NativeHandlerManager:
         """load, start and publish one native handler"""
         if self._find(handler) is not None:
             return handler
-        spec = resolve_blkdev(self.disk_session, handler.cfg)
+        spec = resolve_blkdev(self.disk_session, handler.config)
         program = self._make_program(handler)
         # the handler's pr_MsgPort becomes a real Exec signal port. The port is
         # signalled with SIGB_DOS, like a process port (dos/Cli.py)
@@ -278,18 +277,23 @@ class NativeHandlerManager:
             )
         info = self.seg_loader.get_info(baddr)
         seglist = info.seglist
+        config = handler.config
         proc = DosProcess(
             self.machine,
             self.alloc,
             "%s_handler" % handler.name,
+            stack_size=config.stack,
             start_pc=seglist.get_start_pc(),
         )
+        # a handler process carries its priority in the task node, exactly like
+        # CreateProc/CreateNewProc do (dos/Cli.py)
+        proc.proc.task.node.pri.val = config.priority
         return HandlerProgram(
             proc.get_sched_task(),
             proc.get_ami_task(),
             proc.proc.msg_port,
             seg_list_baddr=baddr,
-            glob_vec=startup.GLOBVEC_C,
+            glob_vec=config.globvec,
             owner=_ProcessOwner(self, proc, baddr),
         )
 

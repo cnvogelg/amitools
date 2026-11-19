@@ -63,14 +63,6 @@ class BlkDevSpec:
         )
 
 
-def _parse_unit(value):
-    if value is None:
-        return None
-    if isinstance(value, int):
-        return value
-    return int(str(value), 0)
-
-
 def _find_partition(disk_session, part):
     """find ``part`` (name or index) across the session's disk units"""
     for unit in disk_session.get_units():
@@ -83,19 +75,15 @@ def _find_partition(disk_session, part):
     return None, None
 
 
-def resolve_blkdev(disk_session, cfg):
-    """build a :class:`BlkDevSpec` from a handler config
+def resolve_blkdev(disk_session, config):
+    """build a :class:`BlkDevSpec` from a ``NativeConfig``
 
-    Reads ``device``/``unit``/``part`` (``partition`` is accepted as an alias).
     A partition that can be resolved in the disk session supplies both the unit
     and the geometry; otherwise a synthetic geometry is used.
     """
-    cfg = cfg or {}
-    device = cfg.get("device") or DEFAULT_DEVICE
-    unit = _parse_unit(cfg.get("unit"))
-    part = cfg.get("part")
-    if part is None:
-        part = cfg.get("partition")
+    device = config.device or DEFAULT_DEVICE
+    unit = config.unit
+    part = config.part
 
     geometry = None
     if disk_session is not None and part is not None:

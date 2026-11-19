@@ -193,6 +193,28 @@ def handler_native_real_binary_wiring_test():
     assert slm.alloc.is_all_free()
 
 
+def handler_native_process_options_test():
+    """``globvec``/``stack``/``priority`` reach the started handler (24a)."""
+    machine, scheduler, slm = _make_slm()
+    handler = NativeHandler(
+        "work", {"binary": HUNK, "globvec": -2, "stack": 8192, "priority": 5}
+    )
+    _register(slm, handler)
+    _wire(slm, machine, scheduler)
+
+    slm.open_base_libs()
+    entry = slm.dos_impl.dos_list.get_entry_by_name("work")
+    assert entry.struct.dol_GlobVec.val == -2
+    # the handler process carries the configured priority and stack size
+    started = slm.handler_mgr.native_mgr.started[0]
+    task = started.program.ami_task
+    assert task.node.pri.val == 5
+    assert task.tc_SPUpper.aptr - task.tc_SPLower.aptr == 8192
+
+    _finish(slm)
+    assert slm.alloc.is_all_free()
+
+
 def handler_native_strict_lvo_clean_test():
     """The tiny fixture uses only implemented exec LVOs (step 23h)."""
     machine = Machine()
