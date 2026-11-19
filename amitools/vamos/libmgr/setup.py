@@ -2,6 +2,7 @@ from amitools.vamos.handler import build_handler_manager
 from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.lib.LibList import vamos_libs
+from amitools.vamos.libtypes import Message, MsgPort
 from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.log import log_libmgr
 from amitools.vamos.schedule import SchedulerEvent, TaskState
@@ -167,11 +168,18 @@ class SetupLibManager(object):
             return
         exec_impl = self.exec_impl
         port_list = exec_impl.exec_lib.port_list
+        mem = exec_impl.mem
+
+        def put_msg(port_addr, msg_addr):
+            # as PutMsg(): queue the packet and signal the handler's task
+            exec_impl.msg_func.put_msg(MsgPort(mem, port_addr), Message(mem, msg_addr))
+
         self.handler_mgr.attach_packet_transport(
             self.alloc,
             exec_impl.port_mgr,
-            exec_impl.mem,
+            mem,
             find_port=lambda name: port_list.find_name(name, promote=True),
+            put_msg=put_msg,
         )
 
     def close_base_libs(self):

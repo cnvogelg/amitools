@@ -17,7 +17,9 @@ once the exec/dos libraries are open via
 The reply is expected on the reply port. A synchronous handler (an emulated
 one driven in-process) queues it while ``put_msg`` runs, so no wait is needed;
 a handler that runs as its own task needs a ``pump`` callable that advances the
-emulation until the reply arrives.
+emulation until the reply arrives. Such a handler waits for the signal of its
+port, which ``PortManager.put_msg`` alone does not send: the transport then
+needs a ``put_msg`` that delivers like exec's ``PutMsg()``.
 
 Packets in flight
 -----------------
@@ -157,6 +159,7 @@ class DosPktHandler(PacketHandler):
         self._own_reply_port = False
         self._find_port = None
         self._pump = None
+        self._put_msg = None
         self.timeout = self.REPLY_TIMEOUT
         # packet address -> _InFlight, for every packet not yet answered
         self._in_flight = {}
@@ -167,7 +170,14 @@ class DosPktHandler(PacketHandler):
     # ----- attaching the transport -----
 
     def attach_transport(
-        self, alloc, port_mgr, mem, find_port=None, pump=None, timeout=None
+        self,
+        alloc,
+        port_mgr,
+        mem,
+        find_port=None,
+        pump=None,
+        timeout=None,
+        put_msg=None,
     ):
         """bind the handler to the live machine
 
@@ -175,13 +185,19 @@ class DosPktHandler(PacketHandler):
         direct address); ``pump()`` advances the emulation while waiting for a
         reply from a handler that runs as its own task, and returns ``False``
         once nothing can make progress any more. ``timeout`` (seconds) bounds
-        a pumped wait; it defaults to ``REPLY_TIMEOUT``.
+        a pumped wait; it defaults to ``REPLY_TIMEOUT``. ``put_msg(port_addr,
+        msg_addr)`` delivers a packet to the handler port as ``PutMsg()``
+        does: it queues the message, on a port the port manager knows or in
+        the port's ``mp_MsgList``, and signals the port's task. Without one,
+        the packet goes to the port manager's queue only, which is enough for
+        a handler driven in-process.
         """
         self.alloc = alloc
         self.mem = mem
         self.port_mgr = port_mgr
         self._find_port = find_port
         self._pump = pump
+        self._put_msg = put_msg
         if timeout is not None:
             self.timeout = timeout
         if self.handler_port == 0 and self.port_name is not None:
@@ -336,7 +352,7 @@ class DosPktHandler(PacketHandler):
     def _send(self, pkt_addr, action, args):
         if self.port_mgr is None or self.alloc is None or self.handler_port == 0:
             raise HandlerError(ERROR_NOT_IMPLEMENTED, "packet transport not attached")
-        if not self.port_mgr.has_port(self.handler_port):
+        if self._put_msg is None and not self.port_mgr.has_port(self.handler_port):
             raise HandlerError(
                 ERROR_OBJECT_NOT_FOUND,
                 "handler port %06x not found" % self.handler_port,
@@ -344,13 +360,19 @@ class DosPktHandler(PacketHandler):
         # a StandardPacket: the message's ln_Name names the DosPacket
         msg = self.alloc.alloc_astruct(MessageStruct, label="DosPkt")
         msg.node.name.aptr = pkt_addr
+        # for a handler that answers with ReplyMsg()
+        msg.reply_port.aptr = self.reply_port
+        msg.length.val = MessageStruct.get_size() + DosPacketStruct.get_size()
         pkt = DosPacketStruct(self.mem, pkt_addr)
         pkt.link.aptr = msg.addr
         pkt.port.aptr = self.reply_port
         entry = _InFlight(pkt_addr, action, args, msg)
         self._in_flight[pkt_addr] = entry
         # a synchronous handler queues its reply while put_msg runs
-        self.port_mgr.put_msg(self.handler_port, msg.addr)
+        if self._put_msg is not None:
+            self._put_msg(self.handler_port, msg.addr)
+        else:
+            self.port_mgr.put_msg(self.handler_port, msg.addr)
         return entry
 
     def _send_unwaited(self, action, arg1):

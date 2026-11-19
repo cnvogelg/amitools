@@ -473,3 +473,36 @@ def dospkt_holds_names_abandoned_buffers_test():
     env.server.answer(res1=64)
     env.h.poll()
     assert not env.h.holds(buf.addr)
+
+
+def dospkt_put_msg_delivers_like_exec_test():
+    # a handler that runs as its own task waits for its port's signal, so
+    # the transport delivers through the put_msg it was given
+    mem = MockMemory(size_kib=64)
+    alloc = MemoryAlloc(mem)
+    port_mgr = PortManager(alloc)
+    server = _Server(mem, port_mgr)
+    delivered = []
+
+    def put_msg(port_addr, msg_addr):
+        delivered.append(port_addr)
+        port_mgr.put_msg(port_addr, msg_addr)
+
+    handler = DosPktHandler("work", alloc, port=server.port)
+    handler.attach_transport(
+        alloc,
+        port_mgr,
+        mem,
+        pump=lambda: server.answer(res1=0x40),
+        put_msg=put_msg,
+    )
+    assert handler.locate_object("x").bptr == 0x40
+    assert delivered == [server.port]
+
+
+def dospkt_message_names_its_reply_port_test():
+    # a handler that answers with ReplyMsg() replies to mn_ReplyPort
+    env = _inflight_env()
+    _abandon(env, env.h.locate_object, "x")
+    msg = MessageStruct(env.mem, env.server.queue[0])
+    assert msg.reply_port.aptr == env.h.reply_port
