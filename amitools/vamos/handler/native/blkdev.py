@@ -5,16 +5,26 @@ device* (``scsi.device``) and applies the partition geometry from its
 ``DosEnvec``. This module turns the handler config into the pieces the startup
 message needs:
 
-* the device name (``scsi.device`` by default) and the unit number;
+* the block device (``scsi.device``) and the unit number;
 * the geometry source (the ``DosEnvec`` of an RDB partition) for
   :func:`~amitools.vamos.handler.native.startup.build_startup`.
 
-RDB-first: the geometry is taken from the ``DiskSession`` that already
-installed ``scsi.device``. A plain ADF/HDF (no RDB) falls back to a small
-synthetic geometry so the handler still starts; the raw whole-disk backend is
-a later step (HANDLER.md step 25).
+The partition is referenced through a :class:`~amitools.vamos.disk.DiskSession`
+(HANDLER.md step 24b): ``device`` names the DOS device node (``DH0``) that
+``DiskSession.install_dos`` created for a partition, ``part`` names the RDB
+partition directly (by name or index). With neither set the volume name is
+tried, and the first partition is the final fallback. The geometry comes from
+``DiskSession.get_backend(unit).partitions[...]``, which is available once
+``disk_session.open()`` ran, so the manager does not depend on the DOS list.
+
+RDB-first: a plain ADF/HDF (no RDB) falls back to a small synthetic geometry so
+the handler still starts; the raw whole-disk backend is a later step (HANDLER.md
+step 25).
 """
 
+from amitools.vamos.log import log_handler
+
+# the block device a started handler opens with OpenDevice()
 DEFAULT_DEVICE = "scsi.device"
 
 
@@ -63,37 +73,61 @@ class BlkDevSpec:
         )
 
 
-def _find_partition(disk_session, part):
-    """find ``part`` (name or index) across the session's disk units"""
+def _find_partition(disk_session, selector):
+    """find a partition by DOS device name or RDB index across the units
+
+    Returns ``(unit, dos_env)`` or ``None``.
+    """
+    if selector is None:
+        return None
     for unit in disk_session.get_units():
         backend = disk_session.get_backend(unit)
-        partitions = getattr(backend, "partitions", ())
-        for partition in partitions:
+        for partition in getattr(backend, "partitions", ()):
             name = partition.name.rstrip(":")
-            if part == name or str(part) == str(partition.index):
+            if selector == name or str(selector) == str(partition.index):
                 return unit, partition.dos_env
-    return None, None
+    return None
 
 
-def resolve_blkdev(disk_session, config):
+def _first_partition(disk_session):
+    """the first partition of the lowest unit that has one, or ``None``"""
+    for unit in disk_session.get_units():
+        backend = disk_session.get_backend(unit)
+        for partition in getattr(backend, "partitions", ()):
+            return unit, partition.dos_env
+    return None
+
+
+def resolve_blkdev(disk_session, config, name=None):
     """build a :class:`BlkDevSpec` from a ``NativeConfig``
 
-    A partition that can be resolved in the disk session supplies both the unit
-    and the geometry; otherwise a synthetic geometry is used.
+    ``config.device`` names the DOS device node of a partition, ``config.part``
+    the RDB partition directly; ``name`` is the mount name used when neither is
+    set. A partition that can be resolved in the disk session supplies both the
+    unit and the geometry; otherwise a synthetic geometry is used.
     """
-    device = config.device or DEFAULT_DEVICE
     unit = config.unit
-    part = config.part
-
     geometry = None
-    if disk_session is not None and part is not None:
-        found_unit, found_geometry = _find_partition(disk_session, part)
-        if found_geometry is not None:
-            geometry = found_geometry
+
+    if disk_session is not None:
+        selector = config.part
+        if selector is None:
+            selector = config.device
+        if selector is None:
+            selector = name
+        found = _find_partition(disk_session, selector)
+        if found is None:
+            # no match (or no selector at all): fall back to the first
+            # partition so a single-disk setup still mounts
+            found = _first_partition(disk_session)
+        if found is not None:
+            found_unit, geometry = found
             if unit is None:
                 unit = found_unit
+
     if geometry is None:
+        log_handler.debug("native handler: no disk partition, using synthetic geometry")
         geometry = BlkDevGeometry()
     if unit is None:
         unit = 0
-    return BlkDevSpec(device, unit, geometry)
+    return BlkDevSpec(DEFAULT_DEVICE, unit, geometry)

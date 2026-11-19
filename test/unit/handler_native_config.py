@@ -31,18 +31,18 @@ def handler_native_config_values_test():
         {
             "handler": "native",
             "binary": "/path/pfs3aio",
-            "device": "scsi.device",
+            "device": "DH0",
             "unit": "2",
-            "part": "DH0",
+            "part": "DH1",
             "globvec": "-2",
             "stack": "0x2000",
             "priority": 5,
         }
     )
     assert cfg.binary == "/path/pfs3aio"
-    assert cfg.device == "scsi.device"
+    assert cfg.device == "DH0"
     assert cfg.unit == 2
-    assert cfg.part == "DH0"
+    assert cfg.part == "DH1"
     assert cfg.globvec == -2
     assert cfg.stack == 0x2000
     assert cfg.priority == 5

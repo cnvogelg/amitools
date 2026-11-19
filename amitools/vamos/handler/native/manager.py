@@ -118,7 +118,7 @@ class NativeHandlerManager:
         """load, start and publish one native handler"""
         if self._find(handler) is not None:
             return handler
-        spec = resolve_blkdev(self.disk_session, handler.config)
+        spec = resolve_blkdev(self.disk_session, handler.config, handler.name)
         program = self._make_program(handler)
         # the handler's pr_MsgPort becomes a real Exec signal port. The port is
         # signalled with SIGB_DOS, like a process port (dos/Cli.py)
