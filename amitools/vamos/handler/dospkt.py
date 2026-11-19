@@ -54,7 +54,12 @@ import threading
 import time
 
 from amitools.vamos.lib.dos.action import DosAction
-from amitools.vamos.libstructs import DosPacketStruct, FileHandleStruct, MessageStruct
+from amitools.vamos.libstructs import (
+    DosPacketStruct,
+    FileHandleStruct,
+    MessageStruct,
+    NodeType,
+)
 from amitools.vamos.log import log_dos
 
 from .base import (
@@ -359,6 +364,9 @@ class DosPktHandler(PacketHandler):
             )
         # a StandardPacket: the message's ln_Name names the DosPacket
         msg = self.alloc.alloc_astruct(MessageStruct, label="DosPkt")
+        # as PutMsg() sets it: a handler that tells its I/O replies
+        # (NT_REPLYMSG) from packets by the type would skip the packet
+        msg.node.type.val = NodeType.NT_MESSAGE
         msg.node.name.aptr = pkt_addr
         # for a handler that answers with ReplyMsg()
         msg.reply_port.aptr = self.reply_port

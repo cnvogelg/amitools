@@ -28,7 +28,12 @@ from amitools.vamos.handler import (
 from amitools.vamos.handler.dospkt import PacketTimeout, packet_factory
 from amitools.vamos.lib.dos.action import DosAction
 from amitools.vamos.lib.lexec.PortManager import PortManager
-from amitools.vamos.libstructs import DosPacketStruct, FileHandleStruct, MessageStruct
+from amitools.vamos.libstructs import (
+    DosPacketStruct,
+    FileHandleStruct,
+    MessageStruct,
+    NodeType,
+)
 from amitools.vamos.machine.mock import MockMemory
 from amitools.vamos.mem import MemoryAlloc
 
@@ -506,3 +511,5 @@ def dospkt_message_names_its_reply_port_test():
     _abandon(env, env.h.locate_object, "x")
     msg = MessageStruct(env.mem, env.server.queue[0])
     assert msg.reply_port.aptr == env.h.reply_port
+    # and is a message, as PutMsg() makes it, not a reply
+    assert msg.node.type.val == NodeType.NT_MESSAGE
