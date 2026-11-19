@@ -222,6 +222,35 @@ class DosPktHandler(PacketHandler):
             self._own_reply_port = False
             self.reply_port = 0
 
+    # ----- raw packets -----
+
+    def do_packet(self, action, *args):
+        """send a packet with raw arguments; return ``(dp_Res1, dp_Res2)``
+
+        Like ``DoPkt``: the arguments go into ``dp_Arg1``... as given (as
+        unsigned or signed 32-bit values), and the results come back as they
+        are, without turning a failure into a :class:`HandlerError`. A wait
+        that ends without a reply raises as for any other call. Memory the
+        arguments name belongs to the caller, who should not reuse it while
+        :meth:`holds` says an unanswered packet points to it.
+        """
+        if len(args) > _NUM_ARGS:
+            raise ValueError("a DosPacket has %d arguments" % _NUM_ARGS)
+        with self._call(action) as call:
+            for index, value in enumerate(args, 1):
+                value &= 0xFFFFFFFF
+                call.arg(index, value - 0x100000000 if value & 0x80000000 else value)
+            self._dopkt(call.pkt)
+            return call.pkt.res1.val, call.pkt.res2.val
+
+    def holds(self, addr):
+        """does an abandoned packet still name memory at ``addr``?
+
+        A packet names a buffer by its start address or by its BPTR.
+        """
+        with self._lock:
+            return self._is_held(addr)
+
     # ----- packets in flight -----
 
     def pending(self):
@@ -444,7 +473,8 @@ class DosPktHandler(PacketHandler):
     @staticmethod
     def _packet_args(pkt):
         return tuple(
-            getattr(pkt, "arg%d" % index).val for index in range(1, _NUM_ARGS + 1)
+            getattr(pkt, "arg%d" % index).val & 0xFFFFFFFF
+            for index in range(1, _NUM_ARGS + 1)
         )
 
 

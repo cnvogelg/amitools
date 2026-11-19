@@ -448,3 +448,28 @@ def dospkt_shutdown_frees_abandoned_packets_test():
     env.h.shutdown()
     assert env.h.pending() == []
     assert env.alloc.available() > reply_port_size
+
+
+def dospkt_do_packet_returns_raw_results_test():
+    env = _inflight_env()
+    env.h._pump = lambda: env.server.answer(res1=0, res2=ERROR_OBJECT_NOT_FOUND)
+    # no HandlerError: the caller gets dp_Res1/dp_Res2 as they are
+    assert env.h.do_packet(DosAction.ACTION_LOCATE_OBJECT, 0, 0, -2) == (
+        0,
+        ERROR_OBJECT_NOT_FOUND,
+    )
+    env.h._pump = lambda: env.server.answer(res1=-1)
+    assert env.h.do_packet(DosAction.ACTION_SEEK, 0x10, 0xFFFFFFFF, 0) == (-1, 0)
+    assert env.alloc.available() == env.baseline
+
+
+def dospkt_holds_names_abandoned_buffers_test():
+    env = _inflight_env()
+    buf = env.alloc.alloc_memory(64)
+    _abandon(env, env.h.do_packet, DosAction.ACTION_READ, 0x10, buf.addr, 64)
+    assert env.h.holds(buf.addr)
+    other = env.alloc.alloc_memory(64)
+    assert not env.h.holds(other.addr)
+    env.server.answer(res1=64)
+    env.h.poll()
+    assert not env.h.holds(buf.addr)
