@@ -367,8 +367,8 @@ def handler_packet_examine_fh_test(rec):
     fh = PacketFile(0x55, "f")
 
     def fill(pkt):
-        fib = FileInfoBlockStruct(rec.mem, pkt.arg2.val)
-        rec.mem.w_cstr(fib.fib_FileName.addr, "f")
+        fib = FileInfoBlockStruct(rec.mem, pkt.arg2.val << 2)
+        rec.mem.w_bstr(fib.fib_FileName.addr, "f")
         fib.fib_DirEntryType.val = HandlerFileInfo.FILE
         fib.fib_Size.val = 5
 

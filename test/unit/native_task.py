@@ -135,13 +135,13 @@ class TaskHandler:
             pkt.res1.val = 1
             pkt.res2.val = 0
         elif action == ACTION_INFO:
-            # arg2 points at the caller's InfoData
-            self._write_info(pkt.arg2.val)
+            # arg2 is a BPTR to the caller's InfoData
+            self._write_info(pkt.arg2.val << 2)
             pkt.res1.val = 1
             pkt.res2.val = 0
         elif action == ACTION_DISK_INFO:
-            # arg1 points at the caller's InfoData (no lock)
-            self._write_info(pkt.arg1.val)
+            # arg1 is a BPTR to the caller's InfoData (no lock)
+            self._write_info(pkt.arg1.val << 2)
             pkt.res1.val = 1
             pkt.res2.val = 0
         else:

@@ -118,7 +118,9 @@ def pytask_dos_dopkt_disk_info_test(vamos_task):
         info_mem = ctx.alloc.alloc_astruct(InfoDataStruct, label="InfoData")
 
         assert (
-            dos_proxy.DoPkt(port, DosAction.ACTION_DISK_INFO, info_mem.addr, 0, 0, 0, 0)
+            dos_proxy.DoPkt(
+                port, DosAction.ACTION_DISK_INFO, info_mem.addr >> 2, 0, 0, 0, 0
+            )
             == DOSTRUE
         )
         info = InfoDataStruct(ctx.mem, info_mem.addr)
@@ -305,7 +307,7 @@ def pytask_dos_sendpkt_abortpkt_test(vamos_task):
         msg_access = MessageStruct(ctx.mem, msg.addr)
         msg_access.node.name.aptr = pkt.addr
         pkt.type.val = DosAction.ACTION_DISK_INFO
-        pkt.arg1.val = info_mem.addr
+        pkt.arg1.val = info_mem.addr >> 2
 
         dos_proxy.SendPkt(pkt, port, proc_port_addr)
         assert dos_proxy.WaitPkt() == pkt.addr

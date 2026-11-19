@@ -58,7 +58,7 @@ def handler_dispatch_put_msg_test():
 
     msg, pkt = _make_msg(mem)
     pkt.type.val = DosAction.ACTION_DISK_INFO
-    pkt.arg1.val = _INFO_ADDR
+    pkt.arg1.val = _INFO_ADDR >> 2
 
     dispatcher.put_msg(port_mgr, msg.addr)
 
