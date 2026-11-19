@@ -112,9 +112,9 @@ class SetupLibManager(object):
         return self.lib_mgr
 
     def cleanup(self):
-        # a native handler that was not stopped by close_base_libs is stopped
-        # here, before the base libraries are torn down
-        self._stop_native_handlers()
+        # a handler transport that was not stopped by close_base_libs is
+        # detached here, before the base libraries are torn down
+        self._detach_handler_transports()
         # shutdown of libmgr needs temp stack
         sp = self.machine.get_ram_begin() - 4
         native_shutdown = None
@@ -174,17 +174,24 @@ class SetupLibManager(object):
         self.dos_impl = self.dos_vlib.get_impl()
         self.dos_ctx.set_dos_lib(self.dos_impl)
         log_libmgr.info("open base lib: dos:  @%06x", self.dos_addr)
-        # now that exec/dos (and the port manager) exist, hand the live machine
-        # to any detached packet handler (``?handler=packet``)
-        self._attach_packet_handlers()
-        # and start the 68k handler tasks of the native handler volumes
-        self._start_native_handlers()
+        # now that exec/dos (and the port manager) exist, attach the handler
+        # transports: packet handlers (``?handler=packet``) get the live
+        # machine, native handlers (``?handler=native``) start their 68k tasks
+        self._attach_handler_transports()
 
-    def _start_native_handlers(self):
+    def _attach_handler_transports(self):
         if self.handler_mgr is None:
             return
-        # the handler manager owns the 68k task host (step 23); it is a no-op
-        # when no ``?handler=native`` volume is bound
+        # the handler manager owns the transports; each is a no-op when no
+        # volume with the matching ``?handler=`` type is bound
+        exec_impl = self.exec_impl
+        port_list = exec_impl.exec_lib.port_list
+        self.handler_mgr.attach_packet_transport(
+            self.alloc,
+            exec_impl.port_mgr,
+            exec_impl.mem,
+            find_port=lambda name: port_list.find_name(name, promote=True),
+        )
         self.handler_mgr.attach_native_transport(
             self.machine,
             self.alloc,
@@ -195,26 +202,14 @@ class SetupLibManager(object):
             disk_session=self.disk_session,
         )
 
-    def _stop_native_handlers(self):
+    def _detach_handler_transports(self):
         if self.handler_mgr is not None:
             self.handler_mgr.stop_native_transport()
 
-    def _attach_packet_handlers(self):
-        if self.handler_mgr is None:
-            return
-        exec_impl = self.exec_impl
-        port_list = exec_impl.exec_lib.port_list
-        self.handler_mgr.attach_packet_transport(
-            self.alloc,
-            exec_impl.port_mgr,
-            exec_impl.mem,
-            find_port=lambda name: port_list.find_name(name, promote=True),
-        )
-
     def close_base_libs(self):
         log_libmgr.info("closing base libs...")
-        # stop the native handler tasks while exec/dos are still alive
-        self._stop_native_handlers()
+        # stop the handler transports while exec/dos are still alive
+        self._detach_handler_transports()
         # close dos
         self.lib_mgr.close_lib(self.dos_addr)
         log_libmgr.info("closed dos")
