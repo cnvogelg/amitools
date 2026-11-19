@@ -4,13 +4,24 @@ from amitools.vamos.task import DosProcess
 
 class DosLibCtx(LibCtx):
     def __init__(
-        self, machine, alloc, runner, seg_loader, path_mgr, scheduler, odg_base
+        self,
+        machine,
+        alloc,
+        runner,
+        seg_loader,
+        path_mgr,
+        scheduler,
+        odg_base,
+        handler_mgr=None,
     ):
         LibCtx.__init__(self, machine, runner, alloc)
         self.path_mgr = path_mgr
         self.seg_loader = seg_loader
         self.scheduler = scheduler
         self.odg_base = odg_base
+        # file system handler registry, built by the caller (main) and passed
+        # in; dos.library only consumes it
+        self.handler_mgr = handler_mgr
         # compat for process
         self.process = None
         self.exec_lib = None

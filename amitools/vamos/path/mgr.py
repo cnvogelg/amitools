@@ -3,15 +3,7 @@ from .amipath import AmiPath, AmiPathError
 from .env import AmiPathEnv
 from .volume import VolumeManager
 from .assign import AssignManager
-
-
-class SysPathError(Exception):
-    def __init__(self, path, reason):
-        self.path = path
-        self.reason = reason
-
-    def __str__(self):
-        return "path='%s': %s" % (self.path, self.reason)
+from .syspath import SysPathResolver
 
 
 class PathManagerEnv(AmiPathEnv):
@@ -22,7 +14,7 @@ class PathManagerEnv(AmiPathEnv):
     def _cwd_path_resolver(self, ami_path):
         """resolve and check cwd"""
         # allow escaped sys paths
-        ami_path = self.path_mgr.resolve_esc_sys_path(ami_path, True)
+        ami_path = self.path_mgr._resolve_esc_sys_path(ami_path, True)
         # common check
         ami_path = AmiPathEnv._cwd_path_resolver(self, ami_path)
         # make sure its a valid prefix path
@@ -33,7 +25,7 @@ class PathManagerEnv(AmiPathEnv):
     def _cmd_path_resolver(self, ami_path):
         """resolve and check a command path"""
         # allow escaped sys paths
-        ami_path = self.path_mgr.resolve_esc_sys_path(ami_path, True)
+        ami_path = self.path_mgr._resolve_esc_sys_path(ami_path, True)
         # common check
         ami_path = AmiPathEnv._cmd_path_resolver(self, ami_path)
         # make sure its a valid prefix path
@@ -43,6 +35,12 @@ class PathManagerEnv(AmiPathEnv):
 
 
 class PathManager:
+    """Manage Amiga volumes, assigns, cwd, and Amiga path resolution.
+
+    This is the Amiga-side path API. Host path conversion is not part of it;
+    use :class:`SysPathResolver` at an explicit host boundary instead.
+    """
+
     default_cwd = "::."
     default_cmd_paths = ["c:"]
     default_vols_base_dir = "~/.vamos/volumes"
@@ -58,6 +56,7 @@ class PathManager:
         auto_assigns=None,
         auto_assigns_mkdir=True,
         sys_vol=None,
+        file_system=None,
     ):
         # set defaults
         if not cwd:
@@ -76,9 +75,16 @@ class PathManager:
         self.auto_assigns_mkdir = auto_assigns_mkdir
         self.sys_vol = sys_vol
         # setup sub mgr
-        self.vol_mgr = VolumeManager(vols_base_dir)
+        self.vol_mgr = VolumeManager(vols_base_dir, file_system)
         self.assign_mgr = AssignManager(self.vol_mgr)
+        # sys path handling (host file system boundary)
+        self._sys_path = SysPathResolver(self, self.vol_mgr)
         self.default_env = PathManagerEnv(self, cwd, cmd_paths)
+        # set by build_handler_manager() once the handlers are bound
+        self.handler_mgr = None
+
+    def set_handler_mgr(self, handler_mgr):
+        self.handler_mgr = handler_mgr
 
     def get_vol_mgr(self):
         return self.vol_mgr
@@ -166,7 +172,8 @@ class PathManager:
                 if av == "root":
                     spec = "root:/"
                 elif av == "ram":
-                    spec = "ram:?temp"
+                    # an in-memory file system handler, not a host temp dir
+                    spec = "ram:?handler=ram"
                 else:
                     log_path.error("invalid auto volume: '%s'", av)
                     return False
@@ -496,38 +503,7 @@ class PathManager:
         else:
             raise AmiPathError(ami_path, "can't derive cmdpaths")
 
-    def to_sys_path(self, ami_path, env=None, strict=False):
-        """Convert an Amiga path to a sys path
-
-        If path is not a volume path it will be converted with volpath()
-        first.
-        """
-        if type(ami_path) is str:
-            ami_path = AmiPath(ami_path)
-        if ami_path.is_local() or not self.is_volume_path(ami_path):
-            ami_path = self.volpath(ami_path, env=env, strict=strict)
-            if ami_path is None:
-                return None
-        res = self.vol_mgr.ami_to_sys_path(str(ami_path))
-        return res
-
-    def from_sys_path(self, sys_path, strict=False):
-        """Convert sys path to AmiPath
-
-        If sys_path is not absolute then resolve it first.
-
-        If path is not mappable return None or
-        if strict mode is True then raise an SysPathError
-        """
-        ami_path = self.vol_mgr.sys_to_ami_path(sys_path)
-        if ami_path:
-            return AmiPath(ami_path)
-        elif strict:
-            raise SysPathError(sys_path, "can't map to ami path!")
-        else:
-            return None
-
-    def resolve_esc_sys_path(self, ami_path, strict=False):
+    def _resolve_esc_sys_path(self, ami_path, strict=False):
         """resolve an escaped sys path inside an ami path
 
         An escaped sys path starts with a '::' and an absolute or relative sys
@@ -541,13 +517,4 @@ class PathManager:
 
         An empty sys path raises an AmiPathError
         """
-        if type(ami_path) is str:
-            ami_path = AmiPath(ami_path)
-        ap = str(ami_path)
-        if ap.startswith("::"):
-            sys_path = ap[2:]
-            if len(sys_path) == 0:
-                raise AmiPathError(ami_path, "empty esc sys path!")
-            return self.from_sys_path(sys_path, strict)
-        else:
-            return ami_path
+        return self._sys_path.resolve_esc_sys_path(ami_path, strict=strict)

@@ -2,7 +2,7 @@ import sys
 
 from .tool import Tool
 from amitools.vamos.cfg import PathParser
-from amitools.vamos.path import VamosPathManager, AmiPathError
+from amitools.vamos.path import VamosPathManager, AmiPathError, SysPathResolver
 
 
 class PathTool(Tool):
@@ -10,6 +10,7 @@ class PathTool(Tool):
         Tool.__init__(self, "path", "path conversion utilities")
         self.path_parser = None
         self.path_mgr = None
+        self.sys_path = None
 
     def add_parsers(self, main_parser):
         self.path_parser = PathParser()
@@ -30,7 +31,10 @@ class PathTool(Tool):
         ok = self.path_mgr.parse_config(cfg_dict)
         if not ok:
             return False
-        return self.path_mgr.setup()
+        if not self.path_mgr.setup():
+            return False
+        self.sys_path = SysPathResolver(self.path_mgr)
+        return True
 
     def shutdown(self):
         self.path_mgr.shutdown()
@@ -42,10 +46,10 @@ class PathTool(Tool):
         cmd = args.path_cmd
         try:
             if cmd == "ami2sys":
-                res = self.path_mgr.to_sys_path(args.input)
+                res = self.sys_path.to_sys_path(args.input)
                 return self._report_path(res)
             elif cmd == "sys2ami":
-                res = self.path_mgr.from_sys_path(args.input)
+                res = self.sys_path.from_sys_path(args.input)
                 return self._report_path(res)
         except AmiPathError as e:
             print(str(e), file=sys.stderr)

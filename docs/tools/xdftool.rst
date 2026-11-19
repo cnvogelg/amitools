@@ -343,6 +343,66 @@ Example::
   > xdftool empty.adf makedir c      ; create a new directory called 'c'
 
 
+``rename`` - Rename or move a file or directory
+-----------------------------------------------
+
+::
+
+  rename <old_ami_path> <new_ami_path>
+
+This command renames the file or directory given with ``<old_ami_path>`` to
+``<new_ami_path>``. The entry keeps its data, protection flags, comment and
+modification time; only its name and its directory entry change, so no blocks
+are copied.
+
+The new path is the full target path: its last component becomes the new name
+and the preceding components select the target directory. Use ``rename a b``
+to rename an entry in place, or ``rename a d/a`` to move it into the directory
+``d``. The target must not exist yet otherwise the command fails.
+
+Example::
+
+  > xdftool mydisk.adf rename README README.txt   ; rename a file in place
+  > xdftool mydisk.adf rename c/dir d/dir         ; move a file to another dir
+  > xdftool mydisk.adf rename c c_old             ; rename a directory
+
+
+``makelink`` - Create a soft link
+---------------------------------
+
+::
+
+  makelink <ami_path> <target>
+
+This creates a soft link (``ST_SOFTLINK``) at ``<ami_path>`` whose target is
+the AmigaDOS path string ``<target>``. The target is resolved relative to the
+directory the link lives in, or from the volume root if it starts with ``/``
+or ``:``. A lookup of the link transparently resolves to the target, so the
+link can be read, listed and used as a directory component like the object it
+names. Only soft links are supported; a hard link cannot be expressed on an
+ADFS volume.
+
+Example::
+
+  > xdftool mydisk.adf makelink c/link c/target   ; link in 'c' to 'c/target'
+  > xdftool mydisk.adf makelink link README       ; link to a root entry
+
+
+``readlink`` - Show the target of a soft link
+---------------------------------------------
+
+::
+
+  readlink <ami_path>
+
+This prints the target path stored in the soft link at ``<ami_path>``. It
+fails if the path is not a soft link.
+
+Example::
+
+  > xdftool mydisk.adf readlink link     ; print the link's target
+
+
 ``write`` - Write a host file or a host directory tree to the image
 -------------------------------------------------------------------
 

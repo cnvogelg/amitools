@@ -124,21 +124,18 @@ class Process(DosProcess):
     # ----- binary -----
     def load_binary(self, lock, ami_bin_file, shell=False):
         self.bin_basename = self.ctx.path_mgr.ami_name_of_path(lock, ami_bin_file)
-        sys_path, ami_path = self.ctx.path_mgr.ami_command_to_sys_path(
-            lock, ami_bin_file
-        )
-        if not sys_path:
-            log_proc.error("failed loading binary: %s -> %s", ami_bin_file, sys_path)
-            return False
-
-        self.bin_seg_list = self.ctx.seg_loader.load_sys_seglist(
-            sys_path,
-            file_mgr=self.ctx.dos_lib.file_mgr,
-            ami_file=ami_bin_file,
-            lock=lock,
-        )
-        if self.bin_seg_list == 0:
-            log_proc.error("failed loading seglist: %s", sys_path)
+        # search the command on the command path and try each candidate
+        cmd_paths = self.ctx.path_mgr.ami_command_paths(lock, ami_bin_file)
+        ami_path = None
+        self.bin_seg_list = 0
+        for path in cmd_paths:
+            baddr = self.ctx.seg_loader.load_ami_seglist(path, lock)
+            if baddr:
+                ami_path = path
+                self.bin_seg_list = baddr
+                break
+        if ami_path is None:
+            log_proc.error("failed loading binary: %s", ami_bin_file)
             return False
 
         self.bin_seg_info = self.ctx.seg_loader.get_info(self.bin_seg_list)
@@ -324,6 +321,18 @@ class Process(DosProcess):
         return self.shell_packet.addr
 
     # ----- task struct -----
+
+    def _handler_port(self, name):
+        """the packet port of the handler serving ``name`` (0 if none)"""
+        mgr = getattr(self.ctx.dos_lib, "handler_mgr", None)
+        if mgr is None:
+            return 0
+        get_dispatcher = getattr(mgr, "get_dispatcher", None)
+        if get_dispatcher is None:
+            return 0
+        dispatcher = get_dispatcher(name)
+        return dispatcher.port if dispatcher is not None else 0
+
     def init_task_struct(self, input_fh, output_fh):
         # memory adress of proc
         self.addr = self.ami_proc.addr
@@ -335,12 +344,11 @@ class Process(DosProcess):
         task.pr_CLI.aptr = self.cli.addr
         task.pr_CIS.aptr = input_fh.b_addr << 2  # compensate BCPL auto-conversion
         task.pr_COS.aptr = output_fh.b_addr << 2  # compensate BCPL auto-conversion
-        # setup console task
-        console_task = self.ctx.dos_lib.file_mgr.get_console_handler_port()
-        task.pr_ConsoleTask.aptr = console_task
-        # setup file sys task
-        fs_task = self.ctx.dos_lib.file_mgr.get_fs_handler_port()
-        task.pr_FileSystemTask.aptr = fs_task
+        # setup console task: the console handler's packet port
+        task.pr_ConsoleTask.aptr = self._handler_port("console")
+        # setup file sys task: the handler of the process's current volume
+        volume = self.ctx.path_mgr.ami_volume_of_path(self.home_lock.ami_path)
+        task.pr_FileSystemTask.aptr = self._handler_port(volume)
         # set home dir
         task.pr_HomeDir.aptr = self.home_lock.b_addr << 2
         varlist = self.get_local_vars()

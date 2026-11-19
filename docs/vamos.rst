@@ -56,6 +56,9 @@ Features
 * Fast m68k CPU emulation with Musashi CPU Emulator
 * Supports native library loading for application libs (e.g. SAS sc1.library)
 * Dos Library supports: Locks, Files (Open, Read, Write, Seek, Close)
+* A handler-based file system layer: host directories, an in-memory volume,
+  AmigaDOS file systems in image files (ADF/HDF/RDB), and the
+  ``NIL:``/``CONSOLE:`` devices (see :doc:`vamos-handler`)
 * Exec Library supports: AllocMem/Vec, LoadLibrary
 * Many useful tracing and logging features
 
@@ -123,8 +126,10 @@ In the source archive see *config/sample_vamosrc* for an example config file.
 
 
 AmigaOS uses **Volumes** to name(:) and identify the different file systems
-found on an Amiga system. In vamos a Volume is defined as a part of the host
-(i.e. Mac or PC) file system that will be exposed to the Amiga emulation.
+found on an Amiga system. In vamos a Volume is backed by a *handler*: by
+default a host (i.e. Mac or PC) directory that will be exposed to the Amiga
+emulation, but also an in-memory file system or a device. The handler layer is
+described in :doc:`vamos-handler`.
 
 You specify a volume by giving a **host directory path**. All files below this
 path are considered to be part of the volume.
@@ -169,6 +174,35 @@ A typical example:
 
 As you see, tilde is allowed as a synonym for your home directory for system
 paths. Also host environment variables can be expanded with a dollar sign.
+
+A volume definition can carry options after a question mark. The ``handler``
+option selects the handler that backs the volume. By default a volume uses the
+``hostfs`` handler, which maps it to the given host directory:
+
+    [volumes]
+    work=~/amiga/work?handler=hostfs
+
+Besides ``hostfs`` vamos ships an in-memory ``ram`` file system, an ``adfs``
+handler for AmigaDOS file systems in image files, and the ``nil`` and
+``console`` devices. A non-host volume needs no host path, so its source may be
+empty. The ``ram`` handler takes an optional nominal capacity in KiB:
+
+    [volumes]
+    scratch=?handler=ram
+    tmp=?handler=ram,size=2048
+
+A volume whose source is a *file* is an ADFS image volume and defaults to the
+``adfs`` handler; the image type is auto-detected, ``img`` forces it and
+``part`` selects an RDB partition:
+
+    [volumes]
+    work=~/amiga/disks/work.adf
+    data=~/amiga/disks/disk.rdb?part=1
+
+The in-memory ``ram:`` volume is also created automatically (see
+``--auto-volumes`` below); it is not a host temp directory. The ``NIL:`` and
+``CONSOLE:`` devices always exist and need no volume definition. See
+:doc:`vamos-handler` for the available handlers and how to write your own.
 
 2.1.2 Assigns
 ^^^^^^^^^^^^^
@@ -639,7 +673,6 @@ switch:
 
     > ./vamos -l dos:info,exec:info a68k
     19:18:10.840       exec:   INFO:  open exec.library V39
-    19:18:10.840        dos:   INFO:  dos fs handler port: fd0000
     19:18:10.843       exec:   INFO:  SetSignals: new_signals=00000000 signal_mask=00003000 old_signals=00000000
     19:18:10.845        dos:   INFO:  open dos.library V39
     19:18:10.845       exec:   INFO:  OpenLibrary: 'dos.library' V0 -> [Lib:'dos.library',V0]

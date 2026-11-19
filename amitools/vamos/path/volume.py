@@ -1,42 +1,33 @@
-import os
-import os.path
-import shutil
-import tempfile
 from amitools.vamos.log import log_path
-import logging
 from .spec import Spec
-from .amipath import collapse_parent_steps
-
-
-def resolve_sys_path(sys_path):
-    """replace ~ (home) or environment variables in path and
-    make path absolute
-
-    return resolved path
-    """
-    # expand system path
-    sys_path = os.path.expanduser(sys_path)
-    sys_path = os.path.expandvars(sys_path)
-    abs_path = os.path.abspath(sys_path)
-    return abs_path
+from .syspath import SysPathMapper, SysVolume, HostFileSystem, resolve_sys_path
 
 
 class Volume(object):
-    def __init__(self, name, path, cfg=None):
+    """Amiga side of a volume.
+
+    The host file system handling is delegated to a :class:`SysVolume`.
+    """
+
+    def __init__(self, name, path, cfg=None, file_system=None, is_image=False):
         if cfg is None:
             cfg = {}
         self.name = name
-        self.path = path
         self.lo_name = name.lower()
         self.cfg = cfg
         self.is_setup = False
-        self.temp_base = None
+        # an image-backed volume is a file system inside an image file
+        # (ADF/HDF/RDB) rather than a host directory
+        self.is_image = is_image
+        self.sys_volume = SysVolume(
+            name, path, cfg, file_system, is_image=is_image
+        )
 
     def __str__(self):
         return "Volume(%s(%s):%s,cfg=%r,is_setup=%s)" % (
             self.name,
             self.lo_name,
-            self.path,
+            self.get_path(),
             self.cfg,
             self.is_setup,
         )
@@ -47,7 +38,7 @@ class Volume(object):
 
     def get_path(self):
         """return mapped volume path in original format"""
-        return self.path
+        return self.sys_volume.get_path()
 
     def get_lo_name(self):
         """return normalized volume name in lower case"""
@@ -57,115 +48,38 @@ class Volume(object):
         """return volume configuration"""
         return self.cfg
 
+    def get_sys_volume(self):
+        return self.sys_volume
+
     def setup(self):
-        path = self.path
-        # temp dir?
-        if "temp" in self.cfg:
-            temp_path = self._create_temp(path)
-            if not temp_path:
-                return False
-            # mount a unique dir below the configured path, so
-            # concurrent vamos instances do not clash on setup or
-            # teardown of a shared temp volume
-            self.temp_base = path
-            self.path = temp_path
-        # does path exist?
-        elif not os.path.isdir(path):
-            if "create" in self.cfg:
-                if not self._create_path(path):
-                    return False
-            else:
-                log_path.error("volume path does not exist: '%s'", path)
-                return False
-        return True
+        return self.sys_volume.setup()
 
     def shutdown(self):
-        if "temp" in self.cfg:
-            self._delete_temp(self.path)
-
-    def _create_temp(self, base):
-        """create a unique temp dir below the configured base path
-
-        return the created path or None on error"""
-        # retry: another instance may remove an empty base dir between
-        # our makedirs and mkdtemp
-        for _ in range(3):
-            try:
-                os.makedirs(base, exist_ok=True)
-                path = tempfile.mkdtemp(dir=base)
-                log_path.debug("created temp dir: %s", path)
-                return path
-            except OSError:
-                continue
-        log_path.error("error creating temp dir below: '%s'", base)
-        return None
-
-    def _delete_temp(self, path):
-        try:
-            log_path.debug("removing temp dir: %s", path)
-            shutil.rmtree(path)
-        except OSError:
-            log_path.error("error removing temp dir: '%s'", path)
-        # drop the base dir if we were its last user
-        try:
-            os.rmdir(self.temp_base)
-        except OSError:
-            pass
-
-    def _create_path(self, path):
-        # try to create path
-        try:
-            log_path.info("creating volume dir: %s", path)
-            # exist_ok: a concurrent vamos may create the shared volume
-            # dir (e.g. the auto 'system:') between our check and here
-            os.makedirs(path, exist_ok=True)
-            return path
-        except OSError as e:
-            log_path.error("error creating volume dir: %s -> %s", path, e)
-            return None
+        self.sys_volume.shutdown()
 
     def create_rel_sys_path(self, rel_path):
-        if type(rel_path) in (list, tuple):
-            rel_path = os.path.join(*rel_path)
-        dir_path = os.path.join(self.path, rel_path)
-        if os.path.isdir(dir_path):
-            log_path.debug(
-                "rel sys path in volume already exists '%s' + %s -> %s",
-                self.name,
-                rel_path,
-                dir_path,
-            )
-            return dir_path
-        try:
-            log_path.debug(
-                "creating rel sys path in volume '%s' + %s -> %s",
-                self.name,
-                rel_path,
-                dir_path,
-            )
-            # exist_ok: concurrent instances race to create the shared
-            # auto-assign dirs (c:, s:, libs:, ...) under 'system:'
-            os.makedirs(dir_path, exist_ok=True)
-            return dir_path
-        except OSError as e:
-            log_path.error(
-                "error creating rel sys path in volume '%s' + %s -> %s",
-                self.name,
-                rel_path,
-                dir_path,
-            )
-            return None
+        return self.sys_volume.create_rel_sys_path(rel_path)
 
 
 class VolumeManager(object):
-    def __init__(self, vols_base_dir=None):
+    def __init__(self, vols_base_dir=None, file_system=None):
+        if file_system is None:
+            file_system = HostFileSystem()
+        self.file_system = file_system
         self.volumes = []
         self.is_setup = False
         self.vols_by_name = {}
         self.vols_base_dir = vols_base_dir
+        self.sys_path_mapper = SysPathMapper(self, file_system)
 
     def get_num_volumes(self):
         return len(self.volumes)
+
+    def get_all_volumes(self):
+        return self.volumes
+
+    def get_sys_path_mapper(self):
+        return self.sys_path_mapper
 
     def set_vols_base_dir(self, dir):
         self.vols_base_dir = dir
@@ -261,47 +175,53 @@ class VolumeManager(object):
         name = spec.get_name()
         src_list = spec.get_src_list()
         cfg = spec.get_cfg()
+        handler_type = cfg.get("handler")
+        is_image = False
         n = len(src_list)
         if n == 0:
-            # local path
-            path = self._get_local_vol_path(name)
-            log_path.debug("local path='%s'", path)
-            if path is None:
-                return None
+            if handler_type is not None and handler_type != "hostfs":
+                # a non-host handler (nil:, console:, ...) has no host
+                # directory of its own
+                path = None
+                log_path.debug("non-host handler '%s': no host path", handler_type)
+            else:
+                # local path
+                path = self._get_local_vol_path(name)
+                log_path.debug("local path='%s'", path)
+                if path is None:
+                    return None
         elif n == 1:
             path = resolve_sys_path(src_list[0])
             log_path.debug("resolved path='%s'", path)
+            # a file source (not a directory) is an image-backed volume: an
+            # AmigaDOS file system inside an ADF/HDF/RDB image. It defaults to
+            # the adfs handler unless the spec asks for another one.
+            if self.file_system.is_file(path) and handler_type in (None, "adfs"):
+                is_image = True
+                handler_type = "adfs"
         if n > 1:
             log_path.error("only one source in volume spec allowed!")
             return None
+        if handler_type is None:
+            handler_type = "hostfs"
+        if is_image:
+            cfg["handler"] = handler_type
         log_path.debug("name='%s', path='%s'", name, path)
         # create volume
-        return Volume(name, path, cfg)
+        return Volume(name, path, cfg, self.file_system, is_image=is_image)
 
     def _get_local_vol_path(self, name):
         base_dir = self._setup_base_dir()
         if base_dir is None:
             return None
-        return os.path.join(base_dir, name)
+        return self.file_system.join_path(base_dir, name)
 
     def _setup_base_dir(self):
         # ensure that vols_base_dir exists
         base_dir = self.vols_base_dir
         if not base_dir:
             raise ValueError("volume manager: no base dir given!")
-        base_dir = resolve_sys_path(base_dir)
-        if not os.path.isdir(base_dir):
-            try:
-                log_path.info("creating volume base dir: %s", base_dir)
-                # exist_ok: concurrent vamos instances share this dir and
-                # race to create it on the first run of a fresh setup
-                os.makedirs(base_dir, exist_ok=True)
-            except OSError as e:
-                log_path.error("error creating volume base dir: %s -> %s", base_dir, e)
-                return None
-        else:
-            log_path.debug("found base dir: %s", base_dir)
-        return base_dir
+        return self.file_system.ensure_dir(base_dir)
 
     def del_volume(self, name):
         lo_name = name.lower()
@@ -333,36 +253,7 @@ class VolumeManager(object):
 
         return ami_path or None if sys_path can't be mapped
         """
-        if not os.path.isabs(sys_path):
-            sys_path = resolve_sys_path(sys_path)
-            log_path.debug("vol: sys_to_ami_path: resolved rel path: %s", sys_path)
-        res_len = None
-        result = None
-        for volume in self.volumes:
-            vol_sys_path = volume.get_path()
-            try:
-                common_path = os.path.commonpath([vol_sys_path, sys_path])
-            except ValueError:
-                continue
-            if os.path.normcase(common_path) == os.path.normcase(
-                os.path.normpath(vol_sys_path)
-            ):
-                remainder = os.path.relpath(sys_path, vol_sys_path)
-                if remainder == os.curdir:
-                    remainder = ""
-                n = len(remainder)
-                # get volume name and build amiga path
-                vol_name = volume.get_name()
-                ami_path = vol_name + ":" + remainder
-                log_path.debug(
-                    "vol: sys_to_ami_path: sys='%s' -> ami='%s'", sys_path, ami_path
-                )
-                if result is None or n < res_len:
-                    result = ami_path
-                    res_len = n
-        # return best result
-        log_path.info("vol: sys_to_ami_path: sys='%s' -> ami=%s", sys_path, result)
-        return result
+        return self.sys_path_mapper.sys_to_ami_path(sys_path)
 
     def ami_to_sys_path(self, ami_path, fast=False):
         """Map an Amiga path to a system path.
@@ -372,83 +263,6 @@ class VolumeManager(object):
 
         If volume does not exist also return None.
 
-        It replaces the volume with the sys_path prefix.
-        Furthermore, the remaining Amiga path is mapped to
-        the system file system and case corrected if a
-        corresponding entry is found.
-
-        If 'fast' mode is enabled then the original case
-        of the path elements is kept if the underlying FS
-        is case insensitive.
-
-        Return None on error or system path
+        See :meth:`SysPathMapper.ami_to_sys_path` for details.
         """
-        # find volume
-        pos = ami_path.find(":")
-        if pos <= 0:
-            log_path.debug("vol: ami_to_sys_path: empty volume: %s", ami_path)
-            return None
-        vol_name = ami_path[:pos].lower()
-        # check volume name
-        if vol_name in self.vols_by_name:
-            volume = self.vols_by_name[vol_name]
-            vol_sys_path = volume.get_path()
-            remainder = ami_path[pos + 1 :]
-
-            # only volume name given
-            if len(remainder) == 0:
-                log_path.info(
-                    "vol: direct volume: ami='%s' -> sys='%s'", ami_path, vol_sys_path
-                )
-                return vol_sys_path
-
-            # invalid volume:/... path
-            if remainder[0] == "/":
-                log_path.error("vol: ami_to_sys_path: invalid :/ path: %s", ami_path)
-                return None
-
-            # follow ami path along in sys world
-            dirs = collapse_parent_steps(remainder.split("/"))
-            if dirs is None:
-                log_path.error(
-                    "vol: ami_to_sys_path: parent step above volume: %s", ami_path
-                )
-                return None
-            sys_path = self._follow_path_no_case(vol_sys_path, dirs, fast)
-            log_path.info(
-                "vol: ami_to_sys_path: ami='%s' -> sys='%s'", ami_path, sys_path
-            )
-            return sys_path
-        else:
-            log_path.error(
-                "vol: ami_to_sys_path: volume='%s' not found: %s", vol_name, ami_path
-            )
-            return None
-
-    def _follow_path_no_case(self, base, dirs, fast):
-        # base is the name (no more dirs)
-        if len(dirs) == 0:
-            return base
-        # make sure base is a dir
-        if not os.path.isdir(base):
-            # assume remainder is new
-            return os.path.join(base, os.path.join(*dirs))
-        # dir component to search
-        d = dirs[0]
-        # check for direct match first
-        if fast:
-            dp = os.path.join(base, d)
-            if os.path.exists(dp):
-                return self._follow_path_no_case(dp, dirs[1:], fast)
-        # read dir and check for no case variant
-        dlow = d.lower()
-        files = os.listdir(base)
-        dl = len(d)
-        for f in files:
-            if len(f) == dl:
-                flow = f.lower()
-                if flow == dlow:
-                    res = os.path.join(base, f)
-                    return self._follow_path_no_case(res, dirs[1:], fast)
-        # can't find it -> we assume rest of path is new
-        return os.path.join(base, os.path.join(*dirs))
+        return self.sys_path_mapper.ami_to_sys_path(ami_path, fast)

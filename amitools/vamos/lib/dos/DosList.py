@@ -1,10 +1,27 @@
-from amitools.vamos.log import log_doslist
+from amitools.vamos.astructs import CSTR
+from amitools.vamos.log import log_doslist, log_dos
 from amitools.vamos.libstructs import (
     DosListDeviceStruct,
     DosListVolumeStruct,
     DosListAssignStruct,
     AssignListStruct,
+    FileHandleStruct,
+    ExAllControlStruct,
+    FileInfoBlockStruct,
+    DosPacketStruct,
+    CLIStruct,
+    RDArgsStruct,
 )
+from amitools.vamos.error import UnsupportedFeatureError
+
+from .Error import (
+    DOSTRUE,
+    DOSFALSE,
+    NO_ERROR,
+    ERROR_DEVICE_NOT_MOUNTED,
+    ERROR_OBJECT_WRONG_TYPE,
+)
+from . import Lock
 
 
 def _struct_field(struct, path):
@@ -58,16 +75,15 @@ class DosListEntry:
 
 
 class DosList:
-    def __init__(self, path_mgr, assign_mgr, mem, alloc):
+    def __init__(self, path_mgr, assign_mgr, mem, alloc, handler_mgr=None):
         self.mem = mem
         self.alloc = alloc
         self.path_mgr = path_mgr
         self.assign_mgr = assign_mgr
+        self.handler_mgr = handler_mgr
         self.entries_by_b_addr = {}
         self.entries_by_name = {}
         self.devices_by_name = {}
-        self.host_ports = []
-        self.host_port_mgr = None
         self.entries = []
         self.first_entry = None
         self.LDF_DEVICES = 1 << 2
@@ -86,12 +102,20 @@ class DosList:
         # fill dos list
         volumes = path_mgr.get_all_volume_names()
         for vol in volumes:
-            self.add_volume(vol)
+            # non-filesystem handlers are devices, added in add_host_devices
+            if self._is_filesystem(vol):
+                self.add_volume(vol)
         assigns = path_mgr.get_all_assign_names()
         for assign in assigns:
             alist = path_mgr.get_assign(assign).get_assigns()
             self.add_assign(assign, alist)
         return self.get_head_addr()
+
+    def _is_filesystem(self, name):
+        """is the handler behind this volume/device a file system?"""
+        if self.handler_mgr is None:
+            return True
+        return self.handler_mgr.is_filesystem(name)
 
     def get_head_addr(self):
         if self.first_entry is None:
@@ -102,21 +126,38 @@ class DosList:
         for entry in list(self.entries):
             self.remove_entry(entry)
             self.free_entry(entry)
-        for port in self.host_ports:
-            self.host_port_mgr.free_port(port)
-            self.host_port_mgr.unregister_port(port)
-        self.host_ports.clear()
 
-    def add_host_devices(self, file_mgr, port_mgr):
-        """Publish host-directory mounts as paired DOS devices and volumes."""
-        self.host_port_mgr = port_mgr
+    def _handler_port(self, name):
+        """the packet port of the handler registered as ``name`` (0 if none)"""
+        if self.handler_mgr is None:
+            return 0
+        handler = self.handler_mgr.get_handler(name)
+        dispatcher = getattr(handler, "dispatcher", None)
+        return dispatcher.port if dispatcher is not None else 0
+
+    def add_host_devices(self):
+        """Publish mounted volumes and devices in the DOS list.
+
+        Every handler is reachable through its own packet port (its
+        ``dispatcher``). A filesystem volume gets a paired device entry backed
+        by that port; a non-filesystem device (``NIL:``, ``CONSOLE:``, ...)
+        gets a device entry backed by its port too. The ports are owned by the
+        handlers (freed when their dispatchers are detached).
+        """
         for volume in tuple(self.entries):
             if volume.struct_def is not DosListVolumeStruct:
                 continue
-            port = port_mgr.create_port(volume.name + " handler", file_mgr.fs_put_msg)
-            self.host_ports.append(port)
+            port = self._handler_port(volume.name)
             self.add_device(volume.name, startup_bptr=0, task=port)
             _struct_write(volume.struct, "dol_Task", port)
+        # device handlers (NIL:, CONSOLE:, ...) become device-only entries
+        if self.handler_mgr is not None:
+            for name in self.handler_mgr.get_all_names():
+                if self.handler_mgr.is_filesystem(name):
+                    continue
+                if self.get_entry_by_name(name) is not None:
+                    continue
+                self.add_device(name, startup_bptr=0, task=self._handler_port(name))
 
     def free_entry(self, entry):
         """Free a detached entry and its DOS-list-owned allocations."""
@@ -295,17 +336,121 @@ class DosList:
 
     def remove_assign(self, name):
         entry = self.get_entry_by_name(name)
-        if entry is None or _struct_read(entry.struct, "dol_Type") != 1:
+        if not self.is_assign_entry(entry):
             return None
-        oldlock_addr = _struct_read(entry.struct, "dol_Lock")
-        oldlock = self.lock_mgr.get_by_b_addr(oldlock_addr >> 2)
-        if oldlock is not None:
-            self.lock_mgr.release_lock(oldlock)
-        self._release_locklist(entry)
         self.remove_entry(entry)
-        self.alloc.free_bstr(entry.name_addr)
-        entry.mem.free()
+        # free_entry releases dol_Lock and every AssignList lock and frees
+        # the AssignList nodes; releasing them here again would double-free
+        self.free_entry(entry)
         self.assign_mgr.del_assign(name)
+        return True
+
+    def is_assign_entry(self, entry):
+        """is a DOS list entry a directory assign?"""
+        return entry is not None and _struct_read(entry.struct, "dol_Type") == 1
+
+    def _rebuild_assign_list(self, entry):
+        """rewrite dol_Lock/dol_List from ``entry.locks`` (first is primary)"""
+        for alist in entry.alist:
+            alist.free()
+        entry.alist = []
+        _struct_write(entry.struct, "dol_Lock", 0)
+        _struct_write(entry.struct, "dol_List", 0)
+        first = True
+        last = None
+        for lock in entry.locks:
+            if first:
+                _struct_write(entry.struct, "dol_Lock", lock.mem.addr)
+                first = False
+                continue
+            alist = self.alloc.alloc_astruct(AssignListStruct, label="AssignList")
+            alist.al_Next.aptr = 0
+            alist.al_Lock.aptr = lock.mem.addr
+            entry.alist.append(alist)
+            if last is not None:
+                last.al_Next.aptr = alist.addr
+            else:
+                _struct_write(entry.struct, "dol_List", alist.addr)
+            last = alist
+
+    def _sync_assign_mgr(self, entry):
+        """mirror an assign's directory list into the path manager
+
+        ``entry.assigns`` is the canonical list of Amiga paths: it also keeps
+        paths of a late assign that does not exist (and thus has no lock).
+        """
+        paths = list(entry.assigns)
+        if not paths:
+            paths = [str(lock.ami_path) for lock in entry.locks]
+        self.assign_mgr.set_assign(entry.name, paths)
+
+    def set_assign_paths(self, name, paths):
+        """create/conver an assign pointing at the given Amiga paths.
+
+        AssignLate()/AssignPath() delegate here. An existing assign is
+        replaced; a volume/device of the same name is left alone and None is
+        returned.
+        """
+        entry = self.get_entry_by_name(name)
+        if entry is not None and not self.is_assign_entry(entry):
+            return None
+        if entry is not None:
+            self.remove_assign(name)
+        entry = self.add_assign(name, list(paths), append=False)
+        entry.locks = []
+        _struct_write(entry.struct, "dol_List", 0)
+        for path in paths:
+            lock = self.lock_mgr.create_lock(None, path, False)
+            if lock is None:
+                log_doslist.warning("assign %s: path does not exist: %s", name, path)
+            else:
+                entry.locks.append(lock)
+        self._rebuild_assign_list(entry)
+        self._link_head(entry)
+        self._sync_assign_mgr(entry)
+        return entry
+
+    def add_assign_lock(self, name, lock):
+        """AssignAdd(): append a directory lock to an existing assign"""
+        entry = self.get_entry_by_name(name)
+        if not self.is_assign_entry(entry):
+            return False
+        entry.locks.append(lock)
+        path = str(lock.ami_path)
+        if path not in entry.assigns:
+            entry.assigns.append(path)
+        self._rebuild_assign_list(entry)
+        self._sync_assign_mgr(entry)
+        return True
+
+    def remove_assign_lock(self, name, lock):
+        """RemAssignList(): remove a directory lock from an assign"""
+        entry = self.get_entry_by_name(name)
+        if not self.is_assign_entry(entry):
+            return False
+        index = None
+        for i, cur in enumerate(entry.locks):
+            if self.lock_mgr.same_lock(cur, lock):
+                index = i
+                break
+        if index is None:
+            return False
+        stored = entry.locks.pop(index)
+        path = str(stored.ami_path)
+        if path in entry.assigns:
+            entry.assigns.remove(path)
+        # drop the DOS list's view first, then unlink the entry if empty
+        self._rebuild_assign_list(entry)
+        if entry.locks:
+            self._sync_assign_mgr(entry)
+            # like AmigaDOS the stored lock is released, but a lock handed in
+            # by the caller stays usable (it is not the assign's lock then)
+            if stored is not lock:
+                self.lock_mgr.release_lock(stored)
+        else:
+            self.remove_assign(name)
+            # the destroyed assign releases its last resource too
+            self.lock_mgr.release_lock(stored)
         return True
 
     def _release_locklist(self, entry):
@@ -384,6 +529,16 @@ class DosList:
             entry = entry.next
         return None
 
+    def get_first_entry(self, flags):
+        """the first entry matching the DOS list type flags"""
+        return self._next_dos_entry(self.first_entry, flags)
+
+    def get_next_entry(self, entry, flags):
+        """the entry after ``entry`` matching the DOS list type flags"""
+        if entry is None:
+            return None
+        return self._next_dos_entry(entry.next, flags)
+
     def lock_dos_list(self, flags):
         # Yes, this algorithm is really the one in the
         # dos.library.
@@ -408,3 +563,283 @@ class DosList:
             return 0
         else:
             return entry.mem.addr
+
+
+# ----- fd functions (RKRM AmigaDOS 3, "DOS list" and "DOS objects") -----
+
+
+def lock_dos_list(dos, ctx, flags):
+    return dos.dos_list.lock_dos_list(flags)
+
+
+def unlock_dos_list(dos, ctx, flags):
+    dos.dos_list.unlock_dos_list(flags)
+
+
+def next_dos_entry(dos, ctx, node, flags):
+    return dos.dos_list.next_dos_entry(flags, node)
+
+
+def find_dos_entry(dos, ctx, dlist, name_ptr, flags):
+    if name_ptr == 0:
+        log_dos.info(
+            "FindDosEntry(dlist=0x%x, name=NULL, flags=0x%x) -> 0", dlist, flags
+        )
+        return 0
+    try:
+        name = ctx.mem.r_cstr(name_ptr)
+    except Exception:
+        log_dos.info("FindDosEntry: failed to read CSTR at 0x%x", name_ptr)
+        return 0
+    if name and name.endswith(":"):
+        name = name[:-1]
+    entry = dos.dos_list.get_entry_by_name(name, flags)
+    if entry is None:
+        log_dos.info("FindDosEntry('%s', flags=0x%x) -> 0 (not found)", name, flags)
+        return 0
+    entry_type = entry.struct.dol_Type.val
+    type_matches = False
+    if entry_type == 0 and (flags & 4):
+        type_matches = True
+    elif entry_type == 2 and (flags & 8):
+        type_matches = True
+    elif entry_type == 1 and (flags & 16):
+        type_matches = True
+    if not type_matches:
+        log_dos.info(
+            "FindDosEntry('%s', flags=0x%x) -> 0 (type %d doesn't match)",
+            name,
+            flags,
+            entry_type,
+        )
+        return 0
+    log_dos.info("FindDosEntry('%s', flags=0x%x) -> 0x%x", name, flags, entry.mem.addr)
+    return entry.mem.addr
+
+
+def attempt_lock_dos_list(dos, ctx, flags):
+    log_dos.info("AttemptLockDosList(flags=0x%x)", flags)
+    return dos.dos_list.lock_dos_list(flags)
+
+
+def inhibit(dos, ctx, name, onoff):
+    dev_name = name if name else ""
+    if dev_name.endswith(":"):
+        dev_name = dev_name[:-1]
+    entry = dos.dos_list.get_entry_by_name(dev_name)
+    if (
+        entry is None
+        or entry.struct.dol_Type.val != 0
+        or not entry.exclusive
+        or entry.struct.dol_Task.aptr != 0
+    ):
+        dos.setioerr(ctx, ERROR_DEVICE_NOT_MOUNTED)
+        log_dos.info("Inhibit('%s', %d) -> false", dev_name, onoff)
+        return DOSFALSE
+    entry.inhibited = bool(onoff)
+    dos.setioerr(ctx, NO_ERROR)
+    log_dos.info("Inhibit('%s', %d) -> true", dev_name, onoff)
+    return DOSTRUE
+
+
+def make_dos_entry(dos, ctx, name_ptr, entry_type):
+    try:
+        name = ctx.mem.r_cstr(name_ptr) if name_ptr else ""
+    except Exception:
+        name = ""
+    if not name:
+        name = f"vol_{entry_type:x}"
+    struct_defs = {
+        0: DosListDeviceStruct,
+        1: DosListAssignStruct,
+        2: DosListVolumeStruct,
+    }
+    struct_def = struct_defs.get(entry_type)
+    if struct_def is None:
+        dos.setioerr(ctx, ERROR_OBJECT_WRONG_TYPE)
+        return 0
+    entry = ctx.alloc.alloc_astruct(struct_def, label=f"DosList({name})")
+    entry.dol_Next.aptr = 0
+    entry.dol_Type.val = entry_type
+    entry.dol_Task.aptr = 0
+    entry.dol_Lock.aptr = 0
+    if struct_def is DosListDeviceStruct:
+        entry.dol_Handler.aptr = 0
+        entry.dol_StackSize.val = 0
+        entry.dol_Priority.val = 0
+        entry.dol_Startup.val = 0
+        entry.dol_SegList.aptr = 0
+        entry.dol_GlobVec.aptr = 0
+    elif struct_def is DosListVolumeStruct:
+        entry.dol_LockList.aptr = 0
+        entry.dol_DiskType.val = 0
+    else:
+        entry.dol_List.aptr = 0
+    name_mem = ctx.alloc.alloc_bstr(name, label="DosListName")
+    entry.dol_Name.aptr = name_mem.addr
+    dos.dos_entries[entry.addr] = {
+        "mem": entry,
+        "name": name_mem,
+        "name_text": name,
+        "dos_list_entry": None,
+    }
+    log_dos.info("MakeDosEntry('%s', type=%d) -> 0x%x", name, entry_type, entry.addr)
+    return entry.addr
+
+
+def add_dos_entry(dos, ctx, dlist_ptr):
+    record = dos.dos_entries.get(dlist_ptr)
+    ok = record is not None and record["dos_list_entry"] is None
+    if ok:
+        try:
+            record["dos_list_entry"] = dos.dos_list.add_existing_entry(
+                record["name_text"], record["mem"], record["name"]
+            )
+        except ValueError:
+            ok = False
+        else:
+            dos.update_dos_list_head()
+    log_dos.info("AddDosEntry(0x%x) -> %s", dlist_ptr, ok)
+    return DOSTRUE if ok else DOSFALSE
+
+
+def rem_dos_entry(dos, ctx, dlist_ptr):
+    record = dos.dos_entries.get(dlist_ptr)
+    entry = record["dos_list_entry"] if record is not None else None
+    ok = entry is not None and dos.dos_list.remove_entry(entry)
+    if ok:
+        record["dos_list_entry"] = None
+        dos.update_dos_list_head()
+    log_dos.info("RemDosEntry(0x%x) -> %s", dlist_ptr, ok)
+    return DOSTRUE if ok else DOSFALSE
+
+
+def free_dos_entry(dos, ctx, dlist_ptr):
+    entry = dos.dos_entries.pop(dlist_ptr, None)
+    if entry:
+        linked_entry = entry["dos_list_entry"]
+        if linked_entry is not None:
+            dos.dos_list.remove_entry(linked_entry)
+            dos.update_dos_list_head()
+        ctx.alloc.free_bstr(entry["name"])
+        ctx.alloc.free_struct(entry["mem"])
+    log_dos.info("FreeDosEntry(0x%x)", dlist_ptr)
+    return 0
+
+
+def is_file_system(dos, ctx, name_ptr):
+    name = ctx.mem.r_cstr(name_ptr)
+    log_dos.info("IsFileSystem('%s'):", name)
+    lock = dos.get_current_dir(ctx)
+    res = dos.file_mgr.is_file_system(lock, name)
+    log_dos.info("IsFileSystem('%s'): %s", name, res)
+    if res:
+        return DOSTRUE
+    else:
+        return DOSFALSE
+
+
+def alloc_dos_object(dos, ctx, obj_type, tags_ptr):
+    if obj_type == 0:  # DOS_FILEHANDLE
+        name = "DOS_FILEHANDLE"
+        struct_def = FileHandleStruct
+    elif obj_type == 1:  # DOS_EXALLCONTROL
+        name = "DOS_EXALLCONTROL"
+        struct_def = ExAllControlStruct
+    elif obj_type == 2:  # DOS_FIB
+        name = "DOS_FIB"
+        struct_def = FileInfoBlockStruct
+    elif obj_type == 3:  # DOS_STDPKT
+        name = "DOS_STDPKT"
+        struct_def = DosPacketStruct
+    elif obj_type == 4:  # DOS_CLI
+        name = "DOS_CLI"
+        struct_def = CLIStruct
+    elif obj_type == 5:  # DOS_RDARGS
+        name = "DOS_RDARGS"
+        struct_def = RDArgsStruct
+    else:
+        log_dos.error("AllocDosObject: invalid type=%d", obj_type)
+        return 0
+    if struct_def is None:
+        log_dos.warning("AllocDosObject: unsupported type=%d/%s", obj_type, name)
+        return 0
+    # allocate struct
+    dos_obj = ctx.alloc.alloc_astruct(struct_def, label=name)
+    log_dos.info(
+        "AllocDosObject: type=%d/%s tags_ptr=%08x -> dos_obj=%s",
+        obj_type,
+        name,
+        tags_ptr,
+        dos_obj,
+    )
+    # store struct
+    ptr = dos_obj.addr
+    dos.dos_objs[ptr] = (dos_obj, obj_type)
+    # pre fill struct
+    if obj_type == 0:
+        dos_obj.fh_Pos.val = 0xFFFFFFFF
+        dos_obj.fh_End.val = 0xFFFFFFFF
+    elif obj_type == 4:
+        raise UnsupportedFeatureError("AllocDosObject: DOS_CLI fill TBD")
+    return ptr
+
+
+def free_dos_object(dos, ctx, obj_type, ptr):
+    # retrieve struct
+    if ptr in dos.dos_objs:
+        entry = dos.dos_objs[ptr]
+        del dos.dos_objs[ptr]
+        # check type
+        if obj_type != entry[1]:
+            log_dos.warning("FreeDosObject: type mismatch %d != %d", obj_type, entry[1])
+        # Freeing a control also releases an unfinished scan.
+        if entry[1] == 1:
+            Lock.drop_exall_scan(dos, ptr)
+        # free struct
+        ctx.alloc.free_struct(entry[0])
+    else:
+        log_dos.error("FreeDosObject: type=%d ptr=%08x -> NOT FOUND!", obj_type, ptr)
+
+
+class DosListMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def IsFileSystem(self, ctx, name_ptr):
+        return is_file_system(self, ctx, name_ptr)
+
+    def AllocDosObject(self, ctx, obj_type, tags_ptr):
+        return alloc_dos_object(self, ctx, obj_type, tags_ptr)
+
+    def FreeDosObject(self, ctx, obj_type, ptr):
+        return free_dos_object(self, ctx, obj_type, ptr)
+
+    def LockDosList(self, ctx, flags):
+        return lock_dos_list(self, ctx, flags)
+
+    def UnLockDosList(self, ctx, flags):
+        return unlock_dos_list(self, ctx, flags)
+
+    def NextDosEntry(self, ctx, node, flags):
+        return next_dos_entry(self, ctx, node, flags)
+
+    def FindDosEntry(self, ctx, dlist, name_ptr, flags):
+        return find_dos_entry(self, ctx, dlist, name_ptr, flags)
+
+    def AttemptLockDosList(self, ctx, flags):
+        return attempt_lock_dos_list(self, ctx, flags)
+
+    def Inhibit(self, ctx, name: CSTR, onoff):
+        return inhibit(self, ctx, name.get_str(), onoff)
+
+    def MakeDosEntry(self, ctx, name_ptr, entry_type):
+        return make_dos_entry(self, ctx, name_ptr, entry_type)
+
+    def AddDosEntry(self, ctx, dlist_ptr):
+        return add_dos_entry(self, ctx, dlist_ptr)
+
+    def RemDosEntry(self, ctx, dlist_ptr):
+        return rem_dos_entry(self, ctx, dlist_ptr)
+
+    def FreeDosEntry(self, ctx, dlist_ptr):
+        return free_dos_entry(self, ctx, dlist_ptr)

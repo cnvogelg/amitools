@@ -1,27 +1,24 @@
-import os.path
-
 from amitools.binfmt.BinFmt import BinFmt
 from amitools.binfmt.Relocate import Relocate
 from amitools.vamos.log import log_segload
+from amitools.vamos.path.amipath import AmiPath
 from .seglist import SegList
 from .overlay import OverlayInfo
 
 
 class SegLoadInfo(object):
-    def __init__(
-        self, seglist, bin_img=None, sys_file=None, ami_file=None, overlay=None
-    ):
+    def __init__(self, seglist, bin_img=None, ami_file=None, overlay=None, name=None):
         self.seglist = seglist
         self.bin_img = bin_img
-        self.sys_file = sys_file
         self.ami_file = ami_file
         self.overlay = overlay
+        self.name = name
 
     def __str__(self):
-        return "[SegLoad:%s,sys=%s,ami=%s]" % (
+        return "[SegLoad:%s,ami=%s,name=%s]" % (
             self.seglist,
-            self.sys_file,
             self.ami_file,
+            self.name,
         )
 
     def has_overlay(self):
@@ -29,57 +26,79 @@ class SegLoadInfo(object):
 
 
 class SegmentLoader(object):
-    def __init__(self, alloc, path_mgr=None):
+    def __init__(self, alloc, file_opener=None):
         self.alloc = alloc
-        self.path_mgr = path_mgr
+        self.file_opener = file_opener
         self.mem = alloc.get_mem()
         self.binfmt = BinFmt()
         # map seglist baddr to bin_img
         self.infos = {}
 
-    def load_sys_seglist(self, sys_bin_file, file_mgr=None, ami_file=None, lock=None):
-        """load seglist, register it, and return seglist baddr or 0.
+    def set_file_opener(self, file_opener):
+        self.file_opener = file_opener
 
-        If a file_mgr is given, binaries with an overlay table get their
-        overlay manager data set up. ami_file and lock are used to reopen the
-        binary for the overlay manager. Without a file_mgr overlay tables are
-        not set up."""
-        info = self.int_load_sys_seglist(sys_bin_file)
-        if info and file_mgr is not None and OverlayInfo.has_overlay(info.bin_img):
-            try:
-                info.overlay = OverlayInfo.create(
-                    self.alloc,
-                    file_mgr,
-                    info.seglist,
-                    sys_bin_file,
-                    ami_file or sys_bin_file,
-                    lock,
-                )
-            except ValueError as e:
-                log_segload.warning("overlay setup failed: %s", e)
-                info.seglist.free()
-                info = None
-            # None means no supported setup needed (e.g. custom manager) - keep seglist
+    def get_file_opener(self):
+        return self.file_opener
+
+    def load_seglist(self, fobj, name=None, ami_file=None, lock=None, file_opener=None):
+        """load seglist from an already opened file object and register it.
+
+        Return the seglist baddr or 0. The caller keeps ownership of fobj
+        and is responsible for closing it.
+
+        If a file opener is available, binaries with an overlay table get
+        their overlay manager data set up. The overlay needs its own file
+        handle that stays open, so it is opened again via the opener.
+        """
+        info = self.int_load_seglist(fobj, name=name, ami_file=ami_file)
+        if info:
+            opener = file_opener or self.file_opener
+            if opener is not None and OverlayInfo.has_overlay(info.bin_img):
+                try:
+                    info.overlay = OverlayInfo.create(
+                        self.alloc,
+                        opener,
+                        info.seglist,
+                        info.ami_file or info.name,
+                        lock,
+                    )
+                except ValueError as e:
+                    log_segload.warning("overlay setup failed: %s", e)
+                    info.seglist.free()
+                    info = None
+                # None means no supported setup needed (e.g. custom
+                # manager) - keep seglist
         if info:
             baddr = info.seglist.get_baddr()
             self.infos[baddr] = info
-            log_segload.info("loaded sys seglist: %s", info)
+            log_segload.info("loaded seglist: %s", info)
             return baddr
         else:
-            log_segload.info("can't load sys seglist: %s", sys_bin_file)
+            log_segload.info("can't load seglist: %s", name)
             return 0
 
-    def load_ami_seglist(self, ami_bin_file, lock=None):
-        """load seglist, register it, and return seglist baddr or 0"""
-        info = self.int_load_ami_seglist(ami_bin_file, lock)
-        if info:
-            baddr = info.seglist.get_baddr()
-            self.infos[baddr] = info
-            log_segload.info("loaded ami seglist: %s", info)
-            return baddr
-        else:
-            log_segload.info("can't load ami seglist: %s", ami_bin_file)
+    def load_ami_seglist(self, ami_bin_file, lock=None, file_opener=None):
+        """load seglist from an Amiga path and register it.
+
+        Return the seglist baddr or 0."""
+        opener = file_opener or self.file_opener
+        if opener is None:
+            log_segload.error("no file opener set to load: %s", ami_bin_file)
             return 0
+        fobj = opener.open(ami_bin_file, lock)
+        if fobj is None:
+            log_segload.info("can't open ami seglist: %s", ami_bin_file)
+            return 0
+        try:
+            return self.load_seglist(
+                fobj,
+                name=ami_bin_file,
+                ami_file=ami_bin_file,
+                lock=lock,
+                file_opener=opener,
+            )
+        finally:
+            fobj.close()
 
     def unload_seglist(self, seglist_baddr):
         """unregister given seglist baddr and free seglist.
@@ -124,30 +143,24 @@ class SegmentLoader(object):
             info.seglist.free()
         return len(self.infos)
 
-    def int_load_ami_seglist(self, ami_bin_file, lock=None):
-        """load seglist given by ami binary path and return SegLoadInfo"""
-        if self.path_mgr is None:
-            return None
-        # try to map path
-        sys_path = self.path_mgr.ami_to_sys_path(lock, ami_bin_file, mustExist=True)
-        if sys_path:
-            info = self.int_load_sys_seglist(sys_path)
-            info.ami_file = ami_bin_file
-            return info
+    def int_load_seglist(self, fobj, name=None, ami_file=None):
+        """load seglist from the given file object and return SegLoadInfo.
 
-    def int_load_sys_seglist(self, sys_bin_file):
-        """load seglist given by sys binary path and return SegLoadInfo"""
-        base_name = os.path.basename(sys_bin_file)
-
-        # does file exist?
-        if not os.path.isfile(sys_bin_file):
-            log_segload.debug("no file: %s", sys_bin_file)
-            return None
+        The file object is read from its current position. It is not
+        closed by this method.
+        """
+        # derive a label base name from the Amiga file name
+        if name is not None:
+            base_name = AmiPath(str(name)).filename()
+        else:
+            base_name = None
+        if not base_name:
+            base_name = "seglist"
 
         # try to load bin image in supported format (e.g. HUNK or ELF)
-        bin_img = self.binfmt.load_image(sys_bin_file)
+        bin_img = self.binfmt.load_image_fobj(fobj)
         if bin_img is None:
-            log_segload.debug("load_image failed: %s", sys_bin_file)
+            log_segload.debug("load_image failed: %s", name)
             return None
 
         # create relocator
@@ -162,8 +175,8 @@ class SegmentLoader(object):
         if self.alloc.label_mgr:
             labels = []
             for i in range(len(sizes)):
-                name = "%s_%d:%s" % (base_name, i, names[i].lower())
-                labels.append(name)
+                label = "%s_%d:%s" % (base_name, i, names[i].lower())
+                labels.append(label)
         else:
             labels = None
 
@@ -181,4 +194,4 @@ class SegmentLoader(object):
             # write data to segments
             self.mem.w_block(addrs[i], bytes(datas[i]))
 
-        return SegLoadInfo(seg_list, bin_img, sys_bin_file)
+        return SegLoadInfo(seg_list, bin_img, ami_file=ami_file, name=name)

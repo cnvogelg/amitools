@@ -1,7 +1,8 @@
 """Handle printf like Functions including VPrintf and RawDoFmt"""
 
 import re
-from amitools.util.Math import *
+
+from amitools.util.Math import int16, int32, signext16
 
 
 class printf_element:

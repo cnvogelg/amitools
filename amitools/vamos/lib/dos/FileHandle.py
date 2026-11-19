@@ -1,20 +1,39 @@
-import os
-import sys
-
+from amitools.vamos.handler import HandlerError
+from amitools.vamos.handler.base import (
+    ERROR_LOCK_COLLISION,
+    ERROR_RECORD_NOT_LOCKED,
+    REC_EXCLUSIVE,
+    REC_EXCLUSIVE_IMMED,
+)
 from amitools.vamos.libstructs import FileHandleStruct
-from .terminal import Terminal, Latin1ToUtf8Converter
 
 
 class FileHandle:
-    """represent an AmigaOS file handle (FH) in vamos"""
+    """represent an AmigaOS file handle (FH) in vamos
+
+    The handle is a thin DOS-level adapter. Every operation that maps to an
+    AmigaDOS handler packet is delegated to the handler the handle was opened
+    with; the raw stream (``obj``) is only used as a fallback for handler-less
+    handles (bare test managers, the console fallback) and for the few
+    operations that have no packet (``tell``, ``is_interactive``).
+    """
 
     def __init__(
-        self, obj, ami_path, sys_path, need_close=True, is_nil=False, auto_flush=False
+        self,
+        obj,
+        ami_path,
+        name,
+        handler=None,
+        handler_file=None,
+        need_close=True,
+        is_nil=False,
+        auto_flush=False,
     ):
         self.obj = obj
-        self.name = os.path.basename(sys_path)
+        self.name = name
         self.ami_path = ami_path
-        self.sys_path = sys_path
+        self.handler = handler
+        self.handler_file = handler_file
         self.b_addr = 0
         self.need_close = need_close
         self.auto_flush = auto_flush
@@ -22,25 +41,17 @@ class FileHandle:
         self.unch = bytearray()
         self.ch = -1
         self.is_nil = is_nil
-        self.interactive = self.obj.isatty()
-        # tty stuff
-        if self.interactive:
-            self.terminal = Terminal(obj)
-        else:
-            self.terminal = None
-        # Latin-1 to UTF-8 conversion for non-terminal stdout
-        enc = sys.stdout.encoding
-        is_utf8 = enc and enc.lower().replace("-", "") == "utf8"
-        if not self.interactive and obj == sys.stdout.buffer and is_utf8:
-            self.latin1_conv = Latin1ToUtf8Converter()
-        else:
-            self.latin1_conv = None
+        # handler-less record locks (offset, length, mode); a handler-backed
+        # handle keeps its locks on the handler file instead
+        self.record_locks = []
+        # console conversions (tty, latin1->utf8) live in the handler's
+        # stream; the DOS layer only sees a plain byte stream
+        self.interactive = self.obj.isatty() if self.obj is not None else False
 
     def __repr__(self):
-        return "[FH:'%s'(ami='%s',sys='%s',nc=%s,af=%s,int=%s)@%06x=B@%06x]" % (
+        return "[FH:'%s'(ami='%s',nc=%s,af=%s,int=%s)@%06x=B@%06x]" % (
             self.name,
             self.ami_path,
-            self.sys_path,
             self.need_close,
             self.auto_flush,
             self.interactive,
@@ -52,13 +63,22 @@ class FileHandle:
         return "[FH:'%s'@%06x=B@%06x]" % (self.name, self.mem.addr, self.b_addr)
 
     def close(self):
+        """ACTION_END: close the file via the handler"""
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                self.handler.end(self.handler_file)
+            except HandlerError:
+                pass
+            return
         if self.need_close:
             self.obj.close()
-        # restore tty
-        if self.terminal:
-            self.terminal.close()
 
-    def alloc_fh(self, alloc, fs_handler_port):
+    def _handler_port(self):
+        """the packet port of the handler that owns this file (0 if none)"""
+        dispatcher = getattr(self.handler, "dispatcher", None)
+        return dispatcher.port if dispatcher is not None else 0
+
+    def alloc_fh(self, alloc):
         name = "File:" + self.name
         self.mem = self.struct = alloc.alloc_astruct(FileHandleStruct, label=name)
         fh = self.struct
@@ -66,8 +86,8 @@ class FileHandle:
         # -- fill filehandle
         # use baddr of FH itself as identifier
         fh.fh_Args.val = self.b_addr
-        # set port
-        fh.fh_Type.aptr = fs_handler_port
+        # fh_Type is the packet port of the handler owning this file
+        fh.fh_Type.aptr = self._handler_port()
         # buffer handling: set fh_End != 0 (to prepare for EOF hack in FGetS)
         fh.fh_End.val = 1
         return self.b_addr
@@ -80,31 +100,51 @@ class FileHandle:
     # --- file ops ---
 
     def set_mode(self, cooked):
-        # no tty support on this platform
-        if not self.terminal:
+        """ACTION_SCREEN_MODE: set the console buffer mode
+
+        Returns True on success, False if the handler/stream does not support
+        mode switching.
+        """
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                return self.handler.set_mode(self.handler_file, cooked)
+            except HandlerError:
+                return False
+        # handler-less fallback: the stream may provide tty mode handling
+        fn = getattr(self.obj, "set_mode", None)
+        if fn is None:
             return False
-        # set mode
-        return self.terminal.set_mode(cooked)
+        return fn(cooked)
 
     def wait_for_char(self, timeout):
-        if not self.terminal:
+        """ACTION_WAIT_CHAR: wait for input becoming available
+
+        Returns True if a char is available, False on timeout, None if the
+        handler/stream does not support waiting.
+        """
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                return self.handler.wait_for_char(self.handler_file, timeout)
+            except HandlerError:
+                return None
+        fn = getattr(self.obj, "wait_for_char", None)
+        if fn is None:
             return False
-        return self.terminal.wait_for_char(timeout)
+        return fn(timeout)
 
     def write(self, data):
-        """write data
+        """ACTION_WRITE: write data
 
         return -1 on error, 0=EOF, >0 written bytes"""
         assert isinstance(data, (bytes, bytearray))
         orig_len = len(data)
 
-        # read from terminal or direct
-        if self.terminal:
-            got = self.terminal.write(data)
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                got = self.handler.write(self.handler_file, data)
+            except HandlerError:
+                return -1
         else:
-            # do Latin-1 to UTF-8 conversion if needed
-            if self.latin1_conv:
-                data = self.latin1_conv.convert(data)
             try:
                 self.obj.write(data)
                 got = orig_len
@@ -113,15 +153,18 @@ class FileHandle:
 
         # do auto flush?
         if got > 0 and self.auto_flush:
-            self.obj.flush()
+            self.flush()
 
         # return got bytes
         return got
 
     def read(self, len):
-        """Return bytes, an empty byte string at EOF, or -1 on error."""
-        if self.terminal:
-            return self.terminal.read(len)
+        """ACTION_READ: return bytes, an empty byte string at EOF, or -1."""
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                return self.handler.read(self.handler_file, len)
+            except HandlerError:
+                return -1
         try:
             read = getattr(self.obj, "read1", None)
             if read is None:
@@ -143,11 +186,7 @@ class FileHandle:
             if self.is_nil:
                 return -1
 
-            # read from terminal or direct
-            if self.terminal:
-                d = self.terminal.read(1)
-            else:
-                d = self.obj.read(1)
+            d = self.read(1)
 
             # -1 on Error
             if d == -1:
@@ -202,36 +241,110 @@ class FileHandle:
         self.auto_flush = buf_type == 1
 
     def tell(self):
+        if self.obj is None:
+            return -1
         try:
             return self.obj.tell()
         except IOError:
             return -1
 
     def seek(self, pos, whence):
-        """set to position from whence
+        """ACTION_SEEK: set to position from whence
 
         return -1 on error, -2 on too far or new_pos
         """
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                return self.handler.seek(self.handler_file, pos, whence)
+            except HandlerError:
+                return -1
         try:
-            new_pos = self.obj.seek(pos, whence)
-
-            # we have to limit seek to file size
-            stat = os.stat(self.obj.fileno())
-            file_size = stat.st_size
-
-            # if seek to far then limit to file size
-            if new_pos > file_size:
-                # seek to end
-                self.obj.seek(file_size, 0)
-                return -2
-
-            return new_pos
-
+            return self.obj.seek(pos, whence)
         except IOError:
             return -1
 
+    def set_file_size(self, size, mode):
+        """ACTION_SET_FILE_SIZE: return the new size or -1 on error
+
+        ``mode`` is the raw AmigaDOS mode: ``-1`` (OFFSET_BEGINNING),
+        ``0`` (OFFSET_CURRENT) or ``1`` (OFFSET_END).
+        """
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                return self.handler.set_file_size(self.handler_file, size, mode)
+            except HandlerError:
+                return -1
+        # handler-less fallback: truncate the raw stream
+        obj = self.obj
+        if obj is None:
+            return -1
+        try:
+            if mode == -1:
+                new_size = size
+            elif mode == 0:
+                new_size = obj.tell() + size
+            elif mode == 1:
+                new_size = obj.seek(0, 2) + size
+            else:
+                return -1
+            if new_size < 0:
+                return -1
+            obj.truncate(new_size)
+            return new_size
+        except (OSError, ValueError, AttributeError):
+            return -1
+
     def flush(self):
+        """ACTION_FLUSH: flush the handler's buffers"""
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                self.handler.flush(self.handler_file)
+            except HandlerError:
+                pass
+            return
         self.obj.flush()
+
+    # --- record locks (ACTION_LOCK_RECORD / ACTION_FREE_RECORD) ---
+
+    def lock_record(self, offset, length, mode, timeout):
+        """lock a byte range of the file: return (success, error_code)
+
+        A handler-backed handle delegates to the handler (which owns the file's
+        record locks); a handler-less handle keeps a per-handle list.
+        """
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                self.handler.lock_record(
+                    self.handler_file, offset, length, mode, timeout
+                )
+                return True, 0
+            except HandlerError as e:
+                return False, e.code
+        # handler-less fallback: a per-handle list
+        end = offset + length
+        exclusive = mode in (REC_EXCLUSIVE, REC_EXCLUSIVE_IMMED)
+        for other_offset, other_length, other_mode in self.record_locks:
+            if offset < other_offset + other_length and other_offset < end:
+                other_exclusive = other_mode in (REC_EXCLUSIVE, REC_EXCLUSIVE_IMMED)
+                if exclusive or other_exclusive:
+                    # match the handler contract: an overlapping lock collides
+                    return False, ERROR_LOCK_COLLISION
+        self.record_locks.append((offset, length, mode))
+        return True, 0
+
+    def free_record(self, offset, length):
+        """release a record lock: return (success, error_code)"""
+        if self.handler is not None and self.handler_file is not None:
+            try:
+                self.handler.free_record(self.handler_file, offset, length)
+                return True, 0
+            except HandlerError as e:
+                return False, e.code
+        for i, (o, l, _m) in enumerate(self.record_locks):
+            if o == offset and l == length:
+                del self.record_locks[i]
+                return True, 0
+        return False, ERROR_RECORD_NOT_LOCKED
 
     def is_interactive(self):
         return self.interactive

@@ -128,6 +128,27 @@ comma-separated values.
 
       vamos -V sys:$HOME/amiga/system -V work:$HOME/amiga/work myprog
 
+  A volume spec may carry options after ``?``, such as ``?create`` (create the
+  host directory). The ``handler`` option selects the handler that backs the
+  volume: ``hostfs`` (a host directory, the default), ``ram`` (an in-memory
+  file system), ``adfs`` (an AmigaDOS file system inside an image file), or the
+  ``nil``/``console`` devices. A non-host volume needs no host path, and ``ram``
+  accepts a nominal size in KiB::
+
+      vamos -V work:/abs/path?handler=hostfs -V scratch:?handler=ram,size=2048 myprog
+
+  A volume whose source is a *file* is an ADFS image volume: the handler
+  defaults to ``adfs`` and the file is not mapped to the host file system. The
+  image is a raw floppy image (``.adf``), a hardfile (``.hdf``) or one RDB
+  partition (``.rdb``); the type is auto-detected, ``?img=`` forces it
+  (``adf``/``adf_hd``/``hdf``/``rdb``, or ``xdf`` for "raw image, detect") and
+  ``?part=`` selects the RDB partition::
+
+      vamos -V work:disk.adf myprog
+      vamos -V work:disk.rdb?part=1 myprog
+
+  See :doc:`vamos-handler` for the handler layer and how to write your own.
+
 * ``-a NAME:AMIGA-PATH``, ``--assign NAME:AMIGA-PATH``: Define an Amiga
   assign. Use ``+`` to add paths to a multi-assign::
 
@@ -142,7 +163,8 @@ comma-separated values.
   volumes: ``vamos --vols-base-dir ./vamos-volumes myprog``.
 * ``--auto-volumes NAME,...``: Select automatically created volumes (``root``
   and ``ram`` by default); use ``off`` to disable them:
-  ``vamos --auto-volumes root,ram myprog``.
+  ``vamos --auto-volumes root,ram myprog``. ``root`` is a host directory (the
+  host ``/``) and ``ram`` is the in-memory ``ram`` handler.
 * ``-A NAME,...``, ``--auto-assigns NAME,...``: Select automatically created
   assigns (``c``, ``s``, ``libs``, ``devs``, and ``t`` by default); use
   ``off`` to disable them: ``vamos -A c,libs myprog``.
@@ -207,10 +229,14 @@ Exception names accepted by ``--hw-exception`` are ``bus``, ``address``,
 Disks, libraries, and devices
 -----------------------------
 
-Host directory volumes also have DOS device entries with matching handler
-ports. Their capacity comes from the host filesystem, so mounts on the same
-filesystem report overlapping space. These entries do not represent physical
-block devices and have no filesystem startup message or block geometry.
+Every handler is reachable through its own packet port, so every file system
+volume -- a host directory or an in-memory ``ram`` volume -- has a DOS device
+entry with a matching handler port. Their capacity comes from the backing file
+system (the host filesystem, or the ``ram`` handler's nominal size), so host
+mounts on the same filesystem report overlapping space. The ``NIL:`` and
+``CONSOLE:`` devices get a device entry backed by their own handler port too
+(the ``NIL:`` sink and the console), with no startup message. None of these
+entries represent physical block devices and they have no block geometry.
 
 * ``--disk IMAGE``: Expose an RDB disk image through ``scsi.device``; repeat
   to add units in order: ``vamos --disk work.hdf myprog``. The command-line

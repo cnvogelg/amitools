@@ -13,9 +13,10 @@ from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.lib.VamosTestDevice import VamosTestDevice
 from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.trace import TraceManager
+from helper import HostFileOpener
 
 
-def setup(path_mgr=None):
+def setup(path_mgr=None, file_opener=None):
     log_libmgr.setLevel(logging.INFO)
     log_exec.setLevel(logging.INFO)
     machine = Machine()
@@ -23,7 +24,7 @@ def setup(path_mgr=None):
     # machine.show_instr(True)
     sp = machine.get_ram_begin() - 4
     alloc = MemoryAlloc.for_machine(machine)
-    segloader = SegmentLoader(alloc, path_mgr)
+    segloader = SegmentLoader(alloc, file_opener=file_opener)
     cfg = LibMgrCfg()
     mgr = LibManager(machine, alloc, runtime.run, segloader, cfg)
     # setup ctx map
@@ -238,7 +239,10 @@ class ALibHelper(object):
                     return lib_file
 
         pm = PathMgrMock()
-        self.machine, self.alloc, self.mgr, self.sp, self.cfg = setup(path_mgr=pm)
+        opener = HostFileOpener({"LIBS:" + lib_name: lib_file})
+        self.machine, self.alloc, self.mgr, self.sp, self.cfg = setup(
+            path_mgr=pm, file_opener=opener
+        )
         self.trace = TraceManager(self.machine)
         self.trace.setup_cpu_instr_trace(False)
         self.mgr.bootstrap_exec()

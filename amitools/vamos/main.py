@@ -5,12 +5,13 @@ import pstats
 from .cfg import VamosMainParser
 from .machine import Machine, MemoryMap, Runtime
 from .log import log_main, log_setup, log_help
-from .path import VamosPathManager
+from .path import VamosPathManager, SysPathResolver
+from .handler import build_handler_manager
 from .trace import TraceManager
 from .libmgr import SetupLibManager
 from .schedule import Scheduler
 from .profiler import MainProfiler
-from .mode import ModeContext, ModeSetup
+from .mode import ModeContext, ModeSetup, ProcArgs
 from .disk import DiskSession
 
 RET_CODE_CONFIG_ERROR = 1000
@@ -70,6 +71,7 @@ def main(
 
     mem_map = MemoryMap(machine)
     path_mgr = None
+    handler_mgr = None
     slm = None
     slm_is_setup = False
     base_libs_are_open = False
@@ -108,6 +110,9 @@ def main(
             log_main.error("path setup failed!")
             return error_code
 
+        # build file system handlers for the configured volumes
+        handler_mgr = build_handler_manager(path_mgr)
+
         # setup scheduler
         schedule_cfg = mp.get_schedule_dict().schedule
         scheduler = Scheduler.from_cfg(machine, schedule_cfg)
@@ -137,6 +142,7 @@ def main(
             scheduler,
             path_mgr,
             main_profiler=main_profiler,
+            handler_mgr=handler_mgr,
         )
         if not slm.parse_config(lib_cfg):
             log_main.error("lib manager setup failed!")
@@ -164,7 +170,11 @@ def main(
         proc_cfg = mp.get_proc_dict().process
         exec_ctx = slm.exec_ctx
         dos_ctx = slm.dos_ctx
-        mode_ctx = ModeContext(proc_cfg, exec_ctx, dos_ctx, scheduler, default_runtime)
+        sys_path = SysPathResolver(path_mgr)
+        proc_args = ProcArgs(sys_path.file_system, sys_path.from_sys_path)
+        mode_ctx = ModeContext(
+            proc_cfg, exec_ctx, dos_ctx, scheduler, default_runtime, proc_args
+        )
 
         # select mode via ModeSetup
         if mode is None:
@@ -197,6 +207,8 @@ def main(
         if slm_is_setup:
             cleanup_step("library manager", slm.cleanup)
         cleanup_step("disk", disk_session.close)
+        if handler_mgr is not None:
+            cleanup_step("handler manager", handler_mgr.shutdown)
         if path_mgr is not None:
             cleanup_step("path manager", path_mgr.shutdown)
         cleanup_step("memory map", mem_map.cleanup)

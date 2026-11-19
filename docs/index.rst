@@ -12,6 +12,7 @@ amitools Documentation
     tools/icontool
     vamos
     vamos-ref
+    vamos-handler
     vamos-lib
     libs/icontool
 
@@ -33,6 +34,7 @@ Vamos
 
 * :doc:`vamos` - virtual AmigaOS runtime
 * :doc:`vamos-ref` - command-line options, configuration files, and environment variables
+* :doc:`vamos-handler` - file system handlers and the handler API
 * :doc:`vamos-lib` - library configuration and loading
 
 Libraries

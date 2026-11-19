@@ -1,3 +1,7 @@
+from amitools.vamos.log import log_dos
+
+from .Error import ERROR_BAD_TEMPLATE, NO_ERROR
+
 # pattern match constants
 P_ANY = 0x80
 P_SINGLE = 0x81
@@ -572,6 +576,43 @@ def pattern_match(pattern, in_str, debug=False):
                 markers.push(Marker(True, pat_pos, str_pos + 1))
 
 
+# ----- fd functions -----
+
+
+def parse_pattern(dos, ctx, src_ptr, dst_ptr, dst_len, ignore_case=False):
+    src = ctx.mem.r_cstr(src_ptr)
+    pat = pattern_parse(src, ignore_case=ignore_case)
+    log_dos.info("ParsePattern: src=%s ignore_case=%s -> pat=%s", src, ignore_case, pat)
+    if pat is None:
+        dos.setioerr(ctx, ERROR_BAD_TEMPLATE)
+        return -1
+    dos.setioerr(ctx, NO_ERROR)
+    pat_str = pat.pat_str
+    if len(pat_str) >= dst_len:
+        return -1
+    ctx.mem.w_cstr(dst_ptr, pat_str)
+    if pat.has_wildcard:
+        return 1
+    return 0
+
+
+def match_pattern(dos, ctx, pat_ptr, txt_ptr, ignore_case=False):
+    pat = ctx.mem.r_cstr(pat_ptr)
+    txt = ctx.mem.r_cstr(txt_ptr)
+    pattern = Pattern(None, pat, ignore_case, True)
+    match = pattern_match(pattern, txt)
+    log_dos.info(
+        "MatchPattern: pat=%s txt=%s ignore_case=%s -> match=%s",
+        pat,
+        txt,
+        ignore_case,
+        match,
+    )
+    if match:
+        return -1
+    return 0
+
+
 # ----- test -----
 if __name__ == "__main__":
     import sys
@@ -591,3 +632,19 @@ if __name__ == "__main__":
                 for a in sys.argv[2:]:
                     match = pattern_match(pat, a, debug=True)
                     print("'%s' -> %s" % (a, match))
+
+
+class PatternMatchMixin:
+    """dos.library fd methods (HANDLER.md step 22m)."""
+
+    def ParsePattern(self, ctx, src_ptr, dst_ptr, dst_len):
+        return parse_pattern(self, ctx, src_ptr, dst_ptr, dst_len)
+
+    def ParsePatternNoCase(self, ctx, src_ptr, dst_ptr, dst_len):
+        return parse_pattern(self, ctx, src_ptr, dst_ptr, dst_len, True)
+
+    def MatchPattern(self, ctx, pat_ptr, txt_ptr):
+        return match_pattern(self, ctx, pat_ptr, txt_ptr)
+
+    def MatchPatternNoCase(self, ctx, pat_ptr, txt_ptr):
+        return match_pattern(self, ctx, pat_ptr, txt_ptr, ignore_case=True)

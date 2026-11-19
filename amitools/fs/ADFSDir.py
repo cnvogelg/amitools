@@ -4,11 +4,16 @@ from .block.UserDirBlock import UserDirBlock
 from .block.EntryBlock import EntryBlock
 from .block.DirCacheBlock import *
 from .ADFSFile import ADFSFile
+from .ADFSSoftLink import ADFSSoftLink
 from .ADFSNode import ADFSNode, MAX_COMMENT_BYTES
 from .FileName import FileName
 from .FSError import *
 from .FSString import FSString
 from .MetaInfo import *
+
+# AmigaDOS follows at most this many soft links before a path lookup fails
+# with ERROR_TOO_MANY_LEVELS (dos.library's cap)
+MAX_LINK_DEPTH = 15
 
 
 class ADFSDir(ADFSNode):
@@ -51,9 +56,9 @@ class ADFSDir(ADFSNode):
     def _read_add_node(self, blk, recursive):
         """the hash chain link and node of entry block blk. The node is None
         if blk gives none: it is no header, the header is invalid or of a
-        type that is not read, as a link or the root block, or the blocks of
-        its file cannot all be found. The link is 0 unless the header is
-        valid"""
+        type that is not read, as a hard link or the root block, or the
+        blocks of its file cannot all be found. The link is 0 unless the
+        header is valid"""
         node = None
         is_header = blk.valid_chksum and blk.type == Block.T_SHORT
         if is_header:
@@ -63,9 +68,12 @@ class ADFSDir(ADFSNode):
             # its a file
             elif blk.sub_type == Block.ST_FILE:
                 node = ADFSFile(self.volume, self)
+            # its a soft link
+            elif blk.sub_type == Block.ST_SOFTLINK:
+                node = ADFSSoftLink(self.volume, self)
         if node == None:
-            # a valid header of a type that is not read, as a link, leads on
-            # along its hash chain; the root block is in none
+            # a valid header of a type that is not read, as a hard link,
+            # leads on along its hash chain; the root block is in none
             if is_header and blk.sub_type != Block.ST_ROOT:
                 return blk._get_long(-4), None
             return 0, None
@@ -326,7 +334,7 @@ class ADFSDir(ADFSNode):
                     new_blk,
                     node.get_size(),
                     update_myself=False,
-                    sub_type=Block.ST_USERDIR if node.is_dir() else Block.ST_FILE,
+                    sub_type=node.block.sub_type,
                 )
                 if record == None:
                     raise FSError(
@@ -381,6 +389,16 @@ class ADFSDir(ADFSNode):
             raise ValueError("create_file's name must be a FSString")
         node = ADFSFile(self.volume, self)
         node.set_file_data(data)
+        self._create_node(node, name, meta_info, update_ts)
+        return node
+
+    def create_soft_link(self, name, target, meta_info=None, update_ts=True):
+        if not isinstance(name, FSString):
+            raise ValueError("create_soft_link's name must be a FSString")
+        if not isinstance(target, FSString):
+            raise ValueError("create_soft_link's target must be a FSString")
+        node = ADFSSoftLink(self.volume, self)
+        node.set_target(target)
         self._create_node(node, name, meta_info, update_ts)
         return node
 
@@ -495,6 +513,174 @@ class ADFSDir(ADFSNode):
             self.update_dir_mod_time()
             self.volume.update_disk_time()
 
+    def _unlink_node(self, node):
+        """unlink node from my hash chain and entry list. The link is written
+        as one step, undone here if it fails; my in-memory state is restored,
+        too."""
+        hash_key = node.name.hash(hash_size=self.hash_size)
+        names = self.name_hash[hash_key]
+        pos = None
+        for i in range(len(names)):
+            if names[i] is node:
+                pos = i
+                break
+        if pos is None:
+            raise FSError(
+                INTERNAL_ERROR, node=node, extra="node not found in hash chain"
+            )
+        if pos > 0:
+            prev = names[pos - 1]
+        else:
+            prev = None
+        if pos == len(names) - 1:
+            next_blk = 0
+        else:
+            next_blk = names[pos + 1].block.blk_num
+        if prev is None:
+            link_blk = self.block
+            old = self.block.hash_table[hash_key]
+            self.block.hash_table[hash_key] = next_blk
+        else:
+            link_blk = prev.block
+            old = prev.block.hash_chain
+            prev.block.hash_chain = next_blk
+        try:
+            link_blk.write()
+        except Exception:
+            if prev is None:
+                self.block.hash_table[hash_key] = old
+            else:
+                prev.block.hash_chain = old
+            raise
+        names.remove(node)
+        self.entries.remove(node)
+
+    def _link_node(self, node, fn):
+        """link node into my hash chain under the name in fn, and refresh its
+        header and in-memory name/parent. The node header is written first,
+        pointing at the chain head, then my hash table. A failed write is
+        undone here."""
+        name = fn.get_name()
+        hash_key = fn.hash(hash_size=self.hash_size)
+        chain = self.name_hash[hash_key]
+        if len(chain) == 0:
+            hash_chain_blk = 0
+        else:
+            hash_chain_blk = chain[0].block.blk_num
+        old_name = node.block.name
+        old_parent = node.block.parent
+        old_hash_chain = node.block.hash_chain
+        node.block.name = name
+        node.block.parent = self.block.blk_num
+        node.block.hash_chain = hash_chain_blk
+        try:
+            node.block.write()
+        except Exception:
+            node.block.name = old_name
+            node.block.parent = old_parent
+            node.block.hash_chain = old_hash_chain
+            raise
+        old_head = self.block.hash_table[hash_key]
+        self.block.hash_table[hash_key] = node.block.blk_num
+        try:
+            self.block.write()
+        except Exception:
+            # my block on disk is as it was; put the node's header back, too
+            self.block.hash_table[hash_key] = old_head
+            node.block.name = old_name
+            node.block.parent = old_parent
+            node.block.hash_chain = old_hash_chain
+            try:
+                node.block.write()
+            except Exception:
+                pass
+            raise
+        chain.insert(0, node)
+        self.entries.append(node)
+        node.rename(name, self)
+
+    def rename_node(self, node, new_name):
+        """rename node into this directory under new_name. The node keeps its
+        blocks; only its name, parent and hash chain position change. Each
+        write that links or unlinks is one atomic step with rollback, so a
+        failed rename leaves the node in exactly one chain: at its old or at
+        its new place."""
+        if not isinstance(new_name, FSString):
+            raise ValueError("rename_node's new_name must be a FSString")
+        old_parent = node.parent
+        if old_parent is None:
+            raise FSError(DELETE_NOT_ALLOWED, node=node)
+        # my own state and the old parent's must be changeable
+        self.ensure_entries()
+        self.check_entries()
+        self.check_dircache()
+        if old_parent is not self:
+            old_parent.ensure_entries()
+            old_parent.check_entries()
+            old_parent.check_dircache()
+        # check the new name
+        fn = FileName(
+            new_name, is_intl=self.volume.is_intl, is_longname=self.volume.is_longname
+        )
+        if not fn.is_valid():
+            raise FSError(INVALID_FILE_NAME, file_name=new_name, node=self)
+        name = fn.get_name()
+        # does the new name already name an entry of mine?
+        new_hash_key = fn.hash(hash_size=self.hash_size)
+        new_up = fn.get_upper_ami_str()
+        for entry in self.name_hash[new_hash_key]:
+            if entry.name.get_upper_ami_str() == new_up:
+                if entry is node:
+                    if entry.name.get_name() == name:
+                        # the same object under exactly the same name
+                        return
+                    # a case-only change still relinks the node
+                    break
+                raise FSError(NAME_ALREADY_EXISTS, file_name=new_name, node=self)
+        # a dircache record in the new dir: make sure it finds room before
+        # anything changes
+        if self.volume.is_dircache:
+            record = self.get_dircache_record(node)
+            sub_type = node.block.sub_type
+            new_record = DirCacheRecord(
+                entry=node.block.blk_num,
+                size=node.get_size(),
+                protect=node.meta_info.get_protect(),
+                mod_ts=node.meta_info.get_mod_ts(),
+                sub_type=sub_type,
+                name=name,
+                comment=node.meta_info.get_comment(),
+            )
+            self.check_dircache_room(record, new_record)
+            # the record goes first, as in _delete
+            old_parent._dircache_remove_entry(node)
+        # unlink from the old parent
+        old_parent._unlink_node(node)
+        # link into me; put the node back if that fails
+        try:
+            self._link_node(node, fn)
+        except Exception:
+            try:
+                old_parent._link_node(node, node.name)
+            except Exception:
+                pass
+            raise
+        # dircache: give the node a record in its new dir
+        if self.volume.is_dircache:
+            self._dircache_add_entry(
+                name,
+                node.meta_info,
+                node.block.blk_num,
+                node.get_size(),
+                update_myself=False,
+                sub_type=node.block.sub_type,
+            )
+        # update time stamps
+        self.update_dir_mod_time()
+        if old_parent is not self:
+            old_parent.update_dir_mod_time()
+        self.volume.update_disk_time()
+
     def can_delete(self):
         self.ensure_entries()
         return len(self.entries) == 0
@@ -525,7 +711,7 @@ class ADFSDir(ADFSNode):
         for e in es:
             e.list(indent=indent + 1, all=all, detail=detail, encoding=encoding)
 
-    def get_path(self, pc, allow_file=True, allow_dir=True):
+    def get_path(self, pc, allow_file=True, allow_dir=True, follow_last=True, depth=0):
         if len(pc) == 0:
             return self
         self.ensure_entries()
@@ -533,9 +719,20 @@ class ADFSDir(ADFSNode):
             if not isinstance(pc[0], FileName):
                 raise ValueError("get_path's pc must be a FileName array")
             if e.name.get_upper_ami_str() == pc[0].get_upper_ami_str():
+                if isinstance(e, ADFSSoftLink):
+                    # a link in the middle of a path is always followed; in
+                    # the last position only if follow_last is set
+                    if len(pc) > 1 or follow_last:
+                        return self._follow_link(
+                            e, pc[1:], allow_file, allow_dir, depth
+                        )
+                    else:
+                        return e
                 if len(pc) > 1:
                     if isinstance(e, ADFSDir):
-                        return e.get_path(pc[1:], allow_file, allow_dir)
+                        return e.get_path(
+                            pc[1:], allow_file, allow_dir, follow_last, depth
+                        )
                     else:
                         return None
                 else:
@@ -552,6 +749,45 @@ class ADFSDir(ADFSNode):
                     else:
                         return None
         return None
+
+    def _follow_link(self, link, rest_pc, allow_file, allow_dir, depth):
+        """resolve soft link link, then the remaining path components rest_pc.
+
+        The link's target is resolved relative to the directory the link
+        lives in, or from the volume root if it starts with ``/`` or ``:``.
+        depth counts the links followed so far"""
+        if depth >= MAX_LINK_DEPTH:
+            raise FSError(TOO_MANY_LEVELS, node=link)
+        target = link.get_target().get_unicode()
+        if target[:1] in ("/", ":"):
+            base = []
+        else:
+            # the components of the link's own path, without its name
+            base = link.get_node_path()[:-1]
+        # rebuild the target's component list, dropping . and .. steps
+        for comp in target.split("/"):
+            if comp == "" or comp == ".":
+                continue
+            if comp == "..":
+                if not base:
+                    raise FSError(FILE_NOT_FOUND, node=link)
+                base.pop()
+            else:
+                base.append(comp)
+        # append the components that follow the link in the looked-up path
+        for comp in rest_pc:
+            base.append(comp.get_unicode_name())
+        pc = [
+            FileName(
+                FSString(c),
+                is_intl=self.volume.is_intl,
+                is_longname=self.volume.is_longname,
+            )
+            for c in base
+        ]
+        return self.volume.get_root_dir().get_path(
+            pc, allow_file, allow_dir, follow_last=True, depth=depth + 1
+        )
 
     def draw_on_bitmap(self, bm, show_all=False, first=True):
         blk_num = self.block.blk_num

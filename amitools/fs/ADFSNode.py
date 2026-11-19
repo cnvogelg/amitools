@@ -184,6 +184,14 @@ class ADFSNode:
     def delete_children(self, wipe, all, update_ts):
         pass
 
+    def rename(self, new_name, new_parent):
+        """refresh my in-memory name and parent after a rename. The directory
+        that relinks me writes my header."""
+        self.name = FileName(
+            new_name, is_intl=self.volume.is_intl, is_longname=self.volume.is_longname
+        )
+        self.parent = new_parent
+
     def get_meta_info(self):
         return self.meta_info
 

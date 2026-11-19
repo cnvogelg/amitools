@@ -67,6 +67,17 @@ class Assign(object):
 
     def _create_dir(self, volume, rel_dir):
         log_path.debug("%s: create assign dir: rel_dir='%s'", self.name, rel_dir)
+        # a non-host volume (ram:, nil:, ...) has no host directory; the
+        # responsible handler creates it once it is bound, see
+        # build_handler_manager(). An image-backed volume has no host
+        # directory either, so it is deferred the same way.
+        if volume.get_path() is None or volume.is_image:
+            log_path.debug(
+                "assign '%s': defer dir creation for handler volume '%s'",
+                self.name,
+                volume.get_name(),
+            )
+            return True
         path = volume.create_rel_sys_path(rel_dir)
         if not path:
             log_path.error(
@@ -193,6 +204,27 @@ class AssignManager(object):
         del self.assigns_by_name[lo_name]
         log_path.info("delete assign: %s", a)
         return True
+
+    def set_assign(self, name, paths):
+        """install/replace an assign with the given source paths
+
+        Used by dos.library runtime assign calls (AssignLate, AssignPath,
+        AssignAdd, RemAssignList). Unlike :meth:`add_assign` this accepts a
+        replacement after setup and a path whose volume is not mounted yet
+        (late binding assigns may refer to such a path). Returns the Assign.
+        """
+        self.del_assign(name)
+        assign = Assign(name, list(paths))
+        if not assign.setup(self):
+            log_path.warning(
+                "assign '%s': setup incomplete, keeping it for later access", name
+            )
+        assign.is_setup = True
+        lo_name = name.lower()
+        self.assigns_by_name[lo_name] = assign
+        self.assigns.append(assign)
+        log_path.info("set assign: %s", assign)
+        return assign
 
     def _parse_spec(self, spec):
         # auto convert spec string

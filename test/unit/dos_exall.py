@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from amitools.vamos.handler import HostFileSysHandler
 from amitools.vamos.lib.DosLibrary import DosLibrary
 from amitools.vamos.lib.dos.Error import (
     DOSFALSE,
@@ -27,8 +28,6 @@ from amitools.vamos.machine import (
     Machine,
     Runtime,
     REG_D0,
-    REG_D1,
-    REG_D2,
     REG_A0,
     REG_A1,
     REG_A2,
@@ -37,8 +36,31 @@ from amitools.vamos.machine.mock import MockCPU, MockMemory
 from amitools.vamos.mem import MemoryAlloc
 
 
+class _RecordingHandler(HostFileSysHandler):
+    """host handler that counts handler locks created and freed"""
+
+    def __init__(self, name, root):
+        super().__init__(name, root)
+        self.created = 0
+        self.freed = 0
+
+    def locate_object(self, ami_path, exclusive=False):
+        lock = super().locate_object(ami_path, exclusive)
+        self.created += 1
+        return lock
+
+    def copy_dir(self, lock):
+        new_lock = super().copy_dir(lock)
+        self.created += 1
+        return new_lock
+
+    def free_lock(self, lock):
+        self.freed += 1
+        super().free_lock(lock)
+
+
 class ExAllEnv:
-    def __init__(self, path, mem=None, cpu=None, alloc=None):
+    def __init__(self, path, mem=None, cpu=None, alloc=None, handler=None):
         self.path = path
         for name in ("alpha", "bravo", "charlie"):
             (path / name).write_bytes(name.encode())
@@ -50,8 +72,15 @@ class ExAllEnv:
         self.lib.mem_allocs = {}
         self.lib.dos_objs = {}
         self.lib.exall_scans = {}
-        self.lock = Lock(path.name, "SYS:dir", str(path))
-        self.lock.key = 7
+        self.handler = (
+            handler if handler is not None else HostFileSysHandler("SYS", str(path))
+        )
+        self.lock = Lock(
+            "dir",
+            "SYS:dir",
+            handler=self.handler,
+            handler_lock=self.handler.locate_object(""),
+        )
         self.lib.lock_mgr = SimpleNamespace(
             get_by_b_addr=lambda addr: self.lock if addr else None
         )
@@ -69,9 +98,7 @@ class ExAllEnv:
         self.buf = self.buffer.addr + 4
 
     def new_control(self):
-        self.cpu.w_reg(REG_D1, 1)
-        self.cpu.w_reg(REG_D2, 0)
-        ptr = self.lib.AllocDosObject(self.ctx)
+        ptr = self.lib.AllocDosObject(self.ctx, 1, 0)
         control = ExAllControlStruct(self.mem, ptr)
         assert control.eac_LastKey.val == 0
         assert control.eac_MatchFunc.aptr == 0
@@ -79,9 +106,7 @@ class ExAllEnv:
         return control
 
     def free_control(self, control):
-        self.cpu.w_reg(REG_D1, 1)
-        self.cpu.w_reg(REG_D2, control.addr)
-        self.lib.FreeDosObject(self.ctx)
+        self.lib.FreeDosObject(self.ctx, 1, control.addr)
         self.controls.remove(control)
 
     def run(self, size=4096, data_type=3, control=None):
@@ -227,7 +252,7 @@ def dos_exall_buffer_too_small_test(env):
 
 
 def dos_exall_not_directory_test(env):
-    env.lock.sys_path = str(env.path / "alpha")
+    env.lock.handler_lock = env.handler.locate_object("alpha")
     assert env.run() == (DOSFALSE, ERROR_OBJECT_WRONG_TYPE, [])
     assert not env.lib.exall_scans
 
@@ -327,7 +352,12 @@ def dos_exall_host_error_cleanup_test(env, monkeypatch):
 
 def dos_exall_wrong_resume_lock_test(env):
     env.run(size=24)
-    env.lock = Lock("other", "SYS:other", str(env.path))
+    env.lock = Lock(
+        "other",
+        "SYS:other",
+        handler=env.handler,
+        handler_lock=env.handler.locate_object(""),
+    )
     assert env.run() == (DOSFALSE, ERROR_INVALID_LOCK, [])
     assert not env.lib.exall_scans
 
@@ -386,3 +416,21 @@ def dos_exall_native_hook_test(tmp_path):
             alloc.free_memory(allocation)
         env.close()
         machine.cleanup()
+
+
+def dos_exall_scan_lock_is_freed_test(tmp_path):
+    handler = _RecordingHandler("SYS", str(tmp_path))
+    env = ExAllEnv(tmp_path, handler=handler)
+    try:
+        # the caller's own lock stays allocated; the scan's cloned lock is
+        # released again when the scan ends
+        env.run()
+        assert not env.lib.exall_scans
+        assert handler.created - handler.freed == 1
+        # ending a scan explicitly releases its clone as well
+        env.run(size=24)
+        env.lib.ExAllEnd(env.ctx, 1, env.buf, 24, 3, env.control.addr)
+        assert not env.lib.exall_scans
+        assert handler.created - handler.freed == 1
+    finally:
+        env.close()

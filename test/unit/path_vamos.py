@@ -60,3 +60,22 @@ def path_vamos_matchfirst_parent_lock_test(tmpdir):
 
     assert mfn.lock_mgr.calls[-1][1] == "T:"
     vpm.shutdown()
+
+
+def path_vamos_handler_list_dir_test(tmpdir):
+    from amitools.vamos.handler import MODE_NEWFILE, build_handler_manager
+
+    vpm = VamosPathManager(vols_base_dir=str(tmpdir), auto_volumes=[], auto_assigns=[])
+    assert vpm.get_vol_mgr().add_volume("ram:?handler=ram")
+    assert vpm.setup()
+    mgr = build_handler_manager(vpm)
+    assert vpm.handler_mgr is mgr
+    # write a file through the handler of the path-less volume
+    handler, fh = mgr.find_output("ram:f.txt", MODE_NEWFILE)
+    handler.write(fh, b"x")
+    handler.end(fh)
+    # ami_list_dir / ami_path_exists fall back to the handler
+    assert "f.txt" in vpm.ami_list_dir(None, "ram:")
+    assert vpm.ami_path_exists(None, "ram:f.txt")
+    assert not vpm.ami_path_exists(None, "ram:nope")
+    vpm.shutdown()

@@ -29,7 +29,7 @@ def dos_filehandle_setvbuf_test():
     alloc = MemoryAlloc(mem)
     file_obj = _DummyFile()
     fh = FileHandle(file_obj, "SYS:test", "/tmp/test")
-    fh_b_addr = fh.alloc_fh(alloc, 0x1234)
+    fh_b_addr = fh.alloc_fh(alloc)
     lib = DosLibrary()
     lib.file_mgr = SimpleNamespace(get_by_b_addr=lambda b_addr, for_writing=None: fh)
 
@@ -38,7 +38,7 @@ def dos_filehandle_setvbuf_test():
     cpu.w_reg(REG_D3, 1)
     cpu.w_reg(REG_D4, 0x1000)
 
-    assert lib.SetVBuf(ctx) == 0
+    assert lib.SetVBuf(ctx, fh_b_addr, 0x5678, 1, 0x1000) == 0
     assert fh.struct.fh_Buf.val == 0x5678
     assert fh.buf_type == 1
     assert fh.buf_size == 0x1000

@@ -69,30 +69,30 @@ class ADFBlockDevice(BlockDevice):
         if self.fobj:
             self.fobj.close()
 
-    def read_block(self, blk_num):
-        if blk_num >= self.num_blocks:
+    def read_block(self, blk_num, num_blks=1):
+        if blk_num + num_blks > self.num_blocks:
             raise ValueError(
                 "Invalid ADF block num: got %d but max is %d"
                 % (blk_num, self.num_blocks)
             )
         off = self._blk_to_offset(blk_num)
-        return self.data[off : off + self.block_bytes]
+        return self.data[off : off + self.block_bytes * num_blks]
 
-    def write_block(self, blk_num, data):
+    def write_block(self, blk_num, data, num_blks=1):
         if self.read_only:
             raise IOError("ADF File is read-only!")
-        if blk_num >= self.num_blocks:
+        if blk_num + num_blks > self.num_blocks:
             raise ValueError(
                 "Invalid ADF block num: got %d but max is %d"
                 % (blk_num, self.num_blocks)
             )
-        if len(data) != self.block_bytes:
+        if len(data) != self.block_bytes * num_blks:
             raise ValueError(
                 "Invalid ADF block size written: got %d but size is %d"
-                % (len(data), self.block_bytes)
+                % (len(data), self.block_bytes * num_blks)
             )
         off = self._blk_to_offset(blk_num)
-        self.data[off : off + self.block_bytes] = data
+        self.data[off : off + self.block_bytes * num_blks] = data
         self.dirty = True
 
 

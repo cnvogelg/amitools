@@ -7,16 +7,36 @@ from ..TimeStamp import *
 from ..FSString import FSString
 
 
+# A soft link (``ST_SOFTLINK``) is a file header whose data-block pointer
+# table is unused: instead its target is a NUL-terminated C string that spans
+# long 6 up to ``BLKO_SYMBOLICNAME_END`` (``(block_longs - 56) * 4`` bytes).
+BLK_SYMBOLICNAME_START = 6
+BLKO_SYMBOLICNAME_END = -51
+
+
 class FileHeaderBlock(EntryBlock):
-    def __init__(self, blkdev, blk_num, is_longname):
+    def __init__(self, blkdev, blk_num, is_longname, sub_type=Block.ST_FILE):
         EntryBlock.__init__(
             self,
             blkdev,
             blk_num,
             is_type=Block.T_SHORT,
-            is_sub_type=Block.ST_FILE,
+            is_sub_type=sub_type,
             is_longname=is_longname,
         )
+
+    def _symbolic_name_size(self):
+        """number of bytes available for a soft link target"""
+        return (self.blkdev.block_longs - 56) * 4
+
+    def _read_symbolic_name(self):
+        return self._get_cstr(BLK_SYMBOLICNAME_START, self._symbolic_name_size())
+
+    def _put_symbolic_name(self, fs_str):
+        # clear the region first so a shorter target leaves no stale bytes
+        # behind its terminating NUL
+        self._put_bytes(BLK_SYMBOLICNAME_START, b"\0" * self._symbolic_name_size())
+        self._put_cstr(BLK_SYMBOLICNAME_START, self._symbolic_name_size(), fs_str)
 
     def set(self, data):
         self._set_data(data)
@@ -36,14 +56,20 @@ class FileHeaderBlock(EntryBlock):
         self.block_count = self._get_long(2)
         self.first_data = self._get_long(4)
 
-        # read (limited) data blocks table
-        bc = self.block_count
-        mbc = self.blkdev.block_longs - 56
-        if bc > mbc:
-            bc = mbc
+        # a soft link keeps its target where a file header holds the start of
+        # its data-block pointer table; a file's table must stay untouched
+        self.symbolic_name = None
         self.data_blocks = []
-        for i in range(bc):
-            self.data_blocks.append(self._get_long(-51 - i))
+        if self.sub_type == Block.ST_SOFTLINK:
+            self.symbolic_name = self._read_symbolic_name()
+        else:
+            # read (limited) data blocks table
+            bc = self.block_count
+            mbc = self.blkdev.block_longs - 56
+            if bc > mbc:
+                bc = mbc
+            for i in range(bc):
+                self.data_blocks.append(self._get_long(-51 - i))
 
         self.protect = self._get_long(-48)
         self.protect_flags = ProtectFlags(self.protect)
@@ -62,9 +88,12 @@ class FileHeaderBlock(EntryBlock):
         self._put_long(2, self.block_count)
         self._put_long(4, self.first_data)
 
-        # data blocks
-        for i in range(len(self.data_blocks)):
-            self._put_long(-51 - i, self.data_blocks[i])
+        if self.sub_type == Block.ST_SOFTLINK:
+            self._put_symbolic_name(self.symbolic_name)
+        else:
+            # data blocks
+            for i in range(len(self.data_blocks)):
+                self._put_long(-51 - i, self.data_blocks[i])
 
         self._put_long(-48, self.protect)
         self._put_long(-47, self.byte_size)
@@ -87,9 +116,11 @@ class FileHeaderBlock(EntryBlock):
         comment=None,
         mod_ts=None,
         hash_chain=0,
+        symbolic_name=None,
     ):
         Block.create(self)
         self.own_key = self.blk_num
+        self.symbolic_name = symbolic_name
         n = len(data_blocks)
         self.block_count = n
         if n == 0:

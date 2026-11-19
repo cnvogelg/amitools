@@ -1,5 +1,3 @@
-import os.path
-import os
 from amitools.vamos.log import log_path
 from .mgr import PathManager
 from .amipath import AmiPath, AmiPathError
@@ -21,30 +19,19 @@ class VamosPathManager(PathManager):
 
     # ----- API -----
 
-    def ami_command_to_sys_path(self, cwd_lock, ami_path):
-        """lookup a command on path if it does not contain a relative or
-        absolute path. otherwise perform normal 'ami_to_sys_path' conversion"""
+    def ami_command_paths(self, cwd_lock, ami_path):
+        """return the list of Amiga paths to try for a command.
+
+        If the path contains a relative or absolute component it is used
+        directly, otherwise the command path is searched."""
         env = self._get_lock_env(cwd_lock)
         cmd_paths = self.cmdpaths(ami_path, env=env)
         log_path.info(
-            "ami_command_to_sys_path: ami_path=%s -> cmd_paths=%s",
+            "ami_command_paths: ami_path=%s -> cmd_paths=%s",
             ami_path,
             ",".join(map(str, cmd_paths)),
         )
-        # check if ami path exists as sys path
-        for cmd_path in cmd_paths:
-            sys_path = self.to_sys_path(str(cmd_path))
-            if os.path.isfile(sys_path):
-                log_path.info(
-                    "ami_command_to_sys_path: ami_path=%s -> sys_path=%s, ami_path=%s",
-                    ami_path,
-                    sys_path,
-                    cmd_path,
-                )
-                return sys_path, cmd_path
-        # nothing found
-        log_path.info("ami_command_to_sys_path: ami_path='%s' not found!", ami_path)
-        return None, None
+        return cmd_paths
 
     def ami_to_sys_path(self, cwd_lock, ami_path, searchMulti=False, mustExist=False):
         env = self._get_lock_env(cwd_lock)
@@ -55,16 +42,17 @@ class VamosPathManager(PathManager):
         # now we have paths with volume:abs/path
         sys_path = None
         # search for existing multi assign
+        fs = self._sys_path.file_system
         if searchMulti or mustExist:
             for npath in paths:
                 # first try to find existing path in all locations
-                spath = self.to_sys_path(str(npath))
-                if spath and os.path.exists(spath):
+                spath = self._sys_path.to_sys_path(str(npath))
+                if spath and fs.exists(spath):
                     sys_path = spath
                     break
         # nothing found -> try first path
         if sys_path is None and not mustExist:
-            sys_path = self.to_sys_path(str(paths[0]))
+            sys_path = self._sys_path.to_sys_path(str(paths[0]))
         log_path.info(
             "ami_to_sys_path: ami_path='%s' -> volpaths=%s -> sys_path='%s'",
             ami_path,
@@ -74,7 +62,7 @@ class VamosPathManager(PathManager):
         return sys_path
 
     def sys_to_ami_path(self, sys_path):
-        ami_path = self.from_sys_path(sys_path)
+        ami_path = self._sys_path.from_sys_path(sys_path)
         log_path.info(
             "sys_to_ami_path: sys_path='%s' -> abs_path='%s' -> ami_path='%s'",
             sys_path,
@@ -137,29 +125,50 @@ class VamosPathManager(PathManager):
 
     def ami_list_dir(self, cwd_lock, ami_path):
         sys_path = self.ami_to_sys_path(cwd_lock, ami_path, mustExist=True)
-        if sys_path is None:
-            return None
-        if not os.path.isdir(str(sys_path)):
-            return None
-        files = os.listdir(str(sys_path))
-        log_path.info(
-            "ami_list_dir: path='%s' -> sys_path='%s' -> files=%s",
-            ami_path,
-            sys_path,
-            files,
-        )
-        return files
+        if sys_path is not None:
+            fs = self._sys_path.file_system
+            if not fs.is_dir(str(sys_path)):
+                return None
+            files = fs.list_dir(str(sys_path))
+            log_path.info(
+                "ami_list_dir: path='%s' -> sys_path='%s' -> files=%s",
+                ami_path,
+                sys_path,
+                files,
+            )
+            return files
+        # a non-host volume (ram:, ...) has no sys path: list via its handler
+        if self.handler_mgr is not None:
+            abs_path = self.ami_abs_path(cwd_lock, ami_path)
+            files = self.handler_mgr.list_dir(abs_path)
+            log_path.info(
+                "ami_list_dir: path='%s' -> handler -> files=%s", ami_path, files
+            )
+            return files
+        return None
 
     def ami_path_exists(self, cwd_lock, ami_path):
         sys_path = self.ami_to_sys_path(cwd_lock, ami_path, mustExist=True)
-        exists = os.path.exists(str(sys_path))
-        log_path.info(
-            "ami_path_exists: path='%s' -> sys_path='%s' -> exists=%s",
-            ami_path,
-            sys_path,
-            exists,
-        )
-        return exists
+        if sys_path is not None:
+            exists = self._sys_path.file_system.exists(str(sys_path))
+            log_path.info(
+                "ami_path_exists: path='%s' -> sys_path='%s' -> exists=%s",
+                ami_path,
+                sys_path,
+                exists,
+            )
+            return exists
+        # a non-host volume (ram:, ...) has no sys path: ask its handler
+        if self.handler_mgr is not None:
+            abs_path = self.ami_abs_path(cwd_lock, ami_path)
+            exists = self.handler_mgr.path_exists(abs_path)
+            log_path.info(
+                "ami_path_exists: path='%s' -> handler -> exists=%s",
+                ami_path,
+                exists,
+            )
+            return exists
+        return False
 
     def ami_path_join(self, a, b):
         return AmiPath(a).join(AmiPath(b))

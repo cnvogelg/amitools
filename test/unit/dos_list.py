@@ -2,6 +2,30 @@ from amitools.vamos.lib.dos.DosList import DosList
 
 LDF_DEVICES = 1 << 2
 LDF_VOLUMES = 1 << 3
+LDF_ASSIGNS = 1 << 4
+
+
+def dos_list_get_first_next_entry_test(mem_alloc):
+    mem, alloc = mem_alloc
+    dos_list = DosList(None, None, mem, alloc)
+    vol = dos_list.add_volume("root")
+    dh0 = dos_list.add_device("DH0", startup_bptr=1)
+    assign = dos_list.add_assign("a", ["root:"])
+
+    # devices only
+    assert dos_list.get_first_entry(LDF_DEVICES) is dh0
+    assert dos_list.get_next_entry(dh0, LDF_DEVICES) is None
+    # volumes only
+    assert dos_list.get_first_entry(LDF_VOLUMES) is vol
+    assert dos_list.get_next_entry(vol, LDF_VOLUMES) is None
+    # several types: link order is volume -> device -> assign
+    all_types = LDF_DEVICES | LDF_VOLUMES | LDF_ASSIGNS
+    assert dos_list.get_first_entry(all_types) is vol
+    assert dos_list.get_next_entry(vol, all_types) is dh0
+    assert dos_list.get_next_entry(dh0, all_types) is assign
+    assert dos_list.get_next_entry(assign, all_types) is None
+    assert dos_list.get_next_entry(None, LDF_DEVICES) is None
+    dos_list.free_list()
 
 
 def dos_list_device_link_test(mem_alloc):
@@ -57,14 +81,23 @@ def dos_list_remove_head_test(mem_alloc):
 
 def dos_list_host_device_volume_pairs_test(mem_alloc):
     from types import SimpleNamespace
-    from amitools.vamos.lib.lexec.PortManager import PortManager
 
     mem, alloc = mem_alloc
-    listing = DosList(None, None, mem, alloc)
+    ports = {"system": 0x111, "ram": 0x222}
+
+    def get_handler(name):
+        return SimpleNamespace(dispatcher=SimpleNamespace(port=ports[name]))
+
+    handler_mgr = SimpleNamespace(
+        is_filesystem=lambda name: True,
+        get_all_names=lambda: ["system", "ram"],
+        get_handler=get_handler,
+    )
+    listing = DosList(None, None, mem, alloc, handler_mgr=handler_mgr)
     first = listing.add_volume("system")
     second = listing.add_volume("ram")
-    ports = PortManager(alloc)
-    listing.add_host_devices(SimpleNamespace(fs_put_msg=lambda *args: None), ports)
+    # each volume's device entry reports that handler's own packet port
+    listing.add_host_devices()
     cursor = listing.lock_dos_list(LDF_DEVICES)
     found = []
     while cursor:
@@ -74,11 +107,46 @@ def dos_list_host_device_volume_pairs_test(mem_alloc):
     assert [entry.name for entry in found] == ["system", "ram"]
     for volume, device in zip((first, second), found):
         assert volume.struct.dol_Task.aptr == device.struct.dol_Task.aptr
-        assert ports.has_port(device.struct.dol_Task.aptr)
         assert listing.get_entry_by_name(device.name) is volume
         assert listing.get_entry_by_name(device.name, LDF_DEVICES) is device
         assert device.struct.dol_Startup.val == 0
-    assert first.struct.dol_Task.aptr != second.struct.dol_Task.aptr
+    assert first.struct.dol_Task.aptr == ports["system"]
+    assert second.struct.dol_Task.aptr == ports["ram"]
     listing.free_list()
-    assert not ports.ports
+    assert alloc.is_all_free()
+
+
+def dos_list_device_handler_test(mem_alloc):
+    from types import SimpleNamespace
+    from amitools.vamos.libstructs import DosListVolumeStruct
+
+    mem, alloc = mem_alloc
+
+    def is_filesystem(name):
+        return name != "nil"
+
+    handler_mgr = SimpleNamespace(
+        is_filesystem=is_filesystem,
+        get_all_names=lambda: ["work", "nil"],
+        get_handler=lambda name: None,
+    )
+    listing = DosList(None, None, mem, alloc, handler_mgr=handler_mgr)
+    path_mgr = SimpleNamespace(
+        get_all_volume_names=lambda: ["work", "nil"],
+        get_all_assign_names=lambda: [],
+    )
+    listing.build_list(path_mgr)
+    # a filesystem volume becomes a volume entry ...
+    work = listing.get_entry_by_name("work")
+    assert work.struct_def is DosListVolumeStruct
+    # ... while a device handler is not a volume
+    assert listing.get_entry_by_name("nil", LDF_VOLUMES) is None
+    # a handler without a dispatcher yields a device entry with no port
+    listing.add_host_devices()
+    nil = listing.get_entry_by_name("nil", LDF_DEVICES)
+    assert nil is not None
+    assert nil.struct.dol_Type.val == 0
+    assert nil.struct.dol_Task.aptr == 0
+    assert listing.get_entry_by_name("nil") is nil
+    listing.free_list()
     assert alloc.is_all_free()

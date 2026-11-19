@@ -2,7 +2,6 @@ import io
 import os
 import tempfile
 import threading
-from types import SimpleNamespace
 
 import pytest
 
@@ -29,18 +28,11 @@ def dos_filehandle_read_write_only_error_test(tmp_path, buffering):
 
 
 def dos_filehandle_read_terminal_test():
+    # the console conversions (including the tty read path) live in the
+    # handler's stream; FileHandle simply reads from its obj
     with io.BytesIO(b"file input") as stream:
         handle = FileHandle(stream, "SYS:test", "/tmp/test", need_close=False)
-        calls = []
-
-        def read(size):
-            calls.append(size)
-            return b"terminal input"
-
-        handle.terminal = SimpleNamespace(read=read)
-        assert handle.read(42) == b"terminal input"
-        assert calls == [42]
-        assert stream.tell() == 0
+        assert handle.read(42) == b"file input"
 
 
 @pytest.mark.parametrize("buffering", [-1, 0])

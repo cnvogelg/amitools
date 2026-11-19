@@ -1,11 +1,8 @@
-import os.path
-import logging
-
 from amitools.util import SlotArray
+from amitools.vamos.handler import HandlerError
 from amitools.vamos.log import log_lock
 from amitools.vamos.error import VamosInternalError
 from amitools.vamos.libstructs import DosListVolumeStruct, FileLockStruct
-from .Error import *
 from .Lock import Lock
 from .PathPart import expand_progdir_path
 
@@ -13,8 +10,9 @@ from .PathPart import expand_progdir_path
 class LockKey:
     """manage a set of lock objects that belong to the same key
 
-    key is typically a unique identifier of the file object in the volume.
-    we use the absolute system path here.
+    key identifies the file object within its volume. We use the identity
+    of the handler that owns the object plus the handler lock key, so two
+    locks on the same object share a key (and thus a DOS fl_Key).
     """
 
     def __init__(self, key):
@@ -36,24 +34,40 @@ class LockKey:
     def find_lock_by_baddr(self, b_addr):
         return self.locks_by_baddr.get(b_addr)
 
-    def no_locks(self):
-        return bool(self.locks_by_baddr)
+    def is_empty(self):
+        return not self.locks_by_baddr
 
 
 class LockManager:
     def __init__(
-        self, path_mgr, dos_list, alloc, mem, max_locks=1024, fs_handler_port=0
+        self,
+        path_mgr,
+        dos_list,
+        alloc,
+        mem,
+        handler_mgr=None,
+        max_locks=1024,
     ):
         self.path_mgr = path_mgr
         self.dos_list = dos_list
         self.alloc = alloc
         self.mem = mem
-        self.fs_handler_port = fs_handler_port
-        # we manage keys per sys_path
-        # each individual sys_path gets a unique slot = key
+        self.handler_mgr = handler_mgr
+        # we manage keys per file object
+        # each individual file object gets a unique slot = key
         self.keys = SlotArray(max_locks)
-        # map each sys_path name to a lock_key
-        self.sys_path_to_key_map = {}
+        # map each file object identity to a lock_key
+        self.lock_key_map = {}
+
+    def _lock_identity(self, lock):
+        """identity of the object a lock points at
+
+        Prefer the handler lock key so locks on the same object share a DOS
+        key. Fall back to the Amiga path for locks without a handler.
+        """
+        if lock.handler is not None and lock.handler_lock is not None:
+            return (id(lock.handler), lock.handler_lock.key)
+        return (None, str(lock.ami_path).lower())
 
     def _register_lock(self, lock):
         # look up volume
@@ -66,29 +80,29 @@ class LockManager:
         else:
             vol_baddr = volume.mem.addr
 
-        # is key already assigned to sys_path?
-        lock_key = self.sys_path_to_key_map.get(lock.sys_path)
+        # is a key already assigned to this object?
+        identity = self._lock_identity(lock)
+        lock_key = self.lock_key_map.get(identity)
         if not lock_key:
             # allocate new slot id
-            lock_key = LockKey(lock.sys_path)
+            lock_key = LockKey(identity)
             slot_id = self.keys.alloc(lock_key)
-            log_lock.debug(
-                "allocate log key slot %s for sys_path '%s'", slot_id, lock.sys_path
-            )
+            log_lock.debug("allocate lock key slot %s for %s", slot_id, identity)
             if slot_id is None:
                 log_lock.error("no more lock slots! max=%d", len(self.keys))
                 return None
             lock_key.slot_id = slot_id
+            self.lock_key_map[identity] = lock_key
         else:
             slot_id = lock_key.slot_id
-            log_lock.debug(
-                "found log key slot %s for sys_path '%s'", slot_id, lock.sys_path
-            )
+            log_lock.debug("found lock key slot %s for %s", slot_id, identity)
 
         # allocate lock struct and use slot_id for key
         lock.alloc(self.alloc, vol_baddr, slot_id)
-        if self.fs_handler_port:
-            lock.struct.fl_Task.aptr = self.fs_handler_port
+        # fl_Task is the packet port of the handler that owns the lock
+        dispatcher = getattr(lock.handler, "dispatcher", None)
+        if dispatcher is not None:
+            lock.struct.fl_Task.aptr = dispatcher.port
 
         # register lock in key (with baddr allocated above)
         lock_key.add_lock(lock)
@@ -104,9 +118,13 @@ class LockManager:
         # remove lock in key
         lock_key.del_lock(lock)
         # last lock in key?
-        if lock_key.no_locks():
-            del self.sys_path_to_key_map[lock.sys_path]
-            self.locks.free(slot_id)
+        if lock_key.is_empty():
+            del self.lock_key_map[lock_key.key]
+            self.keys.free(slot_id)
+
+        # release the handler-side lock object (ACTION_FREE_LOCK)
+        if lock.handler is not None and lock.handler_lock is not None:
+            lock.handler.free_lock(lock.handler_lock)
 
         # free lock itself
         lock.free(self.alloc)
@@ -131,28 +149,76 @@ class LockManager:
                 log_lock.debug("expanded '*' path to: %s", expanded)
                 ami_path = expanded
             ami_path = self.path_mgr.ami_abs_path(cur_dir, ami_path)
-        sys_path = self.path_mgr.ami_to_sys_path(cur_dir, ami_path, searchMulti=True)
         name = self.path_mgr.ami_name_of_path(cur_dir, ami_path)
-        if sys_path is None:
-            log_lock.info("lock '%s' invalid: no sys path found: '%s'", name, ami_path)
-            return None
-        exists = os.path.exists(sys_path)
-        if not exists:
-            log_lock.info(
-                "lock '%s' invalid: sys path does not exist: '%s' -> '%s'",
-                name,
-                ami_path,
-                sys_path,
+        cwd = cur_dir.ami_path if cur_dir is not None else None
+        try:
+            handler, handler_lock = self.handler_mgr.locate_object(
+                ami_path, exclusive=exclusive, cwd=cwd
             )
+        except HandlerError as e:
+            log_lock.info("lock '%s' invalid: '%s' (%s)", name, ami_path, e)
             return None
-        lock = Lock(name, ami_path, sys_path, exclusive)
+        lock = Lock(
+            name,
+            ami_path,
+            exclusive,
+            handler=handler,
+            handler_lock=handler_lock,
+        )
+        return self._register_lock(lock)
+
+    def register_handler_lock(
+        self, handler, handler_lock, ami_path, name=None, exclusive=False
+    ):
+        """build and register a DOS lock from a handler lock + Amiga path
+
+        Used by the handler-backed lock operations (``dup_lock``,
+        ``create_parent_lock``, ``DupLockFromFH``, ``ParentOfFH``) that already
+        hold a handler lock and only need a DOS ``Lock`` around it.
+        """
+        if name is None:
+            name = self.path_mgr.ami_name_of_path(None, ami_path)
+        lock = Lock(
+            name,
+            ami_path,
+            exclusive,
+            handler=handler,
+            handler_lock=handler_lock,
+        )
         return self._register_lock(lock)
 
     def dup_lock(self, lock):
+        # handler-backed: ACTION_COPY_DIR replicates the object
+        if lock.handler is not None and lock.handler_lock is not None:
+            try:
+                handler_lock = lock.handler.copy_dir(lock.handler_lock)
+            except HandlerError as e:
+                log_lock.info("dup_lock '%s' failed: %s", lock, e)
+                return None
+            return self.register_handler_lock(
+                lock.handler,
+                handler_lock,
+                lock.ami_path,
+                name=lock.name,
+                exclusive=lock.exclusive,
+            )
+        # path-based fallback for handler-less locks (bare test managers)
         return self.create_lock(lock, "", False)
 
     def create_parent_lock(self, lock):
-        # top level
+        # handler-backed: ACTION_PARENT resolves the parent on the handler
+        if lock.handler is not None and lock.handler_lock is not None:
+            try:
+                handler_lock = lock.handler.parent(lock.handler_lock)
+            except HandlerError as e:
+                log_lock.info("parent of '%s' failed: %s", lock, e)
+                return None
+            ami_parent_path = self.path_mgr.ami_abs_parent_path(lock.ami_path)
+            name = self.path_mgr.ami_name_of_path(None, ami_parent_path)
+            return self.register_handler_lock(
+                lock.handler, handler_lock, ami_parent_path, name=name
+            )
+        # path-based fallback for handler-less locks (bare test managers)
         if lock.ami_path[-1] == ":":
             return None
         ami_path = lock.ami_path
@@ -191,3 +257,9 @@ class LockManager:
             name_addr = volnode.name.aptr
             name = self.mem.r_bstr(name_addr) + ":"
             return name
+
+    def same_lock(self, lock1, lock2):
+        """do two locks refer to the same file system object?"""
+        if lock1 is None or lock2 is None:
+            return lock1 is lock2
+        return self._lock_identity(lock1) == self._lock_identity(lock2)

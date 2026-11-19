@@ -23,6 +23,7 @@ log_path = logging.getLogger("path")
 log_file = logging.getLogger("file")
 log_lock = logging.getLogger("lock")
 log_doslist = logging.getLogger("doslist")
+log_handler = logging.getLogger("handler")
 
 log_dos = logging.getLogger("dos")
 log_exec = logging.getLogger("exec")
@@ -51,6 +52,7 @@ loggers = [
     log_file,
     log_lock,
     log_doslist,
+    log_handler,
     log_segload,
     log_dos,
     log_exec,
