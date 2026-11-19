@@ -43,7 +43,6 @@ class _ReplyHolder:
 
     def __init__(self):
         self.done = False
-        self.reply_addr = 0
         self.error = None
 
 
@@ -129,21 +128,22 @@ class NativeHandler(DosPktHandler):
         # scheduler keeps a task as "current" after it went idle, so use the
         # greenlet-based check (Python-driven calls run in the main greenlet)
         if self.scheduler.get_running_task() is not None:
-            reply_addr = self._transport_pkt(pkt)
+            self._transport_pkt(pkt)
         else:
-            reply_addr = self._transport_in_task(pkt)
-        self._copy_result(pkt, reply_addr)
+            self._transport_in_task(pkt)
 
     def _exec_proxy(self):
         """the exec.library proxy of the running exec instance"""
         return self.exec_lib.msg_func.ctx.proxies.get_exec_lib_proxy()
 
     def _transport_pkt(self, pkt):
-        """send one packet with exec functions and return the reply address
+        """send one packet with exec functions and copy the reply into ``pkt``
 
         Runs with a current task: ``CreateMsgPort`` allocates a signal on it
-        and ``WaitPort`` blocks it until the handler replies. The reply port is
-        freed again (its signal included) before returning.
+        and ``WaitPort`` blocks it until the handler replies. The reply is read
+        back *before* the message is freed - a busy handler reuses the freed
+        message memory, so copying afterwards would read garbage. The reply
+        port is freed again (its signal included) before returning.
         """
         exec_lib = self._exec_proxy()
         reply_port = exec_lib.CreateMsgPort()
@@ -165,13 +165,13 @@ class NativeHandler(DosPktHandler):
                     ERROR_NOT_IMPLEMENTED,
                     "no reply from native handler '%s'" % self.name,
                 )
-            return reply.addr
+            self._copy_result(pkt, reply.addr)
         finally:
             msg.free()
             exec_lib.DeleteMsgPort(reply_port)
 
     def _transport_in_task(self, pkt):
-        """run the transport inside a helper task and return the reply address
+        """run the transport inside a helper task
 
         A Python-driven call has no current task, so a helper ``ExecTask`` is
         added to the scheduler and performs the transport via the exec proxy.
@@ -195,7 +195,6 @@ class NativeHandler(DosPktHandler):
                     ERROR_NOT_IMPLEMENTED,
                     "no reply from native handler '%s'" % self.name,
                 )
-            return holder.reply_addr
         finally:
             if sched_task.get_state() != TaskState.TS_REMOVED:
                 try:
@@ -206,7 +205,7 @@ class NativeHandler(DosPktHandler):
 
     def _run_transport(self, pkt, holder):
         try:
-            holder.reply_addr = self._transport_pkt(pkt)
+            self._transport_pkt(pkt)
         except Exception as e:  # noqa: BLE001 - reported to the caller
             holder.error = e
         finally:
