@@ -83,3 +83,22 @@ def cfg_vamos_disk_args_test():
     vmp = VamosMainParser()
     assert vmp.parse(args=["--disk", "disk0.hdf", "bin"])
     assert vmp.get_disk_dict() == {"disks": ["disk0.hdf"], "read_only": True}
+
+
+def cfg_disk_short_args_test():
+    # -D is a shortcut for --disk and appends in order
+    dp = DiskParser()
+    ap = argparse.ArgumentParser()
+    dp.setup_args(ap)
+    args = ap.parse_args(["-D", "disk0.hdf", "--disk", "disk1.hdf"])
+    dp.parse_args(args)
+    assert dp.get_cfg_dict() == {
+        "disks": ["disk0.hdf", "disk1.hdf"],
+        "read_only": True,
+    }
+
+
+def cfg_vamos_disk_short_args_test():
+    vmp = VamosMainParser()
+    assert vmp.parse(args=["-D", "disk0.hdf", "bin"])
+    assert vmp.get_disk_dict() == {"disks": ["disk0.hdf"], "read_only": True}

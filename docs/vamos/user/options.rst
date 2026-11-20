@@ -141,7 +141,7 @@ path. Options that accept lists can be repeated or take comma-separated values.
 Disks
 -----
 
-``--disk IMAGE``
+``-D IMAGE``, ``--disk IMAGE``
     Expose a disk image through ``scsi.device``; repeat to add units in order.
     An RDB image publishes its partitions as DOS devices; a raw ADF/HDF (or
     gzipped ``.adz``/``.hdz``) is exposed as one whole-disk device.
@@ -149,6 +149,7 @@ Disks
     .. code-block:: text
 
         vamos --disk work.hdf myprog
+        vamos -D work.hdf -D floppy.adf myprog
 
     A value may carry per-image options as ``IMAGE?key=val,key=val``:
     ``rw``/``ro`` select the read/write mode, ``name=<NAME>`` sets the raw

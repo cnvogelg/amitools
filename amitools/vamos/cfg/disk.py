@@ -9,6 +9,7 @@ class DiskParser(Parser):
         }
         arg_cfg = {
             "disks": Argument(
+                "-D",
                 "--disk",
                 action="append",
                 help="expose a disk image through an Amiga device",
