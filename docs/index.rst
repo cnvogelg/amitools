@@ -10,10 +10,7 @@ amitools Documentation
     tools/rdbtool
     tools/romtool
     tools/icontool
-    vamos
-    vamos-ref
-    vamos-handler
-    vamos-lib
+    vamos/index
     libs/icontool
 
 The ``amitools`` are an extensive set of command line tools and Python
@@ -32,10 +29,9 @@ Tools
 Vamos
 -----
 
-* :doc:`vamos` - virtual AmigaOS runtime
-* :doc:`vamos-ref` - command-line options, configuration files, and environment variables
-* :doc:`vamos-handler` - file system handlers and the handler API
-* :doc:`vamos-lib` - library configuration and loading
+* :doc:`vamos/index` - virtual AmigaOS runtime
+* :doc:`vamos/user/index` - User's Manual: configuration, options, running and debugging
+* :doc:`vamos/dev/index` - Developer's Manual: architecture, handlers, libraries and API
 
 Libraries
 ---------

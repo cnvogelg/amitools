@@ -382,5 +382,5 @@ defaults to ``adfs`` and the file is not mapped to the host file system::
 
 The auto ``ram:`` volume uses the ``ram`` handler and the auto ``root:`` volume
 uses ``hostfs``. ``NIL:`` and ``CONSOLE:`` always exist as built-in devices,
-so they need no volume definition. See :doc:`vamos` for the volume model and
-:doc:`vamos-ref` for the command-line and config options.
+so they need no volume definition. See :doc:`../user/config` for the volume
+model and :doc:`../user/options` for the command-line and config options.
