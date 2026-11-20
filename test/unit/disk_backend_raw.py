@@ -19,7 +19,7 @@ from amitools.fs.blkdev.HDFBlockDevice import HDFBlockDevice
 from amitools.fs.blkdev.RawBlockDevice import RawBlockDevice
 from amitools.fs.block.BootBlock import BootBlock
 from amitools.fs.rdb.RDisk import RDisk
-from amitools.vamos.disk import DiskImage, RawDiskImage, open_disk_backend
+from amitools.vamos.disk import DiskImage, DiskSession, RawDiskImage, open_disk_backend
 
 
 def _make_adf(path, dos_type=None):
@@ -44,6 +44,18 @@ def _make_rdb(path):
     rdisk = RDisk(raw)
     rdisk.create(DiskGeometry(10, 1, 32), rdb_cyls=1)
     rdisk.add_partition(FSString("DH0"), (1, 9), dos_type=DosType.DOS3)
+    raw.flush()
+    rdisk.close()
+    raw.close()
+
+
+def _make_rdb_two(path):
+    raw = RawBlockDevice(str(path), read_only=False, block_bytes=512)
+    raw.create(320)
+    rdisk = RDisk(raw)
+    rdisk.create(DiskGeometry(10, 1, 32), rdb_cyls=1)
+    rdisk.add_partition(FSString("DH0"), (1, 4), dos_type=DosType.DOS3)
+    rdisk.add_partition(FSString("DH1"), (5, 9), dos_type=DosType.DOS3)
     raw.flush()
     rdisk.close()
     raw.close()
@@ -215,3 +227,51 @@ def disk_backend_factory_rejects_raw_options_on_rdb_test(tmp_path):
     _make_rdb(rdb)
     with pytest.raises(ValueError, match="does not accept raw options"):
         open_disk_backend(rdb, options={"name": "DH9"})
+
+
+def disk_backend_part_selects_by_name_test(tmp_path):
+    rdb = tmp_path / "disk.hdf"
+    _make_rdb_two(rdb)
+    backend = open_disk_backend(rdb, options={"part": "DH1"}).open()
+    try:
+        assert [p.name for p in backend.partitions] == ["DH1"]
+        assert backend.partitions[0].index == 1
+        assert [d.name for d in backend.dos_devices()] == ["DH1"]
+    finally:
+        backend.close()
+
+
+def disk_backend_part_selects_by_index_test(tmp_path):
+    rdb = tmp_path / "disk.hdf"
+    _make_rdb_two(rdb)
+    backend = open_disk_backend(rdb, options={"part": "1"}).open()
+    try:
+        assert [p.name for p in backend.partitions] == ["DH1"]
+    finally:
+        backend.close()
+
+
+def disk_backend_part_unknown_raises_test(tmp_path):
+    rdb = tmp_path / "disk.hdf"
+    _make_rdb_two(rdb)
+    backend = open_disk_backend(rdb, options={"part": "DH9"})
+    with pytest.raises(IOError, match="can't find partition"):
+        backend.open()
+
+
+def disk_backend_part_rejected_on_raw_test(tmp_path):
+    adf = tmp_path / "floppy.adf"
+    _make_adf(adf)
+    with pytest.raises(ValueError, match="does not accept RDB options"):
+        open_disk_backend(adf, options={"part": "DH0"})
+
+
+def disk_backend_part_option_through_session_test(tmp_path):
+    # the ``?part=`` option flows through the DiskSession spec parsing
+    rdb = tmp_path / "disk.hdf"
+    _make_rdb_two(rdb)
+    session = DiskSession([str(rdb) + "?part=DH1"]).open()
+    try:
+        assert [p.name for p in session.get_backend(0).partitions] == ["DH1"]
+    finally:
+        session.close()

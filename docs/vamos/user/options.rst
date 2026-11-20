@@ -152,7 +152,8 @@ Disks
         vamos -D work.hdf -D floppy.adf myprog
 
     A value may carry per-image options as ``IMAGE?key=val,key=val``:
-    ``rw``/``ro`` select the read/write mode, ``name=<NAME>`` sets the raw
+    ``rw``/``ro`` select the read/write mode, ``part=<NAME|INDEX>`` exposes a
+    single RDB partition instead of all of them, ``name=<NAME>`` sets the raw
     device name, and ``type=``/``bs=``/``chs=``/``algo=`` override the raw
     geometry.
 
@@ -160,6 +161,7 @@ Disks
 
         vamos --disk floppy.adf?name=DF0 myprog
         vamos --disk work.hdf?rw,bs=512 myprog
+        vamos --disk big.hdf?part=DH1 myprog
 
 ``--disk-read-write``
     Open every ``--disk`` image read-write instead of read-only, so a native

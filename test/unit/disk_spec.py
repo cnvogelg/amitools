@@ -46,6 +46,14 @@ def disk_spec_keeps_commas_in_options_test():
     assert spec.options == {"chs": "10,1,32"}
 
 
+def disk_spec_part_option_test():
+    # ``part`` selects an RDB partition and stays in the factory options
+    spec = DiskSpec.parse("work.hdf?part=DH1,rw")
+    assert spec.path == "work.hdf"
+    assert spec.read_only is False
+    assert spec.factory_options() == {"part": "DH1"}
+
+
 def disk_spec_comma_in_path_test():
     # a comma before the '?' belongs to the path
     spec = DiskSpec.parse("/tmp/disk,with,commas.hdf?rw")

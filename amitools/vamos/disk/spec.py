@@ -9,10 +9,11 @@ A ``--disk`` value is ``IMAGE[?key=val,key=val]``::
 The option list reuses the volume-spec syntax
 (:meth:`amitools.vamos.path.Spec._parse_cfg`): the keys are separated by
 commas, a bare key is ``True`` and ``key=on``/``key=false`` convert to
-booleans. ``rw``/``ro`` pick the per-disk mode; every other key is handed to
-the block-device factory. An unknown key is a config error, so a typo fails
-loudly instead of being silently ignored. A ``?`` inside a path is therefore
-not supported; such an image must be renamed.
+booleans. ``rw``/``ro`` pick the per-disk mode, ``part=<name|index>`` selects
+one RDB partition, and every other key is handed to the block-device factory.
+An unknown key is a config error, so a typo fails loudly instead of being
+silently ignored. A ``?`` inside a path is therefore not supported; such an
+image must be renamed.
 """
 
 from dataclasses import dataclass, field
@@ -21,10 +22,13 @@ from typing import Mapping, Optional
 from amitools.vamos.cfgcore import split_nest
 
 # every option key a ``--disk`` entry may carry
-KNOWN_KEYS = frozenset(("rw", "ro", "name", "type", "bs", "chs", "algo"))
+KNOWN_KEYS = frozenset(("rw", "ro", "name", "type", "bs", "chs", "algo", "part"))
 
 # the subset only meaningful for a raw (non-RDB) image
 RAW_KEYS = frozenset(("name", "type", "bs", "chs", "algo"))
+
+# the subset only meaningful for an RDB image (partition selection)
+RDB_KEYS = frozenset(("part",))
 
 
 def _parse_options(cfg_str):

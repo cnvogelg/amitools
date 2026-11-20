@@ -23,7 +23,7 @@ from amitools.fs.block.rdb.RDBlock import RDBlock
 from amitools.fs.rdb.RDisk import RDisk
 from amitools.util.Win32Disk import DiskLock, is_windows_disk
 
-from .spec import RAW_KEYS
+from .spec import RAW_KEYS, RDB_KEYS
 
 # characters allowed in a sanitized default raw-device name
 _SAFE_NAME_CHARS = frozenset(
@@ -197,10 +197,14 @@ class DiskImage:
         *,
         read_only: bool = True,
         block_size: Optional[int] = None,
+        part=None,
     ):
         self.image = Path(image)
         self.read_only = read_only
         self.requested_block_size = block_size
+        # an optional RDB partition selector (name or index): expose only that
+        # partition as the disk unit's DOS device (HANDLER.md step 27c)
+        self.part = part
         self.block_size = block_size or 512
         self.total_blocks = 0
         self.cyls = 0
@@ -318,6 +322,11 @@ class DiskImage:
                         driver_globvec=driver_globvec,
                     )
                 )
+            if self.part is not None:
+                selected = self._select_partition(self.part)
+                if selected is None:
+                    raise IOError("can't find partition %s in RDB image" % (self.part,))
+                self.partitions = [selected]
             return self
         except Exception:
             if blkdev is not None:
@@ -363,6 +372,14 @@ class DiskImage:
     def sync(self) -> None:
         if self.blkdev is not None:
             self.blkdev.flush()
+
+    def _select_partition(self, selector):
+        """the RDB partition matching ``selector`` by drive name or index"""
+        wanted = str(selector)
+        for partition in self.partitions:
+            if wanted == partition.name.rstrip(":") or wanted == str(partition.index):
+                return partition
+        return None
 
     def dos_devices(self):
         """every RDB partition as a ``(name, DosEnvec source)`` device"""
@@ -595,11 +612,11 @@ def open_disk_backend(image, *, read_only=True, options=None, unit=0):
     """open the backend matching an image's on-disk type (HANDLER.md 25b).
 
     An RDB image (``RDSK`` magic or an ``.rdb``/``.rdisk`` extension) gets a
-    :class:`DiskImage`, which exposes the whole RDB and its partitions; every
-    other image gets a :class:`RawDiskImage`. ``options`` carries the raw
-    geometry/type keys (``type``/``bs``/``chs``/``algo``) and the optional
-    ``name``; an RDB image rejects the raw-only keys so a mistyped option fails
-    loudly.
+    :class:`DiskImage`, which exposes the whole RDB and its partitions (or the
+    one named by ``part``); every other image gets a :class:`RawDiskImage`.
+    ``options`` carries the raw geometry/type keys (``type``/``bs``/``chs``/
+    ``algo``) and the optional ``name``; each image kind rejects the other
+    kind's keys so a mistyped option fails loudly.
     """
     options = dict(options or {})
     factory = BlkDevFactory()
@@ -611,7 +628,13 @@ def open_disk_backend(image, *, read_only=True, options=None, unit=0):
                 "RDB image does not accept raw options: %s"
                 % ", ".join(sorted(raw_keys))
             )
-        return DiskImage(image, read_only=read_only)
+        part = options.pop("part", None)
+        return DiskImage(image, read_only=read_only, part=part)
+    rdb_keys = RDB_KEYS.intersection(options)
+    if rdb_keys:
+        raise ValueError(
+            "raw image does not accept RDB options: %s" % ", ".join(sorted(rdb_keys))
+        )
     name = options.pop("name", None)
     return RawDiskImage(
         image,
