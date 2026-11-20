@@ -223,11 +223,12 @@ Edit Image
 
 ::
 
-  create [ size=<size> [h=<heads>] [s=<secs>] | chs=<cyls>,<heads>,<secs> ]
+  create [ size=<size> [h=<heads>] [s=<secs>] | chs=<cyls>,<heads>,<secs> ] [ type=<type> ]
 
 With this command you can create a new disk image file. If the disk image
 format has a fixed size (e.g. ADF) then you do not need to specify extra
-paramters to this command.
+paramters to this command. Pass ``type=adf_hd`` to create a high-density (HD)
+floppy image (1760 KiB, 22 sectors) instead of the 880 KiB DD default.
 
 For a hard disk image (HDF) file you must either give the total ``size`` in
 bytes or the disk geometry in cylinders, heads, and sectors. If you specify
@@ -246,6 +247,7 @@ Example::
 
   > xdftool new.hdf create size=10Mi     ; create an empty HDF image with 10Mi
   > xdftool new.adf create               ; create an empty floppy disk image
+  > xdftool new.adf create type=adf_hd   ; create an empty HD floppy image
   > xdftool new.hdf create chs=10,1,32   ; create disk with given geometry
   > xdftool new.hdf create size=10Mi h=2 ; force 2 heads
 
