@@ -60,13 +60,25 @@ class BlkDevGeometry:
 class BlkDevSpec:
     """the block device a native handler is bound to"""
 
-    def __init__(self, device, unit, geometry, partition_name=None):
+    def __init__(
+        self,
+        device,
+        unit,
+        geometry,
+        partition_name=None,
+        driver_data=None,
+        driver_globvec=None,
+    ):
         self.device = device
         self.unit = unit
         self.geometry = geometry
         # the RDB partition's DOS device name (e.g. ``DH0``), when resolved;
         # lets the manager reuse that node's ``FileSysStartupMsg`` (step 24c)
         self.partition_name = partition_name
+        # the RDB driver for the partition (seglist data, globvec); a handler
+        # without an explicit ``binary=`` loads it (step 24d)
+        self.driver_data = driver_data
+        self.driver_globvec = driver_globvec
 
     def __repr__(self):
         return "BlkDevSpec(device=%s, unit=%s, geometry=%s)" % (
@@ -113,6 +125,8 @@ def resolve_blkdev(disk_session, config, name=None):
     unit = config.unit
     geometry = None
     partition_name = None
+    driver_data = None
+    driver_globvec = None
 
     if disk_session is not None:
         selector = config.part
@@ -129,6 +143,9 @@ def resolve_blkdev(disk_session, config, name=None):
             found_unit, partition = found
             geometry = partition.dos_env
             partition_name = partition.name.rstrip(":")
+            # the RDB driver is an optional handler source (step 24d)
+            driver_data = getattr(partition, "driver_data", None)
+            driver_globvec = getattr(partition, "driver_globvec", None)
             if unit is None:
                 unit = found_unit
 
@@ -137,4 +154,11 @@ def resolve_blkdev(disk_session, config, name=None):
         geometry = BlkDevGeometry()
     if unit is None:
         unit = 0
-    return BlkDevSpec(DEFAULT_DEVICE, unit, geometry, partition_name)
+    return BlkDevSpec(
+        DEFAULT_DEVICE,
+        unit,
+        geometry,
+        partition_name,
+        driver_data=driver_data,
+        driver_globvec=driver_globvec,
+    )

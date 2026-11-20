@@ -280,6 +280,40 @@ Built-in handlers
     manager exists and is attached to the live machine once ``exec.library``
     is up.
 
+``native`` -- ``NativeHandler``
+    A *client* of an original 68k AmigaDOS file system handler that runs as its
+    own task inside the emulator. The handler binary is loaded as a seglist,
+    started as a process and talked to over its real ``MsgPort`` with the exec
+    message/signal functions (``PutMsg``/``WaitPort``/``GetMsg``), so an
+    unmodified handler such as ``pfs3aio`` can mount a ``--disk`` partition.
+    Select it with a path-less ``?handler=native`` volume::
+
+        vamos --disk work.hdf -V "WORK:?handler=native,binary=/path/pfs3aio,device=DH0"
+
+    Options (comma-separated after ``?``):
+
+    ``binary``
+        The handler seglist: a host path, an Amiga path (``LIBS:pfs3aio``), or
+        omitted to mount the driver the RDB stores for the partition's DOS type.
+
+    ``device`` / ``part``
+        The ``--disk`` partition to mount, named by its DOS device node
+        (``device=DH0``) or its RDB partition (``part=DH0`` or ``part=1``).
+        With neither set the volume name is tried, then the first partition.
+
+    ``globvec``
+        The handler's ``dol_GlobVec``: ``-1`` for a C handler, ``-2`` for an
+        assembler one. Overrides the value stored in the RDB driver.
+
+    ``stack`` / ``priority``
+        The handler process's stack size (default 4 KiB) and exec task priority.
+
+    The volume is bound before ``exec.library`` exists, so the handler is
+    created detached and attached to the live machine (and its started task)
+    once the base libraries are open. When the mount name equals the partition's
+    DOS device name the manager *adopts* the ``--disk`` node instead of creating
+    a second one. A handler that fails to start aborts vamos with a setup error.
+
 
 Writing a handler
 -----------------

@@ -12,6 +12,7 @@ dos exist (HANDLER.md step 23g) and stopped again before the base libraries are
 closed.
 """
 
+import io
 import os
 
 from amitools.vamos.loader.fileobj import StreamFileObj
@@ -133,7 +134,7 @@ class NativeHandlerManager:
         if self._find(handler) is not None:
             return handler
         spec = resolve_blkdev(self.disk_session, handler.config, handler.name)
-        program = self._make_program(handler)
+        program = self._make_program(handler, spec)
         # the handler's pr_MsgPort becomes a real Exec signal port. The port is
         # signalled with SIGB_DOS, like a process port (dos/Cli.py)
         port = program.msg_port
@@ -315,26 +316,29 @@ class NativeHandlerManager:
 
     # ----- program creation -----
 
-    def _make_program(self, handler):
+    def _make_program(self, handler, spec):
         if self.task_factory is not None:
             return self.task_factory(self, handler)
-        return self._load_program(handler)
+        return self._load_program(handler, spec)
 
-    def _load_program(self, handler):
+    def _load_program(self, handler, spec):
+        config = handler.config
         binary = handler.binary
-        if not binary:
-            raise HandlerError(
-                ERROR_OBJECT_NOT_FOUND,
-                "native handler '%s' has no binary configured" % handler.name,
-            )
-        baddr = self._load_seglist(binary)
+        if binary:
+            baddr = self._load_seglist(binary)
+            glob_vec = config.globvec
+        else:
+            # no explicit binary: mount the driver the RDB stores for the
+            # partition's DOS type (step 24d)
+            baddr = self._load_rdb_driver(handler, spec)
+            glob_vec = self._driver_globvec(config, spec)
         if baddr == 0:
+            source = binary if binary else "RDB driver"
             raise HandlerError(
-                ERROR_OBJECT_NOT_FOUND, "can't load native handler '%s'" % binary
+                ERROR_OBJECT_NOT_FOUND, "can't load native handler '%s'" % source
             )
         info = self.seg_loader.get_info(baddr)
         seglist = info.seglist
-        config = handler.config
         proc = DosProcess(
             self.machine,
             self.alloc,
@@ -350,9 +354,33 @@ class NativeHandlerManager:
             proc.get_ami_task(),
             proc.proc.msg_port,
             seg_list_baddr=baddr,
-            glob_vec=config.globvec,
+            glob_vec=glob_vec,
             owner=_ProcessOwner(self, proc, baddr),
         )
+
+    def _load_rdb_driver(self, handler, spec):
+        """load the RDB driver seglist stored for the partition (step 24d)"""
+        data = spec.driver_data
+        if not data:
+            raise HandlerError(
+                ERROR_OBJECT_NOT_FOUND,
+                "native handler '%s' has no binary configured and no RDB driver"
+                % handler.name,
+            )
+        fobj = StreamFileObj(io.BytesIO(data))
+        try:
+            return self.seg_loader.load_seglist(fobj, name=handler.name)
+        finally:
+            fobj.close()
+
+    @staticmethod
+    def _driver_globvec(config, spec):
+        """the ``dol_GlobVec`` for an RDB driver: explicit ``?globvec=`` wins"""
+        if "globvec" in config.raw:
+            return config.globvec
+        if spec.driver_globvec is not None:
+            return spec.driver_globvec
+        return config.globvec
 
     def _load_seglist(self, binary):
         text = str(binary)

@@ -337,18 +337,25 @@ The ``--disk`` option exposes a standard RDB disk image through
 in command-line order, starting at unit 0. Each RDB partition is also
 published in the AmigaDOS device list under its drive name.
 
-Disk images opened this way are read-only. vamos takes an exclusive host-file
-lock for the lifetime of the process and refuses to open an image that is
-already in use by another cooperating process.
+Disk images are opened read-only by default. Pass ``--disk-read-write`` to open
+every ``--disk`` image read-write instead; a writable image lets a native file
+system handler (see :doc:`vamos-handler`) write through to the image. vamos
+takes an exclusive host-file lock for the lifetime of the process and refuses
+to open an image that is already in use by another cooperating process.
 
 For example, an Amiga diagnostic program can inspect the ``DH0`` partition in
 ``disk.hdf`` with normal Exec and DOS APIs:
 
     vamos --disk disk.hdf pfsdoctor DH0 CHECK NONINTERACTIVE
 
-The initial implementation supports direct RDB images whose RDB is in one of
-the standard first 16 blocks. Container formats and writable command-line
-images are not supported.
+A partition can also be mounted by an original 68k file system handler with a
+path-less ``?handler=native`` volume; the handler binary is optional when the
+RDB stores the driver:
+
+    vamos --disk work.hdf -V "WORK:?handler=native,binary=/path/pfs3aio,device=DH0"
+
+The implementation supports direct RDB images whose RDB is in one of the
+standard first 16 blocks. Container formats are not supported.
 
 2.2 Exec Setup
 ~~~~~~~~~~~~~~

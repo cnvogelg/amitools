@@ -9,6 +9,7 @@ device the handler opens is always ``scsi.device``.
 
 from types import SimpleNamespace
 
+import amitools.fs.DosType as DosType
 from amitools.fs.FSString import FSString
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 from amitools.fs.blkdev.RawBlockDevice import RawBlockDevice
@@ -35,12 +36,14 @@ def _session(*backends):
     )
 
 
-def _make_rdb(path):
+def _make_rdb(path, driver=None):
     raw = RawBlockDevice(str(path), read_only=False, block_bytes=512)
     raw.create(320)
     rdisk = RDisk(raw)
     rdisk.create(DiskGeometry(10, 1, 32), rdb_cyls=1)
-    rdisk.add_partition(FSString("DH0"), (1, 9))
+    rdisk.add_partition(FSString("DH0"), (1, 9), dos_type=DosType.DOS3)
+    if driver is not None:
+        assert rdisk.add_filesystem(driver, dos_type=DosType.DOS3)
     raw.flush()
     rdisk.close()
     raw.close()
@@ -115,6 +118,21 @@ def handler_native_blkdev_empty_session_test():
     session = _session(SimpleNamespace(partitions=[]))
     spec = resolve_blkdev(session, NativeConfig({}), "WORK")
     assert isinstance(spec.geometry, BlkDevGeometry)
+
+
+def handler_native_blkdev_carries_rdb_driver_test(tmp_path):
+    # the resolved partition carries the RDB driver for a handler without a
+    # ``binary=`` (step 24d)
+    data = bytes(range(256)) * 3
+    image = tmp_path / "disk.hdf"
+    _make_rdb(image, driver=data)
+    session = DiskSession([image]).open()
+    try:
+        spec = resolve_blkdev(session, NativeConfig({"device": "DH0"}), "WORK")
+        assert spec.driver_data == data
+        assert spec.driver_globvec == -1
+    finally:
+        session.close()
 
 
 def handler_native_blkdev_real_rdb_test(tmp_path):

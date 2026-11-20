@@ -4,6 +4,7 @@ import os
 
 import pytest
 
+import amitools.fs.DosType as DosType
 from amitools.fs.FSString import FSString
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 from amitools.fs.blkdev.RawBlockDevice import RawBlockDevice
@@ -15,15 +16,53 @@ from amitools.vamos.machine.mock import MockMemory
 from amitools.vamos.mem import MemoryAlloc
 
 
-def _make_rdb(path):
+def _make_rdb(path, driver=None):
     raw = RawBlockDevice(str(path), read_only=False, block_bytes=512)
     raw.create(320)
     rdisk = RDisk(raw)
     rdisk.create(DiskGeometry(10, 1, 32), rdb_cyls=1)
-    rdisk.add_partition(FSString("DH0"), (1, 9))
+    rdisk.add_partition(FSString("DH0"), (1, 9), dos_type=DosType.DOS3)
+    if driver is not None:
+        assert rdisk.add_filesystem(driver, dos_type=DosType.DOS3)
     raw.flush()
     rdisk.close()
     raw.close()
+
+
+def disk_session_from_config_read_only_test():
+    # the default is read-only
+    session = DiskSession.from_config({"disks": []})
+    assert session.default_read_only is True
+    # --disk-read-write passes read_only=False through
+    session = DiskSession.from_config({"disks": [], "read_only": False})
+    assert session.default_read_only is False
+    # an object-style config is accepted too
+    cfg = SimpleNamespace(disks=[], read_only=False)
+    session = DiskSession.from_config(cfg)
+    assert session.default_read_only is False
+
+
+def disk_image_exposes_partition_driver_test(tmp_path):
+    data = bytes(range(256)) * 5
+    image_path = tmp_path / "disk.hdf"
+    _make_rdb(image_path, driver=data)
+    image = DiskImage(image_path).open()
+    part = image.partitions[0]
+    # the RDB driver for the partition's DOS type round-trips ...
+    assert part.driver_data == data
+    # ... and its global_vec (stored as 0xFFFFFFFF) is signed
+    assert part.driver_globvec == -1
+    image.close()
+
+
+def disk_image_partition_without_driver_test(tmp_path):
+    image_path = tmp_path / "disk.hdf"
+    _make_rdb(image_path)  # no filesystem stored
+    image = DiskImage(image_path).open()
+    part = image.partitions[0]
+    assert part.driver_data is None
+    assert part.driver_globvec is None
+    image.close()
 
 
 def disk_image_opens_whole_rdb_test(tmp_path):

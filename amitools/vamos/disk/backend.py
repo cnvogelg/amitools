@@ -117,11 +117,20 @@ class BlockBackend(Protocol):
 
 @dataclass(frozen=True)
 class DiskPartition:
-    """An RDB partition exported as an AmigaDOS device."""
+    """An RDB partition exported as an AmigaDOS device.
+
+    ``driver_data`` is the filesystem driver (a seglist hunk stream) the RDB
+    stores for the partition's DOS type, and ``driver_globvec`` its
+    ``dol_GlobVec``. Both are ``None`` when the RDB has no matching driver.
+    A native handler without an explicit ``binary=`` mounts with them
+    (HANDLER.md step 24d).
+    """
 
     name: str
     index: int
     dos_env: object
+    driver_data: Optional[bytes] = None
+    driver_globvec: Optional[int] = None
 
 
 class DiskImage:
@@ -179,6 +188,28 @@ class DiskImage:
                 return rdb
         return None
 
+    @staticmethod
+    def _match_driver(filesystems, dos_env):
+        """the RDB driver (seglist data, globvec) for a partition's DOS type
+
+        The RDB stores one filesystem per DOS type; a partition mounts the one
+        whose ``dos_type`` matches its own. Returns ``(None, None)`` when no
+        filesystem matches, so a native handler with an explicit ``binary=``
+        (or a Python handler) is unaffected.
+        """
+        dos_type = getattr(dos_env, "dos_type", None)
+        if dos_type is None:
+            return None, None
+        for fs in filesystems:
+            fshd = fs.fshd
+            if fshd is not None and fshd.dos_type == dos_type:
+                # only a header that declares the global_vec flag carries one
+                glob_vec = dict(fshd.get_flags()).get("global_vec")
+                if glob_vec is not None and glob_vec >= 0x80000000:
+                    glob_vec -= 0x100000000
+                return fs.get_data(), glob_vec
+        return None, None
+
     def open(self):
         if self.is_open:
             return self
@@ -227,8 +258,16 @@ class DiskImage:
                     name = drv_name.get_unicode()
                 else:
                     name = str(drv_name)
+                dos_env = part.part_blk.dos_env
+                driver_data, driver_globvec = self._match_driver(rdisk.fs, dos_env)
                 self.partitions.append(
-                    DiskPartition(name, index, part.part_blk.dos_env)
+                    DiskPartition(
+                        name,
+                        index,
+                        dos_env,
+                        driver_data=driver_data,
+                        driver_globvec=driver_globvec,
+                    )
                 )
             return self
         except Exception:

@@ -241,6 +241,8 @@ entries represent physical block devices and they have no block geometry.
 * ``--disk IMAGE``: Expose an RDB disk image through ``scsi.device``; repeat
   to add units in order: ``vamos --disk work.hdf myprog``. The command-line
   disk image is read-only.
+* ``--disk-read-write``: Open every ``--disk`` image read-write instead of
+  read-only, so a native file system handler can write through to it.
 * ``-O OPTIONS``, ``--lib-options OPTIONS``: Configure a library or device as
   ``<name>=<key>:<value>``. Separate settings with commas, libraries/devices
   with ``+``, or repeat ``-O``:
