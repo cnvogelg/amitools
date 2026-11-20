@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 import amitools.fs.DosType as DosType
 from amitools.fs.FSString import FSString
+from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 from amitools.fs.blkdev.RawBlockDevice import RawBlockDevice
 from amitools.fs.rdb.RDisk import RDisk
@@ -144,5 +145,43 @@ def handler_native_blkdev_real_rdb_test(tmp_path):
         assert spec.unit == 0
         assert spec.geometry.low_cyl == 1
         assert spec.geometry.high_cyl == 9
+    finally:
+        session.close()
+
+
+def _make_adf(path):
+    adf = ADFBlockDevice(str(path))
+    adf.create()
+    adf.close()
+
+
+def handler_native_blkdev_raw_device_test(tmp_path):
+    # a raw ADF is published as a whole-disk partition, so the native handler
+    # mounts its real geometry instead of the synthetic fallback (step 27b)
+    image = tmp_path / "floppy.adf"
+    _make_adf(image)
+    session = DiskSession([image]).open()
+    try:
+        spec = resolve_blkdev(session, NativeConfig({}), "WORK")
+        assert spec.unit == 0
+        assert not isinstance(spec.geometry, BlkDevGeometry)
+        assert spec.geometry.surfaces == 2
+        assert spec.geometry.blk_per_trk == 11
+        assert spec.geometry.low_cyl == 0
+        assert spec.geometry.high_cyl == 79
+        # the device name lets the manager reuse the session's startup (24c)
+        assert spec.partition_name == "floppy"
+    finally:
+        session.close()
+
+
+def handler_native_blkdev_raw_device_by_name_test(tmp_path):
+    image = tmp_path / "floppy.adf"
+    _make_adf(image)
+    session = DiskSession([image]).open()
+    try:
+        spec = resolve_blkdev(session, NativeConfig({"device": "floppy"}), "WORK")
+        assert spec.geometry.surfaces == 2
+        assert spec.partition_name == "floppy"
     finally:
         session.close()

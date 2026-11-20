@@ -61,7 +61,11 @@ def disk_backend_raw_adf_test(tmp_path):
         assert image.total_blocks == 80 * 2 * 11
         assert image.read_only is False
         assert image.exclusive is True
-        assert image.partitions == ()
+        # the whole disk is published as one synthetic partition for the
+        # native handler (step 27b)
+        assert [p.name for p in image.partitions] == ["floppy"]
+        assert image.partitions[0].index == 0
+        assert image.partitions[0].dos_env.high_cyl == 79
 
         payload = bytes(range(256)) * 2
         image.write_blocks(3, payload)

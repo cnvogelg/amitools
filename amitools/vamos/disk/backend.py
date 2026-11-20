@@ -436,7 +436,7 @@ class RawDiskImage:
         self.heads = 0
         self.secs = 0
         self.blkdev = None
-        self.partitions = ()
+        self.partitions = []
         self.host_lock = HostFileLock(self.image, read_only=read_only)
 
     @property
@@ -467,6 +467,9 @@ class RawDiskImage:
             # the factory downgrades to read-only when the host file is not
             # writable, so trust the opened device over the request
             self.read_only = _blkdev_read_only(blkdev)
+            # publish the whole disk as one synthetic partition so a native
+            # handler can resolve it through ``backend.partitions`` (step 27b)
+            self.partitions = [self._make_partition()]
             return self
         except Exception:
             if blkdev is not None:
@@ -515,7 +518,15 @@ class RawDiskImage:
 
     def dos_devices(self):
         """the whole disk as one synthetic ``(name, DosEnvec source)`` device"""
-        return [DosDevice(self._device_name(), self._make_dos_env(), self._explicit)]
+        if not self.partitions:
+            # not open yet: build the synthetic device on demand
+            return [
+                DosDevice(self._device_name(), self._make_dos_env(), self._explicit)
+            ]
+        return [
+            DosDevice(partition.name, partition.dos_env, self._explicit)
+            for partition in self.partitions
+        ]
 
     @property
     def _explicit(self) -> bool:
@@ -544,9 +555,20 @@ class RawDiskImage:
         env.update_size()
         return env
 
+    def _make_partition(self):
+        """the whole disk as one synthetic partition for the native handler
+
+        A native handler resolves its block device through
+        ``DiskSession.get_backend(unit).partitions`` (HANDLER.md step 27b). A
+        raw image has no partition table, so the whole disk is published as a
+        single partition: index 0, the whole-disk geometry and no RDB driver.
+        """
+        return DiskPartition(self._device_name(), 0, self._make_dos_env())
+
     def close(self) -> None:
         blkdev = self.blkdev
         self.blkdev = None
+        self.partitions = []
         first_error = None
         try:
             if blkdev is not None:

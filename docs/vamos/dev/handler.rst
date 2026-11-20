@@ -285,8 +285,8 @@ Built-in handlers
     own task inside the emulator. The handler binary is loaded as a seglist,
     started as a process and talked to over its real ``MsgPort`` with the exec
     message/signal functions (``PutMsg``/``WaitPort``/``GetMsg``), so an
-    unmodified handler such as ``pfs3aio`` can mount a ``--disk`` partition.
-    Select it with a path-less ``?handler=native`` volume::
+    unmodified handler such as ``pfs3aio`` can mount a ``--disk`` partition or a
+    raw ADF/HDF image. Select it with a path-less ``?handler=native`` volume::
 
         vamos --disk work.hdf -V "WORK:?handler=native,binary=/path/pfs3aio,device=DH0"
 
@@ -297,9 +297,10 @@ Built-in handlers
         omitted to mount the driver the RDB stores for the partition's DOS type.
 
     ``device`` / ``part``
-        The ``--disk`` partition to mount, named by its DOS device node
-        (``device=DH0``) or its RDB partition (``part=DH0`` or ``part=1``).
-        With neither set the volume name is tried, then the first partition.
+        The ``--disk`` device to mount, named by its DOS device node
+        (``device=DH0``), its RDB partition (``part=DH0`` or ``part=1``) or a
+        raw image's whole-disk device name. With neither set the volume name is
+        tried, then the first partition.
 
     ``globvec``
         The handler's ``dol_GlobVec``: ``-1`` for a C handler, ``-2`` for an

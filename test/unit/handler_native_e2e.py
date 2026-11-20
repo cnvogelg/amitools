@@ -14,6 +14,7 @@ import pytest
 
 from amitools.fs.FSString import FSString
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
+from amitools.fs.blkdev.HDFBlockDevice import HDFBlockDevice
 from amitools.fs.blkdev.RawBlockDevice import RawBlockDevice
 from amitools.fs.rdb.RDisk import RDisk
 from amitools.vamos.disk import DiskSession
@@ -151,3 +152,51 @@ def handler_native_filesystem_end_to_end_test(tmp_path, handler_spec):
     # locks and files must be gone, so assert nothing else is left over.
     leftovers = sorted(size for _, size in slm.alloc.get_orphans())
     assert leftovers == [0x20, 0x40, 0x50]
+
+
+def _make_hdf(path, cyls, secs):
+    """create a raw whole-disk HDF image (no RDB)"""
+    hdf = HDFBlockDevice(str(path))
+    hdf.create(DiskGeometry(cyls, 1, secs))
+    hdf.close()
+
+
+def handler_native_raw_device_end_to_end_test(tmp_path, handler_spec):
+    # a raw HDF (no RDB) is mounted through the whole-disk synthetic partition
+    # (step 27b): the handler formats and uses it without a partition table
+    dos_type = handler_spec["dos_type"]
+    image = tmp_path / "disk.hdf"
+    _make_hdf(image, _CYLS, _SECS)
+
+    machine, scheduler, slm = _make_slm(tmp_path)
+
+    disk_session = DiskSession([str(image)], read_only=False)
+    disk_session.open()
+    slm.disk_session = disk_session
+    disk_session.install_devices(slm)
+
+    # no device/part selector: the raw whole-disk partition is the fallback
+    handler = NativeHandler("DH0", {"binary": handler_spec["binary"]})
+    slm.handler_mgr.register("DH0", handler)
+    wire_handler_transports(slm, slm.handler_mgr, machine, scheduler, disk_session)
+
+    slm.open_base_libs()
+    assert handler.handler_port != 0
+    assert slm.dos_impl.dos_list.get_entry_by_name("DH0") is not None
+
+    # format the raw device, then write and read a file
+    handler.inhibit(True)
+    handler.format("Work", dos_type)
+    handler.inhibit(False)
+
+    payload = b"hello from a raw device\n"
+    fh = handler.find_output("file.txt", MODE_NEWFILE)
+    assert handler.write(fh, payload) == len(payload)
+    handler.end(fh)
+    fh = handler.find_input("file.txt")
+    assert handler.read(fh, -1) == payload
+    handler.end(fh)
+
+    slm.close_base_libs()
+    slm.cleanup()
+    disk_session.close()
