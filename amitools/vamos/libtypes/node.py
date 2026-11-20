@@ -17,18 +17,31 @@ node_map = {
 }
 
 
+# ln_Succ and ln_Pred of a Node and a MinNode
+SUCC = 0
+PRED = 4
+
+
+def remove_node(mem, addr, clear=True):
+    """unlink the node at addr as exec's Remove() does"""
+    succ = mem.r32(addr + SUCC)
+    pred = mem.r32(addr + PRED)
+    if succ == 0 or pred == 0:
+        return False
+    mem.w32(succ + PRED, pred)
+    mem.w32(pred + SUCC, succ)
+    if clear:
+        mem.w32(addr + SUCC, 0)
+        mem.w32(addr + PRED, 0)
+    return True
+
+
 class NodeBase:
+    # list operations run for every message and task switch: they follow
+    # the links in memory instead of through struct wrappers
+
     def remove(self, clear=True):
-        succ = self.succ.ref
-        pred = self.pred.ref
-        if succ is None or pred is None:
-            return False
-        succ.pred.ref = pred
-        pred.succ.ref = succ
-        if clear:
-            self.succ.ref = None
-            self.pred.ref = None
-        return True
+        return remove_node(self._mem, self.addr, clear)
 
 
 @AmigaClassDef

@@ -1,5 +1,16 @@
 from amitools.vamos.schedule import NativeTask, PythonTask
 from amitools.vamos.libtypes import Task
+from amitools.vamos.libstructs import TaskStruct, TaskState
+
+
+def _offset(name):
+    return TaskStruct.sdef.find_field_def_by_name(name).offset
+
+
+# the scheduler reports every state and signal change: write them directly
+_TC_STATE = _offset("tc_State")
+_TC_SIGRECVD = _offset("tc_SigRecvd")
+_TC_SIGWAIT = _offset("tc_SigWait")
 
 
 class MappedTask:
@@ -33,14 +44,17 @@ class MappedTask:
     def _setup_state_sync(self):
         # install state hook to map state to mapped task value
         def map_state(task, state):
-            self.ami_task.tc_State.val = state.name
+            ami_task = self.ami_task
+            ami_task._mem.w8(ami_task.addr + _TC_STATE, getattr(TaskState, state.name))
 
         self.sched_task.set_state_callback(map_state)
 
     def _setup_sigmask_sync(self):
         def map_sigmask(task, sigmask_received, sigmask_wait):
-            self.ami_task.tc_SigRecvd.val = sigmask_received
-            self.ami_task.tc_SigWait.val = sigmask_wait
+            ami_task = self.ami_task
+            mem = ami_task._mem
+            mem.w32(ami_task.addr + _TC_SIGRECVD, sigmask_received)
+            mem.w32(ami_task.addr + _TC_SIGWAIT, sigmask_wait)
 
         self.sched_task.set_sigmask_callback(map_sigmask)
 
