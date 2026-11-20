@@ -238,9 +238,13 @@ mounts on the same filesystem report overlapping space. The ``NIL:`` and
 (the ``NIL:`` sink and the console), with no startup message. None of these
 entries represent physical block devices and they have no block geometry.
 
-* ``--disk IMAGE``: Expose an RDB disk image through ``scsi.device``; repeat
-  to add units in order: ``vamos --disk work.hdf myprog``. The command-line
-  disk image is read-only.
+* ``--disk IMAGE``: Expose a disk image through ``scsi.device``; repeat to add
+  units in order: ``vamos --disk work.hdf myprog``. An RDB image publishes its
+  partitions as DOS devices; a raw ADF/HDF (or gzipped ``.adz``/``.hdz``) is
+  exposed as one whole-disk device. A value may carry per-image options as
+  ``IMAGE?key=val,key=val``: ``rw``/``ro`` select the read/write mode,
+  ``name=<NAME>`` sets the raw device name, and ``type=``/``bs=``/``chs=``/
+  ``algo=`` override the raw geometry.
 * ``--disk-read-write``: Open every ``--disk`` image read-write instead of
   read-only, so a native file system handler can write through to it.
 * ``-O OPTIONS``, ``--lib-options OPTIONS``: Configure a library or device as

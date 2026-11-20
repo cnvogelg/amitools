@@ -332,16 +332,48 @@ or in the config file:
 ^^^^^^^^^^^^^^^^^
 
 
-The ``--disk`` option exposes a standard RDB disk image through
-``scsi.device``. The option can be repeated; images are assigned device units
-in command-line order, starting at unit 0. Each RDB partition is also
-published in the AmigaDOS device list under its drive name.
+The ``--disk`` option exposes a disk image through ``scsi.device``. The option
+can be repeated; images are assigned device units in command-line order,
+starting at unit 0.
+
+Two image families are supported:
+
+* **RDB** hard disk images (``RDSK`` magic, or an ``.rdb``/``.rdisk``
+  extension). Every RDB partition is published in the AmigaDOS device list
+  under its drive name, and the whole disk is exposed through ``scsi.device``.
+  The RDB must be in one of the standard first 16 blocks.
+* **raw** images: ADF floppies (DD/HD), HDF hardfiles and gzipped
+  ``.adz``/``.hdz`` images. There is no partition table, so the whole disk is
+  published as a single synthetic device named after the image (or ``?name=``).
+  Container formats other than gzip are not supported.
 
 Disk images are opened read-only by default. Pass ``--disk-read-write`` to open
 every ``--disk`` image read-write instead; a writable image lets a native file
-system handler (see :doc:`vamos-handler`) write through to the image. vamos
-takes an exclusive host-file lock for the lifetime of the process and refuses
-to open an image that is already in use by another cooperating process.
+system handler (see :doc:`vamos-handler`) write through to the image. A gzipped
+image always stays read-only. vamos takes an exclusive host-file lock for the
+lifetime of the process and refuses to open an image that is already in use by
+another cooperating process.
+
+Each ``--disk`` value may carry per-image options as ``IMAGE?key=val,key=val``:
+
+``rw`` / ``ro``
+    Open this one image read-write (``?rw``) or read-only (``?ro``), overriding
+    the global ``--disk-read-write`` default.
+
+``name=<NAME>``
+    The DOS device name of a raw whole-disk image. By default the image's file
+    stem is used, sanitized to ``[A-Za-z0-9_-]``; a name that already exists is
+    a setup error.
+
+``type=<adf|adf_hd|hdf>``
+    Force the raw image type when detection from the contents or extension is
+    ambiguous.
+
+``bs=<bytes>``, ``chs=<c,h,s>``, ``algo=<n>``
+    Override the block size and the HDF geometry. A comma value is nested, e.g.
+    ``?chs=(10,1,32)``.
+
+A ``?`` inside a path is not supported; rename such an image.
 
 For example, an Amiga diagnostic program can inspect the ``DH0`` partition in
 ``disk.hdf`` with normal Exec and DOS APIs:
@@ -354,8 +386,9 @@ RDB stores the driver:
 
     vamos --disk work.hdf -V "WORK:?handler=native,binary=/path/pfs3aio,device=DH0"
 
-The implementation supports direct RDB images whose RDB is in one of the
-standard first 16 blocks. Container formats are not supported.
+A raw floppy image is exposed as a whole-disk device named ``DF0``:
+
+    vamos --disk floppy.adf?name=DF0 myprog
 
 2.2 Exec Setup
 ~~~~~~~~~~~~~~

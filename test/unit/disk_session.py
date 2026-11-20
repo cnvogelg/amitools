@@ -6,6 +6,7 @@ import pytest
 
 import amitools.fs.DosType as DosType
 from amitools.fs.FSString import FSString
+from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 from amitools.fs.blkdev.RawBlockDevice import RawBlockDevice
 from amitools.fs.rdb.RDisk import RDisk
@@ -14,6 +15,22 @@ from amitools.vamos.disk import backend as backend_module
 from amitools.vamos.lib.dos.DosList import DosList
 from amitools.vamos.machine.mock import MockMemory
 from amitools.vamos.mem import MemoryAlloc
+
+
+def _make_adf(path, dos_type=DosType.DOS3):
+    adf = ADFBlockDevice(str(path))
+    adf.create()
+    adf.close()
+
+
+def _dos_impl():
+    mem = MockMemory(size_kib=64)
+    alloc = MemoryAlloc(mem)
+    dos_list = DosList(None, None, mem, alloc)
+    dos = SimpleNamespace(
+        alloc=alloc, dos_list=dos_list, update_dos_list_head=lambda: None
+    )
+    return dos, dos_list
 
 
 def _make_rdb(path, driver=None):
@@ -169,6 +186,115 @@ def disk_image_releases_lock_when_failed_backend_close_raises_test(tmp_path):
 
     raw.close.assert_called_once_with()
     image.host_lock.release.assert_called_once_with()
+
+
+def disk_session_per_disk_read_write_test(tmp_path):
+    adf = tmp_path / "floppy.adf"
+    _make_adf(adf)
+
+    # the global default is read-only ...
+    session = DiskSession([adf]).open()
+    try:
+        assert session.get_backend(0).read_only is True
+    finally:
+        session.close()
+
+    # ... ?rw overrides it for that one disk
+    session = DiskSession([str(adf) + "?rw"]).open()
+    try:
+        assert session.get_backend(0).read_only is False
+    finally:
+        session.close()
+
+    # a read-write default can be overridden back with ?ro
+    session = DiskSession([str(adf) + "?ro"], read_only=False).open()
+    try:
+        assert session.get_backend(0).read_only is True
+    finally:
+        session.close()
+
+
+def disk_session_raw_device_name_test(tmp_path):
+    adf = tmp_path / "floppy.adf"
+    _make_adf(adf)
+    dos, dos_list = _dos_impl()
+    session = DiskSession([str(adf) + "?name=DF0"]).open()
+    try:
+        session.install_dos(dos)
+        device = dos_list.get_device_by_name("DF0")
+        assert device is not None
+        assert device.struct.dol_Task.aptr == 0
+    finally:
+        session.close()
+
+
+def disk_session_raw_default_device_name_test(tmp_path):
+    adf = tmp_path / "my floppy.adf"
+    _make_adf(adf)
+    dos, dos_list = _dos_impl()
+    session = DiskSession([adf]).open()
+    try:
+        assert session.get_backend(0).dos_devices()[0].name == "my_floppy"
+        session.install_dos(dos)
+        assert dos_list.get_device_by_name("my_floppy") is not None
+    finally:
+        session.close()
+
+
+def disk_session_raw_default_name_collision_test(tmp_path):
+    first = tmp_path / "a" / "floppy.adf"
+    second = tmp_path / "b" / "floppy.adf"
+    first.parent.mkdir()
+    second.parent.mkdir()
+    _make_adf(first)
+    _make_adf(second)
+    dos, dos_list = _dos_impl()
+    session = DiskSession([first, second]).open()
+    try:
+        session.install_dos(dos)
+        assert dos_list.get_device_by_name("floppy") is not None
+        assert dos_list.get_device_by_name("floppy1") is not None
+    finally:
+        session.close()
+
+
+def disk_session_raw_explicit_name_collision_test(tmp_path):
+    first = tmp_path / "a" / "floppy.adf"
+    second = tmp_path / "b" / "floppy.adf"
+    first.parent.mkdir()
+    second.parent.mkdir()
+    _make_adf(first)
+    _make_adf(second)
+    dos, dos_list = _dos_impl()
+    session = DiskSession([str(first) + "?name=DF0", str(second) + "?name=DF0"]).open()
+    try:
+        with pytest.raises(ValueError, match="duplicate DOS device name"):
+            session.install_dos(dos)
+    finally:
+        session.close()
+
+
+def disk_session_dos_devices_raw_vs_rdb_test(tmp_path):
+    adf = tmp_path / "floppy.adf"
+    _make_adf(adf)
+    rdb = tmp_path / "disk.hdf"
+    _make_rdb(rdb)
+
+    raw = DiskSession([adf]).open()
+    try:
+        devices = raw.get_backend(0).dos_devices()
+        assert len(devices) == 1
+        assert devices[0].name == "floppy"
+    finally:
+        raw.close()
+
+    image = DiskSession([rdb]).open()
+    try:
+        devices = image.get_backend(0).dos_devices()
+        assert [d.name for d in devices] == ["DH0"]
+        assert devices[0].explicit_name is True
+    finally:
+        image.close()
 
 
 def disk_session_assigns_units_and_closes_owned_backends_test():

@@ -17,9 +17,10 @@ tried, and the first partition is the final fallback. The geometry comes from
 ``DiskSession.get_backend(unit).partitions[...]``, which is available once
 ``disk_session.open()`` ran, so the manager does not depend on the DOS list.
 
-RDB-first: a plain ADF/HDF (no RDB) falls back to a small synthetic geometry so
-the handler still starts; the raw whole-disk backend is a later step (HANDLER.md
-step 25).
+RDB-first: a native handler mounts an RDB partition. A raw ADF/HDF is now
+exposed as a whole-disk ``--disk`` device (HANDLER.md step 25), but binding a
+native handler to that raw device is a separate step, so a handler with no RDB
+partition still falls back to a small synthetic geometry.
 """
 
 from amitools.vamos.log import log_handler
