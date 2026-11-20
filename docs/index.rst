@@ -10,6 +10,12 @@ amitools Documentation
     tools/rdbtool
     tools/romtool
     tools/icontool
+    tools/hunktool
+    tools/fdtool
+    tools/geotool
+    tools/typetool
+    tools/vamospath
+    tools/vamostool
     vamos/index
     libs/icontool
 
@@ -25,6 +31,12 @@ Tools
 * :doc:`tools/rdbtool` - disk partition tool
 * :doc:`tools/romtool` - scan and edit Kickstart ROM files
 * :doc:`tools/icontool` - inspect and edit Amiga icon files
+* :doc:`tools/hunktool` - load and dump Amiga Hunk executables, libraries and object files
+* :doc:`tools/fdtool` - read ``.fd`` function description files and generate code
+* :doc:`tools/geotool` - detect and compute disk geometries
+* :doc:`tools/typetool` - inspect the AmigaOS structure definitions vamos uses
+* :doc:`tools/vamospath` - convert between AmigaOS and host paths
+* :doc:`tools/vamostool` - helper tools for paths, types, library profiles and state files
 
 Vamos
 -----

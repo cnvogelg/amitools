@@ -85,12 +85,12 @@ features but may be unstable from time to time.
 | `romtool` | Scan, split, patch and build Kickstart ROM images for emulators, soft kickers and flash ROMs | [romtool](https://amitools.readthedocs.io/en/latest/tools/romtool.html) |
 | `icontool` | List and batch edit Workbench `.info` icon files: tool types, positions, structure fields, PNG import and export | [icontool](https://amitools.readthedocs.io/en/latest/tools/icontool.html) |
 | `vamos` | Run AmigaOS command line programs on the host: the **V**irtual **Am**iga **OS** | [vamos](https://amitools.readthedocs.io/en/latest/vamos/), [user manual](https://amitools.readthedocs.io/en/latest/vamos/user/index.html), [developer manual](https://amitools.readthedocs.io/en/latest/vamos/dev/index.html) |
-| `vamospath` | Convert between AmigaOS and host paths using a vamos configuration | |
-| `vamostool` | Helpers around vamos: path conversion, type inspection, library profile dumps and state file info | |
-| `hunktool` | Load and dump Amiga Hunk executables, libraries, object files and overlays | |
-| `typetool` | Inspect the AmigaOS C structure definitions vamos uses | |
-| `fdtool` | Read Commodore's `.fd` function description files and dump them in several formats, including vamos' code structures | |
-| `geotool` | Detect and compute disk geometries (cylinders, heads, sectors) for image files and sizes | |
+| `vamospath` | Convert between AmigaOS and host paths using a vamos configuration | [vamospath](https://amitools.readthedocs.io/en/latest/tools/vamospath.html) |
+| `vamostool` | Helpers around vamos: path conversion, type inspection, library profile dumps and state file info | [vamostool](https://amitools.readthedocs.io/en/latest/tools/vamostool.html) |
+| `hunktool` | Load and dump Amiga Hunk executables, libraries, object files and overlays | [hunktool](https://amitools.readthedocs.io/en/latest/tools/hunktool.html) |
+| `typetool` | Inspect the AmigaOS C structure definitions vamos uses | [typetool](https://amitools.readthedocs.io/en/latest/tools/typetool.html) |
+| `fdtool` | Read Commodore's `.fd` function description files and dump them in several formats, including vamos' code structures | [fdtool](https://amitools.readthedocs.io/en/latest/tools/fdtool.html) |
+| `geotool` | Detect and compute disk geometries (cylinders, heads, sectors) for image files and sizes | [geotool](https://amitools.readthedocs.io/en/latest/tools/geotool.html) |
 
 Every tool prints its usage with `-h` or `help`.
 
