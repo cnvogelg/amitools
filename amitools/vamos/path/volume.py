@@ -19,9 +19,7 @@ class Volume(object):
         # an image-backed volume is a file system inside an image file
         # (ADF/HDF/RDB) rather than a host directory
         self.is_image = is_image
-        self.sys_volume = SysVolume(
-            name, path, cfg, file_system, is_image=is_image
-        )
+        self.sys_volume = SysVolume(name, path, cfg, file_system, is_image=is_image)
 
     def __str__(self):
         return "Volume(%s(%s):%s,cfg=%r,is_setup=%s)" % (

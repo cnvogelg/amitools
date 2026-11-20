@@ -1,4 +1,6 @@
 import collections
+
+import pytest
 from amitools.vamos.lib.ExecLibrary import ExecLibrary
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.lib.VamosTestDevice import VamosTestDevice
@@ -264,4 +266,18 @@ def libcore_mgr_open_dev_test():
     # shutdown
     left = mgr.shutdown()
     assert left == 0
+    assert alloc.is_all_free()
+
+
+def libcore_mgr_add_impl_of_loaded_lib_test():
+    machine, alloc, mgr = setup_env()
+    mgr.bootstrap_exec()
+    test_vlib = mgr.make_lib_name("vamostest.library")
+    # the loaded vlib keeps its impl: a late registration is an error
+    with pytest.raises(RuntimeError):
+        mgr.add_impl_cls("vamostest.library", VamosTestLibrary)
+    assert mgr.expunge_lib(test_vlib)
+    # once it is gone, the next load uses the new impl
+    mgr.add_impl_cls("vamostest.library", VamosTestLibrary)
+    assert mgr.shutdown() == 0
     assert alloc.is_all_free()

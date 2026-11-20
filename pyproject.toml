@@ -40,6 +40,18 @@ readme = { file="README.md", content-type="text/markdown" }
 [tool.setuptools_scm]
 local_scheme = "no-local-version"
 
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+# Conservative rule set mirroring the previous flake8 configuration.
+select = ["E", "W", "F"]
+ignore = ["E203"]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+
 [project.scripts]
 fdtool = "amitools.tools.fdtool:main"
 geotool = "amitools.tools.geotool:main"

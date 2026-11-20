@@ -178,7 +178,9 @@ class DosListDeviceStruct(AmigaStruct):
         (LONG, "dol_Priority"),
         (LONG, "dol_Startup"),
         (BPTR_VOID, "dol_SegList"),
-        (BPTR_VOID, "dol_GlobVec"),
+        # dol_GlobVec is a BPTR in the ABI but stores the sentinels -1/-2 for
+        # C/assembler handlers, so model it as a signed long
+        (LONG, "dol_GlobVec"),
         (BSTR, "dol_Name"),
     ]
 

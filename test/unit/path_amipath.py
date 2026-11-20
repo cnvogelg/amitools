@@ -297,6 +297,8 @@ def path_amipath_collapse_parent_steps_test():
     assert p.collapse_parent_steps() is p
     # join keeps a trailing parent step, so 'src//' resolves to the parent
     assert AmiPath("foo:x").join(AmiPath("src//")) == AmiPath("foo:x/src//")
-    assert str(AmiPath("foo:x").join(AmiPath("src//")).collapse_parent_steps()) == "foo:x"
+    assert (
+        str(AmiPath("foo:x").join(AmiPath("src//")).collapse_parent_steps()) == "foo:x"
+    )
     assert AmiPath("foo:x/y").join(AmiPath("/a//")) == AmiPath("foo:x/a//")
     assert AmiPath("foo:x").join(AmiPath(":a//")) == AmiPath("foo:a//")

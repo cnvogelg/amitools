@@ -438,7 +438,7 @@ def handler_decode_examine_object_test(dec):
     assert dec.harness.decode(pkt) == DOSTRUE
     assert h.calls[-1] == ("examine_object", h.lock)
     fib = FileInfoBlockStruct(mem, _FIB_ADDR)
-    assert mem.r_cstr(fib.fib_FileName.addr) == "f"
+    assert mem.r_bstr(fib.fib_FileName.addr) == "f"
     assert fib.fib_Size.val == 5
     assert fib.fib_DirEntryType.val == HandlerFileInfo.FILE
 

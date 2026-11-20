@@ -1,5 +1,49 @@
 # Change Log
 
+## [0.9.1][10] (2026-11-19)
+
+### global
+
+* Use Ruff for source code formatting and linting
+* Publish distributions to PyPI and TestPyPI from release tags (#260)
+* Updated GitHub Actions runtimes and added a Ruff lint job (#261)
+* Added the missing Read the Docs requirements file
+
+### vamos
+
+* Added IPv4 `bsdsocket` support: sockets and descriptor readiness, `WaitSelect` with fd sets, timeouts and signals, socket options and shutdown entry points, host error translation, and hostname resolution (#269)
+* Implemented bulk directory enumeration with `ExAll`, including filtering hooks and isolated scans
+* Loaded native MUI class libraries (#279) and scheduled native library shutdown with helper tasks (#281)
+* Read directory locks from live process structures (#280)
+* Resolved embedded AmigaDOS parent directory steps (#264)
+* Isolated temporary volumes between vamos instances (#262)
+* Added a synthetic VHPOSR counter and honored hardware-access modes for VHPOSR reads (#265)
+* Preserved process stack bounds across `RunCommand` calls (#266)
+* Exposed the DOS timer request through `DOSBase` (#267)
+* Allowed short reads from buffered input streams and retained raw-stream support on partial reads (#263)
+* Returned an error when a file position cannot be queried
+* Corrected the `ExecBase` layout and published PAL clock frequencies (#273)
+* Exposed allocator memory through `MemList` (#274)
+* Enumerated host mounts and reported filesystem space (#275)
+* Ran Supervisor callbacks with an RTE frame (#276)
+* Let `Wait()` sleep inside `Forbid()` and honored SysFlags reschedule requests in `Permit()`
+* Added `SetTaskPri()` and `SplitName()`
+* Provided deterministic defaults for hardware probes (#277)
+* Fixed `MatchFirst` parent locks for assign-relative deletes
+
+### binfmt
+
+* Decoded overlay tables and fixed `HUNK_OVERLAY` parsing
+* Added overlay handling to the segment loader
+* Showed overlay table details in `hunktool` info
+
+### Contributors
+
+* Bernie Innocenti
+* Christian Vogelgsang
+* Stefan Reinauer
+* bebbo
+
 ## [0.9.0][9] (2026-11-05)
 
 ### global
@@ -305,3 +349,4 @@
 [7]: https://github.com/cnvogelg/amitools/tree/v0.7.0
 [8]: https://github.com/cnvogelg/amitools/tree/v0.8.0
 [9]: https://github.com/cnvogelg/amitools/releases/tag/v0.9.0
+[10]: https://github.com/cnvogelg/amitools/releases/tag/v0.9.1

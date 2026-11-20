@@ -17,6 +17,47 @@ from .disk import DiskSession
 RET_CODE_CONFIG_ERROR = 1000
 
 
+class _DiskDosSetupError(RuntimeError):
+    """the ``--disk`` partitions could not be published in the DOS list"""
+
+
+def wire_handler_transports(slm, handler_mgr, machine, scheduler, disk_session=None):
+    """connect the handler transports to the lib manager lifecycle
+
+    The handler transports need the live machine (exec/dos), so they cannot be
+    attached when the handlers are bound. This registers the attach and detach
+    steps as ``post_setup``/``pre_shutdown`` callbacks on ``slm``, which keeps
+    the lib manager itself unaware of handlers.
+    """
+    if handler_mgr is None:
+        return
+
+    def attach(lib_mgr):
+        exec_impl = lib_mgr.exec_impl
+        port_list = exec_impl.exec_lib.port_list
+        handler_mgr.attach_packet_transport(
+            lib_mgr.alloc,
+            exec_impl.port_mgr,
+            exec_impl.mem,
+            find_port=lambda name: port_list.find_name(name, promote=True),
+        )
+        handler_mgr.attach_native_transport(
+            machine,
+            lib_mgr.alloc,
+            scheduler,
+            lib_mgr.seg_loader,
+            exec_impl,
+            lib_mgr.dos_impl,
+            disk_session=disk_session,
+        )
+
+    def detach(lib_mgr):
+        handler_mgr.stop_native_transport()
+
+    slm.add_post_setup_callback(attach)
+    slm.add_pre_shutdown_callback(detach)
+
+
 def main(
     cfg_files=None,
     args=None,
@@ -35,7 +76,8 @@ def main(
     cfg_dict(opt): pass options directly as a dictionary
 
     mode: give the vamos run mode or auto select by config
-    single_return_code: if true then return only one int error code otherwise None or list
+    single_return_code: if true then return only one int error code otherwise
+    None or list
 
     if an internal error occurred then return: None
     otherwise and array with exit codes for each added task
@@ -147,24 +189,37 @@ def main(
         if not slm.parse_config(lib_cfg):
             log_main.error("lib manager setup failed!")
             return error_code
+        # native handlers resolve their block device through the disk session
+        slm.disk_session = disk_session
         slm.setup()
         slm_is_setup = True
         if disk_session.get_units():
             disk_session.install_devices(slm)
 
+            # publish the RDB partitions before the native handler transports
+            # start, so a native volume whose mount name matches its partition
+            # adopts that node instead of creating a duplicate (HANDLER.md 24c)
+            def install_disk_dos(lib_mgr):
+                try:
+                    disk_session.install_dos(lib_mgr.dos_impl)
+                except (RuntimeError, ValueError) as exc:
+                    raise _DiskDosSetupError(str(exc)) from exc
+
+            slm.add_post_setup_callback(install_disk_dos)
+        # connect the handler transports to the lib manager lifecycle
+        wire_handler_transports(slm, handler_mgr, machine, scheduler, disk_session)
+
         # setup profiler
         main_profiler.setup()
         profiler_is_setup = True
 
-        # open base libs
-        slm.open_base_libs()
+        # open base libs (this runs the disk DOS install, then the handlers)
+        try:
+            slm.open_base_libs()
+        except _DiskDosSetupError as exc:
+            log_main.error("DOS disk setup failed: %s", exc)
+            return error_code
         base_libs_are_open = True
-        if disk_session.get_units():
-            try:
-                disk_session.install_dos(slm.dos_impl)
-            except (RuntimeError, ValueError) as exc:
-                log_main.error("DOS disk setup failed: %s", exc)
-                return error_code
 
         # prepare mode context
         proc_cfg = mp.get_proc_dict().process
@@ -197,6 +252,10 @@ def main(
         # attempting every shutdown step and reporting cleanup failures.
         # Remove disk nodes before dos.library frees its maintained list.
         if base_libs_are_open:
+            # stop the native handlers first: an adopted --disk node is owned
+            # by the DiskSession and must not be freed under a running handler
+            if handler_mgr is not None:
+                cleanup_step("native handlers", handler_mgr.stop_native_transport)
             cleanup_step(
                 "DOS disk",
                 lambda: disk_session.release_dos(slm.dos_impl),

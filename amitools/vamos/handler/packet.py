@@ -29,7 +29,6 @@ from amitools.vamos.libstructs import (
 from amitools.vamos.libtypes import DosPacket
 
 from .base import (
-    ERROR_ACTION_NOT_KNOWN,
     ERROR_BAD_NUMBER,
     ERROR_OBJECT_NOT_FOUND,
     MODE_NEWFILE,
@@ -100,8 +99,10 @@ class _PacketCall:
     """one in-flight packet plus its transient allocations
 
     Used as a context manager. All buffers, BSTRs, file handles and structs
-    allocated while building the call are released when the block exits, so a
-    call never leaks memory (even if ``_dopkt`` raises).
+    allocated while building the call are released through
+    :meth:`PacketHandler._end_call` when the block exits, so a call never leaks
+    memory (even if ``_dopkt`` raises). A transport whose handler may still
+    hold the packet can keep the memory until the handler replies.
     """
 
     def __init__(self, handler, action):
@@ -118,12 +119,19 @@ class _PacketCall:
         return self
 
     def __exit__(self, exc_type, exc, tb):
+        self.handler._end_call(self)
+        return False
+
+    def free(self):
+        """release the packet and everything allocated for it"""
         for struct in self._structs:
             struct.free()
         for mem in self._mems:
             self.handler.alloc.free_memory(mem)
         self.pkt.free()
-        return False
+        self._structs = []
+        self._mems = []
+        self.pkt = None
 
     def arg(self, index, value):
         getattr(self.pkt, "arg%d" % index).val = value
@@ -218,6 +226,19 @@ class PacketHandler(Handler):
     def _call(self, action):
         return _PacketCall(self, action)
 
+    def _end_call(self, call):
+        """a call's block has ended: release its packet and allocations"""
+        call.free()
+
+    def _free_struct(self, struct):
+        """free a struct a packet pointed to once its call has ended
+
+        The FIB of a lock and the result structs of ``info``/``examine_fh``
+        live outside the call. A transport whose handler may still hold an
+        unanswered packet that points to one can keep it until the reply.
+        """
+        struct.free()
+
     def _make_lock(self, bptr):
         lock = PacketLock(bptr)
         lock.handler = self
@@ -241,14 +262,14 @@ class PacketHandler(Handler):
             fib.fib_Date.ds_Tick.val,
         )
         return HandlerFileInfo(
-            name=mem.r_cstr(fib.fib_FileName.addr),
+            name=mem.r_bstr(fib.fib_FileName.addr),
             entry_type=fib.fib_DirEntryType.val,
             protection=fib.fib_Protection.val,
             size=fib.fib_Size.val,
             blocks=fib.fib_NumBlocks.val,
             date=ami_to_sys_time(date),
             key=fib.fib_DiskKey.val,
-            comment=mem.r_cstr(fib.fib_Comment.addr),
+            comment=mem.r_bstr(fib.fib_Comment.addr),
             owner_uid=fib.fib_OwnerUID.val,
             owner_gid=fib.fib_OwnerGID.val,
         )
@@ -289,7 +310,7 @@ class PacketHandler(Handler):
 
     def free_lock(self, lock):
         if lock.fib is not None:
-            lock.fib.free()
+            self._free_struct(lock.fib)
             lock.fib = None
         with self._call(DosAction.ACTION_FREE_LOCK) as call:
             call.arg(1, lock.bptr)
@@ -350,7 +371,7 @@ class PacketHandler(Handler):
                 call.send()
                 return self._parse_info(info_data)
             finally:
-                info_data.free()
+                self._free_struct(info_data)
 
     def disk_info(self, lock):
         with self._call(DosAction.ACTION_DISK_INFO) as call:
@@ -360,7 +381,7 @@ class PacketHandler(Handler):
                 call.send()
                 return self._parse_info(info_data)
             finally:
-                info_data.free()
+                self._free_struct(info_data)
 
     def fh_from_lock(self, lock, mode=MODE_OLDFILE):
         with self._call(DosAction.ACTION_FH_FROM_LOCK) as call:
@@ -601,7 +622,7 @@ class PacketHandler(Handler):
                 call.send()
                 return self._parse_fib(fib)
             finally:
-                fib.free()
+                self._free_struct(fib)
 
     def set_owner(self, lock, path, owner):
         with self._call(DosAction.ACTION_SET_OWNER) as call:

@@ -10,6 +10,10 @@ class FuncBase:
     def get_my_sched_task(self):
         """return the scheduler task associated with current task
 
-        the scheduler task is needed for task/signals
+        the scheduler task is needed for task/signals. Returns None when no
+        task is currently running (e.g. a handler is started from Python).
         """
-        return self.ctx.task.get_sched_task()
+        task = self.ctx.task
+        if task is None:
+            return None
+        return task.get_sched_task()

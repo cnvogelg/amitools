@@ -3,6 +3,7 @@ import pytest
 
 from amitools.vamos.libcore import LibStubGen, LibCtx, LibImplScanner
 from amitools.vamos.libcore.util import SR_NEGATIVE, SR_ZERO
+from amitools.vamos.error import MissingLibFuncError
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.machine.mock import MockMachine
 from amitools.vamos.machine import Runtime
@@ -302,3 +303,34 @@ def libcore_stub_gen_fake_log_profile_test(caplog):
     stub.PrintString()
     _check_log_fake(caplog)
     _check_profile(fd, profile)
+
+
+def libcore_stub_gen_strict_missing_test():
+    """strict-LVO mode raises for an unimplemented function (step 23h)."""
+    scan = _create_scan()
+    ctx = _create_ctx()
+    gen = LibStubGen(strict_missing=True)
+    stub = gen.gen_stub(scan, ctx)
+    _check_stub(stub)
+    # a valid function is unaffected
+    stub.PrintHello()
+    # a missing function raises instead of silently returning d0=0
+    with pytest.raises(MissingLibFuncError) as exc:
+        stub.Dummy()
+    assert exc.value.lib_name == "vamostest.library"
+    assert exc.value.func_name == "Dummy"
+    assert exc.value.bias == 54
+
+
+def libcore_stub_gen_strict_fake_test():
+    """strict-LVO mode also raises for every fake stub function."""
+    name = "vamostest.library"
+    fd = read_lib_fd(name)
+    ctx = _create_ctx()
+    gen = LibStubGen(strict_missing=True)
+    stub = gen.gen_fake_stub(name, fd, ctx)
+    _check_stub(stub)
+    with pytest.raises(MissingLibFuncError):
+        stub.PrintHello()
+    with pytest.raises(MissingLibFuncError):
+        stub.Dummy()

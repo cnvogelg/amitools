@@ -30,6 +30,9 @@ class HandlerManager:
         self.file_system = file_system or HostFileSystem()
         self.registry = registry if registry is not None else default_registry()
         self.handlers = {}
+        # the task host of the ``?handler=native`` volumes (step 23); built once
+        # the base libraries are open (see attach_native_transport)
+        self.native_mgr = None
 
     # ----- registration -----
 
@@ -72,6 +75,9 @@ class HandlerManager:
 
     def shutdown(self):
         """release all registered handlers"""
+        # stop the native handler tasks first: a handler's own shutdown() asks
+        # the task host to stop it, which needs the tasks still running
+        self.stop_native_transport()
         for name in list(self.handlers):
             handler = self.handlers[name]
             handler_shutdown = getattr(handler, "shutdown", None)
@@ -94,6 +100,10 @@ class HandlerManager:
         dispatcher are left alone.
         """
         for name, handler in self.handlers.items():
+            # a native handler is served by its own 68k task: its dispatcher
+            # shim already reports the real packet port
+            if getattr(handler, "is_native", False):
+                continue
             if getattr(handler, "dispatcher", None) is not None:
                 continue
             decoder = make_decoder(handler)
@@ -172,22 +182,81 @@ class HandlerManager:
                 return handler
         return None
 
-    def attach_packet_transport(self, alloc, port_mgr, mem, find_port=None, pump=None):
+    def attach_packet_transport(
+        self, alloc, port_mgr, mem, find_port=None, pump=None, put_msg=None
+    ):
         """attach the live machine to every detached packet handler
 
         A ``?handler=packet`` volume is bound before ``exec.library`` exists, so
         its :class:`~amitools.vamos.handler.dospkt.DosPktHandler` starts out
         detached. Once the port manager is available the DOS layer calls this to
-        hand it the allocator, the ``PortManager`` and a port-name resolver.
+        hand it the allocator, the ``PortManager``, a port-name resolver and
+        exec's message delivery.
         Handlers that need no transport (or are already attached) are ignored.
         """
         for handler in self.handlers.values():
             attach = getattr(handler, "attach_transport", None)
             if attach is not None:
-                attach(alloc, port_mgr, mem, find_port=find_port, pump=pump)
+                attach(
+                    alloc,
+                    port_mgr,
+                    mem,
+                    find_port=find_port,
+                    pump=pump,
+                    put_msg=put_msg,
+                )
+
+    def attach_native_transport(
+        self,
+        machine,
+        alloc,
+        scheduler,
+        seg_loader,
+        exec_impl,
+        dos_impl,
+        disk_session=None,
+        task_factory=None,
+    ):
+        """start the 68k task host of every detached native handler
+
+        Mirrors :meth:`attach_packet_transport`: a ``?handler=native`` volume is
+        bound before ``exec.library`` exists, so its
+        :class:`~amitools.vamos.handler.native.NativeHandler` starts out
+        detached. Once the base libraries are open the DOS layer calls this to
+        build the :class:`~amitools.vamos.handler.native.NativeHandlerManager`
+        and start the handler tasks. No-op when there is no native handler.
+        """
+        from .native import NativeHandler, build_native_manager
+
+        if not any(isinstance(h, NativeHandler) for h in self.handlers.values()):
+            return None
+        self.native_mgr = build_native_manager(
+            machine,
+            alloc,
+            scheduler,
+            seg_loader,
+            exec_impl,
+            dos_impl,
+            handler_mgr=self,
+            disk_session=disk_session,
+            task_factory=task_factory,
+        )
+        self.native_mgr.start_all()
+        return self.native_mgr
+
+    def stop_native_transport(self):
+        """stop the native task host and free the handler tasks (idempotent)"""
+        mgr = self.native_mgr
+        if mgr is not None:
+            self.native_mgr = None
+            mgr.shutdown()
 
     def get_all_names(self):
         return list(self.handlers.keys())
+
+    def get_all_handlers(self):
+        """every registered handler, in registration order"""
+        return list(self.handlers.values())
 
     # ----- path resolution -----
 
@@ -401,6 +470,12 @@ class HandlerManager:
         handler = self.get_handler(name)
         if handler is None:
             return True
+        # the local flag describes the handler; a transport handler's
+        # ``is_filesystem()`` is the remote packet query and is not available
+        # until its transport is attached (and would be a needless round trip)
+        is_fs = getattr(handler, "is_fs", None)
+        if is_fs is not None:
+            return is_fs
         return handler.is_filesystem()
 
     # ----- directory listing -----

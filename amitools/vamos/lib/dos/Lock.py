@@ -78,7 +78,8 @@ def fill_fib(fib_mem, info, name=None):
     if name is None:
         name = info.name
     mem = fib_mem.mem
-    # name (fib_FileName is a 108 byte field)
+    # a handler replies with fib_FileName/fib_Comment as BSTRs; dos.library
+    # converts them to C strings (fixfib) before the program sees the FIB
     name_addr = _struct_addr(fib_mem, "fib_FileName")
     mem.clear_block(name_addr, 108, 0)
     mem.w_cstr(name_addr, name)

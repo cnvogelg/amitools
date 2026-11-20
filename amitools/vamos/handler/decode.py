@@ -189,13 +189,15 @@ class PacketDecoder:
     def _fill_fib(self, fib, info):
         """write a :class:`HandlerFileInfo` into a FileInfoBlock"""
         mem = self.mem
+        # the handler writes fib_FileName/fib_Comment as BSTRs; dos.library
+        # converts them to C strings (fixfib) before a program sees them
         name_addr = fib.fib_FileName.addr
         mem.clear_block(name_addr, 108, 0)
-        mem.w_cstr(name_addr, info.name)
+        mem.w_bstr(name_addr, info.name)
         comment_addr = fib.fib_Comment.addr
         mem.clear_block(comment_addr, 80, 0)
         if info.comment:
-            mem.w_cstr(comment_addr, info.comment)
+            mem.w_bstr(comment_addr, info.comment)
         fib.fib_DiskKey.val = info.key
         fib.fib_DirEntryType.val = info.entry_type
         fib.fib_EntryType.val = info.entry_type
