@@ -612,8 +612,8 @@ def handler_decode_set_protect_comment_test(dec):
         _pkt(
             mem,
             DosAction.ACTION_SET_PROTECT,
-            arg2=_bstr(mem, "x", _PATH_ADDR),
-            arg3=0x1F,
+            arg3=_bstr(mem, "x", _PATH_ADDR),
+            arg4=0x1F,
         )
     )
     assert h.calls[-1] == ("set_protect", "x", 0x1F)
@@ -621,8 +621,8 @@ def handler_decode_set_protect_comment_test(dec):
         _pkt(
             mem,
             DosAction.ACTION_SET_COMMENT,
-            arg2=_bstr(mem, "x", _PATH_ADDR),
-            arg3=_bstr(mem, "hi", _PATH2_ADDR),
+            arg3=_bstr(mem, "x", _PATH_ADDR),
+            arg4=_bstr(mem, "hi", _PATH2_ADDR),
         )
     )
     assert h.calls[-1] == ("set_comment", "x", "hi")
@@ -638,8 +638,9 @@ def handler_decode_set_date_test(dec):
         _pkt(
             mem,
             DosAction.ACTION_SET_DATE,
-            arg2=_bstr(mem, "x", _PATH_ADDR),
-            arg3=_DATE_ADDR >> 2,
+            arg3=_bstr(mem, "x", _PATH_ADDR),
+            # a plain pointer, not a BPTR
+            arg4=_DATE_ADDR,
         )
     )
     name, date = h.calls[-1][1], h.calls[-1][2]
@@ -836,7 +837,7 @@ def handler_decode_error_mapping_test(dec):
         _pkt(mem, DosAction.ACTION_LOCATE_OBJECT, arg2=_bstr(mem, "f", _PATH_ADDR))
     )
     h.error = ERROR_OBJECT_NOT_FOUND
-    pkt = _pkt(mem, DosAction.ACTION_EXAMINE_OBJECT, arg1=src, arg2=_FIB_ADDR)
+    pkt = _pkt(mem, DosAction.ACTION_EXAMINE_OBJECT, arg1=src, arg2=_FIB_ADDR >> 2)
     assert dec.harness.decode(pkt) == DOSFALSE
     assert pkt.res2.val == ERROR_OBJECT_NOT_FOUND
 

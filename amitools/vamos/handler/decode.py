@@ -180,8 +180,8 @@ class PacketDecoder:
         parent = AmiPath(ami_path).parent()
         return str(parent) if parent is not None else ami_path
 
-    def _read_date(self, bptr):
-        ds = DateStampStruct(self.mem, bptr << 2)
+    def _read_date(self, addr):
+        ds = DateStampStruct(self.mem, addr)
         return ami_to_sys_time(
             AmiTime(ds.ds_Days.val, ds.ds_Minute.val, ds.ds_Tick.val)
         )
@@ -365,15 +365,15 @@ class PacketDecoder:
             return 0
 
         if action == DosAction.ACTION_SET_PROTECT:
-            self._handler().set_protect(mem.r_bstr(a2 << 2), a3)
+            self._handler().set_protect(mem.r_bstr(a3 << 2), a4)
             return 0
 
         if action == DosAction.ACTION_SET_COMMENT:
-            self._handler().set_comment(mem.r_bstr(a2 << 2), mem.r_bstr(a3 << 2))
+            self._handler().set_comment(mem.r_bstr(a3 << 2), mem.r_bstr(a4 << 2))
             return 0
 
         if action == DosAction.ACTION_SET_DATE:
-            self._handler().set_date(mem.r_bstr(a2 << 2), self._read_date(a3))
+            self._handler().set_date(mem.r_bstr(a3 << 2), self._read_date(a4))
             return 0
 
         if action == DosAction.ACTION_CREATE_DIR:

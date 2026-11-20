@@ -172,14 +172,17 @@ class _PacketCall:
         return fh
 
     def date(self, value):
-        """allocate a DateStampStruct for ``set_date`` and return its BPTR"""
+        """allocate a DateStampStruct for ``set_date`` and return its address
+
+        ``ACTION_SET_DATE`` takes a plain pointer (CPTR), not a BPTR.
+        """
         ds = self.handler.alloc.alloc_astruct(DateStampStruct, label="DateStamp")
         at = sys_to_ami_time(value)
         ds.ds_Days.val = at.tday
         ds.ds_Minute.val = at.tmin
         ds.ds_Tick.val = at.tick
         self._structs.append(ds)
-        return ds.addr >> 2
+        return ds.addr
 
     def send(self):
         """run the transport and translate the reply
@@ -504,22 +507,25 @@ class PacketHandler(Handler):
     def set_protect(self, ami_path, mask):
         with self._call(DosAction.ACTION_SET_PROTECT) as call:
             call.arg(1, 0)
-            call.arg(2, call.bstr(ami_path))
-            call.arg(3, mask)
+            call.arg(2, 0)
+            call.arg(3, call.bstr(ami_path))
+            call.arg(4, mask)
             call.send()
 
     def set_comment(self, ami_path, comment):
         with self._call(DosAction.ACTION_SET_COMMENT) as call:
             call.arg(1, 0)
-            call.arg(2, call.bstr(ami_path))
-            call.arg(3, call.bstr(comment))
+            call.arg(2, 0)
+            call.arg(3, call.bstr(ami_path))
+            call.arg(4, call.bstr(comment))
             call.send()
 
     def set_date(self, ami_path, date):
         with self._call(DosAction.ACTION_SET_DATE) as call:
             call.arg(1, 0)
-            call.arg(2, call.bstr(ami_path))
-            call.arg(3, call.date(date))
+            call.arg(2, 0)
+            call.arg(3, call.bstr(ami_path))
+            call.arg(4, call.date(date))
             call.send()
 
     def create_dir(self, ami_path):

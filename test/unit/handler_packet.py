@@ -65,10 +65,12 @@ def _capture(mem, pkt):
     elif action == DosAction.ACTION_RENAME_OBJECT:
         rec["old"] = mem.r_bstr(pkt.arg2.val << 2)
         rec["new"] = mem.r_bstr(pkt.arg4.val << 2)
-    elif action in (DosAction.ACTION_SET_PROTECT, DosAction.ACTION_SET_COMMENT):
-        rec["path"] = mem.r_bstr(pkt.arg2.val << 2)
-    elif action == DosAction.ACTION_SET_DATE:
-        rec["path"] = mem.r_bstr(pkt.arg2.val << 2)
+    elif action in (
+        DosAction.ACTION_SET_PROTECT,
+        DosAction.ACTION_SET_COMMENT,
+        DosAction.ACTION_SET_DATE,
+    ):
+        rec["path"] = mem.r_bstr(pkt.arg3.val << 2)
     elif action == DosAction.ACTION_MAKE_LINK:
         rec["name"] = mem.r_bstr(pkt.arg2.val << 2)
         rec["soft"] = pkt.arg4.val == 1
@@ -259,8 +261,10 @@ def handler_packet_set_date_marshalling_test(rec):
     call = rec.last()
     assert call["action"] == DosAction.ACTION_SET_DATE
     assert call["arg1"] == 0
+    assert call["arg2"] == 0
     assert call["path"] == "f"
-    ds = DateStampStruct(rec.mem, call["arg3"] << 2)
+    # a plain pointer, not a BPTR
+    ds = DateStampStruct(rec.mem, call["arg4"])
     at = AmiTime(ds.ds_Days.val, ds.ds_Minute.val, ds.ds_Tick.val)
     assert ami_to_sys_time(at) == 1000000
 
