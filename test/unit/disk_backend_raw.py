@@ -172,9 +172,43 @@ def disk_backend_raw_gzip_test(tmp_path):
     finally:
         image.close()
 
-    # a gzipped image cannot be opened read-write
-    with pytest.raises(IOError, match="gzip"):
-        RawDiskImage(adz, read_only=False).open()
+
+def disk_backend_raw_gzip_write_test(tmp_path):
+    # a small gzip'ed floppy can be opened read-write: the image is decompressed
+    # into memory and re-compressed on close (step 27d)
+    adf = tmp_path / "floppy.adf"
+    _make_adf(adf, dos_type=DosType.DOS1)
+    adz = tmp_path / "floppy.adz"
+    with open(adf, "rb") as src, gzip.open(adz, "wb") as dst:
+        shutil.copyfileobj(src, dst)
+
+    image = RawDiskImage(adz, read_only=False).open()
+    try:
+        assert image.read_only is False
+        payload = bytes(range(256)) * 2
+        image.write_blocks(3, payload)
+        assert image.read_blocks(3) == payload
+    finally:
+        image.close()
+
+    # reopen read-only: the write survived the gzip round-trip
+    image = RawDiskImage(adz, read_only=True).open()
+    try:
+        assert image.read_blocks(3) == payload
+        assert image.dos_devices()[0].dos_env.dos_type == DosType.DOS1
+    finally:
+        image.close()
+
+
+def disk_backend_raw_gzip_hdf_write_refused_test(tmp_path):
+    # a large gzip'ed HDF is not buffered: keep it read-only
+    hdf = tmp_path / "disk.hdf"
+    _make_hdf(hdf, DiskGeometry(1, 1, 32))
+    hdz = tmp_path / "disk.hdz"
+    with open(hdf, "rb") as src, gzip.open(hdz, "wb") as dst:
+        shutil.copyfileobj(src, dst)
+    with pytest.raises(IOError, match="HDF/RDB"):
+        RawDiskImage(hdz, read_only=False).open()
 
 
 def disk_backend_raw_name_option_test(tmp_path):

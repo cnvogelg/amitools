@@ -165,8 +165,9 @@ Disks
 
 ``--disk-read-write``
     Open every ``--disk`` image read-write instead of read-only, so a native
-    file system handler can write through to it. A gzipped image always stays
-    read-only.
+    file system handler can write through to it. A gzipped floppy (``.adz``) is
+    decompressed into memory and re-compressed when it is closed; a gzipped HDF
+    stays read-only.
 
     .. code-block:: text
 
