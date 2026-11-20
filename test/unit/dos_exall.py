@@ -8,7 +8,6 @@ from amitools.vamos.handler import HostFileSysHandler
 from amitools.vamos.lib.DosLibrary import DosLibrary
 from amitools.vamos.lib.dos.Error import (
     DOSFALSE,
-    DOSTRUE,
     ERROR_BAD_NUMBER,
     ERROR_INVALID_LOCK,
     ERROR_NO_FREE_STORE,

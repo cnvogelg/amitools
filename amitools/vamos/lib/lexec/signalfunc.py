@@ -88,7 +88,13 @@ class SignalFunc(FuncBase):
             return task.map_task.get_ami_task().addr == task_addr
 
         sched_task = self.get_my_sched_task()
-        other_task = sched_task.find_task_pred_func(pred_func)
+        if sched_task is not None:
+            other_task = sched_task.find_task_pred_func(pred_func)
+        else:
+            # no task is currently running (e.g. a handler is started from
+            # Python): search the scheduler directly
+            scheduler = getattr(self.ctx, "scheduler", None)
+            other_task = scheduler.find_task_pred_func(pred_func) if scheduler else None
         if other_task:
             log_exec.info(
                 "Signal(task=%08x, signals=%08x) -> task=%s",

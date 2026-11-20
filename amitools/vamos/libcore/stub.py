@@ -4,6 +4,7 @@ import time
 import traceback
 
 from amitools.vamos.astructs import ScalarType, PointerType
+from amitools.vamos.error import MissingLibFuncError
 from amitools.vamos.machine.regs import REG_D0, REG_D1, REG_A7
 from .util import set_sr_from_d0
 
@@ -63,10 +64,19 @@ class LibStubGen(object):
     """the lib stub generator scans a lib impl and creates stubs for all
     methods found there"""
 
-    def __init__(self, log_missing=None, log_valid=None, ignore_invalid=True):
+    def __init__(
+        self,
+        log_missing=None,
+        log_valid=None,
+        ignore_invalid=True,
+        strict_missing=False,
+    ):
         self.log_missing = log_missing
         self.log_valid = log_valid
         self.ignore_invalid = ignore_invalid
+        # strict-LVO audit: raise instead of silently returning d0=0 for an
+        # unimplemented library function (HANDLER.md step 23h)
+        self.strict_missing = strict_missing
 
     def gen_fake_stub(self, name, fd, ctx, profile=None):
         """a fake stub exists without an implementation and only contains
@@ -135,7 +145,13 @@ class LibStubGen(object):
         """create a stub func for an empty slot in the jump table"""
         bias = idx * 6 + 6
         log = self.log_missing
-        if log is None:
+        if self.strict_missing:
+            name = "_hole_%d" % idx
+
+            def stub_func(this, *args, **kwargs):
+                raise MissingLibFuncError(stub.name, name, bias)
+
+        elif log is None:
             # without tracing
             def stub_func(this, *args, **kwargs):
                 # return d0=0
@@ -163,7 +179,14 @@ class LibStubGen(object):
         returns an unbound method for the stub instance
         """
         log = self.log_missing
-        if log is None:
+        if self.strict_missing:
+            name = fd_func.get_name()
+            bias = fd_func.get_bias()
+
+            def stub_func(this, *args, **kwargs):
+                raise MissingLibFuncError(stub.name, name, bias)
+
+        elif log is None:
             # without tracing
             def stub_func(this, *args, **kwargs):
                 # return d0=0

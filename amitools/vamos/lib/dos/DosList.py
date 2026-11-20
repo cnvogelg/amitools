@@ -117,6 +117,13 @@ class DosList:
             return True
         return self.handler_mgr.is_filesystem(name)
 
+    def _is_native(self, name):
+        """is the handler behind this volume/device a native (68k) one?"""
+        if self.handler_mgr is None:
+            return False
+        handler = self.handler_mgr.get_handler(name)
+        return getattr(handler, "is_native", False)
+
     def get_head_addr(self):
         if self.first_entry is None:
             return 0
@@ -146,6 +153,10 @@ class DosList:
         """
         for volume in tuple(self.entries):
             if volume.struct_def is not DosListVolumeStruct:
+                continue
+            # a native handler's node is published by its manager (step 24c):
+            # skip it here so the two do not create a duplicate
+            if self._is_native(volume.name):
                 continue
             port = self._handler_port(volume.name)
             self.add_device(volume.name, startup_bptr=0, task=port)
@@ -254,8 +265,18 @@ class DosList:
         task=0,
         exclusive=False,
         unit=None,
+        seg_list=0,
+        glob_vec=0,
+        handler=0,
     ):
-        """Append a DLT_DEVICE backed by a FileSysStartupMsg BPTR."""
+        """Append a DLT_DEVICE backed by a FileSysStartupMsg BPTR.
+
+        ``seg_list`` is the BPTR of an already loaded handler seglist and
+        ``handler`` the BPTR of the handler binary name (a BSTR) used by
+        ``LoadSeg`` when ``seg_list`` is 0. Both default to 0 for the Python
+        handlers whose code runs in-process. ``glob_vec`` is the handler's
+        global vector (``-1``/``-2`` for C/asm handlers).
+        """
         entry = DosListEntry(name, DosListDeviceStruct)
         entry.exclusive = exclusive
         entry.unit = unit
@@ -263,12 +284,29 @@ class DosList:
         _struct_write(entry.struct, "dol_Type", 0)
         _struct_write(entry.struct, "dol_Task", task)
         _struct_write(entry.struct, "dol_Lock", 0)
-        _struct_write(entry.struct, "dol_Handler", 0)
+        _struct_write(entry.struct, "dol_Handler", handler)
         _struct_write(entry.struct, "dol_StackSize", 0)
         _struct_write(entry.struct, "dol_Priority", 0)
         _struct_write(entry.struct, "dol_Startup", startup_bptr)
-        _struct_write(entry.struct, "dol_SegList", 0)
-        _struct_write(entry.struct, "dol_GlobVec", 0)
+        _struct_write(entry.struct, "dol_SegList", seg_list)
+        _struct_write(entry.struct, "dol_GlobVec", glob_vec)
+        return entry
+
+    def fill_device(self, entry, task=0, seg_list=0, glob_vec=0, handler=0):
+        """Fill in the handler fields of an existing ``DLT_DEVICE`` entry.
+
+        Used by the native handler manager to *adopt* a ``--disk`` partition
+        node (step 24c): the handler's ``dol_Task``/``dol_SegList``/
+        ``dol_GlobVec``/``dol_Handler`` are set while ``dol_Startup`` - owned by
+        the :class:`~amitools.vamos.disk.DiskSession` - is left untouched. The
+        defaults clear the fields again (e.g. when the handler stops).
+        """
+        if entry.struct_def is not DosListDeviceStruct:
+            raise ValueError("not a DOS device entry: %s" % entry.name)
+        _struct_write(entry.struct, "dol_Task", task)
+        _struct_write(entry.struct, "dol_SegList", seg_list)
+        _struct_write(entry.struct, "dol_GlobVec", glob_vec)
+        _struct_write(entry.struct, "dol_Handler", handler)
         return entry
 
     def remove_entry(self, entry):
@@ -517,6 +555,15 @@ class DosList:
             return entry
         return self.devices_by_name.get(key)
 
+    def get_device_by_name(self, name):
+        """the ``DLT_DEVICE`` entry named ``name`` (or ``None``)
+
+        Unlike :meth:`get_entry_by_name` this never falls back to a volume or
+        assign of the same name, so a caller that needs the *device* node (the
+        native handler manager, step 24c) is not confused by a volume entry.
+        """
+        return self.devices_by_name.get(name.lower())
+
     def _next_dos_entry(self, entry, flags):
         while entry != None:
             t = _struct_read(entry.struct, "dol_Type")
@@ -669,7 +716,7 @@ def make_dos_entry(dos, ctx, name_ptr, entry_type):
         entry.dol_Priority.val = 0
         entry.dol_Startup.val = 0
         entry.dol_SegList.aptr = 0
-        entry.dol_GlobVec.aptr = 0
+        entry.dol_GlobVec.val = 0
     elif struct_def is DosListVolumeStruct:
         entry.dol_LockList.aptr = 0
         entry.dol_DiskType.val = 0

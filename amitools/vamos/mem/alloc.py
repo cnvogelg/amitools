@@ -296,6 +296,14 @@ class MemoryAlloc:
             for l in labels:
                 log_mem_alloc.warning("-> %s", l)
 
+    def get_orphans(self):
+        """return the still-allocated blocks as sorted ``(addr, size)`` pairs
+
+        A block is orphaned once it was allocated and never freed. Called after
+        a teardown this lists what is still allocated.
+        """
+        return sorted(self.addrs.items())
+
     def dump_orphans(self):
         last = self.free_first
         if last is None:
