@@ -2,6 +2,7 @@ from amitools.vamos.handler import build_handler_manager
 from amitools.vamos.lib.dos.DosLibCtx import DosLibCtx
 from amitools.vamos.lib.lexec.ExecLibCtx import ExecLibCtx
 from amitools.vamos.lib.LibList import vamos_libs
+from amitools.vamos.libtypes import Message, MsgPort
 from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.log import log_libmgr
 from amitools.vamos.schedule import SchedulerEvent, TaskState
