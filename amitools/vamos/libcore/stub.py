@@ -3,7 +3,7 @@ from typing import get_type_hints
 import time
 import traceback
 
-from amitools.vamos.astructs import ScalarType, PointerType
+from amitools.vamos.astructs import ScalarType, PointerType, AmigaStruct
 from amitools.vamos.error import MissingLibFuncError
 from amitools.vamos.machine.regs import REG_D0, REG_D1, REG_A7
 from .util import set_sr_from_d0
@@ -306,6 +306,19 @@ class LibStubGen(object):
                 readers.append(
                     lambda ctx, reg=reg, arg_type=arg_type: arg_type(
                         cpu=ctx.cpu, reg=reg, mem=ctx.mem
+                    )
+                )
+            elif (
+                issubclass(arg_type, AmigaStruct)
+                and arg_type.__init__ is AmigaStruct.__init__
+            ):
+                # a struct bound to memory: skip the constructor's options
+                bind = arg_type._bind
+                readers.append(
+                    lambda ctx, reg=reg, bind=bind: (
+                        bind(ctx.mem, arg_val)
+                        if (arg_val := ctx.cpu.r_reg(reg)) != 0
+                        else None
                     )
                 )
             else:

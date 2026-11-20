@@ -10,6 +10,21 @@ class TypeBase:
     # type parameters (will be overwritten in derived classes)
     _byte_size = None
 
+    # defaults of an instance bound to memory: _bind() sets only the
+    # address and the memory, as most instances are just that
+    _reg = None
+    _cpu = None
+    _offset = 0
+    _base_offset = 0
+    _mem_obj = None
+    _alloc = None
+
+    # read for nearly every instance: no detour through __getattr__. No
+    # struct names a field or alias addr or mem (offset is one, so it stays
+    # behind the fields)
+    addr = property(lambda self: self._addr)
+    mem = property(lambda self: self._mem)
+
     @classmethod
     def get_byte_size(cls):
         """return the memory footprint in bytes"""
@@ -35,12 +50,10 @@ class TypeBase:
         set_attr = object.__setattr__
         set_attr(obj, "_mem", mem)
         set_attr(obj, "_addr", addr)
-        set_attr(obj, "_reg", None)
-        set_attr(obj, "_cpu", None)
-        set_attr(obj, "_offset", offset)
-        set_attr(obj, "_base_offset", base_offset)
-        set_attr(obj, "_mem_obj", None)
-        set_attr(obj, "_alloc", None)
+        if offset:
+            set_attr(obj, "_offset", offset)
+        if base_offset:
+            set_attr(obj, "_base_offset", base_offset)
 
     @classmethod
     def _bind(cls, mem, addr, offset=0, base_offset=0):
@@ -70,13 +83,20 @@ class TypeBase:
         set_attr = object.__setattr__
         set_attr(self, "_mem", mem)
         set_attr(self, "_addr", addr)
-        set_attr(self, "_reg", reg)
-        set_attr(self, "_cpu", cpu)
-        set_attr(self, "_offset", offset)
-        set_attr(self, "_base_offset", base_offset)
+        # the class holds the defaults
+        if reg is not None:
+            set_attr(self, "_reg", reg)
+        if cpu is not None:
+            set_attr(self, "_cpu", cpu)
+        if offset:
+            set_attr(self, "_offset", offset)
+        if base_offset:
+            set_attr(self, "_base_offset", base_offset)
         # optional allocation
-        set_attr(self, "_mem_obj", mem_obj)
-        set_attr(self, "_alloc", alloc)
+        if mem_obj is not None:
+            set_attr(self, "_mem_obj", mem_obj)
+        if alloc is not None:
+            set_attr(self, "_alloc", alloc)
         # both addr and reg are not allowed
         assert not (reg and addr)
         if reg:
@@ -187,11 +207,7 @@ class TypeBase:
         return path[len(arg) + 3 :]
 
     def __getattr__(self, key):
-        if key == "addr":
-            return self._addr
-        elif key == "mem":
-            return self._mem
-        elif key == "cpu":
+        if key == "cpu":
             return self._cpu
         elif key == "reg":
             return self._reg
