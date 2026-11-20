@@ -26,7 +26,7 @@ by :class:`~amitools.vamos.handler.native.manager.NativeHandlerManager` once
 the base libraries are open.
 """
 
-from amitools.vamos.libstructs import MessageStruct
+from amitools.vamos.libstructs import DosPacketStruct, MessageStruct
 from amitools.vamos.schedule import TaskState
 from amitools.vamos.task import ExecTask
 
@@ -162,6 +162,23 @@ class NativeHandler(DosPktHandler):
         finally:
             msg.free()
             exec_lib.DeleteMsgPort(reply_port)
+
+    def _copy_result(self, pkt, reply_addr):
+        """copy ``dp_Res1``/``dp_Res2`` from the handler's reply into ``pkt``
+
+        A DOS handler replies with the packet it was given, so the reply's
+        ``mn_Node.ln_Name`` normally names ``pkt`` itself; read the named
+        packet anyway so a handler that answers with another message is
+        handled too. The packet is read while the reply message is still owned:
+        a busy handler reuses the freed message memory (see
+        :meth:`_transport_pkt`).
+        """
+        if reply_addr == 0:
+            raise HandlerError(ERROR_NOT_IMPLEMENTED, "empty packet reply")
+        reply = MessageStruct(self.mem, reply_addr)
+        reply_pkt = DosPacketStruct(self.mem, reply.node.name.aptr)
+        pkt.res1.val = reply_pkt.res1.val
+        pkt.res2.val = reply_pkt.res2.val
 
     def _transport_in_task(self, pkt):
         """run the transport inside a helper task
