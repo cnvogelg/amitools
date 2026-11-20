@@ -101,7 +101,8 @@ class UtilityLibrary(LibImpl):
     # Tags
 
     def FindTagItem(self, ctx, tag_val, tag_list: TagList) -> TagItem:
-        if not tag_list:
+        # a NULL list: TagList has a length, so "not tag_list" would walk it
+        if tag_list is None:
             return None
         log_utility.info("FindTagItem(tag=%08x, list=%s)", tag_val, tag_list)
         tag = tag_list.find_tag(tag_val)

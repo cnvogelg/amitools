@@ -41,6 +41,8 @@ def pytask_util_tag_find_tag_item_test(vamos_task):
         assert tag.get_tag() == MyTag.BAR_TAG
         tag = lib.FindTagItem(MyTag.BAZ_TAG, tl)
         assert tag is None
+        # no list
+        assert lib.FindTagItem(MyTag.FOO_TAG, 0) is None
         # free tag list
         tl.free()
 

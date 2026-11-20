@@ -19,6 +19,36 @@ ControlTags = [
 ]
 
 
+_TAG_DONE = CommonTag.TAG_DONE.value
+_TAG_MORE = CommonTag.TAG_MORE.value
+_TAG_SKIP = CommonTag.TAG_SKIP.value
+# TAG_DONE, TAG_IGNORE, TAG_MORE and TAG_SKIP
+_CONTROL_TAGS = frozenset(int(tag) for tag in ControlTags)
+
+
+# tag lists are walked on every FindTagItem() and NextTagItem(): follow
+# them in memory instead of through struct wrappers
+def succ_tag_addr(mem, addr):
+    """address of the tag item after the one at addr, or 0 at the end"""
+    tag = mem.r32(addr)
+    if tag == _TAG_DONE:
+        return 0
+    if tag == _TAG_MORE:
+        return mem.r32(addr + 4)
+    if tag == _TAG_SKIP:
+        return addr + 8 * (1 + mem.r32(addr + 4))
+    return addr + 8
+
+
+def real_tag_addr(mem, addr):
+    """address of this or the next real tag item, or 0 at the end"""
+    while addr != 0:
+        if mem.r32(addr) not in _CONTROL_TAGS:
+            return addr
+        addr = succ_tag_addr(mem, addr)
+    return 0
+
+
 class Tag(ULONG):
     def __repr__(self):
         return f"TagItem(@{self.addr:08x})"
@@ -55,35 +85,22 @@ class TagItem(TagItemStruct):
 
         handle all control tags and return None if TAG_DONE
         """
-        tag_obj = self
-        while tag_obj:
-            tag = tag_obj.tag.val
-            if tag not in ControlTags:
-                return tag_obj
-            tag_obj = tag_obj.succ_real_tag()
-        return tag_obj
+        addr = real_tag_addr(self._mem, self._addr)
+        if addr == self._addr:
+            return self
+        return TagItem(self._mem, addr) if addr != 0 else None
 
     def succ_tag(self):
         """successor tag after this one"""
-        tag = self.tag.val
-        data = self.data.val
-        if tag == CommonTag.TAG_DONE:
-            return None
-        elif tag == CommonTag.TAG_MORE:
-            if data == 0:
-                return None
-            else:
-                return TagItem(self.mem, data)
-        elif tag == CommonTag.TAG_SKIP:
-            addr = self.addr + 8 * (1 + data)
-            return TagItem(self.mem, addr)
-        else:
-            return TagItem(self.mem, self.addr + 8)
+        addr = succ_tag_addr(self._mem, self._addr)
+        return TagItem(self._mem, addr) if addr != 0 else None
 
     def succ_real_tag(self):
-        succ = self.succ_tag()
-        if succ:
-            return succ.next_real_tag()
+        mem = self._mem
+        addr = succ_tag_addr(mem, self._addr)
+        if addr != 0:
+            addr = real_tag_addr(mem, addr)
+        return TagItem(mem, addr) if addr != 0 else None
 
     def next_tag(self):
         return TagItem(self.mem, self.addr + 8)
@@ -159,11 +176,14 @@ class TagList:
         return TagListIter(self.tag)
 
     def __len__(self):
-        tag = self.tag.next_real_tag()
+        mem = self._mem
         num = 0
-        while tag:
-            tag = tag.succ_real_tag()
+        addr = real_tag_addr(mem, self._addr)
+        while addr != 0:
             num += 1
+            addr = succ_tag_addr(mem, addr)
+            if addr != 0:
+                addr = real_tag_addr(mem, addr)
         return num
 
     def to_list(self, map_enum=None, do_map=True):
@@ -181,11 +201,16 @@ class TagList:
         if isinstance(tag_val, TagItem):
             tag_val = tag_val.tag.val
 
-        tag = self.tag.next_real_tag()
-        while tag:
-            if tag.tag.val == tag_val:
-                return tag
-            tag = tag.succ_real_tag()
+        mem = self._mem
+        tag_val &= 0xFFFFFFFF
+        addr = real_tag_addr(mem, self._addr)
+        while addr != 0:
+            if mem.r32(addr) == tag_val:
+                return TagItem(mem, addr)
+            addr = succ_tag_addr(mem, addr)
+            if addr != 0:
+                addr = real_tag_addr(mem, addr)
+        return None
 
     def set_tag(self, tag, data):
         tag = self.find_tag(tag)

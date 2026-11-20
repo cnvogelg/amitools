@@ -343,3 +343,75 @@ def libtypes_tag_array_alloc_test():
     assert tl.to_list() == [MyTag.FOO_TAG, MyTag.BAR_TAG]
     tl.free()
     assert alloc.is_all_free()
+
+
+# --- walking past control tags ---
+
+
+def build_control_tag_list():
+    # IGNORE, FOO, SKIP over BAR, MORE to a second list with BAZ and a user tag
+    mem, addr = build_tag_list(
+        CommonTag.TAG_IGNORE,
+        0,
+        MyTag.FOO_TAG,
+        12,
+        CommonTag.TAG_SKIP,
+        1,
+        MyTag.BAR_TAG,
+        13,
+        CommonTag.TAG_MORE,
+        0x100,
+    )
+    build_tag_list(
+        MyTag.BAZ_TAG,
+        14,
+        0x80000001,
+        15,
+        CommonTag.TAG_DONE,
+        0,
+        base=0x100,
+        mem=mem,
+    )
+    return mem, addr
+
+
+def libtypes_tag_list_control_len_test():
+    mem, addr = build_control_tag_list()
+    tag_list = TagList(mem, addr)
+    assert len(tag_list) == 3
+    assert tag_list.to_list() == [
+        (MyTag.FOO_TAG, 12),
+        (MyTag.BAZ_TAG, 14),
+        (0x80000001, 15),
+    ]
+
+
+def libtypes_tag_list_control_find_test():
+    mem, addr = build_control_tag_list()
+    tl = TagList(mem, addr)
+    assert tl.find_tag(MyTag.FOO_TAG) == TagItem(mem, addr + 8)
+    # skipped by TAG_SKIP
+    assert tl.find_tag(MyTag.BAR_TAG) is None
+    # behind TAG_MORE
+    assert tl.find_tag(MyTag.BAZ_TAG) == TagItem(mem, 0x100)
+    # a user tag, given unsigned or as a signed long
+    assert tl.find_tag(0x80000001) == TagItem(mem, 0x108)
+    assert tl.find_tag(-0x7FFFFFFF) == TagItem(mem, 0x108)
+    # control tags are never found
+    assert tl.find_tag(CommonTag.TAG_IGNORE) is None
+    assert tl.find_tag(CommonTag.TAG_MORE) is None
+
+
+def libtypes_tag_item_control_walk_test():
+    mem, addr = build_control_tag_list()
+    ignore = TagItem(mem, addr)
+    foo = ignore.next_real_tag()
+    assert foo == TagItem(mem, addr + 8)
+    # a real tag is its own next real tag
+    assert foo.next_real_tag() is foo
+    assert foo.succ_tag() == TagItem(mem, addr + 16)
+    baz = foo.succ_real_tag()
+    assert baz == TagItem(mem, 0x100)
+    user = baz.succ_real_tag()
+    assert user == TagItem(mem, 0x108)
+    assert user.succ_real_tag() is None
