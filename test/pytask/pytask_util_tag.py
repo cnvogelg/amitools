@@ -100,6 +100,38 @@ def pytask_util_tag_next_tag_item_test(vamos_task):
     run_util_func(vamos_task, func)
 
 
+def pytask_util_tag_next_tag_item_control_test(vamos_task):
+    def func(ctx, lib):
+        tl = TagList.alloc(
+            ctx.alloc,
+            (CommonTag.TAG_IGNORE, 0),
+            (MyTag.FOO_TAG, 1),
+            (CommonTag.TAG_SKIP, 1),
+            (MyTag.BAR_TAG, 2),
+            (MyTag.BAZ_TAG, 3),
+        )
+        assert tl is not None
+        base = tl.get_addr()
+        aptr = APTR(TagItem).alloc(ctx.alloc)
+        aptr.ref = tl.get_first_tag()
+
+        # past TAG_IGNORE: FOO, and the pointer moves past FOO
+        assert lib.NextTagItem(aptr) == base + 8
+        assert aptr.aptr == base + 16
+
+        # TAG_SKIP skips BAR
+        assert lib.NextTagItem(aptr) == base + 32
+        assert aptr.aptr == base + 40
+
+        # no more
+        assert lib.NextTagItem(aptr) == 0
+
+        aptr.free()
+        tl.free()
+
+    run_util_func(vamos_task, func)
+
+
 def pytask_util_tag_pack_bool_tags_test(vamos_task):
     def func(ctx, lib):
         # build tag list

@@ -165,10 +165,12 @@ class UtilityLibrary(LibImpl):
             tag_ptr.ref = None
             return 0
         else:
-            succ_tag = tag.succ_tag()
-            log_utility.info("real tag=%r, succ_tag=%r", tag, succ_tag)
+            # return the real tag and move past it, not past the control
+            # tag the pointer may have been on
+            succ_tag = real_tag.succ_tag()
+            log_utility.info("real tag=%r, succ_tag=%r", real_tag, succ_tag)
             tag_ptr.ref = succ_tag
-            return tag.get_addr()
+            return real_tag.get_addr()
 
     def FilterTagChanges(self, ctx, change_list: TagList, orig_list: TagList, apply):
         if change_list is None or orig_list is None:
