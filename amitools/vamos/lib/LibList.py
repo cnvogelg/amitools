@@ -1,3 +1,4 @@
+from .ConsoleDevice import ConsoleDevice
 from .DosLibrary import DosLibrary
 from .BsdSocketLibrary import BsdSocketLibrary
 from .ExecLibrary import ExecLibrary
@@ -18,6 +19,7 @@ from .VamosTestLibrary import VamosTestLibrary
 from .VamosTestDevice import VamosTestDevice
 
 vamos_libs = {
+    "console.device": ConsoleDevice,
     "bsdsocket.library": BsdSocketLibrary,
     "dos.library": DosLibrary,
     "exec.library": ExecLibrary,
