@@ -223,11 +223,12 @@ Edit Image
 
 ::
 
-  create [ size=<size> [h=<heads>] [s=<secs>] | chs=<cyls>,<heads>,<secs> ]
+  create [ size=<size> [h=<heads>] [s=<secs>] | chs=<cyls>,<heads>,<secs> ] [ type=<type> ]
 
 With this command you can create a new disk image file. If the disk image
 format has a fixed size (e.g. ADF) then you do not need to specify extra
-paramters to this command.
+paramters to this command. Pass ``type=adf_hd`` to create a high-density (HD)
+floppy image (1760 KiB, 22 sectors) instead of the 880 KiB DD default.
 
 For a hard disk image (HDF) file you must either give the total ``size`` in
 bytes or the disk geometry in cylinders, heads, and sectors. If you specify
@@ -246,6 +247,7 @@ Example::
 
   > xdftool new.hdf create size=10Mi     ; create an empty HDF image with 10Mi
   > xdftool new.adf create               ; create an empty floppy disk image
+  > xdftool new.adf create type=adf_hd   ; create an empty HD floppy image
   > xdftool new.hdf create chs=10,1,32   ; create disk with given geometry
   > xdftool new.hdf create size=10Mi h=2 ; force 2 heads
 
@@ -367,36 +369,42 @@ Example::
   > xdftool mydisk.adf rename c c_old             ; rename a directory
 
 
-``makelink`` - Create a soft link
----------------------------------
+``makelink`` - Create a soft or hard link
+-----------------------------------------
 
 ::
 
-  makelink <ami_path> <target>
+  makelink <ami_path> <target> [hard]
 
 This creates a soft link (``ST_SOFTLINK``) at ``<ami_path>`` whose target is
 the AmigaDOS path string ``<target>``. The target is resolved relative to the
 directory the link lives in, or from the volume root if it starts with ``/``
 or ``:``. A lookup of the link transparently resolves to the target, so the
 link can be read, listed and used as a directory component like the object it
-names. Only soft links are supported; a hard link cannot be expressed on an
-ADFS volume.
+names.
+
+With the optional ``hard`` argument a hard link (``ST_LINKFILE``) is created
+instead: ``<target>`` names an existing file, resolved from the volume root,
+and the new name shares that file's data and metadata. A hard link can only
+name a file, not a directory.
 
 Example::
 
   > xdftool mydisk.adf makelink c/link c/target   ; link in 'c' to 'c/target'
   > xdftool mydisk.adf makelink link README       ; link to a root entry
+  > xdftool mydisk.adf makelink alt README hard   ; hard link to 'README'
 
 
-``readlink`` - Show the target of a soft link
----------------------------------------------
+``readlink`` - Show the target of a link
+----------------------------------------
 
 ::
 
   readlink <ami_path>
 
-This prints the target path stored in the soft link at ``<ami_path>``. It
-fails if the path is not a soft link.
+This prints the target stored in the link at ``<ami_path>``: the target path
+for a soft link, or the name of the real file for a hard link. It fails if the
+path is not a link.
 
 Example::
 

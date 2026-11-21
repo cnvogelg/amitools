@@ -15,7 +15,7 @@ from amitools.vamos.libstructs import (
     NodeType,
     ProcessStruct,
 )
-from amitools.vamos.libtypes import DosPacket
+from amitools.vamos.libtypes import DosPacket, Message, MsgPort
 from amitools.vamos.log import log_dos
 
 from . import Helper
@@ -32,8 +32,16 @@ def wait_pkt(dos, ctx):
     port_addr = proc.pr_MsgPort.addr
     log_dos.info("WaitPkt: proc=%06x port=%06x", proc_addr, port_addr)
     if not ctx.exec_lib.port_mgr.has_port(port_addr):
-        log_dos.warning("WaitPkt: port %06x not registered", port_addr)
-        return 0
+        # A real signal port the Python port manager does not own: a native
+        # (68k) handler receives its packets on its process port through the
+        # exec message path, so receive one the same way a real WaitPkt does
+        # (WaitPort followed by GetMsg).
+        msg_func = ctx.exec_lib.msg_func
+        msg_func.wait_port(proc.msg_port)
+        msg = msg_func.get_msg(proc.msg_port)
+        if msg is None:
+            return 0
+        return msg.name.aptr
     if not ctx.exec_lib.port_mgr.has_msg(port_addr):
         raise UnsupportedFeatureError(
             f"WaitPkt on empty message queue called: Port ({port_addr:06x})"
@@ -63,10 +71,16 @@ def reply_pkt(dos, ctx, dp: DosPacket, res1, res2):
     msg.node.type.val = NodeType.NT_REPLYMSG
     msg.node.succ.aptr = 0
     msg.node.pred.aptr = 0
-    try:
-        ctx.exec_lib.port_mgr.put_msg(reply_port, dp.link.aptr)
-    except Exception:
-        ctx.proxies.get_exec_lib_proxy().PutMsg(reply_port, dp.link.aptr)
+    # ReplyMsg semantics: put the message on the reply port and signal its
+    # task. Going through the exec message path (not the port manager queue
+    # alone) also wakes a real signal port, e.g. the reply port of a native
+    # (68k) handler's caller, while a Python port manager port still reaches
+    # its callback.
+    ctx.exec_lib.msg_func.put_msg(
+        MsgPort(ctx.mem, reply_port),
+        Message(ctx.mem, dp.link.aptr),
+        msg_type=NodeType.NT_REPLYMSG,
+    )
     log_dos.info(
         "ReplyPkt: pkt=%06x res1=%d res2=%d -> port=%06x",
         dp.addr,

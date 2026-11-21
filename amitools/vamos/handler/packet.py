@@ -99,8 +99,10 @@ class _PacketCall:
     """one in-flight packet plus its transient allocations
 
     Used as a context manager. All buffers, BSTRs, file handles and structs
-    allocated while building the call are released when the block exits, so a
-    call never leaks memory (even if ``_dopkt`` raises).
+    allocated while building the call are released through
+    :meth:`PacketHandler._end_call` when the block exits, so a call never leaks
+    memory (even if ``_dopkt`` raises). A transport whose handler may still
+    hold the packet can keep the memory until the handler replies.
     """
 
     def __init__(self, handler, action):
@@ -117,12 +119,19 @@ class _PacketCall:
         return self
 
     def __exit__(self, exc_type, exc, tb):
+        self.handler._end_call(self)
+        return False
+
+    def free(self):
+        """release the packet and everything allocated for it"""
         for struct in self._structs:
             struct.free()
         for mem in self._mems:
             self.handler.alloc.free_memory(mem)
         self.pkt.free()
-        return False
+        self._structs = []
+        self._mems = []
+        self.pkt = None
 
     def arg(self, index, value):
         getattr(self.pkt, "arg%d" % index).val = value
@@ -163,14 +172,17 @@ class _PacketCall:
         return fh
 
     def date(self, value):
-        """allocate a DateStampStruct for ``set_date`` and return its BPTR"""
+        """allocate a DateStampStruct for ``set_date`` and return its address
+
+        ``ACTION_SET_DATE`` takes a plain pointer (CPTR), not a BPTR.
+        """
         ds = self.handler.alloc.alloc_astruct(DateStampStruct, label="DateStamp")
         at = sys_to_ami_time(value)
         ds.ds_Days.val = at.tday
         ds.ds_Minute.val = at.tmin
         ds.ds_Tick.val = at.tick
         self._structs.append(ds)
-        return ds.addr >> 2
+        return ds.addr
 
     def send(self):
         """run the transport and translate the reply
@@ -213,6 +225,19 @@ class PacketHandler(Handler):
 
     def _call(self, action):
         return _PacketCall(self, action)
+
+    def _end_call(self, call):
+        """a call's block has ended: release its packet and allocations"""
+        call.free()
+
+    def _free_struct(self, struct):
+        """free a struct a packet pointed to once its call has ended
+
+        The FIB of a lock and the result structs of ``info``/``examine_fh``
+        live outside the call. A transport whose handler may still hold an
+        unanswered packet that points to one can keep it until the reply.
+        """
+        struct.free()
 
     def _make_lock(self, bptr):
         lock = PacketLock(bptr)
@@ -285,7 +310,7 @@ class PacketHandler(Handler):
 
     def free_lock(self, lock):
         if lock.fib is not None:
-            lock.fib.free()
+            self._free_struct(lock.fib)
             lock.fib = None
         with self._call(DosAction.ACTION_FREE_LOCK) as call:
             call.arg(1, lock.bptr)
@@ -346,7 +371,7 @@ class PacketHandler(Handler):
                 call.send()
                 return self._parse_info(info_data)
             finally:
-                info_data.free()
+                self._free_struct(info_data)
 
     def disk_info(self, lock):
         with self._call(DosAction.ACTION_DISK_INFO) as call:
@@ -356,7 +381,7 @@ class PacketHandler(Handler):
                 call.send()
                 return self._parse_info(info_data)
             finally:
-                info_data.free()
+                self._free_struct(info_data)
 
     def fh_from_lock(self, lock, mode=MODE_OLDFILE):
         with self._call(DosAction.ACTION_FH_FROM_LOCK) as call:
@@ -482,22 +507,25 @@ class PacketHandler(Handler):
     def set_protect(self, ami_path, mask):
         with self._call(DosAction.ACTION_SET_PROTECT) as call:
             call.arg(1, 0)
-            call.arg(2, call.bstr(ami_path))
-            call.arg(3, mask)
+            call.arg(2, 0)
+            call.arg(3, call.bstr(ami_path))
+            call.arg(4, mask)
             call.send()
 
     def set_comment(self, ami_path, comment):
         with self._call(DosAction.ACTION_SET_COMMENT) as call:
             call.arg(1, 0)
-            call.arg(2, call.bstr(ami_path))
-            call.arg(3, call.bstr(comment))
+            call.arg(2, 0)
+            call.arg(3, call.bstr(ami_path))
+            call.arg(4, call.bstr(comment))
             call.send()
 
     def set_date(self, ami_path, date):
         with self._call(DosAction.ACTION_SET_DATE) as call:
             call.arg(1, 0)
-            call.arg(2, call.bstr(ami_path))
-            call.arg(3, call.date(date))
+            call.arg(2, 0)
+            call.arg(3, call.bstr(ami_path))
+            call.arg(4, call.date(date))
             call.send()
 
     def create_dir(self, ami_path):
@@ -594,7 +622,7 @@ class PacketHandler(Handler):
                 call.send()
                 return self._parse_fib(fib)
             finally:
-                fib.free()
+                self._free_struct(fib)
 
     def set_owner(self, lock, path, owner):
         with self._call(DosAction.ACTION_SET_OWNER) as call:

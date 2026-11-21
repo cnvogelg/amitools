@@ -26,16 +26,14 @@ by :class:`~amitools.vamos.handler.native.manager.NativeHandlerManager` once
 the base libraries are open.
 """
 
-from amitools.vamos.libstructs import MessageStruct
+from amitools.vamos.libstructs import DosPacketStruct, MessageStruct
 from amitools.vamos.schedule import TaskState
 from amitools.vamos.task import ExecTask
 
 from ..base import ERROR_NOT_IMPLEMENTED, HandlerError
 from ..dospkt import DosPktHandler
 from . import startup
-
-# config keys understood by the ``native`` handler type
-_BINARY_KEYS = ("binary", "handler_binary")
+from .config import NativeConfig
 
 
 class _ReplyHolder:
@@ -56,7 +54,9 @@ class NativeHandler(DosPktHandler):
     def __init__(self, name, cfg=None):
         super().__init__(name, is_filesystem=True)
         self.cfg = dict(cfg or {})
-        self.binary = self._config_binary()
+        # validate the volume options once (HANDLER.md 24a)
+        self.config = NativeConfig(cfg)
+        self.binary = self.config.binary
         # the started handler's port and the manager that owns it
         self.manager = None
         self.machine = None
@@ -67,13 +67,6 @@ class NativeHandler(DosPktHandler):
         # GetDeviceProc/DeviceProc see the running task (see 23e); its presence
         # also makes HandlerManager.attach_dispatchers skip this handler
         self.dispatcher = _NativeDispatcher(self)
-
-    def _config_binary(self):
-        for key in _BINARY_KEYS:
-            value = self.cfg.get(key)
-            if value:
-                return value
-        return None
 
     # ----- attaching the live machine -----
 
@@ -169,6 +162,23 @@ class NativeHandler(DosPktHandler):
         finally:
             msg.free()
             exec_lib.DeleteMsgPort(reply_port)
+
+    def _copy_result(self, pkt, reply_addr):
+        """copy ``dp_Res1``/``dp_Res2`` from the handler's reply into ``pkt``
+
+        A DOS handler replies with the packet it was given, so the reply's
+        ``mn_Node.ln_Name`` normally names ``pkt`` itself; read the named
+        packet anyway so a handler that answers with another message is
+        handled too. The packet is read while the reply message is still owned:
+        a busy handler reuses the freed message memory (see
+        :meth:`_transport_pkt`).
+        """
+        if reply_addr == 0:
+            raise HandlerError(ERROR_NOT_IMPLEMENTED, "empty packet reply")
+        reply = MessageStruct(self.mem, reply_addr)
+        reply_pkt = DosPacketStruct(self.mem, reply.node.name.aptr)
+        pkt.res1.val = reply_pkt.res1.val
+        pkt.res2.val = reply_pkt.res2.val
 
     def _transport_in_task(self, pkt):
         """run the transport inside a helper task

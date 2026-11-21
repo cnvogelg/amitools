@@ -10,6 +10,9 @@ class EntryBlock(Block):
         Block.__init__(self, blkdev, blk_num, is_type, is_sub_type)
         self.is_longname = is_longname
         self.comment_block_id = 0
+        # owner ids, packed into the long at -49 (uid high, gid low)
+        self.uid = 0
+        self.gid = 0
 
     def _read_nac_modts(self):
         """Reads the name, comment, and modifcation timestamp"""
@@ -60,3 +63,16 @@ class EntryBlock(Block):
     def needs_extra_comment_block(name, comment):
         """Returns whether the given name/comment pair requires an extra comment block"""
         return len(name.get_ami_str()) + len(comment.get_ami_str()) > 110
+
+    def _read_owner(self):
+        """read the owner ids packed into the long at -49: the user id in the
+        high 16 bits and the group id in the low 16 (spec ``BSIZE-196 UID`` /
+        ``BSIZE-194 GID``)"""
+        v = self._get_long(-49)
+        self.uid = (v >> 16) & 0xFFFF
+        self.gid = v & 0xFFFF
+
+    def _write_owner(self):
+        """write the owner ids packed into the long at -49"""
+        v = ((self.uid & 0xFFFF) << 16) | (self.gid & 0xFFFF)
+        self._put_long(-49, v)

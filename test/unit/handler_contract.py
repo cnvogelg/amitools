@@ -425,8 +425,20 @@ class HandlerContract:
         assert h.read_link(lock, "link", 32) == "target"
         # the soft link resolves to the target file
         assert read_all(h, "link") == b"data"
-        # the host file system cannot express a hard link
-        expect_error(236, h.make_link, lock, "hard", lock, False)
+        if env.kind == "adfs":
+            # ADFS can express a hard link: its target is a lock on the file
+            target_lock = h.locate_object("target")
+            h.make_link(lock, "hard", target_lock, False)
+            # both names name the same file and read the same data
+            assert read_all(h, "hard") == b"data"
+            assert h.same_lock(h.locate_object("hard"), target_lock) is True
+            # the real file cannot go while a hard link still names it
+            expect_error(216, h.delete_object, "target")
+            h.delete_object("hard")
+            assert read_all(h, "target") == b"data"
+        else:
+            # the host file system cannot express a hard link
+            expect_error(236, h.make_link, lock, "hard", lock, False)
         # a plain file is not a link
         make_file(h, "plain", b"x")
         expect_error(212, h.read_link, lock, "plain", 32)

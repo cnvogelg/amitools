@@ -8,6 +8,11 @@ host file system.
 
 All paths it receives are volume-relative and use AmigaDOS ``/`` separators.
 Resolution is case-insensitive and collapses AmigaDOS parent steps.
+
+Hard links to files (``ST_LINKFILE``) can be created and are followed on
+lookup. A hard link to a directory (``ST_LINKDIR``) that another tool wrote is
+read-only: a lookup follows it to the real directory, but ``make_link`` still
+refuses to create one (AmigaDOS behavior).
 """
 
 from amitools.fs import DosType
@@ -20,6 +25,7 @@ from amitools.fs.FSError import (
     INVALID_FILE_NAME,
     INVALID_PARENT_DIRECTORY,
     INVALID_VOLUME_NAME,
+    LINK_NOT_ALLOWED,
     NAME_ALREADY_EXISTS,
     NO_FREE_BLOCKS,
     TOO_MANY_LEVELS,
@@ -36,6 +42,7 @@ from .base import (
     ERROR_DIRECTORY_NOT_EMPTY,
     ERROR_DISK_FULL,
     ERROR_INVALID_COMPONENT_NAME,
+    ERROR_INVALID_LOCK,
     ERROR_NO_MORE_ENTRIES,
     ERROR_NOT_IMPLEMENTED,
     ERROR_OBJECT_EXISTS,
@@ -66,6 +73,7 @@ _ADFS_ERROR_MAP = {
     DELETE_NOT_ALLOWED: ERROR_DIRECTORY_NOT_EMPTY,
     INVALID_COMMENT: ERROR_BAD_NUMBER,
     TOO_MANY_LEVELS: ERROR_TOO_MANY_LEVELS,
+    LINK_NOT_ALLOWED: ERROR_OBJECT_WRONG_TYPE,
 }
 
 
@@ -284,6 +292,8 @@ class AdfsHandler(FileSystemHandler):
             date=date,
             key=key,
             comment=mi.get_comment_unicode_str(),
+            owner_uid=mi.get_owner_uid(),
+            owner_gid=mi.get_owner_gid(),
         )
 
     def _info_data(self):
@@ -494,6 +504,14 @@ class AdfsHandler(FileSystemHandler):
         except Exception as e:
             raise HandlerError(_adfs_error(getattr(e, "code", None))) from None
 
+    def set_owner(self, lock, path, owner):
+        self._check_writable()
+        node, _ = self._node(path)
+        try:
+            node.change_owner((owner >> 16) & 0xFFFF, owner & 0xFFFF)
+        except Exception as e:
+            raise HandlerError(_adfs_error(getattr(e, "code", None))) from None
+
     def set_date(self, ami_path, date):
         self._check_writable()
         node, _ = self._node(ami_path)
@@ -523,9 +541,6 @@ class AdfsHandler(FileSystemHandler):
 
     def make_link(self, lock, name, dest, soft):
         self._check_writable()
-        if not soft:
-            # an ADFS volume can only express a soft link
-            raise HandlerError(ERROR_NOT_IMPLEMENTED, "hard links are not supported")
         rel = self._rel_in_lock(lock, name)
         fn = FileName(
             FSString(rel),
@@ -548,10 +563,19 @@ class AdfsHandler(FileSystemHandler):
                 raise HandlerError(ERROR_OBJECT_NOT_FOUND)
         if not parent.is_dir():
             raise HandlerError(ERROR_OBJECT_WRONG_TYPE)
-        if not isinstance(dest, FSString):
-            dest = FSString(dest)
         try:
-            parent.create_soft_link(base_name, dest)
+            if soft:
+                if not isinstance(dest, FSString):
+                    dest = FSString(dest)
+                parent.create_soft_link(base_name, dest)
+            else:
+                # a hard link's dest is a handler lock on the target file
+                target = getattr(dest, "node", None)
+                if target is None:
+                    raise HandlerError(ERROR_INVALID_LOCK)
+                parent.create_hard_link(base_name, target)
+        except HandlerError:
+            raise
         except Exception as e:
             raise HandlerError(_adfs_error(getattr(e, "code", None))) from None
 

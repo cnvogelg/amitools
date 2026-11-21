@@ -24,6 +24,7 @@ INVALID_COMMENT = 23
 INVALID_DIR_CACHE_BLOCK = 24
 INVALID_ENTRY_BLOCK = 25
 TOO_MANY_LEVELS = 26
+LINK_NOT_ALLOWED = 27
 
 error_names = {
     INVALID_BOOT_BLOCK: "Invalid Boot Block",
@@ -52,6 +53,7 @@ error_names = {
     INVALID_DIR_CACHE_BLOCK: "Invalid DirCache Block",
     INVALID_ENTRY_BLOCK: "Invalid Entry Block",
     TOO_MANY_LEVELS: "Too many levels",
+    LINK_NOT_ALLOWED: "Link not allowed",
 }
 
 

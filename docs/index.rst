@@ -10,10 +10,13 @@ amitools Documentation
     tools/rdbtool
     tools/romtool
     tools/icontool
-    vamos
-    vamos-ref
-    vamos-handler
-    vamos-lib
+    tools/hunktool
+    tools/fdtool
+    tools/geotool
+    tools/typetool
+    tools/vamospath
+    tools/vamostool
+    vamos/index
     libs/icontool
 
 The ``amitools`` are an extensive set of command line tools and Python
@@ -28,14 +31,19 @@ Tools
 * :doc:`tools/rdbtool` - disk partition tool
 * :doc:`tools/romtool` - scan and edit Kickstart ROM files
 * :doc:`tools/icontool` - inspect and edit Amiga icon files
+* :doc:`tools/hunktool` - load and dump Amiga Hunk executables, libraries and object files
+* :doc:`tools/fdtool` - read ``.fd`` function description files and generate code
+* :doc:`tools/geotool` - detect and compute disk geometries
+* :doc:`tools/typetool` - inspect the AmigaOS structure definitions vamos uses
+* :doc:`tools/vamospath` - convert between AmigaOS and host paths
+* :doc:`tools/vamostool` - helper tools for paths, types, library profiles and state files
 
 Vamos
 -----
 
-* :doc:`vamos` - virtual AmigaOS runtime
-* :doc:`vamos-ref` - command-line options, configuration files, and environment variables
-* :doc:`vamos-handler` - file system handlers and the handler API
-* :doc:`vamos-lib` - library configuration and loading
+* :doc:`vamos/index` - virtual AmigaOS runtime
+* :doc:`vamos/user/index` - User's Manual: configuration, options, running and debugging
+* :doc:`vamos/dev/index` - Developer's Manual: architecture, handlers, libraries and API
 
 Libraries
 ---------

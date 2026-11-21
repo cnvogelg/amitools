@@ -1,6 +1,7 @@
 import os
 import os.path
 import stat
+import io
 import gzip
 from .ADFBlockDevice import ADFBlockDevice
 from .HDFBlockDevice import HDFBlockDevice
@@ -8,6 +9,52 @@ from .RawBlockDevice import RawBlockDevice
 from .DiskGeometry import DiskGeometry
 from amitools.fs.rdb.RDisk import RDisk
 import amitools.util.BlkDevTools as BlkDevTools
+
+
+class WritableGzipImage:
+    """a seekable, in-memory view of a gzip'ed image file.
+
+    A gzip stream cannot be updated in place, so a writable gzip image is
+    decompressed once into memory, edited through the usual file interface and
+    written back gzip'ed on :meth:`flush`/:meth:`close` (HANDLER.md step 27d).
+    Only small floppy images (``.adz``) are opened this way.
+    """
+
+    def __init__(self, path):
+        self.path = path
+        with gzip.open(path, "rb") as src:
+            self._buf = io.BytesIO(src.read())
+        self.closed = False
+
+    def read(self, n=-1):
+        return self._buf.read(n)
+
+    def seek(self, off, whence=0):
+        return self._buf.seek(off, whence)
+
+    def tell(self):
+        return self._buf.tell()
+
+    def write(self, data):
+        self._buf.write(data)
+
+    def truncate(self, size=None):
+        return self._buf.truncate(size)
+
+    def flush(self):
+        if self.closed:
+            return
+        # re-compress the current content so a sync persists the image
+        with open(self.path, "wb") as raw:
+            with gzip.GzipFile(fileobj=raw, mode="wb") as dst:
+                dst.write(self._buf.getvalue())
+
+    def close(self):
+        if self.closed:
+            return
+        self.flush()
+        self.closed = True
+        self._buf.close()
 
 
 class BlkDevFactory:
@@ -132,11 +179,18 @@ class BlkDevFactory:
 
         # is gzipped?
         if t & self.GZIP_MASK:
-            # only supported for read access for now
-            if not read_only:
-                raise IOError("can't write gzip'ed image files!")
-            # automatically wrap a fobj to unzip
-            fobj = gzip.GzipFile(img_file, "rb", fileobj=fobj)
+            if read_only:
+                # automatically wrap a fobj to unzip
+                fobj = gzip.GzipFile(img_file, "rb", fileobj=fobj)
+            elif (t & self.TYPE_MASK) in (self.TYPE_ADF, self.TYPE_ADF_HD):
+                # a writable gzip image is decompressed into memory and
+                # re-compressed on flush/close (step 27d). A large HDF/RDB is
+                # not worth buffering: keep it read-only.
+                fobj = WritableGzipImage(img_file)
+            else:
+                raise IOError(
+                    "can't write gzip'ed HDF/RDB image files: use an uncompressed image"
+                )
             # remove gzip flag from type
             t = t & self.TYPE_MASK
 

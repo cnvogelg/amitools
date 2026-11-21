@@ -12,7 +12,17 @@ import os
 import pytest
 from native_task import TaskHandler
 
-from amitools.vamos.handler.base import ERROR_OBJECT_IN_USE, HandlerError
+import amitools.fs.DosType as DosType
+from amitools.fs.FSString import FSString
+from amitools.fs.blkdev.DiskGeometry import DiskGeometry
+from amitools.fs.blkdev.RawBlockDevice import RawBlockDevice
+from amitools.fs.rdb.RDisk import RDisk
+from amitools.vamos.disk import DiskSession
+from amitools.vamos.handler.base import (
+    ERROR_OBJECT_IN_USE,
+    ERROR_OBJECT_NOT_FOUND,
+    HandlerError,
+)
 from amitools.vamos.handler.native import NativeHandler, NativeHandlerManager
 from amitools.vamos.libmgr import SetupLibManager
 from amitools.vamos.main import wire_handler_transports
@@ -189,6 +199,109 @@ def handler_native_real_binary_wiring_test():
     dispatcher = slm.handler_mgr.get_dispatcher("work")
     assert dispatcher.port == handler.handler_port
 
+    _finish(slm)
+    assert slm.alloc.is_all_free()
+
+
+def handler_native_process_options_test():
+    """``globvec``/``stack``/``priority`` reach the started handler (24a)."""
+    machine, scheduler, slm = _make_slm()
+    handler = NativeHandler(
+        "work", {"binary": HUNK, "globvec": -2, "stack": 8192, "priority": 5}
+    )
+    _register(slm, handler)
+    _wire(slm, machine, scheduler)
+
+    slm.open_base_libs()
+    entry = slm.dos_impl.dos_list.get_entry_by_name("work")
+    assert entry.struct.dol_GlobVec.val == -2
+    # the handler process carries the configured priority and stack size
+    started = slm.handler_mgr.native_mgr.started[0]
+    task = started.program.ami_task
+    assert task.node.pri.val == 5
+    assert task.tc_SPUpper.aptr - task.tc_SPLower.aptr == 8192
+
+    _finish(slm)
+    assert slm.alloc.is_all_free()
+
+
+def _make_rdb_with_driver(path, data):
+    raw = RawBlockDevice(str(path), read_only=False, block_bytes=512)
+    raw.create(320)
+    rdisk = RDisk(raw)
+    rdisk.create(DiskGeometry(10, 1, 32), rdb_cyls=1)
+    rdisk.add_partition(FSString("DH0"), (1, 9), dos_type=DosType.DOS3)
+    assert rdisk.add_filesystem(data, dos_type=DosType.DOS3)
+    raw.flush()
+    rdisk.close()
+    raw.close()
+
+
+def handler_native_rdb_driver_test(tmp_path):
+    """No ``binary=``: the handler mounts the driver stored in the RDB (24d)."""
+    with open(HUNK, "rb") as fobj:
+        driver = fobj.read()
+    image = tmp_path / "disk.hdf"
+    _make_rdb_with_driver(image, driver)
+
+    machine, scheduler, slm = _make_slm()
+    disk_session = DiskSession([image]).open()
+    handler = NativeHandler("work", {"device": "DH0"})
+    _register(slm, handler)
+    wire_handler_transports(
+        slm, slm.handler_mgr, machine, scheduler, disk_session=disk_session
+    )
+    try:
+        slm.open_base_libs()
+        # the seglist came from the RDB driver, and its global_vec (-1) is used
+        entry = slm.dos_impl.dos_list.get_entry_by_name("work")
+        assert entry.struct.dol_SegList.aptr != 0
+        assert entry.struct.dol_GlobVec.val == -1
+        # the mounted driver actually answers a DOS op
+        lock = handler.locate_object("foo")
+        assert lock.bptr == 1
+        handler.free_lock(lock)
+    finally:
+        _finish(slm)
+        disk_session.close()
+    assert slm.alloc.is_all_free()
+
+
+def handler_native_rdb_driver_globvec_override_test(tmp_path):
+    """An explicit ``?globvec=`` wins over the RDB driver's own value (24d)."""
+    with open(HUNK, "rb") as fobj:
+        driver = fobj.read()
+    image = tmp_path / "disk.hdf"
+    _make_rdb_with_driver(image, driver)
+
+    machine, scheduler, slm = _make_slm()
+    disk_session = DiskSession([image]).open()
+    handler = NativeHandler("work", {"device": "DH0", "globvec": -2})
+    _register(slm, handler)
+    wire_handler_transports(
+        slm, slm.handler_mgr, machine, scheduler, disk_session=disk_session
+    )
+    try:
+        slm.open_base_libs()
+        entry = slm.dos_impl.dos_list.get_entry_by_name("work")
+        assert entry.struct.dol_GlobVec.val == -2
+    finally:
+        _finish(slm)
+        disk_session.close()
+    assert slm.alloc.is_all_free()
+
+
+def handler_native_missing_binary_and_driver_test():
+    """No ``binary=`` and no RDB driver is a setup error, not a crash."""
+    machine, scheduler, slm = _make_slm()
+    slm.open_base_libs()
+    handler = NativeHandler("work", {})
+    _register(slm, handler)
+    mgr = _make_manager(slm)
+    with pytest.raises(HandlerError) as exc:
+        mgr.start(handler)
+    assert exc.value.code == ERROR_OBJECT_NOT_FOUND
+    mgr.shutdown()
     _finish(slm)
     assert slm.alloc.is_all_free()
 

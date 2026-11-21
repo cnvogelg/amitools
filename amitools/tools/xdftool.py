@@ -8,6 +8,8 @@ import argparse
 import os.path
 
 from amitools.fs.ADFSVolume import ADFSVolume
+from amitools.fs.ADFSHardLink import ADFSHardLink
+from amitools.fs.ADFSHardLinkDir import ADFSHardLinkDir
 from amitools.fs.ADFSSoftLink import ADFSSoftLink
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 from amitools.fs.FSError import *
@@ -569,12 +571,21 @@ class MakeLinkCmd(Command):
 
     def handle_vol(self, vol):
         n = len(self.opts)
-        if n != 2:
-            print("Usage: makelink <ami_path> <target>")
+        if n < 2 or n > 3:
+            print("Usage: makelink <ami_path> <target> [hard]")
             return 1
         link_path = make_fsstr(self.opts[0])
         target = make_fsstr(self.opts[1])
-        vol.create_soft_link(link_path, target)
+        hard = n == 3 and self.opts[2] == "hard"
+        if hard:
+            # a hard link's target is an existing file, resolved on the volume
+            node = vol.get_path_name(target)
+            if node is None:
+                print("Target not found:", self.opts[1])
+                return 2
+            vol.create_hard_link(link_path, node)
+        else:
+            vol.create_soft_link(link_path, target)
         return 0
 
 
@@ -589,11 +600,19 @@ class ReadLinkCmd(Command):
         if node is None:
             print("Link not found:", self.opts[0])
             return 2
-        if not isinstance(node, ADFSSoftLink):
-            print("Not a link:", self.opts[0])
-            return 2
-        print(node.get_target().get_unicode())
-        return 0
+        if isinstance(node, ADFSSoftLink):
+            print(node.get_target().get_unicode())
+            return 0
+        if isinstance(node, ADFSHardLink):
+            # a hard link names a real file: print the file it points at
+            print(node.get_real_node().block.name.get_unicode())
+            return 0
+        if isinstance(node, ADFSHardLinkDir):
+            # a directory hard link names a real directory
+            print(node.get_real_node().block.name.get_unicode())
+            return 0
+        print("Not a link:", self.opts[0])
+        return 2
 
 
 class WriteCmd(Command):
@@ -675,16 +694,55 @@ class ProtectCmd(Command):
         n = len(self.opts)
         if n != 2:
             print("Usage: protect <ami_file> <protect>")
+            print("       protect is an 'hsparwed' string or a 0x... mask")
             return 1
         name = make_fsstr(self.opts[0])
         pr_str = self.opts[1]
         node = vol.get_path_name(name)
         if node != None:
-            node.change_protect_by_string(pr_str)
+            if pr_str.lower().startswith("0x"):
+                try:
+                    mask = int(pr_str, 0)
+                except ValueError:
+                    print("Invalid protect mask:", pr_str)
+                    return 1
+                if not (0 <= mask <= 0xFFFFFFFF):
+                    print("protect mask out of range (0..0xffffffff)")
+                    return 1
+                node.change_protect(mask)
+            else:
+                node.change_protect_by_string(pr_str)
             return 0
         else:
             print("Can't find node:", name)
             return 2
+
+
+class ChownCmd(Command):
+    def __init__(self, args, opts):
+        Command.__init__(self, args, opts, edit=True)
+
+    def handle_vol(self, vol):
+        n = len(self.opts)
+        if n != 3:
+            print("Usage: chown <ami_file> <uid> <gid>")
+            return 1
+        name = make_fsstr(self.opts[0])
+        try:
+            uid = int(self.opts[1], 0)
+            gid = int(self.opts[2], 0)
+        except ValueError:
+            print("Invalid uid/gid:", self.opts[1], self.opts[2])
+            return 1
+        if not (0 <= uid <= 0xFFFF and 0 <= gid <= 0xFFFF):
+            print("uid/gid out of range (0..65535)")
+            return 1
+        node = vol.get_path_name(name)
+        if node is None:
+            print("Can't find node:", name)
+            return 2
+        node.change_owner(uid, gid)
+        return 0
 
 
 class CommentCmd(Command):
@@ -1148,6 +1206,7 @@ def main(args=None, defaults=None):
         "bitmap": BitmapCmd,
         "blkdev": BlkDevCmd,
         "protect": ProtectCmd,
+        "chown": ChownCmd,
         "comment": CommentCmd,
         "time": TimeCmd,
         "block": BlockCmd,

@@ -2,6 +2,7 @@ from .FSError import *
 
 
 class ProtectFlags:
+    # owner bits (active low)
     FIBF_DELETE = 1
     FIBF_EXECUTE = 2
     FIBF_WRITE = 4
@@ -9,11 +10,39 @@ class ProtectFlags:
     FIBF_ARCHIVE = 16
     FIBF_PURE = 32
     FIBF_SCRIPT = 64
+    FIBF_HOLD = 128
+    # group bits (active high)
+    FIBF_GRP_DELETE = 1 << 8
+    FIBF_GRP_EXECUTE = 1 << 9
+    FIBF_GRP_WRITE = 1 << 10
+    FIBF_GRP_READ = 1 << 11
+    # other bits (active high)
+    FIBF_OTR_DELETE = 1 << 12
+    FIBF_OTR_EXECUTE = 1 << 13
+    FIBF_OTR_WRITE = 1 << 14
+    FIBF_OTR_READ = 1 << 15
+    # set user id (bit 31)
+    FIBF_SUID = 1 << 31
 
     flag_txt = "HSPArwed"
     flag_num = len(flag_txt)
     flag_none = 0xF  # --------
     empty_string = "-" * flag_num
+
+    # number of bits in the whole protection long
+    mask_num = 32
+    # the bits the 8-char owner string cannot show: group, other and SUID
+    extra_bits = (
+        FIBF_GRP_DELETE
+        | FIBF_GRP_EXECUTE
+        | FIBF_GRP_WRITE
+        | FIBF_GRP_READ
+        | FIBF_OTR_DELETE
+        | FIBF_OTR_EXECUTE
+        | FIBF_OTR_WRITE
+        | FIBF_OTR_READ
+        | FIBF_SUID
+    )
 
     def __init__(self, mask=0):
         self.mask = mask
@@ -43,14 +72,22 @@ class ProtectFlags:
 
     def bin_str(self):
         res = ""
-        m = 1 << (self.flag_num - 1)
-        for i in range(self.flag_num):
+        m = 1 << (self.mask_num - 1)
+        for i in range(self.mask_num):
             if m & self.mask == m:
                 res += "1"
             else:
                 res += "0"
             m >>= 1
         return res
+
+    def has_extra(self):
+        """whether group/other/SUID bits are set beyond the 8-char owner form"""
+        return self.mask & self.extra_bits != 0
+
+    def extra_str(self):
+        """hex form of the full protection long, e.g. ``0x0000800f``"""
+        return "0x%08x" % self.mask
 
     def short_str(self):
         return str(self).replace("-", "")

@@ -11,6 +11,9 @@ from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.libcore import LibProfileData
 from amitools.fd import read_lib_fd
 from amitools.vamos.machine.regs import *
+from amitools.vamos.machine.regs import REG_A1, REG_A2
+from amitools.vamos.libstructs import NodeStruct
+from amitools.vamos.libtypes import Library
 
 
 def _check_stub(stub):
@@ -334,3 +337,29 @@ def libcore_stub_gen_strict_fake_test():
         stub.PrintHello()
     with pytest.raises(MissingLibFuncError):
         stub.Dummy()
+
+
+class _Arg:
+    def __init__(self, reg, type):
+        self.reg = reg
+        self.type = type
+
+
+def libcore_stub_struct_arg_test():
+    ctx = _create_ctx()
+    readers = LibStubGen()._gen_extra_arg_readers(
+        # a plain struct, and one with its own constructor
+        [_Arg(REG_A1, NodeStruct), _Arg(REG_A2, Library)]
+    )
+    ctx.cpu.w_reg(REG_A1, 0x100)
+    ctx.cpu.w_reg(REG_A2, 0x200)
+    node, lib = [reader(ctx) for reader in readers]
+    assert type(node) is NodeStruct
+    assert node.addr == 0x100
+    assert node.mem is ctx.mem
+    assert type(lib) is Library
+    assert lib.addr == 0x200
+    # NULL pointers are passed as None
+    ctx.cpu.w_reg(REG_A1, 0)
+    ctx.cpu.w_reg(REG_A2, 0)
+    assert [reader(ctx) for reader in readers] == [None, None]

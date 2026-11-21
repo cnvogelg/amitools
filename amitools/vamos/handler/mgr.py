@@ -182,19 +182,29 @@ class HandlerManager:
                 return handler
         return None
 
-    def attach_packet_transport(self, alloc, port_mgr, mem, find_port=None, pump=None):
+    def attach_packet_transport(
+        self, alloc, port_mgr, mem, find_port=None, pump=None, put_msg=None
+    ):
         """attach the live machine to every detached packet handler
 
         A ``?handler=packet`` volume is bound before ``exec.library`` exists, so
         its :class:`~amitools.vamos.handler.dospkt.DosPktHandler` starts out
         detached. Once the port manager is available the DOS layer calls this to
-        hand it the allocator, the ``PortManager`` and a port-name resolver.
+        hand it the allocator, the ``PortManager``, a port-name resolver and
+        exec's message delivery.
         Handlers that need no transport (or are already attached) are ignored.
         """
         for handler in self.handlers.values():
             attach = getattr(handler, "attach_transport", None)
             if attach is not None:
-                attach(alloc, port_mgr, mem, find_port=find_port, pump=pump)
+                attach(
+                    alloc,
+                    port_mgr,
+                    mem,
+                    find_port=find_port,
+                    pump=pump,
+                    put_msg=put_msg,
+                )
 
     def attach_native_transport(
         self,

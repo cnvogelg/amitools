@@ -361,7 +361,16 @@ class AmigaStruct(TypeBase):
     _field_attr_paths = None
     # the structure definition is filled in by the decorator
     sdef = None
-    __slots__ = ("sfields", "_free_refs")
+    __slots__ = ("_sfields", "_free_refs")
+
+    @property
+    def sfields(self):
+        """the field instances, made when a field is first used"""
+        sfields = self._sfields
+        if sfields is None:
+            sfields = AmigaStructFields(self)
+            object.__setattr__(self, "_sfields", sfields)
+        return sfields
 
     @classmethod
     def get_signature(cls):
@@ -398,7 +407,7 @@ class AmigaStruct(TypeBase):
     def _bind(cls, mem, addr, offset=0, base_offset=0):
         obj = object.__new__(cls)
         cls._bind_base(obj, mem, addr, offset, base_offset)
-        object.__setattr__(obj, "sfields", AmigaStructFields(obj))
+        object.__setattr__(obj, "_sfields", None)
         object.__setattr__(obj, "_free_refs", _EMPTY_FREE_REFS)
         obj._bind_setup()
         return obj
@@ -407,8 +416,8 @@ class AmigaStruct(TypeBase):
 
     def __init__(self, mem, addr, **kwargs):
         super(AmigaStruct, self).__init__(mem, addr, **kwargs)
-        # create field instances
-        object.__setattr__(self, "sfields", AmigaStructFields(self))
+        # field instances are made on first use
+        object.__setattr__(self, "_sfields", None)
         self._bind_setup()
         if kwargs:
             free_refs = []

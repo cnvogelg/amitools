@@ -73,6 +73,13 @@ class VLibManager(object):
             setattr(ctx, key, val)
 
     def add_impl_cls(self, name, impl_cls):
+        # a loaded vlib keeps the impl it was made with, so registering one
+        # now would only take effect after an expunge: an embedder that adds
+        # its own impl too late would silently get the stock one instead
+        if name in self.name_vlib:
+            raise RuntimeError(
+                "can't register an impl for '%s': it is already loaded" % name
+            )
         self.lib_reg.add_lib_impl(name, impl_cls)
 
     def add_ctx(self, name, ctx):

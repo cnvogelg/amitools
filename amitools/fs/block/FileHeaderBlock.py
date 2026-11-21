@@ -1,3 +1,4 @@
+import struct
 import time
 from .Block import Block
 from .EntryBlock import EntryBlock
@@ -24,6 +25,8 @@ class FileHeaderBlock(EntryBlock):
             is_sub_type=sub_type,
             is_longname=is_longname,
         )
+        # set by create() until the header is written; _read() clears it
+        self._new_block = False
 
     def _symbolic_name_size(self):
         """number of bytes available for a soft link target"""
@@ -50,6 +53,7 @@ class FileHeaderBlock(EntryBlock):
         Block.read(self)
         if not self.valid:
             return False
+        self._new_block = False
 
         # FileHeader fields
         self.own_key = self._get_long(1)
@@ -74,7 +78,13 @@ class FileHeaderBlock(EntryBlock):
         self.protect = self._get_long(-48)
         self.protect_flags = ProtectFlags(self.protect)
         self.byte_size = self._get_long(-47)
+        self._read_owner()
         self._read_nac_modts()
+        # a hard link (``ST_LINKFILE``) names the file it points at in
+        # ``real_entry`` and chains the file's links in ``next_link``; both
+        # stay 0 for a real file and for a soft link
+        self.real_entry = self._get_long(-11)
+        self.next_link = self._get_long(-10)
         self.hash_chain = self._get_long(-4)
         self.parent = self._get_long(-3)
         self.extension = self._get_long(-2)
@@ -82,7 +92,7 @@ class FileHeaderBlock(EntryBlock):
         self.valid = self.own_key == self.blk_num
         return self.valid
 
-    def write(self):
+    def write(self, links=None):
         Block._create_data(self)
         self._put_long(1, self.own_key)
         self._put_long(2, self.block_count)
@@ -98,12 +108,33 @@ class FileHeaderBlock(EntryBlock):
         self._put_long(-48, self.protect)
         self._put_long(-47, self.byte_size)
 
+        self._write_owner()
         self._write_nac_modts()
 
+        # ``real_entry``/``next_link`` belong to the hard-link chain, not to a
+        # real file: take them from disk so a node that read a stale chain
+        # cannot clobber it. A link owns its own fields and writes them, as
+        # does any block built by create() (there is nothing on disk yet).
+        if links is None:
+            links = self._new_block or self.sub_type != Block.ST_FILE
+        if links:
+            self._put_long(-11, self.real_entry)
+            self._put_long(-10, self.next_link)
+        else:
+            self._read_link_fields()
         self._put_long(-4, self.hash_chain)
         self._put_long(-3, self.parent)
         self._put_long(-2, self.extension)
         Block.write(self)
+        self._new_block = False
+
+    def _read_link_fields(self):
+        """take the on-disk link chain of a real file, which this node does
+        not own"""
+        data = self.blkdev.read_block(self.blk_num)
+        longs = self.block_longs
+        self.real_entry = struct.unpack_from(">I", data, (longs - 11) * 4)[0]
+        self.next_link = struct.unpack_from(">I", data, (longs - 10) * 4)[0]
 
     def create(
         self,
@@ -117,6 +148,10 @@ class FileHeaderBlock(EntryBlock):
         mod_ts=None,
         hash_chain=0,
         symbolic_name=None,
+        real_entry=0,
+        next_link=0,
+        uid=0,
+        gid=0,
     ):
         Block.create(self)
         self.own_key = self.blk_num
@@ -132,6 +167,8 @@ class FileHeaderBlock(EntryBlock):
         self.protect = protect
         self.protect_flags = ProtectFlags(self.protect)
         self.byte_size = byte_size
+        self.uid = uid
+        self.gid = gid
         if comment is None:
             self.comment = FSString()
         else:
@@ -143,7 +180,10 @@ class FileHeaderBlock(EntryBlock):
         self.hash_chain = hash_chain
         self.parent = parent
         self.extension = extension
+        self.real_entry = real_entry
+        self.next_link = next_link
         self.valid = True
+        self._new_block = True
         return True
 
     def dump(self):
@@ -156,9 +196,12 @@ class FileHeaderBlock(EntryBlock):
         pf = ProtectFlags(self.protect)
         print(" protect:    0x%x 0b%s %s" % (self.protect, pf.bin_str(), pf))
         print(" byte_size:  %d" % self.byte_size)
+        print(" uid/gid:    %d/%d" % (self.uid, self.gid))
         print(" comment:    '%s'" % self.comment)
         print(" mod_ts:     %s" % self.mod_ts)
         print(" name:       '%s'" % self.name)
         print(" hash_chain: %d" % self.hash_chain)
         print(" parent:     %d" % self.parent)
         print(" extension:  %d" % self.extension)
+        print(" real_entry: %d" % self.real_entry)
+        print(" next_link:  %d" % self.next_link)

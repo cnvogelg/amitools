@@ -87,7 +87,11 @@ class ADFSNode:
         mine to free, rewrite and count only if the bitmap has it
         allocated"""
         self.meta_info = MetaInfo(
-            self.block.protect, self.block.mod_ts, self.block.comment
+            self.block.protect,
+            self.block.mod_ts,
+            self.block.comment,
+            owner_uid=self.block.uid,
+            owner_gid=self.block.gid,
         )
         blk_num = self.block.comment_block_id
         comment_block = self._read_comment_block(blk_num)
@@ -184,6 +188,11 @@ class ADFSNode:
     def delete_children(self, wipe, all, update_ts):
         pass
 
+    def unlink_extra(self):
+        """hook for a node that, on delete, also leaves a chain other than the
+        directory's hash chain (a hard link leaves its file's link list)"""
+        pass
+
     def rename(self, new_name, new_parent):
         """refresh my in-memory name and parent after a rename. The directory
         that relinks me writes my header."""
@@ -209,8 +218,17 @@ class ADFSNode:
         if not hasattr(self.block, "protect"):
             protect = None
         mod_ts = meta_info.get_mod_ts()
+        # owner: only change when this meta info carries ids (a plain comment
+        # or protect change keeps the entry's owner)
+        if meta_info.has_owner() and hasattr(self.block, "uid"):
+            owner_uid = meta_info.get_owner_uid()
+            owner_gid = meta_info.get_owner_gid()
+        else:
+            owner_uid = None
+            owner_gid = None
+        owner = owner_uid is not None
         # a protection of 0, ----rwed, is a change, too
-        if protect is None and not (mod_ts or comment):
+        if protect is None and not (mod_ts or comment) and not owner:
             return
         # a comment change rewrites or frees only a comment block that is
         # still mine
@@ -243,6 +261,8 @@ class ADFSNode:
                 sub_type=self.block.sub_type,
                 name=self.name.get_name(),
                 comment=new_comment,
+                owner_uid=(owner_uid if owner else self.meta_info.get_owner_uid()),
+                owner_gid=(owner_gid if owner else self.meta_info.get_owner_gid()),
             )
             # a grown record may need a new dircache block: make sure that
             # there is one before anything changes
@@ -267,13 +287,23 @@ class ADFSNode:
         # change the header, and put it back as it was if a write fails
         saved = {
             name: getattr(self.block, name)
-            for name in ("protect", "mod_ts", "comment", "comment_block_id")
+            for name in (
+                "protect",
+                "mod_ts",
+                "comment",
+                "comment_block_id",
+                "uid",
+                "gid",
+            )
             if hasattr(self.block, name)
         }
         if protect is not None:
             self.block.protect = protect
         if mod_ts:
             self.block.mod_ts = mod_ts
+        if owner:
+            self.block.uid = owner_uid
+            self.block.gid = owner_gid
         if comment:
             self.block.comment_block_id = comment_blk_num
             if comment_blk_num == 0:
@@ -316,6 +346,8 @@ class ADFSNode:
             self.meta_info.set_protect(protect)
         if mod_ts:
             self.meta_info.set_mod_ts(mod_ts)
+        if owner:
+            self.meta_info.set_owner(owner_uid, owner_gid)
 
     def _write_comment_block(self, blk_num, comment):
         """write comment into comment block blk_num of this entry"""
@@ -328,6 +360,10 @@ class ADFSNode:
 
     def change_protect(self, protect):
         self.change_meta_info(MetaInfo(protect=protect))
+
+    def change_owner(self, uid, gid):
+        """set the entry's user and group id (both 16-bit)"""
+        self.change_meta_info(MetaInfo(owner_uid=uid, owner_gid=gid))
 
     def change_protect_by_string(self, pr_str):
         # no flags given: nothing changes, where a protection of 0 would
@@ -352,6 +388,12 @@ class ADFSNode:
         istr = "  " * indent
         if detail:
             extra = self.get_detail_str()
+            prot = self.meta_info.get_protect_extra_str()
+            if prot:
+                extra = (extra + " " + prot) if extra else prot
+            owner = self.meta_info.get_owner_str()
+            if owner:
+                extra = (extra + " " + owner) if extra else owner
         else:
             extra = self.meta_info.get_str_line()
         return "%-40s       %8s  %s" % (

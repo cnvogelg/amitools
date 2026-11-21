@@ -4,7 +4,9 @@ import os
 
 import pytest
 
+import amitools.fs.DosType as DosType
 from amitools.fs.FSString import FSString
+from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 from amitools.fs.blkdev.RawBlockDevice import RawBlockDevice
 from amitools.fs.rdb.RDisk import RDisk
@@ -15,15 +17,66 @@ from amitools.vamos.machine.mock import MockMemory
 from amitools.vamos.mem import MemoryAlloc
 
 
-def _make_rdb(path):
+def _make_adf(path, dos_type=DosType.DOS3):
+    adf = ADFBlockDevice(str(path))
+    adf.create()
+    adf.close()
+
+
+def _dos_impl():
+    mem = MockMemory(size_kib=64)
+    alloc = MemoryAlloc(mem)
+    dos_list = DosList(None, None, mem, alloc)
+    dos = SimpleNamespace(
+        alloc=alloc, dos_list=dos_list, update_dos_list_head=lambda: None
+    )
+    return dos, dos_list
+
+
+def _make_rdb(path, driver=None):
     raw = RawBlockDevice(str(path), read_only=False, block_bytes=512)
     raw.create(320)
     rdisk = RDisk(raw)
     rdisk.create(DiskGeometry(10, 1, 32), rdb_cyls=1)
-    rdisk.add_partition(FSString("DH0"), (1, 9))
+    rdisk.add_partition(FSString("DH0"), (1, 9), dos_type=DosType.DOS3)
+    if driver is not None:
+        assert rdisk.add_filesystem(driver, dos_type=DosType.DOS3)
     raw.flush()
     rdisk.close()
     raw.close()
+
+
+def disk_session_from_config_read_only_test():
+    # every disk is read-only unless a per-disk ?rw overrides it
+    session = DiskSession.from_config({"disks": []})
+    assert session.default_read_only is True
+    # an object-style config is accepted too
+    cfg = SimpleNamespace(disks=[])
+    session = DiskSession.from_config(cfg)
+    assert session.default_read_only is True
+
+
+def disk_image_exposes_partition_driver_test(tmp_path):
+    data = bytes(range(256)) * 5
+    image_path = tmp_path / "disk.hdf"
+    _make_rdb(image_path, driver=data)
+    image = DiskImage(image_path).open()
+    part = image.partitions[0]
+    # the RDB driver for the partition's DOS type round-trips ...
+    assert part.driver_data == data
+    # ... and its global_vec (stored as 0xFFFFFFFF) is signed
+    assert part.driver_globvec == -1
+    image.close()
+
+
+def disk_image_partition_without_driver_test(tmp_path):
+    image_path = tmp_path / "disk.hdf"
+    _make_rdb(image_path)  # no filesystem stored
+    image = DiskImage(image_path).open()
+    part = image.partitions[0]
+    assert part.driver_data is None
+    assert part.driver_globvec is None
+    image.close()
 
 
 def disk_image_opens_whole_rdb_test(tmp_path):
@@ -130,6 +183,115 @@ def disk_image_releases_lock_when_failed_backend_close_raises_test(tmp_path):
 
     raw.close.assert_called_once_with()
     image.host_lock.release.assert_called_once_with()
+
+
+def disk_session_per_disk_read_write_test(tmp_path):
+    adf = tmp_path / "floppy.adf"
+    _make_adf(adf)
+
+    # the global default is read-only ...
+    session = DiskSession([adf]).open()
+    try:
+        assert session.get_backend(0).read_only is True
+    finally:
+        session.close()
+
+    # ... ?rw overrides it for that one disk
+    session = DiskSession([str(adf) + "?rw"]).open()
+    try:
+        assert session.get_backend(0).read_only is False
+    finally:
+        session.close()
+
+    # a read-write default can be overridden back with ?ro
+    session = DiskSession([str(adf) + "?ro"], read_only=False).open()
+    try:
+        assert session.get_backend(0).read_only is True
+    finally:
+        session.close()
+
+
+def disk_session_raw_device_name_test(tmp_path):
+    adf = tmp_path / "floppy.adf"
+    _make_adf(adf)
+    dos, dos_list = _dos_impl()
+    session = DiskSession([str(adf) + "?name=DF0"]).open()
+    try:
+        session.install_dos(dos)
+        device = dos_list.get_device_by_name("DF0")
+        assert device is not None
+        assert device.struct.dol_Task.aptr == 0
+    finally:
+        session.close()
+
+
+def disk_session_raw_default_device_name_test(tmp_path):
+    adf = tmp_path / "my floppy.adf"
+    _make_adf(adf)
+    dos, dos_list = _dos_impl()
+    session = DiskSession([adf]).open()
+    try:
+        assert session.get_backend(0).dos_devices()[0].name == "my_floppy"
+        session.install_dos(dos)
+        assert dos_list.get_device_by_name("my_floppy") is not None
+    finally:
+        session.close()
+
+
+def disk_session_raw_default_name_collision_test(tmp_path):
+    first = tmp_path / "a" / "floppy.adf"
+    second = tmp_path / "b" / "floppy.adf"
+    first.parent.mkdir()
+    second.parent.mkdir()
+    _make_adf(first)
+    _make_adf(second)
+    dos, dos_list = _dos_impl()
+    session = DiskSession([first, second]).open()
+    try:
+        session.install_dos(dos)
+        assert dos_list.get_device_by_name("floppy") is not None
+        assert dos_list.get_device_by_name("floppy1") is not None
+    finally:
+        session.close()
+
+
+def disk_session_raw_explicit_name_collision_test(tmp_path):
+    first = tmp_path / "a" / "floppy.adf"
+    second = tmp_path / "b" / "floppy.adf"
+    first.parent.mkdir()
+    second.parent.mkdir()
+    _make_adf(first)
+    _make_adf(second)
+    dos, dos_list = _dos_impl()
+    session = DiskSession([str(first) + "?name=DF0", str(second) + "?name=DF0"]).open()
+    try:
+        with pytest.raises(ValueError, match="duplicate DOS device name"):
+            session.install_dos(dos)
+    finally:
+        session.close()
+
+
+def disk_session_dos_devices_raw_vs_rdb_test(tmp_path):
+    adf = tmp_path / "floppy.adf"
+    _make_adf(adf)
+    rdb = tmp_path / "disk.hdf"
+    _make_rdb(rdb)
+
+    raw = DiskSession([adf]).open()
+    try:
+        devices = raw.get_backend(0).dos_devices()
+        assert len(devices) == 1
+        assert devices[0].name == "floppy"
+    finally:
+        raw.close()
+
+    image = DiskSession([rdb]).open()
+    try:
+        devices = image.get_backend(0).dos_devices()
+        assert [d.name for d in devices] == ["DH0"]
+        assert devices[0].explicit_name is True
+    finally:
+        image.close()
 
 
 def disk_session_assigns_units_and_closes_owned_backends_test():

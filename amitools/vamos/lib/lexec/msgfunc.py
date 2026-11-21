@@ -2,9 +2,28 @@ import logging
 from .funcbase import FuncBase
 from amitools.vamos.log import log_exec
 from amitools.vamos.libtypes import MsgPort, Message
-from amitools.vamos.libstructs import NodeType, MsgPortFlags
+from amitools.vamos.libtypes.list_ import list_add_tail, list_first, list_rem_head
+from amitools.vamos.libstructs import (
+    NodeType,
+    MsgPortFlags,
+    MsgPortStruct,
+    MessageStruct,
+    NodeStruct,
+)
 from amitools.vamos.astructs import CSTR
-from amitools.vamos.error import UnsupportedFeatureError
+
+
+def _offset(struct, name):
+    return struct.sdef.find_field_def_by_name(name).offset
+
+
+# messages pass for every packet and I/O request: read and write their
+# fields directly instead of through struct wrappers
+_LN_TYPE = _offset(MessageStruct, "mn_Node") + _offset(NodeStruct, "ln_Type")
+_MP_FLAGS = _offset(MsgPortStruct, "mp_Flags")
+_MP_SIGBIT = _offset(MsgPortStruct, "mp_SigBit")
+_MP_SIGTASK = _offset(MsgPortStruct, "mp_SigTask")
+_MP_MSGLIST = _offset(MsgPortStruct, "mp_MsgList")
 
 
 class MessageFunc(FuncBase):
@@ -56,31 +75,34 @@ class MessageFunc(FuncBase):
             log_exec.warning("PutMsg: port is NULL, msg=%s", msg)
             return
 
+        mem = self.ctx.mem
+        port_addr = port.addr
+        msg_addr = msg.addr
         # check legacy port manager first
-        has_port = self.port_mgr.has_port(port.addr)
+        has_port = self.port_mgr.has_port(port_addr)
         if has_port:
             log_exec.info("PutMsg(%s, %s) -> PortMgr", port, msg)
-            msg.node.type.val = msg_type
-            self.port_mgr.put_msg(port.addr, msg.addr)
+            mem.w8(msg_addr + _LN_TYPE, msg_type)
+            self.port_mgr.put_msg(port_addr, msg_addr)
             self._signal_port(port)
             return
 
         # set type
-        msg.node.type.val = msg_type
+        mem.w8(msg_addr + _LN_TYPE, msg_type)
 
         # add to port list
         log_exec.info("PutMsg(%s, %s)", port, msg)
-        port.msg_list.add_tail(msg.node)
+        list_add_tail(mem, port_addr + _MP_MSGLIST, msg_addr)
 
         # signal?
-        flags = port.flags.val
+        flags = mem.r8(port_addr + _MP_FLAGS)
         if flags == MsgPortFlags.PA_SIGNAL:
             # post signal
-            task = port.sig_task.aptr
-            if task is None:
+            task = mem.r32(port_addr + _MP_SIGTASK)
+            if task == 0:
                 log_exec.error("PutMsg: No task to signal?")
             else:
-                sig_bit = port.sig_bit.val
+                sig_bit = mem.r8(port_addr + _MP_SIGBIT)
                 sig_mask = 1 << sig_bit
                 log_exec.debug("PutMsg: set signal %s task %08x", sig_bit, task)
                 self.signal_func.signal(task, sig_mask)
@@ -104,45 +126,41 @@ class MessageFunc(FuncBase):
             log_exec.info("GetMsg(%s) -> PortMgr -> %s", port, msg)
             return msg
 
-        # get message list
-        msg_list = port.msg_list
-
-        # no messages
-        if msg_list.is_empty():
+        # get message
+        msg_addr = list_rem_head(self.ctx.mem, port.addr + _MP_MSGLIST)
+        if msg_addr == 0:
             log_exec.info("GetMsg(%s) -> None", port)
             return None
-
-        # get message
-        msg = port.msg_list.rem_head(promote=True)
+        msg = Message(self.ctx.mem, msg_addr)
         log_exec.info("GetMsg(%s) -> %s", port, msg)
         return msg
 
     def wait_port(self, port: MsgPort) -> Message:
-        # check port mgr first
-        has_port = self.port_mgr.has_port(port.addr)
-        if has_port:
-            has_msg = self.port_mgr.has_msg(port.addr)
-            if not has_msg:
-                raise UnsupportedFeatureError(
-                    "WaitPort on empty message queue called: Port (%06x)" % port.addr
-                )
-            msg_addr = self.port_mgr.peek_msg(port.addr)
-            log_exec.info("WaitPort: peek message %06x", msg_addr)
-            return Message(self.ctx.mem, msg_addr)
-
         # get sig mask
-        sig_bit = port.sig_bit.val
+        mem = self.ctx.mem
+        sig_bit = mem.r8(port.addr + _MP_SIGBIT)
         sig_mask = 1 << sig_bit
-        msg_list = port.msg_list
+        list_addr = port.addr + _MP_MSGLIST
 
         log_exec.info("WaitPort: port=%s", port)
-        while msg_list.is_empty():
+        while True:
+            # a port the Python port manager owns (it was AddPort'ed): peek its
+            # queue. a plain message port: check the exec message list.
+            if self.port_mgr.has_port(port.addr):
+                msg_addr = self.port_mgr.peek_msg(port.addr)
+                if msg_addr is not None:
+                    log_exec.info("WaitPort: peek message %06x", msg_addr)
+                    return Message(mem, msg_addr)
+            else:
+                msg_addr = list_first(mem, list_addr)
+                if msg_addr != 0:
+                    msg = Message(mem, msg_addr)
+                    log_exec.info("WaitPort: return msg %s", msg)
+                    return msg
+            # empty queue: block on the port's signal until a message is
+            # delivered (PutMsg signals the port's task)
             log_exec.debug("WaitPort: waiting for signal %s", sig_bit)
             self.signal_func.wait(sig_mask)
-
-        msg = msg_list.get_head().cast(Message)
-        log_exec.info("WaitPort: return msg %s", msg)
-        return msg
 
     def add_port(self, port: MsgPort):
         log_exec.info("AddPort(%s)", port)
@@ -177,11 +195,11 @@ class MessageFunc(FuncBase):
 
     def _signal_port(self, port: MsgPort):
         try:
-            flags = port.flags.val
-            if flags == MsgPortFlags.PA_SIGNAL:
-                task = port.sig_task.aptr
-                if task is not None:
-                    sig_bit = port.sig_bit.val
+            mem = self.ctx.mem
+            if mem.r8(port.addr + _MP_FLAGS) == MsgPortFlags.PA_SIGNAL:
+                task = mem.r32(port.addr + _MP_SIGTASK)
+                if task != 0:
+                    sig_bit = mem.r8(port.addr + _MP_SIGBIT)
                     self.signal_func.signal(task, 1 << sig_bit)
         except Exception:
             pass

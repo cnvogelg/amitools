@@ -4,7 +4,12 @@ import os
 
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 from amitools.fs.ADFSVolume import ADFSVolume
+from amitools.fs.FSString import FSString
+from amitools.fs.FileName import FileName
 from amitools.fs import DosType
+from amitools.fs.block.Block import Block
+from amitools.fs.block.UserDirBlock import UserDirBlock
+from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
 
 
 # tag a parameter for full testing
@@ -489,6 +494,99 @@ def xdftool_rename_conflict_test(xdftool, toolrun, xdf_img, test_files):
     )
 
 
+def xdftool_chown_test(xdftool, xdf_img, test_files):
+    """chown sets the owner ids and a detailed listing shows them"""
+    img = xdf_img.file_name
+    xdftool(img, ("write", test_files.file_path))
+    # a fresh entry has no owner, so nothing extra is shown
+    detail = xdftool(img, ("list", test_files.file_name, "detail"))
+    assert not any("0 0" in line for line in detail)
+    # decimal ids are stored and shown
+    xdftool(img, ("chown", test_files.file_name, "1", "2"))
+    detail = xdftool(img, ("list", test_files.file_name, "detail"))
+    assert any("1 2" in line for line in detail)
+    # hex ids are accepted, too
+    xdftool(img, ("chown", test_files.file_name, "0x10", "0x20"))
+    detail = xdftool(img, ("list", test_files.file_name, "detail"))
+    assert any("16 32" in line for line in detail)
+
+
+def xdftool_chown_bad_value_test(xdftool, toolrun, xdf_img, test_files):
+    xdftool(xdf_img.file_name, ("write", test_files.file_path))
+    ret, _, _ = toolrun.run(
+        "xdftool", xdf_img.file_name, "chown", test_files.file_name, "0x10000", "0"
+    )
+    assert ret != 0
+
+
+def xdftool_protect_numeric_test(xdftool, xdf_img, test_files):
+    """a 0x... protect mask sets the group/other bits the owner string hides"""
+    img = xdf_img.file_name
+    xdftool(img, ("write", test_files.file_path))
+    # the classic string form still works and shows the owner byte
+    xdftool(img, ("protect", test_files.file_name, "hsparwed"))
+    listing = xdftool(img, ("list", test_files.file_name), raw_output=True).decode()
+    assert "hsparwed" in listing
+    # a numeric mask sets the high bits; both listings show the hex mask
+    xdftool(img, ("protect", test_files.file_name, "0x8000800f"))
+    listing = xdftool(img, ("list", test_files.file_name), raw_output=True).decode()
+    assert "0x8000800f" in listing
+    detail = xdftool(
+        img, ("list", test_files.file_name, "detail"), raw_output=True
+    ).decode()
+    assert "0x8000800f" in detail
+
+
+def xdftool_protect_bad_value_test(xdftool, toolrun, xdf_img, test_files):
+    xdftool(xdf_img.file_name, ("write", test_files.file_path))
+    ret, _, _ = toolrun.run(
+        "xdftool",
+        xdf_img.file_name,
+        "protect",
+        test_files.file_name,
+        "0x100000000",
+    )
+    assert ret != 0
+
+
+def xdftool_readlink_dir_test(xdftool, toolrun, tmp_path):
+    """a ST_LINKDIR written by another tool lists and readlinks; makelink
+    hard on a directory is refused"""
+    img = str(tmp_path / "dirlink.adf")
+    xdftool(img, ("format", "Work", "DOS0"), ("makedir", "realdir"))
+    # hand-write the directory link: xdftool never creates one
+    blkdev = ADFBlockDevice(img)
+    blkdev.open()
+    volume = ADFSVolume(blkdev)
+    volume.open()
+    root = volume.root_dir
+    root.ensure_entries()
+    real = volume.get_path_name(FSString("realdir"))
+    name = FSString("dirlink")
+    fn = FileName(name, is_intl=volume.is_intl, is_longname=volume.is_longname)
+    hash_idx = fn.hash(hash_size=root.hash_size)
+    old_head = root.block.hash_table[hash_idx]
+    blk_num = volume.bitmap.alloc_n(1)[0]
+    ud = UserDirBlock(blkdev, blk_num, volume.is_longname, sub_type=Block.ST_LINKDIR)
+    ud.create(
+        root.block.blk_num, name, hash_chain=old_head, real_entry=real.block.blk_num
+    )
+    ud.write()
+    root.block.hash_table[hash_idx] = blk_num
+    root.block.write()
+    volume.bitmap.write()
+    volume.close()
+    blkdev.close()
+    # list shows the directory link and readlink prints the real directory
+    listing = xdftool(img, "list", raw_output=True).decode()
+    assert "dirlink" in listing
+    target = xdftool(img, ("readlink", "dirlink"), raw_output=True).decode().strip()
+    assert target == "realdir"
+    # makelink hard on a directory still errors
+    ret, _, _ = toolrun.run("xdftool", img, "makelink", "newlink", "realdir", "hard")
+    assert ret != 0
+
+
 def xdftool_makelink_readlink_test(xdftool, xdf_img, test_files):
     """create a soft link, read its target back and resolve through it"""
     xdftool(xdf_img.file_name, ("write", test_files.file_path))
@@ -498,6 +596,18 @@ def xdftool_makelink_readlink_test(xdftool, xdf_img, test_files):
     # a lookup of the link resolves to the target file
     assert (
         xdftool(xdf_img.file_name, ("type", "link"), raw_output=True) == test_files.data
+    )
+
+
+def xdftool_makelink_hard_test(xdftool, xdf_img, test_files):
+    """create a hard link, read its target back and resolve through it"""
+    xdftool(xdf_img.file_name, ("write", test_files.file_path))
+    xdftool(xdf_img.file_name, ("makelink", "hard", test_files.file_name, "hard"))
+    # readlink prints the real file the hard link names
+    assert xdftool(xdf_img.file_name, ("readlink", "hard")) == [test_files.file_name]
+    # a lookup of the hard link resolves to the same data
+    assert (
+        xdftool(xdf_img.file_name, ("type", "hard"), raw_output=True) == test_files.data
     )
 
 

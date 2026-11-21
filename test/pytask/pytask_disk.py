@@ -1,10 +1,14 @@
+import amitools.fs.DosType as DosType
 from amitools.fs.FSString import FSString
+from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 from amitools.fs.blkdev.RawBlockDevice import RawBlockDevice
+from amitools.fs.block.BootBlock import BootBlock
 from amitools.fs.rdb.RDisk import RDisk
 from amitools.vamos.lib.ScsiDevice import CMD_READ
 from amitools.vamos.lib.dos.Error import DOSFALSE, DOSTRUE
 from amitools.vamos.libstructs import (
+    DevProcStruct,
     DosEnvecStruct,
     DosListDeviceStruct,
     FileSysStartupMsgStruct,
@@ -88,6 +92,85 @@ def pytask_disk_exposes_rdb_partition_and_raw_device_test(vamos_task, tmp_path):
             str(tmp_path / "volumes"),
             "--disk",
             str(image_path),
+        ],
+    )
+    assert exit_codes == [0]
+
+
+def _make_adf(path, dos_type=DosType.DOS3):
+    adf = ADFBlockDevice(str(path))
+    adf.create()
+    boot = BootBlock(adf, 0)
+    boot.create(dos_type=dos_type)
+    boot.write()
+    adf.close()
+
+
+def pytask_disk_exposes_raw_adf_device_test(vamos_task, tmp_path):
+    adf_path = tmp_path / "floppy.adf"
+    _make_adf(adf_path)
+
+    def proc(ctx, task):
+        dos_proxy = ctx.proxies.get_dos_lib_proxy()
+        exec_proxy = ctx.proxies.get_exec_lib_proxy()
+
+        name = ctx.alloc.alloc_cstr("DF0")
+        device_addr = dos_proxy.FindDosEntry(0, name.addr, LDF_DEVICES)
+        assert device_addr != 0
+        device = DosListDeviceStruct(ctx.mem, device_addr)
+        assert device.dol_Type.val == 0
+        assert device.dol_Name.str == "DF0"
+
+        startup = FileSysStartupMsgStruct(ctx.mem, device.dol_Startup.val << 2)
+        assert startup.fssm_Unit.val == 0
+        assert startup.fssm_Device.str == "scsi.device"
+        env = DosEnvecStruct(ctx.mem, startup.fssm_Environ.aptr)
+        assert env.de_SizeBlock.val == 128  # longwords
+        assert env.de_LowCyl.val == 0
+        assert env.de_HighCyl.val == 79
+        assert env.de_Surfaces.val == 2
+        assert env.de_BlocksPerTrack.val == 11
+        assert env.de_DosType.val == DosType.DOS3
+
+        # the device node is reachable through GetDeviceProc
+        devproc_name = ctx.alloc.alloc_cstr("DF0:")
+        devproc_addr = dos_proxy.GetDeviceProc(devproc_name.addr, 0)
+        assert devproc_addr != 0
+        devproc = DevProcStruct(ctx.mem, devproc_addr)
+        assert devproc.dvp_DevNode.aptr == device_addr
+        dos_proxy.FreeDeviceProc(devproc_addr)
+
+        # and the whole-disk backend answers a raw block read
+        port = exec_proxy.CreateMsgPort()
+        request_addr = exec_proxy.CreateIORequest(port, IORequestStruct.get_byte_size())
+        request = IORequestStruct(ctx.mem, request_addr)
+        data = ctx.alloc.alloc_memory(512, label="disk read")
+        assert exec_proxy.OpenDevice("scsi.device", 0, request_addr, 0) == 0
+        request.command.val = CMD_READ
+        request.offset.val = 0
+        request.length.val = 512
+        request.data.val = data.addr
+        assert exec_proxy.DoIO(request_addr) == 0
+        assert request.error.val == 0
+        assert request.actual.val == 512
+        assert ctx.mem.r_block(data.addr, 4) == b"DOS\x03"
+
+        exec_proxy.CloseDevice(request_addr)
+        exec_proxy.DeleteIORequest(request_addr)
+        exec_proxy.DeleteMsgPort(port)
+        ctx.alloc.free_memory(data)
+        ctx.alloc.free_cstr(devproc_name)
+        ctx.alloc.free_cstr(name)
+        return 0
+
+    exit_codes = vamos_task.run(
+        [proc],
+        process=True,
+        args=[
+            "--vols-base-dir",
+            str(tmp_path / "volumes"),
+            "--disk",
+            str(adf_path) + "?name=DF0",
         ],
     )
     assert exit_codes == [0]

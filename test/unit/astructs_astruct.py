@@ -396,3 +396,35 @@ def astructs_astruct_class_subfield_alias_test():
     assert spc.plain2.name.str == "cde"
     spc.free()
     assert alloc.is_all_free()
+
+
+def astructs_astruct_bind_test():
+    mem = MockMemory()
+    ms = MyStruct._bind(mem, 0x10)
+    assert ms.addr == 0x10
+    assert ms.mem is mem
+    assert ms.get_addr() == 0x10
+    # the fields are made when one is first used, and only once
+    assert ms._sfields is None
+    ms.ms_Word.val = -3
+    assert mem.r16(0x10) == 0xFFFD
+    assert ms.sfields is ms.sfields
+    assert ms.offset == 0
+    assert ms.base_offset == 0
+    assert ms.cpu is None
+    assert ms.reg is None
+
+
+def astructs_astruct_init_defaults_test():
+    mem = MockMemory()
+    ms = MyStruct(mem, 0x10)
+    assert ms.addr == 0x10
+    assert ms.mem is mem
+    assert ms._sfields is None
+    assert ms.offset == 0
+    ms.ms_StackSize.val = 1234
+    assert ms.ms_StackSize.val == 1234
+    # a nested struct keeps its offset
+    ss = SubStruct(mem, 0x100)
+    assert ss.ss_My2.offset == 20
+    assert ss.ss_My2.addr == 0x114

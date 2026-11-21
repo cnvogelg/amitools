@@ -4,7 +4,8 @@ from dataclasses import dataclass
 
 from amitools.vamos.libstructs import DosEnvecStruct, FileSysStartupMsgStruct
 
-from .backend import DiskImage
+from .backend import open_disk_backend
+from .spec import DiskSpec
 
 
 @dataclass
@@ -84,12 +85,21 @@ class DiskSession:
         block_size=None,
         unit=None,
     ):
+        spec = DiskSpec.parse(image)
+        if read_only is None:
+            read_only = spec.read_only
         if read_only is None:
             read_only = self.default_read_only
-        backend = DiskImage(
-            image,
+        options = spec.factory_options()
+        if block_size is not None:
+            options.setdefault("bs", block_size)
+        if unit is None:
+            unit = self._next_unit()
+        backend = open_disk_backend(
+            spec.path,
             read_only=read_only,
-            block_size=block_size,
+            options=options,
+            unit=unit,
         )
         return self.add_backend(backend, unit=unit, owned=True)
 
@@ -199,11 +209,17 @@ class DiskSession:
         try:
             for unit in self.get_units():
                 backend = self.get_backend(unit)
-                for partition in getattr(backend, "partitions", ()):
-                    name = partition.name.rstrip(":")
-                    if dos_list.get_entry_by_name(name) is not None:
-                        raise ValueError("duplicate DOS device name: %s" % name)
-                    env = self._alloc_dos_env(alloc, partition.dos_env)
+                for dos_device in backend.dos_devices():
+                    name = dos_device.name.rstrip(":")
+                    if dos_list.get_device_by_name(name) is not None:
+                        # an explicit name must be unique; a defaulted raw
+                        # name may fall back to "<name><unit>"
+                        if dos_device.explicit_name:
+                            raise ValueError("duplicate DOS device name: %s" % name)
+                        name = "%s%d" % (name, unit)
+                        if dos_list.get_device_by_name(name) is not None:
+                            raise ValueError("duplicate DOS device name: %s" % name)
+                    env = self._alloc_dos_env(alloc, dos_device.dos_env)
                     startup = None
                     device_name = None
                     try:

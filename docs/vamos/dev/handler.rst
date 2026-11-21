@@ -80,7 +80,7 @@ The action methods are grouped into three families:
 - ``set_mode(fh, cooked)`` / ``wait_for_char(fh, timeout)`` -- console-only
   operations (``ACTION_SCREEN_MODE`` / ``ACTION_WAIT_CHAR``).
 
-**Names** (path-based operations that need no open handle):
+**Names** (operations on a path or name that need no open file handle):
 
 - ``delete_object(ami_path)`` -- ``ACTION_DELETE_OBJECT``.
 - ``rename_object(old_path, new_path)`` -- ``ACTION_RENAME_OBJECT``.
@@ -88,6 +88,17 @@ The action methods are grouped into three families:
 - ``set_comment(ami_path, comment)`` -- ``ACTION_SET_COMMENT``.
 - ``set_date(ami_path, date)`` -- ``ACTION_SET_DATE``.
 - ``create_dir(ami_path)`` -- ``ACTION_CREATE_DIR``.
+- ``make_link(lock, name, dest, soft)`` -- ``ACTION_MAKE_LINK``. Creates a link
+  named ``name`` in the directory of ``lock``. A soft link (``soft=True``)
+  stores ``dest`` as a path string; a hard link (``soft=False``) shares the
+  file named by the ``dest`` lock, so both names see the same data and
+  metadata.
+- ``read_link(lock, path, size)`` -- ``ACTION_READ_LINK``.
+
+The ADFS handler supports both kinds of link; the host file system supports
+soft links only (a hard link raises ``ERROR_NOT_IMPLEMENTED``). A hard link
+whose target lock belongs to a different handler is
+``ERROR_RENAME_ACROSS_DEVICES`` (``HandlerManager`` checks this).
 
 ``ACTION_METHODS`` is the 1:1 map from method name to ``DosAction``. The
 invariant is that *every* public action method models exactly one AmigaDOS
@@ -280,6 +291,41 @@ Built-in handlers
     manager exists and is attached to the live machine once ``exec.library``
     is up.
 
+``native`` -- ``NativeHandler``
+    A *client* of an original 68k AmigaDOS file system handler that runs as its
+    own task inside the emulator. The handler binary is loaded as a seglist,
+    started as a process and talked to over its real ``MsgPort`` with the exec
+    message/signal functions (``PutMsg``/``WaitPort``/``GetMsg``), so an
+    unmodified handler such as ``pfs3aio`` can mount a ``--disk`` partition or a
+    raw ADF/HDF image. Select it with a path-less ``?handler=native`` volume::
+
+        vamos --disk work.hdf -V "WORK:?handler=native,binary=/path/pfs3aio,device=DH0"
+
+    Options (comma-separated after ``?``):
+
+    ``binary``
+        The handler seglist: a host path, an Amiga path (``LIBS:pfs3aio``), or
+        omitted to mount the driver the RDB stores for the partition's DOS type.
+
+    ``device`` / ``part``
+        The ``--disk`` device to mount, named by its DOS device node
+        (``device=DH0``), its RDB partition (``part=DH0`` or ``part=1``) or a
+        raw image's whole-disk device name. With neither set the volume name is
+        tried, then the first partition.
+
+    ``globvec``
+        The handler's ``dol_GlobVec``: ``-1`` for a C handler, ``-2`` for an
+        assembler one. Overrides the value stored in the RDB driver.
+
+    ``stack`` / ``priority``
+        The handler process's stack size (default 4 KiB) and exec task priority.
+
+    The volume is bound before ``exec.library`` exists, so the handler is
+    created detached and attached to the live machine (and its started task)
+    once the base libraries are open. When the mount name equals the partition's
+    DOS device name the manager *adopts* the ``--disk`` node instead of creating
+    a second one. A handler that fails to start aborts vamos with a setup error.
+
 
 Writing a handler
 -----------------
@@ -348,5 +394,5 @@ defaults to ``adfs`` and the file is not mapped to the host file system::
 
 The auto ``ram:`` volume uses the ``ram`` handler and the auto ``root:`` volume
 uses ``hostfs``. ``NIL:`` and ``CONSOLE:`` always exist as built-in devices,
-so they need no volume definition. See :doc:`vamos` for the volume model and
-:doc:`vamos-ref` for the command-line and config options.
+so they need no volume definition. See :doc:`../user/config` for the volume
+model and :doc:`../user/options` for the command-line and config options.

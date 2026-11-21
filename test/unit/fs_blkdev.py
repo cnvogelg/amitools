@@ -8,6 +8,7 @@ backend can read and write several blocks in one call.
 import pytest
 
 from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
+from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 from amitools.fs.blkdev.HDFBlockDevice import HDFBlockDevice
 from amitools.fs.blkdev.ImageFile import ImageFile
@@ -109,3 +110,36 @@ def image_file_multi_block_bounds_test(tmp_path):
             image.write_blk(2, b"a" * 512, 3)
     finally:
         image.close()
+
+
+def blkdev_factory_create_adf_hd_test(tmp_path):
+    # ``type=adf_hd`` creates a 1760 KiB / 22-sector HD floppy (step 27e)
+    path = tmp_path / "hd.adf"
+    blkdev = BlkDevFactory().create(str(path), options={"type": "adf_hd"})
+    try:
+        assert isinstance(blkdev, ADFBlockDevice)
+        assert blkdev.hd is True
+        assert blkdev.sectors == 22
+        assert blkdev.num_blocks == 80 * 2 * 22
+    finally:
+        blkdev.close()
+    assert path.stat().st_size == 80 * 2 * 22 * 512
+
+    # reopening detects the HD floppy from its size
+    blkdev = BlkDevFactory().open(str(path))
+    try:
+        assert blkdev.hd is True
+        assert blkdev.sectors == 22
+    finally:
+        blkdev.close()
+
+    # without a type a DD floppy is still the default
+    dd = tmp_path / "dd.adf"
+    blkdev = BlkDevFactory().create(str(dd))
+    try:
+        assert blkdev.hd is False
+        assert blkdev.sectors == 11
+        assert blkdev.num_blocks == 80 * 2 * 11
+    finally:
+        blkdev.close()
+    assert dd.stat().st_size == 80 * 2 * 11 * 512
