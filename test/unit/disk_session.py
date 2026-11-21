@@ -47,16 +47,13 @@ def _make_rdb(path, driver=None):
 
 
 def disk_session_from_config_read_only_test():
-    # the default is read-only
+    # every disk is read-only unless a per-disk ?rw overrides it
     session = DiskSession.from_config({"disks": []})
     assert session.default_read_only is True
-    # --disk-read-write passes read_only=False through
-    session = DiskSession.from_config({"disks": [], "read_only": False})
-    assert session.default_read_only is False
     # an object-style config is accepted too
-    cfg = SimpleNamespace(disks=[], read_only=False)
+    cfg = SimpleNamespace(disks=[])
     session = DiskSession.from_config(cfg)
-    assert session.default_read_only is False
+    assert session.default_read_only is True
 
 
 def disk_image_exposes_partition_driver_test(tmp_path):

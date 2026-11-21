@@ -163,15 +163,10 @@ Disks
         vamos --disk work.hdf?rw,bs=512 myprog
         vamos --disk big.hdf?part=DH1 myprog
 
-``--disk-read-write``
-    Open every ``--disk`` image read-write instead of read-only, so a native
-    file system handler can write through to it. A gzipped floppy (``.adz``) is
-    decompressed into memory and re-compressed when it is closed; a gzipped HDF
-    stays read-only.
-
-    .. code-block:: text
-
-        vamos --disk work.hdf --disk-read-write myprog
+    Images are read-only by default; ``?rw`` is the only way to opt a disk into
+    write access, so a native file system handler can write through to it. A
+    gzipped floppy (``.adz``) is decompressed into memory and re-compressed when
+    it is closed; a gzipped HDF stays read-only.
 
 Program and process
 -------------------

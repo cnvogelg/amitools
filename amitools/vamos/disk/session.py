@@ -65,14 +65,11 @@ class DiskSession:
     def from_config(cls, cfg, *, debug=False):
         if cfg is None:
             images = []
-            read_only = True
         elif isinstance(cfg, dict):
             images = cfg.get("disks", [])
-            read_only = cfg.get("read_only", True)
         else:
             images = getattr(cfg, "disks", [])
-            read_only = getattr(cfg, "read_only", True)
-        return cls(images, read_only=read_only, debug=debug)
+        return cls(images, read_only=True, debug=debug)
 
     def _next_unit(self):
         unit = 0
