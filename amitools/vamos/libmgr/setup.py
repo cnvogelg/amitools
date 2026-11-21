@@ -23,6 +23,10 @@ class SetupLibManager(object):
         lib_cfg=None,
         main_profiler=None,
         handler_mgr=None,
+        display_scale=(1, 1),
+        display_aspect="square",
+        display_backend="sdl",
+        display_output="vamos-frames",
     ):
         self.machine = machine
         self.mem_map = mem_map
@@ -36,6 +40,11 @@ class SetupLibManager(object):
         # and take ownership of it
         self.handler_mgr = handler_mgr
         self._own_handler_mgr = handler_mgr is None
+        self.display_scale = display_scale
+        self.display_aspect = display_aspect
+        from amitools.vamos.display import create_display
+
+        self.display = create_display(display_backend, display_output)
         # state
         self.seg_loader = None
         self.exec_ctx = None
@@ -107,6 +116,8 @@ class SetupLibManager(object):
             main_profiler=self.main_profiler,
         )
         self.lib_mgr.set_strict_lvo(self._strict_lvo)
+        self.lib_mgr.vlib_mgr.set_ctx_extra_attr("scheduler", self.scheduler)
+        self.lib_mgr.vlib_mgr.set_ctx_extra_attr("display", self.display)
         # setup special lib contexts for exec and dos
         self.exec_ctx = ExecLibCtx(
             self.machine,
@@ -127,8 +138,18 @@ class SetupLibManager(object):
             odg_base,
             handler_mgr=self.handler_mgr,
         )
+        self.dos_ctx.lib_mgr = self.lib_mgr
+        for name in ("asl", "diskfont", "iffparse", "icon", "datatypes"):
+            self.lib_mgr.add_ctx(name + ".library", self.dos_ctx)
+        self.exec_ctx.display_scale = self.display_scale
+        self.exec_ctx.display_aspect = self.display_aspect
         self.lib_mgr.add_ctx("exec.library", self.exec_ctx)
         self.lib_mgr.add_ctx("bsdsocket.library", self.exec_ctx)
+        self.lib_mgr.add_ctx("keymap.library", self.exec_ctx)
+        self.lib_mgr.add_ctx("gadtools.library", self.exec_ctx)
+        self.lib_mgr.add_ctx("layers.library", self.exec_ctx)
+        self.lib_mgr.add_ctx("intuition.library", self.exec_ctx)
+        self.lib_mgr.add_ctx("graphics.library", self.exec_ctx)
         self.lib_mgr.add_ctx("dos.library", self.dos_ctx)
         # add all vamos libs
         for name in vamos_libs:

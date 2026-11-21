@@ -9,6 +9,8 @@ class LibCtx(object):
         self.mem = machine.get_mem()
         # will be set on creation
         self.vlib = None
+        self.scheduler = None
+        self.display = None
 
     def __str__(self):
         return "[LibCtx:cpu=%s,mem=%s]" % (self.cpu, self.mem)

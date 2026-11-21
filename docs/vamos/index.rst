@@ -24,8 +24,10 @@ binaries -- compilers, assemblers and build tools -- and even to build complete
 Amiga projects, including AmigaOS itself.
 
 Because vamos emulates the API and not the hardware, it cannot run programs that
-access the custom chips, graphics or the user interface directly. For games and
-GUI applications use a full machine emulator such as FS-UAE or WinUAE. Remember:
+access the custom chips directly. A subset of graphics and Intuition APIs is
+available through SDL windows or offline PNG output; see :doc:`user/graphics`.
+Programs requiring chipset emulation or unsupported GUI APIs need a full machine
+emulator such as FS-UAE or WinUAE. Remember:
 vamos is an API-level emulator and will never be a full Amiga system emulator.
 
 Features
@@ -68,6 +70,7 @@ Documentation
 * :doc:`user/config` -- the configuration concept (INI/JSON files and the command line)
 * :doc:`user/options` -- every command-line option, grouped and with examples
 * :doc:`user/running` -- running programs, the search path and the Amiga Shell
+* :doc:`user/graphics` -- graphics support, SDL windows and offline PNG output
 * :doc:`user/debugging` -- logging, tracing, disassembly and profiling
 
 **Developer's Manual**
