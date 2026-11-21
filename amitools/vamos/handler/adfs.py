@@ -8,6 +8,11 @@ host file system.
 
 All paths it receives are volume-relative and use AmigaDOS ``/`` separators.
 Resolution is case-insensitive and collapses AmigaDOS parent steps.
+
+Hard links to files (``ST_LINKFILE``) can be created and are followed on
+lookup. A hard link to a directory (``ST_LINKDIR``) that another tool wrote is
+read-only: a lookup follows it to the real directory, but ``make_link`` still
+refuses to create one (AmigaDOS behavior).
 """
 
 from amitools.fs import DosType

@@ -6,13 +6,13 @@ from ..FSString import FSString
 
 
 class UserDirBlock(EntryBlock):
-    def __init__(self, blkdev, blk_num, is_longname=False):
+    def __init__(self, blkdev, blk_num, is_longname=False, sub_type=Block.ST_USERDIR):
         EntryBlock.__init__(
             self,
             blkdev,
             blk_num,
             is_type=Block.T_SHORT,
-            is_sub_type=Block.ST_USERDIR,
+            is_sub_type=sub_type,
             is_longname=is_longname,
         )
 
@@ -34,6 +34,11 @@ class UserDirBlock(EntryBlock):
         self.protect = self._get_long(-48)
         self._read_owner()
         self._read_nac_modts()
+        # a directory hard link (``ST_LINKDIR``) names the directory it points
+        # at in ``real_entry`` and chains the directory's links in
+        # ``next_link``; both stay 0 for a real directory
+        self.real_entry = self._get_long(-11)
+        self.next_link = self._get_long(-10)
         self.hash_chain = self._get_long(-4)
         self.parent = self._get_long(-3)
         self.extension = self._get_long(-2)
@@ -56,6 +61,8 @@ class UserDirBlock(EntryBlock):
         mod_ts=None,
         hash_chain=0,
         extension=0,
+        real_entry=0,
+        next_link=0,
         uid=0,
         gid=0,
     ):
@@ -74,6 +81,8 @@ class UserDirBlock(EntryBlock):
         self.hash_chain = hash_chain
         self.parent = parent
         self.extension = extension
+        self.real_entry = real_entry
+        self.next_link = next_link
         # empty hash table
         self.hash_table = []
         self.hash_size = self.blkdev.block_longs - 56
@@ -88,6 +97,8 @@ class UserDirBlock(EntryBlock):
         self._put_long(-48, self.protect)
         self._write_owner()
         self._write_nac_modts()
+        self._put_long(-11, self.real_entry)
+        self._put_long(-10, self.next_link)
         self._put_long(-4, self.hash_chain)
         self._put_long(-3, self.parent)
         self._put_long(-2, self.extension)
@@ -110,3 +121,5 @@ class UserDirBlock(EntryBlock):
         print(" hash_chain: %d" % self.hash_chain)
         print(" parent:     %d" % self.parent)
         print(" extension:  %s" % self.extension)
+        print(" real_entry: %d" % self.real_entry)
+        print(" next_link:  %d" % self.next_link)

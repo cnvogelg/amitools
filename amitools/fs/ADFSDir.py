@@ -6,6 +6,7 @@ from .block.FileHeaderBlock import FileHeaderBlock
 from .block.DirCacheBlock import *
 from .ADFSFile import ADFSFile
 from .ADFSHardLink import ADFSHardLink
+from .ADFSHardLinkDir import ADFSHardLinkDir
 from .ADFSSoftLink import ADFSSoftLink
 from .ADFSNode import ADFSNode, MAX_COMMENT_BYTES
 from .FileName import FileName
@@ -58,9 +59,12 @@ class ADFSDir(ADFSNode):
     def _read_add_node(self, blk, recursive):
         """the hash chain link and node of entry block blk. The node is None
         if blk gives none: it is no header, the header is invalid or of a
-        type that is not read, as a directory hard link or the root block, or
-        the blocks of its file cannot all be found. The link is 0 unless the
-        header is valid"""
+        type that is not read, as the root block, or the blocks of its file
+        cannot all be found. The link is 0 unless the header is valid.
+
+        A directory hard link (``ST_LINKDIR``) written by another tool is read
+        as a read-only :class:`ADFSHardLinkDir` and followed on lookup; it is
+        never created here."""
         node = None
         is_header = blk.valid_chksum and blk.type == Block.T_SHORT
         if is_header:
@@ -76,9 +80,12 @@ class ADFSDir(ADFSNode):
             # its a hard link
             elif blk.sub_type == Block.ST_LINKFILE:
                 node = ADFSHardLink(self.volume, self)
+            # its a hard link to a directory (read-only)
+            elif blk.sub_type == Block.ST_LINKDIR:
+                node = ADFSHardLinkDir(self.volume, self)
         if node == None:
-            # a valid header of a type that is not read, as a directory hard
-            # link, leads on along its hash chain; the root block is in none
+            # a valid header of a type that is not read leads on along its
+            # hash chain; the root block is in none
             if is_header and blk.sub_type != Block.ST_ROOT:
                 return blk._get_long(-4), None
             return 0, None
@@ -799,6 +806,23 @@ class ADFSDir(ADFSNode):
                         return None
                     if follow_last:
                         if not allow_file:
+                            return None
+                        return e.get_real_node()
+                    else:
+                        return e
+                if isinstance(e, ADFSHardLinkDir):
+                    # a directory hard link names a directory: it may have
+                    # further path components, and is followed only if
+                    # follow_last is set
+                    if len(pc) > 1:
+                        real = e.get_real_node()
+                        if isinstance(real, ADFSDir):
+                            return real.get_path(
+                                pc[1:], allow_file, allow_dir, follow_last, depth
+                            )
+                        return None
+                    if follow_last:
+                        if not allow_dir:
                             return None
                         return e.get_real_node()
                     else:

@@ -4,7 +4,12 @@ import os
 
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 from amitools.fs.ADFSVolume import ADFSVolume
+from amitools.fs.FSString import FSString
+from amitools.fs.FileName import FileName
 from amitools.fs import DosType
+from amitools.fs.block.Block import Block
+from amitools.fs.block.UserDirBlock import UserDirBlock
+from amitools.fs.blkdev.ADFBlockDevice import ADFBlockDevice
 
 
 # tag a parameter for full testing
@@ -544,6 +549,44 @@ def xdftool_protect_bad_value_test(xdftool, toolrun, xdf_img, test_files):
     assert ret != 0
 
 
+def xdftool_readlink_dir_test(xdftool, toolrun, tmp_path):
+    """a ST_LINKDIR written by another tool lists and readlinks; makelink
+    hard on a directory is refused"""
+    img = str(tmp_path / "dirlink.adf")
+    xdftool(img, ("format", "Work", "DOS0"), ("makedir", "realdir"))
+    # hand-write the directory link: xdftool never creates one
+    blkdev = ADFBlockDevice(img)
+    blkdev.open()
+    volume = ADFSVolume(blkdev)
+    volume.open()
+    root = volume.root_dir
+    root.ensure_entries()
+    real = volume.get_path_name(FSString("realdir"))
+    name = FSString("dirlink")
+    fn = FileName(name, is_intl=volume.is_intl, is_longname=volume.is_longname)
+    hash_idx = fn.hash(hash_size=root.hash_size)
+    old_head = root.block.hash_table[hash_idx]
+    blk_num = volume.bitmap.alloc_n(1)[0]
+    ud = UserDirBlock(blkdev, blk_num, volume.is_longname, sub_type=Block.ST_LINKDIR)
+    ud.create(
+        root.block.blk_num, name, hash_chain=old_head, real_entry=real.block.blk_num
+    )
+    ud.write()
+    root.block.hash_table[hash_idx] = blk_num
+    root.block.write()
+    volume.bitmap.write()
+    volume.close()
+    blkdev.close()
+    # list shows the directory link and readlink prints the real directory
+    listing = xdftool(img, "list", raw_output=True).decode()
+    assert "dirlink" in listing
+    target = xdftool(img, ("readlink", "dirlink"), raw_output=True).decode().strip()
+    assert target == "realdir"
+    # makelink hard on a directory still errors
+    ret, _, _ = toolrun.run("xdftool", img, "makelink", "newlink", "realdir", "hard")
+    assert ret != 0
+
+
 def xdftool_makelink_readlink_test(xdftool, xdf_img, test_files):
     """create a soft link, read its target back and resolve through it"""
     xdftool(xdf_img.file_name, ("write", test_files.file_path))
@@ -694,7 +737,8 @@ def _open_file_node(img_file, ami_path):
     blkdev = factory.open(img_file, read_only=True)
     vol = ADFSVolume(blkdev)
     vol.open()
-    
+    from amitools.fs.FSString import FSString
+
     node = vol.get_path_name(FSString(ami_path))
     assert node is not None and node.is_file()
     ppb = blkdev.block_longs - 56

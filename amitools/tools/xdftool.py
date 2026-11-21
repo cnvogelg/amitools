@@ -9,6 +9,7 @@ import os.path
 
 from amitools.fs.ADFSVolume import ADFSVolume
 from amitools.fs.ADFSHardLink import ADFSHardLink
+from amitools.fs.ADFSHardLinkDir import ADFSHardLinkDir
 from amitools.fs.ADFSSoftLink import ADFSSoftLink
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 from amitools.fs.FSError import *
@@ -604,6 +605,10 @@ class ReadLinkCmd(Command):
             return 0
         if isinstance(node, ADFSHardLink):
             # a hard link names a real file: print the file it points at
+            print(node.get_real_node().block.name.get_unicode())
+            return 0
+        if isinstance(node, ADFSHardLinkDir):
+            # a directory hard link names a real directory
             print(node.get_real_node().block.name.get_unicode())
             return 0
         print("Not a link:", self.opts[0])
