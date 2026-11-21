@@ -689,12 +689,24 @@ class ProtectCmd(Command):
         n = len(self.opts)
         if n != 2:
             print("Usage: protect <ami_file> <protect>")
+            print("       protect is an 'hsparwed' string or a 0x... mask")
             return 1
         name = make_fsstr(self.opts[0])
         pr_str = self.opts[1]
         node = vol.get_path_name(name)
         if node != None:
-            node.change_protect_by_string(pr_str)
+            if pr_str.lower().startswith("0x"):
+                try:
+                    mask = int(pr_str, 0)
+                except ValueError:
+                    print("Invalid protect mask:", pr_str)
+                    return 1
+                if not (0 <= mask <= 0xFFFFFFFF):
+                    print("protect mask out of range (0..0xffffffff)")
+                    return 1
+                node.change_protect(mask)
+            else:
+                node.change_protect_by_string(pr_str)
             return 0
         else:
             print("Can't find node:", name)

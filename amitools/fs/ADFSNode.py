@@ -388,6 +388,9 @@ class ADFSNode:
         istr = "  " * indent
         if detail:
             extra = self.get_detail_str()
+            prot = self.meta_info.get_protect_extra_str()
+            if prot:
+                extra = (extra + " " + prot) if extra else prot
             owner = self.meta_info.get_owner_str()
             if owner:
                 extra = (extra + " " + owner) if extra else owner

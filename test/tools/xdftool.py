@@ -514,6 +514,36 @@ def xdftool_chown_bad_value_test(xdftool, toolrun, xdf_img, test_files):
     assert ret != 0
 
 
+def xdftool_protect_numeric_test(xdftool, xdf_img, test_files):
+    """a 0x... protect mask sets the group/other bits the owner string hides"""
+    img = xdf_img.file_name
+    xdftool(img, ("write", test_files.file_path))
+    # the classic string form still works and shows the owner byte
+    xdftool(img, ("protect", test_files.file_name, "hsparwed"))
+    listing = xdftool(img, ("list", test_files.file_name), raw_output=True).decode()
+    assert "hsparwed" in listing
+    # a numeric mask sets the high bits; both listings show the hex mask
+    xdftool(img, ("protect", test_files.file_name, "0x8000800f"))
+    listing = xdftool(img, ("list", test_files.file_name), raw_output=True).decode()
+    assert "0x8000800f" in listing
+    detail = xdftool(
+        img, ("list", test_files.file_name, "detail"), raw_output=True
+    ).decode()
+    assert "0x8000800f" in detail
+
+
+def xdftool_protect_bad_value_test(xdftool, toolrun, xdf_img, test_files):
+    xdftool(xdf_img.file_name, ("write", test_files.file_path))
+    ret, _, _ = toolrun.run(
+        "xdftool",
+        xdf_img.file_name,
+        "protect",
+        test_files.file_name,
+        "0x100000000",
+    )
+    assert ret != 0
+
+
 def xdftool_makelink_readlink_test(xdftool, xdf_img, test_files):
     """create a soft link, read its target back and resolve through it"""
     xdftool(xdf_img.file_name, ("write", test_files.file_path))
@@ -664,8 +694,7 @@ def _open_file_node(img_file, ami_path):
     blkdev = factory.open(img_file, read_only=True)
     vol = ADFSVolume(blkdev)
     vol.open()
-    from amitools.fs.FSString import FSString
-
+    
     node = vol.get_path_name(FSString(ami_path))
     assert node is not None and node.is_file()
     ppb = blkdev.block_longs - 56

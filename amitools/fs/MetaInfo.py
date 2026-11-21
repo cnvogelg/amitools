@@ -25,6 +25,9 @@ class MetaInfo:
         """Return a unicode string with protect flags, mod time and (optional) comment"""
         res = []
         res.append(self.get_protect_str())
+        prot = self.get_protect_extra_str()
+        if prot:
+            res.append(prot)
         owner = self.get_owner_str()
         if owner:
             res.append(owner)
@@ -75,6 +78,14 @@ class MetaInfo:
     def get_protect_short_str(self):
         if self.protect_flags != None:
             return self.protect_flags.short_str()
+        else:
+            return ""
+
+    def get_protect_extra_str(self):
+        """hex form of the protection long, only when it has group/other/SUID
+        bits the 8-char owner string cannot show"""
+        if self.protect_flags is not None and self.protect_flags.has_extra():
+            return self.protect_flags.extra_str()
         else:
             return ""
 
