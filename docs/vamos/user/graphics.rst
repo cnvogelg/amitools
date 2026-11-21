@@ -182,3 +182,35 @@ Run the focused tests with::
 
     python -m pytest -q test/unit/lib_boopsi.py test/unit/lib_os_support.py
     AMITOOLS_TEST_SDL=1 python -m pytest -q test/unit/lib_os_native.py
+
+Classic gadgets and GadTools drawing
+------------------------------------
+
+Application-owned window gadget lists support Add/RemoveGList, single-gadget
+wrappers, refresh, enable/disable, relative geometry, boolean verification and
+toggle selection. DrawBorder and classic planar DrawImage render through the
+shared raster backend. Basic string gadgets support append, backspace and
+Return; full cursor editing, selection, validation hooks and numeric editing
+are not implemented. EraseRect fills the background pen; layer backfill hooks
+are not implemented.
+
+Custom gadgets use their guest MutualExclude hook for GM_HITTEST, GM_RENDER,
+GM_GOACTIVE, GM_HANDLEINPUT and GM_GOINACTIVE. Input includes gadget-relative
+coordinates and a temporary InputEvent. GMR_VERIFY supplies the termination
+code and gadget pointer in IDCMP_GADGETUP; GMR_REUSE passes the event onward.
+The temporary GadgetInfo, method and event memory is valid only during the
+hook. ObtainGIRPort supplies a private raster-state copy sharing the window
+backing; ReleaseGIRPort releases it. Raster state and the interrupted CPU
+context are preserved. Active
+hooks receive an abort notification before removal, disabling or closure.
+
+GadTools provides GetVisualInfoA, FreeVisualInfo and simple DrawBevelBoxA
+frames, honoring GT_VisualInfo screen pens and GTBB_Recessed. It does not
+create GadTools widgets. These services keep widget implementations in the
+guest application or native toolkit.
+
+This is an initial subset. Requester/screen gadgets, proportional gadgets,
+BOOPSI image rendering, full highlight styles, layout/help methods, tab
+cycling, input timers, tablet events, and additional GadTools APIs/frame
+styles remain unsupported. Programs using those features may still render
+incompletely or require additional input support.
