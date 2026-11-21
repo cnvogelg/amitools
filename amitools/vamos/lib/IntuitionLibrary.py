@@ -456,9 +456,9 @@ class IntuitionLibrary(LibImpl):
             tag, data = item.get_tag(), item.get_data()
 
             if tag == WA_Left:
-                left = (data & 0x7fff) - (data & 0x8000)
+                left = (data & 0x7FFF) - (data & 0x8000)
             elif tag == WA_Top:
-                top = (data & 0x7fff) - (data & 0x8000)
+                top = (data & 0x7FFF) - (data & 0x8000)
             elif tag in (WA_Width, WA_InnerWidth):
                 width = data
             elif tag in (WA_Height, WA_InnerHeight):
@@ -1919,7 +1919,9 @@ class IntuitionLibrary(LibImpl):
         if not screen:
             return 0
         sc = ScreenStruct(ctx.mem, screen)
-        block = ctx.alloc.alloc_memory(76, label="Screen DrawInfo", except_on_failure=False)
+        block = ctx.alloc.alloc_memory(
+            76, label="Screen DrawInfo", except_on_failure=False
+        )
         if block is None:
             return 0
         addr = block.addr
@@ -1988,7 +1990,9 @@ class IntuitionLibrary(LibImpl):
         if requester:
             return 0  # Requester-relative gadget domains are not supported.
         win = WindowStruct(ctx.mem, window)
-        info = ctx.alloc.alloc_memory(58, label="BOOPSI GadgetInfo", except_on_failure=False)
+        info = ctx.alloc.alloc_memory(
+            58, label="BOOPSI GadgetInfo", except_on_failure=False
+        )
         if info is None:
             return 0
         draw = 0
@@ -1996,11 +2000,16 @@ class IntuitionLibrary(LibImpl):
             draw = self.GetScreenDrawInfo(ctx, win.WScreen.val)
             if not draw:
                 return 0
-            for offset, value in ((0, win.WScreen.val), (4, window),
-                                  (12, win.RPort.val), (16, win.WLayer.val), (30, draw)):
+            for offset, value in (
+                (0, win.WScreen.val),
+                (4, window),
+                (12, win.RPort.val),
+                (16, win.WLayer.val),
+                (30, draw),
+            ):
                 ctx.mem.w32(info.addr + offset, value)
-            ctx.mem.w16(info.addr + 24, win.Width.val & 0xffff)
-            ctx.mem.w16(info.addr + 26, win.Height.val & 0xffff)
+            ctx.mem.w16(info.addr + 24, win.Width.val & 0xFFFF)
+            ctx.mem.w16(info.addr + 26, win.Height.val & 0xFFFF)
             ctx.mem.w8(info.addr + 28, win.DetailPen.val)
             ctx.mem.w8(info.addr + 29, win.BlockPen.val)
             return self.boopsi.method(obj, 0x103, tags, info.addr)

@@ -325,6 +325,7 @@ def asl_png_cancels_without_sdl_test(os_ctx, tmp_path, monkeypatch):
     from amitools.vamos.display.png import PNGDisplay
 
     original = builtins.__import__
+
     def no_sdl(name, *args, **kwargs):
         if name == "sdl2" or name.startswith("sdl2."):
             raise AssertionError("offline requester imported SDL")

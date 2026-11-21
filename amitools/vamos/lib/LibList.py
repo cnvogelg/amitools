@@ -33,7 +33,6 @@ vamos_libs = {
     "iffparse.library": IFFParseLibrary,
     "icon.library": IconLibrary,
     "datatypes.library": DatatypesLibrary,
-
     "workbench.library": WorkbenchLibrary,
     "keymap.library": KeyMapLibrary,
     "gadtools.library": GadToolsLibrary,
