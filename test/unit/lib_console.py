@@ -83,9 +83,7 @@ def console_native_vector_and_device_lifecycle_test(tmp_path):
             assert exec_lib.OpenDevice(ctx, device, 0, request.addr, 0) == -1
             assert request.io_Device.aptr == 0
             assert request.io_Error.val == -1
-            assert (
-                exec_lib.OpenDevice(ctx, device, 0xFFFFFFFF, request.addr, 0) == 0
-            )
+            assert exec_lib.OpenDevice(ctx, device, 0xFFFFFFFF, request.addr, 0) == 0
             assert request.io_Error.val == 0
             # Call the real device vector through the generated FD stubs.
             ctx.mem.w_block(block.addr, bytes.fromhex("4eaeffd04e75"))
