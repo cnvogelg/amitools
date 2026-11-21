@@ -1,3 +1,7 @@
+from .WorkbenchLibrary import WorkbenchLibrary
+from .KeyMapLibrary import KeyMapLibrary
+from .GadToolsLibrary import GadToolsLibrary
+from .LayersLibrary import LayersLibrary
 from .DosLibrary import DosLibrary
 from .BsdSocketLibrary import BsdSocketLibrary
 from .ExecLibrary import ExecLibrary
@@ -19,6 +23,10 @@ from .VamosTestDevice import VamosTestDevice
 
 vamos_libs = {
     "bsdsocket.library": BsdSocketLibrary,
+    "workbench.library": WorkbenchLibrary,
+    "keymap.library": KeyMapLibrary,
+    "gadtools.library": GadToolsLibrary,
+    "layers.library": LayersLibrary,
     "dos.library": DosLibrary,
     "exec.library": ExecLibrary,
     "expansion.library": ExpansionLibrary,

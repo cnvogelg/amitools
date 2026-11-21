@@ -60,7 +60,7 @@ def test_execpy_vamos_ctx_func_test(vamos):
     assert stdout == [
         "hello, world!",
         "<class 'amitools.vamos.libcore.ctx.LibCtx'>",
-        "['alloc', 'cpu', 'machine', 'mem', 'proxies', 'runner', 'vlib']",
+        "['alloc', 'cpu', 'display', 'machine', 'mem', 'proxies', 'runner', 'scheduler', 'vlib']",
     ]
     assert stderr == []
 
@@ -71,10 +71,12 @@ def test_execpy_vamos_ctx_func_checked_test(vamos):
         assert sorted(ctx.__dict__) == [
             "alloc",
             "cpu",
+            "display",
             "machine",
             "mem",
             "proxies",
             "runner",
+            "scheduler",
             "vlib",
         ]
 

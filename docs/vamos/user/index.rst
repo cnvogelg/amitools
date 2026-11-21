@@ -11,4 +11,5 @@ and shows how to debug and profile a run.
     config
     options
     running
+    graphics
     debugging
