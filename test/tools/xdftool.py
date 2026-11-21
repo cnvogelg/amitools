@@ -489,6 +489,31 @@ def xdftool_rename_conflict_test(xdftool, toolrun, xdf_img, test_files):
     )
 
 
+def xdftool_chown_test(xdftool, xdf_img, test_files):
+    """chown sets the owner ids and a detailed listing shows them"""
+    img = xdf_img.file_name
+    xdftool(img, ("write", test_files.file_path))
+    # a fresh entry has no owner, so nothing extra is shown
+    detail = xdftool(img, ("list", test_files.file_name, "detail"))
+    assert not any("0 0" in line for line in detail)
+    # decimal ids are stored and shown
+    xdftool(img, ("chown", test_files.file_name, "1", "2"))
+    detail = xdftool(img, ("list", test_files.file_name, "detail"))
+    assert any("1 2" in line for line in detail)
+    # hex ids are accepted, too
+    xdftool(img, ("chown", test_files.file_name, "0x10", "0x20"))
+    detail = xdftool(img, ("list", test_files.file_name, "detail"))
+    assert any("16 32" in line for line in detail)
+
+
+def xdftool_chown_bad_value_test(xdftool, toolrun, xdf_img, test_files):
+    xdftool(xdf_img.file_name, ("write", test_files.file_path))
+    ret, _, _ = toolrun.run(
+        "xdftool", xdf_img.file_name, "chown", test_files.file_name, "0x10000", "0"
+    )
+    assert ret != 0
+
+
 def xdftool_makelink_readlink_test(xdftool, xdf_img, test_files):
     """create a soft link, read its target back and resolve through it"""
     xdftool(xdf_img.file_name, ("write", test_files.file_path))

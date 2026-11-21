@@ -64,6 +64,8 @@ class ADFSSoftLink(ADFSNode):
             mod_ts=meta_info.get_mod_ts(),
             hash_chain=hash_chain_blk,
             symbolic_name=self.target,
+            uid=meta_info.get_owner_uid(),
+            gid=meta_info.get_owner_gid(),
         )
         fhb.write()
         self.set_block(fhb)

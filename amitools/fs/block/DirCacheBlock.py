@@ -9,11 +9,22 @@ from ..FSString import FSString
 
 class DirCacheRecord:
     def __init__(
-        self, entry=0, size=0, protect=0, mod_ts=None, sub_type=0, name="", comment=None
+        self,
+        entry=0,
+        size=0,
+        protect=0,
+        mod_ts=None,
+        sub_type=0,
+        name="",
+        comment=None,
+        owner_uid=0,
+        owner_gid=0,
     ):
         self.entry = entry
         self.size = size
         self.protect = protect
+        self.owner_uid = owner_uid
+        self.owner_gid = owner_gid
         self.mod_ts = mod_ts
         self.sub_type = sub_type
         self.name = name
@@ -40,6 +51,8 @@ class DirCacheRecord:
         self.entry = d[0]
         self.size = d[1]
         self.protect = d[2]
+        self.owner_uid = d[3]
+        self.owner_gid = d[4]
         self.mod_ts = TimeStamp(d[5], d[6], d[7])
         # sub-type as signed but store as unsigned byte
         raw = data[off + 22]
@@ -69,8 +82,8 @@ class DirCacheRecord:
             self.entry,
             self.size,
             self.protect,
-            0,
-            0,
+            self.owner_uid & 0xFFFF,
+            self.owner_gid & 0xFFFF,
             ts.days,
             ts.mins,
             ts.ticks,
@@ -97,6 +110,7 @@ class DirCacheRecord:
         print("\tsize:       %s" % self.size)
         pf = ProtectFlags(self.protect)
         print("\tprotect:    0x%x 0b%s %s" % (self.protect, pf.bin_str(), pf))
+        print("\tuid/gid:    %d/%d" % (self.owner_uid, self.owner_gid))
         print("\tmod_ts:     %s" % self.mod_ts)
         print("\tsub_type:   %s" % self._subtype_str())
         print("\tname:       %s" % self.name)

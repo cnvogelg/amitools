@@ -701,6 +701,33 @@ class ProtectCmd(Command):
             return 2
 
 
+class ChownCmd(Command):
+    def __init__(self, args, opts):
+        Command.__init__(self, args, opts, edit=True)
+
+    def handle_vol(self, vol):
+        n = len(self.opts)
+        if n != 3:
+            print("Usage: chown <ami_file> <uid> <gid>")
+            return 1
+        name = make_fsstr(self.opts[0])
+        try:
+            uid = int(self.opts[1], 0)
+            gid = int(self.opts[2], 0)
+        except ValueError:
+            print("Invalid uid/gid:", self.opts[1], self.opts[2])
+            return 1
+        if not (0 <= uid <= 0xFFFF and 0 <= gid <= 0xFFFF):
+            print("uid/gid out of range (0..65535)")
+            return 1
+        node = vol.get_path_name(name)
+        if node is None:
+            print("Can't find node:", name)
+            return 2
+        node.change_owner(uid, gid)
+        return 0
+
+
 class CommentCmd(Command):
     def __init__(self, args, opts):
         Command.__init__(self, args, opts, edit=True)
@@ -1162,6 +1189,7 @@ def main(args=None, defaults=None):
         "bitmap": BitmapCmd,
         "blkdev": BlkDevCmd,
         "protect": ProtectCmd,
+        "chown": ChownCmd,
         "comment": CommentCmd,
         "time": TimeCmd,
         "block": BlockCmd,

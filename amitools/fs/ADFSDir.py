@@ -261,6 +261,8 @@ class ADFSDir(ADFSNode):
             meta_info.get_comment(),
             meta_info.get_mod_ts(),
             hash_chain_blk,
+            uid=meta_info.get_owner_uid(),
+            gid=meta_info.get_owner_gid(),
         )
         ud.write()
         self.set_block(ud)
@@ -307,7 +309,12 @@ class ADFSDir(ADFSNode):
             and extra_comment is not None
             and EntryBlock.needs_extra_comment_block(name, extra_comment)
         ):
-            meta_info = MetaInfo(meta_info.get_protect(), meta_info.get_mod_ts())
+            meta_info = MetaInfo(
+                meta_info.get_protect(),
+                meta_info.get_mod_ts(),
+                owner_uid=meta_info.get_owner_uid(),
+                owner_gid=meta_info.get_owner_gid(),
+            )
         else:
             extra_comment = None
         # calc hash index of name
@@ -705,6 +712,8 @@ class ADFSDir(ADFSNode):
                 sub_type=sub_type,
                 name=name,
                 comment=node.meta_info.get_comment(),
+                owner_uid=node.meta_info.get_owner_uid(),
+                owner_gid=node.meta_info.get_owner_gid(),
             )
             self.check_dircache_room(record, new_record)
             # the record goes first, as in _delete
@@ -929,6 +938,8 @@ class ADFSDir(ADFSNode):
             sub_type=sub_type,
             name=name,
             comment=meta_info.get_comment(),
+            owner_uid=meta_info.get_owner_uid(),
+            owner_gid=meta_info.get_owner_gid(),
         )
         if not self._dircache_add_entry_int(r, update_myself):
             return None

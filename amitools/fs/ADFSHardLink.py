@@ -94,6 +94,8 @@ class ADFSHardLink(ADFSNode):
             hash_chain=hash_chain_blk,
             real_entry=real.block.blk_num,
             next_link=old_head,
+            uid=meta_info.get_owner_uid(),
+            gid=meta_info.get_owner_gid(),
         )
         fhb.write()
         # chain the new link at the head of the real file's link list; put it

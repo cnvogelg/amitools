@@ -32,6 +32,7 @@ class UserDirBlock(EntryBlock):
         # UserDir fields
         self.own_key = self._get_long(1)
         self.protect = self._get_long(-48)
+        self._read_owner()
         self._read_nac_modts()
         self.hash_chain = self._get_long(-4)
         self.parent = self._get_long(-3)
@@ -55,10 +56,14 @@ class UserDirBlock(EntryBlock):
         mod_ts=None,
         hash_chain=0,
         extension=0,
+        uid=0,
+        gid=0,
     ):
         Block.create(self)
         self.own_key = self.blk_num
         self.protect = protect
+        self.uid = uid
+        self.gid = gid
         if comment is None:
             self.comment = FSString()
         else:
@@ -81,6 +86,7 @@ class UserDirBlock(EntryBlock):
         Block._create_data(self)
         self._put_long(1, self.own_key)
         self._put_long(-48, self.protect)
+        self._write_owner()
         self._write_nac_modts()
         self._put_long(-4, self.hash_chain)
         self._put_long(-3, self.parent)
@@ -97,6 +103,7 @@ class UserDirBlock(EntryBlock):
         print(" own_key:    %d" % (self.own_key))
         pf = ProtectFlags(self.protect)
         print(" protect:    0x%x 0b%s %s" % (self.protect, pf.bin_str(), pf))
+        print(" uid/gid:    %d/%d" % (self.uid, self.gid))
         print(" comment:    '%s'" % self.comment)
         print(" mod_ts:     %s" % self.mod_ts)
         print(" name:       '%s'" % self.name)

@@ -233,6 +233,8 @@ class ADFSFile(ADFSNode):
             meta_info.get_comment(),
             meta_info.get_mod_ts(),
             hash_chain_blk,
+            uid=meta_info.get_owner_uid(),
+            gid=meta_info.get_owner_gid(),
         )
         fhb.write()
         self.set_block(fhb)

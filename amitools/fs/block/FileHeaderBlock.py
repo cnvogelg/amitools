@@ -78,6 +78,7 @@ class FileHeaderBlock(EntryBlock):
         self.protect = self._get_long(-48)
         self.protect_flags = ProtectFlags(self.protect)
         self.byte_size = self._get_long(-47)
+        self._read_owner()
         self._read_nac_modts()
         # a hard link (``ST_LINKFILE``) names the file it points at in
         # ``real_entry`` and chains the file's links in ``next_link``; both
@@ -107,6 +108,7 @@ class FileHeaderBlock(EntryBlock):
         self._put_long(-48, self.protect)
         self._put_long(-47, self.byte_size)
 
+        self._write_owner()
         self._write_nac_modts()
 
         # ``real_entry``/``next_link`` belong to the hard-link chain, not to a
@@ -148,6 +150,8 @@ class FileHeaderBlock(EntryBlock):
         symbolic_name=None,
         real_entry=0,
         next_link=0,
+        uid=0,
+        gid=0,
     ):
         Block.create(self)
         self.own_key = self.blk_num
@@ -163,6 +167,8 @@ class FileHeaderBlock(EntryBlock):
         self.protect = protect
         self.protect_flags = ProtectFlags(self.protect)
         self.byte_size = byte_size
+        self.uid = uid
+        self.gid = gid
         if comment is None:
             self.comment = FSString()
         else:
@@ -190,6 +196,7 @@ class FileHeaderBlock(EntryBlock):
         pf = ProtectFlags(self.protect)
         print(" protect:    0x%x 0b%s %s" % (self.protect, pf.bin_str(), pf))
         print(" byte_size:  %d" % self.byte_size)
+        print(" uid/gid:    %d/%d" % (self.uid, self.gid))
         print(" comment:    '%s'" % self.comment)
         print(" mod_ts:     %s" % self.mod_ts)
         print(" name:       '%s'" % self.name)
