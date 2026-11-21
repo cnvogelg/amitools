@@ -11,9 +11,7 @@ the other ``dos/`` modules and the tests can keep calling ``dos._alloc_mem``,
 """
 
 from amitools.vamos.error import VamosInternalError
-from amitools.vamos.log import log_dos
 from amitools.vamos.machine.regs import REG_A7
-from amitools.vamos.schedule import SchedulerEvent
 
 from .Error import DOSFALSE, DOSTRUE
 
@@ -106,20 +104,6 @@ def create_child_process(dos, ctx, name, **kw_args):
     return DosProcess(ctx.machine, ctx.alloc, name, **kw_args)
 
 
-def child_proc_event(dos, event):
-    """free a process made by CreateNewProc() once its task has ended"""
-    if event.type != SchedulerEvent.Type.REMOVE_TASK:
-        return
-    child = dos.child_procs.pop(event.task, None)
-    if child is None:
-        return
-    port_addr = child.proc.msg_port.addr
-    if dos.port_mgr.has_port(port_addr):
-        dos.port_mgr.unregister_port(port_addr)
-    log_dos.info("CreateNewProc: process %06x ended", child.proc.addr)
-    child.free()
-
-
 class HelperMixin:
     """dos.library fd methods (HANDLER.md step 22m)."""
 
@@ -157,7 +141,3 @@ class HelperMixin:
         process vamos did not load as a program.
         """
         return create_child_process(self, ctx, name, **kw_args)
-
-    def _child_proc_event(self, event):
-        """free a process made by CreateNewProc() once its task has ended"""
-        return child_proc_event(self, event)

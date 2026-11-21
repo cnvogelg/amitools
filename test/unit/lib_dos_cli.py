@@ -14,7 +14,8 @@ from amitools.vamos.lib.dos.Error import (
     ERROR_OBJECT_WRONG_TYPE,
 )
 from amitools.vamos.lib.DosLibrary import DosLibrary
-from amitools.vamos.libstructs import CLIStruct, ProcessStruct
+from amitools.vamos.lib.dos.Cli import _new_proc_tags, _resolve_child_fh
+from amitools.vamos.libstructs import CLIStruct, ProcessFlags, ProcessStruct
 from amitools.vamos.libtypes import DosPacket, DosTag, TagList
 from amitools.vamos.machine import Code, Machine, Runtime
 from amitools.vamos.machine.mock import MockCPU, MockMemory
@@ -61,6 +62,8 @@ def _make_ctx(mem, cpu, cli=True):
     return SimpleNamespace(
         mem=mem,
         cpu=cpu,
+        alloc=MemoryAlloc(mem),
+        machine=SimpleNamespace(get_run_exit_addr=lambda: 0x400),
         process=SimpleNamespace(
             get_ami_process=lambda: proc,
             get_cli_struct=lambda: cli_struct.addr if cli else 0,
@@ -168,27 +171,48 @@ def lib_dos_cli_execute_test():
 
     def run(call_ctx, cmd, tags):
         seen["cmd"] = cmd
-        seen["tags"] = tags
+        if tags:
+            seen["tags"] = dict(tags.to_list(map_enum=DosTag, do_map=True))
+        else:
+            seen["tags"] = None
         seen["cis"] = proc.pr_CIS.bptr
         seen["cos"] = proc.pr_COS.bptr
-        return 5
+        return seen.get("ret", 0)
 
     lib._system_tag_list = run
     cmd = _cstr(mem, cpu, REG_D1, "echo hi")
     file = _long(mem, cpu, REG_D2, 33)
     file2 = _long(mem, cpu, REG_D3, 44)
-    assert lib.Execute(ctx, cmd, file, file2) == 5
-    assert seen == {"cmd": "echo hi", "tags": None, "cis": 33, "cos": 44}
+    # a zero result means the command could be started -> DOSTRUE
+    assert lib.Execute(ctx, cmd, file, file2) == DOSTRUE
+    assert seen == {
+        "cmd": "echo hi",
+        "tags": {DosTag.SYS_Input: 33, DosTag.SYS_Output: 44},
+        "cis": 33,
+        "cos": 44,
+    }
     # the caller's handles are restored
     assert proc.pr_CIS.bptr == 11
     assert proc.pr_COS.bptr == 22
 
-    # zero handles keep the current input/output
+    # a non-zero result (command not found) -> DOSFALSE
+    seen["ret"] = 5
     cmd = _cstr(mem, cpu, REG_D1, "echo hi")
     file = _long(mem, cpu, REG_D2, 0)
     file2 = _long(mem, cpu, REG_D3, 0)
-    assert lib.Execute(ctx, cmd, file, file2) == 5
-    assert seen == {"cmd": "echo hi", "tags": None, "cis": 11, "cos": 22}
+    assert lib.Execute(ctx, cmd, file, file2) == DOSFALSE
+    # zero handles keep the current input/output and add no tags
+    assert seen == {"cmd": "echo hi", "tags": None, "cis": 11, "cos": 22, "ret": 5}
+
+    # an empty command with no handles opens a new interactive shell
+    del seen["ret"]
+    cmd = _cstr(mem, cpu, REG_D1, "")
+    file = _long(mem, cpu, REG_D2, 0)
+    file2 = _long(mem, cpu, REG_D3, 0)
+    assert lib.Execute(ctx, cmd, file, file2) == DOSTRUE
+    assert seen["cmd"] == "Run NewShell"
+    assert seen["tags"] is None
+    assert ctx.alloc.is_all_free()
 
 
 def lib_dos_cli_createproc_test():
@@ -208,12 +232,32 @@ def lib_dos_cli_createproc_test():
     pri = _long(mem, cpu, REG_D2, 5)
     seglist = _long(mem, cpu, REG_D3, 0x2222)
     stack = _long(mem, cpu, REG_D4, 8192)
-    assert lib.CreateProc(ctx, name, pri, seglist, stack) == 0x1234
+    # CreateProc returns the process's pr_MsgPort, not the Process struct
+    assert lib.CreateProc(ctx, name, pri, seglist, stack) == (
+        ProcessStruct(mem, 0x1234).msg_port.addr
+    )
     tags = captured["tags"]
     assert tags[DosTag.NP_SegList] == 0x2222
     assert tags[DosTag.NP_StackSize] == 8192
     assert tags[DosTag.NP_Priority] == 5
     assert mem.r_cstr(tags[DosTag.NP_Name]) == "child"
+    # AOS 3.x compat: keep the seglist, the dirs and the inherited handles
+    assert tags[DosTag.NP_FreeSegList] == 0
+    assert tags[DosTag.NP_CurrentDir] == 0
+    assert tags[DosTag.NP_HomeDir] == 0
+    assert tags[DosTag.NP_Input] == 0
+    assert tags[DosTag.NP_Output] == 0
+    assert tags[DosTag.NP_CloseInput] == 0
+    assert tags[DosTag.NP_CloseOutput] == 0
+
+    # a failing CreateNewProc yields a NULL msg port
+    lib.CreateNewProc = lambda call_ctx, tag_list: 0
+    name = _cstr(mem, cpu, REG_D1, "child")
+    pri = _long(mem, cpu, REG_D2, 5)
+    seglist = _long(mem, cpu, REG_D3, 0x2222)
+    stack = _long(mem, cpu, REG_D4, 8192)
+    assert lib.CreateProc(ctx, name, pri, seglist, stack) == 0
+    assert alloc.is_all_free()
 
     # NULL seglist cannot create a process
     name = _cstr(mem, cpu, REG_D1, "child")
@@ -507,15 +551,33 @@ def lib_dos_cli_run_command_test(monkeypatch):
     calls = []
 
     def fake_run(proc, prog_start, args, length, stack):
-        calls.append((proc, prog_start, args, length, stack))
+        ami_proc = ctx.process.get_ami_process()
+        calls.append(
+            (
+                proc,
+                prog_start,
+                args,
+                length,
+                stack,
+                ami_proc.pr_Arguments.aptr,
+                ami_proc.pr_ReturnAddr.aptr,
+            )
+        )
+        # the command sets its own IoErr; the flush must preserve it
+        lib.io_err = 42
         return 7
 
     monkeypatch.setattr("amitools.vamos.lib.dos.Cli.ami_run_command", fake_run)
     assert lib.RunCommand(ctx, 0x10, 8, DEST_ADDR, 4) == 7
-    # the stack is rounded up and the seglist is resolved to its program start
-    assert calls == [(ctx.process, (0x10 << 2) + 4, DEST_ADDR, 4, 8)]
+    # the stack is rounded up and the seglist is resolved to its program start;
+    # pr_Arguments/pr_ReturnAddr are set while the command runs
+    assert calls == [(ctx.process, (0x10 << 2) + 4, DEST_ADDR, 4, 8, DEST_ADDR, 0x400)]
     # the command line is pushed and cleared again
     assert input_fh.buf == ""
+    # both process fields are restored, the command's IoErr survives the flush
+    assert ctx.process.this_task.pr_Arguments.aptr == 0x222
+    assert ctx.process.this_task.pr_ReturnAddr.aptr == 0
+    assert lib.io_err == 42
 
 
 def lib_dos_cli_run_command_unknown_test():
@@ -527,3 +589,176 @@ def lib_dos_cli_run_command_unknown_test():
 
     with pytest.raises(VamosInternalError):
         lib.RunCommand(ctx, 0x10, 0, DEST_ADDR, 0)
+
+
+def _new_proc_ctx(mem, alloc, parent_addr=0):
+    if parent_addr:
+        exec_lib = SimpleNamespace(
+            exec_lib=SimpleNamespace(
+                this_task=SimpleNamespace(aptr=parent_addr),
+            ),
+        )
+    else:
+        exec_lib = None
+    return SimpleNamespace(mem=mem, alloc=alloc, exec_lib=exec_lib, process=None)
+
+
+def lib_dos_cli_new_proc_defaults_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    ctx = _new_proc_ctx(mem, alloc)
+
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
+    p = _new_proc_tags(ctx, tags)
+    assert p["name"] == "New Process"
+    assert p["entry_pc"] == 0x4000
+    assert p["seglist_bptr"] == 0
+    assert p["stack_size"] == 4000
+    assert p["priority"] == 0
+    assert p["current_dir"] == 0
+    assert p["home_dir"] == 0
+    assert p["console_task"] == 0
+    assert p["window_ptr"] == 0xFFFFFFFF
+    # handles are not resolved here: _spawn opens the NIL: defaults
+    assert p["input_fh"] is None
+    assert p["output_fh"] is None
+    assert p["error_fh"] is None
+    assert p["arguments"] is None
+    # close input/output default to TRUE; error and free-seglist to FALSE
+    assert p["flags"] & ProcessFlags.PRF_CLOSEINPUT
+    assert p["flags"] & ProcessFlags.PRF_CLOSEOUTPUT
+    assert not (p["flags"] & ProcessFlags.PRF_CLOSEERROR)
+    assert not (p["flags"] & ProcessFlags.PRF_FREESEGLIST)
+    assert not (p["flags"] & ProcessFlags.PRF_NOTIFYONDEATH)
+    assert not (p["flags"] & ProcessFlags.PRF_FREEARGS)
+    tags.free()
+
+
+def lib_dos_cli_new_proc_tags_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    ctx = _new_proc_ctx(mem, alloc)
+
+    name = alloc.alloc_cstr("myproc")
+    args = alloc.alloc_cstr("arg1 arg2")
+    tags = TagList.alloc(
+        alloc,
+        (DosTag.NP_Entry, 0x4000),
+        (DosTag.NP_Name, name.addr),
+        (DosTag.NP_StackSize, 8192),
+        (DosTag.NP_Priority, 7),
+        (DosTag.NP_CurrentDir, 0x11),
+        (DosTag.NP_HomeDir, 0x22),
+        (DosTag.NP_Input, 0x33),
+        (DosTag.NP_Output, 0x44),
+        (DosTag.NP_Error, 0x55),
+        (DosTag.NP_ConsoleTask, 0x66),
+        (DosTag.NP_WindowPtr, 0x77),
+        (DosTag.NP_Arguments, args.addr),
+        (DosTag.NP_NotifyOnDeath, 1),
+        (DosTag.NP_ExitCode, 0x88),
+        (DosTag.NP_ExitData, 0x99),
+        (DosTag.NP_FreeSegList, 0),
+        (DosTag.NP_CloseInput, 0),
+        (DosTag.NP_CloseOutput, 0),
+        (DosTag.NP_CloseError, 0),
+        (DosTag.NP_UserData, 0xAA),
+    )
+    p = _new_proc_tags(ctx, tags)
+    assert p["name"] == "myproc"
+    assert p["entry_pc"] == 0x4000
+    assert p["stack_size"] == 8192
+    assert p["priority"] == 7
+    assert p["current_dir"] == 0x11
+    assert p["home_dir"] == 0x22
+    assert p["input_fh"] == 0x33
+    assert p["output_fh"] == 0x44
+    assert p["error_fh"] == 0x55
+    assert p["console_task"] == 0x66
+    assert p["window_ptr"] == 0x77
+    assert p["arguments"] == "arg1 arg2"
+    assert p["exit_code"] == 0x88
+    assert p["exit_data"] == 0x99
+    assert p["user_data"] == 0xAA
+    assert p["notify_on_death"] == 1
+    # the explicit close/seglist/arguments flags are honored
+    assert not (p["flags"] & ProcessFlags.PRF_CLOSEINPUT)
+    assert not (p["flags"] & ProcessFlags.PRF_CLOSEOUTPUT)
+    assert not (p["flags"] & ProcessFlags.PRF_CLOSEERROR)
+    assert not (p["flags"] & ProcessFlags.PRF_FREESEGLIST)
+    assert p["flags"] & ProcessFlags.PRF_NOTIFYONDEATH
+    assert p["flags"] & ProcessFlags.PRF_FREEARGS
+    tags.free()
+    ctx.alloc.free_cstr(name)
+    ctx.alloc.free_cstr(args)
+
+
+def lib_dos_cli_new_proc_seglist_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    ctx = _new_proc_ctx(mem, alloc)
+
+    tags = TagList.alloc(alloc, (DosTag.NP_SegList, 0x1234))
+    p = _new_proc_tags(ctx, tags)
+    # the entry is the first segment of the seglist
+    assert p["entry_pc"] == (0x1234 << 2) + 4
+    assert p["seglist_bptr"] == 0x1234
+    tags.free()
+
+
+def lib_dos_cli_new_proc_missing_entry_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    ctx = _new_proc_ctx(mem, alloc)
+
+    tags = TagList.alloc(alloc, (DosTag.NP_StackSize, 4096))
+    assert _new_proc_tags(ctx, tags) is None
+    tags.free()
+
+
+def lib_dos_cli_new_proc_inherit_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    parent = ProcessStruct(mem, PROC_ADDR)
+    parent.task.node.pri.val = 9
+    parent.current_dir.bptr = 0x11
+    parent.home_dir.bptr = 0x22
+    parent.console_task.aptr = 0x33
+    parent.window_ptr.aptr = 0x44
+    ctx = _new_proc_ctx(mem, alloc, parent_addr=PROC_ADDR)
+
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
+    p = _new_proc_tags(ctx, tags)
+    assert p["parent_addr"] == PROC_ADDR
+    # priority defaults to 0 (RKRM); current/home dir, console task and
+    # window are still inherited from the parent
+    assert p["priority"] == 0
+    assert p["current_dir"] == 0x11
+    assert p["home_dir"] == 0x22
+    assert p["console_task"] == 0x33
+    assert p["window_ptr"] == 0x44
+    tags.free()
+
+
+def lib_dos_cli_new_proc_resolve_fh_test():
+    class FakeFH:
+        b_addr = 0x99
+
+    class FakeFileMgr:
+        def __init__(self):
+            self.opened = []
+
+        def open(self, lock, path, mode):
+            self.opened.append((path, mode))
+            return FakeFH()
+
+    dos = SimpleNamespace(file_mgr=FakeFileMgr())
+    # an absent tag opens the NIL: default
+    assert _resolve_child_fh(dos, None, "r", "input") == 0x99
+    assert dos.file_mgr.opened == [("NIL:", "r")]
+    # an explicit 0 (BNULL) is kept: no NIL: open (AROS behaviour)
+    assert _resolve_child_fh(dos, 0, "r", "input") == 0
+    assert dos.file_mgr.opened == [("NIL:", "r")]
+    # a caller supplied handle is kept
+    assert _resolve_child_fh(dos, 0x33, "r", "input") == 0x33
+    assert dos.file_mgr.opened == [("NIL:", "r")]

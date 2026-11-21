@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from amitools.vamos.dos import run_command
+from amitools.vamos.lib.dos.run import run_command
 from amitools.vamos.libstructs import ProcessStruct
 from amitools.vamos.machine import Machine, Runtime, REG_D0, REG_D1, REG_D2, REG_A0
 from amitools.vamos.mem import MemoryAlloc

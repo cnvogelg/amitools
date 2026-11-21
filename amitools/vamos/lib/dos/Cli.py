@@ -9,13 +9,27 @@ runner.
 """
 
 from amitools.vamos.astructs import CSTR, LONG
-from amitools.vamos.dos import run_command as ami_run_command
-from amitools.vamos.dos import run_sub_process
 from amitools.vamos.error import VamosInternalError
-from amitools.vamos.libstructs import CLIStruct, MsgPortFlags, ProcessStruct, TaskState
+from amitools.vamos.libstructs import (
+    CLIStruct,
+    MsgPortFlags,
+    ProcessFlags,
+    ProcessStruct,
+    TaskState,
+)
 from amitools.vamos.libtypes import DosPacket, DosTag, TagList
 from amitools.vamos.log import log_dos
-from amitools.vamos.machine.regs import REG_A0, REG_D0
+from amitools.vamos.machine import Code
+from amitools.vamos.machine.regs import (
+    REG_A0,
+    REG_A2,
+    REG_A5,
+    REG_A6,
+    REG_D0,
+    REG_D1,
+    REG_D2,
+)
+from amitools.vamos.schedule import SchedulerEvent
 
 from .CommandLine import CommandLine
 from .Error import (
@@ -27,9 +41,14 @@ from .Error import (
     ERROR_OBJECT_WRONG_TYPE,
 )
 from .Process import Process
+from .run import run_command as ami_run_command
+from .run import run_sub_process
 
 # the AmigaDOS V36 process table size returned by MaxCli()
 MAX_CLI = 256
+
+# the exec signal a dying child sends its parent (NP_NotifyOnDeath)
+SIGF_CHILD = 1 << 1
 
 
 def _ami_proc(ctx):
@@ -76,6 +95,16 @@ def create_proc(dos, ctx, name, pri, seglist, stack_size):
         (DosTag.NP_SegList, seglist & 0xFFFFFFFF),
         (DosTag.NP_StackSize, stack_size & 0xFFFFFFFF),
         (DosTag.NP_Priority, pri & 0xFFFFFFFF),
+        # AOS 3.x compat (AROS createproc.c): CreateProc must not free the
+        # caller's seglist, must not close the inherited handles and must not
+        # break Forbid() locking, so it passes 0 for the dirs/handles.
+        (DosTag.NP_FreeSegList, 0),
+        (DosTag.NP_CurrentDir, 0),
+        (DosTag.NP_HomeDir, 0),
+        (DosTag.NP_Input, 0),
+        (DosTag.NP_Output, 0),
+        (DosTag.NP_CloseInput, 0),
+        (DosTag.NP_CloseOutput, 0),
     ]
     name_mem = None
     if name:
@@ -88,8 +117,50 @@ def create_proc(dos, ctx, name, pri, seglist, stack_size):
         tag_list.free()
         if name_mem is not None:
             ctx.alloc.free_cstr(name_mem)
-    log_dos.info("CreateProc(%s, pri=%d) -> %06x", name, pri, proc_addr)
-    return proc_addr
+    if proc_addr == 0:
+        log_dos.info("CreateProc(%s, pri=%d) -> failed", name, pri)
+        return 0
+    # CreateProc() returns the process's pr_MsgPort, not the Process struct
+    msg_port_addr = ProcessStruct(ctx.mem, proc_addr).msg_port.addr
+    log_dos.info(
+        "CreateProc(%s, pri=%d) -> msg_port=%06x (proc=%06x)",
+        name,
+        pri,
+        msg_port_addr,
+        proc_addr,
+    )
+    return msg_port_addr
+
+
+# sentinel to tell "tag not given" apart from an explicit zero value
+_UNSET = object()
+
+
+def _tag_data(tags, tag):
+    """tag value or ``None`` when the tag is absent (an explicit 0 is kept)"""
+    val = tags.get_tag_data(tag, _UNSET)
+    return None if val is _UNSET else val
+
+
+def _current_proc_addr(ctx):
+    """address of the DOS process currently running (0 if none)"""
+    # exec's ThisTask variable is the canonical current process
+    exec_lib = getattr(ctx, "exec_lib", None)
+    if exec_lib is not None:
+        el = getattr(exec_lib, "exec_lib", None)
+        if el is not None:
+            addr = el.this_task.aptr
+            if addr:
+                return addr
+    process = getattr(ctx, "process", None)
+    if process is not None:
+        proc = getattr(process, "proc", None)
+        if proc is not None:
+            return proc.addr
+        task = getattr(process, "this_task", None)
+        if task is not None:
+            return task.addr
+    return 0
 
 
 def _new_proc_tags(ctx, tags):
@@ -97,55 +168,193 @@ def _new_proc_tags(ctx, tags):
     tag_list = tags.to_list(map_enum=DosTag, do_map=True)
     log_dos.info("CreateNewProc: tags=%s", tag_list)
 
-    entry_pc = tags.get_tag_data(DosTag.NP_Entry, 0)
-    seglist_bptr = tags.get_tag_data(DosTag.NP_SegList, 0)
-    stack_size = tags.get_tag_data(DosTag.NP_StackSize, 4096)
-    name_ptr = tags.get_tag_data(DosTag.NP_Name, 0)
-    priority = tags.get_tag_data(DosTag.NP_Priority, 0)
-    current_dir = tags.get_tag_data(DosTag.NP_CurrentDir, 0)
-    home_dir = tags.get_tag_data(DosTag.NP_HomeDir, 0)
-    input_fh = tags.get_tag_data(DosTag.NP_Input, 0)
-    output_fh = tags.get_tag_data(DosTag.NP_Output, 0)
+    entry_pc = _tag_data(tags, DosTag.NP_Entry)
+    seglist_bptr = _tag_data(tags, DosTag.NP_SegList)
+    stack_size = _tag_data(tags, DosTag.NP_StackSize)
+    name_ptr = _tag_data(tags, DosTag.NP_Name)
+    priority = _tag_data(tags, DosTag.NP_Priority)
+    current_dir = _tag_data(tags, DosTag.NP_CurrentDir)
+    home_dir = _tag_data(tags, DosTag.NP_HomeDir)
+    input_fh = _tag_data(tags, DosTag.NP_Input)
+    output_fh = _tag_data(tags, DosTag.NP_Output)
+    error_fh = _tag_data(tags, DosTag.NP_Error)
+    close_input = _tag_data(tags, DosTag.NP_CloseInput)
+    close_output = _tag_data(tags, DosTag.NP_CloseOutput)
+    close_error = _tag_data(tags, DosTag.NP_CloseError)
+    console_task = _tag_data(tags, DosTag.NP_ConsoleTask)
+    window_ptr = _tag_data(tags, DosTag.NP_WindowPtr)
+    arguments_ptr = _tag_data(tags, DosTag.NP_Arguments)
+    notify_on_death = _tag_data(tags, DosTag.NP_NotifyOnDeath)
+    exit_code = _tag_data(tags, DosTag.NP_ExitCode)
+    exit_data = _tag_data(tags, DosTag.NP_ExitData)
+    free_seglist = _tag_data(tags, DosTag.NP_FreeSegList)
+    user_data = _tag_data(tags, DosTag.NP_UserData)
 
-    name = ctx.mem.r_cstr(name_ptr) if name_ptr != 0 else "child_process"
-    if entry_pc == 0 and seglist_bptr == 0:
+    # tags that vamos accepts but does not act on yet
+    if _tag_data(tags, DosTag.NP_Synchronous):
+        log_dos.warning("CreateNewProc: NP_Synchronous is not supported (ignored)")
+    if _tag_data(tags, DosTag.NP_Cli):
+        log_dos.warning("CreateNewProc: NP_Cli is not supported (ignored)")
+    if _tag_data(tags, DosTag.NP_Path):
+        log_dos.warning("CreateNewProc: NP_Path is not supported (ignored)")
+    if _tag_data(tags, DosTag.NP_CommandName):
+        log_dos.warning("CreateNewProc: NP_CommandName is not supported (ignored)")
+    if _tag_data(tags, DosTag.NP_CopyVars) == 0:
+        # local variables are shared process-wide in vamos
+        log_dos.info("CreateNewProc: NP_CopyVars=FALSE (local vars are shared)")
+
+    if entry_pc is None and seglist_bptr is None:
         log_dos.warning("CreateNewProc: no NP_Entry or NP_SegList")
         return None
-    if entry_pc == 0 and seglist_bptr != 0:
-        seg_addr = seglist_bptr << 2
-        entry_pc = seg_addr + 4
+    if entry_pc is None:
+        entry_pc = (seglist_bptr << 2) + 4
+
+    parent_addr = _current_proc_addr(ctx)
+    parent = ProcessStruct(ctx.mem, parent_addr) if parent_addr else None
+
+    # RKRM AmigaDOS defaults: name "New Process", stack 4000, priority 0;
+    # input/output default to NIL: (see _spawn) and the error stream to ZERO.
+    # Current/home dir, console task and window are inherited from the parent.
+    if stack_size is None:
+        stack_size = 4000
+    if name_ptr:
+        name = ctx.mem.r_cstr(name_ptr)
+    else:
+        name = "New Process"
+    if priority is None:
+        priority = 0
+    if current_dir is None:
+        current_dir = parent.current_dir.bptr if parent else 0
+    if home_dir is None:
+        home_dir = parent.home_dir.bptr if parent else 0
+    if console_task is None:
+        console_task = parent.console_task.aptr if parent else 0
+    if window_ptr is None:
+        window_ptr = parent.window_ptr.aptr if parent else 0xFFFFFFFF
+    if user_data is None:
+        user_data = 0
+
+    # input/output are closed on exit by default; the error stream is *not*
+    # (RKRM and the NDK dos/dostags.h agree on this asymmetric default)
+    if close_input is None:
+        close_input = 1
+    if close_output is None:
+        close_output = 1
+    if close_error is None:
+        close_error = 0
+
+    # NP_Arguments is copied into DOS memory and pushed into the input
+    # buffer so that ReadArgs() works in the child
+    arguments = None
+    if arguments_ptr is not None:
+        arguments = ctx.mem.r_cstr(arguments_ptr) if arguments_ptr else ""
+
+    flags = 0
+    if close_input:
+        flags |= ProcessFlags.PRF_CLOSEINPUT
+    if close_output:
+        flags |= ProcessFlags.PRF_CLOSEOUTPUT
+    if close_error:
+        flags |= ProcessFlags.PRF_CLOSEERROR
+    if free_seglist:
+        flags |= ProcessFlags.PRF_FREESEGLIST
+    if notify_on_death:
+        flags |= ProcessFlags.PRF_NOTIFYONDEATH
+    if arguments is not None:
+        flags |= ProcessFlags.PRF_FREEARGS
 
     log_dos.info(
-        "CreateNewProc: name=%s entry=%06x stack=%d pri=%d",
+        "CreateNewProc: name=%s entry=%06x stack=%d pri=%d flags=%x",
         name,
         entry_pc,
         stack_size,
         priority,
+        int(flags),
     )
     return {
         "name": name,
         "entry_pc": entry_pc,
-        "seglist_bptr": seglist_bptr,
+        "seglist_bptr": seglist_bptr if seglist_bptr is not None else 0,
         "stack_size": stack_size,
         "priority": priority,
         "current_dir": current_dir,
         "home_dir": home_dir,
         "input_fh": input_fh,
         "output_fh": output_fh,
+        "error_fh": error_fh,
+        "console_task": console_task,
+        "window_ptr": window_ptr,
+        "user_data": user_data,
+        "arguments": arguments,
+        "flags": flags,
+        "exit_code": exit_code or 0,
+        "exit_data": exit_data or 0,
+        "notify_on_death": 1 if notify_on_death else 0,
+        "parent_addr": parent_addr,
     }
+
+
+def _open_nil_fh(dos, mode, label):
+    """open the ``NIL:`` handle a missing NP_Input/NP_Output needs"""
+    fh = dos.file_mgr.open(None, "NIL:", mode)
+    if fh is None:
+        log_dos.warning("CreateNewProc: cannot open NIL: for %s", label)
+    return fh
+
+
+def _resolve_child_fh(dos, bptr, mode, label):
+    """the caller's handle, or the NIL: default when the tag was absent
+
+    An explicit ``0`` (BNULL) is kept: it means "no handle", not "NIL:"
+    (AROS only opens NIL: for a tag that was not specified at all).
+    """
+    if bptr is not None:
+        return bptr
+    fh = _open_nil_fh(dos, mode, label)
+    return fh.b_addr if fh is not None else 0
 
 
 def _spawn(dos, ctx, p):
     """create and schedule the child process described by ``p``"""
+    # NP_Arguments is copied into DOS memory *before* the child starts so its
+    # entry point receives the string in A0 and its length in D0, as documented
+    # in RKRM ("the string and its lengths will be loaded into registers A0 and
+    # D0 before execution of the process begins").
+    arg_mem = None
+    arg_addr = 0
+    arg_len = 0
+    if p["arguments"] is not None:
+        arg_mem = ctx.alloc.alloc_cstr(p["arguments"], label="CreateNewProc_Args")
+        arg_addr = arg_mem.addr
+        arg_len = len(p["arguments"])
+
+    odg_base = getattr(ctx, "odg_base", 0)
+    start_regs = {
+        REG_D0: arg_len,
+        REG_A0: arg_addr,
+        # D2 holds the stack size and the old DOS register guard is installed in
+        # A2/A5/A6, exactly like a process vamos loaded from a seglist
+        REG_D2: p["stack_size"],
+        REG_A2: odg_base,
+        REG_A5: odg_base,
+        REG_A6: odg_base,
+    }
     # the child is a process of its own: the scheduler runs it beside
-    # its parent, and it is freed once its task ends (_child_proc_event)
-    child = dos.create_child_process(
-        ctx,
-        p["name"],
-        stack_size=p["stack_size"],
-        start_pc=p["entry_pc"],
-        start_regs={REG_D0: 0, REG_A0: 0},
-    )
+    # its parent, and it is freed once its task ends (child_proc_event)
+    try:
+        child = dos.create_child_process(
+            ctx,
+            p["name"],
+            stack_size=p["stack_size"],
+            start_pc=p["entry_pc"],
+            start_regs=start_regs,
+        )
+    except Exception:
+        # creating the process failed: the copied arguments are not owned by
+        # anybody yet and have to be released (RKRM "What's Released on Error?")
+        if arg_mem is not None:
+            ctx.alloc.free_cstr(arg_mem)
+        raise
     proc = child.proc
     task = proc.task
     stack = child.get_stack()
@@ -153,26 +362,44 @@ def _spawn(dos, ctx, p):
     task.sp_reg.aptr = stack.get_initial_sp()
     task.sp_lower.aptr = stack.get_lower()
     task.sp_upper.aptr = stack.get_upper()
+    task.tc_UserData.aptr = p["user_data"]
     proc.stack_size.val = stack.get_size()
     proc.stack_base.bptr = stack.get_lower() >> 2
     proc.seg_list.bptr = p["seglist_bptr"]
     proc.glob_vec.aptr = 0xFFFFFFFF
     proc.current_dir.bptr = p["current_dir"]
     proc.home_dir.bptr = p["home_dir"]
-    proc.window_ptr.aptr = 0xFFFFFFFF
+    proc.window_ptr.aptr = p["window_ptr"]
+    proc.console_task.aptr = p["console_task"]
+    proc.flags.val = int(p["flags"])
+    proc.exit_code.aptr = p["exit_code"]
+    proc.exit_data.val = p["exit_data"]
 
-    input_fh = p["input_fh"]
-    output_fh = p["output_fh"]
-    if input_fh == 0 or output_fh == 0:
-        parent_proc = ctx.exec_lib.exec_lib.this_task.aptr
-        if parent_proc != 0:
-            parent = ProcessStruct(ctx.mem, parent_proc)
-            if input_fh == 0:
-                input_fh = parent.cis.bptr
-            if output_fh == 0:
-                output_fh = parent.cos.bptr
+    # NP_Input/NP_Output default to a fresh NIL: open; NP_Error defaults to
+    # ZERO (RKRM). An explicit 0 (BNULL) is kept as 0 for all three.
+    input_fh = _resolve_child_fh(dos, p["input_fh"], "r", "input")
+    output_fh = _resolve_child_fh(dos, p["output_fh"], "w", "output")
+    error_fh = p["error_fh"] if p["error_fh"] is not None else 0
     proc.cis.bptr = input_fh
     proc.cos.bptr = output_fh
+    proc.ces.bptr = error_fh
+
+    # remember what the exit cleanup in child_proc_event() needs
+    child.dos_ctx = ctx
+    child.dos_flags = p["flags"]
+    child.dos_exit_code = p["exit_code"]
+    child.dos_exit_data = p["exit_data"]
+    child.dos_notify = p["notify_on_death"]
+    child.dos_parent_addr = p["parent_addr"]
+    child.dos_arg_mem = arg_mem
+
+    # NP_Arguments: record it and push it into the input buffer so that
+    # ReadArgs() sees it in the child (RKRM)
+    if arg_mem is not None:
+        proc.arguments.aptr = arg_addr
+        fh = dos.file_mgr.get_by_b_addr(input_fh)
+        if fh is not None:
+            fh.setbuf(p["arguments"])
 
     # the process port is signalled with SIGB_DOS. it is no public port:
     # FindPort() does not find it, a child that wants one adds its own
@@ -189,10 +416,11 @@ def _spawn(dos, ctx, p):
     task.state.val = TaskState.TS_READY
 
     log_dos.info(
-        "CreateNewProc: created process %06x entry=%06x port=%06x",
+        "CreateNewProc: created process %06x entry=%06x port=%06x flags=%x",
         proc.addr,
         p["entry_pc"],
         port_addr,
+        int(p["flags"]),
     )
     return proc.addr
 
@@ -206,6 +434,161 @@ def create_new_proc(dos, ctx, tags):
     if params is None:
         return 0
     return _spawn(dos, ctx, params)
+
+
+# ----- child process shutdown -----
+
+
+def _close_child_fh(dos, bptr, label):
+    """close one of the child's handles if it is safe to do so"""
+    if not bptr:
+        return
+    try:
+        fh = dos.file_mgr.get_by_b_addr(bptr)
+    except (ValueError, VamosInternalError):
+        fh = None
+    if fh is None:
+        return
+    # never close the shared standard handles: they are not ours
+    if fh in (dos.file_mgr.std_input, dos.file_mgr.std_output):
+        log_dos.warning("CreateNewProc: not closing shared std %s handle", label)
+        return
+    log_dos.info("CreateNewProc: closing child %s handle", label)
+    dos.file_mgr.close(fh)
+
+
+def _free_child_seglist(dos, ctx, bptr):
+    """unload the child's seglist if DOS manages it (NP_FreeSegList)"""
+    if not bptr:
+        return
+    if bptr >= 0x80000000:
+        bptr -= 0x100000000
+    if bptr in dos.seg_lists:
+        dos._unload_seg_list(ctx, bptr)
+        return
+    seg_loader = getattr(ctx, "seg_loader", None)
+    if seg_loader is not None and bptr in getattr(seg_loader, "infos", {}):
+        seg_loader.unload_seglist(abs(bptr))
+        return
+    log_dos.info(
+        "CreateNewProc: NP_FreeSegList set but seglist %06x is not managed by DOS",
+        bptr,
+    )
+
+
+def _call_exit_handler(dos, ctx, child, ret_code, exit_code, exit_data):
+    """call the NP_ExitCode handler with the process return code"""
+    runner = getattr(ctx, "runner", None)
+    if runner is None:
+        log_dos.warning("CreateNewProc: no runner to call NP_ExitCode %06x", exit_code)
+        return
+    code = Code(
+        pc=exit_code,
+        sp=child.get_stack().get_initial_sp(),
+        set_regs={
+            REG_D0: ret_code & 0xFFFFFFFF,
+            REG_D1: exit_data & 0xFFFFFFFF,
+        },
+        get_regs=[],
+    )
+    log_dos.info(
+        "CreateNewProc: calling NP_ExitCode %06x(rc=%d, data=%d)",
+        exit_code,
+        ret_code,
+        exit_data,
+    )
+    try:
+        run_state = runner(code)
+    except Exception as e:  # the exit handler must not break the shutdown
+        log_dos.warning("CreateNewProc: NP_ExitCode %06x failed: %s", exit_code, e)
+        return
+    if run_state is not None and run_state.mach_error is not None:
+        log_dos.warning(
+            "CreateNewProc: NP_ExitCode %06x machine error: %s",
+            exit_code,
+            run_state.mach_error,
+        )
+
+
+def _notify_parent_death(ctx, parent_addr):
+    """signal the parent task that a child died (NP_NotifyOnDeath)"""
+    scheduler = getattr(ctx, "scheduler", None)
+    if scheduler is None or parent_addr == 0:
+        return
+
+    def pred(task):
+        map_task = getattr(task, "map_task", None)
+        if map_task is None:
+            return False
+        ami = map_task.get_ami_task()
+        return ami is not None and ami.addr == parent_addr
+
+    parent_task = scheduler.find_task_pred_func(pred)
+    if parent_task is None:
+        log_dos.warning(
+            "CreateNewProc: NP_NotifyOnDeath parent %06x not found", parent_addr
+        )
+        return
+    log_dos.info("CreateNewProc: signalling parent %06x (SIGF_CHILD)", parent_addr)
+    parent_task.set_signal(SIGF_CHILD, SIGF_CHILD)
+
+
+def _child_exit_cleanup(dos, child, ret_code):
+    """emulate the DOS part of a process shutdown before it is freed"""
+    ctx = getattr(child, "dos_ctx", None)
+    if ctx is None:
+        return
+    flags = getattr(child, "dos_flags", 0)
+    proc = child.proc
+    # NP_ExitCode(return code, exit data)
+    exit_code = getattr(child, "dos_exit_code", 0)
+    if exit_code:
+        _call_exit_handler(
+            dos, ctx, child, ret_code, exit_code, getattr(child, "dos_exit_data", 0)
+        )
+    # close the process's handles
+    if flags & ProcessFlags.PRF_CLOSEINPUT:
+        _close_child_fh(dos, proc.cis.bptr, "input")
+    if flags & ProcessFlags.PRF_CLOSEOUTPUT:
+        _close_child_fh(dos, proc.cos.bptr, "output")
+    if flags & ProcessFlags.PRF_CLOSEERROR:
+        _close_child_fh(dos, proc.ces.bptr, "error")
+    # unload the seglist
+    if flags & ProcessFlags.PRF_FREESEGLIST:
+        _free_child_seglist(dos, ctx, proc.seg_list.bptr)
+    # free the copied NP_Arguments
+    arg_mem = getattr(child, "dos_arg_mem", None)
+    if arg_mem is not None:
+        ctx.alloc.free_cstr(arg_mem)
+        child.dos_arg_mem = None
+    # NP_NotifyOnDeath: signal the parent task
+    if flags & ProcessFlags.PRF_NOTIFYONDEATH:
+        _notify_parent_death(ctx, getattr(child, "dos_parent_addr", 0))
+
+
+def child_proc_event(dos, event):
+    """free a process made by CreateNewProc() once its task has ended"""
+    if event.type != SchedulerEvent.Type.REMOVE_TASK:
+        return
+    child = dos.child_procs.pop(event.task, None)
+    if child is None:
+        return
+    ret_code = event.task.get_exit_code()
+    if ret_code is None:
+        # NativeTask only stores exit_code after it has reported REMOVE_TASK,
+        # so read the return code the code left in D0 from the run state
+        run_state = getattr(event.task, "run_state", None)
+        regs = getattr(run_state, "regs", None) if run_state is not None else None
+        if regs:
+            ret_code = regs[REG_D0] & 0xFF
+        else:
+            ret_code = 0
+    _child_exit_cleanup(dos, child, ret_code)
+    port_addr = child.proc.msg_port.addr
+    if dos.port_mgr.has_port(port_addr):
+        dos.port_mgr.unregister_port(port_addr)
+    log_dos.info("CreateNewProc: process %06x ended", child.proc.addr)
+    child.free()
 
 
 def exit_process(dos, ctx, return_code):
@@ -379,10 +762,21 @@ def system_tag_list(dos, ctx, cmd, tag_list):
     if ctx.process.is_native_shell():
         cli_addr = ctx.process.get_cli_struct()
         cli = CLIStruct(ctx.mem, cli_addr)
-        new_input = dos.file_mgr.open(None, "NIL:", "r")
-        if new_input == None:
+        # a caller supplied SYS_Input handle receives the command line, else
+        # vamos opens a fresh NIL: stream to push the commands into
+        new_input = None
+        if tag_list is not None:
+            intag = tag_list.find_tag(DosTag.SYS_Input)
+            if intag is not None:
+                data = intag.get_data()
+                if data:
+                    new_input = dos.file_mgr.get_by_b_addr(data)
+        if new_input is None:
+            new_input = dos.file_mgr.open(None, "NIL:", "r")
+        if new_input is None:
             log_dos.warning(
-                "SystemTagList: can't create new input file handle for SystemTagList('%s')",
+                "SystemTagList: can't create new input file handle for "
+                "SystemTagList('%s')",
                 cmd,
             )
             return 0xFFFFFFFF
@@ -410,7 +804,6 @@ def system_tag_list(dos, ctx, cmd, tag_list):
         packet = ctx.process.run_system()
         stack_size = cli.cli_DefaultStack.val << 2
         current_dir = ctx.process.get_current_dir()
-        cur_lock = dos.lock_mgr.get_by_b_addr(current_dir >> 2)
         dup_lock = dos.lock_mgr.dup_lock(dos.get_current_dir(ctx))
         cur_module = cli.cli_Module.aptr
         cur_out = ctx.process.this_task.pr_COS.aptr
@@ -436,7 +829,7 @@ def system_tag_list(dos, ctx, cmd, tag_list):
         cli.cli_StandardInput.aptr = input_fhsi
         cli.cli_Background.val = DOSFALSE
         cli.cli_Module.aptr = cur_module
-        if output_fhci != None:
+        if output_fhci is not None:
             cli.cli_StandardOutput.aptr = output_fhci
         # Channels are closed by the dying shell
         ctx.mem.w_bstr(cli.cli_SetName.aptr, cur_setname)
@@ -493,15 +886,14 @@ def load_seg_list(dos, ctx, name, lock):
 def run_command(dos, ctx, b_addr, stack, args, length):
     if b_addr >= 0x80000000:
         b_addr -= 0x100000000
-    if not b_addr in dos.seg_lists:
+    if b_addr not in dos.seg_lists:
         raise VamosInternalError(
             "Trying to run unknown LoadSeg seg_list: b_addr=%06x" % b_addr
         )
     else:
         name = dos.seg_lists[b_addr]
-    fh = ctx.process.get_input()
     cmdline = ctx.mem.r_cstr(args)
-    # push command line into input buffer
+    # push command line into input buffer so ReadArgs()/ReadItem() see it
     input_fh = ctx.process.get_input()
     input_fh.setbuf(cmdline)
     log_dos.info(
@@ -514,9 +906,28 @@ def run_command(dos, ctx, b_addr, stack, args, length):
     # round up the stack
     stack = (stack + 3) & -4
     prog_start = (abs(b_addr) << 2) + 4
-    ret_code = ami_run_command(ctx.process, prog_start, args, length, stack)
-    # clear input
-    input_fh.setbuf("")
+    # the running command sees its arguments in pr_Arguments and returns
+    # through pr_ReturnAddr; both are restored afterwards (RKRM)
+    proc = _ami_proc(ctx)
+    old_args = old_return = None
+    if proc is not None:
+        old_args = proc.pr_Arguments.aptr
+        old_return = proc.pr_ReturnAddr.aptr
+        proc.pr_Arguments.aptr = args & 0xFFFFFFFF
+        machine = getattr(ctx, "machine", None)
+        if machine is not None:
+            proc.pr_ReturnAddr.aptr = machine.get_run_exit_addr()
+    try:
+        ret_code = ami_run_command(ctx.process, prog_start, args, length, stack)
+    finally:
+        if proc is not None:
+            proc.pr_Arguments.aptr = old_args
+            proc.pr_ReturnAddr.aptr = old_return
+        # flush leftover input, preserving IoErr (AROS does the same to fix
+        # the AmigaOS C:Execute)
+        io_err = getattr(dos, "io_err", 0)
+        input_fh.setbuf("")
+        dos.io_err = io_err
     return ret_code
 
 
@@ -526,9 +937,24 @@ def execute(dos, ctx, cmd, file, file2):
     ``file``/``file2`` are BPTRs to the input/output file handles to use while
     the command runs (zero keeps the current handle). The command is run
     through ``_system_tag_list`` (so a test can replace it on the DOS lib).
+    Returns DOSTRUE if the command could be found and started, DOSFALSE
+    otherwise (never the command's return code).
     """
-    if not cmd:
-        return DOSFALSE
+    # an empty command line with no handles creates a new interactive shell
+    # (RKRM/AROS map this to "Run NewShell")
+    if not cmd and not file and not file2:
+        cmd = "Run NewShell"
+    log_dos.info("Execute(%s, in=%s, out=%s)", cmd, file, file2)
+
+    # forward the handles as SYS_Input/SYS_Output tags (AROS does the same)
+    tags = []
+    if file:
+        tags.append((DosTag.SYS_Input, file))
+    if file2:
+        tags.append((DosTag.SYS_Output, file2))
+    tag_list = TagList.alloc(ctx.alloc, *tags) if tags else None
+
+    # keep the caller's handles visible to the non-native command runner
     proc = _ami_proc(ctx)
     old_cis = old_cos = None
     if proc is not None:
@@ -539,12 +965,15 @@ def execute(dos, ctx, cmd, file, file2):
         if file2:
             proc.pr_COS.bptr = file2
     try:
-        log_dos.info("Execute(%s, in=%s, out=%s)", cmd, file, file2)
-        return dos._system_tag_list(ctx, cmd, None)
+        result = dos._system_tag_list(ctx, cmd, tag_list)
     finally:
         if proc is not None:
             proc.pr_CIS.bptr = old_cis
             proc.pr_COS.bptr = old_cos
+        if tag_list is not None:
+            tag_list.free()
+    # SystemTagList() returns 0 for success, otherwise the command result
+    return DOSTRUE if result == 0 else DOSFALSE
 
 
 def do_shell_method_tag_list(dos, ctx, method, tags):
@@ -595,6 +1024,7 @@ def cli_init_run(dos, ctx, dp):
 
 __all__ = [
     "MAX_CLI",
+    "child_proc_event",
     "cli_init",
     "cli_init_newcli",
     "cli_init_run",
@@ -717,3 +1147,7 @@ class CliMixin:
 
     def DoShellMethodTagList(self, ctx, method: LONG, tags: TagList):
         return do_shell_method_tag_list(self, ctx, method.val, tags)
+
+    def _child_proc_event(self, event):
+        """free a process made by CreateNewProc() once its task has ended"""
+        return child_proc_event(self, event)

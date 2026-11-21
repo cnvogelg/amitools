@@ -1,7 +1,15 @@
 from amitools.vamos.log import log_proc
 from amitools.vamos.task import Stack
 from amitools.vamos.machine import Code
-from amitools.vamos.machine.regs import *
+from amitools.vamos.machine.regs import (
+    REG_D0,
+    REG_D1,
+    REG_D2,
+    REG_A0,
+    REG_A2,
+    REG_A5,
+    REG_A6,
+)
 from amitools.vamos.schedule import SchedulerEvent
 
 
