@@ -197,3 +197,82 @@ def dos_adfs_volume_e2e_test(tmp_path):
     assert volume.read_file(FSString("link.txt")) == DATA
     volume.close()
     blkdev.close()
+
+
+def dos_adfs_set_owner_test(tmp_path):
+    """dos.library SetOwner stores the owner and Examine reports it"""
+    image = make_image(tmp_path / "disk.adf")
+
+    def proc(ctx, task):
+        dos_lib = ctx.dos_lib
+        cpu = ctx.cpu
+        mem = ctx.mem
+        alloc = ctx.alloc
+
+        # SetOwner() packs uid in the high 16 bits and gid in the low 16
+        name = alloc.alloc_cstr("work:hello.txt")
+        cpu.w_reg(REG_D1, name.addr)
+        cpu.w_reg(REG_D2, 0x00C8_00C9)
+        assert (
+            dos_lib.SetOwner(
+                ctx,
+                CSTR(cpu=cpu, reg=REG_D1, mem=mem),
+                LONG(cpu=cpu, reg=REG_D2, mem=mem),
+            )
+            == DOSTRUE
+        )
+        alloc.free_cstr(name)
+
+        # Examine() fills fib_OwnerUID/fib_OwnerGID from the handler
+        name = alloc.alloc_cstr("work:hello.txt")
+        cpu.w_reg(REG_D1, name.addr)
+        cpu.w_reg(REG_D2, 0xFFFFFFFF)  # exclusive
+        lock_b = dos_lib.Lock(
+            ctx, CSTR(cpu=cpu, reg=REG_D1, mem=mem), cpu.r_reg(REG_D2)
+        )
+        alloc.free_cstr(name)
+        assert lock_b != 0
+
+        fib_mem = alloc.alloc_astruct(FileInfoBlockStruct, label="FIB")
+        cpu.w_reg(REG_D1, lock_b)
+        cpu.w_reg(REG_D2, fib_mem.addr)
+        assert dos_lib.Examine(ctx, cpu.r_reg(REG_D1), cpu.r_reg(REG_D2)) == DOSTRUE
+        fib = FileInfoBlockStruct(mem, fib_mem.addr)
+        assert fib.fib_OwnerUID.val == 0xC8
+        assert fib.fib_OwnerGID.val == 0xC9
+        alloc.free_struct(fib_mem)
+
+        cpu.w_reg(REG_D1, lock_b)
+        dos_lib.UnLock(ctx, cpu.r_reg(REG_D1))
+        return 0
+
+    def gen_task_list(mode_ctx):
+        dos_ctx = mode_ctx.dos_ctx
+        return [
+            DosProcess(
+                dos_ctx.machine,
+                dos_ctx.alloc,
+                "adfs",
+                func=lambda task: proc(dos_ctx, task),
+            )
+        ]
+
+    mode = BaseMode("adfs", gen_task_list)
+    args = [
+        "--vols-base-dir",
+        str(tmp_path / "volumes"),
+        "-V",
+        "work:" + image,
+    ]
+    assert main(cfg_files=[], args=args, mode=mode, single_return_code=False) == [0]
+
+    # the owner is persisted in the image
+    blkdev = ADFBlockDevice(image)
+    blkdev.open()
+    volume = ADFSVolume(blkdev)
+    volume.open()
+    node = volume.get_file_path_name(FSString("hello.txt"))
+    assert node.meta_info.get_owner_uid() == 0xC8
+    assert node.meta_info.get_owner_gid() == 0xC9
+    volume.close()
+    blkdev.close()

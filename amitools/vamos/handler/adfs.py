@@ -287,6 +287,8 @@ class AdfsHandler(FileSystemHandler):
             date=date,
             key=key,
             comment=mi.get_comment_unicode_str(),
+            owner_uid=mi.get_owner_uid(),
+            owner_gid=mi.get_owner_gid(),
         )
 
     def _info_data(self):
@@ -494,6 +496,14 @@ class AdfsHandler(FileSystemHandler):
         node, _ = self._node(ami_path)
         try:
             node.change_comment(FSString(comment))
+        except Exception as e:
+            raise HandlerError(_adfs_error(getattr(e, "code", None))) from None
+
+    def set_owner(self, lock, path, owner):
+        self._check_writable()
+        node, _ = self._node(path)
+        try:
+            node.change_owner((owner >> 16) & 0xFFFF, owner & 0xFFFF)
         except Exception as e:
             raise HandlerError(_adfs_error(getattr(e, "code", None))) from None
 
