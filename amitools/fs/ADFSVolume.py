@@ -2,6 +2,7 @@ from .block.BootBlock import BootBlock
 from .block.RootBlock import RootBlock
 from .ADFSVolDir import ADFSVolDir
 from .ADFSBitmap import ADFSBitmap
+from .ADFSNode import ADFSNode
 from .FileName import FileName
 from .RootMetaInfo import RootMetaInfo
 from .FSError import *
@@ -235,6 +236,13 @@ class ADFSVolume:
     def get_root_dir(self):
         return self.root_dir
 
+    def find_node(self, blk_num):
+        """a node already read into my directory tree whose header is block
+        blk_num, or None"""
+        if self.root_dir is None:
+            return None
+        return self.root_dir.find_node(blk_num)
+
     def get_dos_type(self):
         return self.boot.dos_type
 
@@ -409,6 +417,44 @@ class ADFSVolume:
                 )
         node.create_soft_link(base_name, target)
 
+    def create_hard_link(self, ami_path, target):
+        """Create a hard link at ami_path pointing to target.
+
+        ``target`` is the file node to link (or an :class:`FSString` path that
+        resolves to one). A hard link shares the target file's data and
+        metadata, so both names see the same file; a link to a directory is
+        refused."""
+        if not isinstance(ami_path, FSString):
+            raise ValueError("create_hard_link's ami_path must be a FSString")
+        if isinstance(target, FSString):
+            node = self.get_path_name(target)
+            if node is None:
+                raise FSError(FILE_NOT_FOUND, file_name=target)
+        elif isinstance(target, ADFSNode):
+            node = target
+        else:
+            raise ValueError("create_hard_link's target must be a node or FSString")
+        # check link path
+        fn = FileName(ami_path, is_intl=self.is_intl, is_longname=self.is_longname)
+        if not fn.is_valid():
+            raise FSError(INVALID_FILE_NAME, file_name=ami_path)
+        # split into dir and base name
+        dir_name, base_name = fn.get_dir_and_base_name()
+        if base_name == None:
+            raise FSError(INVALID_FILE_NAME, file_name=ami_path)
+        # find parent of link
+        if dir_name == None:
+            parent = self.root_dir
+        else:
+            parent = self.get_dir_path_name(dir_name)
+            if parent == None:
+                raise FSError(
+                    INVALID_PARENT_DIRECTORY,
+                    file_name=ami_path,
+                    extra="not found: " + dir_name.get_unicode(),
+                )
+        return parent.create_hard_link(base_name, node)
+
     def write_file(self, data, ami_path, suggest_name=None, cache=False):
         """Write given data as a file"""
         # get parent node and file_name
@@ -434,8 +480,11 @@ class ADFSVolume:
         return data
 
     def delete(self, ami_path, wipe=False, all=False):
-        """Delete a file or directory at given path"""
-        node = self.get_path_name(ami_path)
+        """Delete a file or directory at given path.
+
+        A link at the last path component is removed itself, not the object it
+        names, so a link can be deleted without touching its target."""
+        node = self.get_path_name(ami_path, follow_last=False)
         if node == None:
             raise FSError(FILE_NOT_FOUND, file_name=ami_path)
         node.delete(wipe=wipe, all=all)

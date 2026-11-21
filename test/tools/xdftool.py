@@ -501,6 +501,18 @@ def xdftool_makelink_readlink_test(xdftool, xdf_img, test_files):
     )
 
 
+def xdftool_makelink_hard_test(xdftool, xdf_img, test_files):
+    """create a hard link, read its target back and resolve through it"""
+    xdftool(xdf_img.file_name, ("write", test_files.file_path))
+    xdftool(xdf_img.file_name, ("makelink", "hard", test_files.file_name, "hard"))
+    # readlink prints the real file the hard link names
+    assert xdftool(xdf_img.file_name, ("readlink", "hard")) == [test_files.file_name]
+    # a lookup of the hard link resolves to the same data
+    assert (
+        xdftool(xdf_img.file_name, ("type", "hard"), raw_output=True) == test_files.data
+    )
+
+
 def xdftool_makelink_dir_test(xdftool, xdf_img, test_files):
     """a link to a directory resolves to the directory"""
     xdftool(

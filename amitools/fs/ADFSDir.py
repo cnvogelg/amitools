@@ -2,8 +2,10 @@ import struct
 from .block.Block import Block
 from .block.UserDirBlock import UserDirBlock
 from .block.EntryBlock import EntryBlock
+from .block.FileHeaderBlock import FileHeaderBlock
 from .block.DirCacheBlock import *
 from .ADFSFile import ADFSFile
+from .ADFSHardLink import ADFSHardLink
 from .ADFSSoftLink import ADFSSoftLink
 from .ADFSNode import ADFSNode, MAX_COMMENT_BYTES
 from .FileName import FileName
@@ -56,8 +58,8 @@ class ADFSDir(ADFSNode):
     def _read_add_node(self, blk, recursive):
         """the hash chain link and node of entry block blk. The node is None
         if blk gives none: it is no header, the header is invalid or of a
-        type that is not read, as a hard link or the root block, or the
-        blocks of its file cannot all be found. The link is 0 unless the
+        type that is not read, as a directory hard link or the root block, or
+        the blocks of its file cannot all be found. The link is 0 unless the
         header is valid"""
         node = None
         is_header = blk.valid_chksum and blk.type == Block.T_SHORT
@@ -71,9 +73,12 @@ class ADFSDir(ADFSNode):
             # its a soft link
             elif blk.sub_type == Block.ST_SOFTLINK:
                 node = ADFSSoftLink(self.volume, self)
+            # its a hard link
+            elif blk.sub_type == Block.ST_LINKFILE:
+                node = ADFSHardLink(self.volume, self)
         if node == None:
-            # a valid header of a type that is not read, as a hard link,
-            # leads on along its hash chain; the root block is in none
+            # a valid header of a type that is not read, as a directory hard
+            # link, leads on along its hash chain; the root block is in none
             if is_header and blk.sub_type != Block.ST_ROOT:
                 return blk._get_long(-4), None
             return 0, None
@@ -217,6 +222,23 @@ class ADFSDir(ADFSNode):
     def get_entries(self):
         self.ensure_entries()
         return self.entries
+
+    def find_node(self, blk_num):
+        """the node of mine or of a loaded sub directory whose header is
+        block blk_num, or None. A directory that is not read yet is not
+        searched: reading it later gives the node from disk."""
+        if self.block is not None and self.block.blk_num == blk_num:
+            return self
+        if self.entries is None:
+            return None
+        for e in self.entries:
+            if e.block is not None and e.block.blk_num == blk_num:
+                return e
+            if isinstance(e, ADFSDir):
+                found = e.find_node(blk_num)
+                if found is not None:
+                    return found
+        return None
 
     def has_name(self, fn):
         fn_hash = fn.hash(hash_size=self.hash_size)
@@ -402,6 +424,24 @@ class ADFSDir(ADFSNode):
         self._create_node(node, name, meta_info, update_ts)
         return node
 
+    def create_hard_link(self, name, target_node, meta_info=None, update_ts=True):
+        """create a hard link named name pointing at target_node.
+
+        A hard link can only name a file: a link to a directory, as the on-disk
+        format allows but AmigaDOS mishandles, is refused."""
+        if not isinstance(name, FSString):
+            raise ValueError("create_hard_link's name must be a FSString")
+        real = target_node
+        if isinstance(real, ADFSHardLink):
+            real = real.get_real_node()
+        if not isinstance(real, ADFSFile):
+            raise FSError(LINK_NOT_ALLOWED, node=target_node)
+        node = ADFSHardLink(self.volume, self)
+        node.real_node = real
+        node.real_entry = real.block.blk_num
+        self._create_node(node, name, meta_info, update_ts)
+        return node
+
     def check_delete(self, node, all=False, update_ts=True):
         """refuse to delete node, with all its entries if all is set,
         before anything is written"""
@@ -415,6 +455,18 @@ class ADFSDir(ADFSNode):
             raise FSError(
                 INTERNAL_ERROR, node=node, extra="node not found in hash chain"
             )
+        # a real file that hard links still name cannot go: its data header
+        # would be freed from under them. The links must be deleted first.
+        # Read the header fresh: an in-memory node may hold a stale chain
+        if isinstance(node, ADFSFile):
+            fhb = FileHeaderBlock(
+                self.blkdev, node.block.blk_num, self.volume.is_longname
+            )
+            fhb.read()
+            if fhb.valid and fhb.next_link != 0:
+                raise FSError(
+                    DELETE_NOT_ALLOWED, node=node, extra="hard links point here"
+                )
         if node.is_dir():
             node.ensure_entries()
             node.check_entries()
@@ -495,6 +547,9 @@ class ADFSDir(ADFSNode):
         # remove from my lists
         self.entries.remove(node)
         names.remove(node)
+
+        # a hard link also leaves the real file's link chain
+        node.unlink_extra()
 
         # nothing links the node any more: release its blocks
         self.volume.bitmap.dealloc_n(blk_nums)
@@ -726,6 +781,17 @@ class ADFSDir(ADFSNode):
                         return self._follow_link(
                             e, pc[1:], allow_file, allow_dir, depth
                         )
+                    else:
+                        return e
+                if isinstance(e, ADFSHardLink):
+                    # a hard link names a file: it has no further path
+                    # components, and is followed only if follow_last is set
+                    if len(pc) > 1:
+                        return None
+                    if follow_last:
+                        if not allow_file:
+                            return None
+                        return e.get_real_node()
                     else:
                         return e
                 if len(pc) > 1:

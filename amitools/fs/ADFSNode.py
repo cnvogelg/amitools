@@ -184,6 +184,11 @@ class ADFSNode:
     def delete_children(self, wipe, all, update_ts):
         pass
 
+    def unlink_extra(self):
+        """hook for a node that, on delete, also leaves a chain other than the
+        directory's hash chain (a hard link leaves its file's link list)"""
+        pass
+
     def rename(self, new_name, new_parent):
         """refresh my in-memory name and parent after a rename. The directory
         that relinks me writes my header."""

@@ -8,6 +8,7 @@ import argparse
 import os.path
 
 from amitools.fs.ADFSVolume import ADFSVolume
+from amitools.fs.ADFSHardLink import ADFSHardLink
 from amitools.fs.ADFSSoftLink import ADFSSoftLink
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 from amitools.fs.FSError import *
@@ -569,12 +570,21 @@ class MakeLinkCmd(Command):
 
     def handle_vol(self, vol):
         n = len(self.opts)
-        if n != 2:
-            print("Usage: makelink <ami_path> <target>")
+        if n < 2 or n > 3:
+            print("Usage: makelink <ami_path> <target> [hard]")
             return 1
         link_path = make_fsstr(self.opts[0])
         target = make_fsstr(self.opts[1])
-        vol.create_soft_link(link_path, target)
+        hard = n == 3 and self.opts[2] == "hard"
+        if hard:
+            # a hard link's target is an existing file, resolved on the volume
+            node = vol.get_path_name(target)
+            if node is None:
+                print("Target not found:", self.opts[1])
+                return 2
+            vol.create_hard_link(link_path, node)
+        else:
+            vol.create_soft_link(link_path, target)
         return 0
 
 
@@ -589,11 +599,15 @@ class ReadLinkCmd(Command):
         if node is None:
             print("Link not found:", self.opts[0])
             return 2
-        if not isinstance(node, ADFSSoftLink):
-            print("Not a link:", self.opts[0])
-            return 2
-        print(node.get_target().get_unicode())
-        return 0
+        if isinstance(node, ADFSSoftLink):
+            print(node.get_target().get_unicode())
+            return 0
+        if isinstance(node, ADFSHardLink):
+            # a hard link names a real file: print the file it points at
+            print(node.get_real_node().block.name.get_unicode())
+            return 0
+        print("Not a link:", self.opts[0])
+        return 2
 
 
 class WriteCmd(Command):
