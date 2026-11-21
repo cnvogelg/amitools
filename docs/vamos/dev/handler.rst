@@ -80,7 +80,7 @@ The action methods are grouped into three families:
 - ``set_mode(fh, cooked)`` / ``wait_for_char(fh, timeout)`` -- console-only
   operations (``ACTION_SCREEN_MODE`` / ``ACTION_WAIT_CHAR``).
 
-**Names** (path-based operations that need no open handle):
+**Names** (operations on a path or name that need no open file handle):
 
 - ``delete_object(ami_path)`` -- ``ACTION_DELETE_OBJECT``.
 - ``rename_object(old_path, new_path)`` -- ``ACTION_RENAME_OBJECT``.
@@ -88,6 +88,17 @@ The action methods are grouped into three families:
 - ``set_comment(ami_path, comment)`` -- ``ACTION_SET_COMMENT``.
 - ``set_date(ami_path, date)`` -- ``ACTION_SET_DATE``.
 - ``create_dir(ami_path)`` -- ``ACTION_CREATE_DIR``.
+- ``make_link(lock, name, dest, soft)`` -- ``ACTION_MAKE_LINK``. Creates a link
+  named ``name`` in the directory of ``lock``. A soft link (``soft=True``)
+  stores ``dest`` as a path string; a hard link (``soft=False``) shares the
+  file named by the ``dest`` lock, so both names see the same data and
+  metadata.
+- ``read_link(lock, path, size)`` -- ``ACTION_READ_LINK``.
+
+The ADFS handler supports both kinds of link; the host file system supports
+soft links only (a hard link raises ``ERROR_NOT_IMPLEMENTED``). A hard link
+whose target lock belongs to a different handler is
+``ERROR_RENAME_ACROSS_DEVICES`` (``HandlerManager`` checks this).
 
 ``ACTION_METHODS`` is the 1:1 map from method name to ``DosAction``. The
 invariant is that *every* public action method models exactly one AmigaDOS

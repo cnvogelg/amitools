@@ -191,8 +191,16 @@ def handler_adfs_link_test(tmp_path):
     node = h.volume.get_link_path_name(FSString("link"))
     assert node.block.sub_type == Block.ST_SOFTLINK
     assert node.block.symbolic_name.get_unicode() == "target"
-    # a hard link cannot be expressed on an ADFS volume
-    expect_error(236, h.make_link, lock, "hard", lock, False)
+    # a hard link shares the target file: its dest is a lock on the file
+    target_lock = h.locate_object("target")
+    h.make_link(lock, "hard", target_lock, False)
+    assert read_file(h, "hard") == b"data"
+    assert h.same_lock(h.locate_object("hard"), target_lock) is True
+    # on disk it is a file header with sec_type ST_LINKFILE pointing at the
+    # real file's header block
+    link_node = h.volume.get_link_path_name(FSString("hard"))
+    assert link_node.block.sub_type == Block.ST_LINKFILE
+    assert link_node.block.real_entry == target_lock.node.block.blk_num
     # a plain file is not a link
     write_file(h, "plain", b"x")
     expect_error(212, h.read_link, lock, "plain", 32)
@@ -200,6 +208,27 @@ def handler_adfs_link_test(tmp_path):
     expect_error(205, h.read_link, lock, "gone", 32)
     # the name must be free
     expect_error(203, h.make_link, lock, "target", "x", True)
+
+
+def handler_adfs_hard_link_test(tmp_path):
+    h = make_handler(tmp_path / "work.adf")
+    write_file(h, "target", b"data")
+    lock = h.locate_object("")
+    h.make_link(lock, "hard", h.locate_object("target"), False)
+    # deleting the link keeps the target and its data
+    h.delete_object("hard")
+    assert read_file(h, "target") == b"data"
+    # the real file cannot be deleted while a hard link still names it
+    h.make_link(lock, "hard2", h.locate_object("target"), False)
+    expect_error(216, h.delete_object, "target")
+    h.delete_object("hard2")
+    h.delete_object("target")
+    expect_error(205, h.locate_object, "target")
+    # a hard link to a directory is refused
+    h.create_dir("dir")
+    expect_error(212, h.make_link, lock, "dlink", h.locate_object("dir"), False)
+    # a hard link's dest must be a lock, not a path string
+    expect_error(211, h.make_link, lock, "dlink", "dir", False)
 
 
 def handler_adfs_link_into_dir_test(tmp_path):
