@@ -54,10 +54,10 @@ def schedule_sdl_dispatch_batch_test(pump):
     sdl.SDL_PollEvent.side_effect = [1, 1, 1, 1, 0]
     lib.ingest_event.side_effect = [None, first, None, second]
     assert lib._pump_display(None)
-    assert [
-        call.args[1]
-        for call in lib.drain_pending_intui_events.call_args_list
-    ] == [first, second]
+    assert [call.args[1] for call in lib.drain_pending_intui_events.call_args_list] == [
+        first,
+        second,
+    ]
     sdl.SDL_WaitEventTimeout.assert_not_called()
 
 
@@ -292,18 +292,23 @@ def schedule_sdl_cycle_budget_still_limits_native_task_test(context):
 def schedule_multiple_callbacks_and_removal_test(context):
     scheduler = context.scheduler
     called = []
+
     def first():
         called.append("first")
         scheduler.remove_after_schedule_callback(first)
         scheduler.remove_after_schedule_callback(removed)
         scheduler.add_after_schedule_callback(added)
         return True
+
     def removed():
         called.append("removed")
+
     def added():
         called.append("added")
+
     def second():
         called.append("second")
+
     for callback in (first, removed, second, first):
         scheduler.add_after_schedule_callback(callback)
     context.python("task", lambda task: 0)

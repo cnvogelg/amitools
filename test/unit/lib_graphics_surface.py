@@ -91,8 +91,9 @@ def graphics_indexed_load_guest_planes_test(raster):
 def graphics_area_stipple_modes_and_origin_test(raster, mode):
     surface, state = raster
     surface.fill(state, 0, 0, 8, 8)
-    patterned = replace(state, foreground=3, background=6, mode=mode,
-                        area_pattern=(0xaaaa, 0x5555))
+    patterned = replace(
+        state, foreground=3, background=6, mode=mode, area_pattern=(0xAAAA, 0x5555)
+    )
     surface.fill(patterned, 1, 1, 6, 6)
     for y in range(8):
         for x in range(8):

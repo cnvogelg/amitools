@@ -83,6 +83,7 @@ IECODE_MBUTTON = 0x6A
 
 # def ts(label): print(f"{time.perf_counter():.6f} {label}")
 
+
 class IntuitionLibrary(LibImpl):
     def __init__(self):
         super().__init__()
@@ -385,7 +386,15 @@ class IntuitionLibrary(LibImpl):
             flags = True
 
         amiga_win_addr = self.create_window_struct(
-            ctx, left, top, width, height, idcmp_flags, title, screen, flags,
+            ctx,
+            left,
+            top,
+            width,
+            height,
+            idcmp_flags,
+            title,
+            screen,
+            flags,
             new_win.Flags.val,
         )
 
@@ -490,7 +499,15 @@ class IntuitionLibrary(LibImpl):
 
         # Return fake Amiga window pointer
         amiga_win_addr = self.create_window_struct(
-            ctx, left, top, width, height, idcmp_flags, title, screen, flags,
+            ctx,
+            left,
+            top,
+            width,
+            height,
+            idcmp_flags,
+            title,
+            screen,
+            flags,
             amiga_flags,
         )
         ctx.cpu.w_reg(REG_D0, amiga_win_addr)
@@ -570,21 +587,40 @@ class IntuitionLibrary(LibImpl):
         if self.default_screen is None:
             return 0
         ptr = ctx.cpu.r_reg(REG_A0)
-        values = dict(Width=640, Height=256, Depth=3, Font=0,
-                      DefaultTitle=0, DetailPen=1, BlockPen=0)
+        values = dict(
+            Width=640,
+            Height=256,
+            Depth=3,
+            Font=0,
+            DefaultTitle=0,
+            DetailPen=1,
+            BlockPen=0,
+        )
         if ptr:
             ns = NewScreenStruct(ctx.mem, ptr)
             values.update((name, getattr(ns, name).val) for name in values)
-        fields = {3: "Width", 4: "Height", 5: "Depth", 6: "DetailPen",
-                  7: "BlockPen", 8: "DefaultTitle", 11: "Font"}
+        fields = {
+            3: "Width",
+            4: "Height",
+            5: "Depth",
+            6: "DetailPen",
+            7: "BlockPen",
+            8: "DefaultTitle",
+            11: "Font",
+        }
         for item in TagList(ctx.mem, ctx.cpu.r_reg(REG_A1)):
             field = fields.get(item.get_tag() - SA_Dummy)
             if field is not None:
                 values[field] = item.get_data()
         screen = self.create_screen(
-            ctx, values["Width"], values["Height"], values["Depth"],
-            values["Font"], values["DefaultTitle"],
-            values["DetailPen"], values["BlockPen"]
+            ctx,
+            values["Width"],
+            values["Height"],
+            values["Depth"],
+            values["Font"],
+            values["DefaultTitle"],
+            values["DetailPen"],
+            values["BlockPen"],
         )
         if screen is None:
             return 0
@@ -599,7 +635,9 @@ class IntuitionLibrary(LibImpl):
 
     def LockPubScreen(self, ctx):
         name = ctx.cpu.r_reg(REG_A0)
-        if self.default_screen is None or (name and ctx.mem.r_cstr(name) != "Workbench"):
+        if self.default_screen is None or (
+            name and ctx.mem.r_cstr(name) != "Workbench"
+        ):
             return 0
         self._pub_screen_locks += 1
         return self.default_screen.addr
@@ -615,7 +653,8 @@ class IntuitionLibrary(LibImpl):
         if self._pub_list_memory is None:
             memory = ctx.alloc.alloc_memory(
                 ListStruct.get_size() + PubScreenNodeStruct.get_size() + 10,
-                label="Intuition public screens", except_on_failure=False
+                label="Intuition public screens",
+                except_on_failure=False,
             )
             if memory is None:
                 return 0
@@ -761,7 +800,16 @@ class IntuitionLibrary(LibImpl):
     # ----- Helper -----
 
     def create_window_struct(
-        self, ctx, left, top, width, height, idcmp_flags, title, screen_addr, flags,
+        self,
+        ctx,
+        left,
+        top,
+        width,
+        height,
+        idcmp_flags,
+        title,
+        screen_addr,
+        flags,
         amiga_flags=0,
     ):
         if not (0 < width <= 32767 and 0 < height <= 32767):
@@ -781,7 +829,9 @@ class IntuitionLibrary(LibImpl):
         )
         # Create host window
         host_width, host_height = self._display_size(width, height)
-        host_window = self.display.create_window(title, host_width, host_height, bool(flags))
+        host_window = self.display.create_window(
+            title, host_width, host_height, bool(flags)
+        )
 
         if not host_window:
             log_intui.error("Failed to create host window")
@@ -1032,7 +1082,11 @@ class IntuitionLibrary(LibImpl):
         # ---------- KEYBOARD ----------
         elif event.kind == "key":
             win = WindowStruct(ctx.mem, win_addr)
-            key = event.text_key if win.IDCMPFlags.val & IDCMP_VANILLAKEY else event.raw_key
+            key = (
+                event.text_key
+                if win.IDCMPFlags.val & IDCMP_VANILLAKEY
+                else event.raw_key
+            )
             if key is not None:
                 vanilla, code, qualifier = key
                 return PendingIntuiEvent(
@@ -1047,7 +1101,10 @@ class IntuitionLibrary(LibImpl):
 
         elif event.kind == "resize":
             scale = self._window_scales.get(window_id, self.display_scale)
-            width, height = max(1, int(event.x / scale[0])), max(1, int(event.y / scale[1]))
+            width, height = (
+                max(1, int(event.x / scale[0])),
+                max(1, int(event.y / scale[1])),
+            )
             if self._resize_window(ctx, win_addr, width, height):
                 return PendingIntuiEvent(win_addr, IDCMP_NEWSIZE, 0, 0, 0, window_id)
         elif event.kind == "expose":
@@ -1252,8 +1309,20 @@ class IntuitionLibrary(LibImpl):
             "Menu selection handled: %s", ctx.mem.r_cstr(item.ItemFill.get())
         )
 
-    def render_menu_item(self, ctx, frame, text, x, y, w, h, enabled=True,
-                         hovered=False, checked=False, shortcut=None):
+    def render_menu_item(
+        self,
+        ctx,
+        frame,
+        text,
+        x,
+        y,
+        w,
+        h,
+        enabled=True,
+        hovered=False,
+        checked=False,
+        shortcut=None,
+    ):
         font = self.graphics_lib.font_registry.get(self.graphics_lib.topaz_font)
         if font is not None:
             frame.menu_item(font, text, x, y, w, h, enabled, hovered, checked, shortcut)
@@ -1452,9 +1521,14 @@ class IntuitionLibrary(LibImpl):
             if graphics.palette is not None:
                 for n in range(1 << depth):
                     color = graphics.palette[n]
-                    rgb = (color.r, color.g, color.b) if hasattr(color, "r") else color[:3]
-                    graphics.SetRGB32CM(ctx, color_map, n,
-                                        *(c * 0x01010101 for c in rgb))
+                    rgb = (
+                        (color.r, color.g, color.b)
+                        if hasattr(color, "r")
+                        else color[:3]
+                    )
+                    graphics.SetRGB32CM(
+                        ctx, color_map, n, *(c * 0x01010101 for c in rgb)
+                    )
 
             # BitMap
             bm = screen.BitMap
@@ -1530,7 +1604,9 @@ class IntuitionLibrary(LibImpl):
             )
             if graphics.palette is not None:
                 graphics.screen_palettes[screen.ViewPort.addr] = graphics.palette.copy()
-                graphics._color_palettes[color_map] = graphics.screen_palettes[screen.ViewPort.addr]
+                graphics._color_palettes[color_map] = graphics.screen_palettes[
+                    screen.ViewPort.addr
+                ]
             rollback.pop_all()
             return screen
 
@@ -1608,7 +1684,9 @@ class IntuitionLibrary(LibImpl):
         ):
             value &= 0xFFFF
             if value:
-                if (minimum and not 0 < value <= current) or (not minimum and value < current):
+                if (minimum and not 0 < value <= current) or (
+                    not minimum and value < current
+                ):
                     success = 0
                 else:
                     field.val = value
@@ -1618,7 +1696,9 @@ class IntuitionLibrary(LibImpl):
         if self.find_window_id(window) is None:
             return
         win = WindowStruct(ctx.mem, window)
-        width, height = self._pending_window_sizes.get(window, (win.Width.val, win.Height.val))
+        width, height = self._pending_window_sizes.get(
+            window, (win.Width.val, win.Height.val)
+        )
         width += self._signed_word(dx)
         height += self._signed_word(dy)
         if win.Flags.val & 1:  # WFLG_SIZEGADGET
@@ -1631,7 +1711,9 @@ class IntuitionLibrary(LibImpl):
         win = WindowStruct(ctx.mem, window)
         if (win.Width.val, win.Height.val) == (width, height):
             return False
-        if not self.graphics_lib.resize_window_rastport(ctx, win.RPort.val, width, height):
+        if not self.graphics_lib.resize_window_rastport(
+            ctx, win.RPort.val, width, height
+        ):
             return False
         win.Width.val, win.Height.val = width, height
         win.GZZWidth.val = width - win.BorderLeft.val - win.BorderRight.val
@@ -1643,10 +1725,15 @@ class IntuitionLibrary(LibImpl):
         pending, self._pending_window_sizes = self._pending_window_sizes, {}
         for window, (width, height) in pending.items():
             window_id = self.find_window_id(window)
-            if window_id is not None and self._resize_window(ctx, window, width, height):
+            if window_id is not None and self._resize_window(
+                ctx, window, width, height
+            ):
                 scale = self._window_scales.get(window_id, self.display_scale)
-                self.display.resize_window(self.host_windows[window_id],
-                                     round(width * scale[0]), round(height * scale[1]))
+                self.display.resize_window(
+                    self.host_windows[window_id],
+                    round(width * scale[0]),
+                    round(height * scale[1]),
+                )
                 self.queue_idcmp(ctx, window, IDCMP_NEWSIZE)
                 self.queue_idcmp(ctx, window, IDCMP_REFRESHWINDOW)
         # Applications draw in response to input without Begin/EndRefresh.
@@ -1654,8 +1741,10 @@ class IntuitionLibrary(LibImpl):
         # another IDCMP_REFRESHWINDOW (which would ask the guest to redraw).
         if self.graphics_lib is not None:
             for rp_addr, backing in self.graphics_lib.rp_graphics_map.items():
-                if backing.batch.commands or getattr(backing, "present_pending", False) or getattr(
-                    getattr(backing, "surface", None), "dirty", False
+                if (
+                    backing.batch.commands
+                    or getattr(backing, "present_pending", False)
+                    or getattr(getattr(backing, "surface", None), "dirty", False)
                 ):
                     win_addr = self.rp_2_win_addr.get(rp_addr)
                     if win_addr is not None:
@@ -1746,7 +1835,6 @@ class IntuitionLibrary(LibImpl):
         rc = 0
         cpu.w_reg(REG_D0, rc)
 
-
     def _upload_surface(self, graphics):
         palette = getattr(graphics, "palette", self.graphics_lib.palette)
         graphics.frame.upload(graphics.surface.pixels, palette)
@@ -1759,8 +1847,16 @@ class IntuitionLibrary(LibImpl):
         if isinstance(command, BFDraw):
             surface.line(state, command.x1, command.y1, command.x2, command.y2, clip)
         elif isinstance(command, BitmapBlit):
-            surface.bitmap_blit(state, command.x, command.y, command.w, command.h,
-                                command.pixels, command.mask, clip)
+            surface.bitmap_blit(
+                state,
+                command.x,
+                command.y,
+                command.w,
+                command.h,
+                command.pixels,
+                command.mask,
+                clip,
+            )
         elif isinstance(command, BFTemplate):
             surface.template(
                 state, command.x, command.y, command.w, command.h, command.pixels, clip
@@ -1808,10 +1904,6 @@ class IntuitionLibrary(LibImpl):
                 graphics.batch.clear()
         else:
             graphics.batch.clear()
-
-
-
-
 
 
 class PendingIntuiEvent:

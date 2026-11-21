@@ -1,4 +1,5 @@
 from amitools.vamos.display.base import Color, Rect
+
 """Guest bitmap and color-map storage for the indexed graphics backend."""
 
 from contextlib import ExitStack
@@ -312,7 +313,6 @@ class GraphicsSupport:
             ctx.mem.w16(low_table + n * 2, low)
         palette = self._color_palettes.get(cm)
         if palette is not None:
-
             palette[n] = Color(*rgb, 255)
             for rp_addr, backing in self.rp_graphics_map.items():
                 if getattr(backing, "palette", None) is palette:

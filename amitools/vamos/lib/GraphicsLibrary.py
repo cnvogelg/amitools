@@ -262,8 +262,12 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
             stride = min(old.BytesPerRow.val, new.BytesPerRow.val)
             for plane in range(old.Depth.val):
                 for y in range(min(old.Rows.val, height)):
-                    ctx.mem.w_block(new.Planes[plane].val + y * new.BytesPerRow.val,
-                                    ctx.mem.r_block(old.Planes[plane].val + y * old.BytesPerRow.val, stride))
+                    ctx.mem.w_block(
+                        new.Planes[plane].val + y * new.BytesPerRow.val,
+                        ctx.mem.r_block(
+                            old.Planes[plane].val + y * old.BytesPerRow.val, stride
+                        ),
+                    )
             surface = RasterSurface(width, height)
             # The scratch descriptor remains owned with its planes. The
             # original public descriptor and RastPort never move.
@@ -280,7 +284,9 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
                 layer.Width.val, layer.Height.val = width, height
                 layer.bounds.MaxX.val = layer.bounds.MinX.val + width - 1
                 layer.bounds.MaxY.val = layer.bounds.MinY.val + height - 1
-                self._replace_region(ctx, layer.DamageList.val, [(0, 0, width - 1, height - 1)])
+                self._replace_region(
+                    ctx, layer.DamageList.val, [(0, 0, width - 1, height - 1)]
+                )
             rollback.pop_all()
         return True
 
@@ -330,9 +336,10 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
         frame = self.display.create_frame(window, width, height)
         if frame is None:
             return False
-        self.rp_graphics_map[rastport_addr] = RastPortGraphics(window, frame, width, height)
+        self.rp_graphics_map[rastport_addr] = RastPortGraphics(
+            window, frame, width, height
+        )
         return True
-
 
     def free_rast_port_graphics(self, ctx, rastport_addr):
         graphics = self.rp_graphics_map.pop(rastport_addr, None)
@@ -340,7 +347,6 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
             with ExitStack() as cleanup:
                 cleanup.callback(graphics.frame.close)
                 cleanup.callback(graphics.batch.clear)
-
 
     def get_rp_graphics(self, rastport_addr):
         rp_graphics = self.rp_graphics_map.get(rastport_addr, None)
@@ -362,10 +368,16 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
         font = get_display(ctx).open_font(path, size, style)
         if font is None:
             return None, None
-        addr = self._store_font(ctx, font, amiga_name or name, font.height,
-                                font.baseline, font.width, font.strike)
+        addr = self._store_font(
+            ctx,
+            font,
+            amiga_name or name,
+            font.height,
+            font.baseline,
+            font.width,
+            font.strike,
+        )
         return (font, addr) if addr else (None, None)
-
 
     def _store_font(self, ctx, font, name, height, ascent, width, strike):
         with ExitStack() as rollback:
@@ -463,7 +475,6 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
     def _release_host_font(owner):
         owner["refs"] -= 1
 
-
     def _retain_host_font(self, font_addr):
         owner = self._font_owners.get(font_addr)
         if owner is None:
@@ -522,7 +533,11 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
         font = self.font_registry.get(rp.Font.val or self.topaz_font)
         if font is None:
             return None
-        string = bytes(ctx.mem.r_block(string_ptr, count)).decode("latin-1").replace("\0", "\ufffd")
+        string = (
+            bytes(ctx.mem.r_block(string_ptr, count))
+            .decode("latin-1")
+            .replace("\0", "\ufffd")
+        )
         spacing = rp.TxSpacing.val
         parts = list(string) if spacing else [string]
         runs, advance = [], 0
@@ -534,7 +549,6 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
             runs.append((advance, part))
             advance += width + (spacing if spacing else 0)
         return font, runs, advance
-
 
     def _raster_state(self, ctx, rp):
         if not rp.BitMap.val:
@@ -554,7 +568,9 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
             tuple(
                 ctx.mem.r16(rp.AreaPtrn.val + n * 2)
                 for n in range(1 << rp.AreaPtSz.val)
-            ) if rp.AreaPtrn.val and 0 <= rp.AreaPtSz.val <= 8 else (),
+            )
+            if rp.AreaPtrn.val and 0 <= rp.AreaPtSz.val <= 8
+            else (),
         )
 
     def TextLength(self, ctx):
@@ -819,9 +835,15 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
             return
         color_map = ctx.mem.r32(vp + 4) if vp else 0
         if color_map in self._color_maps:
-            self.SetRGB32CM(ctx, color_map, index,
-                           *((ctx.cpu.r_reg(reg) & 15) * 0x11111111
-                             for reg in (REG_D1, REG_D2, REG_D3)))
+            self.SetRGB32CM(
+                ctx,
+                color_map,
+                index,
+                *(
+                    (ctx.cpu.r_reg(reg) & 15) * 0x11111111
+                    for reg in (REG_D1, REG_D2, REG_D3)
+                ),
+            )
             return
         palette[index] = Color(
             (ctx.cpu.r_reg(REG_D1) & 15) * 17,

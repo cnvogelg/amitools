@@ -142,7 +142,12 @@ def graphics_native_sdl_window_and_render_test(monkeypatch):
         intuition.check_refresh(ctx)
         assert not backing.batch.commands
         pixels = (ctypes.c_uint32 * (64 * 32))()
-        assert sdl2.SDL_SetRenderTarget(backing.frame.window.renderer, backing.frame.texture) == 0
+        assert (
+            sdl2.SDL_SetRenderTarget(
+                backing.frame.window.renderer, backing.frame.texture
+            )
+            == 0
+        )
         try:
             assert (
                 sdl2.SDL_RenderReadPixels(
@@ -237,7 +242,9 @@ def graphics_native_sdl_window_and_render_test(monkeypatch):
                 ctx.cpu.w_reg(reg, value)
             intuition.ScrollWindowRaster(ctx)
             intuition.check_refresh(ctx)
-            sdl2.SDL_SetRenderTarget(backing.frame.window.renderer, backing.frame.texture)
+            sdl2.SDL_SetRenderTarget(
+                backing.frame.window.renderer, backing.frame.texture
+            )
             try:
                 assert (
                     sdl2.SDL_RenderReadPixels(

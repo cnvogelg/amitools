@@ -65,5 +65,6 @@ def bitmap_font_mask(font, text):
                     bit = (loc >> 16) + x
                     data[y * width + left + x] = bool(
                         font.strike.data[y * font.strike.modulo + bit // 8]
-                        & (0x80 >> (bit & 7)))
+                        & (0x80 >> (bit & 7))
+                    )
     return width, font.height, bytes(data)

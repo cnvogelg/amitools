@@ -67,6 +67,7 @@ class Context:
             ),
         )
         from amitools.vamos.display.sdl import SDLDisplay
+
         self.display = SDLDisplay()
         self.display.fonts_opened = True
         self.graphics = GraphicsLibrary()

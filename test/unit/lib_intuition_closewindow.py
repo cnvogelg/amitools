@@ -8,7 +8,12 @@ import pytest
 from amitools.vamos.label import LabelManager
 from amitools.vamos.lib.GraphicsLibrary import GraphicsLibrary
 from amitools.vamos.lib.IntuitionLibrary import IntuitionLibrary
-from amitools.vamos.lib.graphics import RastPortStruct, LayerStruct, RectangleStruct, BitMapStruct
+from amitools.vamos.lib.graphics import (
+    RastPortStruct,
+    LayerStruct,
+    RectangleStruct,
+    BitMapStruct,
+)
 from amitools.vamos.lib.intuition import (
     IDCMP_NEWSIZE,
     IDCMP_CLOSEWINDOW,
@@ -96,6 +101,7 @@ class WindowContext:
         )
         self.graphics = GraphicsLibrary()
         from amitools.vamos.display.base import Color
+
         self.graphics.palette = {n: Color(n, n, n) for n in range(256)}
         self.graphics.alloc = self.alloc
         self.graphics.topaz_font = self.font.get_addr()
@@ -293,7 +299,8 @@ def intuition_window_programmatic_resize_test(ctx):
     ctx.intuition.check_refresh(ctx)
     assert (window.Width.val, window.Height.val) == (100, 52)
     ctx.sdl.SDL_SetWindowSize.assert_called_once_with(
-        ctx.intuition.find_window_id(target), 100, 52)
+        ctx.intuition.find_window_id(target), 100, 52
+    )
     message = ctx.messages.get_msg(MsgPort(ctx.mem, window.UserPort.val))
     assert message is not None
     assert ctx.mem.r32(message.addr + 20) == IDCMP_NEWSIZE
@@ -730,6 +737,7 @@ def intuition_mouse_requires_reporting_test(ctx):
 
 def intuition_rawkey_history_lifetime_test(ctx):
     from amitools.vamos.lib.intuition import IDCMP_RAWKEY, IntuiMessageStruct
+
     target = ctx.open()
     win = WindowStruct(ctx.mem, target)
     win.IDCMPFlags.val |= IDCMP_RAWKEY

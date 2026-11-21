@@ -43,6 +43,7 @@ class SetupLibManager(object):
         self.display_scale = display_scale
         self.display_aspect = display_aspect
         from amitools.vamos.display import create_display
+
         self.display = create_display(display_backend, display_output)
         # state
         self.seg_loader = None

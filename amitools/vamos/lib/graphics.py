@@ -10,42 +10,45 @@ JAM2 = 1
 COMPLEMENT = 2
 INVERSVID = 4
 
-#------ Font Styles (bit flags) -------
+# ------ Font Styles (bit flags) -------
 FSF_UNDERLINED = 0x01
-FSF_BOLD       = 0x02
-FSF_ITALIC     = 0x04
-FSF_EXTENDED   = 0x08
-FSF_COLORFONT  = 0x40
-FSF_TAGGED     = 0x80
+FSF_BOLD = 0x02
+FSF_ITALIC = 0x04
+FSF_EXTENDED = 0x08
+FSF_COLORFONT = 0x40
+FSF_TAGGED = 0x80
 
-#------ Font Flags (bit flags) -------
-FPF_ROMFONT     = 0x01
-FPF_DISKFONT    = 0x02
-FPF_REVPATH     = 0x04
-FPF_TALLDOT     = 0x08
-FPF_WIDEDOT     = 0x10
-FPF_PROPORTIONAL= 0x20
-FPF_DESIGNED    = 0x40
-FPF_REMOVED     = 0x80
+# ------ Font Flags (bit flags) -------
+FPF_ROMFONT = 0x01
+FPF_DISKFONT = 0x02
+FPF_REVPATH = 0x04
+FPF_TALLDOT = 0x08
+FPF_WIDEDOT = 0x10
+FPF_PROPORTIONAL = 0x20
+FPF_DESIGNED = 0x40
+FPF_REMOVED = 0x80
+
 
 @AmigaStructDef
 class TextAttrStruct(AmigaStruct):
     _format = [
-        (ULONG, "ta_Name"),   # STRPTR to font name
+        (ULONG, "ta_Name"),  # STRPTR to font name
         (UWORD, "ta_YSize"),  # font height
         (UBYTE, "ta_Style"),  # style flags
         (UBYTE, "ta_Flags"),  # font flags
     ]
 
+
 @AmigaStructDef
 class TTextAttrStruct(AmigaStruct):
     _format = [
-        (ULONG, "tta_Name"),   # STRPTR to font name
+        (ULONG, "tta_Name"),  # STRPTR to font name
         (UWORD, "tta_YSize"),  # font height
         (UBYTE, "tta_Style"),  # style flags
         (UBYTE, "tta_Flags"),  # font flags
-        (ULONG, "tta_Tags"),   # pointer to TagItem list
+        (ULONG, "tta_Tags"),  # pointer to TagItem list
     ]
+
 
 @AmigaStructDef
 class BitMapStruct(AmigaStruct):
@@ -55,7 +58,6 @@ class BitMapStruct(AmigaStruct):
         (UBYTE, "Flags"),
         (UBYTE, "Depth"),
         (UWORD, "pad"),
-
         # Explicitly define each bitplane pointer
         (ARRAY(ULONG, 8), "Planes"),  # PLANEPTR
     ]
@@ -64,13 +66,12 @@ class BitMapStruct(AmigaStruct):
 @AmigaStructDef
 class RastPortStruct(AmigaStruct):
     _format = [
-        (ULONG, "Layer"),           # struct Layer*
-        (ULONG, "BitMap"),          # struct BitMap*
-        (ULONG, "AreaPtrn"),        # UWORD*
-        (ULONG, "TmpRas"),          # struct TmpRas*
-        (ULONG, "AreaInfo"),        # struct AreaInfo*
-        (ULONG, "GelsInfo"),        # struct GelsInfo*
-
+        (ULONG, "Layer"),  # struct Layer*
+        (ULONG, "BitMap"),  # struct BitMap*
+        (ULONG, "AreaPtrn"),  # UWORD*
+        (ULONG, "TmpRas"),  # struct TmpRas*
+        (ULONG, "AreaInfo"),  # struct AreaInfo*
+        (ULONG, "GelsInfo"),  # struct GelsInfo*
         (UBYTE, "Mask"),
         (BYTE, "FgPen"),
         (BYTE, "BgPen"),
@@ -79,32 +80,26 @@ class RastPortStruct(AmigaStruct):
         (BYTE, "AreaPtSz"),
         (BYTE, "linpatcnt"),
         (BYTE, "dummy"),
-
         (UWORD, "Flags"),
         (UWORD, "LinePtrn"),
-
         (WORD, "cp_x"),
         (WORD, "cp_y"),
-
         (ARRAY(UBYTE, 8), "minterms"),
-
         (WORD, "PenWidth"),
         (WORD, "PenHeight"),
-
-        (ULONG, "Font"),            # struct TextFont*
-
+        (ULONG, "Font"),  # struct TextFont*
         (UBYTE, "AlgoStyle"),
         (UBYTE, "TxFlags"),
         (UWORD, "TxHeight"),
         (UWORD, "TxWidth"),
         (UWORD, "TxBaseline"),
         (WORD, "TxSpacing"),
-
-        (ULONG, "RP_User"),         # APTR*
+        (ULONG, "RP_User"),  # APTR*
         (ARRAY(ULONG, 2), "longreserved"),
         (ARRAY(UWORD, 7), "wordreserved"),
         (ARRAY(UBYTE, 8), "reserved"),
     ]
+
 
 @AmigaStructDef
 class RectangleStruct(AmigaStruct):
@@ -119,65 +114,61 @@ class RectangleStruct(AmigaStruct):
 @AmigaStructDef
 class RegionRectangleStruct(AmigaStruct):
     _format = [
-        (ULONG, "Next"),     # struct RegionRectangle*
-        (ULONG, "Prev"),     # struct RegionRectangle*
+        (ULONG, "Next"),  # struct RegionRectangle*
+        (ULONG, "Prev"),  # struct RegionRectangle*
         (RectangleStruct, "bounds"),
     ]
+
 
 @AmigaStructDef
 class RegionStruct(AmigaStruct):
     _format = [
         (RectangleStruct, "bounds"),
-        (ULONG, "RegionRectangle"),   # struct RegionRectangle*
+        (ULONG, "RegionRectangle"),  # struct RegionRectangle*
     ]
+
 
 @AmigaStructDef
 class LayerInfoStruct(AmigaStruct):
     _format = [
-        (ULONG, "top_layer"),            # struct Layer*
-        (ULONG, "resPtr1"),              # void* (V45 spare)
-        (ULONG, "resPtr2"),              # void* (V45 spare)
-        (ULONG, "FreeClipRects"),        # struct ClipRect*
-
-        (RectangleStruct, "bounds"),     # struct Rectangle
-
-        (SignalSemaphoreStruct, "Lock"), # struct SignalSemaphore
-        (MinListStruct, "gs_Head"),      # struct MinList
-
-        (WORD, "PrivateReserve3"),       # Private
-        (ULONG, "PrivateReserve4"),      # Private
-
+        (ULONG, "top_layer"),  # struct Layer*
+        (ULONG, "resPtr1"),  # void* (V45 spare)
+        (ULONG, "resPtr2"),  # void* (V45 spare)
+        (ULONG, "FreeClipRects"),  # struct ClipRect*
+        (RectangleStruct, "bounds"),  # struct Rectangle
+        (SignalSemaphoreStruct, "Lock"),  # struct SignalSemaphore
+        (MinListStruct, "gs_Head"),  # struct MinList
+        (WORD, "PrivateReserve3"),  # Private
+        (ULONG, "PrivateReserve4"),  # Private
         (UWORD, "Flags"),
-        (BYTE, "res_count"),             # V45 spare
+        (BYTE, "res_count"),  # V45 spare
         (BYTE, "LockLayersCount"),
-        (BYTE, "PrivateReserve5"),       # Private
-        (BYTE, "UserClipRectsCount"),    # Private
-
-        (ULONG, "BlankHook"),            # struct Hook*
-        (ULONG, "resPtr5"),              # Private
+        (BYTE, "PrivateReserve5"),  # Private
+        (BYTE, "UserClipRectsCount"),  # Private
+        (ULONG, "BlankHook"),  # struct Hook*
+        (ULONG, "resPtr5"),  # Private
     ]
+
 
 @AmigaStructDef
 class ViewPortStruct(AmigaStruct):
     _format = [
-        (ULONG, "Next"),              # struct ViewPort*
-        (ULONG, "ColorMap"),          # struct ColorMap*
-        (ULONG, "DspIns"),            # struct CopList*
-        (ULONG, "SprIns"),            # struct CopList*
-        (ULONG, "ClrIns"),            # struct CopList*
-        (ULONG, "UCopIns"),           # struct UCopList*
-
+        (ULONG, "Next"),  # struct ViewPort*
+        (ULONG, "ColorMap"),  # struct ColorMap*
+        (ULONG, "DspIns"),  # struct CopList*
+        (ULONG, "SprIns"),  # struct CopList*
+        (ULONG, "ClrIns"),  # struct CopList*
+        (ULONG, "UCopIns"),  # struct UCopList*
         (WORD, "DWidth"),
         (WORD, "DHeight"),
         (WORD, "DxOffset"),
         (WORD, "DyOffset"),
-
         (UWORD, "Modes"),
         (UBYTE, "SpritePriorities"),
         (UBYTE, "ExtendedModes"),
-
-        (ULONG, "RasInfo"),           # struct RasInfo*
+        (ULONG, "RasInfo"),  # struct RasInfo*
     ]
+
 
 @AmigaStructDef
 class LayerStruct(AmigaStruct):
@@ -214,7 +205,6 @@ class LayerStruct(AmigaStruct):
         (ULONG, "reserved2b"),
         (ULONG, "reserved2c"),
         (UWORD, "reserved2d"),
-
         # ⭐ Correct: pointer to Region, not embedded RegionStruct
         (ULONG, "DamageList"),
     ]

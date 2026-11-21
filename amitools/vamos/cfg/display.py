@@ -27,7 +27,9 @@ class DisplayParser(Parser):
             },
             {
                 "display": {
-                    "backend": Argument("--display-backend", help="display backend: sdl or png"),
+                    "backend": Argument(
+                        "--display-backend", help="display backend: sdl or png"
+                    ),
                     "output": Argument("--display-output", help="PNG output directory"),
                     "scale": Argument(
                         "--display-scale",
@@ -43,6 +45,13 @@ class DisplayParser(Parser):
             },
             "display",
             "host display options",
-            {"display": {"scale": "scale", "aspect": "aspect", "backend": "backend", "output": "output"}},
+            {
+                "display": {
+                    "scale": "scale",
+                    "aspect": "aspect",
+                    "backend": "backend",
+                    "output": "output",
+                }
+            },
             "display",
         )

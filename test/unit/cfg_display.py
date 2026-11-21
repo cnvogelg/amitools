@@ -10,7 +10,12 @@ def cfg_display_cli_and_ini_test():
     assert parser.parse(
         args=["--display-scale", "2", "--display-aspect", "4:3", "test"]
     )
-    assert parser.get_display_dict().display == {"scale": "2", "aspect": "4:3", "backend": "sdl", "output": "vamos-frames"}
+    assert parser.get_display_dict().display == {
+        "scale": "2",
+        "aspect": "4:3",
+        "backend": "sdl",
+        "output": "vamos-frames",
+    }
     parser.parse_dict_config({"display": {"scale": "1x2", "aspect": "square"}}, "ini")
     assert parse_display_scale(parser.get_display_dict().display.scale) == (1, 2)
 
@@ -35,7 +40,9 @@ def intuition_display_aspect_and_mouse_test():
 
 def cfg_display_png_test():
     parser = VamosMainParser()
-    assert parser.parse(args=["--display-backend", "png", "--display-output", "captures", "test"])
+    assert parser.parse(
+        args=["--display-backend", "png", "--display-output", "captures", "test"]
+    )
     assert parser.get_display_dict().display.backend == "png"
     assert parser.get_display_dict().display.output == "captures"
     parser.parse_dict_config({"display": {"backend": "sdl", "output": "frames"}}, "ini")
