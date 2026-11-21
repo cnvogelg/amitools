@@ -154,6 +154,10 @@ class Display:
     def poll(self, wait_ms=0, limit=64):
         return []
 
+    def request_fields(self, title, fields):
+        """Return edited field values, or None on cancellation/headless use."""
+        return None
+
     def open_fonts(self):
         return True
 

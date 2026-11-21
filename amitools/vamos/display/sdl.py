@@ -190,6 +190,11 @@ class SDLDisplay(Display):
                 result.append(translated)
         return result
 
+    def request_fields(self, title, fields):
+        from .sdl_requester import request_fields
+
+        return request_fields(title, fields)
+
     def open_fonts(self):
         try:
             from sdl2 import sdlttf
