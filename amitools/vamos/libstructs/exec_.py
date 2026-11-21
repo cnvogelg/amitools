@@ -13,7 +13,6 @@ from amitools.vamos.astructs import (
     UWORD,
     WORD,
     ULONG,
-    LONG,
     CSTR,
     ARRAY,
 )
@@ -366,6 +365,22 @@ class UnitStruct(AmigaStruct):
 
 
 # IORequests
+# The plain ``struct IORequest`` (0x20) that e.g. timer.device's
+# ``struct timerequest`` embeds. ``IORequestStruct`` below is the larger
+# ``struct IOStdReq`` (0x30) with the io_Actual/io_Length/io_Data/io_Offset
+# extension.
+@AmigaStructDef
+class IORequestBaseStruct(AmigaStruct):
+    _format = [
+        (MessageStruct, "io_Message"),
+        (APTR(DeviceStruct), "io_Device"),
+        (APTR(UnitStruct), "io_Unit"),
+        (UWORD, "io_Command"),
+        (UBYTE, "io_Flags"),
+        (BYTE, "io_Error"),
+    ]
+
+
 @AmigaStructDef
 class IORequestStruct(AmigaStruct):
     _format = [

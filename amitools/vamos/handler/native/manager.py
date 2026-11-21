@@ -21,6 +21,7 @@ from amitools.vamos.schedule import TaskState
 from amitools.vamos.task import DosProcess
 
 from ..base import (
+    ERROR_ACTION_NOT_KNOWN,
     ERROR_OBJECT_IN_USE,
     ERROR_OBJECT_NOT_FOUND,
     HandlerError,
@@ -209,6 +210,11 @@ class NativeHandlerManager:
             else:
                 startup_bptr = entry.struct.dol_Startup.val
             alt_port = handler.send_startup(bptr, startup_bptr, entry.baddr)
+            if not alt_port:
+                # a handler may move its action port by updating the device
+                # node's ``dol_Task`` (SFS starts a second process for it)
+                # instead of returning one in ``dp_Arg4``
+                alt_port = entry.struct.dol_Task.aptr
             if alt_port:
                 handler.handler_port = alt_port
         except Exception:
@@ -263,6 +269,15 @@ class NativeHandlerManager:
             return
         if err == ERROR_OBJECT_IN_USE:
             raise HandlerError(err, "native handler still has open objects")
+        if err == ERROR_ACTION_NOT_KNOWN:
+            # the handler does not implement ACTION_DIE at all (e.g. SFS
+            # 1.279 replies ERROR_ACTION_NOT_KNOWN), so it cannot be asked to
+            # exit; there is nothing to retry, tear it down anyway
+            log_handler.warning(
+                "native handler '%s' does not support ACTION_DIE; forcing teardown",
+                handler.name,
+            )
+            return
         raise HandlerError(err, "native handler '%s' refused to die" % handler.name)
 
     def _teardown(self, started):

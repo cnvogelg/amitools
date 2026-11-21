@@ -10,6 +10,7 @@ from amitools.vamos.libstructs import (
     MessageStruct,
     NodeStruct,
 )
+from amitools.vamos.astructs import CSTR
 
 
 def _offset(struct, name):
@@ -23,8 +24,6 @@ _MP_FLAGS = _offset(MsgPortStruct, "mp_Flags")
 _MP_SIGBIT = _offset(MsgPortStruct, "mp_SigBit")
 _MP_SIGTASK = _offset(MsgPortStruct, "mp_SigTask")
 _MP_MSGLIST = _offset(MsgPortStruct, "mp_MsgList")
-from amitools.vamos.astructs import CSTR
-from amitools.vamos.error import UnsupportedFeatureError
 
 
 class MessageFunc(FuncBase):
@@ -137,18 +136,6 @@ class MessageFunc(FuncBase):
         return msg
 
     def wait_port(self, port: MsgPort) -> Message:
-        # check port mgr first
-        has_port = self.port_mgr.has_port(port.addr)
-        if has_port:
-            has_msg = self.port_mgr.has_msg(port.addr)
-            if not has_msg:
-                raise UnsupportedFeatureError(
-                    "WaitPort on empty message queue called: Port (%06x)" % port.addr
-                )
-            msg_addr = self.port_mgr.peek_msg(port.addr)
-            log_exec.info("WaitPort: peek message %06x", msg_addr)
-            return Message(self.ctx.mem, msg_addr)
-
         # get sig mask
         mem = self.ctx.mem
         sig_bit = mem.r8(port.addr + _MP_SIGBIT)
@@ -157,15 +144,23 @@ class MessageFunc(FuncBase):
 
         log_exec.info("WaitPort: port=%s", port)
         while True:
-            msg_addr = list_first(mem, list_addr)
-            if msg_addr != 0:
-                break
+            # a port the Python port manager owns (it was AddPort'ed): peek its
+            # queue. a plain message port: check the exec message list.
+            if self.port_mgr.has_port(port.addr):
+                msg_addr = self.port_mgr.peek_msg(port.addr)
+                if msg_addr is not None:
+                    log_exec.info("WaitPort: peek message %06x", msg_addr)
+                    return Message(mem, msg_addr)
+            else:
+                msg_addr = list_first(mem, list_addr)
+                if msg_addr != 0:
+                    msg = Message(mem, msg_addr)
+                    log_exec.info("WaitPort: return msg %s", msg)
+                    return msg
+            # empty queue: block on the port's signal until a message is
+            # delivered (PutMsg signals the port's task)
             log_exec.debug("WaitPort: waiting for signal %s", sig_bit)
             self.signal_func.wait(sig_mask)
-
-        msg = Message(mem, msg_addr)
-        log_exec.info("WaitPort: return msg %s", msg)
-        return msg
 
     def add_port(self, port: MsgPort):
         log_exec.info("AddPort(%s)", port)

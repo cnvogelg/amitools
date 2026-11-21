@@ -3,7 +3,7 @@ from amitools.vamos.astructs import (
     AmigaStruct,
     ULONG,
 )
-from .exec_ import IORequestStruct
+from .exec_ import IORequestBaseStruct
 
 
 # TimeVal
@@ -16,6 +16,6 @@ class TimeValStruct(AmigaStruct):
 @AmigaStructDef
 class TimeRequestStruct(AmigaStruct):
     _format = [
-        (IORequestStruct, "tr_node"),
+        (IORequestBaseStruct, "tr_node"),
         (TimeValStruct, "tr_time"),
     ]
