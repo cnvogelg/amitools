@@ -1,9 +1,9 @@
-from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
 
 from lib_intuition_screen_font import Context
+from amitools.vamos.path import PathManager
 
 
 @pytest.mark.parametrize("labels", [False, True])
@@ -15,7 +15,7 @@ def graphics_lifetime_setup_rollback_test(monkeypatch, labels, failure):
     ctx.finish()
     graphics = ctx.graphics
     graphics.text_attr = graphics.topaz_font = None
-    ctx.path_mgr = SimpleNamespace(to_sys_path=lambda *args: None)
+    ctx.path_mgr = PathManager()
     ttf = ctx.ttf
     ttf.TTF_Init = Mock(return_value=-1 if failure == "init" else 0)
     ttf.TTF_Quit = Mock()

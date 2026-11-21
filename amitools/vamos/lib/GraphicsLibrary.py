@@ -87,7 +87,9 @@ class GraphicsLibrary(GraphicsSupport, LibImpl):
         try:
             with ExitStack() as rollback:
                 rollback.callback(self.display.close_fonts)
-                self.fontsPath = ctx.path_mgr.to_sys_path("FONTS:")
+                from amitools.vamos.path import SysPathResolver
+
+                self.fontsPath = SysPathResolver(ctx.path_mgr).to_sys_path("FONTS:")
                 if self.fontsPath is None:
                     self.fontsPath = os.path.join(os.path.dirname(__file__), "fonts")
                 attr_memory = ctx.alloc.alloc_memory(
