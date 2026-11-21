@@ -34,6 +34,10 @@ _HANDLER_DIR = os.path.join(os.path.dirname(__file__), "..", "handler")
 # handler deliberately leaves alive after Quit() (see the RDB test). A handler
 # that does not implement ACTION_DIE cannot be shut down at all (SFS): its
 # ``leftovers`` is ``None`` and the orphan assertion is skipped for it.
+#
+# FastFileSystem is marked ``full``: its synchronous block I/O is emulated
+# instruction by instruction and takes ~60s of the whole suite (~40s for the
+# RDB case, ~21s for the raw-device case), so it only runs with --full-suite.
 HANDLERS = [
     {
         "name": "pfs3aio",
@@ -59,13 +63,16 @@ HANDLERS = [
         # pin. Only the filesystem flow is asserted for this handler.
         "leftovers": None,
     },
-    {
-        "name": "fastfilesystem",
-        "binary": os.path.abspath(os.path.join(_HANDLER_DIR, "FastFileSystem")),
-        "dos_type": 0x444F5303,  # 'DOS\3' (FFS)
-        "cpu": "68000",
-        "leftovers": [],
-    },
+    pytest.param(
+        {
+            "name": "fastfilesystem",
+            "binary": os.path.abspath(os.path.join(_HANDLER_DIR, "FastFileSystem")),
+            "dos_type": 0x444F5303,  # 'DOS\3' (FFS)
+            "cpu": "68000",
+            "leftovers": [],
+        },
+        marks=pytest.mark.full,
+    ),
 ]
 
 # an RDB image large enough for a small volume (1 head, 32 sectors/cylinder)
