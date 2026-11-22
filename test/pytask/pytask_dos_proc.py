@@ -7,6 +7,7 @@ from amitools.vamos.libstructs import (
     TaskState,
 )
 from amitools.vamos.libtypes import DosTag, TagList
+from amitools.vamos.lib.dos.Error import DOSTRUE
 from amitools.vamos.loader import SegList
 from amitools.vamos.loader.segload import SegLoadInfo
 from amitools.vamos.machine.opcodes import op_rts
@@ -14,6 +15,13 @@ from amitools.vamos.machine.opcodes import op_rts
 LVO_SIGNAL = -324
 CHILD_CODE_SIZE = 32
 SIGF_CHILD = 1 << 1
+
+# dos.library LVOs used by the redirection child code
+LVO_READ = -42
+LVO_WRITE = -48
+LVO_INPUT = -54
+LVO_OUTPUT = -60
+REDIR_CODE_SIZE = 64
 
 
 def write_child_code(mem, pc, exec_base, task_addr, sig_mask):
@@ -745,6 +753,130 @@ def pytask_dos_create_proc_test(vamos_task):
         del ctx.dos_lib.seg_lists[b_addr]
         exec_proxy.FreeSignal(sig)
         ctx.alloc.free_cstr(name)
+        return 0
+
+    exit_codes = vamos_task.run([proc], process=True)
+    assert exit_codes == [0]
+
+
+# ----- SystemTagList/Execute redirection (Step 3) -----
+
+
+def write_redir_child_code(mem, pc, dos_base, buf_addr):
+    """child code: copy one byte from Input() to Output(), then return 0"""
+    code = bytearray()
+
+    def op16(val):
+        code.extend((val & 0xFFFF).to_bytes(2, "big"))
+
+    def op32(val):
+        code.extend((val & 0xFFFFFFFF).to_bytes(4, "big"))
+
+    op16(0x2C7C)
+    op32(dos_base)  # movea.l #dos_base,a6
+    op16(0x4EAE)
+    op16(LVO_INPUT)  # jsr Input(a6)   -> d0 = input fh
+    op16(0x2A00)  # move.l d0,d5
+    op16(0x4EAE)
+    op16(LVO_OUTPUT)  # jsr Output(a6)  -> d0 = output fh
+    op16(0x2C00)  # move.l d0,d6
+    op16(0x2205)  # move.l d5,d1
+    op16(0x243C)
+    op32(buf_addr)  # move.l #buf,d2
+    op16(0x7601)  # moveq #1,d3
+    op16(0x4EAE)
+    op16(LVO_READ)  # jsr Read(a6)    -> d0 = bytes read
+    op16(0x2600)  # move.l d0,d3
+    op16(0x2206)  # move.l d6,d1
+    op16(0x243C)
+    op32(buf_addr)  # move.l #buf,d2
+    op16(0x4EAE)
+    op16(LVO_WRITE)  # jsr Write(a6)
+    op16(0x7000)  # moveq #0,d0
+    op16(0x4E75)  # rts
+    mem.w_block(pc, bytes(code))
+
+
+def _install_redir_command(ctx):
+    """register an in-memory ``redircmd`` and make the current process a
+    non-shell command runner, so SystemTagList() takes the non-native path.
+
+    Returns the scratch buffer used by the child code.
+    """
+    dos_base = ctx.dos_lib.lib_struct.addr
+    buf = ctx.alloc.alloc_memory(4, label="redir_buf")
+    seg_list = SegList.alloc(ctx.alloc, [REDIR_CODE_SIZE])
+    write_redir_child_code(ctx.mem, seg_list.get_start_pc(), dos_base, buf.addr)
+    b_addr = seg_list.get_baddr()
+    # register the seglist so Process.load_binary finds it under any path
+    ctx.seg_loader.infos[b_addr] = SegLoadInfo(seg_list, name="redircmd")
+    ctx.seg_loader.load_ami_seglist = lambda path, lock=None, file_opener=None: b_addr
+    # the current process runs a command, not a shell (non-native path)
+    cwd_lock = ctx.dos_lib.lock_mgr.create_lock(None, "root:", False)
+    ctx.process.is_native_shell = lambda: False
+    ctx.process.cwd_lock = cwd_lock
+    ctx.process.cwd = "root:"
+    return buf
+
+
+def pytask_dos_system_tag_list_redir_test(vamos_task):
+    """SystemTagList() honours '<' and '>' on the command line"""
+
+    def proc(ctx, task):
+        dos_proxy = ctx.proxies.get_dos_lib_proxy()
+        fm = ctx.dos_lib.file_mgr
+        alloc = ctx.alloc
+        buf = _install_redir_command(ctx)
+
+        # input file holding a single byte
+        in_fh = fm.open(None, "ram:redir_in.txt", "w")
+        assert in_fh is not None
+        in_fh.write(b"Z")
+        fm.close(in_fh)
+
+        cmd = alloc.alloc_cstr("redircmd <ram:redir_in.txt >ram:redir_out.txt")
+        assert dos_proxy.SystemTagList(cmd.addr, None) == 0
+        alloc.free_cstr(cmd)
+
+        # the child copied the byte from the redirected input to the output
+        out_fh = fm.open(None, "ram:redir_out.txt", "r")
+        assert out_fh is not None
+        assert out_fh.read(16) == b"Z"
+        fm.close(out_fh)
+
+        alloc.free_memory(buf)
+        return 0
+
+    exit_codes = vamos_task.run([proc], process=True)
+    assert exit_codes == [0]
+
+
+def pytask_dos_execute_redir_test(vamos_task):
+    """Execute() forwards its input/output handles to the command"""
+
+    def proc(ctx, task):
+        dos_proxy = ctx.proxies.get_dos_lib_proxy()
+        fm = ctx.dos_lib.file_mgr
+        alloc = ctx.alloc
+        buf = _install_redir_command(ctx)
+
+        in_fh = fm.open(None, "ram:exec_in.txt", "w")
+        in_fh.write(b"Q")
+        fm.close(in_fh)
+        in_fh = fm.open(None, "ram:exec_in.txt", "r")
+        out_fh = fm.open(None, "ram:exec_out.txt", "w")
+
+        cmd = alloc.alloc_cstr("redircmd")
+        assert dos_proxy.Execute(cmd.addr, in_fh.b_addr, out_fh.b_addr) == DOSTRUE
+        alloc.free_cstr(cmd)
+        fm.close(in_fh)
+        fm.close(out_fh)
+
+        out_fh = fm.open(None, "ram:exec_out.txt", "r")
+        assert out_fh.read(16) == b"Q"
+        fm.close(out_fh)
+
+        alloc.free_memory(buf)
         return 0
 
     exit_codes = vamos_task.run([proc], process=True)

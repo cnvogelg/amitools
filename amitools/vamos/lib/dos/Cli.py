@@ -826,6 +826,65 @@ def max_cli(ctx):
 # ----- system/execute -----
 
 
+def _resolve_redirection(dos, lock, cl, tag_list):
+    """resolve the command's input/output handles for ``SystemTagList``
+
+    A redirection on the command line (``<``, ``>``, ``>>``) takes precedence
+    over the ``SYS_Input``/``SYS_Output`` handles that ``Execute()`` forwards.
+    Returns ``(input_fh, output_fh, owned_fhs)`` or ``None`` when opening a
+    redirection file failed; ``owned_fhs`` are the handles opened here that the
+    caller has to close once the command has run.
+    """
+    input_fh = None
+    output_fh = None
+    owned = []
+
+    redir_in = cl.get_redir_in()
+    if redir_in is not None:
+        fh = dos.file_mgr.open(lock, redir_in, "r")
+        if fh is None:
+            log_dos.warning(
+                "SystemTagList: cannot open input redirection '%s'", redir_in
+            )
+            return None
+        input_fh = fh
+        owned.append(fh)
+
+    redir_out = cl.get_redir_out()
+    if redir_out is not None:
+        append = cl.is_append_out()
+        # '>>' opens read/write (creating the file) and appends at EOF;
+        # '>' truncates the file.
+        fh = dos.file_mgr.open(lock, redir_out, "rw" if append else "w")
+        if fh is None:
+            log_dos.warning(
+                "SystemTagList: cannot open output redirection '%s'", redir_out
+            )
+            for o in owned:
+                dos.file_mgr.close(o)
+            return None
+        if append:
+            fh.seek(0, 2)
+        output_fh = fh
+        owned.append(fh)
+
+    # no redirection: fall back to the Execute() SYS_Input/SYS_Output handles
+    if input_fh is None and tag_list is not None:
+        intag = tag_list.find_tag(DosTag.SYS_Input)
+        if intag is not None:
+            data = intag.get_data()
+            if data:
+                input_fh = dos.file_mgr.get_by_b_addr(data)
+    if output_fh is None and tag_list is not None:
+        outtag = tag_list.find_tag(DosTag.SYS_Output)
+        if outtag is not None:
+            data = outtag.get_data()
+            if data:
+                output_fh = dos.file_mgr.get_by_b_addr(data)
+
+    return input_fh, output_fh, owned
+
+
 def system_tag_list(dos, ctx, cmd, tag_list):
     log_dos.info("SystemTagList: cmd=%s tags=%s ctx=%s", cmd, tag_list, ctx)
     # cmd is at this point a full string of commands to execute.
@@ -920,7 +979,6 @@ def system_tag_list(dos, ctx, cmd, tag_list):
         if res != cl.LINE_OK:
             log_dos.info("SystemTagList: error parsing command: '%s' -> %d", res)
             return 10  # RETURN_ERROR
-        # TODO: redirs
         binary = cl.get_cmd()
         arg_str = cl.get_arg_str()
         log_dos.info("SystemTagList: bin='%s' arg_str='%s'", binary, arg_str[:-1])
@@ -928,16 +986,35 @@ def system_tag_list(dos, ctx, cmd, tag_list):
         cur_proc = ctx.process
         cwd_lock = cur_proc.cwd_lock
         cwd = cur_proc.cwd
+        # resolve the command's input/output: command line redirection wins
+        # over the SYS_Input/SYS_Output handles Execute() forwarded
+        redir = _resolve_redirection(dos, cwd_lock, cl, tag_list)
+        if redir is None:
+            return 10  # RETURN_ERROR
+        input_fh, output_fh, redir_fhs = redir
         # create a process and run it...
-        proc = Process(ctx, binary, arg_str, cwd=cwd, cwd_lock=cwd_lock)
-        if not proc.ok:
-            log_dos.warning(
-                "SystemTagList: can't create process for '%s' args=%s",
+        try:
+            proc = Process(
+                ctx,
                 binary,
                 arg_str,
+                input_fh=input_fh,
+                output_fh=output_fh,
+                cwd=cwd,
+                cwd_lock=cwd_lock,
             )
-            return DOSTRUE
-        return run_sub_process(ctx.scheduler, ctx.runner, proc)
+            if not proc.ok:
+                log_dos.warning(
+                    "SystemTagList: can't create process for '%s' args=%s",
+                    binary,
+                    arg_str,
+                )
+                return DOSTRUE
+            return run_sub_process(ctx.scheduler, ctx.runner, proc)
+        finally:
+            # close only the handles opened for the redirection here
+            for fh in redir_fhs:
+                dos.file_mgr.close(fh)
 
 
 def load_seg_list(dos, ctx, name, lock):

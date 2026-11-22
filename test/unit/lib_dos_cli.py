@@ -18,7 +18,9 @@ from amitools.vamos.lib.dos.Cli import (
     _new_proc_tags,
     _resolve_child_dir,
     _resolve_child_fh,
+    _resolve_redirection,
 )
+from amitools.vamos.lib.dos.CommandLine import CommandLine
 from amitools.vamos.libstructs import CLIStruct, ProcessFlags, ProcessStruct
 from amitools.vamos.libtypes import DosPacket, DosTag, TagList
 from amitools.vamos.machine import Code, Machine, Runtime
@@ -857,3 +859,222 @@ def lib_dos_cli_new_proc_resolve_fh_test():
     # a caller supplied handle is kept
     assert _resolve_child_fh(dos, 0x33, "r", "input") == 0x33
     assert dos.file_mgr.opened == [("NIL:", "r")]
+
+
+# ----- SystemTagList redirection (Step 3) -----
+
+
+class _RedirFH:
+    def __init__(self, b_addr, mode):
+        self.b_addr = b_addr
+        self.mode = mode
+        self.seeks = []
+
+    def seek(self, pos, whence):
+        self.seeks.append((pos, whence))
+
+
+class _RedirFileMgr:
+    """a file manager that records the redirection opens"""
+
+    def __init__(self, fail=()):
+        self.fail = set(fail)
+        self.opened = []
+        self.closed = []
+        self.by_b = {}
+
+    def open(self, lock, path, mode):
+        if path in self.fail:
+            return None
+        fh = _RedirFH(0x100 + len(self.opened), mode)
+        self.opened.append((lock, path, mode))
+        self.by_b[fh.b_addr] = fh
+        return fh
+
+    def close(self, fh):
+        self.closed.append(fh)
+
+    def get_by_b_addr(self, b_addr):
+        return self.by_b.get(b_addr)
+
+
+def _parse_cmd(line):
+    cl = CommandLine()
+    assert cl.parse_line(line) == cl.LINE_OK
+    return cl
+
+
+def lib_dos_cli_resolve_redirection_test():
+    # no redirection and no SYS tags -> nothing is resolved
+    fm = _RedirFileMgr()
+    dos = SimpleNamespace(file_mgr=fm)
+    assert _resolve_redirection(dos, "LOCK", _parse_cmd("dir"), None) == (
+        None,
+        None,
+        [],
+    )
+    assert fm.opened == []
+
+    # '<' opens the input file read-only and owns it
+    fm = _RedirFileMgr()
+    dos = SimpleNamespace(file_mgr=fm)
+    in_fh, out_fh, owned = _resolve_redirection(
+        dos, "LOCK", _parse_cmd("type foo <in.txt"), None
+    )
+    assert fm.opened == [("LOCK", "in.txt", "r")]
+    assert in_fh is owned[0]
+    assert out_fh is None
+    assert fm.closed == []
+
+    # '>' truncates the output file
+    fm = _RedirFileMgr()
+    dos = SimpleNamespace(file_mgr=fm)
+    in_fh, out_fh, owned = _resolve_redirection(
+        dos, "LOCK", _parse_cmd("echo hi >out.txt"), None
+    )
+    assert fm.opened == [("LOCK", "out.txt", "w")]
+    assert in_fh is None
+    assert out_fh is owned[0]
+    assert out_fh.seeks == []
+
+    # '>>' opens read/write and seeks to the end so writes append
+    fm = _RedirFileMgr()
+    dos = SimpleNamespace(file_mgr=fm)
+    in_fh, out_fh, owned = _resolve_redirection(
+        dos, "LOCK", _parse_cmd("echo hi >>out.txt"), None
+    )
+    assert fm.opened == [("LOCK", "out.txt", "rw")]
+    assert out_fh.seeks == [(0, 2)]
+
+    # both redirections in one line
+    fm = _RedirFileMgr()
+    dos = SimpleNamespace(file_mgr=fm)
+    in_fh, out_fh, owned = _resolve_redirection(
+        dos, "LOCK", _parse_cmd("type foo <in.txt >out.txt"), None
+    )
+    assert fm.opened == [("LOCK", "in.txt", "r"), ("LOCK", "out.txt", "w")]
+    assert owned == [in_fh, out_fh]
+
+    # a failed input open yields None
+    fm = _RedirFileMgr(fail=("in.txt",))
+    dos = SimpleNamespace(file_mgr=fm)
+    assert (
+        _resolve_redirection(dos, "LOCK", _parse_cmd("type foo <in.txt"), None) is None
+    )
+    assert fm.closed == []
+
+    # a failed output open yields None and closes the input already opened
+    fm = _RedirFileMgr(fail=("out.txt",))
+    dos = SimpleNamespace(file_mgr=fm)
+    assert (
+        _resolve_redirection(dos, "LOCK", _parse_cmd("type foo <in.txt >out.txt"), None)
+        is None
+    )
+    assert len(fm.closed) == 1
+
+
+def lib_dos_cli_resolve_redirection_sys_tags_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+
+    # SYS_Input/SYS_Output are used when the command line has no redirection
+    fm = _RedirFileMgr()
+    fm.by_b[0x55] = "IN"
+    fm.by_b[0x66] = "OUT"
+    dos = SimpleNamespace(file_mgr=fm)
+    tag_list = TagList.alloc(alloc, (DosTag.SYS_Input, 0x55), (DosTag.SYS_Output, 0x66))
+    assert _resolve_redirection(dos, "LOCK", _parse_cmd("dir"), tag_list) == (
+        "IN",
+        "OUT",
+        [],
+    )
+    # the SYS handles are not opened here, so nothing is owned
+    assert fm.opened == []
+
+    # a command line redirection wins over the SYS tags
+    fm = _RedirFileMgr()
+    fm.by_b[0x55] = "IN"
+    fm.by_b[0x66] = "OUT"
+    dos = SimpleNamespace(file_mgr=fm)
+    in_fh, out_fh, owned = _resolve_redirection(
+        dos, "LOCK", _parse_cmd("type foo <in.txt >out.txt"), tag_list
+    )
+    assert fm.opened == [("LOCK", "in.txt", "r"), ("LOCK", "out.txt", "w")]
+    assert in_fh is owned[0] and out_fh is owned[1]
+    tag_list.free()
+
+
+def lib_dos_cli_system_tag_list_redir_test(monkeypatch):
+    from amitools.vamos.lib.dos import Cli
+
+    mem = MockMemory()
+    fm = _RedirFileMgr()
+    ctx = SimpleNamespace(
+        mem=mem,
+        process=SimpleNamespace(
+            is_native_shell=lambda: False,
+            cwd_lock="LOCK",
+            cwd="root:",
+        ),
+        scheduler="SCHED",
+        runner="RUNNER",
+    )
+    dos = SimpleNamespace(file_mgr=fm)
+    captured = {}
+
+    class FakeProcess:
+        def __init__(
+            self,
+            call_ctx,
+            binary,
+            arg_str,
+            input_fh=None,
+            output_fh=None,
+            cwd=None,
+            cwd_lock=None,
+        ):
+            self.ok = True
+            captured.update(
+                binary=binary,
+                arg_str=arg_str,
+                input_fh=input_fh,
+                output_fh=output_fh,
+                cwd=cwd,
+                cwd_lock=cwd_lock,
+            )
+
+        def free(self):
+            pass
+
+    monkeypatch.setattr(Cli, "Process", FakeProcess)
+    monkeypatch.setattr(Cli, "run_sub_process", lambda sched, runner, proc: 0)
+
+    # '<in >out' opens both files, passes them to the process and closes them
+    assert Cli.system_tag_list(dos, ctx, "type foo <in.txt >out.txt", None) == 0
+    assert fm.opened == [("LOCK", "in.txt", "r"), ("LOCK", "out.txt", "w")]
+    assert captured["binary"] == "type"
+    assert captured["arg_str"].strip() == "foo"
+    assert captured["input_fh"].mode == "r"
+    assert captured["output_fh"].mode == "w"
+    assert fm.closed == [captured["input_fh"], captured["output_fh"]]
+
+    # a failing redirection aborts before the process is created
+    captured.clear()
+    fm.opened.clear()
+    fm.closed.clear()
+    fm.fail = {"in.txt"}
+    assert Cli.system_tag_list(dos, ctx, "type foo <in.txt", None) == 10
+    assert captured == {}
+
+    # a SYS_Output tag is passed through and not closed by SystemTagList
+    alloc = MemoryAlloc(mem)
+    fm.fail = set()
+    fm.by_b[0x77] = "OUT"
+    tag_list = TagList.alloc(alloc, (DosTag.SYS_Output, 0x77))
+    captured.clear()
+    fm.closed.clear()
+    assert Cli.system_tag_list(dos, ctx, "dir", tag_list) == 0
+    assert captured["input_fh"] is None
+    assert captured["output_fh"] == "OUT"
+    assert fm.closed == []
+    tag_list.free()
