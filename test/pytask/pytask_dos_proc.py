@@ -705,6 +705,8 @@ def pytask_dos_create_proc_test(vamos_task):
         mem = ctx.mem
 
         parent = ProcessStruct(mem, ctx.process.proc.addr)
+        # RKRM: CreateProc copies the caller's pr_WindowPtr unconditionally
+        parent.window_ptr.aptr = 0x1234
         exec_base = ctx.exec_lib.exec_lib.addr
         sig = exec_proxy.AllocSignal(-1)
         sig_mask = 1 << sig
@@ -724,6 +726,7 @@ def pytask_dos_create_proc_test(vamos_task):
         child = child_task.map_task.get_ami_process()
         assert child.msg_port.addr == msg_port_addr
         assert child.task.node.pri.val == 5
+        assert child.window_ptr.aptr == 0x1234
         # AOS 3.x compat: no input/output handles and they are not closed
         assert child.cis.bptr == 0
         assert child.cos.bptr == 0
@@ -735,6 +738,7 @@ def pytask_dos_create_proc_test(vamos_task):
         # the caller's seglist is kept (NP_FreeSegList=FALSE)
         assert b_addr in ctx.dos_lib.seg_lists
         assert b_addr in ctx.seg_loader.infos
+        parent.window_ptr.aptr = 0
 
         # release the seglist DOS kept alive
         ctx.seg_loader.unload_seglist(b_addr)

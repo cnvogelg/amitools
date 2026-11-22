@@ -224,7 +224,14 @@ def lib_dos_cli_createproc_test():
     cpu = MockCPU()
     alloc = MemoryAlloc(mem)
     lib = DosLibrary()
-    ctx = SimpleNamespace(mem=mem, cpu=cpu, alloc=alloc)
+    parent = ProcessStruct(mem, PROC_ADDR)
+    parent.window_ptr.aptr = 0x44
+    ctx = SimpleNamespace(
+        mem=mem,
+        cpu=cpu,
+        alloc=alloc,
+        process=SimpleNamespace(proc=SimpleNamespace(addr=PROC_ADDR)),
+    )
     captured = {}
 
     def create_new_proc(call_ctx, tag_list):
@@ -245,6 +252,9 @@ def lib_dos_cli_createproc_test():
     assert tags[DosTag.NP_StackSize] == 8192
     assert tags[DosTag.NP_Priority] == 5
     assert mem.r_cstr(tags[DosTag.NP_Name]) == "child"
+    # RKRM: CreateProc copies the caller's pr_WindowPtr unconditionally (it
+    # does not use CreateNewProc's NULL/-1 default rule)
+    assert tags[DosTag.NP_WindowPtr] == 0x44
     # AOS 3.x compat: keep the seglist, the dirs and the inherited handles
     assert tags[DosTag.NP_FreeSegList] == 0
     assert tags[DosTag.NP_CurrentDir] == 0
@@ -624,7 +634,8 @@ def lib_dos_cli_new_proc_defaults_test():
     assert p["current_dir"] is None
     assert p["home_dir"] is None
     assert p["console_task"] == 0
-    assert p["window_ptr"] == 0xFFFFFFFF
+    # a task (no parent) gets a NULL window pointer (RKRM)
+    assert p["window_ptr"] == 0
     # handles are not resolved here: _spawn opens the NIL: defaults
     assert p["input_fh"] is None
     assert p["output_fh"] is None
@@ -736,14 +747,45 @@ def lib_dos_cli_new_proc_inherit_test():
     tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
     p = _new_proc_tags(ctx, tags)
     assert p["parent_addr"] == PROC_ADDR
-    # priority defaults to 0 (RKRM); console task and window are still
-    # inherited from the parent, while the absent dir tags stay None and are
-    # duplicated from the parent by _spawn()
+    # priority defaults to 0 (RKRM); the console task is inherited from the
+    # parent, while the absent dir tags stay None and are duplicated from the
+    # parent by _spawn()
     assert p["priority"] == 0
     assert p["current_dir"] is None
     assert p["home_dir"] is None
     assert p["console_task"] == 0x33
-    assert p["window_ptr"] == 0x44
+    # the parent's window pointer is neither NULL nor -1, so the child gets NULL
+    assert p["window_ptr"] == 0
+    tags.free()
+
+
+def lib_dos_cli_new_proc_window_ptr_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    parent = ProcessStruct(mem, PROC_ADDR)
+    ctx = _new_proc_ctx(mem, alloc, parent_addr=PROC_ADDR)
+
+    # absent tag, parent window NULL -> copied
+    parent.window_ptr.aptr = 0
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
+    assert _new_proc_tags(ctx, tags)["window_ptr"] == 0
+    tags.free()
+
+    # absent tag, parent window -1 -> copied
+    parent.window_ptr.aptr = 0xFFFFFFFF
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
+    assert _new_proc_tags(ctx, tags)["window_ptr"] == 0xFFFFFFFF
+    tags.free()
+
+    # absent tag, parent window other -> NULL
+    parent.window_ptr.aptr = 0x44
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
+    assert _new_proc_tags(ctx, tags)["window_ptr"] == 0
+    tags.free()
+
+    # an explicit tag is installed as-is (even a real window pointer)
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000), (DosTag.NP_WindowPtr, 0x44))
+    assert _new_proc_tags(ctx, tags)["window_ptr"] == 0x44
     tags.free()
 
 

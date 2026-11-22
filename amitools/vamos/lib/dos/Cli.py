@@ -91,10 +91,17 @@ def create_proc(dos, ctx, name, pri, seglist, stack_size):
     if seglist == 0:
         log_dos.warning("CreateProc: no seglist")
         return 0
+    # RKRM: CreateProc() copies pr_ConsoleTask and pr_WindowPtr from the caller
+    # unconditionally (NULL/0 for a task), unlike CreateNewProc's NP_WindowPtr
+    # default rule. pr_WindowPtr must therefore be passed explicitly.
+    parent_addr = _current_proc_addr(ctx)
+    parent = ProcessStruct(ctx.mem, parent_addr) if parent_addr else None
+    window_ptr = parent.window_ptr.aptr if parent else 0
     tags = [
         (DosTag.NP_SegList, seglist & 0xFFFFFFFF),
         (DosTag.NP_StackSize, stack_size & 0xFFFFFFFF),
         (DosTag.NP_Priority, pri & 0xFFFFFFFF),
+        (DosTag.NP_WindowPtr, window_ptr),
         # AOS 3.x compat (AROS createproc.c): CreateProc must not free the
         # caller's seglist, must not close the inherited handles and must not
         # break Forbid() locking, so it passes 0 for the dirs/handles.
@@ -215,7 +222,7 @@ def _new_proc_tags(ctx, tags):
     # RKRM AmigaDOS defaults: name "New Process", stack 4000, priority 0;
     # input/output default to NIL: (see _spawn) and the error stream to ZERO.
     # Current/home dir are resolved in _spawn (they need the lock manager to
-    # DupLock the caller's locks); console task and window are inherited here.
+    # DupLock the caller's locks); the console task is inherited here.
     if stack_size is None:
         stack_size = 4000
     if name_ptr:
@@ -227,7 +234,13 @@ def _new_proc_tags(ctx, tags):
     if console_task is None:
         console_task = parent.console_task.aptr if parent else 0
     if window_ptr is None:
-        window_ptr = parent.window_ptr.aptr if parent else 0xFFFFFFFF
+        # RKRM: copy the caller's window pointer only if it is NULL or -1,
+        # otherwise use NULL; a task (no parent) gets NULL
+        if parent is None:
+            window_ptr = 0
+        else:
+            parent_window = parent.window_ptr.aptr
+            window_ptr = parent_window if parent_window in (0, 0xFFFFFFFF) else 0
     if user_data is None:
         user_data = 0
 
