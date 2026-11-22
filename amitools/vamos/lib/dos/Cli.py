@@ -19,7 +19,7 @@ from amitools.vamos.libstructs import (
     TaskState,
 )
 from amitools.vamos.libtypes import DosPacket, DosTag, TagList
-from amitools.vamos.log import log_dos
+from amitools.vamos.log import log_dos, log_proc
 from amitools.vamos.machine import Code
 from amitools.vamos.machine.regs import (
     REG_A0,
@@ -31,6 +31,7 @@ from amitools.vamos.machine.regs import (
     REG_D2,
 )
 from amitools.vamos.schedule import SchedulerEvent
+from amitools.vamos.task import Stack
 
 from .CommandLine import CommandLine
 from .Error import (
@@ -42,8 +43,6 @@ from .Error import (
     ERROR_OBJECT_WRONG_TYPE,
 )
 from .Process import Process
-from .run import run_command as ami_run_command
-from .run import run_sub_process
 from .Var import copy_local_vars, free_local_vars
 
 # the AmigaDOS V36 process table size returned by MaxCli()
@@ -1191,6 +1190,84 @@ def _lookup_fh(dos, b_addr):
         return None
 
 
+# ----- run code/processes in the caller's task -----
+
+
+def run_sub_process(scheduler, runner, proc):
+    log_proc.info("start sub process: %s", proc)
+
+    # actually we need to add a new task and do multitasking
+    # for now we simply run it as a sub run in our task
+    task = proc.get_sched_task()
+
+    # hack cur task
+    cur_task = scheduler.cur_task
+    scheduler._report_event(SchedulerEvent.Type.ADD_TASK, task)
+    scheduler._report_event(SchedulerEvent.Type.READY_TASK, cur_task)
+    scheduler._report_event(SchedulerEvent.Type.ACTIVE_TASK, task)
+
+    # return value
+    code = task.get_code()
+    run_state = runner(code)
+    ret_code = run_state.regs[REG_D0]
+    log_proc.info("return from sub process: ret_code=%d", ret_code)
+
+    # cleanup proc
+    proc.free()
+
+    # restore cur task
+    scheduler._report_event(SchedulerEvent.Type.READY_TASK, task)
+    scheduler._report_event(SchedulerEvent.Type.ACTIVE_TASK, cur_task)
+    scheduler._report_event(SchedulerEvent.Type.REMOVE_TASK, task)
+
+    return ret_code
+
+
+def run_sub_command(process, start_pc, args_ptr, args_len, stack_size, reg_d1=0):
+    """run a loaded command in the caller's task with a fresh stack
+
+    This is the low-level runner shared by ``RunCommand()`` and the native
+    shell branch of ``SystemTagList()``: the caller is overloaded with the
+    command and gets its own stack, but no new task is created.
+    """
+    ctx = process.ctx
+    alloc = ctx.alloc
+    new_stack = Stack.alloc(alloc, stack_size)
+    task = process.this_task.pr_Task
+    # save old stack
+    oldstack_lower = task.tc_SPLower.aptr
+    oldstack_upper = task.tc_SPUpper.aptr
+    # activate new stack
+    task.tc_SPLower.aptr = new_stack.get_lower()
+    task.tc_SPUpper.aptr = new_stack.get_upper()
+    # NOTE: the Manx fexec and BPCL mess is not (yet) setup here.
+
+    try:
+        # new proc registers: d0=arg_len a0=arg_cptr
+        # d2=stack_size. This value is also in 4(sp), but various C
+        # programs rely on it being present (1.3-3.1 at least have it).
+        set_regs = {
+            REG_D0: args_len,
+            REG_D1: reg_d1,
+            REG_A0: args_ptr,
+            REG_D2: stack_size,
+            REG_A2: ctx.odg_base,
+            REG_A5: ctx.odg_base,
+            REG_A6: ctx.odg_base,
+        }
+        get_regs = [REG_D0]
+        code = Code(start_pc, new_stack.get_initial_sp(), set_regs, get_regs)
+
+        rs = ctx.runner(code)
+        ret_code = rs.regs[REG_D0]
+        log_proc.info("return from RunCommand: ret_code=%d", ret_code)
+        return ret_code
+    finally:
+        task.tc_SPLower.aptr = oldstack_lower
+        task.tc_SPUpper.aptr = oldstack_upper
+        new_stack.free()
+
+
 def system_tag_list(dos, ctx, cmd, tag_list):
     log_dos.info("SystemTagList: cmd=%s tags=%s ctx=%s", cmd, tag_list, ctx)
     # cmd is at this point a full string of commands to execute.
@@ -1251,7 +1328,7 @@ def system_tag_list(dos, ctx, cmd, tag_list):
         reg_d1 = packet >> 2
         code_start = ctx.process.shell_start
         log_dos.info("(Shell)SystemTagList: pc=%06x", code_start)
-        ret_code = ami_run_command(ctx.process, code_start, 0, 0, stack_size, reg_d1)
+        ret_code = run_sub_command(ctx.process, code_start, 0, 0, stack_size, reg_d1)
         log_dos.info(
             "(Shell)SystemTagList returned: cmd='%s' tags=%s: ret_code=%d",
             cmd,
@@ -1371,7 +1448,7 @@ def run_command(dos, ctx, b_addr, stack, args, length):
         if machine is not None:
             proc.pr_ReturnAddr.aptr = machine.get_run_exit_addr()
     try:
-        ret_code = ami_run_command(ctx.process, prog_start, args, length, stack)
+        ret_code = run_sub_command(ctx.process, prog_start, args, length, stack)
     finally:
         if proc is not None:
             proc.pr_Arguments.aptr = old_args
@@ -1498,6 +1575,8 @@ __all__ = [
     "load_seg_list",
     "max_cli",
     "run_command",
+    "run_sub_command",
+    "run_sub_process",
     "set_arg_str",
     "set_console_task",
     "set_current_dir_name",

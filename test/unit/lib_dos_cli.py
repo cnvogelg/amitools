@@ -583,7 +583,7 @@ def lib_dos_cli_run_command_test(monkeypatch):
         lib.io_err = 42
         return 7
 
-    monkeypatch.setattr("amitools.vamos.lib.dos.Cli.ami_run_command", fake_run)
+    monkeypatch.setattr("amitools.vamos.lib.dos.Cli.run_sub_command", fake_run)
     assert lib.RunCommand(ctx, 0x10, 8, DEST_ADDR, 4) == 7
     # the stack is rounded up and the seglist is resolved to its program start;
     # pr_Arguments/pr_ReturnAddr are set while the command runs
