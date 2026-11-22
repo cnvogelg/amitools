@@ -214,7 +214,8 @@ def _new_proc_tags(ctx, tags):
 
     # RKRM AmigaDOS defaults: name "New Process", stack 4000, priority 0;
     # input/output default to NIL: (see _spawn) and the error stream to ZERO.
-    # Current/home dir, console task and window are inherited from the parent.
+    # Current/home dir are resolved in _spawn (they need the lock manager to
+    # DupLock the caller's locks); console task and window are inherited here.
     if stack_size is None:
         stack_size = 4000
     if name_ptr:
@@ -223,10 +224,6 @@ def _new_proc_tags(ctx, tags):
         name = "New Process"
     if priority is None:
         priority = 0
-    if current_dir is None:
-        current_dir = parent.current_dir.bptr if parent else 0
-    if home_dir is None:
-        home_dir = parent.home_dir.bptr if parent else 0
     if console_task is None:
         console_task = parent.console_task.aptr if parent else 0
     if window_ptr is None:
@@ -314,6 +311,42 @@ def _resolve_child_fh(dos, bptr, mode, label):
     return fh.b_addr if fh is not None else 0
 
 
+def _resolve_child_dir(dos, explicit_bptr, parent_bptr, label):
+    """the child's current/home dir lock BPTR (RKRM ``NP_CurrentDir``)
+
+    An explicit tag lock is absorbed by the child; an absent tag duplicates
+    the caller's lock (``ZERO`` for a task). Returns ``(bptr, owned)`` where
+    ``owned`` marks a lock obtained here that ``_spawn()`` must release if
+    creating the process fails.
+    """
+    if explicit_bptr is not None:
+        return explicit_bptr, explicit_bptr != 0
+    if not parent_bptr:
+        return 0, False
+    parent_lock = dos.lock_mgr.get_by_b_addr(parent_bptr)
+    if parent_lock is None:
+        return 0, False
+    dup = dos.lock_mgr.dup_lock(parent_lock)
+    if dup is None:
+        log_dos.warning(
+            "CreateNewProc: cannot duplicate parent %s lock %06x", label, parent_bptr
+        )
+        return 0, False
+    return dup.b_addr, True
+
+
+def _release_lock_bptr(dos, bptr):
+    """release a DOS lock by BPTR, ignoring an already-freed lock"""
+    if not bptr:
+        return
+    try:
+        lock = dos.lock_mgr.get_by_b_addr(bptr)
+    except (VamosInternalError, IndexError, AttributeError, TypeError):
+        lock = None
+    if lock is not None:
+        dos.lock_mgr.release_lock(lock)
+
+
 def _spawn(dos, ctx, p):
     """create and schedule the child process described by ``p``"""
     # NP_Arguments is copied into DOS memory *before* the child starts so its
@@ -341,6 +374,22 @@ def _spawn(dos, ctx, p):
     }
     # the child is a process of its own: the scheduler runs it beside
     # its parent, and it is freed once its task ends (child_proc_event)
+    # RKRM NP_CurrentDir/NP_HomeDir: an explicit tag lock is absorbed by the
+    # child; an absent tag duplicates the caller's lock. Both are released on
+    # process exit (the current dir only when non-ZERO -> PRF_FREECURRDIR).
+    parent_addr = p["parent_addr"]
+    parent = ProcessStruct(ctx.mem, parent_addr) if parent_addr else None
+    parent_current = parent.current_dir.bptr if parent else 0
+    parent_home = parent.home_dir.bptr if parent else 0
+    current_dir, current_owned = _resolve_child_dir(
+        dos, p["current_dir"], parent_current, "current dir"
+    )
+    home_dir, home_owned = _resolve_child_dir(
+        dos, p["home_dir"], parent_home, "home dir"
+    )
+    flags = int(p["flags"])
+    if current_dir:
+        flags |= ProcessFlags.PRF_FREECURRDIR
     try:
         child = dos.create_child_process(
             ctx,
@@ -351,9 +400,14 @@ def _spawn(dos, ctx, p):
         )
     except Exception:
         # creating the process failed: the copied arguments are not owned by
-        # anybody yet and have to be released (RKRM "What's Released on Error?")
+        # anybody yet and have to be released (RKRM "What's Released on Error?"),
+        # and so are the locks obtained/absorbed for the new process
         if arg_mem is not None:
             ctx.alloc.free_cstr(arg_mem)
+        if current_owned:
+            _release_lock_bptr(dos, current_dir)
+        if home_owned:
+            _release_lock_bptr(dos, home_dir)
         raise
     proc = child.proc
     task = proc.task
@@ -367,11 +421,11 @@ def _spawn(dos, ctx, p):
     proc.stack_base.bptr = stack.get_lower() >> 2
     proc.seg_list.bptr = p["seglist_bptr"]
     proc.glob_vec.aptr = 0xFFFFFFFF
-    proc.current_dir.bptr = p["current_dir"]
-    proc.home_dir.bptr = p["home_dir"]
+    proc.current_dir.bptr = current_dir
+    proc.home_dir.bptr = home_dir
     proc.window_ptr.aptr = p["window_ptr"]
     proc.console_task.aptr = p["console_task"]
-    proc.flags.val = int(p["flags"])
+    proc.flags.val = flags
     proc.exit_code.aptr = p["exit_code"]
     proc.exit_data.val = p["exit_data"]
 
@@ -386,7 +440,7 @@ def _spawn(dos, ctx, p):
 
     # remember what the exit cleanup in child_proc_event() needs
     child.dos_ctx = ctx
-    child.dos_flags = p["flags"]
+    child.dos_flags = flags
     child.dos_exit_code = p["exit_code"]
     child.dos_exit_data = p["exit_data"]
     child.dos_notify = p["notify_on_death"]
@@ -420,7 +474,7 @@ def _spawn(dos, ctx, p):
         proc.addr,
         p["entry_pc"],
         port_addr,
-        int(p["flags"]),
+        flags,
     )
     return proc.addr
 
@@ -556,6 +610,11 @@ def _child_exit_cleanup(dos, child, ret_code):
     # unload the seglist
     if flags & ProcessFlags.PRF_FREESEGLIST:
         _free_child_seglist(dos, ctx, proc.seg_list.bptr)
+    # release the current directory (PRF_FREECURRDIR) and the home directory
+    # (RKRM: pr_HomeDir is always released on process exit when non-ZERO)
+    if flags & ProcessFlags.PRF_FREECURRDIR:
+        _release_lock_bptr(dos, proc.current_dir.bptr)
+    _release_lock_bptr(dos, proc.home_dir.bptr)
     # free the copied NP_Arguments
     arg_mem = getattr(child, "dos_arg_mem", None)
     if arg_mem is not None:

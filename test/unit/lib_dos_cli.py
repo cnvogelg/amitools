@@ -14,7 +14,11 @@ from amitools.vamos.lib.dos.Error import (
     ERROR_OBJECT_WRONG_TYPE,
 )
 from amitools.vamos.lib.DosLibrary import DosLibrary
-from amitools.vamos.lib.dos.Cli import _new_proc_tags, _resolve_child_fh
+from amitools.vamos.lib.dos.Cli import (
+    _new_proc_tags,
+    _resolve_child_dir,
+    _resolve_child_fh,
+)
 from amitools.vamos.libstructs import CLIStruct, ProcessFlags, ProcessStruct
 from amitools.vamos.libtypes import DosPacket, DosTag, TagList
 from amitools.vamos.machine import Code, Machine, Runtime
@@ -615,8 +619,10 @@ def lib_dos_cli_new_proc_defaults_test():
     assert p["seglist_bptr"] == 0
     assert p["stack_size"] == 4000
     assert p["priority"] == 0
-    assert p["current_dir"] == 0
-    assert p["home_dir"] == 0
+    # absent dir tags stay None: _spawn resolves them by duplicating the
+    # caller's locks (or ZERO for a task)
+    assert p["current_dir"] is None
+    assert p["home_dir"] is None
     assert p["console_task"] == 0
     assert p["window_ptr"] == 0xFFFFFFFF
     # handles are not resolved here: _spawn opens the NIL: defaults
@@ -730,14 +736,61 @@ def lib_dos_cli_new_proc_inherit_test():
     tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
     p = _new_proc_tags(ctx, tags)
     assert p["parent_addr"] == PROC_ADDR
-    # priority defaults to 0 (RKRM); current/home dir, console task and
-    # window are still inherited from the parent
+    # priority defaults to 0 (RKRM); console task and window are still
+    # inherited from the parent, while the absent dir tags stay None and are
+    # duplicated from the parent by _spawn()
     assert p["priority"] == 0
-    assert p["current_dir"] == 0x11
-    assert p["home_dir"] == 0x22
+    assert p["current_dir"] is None
+    assert p["home_dir"] is None
     assert p["console_task"] == 0x33
     assert p["window_ptr"] == 0x44
     tags.free()
+
+
+def lib_dos_cli_new_proc_resolve_dir_test():
+    class FakeLock:
+        def __init__(self, b_addr):
+            self.b_addr = b_addr
+
+    class FakeLockMgr:
+        def __init__(self, parent_lock=None, dup_addr=0x99):
+            self.parent_lock = parent_lock
+            self.dup_addr = dup_addr
+            self.dups = 0
+
+        def get_by_b_addr(self, b_addr):
+            return self.parent_lock
+
+        def dup_lock(self, lock):
+            self.dups += 1
+            return FakeLock(self.dup_addr) if self.dup_addr is not None else None
+
+    # an explicit tag lock is absorbed by the child (no dup)
+    mgr = FakeLockMgr()
+    dos = SimpleNamespace(lock_mgr=mgr)
+    assert _resolve_child_dir(dos, 0x11, 0x22, "current dir") == (0x11, True)
+    assert mgr.dups == 0
+
+    # an explicit ZERO is kept and owns nothing
+    assert _resolve_child_dir(dos, 0, 0x22, "current dir") == (0, False)
+
+    # an absent tag duplicates the caller's lock
+    mgr = FakeLockMgr(parent_lock=FakeLock(0x22))
+    dos = SimpleNamespace(lock_mgr=mgr)
+    assert _resolve_child_dir(dos, None, 0x22, "current dir") == (0x99, True)
+    assert mgr.dups == 1
+
+    # no caller lock (a task) -> ZERO
+    mgr = FakeLockMgr()
+    dos = SimpleNamespace(lock_mgr=mgr)
+    assert _resolve_child_dir(dos, None, 0, "current dir") == (0, False)
+    assert mgr.dups == 0
+
+    # a failed DupLock also yields ZERO and owns nothing
+    mgr = FakeLockMgr(parent_lock=FakeLock(0x22), dup_addr=None)
+    dos = SimpleNamespace(lock_mgr=mgr)
+    assert _resolve_child_dir(dos, None, 0x22, "current dir") == (0, False)
+    assert mgr.dups == 1
 
 
 def lib_dos_cli_new_proc_resolve_fh_test():

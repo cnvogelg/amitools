@@ -209,12 +209,16 @@ def pytask_dos_create_new_proc_defaults_test(vamos_task):
         dos_proxy = ctx.proxies.get_dos_lib_proxy()
         exec_proxy = ctx.proxies.get_exec_lib_proxy()
         mem = ctx.mem
+        lock_mgr = ctx.dos_lib.lock_mgr
 
         parent = ProcessStruct(mem, ctx.process.proc.addr)
-        # give the parent non-default values to inherit
+        # give the parent non-default values to inherit: a priority and real
+        # current/home dir locks
         parent.task.node.pri.val = 3
-        parent.current_dir.bptr = 0x40
-        parent.home_dir.bptr = 0x80
+        cwd_lock = lock_mgr.create_lock(None, "root:", False)
+        home_lock = lock_mgr.create_lock(None, "root:", False)
+        parent.current_dir.bptr = cwd_lock.b_addr
+        parent.home_dir.bptr = home_lock.b_addr
         exec_base = ctx.exec_lib.exec_lib.addr
         sig = exec_proxy.AllocSignal(-1)
         sig_mask = 1 << sig
@@ -232,13 +236,89 @@ def pytask_dos_create_new_proc_defaults_test(vamos_task):
         assert child.task.node.name.str == "New Process"
         assert child.stack_size.val == 4000
         assert child.task.node.pri.val == 0
-        # current dir and home dir are still inherited from the parent
-        assert child.current_dir.bptr == 0x40
-        assert child.home_dir.bptr == 0x80
+        # absent dir tags: the child gets *duplicated* locks (distinct BPTRs
+        # pointing at the same object), not the caller's locks
+        assert child.current_dir.bptr != 0
+        assert child.current_dir.bptr != cwd_lock.b_addr
+        assert child.home_dir.bptr != 0
+        assert child.home_dir.bptr != home_lock.b_addr
+        assert child.flags.val & ProcessFlags.PRF_FREECURRDIR
+        child_cwd = lock_mgr.get_by_b_addr(child.current_dir.bptr)
+        child_home = lock_mgr.get_by_b_addr(child.home_dir.bptr)
+        assert child_cwd is not cwd_lock
+        assert lock_mgr.same_lock(child_cwd, cwd_lock)
+        assert lock_mgr.same_lock(child_home, home_lock)
+        cwd_key = lock_mgr.keys[cwd_lock.key]
+        child_cwd_bptr = child.current_dir.bptr
+        child_home_bptr = child.home_dir.bptr
 
         wait_for_child(task, exec_proxy, sig_mask, "New Process")
+
+        # the child's duplicated locks are released on exit ...
+        assert child_cwd_bptr not in cwd_key.locks_by_baddr
+        assert child_home_bptr not in cwd_key.locks_by_baddr
+        # ... while the caller's locks are still valid
+        assert lock_mgr.get_by_b_addr(cwd_lock.b_addr) is cwd_lock
+        assert lock_mgr.get_by_b_addr(home_lock.b_addr) is home_lock
+
+        parent.current_dir.bptr = 0
+        parent.home_dir.bptr = 0
+        lock_mgr.release_lock(cwd_lock)
+        lock_mgr.release_lock(home_lock)
         exec_proxy.FreeSignal(sig)
         tags.free()
+        ctx.alloc.free_memory(code)
+        return 0
+
+    exit_codes = vamos_task.run([proc], process=True)
+    assert exit_codes == [0]
+
+
+def pytask_dos_create_new_proc_explicit_dirs_test(vamos_task):
+    def proc(ctx, task):
+        dos_proxy = ctx.proxies.get_dos_lib_proxy()
+        exec_proxy = ctx.proxies.get_exec_lib_proxy()
+        mem = ctx.mem
+        lock_mgr = ctx.dos_lib.lock_mgr
+
+        parent = ProcessStruct(mem, ctx.process.proc.addr)
+        exec_base = ctx.exec_lib.exec_lib.addr
+        sig = exec_proxy.AllocSignal(-1)
+        sig_mask = 1 << sig
+        code = ctx.alloc.alloc_memory(CHILD_CODE_SIZE, label="child_code")
+        write_child_code(mem, code.addr, exec_base, parent.addr, sig_mask)
+        name = ctx.alloc.alloc_cstr("dirs_child")
+        cwd_lock = lock_mgr.create_lock(None, "root:", False)
+        home_lock = lock_mgr.create_lock(None, "ram:", False)
+        tags = TagList.alloc(
+            ctx.alloc,
+            (DosTag.NP_Entry, code.addr),
+            (DosTag.NP_Name, name.addr),
+            (DosTag.NP_CurrentDir, cwd_lock.b_addr),
+            (DosTag.NP_HomeDir, home_lock.b_addr),
+        )
+
+        proc_addr = dos_proxy.CreateNewProc(tags)
+        assert proc_addr != 0
+        child = ProcessStruct(mem, proc_addr)
+        # an explicit tag lock is absorbed by the child as-is
+        assert child.current_dir.bptr == cwd_lock.b_addr
+        assert child.home_dir.bptr == home_lock.b_addr
+        assert child.flags.val & ProcessFlags.PRF_FREECURRDIR
+        cwd_key = lock_mgr.keys[cwd_lock.key]
+        home_key = lock_mgr.keys[home_lock.key]
+        cwd_bptr = cwd_lock.b_addr
+        home_bptr = home_lock.b_addr
+
+        wait_for_child(task, exec_proxy, sig_mask, "dirs_child")
+
+        # both provided locks are released when the child exits
+        assert cwd_bptr not in cwd_key.locks_by_baddr
+        assert home_bptr not in home_key.locks_by_baddr
+
+        exec_proxy.FreeSignal(sig)
+        tags.free()
+        ctx.alloc.free_cstr(name)
         ctx.alloc.free_memory(code)
         return 0
 
