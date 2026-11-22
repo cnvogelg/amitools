@@ -788,6 +788,29 @@ def lib_dos_cli_new_proc_cli_tags_test():
     alloc.free_cstr(cname)
 
 
+def lib_dos_cli_new_proc_affinity_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    ctx = _new_proc_ctx(mem, alloc)
+
+    # NP_Affinity is an SMP-only tag: accepted and ignored on this single-CPU
+    # emulation (AROS: "elsewhere it is accepted and ignored")
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
+    base = _new_proc_tags(ctx, tags)
+    tags.free()
+
+    tags = TagList.alloc(
+        alloc,
+        (DosTag.NP_Entry, 0x4000),
+        (DosTag.NP_Affinity, 0xFF),
+    )
+    p = _new_proc_tags(ctx, tags)
+    tags.free()
+
+    # parsing succeeds and the ignored tag changes nothing
+    assert p == base
+
+
 def lib_dos_cli_new_proc_seglist_test():
     mem = MockMemory()
     alloc = MemoryAlloc(mem)
