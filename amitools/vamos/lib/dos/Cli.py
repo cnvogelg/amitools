@@ -13,6 +13,7 @@ from amitools.vamos.error import VamosInternalError
 from amitools.vamos.libstructs import (
     CLIStruct,
     MsgPortFlags,
+    PathListStruct,
     ProcessFlags,
     ProcessStruct,
     TaskState,
@@ -55,6 +56,16 @@ SIGF_CHILD = 1 << 1
 # SIGB_SINGLE is a reserved per-task signal bit (Task.new_task marks 0..15 as
 # allocated), so AllocSignal() never hands it out to the guest.
 SIGF_SINGLE = 1 << 4
+
+# the shell environment a CreateNewProc() child gets with NP_Cli (RKRM
+# "Creating and Terminating Processes", dos/dosextens.h). cli_DefaultStack is
+# counted in 4-byte longs and the buffer sizes match a real CLI.
+CLI_DEFAULTSTACK_UNIT = 4
+CLI_DEFAULT_PROMPT = "%N.%S> "
+CLI_PROMPT_SIZE = 60
+CLI_COMMANDNAME_SIZE = 104
+CLI_COMMANDFILE_SIZE = 40
+CLI_SETNAME_SIZE = 80
 
 
 def _ami_proc(ctx):
@@ -204,14 +215,9 @@ def _new_proc_tags(ctx, tags):
     user_data = _tag_data(tags, DosTag.NP_UserData)
     copy_vars = _tag_data(tags, DosTag.NP_CopyVars)
     synchronous = _tag_data(tags, DosTag.NP_Synchronous)
-
-    # tags that vamos accepts but does not act on yet
-    if _tag_data(tags, DosTag.NP_Cli):
-        log_dos.warning("CreateNewProc: NP_Cli is not supported (ignored)")
-    if _tag_data(tags, DosTag.NP_Path):
-        log_dos.warning("CreateNewProc: NP_Path is not supported (ignored)")
-    if _tag_data(tags, DosTag.NP_CommandName):
-        log_dos.warning("CreateNewProc: NP_CommandName is not supported (ignored)")
+    cli = _tag_data(tags, DosTag.NP_Cli)
+    path = _tag_data(tags, DosTag.NP_Path)
+    command_name_ptr = _tag_data(tags, DosTag.NP_CommandName)
 
     if entry_pc is None and seglist_bptr is None:
         log_dos.warning("CreateNewProc: no NP_Entry or NP_SegList")
@@ -267,6 +273,12 @@ def _new_proc_tags(ctx, tags):
     if arguments_ptr is not None:
         arguments = ctx.mem.r_cstr(arguments_ptr) if arguments_ptr else ""
 
+    # NP_CommandName is copied into the child's CLI (_alloc_child_cli); an
+    # absent tag means "copy the caller's command name" (see below)
+    command_name = None
+    if command_name_ptr is not None:
+        command_name = ctx.mem.r_cstr(command_name_ptr) if command_name_ptr else ""
+
     flags = 0
     if close_input:
         flags |= ProcessFlags.PRF_CLOSEINPUT
@@ -280,6 +292,8 @@ def _new_proc_tags(ctx, tags):
         flags |= ProcessFlags.PRF_NOTIFYONDEATH
     if synchronous:
         flags |= ProcessFlags.PRF_SYNCHRONOUS
+    if cli:
+        flags |= ProcessFlags.PRF_FREECLI
     if arguments is not None:
         flags |= ProcessFlags.PRF_FREEARGS
 
@@ -313,6 +327,9 @@ def _new_proc_tags(ctx, tags):
         "parent_addr": parent_addr,
         "copy_vars": bool(copy_vars),
         "synchronous": bool(synchronous),
+        "cli": bool(cli),
+        "path": path,
+        "command_name": command_name,
     }
 
 
@@ -370,6 +387,159 @@ def _release_lock_bptr(dos, bptr):
         lock = None
     if lock is not None:
         dos.lock_mgr.release_lock(lock)
+
+
+def _cli_of_proc(mem, proc_addr):
+    """the CLIStruct of the process at ``proc_addr`` (or ``None``)"""
+    if not proc_addr:
+        return None
+    cli_addr = ProcessStruct(mem, proc_addr).pr_CLI.aptr
+    if not cli_addr:
+        return None
+    return CLIStruct(mem, cli_addr)
+
+
+def _copy_path_list(dos, ctx, src_bptr):
+    """duplicate a CLI command-path chain (AROS ``internal_CopyPath``)
+
+    Returns ``(head_bptr, owned)`` where ``owned`` is a list of
+    ``(node_addr, lock)`` pairs the caller has to release.
+    """
+    owned = []
+    head = 0
+    prev = None
+    addr = src_bptr
+    while addr:
+        src = PathListStruct(ctx.mem, addr)
+        lock = dos.lock_mgr.get_by_b_addr(src.pl_Lock.bptr)
+        if lock is None:
+            break
+        dup = dos.lock_mgr.dup_lock(lock)
+        if dup is None:
+            break
+        node = ctx.alloc.alloc_astruct(PathListStruct, label="child_cli_Path")
+        node.pl_Lock.aptr = dup.mem.addr
+        node.pl_Next.aptr = 0
+        if prev is None:
+            head = node.addr
+        else:
+            prev.pl_Next.aptr = node.addr
+        prev = node
+        owned.append((node.addr, dup))
+        addr = src.pl_Next.aptr
+    return head, owned
+
+
+def _adopt_path_list(dos, ctx, bptr):
+    """take ownership of a caller-supplied ``NP_Path`` chain
+
+    The chain is not copied (RKRM): the child releases its locks on exit.
+    """
+    owned = []
+    addr = bptr
+    while addr:
+        node = PathListStruct(ctx.mem, addr)
+        lock = dos.lock_mgr.get_by_b_addr(node.pl_Lock.bptr)
+        if lock is not None:
+            owned.append((addr, lock))
+        addr = node.pl_Next.aptr
+    return owned
+
+
+def _free_path_list(dos, ctx, owned):
+    """release a child CLI's command-path chain (nodes and locks)"""
+    for addr, lock in owned:
+        mem_obj = ctx.alloc.get_memory(addr)
+        if mem_obj is not None:
+            ctx.alloc.free_memory(mem_obj)
+        dos.lock_mgr.release_lock(lock)
+
+
+def _alloc_child_cli(dos, ctx, child, p, input_bptr, output_bptr):
+    """build the CLI structure of a ``CreateNewProc()`` child (``NP_Cli``)
+
+    The new shell environment copies the caller's prompt and command name (or
+    falls back to defaults), points its standard streams at the child's
+    ``pr_CIS``/``pr_COS`` and takes the ``NP_Path`` chain (or a copy of the
+    caller's path). ``PRF_FREECLI`` makes the child release all of it on exit
+    (RKRM "Creating and Terminating Processes").
+    """
+    alloc = ctx.alloc
+    mem = ctx.mem
+    parent_cli = _cli_of_proc(mem, p["parent_addr"])
+
+    cli = alloc.alloc_astruct(CLIStruct, label="child_CLI")
+    prompt = alloc.alloc_memory(CLI_PROMPT_SIZE, label="child_cli_Prompt")
+    cmdname = alloc.alloc_memory(CLI_COMMANDNAME_SIZE, label="child_cli_CommandName")
+    cmdfile = alloc.alloc_memory(CLI_COMMANDFILE_SIZE, label="child_cli_CommandFile")
+    setname = alloc.alloc_memory(CLI_SETNAME_SIZE, label="child_cli_SetName")
+
+    cli.cli_DefaultStack.val = (
+        p["stack_size"] + CLI_DEFAULTSTACK_UNIT - 1
+    ) // CLI_DEFAULTSTACK_UNIT
+    cli.cli_FailLevel.val = 10
+    cli.cli_StandardInput.aptr = input_bptr << 2
+    cli.cli_CurrentInput.aptr = input_bptr << 2
+    cli.cli_StandardOutput.aptr = output_bptr << 2
+    cli.cli_CurrentOutput.aptr = output_bptr << 2
+    cli.cli_Prompt.aptr = prompt.addr
+    cli.cli_CommandName.aptr = cmdname.addr
+    cli.cli_CommandFile.aptr = cmdfile.addr
+    cli.cli_SetName.aptr = setname.addr
+
+    # the prompt is copied from the caller's shell environment if it has one
+    if parent_cli is not None:
+        prompt_str = mem.r_bstr(parent_cli.cli_Prompt.aptr) or CLI_DEFAULT_PROMPT
+    else:
+        prompt_str = CLI_DEFAULT_PROMPT
+    mem.w_bstr(prompt.addr, prompt_str[: CLI_PROMPT_SIZE - 1])
+
+    # NP_CommandName, else the caller's command name, else empty (RKRM)
+    if p["command_name"] is not None:
+        name_str = p["command_name"]
+    elif parent_cli is not None:
+        name_str = mem.r_bstr(parent_cli.cli_CommandName.aptr)
+    else:
+        name_str = ""
+    mem.w_bstr(cmdname.addr, name_str[: CLI_COMMANDNAME_SIZE - 1])
+    mem.w_bstr(setname.addr, "SYS:")
+
+    # NP_Path: an explicit chain is adopted, otherwise the caller's is copied
+    if p["path"] is not None:
+        cli.cli_CommandDir.aptr = p["path"]
+        paths = _adopt_path_list(dos, ctx, p["path"])
+    else:
+        src = parent_cli.cli_CommandDir.aptr if parent_cli is not None else 0
+        head, paths = _copy_path_list(dos, ctx, src)
+        cli.cli_CommandDir.aptr = head
+
+    child.proc.pr_CLI.aptr = cli.addr
+    child.dos_cli = (cli, prompt, cmdname, cmdfile, setname)
+    child.dos_cli_paths = paths
+    log_dos.info(
+        "CreateNewProc: child CLI %06x prompt='%s' cmd='%s'",
+        cli.addr,
+        prompt_str,
+        name_str,
+    )
+    return cli
+
+
+def _free_child_cli(dos, ctx, child, proc):
+    """release the shell environment a child created for itself (``NP_Cli``)"""
+    cli_res = getattr(child, "dos_cli", None)
+    if cli_res is None:
+        return
+    cli, prompt, cmdname, cmdfile, setname = cli_res
+    _free_path_list(dos, ctx, getattr(child, "dos_cli_paths", []))
+    ctx.alloc.free_memory(prompt)
+    ctx.alloc.free_memory(cmdname)
+    ctx.alloc.free_memory(cmdfile)
+    ctx.alloc.free_memory(setname)
+    cli.free()
+    proc.pr_CLI.aptr = 0
+    child.dos_cli = None
+    child.dos_cli_paths = []
 
 
 def _spawn(dos, ctx, p):
@@ -462,6 +632,11 @@ def _spawn(dos, ctx, p):
     proc.cis.bptr = input_fh
     proc.cos.bptr = output_fh
     proc.ces.bptr = error_fh
+
+    # NP_Cli: build the child's shell environment (RKRM). PRF_FREECLI makes the
+    # child release it on exit (see _free_child_cli).
+    if p["cli"]:
+        _alloc_child_cli(dos, ctx, child, p, input_fh, output_fh)
 
     # NP_CopyVars: every child gets its own local-variable table so that it has
     # an independent set from the caller; the tag (default TRUE) then decides
@@ -738,6 +913,9 @@ def _child_exit_cleanup(dos, child, ret_code):
     if arg_mem is not None:
         ctx.alloc.free_cstr(arg_mem)
         child.dos_arg_mem = None
+    # NP_Cli: release the child's shell environment (PRF_FREECLI)
+    if flags & ProcessFlags.PRF_FREECLI:
+        _free_child_cli(dos, ctx, child, proc)
     # NP_CopyVars: release the child's own local shell variables
     free_local_vars(dos, ctx, child)
 

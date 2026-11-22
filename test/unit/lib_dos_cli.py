@@ -756,6 +756,38 @@ def lib_dos_cli_new_proc_synchronous_test():
     tags.free()
 
 
+def lib_dos_cli_new_proc_cli_tags_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    ctx = _new_proc_ctx(mem, alloc)
+
+    # NP_Cli defaults to FALSE: no CLI, no PRF_FREECLI
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
+    p = _new_proc_tags(ctx, tags)
+    assert p["cli"] is False
+    assert not (p["flags"] & ProcessFlags.PRF_FREECLI)
+    assert p["path"] is None
+    assert p["command_name"] is None
+    tags.free()
+
+    # NP_Cli requests a shell environment; NP_Path/NP_CommandName are read
+    cname = alloc.alloc_cstr("mycmd")
+    tags = TagList.alloc(
+        alloc,
+        (DosTag.NP_Entry, 0x4000),
+        (DosTag.NP_Cli, 1),
+        (DosTag.NP_Path, 0x1234),
+        (DosTag.NP_CommandName, cname.addr),
+    )
+    p = _new_proc_tags(ctx, tags)
+    assert p["cli"] is True
+    assert p["flags"] & ProcessFlags.PRF_FREECLI
+    assert p["path"] == 0x1234
+    assert p["command_name"] == "mycmd"
+    tags.free()
+    alloc.free_cstr(cname)
+
+
 def lib_dos_cli_new_proc_seglist_test():
     mem = MockMemory()
     alloc = MemoryAlloc(mem)

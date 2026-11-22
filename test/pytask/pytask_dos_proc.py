@@ -1,7 +1,9 @@
 from amitools.vamos.libstructs import (
+    CLIStruct,
     MsgPortFlags,
     MsgPortStruct,
     NodeType,
+    PathListStruct,
     ProcessFlags,
     ProcessStruct,
     TaskState,
@@ -1091,6 +1093,196 @@ def pytask_dos_create_new_proc_sync_and_notify_test(vamos_task):
         alloc.free_memory(scratch)
         alloc.free_memory(code)
         alloc.free_cstr(name)
+        return 0
+
+    exit_codes = vamos_task.run([proc], process=True)
+    assert exit_codes == [0]
+
+
+# ----- NP_Cli / NP_Path / NP_CommandName (Step 6) -----
+
+CLI_CODE_SIZE = 48
+# Cli() LVO (dos_lib.fd)
+LVO_CLI = -492
+
+
+def write_cli_child_code(mem, pc, dos_base, scratch, exec_base, task_addr, sig_mask):
+    """child code: store Cli() into scratch, Signal(parent), then return 0"""
+    mem.w16(pc, 0x2C7C)  # movea.l #dos_base,a6
+    mem.w32(pc + 2, dos_base)
+    mem.w16(pc + 6, 0x4EAE)  # jsr Cli(a6)
+    mem.w16(pc + 8, LVO_CLI & 0xFFFF)
+    mem.w16(pc + 10, 0x23C0)  # move.l d0,(scratch).l
+    mem.w32(pc + 12, scratch)
+    mem.w16(pc + 16, 0x2C7C)  # movea.l #exec_base,a6
+    mem.w32(pc + 18, exec_base)
+    mem.w16(pc + 22, 0x227C)  # movea.l #task,a1
+    mem.w32(pc + 24, task_addr)
+    mem.w16(pc + 28, 0x203C)  # move.l #sig_mask,d0
+    mem.w32(pc + 30, sig_mask)
+    mem.w16(pc + 34, 0x4EAE)  # jsr Signal(a6)
+    mem.w16(pc + 36, LVO_SIGNAL & 0xFFFF)
+    mem.w16(pc + 38, 0x7000)  # moveq #0,d0
+    mem.w16(pc + 40, op_rts)
+
+
+def pytask_dos_create_new_proc_cli_test(vamos_task):
+    """NP_Cli: the child gets a populated CLI (prompt, command name and command
+    path copied from the caller; standard streams from pr_CIS/pr_COS) that is
+    freed again when the child exits (PRF_FREECLI)"""
+
+    def proc(ctx, task):
+        dos_proxy = ctx.proxies.get_dos_lib_proxy()
+        exec_proxy = ctx.proxies.get_exec_lib_proxy()
+        mem = ctx.mem
+        alloc = ctx.alloc
+
+        parent = ProcessStruct(mem, ctx.process.proc.addr)
+        exec_base = ctx.exec_lib.exec_lib.addr
+        dos_base = ctx.dos_lib.lib_struct.addr
+
+        # give the caller a shell environment to copy prompt/name/path from
+        caller_prompt = alloc.alloc_memory(60, label="caller_prompt")
+        caller_cmd = alloc.alloc_memory(104, label="caller_cmd")
+        mem.w_bstr(caller_prompt.addr, "9.work:> ")
+        mem.w_bstr(caller_cmd.addr, "CallerCmd")
+        caller_cli = alloc.alloc_astruct(CLIStruct, label="caller_CLI")
+        caller_cli.cli_Prompt.aptr = caller_prompt.addr
+        caller_cli.cli_CommandName.aptr = caller_cmd.addr
+        caller_lock = ctx.dos_lib.lock_mgr.create_lock(None, "SYS:", False)
+        caller_path = alloc.alloc_astruct(PathListStruct, label="caller_path")
+        caller_path.pl_Lock.aptr = caller_lock.mem.addr
+        caller_path.pl_Next.aptr = 0
+        caller_cli.cli_CommandDir.aptr = caller_path.addr
+        parent.pr_CLI.aptr = caller_cli.addr
+
+        sig = exec_proxy.AllocSignal(-1)
+        sig_mask = 1 << sig
+        code = alloc.alloc_memory(CLI_CODE_SIZE, label="cli_code")
+        scratch = alloc.alloc_memory(4, label="cli_scratch")
+        mem.w32(scratch.addr, 0)
+        write_cli_child_code(
+            mem, code.addr, dos_base, scratch.addr, exec_base, parent.addr, sig_mask
+        )
+        child_name = alloc.alloc_cstr("cli_child")
+        tags = TagList.alloc(
+            alloc,
+            (DosTag.NP_Entry, code.addr),
+            (DosTag.NP_Name, child_name.addr),
+            (DosTag.NP_StackSize, 8192),
+            (DosTag.NP_Cli, 1),
+        )
+        proc_addr = dos_proxy.CreateNewProc(tags)
+        assert proc_addr != 0
+        tags.free()
+
+        # inspect the child's CLI before it has run (cooperative scheduler)
+        child = ProcessStruct(mem, proc_addr)
+        assert child.flags.val & ProcessFlags.PRF_FREECLI
+        cli_addr = child.pr_CLI.aptr
+        assert cli_addr != 0
+        child_cli = CLIStruct(mem, cli_addr)
+        assert mem.r_bstr(child_cli.cli_Prompt.aptr) == "9.work:> "
+        assert mem.r_bstr(child_cli.cli_CommandName.aptr) == "CallerCmd"
+        assert child_cli.cli_DefaultStack.val == 8192 // 4
+        assert child_cli.cli_StandardInput.aptr == child.pr_CIS.aptr
+        assert child_cli.cli_CurrentInput.aptr == child.pr_CIS.aptr
+        assert child_cli.cli_StandardOutput.aptr == child.pr_COS.aptr
+        assert child_cli.cli_CurrentOutput.aptr == child.pr_COS.aptr
+        # the caller's command path was copied, not shared
+        child_path_addr = child_cli.cli_CommandDir.aptr
+        assert child_path_addr != 0
+        assert child_path_addr != caller_path.addr
+        child_path = PathListStruct(mem, child_path_addr)
+        assert child_path.pl_Lock.bptr != caller_lock.b_addr
+
+        # the child sees its own CLI through Cli()
+        child_task = task.find_task("cli_child")
+        wait_for_child(child_task, exec_proxy, sig_mask, "cli_child")
+        assert mem.r32(scratch.addr) == cli_addr
+        # the child's CLI (and its copied path) was freed on exit ...
+        assert alloc.get_memory(cli_addr) is None
+        assert alloc.get_memory(child_path_addr) is None
+        # ... while the caller's lock is still valid
+        assert ctx.dos_lib.lock_mgr.get_by_b_addr(caller_lock.b_addr) is not None
+
+        exec_proxy.FreeSignal(sig)
+        alloc.free_memory(code)
+        alloc.free_memory(scratch)
+        alloc.free_cstr(child_name)
+        parent.pr_CLI.aptr = 0
+        caller_path.free()
+        ctx.dos_lib.lock_mgr.release_lock(caller_lock)
+        caller_cli.free()
+        alloc.free_memory(caller_prompt)
+        alloc.free_memory(caller_cmd)
+        return 0
+
+    exit_codes = vamos_task.run([proc], process=True)
+    assert exit_codes == [0]
+
+
+def pytask_dos_create_new_proc_cli_path_test(vamos_task):
+    """NP_Path + NP_CommandName: the child adopts the caller's path chain (not a
+    copy) and uses the explicit command name; both are released on exit"""
+
+    def proc(ctx, task):
+        dos_proxy = ctx.proxies.get_dos_lib_proxy()
+        exec_proxy = ctx.proxies.get_exec_lib_proxy()
+        mem = ctx.mem
+        alloc = ctx.alloc
+
+        parent = ProcessStruct(mem, ctx.process.proc.addr)
+        exec_base = ctx.exec_lib.exec_lib.addr
+        dos_base = ctx.dos_lib.lib_struct.addr
+
+        # a caller-owned path chain that the child adopts (RKRM NP_Path)
+        my_lock = ctx.dos_lib.lock_mgr.create_lock(None, "SYS:", False)
+        my_lock_addr = my_lock.mem.addr
+        my_path = alloc.alloc_astruct(PathListStruct, label="my_path")
+        my_path.pl_Lock.aptr = my_lock.mem.addr
+        my_path.pl_Next.aptr = 0
+
+        sig = exec_proxy.AllocSignal(-1)
+        sig_mask = 1 << sig
+        code = alloc.alloc_memory(CLI_CODE_SIZE, label="cli_code")
+        scratch = alloc.alloc_memory(4, label="cli_scratch")
+        mem.w32(scratch.addr, 0)
+        write_cli_child_code(
+            mem, code.addr, dos_base, scratch.addr, exec_base, parent.addr, sig_mask
+        )
+        child_name = alloc.alloc_cstr("cli_path_child")
+        cname = alloc.alloc_cstr("ExplicitCmd")
+        tags = TagList.alloc(
+            alloc,
+            (DosTag.NP_Entry, code.addr),
+            (DosTag.NP_Name, child_name.addr),
+            (DosTag.NP_StackSize, 8192),
+            (DosTag.NP_Cli, 1),
+            (DosTag.NP_Path, my_path.addr),
+            (DosTag.NP_CommandName, cname.addr),
+        )
+        proc_addr = dos_proxy.CreateNewProc(tags)
+        assert proc_addr != 0
+        tags.free()
+
+        child = ProcessStruct(mem, proc_addr)
+        child_cli = CLIStruct(mem, child.pr_CLI.aptr)
+        assert mem.r_bstr(child_cli.cli_CommandName.aptr) == "ExplicitCmd"
+        # the explicit path is adopted, not copied
+        assert child_cli.cli_CommandDir.aptr == my_path.addr
+
+        child_task = task.find_task("cli_path_child")
+        wait_for_child(child_task, exec_proxy, sig_mask, "cli_path_child")
+        # the adopted path node and its lock were released with the child
+        assert alloc.get_memory(my_path.addr) is None
+        assert alloc.get_memory(my_lock_addr) is None
+
+        exec_proxy.FreeSignal(sig)
+        alloc.free_memory(code)
+        alloc.free_memory(scratch)
+        alloc.free_cstr(child_name)
+        alloc.free_cstr(cname)
         return 0
 
     exit_codes = vamos_task.run([proc], process=True)

@@ -34,3 +34,7 @@ class DosProcess(ExecTask):
 
     def get_local_vars(self):
         return MinListStruct(self.proc._mem, self.proc.pr_LocalVars.addr)
+
+    def get_cli_struct(self):
+        # a CreateNewProc() child only has a CLI when NP_Cli asked for one
+        return self.proc.pr_CLI.aptr
