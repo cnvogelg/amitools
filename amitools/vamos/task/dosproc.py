@@ -1,7 +1,5 @@
 from amitools.vamos.libtypes import Process
-from amitools.vamos.machine import Code
-from amitools.vamos.schedule import PythonTask, NativeTask
-from .stack import Stack
+from amitools.vamos.libstructs.exec_ import MinListStruct
 from .exectask import ExecTask
 
 
@@ -33,3 +31,10 @@ class DosProcess(ExecTask):
 
     def set_home_dir(self, addr):
         self.proc.home_dir.aptr = addr
+
+    def get_local_vars(self):
+        return MinListStruct(self.proc._mem, self.proc.pr_LocalVars.addr)
+
+    def get_cli_struct(self):
+        # a CreateNewProc() child only has a CLI when NP_Cli asked for one
+        return self.proc.pr_CLI.aptr

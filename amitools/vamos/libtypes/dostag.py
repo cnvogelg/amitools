@@ -12,9 +12,13 @@ class DosTag(IntEnum):
     SYS_Input = SYS_Dummy + 1
     SYS_Output = SYS_Dummy + 2
     SYS_Asynch = SYS_Dummy + 3
-    SYS_UserShell = 36
-    SYS_CustomShell = 37
+    SYS_UserShell = SYS_Dummy + 4
+    SYS_CustomShell = SYS_Dummy + 5
     SYS_Error = SYS_Dummy + 6
+    SYS_ScriptInput = SYS_Dummy + 11
+    SYS_Background = SYS_Dummy + 12
+    SYS_CliNumPtr = SYS_Dummy + 13
+    SYS_CliType = SYS_Dummy + 14
     # CreateNewProc
     NP_SegList = NP_Dummy + 1
     NP_FreeSegList = NP_Dummy + 2
@@ -41,6 +45,8 @@ class DosTag(IntEnum):
     NP_Synchronous = NP_Dummy + 23
     NP_ExitCode = NP_Dummy + 24
     NP_ExitData = NP_Dummy + 25
+    NP_UserData = NP_Dummy + 26
+    NP_Affinity = NP_Dummy + 27
     # AllocDosObject
     ADO_FH_Mode = ADO_Dummy + 1
     ADO_DirLen = ADO_Dummy + 2

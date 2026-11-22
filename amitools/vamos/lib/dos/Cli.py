@@ -9,13 +9,29 @@ runner.
 """
 
 from amitools.vamos.astructs import CSTR, LONG
-from amitools.vamos.dos import run_command as ami_run_command
-from amitools.vamos.dos import run_sub_process
 from amitools.vamos.error import VamosInternalError
-from amitools.vamos.libstructs import CLIStruct, MsgPortFlags, ProcessStruct, TaskState
+from amitools.vamos.libstructs import (
+    CLIStruct,
+    MsgPortFlags,
+    PathListStruct,
+    ProcessFlags,
+    ProcessStruct,
+    TaskState,
+)
 from amitools.vamos.libtypes import DosPacket, DosTag, TagList
-from amitools.vamos.log import log_dos
-from amitools.vamos.machine.regs import REG_A0, REG_D0
+from amitools.vamos.log import log_dos, log_proc
+from amitools.vamos.machine import Code
+from amitools.vamos.machine.regs import (
+    REG_A0,
+    REG_A2,
+    REG_A5,
+    REG_A6,
+    REG_D0,
+    REG_D1,
+    REG_D2,
+)
+from amitools.vamos.schedule import SchedulerEvent
+from amitools.vamos.task import Stack
 
 from .CommandLine import CommandLine
 from .Error import (
@@ -27,9 +43,28 @@ from .Error import (
     ERROR_OBJECT_WRONG_TYPE,
 )
 from .Process import Process
+from .Var import copy_local_vars, free_local_vars
 
 # the AmigaDOS V36 process table size returned by MaxCli()
 MAX_CLI = 256
+
+# the exec signal a dying child sends its parent (NP_NotifyOnDeath)
+SIGF_CHILD = 1 << 1
+
+# the exec signal a synchronous child sends its waiting parent (NP_Synchronous).
+# SIGB_SINGLE is a reserved per-task signal bit (Task.new_task marks 0..15 as
+# allocated), so AllocSignal() never hands it out to the guest.
+SIGF_SINGLE = 1 << 4
+
+# the shell environment a CreateNewProc() child gets with NP_Cli (RKRM
+# "Creating and Terminating Processes", dos/dosextens.h). cli_DefaultStack is
+# counted in 4-byte longs and the buffer sizes match a real CLI.
+CLI_DEFAULTSTACK_UNIT = 4
+CLI_DEFAULT_PROMPT = "%N.%S> "
+CLI_PROMPT_SIZE = 60
+CLI_COMMANDNAME_SIZE = 104
+CLI_COMMANDFILE_SIZE = 40
+CLI_SETNAME_SIZE = 80
 
 
 def _ami_proc(ctx):
@@ -72,10 +107,27 @@ def create_proc(dos, ctx, name, pri, seglist, stack_size):
     if seglist == 0:
         log_dos.warning("CreateProc: no seglist")
         return 0
+    # RKRM: CreateProc() copies pr_ConsoleTask and pr_WindowPtr from the caller
+    # unconditionally (NULL/0 for a task), unlike CreateNewProc's NP_WindowPtr
+    # default rule. pr_WindowPtr must therefore be passed explicitly.
+    parent_addr = _current_proc_addr(ctx)
+    parent = ProcessStruct(ctx.mem, parent_addr) if parent_addr else None
+    window_ptr = parent.window_ptr.aptr if parent else 0
     tags = [
         (DosTag.NP_SegList, seglist & 0xFFFFFFFF),
         (DosTag.NP_StackSize, stack_size & 0xFFFFFFFF),
         (DosTag.NP_Priority, pri & 0xFFFFFFFF),
+        (DosTag.NP_WindowPtr, window_ptr),
+        # AOS 3.x compat (AROS createproc.c): CreateProc must not free the
+        # caller's seglist, must not close the inherited handles and must not
+        # break Forbid() locking, so it passes 0 for the dirs/handles.
+        (DosTag.NP_FreeSegList, 0),
+        (DosTag.NP_CurrentDir, 0),
+        (DosTag.NP_HomeDir, 0),
+        (DosTag.NP_Input, 0),
+        (DosTag.NP_Output, 0),
+        (DosTag.NP_CloseInput, 0),
+        (DosTag.NP_CloseOutput, 0),
     ]
     name_mem = None
     if name:
@@ -88,8 +140,50 @@ def create_proc(dos, ctx, name, pri, seglist, stack_size):
         tag_list.free()
         if name_mem is not None:
             ctx.alloc.free_cstr(name_mem)
-    log_dos.info("CreateProc(%s, pri=%d) -> %06x", name, pri, proc_addr)
-    return proc_addr
+    if proc_addr == 0:
+        log_dos.info("CreateProc(%s, pri=%d) -> failed", name, pri)
+        return 0
+    # CreateProc() returns the process's pr_MsgPort, not the Process struct
+    msg_port_addr = ProcessStruct(ctx.mem, proc_addr).msg_port.addr
+    log_dos.info(
+        "CreateProc(%s, pri=%d) -> msg_port=%06x (proc=%06x)",
+        name,
+        pri,
+        msg_port_addr,
+        proc_addr,
+    )
+    return msg_port_addr
+
+
+# sentinel to tell "tag not given" apart from an explicit zero value
+_UNSET = object()
+
+
+def _tag_data(tags, tag):
+    """tag value or ``None`` when the tag is absent (an explicit 0 is kept)"""
+    val = tags.get_tag_data(tag, _UNSET)
+    return None if val is _UNSET else val
+
+
+def _current_proc_addr(ctx):
+    """address of the DOS process currently running (0 if none)"""
+    # exec's ThisTask variable is the canonical current process
+    exec_lib = getattr(ctx, "exec_lib", None)
+    if exec_lib is not None:
+        el = getattr(exec_lib, "exec_lib", None)
+        if el is not None:
+            addr = el.this_task.aptr
+            if addr:
+                return addr
+    process = getattr(ctx, "process", None)
+    if process is not None:
+        proc = getattr(process, "proc", None)
+        if proc is not None:
+            return proc.addr
+        task = getattr(process, "this_task", None)
+        if task is not None:
+            return task.addr
+    return 0
 
 
 def _new_proc_tags(ctx, tags):
@@ -97,55 +191,418 @@ def _new_proc_tags(ctx, tags):
     tag_list = tags.to_list(map_enum=DosTag, do_map=True)
     log_dos.info("CreateNewProc: tags=%s", tag_list)
 
-    entry_pc = tags.get_tag_data(DosTag.NP_Entry, 0)
-    seglist_bptr = tags.get_tag_data(DosTag.NP_SegList, 0)
-    stack_size = tags.get_tag_data(DosTag.NP_StackSize, 4096)
-    name_ptr = tags.get_tag_data(DosTag.NP_Name, 0)
-    priority = tags.get_tag_data(DosTag.NP_Priority, 0)
-    current_dir = tags.get_tag_data(DosTag.NP_CurrentDir, 0)
-    home_dir = tags.get_tag_data(DosTag.NP_HomeDir, 0)
-    input_fh = tags.get_tag_data(DosTag.NP_Input, 0)
-    output_fh = tags.get_tag_data(DosTag.NP_Output, 0)
+    entry_pc = _tag_data(tags, DosTag.NP_Entry)
+    seglist_bptr = _tag_data(tags, DosTag.NP_SegList)
+    stack_size = _tag_data(tags, DosTag.NP_StackSize)
+    name_ptr = _tag_data(tags, DosTag.NP_Name)
+    priority = _tag_data(tags, DosTag.NP_Priority)
+    current_dir = _tag_data(tags, DosTag.NP_CurrentDir)
+    home_dir = _tag_data(tags, DosTag.NP_HomeDir)
+    input_fh = _tag_data(tags, DosTag.NP_Input)
+    output_fh = _tag_data(tags, DosTag.NP_Output)
+    error_fh = _tag_data(tags, DosTag.NP_Error)
+    close_input = _tag_data(tags, DosTag.NP_CloseInput)
+    close_output = _tag_data(tags, DosTag.NP_CloseOutput)
+    close_error = _tag_data(tags, DosTag.NP_CloseError)
+    console_task = _tag_data(tags, DosTag.NP_ConsoleTask)
+    window_ptr = _tag_data(tags, DosTag.NP_WindowPtr)
+    arguments_ptr = _tag_data(tags, DosTag.NP_Arguments)
+    notify_on_death = _tag_data(tags, DosTag.NP_NotifyOnDeath)
+    exit_code = _tag_data(tags, DosTag.NP_ExitCode)
+    exit_data = _tag_data(tags, DosTag.NP_ExitData)
+    free_seglist = _tag_data(tags, DosTag.NP_FreeSegList)
+    user_data = _tag_data(tags, DosTag.NP_UserData)
+    copy_vars = _tag_data(tags, DosTag.NP_CopyVars)
+    synchronous = _tag_data(tags, DosTag.NP_Synchronous)
+    cli = _tag_data(tags, DosTag.NP_Cli)
+    path = _tag_data(tags, DosTag.NP_Path)
+    command_name_ptr = _tag_data(tags, DosTag.NP_CommandName)
 
-    name = ctx.mem.r_cstr(name_ptr) if name_ptr != 0 else "child_process"
-    if entry_pc == 0 and seglist_bptr == 0:
+    if entry_pc is None and seglist_bptr is None:
         log_dos.warning("CreateNewProc: no NP_Entry or NP_SegList")
         return None
-    if entry_pc == 0 and seglist_bptr != 0:
-        seg_addr = seglist_bptr << 2
-        entry_pc = seg_addr + 4
+    if entry_pc is None:
+        entry_pc = (seglist_bptr << 2) + 4
+
+    parent_addr = _current_proc_addr(ctx)
+    parent = ProcessStruct(ctx.mem, parent_addr) if parent_addr else None
+
+    # RKRM AmigaDOS defaults: name "New Process", stack 4000, priority 0;
+    # input/output default to NIL: (see _spawn) and the error stream to ZERO.
+    # Current/home dir are resolved in _spawn (they need the lock manager to
+    # DupLock the caller's locks); the console task is inherited here.
+    if stack_size is None:
+        stack_size = 4000
+    if name_ptr:
+        name = ctx.mem.r_cstr(name_ptr)
+    else:
+        name = "New Process"
+    if priority is None:
+        priority = 0
+    if console_task is None:
+        console_task = parent.console_task.aptr if parent else 0
+    if window_ptr is None:
+        # RKRM: copy the caller's window pointer only if it is NULL or -1,
+        # otherwise use NULL; a task (no parent) gets NULL
+        if parent is None:
+            window_ptr = 0
+        else:
+            parent_window = parent.window_ptr.aptr
+            window_ptr = parent_window if parent_window in (0, 0xFFFFFFFF) else 0
+    if user_data is None:
+        user_data = 0
+    # NP_CopyVars defaults to TRUE: the child gets a deep copy of the caller's
+    # local shell variables and aliases (RKRM "Creating and Terminating
+    # Processes"). An explicit 0 leaves the child with no variables.
+    if copy_vars is None:
+        copy_vars = 1
+
+    # input/output are closed on exit by default; the error stream is *not*
+    # (RKRM and the NDK dos/dostags.h agree on this asymmetric default)
+    if close_input is None:
+        close_input = 1
+    if close_output is None:
+        close_output = 1
+    if close_error is None:
+        close_error = 0
+
+    # NP_Arguments is copied into DOS memory and pushed into the input
+    # buffer so that ReadArgs() works in the child
+    arguments = None
+    if arguments_ptr is not None:
+        arguments = ctx.mem.r_cstr(arguments_ptr) if arguments_ptr else ""
+
+    # NP_CommandName is copied into the child's CLI (_alloc_child_cli); an
+    # absent tag means "copy the caller's command name" (see below)
+    command_name = None
+    if command_name_ptr is not None:
+        command_name = ctx.mem.r_cstr(command_name_ptr) if command_name_ptr else ""
+
+    flags = 0
+    if close_input:
+        flags |= ProcessFlags.PRF_CLOSEINPUT
+    if close_output:
+        flags |= ProcessFlags.PRF_CLOSEOUTPUT
+    if close_error:
+        flags |= ProcessFlags.PRF_CLOSEERROR
+    if free_seglist:
+        flags |= ProcessFlags.PRF_FREESEGLIST
+    if notify_on_death:
+        flags |= ProcessFlags.PRF_NOTIFYONDEATH
+    if synchronous:
+        flags |= ProcessFlags.PRF_SYNCHRONOUS
+    if cli:
+        flags |= ProcessFlags.PRF_FREECLI
+    if arguments is not None:
+        flags |= ProcessFlags.PRF_FREEARGS
 
     log_dos.info(
-        "CreateNewProc: name=%s entry=%06x stack=%d pri=%d",
+        "CreateNewProc: name=%s entry=%06x stack=%d pri=%d flags=%x",
         name,
         entry_pc,
         stack_size,
         priority,
+        int(flags),
     )
     return {
         "name": name,
         "entry_pc": entry_pc,
-        "seglist_bptr": seglist_bptr,
+        "seglist_bptr": seglist_bptr if seglist_bptr is not None else 0,
         "stack_size": stack_size,
         "priority": priority,
         "current_dir": current_dir,
         "home_dir": home_dir,
         "input_fh": input_fh,
         "output_fh": output_fh,
+        "error_fh": error_fh,
+        "console_task": console_task,
+        "window_ptr": window_ptr,
+        "user_data": user_data,
+        "arguments": arguments,
+        "flags": flags,
+        "exit_code": exit_code or 0,
+        "exit_data": exit_data or 0,
+        "notify_on_death": 1 if notify_on_death else 0,
+        "parent_addr": parent_addr,
+        "copy_vars": bool(copy_vars),
+        "synchronous": bool(synchronous),
+        "cli": bool(cli),
+        "path": path,
+        "command_name": command_name,
     }
+
+
+def _open_nil_fh(dos, mode, label):
+    """open the ``NIL:`` handle a missing NP_Input/NP_Output needs"""
+    fh = dos.file_mgr.open(None, "NIL:", mode)
+    if fh is None:
+        log_dos.warning("CreateNewProc: cannot open NIL: for %s", label)
+    return fh
+
+
+def _resolve_child_fh(dos, bptr, mode, label):
+    """the caller's handle, or the NIL: default when the tag was absent
+
+    An explicit ``0`` (BNULL) is kept: it means "no handle", not "NIL:"
+    (AROS only opens NIL: for a tag that was not specified at all).
+    """
+    if bptr is not None:
+        return bptr
+    fh = _open_nil_fh(dos, mode, label)
+    return fh.b_addr if fh is not None else 0
+
+
+def _resolve_child_dir(dos, explicit_bptr, parent_bptr, label):
+    """the child's current/home dir lock BPTR (RKRM ``NP_CurrentDir``)
+
+    An explicit tag lock is absorbed by the child; an absent tag duplicates
+    the caller's lock (``ZERO`` for a task). Returns ``(bptr, owned)`` where
+    ``owned`` marks a lock obtained here that ``_spawn()`` must release if
+    creating the process fails.
+    """
+    if explicit_bptr is not None:
+        return explicit_bptr, explicit_bptr != 0
+    if not parent_bptr:
+        return 0, False
+    parent_lock = dos.lock_mgr.get_by_b_addr(parent_bptr)
+    if parent_lock is None:
+        return 0, False
+    dup = dos.lock_mgr.dup_lock(parent_lock)
+    if dup is None:
+        log_dos.warning(
+            "CreateNewProc: cannot duplicate parent %s lock %06x", label, parent_bptr
+        )
+        return 0, False
+    return dup.b_addr, True
+
+
+def _release_lock_bptr(dos, bptr):
+    """release a DOS lock by BPTR, ignoring an already-freed lock"""
+    if not bptr:
+        return
+    try:
+        lock = dos.lock_mgr.get_by_b_addr(bptr)
+    except (VamosInternalError, IndexError, AttributeError, TypeError):
+        lock = None
+    if lock is not None:
+        dos.lock_mgr.release_lock(lock)
+
+
+def _cli_of_proc(mem, proc_addr):
+    """the CLIStruct of the process at ``proc_addr`` (or ``None``)"""
+    if not proc_addr:
+        return None
+    cli_addr = ProcessStruct(mem, proc_addr).pr_CLI.aptr
+    if not cli_addr:
+        return None
+    return CLIStruct(mem, cli_addr)
+
+
+def _copy_path_list(dos, ctx, src_bptr):
+    """duplicate a CLI command-path chain (AROS ``internal_CopyPath``)
+
+    Returns ``(head_bptr, owned)`` where ``owned`` is a list of
+    ``(node_addr, lock)`` pairs the caller has to release.
+    """
+    owned = []
+    head = 0
+    prev = None
+    addr = src_bptr
+    while addr:
+        src = PathListStruct(ctx.mem, addr)
+        lock = dos.lock_mgr.get_by_b_addr(src.pl_Lock.bptr)
+        if lock is None:
+            break
+        dup = dos.lock_mgr.dup_lock(lock)
+        if dup is None:
+            break
+        node = ctx.alloc.alloc_astruct(PathListStruct, label="child_cli_Path")
+        node.pl_Lock.aptr = dup.mem.addr
+        node.pl_Next.aptr = 0
+        if prev is None:
+            head = node.addr
+        else:
+            prev.pl_Next.aptr = node.addr
+        prev = node
+        owned.append((node.addr, dup))
+        addr = src.pl_Next.aptr
+    return head, owned
+
+
+def _adopt_path_list(dos, ctx, bptr):
+    """take ownership of a caller-supplied ``NP_Path`` chain
+
+    The chain is not copied (RKRM): the child releases its locks on exit.
+    """
+    owned = []
+    addr = bptr
+    while addr:
+        node = PathListStruct(ctx.mem, addr)
+        lock = dos.lock_mgr.get_by_b_addr(node.pl_Lock.bptr)
+        if lock is not None:
+            owned.append((addr, lock))
+        addr = node.pl_Next.aptr
+    return owned
+
+
+def _free_path_list(dos, ctx, owned):
+    """release a child CLI's command-path chain (nodes and locks)"""
+    for addr, lock in owned:
+        mem_obj = ctx.alloc.get_memory(addr)
+        if mem_obj is not None:
+            ctx.alloc.free_memory(mem_obj)
+        dos.lock_mgr.release_lock(lock)
+
+
+def _alloc_child_cli(dos, ctx, child, p, input_bptr, output_bptr):
+    """build the CLI structure of a ``CreateNewProc()`` child (``NP_Cli``)
+
+    The new shell environment copies the caller's prompt and command name (or
+    falls back to defaults), points its standard streams at the child's
+    ``pr_CIS``/``pr_COS`` and takes the ``NP_Path`` chain (or a copy of the
+    caller's path). ``PRF_FREECLI`` makes the child release all of it on exit
+    (RKRM "Creating and Terminating Processes").
+    """
+    alloc = ctx.alloc
+    mem = ctx.mem
+    parent_cli = _cli_of_proc(mem, p["parent_addr"])
+
+    cli = alloc.alloc_astruct(CLIStruct, label="child_CLI")
+    prompt = alloc.alloc_memory(CLI_PROMPT_SIZE, label="child_cli_Prompt")
+    cmdname = alloc.alloc_memory(CLI_COMMANDNAME_SIZE, label="child_cli_CommandName")
+    cmdfile = alloc.alloc_memory(CLI_COMMANDFILE_SIZE, label="child_cli_CommandFile")
+    setname = alloc.alloc_memory(CLI_SETNAME_SIZE, label="child_cli_SetName")
+
+    cli.cli_DefaultStack.val = (
+        p["stack_size"] + CLI_DEFAULTSTACK_UNIT - 1
+    ) // CLI_DEFAULTSTACK_UNIT
+    cli.cli_FailLevel.val = 10
+    cli.cli_StandardInput.aptr = input_bptr << 2
+    cli.cli_CurrentInput.aptr = input_bptr << 2
+    cli.cli_StandardOutput.aptr = output_bptr << 2
+    cli.cli_CurrentOutput.aptr = output_bptr << 2
+    cli.cli_Prompt.aptr = prompt.addr
+    cli.cli_CommandName.aptr = cmdname.addr
+    cli.cli_CommandFile.aptr = cmdfile.addr
+    cli.cli_SetName.aptr = setname.addr
+
+    # the prompt is copied from the caller's shell environment if it has one
+    if parent_cli is not None:
+        prompt_str = mem.r_bstr(parent_cli.cli_Prompt.aptr) or CLI_DEFAULT_PROMPT
+    else:
+        prompt_str = CLI_DEFAULT_PROMPT
+    mem.w_bstr(prompt.addr, prompt_str[: CLI_PROMPT_SIZE - 1])
+
+    # NP_CommandName, else the caller's command name, else empty (RKRM)
+    if p["command_name"] is not None:
+        name_str = p["command_name"]
+    elif parent_cli is not None:
+        name_str = mem.r_bstr(parent_cli.cli_CommandName.aptr)
+    else:
+        name_str = ""
+    mem.w_bstr(cmdname.addr, name_str[: CLI_COMMANDNAME_SIZE - 1])
+    mem.w_bstr(setname.addr, "SYS:")
+
+    # NP_Path: an explicit chain is adopted, otherwise the caller's is copied
+    if p["path"] is not None:
+        cli.cli_CommandDir.aptr = p["path"]
+        paths = _adopt_path_list(dos, ctx, p["path"])
+    else:
+        src = parent_cli.cli_CommandDir.aptr if parent_cli is not None else 0
+        head, paths = _copy_path_list(dos, ctx, src)
+        cli.cli_CommandDir.aptr = head
+
+    child.proc.pr_CLI.aptr = cli.addr
+    child.dos_cli = (cli, prompt, cmdname, cmdfile, setname)
+    child.dos_cli_paths = paths
+    log_dos.info(
+        "CreateNewProc: child CLI %06x prompt='%s' cmd='%s'",
+        cli.addr,
+        prompt_str,
+        name_str,
+    )
+    return cli
+
+
+def _free_child_cli(dos, ctx, child, proc):
+    """release the shell environment a child created for itself (``NP_Cli``)"""
+    cli_res = getattr(child, "dos_cli", None)
+    if cli_res is None:
+        return
+    cli, prompt, cmdname, cmdfile, setname = cli_res
+    _free_path_list(dos, ctx, getattr(child, "dos_cli_paths", []))
+    ctx.alloc.free_memory(prompt)
+    ctx.alloc.free_memory(cmdname)
+    ctx.alloc.free_memory(cmdfile)
+    ctx.alloc.free_memory(setname)
+    cli.free()
+    proc.pr_CLI.aptr = 0
+    child.dos_cli = None
+    child.dos_cli_paths = []
 
 
 def _spawn(dos, ctx, p):
     """create and schedule the child process described by ``p``"""
+    # NP_Arguments is copied into DOS memory *before* the child starts so its
+    # entry point receives the string in A0 and its length in D0, as documented
+    # in RKRM ("the string and its lengths will be loaded into registers A0 and
+    # D0 before execution of the process begins").
+    arg_mem = None
+    arg_addr = 0
+    arg_len = 0
+    if p["arguments"] is not None:
+        arg_mem = ctx.alloc.alloc_cstr(p["arguments"], label="CreateNewProc_Args")
+        arg_addr = arg_mem.addr
+        arg_len = len(p["arguments"])
+
+    odg_base = getattr(ctx, "odg_base", 0)
+    start_regs = {
+        REG_D0: arg_len,
+        REG_A0: arg_addr,
+        # D2 holds the stack size and the old DOS register guard is installed in
+        # A2/A5/A6, exactly like a process vamos loaded from a seglist
+        REG_D2: p["stack_size"],
+        REG_A2: odg_base,
+        REG_A5: odg_base,
+        REG_A6: odg_base,
+    }
     # the child is a process of its own: the scheduler runs it beside
-    # its parent, and it is freed once its task ends (_child_proc_event)
-    child = dos.create_child_process(
-        ctx,
-        p["name"],
-        stack_size=p["stack_size"],
-        start_pc=p["entry_pc"],
-        start_regs={REG_D0: 0, REG_A0: 0},
+    # its parent, and it is freed once its task ends (child_proc_event)
+    # RKRM NP_CurrentDir/NP_HomeDir: an explicit tag lock is absorbed by the
+    # child; an absent tag duplicates the caller's lock. Both are released on
+    # process exit (the current dir only when non-ZERO -> PRF_FREECURRDIR).
+    parent_addr = p["parent_addr"]
+    parent = ProcessStruct(ctx.mem, parent_addr) if parent_addr else None
+    parent_current = parent.current_dir.bptr if parent else 0
+    parent_home = parent.home_dir.bptr if parent else 0
+    current_dir, current_owned = _resolve_child_dir(
+        dos, p["current_dir"], parent_current, "current dir"
     )
+    home_dir, home_owned = _resolve_child_dir(
+        dos, p["home_dir"], parent_home, "home dir"
+    )
+    flags = int(p["flags"])
+    if current_dir:
+        flags |= ProcessFlags.PRF_FREECURRDIR
+    try:
+        child = dos.create_child_process(
+            ctx,
+            p["name"],
+            stack_size=p["stack_size"],
+            start_pc=p["entry_pc"],
+            start_regs=start_regs,
+        )
+    except Exception:
+        # creating the process failed: the copied arguments are not owned by
+        # anybody yet and have to be released (RKRM "What's Released on Error?"),
+        # and so are the locks obtained/absorbed for the new process
+        if arg_mem is not None:
+            ctx.alloc.free_cstr(arg_mem)
+        if current_owned:
+            _release_lock_bptr(dos, current_dir)
+        if home_owned:
+            _release_lock_bptr(dos, home_dir)
+        raise
     proc = child.proc
     task = proc.task
     stack = child.get_stack()
@@ -153,26 +610,62 @@ def _spawn(dos, ctx, p):
     task.sp_reg.aptr = stack.get_initial_sp()
     task.sp_lower.aptr = stack.get_lower()
     task.sp_upper.aptr = stack.get_upper()
+    task.tc_UserData.aptr = p["user_data"]
     proc.stack_size.val = stack.get_size()
     proc.stack_base.bptr = stack.get_lower() >> 2
     proc.seg_list.bptr = p["seglist_bptr"]
     proc.glob_vec.aptr = 0xFFFFFFFF
-    proc.current_dir.bptr = p["current_dir"]
-    proc.home_dir.bptr = p["home_dir"]
-    proc.window_ptr.aptr = 0xFFFFFFFF
+    proc.current_dir.bptr = current_dir
+    proc.home_dir.bptr = home_dir
+    proc.window_ptr.aptr = p["window_ptr"]
+    proc.console_task.aptr = p["console_task"]
+    proc.flags.val = flags
+    proc.exit_code.aptr = p["exit_code"]
+    proc.exit_data.val = p["exit_data"]
 
-    input_fh = p["input_fh"]
-    output_fh = p["output_fh"]
-    if input_fh == 0 or output_fh == 0:
-        parent_proc = ctx.exec_lib.exec_lib.this_task.aptr
-        if parent_proc != 0:
-            parent = ProcessStruct(ctx.mem, parent_proc)
-            if input_fh == 0:
-                input_fh = parent.cis.bptr
-            if output_fh == 0:
-                output_fh = parent.cos.bptr
+    # NP_Input/NP_Output default to a fresh NIL: open; NP_Error defaults to
+    # ZERO (RKRM). An explicit 0 (BNULL) is kept as 0 for all three.
+    input_fh = _resolve_child_fh(dos, p["input_fh"], "r", "input")
+    output_fh = _resolve_child_fh(dos, p["output_fh"], "w", "output")
+    error_fh = p["error_fh"] if p["error_fh"] is not None else 0
     proc.cis.bptr = input_fh
     proc.cos.bptr = output_fh
+    proc.ces.bptr = error_fh
+
+    # NP_Cli: build the child's shell environment (RKRM). PRF_FREECLI makes the
+    # child release it on exit (see _free_child_cli).
+    if p["cli"]:
+        _alloc_child_cli(dos, ctx, child, p, input_fh, output_fh)
+
+    # NP_CopyVars: every child gets its own local-variable table so that it has
+    # an independent set from the caller; the tag (default TRUE) then decides
+    # whether the caller's shell variables and aliases are deep-copied into it
+    # (RKRM). The table is released when the child terminates.
+    child._local_vars = {}
+    if p["copy_vars"]:
+        copy_local_vars(dos, ctx, child)
+
+    # remember what the exit cleanup in child_proc_event() needs
+    child.dos_ctx = ctx
+    child.dos_flags = flags
+    child.dos_exit_code = p["exit_code"]
+    child.dos_exit_data = p["exit_data"]
+    child.dos_notify = p["notify_on_death"]
+    child.dos_parent_addr = p["parent_addr"]
+    # the caller's scheduler task, used to wake it for NP_Synchronous. This is
+    # also available for a task caller, where there is no process address.
+    child.dos_parent_task = (
+        ctx.scheduler.get_running_task() if ctx.scheduler is not None else None
+    )
+    child.dos_arg_mem = arg_mem
+
+    # NP_Arguments: record it and push it into the input buffer so that
+    # ReadArgs() sees it in the child (RKRM)
+    if arg_mem is not None:
+        proc.arguments.aptr = arg_addr
+        fh = dos.file_mgr.get_by_b_addr(input_fh)
+        if fh is not None:
+            fh.setbuf(p["arguments"])
 
     # the process port is signalled with SIGB_DOS. it is no public port:
     # FindPort() does not find it, a child that wants one adds its own
@@ -189,11 +682,21 @@ def _spawn(dos, ctx, p):
     task.state.val = TaskState.TS_READY
 
     log_dos.info(
-        "CreateNewProc: created process %06x entry=%06x port=%06x",
+        "CreateNewProc: created process %06x entry=%06x port=%06x flags=%x",
         proc.addr,
         p["entry_pc"],
         port_addr,
+        flags,
     )
+
+    # NP_Synchronous: the caller blocks until the child has terminated. AROS
+    # implements this by setting PRF_WAITINGFORCHILD on the parent and waiting
+    # on SIGF_SINGLE, which the child's exit path signals. (The RKRM book notes
+    # the tag is ignored by AmigaDOS 3; vamos follows AROS/later AmigaDOS and
+    # implements it as a superset, like NP_NotifyOnDeath.)
+    if p["synchronous"]:
+        _wait_for_sync_child(ctx, sched_task, child.dos_parent_task, parent_addr)
+
     return proc.addr
 
 
@@ -206,6 +709,250 @@ def create_new_proc(dos, ctx, tags):
     if params is None:
         return 0
     return _spawn(dos, ctx, params)
+
+
+# ----- child process shutdown -----
+
+
+def _close_child_fh(dos, bptr, label):
+    """close one of the child's handles if it is safe to do so"""
+    if not bptr:
+        return
+    try:
+        fh = dos.file_mgr.get_by_b_addr(bptr)
+    except (ValueError, VamosInternalError):
+        fh = None
+    if fh is None:
+        return
+    # never close the shared standard handles: they are not ours
+    if fh in (dos.file_mgr.std_input, dos.file_mgr.std_output):
+        log_dos.warning("CreateNewProc: not closing shared std %s handle", label)
+        return
+    log_dos.info("CreateNewProc: closing child %s handle", label)
+    dos.file_mgr.close(fh)
+
+
+def _free_child_seglist(dos, ctx, bptr):
+    """unload the child's seglist if DOS manages it (NP_FreeSegList)"""
+    if not bptr:
+        return
+    if bptr >= 0x80000000:
+        bptr -= 0x100000000
+    if bptr in dos.seg_lists:
+        dos._unload_seg_list(ctx, bptr)
+        return
+    seg_loader = getattr(ctx, "seg_loader", None)
+    if seg_loader is not None and bptr in getattr(seg_loader, "infos", {}):
+        seg_loader.unload_seglist(abs(bptr))
+        return
+    log_dos.info(
+        "CreateNewProc: NP_FreeSegList set but seglist %06x is not managed by DOS",
+        bptr,
+    )
+
+
+def _call_exit_handler(dos, ctx, child, ret_code, exit_code, exit_data):
+    """call the NP_ExitCode handler with the process return code"""
+    runner = getattr(ctx, "runner", None)
+    if runner is None:
+        log_dos.warning("CreateNewProc: no runner to call NP_ExitCode %06x", exit_code)
+        return
+    code = Code(
+        pc=exit_code,
+        sp=child.get_stack().get_initial_sp(),
+        set_regs={
+            REG_D0: ret_code & 0xFFFFFFFF,
+            REG_D1: exit_data & 0xFFFFFFFF,
+        },
+        get_regs=[],
+    )
+    log_dos.info(
+        "CreateNewProc: calling NP_ExitCode %06x(rc=%d, data=%d)",
+        exit_code,
+        ret_code,
+        exit_data,
+    )
+    try:
+        run_state = runner(code)
+    except Exception as e:  # the exit handler must not break the shutdown
+        log_dos.warning("CreateNewProc: NP_ExitCode %06x failed: %s", exit_code, e)
+        return
+    if run_state is not None and run_state.mach_error is not None:
+        log_dos.warning(
+            "CreateNewProc: NP_ExitCode %06x machine error: %s",
+            exit_code,
+            run_state.mach_error,
+        )
+
+
+def _find_parent_task(ctx, parent_addr):
+    """the scheduler task that owns the Amiga task/process at ``parent_addr``"""
+    scheduler = getattr(ctx, "scheduler", None)
+    if scheduler is None or parent_addr == 0:
+        return None
+
+    def pred(task):
+        map_task = getattr(task, "map_task", None)
+        if map_task is None:
+            return False
+        ami = map_task.get_ami_task()
+        return ami is not None and ami.addr == parent_addr
+
+    return scheduler.find_task_pred_func(pred)
+
+
+def _notify_parent_sync(ctx, parent_task, parent_addr):
+    """wake a parent blocked in a synchronous CreateNewProc (NP_Synchronous)"""
+    if parent_task is None:
+        parent_task = _find_parent_task(ctx, parent_addr)
+    if parent_task is None:
+        log_dos.warning(
+            "CreateNewProc: NP_Synchronous parent %06x not found", parent_addr
+        )
+        return
+    # clear the PRF_WAITINGFORCHILD the caller set while it waits (AROS)
+    if parent_addr:
+        proc = ProcessStruct(ctx.mem, parent_addr)
+        proc.flags.val &= ~ProcessFlags.PRF_WAITINGFORCHILD
+    log_dos.info("CreateNewProc: signalling parent %06x (SIGF_SINGLE)", parent_addr)
+    parent_task.set_signal(SIGF_SINGLE, SIGF_SINGLE)
+
+
+def _notify_parent_death(ctx, parent_task, parent_addr):
+    """signal the parent task that a child died (NP_NotifyOnDeath)"""
+    if parent_task is None:
+        parent_task = _find_parent_task(ctx, parent_addr)
+    if parent_task is None:
+        log_dos.warning(
+            "CreateNewProc: NP_NotifyOnDeath parent %06x not found", parent_addr
+        )
+        return
+    log_dos.info("CreateNewProc: signalling parent %06x (SIGF_CHILD)", parent_addr)
+    parent_task.set_signal(SIGF_CHILD, SIGF_CHILD)
+
+
+def _notify_parent(ctx, parent_task, parent_addr, flags):
+    """deliver a dying child's completion signals to its parent"""
+    # the parent may itself have terminated (its process memory is freed then)
+    if parent_task is not None and parent_task.get_state() == TaskState.TS_REMOVED:
+        return
+    # NP_Synchronous must be signalled first in case both tags are set (AROS)
+    if flags & ProcessFlags.PRF_SYNCHRONOUS:
+        _notify_parent_sync(ctx, parent_task, parent_addr)
+    if flags & ProcessFlags.PRF_NOTIFYONDEATH:
+        _notify_parent_death(ctx, parent_task, parent_addr)
+
+
+def _schedule_child_notify(ctx, parent_task, parent_addr, flags):
+    """deliver the completion signals once the dying child's greenlet has ended
+
+    Signalling from inside the child's greenlet would switch back to the
+    scheduler before child.free() and leave the greenlet suspended forever,
+    leaking the process. The scheduler runs this callback on its own greenlet
+    after the child has fully unwound, so the child is freed first.
+    """
+    scheduler = getattr(ctx, "scheduler", None)
+    if scheduler is None or not scheduler.running:
+        _notify_parent(ctx, parent_task, parent_addr, flags)
+        return
+
+    def deliver():
+        scheduler.remove_after_schedule_callback(deliver)
+        _notify_parent(ctx, parent_task, parent_addr, flags)
+
+    scheduler.add_after_schedule_callback(deliver)
+
+
+def _wait_for_sync_child(ctx, child_task, parent_task, parent_addr):
+    """block the caller until a synchronous child task has terminated"""
+    if parent_task is None:
+        # no task is running (e.g. driven from Python): cannot block
+        log_dos.warning("CreateNewProc: NP_Synchronous without a running task")
+        return
+    # mark the parent as waiting (AROS PRF_WAITINGFORCHILD) and clear a stale
+    # completion signal before sleeping; the child cannot run until we yield
+    if parent_addr:
+        proc = ProcessStruct(ctx.mem, parent_addr)
+        proc.flags.val |= ProcessFlags.PRF_WAITINGFORCHILD
+    parent_task.set_signal(0, SIGF_SINGLE)
+    log_dos.info("CreateNewProc: NP_Synchronous waiting for %s", child_task.name)
+    parent_task.wait(SIGF_SINGLE)
+
+
+def _child_exit_cleanup(dos, child, ret_code):
+    """emulate the DOS part of a process shutdown before it is freed"""
+    ctx = getattr(child, "dos_ctx", None)
+    if ctx is None:
+        return
+    flags = getattr(child, "dos_flags", 0)
+    proc = child.proc
+    # NP_ExitCode(return code, exit data)
+    exit_code = getattr(child, "dos_exit_code", 0)
+    if exit_code:
+        _call_exit_handler(
+            dos, ctx, child, ret_code, exit_code, getattr(child, "dos_exit_data", 0)
+        )
+    # close the process's handles
+    if flags & ProcessFlags.PRF_CLOSEINPUT:
+        _close_child_fh(dos, proc.cis.bptr, "input")
+    if flags & ProcessFlags.PRF_CLOSEOUTPUT:
+        _close_child_fh(dos, proc.cos.bptr, "output")
+    if flags & ProcessFlags.PRF_CLOSEERROR:
+        _close_child_fh(dos, proc.ces.bptr, "error")
+    # unload the seglist
+    if flags & ProcessFlags.PRF_FREESEGLIST:
+        _free_child_seglist(dos, ctx, proc.seg_list.bptr)
+    # release the current directory (PRF_FREECURRDIR) and the home directory
+    # (RKRM: pr_HomeDir is always released on process exit when non-ZERO)
+    if flags & ProcessFlags.PRF_FREECURRDIR:
+        _release_lock_bptr(dos, proc.current_dir.bptr)
+    _release_lock_bptr(dos, proc.home_dir.bptr)
+    # free the copied NP_Arguments
+    arg_mem = getattr(child, "dos_arg_mem", None)
+    if arg_mem is not None:
+        ctx.alloc.free_cstr(arg_mem)
+        child.dos_arg_mem = None
+    # NP_Cli: release the child's shell environment (PRF_FREECLI)
+    if flags & ProcessFlags.PRF_FREECLI:
+        _free_child_cli(dos, ctx, child, proc)
+    # NP_CopyVars: release the child's own local shell variables
+    free_local_vars(dos, ctx, child)
+
+
+def child_proc_event(dos, event):
+    """free a process made by CreateNewProc() once its task has ended"""
+    if event.type != SchedulerEvent.Type.REMOVE_TASK:
+        return
+    child = dos.child_procs.pop(event.task, None)
+    if child is None:
+        return
+    ret_code = event.task.get_exit_code()
+    if ret_code is None:
+        # NativeTask only stores exit_code after it has reported REMOVE_TASK,
+        # so read the return code the code left in D0 from the run state
+        run_state = getattr(event.task, "run_state", None)
+        regs = getattr(run_state, "regs", None) if run_state is not None else None
+        if regs:
+            ret_code = regs[REG_D0] & 0xFF
+        else:
+            ret_code = 0
+    _child_exit_cleanup(dos, child, ret_code)
+    port_addr = child.proc.msg_port.addr
+    if dos.port_mgr.has_port(port_addr):
+        dos.port_mgr.unregister_port(port_addr)
+    # remember the completion notifications before the process is freed
+    ctx = getattr(child, "dos_ctx", None)
+    flags = getattr(child, "dos_flags", 0)
+    parent_addr = getattr(child, "dos_parent_addr", 0)
+    parent_task = getattr(child, "dos_parent_task", None)
+    log_dos.info("CreateNewProc: process %06x ended", child.proc.addr)
+    child.free()
+    # NP_Synchronous / NP_NotifyOnDeath: wake the parent once this child has
+    # fully unwound and been freed
+    if ctx is not None and (
+        flags & (ProcessFlags.PRF_SYNCHRONOUS | ProcessFlags.PRF_NOTIFYONDEATH)
+    ):
+        _schedule_child_notify(ctx, parent_task, parent_addr, flags)
 
 
 def exit_process(dos, ctx, return_code):
@@ -371,6 +1118,156 @@ def max_cli(ctx):
 # ----- system/execute -----
 
 
+def _resolve_redirection(dos, lock, cl, tag_list):
+    """resolve the command's input/output handles for ``SystemTagList``
+
+    A redirection on the command line (``<``, ``>``, ``>>``) takes precedence
+    over the ``SYS_Input``/``SYS_Output`` handles that ``Execute()`` forwards.
+    Returns ``(input_fh, output_fh, owned_fhs)`` or ``None`` when opening a
+    redirection file failed; ``owned_fhs`` are the handles opened here that the
+    caller has to close once the command has run.
+    """
+    input_fh = None
+    output_fh = None
+    owned = []
+
+    redir_in = cl.get_redir_in()
+    if redir_in is not None:
+        fh = dos.file_mgr.open(lock, redir_in, "r")
+        if fh is None:
+            log_dos.warning(
+                "SystemTagList: cannot open input redirection '%s'", redir_in
+            )
+            return None
+        input_fh = fh
+        owned.append(fh)
+
+    redir_out = cl.get_redir_out()
+    if redir_out is not None:
+        append = cl.is_append_out()
+        # '>>' opens read/write (creating the file) and appends at EOF;
+        # '>' truncates the file.
+        fh = dos.file_mgr.open(lock, redir_out, "rw" if append else "w")
+        if fh is None:
+            log_dos.warning(
+                "SystemTagList: cannot open output redirection '%s'", redir_out
+            )
+            for o in owned:
+                dos.file_mgr.close(o)
+            return None
+        if append:
+            fh.seek(0, 2)
+        output_fh = fh
+        owned.append(fh)
+
+    # no redirection: fall back to the Execute() SYS_Input/SYS_Output handles
+    if input_fh is None and tag_list is not None:
+        intag = tag_list.find_tag(DosTag.SYS_Input)
+        if intag is not None:
+            input_fh = _lookup_fh(dos, intag.get_data())
+    if output_fh is None and tag_list is not None:
+        outtag = tag_list.find_tag(DosTag.SYS_Output)
+        if outtag is not None:
+            output_fh = _lookup_fh(dos, outtag.get_data())
+
+    return input_fh, output_fh, owned
+
+
+def _lookup_fh(dos, b_addr):
+    """resolve a caller supplied DOS file handle BPTR
+
+    Returns ``None`` for a null or unknown handle.  The AmigaOS shell's ``Run``
+    built-in hands a hand-crafted ``FileHandle`` (built with ``AllocVec``) to
+    ``System()`` as ``SYS_Input``; it was never opened through DOS and is thus
+    not tracked by the file manager.  An unknown handle must not abort the call.
+    """
+    if not b_addr:
+        return None
+    try:
+        return dos.file_mgr.get_by_b_addr(b_addr)
+    except ValueError:
+        log_dos.warning("ignoring unknown file handle b@%06x", b_addr)
+        return None
+
+
+# ----- run code/processes in the caller's task -----
+
+
+def run_sub_process(scheduler, runner, proc):
+    log_proc.info("start sub process: %s", proc)
+
+    # actually we need to add a new task and do multitasking
+    # for now we simply run it as a sub run in our task
+    task = proc.get_sched_task()
+
+    # hack cur task
+    cur_task = scheduler.cur_task
+    scheduler._report_event(SchedulerEvent.Type.ADD_TASK, task)
+    scheduler._report_event(SchedulerEvent.Type.READY_TASK, cur_task)
+    scheduler._report_event(SchedulerEvent.Type.ACTIVE_TASK, task)
+
+    # return value
+    code = task.get_code()
+    run_state = runner(code)
+    ret_code = run_state.regs[REG_D0]
+    log_proc.info("return from sub process: ret_code=%d", ret_code)
+
+    # cleanup proc
+    proc.free()
+
+    # restore cur task
+    scheduler._report_event(SchedulerEvent.Type.READY_TASK, task)
+    scheduler._report_event(SchedulerEvent.Type.ACTIVE_TASK, cur_task)
+    scheduler._report_event(SchedulerEvent.Type.REMOVE_TASK, task)
+
+    return ret_code
+
+
+def run_sub_command(process, start_pc, args_ptr, args_len, stack_size, reg_d1=0):
+    """run a loaded command in the caller's task with a fresh stack
+
+    This is the low-level runner shared by ``RunCommand()`` and the native
+    shell branch of ``SystemTagList()``: the caller is overloaded with the
+    command and gets its own stack, but no new task is created.
+    """
+    ctx = process.ctx
+    alloc = ctx.alloc
+    new_stack = Stack.alloc(alloc, stack_size)
+    task = process.this_task.pr_Task
+    # save old stack
+    oldstack_lower = task.tc_SPLower.aptr
+    oldstack_upper = task.tc_SPUpper.aptr
+    # activate new stack
+    task.tc_SPLower.aptr = new_stack.get_lower()
+    task.tc_SPUpper.aptr = new_stack.get_upper()
+    # NOTE: the Manx fexec and BPCL mess is not (yet) setup here.
+
+    try:
+        # new proc registers: d0=arg_len a0=arg_cptr
+        # d2=stack_size. This value is also in 4(sp), but various C
+        # programs rely on it being present (1.3-3.1 at least have it).
+        set_regs = {
+            REG_D0: args_len,
+            REG_D1: reg_d1,
+            REG_A0: args_ptr,
+            REG_D2: stack_size,
+            REG_A2: ctx.odg_base,
+            REG_A5: ctx.odg_base,
+            REG_A6: ctx.odg_base,
+        }
+        get_regs = [REG_D0]
+        code = Code(start_pc, new_stack.get_initial_sp(), set_regs, get_regs)
+
+        rs = ctx.runner(code)
+        ret_code = rs.regs[REG_D0]
+        log_proc.info("return from RunCommand: ret_code=%d", ret_code)
+        return ret_code
+    finally:
+        task.tc_SPLower.aptr = oldstack_lower
+        task.tc_SPUpper.aptr = oldstack_upper
+        new_stack.free()
+
+
 def system_tag_list(dos, ctx, cmd, tag_list):
     log_dos.info("SystemTagList: cmd=%s tags=%s ctx=%s", cmd, tag_list, ctx)
     # cmd is at this point a full string of commands to execute.
@@ -379,10 +1276,19 @@ def system_tag_list(dos, ctx, cmd, tag_list):
     if ctx.process.is_native_shell():
         cli_addr = ctx.process.get_cli_struct()
         cli = CLIStruct(ctx.mem, cli_addr)
-        new_input = dos.file_mgr.open(None, "NIL:", "r")
-        if new_input == None:
+        # a caller supplied SYS_Input handle receives the command line, else
+        # vamos opens a fresh NIL: stream to push the commands into
+        new_input = None
+        if tag_list is not None:
+            intag = tag_list.find_tag(DosTag.SYS_Input)
+            if intag is not None:
+                new_input = _lookup_fh(dos, intag.get_data())
+        if new_input is None:
+            new_input = dos.file_mgr.open(None, "NIL:", "r")
+        if new_input is None:
             log_dos.warning(
-                "SystemTagList: can't create new input file handle for SystemTagList('%s')",
+                "SystemTagList: can't create new input file handle for "
+                "SystemTagList('%s')",
                 cmd,
             )
             return 0xFFFFFFFF
@@ -410,7 +1316,6 @@ def system_tag_list(dos, ctx, cmd, tag_list):
         packet = ctx.process.run_system()
         stack_size = cli.cli_DefaultStack.val << 2
         current_dir = ctx.process.get_current_dir()
-        cur_lock = dos.lock_mgr.get_by_b_addr(current_dir >> 2)
         dup_lock = dos.lock_mgr.dup_lock(dos.get_current_dir(ctx))
         cur_module = cli.cli_Module.aptr
         cur_out = ctx.process.this_task.pr_COS.aptr
@@ -423,7 +1328,7 @@ def system_tag_list(dos, ctx, cmd, tag_list):
         reg_d1 = packet >> 2
         code_start = ctx.process.shell_start
         log_dos.info("(Shell)SystemTagList: pc=%06x", code_start)
-        ret_code = ami_run_command(ctx.process, code_start, 0, 0, stack_size, reg_d1)
+        ret_code = run_sub_command(ctx.process, code_start, 0, 0, stack_size, reg_d1)
         log_dos.info(
             "(Shell)SystemTagList returned: cmd='%s' tags=%s: ret_code=%d",
             cmd,
@@ -436,7 +1341,7 @@ def system_tag_list(dos, ctx, cmd, tag_list):
         cli.cli_StandardInput.aptr = input_fhsi
         cli.cli_Background.val = DOSFALSE
         cli.cli_Module.aptr = cur_module
-        if output_fhci != None:
+        if output_fhci is not None:
             cli.cli_StandardOutput.aptr = output_fhci
         # Channels are closed by the dying shell
         ctx.mem.w_bstr(cli.cli_SetName.aptr, cur_setname)
@@ -455,7 +1360,6 @@ def system_tag_list(dos, ctx, cmd, tag_list):
         if res != cl.LINE_OK:
             log_dos.info("SystemTagList: error parsing command: '%s' -> %d", res)
             return 10  # RETURN_ERROR
-        # TODO: redirs
         binary = cl.get_cmd()
         arg_str = cl.get_arg_str()
         log_dos.info("SystemTagList: bin='%s' arg_str='%s'", binary, arg_str[:-1])
@@ -463,16 +1367,35 @@ def system_tag_list(dos, ctx, cmd, tag_list):
         cur_proc = ctx.process
         cwd_lock = cur_proc.cwd_lock
         cwd = cur_proc.cwd
+        # resolve the command's input/output: command line redirection wins
+        # over the SYS_Input/SYS_Output handles Execute() forwarded
+        redir = _resolve_redirection(dos, cwd_lock, cl, tag_list)
+        if redir is None:
+            return 10  # RETURN_ERROR
+        input_fh, output_fh, redir_fhs = redir
         # create a process and run it...
-        proc = Process(ctx, binary, arg_str, cwd=cwd, cwd_lock=cwd_lock)
-        if not proc.ok:
-            log_dos.warning(
-                "SystemTagList: can't create process for '%s' args=%s",
+        try:
+            proc = Process(
+                ctx,
                 binary,
                 arg_str,
+                input_fh=input_fh,
+                output_fh=output_fh,
+                cwd=cwd,
+                cwd_lock=cwd_lock,
             )
-            return DOSTRUE
-        return run_sub_process(ctx.scheduler, ctx.runner, proc)
+            if not proc.ok:
+                log_dos.warning(
+                    "SystemTagList: can't create process for '%s' args=%s",
+                    binary,
+                    arg_str,
+                )
+                return DOSTRUE
+            return run_sub_process(ctx.scheduler, ctx.runner, proc)
+        finally:
+            # close only the handles opened for the redirection here
+            for fh in redir_fhs:
+                dos.file_mgr.close(fh)
 
 
 def load_seg_list(dos, ctx, name, lock):
@@ -493,15 +1416,14 @@ def load_seg_list(dos, ctx, name, lock):
 def run_command(dos, ctx, b_addr, stack, args, length):
     if b_addr >= 0x80000000:
         b_addr -= 0x100000000
-    if not b_addr in dos.seg_lists:
+    if b_addr not in dos.seg_lists:
         raise VamosInternalError(
             "Trying to run unknown LoadSeg seg_list: b_addr=%06x" % b_addr
         )
     else:
         name = dos.seg_lists[b_addr]
-    fh = ctx.process.get_input()
     cmdline = ctx.mem.r_cstr(args)
-    # push command line into input buffer
+    # push command line into input buffer so ReadArgs()/ReadItem() see it
     input_fh = ctx.process.get_input()
     input_fh.setbuf(cmdline)
     log_dos.info(
@@ -514,9 +1436,28 @@ def run_command(dos, ctx, b_addr, stack, args, length):
     # round up the stack
     stack = (stack + 3) & -4
     prog_start = (abs(b_addr) << 2) + 4
-    ret_code = ami_run_command(ctx.process, prog_start, args, length, stack)
-    # clear input
-    input_fh.setbuf("")
+    # the running command sees its arguments in pr_Arguments and returns
+    # through pr_ReturnAddr; both are restored afterwards (RKRM)
+    proc = _ami_proc(ctx)
+    old_args = old_return = None
+    if proc is not None:
+        old_args = proc.pr_Arguments.aptr
+        old_return = proc.pr_ReturnAddr.aptr
+        proc.pr_Arguments.aptr = args & 0xFFFFFFFF
+        machine = getattr(ctx, "machine", None)
+        if machine is not None:
+            proc.pr_ReturnAddr.aptr = machine.get_run_exit_addr()
+    try:
+        ret_code = run_sub_command(ctx.process, prog_start, args, length, stack)
+    finally:
+        if proc is not None:
+            proc.pr_Arguments.aptr = old_args
+            proc.pr_ReturnAddr.aptr = old_return
+        # flush leftover input, preserving IoErr (AROS does the same to fix
+        # the AmigaOS C:Execute)
+        io_err = getattr(dos, "io_err", 0)
+        input_fh.setbuf("")
+        dos.io_err = io_err
     return ret_code
 
 
@@ -526,9 +1467,24 @@ def execute(dos, ctx, cmd, file, file2):
     ``file``/``file2`` are BPTRs to the input/output file handles to use while
     the command runs (zero keeps the current handle). The command is run
     through ``_system_tag_list`` (so a test can replace it on the DOS lib).
+    Returns DOSTRUE if the command could be found and started, DOSFALSE
+    otherwise (never the command's return code).
     """
-    if not cmd:
-        return DOSFALSE
+    # an empty command line with no handles creates a new interactive shell
+    # (RKRM/AROS map this to "Run NewShell")
+    if not cmd and not file and not file2:
+        cmd = "Run NewShell"
+    log_dos.info("Execute(%s, in=%s, out=%s)", cmd, file, file2)
+
+    # forward the handles as SYS_Input/SYS_Output tags (AROS does the same)
+    tags = []
+    if file:
+        tags.append((DosTag.SYS_Input, file))
+    if file2:
+        tags.append((DosTag.SYS_Output, file2))
+    tag_list = TagList.alloc(ctx.alloc, *tags) if tags else None
+
+    # keep the caller's handles visible to the non-native command runner
     proc = _ami_proc(ctx)
     old_cis = old_cos = None
     if proc is not None:
@@ -539,12 +1495,15 @@ def execute(dos, ctx, cmd, file, file2):
         if file2:
             proc.pr_COS.bptr = file2
     try:
-        log_dos.info("Execute(%s, in=%s, out=%s)", cmd, file, file2)
-        return dos._system_tag_list(ctx, cmd, None)
+        result = dos._system_tag_list(ctx, cmd, tag_list)
     finally:
         if proc is not None:
             proc.pr_CIS.bptr = old_cis
             proc.pr_COS.bptr = old_cos
+        if tag_list is not None:
+            tag_list.free()
+    # SystemTagList() returns 0 for success, otherwise the command result
+    return DOSTRUE if result == 0 else DOSFALSE
 
 
 def do_shell_method_tag_list(dos, ctx, method, tags):
@@ -595,6 +1554,7 @@ def cli_init_run(dos, ctx, dp):
 
 __all__ = [
     "MAX_CLI",
+    "child_proc_event",
     "cli_init",
     "cli_init_newcli",
     "cli_init_run",
@@ -615,6 +1575,8 @@ __all__ = [
     "load_seg_list",
     "max_cli",
     "run_command",
+    "run_sub_command",
+    "run_sub_process",
     "set_arg_str",
     "set_console_task",
     "set_current_dir_name",
@@ -717,3 +1679,7 @@ class CliMixin:
 
     def DoShellMethodTagList(self, ctx, method: LONG, tags: TagList):
         return do_shell_method_tag_list(self, ctx, method.val, tags)
+
+    def _child_proc_event(self, event):
+        """free a process made by CreateNewProc() once its task has ended"""
+        return child_proc_event(self, event)

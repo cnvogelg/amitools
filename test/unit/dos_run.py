@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from amitools.vamos.dos import run_command
+from amitools.vamos.lib.dos.Cli import run_sub_command
 from amitools.vamos.libstructs import ProcessStruct
 from amitools.vamos.machine import Machine, Runtime, REG_D0, REG_D1, REG_D2, REG_A0
 from amitools.vamos.mem import MemoryAlloc
@@ -55,7 +55,7 @@ def dos_run_stack_bounds_test(context):
         return SimpleNamespace(regs={REG_D0: 42})
 
     context.ctx.runner = runner
-    assert run_command(context.process, 0x200, 0x100, 3, 8192, 17) == 42
+    assert run_sub_command(context.process, 0x200, 0x100, 3, 8192, 17) == 42
     assert bounds(context) == original
     assert context.alloc.get_free_bytes() == before
 
@@ -69,7 +69,7 @@ def dos_run_exception_restores_stack_test(context):
 
     context.ctx.runner = runner
     with pytest.raises(RuntimeError, match="command failed"):
-        run_command(context.process, 0x200, 0, 0, 8192)
+        run_sub_command(context.process, 0x200, 0, 0, 8192)
     assert bounds(context) == original
     assert context.alloc.get_free_bytes() == before
 
@@ -84,7 +84,7 @@ def dos_run_nested_stack_test(context):
         if len(calls) == 1:
             outer = bounds(context)
             assert outer[1] - outer[0] == 8192
-            assert run_command(context.process, 0x400, 0, 0, 16384) == 23
+            assert run_sub_command(context.process, 0x400, 0, 0, 16384) == 23
             assert bounds(context) == outer
         else:
             inner = bounds(context)
@@ -93,7 +93,7 @@ def dos_run_nested_stack_test(context):
         return SimpleNamespace(regs={REG_D0: 23})
 
     context.ctx.runner = runner
-    assert run_command(context.process, 0x200, 0, 0, 8192) == 23
+    assert run_sub_command(context.process, 0x200, 0, 0, 8192) == 23
     assert len(calls) == 2
     assert bounds(context) == original
     assert context.alloc.get_free_bytes() == before
@@ -114,7 +114,7 @@ def dos_run_native_stack_bounds_test(context):
     before = context.alloc.get_free_bytes()
     try:
         task_addr = context.process.this_task.pr_Task.addr
-        assert run_command(context.process, code.addr, task_addr, 0, 8192) == 42
+        assert run_sub_command(context.process, code.addr, task_addr, 0, 8192) == 42
         lower = context.mem.r32(record.addr)
         upper = context.mem.r32(record.addr + 4)
         sp = context.mem.r32(record.addr + 8)

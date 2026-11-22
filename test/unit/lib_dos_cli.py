@@ -14,7 +14,14 @@ from amitools.vamos.lib.dos.Error import (
     ERROR_OBJECT_WRONG_TYPE,
 )
 from amitools.vamos.lib.DosLibrary import DosLibrary
-from amitools.vamos.libstructs import CLIStruct, ProcessStruct
+from amitools.vamos.lib.dos.Cli import (
+    _new_proc_tags,
+    _resolve_child_dir,
+    _resolve_child_fh,
+    _resolve_redirection,
+)
+from amitools.vamos.lib.dos.CommandLine import CommandLine
+from amitools.vamos.libstructs import CLIStruct, ProcessFlags, ProcessStruct
 from amitools.vamos.libtypes import DosPacket, DosTag, TagList
 from amitools.vamos.machine import Code, Machine, Runtime
 from amitools.vamos.machine.mock import MockCPU, MockMemory
@@ -61,6 +68,8 @@ def _make_ctx(mem, cpu, cli=True):
     return SimpleNamespace(
         mem=mem,
         cpu=cpu,
+        alloc=MemoryAlloc(mem),
+        machine=SimpleNamespace(get_run_exit_addr=lambda: 0x400),
         process=SimpleNamespace(
             get_ami_process=lambda: proc,
             get_cli_struct=lambda: cli_struct.addr if cli else 0,
@@ -168,27 +177,48 @@ def lib_dos_cli_execute_test():
 
     def run(call_ctx, cmd, tags):
         seen["cmd"] = cmd
-        seen["tags"] = tags
+        if tags:
+            seen["tags"] = dict(tags.to_list(map_enum=DosTag, do_map=True))
+        else:
+            seen["tags"] = None
         seen["cis"] = proc.pr_CIS.bptr
         seen["cos"] = proc.pr_COS.bptr
-        return 5
+        return seen.get("ret", 0)
 
     lib._system_tag_list = run
     cmd = _cstr(mem, cpu, REG_D1, "echo hi")
     file = _long(mem, cpu, REG_D2, 33)
     file2 = _long(mem, cpu, REG_D3, 44)
-    assert lib.Execute(ctx, cmd, file, file2) == 5
-    assert seen == {"cmd": "echo hi", "tags": None, "cis": 33, "cos": 44}
+    # a zero result means the command could be started -> DOSTRUE
+    assert lib.Execute(ctx, cmd, file, file2) == DOSTRUE
+    assert seen == {
+        "cmd": "echo hi",
+        "tags": {DosTag.SYS_Input: 33, DosTag.SYS_Output: 44},
+        "cis": 33,
+        "cos": 44,
+    }
     # the caller's handles are restored
     assert proc.pr_CIS.bptr == 11
     assert proc.pr_COS.bptr == 22
 
-    # zero handles keep the current input/output
+    # a non-zero result (command not found) -> DOSFALSE
+    seen["ret"] = 5
     cmd = _cstr(mem, cpu, REG_D1, "echo hi")
     file = _long(mem, cpu, REG_D2, 0)
     file2 = _long(mem, cpu, REG_D3, 0)
-    assert lib.Execute(ctx, cmd, file, file2) == 5
-    assert seen == {"cmd": "echo hi", "tags": None, "cis": 11, "cos": 22}
+    assert lib.Execute(ctx, cmd, file, file2) == DOSFALSE
+    # zero handles keep the current input/output and add no tags
+    assert seen == {"cmd": "echo hi", "tags": None, "cis": 11, "cos": 22, "ret": 5}
+
+    # an empty command with no handles opens a new interactive shell
+    del seen["ret"]
+    cmd = _cstr(mem, cpu, REG_D1, "")
+    file = _long(mem, cpu, REG_D2, 0)
+    file2 = _long(mem, cpu, REG_D3, 0)
+    assert lib.Execute(ctx, cmd, file, file2) == DOSTRUE
+    assert seen["cmd"] == "Run NewShell"
+    assert seen["tags"] is None
+    assert ctx.alloc.is_all_free()
 
 
 def lib_dos_cli_createproc_test():
@@ -196,7 +226,14 @@ def lib_dos_cli_createproc_test():
     cpu = MockCPU()
     alloc = MemoryAlloc(mem)
     lib = DosLibrary()
-    ctx = SimpleNamespace(mem=mem, cpu=cpu, alloc=alloc)
+    parent = ProcessStruct(mem, PROC_ADDR)
+    parent.window_ptr.aptr = 0x44
+    ctx = SimpleNamespace(
+        mem=mem,
+        cpu=cpu,
+        alloc=alloc,
+        process=SimpleNamespace(proc=SimpleNamespace(addr=PROC_ADDR)),
+    )
     captured = {}
 
     def create_new_proc(call_ctx, tag_list):
@@ -208,12 +245,35 @@ def lib_dos_cli_createproc_test():
     pri = _long(mem, cpu, REG_D2, 5)
     seglist = _long(mem, cpu, REG_D3, 0x2222)
     stack = _long(mem, cpu, REG_D4, 8192)
-    assert lib.CreateProc(ctx, name, pri, seglist, stack) == 0x1234
+    # CreateProc returns the process's pr_MsgPort, not the Process struct
+    assert lib.CreateProc(ctx, name, pri, seglist, stack) == (
+        ProcessStruct(mem, 0x1234).msg_port.addr
+    )
     tags = captured["tags"]
     assert tags[DosTag.NP_SegList] == 0x2222
     assert tags[DosTag.NP_StackSize] == 8192
     assert tags[DosTag.NP_Priority] == 5
     assert mem.r_cstr(tags[DosTag.NP_Name]) == "child"
+    # RKRM: CreateProc copies the caller's pr_WindowPtr unconditionally (it
+    # does not use CreateNewProc's NULL/-1 default rule)
+    assert tags[DosTag.NP_WindowPtr] == 0x44
+    # AOS 3.x compat: keep the seglist, the dirs and the inherited handles
+    assert tags[DosTag.NP_FreeSegList] == 0
+    assert tags[DosTag.NP_CurrentDir] == 0
+    assert tags[DosTag.NP_HomeDir] == 0
+    assert tags[DosTag.NP_Input] == 0
+    assert tags[DosTag.NP_Output] == 0
+    assert tags[DosTag.NP_CloseInput] == 0
+    assert tags[DosTag.NP_CloseOutput] == 0
+
+    # a failing CreateNewProc yields a NULL msg port
+    lib.CreateNewProc = lambda call_ctx, tag_list: 0
+    name = _cstr(mem, cpu, REG_D1, "child")
+    pri = _long(mem, cpu, REG_D2, 5)
+    seglist = _long(mem, cpu, REG_D3, 0x2222)
+    stack = _long(mem, cpu, REG_D4, 8192)
+    assert lib.CreateProc(ctx, name, pri, seglist, stack) == 0
+    assert alloc.is_all_free()
 
     # NULL seglist cannot create a process
     name = _cstr(mem, cpu, REG_D1, "child")
@@ -507,15 +567,33 @@ def lib_dos_cli_run_command_test(monkeypatch):
     calls = []
 
     def fake_run(proc, prog_start, args, length, stack):
-        calls.append((proc, prog_start, args, length, stack))
+        ami_proc = ctx.process.get_ami_process()
+        calls.append(
+            (
+                proc,
+                prog_start,
+                args,
+                length,
+                stack,
+                ami_proc.pr_Arguments.aptr,
+                ami_proc.pr_ReturnAddr.aptr,
+            )
+        )
+        # the command sets its own IoErr; the flush must preserve it
+        lib.io_err = 42
         return 7
 
-    monkeypatch.setattr("amitools.vamos.lib.dos.Cli.ami_run_command", fake_run)
+    monkeypatch.setattr("amitools.vamos.lib.dos.Cli.run_sub_command", fake_run)
     assert lib.RunCommand(ctx, 0x10, 8, DEST_ADDR, 4) == 7
-    # the stack is rounded up and the seglist is resolved to its program start
-    assert calls == [(ctx.process, (0x10 << 2) + 4, DEST_ADDR, 4, 8)]
+    # the stack is rounded up and the seglist is resolved to its program start;
+    # pr_Arguments/pr_ReturnAddr are set while the command runs
+    assert calls == [(ctx.process, (0x10 << 2) + 4, DEST_ADDR, 4, 8, DEST_ADDR, 0x400)]
     # the command line is pushed and cleared again
     assert input_fh.buf == ""
+    # both process fields are restored, the command's IoErr survives the flush
+    assert ctx.process.this_task.pr_Arguments.aptr == 0x222
+    assert ctx.process.this_task.pr_ReturnAddr.aptr == 0
+    assert lib.io_err == 42
 
 
 def lib_dos_cli_run_command_unknown_test():
@@ -527,3 +605,575 @@ def lib_dos_cli_run_command_unknown_test():
 
     with pytest.raises(VamosInternalError):
         lib.RunCommand(ctx, 0x10, 0, DEST_ADDR, 0)
+
+
+def _new_proc_ctx(mem, alloc, parent_addr=0):
+    if parent_addr:
+        exec_lib = SimpleNamespace(
+            exec_lib=SimpleNamespace(
+                this_task=SimpleNamespace(aptr=parent_addr),
+            ),
+        )
+    else:
+        exec_lib = None
+    return SimpleNamespace(mem=mem, alloc=alloc, exec_lib=exec_lib, process=None)
+
+
+def lib_dos_cli_new_proc_defaults_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    ctx = _new_proc_ctx(mem, alloc)
+
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
+    p = _new_proc_tags(ctx, tags)
+    assert p["name"] == "New Process"
+    assert p["entry_pc"] == 0x4000
+    assert p["seglist_bptr"] == 0
+    assert p["stack_size"] == 4000
+    assert p["priority"] == 0
+    # absent dir tags stay None: _spawn resolves them by duplicating the
+    # caller's locks (or ZERO for a task)
+    assert p["current_dir"] is None
+    assert p["home_dir"] is None
+    assert p["console_task"] == 0
+    # a task (no parent) gets a NULL window pointer (RKRM)
+    assert p["window_ptr"] == 0
+    # handles are not resolved here: _spawn opens the NIL: defaults
+    assert p["input_fh"] is None
+    assert p["output_fh"] is None
+    assert p["error_fh"] is None
+    assert p["arguments"] is None
+    # close input/output default to TRUE; error and free-seglist to FALSE
+    assert p["flags"] & ProcessFlags.PRF_CLOSEINPUT
+    assert p["flags"] & ProcessFlags.PRF_CLOSEOUTPUT
+    assert not (p["flags"] & ProcessFlags.PRF_CLOSEERROR)
+    assert not (p["flags"] & ProcessFlags.PRF_FREESEGLIST)
+    assert not (p["flags"] & ProcessFlags.PRF_NOTIFYONDEATH)
+    assert not (p["flags"] & ProcessFlags.PRF_FREEARGS)
+    tags.free()
+
+
+def lib_dos_cli_new_proc_tags_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    ctx = _new_proc_ctx(mem, alloc)
+
+    name = alloc.alloc_cstr("myproc")
+    args = alloc.alloc_cstr("arg1 arg2")
+    tags = TagList.alloc(
+        alloc,
+        (DosTag.NP_Entry, 0x4000),
+        (DosTag.NP_Name, name.addr),
+        (DosTag.NP_StackSize, 8192),
+        (DosTag.NP_Priority, 7),
+        (DosTag.NP_CurrentDir, 0x11),
+        (DosTag.NP_HomeDir, 0x22),
+        (DosTag.NP_Input, 0x33),
+        (DosTag.NP_Output, 0x44),
+        (DosTag.NP_Error, 0x55),
+        (DosTag.NP_ConsoleTask, 0x66),
+        (DosTag.NP_WindowPtr, 0x77),
+        (DosTag.NP_Arguments, args.addr),
+        (DosTag.NP_NotifyOnDeath, 1),
+        (DosTag.NP_ExitCode, 0x88),
+        (DosTag.NP_ExitData, 0x99),
+        (DosTag.NP_FreeSegList, 0),
+        (DosTag.NP_CloseInput, 0),
+        (DosTag.NP_CloseOutput, 0),
+        (DosTag.NP_CloseError, 0),
+        (DosTag.NP_UserData, 0xAA),
+        (DosTag.NP_Synchronous, 1),
+    )
+    p = _new_proc_tags(ctx, tags)
+    assert p["name"] == "myproc"
+    assert p["entry_pc"] == 0x4000
+    assert p["stack_size"] == 8192
+    assert p["priority"] == 7
+    assert p["current_dir"] == 0x11
+    assert p["home_dir"] == 0x22
+    assert p["input_fh"] == 0x33
+    assert p["output_fh"] == 0x44
+    assert p["error_fh"] == 0x55
+    assert p["console_task"] == 0x66
+    assert p["window_ptr"] == 0x77
+    assert p["arguments"] == "arg1 arg2"
+    assert p["exit_code"] == 0x88
+    assert p["exit_data"] == 0x99
+    assert p["user_data"] == 0xAA
+    assert p["notify_on_death"] == 1
+    assert p["synchronous"] is True
+    # the explicit close/seglist/arguments flags are honored
+    assert not (p["flags"] & ProcessFlags.PRF_CLOSEINPUT)
+    assert not (p["flags"] & ProcessFlags.PRF_CLOSEOUTPUT)
+    assert not (p["flags"] & ProcessFlags.PRF_CLOSEERROR)
+    assert not (p["flags"] & ProcessFlags.PRF_FREESEGLIST)
+    assert p["flags"] & ProcessFlags.PRF_NOTIFYONDEATH
+    assert p["flags"] & ProcessFlags.PRF_SYNCHRONOUS
+    assert p["flags"] & ProcessFlags.PRF_FREEARGS
+    tags.free()
+    ctx.alloc.free_cstr(name)
+    ctx.alloc.free_cstr(args)
+
+
+def lib_dos_cli_new_proc_copy_vars_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    ctx = _new_proc_ctx(mem, alloc)
+
+    # NP_CopyVars defaults to TRUE
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
+    assert _new_proc_tags(ctx, tags)["copy_vars"] is True
+    tags.free()
+
+    # an explicit 0 turns the copy off
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000), (DosTag.NP_CopyVars, 0))
+    assert _new_proc_tags(ctx, tags)["copy_vars"] is False
+    tags.free()
+
+    # a non-zero value keeps it on
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000), (DosTag.NP_CopyVars, 1))
+    assert _new_proc_tags(ctx, tags)["copy_vars"] is True
+    tags.free()
+
+
+def lib_dos_cli_new_proc_synchronous_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    ctx = _new_proc_ctx(mem, alloc)
+
+    # NP_Synchronous defaults to FALSE: no PRF_SYNCHRONOUS
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
+    p = _new_proc_tags(ctx, tags)
+    assert p["synchronous"] is False
+    assert not (p["flags"] & ProcessFlags.PRF_SYNCHRONOUS)
+    tags.free()
+
+    # a non-zero value requests the synchronous wait
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000), (DosTag.NP_Synchronous, 1))
+    p = _new_proc_tags(ctx, tags)
+    assert p["synchronous"] is True
+    assert p["flags"] & ProcessFlags.PRF_SYNCHRONOUS
+    tags.free()
+
+
+def lib_dos_cli_new_proc_cli_tags_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    ctx = _new_proc_ctx(mem, alloc)
+
+    # NP_Cli defaults to FALSE: no CLI, no PRF_FREECLI
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
+    p = _new_proc_tags(ctx, tags)
+    assert p["cli"] is False
+    assert not (p["flags"] & ProcessFlags.PRF_FREECLI)
+    assert p["path"] is None
+    assert p["command_name"] is None
+    tags.free()
+
+    # NP_Cli requests a shell environment; NP_Path/NP_CommandName are read
+    cname = alloc.alloc_cstr("mycmd")
+    tags = TagList.alloc(
+        alloc,
+        (DosTag.NP_Entry, 0x4000),
+        (DosTag.NP_Cli, 1),
+        (DosTag.NP_Path, 0x1234),
+        (DosTag.NP_CommandName, cname.addr),
+    )
+    p = _new_proc_tags(ctx, tags)
+    assert p["cli"] is True
+    assert p["flags"] & ProcessFlags.PRF_FREECLI
+    assert p["path"] == 0x1234
+    assert p["command_name"] == "mycmd"
+    tags.free()
+    alloc.free_cstr(cname)
+
+
+def lib_dos_cli_new_proc_affinity_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    ctx = _new_proc_ctx(mem, alloc)
+
+    # NP_Affinity is an SMP-only tag: accepted and ignored on this single-CPU
+    # emulation (AROS: "elsewhere it is accepted and ignored")
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
+    base = _new_proc_tags(ctx, tags)
+    tags.free()
+
+    tags = TagList.alloc(
+        alloc,
+        (DosTag.NP_Entry, 0x4000),
+        (DosTag.NP_Affinity, 0xFF),
+    )
+    p = _new_proc_tags(ctx, tags)
+    tags.free()
+
+    # parsing succeeds and the ignored tag changes nothing
+    assert p == base
+
+
+def lib_dos_cli_new_proc_seglist_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    ctx = _new_proc_ctx(mem, alloc)
+
+    tags = TagList.alloc(alloc, (DosTag.NP_SegList, 0x1234))
+    p = _new_proc_tags(ctx, tags)
+    # the entry is the first segment of the seglist
+    assert p["entry_pc"] == (0x1234 << 2) + 4
+    assert p["seglist_bptr"] == 0x1234
+    tags.free()
+
+
+def lib_dos_cli_new_proc_missing_entry_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    ctx = _new_proc_ctx(mem, alloc)
+
+    tags = TagList.alloc(alloc, (DosTag.NP_StackSize, 4096))
+    assert _new_proc_tags(ctx, tags) is None
+    tags.free()
+
+
+def lib_dos_cli_new_proc_inherit_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    parent = ProcessStruct(mem, PROC_ADDR)
+    parent.task.node.pri.val = 9
+    parent.current_dir.bptr = 0x11
+    parent.home_dir.bptr = 0x22
+    parent.console_task.aptr = 0x33
+    parent.window_ptr.aptr = 0x44
+    ctx = _new_proc_ctx(mem, alloc, parent_addr=PROC_ADDR)
+
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
+    p = _new_proc_tags(ctx, tags)
+    assert p["parent_addr"] == PROC_ADDR
+    # priority defaults to 0 (RKRM); the console task is inherited from the
+    # parent, while the absent dir tags stay None and are duplicated from the
+    # parent by _spawn()
+    assert p["priority"] == 0
+    assert p["current_dir"] is None
+    assert p["home_dir"] is None
+    assert p["console_task"] == 0x33
+    # the parent's window pointer is neither NULL nor -1, so the child gets NULL
+    assert p["window_ptr"] == 0
+    tags.free()
+
+
+def lib_dos_cli_new_proc_window_ptr_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    parent = ProcessStruct(mem, PROC_ADDR)
+    ctx = _new_proc_ctx(mem, alloc, parent_addr=PROC_ADDR)
+
+    # absent tag, parent window NULL -> copied
+    parent.window_ptr.aptr = 0
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
+    assert _new_proc_tags(ctx, tags)["window_ptr"] == 0
+    tags.free()
+
+    # absent tag, parent window -1 -> copied
+    parent.window_ptr.aptr = 0xFFFFFFFF
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
+    assert _new_proc_tags(ctx, tags)["window_ptr"] == 0xFFFFFFFF
+    tags.free()
+
+    # absent tag, parent window other -> NULL
+    parent.window_ptr.aptr = 0x44
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
+    assert _new_proc_tags(ctx, tags)["window_ptr"] == 0
+    tags.free()
+
+    # an explicit tag is installed as-is (even a real window pointer)
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000), (DosTag.NP_WindowPtr, 0x44))
+    assert _new_proc_tags(ctx, tags)["window_ptr"] == 0x44
+    tags.free()
+
+
+def lib_dos_cli_new_proc_resolve_dir_test():
+    class FakeLock:
+        def __init__(self, b_addr):
+            self.b_addr = b_addr
+
+    class FakeLockMgr:
+        def __init__(self, parent_lock=None, dup_addr=0x99):
+            self.parent_lock = parent_lock
+            self.dup_addr = dup_addr
+            self.dups = 0
+
+        def get_by_b_addr(self, b_addr):
+            return self.parent_lock
+
+        def dup_lock(self, lock):
+            self.dups += 1
+            return FakeLock(self.dup_addr) if self.dup_addr is not None else None
+
+    # an explicit tag lock is absorbed by the child (no dup)
+    mgr = FakeLockMgr()
+    dos = SimpleNamespace(lock_mgr=mgr)
+    assert _resolve_child_dir(dos, 0x11, 0x22, "current dir") == (0x11, True)
+    assert mgr.dups == 0
+
+    # an explicit ZERO is kept and owns nothing
+    assert _resolve_child_dir(dos, 0, 0x22, "current dir") == (0, False)
+
+    # an absent tag duplicates the caller's lock
+    mgr = FakeLockMgr(parent_lock=FakeLock(0x22))
+    dos = SimpleNamespace(lock_mgr=mgr)
+    assert _resolve_child_dir(dos, None, 0x22, "current dir") == (0x99, True)
+    assert mgr.dups == 1
+
+    # no caller lock (a task) -> ZERO
+    mgr = FakeLockMgr()
+    dos = SimpleNamespace(lock_mgr=mgr)
+    assert _resolve_child_dir(dos, None, 0, "current dir") == (0, False)
+    assert mgr.dups == 0
+
+    # a failed DupLock also yields ZERO and owns nothing
+    mgr = FakeLockMgr(parent_lock=FakeLock(0x22), dup_addr=None)
+    dos = SimpleNamespace(lock_mgr=mgr)
+    assert _resolve_child_dir(dos, None, 0x22, "current dir") == (0, False)
+    assert mgr.dups == 1
+
+
+def lib_dos_cli_new_proc_resolve_fh_test():
+    class FakeFH:
+        b_addr = 0x99
+
+    class FakeFileMgr:
+        def __init__(self):
+            self.opened = []
+
+        def open(self, lock, path, mode):
+            self.opened.append((path, mode))
+            return FakeFH()
+
+    dos = SimpleNamespace(file_mgr=FakeFileMgr())
+    # an absent tag opens the NIL: default
+    assert _resolve_child_fh(dos, None, "r", "input") == 0x99
+    assert dos.file_mgr.opened == [("NIL:", "r")]
+    # an explicit 0 (BNULL) is kept: no NIL: open (AROS behaviour)
+    assert _resolve_child_fh(dos, 0, "r", "input") == 0
+    assert dos.file_mgr.opened == [("NIL:", "r")]
+    # a caller supplied handle is kept
+    assert _resolve_child_fh(dos, 0x33, "r", "input") == 0x33
+    assert dos.file_mgr.opened == [("NIL:", "r")]
+
+
+# ----- SystemTagList redirection (Step 3) -----
+
+
+class _RedirFH:
+    def __init__(self, b_addr, mode):
+        self.b_addr = b_addr
+        self.mode = mode
+        self.seeks = []
+
+    def seek(self, pos, whence):
+        self.seeks.append((pos, whence))
+
+
+class _RedirFileMgr:
+    """a file manager that records the redirection opens"""
+
+    def __init__(self, fail=()):
+        self.fail = set(fail)
+        self.opened = []
+        self.closed = []
+        self.by_b = {}
+
+    def open(self, lock, path, mode):
+        if path in self.fail:
+            return None
+        fh = _RedirFH(0x100 + len(self.opened), mode)
+        self.opened.append((lock, path, mode))
+        self.by_b[fh.b_addr] = fh
+        return fh
+
+    def close(self, fh):
+        self.closed.append(fh)
+
+    def get_by_b_addr(self, b_addr):
+        return self.by_b.get(b_addr)
+
+
+def _parse_cmd(line):
+    cl = CommandLine()
+    assert cl.parse_line(line) == cl.LINE_OK
+    return cl
+
+
+def lib_dos_cli_resolve_redirection_test():
+    # no redirection and no SYS tags -> nothing is resolved
+    fm = _RedirFileMgr()
+    dos = SimpleNamespace(file_mgr=fm)
+    assert _resolve_redirection(dos, "LOCK", _parse_cmd("dir"), None) == (
+        None,
+        None,
+        [],
+    )
+    assert fm.opened == []
+
+    # '<' opens the input file read-only and owns it
+    fm = _RedirFileMgr()
+    dos = SimpleNamespace(file_mgr=fm)
+    in_fh, out_fh, owned = _resolve_redirection(
+        dos, "LOCK", _parse_cmd("type foo <in.txt"), None
+    )
+    assert fm.opened == [("LOCK", "in.txt", "r")]
+    assert in_fh is owned[0]
+    assert out_fh is None
+    assert fm.closed == []
+
+    # '>' truncates the output file
+    fm = _RedirFileMgr()
+    dos = SimpleNamespace(file_mgr=fm)
+    in_fh, out_fh, owned = _resolve_redirection(
+        dos, "LOCK", _parse_cmd("echo hi >out.txt"), None
+    )
+    assert fm.opened == [("LOCK", "out.txt", "w")]
+    assert in_fh is None
+    assert out_fh is owned[0]
+    assert out_fh.seeks == []
+
+    # '>>' opens read/write and seeks to the end so writes append
+    fm = _RedirFileMgr()
+    dos = SimpleNamespace(file_mgr=fm)
+    in_fh, out_fh, owned = _resolve_redirection(
+        dos, "LOCK", _parse_cmd("echo hi >>out.txt"), None
+    )
+    assert fm.opened == [("LOCK", "out.txt", "rw")]
+    assert out_fh.seeks == [(0, 2)]
+
+    # both redirections in one line
+    fm = _RedirFileMgr()
+    dos = SimpleNamespace(file_mgr=fm)
+    in_fh, out_fh, owned = _resolve_redirection(
+        dos, "LOCK", _parse_cmd("type foo <in.txt >out.txt"), None
+    )
+    assert fm.opened == [("LOCK", "in.txt", "r"), ("LOCK", "out.txt", "w")]
+    assert owned == [in_fh, out_fh]
+
+    # a failed input open yields None
+    fm = _RedirFileMgr(fail=("in.txt",))
+    dos = SimpleNamespace(file_mgr=fm)
+    assert (
+        _resolve_redirection(dos, "LOCK", _parse_cmd("type foo <in.txt"), None) is None
+    )
+    assert fm.closed == []
+
+    # a failed output open yields None and closes the input already opened
+    fm = _RedirFileMgr(fail=("out.txt",))
+    dos = SimpleNamespace(file_mgr=fm)
+    assert (
+        _resolve_redirection(dos, "LOCK", _parse_cmd("type foo <in.txt >out.txt"), None)
+        is None
+    )
+    assert len(fm.closed) == 1
+
+
+def lib_dos_cli_resolve_redirection_sys_tags_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+
+    # SYS_Input/SYS_Output are used when the command line has no redirection
+    fm = _RedirFileMgr()
+    fm.by_b[0x55] = "IN"
+    fm.by_b[0x66] = "OUT"
+    dos = SimpleNamespace(file_mgr=fm)
+    tag_list = TagList.alloc(alloc, (DosTag.SYS_Input, 0x55), (DosTag.SYS_Output, 0x66))
+    assert _resolve_redirection(dos, "LOCK", _parse_cmd("dir"), tag_list) == (
+        "IN",
+        "OUT",
+        [],
+    )
+    # the SYS handles are not opened here, so nothing is owned
+    assert fm.opened == []
+
+    # a command line redirection wins over the SYS tags
+    fm = _RedirFileMgr()
+    fm.by_b[0x55] = "IN"
+    fm.by_b[0x66] = "OUT"
+    dos = SimpleNamespace(file_mgr=fm)
+    in_fh, out_fh, owned = _resolve_redirection(
+        dos, "LOCK", _parse_cmd("type foo <in.txt >out.txt"), tag_list
+    )
+    assert fm.opened == [("LOCK", "in.txt", "r"), ("LOCK", "out.txt", "w")]
+    assert in_fh is owned[0] and out_fh is owned[1]
+    tag_list.free()
+
+
+def lib_dos_cli_system_tag_list_redir_test(monkeypatch):
+    from amitools.vamos.lib.dos import Cli
+
+    mem = MockMemory()
+    fm = _RedirFileMgr()
+    ctx = SimpleNamespace(
+        mem=mem,
+        process=SimpleNamespace(
+            is_native_shell=lambda: False,
+            cwd_lock="LOCK",
+            cwd="root:",
+        ),
+        scheduler="SCHED",
+        runner="RUNNER",
+    )
+    dos = SimpleNamespace(file_mgr=fm)
+    captured = {}
+
+    class FakeProcess:
+        def __init__(
+            self,
+            call_ctx,
+            binary,
+            arg_str,
+            input_fh=None,
+            output_fh=None,
+            cwd=None,
+            cwd_lock=None,
+        ):
+            self.ok = True
+            captured.update(
+                binary=binary,
+                arg_str=arg_str,
+                input_fh=input_fh,
+                output_fh=output_fh,
+                cwd=cwd,
+                cwd_lock=cwd_lock,
+            )
+
+        def free(self):
+            pass
+
+    monkeypatch.setattr(Cli, "Process", FakeProcess)
+    monkeypatch.setattr(Cli, "run_sub_process", lambda sched, runner, proc: 0)
+
+    # '<in >out' opens both files, passes them to the process and closes them
+    assert Cli.system_tag_list(dos, ctx, "type foo <in.txt >out.txt", None) == 0
+    assert fm.opened == [("LOCK", "in.txt", "r"), ("LOCK", "out.txt", "w")]
+    assert captured["binary"] == "type"
+    assert captured["arg_str"].strip() == "foo"
+    assert captured["input_fh"].mode == "r"
+    assert captured["output_fh"].mode == "w"
+    assert fm.closed == [captured["input_fh"], captured["output_fh"]]
+
+    # a failing redirection aborts before the process is created
+    captured.clear()
+    fm.opened.clear()
+    fm.closed.clear()
+    fm.fail = {"in.txt"}
+    assert Cli.system_tag_list(dos, ctx, "type foo <in.txt", None) == 10
+    assert captured == {}
+
+    # a SYS_Output tag is passed through and not closed by SystemTagList
+    alloc = MemoryAlloc(mem)
+    fm.fail = set()
+    fm.by_b[0x77] = "OUT"
+    tag_list = TagList.alloc(alloc, (DosTag.SYS_Output, 0x77))
+    captured.clear()
+    fm.closed.clear()
+    assert Cli.system_tag_list(dos, ctx, "dir", tag_list) == 0
+    assert captured["input_fh"] is None
+    assert captured["output_fh"] == "OUT"
+    assert fm.closed == []
+    tag_list.free()

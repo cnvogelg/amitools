@@ -20,6 +20,8 @@ from amitools.vamos.lib.dos.Var import (
     GVF_BINARY_VAR,
     GVF_GLOBAL_ONLY,
     GVF_LOCAL_ONLY,
+    copy_local_vars,
+    free_local_vars,
 )
 from amitools.vamos.lib.DosLibrary import DosLibrary
 from amitools.vamos.libstructs import LocalVarStruct, MinListStruct, NodeStruct
@@ -260,3 +262,99 @@ def lib_dos_var_binary_test():
     assert env.lib.GetVar(env.ctx, env.name("bin"), BUFFER, 2, flags) == 2
     assert env.mem.r_block(BUFFER, 2) == payload[:2]
     assert env.lib.io_err == len(payload)
+
+
+# ----- per-process local variables (NP_CopyVars) -----
+
+
+def _child_process(env, label="child"):
+    """a second process with its own pr_LocalVars list and variable table"""
+    varlist_mem = env.alloc.alloc_memory(
+        MinListStruct.get_size(), label=label + "VarList"
+    )
+    varlist = MinListStruct(env.mem, varlist_mem.addr)
+    head_mem = env.alloc.alloc_memory(NodeStruct.get_size(), label=label + "VarHead")
+    varlist.mlh_Head.aptr = head_mem.addr
+    varlist.mlh_Tail.aptr = 0
+    varlist.mlh_TailPred.aptr = head_mem.addr
+    return SimpleNamespace(get_local_vars=lambda: varlist, _local_vars={})
+
+
+def lib_dos_var_copy_local_vars_test():
+    env = _Env()
+    env.set("foo", "bar")
+    env.lib.SetVar(env.ctx, env.name("myalias"), env.value("dir"), 0, env.lib.LV_ALIAS)
+    child = _child_process(env)
+
+    # copy_local_vars() deep-copies every variable and alias into the child
+    copy_local_vars(env.lib, env.ctx, child)
+    assert set(child._local_vars.keys()) == {
+        ("foo", env.lib.LV_VAR),
+        ("myalias", env.lib.LV_ALIAS),
+    }
+    node = child._local_vars[("foo", env.lib.LV_VAR)]
+    # the copy has its own node and value buffer
+    assert node.addr != env.lib.local_vars[("foo", env.lib.LV_VAR)].addr
+    assert env.mem.r_cstr(node.lv_Value.aptr) == "bar"
+
+    # the two sets are independent: overwriting the child leaves the parent alone
+    child_ctx = SimpleNamespace(mem=env.mem, process=child)
+    env.lib.SetVar(child_ctx, env.name("foo"), env.value("child"), 0, 0)
+    assert env.mem.r_cstr(child._local_vars[("foo", env.lib.LV_VAR)].lv_Value.aptr) == (
+        "child"
+    )
+    parent_node = env.lib.local_vars[("foo", env.lib.LV_VAR)]
+    assert env.mem.r_cstr(parent_node.lv_Value.aptr) == "bar"
+    env.set("foo", "parent")
+    assert env.mem.r_cstr(child._local_vars[("foo", env.lib.LV_VAR)].lv_Value.aptr) == (
+        "child"
+    )
+    # a lookup through the child context reads the child's own table
+    assert env.lib.GetVar(child_ctx, env.name("foo"), BUFFER, 64, 0) == len("child")
+    assert env.mem.r_cstr(BUFFER) == "child"
+    # a variable that only exists in the child is invisible to the parent
+    env.lib.SetVar(child_ctx, env.name("onlychild"), env.value("x"), 0, 0)
+    assert ("onlychild", env.lib.LV_VAR) not in env.lib.local_vars
+    assert env.get("onlychild") == -1
+
+
+def lib_dos_var_copy_local_vars_binary_test():
+    env = _Env()
+    payload = b"\x01\x02\x03\x04"
+    env.mem.w_block(VALUE, payload)
+    env.lib.SetVar(env.ctx, env.name("bin"), VALUE, len(payload), GVF_BINARY_VAR)
+    child = _child_process(env)
+    copy_local_vars(env.lib, env.ctx, child)
+    node = child._local_vars[("bin", env.lib.LV_VAR)]
+    assert node.lv_Len.val == len(payload)
+    assert env.mem.r_block(node.lv_Value.aptr, len(payload)) == payload
+
+
+def lib_dos_var_copy_local_vars_task_test():
+    # a task caller (no current process) copies nothing
+    env = _Env()
+    env.set("foo", "bar")
+    env.ctx.process = None
+    child = _child_process(env)
+    copy_local_vars(env.lib, env.ctx, child)
+    assert child._local_vars == {}
+
+
+def lib_dos_var_free_local_vars_test():
+    env = _Env()
+    env.set("foo", "bar")
+    child = _child_process(env)
+    copy_local_vars(env.lib, env.ctx, child)
+    node = child._local_vars[("foo", env.lib.LV_VAR)]
+    node_addr = node.addr
+    buf_addr = node.lv_Value.aptr
+
+    # freeing the child releases its nodes and value buffers
+    free_local_vars(env.lib, env.ctx, child)
+    assert child._local_vars == {}
+    assert node_addr not in env.lib.mem_allocs
+    assert buf_addr not in env.lib.mem_allocs
+    # the parent's variable is untouched
+    assert env.get("foo") == len("bar")
+    # freeing an empty table is a no-op
+    free_local_vars(env.lib, env.ctx, child)

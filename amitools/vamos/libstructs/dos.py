@@ -17,6 +17,8 @@ from amitools.vamos.astructs import (
     CSTR,
     ARRAY,
 )
+from enum import IntEnum
+
 from .exec_ import (
     TaskStruct,
     MsgPortStruct,
@@ -81,6 +83,22 @@ class CLIStruct(AmigaStruct):
         (BPTR(FileHandleStruct), "cli_StandardOutput"),
         (BPTR_VOID, "cli_Module"),
     ]
+
+
+class ProcessFlags(IntEnum):
+    """pr_Flags bits (dos/dosextens.h)"""
+
+    PRF_FREESEGLIST = 1 << 0
+    PRF_FREECURRDIR = 1 << 1
+    PRF_FREECLI = 1 << 2
+    PRF_CLOSEINPUT = 1 << 3
+    PRF_CLOSEOUTPUT = 1 << 4
+    PRF_FREEARGS = 1 << 5
+    PRF_CLOSEERROR = 1 << 6
+    PRF_SYNCHRONOUS = 1 << 18
+    PRF_WAITINGFORCHILD = 1 << 19
+    PRF_NOTIFYONDEATH = 1 << 20
+    PRF_CLOSECLIERROR = 1 << 21
 
 
 @AmigaStructDef

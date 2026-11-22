@@ -1,0 +1,5 @@
+# Shell-Seg binaries are copyrighted AmigaOS files -- never commit them.
+# Populate this folder locally with extract-shell-seg.py.
+Shell-Seg-*
+MANIFEST.txt
+__pycache__/
