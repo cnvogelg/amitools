@@ -23,6 +23,10 @@ LVO_INPUT = -54
 LVO_OUTPUT = -60
 REDIR_CODE_SIZE = 64
 
+# GetVar(name, buffer, size, flags)(d1/d2/d3/d4); see dos_lib.fd
+LVO_GETVAR = -906
+COPYVARS_CODE_SIZE = 64
+
 
 def write_child_code(mem, pc, exec_base, task_addr, sig_mask):
     """child code: Signal(task, sig_mask) through exec, then return 42"""
@@ -877,6 +881,119 @@ def pytask_dos_execute_redir_test(vamos_task):
         fm.close(out_fh)
 
         alloc.free_memory(buf)
+        return 0
+
+    exit_codes = vamos_task.run([proc], process=True)
+    assert exit_codes == [0]
+
+
+# ----- NP_CopyVars (Step 4) -----
+
+
+def write_getvar_child_code(
+    mem, pc, dos_base, name_addr, buf_addr, len_addr, exec_base, task_addr, sig_mask
+):
+    """child code: GetVar(name, buf, 64, 0), store the result, Signal(parent)"""
+    mem.w16(pc, 0x2C7C)  # movea.l #dos_base,a6
+    mem.w32(pc + 2, dos_base)
+    mem.w16(pc + 6, 0x223C)  # move.l #name,d1
+    mem.w32(pc + 8, name_addr)
+    mem.w16(pc + 12, 0x243C)  # move.l #buf,d2
+    mem.w32(pc + 14, buf_addr)
+    mem.w16(pc + 18, 0x7640)  # moveq #64,d3
+    mem.w16(pc + 20, 0x7800)  # moveq #0,d4
+    mem.w16(pc + 22, 0x4EAE)  # jsr GetVar(a6)
+    mem.w16(pc + 24, LVO_GETVAR & 0xFFFF)
+    mem.w16(pc + 26, 0x23C0)  # move.l d0,(len).l
+    mem.w32(pc + 28, len_addr)
+    mem.w16(pc + 32, 0x2C7C)  # movea.l #exec_base,a6
+    mem.w32(pc + 34, exec_base)
+    mem.w16(pc + 38, 0x227C)  # movea.l #task,a1
+    mem.w32(pc + 40, task_addr)
+    mem.w16(pc + 44, 0x203C)  # move.l #sig_mask,d0
+    mem.w32(pc + 46, sig_mask)
+    mem.w16(pc + 50, 0x4EAE)  # jsr Signal(a6)
+    mem.w16(pc + 52, LVO_SIGNAL & 0xFFFF)
+    mem.w16(pc + 54, 0x7000)  # moveq #0,d0
+    mem.w16(pc + 56, op_rts)
+
+
+def pytask_dos_create_new_proc_copy_vars_test(vamos_task):
+    """NP_CopyVars: the child sees the caller's local variables when TRUE and
+    none when FALSE (RKRM "Creating and Terminating Processes")"""
+
+    def proc(ctx, task):
+        dos_proxy = ctx.proxies.get_dos_lib_proxy()
+        exec_proxy = ctx.proxies.get_exec_lib_proxy()
+        mem = ctx.mem
+        alloc = ctx.alloc
+
+        parent = ProcessStruct(mem, ctx.process.proc.addr)
+        exec_base = ctx.exec_lib.exec_lib.addr
+        dos_base = ctx.dos_lib.lib_struct.addr
+
+        # a local variable in the calling process
+        name = alloc.alloc_cstr("myvar")
+        value = alloc.alloc_cstr("hello")
+        assert dos_proxy.SetVar(name.addr, value.addr, len("hello") + 1, 0) == DOSTRUE
+
+        # one child with the default (copy) and one with NP_CopyVars=0
+        for copy_vars, expected in ((None, "hello"), (0, None)):
+            sig = exec_proxy.AllocSignal(-1)
+            sig_mask = 1 << sig
+            code = alloc.alloc_memory(COPYVARS_CODE_SIZE, label="copyvars_code")
+            buf = alloc.alloc_memory(64, label="copyvars_buf")
+            length = alloc.alloc_memory(4, label="copyvars_len")
+            mem.w_block(buf.addr, b"\xaa" * 64)
+            mem.w32(length.addr, 0xDEADBEEF)
+            write_getvar_child_code(
+                mem,
+                code.addr,
+                dos_base,
+                name.addr,
+                buf.addr,
+                length.addr,
+                exec_base,
+                parent.addr,
+                sig_mask,
+            )
+            child_name = alloc.alloc_cstr("copyvars_child")
+            tag_list = [
+                (DosTag.NP_Entry, code.addr),
+                (DosTag.NP_Name, child_name.addr),
+                (DosTag.NP_StackSize, 8192),
+            ]
+            if copy_vars is not None:
+                tag_list.append((DosTag.NP_CopyVars, copy_vars))
+            tags = TagList.alloc(alloc, *tag_list)
+            assert dos_proxy.CreateNewProc(tags) != 0
+            tags.free()
+
+            child_task = task.find_task("copyvars_child")
+            wait_for_child(child_task, exec_proxy, sig_mask, "copyvars_child")
+
+            if expected is not None:
+                # the caller's variable was deep-copied into the child
+                assert mem.r32(length.addr) == len(expected)
+                assert mem.r_cstr(buf.addr) == expected
+            else:
+                # the child started with an empty set: GetVar() fails
+                assert mem.r32(length.addr) == 0xFFFFFFFF
+                assert mem.r_block(buf.addr, 1) == b"\xaa"
+
+            exec_proxy.FreeSignal(sig)
+            alloc.free_memory(code)
+            alloc.free_memory(buf)
+            alloc.free_memory(length)
+            alloc.free_cstr(child_name)
+
+        # the parent's variable survived both children
+        out = alloc.alloc_memory(64, label="copyvars_out")
+        assert dos_proxy.GetVar(name.addr, out.addr, 64, 0) == len("hello")
+        assert mem.r_cstr(out.addr) == "hello"
+        alloc.free_memory(out)
+        alloc.free_cstr(name)
+        alloc.free_cstr(value)
         return 0
 
     exit_codes = vamos_task.run([proc], process=True)

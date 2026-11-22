@@ -43,6 +43,7 @@ from .Error import (
 from .Process import Process
 from .run import run_command as ami_run_command
 from .run import run_sub_process
+from .Var import copy_local_vars, free_local_vars
 
 # the AmigaDOS V36 process table size returned by MaxCli()
 MAX_CLI = 256
@@ -196,6 +197,7 @@ def _new_proc_tags(ctx, tags):
     exit_data = _tag_data(tags, DosTag.NP_ExitData)
     free_seglist = _tag_data(tags, DosTag.NP_FreeSegList)
     user_data = _tag_data(tags, DosTag.NP_UserData)
+    copy_vars = _tag_data(tags, DosTag.NP_CopyVars)
 
     # tags that vamos accepts but does not act on yet
     if _tag_data(tags, DosTag.NP_Synchronous):
@@ -206,9 +208,6 @@ def _new_proc_tags(ctx, tags):
         log_dos.warning("CreateNewProc: NP_Path is not supported (ignored)")
     if _tag_data(tags, DosTag.NP_CommandName):
         log_dos.warning("CreateNewProc: NP_CommandName is not supported (ignored)")
-    if _tag_data(tags, DosTag.NP_CopyVars) == 0:
-        # local variables are shared process-wide in vamos
-        log_dos.info("CreateNewProc: NP_CopyVars=FALSE (local vars are shared)")
 
     if entry_pc is None and seglist_bptr is None:
         log_dos.warning("CreateNewProc: no NP_Entry or NP_SegList")
@@ -243,6 +242,11 @@ def _new_proc_tags(ctx, tags):
             window_ptr = parent_window if parent_window in (0, 0xFFFFFFFF) else 0
     if user_data is None:
         user_data = 0
+    # NP_CopyVars defaults to TRUE: the child gets a deep copy of the caller's
+    # local shell variables and aliases (RKRM "Creating and Terminating
+    # Processes"). An explicit 0 leaves the child with no variables.
+    if copy_vars is None:
+        copy_vars = 1
 
     # input/output are closed on exit by default; the error stream is *not*
     # (RKRM and the NDK dos/dostags.h agree on this asymmetric default)
@@ -301,6 +305,7 @@ def _new_proc_tags(ctx, tags):
         "exit_data": exit_data or 0,
         "notify_on_death": 1 if notify_on_death else 0,
         "parent_addr": parent_addr,
+        "copy_vars": bool(copy_vars),
     }
 
 
@@ -450,6 +455,14 @@ def _spawn(dos, ctx, p):
     proc.cis.bptr = input_fh
     proc.cos.bptr = output_fh
     proc.ces.bptr = error_fh
+
+    # NP_CopyVars: every child gets its own local-variable table so that it has
+    # an independent set from the caller; the tag (default TRUE) then decides
+    # whether the caller's shell variables and aliases are deep-copied into it
+    # (RKRM). The table is released when the child terminates.
+    child._local_vars = {}
+    if p["copy_vars"]:
+        copy_local_vars(dos, ctx, child)
 
     # remember what the exit cleanup in child_proc_event() needs
     child.dos_ctx = ctx
@@ -633,6 +646,8 @@ def _child_exit_cleanup(dos, child, ret_code):
     if arg_mem is not None:
         ctx.alloc.free_cstr(arg_mem)
         child.dos_arg_mem = None
+    # NP_CopyVars: release the child's own local shell variables
+    free_local_vars(dos, ctx, child)
     # NP_NotifyOnDeath: signal the parent task
     if flags & ProcessFlags.PRF_NOTIFYONDEATH:
         _notify_parent_death(ctx, getattr(child, "dos_parent_addr", 0))

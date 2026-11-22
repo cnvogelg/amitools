@@ -712,6 +712,27 @@ def lib_dos_cli_new_proc_tags_test():
     ctx.alloc.free_cstr(args)
 
 
+def lib_dos_cli_new_proc_copy_vars_test():
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    ctx = _new_proc_ctx(mem, alloc)
+
+    # NP_CopyVars defaults to TRUE
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000))
+    assert _new_proc_tags(ctx, tags)["copy_vars"] is True
+    tags.free()
+
+    # an explicit 0 turns the copy off
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000), (DosTag.NP_CopyVars, 0))
+    assert _new_proc_tags(ctx, tags)["copy_vars"] is False
+    tags.free()
+
+    # a non-zero value keeps it on
+    tags = TagList.alloc(alloc, (DosTag.NP_Entry, 0x4000), (DosTag.NP_CopyVars, 1))
+    assert _new_proc_tags(ctx, tags)["copy_vars"] is True
+    tags.free()
+
+
 def lib_dos_cli_new_proc_seglist_test():
     mem = MockMemory()
     alloc = MemoryAlloc(mem)

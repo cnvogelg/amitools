@@ -2,7 +2,9 @@
 
 ``GetVar``/``SetVar``/``DeleteVar``/``FindVar`` read and write shell variables.
 Local variables live in the current process's ``pr_LocalVars`` list and are
-also tracked in ``DosLibrary.local_vars``; global variables live only in
+tracked per process: a process made by ``CreateNewProc()`` has its own table
+(``_local_vars``), while the main process uses the shared
+``DosLibrary.local_vars``. Global variables live only in
 ``DosLibrary.global_vars``. ``SetVar``/``DeleteVar`` with the ``GVF_GLOBAL_ONLY``
 flag operate on the global table, otherwise a local variable is preferred.
 """
@@ -27,15 +29,31 @@ LVF_IGNORE = 0x80
 # ----- local variable list helpers -----
 
 
+def get_var_table(dos, ctx):
+    """the local-variable table of the process currently running
+
+    Local variables are per process. A process made by ``CreateNewProc()`` gets
+    its own table (``_local_vars``) so it has an independent set from its parent
+    (RKRM ``NP_CopyVars``); the main process keeps using the shared
+    ``DosLibrary.local_vars`` table.
+    """
+    process = getattr(ctx, "process", None)
+    table = getattr(process, "_local_vars", None)
+    if table is None:
+        table = dos.local_vars
+    return table
+
+
 def find_var_node(dos, ctx, name, flags):
-    if (name.lower(), flags & 0xFF) in dos.local_vars:
-        return dos.local_vars[(name.lower(), flags & 0xFF)]
+    table = get_var_table(dos, ctx)
+    key = (name.lower(), flags & 0xFF)
+    if key in table:
+        return table[key]
     return None
 
 
-def create_var_node(dos, ctx, name, flags):
-    varlist = ctx.process.get_local_vars()
-    varlist_struct = varlist
+def _make_var_node(dos, ctx, varlist_struct, table, name, vtype):
+    """allocate a local variable node and splice it into ``varlist_struct``"""
     node_addr = dos._alloc_mem(
         "ShellVar(%s)" % name, LocalVarStruct.get_size() + len(name) + 1
     )
@@ -43,7 +61,7 @@ def create_var_node(dos, ctx, name, flags):
     node = LocalVarStruct(ctx.mem, node_addr)
     ctx.mem.w_cstr(name_addr, name)
     node.lv_Node.ln_Name.aptr = name_addr
-    node.lv_Node.ln_Type.val = flags & 0xFF
+    node.lv_Node.ln_Type.val = vtype
     node.lv_Value.aptr = 0
     head_addr = varlist_struct.mlh_Head.aptr
     head = NodeStruct(ctx.mem, head_addr)
@@ -51,8 +69,50 @@ def create_var_node(dos, ctx, name, flags):
     varlist_struct.mlh_Head.aptr = node_addr
     node.lv_Node.ln_Succ.aptr = head_addr
     node.lv_Node.ln_Pred.aptr = varlist_struct.mlh_Head.addr
-    dos.local_vars[(name.lower(), flags & 0xFF)] = node
+    table[(name.lower(), vtype)] = node
     return node
+
+
+def create_var_node(dos, ctx, name, flags):
+    varlist = ctx.process.get_local_vars()
+    table = get_var_table(dos, ctx)
+    return _make_var_node(dos, ctx, varlist, table, name, flags & 0xFF)
+
+
+def copy_local_vars(dos, ctx, dst_proc):
+    """deep-copy the current process's local variables into ``dst_proc``
+
+    Implements ``NP_CopyVars``: the new process receives an independent copy of
+    the caller's shell variables and aliases (RKRM "Creating and Terminating
+    Processes"). A task caller (no current process) copies nothing.
+    """
+    src_proc = getattr(ctx, "process", None)
+    if src_proc is None:
+        return
+    src_table = get_var_table(dos, ctx)
+    dst_table = getattr(dst_proc, "_local_vars", None)
+    if dst_table is None:
+        dst_table = {}
+        dst_proc._local_vars = dst_table
+    dst_varlist = dst_proc.get_local_vars()
+    for (name, vtype), node in list(src_table.items()):
+        new = _make_var_node(dos, ctx, dst_varlist, dst_table, name, vtype)
+        size = node.lv_Len.val
+        if node.lv_Value.aptr != 0 and size > 0:
+            buf_addr = dos._alloc_mem("ShellVarBuffer", size)
+            new.lv_Value.aptr = buf_addr
+            new.lv_Len.val = size
+            ctx.mem.copy_block(node.lv_Value.aptr, buf_addr, size)
+
+
+def free_local_vars(dos, ctx, proc):
+    """release all local variables of ``proc`` (called when it terminates)"""
+    table = getattr(proc, "_local_vars", None)
+    if not table:
+        return
+    for node in list(table.values()):
+        delete_var_node(dos, ctx, node, table)
+    proc._local_vars = {}
 
 
 def set_var_node(dos, ctx, node, buff_ptr, size, value, flags):
@@ -68,7 +128,9 @@ def set_var_node(dos, ctx, node, buff_ptr, size, value, flags):
         ctx.mem.w_cstr(buf_addr, value)
 
 
-def delete_var_node(dos, ctx, node):
+def delete_var_node(dos, ctx, node, table=None):
+    if table is None:
+        table = get_var_table(dos, ctx)
     buf_addr = node.lv_Value.aptr
     if buf_addr != 0:
         dos._free_mem(buf_addr)
@@ -78,9 +140,9 @@ def delete_var_node(dos, ctx, node):
     NodeStruct(ctx.mem, pred).ln_Succ.aptr = succ
     NodeStruct(ctx.mem, succ).ln_Pred.aptr = pred
     dos._free_mem(node.addr)
-    for k in list(dos.local_vars.keys()):
-        if dos.local_vars[k] == node:
-            del dos.local_vars[k]
+    for k in list(table.keys()):
+        if table[k] == node:
+            del table[k]
 
 
 # ----- fd functions -----
