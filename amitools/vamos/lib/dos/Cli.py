@@ -1165,17 +1165,30 @@ def _resolve_redirection(dos, lock, cl, tag_list):
     if input_fh is None and tag_list is not None:
         intag = tag_list.find_tag(DosTag.SYS_Input)
         if intag is not None:
-            data = intag.get_data()
-            if data:
-                input_fh = dos.file_mgr.get_by_b_addr(data)
+            input_fh = _lookup_fh(dos, intag.get_data())
     if output_fh is None and tag_list is not None:
         outtag = tag_list.find_tag(DosTag.SYS_Output)
         if outtag is not None:
-            data = outtag.get_data()
-            if data:
-                output_fh = dos.file_mgr.get_by_b_addr(data)
+            output_fh = _lookup_fh(dos, outtag.get_data())
 
     return input_fh, output_fh, owned
+
+
+def _lookup_fh(dos, b_addr):
+    """resolve a caller supplied DOS file handle BPTR
+
+    Returns ``None`` for a null or unknown handle.  The AmigaOS shell's ``Run``
+    built-in hands a hand-crafted ``FileHandle`` (built with ``AllocVec``) to
+    ``System()`` as ``SYS_Input``; it was never opened through DOS and is thus
+    not tracked by the file manager.  An unknown handle must not abort the call.
+    """
+    if not b_addr:
+        return None
+    try:
+        return dos.file_mgr.get_by_b_addr(b_addr)
+    except ValueError:
+        log_dos.warning("ignoring unknown file handle b@%06x", b_addr)
+        return None
 
 
 def system_tag_list(dos, ctx, cmd, tag_list):
@@ -1192,9 +1205,7 @@ def system_tag_list(dos, ctx, cmd, tag_list):
         if tag_list is not None:
             intag = tag_list.find_tag(DosTag.SYS_Input)
             if intag is not None:
-                data = intag.get_data()
-                if data:
-                    new_input = dos.file_mgr.get_by_b_addr(data)
+                new_input = _lookup_fh(dos, intag.get_data())
         if new_input is None:
             new_input = dos.file_mgr.open(None, "NIL:", "r")
         if new_input is None:
