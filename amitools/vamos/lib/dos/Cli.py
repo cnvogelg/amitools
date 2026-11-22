@@ -51,6 +51,11 @@ MAX_CLI = 256
 # the exec signal a dying child sends its parent (NP_NotifyOnDeath)
 SIGF_CHILD = 1 << 1
 
+# the exec signal a synchronous child sends its waiting parent (NP_Synchronous).
+# SIGB_SINGLE is a reserved per-task signal bit (Task.new_task marks 0..15 as
+# allocated), so AllocSignal() never hands it out to the guest.
+SIGF_SINGLE = 1 << 4
+
 
 def _ami_proc(ctx):
     process = ctx.process
@@ -198,10 +203,9 @@ def _new_proc_tags(ctx, tags):
     free_seglist = _tag_data(tags, DosTag.NP_FreeSegList)
     user_data = _tag_data(tags, DosTag.NP_UserData)
     copy_vars = _tag_data(tags, DosTag.NP_CopyVars)
+    synchronous = _tag_data(tags, DosTag.NP_Synchronous)
 
     # tags that vamos accepts but does not act on yet
-    if _tag_data(tags, DosTag.NP_Synchronous):
-        log_dos.warning("CreateNewProc: NP_Synchronous is not supported (ignored)")
     if _tag_data(tags, DosTag.NP_Cli):
         log_dos.warning("CreateNewProc: NP_Cli is not supported (ignored)")
     if _tag_data(tags, DosTag.NP_Path):
@@ -274,6 +278,8 @@ def _new_proc_tags(ctx, tags):
         flags |= ProcessFlags.PRF_FREESEGLIST
     if notify_on_death:
         flags |= ProcessFlags.PRF_NOTIFYONDEATH
+    if synchronous:
+        flags |= ProcessFlags.PRF_SYNCHRONOUS
     if arguments is not None:
         flags |= ProcessFlags.PRF_FREEARGS
 
@@ -306,6 +312,7 @@ def _new_proc_tags(ctx, tags):
         "notify_on_death": 1 if notify_on_death else 0,
         "parent_addr": parent_addr,
         "copy_vars": bool(copy_vars),
+        "synchronous": bool(synchronous),
     }
 
 
@@ -471,6 +478,11 @@ def _spawn(dos, ctx, p):
     child.dos_exit_data = p["exit_data"]
     child.dos_notify = p["notify_on_death"]
     child.dos_parent_addr = p["parent_addr"]
+    # the caller's scheduler task, used to wake it for NP_Synchronous. This is
+    # also available for a task caller, where there is no process address.
+    child.dos_parent_task = (
+        ctx.scheduler.get_running_task() if ctx.scheduler is not None else None
+    )
     child.dos_arg_mem = arg_mem
 
     # NP_Arguments: record it and push it into the input buffer so that
@@ -502,6 +514,15 @@ def _spawn(dos, ctx, p):
         port_addr,
         flags,
     )
+
+    # NP_Synchronous: the caller blocks until the child has terminated. AROS
+    # implements this by setting PRF_WAITINGFORCHILD on the parent and waiting
+    # on SIGF_SINGLE, which the child's exit path signals. (The RKRM book notes
+    # the tag is ignored by AmigaDOS 3; vamos follows AROS/later AmigaDOS and
+    # implements it as a superset, like NP_NotifyOnDeath.)
+    if p["synchronous"]:
+        _wait_for_sync_child(ctx, sched_task, child.dos_parent_task, parent_addr)
+
     return proc.addr
 
 
@@ -590,11 +611,11 @@ def _call_exit_handler(dos, ctx, child, ret_code, exit_code, exit_data):
         )
 
 
-def _notify_parent_death(ctx, parent_addr):
-    """signal the parent task that a child died (NP_NotifyOnDeath)"""
+def _find_parent_task(ctx, parent_addr):
+    """the scheduler task that owns the Amiga task/process at ``parent_addr``"""
     scheduler = getattr(ctx, "scheduler", None)
     if scheduler is None or parent_addr == 0:
-        return
+        return None
 
     def pred(task):
         map_task = getattr(task, "map_task", None)
@@ -603,7 +624,30 @@ def _notify_parent_death(ctx, parent_addr):
         ami = map_task.get_ami_task()
         return ami is not None and ami.addr == parent_addr
 
-    parent_task = scheduler.find_task_pred_func(pred)
+    return scheduler.find_task_pred_func(pred)
+
+
+def _notify_parent_sync(ctx, parent_task, parent_addr):
+    """wake a parent blocked in a synchronous CreateNewProc (NP_Synchronous)"""
+    if parent_task is None:
+        parent_task = _find_parent_task(ctx, parent_addr)
+    if parent_task is None:
+        log_dos.warning(
+            "CreateNewProc: NP_Synchronous parent %06x not found", parent_addr
+        )
+        return
+    # clear the PRF_WAITINGFORCHILD the caller set while it waits (AROS)
+    if parent_addr:
+        proc = ProcessStruct(ctx.mem, parent_addr)
+        proc.flags.val &= ~ProcessFlags.PRF_WAITINGFORCHILD
+    log_dos.info("CreateNewProc: signalling parent %06x (SIGF_SINGLE)", parent_addr)
+    parent_task.set_signal(SIGF_SINGLE, SIGF_SINGLE)
+
+
+def _notify_parent_death(ctx, parent_task, parent_addr):
+    """signal the parent task that a child died (NP_NotifyOnDeath)"""
+    if parent_task is None:
+        parent_task = _find_parent_task(ctx, parent_addr)
     if parent_task is None:
         log_dos.warning(
             "CreateNewProc: NP_NotifyOnDeath parent %06x not found", parent_addr
@@ -611,6 +655,54 @@ def _notify_parent_death(ctx, parent_addr):
         return
     log_dos.info("CreateNewProc: signalling parent %06x (SIGF_CHILD)", parent_addr)
     parent_task.set_signal(SIGF_CHILD, SIGF_CHILD)
+
+
+def _notify_parent(ctx, parent_task, parent_addr, flags):
+    """deliver a dying child's completion signals to its parent"""
+    # the parent may itself have terminated (its process memory is freed then)
+    if parent_task is not None and parent_task.get_state() == TaskState.TS_REMOVED:
+        return
+    # NP_Synchronous must be signalled first in case both tags are set (AROS)
+    if flags & ProcessFlags.PRF_SYNCHRONOUS:
+        _notify_parent_sync(ctx, parent_task, parent_addr)
+    if flags & ProcessFlags.PRF_NOTIFYONDEATH:
+        _notify_parent_death(ctx, parent_task, parent_addr)
+
+
+def _schedule_child_notify(ctx, parent_task, parent_addr, flags):
+    """deliver the completion signals once the dying child's greenlet has ended
+
+    Signalling from inside the child's greenlet would switch back to the
+    scheduler before child.free() and leave the greenlet suspended forever,
+    leaking the process. The scheduler runs this callback on its own greenlet
+    after the child has fully unwound, so the child is freed first.
+    """
+    scheduler = getattr(ctx, "scheduler", None)
+    if scheduler is None or not scheduler.running:
+        _notify_parent(ctx, parent_task, parent_addr, flags)
+        return
+
+    def deliver():
+        scheduler.remove_after_schedule_callback(deliver)
+        _notify_parent(ctx, parent_task, parent_addr, flags)
+
+    scheduler.add_after_schedule_callback(deliver)
+
+
+def _wait_for_sync_child(ctx, child_task, parent_task, parent_addr):
+    """block the caller until a synchronous child task has terminated"""
+    if parent_task is None:
+        # no task is running (e.g. driven from Python): cannot block
+        log_dos.warning("CreateNewProc: NP_Synchronous without a running task")
+        return
+    # mark the parent as waiting (AROS PRF_WAITINGFORCHILD) and clear a stale
+    # completion signal before sleeping; the child cannot run until we yield
+    if parent_addr:
+        proc = ProcessStruct(ctx.mem, parent_addr)
+        proc.flags.val |= ProcessFlags.PRF_WAITINGFORCHILD
+    parent_task.set_signal(0, SIGF_SINGLE)
+    log_dos.info("CreateNewProc: NP_Synchronous waiting for %s", child_task.name)
+    parent_task.wait(SIGF_SINGLE)
 
 
 def _child_exit_cleanup(dos, child, ret_code):
@@ -648,9 +740,6 @@ def _child_exit_cleanup(dos, child, ret_code):
         child.dos_arg_mem = None
     # NP_CopyVars: release the child's own local shell variables
     free_local_vars(dos, ctx, child)
-    # NP_NotifyOnDeath: signal the parent task
-    if flags & ProcessFlags.PRF_NOTIFYONDEATH:
-        _notify_parent_death(ctx, getattr(child, "dos_parent_addr", 0))
 
 
 def child_proc_event(dos, event):
@@ -674,8 +763,19 @@ def child_proc_event(dos, event):
     port_addr = child.proc.msg_port.addr
     if dos.port_mgr.has_port(port_addr):
         dos.port_mgr.unregister_port(port_addr)
+    # remember the completion notifications before the process is freed
+    ctx = getattr(child, "dos_ctx", None)
+    flags = getattr(child, "dos_flags", 0)
+    parent_addr = getattr(child, "dos_parent_addr", 0)
+    parent_task = getattr(child, "dos_parent_task", None)
     log_dos.info("CreateNewProc: process %06x ended", child.proc.addr)
     child.free()
+    # NP_Synchronous / NP_NotifyOnDeath: wake the parent once this child has
+    # fully unwound and been freed
+    if ctx is not None and (
+        flags & (ProcessFlags.PRF_SYNCHRONOUS | ProcessFlags.PRF_NOTIFYONDEATH)
+    ):
+        _schedule_child_notify(ctx, parent_task, parent_addr, flags)
 
 
 def exit_process(dos, ctx, return_code):

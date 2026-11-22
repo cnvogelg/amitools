@@ -998,3 +998,100 @@ def pytask_dos_create_new_proc_copy_vars_test(vamos_task):
 
     exit_codes = vamos_task.run([proc], process=True)
     assert exit_codes == [0]
+
+
+# ----- NP_Synchronous (Step 5) -----
+
+SYNC_CODE_SIZE = 32
+
+
+def write_sync_child_code(mem, pc, scratch_addr, value):
+    """child code: store ``value`` at ``scratch_addr`` and return 0"""
+    mem.w16(pc, 0x7000 | (value & 0xFF))  # moveq #value,d0
+    mem.w16(pc + 2, 0x23C0)  # move.l d0,(scratch).l
+    mem.w32(pc + 4, scratch_addr)
+    mem.w16(pc + 8, 0x7000)  # moveq #0,d0
+    mem.w16(pc + 10, op_rts)
+
+
+def pytask_dos_create_new_proc_synchronous_test(vamos_task):
+    """NP_Synchronous: CreateNewProc() returns only after the child has run and
+    its task is gone (AROS; the RKRM book notes the tag is ignored by AOS 3)"""
+
+    def proc(ctx, task):
+        dos_proxy = ctx.proxies.get_dos_lib_proxy()
+        mem = ctx.mem
+        alloc = ctx.alloc
+
+        parent = ProcessStruct(mem, ctx.process.proc.addr)
+        scratch = alloc.alloc_memory(4, label="sync_scratch")
+        mem.w32(scratch.addr, 0)
+        code = alloc.alloc_memory(SYNC_CODE_SIZE, label="sync_code")
+        write_sync_child_code(mem, code.addr, scratch.addr, 7)
+        name = alloc.alloc_cstr("sync_child")
+        tags = TagList.alloc(
+            alloc,
+            (DosTag.NP_Entry, code.addr),
+            (DosTag.NP_Name, name.addr),
+            (DosTag.NP_StackSize, 8192),
+            (DosTag.NP_Synchronous, 1),
+        )
+
+        proc_addr = dos_proxy.CreateNewProc(tags)
+        assert proc_addr != 0
+
+        # by the time CreateNewProc() returned the child has run ...
+        assert mem.r32(scratch.addr) == 7
+        # ... and its task is already gone
+        assert task.find_task("sync_child") is None
+        # the parent is no longer marked as waiting (PRF_WAITINGFORCHILD)
+        assert not (parent.flags.val & ProcessFlags.PRF_WAITINGFORCHILD)
+
+        tags.free()
+        alloc.free_memory(scratch)
+        alloc.free_memory(code)
+        alloc.free_cstr(name)
+        return 0
+
+    exit_codes = vamos_task.run([proc], process=True)
+    assert exit_codes == [0]
+
+
+def pytask_dos_create_new_proc_sync_and_notify_test(vamos_task):
+    """NP_Synchronous together with NP_NotifyOnDeath must not deadlock and
+    must deliver both signals once the child is gone"""
+
+    def proc(ctx, task):
+        dos_proxy = ctx.proxies.get_dos_lib_proxy()
+        exec_proxy = ctx.proxies.get_exec_lib_proxy()
+        mem = ctx.mem
+        alloc = ctx.alloc
+
+        scratch = alloc.alloc_memory(4, label="sync_scratch")
+        mem.w32(scratch.addr, 0)
+        code = alloc.alloc_memory(SYNC_CODE_SIZE, label="sync_code")
+        write_sync_child_code(mem, code.addr, scratch.addr, 9)
+        name = alloc.alloc_cstr("sync_notify_child")
+        tags = TagList.alloc(
+            alloc,
+            (DosTag.NP_Entry, code.addr),
+            (DosTag.NP_Name, name.addr),
+            (DosTag.NP_StackSize, 8192),
+            (DosTag.NP_Synchronous, 1),
+            (DosTag.NP_NotifyOnDeath, 1),
+        )
+
+        assert dos_proxy.CreateNewProc(tags) != 0
+        assert mem.r32(scratch.addr) == 9
+        assert task.find_task("sync_notify_child") is None
+        # the NP_NotifyOnDeath signal is still pending for the caller
+        assert exec_proxy.SetSignal(0, 0) & SIGF_CHILD
+
+        tags.free()
+        alloc.free_memory(scratch)
+        alloc.free_memory(code)
+        alloc.free_cstr(name)
+        return 0
+
+    exit_codes = vamos_task.run([proc], process=True)
+    assert exit_codes == [0]
