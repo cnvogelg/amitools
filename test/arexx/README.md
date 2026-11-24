@@ -10,6 +10,10 @@ These files are **copyrighted AmigaOS binaries**. They are **never committed**
 to this repository (`.gitignore` ignores them). Populate this folder locally
 with the extraction script described below.
 
+For CI they are bundled (encrypted) into `../blob.tar.zstd.enc` and restored
+with `../blob_decode.sh`; see section 4 of `../README.md`. The same files are
+listed in `../blob_files.txt`.
+
 ## Contents
 
 The folder mirrors the AmigaOS layout so the files can be dropped into a vamos

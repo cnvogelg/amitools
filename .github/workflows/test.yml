@@ -21,6 +21,10 @@ jobs:
       # lint warnings that is being worked down separately.
       continue-on-error: true
       run: ruff check .
+    - name: Check fixture blob manifest
+      # Every file in test/blob_files.txt must be git-ignored so copyrighted
+      # AmigaOS fixtures can never be committed by accident.
+      run: test/blob_check.sh
 
   windows-disk:
     runs-on: windows-latest
@@ -51,6 +55,28 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install tox tox-gh-actions
+    - name: Install zstd
+      run: |
+        if command -v zstd >/dev/null 2>&1; then
+          zstd --version
+        elif [ "$RUNNER_OS" = "macOS" ]; then
+          brew install zstd
+        else
+          sudo apt-get update && sudo apt-get install -y zstd
+        fi
+    - name: Restore encrypted fixtures
+      # Copyrighted AmigaOS fixtures (currently ARexx) are not committed; they
+      # are restored from test/blob.tar.zstd.enc using the BLOB_PASSPHRASE
+      # secret.  Fork PRs do not get secrets, so the step is skipped there and
+      # the tests that need the fixtures skip themselves.
+      env:
+        BLOB_PASSPHRASE: ${{ secrets.BLOB_PASSPHRASE }}
+      run: |
+        if [ -z "$BLOB_PASSPHRASE" ]; then
+          echo "BLOB_PASSPHRASE secret not set; fixtures stay absent"
+          exit 0
+        fi
+        test/blob_decode.sh
     - name: Test with tox
       run: tox -vvv
       env:
