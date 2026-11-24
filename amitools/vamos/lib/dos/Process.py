@@ -1,8 +1,4 @@
-from amitools.vamos.libstructs.dos import (
-    CLIStruct,
-    DosPacketStruct,
-    PathStruct,
-)
+from amitools.vamos.libstructs.dos import DosPacketStruct
 from amitools.vamos.libstructs.exec_ import MessageStruct
 from amitools.vamos.log import log_proc
 from amitools.vamos.machine.regs import (
@@ -15,6 +11,7 @@ from amitools.vamos.machine.regs import (
     REG_A6,
 )
 from amitools.vamos.task import DosProcess
+from .ucli import MicroCLI
 
 
 NT_PROCESS = 13
@@ -46,7 +43,6 @@ class ProcessBase(DosProcess):
         self.ctx = ctx
         self.bin_file = bin_file
         self.arg_str = arg_str
-        self.cli_paths = []
 
         if input_fh is None:
             input_fh = self.ctx.dos_lib.file_mgr.get_input()
@@ -74,9 +70,8 @@ class ProcessBase(DosProcess):
             return_regs=[REG_D0],
         )
 
-        self.alloc_cli_struct()
-        self.init_task_struct(input_fh, output_fh)
         self.init_cli_struct(input_fh, output_fh, self.bin_basename)
+        self.init_task_struct(input_fh, output_fh)
         self.set_cwd()
 
     @property
@@ -214,52 +209,12 @@ class ProcessBase(DosProcess):
         pass
 
     # ----- cli struct -----
-    def alloc_cli_struct(self):
-        self.cli = self.ctx.alloc.alloc_astruct(
-            CLIStruct, label=self.bin_basename + "_CLI"
-        )
-
     def init_cli_struct(self, input_fh, output_fh, bin_name):
-        cli = self.cli
-        cli.cli_DefaultStack.val = self.stack.get_size() // 4  # in longs
-        cli.cli_FailLevel.val = 10
-        # set input/output
-        cli.cli_StandardInput.aptr = input_fh.b_addr << 2
-        cli.cli_CurrentInput.aptr = input_fh.b_addr << 2
-        cli.cli_StandardOutput.aptr = output_fh.b_addr << 2
-        cli.cli_CurrentOutput.aptr = output_fh.b_addr << 2
-        self._setup_cli_input(cli)
-        # alloc prompt/cmdname/cmdfile/setname
-        self.prompt = self.ctx.alloc.alloc_memory(60, label="cli_Prompt")
-        self.cmdname = self.ctx.alloc.alloc_memory(104, label="cli_CommandName")
-        self.cmdfile = self.ctx.alloc.alloc_memory(40, label="cli_CommandFile")
-        self.setname = self.ctx.alloc.alloc_memory(80, label="cli_SetName")
-        cli.cli_Prompt.aptr = self.prompt.addr
-        cli.cli_CommandName.aptr = self.cmdname.addr
-        cli.cli_CommandFile.aptr = self.cmdfile.addr
-        cli.cli_SetName.aptr = self.setname.addr
-        # set default prompt
-        self.ctx.mem.w_bstr(self.prompt.addr, "%N.%S> ")
-        self.ctx.mem.w_bstr(self.setname.addr, "SYS:")
-        self.ctx.mem.w_bstr(self.cmdname.addr, bin_name)
-        log_proc.info(self.cli)
-        # Create the path
-        cmd_dir_addr = cli.cli_CommandDir.aptr
-        for p in self.ctx.path_mgr.get_cmd_paths():
-            if p != "C:" and p != "c:":
-                lock = self.ctx.dos_lib.lock_mgr.create_lock(None, p, False)
-                if lock != None:
-                    path = self.ctx.alloc.alloc_astruct(
-                        PathStruct, label="Path(%s)" % p
-                    )
-                    path_struct = path
-                    path_struct.path_Lock.aptr = lock.mem.addr
-                    path_struct.path_Next.aptr = cmd_dir_addr
-                    cmd_dir_addr = path.addr
-                    cli.cli_CommandDir.aptr = cmd_dir_addr
-                    self.cli_paths.append((path, lock))
-                else:
-                    log_proc.warning("Path %s does not exist, expect problems!", p)
+        # build the minimal ("micro") CLI, then let the subclass adjust it
+        self.ucli = MicroCLI(
+            self.ctx, input_fh, output_fh, bin_name, self.stack.get_size()
+        )
+        self._setup_cli_input(self.ucli.cli)
 
     def _setup_cli_input(self, cli):
         # a single binary keeps reading from its standard input; ShellProcess
@@ -267,15 +222,7 @@ class ProcessBase(DosProcess):
         pass
 
     def free_cli_struct(self):
-        self.ctx.alloc.free_memory(self.prompt)
-        self.ctx.alloc.free_memory(self.cmdname)
-        self.ctx.alloc.free_memory(self.setname)
-        self.ctx.alloc.free_memory(self.cmdfile)
-        self.cli.free()
-        # free path
-        for path, lock in self.cli_paths:
-            path.free()
-            self.ctx.dos_lib.lock_mgr.release_lock(lock)
+        self.ucli.free()
 
     # ----- task struct -----
 
@@ -295,7 +242,7 @@ class ProcessBase(DosProcess):
         # Inject arguments into input stream (Needed for C:Execute)
         self.seglist = self.ctx.alloc.alloc_memory(24, label="Process Seglist")
         task.pr_SegList.aptr = self.seglist.addr
-        task.pr_CLI.aptr = self.cli.addr
+        task.pr_CLI.aptr = self.ucli.addr
         task.pr_CIS.aptr = input_fh.b_addr << 2  # compensate BCPL auto-conversion
         task.pr_COS.aptr = output_fh.b_addr << 2  # compensate BCPL auto-conversion
         # setup console task: the console handler's packet port
