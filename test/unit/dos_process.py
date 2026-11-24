@@ -326,7 +326,8 @@ def dos_shell_process_regs_packet_and_cli_test():
         assert regs[REG_D2] == 4096
         assert regs[REG_A2] == ctx.odg_base
         assert regs[REG_A5] == ctx.odg_base
-        assert regs[REG_A6] == ctx.odg_base
+        # A6 is the BCPL return address the shell's entry stub returns through
+        assert regs[REG_A6] == ctx.machine.get_run_exit_addr()
 
         # packet/message/port wiring
         packet = DosPacketStruct(ctx.mem, proc.shell_packet.addr)

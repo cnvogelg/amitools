@@ -350,8 +350,9 @@ class ShellProcess(ProcessBase):
 
     The shell counterpart of ``BinProcess``: the entry point is the BCPL
     call-in at seglist ``+8``, the shell receives a startup ``DosPacket`` in
-    D1 instead of an argument string in D0/A0, and ``cli_CurrentInput`` is
-    redirected to ``S:Vamos-Startup`` when that file exists.
+    D1 instead of an argument string in D0/A0, ``cli_CurrentInput`` is
+    redirected to ``S:Vamos-Startup`` when that file exists, and A6 holds the
+    BCPL return address the entry stub returns through.
     """
 
     def __init__(
@@ -392,6 +393,16 @@ class ShellProcess(ProcessBase):
 
     def free_environment(self):
         self.free_shell_packet()
+
+    def _get_start_regs(self, stack_size):
+        regs = super()._get_start_regs(stack_size)
+        # A BCPL shell returns through the address in A6: the BCPL startup
+        # stub ends with "jmp (a6)" and A6 is the address of the BCPL return
+        # code (see RKRM-dos "Runtime binding of BCPL programs").  Point it
+        # at the machine's exit trap so the shell leaves the process cleanly
+        # instead of jumping into odg_base.
+        regs[REG_A6] = self.ctx.machine.get_run_exit_addr()
+        return regs
 
     def _add_program_regs(self, regs):
         # thor: If we run a shell through vamos, then BPCL places the BPTR to
