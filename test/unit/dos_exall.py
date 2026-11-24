@@ -88,7 +88,7 @@ class ExAllEnv:
             cpu=self.cpu,
             alloc=self.alloc,
             process=SimpleNamespace(
-                this_task=SimpleNamespace(pr_Result2=SimpleNamespace(val=0))
+                proc=SimpleNamespace(pr_Result2=SimpleNamespace(val=0))
             ),
         )
         self.controls = []

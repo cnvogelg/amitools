@@ -19,7 +19,7 @@ def context():
     process_struct.pr_Task.tc_SPLower.aptr = stack.get_lower()
     process_struct.pr_Task.tc_SPUpper.aptr = stack.get_upper()
     ctx = SimpleNamespace(alloc=alloc, odg_base=0)
-    process = SimpleNamespace(ctx=ctx, this_task=process_struct)
+    process = SimpleNamespace(ctx=ctx, proc=process_struct)
     yield SimpleNamespace(
         process=process,
         ctx=ctx,
@@ -35,7 +35,7 @@ def context():
 
 
 def bounds(context):
-    task = context.process.this_task.pr_Task
+    task = context.process.proc.pr_Task
     return task.tc_SPLower.aptr, task.tc_SPUpper.aptr
 
 
@@ -113,7 +113,7 @@ def dos_run_native_stack_bounds_test(context):
     context.mem.w_block(code.addr, program)
     before = context.alloc.get_free_bytes()
     try:
-        task_addr = context.process.this_task.pr_Task.addr
+        task_addr = context.process.proc.pr_Task.addr
         assert run_sub_command(context.process, code.addr, task_addr, 0, 8192) == 42
         lower = context.mem.r32(record.addr)
         upper = context.mem.r32(record.addr + 4)

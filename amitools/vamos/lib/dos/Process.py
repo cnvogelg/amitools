@@ -74,11 +74,6 @@ class ProcessBase(DosProcess):
         self.init_task_struct(input_fh, output_fh)
         self.set_cwd()
 
-    @property
-    def this_task(self):
-        """compat alias: the AmigaDOS Process struct is ``self.proc``"""
-        return self.proc
-
     def free(self):
         self.free_environment()
         self.free_task_struct()

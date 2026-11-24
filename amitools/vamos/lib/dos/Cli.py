@@ -77,7 +77,7 @@ def _ami_proc(ctx):
     get_proc = getattr(process, "get_ami_process", None)
     if get_proc is not None:
         return get_proc()
-    return getattr(process, "this_task", None)
+    return getattr(process, "proc", None)
 
 
 def _cli(ctx):
@@ -183,9 +183,6 @@ def _current_proc_addr(ctx):
         proc = getattr(process, "proc", None)
         if proc is not None:
             return proc.addr
-        task = getattr(process, "this_task", None)
-        if task is not None:
-            return task.addr
     return 0
 
 
@@ -1128,11 +1125,11 @@ def set_program_dir(ctx, lock_bptr):
 
 
 def get_file_sys_task(dos, ctx):
-    return ctx.process.this_task.pr_FileSystemTask.aptr
+    return ctx.process.proc.pr_FileSystemTask.aptr
 
 
 def set_file_sys_task(dos, ctx, port):
-    ctx.process.this_task.pr_FileSystemTask.aptr = port
+    ctx.process.proc.pr_FileSystemTask.aptr = port
 
 
 def find_cli_proc(ctx, num):
@@ -1319,7 +1316,7 @@ def run_sub_command(process, start_pc, args_ptr, args_len, stack_size, reg_d1=0)
     ctx = process.ctx
     alloc = ctx.alloc
     new_stack = Stack.alloc(alloc, stack_size)
-    task = process.this_task.pr_Task
+    task = process.proc.pr_Task
     # save old stack
     oldstack_lower = task.tc_SPLower.aptr
     oldstack_upper = task.tc_SPUpper.aptr
@@ -1404,7 +1401,7 @@ def system_tag_list(dos, ctx, cmd, tag_list):
         current_dir = ctx.process.get_current_dir()
         dup_lock = dos.lock_mgr.dup_lock(dos.get_current_dir(ctx))
         cur_module = cli.cli_Module.aptr
-        cur_out = ctx.process.this_task.pr_COS.aptr
+        cur_out = ctx.process.proc.pr_COS.aptr
         cur_setname = ctx.mem.r_bstr(cli.cli_SetName.aptr)
         cli.cli_Module.aptr = 0
         ctx.process.set_current_dir(dup_lock.mem.addr)
@@ -1431,8 +1428,8 @@ def system_tag_list(dos, ctx, cmd, tag_list):
             cli.cli_StandardOutput.aptr = output_fhci
         # Channels are closed by the dying shell
         ctx.mem.w_bstr(cli.cli_SetName.aptr, cur_setname)
-        ctx.process.this_task.pr_CIS.aptr = input_fhci
-        ctx.process.this_task.pr_COS.aptr = cur_out
+        ctx.process.proc.pr_CIS.aptr = input_fhci
+        ctx.process.proc.pr_COS.aptr = cur_out
         # infile = dos.file_mgr.get_by_b_addr(input_fhci >> 2,False)
         # infile.setbuf("")
         ctx.process.set_current_dir(current_dir)

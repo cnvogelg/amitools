@@ -3,8 +3,9 @@
 Step 2 of the shell refactor folded the old ``self.this_task`` ProcessStruct
 view into ``self.proc`` (the ``libtypes.Process`` allocated by ``DosProcess``)
 and dropped the duplicated dir/var/cli accessors.  Step 3 added ``BinProcess``
-for the single-binary path and Step 4 ``ShellProcess`` for the shell path.
-These tests pin them down without needing a full vamos context.
+for the single-binary path, Step 4 ``ShellProcess`` for the shell path and
+Step 7 removed the ``this_task`` compat alias entirely.  These tests pin them
+down without needing a full vamos context.
 """
 
 from types import SimpleNamespace
@@ -51,10 +52,11 @@ def _make_process():
     return p, proc, file_mgr
 
 
-def dos_process_this_task_is_proc_test():
-    # this_task is only an alias for the already allocated self.proc struct
+def dos_process_no_this_task_alias_test():
+    # Step 7 dropped the old this_task compat alias: accessors use self.proc
+    assert not hasattr(ProcessBase, "this_task")
     p, proc, _ = _make_process()
-    assert p.this_task is proc
+    assert p.proc is proc
 
 
 def dos_process_stream_accessors_test():

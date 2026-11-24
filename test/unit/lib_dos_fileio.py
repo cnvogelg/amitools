@@ -163,7 +163,7 @@ class _Env:
             get_output=lambda: self.out,
             set_input=self._set_input,
             set_output=self._set_output,
-            this_task=self.proc,
+            proc=self.proc,
         )
         self.ctx = SimpleNamespace(
             mem=self.mem, cpu=self.cpu, process=self.process, alloc=self.alloc
