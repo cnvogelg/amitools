@@ -15,3 +15,7 @@ emu.pyd
 .tox
 .idea
 .vscode
+
+# temporary working notes (not part of the repo)
+SHELL.md
+PROC.md
