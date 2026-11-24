@@ -1,10 +1,9 @@
 from amitools.vamos.libstructs.dos import (
     CLIStruct,
     DosPacketStruct,
-    ProcessStruct,
     PathStruct,
 )
-from amitools.vamos.libstructs.exec_ import MessageStruct, MinListStruct
+from amitools.vamos.libstructs.exec_ import MessageStruct
 from amitools.vamos.log import log_proc
 from amitools.vamos.machine.regs import (
     REG_D0,
@@ -21,7 +20,15 @@ from amitools.vamos.task import DosProcess
 NT_PROCESS = 13
 
 
-class Process(DosProcess):
+class ProcessBase(DosProcess):
+    """shared lifecycle for running an AmigaDOS program.
+
+    The single-binary and the shell path live behind the overridable hooks
+    ``init_environment``/``free_environment``, ``_setup_entry``,
+    ``_add_program_regs`` and ``_setup_cli_input`` so that the concrete
+    ``BinProcess``/``ShellProcess`` subclasses can specialize them.
+    """
+
     def __init__(
         self,
         ctx,
@@ -51,17 +58,12 @@ class Process(DosProcess):
         self.init_cwd(cwd, cwd_lock)
 
         # load the binary
-        self.ok = self.load_binary(self.cwd_lock, bin_file, shell)
+        self.ok = self.load_binary(self.cwd_lock, bin_file)
         if not self.ok:
             self.free_cwd()
             return
 
-        if not shell:
-            self.init_args(arg_str, input_fh)
-        else:
-            self.arg = None
-            self.arg_base = 0
-            self.init_shell_packet()
+        self.init_environment(arg_str, input_fh)
 
         # create the DosProcess
         super().__init__(
@@ -79,11 +81,13 @@ class Process(DosProcess):
         self.init_cli_struct(input_fh, output_fh, self.bin_basename)
         self.set_cwd()
 
+    @property
+    def this_task(self):
+        """compat alias: the AmigaDOS Process struct is ``self.proc``"""
+        return self.proc
+
     def free(self):
-        if self.shell:
-            self.free_shell_packet()
-        else:
-            self.free_cwd()
+        self.free_environment()
         self.free_task_struct()
         self.free_cli_struct()
         self.free_args()
@@ -122,7 +126,7 @@ class Process(DosProcess):
             lock_mgr.release_lock(self.cwd_lock)
 
     # ----- binary -----
-    def load_binary(self, lock, ami_bin_file, shell=False):
+    def load_binary(self, lock, ami_bin_file):
         self.bin_basename = self.ctx.path_mgr.ami_name_of_path(lock, ami_bin_file)
         # search the command on the command path and try each candidate
         cmd_paths = self.ctx.path_mgr.ami_command_paths(lock, ami_bin_file)
@@ -149,23 +153,41 @@ class Process(DosProcess):
         lock_mgr = self.ctx.dos_lib.lock_mgr
         self.home_lock = lock_mgr.create_lock(lock, self.home_dir, False)
         log_proc.info("home dir: %s", self.home_lock)
-        # THOR: If this is a shell, then the seglist requires BCPL linkage and
-        # initialization of the GlobVec. Fortunately, for the 3.9 shell all this
-        # magic is not really required, and the BCPL call-in (we use) is at
-        # offset +8
-        if shell:
-            self.prog_start += 8
-            self.shell_start = self.prog_start
+        self._setup_entry()
         log_proc.info("loaded binary: %s", self.bin_seg_info)
         for seg in self.bin_seg_info.seglist:
             log_proc.info(seg)
         return True
+
+    def _setup_entry(self):
+        # THOR: If this is a shell, then the seglist requires BCPL linkage and
+        # initialization of the GlobVec. Fortunately, for the 3.9 shell all this
+        # magic is not really required, and the BCPL call-in (we use) is at
+        # offset +8
+        if self.shell:
+            self.prog_start += 8
+            self.shell_start = self.prog_start
 
     def unload_binary(self):
         self.ctx.seg_loader.unload_seglist(self.bin_seg_list)
         # unlock home dir
         lock_mgr = self.ctx.dos_lib.lock_mgr
         lock_mgr.release_lock(self.home_lock)
+
+    # ----- environment: args vs shell packet -----
+    def init_environment(self, arg_str, input_fh):
+        if self.shell:
+            self.arg = None
+            self.arg_base = 0
+            self.init_shell_packet()
+        else:
+            self.init_args(arg_str, input_fh)
+
+    def free_environment(self):
+        if self.shell:
+            self.free_shell_packet()
+        else:
+            self.free_cwd()
 
     # ----- args -----
     def init_args(self, arg_str, fh):
@@ -187,6 +209,17 @@ class Process(DosProcess):
     # ----- scheduler task setup -----
     def _get_start_regs(self, stack_size):
         regs = {}
+        self._add_program_regs(regs)
+        # d2=stack_size.  this value is also in 4(sp) (see Process.init_stack), but
+        # various C programs rely on it being present (1.3-3.1 at least have it).
+        regs[REG_D2] = stack_size
+        # fill old dos regs with guard
+        regs[REG_A2] = self.ctx.odg_base
+        regs[REG_A5] = self.ctx.odg_base
+        regs[REG_A6] = self.ctx.odg_base
+        return regs
+
+    def _add_program_regs(self, regs):
         if self.shell:
             # thor: If we run a shell through vamos, then
             # BPCL places the BPTR to the parameter packet into
@@ -197,14 +230,6 @@ class Process(DosProcess):
         else:
             regs[REG_D0] = self.arg_len
             regs[REG_A0] = self.arg_base
-        # d2=stack_size.  this value is also in 4(sp) (see Process.init_stack), but
-        # various C programs rely on it being present (1.3-3.1 at least have it).
-        regs[REG_D2] = stack_size
-        # fill old dos regs with guard
-        regs[REG_A2] = self.ctx.odg_base
-        regs[REG_A5] = self.ctx.odg_base
-        regs[REG_A6] = self.ctx.odg_base
-        return regs
 
     # ----- cli struct -----
     def alloc_cli_struct(self):
@@ -221,16 +246,7 @@ class Process(DosProcess):
         cli.cli_CurrentInput.aptr = input_fh.b_addr << 2
         cli.cli_StandardOutput.aptr = output_fh.b_addr << 2
         cli.cli_CurrentOutput.aptr = output_fh.b_addr << 2
-        # shell uses startup file
-        if self.shell:
-            startup_file = "S:Vamos-Startup"
-            file_mgr = self.ctx.dos_lib.file_mgr
-            fh = file_mgr.open(self.cwd_lock, startup_file, "rb+")
-            if fh != None:
-                log_proc.info("using startup file: %s", startup_file)
-                cli.cli_CurrentInput.aptr = fh.mem.addr
-            else:
-                log_proc.info("startup file not found: %s", startup_file)
+        self._setup_cli_input(cli)
         # alloc prompt/cmdname/cmdfile/setname
         self.prompt = self.ctx.alloc.alloc_memory(60, label="cli_Prompt")
         self.cmdname = self.ctx.alloc.alloc_memory(104, label="cli_CommandName")
@@ -263,6 +279,18 @@ class Process(DosProcess):
                 else:
                     log_proc.warning("Path %s does not exist, expect problems!", p)
 
+    def _setup_cli_input(self, cli):
+        # a shell reads its startup commands from S:Vamos-Startup
+        if self.shell:
+            startup_file = "S:Vamos-Startup"
+            file_mgr = self.ctx.dos_lib.file_mgr
+            fh = file_mgr.open(self.cwd_lock, startup_file, "rb+")
+            if fh != None:
+                log_proc.info("using startup file: %s", startup_file)
+                cli.cli_CurrentInput.aptr = fh.mem.addr
+            else:
+                log_proc.info("startup file not found: %s", startup_file)
+
     def free_cli_struct(self):
         self.ctx.alloc.free_memory(self.prompt)
         self.ctx.alloc.free_memory(self.cmdname)
@@ -273,9 +301,6 @@ class Process(DosProcess):
         for path, lock in self.cli_paths:
             path.free()
             self.ctx.dos_lib.lock_mgr.release_lock(lock)
-
-    def get_cli_struct(self):
-        return self.cli.addr
 
     # ----- initialize for running a command in a shell -----
 
@@ -334,10 +359,7 @@ class Process(DosProcess):
         return dispatcher.port if dispatcher is not None else 0
 
     def init_task_struct(self, input_fh, output_fh):
-        # memory adress of proc
-        self.addr = self.ami_proc.addr
-        self.this_task = ProcessStruct(self.ctx.mem, self.addr)
-        task = self.this_task
+        task = self.proc
         # Inject arguments into input stream (Needed for C:Execute)
         self.seglist = self.ctx.alloc.alloc_memory(24, label="Process Seglist")
         task.pr_SegList.aptr = self.seglist.addr
@@ -363,45 +385,29 @@ class Process(DosProcess):
     def free_task_struct(self):
         self.ctx.alloc.free_memory(self.seglist)
 
-    def get_local_vars(self):
-        localvars_addr = self.this_task.pr_LocalVars.addr
-        return MinListStruct(self.ctx.mem, localvars_addr)
-
     def get_input(self):
-        fh_b = self.this_task.pr_CIS.aptr >> 2
+        fh_b = self.proc.pr_CIS.aptr >> 2
         return self.ctx.dos_lib.file_mgr.get_by_b_addr(fh_b)
 
     def set_input(self, input_fh):
         if input_fh is None:  # BNULL
-            self.this_task.pr_CIS.aptr = 0
+            self.proc.pr_CIS.aptr = 0
         else:
-            self.this_task.pr_CIS.aptr = (
+            self.proc.pr_CIS.aptr = (
                 input_fh.b_addr << 2
             )  # compensate BCPL auto-conversion
 
     def get_output(self):
-        fh_b = self.this_task.pr_COS.aptr >> 2
+        fh_b = self.proc.pr_COS.aptr >> 2
         return self.ctx.dos_lib.file_mgr.get_by_b_addr(fh_b)
 
     def set_output(self, output_fh):
         if output_fh is None:  # BNULL
-            self.this_task.pr_COS.aptr = 0
+            self.proc.pr_COS.aptr = 0
         else:
-            self.this_task.pr_COS.aptr = (
+            self.proc.pr_COS.aptr = (
                 output_fh.b_addr << 2
             )  # compensate BCPL auto-conversion
-
-    def get_current_dir(self):
-        return self.this_task.pr_CurrentDir.aptr
-
-    def set_current_dir(self, lock):
-        self.this_task.pr_CurrentDir.aptr = lock
-
-    def get_home_dir(self):
-        return self.this_task.pr_HomeDir.aptr
-
-    def set_home_dir(self, lock_addr):
-        self.this_task.pr_HomeDir.aptr = lock_addr
 
     def is_native_shell(self):
         return self.shell
@@ -410,10 +416,10 @@ class Process(DosProcess):
         return self.bin_basename
 
     def get_arg_str_ptr(self):
-        return self.this_task.pr_Arguments.aptr
+        return self.proc.pr_Arguments.aptr
 
     def set_arg_str_ptr(self, ptr):
-        self.this_task.pr_Arguments.aptr = ptr
+        self.proc.pr_Arguments.aptr = ptr
 
     def get_current_dir_lock(self):
         lock_mgr = self.ctx.dos_lib.lock_mgr

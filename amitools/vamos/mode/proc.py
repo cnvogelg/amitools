@@ -1,6 +1,6 @@
 from .base import BaseMode
 from amitools.vamos.lib.dos import Var
-from amitools.vamos.lib.dos.Process import Process
+from amitools.vamos.lib.dos.Process import ProcessBase
 from amitools.vamos.log import log_proc
 
 
@@ -42,7 +42,7 @@ class ProcMode(BaseMode):
         log_proc.info("cwd:    %s", cwd)
 
         # setup main proc
-        proc = Process(
+        proc = ProcessBase(
             dos_ctx, cmd, arg_str, stack_size=stack_size, shell=shell, cwd=cwd
         )
         if not proc.ok:
