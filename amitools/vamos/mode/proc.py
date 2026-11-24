@@ -1,6 +1,6 @@
 from .base import BaseMode
 from amitools.vamos.lib.dos import Var
-from amitools.vamos.lib.dos.Process import BinProcess, ProcessBase
+from amitools.vamos.lib.dos.Process import BinProcess, ShellProcess
 from amitools.vamos.log import log_proc
 
 
@@ -43,11 +43,8 @@ class ProcMode(BaseMode):
 
         # setup main proc
         if shell:
-            # a shell run still uses ProcessBase's shell path until the
-            # ShellProcess/shell mode land (steps 4/6)
-            proc = ProcessBase(
-                dos_ctx, cmd, arg_str, stack_size=stack_size, shell=True, cwd=cwd
-            )
+            # -x runs a shell seg; step 6 turns this into its own mode
+            proc = ShellProcess(dos_ctx, cmd, arg_str, stack_size=stack_size, cwd=cwd)
         else:
             proc = BinProcess(dos_ctx, cmd, arg_str, stack_size=stack_size, cwd=cwd)
         if not proc.ok:

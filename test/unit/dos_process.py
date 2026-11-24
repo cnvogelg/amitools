@@ -1,16 +1,17 @@
-"""DOS process classes: the ``self.proc`` dedup and ``BinProcess``.
+"""DOS process classes: the ``self.proc`` dedup and the process subclasses.
 
 Step 2 of the shell refactor folded the old ``self.this_task`` ProcessStruct
 view into ``self.proc`` (the ``libtypes.Process`` allocated by ``DosProcess``)
 and dropped the duplicated dir/var/cli accessors.  Step 3 added ``BinProcess``
-for the single-binary path.  These tests pin both down without needing a full
-vamos context.
+for the single-binary path and Step 4 ``ShellProcess`` for the shell path.
+These tests pin them down without needing a full vamos context.
 """
 
 from types import SimpleNamespace
 
-from amitools.vamos.lib.dos.Process import BinProcess, ProcessBase
-from amitools.vamos.libstructs import CLIStruct
+from amitools.vamos.lib.dos.Process import BinProcess, ProcessBase, ShellProcess
+from amitools.vamos.lib.lexec.PortManager import PortManager
+from amitools.vamos.libstructs import CLIStruct, DosPacketStruct, MessageStruct
 from amitools.vamos.machine import (
     Machine,
     REG_A0,
@@ -103,6 +104,7 @@ class _FakeFH:
     def __init__(self, b_addr):
         self.b_addr = b_addr
         self.buf = None
+        self.mem = SimpleNamespace(addr=b_addr << 2)
 
     def setbuf(self, data):
         self.buf = data
@@ -264,5 +266,142 @@ def dos_bin_process_free_test():
     # free() released the home lock and unloaded the binary
     assert ctx.seg_loader.unloaded == [0x5000]
     assert ctx.lock_mgr.released
+    # all allocated memory is back (cleanup asserts is_all_free)
+    ctx.cleanup()
+
+
+# ----- ShellProcess (shell seg + startup packet) -----
+
+
+class _FakeFileMgr:
+    def __init__(self, startup_fh=None):
+        self.startup_fh = startup_fh
+        self.opened = []
+
+    def open(self, lock, name, mode):
+        self.opened.append((name, mode))
+        return self.startup_fh
+
+
+class _ShellCtx(_BinCtx):
+    def __init__(self, startup_fh=None):
+        super().__init__()
+        self.file_mgr = _FakeFileMgr(startup_fh)
+        self.dos_lib = SimpleNamespace(
+            lock_mgr=self.lock_mgr,
+            handler_mgr=None,
+            file_mgr=self.file_mgr,
+        )
+        self.exec_lib = SimpleNamespace(port_mgr=PortManager(self.alloc))
+
+
+def dos_shell_process_regs_packet_and_cli_test():
+    startup_fh = _FakeFH(0x30)
+    ctx = _ShellCtx(startup_fh=startup_fh)
+    proc = ShellProcess(
+        ctx,
+        "root:shell-seg",
+        input_fh=ctx.input_fh,
+        output_fh=ctx.output_fh,
+        stack_size=4096,
+    )
+    try:
+        assert proc.ok
+        assert proc.is_native_shell() is True
+        # a shell is entered at the BCPL call-in, seglist start + 8
+        assert proc.shell_start == 0x5010 + 8
+        assert proc.prog_start == 0x5010 + 8
+
+        # no argument string: the shell gets a startup packet instead
+        assert proc.arg is None
+        assert proc.arg_base == 0
+
+        # D1 = BPTR(shell packet), no D0/A0 argument regs
+        regs = proc.get_sched_task().get_code().set_regs
+        assert regs[REG_D1] == proc.shell_packet.addr >> 2
+        assert REG_D0 not in regs
+        assert REG_A0 not in regs
+        assert regs[REG_D2] == 4096
+        assert regs[REG_A2] == ctx.odg_base
+        assert regs[REG_A5] == ctx.odg_base
+        assert regs[REG_A6] == ctx.odg_base
+
+        # packet/message/port wiring
+        packet = DosPacketStruct(ctx.mem, proc.shell_packet.addr)
+        msg = MessageStruct(ctx.mem, proc.shell_message.addr)
+        assert packet.dp_Type.val == 1  # RUN
+        assert packet.dp_Res1.val == 0
+        assert packet.dp_Res2.val == 0
+        assert packet.dp_Link.aptr == proc.shell_message.addr
+        assert packet.dp_Port.aptr == proc.shell_port
+        assert msg.mn_Node.ln_Name.aptr == proc.shell_packet.addr
+
+        # cli_CurrentInput is redirected to the startup file
+        cli = CLIStruct(ctx.mem, proc.get_cli_struct())
+        assert ctx.file_mgr.opened == [("S:Vamos-Startup", "rb+")]
+        assert cli.cli_CurrentInput.aptr == startup_fh.mem.addr
+        assert cli.cli_StandardInput.aptr == 0x10 << 2
+        assert cli.cli_StandardOutput.aptr == 0x20 << 2
+        assert cli.cli_CurrentOutput.aptr == 0x20 << 2
+        assert ctx.mem.r_bstr(cli.cli_CommandName.aptr) == "shell-seg"
+    finally:
+        proc.free()
+        ctx.cleanup()
+
+
+def dos_shell_process_no_startup_file_test():
+    # without S:Vamos-Startup the shell keeps reading from standard input
+    ctx = _ShellCtx(startup_fh=None)
+    proc = ShellProcess(
+        ctx,
+        "root:shell-seg",
+        input_fh=ctx.input_fh,
+        output_fh=ctx.output_fh,
+    )
+    try:
+        cli = CLIStruct(ctx.mem, proc.get_cli_struct())
+        assert ctx.file_mgr.opened == [("S:Vamos-Startup", "rb+")]
+        assert cli.cli_CurrentInput.aptr == 0x10 << 2
+    finally:
+        proc.free()
+        ctx.cleanup()
+
+
+def dos_shell_process_run_system_test():
+    ctx = _ShellCtx(startup_fh=_FakeFH(0x30))
+    proc = ShellProcess(
+        ctx,
+        "root:shell-seg",
+        input_fh=ctx.input_fh,
+        output_fh=ctx.output_fh,
+    )
+    try:
+        port_mgr = ctx.exec_lib.port_mgr
+        # run_system drains any pending messages and returns the packet
+        port_mgr.put_msg(proc.shell_port, 0xABBA)
+        assert port_mgr.has_msg(proc.shell_port)
+        assert proc.run_system() == proc.shell_packet.addr
+        assert not port_mgr.has_msg(proc.shell_port)
+    finally:
+        proc.free()
+        ctx.cleanup()
+
+
+def dos_shell_process_free_test():
+    ctx = _ShellCtx(startup_fh=_FakeFH(0x30))
+    proc = ShellProcess(
+        ctx,
+        "root:shell-seg",
+        input_fh=ctx.input_fh,
+        output_fh=ctx.output_fh,
+    )
+    proc.free()
+    # free() unloaded the binary and released the home lock
+    assert ctx.seg_loader.unloaded == [0x5000]
+    assert ctx.lock_mgr.released
+    # the shell startup packet/message/port were released
+    assert proc.shell_packet is None
+    assert proc.shell_message is None
+    assert proc.shell_port is None
     # all allocated memory is back (cleanup asserts is_all_free)
     ctx.cleanup()

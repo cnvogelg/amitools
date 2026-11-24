@@ -37,7 +37,6 @@ class ProcessBase(DosProcess):
         input_fh=None,
         output_fh=None,
         stack_size=4096,
-        shell=False,
         cwd=None,
         cwd_lock=None,
     ):
@@ -47,7 +46,6 @@ class ProcessBase(DosProcess):
         self.ctx = ctx
         self.bin_file = bin_file
         self.arg_str = arg_str
-        self.shell = shell
         self.cli_paths = []
 
         if input_fh is None:
@@ -160,13 +158,9 @@ class ProcessBase(DosProcess):
         return True
 
     def _setup_entry(self):
-        # THOR: If this is a shell, then the seglist requires BCPL linkage and
-        # initialization of the GlobVec. Fortunately, for the 3.9 shell all this
-        # magic is not really required, and the BCPL call-in (we use) is at
-        # offset +8
-        if self.shell:
-            self.prog_start += 8
-            self.shell_start = self.prog_start
+        # a single binary is entered at the start of its first segment;
+        # ShellProcess overrides this to use the BCPL call-in at +8
+        pass
 
     def unload_binary(self):
         self.ctx.seg_loader.unload_seglist(self.bin_seg_list)
@@ -176,18 +170,12 @@ class ProcessBase(DosProcess):
 
     # ----- environment: args vs shell packet -----
     def init_environment(self, arg_str, input_fh):
-        if self.shell:
-            self.arg = None
-            self.arg_base = 0
-            self.init_shell_packet()
-        else:
-            self.init_args(arg_str, input_fh)
+        # the non-shell default: hand the argument string to the program.
+        # ShellProcess overrides this to build the shell startup packet.
+        self.init_args(arg_str, input_fh)
 
     def free_environment(self):
-        if self.shell:
-            self.free_shell_packet()
-        else:
-            self.free_cwd()
+        self.free_cwd()
 
     # ----- args -----
     def init_args(self, arg_str, fh):
@@ -220,16 +208,10 @@ class ProcessBase(DosProcess):
         return regs
 
     def _add_program_regs(self, regs):
-        if self.shell:
-            # thor: If we run a shell through vamos, then
-            # BPCL places the BPTR to the parameter packet into
-            # d1. The default shell can work without ParmPkt
-            # thus leave this at zero for this time.
-            regs[REG_D1] = self.shell_packet.addr >> 2
-            log_proc.info("shell startup packet: BPTR %08x", regs[REG_D1])
-        else:
-            regs[REG_D0] = self.arg_len
-            regs[REG_A0] = self.arg_base
+        # the concrete processes add their startup registers: BinProcess
+        # passes the argument string in D0/A0, ShellProcess the startup
+        # packet in D1
+        pass
 
     # ----- cli struct -----
     def alloc_cli_struct(self):
@@ -280,16 +262,9 @@ class ProcessBase(DosProcess):
                     log_proc.warning("Path %s does not exist, expect problems!", p)
 
     def _setup_cli_input(self, cli):
-        # a shell reads its startup commands from S:Vamos-Startup
-        if self.shell:
-            startup_file = "S:Vamos-Startup"
-            file_mgr = self.ctx.dos_lib.file_mgr
-            fh = file_mgr.open(self.cwd_lock, startup_file, "rb+")
-            if fh != None:
-                log_proc.info("using startup file: %s", startup_file)
-                cli.cli_CurrentInput.aptr = fh.mem.addr
-            else:
-                log_proc.info("startup file not found: %s", startup_file)
+        # a single binary keeps reading from its standard input; ShellProcess
+        # overrides this to redirect cli_CurrentInput to S:Vamos-Startup
+        pass
 
     def free_cli_struct(self):
         self.ctx.alloc.free_memory(self.prompt)
@@ -301,49 +276,6 @@ class ProcessBase(DosProcess):
         for path, lock in self.cli_paths:
             path.free()
             self.ctx.dos_lib.lock_mgr.release_lock(lock)
-
-    # ----- initialize for running a command in a shell -----
-
-    def init_shell_packet(self):
-        self.shell_message = self.ctx.alloc.alloc_astruct(
-            MessageStruct, label="Shell Startup Message"
-        )
-        self.shell_packet = self.ctx.alloc.alloc_astruct(
-            DosPacketStruct, label="Shell Startup Packet"
-        )
-        self.shell_port = self.ctx.exec_lib.port_mgr.create_port(
-            "Shell Startup Port", None
-        )
-        shell_packet = self.shell_packet
-        shell_message = self.shell_message
-        shell_packet.dp_Type.val = 1  # indicate RUN
-        shell_packet.dp_Res2.val = 0  # indicate correct startup
-        shell_packet.dp_Res1.val = 0  # indicate RUN
-        shell_packet.dp_Link.aptr = self.shell_message.addr
-        shell_packet.dp_Port.aptr = self.shell_port
-        shell_message.mn_Node.ln_Name.aptr = self.shell_packet.addr
-        log_proc.info(
-            "shell_packet: dp=%08x msg=%08x port=%08x",
-            self.shell_packet.addr,
-            self.shell_message.addr,
-            self.shell_port,
-        )
-
-    def free_shell_packet(self):
-        if self.shell_message != None:
-            self.shell_message.free()
-            self.shell_message = None
-        if self.shell_packet != None:
-            self.shell_packet.free()
-            self.shell_packet = None
-        if self.shell_port != None:
-            self.ctx.exec_lib.port_mgr.free_port(self.shell_port)
-            self.shell_port = None
-
-    def run_system(self):
-        while self.ctx.exec_lib.port_mgr.has_msg(self.shell_port):
-            self.ctx.exec_lib.port_mgr.get_msg(self.shell_port)
-        return self.shell_packet.addr
 
     # ----- task struct -----
 
@@ -410,7 +342,7 @@ class ProcessBase(DosProcess):
             )  # compensate BCPL auto-conversion
 
     def is_native_shell(self):
-        return self.shell
+        return False
 
     def get_program_name(self):
         return self.bin_basename
@@ -458,7 +390,6 @@ class BinProcess(ProcessBase):
             input_fh=input_fh,
             output_fh=output_fh,
             stack_size=stack_size,
-            shell=False,
             cwd=cwd,
             cwd_lock=cwd_lock,
         )
@@ -470,3 +401,116 @@ class BinProcess(ProcessBase):
 
     def is_native_shell(self):
         return False
+
+
+class ShellProcess(ProcessBase):
+    """run a shell segment, e.g. ``L:shell-seg`` (the ``shell`` mode).
+
+    The shell counterpart of ``BinProcess``: the entry point is the BCPL
+    call-in at seglist ``+8``, the shell receives a startup ``DosPacket`` in
+    D1 instead of an argument string in D0/A0, and ``cli_CurrentInput`` is
+    redirected to ``S:Vamos-Startup`` when that file exists.
+    """
+
+    def __init__(
+        self,
+        ctx,
+        bin_file,
+        arg_str=None,
+        input_fh=None,
+        output_fh=None,
+        stack_size=4096,
+        cwd=None,
+        cwd_lock=None,
+    ):
+        super().__init__(
+            ctx,
+            bin_file,
+            arg_str,
+            input_fh=input_fh,
+            output_fh=output_fh,
+            stack_size=stack_size,
+            cwd=cwd,
+            cwd_lock=cwd_lock,
+        )
+
+    def _setup_entry(self):
+        # THOR: If this is a shell, then the seglist requires BCPL linkage and
+        # initialization of the GlobVec. Fortunately, for the 3.9 shell all
+        # this magic is not really required, and the BCPL call-in (we use) is
+        # at offset +8
+        self.prog_start += 8
+        self.shell_start = self.prog_start
+
+    def init_environment(self, arg_str, input_fh):
+        # a shell gets no argument string, only a startup packet
+        self.arg = None
+        self.arg_base = 0
+        self.init_shell_packet()
+
+    def free_environment(self):
+        self.free_shell_packet()
+
+    def _add_program_regs(self, regs):
+        # thor: If we run a shell through vamos, then BPCL places the BPTR to
+        # the parameter packet into d1. The default shell can work without
+        # ParmPkt thus leave this at zero for this time.
+        regs[REG_D1] = self.shell_packet.addr >> 2
+        log_proc.info("shell startup packet: BPTR %08x", regs[REG_D1])
+
+    def _setup_cli_input(self, cli):
+        # a shell reads its startup commands from S:Vamos-Startup
+        startup_file = "S:Vamos-Startup"
+        file_mgr = self.ctx.dos_lib.file_mgr
+        fh = file_mgr.open(self.cwd_lock, startup_file, "rb+")
+        if fh != None:
+            log_proc.info("using startup file: %s", startup_file)
+            cli.cli_CurrentInput.aptr = fh.mem.addr
+        else:
+            log_proc.info("startup file not found: %s", startup_file)
+
+    def is_native_shell(self):
+        return True
+
+    # ----- shell startup packet -----
+
+    def init_shell_packet(self):
+        self.shell_message = self.ctx.alloc.alloc_astruct(
+            MessageStruct, label="Shell Startup Message"
+        )
+        self.shell_packet = self.ctx.alloc.alloc_astruct(
+            DosPacketStruct, label="Shell Startup Packet"
+        )
+        self.shell_port = self.ctx.exec_lib.port_mgr.create_port(
+            "Shell Startup Port", None
+        )
+        shell_packet = self.shell_packet
+        shell_message = self.shell_message
+        shell_packet.dp_Type.val = 1  # indicate RUN
+        shell_packet.dp_Res2.val = 0  # indicate correct startup
+        shell_packet.dp_Res1.val = 0  # indicate RUN
+        shell_packet.dp_Link.aptr = self.shell_message.addr
+        shell_packet.dp_Port.aptr = self.shell_port
+        shell_message.mn_Node.ln_Name.aptr = self.shell_packet.addr
+        log_proc.info(
+            "shell_packet: dp=%08x msg=%08x port=%08x",
+            self.shell_packet.addr,
+            self.shell_message.addr,
+            self.shell_port,
+        )
+
+    def free_shell_packet(self):
+        if self.shell_message != None:
+            self.shell_message.free()
+            self.shell_message = None
+        if self.shell_packet != None:
+            self.shell_packet.free()
+            self.shell_packet = None
+        if self.shell_port != None:
+            self.ctx.exec_lib.port_mgr.free_port(self.shell_port)
+            self.shell_port = None
+
+    def run_system(self):
+        while self.ctx.exec_lib.port_mgr.has_msg(self.shell_port):
+            self.ctx.exec_lib.port_mgr.get_msg(self.shell_port)
+        return self.shell_packet.addr
