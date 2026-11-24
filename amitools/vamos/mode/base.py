@@ -38,6 +38,15 @@ class BaseMode:
                     "done task '%s'. failed with %s", sched_task.get_name(), error
                 )
                 exit_code = 255
+            elif exit_code is None:
+                # the task never terminated (e.g. it is still waiting): this is
+                # a deadlock, not a clean end
+                log_mode.error(
+                    "task '%s' did not terminate (state=%s)",
+                    sched_task.get_name(),
+                    sched_task.get_state().name,
+                )
+                exit_code = 255
             else:
                 log_mode.info(
                     "done task '%s'. exit code=%d", sched_task.get_name(), exit_code

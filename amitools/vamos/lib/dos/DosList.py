@@ -12,7 +12,6 @@ from amitools.vamos.libstructs import (
     CLIStruct,
     RDArgsStruct,
 )
-from amitools.vamos.error import UnsupportedFeatureError
 
 from .Error import (
     DOSTRUE,
@@ -811,8 +810,17 @@ def alloc_dos_object(dos, ctx, obj_type, tags_ptr):
     if struct_def is None:
         log_dos.warning("AllocDosObject: unsupported type=%d/%s", obj_type, name)
         return 0
-    # allocate struct
-    dos_obj = ctx.alloc.alloc_astruct(struct_def, label=name)
+    # DOS_CLI needs its standard string buffers (prompt/setname/command name/
+    # command file) allocated as well, so build it through the CLI helper.
+    # A bare CLIStruct would leave those pointers NULL and a caller writing
+    # through them (SetPrompt, SetCurrentDirName, ...) would corrupt low memory.
+    extra = None
+    if obj_type == 4:
+        from .Cli import alloc_cli_struct
+
+        dos_obj, extra = alloc_cli_struct(dos, ctx, label=name)
+    else:
+        dos_obj = ctx.alloc.alloc_astruct(struct_def, label=name)
     log_dos.info(
         "AllocDosObject: type=%d/%s tags_ptr=%08x -> dos_obj=%s",
         obj_type,
@@ -822,13 +830,11 @@ def alloc_dos_object(dos, ctx, obj_type, tags_ptr):
     )
     # store struct
     ptr = dos_obj.addr
-    dos.dos_objs[ptr] = (dos_obj, obj_type)
+    dos.dos_objs[ptr] = (dos_obj, obj_type, extra)
     # pre fill struct
     if obj_type == 0:
         dos_obj.fh_Pos.val = 0xFFFFFFFF
         dos_obj.fh_End.val = 0xFFFFFFFF
-    elif obj_type == 4:
-        raise UnsupportedFeatureError("AllocDosObject: DOS_CLI fill TBD")
     return ptr
 
 
@@ -843,6 +849,11 @@ def free_dos_object(dos, ctx, obj_type, ptr):
         # Freeing a control also releases an unfinished scan.
         if entry[1] == 1:
             Lock.drop_exall_scan(dos, ptr)
+        # DOS_CLI also owns its string buffers (see alloc_dos_object)
+        extra = entry[2] if len(entry) > 2 else None
+        if extra:
+            for mem_obj in extra:
+                ctx.alloc.free_memory(mem_obj)
         # free struct
         ctx.alloc.free_struct(entry[0])
     else:
