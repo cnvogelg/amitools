@@ -40,9 +40,15 @@ class ProcArgs(object):
             return None
         return cl.get_cmd(), cl.get_arg_str()
 
+    def make_bin_path(self, cmd_cfg, path):
+        """resolve a single binary path (host or Amiga) to an Amiga path"""
+        return self._resolve_binary(path, cmd_cfg.pure_ami_path)
+
     def _to_ami_binary(self, cmd_cfg):
-        binary = cmd_cfg.args[0]
-        if cmd_cfg.pure_ami_path:
+        return self._resolve_binary(cmd_cfg.args[0], cmd_cfg.pure_ami_path)
+
+    def _resolve_binary(self, binary, pure_ami_path):
+        if pure_ami_path:
             return binary
         # if the argument is an existing host file then convert it
         if not self.host_fs.is_file(binary):

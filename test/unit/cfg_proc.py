@@ -9,6 +9,7 @@ def cfg_proc_dict_test():
             "command": {
                 "args": ["a", "b", "c,d", "(e)", "*f"],
                 "shell": True,
+                "shell_bin": "wb:l/Shell-Seg",
                 "pure_ami_path": True,
                 "raw_arg": True,
                 "mode": "proc",
@@ -26,6 +27,7 @@ def cfg_proc_ini_test():
     ini_dict = {
         "vamos": {
             "shell": True,
+            "shell_bin": "wb:l/Shell-Seg",
             "pure_ami_paths": True,
             "raw_arg": True,
             "stack_size": 4,
@@ -37,6 +39,7 @@ def cfg_proc_ini_test():
             "command": {
                 "args": None,
                 "shell": True,
+                "shell_bin": "wb:l/Shell-Seg",
                 "pure_ami_path": True,
                 "raw_arg": True,
                 "mode": "proc",
@@ -54,6 +57,8 @@ def cfg_proc_args_test():
     args = ap.parse_args(
         [
             "-x",
+            "--shell-bin",
+            "wb:l/Shell-Seg",
             "-P",
             "-R",
             "-s",
@@ -76,6 +81,7 @@ def cfg_proc_args_test():
             "command": {
                 "args": ["foo", "a", "b", "c,d", "(e)", "*f"],
                 "shell": True,
+                "shell_bin": "wb:l/Shell-Seg",
                 "pure_ami_path": True,
                 "raw_arg": True,
                 "mode": "proc",
