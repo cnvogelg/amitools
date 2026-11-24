@@ -42,7 +42,7 @@ from .Error import (
     ERROR_NOT_IMPLEMENTED,
     ERROR_OBJECT_WRONG_TYPE,
 )
-from .Process import ProcessBase
+from .Process import BinProcess
 from .Var import copy_local_vars, free_local_vars
 
 # the AmigaDOS V36 process table size returned by MaxCli()
@@ -1461,7 +1461,7 @@ def system_tag_list(dos, ctx, cmd, tag_list):
         input_fh, output_fh, redir_fhs = redir
         # create a process and run it...
         try:
-            proc = ProcessBase(
+            proc = BinProcess(
                 ctx,
                 binary,
                 arg_str,

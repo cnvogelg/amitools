@@ -321,7 +321,8 @@ Each step is independently landable and testable.
    accessors and drop `self.this_task` (use `self.proc`). No behaviour change.
 3. **Add `BinProcess`.** Non-shell path as a subclass; point `mode/proc.py`
    and `Cli.system_tag_list` at it. `proc` mode must be equivalent (same
-   args, same regs, same CLI fields).
+   args, same regs, same CLI fields). Until Step 4, `ProcMode`'s shell branch
+   still goes through `ProcessBase(shell=True)`, so `-x` keeps working.
 4. **Add `ShellProcess`.** Shell path as a subclass; keep `-x` working by
    routing it to the new class. `test/extra/shell_seg.py` must still pass.
 5. **Introduce the uCLI helper.** Extract the minimal-CLI builder used by
@@ -409,7 +410,7 @@ Each step is independently landable and testable.
 
 - [x] Step 1 — baseline
 - [x] Step 2 — extract `ProcessBase` (reuse `DosProcess` accessors)
-- [ ] Step 3 — `BinProcess`
+- [x] Step 3 — `BinProcess`
 - [ ] Step 4 — `ShellProcess`
 - [ ] Step 5 — uCLI helper
 - [ ] Step 6 — `shell` mode

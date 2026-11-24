@@ -430,3 +430,43 @@ class ProcessBase(DosProcess):
         lock_mgr = self.ctx.dos_lib.lock_mgr
         lock_baddr = self.get_home_dir() >> 2
         return lock_mgr.get_by_b_addr(lock_baddr)
+
+
+class BinProcess(ProcessBase):
+    """run a single binary with a minimal CLI (the ``proc`` mode).
+
+    The non-shell counterpart of ``ShellProcess``: the argument string is
+    handed to the program in D0/A0 and it gets a uCLI, with no startup packet
+    and no ``S:Vamos-Startup`` redirect.
+    """
+
+    def __init__(
+        self,
+        ctx,
+        bin_file,
+        arg_str,
+        input_fh=None,
+        output_fh=None,
+        stack_size=4096,
+        cwd=None,
+        cwd_lock=None,
+    ):
+        super().__init__(
+            ctx,
+            bin_file,
+            arg_str,
+            input_fh=input_fh,
+            output_fh=output_fh,
+            stack_size=stack_size,
+            shell=False,
+            cwd=cwd,
+            cwd_lock=cwd_lock,
+        )
+
+    def _add_program_regs(self, regs):
+        # a single binary receives its argument string in D0/A0
+        regs[REG_D0] = self.arg_len
+        regs[REG_A0] = self.arg_base
+
+    def is_native_shell(self):
+        return False

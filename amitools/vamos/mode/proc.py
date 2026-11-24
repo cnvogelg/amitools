@@ -1,6 +1,6 @@
 from .base import BaseMode
 from amitools.vamos.lib.dos import Var
-from amitools.vamos.lib.dos.Process import ProcessBase
+from amitools.vamos.lib.dos.Process import BinProcess, ProcessBase
 from amitools.vamos.log import log_proc
 
 
@@ -42,9 +42,14 @@ class ProcMode(BaseMode):
         log_proc.info("cwd:    %s", cwd)
 
         # setup main proc
-        proc = ProcessBase(
-            dos_ctx, cmd, arg_str, stack_size=stack_size, shell=shell, cwd=cwd
-        )
+        if shell:
+            # a shell run still uses ProcessBase's shell path until the
+            # ShellProcess/shell mode land (steps 4/6)
+            proc = ProcessBase(
+                dos_ctx, cmd, arg_str, stack_size=stack_size, shell=True, cwd=cwd
+            )
+        else:
+            proc = BinProcess(dos_ctx, cmd, arg_str, stack_size=stack_size, cwd=cwd)
         if not proc.ok:
             return None
         self.setup_vars(dos_ctx, proc, proc_cfg.vars)

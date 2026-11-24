@@ -1145,7 +1145,7 @@ def lib_dos_cli_system_tag_list_redir_test(monkeypatch):
         def free(self):
             pass
 
-    monkeypatch.setattr(Cli, "ProcessBase", FakeProcess)
+    monkeypatch.setattr(Cli, "BinProcess", FakeProcess)
     monkeypatch.setattr(Cli, "run_sub_process", lambda sched, runner, proc: 0)
 
     # '<in >out' opens both files, passes them to the process and closes them
