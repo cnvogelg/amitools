@@ -9,3 +9,17 @@ from .profile import ProfileParser
 from .schedule import ScheduleParser
 from .display import DisplayParser
 from .vamos import VamosMainParser
+
+__all__ = [
+    "DiskParser",
+    "DisplayParser",
+    "LibsParser",
+    "LogParser",
+    "MachineParser",
+    "PathParser",
+    "ProcessParser",
+    "ProfileParser",
+    "ScheduleParser",
+    "TraceParser",
+    "VamosMainParser",
+]

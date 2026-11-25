@@ -146,7 +146,7 @@ def pytask_exec_task_find_task_test(vamos_task):
         return 0
 
     def other_task(ctx, task):
-        ami_task = task.map_task.get_ami_task()
+        task.map_task.get_ami_task()
 
         # get exec library
         exec_lib = ctx.proxies.get_exec_lib_proxy()

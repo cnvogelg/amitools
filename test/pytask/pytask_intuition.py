@@ -1,6 +1,4 @@
-import time
 from amitools.vamos.libstructs import TimeValStruct
-from amitools.vamos.lib.TimerDevice import TimerDevice
 
 
 def gen_intuition_task(intuition_func):

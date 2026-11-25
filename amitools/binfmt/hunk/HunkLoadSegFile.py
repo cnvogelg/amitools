@@ -1,4 +1,32 @@
-from .HunkBlockFile import *
+from .Hunk import (
+    HUNK_ABSRELOC32,
+    HUNK_BREAK,
+    HUNK_BSS,
+    HUNK_CODE,
+    HUNK_DATA,
+    HUNK_DEBUG,
+    HUNK_END,
+    HUNK_HEADER,
+    HUNK_OVERLAY,
+    HUNK_RELOC32SHORT,
+    HUNK_RELRELOC32,
+    HUNK_SYMBOL,
+    hunk_names,
+    loadseg_valid_begin_hunks,
+    loadseg_valid_extra_hunks,
+)
+from .HunkBlockFile import (
+    HunkBlockFile,
+    HunkBreakBlock,
+    HunkDebugBlock,
+    HunkEndBlock,
+    HunkHeaderBlock,
+    HunkParseError,
+    HunkRelocLongBlock,
+    HunkRelocWordBlock,
+    HunkSegmentBlock,
+    HunkSymbolBlock,
+)
 from .HunkDebug import HunkDebug
 
 
@@ -107,7 +135,7 @@ class HunkSegment:
                 if self.symbol_blk is None:
                     self.symbol_blk = blk
                 else:
-                    raise HunkParserError("duplicate symbols in hunk")
+                    raise HunkParseError("duplicate symbols in hunk")
             elif blk_id == HUNK_DEBUG:
                 if self.debug_blks is None:
                     self.debug_blks = []

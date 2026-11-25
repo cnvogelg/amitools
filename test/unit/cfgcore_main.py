@@ -1,11 +1,10 @@
-from amitools.vamos.cfgcore import *
+from amitools.vamos.cfgcore import Argument, MainParser, Parser, ValueDict, ValueList
 from io import StringIO
 import logging
-import os
 
 
 def config_main_logging_test(caplog):
-    mp = MainParser(debug=True)
+    MainParser(debug=True)
     assert caplog.record_tuples == [("config", logging.DEBUG, "logging setup")]
 
 
@@ -59,7 +58,8 @@ def config_main_ini_error_test(caplog):
         (
             "config",
             logging.ERROR,
-            "???: ini parser failed: File contains no section headers.  file: '<???>', line: 2  '[hello\\n'",
+            "???: ini parser failed: File contains no section headers.  "
+            "file: '<???>', line: 2  '[hello\\n'",
         )
     ]
 
@@ -97,7 +97,8 @@ def config_main_json_error_test(caplog):
         (
             "config",
             logging.ERROR,
-            "???: json parser failed: Expecting property name enclosed in double quotes: "
+            "???: json parser failed: Expecting property name enclosed in "
+            "double quotes: "
             "line 4 column 1 (char 34)",
         )
     ]

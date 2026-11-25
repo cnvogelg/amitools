@@ -1,5 +1,11 @@
 import pytest
-from amitools.vamos.cfgcore.value import *
+from amitools.vamos.cfgcore.value import (
+    Value,
+    ValueDict,
+    ValueList,
+    parse_scalar,
+    split_nest,
+)
 
 
 def config_value_parse_str_test():
@@ -55,66 +61,66 @@ def config_value_test():
 
 
 def config_value_list_test():
-    l = ValueList(str)
-    assert l.parse("bla") == ["bla"]
-    assert l.parse("a,b") == ["a", "b"]
-    assert l.parse(["a", "b"]) == ["a", "b"]
-    assert l.parse(["a,b", "c"]) == ["a", "b", "c"]
+    vl = ValueList(str)
+    assert vl.parse("bla") == ["bla"]
+    assert vl.parse("a,b") == ["a", "b"]
+    assert vl.parse(["a", "b"]) == ["a", "b"]
+    assert vl.parse(["a,b", "c"]) == ["a", "b", "c"]
     # old value and append
-    assert l.parse(["a,b", "c"], ["x", "y"]) == ["x", "y", "a", "b", "c"]
-    assert l.parse("*,a,b", ["x", "y"]) == ["a", "b"]
-    assert l.parse(["a", "b", "c"], ["x", "y"]) == ["x", "y", "a", "b", "c"]
-    assert l.parse(["*", "a", "b"], ["x", "y"]) == ["a", "b"]
+    assert vl.parse(["a,b", "c"], ["x", "y"]) == ["x", "y", "a", "b", "c"]
+    assert vl.parse("*,a,b", ["x", "y"]) == ["a", "b"]
+    assert vl.parse(["a", "b", "c"], ["x", "y"]) == ["x", "y", "a", "b", "c"]
+    assert vl.parse(["*", "a", "b"], ["x", "y"]) == ["a", "b"]
     # enum
-    l = ValueList(str, enum=("a", "b"))
-    assert l.parse("a,b") == ["a", "b"]
+    vl = ValueList(str, enum=("a", "b"))
+    assert vl.parse("a,b") == ["a", "b"]
     with pytest.raises(ValueError):
-        l.parse("a,c")
+        vl.parse("a,c")
 
 
 def config_value_list_no_split_test():
-    l = ValueList(str, allow_split=False)
-    assert l.parse("bla") == ["bla"]
-    assert l.parse("a,b") == ["a,b"]
-    assert l.parse(["a", "b"]) == ["a", "b"]
-    assert l.parse(["a,b", "c"]) == ["a,b", "c"]
+    vl = ValueList(str, allow_split=False)
+    assert vl.parse("bla") == ["bla"]
+    assert vl.parse("a,b") == ["a,b"]
+    assert vl.parse(["a", "b"]) == ["a", "b"]
+    assert vl.parse(["a,b", "c"]) == ["a,b", "c"]
 
 
 def config_value_list_int_test():
-    l = ValueList(int)
-    assert l.parse("12") == [12]
-    assert l.parse("1,2") == [1, 2]
-    assert l.parse(["1", "2"]) == [1, 2]
-    assert l.parse([1, 2]) == [1, 2]
-    assert l.parse(["1,2", "3"]) == [1, 2, 3]
-    assert l.parse(["1,2", 3]) == [1, 2, 3]
+    vl = ValueList(int)
+    assert vl.parse("12") == [12]
+    assert vl.parse("1,2") == [1, 2]
+    assert vl.parse(["1", "2"]) == [1, 2]
+    assert vl.parse([1, 2]) == [1, 2]
+    assert vl.parse(["1,2", "3"]) == [1, 2, 3]
+    assert vl.parse(["1,2", 3]) == [1, 2, 3]
 
 
 def config_value_list_nest_value_test():
-    l = ValueList(Value(str))
-    assert l.parse("bla") == ["bla"]
-    assert l.parse("a,b") == ["a", "b"]
-    assert l.parse(["a", "b"]) == ["a", "b"]
+    vl = ValueList(Value(str))
+    assert vl.parse("bla") == ["bla"]
+    assert vl.parse("a,b") == ["a", "b"]
+    assert vl.parse(["a", "b"]) == ["a", "b"]
 
 
 def config_value_list_nest_list_test():
-    l = ValueList(ValueList(str, sep="+"))
-    assert l.parse("bla") == [["bla"]]
-    assert l.parse("a,b") == [["a"], ["b"]]
-    assert l.parse("a+b") == [["a", "b"]]
-    assert l.parse(["a", "b"]) == [["a"], ["b"]]
-    assert l.parse([["a"], ["b"]]) == [["a"], ["b"]]
-    l = ValueList(ValueList(str))
-    assert l.parse("(a,b)") == [["a", "b"]]
+    vl = ValueList(ValueList(str, sep="+"))
+    assert vl.parse("bla") == [["bla"]]
+    assert vl.parse("a,b") == [["a"], ["b"]]
+    assert vl.parse("a+b") == [["a", "b"]]
+    assert vl.parse(["a", "b"]) == [["a"], ["b"]]
+    assert vl.parse([["a"], ["b"]]) == [["a"], ["b"]]
+    vl = ValueList(ValueList(str))
+    assert vl.parse("(a,b)") == [["a", "b"]]
 
 
 def config_value_list_nest_dict_rest():
-    l = ValueList(ValueDict(str, sep="+"))
-    assert l.parse("a:b") == [{"a": "b"}]
-    assert l.parse("a:b,c:d") == [{"a": "b"}, {"c": "d"}]
-    assert l.parse("a:b+c:d,e:f") == [{"a": "b", "c": "d"}, {"e": "f"}]
-    l = ValueList(ValueDict(str))
-    assert l.parse("{a:b,c:d},e:f") == [{"a": "b", "c": "d"}, {"e": "f"}]
+    vl = ValueList(ValueDict(str, sep="+"))
+    assert vl.parse("a:b") == [{"a": "b"}]
+    assert vl.parse("a:b,c:d") == [{"a": "b"}, {"c": "d"}]
+    assert vl.parse("a:b+c:d,e:f") == [{"a": "b", "c": "d"}, {"e": "f"}]
+    vl = ValueList(ValueDict(str))
+    assert vl.parse("{a:b,c:d},e:f") == [{"a": "b", "c": "d"}, {"e": "f"}]
 
 
 def config_value_dict_test():
@@ -145,7 +151,7 @@ def config_value_dict_test():
         d.parse("x:c")
     with pytest.raises(ValueError):
         d.parse("x:")
-    # valid keys
+        # valid keys
     d = ValueDict(str, valid_keys=("a", "b"))
     assert d.parse("a:x") == {"a": "x"}
     with pytest.raises(ValueError):
@@ -186,7 +192,7 @@ def config_value_dict_nest_list_test():
     assert d.parse("a:b,c,z:x") == {"a": ["b", "c"], "z": ["x"]}
     with pytest.raises(ValueError):
         d.parse("a,b")
-    # append to list
+        # append to list
     assert d.parse("a:(b,c)", {"a": ["x"]}) == {"a": ["x", "b", "c"]}
     assert d.parse("a:(*,b,c)", {"a": ["x"], "z": []}) == {"a": ["b", "c"], "z": []}
     assert d.parse("*,a:(b,c)", {"a": ["x"], "z": []}) == {"a": ["b", "c"]}

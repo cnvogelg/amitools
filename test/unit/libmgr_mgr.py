@@ -1,5 +1,4 @@
 import logging
-import pytest
 from amitools.vamos.log import log_libmgr, log_exec
 from amitools.vamos.libcore import LibCtx
 from amitools.vamos.libmgr import LibManager, LibMgrCfg, LibCfg
@@ -28,9 +27,9 @@ def setup(path_mgr=None, file_opener=None):
     cfg = LibMgrCfg()
     mgr = LibManager(machine, alloc, runtime.run, segloader, cfg)
     # setup ctx map
-    cpu = machine.get_cpu()
-    mem = machine.get_mem()
-    cpu_type = machine.get_cpu_type()
+    machine.get_cpu()
+    machine.get_mem()
+    machine.get_cpu_type()
     exec_ctx = ExecLibCtx(machine, alloc, runtime.run, segloader, path_mgr, mgr)
     mgr.add_ctx("exec.library", exec_ctx)
     mgr.add_impl_cls("exec.library", ExecLibrary)
@@ -94,14 +93,14 @@ def libmgr_mgr_open_fail_test():
 
 def libmgr_mgr_open_vlib_test():
     machine, alloc, mgr, sp, cfg = setup()
-    exec_vlib = mgr.bootstrap_exec()
+    mgr.bootstrap_exec()
     # make vamos test lib
     test_base = mgr.open_lib("vamostest.library")
     assert test_base > 0
     vmgr = mgr.vlib_mgr
     test_vlib = vmgr.get_vlib_by_addr(test_base)
     assert test_vlib
-    assert type(test_vlib.get_ctx()) == LibCtx
+    assert type(test_vlib.get_ctx()) is LibCtx
     assert vmgr.get_vlib_by_name("vamostest.library") == test_vlib
     impl = test_vlib.get_impl()
     assert impl
@@ -130,14 +129,14 @@ def libmgr_mgr_open_vlib_test():
 
 def libmgr_mgr_open_vlib_dev_test():
     machine, alloc, mgr, sp, cfg = setup()
-    exec_vlib = mgr.bootstrap_exec()
+    mgr.bootstrap_exec()
     # make vamos test lib
     test_base = mgr.open_lib("vamostestdev.device")
     assert test_base > 0
     vmgr = mgr.vlib_mgr
     test_vlib = vmgr.get_vlib_by_addr(test_base)
     assert test_vlib
-    assert type(test_vlib.get_ctx()) == LibCtx
+    assert type(test_vlib.get_ctx()) is LibCtx
     assert vmgr.get_vlib_by_name("vamostestdev.device") == test_vlib
     impl = test_vlib.get_impl()
     assert impl
@@ -166,7 +165,7 @@ def libmgr_mgr_open_vlib_dev_test():
 
 def libmgr_mgr_open_vlib_fake_fd_test():
     machine, alloc, mgr, sp, cfg = setup()
-    exec_vlib = mgr.bootstrap_exec()
+    mgr.bootstrap_exec()
     # make vamos test lib
     cfg.add_lib_cfg(
         "dos.library", LibCfg(create_mode=LibCfg.CREATE_MODE_FAKE, force_version=40)
@@ -190,7 +189,7 @@ def libmgr_mgr_open_vlib_fake_fd_test():
 
 def libmgr_mgr_open_vlib_fake_no_fd_test():
     machine, alloc, mgr, sp, cfg = setup()
-    exec_vlib = mgr.bootstrap_exec()
+    mgr.bootstrap_exec()
     # make vamos test lib
     cfg.add_lib_cfg(
         "foo.library",
@@ -218,7 +217,7 @@ def libmgr_mgr_open_vlib_fake_no_fd_test():
 
 def libmgr_mgr_open_vlib_too_new_test():
     machine, alloc, mgr, sp, cfg = setup()
-    exec_vlib = mgr.bootstrap_exec()
+    mgr.bootstrap_exec()
     # make vamos test lib
     cfg.add_lib_cfg(
         "dos.library", LibCfg(create_mode=LibCfg.CREATE_MODE_FAKE, force_version=40)

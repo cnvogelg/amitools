@@ -1,6 +1,5 @@
 from amitools.vamos.libtypes import Library, ExecLibrary
 from amitools.vamos.libstructs import LibFlags, NodeType
-from amitools.vamos.loader import SegList
 from amitools.vamos.machine import Code, op_jmp, REG_A6, REG_D0
 
 

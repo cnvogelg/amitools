@@ -3,7 +3,6 @@
 # fdtool <file.fd> ...
 #
 
-import sys
 import argparse
 
 import amitools.fd.FDFormat as FDFormat
@@ -50,7 +49,7 @@ def generate_sasc_code(fname, fd, add_private, prefix=""):
         if add_private or not f.is_private():
             line = "__asm __saveds int %s%s(" % (prefix, f.get_name())
             args = f.get_args()
-            if args != None:
+            if args is not None:
                 for a in args:
                     line += "register __%s int %s" % (a[1], a[0])
                     if a != args[-1]:
@@ -112,7 +111,7 @@ def main(args=None):
         if args.gen_sasc:
             generate_sasc_code(args.gen_sasc, fd, args.add_private, args.prefix)
             code_gen = True
-        if args.gen_fd != None:
+        if args.gen_fd is not None:
             FDFormat.write_fd(args.gen_fd, fd, args.add_private)
             code_gen = True
         if not code_gen:

@@ -1,7 +1,6 @@
 from amitools.vamos.lib.dos.PatternMatch import (
     pattern_parse,
     pattern_match,
-    pattern_dump,
 )
 
 

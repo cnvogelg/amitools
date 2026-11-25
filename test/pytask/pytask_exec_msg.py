@@ -1,4 +1,3 @@
-import pytest
 from amitools.vamos.libtypes import MsgPort, Message
 
 

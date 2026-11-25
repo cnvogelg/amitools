@@ -1,6 +1,4 @@
 from .BlockScan import BlockScan
-from amitools.fs.FSString import FSString
-from amitools.fs.FileName import FileName
 from amitools.fs.validate.Log import Log
 import amitools.fs.DosType as DosType
 
@@ -25,7 +23,7 @@ class FileScan:
 
     def scan_all_files(self, all_file_hdr_block_infos, progress=None):
         """scan through all files"""
-        if progress != None:
+        if progress is not None:
             progress.begin("file")
             for bi in all_file_hdr_block_infos:
                 self.scan_file(bi)
@@ -47,7 +45,6 @@ class FileScan:
         blk_num = bi.blk_num
         # run through file list blocks linked by extension
         sbi = bi
-        aborted = False
         num = 0
         while sbi.extension != 0 and sbi.extension < self.block_scan.blkdev.num_blocks:
             # check usage of block
@@ -57,12 +54,10 @@ class FileScan:
                     "File ext block #%d of %s already used" % (num, info),
                     sbi.extension,
                 )
-                aborted = True
                 break
             # get block
             ebi = self.block_scan.get_block(sbi.extension)
-            if ebi == None:
-                aborted = True
+            if ebi is None:
                 break
             # check block type
             if ebi.blk_type != BlockScan.BT_FILE_LIST:
@@ -71,7 +66,6 @@ class FileScan:
                     "File ext block #%d of %s is no ext block" % (num, info),
                     ebi.blk_num,
                 )
-                aborted = True
                 break
             # check for parent link
             if ebi.parent_blk != blk_num:
@@ -106,7 +100,7 @@ class FileScan:
             file_datas.append(fd)
             # check usage of block
             # is block available
-            if dbi == None:
+            if dbi is None:
                 self.log.msg(
                     Log.ERROR,
                     "File data block #%d of %s not found" % (seq_num, info),
@@ -134,7 +128,8 @@ class FileScan:
                     if dbi.hdr_key != blk_num:
                         self.log.msg(
                             Log.ERROR,
-                            "File data block #%d of %s does not ref header: got %d != expect %d"
+                            "File data block #%d of %s does not ref header: "
+                            "got %d != expect %d"
                             % (seq_num, info, dbi.hdr_key, blk_num),
                             data_blk,
                         )
@@ -157,7 +152,8 @@ class FileScan:
         if file_est_blocks != num_data_blocks:
             self.log.msg(
                 Log.ERROR,
-                "File %s with %d bytes has wrong number of data blocks: got %d != expect %d"
+                "File %s with %d bytes has wrong number of data blocks: "
+                "got %d != expect %d"
                 % (info, bi.byte_size, num_data_blocks, file_est_blocks),
                 bi.blk_num,
             )

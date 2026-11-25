@@ -1,7 +1,6 @@
 import pytest
 
 from amitools.vamos.error import VamosInternalError
-from amitools.vamos.machine import InvalidMemoryAccessError
 
 
 def test_raise_invalid_test(vamos):

@@ -19,7 +19,7 @@ from amitools.binfmt.hunk import HunkReader
 from amitools.binfmt.hunk import HunkShow
 from amitools.binfmt.hunk import HunkRelocate
 import amitools.binfmt.elf
-from amitools.util.HexDump import *
+from ..util.HexDump import print_hex
 
 
 def print_pretty(data):
@@ -177,7 +177,7 @@ class Relocate(HunkCommand):
         addrs = rel.get_seq_addrs(base_addr)
         # relocate and return data of segments
         datas = rel.relocate(addrs)
-        if datas == None:
+        if datas is None:
             print("ERROR: relocation failed:", path)
             return False
         else:
@@ -200,7 +200,7 @@ class ElfInfo:
         self.args = args
 
     def run(self):
-        for f in args.files:
+        for f in self.args.files:
             reader = amitools.binfmt.elf.ELFReader()
             elf = reader.load(open(f, "rb"))
             if elf is None:
@@ -208,7 +208,7 @@ class ElfInfo:
                 return 1
             dumper = amitools.binfmt.elf.ELFDumper(elf)
             dumper.dump_sections(
-                show_relocs=args.show_relocs, show_debug=args.show_debug
+                show_relocs=self.args.show_relocs, show_debug=self.args.show_debug
             )
             dumper.dump_symbols()
             dumper.dump_relas()

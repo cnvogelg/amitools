@@ -1,8 +1,6 @@
 """Unit tests for the fsck module."""
 
 import pytest
-import os
-import tempfile
 import shutil
 
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
@@ -217,7 +215,7 @@ class TestFsckCorruptedDisk:
         config.check_only = False
 
         fsck = Fsck(blkdev, config)
-        result = fsck.run()
+        fsck.run()
 
         blkdev.close()
 
@@ -253,7 +251,7 @@ class TestFsckOutputMode:
         config.repair = True
         config.check_only = False
 
-        result = fsck_image(str(original), config, str(copy_path))
+        fsck_image(str(original), config, str(copy_path))
 
         # Both files should exist
         assert original.exists()

@@ -12,7 +12,7 @@ class LoadSegBlock(Block):
         self.next = next
 
     def write(self):
-        if self.data == None:
+        if self.data is None:
             self._create_data()
 
         self._put_long(1, self.size)
@@ -22,7 +22,7 @@ class LoadSegBlock(Block):
         Block.write(self)
 
     def set_data(self, data):
-        if self.data == None:
+        if self.data is None:
             self._create_data()
         self.data[20 : 20 + len(data)] = data
         self.size = (20 + len(data) + 3) // 4

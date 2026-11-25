@@ -1,4 +1,4 @@
-from amitools.fs.block.Block import *
+from ..Block import Block
 import amitools.fs.DosType as DosType
 
 
@@ -175,7 +175,7 @@ class FSHeaderBlock(Block):
         self.version = version
         self.patch_flags = patch_flags
 
-        if dev_node == None:
+        if dev_node is None:
             dev_node = FSHeaderDeviceNode()
         self.dev_node = dev_node
 

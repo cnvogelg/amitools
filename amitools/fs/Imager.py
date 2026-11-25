@@ -1,17 +1,12 @@
 import os
 import os.path
 import sys
-import unicodedata
 
-from .ADFSDir import ADFSDir
-from .ADFSFile import ADFSFile
 from .ADFSNode import check_comment
 from .ADFSVolume import ADFSVolume
 from .MetaDB import MetaDB
 from . import DosType
-from amitools.fs.block.BootBlock import BootBlock
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
-from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 import amitools.util.KeyValue as KeyValue
 from .FSString import FSString
 from .MetaInfoFSUAE import MetaInfoFSUAE
@@ -31,7 +26,7 @@ class Imager:
         self.unread_dir = None
         self.path_encoding = path_encoding
         # get path name encoding for host file system
-        if self.path_encoding == None:
+        if self.path_encoding is None:
             self.path_encoding = sys.getfilesystemencoding()
 
     def get_total_bytes(self):
@@ -68,7 +63,7 @@ class Imager:
             self.meta_db.set_dos_type(volume.boot.dos_type)
             self.meta_db.save(meta_path)
         # save boot code
-        if volume.boot.boot_code != None:
+        if volume.boot.boot_code is not None:
             boot_code_path = vol_path + ".bootcode"
             f = open(boot_code_path, "wb")
             f.write(volume.boot.boot_code)
@@ -138,7 +133,7 @@ class Imager:
     def pack(self, in_path, image_file, force=True, options=None, dos_type=None):
         self.pack_begin(in_path)
         blkdev = self.pack_create_blkdev(in_path, image_file, force, options)
-        if blkdev == None:
+        if blkdev is None:
             raise IOError("Can't create block device for image: " + in_path)
         volume = self.pack_create_volume(in_path, blkdev, dos_type)
         if not volume.valid:
@@ -171,7 +166,7 @@ class Imager:
             is_dir = os.path.isdir(sub_path)
             if is_dir or os.path.isfile(sub_path):
                 meta_info = self.pack_meta_info(sub_path, sub_ami_path)
-                if meta_info != None and meta_info.get_comment() != None:
+                if meta_info is not None and meta_info.get_comment() is not None:
                     check_comment(
                         meta_info.get_comment(), file_name=FSString(sub_ami_path)
                     )
@@ -190,7 +185,7 @@ class Imager:
         meta_path = in_path + self.meta_fsuae.get_suffix()
         if os.path.isfile(meta_path):
             return self.meta_fsuae.load_meta(meta_path)
-        if self.meta_db != None:
+        if self.meta_db is not None:
             return self.meta_db.get_meta_info(ami_path)
         return None
 
@@ -218,7 +213,7 @@ class Imager:
 
         if not blkdev:
             # try to read options from blkdev file
-            if options == None or len(options) == 0:
+            if options is None or len(options) == 0:
                 blkdev_path = in_path + ".blkdev"
                 if os.path.exists(blkdev_path):
                     f = open(blkdev_path, "r")
@@ -231,14 +226,14 @@ class Imager:
         return blkdev
 
     def pack_create_volume(self, in_path, blkdev, dos_type=None):
-        if self.meta_db != None:
+        if self.meta_db is not None:
             name = self.meta_db.get_volume_name()
             meta_info = self.meta_db.get_root_meta_info()
             if dos_type is None:
                 dos_type = self.meta_db.get_dos_type()
         else:
             # try to derive volume name from image name
-            if in_path == None or in_path == "":
+            if in_path is None or in_path == "":
                 raise IOError("Invalid pack input path!")
             # remove trailing slash
             if in_path[-1] == "/":

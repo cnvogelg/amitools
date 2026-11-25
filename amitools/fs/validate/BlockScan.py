@@ -1,5 +1,3 @@
-import time
-
 from amitools.fs.block.Block import Block
 from amitools.fs.block.UserDirBlock import UserDirBlock
 from amitools.fs.block.RootBlock import RootBlock
@@ -10,7 +8,6 @@ from amitools.fs.block.BitmapBlock import BitmapBlock
 from amitools.fs.block.BitmapExtBlock import BitmapExtBlock
 from amitools.fs.block.CommentBlock import CommentBlock
 from amitools.fs.block.DirCacheBlock import DirCacheBlock
-from amitools.fs.FSString import FSString
 import amitools.fs.DosType as DosType
 
 from amitools.fs.validate.Log import Log
@@ -84,9 +81,9 @@ class BlockScan:
             bi = self.get_block(blk_num)
 
             # own key ok?
-            if bi != None:
+            if bi is not None:
                 if bi.blk_status == self.BS_TYPE:
-                    if bi.own_key != None and bi.own_key != blk_num:
+                    if bi.own_key is not None and bi.own_key != blk_num:
                         self.log.msg(
                             Log.ERROR,
                             "Own key is invalid: %d type: %d"
@@ -244,7 +241,7 @@ class BlockScan:
                         # its records run past the end of the block
                         bi.blk_status = self.BS_INVALID
 
-        except IOError as e:
+        except IOError:
             self.log.msg(Log.ERROR, "Can't read block", blk_num)
             bi = BlockInfo(blk_num)
             bi.blk_status = self.BS_READ_ERROR
@@ -276,14 +273,14 @@ class BlockScan:
 
     def is_block_available(self, num):
         if num >= 0 and num < len(self.block_map):
-            return self.block_map[num] != None
+            return self.block_map[num] is not None
         else:
             return False
 
     def get_block(self, num):
         if num >= 0 and num < len(self.block_map):
             bi = self.block_map[num]
-            if bi == None:
+            if bi is None:
                 bi = self.read_block(num)
             return bi
         else:
@@ -291,5 +288,5 @@ class BlockScan:
 
     def dump(self):
         for b in self.block_map:
-            if b != None:
+            if b is not None:
                 print(b)

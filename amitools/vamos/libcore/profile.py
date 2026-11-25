@@ -293,7 +293,7 @@ class LibProfiler(Profiler):
 
     def shutdown(self):
         for name in self.lib_profiles:
-            prof = self.lib_profiles[name]
+            self.lib_profiles[name]
             # prof.remove_empty()
         num_libs = self.get_num_libs()
         if num_libs == 0:

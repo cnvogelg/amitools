@@ -70,8 +70,8 @@ def libtypes_node_str_test():
         mem, 0x42, succ=0x1234, pred=0x5678, type=NodeType.NT_DEVICE, pri=-5, name=12
     )
     assert (
-        str(node)
-        == "[Node:@000042,p=005678,s=001234,NT_DEVICE(00000003/3),-5,@(0000000c):'hello, world!'(13)]"
+        str(node) == "[Node:@000042,p=005678,s=001234,NT_DEVICE(00000003/3),-5,"
+        "@(0000000c):'hello, world!'(13)]"
     )
 
 

@@ -1,10 +1,7 @@
 import pytest
-from amitools.vamos.astructs.typebase import TypeBase
 from amitools.vamos.astructs.pointer import (
     PointerType,
     BCPLPointerType,
-    APTR,
-    BPTR,
     VOID,
     APTR_VOID,
     BPTR_VOID,

@@ -1,4 +1,3 @@
-from .value import Value, ValueList, ValueDict
 from .defdict import DefaultDict
 from .argdict import ArgumentDict
 from .trafo import DictTrafo

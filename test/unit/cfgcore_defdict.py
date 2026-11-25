@@ -1,4 +1,4 @@
-from amitools.vamos.cfgcore import *
+from amitools.vamos.cfgcore import DefaultDict, Value, ValueDict, ValueList
 
 
 def config_defdict_empty_test():

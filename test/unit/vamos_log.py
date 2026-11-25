@@ -1,6 +1,6 @@
 import logging
 from amitools.vamos.cfgcore import ConfigDict
-from amitools.vamos.log import *
+from amitools.vamos.log import log_main, log_mem, log_setup
 
 
 def do_log():

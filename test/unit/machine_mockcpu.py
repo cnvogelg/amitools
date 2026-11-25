@@ -1,5 +1,5 @@
 import pytest
-from amitools.vamos.machine.regs import *
+from amitools.vamos.machine.regs import REG_A6, REG_D0
 from amitools.vamos.machine.mock import MockCPU
 
 

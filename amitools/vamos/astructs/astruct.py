@@ -22,7 +22,7 @@ class AmigaStructPool:
     def add_struct(self, cls):
         assert issubclass(cls, AmigaStruct)
         type_name = cls.sdef.get_type_name()
-        if not type_name in self._pool:
+        if type_name not in self._pool:
             self._pool[type_name] = cls
 
     def find_struct(self, name):

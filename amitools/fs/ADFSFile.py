@@ -1,9 +1,17 @@
-from .block.EntryBlock import EntryBlock
 from .block.FileHeaderBlock import FileHeaderBlock
 from .block.FileListBlock import FileListBlock
 from .block.FileDataBlock import FileDataBlock
 from .ADFSNode import ADFSNode
-from .FSError import *
+from .FSError import (
+    FILE_DATA_BLOCK_COUNT_MISMATCH,
+    FILE_LIST_BLOCK_COUNT_MISMATCH,
+    FSError,
+    INTERNAL_ERROR,
+    INVALID_FILE_DATA_BLOCK,
+    INVALID_FILE_HEADER_BLOCK,
+    INVALID_FILE_LIST_BLOCK,
+    INVALID_SEQ_NUM,
+)
 
 
 class ADFSFile(ADFSNode):
@@ -135,7 +143,7 @@ class ADFSFile(ADFSNode):
             )
 
     def get_file_data(self):
-        if self.data != None:
+        if self.data is not None:
             return self.data
         self.read()
         return self.data
@@ -145,7 +153,7 @@ class ADFSFile(ADFSNode):
         self.data_blks = None
 
     def ensure_data(self):
-        if self.data == None:
+        if self.data is None:
             self.read()
 
     def set_file_data(self, data):
@@ -169,7 +177,8 @@ class ADFSFile(ADFSNode):
         return (ds + bb - 1) // bb
 
     def calc_number_of_list_blks(self):
-        """given the file size: how many list blocks do we need to store the data blk ptrs?"""
+        """given the file size: how many list blocks do we need to store the
+        data blk ptrs?"""
         db = self.calc_number_of_data_blks()
         # ptr per block
         ppb = self.volume.blkdev.block_longs - 56

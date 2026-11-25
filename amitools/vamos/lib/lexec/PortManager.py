@@ -1,5 +1,5 @@
 from amitools.vamos.libstructs import MsgPortStruct
-from amitools.vamos.error import *
+from ...error import VamosInternalError
 
 
 class Port:

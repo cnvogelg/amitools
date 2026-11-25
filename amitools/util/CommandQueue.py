@@ -27,11 +27,11 @@ class CommandQueue:
     def run(self):
         # get first command
         cmd_line = self.get_sub_command()
-        if cmd_line == None:
+        if cmd_line is None:
             return 1
         self.cmd_line = cmd_line
         cmd = self.create_cmd_instance(cmd_line)
-        if cmd == None:
+        if cmd is None:
             self.show_cmd_help(cmd_line[0])
             return 2
 
@@ -40,9 +40,9 @@ class CommandQueue:
 
         if exit_code == 0:
             cmd_line = self.get_sub_command()
-            while cmd_line != None:
+            while cmd_line is not None:
                 cmd = self.create_cmd_instance(cmd_line)
-                if cmd == None:
+                if cmd is None:
                     self.show_cmd_help(cmd_line[0])
                     return 2
 

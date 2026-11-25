@@ -1,4 +1,8 @@
-from amitools.vamos.lib.dos.SysArgs import *
+from amitools.vamos.lib.dos.SysArgs import (
+    ami_quote_str,
+    sys_arg_to_ami_arg,
+    sys_args_to_ami_arg_str,
+)
 
 
 def sys_args_ami_quote_test():

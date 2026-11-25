@@ -1,5 +1,4 @@
 from .BlockScan import BlockScan
-from amitools.fs.FSString import FSString
 from amitools.fs.FileName import FileName
 from amitools.fs.validate.Log import Log
 import amitools.fs.DosType as DosType
@@ -18,21 +17,21 @@ class DirChainEntry:
         self.sub = None
 
     def __str__(self):
-        l = []
+        flags = []
         if self.parent_ok:
-            l.append("parent_ok")
+            flags.append("parent_ok")
         if self.fn_hash_ok:
-            l.append("fn_hash_ok")
+            flags.append("fn_hash_ok")
         if self.valid:
-            l.append("valid")
+            flags.append("valid")
         if self.end:
-            l.append("end")
+            flags.append("end")
         if self.orphaned:
-            l.append("orphaned")
+            flags.append("orphaned")
         return "[DCE @%d '%s': %s]" % (
             self.blk_info.blk_num,
             self.blk_info.name,
-            " ".join(l),
+            " ".join(flags),
         )
 
 
@@ -106,19 +105,20 @@ class DirScan:
         """scan the root tree"""
         # get root block info
         root_bi = self.block_scan.get_block(root_blk_num)
-        if root_bi == None:
+        if root_bi is None:
             self.log.msg(Log.ERROR, "Root block not found?!", root_blk_num)
             return None
-        # do tree scan
-        if progress != None:
+            # do tree scan
+        if progress is not None:
             progress.begin("dir")
         self.root_di = self.scan_dir(root_bi, progress)
-        if progress != None:
+        if progress is not None:
             progress.end()
         return self.root_di
 
     def scan_dir(self, dir_bi, progress):
-        """check a directory by scanning through the hash table entries and follow the chains
+        """check a directory by scanning through the hash table entries and
+        follow the chains
         Returns (all_chains_ok, dir_obj)
         """
         # create new dir info
@@ -126,7 +126,6 @@ class DirScan:
         self.dirs.append(di)
 
         # run through hash_table of directory and build chains
-        chains = {}
         hash_val = 0
         for blk_num in dir_bi.hash_table:
             if blk_num != 0:
@@ -138,7 +137,7 @@ class DirScan:
 
         if self.dircache:
             records = self.scan_dircache(dir_bi)
-            if records != None:
+            if records is not None:
                 self.check_dircache_records(di, records)
 
         return di
@@ -158,7 +157,7 @@ class DirScan:
                 self.log.msg(Log.ERROR, "%s already used" % info, blk_num)
                 return None
             dc_bi = self.block_scan.get_block(blk_num)
-            if dc_bi == None:
+            if dc_bi is None:
                 self.log.msg(Log.ERROR, "out-of-range %s" % info, blk_num)
                 return None
             if dc_bi.blk_type != BlockScan.BT_DIR_CACHE:
@@ -195,7 +194,7 @@ class DirScan:
         for blk_num, r in records:
             info = "dircache record '%s' of %s" % (r.name, dir_info)
             bi = entries.get(r.entry)
-            if bi == None:
+            if bi is None:
                 self.log.msg(
                     Log.ERROR, "%s refers to no entry: %d" % (info, r.entry), blk_num
                 )
@@ -238,7 +237,7 @@ class DirScan:
             self.log.msg(Log.ERROR, "%s already used" % info, blk_num)
             return
         c_bi = self.block_scan.get_block(blk_num)
-        if c_bi == None:
+        if c_bi is None:
             self.log.msg(Log.ERROR, "out-of-range %s" % info, blk_num)
             return
         if c_bi.blk_type != BlockScan.BT_COMMENT:
@@ -270,7 +269,7 @@ class DirScan:
         blk_info = self.block_scan.read_block(blk_num)
 
         # not a block in range
-        if blk_info == None:
+        if blk_info is None:
             self.log.msg(
                 Log.ERROR,
                 "out-of-range block terminates chain #%d of dir '%s' (%d)"
@@ -279,15 +278,15 @@ class DirScan:
             )
             return
 
-        # create dir chain entry
+            # create dir chain entry
         dce = DirChainEntry(blk_info)
         chain.add(dce)
 
         # account
-        if progress != None:
+        if progress is not None:
             progress.add()
 
-        # block already used?
+            # block already used?
         if block_used:
             self.log.msg(
                 Log.ERROR,
@@ -298,7 +297,7 @@ class DirScan:
             dce.end = True
             return
 
-        # self reference?
+            # self reference?
         if blk_num == dir_blk_num:
             self.log.msg(
                 Log.ERROR,
@@ -309,7 +308,7 @@ class DirScan:
             dce.end = True
             return
 
-        # check type of entry block
+            # check type of entry block
         b_type = blk_info.blk_type
         if b_type not in (BlockScan.BT_DIR, BlockScan.BT_FILE_HDR):
             self.log.msg(
@@ -321,7 +320,7 @@ class DirScan:
             dce.end = True
             return
 
-        # check referenceed block type in chain
+            # check referenceed block type in chain
         blk_type = blk_info.blk_type
         if blk_type in (
             BlockScan.BT_ROOT,
@@ -337,7 +336,7 @@ class DirScan:
             dce.end = True
             return
 
-        # all following are ok
+            # all following are ok
         dce.valid = True
 
         # check parent of block
@@ -351,9 +350,9 @@ class DirScan:
                 blk_num,
             )
 
-        # check name hash: the directory has more slots with larger blocks.
-        # Take the normal count for the block size, not a root's hash size
-        # field, which the block scan checks on its own
+            # check name hash: the directory has more slots with larger blocks.
+            # Take the normal count for the block size, not a root's hash size
+            # field, which the block scan checks on its own
         fn = FileName(name, self.intl)
         fn_hash = fn.hash(hash_size=self.block_scan.blkdev.block_longs - 56)
         dce.fn_hash_ok = fn_hash == hash_val
@@ -365,17 +364,17 @@ class DirScan:
                 blk_num,
             )
 
-        # long name entries keep a comment that does not fit in an extra block
+            # long name entries keep a comment that does not fit in an extra block
         if blk_info.comment_blk != 0:
             self.scan_comment_block(blk_info)
 
-        # recurse into dir?
+            # recurse into dir?
         if blk_type == BlockScan.BT_DIR:
             dce.sub = self.scan_dir(blk_info, progress)
         elif blk_type == BlockScan.BT_FILE_HDR:
             self.files.append(dce)
 
-        # check next block in chain
+            # check next block in chain
         next_blk = blk_info.next_blk
         if next_blk != 0:
             self.build_chain(chain, dir_blk_info, next_blk, progress)
@@ -407,5 +406,5 @@ class DirScan:
             for dce in dc.get_entries():
                 print(istr, "  ", dce)
                 sub = dce.sub
-                if sub != None and dce.blk_info.blk_type == BlockScan.BT_DIR:
+                if sub is not None and dce.blk_info.blk_type == BlockScan.BT_DIR:
                     self.dump_dir_info(sub, indent + 1)

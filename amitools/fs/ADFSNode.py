@@ -6,7 +6,7 @@ from .FileName import FileName
 from .MetaInfo import MetaInfo
 from .ProtectFlags import ProtectFlags
 from .TimeStamp import TimeStamp
-from .FSError import *
+from .FSError import DELETE_NOT_ALLOWED, FSError, INVALID_COMMENT, NO_FREE_BLOCKS
 from .FSString import FSString
 import amitools.util.ByteSize as ByteSize
 
@@ -422,8 +422,8 @@ class ADFSNode:
             b.dump()
 
     def get_node_path(self, with_vol=False):
-        if self.parent != None:
-            if not with_vol and self.parent.parent == None:
+        if self.parent is not None:
+            if not with_vol and self.parent.parent is None:
                 r = []
             else:
                 r = self.parent.get_node_path()

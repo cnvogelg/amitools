@@ -1,7 +1,5 @@
-from amitools.vamos.machine.regs import *
+from ..machine.regs import REG_A0, REG_D0
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.lib.util.AmiDate import *
-from amitools.vamos.log import *
 
 import string
 
@@ -11,61 +9,61 @@ class LocaleLibrary(LibImpl):
         return default
 
     def OpenLocale(self, ctx):
-        name = ctx.cpu.r_reg(REG_A0)
+        ctx.cpu.r_reg(REG_A0)
         # dummy
         return 0
 
     def CloseLocale(self, ctx):
-        locale = ctx.cpu.r_reg(REG_A0)
+        ctx.cpu.r_reg(REG_A0)
         # dummy - accept all
 
     def IsUpper(self, ctx):
-        locale = ctx.cpu.r_reg(REG_A0)
+        ctx.cpu.r_reg(REG_A0)
         character = ctx.cpu.r_reg(REG_D0)
         return chr(character) in string.uppercase
 
     def IsLower(self, ctx):
-        locale = ctx.cpu.r_reg(REG_A0)
+        ctx.cpu.r_reg(REG_A0)
         character = ctx.cpu.r_reg(REG_D0)
         return chr(character) in string.lowercase
 
     def IsDigit(self, ctx):
-        locale = ctx.cpu.r_reg(REG_A0)
+        ctx.cpu.r_reg(REG_A0)
         character = ctx.cpu.r_reg(REG_D0)
         return chr(character) in string.digits
 
     def IsPrint(self, ctx):
-        locale = ctx.cpu.r_reg(REG_A0)
+        ctx.cpu.r_reg(REG_A0)
         character = ctx.cpu.r_reg(REG_D0)
         return chr(character) in string.printable
 
     def IsCntrl(self, ctx):
-        locale = ctx.cpu.r_reg(REG_A0)
+        ctx.cpu.r_reg(REG_A0)
         character = ctx.cpu.r_reg(REG_D0)
         # maybe not ok...
-        return character < 32 and not chr(character) in string.printable
+        return character < 32 and chr(character) not in string.printable
 
     def IsXDigit(self, ctx):
-        locale = ctx.cpu.r_reg(REG_A0)
+        ctx.cpu.r_reg(REG_A0)
         character = ctx.cpu.r_reg(REG_D0)
         return chr(character) in string.hexdigits
 
     def IsSpace(self, ctx):
-        locale = ctx.cpu.r_reg(REG_A0)
+        ctx.cpu.r_reg(REG_A0)
         character = ctx.cpu.r_reg(REG_D0)
         return chr(character) in string.whitespace
 
     def IsPunct(self, ctx):
-        locale = ctx.cpu.r_reg(REG_A0)
+        ctx.cpu.r_reg(REG_A0)
         character = ctx.cpu.r_reg(REG_D0)
         return chr(character) in string.punctuation
 
     def IsGraph(self, ctx):
-        locale = ctx.cpu.r_reg(REG_A0)
+        ctx.cpu.r_reg(REG_A0)
         character = ctx.cpu.r_reg(REG_D0)
         return (
             chr(character) in string.printable
-            and not chr(character) in string.whitespace
+            and chr(character) not in string.whitespace
         )
 
 
@@ -121,7 +119,7 @@ class LocaleLibrary(LibImpl):
     fmtTemplate = ctx.cpu.r_reg(REG_A2)
     putCharFunc = ctx.cpu.r_reg(REG_A3)
     print "not implemented: ParseDate"
-  
+
   def StrConvert(self, ctx):
     locale = ctx.cpu.r_reg(REG_A0)
     string = ctx.cpu.r_reg(REG_A1)

@@ -1,4 +1,4 @@
-from amitools.vamos.display.base import Color, Rect
+from amitools.vamos.display.base import Rect
 from amitools.vamos.lib.graphics import LayerStruct
 from amitools.vamos.libcore.impl import LibImpl
 

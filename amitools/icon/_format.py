@@ -1021,7 +1021,8 @@ def rebuild_file(
 
     # DrawerData2 (dd_Flags + dd_ViewModes, 6 bytes)
     # Write if: drawerdata2 exists OR (has_drawerdata AND revision >= 1)
-    # Per icon.library: dd_Flags/dd_ViewModes are written after ToolWindow if DrawerData present
+    # Per icon.library: dd_Flags/dd_ViewModes are written after ToolWindow
+    # if DrawerData present
     if icon.drawerdata2 is not None:
         # Ensure we write exactly 6 bytes
         dd2 = icon.drawerdata2
@@ -1099,7 +1100,8 @@ def format_field(field: FieldDef, value: int) -> str:
 
 def find_field_by_path(path: str) -> Tuple[Optional[FieldDef], str, int]:
     """
-    Parse a path like "DiskObject:Gadget:LeftEdge" and return (field, structure_name, base_offset).
+    Parse a path like "DiskObject:Gadget:LeftEdge" and return (field,
+    structure_name, base_offset).
     Returns (None, "", 0) if not found.
     """
     parts = path.split(":")
@@ -1292,7 +1294,8 @@ def export_icon_to_png(
     """
     Export an icon image to PNG file with configurable transparency.
     icon_index: 0 for main icon, 1 for select icon.
-    transparency: "edge" = only edge-connected color 0, "all" = all color 0, "none" = opaque
+    transparency: "edge" = only edge-connected color 0, "all" = all color 0,
+    "none" = opaque
     force_planar: if True, skip GlowIcons and export traditional planar images
     Returns True on success.
 

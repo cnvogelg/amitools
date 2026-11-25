@@ -138,7 +138,7 @@ class PointerType(TypeBase):
             # e.g. CSTR in Node is used for non-string data
             try:
                 return f"@({addr:08x}):{ref}"
-            except:
+            except Exception:
                 return f"@({addr:08x}):???"
         else:
             return "@NULL"

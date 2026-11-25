@@ -1,5 +1,5 @@
-from .ProtectFlags import *
-from .TimeStamp import *
+from .ProtectFlags import ProtectFlags
+from .TimeStamp import TimeStamp, time, ts_empty_string
 from .FSString import FSString
 
 
@@ -13,7 +13,7 @@ class MetaInfo:
         owner_uid=None,
         owner_gid=None,
     ):
-        if protect_flags != None:
+        if protect_flags is not None:
             self.set_protect_flags(protect_flags)
         else:
             self.set_protect(protect)
@@ -22,7 +22,8 @@ class MetaInfo:
         self.set_owner(owner_uid, owner_gid)
 
     def get_str_line(self):
-        """Return a unicode string with protect flags, mod time and (optional) comment"""
+        """Return a unicode string with protect flags, mod time and (optional)
+        comment"""
         res = []
         res.append(self.get_protect_str())
         prot = self.get_protect_extra_str()
@@ -33,7 +34,7 @@ class MetaInfo:
             res.append(owner)
         res.append(self.get_mod_time_str())
         comment = self.get_comment()
-        if comment == None:
+        if comment is None:
             res.append("")
         else:
             res.append(self.get_comment().get_unicode())
@@ -64,19 +65,19 @@ class MetaInfo:
         return self.owner_gid if self.owner_gid is not None else 0
 
     def get_mod_time_str(self):
-        if self.mod_ts != None:
+        if self.mod_ts is not None:
             return str(self.mod_ts)
         else:
             return ts_empty_string
 
     def get_protect_str(self):
-        if self.protect_flags != None:
+        if self.protect_flags is not None:
             return str(self.protect_flags)
         else:
             return ProtectFlags.empty_string
 
     def get_protect_short_str(self):
-        if self.protect_flags != None:
+        if self.protect_flags is not None:
             return self.protect_flags.short_str()
         else:
             return ""
@@ -91,7 +92,7 @@ class MetaInfo:
 
     def set_protect(self, protect):
         self.protect = protect
-        if self.protect != None:
+        if self.protect is not None:
             self.protect_flags = ProtectFlags(protect)
         else:
             self.protect_flags = None
@@ -110,7 +111,7 @@ class MetaInfo:
 
     def set_mod_time(self, mod_time):
         self.mod_time = mod_time
-        if self.mod_time != None:
+        if self.mod_time is not None:
             self.mod_ts = TimeStamp()
             self.mod_ts.from_secs(mod_time)
         else:
@@ -118,14 +119,14 @@ class MetaInfo:
 
     def set_mod_ts(self, mod_ts):
         self.mod_ts = mod_ts
-        if self.mod_ts != None:
+        if self.mod_ts is not None:
             self.mod_time = self.mod_ts.get_secsf()
         else:
             self.mod_time = None
 
     def set_comment(self, comment):
         """Set comment as a FSString"""
-        if comment != None and not isinstance(comment, FSString):
+        if comment is not None and not isinstance(comment, FSString):
             raise ValueError("Comment must be a FSString")
         self.comment = comment
 
@@ -145,13 +146,13 @@ class MetaInfo:
         return self.comment
 
     def get_comment_ami_str(self):
-        if self.comment != None:
+        if self.comment is not None:
             return self.comment.get_ami_str()
         else:
             return ""
 
     def get_comment_unicode_str(self):
-        if self.comment != None:
+        if self.comment is not None:
             return self.comment.get_unicode()
         else:
             return ""

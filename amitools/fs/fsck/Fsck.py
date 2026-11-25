@@ -8,7 +8,7 @@ from amitools.fs.validate.Log import Log
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 
 from .FsckConfig import FsckConfig
-from .FsckResult import FsckResult, FsckIssue, IssueType, Severity
+from .FsckResult import FsckResult, IssueType, Severity
 
 
 class Fsck:

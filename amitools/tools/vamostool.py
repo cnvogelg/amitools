@@ -7,7 +7,7 @@
 import sys
 import os
 
-from amitools.vamos.tools import *
+from ..vamos.tools import LibProfilerTool, PathTool, StateTool, TypeTool, tools_main
 
 
 def main(args=None):

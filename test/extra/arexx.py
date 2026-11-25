@@ -21,8 +21,8 @@ AREX_ARGS = [
 
 # rexxsyslib prints its banner during init. The console handler emits UTF-8, so
 # the (c) sign shows up as its two UTF-8 bytes when stdout is read as latin-1.
-COPYRIGHT = (
-    "Copyright \u00a9 1987 by William S. Hawes".encode("utf-8").decode("latin-1")
+COPYRIGHT = "Copyright \u00a9 1987 by William S. Hawes".encode("utf-8").decode(
+    "latin-1"
 )
 BANNER = [
     "ARexx Version 1.15",

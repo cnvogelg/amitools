@@ -5,7 +5,6 @@ import logging
 import os
 import pprint
 import io
-from .value import Value, ValueList, ValueDict
 from .cfgdict import ConfigDict
 
 
@@ -64,7 +63,7 @@ class MainParser(object):
         ok, cfg_file, skip_cfgs = self.pre_parse_args(args)
         if not ok:
             return False
-        # enable config debug
+            # enable config debug
         log_cfg.info("input paths: %r, args: %r, cfg_dict: %r", paths, args, cfg_dict)
         log_cfg.info("args: cfg_file=%s, skip_cfgs=%s", cfg_file, skip_cfgs)
         # read config given in args
@@ -72,7 +71,7 @@ class MainParser(object):
             res = self.parse_config_auto(cfg_file)
             ok = res is not None
             log_cfg.info("args: cfg_file '%s' is ok: %s", cfg_file, ok)
-        # try to read given config paths
+            # try to read given config paths
         elif not skip_cfgs and paths:
             log_cfg.info("paths: try config files: %s", paths)
             cfg_file, res = self.parse_files(paths)
@@ -80,17 +79,17 @@ class MainParser(object):
             log_cfg.info("paths: cfg_file '%s' is ok: %s", cfg_file, ok)
         else:
             ok = True
-        # additional config?
+            # additional config?
         if ok and cfg_dict:
             ok = self.parse_dict_config(cfg_dict)
             log_cfg.info("cfg_dict: ok: %s", ok)
-        # handle args
+            # handle args
         try:
             self.parse_args()
         except ValueError as e:
             log_cfg.error("args: parser failed: %s", e)
             return False
-        # dump config?
+            # dump config?
         if getattr(self.args, "config_dump", False):
             self._dump_config()
         return ok
@@ -114,7 +113,7 @@ class MainParser(object):
             long_name = "--config-file"
         if arg_name is None:
             arg_name = "config_file"
-        # add arg switch
+            # add arg switch
         self._ensure_arg_group()
         self.arg_grp.add_argument(
             name,
@@ -134,7 +133,7 @@ class MainParser(object):
             long_name = "--skip-configs"
         if arg_name is None:
             arg_name = "skip_configs"
-        # add arg switch
+            # add arg switch
         self._ensure_arg_group()
         self.arg_grp.add_argument(
             name,
@@ -181,7 +180,7 @@ class MainParser(object):
             cfg_file = getattr(self.args, self.file_arg_name, None)
         if self.skip_arg_name:
             skip_cfg = getattr(self.args, self.skip_arg_name, False)
-        # enable config debug via arg?
+            # enable config debug via arg?
         config_debug = getattr(self.args, "config_debug", False)
         if config_debug:
             self._enable_logging()
@@ -263,7 +262,7 @@ class MainParser(object):
         except IOError as e:
             log_cfg.error("%s: IO error: %s", log_name, e)
             return None
-        # report to parsers
+            # report to parsers
         if cfg_dict:
             for parser in self.parsers:
                 try:
@@ -277,21 +276,21 @@ class MainParser(object):
         # if args were not already parsed by pre_parse_args() above
         if self.args is None:
             raise RuntimeError("run pre_parse_args() first!")
-        # notify parsers about args
+            # notify parsers about args
         for parser in self.parsers:
             parser.parse_args(self.args)
 
     def _auto_detect_format(self, file_obj):
         for line in file_obj:
-            l = line.strip()
-            if l.startswith("{"):
+            cur = line.strip()
+            if cur.startswith("{"):
                 return "json"
-            elif l.startswith("["):
+            elif cur.startswith("["):
                 return "ini"
-            elif l.startswith("#"):
+            elif cur.startswith("#"):
                 # ignore comment
                 pass
-            elif len(l) > 0:
+            elif len(cur) > 0:
                 return None
 
     def _setup_logging(self, debug):
@@ -325,7 +324,7 @@ class MainParser(object):
         except IOError as e:
             log_cfg.error("%s: IO error: %s", log_name, e)
             return None
-        # convert to dictionary
+            # convert to dictionary
         list_sections = self._get_list_sections()
         res = {}
         for sec in p.sections():

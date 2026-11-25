@@ -1,6 +1,6 @@
 from amitools.vamos.log import log_path
 from .mgr import PathManager
-from .amipath import AmiPath, AmiPathError
+from .amipath import AmiPath
 
 
 class VamosPathManager(PathManager):

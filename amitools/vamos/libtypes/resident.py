@@ -1,7 +1,5 @@
 from amitools.vamos.libstructs import (
     ResidentStruct,
-    AutoInitStruct,
-    LibraryStruct,
     NodeType,
 )
 from amitools.vamos.mem import MemoryCache

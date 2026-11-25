@@ -1,4 +1,3 @@
-import time
 from .Block import Block
 from .EntryBlock import EntryBlock
 from ..ProtectFlags import ProtectFlags

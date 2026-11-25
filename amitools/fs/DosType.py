@@ -72,16 +72,16 @@ def parse_dos_type_str(string):
                 return DOS0 + off
             else:
                 return None
-        # other tag?
+                # other tag?
         elif string[0].isalpha() and n == 4:
             return tag_str_to_num(string)
-        # use '0x01234567' hex value
+            # use '0x01234567' hex value
         elif string[0:2] == "0x":
             try:
                 return int(string[2:], 16)
             except ValueError:
                 return None
-        # try number
+                # try number
         else:
             try:
                 return int(string)
@@ -96,19 +96,19 @@ def tag_str_to_num(s):
     a = ord(s[0]) << 24
     b = ord(s[1]) << 16
     c = ord(s[2]) << 8
-    l = s[3]
-    d = ord(l)
-    if l.isdigit():
+    ch = s[3]
+    d = ord(ch)
+    if ch.isdigit():
         d = d - ord("0")
     return a + b + c + d
 
 
-def num_to_tag_str(l):
+def num_to_tag_str(val):
     """Convert the DosType in a 32 bit value to its 4 letter tag string"""
-    a = chr((l >> 24) & 0xFF)
-    b = chr((l >> 16) & 0xFF)
-    c = chr((l >> 8) & 0xFF)
-    last = l & 0xFF
+    a = chr((val >> 24) & 0xFF)
+    b = chr((val >> 16) & 0xFF)
+    c = chr((val >> 8) & 0xFF)
+    last = val & 0xFF
     if last < 32:
         last = chr(last + 48)
     else:

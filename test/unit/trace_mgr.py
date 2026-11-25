@@ -1,7 +1,7 @@
 import logging
 from amitools.vamos.trace import TraceManager
-from amitools.vamos.label import *
-from amitools.vamos.machine import *
+from amitools.vamos.label import LabelLib, LabelRange, LabelStruct
+from amitools.vamos.machine import Machine
 from amitools.vamos.machine.mock import MockMachine
 from amitools.vamos.libstructs import NodeStruct, LibraryStruct
 from amitools.vamos.cfgcore import ConfigDict
@@ -42,12 +42,14 @@ def check_log(chn, records):
         (
             chn,
             lvl,
-            "R(4): 000200: 00000000  Struct  [@000200 +000000 node] Node+0 = ln_Succ(Node*)+0",
+            "R(4): 000200: 00000000  Struct  [@000200 +000000 node] Node+0 = "
+            "ln_Succ(Node*)+0",
         ),
         (
             chn,
             lvl,
-            "W(2): 000208: 0015      Struct  [@000200 +000008 node] Node+8 = ln_Type(NodeType)+0",
+            "W(2): 000208: 0015      Struct  [@000200 +000008 node] Node+8 = "
+            "ln_Type(NodeType)+0",
         ),
         (
             chn,
@@ -57,17 +59,21 @@ def check_log(chn, records):
         (
             chn,
             lvl,
-            "R(2): 000320: 0000      Struct  [@000300 +000020 fake.library] Library+0 = lib_Node.ln_Succ(Node*)+0",
+            "R(2): 000320: 0000      Struct  [@000300 +000020 fake.library] Library+0 "
+            "= "
+            "lib_Node.ln_Succ(Node*)+0",
         ),
         (
             chn,
             lvl,
-            "R(2): 0003dc: 0000        JUMP  [@0003ac +000030 vamostest.library] -36  [6]  PrintString( str/a0 )",
+            "R(2): 0003dc: 0000        JUMP  [@0003ac +000030 vamostest.library] -36  "
+            "[6]  PrintString( str/a0 )",
         ),
         (
             chn,
             lvl,
-            "R(2): 000420: 0000      Struct  [@0003ac +000074 vamostest.library] Library+32 = lib_OpenCnt(UWORD)+0",
+            "R(2): 000420: 0000      Struct  [@0003ac +000074 vamostest.library] "
+            "Library+32 = lib_OpenCnt(UWORD)+0",
         ),
     ]
 
@@ -151,16 +157,19 @@ def trace_mgr_code_line_test(caplog):
         (
             "instr",
             lvl,
-            "@000100 +000000 range                     000100    nop                   ",
+            "@000100 +000000 range                     000100    nop                   "
+            "",
         ),
         (
             "instr",
             lvl,
-            "@000300 +000000 fake.library(-32)         000300    nop                   ",
+            "@000300 +000000 fake.library(-32)         000300    nop                   "
+            "",
         ),
         (
             "instr",
             lvl,
-            "@0003ac +000030 vamostest.library(-36)    0003dc    nop                   ; PrintString",
+            "@0003ac +000030 vamostest.library(-36)    0003dc    nop                   "
+            "; PrintString",
         ),
     ]

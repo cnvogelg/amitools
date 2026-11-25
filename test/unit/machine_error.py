@@ -1,4 +1,3 @@
-import pytest
 import logging
 
 from amitools.vamos.machine import (
@@ -25,7 +24,7 @@ def machine_error_reporter_test(caplog):
     caplog.set_level(logging.ERROR)
 
     r, m, cpu, mem, code, stack = create_runtime(supervisor=True)
-    er = ErrorReporter(m)
+    ErrorReporter(m)
 
     # reset opcode
     mem.w16(code, op_reset)

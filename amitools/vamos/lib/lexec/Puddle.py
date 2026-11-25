@@ -1,5 +1,4 @@
-from amitools.vamos.log import log_exec
-from amitools.vamos.error import *
+from ...error import VamosInternalError
 from amitools.vamos.mem import MemoryAlloc
 
 
@@ -14,7 +13,7 @@ class Puddle:
         self.chunks = MemoryAlloc(self.mem, self.mem_obj.addr, size, label_mgr)
 
     def __del__(self):
-        if self.mem_obj != None:
+        if self.mem_obj is not None:
             if self.label_mgr:
                 self.label_mgr.delete_labels_within(self.mem_obj.addr, self.size)
             self.chunks = None
@@ -26,7 +25,7 @@ class Puddle:
 
     def FreePooled(self, addr, size):
         mem = self.chunks.get_memory(addr)
-        if mem != None:
+        if mem is not None:
             if mem.size == size:
                 self.chunks.free_memory(mem)
             else:

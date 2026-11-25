@@ -74,7 +74,7 @@ if __name__ == "__main__":
 
     for a in sys.argv[1:]:
         v = parse_byte_size_str(a)
-        if v != None:
+        if v is not None:
             print(
                 (a, ":", v, "=", to_byte_size_str(v), "=", to_byte_size_str(v, False))
             )

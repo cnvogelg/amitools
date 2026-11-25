@@ -281,7 +281,8 @@ def _date_to_str(ctx, dt):
     at = AmiTime(ds_day, ds_min, ds_tick)
     st = at.to_sys_time()
     log_dos.info(
-        "DateToStr: ptr=%06x format=%x flags=%x day_ptr=%06x date_ptr=%06x time_ptr=%06x %s => sys_time=%d",
+        "DateToStr: ptr=%06x format=%x flags=%x day_ptr=%06x "
+        "date_ptr=%06x time_ptr=%06x %s => sys_time=%d",
         dt_ptr,
         format,
         flags,

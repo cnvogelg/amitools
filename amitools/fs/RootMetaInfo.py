@@ -1,5 +1,5 @@
 import time
-from .TimeStamp import *
+from .TimeStamp import TimeStamp, ts_empty_string
 
 
 class RootMetaInfo:
@@ -18,7 +18,7 @@ class RootMetaInfo:
     # create_ts
     def set_create_time(self, create_time):
         self.create_time = create_time
-        if self.create_time != None:
+        if self.create_time is not None:
             self.create_ts = TimeStamp()
             self.create_ts.from_secs(create_time)
         else:
@@ -26,7 +26,7 @@ class RootMetaInfo:
 
     def set_create_ts(self, create_ts):
         self.create_ts = create_ts
-        if self.create_ts != None:
+        if self.create_ts is not None:
             self.create_time = self.create_ts.get_secsf()
         else:
             self.create_time = None
@@ -38,7 +38,7 @@ class RootMetaInfo:
         return self.create_ts
 
     def get_create_time_str(self):
-        if self.create_ts != None:
+        if self.create_ts is not None:
             return str(self.create_ts)
         else:
             return ts_empty_string
@@ -50,7 +50,7 @@ class RootMetaInfo:
     # disk_ts
     def set_disk_time(self, disk_time):
         self.disk_time = disk_time
-        if self.disk_time != None:
+        if self.disk_time is not None:
             self.disk_ts = TimeStamp()
             self.disk_ts.from_secs(disk_time)
         else:
@@ -58,7 +58,7 @@ class RootMetaInfo:
 
     def set_disk_ts(self, disk_ts):
         self.disk_ts = disk_ts
-        if self.disk_ts != None:
+        if self.disk_ts is not None:
             self.disk_time = self.disk_ts.get_secsf()
         else:
             self.disk_time = None
@@ -70,7 +70,7 @@ class RootMetaInfo:
         return self.disk_ts
 
     def get_disk_time_str(self):
-        if self.disk_ts != None:
+        if self.disk_ts is not None:
             return str(self.disk_ts)
         else:
             return ts_empty_string
@@ -82,7 +82,7 @@ class RootMetaInfo:
     # mod_ts
     def set_mod_time(self, mod_time):
         self.mod_time = mod_time
-        if self.mod_time != None:
+        if self.mod_time is not None:
             self.mod_ts = TimeStamp()
             self.mod_ts.from_secs(mod_time)
         else:
@@ -90,7 +90,7 @@ class RootMetaInfo:
 
     def set_mod_ts(self, mod_ts):
         self.mod_ts = mod_ts
-        if self.mod_ts != None:
+        if self.mod_ts is not None:
             self.mod_time = self.mod_ts.get_secsf()
         else:
             self.mod_time = None
@@ -102,7 +102,7 @@ class RootMetaInfo:
         return self.mod_ts
 
     def get_mod_time_str(self):
-        if self.mod_ts != None:
+        if self.mod_ts is not None:
             return str(self.mod_ts)
         else:
             return ts_empty_string

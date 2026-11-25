@@ -1,5 +1,6 @@
-from amitools.fs.block.rdb.RDBlock import *
-from amitools.fs.block.rdb.PartitionBlock import *
+from ..block.Block import Block
+from ..block.rdb.PartitionBlock import PartitionBlock, PartitionDosEnv
+from ..block.rdb.RDBlock import RDBDriveID, RDBLogicalDrive, RDBPhysicalDrive, RDBlock
 import amitools.util.ByteSize as ByteSize
 import amitools.fs.DosType as DosType
 from .FileSystem import FileSystem
@@ -100,7 +101,7 @@ class RDisk:
 
     def dump(self, hex_dump=False):
         # rdb
-        if self.rdb != None:
+        if self.rdb is not None:
             self.rdb.dump()
         # partitions
         for p in self.parts:
@@ -207,13 +208,13 @@ class RDisk:
                     if i == p.get_blk_num():
                         blk = "P%d" % p.num
                         break
-                if blk == None:
+                if blk is None:
                     # check file systems
                     for f in self.fs:
                         if i in f.get_blk_nums():
                             blk = "F%d" % f.num
                             break
-                if blk == None:
+                if blk is None:
                     blk = "--"
             res.append(blk)
         return res
@@ -259,7 +260,6 @@ class RDisk:
 
     def find_partition_by_drive_name(self, name):
         lo_name = name.lower()
-        num = 0
         for p in self.parts:
             drv_name = p.get_drive_name().get_unicode().lower()
             if drv_name == lo_name:
@@ -268,7 +268,7 @@ class RDisk:
 
     def find_partition_by_string(self, s):
         p = self.find_partition_by_drive_name(s)
-        if p != None:
+        if p is not None:
             return p
         # try partition number
         try:
@@ -305,7 +305,7 @@ class RDisk:
         cyl_blks = heads * secs
         rdb_blk_hi = cyl_blks * rdb_cyls - 1
 
-        if disk_names != None:
+        if disk_names is not None:
             disk_vendor = disk_names[0]
             disk_product = disk_names[1]
             disk_revision = disk_names[2]
@@ -314,7 +314,7 @@ class RDisk:
             disk_product = "IMAGE"
             disk_revision = "2012"
 
-        if ctrl_names != None:
+        if ctrl_names is not None:
             ctrl_vendor = ctrl_names[0]
             ctrl_product = ctrl_names[1]
             ctrl_revision = ctrl_names[2]
@@ -324,9 +324,9 @@ class RDisk:
             ctrl_revision = ""
 
         flags = 0x7
-        if disk_names != None:
+        if disk_names is not None:
             flags |= 0x10
-        if ctrl_names != None:
+        if ctrl_names is not None:
             flags |= 0x20
 
         # create RDB
@@ -524,7 +524,7 @@ class RDisk:
 
     def find_free_cyl_range_start(self, num_cyls):
         ranges = self.get_free_cyl_ranges()
-        if ranges == None:
+        if ranges is None:
             return None
         for r in ranges:
             size = r[1] - r[0] + 1
@@ -662,24 +662,24 @@ class RDisk:
             return False
         p = self.parts[pid]
         pb = p.part_blk
-        if pb == None:
+        if pb is None:
             return False
         # set flags
         dirty = False
-        if flags != None:
+        if flags is not None:
             pb.flags = flags
             dirty = True
-        if drv_name != None:
+        if drv_name is not None:
             pb.drv_name = drv_name
             dirty = True
-        if dev_flags != None:
+        if dev_flags is not None:
             pb.dev_flags = dev_flags
             dirty = True
         # set dosenv flags
-        if dos_type != None:
+        if dos_type is not None:
             pb.dos_env.dos_type = dos_type
             dirty = True
-        if boot_pri != None:
+        if boot_pri is not None:
             pb.dos_env.boot_pri = boot_pri
             dirty = True
         # change fs block size

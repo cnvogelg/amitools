@@ -58,7 +58,8 @@ class WritableGzipImage:
 
 
 class BlkDevFactory:
-    """the block device factory opens or creates image files suitable as a block device for file system access."""
+    """the block device factory opens or creates image files suitable as a
+    block device for file system access."""
 
     GZIP_MASK = 0x10
     TYPE_MASK = 0x0F
@@ -249,10 +250,10 @@ class BlkDevFactory:
                 raise IOError("can't open rdisk of image file")
             # determine partition
             p = "0"
-            if options != None and "part" in options:
+            if options is not None and "part" in options:
                 p = str(options["part"])
             part = rdisk.find_partition_by_string(p)
-            if part == None:
+            if part is None:
                 raise IOError("can't find partition in image file")
             blkdev = part.create_blkdev(True)  # auto_close rdisk
             blkdev.open()

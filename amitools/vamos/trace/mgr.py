@@ -2,7 +2,6 @@ import logging
 from amitools.vamos.log import log_mem, log_mem_int, log_instr
 from amitools.vamos.label import LabelStruct, LabelLib, LabelSegment
 from amitools.vamos.machine import CPUState, DisAsm
-from amitools.vamos.machine.regs import *
 from .mem import TraceMemory
 
 

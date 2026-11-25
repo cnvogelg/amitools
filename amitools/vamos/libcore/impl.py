@@ -145,7 +145,6 @@ class LibImplScanner(object):
         # scan methods of the impl class
         members = inspect.getmembers(impl, predicate=inspect.ismethod)
         for name, method in members:
-            tag = None
             # is a func in the fd?
             if fd_lib.has_func(name):
                 fd_func = fd_lib.get_func_by_name(name)

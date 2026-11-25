@@ -1,5 +1,5 @@
 from amitools.vamos.libstructs import SignalSemaphoreStruct
-from amitools.vamos.error import *
+from ...error import VamosInternalError
 
 
 class SemaphoreManager:

@@ -1,10 +1,9 @@
-from amitools.vamos.display.base import Color, Rect
-
 """Guest bitmap and color-map storage for the indexed graphics backend."""
 
 from contextlib import ExitStack
 from dataclasses import dataclass
 
+from amitools.vamos.display.base import Color
 from amitools.vamos.libtypes import TagList
 
 from .graphics import BitMapStruct, RastPortStruct

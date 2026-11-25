@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from .astruct import AmigaStruct
 from .array import ArrayType
-import pprint
 
 
 @dataclass
@@ -127,7 +126,7 @@ class TypeDumper:
         sub_state = state.clone()
 
         # go through fields
-        type_size = state.type_size + state.indent_size
+        state.type_size + state.indent_size
         for field_def in type_cls.sdef.get_field_defs():
             # field name = ".lnSucc"
             field_type = field_def.type
@@ -326,7 +325,7 @@ class TypeDumper:
                 line += f"  {field_name}"
         elif state.field_size > 0 and obj:
             # reserve field space
-            line += f"  " + " " * state.field_size
+            line += "  " + " " * state.field_size
         # optional obj value
         if obj is not None:
             line += f"  {obj}"

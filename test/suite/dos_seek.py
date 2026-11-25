@@ -1,6 +1,3 @@
-import pytest
-
-
 def dos_seek_test(vamos, tmpdir):
     test_file = str(tmpdir / "test")
     rc, stdout, stderr = vamos.run_prog("dos_seek", "root:" + test_file[1:])

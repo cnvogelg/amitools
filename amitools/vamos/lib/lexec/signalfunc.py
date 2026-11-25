@@ -75,7 +75,8 @@ class SignalFunc(FuncBase):
         task = self.get_my_ami_task()
         real_mask = task.sig_recvd.val
         log_exec.info(
-            "SetSignals: new_signals=%08x signal_mask=%08x old_signals=%08x real_mask=%08x",
+            "SetSignals: new_signals=%08x signal_mask=%08x "
+            "old_signals=%08x real_mask=%08x",
             new_signals,
             signal_mask,
             old_signals,

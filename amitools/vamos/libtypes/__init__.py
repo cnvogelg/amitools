@@ -18,3 +18,29 @@ from .dostag import DosTag
 
 # timer
 from .timer import TimeVal
+
+__all__ = [
+    "CLI",
+    "CommonTag",
+    "DosPacket",
+    "DosTag",
+    "ExecLibrary",
+    "FileHandle",
+    "FileLock",
+    "Library",
+    "List",
+    "Message",
+    "MinList",
+    "MinNode",
+    "MsgPort",
+    "Node",
+    "PathList",
+    "Process",
+    "Resident",
+    "Tag",
+    "TagArray",
+    "TagItem",
+    "TagList",
+    "Task",
+    "TimeVal",
+]

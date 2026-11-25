@@ -1,3 +1,5 @@
+import io
+import os
 from types import SimpleNamespace
 
 from amitools.vamos.handler import (
@@ -54,10 +56,6 @@ def dos_filehandle_alloc_no_handler_test():
 
     fh.free_fh(alloc)
     assert alloc.is_all_free()
-
-
-import io
-import os
 
 
 def dos_filehandle_tell_pipe_test():

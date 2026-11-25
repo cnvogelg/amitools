@@ -3,7 +3,6 @@ import collections
 from amitools.vamos.libcore import LibCreator, LibInfo, LibCtx, LibProfiler
 from amitools.vamos.machine.mock import MockMachine
 from amitools.vamos.machine import Runtime
-from amitools.vamos.label import LabelManager
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 
@@ -13,7 +12,7 @@ def setup():
     runtime = Runtime(machine)
     mem = machine.get_mem()
     traps = machine.get_traps()
-    cpu = machine.get_cpu()
+    machine.get_cpu()
     alloc = MemoryAlloc.for_machine(machine)
     ctx = LibCtx(machine, runtime.run, alloc)
     return mem, traps, alloc, ctx

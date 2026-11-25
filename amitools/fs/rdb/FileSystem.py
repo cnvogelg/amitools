@@ -1,6 +1,6 @@
-from amitools.fs.block.rdb.FSHeaderBlock import *
-from amitools.fs.block.rdb.LoadSegBlock import *
-from amitools.util.HexDump import *
+from ...util.HexDump import print_hex
+from ..block.rdb.FSHeaderBlock import FSHeaderBlock
+from ..block.rdb.LoadSegBlock import Block, LoadSegBlock
 import amitools.fs.DosType as DosType
 
 
@@ -15,7 +15,7 @@ class FileSystem:
         self.data = None
 
     def get_next_fs_blk(self):
-        if self.fshd != None:
+        if self.fshd is not None:
             return self.fshd.next
         else:
             return 0xFFFFFFFF
@@ -110,7 +110,7 @@ class FileSystem:
     # ----- query -----
 
     def dump(self, hex_dump=False):
-        if self.fshd != None:
+        if self.fshd is not None:
             self.fshd.dump()
         # only dump ids of lseg blocks
         print("LoadSegBlocks:")

@@ -416,7 +416,7 @@ class ShellProcess(ProcessBase):
         startup_file = "S:Vamos-Startup"
         file_mgr = self.ctx.dos_lib.file_mgr
         fh = file_mgr.open(self.cwd_lock, startup_file, "rb+")
-        if fh != None:
+        if fh is not None:
             log_proc.info("using startup file: %s", startup_file)
             cli.cli_CurrentInput.aptr = fh.mem.addr
         else:
@@ -453,13 +453,13 @@ class ShellProcess(ProcessBase):
         )
 
     def free_shell_packet(self):
-        if self.shell_message != None:
+        if self.shell_message is not None:
             self.shell_message.free()
             self.shell_message = None
-        if self.shell_packet != None:
+        if self.shell_packet is not None:
             self.shell_packet.free()
             self.shell_packet = None
-        if self.shell_port != None:
+        if self.shell_port is not None:
             self.ctx.exec_lib.port_mgr.free_port(self.shell_port)
             self.shell_port = None
 

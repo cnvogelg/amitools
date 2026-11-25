@@ -1,7 +1,7 @@
 from amitools.vamos.loader import SegmentLoader
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.machine import Machine, Runtime
-from amitools.vamos.machine.regs import *
+from amitools.vamos.machine.regs import REG_A0, REG_D0
 from amitools.vamos.libtypes import Resident, ExecLibrary, Library
 from amitools.vamos.libstructs import ResidentFlags, NodeType, AutoInitStruct
 from amitools.vamos.libnative import InitRes

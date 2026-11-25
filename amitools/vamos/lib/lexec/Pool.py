@@ -1,5 +1,5 @@
 from amitools.vamos.log import log_exec
-from amitools.vamos.error import *
+from ...error import VamosInternalError
 from .Puddle import Puddle
 
 
@@ -31,21 +31,21 @@ class Pool:
         result = None
         if size >= self.thresh:
             puddle = Puddle(self.mem, self.alloc, label_mgr, name, size)
-            if puddle != None:
+            if puddle is not None:
                 self.puddles.append(puddle)
                 result = puddle.AllocPooled(name + self.name, size)
         else:
             for puddle in self.puddles:
                 result = puddle.AllocPooled(name + self.name, size)
-                if result != None:
+                if result is not None:
                     break
                 # none of the puddles had enough memory
-            if result == None:
+            if result is None:
                 puddle = Puddle(self.mem, self.alloc, label_mgr, name, self.minsize)
-                if puddle != None:
+                if puddle is not None:
                     self.puddles.append(puddle)
                     result = puddle.AllocPooled(name + self.name, size)
-        if result == None:
+        if result is None:
             log_exec.info("AllocPooled: Unable to allocate memory (%x)", size)
         return result
 

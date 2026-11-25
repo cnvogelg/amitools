@@ -1,4 +1,3 @@
-import pytest
 from amitools.vamos.libstructs import NodeStruct, TaskStruct, ExecLibraryStruct
 from amitools.vamos.machine.mock import MockMemory
 

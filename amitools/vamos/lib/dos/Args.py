@@ -562,7 +562,6 @@ def read_args(dos, ctx, template_ptr, array_ptr, rdargs_ptr):
         if ah.want_help():
             ctx.process.get_output().write(template.encode("latin1") + b": ")
             csrc.append_line()
-            msg = ext_help if ext_help else template
             # ext help is shown on second '?'
             while ah.want_help():
                 ctx.process.get_output().write(template.encode("latin1") + b": ")

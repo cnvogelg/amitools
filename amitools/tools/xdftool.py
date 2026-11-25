@@ -12,17 +12,15 @@ from amitools.fs.ADFSHardLink import ADFSHardLink
 from amitools.fs.ADFSHardLinkDir import ADFSHardLinkDir
 from amitools.fs.ADFSSoftLink import ADFSSoftLink
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
-from amitools.fs.FSError import *
+from ..fs.FSError import FSError, INVALID_USER_DIR_BLOCK, UNSUPPORTED_DIR_BLOCK
+from ..util.HexDump import print_hex
 from amitools.fs.Imager import Imager
 from amitools.fs.Repacker import Repacker
 from amitools.fs.block.BootBlock import BootBlock
-from amitools.fs.block.RootBlock import RootBlock
 from amitools.fs.block.Block import Block
 from amitools.fs.block.BlockFactory import BlockFactory
 from amitools.util.CommandQueue import CommandQueue
-from amitools.util.HexDump import *
 import amitools.util.KeyValue as KeyValue
-from amitools.fs.rdb.RDisk import RDisk
 from amitools.fs.FSString import FSString
 import amitools.fs.DosType as DosType
 
@@ -455,7 +453,7 @@ class ListCmd(Command):
         else:
             name = make_fsstr(self.opts[0])
             node = vol.get_path_name(name)
-            if node != None:
+            if node is not None:
                 show_all = "all" in self.opts
                 show_detail = "detail" in self.opts
                 show_info = "info" in self.opts
@@ -506,7 +504,7 @@ class ReadCmd(Command):
         # single file operation
         name = make_fsstr(p[0])
         node = vol.get_path_name(name)
-        if node == None:
+        if node is None:
             print("Node not found:", p[0])
             return 2
         # its a file
@@ -652,7 +650,7 @@ class WriteCmd(Command):
         # handle dir
         elif os.path.isdir(sys_file):
             parent_node, dir_name = vol.get_create_path_name(ami_path, file_name)
-            if parent_node == None:
+            if parent_node is None:
                 print("Invalid path", ami_path)
                 return 2
 
@@ -682,7 +680,7 @@ class DeleteCmd(Command):
         do_wipe = "wipe" in self.opts
         do_all = "all" in self.opts
         path = make_fsstr(self.opts[0])
-        node = vol.delete(path, wipe=do_wipe, all=do_all)
+        vol.delete(path, wipe=do_wipe, all=do_all)
         return 0
 
 
@@ -699,7 +697,7 @@ class ProtectCmd(Command):
         name = make_fsstr(self.opts[0])
         pr_str = self.opts[1]
         node = vol.get_path_name(name)
-        if node != None:
+        if node is not None:
             if pr_str.lower().startswith("0x"):
                 try:
                     mask = int(pr_str, 0)
@@ -757,7 +755,7 @@ class CommentCmd(Command):
         name = make_fsstr(self.opts[0])
         comment = make_fsstr(self.opts[1])
         node = vol.get_path_name(name)
-        if node != None:
+        if node is not None:
             node.change_comment(comment)
             return 0
         else:
@@ -777,7 +775,7 @@ class TimeCmd(Command):
         name = make_fsstr(self.opts[0])
         tstr = self.opts[1]
         node = vol.get_path_name(name)
-        if node != None:
+        if node is not None:
             if node.change_mod_ts_by_string(tstr):
                 return 0
             else:
@@ -798,7 +796,7 @@ class RelabelCmd(Command):
             print("Usage: relabel <new_name>")
             return 1
         name = self.opts[0]
-        node = vol.relabel(FSString(name))
+        vol.relabel(FSString(name))
         return 0
 
 
@@ -810,7 +808,8 @@ class BlockCmd(Command):
         n = len(self.opts)
         if n == 0:
             print(
-                "Usage: block ( boot | root | node <ami_file> [data] | dump <block_no> | decode <block_no> )"
+                "Usage: block ( boot | root | node <ami_file> [data] | "
+                "dump <block_no> | decode <block_no> )"
             )
             return 1
         cmd = self.opts[0]
@@ -828,7 +827,7 @@ class BlockCmd(Command):
             else:
                 name = make_fsstr(self.opts[1])
                 node = vol.get_path_name(name)
-                if node != None:
+                if node is not None:
                     with_data = "data" in self.opts
                     node.dump_blocks(with_data)
                     return 0
@@ -871,7 +870,8 @@ class BitmapCmd(Command):
         n = len(self.opts)
         if n == 0:
             print(
-                "Usage: bitmap ( info | free | used | find [n] | all | maps | root [all] | node <path> [all] [entries]) [brief]"
+                "Usage: bitmap ( info | free | used | find [n] | all | "
+                "maps | root [all] | node <path> [all] [entries]) [brief]"
             )
             return 1
         cmd = self.opts[0]
@@ -895,7 +895,7 @@ class BitmapCmd(Command):
             if n == 2:
                 num = int(self.opts[1])
                 blk_nums = vol.bitmap.find_n_free(num)
-                if blk_nums == None:
+                if blk_nums is None:
                     print("No %d free blocks found" % num)
                     return 100
                 else:
@@ -903,7 +903,7 @@ class BitmapCmd(Command):
                     return 0
             else:
                 blk_num = vol.bitmap.find_free()
-                if blk_num == None:
+                if blk_num is None:
                     print("No free block found")
                     return 100
                 else:
@@ -930,7 +930,7 @@ class BitmapCmd(Command):
             if n > 1:
                 name = make_fsstr(self.opts[1])
                 node = vol.get_path_name(name)
-                if node != None:
+                if node is not None:
                     show_all = "all" in self.opts
                     show_entries = "entries" in self.opts
                     bm = vol.bitmap.create_draw_bitmap()
@@ -956,7 +956,8 @@ class RootCmd(Command):
         n = len(self.opts)
         if n == 0:
             print(
-                "Usage: root ( show | create_time <time> | disk_time <time> | time <time> )"
+                "Usage: root ( show | create_time <time> | disk_time <time> "
+                "| time <time> )"
             )
             return 1
         cmd = self.opts[0]
@@ -1011,7 +1012,8 @@ class BootCmd(Command):
         n = len(self.opts)
         if n == 0:
             print(
-                "Usage: boot ( show [hex] [asm] | read <file> | write <file> | install [boot1x] | clear )"
+                "Usage: boot ( show [hex] [asm] | read <file> | "
+                "write <file> | install [boot1x] | clear )"
             )
             return 1
         cmd = self.opts[0]
@@ -1021,7 +1023,7 @@ class BootCmd(Command):
         # boot show [hex] [asm]
         if cmd == "show":
             bb.dump()
-            if bb.valid and bb.boot_code != None:
+            if bb.valid and bb.boot_code is not None:
                 if "hex" in self.opts:
                     print_hex(bb.boot_code)
                 if "asm" in self.opts:
@@ -1035,7 +1037,7 @@ class BootCmd(Command):
         elif cmd == "read":
             if n > 1:
                 if bb.valid:
-                    if bb.boot_code != None:
+                    if bb.boot_code is not None:
                         f = open(self.opts[1], "wb")
                         f.write(bb.boot_code)
                         f.close()
@@ -1073,7 +1075,7 @@ class BootCmd(Command):
                 name = self.opts[1]
             # boot code directory
             bc_dir = bb.get_boot_code_dir()
-            if bc_dir == None:
+            if bc_dir is None:
                 print("No boot code directory found!")
                 return 1
             path = os.path.join(bc_dir, name + ".bin")
@@ -1128,7 +1130,6 @@ class FsckCmd(Command):
 
     def handle_blkdev(self, blkdev):
         from amitools.fs.fsck.Fsck import Fsck
-        from amitools.fs.fsck.FsckResult import Severity
 
         # Handle --output mode: copy image first
         if self.config.output_path:

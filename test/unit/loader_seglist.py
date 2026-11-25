@@ -1,6 +1,4 @@
 from amitools.vamos.loader import SegList
-from amitools.vamos.machine.mock import MockMemory
-from amitools.vamos.mem import MemoryAlloc
 
 
 def loader_seglist_alloc_test(buildlibnix, mem_alloc):

@@ -1,4 +1,3 @@
-import time
 import struct
 
 from .Block import Block
@@ -191,7 +190,7 @@ class DirCacheBlock(Block):
         self.own_key = self.blk_num
         self.parent = parent
         self.next_cache = next_cache
-        if records == None:
+        if records is None:
             self.num_records = 0
             self.records = []
         else:

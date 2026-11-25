@@ -78,14 +78,14 @@ class Block:
         return self.type == Block.T_DIR_CACHE
 
     def read(self):
-        if self.data == None:
+        if self.data is None:
             self._read_data()
         self._get_types()
         self._get_chksum()
         self.valid = self.valid_types and self.valid_chksum
 
     def write(self):
-        if self.data == None:
+        if self.data is None:
             self._create_data()
         self._put_types()
         self._put_chksum()
@@ -105,7 +105,7 @@ class Block:
         self.data[:] = data
 
     def _write_data(self):
-        if self.data != None:
+        if self.data is not None:
             self.blkdev.write_block(self.blk_num, self.data)
 
     def _free_data(self):
@@ -183,7 +183,7 @@ class Block:
         return TimeStamp(days, mins, ticks)
 
     def _put_timestamp(self, loc, ts):
-        if ts == None:
+        if ts is None:
             ts = TimeStamp()
         self._put_long(loc, ts.days)
         self._put_long(loc + 1, ts.mins)

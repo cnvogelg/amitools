@@ -1,8 +1,7 @@
-import sys
 import json
 
 from .tool import Tool
-from amitools.vamos.libcore import LibProfiler, LibImplScan
+from amitools.vamos.libcore import LibProfiler, LibImplFuncTag
 from amitools.vamos.cfgcore import ConfigDict
 
 

@@ -1,7 +1,3 @@
-import logging
-from amitools.vamos.log import *
-
-
 class LabelManager:
     def __init__(self):
         self.first = None
@@ -12,10 +8,10 @@ class LabelManager:
     # lists are ill-performing as the list grows larger,
     # and this is a heavy-duty class.
     def add_label(self, range):
-        assert range.next == None
-        assert range.prev == None
-        if self.last == None:
-            assert self.first == None
+        assert range.next is None
+        assert range.prev is None
+        if self.last is None:
+            assert self.first is None
             self.last = range
             self.first = range
         else:
@@ -24,9 +20,9 @@ class LabelManager:
             self.last = range
 
     def remove_label(self, range):
-        if range.prev != None:
+        if range.prev is not None:
             range.prev.next = range.next
-        if range.next != None:
+        if range.next is not None:
             range.next.prev = range.prev
         if self.last == range:
             self.last = range.prev
@@ -40,7 +36,7 @@ class LabelManager:
         # this is necessary because the label could be part of a puddle
         # that is released in one go.
         r = self.first
-        while r != None:
+        while r is not None:
             if r.addr >= addr and r.addr + r.size <= addr + size:
                 s = r.next
                 self.remove_label(r)
@@ -51,14 +47,14 @@ class LabelManager:
     def get_all_labels(self):
         ranges = []
         r = self.first
-        while r != None:
+        while r is not None:
             ranges.append(r)
             r = r.next
         return ranges
 
     def dump(self):
         r = self.first
-        while r != None:
+        while r is not None:
             print(r)
             r = r.next
 
@@ -68,7 +64,7 @@ class LabelManager:
     # lies.
     def get_label(self, addr):
         r = self.first
-        while r != None:
+        while r is not None:
             if r.addr <= addr and addr < r.end:
                 return r
             r = r.next
@@ -77,7 +73,7 @@ class LabelManager:
     def get_intersecting_labels(self, addr, size):
         result = []
         r = self.first
-        while r != None:
+        while r is not None:
             if r.does_intersect(addr, size):
                 result.append(r)
             r = r.next
@@ -85,7 +81,7 @@ class LabelManager:
 
     def get_label_offset(self, addr):
         r = self.get_label(addr)
-        if r == None:
+        if r is None:
             return (None, 0)
         else:
             off = addr - r.addr

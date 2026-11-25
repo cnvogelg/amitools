@@ -51,7 +51,7 @@ class Validator:
         Try to determine root block from boot block or guess number.
         Returns True if the root block could be decoded.
         """
-        if self.boot != None:
+        if self.boot is not None:
             # retrieve root block number from boot block
             root_blk_num = self.boot.got_root_blk
             # guessed root
@@ -105,7 +105,7 @@ class Validator:
         Return false if structure is not healthy"""
         self.block_scan = BlockScan(self.blkdev, self.log, self.dos_type)
         self.dir_scan = DirScan(self.block_scan, self.log)
-        ok = self.dir_scan.scan_tree(self.root.blk_num, progress=self.progress)
+        self.dir_scan.scan_tree(self.root.blk_num, progress=self.progress)
         self.log.msg(
             Log.INFO, "Scanned %d directories" % len(self.dir_scan.get_all_dir_infos())
         )

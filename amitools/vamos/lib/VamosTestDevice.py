@@ -1,6 +1,5 @@
-from amitools.vamos.machine.regs import *
+from ..machine.regs import REG_D0, REG_D1
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.error import *
 
 
 class VamosTestDevice(LibImpl):

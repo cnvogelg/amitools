@@ -1,5 +1,5 @@
 import os
-from amitools.fs.block.rdb.PartitionBlock import *
+from ..block.rdb.PartitionBlock import PartitionBlock
 from amitools.fs.blkdev.PartBlockDevice import PartBlockDevice
 import amitools.util.ByteSize as ByteSize
 import amitools.fs.DosType as DosType
@@ -16,7 +16,7 @@ class Partition:
         self.part_blk = None
 
     def get_next_partition_blk(self):
-        if self.part_blk != None:
+        if self.part_blk is not None:
             return self.part_blk.next
         else:
             return 0xFFFFFFFF
@@ -70,7 +70,7 @@ class Partition:
 
     def get_cyl_range(self):
         de = self.part_blk.dos_env
-        if de == None:
+        if de is None:
             return None
         else:
             return (de.low_cyl, de.high_cyl)

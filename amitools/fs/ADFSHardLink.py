@@ -2,8 +2,7 @@ from .ADFSFile import ADFSFile
 from .ADFSNode import ADFSNode
 from .block.Block import Block
 from .block.FileHeaderBlock import FileHeaderBlock
-from .FSError import *
-from .FSString import FSString
+from .FSError import FSError, INVALID_FILE_HEADER_BLOCK
 
 
 class ADFSHardLink(ADFSNode):

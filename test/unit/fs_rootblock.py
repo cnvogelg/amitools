@@ -5,7 +5,6 @@ import pytest
 from amitools.fs import DosType
 from amitools.fs.ADFSBitmap import ADFSBitmap
 from amitools.fs.ADFSVolume import ADFSVolume
-from amitools.fs import DosType
 from amitools.fs.FSString import FSString
 from amitools.fs.TimeStamp import TimeStamp
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry

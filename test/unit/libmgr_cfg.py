@@ -11,29 +11,29 @@ def libmgr_cfg_lib_default_test():
     assert lc.get_num_fake_funcs() == 0
     txt = str(lc)
     assert (
-        txt
-        == "LibCfg(create_mode=auto, force_version=None, expunge_mode=last_close, num_fake_funcs=0)"
+        txt == "LibCfg(create_mode=auto, force_version=None, "
+        "expunge_mode=last_close, num_fake_funcs=0)"
     )
 
 
 def libmgr_cfg_lib_custom_test():
     lc = LibCfg(LibCfg.CREATE_MODE_OFF, 1, LibCfg.EXPUNGE_MODE_NO_MEM, 42)
     assert lc.get_create_mode() == LibCfg.CREATE_MODE_OFF
-    assert lc.get_force_version() is 1
+    assert lc.get_force_version() == 1
     assert lc.get_expunge_mode() == LibCfg.EXPUNGE_MODE_NO_MEM
     assert lc.get_num_fake_funcs() == 42
     txt = str(lc)
     assert (
-        txt
-        == "LibCfg(create_mode=off, force_version=1, expunge_mode=no_mem, num_fake_funcs=42)"
+        txt == "LibCfg(create_mode=off, force_version=1, "
+        "expunge_mode=no_mem, num_fake_funcs=42)"
     )
 
 
 def libmgr_cfg_lib_fail_test():
     with pytest.raises(ValueError):
-        lc = LibCfg(create_mode="bla")
+        LibCfg(create_mode="bla")
     with pytest.raises(ValueError):
-        lc = LibCfg(expunge_mode="foo")
+        LibCfg(expunge_mode="foo")
 
 
 def libmgr_cfg_lib_eq_test():
@@ -281,11 +281,17 @@ def libmgr_cfg_dump_test(capsys):
     captured = capsys.readouterr()
     assert captured.out.splitlines() == [
         "libs config:",
-        "  default: LibCfg(create_mode=fake, force_version=23, expunge_mode=shutdown, num_fake_funcs=1)",
-        "  lib 'foo.library': LibCfg(create_mode=amiga, force_version=42, expunge_mode=last_close, num_fake_funcs=2)",
-        "  lib 'libs/foo.library': LibCfg(create_mode=vamos, force_version=43, expunge_mode=last_close, num_fake_funcs=10)",
+        "  default: LibCfg(create_mode=fake, force_version=23, "
+        "expunge_mode=shutdown, num_fake_funcs=1)",
+        "  lib 'foo.library': LibCfg(create_mode=amiga, force_version=42, "
+        "expunge_mode=last_close, num_fake_funcs=2)",
+        "  lib 'libs/foo.library': LibCfg(create_mode=vamos, "
+        "force_version=43, expunge_mode=last_close, num_fake_funcs=10)",
         "devs config:",
-        "  default: LibCfg(create_mode=amiga, force_version=42, expunge_mode=last_close, num_fake_funcs=3)",
-        "  dev 'bar.device': LibCfg(create_mode=fake, force_version=23, expunge_mode=shutdown, num_fake_funcs=4)",
-        "  dev 'devs/bar.device': LibCfg(create_mode=vamos, force_version=43, expunge_mode=last_close, num_fake_funcs=11)",
+        "  default: LibCfg(create_mode=amiga, force_version=42, "
+        "expunge_mode=last_close, num_fake_funcs=3)",
+        "  dev 'bar.device': LibCfg(create_mode=fake, force_version=23, "
+        "expunge_mode=shutdown, num_fake_funcs=4)",
+        "  dev 'devs/bar.device': LibCfg(create_mode=vamos, "
+        "force_version=43, expunge_mode=last_close, num_fake_funcs=11)",
     ]

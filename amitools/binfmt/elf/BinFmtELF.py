@@ -2,7 +2,6 @@ from amitools.binfmt.BinImage import (
     BIN_IMAGE_TYPE_ELF,
     SEGMENT_TYPE_CODE,
     SEGMENT_TYPE_DATA,
-    SEGMENT_FLAG_READ_ONLY,
     SEGMENT_TYPE_BSS,
     Segment,
     Relocations,

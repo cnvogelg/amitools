@@ -24,9 +24,9 @@ def setup_env(main_profiler=None, prof_names=None, prof_calls=False):
         prof_calls=prof_calls,
     )
     # setup ctx map
-    cpu = machine.get_cpu()
-    mem = machine.get_mem()
-    cpu_type = machine.get_cpu_type()
+    machine.get_cpu()
+    machine.get_mem()
+    machine.get_cpu_type()
     segloader = SegmentLoader(alloc)
     exec_ctx = ExecLibCtx(machine, alloc, runtime.run, segloader, None, None)
     # add extra attr to ctx
@@ -62,7 +62,7 @@ def libcore_mgr_bootstrap_shutdown_test():
 
 def libcore_mgr_make_test():
     machine, alloc, mgr = setup_env()
-    exec_vlib = mgr.bootstrap_exec()
+    mgr.bootstrap_exec()
     # make vamos test lib
     test_vlib = mgr.make_lib_name("vamostest.library")
     test_base = test_vlib.get_addr()
@@ -82,7 +82,7 @@ def libcore_mgr_make_test():
 
 def libcore_mgr_make_version_revision_test():
     machine, alloc, mgr = setup_env()
-    exec_vlib = mgr.bootstrap_exec()
+    mgr.bootstrap_exec()
     # make vamos test lib
     test_vlib = mgr.make_lib_name("vamostest.library", version=11, revision=23)
     test_base = test_vlib.get_addr()
@@ -106,7 +106,7 @@ def libcore_mgr_make_profile_test():
     profiler = mgr.get_profiler()
     assert profiler
     profiler.setup()
-    exec_vlib = mgr.bootstrap_exec()
+    mgr.bootstrap_exec()
     # make vamos test lib
     test_vlib = mgr.make_lib_name("vamostest.library")
     test_base = test_vlib.get_addr()
@@ -129,7 +129,7 @@ def libcore_mgr_make_profile_test():
 
 def libcore_mgr_make_fake_with_fd_test():
     machine, alloc, mgr = setup_env()
-    exec_vlib = mgr.bootstrap_exec()
+    mgr.bootstrap_exec()
     # make vamos test lib
     test_vlib = mgr.make_lib_name("testnix.library")
     assert test_vlib is None
@@ -148,7 +148,7 @@ def libcore_mgr_make_fake_with_fd_test():
 
 def libcore_mgr_make_fake_without_fd_test():
     machine, alloc, mgr = setup_env()
-    exec_vlib = mgr.bootstrap_exec()
+    mgr.bootstrap_exec()
     # make vamos test lib
     test_vlib = mgr.make_lib_name("foo.library")
     assert test_vlib is None
@@ -169,7 +169,7 @@ def libcore_mgr_make_fake_without_fd_test():
 
 def libcore_mgr_make_fake_without_fd_cfg_test():
     machine, alloc, mgr = setup_env()
-    exec_vlib = mgr.bootstrap_exec()
+    mgr.bootstrap_exec()
     # lib_cfg
     Cfg = collections.namedtuple("Cfg", ["num_fake_funcs"])
     lib_cfg = Cfg(10)
@@ -193,10 +193,10 @@ def libcore_mgr_make_fake_without_fd_cfg_test():
 
 def libcore_mgr_make_open_test():
     machine, alloc, mgr = setup_env()
-    exec_vlib = mgr.bootstrap_exec()
+    mgr.bootstrap_exec()
     # make vamos test lib
     test_vlib = mgr.make_lib_name("vamostest.library")
-    test_base = test_vlib.get_addr()
+    test_vlib.get_addr()
     impl = test_vlib.get_impl()
     lib = test_vlib.get_library()
     assert lib.version.val == impl.get_version()
@@ -214,7 +214,7 @@ def libcore_mgr_make_open_test():
 
 def libcore_mgr_open_test():
     machine, alloc, mgr = setup_env()
-    exec_vlib = mgr.bootstrap_exec()
+    mgr.bootstrap_exec()
     # make vamos test lib
     test_vlib = mgr.open_lib_name("vamostest.library")
     impl = test_vlib.get_impl()
@@ -231,10 +231,10 @@ def libcore_mgr_open_test():
 
 def libcore_mgr_make_open_dev_test():
     machine, alloc, mgr = setup_env()
-    exec_vlib = mgr.bootstrap_exec()
+    mgr.bootstrap_exec()
     # make vamos test lib
     test_vlib = mgr.make_lib_name("vamostestdev.device")
-    test_base = test_vlib.get_addr()
+    test_vlib.get_addr()
     impl = test_vlib.get_impl()
     lib = test_vlib.get_library()
     assert test_vlib.is_device()
@@ -253,7 +253,7 @@ def libcore_mgr_make_open_dev_test():
 
 def libcore_mgr_open_dev_test():
     machine, alloc, mgr = setup_env()
-    exec_vlib = mgr.bootstrap_exec()
+    mgr.bootstrap_exec()
     # make vamos test lib
     test_vlib = mgr.open_lib_name("vamostestdev.device")
     impl = test_vlib.get_impl()

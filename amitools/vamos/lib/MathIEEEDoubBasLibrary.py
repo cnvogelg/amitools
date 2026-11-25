@@ -1,7 +1,13 @@
-from amitools.vamos.machine.regs import *
+from ...util.Math import (
+    Amiga_INT_MAX,
+    Amiga_INT_MIN,
+    double_to_regs,
+    int32,
+    regs_to_double,
+)
+from ..machine.regs import REG_D0, REG_D1, REG_D2, REG_D3
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.log import log_math
-from amitools.util.Math import *
 import math
 
 

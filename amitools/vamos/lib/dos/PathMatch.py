@@ -8,13 +8,13 @@ class PathMatchChain:
         self.prefix = prefix
         self.parent = parent
         self.child = None
-        if self.parent != None:
+        if self.parent is not None:
             self.parent.child = self
 
     def reset(self):
         self.pos = -1
         self.candidates = []
-        if self.child != None:
+        if self.child is not None:
             self.child.reset()
 
     def _join(self, a, b):
@@ -34,7 +34,7 @@ class PathMatchChain:
         if self.pos == -1:
             self.candidates = path_mgr.ami_list_dir(self.lock, full_prefix)
             # no dir?
-            if self.candidates == None:
+            if self.candidates is None:
                 return None
             self.pos = 0
 
@@ -50,7 +50,7 @@ class PathMatchChain:
                     ami_path = name
 
                 # is tail?
-                if self.child == None:
+                if self.child is None:
                     if postfix != "":
                         ami_path = self._join(ami_path, postfix)
                     if path_mgr.ami_path_exists(self.lock, ami_path):
@@ -61,12 +61,12 @@ class PathMatchChain:
                 else:
                     # sub paths
                     match = self.child.next(path_mgr, ami_path, postfix)
-                    if match != None:
+                    if match is not None:
                         return match
 
             # try next candidate
             self.pos += 1
-            if self.child != None:
+            if self.child is not None:
                 self.child.reset()
 
         # nothing found
@@ -74,7 +74,7 @@ class PathMatchChain:
 
     def __str__(self):
         txt = "[prefix='%s' pattern='%s']" % (self.prefix, self.pattern)
-        if self.child != None:
+        if self.child is not None:
             txt += str(self.child)
         return txt
 
@@ -114,7 +114,7 @@ class PathMatch:
                 last.append(s)
             else:
                 pat = pattern_parse(s)
-                if pat != None:
+                if pat is not None:
                     if pat.has_wildcard:
                         # prefix
                         if len(last) > 0:
@@ -125,12 +125,13 @@ class PathMatch:
                         chain = PathMatchChain(
                             self.lock, pat, prefix=prefix, parent=prev_chain
                         )
-                        if prev_chain == None:
+                        if prev_chain is None:
                             self.head_chain = chain
                         prev_chain = chain
                     else:
                         last.append(pat.pat_str)
-                        # thor: even if there is no wild-card, do not append the string directly
+                        # thor: even if there is no wild-card, do not append the
+                        # string directly
                         # since the escape-character ' still needs to be removed
                 else:
                     return False
@@ -153,11 +154,11 @@ class PathMatch:
         )
 
     def has_wildcards(self):
-        return self.head_chain != None
+        return self.head_chain is not None
 
     def begin(self):
         # no wildcard?
-        if self.head_chain == None:
+        if self.head_chain is None:
             ami_path = self.prefix + self.postfix
             if self.path_mgr.ami_path_exists(self.lock, ami_path):
                 return ami_path
@@ -170,7 +171,7 @@ class PathMatch:
 
     def __next__(self):
         # no wildcard?
-        if self.head_chain == None:
+        if self.head_chain is None:
             return None
         # has wildcards
         else:

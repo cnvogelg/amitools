@@ -34,7 +34,7 @@ class FuncTable:
     def get_num_indices(self):
         return self.max_bias // 6
 
-    def get_all_func_names():
+    def get_all_func_names(self):
         return list(self.name_map.keys())
 
     def has_func(self, name):

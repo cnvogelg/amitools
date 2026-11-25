@@ -3,7 +3,6 @@
 
 import os
 import fnmatch
-import tempfile
 
 from .ScanFile import ScanFile
 
@@ -108,7 +107,7 @@ class FileScanner:
             return True
 
     def promote_scan_file(self, scan_file, seekable=False, file_based=False):
-        if not seekable and not file_base:
+        if not seekable and not file_based:
             return scan_file
         fb = file_based
         if not fb and seekable and scan_file.size > self.ram_bytes:

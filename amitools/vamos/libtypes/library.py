@@ -1,5 +1,4 @@
 from amitools.vamos.libstructs import LibraryStruct, NodeType
-from amitools.vamos.label import LabelLib
 from amitools.vamos.machine.opcodes import op_rts
 from amitools.vamos.astructs import AmigaClassDef
 

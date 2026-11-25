@@ -8,7 +8,6 @@ import argparse
 import os.path
 import json
 
-from amitools.util.HexDump import get_hex_line
 from amitools.util.CommandQueue import CommandQueue
 from amitools.fs.FSError import FSError
 from amitools.fs.FSString import FSString
@@ -16,10 +15,9 @@ from amitools.fs.rdb.RDisk import RDisk
 from amitools.fs.blkdev.RawBlockDevice import RawBlockDevice
 from amitools.fs.blkdev.DiskGeometry import DiskGeometry
 from amitools.fs.blkdev.ImageFile import ImageFile
-from amitools.fs.DosType import *
+from ..fs.DosType import num_to_tag_str, parse_dos_type_str, read_dostype_from_file
 from amitools.fs.block.rdb.PartitionBlock import PartitionBlock, PartitionDosEnv
 from amitools.fs.block.rdb.FSHeaderBlock import FSHeaderDeviceNode
-from amitools.fs.block.BootBlock import BootBlock
 import amitools.util.KeyValue as KeyValue
 import amitools.util.ByteSize as ByteSize
 import amitools.util.VerTag as VerTag
@@ -40,24 +38,24 @@ class Command:
         self.rdisk = rdisk
         # optional init blkdev function
         if hasattr(self, "init_blkdev"):
-            if blkdev == None:
+            if blkdev is None:
                 self.blkdev = self.init_blkdev(self.args.image_file)
-                if self.blkdev == None:
+                if self.blkdev is None:
                     return 5
                 blkdev = self.blkdev
 
-        # optional init rdisk function
+                # optional init rdisk function
         if hasattr(self, "init_rdisk"):
             # close old
-            if rdisk != None:
+            if rdisk is not None:
                 rdisk.close()
-            # create new rdisk
+                # create new rdisk
             self.rdisk = self.init_rdisk(blkdev)
-            if self.rdisk == None:
+            if self.rdisk is None:
                 return 6
             rdisk = self.rdisk
 
-        # common handler
+            # common handler
         if hasattr(self, "handle_blkdev"):
             return self.handle_blkdev(blkdev)
         elif hasattr(self, "handle_rdisk"):
@@ -98,12 +96,12 @@ class FSCommandQueue(CommandQueue):
             exit_code = 4
         finally:
             # close rdisk
-            if self.rdisk != None:
+            if self.rdisk is not None:
                 self.rdisk.close()
                 if self.args.verbose:
                     print("closing rdisk:", self.img)
-            # close blkdev
-            if self.blkdev != None:
+                    # close blkdev
+            if self.blkdev is not None:
                 self.blkdev.close()
                 if self.args.verbose:
                     print("closing image:", self.img)
@@ -113,7 +111,7 @@ class FSCommandQueue(CommandQueue):
         return cclass(self.args, opts)
 
     def _open_rdisk(self):
-        if self.rdisk == None:
+        if self.rdisk is None:
             self.rdisk = RDisk(self.blkdev)
             if self.args.verbose:
                 print("opening rdisk:", self.img)
@@ -141,24 +139,24 @@ class FSCommandQueue(CommandQueue):
                 if not self._open_rdisk():
                     raise IOError("No RDB Disk?")
 
-        # run first command
+                    # run first command
         if self.args.verbose:
             print("command:", self.cmd_line)
         if cmd.edit and self.args.read_only:
             raise IOError("Edit commands not allowed in read-only mode")
 
-        # check code of command after __init__ parsing
+            # check code of command after __init__ parsing
         if cmd.exit_code != 0:
             return cmd.exit_code
 
-        # perform command
+            # perform command
         exit_code = cmd.run(self.blkdev, self.rdisk)
-        if cmd.blkdev != None:
+        if cmd.blkdev is not None:
             self.blkdev = cmd.blkdev
-        if cmd.rdisk != None:
+        if cmd.rdisk is not None:
             self.rdisk = cmd.rdisk
 
-        # final exit code
+            # final exit code
         if self.args.verbose:
             print("exit_code:", exit_code)
         return exit_code
@@ -167,27 +165,26 @@ class FSCommandQueue(CommandQueue):
         self.cmd_line = cmd_line
         if self.args.verbose:
             print("command:", self.cmd_line)
-        # verify command
+            # verify command
         if cmd.edit and self.args.read_only:
             raise IOError("Edit commands not allowed in read-only mode")
-        # make sure rdisk is set up
-        if self.rdisk == None and cmd.need_rdisk():
+            # make sure rdisk is set up
+        if self.rdisk is None and cmd.need_rdisk():
             if not self._open_rdisk():
                 raise IOError("No RDB Disk?")
-        # run command
+                # run command
         exit_code = cmd.run(self.blkdev, self.rdisk)
-        if cmd.blkdev != None:
+        if cmd.blkdev is not None:
             self.blkdev = cmd.blkdev
-        if cmd.rdisk != None:
+        if cmd.rdisk is not None:
             self.rdisk = cmd.rdisk
         if self.args.verbose:
             print("exit_code:", exit_code)
         return exit_code
 
+        # ----- Commands -------------------------------------------------------------
 
-# ----- Commands -------------------------------------------------------------
-
-# --- Open RDISK device/image ---
+        # --- Open RDISK device/image ---
 
 
 class OpenCommand(Command):
@@ -198,14 +195,14 @@ class OpenCommand(Command):
         # make sure image file exists
         if not os.path.exists(file_name):
             raise IOError("Image File not found: '%s'" % file_name)
-        # parse opts
+            # parse opts
         opts = KeyValue.parse_key_value_strings(self.opts)
         # is a block size given in options? if yes then enforce it
         bs = 512
         opts_bs = self._get_opts_block_size(opts)
         if opts_bs:
             bs = opts_bs
-        # setup initial raw block dev with default block size
+            # setup initial raw block dev with default block size
         blkdev = RawBlockDevice(file_name, self.args.read_only, block_bytes=bs)
         blkdev.open()
         # if no bs was given in options then try to find out block size
@@ -221,15 +218,15 @@ class OpenCommand(Command):
                 )
                 blkdev.open()
                 bs = peek_bs
-        # try to guess geometry
+                # try to guess geometry
         file_size = blkdev.num_blocks * blkdev.block_bytes
         geo = DiskGeometry(block_bytes=bs)
         if not geo.detect(file_size, opts):
             raise IOError("Can't detect geometry of disk: '%s'" % file_name)
-        # make sure block size is still the same
+            # make sure block size is still the same
         if geo.block_bytes != bs:
             raise IOError("Invalid geo block size chosen: %d" % geo.block_bytes)
-        # keep geo
+            # keep geo
         blkdev.geo = geo
         return blkdev
 
@@ -240,8 +237,7 @@ class OpenCommand(Command):
                 raise IOError("Invalid block size given!")
             return bs
 
-
-# --- Create new RDISK device/image ---
+            # --- Create new RDISK device/image ---
 
 
 class CreateCommand(Command):
@@ -252,23 +248,22 @@ class CreateCommand(Command):
         # do not overwrite an existing image file
         if os.path.exists(file_name) and not self.args.force:
             raise IOError("Image File already exists: '%s'" % file_name)
-        # make sure size is given
+            # make sure size is given
         if len(self.opts) < 1:
             print("Usage: create ( size=<n> | chs=<c,h,s> | from=<img> ) [bs=<n>]")
             return None
-        # determine disk geometry
+            # determine disk geometry
         opts = KeyValue.parse_key_value_strings(self.opts)
         geo = DiskGeometry()
         if not geo.setup(opts):
             raise IOError("Can't set geometry of disk: '%s'" % file_name)
-        # create new empty image file for geometry
+            # create new empty image file for geometry
         blkdev = RawBlockDevice(file_name, block_bytes=geo.block_bytes)
         blkdev.create(geo.get_num_blocks())
         blkdev.geo = geo
         return blkdev
 
-
-# --- Change size of blkdev image ---
+        # --- Change size of blkdev image ---
 
 
 class ResizeCommand(Command):
@@ -279,16 +274,16 @@ class ResizeCommand(Command):
         # do not overwrite an existing image file
         if not os.path.exists(file_name):
             raise IOError("Image File does not exist: '%s'" % file_name)
-        # make sure size is given
+            # make sure size is given
         if len(self.opts) < 1:
             print("Usage: resize ( size=<n> | chs=<c,h,s> | from=<img> ) [bs=<n>]")
             return None
-        # determine disk geometry
+            # determine disk geometry
         opts = KeyValue.parse_key_value_strings(self.opts)
         geo = DiskGeometry()
         if not geo.setup(opts):
             raise IOError("Can't set geometry of disk: '%s'" % file_name)
-        # grow or shrink image file
+            # grow or shrink image file
         cur_size = ImageFile.get_image_size(file_name)
         new_size = geo.get_num_bytes()
         if cur_size == new_size:
@@ -303,8 +298,7 @@ class ResizeCommand(Command):
         blkdev.geo = geo
         return blkdev
 
-
-# --- Init existing disk image ---
+        # --- Init existing disk image ---
 
 
 class InitCommand(OpenCommand):
@@ -347,8 +341,7 @@ class InitCommand(OpenCommand):
         rdisk.create(blkdev.geo, rdb_cyls=rdb_cyls, disk_names=disk_names)
         return rdisk
 
-
-# --- Adjust Range of RDB ---
+        # --- Adjust Range of RDB ---
 
 
 class AdjustCommand(Command):
@@ -385,7 +378,7 @@ class AdjustCommand(Command):
                 phys = opts["phys"]
             else:
                 phys = False
-        # try to resize
+                # try to resize
         if lo_cyl or hi_cyl:
             rdisk.resize(lo_cyl, hi_cyl, phys)
         else:
@@ -393,8 +386,7 @@ class AdjustCommand(Command):
             return 1
         return 0
 
-
-# --- Remap RDB: Change Cylinder Block Size ---
+        # --- Remap RDB: Change Cylinder Block Size ---
 
 
 class RemapCommand(Command):
@@ -414,8 +406,7 @@ class RemapCommand(Command):
         rdisk.remap(geo.heads, geo.secs)
         return 0
 
-
-# --- Info about rdisk ----
+        # --- Info about rdisk ----
 
 
 class InfoCommand(Command):
@@ -442,8 +433,8 @@ class InfoCommand(Command):
                 )
             )
         lines = rdisk.get_info(part_name, full=True)
-        for l in lines:
-            print(l)
+        for line in lines:
+            print(line)
         return 0
 
 
@@ -471,8 +462,8 @@ class ListCommand(Command):
                 )
             )
         lines = rdisk.get_info(part_name)
-        for l in lines:
-            print(l)
+        for line in lines:
+            print(line)
         return 0
 
 
@@ -492,8 +483,7 @@ class JsonCommand(Command):
             print(json.dumps(desc, sort_keys=True, indent=4))
         return 0
 
-
-# --- Show rdisk structures ---
+        # --- Show rdisk structures ---
 
 
 class ShowCommand(Command):
@@ -502,8 +492,7 @@ class ShowCommand(Command):
         rdisk.dump(show_hex)
         return 0
 
-
-# --- Show allocation map ---
+        # --- Show allocation map ---
 
 
 class MapCommand(Command):
@@ -522,8 +511,7 @@ class MapCommand(Command):
                 print("")
         return 0
 
-
-# --- Free Partition Ranges
+        # --- Free Partition Ranges
 
 
 class FreeCommand(Command):
@@ -533,8 +521,7 @@ class FreeCommand(Command):
             print(r)
         return 0
 
-
-# --- Add a partition ---
+        # --- Add a partition ---
 
 
 class PartEditCommand(Command):
@@ -636,46 +623,46 @@ class PartEditCommand(Command):
         start = None
         if "start" in self.popts:
             start = int(self.popts["start"])
-        # range with start=<n> end=<n>
+            # range with start=<n> end=<n>
         if "end" in self.popts:
             end = int(self.popts["end"])
-            if start == None or end <= start:
+            if start is None or end <= start:
                 return None
             else:
                 return (start, end)
-        # expect a size
+                # expect a size
         elif "size" in self.popts:
             size = self.popts["size"]
             cyls = None
-            if type(size) == int:
+            if type(size) is int:
                 cyls = size
-            # size in bytes
+                # size in bytes
             elif size[-1] in ("b", "B"):
                 num_bytes = ByteSize.parse_byte_size_str(size[:-1])
-                if num_bytes == None:
+                if num_bytes is None:
                     return None
                 cyls = num_bytes // self.rdisk.get_cylinder_bytes()
-            # size in percent
+                # size in percent
             elif size[-1] == "%":
                 prc = float(size[:-1])
                 cyls = int(prc * self.rdisk.get_logical_cylinders() / 100.0)
-            # size in cylinders
+                # size in cylinders
             else:
                 cyls = ByteSize.parse_byte_size_str(size)
 
-            # check cyls
-            if cyls == None or cyls < 1:
+                # check cyls
+            if cyls is None or cyls < 1:
                 return None
-            # find a range if no start is given
-            if start == None:
+                # find a range if no start is given
+            if start is None:
                 start = self.rdisk.find_free_cyl_range_start(cyls)
-                if start == None:
+                if start is None:
                     return None
             return (start, start + cyls - 1)
-        # nothing specified -> get next free range
+            # nothing specified -> get next free range
         else:
             ranges = self.rdisk.get_free_cyl_ranges()
-            if ranges == None:
+            if ranges is None:
                 return None
             return ranges[0]
 
@@ -777,13 +764,14 @@ class ChangeCommand(PartEditCommand):
     def handle_rdisk(self, rdisk):
         if len(self.opts) < 1:
             print(
-                "Usage: change <id> [name=<s>] [dostype=<n|tag>] [automount=<b>] [bootable=<b>] [pri=<n>] "
+                "Usage: change <id> [name=<s>] [dostype=<n|tag>] "
+                "[automount=<b>] [bootable=<b>] [pri=<n>] "
                 + self.get_more_dos_env_info()
             )
             return 1
         else:
             p = rdisk.find_partition_by_string(self.opts[0])
-            if p != None:
+            if p is not None:
                 self.parse_opts(rdisk)
                 dostype = self.get_dos_type(empty=True)
                 drv_name = self.get_drv_name(empty=True)
@@ -809,8 +797,7 @@ class ChangeCommand(PartEditCommand):
                 print("Can't find partition: '%s'" % self.opts[0])
                 return 1
 
-
-# --- Export/Import file system image ---
+                # --- Export/Import file system image ---
 
 
 class ExportCommand(Command):
@@ -858,8 +845,7 @@ class ImportCommand(Command):
                 print("Can't find partition: '%s'" % part)
                 return 1
 
-
-# --- Fill empty space with partitions ---
+                # --- Fill empty space with partitions ---
 
 
 class FillCommand(PartEditCommand):
@@ -867,14 +853,14 @@ class FillCommand(PartEditCommand):
         self.parse_opts(rdisk)
         ranges = rdisk.get_free_cyl_ranges()
         # nothing to do
-        if ranges == None:
+        if ranges is None:
             return 0
         for lo_hi in ranges:
             drv_name = self.get_drv_name()
-            if drv_name == None:
+            if drv_name is None:
                 print("ERROR: invalid drive name!")
             dostype = self.get_dos_type()
-            if dostype == None:
+            if dostype is None:
                 print("ERROR: invalid dostype given!")
                 return 1
             flags = self.get_flags()
@@ -894,8 +880,7 @@ class FillCommand(PartEditCommand):
             )
         return 0
 
-
-# --- Delete partition command ---
+        # --- Delete partition command ---
 
 
 class DeleteCommand(Command):
@@ -908,7 +893,7 @@ class DeleteCommand(Command):
             return 1
         else:
             p = rdisk.find_partition_by_string(self.opts[0])
-            if p != None:
+            if p is not None:
                 if not rdisk.delete_partition(p.num):
                     print("ERROR: deleting partition: '%s'" % self.opts[0])
                     return 1
@@ -918,8 +903,7 @@ class DeleteCommand(Command):
                 print("Can't find partition: '%s'" % self.opts[0])
                 return 1
 
-
-# --- Filesystem Commands ---
+                # --- Filesystem Commands ---
 
 
 class FSGetCommand(Command):
@@ -930,7 +914,7 @@ class FSGetCommand(Command):
         else:
             num = int(self.opts[0])
             fs = rdisk.get_filesystem(num)
-            if fs == None:
+            if fs is None:
                 print("fsget: invalid filesystem index", num)
                 return 1
             else:
@@ -984,18 +968,18 @@ class FSAddCommand(Command):
                 ver = VerTag.get_version(tag)
             if not ver:
                 ver = (0, 0)
-            # overwrite version from options
+                # overwrite version from options
             if "version" in opts:
                 vstr = opts["version"]
                 pos = vstr.find(".")
                 if pos != -1:
                     ver = (int(vstr[:pos]), int(vstr[pos + 1 :]))
-            # valid fs flags
+                    # valid fs flags
             dev_flags = []
             for key in opts:
                 if key in valid_flags:
                     dev_flags.append((key, opts[key]))
-            # add fs
+                    # add fs
             version = ver[0] << 16 | ver[1]
             # get dostype
             dostype = self.get_dos_type()
@@ -1018,7 +1002,7 @@ class FSDeleteCommand(Command):
             return 1
         else:
             fs = rdisk.find_filesystem_by_string(self.opts[0])
-            if fs != None:
+            if fs is not None:
                 if not rdisk.delete_filesystem(fs.num):
                     print("ERROR deleting filesystem: '%s'" % self.opts[0])
                     return 1
@@ -1039,7 +1023,7 @@ class FSFlagsCommand(Command):
             return 1
         else:
             fs = rdisk.find_filesystem_by_string(self.opts[0])
-            if fs != None:
+            if fs is not None:
                 opts = KeyValue.parse_key_value_strings(self.opts[1:])
                 valid_flags = fs.get_valid_flag_names()
                 flags = []
@@ -1055,8 +1039,9 @@ class FSFlagsCommand(Command):
                 print("ERROR finding filesystem: '%s'" % self.opts[0])
                 return 1
 
+                # ----- main -----
 
-# ----- main -----
+
 def main(args=None, defaults=None):
     # call scanner and process all files with selected command
     cmd_map = {

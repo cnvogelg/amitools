@@ -1,18 +1,31 @@
-import struct
 from .block.Block import Block
 from .block.UserDirBlock import UserDirBlock
 from .block.EntryBlock import EntryBlock
 from .block.FileHeaderBlock import FileHeaderBlock
-from .block.DirCacheBlock import *
+from .FSError import (
+    DELETE_NOT_ALLOWED,
+    FILE_NOT_FOUND,
+    FSError,
+    INTERNAL_ERROR,
+    INVALID_DIR_CACHE_BLOCK,
+    INVALID_ENTRY_BLOCK,
+    INVALID_FILE_NAME,
+    INVALID_USER_DIR_BLOCK,
+    LINK_NOT_ALLOWED,
+    NAME_ALREADY_EXISTS,
+    NO_FREE_BLOCKS,
+    TOO_MANY_LEVELS,
+    UNSUPPORTED_DIR_BLOCK,
+)
+from .MetaInfo import MetaInfo
+from .block.DirCacheBlock import DirCacheBlock, DirCacheRecord
 from .ADFSFile import ADFSFile
 from .ADFSHardLink import ADFSHardLink
 from .ADFSHardLinkDir import ADFSHardLinkDir
 from .ADFSSoftLink import ADFSSoftLink
 from .ADFSNode import ADFSNode, MAX_COMMENT_BYTES
 from .FileName import FileName
-from .FSError import *
 from .FSString import FSString
-from .MetaInfo import *
 
 # AmigaDOS follows at most this many soft links before a path lookup fails
 # with ERROR_TOO_MANY_LEVELS (dos.library's cap)
@@ -32,7 +45,7 @@ class ADFSDir(ADFSNode):
         self.valid = False
 
     def __repr__(self):
-        if self.block != None:
+        if self.block is not None:
             return "[Dir(%d)'%s':%s]" % (
                 self.block.blk_num,
                 self.block.name,
@@ -45,7 +58,7 @@ class ADFSDir(ADFSNode):
         # create a single empty dir cache block
         if self.volume.is_dircache:
             self.dcache_blks = []
-            if self._dircache_add_block(True) == None:
+            if self._dircache_add_block(True) is None:
                 raise FSError(NO_FREE_BLOCKS, node=self, extra="want dcache")
 
     def blocks_create_old(self, anon_blk):
@@ -83,7 +96,7 @@ class ADFSDir(ADFSNode):
             # its a hard link to a directory (read-only)
             elif blk.sub_type == Block.ST_LINKDIR:
                 node = ADFSHardLinkDir(self.volume, self)
-        if node == None:
+        if node is None:
             # a valid header of a type that is not read leads on along its
             # hash chain; the root block is in none
             if is_header and blk.sub_type != Block.ST_ROOT:
@@ -93,7 +106,7 @@ class ADFSDir(ADFSNode):
             blk = node.blocks_create_old(blk)
         except FSError:
             # a file whose header is valid leads on along its hash chain
-            if node.block != None:
+            if node.block is not None:
                 return node.block.hash_chain, None
             return 0, None
         if recursive and node.is_dir():
@@ -134,14 +147,14 @@ class ADFSDir(ADFSNode):
                 if blk.valid:
                     # create file/dir node
                     hash_chain, node = self._read_add_node(blk, recursive)
-            if node == None:
+            if node is None:
                 # a block that gives no entry ends its hash chain, unless it
                 # is a valid header other than the root block, and the others
                 # are read in full.
                 # The entries read can be listed and read, but a new entry
                 # could take the name or hash chain of one not read, and
                 # deleting me would lose those
-                if entry_bad_blk == None:
+                if entry_bad_blk is None:
                     entry_bad_blk = blk
             else:
                 # store node in entries
@@ -176,7 +189,7 @@ class ADFSDir(ADFSNode):
         self.entry_bad_blk = entry_bad_blk
         self.dcache_blks = dcache_blks
         self.dcache_bad_blk = dcache_bad_blk
-        if entry_bad_blk != None:
+        if entry_bad_blk is not None:
             self.valid = False
 
         # a header whose comment cannot be read, as one longer than 79
@@ -207,12 +220,12 @@ class ADFSDir(ADFSNode):
     def check_entries(self):
         """refuse to add an entry to a directory, or remove one, if not all
         its entries could be read"""
-        if self.entry_bad_blk != None:
+        if self.entry_bad_blk is not None:
             raise FSError(INVALID_ENTRY_BLOCK, block=self.entry_bad_blk, node=self)
 
     def check_dircache(self):
         """refuse to change a directory whose dircache cannot be read"""
-        if self.dcache_bad_blk != None:
+        if self.dcache_bad_blk is not None:
             raise FSError(INVALID_DIR_CACHE_BLOCK, block=self.dcache_bad_blk, node=self)
 
     def flush(self):
@@ -223,7 +236,7 @@ class ADFSDir(ADFSNode):
         self.name_hash = None
 
     def ensure_entries(self):
-        if self.entries == None:
+        if self.entries is None:
             self.read()
 
     def get_entries(self):
@@ -292,7 +305,7 @@ class ADFSDir(ADFSNode):
             self.parent.check_dircache()
 
         # make sure a default meta_info is available
-        if meta_info == None:
+        if meta_info is None:
             meta_info = MetaInfo()
             meta_info.set_current_as_mod_time()
             meta_info.set_default_protect()
@@ -337,7 +350,7 @@ class ADFSDir(ADFSNode):
 
         # try to find free blocks
         free_blks = self.volume.bitmap.alloc_n(num_blks)
-        if free_blks == None:
+        if free_blks is None:
             raise FSError(
                 NO_FREE_BLOCKS, node=self, file_name=name, extra="want %d" % num_blks
             )
@@ -372,7 +385,7 @@ class ADFSDir(ADFSNode):
                     update_myself=False,
                     sub_type=node.block.sub_type,
                 )
-                if record == None:
+                if record is None:
                     raise FSError(
                         NO_FREE_BLOCKS, node=self, file_name=name, extra="want dcache"
                     )
@@ -393,7 +406,7 @@ class ADFSDir(ADFSNode):
                 # block in memory only
                 self.block.extension = old_extension
                 blk_nums.append(self.dcache_blks.pop().blk_num)
-            elif record != None and not self._dircache_take_back(record):
+            elif record is not None and not self._dircache_take_back(record):
                 # the record still points to the node: keep its blocks
                 raise
             self.volume.bitmap.dealloc_n(blk_nums)
@@ -510,7 +523,7 @@ class ADFSDir(ADFSNode):
                 pos = i
                 break
         # hmm not found?!
-        if pos == None:
+        if pos is None:
             raise FSError(
                 INTERNAL_ERROR, node=node, extra="node not found in hash chain"
             )
@@ -537,7 +550,7 @@ class ADFSDir(ADFSNode):
 
         # remove node from the hash chain. If that fails, the node is still
         # linked on disk: link it here again and give it back its record
-        if prev == None:
+        if prev is None:
             link_blk = self.block
             self.block.hash_table[hash_key] = next_blk
         else:
@@ -546,11 +559,11 @@ class ADFSDir(ADFSNode):
         try:
             link_blk.write()
         except Exception:
-            if prev == None:
+            if prev is None:
                 self.block.hash_table[hash_key] = node.block.blk_num
             else:
                 prev.block.hash_chain = node.block.blk_num
-            if record != None:
+            if record is not None:
                 try:
                     self._dircache_add_entry_int(record)
                 except Exception:
@@ -897,7 +910,7 @@ class ADFSDir(ADFSNode):
             self.ensure_entries()
             for e in self.entries:
                 e.draw_on_bitmap(bm, show_all, False)
-        if self.dcache_blks != None:
+        if self.dcache_blks is not None:
             for dcb in self.dcache_blks:
                 bm[dcb.blk_num] = ord("C")
 
@@ -928,11 +941,11 @@ class ADFSDir(ADFSNode):
 
     def get_detail_str(self):
         self.ensure_entries()
-        if self.entries != None:
+        if self.entries is not None:
             s = "entries=%d" % len(self.entries)
         else:
             s = ""
-        if self.dcache_blks != None:
+        if self.dcache_blks is not None:
             s += " dcache=%d" % len(self.dcache_blks)
         return s
 
@@ -941,7 +954,7 @@ class ADFSDir(ADFSNode):
     def _dircache_check_read(self):
         """the changes refuse a dircache that could not be read before they
         write anything: getting here with one is a bug"""
-        if self.dcache_blks == None or self.dcache_bad_blk != None:
+        if self.dcache_blks is None or self.dcache_bad_blk is not None:
             raise FSError(INTERNAL_ERROR, node=self, extra="dircache not read")
 
     def _dircache_add_entry(
@@ -985,12 +998,12 @@ class ADFSDir(ADFSNode):
                     raise
                 return True
         # need to create a new one
-        return self._dircache_add_block(update_myself, [r]) != None
+        return self._dircache_add_block(update_myself, [r]) is not None
 
     def _dircache_add_block(self, update_myself, records=None):
         # allocate block
         blk_nums = self.volume.bitmap.alloc_n(1)
-        if blk_nums == None:
+        if blk_nums is None:
             return None
         # setup dir cache block and write it before anything links to it
         dcb_num = blk_nums[0]
@@ -1038,7 +1051,7 @@ class ADFSDir(ADFSNode):
         freed = []
         for dcb, record in records:
             blk_num = self._dircache_remove_record(dcb, record, update_myself)
-            if blk_num != None:
+            if blk_num is not None:
                 freed.append(blk_num)
         return freed
 
@@ -1118,7 +1131,7 @@ class ADFSDir(ADFSNode):
         for dcb in self.dcache_blks:
             if self._dircache_fits(dcb, new_record, record):
                 return
-        if self.volume.bitmap.find_n_free(1) == None:
+        if self.volume.bitmap.find_n_free(1) is None:
             raise FSError(NO_FREE_BLOCKS, node=self, extra="want dcache")
 
     def update_dircache_record(self, record, new_record):
@@ -1179,7 +1192,7 @@ class ADFSDir(ADFSNode):
         num_data = 0
         if self._own_comment_block() is not None:
             num_non_data += 1
-        if self.dcache_blks != None:
+        if self.dcache_blks is not None:
             num_non_data += len(self.dcache_blks)
         if all or first:
             self.ensure_entries()

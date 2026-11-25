@@ -1,4 +1,4 @@
-from amitools.vamos.cfgcore import *
+from ..cfgcore import Argument, Parser, Value, ValueDict
 
 
 class LibsParser(Parser):

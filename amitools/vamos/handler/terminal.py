@@ -190,7 +190,7 @@ class Terminal:
             return self.in_conv.read(size)
         else:
             try:
-                data = self.obj.read1(size)
+                self.obj.read1(size)
             except IOError:
                 return -1
 

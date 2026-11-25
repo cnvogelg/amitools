@@ -19,7 +19,7 @@ def machine_hwaccess_ignore_test(caplog):
     caplog.set_level(logging.WARN, "hw")
     machine = Machine()
     mem = machine.get_mem()
-    hw = HWAccess.from_mode_str(machine, "ignore")
+    HWAccess.from_mode_str(machine, "ignore")
     assert mem.cpu_r8(0xBF0000) == 0
     mem.cpu_w8(0xBF0000, 42)
     assert mem.cpu_r16(0xDF0000) == 0
@@ -36,7 +36,7 @@ def machine_hwaccess_abort_test(caplog):
     caplog.set_level(logging.WARN, "hw")
     machine = Machine()
     mem = machine.get_mem()
-    hw = HWAccess.from_mode_str(machine, "abort")
+    HWAccess.from_mode_str(machine, "abort")
     with pytest.raises(HWAccessError):
         mem.cpu_r8(0xBF0000)
     with pytest.raises(HWAccessError):

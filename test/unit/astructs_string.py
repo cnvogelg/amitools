@@ -1,4 +1,3 @@
-from amitools.vamos.astructs.typebase import TypeBase
 from amitools.vamos.astructs.string import CSTR, BSTR, CStringType, BStringType
 from amitools.vamos.machine.mock import MockMemory, MockCPU
 from amitools.vamos.machine import REG_D0
@@ -115,7 +114,7 @@ def astructs_string_bstr_test():
     assert bstr.str == "now!"
 
 
-def astructs_string_cstr_reg_test():
+def astructs_string_bstr_reg_test():
     txt = "hello, world!"
     mem.w_bstr(0x40, txt)
     cpu.w_reg(REG_D0, 0x10)  # BADDR
@@ -135,7 +134,7 @@ def astructs_string_bstr_null_test():
     assert bstr != bstr2
 
 
-def astructs_string_cstr_compare_test():
+def astructs_string_bstr_compare_test():
     txt = "hello, world!"
     mem.w32(0x20, 0x10)
     mem.w_bstr(0x40, txt)

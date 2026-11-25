@@ -1,7 +1,38 @@
 """The hunk block types defined as data classes"""
 
 import struct
-from .Hunk import *
+from .Hunk import (
+    EXT_ABSCOMMON,
+    HUNK_ABSRELOC32,
+    HUNK_BREAK,
+    HUNK_BSS,
+    HUNK_CODE,
+    HUNK_DATA,
+    HUNK_DEBUG,
+    HUNK_DREL16,
+    HUNK_DREL32,
+    HUNK_DREL8,
+    HUNK_END,
+    HUNK_EXT,
+    HUNK_HEADER,
+    HUNK_INDEX,
+    HUNK_LIB,
+    HUNK_NAME,
+    HUNK_OVERLAY,
+    HUNK_RELOC32SHORT,
+    HUNK_RELRELOC16,
+    HUNK_RELRELOC32,
+    HUNK_RELRELOC8,
+    HUNK_SYMBOL,
+    HUNK_TYPE_MASK,
+    HUNK_UNIT,
+    TYPE_LIB,
+    TYPE_LOADSEG,
+    TYPE_UNIT,
+    TYPE_UNKNOWN,
+    hunk_names,
+    type_names,
+)
 
 
 class HunkParseError(Exception):
@@ -100,14 +131,14 @@ class HunkHeaderBlock(HunkBlock):
     def parse(self, f):
         # parse resident library names (AOS 1.x only)
         while True:
-            l, s = self._read_name(f)
-            if l < 0:
+            nlen, s = self._read_name(f)
+            if nlen < 0:
                 raise HunkParseError("Error parsing HUNK_HEADER names")
-            elif l == 0:
+            elif nlen == 0:
                 break
             self.reslib_names.append(s)
 
-        # table size and hunk range
+            # table size and hunk range
         self.table_size = self._read_long(f)
         self.first_hunk = self._read_long(f)
         self.last_hunk = self._read_long(f)
@@ -116,14 +147,14 @@ class HunkHeaderBlock(HunkBlock):
                 "HUNK_HEADER invalid table_size or first_hunk or last_hunk"
             )
 
-        # determine number of hunks in size table
+            # determine number of hunks in size table
         num_hunks = self.last_hunk - self.first_hunk + 1
         for a in range(num_hunks):
             hunk_size = self._read_long(f)
             if hunk_size < 0:
                 raise HunkParseError("HUNK_HEADER contains invalid hunk_size")
-            # note that the upper bits are the target memory type. We only have FAST,
-            # so let's forget about them for a moment.
+                # note that the upper bits are the target memory type. We only
+                # have FAST, so let's forget about them for a moment.
             self.hunk_table.append(hunk_size & 0x3FFFFFFF)
 
     def write(self, f):
@@ -167,7 +198,7 @@ class HunkRelocLongBlock(HunkBlock):
     def __init__(self, blk_id=None, relocs=None):
         if blk_id is not None:
             self.blk_id = blk_id
-        # map hunk number to list of relocations (i.e. byte offsets in long)
+            # map hunk number to list of relocations (i.e. byte offsets in long)
         if relocs is None:
             self.relocs = []
         else:
@@ -201,7 +232,7 @@ class HunkRelocWordBlock(HunkBlock):
     def __init__(self, blk_id=None, relocs=None):
         if blk_id is not None:
             self.blk_id = blk_id
-        # list of tuples (hunk_no, [offsets])
+            # list of tuples (hunk_no, [offsets])
         if relocs is None:
             self.relocs = []
         else:
@@ -221,7 +252,7 @@ class HunkRelocWordBlock(HunkBlock):
                 off = self._read_word(f)
                 offsets.append(off)
             self.relocs.append((hunk_num, offsets))
-        # pad to long
+            # pad to long
         if num_words % 2 == 1:
             self._read_word(f)
 
@@ -234,7 +265,7 @@ class HunkRelocWordBlock(HunkBlock):
             for i in range(num_offs):
                 self._write_word(f, offsets[i])
             num_words += 2 + num_offs
-        # end
+            # end
         self._write_word(f, 0)
         num_words += 1
         # padding?
@@ -399,14 +430,14 @@ class HunkExtBlock(HunkBlock):
             # ABSCOMMON -> bss size
             if ext_type == EXT_ABSCOMMON:
                 bss_size = self._read_long(f)
-            # is a reference
+                # is a reference
             elif ext_type >= 0x80:
                 num_refs = self._read_long(f)
                 offsets = []
                 for i in range(num_refs):
                     off = self._read_long(f)
                     offsets.append(off)
-            # is a definition
+                    # is a definition
             else:
                 value = self._read_long(f)
             e = HunkExtEntry(name, ext_type, value, bss_size, offsets)
@@ -419,13 +450,13 @@ class HunkExtBlock(HunkBlock):
             # ABSCOMMON
             if ext_type == EXT_ABSCOMMON:
                 self._write_long(f, entry.bss_size)
-            # is a reference
+                # is a reference
             elif ext_type >= 0x80:
                 num_offsets = len(entry.ref_offsets)
                 self._write_long(f, num_offsets)
                 for off in entry.ref_offsets:
                     self._write_long(f, off)
-            # is a definition
+                    # is a definition
             else:
                 self._write_long(f, entry.def_value)
         self._write_long(f, 0)
@@ -484,7 +515,7 @@ class HunkLibBlock(HunkBlock):
             # update offsets
             self.offsets.append(pos)
             pos = f.tell()
-        # fill in size
+            # fill in size
         end = f.tell()
         size = end - start - 4
         num_longs = size // 4
@@ -558,7 +589,7 @@ class HunkIndexBlock(HunkBlock):
                 for j in range(num_refs):
                     name_off = self._read_word(f)
                     hunk_entry.sym_refs.append(HunkIndexSymbolRef(name_off))
-                # defs
+                    # defs
                 num_defs = self._read_word(f)
                 for j in range(num_defs):
                     name_off = self._read_word(f)
@@ -567,9 +598,9 @@ class HunkIndexBlock(HunkBlock):
                     hunk_entry.sym_defs.append(
                         HunkIndexSymbolDef(name_off, value, stype)
                     )
-                # calc word size
+                    # calc word size
                 num_words = num_words - (5 + num_refs + num_defs * 3)
-        # alignment word?
+                # alignment word?
         if num_words == 1:
             self._read_word(f)
 
@@ -598,27 +629,28 @@ class HunkIndexBlock(HunkBlock):
                 self._write_word(f, num_refs)
                 for sym_ref in index.sym_refs:
                     self._write_word(f, sym_ref.name_off)
-                # defs
+                    # defs
                 num_defs = len(index.sym_defs)
                 self._write_word(f, num_defs)
                 for sym_def in index.sym_defs:
                     self._write_word(f, sym_def.name_off)
                     self._write_word(f, sym_def.value)
                     self._write_word(f, sym_def.sym_ctype)
-                # count words
+                    # count words
                 num_words += 5 + num_refs + num_defs * 3
-        # alignment word?
+                # alignment word?
         if num_words % 2 == 1:
             num_words += 1
             self._write_word(f, 0)
-        # fill in real size
+            # fill in real size
         pos = f.tell()
         f.seek(num_longs_pos, 0)
         self._write_long(f, num_words / 2)
         f.seek(pos, 0)
 
+        # map the hunk types to the block classes
 
-# map the hunk types to the block classes
+
 hunk_block_type_map = {
     # Load Module
     HUNK_HEADER: HunkHeaderBlock,
@@ -774,8 +806,9 @@ class HunkBlockFile:
             res.append(name)
         return res
 
+        # mini test
 
-# mini test
+
 if __name__ == "__main__":
     import sys
     import io
@@ -808,6 +841,6 @@ if __name__ == "__main__":
                 if data[i] != new_data[i]:
                     print("MISMATCH @%x" % i)
             print("OK")
-        # detect type of file
+            # detect type of file
         t = hbf.detect_type()
         print("type=", t, type_names[t])

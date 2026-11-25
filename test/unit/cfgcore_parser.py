@@ -1,4 +1,4 @@
-from amitools.vamos.cfgcore import *
+from amitools.vamos.cfgcore import Argument, Parser, Value, ValueDict, ValueList
 import argparse
 
 

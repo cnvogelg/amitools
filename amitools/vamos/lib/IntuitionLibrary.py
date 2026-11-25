@@ -12,7 +12,6 @@ from amitools.vamos.lib.boopsi import Boopsi
 from amitools.vamos.lib.graphics import (
     RastPortStruct,
     LayerStruct,
-    RectangleStruct,
     TextAttrStruct,
     JAM2,
 )
@@ -62,7 +61,7 @@ from amitools.vamos.machine.regs import (
     REG_D4,
     REG_D5,
 )
-from amitools.vamos.libstructs.exec_ import MsgPortStruct, MessageStruct, ListStruct
+from amitools.vamos.libstructs.exec_ import MsgPortStruct, ListStruct
 
 MENUNULL = 0xFFFF
 
@@ -1186,7 +1185,8 @@ class IntuitionLibrary(ClassicGadgets, LibImpl):
 
         if (win.IDCMPFlags.get() & idcmp_flag) == 0:
             # if idcmp_flag != IDCMP_INTUITICKS:
-            #     log_intui.debug("IDCMP flag %x not set for window %08x, skipping", idcmp_flag, win_addr)
+            #     log_intui.debug("IDCMP flag %x not set for window %08x, skipping",
+            #     idcmp_flag, win_addr)
             return
 
         user_port_addr = win.UserPort.get()
@@ -1841,7 +1841,6 @@ class IntuitionLibrary(ClassicGadgets, LibImpl):
 
         rastport_addr = win.RPort.get()
         rp_graphics = self.graphics_lib.get_rp_graphics(rastport_addr)
-        batch = rp_graphics.batch
 
         self._flush_batch(rp_graphics)
         rp_graphics.clip_rects = None
@@ -1865,8 +1864,8 @@ class IntuitionLibrary(ClassicGadgets, LibImpl):
     # --- intuition.library: SetWindowPointerA ---
     def SetWindowPointerA(self, ctx):
         cpu = ctx.cpu
-        win_addr = cpu.r_reg(REG_A0)
-        taglist_addr = cpu.r_reg(REG_A1)
+        cpu.r_reg(REG_A0)
+        cpu.r_reg(REG_A1)
 
         rc = 0
         cpu.w_reg(REG_D0, rc)
@@ -1874,7 +1873,7 @@ class IntuitionLibrary(ClassicGadgets, LibImpl):
     # --- intuition.library: ClearPointer ---
     def ClearPointer(self, ctx):
         cpu = ctx.cpu
-        win_addr = cpu.r_reg(REG_A0)
+        cpu.r_reg(REG_A0)
 
         rc = 0
         cpu.w_reg(REG_D0, rc)

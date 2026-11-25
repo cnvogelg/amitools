@@ -10,7 +10,7 @@ from amitools.vamos.machine import Runtime
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.libcore import LibProfileData
 from amitools.fd import read_lib_fd
-from amitools.vamos.machine.regs import *
+from amitools.vamos.machine.regs import REG_A0, REG_D0, REG_D1
 from amitools.vamos.machine.regs import REG_A1, REG_A2
 from amitools.vamos.libstructs import NodeStruct
 from amitools.vamos.libtypes import Library
@@ -44,18 +44,21 @@ def _check_log(caplog):
         (
             "missing",
             logging.WARN,
-            "? CALL: (vamostest.library)   54 Dummy( a[d0]=00000000, b[d1]=00000000 ) from PC=000000 -> d0=0 (default)",
+            "? CALL: (vamostest.library)   54 Dummy( a[d0]=00000000, "
+            "b[d1]=00000000 ) from PC=000000 -> d0=0 (default)",
         ),
         (
             "valid",
             logging.INFO,
-            "{ CALL: (vamostest.library)   48 Swap( a[d0]=00000000, b[d1]=00000000 ) from PC=000000",
+            "{ CALL: (vamostest.library)   48 Swap( a[d0]=00000000, "
+            "b[d1]=00000000 ) from PC=000000",
         ),
         ("valid", logging.INFO, "} CALL: -> d0=00000000, d1=00000000"),
         (
             "valid",
             logging.INFO,
-            "{ CALL: (vamostest.library)   36 PrintString( str[a0]=00000010 ) from PC=000000",
+            "{ CALL: (vamostest.library)   36 PrintString( str[a0]=00000010 ) "
+            "from PC=000000",
         ),
         ("valid", logging.INFO, "} CALL: -> d0=00000000"),
     ]
@@ -66,23 +69,26 @@ def _check_log_fake(caplog):
         (
             "missing",
             logging.WARN,
-            "? CALL: (vamostest.library)   30 PrintHello(  ) from PC=000000 -> d0=0 (default)",
+            "? CALL: (vamostest.library)   30 PrintHello(  ) from PC=000000 "
+            "-> d0=0 (default)",
         ),
         (
             "missing",
             logging.WARN,
-            "? CALL: (vamostest.library)   54 Dummy( a[d0]=00000000, b[d1]=00000000 ) from PC=000000 -> d0=0 (default)",
+            "? CALL: (vamostest.library)   54 Dummy( a[d0]=00000000, "
+            "b[d1]=00000000 ) from PC=000000 -> d0=0 (default)",
         ),
         (
             "missing",
             logging.WARN,
-            "? CALL: (vamostest.library)   48 Swap( a[d0]=00000000, b[d1]=00000000 ) from PC=000000 -> d0=0 (default)",
+            "? CALL: (vamostest.library)   48 Swap( a[d0]=00000000, "
+            "b[d1]=00000000 ) from PC=000000 -> d0=0 (default)",
         ),
         (
             "missing",
             logging.WARN,
-            "? CALL: (vamostest.library)   36 PrintString( str[a0]=00000010 ) from PC=000000 -> d0=0 "
-            "(default)",
+            "? CALL: (vamostest.library)   36 PrintString( str[a0]=00000010 ) "
+            "from PC=000000 -> d0=0 (default)",
         ),
     ]
 
@@ -135,7 +141,7 @@ def libcore_stub_result_sets_cc_test():
     scan = _create_scan()
     ctx = _create_ctx()
     gen = LibStubGen()
-    stub = gen.gen_stub(scan, ctx)
+    gen.gen_stub(scan, ctx)
 
     ctx.cpu.w_reg(REG_D0, 0)
     gen._set_result(ctx, 0, int)

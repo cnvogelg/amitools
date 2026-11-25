@@ -1,8 +1,19 @@
 """A class for reading and writing ELF format binaries (esp. Amiga m68k ones)"""
 
 import os
-from .ELF import *
-from .ELFFile import *
+from .ELF import SHT_NOBITS, SHT_RELA, SHT_STRTAB, SHT_SYMTAB
+from .ELFFile import (
+    ELFFile,
+    ELFHeader,
+    ELFIdentifier,
+    ELFParseError,
+    ELFSection,
+    ELFSectionHeader,
+    ELFSectionRelocationsWithAddend,
+    ELFSectionStringTable,
+    ELFSectionSymbolTable,
+    ELFSectionWithData,
+)
 
 
 class ELFReader:
@@ -70,7 +81,7 @@ class ELFReader:
 
     def _resolve_symtab_indices(self, sect, ef, sections):
         for sym in sect.symtab:
-            if sym.shndx_str == None:
+            if sym.shndx_str is None:
                 # refers a valid section
                 idx = sym.shndx
                 if idx == 65522:  # common
@@ -90,7 +101,7 @@ class ELFReader:
                 src_file_sym = sym
             elif sym_type in ("OBJECT", "FUNC", "NOTYPE"):
                 # add containing file symbol and its name
-                if src_file_sym != None:
+                if src_file_sym is not None:
                     sym.file_sym = src_file_sym
                 else:
                     sym.file_sym = None

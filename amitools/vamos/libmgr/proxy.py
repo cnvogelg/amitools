@@ -1,6 +1,5 @@
 from amitools.vamos.log import log_libmgr
 from amitools.vamos.libcore import LibProxyGen, LibCtx
-from amitools.vamos.error import VamosInternalError
 
 
 class LibProxyManager:

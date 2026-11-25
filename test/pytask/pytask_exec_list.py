@@ -1,4 +1,3 @@
-import pytest
 from amitools.vamos.libtypes import List, Node
 from amitools.vamos.libstructs import MinListStruct, NodeType
 
@@ -6,7 +5,7 @@ from amitools.vamos.libstructs import MinListStruct, NodeType
 def pytask_exec_list_alloc_free_test(vamos_task):
     def task(ctx, task):
         # get exec library
-        exec_lib = ctx.proxies.get_exec_lib_proxy()
+        ctx.proxies.get_exec_lib_proxy()
 
         # alloc new list
         list = List.alloc(ctx.alloc)

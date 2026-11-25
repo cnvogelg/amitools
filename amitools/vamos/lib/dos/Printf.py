@@ -74,7 +74,7 @@ class printf_element:
             if self.length and "l" in self.length:
                 if val >= 0x80000000:
                     val = 0xFFFFFFFE - val
-            # 16 bit
+                    # 16 bit
             else:
                 if val >= 0x8000:
                     val = 0xFFFE - val
@@ -116,7 +116,7 @@ def printf_parse_string(string):
             fs = string[pos:m_s]
             fragments.append(fs)
 
-        # fetch options
+            # fetch options
         flags = m.group(1)
         width_limit = m.group(2)
         length = m.group(3)
@@ -143,8 +143,8 @@ def printf_read_data(state, mem_access, data_ptr):
             bptr *= 4
             data = mem_access.r_bstr(bptr)
         elif t in ("d", "u", "x"):  # number
-            l = e.length
-            if l is not None and "l" in l:
+            length = e.length
+            if length is not None and "l" in length:
                 data = mem_access.r32(data_ptr)
                 if t == "d":
                     data = int32(data)
@@ -164,8 +164,8 @@ def printf_read_data(state, mem_access, data_ptr):
             else:
                 data = ""  # thor: exec ignores NULL strings.
         elif t == "c":  # char
-            l = e.length
-            if l is not None and "l" in l:
+            length = e.length
+            if length is not None and "l" in length:
                 data = mem_access.r32(data_ptr)
                 data_ptr += 4
             else:
@@ -199,8 +199,9 @@ def printf(string, mem_access, data_ptr):
     printf_read_data(ps, mem_access, data_ptr)
     return printf_generate_output(ps)
 
+    # test
 
-# test
+
 if __name__ == "__main__":
     txt = "hello %s... %d what a number %2ld.. now align %-4.2s!"
     print(txt)

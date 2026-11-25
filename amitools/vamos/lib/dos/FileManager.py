@@ -208,9 +208,9 @@ class FileManager:
             # or writing to the input handle for the console. The console
             # streams know their direction, so redirect between the two.
             direction = getattr(fh.obj, "direction", None)
-            if for_writing == True and direction == "in":
+            if for_writing and direction == "in":
                 return self.std_output
-            elif for_writing == False and direction == "out":
+            elif not for_writing and direction == "out":
                 return self.std_input
             return fh
         else:

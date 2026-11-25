@@ -22,16 +22,16 @@ class Repacker:
         return self.in_blkdev
 
     def create_in_volume(self):
-        if self.in_blkdev == None:
+        if self.in_blkdev is None:
             return None
         self.in_volume = ADFSVolume(self.in_blkdev)
         self.in_volume.open()
         return self.in_volume
 
     def create_in(self):
-        if self.create_in_blkdev() == None:
+        if self.create_in_blkdev() is None:
             return False
-        if self.create_in_volume() == None:
+        if self.create_in_volume() is None:
             return False
         return True
 
@@ -51,21 +51,21 @@ class Repacker:
                 e.flush()
 
     def create_out_blkdev(self, image_file, force=True, options=None):
-        if self.in_blkdev == None:
+        if self.in_blkdev is None:
             return None
         # clone geo from input
-        if options == None:
+        if options is None:
             options = self.in_blkdev.get_options()
         f = BlkDevFactory()
         self.out_blkdev = f.create(image_file, force=force, options=options)
         return self.out_blkdev
 
     def create_out_volume(self, blkdev=None):
-        if blkdev != None:
+        if blkdev is not None:
             self.out_blkdev = blkdev
-        if self.out_blkdev == None:
+        if self.out_blkdev is None:
             return None
-        if self.in_volume == None:
+        if self.in_volume is None:
             return None
         # clone input volume
         iv = self.in_volume

@@ -39,12 +39,12 @@ def read_lib_fd(lib_name, fd_dir=None, add_std_calls=True):
     # get default path if none is given
     if fd_dir is None:
         fd_dir = get_data_sub_dir("fd")
-    # get fd path
+        # get fd path
     fd_name = get_fd_name(lib_name)
     fd_path = os.path.join(fd_dir, fd_name)
     if not os.path.isfile(fd_path):
         return None
-    # try to read fd
+        # try to read fd
     fd = read_fd(fd_path)
     fd.is_device = is_device(lib_name)
     if add_std_calls:
@@ -77,11 +77,11 @@ def read_fd(fname):
     # parse file
     f = open(fname, "r")
     for line in f:
-        l = line.strip()
-        if len(l) > 1 and l[0] != "*":
+        txt = line.strip()
+        if len(txt) > 1 and txt[0] != "*":
             # a command
-            if l[0] == "#" and l[1] == "#":
-                cmdline = l[2:]
+            if txt[0] == "#" and txt[1] == "#":
+                cmdline = txt[2:]
                 cmda = cmdline.split(" ")
                 cmd = cmda[0]
                 if cmd == "base":
@@ -98,18 +98,18 @@ def read_fd(fname):
                 else:
                     print("Invalid command:", cmda)
                     return None
-            # a function
+                    # a function
             else:
-                m = re.match(func_pat, l)
-                if m == None:
+                m = re.match(func_pat, txt)
+                if m is None:
                     raise IOError("Invalid FD Format")
                 else:
                     name = m.group(1)
                     # create a function definition
                     func_def = FuncDef(name, bias, private)
-                    if func_table != None:
+                    if func_table is not None:
                         func_table.add_func(func_def)
-                    # check args
+                        # check args
                     args = m.group(2)
                     regs = m.group(3)
                     arg = args.replace(",", "/").split("/")
@@ -147,7 +147,7 @@ def write_fd(fname, fd, add_private):
             if last_mode != new_mode:
                 fo.write("##%s\n" % new_mode)
                 last_mode = new_mode
-            # check new bias
+                # check new bias
             new_bias = f.get_bias()
             if last_bias + 6 != new_bias:
                 fo.write("##bias %d\n" % new_bias)
@@ -155,7 +155,7 @@ def write_fd(fname, fd, add_private):
             # build func
             line = f.get_name()
             args = f.get_args()
-            if args == None:
+            if args is None:
                 line += "()()"
             else:
                 line += "(" + ",".join([x[0] for x in args]) + ")"

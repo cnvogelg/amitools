@@ -1,5 +1,4 @@
 from .Block import Block
-from amitools.util.HexDump import *
 
 
 class BitmapExtBlock(Block):

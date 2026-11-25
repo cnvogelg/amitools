@@ -70,7 +70,8 @@ class BitmapScan:
             if got != expect:
                 self.log.msg(
                     Log.ERROR,
-                    "Invalid bitmap allocation (@%d: #%d+%d) blks [%d...%d] got=%08x expect=%08x"
+                    "Invalid bitmap allocation (@%d: #%d+%d) blks "
+                    "[%d...%d] got=%08x expect=%08x"
                     % (lw, bm_blk, cur_pos / 4, blk_num, blk_num + 31, got, expect),
                 )
             lw += 1
@@ -87,7 +88,8 @@ class BitmapScan:
         if got != expect:
             self.log.msg(
                 Log.ERROR,
-                "Invalid bitmap allocation (last) (@%d: #%d+%d) blks [%d...%d] got=%08x expect=%08x"
+                "Invalid bitmap allocation (last) (@%d: #%d+%d) blks "
+                "[%d...%d] got=%08x expect=%08x"
                 % (
                     lw,
                     bm_blk,
@@ -122,7 +124,7 @@ class BitmapScan:
             if self.block_scan.is_block_available(bm_ext):
                 self.log.msg(
                     Log.ERROR,
-                    "Bitmap ext block @%d already used?" % bm_block,
+                    "Bitmap ext block @%d already used?" % bm_ext,
                     cur_blk_num,
                 )
             else:
@@ -145,7 +147,7 @@ class BitmapScan:
         list_end = False
         for bm_block in ptrs:
             # still inside the pointer list
-            if list_end == False:
+            if not list_end:
                 # add a normal block
                 if bm_block != 0:
                     # make sure bitmap block was not used already

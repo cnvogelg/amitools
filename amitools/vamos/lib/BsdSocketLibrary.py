@@ -4,7 +4,6 @@ from amitools.vamos.machine.regs import (
     REG_D1,
     REG_D2,
     REG_D3,
-    REG_D4,
     REG_A0,
     REG_A1,
     REG_A2,

@@ -353,7 +353,7 @@ def vfwritef(dos, ctx, fh_b_addr, fmt, args_ptr):
             if ch == "T":
                 out = out + ("%*s" % (-n, ctx.mem.r_cstr(val)))
             elif ch == "O":
-                out = out + ("%*O" % (-n, val))
+                out = out + ("%*o" % (-n, val))
             elif ch == "X":
                 out = out + ("%*X" % (-n, val))
             elif ch == "I":

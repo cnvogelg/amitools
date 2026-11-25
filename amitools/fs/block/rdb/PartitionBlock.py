@@ -1,4 +1,4 @@
-from amitools.fs.block.Block import *
+from ..Block import Block
 import amitools.fs.DosType as DosType
 from amitools.fs.FSString import FSString
 
@@ -169,7 +169,7 @@ class PartitionBlock(Block):
         assert isinstance(drv_name, FSString)
         self.drv_name = drv_name
 
-        if dos_env == None:
+        if dos_env is None:
             dos_env = PartitionDosEnv()
         dos_env.update_size()
         self.dos_env = dos_env

@@ -1,7 +1,6 @@
 import code
 import importlib
 
-from amitools.vamos.machine.regs import *
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.error import VamosInternalError
 from amitools.vamos.astructs import CSTR

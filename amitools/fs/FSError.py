@@ -71,12 +71,12 @@ class FSError(Exception):
         else:
             code_str = "?"
         srcs = []
-        if self.node != None:
+        if self.node is not None:
             srcs.append("node=" + str(self.node))
-        if self.block != None:
+        if self.block is not None:
             srcs.append("block=" + str(self.block))
-        if self.file_name != None:
+        if self.file_name is not None:
             srcs.append("file_name=" + self.file_name.get_unicode())
-        if self.extra != None:
+        if self.extra is not None:
             srcs.append(str(self.extra))
         return "%s(%d):%s" % (code_str, self.code, ",".join(srcs))

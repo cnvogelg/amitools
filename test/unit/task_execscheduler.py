@@ -1,7 +1,6 @@
-from amitools.vamos.machine import Machine, REG_D0, op_nop, op_rts
+from amitools.vamos.machine import Machine
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.task import ExecTask, ExecScheduler
-from amitools.vamos.loader import SegList
 from amitools.vamos.schedule import Scheduler, SchedulerEvent
 from amitools.vamos.libtypes import ExecLibrary
 

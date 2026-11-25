@@ -26,7 +26,8 @@ def parse_key_value_string(s, d):
 
 
 def parse_key_value_strings(strs):
-    """parse an array of strings with key=value contents and create a dictionary from it."""
+    """parse an array of strings with key=value contents and create a
+    dictionary from it."""
     result = {}
     for s in strs:
         parse_key_value_string(s, result)

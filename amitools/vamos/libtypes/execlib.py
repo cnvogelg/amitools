@@ -1,5 +1,5 @@
 from amitools.vamos.libstructs import ExecLibraryStruct, NodeType
-from .library import Library, LibBase
+from .library import LibBase
 from amitools.vamos.astructs import AmigaClassDef
 
 

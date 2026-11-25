@@ -5,7 +5,6 @@ def machine_disasm_default_test():
     mach = Machine()
     disasm = DisAsm(mach)
     mem = mach.get_mem()
-    cpu = mach.get_cpu()
     traps = mach.get_traps()
     # trap without func
     mem.w16(0, 0xA123)

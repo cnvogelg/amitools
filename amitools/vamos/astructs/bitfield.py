@@ -109,7 +109,7 @@ def BitFieldType(cls):
         if type(val) is int and name[0] != "_":
             # check that val is really a bit mask
             if val & (val - 1) != 0:
-                raise ValueError("no bit mask in bit field: " % name)
+                raise ValueError("no bit mask in bit field: %s" % name)
             _name_to_val[name] = val
             _val_to_name[val] = name
             _names.append(name)

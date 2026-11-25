@@ -1,6 +1,3 @@
-import pytest
-
-
 def dos_setmode_cooked_test(vamos, tmpdir):
     # run setmode in mode 0 (cooked)
     rc, stdout, stderr = vamos.run_prog(

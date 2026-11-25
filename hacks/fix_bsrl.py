@@ -5,7 +5,8 @@ import array
 import struct
 
 parser = argparse.ArgumentParser(
-    description="Patch the bsr.l to bsr.w instructions in an Amiga binary to make it 68000 compatible"
+    description="Patch the bsr.l to bsr.w instructions in an Amiga binary "
+    "to make it 68000 compatible"
 )
 parser.add_argument("bin_file", help="AmigaOS binary")
 parser.add_argument("off_file", help="Offset file to patch")
@@ -60,7 +61,7 @@ off.close()
 
 # write output
 output = args.output
-if output == None:
+if output is None:
     output = args.bin_file + ".patched"
 
 print("writing '%s'..." % output, end=" ")

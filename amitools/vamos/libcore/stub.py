@@ -41,7 +41,7 @@ class LibStub(object):
 
     def _gen_arg_dump(self, args, ctx):
         """a call stub helper to dump the registers of a call"""
-        if args == None or len(args) == 0:
+        if args is None or len(args) == 0:
             return ""
         result = []
         for a in args:
@@ -285,9 +285,7 @@ class LibStubGen(object):
                     addr = get_addr()
                     res_str = "d0=%08x (%s)" % (addr, res)
                 else:
-                    raise ValueError(
-                        f"Invalid result value '{result_value}' for {result_type}"
-                    )
+                    raise ValueError(f"Invalid result value '{res}' for {type(res)}")
         else:
             res_str = "n/a"
         return res_str

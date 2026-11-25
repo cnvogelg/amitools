@@ -52,7 +52,7 @@ class MicroCLI:
         for p in ctx.path_mgr.get_cmd_paths():
             if p != "C:" and p != "c:":
                 lock = ctx.dos_lib.lock_mgr.create_lock(None, p, False)
-                if lock != None:
+                if lock is not None:
                     path = ctx.alloc.alloc_astruct(PathStruct, label="Path(%s)" % p)
                     path.path_Lock.aptr = lock.mem.addr
                     path.path_Next.aptr = cmd_dir_addr

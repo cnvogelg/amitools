@@ -327,8 +327,13 @@ def schedule_multiple_callbacks_and_removal_test(context):
 def schedule_idle_calls_all_sources_test(context):
     scheduler = context.scheduler
     calls = []
-    a = lambda: calls.append("a") or True
-    b = lambda: calls.append("b") or False
+
+    def a():
+        return calls.append("a") or True
+
+    def b():
+        return calls.append("b") or False
+
     scheduler.add_idle_callback(a)
     scheduler.add_idle_callback(a)
     scheduler.add_idle_callback(b)

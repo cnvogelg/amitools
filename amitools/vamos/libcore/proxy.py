@@ -67,7 +67,7 @@ class LibProxyRegs:
             if get_addr is not None:
                 val = get_addr()
             else:
-                raise ValueError(f"Invalid argument for proxy call reg={reg} val={val}")
+                raise ValueError(f"Invalid argument for proxy call val={val}")
         return val
 
     def _map_tag_list(self, tag_list):

@@ -98,7 +98,7 @@ class DiskGeometry:
             elif "size" in options:
                 # parse size
                 size = options["size"]
-                if type(size) != int:
+                if type(size) is not int:
                     size = ByteSize.parse_byte_size_str(size)
                     if size is None:
                         return None

@@ -1,10 +1,8 @@
 from amitools.vamos.machine import Machine, Code
 from amitools.vamos.mem import MemoryAlloc
-from amitools.vamos.schedule import Scheduler, TaskState, NativeTask, PythonTask
+from amitools.vamos.schedule import TaskState, NativeTask, PythonTask
 from amitools.vamos.task import MappedTask
 from amitools.vamos.libtypes import Task, Process
-from amitools.vamos.machine.opcodes import *
-from amitools.vamos.machine.regs import *
 
 
 class Ctx:

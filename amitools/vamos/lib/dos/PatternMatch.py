@@ -69,9 +69,13 @@ def pattern_parse(src_str, ignore_case=True, star_is_wild=False):
     flush_blocks = False
 
     if ignore_case:
-        tr = lambda x: x.lower()
+
+        def tr(x):
+            return x.lower()
     else:
-        tr = lambda x: x
+
+        def tr(x):
+            return x
 
     pos = 0
     while pos < n_src:
@@ -88,7 +92,7 @@ def pattern_parse(src_str, ignore_case=True, star_is_wild=False):
         if src == "#":
             has_wild = True
             # next char?
-            if next == None:
+            if next is None:
                 return None
             # '#?' - match any characters
             if next == "?":
@@ -106,7 +110,7 @@ def pattern_parse(src_str, ignore_case=True, star_is_wild=False):
         # '~' - negate following expression
         elif src == "~":
             # at the end? -> place plain
-            if next == None:
+            if next is None:
                 dst += src
             # invalid
             elif next == ")":
@@ -343,9 +347,13 @@ def _scan_or_block(pat, pat_pos, str_pos, markers):
 def pattern_match(pattern, in_str, debug=False):
     """match pattern pat against str and return True/False"""
     if pattern.ignore_case:
-        tr = lambda x: x.lower()
+
+        def tr(x):
+            return x.lower()
     else:
-        tr = lambda x: x
+
+        def tr(x):
+            return x
 
     pat = pattern.pat_str
     markers = MarkerStack()
@@ -396,7 +404,8 @@ def pattern_match(pattern, in_str, debug=False):
             # add a marker skipping the NOT pattern at this string
             markers.push(Marker(True, pat_end, str_pos))
             # we continue to scan the NOT expression
-            # if it succeeds then NOTEND is reached -> path will fail as we matched the NOT expr
+            # if it succeeds then NOTEND is reached -> path will fail as we
+            # matched the NOT expr
             # otherwise this pushed marker will continue with pattern scanning
 
         # --- NOTEND - end not block reached -------------------------------------
@@ -565,7 +574,7 @@ def pattern_match(pattern, in_str, debug=False):
         # get next marker to try
         if get_next_marker:
             m = markers.pop()
-            if m == None:
+            if m is None:
                 if debug:
                     print("no next marker. end")
                 return False
@@ -623,7 +632,7 @@ if __name__ == "__main__":
         print("Usage:", sys.argv[0], "<pattern> [match]")
     else:
         pat = pattern_parse(a[0])
-        if pat == None:
+        if pat is None:
             print("Error parsing pattern!")
             sys.exit(1)
         else:

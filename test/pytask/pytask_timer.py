@@ -1,5 +1,3 @@
-import time
-from amitools.vamos.astructs import LONG
 from amitools.vamos.libstructs import TimeRequestStruct
 from amitools.vamos.libtypes import TimeVal
 from amitools.vamos.lib.TimerDevice import TimerDevice

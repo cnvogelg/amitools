@@ -92,7 +92,10 @@ def iff_nested_roundtrip_test(os_ctx):
     assert lib.PopChunk(ctx, iff) == 0
     assert lib.PopChunk(ctx, iff) == 0
     assert lib.PopChunk(ctx, iff) == 0
-    expected = b"FORM\x00\x00\x00(PREFTEST\x00\x00\x00\x03abc\0FORM\x00\x00\x00\x10PREFDATA\x00\x00\x00\x041234"
+    expected = (
+        b"FORM\x00\x00\x00(PREFTEST\x00\x00\x00\x03abc\0FORM\x00\x00\x00\x10"
+        b"PREFDATA\x00\x00\x00\x041234"
+    )
     assert stream.getvalue() == expected
     lib.CloseIFF(ctx, iff)
     assert not stream.closed

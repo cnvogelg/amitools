@@ -1,6 +1,6 @@
 import struct
 from amitools.vamos.machine import Code, REG_A2, REG_A3
-from amitools.vamos.lib.dos.Printf import *
+from ..dos.Printf import printf_generate_output, printf_parse_string, printf_read_data
 
 # setup loop code fragment:
 # +0000: 243c <len-1.l>       move.l #<len-1>,d2

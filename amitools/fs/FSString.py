@@ -1,10 +1,10 @@
-import sys
 import unicodedata
 
 
 class FSString:
-    """Simple string class that allows to manage strings encoded in Latin-1 used for the Amiga FS.
-    It stores the string internally as a python UTF-8 string but allows to convert to Amiga format.
+    """Simple string class that allows to manage strings encoded in Latin-1
+    used for the Amiga FS. It stores the string internally as a python UTF-8
+    string but allows to convert to Amiga format.
     """
 
     def __init__(self, txt="", encoding="Latin-1"):

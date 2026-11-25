@@ -1,5 +1,4 @@
 import os
-import pytest
 
 
 def dos_examine_test(vamos, tmpdir):

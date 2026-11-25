@@ -3,12 +3,11 @@ from amitools.fd import read_lib_fd
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.libcore import (
     LibImplScanner,
-    LibImplScan,
     LibImplFuncArg,
     LibImplFuncTag,
 )
 from amitools.vamos.error import VamosInternalError
-from amitools.vamos.machine.regs import *
+from amitools.vamos.machine.regs import REG_A0, REG_D0
 from amitools.vamos.libtypes import TagItem
 
 

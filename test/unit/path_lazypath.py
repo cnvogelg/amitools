@@ -1,5 +1,5 @@
 import pytest
-from amitools.vamos.path import *
+from amitools.vamos.path import AmiPath, AmiPathError, LazyPath, LazyPathList
 
 
 def lp_with_resolver(path):
@@ -145,6 +145,6 @@ def path_lazypath_list_resolver_test():
     assert lpl.is_resolved()
     assert str(lpl) == "[baz:,bar:]"
     assert (
-        repr(lpl)
-        == "LazyPathList(paths=[LazyPath(path=baz:, resolved_path=baz:), LazyPath(path=foo:, resolved_path=bar:)])"
+        repr(lpl) == "LazyPathList(paths=[LazyPath(path=baz:, resolved_path=baz:), "
+        "LazyPath(path=foo:, resolved_path=bar:)])"
     )

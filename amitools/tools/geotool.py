@@ -17,7 +17,8 @@ def main(args=None):
     n = len(a)
     if n < 3:
         print(
-            "Usage: (detect <size|file> [options] | setup <options> | open <file> [options] | create <file> <options>)"
+            "Usage: (detect <size|file> [options] | setup <options> | "
+            "open <file> [options] | create <file> <options>)"
         )
         print(
             """Options:
@@ -38,7 +39,7 @@ def main(args=None):
             else:
                 # parse size string
                 size = ByteSize.parse_byte_size_str(a[2])
-            if size == None:
+            if size is None:
                 print("Invalid size!")
             else:
                 d = DiskGeometry()
@@ -48,7 +49,7 @@ def main(args=None):
                 print("size:  ", size)
                 print("opts:  ", opts)
                 size = d.detect(size, opts)
-                if size != None:
+                if size is not None:
                     print("geo:   ", d)
                 else:
                     print("FAILED")
@@ -58,7 +59,7 @@ def main(args=None):
             opts = KeyValue.parse_key_value_strings(a[2:])
             print("opts:  ", opts)
             size = d.setup(opts)
-            if size != None:
+            if size is not None:
                 print("setup: ", size, ByteSize.to_byte_size_str(size))
                 print("geo:   ", d)
             else:
@@ -71,7 +72,7 @@ def main(args=None):
             print("opts:   ", opts)
             f = BlkDevFactory()
             blkdev = f.open(a[2], options=opts)
-            if blkdev != None:
+            if blkdev is not None:
                 print("blkdev: ", blkdev.__class__.__name__)
                 print("geo:    ", blkdev.get_geometry())
                 blkdev.close()
@@ -83,7 +84,7 @@ def main(args=None):
             print("opts:   ", opts)
             f = BlkDevFactory()
             blkdev = f.create(a[2], options=opts)
-            if blkdev != None:
+            if blkdev is not None:
                 print("blkdev: ", blkdev.__class__.__name__)
                 print("geo:    ", blkdev.get_geometry())
                 blkdev.close()

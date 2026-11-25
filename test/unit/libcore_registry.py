@@ -1,5 +1,3 @@
-import pytest
-
 from amitools.vamos.lib.DosLibrary import DosLibrary
 from amitools.vamos.lib.ExecLibrary import ExecLibrary
 from amitools.vamos.libcore import LibRegistry

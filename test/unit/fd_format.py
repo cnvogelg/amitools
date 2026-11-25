@@ -1,4 +1,4 @@
-from amitools.fd import *
+from amitools.fd.FDFormat import generate_fd, get_base_name, get_fd_name, read_lib_fd
 
 
 def fd_format_get_base_name_test():

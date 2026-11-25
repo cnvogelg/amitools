@@ -1,6 +1,3 @@
-import pytest
-
-
 def dos_system_test(vamos):
     vamos.make_prog("proc_args")
     cmd_name = vamos.get_prog_bin_name("proc_args")

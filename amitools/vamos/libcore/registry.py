@@ -1,6 +1,3 @@
-from .impl import LibImpl
-
-
 class LibRegistry:
     def __init__(self):
         self.impls = {}

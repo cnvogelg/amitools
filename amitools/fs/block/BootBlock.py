@@ -23,7 +23,7 @@ class BootBlock(Block):
         self.valid_dos_type = True
         # root blk
         self.calc_root_blk = self.blkdev.get_root_block_num()
-        if root_blk != None:
+        if root_blk is not None:
             self.got_root_blk = root_blk
         else:
             self.got_root_blk = self.calc_root_blk
@@ -37,7 +37,7 @@ class BootBlock(Block):
         return self.set_boot_code(boot_code)
 
     def set_boot_code(self, boot_code):
-        if boot_code != None:
+        if boot_code is not None:
             if len(boot_code) <= self.max_boot_code:
                 self.boot_code = boot_code
                 self.valid = True
@@ -108,7 +108,7 @@ class BootBlock(Block):
         self._put_long(0, self.dos_type)
         self._put_long(2, self.got_root_blk)
 
-        if self.boot_code != None:
+        if self.boot_code is not None:
             self.write_boot_code()
             self.calc_chksum = self._calc_chksum()
             self._put_long(1, self.calc_chksum)
@@ -166,7 +166,7 @@ class BootBlock(Block):
             % (self.got_chksum, self.calc_chksum, self.valid_chksum)
         )
         print(" valid:     %s" % self.valid)
-        if self.boot_code != None:
+        if self.boot_code is not None:
             print(" boot_code: %d bytes" % len(self.boot_code))
 
     def get_boot_code_dir(self):

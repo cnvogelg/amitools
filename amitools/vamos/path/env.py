@@ -1,4 +1,4 @@
-from .amipath import AmiPath, AmiPathError
+from .amipath import AmiPathError
 from .lazypath import LazyPath, LazyPathList
 from amitools.vamos.log import log_path
 

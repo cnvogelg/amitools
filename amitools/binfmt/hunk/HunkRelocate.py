@@ -48,7 +48,7 @@ class HunkRelocate:
             main_hunk = segment[0]
             hunk_no = main_hunk["hunk_no"]
             alloc_size = main_hunk["alloc_size"]
-            size = main_hunk["size"]
+            main_hunk["size"]
             data = ctypes.create_string_buffer(alloc_size)
 
             # fill in segment data

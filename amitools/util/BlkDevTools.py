@@ -21,10 +21,10 @@ def getblkdevsize(dev):
 
         fh = open(dev, "r")
         buf = array.array("B", list(range(0, 4)))  # uint32
-        r = fcntl.ioctl(fh.fileno(), DKIOCGETBLOCKSIZE, buf, 1)
+        fcntl.ioctl(fh.fileno(), DKIOCGETBLOCKSIZE, buf, 1)
         blocksize = struct.unpack("I", buf)[0]
         buf = array.array("B", list(range(0, 8)))  # uint64
-        r = fcntl.ioctl(fh.fileno(), DKIOCGETBLOCKCOUNT, buf, 1)
+        fcntl.ioctl(fh.fileno(), DKIOCGETBLOCKCOUNT, buf, 1)
         blockcount = struct.unpack("Q", buf)[0]
         fh.close()
         size = blocksize * blockcount
@@ -37,7 +37,7 @@ def getblkdevsize(dev):
 
         fh = open(dev, "r")
         buf = array.array("B", list(range(0, 8)))  # off_t / int64
-        r = fcntl.ioctl(fh.fileno(), DIOCGMEDIASIZE, buf, 1)
+        fcntl.ioctl(fh.fileno(), DIOCGMEDIASIZE, buf, 1)
         size = struct.unpack("q", buf)[0]
         fh.close()
 

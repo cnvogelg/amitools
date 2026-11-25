@@ -1,4 +1,3 @@
-import pytest
 from amitools.vamos.machine.opcodes import op_rts
 from amitools.vamos.libstructs import LibraryStruct, NodeType, LibFlags
 from amitools.vamos.libtypes import Library
@@ -79,7 +78,6 @@ def libtypes_library_open_cnt_test(mem_alloc):
     name = "my.library"
     id_str = "my.library 1.2"
     neg_size = 30
-    pos_size = LibraryStruct.get_size()
     lib = Library.alloc(alloc, name=name, id_string=id_str, neg_size=neg_size)
     # test open cnt
     assert lib.open_cnt.val == 0

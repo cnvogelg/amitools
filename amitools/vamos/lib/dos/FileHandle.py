@@ -103,7 +103,7 @@ class FileHandle:
         self.mem = None
         self.struct = None
 
-    # --- file ops ---
+        # --- file ops ---
 
     def set_mode(self, cooked):
         """ACTION_SCREEN_MODE: set the console buffer mode
@@ -116,7 +116,7 @@ class FileHandle:
                 return self.handler.set_mode(self.handler_file, cooked)
             except HandlerError:
                 return False
-        # handler-less fallback: the stream may provide tty mode handling
+                # handler-less fallback: the stream may provide tty mode handling
         fn = getattr(self.obj, "set_mode", None)
         if fn is None:
             return False
@@ -157,11 +157,11 @@ class FileHandle:
             except IOError:
                 got = -1
 
-        # do auto flush?
+                # do auto flush?
         if got > 0 and self.auto_flush:
             self.flush()
 
-        # return got bytes
+            # return got bytes
         return got
 
     def read(self, len):
@@ -197,7 +197,7 @@ class FileHandle:
             # -1 on Error
             if d == -1:
                 return -1
-            # -2 on EOF
+                # -2 on EOF
             elif d == b"":
                 return -2
             self.ch = d[0]
@@ -225,7 +225,7 @@ class FileHandle:
     def ungetc(self, var):
         if var == 0xFFFFFFFF:
             var = -1
-        # var == -1 -> unget last char
+            # var == -1 -> unget last char
         if var < 0 and self.ch >= 0:
             var = self.ch
             self.ch = -1
@@ -280,7 +280,7 @@ class FileHandle:
                 return self.handler.set_file_size(self.handler_file, size, mode)
             except HandlerError:
                 return -1
-        # handler-less fallback: truncate the raw stream
+                # handler-less fallback: truncate the raw stream
         obj = self.obj
         if obj is None:
             return -1
@@ -310,7 +310,7 @@ class FileHandle:
             return
         self.obj.flush()
 
-    # --- record locks (ACTION_LOCK_RECORD / ACTION_FREE_RECORD) ---
+        # --- record locks (ACTION_LOCK_RECORD / ACTION_FREE_RECORD) ---
 
     def lock_record(self, offset, length, mode, timeout):
         """lock a byte range of the file: return (success, error_code)
@@ -326,7 +326,7 @@ class FileHandle:
                 return True, 0
             except HandlerError as e:
                 return False, e.code
-        # handler-less fallback: a per-handle list
+                # handler-less fallback: a per-handle list
         end = offset + length
         exclusive = mode in (REC_EXCLUSIVE, REC_EXCLUSIVE_IMMED)
         for other_offset, other_length, other_mode in self.record_locks:
@@ -346,8 +346,8 @@ class FileHandle:
                 return True, 0
             except HandlerError as e:
                 return False, e.code
-        for i, (o, l, _m) in enumerate(self.record_locks):
-            if o == offset and l == length:
+        for i, (o, rec_len, _m) in enumerate(self.record_locks):
+            if o == offset and rec_len == length:
                 del self.record_locks[i]
                 return True, 0
         return False, ERROR_RECORD_NOT_LOCKED

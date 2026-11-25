@@ -1,5 +1,4 @@
 import logging
-import pytest
 
 from amitools.vamos.libcore import LibStubGen, LibCtx, LibImplScanner
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary

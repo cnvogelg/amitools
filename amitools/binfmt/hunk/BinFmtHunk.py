@@ -1,7 +1,23 @@
-from amitools.binfmt.BinImage import *
+from ..BinImage import (
+    BIN_IMAGE_RELOC_32,
+    BIN_IMAGE_RELOC_PC32,
+    BIN_IMAGE_TYPE_HUNK,
+    BinImage,
+    DebugLine,
+    DebugLineEntry,
+    DebugLineFile,
+    Reloc,
+    Relocations,
+    SEGMENT_TYPE_BSS,
+    SEGMENT_TYPE_CODE,
+    SEGMENT_TYPE_DATA,
+    Segment,
+    Symbol,
+    SymbolTable,
+)
+from .HunkDebug import HunkDebugLine
 from .HunkBlockFile import HunkBlockFile, HunkParseError
 from .HunkLoadSegFile import HunkLoadSegFile, HunkSegment
-from .HunkDebug import *
 from . import Hunk
 
 
@@ -158,7 +174,9 @@ class BinFmtHunk:
                 Hunk.HUNK_RELOC32SHORT,
                 Hunk.HUNK_RELRELOC32,
             ):
-                raise HunkParseError("Invalid Relocations for BinImage: %d" % blk_id)
+                raise HunkParseError(
+                    "Invalid Relocations for BinImage: %d" % blk.blk_id
+                )
             relocs = blk.relocs
             for r in relocs:
                 hunk_num = r[0]
@@ -166,7 +184,7 @@ class BinFmtHunk:
                 to_seg = all_segs[hunk_num]
                 # create reloc for target segment or reuse one.
                 rl = seg.get_reloc(to_seg)
-                if rl == None:
+                if rl is None:
                     rl = Relocations(to_seg)
                 # type
                 if blk.blk_id == Hunk.HUNK_RELRELOC32:

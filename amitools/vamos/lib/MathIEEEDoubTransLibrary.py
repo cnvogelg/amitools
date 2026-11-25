@@ -1,7 +1,7 @@
-from amitools.vamos.machine.regs import *
+from ...util.Math import double_to_regs, float_to_reg, reg_to_float, regs_to_double
+from ..machine.regs import REG_A0, REG_D0, REG_D1, REG_D2, REG_D3
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.log import log_math
-from amitools.util.Math import *
 import math
 
 

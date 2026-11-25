@@ -91,7 +91,7 @@ def path_volume_sys_to_ami_test(tmpdir):
     v = VolumeManager()
     mp = tmpdir.mkdir("bla")
     my_path = str(mp)
-    no_path = str(tmpdir.join("hugo"))
+    str(tmpdir.join("hugo"))
     mp2 = mp.mkdir("blub")
     my_path2 = str(mp2)
     assert v.add_volume("My:" + my_path)

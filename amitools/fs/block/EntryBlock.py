@@ -1,5 +1,4 @@
 from .Block import Block
-from .CommentBlock import CommentBlock
 from ..FSString import FSString
 
 
@@ -61,7 +60,8 @@ class EntryBlock(Block):
 
     @staticmethod
     def needs_extra_comment_block(name, comment):
-        """Returns whether the given name/comment pair requires an extra comment block"""
+        """Returns whether the given name/comment pair requires an extra comment
+        block"""
         return len(name.get_ami_str()) + len(comment.get_ami_str()) > 110
 
     def _read_owner(self):

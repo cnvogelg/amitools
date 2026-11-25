@@ -16,6 +16,7 @@ usage:
 
 import argparse
 import hashlib
+import importlib
 import os
 import sys
 
@@ -24,8 +25,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, os.pardir, os.pardir))
 sys.path.insert(1, REPO)
 
-from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
-from amitools.fs.ADFSVolume import ADFSVolume
+BlkDevFactory = importlib.import_module(
+    "amitools.fs.blkdev.BlkDevFactory"
+).BlkDevFactory
+ADFSVolume = importlib.import_module("amitools.fs.ADFSVolume").ADFSVolume
 
 # ---------------------------------------------------------------------------
 # the known ARexx files: relative output path, source file name, version,
@@ -38,46 +41,121 @@ from amitools.fs.ADFSVolume import ADFSVolume
 # ---------------------------------------------------------------------------
 AREXX_FILES = [
     # --- libraries ---
-    ("Libs/rexxsyslib.library", "rexxsyslib.library", "47.2 (19.8.2019)",
-     "54982a5e9919097050c3fe56cb319e20763e6326",
-     "Workbench 3.2, Libs/"),
-    ("Libs/rexxsupport.library", "rexxsupport.library", "47.2 (2.4.2023)",
-     "d0d25ee6584eba401f62f18de7758e6fb886ed31",
-     "3.2.3 update, Libs/rexxsupport.library.Z"),
+    (
+        "Libs/rexxsyslib.library",
+        "rexxsyslib.library",
+        "47.2 (19.8.2019)",
+        "54982a5e9919097050c3fe56cb319e20763e6326",
+        "Workbench 3.2, Libs/",
+    ),
+    (
+        "Libs/rexxsupport.library",
+        "rexxsupport.library",
+        "47.2 (2.4.2023)",
+        "d0d25ee6584eba401f62f18de7758e6fb886ed31",
+        "3.2.3 update, Libs/rexxsupport.library.Z",
+    ),
     # --- ARexx master ---
-    ("System/RexxMast", "RexxMast", "47.2 (5.8.2019)",
-     "c5ff779e18ea2d15275f62ccab5746b2d66d2d5d",
-     "Workbench 3.2, System/"),
+    (
+        "System/RexxMast",
+        "RexxMast",
+        "47.2 (5.8.2019)",
+        "c5ff779e18ea2d15275f62ccab5746b2d66d2d5d",
+        "Workbench 3.2, System/",
+    ),
     # --- BOOPSI class ---
-    ("Classes/arexx.class", "arexx.class", "47.3 (3.6.2024)",
-     "a4dd6d7051bf73dfd62c87c3a4e70447ac4f2617",
-     "3.2.3 update, Classes/arexx.class.Z"),
+    (
+        "Classes/arexx.class",
+        "arexx.class",
+        "47.3 (3.6.2024)",
+        "a4dd6d7051bf73dfd62c87c3a4e70447ac4f2617",
+        "3.2.3 update, Classes/arexx.class.Z",
+    ),
     # --- ARexx host commands (REXX:) ---
-    ("Rexxc/HI", "HI", "45.1 (7.12.2017)",
-     "8c0be07a0a339f1386d55431cbfa1562349b8772", "Workbench 3.2, Rexxc/"),
-    ("Rexxc/RX", "RX", "45.9 (14.1.2018)",
-     "cb62bb549d954f889b46faf00e8655975eea3a89", "Workbench 3.2, Rexxc/"),
-    ("Rexxc/RXC", "RXC", "45.1 (7.12.2017)",
-     "f143b053179a100758f9e1943ae5fec1410513e5", "Workbench 3.2, Rexxc/"),
-    ("Rexxc/RXLIB", "RXLIB", "45.1 (7.12.2017)",
-     "ad6ed8b0adb785cd81f334a302ba3195a4b35370", "Workbench 3.2, Rexxc/"),
-    ("Rexxc/RXSET", "RXSET", "45.1 (7.12.2017)",
-     "361ee72cf92846c40d1b1b1726e05d7e53cba5eb", "Workbench 3.2, Rexxc/"),
-    ("Rexxc/TCC", "TCC", "45.1 (7.12.2017)",
-     "765c34d8a57367dba79925f97014a50040a962ec", "Workbench 3.2, Rexxc/"),
-    ("Rexxc/TCO", "TCO", "45.1 (7.12.2017)",
-     "8864f978ddfd47d88ccc6c591e899e682f86b081", "Workbench 3.2, Rexxc/"),
-    ("Rexxc/TE", "TE", "45.1 (7.12.2017)",
-     "b0daae98210379c522eec5ceae38d68ae2fc3757", "Workbench 3.2, Rexxc/"),
-    ("Rexxc/TS", "TS", "45.1 (7.12.2017)",
-     "13b27bd330fd0cd47b4006ecd8bbb14c843a727b", "Workbench 3.2, Rexxc/"),
-    ("Rexxc/WaitForPort", "WaitForPort", "45.1 (7.12.2017)",
-     "cf2a4fdbe02c712d7db36a86acda2936ffc46a48", "Workbench 3.2, Rexxc/"),
+    (
+        "Rexxc/HI",
+        "HI",
+        "45.1 (7.12.2017)",
+        "8c0be07a0a339f1386d55431cbfa1562349b8772",
+        "Workbench 3.2, Rexxc/",
+    ),
+    (
+        "Rexxc/RX",
+        "RX",
+        "45.9 (14.1.2018)",
+        "cb62bb549d954f889b46faf00e8655975eea3a89",
+        "Workbench 3.2, Rexxc/",
+    ),
+    (
+        "Rexxc/RXC",
+        "RXC",
+        "45.1 (7.12.2017)",
+        "f143b053179a100758f9e1943ae5fec1410513e5",
+        "Workbench 3.2, Rexxc/",
+    ),
+    (
+        "Rexxc/RXLIB",
+        "RXLIB",
+        "45.1 (7.12.2017)",
+        "ad6ed8b0adb785cd81f334a302ba3195a4b35370",
+        "Workbench 3.2, Rexxc/",
+    ),
+    (
+        "Rexxc/RXSET",
+        "RXSET",
+        "45.1 (7.12.2017)",
+        "361ee72cf92846c40d1b1b1726e05d7e53cba5eb",
+        "Workbench 3.2, Rexxc/",
+    ),
+    (
+        "Rexxc/TCC",
+        "TCC",
+        "45.1 (7.12.2017)",
+        "765c34d8a57367dba79925f97014a50040a962ec",
+        "Workbench 3.2, Rexxc/",
+    ),
+    (
+        "Rexxc/TCO",
+        "TCO",
+        "45.1 (7.12.2017)",
+        "8864f978ddfd47d88ccc6c591e899e682f86b081",
+        "Workbench 3.2, Rexxc/",
+    ),
+    (
+        "Rexxc/TE",
+        "TE",
+        "45.1 (7.12.2017)",
+        "b0daae98210379c522eec5ceae38d68ae2fc3757",
+        "Workbench 3.2, Rexxc/",
+    ),
+    (
+        "Rexxc/TS",
+        "TS",
+        "45.1 (7.12.2017)",
+        "13b27bd330fd0cd47b4006ecd8bbb14c843a727b",
+        "Workbench 3.2, Rexxc/",
+    ),
+    (
+        "Rexxc/WaitForPort",
+        "WaitForPort",
+        "45.1 (7.12.2017)",
+        "cf2a4fdbe02c712d7db36a86acda2936ffc46a48",
+        "Workbench 3.2, Rexxc/",
+    ),
 ]
 
 # extensions that are treated as Amiga disk images
-DISK_EXTS = (".adf", ".adz", ".adf.gz", ".hdf", ".hdz", ".hdf.gz",
-             ".rdb", ".rdisk", ".rdisk.gz")
+DISK_EXTS = (
+    ".adf",
+    ".adz",
+    ".adf.gz",
+    ".hdf",
+    ".hdz",
+    ".hdf.gz",
+    ".rdb",
+    ".rdisk",
+    ".rdisk.gz",
+)
 
 # .Z compressed members are recognised case-insensitively
 Z_SUFFIX = ".z"
@@ -298,12 +376,19 @@ def scan_source(src, names, want, found, unknown, verbose):
 
 def main():
     ap = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("sources", nargs="+",
-                    help="folders and/or Amiga disk images (scanned recursively)")
-    ap.add_argument("-o", "--output", default=HERE,
-                    help="output folder (default: this script's folder)")
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument(
+        "sources",
+        nargs="+",
+        help="folders and/or Amiga disk images (scanned recursively)",
+    )
+    ap.add_argument(
+        "-o",
+        "--output",
+        default=HERE,
+        help="output folder (default: this script's folder)",
+    )
     ap.add_argument("-v", "--verbose", action="store_true", help="show extra detail")
     args = ap.parse_args()
 
@@ -314,8 +399,9 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
 
     names = {src.lower() for _, src, _, _, _ in AREXX_FILES}
-    want = {sha: (out_rel, src, ver, where)
-            for out_rel, src, ver, sha, where in AREXX_FILES}
+    want = {
+        sha: (out_rel, src, ver, where) for out_rel, src, ver, sha, where in AREXX_FILES
+    }
 
     found = {}
     unknown = []
@@ -348,8 +434,10 @@ def main():
         for out_rel, ver, where in missing:
             print("  - %s (%s): expected %s" % (out_rel, ver, where))
     if unknown:
-        print("\nnote: %d matching-named file(s) did not match a known SHA-1 "
-              "(run with -v to list)" % len(unknown))
+        print(
+            "\nnote: %d matching-named file(s) did not match a known SHA-1 "
+            "(run with -v to list)" % len(unknown)
+        )
 
     print("\n%d/%d ARexx files available in %s" % (ok, len(AREXX_FILES), out_dir))
     return 1 if missing else 0

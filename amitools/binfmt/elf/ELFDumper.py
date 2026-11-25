@@ -1,6 +1,3 @@
-from .ELF import *
-
-
 class ELFDumper:
     def __init__(self, elf_file):
         self.elf = elf_file
@@ -79,7 +76,8 @@ class ELFDumper:
             return
 
         print(
-            "idx   value     size    type      bind      visible   ndx              name"
+            "idx   value     size    type      bind      visible   "
+            "ndx              name"
         )
         for symtab in symtabs:
             for sym in symtab.get_table_symbols():

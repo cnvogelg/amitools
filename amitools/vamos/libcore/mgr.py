@@ -198,7 +198,7 @@ class VLibManager(object):
         return vlib
 
     def open_lib(self, lib_info, fake=False, lib_cfg=None):
-        vlib = self.get_vlib_by_name(name)
+        vlib = self.get_vlib_by_name(lib_info.name)
         if not vlib:
             vlib = self.make_lib(lib_info, fake, lib_cfg)
         if vlib:

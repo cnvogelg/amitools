@@ -17,9 +17,6 @@ jobs:
     - name: Check formatting
       run: ruff format --check .
     - name: Lint
-      # Non-blocking: the codebase still has a backlog of pre-existing
-      # lint warnings that is being worked down separately.
-      continue-on-error: true
       run: ruff check .
     - name: Check fixture blob manifest
       # Every file in test/blob_files.txt must be git-ignored so copyrighted

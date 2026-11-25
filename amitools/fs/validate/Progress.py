@@ -1,6 +1,3 @@
-import sys
-
-
 class Progress:
     def __init__(self):
         self.num = 0

@@ -112,14 +112,14 @@ class ListBase:
 
     def __len__(self):
         mem = self._mem
-        l = 0
+        num = 0
         addr = self._start_addr()
         while addr != 0:
             addr = mem.r32(addr + SUCC)
             if addr == 0:
                 break
-            l += 1
-        return l
+            num += 1
+        return num
 
     def is_empty(self):
         addr = self._start_addr()
@@ -233,7 +233,7 @@ class List(ListStruct, ListBase):
                 return self.promote_type()
             else:
                 return self
-        # arg?
+                # arg?
         arg = self._get_path_arg(path)
         if arg:
             sub_obj = self.find_name(arg)
@@ -241,7 +241,7 @@ class List(ListStruct, ListBase):
                 sub_path = self._skip_path_arg(path, arg)
                 return sub_obj.get_path(sub_path)
 
-    # ----- list ops -----
+                # ----- list ops -----
 
     def new(self, lt):
         self.type.val = lt

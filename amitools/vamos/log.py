@@ -108,13 +108,13 @@ def log_help():
         print("  %s" % n)
     print()
     print("logging levels:")
-    for l in levels:
-        print("  %s" % l)
+    for level in levels:
+        print("  %s" % level)
 
 
 def log_setup(cfg):
     # setup handler
-    if cfg.file != None:
+    if cfg.file is not None:
         ch = logging.FileHandler(cfg.file, mode="w")
     else:
         ch = logging.StreamHandler()
@@ -128,27 +128,27 @@ def log_setup(cfg):
     else:
         formatter = logging.Formatter("%(name)10s:%(levelname)7s:  %(message)s")
     ch.setFormatter(formatter)
-    for l in loggers:
-        l.addHandler(ch)
+    for logger in loggers:
+        logger.addHandler(ch)
 
-    # setup default
+        # setup default
     level = logging.WARN
     if cfg.quiet:
         log_cfg.info("log: quiet!")
         level = logging.ERROR
-    for l in loggers:
-        log_cfg.info("log: %s -> %s", l.name, levels_str[level])
-        if l in preset:
-            l.setLevel(preset[l])
+    for logger in loggers:
+        log_cfg.info("log: %s -> %s", logger.name, levels_str[level])
+        if logger in preset:
+            logger.setLevel(preset[logger])
         else:
-            l.setLevel(level)
+            logger.setLevel(level)
 
-    # is verbose enabled?
+            # is verbose enabled?
     if cfg.verbose:
         log_cfg.info("log: verbose: set main to INFO")
         log_main.setLevel(logging.INFO)
 
-    # parse args
+        # parse args
     levels = cfg.levels
     if levels:
         return _setup_levels(levels)
@@ -165,18 +165,18 @@ def _setup_levels(levels):
         # get and parse level
         lvl = levels[name]
         level = log_parse_level(lvl)
-        if level == None:
+        if level is None:
             log_cfg.error("invalid log level: %s", lvl)
             return False
-        # find logger
+            # find logger
         if name == "all":
-            for l in loggers:
-                l.setLevel(level)
+            for logger in loggers:
+                logger.setLevel(level)
         else:
             found = False
-            for l in loggers:
-                if l.name == name:
-                    l.setLevel(level)
+            for logger in loggers:
+                if logger.name == name:
+                    logger.setLevel(level)
                     found = True
                     break
             if not found:

@@ -5,7 +5,17 @@ from .ADFSBitmap import ADFSBitmap
 from .ADFSNode import ADFSNode
 from .FileName import FileName
 from .RootMetaInfo import RootMetaInfo
-from .FSError import *
+from .FSError import (
+    DELETE_NOT_ALLOWED,
+    FILE_NOT_FOUND,
+    FSError,
+    INVALID_BOOT_BLOCK,
+    INVALID_FILE_NAME,
+    INVALID_PARENT_DIRECTORY,
+    INVALID_ROOT_BLOCK,
+    INVALID_VOLUME_NAME,
+    NAME_ALREADY_EXISTS,
+)
 from .FSString import FSString
 from .TimeStamp import TimeStamp
 from . import DosType
@@ -75,7 +85,7 @@ class ADFSVolume:
         is_longname=False,
     ):
         # determine dos_type
-        if dos_type == None:
+        if dos_type is None:
             dos_type = DosType.DOS0
             if is_longname:
                 dos_type = DosType.DOS6
@@ -104,7 +114,7 @@ class ADFSVolume:
         self.boot.write()
         # create a root block
         self.root = RootBlock(self.blkdev, self.boot.calc_root_blk)
-        if meta_info == None:
+        if meta_info is None:
             meta_info = RootMetaInfo()
             meta_info.set_current_as_create_time()
             meta_info.set_current_as_mod_time()
@@ -198,7 +208,7 @@ class ADFSVolume:
         # make sure input is correct
         if not isinstance(path_name, FSString):
             raise ValueError("get_create_path_name's path_name must be a FSString")
-        if suggest_name != None and not isinstance(suggest_name, FSString):
+        if suggest_name is not None and not isinstance(suggest_name, FSString):
             raise ValueError("get_create_path_name's suggest_name must be a FSString")
         # is root path?
         fn = FileName(path_name, is_intl=self.is_intl, is_longname=self.is_longname)
@@ -210,18 +220,18 @@ class ADFSVolume:
         else:
             # try to get path_name as a directory
             node = self.get_dir_path_name(path_name)
-            if node != None:
+            if node is not None:
                 return node, suggest_name
             else:
                 # split into dir and file name
                 dn, fn = fn.get_dir_and_base_name()
-                if dn != None:
+                if dn is not None:
                     # has a directory -> try to fetch it
                     node = self.get_dir_path_name(dn)
                 else:
                     # no dir -> assume root dir
                     node = self.root_dir
-                if fn != None:
+                if fn is not None:
                     # take given name
                     return node, fn
                 else:
@@ -269,21 +279,21 @@ class ADFSVolume:
         self.change_meta_info(mi)
 
     def change_meta_info(self, meta_info):
-        if self.root != None and self.root.valid:
+        if self.root is not None and self.root.valid:
             dirty = False
             # update create_ts
             create_ts = meta_info.get_create_ts()
-            if create_ts != None:
+            if create_ts is not None:
                 self.root.create_ts = meta_info.get_create_ts()
                 dirty = True
             # update disk_ts
             disk_ts = meta_info.get_disk_ts()
-            if disk_ts != None:
+            if disk_ts is not None:
                 self.root.disk_ts = disk_ts
                 dirty = True
             # update mod_ts
             mod_ts = meta_info.get_mod_ts()
-            if mod_ts != None:
+            if mod_ts is not None:
                 self.root.mod_ts = mod_ts
                 dirty = True
             # update if something changed
@@ -348,16 +358,16 @@ class ADFSVolume:
             raise ValueError("rename's new_ami_path must be a FSString")
         # find the source node
         node = self.get_path_name(old_ami_path)
-        if node == None:
+        if node is None:
             raise FSError(FILE_NOT_FOUND, file_name=old_ami_path)
         # the root cannot be renamed
-        if node.parent == None:
+        if node.parent is None:
             raise FSError(DELETE_NOT_ALLOWED, node=node)
         # find the target parent and base name
         parent_node, new_name = self.get_create_path_name(new_ami_path)
-        if parent_node == None:
+        if parent_node is None:
             raise FSError(INVALID_PARENT_DIRECTORY, file_name=new_ami_path)
-        if new_name == None:
+        if new_name is None:
             raise FSError(NAME_ALREADY_EXISTS, file_name=new_ami_path)
         parent_node.rename_node(node, new_name)
 
@@ -372,15 +382,15 @@ class ADFSVolume:
             raise FSError(INVALID_FILE_NAME, file_name=ami_path)
         # split into dir and base name
         dir_name, base_name = fn.get_dir_and_base_name()
-        if base_name == None:
+        if base_name is None:
             raise FSError(INVALID_FILE_NAME, file_name=ami_path)
         # find parent of dir
-        if dir_name == None:
+        if dir_name is None:
             node = self.root_dir
         else:
             # no parent dir found
             node = self.get_dir_path_name(dir_name)
-            if node == None:
+            if node is None:
                 raise FSError(
                     INVALID_PARENT_DIRECTORY,
                     file_name=ami_path,
@@ -401,15 +411,15 @@ class ADFSVolume:
             raise FSError(INVALID_FILE_NAME, file_name=ami_path)
         # split into dir and base name
         dir_name, base_name = fn.get_dir_and_base_name()
-        if base_name == None:
+        if base_name is None:
             raise FSError(INVALID_FILE_NAME, file_name=ami_path)
         # find parent of link
-        if dir_name == None:
+        if dir_name is None:
             node = self.root_dir
         else:
             # no parent dir found
             node = self.get_dir_path_name(dir_name)
-            if node == None:
+            if node is None:
                 raise FSError(
                     INVALID_PARENT_DIRECTORY,
                     file_name=ami_path,
@@ -440,14 +450,14 @@ class ADFSVolume:
             raise FSError(INVALID_FILE_NAME, file_name=ami_path)
         # split into dir and base name
         dir_name, base_name = fn.get_dir_and_base_name()
-        if base_name == None:
+        if base_name is None:
             raise FSError(INVALID_FILE_NAME, file_name=ami_path)
         # find parent of link
-        if dir_name == None:
+        if dir_name is None:
             parent = self.root_dir
         else:
             parent = self.get_dir_path_name(dir_name)
-            if parent == None:
+            if parent is None:
                 raise FSError(
                     INVALID_PARENT_DIRECTORY,
                     file_name=ami_path,
@@ -459,9 +469,9 @@ class ADFSVolume:
         """Write given data as a file"""
         # get parent node and file_name
         parent_node, file_name = self.get_create_path_name(ami_path, suggest_name)
-        if parent_node == None:
+        if parent_node is None:
             raise FSError(INVALID_PARENT_DIRECTORY, file_name=ami_path)
-        if file_name == None:
+        if file_name is None:
             raise FSError(INVALID_FILE_NAME, file_name=file_name)
         # create file
         node = parent_node.create_file(file_name, data)
@@ -472,7 +482,7 @@ class ADFSVolume:
         """Read a file and return data"""
         # get node of file
         node = self.get_file_path_name(ami_path)
-        if node == None:
+        if node is None:
             raise FSError(FILE_NOT_FOUND, file_name=ami_path)
         data = node.get_file_data()
         if not cache:
@@ -485,6 +495,6 @@ class ADFSVolume:
         A link at the last path component is removed itself, not the object it
         names, so a link can be deleted without touching its target."""
         node = self.get_path_name(ami_path, follow_last=False)
-        if node == None:
+        if node is None:
             raise FSError(FILE_NOT_FOUND, file_name=ami_path)
         node.delete(wipe=wipe, all=all)

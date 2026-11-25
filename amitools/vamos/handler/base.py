@@ -181,14 +181,16 @@ class HandlerInfoData:
         self.num_soft_errors = num_soft_errors
         self.unit_number = unit_number
 
+        # --- method -> AmigaDOS packet map ----------------------------------------
+        # Every public action method of :class:`Handler` models exactly one AmigaDOS
+        # handler packet (``ACTION_*``). The map keeps the API a 1:1 model of the
+        # packets so a future ``PacketHandler`` can translate a method call into the
+        # matching ``DosPacket``. Methods without a packet (``tell``,
+        # ``is_interactive``)
+        # are deliberately not part of the handler API; lifecycle methods such as
+        # ``shutdown`` are not actions and are exempt.
 
-# --- method -> AmigaDOS packet map ----------------------------------------
-# Every public action method of :class:`Handler` models exactly one AmigaDOS
-# handler packet (``ACTION_*``). The map keeps the API a 1:1 model of the
-# packets so a future ``PacketHandler`` can translate a method call into the
-# matching ``DosPacket``. Methods without a packet (``tell``, ``is_interactive``)
-# are deliberately not part of the handler API; lifecycle methods such as
-# ``shutdown`` are not actions and are exempt.
+
 ACTION_METHODS = {
     # locks
     "locate_object": DosAction.ACTION_LOCATE_OBJECT,
@@ -296,7 +298,7 @@ class Handler:
     def _not_implemented(self, action):
         raise HandlerError(ERROR_NOT_IMPLEMENTED, "not implemented: %s" % action)
 
-    # --- locks ---
+        # --- locks ---
 
     def locate_object(self, ami_path, exclusive=False):
         self._unsupported("locate_object")
@@ -334,7 +336,7 @@ class Handler:
     def copy_dir_fh(self, fh):
         self._unsupported("copy_dir_fh")
 
-    # --- files ---
+        # --- files ---
 
     def find_input(self, ami_path):
         self._unsupported("find_input")
@@ -390,7 +392,7 @@ class Handler:
         """
         self._unsupported("wait_for_char")
 
-    # --- names ---
+        # --- names ---
 
     def delete_object(self, ami_path):
         self._unsupported("delete_object")
@@ -410,7 +412,7 @@ class Handler:
     def create_dir(self, ami_path):
         self._unsupported("create_dir")
 
-    # --- volume maintenance ---
+        # --- volume maintenance ---
 
     def rename_disk(self, new_name):
         """relabel the volume (ACTION_RENAME_DISK)"""
@@ -440,7 +442,7 @@ class Handler:
         """is this handler a file system? (ACTION_IS_FILESYSTEM)"""
         return self.is_fs
 
-    # --- links ---
+        # --- links ---
 
     def make_link(self, lock, name, dest, soft):
         """create a hard (``soft`` False) or soft link (ACTION_MAKE_LINK)
@@ -458,7 +460,7 @@ class Handler:
         """
         self._not_implemented("read_link")
 
-    # --- objects / metadata ---
+        # --- objects / metadata ---
 
     def change_mode(self, lock, mode):
         """switch the sharing mode of a lock or file handle (ACTION_CHANGE_MODE)"""
@@ -472,7 +474,7 @@ class Handler:
         """set the owner of an object (ACTION_SET_OWNER)"""
         self._not_implemented("set_owner")
 
-    # --- record locks ---
+        # --- record locks ---
 
     def lock_record(self, fh, offset, length, mode, timeout):
         """lock a record of an open file (ACTION_LOCK_RECORD)"""
@@ -482,7 +484,7 @@ class Handler:
         """release a record lock (ACTION_FREE_RECORD)"""
         self._not_implemented("free_record")
 
-    # --- notification ---
+        # --- notification ---
 
     def add_notify(self, notify):
         """start monitoring an object (ACTION_ADD_NOTIFY)"""
@@ -530,8 +532,8 @@ class FileSystemHandler(Handler):
         fh.record_locks.append((offset, length, mode))
 
     def free_record(self, fh, offset, length):
-        for i, (o, l, _m) in enumerate(fh.record_locks):
-            if o == offset and l == length:
+        for i, (o, rec_len, _m) in enumerate(fh.record_locks):
+            if o == offset and rec_len == length:
                 del fh.record_locks[i]
                 return
         raise HandlerError(ERROR_RECORD_NOT_LOCKED)

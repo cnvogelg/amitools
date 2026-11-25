@@ -41,8 +41,8 @@ def native_disk_lock_process_test():
     api = _Win32()
     handle = api.lock_disk(number)
     code = (
-        "from amitools.util.Win32Disk import _Win32; a=_Win32(); a.close(a.lock_disk(%d))"
-        % number
+        "from amitools.util.Win32Disk import _Win32; a=_Win32(); "
+        "a.close(a.lock_disk(%d))" % number
     )
     root = Path(__file__).resolve().parents[2]
     try:

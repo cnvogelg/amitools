@@ -1,5 +1,3 @@
-import sys
-
 from .tool import Tool
 from amitools.vamos.astructs import TypeDumper
 from amitools.vamos.libstructs import ExecLibraryStruct
@@ -75,7 +73,8 @@ class StateTool(Tool):
         roms = parser.get_roms()
         for rom in roms:
             print(
-                f"@{rom.address:08x}  +{rom.size:08x}  {rom.crc32:08x}  {rom.name}  {rom.path}"
+                f"@{rom.address:08x}  +{rom.size:08x}  {rom.crc32:08x}  "
+                f"{rom.name}  {rom.path}"
             )
 
         return 0

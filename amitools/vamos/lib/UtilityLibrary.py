@@ -4,15 +4,15 @@ from amitools.vamos.machine.regs import REG_D0, REG_D1, REG_A0, REG_A1
 from amitools.vamos.astructs import APTR
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.libstructs import ClockDataStruct
-from amitools.vamos.libtypes import TagList, TagItem, CommonTag, TagArray, Tag
-from amitools.vamos.lib.util.AmiDate import *
+from amitools.vamos.libtypes import TagList, TagItem, TagArray
+from ..log import log_utility
+from .util.AmiDate import date_at, read_clock_data, seconds_since, write_clock_data
 from amitools.vamos.lib.util.flags import (
     MapTagsFlag,
     FilterTagItemsFlag,
     PackStructureTagsFlag,
 )
 from amitools.vamos.lib.lexec.flags import MemFlag
-from amitools.vamos.log import *
 
 
 class UtilityLibrary(LibImpl):

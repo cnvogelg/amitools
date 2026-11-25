@@ -1,6 +1,18 @@
 from amitools.vamos.lib.dos.CSource import CSource
-from amitools.vamos.lib.dos.Args import *
-from amitools.vamos.lib.dos.Error import *
+from amitools.vamos.lib.dos.Args import (
+    ArgsParser,
+    ParseResultList,
+    TemplateArg,
+    TemplateArgList,
+)
+from amitools.vamos.lib.dos.Error import (
+    ERROR_BAD_NUMBER,
+    ERROR_KEY_NEEDS_ARG,
+    ERROR_REQUIRED_ARG_MISSING,
+    ERROR_TOO_MANY_ARGS,
+    NO_ERROR,
+    dos_error_strings,
+)
 
 
 def template_arg_test():

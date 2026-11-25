@@ -1,5 +1,4 @@
 import os
-import time
 import struct
 from contextlib import ExitStack
 
@@ -25,7 +24,7 @@ from amitools.vamos.lib.graphics import (
     JAM2,
 )
 from amitools.vamos.lib.intuition import TextFontStruct, WindowStruct
-from amitools.vamos.log import log_main, log_gfx
+from amitools.vamos.log import log_gfx
 from dataclasses import dataclass
 from amitools.vamos.display import get_display
 from amitools.vamos.display.base import Rect, Color
@@ -35,7 +34,6 @@ from amitools.vamos.lib.graphics_base import GfxBaseStruct
 from amitools.vamos.libtypes import List
 from amitools.vamos.libstructs import NodeType
 from amitools.vamos.lib.graphics_font import (
-    BitmapFont,
     load_topaz_font,
 )
 

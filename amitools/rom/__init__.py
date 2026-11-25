@@ -6,3 +6,18 @@ from .romaccess import RomAccess
 from .rombuilder import RomBuilder, KickRomBuilder, ExtRomBuilder
 from .rompatcher import RomPatcher
 from .romsplitter import RomSplitter
+
+__all__ = [
+    "BlizKickModule",
+    "ExtRomBuilder",
+    "KickRomAccess",
+    "KickRomBuilder",
+    "Loader",
+    "RemusFile",
+    "RemusFileSet",
+    "ResidentScan",
+    "RomAccess",
+    "RomBuilder",
+    "RomPatcher",
+    "RomSplitter",
+]

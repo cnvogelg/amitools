@@ -1,5 +1,5 @@
 import pytest
-from amitools.vamos.path import *
+from amitools.vamos.path import AmiPathEnv, AmiPathError
 from amitools.vamos.cfgcore import ConfigDict
 
 

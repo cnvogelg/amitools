@@ -1,6 +1,6 @@
 from . import Hunk
 from . import HunkDisassembler
-from amitools.util.HexDump import *
+from ...util.HexDump import print_hex
 
 
 class HunkShow:
@@ -65,7 +65,7 @@ class HunkShow:
             self.show_segment(segment, self.segments)
 
         # overlay
-        if self.overlay != None:
+        if self.overlay is not None:
             self.show_overlay_info()
             num_ov = len(self.overlay_headers)
             for o in range(num_ov):
@@ -290,13 +290,13 @@ class HunkShow:
         alloc_type,
     ):
         extra = ""
-        if alloc_size != None:
+        if alloc_size is not None:
             if alloc_type:
                 extra += "alloc size (%s) %08x " % (alloc_type, alloc_size)
             else:
                 extra += "alloc size %08x  " % alloc_size
         extra += "file header @%08x" % hunk_file_offset
-        if data_file_offset != None:
+        if data_file_offset is not None:
             extra += "  data @%08x" % data_file_offset
         print(
             "\t#%03d  %-5s  size %08x  %s  %s" % (hunk_no, type_name, size, extra, name)

@@ -43,7 +43,7 @@ class MatchFirstNext:
     def first(self, ctx):
         # match first entry
         self.path = self.matcher.begin()
-        if self.path == None:
+        if self.path is None:
             return ERROR_OBJECT_NOT_FOUND
         self.name = self.path_mgr.ami_name_of_path(self.lock, self.path)
         # get parent dir of first match
@@ -72,7 +72,7 @@ class MatchFirstNext:
     def _fill_fib(self, ctx, path):
         # fill FileInfo of first match in anchor
         lock = self.lock_mgr.create_lock(self.lock, path, False)
-        if lock == None:
+        if lock is None:
             return ERROR_OBJECT_NOT_FOUND
         fib_ptr = self.anchor.ap_Info.addr
         fib = FileInfoBlockStruct(ctx.mem, fib_ptr)
@@ -86,7 +86,7 @@ class MatchFirstNext:
 
     def _fill_lock(self, path):
         lock = self.lock_mgr.create_lock(self.lock, path, False)
-        if lock == None:
+        if lock is None:
             return False
         self.dir_lock = lock
         oldlock = self.lock_mgr.get_by_b_addr(self.achain_dummy_struct.lock.bptr)
@@ -101,10 +101,10 @@ class MatchFirstNext:
         return self._fill_lock(parent)
 
     def _push_dodir(self, name, path):
-        abs_path = self.path_mgr.ami_abs_path(self.lock, path)
+        self.path_mgr.ami_abs_path(self.lock, path)
         dir_entries = sorted(self.path_mgr.ami_list_dir(self.lock, path))
         # its really a dir
-        if dir_entries != None:
+        if dir_entries is not None:
             self.dodir_stack.append((name, path, dir_entries))
             self._fill_lock(path)
 
@@ -150,10 +150,10 @@ class MatchFirstNext:
             self.anchor.ap_Flags.val = flags
 
         # no dodir -> use matcher
-        if path == None:
+        if path is None:
             path = next(self.matcher)
             # no more matches
-            if path == None:
+            if path is None:
                 return ERROR_NO_MORE_ENTRIES
             # extract name
             name = self.path_mgr.ami_name_of_path(self.lock, path)
@@ -169,12 +169,12 @@ class MatchFirstNext:
 
     def end(self, ctx):
         # restore label
-        if self.new_label != None:
+        if self.new_label is not None:
             ctx.label_mgr.remove_label(self.new_label)
-        if self.old_label != None:
+        if self.old_label is not None:
             ctx.label_mgr.add_label(self.old_label)
         # free last dir lock & achain
-        if self.achain_dummy != None:
+        if self.achain_dummy is not None:
             oldlock = self.lock_mgr.get_by_b_addr(self.achain_dummy_struct.lock.bptr)
             self.lock_mgr.release_lock(oldlock)
             self.achain_dummy.free()
@@ -235,7 +235,7 @@ def match_next(dos, ctx, anchor_ptr):
         raise VamosInternalError("MatchNext: No matcher found for %06x" % anchor_ptr)
     mfn = dos.matches[anchor_ptr]
     # has matches?
-    if mfn != None:
+    if mfn is not None:
         dos.setioerr(ctx, mfn.next(ctx))
         if dos.io_err == NO_ERROR:
             log_dos.info(
@@ -259,7 +259,7 @@ def match_end(dos, ctx, anchor_ptr):
         raise VamosInternalError("MatchEnd: No matcher found for %06x" % anchor_ptr)
     mfn = dos.matches[anchor_ptr]
     del dos.matches[anchor_ptr]
-    if mfn != None:
+    if mfn is not None:
         mfn.end(ctx)
 
 

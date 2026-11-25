@@ -1,4 +1,4 @@
-from .amipath import AmiPath, AmiPathError
+from .amipath import AmiPath
 
 
 class LazyPath(object):

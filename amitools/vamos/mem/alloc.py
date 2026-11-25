@@ -1,4 +1,4 @@
-from amitools.vamos.error import *
+from ..error import VamosInternalError
 from amitools.vamos.log import log_mem_alloc
 from amitools.vamos.label import LabelRange, LabelStruct, LabelLib
 
@@ -12,7 +12,7 @@ class MemoryEntry:
         self.label = label
 
     def __str__(self):
-        if self.label != None:
+        if self.label is not None:
             return str(self.label)
         else:
             return "[@%06x +%06x %06x]" % (self.addr, self.size, self.addr + self.size)
@@ -54,7 +54,7 @@ class MemoryAlloc:
         if size == 0:
             size = mem.get_ram_size_kib() * 1024
             size -= addr
-        # if addr == 0 skip 0 to never return NULL pointer!
+            # if addr == 0 skip 0 to never return NULL pointer!
         if addr == 0:
             addr = 4
             size -= 4
@@ -105,18 +105,18 @@ class MemoryAlloc:
         return: index of chunk in free list or -1 if none found + bytes left in chunk
         """
         chunk = self.free_first
-        while chunk != None:
+        while chunk is not None:
             left = chunk.does_fit(size)
             # exact match
             if left == 0:
                 return (chunk, 0)
-            # potential candidate: has some bytes left
+                # potential candidate: has some bytes left
             elif left > 0:
                 # Don't make such a hassle. Return the first one that fits.
                 # This function takes too much time.
                 return (chunk, left)
             chunk = chunk.next
-        # nothing found?
+            # nothing found?
         return (None, -1)
 
     def _remove_chunk(self, chunk):
@@ -124,9 +124,9 @@ class MemoryAlloc:
         prev = chunk.prev
         if chunk == self.free_first:
             self.free_first = next
-        if next != None:
+        if next is not None:
             next.prev = prev
-        if prev != None:
+        if prev is not None:
             prev.next = next
         self.free_entries -= 1
 
@@ -135,9 +135,9 @@ class MemoryAlloc:
         prev = old_chunk.prev
         if old_chunk == self.free_first:
             self.free_first = new_chunk
-        if next != None:
+        if next is not None:
             next.prev = new_chunk
-        if prev != None:
+        if prev is not None:
             prev.next = new_chunk
         new_chunk.next = next
         new_chunk.prev = prev
@@ -146,19 +146,19 @@ class MemoryAlloc:
         cur = self.free_first
         last = None
         addr = chunk.addr
-        while cur != None:
+        while cur is not None:
             # fits right before
             if addr < cur.addr:
                 break
             last = cur
             cur = cur.next
-        # inster after last but before cur
-        if last == None:
+            # inster after last but before cur
+        if last is None:
             self.free_first = chunk
         else:
             last.next = chunk
             chunk.prev = last
-        if cur != None:
+        if cur is not None:
             chunk.next = cur
             cur.prev = chunk
         self.free_entries += 1
@@ -168,11 +168,11 @@ class MemoryAlloc:
         if a.addr + a.size == b.addr:
             chunk = MemoryChunk(a.addr, a.size + b.size)
             prev = a.prev
-            if prev != None:
+            if prev is not None:
                 prev.next = chunk
                 chunk.prev = prev
             next = b.next
-            if next != None:
+            if next is not None:
                 next.prev = chunk
                 chunk.next = next
             if self.free_first == a:
@@ -197,21 +197,21 @@ class MemoryAlloc:
         # find best free chunk
         chunk, left = self._find_best_chunk(size)
         # out of memory?
-        if chunk == None:
+        if chunk is None:
             if except_on_fail:
                 self.dump_orphans()
                 log_mem_alloc.error("[alloc: NO MEMORY for %06x bytes]" % size)
                 raise VamosInternalError("[alloc: NO MEMORY for %06x bytes]" % size)
             return 0
-        # remove chunk from free list
-        # is something left?
+            # remove chunk from free list
+            # is something left?
         addr = chunk.addr
         if left == 0:
             self._remove_chunk(chunk)
         else:
             left_chunk = MemoryChunk(addr + size, left)
             self._replace_chunk(chunk, left_chunk)
-        # add to valid allocs map
+            # add to valid allocs map
         self.addrs[addr] = size
         self.free_bytes -= size
         # erase memory
@@ -235,7 +235,7 @@ class MemoryAlloc:
         # first check if its a right alloc
         if addr not in self.addrs:
             raise VamosInternalError("Invalid Free'd Memory at %06x" % addr)
-        # align size to 4 bytes
+            # align size to 4 bytes
         size = (size + self.alignment - 1) & ~(self.alignment - 1)
         real_size = self.addrs[addr]
         assert size == real_size
@@ -247,26 +247,25 @@ class MemoryAlloc:
 
         # try to merge with prev/next
         prev = chunk.prev
-        if prev != None:
+        if prev is not None:
             new_chunk = self._merge_chunk(prev, chunk)
-            if new_chunk != None:
+            if new_chunk is not None:
                 log_mem_alloc.debug(
                     "merged: %s + this=%s -> %s", prev, chunk, new_chunk
                 )
                 chunk = new_chunk
         next = chunk.next
-        if next != None:
+        if next is not None:
             new_chunk = self._merge_chunk(chunk, next)
-            if new_chunk != None:
+            if new_chunk is not None:
                 log_mem_alloc.debug(
                     "merged: this=%s + %s -> %s", chunk, next, new_chunk
                 )
 
-        # correct free bytes
+                # correct free bytes
         self.free_bytes += size
         if self.change_callback is not None:
             self.change_callback()
-        num_allocs = len(self.addrs)
         log_mem_alloc.info(
             "[free  @%06x-%06x: %06x bytes] %s",
             addr,
@@ -284,7 +283,7 @@ class MemoryAlloc:
     def dump_mem_state(self):
         chunk = self.free_first
         num = 0
-        while chunk != None:
+        while chunk is not None:
             log_mem_alloc.debug("dump #%02d: %s" % (num, chunk))
             num += 1
             chunk = chunk.next
@@ -293,8 +292,8 @@ class MemoryAlloc:
         log_mem_alloc.warning("orphan: [@%06x +%06x %06x]" % (addr, size, addr + size))
         if self.label_mgr:
             labels = self.label_mgr.get_intersecting_labels(addr, size)
-            for l in labels:
-                log_mem_alloc.warning("-> %s", l)
+            for lbl in labels:
+                log_mem_alloc.warning("-> %s", lbl)
 
     def get_orphans(self):
         """return the still-allocated blocks as sorted ``(addr, size)`` pairs
@@ -309,26 +308,26 @@ class MemoryAlloc:
         if last is None:
             log_mem_alloc.warning("orphan: free list is empty")
             return
-        # orphan at begin?
+            # orphan at begin?
         if last.addr != self.addr:
             addr = self.addr
             size = last.addr - addr
             self._dump_orphan(addr, size)
-        # walk along free list
+            # walk along free list
         cur = last.next
-        while cur != None:
+        while cur is not None:
             addr = last.addr + last.size
             size = cur.addr - addr
             self._dump_orphan(addr, size)
             last = cur
             cur = cur.next
-        # orphan at end?
+            # orphan at end?
         addr = last.addr + last.size
         end = self.addr + self.size
         if addr != end:
             self._dump_orphan(addr, end - addr)
 
-    # ----- convenience functions with label creation -----
+            # ----- convenience functions with label creation -----
 
     def get_memory(self, addr):
         if addr in self.mem_objs:
@@ -379,7 +378,8 @@ class MemoryAlloc:
             return mem_obj
         raise VamosInternalError("Invalid struct free: %r" % (mem,))
 
-    # memory
+        # memory
+
     def alloc_memory(self, size, label=None, except_on_failure=True):
         addr = self.alloc_mem(size, except_on_failure)
         if addr == 0:
@@ -396,12 +396,13 @@ class MemoryAlloc:
 
     def free_memory(self, mem):
         log_mem_alloc.info("free memory: %s", mem)
-        if mem.label != None:
+        if mem.label is not None:
             self.label_mgr.remove_label(mem.label)
         self.free_mem(mem.addr, mem.size)
         del self.mem_objs[mem.addr]
 
-    # struct
+        # struct
+
     def alloc_struct(self, struct, size=None, label=None):
         mem = self._alloc_struct_mem(struct, size=size, label=label)
         log_mem_alloc.info("alloc struct: %s", mem)
@@ -431,11 +432,12 @@ class MemoryAlloc:
         self.free_mem(mem.addr, mem.size)
         del self.mem_objs[mem.addr]
 
-    # library
+        # library
+
     def alloc_lib(self, lib_struct, pos_size=0, neg_size=0, fd=None, label=None):
         if pos_size == 0:
             pos_size = lib_struct.get_size()
-        # round neg_size to multiple of four
+            # round neg_size to multiple of four
         neg_size = (neg_size + 3) & ~3
         size = neg_size + pos_size
         # alloc full size
@@ -490,7 +492,8 @@ class MemoryAlloc:
         self.free_mem(mem.addr, mem.size)
         del self.mem_objs[mem.addr]
 
-    # cstr
+        # cstr
+
     def alloc_cstr(self, cstr, label=None):
         size = len(cstr) + 1
         addr = self.alloc_mem(size)
@@ -512,7 +515,8 @@ class MemoryAlloc:
         self.free_mem(mem.addr, mem.size)
         del self.mem_objs[mem.addr]
 
-    # bstr
+        # bstr
+
     def alloc_bstr(self, bstr, label=None):
         size = len(bstr) + 2  # front: count, end: extra zero for safety
         addr = self.alloc_mem(size)
@@ -545,7 +549,7 @@ class MemoryAlloc:
     def available(self):
         free = 0
         chunk = self.free_first
-        while chunk != None:
+        while chunk is not None:
             free += chunk.size
             chunk = chunk.next
         return free
@@ -553,7 +557,7 @@ class MemoryAlloc:
     def largest_chunk(self):
         largest = 0
         chunk = self.free_first
-        while chunk != None:
+        while chunk is not None:
             if chunk.size > largest:
                 largest = chunk.size
             chunk = chunk.next

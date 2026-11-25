@@ -27,7 +27,8 @@ class LineState:
 
     def __str__(self):
         return (
-            "[address=%08x file=%d line=%d column=%d is_stmt=%s basic_block=%s end_sequence=%d]"
+            "[address=%08x file=%d line=%d column=%d is_stmt=%s basic_block=%s "
+            "end_sequence=%d]"
             % (
                 self.address,
                 self.file,
@@ -59,7 +60,7 @@ class DwarfDebugLine:
         if debug_line is None:
             self.error = "No .debug_line section found! No debug info?"
             return False
-        # get (optional) relocations
+            # get (optional) relocations
         rela = elf_file.get_section_by_name(".rela.debug_line")
         # start parsing
         self.input = io.StringIO(debug_line.data)
@@ -68,7 +69,7 @@ class DwarfDebugLine:
             return False
         if self.verbose:
             self.dump_header()
-        # decode line program
+            # decode line program
         matrix = []
         state = LineState(self.default_is_stmt)
         log = self._log
@@ -91,7 +92,7 @@ class DwarfDebugLine:
                     matrix.append(line)
                     state.__init__()
                     log("DW_LNE_end_sequence:", line)
-                # 2: DW_LNE_set_address
+                    # 2: DW_LNE_set_address
                 elif sub_opc == 2:
                     pos = self.input.tell()
                     addr = self.read_long()
@@ -99,16 +100,16 @@ class DwarfDebugLine:
                     state.address = addr + addend
                     state.section = sect
                     log("DW_LNE_set_address: %08x  sect=%s" % (state.address, sect))
-                # 3: DW_LNE_set_file
+                    # 3: DW_LNE_set_file
                 elif sub_opc == 3:
                     tup = self.decode_file()
                     self.files.append(tup)
                     log("DW_LNE_set_file", tup)
-                # other (unknown) ext opc
+                    # other (unknown) ext opc
                 else:
                     log("unknown sub opcode!")
                     self.input.seek(opc_size - 1, 1)
-            # standard opcodes
+                    # standard opcodes
             elif opc < self.opc_base:
                 # 1: DW_LNS_copy
                 if opc == 1:
@@ -116,33 +117,33 @@ class DwarfDebugLine:
                     matrix.append(line)
                     log("DW_LNS_copy:", line)
                     state.basic_block = False
-                # 2: DW_LNS_advance_pc
+                    # 2: DW_LNS_advance_pc
                 elif opc == 2:
                     offset = self.read_leb128() * self.min_instr_len
                     state.address += offset
                     log("DW_LNS_advance_pc: +%d -> %08x" % (offset, state.address))
-                # 3: DW_LNS_advance_line
+                    # 3: DW_LNS_advance_line
                 elif opc == 3:
                     offset = self.read_sleb128()
                     state.line += offset
                     log("DW_LNS_advance_line: +%d -> %d" % (offset, state.line))
-                # 4: DW_LNS_set_file
+                    # 4: DW_LNS_set_file
                 elif opc == 4:
                     state.file = self.read_leb128()
                     log("DW_LNS_set_file", state.file)
-                # 5: DW_LNS_set_column
+                    # 5: DW_LNS_set_column
                 elif opc == 5:
                     state.column = self.read_leb128()
                     log("DW_LNS_set_column", state.column)
-                # 6: DW_LNS_negate_stmt
+                    # 6: DW_LNS_negate_stmt
                 elif opc == 6:
                     state.is_stmt = not state.is_stmt
                     log("DW_LNS_negate_stmt", state.is_stmt)
-                # 7: DW_LNS_set_basic_block
+                    # 7: DW_LNS_set_basic_block
                 elif opc == 7:
                     state.basic_block = True
                     log("DW_LNS_set_basic_block")
-                # 8: DW_LNS_const_add_pc
+                    # 8: DW_LNS_const_add_pc
                 elif opc == 8:
                     (addr_addend, _) = self.decode_special_opcode(255)
                     state.address += addr_addend
@@ -150,18 +151,18 @@ class DwarfDebugLine:
                         "DW_LNS_const_add_pc: +%d -> %08x"
                         % (addr_addend, state.address)
                     )
-                # 9: DW_LNS_fixed_advance_pc
+                    # 9: DW_LNS_fixed_advance_pc
                 elif opc == 9:
                     offset = self.read_word()
                     state.address += offset
                     log("DW_LNS_fixed_advance_pc: %+08x" % offset)
-                # other (unknown) opc
+                    # other (unknown) opc
                 else:
                     num_args = self.std_opc_lens[opc]
                     log("skip unknown: num_args=", num_args)
                     for i in range(num_args):
                         self.read_leb128()
-            # special opcodes:
+                        # special opcodes:
             else:
                 (addr_addend, line_addend) = self.decode_special_opcode(opc)
                 state.address += addr_addend
@@ -170,7 +171,7 @@ class DwarfDebugLine:
                 line = state.clone()
                 matrix.append(line)
                 log("special", (opc - self.opc_base), line)
-        # done
+                # done
         self.matrix = matrix
         return True
 
@@ -220,23 +221,23 @@ class DwarfDebugLine:
         n = self.opc_base
         if n > 0:
             for i in range(n - 1):
-                l = self.read_byte()
-                self.std_opc_lens.append(l)
-        # 10 include dirs
+                opc_len = self.read_byte()
+                self.std_opc_lens.append(opc_len)
+                # 10 include dirs
         self.inc_dirs = []
         while True:
             inc_dir = self.read_string()
             if inc_dir == "":
                 break
             self.inc_dirs.append(inc_dir)
-        # 11 file names
+            # 11 file names
         self.files = []
         while True:
             tup = self.decode_file()
             if tup is None:
                 break
             self.files.append(tup)
-        # end header: check header size
+            # end header: check header size
         pos = self.input.tell()
         hdr_len = pos - 10
         if hdr_len != self.header_length:
@@ -305,7 +306,7 @@ class DwarfDebugLine:
             shift += 7
             if byte & 0x80 == 0:
                 break
-        # negative?
+                # negative?
         if byte & 0x40 == 0x40:
             mask = 1 << shift
             result |= -mask
@@ -327,8 +328,9 @@ class DwarfDebugLine:
         data = self.input.read(1)
         return struct.unpack(">b", data)[0]
 
+        # mini test
 
-# mini test
+
 if __name__ == "__main__":
     import sys
     from .ELFReader import ELFReader

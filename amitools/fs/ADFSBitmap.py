@@ -2,8 +2,13 @@ import struct
 
 from .block.BitmapBlock import BitmapBlock
 from .block.BitmapExtBlock import BitmapExtBlock
-from .DosType import *
-from .FSError import *
+from .DosType import rootblock_tracks_used_blocks
+from .FSError import (
+    BITMAP_BLOCK_COUNT_MISMATCH,
+    BITMAP_SIZE_MISMATCH,
+    FSError,
+    INVALID_BITMAP_BLOCK,
+)
 
 
 class ADFSBitmap:
@@ -240,7 +245,7 @@ class ADFSBitmap:
 
     def alloc_n(self, num):
         free_blks = self.find_n_free(num)
-        if free_blks == None:
+        if free_blks is None:
             return None
         for b in free_blks:
             self.clr_bit(b)

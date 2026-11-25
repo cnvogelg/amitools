@@ -336,14 +336,14 @@ def astructs_astruct_class_test():
     mem = MockMemory()
     alloc = MemoryAlloc(mem)
     pc = PlainClass.alloc(alloc)
-    assert type(pc) == PlainClass
+    assert type(pc) is PlainClass
     assert pc.foo() == ""
     # alloc a name
     pc.name.alloc_str(alloc, "hello")
     assert pc.foo() == "hello"
     # another struct
     pc2 = PlainClass.alloc(alloc, name="world!")
-    assert type(pc2) == PlainClass
+    assert type(pc2) is PlainClass
     assert pc2.name.str == "world!"
     assert pc2.foo() == "world!"
     pc.next.ref = pc2
@@ -380,7 +380,7 @@ def astructs_astruct_class_sub_test():
     mem = MockMemory()
     alloc = MemoryAlloc(mem)
     spc = SubPlainClass.alloc(alloc, plain={"name": "abc"}, plain2={"name": "cde"})
-    assert type(spc) == SubPlainClass
+    assert type(spc) is SubPlainClass
     assert spc.plain.name.str == "abc"
     assert spc.plain2.name.str == "cde"
     spc.free()
@@ -391,7 +391,7 @@ def astructs_astruct_class_subfield_alias_test():
     mem = MockMemory()
     alloc = MemoryAlloc(mem)
     spc = SubPlainClass.alloc(alloc, name="abc", plain2={"name": "cde"})
-    assert type(spc) == SubPlainClass
+    assert type(spc) is SubPlainClass
     assert spc.plain.name.str == "abc"
     assert spc.plain2.name.str == "cde"
     spc.free()

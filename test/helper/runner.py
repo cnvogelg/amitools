@@ -36,7 +36,7 @@ def run_proc(args, stdin_str=None, raw_output=False, use_pty=False, stdin_delay=
             time.sleep(stdin_delay)
             p.write(stdin_bytes)
 
-        # read remaining lines
+            # read remaining lines
         while True:
             try:
                 stdout += p.readline()
@@ -52,7 +52,7 @@ def run_proc(args, stdin_str=None, raw_output=False, use_pty=False, stdin_delay=
         (stdout, stderr) = p.communicate(stdin_bytes)
         returncode = p.returncode
 
-    # process stdout
+        # process stdout
     if not raw_output:
         stdout = stdout.decode("latin-1").splitlines()
         if stderr:
@@ -69,7 +69,7 @@ def run_func(func, args, stdin_str=None, raw_output=False):
         stdin_bytes = stdin_str.encode("latin-1")
         sys.stdin = io.TextIOWrapper(io.BytesIO(stdin_bytes))
 
-    # run vamos directly
+        # run vamos directly
     old_stdout = sys.stdout
     old_stderr = sys.stderr
     stdout_bytes_io = io.BytesIO()
@@ -187,7 +187,7 @@ class VamosTestRunner:
                 )
             run_subproc = True
 
-        # terminate args
+            # terminate args
         args.append("--")
 
         # built binaries have special prog names
@@ -196,7 +196,7 @@ class VamosTestRunner:
         if len(prog_args) > 1:
             args = args + list(prog_args[1:])
 
-        # run and get stdout/stderr
+            # run and get stdout/stderr
         print("running:", " ".join(args))
         if run_subproc:
             returncode, stdout, stderr = run_proc(
@@ -212,7 +212,7 @@ class VamosTestRunner:
 
             returncode, stdout, stderr = run_func(run, args[1:], stdin)
 
-        # show?
+            # show?
         if self.dump_file:
             fh = open("vamos.log", "a")
             fh.write(" ".join(args) + "\n")
@@ -236,7 +236,7 @@ class VamosTestRunner:
                 print(line)
             print("---end---")
 
-        # generate data?
+            # generate data?
         if self.generate_data:
             dat_path = self._get_data_path(prog_args[0], kw_args)
             print("wrote output to '%s'" % dat_path)
@@ -274,8 +274,8 @@ class VamosTestRunner:
         dat_path = self._get_data_path(prog_args[0], kw_args)
         f = open(dat_path, "r")
         ok_stdout = []
-        for l in f:
-            ok_stdout.append(l.strip())
+        for line in f:
+            ok_stdout.append(line.strip())
         f.close()
         # do regex compare?
         if "regex" in kw_args:
@@ -318,13 +318,13 @@ class VamosRunner:
         else:
             stdin = None
 
-        # timestamps?
+            # timestamps?
         if "no_ts" in kw_args:
             no_ts = kw_args["no_ts"]
         else:
             no_ts = True
 
-        # run vamos with prog
+            # run vamos with prog
         args = [self.vamos_bin] + self.vamos_args
         if no_ts:
             args.append("--no-ts")

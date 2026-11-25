@@ -1,5 +1,5 @@
 from amitools.vamos.machine import DisAsm
-from .BinImage import *
+from .BinImage import SEGMENT_TYPE_CODE
 
 
 class Disassemble:
@@ -18,7 +18,7 @@ class Disassemble:
                 "src %10s:%d  [%s]"
                 % (f.get_src_file(), d.get_src_line(), f.get_dir_name())
             )
-        # info about relocation
+            # info about relocation
         r = segment.find_reloc(addr, size)
         if r is not None:
             delta = r[2] - addr
@@ -30,16 +30,16 @@ class Disassemble:
         if segment.seg_type != SEGMENT_TYPE_CODE:
             return None
 
-        # generate raw assembly
+            # generate raw assembly
         data = segment.data
         lines = self.disasm.disassemble_block(data)
 
         # process lines
         result = []
-        for l in lines:
-            addr = l[0]
-            word = l[1]
-            code = l[2]
+        for entry in lines:
+            addr = entry[0]
+            word = entry[1]
+            code = entry[2]
 
             # try to find a symbol for this addr
             symbol = segment.find_symbol(addr)
@@ -47,7 +47,7 @@ class Disassemble:
                 line = "\t\t\t\t%s:" % symbol
                 result.append(line)
 
-            # create final line
+                # create final line
             line = "%08x\t%-20s\t%-30s  " % (
                 addr,
                 " ".join(["%04x" % x for x in word]),
@@ -67,8 +67,9 @@ class Disassemble:
 
         return result
 
+        # mini test
 
-# mini test
+
 if __name__ == "__main__":
     import sys
     from .BinFmt import BinFmt
@@ -82,5 +83,5 @@ if __name__ == "__main__":
             for seg in bi.get_segments():
                 if seg.seg_type == SEGMENT_TYPE_CODE:
                     lines = d.disassemble(seg, bi)
-                    for l in lines:
-                        print(l)
+                    for entry in lines:
+                        print(entry)

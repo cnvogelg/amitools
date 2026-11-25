@@ -602,7 +602,7 @@ def intuition_idcmp_reply_frees_allocation_test(ctx):
 
     target = ctx.open()
     port = MsgPort(ctx.mem, WindowStruct(ctx.mem, target).UserPort.val)
-    before = ctx.alloc.get_free_bytes()
+    ctx.alloc.get_free_bytes()
     ctx.intuition.queue_idcmp(ctx, target, IDCMP_NEWSIZE, code=123)
     msg = ctx.messages.get_msg(port)
     assert msg is not None
@@ -705,7 +705,6 @@ def intuition_modify_idcmp_allocation_failure_test(ctx):
 
 
 def intuition_close_window_preserves_borrowed_user_port_test(ctx):
-    from amitools.vamos.libtypes import MsgPort
 
     borrowed = ctx.messages.create_msg_port()
     target = ctx.open()

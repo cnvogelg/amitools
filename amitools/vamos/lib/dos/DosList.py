@@ -349,7 +349,7 @@ class DosList:
     def create_assign(self, name, lock):
         syspath = lock.ami_path
         entry = self.get_entry_by_name(name)
-        if entry == None:
+        if entry is None:
             entry = self.add_assign(name, [name + ":"], append=False)
             entry.locks.append(lock)
             _struct_write(entry.struct, "dol_Lock", lock.mem.addr)
@@ -513,8 +513,9 @@ class DosList:
         for entry in self.entries:
             first = True
             assign_last = None
-            name_addr = _struct_read(entry.struct, "dol_Name")
-            # print "*** Entry %s, Name address is %s,%s" % (entry.mem,name_addr,self.mem.r_bstr(name_addr))
+            _struct_read(entry.struct, "dol_Name")
+            # print "*** Entry %s, Name address is %s,%s" %
+            # (entry.mem,name_addr,self.mem.r_bstr(name_addr))
             for dirs in entry.assigns:
                 lock = lock_mgr.create_lock(None, dirs, False)
                 if lock is None:
@@ -531,7 +532,7 @@ class DosList:
                         entry.alist.append(assign_entry)
                         assign_entry.al_Next.aptr = 0
                         assign_entry.al_Lock.aptr = lock.mem.addr
-                        if assign_last != None:
+                        if assign_last is not None:
                             assign_last.al_Next.aptr = assign_entry.addr
                         else:
                             _struct_write(entry.struct, "dol_List", assign_entry.addr)
@@ -564,7 +565,7 @@ class DosList:
         return self.devices_by_name.get(name.lower())
 
     def _next_dos_entry(self, entry, flags):
-        while entry != None:
+        while entry is not None:
             t = _struct_read(entry.struct, "dol_Type")
             if t == 0 and flags & self.LDF_DEVICES:
                 return entry
@@ -589,7 +590,7 @@ class DosList:
         # Yes, this algorithm is really the one in the
         # dos.library.
         entry = self._next_dos_entry(self.first_entry, flags)
-        if entry == None:
+        if entry is None:
             return 0
         else:
             return entry.mem.addr + 1
@@ -605,7 +606,7 @@ class DosList:
         else:
             entry = self.entries_by_b_addr[node >> 2].next
             entry = self._next_dos_entry(entry, flags)
-        if entry == None:
+        if entry is None:
             return 0
         else:
             return entry.mem.addr

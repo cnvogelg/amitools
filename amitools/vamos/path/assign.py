@@ -1,5 +1,4 @@
 from amitools.vamos.log import log_path
-from amitools.vamos.cfgcore import split_nest
 from .spec import Spec
 
 
@@ -147,11 +146,11 @@ class AssignManager(object):
         return name.lower() in self.assigns_by_name
 
     def add_assigns(self, specs, force=False):
-        if not assigns:
+        if not specs:
             return []
         res = []
         for spec in specs:
-            a = self.add_assign(assign, alist)
+            a = self.add_assign(spec)
             if not a:
                 return False
             res.append(a)

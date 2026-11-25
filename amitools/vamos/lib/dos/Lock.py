@@ -88,7 +88,7 @@ def fill_fib(fib_mem, info, name=None):
     mem.clear_block(comment_addr, 80, 0)
     if info.comment:
         mem.w_cstr(comment_addr, info.comment)
-    # key / "inode" information
+        # key / "inode" information
     _struct_write(fib_mem, "fib_DiskKey", info.key)
     # type
     _struct_write(fib_mem, "fib_DirEntryType", info.entry_type)
@@ -184,16 +184,16 @@ class Lock:
         self.mem = None
         self.struct = None
 
-    # --- lock ops ---
+        # --- lock ops ---
 
     def examine_lock(self, fib_mem):
         try:
             info = self.handler.examine_object(self.handler_lock)
         except HandlerError as e:
             return e.code
-        # the DOS name of the examined object is the lock's own name; this
-        # matters for the volume root, whose host basename is not the
-        # volume name
+            # the DOS name of the examined object is the lock's own name; this
+            # matters for the volume root, whose host basename is not the
+            # volume name
         fill_fib(fib_mem, info, name=self.name)
         return NO_ERROR
 
@@ -232,8 +232,7 @@ class Lock:
             return 0
         return self.struct.volume.aptr
 
-
-# ----- fd functions (RKRM AmigaDOS 3, "Locks" and "Examining") -----
+        # ----- fd functions (RKRM AmigaDOS 3, "Locks" and "Examining") -----
 
 
 def lock(dos, ctx, name, mode):
@@ -246,34 +245,34 @@ def lock(dos, ctx, name, mode):
 
     cur_dir = dos.get_current_dir(ctx)
     home_dir = dos.get_home_dir(ctx)
-    l = dos.lock_mgr.create_lock(cur_dir, name, lock_exclusive, home_dir=home_dir)
+    lk = dos.lock_mgr.create_lock(cur_dir, name, lock_exclusive, home_dir=home_dir)
     log_dos.info(
         "Lock: (curdir=%s, homedir=%s) '%s' exc=%s -> %s",
         cur_dir,
         home_dir,
         name,
         lock_exclusive,
-        l,
+        lk,
     )
-    if l is None:
+    if lk is None:
         dos.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
         return 0
-    return l.b_addr
+    return lk.b_addr
 
 
 def unlock(dos, ctx, lock_b_addr):
     if lock_b_addr == 0:
         log_dos.info("UnLock: NULL")
     else:
-        l = dos.lock_mgr.get_by_b_addr(lock_b_addr)
-        log_dos.info("UnLock: %s", l)
-        dos.lock_mgr.release_lock(l)
+        lk = dos.lock_mgr.get_by_b_addr(lock_b_addr)
+        log_dos.info("UnLock: %s", lk)
+        dos.lock_mgr.release_lock(lk)
 
 
 def dup_lock(dos, ctx, lock_b_addr):
-    l = dos.lock_mgr.get_by_b_addr(lock_b_addr)
-    dup = dos.lock_mgr.dup_lock(l)
-    log_dos.info("DupLock: %s -> %s", l, dup)
+    lk = dos.lock_mgr.get_by_b_addr(lock_b_addr)
+    dup = dos.lock_mgr.dup_lock(lk)
+    log_dos.info("DupLock: %s -> %s", lk, dup)
     if dup is None:
         dos.setioerr(ctx, ERROR_INVALID_LOCK)
         return 0
@@ -288,8 +287,8 @@ def same_lock(dos, ctx, lock1_b_addr, lock2_b_addr):
         return DOSFALSE
     if lock1 is lock2:
         return DOSTRUE
-    # two locks on the same handler are compared by the handler; locks
-    # from different handlers are never the same object
+        # two locks on the same handler are compared by the handler; locks
+        # from different handlers are never the same object
     if (
         lock1.handler is not None
         and lock1.handler is lock2.handler
@@ -304,18 +303,18 @@ def same_lock(dos, ctx, lock1_b_addr, lock2_b_addr):
 
 
 def open_from_lock(dos, ctx, lock_b_addr):
-    l = dos.lock_mgr.get_by_b_addr(lock_b_addr)
-    if l is None:
+    lk = dos.lock_mgr.get_by_b_addr(lock_b_addr)
+    if lk is None:
         dos.setioerr(ctx, ERROR_INVALID_LOCK)
         return 0
     try:
-        fh = dos.file_mgr.open_from_lock(l, MODE_OLDFILE)
+        fh = dos.file_mgr.open_from_lock(lk, MODE_OLDFILE)
     except HandlerError as e:
         dos.setioerr(ctx, e.code)
         return 0
-    # the handle absorbs the lock
-    dos.lock_mgr.release_lock(l)
-    log_dos.info("OpenFromLock: %s -> %s", l, fh)
+        # the handle absorbs the lock
+    dos.lock_mgr.release_lock(lk)
+    log_dos.info("OpenFromLock: %s -> %s", lk, fh)
     dos.setioerr(ctx, NO_ERROR)
     return fh.b_addr
 
@@ -330,12 +329,12 @@ def dup_lock_from_fh(dos, ctx, fh_b_addr):
     except HandlerError as e:
         dos.setioerr(ctx, e.code)
         return 0
-    l = dos.lock_mgr.register_handler_lock(
+    lk = dos.lock_mgr.register_handler_lock(
         fh.handler, handler_lock, fh.ami_path, name=fh.name
     )
-    log_dos.info("DupLockFromFH: %s -> %s", fh, l)
+    log_dos.info("DupLockFromFH: %s -> %s", fh, lk)
     dos.setioerr(ctx, NO_ERROR)
-    return l.b_addr
+    return lk.b_addr
 
 
 def parent_of_fh(dos, ctx, fh_b_addr):
@@ -350,20 +349,20 @@ def parent_of_fh(dos, ctx, fh_b_addr):
         return 0
     ami_parent_path = dos.path_mgr.ami_abs_parent_path(fh.ami_path)
     name = dos.path_mgr.ami_name_of_path(None, ami_parent_path)
-    l = dos.lock_mgr.register_handler_lock(
+    lk = dos.lock_mgr.register_handler_lock(
         fh.handler, handler_lock, ami_parent_path, name=name
     )
-    log_dos.info("ParentOfFH: %s -> %s", fh, l)
+    log_dos.info("ParentOfFH: %s -> %s", fh, lk)
     dos.setioerr(ctx, NO_ERROR)
-    return l.b_addr
+    return lk.b_addr
 
 
 def examine(dos, ctx, lock_b_addr, fib_ptr):
-    l = dos.lock_mgr.get_by_b_addr(lock_b_addr)
+    lk = dos.lock_mgr.get_by_b_addr(lock_b_addr)
     fib = FileInfoBlockStruct(ctx.mem, fib_ptr)
-    err = l.examine_lock(fib)
+    err = lk.examine_lock(fib)
     name = ctx.mem.r_cstr(fib.fib_FileName.addr)
-    log_dos.info("Examine: %s fib=%06x(%s) -> %s", l, fib_ptr, name, err)
+    log_dos.info("Examine: %s fib=%06x(%s) -> %s", lk, fib_ptr, name, err)
     dos.setioerr(ctx, err)
     if err == NO_ERROR:
         return DOSTRUE
@@ -385,52 +384,52 @@ def examine_fh(dos, ctx, fh_b_addr, fib_ptr):
         log_dos.info("ExamineFH: %s fib=%06x -> ok", fh, fib_ptr)
         dos.setioerr(ctx, 0)
         return DOSTRUE
-    # handler-less fallback: examine via a temporary lock
-    l = dos.lock_mgr.create_lock(dos.get_current_dir(ctx), fh.ami_path, False)
+        # handler-less fallback: examine via a temporary lock
+    lk = dos.lock_mgr.create_lock(dos.get_current_dir(ctx), fh.ami_path, False)
     log_dos.info(
         "Lock: (%s) '%s' exc=%s -> %s",
         dos.get_current_dir(ctx),
         fh.ami_path,
         False,
-        l,
+        lk,
     )
-    if l is None:
+    if lk is None:
         dos.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
         return DOSFALSE
 
-    err = l.examine_lock(fib)
+    err = lk.examine_lock(fib)
     name = ctx.mem.r_cstr(fib.fib_FileName.addr)
     log_dos.info("ExamineFH: %s fib=%06x(%s) -> %s", fh, fib_ptr, name, err)
     dos.setioerr(ctx, err)
 
-    log_dos.info("UnLock: %s", l)
-    dos.lock_mgr.release_lock(l)
+    log_dos.info("UnLock: %s", lk)
+    dos.lock_mgr.release_lock(lk)
     if err == NO_ERROR:
         return DOSTRUE
     return DOSFALSE
 
 
 def info(dos, ctx, lock_b_addr, info_ptr):
-    l = dos.lock_mgr.get_by_b_addr(lock_b_addr)
+    lk = dos.lock_mgr.get_by_b_addr(lock_b_addr)
     info_data = InfoDataStruct(ctx.mem, info_ptr)
-    if l is None:
+    if lk is None:
         dos.setioerr(ctx, ERROR_INVALID_LOCK)
         return DOSFALSE
-    vol = l.find_volume_node(dos.dos_list)
+    vol = lk.find_volume_node(dos.dos_list)
     if vol:
-        if l.handler is None:
+        if lk.handler is None:
             dos.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
             return DOSFALSE
         try:
-            if l.handler_lock is not None:
-                disk = l.handler.info(l.handler_lock)
+            if lk.handler_lock is not None:
+                disk = lk.handler.info(lk.handler_lock)
             elif dos.handler_mgr is not None:
                 # a lock without a handler lock: a lock-less volume query
                 # (ACTION_DISK_INFO) resolved through the handler manager
-                volume_name = dos.lock_mgr.volume_name_of_lock(l)
+                volume_name = dos.lock_mgr.volume_name_of_lock(lk)
                 disk = dos.handler_mgr.disk_info(volume_name)
             else:
-                disk = l.handler.disk_info(None)
+                disk = lk.handler.disk_info(None)
         except HandlerError as e:
             dos.setioerr(ctx, e.code)
             return DOSFALSE
@@ -454,19 +453,19 @@ def info(dos, ctx, lock_b_addr, info_ptr):
         info_data.id_VolumeNode.aptr = vol
         info_data.id_InUse.val = 0
         dos.setioerr(ctx, 0)
-        log_dos.info("Info: %s info=%06x -> true", l, info_ptr)
+        log_dos.info("Info: %s info=%06x -> true", lk, info_ptr)
         return DOSTRUE
     else:
-        log_dos.info("Info: %s info=%06x -> false", l, info_ptr)
+        log_dos.info("Info: %s info=%06x -> false", lk, info_ptr)
         return DOSFALSE
 
 
 def exnext(dos, ctx, lock_b_addr, fib_ptr):
-    l = dos.lock_mgr.get_by_b_addr(lock_b_addr)
+    lk = dos.lock_mgr.get_by_b_addr(lock_b_addr)
     fib = FileInfoBlockStruct(ctx.mem, fib_ptr)
-    err = l.examine_next(fib)
+    err = lk.examine_next(fib)
     name = ctx.mem.r_cstr(fib.fib_FileName.addr)
-    log_dos.info("ExNext: %s fib=%06x (%s) -> %s", l, fib_ptr, name, err)
+    log_dos.info("ExNext: %s fib=%06x (%s) -> %s", lk, fib_ptr, name, err)
     dos.setioerr(ctx, err)
     if err == NO_ERROR:
         dos.setioerr(ctx, 0)
@@ -475,8 +474,9 @@ def exnext(dos, ctx, lock_b_addr, fib_ptr):
         dos.setioerr(ctx, err)
         return DOSFALSE
 
+        # bytes of struct ExAllData used by each ED_* type: ED_NAME .. ED_OWNER
 
-# bytes of struct ExAllData used by each ED_* type: ED_NAME .. ED_OWNER
+
 EX_ALL_DATA_SIZES = (0, 8, 12, 16, 20, 32, 36, 40)
 
 
@@ -666,9 +666,9 @@ def exall_end(dos, ctx, lock_b_addr, buffer, size, data_type, control_ptr):
 
 
 def parent_dir(dos, ctx, lock_b_addr):
-    l = dos.lock_mgr.get_by_b_addr(lock_b_addr)
-    parent_lock = dos.lock_mgr.create_parent_lock(l)
-    log_dos.info("ParentDir: %s -> %s", l, parent_lock)
+    lk = dos.lock_mgr.get_by_b_addr(lock_b_addr)
+    parent_lock = dos.lock_mgr.create_parent_lock(lk)
+    log_dos.info("ParentDir: %s -> %s", lk, parent_lock)
     if parent_lock is not None:
         return parent_lock.b_addr
     return 0

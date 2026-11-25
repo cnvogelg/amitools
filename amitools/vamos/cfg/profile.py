@@ -1,4 +1,4 @@
-from amitools.vamos.cfgcore import *
+from ..cfgcore import Argument, Parser, Value, ValueList
 
 
 class ProfileParser(Parser):

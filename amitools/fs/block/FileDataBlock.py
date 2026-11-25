@@ -41,7 +41,7 @@ class FileDataBlock(Block):
         self._put_long(2, self.seq_num)
         self._put_long(3, self.data_size)
         self._put_long(4, self.next_data)
-        if self.contents != None:
+        if self.contents is not None:
             self.data[24 : 24 + self.data_size] = self.contents
         Block.write(self)
 

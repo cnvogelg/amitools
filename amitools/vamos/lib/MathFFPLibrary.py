@@ -1,7 +1,14 @@
-from amitools.vamos.machine.regs import *
+from ...util.Math import (
+    Amiga_INT_MAX,
+    Amiga_INT_MIN,
+    ffp_reg_to_float,
+    float_to_ffp_reg,
+    int32,
+    math,
+)
+from ..machine.regs import REG_D0, REG_D1
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.log import log_math
-from amitools.util.Math import *
 
 
 class MathFFPLibrary(LibImpl):

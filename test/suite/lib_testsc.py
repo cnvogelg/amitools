@@ -1,5 +1,4 @@
 import os
-import pytest
 
 
 def lib_testsc_test(vamos, buildlibsc):

@@ -1,7 +1,13 @@
-from amitools.vamos.machine.regs import *
+from ...util.Math import (
+    ffp_reg_to_float,
+    float_to_ffp_reg,
+    float_to_reg,
+    math,
+    reg_to_float,
+)
+from ..machine.regs import REG_D0, REG_D1
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.log import log_math
-from amitools.util.Math import *
 
 
 class MathTransLibrary(LibImpl):

@@ -7,7 +7,7 @@ from amitools.vamos.machine.mock import MockMachine
 from amitools.vamos.machine import Runtime
 from amitools.vamos.mem import MemoryAlloc
 from amitools.fd import read_lib_fd
-from amitools.vamos.machine.regs import *
+from amitools.vamos.machine.regs import REG_A0, REG_D0, REG_D1
 from amitools.vamos.libtypes import TagList
 
 
@@ -20,7 +20,7 @@ def _create_ctx():
 
 def _create_fd():
     name = "vamostest.library"
-    impl = VamosTestLibrary()
+    VamosTestLibrary()
     fd = read_lib_fd(name)
     return fd
 

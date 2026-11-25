@@ -1,5 +1,3 @@
-from amitools.vamos.schedule import NativeTask, PythonTask
-from amitools.vamos.libtypes import Task
 from amitools.vamos.libstructs import TaskStruct, TaskState
 
 
@@ -39,7 +37,10 @@ class MappedTask:
         self._setup_sigmask_sync()
 
     def __repr__(self):
-        return f"[MappedTask(sched_task={self.sched_task}, ami_task={self.ami_task}, ami_proc={self.ami_proc})]"
+        return (
+            f"[MappedTask(sched_task={self.sched_task}, "
+            f"ami_task={self.ami_task}, ami_proc={self.ami_proc})]"
+        )
 
     def _setup_state_sync(self):
         # install state hook to map state to mapped task value

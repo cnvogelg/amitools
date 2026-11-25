@@ -6,9 +6,7 @@ This script creates various types of corrupted Amiga disk images
 that can be used to test fsck repair capabilities.
 """
 
-import os
 import struct
-import shutil
 from pathlib import Path
 
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory

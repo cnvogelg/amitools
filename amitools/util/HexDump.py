@@ -9,8 +9,8 @@ def _get_vis_char(d):
 
 
 def get_hex_line(addr, line, indent=0, num=16):
-    l = len(line)
-    skip = num - l
+    line_len = len(line)
+    skip = num - line_len
     out = " " * indent
     out += "%08x: " % addr
     for d in line:
@@ -24,10 +24,10 @@ def get_hex_line(addr, line, indent=0, num=16):
 
 
 def print_hex(data, indent=0, num=16, out=print, base_addr=0):
-    l = len(data)
+    data_len = len(data)
     o = 0
     addr = base_addr
-    while o < l:
+    while o < data_len:
         line = data[o : o + num]
         out(get_hex_line(addr, line, indent, num))
         o += num
@@ -84,8 +84,9 @@ def print_hex_diff(
         o += num
         addr += num
 
+        # mini test
 
-# mini test
+
 if __name__ == "__main__":
     print_hex("hello, world!", num=8, base_addr=0xF80000)
     print_hex_diff("hello, world!", "hello. WOrld!", num=8, base_addr=0xF80000)

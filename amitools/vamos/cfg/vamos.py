@@ -1,5 +1,16 @@
-from amitools.vamos.cfgcore import *
-from amitools.vamos.cfg import *
+from . import (
+    DiskParser,
+    DisplayParser,
+    LibsParser,
+    LogParser,
+    MachineParser,
+    PathParser,
+    ProcessParser,
+    ProfileParser,
+    ScheduleParser,
+    TraceParser,
+)
+from ..cfgcore import MainParser
 
 
 class VamosMainParser(MainParser):

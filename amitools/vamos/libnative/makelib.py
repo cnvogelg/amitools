@@ -44,7 +44,7 @@ class MakeLib(object):
             mf.make_functions(lib_base, vectors_addr)
 
         # lib object and set neg/pos size
-        lib = Library(self.mem, addr, neg_size=neg_size, pos_size=pos_size)
+        Library(self.mem, addr, neg_size=neg_size, pos_size=pos_size)
 
         # init struct?
         if init_struct_addr != 0:

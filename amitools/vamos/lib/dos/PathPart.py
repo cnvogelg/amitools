@@ -150,7 +150,7 @@ def add_part(dos, ctx, dn_addr, fn_addr, size):
     fn = ctx.mem.r_cstr(fn_addr)
     np = _add_part(dn, fn, size)
     log_dos.info("AddPart: dn='%s' fn='%s' size=%d -> np='%s'", dn, fn, size, np)
-    if np != None:
+    if np is not None:
         ctx.mem.w_cstr(dn_addr, np)
         return DOSTRUE
     else:

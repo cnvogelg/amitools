@@ -1,5 +1,5 @@
 import pytest
-from amitools.vamos.path import *
+from amitools.vamos.path import AmiPath, AmiPathEnv, AmiPathError, PathManager
 from amitools.vamos.cfgcore import ConfigDict
 import logging
 from amitools.vamos.log import log_path
@@ -274,7 +274,7 @@ def path_mgr_volpaths_test(tmpdir):
 
 def path_mgr_resolve_assigns_test(tmpdir):
     pm = setup_pm(tmpdir)
-    env = pm.get_default_env()
+    pm.get_default_env()
     ra = pm.resolve_assigns
     # relpath
     assert ra(AmiPath()) == AmiPath()
@@ -352,9 +352,9 @@ def get_volume_sys_path(pm, vol_name):
 
 def path_mgr_create_env_test(tmpdir):
     pm = setup_pm(tmpdir)
-    sys_sys_path = get_volume_sys_path(pm, "sys")
+    get_volume_sys_path(pm, "sys")
     assert pm.get_vol_mgr().add_volume("cwd:.")
-    sys_cwd_path = get_volume_sys_path(pm, "cwd")
+    get_volume_sys_path(pm, "cwd")
     def_env = pm.get_default_env()
     # create clone of default env
     env = pm.create_env()

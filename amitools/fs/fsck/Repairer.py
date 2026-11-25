@@ -1,6 +1,6 @@
 """Block repair operations for fsck."""
 
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set
 
 from amitools.fs.block.Block import Block
 from amitools.fs.block.RootBlock import RootBlock

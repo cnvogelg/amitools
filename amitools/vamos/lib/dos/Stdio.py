@@ -87,7 +87,7 @@ def put_str(dos, ctx, str_ptr):
     str_dat = ctx.mem.r_cbytes(str_ptr)
     # write to stdout
     fh = ctx.process.get_output()
-    ok = fh.write(str_dat)
+    fh.write(str_dat)
 
     show_data = str_dat[: Helper.MAX_SHOW_DATA]
     log_dos.info("PutStr: %s", show_data)

@@ -1,5 +1,14 @@
 import struct
-from .ELF import *
+from .ELF import (
+    ET_values,
+    R_68K_values,
+    SHN_values,
+    SHT_flags,
+    SHT_values,
+    STB_values,
+    STT_values,
+    STV_values,
+)
 
 
 class ELFParseError(Exception):
@@ -108,8 +117,7 @@ class ELFSectionHeader(ELFPart):
         self.flags_dec = self._decode_flags(self.flags, SHT_flags)
         self.type_str = self._decode_value(self.type_, SHT_values)
 
-
-# ----- Sections -----
+        # ----- Sections -----
 
 
 class ELFSection:
@@ -157,10 +165,10 @@ class ELFSectionStringTable(ELFSectionWithData):
         self.strtab = None
 
     def decode(self):
-        l = len(self.data)
+        data_len = len(self.data)
         o = 0
         strtab = []
-        while o < l:
+        while o < data_len:
             n = self.data.find(b"\0", o)
             if n == -1:
                 raise ELFParseError("Invalid strtab!")

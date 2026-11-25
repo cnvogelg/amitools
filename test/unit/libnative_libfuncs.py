@@ -1,10 +1,9 @@
 from amitools.vamos.machine import Machine, Runtime
-from amitools.vamos.machine.regs import *
+from amitools.vamos.machine.regs import REG_D0
 from amitools.vamos.machine.opcodes import op_jmp
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.libnative import LibFuncs
 from amitools.vamos.libtypes import ExecLibrary, Library
-from amitools.vamos.libstructs import LibFlags
 from amitools.vamos.loader import SegList, SegmentLoader
 
 
@@ -167,8 +166,8 @@ def libnative_libfuncs_set_function_test():
     machine = Machine()
     runtime = Runtime(machine)
     mem = machine.get_mem()
-    cpu = machine.get_cpu()
-    sp = machine.get_ram_begin() - 4
+    machine.get_cpu()
+    machine.get_ram_begin() - 4
     alloc = MemoryAlloc.for_machine(machine)
     # new lib
     lib = Library.alloc(alloc, name="my.library", id_string="bla", neg_size=36)

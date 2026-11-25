@@ -11,6 +11,7 @@ usage:
 
 import argparse
 import hashlib
+import importlib
 import io
 import os
 import sys
@@ -20,35 +21,86 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, os.pardir, os.pardir))
 sys.path.insert(1, REPO)
 
-from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
-from amitools.fs.ADFSVolume import ADFSVolume
-from amitools.rom.romsplitter import RomSplitter
-from amitools.binfmt.hunk.BinFmtHunk import BinFmtHunk
+BlkDevFactory = importlib.import_module(
+    "amitools.fs.blkdev.BlkDevFactory"
+).BlkDevFactory
+ADFSVolume = importlib.import_module("amitools.fs.ADFSVolume").ADFSVolume
+RomSplitter = importlib.import_module("amitools.rom.romsplitter").RomSplitter
+BinFmtHunk = importlib.import_module("amitools.binfmt.hunk.BinFmtHunk").BinFmtHunk
 
 # ---------------------------------------------------------------------------
 # the known Shell-Seg files: name, SHA-1, kind, AmigaOS release, where it lives
 # ---------------------------------------------------------------------------
 SHELL_SEGS = [
-    ("Shell-Seg-1.3", "4bbe3ccb55fab49c83ff7ab52b2af277e6d92429", "disk",
-     "AmigaOS 1.3", "L/Shell-Seg on Workbench 1.3 (no $VER)"),
-    ("Shell-Seg-37.69", "40a54732afd46a4649e53088e722da0e0f4e6900", "rom",
-     "AmigaOS 2.x", "shell resident in Kickstart 37.175"),
-    ("Shell-Seg-39.13", "0534b29813f87247d9bdd8f02c25e6ebe58fe699", "rom",
-     "AmigaOS 3.0", "shell resident in Kickstart 39.106"),
-    ("Shell-Seg-40.2", "02ba4b4368ed89177acfc17b45cbde4ae2062d2a", "rom",
-     "AmigaOS 3.1", "shell resident in Kickstart 40.68"),
-    ("Shell-Seg-45.7", "f091f33d28abe5c55de0e881d16861dfc703df01", "rom",
-     "AmigaOS 3.9", "shell resident in Kickstart 45.66 (Cloanto OS 3.X)"),
-    ("Shell-Seg-46.10", "8609de3b11da6b5d40d375a8d383fa2513316b28", "disk",
-     "AmigaOS 3.1.4", "L/Shell-Seg on the Modules 3.1.4 disks"),
-    ("Shell-Seg-47.47", "0fe2a77ee989b343149f234ec7935aee2e0339f8", "disk",
-     "AmigaOS 3.2", "L/Shell-Seg on the Modules 3.2 disk"),
-    ("Shell-Seg-47.48", "2be0093a67cacf6efec1258d5bd91db4ee7f1f6f", "disk",
-     "AmigaOS 3.2.1-3.2.3", "L/Shell-Seg on the Modules 3.2.1 disk"),
+    (
+        "Shell-Seg-1.3",
+        "4bbe3ccb55fab49c83ff7ab52b2af277e6d92429",
+        "disk",
+        "AmigaOS 1.3",
+        "L/Shell-Seg on Workbench 1.3 (no $VER)",
+    ),
+    (
+        "Shell-Seg-37.69",
+        "40a54732afd46a4649e53088e722da0e0f4e6900",
+        "rom",
+        "AmigaOS 2.x",
+        "shell resident in Kickstart 37.175",
+    ),
+    (
+        "Shell-Seg-39.13",
+        "0534b29813f87247d9bdd8f02c25e6ebe58fe699",
+        "rom",
+        "AmigaOS 3.0",
+        "shell resident in Kickstart 39.106",
+    ),
+    (
+        "Shell-Seg-40.2",
+        "02ba4b4368ed89177acfc17b45cbde4ae2062d2a",
+        "rom",
+        "AmigaOS 3.1",
+        "shell resident in Kickstart 40.68",
+    ),
+    (
+        "Shell-Seg-45.7",
+        "f091f33d28abe5c55de0e881d16861dfc703df01",
+        "rom",
+        "AmigaOS 3.9",
+        "shell resident in Kickstart 45.66 (Cloanto OS 3.X)",
+    ),
+    (
+        "Shell-Seg-46.10",
+        "8609de3b11da6b5d40d375a8d383fa2513316b28",
+        "disk",
+        "AmigaOS 3.1.4",
+        "L/Shell-Seg on the Modules 3.1.4 disks",
+    ),
+    (
+        "Shell-Seg-47.47",
+        "0fe2a77ee989b343149f234ec7935aee2e0339f8",
+        "disk",
+        "AmigaOS 3.2",
+        "L/Shell-Seg on the Modules 3.2 disk",
+    ),
+    (
+        "Shell-Seg-47.48",
+        "2be0093a67cacf6efec1258d5bd91db4ee7f1f6f",
+        "disk",
+        "AmigaOS 3.2.1-3.2.3",
+        "L/Shell-Seg on the Modules 3.2.1 disk",
+    ),
 ]
 
-DISK_EXTS = (".adf", ".adz", ".adf.gz", ".hdf", ".hdz", ".hdf.gz",
-             ".rdb", ".rdisk", ".rdisk.gz")
+DISK_EXTS = (
+    ".adf",
+    ".adz",
+    ".adf.gz",
+    ".hdf",
+    ".hdz",
+    ".hdf.gz",
+    ".rdb",
+    ".rdisk",
+    ".rdisk.gz",
+)
 
 
 def sha1(data):
@@ -147,12 +199,21 @@ def scan_roms(kickstart_dir, want, verbose=False):
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("disk_dir", help="folder with Amiga disk images (scanned recursively)")
-    ap.add_argument("kickstart_dir", help="folder with Kickstart ROMs (scanned recursively)")
-    ap.add_argument("-o", "--output", default=HERE,
-                    help="output folder (default: this script's folder)")
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument(
+        "disk_dir", help="folder with Amiga disk images (scanned recursively)"
+    )
+    ap.add_argument(
+        "kickstart_dir", help="folder with Kickstart ROMs (scanned recursively)"
+    )
+    ap.add_argument(
+        "-o",
+        "--output",
+        default=HERE,
+        help="output folder (default: this script's folder)",
+    )
     ap.add_argument("-v", "--verbose", action="store_true", help="show extra detail")
     args = ap.parse_args()
 
@@ -162,8 +223,10 @@ def main():
     out_dir = os.path.abspath(args.output)
     os.makedirs(out_dir, exist_ok=True)
 
-    want = {sha: (name, kind, release, detail)
-            for name, sha, kind, release, detail in SHELL_SEGS}
+    want = {
+        sha: (name, kind, release, detail)
+        for name, sha, kind, release, detail in SHELL_SEGS
+    }
 
     print("scanning disk images: %s" % args.disk_dir)
     disk_found, disk_unknown = scan_disks(args.disk_dir, want, args.verbose)
@@ -198,8 +261,10 @@ def main():
         for name, release, detail in missing:
             print("  - %s (%s): expected %s" % (name, release, detail))
     if disk_unknown or rom_unknown:
-        print("\nnote: %d unknown Shell-Seg shell module(s) were skipped "
-              "(run with -v to list)" % (len(disk_unknown) + len(rom_unknown)))
+        print(
+            "\nnote: %d unknown Shell-Seg shell module(s) were skipped "
+            "(run with -v to list)" % (len(disk_unknown) + len(rom_unknown))
+        )
 
     print("\n%d/%d shells available in %s" % (ok, len(SHELL_SEGS), out_dir))
     return 1 if missing else 0

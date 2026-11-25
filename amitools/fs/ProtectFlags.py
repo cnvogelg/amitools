@@ -1,4 +1,4 @@
-from .FSError import *
+from .FSError import FSError, INVALID_PROTECT_FORMAT
 
 
 class ProtectFlags:
@@ -120,7 +120,6 @@ class ProtectFlags:
         if len(s) == 0:
             return
         # allow to add with '+' or sub with '-'
-        n = self.flag_txt
         mode = "+"
         self.mask = self.flag_none
         for a in s.lower():
@@ -136,7 +135,7 @@ class ProtectFlags:
                         mask = 1 << (self.flag_num - 1 - i)
                         is_low = flg_low == flg
                         break
-                if mask == None:
+                if mask is None:
                     raise FSError(INVALID_PROTECT_FORMAT, extra="char: " + a)
                 # apply mask
                 if mode == "+":
@@ -178,5 +177,5 @@ if __name__ == "__main__":
         p = ProtectFlags()
         p.parse(i)
         s = str(p)
-        if not i in s:
+        if i not in s:
             print(s)

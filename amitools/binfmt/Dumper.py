@@ -1,4 +1,4 @@
-from .BinImage import *
+from .BinImage import segment_type_names
 import amitools.util.HexDump as HexDump
 
 

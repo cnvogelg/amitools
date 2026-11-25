@@ -1,7 +1,7 @@
 from .ADFSNode import ADFSNode
 from .block.Block import Block
 from .block.FileHeaderBlock import FileHeaderBlock
-from .FSError import *
+from .FSError import FSError, INVALID_FILE_HEADER_BLOCK, INVALID_FILE_NAME
 from .FSString import FSString
 
 

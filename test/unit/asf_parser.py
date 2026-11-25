@@ -1,5 +1,5 @@
 import pytest
-from amitools.state import ASFFile, ASFParser, MemChunk, MemType, ROMChunk
+from amitools.state import ASFFile, ASFParser, MemChunk, MemType
 
 ASF_LIST = (
     "a500.uss",

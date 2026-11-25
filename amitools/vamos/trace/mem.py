@@ -1,6 +1,3 @@
-import logging
-
-
 class TraceMemory:
     def __init__(self, mem, trace_mgr):
         """a front-end class to memory that does tracing"""

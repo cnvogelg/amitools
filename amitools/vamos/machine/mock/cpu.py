@@ -1,4 +1,4 @@
-from amitools.vamos.machine.regs import *
+from ..regs import REG_A0, REG_A7, REG_D7, REG_PC
 
 
 class MockCPU(object):

@@ -1,7 +1,7 @@
 from amitools.vamos.libnative import MakeLib, InitStructBuilder
 from amitools.vamos.mem import MemoryAlloc
 from amitools.vamos.machine import Machine, Runtime
-from amitools.vamos.machine.opcodes import *
+from amitools.vamos.machine.opcodes import op_rts
 from amitools.vamos.libstructs import LibraryStruct
 from amitools.vamos.libtypes import Library
 

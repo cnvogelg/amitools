@@ -1,5 +1,10 @@
-from amitools.vamos.libcore import *
-from amitools.vamos.machine.mock import *
+from amitools.vamos.libcore import (
+    LibCtx,
+    LibImplScanner,
+    LibPatcherMultiTrap,
+    LibStubGen,
+)
+from amitools.vamos.machine.mock import MockMachine
 from amitools.vamos.machine import Runtime
 from amitools.vamos.lib.VamosTestLibrary import VamosTestLibrary
 from amitools.vamos.mem import MemoryAlloc

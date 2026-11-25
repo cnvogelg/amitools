@@ -1,7 +1,15 @@
-from enum import IntEnum
 from .TimerDevice import TimerDevice
 import sys
-from amitools.vamos.machine.regs import *
+from ..machine.regs import (
+    REG_A0,
+    REG_A1,
+    REG_A2,
+    REG_A3,
+    REG_A7,
+    REG_D0,
+    REG_D1,
+    REG_D2,
+)
 from amitools.vamos.libnative import MakeFuncs, InitStruct, MakeLib, LibFuncs, InitRes
 from amitools.vamos.libcore import LibImpl
 from amitools.vamos.astructs import BYTE, CSTR, LONG
@@ -9,7 +17,6 @@ from amitools.vamos.libstructs import (
     ExecLibraryStruct,
     StackSwapStruct,
     IORequestStruct,
-    MinListStruct,
     MsgPortStruct,
     NodeType,
     SignalSemaphoreStruct,
@@ -17,7 +24,7 @@ from amitools.vamos.libstructs import (
 from amitools.vamos.libtypes import ExecLibrary as ExecLibraryType, MsgPort, Message
 from amitools.vamos.libtypes import Task, List, MinList, Node
 from amitools.vamos.log import log_exec
-from amitools.vamos.error import VamosInternalError, UnsupportedFeatureError
+from amitools.vamos.error import VamosInternalError
 from amitools.vamos.lib.lexec.signalfunc import SignalFunc
 from amitools.vamos.lib.lexec.taskfunc import TaskFunc
 from amitools.vamos.lib.lexec.msgfunc import MessageFunc
@@ -183,7 +190,8 @@ class ExecLibrary(LibImpl):
         # we report the old stack befor callee
         old_pointer += 4
         log_exec.info(
-            "StackSwap: old(lower=%06x,upper=%06x,ptr=%06x) new(lower=%06x,upper=%06x,ptr=%06x)"
+            "StackSwap: old(lower=%06x,upper=%06x,ptr=%06x) "
+            "new(lower=%06x,upper=%06x,ptr=%06x)"
             % (old_lower, old_upper, old_pointer, new_lower, new_upper, new_pointer)
         )
         stsw.stk_Lower.aptr = old_lower
@@ -441,7 +449,7 @@ class ExecLibrary(LibImpl):
             log_exec.info("FreeMem: freeing NULL")
             return
         mb = self.alloc.get_memory(addr)
-        if mb != None:
+        if mb is not None:
             log_exec.info("FreeMem: 0x%06x %d bytes -> %s" % (addr, size, mb))
             self.alloc.free_memory(mb)
         else:
@@ -466,7 +474,7 @@ class ExecLibrary(LibImpl):
             log_exec.info("FreeVec: freeing NULL")
             return
         mb = self.alloc.get_memory(addr)
-        if mb != None:
+        if mb is not None:
             log_exec.info("FreeVec: %s" % mb)
             self.alloc.free_memory(mb)
         else:
@@ -837,7 +845,7 @@ class ExecLibrary(LibImpl):
         name = ctx.mem.r_cstr(name_ptr)
         semaphore = self.semaphore_mgr.FindSemaphore(name)
         log_exec.info("FindSemaphore(%s) -> %s" % (name, semaphore))
-        if semaphore != None:
+        if semaphore is not None:
             return semaphore.addr
         else:
             return 0

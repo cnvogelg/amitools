@@ -7,7 +7,7 @@ import socket
 import threading
 import time
 
-from helper import *
+from helper import BinBuilder, ToolRunner, VamosRunner, VamosTask, VamosTestRunner
 
 
 VAMOS_BIN = "../bin/vamos"

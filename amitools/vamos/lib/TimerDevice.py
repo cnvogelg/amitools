@@ -1,7 +1,5 @@
 import time
 from amitools.vamos.libcore import LibImpl
-from amitools.vamos.machine.regs import REG_A0
-from amitools.vamos.astructs import LONG
 from amitools.vamos.libtypes import TimeVal
 from amitools.vamos.libstructs import TimeRequestStruct
 from amitools.vamos.log import log_timer

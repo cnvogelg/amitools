@@ -1,6 +1,3 @@
-import pytest
-
-
 def check_arg(vamos, args, arg_res):
     # vc currently mangles GetArgStr()
     if vamos.flavor == "vc":
