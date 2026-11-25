@@ -8,6 +8,7 @@ class ProcessParser(Parser):
                 "command": {
                     "args": ValueList(str, allow_split=False),
                     "shell": False,
+                    "shell_bin": Value(str, "L:shell-seg"),
                     "pure_ami_path": False,
                     "raw_arg": False,
                     "mode": Value(str, "proc"),
@@ -27,6 +28,11 @@ class ProcessParser(Parser):
                         "--shell",
                         action="store_true",
                         help="run an AmigaOs shell instead of a binary",
+                    ),
+                    "shell_bin": Argument(
+                        "--shell-bin",
+                        action="store",
+                        help="Amiga path of the shell seg used by -x/--mode shell",
                     ),
                     "pure_ami_path": Argument(
                         "-P",
@@ -64,6 +70,7 @@ class ProcessParser(Parser):
             "process": {
                 "command": {
                     "shell": "shell",
+                    "shell_bin": "shell_bin",
                     "pure_ami_path": "pure_ami_paths",
                     "raw_arg": "raw_arg",
                 },

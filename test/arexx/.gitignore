@@ -1,0 +1,9 @@
+# ARexx binaries are copyrighted AmigaOS files -- never commit them.
+# Populate this folder locally with extract-arexx.py.
+Classes/arexx.class
+Libs/rexxsupport.library
+Libs/rexxsyslib.library
+Rexxc/
+System/RexxMast
+MANIFEST.txt
+__pycache__/

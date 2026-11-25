@@ -48,6 +48,12 @@ class FileHandle:
         # stream; the DOS layer only sees a plain byte stream
         self.interactive = self.obj.isatty() if self.obj is not None else False
 
+    def _mem_addr(self):
+        # a freed (or never allocated) handle has no mem anymore, but logging
+        # may still format it, so tolerate a missing mem/struct
+        mem = getattr(self, "mem", None)
+        return mem.addr if mem is not None else 0
+
     def __repr__(self):
         return "[FH:'%s'(ami='%s',nc=%s,af=%s,int=%s)@%06x=B@%06x]" % (
             self.name,
@@ -55,12 +61,12 @@ class FileHandle:
             self.need_close,
             self.auto_flush,
             self.interactive,
-            self.mem.addr,
+            self._mem_addr(),
             self.b_addr,
         )
 
     def __str__(self):
-        return "[FH:'%s'@%06x=B@%06x]" % (self.name, self.mem.addr, self.b_addr)
+        return "[FH:'%s'@%06x=B@%06x]" % (self.name, self._mem_addr(), self.b_addr)
 
     def close(self):
         """ACTION_END: close the file via the handler"""

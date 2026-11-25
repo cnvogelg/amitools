@@ -60,7 +60,7 @@ def _make_lib(line=b""):
     process = SimpleNamespace(
         get_input=lambda: _FakeInput(line),
         get_output=lambda: _FakeOutput(),
-        this_task=None,
+        proc=None,
     )
     lib = DosLibrary()
     # only the state Args.py touches is wired up

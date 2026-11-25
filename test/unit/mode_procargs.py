@@ -74,3 +74,44 @@ def proc_args_pure_ami_path_test():
     result = adapter.make_cmd_args(make_cfg(["/host/bin/hello"], pure_ami_path=True))
     assert result == ("/host/bin/hello", "\n")
     assert mapped == []
+
+
+def proc_args_make_bin_path_ami_test():
+    # an Amiga path is passed through unchanged
+    mapped = []
+
+    def sys_to_ami(path):
+        mapped.append(path)
+        return AmiPath("root:bin/shell")
+
+    adapter = ProcArgs(HostFS(), sys_to_ami)
+    cfg = make_cfg([], pure_ami_path=False)
+    assert adapter.make_bin_path(cfg, "wb:l/Shell-Seg") == "wb:l/Shell-Seg"
+    assert mapped == []
+
+
+def proc_args_make_bin_path_host_test():
+    # an existing host file is mapped to an Amiga path
+    mapped = []
+
+    def sys_to_ami(path):
+        mapped.append(path)
+        return AmiPath("root:bin/shell")
+
+    adapter = ProcArgs(HostFS(["/host/shell"]), sys_to_ami)
+    cfg = make_cfg([], pure_ami_path=False)
+    assert adapter.make_bin_path(cfg, "/host/shell") == "root:bin/shell"
+    assert mapped == ["/host/shell"]
+
+
+def proc_args_make_bin_path_pure_test():
+    # a pure Amiga path bypasses host mapping even if the file exists
+    adapter = ProcArgs(HostFS(["/host/shell"]), lambda p: AmiPath("root:bin/shell"))
+    cfg = make_cfg([], pure_ami_path=True)
+    assert adapter.make_bin_path(cfg, "/host/shell") == "/host/shell"
+
+
+def proc_args_make_bin_path_unmappable_test():
+    adapter = ProcArgs(HostFS(["/host/shell"]), lambda p: None)
+    cfg = make_cfg([], pure_ami_path=False)
+    assert adapter.make_bin_path(cfg, "/host/shell") is None

@@ -1,11 +1,13 @@
 from amitools.vamos.log import log_mode
 from .proc import ProcMode
+from .shell import ShellMode
 from .test import TestMode
 
 
 class ModeSetup:
     mode_map = {
         "proc": ProcMode,
+        "shell": ShellMode,
         "test": TestMode,
     }
 
@@ -17,8 +19,11 @@ class ModeSetup:
 
     @classmethod
     def select(cls, cmd_cfg):
-        # get configured mode
-        mode = cmd_cfg.mode
+        # -x/--shell is a shortcut that selects the shell mode
+        if cmd_cfg.shell:
+            mode = "shell"
+        else:
+            mode = cmd_cfg.mode
         log_mode.info("select mode '%s'", mode)
 
         # is mode available

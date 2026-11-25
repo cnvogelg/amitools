@@ -172,11 +172,20 @@ Program and process
 -------------------
 
 ``-x``, ``--shell``
-    Run an Amiga Shell instead of a binary.
+    Run an Amiga Shell instead of a binary. This is a shortcut for
+    ``-M shell``.
 
     .. code-block:: text
 
-        vamos -x Shell-Seg
+        vamos -x
+
+``--shell-bin NAME``
+    Set the Amiga path of the Shell seg loaded by ``-x``/``-M shell``
+    (default: ``L:shell-seg``).
+
+    .. code-block:: text
+
+        vamos -x --shell-bin wb:l/Shell-Seg
 
 ``-P``, ``--pure-ami-paths``
     Do not interpret the program name as a host-system path.
@@ -194,8 +203,8 @@ Program and process
         vamos -R -- 'myprog "argument with spaces"'
 
 ``-M MODE``, ``--mode MODE``
-    Select an execution mode. Available modes are ``proc`` and ``test``;
-    ``list`` prints the available modes.
+    Select an execution mode. Available modes are ``proc``, ``shell`` and
+    ``test``; ``list`` prints the available modes.
 
     .. code-block:: text
 

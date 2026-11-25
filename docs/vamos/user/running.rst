@@ -45,13 +45,19 @@ In addition to running regular Amiga executables, vamos is also able to run a
 real Amiga Shell. As a binary you need an original ``Shell-Seg`` from a modern
 AmigaOS (e.g. 3.9).
 
-Now run vamos with the ``-x`` switch and pass in the ``Shell-Seg`` as your Amiga
-binary:
+Run vamos with the ``-x`` switch (a shortcut for ``-M shell``) to start a shell:
 
 .. code-block:: text
 
-    vamos -x Shell-Seg
+    vamos -x
     0.SYS:>
+
+The shell seg is loaded from ``L:shell-seg`` by default; use ``--shell-bin`` to
+name it explicitly:
+
+.. code-block:: text
+
+    vamos -x --shell-bin wb:l/Shell-Seg
 
 If available the shell reads the file ``S:Vamos-Startup`` as its startup
 configuration file.

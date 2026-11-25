@@ -412,13 +412,13 @@ def select_output(dos, ctx, fh_b_addr):
 
 
 def input(dos, ctx):
-    inp_bptr = ctx.process.this_task.pr_CIS.aptr >> 2
+    inp_bptr = ctx.process.proc.pr_CIS.aptr >> 2
     log_dos.info("Input() -> b%06x", inp_bptr)
     return inp_bptr
 
 
 def output(dos, ctx):
-    out_bptr = ctx.process.this_task.pr_COS.aptr >> 2
+    out_bptr = ctx.process.proc.pr_COS.aptr >> 2
     log_dos.info("Output() -> b%06x", out_bptr)
     return out_bptr
 

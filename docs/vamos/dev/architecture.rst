@@ -88,6 +88,6 @@ The ``amitools.vamos`` package is split into the following sub-packages:
    * - ``task`` / ``schedule``
      - emulated tasks and the scheduler
    * - ``mode``
-     - the execution modes (``proc``, ``test``)
+     - the execution modes (``proc``, ``shell``, ``test``)
 
 See :doc:`api` for the Python reference and examples.

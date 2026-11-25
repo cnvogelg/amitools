@@ -42,7 +42,7 @@ from .Error import (
     ERROR_NOT_IMPLEMENTED,
     ERROR_OBJECT_WRONG_TYPE,
 )
-from .Process import Process
+from .Process import BinProcess
 from .Var import copy_local_vars, free_local_vars
 
 # the AmigaDOS V36 process table size returned by MaxCli()
@@ -61,6 +61,9 @@ SIGF_SINGLE = 1 << 4
 # counted in 4-byte longs and the buffer sizes match a real CLI.
 CLI_DEFAULTSTACK_UNIT = 4
 CLI_DEFAULT_PROMPT = "%N.%S> "
+# the stack size (bytes) AllocDosObject(DOS_CLI) puts in cli_DefaultStack when
+# the caller does not set one; matches the CreateNewProc() NP_StackSize default
+CLI_DEFAULT_STACK_SIZE = 4000
 CLI_PROMPT_SIZE = 60
 CLI_COMMANDNAME_SIZE = 104
 CLI_COMMANDFILE_SIZE = 40
@@ -74,7 +77,7 @@ def _ami_proc(ctx):
     get_proc = getattr(process, "get_ami_process", None)
     if get_proc is not None:
         return get_proc()
-    return getattr(process, "this_task", None)
+    return getattr(process, "proc", None)
 
 
 def _cli(ctx):
@@ -180,9 +183,6 @@ def _current_proc_addr(ctx):
         proc = getattr(process, "proc", None)
         if proc is not None:
             return proc.addr
-        task = getattr(process, "this_task", None)
-        if task is not None:
-            return task.addr
     return 0
 
 
@@ -454,6 +454,44 @@ def _free_path_list(dos, ctx, owned):
         dos.lock_mgr.release_lock(lock)
 
 
+def alloc_cli_struct(dos, ctx, label="CLI", stack_size=None):
+    """allocate a valid ``CommandLineInterface`` with its string buffers.
+
+    AmigaDOS requires ``AllocDosObject(DOS_CLI)`` to return a CLI whose
+    ``cli_Prompt``/``cli_SetName``/``cli_CommandName``/``cli_CommandFile``
+    point at real buffers: the DOS accessors (``SetPrompt``,
+    ``SetCurrentDirName``, ``SetProgramName``) and programs such as ``RexxMast``
+    write through these pointers, so a NULL field would corrupt low memory.
+
+    Returns ``(cli, resources)`` where ``resources`` are the memory objects the
+    caller must release with ``free_memory()``.
+    """
+    alloc = ctx.alloc
+    mem = ctx.mem
+    cli = alloc.alloc_astruct(CLIStruct, label=label)
+    prompt = alloc.alloc_memory(CLI_PROMPT_SIZE, label=label + "_Prompt")
+    cmdname = alloc.alloc_memory(CLI_COMMANDNAME_SIZE, label=label + "_CommandName")
+    cmdfile = alloc.alloc_memory(CLI_COMMANDFILE_SIZE, label=label + "_CommandFile")
+    setname = alloc.alloc_memory(CLI_SETNAME_SIZE, label=label + "_SetName")
+
+    if stack_size is None:
+        stack_size = CLI_DEFAULT_STACK_SIZE
+    cli.cli_DefaultStack.val = (
+        stack_size + CLI_DEFAULTSTACK_UNIT - 1
+    ) // CLI_DEFAULTSTACK_UNIT
+    cli.cli_FailLevel.val = 10
+    cli.cli_Prompt.aptr = prompt.addr
+    cli.cli_CommandName.aptr = cmdname.addr
+    cli.cli_CommandFile.aptr = cmdfile.addr
+    cli.cli_SetName.aptr = setname.addr
+
+    mem.w_bstr(prompt.addr, CLI_DEFAULT_PROMPT)
+    mem.w_bstr(cmdname.addr, "")
+    mem.w_bstr(cmdfile.addr, "")
+    mem.w_bstr(setname.addr, "SYS:")
+    return cli, [prompt, cmdname, cmdfile, setname]
+
+
 def _alloc_child_cli(dos, ctx, child, p, input_bptr, output_bptr):
     """build the CLI structure of a ``CreateNewProc()`` child (``NP_Cli``)
 
@@ -463,28 +501,18 @@ def _alloc_child_cli(dos, ctx, child, p, input_bptr, output_bptr):
     caller's path). ``PRF_FREECLI`` makes the child release all of it on exit
     (RKRM "Creating and Terminating Processes").
     """
-    alloc = ctx.alloc
     mem = ctx.mem
     parent_cli = _cli_of_proc(mem, p["parent_addr"])
 
-    cli = alloc.alloc_astruct(CLIStruct, label="child_CLI")
-    prompt = alloc.alloc_memory(CLI_PROMPT_SIZE, label="child_cli_Prompt")
-    cmdname = alloc.alloc_memory(CLI_COMMANDNAME_SIZE, label="child_cli_CommandName")
-    cmdfile = alloc.alloc_memory(CLI_COMMANDFILE_SIZE, label="child_cli_CommandFile")
-    setname = alloc.alloc_memory(CLI_SETNAME_SIZE, label="child_cli_SetName")
+    cli, resources = alloc_cli_struct(
+        dos, ctx, label="child_CLI", stack_size=p["stack_size"]
+    )
+    prompt, cmdname, cmdfile, setname = resources
 
-    cli.cli_DefaultStack.val = (
-        p["stack_size"] + CLI_DEFAULTSTACK_UNIT - 1
-    ) // CLI_DEFAULTSTACK_UNIT
-    cli.cli_FailLevel.val = 10
     cli.cli_StandardInput.aptr = input_bptr << 2
     cli.cli_CurrentInput.aptr = input_bptr << 2
     cli.cli_StandardOutput.aptr = output_bptr << 2
     cli.cli_CurrentOutput.aptr = output_bptr << 2
-    cli.cli_Prompt.aptr = prompt.addr
-    cli.cli_CommandName.aptr = cmdname.addr
-    cli.cli_CommandFile.aptr = cmdfile.addr
-    cli.cli_SetName.aptr = setname.addr
 
     # the prompt is copied from the caller's shell environment if it has one
     if parent_cli is not None:
@@ -1097,11 +1125,11 @@ def set_program_dir(ctx, lock_bptr):
 
 
 def get_file_sys_task(dos, ctx):
-    return ctx.process.this_task.pr_FileSystemTask.aptr
+    return ctx.process.proc.pr_FileSystemTask.aptr
 
 
 def set_file_sys_task(dos, ctx, port):
-    ctx.process.this_task.pr_FileSystemTask.aptr = port
+    ctx.process.proc.pr_FileSystemTask.aptr = port
 
 
 def find_cli_proc(ctx, num):
@@ -1193,32 +1221,87 @@ def _lookup_fh(dos, b_addr):
 # ----- run code/processes in the caller's task -----
 
 
+class _SubProcessWatcher:
+    """capture a synchronous command's exit code and wake the waiting caller.
+
+    ``run_sub_process`` blocks the caller until the command's task has been
+    removed. The task removal is reported from inside the command's greenlet,
+    so the caller must not be woken there: switching to it would suspend the
+    command before its process is freed. The wake up is deferred to an
+    after-schedule callback that runs once the command has fully unwound.
+    """
+
+    def __init__(self, scheduler, task, parent_task):
+        self.scheduler = scheduler
+        self.task = task
+        self.parent_task = parent_task
+        self.exit_code = 0
+
+    def on_event(self, event):
+        if event.task is not self.task:
+            return
+        if event.type != SchedulerEvent.Type.REMOVE_TASK:
+            return
+        # NativeTask only stores exit_code after it reported REMOVE_TASK, so
+        # read the code the command left in D0 from its run state here
+        run_state = getattr(self.task, "run_state", None)
+        regs = getattr(run_state, "regs", None) if run_state is not None else None
+        self.exit_code = regs[REG_D0] if regs else 0
+        self.scheduler.add_after_schedule_callback(self._wake_parent)
+
+    def _wake_parent(self):
+        self.scheduler.remove_after_schedule_callback(self._wake_parent)
+        self.parent_task.set_signal(SIGF_SINGLE, SIGF_SINGLE)
+
+
 def run_sub_process(scheduler, runner, proc):
+    """run a freshly loaded command process to completion.
+
+    ``SystemTagList``/``Execute`` block until the command is done, but the
+    command is its own AmigaDOS process: it gets its own scheduler task, so it
+    can ``Wait()``/``Signal()`` and may start further processes (a daemon) that
+    outlive it. The caller sleeps on ``SIGF_SINGLE`` until that task has ended
+    and its process has been freed.
+
+    Without a running caller task (a Python caller) the code is run inline in
+    the current runtime, as before.
+    """
     log_proc.info("start sub process: %s", proc)
-
-    # actually we need to add a new task and do multitasking
-    # for now we simply run it as a sub run in our task
     task = proc.get_sched_task()
+    parent_task = scheduler.get_running_task() if scheduler is not None else None
 
-    # hack cur task
-    cur_task = scheduler.cur_task
-    scheduler._report_event(SchedulerEvent.Type.ADD_TASK, task)
-    scheduler._report_event(SchedulerEvent.Type.READY_TASK, cur_task)
-    scheduler._report_event(SchedulerEvent.Type.ACTIVE_TASK, task)
+    if parent_task is None:
+        # no task to block on: run the command inline in the current runtime
+        cur_task = scheduler.cur_task if scheduler is not None else None
+        if scheduler is not None:
+            scheduler._report_event(SchedulerEvent.Type.ADD_TASK, task)
+            scheduler._report_event(SchedulerEvent.Type.READY_TASK, cur_task)
+            scheduler._report_event(SchedulerEvent.Type.ACTIVE_TASK, task)
+        run_state = runner(task.get_code())
+        ret_code = run_state.regs[REG_D0]
+        proc.free()
+        if scheduler is not None:
+            scheduler._report_event(SchedulerEvent.Type.READY_TASK, task)
+            scheduler._report_event(SchedulerEvent.Type.ACTIVE_TASK, cur_task)
+            scheduler._report_event(SchedulerEvent.Type.REMOVE_TASK, task)
+        log_proc.info("return from sub process: ret_code=%d", ret_code)
+        return ret_code
 
-    # return value
-    code = task.get_code()
-    run_state = runner(code)
-    ret_code = run_state.regs[REG_D0]
+    watcher = _SubProcessWatcher(scheduler, task, parent_task)
+    scheduler.add_event_callback(watcher.on_event)
+    try:
+        scheduler.add_task(task)
+        # the command runs once we yield; drop a stale completion signal first
+        parent_task.set_signal(0, SIGF_SINGLE)
+        parent_task.wait(SIGF_SINGLE)
+    finally:
+        scheduler.remove_event_callback(watcher.on_event)
+
+    ret_code = watcher.exit_code
     log_proc.info("return from sub process: ret_code=%d", ret_code)
 
     # cleanup proc
     proc.free()
-
-    # restore cur task
-    scheduler._report_event(SchedulerEvent.Type.READY_TASK, task)
-    scheduler._report_event(SchedulerEvent.Type.ACTIVE_TASK, cur_task)
-    scheduler._report_event(SchedulerEvent.Type.REMOVE_TASK, task)
 
     return ret_code
 
@@ -1233,7 +1316,7 @@ def run_sub_command(process, start_pc, args_ptr, args_len, stack_size, reg_d1=0)
     ctx = process.ctx
     alloc = ctx.alloc
     new_stack = Stack.alloc(alloc, stack_size)
-    task = process.this_task.pr_Task
+    task = process.proc.pr_Task
     # save old stack
     oldstack_lower = task.tc_SPLower.aptr
     oldstack_upper = task.tc_SPUpper.aptr
@@ -1318,7 +1401,7 @@ def system_tag_list(dos, ctx, cmd, tag_list):
         current_dir = ctx.process.get_current_dir()
         dup_lock = dos.lock_mgr.dup_lock(dos.get_current_dir(ctx))
         cur_module = cli.cli_Module.aptr
-        cur_out = ctx.process.this_task.pr_COS.aptr
+        cur_out = ctx.process.proc.pr_COS.aptr
         cur_setname = ctx.mem.r_bstr(cli.cli_SetName.aptr)
         cli.cli_Module.aptr = 0
         ctx.process.set_current_dir(dup_lock.mem.addr)
@@ -1345,8 +1428,8 @@ def system_tag_list(dos, ctx, cmd, tag_list):
             cli.cli_StandardOutput.aptr = output_fhci
         # Channels are closed by the dying shell
         ctx.mem.w_bstr(cli.cli_SetName.aptr, cur_setname)
-        ctx.process.this_task.pr_CIS.aptr = input_fhci
-        ctx.process.this_task.pr_COS.aptr = cur_out
+        ctx.process.proc.pr_CIS.aptr = input_fhci
+        ctx.process.proc.pr_COS.aptr = cur_out
         # infile = dos.file_mgr.get_by_b_addr(input_fhci >> 2,False)
         # infile.setbuf("")
         ctx.process.set_current_dir(current_dir)
@@ -1375,7 +1458,7 @@ def system_tag_list(dos, ctx, cmd, tag_list):
         input_fh, output_fh, redir_fhs = redir
         # create a process and run it...
         try:
-            proc = Process(
+            proc = BinProcess(
                 ctx,
                 binary,
                 arg_str,

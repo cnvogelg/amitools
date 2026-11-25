@@ -73,7 +73,7 @@ def _make_ctx(mem, cpu, cli=True):
         process=SimpleNamespace(
             get_ami_process=lambda: proc,
             get_cli_struct=lambda: cli_struct.addr if cli else 0,
-            this_task=proc,
+            proc=proc,
             get_program_name=lambda: "myprog",
             get_home_dir=lambda: proc.pr_HomeDir.bptr,
         ),
@@ -89,16 +89,16 @@ def lib_dos_cli_properties_test():
     assert lib.GetConsoleTask(ctx) == 0x111
     old = lib.SetConsoleTask(ctx, _long(mem, cpu, REG_D1, 0x333))
     assert old == 0x111
-    assert ctx.process.this_task.pr_ConsoleTask.aptr == 0x333
+    assert ctx.process.proc.pr_ConsoleTask.aptr == 0x333
 
     old = lib.SetArgStr(ctx, _cstr(mem, cpu, REG_D1, "arg1 arg2"))
     assert old == 0x222
-    assert mem.r_cstr(ctx.process.this_task.pr_Arguments.aptr) == "arg1 arg2"
+    assert mem.r_cstr(ctx.process.proc.pr_Arguments.aptr) == "arg1 arg2"
 
     assert lib.GetCurrentDir(ctx) == 12
     old = lib.SetProgramDir(ctx, _long(mem, cpu, REG_D1, 56))
     assert old == 34
-    assert ctx.process.this_task.pr_HomeDir.bptr == 56
+    assert ctx.process.proc.pr_HomeDir.bptr == 56
 
 
 def lib_dos_cli_prompt_test():
@@ -170,7 +170,7 @@ def lib_dos_cli_execute_test():
     cpu = MockCPU()
     ctx = _make_ctx(mem, cpu)
     lib = DosLibrary()
-    proc = ctx.process.this_task
+    proc = ctx.process.proc
     proc.pr_CIS.bptr = 11
     proc.pr_COS.bptr = 22
     seen = {}
@@ -345,12 +345,12 @@ def lib_dos_cli_file_sys_task_test():
 
     # SetFileSysTask is a void call but updates the process field
     assert lib.SetFileSysTask(ctx, 0x1234) is None
-    assert ctx.process.this_task.pr_FileSystemTask.aptr == 0x1234
+    assert ctx.process.proc.pr_FileSystemTask.aptr == 0x1234
     assert lib.GetFileSysTask(ctx) == 0x1234
 
     # and it can be cleared again
     lib.SetFileSysTask(ctx, 0)
-    assert ctx.process.this_task.pr_FileSystemTask.aptr == 0
+    assert ctx.process.proc.pr_FileSystemTask.aptr == 0
     assert lib.GetFileSysTask(ctx) == 0
 
 
@@ -591,8 +591,8 @@ def lib_dos_cli_run_command_test(monkeypatch):
     # the command line is pushed and cleared again
     assert input_fh.buf == ""
     # both process fields are restored, the command's IoErr survives the flush
-    assert ctx.process.this_task.pr_Arguments.aptr == 0x222
-    assert ctx.process.this_task.pr_ReturnAddr.aptr == 0
+    assert ctx.process.proc.pr_Arguments.aptr == 0x222
+    assert ctx.process.proc.pr_ReturnAddr.aptr == 0
     assert lib.io_err == 42
 
 
@@ -1145,7 +1145,7 @@ def lib_dos_cli_system_tag_list_redir_test(monkeypatch):
         def free(self):
             pass
 
-    monkeypatch.setattr(Cli, "Process", FakeProcess)
+    monkeypatch.setattr(Cli, "BinProcess", FakeProcess)
     monkeypatch.setattr(Cli, "run_sub_process", lambda sched, runner, proc: 0)
 
     # '<in >out' opens both files, passes them to the process and closes them

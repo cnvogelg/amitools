@@ -153,4 +153,54 @@ The `Makefile` in this directory contains a line *SASC_INSTALL_DIR* that
 describes the location where the `sc` directory of the Amiga installation
 can be found in the host file system. The default is `volumes/sc`.
 
+## 4. Copyrighted test fixtures
+
+Some tests need original, copyrighted AmigaOS binaries (currently the ARexx
+runtime, see `arexx/README.md`, and the shell variants in `shell-seg/`, see
+`shell-seg/README.md`). These files are **never committed**. Instead
+they are listed in `blob_files.txt` and stored encrypted in
+`blob.tar.zstd.enc`; the tests skip themselves when the files are absent.
+
+The manifest `blob_files.txt` lists every such file (paths relative to this
+`test/` directory, one per line, `#` comments allowed; a directory entry
+includes everything below it). A file listed there must also be ignored by a
+`.gitignore` so it can never be committed; the lint CI job enforces this with
+`blob_check.sh`.
+
+### Restoring the fixtures
+
+The blob is encrypted with a passphrase that is kept in the CI secret
+`BLOB_PASSPHRASE`. For how to create that secret in the GitHub repository see
+the "Copyrighted test fixtures" section in the top-level
+[README.md](../README.md). To restore the files locally (after cloning, or in
+CI):
+
+```
+BLOB_PASSPHRASE=... test/blob_decode.sh
+```
+
+`blob_decode.sh` unpacks the archive into this `test/` directory, recreating
+every path in the manifest.
+
+### Regenerating the blob
+
+After changing `blob_files.txt` or replacing a fixture on disk, rebuild the
+blob with the same passphrase:
+
+```
+BLOB_PASSPHRASE=... test/blob_encode.sh
+```
+
+The script checks that every listed file exists and is not tracked by git, then
+packs exactly those files (tar, paths relative to `test/`) with zstd and
+AES-256. Commit the regenerated `blob.tar.zstd.enc`. Both scripts also prompt
+for the passphrase if `BLOB_PASSPHRASE` is not set.
+
+### Adding a new fixture
+
+1. Populate the file locally (e.g. with an `extract-*.py` script).
+2. Add its path to `blob_files.txt`.
+3. Make sure a `.gitignore` ignores it (`blob_check.sh` will tell you).
+4. Run `BLOB_PASSPHRASE=... test/blob_encode.sh` and commit the new blob.
+
 EOF

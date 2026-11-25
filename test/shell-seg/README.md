@@ -66,3 +66,30 @@ because that is what the amitools tests already use for `Shell-Seg`.
 * A different 3.1-era build `40.2 (ESCOM)` (SHA-1
   `f2614b0f06e5a37742ee77bbc2a0f3d4673b7193`) exists in the Walker 43.1 ROM and
   is intentionally not part of this set.
+
+## Status under `vamos -x`
+
+`test/extra/shell_seg.py` runs every collected seg through the `shell` mode
+(`vamos -x --shell-bin seg:<name>`) and pins its exit code:
+
+| shell   | runs | exit code |
+|---------|------|-----------|
+| 1.3     | no   | —         |
+| 37.69   | yes  | 46        |
+| 39.13   | yes  | 46        |
+| 40.2    | yes  | 44        |
+| 45.7    | yes  | 188       |
+| 46.10   | yes  | 212       |
+| 47.47   | yes  | 136       |
+| 47.48   | yes  | 132       |
+
+The 2.x–3.2.1 shells are C programs with a BCPL-compatible entry stub at
+seglist `+8`. The stub ends with `jmp (a6)`, where `a6` is the address of the
+BCPL return code (see RKRM-dos, "Runtime binding of BCPL programs").
+`ShellProcess` points `a6` at the machine's exit trap, so the shell leaves the
+process cleanly.
+
+The 1.3 shell is a genuine BCPL program: its first long-word is a BCPL Global
+Vector init offset, so it needs the `dos.library` BCPL Global Vector and the
+BCPL call/return trampolines (`dl_A2`/`dl_A5`/`dl_A6`). None of that is
+implemented in vamos yet, so its test is marked `xfail`.

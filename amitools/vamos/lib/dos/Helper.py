@@ -59,7 +59,7 @@ def set_io_err(dos, ctx, err):
     process = ctx.process
     if process is None:
         return
-    amiga_process = getattr(process, "this_task", None)
+    amiga_process = getattr(process, "proc", None)
     if amiga_process is None:
         amiga_process = getattr(process, "ami_proc", None)
     if amiga_process is not None:

@@ -176,6 +176,28 @@ runs everything through `tox` for all supported Python versions. Rebuilding
 the test programs needs the cross compilers described in
 [test/README.md](test/README.md).
 
+### Copyrighted test fixtures
+
+Some tests need original, copyrighted AmigaOS binaries (for example the ARexx
+runtime). These files are never committed. They are listed in
+[`test/blob_files.txt`](test/blob_files.txt) and stored encrypted in
+`test/blob.tar.zstd.enc`, which is safe to publish because it can only be
+opened with a passphrase.
+
+To let CI run those tests, store the passphrase as a repository secret:
+
+1. Open the repository on GitHub.
+2. Go to **Settings → Secrets and variables → Actions**.
+3. Click **New repository secret**.
+4. Name it `BLOB_PASSPHRASE` and paste the same passphrase that was used with
+   `test/blob_encode.sh`.
+
+The test workflow then restores the fixtures with `test/blob_decode.sh` before
+running the suite. Pull requests from forks do not receive secrets, so there
+the restore is skipped and the affected tests skip themselves. See
+[test/README.md](test/README.md) for restoring the fixtures locally, adding
+new ones and regenerating the blob.
+
 ### Publishing releases
 
 The `Build and publish Python distributions` workflow builds a source

@@ -1,0 +1,42 @@
+# Copyrighted test fixtures that must never be committed.
+#
+# One path per line, relative to the test/ directory.  Blank lines and lines
+# starting with '#' are ignored.  A directory entry includes everything below
+# it recursively.
+#
+# The listed files are packed into test/blob.tar.zstd.enc by
+# test/blob_encode.sh (zstd + AES-256) and restored on CI with
+# test/blob_decode.sh.  The archive is safe to commit: it can only be opened
+# with the passphrase kept in the CI secret BLOB_PASSPHRASE.
+#
+# After changing this list or replacing a fixture, regenerate the blob:
+#
+#     BLOB_PASSPHRASE=... test/blob_encode.sh
+#
+# See test/README.md ("Copyrighted test fixtures").
+
+# --- ARexx (AmigaOS 3.2.3) -- see test/arexx/README.md ---------------------
+arexx/Libs/rexxsyslib.library
+arexx/Libs/rexxsupport.library
+arexx/System/RexxMast
+arexx/Classes/arexx.class
+arexx/Rexxc/HI
+arexx/Rexxc/RX
+arexx/Rexxc/RXC
+arexx/Rexxc/RXLIB
+arexx/Rexxc/RXSET
+arexx/Rexxc/TCC
+arexx/Rexxc/TCO
+arexx/Rexxc/TE
+arexx/Rexxc/TS
+arexx/Rexxc/WaitForPort
+
+# --- Shell-Seg (various AmigaOS releases) -- see test/shell-seg/README.md ---
+shell-seg/Shell-Seg-1.3
+shell-seg/Shell-Seg-37.69
+shell-seg/Shell-Seg-39.13
+shell-seg/Shell-Seg-40.2
+shell-seg/Shell-Seg-45.7
+shell-seg/Shell-Seg-46.10
+shell-seg/Shell-Seg-47.47
+shell-seg/Shell-Seg-47.48

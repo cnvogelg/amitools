@@ -109,7 +109,17 @@ class Scheduler(object):
 
     def set_event_callback(self, func):
         """the function will receive ScheduleEvent"""
-        self.event_hooks.append(func)
+        self.add_event_callback(func)
+
+    def add_event_callback(self, func):
+        """register a function that receives every ScheduleEvent"""
+        if func not in self.event_hooks:
+            self.event_hooks.append(func)
+
+    def remove_event_callback(self, func):
+        """unregister a ScheduleEvent callback"""
+        if func in self.event_hooks:
+            self.event_hooks.remove(func)
 
     def get_num_tasks(self):
         """count the active tasks"""
@@ -145,8 +155,10 @@ class Scheduler(object):
             raise RuntimeError("no tasks to schedule!")
 
         if self._run_tasks(wait_for_events=True) == RunResult.IDLE:
-            # every task left waits and no task is there to wake it up
-            log_schedule.error("schedule(): no task to run?!")
+            # every task left waits and no task is there to wake it up. This is
+            # the normal end of a program that left a background task (e.g. a
+            # daemon) waiting: the primary task(s) are already done.
+            log_schedule.info("schedule(): all tasks waiting (idle)")
             return False
         return True
 
