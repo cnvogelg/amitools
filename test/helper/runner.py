@@ -17,7 +17,14 @@ from .builder import BinBuilder
 from amitools.vamos.main import main as vamos_main
 
 
-def run_proc(args, stdin_str=None, raw_output=False, use_pty=False, stdin_delay=0.01):
+def run_proc(
+    args,
+    stdin_str=None,
+    raw_output=False,
+    use_pty=False,
+    stdin_delay=0.01,
+    timeout=None,
+):
     if stdin_str:
         stdin_bytes = stdin_str.encode("latin-1")
         stdin_flag = subprocess.PIPE
@@ -49,13 +56,20 @@ def run_proc(args, stdin_str=None, raw_output=False, use_pty=False, stdin_delay=
         p = subprocess.Popen(
             args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_flag
         )
-        (stdout, stderr) = p.communicate(stdin_bytes)
+        try:
+            (stdout, stderr) = p.communicate(stdin_bytes, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            p.communicate()
+            raise TimeoutError(
+                "command did not finish within %s s: %s" % (timeout, " ".join(args))
+            )
         returncode = p.returncode
 
         # process stdout
     if not raw_output:
         stdout = stdout.decode("latin-1").splitlines()
-        if stderr:
+        if stderr is not None:
             stderr = stderr.decode("latin-1").splitlines()
     return returncode, stdout, stderr
 
@@ -204,6 +218,7 @@ class VamosTestRunner:
                 stdin,
                 use_pty=use_pty,
                 stdin_delay=kw_args.get("stdin_delay", 0.01),
+                timeout=kw_args.get("timeout"),
             )
         else:
 
@@ -324,7 +339,11 @@ class VamosRunner:
         else:
             no_ts = True
 
-            # run vamos with prog
+        # wall clock limit for subprocess runs (None = no limit).  An
+        # in-process run cannot be interrupted, so it ignores this.
+        timeout = kw_args.get("timeout", None)
+
+        # run vamos with prog
         args = [self.vamos_bin] + self.vamos_args
         if no_ts:
             args.append("--no-ts")
@@ -337,7 +356,7 @@ class VamosRunner:
         print("running:", " ".join(args))
         print("stdin:", stdin)
         if self.run_subproc:
-            return run_proc(args, stdin)
+            return run_proc(args, stdin, timeout=timeout)
         else:
 
             def run(args):
