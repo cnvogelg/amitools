@@ -1,10 +1,11 @@
 from .elf.BinFmtELF import BinFmtELF
 from .hunk.BinFmtHunk import BinFmtHunk
+from .py.BinFmtPy import BinFmtPy
 
 
 class BinFmt:
     def __init__(self):
-        self.formats = [BinFmtHunk(), BinFmtELF()]
+        self.formats = [BinFmtHunk(), BinFmtELF(), BinFmtPy()]
 
     def get_format(self, path):
         """get instance of BinFmt loader or None"""
@@ -14,8 +15,13 @@ class BinFmt:
     def get_format_fobj(self, fobj):
         """get instance of BinFmt loader or None"""
         for f in self.formats:
+            # probe each format from the same position, even if a format
+            # forgets to restore the stream itself
+            pos = fobj.tell()
             if f.is_image_fobj(fobj):
+                fobj.seek(pos, 0)
                 return f
+            fobj.seek(pos, 0)
         return None
 
     def is_image(self, path):

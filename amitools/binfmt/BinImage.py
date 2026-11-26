@@ -8,8 +8,9 @@ segment_type_names = ["CODE", "DATA", "BSS"]
 
 BIN_IMAGE_TYPE_HUNK = 0
 BIN_IMAGE_TYPE_ELF = 1
+BIN_IMAGE_TYPE_PY = 2
 
-bin_image_type_names = ["hunk", "elf"]
+bin_image_type_names = ["hunk", "elf", "py"]
 
 BIN_IMAGE_RELOC_32 = 1
 BIN_IMAGE_RELOC_PC32 = 4

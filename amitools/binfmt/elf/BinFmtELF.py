@@ -29,9 +29,8 @@ class BinFmtELF:
 
     def is_image_fobj(self, fobj):
         """check if a given fobj is a supported ELF file"""
+        pos = fobj.tell()
         try:
-            pos = fobj.tell()
-
             # read identifier
             ident = ELFIdentifier()
             ident_data = fobj.read(16)
@@ -41,14 +40,15 @@ class BinFmtELF:
             hdr = ELFHeader()
             hdr_data = fobj.read(36)
             hdr.parse(hdr_data)
-
-            # seek back
-            fobj.seek(pos, 0)
-
-            # check header
-            return self.is_supported_elf(ident, hdr)
         except ELFParseError:
             return False
+        finally:
+            # always restore the position, also on a parse error, so that a
+            # later format probe in BinFmt sees the original file
+            fobj.seek(pos, 0)
+
+        # check header
+        return self.is_supported_elf(ident, hdr)
 
     def is_supported_elf(self, ident, hdr):
         """check ELF header if its a m68k binary"""
