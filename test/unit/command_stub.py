@@ -24,7 +24,12 @@ class Context:
 
     def run_stub(self, cmd, set_regs=None):
         seglist = self.mgr.make_stub(cmd)
-        code = Code(seglist.get_start_pc(), self.stack, set_regs=set_regs)
+        # a DOS program is always entered with an argument line in A0/D0, so
+        # default them to "no arguments" instead of relying on the reset state
+        regs = {REG_A0: 0, REG_D0: 0}
+        if set_regs:
+            regs.update(set_regs)
+        code = Code(seglist.get_start_pc(), self.stack, set_regs=regs)
         return self.rt.start(code)
 
     def cleanup(self):
