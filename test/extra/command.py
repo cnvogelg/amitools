@@ -8,6 +8,8 @@ binary. These tests use host files under ``tmp_path`` (mapped through the
 
 import os
 
+from amitools.vamos.cmdcore.version import get_amitools_version
+
 SHEBANG = "#!/usr/bin/env python3\n"
 
 
@@ -177,4 +179,68 @@ def command_resident_shell_error_test(vrun, tmp_path):
     )
     # the shell survives the failing command and reaches its own endcli
     assert stdout[-1].endswith("PROCESS 0 ENDING")
+    assert retcode == SHELL_SEG_RETCODE
+
+
+# ----- built-in internal commands -----
+
+
+def command_internal_vamos_version_test(vrun):
+    """the built-in vamos command is available without any --resident-dir"""
+    _check_shell_seg(vrun)
+    seg = "seg:" + SHELL_SEG_NAME
+    retcode, stdout, stderr = vrun.run_prog(
+        seg,
+        vargs=["-x", "--shell-bin", seg],
+        stdin="vamos version\nendcli\n",
+    )
+    assert stdout == [PROMPT + get_amitools_version(), PROMPT + "PROCESS 0 ENDING"]
+    assert stderr == []
+    assert retcode == SHELL_SEG_RETCODE
+
+
+def command_internal_vamos_unknown_test(vrun):
+    """an unknown subcommand prints usage and does not end the shell"""
+    _check_shell_seg(vrun)
+    seg = "seg:" + SHELL_SEG_NAME
+    retcode, stdout, stderr = vrun.run_prog(
+        seg,
+        vargs=["-x", "--shell-bin", seg],
+        stdin="vamos bogus\nendcli\n",
+    )
+    assert any("unknown subcommand 'bogus'" in line for line in stdout)
+    assert stdout[-1].endswith("PROCESS 0 ENDING")
+    assert retcode == SHELL_SEG_RETCODE
+
+
+def command_internal_disabled_test(vrun):
+    """--no-internal-commands drops the built-in vamos command"""
+    _check_shell_seg(vrun)
+    seg = "seg:" + SHELL_SEG_NAME
+    retcode, stdout, stderr = vrun.run_prog(
+        seg,
+        vargs=["-x", "--shell-bin", seg, "--no-internal-commands"],
+        stdin="vamos version\nendcli\n",
+    )
+    assert any("Unknown command" in line for line in stdout)
+    assert stdout[-1].endswith("PROCESS 0 ENDING")
+    assert retcode == SHELL_SEG_RETCODE
+
+
+def command_internal_collision_test(vrun, tmp_path):
+    """a --resident-dir command overrides a built-in of the same name"""
+    _check_shell_seg(vrun)
+    (tmp_path / "vamos.py").write_text(
+        "def main(ctx, arg_line, prog_name):\n"
+        "    ctx.stdout.writeln('user vamos')\n"
+        "    return 0\n"
+    )
+    seg = "seg:" + SHELL_SEG_NAME
+    retcode, stdout, stderr = vrun.run_prog(
+        seg,
+        vargs=["-x", "--shell-bin", seg, "--resident-dir", str(tmp_path)],
+        stdin="vamos version\nendcli\n",
+    )
+    assert stdout == [PROMPT + "user vamos", PROMPT + "PROCESS 0 ENDING"]
+    assert stderr == []
     assert retcode == SHELL_SEG_RETCODE

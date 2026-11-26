@@ -115,6 +115,37 @@ def command_load_run_exception_test():
     assert cmd.run(None, "") == RETURN_ERROR
 
 
+def command_load_run_sys_exit_test():
+    """sys.exit(code) in main() is honored as the exit code"""
+    cmd = PyCommand(
+        "quit",
+        source=("import sys\ndef main(ctx, arg_line, prog_name):\n    sys.exit(7)\n"),
+    )
+    assert cmd.run(None, "") == 7
+    # sys.exit() without a code means success
+    cmd = PyCommand(
+        "quit0",
+        source=("import sys\ndef main(ctx, arg_line, prog_name):\n    sys.exit()\n"),
+    )
+    assert cmd.run(None, "") == 0
+    # a non-integer code is an error
+    cmd = PyCommand(
+        "quits",
+        source=(
+            "import sys\ndef main(ctx, arg_line, prog_name):\n    sys.exit('bad')\n"
+        ),
+    )
+    assert cmd.run(None, "") == RETURN_ERROR
+
+
+def command_load_import_sys_exit_test():
+    """sys.exit() during import is a load error, not a fatal exit"""
+    cmd = PyCommand("quitimport", source="import sys\nsys.exit(3)\n")
+    with pytest.raises(CommandLoadError):
+        cmd.load()
+    assert cmd.run(None, "") == RETURN_ERROR
+
+
 def command_load_sys_path_test(tmp_path):
     """a command can import a sibling helper module from its own directory"""
     (tmp_path / "cmdhelper.py").write_text("VALUE = 7\n")

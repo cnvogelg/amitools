@@ -92,6 +92,10 @@ class PyCommand:
         module.__file__ = filename
         try:
             exec(code, module.__dict__)
+        except SystemExit as e:
+            raise CommandLoadError(
+                "command '%s' exited during import: %s" % (self.name, e)
+            )
         except Exception as e:
             raise CommandLoadError("command '%s' failed to import: %s" % (self.name, e))
         main = getattr(module, "main", None)
@@ -112,13 +116,20 @@ class PyCommand:
 
         A load error or a Python exception inside ``main`` is logged and
         turned into a non-zero exit code so the emulated program terminates
-        cleanly.
+        cleanly. A ``sys.exit()`` in the command is honored as its exit code.
         """
         try:
             self.ensure_loaded()
             ret = self.main(ctx, arg_line, self.name)
         except CommandLoadError:
             log_cmd.error("command '%s' failed to load:", self.name, exc_info=True)
+            return RETURN_ERROR
+        except SystemExit as e:
+            # let a command end itself with sys.exit(code)
+            if e.code is None:
+                return 0
+            if isinstance(e.code, int):
+                return e.code & 0xFF
             return RETURN_ERROR
         except Exception:
             log_cmd.error("command '%s' failed:", self.name, exc_info=True)
