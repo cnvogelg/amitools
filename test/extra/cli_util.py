@@ -13,6 +13,7 @@ subprocess runs (``--run-subproc``).
 """
 
 import os
+import re
 
 CLI_DIR = "cli"
 CLI_VOL = "cli"
@@ -51,7 +52,9 @@ def run_cli(vrun, name, *args, stdin=None, vargs=(), timeout=CLI_TIMEOUT):
     """
     add_cli_volume(vrun)
     prog = "{}:C/{}".format(CLI_VOL, name)
-    all_vargs = [CLI_PATH_ARG, CLI_PATH] + list(vargs)
+    # the trailing "--" keeps command arguments such as "-w" (Protect) or
+    # "FROM"/"TO" out of vamos' own option parser
+    all_vargs = [CLI_PATH_ARG, CLI_PATH] + list(vargs) + ["--"]
     return vrun.run_prog(prog, *args, stdin=stdin, vargs=all_vargs, timeout=timeout)
 
 
@@ -66,3 +69,52 @@ def run_cli_rc(vrun, name, *args, expect_rc=0, **kw):
         stderr,
     )
     return stdout, stderr
+
+
+# the standard scratch tree used by the file commands.  The sizes are fixed so
+# the commands' summaries ("N files - N bytes - ...") are deterministic.
+WORK_FILES = {
+    "in.txt": "hello\nworld\n",
+    "a.txt": "banana\napple\ncherry\n",
+    "b.txt": "dog\ncat\n",
+    "del.txt": "delete me\n",
+    "ren.txt": "rename me\n",
+    "nested.txt": "nested\n",
+    "sub/deep.txt": "deep\n",
+}
+
+
+def make_work_tree(work_dir):
+    """populate a scratch host directory with the standard CLI test tree."""
+    for rel, data in WORK_FILES.items():
+        path = os.path.join(str(work_dir), rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            f.write(data)
+    return work_dir
+
+
+def work_vargs(work_dir):
+    """vamos options exposing ``work_dir`` as the ``work:`` volume."""
+    return ["-Vwork:" + str(work_dir)]
+
+
+def assert_lines(stdout, patterns):
+    """assert each stdout line matches the corresponding pattern.
+
+    A ``str`` pattern must be equal; a compiled regex must ``fullmatch``.
+    """
+    assert len(stdout) == len(patterns), "got %d lines, want %d:\n%s" % (
+        len(stdout),
+        len(patterns),
+        "\n".join(repr(line) for line in stdout),
+    )
+    for i, (line, pat) in enumerate(zip(stdout, patterns)):
+        if isinstance(pat, re.Pattern):
+            assert pat.fullmatch(line), "line %d %r does not match %r" % (
+                i,
+                line,
+                pat.pattern,
+            )
+        else:
+            assert line == pat, "line %d %r != %r" % (i, line, pat)
