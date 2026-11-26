@@ -141,3 +141,19 @@ def command_resident_add_dir_missing_test():
     assert ctx.resident.entries == []
     ctx.cleanup()
     assert ctx.alloc.is_all_free()
+
+
+def command_resident_sibling_import_test(tmp_path):
+    """a resident command can import a sibling helper module"""
+    (tmp_path / "_cmdhelper.py").write_text("VALUE = 42\n")
+    (tmp_path / "usehelper.py").write_text(
+        "import _cmdhelper\n"
+        "def main(ctx, arg_line, prog_name):\n"
+        "    return _cmdhelper.VALUE\n"
+    )
+    ctx = Context()
+    assert ctx.resident.add_dir(str(tmp_path)) == 1
+    cmd = ctx.mgr.get_command("usehelper")
+    assert cmd.run(None, "") == 42
+    ctx.cleanup()
+    assert ctx.alloc.is_all_free()

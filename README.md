@@ -115,7 +115,15 @@ romtool scan kick31.rom -i
 
 # run an Amiga program; -V maps a host directory to an Amiga volume
 vamos -V work:/path/to/dir myprog
+
+# run a Python command like an Amiga binary, or publish a command directory
+vamos hello.py world
+vamos -x --resident-dir ./my-commands
 ```
+
+Python commands are plain ``*.py`` files with a ``main(ctx, arg_line,
+prog_name)`` function that runs inside the emulated AmigaOS and can use the
+``dos``/``exec`` proxies; see the [user manual](https://amitools.readthedocs.io/en/latest/vamos/user/commands.html).
 
 ## Python libraries
 

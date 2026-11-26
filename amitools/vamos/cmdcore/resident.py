@@ -40,11 +40,15 @@ class ResidentCommands:
 
     # ----- registration -----
 
-    def add_source(self, name, source):
-        """register a command from Python source as a resident segment"""
+    def add_source(self, name, source, path=None):
+        """register a command from Python source as a resident segment.
+
+        ``path`` is the optional host path the source came from; it lets the
+        command import sibling helper modules from its own directory.
+        """
         if self.dos is None:
             raise RuntimeError("ResidentCommands.setup() was not called")
-        cmd = self.cmd_mgr.make_command(name, source=source)
+        cmd = self.cmd_mgr.make_command(name, source=source, path=path)
         seglist = self.cmd_mgr.make_stub(cmd)
         b_addr = seglist.get_baddr()
         name_addr = self._write_name(name)
@@ -84,7 +88,7 @@ class ResidentCommands:
                 continue
             with open(path, "rb") as f:
                 source = f.read()
-            self.add_source(entry[:-3], source)
+            self.add_source(entry[:-3], source, path=path)
             count += 1
         return count
 

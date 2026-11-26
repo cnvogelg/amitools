@@ -231,6 +231,27 @@ Program and process
 
         vamos myprog input.dat
 
+Python commands
+---------------
+
+A ``*.py`` file with a Python shebang runs like an Amiga program; see
+:doc:`commands`.
+
+``--resident-dir DIR``
+    Publish every top-level ``*.py`` in the host directory ``DIR`` as a resident
+    command, named after the file without ``.py``. Repeat for more directories.
+
+    .. code-block:: text
+
+        vamos -x --resident-dir ./my-commands
+
+``--no-internal-commands``
+    Do not register the built-in commands (see :doc:`commands`).
+
+    .. code-block:: text
+
+        vamos -x --no-internal-commands
+
 Machine and hardware
 --------------------
 
