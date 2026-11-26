@@ -74,8 +74,9 @@ def handler_filesys_rename_overwrite_test(tmp_path):
 
 def handler_filesys_create_dir_missing_parent_test(tmp_path):
     h, _ = make_handler(tmp_path)
-    # the host reports a missing parent as "object not found"
-    expect_error(203, h.create_dir, "missing/sub")
+    # a missing parent is reported as "object not found" (205), not as
+    # "object exists" (203): callers such as "MakeDir ... ALL" rely on it
+    expect_error(205, h.create_dir, "missing/sub")
 
 
 def handler_filesys_soft_link_test(tmp_path):

@@ -368,6 +368,13 @@ class HostFileSysHandler(FileSystemHandler):
         sys_path = self._sys_path(ami_path)
         try:
             self.fs.mkdir(sys_path)
+        except FileExistsError:
+            raise HandlerError(ERROR_OBJECT_EXISTS)
+        except FileNotFoundError:
+            # a missing parent is reported as such: callers such as
+            # "MakeDir ... ALL" retry after creating the parents, which only
+            # works if this is not mistaken for ERROR_OBJECT_EXISTS.
+            raise HandlerError(ERROR_OBJECT_NOT_FOUND)
         except OSError:
             raise HandlerError(ERROR_OBJECT_EXISTS)
 
