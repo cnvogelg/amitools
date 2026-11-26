@@ -187,11 +187,11 @@ class FileManager:
             if expanded != ami_path:
                 log_file.debug("expanded '*' path to: %s", expanded)
                 ami_path = expanded
-        fh = self._open_via_handler(ami_path, f_mode, cwd)
-        if fh is None:
-            return None
-        self._register_file(fh)
-        return fh
+        # _open_via_handler registers the wrapped handle (via
+        # wrap_handler_file), so do not register it a second time here: a
+        # second _register_file would allocate another FileHandleStruct and
+        # leak the first one.
+        return self._open_via_handler(ami_path, f_mode, cwd)
 
     def close(self, fh):
         fh.close()
