@@ -31,6 +31,22 @@ CHANGE_LOCK = 0
 CHANGE_FH = 1
 
 
+def _get_fh(dos, ctx, fh_b_addr, for_writing=None):
+    """Resolve a file handle BPTR, tolerating BNULL and stale handles.
+
+    AmigaDOS file I/O calls accept a NULL handle and merely report an error
+    instead of dereferencing it (cf. AROS ``rom/dos/fputs.c``).  A stale
+    non-NULL handle is treated the same way.
+    """
+    try:
+        fh = dos.file_mgr.get_by_b_addr(fh_b_addr, for_writing)
+    except ValueError:
+        fh = None
+    if fh is None:
+        dos.setioerr(ctx, ERROR_OBJECT_NOT_FOUND)
+    return fh
+
+
 # ----- open/close -----
 
 
@@ -77,7 +93,9 @@ def close_file(dos, ctx, fh_b_addr):
 
 
 def read_file(dos, ctx, fh_b_addr, buf_ptr, size):
-    fh = dos.file_mgr.get_by_b_addr(fh_b_addr, False)
+    fh = _get_fh(dos, ctx, fh_b_addr, False)
+    if fh is None:
+        return -1
     data = fh.read(size)
     if data == -1:
         log_dos.info("Read(%s, @%06x, %d) -> FAILED!", fh, buf_ptr, size)
@@ -97,7 +115,9 @@ def read_file(dos, ctx, fh_b_addr, buf_ptr, size):
 
 
 def write_file(dos, ctx, fh_b_addr, buf_ptr, size):
-    fh = dos.file_mgr.get_by_b_addr(fh_b_addr, True)
+    fh = _get_fh(dos, ctx, fh_b_addr, True)
+    if fh is None:
+        return -1
     data = ctx.mem.r_block(buf_ptr, size)
     res = fh.write(data)
     if res == -1:
@@ -120,7 +140,9 @@ def write_file(dos, ctx, fh_b_addr, buf_ptr, size):
 def fwrite(dos, ctx, fh_b_addr, buf_ptr, size, number):
     # Actually, this is buffered I/O, not unbuffered IO. For the
     # time being, keep it unbuffered.
-    fh = dos.file_mgr.get_by_b_addr(fh_b_addr, True)
+    fh = _get_fh(dos, ctx, fh_b_addr, True)
+    if fh is None:
+        return 0
     data = ctx.mem.r_block(buf_ptr, size * number)
     res = fh.write(data)
     if res == -1:
@@ -145,7 +167,9 @@ def fread(dos, ctx, fh_b_addr, buf_ptr, size, number):
     # Again, this is actually buffered I/O and I should really
     # go through all the buffer logic. However, for the time
     # being, keep it unbuffered.
-    fh = dos.file_mgr.get_by_b_addr(fh_b_addr, True)
+    fh = _get_fh(dos, ctx, fh_b_addr, True)
+    if fh is None:
+        return 0
 
     data = fh.read(size * number)
     if data == -1:
@@ -168,7 +192,9 @@ def fread(dos, ctx, fh_b_addr, buf_ptr, size, number):
 
 
 def seek(dos, ctx, fh_b_addr, pos, mode):
-    fh = dos.file_mgr.get_by_b_addr(fh_b_addr)
+    fh = _get_fh(dos, ctx, fh_b_addr)
+    if fh is None:
+        return -1
     if mode == 0xFFFFFFFF:
         mode_str = "BEGINNING"
         whence = 0
@@ -211,7 +237,10 @@ def set_file_size(dos, ctx, fh_b_addr, pos, mode):
         pos -= 0x100000000
     if mode >= 0x80000000:
         mode -= 0x100000000
-    fh = dos.file_mgr.get_by_b_addr(fh_b_addr)
+    try:
+        fh = dos.file_mgr.get_by_b_addr(fh_b_addr)
+    except ValueError:
+        fh = None
     if fh is None:
         dos.setioerr(ctx, ERROR_INVALID_LOCK)
         return -1
@@ -228,7 +257,9 @@ def set_file_size(dos, ctx, fh_b_addr, pos, mode):
 
 
 def fgetc(dos, ctx, fh_b_addr):
-    fh = dos.file_mgr.get_by_b_addr(fh_b_addr, False)
+    fh = _get_fh(dos, ctx, fh_b_addr, False)
+    if fh is None:
+        return -1
     ch = fh.getc()
     if ch == -2:
         log_dos.info("FGetC(%s) -> EOF (%d)", fh, ch)
@@ -243,7 +274,9 @@ def fgetc(dos, ctx, fh_b_addr):
 
 
 def fputc(dos, ctx, fh_b_addr, val):
-    fh = dos.file_mgr.get_by_b_addr(fh_b_addr, True)
+    fh = _get_fh(dos, ctx, fh_b_addr, True)
+    if fh is None:
+        return -1
     log_dos.info("FPutC(%s, '%c' (%d))", fh, val, val)
     fh.write(bytes((val,)))
     return val
@@ -252,7 +285,11 @@ def fputc(dos, ctx, fh_b_addr, val):
 def fputs(dos, ctx, fh_b_addr, str_ptr):
     str_dat = ctx.mem.r_cbytes(str_ptr)
     # write to stdout
-    fh = dos.file_mgr.get_by_b_addr(fh_b_addr, True)
+    fh = _get_fh(dos, ctx, fh_b_addr, True)
+    if fh is None:
+        # AmigaDOS tolerates a NULL handle here and reports the error
+        # instead of crashing (see AROS rom/dos/fputs.c).
+        return -1
     ok = fh.write(str_dat)
 
     show_data = str_dat[: Helper.MAX_SHOW_DATA]
@@ -261,7 +298,9 @@ def fputs(dos, ctx, fh_b_addr, str_ptr):
 
 
 def ungetc(dos, ctx, fh_b_addr, val):
-    fh = dos.file_mgr.get_by_b_addr(fh_b_addr, False)
+    fh = _get_fh(dos, ctx, fh_b_addr, False)
+    if fh is None:
+        return -1
     ch = fh.ungetc(val)
     log_dos.info("UnGetC(%s, %d) -> ch=%d (%d)", fh, val, ch, ch)
     return ch
@@ -274,7 +313,9 @@ def fgets(dos, ctx, fh_b_addr, buf_addr, buflen):
     if fh_end == 0:
         return 0
 
-    fh = dos.file_mgr.get_by_b_addr(fh_b_addr, False)
+    fh = _get_fh(dos, ctx, fh_b_addr, False)
+    if fh is None:
+        return 0
     line, error = fh.gets(buflen)
     log_dos.info("FGetS(%s,%d) -> '%s' error=%s", fh, buflen, line, error)
     ctx.mem.w_cstr(buf_addr, line)
@@ -287,7 +328,9 @@ def fgets(dos, ctx, fh_b_addr, buf_addr, buflen):
 
 
 def flush_file(dos, ctx, fh_b_addr):
-    fh = dos.file_mgr.get_by_b_addr(fh_b_addr, True)
+    fh = _get_fh(dos, ctx, fh_b_addr, True)
+    if fh is None:
+        return -1
     fh.flush()
     return -1
 

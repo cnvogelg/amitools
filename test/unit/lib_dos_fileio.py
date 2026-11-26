@@ -311,6 +311,46 @@ def lib_dos_fileio_put_str_test(env):
     assert env.out.data == [b"hello"]
 
 
+# ----- BNULL / stale handle tolerance -----
+
+
+def lib_dos_fileio_null_handle_test(env):
+    # AmigaDOS file I/O calls tolerate a NULL handle and report an error
+    # instead of dereferencing it (cf. AROS rom/dos/fputs.c).
+    env.mem.w_cstr(BUF_ADDR, "x")
+    assert env.lib.FPuts(env.ctx, 0, BUF_ADDR) == -1
+    assert env.lib.io_err == ERROR_OBJECT_NOT_FOUND
+    assert env.lib.FPutC(env.ctx, 0, ord("x")) == -1
+    assert env.lib.io_err == ERROR_OBJECT_NOT_FOUND
+    assert env.lib.FGetC(env.ctx, 0) == -1
+    assert env.lib.io_err == ERROR_OBJECT_NOT_FOUND
+    assert env.lib.UnGetC(env.ctx, 0, ord("x")) == -1
+    assert env.lib.io_err == ERROR_OBJECT_NOT_FOUND
+    assert env.lib.FGets(env.ctx, 0, BUF_ADDR, 16) == 0
+    assert env.lib.FWrite(env.ctx, 0, BUF_ADDR, 1, 1) == 0
+    assert env.lib.io_err == ERROR_OBJECT_NOT_FOUND
+    assert env.lib.FRead(env.ctx, 0, BUF_ADDR, 1, 1) == 0
+    assert env.lib.io_err == ERROR_OBJECT_NOT_FOUND
+    assert env.lib.Read(env.ctx, 0, BUF_ADDR, 1) == -1
+    assert env.lib.io_err == ERROR_OBJECT_NOT_FOUND
+    assert env.lib.Write(env.ctx, 0, BUF_ADDR, 1) == -1
+    assert env.lib.io_err == ERROR_OBJECT_NOT_FOUND
+    assert env.lib.Seek(env.ctx, 0, 0, 0xFFFFFFFF) == -1
+    assert env.lib.io_err == ERROR_OBJECT_NOT_FOUND
+    assert env.lib.Flush(env.ctx, 0) == -1
+    assert env.lib.io_err == ERROR_OBJECT_NOT_FOUND
+    assert env.lib.SetFileSize(env.ctx, 0, 0, 0) == -1
+
+
+def lib_dos_fileio_stale_handle_test(env):
+    # a stale (unregistered) non-NULL handle is reported like a NULL one
+    env.mem.w_cstr(BUF_ADDR, "x")
+    assert env.lib.FPuts(env.ctx, 0xDEAD, BUF_ADDR) == -1
+    assert env.lib.io_err == ERROR_OBJECT_NOT_FOUND
+    assert env.lib.FGetC(env.ctx, 0xDEAD) == -1
+    assert env.lib.io_err == ERROR_OBJECT_NOT_FOUND
+
+
 # ----- VPrintf / VFPrintf / VFWritef -----
 
 
