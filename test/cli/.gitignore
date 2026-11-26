@@ -1,0 +1,5 @@
+# AmigaOS CLI binaries are copyrighted AmigaOS files -- never commit them.
+# Populate this folder locally with extract-cli.py.
+C
+MANIFEST.txt
+__pycache__/

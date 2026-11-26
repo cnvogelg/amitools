@@ -40,3 +40,6 @@ shell-seg/Shell-Seg-45.7
 shell-seg/Shell-Seg-46.10
 shell-seg/Shell-Seg-47.47
 shell-seg/Shell-Seg-47.48
+
+# --- CLI (AmigaOS 3.2.3) -- see test/cli/README.md -------------------------
+cli/C
