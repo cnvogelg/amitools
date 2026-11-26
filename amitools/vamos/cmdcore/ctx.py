@@ -16,20 +16,31 @@ class CommandStream:
         self.alloc = alloc
         self.host_stream = host_stream
 
+    def _get_fh_b_addr(self):
+        # accept either a FileHandle or a plain BPTR
+        return getattr(self.file_handle, "b_addr", self.file_handle)
+
     def _write_dos(self, data):
         # place the bytes in Amiga memory and hand the buffer to dos.Write()
         mem_obj = self.alloc.alloc_memory(len(data))
         try:
             self.alloc.get_mem().w_block(mem_obj.addr, data)
-            return self.dos_lib.Write(self.file_handle, mem_obj.addr, len(data))
+            return self.dos_lib.Write(self._get_fh_b_addr(), mem_obj.addr, len(data))
         finally:
             self.alloc.free_memory(mem_obj)
+
+    def _has_dos(self):
+        return (
+            self.dos_lib is not None
+            and self.file_handle is not None
+            and self.alloc is not None
+        )
 
     def write(self, text):
         if not isinstance(text, str):
             text = str(text)
         data = text.encode("latin-1", "replace")
-        if self.dos_lib is not None and self.file_handle and self.alloc is not None:
+        if self._has_dos():
             self._write_dos(data)
         else:
             stream = self.host_stream if self.host_stream is not None else sys.stdout
@@ -40,7 +51,9 @@ class CommandStream:
         return self.write(text + "\n")
 
     def flush(self):
-        if self.dos_lib is None:
+        if self._has_dos():
+            self.dos_lib.Flush(self._get_fh_b_addr())
+        else:
             stream = self.host_stream if self.host_stream is not None else sys.stdout
             stream.flush()
 
@@ -74,7 +87,9 @@ class CommandContext:
         self.stdout = CommandStream(dos_lib, out_fh, alloc, sys.stdout)
         # stderr falls back to the output handle when no separate error
         # handle exists (AmigaDOS normally has a single console)
-        self.stderr = CommandStream(dos_lib, err_fh or out_fh, alloc, sys.stderr)
+        if err_fh is None:
+            err_fh = out_fh
+        self.stderr = CommandStream(dos_lib, err_fh, alloc, sys.stderr)
 
     def print(self, *args):
         self.stdout.writeln(" ".join(str(a) for a in args))
