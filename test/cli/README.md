@@ -159,6 +159,9 @@ in the [vamos issue tracker](https://github.com/cnvogelg/amitools/issues).
 | `Type`, `List`, `Dir`, `Copy`, `Delete`, `Rename`, `MakeDir`, `Join`, `Sort` | works |
 | `Version`, `Avail`, `Eval`, `Date`, `Info`, `Wait`, `Lock`, `AddBuffers`, `SetDate`, `ChangeTaskPri`, `CPU`, `DiskChange`, `MD5Sum`, `Assign` | works |
 | `Which` | works (the target must have the execute bit) |
+| `AmigaModel`, `GuessBootDev`, `SetPatch`, `SetClock`, `RemRAD`, `ROMReserveLow`, `SetFont`, `RequestChoice` | works (the result reflects the vamos environment, e.g. no clock, no RAM disk) |
+| `CopyTooltypes`, `Install` | works (error path only; there is no icon or installable disk) |
+| `Ed`, `WBLoad`, `WBInfo` | works (argument check only; the real commands need a window or Workbench) |
 | `Relabel` | works (rc `0`); a hostfs volume's name is not persisted |
 | `Break` | works (error path); breaking a real task needs a shell session |
 | `Protect` (set) | works |
@@ -171,8 +174,23 @@ in the [vamos issue tracker](https://github.com/cnvogelg/amitools/issues).
 | `LoadResource` | **xfail** — the task never terminates |
 | `Mount` | **xfail** — needs `DEVS:MountList` |
 
-`AddDataTypes`, `BindDrivers`, `ConClip`, `IconX`, `RemRAD`, `SetClock`,
-`SetPatch`, `IPrefs`, `LoadWB`, `WBLoad`, `DefIcons`, `WBInfo`, `AmigaModel`,
-`GuessBootDev`, `CopyTooltypes`, `ROMReserveLow`, `AssignWedge`,
-`RequestChoice`, `RequestFile`, `SetFont`, `SetKeyboard`, `Install` and `Ed`
-are GUI, hardware, installer or console programs that are not covered.
+## Not covered
+
+The remaining commands cannot run to a meaningful result under `vamos`, so they
+are deliberately left out (each reason is what a probe of the real 3.2.3 binary
+showed):
+
+* `AssignWedge`, `DefIcons` — the task never terminates (`did not terminate
+  (state=TS_WAIT)`, rc `255`); they wait for an Intuition message port that
+  `vamos` never delivers.
+* `SetKeyboard` — the only path needs a resident keyboard library
+  (`ERROR_INVALID_RESIDENT_LIBRARY`, rc `20`); the missing-argument path is
+  still checked by the `cli_readargs` smoke test.
+* `AddDataTypes`, `BindDrivers`, `ConClip`, `IconX`, `IPrefs`, `LoadWB`,
+  `RequestFile` — they run but are no-ops: no output and nothing observable to
+  assert (they return a bare rc `0`/`5`/`20`). `ConClip`, `IPrefs` and `LoadWB`
+  wait for a Workbench that `vamos` does not provide.
+
+Commands that *do* produce a deterministic result are covered above even when
+they only reach their error path, because the error path is what `vamos` can
+actually exercise today.
