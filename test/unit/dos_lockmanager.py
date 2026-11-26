@@ -262,3 +262,30 @@ def dos_lockmanager_parent_lock_handlerless_test(mem_alloc):
     mgr.release_lock(root)
     mgr.release_lock(lock)
     assert alloc.is_all_free()
+
+
+def dos_lockmanager_lock_without_volume_test(mem_alloc):
+    # A handle opened by a name relative to the current dir yields a lock
+    # whose ami_path has no volume (MD5Sum -> DupLockFromFH).  An absolute
+    # path may also name a volume that is not in the DosList.  Neither may
+    # crash registration; fl_Volume simply stays 0.
+    mem, alloc = mem_alloc
+    path_mgr = SimpleNamespace(
+        ami_volume_of_path=lambda ami_path: None,
+        ami_abs_parent_path=_ami_abs_parent_path,
+        ami_name_of_path=_ami_name_of_path,
+        ami_abs_path=lambda cwd, path: str(path),
+    )
+    dos_list = SimpleNamespace(get_entry_by_name=lambda name: None)
+    mgr = LockManager(path_mgr, dos_list, alloc, mem)
+
+    relative = mgr._register_lock(Lock("in.txt", "in.txt"))
+    unknown = mgr._register_lock(Lock("a", "SYS:a"))
+
+    assert relative.vol_addr == 0
+    assert relative.struct.volume.aptr == 0
+    assert unknown.vol_addr == 0
+
+    mgr.release_lock(relative)
+    mgr.release_lock(unknown)
+    assert alloc.is_all_free()

@@ -400,3 +400,18 @@ def lib_dos_match_end_test():
         assert env.alloc.get_memory(achain.addr) is None
     finally:
         env.close()
+
+
+def lib_dos_match_end_twice_test():
+    # some programs (e.g. the OS 3.2.3 Type) call MatchEnd twice for the same
+    # anchor; the second call must be a harmless no-op, not an internal error
+    env = _MatchEnv()
+    env.set_pattern("#?")
+    try:
+        assert env.lib.MatchFirst(env.ctx, env.pat.addr, env.anchor_ptr) == NO_ERROR
+        env.lib.MatchEnd(env.ctx, env.anchor_ptr)
+        assert env.anchor_ptr not in env.lib.matches
+        env.lib.MatchEnd(env.ctx, env.anchor_ptr)
+        assert env.anchor_ptr not in env.lib.matches
+    finally:
+        env.close()

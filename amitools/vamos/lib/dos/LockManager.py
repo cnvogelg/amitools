@@ -3,6 +3,7 @@ from amitools.vamos.handler import HandlerError
 from amitools.vamos.log import log_lock
 from amitools.vamos.error import VamosInternalError
 from amitools.vamos.libstructs import DosListVolumeStruct, FileLockStruct
+from amitools.vamos.path.amipath import AmiPath
 from .Lock import Lock
 from .PathPart import expand_progdir_path
 
@@ -70,13 +71,20 @@ class LockManager:
         return (None, str(lock.ami_path).lower())
 
     def _register_lock(self, lock):
-        # look up volume
-        volume_name = self.path_mgr.ami_volume_of_path(lock.ami_path)
-        log_lock.debug("fl_Volume: looking up volume '%s' of %s", volume_name, lock)
-        volume = self.dos_list.get_entry_by_name(volume_name)
+        # look up volume.  A lock built from a relative path (e.g.
+        # DupLockFromFH on an FH that was opened by a name relative to the
+        # current dir) has no volume; fl_Volume stays 0 then.
+        volume_name = None
+        if AmiPath(lock.ami_path).prefix() is not None:
+            volume_name = self.path_mgr.ami_volume_of_path(lock.ami_path)
+        if volume_name is None:
+            volume = None
+        else:
+            log_lock.debug("fl_Volume: looking up volume '%s' of %s", volume_name, lock)
+            volume = self.dos_list.get_entry_by_name(volume_name)
         if volume is None:
             vol_baddr = 0
-            log_lock.warning("lock volume? volume=%s lock=%s", volume, lock)
+            log_lock.debug("lock without volume: lock=%s", lock)
         else:
             vol_baddr = volume.mem.addr
 

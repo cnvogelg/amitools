@@ -256,7 +256,12 @@ def match_end(dos, ctx, anchor_ptr):
     log_dos.info("MatchEnd: anchor=%06x ", anchor_ptr)
     # retrieve match
     if anchor_ptr not in dos.matches:
-        raise VamosInternalError("MatchEnd: No matcher found for %06x" % anchor_ptr)
+        # Some programs (e.g. the OS 3.2.3 Type) call MatchEnd twice for the
+        # same anchor.  The first call already released the matcher and the
+        # anchor is invalid afterwards, so tolerate the repeat instead of
+        # aborting the whole run with an internal error.
+        log_dos.info("MatchEnd: no matcher for %06x (already ended?)", anchor_ptr)
+        return
     mfn = dos.matches[anchor_ptr]
     del dos.matches[anchor_ptr]
     if mfn is not None:

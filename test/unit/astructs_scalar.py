@@ -156,3 +156,41 @@ def astructs_scalar_byte_test():
     cpu.w_reg(REG_D0, 0xFFFF)
     b = BYTE(reg=REG_D0, cpu=cpu)
     assert b.val == -1
+
+
+def astructs_scalar_write_wraps_test():
+    # a value that does not fit the field is reduced to its width instead of
+    # overflowing the underlying (C) write -- e.g. DoPkt passes a 32 bit arg
+    # to a signed LONG field
+    obj = LONG(mem=mem, addr=0)
+    obj.set(0xFFFFFFFF)
+    assert obj.get() == -1
+    obj.set(0x100000000)
+    assert obj.get() == 0
+    # signed word/byte wrap to their signed range
+    word = WORD(mem=mem, addr=0)
+    word.set(0xFFFF)
+    assert word.get() == -1
+    byte = BYTE(mem=mem, addr=0)
+    byte.set(0x1FF)
+    assert byte.get() == -1
+    # the same wrap applies to registers
+    reg = LONG(reg=REG_D0, cpu=cpu)
+    reg.set(0xFFFFFFFF)
+    assert reg.get() == -1
+    # unsigned fields wrap into their unsigned range
+    ulong = ULONG(mem=mem, addr=0)
+    ulong.set(-1)
+    assert ulong.get() == 0xFFFFFFFF
+    uword = UWORD(mem=mem, addr=0)
+    uword.set(0x1FFFF)
+    assert uword.get() == 0xFFFF
+    ubyte = UBYTE(mem=mem, addr=0)
+    ubyte.set(0x1FF)
+    assert ubyte.get() == 0xFF
+    # a scalar object is accepted as value too (Library.new passes one)
+    src = UBYTE(mem=mem, addr=4)
+    src.set(7)
+    dst = UBYTE(mem=mem, addr=8)
+    dst.set(src)
+    assert dst.get() == 7

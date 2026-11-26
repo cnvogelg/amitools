@@ -1,6 +1,19 @@
 from .typebase import TypeBase
 
 
+def _wrap_signed(val, bits):
+    """reduce a Python int to the signed range of ``bits`` bits"""
+    val = int(val) & ((1 << bits) - 1)
+    if val & (1 << (bits - 1)):
+        val -= 1 << bits
+    return val
+
+
+def _wrap_unsigned(val, bits):
+    """reduce a Python int to the unsigned range of ``bits`` bits"""
+    return int(val) & ((1 << bits) - 1)
+
+
 class ScalarType(TypeBase):
     _signed = None
     _mem_width = None
@@ -101,6 +114,7 @@ class SignedType(ScalarType):
             return self._cpu.r8s_reg(self._reg)
 
     def _write_reg(self, val):
+        val = _wrap_signed(val, self._byte_size * 8)
         if self._byte_size == 4:
             self._cpu.w32s_reg(self._reg, val)
         elif self._byte_size == 2:
@@ -112,7 +126,9 @@ class SignedType(ScalarType):
         return self._mem.reads(self._mem_width, self._addr)
 
     def _write_mem(self, val):
-        self._mem.writes(self._mem_width, self._addr, val)
+        self._mem.writes(
+            self._mem_width, self._addr, _wrap_signed(val, 8 << self._mem_width)
+        )
 
 
 class UnsignedType(ScalarType):
@@ -127,6 +143,7 @@ class UnsignedType(ScalarType):
             return self._cpu.r8_reg(self._reg)
 
     def _write_reg(self, val):
+        val = _wrap_unsigned(val, self._byte_size * 8)
         if self._byte_size == 4:
             self._cpu.w32_reg(self._reg, val)
         elif self._byte_size == 2:
@@ -138,7 +155,9 @@ class UnsignedType(ScalarType):
         return self._mem.read(self._mem_width, self._addr)
 
     def _write_mem(self, val):
-        self._mem.write(self._mem_width, self._addr, val)
+        self._mem.write(
+            self._mem_width, self._addr, _wrap_unsigned(val, 8 << self._mem_width)
+        )
 
 
 class LONG(SignedType):
