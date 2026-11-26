@@ -4,6 +4,7 @@ import pstats
 
 from .cfg import VamosMainParser
 from .cmdcore import CommandManager
+from .cmdcore.resident import ResidentCommands
 from .machine import Machine, MemoryMap, Runtime
 from .log import log_main, log_setup, log_help
 from .path import VamosPathManager, SysPathResolver
@@ -214,6 +215,21 @@ def main(
             machine, slm.alloc, runner, proxies=slm.get_lib_proxy_mgr()
         )
         slm.seg_loader.set_command_manager(cmd_mgr)
+
+        # publish --resident-dir commands in the DOS resident list once the
+        # base libraries are open; the shell resolves them via FindSegment
+        cmd_cfg = mp.get_command_dict().command
+        resident = ResidentCommands(cmd_mgr)
+
+        def register_resident_commands(lib_mgr):
+            resident.setup(lib_mgr.dos_impl, lib_mgr.dos_ctx)
+            for host_dir in cmd_cfg.resident_dir or []:
+                resident.add_dir(host_dir)
+
+        slm.add_post_setup_callback(register_resident_commands)
+        # unlink the resident nodes before cmd_mgr frees the stub seglists and
+        # before DosLibrary.finish_lib walks the resident list
+        slm.add_pre_shutdown_callback(lambda lib_mgr: resident.shutdown())
         # free the command stubs and traps while exec/dos are still alive
         slm.add_pre_shutdown_callback(lambda lib_mgr: cmd_mgr.shutdown())
 

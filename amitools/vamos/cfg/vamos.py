@@ -10,6 +10,7 @@ from . import (
     ScheduleParser,
     TraceParser,
 )
+from .command import CommandParser
 from ..cfgcore import MainParser
 
 
@@ -45,6 +46,9 @@ class VamosMainParser(MainParser):
         self.add_parser(self.schedule)
         self.display = DisplayParser()
         self.add_parser(self.display)
+        # python commands
+        self.command = CommandParser()
+        self.add_parser(self.command)
 
     def get_log_dict(self):
         return self.log.get_cfg_dict()
@@ -75,3 +79,6 @@ class VamosMainParser(MainParser):
 
     def get_display_dict(self):
         return self.display.get_cfg_dict()
+
+    def get_command_dict(self):
+        return self.command.get_cfg_dict()

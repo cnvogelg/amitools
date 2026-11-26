@@ -106,3 +106,75 @@ def command_binary_explicit_no_gate_test(vrun, tmp_path):
     assert retcode == 0
     assert stdout == ["plain ran"]
     assert stderr == []
+
+
+# ----- resident commands (driven through the real shell) -----
+
+# a stock Shell-Seg fixture (see test/shell-seg/README.md); the tests skip when
+# it was not extracted locally. 132 is its own endcli return code.
+SHELL_SEG_DIR = "shell-seg"
+SHELL_SEG_NAME = "Shell-Seg-47.48"
+SHELL_SEG_RETCODE = 132
+PROMPT = "\x0f0.SYS:> "
+
+
+def _check_shell_seg(vrun):
+    vrun.skip_if_prog_not_available(os.path.join(SHELL_SEG_DIR, SHELL_SEG_NAME))
+    vol_arg = "-Vseg:" + SHELL_SEG_DIR
+    if vol_arg not in vrun.vamos_args:
+        vrun.add_volume_or_skip("seg", SHELL_SEG_DIR)
+
+
+def command_resident_shell_test(vrun, tmp_path):
+    """a --resident-dir command is found and run by the stock shell"""
+    _check_shell_seg(vrun)
+    (tmp_path / "hello.py").write_text(
+        "def main(ctx, arg_line, prog_name):\n"
+        "    ctx.stdout.writeln('resident %s' % prog_name)\n"
+        "    return 5\n"
+    )
+    seg = "seg:" + SHELL_SEG_NAME
+    retcode, stdout, stderr = vrun.run_prog(
+        seg,
+        vargs=["-x", "--shell-bin", seg, "--resident-dir", str(tmp_path)],
+        stdin="hello\nendcli\n",
+    )
+    assert stdout == [PROMPT + "resident hello", PROMPT + "PROCESS 0 ENDING"]
+    assert stderr == []
+    assert retcode == SHELL_SEG_RETCODE
+
+
+def command_resident_shell_args_test(vrun, tmp_path):
+    """the resident command receives the shell command line in A0/D0"""
+    _check_shell_seg(vrun)
+    (tmp_path / "echoargs.py").write_text(
+        "def main(ctx, arg_line, prog_name):\n"
+        "    ctx.stdout.writeln('args=%s' % arg_line.rstrip())\n"
+        "    return 0\n"
+    )
+    seg = "seg:" + SHELL_SEG_NAME
+    retcode, stdout, stderr = vrun.run_prog(
+        seg,
+        vargs=["-x", "--shell-bin", seg, "--resident-dir", str(tmp_path)],
+        stdin="echoargs one two\nendcli\n",
+    )
+    assert stdout == [PROMPT + "args=one two", PROMPT + "PROCESS 0 ENDING"]
+    assert stderr == []
+    assert retcode == SHELL_SEG_RETCODE
+
+
+def command_resident_shell_error_test(vrun, tmp_path):
+    """a command that raises does not take the shell down with it"""
+    _check_shell_seg(vrun)
+    (tmp_path / "boom.py").write_text(
+        "def main(ctx, arg_line, prog_name):\n    raise ValueError('nope')\n"
+    )
+    seg = "seg:" + SHELL_SEG_NAME
+    retcode, stdout, stderr = vrun.run_prog(
+        seg,
+        vargs=["-x", "--shell-bin", seg, "--resident-dir", str(tmp_path)],
+        stdin="boom\nendcli\n",
+    )
+    # the shell survives the failing command and reaches its own endcli
+    assert stdout[-1].endswith("PROCESS 0 ENDING")
+    assert retcode == SHELL_SEG_RETCODE

@@ -1,5 +1,6 @@
 from .log import LogParser
 from .path import PathParser
+from .command import CommandParser
 from .disk import DiskParser
 from .libs import LibsParser
 from .trace import TraceParser
@@ -11,6 +12,7 @@ from .display import DisplayParser
 from .vamos import VamosMainParser
 
 __all__ = [
+    "CommandParser",
     "DiskParser",
     "DisplayParser",
     "LibsParser",
