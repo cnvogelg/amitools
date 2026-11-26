@@ -1,5 +1,6 @@
 from amitools.vamos.libstructs.dos import DosPacketStruct
 from amitools.vamos.libstructs.exec_ import MessageStruct
+from amitools.vamos.handler import DosProtection, HandlerError, HostFileSysHandler
 from amitools.vamos.log import log_proc
 from amitools.vamos.machine.regs import (
     REG_D0,
@@ -10,6 +11,7 @@ from amitools.vamos.machine.regs import (
     REG_A5,
     REG_A6,
 )
+from amitools.vamos.path.amipath import AmiPath
 from amitools.vamos.task import DosProcess
 from .ucli import MicroCLI
 
@@ -118,9 +120,16 @@ class ProcessBase(DosProcess):
         self.bin_basename = self.ctx.path_mgr.ami_name_of_path(lock, ami_bin_file)
         # search the command on the command path and try each candidate
         cmd_paths = self.ctx.path_mgr.ami_command_paths(lock, ami_bin_file)
+        # a bare command name is looked up on the command path: only pick up a
+        # Python command there when it is marked executable (an explicit path
+        # with a directory component is loaded without the gate)
+        search = AmiPath(str(ami_bin_file)).is_name_only()
         ami_path = None
         self.bin_seg_list = 0
         for path in cmd_paths:
+            if search and not self._command_allowed(path, lock):
+                log_proc.info("skip non-executable command: %s", path)
+                continue
             baddr = self.ctx.seg_loader.load_ami_seglist(path, lock)
             if baddr:
                 ami_path = path
@@ -146,6 +155,41 @@ class ProcessBase(DosProcess):
         for seg in self.bin_seg_info.seglist:
             log_proc.info(seg)
         return True
+
+    def _command_allowed(self, ami_path, lock):
+        """apply the executable gate to a command-path candidate.
+
+        A native binary is always allowed. A Python command is only allowed
+        when it is marked executable: the host execute bit on a host-backed
+        volume, the Amiga ``s`` (script) protection bit on any other volume.
+        """
+        seg_loader = getattr(self.ctx, "seg_loader", None)
+        if seg_loader is None or not seg_loader.is_python_command(ami_path, lock):
+            return True
+        return self._is_command_executable(ami_path, lock)
+
+    def _is_command_executable(self, ami_path, lock):
+        handler_mgr = getattr(self.ctx, "handler_mgr", None)
+        if handler_mgr is None:
+            # no handler layer to ask: don't block the command
+            return True
+        cwd = lock.ami_path if lock is not None else None
+        try:
+            handler, handler_lock = handler_mgr.locate_object(ami_path, cwd=cwd)
+        except HandlerError:
+            return False
+        try:
+            info = handler.examine_object(handler_lock)
+        except HandlerError:
+            return False
+        finally:
+            handler.free_lock(handler_lock)
+        prot = DosProtection(info.protection)
+        if isinstance(handler, HostFileSysHandler):
+            # host-backed volume: the host execute bit (active low)
+            return prot.is_e()
+        # other volume (RAM:, ADF, ...): the Amiga script bit
+        return bool(prot.mask & DosProtection.FIBF_SCRIPT)
 
     def _setup_entry(self):
         # a single binary is entered at the start of its first segment;

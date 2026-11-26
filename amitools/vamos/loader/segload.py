@@ -1,5 +1,6 @@
 from amitools.binfmt.BinFmt import BinFmt
 from amitools.binfmt.BinImage import BIN_IMAGE_TYPE_PY
+from amitools.binfmt.py import BinFmtPy
 from amitools.binfmt.Relocate import Relocate
 from amitools.vamos.log import log_segload
 from amitools.vamos.path.amipath import AmiPath
@@ -59,6 +60,23 @@ class SegmentLoader(object):
 
     def get_command_manager(self):
         return self.command_manager
+
+    def is_python_command(self, ami_path, lock=None):
+        """check whether the Amiga file is a Python command (shebang).
+
+        Used by the command-path search to apply the executable gate without
+        reading the file twice: only a Python command needs the check.
+        """
+        opener = self.file_opener
+        if opener is None:
+            return False
+        fobj = opener.open(ami_path, lock)
+        if fobj is None:
+            return False
+        try:
+            return BinFmtPy().is_image_fobj(fobj)
+        finally:
+            fobj.close()
 
     def load_seglist(self, fobj, name=None, ami_file=None, lock=None, file_opener=None):
         """load seglist from an already opened file object and register it.

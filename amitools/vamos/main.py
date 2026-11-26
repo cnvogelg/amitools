@@ -3,6 +3,7 @@ import io
 import pstats
 
 from .cfg import VamosMainParser
+from .cmdcore import CommandManager
 from .machine import Machine, MemoryMap, Runtime
 from .log import log_main, log_setup, log_help
 from .path import VamosPathManager, SysPathResolver
@@ -204,6 +205,18 @@ def main(
         slm.disk_session = disk_session
         slm.setup()
         slm_is_setup = True
+
+        # one command manager per run: the segment loader uses it to build a
+        # stub for a Python command, so both proc mode (a directly loaded
+        # ``*.py``) and shell mode (RunCommand/LoadSeg) resolve commands
+        # through the same registry, traps and module cache
+        cmd_mgr = CommandManager(
+            machine, slm.alloc, runner, proxies=slm.get_lib_proxy_mgr()
+        )
+        slm.seg_loader.set_command_manager(cmd_mgr)
+        # free the command stubs and traps while exec/dos are still alive
+        slm.add_pre_shutdown_callback(lambda lib_mgr: cmd_mgr.shutdown())
+
         if disk_session.get_units():
             disk_session.install_devices(slm)
 

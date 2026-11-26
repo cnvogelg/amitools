@@ -180,3 +180,28 @@ def command_segload_manager_accessor_test(ctx):
     loader.set_command_manager(ctx.mgr)
     assert loader.get_command_manager() is ctx.mgr
     ctx.cleanup()
+
+
+# ----- Python command detection (executable gate support) -----
+
+
+def command_segload_is_python_command_test(ctx, py_file, tmp_path):
+    loader = ctx.make_loader()
+    opener = HostFileOpener({"cmds/hello.py": py_file})
+    loader.set_file_opener(opener)
+    assert loader.is_python_command("cmds/hello.py")
+    # a plain .py without a shebang is not a command
+    plain = tmp_path / "plain.py"
+    plain.write_text("x = 1\n")
+    opener.add("cmds/plain.py", str(plain))
+    assert not loader.is_python_command("cmds/plain.py")
+    # a missing file is not a command
+    assert not loader.is_python_command("cmds/missing.py")
+    ctx.cleanup()
+
+
+def command_segload_is_python_command_no_opener_test(ctx):
+    loader = ctx.make_loader()
+    assert loader.get_file_opener() is None
+    assert not loader.is_python_command("cmds/hello.py")
+    ctx.cleanup()
