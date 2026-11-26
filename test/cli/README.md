@@ -147,18 +147,18 @@ in the [vamos issue tracker](https://github.com/cnvogelg/amitools/issues).
 |---------|--------|
 | `Type`, `List`, `Dir`, `Copy`, `Delete`, `Rename`, `MakeDir`, `Join`, `Sort` | works |
 | `Version`, `Avail`, `Eval`, `Date`, `Info`, `Wait`, `Lock`, `AddBuffers`, `SetDate`, `ChangeTaskPri`, `CPU`, `DiskChange`, `MD5Sum`, `Assign` | works |
+| `Relabel` | works (rc `0`); a hostfs volume's name is not persisted |
+| `Break` | works (error path); breaking a real task needs a shell session |
 | `Protect` (set) | works |
 | `Protect` (display) | **xfail** — clears the host file's permission bits |
 | `Filenote` | **xfail** — the note is not readable back on hostfs |
-| `Relabel` | **xfail** — returns `0` but the hostfs name is unchanged |
 | `MakeLink` | **xfail** — cannot create a link |
-| `Search` | **xfail** — returns `5` and errors |
+| `Search` | **xfail** — returns `5` without reporting a match |
 | `Which` | **xfail** — returns `5`, no output |
-| `Status` | **xfail** — `ERROR_BAD_NUMBER` |
+| `Status` | **xfail** — no CLI process table to list |
 | `Group`, `Owner` | **xfail** — hostfs returns `ERROR_NOT_IMPLEMENTED` |
 | `LoadResource` | **xfail** — the task never terminates |
 | `Mount` | **xfail** — needs `DEVS:MountList` |
-| `Break` | **xfail** — needs a running task |
 
 `AddDataTypes`, `BindDrivers`, `ConClip`, `IconX`, `RemRAD`, `SetClock`,
 `SetPatch`, `IPrefs`, `LoadWB`, `WBLoad`, `DefIcons`, `WBInfo`, `AmigaModel`,
