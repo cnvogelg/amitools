@@ -355,7 +355,12 @@ def pattern_match(pattern, in_str, debug=False):
         def tr(x):
             return x
 
-    pat = pattern.pat_str
+    # Fold the pattern too: ParsePatternNoCase() already lower-cases the
+    # literals it stores, but a caller may hand in a pattern that was not
+    # parsed that way (e.g. C:Search builds an upper-case pattern and relies
+    # on MatchPatternNoCase folding the text).  Control codes (P_ANY, ...)
+    # are non-letters, so folding leaves them untouched.
+    pat = tr(pattern.pat_str)
     markers = MarkerStack()
     pat_pos = 0
     str_pos = 0

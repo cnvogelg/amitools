@@ -166,10 +166,10 @@ in the [vamos issue tracker](https://github.com/cnvogelg/amitools/issues).
 | `Relabel` | works (rc `0`); a hostfs volume's name is not persisted |
 | `Break` | works (error path); breaking a real task needs a shell session |
 | `Protect` (set) | works |
+| `Search` | works (matches case-insensitively) |
 | `Protect` (display) | **xfail** — clears the host file's permission bits |
 | `Filenote` | **xfail** — the note is not readable back on hostfs |
 | `MakeLink` | **xfail** — cannot create a link |
-| `Search` | **xfail** — returns `5` without reporting a match |
 | `Status` | **xfail** — no CLI process table to list |
 | `Group`, `Owner` | **xfail** — hostfs returns `ERROR_NOT_IMPLEMENTED` |
 | `LoadResource` | **xfail** — the task never terminates |

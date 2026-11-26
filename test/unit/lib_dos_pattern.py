@@ -217,12 +217,47 @@ def lib_dos_match_pattern_nocase_test():
         assert lib.MatchPattern(ctx, buf.addr, txt.addr) == -1
         mem.w_cstr(txt.addr, "test.o")
         assert lib.MatchPattern(ctx, buf.addr, txt.addr) == 0
-        # ...and the NoCase matcher expects an already lower-cased pattern
+        # ...but the NoCase matcher folds the pattern as well, so the
+        # case-preserving pattern above still matches any casing
         mem.w_cstr(txt.addr, "TEST.O")
-        assert lib.MatchPatternNoCase(ctx, buf.addr, txt.addr) == 0
+        assert lib.MatchPatternNoCase(ctx, buf.addr, txt.addr) == -1
+        mem.w_cstr(txt.addr, "test.o")
+        assert lib.MatchPatternNoCase(ctx, buf.addr, txt.addr) == -1
     finally:
         alloc.free_memory(src)
         alloc.free_memory(buf)
+        alloc.free_memory(txt)
+    assert alloc.is_all_free()
+
+
+def lib_dos_match_pattern_nocase_raw_test():
+    """MatchPatternNoCase folds a raw pattern that was not parsed first.
+
+    C:Search builds an upper-case pattern and passes it straight to
+    MatchPatternNoCase() (it never calls ParsePatternNoCase()), relying on the
+    matcher to fold the text -- and the pattern -- case-insensitively.
+    """
+    mem = MockMemory()
+    alloc = MemoryAlloc(mem)
+    lib = _make_lib()
+    ctx = _make_ctx(mem, alloc)
+    pat = alloc.alloc_memory(64)
+    txt = alloc.alloc_memory(64)
+
+    def match_nc(pattern, text):
+        mem.w_cstr(pat.addr, pattern)
+        mem.w_cstr(txt.addr, text)
+        return lib.MatchPatternNoCase(ctx, pat.addr, txt.addr)
+
+    try:
+        assert match_nc("HELLO", "hello") == -1
+        assert match_nc("hello", "HELLO") == -1
+        assert match_nc("HeLLo", "hEllO") == -1
+        assert match_nc("HELLO", "world") == 0
+        assert match_nc("README.TXT", "readme.txt") == -1
+        assert match_nc("README.TXT", "readme.tx") == 0
+    finally:
+        alloc.free_memory(pat)
         alloc.free_memory(txt)
     assert alloc.is_all_free()
 
