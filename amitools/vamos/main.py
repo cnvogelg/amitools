@@ -4,8 +4,7 @@ import pstats
 
 from .cfg import VamosMainParser
 from .cmdcore import CommandManager
-from .cmdcore.resident import ResidentCommands
-from .command import get_command_dir
+from .cmdcore.resident import ResidentCommands, register_commands
 from .machine import Machine, MemoryMap, Runtime
 from .log import log_main, log_setup, log_help
 from .path import VamosPathManager, SysPathResolver
@@ -224,12 +223,7 @@ def main(
 
         def register_resident_commands(lib_mgr):
             resident.setup(lib_mgr.dos_impl, lib_mgr.dos_ctx)
-            # built-in commands first: a --resident-dir (or command path)
-            # command with the same name is registered later and wins
-            if not cmd_cfg.no_internal_commands:
-                resident.add_dir(get_command_dir())
-            for host_dir in cmd_cfg.resident_dir or []:
-                resident.add_dir(host_dir)
+            register_commands(resident, cmd_cfg)
 
         slm.add_post_setup_callback(register_resident_commands)
         # unlink the resident nodes before cmd_mgr frees the stub seglists and

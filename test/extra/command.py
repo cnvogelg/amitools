@@ -12,6 +12,12 @@ from amitools.vamos.cmdcore.version import get_amitools_version
 
 SHEBANG = "#!/usr/bin/env python3\n"
 
+# the sample command fixtures (test/command/), resolved from this file so the
+# tests work regardless of the pytest working directory
+COMMAND_DIR = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "command")
+)
+
 
 def _make_cmd(tmp_path, name, body):
     p = tmp_path / (name + ".py")
@@ -110,6 +116,68 @@ def command_binary_explicit_no_gate_test(vrun, tmp_path):
     assert stderr == []
 
 
+# ----- the sample fixtures (test/command/) run directly as binaries -----
+
+
+def command_samples_binary_test(vrun):
+    """run the sample fixtures directly as binaries and read their exit codes"""
+    retcode, stdout, stderr = vrun.run_prog(os.path.join(COMMAND_DIR, "hello.py"))
+    assert retcode == 0
+    assert stdout == ["hello from hello"]
+    assert stderr == []
+
+    retcode, stdout, stderr = vrun.run_prog(os.path.join(COMMAND_DIR, "exit7.py"))
+    assert retcode == 7
+    assert stdout == []
+
+    retcode, stdout, stderr = vrun.run_prog(
+        os.path.join(COMMAND_DIR, "args.py"), "one", "two"
+    )
+    assert retcode == 0
+    assert stdout == ["prog=args", "args=one two"]
+    assert stderr == []
+
+
+def command_samples_proxy_test(vrun):
+    """the sample fixtures reach the dos and exec library proxies"""
+    retcode, stdout, stderr = vrun.run_prog(os.path.join(COMMAND_DIR, "dosproxy.py"))
+    assert retcode == 0
+    assert stdout == ["ioerr=123", "output=ok"]
+    assert stderr == []
+
+    retcode, stdout, stderr = vrun.run_prog(os.path.join(COMMAND_DIR, "execproxy.py"))
+    assert retcode == 0
+    assert stdout == ["alloc=ok"]
+    assert stderr == []
+
+
+def command_ram_gate_test(vrun):
+    """a Python command on RAM: needs the Amiga ``s`` bit (non-hostfs gate)
+
+    ``ramgate.py`` writes a command to RAM: and runs it with
+    ``SystemTagList()``. Run as a binary (not from the shell, which would
+    forward to itself) SystemTagList() resolves the bare name through the
+    command path, so the gate is applied. With the ``s`` bit the command runs,
+    without it the load is refused.
+    """
+    cmd = os.path.join(COMMAND_DIR, "ramgate.py")
+    # the script bit marks the RAM: command executable
+    retcode, stdout, stderr = vrun.run_prog(
+        cmd, "gated.py", "script", vargs=["--cwd", "ram:"]
+    )
+    assert retcode == 0
+    assert stdout == ["ram command ran", "rc=0"]
+    assert stderr == []
+    # without the script bit the command is blocked (SystemTagList -> -1)
+    retcode, stdout, stderr = vrun.run_prog(
+        cmd, "plain.py", "plain", vargs=["--cwd", "ram:"]
+    )
+    assert retcode == 0
+    assert stdout == ["rc=4294967295"]
+    # the gate refuses the load and logs why
+    assert any("failed loading binary: plain.py" in line for line in stderr)
+
+
 # ----- resident commands (driven through the real shell) -----
 
 # a stock Shell-Seg fixture (see test/shell-seg/README.md); the tests skip when
@@ -127,56 +195,62 @@ def _check_shell_seg(vrun):
         vrun.add_volume_or_skip("seg", SHELL_SEG_DIR)
 
 
-def command_resident_shell_test(vrun, tmp_path):
-    """a --resident-dir command is found and run by the stock shell"""
+def _run_shell(vrun, stdin, resident_dir=None):
+    """run the stock shell and feed it ``stdin``; returns (rc, out, err)"""
     _check_shell_seg(vrun)
-    (tmp_path / "hello.py").write_text(
-        "def main(ctx, arg_line, prog_name):\n"
-        "    ctx.stdout.writeln('resident %s' % prog_name)\n"
-        "    return 5\n"
-    )
     seg = "seg:" + SHELL_SEG_NAME
-    retcode, stdout, stderr = vrun.run_prog(
-        seg,
-        vargs=["-x", "--shell-bin", seg, "--resident-dir", str(tmp_path)],
-        stdin="hello\nendcli\n",
-    )
-    assert stdout == [PROMPT + "resident hello", PROMPT + "PROCESS 0 ENDING"]
+    vargs = ["-x", "--shell-bin", seg]
+    if resident_dir is not None:
+        vargs += ["--resident-dir", resident_dir]
+    return vrun.run_prog(seg, vargs=vargs, stdin=stdin)
+
+
+def command_samples_hello_shell_test(vrun):
+    """the hello sample runs as a resident command in the stock shell"""
+    retcode, stdout, stderr = _run_shell(vrun, "hello\nendcli\n", COMMAND_DIR)
+    assert stdout == [PROMPT + "hello from hello", PROMPT + "PROCESS 0 ENDING"]
     assert stderr == []
     assert retcode == SHELL_SEG_RETCODE
 
 
-def command_resident_shell_args_test(vrun, tmp_path):
-    """the resident command receives the shell command line in A0/D0"""
-    _check_shell_seg(vrun)
-    (tmp_path / "echoargs.py").write_text(
-        "def main(ctx, arg_line, prog_name):\n"
-        "    ctx.stdout.writeln('args=%s' % arg_line.rstrip())\n"
-        "    return 0\n"
-    )
-    seg = "seg:" + SHELL_SEG_NAME
-    retcode, stdout, stderr = vrun.run_prog(
-        seg,
-        vargs=["-x", "--shell-bin", seg, "--resident-dir", str(tmp_path)],
-        stdin="echoargs one two\nendcli\n",
-    )
-    assert stdout == [PROMPT + "args=one two", PROMPT + "PROCESS 0 ENDING"]
+def command_samples_args_shell_test(vrun):
+    """the args sample sees the shell command line and the program name"""
+    retcode, stdout, stderr = _run_shell(vrun, "args one two\nendcli\n", COMMAND_DIR)
+    assert stdout == [
+        PROMPT + "prog=args",
+        "args=one two",
+        PROMPT + "PROCESS 0 ENDING",
+    ]
     assert stderr == []
+    assert retcode == SHELL_SEG_RETCODE
+
+
+def command_samples_proxy_shell_test(vrun):
+    """the proxy samples reach dos and exec from the shell"""
+    retcode, stdout, stderr = _run_shell(vrun, "dosproxy\nendcli\n", COMMAND_DIR)
+    assert stdout == [PROMPT + "ioerr=123", "output=ok", PROMPT + "PROCESS 0 ENDING"]
+    assert stderr == []
+    assert retcode == SHELL_SEG_RETCODE
+
+    retcode, stdout, stderr = _run_shell(vrun, "execproxy\nendcli\n", COMMAND_DIR)
+    assert stdout == [PROMPT + "alloc=ok", PROMPT + "PROCESS 0 ENDING"]
+    assert stderr == []
+    assert retcode == SHELL_SEG_RETCODE
+
+
+def command_samples_exit7_shell_test(vrun):
+    """a command's non-zero exit code does not disturb the shell"""
+    retcode, stdout, stderr = _run_shell(vrun, "exit7\nendcli\n", COMMAND_DIR)
+    assert stdout[-1].endswith("PROCESS 0 ENDING")
     assert retcode == SHELL_SEG_RETCODE
 
 
 def command_resident_shell_error_test(vrun, tmp_path):
     """a command that raises does not take the shell down with it"""
-    _check_shell_seg(vrun)
     (tmp_path / "boom.py").write_text(
         "def main(ctx, arg_line, prog_name):\n    raise ValueError('nope')\n"
     )
-    seg = "seg:" + SHELL_SEG_NAME
-    retcode, stdout, stderr = vrun.run_prog(
-        seg,
-        vargs=["-x", "--shell-bin", seg, "--resident-dir", str(tmp_path)],
-        stdin="boom\nendcli\n",
-    )
+    retcode, stdout, stderr = _run_shell(vrun, "boom\nendcli\n", str(tmp_path))
     # the shell survives the failing command and reaches its own endcli
     assert stdout[-1].endswith("PROCESS 0 ENDING")
     assert retcode == SHELL_SEG_RETCODE
@@ -187,13 +261,7 @@ def command_resident_shell_error_test(vrun, tmp_path):
 
 def command_internal_vamos_version_test(vrun):
     """the built-in vamos command is available without any --resident-dir"""
-    _check_shell_seg(vrun)
-    seg = "seg:" + SHELL_SEG_NAME
-    retcode, stdout, stderr = vrun.run_prog(
-        seg,
-        vargs=["-x", "--shell-bin", seg],
-        stdin="vamos version\nendcli\n",
-    )
+    retcode, stdout, stderr = _run_shell(vrun, "vamos version\nendcli\n")
     assert stdout == [PROMPT + get_amitools_version(), PROMPT + "PROCESS 0 ENDING"]
     assert stderr == []
     assert retcode == SHELL_SEG_RETCODE
@@ -201,13 +269,7 @@ def command_internal_vamos_version_test(vrun):
 
 def command_internal_vamos_unknown_test(vrun):
     """an unknown subcommand prints usage and does not end the shell"""
-    _check_shell_seg(vrun)
-    seg = "seg:" + SHELL_SEG_NAME
-    retcode, stdout, stderr = vrun.run_prog(
-        seg,
-        vargs=["-x", "--shell-bin", seg],
-        stdin="vamos bogus\nendcli\n",
-    )
+    retcode, stdout, stderr = _run_shell(vrun, "vamos bogus\nendcli\n")
     assert any("unknown subcommand 'bogus'" in line for line in stdout)
     assert stdout[-1].endswith("PROCESS 0 ENDING")
     assert retcode == SHELL_SEG_RETCODE
@@ -229,18 +291,12 @@ def command_internal_disabled_test(vrun):
 
 def command_internal_collision_test(vrun, tmp_path):
     """a --resident-dir command overrides a built-in of the same name"""
-    _check_shell_seg(vrun)
     (tmp_path / "vamos.py").write_text(
         "def main(ctx, arg_line, prog_name):\n"
         "    ctx.stdout.writeln('user vamos')\n"
         "    return 0\n"
     )
-    seg = "seg:" + SHELL_SEG_NAME
-    retcode, stdout, stderr = vrun.run_prog(
-        seg,
-        vargs=["-x", "--shell-bin", seg, "--resident-dir", str(tmp_path)],
-        stdin="vamos version\nendcli\n",
-    )
+    retcode, stdout, stderr = _run_shell(vrun, "vamos version\nendcli\n", str(tmp_path))
     assert stdout == [PROMPT + "user vamos", PROMPT + "PROCESS 0 ENDING"]
     assert stderr == []
     assert retcode == SHELL_SEG_RETCODE

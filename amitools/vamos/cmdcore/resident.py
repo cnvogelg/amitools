@@ -109,3 +109,19 @@ class ResidentCommands:
             self.dos.seg_lists.pop(b_addr, None)
             log_cmd.info("unregistered resident command '%s'", name)
         self.entries = []
+
+
+def register_commands(resident, cmd_cfg):
+    """publish the built-in and configured resident command dirs.
+
+    The built-in ``vamos.command`` directory is scanned first (unless
+    ``--no-internal-commands`` is set), then every ``--resident-dir`` in order,
+    so a user command with the same name as a built-in wins.
+    """
+    if not cmd_cfg.no_internal_commands:
+        # imported lazily to keep the package import order simple
+        from amitools.vamos.command import get_command_dir
+
+        resident.add_dir(get_command_dir())
+    for host_dir in cmd_cfg.resident_dir or []:
+        resident.add_dir(host_dir)
