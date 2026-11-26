@@ -81,3 +81,39 @@ def fd_format_read_timer_dev_test():
     assert tab[2] == expunge_lib
     assert expunge_lib.get_index() == 2
     assert expunge_lib.get_bias() == 18
+
+
+def fd_format_read_workbench_lib_test():
+    # The NDK ships this FD as wb_lib.fd; the real function order matters as
+    # C:WBInfo calls workbench.library/WBInfo at LVO -90.
+    fd = read_lib_fd("workbench.library")
+    assert fd.get_base_name() == "_WorkbenchBase"
+    assert fd.get_max_bias() == 138
+    assert fd.get_neg_size() == 144
+    assert fd.get_num_indices() == 23
+    wbinfo = fd.get_func_by_name("WBInfo")
+    assert fd.get_func_by_index(14) == wbinfo
+    assert wbinfo.get_index() == 14
+    assert wbinfo.get_bias() == 90
+    which = fd.get_func_by_name("WhichWorkbenchObjectA")
+    assert fd.get_func_by_index(22) == which
+    assert which.get_bias() == 138
+
+
+def fd_format_read_keymap_lib_test():
+    fd = read_lib_fd("keymap.library")
+    assert fd.get_base_name() == "_KeymapBase"
+    assert fd.get_max_bias() == 48
+    assert fd.get_neg_size() == 54
+    assert fd.get_num_indices() == 8
+    assert fd.get_func_by_name("SetKeyMapDefault").get_bias() == 30
+    assert fd.get_func_by_name("MapANSI").get_bias() == 48
+
+
+def fd_format_read_input_dev_test():
+    fd = read_lib_fd("input.device")
+    assert fd.get_base_name() == "_InputBase"
+    assert fd.get_max_bias() == 42
+    assert fd.get_neg_size() == 48
+    assert fd.get_num_indices() == 7
+    assert fd.get_func_by_name("PeekQualifier").get_bias() == 42

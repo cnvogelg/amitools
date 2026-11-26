@@ -161,7 +161,8 @@ in the [vamos issue tracker](https://github.com/cnvogelg/amitools/issues).
 | `Which` | works (the target must have the execute bit) |
 | `AmigaModel`, `GuessBootDev`, `SetPatch`, `SetClock`, `RemRAD`, `ROMReserveLow`, `SetFont`, `RequestChoice` | works (the result reflects the vamos environment, e.g. no clock, no RAM disk) |
 | `CopyTooltypes`, `Install` | works (error path only; there is no icon or installable disk) |
-| `Ed`, `WBLoad`, `WBInfo` | works (argument check only; the real commands need a window or Workbench) |
+| `Ed`, `WBLoad` | works (argument check only; the real commands need a window) |
+| `WBInfo` | works (the Workbench info window is stubbed; `FILE=`/`DRAWER=` complete) |
 | `Relabel` | works (rc `0`); a hostfs volume's name is not persisted |
 | `Break` | works (error path); breaking a real task needs a shell session |
 | `Protect` (set) | works |
@@ -183,7 +184,7 @@ showed):
 * `AssignWedge`, `DefIcons` — the task never terminates (`did not terminate
   (state=TS_WAIT)`, rc `255`); they wait for an Intuition message port that
   `vamos` never delivers.
-* `SetKeyboard` — the only path needs a resident keyboard library
+* `SetKeyboard` — the only path needs `keymap.resource`
   (`ERROR_INVALID_RESIDENT_LIBRARY`, rc `20`); the missing-argument path is
   still checked by the `cli_readargs` smoke test.
 * `AddDataTypes`, `BindDrivers`, `ConClip`, `IconX`, `IPrefs`, `LoadWB`,
