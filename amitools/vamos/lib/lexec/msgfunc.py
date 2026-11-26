@@ -23,14 +23,17 @@ _LN_TYPE = _offset(MessageStruct, "mn_Node") + _offset(NodeStruct, "ln_Type")
 _MP_FLAGS = _offset(MsgPortStruct, "mp_Flags")
 _MP_SIGBIT = _offset(MsgPortStruct, "mp_SigBit")
 _MP_SIGTASK = _offset(MsgPortStruct, "mp_SigTask")
+# mp_SoftInt shares mp_SigTask's storage (a union in exec/ports.h)
+_MP_SOFTINT = _MP_SIGTASK
 _MP_MSGLIST = _offset(MsgPortStruct, "mp_MsgList")
 
 
 class MessageFunc(FuncBase):
-    def __init__(self, ctx, exec_lib, signal_func, task_func, port_mgr):
+    def __init__(self, ctx, exec_lib, signal_func, task_func, port_mgr, soft_int=None):
         super().__init__(ctx, exec_lib)
         self.signal_func = signal_func
         self.task_func = task_func
+        self.soft_int = soft_int
         # legacy port mgr
         self.port_mgr = port_mgr
 
@@ -101,7 +104,13 @@ class MessageFunc(FuncBase):
         log_exec.info("PutMsg(%s, %s)", port, msg)
         list_add_tail(mem, port_addr + _MP_MSGLIST, msg_addr)
 
-        # signal?
+        self.notify_port(port_addr)
+
+    def notify_port(self, port_addr):
+        """Tell a port's owner a message arrived, as PutMsg() does after
+        queueing it: signal mp_SigTask (PA_SIGNAL), Cause() mp_SoftInt
+        (PA_SOFTINT) or nothing (PA_IGNORE)."""
+        mem = self.ctx.mem
         flags = mem.r8(port_addr + _MP_FLAGS)
         if flags == MsgPortFlags.PA_SIGNAL:
             # post signal
@@ -114,7 +123,14 @@ class MessageFunc(FuncBase):
                 log_exec.debug("PutMsg: set signal %s task %08x", sig_bit, task)
                 self.signal_func.signal(task, sig_mask)
         elif flags == MsgPortFlags.PA_SOFTINT:
-            log_exec.error("PutMsg: PA_SOFTINT is ignored!")
+            intr = mem.r32(port_addr + _MP_SOFTINT)
+            if intr == 0:
+                log_exec.error("PutMsg: PA_SOFTINT port without mp_SoftInt")
+            elif self.soft_int is None:
+                log_exec.error("PutMsg: no software interrupts, PA_SOFTINT ignored")
+            else:
+                log_exec.debug("PutMsg: cause soft int %08x", intr)
+                self.soft_int.cause(intr)
         elif flags == MsgPortFlags.PA_IGNORE:
             log_exec.debug("PutMsg: no notify")
         else:
@@ -201,15 +217,7 @@ class MessageFunc(FuncBase):
             self.put_msg(port, msg, msg_type=NodeType.NT_REPLYMSG)
 
     def _signal_port(self, port: MsgPort):
-        try:
-            mem = self.ctx.mem
-            if mem.r8(port.addr + _MP_FLAGS) == MsgPortFlags.PA_SIGNAL:
-                task = mem.r32(port.addr + _MP_SIGTASK)
-                if task != 0:
-                    sig_bit = mem.r8(port.addr + _MP_SIGBIT)
-                    self.signal_func.signal(task, 1 << sig_bit)
-        except Exception:
-            pass
+        self.notify_port(port.addr)
 
     def _unlink_msg(self, msg_addr):
         try:

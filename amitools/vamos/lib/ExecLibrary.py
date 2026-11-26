@@ -28,6 +28,7 @@ from amitools.vamos.error import VamosInternalError
 from amitools.vamos.lib.lexec.signalfunc import SignalFunc
 from amitools.vamos.lib.lexec.taskfunc import TaskFunc
 from amitools.vamos.lib.lexec.msgfunc import MessageFunc
+from amitools.vamos.lib.lexec.softint import SoftIntFunc
 from .lexec.PortManager import PortManager
 from .lexec.SemaphoreManager import SemaphoreManager
 from .lexec.Pool import Pool
@@ -83,8 +84,14 @@ class ExecLibrary(LibImpl):
         self.memory_header = AllocatorMemHeader(ctx.alloc, self.exec_lib.mem_list)
         self.signal_func = SignalFunc(ctx, self.exec_lib)
         self.task_func = TaskFunc(ctx, self.exec_lib)
+        self.soft_int = SoftIntFunc(ctx, base_addr)
         self.msg_func = MessageFunc(
-            ctx, self.exec_lib, self.signal_func, self.task_func, self.port_mgr
+            ctx,
+            self.exec_lib,
+            self.signal_func,
+            self.task_func,
+            self.port_mgr,
+            self.soft_int,
         )
         io_sdef = IORequestStruct.sdef
         msgport_sdef = MsgPortStruct.sdef
@@ -154,6 +161,9 @@ class ExecLibrary(LibImpl):
         # (since we do not deal with irqs right now)
         log_exec.info("Enable -> Permit")
         self.signal_func.permit()
+
+    def Cause(self, ctx, interrupt):
+        self.soft_int.cause(interrupt)
 
     def Forbid(self, ctx):
         self.signal_func.forbid()

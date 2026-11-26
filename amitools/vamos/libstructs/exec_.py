@@ -166,6 +166,16 @@ class IntVectorStruct(AmigaStruct):
     ]
 
 
+# Interrupt
+@AmigaStructDef
+class InterruptStruct(AmigaStruct):
+    _format = [
+        (NodeStruct, "is_Node"),
+        (APTR_VOID, "is_Data"),
+        (APTR_VOID, "is_Code"),
+    ]
+
+
 # SoftIntList
 @AmigaStructDef
 class SoftIntListStruct(AmigaStruct):
