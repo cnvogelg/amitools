@@ -40,6 +40,11 @@ written to `C/` next to the script; use `-o DIR` to change that.
 
 The script exits with status `1` if any expected command is missing.
 
+The extracted commands are marked **executable**, exactly like the real `C:`
+drawer. AmigaDOS only runs a hostfs file whose host mode has the execute bit
+set (the shell checks `fib_Protection` before `LoadSeg`), so without it the
+`Shell-Seg` session and `Which` cannot use the fixture.
+
 ## Sources — AmigaOS 3.2 base + 3.2.3 update
 
 Like the ARexx fixture, the final 3.2.3 state is the base **AmigaOS 3.2**
@@ -136,6 +141,12 @@ fixture is absent. The shared helper is `../extra/cli_util.py`; a scratch
 hostfs volume (`tmp_path`) is passed as `work:` for tests that need input or
 output files.
 
+`../extra/cli_shell.py` additionally runs the real AmigaOS shell
+(`Shell-Seg-47.48` from `../shell-seg/`) through vamos' `shell` mode and feeds
+it a script on stdin, so several commands run inside one session (command
+search path, `RunCommand`, the prompt and the shell's error handling). It
+skips when either the shell seg or the commands are missing.
+
 ## Status under vamos
 
 The table below is kept in sync with `../extra/cli_*.py`. "works" means the
@@ -147,6 +158,7 @@ in the [vamos issue tracker](https://github.com/cnvogelg/amitools/issues).
 |---------|--------|
 | `Type`, `List`, `Dir`, `Copy`, `Delete`, `Rename`, `MakeDir`, `Join`, `Sort` | works |
 | `Version`, `Avail`, `Eval`, `Date`, `Info`, `Wait`, `Lock`, `AddBuffers`, `SetDate`, `ChangeTaskPri`, `CPU`, `DiskChange`, `MD5Sum`, `Assign` | works |
+| `Which` | works (the target must have the execute bit) |
 | `Relabel` | works (rc `0`); a hostfs volume's name is not persisted |
 | `Break` | works (error path); breaking a real task needs a shell session |
 | `Protect` (set) | works |
@@ -154,7 +166,6 @@ in the [vamos issue tracker](https://github.com/cnvogelg/amitools/issues).
 | `Filenote` | **xfail** — the note is not readable back on hostfs |
 | `MakeLink` | **xfail** — cannot create a link |
 | `Search` | **xfail** — returns `5` without reporting a match |
-| `Which` | **xfail** — returns `5`, no output |
 | `Status` | **xfail** — no CLI process table to list |
 | `Group`, `Owner` | **xfail** — hostfs returns `ERROR_NOT_IMPLEMENTED` |
 | `LoadResource` | **xfail** — the task never terminates |

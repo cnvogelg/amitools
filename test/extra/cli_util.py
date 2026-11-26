@@ -43,6 +43,22 @@ def skip_if_cmd_missing(vrun, name, sha1=None):
     vrun.skip_if_prog_not_available(os.path.join(CLI_DIR, "C", name), sha1)
 
 
+def ensure_cmd_executable(name):
+    """add the execute bit to ``cli:C/<name>`` if the fixture has none.
+
+    AmigaDOS only runs a hostfs file whose host mode has the execute bit set
+    (the shell checks ``fib_Protection`` before ``LoadSeg``).  ``extract-cli.py``
+    marks the extracted commands executable, but a fixture restored from the
+    encrypted blob without the bit would otherwise make the shell refuse the
+    command, so the ``Shell-Seg`` session test enforces it here.
+    """
+    path = os.path.join(CLI_DIR, "C", name)
+    if os.path.exists(path):
+        mode = os.stat(path).st_mode
+        if not mode & 0o111:
+            os.chmod(path, mode | 0o111)
+
+
 def run_cli(vrun, name, *args, stdin=None, vargs=(), timeout=CLI_TIMEOUT):
     """run ``cli:C/<name>`` with ``args`` and return ``(rc, stdout, stderr)``.
 

@@ -390,6 +390,19 @@ CLI_FILES = [
 ]
 
 
+def mark_executable(path):
+    """add the execute bit to an extracted command.
+
+    AmigaDOS only runs a hostfs file whose host mode has the execute bit set
+    (the shell checks ``fib_Protection``), so the commands are marked
+    executable here, exactly like the real ``C:`` drawer.  Without this the
+    ``Shell-Seg`` session cannot run the extracted programs.
+    """
+    mode = os.stat(path).st_mode
+    if not mode & 0o111:
+        os.chmod(path, mode | 0o111)
+
+
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -427,12 +440,14 @@ def main():
     for name, ver, sha, where in CLI_FILES:
         out_path = os.path.join(cmd_dir, name)
         if os.path.isfile(out_path) and extract_util.file_sha1(out_path) == sha:
+            mark_executable(out_path)
             print("%-16s %-26s present" % (name, ver))
             ok += 1
         elif sha in found:
             blob, source, logical = found[sha]
             with open(out_path, "wb") as f:
                 f.write(blob)
+            mark_executable(out_path)
             print("%-16s %-26s extracted <- %s" % (name, ver, source))
             ok += 1
         else:
