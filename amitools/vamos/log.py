@@ -18,6 +18,7 @@ log_schedule = logging.getLogger("schedule")
 log_lib = logging.getLogger("lib")
 log_libmgr = logging.getLogger("libmgr")
 log_segload = logging.getLogger("segload")
+log_cmd = logging.getLogger("cmd")
 
 log_path = logging.getLogger("path")
 log_file = logging.getLogger("file")
@@ -56,6 +57,7 @@ loggers = [
     log_doslist,
     log_handler,
     log_segload,
+    log_cmd,
     log_dos,
     log_exec,
     log_proc,
