@@ -1,18 +1,30 @@
 from amitools.binfmt.BinFmt import BinFmt
+from amitools.binfmt.BinImage import BIN_IMAGE_TYPE_PY
 from amitools.binfmt.Relocate import Relocate
 from amitools.vamos.log import log_segload
 from amitools.vamos.path.amipath import AmiPath
+from amitools.vamos.cmdcore.pycmd import strip_py_ext
 from .seglist import SegList
 from .overlay import OverlayInfo
 
 
 class SegLoadInfo(object):
-    def __init__(self, seglist, bin_img=None, ami_file=None, overlay=None, name=None):
+    def __init__(
+        self,
+        seglist,
+        bin_img=None,
+        ami_file=None,
+        overlay=None,
+        name=None,
+        command=None,
+    ):
         self.seglist = seglist
         self.bin_img = bin_img
         self.ami_file = ami_file
         self.overlay = overlay
         self.name = name
+        # for a Python command: the PyCommand owning the stub and trap
+        self.command = command
 
     def __str__(self):
         return "[SegLoad:%s,ami=%s,name=%s]" % (
@@ -26,9 +38,11 @@ class SegLoadInfo(object):
 
 
 class SegmentLoader(object):
-    def __init__(self, alloc, file_opener=None):
+    def __init__(self, alloc, file_opener=None, command_manager=None):
         self.alloc = alloc
         self.file_opener = file_opener
+        # optional command manager used to load Python commands
+        self.command_manager = command_manager
         self.mem = alloc.get_mem()
         self.binfmt = BinFmt()
         # map seglist baddr to bin_img
@@ -39,6 +53,12 @@ class SegmentLoader(object):
 
     def get_file_opener(self):
         return self.file_opener
+
+    def set_command_manager(self, command_manager):
+        self.command_manager = command_manager
+
+    def get_command_manager(self):
+        return self.command_manager
 
     def load_seglist(self, fobj, name=None, ami_file=None, lock=None, file_opener=None):
         """load seglist from an already opened file object and register it.
@@ -64,7 +84,7 @@ class SegmentLoader(object):
                     )
                 except ValueError as e:
                     log_segload.warning("overlay setup failed: %s", e)
-                    info.seglist.free()
+                    self._free_segload_info(info)
                     info = None
                 # None means no supported setup needed (e.g. custom
                 # manager) - keep seglist
@@ -100,6 +120,20 @@ class SegmentLoader(object):
         finally:
             fobj.close()
 
+    def _free_segload_info(self, info):
+        """release the resources of a SegLoadInfo.
+
+        A Python command owns its stub seglist and trap in the command
+        manager, so it is freed there instead of freeing the seglist
+        directly.
+        """
+        if info.overlay:
+            info.overlay.free()
+        if info.command is not None and self.command_manager is not None:
+            self.command_manager.free_stub(info.command)
+        else:
+            info.seglist.free()
+
     def unload_seglist(self, seglist_baddr):
         """unregister given seglist baddr and free seglist.
         return True if seglist was unloaded"""
@@ -109,9 +143,7 @@ class SegmentLoader(object):
         info = self.infos[seglist_baddr]
         log_segload.info("unload seglist: %s", info)
         del self.infos[seglist_baddr]
-        if info.overlay:
-            info.overlay.free()
-        info.seglist.free()
+        self._free_segload_info(info)
         return True
 
     def get_info(self, seglist_baddr):
@@ -138,9 +170,7 @@ class SegmentLoader(object):
             info = self.infos[baddr]
             log_segload.warning("orphaned seglist: %s", info)
             # try to free list
-            if info.overlay:
-                info.overlay.free()
-            info.seglist.free()
+            self._free_segload_info(info)
         return len(self.infos)
 
     def int_load_seglist(self, fobj, name=None, ami_file=None):
@@ -162,6 +192,21 @@ class SegmentLoader(object):
         if bin_img is None:
             log_segload.debug("load_image failed: %s", name)
             return None
+
+        # a Python command has no segments; synthesize a minimal stub
+        if bin_img.file_type == BIN_IMAGE_TYPE_PY:
+            if self.command_manager is None:
+                log_segload.error("no command manager to load python command: %s", name)
+                return None
+            cmd_name = strip_py_ext(base_name)
+            cmd = self.command_manager.make_command(
+                cmd_name, source=bin_img.get_file_data()
+            )
+            seg_list = self.command_manager.make_stub(cmd)
+            log_segload.info("loaded python command: %s", cmd_name)
+            return SegLoadInfo(
+                seg_list, None, ami_file=ami_file, name=name, command=cmd
+            )
 
         # create relocator
         relocator = Relocate(bin_img)
