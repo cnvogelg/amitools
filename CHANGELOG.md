@@ -1,5 +1,16 @@
 # Change Log
 
+## [Unreleased]
+
+### vamos
+
+* Fixed internal errors surfaced by the real AmigaOS 3.2.3 `C:` commands: a repeated `MatchEnd` on one anchor, oversized scalar writes into packet fields, locks without a volume, `BNULL`/stale file handles in the DOS file I/O calls, and a `CreateDir` whose parent is missing now reported as not found
+* Fixed a double-registered `FileHandle` that leaked a struct on every open
+
+### tests
+
+* Added a `test/cli` fixture with the AmigaOS 3.2.3 `C:` commands and per-command tests, plus a `Shell-Seg` session test that runs several commands in one shell
+
 ## [0.9.1][10] (2026-11-19)
 
 ### global

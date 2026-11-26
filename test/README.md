@@ -156,8 +156,9 @@ can be found in the host file system. The default is `volumes/sc`.
 ## 4. Copyrighted test fixtures
 
 Some tests need original, copyrighted AmigaOS binaries (currently the ARexx
-runtime, see `arexx/README.md`, and the shell variants in `shell-seg/`, see
-`shell-seg/README.md`). These files are **never committed**. Instead
+runtime, see `arexx/README.md`, the shell variants in `shell-seg/`, see
+`shell-seg/README.md`, and the CLI commands in `cli/`, see `cli/README.md`).
+These files are **never committed**. Instead
 they are listed in `blob_files.txt` and stored encrypted in
 `blob.tar.zstd.enc`; the tests skip themselves when the files are absent.
 
