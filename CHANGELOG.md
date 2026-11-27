@@ -6,6 +6,10 @@
 
 * Fixed internal errors surfaced by the real AmigaOS 3.2.3 `C:` commands: a repeated `MatchEnd` on one anchor, oversized scalar writes into packet fields, locks without a volume, `BNULL`/stale file handles in the DOS file I/O calls, and a `CreateDir` whose parent is missing now reported as not found
 * Fixed a double-registered `FileHandle` that leaked a struct on every open
+* Added the missing `workbench.library`, `keymap.library` and `input.device` FDs (from the NDK 3.2) and stubbed `WorkbenchLibrary.WBInfo`, so a command that calls the real jump table no longer faults
+* Folded both the string and the pattern in case-insensitive `MatchPatternNoCase`, so `Search` reports its matches
+* Reported the base directory's lock for `ap_Current->an_Lock` during a recursive `DODIR` scan, so `Dir ALL` no longer aborts with a bogus "circular directory entry found"
+* Set `APF_ITSWILD` in `MatchFirst` for wildcard patterns, so `Protect` reports each entry it changes
 
 ### tests
 
