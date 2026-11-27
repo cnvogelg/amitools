@@ -1,11 +1,8 @@
 """Run the original AmigaOS 3.2.3 ``Dir`` command (see test/cli/README.md).
 
-``Dir`` prints directories first, then the files in two columns.  The plain
-forms work; ``ALL`` (recursive) is marked ``xfail`` because vamos's incomplete
-``AnchorPath`` chain makes the command report a bogus circular directory.
+``Dir`` prints directories first, then the files in two columns.  ``ALL``
+recurses into subdirectories.
 """
-
-import pytest
 
 from cli_util import make_work_tree, run_cli_rc, skip_if_cmd_missing, work_vargs
 
@@ -13,6 +10,11 @@ DIR_SHA1 = "9c4044d3e06697fdd68cd1add615c6e3ce8ff8fd"
 
 _DIRS = "     sub (dir)"
 _FILES = "  a.txt       b.txt       del.txt     in.txt      nested.txt  ren.txt"
+_ALL = [
+    _DIRS,
+    "       deep.txt",
+    _FILES,
+]
 
 
 def cli_dir_plain_test(vrun, tmp_path):
@@ -55,15 +57,10 @@ def cli_dir_subdir_test(vrun, tmp_path):
     assert stderr == []
 
 
-@pytest.mark.xfail(
-    reason="vamos' AnchorPath chain triggers a bogus 'circular directory' error",
-    strict=True,
-)
 def cli_dir_all_test(vrun, tmp_path):
     """``ALL`` recurses into subdirectories."""
     skip_if_cmd_missing(vrun, "Dir", DIR_SHA1)
     make_work_tree(tmp_path)
     stdout, stderr = run_cli_rc(vrun, "Dir", "work:", "ALL", vargs=work_vargs(tmp_path))
-    # the subdirectory and its contents must be listed
-    assert "deep.txt" in "\n".join(stdout)
+    assert stdout == _ALL
     assert stderr == []

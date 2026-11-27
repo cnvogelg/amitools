@@ -39,6 +39,10 @@ class MatchFirstNext:
         self.name = None
         self.path = None
         self.dir_lock = None
+        # path of the outermost directory entered via APF_DODIR. While such a
+        # recursive scan is active, ap_Current->an_Lock must report this lock
+        # (see _push_dodir).
+        self.base_path = None
 
     def first(self, ctx):
         # match first entry
@@ -101,12 +105,15 @@ class MatchFirstNext:
         return self._fill_lock(parent)
 
     def _push_dodir(self, name, path):
-        self.path_mgr.ami_abs_path(self.lock, path)
-        dir_entries = sorted(self.path_mgr.ami_list_dir(self.lock, path))
+        dir_entries = self.path_mgr.ami_list_dir(self.lock, path)
         # its really a dir
         if dir_entries is not None:
-            self.dodir_stack.append((name, path, dir_entries))
-            self._fill_lock(path)
+            if not self.dodir_stack:
+                # Remember the outermost directory entered by a DODIR request.
+                # The AmigaOS Dir command walks the recursion stack and checks
+                # that every result reports this lock in ap_Current->an_Lock.
+                self.base_path = path
+            self.dodir_stack.append((name, path, sorted(dir_entries)))
 
     def _get_dodir(self, flags):
         if len(self.dodir_stack) > 0:
@@ -120,18 +127,17 @@ class MatchFirstNext:
                     sub_path = path + sub_name
                 else:
                     sub_path = path + "/" + sub_name
-                self._fill_lock(path)
                 return sub_name, sub_path, flags
             else:
                 # top stack is finished
                 flags |= self.DIDDIR
                 flags &= ~self.DODIR
                 self.dodir_stack.pop()
-                self._fill_parent_lock(path)
+                if not self.dodir_stack:
+                    self.base_path = None
                 return name, path, flags
         else:
             flags &= ~self.DODIR
-            self._fill_lock("")
             return None, None, flags
 
     def next(self, ctx):
@@ -149,19 +155,25 @@ class MatchFirstNext:
         if flags != org_flags:
             self.anchor.ap_Flags.val = flags
 
-        # no dodir -> use matcher
         if path is None:
+            # no dodir -> use matcher
             path = next(self.matcher)
             # no more matches
             if path is None:
                 return ERROR_NO_MORE_ENTRIES
             # extract name
             name = self.path_mgr.ami_name_of_path(self.lock, path)
-
-        # update current
-        self.path = path
-        self.name = name
-        self._fill_parent_lock(path)
+            self.path = path
+            self.name = name
+            self._fill_parent_lock(path)
+        else:
+            # A directory listing requested via DODIR. The AmigaOS Dir command
+            # expects ap_Current->an_Lock to stay on the directory the
+            # recursive scan started in, so report that lock here.
+            self.path = path
+            self.name = name
+            if self.base_path is not None:
+                self._fill_lock(self.base_path)
 
         # fill fib
         io_err = self._fill_fib(ctx, path)
