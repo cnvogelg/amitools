@@ -377,6 +377,30 @@ def lib_dos_match_first_test():
         env.close()
 
 
+def lib_dos_match_first_itswild_test():
+    env = _MatchEnv()
+    env.set_pattern("#?")  # a wildcard pattern
+    try:
+        err = env.lib.MatchFirst(env.ctx, env.pat.addr, env.anchor_ptr)
+        assert err == NO_ERROR
+        # MatchFirst sets APF_ITSWILD (bit 1) when the pattern has a wildcard
+        assert env.anchor.ap_Flags.val & 2 == 2
+    finally:
+        env.close()
+
+
+def lib_dos_match_first_no_itswild_test():
+    env = _MatchEnv()
+    env.set_pattern("alpha")  # a literal pattern
+    try:
+        err = env.lib.MatchFirst(env.ctx, env.pat.addr, env.anchor_ptr)
+        assert err == NO_ERROR
+        # no wildcard -> APF_ITSWILD stays clear
+        assert env.anchor.ap_Flags.val & 2 == 0
+    finally:
+        env.close()
+
+
 def lib_dos_match_first_no_match_test():
     env = _MatchEnv()
     env.set_pattern("#?z")  # no listing entry ends in 'z'

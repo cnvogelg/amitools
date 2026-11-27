@@ -16,6 +16,7 @@ from .PathMatch import PathMatch
 
 
 class MatchFirstNext:
+    ITSWILD = 2
     DODIR = 4
     DIDDIR = 8
 
@@ -49,6 +50,10 @@ class MatchFirstNext:
         self.path = self.matcher.begin()
         if self.path is None:
             return ERROR_OBJECT_NOT_FOUND
+        # MatchFirst() sets APF_ITSWILD if the pattern contains a wildcard so
+        # callers can tell whether the result may be one of many entries.
+        if self.matcher.has_wildcards():
+            self.anchor.ap_Flags.val |= self.ITSWILD
         self.name = self.path_mgr.ami_name_of_path(self.lock, self.path)
         # get parent dir of first match
         dir_part = self.path_mgr.ami_dir_of_path(self.lock, self.path)
