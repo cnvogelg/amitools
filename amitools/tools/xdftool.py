@@ -7,7 +7,6 @@ import sys
 import argparse
 import os.path
 
-from amitools.fs.ADFSVolume import ADFSVolume
 from amitools.fs.ADFSHardLink import ADFSHardLink
 from amitools.fs.ADFSHardLinkDir import ADFSHardLinkDir
 from amitools.fs.ADFSSoftLink import ADFSSoftLink
@@ -23,6 +22,8 @@ from amitools.util.CommandQueue import CommandQueue
 import amitools.util.KeyValue as KeyValue
 from amitools.fs.FSString import FSString
 import amitools.fs.DosType as DosType
+from amitools.fs.VolumeFactory import open_volume, create_volume
+from amitools.fs.pfs3 import is_pfs3_blkdev
 
 
 # system encoding
@@ -42,6 +43,16 @@ def make_fsstr(s):
             pass
     u = s.decode(encoding)
     return FSString(u)
+
+
+def _get_create_options(vol):
+    """the options to format a volume like vol with"""
+    get = getattr(vol, "get_create_options", None)
+    return get() if get else {}
+
+
+def _is_pfs3(vol):
+    return getattr(vol, "is_pfs3", False)
 
 
 # ----- commands -----
@@ -186,9 +197,7 @@ class OpenCmd(Command):
         return f.open(image_file, options=opts, read_only=self.args.read_only)
 
     def init_vol(self, blkdev):
-        vol = ADFSVolume(blkdev)
-        vol.open()
-        return vol
+        return open_volume(blkdev)
 
 
 class CreateCmd(Command):
@@ -212,7 +221,6 @@ class FormatCmd(Command):
             return blkdev
 
     def init_vol(self, blkdev):
-        vol = ADFSVolume(blkdev)
         n = len(self.opts)
         if n < 1 or n > 2:
             print("Usage: format <volume_name> [dos_type]")
@@ -227,8 +235,7 @@ class FormatCmd(Command):
             else:
                 dos_type = None
             vol_name = make_fsstr(self.opts[0])
-            vol.create(vol_name, dos_type=dos_type)
-            return vol
+            return create_volume(blkdev, vol_name, dos_type=dos_type)
 
     def handle_vol(self, volume):
         # need fake handle_vol otherwise init_vol is not called
@@ -360,7 +367,13 @@ class DefragCmd(Command):
             backup += blkdev.read_block(i)
         # 2. recreate the volume in place on the same block device.
         # this reuses the same vol object so the command queue stays valid
-        vol.create(name, meta_info=root_meta, dos_type=dos_type, boot_code=boot_code)
+        vol.create(
+            name,
+            meta_info=root_meta,
+            dos_type=dos_type,
+            boot_code=boot_code,
+            **_get_create_options(vol),
+        )
         # 3. restore sorted by name for a deterministic, contiguous layout.
         # per-file FLB interleave is handled by ADFSFile.blocks_create_new.
         # note: directory hash-chain order after defrag follows the sorted
@@ -416,6 +429,17 @@ class DefragCmd(Command):
         for e in dir_node.get_entries():
             fname = e.get_file_name().get_name()
             meta = e.get_meta_info()
+            # PFS3: a restore would turn hard links into copies and rollover
+            # files into plain files
+            if (
+                getattr(e, "is_link", lambda: False)()
+                or getattr(e, "is_rollover", lambda: False)()
+            ):
+                raise FSError(
+                    UNSUPPORTED_DIR_BLOCK,
+                    node=e,
+                    extra="links and rollover files cannot be defragmented",
+                )
             if e.is_dir():
                 result.append((fname, meta, True, self._snapshot_dir(e)))
             elif e.is_file():
@@ -598,6 +622,13 @@ class ReadLinkCmd(Command):
         if node is None:
             print("Link not found:", self.opts[0])
             return 2
+        if _is_pfs3(vol):
+            # a soft link's path, or the name of a hard link's object
+            if not node.is_link():
+                print("Not a link:", self.opts[0])
+                return 2
+            print(node.get_link_target().get_unicode())
+            return 0
         if isinstance(node, ADFSSoftLink):
             print(node.get_target().get_unicode())
             return 0
@@ -848,6 +879,9 @@ class BlockCmd(Command):
                 return 1
             else:
                 block_no = int(self.opts[1])
+                if _is_pfs3(vol):
+                    vol.decode_block(block_no)
+                    return 0
                 # read block
                 blk = Block(vol.blkdev, block_no)
                 blk.read()
@@ -881,6 +915,13 @@ class BitmapCmd(Command):
         if self.opts[-1] == "brief":
             brief = True
             self.opts = self.opts[:-1]
+
+        if _is_pfs3(vol):
+            if cmd == "info":
+                vol.print_bitmap_info()
+                return 0
+            print("bitmap: only 'info' is supported on PFS3 volumes")
+            return 1
 
         if cmd == "info":
             vol.bitmap.print_info()
@@ -1017,6 +1058,13 @@ class BootCmd(Command):
             )
             return 1
         cmd = self.opts[0]
+        # PFS3 boot blocks hold the disk type the handler checks, no code
+        if is_pfs3_blkdev(blkdev):
+            if cmd == "show":
+                print("PFS3 volume: its boot blocks hold no boot code")
+                return 0
+            print("boot: PFS3 volumes hold no boot code")
+            return 1
         # fetch boot blcok
         bb = BootBlock(blkdev, 0)
         bb.read()
@@ -1142,6 +1190,10 @@ class FsckCmd(Command):
             factory = BlkDevFactory()
             blkdev = factory.open(self.config.output_path, read_only=False)
 
+        # PFS3: check only
+        if is_pfs3_blkdev(blkdev):
+            return self._check_pfs3(blkdev)
+
         # Run fsck
         fsck = Fsck(blkdev, self.config)
         result = fsck.run()
@@ -1156,6 +1208,17 @@ class FsckCmd(Command):
             return 0 if result.error_count == result.fixed_count else 1
         else:
             return 1
+
+    def _check_pfs3(self, blkdev):
+        from amitools.fs.pfs3.PFS3Volume import PFS3Volume
+
+        if self.config.repair or self.config.salvage:
+            print("fsck: PFS3 volumes can only be checked, not repaired")
+        vol = PFS3Volume(blkdev)
+        vol.open()
+        result = vol.check()
+        self._print_results(result)
+        return 0 if result.is_clean else 1
 
     def _print_results(self, result):
         from amitools.fs.fsck.FsckResult import Severity

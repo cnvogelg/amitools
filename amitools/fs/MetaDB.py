@@ -80,9 +80,12 @@ class MetaDB:
         if len(dos_type_str) != 4:
             raise IOError("Invalid xdfmeta dostype string")
         num = ord(dos_type_str[3]) - ord("0")
-        if num < 0 or num > 7:
+        if dos_type_str in ("PFS1", "PFS2", "PFS3", "PDS3"):
+            self.dos_type = DosType.tag_str_to_num(dos_type_str)
+        elif num < 0 or num > 7:
             raise IOError("Invalid xdfmeta dostype number")
-        self.dos_type = DosType.DOS0 + num
+        else:
+            self.dos_type = DosType.DOS0 + num
         # then time stamps
         create_ts = TimeStamp()
         ok1 = create_ts.parse(comp[1])
@@ -129,8 +132,11 @@ class MetaDB:
         f = open(file_path, "w")
         # header
         mi = self.vol_meta
-        num = self.dos_type - DosType.DOS0 + ord("0")
-        dos_type_str = "DOS%c" % num
+        if DosType.is_pfs(self.dos_type):
+            dos_type_str = DosType.num_to_tag_str(self.dos_type)
+        else:
+            num = self.dos_type - DosType.DOS0 + ord("0")
+            dos_type_str = "DOS%c" % num
         vol_name = self.vol_name
         line = "%s:%s,%s,%s,%s\n" % (
             vol_name,

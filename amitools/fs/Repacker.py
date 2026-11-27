@@ -1,5 +1,5 @@
 from .ADFSNode import check_comment
-from .ADFSVolume import ADFSVolume
+from .VolumeFactory import open_volume, create_volume
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
 
 
@@ -24,8 +24,7 @@ class Repacker:
     def create_in_volume(self):
         if self.in_blkdev is None:
             return None
-        self.in_volume = ADFSVolume(self.in_blkdev)
-        self.in_volume.open()
+        self.in_volume = open_volume(self.in_blkdev)
         return self.in_volume
 
     def create_in(self):
@@ -73,9 +72,15 @@ class Repacker:
         dos_type = iv.get_dos_type()
         meta_info = iv.get_meta_info()
         boot_code = iv.get_boot_code()
-        self.out_volume = ADFSVolume(self.out_blkdev)
-        self.out_volume.create(
-            name, meta_info=meta_info, dos_type=dos_type, boot_code=boot_code
+        get_options = getattr(iv, "get_create_options", None)
+        options = get_options() if get_options else {}
+        self.out_volume = create_volume(
+            self.out_blkdev,
+            name,
+            meta_info=meta_info,
+            dos_type=dos_type,
+            boot_code=boot_code,
+            **options,
         )
         return self.out_volume
 

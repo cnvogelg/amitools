@@ -25,6 +25,10 @@ INVALID_DIR_CACHE_BLOCK = 24
 INVALID_ENTRY_BLOCK = 25
 TOO_MANY_LEVELS = 26
 LINK_NOT_ALLOWED = 27
+INVALID_ANODE = 28
+INVALID_RESERVED_BLOCK = 29
+VOLUME_READ_ONLY = 30
+UNSUPPORTED_OPERATION = 31
 
 error_names = {
     INVALID_BOOT_BLOCK: "Invalid Boot Block",
@@ -54,6 +58,10 @@ error_names = {
     INVALID_ENTRY_BLOCK: "Invalid Entry Block",
     TOO_MANY_LEVELS: "Too many levels",
     LINK_NOT_ALLOWED: "Link not allowed",
+    INVALID_ANODE: "Invalid Anode",
+    INVALID_RESERVED_BLOCK: "Invalid Reserved Block",
+    VOLUME_READ_ONLY: "Volume is read-only",
+    UNSUPPORTED_OPERATION: "Operation not supported",
 }
 
 
