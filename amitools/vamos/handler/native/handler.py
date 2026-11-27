@@ -127,7 +127,7 @@ class NativeHandler(DosPktHandler):
 
     def _exec_proxy(self):
         """the exec.library proxy of the running exec instance"""
-        return self.exec_lib.msg_func.ctx.proxies.get_exec_lib_proxy()
+        return self.exec_lib.ctx.proxies.get_exec_lib_proxy()
 
     def _transport_pkt(self, pkt):
         """send one packet with exec functions and copy the reply into ``pkt``

@@ -21,12 +21,26 @@ from amitools.vamos.lib.intuition import (
     TextFontStruct,
     WindowStruct,
 )
-from amitools.vamos.lib.lexec.msgfunc import MessageFunc
+from amitools.vamos.lib.lexec.msgfunc import MessageMixin
 from amitools.vamos.lib.lexec.PortManager import PortManager
 from amitools.vamos.libtypes import MsgPort
 from amitools.vamos.machine import REG_A0
 from amitools.vamos.machine.mock import MockCPU, MockMemory
 from amitools.vamos.mem import MemoryAlloc
+
+
+class MessageHost(MessageMixin):
+    """a minimal host for ``MessageMixin`` in tests (no full exec.library)."""
+
+    def __init__(self, ctx, signal, task, port_mgr):
+        self.ctx = ctx
+        self.port_mgr = port_mgr
+        self.soft_int = None
+        self.alloc_signal = signal.alloc_signal
+        self.free_signal = signal.free_signal
+        self.signal = signal.signal
+        self.find_task = task.find_task
+        self.wait = lambda mask: 0
 
 
 class WindowContext:
@@ -93,11 +107,12 @@ class WindowContext:
             free_signal=Mock(),
         )
         task = SimpleNamespace(find_task=lambda name: None)
-        self.messages = MessageFunc(self, None, signal, task, PortManager(self.alloc))
+        self.messages = MessageHost(self, signal, task, PortManager(self.alloc))
         self.exec_lib = SimpleNamespace(
             CreateMsgPort=lambda ctx: self.messages.create_msg_port(),
             DeleteMsgPort=self.delete_port,
-            msg_func=self.messages,
+            put_msg=self.messages.put_msg,
+            port_mgr=self.messages.port_mgr,
         )
         self.graphics = GraphicsLibrary()
         from amitools.vamos.display.base import Color

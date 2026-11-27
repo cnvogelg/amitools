@@ -1,8 +1,6 @@
 import logging
-from .funcbase import FuncBase
-from amitools.vamos.log import log_exec
-from amitools.vamos.libtypes import MsgPort, Message
-from amitools.vamos.libtypes.list_ import list_add_tail, list_first, list_rem_head
+
+from amitools.vamos.astructs import CSTR
 from amitools.vamos.libstructs import (
     NodeType,
     MsgPortFlags,
@@ -10,7 +8,11 @@ from amitools.vamos.libstructs import (
     MessageStruct,
     NodeStruct,
 )
-from amitools.vamos.astructs import CSTR
+from amitools.vamos.libtypes import MsgPort, Message
+from amitools.vamos.libtypes.list_ import list_add_tail, list_first, list_rem_head
+from amitools.vamos.log import log_exec
+
+from .funcbase import FuncBaseMixin
 
 
 def _offset(struct, name):
@@ -28,31 +30,54 @@ _MP_SOFTINT = _MP_SIGTASK
 _MP_MSGLIST = _offset(MsgPortStruct, "mp_MsgList")
 
 
-class MessageFunc(FuncBase):
-    def __init__(self, ctx, exec_lib, signal_func, task_func, port_mgr, soft_int=None):
-        super().__init__(ctx, exec_lib)
-        self.signal_func = signal_func
-        self.task_func = task_func
-        self.soft_int = soft_int
-        # legacy port mgr
-        self.port_mgr = port_mgr
+class MessageMixin(FuncBaseMixin):
+    """exec.library message/port LVOs (fd banner: messages)."""
+
+    def PutMsg(self, ctx, port: MsgPort, msg: Message):
+        return self.put_msg(port, msg)
+
+    def GetMsg(self, ctx, port: MsgPort) -> Message:
+        return self.get_msg(port)
+
+    def CreateMsgPort(self, ctx) -> MsgPort:
+        return self.create_msg_port()
+
+    def DeleteMsgPort(self, ctx, msg_port: MsgPort):
+        return self.delete_msg_port(msg_port)
+
+    def WaitPort(self, ctx, msg_port: MsgPort) -> Message:
+        return self.wait_port(msg_port)
+
+    def AddPort(self, ctx, msg_port: MsgPort):
+        return self.add_port(msg_port)
+
+    def RemPort(self, ctx, msg_port: MsgPort):
+        return self.rem_port(msg_port)
+
+    def FindPort(self, ctx, name: CSTR) -> MsgPort:
+        return self.find_port(name)
+
+    def ReplyMsg(self, ctx, msg: Message):
+        return self.reply_msg(msg)
+
+    # ----- internal -----
 
     def create_msg_port(self) -> MsgPort:
         # alloc signal first
-        signal = self.signal_func.alloc_signal(-1)
+        signal = self.alloc_signal(-1)
         if signal == -1:
             log_exec.error("CreateMsgPort: no signal!")
             return None
 
         # get my task
-        my_task = self.task_func.find_task(None)
+        my_task = self.find_task(None)
 
         # alloc port
         memory = self.ctx.alloc.alloc_memory(
             MsgPort.get_size(), label="exec_port", except_on_failure=False
         )
         if memory is None:
-            self.signal_func.free_signal(signal)
+            self.free_signal(signal)
             return None
         msg_port = MsgPort(self.ctx.mem, memory.addr)
         msg_port.new(sig_bit=signal, sig_task=my_task)
@@ -73,7 +98,7 @@ class MessageFunc(FuncBase):
 
         # free signal if not allocated
         if signal > 15:
-            self.signal_func.free_signal(signal)
+            self.free_signal(signal)
 
         # free port
         msg_port.free(self.ctx.alloc)
@@ -121,7 +146,7 @@ class MessageFunc(FuncBase):
                 sig_bit = mem.r8(port_addr + _MP_SIGBIT)
                 sig_mask = 1 << sig_bit
                 log_exec.debug("PutMsg: set signal %s task %08x", sig_bit, task)
-                self.signal_func.signal(task, sig_mask)
+                self.signal(task, sig_mask)
         elif flags == MsgPortFlags.PA_SOFTINT:
             intr = mem.r32(port_addr + _MP_SOFTINT)
             if intr == 0:
@@ -183,7 +208,7 @@ class MessageFunc(FuncBase):
             # empty queue: block on the port's signal until a message is
             # delivered (PutMsg signals the port's task)
             log_exec.debug("WaitPort: waiting for signal %s", sig_bit)
-            self.signal_func.wait(sig_mask)
+            self.wait(sig_mask)
 
     def add_port(self, port: MsgPort):
         log_exec.info("AddPort(%s)", port)

@@ -36,7 +36,7 @@ def wait_pkt(dos, ctx):
         # (68k) handler receives its packets on its process port through the
         # exec message path, so receive one the same way a real WaitPkt does
         # (WaitPort followed by GetMsg).
-        msg_func = ctx.exec_lib.msg_func
+        msg_func = ctx.exec_lib
         msg_func.wait_port(proc.msg_port)
         msg = msg_func.get_msg(proc.msg_port)
         if msg is None:
@@ -76,7 +76,7 @@ def reply_pkt(dos, ctx, dp: DosPacket, res1, res2):
     # alone) also wakes a real signal port, e.g. the reply port of a native
     # (68k) handler's caller, while a Python port manager port still reaches
     # its callback.
-    ctx.exec_lib.msg_func.put_msg(
+    ctx.exec_lib.put_msg(
         MsgPort(ctx.mem, reply_port),
         Message(ctx.mem, dp.link.aptr),
         msg_type=NodeType.NT_REPLYMSG,

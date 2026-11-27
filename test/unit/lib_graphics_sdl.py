@@ -315,7 +315,7 @@ def graphics_native_sdl_window_and_render_test(monkeypatch):
                 assert pending is None
                 return
             intuition.drain_pending_intui_events(ctx, pending)
-            message = ctx.exec_lib.msg_func.get_msg(port)
+            message = ctx.exec_lib.get_msg(port)
             assert message is not None
             result = IntuiMessageStruct(ctx.mem, message.addr)
             assert (
@@ -325,8 +325,8 @@ def graphics_native_sdl_window_and_render_test(monkeypatch):
                 result.MouseX.val,
                 result.MouseY.val,
             ) == expected
-            ctx.exec_lib.msg_func.reply_msg(message)
-            assert ctx.exec_lib.msg_func.get_msg(port) is None
+            ctx.exec_lib.reply_msg(message)
+            assert ctx.exec_lib.get_msg(port) is None
 
         event = sdl2.SDL_Event()
         for event_type, button_code in (

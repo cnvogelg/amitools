@@ -175,7 +175,7 @@ def png_native_window_idle_capture_test(tmp_path, monkeypatch, wait_for_close):
             ctx.cpu.w_reg(register, value)
         graphics.RectFill(ctx)
         if wait_for_close:
-            messages = ctx.exec_lib.msg_func
+            messages = ctx.exec_lib
             port = MsgPort(ctx.mem, window.UserPort.val)
             messages.wait_port(port)
             message = messages.get_msg(port)

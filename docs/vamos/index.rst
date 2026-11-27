@@ -39,7 +39,8 @@ Features
 * A handler-based file system layer: host directories, an in-memory volume,
   AmigaDOS file systems in image files (ADF/HDF/RDB), and the ``NIL:`` /
   ``CONSOLE:`` devices (see :doc:`dev/handler`)
-* Exec library support: AllocMem/Vec, LoadLibrary
+* Exec library support: tasks, signals, message ports, memory, devices,
+  libraries and semaphores
 * A real Amiga Shell and many useful tracing, logging and profiling features
 
 First run
@@ -78,4 +79,5 @@ Documentation
 * :doc:`dev/architecture` -- how vamos is built and how the packages fit together
 * :doc:`dev/handler` -- the file system handler layer and its API
 * :doc:`dev/lib` -- library loading and configuration
+* :doc:`dev/exec` -- the ``exec.library`` implementation and its topic mixins
 * :doc:`dev/api` -- Python API reference and examples

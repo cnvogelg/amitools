@@ -386,9 +386,7 @@ def bsdsocket_select_signals_and_cooperative_yield_test(
         bits[0] |= mask
 
     task = SimpleNamespace(reschedule=schedule)
-    ctx.exec_lib = SimpleNamespace(
-        signal_func=SimpleNamespace(get_my_sched_task=lambda: task, set_signal=consume)
-    )
+    ctx.exec_lib = SimpleNamespace(get_my_sched_task=lambda: task, set_signal=consume)
     monkeypatch.setattr(select, "select", lambda *args: ([], [], []))
     select_args(ctx, 1, read, signals=signals)
     assert ctx.lib.WaitSelect(ctx) == (-1 if interrupt else 0)

@@ -1217,7 +1217,7 @@ class IntuitionLibrary(ClassicGadgets, LibImpl):
             port.new(sig_bit=0)
             port.flags.val = 2  # PA_IGNORE; replies are handled synchronously.
             owner = {"port": memory, "messages": {}, "closed": False}
-            manager = ctx.exec_lib.msg_func.port_mgr
+            manager = ctx.exec_lib.port_mgr
             manager.register_port(memory.addr)
             manager.ports[memory.addr].handler = lambda manager, addr: (
                 self._reply_idcmp(ctx, owner, addr)
@@ -1248,7 +1248,7 @@ class IntuitionLibrary(ClassicGadgets, LibImpl):
         msg.IDCMPWindow.val = win_addr
         owner["messages"][memory.addr] = (memory, user_port_addr)
         try:
-            ctx.exec_lib.msg_func.put_msg(
+            ctx.exec_lib.put_msg(
                 MsgPort(ctx.mem, user_port_addr), Message(ctx.mem, memory.addr)
             )
         except Exception:
@@ -1258,7 +1258,7 @@ class IntuitionLibrary(ClassicGadgets, LibImpl):
 
     def _release_idcmp_port(self, ctx, owner):
         if owner["closed"] and not owner["messages"]:
-            manager = ctx.exec_lib.msg_func.port_mgr
+            manager = ctx.exec_lib.port_mgr
             self._reply_owners.pop(owner["port"].addr, None)
             manager.unregister_port(owner["port"].addr)
             ctx.alloc.free_memory(owner["port"])
@@ -1274,7 +1274,7 @@ class IntuitionLibrary(ClassicGadgets, LibImpl):
         if owner is None:
             return
         owner["closed"] = True
-        manager = ctx.exec_lib.msg_func.port_mgr
+        manager = ctx.exec_lib.port_mgr
         for addr, (memory, port_addr) in tuple(owner["messages"].items()):
             queued = False
             port = manager.ports.get(port_addr)

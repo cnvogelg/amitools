@@ -1,5 +1,7 @@
-from .funcbase import FuncBase
+from amitools.vamos.astructs import BYTE
 from amitools.vamos.log import log_exec
+
+from .funcbase import FuncBaseMixin
 
 
 # private ExecBase->SysFlags bits, see exec/execbase.inc
@@ -8,7 +10,26 @@ SFF_AttnSwitch = 1 << 15
 SFF_RESCHEDULE = SFF_QuantumOver | SFF_AttnSwitch
 
 
-class SignalFunc(FuncBase):
+class SignalMixin(FuncBaseMixin):
+    """exec.library signal LVOs (fd banner: tasks / signals)."""
+
+    def AllocSignal(self, ctx, signal_num: BYTE):
+        return self.alloc_signal(signal_num.val)
+
+    def FreeSignal(self, ctx, signal_num: BYTE):
+        return self.free_signal(signal_num.val)
+
+    def SetSignal(self, ctx, new_signals, signal_mask):
+        return self.set_signal(new_signals, signal_mask)
+
+    def Signal(self, ctx, task, signals):
+        self.signal(task, signals)
+
+    def Wait(self, ctx, signal_set):
+        return self.wait(signal_set)
+
+    # ----- internal -----
+
     def alloc_signal(self, sig_num):
         task = self.get_my_ami_task()
         old_mask = task.sig_alloc.val

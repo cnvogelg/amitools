@@ -369,7 +369,7 @@ class BsdSocketLibrary(LibImpl):
         if executive is None and getattr(ctx, "lib_mgr", None) is not None:
             vlib = ctx.lib_mgr.get_vlib_by_name("exec.library")
             executive = vlib.get_impl() if vlib is not None else None
-        signal_func = getattr(executive, "signal_func", None)
+        signal_func = executive
         if getattr(ctx, "task", True) is None:
             signal_func = None
         task = signal_func.get_my_sched_task() if signal_func else None

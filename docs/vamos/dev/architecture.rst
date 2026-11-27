@@ -69,6 +69,8 @@ The ``amitools.vamos`` package is split into the following sub-packages:
      - the in-memory structures and their Python wrappers
    * - ``dos``
      - the ``dos.library`` implementation, split into focused modules
+   * - ``lexec``
+     - the ``exec.library`` implementation, split into topic mixins
    * - ``handler``
      - the file-system handler API, the manager and the built-in handlers
    * - ``path``

@@ -1,7 +1,13 @@
-class FuncBase:
-    def __init__(self, ctx, exec_lib):
-        self.ctx = ctx
-        self.exec_lib = exec_lib
+from amitools.vamos.machine.regs import REG_A7
+
+
+class FuncBaseMixin:
+    """shared helpers for the ``exec.library`` mixins.
+
+    The topic mixins are combined into ``ExecLibrary``, so ``self`` is the
+    library implementation carrying the shared state (``ctx``, ``mem``,
+    ``alloc``, ...).
+    """
 
     def get_my_ami_task(self):
         """return Amiga Task structure to access current task"""
@@ -17,3 +23,8 @@ class FuncBase:
         if task is None:
             return None
         return task.get_sched_task()
+
+    def get_callee_pc(self, ctx):
+        """a call stub log helper to extract the callee's pc"""
+        sp = ctx.cpu.r_reg(REG_A7)
+        return ctx.mem.r32(sp)

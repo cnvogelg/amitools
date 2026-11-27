@@ -76,7 +76,7 @@ class TaskHandler:
     def __call__(self, manager, handler):
         alloc = manager.alloc
         machine = manager.machine
-        messages = manager.exec_impl.msg_func
+        messages = manager.exec_impl
         mem = alloc.get_mem()
         self.mem = mem
         self.port = MsgPort.alloc(alloc)

@@ -56,7 +56,7 @@ def libmgr_setup_shutdown_helper_test(monkeypatch):
     slm = SetupLibManager(machine, mem_map, runtime.run, scheduler, PathManager())
     slm.setup()
     slm.open_base_libs()
-    messages = slm.exec_impl.msg_func
+    messages = slm.exec_impl
     ports = []
     events = []
 

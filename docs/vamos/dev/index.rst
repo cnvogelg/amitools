@@ -11,4 +11,5 @@ the library configuration, and provides a Python API reference with examples.
     architecture
     handler
     lib
+    exec
     api

@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from amitools.vamos.lib.lexec.msgfunc import MessageFunc
+from amitools.vamos.lib.lexec.msgfunc import MessageMixin
 from amitools.vamos.lib.lexec.PortManager import PortManager
 from amitools.vamos.lib.lexec.softint import SoftIntFunc
 from amitools.vamos.libstructs import InterruptStruct, MsgPortFlags, NodeType
@@ -18,6 +18,16 @@ EXEC_BASE = 0x4000
 
 # addq.l #1,(a1); move.l a6,4(a1); move.l a5,8(a1); rts
 COUNT_HANDLER = bytes.fromhex("5291234e0004234d00084e75")
+
+
+class MessageHost(MessageMixin):
+    """a minimal host for ``MessageMixin`` in tests (no full exec.library)."""
+
+    def __init__(self, ctx, signal, port_mgr, soft_int):
+        self.ctx = ctx
+        self.port_mgr = port_mgr
+        self.soft_int = soft_int
+        self.signal = signal.signal
 
 
 class Env:
@@ -141,7 +151,7 @@ def exec_cause_does_not_nest_test(env):
 
 def exec_putmsg_softint_port_test(env):
     signal = SimpleNamespace(signal=Mock())
-    msgs = MessageFunc(env.ctx, None, signal, None, PortManager(env.alloc), env.soft)
+    msgs = MessageHost(env.ctx, signal, PortManager(env.alloc), env.soft)
     port = MsgPort(env.mem, env.block(MsgPort.get_size()))
     got = []
 
