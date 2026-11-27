@@ -21,6 +21,10 @@ extract their contents. Furthermore, you can
 * repack existing images
 * work on partitions inside RDISK/RDB hdf images or on real disks
 
+It works on volumes of the Amiga file systems *OFS/FFS* and of the
+*Professional File System 3* (PFS3, as written by pfs3aio). The kind of volume
+is detected when an image is opened. See :ref:`pfs3` for the details.
+
 *****
 Usage
 *****
@@ -277,6 +281,10 @@ The following variant flags are recognized:
 * ``dc`` or ``dircache`` for directory caching
 * ``ln`` or ``longname`` for long file name support
 
+A ``dos_type`` of ``pfs3`` (or ``PFS3``, ``PFS1``, ``PFS2``, or ``PDS3`` of the
+direct SCSI variant) creates a PFS3 volume instead, laid out as the pfs3aio
+formatter does it (see :ref:`pfs3`).
+
 If the disk image file you specify does not exist on disk yet then an implicit
 ``create`` command will be executed first. If the file already exists you must
 use the ``create`` command if you want to create a resized image.
@@ -289,6 +297,8 @@ Example::
   > xdftool empty.hdf format Work size=10M ffs ; create an FFS hdf image
   > xdftool empty.hdf create size=10M + format Work ffs ; same result
   > xdftool empty.hdf format Work size=10M ffs+ln ; create with long name support
+  > xdftool empty.hdf create size=100M + format Work pfs3 ; create a PFS3 hdf image
+  > xdftool disk.rdb open part=1 + format Work pfs3 ; PFS3 on an RDB partition
 
 
 ``boot`` - Alter the boot block
@@ -860,3 +870,52 @@ Example::
   > xdftool test.adf block node c
   > xdftool test.adf block node myfile data
   > xdftool test.adf block dump 880
+
+
+.. _pfs3:
+
+PFS3 Volumes
+============
+
+``xdftool`` reads and writes volumes of the *Professional File System 3* as
+written by pfs3aio, on whole HDF/ADF images and on partitions of RDB images.
+A PFS3 volume is recognized by its boot block when the image is opened, so all
+commands work on it without extra options, whatever DosType its RDB partition
+has (``PFS\3``, or ``PDS\3`` for the direct SCSI variant of the handler).
+``format`` with a ``pfs3`` dos type
+creates one (``PFS\1`` on disk, or ``PFS\2`` if the volume needs larger
+reserved blocks or a logical block size above the sector size).
+
+Every command that changes a PFS3 volume is committed the way the PFS3 handler
+does it: changed metadata is written to free blocks and the volume switches to
+the new state with the final write of its root block. If a write fails, the
+volume keeps its previous state.
+
+PFS3 specifics:
+
+* File names can be longer than 30 characters. Their maximum is set when the
+  volume is formatted. ``pack`` chooses it from the longest name of the
+  directory tree.
+* Hard links to files read as the file they link to: ``read`` and ``unpack``
+  copy their contents. Soft links and hard links to directories are listed
+  but not copied. Deleting a link removes the link. Deleting an object with
+  hard links lets its first link take its place, as the handler does.
+* Rollover files read as their current contents.
+* Deleted files are not moved to the ``.DELDIR``: ``delete`` frees them.
+* ``fsck`` checks a PFS3 volume but does not repair it. ``bitmap`` only
+  supports ``info``. ``boot`` refuses to change PFS3 boot blocks.
+* ``rename`` also moves objects to other directories. Their hard links follow
+  them, as with the handler. A directory can not move into itself.
+* ``makelink`` makes soft links, whose target must be shorter than a block,
+  and hard links to files, rollover files and directories. Unlike OFS/FFS,
+  PFS3 allows hard links to directories: the handler makes them, too. A hard
+  link to a hard link links to its object. Soft links can not be hard linked,
+  as AmigaDOS can not lock them.
+* ``readlink`` prints the target of a soft link, or the name of the object a
+  hard link links to. Paths do not follow soft links.
+* ``chown`` sets the owner of an entry. The root directory has none.
+* ``defrag`` refuses volumes with hard links, soft links or rollover files,
+  since restoring would change them.
+* A volume with an interrupted handler operation pending, or with option
+  flags unknown to amitools, can only be read. Mount it with the PFS3 handler
+  once to complete the operation.

@@ -22,6 +22,15 @@ DOS_FFS_INTL_DIRCACHE = DOS5
 DOS_OFS_INTL_LONGNAME = DOS6
 DOS_FFS_INTL_LONGNAME = DOS7
 
+# Professional File System 3: PFS\1 and PFS\2 are the on-disk types,
+# PFS\3 is the DosType of partitions for pfs3aio and PDS\3 that of
+# partitions for its direct SCSI variant (same on-disk format)
+PFS1 = 0x50465301
+PFS2 = 0x50465302
+PFS3 = 0x50465303
+PDS3 = 0x50445303
+DOS_PFS3 = PFS3
+
 # string names for dos types
 dos_type_names = [
     "DOS0:ofs",
@@ -45,6 +54,14 @@ def parse_dos_type_str(string):
     return None if its invalid or dostype value
     """
     comp = string.split("+")
+    # 'pfs', 'pfs3', 'PFS1', 'pds3' ...: Professional File System 3
+    lo = string.lower()
+    if lo == "pfs":
+        return PFS3
+    if lo == "pds3":
+        return PDS3
+    if len(lo) == 4 and lo[:3] == "pfs" and lo[3] in "123":
+        return PFS1 + int(lo[3]) - 1
     if "ffs" in comp:
         if "dc" in comp or "dircache" in comp:
             return DOS_FFS_INTL_DIRCACHE
@@ -118,12 +135,19 @@ def num_to_tag_str(val):
 
 def get_dos_type_str(dos_type):
     """return description of dos type as a string"""
+    if is_pfs(dos_type):
+        return num_to_tag_str(dos_type) + ":pfs3"
     return dos_type_names[dos_type & 0x7]
 
 
 def is_valid(dos_type):
     """check if its a valid dos type"""
     return (dos_type >= DOS0) and (dos_type <= DOS7)
+
+
+def is_pfs(dos_type):
+    """check if its a Professional File System 3 dostype"""
+    return dos_type in (PFS1, PFS2, PFS3, PDS3)
 
 
 def is_ffs(dos_type):

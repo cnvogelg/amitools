@@ -3,7 +3,7 @@
 import io
 
 from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
-from amitools.fs.ADFSVolume import ADFSVolume
+from amitools.fs.VolumeFactory import open_volume
 
 
 class ADFSScanner:
@@ -25,8 +25,7 @@ class ADFSScanner:
         # create blkdev
         blkdev = self.factory.open(sf.get_local_path(), fobj=sf.get_fobj())
         # create volume
-        volume = ADFSVolume(blkdev)
-        volume.open()
+        volume = open_volume(blkdev)
         # scan volume
         node = volume.get_root_dir()
         ok = self._scan_node(sf, scanner, node)
