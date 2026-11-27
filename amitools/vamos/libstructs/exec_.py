@@ -426,6 +426,24 @@ class MemHeaderStruct(AmigaStruct):
     ]
 
 
+# MemEntry (one chunk of a MemList, see AllocEntry/FreeEntry)
+@AmigaStructDef
+class MemEntryStruct(AmigaStruct):
+    _format = [
+        (ULONG, "me_Un"),  # union: me_Reqs on input, me_Addr on output
+        (ULONG, "me_Length"),
+    ]
+
+
+# MemList
+@AmigaStructDef
+class MemListStruct(AmigaStruct):
+    _format = [
+        (NodeStruct, "ml_Node"),
+        (UWORD, "ml_NumEntries"),
+    ]
+
+
 @BitFieldType
 class ResidentFlags(BitField, UBYTE):
     RTF_AUTOINIT = 1 << 7

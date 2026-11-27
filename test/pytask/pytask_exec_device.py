@@ -117,3 +117,31 @@ def pytask_exec_create_io_request_test(vamos_task):
 
     exit_codes = vamos_task.run([task])
     assert exit_codes == [0]
+
+
+def pytask_exec_add_rem_device_test(vamos_task):
+    from amitools.vamos.libstructs import DeviceStruct
+
+    def task(ctx, task):
+        exec_proxy = ctx.proxies.get_exec_lib_proxy()
+        exec_base = ExecLibraryType(ctx.mem, exec_proxy.base_addr)
+
+        dev_mem = ctx.alloc.alloc_struct(DeviceStruct)
+        dev = DeviceStruct(ctx.mem, dev_mem.addr)
+        name_mem = ctx.alloc.alloc_cstr("my.device", label="devname")
+        dev.dd_Library.lib_Node.ln_Name.aptr = name_mem.addr
+
+        exec_proxy.AddDevice(dev)
+        node = exec_base.device_list.find_name("my.device")
+        assert node is not None
+        assert node.type.val == NodeType.NT_DEVICE
+
+        exec_proxy.RemDevice(dev)
+        assert exec_base.device_list.find_name("my.device") is None
+
+        ctx.alloc.free_cstr(name_mem)
+        ctx.alloc.free_struct(dev_mem)
+        return 0
+
+    exit_codes = vamos_task.run([task])
+    assert exit_codes == [0]

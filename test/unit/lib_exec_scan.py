@@ -1,19 +1,19 @@
-"""exec.library scan guard (EXEC.md step 1n).
+"""exec.library scan guard (EXEC.md step 1n / Stage 2).
 
 Reports the implemented/missing split for ``exec.library`` after the topic
-mixin refactor. It does not fail while public LVOs are still missing (Stage 2
-implements them); it only guards the structural contract: every fd function
-that has a method must match the fd signature, and the Stage 1 set of 82
-functions must not shrink.
+mixin refactor and the Stage 2 implementation. It guards the structural
+contract: every fd function that has a method must match the fd signature, the
+Stage 2 set of implemented functions must not shrink, and the only functions
+left unimplemented are the private ``execPrivate*`` slots.
 """
 
 from amitools.fd import read_lib_fd
 from amitools.vamos.lib.ExecLibrary import ExecLibrary
 from amitools.vamos.libcore.impl import LibImplScanner
 
-# Stage 1 refactor: the 82 functions present in the original monolith.
-# Stage 2 grows this set; it must never shrink.
-STAGE1_VALID = 82
+# Stage 2: every public LVO is implemented (82 Stage 1 + 40 Stage 2).
+# This set must never shrink.
+STAGE2_VALID = 122
 
 
 def _scan():
@@ -35,5 +35,8 @@ def lib_exec_scan_report_test():
     # a method that does not match its fd entry is a real bug
     assert scan.get_num_invalid_funcs() == 0
     assert scan.get_num_error_funcs() == 0
-    # the refactored set must not shrink
-    assert scan.get_num_valid_funcs() >= STAGE1_VALID
+    # the implemented set must not shrink
+    assert scan.get_num_valid_funcs() >= STAGE2_VALID
+    # the private execPrivate* slots stay stubs; nothing public is missing
+    missing = scan.get_missing_func_names()
+    assert all(name.startswith("execPrivate") for name in missing)

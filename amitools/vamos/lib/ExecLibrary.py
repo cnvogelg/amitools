@@ -64,6 +64,8 @@ class ExecLibrary(
         ctx.exec_lib = self
         self._pools = {}
         self._poolid = 0x1000
+        # tasks added via AddTask(): keep the mapped task alive
+        self._added_tasks = []
         self.exec_lib = ExecLibraryType(ctx.mem, base_addr)
         # init all exec lists
         self.exec_lib.mem_list.new(NodeType.NT_MEMORY)

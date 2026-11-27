@@ -6,6 +6,15 @@ from amitools.vamos.machine.regs import REG_A0, REG_A1, REG_A2, REG_D0, REG_D1
 class ModuleMixin:
     """exec.library module-creation LVOs (fd banner: module creation)."""
 
+    def InitCode(self, ctx, startClass, version):
+        # ROM module initialisation: no ROM modules in vamos
+        log_exec.info(
+            "InitCode(startClass=%d, version=%d) -> 0: no ROM modules",
+            startClass,
+            version,
+        )
+        return 0
+
     def MakeFunctions(self, ctx):
         target = ctx.cpu.r_reg(REG_A0)
         func_array = ctx.cpu.r_reg(REG_A1)

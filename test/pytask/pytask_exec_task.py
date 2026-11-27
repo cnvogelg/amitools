@@ -117,6 +117,35 @@ def pytask_exec_task_set_task_pri_test(vamos_task):
     assert exit_codes == [0]
 
 
+def pytask_exec_task_set_except_trap_test(vamos_task):
+    def task(ctx, task):
+        ami_task = task.map_task.get_ami_task()
+        exec_lib = ctx.proxies.get_exec_lib_proxy()
+
+        # SetExcept returns the old mask and updates the affected bits
+        ami_task.sig_except.val = 0x0F
+        old = exec_lib.SetExcept(0x30, 0x3C)
+        assert old == 0x0F
+        assert ami_task.sig_except.val == 0x33
+
+        # traps are bits in tc_TrapAlloc
+        assert ami_task.trap_alloc.val == 0
+        assert exec_lib.AllocTrap(4) == 4
+        assert ami_task.trap_alloc.val == 1 << 4
+        # a specific trap already in use fails (-1 -> 0xFFFFFFFF in D0)
+        assert exec_lib.AllocTrap(4) == 0xFFFFFFFF
+        # -1 picks the first free trap
+        assert exec_lib.AllocTrap(-1) == 0
+        assert ami_task.trap_alloc.val == (1 << 4) | 1
+        exec_lib.FreeTrap(4)
+        assert ami_task.trap_alloc.val == 1
+
+        return 0
+
+    exit_codes = vamos_task.run([task])
+    assert exit_codes == [0]
+
+
 def pytask_exec_task_find_task_test(vamos_task):
     def task(ctx, task):
         ami_task = task.map_task.get_ami_task()

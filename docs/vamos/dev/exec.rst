@@ -105,6 +105,8 @@ Shared state
 - ``soft_int`` -- the ``SoftIntFunc`` used by ``Cause`` and ``PA_SOFTINT``
   message ports.
 - ``_pools`` / ``_poolid`` -- the V39 ``Pool`` registry.
+- ``_added_tasks`` -- keeps the ``MappedTask`` objects created by ``AddTask``
+  alive while their scheduler task runs.
 - ``_io_*`` / ``_msg_port_*`` -- the ``IORequest``/``MsgPort`` field offsets
   cached once for the device LVOs.
 
@@ -117,17 +119,37 @@ mixins or by the rest of vamos: ``PortManager``, ``SemaphoreManager``,
 Function coverage
 -----------------
 
-vamos currently implements 82 of the fd functions. The remaining slots are the
-``execPrivate1..33`` diagnostics (kept as the standard missing-func stubs) and
-about 40 public LVOs still to be implemented (interrupt vectors, ``AddTask`` /
-``RemTask``, the memory-handler and kickmem calls, the task-tree and child
-calls, the quick vector, ``Cache*`` and the missing semaphore helpers).
+vamos implements every public ``exec.library`` LVO. The only functions left as
+the standard missing-func stubs are the private ``execPrivate1..33`` diagnostic
+slots, which are not part of the public API.
+
+The last batch (Stage 2) added the interrupt vectors and servers
+(``SetSR`` / ``SuperState`` / ``UserState`` / ``SetIntVector`` /
+``AddIntServer`` / ``RemIntServer``), ``AddTask`` / ``RemTask`` and the trap
+allocator (``SetExcept`` / ``AllocTrap`` / ``FreeTrap``), the entry/fixed
+allocator (``AllocAbs`` / ``AllocEntry`` / ``FreeEntry``) and the memory lists
+and handlers (``AddMemList`` / ``AddMemHandler`` / ``RemMemHandler``) plus the
+``Cache*`` calls, the semaphore-list and legacy ``Procure`` / ``Vacate``
+helpers, ``AddDevice`` / ``RemDevice``, ``AddResource`` / ``RemResource``,
+``InitCode`` and the misc/diagnostic calls (``Debug`` / ``GetCC`` /
+``ObtainQuickVector`` / ``SumKickData`` / ``ColdReboot`` and ``Child*``).
+
+Fidelity follows a simple rule: real bookkeeping where the guest can see the
+state, and an honest, documented stub where the host has no equivalent. In
+particular ``AllocAbs`` returns ``NULL`` (the host allocator cannot place a
+block at a fixed address), ``AddMemList`` only records the header,
+``ObtainQuickVector`` returns ``0`` like AROS (vamos has no quick vectors) so
+the caller falls back to a normal interrupt server, ``ColdReboot`` /
+``SumKickData`` are no-ops, and the ``Child*`` calls report "no child
+registry". ``AddTask`` / ``RemTask`` integrate with the scheduler for the
+simple case of an externally built ``Task`` that owns a native m68k stack; the
+limits of that mapping are documented in the mixin.
 
 The split is reported by ``test/unit/lib_exec_scan.py``, which scans
-``ExecLibrary`` against ``exec_lib.fd``. The test only fails on an
+``ExecLibrary`` against ``exec_lib.fd``. The test fails on an
 *invalid*/*error* function (a method whose signature no longer matches its fd
-entry) and on the Stage 1 set shrinking; it deliberately does not fail while
-public LVOs are still missing.
+entry) or if the implemented set shrinks, and it asserts that the only missing
+functions are the private ``execPrivate*`` slots.
 
 
 Adding an LVO

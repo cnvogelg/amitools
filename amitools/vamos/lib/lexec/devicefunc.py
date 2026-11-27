@@ -1,7 +1,7 @@
 from amitools.vamos.astructs import CSTR
 from amitools.vamos.error import VamosInternalError
-from amitools.vamos.libstructs import IORequestStruct, NodeType
-from amitools.vamos.libtypes import MsgPort
+from amitools.vamos.libstructs import DeviceStruct, IORequestStruct, NodeType
+from amitools.vamos.libtypes import MsgPort, Node
 from amitools.vamos.log import log_exec
 
 from .funcbase import FuncBaseMixin
@@ -9,6 +9,18 @@ from .funcbase import FuncBaseMixin
 
 class DeviceMixin(FuncBaseMixin):
     """exec.library device/IO LVOs (fd banner: devices)."""
+
+    def AddDevice(self, ctx, device: DeviceStruct):
+        """add a device to the public device list (bookkeeping only)."""
+        node = Node(ctx.mem, device.addr)
+        node.type.val = NodeType.NT_DEVICE
+        self.exec_lib.device_list.enqueue(node)
+        log_exec.info("AddDevice(%s)", node)
+
+    def RemDevice(self, ctx, device: DeviceStruct):
+        node = Node(ctx.mem, device.addr)
+        log_exec.info("RemDevice(%s)", node)
+        node.remove()
 
     def CreateIORequest(self, ctx, port: MsgPort, size):
         # label alloc
