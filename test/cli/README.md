@@ -172,7 +172,7 @@ in the [vamos issue tracker](https://github.com/cnvogelg/amitools/issues).
 | `MakeLink` | **xfail** — cannot create a link |
 | `Status` | **xfail** — no CLI process table to list |
 | `Group`, `Owner` | **xfail** — hostfs returns `ERROR_NOT_IMPLEMENTED` |
-| `LoadResource` | **xfail** — the task never terminates |
+| `LoadResource` | **xfail** — the helper process gets `NP_SegList=0` (vamos has no `cli_Module`) and the command waits forever |
 | `Mount` | **xfail** — needs `DEVS:MountList` |
 
 ## Not covered
